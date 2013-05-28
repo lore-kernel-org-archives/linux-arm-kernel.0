@@ -1,57 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 28 May 2013 16:43:54 +0200
-Subject: [PATCH] ARM: nomadik: update defconfig base
-Message-ID: <1369752234-27653-1-git-send-email-linus.walleij@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 28 May 2013 16:47:48 +0200
+Subject: [PATCH v6 00/10] ASoC: fsl-ssi: ac97-slave support
+Message-ID: <1369752478-30260-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the Nomadik defconfig enabling:
-- GPIO keyboard input
-- Regulators
-- LED class driver
-- LED heartbeat trigger
+Hi,
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/configs/nhk8815_defconfig | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+This series adds DT support for phycore-ac97. Beside ac97 support, the series
+adds imx-pcm-fiq and generic DMA bindings to fsl-ssi.
 
-diff --git a/arch/arm/configs/nhk8815_defconfig b/arch/arm/configs/nhk8815_defconfig
-index 606a080..e4cb5a4 100644
---- a/arch/arm/configs/nhk8815_defconfig
-+++ b/arch/arm/configs/nhk8815_defconfig
-@@ -48,7 +48,6 @@ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
- CONFIG_MTD=y
- CONFIG_MTD_TESTS=m
- CONFIG_MTD_CMDLINE_PARTS=y
--CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
- CONFIG_MTD_NAND_ECC_SMC=y
- CONFIG_MTD_NAND=y
-@@ -81,6 +80,7 @@ CONFIG_PPP_SYNC_TTY=m
- # CONFIG_INPUT_MOUSEDEV is not set
- CONFIG_INPUT_EVDEV=y
- # CONFIG_KEYBOARD_ATKBD is not set
-+CONFIG_KEYBOARD_GPIO=y
- # CONFIG_MOUSE_PS2 is not set
- # CONFIG_SERIO is not set
- # CONFIG_LEGACY_PTYS is not set
-@@ -93,10 +93,16 @@ CONFIG_I2C_GPIO=y
- CONFIG_I2C_NOMADIK=y
- CONFIG_DEBUG_GPIO=y
- # CONFIG_HWMON is not set
-+CONFIG_REGULATOR=y
- CONFIG_MMC=y
- CONFIG_MMC_UNSAFE_RESUME=y
- # CONFIG_MMC_BLOCK_BOUNCE is not set
- CONFIG_MMC_ARMMMCI=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
-+CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
-+CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_DRV_PL031=y
- CONFIG_DMADEVICES=y
--- 
-1.8.1.4
+Regards,
+
+Markus
+
+Changes in v6:
+ - Rebased onto 3.10-rc3 with Shawn's pcm cleanup patches
+ - Setup of reset functions moved to phycore-ac97.c
+
+Changes in v5:
+ - Pass of_node via parent device to imx-pcm-dma.
+
+Changes in v4:
+ - phycore-ac97 uses the iomux functions based on audmux phandle now.
+ - fsl-ssi imx-pcm-fiq got some new comments about problems with imx-ssi and
+   incompatible codecs
+
+Changes in v3:
+ - Rebased onto pcm dma cleanup patches
+ - A lot of cleanups for the fsl-ssi ac97 integration
+ - Some small changes which are listed in the notes of the patches.
+
+Markus Pargmann (10):
+      ASoC: phycore-ac97: Add DT support
+      ASoC: imx-pcm-dma: DT support
+      ASoC: imx-pcm-fiq: Introduce pcm-fiq-params
+      ASoC: fsl-ssi: Add support for imx-pcm-fiq
+      ASoC: fsl-ssi: Use generic DMA bindings if possible
+      ARM: imx: Export ac97 reset functions
+      ASoC: fsl-ssi: imx ac97 support
+      ASoC: fsl: Kconfig: Use fsl-ssi for phycore-ac97
+      ASoC: fsl: Move fsl-ssi binding doc to sound/
+      ASoC: fsl: Update fsl-ssi binding doc
+
+ .../{powerpc/fsl/ssi.txt => sound/fsl,ssi.txt}     |  10 +
+ .../bindings/sound/phytec,phycore-ac97.txt         |  14 +
+ arch/arm/mach-imx/mach-pca100.c                    |   7 +-
+ arch/arm/mach-imx/mach-pcm043.c                    |   7 +-
+ sound/soc/fsl/Kconfig                              |   2 +-
+ sound/soc/fsl/fsl_ssi.c                            | 441 +++++++++++++++++----
+ sound/soc/fsl/fsl_ssi.h                            |   7 +
+ sound/soc/fsl/imx-pcm-dma.c                        |   1 -
+ sound/soc/fsl/imx-pcm-fiq.c                        |  18 +-
+ sound/soc/fsl/imx-pcm.h                            |  12 +-
+ sound/soc/fsl/imx-ssi.c                            |   7 +-
+ sound/soc/fsl/imx-ssi.h                            |   1 +
+ sound/soc/fsl/phycore-ac97.c                       | 241 +++++++++--
+ 13 files changed, 643 insertions(+), 125 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc/fsl/ssi.txt => sound/fsl,ssi.txt} (88%)
+ create mode 100644 Documentation/devicetree/bindings/sound/phytec,phycore-ac97.txt
