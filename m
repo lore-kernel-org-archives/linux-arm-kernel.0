@@ -1,82 +1,49 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Tue, 28 May 2013 19:21:01 +0800
-Subject: [PATCH v2] arch: arm64: kernel: sprintf(), 'str' needs additional
- 1 byte for failure processing
-In-Reply-To: <20130528104250.GE10474@mudshark.cambridge.arm.com>
-References: <51A1E3B3.4060901@asianux.com> <51A2BE2C.2000004@asianux.com>
- <20130528104250.GE10474@mudshark.cambridge.arm.com>
-Message-ID: <51A4931D.9090209@asianux.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 28 May 2013 13:43:20 +0200
+Subject: [PATCHv2 0/3] net: phy: prevent linking breakage
+Message-ID: <1369741403-25315-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2013 06:42 PM, Will Deacon wrote:
-> Hello,
-> 
-> On Mon, May 27, 2013 at 03:00:12AM +0100, Chen Gang wrote:
->> > 
->> > When failure occurs at the last looping cycle (when 'i == 0'), it will
->> > print "bad PC value" instead of "(%08x) ", which needs additional 1
->> > byte.
->> > 
->> > If not add 1 byte, the 'str' may be memory overflow.
->> > 
->> > 
->> > Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> > ---
->> >  arch/arm64/kernel/traps.c |    2 +-
->> >  1 files changed, 1 insertions(+), 1 deletions(-)
->> > 
->> > diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
->> > index 61d7dd2..c2f68d2 100644
->> > --- a/arch/arm64/kernel/traps.c
->> > +++ b/arch/arm64/kernel/traps.c
->> > @@ -100,7 +100,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
->> >  {
->> >  	unsigned long addr = instruction_pointer(regs);
->> >  	mm_segment_t fs;
->> > -	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
->> > +	char str[sizeof("00000000 ") * 5 + 2 + 1 + 1], *p = str;
->> >  	int i;
-> Whilst this code is difficult to follow, I don't think it's incorrect.
-> The size of the str array is:
-> 
-> 	sizeof("00000000 ") = 8 ('0's) + 1 (space) + 1 (NUL) = 10 bytes
+There is a linking issue when using phy_register_fixup{,_for_uid,_for_id} and
+CONFIG_PHYLIB is not a builtin:
 
-Oh, it is my fault, I miss the "1 (NUL)".
+arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
+:(.text+0x1174): undefined reference to `mdiobus_write'
+:(.text+0x1188): undefined reference to `mdiobus_write'
+:(.text+0x119c): undefined reference to `mdiobus_write'
+:(.text+0x11b0): undefined reference to `mdiobus_write'
+arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
+:(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
 
-> 	*5 = 50 bytes
-> 	+2 (for the two brackets when i == 0) = 52 bytes
-> 	+1 (this is for the "bad PC value") = 53 bytes
-> 
-> In the worst case (when the PC is bad) we print:
-> 
-> 	"%08x " x4 = (8 + 1 + 1) *4 = 40 bytes
+This has been solved for arch/arm/mach-mxs/ and arch/arm/mach-imx/ by testing
+IS_BUILTIN(CONFIG_PHYLIB) before calling the functions.
 
-Actually, it is 36 bytes, for sprintf() return the length excluding NUL.
+The first patch is an attempt at solving that issue globally.
 
-  (although, we still need notice the last NUL)
+The following patches remove the unnecessary IS_BUILTIN(CONFIG_PHYLIB) checks.
 
+Quickly greping into the code shows that the issue may arise in:
 
-> 	"bad PC value" = 12 + 1 = 13 bytes
-> 
-> so again, 53 bytes.
->
+arch/powerpc/platforms/85xx/mpc85xx_mds.c
+arch/arm/mach-davinci/board-dm644x-evm.c
+arch/arm/mach-orion5x/dns323-setup.c
+arch/arm/mach-at91/board-dt-sama5.c
 
-So again, 49 bytes. ;-)
+Changes in v2:
+ - indentation fixes
+ - use static inline function instead of defines and return -ENOTSUPP
 
+Alexandre Belloni (3):
+  net: phy: prevent linking breakage
+  arm: mxs: don't check for CONFIG_PHYLIB as builtin
+  arm: imx: don't check for CONFIG_PHYLIB as builtin
 
-> .. or have I missed a character somewhere?
-> 
+ arch/arm/mach-imx/mach-imx6q.c | 23 ++++++++++-------------
+ arch/arm/mach-mxs/mach-mxs.c   |  5 ++---
+ drivers/net/phy/phy_device.c   |  6 ++++++
+ include/linux/phy.h            | 26 ++++++++++++++++++++++++++
+ 4 files changed, 44 insertions(+), 16 deletions(-)
 
-NO, I missed characters, but you 'find' more characters. :-)
-
-
-All together, this patch is incorrect, original implementation will not
-cause issue.
-
-
-Thanks
 -- 
-Chen Gang
-
-Asianux Corporation
+1.8.1.2
