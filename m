@@ -1,29 +1,33 @@
-From: aida.mynzhasova@skitlab.ru (Aida Mynzhasova)
-Date: Tue, 28 May 2013 15:46:17 +0400
-Subject: [PATCH] ARM: OMAP: fix IVA2 module base address
-Message-ID: <1369741577-21984-1-git-send-email-aida.mynzhasova@skitlab.ru>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 28 May 2013 07:52:30 -0400
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 3)
+In-Reply-To: <20130528023158.GB13532@quad.lixom.net>
+References: <20130527185436.GN31290@titan.lakedaemon.net>
+ <20130528023158.GB13532@quad.lixom.net>
+Message-ID: <20130528115230.GQ31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects the base address of IVA2 module on omap3430.
+On Mon, May 27, 2013 at 07:31:58PM -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, May 27, 2013 at 02:54:36PM -0400, Jason Cooper wrote:
+> 
+> > Thomas Petazzoni (2):
+> >       arm: mvebu: fix length of SATA registers area in .dtsi
+> >       arm: mvebu: fix length of Ethernet registers area in .dtsi
+> 
+> Is this an actual regression in 3.10?
 
-Signed-off-by: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
----
- arch/arm/mach-omap2/prcm-common.h |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Nope, it's just wrong.  :)
 
-diff --git a/arch/arm/mach-omap2/prcm-common.h b/arch/arm/mach-omap2/prcm-common.h
-index c7d355f..d5ec044 100644
---- a/arch/arm/mach-omap2/prcm-common.h
-+++ b/arch/arm/mach-omap2/prcm-common.h
-@@ -37,7 +37,7 @@
- #define OMAP2430_MDM_MOD				0xc00
- 
- /* IVA2 module is < base on 3430 */
--#define OMAP3430_IVA2_MOD				-0x800
-+#define OMAP3430_IVA2_MOD				0x800
- #define OMAP3430ES2_SGX_MOD				GFX_MOD
- #define OMAP3430_CCR_MOD				PLL_MOD
- #define OMAP3430_DSS_MOD				0x600
--- 
-1.7.10.4
+> I can understand having to fix this before the static mapping is removed,
+> but if it's still there for 3.10, then it makes more sense to queue these
+> fixes for 3.11 (we tend to collect a "fixes-non-critical" that is merged
+> before any other branches in the next merge window).
+
+ok, please drop this PR, I'll rework this and submit fresh ones.
+
+thx,
+
+Jason.
