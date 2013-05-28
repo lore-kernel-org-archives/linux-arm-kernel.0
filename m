@@ -1,47 +1,76 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 28 May 2013 16:05:10 -0600
-Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
-In-Reply-To: <51A520B5.8040803@gmail.com>
-References: <cover.1369658705.git.afzal@ti.com>
- <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
- <51A520B5.8040803@gmail.com>
-Message-ID: <51A52A16.1040204@wwwdotorg.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Wed, 29 May 2013 00:15:09 +0200
+Subject: [PATCH] arm: kirkwood: convert NETGEAR ReadyNAS Duo v2 to use DT for
+ the PCIe interface
+Message-ID: <8738t6ycnm.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2013 03:25 PM, Jon Hunter wrote:
-> 
-> On 27/05/13 15:37, Afzal Mohammed wrote:
->> AM43x timer bindings.
->>
->> Signed-off-by: Afzal Mohammed <afzal@ti.com>
->> ---
->>  Documentation/devicetree/bindings/arm/omap/timer.txt | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
->> index d02e27c..70cb398 100644
->> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
->> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
->> @@ -14,6 +14,8 @@ Required properties:
->>  			ti,omap5430-timer (applicable to OMAP543x devices)
->>  			ti,am335x-timer	(applicable to AM335x devices)
->>  			ti,am335x-timer-1ms (applicable to AM335x devices)
->> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
->> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
->>  
->>  - reg:			Contains timer register address range (base address and
->>  			length).
-> 
-> If you are adding more compatibility strings, then this implies that the
-> AM43x timers are not 100% compatible with any other device listed (such
-> as am335x or any omap device). That's fine but you should state that in
-> the changelog. If the AM43x timer registers are 100% compatible with
-> existing devices you should not add these.
+Hi Jason and Thomas,
 
-I'm not sure that's true; .dts files should always include a compatible
-value that describes the most specific model of the HW, plus any
-baseline compatible value that the HW is compatible with. This allows
-any required quirks/fixes/... to be applied for the specific HW model
-later even if nobody knows right now they'll be needed. Hence, defining
-new compatible values doesn't necessarily mean incompatible HW.
+Thomas, I am following your work on PCIe support for a .dts file I am
+working on for (Armada 370-based) Netgear ReadyNAS 102 and noticed your
+set of patches to convert kirkwood-based boards to use it in order to
+simplify/remove board specific code.
+
+Jason, I gave your associated branch (jcooper/mvebu-next/pcie) a try
+with following patch applied and can confirm USB 3.0 host controller
+(connected to PCIe bus) is usable on Netgear ReadyNAS *Duo v2*
+(88f6282-based brother of the 102).
+
+Note that I had to s/of_pci_range_parser()/of_pci_range_parser_init()/
+in drivers/pci/host/pci-mvebu.c to compile the kernel (this may already
+have been fixed already):
+
+CHK     kernel/config_data.h
+drivers/pci/host/pci-mvebu.c: In function ?mvebu_pcie_probe?:
+drivers/pci/host/pci-mvebu.c:742:2: error: implicit declaration of function ?of_pci_range_parser? [-Werror=implicit-function-declaration]
+cc1: some warnings being treated as errors
+make[3]: *** [drivers/pci/host/pci-mvebu.o] Error 1
+make[2]: *** [drivers/pci/host] Error 2
+make[1]: *** [drivers/pci] Error 2
+make[1]: *** Waiting for unfinished jobs....
+
+Can one of you take the patch below into account? Or 
+
+Cheers,
+
+a+
+
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts |    8 ++++++++
+ arch/arm/mach-kirkwood/board-readynas.c                |    1 -
+ 2 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+index 1ca66ab..f9706da 100644
+--- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
++++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+@@ -111,6 +111,14 @@
+ 			status = "okay";
+ 			nr-ports = <2>;
+ 		};
++
++		pcie-controller {
++			status = "okay";
++
++			pcie at 1,0 {
++				 status = "okay";
++			};
++		};
+ 	};
+ 
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-readynas.c b/arch/arm/mach-kirkwood/board-readynas.c
+index fb42c20..341b82d 100644
+--- a/arch/arm/mach-kirkwood/board-readynas.c
++++ b/arch/arm/mach-kirkwood/board-readynas.c
+@@ -24,5 +24,4 @@ static struct mv643xx_eth_platform_data netgear_readynas_ge00_data = {
+ void __init netgear_readynas_init(void)
+ {
+ 	kirkwood_ge00_init(&netgear_readynas_ge00_data);
+-	kirkwood_pcie_init(KW_PCIE0);
+ }
+-- 
+1.7.10.4
