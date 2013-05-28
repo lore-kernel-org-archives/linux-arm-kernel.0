@@ -1,56 +1,78 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 28 May 2013 16:59:13 -0400 (EDT)
-Subject: [PATCH] ARM: fix kernel decompressor compilation error with
- CONFIG_DEBUG_SEMIHOSTING
-Message-ID: <alpine.LFD.2.03.1305281654120.1918@syhkavp.arg>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Tue, 28 May 2013 23:26:44 +0200
+Subject: [PATCH] cpuidle: improve governor Kconfig options
+In-Reply-To: <51A4AFD9.3020109@linaro.org>
+References: <1369688458-9114-1-git-send-email-daniel.lezcano@linaro.org>
+ <5938372.bcA6BTeOGP@vostro.rjw.lan> <51A4AFD9.3020109@linaro.org>
+Message-ID: <1687661.MEWgzcOBGL@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday, May 28, 2013 03:23:37 PM Daniel Lezcano wrote:
+> On 05/28/2013 02:42 PM, Rafael J. Wysocki wrote:
+> > On Tuesday, May 28, 2013 02:23:00 PM Daniel Lezcano wrote:
+> >> On 05/28/2013 01:46 PM, Rafael J. Wysocki wrote:
+> >>> On Monday, May 27, 2013 11:00:58 PM Daniel Lezcano wrote:
+> >>>> Each governor is suitable for different kernel configurations: the menu
+> >>>> governor suits better for a tickless system, while the ladder governor fits
+> >>>> better for a periodic timer tick system.
+> >>>>
+> >>>> The Kconfig does not allow to [un]select a governor, thus both are compiled in
+> >>>> the kernel but the init order makes the menu governor to be the last one to be
+> >>>> registered, so becoming the default. The only way to switch back to the ladder
+> >>>> governor is to enable the sysfs governor switch in the kernel command line.
+> >>>>
+> >>>> Because it seems nobody complained about this, the menu governor is used by
+> >>>> default most of the time on the system, having both governors is not really
+> >>>> necessary on a tickless system but there isn't a config option to disable one
+> >>>> or another governor.
+> >>>>
+> >>>> Create a submenu for cpuidle and add a label for each governor, so we can see
+> >>>> the option in the menu config and enable/disable it.
+> >>>>
+> >>>> The governors will be enabled depending on the CONFIG_NO_HZ option:
+> >>>>  - If CONFIG_NO_HZ is set, then the menu governor is selected and the ladder
+> >>>>    governor is optional, defaulting to 'no'
+> >>>
+> >>> Why not defaulting to 'yes'?  That'd be backwards compatible, wouldn't it?
+> >>
+> >> Yes, that wouldn't be backward compatible but who wants the ladder
+> >> governor which is less efficient with a tickless system ?
+> > 
+> > I don't know and this isn't the right question to ask I think.
+> > 
+> > You need to ask who uses the ladder governor with CONFIG_NO_HZ and you need to
+> > avoid making changes that aren't backwards compatible if you don't know the
+> > answer (which I'm pretty sure is the case).
+> > 
+> > I'd prefer to default to 'yes' to start with and then to change the
+> > default to 'no' after a couple of cycles, possibly.
+> > 
+> >>>>  - If CONFIG_NO_HZ is not set, then the ladder governor is selected and the
+> >>>>    menu governor is optional, defaulting to 'no'
+> >>>
+> >>> Are you sure this is not going to introduce regressions with CONFIG_NO_HZ
+> >>> unset?
+> >>
+> >> Yes, a system configured with a periodic tick will use the ladder
+> >> instead of the menu governor (which is less efficient on this
+> >> configuration).
+> > 
+> > Well, "less efficient" meaning what exactly?  Less power-efficient or less
+> > efficient performance-wise?
+> 
+> less power efficient.
 
-... and add semihosting output support to the decompressor while at it.
+I thought so, but that's really important, because some people *do* care about
+performance.  In the context of changes like this one we always need to talk
+about both power and performance.  For example, when you're saying that
+changing something may lead to better energy saving behavior, you should also
+say what the impact of that change on performance is going to be.
 
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
+Thanks,
+Rafael
 
-diff --git a/arch/arm/boot/compressed/debug.S b/arch/arm/boot/compressed/debug.S
-index 6e8382d5b7..5392ee6333 100644
---- a/arch/arm/boot/compressed/debug.S
-+++ b/arch/arm/boot/compressed/debug.S
-@@ -1,6 +1,8 @@
- #include <linux/linkage.h>
- #include <asm/assembler.h>
- 
-+#ifndef CONFIG_DEBUG_SEMIHOSTING
-+
- #include CONFIG_DEBUG_LL_INCLUDE
- 
- ENTRY(putc)
-@@ -10,3 +12,29 @@ ENTRY(putc)
- 	busyuart r3, r1
- 	mov	 pc, lr
- ENDPROC(putc)
-+
-+#else
-+
-+ENTRY(putc)
-+	adr	r1, 1f
-+	ldmia	r1, {r2, r3}
-+	add	r2, r2, r1
-+	ldr	r1, [r2, r3]
-+	strb	r0, [r1]
-+	mov	r0, #0x03		@ SYS_WRITEC
-+   ARM(	svc	#0x123456	)
-+ THUMB(	svc	#0xab		)
-+	mov	pc, lr
-+	.align	2
-+1:	.word	_GLOBAL_OFFSET_TABLE_ - .
-+	.word	semi_writec_buf(GOT)
-+ENDPROC(putc)
-+
-+	.bss
-+	.global	semi_writec_buf
-+	.type   semi_writec_buf, %object
-+semi_writec_buf:
-+	.space	4
-+	.size	semi_writec_buf, 4
-+
-+#endif
+
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
