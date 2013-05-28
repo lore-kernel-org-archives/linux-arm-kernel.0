@@ -1,47 +1,56 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 28 May 2013 13:19:23 +0200
-Subject: [PATCHv2 0/3] Add G762/G763 PWM fan controller
-In-Reply-To: <87li6z2yxj.fsf@natisbad.org>
-References: <cover.1369687670.git.arno@natisbad.org>
- <152190814.eApXVbVBPA@wuerfel> <87li6z2yxj.fsf@natisbad.org>
-Message-ID: <20130528111921.GD11547@mithrandir>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 28 May 2013 12:08:59 +0100
+Subject: [GIT PULL for 3.11] arm: introduce psci_smp_ops
+In-Reply-To: <alpine.DEB.2.02.1305281205500.4799@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1305211522120.4799@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1305281205500.4799@kaball.uk.xensource.com>
+Message-ID: <alpine.DEB.2.02.1305281208010.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 12:15:04PM +0200, Arnaud Ebalard wrote:
-> Hi Arnd,
-> 
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > On Tuesday 28 May 2013 00:02:29 Arnaud Ebalard wrote:
-> >> 
-> >> This series adds support for GMT G762/G763. This work is based on a
-> >> basic version for 2.6.31 kernel developed Olivier Mouchet for LaCie
-> >> NAS. Updates have been performed to run on recent kernels. Support has
-> >> been completed and additional features added: ability to configure
-> >> various characteristics from .dts file, better initialization, alarms
-> >> and error reporting support, gear mode, polarity, fan pulse per
-> >> revolution, fan startup voltage control.
-> >
-> > I wonder if this could be split into two separate drivers, one for
-> > the pwm subsystem, and one for a hardware-independent fan controller
-> > based on the pwm interfaces.
-> 
-> To be honest, I wouldn't even know how to start in order to do that.
-> Additionally, it would be worth the effort if other drivers could be
-> easily refactored using this idea. I'll let hwmon people provide some
-> feedback and try and comply with their directions (based on the cpu
-> cycle I can spend on this).
+Sorry for the noise, I have seen now that you pulled
+3.10-rc2-psci-ops-11-tag into "devel-stable".
 
-What Arnd proposes doesn't sounds like a very good idea. PWM-controlled
-fans should be able to work just fine using a generic driver that uses
-the PWM framework, similar to the PWM backlight and LED drivers.
+Thanks,
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130528/31dfe5a9/attachment-0001.sig>
+Stefano
+
+
+On Tue, 28 May 2013, Stefano Stabellini wrote:
+> ping?
+> 
+> 
+> On Tue, 21 May 2013, Stefano Stabellini wrote:
+> > Russell,
+> > please pull (based on v3.10-rc2):
+> > 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git 3.10-rc2-psci-ops-11-tag
+> > 
+> > 
+> > It contains the generic PSCI patch and the smp_init patch that we
+> > discussed so much about.
+> > I think it would be helpful for other people if you could create a
+> > stable branch with these patches so that SoC devs can base their work on
+> > it.
+> > 
+> > 
+> > Jon Medhurst (1):
+> >       ARM: Enable selection of SMP operations at boot time
+> > 
+> > Stefano Stabellini (1):
+> >       arm: introduce psci_smp_ops
+> > 
+> >  arch/arm/include/asm/mach/arch.h |    5 ++
+> >  arch/arm/include/asm/psci.h      |    9 ++++
+> >  arch/arm/kernel/Makefile         |    5 ++-
+> >  arch/arm/kernel/psci.c           |    7 +--
+> >  arch/arm/kernel/psci_smp.c       |   84 ++++++++++++++++++++++++++++++++++++++
+> >  arch/arm/kernel/setup.c          |    9 ++++-
+> >  arch/arm/mach-virt/Makefile      |    1 -
+> >  arch/arm/mach-virt/platsmp.c     |   50 ----------------------
+> >  arch/arm/mach-virt/virt.c        |    3 -
+> >  9 files changed, 113 insertions(+), 60 deletions(-)
+> >  create mode 100644 arch/arm/kernel/psci_smp.c
+> >  delete mode 100644 arch/arm/mach-virt/platsmp.c
+> > 
+> 
