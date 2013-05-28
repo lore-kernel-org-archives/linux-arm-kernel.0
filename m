@@ -1,53 +1,57 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 28 May 2013 12:05:45 +0530
-Subject: [PATCH v6 0/9] Generic PHY Framework
-In-Reply-To: <519AFF95.9060002@ti.com>
-References: <1367229812-30574-1-git-send-email-kishon@ti.com>
- <519AFF95.9060002@ti.com>
-Message-ID: <51A45041.2030105@ti.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 28 May 2013 14:20:06 +0800
+Subject: [PATCH v4 0/6] ARM: imx6q{dl}: add the WEIM driver
+Message-ID: <1369722012-6915-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch set adds a new driver for WEIM in the imx6q{dl}-sabreauto boards.
 
-On Tuesday 21 May 2013 10:31 AM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Monday 29 April 2013 03:33 PM, Kishon Vijay Abraham I wrote:
->> Added a generic PHY framework that provides a set of APIs for the PHY
->> drivers
->> to create/destroy a PHY and APIs for the PHY users to obtain a
->> reference to
->> the PHY with or without using phandle.
->>
->> This framework will be of use only to devices that uses external PHY (PHY
->> functionality is not embedded within the controller).
->>
->> The intention of creating this framework is to bring the phy drivers
->> spread
->> all over the Linux kernel to drivers/phy to increase code re-use and to
->> increase code maintainability.
->>
->> Comments to make PHY as bus wasn't done because PHY devices can be
->> part of
->> other bus and making a same device attached to multiple bus leads to bad
->> design.
->>
->> If the PHY driver has to send notification on connect/disconnect, the PHY
->> driver should make use of the extcon framework. Using this susbsystem
->> to use extcon framwork will have to be analysed.
->>
->> Making omap-usb2 and twl4030 to use this framework is provided as a
->> sample.
->>
->> This patch series is developed on linux-next tree.
->
-> Any comments on this patch series?
+The WEIM(Wireless External Interface Module) works like a bus.
+You can attach many different devices on it, such as NOR, onenand.
 
-Ping..
+In the case of i.MX6q-sabreauto, only the NOR is connected to WEIM.
 
-This series is needed for usb3 phy/sata phy and can also be used by 
-certain video phys. I think it's important to get this in.
+v3 --> v4:
+	[0] use a more proper pad value for the data pins.
+	[1] remove the weim_remove() hook.
+	[2] remove the blank line.
+	[3] use the lower case for the hex value.
+	[4] add returne value for weim_parse_dt().
+	[5] rename the pinctrls.
 
-Thanks
-Kishon
+v2 --> v3:
+	[0] split the NOR pinctrl.
+	[1] make the driver unloaded. change to bool type in Kconfig.
+	[2] use the of_platform_populate().
+	[3] remove the unused "interrupt" property from the Doc.
+v1 --> v2:
+	[0] remove used PADs.
+	[1] fix the wrong pad values, (thanks Alison Chaiken)
+	[2] remove the weim-cs-index.
+	[3] add "fsl" for the weim-cs-timing.
+	[4] remove the partitions info in the document.
+	[5] rewrite the drivers(follow Sascha and Shawn's comments)
+
+
+Huang Shijie (6):
+  drivers: bus: add a new driver for WEIM
+  ARM: dts: imx6q{dl}: fix the pin conflict between SPI and WEIM
+  ARM: dts: imx6qdl: add more information for WEIM
+  ARM: dts: imx6q: add pinctrls for WEIM NOR
+  ARM: dts: imx6dl: add pinctrls for WEIM NOR
+  ARM: dts: imx6qdl-sabreauto: enable the WEIM NOR
+
+ Documentation/devicetree/bindings/bus/imx-weim.txt |   49 +++++++
+ arch/arm/boot/dts/imx6dl-sabreauto.dts             |    9 +-
+ arch/arm/boot/dts/imx6dl.dtsi                      |   58 ++++++++
+ arch/arm/boot/dts/imx6q-sabreauto.dts              |    9 +-
+ arch/arm/boot/dts/imx6q.dtsi                       |   59 +++++++++
+ arch/arm/boot/dts/imx6qdl-sabreauto.dtsi           |   21 +++-
+ arch/arm/boot/dts/imx6qdl.dtsi                     |    4 +-
+ drivers/bus/Kconfig                                |    9 ++
+ drivers/bus/Makefile                               |    1 +
+ drivers/bus/imx-weim.c                             |  138 ++++++++++++++++++++
+ 10 files changed, 353 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
+ create mode 100644 drivers/bus/imx-weim.c
