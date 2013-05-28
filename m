@@ -1,27 +1,26 @@
-From: marex@denx.de (Marek Vasut)
-Date: Tue, 28 May 2013 20:29:55 +0200
-Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
-In-Reply-To: <20130528062711.GB19608@S2101-09.ap.freescale.net>
-References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
- <201305280656.27472.marex@denx.de>
- <20130528062711.GB19608@S2101-09.ap.freescale.net>
-Message-ID: <201305282029.55905.marex@denx.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 28 May 2013 22:01:19 +0200
+Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
+In-Reply-To: <20130528165401.GX31290@titan.lakedaemon.net>
+References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130528154047.GT31290@titan.lakedaemon.net> <20130528175343.77c6353d@skate>
+ <20130528165401.GX31290@titan.lakedaemon.net>
+Message-ID: <51A50D0F.5010909@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Shawn Guo,
+On 05/28/2013 06:54 PM, Jason Cooper wrote:
+>> On Tue, 28 May 2013 11:40:47 -0400, Jason Cooper wrote:
+>>> I'm posting the revised version as replies to patches 1, 5 and 6. Please
+>>> let me know if I messed it up.  I'd like to send the PR for these
+>>> shortly.
+>
+> $ git checkout v3.10-rc3
+> $ git merge mvebu/of_pci
+> $ git merge mvebu/pcie
+> $ git merge mvebu/seb_clk
 
-> On Tue, May 28, 2013 at 06:56:27AM +0200, Marek Vasut wrote:
-> > What is the problem you observe?
-> 
-> The audio playback gives silent output.
+After manually resolving a merge conflict in arch/arm/mach-mvebu/Kconfig
+I can see no obvious regression on neither Dove nor Kirkwood.
 
-You mean like nothing? Zilch? Not even a loud pop on the start/stop of playback?
-
-I have no issues with audio + touchscreen on m28evk since like 3.7 or so (even 
-before I pushed the driver mainline), so this is weird. Do you have your 
-speakers connected to LineOut or Speaker output from the SGTL5000 ? In case of 
-LineOut, is your on-board amplifier on ?
-
-Best regards,
-Marek Vasut
+Sebastian
