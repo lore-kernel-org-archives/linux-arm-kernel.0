@@ -1,49 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 20:13:20 -0700
-Subject: [GIT PULL] ux500 DMA40 device tree migration base
-In-Reply-To: <CACRpkdZjr=48_GJxsoYgK7DFUqLs10x4o9yky3MzNR7vh24ogA@mail.gmail.com>
-References: <CACRpkdZjr=48_GJxsoYgK7DFUqLs10x4o9yky3MzNR7vh24ogA@mail.gmail.com>
-Message-ID: <20130528031320.GD13532@quad.lixom.net>
+Date: Mon, 27 May 2013 20:18:26 -0700
+Subject: [GIT PULL] Renesas ARM based emev2 SoC updates for v3.11
+In-Reply-To: <1369573523-10980-1-git-send-email-horms+renesas@verge.net.au>
+References: <1369573523-10980-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130528031826.GE13532@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 09:34:22PM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
+On Sun, May 26, 2013 at 10:05:22PM +0900, Simon Horman wrote:
+> Hi Arnd, Hi Olof,
 > 
-> here is a patch set that Lee has been chiseling out recently. I've
-> accumulated it in my ux500 tree and piled ACKs on the first 36
-> patches of the patch set. Basically that includes ACKs from
-> subsystem maintainers Vinod Koul and Herbert Xu for affected
-> parts.
+> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 > 
-> We need to get this into Linux-next to proceed with further
-> migration on top of it. All have been circulated on the lists for
-> a while.
-> 
-> Please pull this into an apropriate ARM SoC branch for v3.11!
-> 
-> If we can get ACKs for the rest of the patches in Lee's set these
-> will arrive on top of this base as soon as they are ready.
-> 
-> Yours,
-> Linus Walleij
-> 
-> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-> 
->   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-dma40-for-arm-soc
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-emev2-for-v3.11
+> 
+> for you to fetch changes up to 94a6af856df56ed39bb59ebe17bfa2d10fb333f2:
+> 
+>   ARM: shmobile: emev2: Remove init_irq declaration in machine description (2013-05-22 21:42:03 +0900)
 
-Thanks, pulled into next/drivers.
+Hi,
 
-I see the conversions have been made the brute-force way instead of keeping
-backwards compatibility and cleaning up drivers before removing no longer
-needed board code. That should be fine, as long as you don't introduce too
-crazy dependencies (and conflicts) in the code you're talking about adding on
-top. 
+You could have grouped all of the SoC updates into one branch instead of
+sending them up SoC by SoC to us. Either way works, just letting you know
+there's no need to keep them separate if that's easier.
 
+Also, the changes from Maxime could all have gone into one cleanup branch
+together instead of with the SoC code.
+
+Anyway, no harm done, I've pulled this branch (and will pull the others as
+well) into our next/soc branch.
+
+
+Thanks,
 
 -Olof
