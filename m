@@ -1,13 +1,46 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 28 May 2013 09:16:58 -0600
-Subject: [PATCH v2] clk: tegra: Use common of_clk_init function
-In-Reply-To: <1369640409-1981-1-git-send-email-pgaikwad@nvidia.com>
-References: <1369640409-1981-1-git-send-email-pgaikwad@nvidia.com>
-Message-ID: <51A4CA6A.8090103@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 28 May 2013 17:17:45 +0200
+Subject: [PATCH] arm: omap2: fix AM33xx hwmod infos for UART2
+Message-ID: <1369754265-27712-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2013 01:40 AM, Prashant Gaikwad wrote:
-> Use common of_clk_init() function for clocks initialization.
+The UART2 hwmod structure is pointing to the EDMA channels of UART1,
+which doesn't look right. This patch fixes this by making the UART2
+hwmod structure to a new structure that lists the EDMA channels to be
+used by the UART2.
 
-Acked-by: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+index 01d8f32..9113251 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+@@ -2006,6 +2006,13 @@ static struct omap_hwmod am33xx_uart1_hwmod = {
+ 	},
+ };
+ 
++/* uart2 */
++static struct omap_hwmod_dma_info uart2_edma_reqs[] = {
++	{ .name = "tx",	.dma_req = 28, },
++	{ .name = "rx",	.dma_req = 29, },
++	{ .dma_req = -1 }
++};
++
+ static struct omap_hwmod_irq_info am33xx_uart2_irqs[] = {
+ 	{ .irq = 73 + OMAP_INTC_START, },
+ 	{ .irq = -1 },
+@@ -2016,7 +2023,7 @@ static struct omap_hwmod am33xx_uart2_hwmod = {
+ 	.class		= &uart_class,
+ 	.clkdm_name	= "l4ls_clkdm",
+ 	.mpu_irqs	= am33xx_uart2_irqs,
+-	.sdma_reqs	= uart1_edma_reqs,
++	.sdma_reqs	= uart2_edma_reqs,
+ 	.main_clk	= "dpll_per_m2_div4_ck",
+ 	.prcm		= {
+ 		.omap4	= {
+-- 
+1.7.9.5
