@@ -1,38 +1,47 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 20:18:26 -0700
-Subject: [GIT PULL] Renesas ARM based emev2 SoC updates for v3.11
-In-Reply-To: <1369573523-10980-1-git-send-email-horms+renesas@verge.net.au>
-References: <1369573523-10980-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130528031826.GE13532@quad.lixom.net>
+Date: Mon, 27 May 2013 20:29:48 -0700
+Subject: [PATCH 04/12] ARM: shmobile: r8a7740: Add DT name to clock list
+ for CMT10
+In-Reply-To: <1369645193-3595-5-git-send-email-horms+renesas@verge.net.au>
+References: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
+ <1369645193-3595-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130528032948.GF13532@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 10:05:22PM +0900, Simon Horman wrote:
-> Hi Arnd, Hi Olof,
-> 
-> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-> 
->   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-emev2-for-v3.11
-> 
-> for you to fetch changes up to 94a6af856df56ed39bb59ebe17bfa2d10fb333f2:
-> 
->   ARM: shmobile: emev2: Remove init_irq declaration in machine description (2013-05-22 21:42:03 +0900)
-
 Hi,
 
-You could have grouped all of the SoC updates into one branch instead of
-sending them up SoC by SoC to us. Either way works, just letting you know
-there's no need to keep them separate if that's easier.
+On Mon, May 27, 2013 at 05:59:45PM +0900, Simon Horman wrote:
+> From: Bastian Hecht <hechtb@gmail.com>
+> 
+> This adds temporarily the alternative device name to the clock list
+> that is used when booting via Device Tree setup.
 
-Also, the changes from Maxime could all have gone into one cleanup branch
-together instead of with the SoC code.
+> 
+> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>  arch/arm/mach-shmobile/clock-r8a7740.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+> index 5bd8da0..8fc396a 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a7740.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+> @@ -582,6 +582,7 @@ static struct clk_lookup lookups[] = {
+>  	CLKDEV_DEV_ID("e6cc0000.sci",		&mstp_clks[MSTP230]),
+>  
+>  	CLKDEV_DEV_ID("sh_cmt.10",		&mstp_clks[MSTP329]),
+> +	CLKDEV_DEV_ID("e6138010.timer",		&mstp_clks[MSTP329]),
+>  	CLKDEV_DEV_ID("sh_fsi2",		&mstp_clks[MSTP328]),
+>  	CLKDEV_DEV_ID("i2c-sh_mobile.1",	&mstp_clks[MSTP323]),
+>  	CLKDEV_DEV_ID("renesas_usbhs",		&mstp_clks[MSTP320]),
+> -- 
+> 1.7.10.4
+> 
 
-Anyway, no harm done, I've pulled this branch (and will pull the others as
-well) into our next/soc branch.
+Usually this is instead handled by adding entries to OF_DEV_AUXDATA() to rename
+the device in the board file. Would you mind doing that instead?
 
 
 Thanks,
