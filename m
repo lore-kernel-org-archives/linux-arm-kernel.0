@@ -1,56 +1,56 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 28 May 2013 21:01:49 +0800
-Subject: [PATCH] ARM: dt: Use the 'model' field for printing the hardware
- revision
-In-Reply-To: <CAOMZO5D6dM6+a7mgRy8KgPrSxu0GYXw8VvzqVVQTAVRt+TVb-g@mail.gmail.com>
-References: <1369742670-16305-1-git-send-email-fabio.estevam@freescale.com>
- <20130528121506.GL11166@pengutronix.de>
- <CAOMZO5D6dM6+a7mgRy8KgPrSxu0GYXw8VvzqVVQTAVRt+TVb-g@mail.gmail.com>
-Message-ID: <AC44A003-DDC4-4EB6-A67B-97F69426764F@jcrosoft.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Tue, 28 May 2013 18:34:48 +0530
+Subject: [PATCH V8 0/3] USB: OHCI: Start splitting up the driver
+In-Reply-To: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
+References: <1365746856-7772-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1369746291-21788-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This series of patches begins the process of splitting ohci-hcd up into
+a core library module and independent pci driver modules.
 
-On May 28, 2013, at 8:57 PM, Fabio Estevam <festevam@gmail.com> wrote:
+Patch 1/3 prepares the way by exporting a few functions from ohci-hcd
+and adding a new mechanism for platform-specific drivers to initialize
+their hc_driver structures.  This deserves to be done in the core
+because almost all of the entries in these structures are pure
+boilerplate -- practically none of the drivers need to override more
+than three of the standard core values.
 
-> Hi Uwe,
-> 
-> On Tue, May 28, 2013 at 9:15 AM, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> 
->>> struct machine_desc {
->>>      unsigned int            nr;             /* architecture number  */
->>>      const char              *name;          /* architecture name    */
->>> +     const char              *model;         /* architectute model */
->> s/architectute/architecture/
-> 
-> Thanks for reviewing it. Will fix in v2.
-> 
->> 
->> Is it really needed to add a new field here? Alternatively overwrite
->> name or do something like:
->> 
->>        if (this_is_a_device_tree_machine)
->>                seq_printf(m, "Hardware\t: %s\n", get_model_from_dt());
->>        else
->>                seq_printf(m, "Hardware\t: %s\n", machine_name);
+Change from V7 to V8
+ohci_hcd_init() is called by ohci_setup() to make generic ohci 
+initialization in all ohci drivers.
 
-> I was not able to find a good trick that provides me the
-> 'this_is_a_device_tree_machine' information inside the c_show()
-> function, so I ended up adding a the model inside machine_desc struct.
-> 
+Patch 2/3 is part of separating the ohci pci host controller
+driver from ohci-hcd host code.
+Moved sb800_prefetch() function from ohci-pci.c to pci-quirks.c file
+and EXPORTed, this is part of the effort to move the ohci pci related
+code to generic pci code.
 
-if the dt is present means this is a dt machine
-or the machine_id
+Change from V7 to V8
+no change.
 
-Best Regards,
-J.
+Patch 3/3  separate out ohci-pci into independent driver modules.
 
-> Regards,
-> 
-> Fabio Estevam
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Change from V7 to V8
+USB_OHCI_HCD_PCI symbol no longer dependence on STB03xxx, PPC_MPC52xx and         
+USB_OHCI_HCD_PPC_OF that's what removed.
+
+Manjunath Goudar (3):
+  USB: OHCI: prepare to make ohci-hcd a library module
+  USB: OHCI: Generic changes to make ohci-pci a separate driver
+  USB: OHCI: make ohci-pci a separate driver
+
+ drivers/usb/host/Kconfig      |    6 +-
+ drivers/usb/host/Makefile     |    3 +
+ drivers/usb/host/ohci-hcd.c   |  134 ++++++++++++++++++++++++++----------
+ drivers/usb/host/ohci-hub.c   |    1 -
+ drivers/usb/host/ohci-pci.c   |  151 ++++++++++++-----------------------------
+ drivers/usb/host/ohci-q.c     |    6 +-
+ drivers/usb/host/ohci.h       |   17 +++++
+ drivers/usb/host/pci-quirks.c |   13 ++++
+ drivers/usb/host/pci-quirks.h |    2 +
+ 9 files changed, 184 insertions(+), 149 deletions(-)
+
+-- 
+1.7.9.5
