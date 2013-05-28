@@ -1,54 +1,47 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 28 May 2013 23:51:26 +0200
-Subject: Kirkwood CPU Freq driver
-In-Reply-To: <51A5234D.9030100@baker-net.org.uk>
-References: <51A12DD4.9010907@baker-net.org.uk>
- <20130526083614.GB26249@lunn.ch>
- <20130526180513.GF31290@titan.lakedaemon.net>
- <51A5234D.9030100@baker-net.org.uk>
-Message-ID: <20130528215126.GF7678@lunn.ch>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 28 May 2013 16:05:10 -0600
+Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
+In-Reply-To: <51A520B5.8040803@gmail.com>
+References: <cover.1369658705.git.afzal@ti.com>
+ <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
+ <51A520B5.8040803@gmail.com>
+Message-ID: <51A52A16.1040204@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 10:36:13PM +0100, Adam Baker wrote:
-> On 26/05/13 19:05, Jason Cooper wrote:
-> >On Sun, May 26, 2013 at 10:36:14AM +0200, Andrew Lunn wrote:
-> >>On Sat, May 25, 2013 at 10:32:04PM +0100, Adam Baker wrote:
-> >>>I've been trying to test Andrew Lunn's work creating a CPU Idle
-> >>>driver for Kirkwood.
-> >>
-> >>Thanks for testing this. I must admit, i never tested it once the
-> >>first rc came out. I clearly should of, because its broken. It was a
-> >>three part patch series, and only part 1/3 made it in. Hence the
-> >>issues you are seeing.
-> >>
-> >>Jason, please can you pick up:
-> >>
-> >>https://patchwork.kernel.org/patch/2051401/
-> >>https://patchwork.kernel.org/patch/2080931/
-> >
-> >Yep, got them in now.  Sorry for the mix up.
-> >
+On 05/28/2013 03:25 PM, Jon Hunter wrote:
 > 
-> I've now tested with the first of these patches applied and the
-> changes from the second added to my .config
+> On 27/05/13 15:37, Afzal Mohammed wrote:
+>> AM43x timer bindings.
+>>
+>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+>> ---
+>>  Documentation/devicetree/bindings/arm/omap/timer.txt | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
+>> index d02e27c..70cb398 100644
+>> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
+>> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
+>> @@ -14,6 +14,8 @@ Required properties:
+>>  			ti,omap5430-timer (applicable to OMAP543x devices)
+>>  			ti,am335x-timer	(applicable to AM335x devices)
+>>  			ti,am335x-timer-1ms (applicable to AM335x devices)
+>> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
+>> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
+>>  
+>>  - reg:			Contains timer register address range (base address and
+>>  			length).
 > 
-> To get it to work I had to follow the instructions in the
-> Documentation to add the cpus entry to kirkwood.dtsi so I'll post
-> that as a patch in a day or two but after doing that I have a
-> working cpufreq driver.
+> If you are adding more compatibility strings, then this implies that the
+> AM43x timers are not 100% compatible with any other device listed (such
+> as am335x or any omap device). That's fine but you should state that in
+> the changelog. If the AM43x timer registers are 100% compatible with
+> existing devices you should not add these.
 
-Great that you got it working. Something must of changed in the
-generic code, since originally a cpu node was not required.
-
-The clocks are not needed in node, so please don't list them.
-
-> Measuring the power consumption of my NAS server I observed a slight
-> reduction in power consumption when the clock rate was reduced. I
-> haven't yet measured for long enough to get an accurate measurement
-> but it looks like maybe 1/4 W power saving.
-
-I don't have a killawatt meter etc, so i had no idea how much power it
-actually saves.  Thanks for the figure.
-
-	 Andrew
+I'm not sure that's true; .dts files should always include a compatible
+value that describes the most specific model of the HW, plus any
+baseline compatible value that the HW is compatible with. This allows
+any required quirks/fixes/... to be applied for the specific HW model
+later even if nobody knows right now they'll be needed. Hence, defining
+new compatible values doesn't necessarily mean incompatible HW.
