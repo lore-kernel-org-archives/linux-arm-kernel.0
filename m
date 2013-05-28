@@ -1,90 +1,40 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Tue, 28 May 2013 14:42:55 +0200
-Subject: [PATCH] cpuidle: improve governor Kconfig options
-In-Reply-To: <51A4A1A4.1070008@linaro.org>
-References: <1369688458-9114-1-git-send-email-daniel.lezcano@linaro.org>
- <1578834.dvFIpyCvrt@vostro.rjw.lan> <51A4A1A4.1070008@linaro.org>
-Message-ID: <5938372.bcA6BTeOGP@vostro.rjw.lan>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 28 May 2013 09:57:20 -0300
+Subject: [PATCH] ARM: dt: Use the 'model' field for printing the hardware
+ revision
+In-Reply-To: <20130528121506.GL11166@pengutronix.de>
+References: <1369742670-16305-1-git-send-email-fabio.estevam@freescale.com>
+ <20130528121506.GL11166@pengutronix.de>
+Message-ID: <CAOMZO5D6dM6+a7mgRy8KgPrSxu0GYXw8VvzqVVQTAVRt+TVb-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 28, 2013 02:23:00 PM Daniel Lezcano wrote:
-> On 05/28/2013 01:46 PM, Rafael J. Wysocki wrote:
-> > On Monday, May 27, 2013 11:00:58 PM Daniel Lezcano wrote:
-> >> Each governor is suitable for different kernel configurations: the menu
-> >> governor suits better for a tickless system, while the ladder governor fits
-> >> better for a periodic timer tick system.
-> >>
-> >> The Kconfig does not allow to [un]select a governor, thus both are compiled in
-> >> the kernel but the init order makes the menu governor to be the last one to be
-> >> registered, so becoming the default. The only way to switch back to the ladder
-> >> governor is to enable the sysfs governor switch in the kernel command line.
-> >>
-> >> Because it seems nobody complained about this, the menu governor is used by
-> >> default most of the time on the system, having both governors is not really
-> >> necessary on a tickless system but there isn't a config option to disable one
-> >> or another governor.
-> >>
-> >> Create a submenu for cpuidle and add a label for each governor, so we can see
-> >> the option in the menu config and enable/disable it.
-> >>
-> >> The governors will be enabled depending on the CONFIG_NO_HZ option:
-> >>  - If CONFIG_NO_HZ is set, then the menu governor is selected and the ladder
-> >>    governor is optional, defaulting to 'no'
-> > 
-> > Why not defaulting to 'yes'?  That'd be backwards compatible, wouldn't it?
-> 
-> Yes, that wouldn't be backward compatible but who wants the ladder
-> governor which is less efficient with a tickless system ?
+Hi Uwe,
 
-I don't know and this isn't the right question to ask I think.
+On Tue, May 28, 2013 at 9:15 AM, Uwe Kleine-K?nig
+<u.kleine-koenig@pengutronix.de> wrote:
 
-You need to ask who uses the ladder governor with CONFIG_NO_HZ and you need to
-avoid making changes that aren't backwards compatible if you don't know the
-answer (which I'm pretty sure is the case).
+>>  struct machine_desc {
+>>       unsigned int            nr;             /* architecture number  */
+>>       const char              *name;          /* architecture name    */
+>> +     const char              *model;         /* architectute model */
+> s/architectute/architecture/
 
-I'd prefer to default to 'yes' to start with and then to change the
-default to 'no' after a couple of cycles, possibly.
+Thanks for reviewing it. Will fix in v2.
 
-> >>  - If CONFIG_NO_HZ is not set, then the ladder governor is selected and the
-> >>    menu governor is optional, defaulting to 'no'
-> > 
-> > Are you sure this is not going to introduce regressions with CONFIG_NO_HZ
-> > unset?
-> 
-> Yes, a system configured with a periodic tick will use the ladder
-> instead of the menu governor (which is less efficient on this
-> configuration).
+>
+> Is it really needed to add a new field here? Alternatively overwrite
+> name or do something like:
+>
+>         if (this_is_a_device_tree_machine)
+>                 seq_printf(m, "Hardware\t: %s\n", get_model_from_dt());
+>         else
+>                 seq_printf(m, "Hardware\t: %s\n", machine_name);
 
-Well, "less efficient" meaning what exactly?  Less power-efficient or less
-efficient performance-wise?
+I was not able to find a good trick that provides me the
+'this_is_a_device_tree_machine' information inside the c_show()
+function, so I ended up adding a the model inside machine_desc struct.
 
-> Currently the default is the menu governor with a periodic tick system
-> because both governors are compiled in and the init order makes the menu
-> governor to be enabled instead of the 'ladder'.
+Regards,
 
-I understand that.
-
-> We can set both to 'yes' by default but in this case, I suggest to add
-> in the code a 'preferred' governor depending on tickless or not, so the
-> right governor is chosen at boot time depending on CONFIG_NO_HZ.
-> 
-> Otherwise, I am not sure people running servers (with a periodic tick)
-> will change their kernel command line option to enable the sysfs
-> governor switch to change the governor to ladder, neither they are aware
-> ladder is better for their system.
-> 
-> I am open to any suggestion.
-
-I think the change to make the governor preference depend on CONFIG_NO_HZ
-kind of makes sense.  However, I'd default to 'yes' for both governors in both
-configurations to start with (which basically means that the ordering will now
-depend on CONFIG_NO_HZ).
-
-Thanks,
-Rafael
-
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Fabio Estevam
