@@ -1,41 +1,117 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 20:54:46 -0700
-Subject: [PATCH 10/12] ARM: shmobile: r8a7740: Add CPUIdle
-In-Reply-To: <51A33D83.905@linaro.org>
-References: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
- <1369645193-3595-11-git-send-email-horms+renesas@verge.net.au>
- <51A33D83.905@linaro.org>
-Message-ID: <20130528035446.GJ13532@quad.lixom.net>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 28 May 2013 12:56:57 +0900
+Subject: Introduce a new helper framework for buffer synchronization
+In-Reply-To: <CAF6AEGvGv539Ktdeg03n783nD+HofDamcJCLX93rzzKGOCV8_Q@mail.gmail.com>
+References: <CAAQKjZP=iOmHRpHZCbZD3v_RKUFSn0eM_WVZZvhe7F9g3eTmPA@mail.gmail.com>
+ <CAF6AEGuDih-NR-VZCmQfqbvCOxjxreZRPGfhCyL12FQ1Qd616Q@mail.gmail.com>
+ <006a01ce504e$0de3b0e0$29ab12a0$%dae@samsung.com>
+ <CAF6AEGv2FiKMUpb5s4zHPdj4uVxnQWdVJWL-i1mOOZRxBvMZ4Q@mail.gmail.com>
+ <00cf01ce512b$bacc5540$3064ffc0$%dae@samsung.com>
+ <CAF6AEGuBexKUpTwm9cjGjkxCTKgEaDhAakeP0RN=rtLS6Qy=Mg@mail.gmail.com>
+ <CAAQKjZP37koEPob6yqpn-WxxTh3+O=twyvRzDiEhVJTD8BxQzw@mail.gmail.com>
+ <20130520211304.GV12292@phenom.ffwll.local>
+ <20130520213033.GW12292@phenom.ffwll.local>
+ <032701ce55f1$3e9ba4b0$bbd2ee10$%dae@samsung.com>
+ <20130521074441.GZ12292@phenom.ffwll.local>
+ <033a01ce5604$c32bd250$498376f0$%dae@samsung.com>
+ <CAKMK7uHtk+A7CDZH3qHt+F3H_fdSsWwt-bEPn-N0919oOE+Jkg@mail.gmail.com>
+ <012801ce57ba$a5a87fa0$f0f97ee0$%dae@samsung.com>
+ <014501ce5ac6$511a8500$f34f8f00$%dae@samsung.com>
+ <CAF6AEGvGv539Ktdeg03n783nD+HofDamcJCLX93rzzKGOCV8_Q@mail.gmail.com>
+Message-ID: <005701ce5b57$667c7d40$337577c0$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 01:03:31PM +0200, Daniel Lezcano wrote:
-> On 05/27/2013 10:59 AM, Simon Horman wrote:
-> > From: Bastian Hecht <hechtb@gmail.com>
-> > 
-> > We make use of the r8a7740 Suspend To Ram code to plug together a
-> > CPUIdle driver.
-> > 
-> > Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-> > Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > ---
+
+
+> -----Original Message-----
+> From: linux-fbdev-owner at vger.kernel.org [mailto:linux-fbdev-
+> owner at vger.kernel.org] On Behalf Of Rob Clark
+> Sent: Tuesday, May 28, 2013 12:48 AM
+> To: Inki Dae
+> Cc: Maarten Lankhorst; Daniel Vetter; linux-fbdev; YoungJun Cho; Kyungmin
+> Park; myungjoo.ham; DRI mailing list;
+linux-arm-kernel at lists.infradead.org;
+> linux-media at vger.kernel.org
+> Subject: Re: Introduce a new helper framework for buffer synchronization
 > 
-> Shouldn't it go through Rafael's tree ? Or does the patch contains some
-> dependencies on a code only visible in the ARM tree ?
+> On Mon, May 27, 2013 at 6:38 AM, Inki Dae <inki.dae@samsung.com> wrote:
+> > Hi all,
+> >
+> > I have been removed previous branch and added new one with more cleanup.
+> > This time, the fence helper doesn't include user side interfaces and
+> cache
+> > operation relevant codes anymore because not only we are not sure that
+> > coupling those two things, synchronizing caches and buffer access
+> between
+> > CPU and CPU, CPU and DMA, and DMA and DMA with fences, in kernel side is
+> a
+> > good idea yet but also existing codes for user side have problems with
+> badly
+> > behaved or crashing userspace. So this could be more discussed later.
+> >
+> > The below is a new branch,
+> >
+> > https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
+> exynos.git/?h=dma-f
+> > ence-helper
+> >
+> > And fence helper codes,
+> >
+> > https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
+> exynos.git/commit/?
+> > h=dma-fence-helper&id=adcbc0fe7e285ce866e5816e5e21443dcce01005
+> >
+> > And example codes for device driver,
+> >
+> > https://git.kernel.org/cgit/linux/kernel/git/daeinki/drm-
+> exynos.git/commit/?
+> > h=dma-fence-helper&id=d2ce7af23835789602a99d0ccef1f53cdd5caaae
+> >
+> > I think the time is not yet ripe for RFC posting: maybe existing dma
+> fence
+> > and reservation need more review and addition work. So I'd glad for
+> somebody
+> > giving other opinions and advices in advance before RFC posting.
+> 
+> thoughts from a *really* quick, pre-coffee, first look:
+> * any sort of helper to simplify single-buffer sort of use-cases (v4l)
+> probably wouldn't want to bake in assumption that seqno_fence is used.
+> * I guess g2d is probably not actually a simple use case, since I
+> expect you can submit blits involving multiple buffers :-P
 
-Missing S-o-b from Simon. But this patch clearly builds on the preceding
-one in the series, so merging them independently might not make much
-sense. Getting an ack from Rafael would be nice though.
+I don't think so. One and more buffers can be used: seqno_fence also has
+only one buffer. Actually, we have already applied this approach to most
+devices; multimedia, gpu and display controller. And this approach shows
+more performance; reduced power consumption against traditional way. And g2d
+example is just to show you how to apply my approach to device driver.
 
-I was going to say that it should probably go under drivers/cpuidle as
-well, but that just seems silly -- there is practically no code to share
-with any other platform in this small driver, AND there's not really
-any subsystem-internal data exposed. So it might just make more sense
-to keep it under arch/arm instead.
+> * otherwise, you probably don't want to depend on dmabuf, which is why
+> reservation/fence is split out the way it is..  you want to be able to
+> use a single reservation/fence mechanism within your driver without
+> having to care about which buffers are exported to dmabuf's and which
+> are not.  Creating a dmabuf for every GEM bo is too heavyweight.
 
-Likewise, looking at the kirkwood and calxeda drivers under drivers/cpuidle,
-I'm wondering why we thought it was a good idea to merge them there, besides
-getting caught up in the "nothing can live under arch/arm any more" frenzy.
+Right. But I think we should dealt with this separately. Actually, we are
+trying to use reservation for gpu pipe line synchronization such as sgx sync
+object and this approach is used without dmabuf. In order words, some device
+can use only reservation for such pipe line synchronization and at the same
+time, fence helper or similar thing with dmabuf for buffer synchronization.
 
-
--Olof
+> 
+> I'm not entirely sure if reservation/fence could/should be made any
+> simpler for multi-buffer users.  Probably the best thing to do is just
+> get reservation/fence rolled out in a few drivers and see if some
+> common patterns emerge.
+> 
+> BR,
+> -R
+> 
+> >
+> > Thanks,
+> > Inki Dae
+> >
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-fbdev" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
