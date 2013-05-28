@@ -1,45 +1,39 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 28 May 2013 16:07:46 +0800
-Subject: [PATCH v2] input: sirfsoc_pwrc: add onkey input driver for CSR
- SiRFprimaII PWRC
-In-Reply-To: <20130528075808.GA19496@core.coreip.homeip.net>
-References: <1369709258-14529-1-git-send-email-Baohua.Song@csr.com>
- <20130528075808.GA19496@core.coreip.homeip.net>
-Message-ID: <CAGsJ_4zY0+O6fP2bKLy__U_+-ZsWQXwZ8JXYMpRmtVe6zihfDQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 28 May 2013 10:08:40 +0200
+Subject: [PATCH 3/3 v3] net/macb: Try to optimize struct macb layout
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6026B723A@saturn3.aculab.com>
+References: <cover.1368608928.git.nicolas.ferre@atmel.com>
+ <d0bc206ace3baaf681e111ba07c4d0b576839bb4.1368608928.git.nicolas.ferre@atmel.com>
+ <AE90C24D6B3A694183C094C60CF0A2F6026B723A@saturn3.aculab.com>
+Message-ID: <51A46608.2020906@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/28 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
-> Hi Barry,
+On 15/05/2013 11:37, David Laight :
+>> From: Havard Skinnemoen <havard@skinnemoen.net>
 >
-> On Tue, May 28, 2013 at 10:47:38AM +0800, Barry Song wrote:
->> +     /*
->> +      * For a typical Linux system, we report KEY_SUSPEND to trigger apm-power.c
->> +      * to queue a SUSPEND APM event
->> +      */
->> +     input_event(pwrcdrv->input, EV_PWR, KEY_SUSPEND, 1);
->> +     input_sync(pwrcdrv->input);
->> +
->> +     /*
->> +      * Todo: report KEY_POWER event for Android platforms, Android PowerManager
->> +      * will handle the suspend and powerdown/hibernation
->> +      */
->> +
-> ...
+>> Move the NAPI struct below that since it is used
+>> from the interrupt handler. This field is also marked as
+>> ___cacheline_aligned_in_smp.
 >
->> +
->> +     pwrcdrv->input->evbit[0] = BIT_MASK(EV_PWR) | BIT_MASK(EV_KEY);
->> +     set_bit(KEY_POWER, pwrcdrv->input->keybit);
->
-> Why are we setting up KEY_POWER if we do not send this event?
+> Is that a good idea if the cache line size is 256 bytes?
+> Indeed is that ever sane - except for a few special structures
+> that really need it, and are guaranteed to be allocated
+> with that much alignment.
 
-For Android products, we send KEY_POWER to let Android PM trigger
-SUSPEND. that is left to be done.
+I do not know if that was really needed, it was a recommendation by Ben.
+(previous email here:
+https://patchwork.kernel.org/patch/1887101/
+)
 
->
-> Thanks.
->
-> --
-> Dmitry
+Anyway, it seems that this patch needs more work whereas the others of 
+the series are not commented.
 
--barry
+So maybe, I can resend patches 1, 2 for making this big enhancement go 
+forward (as it is in review process for quite a long time...).
+David, do you want me to resend or can you retrieve these v3 patches in 
+patchwork?
+
+Best regards,
+-- 
+Nicolas Ferre
