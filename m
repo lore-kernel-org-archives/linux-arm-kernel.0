@@ -1,53 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 May 2013 15:07:06 +0100
-Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
-In-Reply-To: <51A4B938.7080708@ti.com>
-References: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
- <20130528130502.GA28971@mudshark.cambridge.arm.com>
- <51A4B938.7080708@ti.com>
-Message-ID: <20130528140705.GE28971@mudshark.cambridge.arm.com>
+From: cdall@cs.columbia.edu (Christoffer Dall)
+Date: Tue, 28 May 2013 07:16:14 -0700
+Subject: [PATCH v3 7/7] ARM: KVM: drop use of PAGE_S2_DEVICE
+In-Reply-To: <51A482CE.1090509@arm.com>
+References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
+ <1368529900-22572-8-git-send-email-marc.zyngier@arm.com>
+ <CAEDV+gJeeQUOOLjFpkvoPk7e=csjmvvefhdp1miiWtosABwW6Q@mail.gmail.com>
+ <51A482CE.1090509@arm.com>
+Message-ID: <CAEDV+gJSM4EpGNV=fN+i6s2K9z6taMzmuNjVf_KyvTUvPaZAwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 03:03:36PM +0100, Sricharan R wrote:
-> On Tuesday 28 May 2013 06:35 PM, Will Deacon wrote:
-> > On Tue, May 28, 2013 at 11:48:20AM +0100, Po-Yu Chuang wrote:
-> >> This bug was introduced in commit e651eab0.
-> >> Some v4/v5 platforms failed to boot due to this.
-> >>
-> >> Signed-off-by: Po-Yu Chuang <ratbert.chuang@gmail.com>
-> >> ---
-> >>  arch/arm/mm/mmu.c |    4 +++-
-> >>  1 file changed, 3 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> >> index e0d8565..19a43f8 100644
-> >> --- a/arch/arm/mm/mmu.c
-> >> +++ b/arch/arm/mm/mmu.c
-> >> @@ -620,6 +620,8 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
-> >>  			unsigned long end, phys_addr_t phys,
-> >>  			const struct mem_type *type)
-> >>  {
-> >> +	pmd_t *p = pmd;
-> >> +
-> >>  #ifndef CONFIG_ARM_LPAE
-> >>  	/*
-> >>  	 * In classic MMU format, puds and pmds are folded in to
-> >> @@ -638,7 +640,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
-> >>  		phys += SECTION_SIZE;
-> >>  	} while (pmd++, addr += SECTION_SIZE, addr != end);
-> >>  
-> >> -	flush_pmd_entry(pmd);
-> >> +	flush_pmd_entry(p);
-> > Wait, shouldn't this flush be *inside* the loop anyway? Otherwise we just
-> > flush the cacheline containing the first pmd. The flushing code could also
-> > flush to PoU instead of PoC for UP ARMv7, but that's an unrelated optimisation.
->    I think in LPAE this loop iterates once and non LPAE twice.
->    So both the entries should be contained in same cache line right ?
+On Tue, May 28, 2013 at 3:11 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 27/05/13 21:01, Christoffer Dall wrote:
+>> On Tue, May 14, 2013 at 4:11 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> At the moment, when mapping a device into Stage-2 for a guest,
+>>> we override whatever the guest uses by forcing a device memory
+>>> type in Stage-2.
+>>>
+>>> While this is not exactly wrong, this isn't really the "spirit" of
+>>> the architecture. The hardware shouldn't have to cope for a broken
+>>> guest mapping to a device as normal memory.
+>>>
+>>
+>> So I'm trying to think of a scenario where this feature in the
+>> architecture would actually be useful, and it sounds like from you
+>> guys that it's only useful to properly run a broken guest.
+>>
+>> Are we 100% sure that a malicious guest can't leverage this to break
+>> isolation? I'm thinking something along the lines of writing to a
+>> device (for example the gic virtual cpu interface) with a cached
+>> mapping. If such a write is in fact written back to cache, and not
+>> evicted from the cache before a later time, where a different VM is
+>> running, can't that adversely affect the other VM?
+>>
+>> Probably this can never happen, but I wasn't able to convince myself
+>> of this from going through the ARM ARM...?
+>
+> I think you definitely have a point here, and I completely missed that
+> case. A shared device (like the GIC virtual CPU interface) must be
+> forced to a device memory type, otherwise we cannot ensure strict
+> isolation of guests.
+>
+> I'll drop this patch from my series and add PAGE_S2_DEVICE back to the
+> arm64 port.
+>
+We still need to get rid of the USER bit in the definition, and since
+that's a purely arch/arm/* patch I assume it should go through RMK's
+tree. Will you ack the other patch?
 
-Dunno, are there any guarantees about alignment of the starting pmd? Even
-so, the function takes the range as parameters, so I don't think we
-should tailor it to the caller. It may explain why this hasn't come up
-sooner though.
-
-Will
+Thanks,
+-Christoffer
