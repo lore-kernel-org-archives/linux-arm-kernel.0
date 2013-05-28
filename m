@@ -1,33 +1,27 @@
-From: clbchenlibo.chen@huawei.com (Libo Chen)
-Date: Tue, 28 May 2013 15:42:53 +0800
-Subject: [PATCH] module: use a macro instead of platform_driver_register
-In-Reply-To: <20130525122240.GC3746@kroah.com>
-References: <51A040D2.20708@huawei.com> <20130525122240.GC3746@kroah.com>
-Message-ID: <51A45FFD.8050200@huawei.com>
+From: Ganesh.Kumar@harman.com (Kumar, Ganesh)
+Date: Tue, 28 May 2013 02:48:33 -0500
+Subject: VDSO for arm 32bit
+In-Reply-To: <20899.25935.838288.45383@pilspetsen.it.uu.se>
+References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
+ <20899.25935.838288.45383@pilspetsen.it.uu.se>
+Message-ID: <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2013/5/25 20:22, Greg KH wrote:
-> On Sat, May 25, 2013 at 12:40:50PM +0800, Libo Chen wrote:
->>
->> I found a lot of mistakes using struct platform_driver without owner
->> so I make a macro instead of the function platform_driver_register.
->> It can set owner in it, then guys don`t care about module owner again.
->>
->> Signed-off-by: Libo Chen <libo.chen@huawei.com>
-> 
-> Nice job, that's the better way to fix this, I'll queue it up for 3.11.
-> 
+Hi Mikel,
 
-Thank Gu, Thomas, David and yours suggestions!
+Kumar, Ganesh writes:
+ > Hi All,
+ >
+ > ? I'm working on OMAP5 on greg's LTS kernel 3.4.25, but I see there is  > no support for vdso for arm 32 bit.
+ > I'm planning to port it to arm 32 bit, is there any work under progress?
+ > would like to understand why the support for arm 32 bit is not there, any idea?
 
-Regards
+> 32-bit ARM has a "kuser" page at a fixed virtual address, which exports a few critical routines to user-space.  With that, a vdso is mostly redundant.
 
-Libo
+  Thanks for the info, my main idea is to get the gettimeofday exported through the kuser helper,tried looking at the sources
+but I could not find anything related to that seems done in the mainline kernel tree for arm cortex, am I missing something here?
+I plan to do that if its not available yet, right now I've started with the kernel doc for the kuser, any pointers further
+to get the gettimeofday up and running using the kuser, Thanks in advance for your time.
 
-> thanks,
-> 
-> greg k-h
-> 
-> .
-> 
+--GK
