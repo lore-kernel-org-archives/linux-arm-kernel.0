@@ -1,59 +1,120 @@
 From: b35083@freescale.com (Jingchang Lu)
-Date: Tue, 28 May 2013 17:12:19 +0800
-Subject: [PATCH v4 0/4] Add initial Freescale Vybrid VF610 support
-Message-ID: <1369732343-2982-1-git-send-email-b35083@freescale.com>
+Date: Tue, 28 May 2013 17:12:21 +0800
+Subject: [PATCH v4 2/4] ARM: imx: add initial support for VF610
+In-Reply-To: <1369732343-2982-1-git-send-email-b35083@freescale.com>
+References: <1369732343-2982-1-git-send-email-b35083@freescale.com>
+Message-ID: <1369732343-2982-3-git-send-email-b35083@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Vybird VF610 is a heterogeneous dual-core eMPU using ARM Cortex-A5 and
-Cortex-M4 cores. The kernel is implemented on the Cortex-A5 core.
-  This SoC shares some IPs with I.MX serials, such as FEC, ESDHC, WATCHDOG,
-I2C, ASRC and ESAI, this SOC also shares some IPs with ColdFire platform,
-such as eDMA and DSPI, and this SOC have its own IPs such as PIT, SAI, UART,
-QuadSPI and DCU.
-  More documents for this soc can be found at:
-  http://www.freescale.com/webapp/sps/site/prod_summary.jsp?code=VF6xx&fsrch=1&sr=5
-  http://www.freescale.com/webapp/sps/site/homepage.jsp?code=VYBRID
+Add initial support for Freescale Vybrid VF610 SoC.
 
-changes in v4:
-	Follow internal suggestions to name the soc name as VF610.
-	Use common of_clk_init() call to initialize clocks.
-	Name lpuart device compatible string to "fsl,vf610-lpuart".
-	Remove "fsl,mvf-fec" compatible string.
-	Remove node of QuadSPI, I2C, SAI, and sound until driver accepted.
-changes in v3:
-	Split one big arch support patch to small patches.
-	Use DTC macro support to define these clock IDs.
-	Remove unused #include header lines.
-	Name clocks close to reference manual.
-	Use common mxc restart function.
-	Define mvf600 pinfunc ID as <mux_reg input_reg mux_mode input_val>.
-	Sort dts node by alphabet order of labels.
-changes in v2:
-	Add more clks definitions.
-	Add pinctrl support based on IMX new pinctrl framework.
+Signed-off-by: Jingchang Lu <b35083@freescale.com>
+---
+v4:
+  Follow internal suggestions to name the soc name as VF610.
+  Use of_clk_init() call initilizing clocks.
+v3:
+  Split one big arch support patch into small patches.
+  Remove unused #include header lines.
+  Use common mxc restart function.
 
-Jingchang Lu (4):
-  ARM: imx: add VF610 clock support
-  ARM: imx: add initial support for VF610
-  ARM: dts: add SoC level device tree source for VF610
-  ARM: dts: add initial VF610 Tower board dts support
-
-Documentation/devicetree/bindings/clock/vf610-clock.txt |  26 ++
- arch/arm/boot/dts/Makefile                              |   3 +-
- arch/arm/boot/dts/vf610-pinfunc.h                       | 810 ++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/vf610-twr.dts                         |  57 +++
- arch/arm/boot/dts/vf610.dtsi                            | 464 +++++++++++++++++++++
- arch/arm/mach-imx/Kconfig                               |  15 +
- arch/arm/mach-imx/Makefile                              |   2 +
- arch/arm/mach-imx/clk-vf610.c                           | 319 ++++++++++++++
- arch/arm/mach-imx/mach-vf610.c                          |  48 +++
- include/dt-bindings/clock/vf610-clock.h                 | 163 ++++++++
- 10 files changed, 1906 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/clock/vf610-clock.txt
- create mode 100644 arch/arm/boot/dts/vf610-pinfunc.h
- create mode 100644 arch/arm/boot/dts/vf610-twr.dts
- create mode 100644 arch/arm/boot/dts/vf610.dtsi
- create mode 100644 arch/arm/mach-imx/clk-vf610.c
+ arch/arm/mach-imx/Kconfig      | 15 +++++++++++++
+ arch/arm/mach-imx/Makefile     |  2 ++
+ arch/arm/mach-imx/mach-vf610.c | 48 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 65 insertions(+)
  create mode 100644 arch/arm/mach-imx/mach-vf610.c
- create mode 100644 include/dt-bindings/clock/vf610-clock.h
+
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index a402248..b7eddbd 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -835,6 +835,21 @@ config SOC_IMX6SL
+ 	help
+ 	  This enables support for Freescale i.MX6 SoloLite processor.
+ 
++config SOC_VF610
++	bool "Vybrid Family VF610 support"
++	select CPU_V7
++	select ARM_GIC
++	select CLKSRC_OF
++	select PINCTRL
++	select PINCTRL_VF610
++	select VF_PIT_TIMER
++	select PL310_ERRATA_588369 if CACHE_PL310
++	select PL310_ERRATA_727915 if CACHE_PL310
++	select PL310_ERRATA_769419 if CACHE_PL310
++
++	help
++	  This enable support for Freescale Vybrid VF610 processor.
++
+ endif
+ 
+ source "arch/arm/mach-imx/devices/Kconfig"
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index 2a4754d..054f039 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -112,4 +112,6 @@ obj-$(CONFIG_MACH_EUKREA_MBIMXSD51_BASEBOARD) += eukrea_mbimxsd51-baseboard.o
+ obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
+ obj-$(CONFIG_SOC_IMX53) += mach-imx53.o
+ 
++obj-$(CONFIG_SOC_VF610) += clk-vf610.o mach-vf610.o
++
+ obj-y += devices/
+diff --git a/arch/arm/mach-imx/mach-vf610.c b/arch/arm/mach-imx/mach-vf610.c
+new file mode 100644
+index 0000000..709fac3
+--- /dev/null
++++ b/arch/arm/mach-imx/mach-vf610.c
+@@ -0,0 +1,48 @@
++/*
++ * Copyright 2012-2013 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/of_platform.h>
++#include <linux/clocksource.h>
++#include <linux/irqchip.h>
++#include <linux/clk-provider.h>
++#include <asm/mach/arch.h>
++#include <asm/hardware/cache-l2x0.h>
++
++#include "common.h"
++
++static void __init vf610_init_machine(void)
++{
++	mxc_arch_reset_init_dt();
++	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
++}
++
++static void __init vf610_init_irq(void)
++{
++	l2x0_of_init(0, ~0UL);
++	irqchip_init();
++}
++
++static void __init vf610_init_time(void)
++{
++	of_clk_init(NULL);
++	clocksource_of_init();
++}
++
++static const char *vf610_dt_compat[] __initdata = {
++	"fsl,vf610",
++	NULL,
++};
++
++DT_MACHINE_START(VYBRID_VF610, "Freescale Vybrid VF610 (Device Tree)")
++	.init_irq	= vf610_init_irq,
++	.init_time	= vf610_init_time,
++	.init_machine   = vf610_init_machine,
++	.dt_compat	= vf610_dt_compat,
++	.restart	= mxc_restart,
++MACHINE_END
+-- 
+1.8.0
