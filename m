@@ -1,70 +1,60 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 11:40:47 -0400
-Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
-In-Reply-To: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130528154047.GT31290@titan.lakedaemon.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 28 May 2013 08:42:12 -0700
+Subject: [PATCHv2 0/3] Add G762/G763 PWM fan controller
+In-Reply-To: <20130528134734.GA12585@mithrandir>
+References: <cover.1369687670.git.arno@natisbad.org>
+ <152190814.eApXVbVBPA@wuerfel> <87li6z2yxj.fsf@natisbad.org>
+ <20130528111921.GD11547@mithrandir>
+ <20130528122940.GA29012@roeck-us.net>
+ <20130528134734.GA12585@mithrandir>
+Message-ID: <20130528154212.GB21891@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas, Sebastian,
-
-In order to avoid losing changes between this series and mvebu/pcie,
-I've rebased this series on top of mvebu/pcie and incorporated the
-correct conflict resolution into this series.  See below...
-
-On Sat, May 11, 2013 at 03:08:00AM +0200, Sebastian Hesselbarth wrote:
-> Marvell EBU SoCs share some common clock functions that register core
-> clocks or clock gates from SoC specific data. These clock drivers are
-> organized by function and over time the drivers filled up with #ifdefs
-> to separate different SoC specific code.
+On Tue, May 28, 2013 at 03:47:49PM +0200, Thierry Reding wrote:
+> On Tue, May 28, 2013 at 05:29:40AM -0700, Guenter Roeck wrote:
+> > On Tue, May 28, 2013 at 01:19:23PM +0200, Thierry Reding wrote:
+> > > On Tue, May 28, 2013 at 12:15:04PM +0200, Arnaud Ebalard wrote:
+> > > > Hi Arnd,
+> > > > 
+> > > > Arnd Bergmann <arnd@arndb.de> writes:
+> > > > 
+> > > > > On Tuesday 28 May 2013 00:02:29 Arnaud Ebalard wrote:
+> > > > >> 
+> > > > >> This series adds support for GMT G762/G763. This work is based on a
+> > > > >> basic version for 2.6.31 kernel developed Olivier Mouchet for LaCie
+> > > > >> NAS. Updates have been performed to run on recent kernels. Support has
+> > > > >> been completed and additional features added: ability to configure
+> > > > >> various characteristics from .dts file, better initialization, alarms
+> > > > >> and error reporting support, gear mode, polarity, fan pulse per
+> > > > >> revolution, fan startup voltage control.
+> > > > >
+> > > > > I wonder if this could be split into two separate drivers, one for
+> > > > > the pwm subsystem, and one for a hardware-independent fan controller
+> > > > > based on the pwm interfaces.
+> > > > 
+> > > > To be honest, I wouldn't even know how to start in order to do that.
+> > > > Additionally, it would be worth the effort if other drivers could be
+> > > > easily refactored using this idea. I'll let hwmon people provide some
+> > > > feedback and try and comply with their directions (based on the cpu
+> > > > cycle I can spend on this).
+> > > 
+> > > What Arnd proposes doesn't sounds like a very good idea. PWM-controlled
+> > > fans should be able to work just fine using a generic driver that uses
+> > > the PWM framework, similar to the PWM backlight and LED drivers.
+> > > 
+> > Isn't that exactly what Arnd proposed ?
 > 
-> This patch set first adds a new element to clock gate descriptors to
-> allow to pass clk flags per clock gate. (Patch 1)
+> Oh, right. I meant to say: "What Arnd proposes sounds like a very good
+> idea." =) Sorry for the confusion.
 > 
-> Then it restructures MVEBU clock drivers into common clock setup and
-> SoC specific files and Kconfig options. The driver's init functions
-> are also registered to get called with of_clk_init. (Patches 2, 3-6)
-> 
-> It then switches Dove, Kirkwood, and Armada 370/XP to make use of
-> of_clk_init instead of mvebu_clocks_init. (Patches 7-9)
-> 
-> Finally, all obsolete files and Kconfig options are removed. (Patch 10)
-> 
-> It has been tested on CuBox (Dove) and Dockstar (Kirkwood) by me.
-> Armada 370 and XP are compile tested only and should get their Tested-by
-> from Thomas and Gregory, respectively.
-> 
-> @Mike: As this only touches MVEBU related code, I suggest to take it
-> all through the corresponding ARM branch.
-> 
-> Sebastian Hesselbarth (10):
->   clk: mvebu: introduce per-clock-gate flags
+I looked into it, and frankly I don't know how to make it work either. The chip
+is dedicated to fan control and supports both linear and pwm mode. Both modes
+are controlled differently. The available configuration options are very fan
+control specific.
 
-I updated armada_370_gating_descr[] and armada_xp_gating_descr[] to
-incorporate Thomas' pcie changes.
+While I agree that a generic fan control driver for pwm chips would be great,
+problem here is that this is not a generic pwm controller. 
 
->   clk: mvebu: add common clock functions for core clk and clk gating
->   clk: mvebu: add Dove SoC-centric clock init
->   clk: mvebu: add Kirkwood SoC-centric clock init
-
->   clk: mvebu: add Armada 370 SoC-centric clock init
->   clk: mvebu: add Armada XP SoC-centric clock init
-
-I then migrated the changes above to these two commits.
-
->   ARM: dove: move DT boards to SoC-centric clock init
->   ARM: kirkwood: move DT boards to SoC-centric clock init
->   ARM: mvebu: move DT boards to SoC-centric clock init
-
->   clk: mvebu: desintegrate obsolete file
-
-Obviously, the diffstat changed slightly here.
-
-I'm posting the revised version as replies to patches 1, 5 and 6. Please
-let me know if I messed it up.  I'd like to send the PR for these
-shortly.
-
-thx,
-
-Jason.
+Thanks,
+Guenter
