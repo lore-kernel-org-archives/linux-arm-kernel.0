@@ -1,35 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 21:22:03 -0700
-Subject: [GIT PULL] Nomadik clocks from device tree
-In-Reply-To: <CACRpkdaKtxKS0=1UOKJPQWKShRm2nHsUWSK5M+qSR6duXfGrxw@mail.gmail.com>
-References: <CACRpkdY8xqi04cf-SJ69QvHr8qB6itqvgxMyNk+=Xrtz2FGVaA@mail.gmail.com>
- <CACRpkdaKtxKS0=1UOKJPQWKShRm2nHsUWSK5M+qSR6duXfGrxw@mail.gmail.com>
-Message-ID: <20130528042203.GO13532@quad.lixom.net>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 28 May 2013 06:56:27 +0200
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <20130528014348.GA19608@S2101-09.ap.freescale.net>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <CAOMZO5DRuKrECnYDtZ0wOK6_vpW95Cwc3xf7LT+VT_B7eV3gug@mail.gmail.com>
+ <20130528014348.GA19608@S2101-09.ap.freescale.net>
+Message-ID: <201305280656.27472.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 10:32:45PM +0200, Linus Walleij wrote:
-> Hi ARM SoC people,
+Dear Shawn Guo,
+
+> On Mon, May 27, 2013 at 09:52:21PM -0300, Fabio Estevam wrote:
+> > Hi Shawn,
+> > 
+> > On Mon, May 13, 2013 at 11:31 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > > Have you tested it against v3.10-rc1?  The issue is still there in my
+> > > testing.
+> > 
+> > I am not able to see the issue on 3.10-rc2.
 > 
-> I have accumulated more Nomadik patches so I'm reiterating this
-> pull request with two new patches on top.
+> My imx/dt branch is currently basing on v3.10-rc1, and I do not care if
+> it works on v3.10-rc2.  I have tested this patch enough on different
+> bases, and I'm not going to test it again and again to find a base which
+> happens to work.  I do not feel comfortable to merge this patch if it
+> only works on particular base.  Who knows if it will break again with
+> another random patches merged in.  There is some issue, and we need to
+> find the root cause of it instead of ignoring it by finding some random
+> base which hides it.
 > 
-> Please pull them in for v3.11!
+> > What are the exact steps to trigger the problem? Do you see it
+> > consistently?
+> 
+> Before I answer your questions, can I ask if you have tried to reproduce
+> it on v3.10-rc1?
 
-Hi,
+What is the problem you observe?
 
-I get a merge conflict on this branch with "ARM: nomadik: fix IRQ
-assignment for SMC ethernet" from 3.10-rc2.  Fixed it up.
-
-Also:
-
-> Rabin Vincent (1):
->       clocksource: nomadik-mtu: support of probe
-
-Hmm, you're not the first one I've caught having missed to add S-o-b
-lines on patches today. Please pay attention to it in the future.
-
-Merged into next/dt for 3.11.
-
-
--Olof
+Best regards,
+Marek Vasut
