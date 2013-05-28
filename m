@@ -1,33 +1,29 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 28 May 2013 15:25:16 +0530
-Subject: [PATCH 3/8] ARM: SPEAr: use generic cpu idle function for wfi
-In-Reply-To: <1369665166-13049-4-git-send-email-sanjay.rawat@linaro.org>
-References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
- <1369665166-13049-4-git-send-email-sanjay.rawat@linaro.org>
-Message-ID: <CAKohpo=dVM_gd31h3sG0d0_hKcCfaHLtwfF3RXL453bE9K+L2A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 28 May 2013 10:55:28 +0100
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130523104303.GC16722@arm.com>
+ <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
+Message-ID: <20130528095528.GA14329@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 May 2013 20:02, Sanjay Singh Rawat <sanjay.rawat@linaro.org> wrote:
-> use cpu_do_idle for entering the wfi mode.
->
-> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
-> ---
->  arch/arm/mach-spear/hotplug.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-spear/hotplug.c b/arch/arm/mach-spear/hotplug.c
-> index d97749c..6dbd3dc 100644
-> --- a/arch/arm/mach-spear/hotplug.c
-> +++ b/arch/arm/mach-spear/hotplug.c
-> @@ -55,7 +55,8 @@ static inline void cpu_leave_lowpower(void)
->  static inline void spear13xx_do_lowpower(unsigned int cpu, int *spurious)
->  {
->         for (;;) {
-> -               wfi();
-> +               /* enter WFI mode */
-> +               cpu_do_idle();
->
->                 if (pen_release == cpu) {
+On Sat, May 25, 2013 at 04:53:19AM +0100, Nicolas Pitre wrote:
+> On Thu, 23 May 2013, Catalin Marinas wrote:
+> 
+> > An issue is that for kunmap_atomic() && VIVT we flush the same page
+> > twice. I don't think we should remove the cache flushing in
+> > __kunmap_atomic() for VIVT since not all kunmap_atomic() calls require
+> > flush_kernel_dcache_page() (unless we just assume that highmem && vivt
+> > don't work together).
+> 
+> VIVT and highmem do work together.  Highmem for ARM was in fact 
+> developed on such a platform.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Thanks for confirming. Do you remember why kunmap() doesn't (need to)
+flush the cache alias (for VIVT)? Or if it does, where?
+
+-- 
+Catalin
