@@ -1,33 +1,45 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 May 2013 08:43:27 +0200
-Subject: [PATCH v4 1/6] drivers: bus: add a new driver for WEIM
-In-Reply-To: <1369722012-6915-2-git-send-email-b32955@freescale.com>
-References: <1369722012-6915-1-git-send-email-b32955@freescale.com>
- <1369722012-6915-2-git-send-email-b32955@freescale.com>
-Message-ID: <20130528064327.GT32299@pengutronix.de>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Tue, 28 May 2013 14:48:16 +0800
+Subject: [PATCH] thermal: cpu_cooling: fix 'descend' check in
+ get_property()
+In-Reply-To: <1369722152-9732-1-git-send-email-shawn.guo@linaro.org>
+References: <1369722152-9732-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1369723696.2083.44.camel@rzhang1-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 02:20:07PM +0800, Huang Shijie wrote:
-> The WEIM(Wireless External Interface Module) works like a bus.
-> You can attach many different devices on it, such as NOR, onenand.
+On Tue, 2013-05-28 at 14:22 +0800, Shawn Guo wrote:
+> The variable 'descend' is initialized as -1 in function get_property(),
+> and will never get any chance to be updated by the following code.
 > 
-> In the case of i.MX6q-sabreauto, the NOR is connected to WEIM.
+> 	if (freq != CPUFREQ_ENTRY_INVALID && descend != -1)
+> 		descend = !!(freq > table[i].frequency);
 > 
-> This patch also adds the devicetree binding document.
-> The driver only works when the devicetree is enabled.
+> This makes function get_property() return the wrong frequency for given
+> cooling level if the frequency table is sorted in ascending.  Fix it
+> by correcting the 'descend' check in if-condition to 'descend == -1'.
 > 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Looks good to me now. Thanks for working on this.
+good catch!
+patch applied to thermal -next.
 
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+thanks,
+rui
+> ---
+>  drivers/thermal/cpu_cooling.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/thermal/cpu_cooling.c b/drivers/thermal/cpu_cooling.c
+> index c94bf2e..82e15db 100644
+> --- a/drivers/thermal/cpu_cooling.c
+> +++ b/drivers/thermal/cpu_cooling.c
+> @@ -167,7 +167,7 @@ static int get_property(unsigned int cpu, unsigned long input,
+>  			continue;
+>  
+>  		/* get the frequency order */
+> -		if (freq != CPUFREQ_ENTRY_INVALID && descend != -1)
+> +		if (freq != CPUFREQ_ENTRY_INVALID && descend == -1)
+>  			descend = !!(freq > table[i].frequency);
+>  
+>  		freq = table[i].frequency;
