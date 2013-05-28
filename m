@@ -1,75 +1,65 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 14:02:27 -0400
-Subject: [PATCH 2/2] net: mv643xx_eth: proper initialization for
- Kirkwood SoCs
-In-Reply-To: <20130524173306.GA30022@obsidianresearch.com>
-References: <1369253042-15082-2-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130522201607.GA18823@obsidianresearch.com>
- <20130523160111.GP31290@titan.lakedaemon.net>
- <20130523171112.GB31281@obsidianresearch.com>
- <20130523172339.GQ31290@titan.lakedaemon.net>
- <20130523175357.GB2821@obsidianresearch.com>
- <20130523184028.GU31290@titan.lakedaemon.net>
- <20130523190140.GA4010@obsidianresearch.com>
- <20130524164636.GV31290@titan.lakedaemon.net>
- <20130524173306.GA30022@obsidianresearch.com>
-Message-ID: <20130528180227.GY31290@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 28 May 2013 12:14:41 -0600
+Subject: [PATCH V2] ARM: tegra: add cpu_disable for hotplug
+Message-ID: <1369764881-20520-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jason,
+From: Joseph Lo <josephl@nvidia.com>
 
-Sorry, I meant to get back to this earlier and it slipped off of my
-plate. :(
+The Tegra114 could hotplug the CPU0, but the common cpu_disable didn't
+support that. Adding a Tegra specific cpu_disable function for it.
 
-On Fri, May 24, 2013 at 11:33:06AM -0600, Jason Gunthorpe wrote:
-> On Fri, May 24, 2013 at 12:46:36PM -0400, Jason Cooper wrote:
-> 
-> > > Why are you not keen on this? It seems like normal device driver
-> > > practice, that is what the data field of of_device_id is typically
-> > > used for..
-> > 
-> > I'm not keen on it because we don't have a document saying "All kirkwood
-> > SoCs need PSC1 set to X after reset."  We know it, but have we tested
-> > the 6282?
-> 
-> I disagree. The manul is very clear how PSC1 must be set for proper
-> operation. Clk125BypassEn bit is used only for loopback testing, it
-> should never set for driver operation. Similarly PortReset must be
-> cleared for driver operation.
-> 
-> It is always safe for the driver to clear these bits, if it knows they
-> are available.  In fact, I would argue the driver should always clear
-> these bits so that the bootloader isn't relied on to do it. It doesn't
-> matter if the SOC errantly sets the bit or not, it can *always* be
-> safely cleared.
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+[swarren: adjusted the switch statement to be future-proof]
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ arch/arm/mach-tegra/common.h  |    1 +
+ arch/arm/mach-tegra/hotplug.c |   11 +++++++++++
+ arch/arm/mach-tegra/platsmp.c |    1 +
+ 3 files changed, 13 insertions(+)
 
-Great!
-
-> Further, I compared my 88F6282/88F6283 manual against the public
-> 88F6180/88F619x/88F6281 spec and confirmed that the PSC1 layout is the
-> same.
-
-Even better.
-
-> So all of these SOC's can share a driver compatible string.
-
-Ok, "marvell,kirkwood-eth" works for me then.  I think Sebastian already
-has patches for that.
-
-> AFAICT the only reason the driver doesn't touch PSC1 today is because
-> the PSC1 was introduced in a later IP revision and its presence isn't
-> auto-detectable.
-
-Makes sense.
-
-> The last bit of the puzzle to get bootloader independence on kirkwood
-> is to encode the phy interface type (GMII/RGMII/BASE-X) in the DT so
-> the entire PSC1 can be set by the driver..
-
-Hmm, let's work on that separately, and later.  I've snowballed this
-attempt enough ;-)
-
-Thanks for digging into this for us,
-
-Jason.
+diff --git a/arch/arm/mach-tegra/common.h b/arch/arm/mach-tegra/common.h
+index 5900cc4..32f8eb3 100644
+--- a/arch/arm/mach-tegra/common.h
++++ b/arch/arm/mach-tegra/common.h
+@@ -2,3 +2,4 @@ extern struct smp_operations tegra_smp_ops;
+ 
+ extern int tegra_cpu_kill(unsigned int cpu);
+ extern void tegra_cpu_die(unsigned int cpu);
++extern int tegra_cpu_disable(unsigned int cpu);
+diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
+index d07f152..a52c10e 100644
+--- a/arch/arm/mach-tegra/hotplug.c
++++ b/arch/arm/mach-tegra/hotplug.c
+@@ -46,6 +46,17 @@ void __ref tegra_cpu_die(unsigned int cpu)
+ 	BUG();
+ }
+ 
++int tegra_cpu_disable(unsigned int cpu)
++{
++	switch (tegra_chip_id) {
++	case TEGRA20:
++	case TEGRA30:
++		return cpu == 0 ? -EPERM : 0;
++	default:
++		return 0;
++	}
++}
++
+ void __init tegra_hotplug_init(void)
+ {
+ 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index 554aedc..24db4ac 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -196,5 +196,6 @@ struct smp_operations tegra_smp_ops __initdata = {
+ #ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_kill		= tegra_cpu_kill,
+ 	.cpu_die		= tegra_cpu_die,
++	.cpu_disable		= tegra_cpu_disable,
+ #endif
+ };
+-- 
+1.7.10.4
