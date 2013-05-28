@@ -1,46 +1,49 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 28 May 2013 17:17:45 +0200
-Subject: [PATCH] arm: omap2: fix AM33xx hwmod infos for UART2
-Message-ID: <1369754265-27712-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 28 May 2013 11:27:13 -0400 (EDT)
+Subject: [PATCH V8 3/3] USB: OHCI: make ohci-pci a separate driver
+In-Reply-To: <1369746291-21788-4-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1305281126340.1030-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The UART2 hwmod structure is pointing to the EDMA channels of UART1,
-which doesn't look right. This patch fixes this by making the UART2
-hwmod structure to a new structure that lists the EDMA channels to be
-used by the UART2.
+On Tue, 28 May 2013, Manjunath Goudar wrote:
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+> This patch splits the PCI portion of ohci-hcd out into its
+> own separate driver module, called ohci-pci.
+> 
+> The major point of difficulty lies in ohci-pci's many vendor- and
+> device-specific workarounds.  Some of them have to be applied before
+> calling ohci_start() some after, which necessitates a fair amount of
+> code motion.  The other platform drivers require much smaller changes.
+> 
+> The complete sb800_prefetch() function moved to ohci-q.c,because its
+> only related to ohci-pci driver.
+> 
+> USB_OHCI_HCD_PCI symbol no longer dependence on STB03xxx, PPC_MPC52xx and
+> USB_OHCI_HCD_PPC_OF that's what removed.
+> 
+> V2:
+>   - few specific content of pci related code in ohci_pci_start function has been moved to ohci_pci_reset
+>     and rest of the generic code is written in ohci_start of ohci-hcd.c file.
+> V3:
+>  - ohci_restart() has been called in ohci_pci_reset() function for to reset the ohci pci.
+> 
+> V4:
+>  -sb800_prefetch() moved to ohci-q.c,because its only related to ohci-pci.
+>  -no longer _creating_ CONFIG_USB_OHCI_PCI,creating CONFIG_USB_OHCI_HCD_PCI.
+>  -overrides renamed with pci_override,its giving proper meaning.
+> 
+> V5:
+>  -sb800_prefetch() moved to pci-quirks.c,because its only related to pci.
+> 
+> V6:
+>  -sb800_prefetch() function has been moved to pci-quirks.c made as separate patch in 2/3.
+>  -Most of the generic ohci pci changes moved in 2/3 patch,now this is complete  ohci-pci separation patch.
+> 
+> V7:
+>  -Unrelated include file has been removed from ohci.h file.
+> 
+> V8:
+>  -USB_OHCI_HCD_PCI symbol does not dependence on STB03xxx, PPC_MPC52xx and USB_OHCI_HCD_PPC_OF.
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 01d8f32..9113251 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -2006,6 +2006,13 @@ static struct omap_hwmod am33xx_uart1_hwmod = {
- 	},
- };
- 
-+/* uart2 */
-+static struct omap_hwmod_dma_info uart2_edma_reqs[] = {
-+	{ .name = "tx",	.dma_req = 28, },
-+	{ .name = "rx",	.dma_req = 29, },
-+	{ .dma_req = -1 }
-+};
-+
- static struct omap_hwmod_irq_info am33xx_uart2_irqs[] = {
- 	{ .irq = 73 + OMAP_INTC_START, },
- 	{ .irq = -1 },
-@@ -2016,7 +2023,7 @@ static struct omap_hwmod am33xx_uart2_hwmod = {
- 	.class		= &uart_class,
- 	.clkdm_name	= "l4ls_clkdm",
- 	.mpu_irqs	= am33xx_uart2_irqs,
--	.sdma_reqs	= uart1_edma_reqs,
-+	.sdma_reqs	= uart2_edma_reqs,
- 	.main_clk	= "dpll_per_m2_div4_ck",
- 	.prcm		= {
- 		.omap4	= {
--- 
-1.7.9.5
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
