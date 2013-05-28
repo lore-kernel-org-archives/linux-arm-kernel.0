@@ -1,116 +1,273 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 28 May 2013 13:02:04 +0200
-Subject: [GIT PULL] at91: cleanup (pinctrl macros, defconfigs) for 3.11 #1
-In-Reply-To: <20130528054701.GB18476@quad.lixom.net>
-References: <1368799336-25226-1-git-send-email-nicolas.ferre@atmel.com>
- <519F9116.8060109@atmel.com>
- <20130528054701.GB18476@quad.lixom.net>
-Message-ID: <20130528110204.GT24476@game.jcrosoft.org>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 28 May 2013 13:10:16 +0200
+Subject: [PATCH v5] clocksource: add Freescale Vybrid pit timer support
+In-Reply-To: <1369732899-17142-1-git-send-email-b35083@freescale.com>
+References: <1369732899-17142-1-git-send-email-b35083@freescale.com>
+Message-ID: <51A49098.4000607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:47 Mon 27 May     , Olof Johansson wrote:
-> On Fri, May 24, 2013 at 06:11:02PM +0200, Nicolas Ferre wrote:
-> > On 17/05/2013 16:02, Nicolas Ferre :
-> > >Arnd, Olof,
-> > >
-> > >Here is the first AT91 cleanup pull-request for 3.11. I is dominated by a big
-> > >update of DT files because of the move to macros in pinctrl. As we plan to
-> > >make this "cleanup" series the base of all our work on AT91 for 3.11, we would
-> > >like to see it appearing early in arm-soc and linux-next: this is why we send
-> > >it to you right now.
-> > >
-> > >We have colected the Acked-by from Linus Walleij and we all think that it makes
-> > >sense to merge this material through arm-soc tree:
-> > >- is touches nearly nothing of pinctrl actual code (a header file)
-> > >- all dtsi/dts modifications for 3.11 will need this as a codebase for avoiding
-> > >   merging nightmare
-> > >
-> > >I hope that it is okay with you.
-> > >
-> > >Thanks, best regards,
-> > >
-> > >The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-> > >
-> > >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-> > >
-> > >are available in the git repository at:
-> > >
-> > >   git://github.com/at91linux/linux-at91.git tags/at91-cleanup
-> > 
-> > Arnd, Olof,
-> > 
-> > After having sent the second "fixes" pull-request to you, I want to
-> > warn you about merging conflicts concerning this "cleanup"
-> > pull-request for 3.11.
-> > 
-> > 2 merging conflicts are appearing when placing the "cleanup" branch
-> > on top of the "fixes" material contained today in at91-fixes tag.
-> > To address this, I have pushed a resolution branch on our usual git tree:
-> > 
-> > git://github.com/at91linux/linux-at91.git   at91-3.11-cleanup1+resolved
-> > 
-> > In case of any question, please let me know. If you want me to
-> > rebase the original tag that I've sent you, I can do it as well.
+On 05/28/2013 11:21 AM, Jingchang Lu wrote:
+> Add Freescale Vybrid Family period interrupt timer support.
 > 
-> Hi,
-> 
-> Thanks, not a big deal for us to resolve so that's ok.
-> 
-> Pulled in the branch. Some comments below:
-> 
-> 
-> > >----------------------------------------------------------------
-> > >Big update with pinctrl by use of macros and
-> > >header files. Increases readability and avoid
-> > >typos.
-> > >Update of AT91 defconfigs and merge of defconfigs for
-> > >SoC look-alike:
-> > >sam9260/9g20 and sam9261/9g10.
-> 
-> This is hard to follow, please structure them better in the future.
-> 
-> > >----------------------------------------------------------------
-> > >Jean-Christophe PLAGNIOL-VILLARD (6):
-> > >       ARM: at91: dt: use #include for all device trees
-> > >       ARM: at91: dt: switch to standard GPIO flag defines.
-> > >       ARM: at91: dt: add pinctrl pre-processor define
-> > >       ARM: at91: dt: switch to pinctrl to pre-processor
-> > >       ARM: at91: dt: switch to standard IRQ flag defines
-> > >       ARM: at91: udpate defconfigs
-> 
-> Typo in the patch subject, please keep an eye on these in the future.
-> 
-> > >  arch/arm/configs/at91_dt_defconfig                 |  55 ++-
-> > >  arch/arm/configs/at91rm9200_defconfig              | 218 ++-------
-> > >  ...am9g20_defconfig => at91sam9260_9g20_defconfig} |  67 ++-
-> > >  arch/arm/configs/at91sam9260_defconfig             |  91 ----
-> > >  ...am9261_defconfig => at91sam9261_9g10_defconfig} |  19 +-
-> > >  arch/arm/configs/at91sam9263_defconfig             |  39 +-
-> > >  arch/arm/configs/at91sam9g45_defconfig             |  94 ++--
-> > >  arch/arm/configs/sama5_defconfig                   |  35 +-
-> > >  arch/arm/mach-at91/Kconfig.non_dt                  | 159 +++----
-> > >  arch/arm/mach-at91/Makefile                        |   2 -
-> > >  arch/arm/mach-at91/board-sam9261ek.c               |  28 +-
-> > >  include/dt-bindings/pinctrl/at91.h                 |  35 ++
-> > >  63 files changed, 1407 insertions(+), 1617 deletions(-)
-> > >  rename arch/arm/configs/{at91sam9g20_defconfig => at91sam9260_9g20_defconfig} (67%)
-> > >  delete mode 100644 arch/arm/configs/at91sam9260_defconfig
-> > >  rename arch/arm/configs/{at91sam9261_defconfig => at91sam9261_9g10_defconfig} (91%)
-> > >  create mode 100644 include/dt-bindings/pinctrl/at91.h
-> 
-> Good to see consolidation, it'd be awesome if there could be even more.
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> ---
 
-more are on the way but on non-dt board and SoC device file no consolidation
-work are done as we simply work on the DT support to drop them
+Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-recently I send the first non-dt board removal patch serie for the Calao
-USB-A926x
+> v5:
+>  Follow internal suggestions to name the SoC family as VF.
+>  Add comment for min and max clockevent delta.
+>  Add clockevent device irq initialization.
+>  Remove IRQF_DISABLED flag.
+> v4:
+>   Use family name names driver and symbol instead of SoC name.
+>   Remove redundant code.
+>   Use BUG_ON instead of WARN_ON.
+>   Add necessory comment information.
+> v3:
+>   Move the pit driver adding from arch to drivers/clocksource.
+> v2:
+>   Use CLOCKSOURCE_OF_DECLARE init pit timer.
+>   Add ONESHOT mode support.
+> 
+>  drivers/clocksource/Kconfig        |   5 +
+>  drivers/clocksource/Makefile       |   1 +
+>  drivers/clocksource/vf_pit_timer.c | 194 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 200 insertions(+)
+>  create mode 100644 drivers/clocksource/vf_pit_timer.c
+> 
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index f151c6c..0a04257 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -85,3 +85,8 @@ config CLKSRC_SAMSUNG_PWM
+>  	  Samsung S3C, S5P and Exynos SoCs, replacing an earlier driver
+>  	  for all devicetree enabled platforms. This driver will be
+>  	  needed only on systems that do not have the Exynos MCT available.
+> +
+> +config VF_PIT_TIMER
+> +	bool
+> +	help
+> +	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 8d979c7..36a9ac1 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -26,6 +26,7 @@ obj-$(CONFIG_ARCH_BCM)		+= bcm_kona_timer.o
+>  obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
+>  obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+>  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
+> +obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
+>  
+>  obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
+>  obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+> diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
+> new file mode 100644
+> index 0000000..598399d
+> --- /dev/null
+> +++ b/drivers/clocksource/vf_pit_timer.c
+> @@ -0,0 +1,194 @@
+> +/*
+> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/clk.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <asm/sched_clock.h>
+> +
+> +/*
+> + * Each pit takes 0x10 Bytes register space
+> + */
+> +#define PITMCR		0x00
+> +#define PIT0_OFFSET	0x100
+> +#define PITn_OFFSET(n)	(PIT0_OFFSET + 0x10 * (n))
+> +#define PITLDVAL	0x00
+> +#define PITCVAL		0x04
+> +#define PITTCTRL	0x08
+> +#define PITTFLG		0x0c
+> +
+> +#define PITMCR_MDIS	(0x1 << 1)
+> +
+> +#define PITTCTRL_TEN	(0x1 << 0)
+> +#define PITTCTRL_TIE	(0x1 << 1)
+> +#define PITCTRL_CHN	(0x1 << 2)
+> +
+> +#define PITTFLG_TIF	0x1
+> +
+> +static void __iomem *clksrc_base;
+> +static void __iomem *clkevt_base;
+> +static unsigned long cycle_per_jiffy;
+> +
+> +static inline void pit_timer_enable(void)
+> +{
+> +	__raw_writel(PITTCTRL_TEN | PITTCTRL_TIE, clkevt_base + PITTCTRL);
+> +}
+> +
+> +static inline void pit_timer_disable(void)
+> +{
+> +	__raw_writel(0, clkevt_base + PITTCTRL);
+> +}
+> +
+> +static inline void pit_irq_acknowledge(void)
+> +{
+> +	__raw_writel(PITTFLG_TIF, clkevt_base + PITTFLG);
+> +}
+> +
+> +static unsigned int pit_read_sched_clock(void)
+> +{
+> +	return __raw_readl(clksrc_base + PITCVAL);
+> +}
+> +
+> +static int __init pit_clocksource_init(unsigned long rate)
+> +{
+> +	/* set the max load value and start the clock source counter */
+> +	__raw_writel(0, clksrc_base + PITTCTRL);
+> +	__raw_writel(~0UL, clksrc_base + PITLDVAL);
+> +	__raw_writel(PITTCTRL_TEN, clksrc_base + PITTCTRL);
+> +
+> +	setup_sched_clock(pit_read_sched_clock, 32, rate);
+> +	return clocksource_mmio_init(clksrc_base + PITCVAL, "vf-pit", rate,
+> +			300, 32, clocksource_mmio_readl_down);
+> +}
+> +
+> +static int pit_set_next_event(unsigned long delta,
+> +				struct clock_event_device *unused)
+> +{
+> +	/*
+> +	 * set a new value to PITLDVAL register will not restart the timer,
+> +	 * to abort the current cycle and start a timer period with the new
+> +	 * value, the timer must be disabled and enabled again.
+> +	 * and the PITLAVAL should be set to delta minus one according to pit
+> +	 * hardware requirement.
+> +	 */
+> +	pit_timer_disable();
+> +	__raw_writel(delta - 1, clkevt_base + PITLDVAL);
+> +	pit_timer_enable();
+> +
+> +	return 0;
+> +}
+> +
+> +static void pit_set_mode(enum clock_event_mode mode,
+> +				struct clock_event_device *evt)
+> +{
+> +	switch (mode) {
+> +	case CLOCK_EVT_MODE_PERIODIC:
+> +		pit_set_next_event(cycle_per_jiffy, evt);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+> +static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = dev_id;
+> +
+> +	pit_irq_acknowledge();
+> +
+> +	/*
+> +	 * pit hardware doesn't support oneshot, it will generate an interrupt
+> +	 * and reload the counter value from PITLDVAL when PITCVAL reach zero,
+> +	 * and start the counter again. So software need to disable the timer
+> +	 * to stop the counter loop in ONESHOT mode.
+> +	 */
+> +	if (likely(evt->mode == CLOCK_EVT_MODE_ONESHOT))
+> +		pit_timer_disable();
+> +
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct clock_event_device clockevent_pit = {
+> +	.name		= "VF pit timer",
+> +	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +	.set_mode	= pit_set_mode,
+> +	.set_next_event	= pit_set_next_event,
+> +	.rating		= 300,
+> +};
+> +
+> +static struct irqaction pit_timer_irq = {
+> +	.name		= "VF pit timer",
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+> +	.handler	= pit_timer_interrupt,
+> +	.dev_id		= &clockevent_pit,
+> +};
+> +
+> +static int __init pit_clockevent_init(unsigned long rate, int irq)
+> +{
+> +	__raw_writel(0, clkevt_base + PITTCTRL);
+> +	__raw_writel(PITTFLG_TIF, clkevt_base + PITTFLG);
+> +
+> +	BUG_ON(setup_irq(irq, &pit_timer_irq));
+> +
+> +	clockevent_pit.cpumask = cpumask_of(0);
+> +	clockevent_pit.irq = irq;
+> +	/*
+> +	 * The value for the LDVAL register trigger is calculated as:
+> +	 * LDVAL trigger = (period / clock period) - 1
+> +	 * The pit is a 32-bit down count timer, when the conter value
+> +	 * reaches 0, it will generate an interrupt, thus the minimal
+> +	 * LDVAL trigger value is 1. And then the min_delta is
+> +	 * minimal LDVAL trigger value + 1, and the max_delta is full 32-bit.
+> +	 */
+> +	clockevents_config_and_register(&clockevent_pit, rate, 2, 0xffffffff);
+> +
+> +	return 0;
+> +}
+> +
+> +static void __init pit_timer_init(struct device_node *np)
+> +{
+> +	struct clk *pit_clk;
+> +	void __iomem *timer_base;
+> +	unsigned long clk_rate;
+> +	int irq;
+> +
+> +	timer_base = of_iomap(np, 0);
+> +	BUG_ON(!timer_base);
+> +
+> +	/*
+> +	 * PIT0 and PIT1 can be chained to build a 64-bit timer,
+> +	 * so choose PIT2 as clocksource, PIT3 as clockevent device,
+> +	 * and leave PIT0 and PIT1 unused for anyone else who needs them.
+> +	 */
+> +	clksrc_base = timer_base + PITn_OFFSET(2);
+> +	clkevt_base = timer_base + PITn_OFFSET(3);
+> +
+> +	irq = irq_of_parse_and_map(np, 0);
+> +	BUG_ON(irq <= 0);
+> +
+> +	pit_clk = of_clk_get(np, 0);
+> +	BUG_ON(IS_ERR(pit_clk));
+> +
+> +	BUG_ON(clk_prepare_enable(pit_clk));
+> +
+> +	clk_rate = clk_get_rate(pit_clk);
+> +	cycle_per_jiffy = clk_rate / (HZ);
+> +
+> +	/* enable the pit module */
+> +	__raw_writel(~PITMCR_MDIS, timer_base + PITMCR);
+> +
+> +	BUG_ON(pit_clocksource_init(clk_rate));
+> +
+> +	pit_clockevent_init(clk_rate, irq);
+> +}
+> +CLOCKSOURCE_OF_DECLARE(vf610, "fsl,vf610-pit", pit_timer_init);
+> 
 
-More will come but as soon as we have finish the dt drivers support
-few critical driver are missing but on the way as lcdc, hlcdc, rtc, etc...
 
-but all the new SoC and board are DT only
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Best Regards,
-J.
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
