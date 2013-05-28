@@ -1,46 +1,48 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 27 May 2013 21:07:29 -0700
-Subject: [PATCH 2/9] ARM: shmobile: add GPIO IRQ macro
-In-Reply-To: <1369648773-7941-3-git-send-email-horms+renesas@verge.net.au>
-References: <1369648773-7941-1-git-send-email-horms+renesas@verge.net.au>
- <1369648773-7941-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130528040729.GN13532@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 27 May 2013 22:13:09 -0600
+Subject: [PATCH v2] video: simplefb: add mode parsing function
+In-Reply-To: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
+References: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <51A42ED5.2060104@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 06:59:26PM +0900, Simon Horman wrote:
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On 05/26/2013 09:53 PM, Alexandre Courbot wrote:
+> The naming scheme of simplefb's mode is precise enough to allow building
+> the mode structure from it instead of using a static list of modes. This
+> patch introduces a function that does this. In case exotic modes that
+> cannot be represented from their name alone are needed, the static list
+> of modes is still available as a backup.
 > 
-> R-Car series gpio_rcar driver can control GPIO IRQ today.
-> It needs base IRQ number for gpio_rcar_config :: .irq_base
-> This patch adds macro for GPIO IRQ.
-> This patch was tested on Bock-W board
+> It also changes the order in which colors are declared from MSB first to
+> the more standard LSB first.
 > 
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 > ---
->  arch/arm/mach-shmobile/include/mach/irqs.h |    5 +++++
->  1 file changed, 5 insertions(+)
+> Changes from v1:
+> - amended documentation following Stephen's suggestion
+> - allow parsing of bitfields larger than 9 bits
+> - made it clear that the parsing order of bits is changed with respect
+>   to the original patch
 > 
-> diff --git a/arch/arm/mach-shmobile/include/mach/irqs.h b/arch/arm/mach-shmobile/include/mach/irqs.h
-> index b2074e2..d241bfd 100644
-> --- a/arch/arm/mach-shmobile/include/mach/irqs.h
-> +++ b/arch/arm/mach-shmobile/include/mach/irqs.h
-> @@ -16,4 +16,9 @@
->  #define IRQPIN_BASE		2000
->  #define irq_pin(nr)		((nr) + IRQPIN_BASE)
->  
-> +/* GPIO IRQ */
-> +#define _GPIO_IRQ_BASE		2500
-> +#define GPIO_IRQ_BASE(x)	(_GPIO_IRQ_BASE + (32 * x))
-> +#define GPIO_IRQ(x, y)		(_GPIO_IRQ_BASE + (32 * x) + y)
-> +
->  #endif /* __ASM_MACH_IRQS_H */
+> Andrew, since this patch introduces a (small) change in the DT bindings,
+> could we try to merge it during the -rc cycle so we don't have to come
+> with a more complex solution in the future?
 
-Hmm. It'd be real nice to see some effort on moving this over to sparse
-irq instead. That'll be needed for full device tree conversion anyway. And
-with that, the static irq bases will be gone, so drivers and some of
-the platform code will need to be adjusted accordingly.
+So, I think we shouldn't change the DT binding at all now. The original
+driver is now merged for 3.10, and I think it's far too late to take
+code that implements new features for 3.10. This means that we couldn't
+merge this patch until 3.11. However, by then, we shouldn't be changing
+the DT binding in incompatible ways. Olof has already published some
+U-Boot binaries that use the current binding, and on IRC indicated he'd
+prefer not to change the binding because of that.
 
+As such, we should either:
 
--Olof
+a) Just add new entries into the format array that already exists in the
+driver. Given David's response, this might be simplest.
+
+b) Extend the DT binding in a 100% backwards-compatible way, which would
+mean defaulting the bit-order to match the existing 1 format, and adding
+a new Boolean property to indicate that the format string is specified
+in the other order.
