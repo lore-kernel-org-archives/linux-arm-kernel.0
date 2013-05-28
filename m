@@ -1,57 +1,44 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 May 2013 10:28:41 +0100
-Subject: [GIT PULL] ux500 DMA40 device tree migration base
-In-Reply-To: <20130528031320.GD13532@quad.lixom.net>
-References: <CACRpkdZjr=48_GJxsoYgK7DFUqLs10x4o9yky3MzNR7vh24ogA@mail.gmail.com>
- <20130528031320.GD13532@quad.lixom.net>
-Message-ID: <20130528092841.GG22683@gmail.com>
+Date: Tue, 28 May 2013 10:38:15 +0100
+Subject: [PATCH 7/7] Documentation: Update binding for Nomadik and DBx5x
+ based platforms
+In-Reply-To: <CACRpkdYyZZSy4VgFc+Uo=5iAF++EPmHM0U2pHcLdkDZc=Xb_sQ@mail.gmail.com>
+References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
+ <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
+ <CACRpkdYyZZSy4VgFc+Uo=5iAF++EPmHM0U2pHcLdkDZc=Xb_sQ@mail.gmail.com>
+Message-ID: <20130528093815.GH22683@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 May 2013, Olof Johansson wrote:
-
-> On Thu, May 23, 2013 at 09:34:22PM +0200, Linus Walleij wrote:
-> > Hi ARM SoC folks,
-> > 
-> > here is a patch set that Lee has been chiseling out recently. I've
-> > accumulated it in my ux500 tree and piled ACKs on the first 36
-> > patches of the patch set. Basically that includes ACKs from
-> > subsystem maintainers Vinod Koul and Herbert Xu for affected
-> > parts.
-> > 
-> > We need to get this into Linux-next to proceed with further
-> > migration on top of it. All have been circulated on the lists for
-> > a while.
-> > 
-> > Please pull this into an apropriate ARM SoC branch for v3.11!
-> > 
-> > If we can get ACKs for the rest of the patches in Lee's set these
-> > will arrive on top of this base as soon as they are ready.
-> > 
-> > Yours,
-> > Linus Walleij
-> > 
-> > The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-> > 
-> >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> > tags/ux500-dma40-for-arm-soc
+> >  Required properties:
+> > -- compatible: "stericsson,nmk-pinctrl", "stericsson,nmk-pinctrl-db8540",
+> > -              "stericsson,nmk-pinctrl-stn8815"
+> > +- compatible: "stericsson,db8500-pinctrl", "stericsson,db8540-pinctrl",
+> > +              "stericsson,stn8815-pinctrl"
 > 
-> Thanks, pulled into next/drivers.
+> OK...
 > 
-> I see the conversions have been made the brute-force way instead of keeping
-> backwards compatibility and cleaning up drivers before removing no longer
-> needed board code. That should be fine, as long as you don't introduce too
-> crazy dependencies (and conflicts) in the code you're talking about adding on
-> top. 
+> >         pinctrl at 80157000 {
+> > -               compatible = "stericsson,nmk-pinctrl";
+> > +               compatible = "stericsson,u8500-pinctrl";
+> 
+> This does not look like a supported compatible string?
 
-It's not as bad as you make it sound. The platform devices which we
-converted over were either already converted (mmci, amba-pl011), not
-used (crypt, hash, musb) or broken (mop500-asoc). So it really should
-be no big deal.
+Do you still think this, or did you change you mind?
+
+If so, what makes you think it? How does it differ from:
+
+compatible = "arm,cortex-a9-twd-timer";
+compatible = "arm,rtc-pl031";
+compatible = "stericsson,db8500-gpio",
+compatible = "stericsson,db8500-musb",
+compatible = "stericsson,db8500-dma40",
+compatible = "stericsson,db8500-prcmu";
+compatible = "stericsson,db8500-prcmu-timer-4";
+compatible = "stericsson,db8500-thermal";
+compatible = "stericsson,db8500-prcmu-regulator";
+
+
 
 -- 
 Lee Jones
