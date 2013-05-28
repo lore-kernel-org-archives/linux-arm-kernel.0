@@ -1,57 +1,44 @@
-From: hechtb@gmail.com (Bastian Hecht)
-Date: Tue, 28 May 2013 23:20:34 +0200
-Subject: [PATCH 09/12] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
-In-Reply-To: <20130528052900.GB25005@verge.net.au>
-References: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
- <1369645193-3595-10-git-send-email-horms+renesas@verge.net.au>
- <20130528035019.GI13532@quad.lixom.net>
- <20130528052900.GB25005@verge.net.au>
-Message-ID: <CABYn4syN6_RdQ4M7vQvCQTLaf9DGtwBNxZ5E-qJfnW0j43oOVw@mail.gmail.com>
+From: jgchunter@gmail.com (Jon Hunter)
+Date: Tue, 28 May 2013 22:20:44 +0100
+Subject: [PATCH] ARM: OMAP2+: timer: initialize before using oh_name
+In-Reply-To: <1369722288-15592-1-git-send-email-afzal@ti.com>
+References: <1369722288-15592-1-git-send-email-afzal@ti.com>
+Message-ID: <51A51FAC.5090606@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/28 Simon Horman <horms@verge.net.au>:
-> On Mon, May 27, 2013 at 08:50:19PM -0700, Olof Johansson wrote:
->> Hi,
->>
->> On Mon, May 27, 2013 at 05:59:50PM +0900, Simon Horman wrote:
->> > From: Bastian Hecht <hechtb@gmail.com>
->> >
->> > We add 2 Suspend to RAM modes:
->> > - A3SM PLL0 on/off:     Power domain A3SM that contains the ARM core
->> >                         and the 2nd level cache with either PLL0 on
->> >                         or off
->> >
->> > As the suspend to memory mechanism we use A3SM PLL off. A3SM PLL on
->> > is included here too, so CPUIdle can use both power down modes (not
->> > included in this patch).
->> >
->> > The setup of the SYSC regarding the external IRQs is taken from
->> > pm-sh7372.c from Magnus Damm.
->> >
->> > Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
->>
->> Missing S-o-b from you, Simon?
->
-> Oops sorry about that.
->
->> > +   .text
->> > +ENTRY(v7_cpu_resume)
->> > +   bl      v7_invalidate_l1
->> > +   b       cpu_resume
->> > +ENDPROC(v7_cpu_resume)
->>
->> This is a global namespace so it'll conflict with i.MX whenever
->> you multiplatform enable shmobile. Might want to pick a more
->> unique name.
->
-> Bastian, could you suggest an alternate name?
 
-It should really be a temporary thing, as this should be handled in
-the generic ARM code. So how about:
+On 28/05/13 07:24, Afzal Mohammed wrote:
+> of_property_read_string_index(...,&oh_name) in omap_dm_timer_init_one
+> does not alter the value of 'oh_name' even if the relevant function
+> fails and as 'oh_name' in stack may have a non-zero value, it would
+> be misunderstood by timer code that DT has specified "ti,hwmod"
+> property for timer. 'oh_name' in this scenario would be a junk value,
+> this would result in module not being enabled by hwmod API's for
+> timer, and in turn crash.
+> 
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
+>  arch/arm/mach-omap2/timer.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-omap2/timer.c b/arch/arm/mach-omap2/timer.c
+> index f8b23b8..8e0c390 100644
+> --- a/arch/arm/mach-omap2/timer.c
+> +++ b/arch/arm/mach-omap2/timer.c
+> @@ -220,7 +220,7 @@ static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+>  					 int posted)
+>  {
+>  	char name[10]; /* 10 = sizeof("gptXX_Xck0") */
+> -	const char *oh_name;
+> +	const char *oh_name = NULL;
+>  	struct device_node *np;
+>  	struct omap_hwmod *oh;
+>  	struct resource irq, mem;
 
-r8a7740_cpu_resume()
+Thanks!
 
-Cheers,
+Acked-by: Jon Hunter <jgchunter@gmail.com>
 
- Bastian
+Cheers
+Jon
