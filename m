@@ -1,10 +1,10 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 16:26:32 -0400
-Subject: [GIT PULL 3/5] ARM: kirkwood: pcie driver for v3.11
+Date: Tue, 28 May 2013 16:28:28 -0400
+Subject: [GIT PULL 4/5] ARM: mvebu: pcie bridge enhancements for v3.11
 In-Reply-To: <20130528202433.GH31290@titan.lakedaemon.net>
 References: <20130528202140.GG31290@titan.lakedaemon.net>
  <20130528202433.GH31290@titan.lakedaemon.net>
-Message-ID: <20130528202632.GI31290@titan.lakedaemon.net>
+Message-ID: <20130528202828.GJ31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,66 +15,29 @@ The following changes since commit 3d9939c92efdd4ced672b94994959ca71b141cb8:
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/pcie_kw-3.11
+  git://git.infradead.org/users/jcooper/linux.git tags/pcie_bridge-3.11
 
-for you to fetch changes up to 0d0632f523fa040b307688ae421a1debf79af2d7:
+for you to fetch changes up to 6eb237c41acc1cf00b3b1176ad4a0ed3f221d630:
 
-  arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree (2013-05-27 16:02:13 +0000)
+  pci: mvebu: fix the emulation of the status register (2013-05-27 16:01:15 +0000)
 
 ----------------------------------------------------------------
-mvebu pcie driver (kirkwood) for v3.11
+mvebu pcie driver (bridge) for v3.11
 
- - kirkwood
-    - enable pcie driver
-    - migrate boards over to pcie dt init
+ - mvebu
+    - allow enumeration of devices beyond physical bridges
+    - remove faking the slot location
+    - fix status register emulation
 
 depends
  - mvebu/pcie
-    - mvebu/of_pci
+    -mvebu/of_pci
 
 ----------------------------------------------------------------
-Thomas Petazzoni (8):
-      pci: mvebu: enable driver usage on Kirkwood
-      arm: kirkwood: move PCIe window init to legacy driver
-      arm: kirkwood: add SoC-level Device Tree data for PCIe interfaces
-      arm: kirkwood: convert Iomega Iconnect to use DT for the PCIe interface
-      arm: kirkwood: convert MPL CEC4 to use DT for the PCIe interface
-      arm: kirkwood: convert ZyXEL NSA310 to use DT for the PCIe interface
-      arm: kirkwood: convert QNAP TS219 to use DT for the PCIe interface
-      arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree
+Thomas Petazzoni (3):
+      pci: mvebu: no longer fake the slot location of downstream devices
+      pci: mvebu: allow the enumeration of devices beyond physical bridges
+      pci: mvebu: fix the emulation of the status register
 
- .../devicetree/bindings/pci/mvebu-pci.txt          |   1 +
- arch/arm/boot/dts/Makefile                         |   2 +
- arch/arm/boot/dts/kirkwood-6281.dtsi               |  31 ++++++
- arch/arm/boot/dts/kirkwood-6282.dtsi               |  48 +++++++++
- arch/arm/boot/dts/kirkwood-db-88f6281.dts          |  30 ++++++
- arch/arm/boot/dts/kirkwood-db-88f6282.dts          |  34 +++++++
- arch/arm/boot/dts/kirkwood-db.dtsi                 |  89 +++++++++++++++++
- arch/arm/boot/dts/kirkwood-iconnect.dts            |   8 ++
- arch/arm/boot/dts/kirkwood-mplcec4.dts             |   8 ++
- arch/arm/boot/dts/kirkwood-nsa310.dts              |   8 ++
- arch/arm/boot/dts/kirkwood-ts219-6281.dts          |   3 +-
- arch/arm/boot/dts/kirkwood-ts219-6282.dts          |   3 +-
- arch/arm/boot/dts/kirkwood-ts219.dtsi              |   9 +-
- arch/arm/boot/dts/kirkwood.dtsi                    |   1 +
- arch/arm/mach-kirkwood/Kconfig                     |  21 ++--
- arch/arm/mach-kirkwood/Makefile                    |   3 +-
- arch/arm/mach-kirkwood/board-db88f628x-bp.c        |  24 +++++
- arch/arm/mach-kirkwood/board-dt.c                  |   6 ++
- arch/arm/mach-kirkwood/board-iconnect.c            |   8 --
- arch/arm/mach-kirkwood/board-mplcec4.c             |   1 -
- arch/arm/mach-kirkwood/board-nsa310.c              |  25 -----
- arch/arm/mach-kirkwood/board-ts219.c               |  10 --
- arch/arm/mach-kirkwood/common.c                    |  24 -----
- arch/arm/mach-kirkwood/common.h                    |   6 ++
- arch/arm/mach-kirkwood/db88f6281-bp-setup.c        | 108 ---------------------
- arch/arm/mach-kirkwood/pcie.c                      |  22 +++++
- drivers/pci/host/Kconfig                           |   2 +-
- drivers/pci/host/pci-mvebu.c                       |   1 +
- 28 files changed, 339 insertions(+), 197 deletions(-)
- create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6281.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-db-88f6282.dts
- create mode 100644 arch/arm/boot/dts/kirkwood-db.dtsi
- create mode 100644 arch/arm/mach-kirkwood/board-db88f628x-bp.c
- delete mode 100644 arch/arm/mach-kirkwood/board-nsa310.c
- delete mode 100644 arch/arm/mach-kirkwood/db88f6281-bp-setup.c
+ drivers/pci/host/pci-mvebu.c | 55 +++++++++++++++++++++++++++++++++++---------
+ 1 file changed, 44 insertions(+), 11 deletions(-)
