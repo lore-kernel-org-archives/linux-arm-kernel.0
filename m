@@ -1,24 +1,27 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 28 May 2013 11:50:41 -0700
-Subject: [PATCH 7/8] ARM: msm: use generic cpu idle function for wfi
-In-Reply-To: <1369665166-13049-8-git-send-email-sanjay.rawat@linaro.org>
-References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
- <1369665166-13049-8-git-send-email-sanjay.rawat@linaro.org>
-Message-ID: <20130528185039.GA11236@davidb.org>
+From: marex@denx.de (Marek Vasut)
+Date: Tue, 28 May 2013 20:29:55 +0200
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <20130528062711.GB19608@S2101-09.ap.freescale.net>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <201305280656.27472.marex@denx.de>
+ <20130528062711.GB19608@S2101-09.ap.freescale.net>
+Message-ID: <201305282029.55905.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 08:02:44PM +0530, Sanjay Singh Rawat wrote:
-> use cpu_do_idle for entering the wfi mode.
+Dear Shawn Guo,
+
+> On Tue, May 28, 2013 at 06:56:27AM +0200, Marek Vasut wrote:
+> > What is the problem you observe?
 > 
-> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
-> ---
->  arch/arm/mach-msm/hotplug.c |    9 ++-------
->  1 file changed, 2 insertions(+), 7 deletions(-)
+> The audio playback gives silent output.
 
-Acked-by: David Brown <davidb@codeaurora.org>
+You mean like nothing? Zilch? Not even a loud pop on the start/stop of playback?
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+I have no issues with audio + touchscreen on m28evk since like 3.7 or so (even 
+before I pushed the driver mainline), so this is weird. Do you have your 
+speakers connected to LineOut or Speaker output from the SGTL5000 ? In case of 
+LineOut, is your on-board amplifier on ?
+
+Best regards,
+Marek Vasut
