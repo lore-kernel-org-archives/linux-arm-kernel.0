@@ -1,57 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 May 2013 11:42:50 +0100
-Subject: [PATCH v2] arch: arm64: kernel: sprintf(), 'str' needs
- additional 1 byte for failure processing
-In-Reply-To: <51A2BE2C.2000004@asianux.com>
-References: <51A1E3B3.4060901@asianux.com>
- <51A2BE2C.2000004@asianux.com>
-Message-ID: <20130528104250.GE10474@mudshark.cambridge.arm.com>
+From: ratbert.chuang@gmail.com (Po-Yu Chuang)
+Date: Tue, 28 May 2013 18:48:20 +0800
+Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
+Message-ID: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This bug was introduced in commit e651eab0.
+Some v4/v5 platforms failed to boot due to this.
 
-On Mon, May 27, 2013 at 03:00:12AM +0100, Chen Gang wrote:
-> 
-> When failure occurs at the last looping cycle (when 'i == 0'), it will
-> print "bad PC value" instead of "(%08x) ", which needs additional 1
-> byte.
-> 
-> If not add 1 byte, the 'str' may be memory overflow.
-> 
-> 
-> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> ---
->  arch/arm64/kernel/traps.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-> index 61d7dd2..c2f68d2 100644
-> --- a/arch/arm64/kernel/traps.c
-> +++ b/arch/arm64/kernel/traps.c
-> @@ -100,7 +100,7 @@ static void dump_instr(const char *lvl, struct pt_regs *regs)
->  {
->  	unsigned long addr = instruction_pointer(regs);
->  	mm_segment_t fs;
-> -	char str[sizeof("00000000 ") * 5 + 2 + 1], *p = str;
-> +	char str[sizeof("00000000 ") * 5 + 2 + 1 + 1], *p = str;
->  	int i;
+Signed-off-by: Po-Yu Chuang <ratbert.chuang@gmail.com>
+---
+ arch/arm/mm/mmu.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Whilst this code is difficult to follow, I don't think it's incorrect.
-The size of the str array is:
-
-	sizeof("00000000 ") = 8 ('0's) + 1 (space) + 1 (NUL) = 10 bytes
-	*5 = 50 bytes
-	+2 (for the two brackets when i == 0) = 52 bytes
-	+1 (this is for the "bad PC value") = 53 bytes
-
-In the worst case (when the PC is bad) we print:
-
-	"%08x " x4 = (8 + 1 + 1) *4 = 40 bytes
-	"bad PC value" = 12 + 1 = 13 bytes
-
-so again, 53 bytes.
-
-... or have I missed a character somewhere?
-
-Will
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e0d8565..19a43f8 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -620,6 +620,8 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+ 			unsigned long end, phys_addr_t phys,
+ 			const struct mem_type *type)
+ {
++	pmd_t *p = pmd;
++
+ #ifndef CONFIG_ARM_LPAE
+ 	/*
+ 	 * In classic MMU format, puds and pmds are folded in to
+@@ -638,7 +640,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+ 		phys += SECTION_SIZE;
+ 	} while (pmd++, addr += SECTION_SIZE, addr != end);
+ 
+-	flush_pmd_entry(pmd);
++	flush_pmd_entry(p);
+ }
+ 
+ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+-- 
+1.7.9.5
