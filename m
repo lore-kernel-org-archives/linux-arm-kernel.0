@@ -1,74 +1,65 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 27 May 2013 19:11:21 -0700
-Subject: [PATCH v3 4/7] ARM: KVM: use phys_addr_t instead of unsigned
- long long for HYP PGDs
-In-Reply-To: <1368529900-22572-5-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 27 May 2013 19:11:57 -0700
+Subject: [PATCH v3 5/7] ARM: KVM: don't special case PC when doing an MMIO
+In-Reply-To: <1368529900-22572-6-git-send-email-marc.zyngier@arm.com>
 References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
- <1368529900-22572-5-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130528021121.GD16071@ubuntu>
+ <1368529900-22572-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130528021157.GE16071@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 12:11:37PM +0100, Marc Zyngier wrote:
-> HYP PGDs are passed around as phys_addr_t, except just before calling
-> into the hypervisor init code, where they are cast to a rather weird
-> unsigned long long.
+On Tue, May 14, 2013 at 12:11:38PM +0100, Marc Zyngier wrote:
+> Admitedly, reading a MMIO register to load PC is very weird.
+> Writing PC to a MMIO register is probably even worse. But
+> the architecture doesn't forbid any of these, and injecting
+> a Prefetch Abort is the wrong thing to do anyway.
 > 
-> Just keep them around as phys_addr_t, which is what makes the most
-> sense.
+> Remove this check altogether, and let the adventurous guest
+> wander into LaLaLand if they feel compelled to do so.
 > 
 > Reported-by: Catalin Marinas <catalin.marinas@arm.com>
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/include/asm/kvm_host.h | 4 ++--
->  arch/arm/kvm/arm.c              | 8 ++++----
->  2 files changed, 6 insertions(+), 6 deletions(-)
+>  arch/arm/include/asm/kvm_emulate.h | 5 -----
+>  arch/arm/kvm/mmio.c                | 6 ------
+>  2 files changed, 11 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 57cb786..ff49193 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -190,8 +190,8 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *);
->  int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		int exception_index);
+> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> index 82b4bab..a464e8d 100644
+> --- a/arch/arm/include/asm/kvm_emulate.h
+> +++ b/arch/arm/include/asm/kvm_emulate.h
+> @@ -65,11 +65,6 @@ static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
+>  	return cpsr_mode > USR_MODE;;
+>  }
 >  
-> -static inline void __cpu_init_hyp_mode(unsigned long long boot_pgd_ptr,
-> -				       unsigned long long pgd_ptr,
-> +static inline void __cpu_init_hyp_mode(phys_addr_t boot_pgd_ptr,
-> +				       phys_addr_t pgd_ptr,
->  				       unsigned long hyp_stack_ptr,
->  				       unsigned long vector_ptr)
+> -static inline bool kvm_vcpu_reg_is_pc(struct kvm_vcpu *vcpu, int reg)
+> -{
+> -	return reg == 15;
+> -}
+> -
+>  static inline u32 kvm_vcpu_get_hsr(struct kvm_vcpu *vcpu)
 >  {
-> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
-> index 37d216d..327a1fb 100644
-> --- a/arch/arm/kvm/arm.c
-> +++ b/arch/arm/kvm/arm.c
-> @@ -789,8 +789,8 @@ long kvm_arch_vm_ioctl(struct file *filp,
+>  	return vcpu->arch.fault.hsr;
+> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
+> index 72a12f2..b8e06b7 100644
+> --- a/arch/arm/kvm/mmio.c
+> +++ b/arch/arm/kvm/mmio.c
+> @@ -86,12 +86,6 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
+>  	sign_extend = kvm_vcpu_dabt_issext(vcpu);
+>  	rt = kvm_vcpu_dabt_get_rd(vcpu);
 >  
->  static void cpu_init_hyp_mode(void *dummy)
->  {
-> -	unsigned long long boot_pgd_ptr;
-> -	unsigned long long pgd_ptr;
-> +	phys_addr_t boot_pgd_ptr;
-> +	phys_addr_t pgd_ptr;
->  	unsigned long hyp_stack_ptr;
->  	unsigned long stack_page;
->  	unsigned long vector_ptr;
-> @@ -798,8 +798,8 @@ static void cpu_init_hyp_mode(void *dummy)
->  	/* Switch from the HYP stub to our own HYP init vector */
->  	__hyp_set_vectors(kvm_get_idmap_vector());
->  
-> -	boot_pgd_ptr = (unsigned long long)kvm_mmu_get_boot_httbr();
-> -	pgd_ptr = (unsigned long long)kvm_mmu_get_httbr();
-> +	boot_pgd_ptr = kvm_mmu_get_boot_httbr();
-> +	pgd_ptr = kvm_mmu_get_httbr();
->  	stack_page = __get_cpu_var(kvm_arm_hyp_stack_page);
->  	hyp_stack_ptr = stack_page + PAGE_SIZE;
->  	vector_ptr = (unsigned long)__kvm_hyp_vector;
+> -	if (kvm_vcpu_reg_is_pc(vcpu, rt)) {
+> -		/* IO memory trying to read/write pc */
+> -		kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
+> -		return 1;
+> -	}
+> -
+>  	mmio->is_write = is_write;
+>  	mmio->phys_addr = fault_ipa;
+>  	mmio->len = len;
 > -- 
 > 1.8.2.3
 > 
 > 
 Applied, thanks.
-
 -Christoffer
