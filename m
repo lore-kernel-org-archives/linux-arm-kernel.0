@@ -1,83 +1,62 @@
-From: jgchunter@gmail.com (Jon Hunter)
-Date: Tue, 28 May 2013 19:42:41 +0100
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <20130526190710.GA3345@blackmetal.musicnaut.iki.fi>
-References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
- <20130516180933.GG5600@atomide.com>
- <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
- <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
- <20130521173936.GE31836@blackmetal.musicnaut.iki.fi>
- <519BCCEC.8010303@gmail.com>
- <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
- <519E67AD.6070702@gmail.com>
- <20130526190710.GA3345@blackmetal.musicnaut.iki.fi>
-Message-ID: <51A4FAA1.5060504@gmail.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Wed, 29 May 2013 00:18:40 +0530
+Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
+In-Reply-To: <20130528140705.GE28971@mudshark.cambridge.arm.com>
+References: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
+ <20130528130502.GA28971@mudshark.cambridge.arm.com> <51A4B938.7080708@ti.com>
+ <20130528140705.GE28971@mudshark.cambridge.arm.com>
+Message-ID: <51A4FC08.3060906@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 26/05/13 20:07, Aaro Koskinen wrote:
-> On Thu, May 23, 2013 at 08:02:05PM +0100, Jon Hunter wrote:
->> On 22/05/13 22:20, Aaro Koskinen wrote:
->>> On Tue, May 21, 2013 at 08:37:16PM +0100, Jon Hunter wrote:
->>>> On 21/05/13 18:39, Aaro Koskinen wrote:
->>>>> On Mon, May 20, 2013 at 10:46:21AM -0700, Tony Lindgren wrote:
->>>>>> * Tony Lindgren <tony@atomide.com> [130516 14:50]:
->>>>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130516 14:05]:
->>>>>>>> On Thu, May 16, 2013 at 11:09:34AM -0700, Tony Lindgren wrote:
->>>>>>>>> * Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
->>>>>>>>>> I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
->>>>>>>>>>
->>>>>>>>>> [    2.264221] retu-mfd 2-0001: Retu v3.2 found
->>>>>>>>>> [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
->>>>>>>>>> [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
->>>>>>>>>>
->>>>>>>>>> The error is coming from regmap code. According to git bisect, it is
->>>>>>>>>> caused by:
->>>>>>>>>>
->>>>>>>>>> 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
->>>>>>>>>> 	Author: Jon Hunter <jon-hunter@ti.com>
->>>>>>>>>> 	Date:   Fri Mar 1 11:22:47 2013 -0600
->>>>>>>>>>
->>>>>>>>>> 	    gpio/omap: convert gpio irq domain to linear mapping
->>>>>>>>>>
->>>>>>>>>> The commit does not anymore revert cleanly, and I haven't yet tried
->>>>>>>>>> crafting a manual revert, so any fix proposals/ideas are welcome...
->>>>>>>>>
->>>>>>>>> Hmm this might be a bit trickier to fix. Obviously the real solution
->>>>>>>>> is to convert omap1 to SPARSE_IRQ like we did for omap2+.
->>>>>>>>>
->>>>>>>>> For the -rc cycle, it might be possible to fix this by adding a
->>>>>>>>> different irq_to_gpio() and gpio_to_irq() functions for omap1.
->>>>>>>>
->>>>>>>> The commit reverts cleanly if we also revert
->>>>>>>> 3513cdeccc647d41c4a9ff923af17deaaac04a66 (gpio/omap: optimise interrupt
->>>>>>>> service routine), which seems to be just some minor optimization. The
->>>>>>>> result is below, and with it 770 works again.
->>>>>>>
->>>>>>> Hmm in this case it seems that we should just fix it rather than go back
->>>>>>> to the old code, so let's take a look at that first.
->>>>>>
->>>>>> Does the following fix it for you or do we need to fix something else
->>>>>> there too?
->>>>>
->>>>> Thanks, that fixes Retu probe on 770.
+On Tuesday 28 May 2013 07:37 PM, Will Deacon wrote:
+> On Tue, May 28, 2013 at 03:03:36PM +0100, Sricharan R wrote:
+>> On Tuesday 28 May 2013 06:35 PM, Will Deacon wrote:
+>>> On Tue, May 28, 2013 at 11:48:20AM +0100, Po-Yu Chuang wrote:
+>>>> This bug was introduced in commit e651eab0.
+>>>> Some v4/v5 platforms failed to boot due to this.
 >>>>
->>>> Sorry for not responding sooner, but I have been moving. 
+>>>> Signed-off-by: Po-Yu Chuang <ratbert.chuang@gmail.com>
+>>>> ---
+>>>>  arch/arm/mm/mmu.c |    4 +++-
+>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
 >>>>
->>>> From looking at the code it appears that the regmap_add_irq_chip()
->>>> is failing in the retu driver. I am not sure if this will work, 
->>>> but have you tried making the following change to the retu driver 
->>>> so that it also uses irq_domain_add_linear() as well? Just a thought ...
->>>
->>> This will trigger WARNING: at drivers/base/regmap/regmap-irq.c:514.
->>
->> Sorry, there is another change needed. Can you try ...
-> 
-> I don't see much improvement with this. Although Retu probe succeeds,
-> genirq error logs are still there. Also none of the GPIO irqs used by
-> other drivers seem to be working at all, e.g. touchscreen.
+>>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+>>>> index e0d8565..19a43f8 100644
+>>>> --- a/arch/arm/mm/mmu.c
+>>>> +++ b/arch/arm/mm/mmu.c
+>>>> @@ -620,6 +620,8 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+>>>>  			unsigned long end, phys_addr_t phys,
+>>>>  			const struct mem_type *type)
+>>>>  {
+>>>> +	pmd_t *p = pmd;
+>>>> +
+>>>>  #ifndef CONFIG_ARM_LPAE
+>>>>  	/*
+>>>>  	 * In classic MMU format, puds and pmds are folded in to
+>>>> @@ -638,7 +640,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+>>>>  		phys += SECTION_SIZE;
+>>>>  	} while (pmd++, addr += SECTION_SIZE, addr != end);
+>>>>  
+>>>> -	flush_pmd_entry(pmd);
+>>>> +	flush_pmd_entry(p);
+>>> Wait, shouldn't this flush be *inside* the loop anyway? Otherwise we just
+>>> flush the cacheline containing the first pmd. The flushing code could also
+>>> flush to PoU instead of PoC for UP ARMv7, but that's an unrelated optimisation.
+>>    I think in LPAE this loop iterates once and non LPAE twice.
+>>    So both the entries should be contained in same cache line right ?
+> Dunno, are there any guarantees about alignment of the starting pmd? Even
+> so, the function takes the range as parameters, so I don't think we
+> should tailor it to the caller. It may explain why this hasn't come up
+> sooner though.
+>
+> Will
+ 
+ This function is not exposed outside. And the ranges passed to this is going
+to not more than 2 entries in any case. If we put the flush inside the loop,
+then we will end up doing an extra flush for the same line. Regarding the
+alignment, I think if the pgd base is aligned, then rest should be fine.
+Will have to check this.
 
-Care to share the log?
-
-Jon
+Regards,
+ Sricharan
