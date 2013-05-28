@@ -1,77 +1,40 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Tue, 28 May 2013 11:49:52 +0100
-Subject: [PATCH] ARM: document the bigger pagetables needed for LPAE
-In-Reply-To: <1369528072.2776.26@driftwood>
-References: <1369410236-22398-1-git-send-email-javi.merino@arm.com>
- <1369528072.2776.26@driftwood>
-Message-ID: <20130528104952.GD2776@e102654-lin.cambridge.arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 28 May 2013 11:52:52 +0100
+Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
+In-Reply-To: <201305271231.40693.arnd@arndb.de>
+References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
+ <201305262323.29519.arnd@arndb.de>
+ <30BA4666-664F-4DA4-A1D5-C2B8AA63C6AB@gmail.com>
+ <201305271231.40693.arnd@arndb.de>
+Message-ID: <1369738372.3148.7.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 01:27:52AM +0100, Rob Landley wrote:
-> On 05/24/2013 10:43:56 AM, Javi Merino wrote:
-> > The Booting documentation assumes that the initial pagetables are
-> > 16KiB but since 1b6ba46 (ARM: LPAE: MMU setup for the 3-level page
-> > table format) they are 20KiB for LPAE kernels.  Thus, the
-> > recommendation to put atags or the dtb in the first 16KiB is wrong,
-> > there's only 12KiB of space there in LPAE kernels, so update the
-> > documentation accordingly.
-> > ---
-> >  Documentation/arm/Booting |    9 +++++----
-> >  1 file changed, 5 insertions(+), 4 deletions(-)
-> 
-> Acked-by: Rob Landley <rob@landley.net>
-
-Thanks.  As Catalin pointed out, I'm missing my SoB.
-
-> With one comment:
-> 
-> > diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-> > index 0c1f475..f6f9cd8 100644
-> > --- a/Documentation/arm/Booting
-> > +++ b/Documentation/arm/Booting
-> > @@ -105,7 +105,7 @@ The tagged list should be stored in system RAM.
+On Mon, 2013-05-27 at 11:31 +0100, Arnd Bergmann wrote:
+> On Monday 27 May 2013, Daniel Tang wrote:
+> > > The one remaining bit that sticks out is the clcd platform data. As I
+> > > said before, I won't require you to convert that to DT in order to
+> > > get your code merged, but I'd also really like to see that happen,
+> > > as we will also need that to get rid of auxdata on the ARM reference
+> > > platforms (integrator, versatile, realview, vexpress).
 > > 
-> >  The tagged list must be placed in a region of memory where neither
-> >  the kernel decompressor nor initrd 'bootp' program will overwrite
-> > -it.  The recommended placement is in the first 16KiB of RAM.
-> > +it.  The recommended placement is in the first 12KiB of RAM.
-> > 
-> >  4b. Setup the device tree
-> >  -------------------------
-> > @@ -120,7 +120,7 @@ tagged list.
-> >  The boot loader must pass at a minimum the size and location of the
-> >  system memory, and the root filesystem location.  The dtb must be
-> >  placed in a region of memory where the kernel decompressor will not
-> > -overwrite it.  The recommended placement is in the first 16KiB of RAM
-> > +overwrite it.  The recommended placement is in the first 12KiB of RAM
-> >  with the caveat that it may not be located at physical address 0  
-> > since
-> >  the kernel interprets a value of 0 in r2 to mean neither a tagged  
-> > list
-> >  nor a dtb were passed.
-> > @@ -137,8 +137,9 @@ then it is legal for the boot loader to call the  
-> > zImage in flash
-> >  directly.
-> > 
-> >  The zImage may also be placed in system RAM (at any location) and
-> > -called there.  Note that the kernel uses 16K of RAM below the image
-> > -to store page tables.  The recommended placement is 32KiB into RAM.
-> > +called there.  Note that the kernel may use up to 20KiB of RAM below
-> > +the image to store page tables.  The recommended placement is 32KiB
-> > +into RAM.
+> > How would you like me to convert the platform data to DT? AFAIK, the clcd
+> > driver isn't aware of DT so the only way is to use the AUXDATA right now.
 > 
-> Now that we have three memory entires, possibly some sort of memory  
-> layout would be in order?
+> Linus Walleij mentioned on IRC that Pawel Moll already posted a series
+> that adds DT support for clcd:
 > 
->     0k-12k   boot data (tagged list or device tree)
->    12k-32k   page tables
->    32k-xxx   kernel image
+> http://lists.freedesktop.org/archives/dri-devel/2013-April/037519.html
 > 
-> Perhaps at the end of section 4's introduction? It's not quite obvious  
-> from the document...
+> The series does a few more things, but you can probbly split out the
+> parts you need and base on that.
 
-Sounds like a good idea, I'll add it and send a v2.
+The main "issue" with the series is its dependency on Laurent Pinchart's
+Common Display Framework (or rather on the progress of its upstreaming).
+I'm planning to discuss this in details in during the Linaro Connect in
+Dublin, but generally, if it's not getting merged in the next window,
+I'll spin the series to use the standard video modes bindings instead of
+CDF. This will make me hurt on Versatile Express, but should work for
+others.
 
-Cheers,
-Javi
+Pawe?
