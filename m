@@ -1,62 +1,54 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 27 May 2013 19:11:57 -0700
-Subject: [PATCH v3 5/7] ARM: KVM: don't special case PC when doing an MMIO
-In-Reply-To: <1368529900-22572-6-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 27 May 2013 19:12:38 -0700
+Subject: [PATCH v3 6/7] ARM: KVM: get rid of S2_PGD_SIZE
+In-Reply-To: <1368529900-22572-7-git-send-email-marc.zyngier@arm.com>
 References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
- <1368529900-22572-6-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130528021157.GE16071@ubuntu>
+ <1368529900-22572-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130528021238.GF16071@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 14, 2013 at 12:11:38PM +0100, Marc Zyngier wrote:
-> Admitedly, reading a MMIO register to load PC is very weird.
-> Writing PC to a MMIO register is probably even worse. But
-> the architecture doesn't forbid any of these, and injecting
-> a Prefetch Abort is the wrong thing to do anyway.
+On Tue, May 14, 2013 at 12:11:39PM +0100, Marc Zyngier wrote:
+> S2_PGD_SIZE defines the number of pages used by a stage-2 PGD
+> and is unused, except for a VM_BUG_ON check that missuses the
+> define.
 > 
-> Remove this check altogether, and let the adventurous guest
-> wander into LaLaLand if they feel compelled to do so.
+> As the check is very unlikely to ever triggered except in
+> circumstances where KVM is the least of our worries, just kill
+> both the define and the VM_BUG_ON check.
 > 
-> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 > ---
->  arch/arm/include/asm/kvm_emulate.h | 5 -----
->  arch/arm/kvm/mmio.c                | 6 ------
->  2 files changed, 11 deletions(-)
+>  arch/arm/include/asm/kvm_arm.h | 1 -
+>  arch/arm/kvm/mmu.c             | 3 ---
+>  2 files changed, 4 deletions(-)
 > 
-> diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-> index 82b4bab..a464e8d 100644
-> --- a/arch/arm/include/asm/kvm_emulate.h
-> +++ b/arch/arm/include/asm/kvm_emulate.h
-> @@ -65,11 +65,6 @@ static inline bool vcpu_mode_priv(struct kvm_vcpu *vcpu)
->  	return cpsr_mode > USR_MODE;;
->  }
+> diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
+> index 124623e..64e9696 100644
+> --- a/arch/arm/include/asm/kvm_arm.h
+> +++ b/arch/arm/include/asm/kvm_arm.h
+> @@ -135,7 +135,6 @@
+>  #define KVM_PHYS_MASK	(KVM_PHYS_SIZE - 1ULL)
+>  #define PTRS_PER_S2_PGD	(1ULL << (KVM_PHYS_SHIFT - 30))
+>  #define S2_PGD_ORDER	get_order(PTRS_PER_S2_PGD * sizeof(pgd_t))
+> -#define S2_PGD_SIZE	(1 << S2_PGD_ORDER)
 >  
-> -static inline bool kvm_vcpu_reg_is_pc(struct kvm_vcpu *vcpu, int reg)
-> -{
-> -	return reg == 15;
-> -}
-> -
->  static inline u32 kvm_vcpu_get_hsr(struct kvm_vcpu *vcpu)
->  {
->  	return vcpu->arch.fault.hsr;
-> diff --git a/arch/arm/kvm/mmio.c b/arch/arm/kvm/mmio.c
-> index 72a12f2..b8e06b7 100644
-> --- a/arch/arm/kvm/mmio.c
-> +++ b/arch/arm/kvm/mmio.c
-> @@ -86,12 +86,6 @@ static int decode_hsr(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
->  	sign_extend = kvm_vcpu_dabt_issext(vcpu);
->  	rt = kvm_vcpu_dabt_get_rd(vcpu);
+>  /* Virtualization Translation Control Register (VTCR) bits */
+>  #define VTCR_SH0	(3 << 12)
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 451bad3..693d16c 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -382,9 +382,6 @@ int kvm_alloc_stage2_pgd(struct kvm *kvm)
+>  	if (!pgd)
+>  		return -ENOMEM;
 >  
-> -	if (kvm_vcpu_reg_is_pc(vcpu, rt)) {
-> -		/* IO memory trying to read/write pc */
-> -		kvm_inject_pabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-> -		return 1;
-> -	}
+> -	/* stage-2 pgd must be aligned to its size */
+> -	VM_BUG_ON((unsigned long)pgd & (S2_PGD_SIZE - 1));
 > -
->  	mmio->is_write = is_write;
->  	mmio->phys_addr = fault_ipa;
->  	mmio->len = len;
+>  	memset(pgd, 0, PTRS_PER_S2_PGD * sizeof(pgd_t));
+>  	kvm_clean_pgd(pgd);
+>  	kvm->arch.pgd = pgd;
 > -- 
 > 1.8.2.3
 > 
