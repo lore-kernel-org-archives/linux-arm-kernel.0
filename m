@@ -1,10 +1,10 @@
 From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Mon, 27 May 2013 19:12:38 -0700
+Date: Mon, 27 May 2013 19:15:28 -0700
 Subject: [PATCH v3 6/7] ARM: KVM: get rid of S2_PGD_SIZE
 In-Reply-To: <1368529900-22572-7-git-send-email-marc.zyngier@arm.com>
 References: <1368529900-22572-1-git-send-email-marc.zyngier@arm.com>
  <1368529900-22572-7-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130528021238.GF16071@ubuntu>
+Message-ID: <20130528021528.GG16071@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -53,5 +53,6 @@ On Tue, May 14, 2013 at 12:11:39PM +0100, Marc Zyngier wrote:
 > 1.8.2.3
 > 
 > 
-Applied, thanks.
+Thanks for spotting this, applied.
+
 -Christoffer
