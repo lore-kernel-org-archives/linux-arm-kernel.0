@@ -1,46 +1,33 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 29 May 2013 19:06:12 +0000 (UTC)
-Subject: [PATCH 0/2] ARM: OMAP AM33XX: clock data: Enable clkout2 output
- on SoC pad
-In-Reply-To: <51A35123.6040600@ti.com>
-References: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
- <79CD15C6BA57404B839C016229A409A83EC8C081@DBDE04.ent.ti.com>
- <alpine.DEB.2.00.1305200246080.2656@utopia.booyaka.com>
- <51A35123.6040600@ti.com>
-Message-ID: <alpine.DEB.2.02.1305291902450.9052@utopia.booyaka.com>
+Date: Wed, 29 May 2013 19:07:12 +0000 (UTC)
+Subject: [RFC PATCH 1/3] ARM: AM33XX: clock: Add debugSS clock nodes to
+ clock tree
+In-Reply-To: <1362396957-30113-2-git-send-email-hvaibhav@ti.com>
+References: <hvaibhav@ti.com>
+ <1362396957-30113-2-git-send-email-hvaibhav@ti.com>
+Message-ID: <alpine.DEB.2.02.1305291906160.9052@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Beno?t,
+On Mon, 4 Mar 2013, hvaibhav at ti.com wrote:
 
-On Mon, 27 May 2013, Benoit Cousson wrote:
-
-> On 05/20/2013 04:47 AM, Paul Walmsley wrote:
-> > On Fri, 17 May 2013, Hiremath, Vaibhav wrote:
-> > 
-> >> Tony, Paul and Benoit,
-> >>
-> >> Any update on this series?
-> > 
-> > Most of the changes are DT-related, so it should probably go in via 
-> > Beno?t.  I'll ack the clock side, but have a comment on patch 2, to be 
-> > sent shortly.
+> From: Vaibhav Hiremath <hvaibhav@ti.com>
 > 
-> I've tried to apply that patch, but unfortunately, it does depend on
-> that one:
+> Represent debugSS clock interface as provided in
+> CM_WKUP_DEBUGSS_CLKCTRL register, which includes,
+> 	- Clock gate for optional DEBUG_CLKA and DBGSYSCLK
+> 	- Clock Mux for TRC_PMD and STM_PMD
+> 	- Clock divider for STM and TPIU
 > 
-> https://patchwork.kernel.org/patch/2212081/
->
-> If you did not already pulled the first one I can take both with your
-> acked-by.
-> Otherwise, I can take only the DTS ones.
-> 
-> Is that OK?
+> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
 
-Will ack that first patch now.  
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
-Vaibhav, looks like that first series is still in RFC form; you might want 
-to repost it as a non-RFC series.
+based on a quick glance.
 
 
 - Paul
