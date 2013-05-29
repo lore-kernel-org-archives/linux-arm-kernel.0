@@ -1,71 +1,298 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 29 May 2013 22:59:46 +0800
-Subject: [PATCH] ARM: fix kernel decompressor compilation error with
- CONFIG_DEBUG_SEMIHOSTING
-In-Reply-To: <alpine.LFD.2.03.1305281654120.1918@syhkavp.arg>
-References: <alpine.LFD.2.03.1305281654120.1918@syhkavp.arg>
-Message-ID: <20130529145944.GE29528@S2101-09.ap.freescale.net>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 29 May 2013 17:01:58 +0200
+Subject: [PATCH 4/8] video: atmel_lcdfb: add device tree suport
+In-Reply-To: <1365692422-9565-4-git-send-email-plagnioj@jcrosoft.com>
+References: <20130411145741.GB25242@game.jcrosoft.org>
+ <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
+ <1365692422-9565-4-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <CACQ1gAhbnsrmCzdv0KNDMN153+0F_8cwNPZUz=SF8sKUPbty3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 04:59:13PM -0400, Nicolas Pitre wrote:
-> 
-> ... and add semihosting output support to the decompressor while at it.
-> 
-> Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-Maybe include the error output in commit log.
-
-  AS      arch/arm/boot/compressed/debug.o
-arch/arm/boot/compressed/debug.S:4:33: fatal error: mach/debug-macro.S: No such file or directory
-compilation terminated.
-make[3]: *** [arch/arm/boot/compressed/debug.o] Error 1
-
-Shawn
-
-> 
-> diff --git a/arch/arm/boot/compressed/debug.S b/arch/arm/boot/compressed/debug.S
-> index 6e8382d5b7..5392ee6333 100644
-> --- a/arch/arm/boot/compressed/debug.S
-> +++ b/arch/arm/boot/compressed/debug.S
-> @@ -1,6 +1,8 @@
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
->  
-> +#ifndef CONFIG_DEBUG_SEMIHOSTING
+2013/4/11 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> get display timings from device tree
+> Use videomode helpers to get display timings and configurations from
+> device tree
+>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Andrew Morton <akpm@linux-foundation.org>
+> ---
+>  .../devicetree/bindings/video/atmel,lcdc.txt       |   75 ++++++
+>  drivers/video/Kconfig                              |    2 +
+>  drivers/video/atmel_lcdfb.c                        |  244 +++++++++++++++++---
+>  3 files changed, 289 insertions(+), 32 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/video/atmel,lcdc.txt
+>
+> diff --git a/Documentation/devicetree/bindings/video/atmel,lcdc.txt b/Documentation/devicetree/bindings/video/atmel,lcdc.txt
+> new file mode 100644
+> index 0000000..1ec175e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/video/atmel,lcdc.txt
+> @@ -0,0 +1,75 @@
+> +Atmel LCDC Framebuffer
+> +-----------------------------------------------------
 > +
->  #include CONFIG_DEBUG_LL_INCLUDE
->  
->  ENTRY(putc)
-> @@ -10,3 +12,29 @@ ENTRY(putc)
->  	busyuart r3, r1
->  	mov	 pc, lr
->  ENDPROC(putc)
+> +Required properties:
+> +- compatible :
+> +       "atmel,at91sam9261-lcdc" ,
+> +       "atmel,at91sam9263-lcdc" ,
+> +       "atmel,at91sam9g10-lcdc" ,
+> +       "atmel,at91sam9g45-lcdc" ,
+> +       "atmel,at91sam9g45es-lcdc" ,
+> +       "atmel,at91sam9rl-lcdc" ,
+> +       "atmel,at32ap-lcdc"
+> +- reg : Should contain 1 register ranges(address and length)
+> +- interrupts : framebuffer controller interrupt
+> +- display: a phandle pointing to the display node
 > +
-> +#else
+> +Required nodes:
+> +- display: a display node is required to initialize the lcd panel
+> +       This should be in the board dts.
+> +- default-mode: a videomode within the display with timing parameters
+> +       as specified below.
 > +
-> +ENTRY(putc)
-> +	adr	r1, 1f
-> +	ldmia	r1, {r2, r3}
-> +	add	r2, r2, r1
-> +	ldr	r1, [r2, r3]
-> +	strb	r0, [r1]
-> +	mov	r0, #0x03		@ SYS_WRITEC
-> +   ARM(	svc	#0x123456	)
-> + THUMB(	svc	#0xab		)
-> +	mov	pc, lr
-> +	.align	2
-> +1:	.word	_GLOBAL_OFFSET_TABLE_ - .
-> +	.word	semi_writec_buf(GOT)
-> +ENDPROC(putc)
+> +Example:
 > +
-> +	.bss
-> +	.global	semi_writec_buf
-> +	.type   semi_writec_buf, %object
-> +semi_writec_buf:
-> +	.space	4
-> +	.size	semi_writec_buf, 4
+> +       fb0: fb at 0x00500000 {
+> +               compatible = "atmel,at91sam9g45-lcdc";
+> +               reg = <0x00500000 0x1000>;
+> +               interrupts = <23 3 0>;
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&pinctrl_fb>;
+> +               display = <&display0>;
+> +               status = "okay";
+> +               #address-cells = <1>;
+> +               #size-cells = <1>;
 > +
-> +#endif
+> +       };
+> +
+> +Atmel LCDC Display
+> +-----------------------------------------------------
+> +Required properties (as per of_videomode_helper):
+> +
+> + - atmel,dmacon: dma controler configuration
+> + - atmel,lcdcon2: lcd controler configuration
+> + - atmel,guard-time: lcd guard time (Delay in frame periods)
+> + - bits-per-pixel: lcd panel bit-depth.
+> +
+> +Optional properties (as per of_videomode_helper):
+> + - atmel,lcdcon-backlight: enable backlight
+> + - atmel,lcd-wiring-mode: lcd wiring mode "RGB" or "BRG"
+> + - atmel,power-control-gpio: gpio to power on or off the LCD (as many as needed)
+still on lcdcon_pol_negative, we can add something like that:
+ - atmel,lcdcon-pwm-pulse-low: Output PWM pulses are low level (high
+level if not set)
+
+> +
+> +Example:
+> +       display0: display {
+> +               bits-per-pixel = <32>;
+> +               atmel,lcdcon-backlight;
+> +               atmel,dmacon = <0x1>;
+> +               atmel,lcdcon2 = <0x80008002>;
+> +               atmel,guard-time = <9>;
+> +               atmel,lcd-wiring-mode = <1>;
+> +
+> +               display-timings {
+> +                       native-mode = <&timing0>;
+> +                       timing0: timing0 {
+> +                               clock-frequency = <9000000>;
+> +                               hactive = <480>;
+> +                               vactive = <272>;
+> +                               hback-porch = <1>;
+> +                               hfront-porch = <1>;
+> +                               vback-porch = <40>;
+> +                               vfront-porch = <1>;
+> +                               hsync-len = <45>;
+> +                               vsync-len = <1>;
+> +                       };
+> +               };
+> +       };
+> diff --git a/drivers/video/Kconfig b/drivers/video/Kconfig
+> index 4c1546f..0687482 100644
+> --- a/drivers/video/Kconfig
+> +++ b/drivers/video/Kconfig
+> @@ -1018,6 +1018,8 @@ config FB_ATMEL
+>         select FB_CFB_FILLRECT
+>         select FB_CFB_COPYAREA
+>         select FB_CFB_IMAGEBLIT
+> +       select FB_MODE_HELPERS
+> +       select OF_VIDEOMODE
+>         help
+>           This enables support for the AT91/AT32 LCD Controller.
+>
+> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+> index f67e226..4a31570 100644
+> --- a/drivers/video/atmel_lcdfb.c
+> +++ b/drivers/video/atmel_lcdfb.c
+> @@ -20,7 +20,11 @@
+>  #include <linux/gfp.h>
+>  #include <linux/module.h>
+>  #include <linux/platform_data/atmel.h>
+> +#include <linux/of.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_gpio.h>
+>  #include <video/of_display_timing.h>
+> +#include <video/videomode.h>
+>
+>  #include <mach/cpu.h>
+>  #include <asm/gpio.h>
+> @@ -59,6 +63,13 @@ struct atmel_lcdfb_info {
+>         struct atmel_lcdfb_config *config;
+>  };
+>
+> +struct atmel_lcdfb_power_ctrl_gpio {
+> +       int gpio;
+> +       int active_low;
+> +
+> +       struct list_head list;
+> +};
+> +
+>  #define lcdc_readl(sinfo, reg)         __raw_readl((sinfo)->mmio+(reg))
+>  #define lcdc_writel(sinfo, reg, val)   __raw_writel((val), (sinfo)->mmio+(reg))
+>
+> @@ -945,16 +956,187 @@ static void atmel_lcdfb_stop_clock(struct atmel_lcdfb_info *sinfo)
+>         clk_disable(sinfo->lcdc_clk);
+>  }
+>
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id atmel_lcdfb_dt_ids[] = {
+> +       { .compatible = "atmel,at91sam9261-lcdc" , .data = &at91sam9261_config, },
+> +       { .compatible = "atmel,at91sam9263-lcdc" , .data = &at91sam9263_config, },
+> +       { .compatible = "atmel,at91sam9g10-lcdc" , .data = &at91sam9g10_config, },
+> +       { .compatible = "atmel,at91sam9g45-lcdc" , .data = &at91sam9g45_config, },
+> +       { .compatible = "atmel,at91sam9g45es-lcdc" , .data = &at91sam9g45es_config, },
+> +       { .compatible = "atmel,at91sam9rl-lcdc" , .data = &at91sam9rl_config, },
+> +       { .compatible = "atmel,at32ap-lcdc" , .data = &at32ap_config, },
+> +       { /* sentinel */ }
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, atmel_lcdfb_dt_ids);
+> +
+> +static const char *atmel_lcdfb_wiring_modes[] = {
+> +       [ATMEL_LCDC_WIRING_BGR] = "BRG",
+> +       [ATMEL_LCDC_WIRING_RGB] = "RGB",
+> +};
+> +
+> +const int atmel_lcdfb_get_of_wiring_modes(struct device_node *np)
+> +{
+> +       const char *mode;
+> +       int err, i;
+> +
+> +       err = of_property_read_string(np, "atmel,lcd-wiring-mode", &mode);
+> +       if (err < 0)
+> +               return ATMEL_LCDC_WIRING_BGR;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(atmel_lcdfb_wiring_modes); i++)
+> +               if (!strcasecmp(mode, atmel_lcdfb_wiring_modes[i]))
+> +                       return i;
+> +
+> +       return -ENODEV;
+> +}
+> +
+> +static void atmel_lcdfb_power_control_gpio(struct atmel_lcdfb_pdata *pdata, int on)
+> +{
+> +       struct atmel_lcdfb_power_ctrl_gpio *og;
+> +
+> +       list_for_each_entry(og, &pdata->pwr_gpios, list)
+> +               gpio_set_value(og->gpio, on);
+> +}
+> +
+> +static int atmel_lcdfb_of_init(struct atmel_lcdfb_info *sinfo)
+> +{
+> +       struct fb_info *info = sinfo->info;
+> +       struct atmel_lcdfb_pdata *pdata = &sinfo->pdata;
+> +       struct fb_var_screeninfo *var = &info->var;
+> +       struct device *dev = &sinfo->pdev->dev;
+> +       struct device_node *np =dev->of_node;
+> +       struct device_node *display_np;
+> +       struct device_node *timings_np;
+> +       struct display_timings *timings;
+> +       enum of_gpio_flags flags;
+> +       struct atmel_lcdfb_power_ctrl_gpio *og;
+> +       bool is_gpio_power = false;
+> +       int ret = -ENOENT;
+> +       int i, gpio;
+> +
+> +       sinfo->config = (struct atmel_lcdfb_config*)
+> +               of_match_device(atmel_lcdfb_dt_ids, dev)->data;
+> +
+> +       display_np = of_parse_phandle(np, "display", 0);
+> +       if (!display_np) {
+> +               dev_err(dev, "failed to find display phandle\n");
+> +               return -ENOENT;
+> +       }
+> +
+> +       ret = of_property_read_u32(display_np, "bits-per-pixel", &var->bits_per_pixel);
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to get property bits-per-pixel\n");
+> +               goto put_display_node;
+> +       }
+> +
+> +       ret = of_property_read_u32(display_np, "atmel,guard-time", &pdata->guard_time);
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to get property atmel,guard-time\n");
+> +               goto put_display_node;
+> +       }
+> +
+> +       ret = of_property_read_u32(display_np, "atmel,lcdcon2", &pdata->default_lcdcon2);
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to get property atmel,lcdcon2\n");
+> +               goto put_display_node;
+> +       }
+> +
+> +       ret = of_property_read_u32(display_np, "atmel,dmacon", &pdata->default_dmacon);
+> +       if (ret < 0) {
+> +               dev_err(dev, "failed to get property bits-per-pixel\n");
+> +               goto put_display_node;
+> +       }
+> +
+> +       ret = -ENOMEM;
+> +       for (i = 0; i < of_gpio_named_count(display_np, "atmel,power-control-gpio"); i++) {
+> +               gpio = of_get_named_gpio_flags(display_np, "atmel,power-control-gpio",
+> +                                              i, &flags);
+> +               if (gpio < 0)
+> +                       continue;
+> +
+> +               og = devm_kzalloc(dev, sizeof(*og), GFP_KERNEL);
+> +               if (!og)
+> +                       goto put_display_node;
+> +
+> +               og->gpio = gpio;
+> +               og->active_low = flags & OF_GPIO_ACTIVE_LOW;
+> +               is_gpio_power = true;
+> +               ret = devm_gpio_request(dev, gpio, "lcd-power-control-gpio");
+> +               if (ret) {
+> +                       dev_err(dev, "request gpio %d failed\n", gpio);
+> +                       goto put_display_node;
+> +               }
+> +
+> +               ret = gpio_direction_output(gpio, og->active_low);
+> +               if (ret) {
+> +                       dev_err(dev, "set direction output gpio %d failed\n", gpio);
+> +                       goto put_display_node;
+> +               }
+> +       }
+> +
+> +       if (is_gpio_power)
+> +               pdata->atmel_lcdfb_power_control = atmel_lcdfb_power_control_gpio;
+> +
+> +       ret = atmel_lcdfb_get_of_wiring_modes(display_np);
+> +       if (ret < 0) {
+> +               dev_err(dev, "invalid atmel,lcd-wiring-mode\n");
+> +               goto put_display_node;
+> +       }
+> +       pdata->lcd_wiring_mode = ret;
+> +
+> +       pdata->lcdcon_is_backlight = of_property_read_bool(display_np, "atmel,lcdcon-backlight");
+
+and here, something like:
+pdata->lcdcon_pol_negative = of_property_read_bool(display_np,
+"atmel,lcdcon-pwm-pulse-low");
+would be nice
+
+
+Regards,
+Richard.
