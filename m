@@ -1,47 +1,60 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 May 2013 18:28:26 +0200
-Subject: [PATCH] pinctrl: sink pinctrldev_list_mutex
-In-Reply-To: <51A4C9BA.40903@wwwdotorg.org>
-References: <1368690525-32252-1-git-send-email-linus.walleij@stericsson.com>
- <519A8A57.9060007@wwwdotorg.org>
- <CACRpkdZieCmFnHCGUkv8EqcAtb3DA7dSZpimSdB4P81tZPJRoQ@mail.gmail.com>
- <519F8B02.1080000@wwwdotorg.org>
- <CACRpkdYxvBvYAnmp-p5WwB3QD0rd83qDcdg-BMhN7-2Jv8Oo_w@mail.gmail.com>
- <51A4C9BA.40903@wwwdotorg.org>
-Message-ID: <CACRpkdaC54jJxfPiaEborfuozHCgvH6vMzsQT_6kJsM-=6fedQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 29 May 2013 12:32:50 -0400 (EDT)
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <alpine.LFD.2.03.1305291038220.1918@syhkavp.arg>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130523104303.GC16722@arm.com>
+ <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
+ <20130528095528.GA14329@arm.com>
+ <alpine.LFD.2.03.1305281340240.1918@syhkavp.arg>
+ <20130529103728.GG17767@MacBook-Pro.local>
+ <alpine.LFD.2.03.1305291038220.1918@syhkavp.arg>
+Message-ID: <alpine.LFD.2.03.1305291230160.1918@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 5:14 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> [Me]
->> But it'd be even cooler to actually just iterate over the
->> pinctrl_list och handles and orphan them, and later recouple
->> them if a driver is loaded back in.
->
-> Hmm. What happens if the client driver wants to select a different state
-> while the pinctrl driver itself isn't loaded? I'm not sure how workable
-> that is. I think the only way to make it work would be to cache enough
-> information in the struct pinctrl that it could be activated even if the
-> driver wasn't loaded. That seems a little scary.
+On Wed, 29 May 2013, Nicolas Pitre wrote:
 
-Yes it looks like that would lead to a bit of scalability problem in the
-struct pinctrl. If for nothing else than for the fact that it will eat
-memory and such :-(
+> On Wed, 29 May 2013, Catalin Marinas wrote:
+> 
+> > On Tue, May 28, 2013 at 06:52:27PM +0100, Nicolas Pitre wrote:
+> > > On Tue, 28 May 2013, Catalin Marinas wrote:
+> > > 
+> > > > On Sat, May 25, 2013 at 04:53:19AM +0100, Nicolas Pitre wrote:
+> > > > > On Thu, 23 May 2013, Catalin Marinas wrote:
+> > > > > 
+> > > > > > An issue is that for kunmap_atomic() && VIVT we flush the same page
+> > > > > > twice. I don't think we should remove the cache flushing in
+> > > > > > __kunmap_atomic() for VIVT since not all kunmap_atomic() calls require
+> > > > > > flush_kernel_dcache_page() (unless we just assume that highmem && vivt
+> > > > > > don't work together).
+> > > > > 
+> > > > > VIVT and highmem do work together.  Highmem for ARM was in fact 
+> > > > > developed on such a platform.
+> > > > 
+> > > > Thanks for confirming. Do you remember why kunmap() doesn't (need to)
+> > > > flush the cache alias (for VIVT)? Or if it does, where?
+> > > 
+> > > kunmap() calls kunmap_high() which actually does not unmap anything but 
+> > > only decrement a use count.  The page is kept around in case it is 
+> > > kmap()'d again, in which case the kmap() will be almost free and the 
+> > > page still warm.
+> > > 
+> > > It is only when the kmap() for a new page runs out of free pkmap  
+> > > entries that the unused but still mapped pages are unmapped.  This 
+> > > unmapping is done in flush_all_zero_pkmaps() where all the unused pages 
+> > > are all unmapped at once.  The cache for all those pages is flushed with 
+> > > flush_cache_kmaps() which on ARM maps to flush_cache_all() when the 
+> > > cache is VIVT.
+> > 
+> > Thanks for clarification Nico. So if kmap_high_get() returns NULL, there
+> > are no high aliases left in the cache.
+> 
+> Exact.
 
-> I'd be fine if there was a requirement to unload all drives that were
-> clients of the pinctrl driver before you could unload the pinctrl
-> driver, just like any other driver/subsystem. This would work fine at
-> least for testing with just hogs, which while not great for full-system
-> testing would surely be fine at least when first developing the pinctrl
-> driver.
+Just to be clear, this is true for VIVT only.
+Unmapped highmem pages can still be cached with VIPT.
 
-Yes ... so if we call
-get_device(pctldev->dev)/put_device(pctldev->dev)
-for any successful pinctrl_get() which is not a hog,
-we increase the refcount so that the device core will disallow
-unloading of the driver.
 
-Now I need to figure out how to do that.
-
-Yours,
-Linus Walleij
+Nicolas
