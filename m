@@ -1,80 +1,78 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Wed, 29 May 2013 10:06:14 +0800
-Subject: [PATCH] arm64: compiling issue for allmodconfig,
- need "asm/parport.h" by "drivers/parport/parport_pc.c"
-In-Reply-To: <20130528170219.GI17912@arm.com>
-References: <5177551D.8090007@asianux.com> <20130424082237.GA23397@arm.com>
- <5177B1F0.10106@asianux.com>
- <20130424102327.GF21850@mudshark.cambridge.arm.com>
- <5177BAD0.9000500@asianux.com> <20130424110511.GK23397@arm.com>
- <5199A453.4080402@asianux.com> <20130521131734.GD27002@arm.com>
- <519C1539.10908@asianux.com> <519C7484.9020709@asianux.com>
- <20130528170219.GI17912@arm.com>
-Message-ID: <51A56296.1090404@asianux.com>
+From: ratbert.chuang@gmail.com (Po-Yu Chuang)
+Date: Wed, 29 May 2013 10:14:58 +0800
+Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
+In-Reply-To: <51A4FC08.3060906@ti.com>
+References: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
+ <20130528130502.GA28971@mudshark.cambridge.arm.com> <51A4B938.7080708@ti.com>
+ <20130528140705.GE28971@mudshark.cambridge.arm.com> <51A4FC08.3060906@ti.com>
+Message-ID: <CANutaR-2gTP7ubiEdgjFyzVMc6=4t5GPjLkH8pkup=O882Hb-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 01:02 AM, Catalin Marinas wrote:
->> > 
->> > After check the Kconfig in drivers, we can find quite a few using long
->> > list args which related with ARCH.
->> > 
->> > And they are not only depend on ARCHs, but also depend on another
->> > things (e.g. VGA_CONSOL also depend on !4xx && !8xx, and another
->> > combinations).
-> Given this dependency is on the negation of that symbol, you just remove
-> it and have a "depends on HAVE_VGA_CONSOLE". The few architectures that
-> need it will have to define it (X86, ARM with a few configurations).
-> 
+On Wed, May 29, 2013 at 2:48 AM, Sricharan R <r.sricharan@ti.com> wrote:
+>
+> On Tuesday 28 May 2013 07:37 PM, Will Deacon wrote:
+> > On Tue, May 28, 2013 at 03:03:36PM +0100, Sricharan R wrote:
+> >> On Tuesday 28 May 2013 06:35 PM, Will Deacon wrote:
+> >>> On Tue, May 28, 2013 at 11:48:20AM +0100, Po-Yu Chuang wrote:
+> >>>> This bug was introduced in commit e651eab0.
+> >>>> Some v4/v5 platforms failed to boot due to this.
+> >>>>
+> >>>> Signed-off-by: Po-Yu Chuang <ratbert.chuang@gmail.com>
+> >>>> ---
+> >>>>  arch/arm/mm/mmu.c |    4 +++-
+> >>>>  1 file changed, 3 insertions(+), 1 deletion(-)
+> >>>>
+> >>>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> >>>> index e0d8565..19a43f8 100644
+> >>>> --- a/arch/arm/mm/mmu.c
+> >>>> +++ b/arch/arm/mm/mmu.c
+> >>>> @@ -620,6 +620,8 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+> >>>>                    unsigned long end, phys_addr_t phys,
+> >>>>                    const struct mem_type *type)
+> >>>>  {
+> >>>> +  pmd_t *p = pmd;
+> >>>> +
+> >>>>  #ifndef CONFIG_ARM_LPAE
+> >>>>    /*
+> >>>>     * In classic MMU format, puds and pmds are folded in to
+> >>>> @@ -638,7 +640,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+> >>>>            phys += SECTION_SIZE;
+> >>>>    } while (pmd++, addr += SECTION_SIZE, addr != end);
+> >>>>
+> >>>> -  flush_pmd_entry(pmd);
+> >>>> +  flush_pmd_entry(p);
+> >>> Wait, shouldn't this flush be *inside* the loop anyway? Otherwise we just
+> >>> flush the cacheline containing the first pmd. The flushing code could also
+> >>> flush to PoU instead of PoC for UP ARMv7, but that's an unrelated optimisation.
+> >>    I think in LPAE this loop iterates once and non LPAE twice.
+> >>    So both the entries should be contained in same cache line right ?
+> > Dunno, are there any guarantees about alignment of the starting pmd? Even
+> > so, the function takes the range as parameters, so I don't think we
+> > should tailor it to the caller. It may explain why this hasn't come up
+> > sooner though.
+> >
+> > Will
+>
+>  This function is not exposed outside. And the ranges passed to this is going
+> to not more than 2 entries in any case. If we put the flush inside the loop,
+> then we will end up doing an extra flush for the same line. Regarding the
+> alignment, I think if the pgd base is aligned, then rest should be fine.
+> Will have to check this.
+>
+> Regards,
+>  Sricharan
+>
 
-it is "depends on !4xx && !8xx && !SPARC && !M68K && !PARISC && !FRV &&
-!SUPERH && !BLACKFIN && !AVR32 && !MN10300 && (!ARM || ARCH_FOOTBRIDGE
-|| ARCH_INTEGRATOR || ARCH_NETWINDER)"
+Hi ,
 
-So, not only x86, ARM, but also s390, xtensa, alpha, cris, h8300, ia64,
-mips... (at least, we do not know, they whether need it or not).
+Catalin and Sricharan,
+Thanks for your explanation.
 
+Will,
+I guess nobody noticed this because the MMU of later v7 processors
+fetches page table
+from D-cache. It even doesn't need to clean pmd to PoU.
 
->> > We also can find another long list for depend on, but not related with
->> > ARCH.
->> > 
->> > They seems not quit difficult for reading (in fact, if we separate them
->> > into pieces and let them spread into another areas, the reader will not
->> > see the whole dependency clearly)
->> > 
->> > For fixing bug, better as local as possible, as independent as possible,
->> > it will be OK if only add !ARM64 for PARPORT_PC depend on, and it has
->> > no any negative effect. But if we define CONFIG_HAVE_*, we have to let
->> > it related with multiple platforms.
->> > 
->> > For design: if can bear current design, better not to touch it, I think
->> > current design is still sustainable, and not complex for understanding,
->> > so not need redesign.
-> We usually clean some of these as we hit them, otherwise people forget
-> about the clean-up later ;).
-
-In fact, I have sent another configuration modification about disabling
-CONFIG_BUG. it is in discussing...
-
-We are sure most of architectures do not need CONFIG_BUG, but for
-VGA_CONSOLE, we can not be sure most of architectures do not need it.
-
-For CONFIG_BUG issue, it will make noisy for most of architectures, but
-for VGA_CONSOLE issue, at least now, it is only effect with arm64.
-
-For CONFIG_BUG issue, it seems we can not provide a satisfied fixing if
-not get rid of it, but for VGA_CONSOLE issue, at least we have a
-complete fixing way for it.
-
-
-And now for CONFIG_BUG issue, it is still continuing discussing, and it
-seems that can not get a result quickly.
-
-So for VGA_CONSOLE... ;-)
-
-
-Thanks.
--- 
-Chen Gang
-
-Asianux Corporation
+Regards,
+Po-Yu
