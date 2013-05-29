@@ -1,91 +1,34 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Wed, 29 May 2013 14:55:57 +0100
-Subject: [RFC] arm: Update Booting document for FDT placement and reserved map
-Message-ID: <1369835757-16371-1-git-send-email-grant.likely@linaro.org>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Wed, 29 May 2013 15:38:40 +0200
+Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig
+In-Reply-To: <51A521F5.2010206@wwwdotorg.org>
+References: <1369761972-31986-1-git-send-email-swarren@wwwdotorg.org>
+ <51A521F5.2010206@wwwdotorg.org>
+Message-ID: <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Booting document isn't very clear about what a bootloader is
-required to do when booting with an FDT. First, the placement of the FDT
-isn't as strict as the document suggests. It can actually appear
-anywhere in RAM and the decompressor will relocated if it absolutely
-needs to (but it is better if it doesn't have to).
+Am Dienstag, 28. Mai 2013, 15:30:29 schrieb Stephen Warren:
+> On 05/28/2013 11:26 AM, Stephen Warren wrote:
+> > From: Stephen Warren <swarren@nvidia.com>
+> > 
+> > This simply rebuilds tegra_defconfig on top of next-20130520. As such, it
+> > should introduce no changes; simply moving entries around due to Kconfig
+> > ordering changes. The apparent exceptions are:
+> > 
+> > AUTO_ZRELADDR: Selected by ARM multi-platform support.
+> > MTD_CHAR: Removed in Kconfig.
+> > 
+> > This should make it easier to create future defconfig patches on top of
+> > linux-next, since all the extraneous diffs have been removed. It also
+> > makes it more likely that once 3.12 comes around, this defconfig will
+> > already match what's required there.
+> 
+> I've applied this (squashed it into) Tegra's for-3.11/defconfig branch.
 
-Second, the bootloader is expected to update the reserved map if there
-are any memory regions that are hands-off for the firmware. While this
-has always been the case, such as when an initrd is provided, it became
-more obvious when starting to work with UEFI. UEFI may provide
-additional data to the OS like a block of SMBIOS tables, but if those
-regions aren't described in the reserved map then the kernel will
-happily reclaim that memory for it's own purposes.
+wouldn't it make more sense to apply such a patch just before the merge window 
+closes (or better after some release candidate)? This way we would have a 
+better chance to have a zero diff between defconfig and tegra_defconfig, e.g. 
+not like 3.10 is now.
 
-It is possible in the future when the kernel is able to parse UEFI
-memory maps directly that we'll relax the requirement for UEFI
-regions, but it is safe and pragmatic to be strict about it now, and it
-really doesn't cause any new hardship. The existing UEFI LinuxLoader
-already update the FDT reserved map.
-
-Signed-off-by: Grant Likely <grant.likely@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Leif Lindholm <leif.lindholm@linaro.org>
-Cc: Olivier Martin <olivier.martin@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
-
-In this patch I've stated that the initrd doesn't need to be included in
-the reserved map. However, should this be changed? Right now the
-decompressor doesn't actually look at the reserved map when
-decompressing and moving things around. If I'm reading the code
-correctly it is possible that the decompressor will overwrite the initrd
-if it gets placed too close to the kernel.
-
-So, my question is this; would it be better to require (or strongly
-recommend) the initrd be included in the reserved map and make the
-zImage wrapper aware of mem regions that is must not touch. Or should I
-leave well enough alone because in practical terms it's working fine
-as-is?
-
- Documentation/arm/Booting | 23 +++++++++++++++++++----
- 1 file changed, 19 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
-index 0c1f475..1ea5020 100644
---- a/Documentation/arm/Booting
-+++ b/Documentation/arm/Booting
-@@ -118,13 +118,28 @@ physical address to determine if a dtb has been passed instead of a
- tagged list.
- 
- The boot loader must pass at a minimum the size and location of the
--system memory, and the root filesystem location.  The dtb must be
-+system memory, and the root filesystem location.  The dtb should be
- placed in a region of memory where the kernel decompressor will not
--overwrite it.  The recommended placement is in the first 16KiB of RAM
--with the caveat that it may not be located at physical address 0 since
--the kernel interprets a value of 0 in r2 to mean neither a tagged list
-+overwrite it. The decompressor will relocate an inconveniently placed
-+DTB, but it is better if it doesn't have to. The recommended placement
-+is either in the first 16KiB of RAM with the caveat that it may not be
-+located at physical address 0[1], or several megabytes past the end of the
-+kernel image.
-+
-+[1] the kernel interprets a value of 0 in r2 to mean neither a tagged list
- nor a dtb were passed.
- 
-+The boot loader must also ensure that the FDT reserve memory map covers
-+all areas of main memory that must not be overwritten. This includes
-+firmware runtime support data[2], fixed framebuffers and DMA buffers.
-+However the initrd does not need to be included as the kernel already
-+knows how to protect the initrd location.
-+
-+[2] In particular when booting from UEFI the OS loader is expected to retrieve the
-+UEFI memory map and add all UEFI runtime memory regions to the reserved
-+map. This include UEFI runtime services, SMBIOS tables and ACPI tables
-+if they exist.
-+
- 5. Calling the kernel image
- ---------------------------
- 
--- 
-1.8.1.2
+Marc
