@@ -1,45 +1,55 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Wed, 29 May 2013 09:50:44 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803E8A3F3@039-SN2MPN1-021.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com>
- <F281D0F91ED19E4D8E63A7504E8A649803E8A3F3@039-SN2MPN1-021.039d.mgd.msft.net>
-Message-ID: <20130529075044.GC3293@lukather>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 29 May 2013 00:51:26 -0700
+Subject: [PATCH v2 1/2] clk: Disable unused clocks after deferred probing
+ is done
+In-Reply-To: <519461BB.3010209@codeaurora.org>
+References: <1368124502-18830-1-git-send-email-skannan@codeaurora.org>
+ <519461BB.3010209@codeaurora.org>
+Message-ID: <20130529075126.6058.58923@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 29, 2013 at 07:11:30AM +0000, Chen Peter-B29397 wrote:
->  
-> > Hello,
-> > 
-> > Am I right in assuming that the MXS USB on-the-go port does not currently
-> > support the
-> > device (gadget) functionality?
-> > Anybody out there working on that?
-> > 
+Quoting Saravana Kannan (2013-05-15 21:34:03)
+> On 05/09/2013 11:35 AM, Saravana Kannan wrote:
+> > With deferred probing, late_initcall() is too soon to declare a clock as
+> > unused. Wait for deferred probing to finish before declaring a clock as
+> > unused. Since deferred probing is done in late_initcall(), do the unused
+> > check to late_initcall_sync.
+> >
+> > Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+> > ---
+> >   drivers/clk/clk.c |    2 +-
+> >   1 files changed, 1 insertions(+), 1 deletions(-)
+> >
+> > diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> > index fe4055f..5ecb64c 100644
+> > --- a/drivers/clk/clk.c
+> > +++ b/drivers/clk/clk.c
+> > @@ -534,7 +534,7 @@ static int clk_disable_unused(void)
+> >
+> >       return 0;
+> >   }
+> > -late_initcall(clk_disable_unused);
+> > +late_initcall_sync(clk_disable_unused);
+> >
+> >   /***    helper functions   ***/
 > 
-> As far as I know, Maxime Ripard may already let the chipidea durl-role function
-> work ok at mx28. It may need my chipidea otg patch
+> Mike,
 > 
-> https://github.com/hzpeterchen/linux-usb.git
+> Thoughts? Picking it up? Removing the existing auto-disable code (I 
+> think they are still useful)?
+> 
 
-Indeed, I've been using the patchset "Add tested id switch and vbus
-connect detect support for Chipidea" from Peter for quite some time on
-top of 3.9 and it works like a charm for the gadget mode on an MX28
-platform.
+Hi Saravana,
 
-BTW, Peter, I've seen that these patches are still not merged in 3.10,
-is there a reason for that? do you plan on sending a version rebased on
-top of 3.10 some time in the future? I tried to do the rebasing myself,
-but the chipidea driver seems to have changed quite heavily, which makes
-the process quite difficult when you don't know what you're doing :)
+I've taken this into clk-next for testing.
 
-Thanks!
-Maxime
+Regards,
+Mike
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+> -Saravana
+> 
+> 
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
