@@ -1,29 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 May 2013 20:08:10 +0200
-Subject: [PATCH V8 0/3] USB: OHCI: Start splitting up the driver
-In-Reply-To: <Pine.LNX.4.44L0.1305291211160.885-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1305291211160.885-100000@iolanthe.rowland.org>
-Message-ID: <3818608.3TBO8NnpYQ@wuerfel>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 29 May 2013 14:09:23 -0400
+Subject: [PATCH v4 3/4] arm: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <1369763672-12919-3-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1305281835080.4799@kaball.uk.xensource.com>
+ <1369763672-12919-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <51A64453.5040005@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 May 2013 12:21:02 Alan Stern wrote:
+Hi Stefano,
+
+On 05/28/2013 01:54 PM, Stefano Stabellini wrote:
+> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
 > 
-> Those error messages are annoying; they don't use dev_err(), so they
-> don't include the device and driver names.  There's no way to know what
-> they refer to.  I rather suspect they come from the usbaudio driver.
+> The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> runtime pvops patching needed.
+> 
+> This allows us to make use of steal_account_process_tick for stolen
+> ticks accounting.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> CC: linux at arm.linux.org.uk
+> CC: will.deacon at arm.com
+> CC: nico at linaro.org
+> CC: marc.zyngier at arm.com
+> CC: cov at codeaurora.org
+> CC: arnd at arndb.de
+> CC: olof at lixom.net
+> 
+> Changes in v3:
+> - improve commit description and Kconfig help text;
+> - no need to initialize pv_time_ops;
+> - add PARAVIRT_TIME_ACCOUNTING.
 
-That makes sense. I have a usb audio device, and I don't actually recall
-getting any sound from my speakers while testing it. I only checked
-that the mouse was working and assumed that the usb-audio was driven
-by ehci, but upon closer inspection, they are both on the same OHCI.
+Looks good to me.
 
-> When you ran this test, did you have commit 815fa7b91761 applied?
+Acked-by: Christopher Covington <cov@codeaurora.org>
 
-Yes.
-
-> Does the same problem occur without Manjunath's changes?
-
-No, it was introduced by the first patch, as I found later.
-
-	Arnd
+-- 
+Employee of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by the Linux Foundation.
