@@ -1,54 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 May 2013 16:25:36 +0200
-Subject: [PATCH V3 2/3] ARM: mmc: bcm281xx SDHCI driver
-In-Reply-To: <1369790016-13270-2-git-send-email-csd@broadcom.com>
-References: <1369790016-13270-1-git-send-email-csd@broadcom.com>
- <1369790016-13270-2-git-send-email-csd@broadcom.com>
-Message-ID: <201305291625.37068.arnd@arndb.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 29 May 2013 07:30:14 -0700
+Subject: build failure: linux-next: ARM/SH-mobile defconfigs: kota2, marzen
+In-Reply-To: <20130529020550.GC16836@verge.net.au> (Simon Horman's message of
+ "Wed, 29 May 2013 11:05:51 +0900")
+References: <87txlmaf2a.fsf@linaro.org> <20130529020550.GC16836@verge.net.au>
+Message-ID: <877gihamfd.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 May 2013, Christian Daudt wrote:
-> +static int sdhci_bcm_kona_sd_reset(struct sdhci_host *host)
-> +{
+Simon Horman <horms@verge.net.au> writes:
 
-> +	/*
-> +	 * Back-to-Back register write needs a delay of 1ms at bootup (min 10uS)
-> +	 * Back-to-Back writes to same register needs delay when SD bus clock
-> +	 * is very low w.r.t AHB clock, mainly during boot-time and during card
-> +	 * insert-removal.
-> +	 */
-> +	mdelay(1);
-> +	sdhci_writel(host, val, KONA_SDHOST_CORECTRL);
+> On Tue, May 28, 2013 at 03:57:01PM -0700, Kevin Hilman wrote:
+>> Hello,
+>> 
+>> Both kota2_defconfig and marzen_defconfig started failing in the most
+>> recnet linux-next (next-20130527) but were successful in the previous
+>> build (next-20130523).
+>> 
+>> Both fail wit this error:
+>> 
+>> drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+>> /work/kernel/next/drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to `shdma_chan_filter'
+>> make[1]: *** [vmlinux] Error 1
+>> make[1]: Target `_all' not remade because of errors.
+>> 
+>> Full build logs are available here:
+>> 
+>>   https://ci.linaro.org/jenkins/job/khilman-kernel-arm-next/arch=arm,defconfig=kota2_defconfig,label=kernel_cloud/54/console
+>>   https://ci.linaro.org/jenkins/job/khilman-kernel-arm-next/arch=arm,defconfig=marzen_defconfig,label=kernel_cloud/54/console
+>> 
+>> Kevin
+>
+> Hi Kevin,
+>
+> thanks for bringing that to my attention.
+> I'll fix it up.
 
-This is now called always without spinlocks held and interrupts enabled,
-so it should really be msleep() not mdelay().
+I imagine it's the same issue, but in updating the list of defconfigs to
+build, I noticed this same error in bockw_defconfig:
 
-> +static void sdhci_bcm_kona_sd_init(struct sdhci_host *host)
-> +{
-> +	unsigned int val;
-> +
-> +	/* enable the interrupt from the IP core */
-> +	val = sdhci_readl(host, KONA_SDHOST_COREIMR);
-> +	val |= KONA_SDHOST_IP;
-> +	sdhci_writel(host, val, KONA_SDHOST_COREIMR);
-> +
-> +	/* Enable the AHB clock gating module to the host */
-> +	val = sdhci_readl(host, KONA_SDHOST_CORECTRL);
-> +	val |= KONA_SDHOST_EN;
-> +
-> +	/*
-> +	 * Back-to-Back register write needs a delay of 1ms at bootup (min 10uS)
-> +	 * Back-to-Back writes to same register needs delay when SD bus clock
-> +	 * is very low w.r.t AHB clock, mainly during boot-time and during card
-> +	 * insert-removal.
-> +	 */
-> +	mdelay(1);
-> +	sdhci_writel(host, val, KONA_SDHOST_CORECTRL);
-> +}
+https://ci.linaro.org/jenkins/job/khilman-kernel-arm-next/arch=arm,defconfig=bockw_defconfig,label=kernel_cloud/60/console
 
-Same here.
-
-Looks good aside from that.
-
-	Arnd
+Kevin
