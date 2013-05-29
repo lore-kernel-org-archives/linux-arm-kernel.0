@@ -1,25 +1,29 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 29 May 2013 22:26:50 +0800
-Subject: [PATCH v6 03/10] ASoC: imx-pcm-fiq: Introduce pcm-fiq-params
-In-Reply-To: <1369752478-30260-4-git-send-email-mpa@pengutronix.de>
-References: <1369752478-30260-1-git-send-email-mpa@pengutronix.de>
- <1369752478-30260-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130529142648.GC29528@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 May 2013 16:27:20 +0200
+Subject: [PATCH V3 3/3] ARM: mmc: bcm281xx SDHCI driver (dt mods)
+In-Reply-To: <1369790016-13270-3-git-send-email-csd@broadcom.com>
+References: <1369790016-13270-1-git-send-email-csd@broadcom.com>
+ <1369790016-13270-3-git-send-email-csd@broadcom.com>
+Message-ID: <201305291627.20984.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 04:47:51PM +0200, Markus Pargmann wrote:
-> @@ -47,7 +56,8 @@ static inline void imx_pcm_dma_exit(struct platform_device *pdev)
->  #endif
->  
->  #ifdef CONFIG_SND_SOC_IMX_PCM_FIQ
-> -int imx_pcm_fiq_init(struct platform_device *pdev);
-> +int imx_pcm_fiq_init(struct platform_device *pdev,
-> +		struct imx_pcm_fiq_params *params);
->  void imx_pcm_fiq_exit(struct platform_device *pdev);
->  #else
->  static inline int imx_pcm_fiq_init(struct platform_device *pdev)
+On Wednesday 29 May 2013, Christian Daudt wrote:
+> +       sdio0: sdio at 0x3f180000 {
+> +               max-frequency = <48000000>;
+> +               status = "okay";
+> +       };
+> +
 
-This one also needs update with a new parameter.
+On a general note, there is no need to duplicate both the label and the
+name here, one of the two is enough. The easiest way to write this
+in a board file is
 
-Shawn
+&sdio {
+	max-frequency = <48000000>;
+	status = "okay";
+};
+
+Your version is not wrong though, so
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
