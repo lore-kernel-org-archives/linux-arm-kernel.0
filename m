@@ -1,35 +1,46 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 29 May 2013 21:05:41 +0200
-Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
-In-Reply-To: <20130529190204.6058.85682@quantum>
-References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130529190204.6058.85682@quantum>
-Message-ID: <51A65185.1020307@gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 29 May 2013 19:06:12 +0000 (UTC)
+Subject: [PATCH 0/2] ARM: OMAP AM33XX: clock data: Enable clkout2 output
+ on SoC pad
+In-Reply-To: <51A35123.6040600@ti.com>
+References: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EC8C081@DBDE04.ent.ti.com>
+ <alpine.DEB.2.00.1305200246080.2656@utopia.booyaka.com>
+ <51A35123.6040600@ti.com>
+Message-ID: <alpine.DEB.2.02.1305291902450.9052@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 09:02 PM, Mike Turquette wrote:
-> Quoting Sebastian Hesselbarth (2013-05-10 18:08:00)
->> Marvell EBU SoCs share some common clock functions that register core
->> clocks or clock gates from SoC specific data. These clock drivers are
->> organized by function and over time the drivers filled up with #ifdefs
->> to separate different SoC specific code.
->>
-...
->> @Mike: As this only touches MVEBU related code, I suggest to take it
->> all through the corresponding ARM branch.
->>
-> Sorry for the tardy response.  This cleanup looks really good.  If it's
-> not too late:
+Salut Beno?t,
+
+On Mon, 27 May 2013, Benoit Cousson wrote:
+
+> On 05/20/2013 04:47 AM, Paul Walmsley wrote:
+> > On Fri, 17 May 2013, Hiremath, Vaibhav wrote:
+> > 
+> >> Tony, Paul and Benoit,
+> >>
+> >> Any update on this series?
+> > 
+> > Most of the changes are DT-related, so it should probably go in via 
+> > Beno?t.  I'll ack the clock side, but have a comment on patch 2, to be 
+> > sent shortly.
+> 
+> I've tried to apply that patch, but unfortunately, it does depend on
+> that one:
+> 
+> https://patchwork.kernel.org/patch/2212081/
 >
-> Acked-by: Mike Turquette<mturquette@linaro.org>
->
-> If the branch is already pulled into arm-soc don't worry about the Ack.
+> If you did not already pulled the first one I can take both with your
+> acked-by.
+> Otherwise, I can take only the DTS ones.
+> 
+> Is that OK?
 
-Mike,
+Will ack that first patch now.  
 
-thanks for the Ack, the corresponding pull request has been sent some
-hours ago by Jason Cooper. It has not been pulled into arm-soc, so it
-is just in time ;)
+Vaibhav, looks like that first series is still in RFC form; you might want 
+to repost it as a non-RFC series.
 
-Sebastian
+
+- Paul
