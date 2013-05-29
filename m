@@ -1,34 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 29 May 2013 11:05:51 +0900
-Subject: build failure: linux-next: ARM/SH-mobile defconfigs: kota2, marzen
-In-Reply-To: <87txlmaf2a.fsf@linaro.org>
-References: <87txlmaf2a.fsf@linaro.org>
-Message-ID: <20130529020550.GC16836@verge.net.au>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Wed, 29 May 2013 11:10:41 +0800
+Subject: [PATCH] bring up pxa988 with DT
+Message-ID: <1369797042-22174-1-git-send-email-zhangwm@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 03:57:01PM -0700, Kevin Hilman wrote:
-> Hello,
-> 
-> Both kota2_defconfig and marzen_defconfig started failing in the most
-> recnet linux-next (next-20130527) but were successful in the previous
-> build (next-20130523).
-> 
-> Both fail wit this error:
-> 
-> drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-> /work/kernel/next/drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to `shdma_chan_filter'
-> make[1]: *** [vmlinux] Error 1
-> make[1]: Target `_all' not remade because of errors.
-> 
-> Full build logs are available here:
-> 
->   https://ci.linaro.org/jenkins/job/khilman-kernel-arm-next/arch=arm,defconfig=kota2_defconfig,label=kernel_cloud/54/console
->   https://ci.linaro.org/jenkins/job/khilman-kernel-arm-next/arch=arm,defconfig=marzen_defconfig,label=kernel_cloud/54/console
-> 
-> Kevin
+This patch is supposed to bring up pxa988 SMP.
+will change to use CLOCKSOURCE later.
 
-Hi Kevin,
+Neil Zhang (1):
+  ARM: mmp: bring up pxa988 with device tree support
 
-thanks for bringing that to my attention.
-I'll fix it up.
+ arch/arm/boot/dts/pxa988-dkb.dts          |   36 ++++++
+ arch/arm/boot/dts/pxa988.dtsi             |  189 +++++++++++++++++++++++++++++
+ arch/arm/mach-mmp/Kconfig                 |   27 ++++
+ arch/arm/mach-mmp/Makefile                |    2 +
+ arch/arm/mach-mmp/common.c                |   11 ++-
+ arch/arm/mach-mmp/common.h                |    2 +
+ arch/arm/mach-mmp/headsmp.S               |  104 ++++++++++++++++
+ arch/arm/mach-mmp/include/mach/addr-map.h |    6 +
+ arch/arm/mach-mmp/mmpx-dt.c               |   74 +++++++++++
+ arch/arm/mach-mmp/platsmp.c               |  163 +++++++++++++++++++++++++
+ arch/arm/mach-mmp/reset.c                 |   66 ++++++++++
+ arch/arm/mach-mmp/reset.h                 |   29 +++++
+ drivers/clk/mmp/Makefile                  |    1 +
+ 13 files changed, 709 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/pxa988-dkb.dts
+ create mode 100644 arch/arm/boot/dts/pxa988.dtsi
+ create mode 100644 arch/arm/mach-mmp/headsmp.S
+ create mode 100644 arch/arm/mach-mmp/mmpx-dt.c
+ create mode 100644 arch/arm/mach-mmp/platsmp.c
+ create mode 100644 arch/arm/mach-mmp/reset.c
+ create mode 100644 arch/arm/mach-mmp/reset.h
+
+-- 
+1.7.4.1
