@@ -1,88 +1,73 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 29 May 2013 12:38:03 -0400
-Subject: [PATCH 03/14] ARM: OMAP4+: CM: Move function prototypes to common
- header for re-use
+Date: Wed, 29 May 2013 12:38:05 -0400
+Subject: [PATCH 05/14] ARM: OMAP4+: PRCM MPU: Move function prototypes to
+ common header for re-use
 In-Reply-To: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
 References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <1369845494-30231-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <1369845494-30231-6-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OMAP5 reuses OMAP4 CM IP block which lets us re-use CM1/CM2 functions.
-So move the function prototypes from cm1_44xx.h, cm2_44xx.h to
-cm_prm44xx_54xx.h header. The suggestion came from Paul Walmsley
-as part of the OMAP5 data file review.
+OMAP5 reuses OMAP4 MPU PRCM IP block which lets us re-use functions.
+So move the function prototypes from prcm_mpu44xx.h to prcm_mpu_44xx_54xx.h
+header. The suggestion came from Paul Walmsley as part of the
+OMAP5 data file review.
 
-This is preparatory  patch to add OMAP5 CM data file.
+This is preparatory  patch to add OMAP5 MPU PRCM data file.
 
 Cc: Paul Walmsley <paul@pwsan.com>
 
 Acked-by: Rajendra Nayak <rnayak@ti.com>
 Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 ---
- arch/arm/mach-omap2/cm1_44xx.h     |    7 ++-----
- arch/arm/mach-omap2/cm2_44xx.h     |    7 ++-----
- arch/arm/mach-omap2/cm_44xx_54xx.h |   36 ++++++++++++++++++++++++++++++++++++
- 3 files changed, 40 insertions(+), 10 deletions(-)
- create mode 100644 arch/arm/mach-omap2/cm_44xx_54xx.h
+ arch/arm/mach-omap2/prcm_mpu44xx.h       |   14 +-----------
+ arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h |   36 ++++++++++++++++++++++++++++++
+ 2 files changed, 37 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h
 
-diff --git a/arch/arm/mach-omap2/cm1_44xx.h b/arch/arm/mach-omap2/cm1_44xx.h
-index 1bc00dc..5ae8fe3 100644
---- a/arch/arm/mach-omap2/cm1_44xx.h
-+++ b/arch/arm/mach-omap2/cm1_44xx.h
-@@ -25,6 +25,8 @@
- #ifndef __ARCH_ARM_MACH_OMAP2_CM1_44XX_H
- #define __ARCH_ARM_MACH_OMAP2_CM1_44XX_H
+diff --git a/arch/arm/mach-omap2/prcm_mpu44xx.h b/arch/arm/mach-omap2/prcm_mpu44xx.h
+index 884af7b..059bd4f 100644
+--- a/arch/arm/mach-omap2/prcm_mpu44xx.h
++++ b/arch/arm/mach-omap2/prcm_mpu44xx.h
+@@ -25,12 +25,9 @@
+ #ifndef __ARCH_ARM_MACH_OMAP2_PRCM_MPU44XX_H
+ #define __ARCH_ARM_MACH_OMAP2_PRCM_MPU44XX_H
  
-+#include "cm_44xx_54xx.h"
-+
- /* CM1 base address */
- #define OMAP4430_CM1_BASE		0x4a004000
++#include "prcm_mpu_44xx_54xx.h"
+ #include "common.h"
  
-@@ -217,9 +219,4 @@
- #define OMAP4_CM1_ABE_WDT3_CLKCTRL_OFFSET		0x0088
- #define OMAP4430_CM1_ABE_WDT3_CLKCTRL			OMAP44XX_CM1_REGADDR(OMAP4430_CM1_ABE_INST, 0x0088)
+-# ifndef __ASSEMBLER__
+-extern void __iomem *prcm_mpu_base;
+-# endif
+-
+ #define OMAP4430_PRCM_MPU_BASE			0x48243000
+ 
+ #define OMAP44XX_PRCM_MPU_REGADDR(inst, reg)				\
+@@ -98,13 +95,4 @@ extern void __iomem *prcm_mpu_base;
+ #define OMAP4_CM_CPU1_CLKSTCTRL_OFFSET		0x0018
+ #define OMAP4430_CM_CPU1_CLKSTCTRL		OMAP44XX_PRCM_MPU_REGADDR(OMAP4430_PRCM_MPU_CPU1_INST, 0x0018)
  
 -/* Function prototypes */
--extern u32 omap4_cm1_read_inst_reg(s16 inst, u16 idx);
--extern void omap4_cm1_write_inst_reg(u32 val, s16 inst, u16 idx);
--extern u32 omap4_cm1_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
+-# ifndef __ASSEMBLER__
+-extern u32 omap4_prcm_mpu_read_inst_reg(s16 inst, u16 idx);
+-extern void omap4_prcm_mpu_write_inst_reg(u32 val, s16 inst, u16 idx);
+-extern u32 omap4_prcm_mpu_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst,
+-					    s16 idx);
+-extern void __init omap2_set_globals_prcm_mpu(void __iomem *prcm_mpu);
+-# endif
 -
  #endif
-diff --git a/arch/arm/mach-omap2/cm2_44xx.h b/arch/arm/mach-omap2/cm2_44xx.h
-index b9de72d..ee5136d 100644
---- a/arch/arm/mach-omap2/cm2_44xx.h
-+++ b/arch/arm/mach-omap2/cm2_44xx.h
-@@ -25,6 +25,8 @@
- #ifndef __ARCH_ARM_MACH_OMAP2_CM2_44XX_H
- #define __ARCH_ARM_MACH_OMAP2_CM2_44XX_H
- 
-+#include "cm_44xx_54xx.h"
-+
- /* CM2 base address */
- #define OMAP4430_CM2_BASE		0x4a008000
- 
-@@ -449,9 +451,4 @@
- #define OMAP4_CM_CEFUSE_CEFUSE_CLKCTRL_OFFSET		0x0020
- #define OMAP4430_CM_CEFUSE_CEFUSE_CLKCTRL		OMAP44XX_CM2_REGADDR(OMAP4430_CM2_CEFUSE_INST, 0x0020)
- 
--/* Function prototypes */
--extern u32 omap4_cm2_read_inst_reg(s16 inst, u16 idx);
--extern void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 idx);
--extern u32 omap4_cm2_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
--
- #endif
-diff --git a/arch/arm/mach-omap2/cm_44xx_54xx.h b/arch/arm/mach-omap2/cm_44xx_54xx.h
+diff --git a/arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h b/arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h
 new file mode 100644
-index 0000000..4154f86
+index 0000000..ca149e7
 --- /dev/null
-+++ b/arch/arm/mach-omap2/cm_44xx_54xx.h
++++ b/arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h
 @@ -0,0 +1,36 @@
 +/*
-+ * OMAP44xx and OMAP54xx CM1/CM2 function prototypes
++ * OMAP44xx and OMAP54xx PRCM MPU function prototypes
 + *
-+ * Copyright (C) 2009-201333 Texas Instruments, Inc.
-+ * Copyright (C) 2009-2010 Nokia Corporation
++ * Copyright (C) 2010, 2013 Texas Instruments, Inc.
++ * Copyright (C) 2010 Nokia Corporation
 + *
 + * Paul Walmsley (paul at pwsan.com)
 + * Rajendra Nayak (rnayak at ti.com)
@@ -100,18 +85,18 @@ index 0000000..4154f86
 + *
 + */
 +
-+#ifndef __ARCH_ARM_MACH_OMAP2_CM_44XX_54XX_H
-+#define __ARCH_ARM_MACH_OMAP2_CM_44XX_55XX_H
++#ifndef __ARCH_ARM_MACH_OMAP2_PRCM_MPU_44XX_54XX_H
++#define __ARCH_ARM_MACH_OMAP2_PRCM_MPU_44XX_54XX_H
 +
-+/* CM1 Function prototypes */
-+extern u32 omap4_cm1_read_inst_reg(s16 inst, u16 idx);
-+extern void omap4_cm1_write_inst_reg(u32 val, s16 inst, u16 idx);
-+extern u32 omap4_cm1_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
++#ifndef __ASSEMBLER__
++extern void __iomem *prcm_mpu_base;
 +
-+/* CM2 Function prototypes */
-+extern u32 omap4_cm2_read_inst_reg(s16 inst, u16 idx);
-+extern void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 idx);
-+extern u32 omap4_cm2_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
++extern u32 omap4_prcm_mpu_read_inst_reg(s16 inst, u16 idx);
++extern void omap4_prcm_mpu_write_inst_reg(u32 val, s16 inst, u16 idx);
++extern u32 omap4_prcm_mpu_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst,
++					    s16 idx);
++extern void __init omap2_set_globals_prcm_mpu(void __iomem *prcm_mpu);
++#endif
 +
 +#endif
 -- 
