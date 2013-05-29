@@ -1,104 +1,35 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 29 May 2013 12:02:04 -0700
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 29 May 2013 21:05:41 +0200
 Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
-In-Reply-To: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+In-Reply-To: <20130529190204.6058.85682@quantum>
 References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130529190204.6058.85682@quantum>
+ <20130529190204.6058.85682@quantum>
+Message-ID: <51A65185.1020307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Sebastian Hesselbarth (2013-05-10 18:08:00)
-> Marvell EBU SoCs share some common clock functions that register core
-> clocks or clock gates from SoC specific data. These clock drivers are
-> organized by function and over time the drivers filled up with #ifdefs
-> to separate different SoC specific code.
-> 
-> This patch set first adds a new element to clock gate descriptors to
-> allow to pass clk flags per clock gate. (Patch 1)
-> 
-> Then it restructures MVEBU clock drivers into common clock setup and
-> SoC specific files and Kconfig options. The driver's init functions
-> are also registered to get called with of_clk_init. (Patches 2, 3-6)
-> 
-> It then switches Dove, Kirkwood, and Armada 370/XP to make use of
-> of_clk_init instead of mvebu_clocks_init. (Patches 7-9)
-> 
-> Finally, all obsolete files and Kconfig options are removed. (Patch 10)
-> 
-> It has been tested on CuBox (Dove) and Dockstar (Kirkwood) by me.
-> Armada 370 and XP are compile tested only and should get their Tested-by
-> from Thomas and Gregory, respectively.
-> 
-> @Mike: As this only touches MVEBU related code, I suggest to take it
-> all through the corresponding ARM branch.
-> 
+On 05/29/2013 09:02 PM, Mike Turquette wrote:
+> Quoting Sebastian Hesselbarth (2013-05-10 18:08:00)
+>> Marvell EBU SoCs share some common clock functions that register core
+>> clocks or clock gates from SoC specific data. These clock drivers are
+>> organized by function and over time the drivers filled up with #ifdefs
+>> to separate different SoC specific code.
+>>
+...
+>> @Mike: As this only touches MVEBU related code, I suggest to take it
+>> all through the corresponding ARM branch.
+>>
+> Sorry for the tardy response.  This cleanup looks really good.  If it's
+> not too late:
+>
+> Acked-by: Mike Turquette<mturquette@linaro.org>
+>
+> If the branch is already pulled into arm-soc don't worry about the Ack.
 
-Sebastian,
+Mike,
 
-Sorry for the tardy response.  This cleanup looks really good.  If it's
-not too late:
+thanks for the Ack, the corresponding pull request has been sent some
+hours ago by Jason Cooper. It has not been pulled into arm-soc, so it
+is just in time ;)
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
-
-If the branch is already pulled into arm-soc don't worry about the Ack.
-
-Regards,
-Mike
-
-> Sebastian Hesselbarth (10):
->   clk: mvebu: introduce per-clock-gate flags
->   clk: mvebu: add common clock functions for core clk and clk gating
->   clk: mvebu: add Dove SoC-centric clock init
->   clk: mvebu: add Kirkwood SoC-centric clock init
->   clk: mvebu: add Armada 370 SoC-centric clock init
->   clk: mvebu: add Armada XP SoC-centric clock init
->   ARM: dove: move DT boards to SoC-centric clock init
->   ARM: kirkwood: move DT boards to SoC-centric clock init
->   ARM: mvebu: move DT boards to SoC-centric clock init
->   clk: mvebu: desintegrate obsolete file
-> 
->  arch/arm/mach-dove/Kconfig          |    3 +-
->  arch/arm/mach-dove/board-dt.c       |    3 +-
->  arch/arm/mach-dove/common.c         |    1 -
->  arch/arm/mach-kirkwood/Kconfig      |    3 +-
->  arch/arm/mach-kirkwood/board-dt.c   |    3 +-
->  arch/arm/mach-mvebu/Kconfig         |    5 +-
->  arch/arm/mach-mvebu/armada-370-xp.c |    4 +-
->  drivers/clk/mvebu/Kconfig           |   25 +-
->  drivers/clk/mvebu/Makefile          |    8 +-
->  drivers/clk/mvebu/armada-370.c      |  176 +++++++++
->  drivers/clk/mvebu/armada-xp.c       |  204 +++++++++++
->  drivers/clk/mvebu/clk-core.c        |  675 -----------------------------------
->  drivers/clk/mvebu/clk-core.h        |   18 -
->  drivers/clk/mvebu/clk-gating-ctrl.c |  250 -------------
->  drivers/clk/mvebu/clk-gating-ctrl.h |   22 --
->  drivers/clk/mvebu/clk.c             |   23 --
->  drivers/clk/mvebu/common.c          |  163 +++++++++
->  drivers/clk/mvebu/common.h          |   48 +++
->  drivers/clk/mvebu/dove.c            |  194 ++++++++++
->  drivers/clk/mvebu/kirkwood.c        |  247 +++++++++++++
->  include/linux/clk/mvebu.h           |   22 --
->  21 files changed, 1066 insertions(+), 1031 deletions(-)
->  create mode 100644 drivers/clk/mvebu/armada-370.c
->  create mode 100644 drivers/clk/mvebu/armada-xp.c
->  delete mode 100644 drivers/clk/mvebu/clk-core.c
->  delete mode 100644 drivers/clk/mvebu/clk-core.h
->  delete mode 100644 drivers/clk/mvebu/clk-gating-ctrl.c
->  delete mode 100644 drivers/clk/mvebu/clk-gating-ctrl.h
->  delete mode 100644 drivers/clk/mvebu/clk.c
->  create mode 100644 drivers/clk/mvebu/common.c
->  create mode 100644 drivers/clk/mvebu/common.h
->  create mode 100644 drivers/clk/mvebu/dove.c
->  create mode 100644 drivers/clk/mvebu/kirkwood.c
->  delete mode 100644 include/linux/clk/mvebu.h
-> ---
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> -- 
-> 1.7.10.4
+Sebastian
