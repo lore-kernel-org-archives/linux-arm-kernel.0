@@ -1,19 +1,76 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 29 May 2013 14:06:02 +0800
-Subject: [PATCH RESEND v3 1/2] pinctrl: imx: add VF610 support to imx
- pinctrl framework
-In-Reply-To: <1369733528-25926-1-git-send-email-b35083@freescale.com>
-References: <1369733528-25926-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130529060600.GG370@S2101-09.ap.freescale.net>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 29 May 2013 08:26:33 +0200 (CEST)
+Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
+In-Reply-To: <20130528024540.GC13532@quad.lixom.net>
+References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
+ <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
+ <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
+ <20130522143204.GE32012@verge.net.au>
+ <Pine.LNX.4.64.1305221911380.12715@axis700.grange>
+ <20130528024540.GC13532@quad.lixom.net>
+Message-ID: <Pine.LNX.4.64.1305290819190.14157@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 05:32:07PM +0800, Jingchang Lu wrote:
-> On some platforms such as VF610, offset of mux and pad ctrl register
-> may be zero, and the mux_mode and config_val are in one 32-bit register.
-> This patch adds support to imx core pinctrl framework to handle these
-> cases.
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+Hi Olof
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On Mon, 27 May 2013, Olof Johansson wrote:
+
+> Hi,
+> 
+> Sorry, a bit behind on email and just discovered this.
+> 
+> On Wed, May 22, 2013 at 07:22:59PM +0200, Guennadi Liakhovetski wrote:
+> 
+> > > > The above didn't work in my tests without this:
+> > > > 
+> > > > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts 
+> > > > b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > > index f603c69..4fb0102 100644
+> > > > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
+> > > > @@ -33,8 +33,10 @@
+> > > >  	};
+> > > >  
+> > > >  	lbsc {
+> > > > +		compatible = "simple-bus";
+> > > >  		#address-cells = <1>;
+> > > >  		#size-cells = <1>;
+> > > > +		ranges = <0 0 0 0x80000000>;
+> > > >  
+> > > >  		ethernet at 8000000 {
+> > > >  			compatible = "smsc,lan9118", "smsc,lan9115";
+> > > > 
+> > > 
+> > > Could you please post this as a formal patch and indicate
+> > > if you would like it included as a fix in v3.10 or not?
+> > 
+> > Can do that, sure, just thought maybe it would be better to fix the 
+> > original patch. Besides, I wasn't sure what the correct values for 
+> > "ranges" are, I just picked up something, that would be sufficient for 
+> > ethernet. But if more devices are added to it in the future, maybe 
+> > different ranges values would be needed. I think actually, lbsc should map 
+> > the 3 BSC areas, so, the correct property would be
+> > 
+> > +		ranges = <0 0 0 0x14000000>;
+> > 
+> > > Also, I am curious to know what your tests are.
+> > 
+> > Just booting with NFS root. I think, anything involving ethernet. Without 
+> > the "simple-bus" property the lbsc node doesn't get scanned, so, no device 
+> > is added. Without "ranges" addresses cannot be mapped correctly.
+> 
+> Since it's a flat mapping you can just specify an empty "ranges" property, no
+> need to actually define contents.
+
+Yes, I knew about that, but does this also hold for busses with different 
+#address-cells properties, i.e. between 64- and 32-bit busses?
+
+> For more info, see http://devicetree.org/Device_Tree_Usage#Ranges_.28Address_Translation.29
+
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
