@@ -1,43 +1,79 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 29 May 2013 11:48:24 +0100
-Subject: [PATCH 8/8] ARM: vexpress/dcscb: select multi-cluster SMP
- operations
-In-Reply-To: <1369374311-21260-9-git-send-email-nicolas.pitre@linaro.org>
-References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
- <1369374311-21260-9-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1369824504.3715.23.camel@linaro1.home>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 29 May 2013 16:24:55 +0530
+Subject: [PATCH] cpufreq: MAINTAINERS: Add git tree path for ARM specific
+ updates
+In-Reply-To: <1369824422.22004.101.camel@joe-AO722>
+References: <aab5b5dc92b960e81e8fd1975eba81234a4ecac8.1369817795.git.viresh.kumar@linaro.org>
+ <1369824422.22004.101.camel@joe-AO722>
+Message-ID: <CAKohpomz4qOmhy-VRb2n0CY7YOr0vP3EGo88iXBhm2MzsJ8rrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-05-24 at 01:45 -0400, Nicolas Pitre wrote:
-> When the DCSCB code is successfully probed and initialized, then the
-> generic MCPM SPM ops should be used as those operations need to be
-> arbitrated through the MCPM layer.
-> 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
->  arch/arm/mach-vexpress/dcscb.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-> index 1acc975360..ce3118dc05 100644
-> --- a/arch/arm/mach-vexpress/dcscb.c
-> +++ b/arch/arm/mach-vexpress/dcscb.c
-> @@ -239,6 +239,8 @@ static int __init dcscb_init(void)
->  		return ret;
->  	}
->  
-> +	mcpm_smp_set_ops();
-> +
+On 29 May 2013 16:17, Joe Perches <joe@perches.com> wrote:
+> On Wed, 2013-05-29 at 16:10 +0530, Viresh Kumar wrote:
+>> ARM specific patches would be
+>> Applied by me now. Rafael will pull in these changes from time to time (at
+>> rc's).
+> []
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+> []
+>> @@ -2216,6 +2216,7 @@ L:      cpufreq at vger.kernel.org
+> []
+>>  T:   git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
+>> +T:   git://git.linaro.org/people/vireshk/linux.git (For ARM Updates)
+>
+> please prefix these with git
+>
+> T:      git git://git.etc...
+>
+> Every other T: git entry does.
+>
 
-This is going to change the platform's smp_ops after setup_arch() has
-already set them, is that OK and not too late?
+Thanks for reporting it.. below commit must be fixing it..
+@Rafael: attached for you to apply.
 
-I ask, because for me, RTSM doesn't boot the secondary CPUs if we rely
-on this change to set the smp_ops, but having a hook in setup_arch() to
-select instead of the standard vexpress ops does work.
+----------x-------------------x------------------
 
-I haven't investigated this more fully yet.
- 
--- 
-Tixy
+From: Viresh Kumar <viresh.kumar@linaro.org>
+Date: Wed, 29 May 2013 12:23:14 +0530
+Subject: [PATCH] cpufreq: MAINTAINERS: Add git tree path for ARM specific
+ updates
+
+To reduce cpufreq maintenance load on Rafael, ARM specific patches would be
+Applied by me now. Rafael will pull in these changes from time to time (at
+rc's). Additionally I would be sending him pull request for every merge window
+and rc's (for fixes).
+
+Web interface of my tree is present here:
+
+https://git.linaro.org/gitweb?p=people/vireshk/linux.git;a=summary
+
+Branch names would be: cpufreq-next and cpufreq-fixes.
+
+This also prefixes tree path with "git ".
+
+Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+---
+ MAINTAINERS | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index fd3a495..92a6624 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2215,7 +2215,8 @@ M:	Viresh Kumar <viresh.kumar@linaro.org>
+ L:	cpufreq at vger.kernel.org
+ L:	linux-pm at vger.kernel.org
+ S:	Maintained
+-T:	git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
++T:	git git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git
++T:	git git://git.linaro.org/people/vireshk/linux.git (For ARM Updates)
+ F:	drivers/cpufreq/
+ F:	include/linux/cpufreq.h
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-cpufreq-MAINTAINERS-Add-git-tree-path-for-ARM-specif.patch
+Type: application/octet-stream
+Size: 1459 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/79deb5ba/attachment.obj>
