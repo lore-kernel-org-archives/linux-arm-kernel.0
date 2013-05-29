@@ -1,53 +1,37 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Wed, 29 May 2013 19:30:24 +0200
-Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig
-In-Reply-To: <51A61EEC.5040300@wwwdotorg.org>
-References: <1369761972-31986-1-git-send-email-swarren@wwwdotorg.org>
- <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
- <51A61EEC.5040300@wwwdotorg.org>
-Message-ID: <7367180.OaP1fIIt8z@ax5200p>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Wed, 29 May 2013 19:32:22 +0200
+Subject: [PATCH] ARM: ux500: cut chip-select GPIOs from SSP device
+Message-ID: <1369848742-10451-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 May 2013 09:29:48 Stephen Warren wrote:
-> On 05/29/2013 07:38 AM, Marc Dietrich wrote:
-> > Am Dienstag, 28. Mai 2013, 15:30:29 schrieb Stephen Warren:
-> >> On 05/28/2013 11:26 AM, Stephen Warren wrote:
-> >>> From: Stephen Warren <swarren@nvidia.com>
-> >>> 
-> >>> This simply rebuilds tegra_defconfig on top of next-20130520. As such,
-> >>> it
-> >>> should introduce no changes; simply moving entries around due to Kconfig
-> >>> ordering changes. The apparent exceptions are:
-> >>> 
-> >>> AUTO_ZRELADDR: Selected by ARM multi-platform support.
-> >>> MTD_CHAR: Removed in Kconfig.
-> >>> 
-> >>> This should make it easier to create future defconfig patches on top of
-> >>> linux-next, since all the extraneous diffs have been removed. It also
-> >>> makes it more likely that once 3.12 comes around, this defconfig will
-> >>> already match what's required there.
-> >> 
-> >> I've applied this (squashed it into) Tegra's for-3.11/defconfig branch.
-> > 
-> > wouldn't it make more sense to apply such a patch just before the merge
-> > window closes (or better after some release candidate)?
-> 
-> Perhaps. It probably also depends a lot on when Kconfig changes get
-> applied in other areas as far as when it makes sense. I deferred it this
-> time around in order to pick up some tegra_defconfig changes that made
-> it into 3.10-rc3.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-ok, nice.
+What GPIO pin is used with which device on the SSP/SPI bus
+is as board-specific as it gets, so it does not belong here
+in the core SoC file, and it is disabled so it doesn't hurt
+to delete this.
 
-> > This way we would have a
-> > better chance to have a zero diff between defconfig and tegra_defconfig,
-> > e.g. not like 3.10 is now.
-> 
-> I don't understand this; what is "defconfig" if not "tegra_defconfig"?
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/dbx5x0.dtsi | 5 -----
+ 1 file changed, 5 deletions(-)
 
-defconfig: make tegra_defconfig; make saveconfig
-
-diff -u tegra_defconfig defconfig
-
-Marc
+diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
+index b4b542b..12f36d4 100644
+--- a/arch/arm/boot/dts/dbx5x0.dtsi
++++ b/arch/arm/boot/dts/dbx5x0.dtsi
+@@ -589,11 +589,6 @@
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 			status = "disabled";
+-
+-			// Add one of these for each child device
+-			cs-gpios = <&gpio0 31 0x4 &gpio4 14 0x4 &gpio4 16 0x4
+-				    &gpio6 22 0x4 &gpio7 0 0x4>;
+-
+ 		};
+ 
+ 		uart at 80120000 {
+-- 
+1.7.11.3
