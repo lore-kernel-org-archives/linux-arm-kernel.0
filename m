@@ -1,50 +1,64 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 May 2013 10:08:50 +0100
-Subject: VDSO for arm 32bit
-In-Reply-To: <alpine.LFD.2.03.1305281415040.1918@syhkavp.arg>
-References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
- <20899.25935.838288.45383@pilspetsen.it.uu.se>
- <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
- <20130528092313.GA10474@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1305281415040.1918@syhkavp.arg>
-Message-ID: <20130529090850.GB13095@mudshark.cambridge.arm.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 29 May 2013 11:16:14 +0200
+Subject: [PATCH] ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
+In-Reply-To: <120501ce5752$6daef380$490cda80$%kim@samsung.com>
+References: <1368630484-29939-1-git-send-email-t.figa@samsung.com>
+ <1623377.nVo7nUcid2@flatron> <120501ce5752$6daef380$490cda80$%kim@samsung.com>
+Message-ID: <51A5C75E.7090006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 07:19:00PM +0100, Nicolas Pitre wrote:
-> On Tue, 28 May 2013, Will Deacon wrote:
-> > Be careful here. I had a crack at a gtod implementation for the vectors page
-> > in the past, but decided to drop it because it quickly became a maintenance
-> > nightmare. Since the layout of the vectors page must be fixed (as userspace
-> > jumps to the absolute addresses for the helpers), having large, complicated
-> > functions (which gtod does become as you quickly start using the stack to
-> > store all of the shared state with the kernel) means that you can quickly
-> > back yourself into a corner where the layout of the code cannot change
-> > without breaking the ABI.
-> 
-> Note that only the entry point is fixed.  The layout of the code is not.  
-> So you may well branch anywhere else within the vector page if the code 
-> is more complex than a few instructions.
+Hello,
 
-Sure, it may be possible simply to have branches in the kuser slots and then
-reserve a chunk at the other end of the vectors page where the actual
-implementation can go.
+On 5/23/2013 3:11 AM, Kukjin Kim wrote:
+> Kukjin Kim wrote:
+> >
+> > Tomasz Figa wrote:
+> > >
+> > > Hi Kukjin,
+> > >
+> > Hi,
+> >
+> > > On Wednesday 15 of May 2013 17:08:04 Tomasz Figa wrote:
+> > > > This patch extends exynos_init_time() function to handle Exynos4210
+> > rev0
+> > > > SoC, which differs in availability of system timers and needs
+> > different
+> > > > clocksource initialization.
+> > > >
+> > > > This makes it possible to use exynos_init_time() function as init_time
+> > > > callback for all Exynos-based boards, including Universal_C210, which
+> > > > originally had to use samsung_timer_init().
+> > > >
+> > > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > > > ---
+> > > >  arch/arm/mach-exynos/Kconfig               |  3 ++-
+> > > >  arch/arm/mach-exynos/common.c              | 30
+> > > > +++++++++++++++++++++++++++++- arch/arm/mach-exynos/common.h
+> > > >   |  2 ++
+> > > >  arch/arm/mach-exynos/mach-universal_c210.c |  5 ++---
+> > > >  4 files changed, 35 insertions(+), 5 deletions(-)
+> > >
+> > > Could you pick this patch to your fixes branch?
+> > >
+> > Yeah, I will after looking at.
+> >
+> > > This is a fix of a regression in handling Exynos4210 rev0 SoC (e.g.
+> > > Universal C210 board) introduced by patches merged to 3.10.
+> > >
+> > OK, I see but I didn't review yet and I  will within a couple of days ;-)
+> >
+> OK, looks fine, this will be sent to upstream during -rc for v3.10.
+>
+> But, Tomasz, as you know, non-DT supporting files will be gone away in
+> v3.11, just note.
 
-> > On top of that, new clock types are added more often than you might think
-> > (not to mention bug fixes in the implementation itself), and you end up in
-> > a horrible situation where you'd end up deprecating one implementation and
-> > adding gettimeofday2 or something equally nasty at a different offset.
-> 
-> That is equally valid for a vdso.
+This patch is needed to get REV0 4210 based board working both in DT and 
+non-DT
+modes.
 
-Sorry, I wasn't clear. My point was that you can change the layout of a vdso
-without breaking anything, since the dynamic loader resolves the entry
-points. It relates back to what I said above -- you need to be careful about
-how you lay the stuff out in memory.
-
-Perhaps the gtod code won't end up being that big. It's around ~500 bytes on
-arm64, but that's without any stack usage. Come to think of it, is there any
-reason why we can't just map an additional vectors page after the one we
-currently have?
-
-Will
+Best regards
+-- 
+Marek Szyprowski
+Samsung R&D Institute Poland
