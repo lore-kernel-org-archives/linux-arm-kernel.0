@@ -1,97 +1,62 @@
-From: liuj97@gmail.com (Jiang Liu)
-Date: Wed, 29 May 2013 21:57:31 +0800
-Subject: [PATCH v6,
- part4 13/41] mm/ARM: prepare for removing num_physpages and simplify
- mem_init()
-In-Reply-To: <1369835879-23553-1-git-send-email-jiang.liu@huawei.com>
-References: <1369835879-23553-1-git-send-email-jiang.liu@huawei.com>
-Message-ID: <1369835879-23553-14-git-send-email-jiang.liu@huawei.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 29 May 2013 10:01:40 -0400 (EDT)
+Subject: VDSO for arm 32bit
+In-Reply-To: <20130529090850.GB13095@mudshark.cambridge.arm.com>
+References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
+ <20899.25935.838288.45383@pilspetsen.it.uu.se>
+ <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
+ <20130528092313.GA10474@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1305281415040.1918@syhkavp.arg>
+ <20130529090850.GB13095@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1305290955390.1918@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare for removing num_physpages and simplify mem_init().
+On Wed, 29 May 2013, Will Deacon wrote:
 
-Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
----
- arch/arm/mm/init.c | 47 ++---------------------------------------------
- 1 file changed, 2 insertions(+), 45 deletions(-)
+> On Tue, May 28, 2013 at 07:19:00PM +0100, Nicolas Pitre wrote:
+> > On Tue, 28 May 2013, Will Deacon wrote:
+> > > Be careful here. I had a crack at a gtod implementation for the vectors page
+> > > in the past, but decided to drop it because it quickly became a maintenance
+> > > nightmare. Since the layout of the vectors page must be fixed (as userspace
+> > > jumps to the absolute addresses for the helpers), having large, complicated
+> > > functions (which gtod does become as you quickly start using the stack to
+> > > store all of the shared state with the kernel) means that you can quickly
+> > > back yourself into a corner where the layout of the code cannot change
+> > > without breaking the ABI.
+> > 
+> > Note that only the entry point is fixed.  The layout of the code is not.  
+> > So you may well branch anywhere else within the vector page if the code 
+> > is more complex than a few instructions.
+> 
+> Sure, it may be possible simply to have branches in the kuser slots and then
+> reserve a chunk at the other end of the vectors page where the actual
+> implementation can go.
+> 
+> > > On top of that, new clock types are added more often than you might think
+> > > (not to mention bug fixes in the implementation itself), and you end up in
+> > > a horrible situation where you'd end up deprecating one implementation and
+> > > adding gettimeofday2 or something equally nasty at a different offset.
+> > 
+> > That is equally valid for a vdso.
+> 
+> Sorry, I wasn't clear. My point was that you can change the layout of a vdso
+> without breaking anything, since the dynamic loader resolves the entry
+> points. It relates back to what I said above -- you need to be careful about
+> how you lay the stuff out in memory.
+> 
+> Perhaps the gtod code won't end up being that big. It's around ~500 bytes on
+> arm64, but that's without any stack usage.
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 4ca7c1a..59c18b8 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -582,9 +582,6 @@ static void __init free_highpages(void)
-  */
- void __init mem_init(void)
- {
--	unsigned long reserved_pages, free_pages;
--	struct memblock_region *reg;
--	int i;
- #ifdef CONFIG_HAVE_TCM
- 	/* These pointers are filled in on TCM detection */
- 	extern u32 dtcm_end;
-@@ -604,47 +601,7 @@ void __init mem_init(void)
- 
- 	free_highpages();
- 
--	reserved_pages = free_pages = 0;
--
--	for_each_bank(i, &meminfo) {
--		struct membank *bank = &meminfo.bank[i];
--		unsigned int pfn1, pfn2;
--		struct page *page, *end;
--
--		pfn1 = bank_pfn_start(bank);
--		pfn2 = bank_pfn_end(bank);
--
--		page = pfn_to_page(pfn1);
--		end  = pfn_to_page(pfn2 - 1) + 1;
--
--		do {
--			if (PageReserved(page))
--				reserved_pages++;
--			else if (!page_count(page))
--				free_pages++;
--			page++;
--		} while (page < end);
--	}
--
--	/*
--	 * Since our memory may not be contiguous, calculate the
--	 * real number of pages we have in this system
--	 */
--	printk(KERN_INFO "Memory:");
--	num_physpages = 0;
--	for_each_memblock(memory, reg) {
--		unsigned long pages = memblock_region_memory_end_pfn(reg) -
--			memblock_region_memory_base_pfn(reg);
--		num_physpages += pages;
--		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
--	}
--	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
--
--	printk(KERN_NOTICE "Memory: %luk/%luk available, %luk reserved, %luK highmem\n",
--		nr_free_pages() << (PAGE_SHIFT-10),
--		free_pages << (PAGE_SHIFT-10),
--		reserved_pages << (PAGE_SHIFT-10),
--		totalhigh_pages << (PAGE_SHIFT-10));
-+	mem_init_print_info(NULL);
- 
- #define MLK(b, t) b, t, ((t) - (b)) >> 10
- #define MLM(b, t) b, t, ((t) - (b)) >> 20
-@@ -710,7 +667,7 @@ void __init mem_init(void)
- 	BUG_ON(PKMAP_BASE + LAST_PKMAP * PAGE_SIZE	> PAGE_OFFSET);
- #endif
- 
--	if (PAGE_SIZE >= 16384 && num_physpages <= 128) {
-+	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
- 		extern int sysctl_overcommit_memory;
- 		/*
- 		 * On a machine this small we won't get
--- 
-1.8.1.2
+That's still fairly large.
+
+> Come to think of it, is there any
+> reason why we can't just map an additional vectors page after the one we
+> currently have?
+
+That certainly can be done if necessary.  Some copy_page implementations 
+do use some of the address space above the vector page for temporary 
+page mapping so some care not to create conflicts would be required.
+
+
+Nicolas
