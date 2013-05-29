@@ -1,117 +1,41 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 29 May 2013 10:53:07 +0200
-Subject: [PATCH v2 14/14] ARM: dts: AM43x: initial support
-In-Reply-To: <3790fa57fc4c69da12224fbcec17cd07c59771a0.1369658705.git.afzal@ti.com>
-References: <cover.1369658705.git.afzal@ti.com>
- <3790fa57fc4c69da12224fbcec17cd07c59771a0.1369658705.git.afzal@ti.com>
-Message-ID: <51A5C1F3.2070605@ti.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 29 May 2013 10:53:18 +0200
+Subject: [PATCH v3 0/5] ARM: dts: OMAP2+: use preprocessor for device trees
+In-Reply-To: <51A5C068.9040308@ti.com>
+References: <1369666354-29152-1-git-send-email-florian.vaussard@epfl.ch>
+ <51A46DB0.5020508@epfl.ch> <51A5C068.9040308@ti.com>
+Message-ID: <51A5C1FE.6020404@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Florian
+Hello Benoit,
 
-Hi Afzal,
+On 05/29/2013 10:46 AM, Benoit Cousson wrote:
+> Salut Florian,
+>
+> On 05/28/2013 10:41 AM, Florian Vaussard wrote:
+>>
+>> On 05/27/2013 04:52 PM, Florian Vaussard wrote:
+>>> Hello,
+>>>
+>>> Following a similar proposal by Stephen Warren for tegra [1], this series
+>>> makes use of the C preprocessor when compiling OMAP DT files, and
+>>> accomplishes some improvements to improve overall readability.
+>
+> Thanks for that nice cleanup.
+>
+>> I realized that I should also address am* devices. I will wait for comments
+>> on this version, then post a v4. Sorry for the noise.
+>
+> That's up to you, but I can anyway already pulled that series. That AM*
+> patches can go later.
+>
 
-On 05/27/2013 04:37 PM, Afzal Mohammed wrote:
-> DT source (minimal) for AM4372 SoC to represent AM43x SoC's. Those
-> represented here are the minimal DT nodes necessary to get kernel
-> booting.
-> 
-> In DT nodes, "ti,hwmod" property has not been added, this would be
-> added along with PRCM support for AM43x.
-> 
-> Signed-off-by: Ankur Kishore <a-kishore@ti.com>
-> Signed-off-by: Afzal Mohammed <afzal@ti.com>
-> ---
-> 
-> v2: Add gptimer 1ms, timer2, synctimer and remove twd local timer
-> 
->  arch/arm/boot/dts/am4372.dtsi | 66 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 66 insertions(+)
->  create mode 100644 arch/arm/boot/dts/am4372.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-> new file mode 100644
-> index 0000000..1d58298
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/am4372.dtsi
-> @@ -0,0 +1,66 @@
-> +/*
-> + * Device Tree Source for AM4372 SoC
-> + *
-> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This file is licensed under the terms of the GNU General Public License
-> + * version 2.  This program is licensed "as is" without any warranty of any
-> + * kind, whether express or implied.
-> + */
-> +
-> +/include/ "skeleton.dtsi"
+I saw in your for_3.11/dts branch that you have a couple of patches 
+declaring
+new pinctrl bindings, so I should base my series of this branch to address
+these patches as well. So I will send a v4 anyway in the coming days.
 
-You can now use the C preprocessor statement instead of this one.
-Florian already started doing the change [1].
+Thanks,
 
-Beside that detail, that patch looks good to me.
-I'll pull it separately of the series.
-
-Regards,
-Benoit
-
-[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/98320
-
-> +
-> +/ {
-> +	compatible = "ti,am4372", "ti,am43";
-> +	interrupt-parent = <&gic>;
-> +
-> +
-> +	aliases {
-> +		serial0 = &uart1;
-> +	};
-> +
-> +	cpus {
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a9";
-> +		};
-> +	};
-> +
-> +	gic: interrupt-controller at 48241000 {
-> +		compatible = "arm,cortex-a9-gic";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		reg = <0x48241000 0x1000>,
-> +		      <0x48240100 0x0100>;
-> +	};
-> +
-> +	ocp {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		uart1: serial at 44e09000 {
-> +			compatible = "ti,am4372-uart","ti,omap2-uart";
-> +			reg = <0x44e09000 0x2000>;
-> +			interrupts = <0 72 0x4>;
-> +		};
-> +
-> +		timer1: timer at 44e31000 {
-> +			compatible = "ti,am4372-timer-1ms","ti,am335x-timer-1ms";
-> +			reg = <0x44e31000 0x400>;
-> +			interrupts = <0 67 0x4>;
-> +			ti,timer-alwon;
-> +		};
-> +
-> +		timer2: timer at 48040000  {
-> +			compatible = "ti,am4372-timer","ti,am335x-timer";
-> +			reg = <0x48040000  0x400>;
-> +			interrupts = <0 68 0x4>;
-> +		};
-> +
-> +		counter32k: counter at 44e86000 {
-> +			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
-> +			reg = <0x44e86000 0x40>;
-> +		};
-> +	};
-> +};
-> 
+Florian
