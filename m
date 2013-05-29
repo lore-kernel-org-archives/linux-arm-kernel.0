@@ -1,70 +1,37 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 29 May 2013 12:59:06 -0400 (EDT)
-Subject: [PATCH 8/8] ARM: vexpress/dcscb: select multi-cluster SMP
- operations
-In-Reply-To: <1369845421.3715.76.camel@linaro1.home>
-References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
- <1369374311-21260-9-git-send-email-nicolas.pitre@linaro.org>
- <1369824504.3715.23.camel@linaro1.home>
- <alpine.LFD.2.03.1305291054150.1918@syhkavp.arg>
- <1369845421.3715.76.camel@linaro1.home>
-Message-ID: <alpine.LFD.2.03.1305291250240.1918@syhkavp.arg>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 29 May 2013 21:05:59 +0400
+Subject: =?UTF-8?B?UmU6IFtQQVRDSF0gU1BJOiBVbmlmeSBzaW1wbGUgcGxhdGZvcm0gZGF0YSBm?=
+ =?UTF-8?B?b3Igc29tZSBjb250cm9sbGVycw==?=
+In-Reply-To: <20130529144909.GT3660@sirena.org.uk>
+References: <1369809742-4220-1-git-send-email-shc_work@mail.ru>
+ <201305291526.35099.arnd@arndb.de>
+ <20130529144909.GT3660@sirena.org.uk>
+Message-ID: <1369847158.250798748@f433.i.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Jon Medhurst (Tixy) wrote:
-
-> On Wed, 2013-05-29 at 11:17 -0400, Nicolas Pitre wrote:
-> > On Wed, 29 May 2013, Jon Medhurst (Tixy) wrote:
-> > 
-> > > On Fri, 2013-05-24 at 01:45 -0400, Nicolas Pitre wrote:
-> > > > When the DCSCB code is successfully probed and initialized, then the
-> > > > generic MCPM SPM ops should be used as those operations need to be
-> > > > arbitrated through the MCPM layer.
-> > > > 
-> > > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > > > ---
-> > > >  arch/arm/mach-vexpress/dcscb.c | 2 ++
-> > > >  1 file changed, 2 insertions(+)
-> > > > 
-> > > > diff --git a/arch/arm/mach-vexpress/dcscb.c b/arch/arm/mach-vexpress/dcscb.c
-> > > > index 1acc975360..ce3118dc05 100644
-> > > > --- a/arch/arm/mach-vexpress/dcscb.c
-> > > > +++ b/arch/arm/mach-vexpress/dcscb.c
-> > > > @@ -239,6 +239,8 @@ static int __init dcscb_init(void)
-> > > >  		return ret;
-> > > >  	}
-> > > >  
-> > > > +	mcpm_smp_set_ops();
-> > > > +
-> > > 
-> > > This is going to change the platform's smp_ops after setup_arch() has
-> > > already set them, is that OK and not too late?
-> > 
-> > Well...  The only methods being invoked before the booting of secondary 
-> > CPUs are smp_init_cpus and smp_prepare_cpus.  In the MCPM case they're 
-> > both no-ops.
-> > 
-> > > I ask, because for me, RTSM doesn't boot the secondary CPUs if we rely
-> > > on this change to set the smp_ops, but having a hook in setup_arch() to
-> > > select instead of the standard vexpress ops does work.
-> > 
-> > Strange.  That works for me both ways.
+> On Wed, May 29, 2013 at 03:26:34PM +0200, Arnd Bergmann wrote:
+> > On Wednesday 29 May 2013, Mark Brown wrote:
 > 
-> Actually, this patch series works for me if I take it on it's own but
-> what should be the same changes in the IKS branch don't. I'll do more
-> investigation...
+> > > We probably also want to make
+> > > GPIO chip select support a standard thing that's available with every
+> > > driver rather than something the driver has to know about but that's a
+> > > separate bit of work.
+> 
+> > That actually seems simpler than doing it in just one driver: if
+> > we add a cs_gpio field to spi_board_info, spi_new_device could
+> > just copy that information into the new spi_device instead of
+> > taking it from master->cs_gpios.
+> 
+> Yeah, that bit of it is fine and straightforward.  It's slightly more
+> work to factor the chip select handling out so that we can implement the
+> handling at the appropriate moments in the flow due to the fact that
+> it's embedded in the message transfer functions but totally doable.
 
-After a closer look, I noticed that I only have 5 out of 8 CPUs online.
+Initial try to simplify i.MX SPI driver I will send in 5 min.
+Patches is untested, so it is only RFC. Platform data still present in
+driver but patch migrate driver to using dynamic counter of
+chipselects for dt-case. Is it true way now? Comments are welcome.
+Thanks.
 
-So as I suspected, the default prepare_cpus method is not empty and 
-causing problems here.  In this case, vexpress_smp_prepare_cpus() is 
-calling vexpress_flags_set() sending any waiting CPU into 
-versatile_secondary_startup where they'll stay forever (the MCPM code 
-expects every new born to go through mcpm_entry_point).
-
-I'll revert to the previous arrangement and we could revisit the 
-awkwardness of it later.
-
-
-Nicolas
+---
