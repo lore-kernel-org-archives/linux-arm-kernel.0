@@ -1,56 +1,74 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 29 May 2013 07:39:18 +0200
-Subject: [PATCH 5/8] ARM: zynq: use generic cpu idle function for wfi
-In-Reply-To: <1369665166-13049-6-git-send-email-sanjay.rawat@linaro.org>
-References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
- <1369665166-13049-6-git-send-email-sanjay.rawat@linaro.org>
-Message-ID: <51A59486.4040901@monstr.eu>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Wed, 29 May 2013 07:55:12 +0200
+Subject: VDSO for arm 32bit
+In-Reply-To: <20130528092313.GA10474@mudshark.cambridge.arm.com>
+References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
+ <20899.25935.838288.45383@pilspetsen.it.uu.se>
+ <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
+ <20130528092313.GA10474@mudshark.cambridge.arm.com>
+Message-ID: <51A59840.3060801@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2013 04:32 PM, Sanjay Singh Rawat wrote:
-> use cpu_do_idle for entering the wfi mode.
-> 
-> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
-> ---
->  arch/arm/mach-zynq/hotplug.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
-> index c89672b..ef0d65d 100644
-> --- a/arch/arm/mach-zynq/hotplug.c
-> +++ b/arch/arm/mach-zynq/hotplug.c
-> @@ -64,8 +64,8 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
->  	 * code will have already disabled interrupts
->  	 */
->  	for (;;) {
-> -		dsb();
-> -		wfi();
-> +		/* enter WFI mode */
-> +		cpu_do_idle();
->  
->  		/*
->  		 * Getting here, means that we have come out of WFI without
-> 
+On 05/28/2013 11:23 AM, Will Deacon wrote:
 
-Applied to zynq/cleanup branch.
+> On Tue, May 28, 2013 at 08:48:33AM +0100, Kumar, Ganesh wrote:
+>> Hi Mikel,
+>>
+>> Kumar, Ganesh writes:
+>>  > Hi All,
+>>  >
+>>  >   I'm working on OMAP5 on greg's LTS kernel 3.4.25, but I see there is  > no support for vdso for arm 32 bit.
+>>  > I'm planning to port it to arm 32 bit, is there any work under progress?
+>>  > would like to understand why the support for arm 32 bit is not there, any idea?
+>>
+>>> 32-bit ARM has a "kuser" page at a fixed virtual address, which exports a few critical routines to user-space.  With that, a vdso is mostly redundant.
+>>
+>>   Thanks for the info, my main idea is to get the gettimeofday exported through the kuser helper,tried looking at the sources
+>> but I could not find anything related to that seems done in the mainline kernel tree for arm cortex, am I missing something here?
+>> I plan to do that if its not available yet, right now I've started with the kernel doc for the kuser, any pointers further
+>> to get the gettimeofday up and running using the kuser, Thanks in advance for your time.
+> 
+> Be careful here. I had a crack at a gtod implementation for the vectors page
+> in the past, but decided to drop it because it quickly became a maintenance
+> nightmare. Since the layout of the vectors page must be fixed (as userspace
+> jumps to the absolute addresses for the helpers), having large, complicated
+> functions (which gtod does become as you quickly start using the stack to
+> store all of the shared state with the kernel) means that you can quickly
+> back yourself into a corner where the layout of the code cannot change
+> without breaking the ABI.
+> 
+> On top of that, new clock types are added more often than you might think
+> (not to mention bug fixes in the implementation itself), and you end up in
+> a horrible situation where you'd end up deprecating one implementation and
+> adding gettimeofday2 or something equally nasty at a different offset.
+> 
+> Maybe this can be solved by adding loads of padding between the different
+> functions and hoping for the best, but I think a better solution would be to
+> try and add something which is actually a vdso but preserves the function
+> offsets of the current helpers, thus preserving the ABI. That could then
+> replace the vectors page and newer C libraries could make use of the vdso
+> functionality. Of course, that's a lot more work and people might have
+> objections to the approach.
+> 
+> Finally, I assume you're only interested in the co-processor backed
+> architected timers for this? I know some people were toying with exposing
+> memory-mapped timers to userspace, but that really scares me.
 
-Thanks,
-Michal
 
+Hi,
+
+We have been doing this for some time with Xenomai on ARM. What we do is
+that:
+- the function to read the clocksource is in the kuser area, at a fixed
+address, its precise implementation (depending on the clocksource type)
+is copied to the vector page when the clocksource is chosen, it expects
+the user-space virtual address of the MMIO register in r0;
+- for MMIO registers, the library maps the register with /dev/mem;
+- the data to handle gettimeofday (so namely, the contents of the
+"struct timekeeper" structure) are copied to the equivalent of a vdso.
+
+Regards.
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/663c5f5e/attachment.sig>
+                                                                Gilles.
