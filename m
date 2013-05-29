@@ -1,21 +1,34 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Wed, 29 May 2013 08:08:06 +0000
-Subject: [PATCH v2 12/14] Documentation: dt: binding: omap: am43x counter
-In-Reply-To: <51A520ED.9070106@gmail.com>
-References: <cover.1369658705.git.afzal@ti.com>
- <755964dc45ae4f023540c05e5739fca87d0ea70b.1369658705.git.afzal@ti.com>
- <51A520ED.9070106@gmail.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EAFB056@DBDE04.ent.ti.com>
+From: B29397@freescale.com (Chen Peter-B29397)
+Date: Wed, 29 May 2013 08:07:55 +0000
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <20130529075044.GC3293@lukather>
+References: <51A5A808.2070803@digi.com>
+ <F281D0F91ED19E4D8E63A7504E8A649803E8A3F3@039-SN2MPN1-021.039d.mgd.msft.net>
+ <20130529075044.GC3293@lukather>
+Message-ID: <F281D0F91ED19E4D8E63A7504E8A649803E8A4D0@039-SN2MPN1-021.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
 
-On Wed, May 29, 2013 at 02:56:05, Jon Hunter wrote:
+ 
+> 
+> Indeed, I've been using the patchset "Add tested id switch and vbus
+> connect detect support for Chipidea" from Peter for quite some time on
+> top of 3.9 and it works like a charm for the gadget mode on an MX28
+> platform.
+> 
+> BTW, Peter, I've seen that these patches are still not merged in 3.10,
+> is there a reason for that? do you plan on sending a version rebased on
+> top of 3.10 some time in the future? I tried to do the rebasing myself,
+> but the chipidea driver seems to have changed quite heavily, which makes
+> the process quite difficult when you don't know what you're doing :)
+> 
 
-> Changelog should state why this is needed.
+I can spend few bandwidth on upstream work recently, I may have more
+bandwidth after June 15th. 
 
-Please see my reply on 11/14 thread.
+Currently, we still have no conclusion for chipidea core driver's coming work,
+like Device tree support, how to identify if the controller is OTG supported.
 
-Regards
-Afzal
+Best regards,
+Peter
