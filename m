@@ -1,43 +1,59 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 29 May 2013 18:48:12 +0900
-Subject: [PATCH 2/2] ARM: dts: Add USB PHY node to Exynos4210
-Message-ID: <000201ce5c51$a261d530$e7257f90$@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 May 2013 10:48:27 +0100
+Subject: A bug about system call on ARM
+In-Reply-To: <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
+ <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
+ <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+Message-ID: <20130529094826.GD13095@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add device node for USB 2.0 PHY controller to Exynos4210.
+Hello,
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
-Tested on Exynos4210.
+On Wed, May 29, 2013 at 09:46:42AM +0100, richard -rw- weinberger wrote:
+> On Wed, May 29, 2013 at 10:24 AM, Wang, Yalin <Yalin.Wang@sonymobile.com> wrote:
+> > I have download the latest linux kernel code  3.9.4
+> > And Compare with  3.4.0 kernel .
+> >
+> > It seems there is no change for this part ,
+> > So it will still happen .
+> > Does anyone know who is responsible for  arm arch part kernel code ?
+> 
+> See MAINTAINERS file.
+> CC'ing linux-arm-kernel at lists.infradead.org
 
- arch/arm/boot/dts/exynos4210.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Cheers for adding us to CC.
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 3c173c7..bec6637 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -135,6 +135,20 @@
- 		clock-names = "usbhost";
- 	};
- 
-+	usb2_phy: usbphy at 125b0000 {
-+		compatible = "samsung,exynos4210-usb2phy";
-+		reg = <0x125b0000 0x100>;
-+		clocks = <&clock 2>, <&clock 305>;
-+		clock-names = "xusbxti", "usb_device";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		usbphy-sys {
-+			reg = <0x10020704 0x8>;
-+		};
-+	};
-+
- 	g2d at 12800000 {
- 		compatible = "samsung,s5pv210-g2d";
- 		reg = <0x12800000 0x1000>;
--- 
-1.7.10.4
+> >> #ifdef CONFIG_ARM_THUMB
+> >>         tst     r8, #PSR_T_BIT
+> >>         movne   r10, #0                         @ no thumb OABI emulation
+> >>         ldreq   r10, [lr, #-4]                  @ get SWI instruction          // crash at this instruction, when get SWI instruction
+
+Do you have the panic log please? Also, which SoC are you using and how are
+you reproducing this?
+
+> >>         ldr     r10, [lr, #-4]                  @ get SWI instruction
+> >>   A710( and     ip, r10, #0x0f000000            @ check for SWI         )
+> >>   A710( teq     ip, #0x0f000000                                         )
+> >>   A710( bne     .Larm710bug                                             )
+> >> #endif
+> >> #ifdef CONFIG_CPU_ENDIAN_BE8
+> >>         rev     r10, r10                        @ little endian instruction
+> >> #endif
+> >>
+> >> /*********************************************************************
+> >> ******************************/
+> >>
+> >> Then reason why it will crash when get SWI instruction is maybe This
+> >> page is clear to aged by kernel, But this MMU fault happpened in
+> >> kernel, So the kernel do_page_fault function will not clear this page
+> >> to young, So that  will crash .
+
+Sounds like we might need some USER annotations around the instruction
+loads, but we should also rework the code so that we re-enable interrupts
+first.
+
+Will
