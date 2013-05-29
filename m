@@ -1,75 +1,60 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 29 May 2013 10:01:43 +0200
-Subject: [PATCH v4 15/21] ARM: shmobile: armadillo-reference: Move st1232
- reset GPIO to DT
-In-Reply-To: <CACRpkdYUQjtmzFzQBES-bcjjT5iTTXifa2BQSusBzMdTCRtyiA@mail.gmail.com>
-References: <1369138482-5871-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1369138482-5871-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CACRpkdYUQjtmzFzQBES-bcjjT5iTTXifa2BQSusBzMdTCRtyiA@mail.gmail.com>
-Message-ID: <7726129.eAP65oL724@avalon>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Wed, 29 May 2013 08:06:39 +0000
+Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
+In-Reply-To: <51A52A16.1040204@wwwdotorg.org>
+References: <cover.1369658705.git.afzal@ti.com>
+ <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
+ <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Jon,
 
-Thanks for the review.
+On Wed, May 29, 2013 at 03:35:10, Stephen Warren wrote:
+> On 05/28/2013 03:25 PM, Jon Hunter wrote:
 
-On Friday 24 May 2013 10:59:50 Linus Walleij wrote:
-> On Tue, May 21, 2013 at 2:14 PM, Laurent Pinchart wrote:
-> > Reference the st1232 reset GPIO from the device tree and remove it from
-> > board code.
-> > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-> > @@ -43,6 +43,7 @@
-> > 
-> >                 interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
-> >                 pinctrl-0 = <&st1232_pins>;
-> >                 pinctrl-names = "default";
-> > 
-> > +               gpios = <&pfc 166 1>;
+> >>  			ti,am335x-timer	(applicable to AM335x devices)
+> >>  			ti,am335x-timer-1ms (applicable to AM335x devices)
+> >> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
+> >> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
+
+> > If you are adding more compatibility strings, then this implies that the
+> > AM43x timers are not 100% compatible with any other device listed (such
+> > as am335x or any omap device). That's fine but you should state that in
+> > the changelog. If the AM43x timer registers are 100% compatible with
+> > existing devices you should not add these.
 > 
-> Just as a random example this becomes:
-> 
-> gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
-> 
-> Which is WAAAY more readable.
+> I'm not sure that's true; .dts files should always include a compatible
+> value that describes the most specific model of the HW, plus any
+> baseline compatible value that the HW is compatible with. This allows
+> any required quirks/fixes/... to be applied for the specific HW model
+> later even if nobody knows right now they'll be needed. Hence, defining
+> new compatible values doesn't necessarily mean incompatible HW.
 
-As stated in my reply to your other e-mail, I'll switch to symbolic constants.
+Stephen took words out of my finger ;)
+ 
+Some explanations,
 
-> > +++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-> > 
-> > @@ -158,7 +158,6 @@ clock_error:
-> >   */
-> >  static void __init eva_init(void)
-> >  {
-> > -
-> >         r8a7740_clock_init(MD_CK0 | MD_CK2);
-> >         eva_clock_init();
-> > 
-> > @@ -171,12 +170,6 @@ static void __init eva_init(void)
-> > 
-> >         r8a7740_add_standard_devices_dt();
-> > 
-> > -       /*
-> > -        * Touchscreen
-> > -        * TODO: Move reset GPIO over to .dts when we can reference it
-> > -        */
-> > -       gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
-> > -
-> 
-> Not really my business but I guess the driver is already augmented to pick
-> its GPIO from the device tree in this case?
+1. first compatible should be exact device [A], followed by compatible
+model (if one)
+2. Minor effort in getting DT right the first time may help prevent
+difficult effort later modifying it (if a necessity comes), considering
+the fact that DT sources has  to move out of Kernel at some point of
+time. And DT is not supposed to be modified, which may cause difficulty
+for the users (I had been a minor victim of this during rebase).
 
-Yes it is.
+As we both were in GPMC land earlier, an example,
 
-> And are you willingly breaking non-DT boots or something?
+If my memory is right, GPMC IP in am335x is rev 6, and IP has 8 chip
+select, but one is not pinned out. Now assume that same IP is integrated
+in another SoC (probably OMAP4 has rev 6). Here if we use same compatible
+for both, driver cannot handle it properly (w/o knowledge about platform).
+But if exact compatible is mentioned, without modifying DT (which should
+be considered as a firmware) just by modifying Kernel, deciding based on
+compatible would help achieve what is required.
 
-The armadillo-reference board doesn't support non-DT boot.
+Regards
+Afzal
 
--- 
-Regards,
-
-Laurent Pinchart
+[A] http://devicetree.org/Device_Tree_Usage#Understanding_the_compatible_Property
