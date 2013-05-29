@@ -1,33 +1,102 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 May 2013 12:20:02 +0100
-Subject: [PATCH] SPI: Unify simple platform data for some controllers
-In-Reply-To: <1369817353.993218858@f175.mail.ru>
-References: <1369809742-4220-1-git-send-email-shc_work@mail.ru>
- <1743419.NY2Q01i8Iq@wuerfel> <1369817353.993218858@f175.mail.ru>
-Message-ID: <20130529112002.GS3660@sirena.org.uk>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Wed, 29 May 2013 06:20:27 -0500
+Subject: [PATCH v7] ARM: dts: omap4-panda: Update the LED support for the
+ panda DTS
+Message-ID: <1369826427-31963-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 12:49:13PM +0400, Alexander Shiyan wrote:
-> > On Wednesday 29 May 2013 10:42:22 Alexander Shiyan wrote:
+The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+are different.
 
-> > Wouldn't it be better to kill off the platform_data for these drivers
-> > and pass the gpio number through spi->controller_data as the
-> > spi_gpio driver does?
+A1-A3 = gpio_wk7
+ES = gpio_110
 
-> Interesting way. Just one question remains, for using not-dt variant,
-> how  we should specify num_chipselect parameter for master?
-> I see only way for specify maximum constant in the driver.
+There is no change to LED D2
 
-We should fix that to be dynamic, having a fixed number is not sensible
-when GPIOs are usable for chip select.  We probably also want to make
-GPIO chip select support a standard thing that's available with every
-driver rather than something the driver has to know about but that's a
-separate bit of work.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/a1431524/attachment.sig>
+Abstract away the pinmux and the LED definitions for the two boards into
+the respective DTS files.
+
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+---
+v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
+v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
+v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
+ arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index 03bd60d..5fd59b3 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -16,8 +16,13 @@
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
+ 
+-	leds {
++	leds: leds {
+ 		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <
++			&led_wkgpio_pins
++		>;
++
+ 		heartbeat {
+ 			label = "pandaboard::status1";
+ 			gpios = <&gpio1 7 0>;
+@@ -137,6 +142,15 @@
+ 	};
+ };
+ 
++&omap4_pmx_wkup {
++	led_wkgpio_pins: pinmux_leds_wkpins {
++		pinctrl-single,pins = <
++			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
++			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
++		>;
++	};
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+index f1d8c21..c968a3b 100644
+--- a/arch/arm/boot/dts/omap4-panda-es.dts
++++ b/arch/arm/boot/dts/omap4-panda-es.dts
+@@ -34,3 +34,31 @@
+ 		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+ 		>;
+ };
++
++&omap4_pmx_core {
++	led_gpio_pins: gpio_led_pmx {
++		pinctrl-single,pins = <
++			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
++		>;
++	};
++};
++
++&led_wkgpio_pins {
++	pinctrl-single,pins = <
++		0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
++	>;
++};
++
++&leds {
++	pinctrl-0 = <
++		&led_gpio_pins
++		&led_wkgpio_pins
++	>;
++
++	heartbeat {
++		gpios = <&gpio4 14 0>;
++	};
++	mmc {
++		gpios = <&gpio1 8 0>;
++	};
++};
+-- 
+1.7.5.4
