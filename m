@@ -1,42 +1,69 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 May 2013 17:19:20 -0600
-Subject: [PATCH v7] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <1369753575-9818-1-git-send-email-p.zabel@pengutronix.de>
-References: <1369753575-9818-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <51A68CF8.7000303@wwwdotorg.org>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 29 May 2013 16:22:20 -0700
+Subject: [GIT PULL 2/5] ARM: mvebu: pcie driver for v3.11 (round 2
+ cumulative)
+In-Reply-To: <20130528202433.GH31290@titan.lakedaemon.net>
+References: <20130528202140.GG31290@titan.lakedaemon.net>
+ <20130528202433.GH31290@titan.lakedaemon.net>
+Message-ID: <20130529232220.6058.14477@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/2013 09:06 AM, Philipp Zabel wrote:
-> This driver implements a reset controller device that toggle a gpio
-> connected to a reset pin of a peripheral IC. The delay between assertion
-> and de-assertion of the reset signal can be configured via device tree.
+Quoting Jason Cooper (2013-05-28 13:24:33)
+> The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
+> 
+>   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/pcie-3.11-2
+> 
+> for you to fetch changes up to 3d9939c92efdd4ced672b94994959ca71b141cb8:
+> 
+>   pci: mvebu: fix return value check in mvebu_pcie_probe() (2013-05-27 15:51:56 +0000)
+> 
+> ----------------------------------------------------------------
+> mvebu pcie driver for v3.11 (round 2, bugfix)
+> 
+>  - mvebu pcie
+>     - fix return value check in mvebu_pcie_probe()
+> 
+> depends
+>  - mvebu/of_pci
+> 
+> ----------------------------------------------------------------
+> Thomas Petazzoni (4):
+>       clk: mvebu: create parent-child relation for PCIe clocks on Armada 370
+>       clk: mvebu: add more PCIe clocks for Armada XP
 
-> diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
+Same story here for pull request #2 as for pull request #5.  The clock
+changes are trivial: Ack.  However if it is a pain to add the ack don't
+worry about it.
 
-> +static void __gpio_reset_set(struct reset_controller_dev *rcdev, int asserted)
+Regards,
+Mike
 
-Nit: Technically I think __ is a reserved name-space, so you shouldn't
-prefix "user-level" (rather than libc/similar) symbols with it, but it's
-not a big deal.
-
-> +static int gpio_reset_probe(struct platform_device *pdev)
-
-> +	if (of_gpio_named_count(np, "reset-gpios") != 1)
-> +		return -EINVAL;
-
-Should that error-path (and the path for of_property_read_u32() failure)
-include a dev_err() like some already do, so it's obvious what the
-failure is?
-
-> +	reset_controller_register(&drvdata->rcdev);
-> +
-> +	platform_set_drvdata(pdev, drvdata);
-
-It might be better to set the drvdata right after it's been allocated.
-It perhaps doesn't matter much here, but if the reset controller core
-ever starts calling into the registered device inside the call to
-reset_controller_register(), then there might be a problem.
-
-Aside from those minor issues,
-Reviewed-by: Stephen Warren <swarren@nvidia.com>
+>       pci: PCIe driver for Marvell Armada 370/XP systems
+>       arm: mvebu: PCIe support is now available on mvebu
+> 
+> Wei Yongjun (1):
+>       pci: mvebu: fix return value check in mvebu_pcie_probe()
+> 
+>  .../devicetree/bindings/pci/mvebu-pci.txt          | 220 ++++++
+>  arch/arm/mach-mvebu/Kconfig                        |   2 +
+>  drivers/clk/mvebu/clk-gating-ctrl.c                |  18 +-
+>  drivers/pci/Kconfig                                |   2 +
+>  drivers/pci/Makefile                               |   3 +
+>  drivers/pci/host/Kconfig                           |   8 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-mvebu.c                       | 880 +++++++++++++++++++++
+>  8 files changed, 1128 insertions(+), 6 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/mvebu-pci.txt
+>  create mode 100644 drivers/pci/host/Kconfig
+>  create mode 100644 drivers/pci/host/Makefile
+>  create mode 100644 drivers/pci/host/pci-mvebu.c
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
