@@ -1,45 +1,63 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 May 2013 12:03:59 +0100
-Subject: [PATCH 1/3] ARM PJ4B: Add support for errata 4742
-In-Reply-To: <1369822618-26797-2-git-send-email-gregory.clement@free-electrons.com>
-References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
- <1369822618-26797-2-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130529110359.GE13095@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 May 2013 12:05:09 +0100
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <20130529110508.GH17767@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+On Sun, May 12, 2013 at 06:35:56AM +0100, Simon Baatz wrote:
+> Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
+> it needs to handle are kernel mapped only.  However, for example when doing
+> direct I/O, pages with user space mappings may occur.
 
-On Wed, May 29, 2013 at 11:16:56AM +0100, Gregory CLEMENT wrote:
-> From: Lior Amsalem <alior@marvell.com>
-> 
-> This commit fix the regression on Armada 370 (the kernal hang during
-> boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
-> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
-> 
-> When coming out of either a Wait for Interrupt (WFI) or a Wait for
-> Event (WFE) IDLE states, a specific timing sensitivity exists between
-> the retiring WFI/WFE instructions and the newly issued subsequent
-> instructions. This sensitivity can result in a CPU hang scenario.  The
-> workaround is to insert either a Data Synchronization Barrier (DSB) or
-> Data Memory Barrier (DMB) command immediately after the WFI/WFE
-> instruction
+After Nico's clarification, I think the original commit introducing this
+function was also incomplete (commit 73be1591 - [ARM] 5545/2: add
+flush_kernel_dcache_page() for ARM) since it ignores highmem pages and
+their flushing could be deferred for a long time.
 
-Thanks for chasing this up! I have no idea why the patch you mentioned
-triggered this though.
+For my understanding (if I re-read this tread) - basically code like
+this should not leave the user mapping inconsistent:
 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 2c73a73..f872432 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -71,6 +71,9 @@ ENDPROC(cpu_v7_reset)
->  ENTRY(cpu_v7_do_idle)
->  	dsb					@ WFI may enter a low-power mode
->  	wfi
-> +#ifdef CONFIG_PJ4B_ERRATA_4742
-> +        mcr     p15, 0, r0, c7, c10, 4          @barrier
-> +#endif
+kmap()
+...
+flush_kernel_dcache_page()
+kunmap()
 
-Is the cp15 encoding required here, or can you just use `dsb'?
+If we use the atomic variants, we get the cache flushing automatically
+but the kunmap_high() does not flush the cache immediately, so we need
+to handle it in flush_kernel_dcache_page().
 
-Will
+> Thus, continue to do lazy flushing if there are no user space mappings.
+> Otherwise, flush the kernel cache lines directly.
+...
+>  /*
+> + * Ensure cache coherency for kernel mapping of this page.
+> + *
+> + * If the page only exists in the page cache and there are no user
+> + * space mappings, this is a no-op since the page was already marked
+> + * dirty at creation.  Otherwise, we need to flush the dirty kernel
+> + * cache lines directly.
+> + */
+> +void flush_kernel_dcache_page(struct page *page)
+> +{
+> +	if (cache_is_vivt() || cache_is_vipt_aliasing()) {
+> +		struct address_space *mapping;
+> +
+> +		mapping = page_mapping(page);
+> +
+> +		if (!mapping || mapping_mapped(mapping))
+> +			__flush_kernel_dcache_page(page);
+> +	}
+> +}
+
+BTW, does the mapping check optimise anything for the
+flush_kernel_dcache_page() uses? Would we have a mapping anyway (or
+anonymous page) in most cases?
+
+Otherwise the patch looks good.
+
+-- 
+Catalin
