@@ -1,20 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 29 May 2013 15:26:05 +0800
-Subject: [PATCH v4] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851CDEFB@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1369733161-19168-1-git-send-email-b35083@freescale.com>
- <20130529034913.GF370@S2101-09.ap.freescale.net>
- <B56CDBE15CE27145A4B77D2D24263E851CDEFB@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <20130529072603.GI370@S2101-09.ap.freescale.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 29 May 2013 09:34:51 +0200
+Subject: [PATCHv3 0/6] Add I2C support for Allwinner SoCs
+In-Reply-To: <2987322.J4qAl07e8R@flatron>
+References: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
+ <2987322.J4qAl07e8R@flatron>
+Message-ID: <20130529073451.GA3293@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 06:57:43AM +0000, Lu Jingchang-B35083 wrote:
-> [Lu Jingchang-B35083] 
->   For multiple dts uart nodes, each node will call .probe once. If the uart_register_driver is called from .probe without any conditioning check, it will then be called more than once, but the uart_register_deiver can only register the same uart driver once. So I think current arrangement will be more reasonable. Thanks!
+Hi Thomas,
+
+On Mon, May 27, 2013 at 09:17:27PM +0200, Tomasz Figa wrote:
+> All the patches look good to me.
 > 
+> Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-It shouldn't be too hard to add a check for that.  But if you like to
-stay with the current one, okay, I'm fine.
+Thanks!
+Maxime
 
-Shawn
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
