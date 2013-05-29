@@ -1,67 +1,63 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Wed, 29 May 2013 19:22:48 -0400
-Subject: [PATCH v3 0/5] rtc-at91rm9200: add shadow interrupt mask
-In-Reply-To: <CAOCHtYiK8Y6iTnb4dWAE+cKHqEta-64gj+PorSFVGBF5wmg1+Q@mail.gmail.com>
-References: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
- <1369298335-24597-1-git-send-email-jhovold@gmail.com>
- <20130529133354.dd181c845ee4e96527483345@linux-foundation.org>
- <CAOCHtYiK8Y6iTnb4dWAE+cKHqEta-64gj+PorSFVGBF5wmg1+Q@mail.gmail.com>
-Message-ID: <51A68DC8.3090703@interlog.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 29 May 2013 16:44:18 -0700
+Subject: [PATCH v2 2/5] clk: samsung: Add support to register rate_table
+ for PLL3xxx
+In-Reply-To: <1369834677-20312-3-git-send-email-vikas.sajjan@linaro.org>
+References: <1369834677-20312-1-git-send-email-vikas.sajjan@linaro.org>
+ <1369834677-20312-3-git-send-email-vikas.sajjan@linaro.org>
+Message-ID: <CAD=FV=VDi+SfebiFnPNp8qR__9L=o9TJ+WSPRfRQLX+p+TMmJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-05-29 04:41 PM, Robert Nelson wrote:
-> On Wed, May 29, 2013 at 3:33 PM, Andrew Morton
-> <akpm@linux-foundation.org> wrote:
->> On Thu, 23 May 2013 10:38:50 +0200 Johan Hovold <jhovold@gmail.com> wrote:
->>
->>> This is an update of the shadow-interrupt-mask series against v3.10-rc2.
->>>
->>> I guess we need Atmel to confirm that all sam9x5 SoCs are indeed
->>> affected. If not, then some probing mechanism as the one Doug suggested
->>> could be implemented on top of (a subset of) these patches. What do you
->>> say, Nicolas?
->>>
->>> Note that the first patch (adding a missing OF compile guard) could be
->>> applied straight away.
->>
->> At this stage it is unclear to me how to proceed with patches 2-5.
+Vikas / Yadwinder,
+
+On Wed, May 29, 2013 at 6:37 AM, Vikas Sajjan <vikas.sajjan@linaro.org> wrote:
+> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
 >
-> fyi:
+> This patch defines a common rate_table which will contain recommended p, m, s,
+> k values for supported rates that needs to be changed for changing
+> corresponding PLL's rate.
 >
-> A version of these patches had been applied once before:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0ef1594c017521ea89278e80fe3f80dafb17abde
->
-> But due to a few issues it was later reverted:
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e24b0bfa2f0446ffaad2661040be23668133aef8
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos4.c    |    8 ++++----
+>  drivers/clk/samsung/clk-exynos5250.c |   14 +++++++-------
+>  drivers/clk/samsung/clk-pll.c        |   14 ++++++++++++--
+>  drivers/clk/samsung/clk-pll.h        |   33 +++++++++++++++++++++++++++++++--
+>  4 files changed, 54 insertions(+), 15 deletions(-)
 
-Strange life of a patch. Mine was the original, Johan Hovold
-objected and had it reverted. Johan then presented his first
-patch then v2. They got lost in the weeds.
+I also reviewed this in our gerrit
+<https://gerrit.chromium.org/gerrit/#/c/56742/>, but I'll summarize
+here for the list...
 
-My hardware was still broken and this bug caused collateral
-damage. My original patch no longer applied to lk 3.10.0-rc1
-so I rewrote it, borrowing some of Johan's ideas and doing a
-probe time check for the broken RTC_IMR. That patch was
-presented about a week ago:
-   http://marc.info/?l=linux-arm-kernel&m=136917492531478&w=2
-The top of that post gives some more background.
+>  struct clk * __init samsung_clk_register_pll35xx(const char *name,
+> -                       const char *pname, const void __iomem *base)
+> +                       const char *pname, const void __iomem *base,
+> +                       const struct samsung_pll_rate_table *rate_table,
+> +                       const unsigned int rate_count)
 
-That prompted Johan to produce v3 of his patch which is the
-subject of this thread. I was hoping that Nicolas Ferre would
-comment or ack one of these patches. Still waiting.
+Feels like you should document here that rate_table needs to be sorted
+and the sort order.
 
+> +struct samsung_pll_rate_table {
+> +       unsigned  int rate;
 
-I have a copy of the original, publicly released manual for
-the at91sam9g25 (a member of the at91sam9x5 family) marked
-"11032A?ATARM?27-Jul-11". It contains the following:
-   Errata
-   49.3.1
-     RTC: Interrupt Mask Register cannot be used
-          Interrupt Mask Register reading always returns 0.
+nit: extra space before "int" should be removed.
 
-Both Rev B and Rev C of that manual drop that particular
-erratum. My g25 SoC-based subsystems come from an Atmel
-partner and still have the RTC IMR bug.
+Also: you can include rate here if you need a convenient place to
+store it (which sadly means that this structure can't be const).
+...but I do like Tomasz's idea of actually calculating it.  You can't
+know it at compile time since the parent rate comes from the device
+tree.
 
-Doug Gilbert
+compatible = "samsung,clock-xxti";
+clock-frequency = <24000000>;
+
+> +       unsigned int pdiv;
+> +       unsigned int mdiv;
+> +       unsigned int sdiv;
+> +       unsigned int kdiv;
+
+I think kdiv is signed.
+
+-Doug
