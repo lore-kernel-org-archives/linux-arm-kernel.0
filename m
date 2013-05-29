@@ -1,19 +1,25 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 29 May 2013 21:32:53 +0200
-Subject: [PATCH v5 11/13] ARM: kirkwood: remove legacy clk alias for
- mv643xx_eth
+Date: Wed, 29 May 2013 21:32:49 +0200
+Subject: [PATCH v5 07/13] ARM: dove: add gigabit ethernet and mvmdio device
+ tree nodes
 In-Reply-To: <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1369855975-21489-12-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1369855975-21489-8-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With all boards converted to DT enabled mv643xx_eth we can now
-remove the clock alias for gbe clocks.
+This patch adds orion-eth and mvmdio device tree nodes for DT enabled
+Dove boards. As there is only one ethernet controller on Dove, a default
+phy node is also added with a note to set its reg property on a per-board
+basis.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
+Changelog:
+v3->v4:
+- convert to new device tree binding
+
 Cc: David Miller <davem@davemloft.net>
 Cc: Lennert Buytenhek <buytenh@wantstofly.org>
 Cc: Jason Cooper <jason@lakedaemon.net>
@@ -24,25 +30,72 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linuxppc-dev at lists.ozlabs.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/mach-kirkwood/board-dt.c |    2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/dove-cubox.dts |    7 +++++++
+ arch/arm/boot/dts/dove.dtsi      |   35 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
-index e9647b8..8db388a 100644
---- a/arch/arm/mach-kirkwood/board-dt.c
-+++ b/arch/arm/mach-kirkwood/board-dt.c
-@@ -66,12 +66,10 @@ static void __init kirkwood_legacy_clk_init(void)
- 	 */
- 	clkspec.args[0] = CGC_BIT_GE0;
- 	clk = of_clk_get_from_provider(&clkspec);
--	orion_clkdev_add(NULL, "mv643xx_eth_port.0", clk);
- 	clk_prepare_enable(clk);
+diff --git a/arch/arm/boot/dts/dove-cubox.dts b/arch/arm/boot/dts/dove-cubox.dts
+index 7e3065a..02618fa 100644
+--- a/arch/arm/boot/dts/dove-cubox.dts
++++ b/arch/arm/boot/dts/dove-cubox.dts
+@@ -49,6 +49,13 @@
+ &uart0 { status = "okay"; };
+ &sata0 { status = "okay"; };
+ &i2c0 { status = "okay"; };
++&mdio { status = "okay"; };
++&eth { status = "okay"; };
++
++&ethphy {
++	compatible = "marvell,88e1310";
++	reg = <1>;
++};
  
- 	clkspec.args[0] = CGC_BIT_GE1;
- 	clk = of_clk_get_from_provider(&clkspec);
--	orion_clkdev_add(NULL, "mv643xx_eth_port.1", clk);
- 	clk_prepare_enable(clk);
- }
- 
+ &sdio0 {
+ 	status = "okay";
+diff --git a/arch/arm/boot/dts/dove.dtsi b/arch/arm/boot/dts/dove.dtsi
+index 6cab468..8612658 100644
+--- a/arch/arm/boot/dts/dove.dtsi
++++ b/arch/arm/boot/dts/dove.dtsi
+@@ -258,5 +258,40 @@
+ 				dmacap,xor;
+ 			};
+ 		};
++
++		mdio: mdio-bus at 72004 {
++			compatible = "marvell,orion-mdio";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x72004 0x84>;
++			interrupts = <30>;
++			clocks = <&gate_clk 2>;
++			status = "disabled";
++
++			ethphy: ethernet-phy {
++				device-type = "ethernet-phy";
++				/* set phy address in board file */
++			};
++		};
++
++		eth: ethernet-controller at 72000 {
++			compatible = "marvell,orion-eth";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x72000 0x4000>;
++			clocks = <&gate_clk 2>;
++			marvell,tx-checksum-limit = <1600>;
++			status = "disabled";
++
++			ethernet-port at 0 {
++				device_type = "network";
++				compatible = "marvell,orion-eth-port";
++				reg = <0>;
++				interrupts = <29>;
++				/* overwrite MAC address in bootloader */
++				local-mac-address = [00 00 00 00 00 00];
++				phy-handle = <&ethphy>;
++			};
++		};
+ 	};
+ };
 -- 
 1.7.10.4
