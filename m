@@ -1,62 +1,32 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 29 May 2013 10:01:40 -0400 (EDT)
-Subject: VDSO for arm 32bit
-In-Reply-To: <20130529090850.GB13095@mudshark.cambridge.arm.com>
-References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
- <20899.25935.838288.45383@pilspetsen.it.uu.se>
- <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
- <20130528092313.GA10474@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1305281415040.1918@syhkavp.arg>
- <20130529090850.GB13095@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1305290955390.1918@syhkavp.arg>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 29 May 2013 07:03:27 -0700
+Subject: [PATCH] ARM: DTS: OMAP4: Panda/SDP: twl6030: fix mux for IRQ pin
+ and msecure line
+In-Reply-To: <51A5CCA5.7000700@ti.com> (Benoit Cousson's message of "Wed, 29
+ May 2013 11:38:45 +0200")
+References: <1369423702-31501-1-git-send-email-khilman@linaro.org>
+ <20130524200954.GA2344@kahuna> <20130524203231.GA2555@kahuna>
+ <87obc0f54r.fsf@linaro.org>
+ <CAGo_u6oz1v1J-6z5W-X7CsOmi+7SAMicz1LZTv0sVXhej1DJ2Q@mail.gmail.com>
+ <87a9nkf3mu.fsf@linaro.org> <51A5CCA5.7000700@ti.com>
+Message-ID: <87ehcpano0.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Will Deacon wrote:
+"Cousson, Benoit" <b-cousson@ti.com> writes:
 
-> On Tue, May 28, 2013 at 07:19:00PM +0100, Nicolas Pitre wrote:
-> > On Tue, 28 May 2013, Will Deacon wrote:
-> > > Be careful here. I had a crack at a gtod implementation for the vectors page
-> > > in the past, but decided to drop it because it quickly became a maintenance
-> > > nightmare. Since the layout of the vectors page must be fixed (as userspace
-> > > jumps to the absolute addresses for the helpers), having large, complicated
-> > > functions (which gtod does become as you quickly start using the stack to
-> > > store all of the shared state with the kernel) means that you can quickly
-> > > back yourself into a corner where the layout of the code cannot change
-> > > without breaking the ABI.
-> > 
-> > Note that only the entry point is fixed.  The layout of the code is not.  
-> > So you may well branch anywhere else within the vector page if the code 
-> > is more complex than a few instructions.
-> 
-> Sure, it may be possible simply to have branches in the kuser slots and then
-> reserve a chunk at the other end of the vectors page where the actual
-> implementation can go.
-> 
-> > > On top of that, new clock types are added more often than you might think
-> > > (not to mention bug fixes in the implementation itself), and you end up in
-> > > a horrible situation where you'd end up deprecating one implementation and
-> > > adding gettimeofday2 or something equally nasty at a different offset.
-> > 
-> > That is equally valid for a vdso.
-> 
-> Sorry, I wasn't clear. My point was that you can change the layout of a vdso
-> without breaking anything, since the dynamic loader resolves the entry
-> points. It relates back to what I said above -- you need to be careful about
-> how you lay the stuff out in memory.
-> 
-> Perhaps the gtod code won't end up being that big. It's around ~500 bytes on
-> arm64, but that's without any stack usage.
+[...]
 
-That's still fairly large.
+>>
+>> Let me respin this after some more doc reading.
+>
+> Did you re-spin it already?
 
-> Come to think of it, is there any
-> reason why we can't just map an additional vectors page after the one we
-> currently have?
+Yes, v2 is here.  
 
-That certainly can be done if necessary.  Some copy_page implementations 
-do use some of the address space above the vector page for temporary 
-page mapping so some care not to create conflicts would be required.
+http://marc.info/?l=linux-omap&m=136944147521955&w=2
 
+It also needed a rework because the fref_clk0_out pin is also in the
+wkup section of the padconf, not core.
 
-Nicolas
+Kevin
