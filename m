@@ -1,33 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 29 May 2013 19:07:12 +0000 (UTC)
-Subject: [RFC PATCH 1/3] ARM: AM33XX: clock: Add debugSS clock nodes to
- clock tree
-In-Reply-To: <1362396957-30113-2-git-send-email-hvaibhav@ti.com>
-References: <hvaibhav@ti.com>
- <1362396957-30113-2-git-send-email-hvaibhav@ti.com>
-Message-ID: <alpine.DEB.2.02.1305291906160.9052@utopia.booyaka.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 29 May 2013 20:08:02 +0100
+Subject: [PATCH] ARM: ux500: cut chip-select GPIOs from SSP device
+In-Reply-To: <1369848742-10451-1-git-send-email-linus.walleij@stericsson.com>
+References: <1369848742-10451-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130529190802.GK3012@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 4 Mar 2013, hvaibhav at ti.com wrote:
+On Wed, 29 May 2013, Linus Walleij wrote:
 
-> From: Vaibhav Hiremath <hvaibhav@ti.com>
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Represent debugSS clock interface as provided in
-> CM_WKUP_DEBUGSS_CLKCTRL register, which includes,
-> 	- Clock gate for optional DEBUG_CLKA and DBGSYSCLK
-> 	- Clock Mux for TRC_PMD and STM_PMD
-> 	- Clock divider for STM and TPIU
-> 
-> Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Rajendra Nayak <rnayak@ti.com>
+> What GPIO pin is used with which device on the SSP/SPI bus
+> is as board-specific as it gets, so it does not belong here
+> in the core SoC file, and it is disabled so it doesn't hurt
+> to delete this.
 
-Acked-by: Paul Walmsley <paul@pwsan.com>
+Sounds fine.
 
-based on a quick glance.
+Acked-by: Lee Jones <lee.jones@linaro.org>
 
-
-- Paul
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
