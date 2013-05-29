@@ -1,37 +1,49 @@
 From: dt.tangr@gmail.com (Daniel Tang)
-Date: Wed, 29 May 2013 15:18:03 +1000
-Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
-In-Reply-To: <201305271231.40693.arnd@arndb.de>
+Date: Wed, 29 May 2013 15:14:41 +1000
+Subject: [RFC PATCHv4 1/6] arm: TI-Nspire platform code
+In-Reply-To: <201305271715.02385.arnd@arndb.de>
 References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <201305262323.29519.arnd@arndb.de>
- <30BA4666-664F-4DA4-A1D5-C2B8AA63C6AB@gmail.com>
- <201305271231.40693.arnd@arndb.de>
-Message-ID: <146FF7AD-650E-4706-B9E1-53C2693D1D0D@gmail.com>
+ <201305270856.19456.arnd@arndb.de>
+ <CAPnH9dnA22C3ZS9jgJNytnmKM_8Vfk7OxNRB1Mg03=q7KhHZBA@mail.gmail.com>
+ <201305271715.02385.arnd@arndb.de>
+Message-ID: <10704A21-6BEC-42DC-BB1E-88A0E87D288B@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 27/05/2013, at 8:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On 28/05/2013, at 1:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
 > On Monday 27 May 2013, Daniel Tang wrote:
->>> The one remaining bit that sticks out is the clcd platform data. As I
->>> said before, I won't require you to convert that to DT in order to
->>> get your code merged, but I'd also really like to see that happen,
->>> as we will also need that to get rid of auxdata on the ARM reference
->>> platforms (integrator, versatile, realview, vexpress).
+>> Before any peripheral is accessed. I.e. before the clocksource and irqchip
+>> drivers.
+> 
+> The irqchip comes first, and by that time, you can actually call
+> of_iomap().
+> 
+>> The write to the port is supposed to ensure all mmio peripherals can be
+>> accessed. Without it, access to certain peripherals will result in
+>> undefined reads or ignored writes.
 >> 
->> How would you like me to convert the platform data to DT? AFAIK, the clcd
->> driver isn't aware of DT so the only way is to use the AUXDATA right now.
+>> On second thoughts, would this actually be the job of the boot loader?
 > 
-> Linus Walleij mentioned on IRC that Pawel Moll already posted a series
-> that adds DT support for clcd:
-> 
-> http://lists.freedesktop.org/archives/dri-devel/2013-April/037519.html
-> 
-> The series does a few more things, but you can probbly split out the
-> parts you need and base on that.
+> Doing it in the boot loader would certainly simplify things. I wonder
+> about the dynamic aspects of power management though: It might be
+> better to expose the individual bits of this register through a proper
+> driver. The boot loader can start out enabling everything, but then
+> you turn off everything that is not needed when that driver gets
+> loaded.
 
-Would it be fine if I waited until CLCD DT patch gets into mainline instead?
+That's the idea for the long term.
+
+For now though, I'll probably just let the bootloader enable everything and work on a proper driver for power management later.
+
+> 
+> I'm still not sure what the register actually does: Does it
+> control reset lines, clock signals, voltage regulators or something
+> else? These things all have their own subsystems, and then there
+> is also the power domain framework.
+
+To be perfectly honest, I'm not too sure. The documentation for the TI-Nspire is all gathered from reverse engineering and all it says is that register "disables bus access to peripherals".
 
 > 
 > 	Arnd
