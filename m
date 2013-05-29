@@ -1,65 +1,108 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 29 May 2013 15:34:32 -0400
-Subject: Kirkwood CPU Freq driver
-In-Reply-To: <20130529005825.GM31290@titan.lakedaemon.net>
-References: <51A12DD4.9010907@baker-net.org.uk>
- <20130526083614.GB26249@lunn.ch>
- <20130526180513.GF31290@titan.lakedaemon.net>
- <51A5234D.9030100@baker-net.org.uk>
- <20130529005825.GM31290@titan.lakedaemon.net>
-Message-ID: <20130529193432.GY31290@titan.lakedaemon.net>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 29 May 2013 21:32:20 +0200
+Subject: [PATCH 1/8] video: atmel_lcdfb: fix platform data struct
+In-Reply-To: <CACQ1gAhhsMw1-Znd8BC=A0rJBrB4pphCtH9v9qOQR+j2dY3vCw@mail.gmail.com>
+References: <20130411145741.GB25242@game.jcrosoft.org>
+ <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
+ <CACQ1gAjF5kuu-czkj56-pQdTBUhvY5VodvfnF3RA_DN-O0b9NQ@mail.gmail.com>
+ <20130529173538.GC23899@game.jcrosoft.org>
+ <CACQ1gAhhsMw1-Znd8BC=A0rJBrB4pphCtH9v9qOQR+j2dY3vCw@mail.gmail.com>
+Message-ID: <20130529193220.GB19468@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 08:58:25PM -0400, Jason Cooper wrote:
-> On Tue, May 28, 2013 at 10:36:13PM +0100, Adam Baker wrote:
-> > On 26/05/13 19:05, Jason Cooper wrote:
-> > >On Sun, May 26, 2013 at 10:36:14AM +0200, Andrew Lunn wrote:
-> > >>On Sat, May 25, 2013 at 10:32:04PM +0100, Adam Baker wrote:
-> > >>>I've been trying to test Andrew Lunn's work creating a CPU Idle
-> > >>>driver for Kirkwood.
-> > >>
-> > >>Thanks for testing this. I must admit, i never tested it once the
-> > >>first rc came out. I clearly should of, because its broken. It was a
-> > >>three part patch series, and only part 1/3 made it in. Hence the
-> > >>issues you are seeing.
-> > >>
-> > >>Jason, please can you pick up:
-> > >>
-> > >>https://patchwork.kernel.org/patch/2051401/
-> > >>https://patchwork.kernel.org/patch/2080931/
-> > >
-> > >Yep, got them in now.  Sorry for the mix up.
-> > >
-> > 
-> > I've now tested with the first of these patches applied and the
-> > changes from the second added to my .config
-> > 
-> > To get it to work I had to follow the instructions in the
-> > Documentation to add the cpus entry to kirkwood.dtsi so I'll post
-> > that as a patch in a day or two but after doing that I have a
-> > working cpufreq driver.
-> > 
-> > Measuring the power consumption of my NAS server I observed a slight
-> > reduction in power consumption when the clock rate was reduced. I
-> > haven't yet measured for long enough to get an accurate measurement
-> > but it looks like maybe 1/4 W power saving.
-> > 
-> > Feel free to add
-> > 
-> > Tested-by: Adam Baker <linux@baker-net.org.uk>
+On 19:44 Wed 29 May     , Richard Genoud wrote:
+> 2013/5/29 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> > On 16:36 Wed 29 May     , Richard Genoud wrote:
+> >> 2013/4/11 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+> >> > Today we mix pdata and drivers data in the struct atmel_lcdfb_info
+> >> > Fix it and introduce a new struct atmel_lcdfb_pdata for platform data only
+> >> >
+> >> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >> > Cc: linux-fbdev at vger.kernel.org
+> >> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> >> > Cc: Andrew Morton <akpm@linux-foundation.org>
+> >> > Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
+> >> > ---
+> >> >  arch/arm/mach-at91/at91sam9261_devices.c    |    6 +-
+> >> >  arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
+> >> >  arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
+> >> >  arch/arm/mach-at91/at91sam9rl_devices.c     |    6 +-
+> >> >  arch/arm/mach-at91/board-sam9261ek.c        |    6 +-
+> >> >  arch/arm/mach-at91/board-sam9263ek.c        |    4 +-
+> >> >  arch/arm/mach-at91/board-sam9m10g45ek.c     |    4 +-
+> >> >  arch/arm/mach-at91/board-sam9rlek.c         |    4 +-
+> >> >  arch/arm/mach-at91/board.h                  |    4 +-
+> >> >  arch/avr32/boards/atngw100/evklcd10x.c      |    6 +-
+> >> >  arch/avr32/boards/atngw100/mrmt.c           |    4 +-
+> >> >  arch/avr32/boards/atstk1000/atstk1000.h     |    2 +-
+> >> >  arch/avr32/boards/atstk1000/setup.c         |    2 +-
+> >> >  arch/avr32/boards/favr-32/setup.c           |    2 +-
+> >> >  arch/avr32/boards/hammerhead/setup.c        |    2 +-
+> >> >  arch/avr32/boards/merisc/display.c          |    2 +-
+> >> >  arch/avr32/boards/mimc200/setup.c           |    4 +-
+> >> >  arch/avr32/mach-at32ap/at32ap700x.c         |    8 +--
+> >> >  arch/avr32/mach-at32ap/include/mach/board.h |    4 +-
+> >> >  drivers/video/atmel_lcdfb.c                 |  104 +++++++++++++++++----------
+> >> >  include/video/atmel_lcdc.h                  |   24 +------
+> >> >  21 files changed, 109 insertions(+), 101 deletions(-)
+> >> >
+> >> [snip]
+> >> > diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+> >> > index c1a2914..98733cd4 100644
+> >> > --- a/drivers/video/atmel_lcdfb.c
+> >> > +++ b/drivers/video/atmel_lcdfb.c
+> >> > @@ -20,12 +20,45 @@
+> >> >  #include <linux/gfp.h>
+> >> >  #include <linux/module.h>
+> >> >  #include <linux/platform_data/atmel.h>
+> >> > +#include <video/of_display_timing.h>
+> >> >
+> >> >  #include <mach/cpu.h>
+> >> >  #include <asm/gpio.h>
+> >> >
+> >> >  #include <video/atmel_lcdc.h>
+> >> >
+> >> > +struct atmel_lcdfb_config {
+> >> > +       bool have_alt_pixclock;
+> >> > +       bool have_hozval;
+> >> > +       bool have_intensity_bit;
+> >> > +};
+> >> > +
+> >> > + /* LCD Controller info data structure, stored in device platform_data */
+> >> > +struct atmel_lcdfb_info {
+> >> > +       spinlock_t              lock;
+> >> > +       struct fb_info          *info;
+> >> > +       void __iomem            *mmio;
+> >> > +       int                     irq_base;
+> >> > +       struct work_struct      task;
+> >> > +
+> >> > +       unsigned int            smem_len;
+> >> > +       struct platform_device  *pdev;
+> >> > +       struct clk              *bus_clk;
+> >> > +       struct clk              *lcdc_clk;
+> >> > +
+> >> > +       struct backlight_device *backlight;
+> >> > +       u8                      bl_power;
+> >> > +       bool                    lcdcon_pol_negative;
+> >> I think lcdcon_pol_negative should be part of pdata, because it really
+> >> depends on how the PWM is wired on the board.
+> >>
+> >
+> > maybe but no one mainline use it on any pdata for non-dt boars
+> > so I did not want to expose it
+> Well, at least, I'm using it :)
+> (and I guess that Andreas is using it also, otherwise he wouldn't have
+> introduce it !)
+
+yes but pdata is for non-dt boards, for dt you can keep it in struct
+atmel_lcdfb_info and add a property
+
+if non-dt boards want it my answer is I do not care switch to DT
+
+Best Regards,
+J.
 > 
-> I apologize, but I won't be able to add this.  I'm using a new work
-> flow, and took the patches in too quickly (well, they had been on the
-> list a while... :-P)  I should've let them sit in my tree for a few more
-> days before sending the pull request to arm-soc.  If I had done that, I
-> could've gone in and added the Tested-by:.  I'll be more careful in the
-> future.
-
-I take this back.  Olof didn't pull last night like I thought he would,
-and he said I have a few hours until he pulls tonight.  So I've added it
-now.  Sorry for the confusion.
-
-thx,
-
-Jason.
+> 
+> Best regards,
+> Richard.
