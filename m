@@ -1,74 +1,37 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 29 May 2013 16:44:23 -0300
-Subject: [PATCH 2/2] ARM: mxs: Pass the system revision
-In-Reply-To: <1369856663-29314-1-git-send-email-fabio.estevam@freescale.com>
-References: <1369856663-29314-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1369856663-29314-2-git-send-email-fabio.estevam@freescale.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 29 May 2013 16:00:53 -0400
+Subject: [PATCH v5 01/13] net: mv643xx_eth: use phy_disconnect instead
+ of phy_detach
+In-Reply-To: <1369855975-21489-2-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369855975-21489-2-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130529200053.GA31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some mxs userspace tools, such as multimedia plugins and kobs-ng (tool used to 
-burn boot images to NAND) rely on the 'Revision' field reported by 
-'/proc/cpuinfo'.
+Sebastian,
 
-Provide a mechanism to pass such information, so that now we can get:
+On Wed, May 29, 2013 at 09:32:43PM +0200, Sebastian Hesselbarth wrote:
+> Using a separated mdio bus driver with mvmdio, phy_detach on network device
+> removal will not stop the phy and finally lead to NULL pointer dereference
+> in mvmdio due to non-existent network device. Use phy_disconnect instead
+> to properly stop phy device from accessing network device prior removal of
+> the network device.
+> 
+> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> ---
+> Note: I observed this behavior when removing a modular mv643xx_eth driver
+> after attaching it to a phy handled by (also modular) mvmdio. The mvmdio
+> conversion has been done in
+> 
+> commit c3a07134e6aa5b93a37f72ffa3d11fadf72bf757
+>  ("mv643xx_eth: convert to use the Marvell Orion MDIO driver")
+> 
+> and should go back any -stable version with that commit (propably only 3.9)
 
-$ cat /proc/cpuinfo                                             
-processor       : 0                                                             
-model name      : ARM926EJ-S rev 5 (v5l)                                        
-BogoMIPS        : 226.09                                                        
-Features        : swp half fastmult edsp java                                   
-CPU implementer : 0x41                                                          
-CPU architecture: 5TEJ                                                          
-CPU variant     : 0x0                                                           
-CPU part        : 0x926                                                         
-CPU revision    : 5                                                             
-                                                                                
-Hardware        : Freescale i.MX28 Evaluation Kit                               
-Revision        : 28012                                                         
-Serial          : 0000000000000000                                              
+It looks like just v3.10-rcX, here.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mxs/mach-mxs.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+thx,
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index b632323..032812d 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -29,6 +29,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach/time.h>
- #include <asm/system_misc.h>
-+#include <asm/system_info.h>
- 
- #include "pm.h"
- 
-@@ -443,10 +444,24 @@ static void mxs_print_silicon_rev(const char *cpu, int srev)
- 				cpu, (srev >> 4) & 0xf, srev & 0xf);
- }
- 
-+static void mxs_pass_sysrev(void)
-+{
-+	int cputype = 0;
-+
-+	if (strcmp(mxs_get_cpu_type(), "MX23"))
-+		cputype = 0x23000;
-+
-+	if (strcmp(mxs_get_cpu_type(), "MX28"))
-+		cputype = 0x28000;
-+
-+	system_rev = (cputype | mxs_get_cpu_rev());
-+}
-+
- static void __init mxs_machine_init(void)
- {
- 
- 	mxs_print_silicon_rev(mxs_get_cpu_type(), mxs_get_cpu_rev());
-+	mxs_pass_sysrev();
- 
- 	if (of_machine_is_compatible("fsl,imx28-evk"))
- 		imx28_evk_init();
--- 
-1.8.1.2
+Jason.
