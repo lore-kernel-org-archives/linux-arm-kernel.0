@@ -1,47 +1,38 @@
-From: jgchunter@gmail.com (Jon Hunter)
-Date: Wed, 29 May 2013 22:29:07 +0100
-Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
-In-Reply-To: <20130529185518.GB3345@blackmetal.musicnaut.iki.fi>
-References: <20130516180933.GG5600@atomide.com>
- <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
- <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
- <20130521173936.GE31836@blackmetal.musicnaut.iki.fi>
- <519BCCEC.8010303@gmail.com>
- <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
- <519E67AD.6070702@gmail.com>
- <20130526190710.GA3345@blackmetal.musicnaut.iki.fi>
- <51A4FAA1.5060504@gmail.com>
- <20130529185518.GB3345@blackmetal.musicnaut.iki.fi>
-Message-ID: <51A67323.7030906@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 29 May 2013 14:48:13 -0700
+Subject: [PATCH 0/2] clk: vt8500: updates for 3.11
+In-Reply-To: <1368433260-16073-1-git-send-email-linux@prisktech.co.nz>
+References: <1368433260-16073-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130529214813.6058.81599@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 29/05/13 19:55, Aaro Koskinen wrote:
-> Hi,
+Quoting Tony Prisk (2013-05-13 01:20:58)
+> Hi Mike,
 > 
-> On Tue, May 28, 2013 at 07:42:41PM +0100, Jon Hunter wrote:
->> Care to share the log?
+> Two updates for the arch-vt8500 clock code:
 > 
-> Below are three logs from 3.10-rc3 / Nokia 770. I did not even compile
-> Retu this time, as it has nothing to do with GPIO IRQs being broken
-> on OMAP1.
-
-That's not entirely true. v3.10-rc3 is booting fine on an osk5912 and
-ethernet is working which is using a gpio for interrupts and it is
-getting interrupts.
-
-> 1) broken vanilla 3.10-rc3: serial wakeup GPIO irq gets IRQ 0 and no
-> other GPIO IRQs seen in /proc/interrupts. genirq error logs seen in boot.
-
-Getting 0 for the irq number definitely looks like the problem.
-
-> 2) working 3.10-rc3 with Tony's fix <== this fix should be applied
-> (http://marc.info/?l=linux-arm-kernel&m=136907202628855&w=2). GPIO IRQs
-> are normal, e.g. touchscreen can be used.
+> #1: Add support for the WM8850 PLL.
+> #2: Remove a second divisor check in vt8500_dclk_set_rate() which causes the
+> divisor to be round-down too low.
 > 
-> 3) .config used.
 
-I am using the omap1_defconfig. Can you try that one for comparison?
+Taken both into clk-next.
 
-Jon
+Thanks,
+Mike
+
+> Regards
+> Tony Prisk
+> 
+> Tony Prisk (2):
+>   clk: vt8500: Add support for clocks on the WM8850 SoCs
+>   clk: vt8500: Remove unnecessary divisor adjustment in
+>     vtwm_dclk_set_rate()
+> 
+>  Documentation/devicetree/bindings/clock/vt8500.txt |    2 +
+>  drivers/clk/clk-vt8500.c                           |   75 ++++++++++++++++++--
+>  2 files changed, 73 insertions(+), 4 deletions(-)
+> 
+> -- 
+> 1.7.9.5
