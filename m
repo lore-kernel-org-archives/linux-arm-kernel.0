@@ -1,61 +1,39 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 29 May 2013 18:11:51 -0400
-Subject: [PATCH] thermal: step_wise: cdev only needs update on a new target
- state
-In-Reply-To: <1369724148-15087-1-git-send-email-shawn.guo@linaro.org>
-References: <1369724148-15087-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <51A67D27.9050502@ti.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 30 May 2013 07:28:47 +0900
+Subject: [GIT PULL] Renesas ARM based SoC fixes for v3.10
+Message-ID: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rui,
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-On 28-05-2013 02:55, Shawn Guo wrote:
-> The cooling device only needs update on a new target state.  Since we
-> already check old target in thermal_zone_trip_update(), we can do one
-> more check to see if it's a new target state.  If not, we can reasonably
-> save some uncecesary code execution.
-> 
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 
-typo above:
-s/uncecesary/unnecessary
+are available in the git repository at:
 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git 
 
-A part from the above typo, I believe we must have this change in:
+for you to fetch changes up to c7f413548dce3d25609c12efe963b3e6c8e678f3:
 
-Acked-by: Eduardo Valentin <eduardo.valentin@ti.com>
+  ARM: shmobile: sh73a0: Update CMT clockevent rating to 80 (2013-05-28 14:46:38 +0900)
 
->  drivers/thermal/step_wise.c |    3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/drivers/thermal/step_wise.c b/drivers/thermal/step_wise.c
-> index 4d4ddae..0afbd86 100644
-> --- a/drivers/thermal/step_wise.c
-> +++ b/drivers/thermal/step_wise.c
-> @@ -133,6 +133,9 @@ static void thermal_zone_trip_update(struct thermal_zone_device *tz, int trip)
->  		old_target = instance->target;
->  		instance->target = get_target_state(instance, trend, throttle);
->  
-> +		if (old_target == instance->target)
-> +			continue;
-> +
->  		/* Activate a passive thermal instance */
->  		if (old_target == THERMAL_NO_TARGET &&
->  			instance->target != THERMAL_NO_TARGET)
-> 
+----------------------------------------------------------------
+Renesas ARM based SoC fixes for v3.10
 
+* Correction to USB OVC and PENC pin groupings on r8a7779 SoC.
+  This avoids conflicts when the USB_OVCn pins are used by another function.
+  This has been observed to be a problem in v3.10-rc1.
 
--- 
-You have got to be excited about what you are doing. (L. Lamport)
+* Update CMT clock rating for sh73a0 SoC to resolve boot failure
+  on kzm9g-reference. This resolves a regression between v3.9 and v3.10-rc1.
 
-Eduardo Valentin
+----------------------------------------------------------------
+Laurent Pinchart (1):
+      sh-pfc: r8a7779: Don't group USB OVC and PENC pins
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/34c0cea2/attachment.sig>
+Simon Horman (1):
+      ARM: shmobile: sh73a0: Update CMT clockevent rating to 80
+
+ arch/arm/mach-shmobile/setup-sh73a0.c |    2 +-
+ drivers/pinctrl/sh-pfc/pfc-r8a7779.c  |   45 ++++++++++++++++++++++++++-------
+ 2 files changed, 37 insertions(+), 10 deletions(-)
