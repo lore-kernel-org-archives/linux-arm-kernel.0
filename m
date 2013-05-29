@@ -1,25 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 May 2013 14:04:18 +0200
-Subject: build failure: linux-next: ARM defconfig: u8500
-In-Reply-To: <CAGa+x84p1pVuFm_MuQVTCJq_50NTsjKtWUFAbQ0W_=beOcA55A@mail.gmail.com>
-References: <CAGa+x87czosA=tWh1KRTSSqMyLckMHwNP7hrRXdokaLsSaaikA@mail.gmail.com>
- <CAGa+x84p1pVuFm_MuQVTCJq_50NTsjKtWUFAbQ0W_=beOcA55A@mail.gmail.com>
-Message-ID: <CACRpkdZ1mRyhvnqaiNGQkprt_WEUdpz5+N09s3hB=GjJme73vw@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 29 May 2013 13:11:25 +0100
+Subject: [PATCH 1/8] drivers: bus: add ARM CCI support
+In-Reply-To: <1369374311-21260-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
+ <1369374311-21260-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1369829485.3715.46.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 1:46 AM, Kevin Hilman <khilman@linaro.org> wrote:
-> On Tue, May 28, 2013 at 3:57 PM, Kevin Hilman <khilman@linaro.org> wrote:
->
->> u8500_defconfig started failing to build in linux next (next-20130527)
->> but was previously building (next-20130523.)
->
-> My apologies, it appears this one is already fixed in next-20130528.
-> /me updates automated build to not be a full day behind linux-next.
+On Fri, 2013-05-24 at 01:45 -0400, Nicolas Pitre wrote:
+[...]
+> diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+[...]
+> +	cci at 2c090000 {
+> +		compatible = "arm,cci-400";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		reg = <0x0 0x2c090000 0 0x1000>;
+> +		ranges = <0x0 0x0 0x2c090000 0x6000>;
+> +
+> +		cci_control0: slave-if at 1000 {
+> +			interface-type = "ace-lite";
+> +			reg = <0x1000 0x1000>;
+> +		};
+> +
+> +		cci_control1: slave-if at 4000 {
+> +			interface-type = "ace";
+> +			reg = <0x4000 0x1000>;
+> +		};
+> +
+> +		cci_control2: slave-if at 5000 {
+> +			interface-type = "ace";
+> +			reg = <0x5000 0x1000>;
+> +		};
+> +	};
 
-My fault for screwing it up one day though. :-/
+The above examples of slave-if nodes are missing the required
+compatible = "arm,cci-400-ctrl-if";
 
-This was beacuse of a double conflict in this file, and
-me missing to fix the second conflict...
-
-Linus
+-- 
+Tixy
