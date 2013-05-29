@@ -1,52 +1,49 @@
-From: Mylene.Josserand@navocap.com (Mylene Josserand)
-Date: Wed, 29 May 2013 12:17:58 +0200
-Subject: [I2C] informations + advice about messages handling
-In-Reply-To: <20130524142017.52545a52@endymion.delvare>
-References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
- <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
- <20130524094407.61d0ec42@endymion.delvare>
- <CA78C307B8F06747967D122FC656B15398644A@SERVEUR0.nvp.local>
- <20130524110706.6052493e@endymion.delvare>
- <CA78C307B8F06747967D122FC656B15398644B@SERVEUR0.nvp.local>
- <20130524142017.52545a52@endymion.delvare>
-Message-ID: <CA78C307B8F06747967D122FC656B15398645D@SERVEUR0.nvp.local>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 May 2013 11:37:28 +0100
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <alpine.LFD.2.03.1305281340240.1918@syhkavp.arg>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130523104303.GC16722@arm.com>
+ <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
+ <20130528095528.GA14329@arm.com>
+ <alpine.LFD.2.03.1305281340240.1918@syhkavp.arg>
+Message-ID: <20130529103728.GG17767@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+On Tue, May 28, 2013 at 06:52:27PM +0100, Nicolas Pitre wrote:
+> On Tue, 28 May 2013, Catalin Marinas wrote:
+> 
+> > On Sat, May 25, 2013 at 04:53:19AM +0100, Nicolas Pitre wrote:
+> > > On Thu, 23 May 2013, Catalin Marinas wrote:
+> > > 
+> > > > An issue is that for kunmap_atomic() && VIVT we flush the same page
+> > > > twice. I don't think we should remove the cache flushing in
+> > > > __kunmap_atomic() for VIVT since not all kunmap_atomic() calls require
+> > > > flush_kernel_dcache_page() (unless we just assume that highmem && vivt
+> > > > don't work together).
+> > > 
+> > > VIVT and highmem do work together.  Highmem for ARM was in fact 
+> > > developed on such a platform.
+> > 
+> > Thanks for confirming. Do you remember why kunmap() doesn't (need to)
+> > flush the cache alias (for VIVT)? Or if it does, where?
+> 
+> kunmap() calls kunmap_high() which actually does not unmap anything but 
+> only decrement a use count.  The page is kept around in case it is 
+> kmap()'d again, in which case the kmap() will be almost free and the 
+> page still warm.
+> 
+> It is only when the kmap() for a new page runs out of free pkmap  
+> entries that the unused but still mapped pages are unmapped.  This 
+> unmapping is done in flush_all_zero_pkmaps() where all the unused pages 
+> are all unmapped at once.  The cache for all those pages is flushed with 
+> flush_cache_kmaps() which on ARM maps to flush_cache_all() when the 
+> cache is VIVT.
 
-Le 24/05/2013 14:20, Jean Delvare a ?crit :
-> On Fri, 24 May 2013 11:52:54 +0200, Mylene Josserand wrote:
->> - an audio codec tlv320aic3204 : There is a driver for this device but
->> for some reasons, we did not use it. Did not find a "SMBus compliant" in
->> its datasheet.
->
-> The tlv320aic32x4 driver uses i2c_master_send, which is a shortcut to
-> i2c_transfer. However it seems to only send 2 bytes on the bus at once,
-> the same could be achieved with i2c_smbus_write_byte_data if needed.
-
-Okay, thanks to have looked at it !
-
->
-> For completeness: a device might use transactions which are compliant
-> with SMBus without being formally "SMBus-compliant", because SMBus has
-> more constraints than just transaction types (I kept things simple
-> originally to not confuse you.) This may explain why it isn't mentioned
-> in the datasheet. Or just because the manufacturer did not care because
-> they target fully I2C-capable systems anyway.
->
-> What you have to look at is the transaction types. They are usually
-> described in the datasheet. Then compare with either the SMBus
-> specification or
-> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/i2c/smbus-protocol
-> and if they match then you can use the i2c_smbus_*() calls.
-
-
-I have checked the PIC18F24201 according to your advice and, of what I 
-have seen, it can handle the SMBus protocol.
-
-Thank you for the explanation and trying to keep it simple for me :)
-
+Thanks for clarification Nico. So if kmap_high_get() returns NULL, there
+are no high aliases left in the cache.
 
 -- 
-Myl?ne JOSSERAND
+Catalin
