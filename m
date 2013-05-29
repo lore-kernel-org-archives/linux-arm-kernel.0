@@ -1,63 +1,40 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 28 May 2013 20:58:25 -0400
-Subject: Kirkwood CPU Freq driver
-In-Reply-To: <51A5234D.9030100@baker-net.org.uk>
-References: <51A12DD4.9010907@baker-net.org.uk>
- <20130526083614.GB26249@lunn.ch>
- <20130526180513.GF31290@titan.lakedaemon.net>
- <51A5234D.9030100@baker-net.org.uk>
-Message-ID: <20130529005825.GM31290@titan.lakedaemon.net>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 29 May 2013 10:07:16 +0900
+Subject: Booting mainline kernels on Samsung ARM-based Chromebooks
+In-Reply-To: <CAOesGMgrT8fCRcnJYP=tcr4Szp5B6NtQxsQeb6pEv24edHLYFw@mail.gmail.com>
+References: <CAOesGMgrT8fCRcnJYP=tcr4Szp5B6NtQxsQeb6pEv24edHLYFw@mail.gmail.com>
+Message-ID: <001901ce5c08$dc248e00$946daa00$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 10:36:13PM +0100, Adam Baker wrote:
-> On 26/05/13 19:05, Jason Cooper wrote:
-> >On Sun, May 26, 2013 at 10:36:14AM +0200, Andrew Lunn wrote:
-> >>On Sat, May 25, 2013 at 10:32:04PM +0100, Adam Baker wrote:
-> >>>I've been trying to test Andrew Lunn's work creating a CPU Idle
-> >>>driver for Kirkwood.
-> >>
-> >>Thanks for testing this. I must admit, i never tested it once the
-> >>first rc came out. I clearly should of, because its broken. It was a
-> >>three part patch series, and only part 1/3 made it in. Hence the
-> >>issues you are seeing.
-> >>
-> >>Jason, please can you pick up:
-> >>
-> >>https://patchwork.kernel.org/patch/2051401/
-> >>https://patchwork.kernel.org/patch/2080931/
-> >
-> >Yep, got them in now.  Sorry for the mix up.
-> >
+On Wednesday, May 29, 2013 9:35 AM, Olof Johansson wrote:
 > 
-> I've now tested with the first of these patches applied and the
-> changes from the second added to my .config
+> Just a quick note that as of v3.10-rc4 (or -rc3 + arm-soc fixes
+> branch) there should be enough pieces in mainline to boot a Chromebook
+> to a useful state without out-of-tree patches.
 > 
-> To get it to work I had to follow the instructions in the
-> Documentation to add the cpus entry to kirkwood.dtsi so I'll post
-> that as a patch in a day or two but after doing that I have a
-> working cpufreq driver.
+> For more info, see:
 > 
-> Measuring the power consumption of my NAS server I observed a slight
-> reduction in power consumption when the clock rate was reduced. I
-> haven't yet measured for long enough to get an accurate measurement
-> but it looks like maybe 1/4 W power saving.
+> https://plus.google.com/u/0/109993695638569781190/posts/bQpzEGG15G8
+
+Oh, great!
+
+As Kukjin Kim mentioned, we have wanted to support mass product
+without out-of-tree patches. Also, I have gone the extra mile
+to do this.
+
 > 
-> Feel free to add
+> There's plenty of stuff not working yet, but it'll come up with
+> simplefb, keyboard, trackpad and USB 2.0 for now.
+
+I will look at the patches about simplefb, USB 2.0, and so on.
+If possible, I will review it.
+Good luck.
+
+Best regards,
+Jingoo Han
+
 > 
-> Tested-by: Adam Baker <linux@baker-net.org.uk>
-
-I apologize, but I won't be able to add this.  I'm using a new work
-flow, and took the patches in too quickly (well, they had been on the
-list a while... :-P)  I should've let them sit in my tree for a few more
-days before sending the pull request to arm-soc.  If I had done that, I
-could've gone in and added the Tested-by:.  I'll be more careful in the
-future.
-
-When you submit v2 of your DT change, please add the Tested-by to that.
-
-Thanks again for testing, we do appreciate the effort.
-
-thx,
-
-Jason.
+> 
+> -Olof
+> --
