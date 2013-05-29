@@ -1,37 +1,31 @@
-From: ratbert.chuang@gmail.com (Po-Yu Chuang)
-Date: Wed, 29 May 2013 17:34:01 +0800
-Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
-In-Reply-To: <20130529085426.GA13095@mudshark.cambridge.arm.com>
-References: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
- <20130528130502.GA28971@mudshark.cambridge.arm.com> <51A4B938.7080708@ti.com>
- <20130528140705.GE28971@mudshark.cambridge.arm.com> <51A4FC08.3060906@ti.com>
- <CANutaR-2gTP7ubiEdgjFyzVMc6=4t5GPjLkH8pkup=O882Hb-Q@mail.gmail.com>
- <20130529085426.GA13095@mudshark.cambridge.arm.com>
-Message-ID: <CANutaR_8jNDzPeyJ8PLZPS=yiZ8Ywmk08dR9vLcB2CpxuJac3A@mail.gmail.com>
+From: jlu@pengutronix.de (Jan =?ISO-8859-1?Q?L=FCbbe?=)
+Date: Wed, 29 May 2013 11:36:04 +0200
+Subject: [PATCH v2] usb: musb: fix clock naming
+In-Reply-To: <20130528173637.GE15794@arwen.pp.htv.fi>
+References: <1369725661-3114-1-git-send-email-yegorslists@googlemail.com>
+ <20130528173637.GE15794@arwen.pp.htv.fi>
+Message-ID: <1369820164.6673.55.camel@polaris.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Tue, 2013-05-28 at 20:36 +0300, Felipe Balbi wrote: 
+> On Tue, May 28, 2013 at 09:21:01AM +0200, yegorslists at googlemail.com wrote:
+> > From: Yegor Yefremov <yegorslists@googlemail.com>
+> > 
+> > 'ick' was changed to 'hsotgusb_ick'
+> > 'fck' was changed to 'hsotgusb_fck'
+> > 
+> > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> > Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> 
+> NAK. Fix your clock data.
 
-On Wed, May 29, 2013 at 4:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, May 29, 2013 at 03:14:58AM +0100, Po-Yu Chuang wrote:
->> Will,
->> I guess nobody noticed this because the MMU of later v7 processors
->> fetches page table
->> from D-cache. It even doesn't need to clean pmd to PoU.
->
-> It does if it's UP. The walker is only guaranteed to read from L1 if you
-> have the multiprocessing extensions.
+Yegor, I'm not sure how my signed-off-by got here. It seems that you
+picked the patch up from this thread:
+http://marc.info/?l=linux-omap&m=134390141101734
 
-Ya, I see.
-
->
-> As for this function, looks like it's ok because it has precisely one
-> caller, so it might be worth prefixing it with some underscores to make it
-> clear that nobody else should be calling it!
-
-I am fine with that.
-Should I create a new patch?
+Note that my mail contains no signed-off-by and the change is described
+as a work around.
 
 Regards,
-Po-Yu
+Jan
