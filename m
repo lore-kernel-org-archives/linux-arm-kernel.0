@@ -1,102 +1,167 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Wed, 29 May 2013 06:20:27 -0500
-Subject: [PATCH v7] ARM: dts: omap4-panda: Update the LED support for the
- panda DTS
-Message-ID: <1369826427-31963-1-git-send-email-dmurphy@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 May 2013 12:22:07 +0100
+Subject: [PATCH 3/3] ARM PJ4B: Add support for errata 4611
+In-Reply-To: <1369822618-26797-4-git-send-email-gregory.clement@free-electrons.com>
+References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
+ <1369822618-26797-4-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130529112207.GG13095@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
-are different.
+On Wed, May 29, 2013 at 11:16:58AM +0100, Gregory CLEMENT wrote:
+> From: Lior Amsalem <alior@marvell.com>
+> 
+> A CP15 clean operation can result in a dead lock state if it is hit by
+> an incoming snoop event. the fiw to this issue is the following:
 
-A1-A3 = gpio_wk7
-ES = gpio_110
+s/fiw/fix/
 
-There is no change to LED D2
+> before any CP15 clean type operation in Cache Coherency mode, issue a
+> Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
+> instruction.
 
-Abstract away the pinmux and the LED definitions for the two boards into
-the respective DTS files.
+Could you combine this with #6124, so we don't have back-to-back ifdefs all
+over the place? Also, there are more clean operations than you have
+described here, so why haven't you have to touch them all?
 
-Signed-off-by: Dan Murphy <dmurphy@ti.com>
----
-v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
-v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
-v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
+> [gregory.clement at free-electrons.com:add errata description in changelog]
+> [gregory.clement at free-electrons.com:make this errata depend on Aramda
+> 370]
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/Kconfig                | 11 +++++++++++
+>  arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
+>  arch/arm/mm/copypage-v6.c       | 11 +++++++++++
+>  arch/arm/mm/proc-macros.S       | 13 +++++++++++++
+>  4 files changed, 57 insertions(+)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 48cdbea..05c13f9 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1087,6 +1087,17 @@ if !MMU
+>  source "arch/arm/Kconfig-nommu"
+>  endif
+>  
+> +config PJ4B_ERRATA_4611
+> +        bool "PJ4B Errata 4611: A Deadlock can Occur if a CP15 Clean/Clean and Invalidate Operation is Hit By a Snoop Event"
+> +        depends on CPU_PJ4B && MACH_ARMADA_370
+> +        help
+> +          A CP15 clean operation can result in a dead lock state if it is hit by
+> +          an incoming snoop event.
+> +          Workaround:
+> +	  Before any CP15 clean type operation in Cache Coherency mode, issue
+> +          a Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
+> +          instruction.
+> +
+>  config PJ4B_ERRATA_4742
+>          bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
+>          depends on CPU_PJ4B && MACH_ARMADA_370
+> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+> index e3a8064..112f778 100644
+> --- a/arch/arm/include/asm/tlbflush.h
+> +++ b/arch/arm/include/asm/tlbflush.h
+> @@ -475,11 +475,22 @@ static inline void flush_pmd_entry(void *pmd)
+>  {
+>  	const unsigned int __tlb_flag = __cpu_tlb_flags;
+>  
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +	unsigned long flags;
+> +	raw_local_irq_save(flags);
+> +	dmb();
+> +#endif
+> +
+>  #ifdef CONFIG_PJ4B_ERRATA_6124
+>  	tlb_op(TLB_DCLEAN, "c7, c14, 1	@ flush_pmd", pmd);
+>  #else
+>  	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
+>  #endif
+> +
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +	raw_local_irq_restore(flags);
+> +#endif
 
- arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
- arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+), 1 deletions(-)
+Eeek. Why do you have to disable interrupts during this? Again, are there no
+chicken bits to save you?
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 03bd60d..5fd59b3 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -16,8 +16,13 @@
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
- 
--	leds {
-+	leds: leds {
- 		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <
-+			&led_wkgpio_pins
-+		>;
-+
- 		heartbeat {
- 			label = "pandaboard::status1";
- 			gpios = <&gpio1 7 0>;
-@@ -137,6 +142,15 @@
- 	};
- };
- 
-+&omap4_pmx_wkup {
-+	led_wkgpio_pins: pinmux_leds_wkpins {
-+		pinctrl-single,pins = <
-+			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
-+			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
-+		>;
-+	};
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
-diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index f1d8c21..c968a3b 100644
---- a/arch/arm/boot/dts/omap4-panda-es.dts
-+++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -34,3 +34,31 @@
- 		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
- 		>;
- };
-+
-+&omap4_pmx_core {
-+	led_gpio_pins: gpio_led_pmx {
-+		pinctrl-single,pins = <
-+			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
-+		>;
-+	};
-+};
-+
-+&led_wkgpio_pins {
-+	pinctrl-single,pins = <
-+		0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
-+	>;
-+};
-+
-+&leds {
-+	pinctrl-0 = <
-+		&led_gpio_pins
-+		&led_wkgpio_pins
-+	>;
-+
-+	heartbeat {
-+		gpios = <&gpio4 14 0>;
-+	};
-+	mmc {
-+		gpios = <&gpio1 8 0>;
-+	};
-+};
--- 
-1.7.5.4
+>  	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+>  
+>  	if (tlb_flag(TLB_WB))
+> @@ -490,11 +501,22 @@ static inline void clean_pmd_entry(void *pmd)
+>  {
+>  	const unsigned int __tlb_flag = __cpu_tlb_flags;
+>  
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +	unsigned long flags;
+> +	raw_local_irq_save(flags);
+> +	dmb();
+> +#endif
+> +
+>  #ifdef CONFIG_PJ4B_ERRATA_6124
+>  	tlb_op(TLB_DCLEAN, "c7, c14, 1	@ flush_pmd", pmd);
+>  #else
+>  	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
+>  #endif
+> +
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +	raw_local_irq_restore(flags);
+> +#endif
+> +
+>  	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+>  }
+>  
+> diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
+> index b9bcc9d..20b69ad 100644
+> --- a/arch/arm/mm/copypage-v6.c
+> +++ b/arch/arm/mm/copypage-v6.c
+> @@ -59,11 +59,22 @@ static void v6_clear_user_highpage_nonaliasing(struct page *page, unsigned long
+>   */
+>  static void discard_old_kernel_data(void *kto)
+>  {
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +        unsigned long flags;
+> +
+> +        raw_local_irq_save(flags);
+> +        dmb();
+> +#endif
+> +
+>  	__asm__("mcrr	p15, 0, %1, %0, c6	@ 0xec401f06"
+>  	   :
+>  	   : "r" (kto),
+>  	     "r" ((unsigned long)kto + PAGE_SIZE - L1_CACHE_BYTES)
+>  	   : "cc");
+> +
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +        raw_local_irq_restore(flags);
+> +#endif
+
+Do you actually have an aliasing vipt cache? If not, you don't care about
+this function.
+
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index f9a0aa7..ca81291 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -178,7 +178,20 @@
+>  #endif
+>  
+>  	str	r3, [r0]
+> +
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +	mrs     r2, cpsr
+> +	orr     r3, r2, #PSR_F_BIT | PSR_I_BIT
+> +	msr     cpsr_c, r3                      @ Disable interrupts
+> +	dmb                                     @ ensure ordering with previous memory accesses
+> +#endif
+> +
+>  	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+> +
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +	msr     cpsr_c, r2                      @ Restore interrupts
+> +	mcr     p15, 0, r0, c7, c10, 4          @ drain write buffer
+> +#endif
+
+This could be a dsb.
+
+Will
