@@ -1,47 +1,36 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 29 May 2013 10:49:33 -0400 (EDT)
-Subject: [PATCH 1/8] drivers: bus: add ARM CCI support
-In-Reply-To: <1369829485.3715.46.camel@linaro1.home>
-References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
- <1369374311-21260-2-git-send-email-nicolas.pitre@linaro.org>
- <1369829485.3715.46.camel@linaro1.home>
-Message-ID: <alpine.LFD.2.03.1305291049000.1918@syhkavp.arg>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 29 May 2013 15:49:09 +0100
+Subject: [PATCH] SPI: Unify simple platform data for some controllers
+In-Reply-To: <201305291526.35099.arnd@arndb.de>
+References: <1369809742-4220-1-git-send-email-shc_work@mail.ru>
+ <1369817353.993218858@f175.mail.ru>
+ <20130529112002.GS3660@sirena.org.uk>
+ <201305291526.35099.arnd@arndb.de>
+Message-ID: <20130529144909.GT3660@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Jon Medhurst (Tixy) wrote:
+On Wed, May 29, 2013 at 03:26:34PM +0200, Arnd Bergmann wrote:
+> On Wednesday 29 May 2013, Mark Brown wrote:
 
-> On Fri, 2013-05-24 at 01:45 -0400, Nicolas Pitre wrote:
-> [...]
-> > diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
-> [...]
-> > +	cci at 2c090000 {
-> > +		compatible = "arm,cci-400";
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		reg = <0x0 0x2c090000 0 0x1000>;
-> > +		ranges = <0x0 0x0 0x2c090000 0x6000>;
-> > +
-> > +		cci_control0: slave-if at 1000 {
-> > +			interface-type = "ace-lite";
-> > +			reg = <0x1000 0x1000>;
-> > +		};
-> > +
-> > +		cci_control1: slave-if at 4000 {
-> > +			interface-type = "ace";
-> > +			reg = <0x4000 0x1000>;
-> > +		};
-> > +
-> > +		cci_control2: slave-if at 5000 {
-> > +			interface-type = "ace";
-> > +			reg = <0x5000 0x1000>;
-> > +		};
-> > +	};
-> 
-> The above examples of slave-if nodes are missing the required
-> compatible = "arm,cci-400-ctrl-if";
+> > We probably also want to make
+> > GPIO chip select support a standard thing that's available with every
+> > driver rather than something the driver has to know about but that's a
+> > separate bit of work.
 
-Indeed.  I'll fix that.
+> That actually seems simpler than doing it in just one driver: if
+> we add a cs_gpio field to spi_board_info, spi_new_device could
+> just copy that information into the new spi_device instead of
+> taking it from master->cs_gpios.
 
-
-Nicolas
+Yeah, that bit of it is fine and straightforward.  It's slightly more
+work to factor the chip select handling out so that we can implement the
+handling at the appropriate moments in the flow due to the fact that
+it's embedded in the message transfer functions but totally doable.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/73ebb588/attachment-0001.sig>
