@@ -1,54 +1,110 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 May 2013 10:24:21 +0100
-Subject: VDSO for arm 32bit
-In-Reply-To: <634BB1CFA60ED14386C17849392C3EB202E52CA407@HICGWSEX01.ad.harman.com>
-References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
- <20899.25935.838288.45383@pilspetsen.it.uu.se>
- <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
- <20130528092313.GA10474@mudshark.cambridge.arm.com>
- <634BB1CFA60ED14386C17849392C3EB202E52CA407@HICGWSEX01.ad.harman.com>
-Message-ID: <20130529092421.GC13095@mudshark.cambridge.arm.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 29 May 2013 18:33:01 +0900
+Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
+In-Reply-To: <51A5C16D.20408@linaro.org>
+References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
+ <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
+ <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
+ <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
+ <51A5C16D.20408@linaro.org>
+Message-ID: <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 05:00:09AM +0100, Kumar, Ganesh wrote:
->    Hmm, it doesn't seem to be quite straight forward, but thanks for the
->    inputs and caution.  Now that I got a direction, I'm planning to
->    proceed as below: 1. As a first step, get the implementation up and
->    running using the kuser helper (understand the situation and plan to
->    limit my implementation for the ARM Cortex's arch timer clock type) On
->    the user land, does this approach needs a change to the libc, kindly
->    confirm. I read the kernel documentation for kuser helper, it gave a
->    nice overview of how things can be done, but not so clear on how
->    actually the helper functions can be called from the user land (the big
->    picture), does it needs a tweak in the libc in order to enable     the
->    new helper functions defined.
-
-Yes, libc would need updating to direct the various clock system calls via
-the vectors page if the kernel is recent enough. Your implementation will
-need to fall back to issuing the system call if the arch timer isn't the
-current clocksource.
-
-> 2. Plan to get it up through the VDSO, study in progress. One question
-> here, was the vdso implementation for 32 bit is not available only because
-> of the frequent addition in new clock types or there is any strong reason
-> or something I need to take care about, kindly clarify.  I'll start
-> looking into the arm64 vdso code as a starting point, is there anything
-> else I can refer/read to get going? kindly help. 
-
-This might not be needed after the feedback from Nicolas.
-
-> >>> I know some people were toying with exposing memory-mapped timers to
-> >>> userspace, but >>> that really scares me.
+On Wednesday, May 29, 2013 5:51 PM, Tushar Behera:
+> On 05/29/2013 11:01 AM, Olof Johansson wrote:
+> > On Tue, May 28, 2013 at 8:59 PM, Tushar Behera <tushar.behera@linaro.org> wrote:
+> >
+> >> The patches are at [1].
+> >
+> > FWIW, a cgit/gitweb link is easier to follow when you're reading an
+> > email. Anyway, found the patches.
+> >
+> >> There are a total of 6 patches on top of
+> >> v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another patch
+> >> (c) is just a defconfig hack to get Arndale booting. Remaining 2 patches
+> >> (e, f) are required to reset the hub during EHCI initialization.
+> >
+> > Huh, I thought you said that (c) wasn't needed when I posted the
+> > defconfig update. It'd be nice to see the code fixed to handle this
+> > case instead of Linaro carrying a patch like this though. I.e. make it
+> > able to deselect the uart, or make it tied to DEBUG_LL like on other
+> > platforms instead of having a separate config for this.
+> >
 > 
->    Just curious, what are the side effects of exposing the memory-mapped
->    timers to user space.
+> It would be good to free up the dependency on the correct UART port for
+> the board to boot. Without that, there would always be boards that don't
+> boot with default mainline defconfig file even though all other
+> components are in place.
+> 
+> >> a. ARM: exynos: defconfig update
+> >> b. ARM: EXYNOS: Update defconfig for Arndale and Origen board
+> >> c. [TEMP] ARM: EXYNOS: Set low-level UART port to 2
+> >> d. ARM: dts: Enabling samsung-usb2phy driver for exynos5250
+> >> e. usb: ehci-s5p: add the HSIC port initialization
+> >> f. ARM: dts: Add USB gpio entries for Arndale board
+> >>
+> >> I am not sure whether such kind of board-specific patches (e, f) are
+> >> appreciated in the drivers. But that is all we need to get USB and
+> >> Ethernet to work on v3.10-rc3 kernel.
+> >
+> > I've come across a similar situation with wifi reset sequence on the
+> > chromebook. On the product kernel we added some code to the board file
+> > to deal with it, but if we keep doing that things will grow out of
+> > hand.
+> >
+> > I don't know if it'll be unpopular, but I think it's time to start a
+> > drivers/platform/arm for these kind of things, and have those drivers
+> > probe on the system compatible value, similar to how x86 does it (with
+> > DMI tables). At least that's my plan for approaching the wifi
+> > reset/power-on sequence on the Chromebook. I hope to have patches in
+> > not all that long...
+> >
+> > Likewise, the hub reset/enable code doesn't have to go with the USB
+> > driver, right? I.e. if you cycle reset/enable on the hub after the
+> > host and phy is configured, you'll still have a working setup?
+> >
+> 
+> Right, hub reset/enable code need not be tied up with USB driver. As per
+> your suggestion regarding drivers/platform/arm, I implemented an Arndale
+> specific driver [2] in drivers/platform/arm and verified USB and
+> ethernet to be working.
 
-Just that you need to be careful about what you expose and how do you expose
-it. For example, control registers may lie in the same page as the actual
-counter, and you don't want userspace having access to that if possible.
+CC'ed Thomas Abraham, Vivek Gautam
 
-You'd probably also need to copy code into place, since there are many timer
-implementations that could be used.
+I think so.
 
-Will
+I looked at Arndale board Schematics.
+'Hub chip' on Arndale board needs hub reset/enable code.
+'HUB_RESET' and 'HUB_CONNECT' pins are used to reset 'Hub chip'
+on Arndale board, not Exynos EHCI controller. So, Exynos EHCI driver
+does not need to consider this hub reset/enable code.
+
+If there is a driver for this 'Hub chip', 'Hub chip' driver maybe
+consider this.
+
+However, Olof Johansson mentioned, 'drivers/platform/arm/board_arndale.c'
+would be a good alternative.
+
+> 
+> [2]
+> https://git.linaro.org/gitweb?p=landing-
+> teams/working/samsung/kernel.git;a=shortlog;h=refs/heads/upstream/arndale-usb-2
+
+It looks good.
+
+Best regards,
+Jingoo Han
+
+> 
+> >
+> > -Olof
+> >
+> 
+> 
+> --
+> Tushar Behera
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
