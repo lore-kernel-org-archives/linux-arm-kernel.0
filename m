@@ -1,77 +1,47 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 29 May 2013 18:47:46 +0100
-Subject: VDSO for arm 32bit
-In-Reply-To: <alpine.LFD.2.03.1305290955390.1918@syhkavp.arg>
-References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
- <20899.25935.838288.45383@pilspetsen.it.uu.se>
- <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
- <20130528092313.GA10474@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1305281415040.1918@syhkavp.arg>
- <20130529090850.GB13095@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1305290955390.1918@syhkavp.arg>
-Message-ID: <20130529174746.GA2224@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 29 May 2013 20:55:08 +0300
+Subject: [GIT PULL] ARM: tegra: DT-related fixes needed by the USB tree
+In-Reply-To: <20130528174704.GH15794@arwen.pp.htv.fi>
+References: <1368831045-19105-1-git-send-email-swarren@wwwdotorg.org>
+ <51A4E62D.7020206@wwwdotorg.org>
+ <20130528174704.GH15794@arwen.pp.htv.fi>
+Message-ID: <20130529175508.GF21290@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 10:01:40AM -0400, Nicolas Pitre wrote:
-> On Wed, 29 May 2013, Will Deacon wrote:
-> 
-> > On Tue, May 28, 2013 at 07:19:00PM +0100, Nicolas Pitre wrote:
-> > > On Tue, 28 May 2013, Will Deacon wrote:
-> > > > Be careful here. I had a crack at a gtod implementation for the vectors page
-> > > > in the past, but decided to drop it because it quickly became a maintenance
-> > > > nightmare. Since the layout of the vectors page must be fixed (as userspace
-> > > > jumps to the absolute addresses for the helpers), having large, complicated
-> > > > functions (which gtod does become as you quickly start using the stack to
-> > > > store all of the shared state with the kernel) means that you can quickly
-> > > > back yourself into a corner where the layout of the code cannot change
-> > > > without breaking the ABI.
+Hi,
+
+On Tue, May 28, 2013 at 08:47:04PM +0300, Felipe Balbi wrote:
+> On Tue, May 28, 2013 at 11:15:25AM -0600, Stephen Warren wrote:
+> > On 05/17/2013 04:50 PM, Stephen Warren wrote:
+> > > Felipe, (and Alan, Greg),
 > > > 
-> > > Note that only the entry point is fixed.  The layout of the code is not.  
-> > > So you may well branch anywhere else within the vector page if the code 
-> > > is more complex than a few instructions.
+> > > These are the changes from the Tegra tree that need to be merged
+> > > before the Tegra USB driver patches 4-8 from Venu can be applied. Recall
+> > > that we had previously agreed on this approach for v3.9, but Venu's
+> > > patches didn't end up being ready until now, unfortunately. I note
+> > > that Venu's patches affect both the Tegra USB and PHY drivers.
 > > 
-> > Sure, it may be possible simply to have branches in the kuser slots and then
-> > reserve a chunk at the other end of the vectors page where the actual
-> > implementation can go.
-> > 
-> > > > On top of that, new clock types are added more often than you might think
-> > > > (not to mention bug fixes in the implementation itself), and you end up in
-> > > > a horrible situation where you'd end up deprecating one implementation and
-> > > > adding gettimeofday2 or something equally nasty at a different offset.
-> > > 
-> > > That is equally valid for a vdso.
-> > 
-> > Sorry, I wasn't clear. My point was that you can change the layout of a vdso
-> > without breaking anything, since the dynamic loader resolves the entry
-> > points. It relates back to what I said above -- you need to be careful about
-> > how you lay the stuff out in memory.
-> > 
-> > Perhaps the gtod code won't end up being that big. It's around ~500 bytes on
-> > arm64, but that's without any stack usage.
+> > Felipe, do you know when you plan to pull this into the USB tree, and
+> > apply Venu's patches? Thanks.
 > 
-> That's still fairly large.
+> got 35 commits testing right now. This pull is in my list for tomorrow.
 > 
-> > Come to think of it, is there any
-> > reason why we can't just map an additional vectors page after the one we
-> > currently have?
-> 
-> That certainly can be done if necessary.  Some copy_page implementations 
-> do use some of the address space above the vector page for temporary 
-> page mapping so some care not to create conflicts would be required.
+> sorry for the delay, have been on a trip for the last 3 weeks and now
+> I'm catching up with emails during my vacations (next 2 weeks).
 
-In theory, we could have a VDSO wrapping the vectors page.  This could allow
-the existing kuser helpers to be looked up by ELF symbol as well as the well-
-known address.  New functions don't necessarily need to have a well-known
-address at all -- they might only be visible as ELF symbols, since there is
-no need to offer a backwards-compatible ABI for new functions.
+the tag is not pushed to where you pointed me to. Please make sure to
+git push it.
 
-Alternatively, we could have a VDSO which is separate from the vectors
-page, exporting only the new functionality, with the vectors page remaining
-as before.
+$ git fetch git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tag tegra-for-3.11-deps-for-usb
+fatal: Couldn't find remote ref refs/tags/tegra-for-3.11-deps-for-usb
 
-Whether or not adding a VDSO brings enough benefit to make it worthwhile
-is a separate discussion, though.
-
-Cheers
----Dave
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/54329a8d/attachment.sig>
