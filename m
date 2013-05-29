@@ -1,63 +1,33 @@
-From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Wed, 29 May 2013 11:42:35 -0400
-Subject: [PATCHv2 3/3] arm: dts: add bandgap entry for OMAP4460 devices
-In-Reply-To: <51A60E7E.2070905@ti.com>
-References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
- <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
- <5193A875.1020000@ti.com> <5193B9AA.7020507@ti.com> <519488D3.5070003@ti.com>
- <5194D0AF.3010407@ti.com> <51A60C74.4010307@ti.com> <51A60E7E.2070905@ti.com>
-Message-ID: <51A621EB.5080805@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 May 2013 17:46:17 +0200
+Subject: [PATCH -next] dmaengine: ste_dma40: add missing iounmap() on
+ error in d40_probe()
+In-Reply-To: <CAPgLHd9kMzZ_ZY6zm0MZ+P6dHq73i_GdCsxhpUOt-V9nf08tWA@mail.gmail.com>
+References: <CAPgLHd9kMzZ_ZY6zm0MZ+P6dHq73i_GdCsxhpUOt-V9nf08tWA@mail.gmail.com>
+Message-ID: <CACRpkdZpReWCaA7=-5xPfd9y5jDfP-P+5VqFCuo4Aa7LQ31Qhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29-05-2013 10:19, Cousson, Benoit wrote:
-> Hi Eduardo,
-> 
-> On 5/29/2013 4:11 PM, Eduardo Valentin wrote:
->> Salut Monsieur Benoit,
->>
->> On 16-05-2013 08:27, Eduardo Valentin wrote:
->>> On 16-05-2013 03:20, Benoit Cousson wrote:
->>>> Hi Eduardo,
->>>>
->>
->> <cut>
->>
->>>> We need to check.
->>>
->>> Yeah, I also dont think this will work, because we will reparent the
->>> interrupt, setting to a different controller. That will break the TALERT
->>> signal already defined at GIC (check original patch).
->>>
->>> I propose keeping the way I sent. Unless there is a way to set two
->>> different controllers to same device.
->>>
->>
->> Any idea on this patch? Shall we keep the way it is?
-> 
-> Well since we cannot use directly interrupt, I think we need to use at
-> least the proper gpio binding.
-> 
+Hi Wei,
 
-hmm... OK. sounds reasonable. I will change the driver and resend this
-one in one single series.
+why does the patch subject say -next?
 
-> Thanks,
-> Benoit
-> 
-> 
-> 
+AFAICS the patch applies to Torvalds tree as well, and should probably
+go in for fixes.
 
+On Tue, May 28, 2013 at 11:07 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
 
--- 
-You have got to be excited about what you are doing. (L. Lamport)
+> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+>
+> Add the missing iounmap() before return from d40_probe()
+> in the error handling case.
+>
+> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-Eduardo Valentin
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 295 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/a5ab6edf/attachment.sig>
+I guess Vinod should apply this... maybe it should even be marked
+for stable.
+
+Yours,
+Linus Walleij
