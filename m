@@ -1,34 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 May 2013 20:27:59 +0200
-Subject: [PATCH -next] dmaengine: ste_dma40: fix error return code in
- d40_probe()
-In-Reply-To: <CAPgLHd-Mw4MQwS8=p9+ZBHHehH7B-Hs49BqiUMrq-aV_5M4pQQ@mail.gmail.com>
-References: <CAPgLHd-Mw4MQwS8=p9+ZBHHehH7B-Hs49BqiUMrq-aV_5M4pQQ@mail.gmail.com>
-Message-ID: <CACRpkdZH8jai84q6uwSRjMR+HCzohH-JMaKw1SCShYwgSKJYXQ@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 29 May 2013 11:34:07 -0700
+Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
+In-Reply-To: <51A57D39.8030506@linaro.org> (Tushar Behera's message of "Wed,
+ 29 May 2013 09:29:53 +0530")
+References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
+ <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
+ <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
+Message-ID: <87mwrd63fk.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 11:06 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+Tushar Behera <tushar.behera@linaro.org> writes:
 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+[...]
+
+> The patches are at [1]. There are a total of 6 patches on top of
+> v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another patch
+> (c) is just a defconfig hack to get Arndale booting. Remaining 2 patches
+> (e, f) are required to reset the hub during EHCI initialization.
 >
-> In many of the error handling case, the return value 'ret' not set
-> and 0 will be return from d40_probe() even if error, but we should
-> return a negative error code instead in those error handling case.
-> This patch fixed them, and also removed useless variable 'err'.
+> a. ARM: exynos: defconfig update
+> b. ARM: EXYNOS: Update defconfig for Arndale and Origen board
+> c. [TEMP] ARM: EXYNOS: Set low-level UART port to 2
+> d. ARM: dts: Enabling samsung-usb2phy driver for exynos5250
+> e. usb: ehci-s5p: add the HSIC port initialization
+> f. ARM: dts: Add USB gpio entries for Arndale board
 >
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> I am not sure whether such kind of board-specific patches (e, f) are
+> appreciated in the drivers. But that is all we need to get USB and
+> Ethernet to work on v3.10-rc3 kernel.
 
-Hm it seems it does not apply on my dma40 branch (the same
-as mentioned by Andy):
-https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-stericsson.git/log/?h=ux500-dma40
+I confirm that using v3.10-rc3 + these patches, the wired network is
+working on Arndale.
 
-I have already queued some 36 patches from this branch into
-ARM SoC so it is in -next today (and conflicting with this patch).
+Thanks,
 
-Could you rebase it and get Vinod's ACK so I can queue it?
-
-Also pls include Lee Jones on CC.
-
-Yours,
-Linus Walleij
+Kevin
