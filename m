@@ -1,46 +1,122 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 29 May 2013 15:36:54 -0400
-Subject: [GIT PULL v2] ARM: mvebu: soc changes for v3.11 (round 2 cumulative)
-In-Reply-To: <20130528183617.GB31290@titan.lakedaemon.net>
-References: <20130528183617.GB31290@titan.lakedaemon.net>
-Message-ID: <20130529193654.GZ31290@titan.lakedaemon.net>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Wed, 29 May 2013 16:44:22 -0300
+Subject: [PATCH 1/2] ARM: mxs: Print silicon version on boot
+Message-ID: <1369856663-29314-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+Introduce functions that identify the SoC type (i.MX23 or iMX28)
+and also report the silicon revision.
 
-Since I have a few hours, I added a Tested-by that I thought I
-missed.  No other changes.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mxs/mach-mxs.c | 85 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 85 insertions(+)
 
-
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/soc-3.11-2
-
-for you to fetch changes up to 0e2ee0c0610ec211a9f0ebf3088cbf4da422ebf8:
-
-  arm: kirkwood: Instantiate cpufreq driver (2013-05-29 19:32:04 +0000)
-
-----------------------------------------------------------------
-mvebu soc changes for v3.11 (round 2)
-
- - kirkwood
-    - use the cpufreq driver
-
-----------------------------------------------------------------
-Andrew Lunn (1):
-      arm: kirkwood: Instantiate cpufreq driver
-
-Thomas Petazzoni (1):
-      arm: kirkwood: use the default of match table
-
- arch/arm/Kconfig                                  |  1 +
- arch/arm/mach-kirkwood/board-dt.c                 |  9 +++------
- arch/arm/mach-kirkwood/common.c                   | 23 +++++++++++++++++++++++
- arch/arm/mach-kirkwood/common.h                   |  2 ++
- arch/arm/mach-kirkwood/include/mach/bridge-regs.h |  2 ++
- 5 files changed, 31 insertions(+), 6 deletions(-)
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 66fe810..b632323 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -38,6 +38,21 @@
+ #define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0		0x2
+ #define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1		0x3
+ 
++
++#define MXS_DIGCTL_BASE_ADDR	0x8001c000
++#define HW_DIGCTL_CHIPID	0x310
++#define HW_DIGCTL_CHIPID_MASK	(0xffff << 16)
++#define HW_DIGCTL_REV_MASK	0xff
++#define HW_DIGCTL_CHIPID_MX23	(0x3780 << 16)
++#define HW_DIGCTL_CHIPID_MX28	(0x2800 << 16)
++
++#define IMX_CHIP_REVISION_1_0	0x10
++#define IMX_CHIP_REVISION_1_1	0x11
++#define IMX_CHIP_REVISION_1_2	0x12
++#define IMX_CHIP_REVISION_1_3	0x13
++#define IMX_CHIP_REVISION_1_4	0x14
++#define IMX_CHIP_REV_UNKNOWN	0xff
++
+ #define MXS_GPIO_NR(bank, nr)	((bank) * 32 + (nr))
+ 
+ #define MXS_SET_ADDR		0x4
+@@ -361,8 +376,78 @@ static void __init cfa10037_init(void)
+ 	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+ }
+ 
++static const char *mxs_get_cpu_type(void)
++{
++	int reg;
++	void __iomem *digctl_base = ioremap(MXS_DIGCTL_BASE_ADDR, SZ_8K);
++
++	if (!digctl_base)
++		return "unknown";
++
++	reg = readl(digctl_base + HW_DIGCTL_CHIPID) & HW_DIGCTL_CHIPID_MASK;
++	switch (reg) {
++	case HW_DIGCTL_CHIPID_MX23:
++		return "23";
++	case HW_DIGCTL_CHIPID_MX28:
++		return "28";
++	default:
++		return "unknown";
++	}
++}
++
++static int mxs_get_cpu_rev(void)
++{
++	int reg, rev;
++	void __iomem *digctl_base = ioremap(MXS_DIGCTL_BASE_ADDR, SZ_8K);
++
++	if (!digctl_base)
++		return -ENOMEM;
++
++	reg = readl(digctl_base + HW_DIGCTL_CHIPID) & HW_DIGCTL_CHIPID_MASK;
++	rev = readl(digctl_base + HW_DIGCTL_CHIPID) & HW_DIGCTL_REV_MASK;
++
++	switch (reg) {
++	case HW_DIGCTL_CHIPID_MX23:
++		switch (rev) {
++		case 0x0:
++			return IMX_CHIP_REVISION_1_0;
++		case 0x1:
++			return IMX_CHIP_REVISION_1_1;
++		case 0x2:
++			return IMX_CHIP_REVISION_1_2;
++		case 0x3:
++			return IMX_CHIP_REVISION_1_3;
++		case 0x4:
++			return IMX_CHIP_REVISION_1_4;
++		default:
++			return IMX_CHIP_REV_UNKNOWN;
++		}
++	case HW_DIGCTL_CHIPID_MX28:
++		switch (rev) {
++		case 0x1:
++			return IMX_CHIP_REVISION_1_2;
++		default:
++			return IMX_CHIP_REV_UNKNOWN;
++		}
++	default:
++		return IMX_CHIP_REV_UNKNOWN;
++	}
++}
++
++static void mxs_print_silicon_rev(const char *cpu, int srev)
++{
++	if (srev == IMX_CHIP_REV_UNKNOWN)
++		pr_info("CPU identified as i.MX%s, unknown revision\n", cpu);
++	else
++		pr_info("CPU identified as i.MX%s, silicon rev %d.%d\n",
++				cpu, (srev >> 4) & 0xf, srev & 0xf);
++}
++
+ static void __init mxs_machine_init(void)
+ {
++
++	mxs_print_silicon_rev(mxs_get_cpu_type(), mxs_get_cpu_rev());
++
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+ 		imx28_evk_init();
+ 	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
+-- 
+1.8.1.2
