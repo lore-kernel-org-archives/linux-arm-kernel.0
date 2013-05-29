@@ -1,37 +1,58 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 29 May 2013 16:00:53 -0400
-Subject: [PATCH v5 01/13] net: mv643xx_eth: use phy_disconnect instead
- of phy_detach
-In-Reply-To: <1369855975-21489-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369855975-21489-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130529200053.GA31290@titan.lakedaemon.net>
+From: jgchunter@gmail.com (Jon Hunter)
+Date: Wed, 29 May 2013 21:17:38 +0100
+Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
+In-Reply-To: <51A52A16.1040204@wwwdotorg.org>
+References: <cover.1369658705.git.afzal@ti.com>
+ <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
+ <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
+Message-ID: <51A66262.7000305@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sebastian,
 
-On Wed, May 29, 2013 at 09:32:43PM +0200, Sebastian Hesselbarth wrote:
-> Using a separated mdio bus driver with mvmdio, phy_detach on network device
-> removal will not stop the phy and finally lead to NULL pointer dereference
-> in mvmdio due to non-existent network device. Use phy_disconnect instead
-> to properly stop phy device from accessing network device prior removal of
-> the network device.
+On 28/05/13 23:05, Stephen Warren wrote:
+> On 05/28/2013 03:25 PM, Jon Hunter wrote:
+>>
+>> On 27/05/13 15:37, Afzal Mohammed wrote:
+>>> AM43x timer bindings.
+>>>
+>>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+>>> ---
+>>>  Documentation/devicetree/bindings/arm/omap/timer.txt | 2 ++
+>>>  1 file changed, 2 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
+>>> index d02e27c..70cb398 100644
+>>> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
+>>> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
+>>> @@ -14,6 +14,8 @@ Required properties:
+>>>  			ti,omap5430-timer (applicable to OMAP543x devices)
+>>>  			ti,am335x-timer	(applicable to AM335x devices)
+>>>  			ti,am335x-timer-1ms (applicable to AM335x devices)
+>>> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
+>>> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
+>>>  
+>>>  - reg:			Contains timer register address range (base address and
+>>>  			length).
+>>
+>> If you are adding more compatibility strings, then this implies that the
+>> AM43x timers are not 100% compatible with any other device listed (such
+>> as am335x or any omap device). That's fine but you should state that in
+>> the changelog. If the AM43x timer registers are 100% compatible with
+>> existing devices you should not add these.
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Note: I observed this behavior when removing a modular mv643xx_eth driver
-> after attaching it to a phy handled by (also modular) mvmdio. The mvmdio
-> conversion has been done in
-> 
-> commit c3a07134e6aa5b93a37f72ffa3d11fadf72bf757
->  ("mv643xx_eth: convert to use the Marvell Orion MDIO driver")
-> 
-> and should go back any -stable version with that commit (propably only 3.9)
+> I'm not sure that's true; .dts files should always include a compatible
+> value that describes the most specific model of the HW, plus any
+> baseline compatible value that the HW is compatible with. This allows
+> any required quirks/fixes/... to be applied for the specific HW model
+> later even if nobody knows right now they'll be needed. Hence, defining
+> new compatible values doesn't necessarily mean incompatible HW.
 
-It looks like just v3.10-rcX, here.
+Yes that does seem to agree with what Grant had told me in the past [1].
+So this is ok then. However, I still think that the changelog needs to
+be vastly improved and more explicit about the changes.
 
-thx,
+Cheers
+Jon
 
-Jason.
+[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/90551/focus=26447
