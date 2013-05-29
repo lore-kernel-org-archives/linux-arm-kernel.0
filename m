@@ -1,62 +1,104 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 29 May 2013 20:01:39 +0100
-Subject: [PATCH 7/7] Documentation: Update binding for Nomadik and DBx5x
- based platforms
-In-Reply-To: <CACRpkdYyZuReZEJCO6h8Ez3=7AmOm=JdT0_Gd+hDaGFnNJ8cGw@mail.gmail.com>
-References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
- <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
- <CACRpkdYyZZSy4VgFc+Uo=5iAF++EPmHM0U2pHcLdkDZc=Xb_sQ@mail.gmail.com>
- <20130528093815.GH22683@gmail.com>
- <CACRpkdYyZuReZEJCO6h8Ez3=7AmOm=JdT0_Gd+hDaGFnNJ8cGw@mail.gmail.com>
-Message-ID: <20130529190139.GH3012@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 29 May 2013 12:02:04 -0700
+Subject: [PATCH 00/10] clk: mvebu: restructure SoC clock drivers
+In-Reply-To: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1368234490-31416-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130529190204.6058.85682@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Linus Walleij wrote:
-
-> On Tue, May 28, 2013 at 11:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> >  Required properties:
-> >> > -- compatible: "stericsson,nmk-pinctrl", "stericsson,nmk-pinctrl-db8540",
-> >> > -              "stericsson,nmk-pinctrl-stn8815"
-> >> > +- compatible: "stericsson,db8500-pinctrl", "stericsson,db8540-pinctrl",
-> >> > +              "stericsson,stn8815-pinctrl"
-> >>
-> >> OK...
-> >>
-> >> >         pinctrl at 80157000 {
-> >> > -               compatible = "stericsson,nmk-pinctrl";
-> >> > +               compatible = "stericsson,u8500-pinctrl";
-> >>
-> >> This does not look like a supported compatible string?
-> >
-> > Do you still think this, or did you change you mind?
+Quoting Sebastian Hesselbarth (2013-05-10 18:08:00)
+> Marvell EBU SoCs share some common clock functions that register core
+> clocks or clock gates from SoC specific data. These clock drivers are
+> organized by function and over time the drivers filled up with #ifdefs
+> to separate different SoC specific code.
 > 
-> Que? It is not among the listed compatible strings?
+> This patch set first adds a new element to clock gate descriptors to
+> allow to pass clk flags per clock gate. (Patch 1)
 > 
-> > If so, what makes you think it? How does it differ from:
-> >
-> > compatible = "arm,cortex-a9-twd-timer";
-> > compatible = "arm,rtc-pl031";
-> > compatible = "stericsson,db8500-gpio",
-> > compatible = "stericsson,db8500-musb",
-> > compatible = "stericsson,db8500-dma40",
-> > compatible = "stericsson,db8500-prcmu";
-> > compatible = "stericsson,db8500-prcmu-timer-4";
-> > compatible = "stericsson,db8500-thermal";
-> > compatible = "stericsson,db8500-prcmu-regulator";
+> Then it restructures MVEBU clock drivers into common clock setup and
+> SoC specific files and Kconfig options. The driver's init functions
+> are also registered to get called with of_clk_init. (Patches 2, 3-6)
 > 
-> It says u8500-pinctrl, not db8500-pinctrl.
+> It then switches Dove, Kirkwood, and Armada 370/XP to make use of
+> of_clk_init instead of mvebu_clocks_init. (Patches 7-9)
 > 
-> Could it be that you're not actually seeing your own typo?
+> Finally, all obsolete files and Kconfig options are removed. (Patch 10)
+> 
+> It has been tested on CuBox (Dove) and Dockstar (Kirkwood) by me.
+> Armada 370 and XP are compile tested only and should get their Tested-by
+> from Thomas and Gregory, respectively.
+> 
+> @Mike: As this only touches MVEBU related code, I suggest to take it
+> all through the corresponding ARM branch.
+> 
 
-Yes, that's exactly what happened.
+Sebastian,
 
-I thought you were mentioning the way it was laid out.
+Sorry for the tardy response.  This cleanup looks really good.  If it's
+not too late:
 
-I'll fixup.
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+If the branch is already pulled into arm-soc don't worry about the Ack.
+
+Regards,
+Mike
+
+> Sebastian Hesselbarth (10):
+>   clk: mvebu: introduce per-clock-gate flags
+>   clk: mvebu: add common clock functions for core clk and clk gating
+>   clk: mvebu: add Dove SoC-centric clock init
+>   clk: mvebu: add Kirkwood SoC-centric clock init
+>   clk: mvebu: add Armada 370 SoC-centric clock init
+>   clk: mvebu: add Armada XP SoC-centric clock init
+>   ARM: dove: move DT boards to SoC-centric clock init
+>   ARM: kirkwood: move DT boards to SoC-centric clock init
+>   ARM: mvebu: move DT boards to SoC-centric clock init
+>   clk: mvebu: desintegrate obsolete file
+> 
+>  arch/arm/mach-dove/Kconfig          |    3 +-
+>  arch/arm/mach-dove/board-dt.c       |    3 +-
+>  arch/arm/mach-dove/common.c         |    1 -
+>  arch/arm/mach-kirkwood/Kconfig      |    3 +-
+>  arch/arm/mach-kirkwood/board-dt.c   |    3 +-
+>  arch/arm/mach-mvebu/Kconfig         |    5 +-
+>  arch/arm/mach-mvebu/armada-370-xp.c |    4 +-
+>  drivers/clk/mvebu/Kconfig           |   25 +-
+>  drivers/clk/mvebu/Makefile          |    8 +-
+>  drivers/clk/mvebu/armada-370.c      |  176 +++++++++
+>  drivers/clk/mvebu/armada-xp.c       |  204 +++++++++++
+>  drivers/clk/mvebu/clk-core.c        |  675 -----------------------------------
+>  drivers/clk/mvebu/clk-core.h        |   18 -
+>  drivers/clk/mvebu/clk-gating-ctrl.c |  250 -------------
+>  drivers/clk/mvebu/clk-gating-ctrl.h |   22 --
+>  drivers/clk/mvebu/clk.c             |   23 --
+>  drivers/clk/mvebu/common.c          |  163 +++++++++
+>  drivers/clk/mvebu/common.h          |   48 +++
+>  drivers/clk/mvebu/dove.c            |  194 ++++++++++
+>  drivers/clk/mvebu/kirkwood.c        |  247 +++++++++++++
+>  include/linux/clk/mvebu.h           |   22 --
+>  21 files changed, 1066 insertions(+), 1031 deletions(-)
+>  create mode 100644 drivers/clk/mvebu/armada-370.c
+>  create mode 100644 drivers/clk/mvebu/armada-xp.c
+>  delete mode 100644 drivers/clk/mvebu/clk-core.c
+>  delete mode 100644 drivers/clk/mvebu/clk-core.h
+>  delete mode 100644 drivers/clk/mvebu/clk-gating-ctrl.c
+>  delete mode 100644 drivers/clk/mvebu/clk-gating-ctrl.h
+>  delete mode 100644 drivers/clk/mvebu/clk.c
+>  create mode 100644 drivers/clk/mvebu/common.c
+>  create mode 100644 drivers/clk/mvebu/common.h
+>  create mode 100644 drivers/clk/mvebu/dove.c
+>  create mode 100644 drivers/clk/mvebu/kirkwood.c
+>  delete mode 100644 include/linux/clk/mvebu.h
+> ---
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Andrew Lunn <andrew@lunn.ch>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Gregory Clement <gregory.clement@free-electrons.com>
+> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> -- 
+> 1.7.10.4
