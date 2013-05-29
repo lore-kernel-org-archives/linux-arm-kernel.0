@@ -1,52 +1,76 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 29 May 2013 13:55:26 +0530
-Subject: [linux-pm] ARM hibernation / suspend-to-disk
-In-Reply-To: <20130529081005.GA25561@hal>
-References: <20130529081005.GA25561@hal>
-Message-ID: <CAKohpomgf4QZ=71JNYztBZTjcqqZw5MK69dR==Thay7yz5q1jg@mail.gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 29 May 2013 10:39:18 +0200
+Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
+References: <cover.1369658705.git.afzal@ti.com>
+ <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
+ <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
+Message-ID: <51A5BEB6.6070809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 May 2013 13:40, Jan Glauber <jan.glauber@gmail.com> wrote:
-> what's the status of suspend-to-disk on ARM? The most recent discussion I
-> found is:
-> http://lists.linuxfoundation.org/pipermail/linux-pm/2012-November/034997.html
->
-> with no replies at all. Is anyone still working on that? Anyone got it running?
->
-> I tried the patch above (on top of LTS 3.4) and got stuck forever, the last
-> thing on the console was:
->
-> root at omap5:/sys/power# echo disk > state
-> [ 2015.641540] PM: Syncing filesystems ... done.
-> [ 2015.666870] PM: Preallocating image memory... done (allocated 16957 pages)
-> [ 2016.062011] PM: Allocated 67828 kbytes in 0.38 seconds (178.49 MB/s)
->
-> Any hint how to debug that?
+Hi Afzal,
 
-I know it is still broken and I had discussion with Kevin in past
-regarding that. See below.
+On 05/29/2013 10:06 AM, Mohammed, Afzal wrote:
+> Hi Jon,
+> 
+> On Wed, May 29, 2013 at 03:35:10, Stephen Warren wrote:
+>> On 05/28/2013 03:25 PM, Jon Hunter wrote:
+> 
+>>>>  			ti,am335x-timer	(applicable to AM335x devices)
+>>>>  			ti,am335x-timer-1ms (applicable to AM335x devices)
+>>>> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
+>>>> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
+> 
+>>> If you are adding more compatibility strings, then this implies that the
+>>> AM43x timers are not 100% compatible with any other device listed (such
+>>> as am335x or any omap device). That's fine but you should state that in
+>>> the changelog. If the AM43x timer registers are 100% compatible with
+>>> existing devices you should not add these.
+>>
+>> I'm not sure that's true; .dts files should always include a compatible
+>> value that describes the most specific model of the HW, plus any
+>> baseline compatible value that the HW is compatible with. This allows
+>> any required quirks/fixes/... to be applied for the specific HW model
+>> later even if nobody knows right now they'll be needed. Hence, defining
+>> new compatible values doesn't necessarily mean incompatible HW.
+> 
+> Stephen took words out of my finger ;)
+>  
+> Some explanations,I don;t 
+> 
+> 1. first compatible should be exact device [A], followed by compatible
+> model (if one)
+> 2. Minor effort in getting DT right the first time may help prevent
+> difficult effort later modifying it (if a necessity comes), considering
+> the fact that DT sources has  to move out of Kernel at some point of
+> time. And DT is not supposed to be modified, which may cause difficulty
+> for the users (I had been a minor victim of this during rebase).
+> 
+> As we both were in GPMC land earlier, an example,
+> 
+> If my memory is right, GPMC IP in am335x is rev 6, and IP has 8 chip
+> select, but one is not pinned out. Now assume that same IP is integrated
+> in another SoC (probably OMAP4 has rev 6). Here if we use same compatible
+> for both, driver cannot handle it properly (w/o knowledge about platform).
+> But if exact compatible is mentioned, without modifying DT (which should
+> be considered as a firmware) just by modifying Kernel, deciding based on
+> compatible would help achieve what is required.
 
-On 13 March 2013 22:57, Kevin Hilman <khilman@linaro.org> wrote:
-> Viresh Kumar <viresh.kumar@linaro.org> writes:
->
->> Hi Guys,
->>
->> As discussed during connect about "HIBERNATION support for ARM platforms",
->> this is my last mail on this, almost a year back, where i tried my best to get
->> relevant answer from Amit.
->>
->> Probably he missed all my mails then, but this might be a good starting point
->> for this discussion as i did some testing on hibernation earlier.
->>
->> https://lkml.org/lkml/2012/2/6/8
->
-> I think the reason that ARM sub-arches are not setting things up is
-> because ARM has never supported hibernation in mainline.
->
-> The most recent patch to add basic support[1] references the various
-> discussions on what is needed and still missing.
->
-> Kevin
->
-> [1] http://marc.info/?l=linux-omap&m=135292458209355&w=2
+That's true for the DTS itself, but here your are changing the binding
+documentation which is supposed to reflect the driver "interface" in the
+Device Tree model description.
+
+Since the driver does not support any new compatible string, you should
+not update the binding.
+
+The driver and the binding will have to be changed the day you will have
+to update the driver to handle a bug / feature specific to that revision
+(ti,am4372-timer).
+
+Since this series does not seems to update the driver, you should not
+update the bindings.
+
+Regards,
+Benoit
