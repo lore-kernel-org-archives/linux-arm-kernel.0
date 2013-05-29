@@ -1,42 +1,53 @@
-From: Russ.Dill@ti.com (Russ Dill)
-Date: Wed, 29 May 2013 10:23:41 -0700
-Subject: ARM hibernation / suspend-to-disk
-In-Reply-To: <20130529081005.GA25561@hal>
-References: <20130529081005.GA25561@hal>
-Message-ID: <51A6399D.4090606@ti.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Wed, 29 May 2013 19:30:24 +0200
+Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig
+In-Reply-To: <51A61EEC.5040300@wwwdotorg.org>
+References: <1369761972-31986-1-git-send-email-swarren@wwwdotorg.org>
+ <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
+ <51A61EEC.5040300@wwwdotorg.org>
+Message-ID: <7367180.OaP1fIIt8z@ax5200p>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 01:10 AM, Jan Glauber wrote:
-> Hi list,
+On Wednesday 29 May 2013 09:29:48 Stephen Warren wrote:
+> On 05/29/2013 07:38 AM, Marc Dietrich wrote:
+> > Am Dienstag, 28. Mai 2013, 15:30:29 schrieb Stephen Warren:
+> >> On 05/28/2013 11:26 AM, Stephen Warren wrote:
+> >>> From: Stephen Warren <swarren@nvidia.com>
+> >>> 
+> >>> This simply rebuilds tegra_defconfig on top of next-20130520. As such,
+> >>> it
+> >>> should introduce no changes; simply moving entries around due to Kconfig
+> >>> ordering changes. The apparent exceptions are:
+> >>> 
+> >>> AUTO_ZRELADDR: Selected by ARM multi-platform support.
+> >>> MTD_CHAR: Removed in Kconfig.
+> >>> 
+> >>> This should make it easier to create future defconfig patches on top of
+> >>> linux-next, since all the extraneous diffs have been removed. It also
+> >>> makes it more likely that once 3.12 comes around, this defconfig will
+> >>> already match what's required there.
+> >> 
+> >> I've applied this (squashed it into) Tegra's for-3.11/defconfig branch.
+> > 
+> > wouldn't it make more sense to apply such a patch just before the merge
+> > window closes (or better after some release candidate)?
 > 
-> what's the status of suspend-to-disk on ARM? The most recent discussion I
-> found is:
-> http://lists.linuxfoundation.org/pipermail/linux-pm/2012-November/034997.html
-> 
-> with no replies at all. Is anyone still working on that? Anyone got it running?
-> 
-> I tried the patch above (on top of LTS 3.4) and got stuck forever, the last
-> thing on the console was:
-> 
-> root at omap5:/sys/power# echo disk > state
-> [ 2015.641540] PM: Syncing filesystems ... done.
-> [ 2015.666870] PM: Preallocating image memory... done (allocated 16957 pages)
-> [ 2016.062011] PM: Allocated 67828 kbytes in 0.38 seconds (178.49 MB/s)
-> 
-> Any hint how to debug that?
-> 
-> thanks,
-> Jan
-> 
+> Perhaps. It probably also depends a lot on when Kconfig changes get
+> applied in other areas as far as when it makes sense. I deferred it this
+> time around in order to pick up some tegra_defconfig changes that made
+> it into 3.10-rc3.
 
-Because of the nature of omap5 PM, you'd need omap5 specific support in
-order for this to work. Specifically, there are a number of assumptions
-about certain power domains never losing state. You can take a look at
-the work I did to get this working on am335x here:
+ok, nice.
 
-https://github.com/russdill/linux/commits/arm-hibernation-am33xx
+> > This way we would have a
+> > better chance to have a zero diff between defconfig and tegra_defconfig,
+> > e.g. not like 3.10 is now.
+> 
+> I don't understand this; what is "defconfig" if not "tegra_defconfig"?
 
-For ARM hibernation support to get merged, there needs to be at least
-one platform that supports it. the am335x code I have is not ready as it
-still relies on PM patchsets that have not yet themselves been merged.
+defconfig: make tegra_defconfig; make saveconfig
+
+diff -u tegra_defconfig defconfig
+
+Marc
