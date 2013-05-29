@@ -1,62 +1,38 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Wed, 29 May 2013 14:41:08 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <20130529121916.GF3293@lukather>
-References: <51A5A808.2070803@digi.com>
- <F281D0F91ED19E4D8E63A7504E8A649803E8A3F3@039-SN2MPN1-021.039d.mgd.msft.net>
- <20130529075044.GC3293@lukather>
- <F281D0F91ED19E4D8E63A7504E8A649803E8A4D0@039-SN2MPN1-021.039d.mgd.msft.net>
- <20130529101332.GC7356@pengutronix.de>
- <20130529121916.GF3293@lukather>
-Message-ID: <20130529124108.GA415@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 May 2013 14:46:27 +0200
+Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
+In-Reply-To: <146FF7AD-650E-4706-B9E1-53C2693D1D0D@gmail.com>
+References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
+ <201305271231.40693.arnd@arndb.de>
+ <146FF7AD-650E-4706-B9E1-53C2693D1D0D@gmail.com>
+Message-ID: <201305291446.28169.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 02:19:16PM +0200, maxime.ripard at free-electrons.com wrote:
-> Hi Michael,
+On Wednesday 29 May 2013, Daniel Tang wrote:
+> On 27/05/2013, at 8:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> On Wed, May 29, 2013 at 12:13:32PM +0200, Michael Grzeschik wrote:
-> > Hi,
+> > On Monday 27 May 2013, Daniel Tang wrote:
+> >>> The one remaining bit that sticks out is the clcd platform data. As I
+> >>> said before, I won't require you to convert that to DT in order to
+> >>> get your code merged, but I'd also really like to see that happen,
+> >>> as we will also need that to get rid of auxdata on the ARM reference
+> >>> platforms (integrator, versatile, realview, vexpress).
+> >> 
+> >> How would you like me to convert the platform data to DT? AFAIK, the clcd
+> >> driver isn't aware of DT so the only way is to use the AUXDATA right now.
 > > 
-> > On Wed, May 29, 2013 at 08:07:55AM +0000, Chen Peter-B29397 wrote:
-> > > 
-> > >  
-> > > > 
-> > > > Indeed, I've been using the patchset "Add tested id switch and vbus
-> > > > connect detect support for Chipidea" from Peter for quite some time on
-> > > > top of 3.9 and it works like a charm for the gadget mode on an MX28
-> > > > platform.
-> > > > 
-> > > > BTW, Peter, I've seen that these patches are still not merged in 3.10,
-> > > > is there a reason for that? do you plan on sending a version rebased on
-> > > > top of 3.10 some time in the future? I tried to do the rebasing myself,
-> > > > but the chipidea driver seems to have changed quite heavily, which makes
-> > > > the process quite difficult when you don't know what you're doing :)
-> > > > 
+> > Linus Walleij mentioned on IRC that Pawel Moll already posted a series
+> > that adds DT support for clcd:
 > > 
-> > we already have Peter's patches on v3.10-rc3 [1].
-> 
-> Wow, great, thanks!
-> 
-> > > I can spend few bandwidth on upstream work recently, I may have more
-> > > bandwidth after June 15th. 
-> > > 
-> > > Currently, we still have no conclusion for chipidea core driver's coming work,
-> > > like Device tree support, how to identify if the controller is OTG supported.
+> > http://lists.freedesktop.org/archives/dri-devel/2013-April/037519.html
 > > 
-> > Yes, the next important step is getting the of propertys "dr_mode" and
-> > "phy_type" properly used in the chipidea core.
+> > The series does a few more things, but you can probbly split out the
+> > parts you need and base on that.
 > 
-> I totally admit lacking some context here, but how does the device tree
-> move prevent from merging these patches? Do they have any shortcomings?
-> I've been using them with DT for quite some time and it seems to be
-> working pretty well if you ask me...
+> Would it be fine if I waited until CLCD DT patch gets into mainline instead?
 
-Peters patches need some more care, as they are not cleanly sperated.
-One patch e.g. adds an delayed worker to handle the otg events. Another
-one above that patch is removing the worker afterwards.
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Yes, you can do that too, I was only asking whether you were interested
+in helping out here.
+
+	Arnd
