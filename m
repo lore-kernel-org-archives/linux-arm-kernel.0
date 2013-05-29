@@ -1,23 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 May 2013 23:51:40 +0200
-Subject: Single zImage and A15/LPAE
-In-Reply-To: <20130529151555.GP17767@MacBook-Pro.local>
-References: <50735B75.8070109@wwwdotorg.org> <2274563.opVbLLPT1p@wuerfel>
- <20130529151555.GP17767@MacBook-Pro.local>
-Message-ID: <201305292351.41096.arnd@arndb.de>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Thu, 30 May 2013 00:00:36 +0200
+Subject: [PATCH] arm: kirkwood: convert NETGEAR ReadyNAS Duo v2 to use DT
+ for the PCIe interface
+In-Reply-To: <20130529114846.GQ31290@titan.lakedaemon.net> (Jason Cooper's
+ message of "Wed, 29 May 2013 07:48:46 -0400")
+References: <8738t6ycnm.fsf@natisbad.org>
+ <20130529114846.GQ31290@titan.lakedaemon.net>
+Message-ID: <87li6xla4b.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 May 2013, Catalin Marinas wrote:
-> > I think to do this right, we need to treat ARMv7+LPAE as a separate
-> > architecture level, just like we treat ARMv6, ARMv7 as separate
-> > compatible architectures. BTW, is there an official name for that
-> > architecture?
-> 
-> The official is Large Physical Address Extension which is an extension
-> to ARMv7, so not a new architecture.
+Hi Jason,
 
-Ah, too bad. I had hoped there were still postfixes like v6K or v4T.
-I guess there is no complete list of ARMv7 extensions anywhere, right?
+Jason Cooper <jason@lakedaemon.net> writes:
 
-	Arnd
+>>  arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts |    8 ++++++++
+>>  arch/arm/mach-kirkwood/board-readynas.c                |    1 -
+>>  2 files changed, 8 insertions(+), 1 deletion(-)
+>
+> Hey, I had a little time to kill, so I went ahead and fixed this up.
+> Let me know if this looks ok.  I've applied it to mvebu/pcie_kirkwood,
+> so you should just be able to pull that and test it.  I'll push it up to
+> arm-soc in a week or so.
+
+Pulled the branch, compiled and tested it: USB 3.0 host controller
+connected to PCIe bus works as expected.
+
+Thanks for your work,
+
+Cheers,
+
+a+
