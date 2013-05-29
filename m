@@ -1,56 +1,36 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 29 May 2013 10:58:27 -0700
-Subject: [PATCH RFC 0/2] clk: add metag specific gate/mux clocks
-In-Reply-To: <51940CAF.6010808@codeaurora.org>
-References: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
- <51940CAF.6010808@codeaurora.org>
-Message-ID: <20130529175827.6058.16653@quantum>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 29 May 2013 20:57:41 +0300
+Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
+ into the driver
+In-Reply-To: <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130529175741.GG21290@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Boyd (2013-05-15 15:31:11)
-> On 05/10/13 08:02, James Hogan wrote:
-> > This adds a metag architecture specific clk-gate and clk-mux which
-> > extends the generic ones to use global lock2 to protect the register
-> > fields. It is common with metag to have an RTOS running on a different
-> > thread or core with access to different bits in the same register (which
-> > contain clock gate/switch bits for other clocks). Access to such
-> > registers must be serialised with a global lock such as the one provided
-> > by the metag architecture port in <asm/global_lock.h>
-> >
-> > RFC because despite extending the generic clocks there's still a bit of
-> > duplicated code necessary. One alternative is to add special cases to
-> > the generic clock components for when a global or callback function
-> > based lock is desired instead of a spinlock, but I wasn't sure if that
-> > sort of hack would really be appreciated in the generic drivers.
-> >
-> > Comments?
+On Wed, May 15, 2013 at 10:51:43AM +0100, Lee Jones wrote:
+> For all ux500 based platforms the maximum number of end-points are used.
+> Move this knowledge into the driver so we can relinquish the burden from
+> platform data. This also removes quite a bit of complexity from the driver
+> and will aid us when we come to enable the driver for Device Tree.
 > 
-> Can you please Cc the devicetree mailing list when proposing new bindings?
-> 
-> Your patchset brings up a question I've had which is if we should be
-> putting the bits and register width information in devicetree at all. On
-> the one hand it's nice to not have anything in C code, just iterate over
-> nodes and register clocks. On the other hand, it's the first time I've
-> seen anyone put the register interface into devicetree. From what I can
-> tell, the regulator bindings have put at most the register base and
-> physical properties like enable-time, max voltage, etc., but not what
-> bits are needed to enable/disable a regulator. Also I thought I read
-> somewhere that reg properties shouldn't overlap each other, so if you
-> ever have two clocks living in the same register we're going to violate
-> that.
-> 
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: linux-usb at vger.kernel.org
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I've written bindings for the generic mux-clock, divider-clock, and I'm
-working on a gate-clock (reusing some RFCs from a while back for
-gate-clock).  All of these specify the base address as well as the
-relevant bit fields.  To me this seems to intuitively describe the
-hardware.  I'll post these bindings soon and let the bike shedding
-begin.
+for drivers/usb/musb
 
-Regards,
-Mike
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> hosted by The Linux Foundation
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/ee1f5254/attachment.sig>
