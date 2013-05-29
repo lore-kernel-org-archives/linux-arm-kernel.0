@@ -1,71 +1,55 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 29 May 2013 09:29:53 +0530
-Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
-In-Reply-To: <20130528231740.GA28879@quad.lixom.net>
-References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
- <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
- <20130528231740.GA28879@quad.lixom.net>
-Message-ID: <51A57D39.8030506@linaro.org>
+From: Ganesh.Kumar@harman.com (Kumar, Ganesh)
+Date: Tue, 28 May 2013 23:00:09 -0500
+Subject: VDSO for arm 32bit
+In-Reply-To: <20130528092313.GA10474@mudshark.cambridge.arm.com>
+References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
+ <20899.25935.838288.45383@pilspetsen.it.uu.se>
+ <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
+ <20130528092313.GA10474@mudshark.cambridge.arm.com>
+Message-ID: <634BB1CFA60ED14386C17849392C3EB202E52CA407@HICGWSEX01.ad.harman.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 04:47 AM, Olof Johansson wrote:
-> On Tue, May 14, 2013 at 08:37:53AM +0530, Tushar Behera wrote:
->> On 05/14/2013 05:36 AM, Kevin Hilman wrote:
->>> Tushar Behera <tushar.behera@linaro.org> writes:
->>>
->>>> It updates following drivers for EXYNOS based DT platform.
->>>>
->>>> * S5M8767 driver
->>>> * MAX8997 driver
->>>> * MMC SDHCI driver
->>>>
->>>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->>>
->>> I tested this using v3.10-rc1 on Arndale, but still don't get any
->>> support for the wired network.  Do you know if this is a Kconfig issue,
->>> or a missing driver?
->>>
->>> I suspect it may be related to the various "unable to find transceiver
->>> of type USB2 PHY" messages I'm seeing?
->>>
->>
->> Yes, right. The missing USB-PHY components are one of the issues (they
->> were there in linux-next when I last tested).
->>
->> Also, on Arndale board, we need to reset the USB hub during EHCI
->> initialization (a couple of those patches are required, which I am not
->> sure if we would be able to upstream).
->>
->> I am collecting a minimal set of patches that would enable USB and wired
->> network on Arndale with 3.10-rc1 kernel. Once done, I will let you know.
+On Tue, May 28, 2013 at 08:48:33AM +0100, Kumar, Ganesh wrote:
+> Hi Mikel,
 > 
-> Hi Tushar,
+> Kumar, Ganesh writes:
+>  > Hi All,
+>  >
+>  > ? I'm working on OMAP5 on greg's LTS kernel 3.4.25, but I see there is  > no support for vdso for arm 32 bit.
+>  > I'm planning to port it to arm 32 bit, is there any work under progress?
+>  > would like to understand why the support for arm 32 bit is not there, any idea?
 > 
-> Got an update on what these patches are yet?
+> > 32-bit ARM has a "kuser" page at a fixed virtual address, which exports a few critical routines to user-space.  With that, a vdso is mostly redundant.
 > 
-> 
-> -Olof
-> 
+>   Thanks for the info, my main idea is to get the gettimeofday 
+> exported through the kuser helper,tried looking at the sources but I could not find anything related to that seems done in the mainline kernel tree for arm cortex, am I missing something here?
+> I plan to do that if its not available yet, right now I've started 
+> with the kernel doc for the kuser, any pointers further to get the gettimeofday up and running using the kuser, Thanks in advance for your time.
 
-The patches are at [1]. There are a total of 6 patches on top of
-v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another patch
-(c) is just a defconfig hack to get Arndale booting. Remaining 2 patches
-(e, f) are required to reset the hub during EHCI initialization.
+>>>Be careful here. I had a crack at a gtod implementation for the vectors page in the past, but decided to drop it because it quickly became a maintenance nightmare. Since the layout of >>>the vectors page must be fixed (as userspace jumps to the absolute addresses for the helpers), having large, complicated functions (which gtod does become as you quickly start using >>>the stack to store all of the shared state with the kernel) means that you can quickly back yourself into a corner where the layout of the code cannot change without breaking the ABI.
+>>>On top of that, new clock types are added more often than you might think (not to mention bug fixes in the implementation itself), and you end up in a horrible situation where you'd >>>end up deprecating one implementation and adding gettimeofday2 or something equally nasty at a different offset.
 
-a. ARM: exynos: defconfig update
-b. ARM: EXYNOS: Update defconfig for Arndale and Origen board
-c. [TEMP] ARM: EXYNOS: Set low-level UART port to 2
-d. ARM: dts: Enabling samsung-usb2phy driver for exynos5250
-e. usb: ehci-s5p: add the HSIC port initialization
-f. ARM: dts: Add USB gpio entries for Arndale board
+>>>Maybe this can be solved by adding loads of padding between the different functions and hoping for the best, but I think a better solution would be to try and add something which is >>>actually a vdso but preserves the function offsets of the current helpers, thus preserving the ABI. That could then replace the vectors page and newer C libraries could make use of >>>the vdso functionality. Of course, that's a lot more work and people might have objections to the approach.
 
-I am not sure whether such kind of board-specific patches (e, f) are
-appreciated in the drivers. But that is all we need to get USB and
-Ethernet to work on v3.10-rc3 kernel.
+   Hmm, it doesn't seem to be quite straight forward, but thanks for the inputs and caution.
+Now that I got a direction, I'm planning to proceed as below:
+1. As a first step, get the implementation up and running using the kuser helper (understand the situation and plan to limit my implementation for the ARM Cortex's arch timer clock type)
+    On the user land, does this approach needs a change to the libc, kindly confirm. I read the kernel documentation for kuser helper, it gave a nice overview of 
+    how things can be done, but not so clear on how actually the helper functions can be called from the user land (the big picture), does it needs a tweak in the libc in order to enable     
+    the new helper functions defined.
 
-[1] git://git.linaro.org/landing-teams/working/samsung/kernel.git
-(upstream/arndale-usb)
+2. Plan to get it up through the VDSO, study in progress. One question here, was the vdso implementation for 32 bit is not available only because of the frequent addition in new clock types or there is any strong reason or something I need to take care about, kindly clarify.
+   I'll start looking into the arm64 vdso code as a starting point, is there anything else I can refer/read to get going? kindly help. 
 
--- 
-Tushar Behera
+>>> Finally, I assume you're only interested in the co-processor backed architected timers for this?
+
+   Yes, correct. 
+
+>>> I know some people were toying with exposing memory-mapped timers to userspace, but >>> that really scares me.
+
+   Just curious, what are the side effects of exposing the memory-mapped timers to user space.
+
+Will
+
+GK
