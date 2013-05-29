@@ -1,81 +1,32 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 28 May 2013 21:54:04 -0400 (EDT)
-Subject: Single zImage and A15/LPAE
-In-Reply-To: <180001ce5c03$60cbcf70$22636e50$%kim@samsung.com>
-References: <50735B75.8070109@wwwdotorg.org>
- <alpine.LFD.2.02.1210082201470.16518@xanadu.home>
- <2043931.InXdkgrjkp@wuerfel> <20121009141736.GB2122@linaro.org>
- <180001ce5c03$60cbcf70$22636e50$%kim@samsung.com>
-Message-ID: <alpine.LFD.2.03.1305282148560.1918@syhkavp.arg>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 29 May 2013 10:00:23 +0800
+Subject: [PATCH 1/3] ARM: dts: imx28-evk: Enable touchscreen support
+In-Reply-To: <201305282029.55905.marex@denx.de>
+References: <1360337803-19858-1-git-send-email-festevam@gmail.com>
+ <201305280656.27472.marex@denx.de>
+ <20130528062711.GB19608@S2101-09.ap.freescale.net>
+ <201305282029.55905.marex@denx.de>
+Message-ID: <20130529020021.GA370@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Kukjin Kim wrote:
-
-> Dave Martin wrote:
-> > On Tue, Oct 09, 2012 at 07:51:02AM +0000, Arnd Bergmann wrote:
-> > > On Monday 08 October 2012 22:18:24 Nicolas Pitre wrote:
-> > > > On Mon, 8 Oct 2012, Stephen Warren wrote:
-> > > >
-> > > > > I'm curious what the single-zImage story is for Cortex A15 CPUs with
-> > > > > LPAE extensions; IIRC, LPAE entails a different page table format
-> > and so
-> > > > > isn't going to co-exist in the same zImage as non-LPAE
-> > > >
-> > > > LPAE vs non LPAE is an even more invasive change than ARMv6+ vs pre
-> > > > ARMv6 support.  So no, I don't think we'll ever support LPAE and non
-> > > > LPAE configs in the same kernel binary.
-> > > >
-> > > > > (although doesn't x86 support that now; I though separate
-> > > > > LPAE/non-LPAE kernels went away there?)
-> > > >
-> > > > I don't think so.  At least Ubuntu apparently still carries a PAE and
-> > > > non PAE kernel packages.  Fedora doesn't, probably because they
-> > decided
-> > > > not to support non PAE capable machines anymore.  We certainly cannot
-> > > > make this choice on ARM yet.
-> > >
-> > > Fedora 18 still has both PAE and non-PAE kernels. I would really hope
-> > > they could give up the PAE version in favor of a 64 bit kernel in
-> > > the 32 bit distro, but it seems none of the big distros trust the
-> > > compat code enough yet. On x86, the number of 32 bit machines still
-> > > running with more than 3GB of RAM installed should be very marginal
-> > > now, most people running the PAE kernel actually have 64 bit capable
-> > > CPUs and have some legacy 32 bit applications that are easier to
-> > > run with a 32 bit user space.
-> > >
-> > > Maybe we get to the same point on ARM in some 10 years, but for
-> > > the forseeable future, Cortex-a15 machines with lots of RAM will
-> > > be very real and we need to have separate kernels for those.
-> > 
-> > In the medium term we could work around this with a fat kernel in
-> > principle (i.e., bundle a non-LPAE single kernel together with an LPAE
-> > one and choose the right one at boot time).  This can be solved outside
-> > the kernel if necessary.
-> > 
-> > This is not great, but the general feeling seems to be that combining
-> > LPAE and non-LPAE in the same kernel is just not going to be worth the
-> > pain (either in code or runtime impacts).
-> > 
-> > For AArch64, we obviously have a different kernel binary anyway.
-> > 
-> (+ Olof, Russell)
+On Tue, May 28, 2013 at 08:29:55PM +0200, Marek Vasut wrote:
+> Dear Shawn Guo,
 > 
-> Just note, I found this in my old mail-box...
+> > On Tue, May 28, 2013 at 06:56:27AM +0200, Marek Vasut wrote:
+> > > What is the problem you observe?
+> > 
+> > The audio playback gives silent output.
 > 
-> So I think, as a result, we need to support separate kernel binary for LPAE
-> and non-LPAE and you guys don't hold a different view about it.
+> You mean like nothing? Zilch? Not even a loud pop on the start/stop of playback?
+> 
+Nothing.
 
-LPAE and non-LPAE configurations will most likely never be supported 
-together in the same kernel binary.  The runtime cost would simply be 
-too high to be worth it.
+> I have no issues with audio + touchscreen on m28evk since like 3.7 or so (even 
+> before I pushed the driver mainline), so this is weird. Do you have your 
+> speakers connected to LineOut or Speaker output from the SGTL5000 ? In case of 
+> LineOut, is your on-board amplifier on ?
+> 
+Only headphone.
 
-> Current SSDK5440 and SD5v1 boards which are reference boards for EXYNOS5440
-> has over 4GB memory as a default and that's why I'm writing this e-mail. It
-> means I should keep separated kernel to support exynos5440 and other exynos
-> SoCs.
-
-They could all be supported together but with less than 4GB of memory.
-
-
-Nicolas
+Shawn
