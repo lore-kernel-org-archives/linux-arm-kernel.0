@@ -1,95 +1,33 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 29 May 2013 20:15:49 +0200
-Subject: [PATCHv3 RESEND 0/6] ARM: sunxi: Add support for A10 Ethernet
- controller
-In-Reply-To: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CACQ1gAgp6o8HqQcv=4cWoAZze3wtXHMX+g+7KvV-pnC2W5=iyg@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 29 May 2013 14:16:56 -0400 (EDT)
+Subject: [PATCH V8 0/3] USB: OHCI: Start splitting up the driver
+In-Reply-To: <3818608.3TBO8NnpYQ@wuerfel>
+Message-ID: <Pine.LNX.4.44L0.1305291415150.885-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/24 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> Hi,
->
-> The Allwinner A10 SoC has an ethernet controller that seem to be specific to
-> Allwinner. This IP has no public documentation, so exact
-> details are quite sparse, and this code come from refactored Allwinner
-> code.
->
-> The rework to use NAPI is taking more time than expected, I'm still working
-> on it, but it could probably be sent as a follow-up patch.
->
-> Thanks,
-> Maxime
->
-> Changes from v2:
->   - Split the MDIO controller to a separate driver and make use of standards
->     device tree bindings
->   - Fixed various minor things as suggested by Florian Fainelli
->   - Added clock support now that we have a clock driver
->
-> Changes from v1:
->   - Use phylib for the phy-related functions
->   - Use an optional regulator to power up the phy
->   - Rename the driver from Davicom Wemac to Allwinner EMAC, since it's the name
->     mentionned in the datasheet, and we have no strong evidence of a
->     relationship with Davicom
->   - Fix various small things around the driver: add defines for undocumented
->     values, fix documentation name and compatible example, etc.
->
-> Maxime Ripard (4):
->   net: Add MDIO bus driver for the Allwinner EMAC
->   ARM: sun4i: Add muxing options for the ethernet controller
->   ARM: sunxi: Add EMAC controller node to sun4i DTSI
->   ARM: sunxi: Add EMAC Controller to Hackberry dt
->
-> Stefan Roese (2):
->   net: Add EMAC ethernet driver found on Allwinner A10 SoC's
->   ARM: cubieboard: Enable ethernet (EMAC) support in dts
->
->  .../bindings/net/allwinner,sun4i-emac.txt          |  22 +
->  .../bindings/net/allwinner,sun4i-mdio.txt          |  26 +
->  arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  15 +
->  arch/arm/boot/dts/sun4i-a10-hackberry.dts          |  41 +
->  arch/arm/boot/dts/sun4i-a10.dtsi                   |  27 +
->  drivers/net/ethernet/Kconfig                       |   1 +
->  drivers/net/ethernet/Makefile                      |   1 +
->  drivers/net/ethernet/allwinner/Kconfig             |  44 +
->  drivers/net/ethernet/allwinner/Makefile            |   6 +
->  drivers/net/ethernet/allwinner/sun4i-emac.c        | 960 +++++++++++++++++++++
->  drivers/net/ethernet/allwinner/sun4i-emac.h        | 108 +++
->  drivers/net/ethernet/allwinner/sun4i-mdio.c        | 191 ++++
->  12 files changed, 1442 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt
->  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
->  create mode 100644 drivers/net/ethernet/allwinner/Kconfig
->  create mode 100644 drivers/net/ethernet/allwinner/Makefile
->  create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.c
->  create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.h
->  create mode 100644 drivers/net/ethernet/allwinner/sun4i-mdio.c
->
-> --
+On Wed, 29 May 2013, Arnd Bergmann wrote:
 
-I tested it successfully on cubieboard 1GB, on top of kernel 3.10-rc3,
-nfsroot (debian wheezy)
-I also added in sun4i-a10-cubieboard.dts
-phy0: ethernet-phy at 0 {
- reg = <1>;
-},
-like Emilio suggested.
+> On Wednesday 29 May 2013 12:21:02 Alan Stern wrote:
+> > 
+> > Those error messages are annoying; they don't use dev_err(), so they
+> > don't include the device and driver names.  There's no way to know what
+> > they refer to.  I rather suspect they come from the usbaudio driver.
+> 
+> That makes sense. I have a usb audio device, and I don't actually recall
+> getting any sound from my speakers while testing it. I only checked
+> that the mouse was working and assumed that the usb-audio was driven
+> by ehci, but upon closer inspection, they are both on the same OHCI.
+> 
+> > When you ran this test, did you have commit 815fa7b91761 applied?
+> 
+> Yes.
+> 
+> > Does the same problem occur without Manjunath's changes?
+> 
+> No, it was introduced by the first patch, as I found later.
 
-running an iperf, there's some good perfs !
-iperf -s
-------------------------------------------------------------
-Server listening on TCP port 5001
-TCP window size: 85.3 KByte (default)
-------------------------------------------------------------
-[  4] local 192.168.1.10 port 5001 connected with 192.168.1.232 port 38169
-[ ID] Interval       Transfer     Bandwidth
-[  4]  0.0-10.0 sec   112 MBytes  94.1 Mbits/sec
+I'll try to replicate your result.  I don't have my USB audio device 
+here today, so it will have to wait until tomorrow.
 
-That's great ! with this patchset, we can now run a server with a
-vanilla kernel ( who needs more that a serial port and ethernet,
-really ? ;) )
-
-Tested-by: Richard Genoud <richard.genoud@gmail.com>
+Alan Stern
