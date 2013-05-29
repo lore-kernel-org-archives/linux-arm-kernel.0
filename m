@@ -1,28 +1,132 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 May 2013 09:54:27 +0100
-Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
-In-Reply-To: <CANutaR-2gTP7ubiEdgjFyzVMc6=4t5GPjLkH8pkup=O882Hb-Q@mail.gmail.com>
-References: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
- <20130528130502.GA28971@mudshark.cambridge.arm.com>
- <51A4B938.7080708@ti.com>
- <20130528140705.GE28971@mudshark.cambridge.arm.com>
- <51A4FC08.3060906@ti.com>
- <CANutaR-2gTP7ubiEdgjFyzVMc6=4t5GPjLkH8pkup=O882Hb-Q@mail.gmail.com>
-Message-ID: <20130529085426.GA13095@mudshark.cambridge.arm.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 29 May 2013 10:57:18 +0200
+Subject: [PATCH v2 14/14] ARM: dts: AM43x: initial support
+In-Reply-To: <51A5C1F3.2070605@ti.com>
+References: <cover.1369658705.git.afzal@ti.com>
+ <3790fa57fc4c69da12224fbcec17cd07c59771a0.1369658705.git.afzal@ti.com>
+ <51A5C1F3.2070605@ti.com>
+Message-ID: <51A5C2EE.4060607@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 03:14:58AM +0100, Po-Yu Chuang wrote:
-> Will,
-> I guess nobody noticed this because the MMU of later v7 processors
-> fetches page table
-> from D-cache. It even doesn't need to clean pmd to PoU.
+Hello,
 
-It does if it's UP. The walker is only guaranteed to read from L1 if you
-have the multiprocessing extensions.
+On 05/29/2013 10:53 AM, Benoit Cousson wrote:
+> + Florian
+>
+> Hi Afzal,
+>
+> On 05/27/2013 04:37 PM, Afzal Mohammed wrote:
+>> DT source (minimal) for AM4372 SoC to represent AM43x SoC's. Those
+>> represented here are the minimal DT nodes necessary to get kernel
+>> booting.
+>>
+>> In DT nodes, "ti,hwmod" property has not been added, this would be
+>> added along with PRCM support for AM43x.
+>>
+>> Signed-off-by: Ankur Kishore <a-kishore@ti.com>
+>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+>> ---
+>>
+>> v2: Add gptimer 1ms, timer2, synctimer and remove twd local timer
+>>
+>>   arch/arm/boot/dts/am4372.dtsi | 66 +++++++++++++++++++++++++++++++++++++++++++
+>>   1 file changed, 66 insertions(+)
+>>   create mode 100644 arch/arm/boot/dts/am4372.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+>> new file mode 100644
+>> index 0000000..1d58298
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/am4372.dtsi
+>> @@ -0,0 +1,66 @@
+>> +/*
+>> + * Device Tree Source for AM4372 SoC
+>> + *
+>> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public License
+>> + * version 2.  This program is licensed "as is" without any warranty of any
+>> + * kind, whether express or implied.
+>> + */
+>> +
+>> +/include/ "skeleton.dtsi"
+>
+> You can now use the C preprocessor statement instead of this one.
+> Florian already started doing the change [1].
+>
+> Beside that detail, that patch looks good to me.
+> I'll pull it separately of the series.
+>
 
-As for this function, looks like it's ok because it has precisely one
-caller, so it might be worth prefixing it with some underscores to make it
-clear that nobody else should be calling it!
+If you pull the patch in your branch, I can take care of the changes 
+when I rebase
+my series. This will allow me to clean the 'interrupts' statements below 
+as well.
 
-Will
+Regards,
+
+Florian
+
+> Regards,
+> Benoit
+>
+> [1] http://thread.gmane.org/gmane.linux.ports.arm.omap/98320
+>
+>> +
+>> +/ {
+>> +	compatible = "ti,am4372", "ti,am43";
+>> +	interrupt-parent = <&gic>;
+>> +
+>> +
+>> +	aliases {
+>> +		serial0 = &uart1;
+>> +	};
+>> +
+>> +	cpus {
+>> +		cpu at 0 {
+>> +			compatible = "arm,cortex-a9";
+>> +		};
+>> +	};
+>> +
+>> +	gic: interrupt-controller at 48241000 {
+>> +		compatible = "arm,cortex-a9-gic";
+>> +		interrupt-controller;
+>> +		#interrupt-cells = <3>;
+>> +		reg = <0x48241000 0x1000>,
+>> +		      <0x48240100 0x0100>;
+>> +	};
+>> +
+>> +	ocp {
+>> +		compatible = "simple-bus";
+>> +		#address-cells = <1>;
+>> +		#size-cells = <1>;
+>> +		ranges;
+>> +
+>> +		uart1: serial at 44e09000 {
+>> +			compatible = "ti,am4372-uart","ti,omap2-uart";
+>> +			reg = <0x44e09000 0x2000>;
+>> +			interrupts = <0 72 0x4>;
+>> +		};
+>> +
+>> +		timer1: timer at 44e31000 {
+>> +			compatible = "ti,am4372-timer-1ms","ti,am335x-timer-1ms";
+>> +			reg = <0x44e31000 0x400>;
+>> +			interrupts = <0 67 0x4>;
+>> +			ti,timer-alwon;
+>> +		};
+>> +
+>> +		timer2: timer at 48040000  {
+>> +			compatible = "ti,am4372-timer","ti,am335x-timer";
+>> +			reg = <0x48040000  0x400>;
+>> +			interrupts = <0 68 0x4>;
+>> +		};
+>> +
+>> +		counter32k: counter at 44e86000 {
+>> +			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+>> +			reg = <0x44e86000 0x40>;
+>> +		};
+>> +	};
+>> +};
+>>
+>
