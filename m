@@ -1,43 +1,60 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 May 2013 09:29:48 -0600
-Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig
-In-Reply-To: <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
-References: <1369761972-31986-1-git-send-email-swarren@wwwdotorg.org>
- <51A521F5.2010206@wwwdotorg.org>
- <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
-Message-ID: <51A61EEC.5040300@wwwdotorg.org>
+Date: Wed, 29 May 2013 09:35:30 -0600
+Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
+In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91B616BE9B@BGMAIL01.nvidia.com>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+ <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
+ <518A8596.7070702@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B616BE9B@BGMAIL01.nvidia.com>
+Message-ID: <51A62042.7070304@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 07:38 AM, Marc Dietrich wrote:
-> Am Dienstag, 28. Mai 2013, 15:30:29 schrieb Stephen Warren:
->> On 05/28/2013 11:26 AM, Stephen Warren wrote:
->>> From: Stephen Warren <swarren@nvidia.com>
->>>
->>> This simply rebuilds tegra_defconfig on top of next-20130520. As such, it
->>> should introduce no changes; simply moving entries around due to Kconfig
->>> ordering changes. The apparent exceptions are:
->>>
->>> AUTO_ZRELADDR: Selected by ARM multi-platform support.
->>> MTD_CHAR: Removed in Kconfig.
->>>
->>> This should make it easier to create future defconfig patches on top of
->>> linux-next, since all the extraneous diffs have been removed. It also
->>> makes it more likely that once 3.12 comes around, this defconfig will
->>> already match what's required there.
+On 05/29/2013 04:10 AM, Jay Agarwal wrote:
+>>>> So, if I apply this series, I do see the PCIe bridge and Ethernet
+>>>> device get enumerated, but I don't see the USB3 controller get
+>>>> enumerated. I believe that is a PCIe device behind the same bridge
+>>>> on the
+>>> same Tegra PCIe port.
+>>>> Shouldn't this device show up?
+>>> I have also reproduced this problem. I see somehow no non-
+>>> prefetchable memory is assigned to any of pcie devices.
+>>> Probably that is the reason for USB3 (pci 0000:04:00.0) not getting
+>>> enumerated since it uses only non-prefetchable memory.
 >>
->> I've applied this (squashed it into) Tegra's for-3.11/defconfig branch.
+>> 1. Bus4(on which usb3 device resides) always return 0xffffffff from it's
+>> config space. which means device is not present?
+>> 2. That's why it is not assigned any resources and hence no usb3 probe
+>> happens.
+>> 3. But same bus does return valid info like vendor/device id etc from it's
+>> config space in downstream kernel and hence usb3 probe does happen.
+>>
+>> Thierry, Stephen,
+>> 4. Any idea why bus4 should return 0xffffffff values in upstream kernel?
+>> Anything missing?
+>> 5. Also, how config space of all pcie devices are mapped? I mean if I change
+>> the config space offset in dts file, then also I find correct vendor/device id
+>> etc for bus0/device0/fun0.
+>>     So how this mapping happens that even after changing the config space
+>> offset in PCIe address space, it always finds correct vendor/device id.
 > 
-> wouldn't it make more sense to apply such a patch just before the merge window 
-> closes (or better after some release candidate)?
+>  Any idea on this?
 
-Perhaps. It probably also depends a lot on when Kconfig changes get
-applied in other areas as far as when it makes sense. I deferred it this
-time around in order to pick up some tegra_defconfig changes that made
-it into 3.10-rc3.
+I did already reply the same day you sent the original email. My
+response was:
 
-> This way we would have a 
-> better chance to have a zero diff between defconfig and tegra_defconfig, e.g. 
-> not like 3.10 is now.
+Is there some reset/enable GPIO or regulator that needs to be programmed
+to enable the PCIe USB3 controller? Take a look at the schematic. If you
+can make it work by tweaking those GPIOs/... manually, then we can
+ignore this issue and fix it up later, since it's not directly related
+to the PCIe controller driver patches. It's more important to get the
+Ethernet working than USB, I think.
 
-I don't understand this; what is "defconfig" if not "tegra_defconfig"?
+To be honest though, I would expect you to be asking around inside
+NVIDIA to determine the answer here. As the PCIe SW expert, I'd expect
+you to drive this process. Try asking the Cardhu board and PCIe HW
+experts within NVIDIA.
+
+Did you make any progress on the issues with the Ethernet device?
