@@ -1,59 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 May 2013 10:48:27 +0100
-Subject: A bug about system call on ARM
-In-Reply-To: <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
-References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
- <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
- <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
-Message-ID: <20130529094826.GD13095@mudshark.cambridge.arm.com>
+From: yegorslists@googlemail.com (Yegor Yefremov)
+Date: Wed, 29 May 2013 11:51:54 +0200
+Subject: [PATCH v2] usb: musb: fix clock naming
+In-Reply-To: <1369820164.6673.55.camel@polaris.local>
+References: <1369725661-3114-1-git-send-email-yegorslists@googlemail.com>
+ <20130528173637.GE15794@arwen.pp.htv.fi>
+ <1369820164.6673.55.camel@polaris.local>
+Message-ID: <CAGm1_kt2UzOf1o6yGVaifqJpU0hySdW+gzsdSw_qsO9vG_UZ1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, May 29, 2013 at 11:36 AM, Jan L?bbe <jlu@pengutronix.de> wrote:
+> On Tue, 2013-05-28 at 20:36 +0300, Felipe Balbi wrote:
+>> On Tue, May 28, 2013 at 09:21:01AM +0200, yegorslists at googlemail.com wrote:
+>> > From: Yegor Yefremov <yegorslists@googlemail.com>
+>> >
+>> > 'ick' was changed to 'hsotgusb_ick'
+>> > 'fck' was changed to 'hsotgusb_fck'
+>> >
+>> > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+>> > Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+>>
+>> NAK. Fix your clock data.
+>
+> Yegor, I'm not sure how my signed-off-by got here. It seems that you
+> picked the patch up from this thread:
+> http://marc.info/?l=linux-omap&m=134390141101734
+>
+> Note that my mail contains no signed-off-by and the change is described
+> as a work around.
 
-On Wed, May 29, 2013 at 09:46:42AM +0100, richard -rw- weinberger wrote:
-> On Wed, May 29, 2013 at 10:24 AM, Wang, Yalin <Yalin.Wang@sonymobile.com> wrote:
-> > I have download the latest linux kernel code  3.9.4
-> > And Compare with  3.4.0 kernel .
-> >
-> > It seems there is no change for this part ,
-> > So it will still happen .
-> > Does anyone know who is responsible for  arm arch part kernel code ?
-> 
-> See MAINTAINERS file.
-> CC'ing linux-arm-kernel at lists.infradead.org
+I'll remove your SoB, when I post the next version. I just added it,
+because you provided the fix. Will contact you next time first. Have
+you worked on this SoC lately? Any pending patches?
 
-Cheers for adding us to CC.
-
-> >> #ifdef CONFIG_ARM_THUMB
-> >>         tst     r8, #PSR_T_BIT
-> >>         movne   r10, #0                         @ no thumb OABI emulation
-> >>         ldreq   r10, [lr, #-4]                  @ get SWI instruction          // crash at this instruction, when get SWI instruction
-
-Do you have the panic log please? Also, which SoC are you using and how are
-you reproducing this?
-
-> >>         ldr     r10, [lr, #-4]                  @ get SWI instruction
-> >>   A710( and     ip, r10, #0x0f000000            @ check for SWI         )
-> >>   A710( teq     ip, #0x0f000000                                         )
-> >>   A710( bne     .Larm710bug                                             )
-> >> #endif
-> >> #ifdef CONFIG_CPU_ENDIAN_BE8
-> >>         rev     r10, r10                        @ little endian instruction
-> >> #endif
-> >>
-> >> /*********************************************************************
-> >> ******************************/
-> >>
-> >> Then reason why it will crash when get SWI instruction is maybe This
-> >> page is clear to aged by kernel, But this MMU fault happpened in
-> >> kernel, So the kernel do_page_fault function will not clear this page
-> >> to young, So that  will crash .
-
-Sounds like we might need some USER annotations around the instruction
-loads, but we should also rework the code so that we re-enable interrupts
-first.
-
-Will
+Yegor
