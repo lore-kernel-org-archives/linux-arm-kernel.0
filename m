@@ -1,44 +1,71 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Wed, 29 May 2013 11:58:01 +0800
-Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
-In-Reply-To: <20130528162415.GA28253@arwen.pp.htv.fi>
-References: <1368424303-10629-5-git-send-email-chao.xie@marvell.com>
- <Pine.LNX.4.44L0.1305131012090.1389-100000@iolanthe.rowland.org>
- <20130528162415.GA28253@arwen.pp.htv.fi>
-Message-ID: <CADApbegejeoxc4TmjvsPse=54durFym2cfDRdg9RviDZJ2HAFg@mail.gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Wed, 29 May 2013 09:29:53 +0530
+Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
+In-Reply-To: <20130528231740.GA28879@quad.lixom.net>
+References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
+ <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
+ <20130528231740.GA28879@quad.lixom.net>
+Message-ID: <51A57D39.8030506@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 12:24 AM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Mon, May 13, 2013 at 10:13:44AM -0400, Alan Stern wrote:
->> On Mon, 13 May 2013, Chao Xie wrote:
+On 05/29/2013 04:47 AM, Olof Johansson wrote:
+> On Tue, May 14, 2013 at 08:37:53AM +0530, Tushar Behera wrote:
+>> On 05/14/2013 05:36 AM, Kevin Hilman wrote:
+>>> Tushar Behera <tushar.behera@linaro.org> writes:
+>>>
+>>>> It updates following drivers for EXYNOS based DT platform.
+>>>>
+>>>> * S5M8767 driver
+>>>> * MAX8997 driver
+>>>> * MMC SDHCI driver
+>>>>
+>>>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>>>
+>>> I tested this using v3.10-rc1 on Arndale, but still don't get any
+>>> support for the wired network.  Do you know if this is a Kconfig issue,
+>>> or a missing driver?
+>>>
+>>> I suspect it may be related to the various "unable to find transceiver
+>>> of type USB2 PHY" messages I'm seeing?
+>>>
 >>
->> > Originaly, ehci driver will call the callbacks in platform data
->> > for PHY initialization and shut down.
->> > With PHY driver, it will call the APIs provided by PHY driver
->> > for PHY initialization and shutdown. It removes the callbacks
->> > in platform data, and at same time it removes one block in the
->> > way of enabling device tree for ehci driver.
+>> Yes, right. The missing USB-PHY components are one of the issues (they
+>> were there in linux-next when I last tested).
 >>
->> I wonder if this is the sort of thing that should be handled in
->> ehci-hcd.c rather than in all the different platform glue drivers.
+>> Also, on Arndale board, we need to reset the USB hub during EHCI
+>> initialization (a couple of those patches are required, which I am not
+>> sure if we would be able to upstream).
 >>
->> Felipe, what do you think?  Are the required actions now sufficiently
->> generic that a single source file can take care of them?
->
-> Sorry for the delay, was on business trip and now on vacations. Anyway,
-> I agree with you. Our PHY layer should be generic enough that it should
-> be usable by ehci-hcd itself. If we have any missing method, let's add
-> it generically.
->
-So what are your idea about making the PHY layer more generic? How
-ehci-hcd will make use of PHY layer?
+>> I am collecting a minimal set of patches that would enable USB and wired
+>> network on Arndale with 3.10-rc1 kernel. Once done, I will let you know.
+> 
+> Hi Tushar,
+> 
+> Got an update on what these patches are yet?
+> 
+> 
+> -Olof
+> 
 
-> cheers
->
-> ps: dropping this from my queue for now.
->
-> --
-> balbi
+The patches are at [1]. There are a total of 6 patches on top of
+v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another patch
+(c) is just a defconfig hack to get Arndale booting. Remaining 2 patches
+(e, f) are required to reset the hub during EHCI initialization.
+
+a. ARM: exynos: defconfig update
+b. ARM: EXYNOS: Update defconfig for Arndale and Origen board
+c. [TEMP] ARM: EXYNOS: Set low-level UART port to 2
+d. ARM: dts: Enabling samsung-usb2phy driver for exynos5250
+e. usb: ehci-s5p: add the HSIC port initialization
+f. ARM: dts: Add USB gpio entries for Arndale board
+
+I am not sure whether such kind of board-specific patches (e, f) are
+appreciated in the drivers. But that is all we need to get USB and
+Ethernet to work on v3.10-rc3 kernel.
+
+[1] git://git.linaro.org/landing-teams/working/samsung/kernel.git
+(upstream/arndale-usb)
+
+-- 
+Tushar Behera
