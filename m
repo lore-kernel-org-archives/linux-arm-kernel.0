@@ -1,33 +1,39 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 29 May 2013 14:16:56 -0400 (EDT)
-Subject: [PATCH V8 0/3] USB: OHCI: Start splitting up the driver
-In-Reply-To: <3818608.3TBO8NnpYQ@wuerfel>
-Message-ID: <Pine.LNX.4.44L0.1305291415150.885-100000@iolanthe.rowland.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 29 May 2013 11:23:52 -0700
+Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
+In-Reply-To: <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
+ (Olof Johansson's message of "Tue, 28 May 2013 22:31:41 -0700")
+References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
+ <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
+ <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
+ <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
+Message-ID: <87sj1563wn.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Arnd Bergmann wrote:
+Olof Johansson <olof@lixom.net> writes:
 
-> On Wednesday 29 May 2013 12:21:02 Alan Stern wrote:
-> > 
-> > Those error messages are annoying; they don't use dev_err(), so they
-> > don't include the device and driver names.  There's no way to know what
-> > they refer to.  I rather suspect they come from the usbaudio driver.
-> 
-> That makes sense. I have a usb audio device, and I don't actually recall
-> getting any sound from my speakers while testing it. I only checked
-> that the mouse was working and assumed that the usb-audio was driven
-> by ehci, but upon closer inspection, they are both on the same OHCI.
-> 
-> > When you ran this test, did you have commit 815fa7b91761 applied?
-> 
-> Yes.
-> 
-> > Does the same problem occur without Manjunath's changes?
-> 
-> No, it was introduced by the first patch, as I found later.
+> On Tue, May 28, 2013 at 8:59 PM, Tushar Behera <tushar.behera@linaro.org> wrote:
+>
+>> The patches are at [1].
+>
+> FWIW, a cgit/gitweb link is easier to follow when you're reading an
+> email. Anyway, found the patches.
+>
+>> There are a total of 6 patches on top of
+>> v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another patch
+>> (c) is just a defconfig hack to get Arndale booting. Remaining 2 patches
+>> (e, f) are required to reset the hub during EHCI initialization.
+>
+> Huh, I thought you said that (c) wasn't needed when I posted the
+> defconfig update. It'd be nice to see the code fixed to handle this
+> case instead of Linaro carrying a patch like this though. I.e. make it
+> able to deselect the uart, or make it tied to DEBUG_LL like on other
+> platforms instead of having a separate config for this.
 
-I'll try to replicate your result.  I don't have my USB audio device 
-here today, so it will have to wait until tomorrow.
+I agree, that defconfig hack is awful to have to carry.
 
-Alan Stern
+I also noticed that correct setting of CONFIG_S3C_LOWLEVEL_UART_PORT is
+needed even without DEBUG_LL which seems broken.
+
+Kevin
