@@ -1,64 +1,56 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 29 May 2013 18:33:28 +0100
-Subject: [PATCH V4] ARM: handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <alpine.LFD.2.03.1305291230160.1918@syhkavp.arg>
-References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
- <20130523104303.GC16722@arm.com>
- <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
- <20130528095528.GA14329@arm.com>
- <alpine.LFD.2.03.1305281340240.1918@syhkavp.arg>
- <20130529103728.GG17767@MacBook-Pro.local>
- <alpine.LFD.2.03.1305291038220.1918@syhkavp.arg>
- <alpine.LFD.2.03.1305291230160.1918@syhkavp.arg>
-Message-ID: <20130529173328.GS17767@MacBook-Pro.local>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 29 May 2013 20:37:15 +0300
+Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
+In-Reply-To: <CADApbegejeoxc4TmjvsPse=54durFym2cfDRdg9RviDZJ2HAFg@mail.gmail.com>
+References: <1368424303-10629-5-git-send-email-chao.xie@marvell.com>
+ <Pine.LNX.4.44L0.1305131012090.1389-100000@iolanthe.rowland.org>
+ <20130528162415.GA28253@arwen.pp.htv.fi>
+ <CADApbegejeoxc4TmjvsPse=54durFym2cfDRdg9RviDZJ2HAFg@mail.gmail.com>
+Message-ID: <20130529173715.GB21290@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 05:32:50PM +0100, Nicolas Pitre wrote:
-> On Wed, 29 May 2013, Nicolas Pitre wrote:
-> 
-> > On Wed, 29 May 2013, Catalin Marinas wrote:
-> > 
-> > > On Tue, May 28, 2013 at 06:52:27PM +0100, Nicolas Pitre wrote:
-> > > > On Tue, 28 May 2013, Catalin Marinas wrote:
-> > > > 
-> > > > > On Sat, May 25, 2013 at 04:53:19AM +0100, Nicolas Pitre wrote:
-> > > > > > On Thu, 23 May 2013, Catalin Marinas wrote:
-> > > > > > 
-> > > > > > > An issue is that for kunmap_atomic() && VIVT we flush the same page
-> > > > > > > twice. I don't think we should remove the cache flushing in
-> > > > > > > __kunmap_atomic() for VIVT since not all kunmap_atomic() calls require
-> > > > > > > flush_kernel_dcache_page() (unless we just assume that highmem && vivt
-> > > > > > > don't work together).
-> > > > > > 
-> > > > > > VIVT and highmem do work together.  Highmem for ARM was in fact 
-> > > > > > developed on such a platform.
-> > > > > 
-> > > > > Thanks for confirming. Do you remember why kunmap() doesn't (need to)
-> > > > > flush the cache alias (for VIVT)? Or if it does, where?
-> > > > 
-> > > > kunmap() calls kunmap_high() which actually does not unmap anything but 
-> > > > only decrement a use count.  The page is kept around in case it is 
-> > > > kmap()'d again, in which case the kmap() will be almost free and the 
-> > > > page still warm.
-> > > > 
-> > > > It is only when the kmap() for a new page runs out of free pkmap  
-> > > > entries that the unused but still mapped pages are unmapped.  This 
-> > > > unmapping is done in flush_all_zero_pkmaps() where all the unused pages 
-> > > > are all unmapped at once.  The cache for all those pages is flushed with 
-> > > > flush_cache_kmaps() which on ARM maps to flush_cache_all() when the 
-> > > > cache is VIVT.
-> > > 
-> > > Thanks for clarification Nico. So if kmap_high_get() returns NULL, there
-> > > are no high aliases left in the cache.
-> > 
-> > Exact.
-> 
-> Just to be clear, this is true for VIVT only.
-> Unmapped highmem pages can still be cached with VIPT.
+Hi,
 
-Indeed.
+On Wed, May 29, 2013 at 11:58:01AM +0800, Chao Xie wrote:
+> On Wed, May 29, 2013 at 12:24 AM, Felipe Balbi <balbi@ti.com> wrote:
+> > Hi,
+> >
+> > On Mon, May 13, 2013 at 10:13:44AM -0400, Alan Stern wrote:
+> >> On Mon, 13 May 2013, Chao Xie wrote:
+> >>
+> >> > Originaly, ehci driver will call the callbacks in platform data
+> >> > for PHY initialization and shut down.
+> >> > With PHY driver, it will call the APIs provided by PHY driver
+> >> > for PHY initialization and shutdown. It removes the callbacks
+> >> > in platform data, and at same time it removes one block in the
+> >> > way of enabling device tree for ehci driver.
+> >>
+> >> I wonder if this is the sort of thing that should be handled in
+> >> ehci-hcd.c rather than in all the different platform glue drivers.
+> >>
+> >> Felipe, what do you think?  Are the required actions now sufficiently
+> >> generic that a single source file can take care of them?
+> >
+> > Sorry for the delay, was on business trip and now on vacations. Anyway,
+> > I agree with you. Our PHY layer should be generic enough that it should
+> > be usable by ehci-hcd itself. If we have any missing method, let's add
+> > it generically.
+> >
+> So what are your idea about making the PHY layer more generic? How
+> ehci-hcd will make use of PHY layer?
+
+
+on probe grab the phy and initialize it. On suspend/resume,
+suspend/resume the PHY and so on. Whatever you were going to do on your
+ehci glue, do it on generic ehci-hcd.
 
 -- 
-Catalin
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/fc3b51af/attachment.sig>
