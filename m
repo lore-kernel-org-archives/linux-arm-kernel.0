@@ -1,43 +1,56 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Wed, 29 May 2013 11:08:46 +0530
-Subject: [PATCH v6 1/9] drivers: phy: add generic PHY framework
-In-Reply-To: <51A531A9.4030800@gmail.com>
-References: <1367229812-30574-1-git-send-email-kishon@ti.com>
- <1367229812-30574-2-git-send-email-kishon@ti.com>
- <51A531A9.4030800@gmail.com>
-Message-ID: <51A59466.6090504@ti.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 29 May 2013 07:39:18 +0200
+Subject: [PATCH 5/8] ARM: zynq: use generic cpu idle function for wfi
+In-Reply-To: <1369665166-13049-6-git-send-email-sanjay.rawat@linaro.org>
+References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
+ <1369665166-13049-6-git-send-email-sanjay.rawat@linaro.org>
+Message-ID: <51A59486.4040901@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05/27/2013 04:32 PM, Sanjay Singh Rawat wrote:
+> use cpu_do_idle for entering the wfi mode.
+> 
+> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+> ---
+>  arch/arm/mach-zynq/hotplug.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+> index c89672b..ef0d65d 100644
+> --- a/arch/arm/mach-zynq/hotplug.c
+> +++ b/arch/arm/mach-zynq/hotplug.c
+> @@ -64,8 +64,8 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
+>  	 * code will have already disabled interrupts
+>  	 */
+>  	for (;;) {
+> -		dsb();
+> -		wfi();
+> +		/* enter WFI mode */
+> +		cpu_do_idle();
+>  
+>  		/*
+>  		 * Getting here, means that we have come out of WFI without
+> 
 
-On Wednesday 29 May 2013 04:07 AM, Sylwester Nawrocki wrote:
-> Hi Kishon,
->
-> On 04/29/2013 12:03 PM, Kishon Vijay Abraham I wrote:
->> The PHY framework provides a set of APIs for the PHY drivers to
->> create/destroy a PHY and APIs for the PHY users to obtain a reference
->> to the
->> PHY with or without using phandle. For dt-boot, the PHY drivers should
->> also register *PHY provider* with the framework.
->>
->> PHY drivers should create the PHY by passing id and ops like init, exit,
->> power_on and power_off. This framework is also pm runtime enabled.
->>
->> The documentation for the generic PHY framework is added in
->> Documentation/phy.txt and the documentation for dt binding can be
->> found at
->> Documentation/devicetree/bindings/phy/phy-bindings.txt
->>
->> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
->
-> Thanks for working on this. For the record, I plan to give this a try
-> in the end of this week, with my simple MIPI CSI/DSI PHY driver. I might
-> have some more comments then. For now just couple of remarks after
-> reading the documentation.
+Applied to zynq/cleanup branch.
 
-Thanks for reviewing. I'll wait for your comments before posting the 
-next version.
+Thanks,
+Michal
 
-Thanks
-Kishon
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/663c5f5e/attachment.sig>
