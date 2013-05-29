@@ -1,58 +1,31 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 29 May 2013 11:38:11 -0700
-Subject: [PATCH RFC 0/2] clk: add metag specific gate/mux clocks
-In-Reply-To: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
-References: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <20130529183811.6058.78627@quantum>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 29 May 2013 11:46:47 -0700
+Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
+In-Reply-To: <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
+References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
+ <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
+ <20130528231740.GA28879@quad.lixom.net>
+ <51A57D39.8030506@linaro.org>
+ <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
+ <51A5C16D.20408@linaro.org>
+ <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
+Message-ID: <CAOesGMiYs6GfaWGWYB8cw_cJ6_RmmZTb4oPfXo1PYJT8-jdHzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting James Hogan (2013-05-10 08:02:02)
-> This adds a metag architecture specific clk-gate and clk-mux which
-> extends the generic ones to use global lock2 to protect the register
-> fields. It is common with metag to have an RTOS running on a different
-> thread or core with access to different bits in the same register (which
-> contain clock gate/switch bits for other clocks). Access to such
-> registers must be serialised with a global lock such as the one provided
-> by the metag architecture port in <asm/global_lock.h>
-> 
-> RFC because despite extending the generic clocks there's still a bit of
-> duplicated code necessary. One alternative is to add special cases to
-> the generic clock components for when a global or callback function
-> based lock is desired instead of a spinlock, but I wasn't sure if that
-> sort of hack would really be appreciated in the generic drivers.
-> 
-> Comments?
-> 
+On Wed, May 29, 2013 at 2:33 AM, Jingoo Han <jg1.han@samsung.com> wrote:
 
-The general approach looks OK, but you've kind of created generic
-mux-clock and gate-clock bindings in a metag-specific driver.  I would
-prefer to have those functions exist in the generic drivers and your
-driver re-use those.  I'll be posting bindings for those clocks by the
-end of the week (they're on my github repo now for the curious).
+> However, Olof Johansson mentioned, 'drivers/platform/arm/board_arndale.c'
+> would be a good alternative.
 
-Wrapping the generic clock types is an OK approach and is done by
-several other drivers, so there is no problem there.
 
-Regards,
-Mike
+Whoa. I didn't quite realize what I proposed, or rather, how what I
+proposed could be perceived. I take it back. :)
 
-> James Hogan (2):
->   clk: metag/clk-gate: add metag specific clock gate
->   clk: metag/clk-mux: add metag specific clk-mux
-> 
->  .../bindings/clock/img,meta-gate-clock.txt         |  28 +++
->  .../bindings/clock/img,meta-mux-clock.txt          |  33 ++++
->  drivers/clk/Makefile                               |   1 +
->  drivers/clk/metag/Makefile                         |   3 +
->  drivers/clk/metag/clk-gate.c                       | 179 +++++++++++++++++
->  drivers/clk/metag/clk-mux.c                        | 211 +++++++++++++++++++++
->  6 files changed, 455 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/img,meta-gate-clock.txt
->  create mode 100644 Documentation/devicetree/bindings/clock/img,meta-mux-clock.txt
->  create mode 100644 drivers/clk/metag/Makefile
->  create mode 100644 drivers/clk/metag/clk-gate.c
->  create mode 100644 drivers/clk/metag/clk-mux.c
-> 
-> -- 
-> 1.8.1.2
+We must _not_ introduce something that will be abused as a new home
+for board file junk. If we do introduce a platform glue directory it
+would need to be very limited in scope. Compare to what's in
+drivers/platform/x86 today.
+
+
+-Olof
