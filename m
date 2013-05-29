@@ -1,52 +1,62 @@
-From: dt.tangr@gmail.com (Daniel Tang)
-Date: Wed, 29 May 2013 15:14:41 +1000
-Subject: [RFC PATCHv4 1/6] arm: TI-Nspire platform code
-In-Reply-To: <201305271715.02385.arnd@arndb.de>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <201305270856.19456.arnd@arndb.de>
- <CAPnH9dnA22C3ZS9jgJNytnmKM_8Vfk7OxNRB1Mg03=q7KhHZBA@mail.gmail.com>
- <201305271715.02385.arnd@arndb.de>
-Message-ID: <10704A21-6BEC-42DC-BB1E-88A0E87D288B@gmail.com>
+From: hvaibhav@ti.com (Hiremath, Vaibhav)
+Date: Wed, 29 May 2013 05:22:23 +0000
+Subject: [PATCH] arm: omap2: fix AM33xx hwmod infos for UART2
+In-Reply-To: <1369754265-27712-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1369754265-27712-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <79CD15C6BA57404B839C016229A409A83EC965EB@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 28/05/2013, at 1:15 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Monday 27 May 2013, Daniel Tang wrote:
->> Before any peripheral is accessed. I.e. before the clocksource and irqchip
->> drivers.
+> -----Original Message-----
+> From: Thomas Petazzoni [mailto:thomas.petazzoni at free-electrons.com]
+> Sent: Tuesday, May 28, 2013 8:48 PM
+> To: Tony Lindgren
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> Hiremath, Vaibhav; Paul Walmsley
+> Subject: [PATCH] arm: omap2: fix AM33xx hwmod infos for UART2
 > 
-> The irqchip comes first, and by that time, you can actually call
-> of_iomap().
+> The UART2 hwmod structure is pointing to the EDMA channels of UART1,
+> which doesn't look right. This patch fixes this by making the UART2
+> hwmod structure to a new structure that lists the EDMA channels to be
+> used by the UART2.
 > 
->> The write to the port is supposed to ensure all mmio peripherals can be
->> accessed. Without it, access to certain peripherals will result in
->> undefined reads or ignored writes.
->> 
->> On second thoughts, would this actually be the job of the boot loader?
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    9 ++++++++-
+>  1 file changed, 8 insertions(+), 1 deletion(-)
 > 
-> Doing it in the boot loader would certainly simplify things. I wonder
-> about the dynamic aspects of power management though: It might be
-> better to expose the individual bits of this register through a proper
-> driver. The boot loader can start out enabling everything, but then
-> you turn off everything that is not needed when that driver gets
-> loaded.
-
-That's the idea for the long term.
-
-For now though, I'll probably just let the bootloader enable everything and work on a proper driver for power management later.
-
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> index 01d8f32..9113251 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
+> @@ -2006,6 +2006,13 @@ static struct omap_hwmod am33xx_uart1_hwmod = {
+>  	},
+>  };
 > 
-> I'm still not sure what the register actually does: Does it
-> control reset lines, clock signals, voltage regulators or something
-> else? These things all have their own subsystems, and then there
-> is also the power domain framework.
+> +/* uart2 */
+> +static struct omap_hwmod_dma_info uart2_edma_reqs[] = {
+> +	{ .name = "tx",	.dma_req = 28, },
+> +	{ .name = "rx",	.dma_req = 29, },
+> +	{ .dma_req = -1 }
+> +};
+> +
+>  static struct omap_hwmod_irq_info am33xx_uart2_irqs[] = {
+>  	{ .irq = 73 + OMAP_INTC_START, },
+>  	{ .irq = -1 },
+> @@ -2016,7 +2023,7 @@ static struct omap_hwmod am33xx_uart2_hwmod = {
+>  	.class		= &uart_class,
+>  	.clkdm_name	= "l4ls_clkdm",
+>  	.mpu_irqs	= am33xx_uart2_irqs,
+> -	.sdma_reqs	= uart1_edma_reqs,
+> +	.sdma_reqs	= uart2_edma_reqs,
+>  	.main_clk	= "dpll_per_m2_div4_ck",
+>  	.prcm		= {
+>  		.omap4	= {
 
-To be perfectly honest, I'm not too sure. The documentation for the TI-Nspire is all gathered from reverse engineering and all it says is that register "disables bus access to peripherals".
+Good catch.
 
-> 
-> 	Arnd
+Acked-by: Vaibhav Hiremath <hvaibhav@ti.com>
 
-Cheers,
-Daniel Tang
+Thanks,
+Vaibhav
