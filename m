@@ -1,54 +1,66 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 29 May 2013 10:39:04 -0400 (EDT)
-Subject: [PATCH V4] ARM: handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130529103728.GG17767@MacBook-Pro.local>
-References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
- <20130523104303.GC16722@arm.com>
- <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
- <20130528095528.GA14329@arm.com>
- <alpine.LFD.2.03.1305281340240.1918@syhkavp.arg>
- <20130529103728.GG17767@MacBook-Pro.local>
-Message-ID: <alpine.LFD.2.03.1305291038220.1918@syhkavp.arg>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 29 May 2013 22:42:58 +0800
+Subject: [PATCH] ARM: mxs: icoll: Fix interrupts gpio bank 0
+In-Reply-To: <1369753257-11091-1-git-send-email-mpa@pengutronix.de>
+References: <1369753257-11091-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130529144256.GD29528@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Catalin Marinas wrote:
-
-> On Tue, May 28, 2013 at 06:52:27PM +0100, Nicolas Pitre wrote:
-> > On Tue, 28 May 2013, Catalin Marinas wrote:
-> > 
-> > > On Sat, May 25, 2013 at 04:53:19AM +0100, Nicolas Pitre wrote:
-> > > > On Thu, 23 May 2013, Catalin Marinas wrote:
-> > > > 
-> > > > > An issue is that for kunmap_atomic() && VIVT we flush the same page
-> > > > > twice. I don't think we should remove the cache flushing in
-> > > > > __kunmap_atomic() for VIVT since not all kunmap_atomic() calls require
-> > > > > flush_kernel_dcache_page() (unless we just assume that highmem && vivt
-> > > > > don't work together).
-> > > > 
-> > > > VIVT and highmem do work together.  Highmem for ARM was in fact 
-> > > > developed on such a platform.
-> > > 
-> > > Thanks for confirming. Do you remember why kunmap() doesn't (need to)
-> > > flush the cache alias (for VIVT)? Or if it does, where?
-> > 
-> > kunmap() calls kunmap_high() which actually does not unmap anything but 
-> > only decrement a use count.  The page is kept around in case it is 
-> > kmap()'d again, in which case the kmap() will be almost free and the 
-> > page still warm.
-> > 
-> > It is only when the kmap() for a new page runs out of free pkmap  
-> > entries that the unused but still mapped pages are unmapped.  This 
-> > unmapping is done in flush_all_zero_pkmaps() where all the unused pages 
-> > are all unmapped at once.  The cache for all those pages is flushed with 
-> > flush_cache_kmaps() which on ARM maps to flush_cache_all() when the 
-> > cache is VIVT.
+On Tue, May 28, 2013 at 05:00:57PM +0200, Markus Pargmann wrote:
+> The mxs interrupt controller does not support polling for interrupts,
+> but the driver still does it, which is a relict from
+> pre-MULTI_IRQ_HANDLER times.
 > 
-> Thanks for clarification Nico. So if kmap_high_get() returns NULL, there
-> are no high aliases left in the cache.
+> The existing code assumes that 0x7f means no interrupt, but this value
+> is an actually valid irq number, namely gpio bank 0's irq. This results
+> in the driver not detecting when irq 0x7f is active which makes the
+> machine effectively dead lock.
+> 
+> This patch removes the interrupt poll loop and allows usage of gpio0
+> interrupt without an infinite loop.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Cc: stable at vger.kernel.org
 
-Exact.
+Thomas, can you please help handle the fix?  If yes, here is my ack.
 
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Nicolas
+Otherwise, I can send it through arm-soc tree if you're fine with it.
+
+Shawn
+
+> ---
+>  drivers/irqchip/irq-mxs.c | 14 ++++----------
+>  1 file changed, 4 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
+> index 29889bb..63b3d4e 100644
+> --- a/drivers/irqchip/irq-mxs.c
+> +++ b/drivers/irqchip/irq-mxs.c
+> @@ -76,16 +76,10 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
+>  {
+>  	u32 irqnr;
+>  
+> -	do {
+> -		irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
+> -		if (irqnr != 0x7f) {
+> -			__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
+> -			irqnr = irq_find_mapping(icoll_domain, irqnr);
+> -			handle_IRQ(irqnr, regs);
+> -			continue;
+> -		}
+> -		break;
+> -	} while (1);
+> +	irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
+> +	__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
+> +	irqnr = irq_find_mapping(icoll_domain, irqnr);
+> +	handle_IRQ(irqnr, regs);
+>  }
+>  
+>  static int icoll_irq_domain_map(struct irq_domain *d, unsigned int virq,
+> -- 
+> 1.8.2.rc2
+> 
