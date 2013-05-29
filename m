@@ -1,36 +1,73 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 29 May 2013 09:07:09 +0900
-Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
-In-Reply-To: <CAOesGMjirb0h4kZ1hB9=1JnDV+azTEG=_6RR9v000xbMsvuv2Q@mail.gmail.com>
-References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
- <CAOesGMjirb0h4kZ1hB9=1JnDV+azTEG=_6RR9v000xbMsvuv2Q@mail.gmail.com>
-Message-ID: <17ec01ce5c00$76384e40$62a8eac0$%kim@samsung.com>
+Date: Wed, 29 May 2013 09:28:01 +0900
+Subject: Single zImage and A15/LPAE
+In-Reply-To: <20121009141736.GB2122@linaro.org>
+References: <50735B75.8070109@wwwdotorg.org>
+ <alpine.LFD.2.02.1210082201470.16518@xanadu.home> <2043931.InXdkgrjkp@wuerfel>
+ <20121009141736.GB2122@linaro.org>
+Message-ID: <180001ce5c03$60cbcf70$22636e50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
-> 
-> Hi,
-> 
-> On Thu, May 9, 2013 at 11:49 PM, Tushar Behera <tushar.behera@linaro.org>
-> wrote:
-> > It updates following drivers for EXYNOS based DT platform.
+Dave Martin wrote:
+> On Tue, Oct 09, 2012 at 07:51:02AM +0000, Arnd Bergmann wrote:
+> > On Monday 08 October 2012 22:18:24 Nicolas Pitre wrote:
+> > > On Mon, 8 Oct 2012, Stephen Warren wrote:
+> > >
+> > > > I'm curious what the single-zImage story is for Cortex A15 CPUs with
+> > > > LPAE extensions; IIRC, LPAE entails a different page table format
+> and so
+> > > > isn't going to co-exist in the same zImage as non-LPAE
+> > >
+> > > LPAE vs non LPAE is an even more invasive change than ARMv6+ vs pre
+> > > ARMv6 support.  So no, I don't think we'll ever support LPAE and non
+> > > LPAE configs in the same kernel binary.
+> > >
+> > > > (although doesn't x86 support that now; I though separate
+> > > > LPAE/non-LPAE kernels went away there?)
+> > >
+> > > I don't think so.  At least Ubuntu apparently still carries a PAE and
+> > > non PAE kernel packages.  Fedora doesn't, probably because they
+> decided
+> > > not to support non PAE capable machines anymore.  We certainly cannot
+> > > make this choice on ARM yet.
 > >
-> > * S5M8767 driver
-> > * MAX8997 driver
-> > * MMC SDHCI driver
+> > Fedora 18 still has both PAE and non-PAE kernels. I would really hope
+> > they could give up the PAE version in favor of a 64 bit kernel in
+> > the 32 bit distro, but it seems none of the big distros trust the
+> > compat code enough yet. On x86, the number of 32 bit machines still
+> > running with more than 3GB of RAM installed should be very marginal
+> > now, most people running the PAE kernel actually have 64 bit capable
+> > CPUs and have some legacy 32 bit applications that are easier to
+> > run with a 32 bit user space.
 > >
-> > Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> > Maybe we get to the same point on ARM in some 10 years, but for
+> > the forseeable future, Cortex-a15 machines with lots of RAM will
+> > be very real and we need to have separate kernels for those.
 > 
-> I didn't see any movement from Kukjin on this, so I have (tentatively)
-> applied this together with my base defconfig update to the fixes
-> branch of arm-soc. I'll take it out in case he protests, but it's very
-> useful since the simplefb driver has landed in 3.10-rc3.
+> In the medium term we could work around this with a fat kernel in
+> principle (i.e., bundle a non-LPAE single kernel together with an LPAE
+> one and choose the right one at boot time).  This can be solved outside
+> the kernel if necessary.
 > 
-I'm fine on this, so please go ahead with my ack if you want,
+> This is not great, but the general feeling seems to be that combining
+> LPAE and non-LPAE in the same kernel is just not going to be worth the
+> pain (either in code or runtime impacts).
+> 
+> For AArch64, we obviously have a different kernel binary anyway.
+> 
+(+ Olof, Russell)
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+Just note, I found this in my old mail-box...
 
-Thanks for your gentle reminder :-)
+So I think, as a result, we need to support separate kernel binary for LPAE
+and non-LPAE and you guys don't hold a different view about it.
+
+Current SSDK5440 and SD5v1 boards which are reference boards for EXYNOS5440
+has over 4GB memory as a default and that's why I'm writing this e-mail. It
+means I should keep separated kernel to support exynos5440 and other exynos
+SoCs.
+
+If you have any concerns about that, please let me know.
 
 - Kukjin
