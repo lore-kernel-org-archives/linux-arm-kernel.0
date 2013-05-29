@@ -1,34 +1,100 @@
-From: marvin24@gmx.de (Marc Dietrich)
-Date: Wed, 29 May 2013 15:38:40 +0200
-Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig
-In-Reply-To: <51A521F5.2010206@wwwdotorg.org>
-References: <1369761972-31986-1-git-send-email-swarren@wwwdotorg.org>
- <51A521F5.2010206@wwwdotorg.org>
-Message-ID: <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed, 29 May 2013 21:57:32 +0800
+Subject: [PATCH v6,
+ part4 14/41] mm/ARM64: prepare for removing num_physpages and
+ simplify mem_init()
+In-Reply-To: <1369835879-23553-1-git-send-email-jiang.liu@huawei.com>
+References: <1369835879-23553-1-git-send-email-jiang.liu@huawei.com>
+Message-ID: <1369835879-23553-15-git-send-email-jiang.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 28. Mai 2013, 15:30:29 schrieb Stephen Warren:
-> On 05/28/2013 11:26 AM, Stephen Warren wrote:
-> > From: Stephen Warren <swarren@nvidia.com>
-> > 
-> > This simply rebuilds tegra_defconfig on top of next-20130520. As such, it
-> > should introduce no changes; simply moving entries around due to Kconfig
-> > ordering changes. The apparent exceptions are:
-> > 
-> > AUTO_ZRELADDR: Selected by ARM multi-platform support.
-> > MTD_CHAR: Removed in Kconfig.
-> > 
-> > This should make it easier to create future defconfig patches on top of
-> > linux-next, since all the extraneous diffs have been removed. It also
-> > makes it more likely that once 3.12 comes around, this defconfig will
-> > already match what's required there.
-> 
-> I've applied this (squashed it into) Tegra's for-3.11/defconfig branch.
+Prepare for removing num_physpages and simplify mem_init().
 
-wouldn't it make more sense to apply such a patch just before the merge window 
-closes (or better after some release candidate)? This way we would have a 
-better chance to have a zero diff between defconfig and tegra_defconfig, e.g. 
-not like 3.10 is now.
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm64/mm/init.c | 48 +++---------------------------------------------
+ 1 file changed, 3 insertions(+), 45 deletions(-)
 
-Marc
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 93de98a..b16c778 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -272,59 +272,17 @@ static void __init free_unused_memmap(void)
+  */
+ void __init mem_init(void)
+ {
+-	unsigned long reserved_pages, free_pages;
+-	struct memblock_region *reg;
+-
+ 	arm64_swiotlb_init();
+ 
+ 	max_mapnr   = pfn_to_page(max_pfn + PHYS_PFN_OFFSET) - mem_map;
+ 
+ #ifndef CONFIG_SPARSEMEM_VMEMMAP
+-	/* this will put all unused low memory onto the freelists */
+ 	free_unused_memmap();
+ #endif
+-
++	/* this will put all unused low memory onto the freelists */
+ 	free_all_bootmem();
+ 
+-	reserved_pages = free_pages = 0;
+-
+-	for_each_memblock(memory, reg) {
+-		unsigned int pfn1, pfn2;
+-		struct page *page, *end;
+-
+-		pfn1 = __phys_to_pfn(reg->base);
+-		pfn2 = pfn1 + __phys_to_pfn(reg->size);
+-
+-		page = pfn_to_page(pfn1);
+-		end  = pfn_to_page(pfn2 - 1) + 1;
+-
+-		do {
+-			if (PageReserved(page))
+-				reserved_pages++;
+-			else if (!page_count(page))
+-				free_pages++;
+-			page++;
+-		} while (page < end);
+-	}
+-
+-	/*
+-	 * Since our memory may not be contiguous, calculate the real number
+-	 * of pages we have in this system.
+-	 */
+-	pr_info("Memory:");
+-	num_physpages = 0;
+-	for_each_memblock(memory, reg) {
+-		unsigned long pages = memblock_region_memory_end_pfn(reg) -
+-			memblock_region_memory_base_pfn(reg);
+-		num_physpages += pages;
+-		printk(" %ldMB", pages >> (20 - PAGE_SHIFT));
+-	}
+-	printk(" = %luMB total\n", num_physpages >> (20 - PAGE_SHIFT));
+-
+-	pr_notice("Memory: %luk/%luk available, %luk reserved\n",
+-		  nr_free_pages() << (PAGE_SHIFT-10),
+-		  free_pages << (PAGE_SHIFT-10),
+-		  reserved_pages << (PAGE_SHIFT-10));
++	mem_init_print_info();
+ 
+ #define MLK(b, t) b, t, ((t) - (b)) >> 10
+ #define MLM(b, t) b, t, ((t) - (b)) >> 20
+@@ -366,7 +324,7 @@ void __init mem_init(void)
+ 	BUILD_BUG_ON(TASK_SIZE_64			> MODULES_VADDR);
+ 	BUG_ON(TASK_SIZE_64				> MODULES_VADDR);
+ 
+-	if (PAGE_SIZE >= 16384 && num_physpages <= 128) {
++	if (PAGE_SIZE >= 16384 && get_num_physpages() <= 128) {
+ 		extern int sysctl_overcommit_memory;
+ 		/*
+ 		 * On a machine this small we won't get anywhere without
+-- 
+1.8.1.2
