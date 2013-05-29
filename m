@@ -1,37 +1,64 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 29 May 2013 19:32:22 +0200
-Subject: [PATCH] ARM: ux500: cut chip-select GPIOs from SSP device
-Message-ID: <1369848742-10451-1-git-send-email-linus.walleij@stericsson.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 29 May 2013 18:33:28 +0100
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <alpine.LFD.2.03.1305291230160.1918@syhkavp.arg>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130523104303.GC16722@arm.com>
+ <alpine.LFD.2.03.1305242350220.1918@syhkavp.arg>
+ <20130528095528.GA14329@arm.com>
+ <alpine.LFD.2.03.1305281340240.1918@syhkavp.arg>
+ <20130529103728.GG17767@MacBook-Pro.local>
+ <alpine.LFD.2.03.1305291038220.1918@syhkavp.arg>
+ <alpine.LFD.2.03.1305291230160.1918@syhkavp.arg>
+Message-ID: <20130529173328.GS17767@MacBook-Pro.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Wed, May 29, 2013 at 05:32:50PM +0100, Nicolas Pitre wrote:
+> On Wed, 29 May 2013, Nicolas Pitre wrote:
+> 
+> > On Wed, 29 May 2013, Catalin Marinas wrote:
+> > 
+> > > On Tue, May 28, 2013 at 06:52:27PM +0100, Nicolas Pitre wrote:
+> > > > On Tue, 28 May 2013, Catalin Marinas wrote:
+> > > > 
+> > > > > On Sat, May 25, 2013 at 04:53:19AM +0100, Nicolas Pitre wrote:
+> > > > > > On Thu, 23 May 2013, Catalin Marinas wrote:
+> > > > > > 
+> > > > > > > An issue is that for kunmap_atomic() && VIVT we flush the same page
+> > > > > > > twice. I don't think we should remove the cache flushing in
+> > > > > > > __kunmap_atomic() for VIVT since not all kunmap_atomic() calls require
+> > > > > > > flush_kernel_dcache_page() (unless we just assume that highmem && vivt
+> > > > > > > don't work together).
+> > > > > > 
+> > > > > > VIVT and highmem do work together.  Highmem for ARM was in fact 
+> > > > > > developed on such a platform.
+> > > > > 
+> > > > > Thanks for confirming. Do you remember why kunmap() doesn't (need to)
+> > > > > flush the cache alias (for VIVT)? Or if it does, where?
+> > > > 
+> > > > kunmap() calls kunmap_high() which actually does not unmap anything but 
+> > > > only decrement a use count.  The page is kept around in case it is 
+> > > > kmap()'d again, in which case the kmap() will be almost free and the 
+> > > > page still warm.
+> > > > 
+> > > > It is only when the kmap() for a new page runs out of free pkmap  
+> > > > entries that the unused but still mapped pages are unmapped.  This 
+> > > > unmapping is done in flush_all_zero_pkmaps() where all the unused pages 
+> > > > are all unmapped at once.  The cache for all those pages is flushed with 
+> > > > flush_cache_kmaps() which on ARM maps to flush_cache_all() when the 
+> > > > cache is VIVT.
+> > > 
+> > > Thanks for clarification Nico. So if kmap_high_get() returns NULL, there
+> > > are no high aliases left in the cache.
+> > 
+> > Exact.
+> 
+> Just to be clear, this is true for VIVT only.
+> Unmapped highmem pages can still be cached with VIPT.
 
-What GPIO pin is used with which device on the SSP/SPI bus
-is as board-specific as it gets, so it does not belong here
-in the core SoC file, and it is disabled so it doesn't hurt
-to delete this.
+Indeed.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/dbx5x0.dtsi | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index b4b542b..12f36d4 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -589,11 +589,6 @@
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			status = "disabled";
--
--			// Add one of these for each child device
--			cs-gpios = <&gpio0 31 0x4 &gpio4 14 0x4 &gpio4 16 0x4
--				    &gpio6 22 0x4 &gpio7 0 0x4>;
--
- 		};
- 
- 		uart at 80120000 {
 -- 
-1.7.11.3
+Catalin
