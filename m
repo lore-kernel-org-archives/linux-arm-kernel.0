@@ -1,38 +1,47 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 May 2013 15:26:34 +0200
-Subject: [PATCH] SPI: Unify simple platform data for some controllers
-In-Reply-To: <20130529112002.GS3660@sirena.org.uk>
-References: <1369809742-4220-1-git-send-email-shc_work@mail.ru>
- <1369817353.993218858@f175.mail.ru> <20130529112002.GS3660@sirena.org.uk>
-Message-ID: <201305291526.35099.arnd@arndb.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 29 May 2013 15:27:31 +0200
+Subject: [PATCH 3/3] ARM PJ4B: Add support for errata 4611
+In-Reply-To: <4523769.Zp7B72tmfz@wuerfel>
+References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
+ <20130529112207.GG13095@mudshark.cambridge.arm.com>
+ <51A5FB26.4090000@free-electrons.com> <4523769.Zp7B72tmfz@wuerfel>
+Message-ID: <51A60243.3000800@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 May 2013, Mark Brown wrote:
-> On Wed, May 29, 2013 at 12:49:13PM +0400, Alexander Shiyan wrote:
-> > > On Wednesday 29 May 2013 10:42:22 Alexander Shiyan wrote:
+On 05/29/2013 03:11 PM, Arnd Bergmann wrote:
+> On Wednesday 29 May 2013 14:57:10 Gregory CLEMENT wrote:
+>>
+>> For the first point, unfortunately it is not possible as they are
+>> errata for different CPUs. If finally the 2 last patches won't be
+>> merged in 3.10, then I will add a new patch before them, to introduce
+>> the PJ4B-MP which is the CPU used by the Armada XP whereas the
+>> Armada 370 uses the PJ4B.
+>>
+>> For the second point and the other CPU specific questions you raised
+>> in the other emails, I am waiting for answer from Marvell engineers.
 > 
-> > > Wouldn't it be better to kill off the platform_data for these drivers
-> > > and pass the gpio number through spi->controller_data as the
-> > > spi_gpio driver does?
+> I've been confused by the various CPU types before. If you have
+> any information that's not yet in the excellent
+> Documentation/arm/Marvell/README file that Thomas added, could you
+> put it in there?
 > 
-> > Interesting way. Just one question remains, for using not-dt variant,
-> > how  we should specify num_chipselect parameter for master?
-> > I see only way for specify maximum constant in the driver.
+> In particular, I'd like to understand what variants of PJ4 there
+> are, and maybe you can list their cpuid part numbers.
+
+OK I will see what kind of information I can gather and which ones I can
+add to the Documentation/arm/Marvell/README file.
+
+My current understanding is that there are at least 3 kind of CPU:
+PJ4, PJ4B and PJ4B-MP and all of them belongs to the Sheeva family.
+
 > 
-> We should fix that to be dynamic, having a fixed number is not sensible
-> when GPIOs are usable for chip select. 
+> 	Arnd
+> 
 
-Agreed (not that I have much of a say on this matter).
 
-> We probably also want to make
-> GPIO chip select support a standard thing that's available with every
-> driver rather than something the driver has to know about but that's a
-> separate bit of work.
-
-That actually seems simpler than doing it in just one driver: if
-we add a cs_gpio field to spi_board_info, spi_new_device could
-just copy that information into the new spi_device instead of
-taking it from master->cs_gpios.
-
-	Arnd
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
