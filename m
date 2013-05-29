@@ -1,155 +1,52 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 29 May 2013 12:16:58 +0200
-Subject: [PATCH 3/3] ARM PJ4B: Add support for errata 4611
-In-Reply-To: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1369822618-26797-4-git-send-email-gregory.clement@free-electrons.com>
+From: Mylene.Josserand@navocap.com (Mylene Josserand)
+Date: Wed, 29 May 2013 12:17:58 +0200
+Subject: [I2C] informations + advice about messages handling
+In-Reply-To: <20130524142017.52545a52@endymion.delvare>
+References: <CA78C307B8F06747967D122FC656B153986448@SERVEUR0.nvp.local>
+ <CAK7N6vpg6QUAKODKO2Msr4+GTASLDpA2cG1teQV3yiwt7D4SSw@mail.gmail.com>
+ <20130524094407.61d0ec42@endymion.delvare>
+ <CA78C307B8F06747967D122FC656B15398644A@SERVEUR0.nvp.local>
+ <20130524110706.6052493e@endymion.delvare>
+ <CA78C307B8F06747967D122FC656B15398644B@SERVEUR0.nvp.local>
+ <20130524142017.52545a52@endymion.delvare>
+Message-ID: <CA78C307B8F06747967D122FC656B15398645D@SERVEUR0.nvp.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+Hi Jean,
 
-A CP15 clean operation can result in a dead lock state if it is hit by
-an incoming snoop event. the fiw to this issue is the following:
-before any CP15 clean type operation in Cache Coherency mode, issue a
-Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
-instruction.
+Le 24/05/2013 14:20, Jean Delvare a ?crit :
+> On Fri, 24 May 2013 11:52:54 +0200, Mylene Josserand wrote:
+>> - an audio codec tlv320aic3204 : There is a driver for this device but
+>> for some reasons, we did not use it. Did not find a "SMBus compliant" in
+>> its datasheet.
+>
+> The tlv320aic32x4 driver uses i2c_master_send, which is a shortcut to
+> i2c_transfer. However it seems to only send 2 bytes on the bus at once,
+> the same could be achieved with i2c_smbus_write_byte_data if needed.
 
-[gregory.clement at free-electrons.com:add errata description in changelog]
-[gregory.clement at free-electrons.com:make this errata depend on Aramda
-370]
-Signed-off-by: Lior Amsalem <alior@marvell.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- arch/arm/Kconfig                | 11 +++++++++++
- arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
- arch/arm/mm/copypage-v6.c       | 11 +++++++++++
- arch/arm/mm/proc-macros.S       | 13 +++++++++++++
- 4 files changed, 57 insertions(+)
+Okay, thanks to have looked at it !
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 48cdbea..05c13f9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1087,6 +1087,17 @@ if !MMU
- source "arch/arm/Kconfig-nommu"
- endif
- 
-+config PJ4B_ERRATA_4611
-+        bool "PJ4B Errata 4611: A Deadlock can Occur if a CP15 Clean/Clean and Invalidate Operation is Hit By a Snoop Event"
-+        depends on CPU_PJ4B && MACH_ARMADA_370
-+        help
-+          A CP15 clean operation can result in a dead lock state if it is hit by
-+          an incoming snoop event.
-+          Workaround:
-+	  Before any CP15 clean type operation in Cache Coherency mode, issue
-+          a Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
-+          instruction.
-+
- config PJ4B_ERRATA_4742
-         bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
-         depends on CPU_PJ4B && MACH_ARMADA_370
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index e3a8064..112f778 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -475,11 +475,22 @@ static inline void flush_pmd_entry(void *pmd)
- {
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	unsigned long flags;
-+	raw_local_irq_save(flags);
-+	dmb();
-+#endif
-+
- #ifdef CONFIG_PJ4B_ERRATA_6124
- 	tlb_op(TLB_DCLEAN, "c7, c14, 1	@ flush_pmd", pmd);
- #else
- 	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
- #endif
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	raw_local_irq_restore(flags);
-+#endif
-+
- 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
- 
- 	if (tlb_flag(TLB_WB))
-@@ -490,11 +501,22 @@ static inline void clean_pmd_entry(void *pmd)
- {
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	unsigned long flags;
-+	raw_local_irq_save(flags);
-+	dmb();
-+#endif
-+
- #ifdef CONFIG_PJ4B_ERRATA_6124
- 	tlb_op(TLB_DCLEAN, "c7, c14, 1	@ flush_pmd", pmd);
- #else
- 	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
- #endif
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	raw_local_irq_restore(flags);
-+#endif
-+
- 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
- }
- 
-diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-index b9bcc9d..20b69ad 100644
---- a/arch/arm/mm/copypage-v6.c
-+++ b/arch/arm/mm/copypage-v6.c
-@@ -59,11 +59,22 @@ static void v6_clear_user_highpage_nonaliasing(struct page *page, unsigned long
-  */
- static void discard_old_kernel_data(void *kto)
- {
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+        unsigned long flags;
-+
-+        raw_local_irq_save(flags);
-+        dmb();
-+#endif
-+
- 	__asm__("mcrr	p15, 0, %1, %0, c6	@ 0xec401f06"
- 	   :
- 	   : "r" (kto),
- 	     "r" ((unsigned long)kto + PAGE_SIZE - L1_CACHE_BYTES)
- 	   : "cc");
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+        raw_local_irq_restore(flags);
-+#endif
- }
- 
- /*
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index f9a0aa7..ca81291 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -178,7 +178,20 @@
- #endif
- 
- 	str	r3, [r0]
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	mrs     r2, cpsr
-+	orr     r3, r2, #PSR_F_BIT | PSR_I_BIT
-+	msr     cpsr_c, r3                      @ Disable interrupts
-+	dmb                                     @ ensure ordering with previous memory accesses
-+#endif
-+
- 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	msr     cpsr_c, r2                      @ Restore interrupts
-+	mcr     p15, 0, r0, c7, c10, 4          @ drain write buffer
-+#endif
- 	.endm
- 
- 
+>
+> For completeness: a device might use transactions which are compliant
+> with SMBus without being formally "SMBus-compliant", because SMBus has
+> more constraints than just transaction types (I kept things simple
+> originally to not confuse you.) This may explain why it isn't mentioned
+> in the datasheet. Or just because the manufacturer did not care because
+> they target fully I2C-capable systems anyway.
+>
+> What you have to look at is the transaction types. They are usually
+> described in the datasheet. Then compare with either the SMBus
+> specification or
+> http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/Documentation/i2c/smbus-protocol
+> and if they match then you can use the i2c_smbus_*() calls.
+
+
+I have checked the PIC18F24201 according to your advice and, of what I 
+have seen, it can handle the SMBus protocol.
+
+Thank you for the explanation and trying to keep it simple for me :)
+
+
 -- 
-1.8.1.2
+Myl?ne JOSSERAND
