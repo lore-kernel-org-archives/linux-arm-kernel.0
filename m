@@ -1,63 +1,48 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 29 May 2013 16:44:18 -0700
-Subject: [PATCH v2 2/5] clk: samsung: Add support to register rate_table
- for PLL3xxx
-In-Reply-To: <1369834677-20312-3-git-send-email-vikas.sajjan@linaro.org>
-References: <1369834677-20312-1-git-send-email-vikas.sajjan@linaro.org>
- <1369834677-20312-3-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <CAD=FV=VDi+SfebiFnPNp8qR__9L=o9TJ+WSPRfRQLX+p+TMmJw@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 30 May 2013 01:51:58 +0200
+Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
+In-Reply-To: <51A682C7.9060605@cogentembedded.com>
+References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
+ <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
+ <51A682C7.9060605@cogentembedded.com>
+Message-ID: <23620997.ZR1QCYhSc2@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas / Yadwinder,
+Hi Sergei,
 
-On Wed, May 29, 2013 at 6:37 AM, Vikas Sajjan <vikas.sajjan@linaro.org> wrote:
-> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
->
-> This patch defines a common rate_table which will contain recommended p, m, s,
-> k values for supported rates that needs to be changed for changing
-> corresponding PLL's rate.
->
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos4.c    |    8 ++++----
->  drivers/clk/samsung/clk-exynos5250.c |   14 +++++++-------
->  drivers/clk/samsung/clk-pll.c        |   14 ++++++++++++--
->  drivers/clk/samsung/clk-pll.h        |   33 +++++++++++++++++++++++++++++++--
->  4 files changed, 54 insertions(+), 15 deletions(-)
+On Thursday 30 May 2013 02:35:51 Sergei Shtylyov wrote:
+> On 05/30/2013 02:28 AM, Simon Horman wrote:
+> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > The USB_OVCn pins are alternate options for USB over-current detection
+> > when using a 3.3V USB interface. As they're not mandatory they can be
+> > used independently of the USB PENC pins. Don't group the USB_OVCn and
+> > PENC pins to avoid conflicts when the USB_OVCn pins are used by another
+> > function.
+> > 
+> > Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> I suspect this is needed in -stable. The bug is older than 3.10-rc1.
 
-I also reviewed this in our gerrit
-<https://gerrit.chromium.org/gerrit/#/c/56742/>, but I'll summarize
-here for the list...
+Is it ? The offending commit is
 
->  struct clk * __init samsung_clk_register_pll35xx(const char *name,
-> -                       const char *pname, const void __iomem *base)
-> +                       const char *pname, const void __iomem *base,
-> +                       const struct samsung_pll_rate_table *rate_table,
-> +                       const unsigned int rate_count)
+commit 97d40c4224172451f666febdd865c24b1c3c3fe5
+Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Date:   Thu Mar 7 13:38:51 2013 +0100
 
-Feels like you should document here that rate_table needs to be sorted
-and the sort order.
+    sh-pfc: r8a7779: Add USB pin groups and functions
+    
+    Signed-off-by: Laurent Pinchart 
+<laurent.pinchart+renesas@ideasonboard.com>
+    Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> +struct samsung_pll_rate_table {
-> +       unsigned  int rate;
+and got applied to mainline in v3.10-rc1.
 
-nit: extra space before "int" should be removed.
+-- 
+Regards,
 
-Also: you can include rate here if you need a convenient place to
-store it (which sadly means that this structure can't be const).
-...but I do like Tomasz's idea of actually calculating it.  You can't
-know it at compile time since the parent rate comes from the device
-tree.
-
-compatible = "samsung,clock-xxti";
-clock-frequency = <24000000>;
-
-> +       unsigned int pdiv;
-> +       unsigned int mdiv;
-> +       unsigned int sdiv;
-> +       unsigned int kdiv;
-
-I think kdiv is signed.
-
--Doug
+Laurent Pinchart
