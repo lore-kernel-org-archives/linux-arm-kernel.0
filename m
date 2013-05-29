@@ -1,66 +1,47 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 29 May 2013 22:42:58 +0800
-Subject: [PATCH] ARM: mxs: icoll: Fix interrupts gpio bank 0
-In-Reply-To: <1369753257-11091-1-git-send-email-mpa@pengutronix.de>
-References: <1369753257-11091-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130529144256.GD29528@S2101-09.ap.freescale.net>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 May 2013 10:49:33 -0400 (EDT)
+Subject: [PATCH 1/8] drivers: bus: add ARM CCI support
+In-Reply-To: <1369829485.3715.46.camel@linaro1.home>
+References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
+ <1369374311-21260-2-git-send-email-nicolas.pitre@linaro.org>
+ <1369829485.3715.46.camel@linaro1.home>
+Message-ID: <alpine.LFD.2.03.1305291049000.1918@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 05:00:57PM +0200, Markus Pargmann wrote:
-> The mxs interrupt controller does not support polling for interrupts,
-> but the driver still does it, which is a relict from
-> pre-MULTI_IRQ_HANDLER times.
-> 
-> The existing code assumes that 0x7f means no interrupt, but this value
-> is an actually valid irq number, namely gpio bank 0's irq. This results
-> in the driver not detecting when irq 0x7f is active which makes the
-> machine effectively dead lock.
-> 
-> This patch removes the interrupt poll loop and allows usage of gpio0
-> interrupt without an infinite loop.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Cc: stable at vger.kernel.org
+On Wed, 29 May 2013, Jon Medhurst (Tixy) wrote:
 
-Thomas, can you please help handle the fix?  If yes, here is my ack.
-
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
-
-Otherwise, I can send it through arm-soc tree if you're fine with it.
-
-Shawn
-
-> ---
->  drivers/irqchip/irq-mxs.c | 14 ++++----------
->  1 file changed, 4 insertions(+), 10 deletions(-)
+> On Fri, 2013-05-24 at 01:45 -0400, Nicolas Pitre wrote:
+> [...]
+> > diff --git a/Documentation/devicetree/bindings/arm/cci.txt b/Documentation/devicetree/bindings/arm/cci.txt
+> [...]
+> > +	cci at 2c090000 {
+> > +		compatible = "arm,cci-400";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		reg = <0x0 0x2c090000 0 0x1000>;
+> > +		ranges = <0x0 0x0 0x2c090000 0x6000>;
+> > +
+> > +		cci_control0: slave-if at 1000 {
+> > +			interface-type = "ace-lite";
+> > +			reg = <0x1000 0x1000>;
+> > +		};
+> > +
+> > +		cci_control1: slave-if at 4000 {
+> > +			interface-type = "ace";
+> > +			reg = <0x4000 0x1000>;
+> > +		};
+> > +
+> > +		cci_control2: slave-if at 5000 {
+> > +			interface-type = "ace";
+> > +			reg = <0x5000 0x1000>;
+> > +		};
+> > +	};
 > 
-> diff --git a/drivers/irqchip/irq-mxs.c b/drivers/irqchip/irq-mxs.c
-> index 29889bb..63b3d4e 100644
-> --- a/drivers/irqchip/irq-mxs.c
-> +++ b/drivers/irqchip/irq-mxs.c
-> @@ -76,16 +76,10 @@ asmlinkage void __exception_irq_entry icoll_handle_irq(struct pt_regs *regs)
->  {
->  	u32 irqnr;
->  
-> -	do {
-> -		irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
-> -		if (irqnr != 0x7f) {
-> -			__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
-> -			irqnr = irq_find_mapping(icoll_domain, irqnr);
-> -			handle_IRQ(irqnr, regs);
-> -			continue;
-> -		}
-> -		break;
-> -	} while (1);
-> +	irqnr = __raw_readl(icoll_base + HW_ICOLL_STAT_OFFSET);
-> +	__raw_writel(irqnr, icoll_base + HW_ICOLL_VECTOR);
-> +	irqnr = irq_find_mapping(icoll_domain, irqnr);
-> +	handle_IRQ(irqnr, regs);
->  }
->  
->  static int icoll_irq_domain_map(struct irq_domain *d, unsigned int virq,
-> -- 
-> 1.8.2.rc2
-> 
+> The above examples of slave-if nodes are missing the required
+> compatible = "arm,cci-400-ctrl-if";
+
+Indeed.  I'll fix that.
+
+
+Nicolas
