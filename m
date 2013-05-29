@@ -1,43 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 May 2013 20:10:05 +0200
-Subject: [PATCH] SPI: Unify simple platform data for some controllers
-In-Reply-To: <1369847158.250798748@f433.i.mail.ru>
-References: <1369809742-4220-1-git-send-email-shc_work@mail.ru>
- <20130529144909.GT3660@sirena.org.uk> <1369847158.250798748@f433.i.mail.ru>
-Message-ID: <1962597.10ArYKg8M9@wuerfel>
+From: richard.genoud@gmail.com (Richard Genoud)
+Date: Wed, 29 May 2013 20:15:49 +0200
+Subject: [PATCHv3 RESEND 0/6] ARM: sunxi: Add support for A10 Ethernet
+ controller
+In-Reply-To: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CACQ1gAgp6o8HqQcv=4cWoAZze3wtXHMX+g+7KvV-pnC2W5=iyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 May 2013 21:05:59 Alexander Shiyan wrote:
-> > On Wed, May 29, 2013 at 03:26:34PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 29 May 2013, Mark Brown wrote:
-> > 
-> > > > We probably also want to make
-> > > > GPIO chip select support a standard thing that's available with every
-> > > > driver rather than something the driver has to know about but that's a
-> > > > separate bit of work.
-> > 
-> > > That actually seems simpler than doing it in just one driver: if
-> > > we add a cs_gpio field to spi_board_info, spi_new_device could
-> > > just copy that information into the new spi_device instead of
-> > > taking it from master->cs_gpios.
-> > 
-> > Yeah, that bit of it is fine and straightforward.  It's slightly more
-> > work to factor the chip select handling out so that we can implement the
-> > handling at the appropriate moments in the flow due to the fact that
-> > it's embedded in the message transfer functions but totally doable.
-> 
-> Initial try to simplify i.MX SPI driver I will send in 5 min.
-> Patches is untested, so it is only RFC. Platform data still present in
-> driver but patch migrate driver to using dynamic counter of
-> chipselects for dt-case. Is it true way now? Comments are welcome.
+2013/5/24 Maxime Ripard <maxime.ripard@free-electrons.com>:
+> Hi,
+>
+> The Allwinner A10 SoC has an ethernet controller that seem to be specific to
+> Allwinner. This IP has no public documentation, so exact
+> details are quite sparse, and this code come from refactored Allwinner
+> code.
+>
+> The rework to use NAPI is taking more time than expected, I'm still working
+> on it, but it could probably be sent as a follow-up patch.
+>
+> Thanks,
+> Maxime
+>
+> Changes from v2:
+>   - Split the MDIO controller to a separate driver and make use of standards
+>     device tree bindings
+>   - Fixed various minor things as suggested by Florian Fainelli
+>   - Added clock support now that we have a clock driver
+>
+> Changes from v1:
+>   - Use phylib for the phy-related functions
+>   - Use an optional regulator to power up the phy
+>   - Rename the driver from Davicom Wemac to Allwinner EMAC, since it's the name
+>     mentionned in the datasheet, and we have no strong evidence of a
+>     relationship with Davicom
+>   - Fix various small things around the driver: add defines for undocumented
+>     values, fix documentation name and compatible example, etc.
+>
+> Maxime Ripard (4):
+>   net: Add MDIO bus driver for the Allwinner EMAC
+>   ARM: sun4i: Add muxing options for the ethernet controller
+>   ARM: sunxi: Add EMAC controller node to sun4i DTSI
+>   ARM: sunxi: Add EMAC Controller to Hackberry dt
+>
+> Stefan Roese (2):
+>   net: Add EMAC ethernet driver found on Allwinner A10 SoC's
+>   ARM: cubieboard: Enable ethernet (EMAC) support in dts
+>
+>  .../bindings/net/allwinner,sun4i-emac.txt          |  22 +
+>  .../bindings/net/allwinner,sun4i-mdio.txt          |  26 +
+>  arch/arm/boot/dts/sun4i-a10-cubieboard.dts         |  15 +
+>  arch/arm/boot/dts/sun4i-a10-hackberry.dts          |  41 +
+>  arch/arm/boot/dts/sun4i-a10.dtsi                   |  27 +
+>  drivers/net/ethernet/Kconfig                       |   1 +
+>  drivers/net/ethernet/Makefile                      |   1 +
+>  drivers/net/ethernet/allwinner/Kconfig             |  44 +
+>  drivers/net/ethernet/allwinner/Makefile            |   6 +
+>  drivers/net/ethernet/allwinner/sun4i-emac.c        | 960 +++++++++++++++++++++
+>  drivers/net/ethernet/allwinner/sun4i-emac.h        | 108 +++
+>  drivers/net/ethernet/allwinner/sun4i-mdio.c        | 191 ++++
+>  12 files changed, 1442 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun4i-emac.txt
+>  create mode 100644 Documentation/devicetree/bindings/net/allwinner,sun4i-mdio.txt
+>  create mode 100644 drivers/net/ethernet/allwinner/Kconfig
+>  create mode 100644 drivers/net/ethernet/allwinner/Makefile
+>  create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.c
+>  create mode 100644 drivers/net/ethernet/allwinner/sun4i-emac.h
+>  create mode 100644 drivers/net/ethernet/allwinner/sun4i-mdio.c
+>
+> --
 
-The plan for i.MX is to move to DT-only in the long run, but
-AFAIK a lot of people still rely on board files and they are
-not trivial to convert without access to test hardware.
+I tested it successfully on cubieboard 1GB, on top of kernel 3.10-rc3,
+nfsroot (debian wheezy)
+I also added in sun4i-a10-cubieboard.dts
+phy0: ethernet-phy at 0 {
+ reg = <1>;
+},
+like Emilio suggested.
 
-Any new i.MX hardware should certainly be DT-only.
+running an iperf, there's some good perfs !
+iperf -s
+------------------------------------------------------------
+Server listening on TCP port 5001
+TCP window size: 85.3 KByte (default)
+------------------------------------------------------------
+[  4] local 192.168.1.10 port 5001 connected with 192.168.1.232 port 38169
+[ ID] Interval       Transfer     Bandwidth
+[  4]  0.0-10.0 sec   112 MBytes  94.1 Mbits/sec
 
-Shawn can probably comment better on the time line.
+That's great ! with this patchset, we can now run a server with a
+vanilla kernel ( who needs more that a serial port and ethernet,
+really ? ;) )
 
-	Arnd
+Tested-by: Richard Genoud <richard.genoud@gmail.com>
