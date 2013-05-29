@@ -1,80 +1,117 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 29 May 2013 14:20:53 +0530
-Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
-In-Reply-To: <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
-References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
- <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
- <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
- <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
-Message-ID: <51A5C16D.20408@linaro.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 29 May 2013 10:53:07 +0200
+Subject: [PATCH v2 14/14] ARM: dts: AM43x: initial support
+In-Reply-To: <3790fa57fc4c69da12224fbcec17cd07c59771a0.1369658705.git.afzal@ti.com>
+References: <cover.1369658705.git.afzal@ti.com>
+ <3790fa57fc4c69da12224fbcec17cd07c59771a0.1369658705.git.afzal@ti.com>
+Message-ID: <51A5C1F3.2070605@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 11:01 AM, Olof Johansson wrote:
-> On Tue, May 28, 2013 at 8:59 PM, Tushar Behera <tushar.behera@linaro.org> wrote:
-> 
->> The patches are at [1].
-> 
-> FWIW, a cgit/gitweb link is easier to follow when you're reading an
-> email. Anyway, found the patches.
-> 
->> There are a total of 6 patches on top of
->> v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another patch
->> (c) is just a defconfig hack to get Arndale booting. Remaining 2 patches
->> (e, f) are required to reset the hub during EHCI initialization.
-> 
-> Huh, I thought you said that (c) wasn't needed when I posted the
-> defconfig update. It'd be nice to see the code fixed to handle this
-> case instead of Linaro carrying a patch like this though. I.e. make it
-> able to deselect the uart, or make it tied to DEBUG_LL like on other
-> platforms instead of having a separate config for this.
-> 
++ Florian
 
-It would be good to free up the dependency on the correct UART port for
-the board to boot. Without that, there would always be boards that don't
-boot with default mainline defconfig file even though all other
-components are in place.
+Hi Afzal,
 
->> a. ARM: exynos: defconfig update
->> b. ARM: EXYNOS: Update defconfig for Arndale and Origen board
->> c. [TEMP] ARM: EXYNOS: Set low-level UART port to 2
->> d. ARM: dts: Enabling samsung-usb2phy driver for exynos5250
->> e. usb: ehci-s5p: add the HSIC port initialization
->> f. ARM: dts: Add USB gpio entries for Arndale board
->>
->> I am not sure whether such kind of board-specific patches (e, f) are
->> appreciated in the drivers. But that is all we need to get USB and
->> Ethernet to work on v3.10-rc3 kernel.
+On 05/27/2013 04:37 PM, Afzal Mohammed wrote:
+> DT source (minimal) for AM4372 SoC to represent AM43x SoC's. Those
+> represented here are the minimal DT nodes necessary to get kernel
+> booting.
 > 
-> I've come across a similar situation with wifi reset sequence on the
-> chromebook. On the product kernel we added some code to the board file
-> to deal with it, but if we keep doing that things will grow out of
-> hand.
+> In DT nodes, "ti,hwmod" property has not been added, this would be
+> added along with PRCM support for AM43x.
 > 
-> I don't know if it'll be unpopular, but I think it's time to start a
-> drivers/platform/arm for these kind of things, and have those drivers
-> probe on the system compatible value, similar to how x86 does it (with
-> DMI tables). At least that's my plan for approaching the wifi
-> reset/power-on sequence on the Chromebook. I hope to have patches in
-> not all that long...
+> Signed-off-by: Ankur Kishore <a-kishore@ti.com>
+> Signed-off-by: Afzal Mohammed <afzal@ti.com>
+> ---
 > 
-> Likewise, the hub reset/enable code doesn't have to go with the USB
-> driver, right? I.e. if you cycle reset/enable on the hub after the
-> host and phy is configured, you'll still have a working setup?
+> v2: Add gptimer 1ms, timer2, synctimer and remove twd local timer
 > 
+>  arch/arm/boot/dts/am4372.dtsi | 66 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 66 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/am4372.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+> new file mode 100644
+> index 0000000..1d58298
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/am4372.dtsi
+> @@ -0,0 +1,66 @@
+> +/*
+> + * Device Tree Source for AM4372 SoC
+> + *
+> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This file is licensed under the terms of the GNU General Public License
+> + * version 2.  This program is licensed "as is" without any warranty of any
+> + * kind, whether express or implied.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
 
-Right, hub reset/enable code need not be tied up with USB driver. As per
-your suggestion regarding drivers/platform/arm, I implemented an Arndale
-specific driver [2] in drivers/platform/arm and verified USB and
-ethernet to be working.
+You can now use the C preprocessor statement instead of this one.
+Florian already started doing the change [1].
 
-[2]
-https://git.linaro.org/gitweb?p=landing-teams/working/samsung/kernel.git;a=shortlog;h=refs/heads/upstream/arndale-usb-2
+Beside that detail, that patch looks good to me.
+I'll pull it separately of the series.
 
+Regards,
+Benoit
+
+[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/98320
+
+> +
+> +/ {
+> +	compatible = "ti,am4372", "ti,am43";
+> +	interrupt-parent = <&gic>;
+> +
+> +
+> +	aliases {
+> +		serial0 = &uart1;
+> +	};
+> +
+> +	cpus {
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a9";
+> +		};
+> +	};
+> +
+> +	gic: interrupt-controller at 48241000 {
+> +		compatible = "arm,cortex-a9-gic";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		reg = <0x48241000 0x1000>,
+> +		      <0x48240100 0x0100>;
+> +	};
+> +
+> +	ocp {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		uart1: serial at 44e09000 {
+> +			compatible = "ti,am4372-uart","ti,omap2-uart";
+> +			reg = <0x44e09000 0x2000>;
+> +			interrupts = <0 72 0x4>;
+> +		};
+> +
+> +		timer1: timer at 44e31000 {
+> +			compatible = "ti,am4372-timer-1ms","ti,am335x-timer-1ms";
+> +			reg = <0x44e31000 0x400>;
+> +			interrupts = <0 67 0x4>;
+> +			ti,timer-alwon;
+> +		};
+> +
+> +		timer2: timer at 48040000  {
+> +			compatible = "ti,am4372-timer","ti,am335x-timer";
+> +			reg = <0x48040000  0x400>;
+> +			interrupts = <0 68 0x4>;
+> +		};
+> +
+> +		counter32k: counter at 44e86000 {
+> +			compatible = "ti,am4372-counter32k","ti,omap-counter32k";
+> +			reg = <0x44e86000 0x40>;
+> +		};
+> +	};
+> +};
 > 
-> -Olof
-> 
-
-
--- 
-Tushar Behera
