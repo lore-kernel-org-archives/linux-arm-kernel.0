@@ -1,85 +1,43 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 29 May 2013 11:28:59 -0400 (EDT)
-Subject: [PATCH 3/8] ARM: introduce common set_auxcr/get_auxcr
- functions
-In-Reply-To: <1369834937.3715.64.camel@linaro1.home>
-References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
- <1369374311-21260-4-git-send-email-nicolas.pitre@linaro.org>
- <1369834937.3715.64.camel@linaro1.home>
-Message-ID: <alpine.LFD.2.03.1305291128180.1918@syhkavp.arg>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 29 May 2013 09:29:48 -0600
+Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig
+In-Reply-To: <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
+References: <1369761972-31986-1-git-send-email-swarren@wwwdotorg.org>
+ <51A521F5.2010206@wwwdotorg.org>
+ <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
+Message-ID: <51A61EEC.5040300@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Jon Medhurst (Tixy) wrote:
-
-> On Fri, 2013-05-24 at 01:45 -0400, Nicolas Pitre wrote:
-> > From: Rob Herring <rob.herring@calxeda.com>
-> > 
-> > Move the private set_auxcr/get_auxcr functions from
-> > drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
-> > 
-> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Reviewed-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/include/asm/cp15.h       | 14 ++++++++++++++
-> >  drivers/cpuidle/cpuidle-calxeda.c | 14 +-------------
-> >  2 files changed, 15 insertions(+), 13 deletions(-)
-> > 
-> > diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-> > index 1f3262e99d..cedd372131 100644
-> > --- a/arch/arm/include/asm/cp15.h
-> > +++ b/arch/arm/include/asm/cp15.h
-> > @@ -61,6 +61,20 @@ static inline void set_cr(unsigned int val)
-> >  	isb();
-> >  }
-> >  
-> > +static inline unsigned int get_auxcr(void)
-> > +{
-> > +	unsigned int val;
-> > +	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val));
-> > +	return val;
-> > +}
-> > +
-> > +static inline void set_auxcr(unsigned int val)
-> > +{
-> > +	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
-> > +	  : : "r" (val));
-> > +	isb();
-> > +}
-> > +
-> >  #ifndef CONFIG_SMP
-> >  extern void adjust_cr(unsigned long mask, unsigned long set);
-> >  #endif
-> > diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
-> > index 223379169c..8a08e04c0e 100644
-> > --- a/drivers/cpuidle/cpuidle-calxeda.c
-> > +++ b/drivers/cpuidle/cpuidle-calxeda.c
-> > @@ -37,19 +37,7 @@
-> >  extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
-> >  extern void *scu_base_addr;
-> >  
-> > -static inline unsigned int get_auxcr(void)
-> > -{
-> > -	unsigned int val;
-> > -	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
-> > -	return val;
-> > -}
-> > -
-> > -static inline void set_auxcr(unsigned int val)
-> > -{
-> > -	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
-> > -	  : : "r" (val) : "cc");
-> > -	isb();
-> > -}
-> > +static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
+On 05/29/2013 07:38 AM, Marc Dietrich wrote:
+> Am Dienstag, 28. Mai 2013, 15:30:29 schrieb Stephen Warren:
+>> On 05/28/2013 11:26 AM, Stephen Warren wrote:
+>>> From: Stephen Warren <swarren@nvidia.com>
+>>>
+>>> This simply rebuilds tegra_defconfig on top of next-20130520. As such, it
+>>> should introduce no changes; simply moving entries around due to Kconfig
+>>> ordering changes. The apparent exceptions are:
+>>>
+>>> AUTO_ZRELADDR: Selected by ARM multi-platform support.
+>>> MTD_CHAR: Removed in Kconfig.
+>>>
+>>> This should make it easier to create future defconfig patches on top of
+>>> linux-next, since all the extraneous diffs have been removed. It also
+>>> makes it more likely that once 3.12 comes around, this defconfig will
+>>> already match what's required there.
+>>
+>> I've applied this (squashed it into) Tegra's for-3.11/defconfig branch.
 > 
-> The added line above looks like a merge error to me.
+> wouldn't it make more sense to apply such a patch just before the merge window 
+> closes (or better after some release candidate)?
 
-Yep, good catch.
+Perhaps. It probably also depends a lot on when Kconfig changes get
+applied in other areas as far as when it makes sense. I deferred it this
+time around in order to pick up some tegra_defconfig changes that made
+it into 3.10-rc3.
 
+> This way we would have a 
+> better chance to have a zero diff between defconfig and tegra_defconfig, e.g. 
+> not like 3.10 is now.
 
-Nicolas
+I don't understand this; what is "defconfig" if not "tegra_defconfig"?
