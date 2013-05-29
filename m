@@ -1,98 +1,77 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Wed, 29 May 2013 19:44:56 +0200
-Subject: [PATCH 1/8] video: atmel_lcdfb: fix platform data struct
-In-Reply-To: <20130529173538.GC23899@game.jcrosoft.org>
-References: <20130411145741.GB25242@game.jcrosoft.org>
- <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
- <CACQ1gAjF5kuu-czkj56-pQdTBUhvY5VodvfnF3RA_DN-O0b9NQ@mail.gmail.com>
- <20130529173538.GC23899@game.jcrosoft.org>
-Message-ID: <CACQ1gAhhsMw1-Znd8BC=A0rJBrB4pphCtH9v9qOQR+j2dY3vCw@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 29 May 2013 18:47:46 +0100
+Subject: VDSO for arm 32bit
+In-Reply-To: <alpine.LFD.2.03.1305290955390.1918@syhkavp.arg>
+References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
+ <20899.25935.838288.45383@pilspetsen.it.uu.se>
+ <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
+ <20130528092313.GA10474@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1305281415040.1918@syhkavp.arg>
+ <20130529090850.GB13095@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1305290955390.1918@syhkavp.arg>
+Message-ID: <20130529174746.GA2224@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/29 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
-> On 16:36 Wed 29 May     , Richard Genoud wrote:
->> 2013/4/11 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> > Today we mix pdata and drivers data in the struct atmel_lcdfb_info
->> > Fix it and introduce a new struct atmel_lcdfb_pdata for platform data only
->> >
->> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->> > Cc: linux-fbdev at vger.kernel.org
->> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->> > Cc: Andrew Morton <akpm@linux-foundation.org>
->> > Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
->> > ---
->> >  arch/arm/mach-at91/at91sam9261_devices.c    |    6 +-
->> >  arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
->> >  arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
->> >  arch/arm/mach-at91/at91sam9rl_devices.c     |    6 +-
->> >  arch/arm/mach-at91/board-sam9261ek.c        |    6 +-
->> >  arch/arm/mach-at91/board-sam9263ek.c        |    4 +-
->> >  arch/arm/mach-at91/board-sam9m10g45ek.c     |    4 +-
->> >  arch/arm/mach-at91/board-sam9rlek.c         |    4 +-
->> >  arch/arm/mach-at91/board.h                  |    4 +-
->> >  arch/avr32/boards/atngw100/evklcd10x.c      |    6 +-
->> >  arch/avr32/boards/atngw100/mrmt.c           |    4 +-
->> >  arch/avr32/boards/atstk1000/atstk1000.h     |    2 +-
->> >  arch/avr32/boards/atstk1000/setup.c         |    2 +-
->> >  arch/avr32/boards/favr-32/setup.c           |    2 +-
->> >  arch/avr32/boards/hammerhead/setup.c        |    2 +-
->> >  arch/avr32/boards/merisc/display.c          |    2 +-
->> >  arch/avr32/boards/mimc200/setup.c           |    4 +-
->> >  arch/avr32/mach-at32ap/at32ap700x.c         |    8 +--
->> >  arch/avr32/mach-at32ap/include/mach/board.h |    4 +-
->> >  drivers/video/atmel_lcdfb.c                 |  104 +++++++++++++++++----------
->> >  include/video/atmel_lcdc.h                  |   24 +------
->> >  21 files changed, 109 insertions(+), 101 deletions(-)
->> >
->> [snip]
->> > diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
->> > index c1a2914..98733cd4 100644
->> > --- a/drivers/video/atmel_lcdfb.c
->> > +++ b/drivers/video/atmel_lcdfb.c
->> > @@ -20,12 +20,45 @@
->> >  #include <linux/gfp.h>
->> >  #include <linux/module.h>
->> >  #include <linux/platform_data/atmel.h>
->> > +#include <video/of_display_timing.h>
->> >
->> >  #include <mach/cpu.h>
->> >  #include <asm/gpio.h>
->> >
->> >  #include <video/atmel_lcdc.h>
->> >
->> > +struct atmel_lcdfb_config {
->> > +       bool have_alt_pixclock;
->> > +       bool have_hozval;
->> > +       bool have_intensity_bit;
->> > +};
->> > +
->> > + /* LCD Controller info data structure, stored in device platform_data */
->> > +struct atmel_lcdfb_info {
->> > +       spinlock_t              lock;
->> > +       struct fb_info          *info;
->> > +       void __iomem            *mmio;
->> > +       int                     irq_base;
->> > +       struct work_struct      task;
->> > +
->> > +       unsigned int            smem_len;
->> > +       struct platform_device  *pdev;
->> > +       struct clk              *bus_clk;
->> > +       struct clk              *lcdc_clk;
->> > +
->> > +       struct backlight_device *backlight;
->> > +       u8                      bl_power;
->> > +       bool                    lcdcon_pol_negative;
->> I think lcdcon_pol_negative should be part of pdata, because it really
->> depends on how the PWM is wired on the board.
->>
->
-> maybe but no one mainline use it on any pdata for non-dt boars
-> so I did not want to expose it
-Well, at least, I'm using it :)
-(and I guess that Andreas is using it also, otherwise he wouldn't have
-introduce it !)
+On Wed, May 29, 2013 at 10:01:40AM -0400, Nicolas Pitre wrote:
+> On Wed, 29 May 2013, Will Deacon wrote:
+> 
+> > On Tue, May 28, 2013 at 07:19:00PM +0100, Nicolas Pitre wrote:
+> > > On Tue, 28 May 2013, Will Deacon wrote:
+> > > > Be careful here. I had a crack at a gtod implementation for the vectors page
+> > > > in the past, but decided to drop it because it quickly became a maintenance
+> > > > nightmare. Since the layout of the vectors page must be fixed (as userspace
+> > > > jumps to the absolute addresses for the helpers), having large, complicated
+> > > > functions (which gtod does become as you quickly start using the stack to
+> > > > store all of the shared state with the kernel) means that you can quickly
+> > > > back yourself into a corner where the layout of the code cannot change
+> > > > without breaking the ABI.
+> > > 
+> > > Note that only the entry point is fixed.  The layout of the code is not.  
+> > > So you may well branch anywhere else within the vector page if the code 
+> > > is more complex than a few instructions.
+> > 
+> > Sure, it may be possible simply to have branches in the kuser slots and then
+> > reserve a chunk at the other end of the vectors page where the actual
+> > implementation can go.
+> > 
+> > > > On top of that, new clock types are added more often than you might think
+> > > > (not to mention bug fixes in the implementation itself), and you end up in
+> > > > a horrible situation where you'd end up deprecating one implementation and
+> > > > adding gettimeofday2 or something equally nasty at a different offset.
+> > > 
+> > > That is equally valid for a vdso.
+> > 
+> > Sorry, I wasn't clear. My point was that you can change the layout of a vdso
+> > without breaking anything, since the dynamic loader resolves the entry
+> > points. It relates back to what I said above -- you need to be careful about
+> > how you lay the stuff out in memory.
+> > 
+> > Perhaps the gtod code won't end up being that big. It's around ~500 bytes on
+> > arm64, but that's without any stack usage.
+> 
+> That's still fairly large.
+> 
+> > Come to think of it, is there any
+> > reason why we can't just map an additional vectors page after the one we
+> > currently have?
+> 
+> That certainly can be done if necessary.  Some copy_page implementations 
+> do use some of the address space above the vector page for temporary 
+> page mapping so some care not to create conflicts would be required.
 
+In theory, we could have a VDSO wrapping the vectors page.  This could allow
+the existing kuser helpers to be looked up by ELF symbol as well as the well-
+known address.  New functions don't necessarily need to have a well-known
+address at all -- they might only be visible as ELF symbols, since there is
+no need to offer a backwards-compatible ABI for new functions.
 
-Best regards,
-Richard.
+Alternatively, we could have a VDSO which is separate from the vectors
+page, exporting only the new functionality, with the vectors page remaining
+as before.
+
+Whether or not adding a VDSO brings enough benefit to make it worthwhile
+is a separate discussion, though.
+
+Cheers
+---Dave
