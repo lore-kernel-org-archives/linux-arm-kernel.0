@@ -1,16 +1,16 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 29 May 2013 21:32:45 +0200
-Subject: [PATCH v5 03/13] net: mv643xx_eth: add phy_node to platform_data
- struct
+Date: Wed, 29 May 2013 21:32:46 +0200
+Subject: [PATCH v5 04/13] net: mv643xx_eth: use of_phy_connect if phy_node
+ present
 In-Reply-To: <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
  <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1369855975-21489-4-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1369855975-21489-5-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a struct device_node pointer for a phy passed by phandle
-to mv643xx_eth node.
+This connects to a phy node passed to the port device instead of probing
+the phy by phy_addr.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -24,28 +24,55 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linuxppc-dev at lists.ozlabs.org
 Cc: linux-kernel at vger.kernel.org
 ---
- include/linux/mv643xx_eth.h |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/net/ethernet/marvell/mv643xx_eth.c |   25 ++++++++++++++++++-------
+ 1 file changed, 18 insertions(+), 7 deletions(-)
 
-diff --git a/include/linux/mv643xx_eth.h b/include/linux/mv643xx_eth.h
-index 141d395..6e8215b 100644
---- a/include/linux/mv643xx_eth.h
-+++ b/include/linux/mv643xx_eth.h
-@@ -30,6 +30,7 @@ struct mv643xx_eth_shared_platform_data {
- #define MV643XX_ETH_PHY_ADDR(x)		(0x80 | (x))
- #define MV643XX_ETH_PHY_NONE		0xff
+diff --git a/drivers/net/ethernet/marvell/mv643xx_eth.c b/drivers/net/ethernet/marvell/mv643xx_eth.c
+index 19964e9..fa8c84a 100644
+--- a/drivers/net/ethernet/marvell/mv643xx_eth.c
++++ b/drivers/net/ethernet/marvell/mv643xx_eth.c
+@@ -60,6 +60,7 @@
+ #include <linux/types.h>
+ #include <linux/slab.h>
+ #include <linux/clk.h>
++#include <linux/of_mdio.h>
  
-+struct device_node;
- struct mv643xx_eth_platform_data {
- 	/*
- 	 * Pointer back to our parent instance, and our port number.
-@@ -41,6 +42,7 @@ struct mv643xx_eth_platform_data {
- 	 * Whether a PHY is present, and if yes, at which address.
- 	 */
- 	int			phy_addr;
-+	struct device_node	*phy_node;
+ static char mv643xx_eth_driver_name[] = "mv643xx_eth";
+ static char mv643xx_eth_driver_version[] = "1.4";
+@@ -2715,17 +2716,27 @@ static int mv643xx_eth_probe(struct platform_device *pdev)
+ 	netif_set_real_num_tx_queues(dev, mp->txq_count);
+ 	netif_set_real_num_rx_queues(dev, mp->rxq_count);
  
- 	/*
- 	 * Use this MAC address if it is valid, overriding the
+-	if (pd->phy_addr != MV643XX_ETH_PHY_NONE) {
++	err = 0;
++	if (pd->phy_node) {
++		mp->phy = of_phy_connect(mp->dev, pd->phy_node,
++					 mv643xx_eth_adjust_link, 0,
++					 PHY_INTERFACE_MODE_GMII);
++		if (!mp->phy)
++			err = -ENODEV;
++	} else if (pd->phy_addr != MV643XX_ETH_PHY_NONE) {
+ 		mp->phy = phy_scan(mp, pd->phy_addr);
+ 
+-		if (IS_ERR(mp->phy)) {
++		if (IS_ERR(mp->phy))
+ 			err = PTR_ERR(mp->phy);
+-			if (err == -ENODEV)
+-				err = -EPROBE_DEFER;
+-			goto out;
+-		}
+-		phy_init(mp, pd->speed, pd->duplex);
++		else
++			phy_init(mp, pd->speed, pd->duplex);
+ 	}
++	if (err == -ENODEV) {
++		err = -EPROBE_DEFER;
++		goto out;
++	}
++	if (err)
++		goto out;
+ 
+ 	SET_ETHTOOL_OPS(dev, &mv643xx_eth_ethtool_ops);
+ 
 -- 
 1.7.10.4
