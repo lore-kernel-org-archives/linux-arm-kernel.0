@@ -1,54 +1,31 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 29 May 2013 18:02:38 +0200
-Subject: [PATCH] ARM: DTS: OMAP4: Panda/SDP: twl6030: fix mux for IRQ
- pin and msecure line
-In-Reply-To: <CAGa+x85ZzfX400eEGmTGPzRiC21S83VRiHYj38cqsJLjDF3L7g@mail.gmail.com>
-References: <1369423702-31501-1-git-send-email-khilman@linaro.org>
- <20130524200954.GA2344@kahuna> <20130524203231.GA2555@kahuna>
- <87obc0f54r.fsf@linaro.org>
- <CAGo_u6oz1v1J-6z5W-X7CsOmi+7SAMicz1LZTv0sVXhej1DJ2Q@mail.gmail.com>
- <87a9nkf3mu.fsf@linaro.org> <51A5CCA5.7000700@ti.com>
- <87ehcpano0.fsf@linaro.org> <51A60F69.7050203@ti.com>
- <CAGa+x85ZzfX400eEGmTGPzRiC21S83VRiHYj38cqsJLjDF3L7g@mail.gmail.com>
-Message-ID: <51A6269E.2090001@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 May 2013 12:06:44 -0400 (EDT)
+Subject: [PATCH] ARM: fix kernel decompressor compilation error with
+ CONFIG_DEBUG_SEMIHOSTING
+In-Reply-To: <20130529145944.GE29528@S2101-09.ap.freescale.net>
+References: <alpine.LFD.2.03.1305281654120.1918@syhkavp.arg>
+ <20130529145944.GE29528@S2101-09.ap.freescale.net>
+Message-ID: <alpine.LFD.2.03.1305291205330.1918@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/29/2013 5:29 PM, Kevin Hilman wrote:
->
-> On May 29, 2013 8:06 AM, "Cousson, Benoit" <b-cousson@ti.com
-> <mailto:b-cousson@ti.com>> wrote:
->  >
->  > On 5/29/2013 4:03 PM, Kevin Hilman wrote:
->  >>
->  >> "Cousson, Benoit" <b-cousson at ti.com <mailto:b-cousson@ti.com>> writes:
->  >>
->  >> [...]
->  >>
->  >>>>
->  >>>> Let me respin this after some more doc reading.
->  >>>
->  >>>
->  >>> Did you re-spin it already?
->  >>
->  >>
->  >> Yes, v2 is here.
->  >>
->  >> http://marc.info/?l=linux-omap&m=136944147521955&w=2
->  >>
->  >> It also needed a rework because the fref_clk0_out pin is also in the
->  >> wkup section of the padconf, not core.
->  >
->  >
->  > OK, I'll wait for the v3 then :-)
->  >
->
-> Hmm, why? v2 has the wkup changes included.
+On Wed, 29 May 2013, Shawn Guo wrote:
 
-Why? Because of my bad understanding of English :-)
-I understood: It also needs a rework...
+> On Tue, May 28, 2013 at 04:59:13PM -0400, Nicolas Pitre wrote:
+> > 
+> > ... and add semihosting output support to the decompressor while at it.
+> > 
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-Sorry, I'll merge it.
+Thanks.
 
-Thanks,
-Benoit
+> Maybe include the error output in commit log.
+
+Yes, and I've improved it as well.
+
+Patch queued as 7737/1.
+
+
+Nicolas
