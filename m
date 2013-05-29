@@ -1,35 +1,56 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 29 May 2013 10:58:02 -0700
-Subject: [PATCH v2 1/5] clk: samsung: Use clk->base instead of directly
- using clk->con0 for PLL3xxx
-In-Reply-To: <1369834677-20312-2-git-send-email-vikas.sajjan@linaro.org>
-References: <1369834677-20312-1-git-send-email-vikas.sajjan@linaro.org>
- <1369834677-20312-2-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <CAD=FV=XAc0R4gHrogYE3gAp5ANWFfo2UT0LCkhn3eVV0b5ukxQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 29 May 2013 10:58:27 -0700
+Subject: [PATCH RFC 0/2] clk: add metag specific gate/mux clocks
+In-Reply-To: <51940CAF.6010808@codeaurora.org>
+References: <1368198127-1295-1-git-send-email-james.hogan@imgtec.com>
+ <51940CAF.6010808@codeaurora.org>
+Message-ID: <20130529175827.6058.16653@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas / Yadwinder,
+Quoting Stephen Boyd (2013-05-15 15:31:11)
+> On 05/10/13 08:02, James Hogan wrote:
+> > This adds a metag architecture specific clk-gate and clk-mux which
+> > extends the generic ones to use global lock2 to protect the register
+> > fields. It is common with metag to have an RTOS running on a different
+> > thread or core with access to different bits in the same register (which
+> > contain clock gate/switch bits for other clocks). Access to such
+> > registers must be serialised with a global lock such as the one provided
+> > by the metag architecture port in <asm/global_lock.h>
+> >
+> > RFC because despite extending the generic clocks there's still a bit of
+> > duplicated code necessary. One alternative is to add special cases to
+> > the generic clock components for when a global or callback function
+> > based lock is desired instead of a spinlock, but I wasn't sure if that
+> > sort of hack would really be appreciated in the generic drivers.
+> >
+> > Comments?
+> 
+> Can you please Cc the devicetree mailing list when proposing new bindings?
+> 
+> Your patchset brings up a question I've had which is if we should be
+> putting the bits and register width information in devicetree at all. On
+> the one hand it's nice to not have anything in C code, just iterate over
+> nodes and register clocks. On the other hand, it's the first time I've
+> seen anyone put the register interface into devicetree. From what I can
+> tell, the regulator bindings have put at most the register base and
+> physical properties like enable-time, max voltage, etc., but not what
+> bits are needed to enable/disable a regulator. Also I thought I read
+> somewhere that reg properties shouldn't overlap each other, so if you
+> ever have two clocks living in the same register we're going to violate
+> that.
+> 
 
-On Wed, May 29, 2013 at 6:37 AM, Vikas Sajjan <vikas.sajjan@linaro.org> wrote:
-> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
->
-> To factor out possible common code, this patch unifies the clk strutures used
-> for PLL35xx & PLL36xx and usues clk->base instead of clk->con0.
->
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos4.c    |   10 ++++---
->  drivers/clk/samsung/clk-exynos5250.c |   14 ++++-----
->  drivers/clk/samsung/clk-pll.c        |   54 ++++++++++++++++++----------------
->  drivers/clk/samsung/clk-pll.h        |    4 +--
->  4 files changed, 44 insertions(+), 38 deletions(-)
+I've written bindings for the generic mux-clock, divider-clock, and I'm
+working on a gate-clock (reusing some RFCs from a while back for
+gate-clock).  All of these specify the base address as well as the
+relevant bit fields.  To me this seems to intuitively describe the
+hardware.  I'll post these bindings soon and let the bike shedding
+begin.
 
-I've run with this patch atop our CCF backport on 3.8 on on
-exynos5250-snow.  It works and looks good to me.  We're planning to
-put this patch into our tree at
-<https://gerrit.chromium.org/gerrit/#/c/56740>.
+Regards,
+Mike
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
-Tested-by: Doug Anderson <dianders@chromium.org>
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
