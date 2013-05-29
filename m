@@ -1,58 +1,44 @@
-From: jgchunter@gmail.com (Jon Hunter)
-Date: Wed, 29 May 2013 21:17:38 +0100
-Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
-In-Reply-To: <51A52A16.1040204@wwwdotorg.org>
-References: <cover.1369658705.git.afzal@ti.com>
- <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
- <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
-Message-ID: <51A66262.7000305@gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 May 2013 16:21:49 -0400 (EDT)
+Subject: [GIT PULL] MCPM support for VExpress RTSM
+Message-ID: <alpine.LFD.2.03.1305291604300.30828@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ARnd, Olof, please pull the following:
 
-On 28/05/13 23:05, Stephen Warren wrote:
-> On 05/28/2013 03:25 PM, Jon Hunter wrote:
->>
->> On 27/05/13 15:37, Afzal Mohammed wrote:
->>> AM43x timer bindings.
->>>
->>> Signed-off-by: Afzal Mohammed <afzal@ti.com>
->>> ---
->>>  Documentation/devicetree/bindings/arm/omap/timer.txt | 2 ++
->>>  1 file changed, 2 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/arm/omap/timer.txt b/Documentation/devicetree/bindings/arm/omap/timer.txt
->>> index d02e27c..70cb398 100644
->>> --- a/Documentation/devicetree/bindings/arm/omap/timer.txt
->>> +++ b/Documentation/devicetree/bindings/arm/omap/timer.txt
->>> @@ -14,6 +14,8 @@ Required properties:
->>>  			ti,omap5430-timer (applicable to OMAP543x devices)
->>>  			ti,am335x-timer	(applicable to AM335x devices)
->>>  			ti,am335x-timer-1ms (applicable to AM335x devices)
->>> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
->>> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
->>>  
->>>  - reg:			Contains timer register address range (base address and
->>>  			length).
->>
->> If you are adding more compatibility strings, then this implies that the
->> AM43x timers are not 100% compatible with any other device listed (such
->> as am335x or any omap device). That's fine but you should state that in
->> the changelog. If the AM43x timer registers are 100% compatible with
->> existing devices you should not add these.
-> 
-> I'm not sure that's true; .dts files should always include a compatible
-> value that describes the most specific model of the HW, plus any
-> baseline compatible value that the HW is compatible with. This allows
-> any required quirks/fixes/... to be applied for the specific HW model
-> later even if nobody knows right now they'll be needed. Hence, defining
-> new compatible values doesn't necessarily mean incompatible HW.
+	git://git.linaro.org/people/nico/linux VExpress_DCSCB
 
-Yes that does seem to agree with what Grant had told me in the past [1].
-So this is ok then. However, I still think that the changelog needs to
-be vastly improved and more explicit about the changes.
+This is the first MCPM backend submission for VExpress running on RTSM 
+aka Fast Models implementing the big.LITTLE system architecture.  This 
+enables SMP secondary boot as well as CPU hotplug on this platform.
 
-Cheers
-Jon
+A big prerequisite for this support is the CCI driver from Lorenzo 
+included in this pull request.
 
-[1] http://thread.gmane.org/gmane.linux.ports.arm.omap/90551/focus=26447
+Also included is Rob Herring's set_auxcr/get_auxcr allowing nicer code.
+
+This is based on RMK's current devel-stable branch as this code also 
+relies on commit b382b940f821 to work properly.
+
+The diffstat follows:
+
+ Documentation/devicetree/bindings/arm/cci.txt   | 172 ++++++
+ .../devicetree/bindings/arm/rtsm-dcscb.txt      |  19 +
+ arch/arm/include/asm/cp15.h                     |  14 +
+ arch/arm/mach-vexpress/Kconfig                  |   9 +
+ arch/arm/mach-vexpress/Makefile                 |   1 +
+ arch/arm/mach-vexpress/core.h                   |   2 +
+ arch/arm/mach-vexpress/dcscb.c                  | 253 +++++++++
+ arch/arm/mach-vexpress/dcscb_setup.S            |  38 ++
+ arch/arm/mach-vexpress/platsmp.c                |  20 +
+ arch/arm/mach-vexpress/v2m.c                    |   1 +
+ drivers/bus/Kconfig                             |   7 +
+ drivers/bus/Makefile                            |   2 +
+ drivers/bus/arm-cci.c                           | 533 ++++++++++++++++++
+ drivers/cpuidle/cpuidle-calxeda.c               |  14 -
+ include/linux/arm-cci.h                         |  61 ++
+ 15 files changed, 1132 insertions(+), 14 deletions(-)
+
+
+Nicolas
