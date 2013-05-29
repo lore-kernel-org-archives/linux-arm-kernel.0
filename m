@@ -1,74 +1,85 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 May 2013 09:27:28 -0600
-Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
-In-Reply-To: <51A5BEB6.6070809@ti.com>
-References: <cover.1369658705.git.afzal@ti.com>
- <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
- <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
- <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
- <51A5BEB6.6070809@ti.com>
-Message-ID: <51A61E60.4070708@wwwdotorg.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 29 May 2013 11:28:59 -0400 (EDT)
+Subject: [PATCH 3/8] ARM: introduce common set_auxcr/get_auxcr
+ functions
+In-Reply-To: <1369834937.3715.64.camel@linaro1.home>
+References: <1369374311-21260-1-git-send-email-nicolas.pitre@linaro.org>
+ <1369374311-21260-4-git-send-email-nicolas.pitre@linaro.org>
+ <1369834937.3715.64.camel@linaro1.home>
+Message-ID: <alpine.LFD.2.03.1305291128180.1918@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 02:39 AM, Benoit Cousson wrote:
-> Hi Afzal,
-> 
-> On 05/29/2013 10:06 AM, Mohammed, Afzal wrote:
->> Hi Jon,
->>
->> On Wed, May 29, 2013 at 03:35:10, Stephen Warren wrote:
->>> On 05/28/2013 03:25 PM, Jon Hunter wrote:
->>
->>>>>  			ti,am335x-timer	(applicable to AM335x devices)
->>>>>  			ti,am335x-timer-1ms (applicable to AM335x devices)
->>>>> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
->>>>> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
->>
->>>> If you are adding more compatibility strings, then this implies that the
->>>> AM43x timers are not 100% compatible with any other device listed (such
->>>> as am335x or any omap device). That's fine but you should state that in
->>>> the changelog. If the AM43x timer registers are 100% compatible with
->>>> existing devices you should not add these.
->>>
->>> I'm not sure that's true; .dts files should always include a compatible
->>> value that describes the most specific model of the HW, plus any
->>> baseline compatible value that the HW is compatible with. This allows
->>> any required quirks/fixes/... to be applied for the specific HW model
->>> later even if nobody knows right now they'll be needed. Hence, defining
->>> new compatible values doesn't necessarily mean incompatible HW.
->>
->> Stephen took words out of my finger ;)
->>  
->> Some explanations,I don;t 
->>
->> 1. first compatible should be exact device [A], followed by compatible
->> model (if one)
->> 2. Minor effort in getting DT right the first time may help prevent
->> difficult effort later modifying it (if a necessity comes), considering
->> the fact that DT sources has  to move out of Kernel at some point of
->> time. And DT is not supposed to be modified, which may cause difficulty
->> for the users (I had been a minor victim of this during rebase).
->>
->> As we both were in GPMC land earlier, an example,
->>
->> If my memory is right, GPMC IP in am335x is rev 6, and IP has 8 chip
->> select, but one is not pinned out. Now assume that same IP is integrated
->> in another SoC (probably OMAP4 has rev 6). Here if we use same compatible
->> for both, driver cannot handle it properly (w/o knowledge about platform).
->> But if exact compatible is mentioned, without modifying DT (which should
->> be considered as a firmware) just by modifying Kernel, deciding based on
->> compatible would help achieve what is required.
-> 
-> That's true for the DTS itself, but here your are changing the binding
-> documentation which is supposed to reflect the driver "interface" in the
-> Device Tree model description.
-> 
-> Since the driver does not support any new compatible string, you should
-> not update the binding.
+On Wed, 29 May 2013, Jon Medhurst (Tixy) wrote:
 
-I don't agree here; the DT binding should define all the required and/or
-allowed values that must/should/can be present in the DT - the entire
-legal schema. The set of all compatible values is included in that,
-irrespective of whether a particular value actually (currently) defines
-a different HW interface or not.
+> On Fri, 2013-05-24 at 01:45 -0400, Nicolas Pitre wrote:
+> > From: Rob Herring <rob.herring@calxeda.com>
+> > 
+> > Move the private set_auxcr/get_auxcr functions from
+> > drivers/cpuidle/cpuidle-calxeda.c so they can be used across platforms.
+> > 
+> > Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > Acked-by: Tony Lindgren <tony@atomide.com>
+> > Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Reviewed-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/include/asm/cp15.h       | 14 ++++++++++++++
+> >  drivers/cpuidle/cpuidle-calxeda.c | 14 +-------------
+> >  2 files changed, 15 insertions(+), 13 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+> > index 1f3262e99d..cedd372131 100644
+> > --- a/arch/arm/include/asm/cp15.h
+> > +++ b/arch/arm/include/asm/cp15.h
+> > @@ -61,6 +61,20 @@ static inline void set_cr(unsigned int val)
+> >  	isb();
+> >  }
+> >  
+> > +static inline unsigned int get_auxcr(void)
+> > +{
+> > +	unsigned int val;
+> > +	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val));
+> > +	return val;
+> > +}
+> > +
+> > +static inline void set_auxcr(unsigned int val)
+> > +{
+> > +	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
+> > +	  : : "r" (val));
+> > +	isb();
+> > +}
+> > +
+> >  #ifndef CONFIG_SMP
+> >  extern void adjust_cr(unsigned long mask, unsigned long set);
+> >  #endif
+> > diff --git a/drivers/cpuidle/cpuidle-calxeda.c b/drivers/cpuidle/cpuidle-calxeda.c
+> > index 223379169c..8a08e04c0e 100644
+> > --- a/drivers/cpuidle/cpuidle-calxeda.c
+> > +++ b/drivers/cpuidle/cpuidle-calxeda.c
+> > @@ -37,19 +37,7 @@
+> >  extern void highbank_set_cpu_jump(int cpu, void *jump_addr);
+> >  extern void *scu_base_addr;
+> >  
+> > -static inline unsigned int get_auxcr(void)
+> > -{
+> > -	unsigned int val;
+> > -	asm("mrc p15, 0, %0, c1, c0, 1	@ get AUXCR" : "=r" (val) : : "cc");
+> > -	return val;
+> > -}
+> > -
+> > -static inline void set_auxcr(unsigned int val)
+> > -{
+> > -	asm volatile("mcr p15, 0, %0, c1, c0, 1	@ set AUXCR"
+> > -	  : : "r" (val) : "cc");
+> > -	isb();
+> > -}
+> > +static struct cpuidle_device __percpu *calxeda_idle_cpuidle_devices;
+> 
+> The added line above looks like a merge error to me.
+
+Yep, good catch.
+
+
+Nicolas
