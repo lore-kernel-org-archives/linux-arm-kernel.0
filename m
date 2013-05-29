@@ -1,27 +1,33 @@
-From: jan.glauber@gmail.com (Jan Glauber)
-Date: Wed, 29 May 2013 10:10:07 +0200
-Subject: ARM hibernation / suspend-to-disk
-Message-ID: <20130529081005.GA25561@hal>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 29 May 2013 10:21:26 +0200
+Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
+In-Reply-To: <20130528.130920.1604291112518863799.davem@davemloft.net>
+References: <1369741403-25315-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130528.130920.1604291112518863799.davem@davemloft.net>
+Message-ID: <51A5BA86.3070609@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi list,
+Hi,
 
-what's the status of suspend-to-disk on ARM? The most recent discussion I
-found is:
-http://lists.linuxfoundation.org/pipermail/linux-pm/2012-November/034997.html
+On 28/05/2013 22:09, David Miller wrote:
+>
+> This is the wrong way to go about this.
+>
+> If the arch code absolutely requires CONFIG_PHYLIB=y then express that
+> dependency in the arch Kconfig.  The arch code in question should not
+> be compiled at all if CONFIG_PHYLIB has an incompatible setting.
+But that is making it impossible to compile a kernel without any network
+stack for those platforms or we are going back to either enclosing the
+calls to phy_register_fixup{,_for_uid,_for_id} with #ifdef CONFIG_PHYLIB
+or if(IS_BUILTIN(CONFIG_PHYLIB)). And as you can see, it is quite error
+prone and is done only done for 2 platforms on a total of 6. I believe
+fixing that in phy.h is more foolproof.
 
-with no replies at all. Is anyone still working on that? Anyone got it running?
+Regards,
 
-I tried the patch above (on top of LTS 3.4) and got stuck forever, the last
-thing on the console was:
-
-root at omap5:/sys/power# echo disk > state
-[ 2015.641540] PM: Syncing filesystems ... done.
-[ 2015.666870] PM: Preallocating image memory... done (allocated 16957 pages)
-[ 2016.062011] PM: Allocated 67828 kbytes in 0.38 seconds (178.49 MB/s)
-
-Any hint how to debug that?
-
-thanks,
-Jan
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
