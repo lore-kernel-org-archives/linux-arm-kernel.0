@@ -1,167 +1,99 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 May 2013 12:22:07 +0100
-Subject: [PATCH 3/3] ARM PJ4B: Add support for errata 4611
-In-Reply-To: <1369822618-26797-4-git-send-email-gregory.clement@free-electrons.com>
-References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
- <1369822618-26797-4-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130529112207.GG13095@mudshark.cambridge.arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 29 May 2013 07:48:46 -0400
+Subject: [PATCH] arm: kirkwood: convert NETGEAR ReadyNAS Duo v2 to use
+ DT for the PCIe interface
+In-Reply-To: <8738t6ycnm.fsf@natisbad.org>
+References: <8738t6ycnm.fsf@natisbad.org>
+Message-ID: <20130529114846.GQ31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 11:16:58AM +0100, Gregory CLEMENT wrote:
-> From: Lior Amsalem <alior@marvell.com>
+On Wed, May 29, 2013 at 12:15:09AM +0200, Arnaud Ebalard wrote:
+> Hi Jason and Thomas,
 > 
-> A CP15 clean operation can result in a dead lock state if it is hit by
-> an incoming snoop event. the fiw to this issue is the following:
-
-s/fiw/fix/
-
-> before any CP15 clean type operation in Cache Coherency mode, issue a
-> Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
-> instruction.
-
-Could you combine this with #6124, so we don't have back-to-back ifdefs all
-over the place? Also, there are more clean operations than you have
-described here, so why haven't you have to touch them all?
-
-> [gregory.clement at free-electrons.com:add errata description in changelog]
-> [gregory.clement at free-electrons.com:make this errata depend on Aramda
-> 370]
-> Signed-off-by: Lior Amsalem <alior@marvell.com>
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Thomas, I am following your work on PCIe support for a .dts file I am
+> working on for (Armada 370-based) Netgear ReadyNAS 102 and noticed your
+> set of patches to convert kirkwood-based boards to use it in order to
+> simplify/remove board specific code.
+> 
+> Jason, I gave your associated branch (jcooper/mvebu-next/pcie) a try
+> with following patch applied and can confirm USB 3.0 host controller
+> (connected to PCIe bus) is usable on Netgear ReadyNAS *Duo v2*
+> (88f6282-based brother of the 102).
+> 
+> Note that I had to s/of_pci_range_parser()/of_pci_range_parser_init()/
+> in drivers/pci/host/pci-mvebu.c to compile the kernel (this may already
+> have been fixed already):
+> 
+> CHK     kernel/config_data.h
+> drivers/pci/host/pci-mvebu.c: In function ?mvebu_pcie_probe?:
+> drivers/pci/host/pci-mvebu.c:742:2: error: implicit declaration of function ?of_pci_range_parser? [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+> make[3]: *** [drivers/pci/host/pci-mvebu.o] Error 1
+> make[2]: *** [drivers/pci/host] Error 2
+> make[1]: *** [drivers/pci] Error 2
+> make[1]: *** Waiting for unfinished jobs....
+> 
+> Can one of you take the patch below into account? Or 
+> 
+> Cheers,
+> 
+> a+
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 > ---
->  arch/arm/Kconfig                | 11 +++++++++++
->  arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
->  arch/arm/mm/copypage-v6.c       | 11 +++++++++++
->  arch/arm/mm/proc-macros.S       | 13 +++++++++++++
->  4 files changed, 57 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 48cdbea..05c13f9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1087,6 +1087,17 @@ if !MMU
->  source "arch/arm/Kconfig-nommu"
->  endif
->  
-> +config PJ4B_ERRATA_4611
-> +        bool "PJ4B Errata 4611: A Deadlock can Occur if a CP15 Clean/Clean and Invalidate Operation is Hit By a Snoop Event"
-> +        depends on CPU_PJ4B && MACH_ARMADA_370
-> +        help
-> +          A CP15 clean operation can result in a dead lock state if it is hit by
-> +          an incoming snoop event.
-> +          Workaround:
-> +	  Before any CP15 clean type operation in Cache Coherency mode, issue
-> +          a Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
-> +          instruction.
-> +
->  config PJ4B_ERRATA_4742
->          bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
->          depends on CPU_PJ4B && MACH_ARMADA_370
-> diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-> index e3a8064..112f778 100644
-> --- a/arch/arm/include/asm/tlbflush.h
-> +++ b/arch/arm/include/asm/tlbflush.h
-> @@ -475,11 +475,22 @@ static inline void flush_pmd_entry(void *pmd)
->  {
->  	const unsigned int __tlb_flag = __cpu_tlb_flags;
->  
-> +#ifdef CONFIG_PJ4B_ERRATA_4611
-> +	unsigned long flags;
-> +	raw_local_irq_save(flags);
-> +	dmb();
-> +#endif
-> +
->  #ifdef CONFIG_PJ4B_ERRATA_6124
->  	tlb_op(TLB_DCLEAN, "c7, c14, 1	@ flush_pmd", pmd);
->  #else
->  	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
->  #endif
-> +
-> +#ifdef CONFIG_PJ4B_ERRATA_4611
-> +	raw_local_irq_restore(flags);
-> +#endif
+>  arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts |    8 ++++++++
+>  arch/arm/mach-kirkwood/board-readynas.c                |    1 -
+>  2 files changed, 8 insertions(+), 1 deletion(-)
 
-Eeek. Why do you have to disable interrupts during this? Again, are there no
-chicken bits to save you?
+Hey, I had a little time to kill, so I went ahead and fixed this up.
+Let me know if this looks ok.  I've applied it to mvebu/pcie_kirkwood,
+so you should just be able to pull that and test it.  I'll push it up to
+arm-soc in a week or so.
 
->  	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
->  
->  	if (tlb_flag(TLB_WB))
-> @@ -490,11 +501,22 @@ static inline void clean_pmd_entry(void *pmd)
->  {
->  	const unsigned int __tlb_flag = __cpu_tlb_flags;
->  
-> +#ifdef CONFIG_PJ4B_ERRATA_4611
-> +	unsigned long flags;
-> +	raw_local_irq_save(flags);
-> +	dmb();
-> +#endif
-> +
->  #ifdef CONFIG_PJ4B_ERRATA_6124
->  	tlb_op(TLB_DCLEAN, "c7, c14, 1	@ flush_pmd", pmd);
->  #else
->  	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
->  #endif
-> +
-> +#ifdef CONFIG_PJ4B_ERRATA_4611
-> +	raw_local_irq_restore(flags);
-> +#endif
-> +
->  	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
->  }
->  
-> diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-> index b9bcc9d..20b69ad 100644
-> --- a/arch/arm/mm/copypage-v6.c
-> +++ b/arch/arm/mm/copypage-v6.c
-> @@ -59,11 +59,22 @@ static void v6_clear_user_highpage_nonaliasing(struct page *page, unsigned long
->   */
->  static void discard_old_kernel_data(void *kto)
->  {
-> +#ifdef CONFIG_PJ4B_ERRATA_4611
-> +        unsigned long flags;
-> +
-> +        raw_local_irq_save(flags);
-> +        dmb();
-> +#endif
-> +
->  	__asm__("mcrr	p15, 0, %1, %0, c6	@ 0xec401f06"
->  	   :
->  	   : "r" (kto),
->  	     "r" ((unsigned long)kto + PAGE_SIZE - L1_CACHE_BYTES)
->  	   : "cc");
-> +
-> +#ifdef CONFIG_PJ4B_ERRATA_4611
-> +        raw_local_irq_restore(flags);
-> +#endif
+thx,
 
-Do you actually have an aliasing vipt cache? If not, you don't care about
-this function.
+Jason.
 
-> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-> index f9a0aa7..ca81291 100644
-> --- a/arch/arm/mm/proc-macros.S
-> +++ b/arch/arm/mm/proc-macros.S
-> @@ -178,7 +178,20 @@
->  #endif
->  
->  	str	r3, [r0]
-> +
-> +#ifdef CONFIG_PJ4B_ERRATA_4611
-> +	mrs     r2, cpsr
-> +	orr     r3, r2, #PSR_F_BIT | PSR_I_BIT
-> +	msr     cpsr_c, r3                      @ Disable interrupts
-> +	dmb                                     @ ensure ordering with previous memory accesses
-> +#endif
-> +
->  	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-> +
-> +#ifdef CONFIG_PJ4B_ERRATA_4611
-> +	msr     cpsr_c, r2                      @ Restore interrupts
-> +	mcr     p15, 0, r0, c7, c10, 4          @ drain write buffer
-> +#endif
+---->8-----
+commit 6bd98481ab346964344e05a041f35ff83cb3d00c
+Author: Arnaud Ebalard <arno@natisbad.org>
+Date:   Wed May 29 11:37:52 2013 +0000
 
-This could be a dsb.
+    arm: kirkwood: NETGEAR ReadyNAS Duo v2 init PCIe via DT
+    
+    Now that the mvebu-pcie driver is in place and enabled for kirkwood,
+    convert to initializing PCIe via devicetree.
+    
+    Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+    Signed-off-by: Jason Cooper <jason@lakedaemon.net>
 
-Will
+diff --git a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+index 1ca66ab..0f852b4 100644
+--- a/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
++++ b/arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts
+@@ -111,6 +111,14 @@
+ 			status = "okay";
+ 			nr-ports = <2>;
+ 		};
++
++		pcie-controller {
++			status = "okay";
++
++			pcie at 1,0 {
++				status = "okay";
++			};
++		};
+ 	};
+ 
+ 	gpio-leds {
+diff --git a/arch/arm/mach-kirkwood/board-readynas.c b/arch/arm/mach-kirkwood/board-readynas.c
+index fb42c20..341b82d 100644
+--- a/arch/arm/mach-kirkwood/board-readynas.c
++++ b/arch/arm/mach-kirkwood/board-readynas.c
+@@ -24,5 +24,4 @@ static struct mv643xx_eth_platform_data netgear_readynas_ge00_data = {
+ void __init netgear_readynas_init(void)
+ {
+ 	kirkwood_ge00_init(&netgear_readynas_ge00_data);
+-	kirkwood_pcie_init(KW_PCIE0);
+ }
