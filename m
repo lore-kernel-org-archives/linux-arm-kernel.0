@@ -1,51 +1,36 @@
-From: mgr@pengutronix.de (Michael Grzeschik)
-Date: Wed, 29 May 2013 12:13:32 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803E8A4D0@039-SN2MPN1-021.039d.mgd.msft.net>
-References: <51A5A808.2070803@digi.com>
- <F281D0F91ED19E4D8E63A7504E8A649803E8A3F3@039-SN2MPN1-021.039d.mgd.msft.net>
- <20130529075044.GC3293@lukather>
- <F281D0F91ED19E4D8E63A7504E8A649803E8A4D0@039-SN2MPN1-021.039d.mgd.msft.net>
-Message-ID: <20130529101332.GC7356@pengutronix.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 29 May 2013 06:14:28 -0400
+Subject: [PATCH] arm: kirkwood: convert NETGEAR ReadyNAS Duo v2 to use
+ DT for the PCIe interface
+In-Reply-To: <20130529094236.619bd698@skate>
+References: <8738t6ycnm.fsf@natisbad.org> <20130529002053.4b8ceb86@skate>
+ <20130528223817.GL31290@titan.lakedaemon.net>
+ <20130529094236.619bd698@skate>
+Message-ID: <20130529101428.GN31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, May 29, 2013 at 08:07:55AM +0000, Chen Peter-B29397 wrote:
+On Wed, May 29, 2013 at 09:42:36AM +0200, Thomas Petazzoni wrote:
+> On Tue, 28 May 2013 18:38:17 -0400, Jason Cooper wrote:
 > 
->  
+> > > Could you check that you're running on top of the latest
+> > > jcooper/mvebu/pcie branch? Thanks!
 > > 
-> > Indeed, I've been using the patchset "Add tested id switch and vbus
-> > connect detect support for Chipidea" from Peter for quite some time on
-> > top of 3.9 and it works like a charm for the gadget mode on an MX28
-> > platform.
-> > 
-> > BTW, Peter, I've seen that these patches are still not merged in 3.10,
-> > is there a reason for that? do you plan on sending a version rebased on
-> > top of 3.10 some time in the future? I tried to do the rebasing myself,
-> > but the chipidea driver seems to have changed quite heavily, which makes
-> > the process quite difficult when you don't know what you're doing :)
-> > 
-
-we already have Peter's patches on v3.10-rc3 [1].
-
-> I can spend few bandwidth on upstream work recently, I may have more
-> bandwidth after June 15th. 
+> > Actually, you want jcooper/mvebu/pcie_kirkwood.  I split out the
+> > kirkwood driver so that if it causes a build breakage and gets dropped,
+> > mvebu/pcie can still go in.
 > 
-> Currently, we still have no conclusion for chipidea core driver's coming work,
-> like Device tree support, how to identify if the controller is OTG supported.
+> There's not really a "kirkwood" driver for PCIe. The pcie-kirkwood
+> stuff is really all about adding the right Device Tree informations,
+> and switching from a legacy-style probing to a DT-style probing.
 
-Yes, the next important step is getting the of propertys "dr_mode" and
-"phy_type" properly used in the chipidea core.
+Agreed.  Bad word choice on my part.  It was late/early, too much/too
+little coffee. ;-)
 
-[1] http://git.pengutronix.de/?p=mgr/linux.git;a=summary -> v3.10/topic/usb-peterchen
+You still need mvebu/pcie_kirkwood for:
 
-Regards,
-Michael
+  005625f pci: mvebu: enable driver usage on Kirkwood
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+thx,
+
+Jason.
