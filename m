@@ -1,33 +1,51 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 29 May 2013 10:21:26 +0200
-Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
-In-Reply-To: <20130528.130920.1604291112518863799.davem@davemloft.net>
-References: <1369741403-25315-1-git-send-email-alexandre.belloni@free-electrons.com>
- <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20130528.130920.1604291112518863799.davem@davemloft.net>
-Message-ID: <51A5BA86.3070609@free-electrons.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 29 May 2013 10:23:18 +0200 (CEST)
+Subject: [patch 7/8] genirq: generic chip: Add linear irq domain
+ support
+In-Reply-To: <20130529022249.DE5ED3E14F1@localhost>
+References: <20130503212258.385818955@linutronix.de>
+ <20130506142348.321859745@linutronix.de>
+ <20130506142539.450634298@linutronix.de>
+ <20130529022249.DE5ED3E14F1@localhost>
+Message-ID: <alpine.LFD.2.02.1305291019450.2995@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 29 May 2013, Grant Likely wrote:
+> > --- linux-2.6.orig/include/linux/irq.h
+> > +++ linux-2.6/include/linux/irq.h
+> > @@ -678,6 +678,8 @@ struct irq_chip_type {
+> >   * @wake_active:	Interrupt is marked as an wakeup from suspend source
+> >   * @num_ct:		Number of available irq_chip_type instances (usually 1)
+> >   * @private:		Private data for non generic chip callbacks
+> > + * @installed:		bitfield to denote installed interrupts
+> > + * @domain:		irq domain pointer
+> >   * @list:		List head for keeping track of instances
+> >   * @chip_types:		Array of interrupt irq_chip_types
+> >   *
+> > @@ -699,6 +701,8 @@ struct irq_chip_generic {
+> >  	u32			wake_active;
+> >  	unsigned int		num_ct;
+> >  	void			*private;
+> > +	unsigned long		installed;
+> 
+> This is probably something that the irqdomain should be keeping track of
+> internally, but that's an issue for a separate patch series.
 
-On 28/05/2013 22:09, David Miller wrote:
->
-> This is the wrong way to go about this.
->
-> If the arch code absolutely requires CONFIG_PHYLIB=y then express that
-> dependency in the arch Kconfig.  The arch code in question should not
-> be compiled at all if CONFIG_PHYLIB has an incompatible setting.
-But that is making it impossible to compile a kernel without any network
-stack for those platforms or we are going back to either enclosing the
-calls to phy_register_fixup{,_for_uid,_for_id} with #ifdef CONFIG_PHYLIB
-or if(IS_BUILTIN(CONFIG_PHYLIB)). And as you can see, it is quite error
-prone and is done only done for 2 platforms on a total of 6. I believe
-fixing that in phy.h is more foolproof.
+Ok. I just need access to that information, so I can figure out if
+it's the first irq of the chip which gets mapped. I need this for
+initializing the mask cache.
+ 
+> [...]
+> > +struct irq_domain_ops irq_generic_chip_ops = {
+> > +	.map = irq_map_generic_chip,
+> > +	.xlate = irq_domain_xlate_onecell,
+> 
+> As discussed on IRC, should use onetwocell here for greater
+> compatibility with existing bindings.
 
-Regards,
+Changed that.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Thanks,
+
+	tglx
