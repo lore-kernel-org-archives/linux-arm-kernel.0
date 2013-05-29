@@ -1,51 +1,52 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 29 May 2013 10:23:18 +0200 (CEST)
-Subject: [patch 7/8] genirq: generic chip: Add linear irq domain
- support
-In-Reply-To: <20130529022249.DE5ED3E14F1@localhost>
-References: <20130503212258.385818955@linutronix.de>
- <20130506142348.321859745@linutronix.de>
- <20130506142539.450634298@linutronix.de>
- <20130529022249.DE5ED3E14F1@localhost>
-Message-ID: <alpine.LFD.2.02.1305291019450.2995@ionos>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 29 May 2013 13:55:26 +0530
+Subject: [linux-pm] ARM hibernation / suspend-to-disk
+In-Reply-To: <20130529081005.GA25561@hal>
+References: <20130529081005.GA25561@hal>
+Message-ID: <CAKohpomgf4QZ=71JNYztBZTjcqqZw5MK69dR==Thay7yz5q1jg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 May 2013, Grant Likely wrote:
-> > --- linux-2.6.orig/include/linux/irq.h
-> > +++ linux-2.6/include/linux/irq.h
-> > @@ -678,6 +678,8 @@ struct irq_chip_type {
-> >   * @wake_active:	Interrupt is marked as an wakeup from suspend source
-> >   * @num_ct:		Number of available irq_chip_type instances (usually 1)
-> >   * @private:		Private data for non generic chip callbacks
-> > + * @installed:		bitfield to denote installed interrupts
-> > + * @domain:		irq domain pointer
-> >   * @list:		List head for keeping track of instances
-> >   * @chip_types:		Array of interrupt irq_chip_types
-> >   *
-> > @@ -699,6 +701,8 @@ struct irq_chip_generic {
-> >  	u32			wake_active;
-> >  	unsigned int		num_ct;
-> >  	void			*private;
-> > +	unsigned long		installed;
-> 
-> This is probably something that the irqdomain should be keeping track of
-> internally, but that's an issue for a separate patch series.
+On 29 May 2013 13:40, Jan Glauber <jan.glauber@gmail.com> wrote:
+> what's the status of suspend-to-disk on ARM? The most recent discussion I
+> found is:
+> http://lists.linuxfoundation.org/pipermail/linux-pm/2012-November/034997.html
+>
+> with no replies at all. Is anyone still working on that? Anyone got it running?
+>
+> I tried the patch above (on top of LTS 3.4) and got stuck forever, the last
+> thing on the console was:
+>
+> root at omap5:/sys/power# echo disk > state
+> [ 2015.641540] PM: Syncing filesystems ... done.
+> [ 2015.666870] PM: Preallocating image memory... done (allocated 16957 pages)
+> [ 2016.062011] PM: Allocated 67828 kbytes in 0.38 seconds (178.49 MB/s)
+>
+> Any hint how to debug that?
 
-Ok. I just need access to that information, so I can figure out if
-it's the first irq of the chip which gets mapped. I need this for
-initializing the mask cache.
- 
-> [...]
-> > +struct irq_domain_ops irq_generic_chip_ops = {
-> > +	.map = irq_map_generic_chip,
-> > +	.xlate = irq_domain_xlate_onecell,
-> 
-> As discussed on IRC, should use onetwocell here for greater
-> compatibility with existing bindings.
+I know it is still broken and I had discussion with Kevin in past
+regarding that. See below.
 
-Changed that.
-
-Thanks,
-
-	tglx
+On 13 March 2013 22:57, Kevin Hilman <khilman@linaro.org> wrote:
+> Viresh Kumar <viresh.kumar@linaro.org> writes:
+>
+>> Hi Guys,
+>>
+>> As discussed during connect about "HIBERNATION support for ARM platforms",
+>> this is my last mail on this, almost a year back, where i tried my best to get
+>> relevant answer from Amit.
+>>
+>> Probably he missed all my mails then, but this might be a good starting point
+>> for this discussion as i did some testing on hibernation earlier.
+>>
+>> https://lkml.org/lkml/2012/2/6/8
+>
+> I think the reason that ARM sub-arches are not setting things up is
+> because ARM has never supported hibernation in mainline.
+>
+> The most recent patch to add basic support[1] references the various
+> discussions on what is needed and still missing.
+>
+> Kevin
+>
+> [1] http://marc.info/?l=linux-omap&m=135292458209355&w=2
