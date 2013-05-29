@@ -1,41 +1,51 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Wed, 29 May 2013 15:40:17 +0530
-Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
-In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
-References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
- <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
- <518A8596.7070702@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B616BE9B@BGMAIL01.nvidia.com>
+From: mgr@pengutronix.de (Michael Grzeschik)
+Date: Wed, 29 May 2013 12:13:32 +0200
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <F281D0F91ED19E4D8E63A7504E8A649803E8A4D0@039-SN2MPN1-021.039d.mgd.msft.net>
+References: <51A5A808.2070803@digi.com>
+ <F281D0F91ED19E4D8E63A7504E8A649803E8A3F3@039-SN2MPN1-021.039d.mgd.msft.net>
+ <20130529075044.GC3293@lukather>
+ <F281D0F91ED19E4D8E63A7504E8A649803E8A4D0@039-SN2MPN1-021.039d.mgd.msft.net>
+Message-ID: <20130529101332.GC7356@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > So, if I apply this series, I do see the PCIe bridge and Ethernet
-> > > device get enumerated, but I don't see the USB3 controller get
-> > > enumerated. I believe that is a PCIe device behind the same bridge
-> > > on the
-> > same Tegra PCIe port.
-> > > Shouldn't this device show up?
-> > I have also reproduced this problem. I see somehow no non-
-> > prefetchable memory is assigned to any of pcie devices.
-> > Probably that is the reason for USB3 (pci 0000:04:00.0) not getting
-> > enumerated since it uses only non-prefetchable memory.
-> 
-> 1. Bus4(on which usb3 device resides) always return 0xffffffff from it's
-> config space. which means device is not present?
-> 2. That's why it is not assigned any resources and hence no usb3 probe
-> happens.
-> 3. But same bus does return valid info like vendor/device id etc from it's
-> config space in downstream kernel and hence usb3 probe does happen.
-> 
-> Thierry, Stephen,
-> 4. Any idea why bus4 should return 0xffffffff values in upstream kernel?
-> Anything missing?
-> 5. Also, how config space of all pcie devices are mapped? I mean if I change
-> the config space offset in dts file, then also I find correct vendor/device id
-> etc for bus0/device0/fun0.
->     So how this mapping happens that even after changing the config space
-> offset in PCIe address space, it always finds correct vendor/device id.
+Hi,
 
- Any idea on this?
+On Wed, May 29, 2013 at 08:07:55AM +0000, Chen Peter-B29397 wrote:
+> 
+>  
+> > 
+> > Indeed, I've been using the patchset "Add tested id switch and vbus
+> > connect detect support for Chipidea" from Peter for quite some time on
+> > top of 3.9 and it works like a charm for the gadget mode on an MX28
+> > platform.
+> > 
+> > BTW, Peter, I've seen that these patches are still not merged in 3.10,
+> > is there a reason for that? do you plan on sending a version rebased on
+> > top of 3.10 some time in the future? I tried to do the rebasing myself,
+> > but the chipidea driver seems to have changed quite heavily, which makes
+> > the process quite difficult when you don't know what you're doing :)
+> > 
+
+we already have Peter's patches on v3.10-rc3 [1].
+
+> I can spend few bandwidth on upstream work recently, I may have more
+> bandwidth after June 15th. 
+> 
+> Currently, we still have no conclusion for chipidea core driver's coming work,
+> like Device tree support, how to identify if the controller is OTG supported.
+
+Yes, the next important step is getting the of propertys "dr_mode" and
+"phy_type" properly used in the chipidea core.
+
+[1] http://git.pengutronix.de/?p=mgr/linux.git;a=summary -> v3.10/topic/usb-peterchen
+
+Regards,
+Michael
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
