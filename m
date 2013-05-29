@@ -1,60 +1,41 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 28 May 2013 23:51:19 -0700
-Subject: [RFT][PATCH 1/2] clk: wm831x: Fix update wrong register for
- enable/disable FLL
-In-Reply-To: <1367422261.8160.1.camel@phoenix>
-References: <1367422261.8160.1.camel@phoenix>
-Message-ID: <20130529065119.6058.68188@quantum>
+From: B35083@freescale.com (Lu Jingchang-B35083)
+Date: Wed, 29 May 2013 06:57:43 +0000
+Subject: [PATCH v4] tty: serial: add Freescale lpuart driver support
+In-Reply-To: <20130529034913.GF370@S2101-09.ap.freescale.net>
+References: <1369733161-19168-1-git-send-email-b35083@freescale.com>
+ <20130529034913.GF370@S2101-09.ap.freescale.net>
+Message-ID: <B56CDBE15CE27145A4B77D2D24263E851CDEFB@039-SN1MPN1-003.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Axel Lin (2013-05-01 08:31:01)
-> According to the datasheet, FLL Enable is controlled by
-> R16530 (4092h) FLL Control1
->         BIT 0: FLL Enable
->                 0 = Disable
->                 1 = Enable
-> 
-> Thus the code should update WM831X_FLL_CONTROL_1 register rather than
-> WM831X_FLL_CONTROL_2 register.
-> 
-> Also fixes a trivial typo in dev_crit message.
-> 
-> Signed-off-by: Axel Lin <axel.lin@ingics.com>
 
-Pulled both into clk-next.
 
-Thanks,
-Mike
-
-> ---
->  drivers/clk/clk-wm831x.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-> index 16ed068..4bdf0b0 100644
-> --- a/drivers/clk/clk-wm831x.c
-> +++ b/drivers/clk/clk-wm831x.c
-> @@ -97,7 +97,7 @@ static int wm831x_fll_prepare(struct clk_hw *hw)
->         struct wm831x *wm831x = clkdata->wm831x;
->         int ret;
->  
-> -       ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_2,
-> +       ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_1,
->                               WM831X_FLL_ENA, WM831X_FLL_ENA);
->         if (ret != 0)
->                 dev_crit(wm831x->dev, "Failed to enable FLL: %d\n", ret);
-> @@ -114,9 +114,9 @@ static void wm831x_fll_unprepare(struct clk_hw *hw)
->         struct wm831x *wm831x = clkdata->wm831x;
->         int ret;
->  
-> -       ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_2, WM831X_FLL_ENA, 0);
-> +       ret = wm831x_set_bits(wm831x, WM831X_FLL_CONTROL_1, WM831X_FLL_ENA, 0);
->         if (ret != 0)
-> -               dev_crit(wm831x->dev, "Failed to disaable FLL: %d\n", ret);
-> +               dev_crit(wm831x->dev, "Failed to disable FLL: %d\n", ret);
->  }
->  
->  static unsigned long wm831x_fll_recalc_rate(struct clk_hw *hw,
-> -- 
-> 1.8.1.2
+>> +static int __init lpuart_serial_init(void) {
+>> +	int ret;
+>> +
+>> +	pr_info("serial: Freescale lpuart driver\n");
+>> +
+>> +	ret = uart_register_driver(&lpuart_reg);
+>> +	if (ret)
+>> +		return ret;
+>> +
+>> +	ret = platform_driver_register(&lpuart_uart_driver);
+>> +	if (ret)
+>> +		uart_unregister_driver(&lpuart_reg);
+>> +
+>> +	return 0;
+>> +}
+>> +
+>> +static void __exit lpuart_serial_exit(void) {
+>> +	platform_driver_unregister(&lpuart_uart_driver);
+>> +	uart_unregister_driver(&lpuart_reg);
+>> +}
+>> +
+>> +module_init(lpuart_serial_init);
+>> +module_exit(lpuart_serial_exit);
+>
+>I think you can call uart_register_driver and uart_unregister_driver
+>in .probe and .remove hook, and then you can simply use
+>module_platform_driver for lpuart_uart_driver.
+[Lu Jingchang-B35083] 
+  For multiple dts uart nodes, each node will call .probe once. If the uart_register_driver is called from .probe without any conditioning check, it will then be called more than once, but the uart_register_deiver can only register the same uart driver once. So I think current arrangement will be more reasonable. Thanks!
