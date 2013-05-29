@@ -1,62 +1,41 @@
-From: hvaibhav@ti.com (Hiremath, Vaibhav)
-Date: Wed, 29 May 2013 05:22:23 +0000
-Subject: [PATCH] arm: omap2: fix AM33xx hwmod infos for UART2
-In-Reply-To: <1369754265-27712-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1369754265-27712-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <79CD15C6BA57404B839C016229A409A83EC965EB@DBDE04.ent.ti.com>
+From: jgq516@gmail.com (jgq516 at gmail.com)
+Date: Wed, 29 May 2013 13:25:14 +0800
+Subject: ftrace calltrace when boot through kexec
+Message-ID: <51A5913A.5030302@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Thomas Petazzoni [mailto:thomas.petazzoni at free-electrons.com]
-> Sent: Tuesday, May 28, 2013 8:48 PM
-> To: Tony Lindgren
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
-> Hiremath, Vaibhav; Paul Walmsley
-> Subject: [PATCH] arm: omap2: fix AM33xx hwmod infos for UART2
-> 
-> The UART2 hwmod structure is pointing to the EDMA channels of UART1,
-> which doesn't look right. This patch fixes this by making the UART2
-> hwmod structure to a new structure that lists the EDMA channels to be
-> used by the UART2.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    9 ++++++++-
->  1 file changed, 8 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> index 01d8f32..9113251 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-> @@ -2006,6 +2006,13 @@ static struct omap_hwmod am33xx_uart1_hwmod = {
->  	},
->  };
-> 
-> +/* uart2 */
-> +static struct omap_hwmod_dma_info uart2_edma_reqs[] = {
-> +	{ .name = "tx",	.dma_req = 28, },
-> +	{ .name = "rx",	.dma_req = 29, },
-> +	{ .dma_req = -1 }
-> +};
-> +
->  static struct omap_hwmod_irq_info am33xx_uart2_irqs[] = {
->  	{ .irq = 73 + OMAP_INTC_START, },
->  	{ .irq = -1 },
-> @@ -2016,7 +2023,7 @@ static struct omap_hwmod am33xx_uart2_hwmod = {
->  	.class		= &uart_class,
->  	.clkdm_name	= "l4ls_clkdm",
->  	.mpu_irqs	= am33xx_uart2_irqs,
-> -	.sdma_reqs	= uart1_edma_reqs,
-> +	.sdma_reqs	= uart2_edma_reqs,
->  	.main_clk	= "dpll_per_m2_div4_ck",
->  	.prcm		= {
->  		.omap4	= {
+Hello,
 
-Good catch.
+When I reboot a preempt_rt 3.4 kernel with cortex a15 tc2 board thru 
+kexec, I got below calltrace appeared:
 
-Acked-by: Vaibhav Hiremath <hvaibhav@ti.com>
+------------[ cut here ]------------
+WARNING: at kernel/trace/ftrace.c:1584 ftrace_bug+0x1e0/0x224()
+Modules linked in:
+[<c0017e14>] (unwind_backtrace+0x0/0x104) from [<c062a468>] 
+(dump_stack+0x20/0x24)
+[<c062a468>] (dump_stack+0x20/0x24) from [<c00265a4>] 
+(warn_slowpath_common+0x64/0x74)
+[<c00265a4>] (warn_slowpath_common+0x64/0x74) from [<c00265e0>] 
+(warn_slowpath_null+0x2c/0x34)
+[<c00265e0>] (warn_slowpath_null+0x2c/0x34) from [<c00bf70c>] 
+(ftrace_bug+0x1e0/0x224)
+[<c00bf70c>] (ftrace_bug+0x1e0/0x224) from [<c00c03b4>] 
+(ftrace_process_locs+0x880/0x930)
+[<c00c03b4>] (ftrace_process_locs+0x880/0x930) from [<c082d018>] 
+(ftrace_init+0xb4/0x194)
+[<c082d018>] (ftrace_init+0xb4/0x194) from [<c081e8c4>] 
+(start_kernel+0x338/0x348)
+[<c081e8c4>] (start_kernel+0x338/0x348) from [<80008054>] (0x80008054)
+---[ end trace af5b256dd27bb7ab ]---
+ftrace failed to modify [<c0022b88>] platform_cpu_kill+0x10/0x1c
+  actual: 00:40:bd:e8
 
-Thanks,
-Vaibhav
+Add notrace before platform_cpu_kill can workaround this calltrace, but 
+it is weird that this problem can't
+reproduce in another cortex-a9 (xilinx-zynq) board, could someone give 
+some hints about this? Thanks.
+
+Regards,
+Xiao
