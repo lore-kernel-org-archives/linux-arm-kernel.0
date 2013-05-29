@@ -1,46 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 29 May 2013 11:42:19 -0600
-Subject: [PATCH] ARM: tegra: rebuild tegra_defconfig
-In-Reply-To: <7367180.OaP1fIIt8z@ax5200p>
-References: <1369761972-31986-1-git-send-email-swarren@wwwdotorg.org>
- <2234363.J239kID5LN@fb07-iapwap2.physik.uni-giessen.de>
- <51A61EEC.5040300@wwwdotorg.org> <7367180.OaP1fIIt8z@ax5200p>
-Message-ID: <51A63DFB.3010206@wwwdotorg.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 29 May 2013 20:41:44 +0300
+Subject: [PATCH v2] usb: musb: fix clock naming
+In-Reply-To: <CAGm1_ks7Y8n1xKA=qiCCFcxgydRiyeJS08A8TPnbnEEmkJxVyg@mail.gmail.com>
+References: <1369725661-3114-1-git-send-email-yegorslists@googlemail.com>
+ <20130528173637.GE15794@arwen.pp.htv.fi>
+ <CAGm1_ks7Y8n1xKA=qiCCFcxgydRiyeJS08A8TPnbnEEmkJxVyg@mail.gmail.com>
+Message-ID: <20130529174144.GE21290@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 11:30 AM, Marc Dietrich wrote:
-> On Wednesday 29 May 2013 09:29:48 Stephen Warren wrote:
->> On 05/29/2013 07:38 AM, Marc Dietrich wrote:
->>> Am Dienstag, 28. Mai 2013, 15:30:29 schrieb Stephen Warren:
->>>> On 05/28/2013 11:26 AM, Stephen Warren wrote:
->>>>> From: Stephen Warren <swarren@nvidia.com>
->>>>>
->>>>> This simply rebuilds tegra_defconfig on top of next-20130520. As such,
->>>>> it
->>>>> should introduce no changes; simply moving entries around due to Kconfig
->>>>> ordering changes. The apparent exceptions are:
-...
->>> This way we would have a
->>> better chance to have a zero diff between defconfig and tegra_defconfig,
->>> e.g. not like 3.10 is now.
->>
->> I don't understand this; what is "defconfig" if not "tegra_defconfig"?
+On Wed, May 29, 2013 at 12:06:52PM +0200, Yegor Yefremov wrote:
+> On Tue, May 28, 2013 at 7:36 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > On Tue, May 28, 2013 at 09:21:01AM +0200, yegorslists at googlemail.com wrote:
+> >> From: Yegor Yefremov <yegorslists@googlemail.com>
+> >>
+> >> 'ick' was changed to 'hsotgusb_ick'
+> >> 'fck' was changed to 'hsotgusb_fck'
+> >>
+> >> Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> >> Signed-off-by: Yegor Yefremov <yegorslists@googlemail.com>
+> >
+> > NAK. Fix your clock data.
 > 
-> defconfig: make tegra_defconfig; make saveconfig
-> 
-> diff -u tegra_defconfig defconfig
+> Do you mean here arch/arm/mach-omap2/cclock3xxx_data.c?
 
-Oh right. Yes, if you do that in the for-3.11/defconfig branch itself,
-there will be diffs.
+yes
 
-That will always be true; that branch won't have any of the new
-drivers/features that will be added in linux-next and the next mainline
-kernel, so at the very least you'd end up removing some options doing that.
-
-I expect most people editing defconfig will be doing it based on some
-linux-next version rather than right on top of for-3.11/defconfig, so
-they can pick up, enable, and test new drivers or features. If you run
-the commands above in next-20130529, there should be a zero diff (unless
-someone made some Kconfig changes between
-next-20130528 and next-20130529 anyway).
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130529/e081ec5d/attachment.sig>
