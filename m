@@ -1,44 +1,48 @@
-From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
-Date: Wed, 29 May 2013 14:01:32 -0400
-Subject: [PATCH v4 1/4] xen: move xen_setup_runstate_info and
- get_runstate_snapshot to drivers/xen/time.c
-In-Reply-To: <alpine.DEB.2.02.1305291718430.4799@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305281835080.4799@kaball.uk.xensource.com>
- <1369763672-12919-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130528181515.GB27718@phenom.dumpdata.com>
- <alpine.DEB.2.02.1305291159220.4799@kaball.uk.xensource.com>
- <20130529155544.GG23775@phenom.dumpdata.com>
- <alpine.DEB.2.02.1305291718430.4799@kaball.uk.xensource.com>
-Message-ID: <20130529180132.GB10845@phenom.dumpdata.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 29 May 2013 12:02:22 -0600
+Subject: [GIT PULL] ARM: tegra: DT-related fixes needed by the USB tree
+In-Reply-To: <20130529175508.GF21290@arwen.pp.htv.fi>
+References: <1368831045-19105-1-git-send-email-swarren@wwwdotorg.org>
+ <51A4E62D.7020206@wwwdotorg.org> <20130528174704.GH15794@arwen.pp.htv.fi>
+ <20130529175508.GF21290@arwen.pp.htv.fi>
+Message-ID: <51A642AE.1070905@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > > > +void xen_setup_runstate_info(int cpu)
-> > > > > +{
-> > > > > +	struct vcpu_register_runstate_memory_area area;
-> > > > > +
-> > > > > +	area.addr.v = &per_cpu(xen_runstate, cpu);
-> > > > > +
-> > > > > +	if (HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area,
-> > > > > +			       cpu, &area))
-> > > > > +		BUG();
-> > > > 
-> > > > The original code did:
-> > > > 
-> > > > -       rc = HYPERVISOR_vcpu_op(VCPUOP_register_runstate_memory_area, cpu,
-> > > > -                               &area);
-> > > > -       WARN_ON(rc && rc != -ENOSYS);
-> > > > -
-> > > > Any reason not to do this?
-> > > 
-> > > The original x86 code just BUGs out: I took that version over the ia64
-> > > version.
-> > 
-> > Ah, I see it now. OK, then this looks good to me.
-> > 
+On 05/29/2013 11:55 AM, Felipe Balbi wrote:
+> Hi,
 > 
-> Can I add your acked-by? ;-)
+> On Tue, May 28, 2013 at 08:47:04PM +0300, Felipe Balbi wrote:
+>> On Tue, May 28, 2013 at 11:15:25AM -0600, Stephen Warren wrote:
+>>> On 05/17/2013 04:50 PM, Stephen Warren wrote:
+>>>> Felipe, (and Alan, Greg),
+>>>> 
+>>>> These are the changes from the Tegra tree that need to be
+>>>> merged before the Tegra USB driver patches 4-8 from Venu can
+>>>> be applied. Recall that we had previously agreed on this
+>>>> approach for v3.9, but Venu's patches didn't end up being
+>>>> ready until now, unfortunately. I note that Venu's patches
+>>>> affect both the Tegra USB and PHY drivers.
+>>> 
+>>> Felipe, do you know when you plan to pull this into the USB
+>>> tree, and apply Venu's patches? Thanks.
+>> 
+>> got 35 commits testing right now. This pull is in my list for
+>> tomorrow.
+>> 
+>> sorry for the delay, have been on a trip for the last 3 weeks and
+>> now I'm catching up with emails during my vacations (next 2
+>> weeks).
+> 
+> the tag is not pushed to where you pointed me to. Please make sure
+> to git push it.
+> 
+> $ git fetch
+> git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git
+> tag tegra-for-3.11-deps-for-usb fatal: Couldn't find remote ref
+> refs/tags/tegra-for-3.11-deps-for-usb
 
-How about?
+Sorry about that. I could have sworn I checked that, but obviously not.
 
-Reviewed-by: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+Anyway, I've pushed it now, and the command you quoted above works for
+me, so I think it's replicated out already.
