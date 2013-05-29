@@ -1,35 +1,43 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Wed, 29 May 2013 16:23:37 +0200
-Subject: [PATCH] ARM: DTS: OMAP4: Panda/SDP: twl6030: fix mux for IRQ
- pin and msecure line
-In-Reply-To: <87ehcpano0.fsf@linaro.org>
-References: <1369423702-31501-1-git-send-email-khilman@linaro.org>
- <20130524200954.GA2344@kahuna> <20130524203231.GA2555@kahuna>
- <87obc0f54r.fsf@linaro.org>
- <CAGo_u6oz1v1J-6z5W-X7CsOmi+7SAMicz1LZTv0sVXhej1DJ2Q@mail.gmail.com>
- <87a9nkf3mu.fsf@linaro.org> <51A5CCA5.7000700@ti.com>
- <87ehcpano0.fsf@linaro.org>
-Message-ID: <51A60F69.7050203@ti.com>
+From: liuj97@gmail.com (Jiang Liu)
+Date: Wed, 29 May 2013 23:08:53 +0800
+Subject: [PATCH, v2 2/5] mm/ARM: fix stale comment about VALID_PAGE()
+In-Reply-To: <1369840136-1491-1-git-send-email-jiang.liu@huawei.com>
+References: <1369840136-1491-1-git-send-email-jiang.liu@huawei.com>
+Message-ID: <1369840136-1491-3-git-send-email-jiang.liu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/29/2013 4:03 PM, Kevin Hilman wrote:
-> "Cousson, Benoit" <b-cousson@ti.com> writes:
->
-> [...]
->
->>>
->>> Let me respin this after some more doc reading.
->>
->> Did you re-spin it already?
->
-> Yes, v2 is here.
->
-> http://marc.info/?l=linux-omap&m=136944147521955&w=2
->
-> It also needed a rework because the fref_clk0_out pin is also in the
-> wkup section of the padconf, not core.
+VALID_PAGE() has been removed from kernel long time ago,
+so fix the comment.
 
-OK, I'll wait for the v3 then :-)
+Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Giancarlo Asnaghi <giancarlo.asnaghi@st.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: linux-kernel at vger.kernel.org
+---
+ arch/arm/include/asm/memory.h | 6 ------
+ 1 file changed, 6 deletions(-)
 
-Benoit
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 57870ab..0cd2a3d 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -260,12 +260,6 @@ static inline __deprecated void *bus_to_virt(unsigned long x)
+ /*
+  * Conversion between a struct page and a physical address.
+  *
+- * Note: when converting an unknown physical address to a
+- * struct page, the resulting pointer must be validated
+- * using VALID_PAGE().  It must return an invalid struct page
+- * for any physical address not corresponding to a system
+- * RAM address.
+- *
+  *  page_to_pfn(page)	convert a struct page * to a PFN number
+  *  pfn_to_page(pfn)	convert a _valid_ PFN number to struct page *
+  *
+-- 
+1.8.1.2
