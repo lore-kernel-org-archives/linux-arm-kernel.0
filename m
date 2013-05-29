@@ -1,39 +1,25 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Wed, 29 May 2013 17:33:03 +0530
-Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
-In-Reply-To: <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
-References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
- <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
- <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
- <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
-Message-ID: <51A5EE77.6040503@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 May 2013 14:04:18 +0200
+Subject: build failure: linux-next: ARM defconfig: u8500
+In-Reply-To: <CAGa+x84p1pVuFm_MuQVTCJq_50NTsjKtWUFAbQ0W_=beOcA55A@mail.gmail.com>
+References: <CAGa+x87czosA=tWh1KRTSSqMyLckMHwNP7hrRXdokaLsSaaikA@mail.gmail.com>
+ <CAGa+x84p1pVuFm_MuQVTCJq_50NTsjKtWUFAbQ0W_=beOcA55A@mail.gmail.com>
+Message-ID: <CACRpkdZ1mRyhvnqaiNGQkprt_WEUdpz5+N09s3hB=GjJme73vw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 11:01 AM, Olof Johansson wrote:
->> There are a total of 6 patches on top of
->> v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another patch
->> (c) is just a defconfig hack to get Arndale booting. Remaining 2 patches
->> (e, f) are required to reset the hub during EHCI initialization.
-> 
-> Huh, I thought you said that (c) wasn't needed when I posted the
-> defconfig update. It'd be nice to see the code fixed to handle this
-> case instead of Linaro carrying a patch like this though. I.e. make it
-> able to deselect the uart, or make it tied to DEBUG_LL like on other
-> platforms instead of having a separate config for this.
-> 
+On Wed, May 29, 2013 at 1:46 AM, Kevin Hilman <khilman@linaro.org> wrote:
+> On Tue, May 28, 2013 at 3:57 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>
+>> u8500_defconfig started failing to build in linux next (next-20130527)
+>> but was previously building (next-20130523.)
+>
+> My apologies, it appears this one is already fixed in next-20130528.
+> /me updates automated build to not be a full day behind linux-next.
 
-I am working on this approach so that we can consolidate both the UART
-port macros together and tie them to DEBUG_LL. I would post the patch
-tomorrow.
+My fault for screwing it up one day though. :-/
 
->> a. ARM: exynos: defconfig update
->> b. ARM: EXYNOS: Update defconfig for Arndale and Origen board
->> c. [TEMP] ARM: EXYNOS: Set low-level UART port to 2
->> d. ARM: dts: Enabling samsung-usb2phy driver for exynos5250
->> e. usb: ehci-s5p: add the HSIC port initialization
->> f. ARM: dts: Add USB gpio entries for Arndale board
+This was beacuse of a double conflict in this file, and
+me missing to fix the second conflict...
 
-
--- 
-Tushar Behera
+Linus
