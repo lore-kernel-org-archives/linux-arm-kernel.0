@@ -1,114 +1,47 @@
-From: c.hemp@phytec.de (Christian Hemp)
-Date: Wed, 29 May 2013 23:06:49 +0200
-Subject: [PATCH 2/2] ARM: dts: Phytec phyFLEX-i.MX6 support
-In-Reply-To: <1369861609-30408-1-git-send-email-c.hemp@phytec.de>
-References: <1369861609-30408-1-git-send-email-c.hemp@phytec.de>
-Message-ID: <1369861609-30408-3-git-send-email-c.hemp@phytec.de>
+From: jgchunter@gmail.com (Jon Hunter)
+Date: Wed, 29 May 2013 22:29:07 +0100
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+In-Reply-To: <20130529185518.GB3345@blackmetal.musicnaut.iki.fi>
+References: <20130516180933.GG5600@atomide.com>
+ <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
+ <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
+ <20130521173936.GE31836@blackmetal.musicnaut.iki.fi>
+ <519BCCEC.8010303@gmail.com>
+ <20130522212054.GG31836@blackmetal.musicnaut.iki.fi>
+ <519E67AD.6070702@gmail.com>
+ <20130526190710.GA3345@blackmetal.musicnaut.iki.fi>
+ <51A4FAA1.5060504@gmail.com>
+ <20130529185518.GB3345@blackmetal.musicnaut.iki.fi>
+Message-ID: <51A67323.7030906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Phytec phyFLEX-i.MX6 board
 
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
----
- arch/arm/boot/dts/Makefile                 |    1 +
- arch/arm/boot/dts/imx6q-phytec-phyflex.dts |   76 ++++++++++++++++++++++++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-phytec-phyflex.dts
+On 29/05/13 19:55, Aaro Koskinen wrote:
+> Hi,
+> 
+> On Tue, May 28, 2013 at 07:42:41PM +0100, Jon Hunter wrote:
+>> Care to share the log?
+> 
+> Below are three logs from 3.10-rc3 / Nokia 770. I did not even compile
+> Retu this time, as it has nothing to do with GPIO IRQs being broken
+> on OMAP1.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4c58951..6ffdaa1 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -118,6 +118,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6dl-sabresd.dtb \
- 	imx6dl-wandboard.dtb \
- 	imx6q-arm2.dtb \
-+	imx6q-phytec-phyflex.dtb \
- 	imx6q-sabreauto.dtb \
- 	imx6q-sabrelite.dtb \
- 	imx6q-sabresd.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-phytec-phyflex.dts b/arch/arm/boot/dts/imx6q-phytec-phyflex.dts
-new file mode 100644
-index 0000000..9690691
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-phytec-phyflex.dts
-@@ -0,0 +1,76 @@
-+/*
-+ * Copyright 2013 Christian Hemp, Phytec Messtechnik GmbH
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx6q.dtsi"
-+
-+/ {
-+	model = "Phytec phyFLEX-i.MX6";
-+	compatible = "phytec,phyflex-imx6", "fsl,imx6q";
-+
-+	memory {
-+		reg = <0x10000000 0x80000000>;
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	hog {
-+                pinctrl_hog: hoggrp {
-+                        fsl,pins = <
-+				MX6Q_PAD_EIM_D23__GPIO3_IO23    0x80000000
-+			>;
-+		};
-+	};
-+
-+	phyflex {
-+		pinctrl_usdhc3_phyflex: usdhc3grp-phyflex {
-+			fsl,pins = <
-+				MX6Q_PAD_ENET_RXD0__GPIO1_IO27  0x80000000
-+				MX6Q_PAD_ENET_TXD1__GPIO1_IO29  0x80000000
-+			>;
-+		};
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet_3>;
-+	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio3 23 0>;
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4_1>;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2_2>;
-+	cd-gpios = <&gpio1 4 0>;
-+	wp-gpios = <&gpio1 2 0>;
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&pinctrl_usdhc3_2
-+		     &pinctrl_usdhc3_phyflex>;
-+        cd-gpios = <&gpio1 27 0>;
-+        wp-gpios = <&gpio1 29 0>;
-+        status = "okay";
-+};
-+
--- 
-1.7.9.5
+That's not entirely true. v3.10-rc3 is booting fine on an osk5912 and
+ethernet is working which is using a gpio for interrupts and it is
+getting interrupts.
+
+> 1) broken vanilla 3.10-rc3: serial wakeup GPIO irq gets IRQ 0 and no
+> other GPIO IRQs seen in /proc/interrupts. genirq error logs seen in boot.
+
+Getting 0 for the irq number definitely looks like the problem.
+
+> 2) working 3.10-rc3 with Tony's fix <== this fix should be applied
+> (http://marc.info/?l=linux-arm-kernel&m=136907202628855&w=2). GPIO IRQs
+> are normal, e.g. touchscreen can be used.
+> 
+> 3) .config used.
+
+I am using the omap1_defconfig. Can you try that one for comparison?
+
+Jon
