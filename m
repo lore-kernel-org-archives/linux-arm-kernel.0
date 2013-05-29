@@ -1,42 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 May 2013 00:02:45 +0200
-Subject: [PATCH V8 0/3] USB: OHCI: Start splitting up the driver
-In-Reply-To: <Pine.LNX.4.44L0.1305291415150.885-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1305291415150.885-100000@iolanthe.rowland.org>
-Message-ID: <201305300002.45754.arnd@arndb.de>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 29 May 2013 15:11:50 -0700
+Subject: [PATCH v2 1/2] clk: si5351: Fix clkout rate computation.
+In-Reply-To: <51949076.9040008@streamunlimited.com>
+References: <1367560403-21685-1-git-send-email-marek.belisko@streamunlimited.com>
+ <20130514191650.10068.92925@quantum> <51949076.9040008@streamunlimited.com>
+Message-ID: <20130529221150.6058.5735@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 May 2013, Alan Stern wrote:
-> 
-> On Wed, 29 May 2013, Arnd Bergmann wrote:
-> 
-> > On Wednesday 29 May 2013 12:21:02 Alan Stern wrote:
-> > > 
-> > > Those error messages are annoying; they don't use dev_err(), so they
-> > > don't include the device and driver names.  There's no way to know what
-> > > they refer to.  I rather suspect they come from the usbaudio driver.
-> > 
-> > That makes sense. I have a usb audio device, and I don't actually recall
-> > getting any sound from my speakers while testing it. I only checked
-> > that the mouse was working and assumed that the usb-audio was driven
-> > by ehci, but upon closer inspection, they are both on the same OHCI.
-> > 
-> > > When you ran this test, did you have commit 815fa7b91761 applied?
-> > 
-> > Yes.
-> > 
-> > > Does the same problem occur without Manjunath's changes?
-> > 
-> > No, it was introduced by the first patch, as I found later.
-> 
-> I'll try to replicate your result.  I don't have my USB audio device 
-> here today, so it will have to wait until tomorrow.
+Quoting Marek Belisko (2013-05-16 00:53:26)
+> On 05/14/2013 09:16 PM, Mike Turquette wrote:
+> > Quoting Marek Belisko (2013-05-02 22:53:22)
+> >> Rate was incorrectly computed because we read from wrong divider register.
+> >>
+> >> Signed-off-by: Marek Belisko <marek.belisko@streamunlimited.com>
+> >> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> >
+> > Do either of these patches need to go into clk-fixes?  If so please be
+> > explicit about it in the changelog, the section under the three dashes.
+> Yes I believe they should go to clk-fixes (probably also to linux-stable).
 
-Strange enough, it seems to be working now, on a different base.
+Pulled both into clk-fixes.  I added the missing changelog to patch #2
+because I am such a nice guy.
 
-The kernel I tried last (based on yesterday's linux-next) also
-had other issues and was very slow, so it may have been something
-different.
+Regards,
+Mike
 
-	Arnd
+> >
+> > Regards,
+> > Mike
+> >
+> >> ---
+> >>   drivers/clk/clk-si5351.c |    2 +-
+> >>   1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >> diff --git a/drivers/clk/clk-si5351.c b/drivers/clk/clk-si5351.c
+> >> index 8927284..cf39e53 100644
+> >> --- a/drivers/clk/clk-si5351.c
+> >> +++ b/drivers/clk/clk-si5351.c
+> >> @@ -932,7 +932,7 @@ static unsigned long si5351_clkout_recalc_rate(struct clk_hw *hw,
+> >>          unsigned char reg;
+> >>          unsigned char rdiv;
+> >>
+> >> -       if (hwdata->num > 5)
+> >> +       if (hwdata->num <= 5)
+> >>                  reg = si5351_msynth_params_address(hwdata->num) + 2;
+> >>          else
+> >>                  reg = SI5351_CLK6_7_OUTPUT_DIVIDER;
+> >> --
+> >> 1.7.9.5
+> >
+> 
+> Regards,
+> 
+> Marek
+> -- 
+> Marek Belisko
+> 
+> Software Developer
+> StreamUnlimited Engineering GmbH
+> Gutheil Schodergasse 8-12
+> A-1100 Vienna, Austria
+> 
+> Office: +421 267200087
+> 
+> e-mail: marek.belisko at streamunlimited.com
+> http://www.streamunlimited.com
+> 
+> Meet us at:
+> 
+> IFA - Berlin, 6-11 September
+> CEDIA - Denver, 25-28 September
