@@ -1,64 +1,42 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 29 May 2013 16:16:49 -0700
-Subject: [PATCH 4/4] MAINTAINERS: vt8500: Add clk-vt8500.c to MAINTAINERS
- file
-In-Reply-To: <51973C1D.2080404@prisktech.co.nz>
-References: <1368825532-30917-1-git-send-email-linux@prisktech.co.nz>
- <1368825532-30917-5-git-send-email-linux@prisktech.co.nz>
- <CABjd4Yw2LbnaUbQFW_bd_6WRGTA34-Vp_tUC2b4Jczj-MM8x1w@mail.gmail.com>
- <51973C1D.2080404@prisktech.co.nz>
-Message-ID: <20130529231649.6058.4589@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 29 May 2013 17:19:20 -0600
+Subject: [PATCH v7] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <1369753575-9818-1-git-send-email-p.zabel@pengutronix.de>
+References: <1369753575-9818-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <51A68CF8.7000303@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Prisk (2013-05-18 01:30:21)
-> On 18/05/13 18:40, Alexey Charkov wrote:
-> > On 18 May 2013 01:18, "Tony Prisk" <linux@prisktech.co.nz> wrote:
-> >> This file has missed being added under ARM/VT8500 ARM ARCHITECTURE,
-> >> and is maintained along with the rest of the vt8500 arch code.
-> >>
-> >> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> >> ---
-> >>   MAINTAINERS |    1 +
-> >>   1 file changed, 1 insertion(+)
-> >>
-> >> diff --git a/MAINTAINERS b/MAINTAINERS
-> >> index 3d7782b..5ab8ccb 100644
-> >> --- a/MAINTAINERS
-> >> +++ b/MAINTAINERS
-> >> @@ -1283,6 +1283,7 @@ M:        Tony Prisk <linux@prisktech.co.nz>
-> >>   L:     linux-arm-kernel at lists.infradead.org (moderated for
-> > non-subscribers)
-> >>   S:     Maintained
-> >>   F:     arch/arm/mach-vt8500/
-> >> +F:     drivers/clk/vt8500-vt8500.c
-> > This looks like a typo (clk vs. vt8500).
-> >
-> > Best,
-> > Alexey
-> >
-> eeek - oops.
-> 
-> Mike,
-> 
-> Disregard this patch - I will send a more complete one through arm-soc 
-> as there are other files missing as well.
-> 
+On 05/28/2013 09:06 AM, Philipp Zabel wrote:
+> This driver implements a reset controller device that toggle a gpio
+> connected to a reset pin of a peripheral IC. The delay between assertion
+> and de-assertion of the reset signal can be configured via device tree.
 
-Hi Tony,
+> diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
 
-I've taken patch #1 into clk-fixes.  I took patches #2 & #3 into
-clk-next from your previous series posted on May 13, which appear
-identical to the ones in this series.  In the future could you put a
-"v2" in the patch subject since those patches were re-posted?  It would
-have helped me catch it.
+> +static void __gpio_reset_set(struct reset_controller_dev *rcdev, int asserted)
 
-I have not taken patch #4.
+Nit: Technically I think __ is a reserved name-space, so you shouldn't
+prefix "user-level" (rather than libc/similar) symbols with it, but it's
+not a big deal.
 
-Does this all sound correct to you?
+> +static int gpio_reset_probe(struct platform_device *pdev)
 
-Thanks,
-Mike
+> +	if (of_gpio_named_count(np, "reset-gpios") != 1)
+> +		return -EINVAL;
 
-> Regards
-> Tony P
+Should that error-path (and the path for of_property_read_u32() failure)
+include a dev_err() like some already do, so it's obvious what the
+failure is?
+
+> +	reset_controller_register(&drvdata->rcdev);
+> +
+> +	platform_set_drvdata(pdev, drvdata);
+
+It might be better to set the drvdata right after it's been allocated.
+It perhaps doesn't matter much here, but if the reset controller core
+ever starts calling into the registered device inside the call to
+reset_controller_register(), then there might be a problem.
+
+Aside from those minor issues,
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
