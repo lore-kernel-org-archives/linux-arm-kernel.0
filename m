@@ -1,64 +1,54 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 29 May 2013 11:16:14 +0200
-Subject: [PATCH] ARM: EXYNOS: Fix support of Exynos4210 rev0 SoC
-In-Reply-To: <120501ce5752$6daef380$490cda80$%kim@samsung.com>
-References: <1368630484-29939-1-git-send-email-t.figa@samsung.com>
- <1623377.nVo7nUcid2@flatron> <120501ce5752$6daef380$490cda80$%kim@samsung.com>
-Message-ID: <51A5C75E.7090006@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 May 2013 10:24:21 +0100
+Subject: VDSO for arm 32bit
+In-Reply-To: <634BB1CFA60ED14386C17849392C3EB202E52CA407@HICGWSEX01.ad.harman.com>
+References: <634BB1CFA60ED14386C17849392C3EB202E52C9C0A@HICGWSEX01.ad.harman.com>
+ <20899.25935.838288.45383@pilspetsen.it.uu.se>
+ <634BB1CFA60ED14386C17849392C3EB202E52C9E87@HICGWSEX01.ad.harman.com>
+ <20130528092313.GA10474@mudshark.cambridge.arm.com>
+ <634BB1CFA60ED14386C17849392C3EB202E52CA407@HICGWSEX01.ad.harman.com>
+Message-ID: <20130529092421.GC13095@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, May 29, 2013 at 05:00:09AM +0100, Kumar, Ganesh wrote:
+>    Hmm, it doesn't seem to be quite straight forward, but thanks for the
+>    inputs and caution.  Now that I got a direction, I'm planning to
+>    proceed as below: 1. As a first step, get the implementation up and
+>    running using the kuser helper (understand the situation and plan to
+>    limit my implementation for the ARM Cortex's arch timer clock type) On
+>    the user land, does this approach needs a change to the libc, kindly
+>    confirm. I read the kernel documentation for kuser helper, it gave a
+>    nice overview of how things can be done, but not so clear on how
+>    actually the helper functions can be called from the user land (the big
+>    picture), does it needs a tweak in the libc in order to enable     the
+>    new helper functions defined.
 
-On 5/23/2013 3:11 AM, Kukjin Kim wrote:
-> Kukjin Kim wrote:
-> >
-> > Tomasz Figa wrote:
-> > >
-> > > Hi Kukjin,
-> > >
-> > Hi,
-> >
-> > > On Wednesday 15 of May 2013 17:08:04 Tomasz Figa wrote:
-> > > > This patch extends exynos_init_time() function to handle Exynos4210
-> > rev0
-> > > > SoC, which differs in availability of system timers and needs
-> > different
-> > > > clocksource initialization.
-> > > >
-> > > > This makes it possible to use exynos_init_time() function as init_time
-> > > > callback for all Exynos-based boards, including Universal_C210, which
-> > > > originally had to use samsung_timer_init().
-> > > >
-> > > > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > > > ---
-> > > >  arch/arm/mach-exynos/Kconfig               |  3 ++-
-> > > >  arch/arm/mach-exynos/common.c              | 30
-> > > > +++++++++++++++++++++++++++++- arch/arm/mach-exynos/common.h
-> > > >   |  2 ++
-> > > >  arch/arm/mach-exynos/mach-universal_c210.c |  5 ++---
-> > > >  4 files changed, 35 insertions(+), 5 deletions(-)
-> > >
-> > > Could you pick this patch to your fixes branch?
-> > >
-> > Yeah, I will after looking at.
-> >
-> > > This is a fix of a regression in handling Exynos4210 rev0 SoC (e.g.
-> > > Universal C210 board) introduced by patches merged to 3.10.
-> > >
-> > OK, I see but I didn't review yet and I  will within a couple of days ;-)
-> >
-> OK, looks fine, this will be sent to upstream during -rc for v3.10.
->
-> But, Tomasz, as you know, non-DT supporting files will be gone away in
-> v3.11, just note.
+Yes, libc would need updating to direct the various clock system calls via
+the vectors page if the kernel is recent enough. Your implementation will
+need to fall back to issuing the system call if the arch timer isn't the
+current clocksource.
 
-This patch is needed to get REV0 4210 based board working both in DT and 
-non-DT
-modes.
+> 2. Plan to get it up through the VDSO, study in progress. One question
+> here, was the vdso implementation for 32 bit is not available only because
+> of the frequent addition in new clock types or there is any strong reason
+> or something I need to take care about, kindly clarify.  I'll start
+> looking into the arm64 vdso code as a starting point, is there anything
+> else I can refer/read to get going? kindly help. 
 
-Best regards
--- 
-Marek Szyprowski
-Samsung R&D Institute Poland
+This might not be needed after the feedback from Nicolas.
+
+> >>> I know some people were toying with exposing memory-mapped timers to
+> >>> userspace, but >>> that really scares me.
+> 
+>    Just curious, what are the side effects of exposing the memory-mapped
+>    timers to user space.
+
+Just that you need to be careful about what you expose and how do you expose
+it. For example, control registers may lie in the same page as the actual
+counter, and you don't want userspace having access to that if possible.
+
+You'd probably also need to copy code into place, since there are many timer
+implementations that could be used.
+
+Will
