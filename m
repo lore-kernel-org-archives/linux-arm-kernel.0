@@ -1,29 +1,93 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 May 2013 18:39:26 -0700
-Subject: [GIT PULL] KVM/ARM Fixes for 3.10
-Message-ID: <CAMJs5B8qTMpaaq0y=xGUrTzUd_-LvmARdGABV8PdpqmWUkPoqw@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Thu, 30 May 2013 09:41:42 +0800
+Subject: A bug about system call on ARM
+In-Reply-To: <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
+ <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
+ <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+ <20130529094826.GD13095@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+Message-ID: <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit e47a5f5fb715b90b40747e9e235de557c6abd56c:
+Hi  Will,
 
-  KVM: x86 emulator: convert XADD to fastop (2013-05-21 15:43:24 +0300)
+Have you received the log files?
 
-are available in the git repository at:
+And is there someone looking at this issue now ?
+This issue happened on Qcom Scorpoin CPUs,
+And  it just happened in our stability test occasionally .
 
-  git://github.com/columbia/linux-kvm-arm.git kvm-arm-fixes-3.10
+If you have some patch for this issue,
+I can do the test for it .
 
-for you to fetch changes up to f3afcd8bf501e98e7707865930338e5a82d8ed88:
+Thanks for your help very much !
 
-  ARM: KVM: be more thorough when invalidating TLBs (2013-05-27 19:34:20 -0700)
+-----Original Message-----
+From: Wang, Yalin 
+Sent: Wednesday, May 29, 2013 5:51 PM
+To: 'Will Deacon'; richard -rw- weinberger
+Cc: linux-arch at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: RE: A bug about system call on ARM
 
-----------------------------------------------------------------
-Andre Przywara (1):
-      ARM: KVM: prevent NULL pointer dereferences with KVM VCPU ioctl
+Hi 
 
-Marc Zyngier (1):
-      ARM: KVM: be more thorough when invalidating TLBs
+This is kernel.log  and  the stack which is recovered by Trace32 tools.
+Please have a look at it .
 
- arch/arm/kvm/arm.c |   15 +++++++++++++--
- arch/arm/kvm/mmu.c |   41 ++++++++++++++++++++++++++---------------
- 2 files changed, 39 insertions(+), 17 deletions(-)
+Thanks 
+
+-----Original Message-----
+From: Will Deacon [mailto:will.deacon at arm.com]
+Sent: Wednesday, May 29, 2013 5:48 PM
+To: richard -rw- weinberger
+Cc: Wang, Yalin; linux-arch at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: A bug about system call on ARM
+
+Hello,
+
+On Wed, May 29, 2013 at 09:46:42AM +0100, richard -rw- weinberger wrote:
+> On Wed, May 29, 2013 at 10:24 AM, Wang, Yalin <Yalin.Wang@sonymobile.com> wrote:
+> > I have download the latest linux kernel code  3.9.4 And Compare with
+> > 3.4.0 kernel .
+> >
+> > It seems there is no change for this part , So it will still happen 
+> > .
+> > Does anyone know who is responsible for  arm arch part kernel code ?
+> 
+> See MAINTAINERS file.
+> CC'ing linux-arm-kernel at lists.infradead.org
+
+Cheers for adding us to CC.
+
+> >> #ifdef CONFIG_ARM_THUMB
+> >>         tst     r8, #PSR_T_BIT
+> >>         movne   r10, #0                         @ no thumb OABI emulation
+> >>         ldreq   r10, [lr, #-4]                  @ get SWI instruction          // crash at this instruction, when get SWI instruction
+
+Do you have the panic log please? Also, which SoC are you using and how are you reproducing this?
+
+> >>         ldr     r10, [lr, #-4]                  @ get SWI instruction
+> >>   A710( and     ip, r10, #0x0f000000            @ check for SWI         )
+> >>   A710( teq     ip, #0x0f000000                                         )
+> >>   A710( bne     .Larm710bug                                             )
+> >> #endif
+> >> #ifdef CONFIG_CPU_ENDIAN_BE8
+> >>         rev     r10, r10                        @ little endian instruction
+> >> #endif
+> >>
+> >> /******************************************************************
+> >> ***
+> >> ******************************/
+> >>
+> >> Then reason why it will crash when get SWI instruction is maybe 
+> >> This page is clear to aged by kernel, But this MMU fault happpened 
+> >> in kernel, So the kernel do_page_fault function will not clear this 
+> >> page to young, So that  will crash .
+
+Sounds like we might need some USER annotations around the instruction loads, but we should also rework the code so that we re-enable interrupts first.
+
+Will
