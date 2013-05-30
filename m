@@ -1,70 +1,126 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 30 May 2013 14:07:12 +0800
-Subject: [PATCH] serail: imx: add support for DTE mode
-Message-ID: <1369894032-7811-1-git-send-email-b32955@freescale.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 May 2013 14:31:26 +0800
+Subject: [PATCH 2/2] ARM: dts: Phytec phyFLEX-i.MX6 support
+In-Reply-To: <1369861609-30408-3-git-send-email-c.hemp@phytec.de>
+References: <1369861609-30408-1-git-send-email-c.hemp@phytec.de>
+ <1369861609-30408-3-git-send-email-c.hemp@phytec.de>
+Message-ID: <20130530063124.GB2602@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uart works in the DCE mode by default, but sometime we need it
-works at the DTE mode.
+On Wed, May 29, 2013 at 11:06:49PM +0200, Christian Hemp wrote:
+> Add support for Phytec phyFLEX-i.MX6 board
 
-This patch adds the support for the DTE mode.
+It's a board supporting all i.MX6 family?  Can we name it using SoC than
+family name?
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- .../bindings/tty/serial/fsl-imx-uart.txt           |    3 +++
- drivers/tty/serial/imx.c                           |    6 ++++++
- 2 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+> ---
+>  arch/arm/boot/dts/Makefile                 |    1 +
+>  arch/arm/boot/dts/imx6q-phytec-phyflex.dts |   76 ++++++++++++++++++++++++++++
+>  2 files changed, 77 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-phytec-phyflex.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 4c58951..6ffdaa1 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -118,6 +118,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx6dl-sabresd.dtb \
+>  	imx6dl-wandboard.dtb \
+>  	imx6q-arm2.dtb \
+> +	imx6q-phytec-phyflex.dtb \
+>  	imx6q-sabreauto.dtb \
+>  	imx6q-sabrelite.dtb \
+>  	imx6q-sabresd.dtb \
+> diff --git a/arch/arm/boot/dts/imx6q-phytec-phyflex.dts b/arch/arm/boot/dts/imx6q-phytec-phyflex.dts
+> new file mode 100644
+> index 0000000..9690691
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-phytec-phyflex.dts
+> @@ -0,0 +1,76 @@
+> +/*
+> + * Copyright 2013 Christian Hemp, Phytec Messtechnik GmbH
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx6q.dtsi"
+> +
+> +/ {
+> +	model = "Phytec phyFLEX-i.MX6";
+> +	compatible = "phytec,phyflex-imx6", "fsl,imx6q";
 
-diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-index b462d0c..c662eb3 100644
---- a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-+++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
-@@ -8,6 +8,8 @@ Required properties:
- Optional properties:
- - fsl,uart-has-rtscts : Indicate the uart has rts and cts
- - fsl,irda-mode : Indicate the uart supports irda mode
-+- fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
-+                  is DCE mode by default.
- 
- Example:
- 
-@@ -16,4 +18,5 @@ serial at 73fbc000 {
- 	reg = <0x73fbc000 0x4000>;
- 	interrupts = <31>;
- 	fsl,uart-has-rtscts;
-+	fsl,dte-mode;
- };
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index 72bc1db..381a2d7 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -201,6 +201,7 @@ struct imx_port {
- 	unsigned int		old_status;
- 	int			txirq, rxirq, rtsirq;
- 	unsigned int		have_rtscts:1;
-+	unsigned int		dte_mode:1;
- 	unsigned int		use_irda:1;
- 	unsigned int		irda_inv_rx:1;
- 	unsigned int		irda_inv_tx:1;
-@@ -1020,6 +1021,8 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	ufcr = readl(sport->port.membase + UFCR);
- 	ufcr = (ufcr & (~UFCR_RFDIV)) | UFCR_RFDIV_REG(div);
-+	if (sport->dte_mode)
-+		ufcr |= UFCR_DCEDTE;
- 	writel(ufcr, sport->port.membase + UFCR);
- 
- 	writel(num, sport->port.membase + UBIR);
-@@ -1444,6 +1447,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
- 	if (of_get_property(np, "fsl,irda-mode", NULL))
- 		sport->use_irda = 1;
- 
-+	if (of_get_property(np, "fsl,dte-mode", NULL))
-+		sport->dte_mode = 1;
-+
- 	sport->devdata = of_id->data;
- 
- 	return 0;
--- 
-1.7.1
+ditto
+
+Shawn
+
+> +
+> +	memory {
+> +		reg = <0x10000000 0x80000000>;
+> +	};
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	hog {
+> +                pinctrl_hog: hoggrp {
+> +                        fsl,pins = <
+> +				MX6Q_PAD_EIM_D23__GPIO3_IO23    0x80000000
+> +			>;
+> +		};
+> +	};
+> +
+> +	phyflex {
+> +		pinctrl_usdhc3_phyflex: usdhc3grp-phyflex {
+> +			fsl,pins = <
+> +				MX6Q_PAD_ENET_RXD0__GPIO1_IO27  0x80000000
+> +				MX6Q_PAD_ENET_TXD1__GPIO1_IO29  0x80000000
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet_3>;
+> +	phy-mode = "rgmii";
+> +	phy-reset-gpios = <&gpio3 23 0>;
+> +	status = "okay";
+> +};
+> +
+> +&uart4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart4_1>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2_2>;
+> +	cd-gpios = <&gpio1 4 0>;
+> +	wp-gpios = <&gpio1 2 0>;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +        pinctrl-names = "default";
+> +        pinctrl-0 = <&pinctrl_usdhc3_2
+> +		     &pinctrl_usdhc3_phyflex>;
+> +        cd-gpios = <&gpio1 27 0>;
+> +        wp-gpios = <&gpio1 29 0>;
+> +        status = "okay";
+> +};
+> +
+> -- 
+> 1.7.9.5
+> 
