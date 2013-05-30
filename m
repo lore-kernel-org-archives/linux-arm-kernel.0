@@ -1,78 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 May 2013 13:18:54 -0700
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 May 2013 22:21:50 +0200
 Subject: MUSB multiplatform work?
-In-Reply-To: <20130528163548.GC28253@arwen.pp.htv.fi>
+In-Reply-To: <20130530201854.GB6467@atomide.com>
 References: <201305271702.09203.arnd@arndb.de>
  <20130528163548.GC28253@arwen.pp.htv.fi>
-Message-ID: <20130530201854.GB6467@atomide.com>
+ <20130530201854.GB6467@atomide.com>
+Message-ID: <CACRpkdZHupVFS+pNADpaJjunPa3fEtyCqLwbL-etHs3gt8EW0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130528 09:42]:
-> Hi,
-> 
-> On Mon, May 27, 2013 at 05:02:09PM +0200, Arnd Bergmann wrote:
-> > Hi Felipe,
-> > 
-> > We've gone through remaining work items for getting the ARM kernel
-> > to full multiplatform support again, and MUSB came up. I'm sure you
-> > have your own thoughts on this, but I'd like to know if there is
-> > already a plan in place.
-> > 
-> > From what I can see, the driver in PIO mode should almost work
-> > on multiple platforms, but there are a couple of compile-time
-> > dependencies in it that need to be turned into run-time conditionals.
-> > In particular the TUSB version seem sufficiently different that
-> > it needs some extra work to be a true run-time option.
-> 
-> yeah, TUSB layer is quite messy, all the others should be doable though.
+On Thu, May 30, 2013 at 10:18 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-TUSB we can make depend on ARMv7, the only implementation we have
-is for omap2420, which is ARMv6. This should solve the issue for
-ARMv7 multiplatform builds for now.
- 
-> > The DMA support as far as I can tell has never been intended to
-> > be usable in a multiplatform setup, but that also seems doable.
-> 
-> we're looking into dmaengine for that but will take a lot of work to
-> have something usable.
+> TUSB would work with dmaengine, but AFAIK we're still missing the
+> dmaengine configuration options to support increasing device end
+> FIFO address.
 
-TUSB would work with dmaengine, but AFAIK we're still missing the
-dmaengine configuration options to support increasing device end
-FIFO address.
- 
-> > Looking just at the #ifdef statements in the driver, I found
-> > that the following things need to be addressed:
-> > 
-> > * abstract musb_write_fifo and musb_read_fifo into callbacks
-> > * move fifo_mode setting into glue driver for runtime selection
-> 
-> for the fifo mode, I'd rather detect the size of the internal fifo and
-> configure it dynamically based on that plus number of endpoints
-> configured in the IP.
-> 
-> > * turn TUSB compile-time switches into run-time conditionals
-> > * turn musb_ep_select into run-time switch
-> > * make is_dma_capable/is_cppi_enabled/tusb_dma_omap run-time conditionals
-> 
-> those can be remove, actually. Back at Nokia we did a huge cleanup on
-> the DMA programming part, it can be very simple with no ifdefs at all,
-> just needs someone to put the work and test on all platforms.
-> 
-> > * abtract dma_controller_create/destroy interface
-> > 
-> > Aside from this, a recent discussion with Maxime has brought up
-> > that the Allwinner A1x platform (mach-sunxi) contains an MUSB variant
-> > that is currently used with an independently implemented device driver,
-> > see https://github.com/linux-sunxi/linux-sunxi/tree/sunxi-3.0/drivers/usb/sun5i_usb
-> > I wonder if you have any insight on how that can be integrated into
-> > musb, or whether it is likely to be a compatible version to start with.
-> 
-> just write a glue layer, should be as easy as that :-)
+Can you elaborate on this? What is the usecase here?
 
-Yes the MUSB code should be able to support it considering the number
-of implementations we already have there.
-
-Regards,
-
-Tony
+Yours,
+Linus Walleij
