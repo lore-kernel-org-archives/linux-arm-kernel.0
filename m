@@ -1,56 +1,42 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 30 May 2013 09:24:24 +0200
-Subject: [v2, 3/3] ARM: dts: AM33XX: Add NAND flash device tree data to
- am335x-evm
-In-Reply-To: <20980858CB6D3A4BAE95CA194937D5E73E9C5629@DBDE04.ent.ti.com>
-References: <ebfab3e9123b3e50b9a9678c1480191addd86d59.1359007746.git.avinashphilip@ti.com>
- <517F5126.5000509@ti.com> <20130508235404.GX32546@atomide.com>
- <20980858CB6D3A4BAE95CA194937D5E73E9C320D@DBDE04.ent.ti.com>
- <20980858CB6D3A4BAE95CA194937D5E73E9C5629@DBDE04.ent.ti.com>
-Message-ID: <51A6FEA8.5030704@ti.com>
+From: srinidhi.kasagar@stericsson.com (Srinidhi Kasagar)
+Date: Thu, 30 May 2013 12:56:13 +0530
+Subject: [PATCH 6/8] ARM: ux500: use generic cpu idle function for wfi
+In-Reply-To: <1369665166-13049-7-git-send-email-sanjay.rawat@linaro.org>
+References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
+ <1369665166-13049-7-git-send-email-sanjay.rawat@linaro.org>
+Message-ID: <20130530072612.GB32244@bnru10>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pekon,
-
-On 05/20/2013 06:44 AM, Gupta, Pekon wrote:
->  
->>>>>
->>>>>  	am33xx_pinmux: pinmux at 44e10800 {
->>>>>  		pinctrl-names = "default";
->>>>> -		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0>;
->>>>> +		pinctrl-0 = <&matrix_keypad_s0 &volume_keys_s0
->>>>> +			&nandflash_pins_s0>;
->>>>
->>>> Why add this to the board level fallback (called pinctrl hogs, I think)?
->>>> This can be part of nand node you added below so that the pinctrl will
->>>> take effect when nand gets probed instead of all the time.
->>>
->>> Yes we should have all the pinctrl entries under the related drivers.
->>> This makes it easy remux pins during runtime if needed, and also
->>> allows unloading pinctrl-single.ko for development.
->>>
->> Yes, accepted. This has been already fixed in v3 of this patch set.
->> If all fine, then please pull this for next merge..
->>
->> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046712.html
->>
->> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046814.html
->>
->> http://lists.infradead.org/pipermail/linux-mtd/2013-May/046710.html
->>
->>
->> with regards, pekon
+On Mon, May 27, 2013 at 16:32:43 +0200, Sanjay Singh Rawat wrote:
+> use cpu_do_idle for entering the wfi mode.
 > 
-> Request you to please accept | provide feedbacks on this patch series.
-> These are waiting acceptance since Jan-2013, and are necessary for 
-> DT based configs for board having NAND support.
+> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+> ---
+>  arch/arm/mach-ux500/hotplug.c |    5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> with regards, pekon
+> diff --git a/arch/arm/mach-ux500/hotplug.c b/arch/arm/mach-ux500/hotplug.c
+> index 2bc00b0..f4ded92 100644
+> --- a/arch/arm/mach-ux500/hotplug.c
+> +++ b/arch/arm/mach-ux500/hotplug.c
+> @@ -25,8 +25,9 @@ void __ref ux500_cpu_die(unsigned int cpu)
+>  {
+>  	/* directly enter low power state, skipping secure registers */
+>  	for (;;) {
+> -		__asm__ __volatile__("dsb\n\t" "wfi\n\t"
+> -				: : : "memory");
+> +		/* enter WFI mode */
+> +		cpu_do_idle();
+> +
 
-Sorry, I missed that series.
+Acked-by: srinidhi kasagar <srinidhi.kasagar@stericsson.com>
 
-I'm applying it right now.
+srinidhi
 
-Thanks,
-Benoit
+>  		if (pen_release == cpu_logical_map(cpu)) {
+>  			/*
+>  			 * OK, proper wakeup, we're done
+> -- 
+> 1.7.9.5
+> 
