@@ -1,33 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 May 2013 22:08:56 +0200
-Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
-In-Reply-To: <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
-References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
- <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CACRpkdZxWsJuvrtH-=VVqAGUCpdgS3W52R4tw5-_QGpggB+1uw@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 30 May 2013 22:13:21 +0200
+Subject: [PATCH 0/3] at_hdmac: dt dma bindings update
+In-Reply-To: <20130530172649.GC3767@intel.com>
+References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
+ <20130530172649.GC3767@intel.com>
+Message-ID: <20130530201321.GE23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 12:28 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
+On 22:56 Thu 30 May     , Vinod Koul wrote:
+> On Thu, May 30, 2013 at 06:08:20PM +0200, ludovic.desroches at atmel.com wrote:
+> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > 
+> > Hi,
+> > 
+> > This set of patches update the dt dma binding for at_hdmac since we need one
+> > more parameter. In order to keep backward compatibility, an existing cell will
+> > be used to add this parameter. Since the content of that cell will become a
+> > magic value due to the concatenation of the two parameters, it is time to
+> > use macros.
+> which tree is this targetted to be applied? 
 
-> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->
-> The USB_OVCn pins are alternate options for USB over-current detection
-> when using a 3.3V USB interface. As they're not mandatory they can be
-> used independently of the USB PENC pins. Don't group the USB_OVCn and
-> PENC pins to avoid conflicts when the USB_OVCn pins are used by another
-> function.
->
-> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+arm-soc as this depends on alreadied applied cleanup I've 
+> 
+> Arnd, can you review this series and ack if this needs to be applied thru
+> dmaengine?
 
-OK, Acked-by, do you want me to take this as a fix in the pinctrl
-tree for v3.10?
+I prefer the invert
 
-Just asking because Simon usually takes everything else relating to
-the SH. ...
-
-Yours,
-Linus Walleij
+Best Regards,
+J.
+> 
+> --
+> ~Vinod
+> > 
+> > Regards
+> > 
+> > Ludovic Desroches (3):
+> >   ARM: at91: dt: add header to define at_hdmac configuration
+> >   ARM: at91: dt: switch DMA DT bindings to pre-processor
+> >   at_hdmac: add FIFO configuration parameter to DMA DT binding
+> > 
+> >  .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
+> >  arch/arm/boot/dts/at91sam9g45.dtsi                 |  5 ++--
+> >  arch/arm/boot/dts/at91sam9n12.dtsi                 | 11 +++++----
+> >  arch/arm/boot/dts/at91sam9x5.dtsi                  | 17 +++++++-------
+> >  arch/arm/boot/dts/sama5d3.dtsi                     | 19 +++++++--------
+> >  drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++----
+> >  include/dt-bindings/dma/at91.h                     | 27 ++++++++++++++++++++++
+> >  7 files changed, 81 insertions(+), 30 deletions(-)
+> >  create mode 100644 include/dt-bindings/dma/at91.h
+> > 
+> > -- 
+> > 1.7.11.3
+> > 
+> 
+> -- 
