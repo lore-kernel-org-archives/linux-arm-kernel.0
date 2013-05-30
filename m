@@ -1,28 +1,39 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 May 2013 23:11:02 +0200
-Subject: [PATCH 1/2] gpiolib: add gpio_export_with_name
-In-Reply-To: <51A7B8CD.4080702@epfl.ch>
-References: <20121121101259.GQ4398@game.jcrosoft.org>
- <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
- <20121126135911.2F1D33E187C@localhost> <51A719A5.50906@epfl.ch>
- <CACRpkdb9F+wJ0hkNqPTP34r3JAEp2s07Q8U24fD6oCdj7MqCFA@mail.gmail.com>
- <51A7B8CD.4080702@epfl.ch>
-Message-ID: <CACRpkdZMj-Xin5PMDWavaWOTCSZF3NBWXk4fG4QXsJzhwBcs_Q@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 30 May 2013 14:11:31 -0700
+Subject: [PATCH] ARM: EXYNOS: Consolidate multiple low-level UART port
+ definitions
+In-Reply-To: <1369888827-9427-1-git-send-email-tushar.behera@linaro.org>
+References: <1369888827-9427-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <CAOesGMgt=zvPM7WoHn4VcUkw28j7+HDUvU2n3hNojx7Nr5PqJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 10:38 PM, Florian Vaussard
-<florian.vaussard@epfl.ch> wrote:
+Hi,
 
-> Indeed, I work in a robotics lab :-) One of our board (mach-imx/
-> mx31moboard*.c) controls for example the multiplexing of two cameras
-> sharing the same acquisition bus (I know, a bit hackish).
-> I developed a similar board with an OMAP3. Such control do not
-> fit well in the above-mentioned cases, but we do not need RT processes.
+On Wed, May 29, 2013 at 9:40 PM, Tushar Behera <tushar.behera@linaro.org> wrote:
+> There are two definitions for low-level UART ports for Exynos platform.
+> CONFIG_S3C_LOWLEVEL_UART_PORT is used for printing "Uncompressing
+> Linux... done, booting the kernel." and CONFIG_S3C_UART for other
+> low-level messages.
+>
+> The assumption for both the uart ports is that they are pre-configured
+> in the bootloader. Since they are essentially the same always, it
+> would be good to consolidate them to use only one macro, in this case
+> 'DEBUG_S3C_UART' would be a better option.
+>
+> 'DEBUG_S3C_UART' is defined only if DEBUG_LL is enabled. We can safely
+> disable this option when DEBUG_LL is not defined and we can boot various
+> boards with different UART port settings. Only drawback of this
+> approach is that when DEBUG_LL is not defined, we would be missing the
+> print "Uncompressing Linux... done, booting the kernel."
+>
+> Since CONFIG_S3C_LOWLEVEL_UART_PORT is still used by other Samsung
+> boards, the consolidation applies only for ARCH_EXYNOS.
+>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
 
-It does seem to fit well with V4L and/or the media controller
-framework though, or is this one of those "oh, we don't really
-like to use V4L so we have this special hack instead" things?
+This looks reasonable, but you have to convert the other samsung
+platforms too -- it's not ok to ignore them.
 
-Yours,
-Linus Walleij
+
+-Olof
