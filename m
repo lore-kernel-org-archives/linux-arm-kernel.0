@@ -1,24 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 May 2013 10:47:38 +0200
-Subject: [PATCH 29/39] dmaengine: ste_dma40: Use the BIT macro to replace
- ugly '(1 << x)'s
-In-Reply-To: <1368611522-9984-30-git-send-email-lee.jones@linaro.org>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-30-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYgu3q8s=jMfQ1L-WEoDxRz4gQW6+jqZ8RTVvCAnLQKVA@mail.gmail.com>
+From: jp.francois@cynove.com (jean-philippe francois)
+Date: Thu, 30 May 2013 10:49:51 +0200
+Subject: [PATCH v2 0/1] ARM: omap3: Fix regression in dpll4 child clock
+ frequency setting.
+Message-ID: <CAGGh5h3fjXkmsZDvQVGJ6ehdz7SUghhHcBU-rCcRq_7HQSWN6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi,
 
-> The aim is to make the code that little more readable.
->
-> Acked-by: Vinod Koul <vnod.koul@intel.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+The following patch fixes a wrong container_of usage for omap3630.
+All sub clock of dpll4 that do not use a reset value as divider are
+affected.
 
-Patch applied to my ux500-dma40 branch.
+For instance CAM_MCLK is 216 MHz instead of the asked 172,8 MHz
+Any user of this clock is affected. This is the case for instance if
+CAM_XCLKA is used to provide clock for an external camera.
 
-Yours,
-Linus Walleij
+Beyond wrong frequency setting, this is also a potential oops waiting
+to bite any omap3isp user, since a wrong pointer is dereferenced, and
+content of this pointer is used to do __raw_writel / __raw_readl.
+
+v2 :
+Follow Mike Turquette's comment and use clock framework instead of
+directly accessing register.
+
+Regards,
+Jean-Philippe Fran?ois
