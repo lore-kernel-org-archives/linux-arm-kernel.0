@@ -1,117 +1,62 @@
-From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
-Date: Thu, 30 May 2013 12:25:40 +0530
-Subject: [PATCH v2 2/5] clk: samsung: Add support to register rate_table
- for PLL3xxx
-In-Reply-To: <CAD=FV=VDi+SfebiFnPNp8qR__9L=o9TJ+WSPRfRQLX+p+TMmJw@mail.gmail.com>
-References: <1369834677-20312-1-git-send-email-vikas.sajjan@linaro.org>
- <1369834677-20312-3-git-send-email-vikas.sajjan@linaro.org>
- <CAD=FV=VDi+SfebiFnPNp8qR__9L=o9TJ+WSPRfRQLX+p+TMmJw@mail.gmail.com>
-Message-ID: <CAKew6eVGnHNN7Fk=sqzE1iV+SFtJ1z4k1freeWdbGaYPXqpUvQ@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 30 May 2013 16:05:54 +0900
+Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
+In-Reply-To: <51A6C97A.6030306@linaro.org>
+References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
+ <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
+ <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
+ <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
+ <51A5C16D.20408@linaro.org> <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
+ <CAOesGMiYs6GfaWGWYB8cw_cJ6_RmmZTb4oPfXo1PYJT8-jdHzw@mail.gmail.com>
+ <51A6C97A.6030306@linaro.org>
+Message-ID: <000101ce5d04$20abb7a0$620326e0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
-
-On Thu, May 30, 2013 at 5:14 AM, Doug Anderson <dianders@chromium.org> wrote:
-> Vikas / Yadwinder,
->
-> On Wed, May 29, 2013 at 6:37 AM, Vikas Sajjan <vikas.sajjan@linaro.org> wrote:
->> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
+On Thursday, May 30, 2013 12:38 PM, Tushar Behera wrote:
+>On 05/30/2013 12:16 AM, Olof Johansson wrote:
+>> On Wed, May 29, 2013 at 2:33 AM, Jingoo Han <jg1.han@samsung.com> wrote:
 >>
->> This patch defines a common rate_table which will contain recommended p, m, s,
->> k values for supported rates that needs to be changed for changing
->> corresponding PLL's rate.
+>>> However, Olof Johansson mentioned, 'drivers/platform/arm/board_arndale.c'
+>>> would be a good alternative.
 >>
->> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
->> ---
->>  drivers/clk/samsung/clk-exynos4.c    |    8 ++++----
->>  drivers/clk/samsung/clk-exynos5250.c |   14 +++++++-------
->>  drivers/clk/samsung/clk-pll.c        |   14 ++++++++++++--
->>  drivers/clk/samsung/clk-pll.h        |   33 +++++++++++++++++++++++++++++++--
->>  4 files changed, 54 insertions(+), 15 deletions(-)
+>>
+>> Whoa. I didn't quite realize what I proposed, or rather, how what I
+>> proposed could be perceived. I take it back. :)
+
+My original message is as below.
+
+"However, as Olof Johansson mentioned, 'drivers/platform/arm/'
+would be a good alternative."
+
+Also, 'board_arndale.c' should not be mentioned.
+Sorry for making confusion. :)
+
+>>
+>> We must _not_ introduce something that will be abused as a new home
+>> for board file junk. If we do introduce a platform glue directory it
+>> would need to be very limited in scope. Compare to what's in
+>> drivers/platform/x86 today.
+>>
+>>
+>> -Olof
+>>
 >
-> I also reviewed this in our gerrit
-> <https://gerrit.chromium.org/gerrit/#/c/56742/>, but I'll summarize
-> here for the list...
+>This was my proof-of-concept for moving USB hub reset code out of USB
+>driver. Verified that it works.
+
+Thank you for your additional comment.
+
 >
->>  struct clk * __init samsung_clk_register_pll35xx(const char *name,
->> -                       const char *pname, const void __iomem *base)
->> +                       const char *pname, const void __iomem *base,
->> +                       const struct samsung_pll_rate_table *rate_table,
->> +                       const unsigned int rate_count)
+>I would wait for your patches for wifi-reset sequence and then will add
+>hub-reset code for Arndale.
+
+Yes, this way looks good.
+
+Best regards,
+Jingoo Han
+
 >
-> Feels like you should document here that rate_table needs to be sorted
-> and the sort order.
 >
-
-sure,  we will add comment  to sort the table in descending order.
-
->> +struct samsung_pll_rate_table {
->> +       unsigned  int rate;
->
-> nit: extra space before "int" should be removed.
->
-
-ok
-
-> Also: you can include rate here if you need a convenient place to
-> store it (which sadly means that this structure can't be const).
-> ...but I do like Tomasz's idea of actually calculating it.  You can't
-> know it at compile time since the parent rate comes from the device
-> tree.
->
-> compatible = "samsung,clock-xxti";
-> clock-frequency = <24000000>;
->
-
-Actually this table should contain the recommended values
-and if we see the user manual, the input(parent) rate is also a part
-of recommended
-table of different output rate for a particular PLL for that SoC.
-
-So as Tomasz said input(parent) rate may change with board,
-then, do those corresponding recommended p, m, s, k will be valid?
-
-In case, input(parent) rate changes then we may need different set of p, m ,s, k
-values recommended for new input rate to get required(recommended to
-use) output rate.
-
-So, we think its better that the p, m, s and k along with the parent
-is known at the compile time ( or DT ?),
-as these p, m, s, k values are very much coupled with the parent rate
-to achieve the
- required(recommended to use) output rate.
-
-Also, since the sorted table is required (sorted based on "rate"),
-its better to have the rate in a const rate table.
-
-And the whole set of recommended values should come from same place(DT
-or static table),
-to keep the things simple and consistent.
-
-Moreover, practically for a particular SoC , we use the recommended
-input(parent) rate only for a PLL.
-So we should keep the things simple here presently.
-
->> +       unsigned int pdiv;
->> +       unsigned int mdiv;
->> +       unsigned int sdiv;
->> +       unsigned int kdiv;
->
-> I think kdiv is signed.
->
-
-No, as these values should be the recommended values to be written in
-corresponding  register bits. So it should remain unsigned.
-
-K value should be considered as negative only while recalculating rate.
-
-As per exynos5250 user manual's section 7.3.2 :
-" K value description "Postive value (Negative value)":
-Postive values is that you should write EPLLCON/VPLLCON register.
-Negative value is that you can calculate PLL output frequency with it."
-
-> -Doug
-
-Regards,
-Yadwinder & Vikas.
+>--
+>Tushar Behera
