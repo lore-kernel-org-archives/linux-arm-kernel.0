@@ -1,46 +1,76 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 May 2013 15:49:24 +0200
-Subject: [PATCHv4 5/6] ARM: cubieboard: Enable ethernet (EMAC) support in dts
+Date: Thu, 30 May 2013 15:49:25 +0200
+Subject: [PATCHv4 6/6] ARM: sunxi: Add EMAC Controller to Hackberry dt
 In-Reply-To: <1369921765-3367-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1369921765-3367-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1369921765-3367-6-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1369921765-3367-7-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Roese <sr@denx.de>
+The Hackberry has a PHY that needs to be powered up through a GPIO, so
+we need to use a fixed regulator here.
 
-Signed-off-by: Stefan Roese <sr@denx.de>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Tested-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-hackberry.dts | 41 +++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-index b70fe0d..e752b57 100644
---- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
-@@ -27,6 +27,21 @@
+diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+index b9efac1..3514b37 100644
+--- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
++++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
+@@ -23,10 +23,51 @@
  	};
  
  	soc at 01c20000 {
 +		emac: ethernet at 01c0b000 {
 +			pinctrl-names = "default";
 +			pinctrl-0 = <&emac_pins_a>;
-+			phy = <&phy1>;
++			phy = <&phy0>;
 +			status = "okay";
 +		};
 +
 +		mdio at 01c0b080 {
++			phy-supply = <&reg_emac_3v3>;
 +			status = "okay";
 +
-+			phy1: ethernet-phy at 1 {
-+				reg = <1>;
++			phy0: ethernet-phy at 0 {
++				reg = <0>;
 +			};
 +		};
 +
- 		pinctrl at 01c20800 {
- 			led_pins_cubieboard: led_pins at 0 {
- 				allwinner,pins = "PH20", "PH21";
++		pio: pinctrl at 01c20800 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&hackberry_hogs>;
++
++			hackberry_hogs: hogs at 0 {
++				allwinner,pins = "PH19";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <0>;
++				allwinner,pull = <0>;
++			};
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			pinctrl-names = "default";
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
+ 		};
+ 	};
++
++	regulators {
++		compatible = "simple-bus";
++
++		reg_emac_3v3: emac-3v3 {
++			compatible = "regulator-fixed";
++			regulator-name = "emac-3v3";
++			regulator-min-microvolt = <3300000>;
++			regulator-max-microvolt = <3300000>;
++			enable-active-high;
++			gpio = <&pio 7 19 0>;
++		};
++	};
+ };
 -- 
 1.8.2.3
