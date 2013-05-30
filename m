@@ -1,57 +1,53 @@
-From: dgilbert@interlog.com (Douglas Gilbert)
-Date: Thu, 30 May 2013 19:17:52 -0400
-Subject: [PATCH v3 0/5] rtc-at91rm9200: add shadow interrupt mask
-In-Reply-To: <20130530123609.6e2966a66dd7b131961ed052@linux-foundation.org>
-References: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
- <1369298335-24597-1-git-send-email-jhovold@gmail.com>
- <20130529133354.dd181c845ee4e96527483345@linux-foundation.org>
- <CAOCHtYiK8Y6iTnb4dWAE+cKHqEta-64gj+PorSFVGBF5wmg1+Q@mail.gmail.com>
- <51A704C3.6010109@atmel.com>
- <20130530123609.6e2966a66dd7b131961ed052@linux-foundation.org>
-Message-ID: <51A7DE20.5080603@interlog.com>
+From: linux@baker-net.org.uk (Adam Baker)
+Date: Fri, 31 May 2013 00:19:01 +0100
+Subject: Kirkwood CPU Freq driver
+In-Reply-To: <20130528215126.GF7678@lunn.ch>
+References: <51A12DD4.9010907@baker-net.org.uk>
+ <20130526083614.GB26249@lunn.ch>
+ <20130526180513.GF31290@titan.lakedaemon.net>
+ <51A5234D.9030100@baker-net.org.uk> <20130528215126.GF7678@lunn.ch>
+Message-ID: <51A7DE65.4090108@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-05-30 03:36 PM, Andrew Morton wrote:
-> On Thu, 30 May 2013 09:50:27 +0200 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+On 28/05/13 22:51, Andrew Lunn wrote:
+>> I've now tested with the first of these patches applied and the
+>> >changes from the second added to my .config
+>> >
+>> >To get it to work I had to follow the instructions in the
+>> >Documentation to add the cpus entry to kirkwood.dtsi so I'll post
+>> >that as a patch in a day or two but after doing that I have a
+>> >working cpufreq driver.
+> Great that you got it working. Something must of changed in the
+> generic code, since originally a cpu node was not required.
 >
->> The review of this patch series was in my TODO list for some time...
->>
->> Today, I magically took time to review it ;-)
->> The patch series is good and I (even if it is too late) here is my:
->>
->> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>
->> I do not know if the series can be stacked for inclusion in 3.10-rc but
->> the resolution of this bug can help a lot (as Douglas is saying in
->> subsequent email...).
+> The clocks are not needed in node, so please don't list them.
 >
-> We can do that, but looking through the discussion and changelogs I
-> can't seem to find a usable description of what impact the bug (and its
-> fix) have upon end-users.
->
-> A nicely packaged description of that impact would help grease the
-> wheels, please.
+Andrew, I just tried testing without the clocks line in the .dtsi and I 
+get the messages below in dmesg
 
-How about this:
+[   18.554990] ERROR: could not get clock /cpus/cpu at 0:cpu_clk(0)
+[   18.560840] kirkwood-cpufreq kirkwood-cpufreq: Unable to get cpuclk
+[   18.567154] kirkwood-cpufreq: probe of kirkwood-cpufreq failed with 
+error -2
 
-The members of Atmel's at91sam9x5 family (9x5) have
-a broken RTC interrupt mask register (AT91_RTC_IMR).
-It does not reflect enabled interrupts but instead
-always returns zero.
+looking at the code in kirkwood_cpufreq_probe() this is what I would 
+expect. Unless I've missed something the driver is simply advertising 
+that it needs those clocks and as they presumably are not gateable it 
+may be safe to not bother reserving them but I don't know the code well 
+enough to make that decision.
 
-The kernel's rtc-at91rm9200 driver handles the RTC
-for the 9x5 family. Currently when the date/time is
-set, an interrupt is generated and this driver neglects
-to handle the interrupt. The kernel complains about the
-un-handled interrupt and disables it henceforth. This
-not only breaks the RTC function, but since that
-interrupt is shared (Atmel's SYS interrupt) then other
-things break as well (e.g. the debug port no longer
-accepts characters).
+Having now looked at the range of kirkwood SoCs I see oretthat there is 
+a 88F632X family that include 2 processor cores. The cpus definitions 
+therefore theoretically ought to live in kirkwood-6281.dtsi and 
+kirkwood-6282.dtsi. The only 2 boards I can see that don't include one 
+of those two at present are kirkwood-km for which the SoC data isn't 
+published and kirkwood-nsa310 which seems to simply be missing pinmux 
+information for things like the sata ports.
 
-Tested on the at91sam9g25. Bug confirmed by Atmel.
+Would everyone prefer to see the cpus node in the 628x.dtsi files or 
+should it go in kirkwood.dtsi until support for the 88F632X family is added?
 
-Edit as you please.
+Regards
 
-Doug Gilbert
+Adam
