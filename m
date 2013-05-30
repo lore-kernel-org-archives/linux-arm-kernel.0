@@ -1,35 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 May 2013 09:48:33 +0200
-Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
- into the driver
-In-Reply-To: <20130529175741.GG21290@arwen.pp.htv.fi>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
- <20130529175741.GG21290@arwen.pp.htv.fi>
-Message-ID: <CACRpkda3d9_XvqRmy0nbWyri2xC3Qst2U2Sv=UDxV4w-UxK_JQ@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 30 May 2013 09:50:27 +0200
+Subject: [PATCH v3 0/5] rtc-at91rm9200: add shadow interrupt mask
+In-Reply-To: <CAOCHtYiK8Y6iTnb4dWAE+cKHqEta-64gj+PorSFVGBF5wmg1+Q@mail.gmail.com>
+References: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
+ <1369298335-24597-1-git-send-email-jhovold@gmail.com>
+ <20130529133354.dd181c845ee4e96527483345@linux-foundation.org>
+ <CAOCHtYiK8Y6iTnb4dWAE+cKHqEta-64gj+PorSFVGBF5wmg1+Q@mail.gmail.com>
+Message-ID: <51A704C3.6010109@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 7:57 PM, Felipe Balbi <balbi@ti.com> wrote:
-> On Wed, May 15, 2013 at 10:51:43AM +0100, Lee Jones wrote:
->> For all ux500 based platforms the maximum number of end-points are used.
->> Move this knowledge into the driver so we can relinquish the burden from
->> platform data. This also removes quite a bit of complexity from the driver
->> and will aid us when we come to enable the driver for Device Tree.
+On 29/05/2013 22:41, Robert Nelson :
+> On Wed, May 29, 2013 at 3:33 PM, Andrew Morton
+> <akpm@linux-foundation.org> wrote:
+>> On Thu, 23 May 2013 10:38:50 +0200 Johan Hovold <jhovold@gmail.com> wrote:
 >>
->> Cc: Felipe Balbi <balbi@ti.com>
->> Cc: linux-usb at vger.kernel.org
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
->> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>>> This is an update of the shadow-interrupt-mask series against v3.10-rc2.
+>>>
+>>> I guess we need Atmel to confirm that all sam9x5 SoCs are indeed
+>>> affected. If not, then some probing mechanism as the one Doug suggested
+>>> could be implemented on top of (a subset of) these patches. What do you
+>>> say, Nicolas?
+>>>
+>>> Note that the first patch (adding a missing OF compile guard) could be
+>>> applied straight away.
+>>
+>> At this stage it is unclear to me how to proceed with patches 2-5.
 >
-> for drivers/usb/musb
+> fyi:
 >
-> Acked-by: Felipe Balbi <balbi@ti.com>
+> A version of these patches had been applied once before:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=0ef1594c017521ea89278e80fe3f80dafb17abde
+>
+> But due to a few issues it was later reverted:
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=e24b0bfa2f0446ffaad2661040be23668133aef8
 
-Is that only for this patch 20/39 or also 21, 22 & 23?
+This new revision doesn't have the issue encountered by first version.
 
-Poke us if we should re-send them...
+Andrew,
 
-Yours,
-Linus Walleij
+The review of this patch series was in my TODO list for some time...
+
+Today, I magically took time to review it ;-)
+The patch series is good and I (even if it is too late) here is my:
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+I do not know if the series can be stacked for inclusion in 3.10-rc but 
+the resolution of this bug can help a lot (as Douglas is saying in 
+subsequent email...).
+
+Best regards,
+-- 
+Nicolas Ferre
