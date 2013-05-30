@@ -1,24 +1,33 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 30 May 2013 09:42:48 -0700
-Subject: [PATCH 7/8] ARM: msm: use generic cpu idle function for wfi
-In-Reply-To: <1369665166-13049-8-git-send-email-sanjay.rawat@linaro.org>
-References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
- <1369665166-13049-8-git-send-email-sanjay.rawat@linaro.org>
-Message-ID: <20130530164248.GA10404@codeaurora.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 30 May 2013 18:39:36 +0200
+Subject: [PATCH 3/3] at_hdmac: add FIFO configuration parameter to DMA
+ DT binding
+In-Reply-To: <51A77F10.8020808@atmel.com>
+References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
+ <1369930103-11963-4-git-send-email-ludovic.desroches@atmel.com>
+ <51A77F10.8020808@atmel.com>
+Message-ID: <20130530163936.GC23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 08:02:44PM +0530, Sanjay Singh Rawat wrote:
->use cpu_do_idle for entering the wfi mode.
->
->Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
->---
-> arch/arm/mach-msm/hotplug.c |    9 ++-------
-> 1 file changed, 2 insertions(+), 7 deletions(-)
+On 18:32 Thu 30 May     , Nicolas Ferre wrote:
+> On 30/05/2013 18:08, ludovic.desroches at atmel.com :
+> >From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >
+> >For most devices the FIFO configuration is the same i.e. when half FIFO size is
+> >available/filled, a source/destination request is serviced. But USART devices
+> >have to do it when there is enough space/data available to perform a single
+> >AHB access so the ASAP configuration.
+> >
+> >Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Clear and neat: thanks Ludo.
 
-Acked-by: David Brown <davidb@codeaurora.org>
+agreed
 
--- 
-sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+can we apply this via AT91 as this depends on some cleanup I did on DT and
+could result on some nigthmware conflict
+
+Best Regards,
+J.
