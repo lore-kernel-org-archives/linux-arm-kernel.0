@@ -1,55 +1,57 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Thu, 30 May 2013 09:11:17 -0700
-Subject: [RFC PATCH 2/2] clocksource: dw_apb: allow build for architectures
- other than arm
-In-Reply-To: <20130530053233.GL25186@sapphire.tkos.co.il>
-References: <1369570367-994-2-git-send-email-baruch@tkos.co.il>
- <51A51271.2070506@linaro.org> <20130530053233.GL25186@sapphire.tkos.co.il>
-Message-ID: <51A77A25.8080306@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 30 May 2013 17:18:23 +0100
+Subject: [PATCH RFC 0/6] Introduce Xen support to ARM64
+Message-ID: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 10:32 PM, Baruch Siach wrote:
-> Hi John,
->
-> On Tue, May 28, 2013 at 01:24:17PM -0700, John Stultz wrote:
->> On 05/26/2013 05:12 AM, Baruch Siach wrote:
->>>   static const struct of_device_id osctimer_ids[] __initconst = {
->>> @@ -124,3 +135,10 @@ void __init dw_apb_timer_init(void)
->>>   	init_sched_clock();
->>>   }
->>> +
->>> +#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
->>> +unsigned long long notrace sched_clock()
->>> +{
->>> +	return read_sched_clock() * sched_clock_mult;
->>> +}
->>> +#endif
->> Also, can you try to condense the number of #ifndef
->> CONFIG_HAVE_SETUP_SCHED_CLOCK checks to one, and consolidate the
->> needed functions all in that one conditional?
-> Thanks for your comments. I'll rework the patch and resubmit.
->
-> I've just noticed that I have a bigger problem. read_sched_clock() returns
-> u32, not u64. This means that in a rate of, say, 100MHz it will wrap around
-> after a little more than 40 seconds. Would it make sense to put ARM's 32 bin
-> sched_clock extension code (arch/arm/kernel/sched_clock.c) is a common place
-> (maybe drivers/clocksource), and use that? There seems to be nothing ARM
-> specific in this code, after all.
+Hi all,
+this patch series introduces Xen support to arch/arm64.
 
-Yea, working out an actual generic sched_clock implementation is 
-something I'd like to see done.
+As you can see from the following patches, there is very little arm64
+specific code here, basically only one assembly file
+(arch/arm64/xen/hypercall.S).
 
-Though I'd really rather we not toss yet another chunk of infrastructure 
-in the drivers/clocksource directory. Instead we should probably have a 
-kernel/time/sched_clock.c.
+Everything else is common with Xen for ARMv7, in particular the code
+under arch/arm/xen (enlighten.c and the stubs in grant-table.c) and all
+the header files under arch/arm/include/asm/xen (events.h, hypercall.h,
+hypervisor.h, interface.h, page.h) can be reused (almost) as-is.
 
-Then its just the issue of tying that and the clocksource code together 
-so you just register existing capable clocksources with a SCHED_CLOCK 
-flag or via a different registration hook.
+Not knowning what is the best way forward I have just created symlinks
+to the original files under arch/arm, see the first patch.
 
-I don't think it will be an easy job, but if you want to give it a shot, 
-I'd be quite interested in reviewing the patches!
+Please advice on what you think is the best way forward.
 
-thanks
--john
+
+
+Stefano Stabellini (6):
+      [HACK!] arm64/xen: create links to arch/arm include files and Xen code
+      arm64/xen: arm header changes to compile on arm64
+      arm64/xen: use XEN_IO_PROTO_ABI_ARM on ARM64
+      arm64/xen: introduce asm/hypervisor.h and sys_bitops.h
+      arm64/xen: implement xen_remap on arm64
+      arm64/xen: introduce CONFIG_XEN and hypercall.S on ARM64
+
+ arch/arm/include/asm/xen/events.h    |    4 +
+ arch/arm/include/asm/xen/page.h      |    6 ++
+ arch/arm64/Kconfig                   |   11 ++++
+ arch/arm64/Makefile                  |    1 +
+ arch/arm64/include/asm/hypervisor.h  |    6 ++
+ arch/arm64/include/asm/io.h          |    1 +
+ arch/arm64/include/asm/sync_bitops.h |   26 ++++++++
+ arch/arm64/include/asm/xen           |    1 +
+ arch/arm64/xen/Makefile              |    1 +
+ arch/arm64/xen/enlighten.c           |    1 +
+ arch/arm64/xen/grant-table.c         |    1 +
+ arch/arm64/xen/hypercall.S           |  105 ++++++++++++++++++++++++++++++++++
+ include/xen/interface/io/protocols.h |    2 +-
+ 13 files changed, 165 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm64/include/asm/hypervisor.h
+ create mode 100644 arch/arm64/include/asm/sync_bitops.h
+ create mode 120000 arch/arm64/include/asm/xen
+ create mode 100644 arch/arm64/xen/Makefile
+ create mode 120000 arch/arm64/xen/enlighten.c
+ create mode 120000 arch/arm64/xen/grant-table.c
+ create mode 100644 arch/arm64/xen/hypercall.S
+
+- Stefano
