@@ -1,48 +1,52 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 30 May 2013 15:50:32 +0400
-Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
-In-Reply-To: <23620997.ZR1QCYhSc2@avalon>
-References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
- <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
- <51A682C7.9060605@cogentembedded.com> <23620997.ZR1QCYhSc2@avalon>
-Message-ID: <51A73D08.40003@cogentembedded.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Thu, 30 May 2013 14:15:19 +0200
+Subject: [RFCv1 09/11] pci: mvebu: add MSI support
+In-Reply-To: <CAErSpo7yC_97Vg-zuype-jyfqiY+77OE97cxYoEO9ZZnXjQ95A@mail.gmail.com>
+References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364316746-8702-10-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo7yC_97Vg-zuype-jyfqiY+77OE97cxYoEO9ZZnXjQ95A@mail.gmail.com>
+Message-ID: <20130530121518.GA20267@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Apr 08, 2013 at 04:29:07PM -0600, Bjorn Helgaas wrote:
+> On Tue, Mar 26, 2013 at 10:52 AM, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+[...]
+> > +static int mvebu_pcie_setup_msi_irq(struct msi_chip *chip,
+> > +                                   struct pci_dev *pdev,
+> > +                                   struct msi_desc *desc)
+> > +{
+> > +       struct mvebu_pcie_msi *msi = to_mvebu_msi(chip);
+> 
+> If this took only the pci_dev (not the msi_chip), I think you could do this:
+> 
+>   struct mvebu_pcie_msi *msi = &pdev->bus->sysdata->msi;
 
-On 30-05-2013 3:51, Laurent Pinchart wrote:
+That would mean that the arch_setup_msi_irq() and friends could still be
+architecture-agnostic because they only pass around pci_dev, and the
+driver specific implementations would know how to lookup sysdata and
+from there the MSI chip.
 
->>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+So I was almost convinced that putting the struct msi_chip pointer into
+sysdata is a good idea. However that also means that each PCI host
+bridge driver becomes architecture-specific. If we ever get a driver
+that can be used on multiple architectures (however unlikely), the only
+way to make it work would be to #ifdef those parts. We could make that
+easier to deal with by providing an accessor (pci_sysdata_set_msi_chip()
+or similar), though.
 
->>> The USB_OVCn pins are alternate options for USB over-current detection
->>> when using a 3.3V USB interface. As they're not mandatory they can be
->>> used independently of the USB PENC pins. Don't group the USB_OVCn and
->>> PENC pins to avoid conflicts when the USB_OVCn pins are used by another
->>> function.
+But maybe it's something we don't need to be concerned about because no
+PCI host bridge driver will ever support two different architecture?
 
->>> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>> Signed-off-by: Laurent Pinchart
->>> <laurent.pinchart+renesas@ideasonboard.com>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+One related point is compile coverage. If the drivers are completely
+architecture-agnostic it makes it a lot easier to compile-test all
+drivers, which might come in useful when doing core changes and such.
 
->> I suspect this is needed in -stable. The bug is older than 3.10-rc1.
-
-> Is it ? The offending commit is
-
-> commit 97d40c4224172451f666febdd865c24b1c3c3fe5
-> Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Date:   Thu Mar 7 13:38:51 2013 +0100
-
->      sh-pfc: r8a7779: Add USB pin groups and functions
-
->      Signed-off-by: Laurent Pinchart
-> <laurent.pinchart+renesas@ideasonboard.com>
->      Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-> and got applied to mainline in v3.10-rc1.
-
-    Ah, then sorry for the false alarm. Consequency of working in the 
-'next' branch all the time...
-
-WBR, Sergei
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130530/062557b1/attachment.sig>
