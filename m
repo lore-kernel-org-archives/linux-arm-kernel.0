@@ -1,55 +1,140 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 30 May 2013 22:06:21 +0300
-Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
- into the driver
-In-Reply-To: <20130530081211.GA1915@gmail.com>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
- <20130529175741.GG21290@arwen.pp.htv.fi>
- <CACRpkda3d9_XvqRmy0nbWyri2xC3Qst2U2Sv=UDxV4w-UxK_JQ@mail.gmail.com>
- <20130530081211.GA1915@gmail.com>
-Message-ID: <20130530190621.GB6277@arwen.pp.htv.fi>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 30 May 2013 12:07:50 -0700
+Subject: [PATCH 6/6] ARM: u300: convert MMC/SD clock to device tree
+In-Reply-To: <1369330288-14856-7-git-send-email-linus.walleij@stericsson.com>
+References: <1369330288-14856-1-git-send-email-linus.walleij@stericsson.com>
+ <1369330288-14856-7-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130530190750.4470.31756@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HI
-
-On Thu, May 30, 2013 at 09:12:11AM +0100, Lee Jones wrote:
-> On Thu, 30 May 2013, Linus Walleij wrote:
+Quoting Linus Walleij (2013-05-23 10:31:28)
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> > On Wed, May 29, 2013 at 7:57 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > > On Wed, May 15, 2013 at 10:51:43AM +0100, Lee Jones wrote:
-> > >> For all ux500 based platforms the maximum number of end-points are used.
-> > >> Move this knowledge into the driver so we can relinquish the burden from
-> > >> platform data. This also removes quite a bit of complexity from the driver
-> > >> and will aid us when we come to enable the driver for Device Tree.
-> > >>
-> > >> Cc: Felipe Balbi <balbi@ti.com>
-> > >> Cc: linux-usb at vger.kernel.org
-> > >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> > >> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-> > >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > >
-> > > for drivers/usb/musb
-> > >
-> > > Acked-by: Felipe Balbi <balbi@ti.com>
-> > 
-> > Is that only for this patch 20/39 or also 21, 22 & 23?
-> > 
-> > Poke us if we should re-send them...
+> This converts the last of the U300 clocks to being probed from
+> the device tree.
 > 
-> I read this as all patches in the series "for drivers/usb/musb".
+> Cc: Mike Turquette <mturquette@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Hi Mike, I'm seeking an ACK on this to take it through the
+> ARM SoC tree.
 
-right :-) Should've sent on patch 0/39, my bad.
+Acked-by: Mike Turquette <mturquette@linaro.org>
 
-cheers
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130530/e68b3510/attachment.sig>
+> ---
+>  .../bindings/clock/ste-u300-syscon-clock.txt       | 23 ++++++++++++++++++++++
+>  arch/arm/boot/dts/ste-u300.dts                     |  9 +++++++--
+>  drivers/clk/clk-u300.c                             | 22 ++++++++++++++++-----
+>  3 files changed, 47 insertions(+), 7 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/ste-u300-syscon-clock.txt b/Documentation/devicetree/bindings/clock/ste-u300-syscon-clock.txt
+> index b6a30f5..7cafcb9 100644
+> --- a/Documentation/devicetree/bindings/clock/ste-u300-syscon-clock.txt
+> +++ b/Documentation/devicetree/bindings/clock/ste-u300-syscon-clock.txt
+> @@ -55,3 +55,26 @@ gpio: gpio at c0016000 {
+>         (...)
+>         clocks = <&gpio_clk>;
+>  };
+> +
+> +
+> +Bindings for the MMC/SD card clock:
+> +
+> +Required properties:
+> +- compatible: must be "stericsson,u300-syscon-mclk"
+> +- #clock-cells: must be <0>
+> +
+> +Optional properties:
+> +- clocks: parent clock(s)
+> +
+> +mmc_mclk: mmc_mclk {
+> +       #clock-cells = <0>;
+> +       compatible = "stericsson,u300-syscon-mclk";
+> +       clocks = <&mmc_pclk>;
+> +};
+> +
+> +mmcsd: mmcsd at c0001000 {
+> +       compatible = "arm,pl18x", "arm,primecell";
+> +       clocks = <&mmc_pclk>, <&mmc_mclk>;
+> +       clock-names = "apb_pclk", "mclk";
+> +       (...)
+> +};
+> diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
+> index e83aafc..d5dd243 100644
+> --- a/arch/arm/boot/dts/ste-u300.dts
+> +++ b/arch/arm/boot/dts/ste-u300.dts
+> @@ -205,6 +205,11 @@
+>                         clock-id = <5>;
+>                         clocks = <&fast_clk>;
+>                 };
+> +               mmc_mclk: mmc_mclk {
+> +                       #clock-cells = <0>;
+> +                       compatible = "stericsson,u300-syscon-mclk";
+> +                       clocks = <&mmc_pclk>;
+> +               };
+>                 spi_clk: spi_p_clk at 26M {
+>                         #clock-cells = <0>;
+>                         compatible = "stericsson,u300-syscon-clk";
+> @@ -433,8 +438,8 @@
+>                         reg = <0xc0001000 0x1000>;
+>                         interrupt-parent = <&vicb>;
+>                         interrupts = <6 7>;
+> -                       clocks = <&mmc_pclk>;
+> -                       clock-names = "apb_pclk";
+> +                       clocks = <&mmc_pclk>, <&mmc_mclk>;
+> +                       clock-names = "apb_pclk", "mclk";
+>                         max-frequency = <24000000>;
+>                         bus-width = <4>; // SD-card slot
+>                         mmc-cap-mmc-highspeed;
+> diff --git a/drivers/clk/clk-u300.c b/drivers/clk/clk-u300.c
+> index 5f234d3..8774e05 100644
+> --- a/drivers/clk/clk-u300.c
+> +++ b/drivers/clk/clk-u300.c
+> @@ -1139,6 +1139,18 @@ mclk_clk_register(struct device *dev, const char *name,
+>         return clk;
+>  }
+>  
+> +static void __init of_u300_syscon_mclk_init(struct device_node *np)
+> +{
+> +       struct clk *clk = ERR_PTR(-EINVAL);
+> +       const char *clk_name = np->name;
+> +       const char *parent_name;
+> +
+> +       parent_name = of_clk_get_parent_name(np, 0);
+> +       clk = mclk_clk_register(NULL, clk_name, parent_name, false);
+> +       if (!IS_ERR(clk))
+> +               of_clk_add_provider(np, of_clk_src_simple_get, clk);
+> +}
+> +
+>  static const __initconst struct of_device_id u300_clk_match[] = {
+>         {
+>                 .compatible = "fixed-clock",
+> @@ -1152,12 +1164,16 @@ static const __initconst struct of_device_id u300_clk_match[] = {
+>                 .compatible = "stericsson,u300-syscon-clk",
+>                 .data = of_u300_syscon_clk_init,
+>         },
+> +       {
+> +               .compatible = "stericsson,u300-syscon-mclk",
+> +               .data = of_u300_syscon_mclk_init,
+> +       },
+>  };
+>  
+> +
+>  void __init u300_clk_init(void __iomem *base)
+>  {
+>         u16 val;
+> -       struct clk *clk;
+>  
+>         syscon_vbase = base;
+>  
+> @@ -1175,8 +1191,4 @@ void __init u300_clk_init(void __iomem *base)
+>         writew(val, syscon_vbase + U300_SYSCON_PMCR);
+>  
+>         of_clk_init(u300_clk_match);
+> -
+> -       /* Then this special MMC/SD clock */
+> -       clk = mclk_clk_register(NULL, "mmc_clk", "mmc_p_clk", false);
+> -       clk_register_clkdev(clk, NULL, "mmci");
+>  }
+> -- 
+> 1.7.11.3
