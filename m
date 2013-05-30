@@ -1,58 +1,96 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 30 May 2013 15:53:23 +0100
-Subject: [PATCH 0/5] Various DT fixes related to ux500 ASoC driver
-In-Reply-To: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <20130530145323.GB1915@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 May 2013 22:57:25 +0800
+Subject: [PATCH 2/2] ARM: imx6q: Mark VPU and IPU AXI transfers as
+ cacheable, increase IPU priority
+In-Reply-To: <1369919399-24370-2-git-send-email-mpa@pengutronix.de>
+References: <1369919399-24370-1-git-send-email-mpa@pengutronix.de>
+ <1369919399-24370-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130530145703.GB22013@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 May 2013, Fabio Baltieri wrote:
-
-> Hi Linus, Lee,
+On Thu, May 30, 2013 at 03:09:59PM +0200, Markus Pargmann wrote:
+> From: Philipp Zabel <p.zabel@pengutronix.de>
 > 
-> these are various fixes I found while testing the ux500 ASoC driver on HREF
-> with device-tree.
-> 
-> First two patches are typos in DT files, while the others are
-> specifically to support ux500 ASoC driver with DT enabled.
-> 
-> The last patch can go in the mfd tree, while the others may safely go
-> through arm-soc, as there are no build dependencies or regression issues
-> in general.
-> 
-> Thanks,
-> Fabio
-> 
-> 
-> Fabio Baltieri (5):
->   ARM: ux500: Fix trivial typo in v-anamic1 comment
->   ARM: ux500: Correct anamic2 typo in DT files
->   ARM: ux500: Add DT regulators for ab8500-codec
->   ARM: ux500: Provide auxdata to ux500 ASoC driver
->   mfd: ab8500-core: Add of_compatible property for ab8500-codec
-> 
->  arch/arm/boot/dts/dbx5x0.dtsi     | 11 ++++++++---
->  arch/arm/boot/dts/href.dtsi       |  2 +-
->  arch/arm/boot/dts/hrefv60plus.dts |  2 +-
->  arch/arm/boot/dts/snowball.dts    |  2 +-
->  arch/arm/mach-ux500/cpu-db8500.c  |  2 ++
->  drivers/mfd/ab8500-core.c         |  1 +
->  drivers/regulator/ab8500.c        |  8 ++++----
->  7 files changed, 18 insertions(+), 10 deletions(-)
+> This is needed so that the IPU framebuffer scanout cannot be starved
+> by VPU or GPU activity.
+> The Freescale SabreLite and SabreSD boards seem to set this in the boot
+> rom already,
 
-All look good to me.
+The boot rom is not board specific but SoC, so you meant boot loader?
 
-For patches 1-4:
+> but the documented register reset values do not contain
+> the necessary settings.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/mach-imx6q.c | 32 ++++++++++++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+> 
+> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+> index 5536fd8..7bef242 100644
+> --- a/arch/arm/mach-imx/mach-imx6q.c
+> +++ b/arch/arm/mach-imx/mach-imx6q.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/regmap.h>
+>  #include <linux/micrel_phy.h>
+>  #include <linux/mfd/syscon.h>
+> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+>  #include <asm/hardware/cache-l2x0.h>
+>  #include <asm/mach/arch.h>
+>  #include <asm/mach/map.h>
+> @@ -161,6 +162,36 @@ static void __init imx6q_usb_init(void)
+>  	imx_anatop_usb_chrg_detect_disable();
+>  }
+>  
+> +static void __init imx6q_gpr_init(void)
+> +{
+> +	struct regmap *gpr;
+> +
+> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+> +	if (IS_ERR(gpr)) {
+> +		pr_warn("failed to find fsl,imx6q-iomuxc-gpr regmap\n");
+> +		return;
+> +	}
+> +
+> +	/* Enable the cacheable attribute of VPU and IPU AXI transactions */
+> +	regmap_update_bits(gpr, IOMUXC_GPR4, 0,
+> +			IMX6Q_GPR4_VPU_WR_CACHE_SEL |
+> +			IMX6Q_GPR4_VPU_RD_CACHE_SEL |
+> +			IMX6Q_GPR4_VPU_P_WR_CACHE_VAL |
+> +			IMX6Q_GPR4_VPU_P_RD_CACHE_VAL_MASK |
+> +			IMX6Q_GPR4_IPU_WR_CACHE_CTL |
+> +			IMX6Q_GPR4_IPU_RD_CACHE_CTL);
+> +
+> +	/* Increase IPU read QoS priority */
+> +	regmap_update_bits(gpr, IOMUXC_GPR6,
+> +			IMX6Q_GPR6_IPU1_ID00_RD_QOS_MASK |
+> +			IMX6Q_GPR6_IPU1_ID01_RD_QOS_MASK,
+> +			(0xf << 16) | (0x7 << 20));
+> +	regmap_update_bits(gpr, IOMUXC_GPR7,
+> +			IMX6Q_GPR7_IPU2_ID00_RD_QOS_MASK |
+> +			IMX6Q_GPR7_IPU2_ID01_RD_QOS_MASK,
+> +			(0xf << 16) | (0x7 << 20));
+> +}
+> +
+>  static void __init imx6q_init_machine(void)
+>  {
+>  	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
+> @@ -172,6 +203,7 @@ static void __init imx6q_init_machine(void)
+>  	imx6q_pm_init();
+>  	imx6q_usb_init();
+>  	imx6q_1588_init();
+> +	imx6q_gpr_init();
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
+The function imx6q_1588_init() is all about setting up some IOMUXC GPR
+bits, so can you consolidate it into imx6q_gpr_init()?
 
-For patch 5:
+Shawn
 
-Applied thanks.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+>  }
+>  
+>  #define OCOTP_CFG3			0x440
+> -- 
+> 1.8.2.1
+> 
