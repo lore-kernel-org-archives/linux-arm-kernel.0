@@ -1,58 +1,59 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 30 May 2013 17:18:28 +0100
-Subject: [PATCH RFC 1/6] [HACK!] arm64/xen: create links to arch/arm include
- files and Xen code
-In-Reply-To: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
-Message-ID: <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Thu, 30 May 2013 11:23:13 -0500
+Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
+ no DMA support
+In-Reply-To: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
+References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
+Message-ID: <51A77CF1.7040105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most of Xen support for ARM is common between ARMv7 and ARMv8.
-Create links to the code under arch/arm (bleah).
+On 05/30/2013 11:02 AM, Guennadi Liakhovetski wrote:
+> On platforms with no support for the shdma dmaengine driver build is
+> currently failing with
+>
+> drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+> drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+>
+> Fix the breakage by defining shdma_chan_filter to NULL in such
+> configurations.
+>
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> ---
+>
+> This is for "next." Compile-tested only. I'll test it on hardware next 
+> week, but I don't think it shall break anything.
+>
+>  include/linux/sh_dma.h |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
+> index b64d6be..1fd8a20 100644
+> --- a/include/linux/sh_dma.h
+> +++ b/include/linux/sh_dma.h
+> @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
+>  #define CHCR_TE	0x00000002
+>  #define CHCR_IE	0x00000004
+>  
+> +#if IS_ENABLED(CONFIG_SH_DMAE)
+>  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
+> +#else
+> +#define shdma_chan_filter NULL
+Would this not be better as a
+#else
+static inline bool shdma_chan_filter(struct dma_chan *chan, void *arg)
+{
+    return false;
+}
+#endif
 
-Other, probably better alternatives:
+Otherwise runtime will call a NULL pointer
 
-- move the code to a different location, maybe the header files to
-include/xen/arm and the code to drivers/xen/arm (still pretty ugly)?
+> +#endif
+>  
+>  #endif
 
-- create a copy of the code to arch/arm64 (even worse);
 
-Please advice on how you would like me to move forward on this.
-
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
----
- arch/arm64/include/asm/xen   |    1 +
- arch/arm64/xen/enlighten.c   |    1 +
- arch/arm64/xen/grant-table.c |    1 +
- 3 files changed, 3 insertions(+), 0 deletions(-)
- create mode 120000 arch/arm64/include/asm/xen
- create mode 120000 arch/arm64/xen/enlighten.c
- create mode 120000 arch/arm64/xen/grant-table.c
-
-diff --git a/arch/arm64/include/asm/xen b/arch/arm64/include/asm/xen
-new file mode 120000
-index 0000000..c27d6980
---- /dev/null
-+++ b/arch/arm64/include/asm/xen
-@@ -0,0 +1 @@
-+../../../arm/include/asm/xen
-\ No newline at end of file
-diff --git a/arch/arm64/xen/enlighten.c b/arch/arm64/xen/enlighten.c
-new file mode 120000
-index 0000000..cb31b7c
---- /dev/null
-+++ b/arch/arm64/xen/enlighten.c
-@@ -0,0 +1 @@
-+../../arm/xen/enlighten.c
-\ No newline at end of file
-diff --git a/arch/arm64/xen/grant-table.c b/arch/arm64/xen/grant-table.c
-new file mode 120000
-index 0000000..5494f6c
---- /dev/null
-+++ b/arch/arm64/xen/grant-table.c
-@@ -0,0 +1 @@
-+../../arm/xen/grant-table.c
-\ No newline at end of file
 -- 
-1.7.2.5
+------------------
+Dan Murphy
