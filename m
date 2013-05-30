@@ -1,32 +1,28 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 30 May 2013 09:31:15 +0100
-Subject: [PATCH] ARM: ux500: Reduce PRCMU reg-names to shorter form for u8540
- DT
-Message-ID: <1369902675-5170-1-git-send-email-lee.jones@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 May 2013 10:32:29 +0200
+Subject: [PATCH 22/39] usb: musb: ux500: take the dma_mask from
+ coherent_dma_mask
+In-Reply-To: <1368611522-9984-23-git-send-email-lee.jones@linaro.org>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZo_ymcubrvm1k9+VKJq6ED-xOSv7V_Sry8ffhFB3RqyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After some discussion and deliberation we have decided to only use the
-short form of the PRCMU register names i.e. not mention the peripheral
-in which the registers reside.
+On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/boot/dts/ccu8540.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> The dma_mask will always be the same as the coherent_dma_mask, so let's
+> cut down on the platform_data burden and set it as such in the driver.
+> This also saves us from supporting it separately when we come to enable
+> this driver for Device Tree.
+>
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: linux-usb at vger.kernel.org
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-diff --git a/arch/arm/boot/dts/ccu8540.dts b/arch/arm/boot/dts/ccu8540.dts
-index af4487f..12f0bc2 100644
---- a/arch/arm/boot/dts/ccu8540.dts
-+++ b/arch/arm/boot/dts/ccu8540.dts
-@@ -23,7 +23,7 @@
- 	soc {
- 		prcmu at 80157000 {
- 			reg = <0x80157000 0x2000>, <0x801b0000 0x8000>, <0x801b8000 0x3000>;
--			reg-names = "prcmu", "prcmu-tcpm-per4", "prcmu-tcdm-per4";
-+			reg-names = "prcmu", "prcmu-tcpm", "prcmu-tcdm";
- 		};
- 
- 		uart at 80120000 {
--- 
-1.7.10.4
+Tentatively applied with Felipe's ACK.
+
+Yours,
+Linus Walleij
