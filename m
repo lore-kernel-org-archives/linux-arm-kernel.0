@@ -1,51 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 May 2013 10:12:05 +0100
-Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
-In-Reply-To: <CANutaR-e4L+wvfu6Fq7_Q_z9Ynwg8zZcEwzFhH5VxMGfkicYQw@mail.gmail.com>
-References: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
- <20130528130502.GA28971@mudshark.cambridge.arm.com>
- <51A4B938.7080708@ti.com>
- <20130528140705.GE28971@mudshark.cambridge.arm.com>
- <51A4FC08.3060906@ti.com>
- <CANutaR-2gTP7ubiEdgjFyzVMc6=4t5GPjLkH8pkup=O882Hb-Q@mail.gmail.com>
- <20130529085426.GA13095@mudshark.cambridge.arm.com>
- <CANutaR_8jNDzPeyJ8PLZPS=yiZ8Ywmk08dR9vLcB2CpxuJac3A@mail.gmail.com>
- <CANutaR-e4L+wvfu6Fq7_Q_z9Ynwg8zZcEwzFhH5VxMGfkicYQw@mail.gmail.com>
-Message-ID: <20130530091205.GD7483@mudshark.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 30 May 2013 12:13:22 +0300
+Subject: [PATCH] ARM: OMAP2+: omap-usb-host: clean up pin mux setup code
+In-Reply-To: <20130508235232.GW32546@atomide.com>
+References: <1366624673-2684-1-git-send-email-rogerq@ti.com>
+ <20130508235232.GW32546@atomide.com>
+Message-ID: <51A71832.70305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 09:15:26AM +0100, Po-Yu Chuang wrote:
-> On Wed, May 29, 2013 at 5:34 PM, Po-Yu Chuang <ratbert.chuang@gmail.com> wrote:
-> > Hi Will,
-> >
-> > On Wed, May 29, 2013 at 4:54 PM, Will Deacon <will.deacon@arm.com> wrote:
-> >> On Wed, May 29, 2013 at 03:14:58AM +0100, Po-Yu Chuang wrote:
-> >>> Will,
-> >>> I guess nobody noticed this because the MMU of later v7 processors
-> >>> fetches page table
-> >>> from D-cache. It even doesn't need to clean pmd to PoU.
-> >>
-> >> It does if it's UP. The walker is only guaranteed to read from L1 if you
-> >> have the multiprocessing extensions.
-> >
-> > Ya, I see.
-> >>
-> >> As for this function, looks like it's ok because it has precisely one
-> >> caller, so it might be worth prefixing it with some underscores to make it
-> >> clear that nobody else should be calling it!
-> >
-> > I am fine with that.
-> > Should I create a new patch?
+On 05/09/2013 02:52 AM, Tony Lindgren wrote:
+> * Roger Quadros <rogerq@ti.com> [130422 03:02]:
+>> The USB host pins are named quite differently between OMAP3 and
+>> OMAP4+ SoCs. To make this managable in code, we create a pin mapping
+>> table (pin_names) that maps pin function to pin name.
+>>
+>> This pin mapping table is populated at runtime based on a pin
+>> name template. Templates are provided for OMAP3 and 4 SoCs.
+>>
+>> The setup_io_mux() function uses the pin mapping table to
+>> setup the pin mux.
+>>
+>> The resulting code is a lot more clean, manageable and scalable.
 > 
-> Hi,
+> I'm planning to drop all the omap4 pdata soonish. Will post some
+> patches after -rc1 to do that. Do you still need this patch
+> considering that?
 > 
-> Does anyone have more comment about this?
 
-Sorry, I was snowed under yesterday. If you fancy adding the underscores to
-__map_init_section, that would help preserve what little remains of my
-sanity.
+In that case we don't need this.
 
-Your existing patch looks technically correct.
-
-Will
+cheers,
+-roger
