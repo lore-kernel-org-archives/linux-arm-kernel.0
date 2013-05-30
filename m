@@ -1,76 +1,100 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 29 May 2013 21:39:04 -0700
-Subject: [PATCH 05/11] ARM: shmobile: APE6EVM LAN9220 support
-In-Reply-To: <Pine.LNX.4.64.1305290819190.14157@axis700.grange>
-References: <1364954906-16014-1-git-send-email-horms+renesas@verge.net.au>
- <1364954906-16014-6-git-send-email-horms+renesas@verge.net.au>
- <Pine.LNX.4.64.1305171458550.31481@axis700.grange>
- <20130522143204.GE32012@verge.net.au>
- <Pine.LNX.4.64.1305221911380.12715@axis700.grange>
- <20130528024540.GC13532@quad.lixom.net>
- <Pine.LNX.4.64.1305290819190.14157@axis700.grange>
-Message-ID: <CAOesGMjLiNTR7cqjSmyy2Ux1srgkC5cPO+D8UsRcgHbW8GQ26Q@mail.gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Thu, 30 May 2013 10:10:27 +0530
+Subject: [PATCH] ARM: EXYNOS: Consolidate multiple low-level UART port
+ definitions
+Message-ID: <1369888827-9427-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 11:26 PM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> Hi Olof
->
-> On Mon, 27 May 2013, Olof Johansson wrote:
->
->> Hi,
->>
->> Sorry, a bit behind on email and just discovered this.
->>
->> On Wed, May 22, 2013 at 07:22:59PM +0200, Guennadi Liakhovetski wrote:
->>
->> > > > The above didn't work in my tests without this:
->> > > >
->> > > > diff --git a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
->> > > > b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
->> > > > index f603c69..4fb0102 100644
->> > > > --- a/arch/arm/boot/dts/r8a73a4-ape6evm.dts
->> > > > +++ b/arch/arm/boot/dts/r8a73a4-ape6evm.dts
->> > > > @@ -33,8 +33,10 @@
->> > > >         };
->> > > >
->> > > >         lbsc {
->> > > > +               compatible = "simple-bus";
->> > > >                 #address-cells = <1>;
->> > > >                 #size-cells = <1>;
->> > > > +               ranges = <0 0 0 0x80000000>;
->> > > >
->> > > >                 ethernet at 8000000 {
->> > > >                         compatible = "smsc,lan9118", "smsc,lan9115";
->> > > >
->> > >
->> > > Could you please post this as a formal patch and indicate
->> > > if you would like it included as a fix in v3.10 or not?
->> >
->> > Can do that, sure, just thought maybe it would be better to fix the
->> > original patch. Besides, I wasn't sure what the correct values for
->> > "ranges" are, I just picked up something, that would be sufficient for
->> > ethernet. But if more devices are added to it in the future, maybe
->> > different ranges values would be needed. I think actually, lbsc should map
->> > the 3 BSC areas, so, the correct property would be
->> >
->> > +           ranges = <0 0 0 0x14000000>;
->> >
->> > > Also, I am curious to know what your tests are.
->> >
->> > Just booting with NFS root. I think, anything involving ethernet. Without
->> > the "simple-bus" property the lbsc node doesn't get scanned, so, no device
->> > is added. Without "ranges" addresses cannot be mapped correctly.
->>
->> Since it's a flat mapping you can just specify an empty "ranges" property, no
->> need to actually define contents.
->
-> Yes, I knew about that, but does this also hold for busses with different
-> #address-cells properties, i.e. between 64- and 32-bit busses?
+There are two definitions for low-level UART ports for Exynos platform.
+CONFIG_S3C_LOWLEVEL_UART_PORT is used for printing "Uncompressing
+Linux... done, booting the kernel." and CONFIG_S3C_UART for other
+low-level messages.
 
-Oh, good question -- I don't think it does. But why go down, you might
-as well use 2 cells in that part of the tree too?
+The assumption for both the uart ports is that they are pre-configured
+in the bootloader. Since they are essentially the same always, it
+would be good to consolidate them to use only one macro, in this case
+'DEBUG_S3C_UART' would be a better option.
 
+'DEBUG_S3C_UART' is defined only if DEBUG_LL is enabled. We can safely
+disable this option when DEBUG_LL is not defined and we can boot various
+boards with different UART port settings. Only drawback of this
+approach is that when DEBUG_LL is not defined, we would be missing the
+print "Uncompressing Linux... done, booting the kernel."
 
--Olof
+Since CONFIG_S3C_LOWLEVEL_UART_PORT is still used by other Samsung
+boards, the consolidation applies only for ARCH_EXYNOS.
+
+Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+---
+ arch/arm/mach-exynos/include/mach/uncompress.h  |   11 ++++++++---
+ arch/arm/plat-samsung/include/plat/uncompress.h |   16 ++++++++++++++--
+ 2 files changed, 22 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
+index 2979995..45b5c2a 100644
+--- a/arch/arm/mach-exynos/include/mach/uncompress.h
++++ b/arch/arm/mach-exynos/include/mach/uncompress.h
+@@ -37,11 +37,16 @@ static void arch_detect_cpu(void)
+ 	chip_id >>= 20;
+ 	chip_id &= 0xf;
+ 
++#ifdef CONFIG_DEBUG_LL
+ 	if (chip_id == 0x5)
+-		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
++		uart_base = (volatile u8 *)EXYNOS5_PA_UART +
++			(S3C_UART_OFFSET * CONFIG_DEBUG_S3C_UART);
+ 	else
+-		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
+-
++		uart_base = (volatile u8 *)EXYNOS4_PA_UART +
++			(S3C_UART_OFFSET * CONFIG_DEBUG_S3C_UART);
++#else
++	uart_base = 0;
++#endif
+ 	/*
+ 	 * For preventing FIFO overrun or infinite loop of UART console,
+ 	 * fifo_max should be the minimum fifo size of all of the UART channels
+diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
+index 438b248..028c2a8 100644
+--- a/arch/arm/plat-samsung/include/plat/uncompress.h
++++ b/arch/arm/plat-samsung/include/plat/uncompress.h
+@@ -38,7 +38,11 @@ static void arch_detect_cpu(void);
+ #define FIFO_MAX	 (14)
+ 
+ #ifdef S3C_PA_UART
+-#define uart_base S3C_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT)
++#ifdef CONFIG_DEBUG_LL
++#define uart_base (S3C_PA_UART + (S3C_UART_OFFSET * CONFIG_DEBUG_S3C_UART))
++#else
++#define uart_base 0
++#endif
+ #endif
+ 
+ static __inline__ void
+@@ -66,6 +70,9 @@ uart_rd(unsigned int reg)
+ 
+ static void putc(int ch)
+ {
++	if (!uart_base)
++		return;
++
+ 	if (uart_rd(S3C2410_UFCON) & S3C2410_UFCON_FIFOMODE) {
+ 		int level;
+ 
+@@ -118,7 +125,12 @@ static void arch_decomp_error(const char *x)
+ #ifdef CONFIG_S3C_BOOT_UART_FORCE_FIFO
+ static inline void arch_enable_uart_fifo(void)
+ {
+-	u32 fifocon = uart_rd(S3C2410_UFCON);
++	u32 fifocon;
++
++	if (!uart_base)
++		return;
++
++	fifocon = uart_rd(S3C2410_UFCON);
+ 
+ 	if (!(fifocon & S3C2410_UFCON_FIFOMODE)) {
+ 		fifocon |= S3C2410_UFCON_RESETBOTH;
+-- 
+1.7.9.5
