@@ -1,42 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 May 2013 17:24:48 -0700
-Subject: [PATCH 00/14] ARM: OMAP5: hwmod, prm/cm data files and updates
- for 3.11
-In-Reply-To: <20130530001321.GR13507@atomide.com>
-References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
- <20130530001321.GR13507@atomide.com>
-Message-ID: <20130530002447.GS13507@atomide.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 29 May 2013 20:26:22 -0400
+Subject: [GIT PULL 2/5] ARM: mvebu: pcie driver for v3.11 (round 2
+ cumulative)
+In-Reply-To: <20130529232220.6058.14477@quantum>
+References: <20130528202140.GG31290@titan.lakedaemon.net>
+ <20130528202433.GH31290@titan.lakedaemon.net>
+ <20130529232220.6058.14477@quantum>
+Message-ID: <20130530002622.GB31290@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130529 17:19]:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130529 09:44]:
-> > Tony, Paul,
+On Wed, May 29, 2013 at 04:22:20PM -0700, Mike Turquette wrote:
+> Quoting Jason Cooper (2013-05-28 13:24:33)
+> > The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
 > > 
-> > Here is another attempt to send the SOC data files for OMAP5 based devices.
-> > As aligned on list, I have dropped clock data from the series.
-> > That means for the boot, one clock data patch needs to be applied.
-> > It is available on my git tree in 'out_of_tree/omap5_clk_data' branch.
+> >   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
 > > 
-> > With OMAP5 and AM33XX support is DT only, respective hwmod files are cleaned
-> > up to remove iospace information and un-used hwmod. For 3.11 since OMAP4
-> > is also targeted as DT only, its hwmod data files is also cleaned up.
-> > Diffstat looks something like below.
+> > are available in the git repository at:
 > > 
-> > 27 files changed, 9013 insertions(+), 2764 deletions(-)
+> >   git://git.infradead.org/users/jcooper/linux.git tags/pcie-3.11-2
 > > 
-> > One can easily notice that the OMAP5 SOC data has significantly come down
-> > becasue of iospace and rest of the hwmod clean-up.
+> > for you to fetch changes up to 3d9939c92efdd4ced672b94994959ca71b141cb8:
+> > 
+> >   pci: mvebu: fix return value check in mvebu_pcie_probe() (2013-05-27 15:51:56 +0000)
+> > 
+> > ----------------------------------------------------------------
+> > mvebu pcie driver for v3.11 (round 2, bugfix)
+> > 
+> >  - mvebu pcie
+> >     - fix return value check in mvebu_pcie_probe()
+> > 
+> > depends
+> >  - mvebu/of_pci
+> > 
+> > ----------------------------------------------------------------
+> > Thomas Petazzoni (4):
+> >       clk: mvebu: create parent-child relation for PCIe clocks on Armada 370
+> >       clk: mvebu: add more PCIe clocks for Armada XP
 > 
-> Yes that's great. I'd like to take the last three patches into my yet to
-> be posted omap-for-v3.11/cleanup branch with the omap4 legacy boot files
-> now that -rc3 is out and the GPIO fix dependency has cleared.
-> 
-> Paul, care to ack those three? Then you probably want to review queue
-> the rest I presume.
+> Same story here for pull request #2 as for pull request #5.  The clock
+> changes are trivial: Ack.  However if it is a pain to add the ack don't
+> worry about it.
 
-Correction: The last two patches I mean.
+Ok, thanks for the Ack.  In this case, I'm going to wave off.  I would
+have to rebase 4 branches (3 depend on this one) and send 4 new PRs.
 
-Regards,
+thx,
 
-Tony
+Jason.
