@@ -1,77 +1,70 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 May 2013 14:25:29 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6q: Add pinctrl for usdhc2 and enet
-In-Reply-To: <1369861609-30408-2-git-send-email-c.hemp@phytec.de>
-References: <1369861609-30408-1-git-send-email-c.hemp@phytec.de>
- <1369861609-30408-2-git-send-email-c.hemp@phytec.de>
-Message-ID: <20130530062526.GA2602@S2101-09.ap.freescale.net>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 30 May 2013 14:07:12 +0800
+Subject: [PATCH] serail: imx: add support for DTE mode
+Message-ID: <1369894032-7811-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 11:06:48PM +0200, Christian Hemp wrote:
-> Add a group to the usdhc2 and enet pinctrl.
-> 
-> Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-> ---
->  arch/arm/boot/dts/imx6q.dtsi |   33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index ed11bcf..c0c8b7b 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -157,6 +157,28 @@
->  							MX6Q_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
->  						>;
->  					};
-> +
-> +					pinctrl_enet_3: enetgrp-3 {
-> +						fsl,pins = <
-> +							MX6Q_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
-> +							MX6Q_PAD_ENET_MDC__ENET_MDC         0x1b0b0
-> +							MX6Q_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
-> +							MX6Q_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
-> +							MX6Q_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
-> +							MX6Q_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
-> +							MX6Q_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
-> +							MX6Q_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
-> +							MX6Q_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
-> +							MX6Q_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
-> +							MX6Q_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
-> +							MX6Q_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
-> +							MX6Q_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
-> +							MX6Q_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
-> +							MX6Q_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
-> +							MX6Q_PAD_ENET_CRS_DV__SPDIF_EXT_CLK 0x1b0b0
+The uart works in the DCE mode by default, but sometime we need it
+works at the DTE mode.
 
-Why do you need to set up SPDIF_EXT_CLK in ENET pin group?
+This patch adds the support for the DTE mode.
 
-Shawn
+Signed-off-by: Huang Shijie <b32955@freescale.com>
+---
+ .../bindings/tty/serial/fsl-imx-uart.txt           |    3 +++
+ drivers/tty/serial/imx.c                           |    6 ++++++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-> +							MX6Q_PAD_ENET_TX_EN__ENET_TX_EN     0x1b0b0
-> +						>;
-> +					};
->  				};
->  
->  				gpmi-nand {
-> @@ -266,6 +288,17 @@
->  							MX6Q_PAD_NANDF_D7__SD2_DATA7 0x17059
->  						>;
->  					};
-> +
-> +					pinctrl_usdhc2_2: usdhc2grp-2 {
-> +						fsl,pins = <
-> +							MX6Q_PAD_SD2_CMD__SD2_CMD    0x17059
-> +							MX6Q_PAD_SD2_CLK__SD2_CLK    0x10059
-> +							MX6Q_PAD_SD2_DAT0__SD2_DATA0 0x17059
-> +							MX6Q_PAD_SD2_DAT1__SD2_DATA1 0x17059
-> +							MX6Q_PAD_SD2_DAT2__SD2_DATA2 0x17059
-> +							MX6Q_PAD_SD2_DAT3__SD2_DATA3 0x17059
-> +						>;
-> +					};
->  				};
->  
->  				usdhc3 {
-> -- 
-> 1.7.9.5
-> 
+diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+index b462d0c..c662eb3 100644
+--- a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
++++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+@@ -8,6 +8,8 @@ Required properties:
+ Optional properties:
+ - fsl,uart-has-rtscts : Indicate the uart has rts and cts
+ - fsl,irda-mode : Indicate the uart supports irda mode
++- fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
++                  is DCE mode by default.
+ 
+ Example:
+ 
+@@ -16,4 +18,5 @@ serial at 73fbc000 {
+ 	reg = <0x73fbc000 0x4000>;
+ 	interrupts = <31>;
+ 	fsl,uart-has-rtscts;
++	fsl,dte-mode;
+ };
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index 72bc1db..381a2d7 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -201,6 +201,7 @@ struct imx_port {
+ 	unsigned int		old_status;
+ 	int			txirq, rxirq, rtsirq;
+ 	unsigned int		have_rtscts:1;
++	unsigned int		dte_mode:1;
+ 	unsigned int		use_irda:1;
+ 	unsigned int		irda_inv_rx:1;
+ 	unsigned int		irda_inv_tx:1;
+@@ -1020,6 +1021,8 @@ imx_set_termios(struct uart_port *port, struct ktermios *termios,
+ 
+ 	ufcr = readl(sport->port.membase + UFCR);
+ 	ufcr = (ufcr & (~UFCR_RFDIV)) | UFCR_RFDIV_REG(div);
++	if (sport->dte_mode)
++		ufcr |= UFCR_DCEDTE;
+ 	writel(ufcr, sport->port.membase + UFCR);
+ 
+ 	writel(num, sport->port.membase + UBIR);
+@@ -1444,6 +1447,9 @@ static int serial_imx_probe_dt(struct imx_port *sport,
+ 	if (of_get_property(np, "fsl,irda-mode", NULL))
+ 		sport->use_irda = 1;
+ 
++	if (of_get_property(np, "fsl,dte-mode", NULL))
++		sport->dte_mode = 1;
++
+ 	sport->devdata = of_id->data;
+ 
+ 	return 0;
+-- 
+1.7.1
