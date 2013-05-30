@@ -1,121 +1,54 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 30 May 2013 19:19:40 +0800
-Subject: [PATCH 1/3] ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ
- on CPU PM entry
+Date: Thu, 30 May 2013 19:19:41 +0800
+Subject: [PATCH 2/3] ARM: tegra114: add low level support for CPU idle
+ powered-down mode
 In-Reply-To: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
 References: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1369912782-30663-2-git-send-email-josephl@nvidia.com>
+Message-ID: <1369912782-30663-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a difference between GICv1 and v2 when CPU in power management
-mode (aka CPU power down on Tegra). For GICv1, IRQ/FIQ interrupt lines
-going to CPU are same lines which are also used for wake-interrupt.
-Therefore, we cannot disable the GIC CPU interface if we need to use same
-interrupts for CPU wake purpose. This creates a race condition for CPU
-power off entry. Also, in GICv1, disabling GICv1 CPU interface puts GICv1
-into bypass mode such that incoming legacy IRQ/FIQ are sent to CPU, which
-means disabling GIC CPU interface doesn't really disable IRQ/FIQ to CPU.
+The flow controller would take care the power sequence when CPU idle in
+powered-down mode. It powered gate the CPU when CPU runs into WFI
+instruction. And wake up the CPU when event be triggered.
 
-GICv2 provides a wake IRQ/FIQ (for wake-event purpose), which are not
-disabled by GIC CPU interface. This is done by adding a bypass override
-capability when the interrupts are disabled at the CPU interface. To
-support this, there are four bits about IRQ/FIQ BypassDisable in CPU
-interface Control Register. When the IRQ/FIQ not being driver by the
-CPU interface, each interrupt output signal can be deasserted rather
-than being driven by the legacy interrupt input.
-
-So the wake-event can be used as wakeup signals to SoC (system power
-controller).
-
-To prevent race conditions and ensure proper interrupt routing on
-Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
-call-back to reprogram the GIC CPU interface on PM entry. The
-GIC CPU interface will be reset back to its normal state by
-the common GIC CPU PM exit callback when the CPU wakes up.
-
-Based on the work by: Scott Williams <scwilliams@nvidia.com>
+The sequence is below.
+* setting wfi bitmap for the CPU as the halt event in the
+  FLOW_CTRL_CPU_HALT_REG to monitor the CPU running into WFI,then power
+  gate it
+* setting IRQ and FIQ as wake up event to wake up CPU when event triggered
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/irq.c | 40 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ arch/arm/mach-tegra/flowctrl.h      | 2 ++
+ arch/arm/mach-tegra/sleep-tegra30.S | 2 ++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index 0de4eed..1a74d56 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -18,10 +18,12 @@
-  */
- 
- #include <linux/kernel.h>
-+#include <linux/cpu_pm.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/io.h>
- #include <linux/of.h>
-+#include <linux/of_address.h>
- #include <linux/irqchip/arm-gic.h>
- #include <linux/syscore_ops.h>
- 
-@@ -65,6 +67,7 @@ static u32 cpu_ier[TEGRA_MAX_NUM_ICTLRS];
- static u32 cpu_iep[TEGRA_MAX_NUM_ICTLRS];
- 
- static u32 ictlr_wake_mask[TEGRA_MAX_NUM_ICTLRS];
-+static void __iomem *tegra_gic_cpu_base;
- #endif
- 
- bool tegra_pending_sgi(void)
-@@ -213,8 +216,43 @@ int tegra_legacy_irq_syscore_init(void)
- 
- 	return 0;
- }
-+
-+static int tegra_gic_notifier(struct notifier_block *self,
-+			      unsigned long cmd, void *v)
-+{
-+	switch (cmd) {
-+	case CPU_PM_ENTER:
-+		writel_relaxed(0x1E0, tegra_gic_cpu_base + GIC_CPU_CTRL);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block tegra_gic_notifier_block = {
-+	.notifier_call = tegra_gic_notifier,
-+};
-+
-+static const struct of_device_id tegra114_dt_gic_match[] __initconst = {
-+	{ .compatible = "arm,cortex-a15-gic" },
-+	{ }
-+};
-+
-+static void tegra114_gic_cpu_pm_registration(void)
-+{
-+	struct device_node *dn;
-+
-+	dn = of_find_matching_node(NULL, tegra114_dt_gic_match);
-+	if (!dn)
-+		return;
-+
-+	tegra_gic_cpu_base = of_iomap(dn, 1);
-+
-+	cpu_pm_register_notifier(&tegra_gic_notifier_block);
-+}
- #else
- #define tegra_set_wake NULL
-+static void tegra114_gic_cpu_pm_registration(void) { }
- #endif
- 
- void __init tegra_init_irq(void)
-@@ -252,4 +290,6 @@ void __init tegra_init_irq(void)
- 	if (!of_have_populated_dt())
- 		gic_init(0, 29, distbase,
- 			IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
-+
-+	tegra114_gic_cpu_pm_registration();
- }
+diff --git a/arch/arm/mach-tegra/flowctrl.h b/arch/arm/mach-tegra/flowctrl.h
+index 7a29bae..e56a950 100644
+--- a/arch/arm/mach-tegra/flowctrl.h
++++ b/arch/arm/mach-tegra/flowctrl.h
+@@ -28,6 +28,8 @@
+ #define FLOW_CTRL_SCLK_RESUME		(1 << 27)
+ #define FLOW_CTRL_HALT_CPU_IRQ		(1 << 10)
+ #define	FLOW_CTRL_HALT_CPU_FIQ		(1 << 8)
++#define FLOW_CTRL_HALT_GIC_IRQ		(1 << 9)
++#define FLOW_CTRL_HALT_GIC_FIQ		(1 << 8)
+ #define FLOW_CTRL_CPU0_CSR		0x8
+ #define	FLOW_CTRL_CSR_INTR_FLAG		(1 << 15)
+ #define FLOW_CTRL_CSR_EVENT_FLAG	(1 << 14)
+diff --git a/arch/arm/mach-tegra/sleep-tegra30.S b/arch/arm/mach-tegra/sleep-tegra30.S
+index ada8821..5877f26 100644
+--- a/arch/arm/mach-tegra/sleep-tegra30.S
++++ b/arch/arm/mach-tegra/sleep-tegra30.S
+@@ -99,6 +99,8 @@ flow_ctrl_setting_for_lp2:
+ 	cmp	r10, #TEGRA30
+ 	moveq   r3, #FLOW_CTRL_WAIT_FOR_INTERRUPT	@ For LP2
+ 	movne	r3, #FLOW_CTRL_WAITEVENT
++	orrne	r3, r3, #FLOW_CTRL_HALT_GIC_IRQ
++	orrne	r3, r3, #FLOW_CTRL_HALT_GIC_FIQ
+ flow_ctrl_done:
+ 	cmp	r10, #TEGRA30
+ 	str	r3, [r2]
 -- 
 1.8.3
