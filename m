@@ -1,67 +1,30 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 30 May 2013 16:51:42 +0200
-Subject: [PATCH v7 00/11] ASoC: fsl-ssi: ac97-slave support
-Message-ID: <1369925513-19329-1-git-send-email-mpa@pengutronix.de>
+Date: Thu, 30 May 2013 16:51:51 +0200
+Subject: [PATCH v7 09/11] ASoC: fsl: Kconfig: Use fsl-ssi for phycore-ac97
+In-Reply-To: <1369925513-19329-1-git-send-email-mpa@pengutronix.de>
+References: <1369925513-19329-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1369925513-19329-10-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ sound/soc/fsl/Kconfig | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-This series adds DT support for phycore-ac97. Beside ac97 support, the series
-adds imx-pcm-fiq and generic DMA bindings to fsl-ssi.
-
-Regards,
-
-Markus
-
-Changes in v7:
- - Only one soc_ac97_ops struct for both ssi drivers (fsl-ssi and imx-ssi) to
-   make it possible to compile a kernel with both drivers.
- - Other small bug/style fixes described in the changelogs of the patches.
-
-Changes in v6:
- - Rebased onto 3.10-rc3 with Shawn's pcm cleanup patches
- - Setup of reset functions moved to phycore-ac97.c
-
-Changes in v5:
- - Pass of_node via parent device to imx-pcm-dma.
-
-Changes in v4:
- - phycore-ac97 uses the iomux functions based on audmux phandle now.
- - fsl-ssi imx-pcm-fiq got some new comments about problems with imx-ssi and
-   incompatible codecs
-
-Changes in v3:
- - Rebased onto pcm dma cleanup patches
- - A lot of cleanups for the fsl-ssi ac97 integration
- - Some small changes which are listed in the notes of the patches.
-
-Markus Pargmann (11):
-      ASoC: imx-pcm-dma: DT support
-      ASoC: imx-pcm-fiq: Introduce pcm-fiq-params
-      ASoC: fsl: Move soc_ac97_ops from imx-ssi to fsl_ssi
-      ASoC: fsl-ssi: Add support for imx-pcm-fiq
-      ASoC: fsl-ssi: Use generic DMA bindings if possible
-      ASoC: fsl-ssi: imx ac97 support
-      ARM: imx: Export ac97 reset functions
-      ASoC: phycore-ac97: Add DT support
-      ASoC: fsl: Kconfig: Use fsl-ssi for phycore-ac97
-      ASoC: fsl: Move fsl-ssi binding doc to sound/
-      ASoC: fsl: Update fsl-ssi binding doc
-
- .../{powerpc/fsl/ssi.txt => sound/fsl,ssi.txt}     |  10 +
- .../bindings/sound/phytec,phycore-ac97.txt         |  14 +
- arch/arm/mach-imx/mach-pca100.c                    |   7 +-
- arch/arm/mach-imx/mach-pcm043.c                    |   7 +-
- sound/soc/fsl/Kconfig                              |   4 +-
- sound/soc/fsl/fsl_ssi.c                            | 450 +++++++++++++++++----
- sound/soc/fsl/fsl_ssi.h                            |   7 +
- sound/soc/fsl/imx-pcm-dma.c                        |   1 -
- sound/soc/fsl/imx-pcm-fiq.c                        |  18 +-
- sound/soc/fsl/imx-pcm.h                            |  15 +-
- sound/soc/fsl/imx-ssi.c                            |  14 +-
- sound/soc/fsl/imx-ssi.h                            |   1 +
- sound/soc/fsl/phycore-ac97.c                       | 236 +++++++++--
- 13 files changed, 656 insertions(+), 128 deletions(-)
- rename Documentation/devicetree/bindings/{powerpc/fsl/ssi.txt => sound/fsl,ssi.txt} (88%)
- create mode 100644 Documentation/devicetree/bindings/sound/phytec,phycore-ac97.txt
+diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
+index 74ef96e..71284c0 100644
+--- a/sound/soc/fsl/Kconfig
++++ b/sound/soc/fsl/Kconfig
+@@ -149,7 +149,8 @@ config SND_SOC_PHYCORE_AC97
+ 	select SND_SOC_WM9712
+ 	select SND_SOC_IMX_PCM_FIQ
+ 	select SND_SOC_IMX_AUDMUX
+-	select SND_SOC_IMX_SSI
++	select SND_SOC_FSL_SSI if MACH_PCA100
++	select SND_SOC_IMX_SSI if MACH_PCM043
+ 	help
+ 	  Say Y if you want to add support for SoC audio on Phytec phyCORE
+ 	  and phyCARD boards in AC97 mode
+-- 
+1.8.2.1
