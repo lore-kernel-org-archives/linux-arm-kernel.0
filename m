@@ -1,146 +1,87 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 May 2013 12:17:37 +0800
-Subject: [PATCH 1/2] ARM: mxs: Print silicon version on boot
-In-Reply-To: <1369856663-29314-1-git-send-email-fabio.estevam@freescale.com>
+Date: Thu, 30 May 2013 12:32:51 +0800
+Subject: [PATCH 2/2] ARM: mxs: Pass the system revision
+In-Reply-To: <1369856663-29314-2-git-send-email-fabio.estevam@freescale.com>
 References: <1369856663-29314-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130530041735.GF1875@S2101-09.ap.freescale.net>
+ <1369856663-29314-2-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130530043249.GG1875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 04:44:22PM -0300, Fabio Estevam wrote:
-> Introduce functions that identify the SoC type (i.MX23 or iMX28)
-> and also report the silicon revision.
+On Wed, May 29, 2013 at 04:44:23PM -0300, Fabio Estevam wrote:
+> Some mxs userspace tools, such as multimedia plugins and kobs-ng (tool used to 
+> burn boot images to NAND) rely on the 'Revision' field reported by 
+> '/proc/cpuinfo'.
+> 
+> Provide a mechanism to pass such information, so that now we can get:
+> 
+> $ cat /proc/cpuinfo                                             
+> processor       : 0                                                             
+> model name      : ARM926EJ-S rev 5 (v5l)                                        
+> BogoMIPS        : 226.09                                                        
+> Features        : swp half fastmult edsp java                                   
+> CPU implementer : 0x41                                                          
+> CPU architecture: 5TEJ                                                          
+> CPU variant     : 0x0                                                           
+> CPU part        : 0x926                                                         
+> CPU revision    : 5                                                             
+>                                                                                 
+> Hardware        : Freescale i.MX28 Evaluation Kit                               
+> Revision        : 28012                                                         
+> Serial          : 0000000000000000                                              
 
-U-Boot already does that, right?
+We now have a standard way to report SoC revision to user space.  Check
+drivers/base/soc.c and arch/arm/mach-tegra/tegra.c for example.
+
+But I will be fine with populating system_rev for coping with those
+user space which are already spread widely if people think it's
+useful/helpful.
+
+Shawn
 
 > 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
->  arch/arm/mach-mxs/mach-mxs.c | 85 ++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 85 insertions(+)
+>  arch/arm/mach-mxs/mach-mxs.c | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 > 
 > diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index 66fe810..b632323 100644
+> index b632323..032812d 100644
 > --- a/arch/arm/mach-mxs/mach-mxs.c
 > +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -38,6 +38,21 @@
->  #define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0		0x2
->  #define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1		0x3
+> @@ -29,6 +29,7 @@
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/time.h>
+>  #include <asm/system_misc.h>
+> +#include <asm/system_info.h>
 >  
-> +
-> +#define MXS_DIGCTL_BASE_ADDR	0x8001c000
-
-It should be coming from device tree.
-
-> +#define HW_DIGCTL_CHIPID	0x310
-> +#define HW_DIGCTL_CHIPID_MASK	(0xffff << 16)
-> +#define HW_DIGCTL_REV_MASK	0xff
-> +#define HW_DIGCTL_CHIPID_MX23	(0x3780 << 16)
-> +#define HW_DIGCTL_CHIPID_MX28	(0x2800 << 16)
-> +
-> +#define IMX_CHIP_REVISION_1_0	0x10
-> +#define IMX_CHIP_REVISION_1_1	0x11
-> +#define IMX_CHIP_REVISION_1_2	0x12
-> +#define IMX_CHIP_REVISION_1_3	0x13
-> +#define IMX_CHIP_REVISION_1_4	0x14
-> +#define IMX_CHIP_REV_UNKNOWN	0xff
-
-Maybe we should prefix them with MXS?
-
-> +
->  #define MXS_GPIO_NR(bank, nr)	((bank) * 32 + (nr))
+>  #include "pm.h"
 >  
->  #define MXS_SET_ADDR		0x4
-> @@ -361,8 +376,78 @@ static void __init cfa10037_init(void)
->  	update_fec_mac_prop(OUI_CRYSTALFONTZ);
+> @@ -443,10 +444,24 @@ static void mxs_print_silicon_rev(const char *cpu, int srev)
+>  				cpu, (srev >> 4) & 0xf, srev & 0xf);
 >  }
 >  
-> +static const char *mxs_get_cpu_type(void)
+> +static void mxs_pass_sysrev(void)
 > +{
-> +	int reg;
-
-u32
-
-> +	void __iomem *digctl_base = ioremap(MXS_DIGCTL_BASE_ADDR, SZ_8K);
+> +	int cputype = 0;
 > +
-> +	if (!digctl_base)
-> +		return "unknown";
+> +	if (strcmp(mxs_get_cpu_type(), "MX23"))
+> +		cputype = 0x23000;
 > +
-> +	reg = readl(digctl_base + HW_DIGCTL_CHIPID) & HW_DIGCTL_CHIPID_MASK;
-> +	switch (reg) {
-> +	case HW_DIGCTL_CHIPID_MX23:
-> +		return "23";
-> +	case HW_DIGCTL_CHIPID_MX28:
-> +		return "28";
-> +	default:
-> +		return "unknown";
-> +	}
-> +}
+> +	if (strcmp(mxs_get_cpu_type(), "MX28"))
+> +		cputype = 0x28000;
 > +
-> +static int mxs_get_cpu_rev(void)
-> +{
-> +	int reg, rev;
-> +	void __iomem *digctl_base = ioremap(MXS_DIGCTL_BASE_ADDR, SZ_8K);
-> +
-> +	if (!digctl_base)
-> +		return -ENOMEM;
-> +
-> +	reg = readl(digctl_base + HW_DIGCTL_CHIPID) & HW_DIGCTL_CHIPID_MASK;
-> +	rev = readl(digctl_base + HW_DIGCTL_CHIPID) & HW_DIGCTL_REV_MASK;
-> +
-> +	switch (reg) {
-> +	case HW_DIGCTL_CHIPID_MX23:
-> +		switch (rev) {
-> +		case 0x0:
-> +			return IMX_CHIP_REVISION_1_0;
-> +		case 0x1:
-> +			return IMX_CHIP_REVISION_1_1;
-> +		case 0x2:
-> +			return IMX_CHIP_REVISION_1_2;
-> +		case 0x3:
-> +			return IMX_CHIP_REVISION_1_3;
-> +		case 0x4:
-> +			return IMX_CHIP_REVISION_1_4;
-> +		default:
-> +			return IMX_CHIP_REV_UNKNOWN;
-> +		}
-> +	case HW_DIGCTL_CHIPID_MX28:
-> +		switch (rev) {
-> +		case 0x1:
-> +			return IMX_CHIP_REVISION_1_2;
-> +		default:
-> +			return IMX_CHIP_REV_UNKNOWN;
-
-So 0x0 will be an unknown revision?
-
-> +		}
-> +	default:
-> +		return IMX_CHIP_REV_UNKNOWN;
-> +	}
-> +}
-> +
-> +static void mxs_print_silicon_rev(const char *cpu, int srev)
-> +{
-> +	if (srev == IMX_CHIP_REV_UNKNOWN)
-> +		pr_info("CPU identified as i.MX%s, unknown revision\n", cpu);
-> +	else
-> +		pr_info("CPU identified as i.MX%s, silicon rev %d.%d\n",
-> +				cpu, (srev >> 4) & 0xf, srev & 0xf);
+> +	system_rev = (cputype | mxs_get_cpu_rev());
 > +}
 > +
 >  static void __init mxs_machine_init(void)
 >  {
-> +
-
-Unnecessary blank line.
-
-Shawn
-
-> +	mxs_print_silicon_rev(mxs_get_cpu_type(), mxs_get_cpu_rev());
-> +
+>  
+>  	mxs_print_silicon_rev(mxs_get_cpu_type(), mxs_get_cpu_rev());
+> +	mxs_pass_sysrev();
+>  
 >  	if (of_machine_is_compatible("fsl,imx28-evk"))
 >  		imx28_evk_init();
->  	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
 > -- 
 > 1.8.1.2
 > 
