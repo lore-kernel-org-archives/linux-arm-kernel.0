@@ -1,58 +1,78 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 30 May 2013 22:13:21 +0200
-Subject: [PATCH 0/3] at_hdmac: dt dma bindings update
-In-Reply-To: <20130530172649.GC3767@intel.com>
-References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
- <20130530172649.GC3767@intel.com>
-Message-ID: <20130530201321.GE23653@game.jcrosoft.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 May 2013 13:18:54 -0700
+Subject: MUSB multiplatform work?
+In-Reply-To: <20130528163548.GC28253@arwen.pp.htv.fi>
+References: <201305271702.09203.arnd@arndb.de>
+ <20130528163548.GC28253@arwen.pp.htv.fi>
+Message-ID: <20130530201854.GB6467@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22:56 Thu 30 May     , Vinod Koul wrote:
-> On Thu, May 30, 2013 at 06:08:20PM +0200, ludovic.desroches at atmel.com wrote:
-> > From: Ludovic Desroches <ludovic.desroches@atmel.com>
-> > 
-> > Hi,
-> > 
-> > This set of patches update the dt dma binding for at_hdmac since we need one
-> > more parameter. In order to keep backward compatibility, an existing cell will
-> > be used to add this parameter. Since the content of that cell will become a
-> > magic value due to the concatenation of the two parameters, it is time to
-> > use macros.
-> which tree is this targetted to be applied? 
-
-arm-soc as this depends on alreadied applied cleanup I've 
+* Felipe Balbi <balbi@ti.com> [130528 09:42]:
+> Hi,
 > 
-> Arnd, can you review this series and ack if this needs to be applied thru
-> dmaengine?
-
-I prefer the invert
-
-Best Regards,
-J.
+> On Mon, May 27, 2013 at 05:02:09PM +0200, Arnd Bergmann wrote:
+> > Hi Felipe,
+> > 
+> > We've gone through remaining work items for getting the ARM kernel
+> > to full multiplatform support again, and MUSB came up. I'm sure you
+> > have your own thoughts on this, but I'd like to know if there is
+> > already a plan in place.
+> > 
+> > From what I can see, the driver in PIO mode should almost work
+> > on multiple platforms, but there are a couple of compile-time
+> > dependencies in it that need to be turned into run-time conditionals.
+> > In particular the TUSB version seem sufficiently different that
+> > it needs some extra work to be a true run-time option.
 > 
-> --
-> ~Vinod
-> > 
-> > Regards
-> > 
-> > Ludovic Desroches (3):
-> >   ARM: at91: dt: add header to define at_hdmac configuration
-> >   ARM: at91: dt: switch DMA DT bindings to pre-processor
-> >   at_hdmac: add FIFO configuration parameter to DMA DT binding
-> > 
-> >  .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
-> >  arch/arm/boot/dts/at91sam9g45.dtsi                 |  5 ++--
-> >  arch/arm/boot/dts/at91sam9n12.dtsi                 | 11 +++++----
-> >  arch/arm/boot/dts/at91sam9x5.dtsi                  | 17 +++++++-------
-> >  arch/arm/boot/dts/sama5d3.dtsi                     | 19 +++++++--------
-> >  drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++----
-> >  include/dt-bindings/dma/at91.h                     | 27 ++++++++++++++++++++++
-> >  7 files changed, 81 insertions(+), 30 deletions(-)
-> >  create mode 100644 include/dt-bindings/dma/at91.h
-> > 
-> > -- 
-> > 1.7.11.3
-> > 
+> yeah, TUSB layer is quite messy, all the others should be doable though.
+
+TUSB we can make depend on ARMv7, the only implementation we have
+is for omap2420, which is ARMv6. This should solve the issue for
+ARMv7 multiplatform builds for now.
+ 
+> > The DMA support as far as I can tell has never been intended to
+> > be usable in a multiplatform setup, but that also seems doable.
 > 
-> -- 
+> we're looking into dmaengine for that but will take a lot of work to
+> have something usable.
+
+TUSB would work with dmaengine, but AFAIK we're still missing the
+dmaengine configuration options to support increasing device end
+FIFO address.
+ 
+> > Looking just at the #ifdef statements in the driver, I found
+> > that the following things need to be addressed:
+> > 
+> > * abstract musb_write_fifo and musb_read_fifo into callbacks
+> > * move fifo_mode setting into glue driver for runtime selection
+> 
+> for the fifo mode, I'd rather detect the size of the internal fifo and
+> configure it dynamically based on that plus number of endpoints
+> configured in the IP.
+> 
+> > * turn TUSB compile-time switches into run-time conditionals
+> > * turn musb_ep_select into run-time switch
+> > * make is_dma_capable/is_cppi_enabled/tusb_dma_omap run-time conditionals
+> 
+> those can be remove, actually. Back at Nokia we did a huge cleanup on
+> the DMA programming part, it can be very simple with no ifdefs at all,
+> just needs someone to put the work and test on all platforms.
+> 
+> > * abtract dma_controller_create/destroy interface
+> > 
+> > Aside from this, a recent discussion with Maxime has brought up
+> > that the Allwinner A1x platform (mach-sunxi) contains an MUSB variant
+> > that is currently used with an independently implemented device driver,
+> > see https://github.com/linux-sunxi/linux-sunxi/tree/sunxi-3.0/drivers/usb/sun5i_usb
+> > I wonder if you have any insight on how that can be integrated into
+> > musb, or whether it is likely to be a compatible version to start with.
+> 
+> just write a glue layer, should be as easy as that :-)
+
+Yes the MUSB code should be able to support it considering the number
+of implementations we already have there.
+
+Regards,
+
+Tony
