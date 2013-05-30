@@ -1,93 +1,57 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Thu, 30 May 2013 09:41:42 +0800
-Subject: A bug about system call on ARM
-In-Reply-To: <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
- <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
- <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
- <20130529094826.GD13095@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
-Message-ID: <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
+From: skannan@codeaurora.org (Saravana Kannan)
+Date: Wed, 29 May 2013 18:46:37 -0700
+Subject: [PATCH v2 1/2] clk: Disable unused clocks after deferred probing
+ is done
+In-Reply-To: <20130529075126.6058.58923@quantum>
+References: <1368124502-18830-1-git-send-email-skannan@codeaurora.org>
+ <519461BB.3010209@codeaurora.org> <20130529075126.6058.58923@quantum>
+Message-ID: <51A6AF7D.8080706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi  Will,
+On 05/29/2013 12:51 AM, Mike Turquette wrote:
+> Quoting Saravana Kannan (2013-05-15 21:34:03)
+>> On 05/09/2013 11:35 AM, Saravana Kannan wrote:
+>>> With deferred probing, late_initcall() is too soon to declare a clock as
+>>> unused. Wait for deferred probing to finish before declaring a clock as
+>>> unused. Since deferred probing is done in late_initcall(), do the unused
+>>> check to late_initcall_sync.
+>>>
+>>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
+>>> ---
+>>>    drivers/clk/clk.c |    2 +-
+>>>    1 files changed, 1 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>>> index fe4055f..5ecb64c 100644
+>>> --- a/drivers/clk/clk.c
+>>> +++ b/drivers/clk/clk.c
+>>> @@ -534,7 +534,7 @@ static int clk_disable_unused(void)
+>>>
+>>>        return 0;
+>>>    }
+>>> -late_initcall(clk_disable_unused);
+>>> +late_initcall_sync(clk_disable_unused);
+>>>
+>>>    /***    helper functions   ***/
+>>
+>> Mike,
+>>
+>> Thoughts? Picking it up? Removing the existing auto-disable code (I
+>> think they are still useful)?
+>>
+>
+> Hi Saravana,
+>
+> I've taken this into clk-next for testing.
+>
+> Regards,
+> Mike
+>
 
-Have you received the log files?
+Thanks.
 
-And is there someone looking at this issue now ?
-This issue happened on Qcom Scorpoin CPUs,
-And  it just happened in our stability test occasionally .
-
-If you have some patch for this issue,
-I can do the test for it .
-
-Thanks for your help very much !
-
------Original Message-----
-From: Wang, Yalin 
-Sent: Wednesday, May 29, 2013 5:51 PM
-To: 'Will Deacon'; richard -rw- weinberger
-Cc: linux-arch at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: RE: A bug about system call on ARM
-
-Hi 
-
-This is kernel.log  and  the stack which is recovered by Trace32 tools.
-Please have a look at it .
-
-Thanks 
-
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com]
-Sent: Wednesday, May 29, 2013 5:48 PM
-To: richard -rw- weinberger
-Cc: Wang, Yalin; linux-arch at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: A bug about system call on ARM
-
-Hello,
-
-On Wed, May 29, 2013 at 09:46:42AM +0100, richard -rw- weinberger wrote:
-> On Wed, May 29, 2013 at 10:24 AM, Wang, Yalin <Yalin.Wang@sonymobile.com> wrote:
-> > I have download the latest linux kernel code  3.9.4 And Compare with
-> > 3.4.0 kernel .
-> >
-> > It seems there is no change for this part , So it will still happen 
-> > .
-> > Does anyone know who is responsible for  arm arch part kernel code ?
-> 
-> See MAINTAINERS file.
-> CC'ing linux-arm-kernel at lists.infradead.org
-
-Cheers for adding us to CC.
-
-> >> #ifdef CONFIG_ARM_THUMB
-> >>         tst     r8, #PSR_T_BIT
-> >>         movne   r10, #0                         @ no thumb OABI emulation
-> >>         ldreq   r10, [lr, #-4]                  @ get SWI instruction          // crash at this instruction, when get SWI instruction
-
-Do you have the panic log please? Also, which SoC are you using and how are you reproducing this?
-
-> >>         ldr     r10, [lr, #-4]                  @ get SWI instruction
-> >>   A710( and     ip, r10, #0x0f000000            @ check for SWI         )
-> >>   A710( teq     ip, #0x0f000000                                         )
-> >>   A710( bne     .Larm710bug                                             )
-> >> #endif
-> >> #ifdef CONFIG_CPU_ENDIAN_BE8
-> >>         rev     r10, r10                        @ little endian instruction
-> >> #endif
-> >>
-> >> /******************************************************************
-> >> ***
-> >> ******************************/
-> >>
-> >> Then reason why it will crash when get SWI instruction is maybe 
-> >> This page is clear to aged by kernel, But this MMU fault happpened 
-> >> in kernel, So the kernel do_page_fault function will not clear this 
-> >> page to young, So that  will crash .
-
-Sounds like we might need some USER annotations around the instruction loads, but we should also rework the code so that we re-enable interrupts first.
-
-Will
+-Saravana
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
