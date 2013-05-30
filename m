@@ -1,87 +1,55 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Thu, 30 May 2013 13:44:23 +0200
-Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
-In-Reply-To: <51A61E60.4070708@wwwdotorg.org>
-References: <cover.1369658705.git.afzal@ti.com>
- <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
- <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
- <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
- <51A5BEB6.6070809@ti.com> <51A61E60.4070708@wwwdotorg.org>
-Message-ID: <51A73B97.2020701@ti.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 30 May 2013 14:45:28 +0300
+Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
+In-Reply-To: <20130529173715.GB21290@arwen.pp.htv.fi>
+References: <1368424303-10629-5-git-send-email-chao.xie@marvell.com>
+ <Pine.LNX.4.44L0.1305131012090.1389-100000@iolanthe.rowland.org>
+ <20130528162415.GA28253@arwen.pp.htv.fi>
+ <CADApbegejeoxc4TmjvsPse=54durFym2cfDRdg9RviDZJ2HAFg@mail.gmail.com>
+ <20130529173715.GB21290@arwen.pp.htv.fi>
+Message-ID: <51A73BD8.8000007@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On 05/29/2013 05:27 PM, Stephen Warren wrote:
-> On 05/29/2013 02:39 AM, Benoit Cousson wrote:
->> Hi Afzal,
->>
->> On 05/29/2013 10:06 AM, Mohammed, Afzal wrote:
->>> Hi Jon,
->>>
->>> On Wed, May 29, 2013 at 03:35:10, Stephen Warren wrote:
->>>> On 05/28/2013 03:25 PM, Jon Hunter wrote:
->>>
->>>>>>  			ti,am335x-timer	(applicable to AM335x devices)
->>>>>>  			ti,am335x-timer-1ms (applicable to AM335x devices)
->>>>>> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
->>>>>> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
->>>
->>>>> If you are adding more compatibility strings, then this implies that the
->>>>> AM43x timers are not 100% compatible with any other device listed (such
->>>>> as am335x or any omap device). That's fine but you should state that in
->>>>> the changelog. If the AM43x timer registers are 100% compatible with
->>>>> existing devices you should not add these.
->>>>
->>>> I'm not sure that's true; .dts files should always include a compatible
->>>> value that describes the most specific model of the HW, plus any
->>>> baseline compatible value that the HW is compatible with. This allows
->>>> any required quirks/fixes/... to be applied for the specific HW model
->>>> later even if nobody knows right now they'll be needed. Hence, defining
->>>> new compatible values doesn't necessarily mean incompatible HW.
->>>
->>> Stephen took words out of my finger ;)
->>>  
->>> Some explanations,I don;t 
->>>
->>> 1. first compatible should be exact device [A], followed by compatible
->>> model (if one)
->>> 2. Minor effort in getting DT right the first time may help prevent
->>> difficult effort later modifying it (if a necessity comes), considering
->>> the fact that DT sources has  to move out of Kernel at some point of
->>> time. And DT is not supposed to be modified, which may cause difficulty
->>> for the users (I had been a minor victim of this during rebase).
->>>
->>> As we both were in GPMC land earlier, an example,
->>>
->>> If my memory is right, GPMC IP in am335x is rev 6, and IP has 8 chip
->>> select, but one is not pinned out. Now assume that same IP is integrated
->>> in another SoC (probably OMAP4 has rev 6). Here if we use same compatible
->>> for both, driver cannot handle it properly (w/o knowledge about platform).
->>> But if exact compatible is mentioned, without modifying DT (which should
->>> be considered as a firmware) just by modifying Kernel, deciding based on
->>> compatible would help achieve what is required.
->>
->> That's true for the DTS itself, but here your are changing the binding
->> documentation which is supposed to reflect the driver "interface" in the
->> Device Tree model description.
->>
->> Since the driver does not support any new compatible string, you should
->> not update the binding.
+On 05/29/2013 08:37 PM, Felipe Balbi wrote:
+> Hi,
 > 
-> I don't agree here; the DT binding should define all the required and/or
-> allowed values that must/should/can be present in the DT - the entire
-> legal schema. The set of all compatible values is included in that,
-> irrespective of whether a particular value actually (currently) defines
-> a different HW interface or not.
+> On Wed, May 29, 2013 at 11:58:01AM +0800, Chao Xie wrote:
+>> On Wed, May 29, 2013 at 12:24 AM, Felipe Balbi <balbi@ti.com> wrote:
+>>> Hi,
+>>>
+>>> On Mon, May 13, 2013 at 10:13:44AM -0400, Alan Stern wrote:
+>>>> On Mon, 13 May 2013, Chao Xie wrote:
+>>>>
+>>>>> Originaly, ehci driver will call the callbacks in platform data
+>>>>> for PHY initialization and shut down.
+>>>>> With PHY driver, it will call the APIs provided by PHY driver
+>>>>> for PHY initialization and shutdown. It removes the callbacks
+>>>>> in platform data, and at same time it removes one block in the
+>>>>> way of enabling device tree for ehci driver.
+>>>>
+>>>> I wonder if this is the sort of thing that should be handled in
+>>>> ehci-hcd.c rather than in all the different platform glue drivers.
+>>>>
+>>>> Felipe, what do you think?  Are the required actions now sufficiently
+>>>> generic that a single source file can take care of them?
+>>>
+>>> Sorry for the delay, was on business trip and now on vacations. Anyway,
+>>> I agree with you. Our PHY layer should be generic enough that it should
+>>> be usable by ehci-hcd itself. If we have any missing method, let's add
+>>> it generically.
+>>>
+>> So what are your idea about making the PHY layer more generic? How
+>> ehci-hcd will make use of PHY layer?
+> 
+> 
+> on probe grab the phy and initialize it. On suspend/resume,
+> suspend/resume the PHY and so on. Whatever you were going to do on your
+> ehci glue, do it on generic ehci-hcd.
+> 
 
-Well, I tend to agree on the principle, but so far it was never really
-done like that. That's not necessarily a good excuse, but if we start
-adding new bindings for the huge number of OMAP|AM variants TI has been
-introduced for 10 years, I'd rather use a wildcard than a exhaustive
-list of all the devices.
-Something like ti,[omap|am]*-timer for example .
+These operations sound generic enough to be done at HCD layer, no? So no need to
+replicate the same stuff in ohci, ehci, xhci, etc.
 
-Regards,
-Benoit
+cheers,
+-roger
