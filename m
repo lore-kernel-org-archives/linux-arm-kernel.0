@@ -1,230 +1,91 @@
 From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Thu, 30 May 2013 18:08:22 +0200
-Subject: [PATCH 2/3] ARM: at91: dt: switch DMA DT bindings to pre-processor
+Date: Thu, 30 May 2013 18:08:23 +0200
+Subject: [PATCH 3/3] at_hdmac: add FIFO configuration parameter to DMA DT
+ binding
 In-Reply-To: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1369930103-11963-3-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1369930103-11963-4-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
+For most devices the FIFO configuration is the same i.e. when half FIFO size is
+available/filled, a source/destination request is serviced. But USART devices
+have to do it when there is enough space/data available to perform a single
+AHB access so the ASAP configuration.
+
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 ---
- arch/arm/boot/dts/at91sam9g45.dtsi |  5 +++--
- arch/arm/boot/dts/at91sam9n12.dtsi | 11 ++++++-----
- arch/arm/boot/dts/at91sam9x5.dtsi  | 17 +++++++++--------
- arch/arm/boot/dts/sama5d3.dtsi     | 19 ++++++++++---------
- 4 files changed, 28 insertions(+), 24 deletions(-)
+ .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
+ drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++++----
+ 2 files changed, 26 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index f0091af..fe84404 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -10,6 +10,7 @@
+diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+index c80e8a3..c280a0e 100644
+--- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
++++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
+@@ -24,8 +24,11 @@ The three cells in order are:
+ 1. A phandle pointing to the DMA controller.
+ 2. The memory interface (16 most significant bits), the peripheral interface
+ (16 less significant bits).
+-3. The peripheral identifier for the hardware handshaking interface. The
+-identifier can be different for tx and rx.
++3. Parameters for the at91 DMA configuration register which are device
++dependant:
++  - bit 7-0: peripheral identifier for the hardware handshaking interface. The
++  identifier can be different for tx and rx.
++  - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 1 for ASAP.
+ 
+ Example:
+ 
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index e923cda..bfd73e1 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -14,6 +14,7 @@
+  * found on AT91SAM9263.
   */
  
- #include "skeleton.dtsi"
 +#include <dt-bindings/dma/at91.h>
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
-@@ -537,7 +538,7 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xfff80000 0x600>;
- 				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma 1 0>;
-+				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(0)>;
- 				dma-names = "rxtx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -548,7 +549,7 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xfffd0000 0x600>;
- 				interrupts = <29 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma 1 13>;
-+				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(13)>;
- 				dma-names = "rxtx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 566af32..3076693 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -8,6 +8,7 @@
-  */
+ #include <linux/clk.h>
+ #include <linux/dmaengine.h>
+ #include <linux/dma-mapping.h>
+@@ -1223,14 +1224,30 @@ static struct dma_chan *at_dma_xlate(struct of_phandle_args *dma_spec,
+ 	atslave = devm_kzalloc(&dmac_pdev->dev, sizeof(*atslave), GFP_KERNEL);
+ 	if (!atslave)
+ 		return NULL;
++
++	atslave->cfg = ATC_DST_H2SEL_HW | ATC_SRC_H2SEL_HW;
+ 	/*
+ 	 * We can fill both SRC_PER and DST_PER, one of these fields will be
+ 	 * ignored depending on DMA transfer direction.
+ 	 */
+-	per_id = dma_spec->args[1];
+-	atslave->cfg = ATC_FIFOCFG_HALFFIFO | ATC_DST_H2SEL_HW
+-		      | ATC_SRC_H2SEL_HW | ATC_DST_PER(per_id)
+-		      | ATC_SRC_PER(per_id);
++	per_id = dma_spec->args[1] & AT91_DMA_CFG_PER_ID_MASK;
++	atslave->cfg |= ATC_DST_PER(per_id) | ATC_SRC_PER(per_id);
++	/*
++	 * We have to translate the value we get from the device tree since
++	 * the half FIFO configuration value had to be 0 to keep backward
++	 * compatibility.
++	 */
++	switch(dma_spec->args[1] & AT91_DMA_CFG_FIFOCFG_MASK) {
++		case AT91_DMA_CFG_FIFOCFG_ALAP:
++			atslave->cfg |= ATC_FIFOCFG_LARGESTBURST;
++			break;
++		case AT91_DMA_CFG_FIFOCFG_ASAP:
++			atslave->cfg |= ATC_FIFOCFG_ENOUGHSPACE;
++			break;
++		case AT91_DMA_CFG_FIFOCFG_HALF:
++		default:
++			atslave->cfg |= ATC_FIFOCFG_HALFFIFO;
++	}
+ 	atslave->dma_dev = &dmac_pdev->dev;
  
- #include "skeleton.dtsi"
-+#include <dt-bindings/dma/at91.h>
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
-@@ -92,7 +93,7 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xf0008000 0x600>;
- 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma 1 0>;
-+				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(0)>;
- 				dma-names = "rxtx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -384,8 +385,8 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf8010000 0x100>;
- 				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 6>;
--				dmas = <&dma 1 13>,
--				       <&dma 1 14>;
-+				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(13)>,
-+				       <&dma 1 AT91_DMA_CFG_PER_ID(14)>;
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -396,8 +397,8 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf8014000 0x100>;
- 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 6>;
--				dmas = <&dma 1 15>,
--				       <&dma 1 16>;
-+				dmas = <&dma 1 AT91_DMA_CFG_PER_ID(15)>,
-+				       <&dma 1 AT91_DMA_CFG_PER_ID(16)>;
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index af91599..a08bf77 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -10,6 +10,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/dma/at91.h>
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
-@@ -470,7 +471,7 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xf0008000 0x600>;
- 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma0 1 0>;
-+				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(0)>;
- 				dma-names = "rxtx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -481,7 +482,7 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xf000c000 0x600>;
- 				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma1 1 0>;
-+				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(0)>;
- 				dma-names = "rxtx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -544,8 +545,8 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf8010000 0x100>;
- 				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 6>;
--				dmas = <&dma0 1 7>,
--				       <&dma0 1 8>;
-+				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(7)>,
-+				       <&dma0 1 AT91_DMA_CFG_PER_ID(8)>;
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -558,8 +559,8 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf8014000 0x100>;
- 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 6>;
--				dmas = <&dma1 1 5>,
--				       <&dma1 1 6>;
-+				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(5)>,
-+				       <&dma1 1 AT91_DMA_CFG_PER_ID(6)>;
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-@@ -572,8 +573,8 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf8018000 0x100>;
- 				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
--				dmas = <&dma0 1 9>,
--				       <&dma0 1 10>;
-+				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(9)>,
-+				       <&dma0 1 AT91_DMA_CFG_PER_ID(10)>;
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index c00e158..03b8c02 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -9,6 +9,7 @@
-  */
- 
- #include "skeleton.dtsi"
-+#include <dt-bindings/dma/at91.h>
- #include <dt-bindings/pinctrl/at91.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/gpio/gpio.h>
-@@ -63,7 +64,7 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xf0000000 0x600>;
- 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma0 2 0>;
-+				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(0)>;
- 				dma-names = "rxtx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_dat4_7>;
-@@ -116,8 +117,8 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf0014000 0x4000>;
- 				interrupts = <18 IRQ_TYPE_LEVEL_HIGH 6>;
--				dmas = <&dma0 2 7>,
--				       <&dma0 2 8>;
-+				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(7)>,
-+				       <&dma0 2 AT91_DMA_CFG_PER_ID(8)>;
- 				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_i2c0>;
-@@ -130,8 +131,8 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf0018000 0x4000>;
- 				interrupts = <19 IRQ_TYPE_LEVEL_HIGH 6>;
--				dmas = <&dma0 2 9>,
--				       <&dma0 2 10>;
-+				dmas = <&dma0 2 AT91_DMA_CFG_PER_ID(9)>,
-+				       <&dma0 2 AT91_DMA_CFG_PER_ID(10)>;
- 				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_i2c1>;
-@@ -178,7 +179,7 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xf8000000 0x600>;
- 				interrupts = <22 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma1 2 0>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(0)>;
- 				dma-names = "rxtx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3>;
-@@ -191,7 +192,7 @@
- 				compatible = "atmel,hsmci";
- 				reg = <0xf8004000 0x600>;
- 				interrupts = <23 IRQ_TYPE_LEVEL_HIGH 0>;
--				dmas = <&dma1 2 1>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(1)>;
- 				dma-names = "rxtx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_mmc2_clk_cmd_dat0 &pinctrl_mmc2_dat1_3>;
-@@ -309,8 +310,8 @@
- 				compatible = "atmel,at91sam9x5-i2c";
- 				reg = <0xf801c000 0x4000>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 6>;
--				dmas = <&dma1 2 11>,
--				       <&dma1 2 12>;
-+				dmas = <&dma1 2 AT91_DMA_CFG_PER_ID(11)>,
-+				       <&dma1 2 AT91_DMA_CFG_PER_ID(12)>;
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
+ 	chan = dma_request_channel(mask, at_dma_filter, atslave);
 -- 
 1.7.11.3
