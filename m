@@ -1,117 +1,34 @@
 From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Thu, 30 May 2013 15:27:42 +0200
-Subject: [PATCH 2/5] ARM: ux500: Correct anamic2 typo in DT files
+Date: Thu, 30 May 2013 15:27:43 +0200
+Subject: [PATCH 3/5] ARM: ux500: Add DT regulators for ab8500-codec
 In-Reply-To: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
 References: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1369920465-13905-3-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <1369920465-13905-4-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix typo of VAMIC2 LDO regulator name in some DT-related files.  This
-patch replaces all occurrences with the right name.
+Add regulator DT bindings for the ab8500-codec driver.
 
 Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi     | 4 ++--
- arch/arm/boot/dts/href.dtsi       | 2 +-
- arch/arm/boot/dts/hrefv60plus.dts | 2 +-
- arch/arm/boot/dts/snowball.dts    | 2 +-
- drivers/regulator/ab8500.c        | 8 ++++----
- 5 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/boot/dts/dbx5x0.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index e6ea7ba..d0b6e32 100644
+index d0b6e32..8e14042 100644
 --- a/arch/arm/boot/dts/dbx5x0.dtsi
 +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -466,8 +466,8 @@
- 					};
+@@ -410,6 +410,11 @@
+ 				codec: ab8500-codec {
+ 					compatible = "stericsson,ab8500-codec";
  
- 					// supply for v-amic2; VAMIC2 LDO; reuse constants for AMIC1
--					ab8500_ldo_amamic2_reg: ab8500_ldo_amamic2 {
--						regulator-compatible = "ab8500_ldo_amamic2";
-+					ab8500_ldo_anamic2_reg: ab8500_ldo_anamic2 {
-+						regulator-compatible = "ab8500_ldo_anamic2";
- 					};
++					V-AUD-supply = <&ab8500_ldo_audio_reg>;
++					V-AMIC1-supply = <&ab8500_ldo_anamic1_reg>;
++					V-AMIC2-supply = <&ab8500_ldo_anamic2_reg>;
++					V-DMIC-supply = <&ab8500_ldo_dmic_reg>;
++
+ 					stericsson,earpeice-cmv = <950>; /* Units in mV. */
+ 				};
  
- 					// supply for v-dmic; VDMIC LDO
-diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
-index c0bc426..4a53c48 100644
---- a/arch/arm/boot/dts/href.dtsi
-+++ b/arch/arm/boot/dts/href.dtsi
-@@ -256,7 +256,7 @@
- 						regulator-name = "V-AMIC1";
- 					};
- 
--					ab8500_ldo_amamic2_reg: ab8500_ldo_amamic2 {
-+					ab8500_ldo_anamic2_reg: ab8500_ldo_anamic2 {
- 						regulator-name = "V-AMIC2";
- 					};
- 
-diff --git a/arch/arm/boot/dts/hrefv60plus.dts b/arch/arm/boot/dts/hrefv60plus.dts
-index 2b587a7..4f04af8 100644
---- a/arch/arm/boot/dts/hrefv60plus.dts
-+++ b/arch/arm/boot/dts/hrefv60plus.dts
-@@ -192,7 +192,7 @@
- 						regulator-name = "V-AMIC1";
- 					};
- 
--					ab8500_ldo_amamic2_reg: ab8500_ldo_amamic2 {
-+					ab8500_ldo_anamic2_reg: ab8500_ldo_anamic2 {
- 						regulator-name = "V-AMIC2";
- 					};
- 
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index db5db24..557d75e 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -336,7 +336,7 @@
- 						regulator-name = "V-AMIC1";
- 					};
- 
--					ab8500_ldo_amamic2_reg: ab8500_ldo_amamic2 {
-+					ab8500_ldo_anamic2_reg: ab8500_ldo_anamic2 {
- 						regulator-name = "V-AMIC2";
- 					};
- 
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index f6656b8..a19045e 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -2901,7 +2901,7 @@ static struct of_regulator_match ab8500_regulator_match[] = {
- 	{ .name	= "ab8500_ldo_tvout",   .driver_data = (void *) AB8500_LDO_TVOUT, },
- 	{ .name = "ab8500_ldo_audio",   .driver_data = (void *) AB8500_LDO_AUDIO, },
- 	{ .name	= "ab8500_ldo_anamic1", .driver_data = (void *) AB8500_LDO_ANAMIC1, },
--	{ .name	= "ab8500_ldo_amamic2", .driver_data = (void *) AB8500_LDO_ANAMIC2, },
-+	{ .name	= "ab8500_ldo_anamic2", .driver_data = (void *) AB8500_LDO_ANAMIC2, },
- 	{ .name	= "ab8500_ldo_dmic",    .driver_data = (void *) AB8500_LDO_DMIC, },
- 	{ .name	= "ab8500_ldo_ana",     .driver_data = (void *) AB8500_LDO_ANA, },
- };
-@@ -2917,7 +2917,7 @@ static struct of_regulator_match ab8505_regulator_match[] = {
- 	{ .name	= "ab8500_ldo_adc",	.driver_data = (void *) AB8505_LDO_ADC, },
- 	{ .name = "ab8500_ldo_audio",   .driver_data = (void *) AB8505_LDO_AUDIO, },
- 	{ .name	= "ab8500_ldo_anamic1", .driver_data = (void *) AB8505_LDO_ANAMIC1, },
--	{ .name	= "ab8500_ldo_amamic2", .driver_data = (void *) AB8505_LDO_ANAMIC2, },
-+	{ .name	= "ab8500_ldo_anamic2", .driver_data = (void *) AB8505_LDO_ANAMIC2, },
- 	{ .name	= "ab8500_ldo_aux8",    .driver_data = (void *) AB8505_LDO_AUX8, },
- 	{ .name	= "ab8500_ldo_ana",     .driver_data = (void *) AB8505_LDO_ANA, },
- };
-@@ -2933,7 +2933,7 @@ static struct of_regulator_match ab8540_regulator_match[] = {
- 	{ .name	= "ab8500_ldo_tvout",   .driver_data = (void *) AB8540_LDO_TVOUT, },
- 	{ .name = "ab8500_ldo_audio",   .driver_data = (void *) AB8540_LDO_AUDIO, },
- 	{ .name	= "ab8500_ldo_anamic1", .driver_data = (void *) AB8540_LDO_ANAMIC1, },
--	{ .name	= "ab8500_ldo_amamic2", .driver_data = (void *) AB8540_LDO_ANAMIC2, },
-+	{ .name	= "ab8500_ldo_anamic2", .driver_data = (void *) AB8540_LDO_ANAMIC2, },
- 	{ .name	= "ab8500_ldo_dmic",    .driver_data = (void *) AB8540_LDO_DMIC, },
- 	{ .name	= "ab8500_ldo_ana",     .driver_data = (void *) AB8540_LDO_ANA, },
- 	{ .name = "ab8500_ldo_sdio",    .driver_data = (void *) AB8540_LDO_SDIO, },
-@@ -2948,7 +2948,7 @@ static struct of_regulator_match ab9540_regulator_match[] = {
- 	{ .name	= "ab8500_ldo_tvout",   .driver_data = (void *) AB9540_LDO_TVOUT, },
- 	{ .name = "ab8500_ldo_audio",   .driver_data = (void *) AB9540_LDO_AUDIO, },
- 	{ .name	= "ab8500_ldo_anamic1", .driver_data = (void *) AB9540_LDO_ANAMIC1, },
--	{ .name	= "ab8500_ldo_amamic2", .driver_data = (void *) AB9540_LDO_ANAMIC2, },
-+	{ .name	= "ab8500_ldo_anamic2", .driver_data = (void *) AB9540_LDO_ANAMIC2, },
- 	{ .name	= "ab8500_ldo_dmic",    .driver_data = (void *) AB9540_LDO_DMIC, },
- 	{ .name	= "ab8500_ldo_ana",     .driver_data = (void *) AB9540_LDO_ANA, },
- };
 -- 
 1.8.2
