@@ -1,130 +1,146 @@
-From: andreas.biessmann@corscience.de (=?ISO-8859-1?Q?Andreas_Bie=DFmann?=)
-Date: Thu, 30 May 2013 16:27:38 +0200
-Subject: [PATCH 1/8] video: atmel_lcdfb: fix platform data struct
-In-Reply-To: <20130530072328.GE19468@game.jcrosoft.org>
-References: <20130411145741.GB25242@game.jcrosoft.org>
- <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
- <CACQ1gAjF5kuu-czkj56-pQdTBUhvY5VodvfnF3RA_DN-O0b9NQ@mail.gmail.com>
- <20130529173538.GC23899@game.jcrosoft.org>
- <CACQ1gAhhsMw1-Znd8BC=A0rJBrB4pphCtH9v9qOQR+j2dY3vCw@mail.gmail.com>
- <20130529193220.GB19468@game.jcrosoft.org>
- <CACQ1gAj_m_aWaq5J41SY8EPwOH5-3zYPsf2WJCunvVnBCyq00Q@mail.gmail.com>
- <20130530072328.GE19468@game.jcrosoft.org>
-Message-ID: <51A761DA.6020109@corscience.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 30 May 2013 16:35:41 +0200
+Subject: [PATCH 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <1369912782-30663-4-git-send-email-josephl@nvidia.com>
+References: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
+ <1369912782-30663-4-git-send-email-josephl@nvidia.com>
+Message-ID: <51A763BD.6070001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30.05.13 09:23, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 08:39 Thu 30 May     , Richard Genoud wrote:
->> 2013/5/29 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->>> On 19:44 Wed 29 May     , Richard Genoud wrote:
->>>> 2013/5/29 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->>>>> On 16:36 Wed 29 May     , Richard Genoud wrote:
->>>>>> 2013/4/11 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->>>>>>> Today we mix pdata and drivers data in the struct atmel_lcdfb_info
->>>>>>> Fix it and introduce a new struct atmel_lcdfb_pdata for platform data only
->>>>>>>
->>>>>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>>>>>> Cc: linux-fbdev at vger.kernel.org
->>>>>>> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>>>>> Cc: Andrew Morton <akpm@linux-foundation.org>
->>>>>>> Cc: Hans-Christian Egtvedt <egtvedt@samfundet.no>
->>>>>>> ---
->>>>>>>  arch/arm/mach-at91/at91sam9261_devices.c    |    6 +-
->>>>>>>  arch/arm/mach-at91/at91sam9263_devices.c    |    6 +-
->>>>>>>  arch/arm/mach-at91/at91sam9g45_devices.c    |    6 +-
->>>>>>>  arch/arm/mach-at91/at91sam9rl_devices.c     |    6 +-
->>>>>>>  arch/arm/mach-at91/board-sam9261ek.c        |    6 +-
->>>>>>>  arch/arm/mach-at91/board-sam9263ek.c        |    4 +-
->>>>>>>  arch/arm/mach-at91/board-sam9m10g45ek.c     |    4 +-
->>>>>>>  arch/arm/mach-at91/board-sam9rlek.c         |    4 +-
->>>>>>>  arch/arm/mach-at91/board.h                  |    4 +-
->>>>>>>  arch/avr32/boards/atngw100/evklcd10x.c      |    6 +-
->>>>>>>  arch/avr32/boards/atngw100/mrmt.c           |    4 +-
->>>>>>>  arch/avr32/boards/atstk1000/atstk1000.h     |    2 +-
->>>>>>>  arch/avr32/boards/atstk1000/setup.c         |    2 +-
->>>>>>>  arch/avr32/boards/favr-32/setup.c           |    2 +-
->>>>>>>  arch/avr32/boards/hammerhead/setup.c        |    2 +-
->>>>>>>  arch/avr32/boards/merisc/display.c          |    2 +-
->>>>>>>  arch/avr32/boards/mimc200/setup.c           |    4 +-
->>>>>>>  arch/avr32/mach-at32ap/at32ap700x.c         |    8 +--
->>>>>>>  arch/avr32/mach-at32ap/include/mach/board.h |    4 +-
->>>>>>>  drivers/video/atmel_lcdfb.c                 |  104 +++++++++++++++++----------
->>>>>>>  include/video/atmel_lcdc.h                  |   24 +------
->>>>>>>  21 files changed, 109 insertions(+), 101 deletions(-)
->>>>>>>
->>>>>> [snip]
->>>>>>> diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
->>>>>>> index c1a2914..98733cd4 100644
->>>>>>> --- a/drivers/video/atmel_lcdfb.c
->>>>>>> +++ b/drivers/video/atmel_lcdfb.c
->>>>>>> @@ -20,12 +20,45 @@
->>>>>>>  #include <linux/gfp.h>
->>>>>>>  #include <linux/module.h>
->>>>>>>  #include <linux/platform_data/atmel.h>
->>>>>>> +#include <video/of_display_timing.h>
->>>>>>>
->>>>>>>  #include <mach/cpu.h>
->>>>>>>  #include <asm/gpio.h>
->>>>>>>
->>>>>>>  #include <video/atmel_lcdc.h>
->>>>>>>
->>>>>>> +struct atmel_lcdfb_config {
->>>>>>> +       bool have_alt_pixclock;
->>>>>>> +       bool have_hozval;
->>>>>>> +       bool have_intensity_bit;
->>>>>>> +};
->>>>>>> +
->>>>>>> + /* LCD Controller info data structure, stored in device platform_data */
->>>>>>> +struct atmel_lcdfb_info {
->>>>>>> +       spinlock_t              lock;
->>>>>>> +       struct fb_info          *info;
->>>>>>> +       void __iomem            *mmio;
->>>>>>> +       int                     irq_base;
->>>>>>> +       struct work_struct      task;
->>>>>>> +
->>>>>>> +       unsigned int            smem_len;
->>>>>>> +       struct platform_device  *pdev;
->>>>>>> +       struct clk              *bus_clk;
->>>>>>> +       struct clk              *lcdc_clk;
->>>>>>> +
->>>>>>> +       struct backlight_device *backlight;
->>>>>>> +       u8                      bl_power;
->>>>>>> +       bool                    lcdcon_pol_negative;
->>>>>> I think lcdcon_pol_negative should be part of pdata, because it really
->>>>>> depends on how the PWM is wired on the board.
->>>>>>
->>>>>
->>>>> maybe but no one mainline use it on any pdata for non-dt boars
->>>>> so I did not want to expose it
->>>> Well, at least, I'm using it :)
->>>> (and I guess that Andreas is using it also, otherwise he wouldn't have
->>>> introduce it !)
->>>
->>> yes but pdata is for non-dt boards, for dt you can keep it in struct
->>> atmel_lcdfb_info and add a property
->>>
->>> if non-dt boards want it my answer is I do not care switch to DT
->>
->> ok (I use a full DT board based on sam9g35)
->>
->> so I'll add something like
->> sinfo->lcdcon_pol_negative = of_property_read_bool(display_np,
->> "atmel,lcdcon-pwm-pulse-low");
->> in /atmel_lcdfb.c
->>
->> But I thought the goal of this patch was to separate driver data from
->> platform specific data, and IMHO, lcdcon_pol_negative is a specificity
->> of the platform.
+On 05/30/2013 01:19 PM, Joseph Lo wrote:
+> This supports CPU core power down on each CPU when CPU idle. When CPU go
+> into this state, it saves it's context and needs a proper configuration
+> in flow controller to power gate the CPU when CPU runs into WFI
+> instruction. And the CPU also needs to set the IRQ as CPU power down idle
+> wake up event in flow controller.
 > 
-> You are right but as non one mainline use it as pdata I choose to drop it
-> and only keep it on the driver as we can still use it for DT
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> ---
+
+Hi Joseph,
+
+a new flag has been added in the cpuidle framework to let this one to
+handle the timer broadcast : CPUIDLE_FLAG_TIMER_STOP
+
+It is the commit b60e6a0eb0273132cbb60a9806abf5f47a4aee1c
+
+You can get rid of the clockevent notify stuff by adding this flag to
+the state.
+
+Also, can you clarify why tegra3 code is used in tegra114 ?
+
+
+>  arch/arm/mach-tegra/cpuidle-tegra114.c | 62 +++++++++++++++++++++++++++++++++-
+>  1 file changed, 61 insertions(+), 1 deletion(-)
 > 
-> It's a way to force peopoe to switch to DT
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> index 1d1c602..e7d21f5 100644
+> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
+> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> @@ -17,19 +17,79 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/cpuidle.h>
+> +#include <linux/cpu_pm.h>
+> +#include <linux/clockchips.h>
+>  
+>  #include <asm/cpuidle.h>
+> +#include <asm/suspend.h>
+> +#include <asm/smp_plat.h>
+> +
+> +#include "pm.h"
+> +#include "sleep.h"
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int tegra114_idle_power_down(struct cpuidle_device *dev,
+> +				    struct cpuidle_driver *drv,
+> +				    int index);
 
-well, we use it on an avr32 board (not mainlined; though no kernel
-update planned currently) ... but no way to use DT currently.
+Isn't possible to move the driver declaration after the
+tegra114_idle_power_down function, before the init function, so we
+prevent a forward declaration ?
 
-Best regards
+> +#define TEGRA114_MAX_STATES 2
+> +#else
+> +#define TEGRA114_MAX_STATES 1
+> +#endif
+>  
+>  static struct cpuidle_driver tegra_idle_driver = {
+>  	.name = "tegra_idle",
+>  	.owner = THIS_MODULE,
+> -	.state_count = 1,
+> +	.state_count = TEGRA114_MAX_STATES,
+>  	.states = {
+>  		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
+> +#ifdef CONFIG_PM_SLEEP
+> +		[1] = {
+> +			.enter			= tegra114_idle_power_down,
+> +			.exit_latency		= 500,
+> +			.target_residency	= 1000,
+> +			.power_usage		= 0,
+> +			.flags			= CPUIDLE_FLAG_TIME_VALID,
+> +			.name			= "powered-down",
+> +			.desc			= "CPU power gated",
+> +		},
+> +#endif
+>  	},
+>  };
+>  
+> +#ifdef CONFIG_PM_SLEEP
+> +static int tegra114_idle_power_down(struct cpuidle_device *dev,
+> +				    struct cpuidle_driver *drv,
+> +				    int index)
+> +{
+> +	u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
 
-Andreas Bie?mann
+IMO, it is up to the tegra_set_cpu_in_lp2 / tegra_clear_cpu_in_lp2
+functions to do the cpu map conversion instead of adding this into a
+routine working with logical cpu.
+
+> +	local_fiq_disable();
+> +
+> +	tegra_set_cpu_in_lp2(cpu);
+> +	cpu_pm_enter();
+> +
+> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+> +	smp_wmb();
+
+Why do you need a memory barrier here ?
+
+> +	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+> +
+> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+> +
+> +	cpu_pm_exit();
+> +	tegra_clear_cpu_in_lp2(cpu);
+> +
+> +	local_fiq_enable();
+> +
+> +	smp_rmb();
+
+Why do you need a memory barrier here ?
+
+> +	return index;
+> +}
+> +#endif
+> +
+>  int __init tegra114_cpuidle_init(void)
+>  {
+> +#ifdef CONFIG_PM_SLEEP
+> +	tegra_tear_down_cpu = tegra30_tear_down_cpu;
+> +#endif
+
+Doesn't this code should go in the pm.c file ?
+
+>  	return cpuidle_register(&tegra_idle_driver, NULL);
+>  }
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
