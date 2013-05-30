@@ -1,50 +1,43 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 May 2013 10:11:29 +0200
-Subject: [PATCHv3 RESEND 0/6] ARM: sunxi: Add support for A10 Ethernet
- controller
-In-Reply-To: <CACQ1gAgp6o8HqQcv=4cWoAZze3wtXHMX+g+7KvV-pnC2W5=iyg@mail.gmail.com>
-References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
- <CACQ1gAgp6o8HqQcv=4cWoAZze3wtXHMX+g+7KvV-pnC2W5=iyg@mail.gmail.com>
-Message-ID: <20130530081129.GF9799@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 30 May 2013 09:12:11 +0100
+Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
+ into the driver
+In-Reply-To: <CACRpkda3d9_XvqRmy0nbWyri2xC3Qst2U2Sv=UDxV4w-UxK_JQ@mail.gmail.com>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+ <20130529175741.GG21290@arwen.pp.htv.fi>
+ <CACRpkda3d9_XvqRmy0nbWyri2xC3Qst2U2Sv=UDxV4w-UxK_JQ@mail.gmail.com>
+Message-ID: <20130530081211.GA1915@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Richard,
+On Thu, 30 May 2013, Linus Walleij wrote:
 
-On Wed, May 29, 2013 at 08:15:49PM +0200, Richard Genoud wrote:
-> 2013/5/24 Maxime Ripard <maxime.ripard@free-electrons.com>:
-> I tested it successfully on cubieboard 1GB, on top of kernel 3.10-rc3,
-> nfsroot (debian wheezy)
-> I also added in sun4i-a10-cubieboard.dts
-> phy0: ethernet-phy at 0 {
->  reg = <1>;
-> },
-> like Emilio suggested.
+> On Wed, May 29, 2013 at 7:57 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > On Wed, May 15, 2013 at 10:51:43AM +0100, Lee Jones wrote:
+> >> For all ux500 based platforms the maximum number of end-points are used.
+> >> Move this knowledge into the driver so we can relinquish the burden from
+> >> platform data. This also removes quite a bit of complexity from the driver
+> >> and will aid us when we come to enable the driver for Device Tree.
+> >>
+> >> Cc: Felipe Balbi <balbi@ti.com>
+> >> Cc: linux-usb at vger.kernel.org
+> >> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> >> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> >> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> >
+> > for drivers/usb/musb
+> >
+> > Acked-by: Felipe Balbi <balbi@ti.com>
 > 
-> running an iperf, there's some good perfs !
-> iperf -s
-> ------------------------------------------------------------
-> Server listening on TCP port 5001
-> TCP window size: 85.3 KByte (default)
-> ------------------------------------------------------------
-> [  4] local 192.168.1.10 port 5001 connected with 192.168.1.232 port 38169
-> [ ID] Interval       Transfer     Bandwidth
-> [  4]  0.0-10.0 sec   112 MBytes  94.1 Mbits/sec
+> Is that only for this patch 20/39 or also 21, 22 & 23?
 > 
-> That's great ! with this patchset, we can now run a server with a
-> vanilla kernel ( who needs more that a serial port and ethernet,
-> really ? ;) )
-> 
-> Tested-by: Richard Genoud <richard.genoud@gmail.com>
+> Poke us if we should re-send them...
 
-Thanks for testing this.
-
-Did you look at the load while iperf was running? I guess we can expect
-it to be pretty high since it runs without DMA.
-
-Maxime
+I read this as all patches in the series "for drivers/usb/musb".
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
