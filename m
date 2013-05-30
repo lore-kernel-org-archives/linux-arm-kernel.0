@@ -1,50 +1,50 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 29 May 2013 20:26:22 -0400
-Subject: [GIT PULL 2/5] ARM: mvebu: pcie driver for v3.11 (round 2
- cumulative)
-In-Reply-To: <20130529232220.6058.14477@quantum>
-References: <20130528202140.GG31290@titan.lakedaemon.net>
- <20130528202433.GH31290@titan.lakedaemon.net>
- <20130529232220.6058.14477@quantum>
-Message-ID: <20130530002622.GB31290@titan.lakedaemon.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 29 May 2013 18:14:30 -0700
+Subject: [PATCH v3] ARM: KVM: mm: Get rid of L_PTE_USER ref from PAGE_S2_DEVICE
+Message-ID: <1369876470-49540-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 04:22:20PM -0700, Mike Turquette wrote:
-> Quoting Jason Cooper (2013-05-28 13:24:33)
-> > The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
-> > 
-> >   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/users/jcooper/linux.git tags/pcie-3.11-2
-> > 
-> > for you to fetch changes up to 3d9939c92efdd4ced672b94994959ca71b141cb8:
-> > 
-> >   pci: mvebu: fix return value check in mvebu_pcie_probe() (2013-05-27 15:51:56 +0000)
-> > 
-> > ----------------------------------------------------------------
-> > mvebu pcie driver for v3.11 (round 2, bugfix)
-> > 
-> >  - mvebu pcie
-> >     - fix return value check in mvebu_pcie_probe()
-> > 
-> > depends
-> >  - mvebu/of_pci
-> > 
-> > ----------------------------------------------------------------
-> > Thomas Petazzoni (4):
-> >       clk: mvebu: create parent-child relation for PCIe clocks on Armada 370
-> >       clk: mvebu: add more PCIe clocks for Armada XP
-> 
-> Same story here for pull request #2 as for pull request #5.  The clock
-> changes are trivial: Ack.  However if it is a pain to add the ack don't
-> worry about it.
+THe L_PTE_USER actually has nothing to do with stage 2 mappings and the
+L_PTE_S2_RDWR value sets the readable bit, which was what L_PTE_USER
+was used for before proper handling of stage 2 memory defines.
 
-Ok, thanks for the Ack.  In this case, I'm going to wave off.  I would
-have to rebase 4 branches (3 depend on this one) and send 4 new PRs.
+Changelog:
+ [v3]: Drop call to kvm_set_s2pte_writable in mmu.c
+ [v2]: Change default mappings to be r/w instead of r/o, as per Marc
+       Zyngier's suggestion.
 
-thx,
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm/include/asm/pgtable.h |    2 +-
+ arch/arm/kvm/mmu.c             |    1 -
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
-Jason.
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9bcd262..8afc60c 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -97,7 +97,7 @@ extern pgprot_t		pgprot_s2_device;
+ #define PAGE_HYP		_MOD_PROT(pgprot_kernel, L_PTE_HYP)
+ #define PAGE_HYP_DEVICE		_MOD_PROT(pgprot_hyp_device, L_PTE_HYP)
+ #define PAGE_S2			_MOD_PROT(pgprot_s2, L_PTE_S2_RDONLY)
+-#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_USER | L_PTE_S2_RDONLY)
++#define PAGE_S2_DEVICE		_MOD_PROT(pgprot_s2_device, L_PTE_S2_RDWR)
+ 
+ #define __PAGE_NONE		__pgprot(_L_PTE_DEFAULT | L_PTE_RDONLY | L_PTE_XN | L_PTE_NONE)
+ #define __PAGE_SHARED		__pgprot(_L_PTE_DEFAULT | L_PTE_USER | L_PTE_XN)
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 2f12e40..d80264c 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -485,7 +485,6 @@ int kvm_phys_addr_ioremap(struct kvm *kvm, phys_addr_t guest_ipa,
+ 
+ 	for (addr = guest_ipa; addr < end; addr += PAGE_SIZE) {
+ 		pte_t pte = pfn_pte(pfn, PAGE_S2_DEVICE);
+-		kvm_set_s2pte_writable(&pte);
+ 
+ 		ret = mmu_topup_memory_cache(&cache, 2, 2);
+ 		if (ret)
+-- 
+1.7.9.5
