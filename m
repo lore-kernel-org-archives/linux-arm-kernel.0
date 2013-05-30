@@ -1,59 +1,48 @@
-From: ratbert.chuang@gmail.com (Po-Yu Chuang)
-Date: Thu, 30 May 2013 19:46:00 +0800
-Subject: [PATCH v2] ARM: map_init_section flushes incorrect pmd
-In-Reply-To: <CANutaR_ZHWdXQrZNBN91K==n3taMKBptmyU0+8DT1RzBStNCyA@mail.gmail.com>
-References: <CANutaR_ZHWdXQrZNBN91K==n3taMKBptmyU0+8DT1RzBStNCyA@mail.gmail.com>
-Message-ID: <1369914361-4237-1-git-send-email-ratbert.chuang@gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 30 May 2013 15:50:32 +0400
+Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
+In-Reply-To: <23620997.ZR1QCYhSc2@avalon>
+References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
+ <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
+ <51A682C7.9060605@cogentembedded.com> <23620997.ZR1QCYhSc2@avalon>
+Message-ID: <51A73D08.40003@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This bug was introduced in commit e651eab0.
-Some v4/v5 platforms failed to boot due to this.
+Hello.
 
-Signed-off-by: Po-Yu Chuang <ratbert.chuang@gmail.com>
----
-v2:
-prefix underscores to map_init_section to emphasize that it should never be
-called by some random function.
+On 30-05-2013 3:51, Laurent Pinchart wrote:
 
- arch/arm/mm/mmu.c |    8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+>>> From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e0d8565..4d409e6 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -616,10 +616,12 @@ static void __init alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	} while (pte++, addr += PAGE_SIZE, addr != end);
- }
- 
--static void __init map_init_section(pmd_t *pmd, unsigned long addr,
-+static void __init __map_init_section(pmd_t *pmd, unsigned long addr,
- 			unsigned long end, phys_addr_t phys,
- 			const struct mem_type *type)
- {
-+	pmd_t *p = pmd;
-+
- #ifndef CONFIG_ARM_LPAE
- 	/*
- 	 * In classic MMU format, puds and pmds are folded in to
-@@ -638,7 +640,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
- 		phys += SECTION_SIZE;
- 	} while (pmd++, addr += SECTION_SIZE, addr != end);
- 
--	flush_pmd_entry(pmd);
-+	flush_pmd_entry(p);
- }
- 
- static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
-@@ -661,7 +663,7 @@ static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
- 		 */
- 		if (type->prot_sect &&
- 				((addr | next | phys) & ~SECTION_MASK) == 0) {
--			map_init_section(pmd, addr, next, phys, type);
-+			__map_init_section(pmd, addr, next, phys, type);
- 		} else {
- 			alloc_init_pte(pmd, addr, next,
- 						__phys_to_pfn(phys), type);
--- 
-1.7.9.5
+>>> The USB_OVCn pins are alternate options for USB over-current detection
+>>> when using a 3.3V USB interface. As they're not mandatory they can be
+>>> used independently of the USB PENC pins. Don't group the USB_OVCn and
+>>> PENC pins to avoid conflicts when the USB_OVCn pins are used by another
+>>> function.
+
+>>> Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>> Signed-off-by: Laurent Pinchart
+>>> <laurent.pinchart+renesas@ideasonboard.com>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+>> I suspect this is needed in -stable. The bug is older than 3.10-rc1.
+
+> Is it ? The offending commit is
+
+> commit 97d40c4224172451f666febdd865c24b1c3c3fe5
+> Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Date:   Thu Mar 7 13:38:51 2013 +0100
+
+>      sh-pfc: r8a7779: Add USB pin groups and functions
+
+>      Signed-off-by: Laurent Pinchart
+> <laurent.pinchart+renesas@ideasonboard.com>
+>      Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+> and got applied to mainline in v3.10-rc1.
+
+    Ah, then sorry for the false alarm. Consequency of working in the 
+'next' branch all the time...
+
+WBR, Sergei
