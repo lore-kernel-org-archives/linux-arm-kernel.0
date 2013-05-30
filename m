@@ -1,33 +1,30 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 30 May 2013 02:42:01 -0700 (PDT)
-Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
-In-Reply-To: <51A5BA86.3070609@free-electrons.com>
-References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
- <20130528.130920.1604291112518863799.davem@davemloft.net>
- <51A5BA86.3070609@free-electrons.com>
-Message-ID: <20130530.024201.1913984663902628192.davem@davemloft.net>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Thu, 30 May 2013 15:20:52 +0530
+Subject: [PATCH 0/2] USB: OHCI: Splitting ohci-platform into independent driver
+In-Reply-To: <y>
+References: <y>
+Message-ID: <1369907454-11003-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Date: Wed, 29 May 2013 10:21:26 +0200
+This series patch begins the process of splitting ohci-platform up 
+into independent driver modules and add a name for the platform-private field.
 
-> On 28/05/2013 22:09, David Miller wrote:
->>
->> This is the wrong way to go about this.
->>
->> If the arch code absolutely requires CONFIG_PHYLIB=y then express that
->> dependency in the arch Kconfig.  The arch code in question should not
->> be compiled at all if CONFIG_PHYLIB has an incompatible setting.
-> But that is making it impossible to compile a kernel without any network
-> stack for those platforms or we are going back to either enclosing the
-> calls to phy_register_fixup{,_for_uid,_for_id} with #ifdef CONFIG_PHYLIB
-> or if(IS_BUILTIN(CONFIG_PHYLIB)). And as you can see, it is quite error
-> prone and is done only done for 2 platforms on a total of 6. I believe
-> fixing that in phy.h is more foolproof.
+Patch 1/2 separate ohci-platform into independent driver modules.  
+ 
+Patch 2/2 adds an ohci->priv field for private use by OHCI platform drivers.
 
-Or you properly segregate the networking bits of the platform code so
-that it can be built only when the necessary networking portions are
-enabled.
 
-Sometimes having dummy stubs makes sense, but not in this situation.
+Manjunath Goudar (2):
+  USB: OHCI: make ohci-platform a separate driver
+  USB: OHCI: add a name for the platform-private field
+
+ drivers/usb/host/Kconfig         |    2 +-
+ drivers/usb/host/Makefile        |    1 +
+ drivers/usb/host/ohci-hcd.c      |    6 +--
+ drivers/usb/host/ohci-platform.c |   88 ++++++++++++++++++--------------------
+ drivers/usb/host/ohci.h          |    3 ++
+ 5 files changed, 47 insertions(+), 53 deletions(-)
+
+-- 
+1.7.9.5
