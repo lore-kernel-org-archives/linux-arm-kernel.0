@@ -1,162 +1,108 @@
-From: j-keerthy@ti.com (keerthy)
-Date: Thu, 30 May 2013 17:03:28 +0530
-Subject: [PATCH v10 01/12] mfd: DT bindings for the palmas family MFD
-In-Reply-To: <5150906F.9040202@wwwdotorg.org>
-References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
- <1363964122-19201-2-git-send-email-ian@slimlogic.co.uk>
- <5150906F.9040202@wwwdotorg.org>
-Message-ID: <51A73908.7020206@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 May 2013 12:41:12 +0100
+Subject: A bug about system call on ARM
+In-Reply-To: <20130530090949.GC7483@mudshark.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
+ <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
+ <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+ <20130529094826.GD13095@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
+ <20130530090949.GC7483@mudshark.cambridge.arm.com>
+Message-ID: <20130530114112.GH7483@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 30, 2013 at 10:09:49AM +0100, Will Deacon wrote:
+> On Thu, May 30, 2013 at 02:41:42AM +0100, Wang, Yalin wrote:
+> > If you have some patch for this issue,
+> > I can do the test for it .
+> 
+> I'll have a look at cooking something which uses an exception table entry
+> to rewind the PC and retry the system call. That's simpler than directly
+> injecting a user page fault from the system call path.
 
-On 03/25/2013 11:29 PM, Stephen Warren wrote:
+Ok, please can you try the following?
 
-> On 03/22/2013 08:55 AM, Ian Lartey wrote:
->> From: Graeme Gregory <gg@slimlogic.co.uk>
->>
->> Add the various binding files for the palmas family of chips. There is a
->> top level MFD binding then a seperate binding for IP blocks on chips.
-> 
->> diff --git a/Documentation/devicetree/bindings/clock/palmas-clk.txt b/Documentation/devicetree/bindings/clock/palmas-clk.txt
-> 
-> Where is the reg property; if you're instantiating the clk device as a
-> standalone DT node and driver, it should be possible to retrieve the
-> address of this IP block instance from DT, not using driver-internal APIs.
-> 
-> This same comment likely applies everywhere, so I won't repeat it.
-> 
->> +Example:
->> +
->> +clk {
->> +    compatible = "ti,twl6035-clk", "ti,palmas-clk";
->> +    ti,clk32kg-mode-sleep = <0>;
->> +    ti,clk32kgaudio-mode-sleep = <0>;
-> 
->> +    #clock-cells = <1>;
->> +    clock-frequency = <32000000>;
->> +    clock-names = "clk32kg", "clk32kgaudio";
-> 
-> The binding description itself should describe what clocks this node
-> provides and consumes.
-> 
-> What is clock-frequency; which clock does it affect?
-> 
-> The presence of #clock-cells implies this is a clock provider. This
-> binding should define the format of the clock cells that this property
-> implies. I assume it's just the ID of the output clocks, but what values
-> correspond to which output clocks? That mapping table needs to be listed
-> here.
-> 
-> The presence of clock-names implies this is a clock consumer. However,
-> there is no clocks property in the example. Is clks missing from the
-> example, or should this property be clock-output-names instead? If this
-> node is a clock consumer, the list of which clocks it requires should be
-> documented.
-> 
->> diff --git a/Documentation/devicetree/bindings/gpio/gpio-palmas.txt b/Documentation/devicetree/bindings/gpio/gpio-palmas.txt
-> 
->> +- gpio-controller: mark the device as a GPIO controller
->> +- gpio-cells = <1>:  GPIO lines are provided.
-> 
-> That's #gpio-cells not gpio-cells.
-> 
-> I assume that cell simply contains the GPIO ID/number. That should be
-> documented for clarity.
-> 
-> Surely gpio-cells should be 2 not 1, so there is space for flags. At
-> least an "inverted" or "active-low" flag should be included; GPIO
-> consumers would typically implement that flag in SW, so there' no
-> requirement that the flag only be supported if the HW supports the feature.
-> 
->> +- interrupt-controller : palmas has its own internal IRQs
->> +- #interrupt-cells : should be set to 2 for IRQ number and flags
->> +  The first cell is the IRQ number.
->> +  The second cell is the flags, encoded as the trigger masks from
->> +  Documentation/devicetree/bindings/interrupts.txt
-> 
-> You need "/interrupt-controller" before the filename there.
-> 
->> +- interrupt-parent : The parent interrupt controller.
-> 
-> If this IP block has interrupt outputs, it should require an
-> "interrupts" property too. This is the same concept that drives the need
-> for a reg property. This same comment likely applies everywhere, so I
-> won't repeat it.
-> 
->> diff --git a/Documentation/devicetree/bindings/input/palmas-pwrbutton.txt b/Documentation/devicetree/bindings/input/palmas-pwrbutton.txt
-> 
->> +- interrupts: the interrupt outputs of the controller.
-> 
-> How many entries are there, what do they mean, and in what order must
-> they appear? (Note that the binding of a node must define the order of
-> the interrupts property, since historically it's been accessed by index,
-> not by name, and all bindings must allow that access method to be used).
-> 
->> +- interrupt-names : Should be the name of irq resource. Each interrupt
->> +  binds its interrupt-name.
-> 
-> The binding needs to define standard names for the entries in this
-> property, or define that interrupts are only retrieved by index, in
-> which case interrupt-names shouldn't be present. This same comment
-> likely applies everywhere, so I won't repeat it.
-> 
->> diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt b/Documentation/devicetree/bindings/mfd/palmas.txt
-> 
->> +Required properties:
-> ...
-> 
-> I believe the Palmas devices have many separate I2C addresses, even
-> buses, which are I think are at least partially independently SW
-> configurable. In that case, the reg property for this node should
-> probably enumerate all the I2C addresses that this chip responds to, so
-> that they can each be passed down to the child nodes.
+Will
 
+--->8
 
-Stephen,
-
-The palmas devices do have multiple I2C slave IDs. From OMAP5 as the master
-all the palmas slave devices are connected via I2C1 bus.
-
-I did not understand the SW configurable part. It is more board
-dependent. Correct me if i understood it wrongly.
-
-Graeme,
-
-Can i send a separate Documentation patch for palmas-core and palmas-regulators
-outside this series since the drivers are already part of mainline kernel.
-This will ensure at least the bare minimal DT support for palmas family
-will be available in the mainline kernel?
-
-> 
-
->> diff --git a/Documentation/devicetree/bindings/regulator/palmas-pmic.txt b/Documentation/devicetree/bindings/regulator/palmas-pmic.txt
-> 
->> +Optional nodes:
->> +- regulators : should contain the constrains and init information for the
->> +	       regulators. It should contain a subnode per regulator from the
->> +	       list.
->> +	       For ti,palmas-pmic - smps12, smps123, smps3 depending on OTP,
->> +	       smps45, smps457, smps7 depending on varient, smps6, smps[8-10],
->> +	       ldo[1-9], ldoln, ldousb
->> +	       For ti,palmas-charger-pmic - smps12, smps123, smps3 depending on OTP,
->> +	       smps[6-9], boost, ldo[1-14], ldoln, ldousb
-> 
-> The list of legal compatible values for this node above doesn't include
-> both ti,palmas-pmic and ti,palmas-charger-pmic. Should it? This node
-> should describe this PMIC block in a completely standalone fashion,
-> without the need to go look at the top-level node to see if it's a
-> "charger" variant or not.
-> 
->> +	       optional chip specific regulator fields :-
->> +	       ti,warm-reset - maintain voltage during warm reset
->> +	       ti,roof-floor - control voltage selection by pin
-> 
-> I assume those are Boolean not integer. It's worth mentioning the type
-> of each property.
-
-
-
-
-Reagrds,
-Keerthy
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index bc5bc0a..855926e 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -361,6 +361,15 @@ ENTRY(vector_swi)
+ 	str	r8, [sp, #S_PSR]		@ Save CPSR
+ 	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
+ 	zero_fp
++	enable_irq
++	ct_user_exit
++
++#ifdef CONFIG_ALIGNMENT_TRAP
++	ldr	ip, __cr_alignment
++	ldr	ip, [ip]
++	mcr	p15, 0, ip, c1, c0		@ update control register
++#endif
++	get_thread_info tsk
+ 
+ 	/*
+ 	 * Get the system call number.
+@@ -375,9 +384,9 @@ ENTRY(vector_swi)
+ #ifdef CONFIG_ARM_THUMB
+ 	tst	r8, #PSR_T_BIT
+ 	movne	r10, #0				@ no thumb OABI emulation
+-	ldreq	r10, [lr, #-4]			@ get SWI instruction
++ USER(	ldreq	r10, [lr, #-4]		)	@ get SWI instruction
+ #else
+-	ldr	r10, [lr, #-4]			@ get SWI instruction
++ USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
+ #endif
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 	rev	r10, r10			@ little endian instruction
+@@ -392,22 +401,13 @@ ENTRY(vector_swi)
+ 	/* Legacy ABI only, possibly thumb mode. */
+ 	tst	r8, #PSR_T_BIT			@ this is SPSR from save_user_regs
+ 	addne	scno, r7, #__NR_SYSCALL_BASE	@ put OS number in
+-	ldreq	scno, [lr, #-4]
++ USER(	ldreq	scno, [lr, #-4]		)
+ 
+ #else
+ 	/* Legacy ABI only. */
+-	ldr	scno, [lr, #-4]			@ get SWI instruction
+-#endif
+-
+-#ifdef CONFIG_ALIGNMENT_TRAP
+-	ldr	ip, __cr_alignment
+-	ldr	ip, [ip]
+-	mcr	p15, 0, ip, c1, c0		@ update control register
++ USER(	ldr	scno, [lr, #-4]		)	@ get SWI instruction
+ #endif
+-	enable_irq
+-	ct_user_exit
+ 
+-	get_thread_info tsk
+ 	adr	tbl, sys_call_table		@ load syscall table pointer
+ 
+ #if defined(CONFIG_OABI_COMPAT)
+@@ -442,6 +442,18 @@ local_restart:
+ 	eor	r0, scno, #__NR_SYSCALL_BASE	@ put OS number back
+ 	bcs	arm_syscall	
+ 	b	sys_ni_syscall			@ not private func
++
++#if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
++	/*
++	 * We may have faulted trying to load the SWI instruction due to
++	 * concurrent page aging on another CPU. In this case, return
++	 * back to the swi instruction and fault the page back.
++	 */
++9001:
++	sub	lr, lr, #4
++	str	lr, [sp, #S_PC]
++	b	ret_fast_syscall
++#endif
+ ENDPROC(vector_swi)
+ 
+ 	/*
