@@ -1,83 +1,111 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 30 May 2013 14:59:54 +0200
-Subject: [PATCH] ARM: imx: Remove mxc specific ulpi access ops
-In-Reply-To: <51A74B41.5010909@pengutronix.de>
-References: <1369917895-9562-1-git-send-email-mpa@pengutronix.de>
- <51A74B41.5010909@pengutronix.de>
-Message-ID: <20130530125954.GE31548@pengutronix.de>
+From: gautam.vivek@samsung.com (Vivek Gautam)
+Date: Thu, 30 May 2013 18:40:55 +0530
+Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
+In-Reply-To: <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
+References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
+ <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
+ <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
+ <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
+ <51A5C16D.20408@linaro.org> <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
+Message-ID: <3D99F44C56954EC59167436E26BE91F6@sisodomain.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 02:51:13PM +0200, Marc Kleine-Budde wrote:
-> On 05/30/2013 02:44 PM, Markus Pargmann wrote:
-> > There are ulpi access ops implemented in drivers/usb/phy/phy-ulpi.c.
-> > mxc access ops implement the same access operations within mach-imx. This
-> > patch removes the mxc ulpi file and uses phy-ulpi instead for
-> > imx_otg_ulpi_create.
-> > 
-> > phy-ulpi successfully tested with i.MX27 Phytec phyCARD-S (pca100).
-> > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > ---
-> >  arch/arm/mach-imx/Kconfig       |   1 +
-> >  arch/arm/mach-imx/Makefile      |   1 -
-> >  arch/arm/mach-imx/mach-pca100.c |   4 +-
-> >  arch/arm/mach-imx/ulpi.c        | 118 ----------------------------------------
-> >  arch/arm/mach-imx/ulpi.h        |   9 ++-
-> >  5 files changed, 9 insertions(+), 124 deletions(-)
-> >  delete mode 100644 arch/arm/mach-imx/ulpi.c
-> > 
-> > diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> > index ba44328..ca59799 100644
-> > --- a/arch/arm/mach-imx/Kconfig
-> > +++ b/arch/arm/mach-imx/Kconfig
-> > @@ -58,6 +58,7 @@ config MXC_USE_EPIT
-> >  
-> >  config MXC_ULPI
-> >  	bool
-> > +	select USB_ULPI_VIEWPORT
-> >  
-> >  config ARCH_HAS_RNGA
-> >  	bool
-> > diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> > index 70ae7c4..dcb8291 100644
-> > --- a/arch/arm/mach-imx/Makefile
-> > +++ b/arch/arm/mach-imx/Makefile
-> > @@ -23,7 +23,6 @@ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
-> >  obj-$(CONFIG_MXC_TZIC) += tzic.o
-> >  obj-$(CONFIG_MXC_AVIC) += avic.o
-> >  
-> > -obj-$(CONFIG_MXC_ULPI) += ulpi.o
-> >  obj-$(CONFIG_MXC_USE_EPIT) += epit.o
-> >  obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
-> >  
-> > diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-> > index b8b15bb..19bb644 100644
-> > --- a/arch/arm/mach-imx/mach-pca100.c
-> > +++ b/arch/arm/mach-imx/mach-pca100.c
-> > @@ -398,8 +398,8 @@ static void __init pca100_init(void)
-> >  		imx27_add_fsl_usb2_udc(&otg_device_pdata);
-> >  	}
-> >  
-> > -	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
-> > -				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
-> > +	usbh2_pdata.otg = imx_otg_ulpi_create(
-> > +			ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
-> 
-> Why don't you keep otg_ulpi_create()?
+Hi,
 
-I could still use otg_ulpi_create with updated access ops
-(ulpi_viewport_access_ops). But I decided to use imx_otg_ulpi_create
-because it is used 10 lines above and it is more consistent this way.
+> On Wednesday, May 29, 2013 5:51 PM, Tushar Behera:
+>> On 05/29/2013 11:01 AM, Olof Johansson wrote:
+>> > On Tue, May 28, 2013 at 8:59 PM, Tushar Behera 
+>> > <tushar.behera@linaro.org> wrote:
+>> >
+>> >> The patches are at [1].
+>> >
+>> > FWIW, a cgit/gitweb link is easier to follow when you're reading an
+>> > email. Anyway, found the patches.
+>> >
+>> >> There are a total of 6 patches on top of
+>> >> v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another 
+>> >> patch
+>> >> (c) is just a defconfig hack to get Arndale booting. Remaining 2 
+>> >> patches
+>> >> (e, f) are required to reset the hub during EHCI initialization.
+>> >
+>> > Huh, I thought you said that (c) wasn't needed when I posted the
+>> > defconfig update. It'd be nice to see the code fixed to handle this
+>> > case instead of Linaro carrying a patch like this though. I.e. make it
+>> > able to deselect the uart, or make it tied to DEBUG_LL like on other
+>> > platforms instead of having a separate config for this.
+>> >
+>>
+>> It would be good to free up the dependency on the correct UART port for
+>> the board to boot. Without that, there would always be boards that don't
+>> boot with default mainline defconfig file even though all other
+>> components are in place.
+>>
+>> >> a. ARM: exynos: defconfig update
+>> >> b. ARM: EXYNOS: Update defconfig for Arndale and Origen board
+>> >> c. [TEMP] ARM: EXYNOS: Set low-level UART port to 2
+>> >> d. ARM: dts: Enabling samsung-usb2phy driver for exynos5250
+>> >> e. usb: ehci-s5p: add the HSIC port initialization
+>> >> f. ARM: dts: Add USB gpio entries for Arndale board
+>> >>
+>> >> I am not sure whether such kind of board-specific patches (e, f) are
+>> >> appreciated in the drivers. But that is all we need to get USB and
+>> >> Ethernet to work on v3.10-rc3 kernel.
+>> >
+>> > I've come across a similar situation with wifi reset sequence on the
+>> > chromebook. On the product kernel we added some code to the board file
+>> > to deal with it, but if we keep doing that things will grow out of
+>> > hand.
+>> >
+>> > I don't know if it'll be unpopular, but I think it's time to start a
+>> > drivers/platform/arm for these kind of things, and have those drivers
+>> > probe on the system compatible value, similar to how x86 does it (with
+>> > DMI tables). At least that's my plan for approaching the wifi
+>> > reset/power-on sequence on the Chromebook. I hope to have patches in
+>> > not all that long...
+>> >
+>> > Likewise, the hub reset/enable code doesn't have to go with the USB
+>> > driver, right? I.e. if you cycle reset/enable on the hub after the
+>> > host and phy is configured, you'll still have a working setup?
+>> >
+>>
+>> Right, hub reset/enable code need not be tied up with USB driver. As per
+>> your suggestion regarding drivers/platform/arm, I implemented an Arndale
+>> specific driver [2] in drivers/platform/arm and verified USB and
+>> ethernet to be working.
+>
+> CC'ed Thomas Abraham, Vivek Gautam
+>
+> I think so.
+>
+> I looked at Arndale board Schematics.
+> 'Hub chip' on Arndale board needs hub reset/enable code.
+> 'HUB_RESET' and 'HUB_CONNECT' pins are used to reset 'Hub chip'
+> on Arndale board, not Exynos EHCI controller. So, Exynos EHCI driver
+> does not need to consider this hub reset/enable code.
+>
+> If there is a driver for this 'Hub chip', 'Hub chip' driver maybe
+> consider this.
+>
+> However, Olof Johansson mentioned, 'drivers/platform/arm/board_arndale.c'
+> would be a good alternative.
 
-Regards,
+We do have a driver for USB3503 in upstream now, which has enough 
+infrastructure for us to use.
+We just want to handle states of HUB_CONNECT line or RESET_N line, which 
+should just be fine with this driver.
 
-Markus
+Am I missing something ?
+
+>
+>>
+>> [2]
+>> https://git.linaro.org/gitweb?p=landing-
+>> teams/working/samsung/kernel.git;a=shortlog;h=refs/heads/upstream/arndale-usb-2
+>
+> It looks good.
 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Vivek 
