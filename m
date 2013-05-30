@@ -1,111 +1,83 @@
-From: gautam.vivek@samsung.com (Vivek Gautam)
-Date: Thu, 30 May 2013 18:40:55 +0530
-Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
-In-Reply-To: <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
-References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
- <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
- <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
- <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
- <51A5C16D.20408@linaro.org> <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
-Message-ID: <3D99F44C56954EC59167436E26BE91F6@sisodomain.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 30 May 2013 15:09:59 +0200
+Subject: [PATCH 2/2] ARM: imx6q: Mark VPU and IPU AXI transfers as cacheable,
+ increase IPU priority
+In-Reply-To: <1369919399-24370-1-git-send-email-mpa@pengutronix.de>
+References: <1369919399-24370-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1369919399-24370-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Philipp Zabel <p.zabel@pengutronix.de>
 
-> On Wednesday, May 29, 2013 5:51 PM, Tushar Behera:
->> On 05/29/2013 11:01 AM, Olof Johansson wrote:
->> > On Tue, May 28, 2013 at 8:59 PM, Tushar Behera 
->> > <tushar.behera@linaro.org> wrote:
->> >
->> >> The patches are at [1].
->> >
->> > FWIW, a cgit/gitweb link is easier to follow when you're reading an
->> > email. Anyway, found the patches.
->> >
->> >> There are a total of 6 patches on top of
->> >> v3.10-rc3. 3 of them (a, b, d) are queued for 3.10-rc4 and another 
->> >> patch
->> >> (c) is just a defconfig hack to get Arndale booting. Remaining 2 
->> >> patches
->> >> (e, f) are required to reset the hub during EHCI initialization.
->> >
->> > Huh, I thought you said that (c) wasn't needed when I posted the
->> > defconfig update. It'd be nice to see the code fixed to handle this
->> > case instead of Linaro carrying a patch like this though. I.e. make it
->> > able to deselect the uart, or make it tied to DEBUG_LL like on other
->> > platforms instead of having a separate config for this.
->> >
->>
->> It would be good to free up the dependency on the correct UART port for
->> the board to boot. Without that, there would always be boards that don't
->> boot with default mainline defconfig file even though all other
->> components are in place.
->>
->> >> a. ARM: exynos: defconfig update
->> >> b. ARM: EXYNOS: Update defconfig for Arndale and Origen board
->> >> c. [TEMP] ARM: EXYNOS: Set low-level UART port to 2
->> >> d. ARM: dts: Enabling samsung-usb2phy driver for exynos5250
->> >> e. usb: ehci-s5p: add the HSIC port initialization
->> >> f. ARM: dts: Add USB gpio entries for Arndale board
->> >>
->> >> I am not sure whether such kind of board-specific patches (e, f) are
->> >> appreciated in the drivers. But that is all we need to get USB and
->> >> Ethernet to work on v3.10-rc3 kernel.
->> >
->> > I've come across a similar situation with wifi reset sequence on the
->> > chromebook. On the product kernel we added some code to the board file
->> > to deal with it, but if we keep doing that things will grow out of
->> > hand.
->> >
->> > I don't know if it'll be unpopular, but I think it's time to start a
->> > drivers/platform/arm for these kind of things, and have those drivers
->> > probe on the system compatible value, similar to how x86 does it (with
->> > DMI tables). At least that's my plan for approaching the wifi
->> > reset/power-on sequence on the Chromebook. I hope to have patches in
->> > not all that long...
->> >
->> > Likewise, the hub reset/enable code doesn't have to go with the USB
->> > driver, right? I.e. if you cycle reset/enable on the hub after the
->> > host and phy is configured, you'll still have a working setup?
->> >
->>
->> Right, hub reset/enable code need not be tied up with USB driver. As per
->> your suggestion regarding drivers/platform/arm, I implemented an Arndale
->> specific driver [2] in drivers/platform/arm and verified USB and
->> ethernet to be working.
->
-> CC'ed Thomas Abraham, Vivek Gautam
->
-> I think so.
->
-> I looked at Arndale board Schematics.
-> 'Hub chip' on Arndale board needs hub reset/enable code.
-> 'HUB_RESET' and 'HUB_CONNECT' pins are used to reset 'Hub chip'
-> on Arndale board, not Exynos EHCI controller. So, Exynos EHCI driver
-> does not need to consider this hub reset/enable code.
->
-> If there is a driver for this 'Hub chip', 'Hub chip' driver maybe
-> consider this.
->
-> However, Olof Johansson mentioned, 'drivers/platform/arm/board_arndale.c'
-> would be a good alternative.
+This is needed so that the IPU framebuffer scanout cannot be starved
+by VPU or GPU activity.
+The Freescale SabreLite and SabreSD boards seem to set this in the boot
+rom already, but the documented register reset values do not contain
+the necessary settings.
 
-We do have a driver for USB3503 in upstream now, which has enough 
-infrastructure for us to use.
-We just want to handle states of HUB_CONNECT line or RESET_N line, which 
-should just be fine with this driver.
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
+ arch/arm/mach-imx/mach-imx6q.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-Am I missing something ?
-
->
->>
->> [2]
->> https://git.linaro.org/gitweb?p=landing-
->> teams/working/samsung/kernel.git;a=shortlog;h=refs/heads/upstream/arndale-usb-2
->
-> It looks good.
-
-
-Regards
-Vivek 
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 5536fd8..7bef242 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -29,6 +29,7 @@
+ #include <linux/regmap.h>
+ #include <linux/micrel_phy.h>
+ #include <linux/mfd/syscon.h>
++#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -161,6 +162,36 @@ static void __init imx6q_usb_init(void)
+ 	imx_anatop_usb_chrg_detect_disable();
+ }
+ 
++static void __init imx6q_gpr_init(void)
++{
++	struct regmap *gpr;
++
++	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
++	if (IS_ERR(gpr)) {
++		pr_warn("failed to find fsl,imx6q-iomuxc-gpr regmap\n");
++		return;
++	}
++
++	/* Enable the cacheable attribute of VPU and IPU AXI transactions */
++	regmap_update_bits(gpr, IOMUXC_GPR4, 0,
++			IMX6Q_GPR4_VPU_WR_CACHE_SEL |
++			IMX6Q_GPR4_VPU_RD_CACHE_SEL |
++			IMX6Q_GPR4_VPU_P_WR_CACHE_VAL |
++			IMX6Q_GPR4_VPU_P_RD_CACHE_VAL_MASK |
++			IMX6Q_GPR4_IPU_WR_CACHE_CTL |
++			IMX6Q_GPR4_IPU_RD_CACHE_CTL);
++
++	/* Increase IPU read QoS priority */
++	regmap_update_bits(gpr, IOMUXC_GPR6,
++			IMX6Q_GPR6_IPU1_ID00_RD_QOS_MASK |
++			IMX6Q_GPR6_IPU1_ID01_RD_QOS_MASK,
++			(0xf << 16) | (0x7 << 20));
++	regmap_update_bits(gpr, IOMUXC_GPR7,
++			IMX6Q_GPR7_IPU2_ID00_RD_QOS_MASK |
++			IMX6Q_GPR7_IPU2_ID01_RD_QOS_MASK,
++			(0xf << 16) | (0x7 << 20));
++}
++
+ static void __init imx6q_init_machine(void)
+ {
+ 	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
+@@ -172,6 +203,7 @@ static void __init imx6q_init_machine(void)
+ 	imx6q_pm_init();
+ 	imx6q_usb_init();
+ 	imx6q_1588_init();
++	imx6q_gpr_init();
+ }
+ 
+ #define OCOTP_CFG3			0x440
+-- 
+1.8.2.1
