@@ -1,88 +1,71 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 May 2013 12:32:51 +0800
-Subject: [PATCH 2/2] ARM: mxs: Pass the system revision
-In-Reply-To: <1369856663-29314-2-git-send-email-fabio.estevam@freescale.com>
-References: <1369856663-29314-1-git-send-email-fabio.estevam@freescale.com>
- <1369856663-29314-2-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20130530043249.GG1875@S2101-09.ap.freescale.net>
+From: weiyj.lk@gmail.com (Wei Yongjun)
+Date: Thu, 30 May 2013 12:32:45 +0800
+Subject: [PATCH -next v2] dmaengine: ste_dma40: fix error return code in
+ d40_probe()
+Message-ID: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 04:44:23PM -0300, Fabio Estevam wrote:
-> Some mxs userspace tools, such as multimedia plugins and kobs-ng (tool used to 
-> burn boot images to NAND) rely on the 'Revision' field reported by 
-> '/proc/cpuinfo'.
-> 
-> Provide a mechanism to pass such information, so that now we can get:
-> 
-> $ cat /proc/cpuinfo                                             
-> processor       : 0                                                             
-> model name      : ARM926EJ-S rev 5 (v5l)                                        
-> BogoMIPS        : 226.09                                                        
-> Features        : swp half fastmult edsp java                                   
-> CPU implementer : 0x41                                                          
-> CPU architecture: 5TEJ                                                          
-> CPU variant     : 0x0                                                           
-> CPU part        : 0x926                                                         
-> CPU revision    : 5                                                             
->                                                                                 
-> Hardware        : Freescale i.MX28 Evaluation Kit                               
-> Revision        : 28012                                                         
-> Serial          : 0000000000000000                                              
+From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
 
-We now have a standard way to report SoC revision to user space.  Check
-drivers/base/soc.c and arch/arm/mach-tegra/tegra.c for example.
+In many of the error handling case, the return value 'ret' not set
+and 0 will be return from d40_probe() even if error, but we should
+return a negative error code instead in those error handling case.
+This patch fixed them, and also removed useless variable 'err'.
 
-But I will be fine with populating system_rev for coping with those
-user space which are already spread widely if people think it's
-useful/helpful.
+Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+---
+v1 -> v2: rebased on linux-next.git
+---
+ drivers/dma/ste_dma40.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-Shawn
-
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mxs/mach-mxs.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
-> 
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index b632323..032812d 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -29,6 +29,7 @@
->  #include <asm/mach/map.h>
->  #include <asm/mach/time.h>
->  #include <asm/system_misc.h>
-> +#include <asm/system_info.h>
->  
->  #include "pm.h"
->  
-> @@ -443,10 +444,24 @@ static void mxs_print_silicon_rev(const char *cpu, int srev)
->  				cpu, (srev >> 4) & 0xf, srev & 0xf);
->  }
->  
-> +static void mxs_pass_sysrev(void)
-> +{
-> +	int cputype = 0;
-> +
-> +	if (strcmp(mxs_get_cpu_type(), "MX23"))
-> +		cputype = 0x23000;
-> +
-> +	if (strcmp(mxs_get_cpu_type(), "MX28"))
-> +		cputype = 0x28000;
-> +
-> +	system_rev = (cputype | mxs_get_cpu_rev());
-> +}
-> +
->  static void __init mxs_machine_init(void)
->  {
->  
->  	mxs_print_silicon_rev(mxs_get_cpu_type(), mxs_get_cpu_rev());
-> +	mxs_pass_sysrev();
->  
->  	if (of_machine_is_compatible("fsl,imx28-evk"))
->  		imx28_evk_init();
-> -- 
-> 1.8.1.2
-> 
-> 
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index 7f23d45..a241e25 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -3506,7 +3506,6 @@ static int __init d40_probe(struct platform_device *pdev)
+ {
+ 	struct stedma40_platform_data *plat_data = pdev->dev.platform_data;
+ 	struct device_node *np = pdev->dev.of_node;
+-	int err;
+ 	int ret = -ENOENT;
+ 	struct d40_base *base = NULL;
+ 	struct resource *res = NULL;
+@@ -3619,6 +3618,7 @@ static int __init d40_probe(struct platform_device *pdev)
+ 		if (IS_ERR(base->lcpa_regulator)) {
+ 			d40_err(&pdev->dev, "Failed to get lcpa_regulator\n");
+ 			base->lcpa_regulator = NULL;
++			ret = PTR_ERR(base->lcpa_regulator);
+ 			goto failure;
+ 		}
+ 
+@@ -3633,13 +3633,13 @@ static int __init d40_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	base->initialized = true;
+-	err = d40_dmaengine_init(base, num_reserved_chans);
+-	if (err)
++	ret = d40_dmaengine_init(base, num_reserved_chans);
++	if (ret)
+ 		goto failure;
+ 
+ 	base->dev->dma_parms = &base->dma_parms;
+-	err = dma_set_max_seg_size(base->dev, STEDMA40_MAX_SEG_SIZE);
+-	if (err) {
++	ret = dma_set_max_seg_size(base->dev, STEDMA40_MAX_SEG_SIZE);
++	if (ret) {
+ 		d40_err(&pdev->dev, "Failed to set dma max seg size\n");
+ 		goto failure;
+ 	}
+@@ -3647,8 +3647,8 @@ static int __init d40_probe(struct platform_device *pdev)
+ 	d40_hw_init(base);
+ 
+ 	if (np) {
+-		err = of_dma_controller_register(np, d40_xlate, NULL);
+-		if (err && err != -ENODEV)
++		ret = of_dma_controller_register(np, d40_xlate, NULL);
++		if (ret && ret != -ENODEV)
+ 			dev_err(&pdev->dev,
+ 				"could not register of_dma_controller\n");
+ 	}
