@@ -1,43 +1,36 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 30 May 2013 18:02:12 +0200 (CEST)
-Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with no
- DMA support
-Message-ID: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
+From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
+Date: Thu, 30 May 2013 18:08:20 +0200
+Subject: [PATCH 0/3] at_hdmac: dt dma bindings update
+Message-ID: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms with no support for the shdma dmaengine driver build is
-currently failing with
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+Hi,
 
-Fix the breakage by defining shdma_chan_filter to NULL in such
-configurations.
+This set of patches update the dt dma binding for at_hdmac since we need one
+more parameter. In order to keep backward compatibility, an existing cell will
+be used to add this parameter. Since the content of that cell will become a
+magic value due to the concatenation of the two parameters, it is time to
+use macros.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
----
+Regards
 
-This is for "next." Compile-tested only. I'll test it on hardware next 
-week, but I don't think it shall break anything.
+Ludovic Desroches (3):
+  ARM: at91: dt: add header to define at_hdmac configuration
+  ARM: at91: dt: switch DMA DT bindings to pre-processor
+  at_hdmac: add FIFO configuration parameter to DMA DT binding
 
- include/linux/sh_dma.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |  5 ++--
+ arch/arm/boot/dts/at91sam9n12.dtsi                 | 11 +++++----
+ arch/arm/boot/dts/at91sam9x5.dtsi                  | 17 +++++++-------
+ arch/arm/boot/dts/sama5d3.dtsi                     | 19 +++++++--------
+ drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++----
+ include/dt-bindings/dma/at91.h                     | 27 ++++++++++++++++++++++
+ 7 files changed, 81 insertions(+), 30 deletions(-)
+ create mode 100644 include/dt-bindings/dma/at91.h
 
-diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
-index b64d6be..1fd8a20 100644
---- a/include/linux/sh_dma.h
-+++ b/include/linux/sh_dma.h
-@@ -99,6 +99,10 @@ struct sh_dmae_pdata {
- #define CHCR_TE	0x00000002
- #define CHCR_IE	0x00000004
- 
-+#if IS_ENABLED(CONFIG_SH_DMAE)
- bool shdma_chan_filter(struct dma_chan *chan, void *arg);
-+#else
-+#define shdma_chan_filter NULL
-+#endif
- 
- #endif
 -- 
-1.7.2.5
+1.7.11.3
