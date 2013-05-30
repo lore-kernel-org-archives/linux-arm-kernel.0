@@ -1,24 +1,30 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Thu, 30 May 2013 09:50:53 -0700
-Subject: [PATCH v2 4/5] clk: samsung: Add set_rate() clk_ops for PLL36xx
-In-Reply-To: <1369834677-20312-5-git-send-email-vikas.sajjan@linaro.org>
-References: <1369834677-20312-1-git-send-email-vikas.sajjan@linaro.org>
- <1369834677-20312-5-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <CAD=FV=X3FEyzzOhKoLo882iTiAjwDO5tYxfLLEHDmHc5v-1fJA@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 30 May 2013 17:56:21 +0100
+Subject: Single zImage and A15/LPAE
+In-Reply-To: <201305292351.41096.arnd@arndb.de>
+References: <50735B75.8070109@wwwdotorg.org> <2274563.opVbLLPT1p@wuerfel>
+ <20130529151555.GP17767@MacBook-Pro.local>
+ <201305292351.41096.arnd@arndb.de>
+Message-ID: <20130530165621.GL23631@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas / Yadwinder,
+On Wed, May 29, 2013 at 10:51:40PM +0100, Arnd Bergmann wrote:
+> On Wednesday 29 May 2013, Catalin Marinas wrote:
+> > > I think to do this right, we need to treat ARMv7+LPAE as a separate
+> > > architecture level, just like we treat ARMv6, ARMv7 as separate
+> > > compatible architectures. BTW, is there an official name for that
+> > > architecture?
+> > 
+> > The official is Large Physical Address Extension which is an extension
+> > to ARMv7, so not a new architecture.
+> 
+> Ah, too bad. I had hoped there were still postfixes like v6K or v4T.
+> I guess there is no complete list of ARMv7 extensions anywhere, right?
 
-On Wed, May 29, 2013 at 6:37 AM, Vikas Sajjan <vikas.sajjan@linaro.org> wrote:
-> This patch adds set_rate and round_rate clk_ops for PLL36xx
->
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
-> ---
->  drivers/clk/samsung/clk-pll.c |   59 +++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 59 insertions(+)
+It's the ARM ARM, though not a list. With ARMv7 we moved away from
+adding suffixes to the architecture number and introduced the CPUID
+scheme to check for what's available on a CPU.
 
-Looks good to me.  I one nit on space/vs tab after
-PLL36XX_LOCK_STAT_SHIFT that would be nice to fix, but not major.
-
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+-- 
+Catalin
