@@ -1,44 +1,46 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 May 2013 15:49:23 +0200
-Subject: [PATCHv4 4/6] ARM: sunxi: Add EMAC controller node to sun4i DTSI
+Date: Thu, 30 May 2013 15:49:24 +0200
+Subject: [PATCHv4 5/6] ARM: cubieboard: Enable ethernet (EMAC) support in dts
 In-Reply-To: <1369921765-3367-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1369921765-3367-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1369921765-3367-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1369921765-3367-6-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Stefan Roese <sr@denx.de>
+
+Signed-off-by: Stefan Roese <sr@denx.de>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Tested-by: Richard Genoud <richard.genoud@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index ff1f41f..983da33 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -163,6 +163,22 @@
- 		reg = <0x01c20000 0x300000>;
- 		ranges;
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index b70fe0d..e752b57 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -27,6 +27,21 @@
+ 	};
  
+ 	soc at 01c20000 {
 +		emac: ethernet at 01c0b000 {
-+			compatible = "allwinner,sun4i-emac";
-+			reg = <0x01c0b000 0x1000>;
-+			interrupts = <55>;
-+			clocks = <&ahb_gates 17>;
-+			status = "disabled";
++			pinctrl-names = "default";
++			pinctrl-0 = <&emac_pins_a>;
++			phy = <&phy1>;
++			status = "okay";
 +		};
 +
 +		mdio at 01c0b080 {
-+			compatible = "allwinner,sun4i-mdio";
-+			reg = <0x01c0b080 0x14>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
 +		};
 +
- 		intc: interrupt-controller at 01c20400 {
- 			compatible = "allwinner,sun4i-ic";
- 			reg = <0x01c20400 0x400>;
+ 		pinctrl at 01c20800 {
+ 			led_pins_cubieboard: led_pins at 0 {
+ 				allwinner,pins = "PH20", "PH21";
 -- 
 1.8.2.3
