@@ -1,26 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 May 2013 20:04:40 +0200
-Subject: [PATCH 00/11] Convert GPIO Davinci to platform driver
-In-Reply-To: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <CACRpkdbJY1mZWzFUqWmUR_C8wjis0xtXLOGYNZB9ewqBuxcd5A@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 30 May 2013 22:56:49 +0530
+Subject: [PATCH 0/3] at_hdmac: dt dma bindings update
+In-Reply-To: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20130530172649.GC3767@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 9:10 AM, Philip Avinash <avinashphilip@ti.com> wrote:
+On Thu, May 30, 2013 at 06:08:20PM +0200, ludovic.desroches at atmel.com wrote:
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Hi,
+> 
+> This set of patches update the dt dma binding for at_hdmac since we need one
+> more parameter. In order to keep backward compatibility, an existing cell will
+> be used to add this parameter. Since the content of that cell will become a
+> magic value due to the concatenation of the two parameters, it is time to
+> use macros.
+which tree is this targetted to be applied? 
 
-> GPIO Davinci driver converted to platform driver to support DT booting.
-> In this patch series
-> - Cleaned gpio Davinci driver code with proper commenting style and appropriate
->   variable names.
-> - Create platform driver for GPIO Davinci in da8xx and dm* platforms and removed
->   gpio related member updation in davinci_soc_info structure.
-> - DT support added for da850 board and tested on da850 EVM.
-> - Remove soc_info reference in the gpio davinci driver and start uses
->   gpiolib interface.
+Arnd, can you review this series and ack if this needs to be applied thru
+dmaengine?
 
-I'll go over and review this. I assume this will then go through
-some DaVinci tree and up into ARM SoC when/if I ACK it.
+--
+~Vinod
+> 
+> Regards
+> 
+> Ludovic Desroches (3):
+>   ARM: at91: dt: add header to define at_hdmac configuration
+>   ARM: at91: dt: switch DMA DT bindings to pre-processor
+>   at_hdmac: add FIFO configuration parameter to DMA DT binding
+> 
+>  .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |  5 ++--
+>  arch/arm/boot/dts/at91sam9n12.dtsi                 | 11 +++++----
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  | 17 +++++++-------
+>  arch/arm/boot/dts/sama5d3.dtsi                     | 19 +++++++--------
+>  drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++----
+>  include/dt-bindings/dma/at91.h                     | 27 ++++++++++++++++++++++
+>  7 files changed, 81 insertions(+), 30 deletions(-)
+>  create mode 100644 include/dt-bindings/dma/at91.h
+> 
+> -- 
+> 1.7.11.3
+> 
 
-Yours,
-Linus Walleij
+-- 
