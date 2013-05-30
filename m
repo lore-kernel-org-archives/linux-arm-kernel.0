@@ -1,48 +1,38 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Thu, 30 May 2013 01:51:58 +0200
-Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
-In-Reply-To: <51A682C7.9060605@cogentembedded.com>
-References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
- <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
- <51A682C7.9060605@cogentembedded.com>
-Message-ID: <23620997.ZR1QCYhSc2@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 May 2013 17:13:22 -0700
+Subject: [PATCH 00/14] ARM: OMAP5: hwmod, prm/cm data files and updates
+ for 3.11
+In-Reply-To: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130530001321.GR13507@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
-
-On Thursday 30 May 2013 02:35:51 Sergei Shtylyov wrote:
-> On 05/30/2013 02:28 AM, Simon Horman wrote:
-> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > 
-> > The USB_OVCn pins are alternate options for USB over-current detection
-> > when using a 3.3V USB interface. As they're not mandatory they can be
-> > used independently of the USB PENC pins. Don't group the USB_OVCn and
-> > PENC pins to avoid conflicts when the USB_OVCn pins are used by another
-> > function.
-> > 
-> > Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130529 09:44]:
+> Tony, Paul,
 > 
-> I suspect this is needed in -stable. The bug is older than 3.10-rc1.
+> Here is another attempt to send the SOC data files for OMAP5 based devices.
+> As aligned on list, I have dropped clock data from the series.
+> That means for the boot, one clock data patch needs to be applied.
+> It is available on my git tree in 'out_of_tree/omap5_clk_data' branch.
+> 
+> With OMAP5 and AM33XX support is DT only, respective hwmod files are cleaned
+> up to remove iospace information and un-used hwmod. For 3.11 since OMAP4
+> is also targeted as DT only, its hwmod data files is also cleaned up.
+> Diffstat looks something like below.
+> 
+> 27 files changed, 9013 insertions(+), 2764 deletions(-)
+> 
+> One can easily notice that the OMAP5 SOC data has significantly come down
+> becasue of iospace and rest of the hwmod clean-up.
 
-Is it ? The offending commit is
+Yes that's great. I'd like to take the last three patches into my yet to
+be posted omap-for-v3.11/cleanup branch with the omap4 legacy boot files
+now that -rc3 is out and the GPIO fix dependency has cleared.
 
-commit 97d40c4224172451f666febdd865c24b1c3c3fe5
-Author: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Date:   Thu Mar 7 13:38:51 2013 +0100
+Paul, care to ack those three? Then you probably want to review queue
+the rest I presume.
 
-    sh-pfc: r8a7779: Add USB pin groups and functions
-    
-    Signed-off-by: Laurent Pinchart 
-<laurent.pinchart+renesas@ideasonboard.com>
-    Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-and got applied to mainline in v3.10-rc1.
-
--- 
 Regards,
 
-Laurent Pinchart
+Tony
