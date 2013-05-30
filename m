@@ -1,16 +1,42 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 May 2013 16:16:36 +0800
-Subject: [PATCH v5] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <1369893217-27809-1-git-send-email-b35083@freescale.com>
-References: <1369893217-27809-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130530081633.GB2670@S2101-09.ap.freescale.net>
+From: ratbert.chuang@gmail.com (Po-Yu Chuang)
+Date: Thu, 30 May 2013 16:15:26 +0800
+Subject: [PATCH] ARM: map_init_section flushes incorrect pmd
+In-Reply-To: <CANutaR_8jNDzPeyJ8PLZPS=yiZ8Ywmk08dR9vLcB2CpxuJac3A@mail.gmail.com>
+References: <1369738100-11152-1-git-send-email-ratbert.chuang@gmail.com>
+ <20130528130502.GA28971@mudshark.cambridge.arm.com> <51A4B938.7080708@ti.com>
+ <20130528140705.GE28971@mudshark.cambridge.arm.com> <51A4FC08.3060906@ti.com>
+ <CANutaR-2gTP7ubiEdgjFyzVMc6=4t5GPjLkH8pkup=O882Hb-Q@mail.gmail.com>
+ <20130529085426.GA13095@mudshark.cambridge.arm.com>
+ <CANutaR_8jNDzPeyJ8PLZPS=yiZ8Ywmk08dR9vLcB2CpxuJac3A@mail.gmail.com>
+Message-ID: <CANutaR-e4L+wvfu6Fq7_Q_z9Ynwg8zZcEwzFhH5VxMGfkicYQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 01:53:37PM +0800, Jingchang Lu wrote:
-> Add Freescale lpuart driver support. The lpuart device
-> can be found on Vybrid VF610 and Layerscape LS-1 SoCs.
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+On Wed, May 29, 2013 at 5:34 PM, Po-Yu Chuang <ratbert.chuang@gmail.com> wrote:
+> Hi Will,
+>
+> On Wed, May 29, 2013 at 4:54 PM, Will Deacon <will.deacon@arm.com> wrote:
+>> On Wed, May 29, 2013 at 03:14:58AM +0100, Po-Yu Chuang wrote:
+>>> Will,
+>>> I guess nobody noticed this because the MMU of later v7 processors
+>>> fetches page table
+>>> from D-cache. It even doesn't need to clean pmd to PoU.
+>>
+>> It does if it's UP. The walker is only guaranteed to read from L1 if you
+>> have the multiprocessing extensions.
+>
+> Ya, I see.
+>>
+>> As for this function, looks like it's ok because it has precisely one
+>> caller, so it might be worth prefixing it with some underscores to make it
+>> clear that nobody else should be calling it!
+>
+> I am fine with that.
+> Should I create a new patch?
 
-Acked-by: Shawn Guo <shawn.guo@linaro.org>
+Hi,
+
+Does anyone have more comment about this?
+
+Regards,
+Po-Yu
