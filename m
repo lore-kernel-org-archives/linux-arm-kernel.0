@@ -1,62 +1,197 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Thu, 30 May 2013 01:50:09 +0000
-Subject: [PATCH v4 4/4] ARM: dts: add initial VF610 Tower board dts support
-In-Reply-To: <20130529111605.GA25053@S2101-09.ap.freescale.net>
-References: <1369732343-2982-1-git-send-email-b35083@freescale.com>
- <1369732343-2982-5-git-send-email-b35083@freescale.com>
- <20130529111605.GA25053@S2101-09.ap.freescale.net>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851CE0C8@039-SN1MPN1-003.039d.mgd.msft.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 May 2013 10:05:25 +0800
+Subject: [RFC 1/3] SPI: imx: Convert to devm_* API
+In-Reply-To: <1369847430-10799-1-git-send-email-shc_work@mail.ru>
+References: <20130529144909.GT3660@sirena.org.uk>
+ <1369847430-10799-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130530020524.GB1875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, May 29, 2013 at 09:10:28PM +0400, Alexander Shiyan wrote:
+> Use devm_* functions for the driver.
+> This ensures more consistent error values and simplifies error paths.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  drivers/spi/spi-imx.c | 79 ++++++++++++++-------------------------------------
+>  1 file changed, 21 insertions(+), 58 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 0befeeb..1cd4473 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -85,7 +85,6 @@ struct spi_imx_data {
+>  
+>  	struct completion xfer_done;
+>  	void __iomem *base;
+> -	int irq;
+>  	struct clk *clk_per;
+>  	struct clk *clk_ipg;
+>  	unsigned long spi_clk;
+> @@ -761,7 +760,7 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  	struct spi_imx_data *spi_imx;
+>  	struct resource *res;
+>  	struct pinctrl *pinctrl;
+> -	int i, ret, num_cs;
+> +	int i, irq, ret, num_cs;
+>  
+>  	if (!np && !mxc_platform_info) {
+>  		dev_err(&pdev->dev, "can't get the platform data\n");
+> @@ -798,7 +797,8 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  		if (!gpio_is_valid(cs_gpio))
+>  			continue;
+>  
+> -		ret = gpio_request(spi_imx->chipselect[i], DRIVER_NAME);
+> +		ret = devm_gpio_request(&pdev->dev, spi_imx->chipselect[i],
+> +					DRIVER_NAME);
+>  		if (ret) {
+>  			dev_err(&pdev->dev, "can't get cs gpios\n");
+>  			goto out_gpio_free;
+> @@ -818,52 +818,41 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  		(struct spi_imx_devtype_data *) pdev->id_entry->driver_data;
+>  
+>  	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> -	if (!res) {
+> -		dev_err(&pdev->dev, "can't get platform resource\n");
+> -		ret = -ENOMEM;
+> +	spi_imx->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(spi_imx->base)) {
+> +		ret = PTR_ERR(spi_imx->base);
+>  		goto out_gpio_free;
+>  	}
+>  
+> -	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
+> -		dev_err(&pdev->dev, "request_mem_region failed\n");
+> -		ret = -EBUSY;
+> -		goto out_gpio_free;
+> -	}
+> -
+> -	spi_imx->base = ioremap(res->start, resource_size(res));
+> -	if (!spi_imx->base) {
+> -		ret = -EINVAL;
+> -		goto out_release_mem;
+> -	}
+> -
+> -	spi_imx->irq = platform_get_irq(pdev, 0);
+> -	if (spi_imx->irq < 0) {
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+>  		ret = -EINVAL;
+> -		goto out_iounmap;
+> +		goto out_gpio_free;
+>  	}
+>  
+> -	ret = request_irq(spi_imx->irq, spi_imx_isr, 0, DRIVER_NAME, spi_imx);
+> +	ret = devm_request_irq(&pdev->dev, irq, spi_imx_isr, 0, DRIVER_NAME,
+> +			       spi_imx);
+>  	if (ret) {
+> -		dev_err(&pdev->dev, "can't get irq%d: %d\n", spi_imx->irq, ret);
+> -		goto out_iounmap;
+> +		dev_err(&pdev->dev, "can't get irq%d: %d\n", irq, ret);
+> +		goto out_gpio_free;
+>  	}
+>  
+>  	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+>  	if (IS_ERR(pinctrl)) {
+>  		ret = PTR_ERR(pinctrl);
+> -		goto out_free_irq;
+> +		goto out_gpio_free;
+>  	}
+>  
+>  	spi_imx->clk_ipg = devm_clk_get(&pdev->dev, "ipg");
+>  	if (IS_ERR(spi_imx->clk_ipg)) {
+>  		ret = PTR_ERR(spi_imx->clk_ipg);
+> -		goto out_free_irq;
+> +		goto out_gpio_free;
+>  	}
+>  
+>  	spi_imx->clk_per = devm_clk_get(&pdev->dev, "per");
+>  	if (IS_ERR(spi_imx->clk_per)) {
+>  		ret = PTR_ERR(spi_imx->clk_per);
+> -		goto out_free_irq;
+> +		goto out_gpio_free;
+>  	}
+>  
+>  	clk_prepare_enable(spi_imx->clk_per);
+> @@ -877,60 +866,34 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  
+>  	master->dev.of_node = pdev->dev.of_node;
+>  	ret = spi_bitbang_start(&spi_imx->bitbang);
 
+---8<-----
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
+> -		goto out_clk_put;
+> -	}
+> -
+> -	dev_info(&pdev->dev, "probed\n");
+> +	if (!ret)
+> +		return 0;
+>  
+> -	return ret;
+> +	dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
+>  
+> -out_clk_put:
+--->8------
 
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->Sent: Wednesday, May 29, 2013 7:16 PM
->To: Lu Jingchang-B35083
->Cc: linux-arm-kernel at lists.infradead.org; s.hauer at pengutronix.de
->Subject: Re: [PATCH v4 4/4] ARM: dts: add initial VF610 Tower board dts
->support
->
->On Tue, May 28, 2013 at 05:12:23PM +0800, Jingchang Lu wrote:
->> +&fec0 {
->> +	phy-mode = "rmii";
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_fec0_1>;
->> +	status = "okay";
->> +};
->
->I'm wondering if fec works fine on your side.  The kernel seems to halt on
->the repeated phy messages below here when I boot the kernel with NFS.
->
->Shawn
->
->fec 400d0000.ethernet eth0: Freescale FEC PHY driver [Generic PHY]
->(mii_bus:phy_addr=400d0000.etherne:00, irq=-1)
->IPv6: ADDRCONF(NETDEV_UP): eth0: link is not ready fec 400d1000.ethernet
->eth1: Freescale FEC PHY driver [Generic PHY]
->(mii_bus:phy_addr=400d0000.etherne:01, irq=-1)
->IPv6: ADDRCONF(NETDEV_UP): eth1: link is not ready
->libphy: 400d0000.etherne:00 - Link is Up - 100/Full
->IPv6: ADDRCONF(NETDEV_CHANGE): eth0: link becomes ready
->libphy: 400d0000.etherne:01 - Link is Up - 100/Full
->IPv6: ADDRCONF(NETDEV_CHANGE): eth1: link becomes ready Sending DHCP
->requests ., OK
->IP-Config: Got DHCP answer from 192.168.1.1, my address is 192.168.1.102
->IP-Config: Complete:
->     device=eth0, hwaddr=00:04:9f:02:19:38, ipaddr=192.168.1.102,
->mask=255.255.255.0, gw=192.168.1.1
->     host=192.168.1.102, domain=domain, nis-domain=(none)
->     bootserver=0.0.0.0, rootserver=192.168.1.100, rootpath=, mtu=576
->     nameserver0=61.177.7.1, nameserver1=221.228.255.1 ALSA device list:
->  No soundcards found.
->libphy: 400d0000.etherne:00 - Link is Up - 100/Half
->libphy: 400d0000.etherne:00 - Link is Up - 100/Full
->libphy: 400d0000.etherne:00 - Link is Up - 100/Half
->libphy: 400d0000.etherne:00 - Link is Up - 100/Full
->libphy: 400d0000.etherne:00 - Link is Up - 100/Half
->libphy: 400d0000.etherne:00 - Link is Up - 100/Full
->libphy: 400d0000.etherne:00 - Link is Up - 100/Half ...
-[Lu Jingchang-B35083] 
-  Are you using kernel version of next-20130529? With the same .config, it seems boot crash with IPv6 enabled after I update to the git tree, but not on next-20130528 and before. Disable IPv6 option makes NFS boot successfully on my board. By the way, the failed message on my side is not the same as above. Thanks!
+I do not understand why above changes are necessary.
+
+>  	clk_disable_unprepare(spi_imx->clk_per);
+>  	clk_disable_unprepare(spi_imx->clk_ipg);
+> -out_free_irq:
+> -	free_irq(spi_imx->irq, spi_imx);
+> -out_iounmap:
+> -	iounmap(spi_imx->base);
+> -out_release_mem:
+> -	release_mem_region(res->start, resource_size(res));
+> +
+>  out_gpio_free:
+> -	while (--i >= 0) {
+> -		if (gpio_is_valid(spi_imx->chipselect[i]))
+> -			gpio_free(spi_imx->chipselect[i]);
+> -	}
+
+With the change, label out_gpio_free becomes improper, and we should
+probably rename it.
+
+Shawn
+
+>  	spi_master_put(master);
+>  	kfree(master);
+> -	platform_set_drvdata(pdev, NULL);
+> +
+>  	return ret;
+>  }
+>  
+>  static int spi_imx_remove(struct platform_device *pdev)
+>  {
+>  	struct spi_master *master = platform_get_drvdata(pdev);
+> -	struct resource *res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>  	struct spi_imx_data *spi_imx = spi_master_get_devdata(master);
+> -	int i;
+>  
+>  	spi_bitbang_stop(&spi_imx->bitbang);
+>  
+>  	writel(0, spi_imx->base + MXC_CSPICTRL);
+>  	clk_disable_unprepare(spi_imx->clk_per);
+>  	clk_disable_unprepare(spi_imx->clk_ipg);
+> -	free_irq(spi_imx->irq, spi_imx);
+> -	iounmap(spi_imx->base);
+> -
+> -	for (i = 0; i < master->num_chipselect; i++)
+> -		if (gpio_is_valid(spi_imx->chipselect[i]))
+> -			gpio_free(spi_imx->chipselect[i]);
+>  
+>  	spi_master_put(master);
+>  
+> -	release_mem_region(res->start, resource_size(res));
+> -
+> -	platform_set_drvdata(pdev, NULL);
+> -
+>  	return 0;
+>  }
+>  
+> -- 
+> 1.8.1.5
+> 
