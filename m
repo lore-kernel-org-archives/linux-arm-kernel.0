@@ -1,40 +1,56 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Thu, 30 May 2013 15:20:54 +0530
-Subject: [RFC PATCH 2/2] USB: OHCI: add a name for the platform-private field
-In-Reply-To: <1369907454-11003-1-git-send-email-manjunath.goudar@linaro.org>
-References: <y> <1369907454-11003-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1369907454-11003-3-git-send-email-manjunath.goudar@linaro.org>
+From: aida.mynzhasova@skitlab.ru (Aida Mynzhasova)
+Date: Thu, 30 May 2013 14:21:01 +0400
+Subject: [PATCH] ARM: OMAP2: TI81XX: id: Add cpu id for TI816x ES2.0 and ES2.1
+Message-ID: <1369909261-23750-1-git-send-email-aida.mynzhasova@skitlab.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an ohci->priv field for private use by OHCI
-platform drivers.
+Currently omap3xxx_check_revision() detects ES1.0 and ES1.1 only,
+this patch extends it by adding ES2.0 and ES2.1 versions support.
 
-Until now none of the platform drivers has used this private space,
-but that's about to change in the next patch of this series.
-
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: linux-usb at vger.kernel.org
+Signed-off-by: Aida Mynzhasova <aida.mynzhasova@skitlab.ru>
 ---
- drivers/usb/host/ohci.h |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/mach-omap2/id.c  |   11 +++++++++--
+ arch/arm/mach-omap2/soc.h |    2 ++
+ 2 files changed, 11 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
-index 3b58482..e2e5faa 100644
---- a/drivers/usb/host/ohci.h
-+++ b/drivers/usb/host/ohci.h
-@@ -421,6 +421,9 @@ struct ohci_hcd {
- 	struct dentry		*debug_periodic;
- 	struct dentry		*debug_registers;
- #endif
-+	/* platform-specific data -- must come last */
-+	unsigned long           priv[0] __aligned(sizeof(s64));
-+
- };
+diff --git a/arch/arm/mach-omap2/id.c b/arch/arm/mach-omap2/id.c
+index 1272c41..8b762a3 100644
+--- a/arch/arm/mach-omap2/id.c
++++ b/arch/arm/mach-omap2/id.c
+@@ -405,11 +405,18 @@ void __init omap3xxx_check_revision(void)
+ 			cpu_rev = "1.0";
+ 			break;
+ 		case 1:
+-		/* FALLTHROUGH */
+-		default:
+ 			omap_revision = TI8168_REV_ES1_1;
+ 			cpu_rev = "1.1";
+ 			break;
++		case 2:
++			omap_revision = TI8168_REV_ES2_0;
++			cpu_rev = "2.0";
++			break;
++		case 3:
++			/* FALLTHROUGH */
++		default:
++			omap_revision = TI8168_REV_ES2_1;
++			cpu_rev = "2.1";
+ 		}
+ 		break;
+ 	case 0xb944:
+diff --git a/arch/arm/mach-omap2/soc.h b/arch/arm/mach-omap2/soc.h
+index 197cc16..8e00226 100644
+--- a/arch/arm/mach-omap2/soc.h
++++ b/arch/arm/mach-omap2/soc.h
+@@ -383,6 +383,8 @@ IS_OMAP_TYPE(3430, 0x3430)
+ #define TI816X_CLASS		0x81600034
+ #define TI8168_REV_ES1_0	TI816X_CLASS
+ #define TI8168_REV_ES1_1	(TI816X_CLASS | (0x1 << 8))
++#define TI8168_REV_ES2_0	(TI816X_CLASS | (0x2 << 8))
++#define TI8168_REV_ES2_1	(TI816X_CLASS | (0x3 << 8))
  
- #ifdef CONFIG_PCI
+ #define TI814X_CLASS		0x81400034
+ #define TI8148_REV_ES1_0	TI814X_CLASS
 -- 
-1.7.9.5
+1.7.10.4
