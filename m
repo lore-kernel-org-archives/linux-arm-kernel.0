@@ -1,51 +1,30 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 30 May 2013 21:29:16 +0300
-Subject: [PATCH -next v2] dmaengine: ste_dma40: fix error return code in
- d40_probe()
-In-Reply-To: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
-References: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
-Message-ID: <CAHp75Vf+ifmn62vRNZbqpVX1hnqeUkenzvY81gZLenFkEJ9pFA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Thu, 30 May 2013 23:26:09 +0530
+Subject: [PATCH 35/39] dmaengine: ste_dma40_ll: Replace meaningless
+ register set with comment
+In-Reply-To: <CACRpkdbXVd7k9rzb-OKUmnW_9J+jWYhz=AjO09_Ymvd2_DOVcQ@mail.gmail.com>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-36-git-send-email-lee.jones@linaro.org>
+ <CACRpkdbXVd7k9rzb-OKUmnW_9J+jWYhz=AjO09_Ymvd2_DOVcQ@mail.gmail.com>
+Message-ID: <20130530175609.GF3767@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 7:32 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
-> In many of the error handling case, the return value 'ret' not set
-> and 0 will be return from d40_probe() even if error, but we should
-> return a negative error code instead in those error handling case.
-> This patch fixed them, and also removed useless variable 'err'.
-
-Hold on, please.
-
-> --- a/drivers/dma/ste_dma40.c
-> +++ b/drivers/dma/ste_dma40.c
-
-> @@ -3619,6 +3618,7 @@ static int __init d40_probe(struct platform_device *pdev)
->                 if (IS_ERR(base->lcpa_regulator)) {
->                         d40_err(&pdev->dev, "Failed to get lcpa_regulator\n");
->                         base->lcpa_regulator = NULL;
-> +                       ret = PTR_ERR(base->lcpa_regulator);
-
-Is it really what we want?
-
-I thixh you may remove that NULL assignment.
-
-
->                         goto failure;
->                 }
->
-
-> @@ -3647,8 +3647,8 @@ static int __init d40_probe(struct platform_device *pdev)
->         d40_hw_init(base);
->
->         if (np) {
-> -               err = of_dma_controller_register(np, d40_xlate, NULL);
-> -               if (err && err != -ENODEV)
-> +               ret = of_dma_controller_register(np, d40_xlate, NULL);
-> +               if (ret && ret != -ENODEV)
-
->From the discussion of dw_dmac I remember we decide that ENODEV check
-is redundant.
+On Thu, May 30, 2013 at 11:04:23AM +0200, Linus Walleij wrote:
+> On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> 
+> > Unsure of the author's intentions, rather than just removing the nop,
+> > we're replacing it with a comment containing the possible intention
+> > of the statement OR:ing with 0.
+> >
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > Cc: Dan Williams <djbw@fb.com>
+> > Cc: Per Forlin <per.forlin@stericsson.com>
+> > Cc: Rabin Vincent <rabin@rab.in>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> 
+> Tentatively applied. Missing Vinod's ACK.
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
 --
-With Best Regards,
-Andy Shevchenko
+~Vinod
