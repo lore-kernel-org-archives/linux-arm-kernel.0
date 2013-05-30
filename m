@@ -1,153 +1,279 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 30 May 2013 12:00:12 -0700
-Subject: [PATCH 3/6] clk: move the U300 fixed and fixed-factor to DT
-In-Reply-To: <1369330288-14856-4-git-send-email-linus.walleij@stericsson.com>
-References: <1369330288-14856-1-git-send-email-linus.walleij@stericsson.com>
- <1369330288-14856-4-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130530190012.4470.50181@quantum>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 30 May 2013 21:00:59 +0200
+Subject: [PATCH v5] clocksource: add Freescale Vybrid pit timer support
+In-Reply-To: <1369732899-17142-1-git-send-email-b35083@freescale.com>
+References: <1369732899-17142-1-git-send-email-b35083@freescale.com>
+Message-ID: <51A7A1EB.1010109@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Linus Walleij (2013-05-23 10:31:25)
-> From: Linus Walleij <linus.walleij@linaro.org>
+On 05/28/2013 11:21 AM, Jingchang Lu wrote:
+> Add Freescale Vybrid Family period interrupt timer support.
 > 
-> This converts the fixed and fixed-factor clocks in the U300
-> platform to register themselves from the device tree.
-> 
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Hi Mike, seeking an ACK on this to take the series through
-> ARM SoC.
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
 
-I'm happy to see another conversion to of_clk_init.
+I queued this patch for 3.11 in my tree [1]
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Thanks
+  -- Daniel
+
+[1]
+https://git.linaro.org/gitweb?p=people/dlezcano/clockevents.git;a=shortlog;h=refs/heads/timers/clockevents
 
 > ---
->  arch/arm/boot/dts/ste-u300.dts | 44 ++++++++++++++++++++++++++++++++++++++++++
->  drivers/clk/clk-u300.c         | 33 +++++++++++++------------------
->  2 files changed, 57 insertions(+), 20 deletions(-)
+> v5:
+>  Follow internal suggestions to name the SoC family as VF.
+>  Add comment for min and max clockevent delta.
+>  Add clockevent device irq initialization.
+>  Remove IRQF_DISABLED flag.
+> v4:
+>   Use family name names driver and symbol instead of SoC name.
+>   Remove redundant code.
+>   Use BUG_ON instead of WARN_ON.
+>   Add necessory comment information.
+> v3:
+>   Move the pit driver adding from arch to drivers/clocksource.
+> v2:
+>   Use CLOCKSOURCE_OF_DECLARE init pit timer.
+>   Add ONESHOT mode support.
 > 
-> diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-> index 0530095..c51a8c7 100644
-> --- a/arch/arm/boot/dts/ste-u300.dts
-> +++ b/arch/arm/boot/dts/ste-u300.dts
-> @@ -33,6 +33,49 @@
->         syscon: syscon at c0011000 {
->                 compatible = "stericsson,u300-syscon";
->                 reg = <0xc0011000 0x1000>;
-> +               clk32: app_32_clk at 32k {
-> +                       #clock-cells = <0>;
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <32768>;
-> +               };
-> +               pll13: pll13 at 13M {
-> +                       #clock-cells = <0>;
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <13000000>;
-> +               };
-> +               pll208: pll208 at 208M {
-> +                       #clock-cells = <0>;
-> +                       compatible = "fixed-clock";
-> +                       clock-frequency = <208000000>;
-> +               };
-> +               app208: app_208_clk at 208M {
-> +                       #clock-cells = <0>;
-> +                       compatible = "fixed-factor-clock";
-> +                       clock-div = <1>;
-> +                       clock-mult = <1>;
-> +                       clocks = <&pll208>;
-> +               };
-> +               app104: app_104_clk at 104M {
-> +                       #clock-cells = <0>;
-> +                       compatible = "fixed-factor-clock";
-> +                       clock-div = <2>;
-> +                       clock-mult = <1>;
-> +                       clocks = <&pll208>;
-> +               };
-> +               app52: app_52_clk at 52M {
-> +                       #clock-cells = <0>;
-> +                       compatible = "fixed-factor-clock";
-> +                       clock-div = <4>;
-> +                       clock-mult = <1>;
-> +                       clocks = <&pll208>;
-> +               };
-> +               app26: app_26_clk at 26M {
-> +                       #clock-cells = <0>;
-> +                       compatible = "fixed-factor-clock";
-> +                       clock-div = <2>;
-> +                       clock-mult = <1>;
-> +                       clocks = <&app52>;
-> +               };
->         };
+>  drivers/clocksource/Kconfig        |   5 +
+>  drivers/clocksource/Makefile       |   1 +
+>  drivers/clocksource/vf_pit_timer.c | 194 +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 200 insertions(+)
+>  create mode 100644 drivers/clocksource/vf_pit_timer.c
+> 
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index f151c6c..0a04257 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -85,3 +85,8 @@ config CLKSRC_SAMSUNG_PWM
+>  	  Samsung S3C, S5P and Exynos SoCs, replacing an earlier driver
+>  	  for all devicetree enabled platforms. This driver will be
+>  	  needed only on systems that do not have the Exynos MCT available.
+> +
+> +config VF_PIT_TIMER
+> +	bool
+> +	help
+> +	  Support for Period Interrupt Timer on Freescale Vybrid Family SoCs.
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 8d979c7..36a9ac1 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -26,6 +26,7 @@ obj-$(CONFIG_ARCH_BCM)		+= bcm_kona_timer.o
+>  obj-$(CONFIG_CADENCE_TTC_TIMER)	+= cadence_ttc_timer.o
+>  obj-$(CONFIG_CLKSRC_EXYNOS_MCT)	+= exynos_mct.o
+>  obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
+> +obj-$(CONFIG_VF_PIT_TIMER)	+= vf_pit_timer.o
 >  
->         timer: timer at c0014000 {
-> @@ -65,6 +108,7 @@
->                 reg = <0xc0012000 0x1000>;
->                 interrupt-parent = <&vicb>;
->                 interrupts = <3>;
-> +               clocks = <&clk32>;
->         };
->  
->         rtc: rtc at c0017000 {
-> diff --git a/drivers/clk/clk-u300.c b/drivers/clk/clk-u300.c
-> index a41e42e..bebd6c9 100644
-> --- a/drivers/clk/clk-u300.c
-> +++ b/drivers/clk/clk-u300.c
-> @@ -11,6 +11,7 @@
->  #include <linux/io.h>
->  #include <linux/clk-provider.h>
->  #include <linux/spinlock.h>
-> +#include <linux/of.h>
->  
->  /* APP side SYSCON registers */
->  /* CLK Control Register 16bit (R/W) */
-> @@ -931,6 +932,17 @@ mclk_clk_register(struct device *dev, const char *name,
->         return clk;
->  }
->  
-> +static const __initconst struct of_device_id u300_clk_match[] = {
-> +       {
-> +               .compatible = "fixed-clock",
-> +               .data = of_fixed_clk_setup,
-> +       },
-> +       {
-> +               .compatible = "fixed-factor-clock",
-> +               .data = of_fixed_factor_clk_setup,
-> +       },
+>  obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
+>  obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
+> diff --git a/drivers/clocksource/vf_pit_timer.c b/drivers/clocksource/vf_pit_timer.c
+> new file mode 100644
+> index 0000000..598399d
+> --- /dev/null
+> +++ b/drivers/clocksource/vf_pit_timer.c
+> @@ -0,0 +1,194 @@
+> +/*
+> + * Copyright 2012-2013 Freescale Semiconductor, Inc.
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License
+> + * as published by the Free Software Foundation; either version 2
+> + * of the License, or (at your option) any later version.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/clockchips.h>
+> +#include <linux/clk.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_irq.h>
+> +#include <asm/sched_clock.h>
+> +
+> +/*
+> + * Each pit takes 0x10 Bytes register space
+> + */
+> +#define PITMCR		0x00
+> +#define PIT0_OFFSET	0x100
+> +#define PITn_OFFSET(n)	(PIT0_OFFSET + 0x10 * (n))
+> +#define PITLDVAL	0x00
+> +#define PITCVAL		0x04
+> +#define PITTCTRL	0x08
+> +#define PITTFLG		0x0c
+> +
+> +#define PITMCR_MDIS	(0x1 << 1)
+> +
+> +#define PITTCTRL_TEN	(0x1 << 0)
+> +#define PITTCTRL_TIE	(0x1 << 1)
+> +#define PITCTRL_CHN	(0x1 << 2)
+> +
+> +#define PITTFLG_TIF	0x1
+> +
+> +static void __iomem *clksrc_base;
+> +static void __iomem *clkevt_base;
+> +static unsigned long cycle_per_jiffy;
+> +
+> +static inline void pit_timer_enable(void)
+> +{
+> +	__raw_writel(PITTCTRL_TEN | PITTCTRL_TIE, clkevt_base + PITTCTRL);
+> +}
+> +
+> +static inline void pit_timer_disable(void)
+> +{
+> +	__raw_writel(0, clkevt_base + PITTCTRL);
+> +}
+> +
+> +static inline void pit_irq_acknowledge(void)
+> +{
+> +	__raw_writel(PITTFLG_TIF, clkevt_base + PITTFLG);
+> +}
+> +
+> +static unsigned int pit_read_sched_clock(void)
+> +{
+> +	return __raw_readl(clksrc_base + PITCVAL);
+> +}
+> +
+> +static int __init pit_clocksource_init(unsigned long rate)
+> +{
+> +	/* set the max load value and start the clock source counter */
+> +	__raw_writel(0, clksrc_base + PITTCTRL);
+> +	__raw_writel(~0UL, clksrc_base + PITLDVAL);
+> +	__raw_writel(PITTCTRL_TEN, clksrc_base + PITTCTRL);
+> +
+> +	setup_sched_clock(pit_read_sched_clock, 32, rate);
+> +	return clocksource_mmio_init(clksrc_base + PITCVAL, "vf-pit", rate,
+> +			300, 32, clocksource_mmio_readl_down);
+> +}
+> +
+> +static int pit_set_next_event(unsigned long delta,
+> +				struct clock_event_device *unused)
+> +{
+> +	/*
+> +	 * set a new value to PITLDVAL register will not restart the timer,
+> +	 * to abort the current cycle and start a timer period with the new
+> +	 * value, the timer must be disabled and enabled again.
+> +	 * and the PITLAVAL should be set to delta minus one according to pit
+> +	 * hardware requirement.
+> +	 */
+> +	pit_timer_disable();
+> +	__raw_writel(delta - 1, clkevt_base + PITLDVAL);
+> +	pit_timer_enable();
+> +
+> +	return 0;
+> +}
+> +
+> +static void pit_set_mode(enum clock_event_mode mode,
+> +				struct clock_event_device *evt)
+> +{
+> +	switch (mode) {
+> +	case CLOCK_EVT_MODE_PERIODIC:
+> +		pit_set_next_event(cycle_per_jiffy, evt);
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +}
+> +
+> +static irqreturn_t pit_timer_interrupt(int irq, void *dev_id)
+> +{
+> +	struct clock_event_device *evt = dev_id;
+> +
+> +	pit_irq_acknowledge();
+> +
+> +	/*
+> +	 * pit hardware doesn't support oneshot, it will generate an interrupt
+> +	 * and reload the counter value from PITLDVAL when PITCVAL reach zero,
+> +	 * and start the counter again. So software need to disable the timer
+> +	 * to stop the counter loop in ONESHOT mode.
+> +	 */
+> +	if (likely(evt->mode == CLOCK_EVT_MODE_ONESHOT))
+> +		pit_timer_disable();
+> +
+> +	evt->event_handler(evt);
+> +
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +static struct clock_event_device clockevent_pit = {
+> +	.name		= "VF pit timer",
+> +	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+> +	.set_mode	= pit_set_mode,
+> +	.set_next_event	= pit_set_next_event,
+> +	.rating		= 300,
 > +};
 > +
->  void __init u300_clk_init(void __iomem *base)
->  {
->         u16 val;
-> @@ -951,26 +963,7 @@ void __init u300_clk_init(void __iomem *base)
->         val |= U300_SYSCON_PMCR_PWR_MGNT_ENABLE;
->         writew(val, syscon_vbase + U300_SYSCON_PMCR);
->  
-> -       /* These are always available (RTC and PLL13) */
-> -       clk = clk_register_fixed_rate(NULL, "app_32_clk", NULL,
-> -                                     CLK_IS_ROOT, 32768);
-> -       /* The watchdog sits directly on the 32 kHz clock */
-> -       clk_register_clkdev(clk, NULL, "coh901327_wdog");
-> -       clk = clk_register_fixed_rate(NULL, "pll13", NULL,
-> -                                     CLK_IS_ROOT, 13000000);
-> -
-> -       /* These derive from PLL208 */
-> -       clk = clk_register_fixed_rate(NULL, "pll208", NULL,
-> -                                     CLK_IS_ROOT, 208000000);
-> -       clk = clk_register_fixed_factor(NULL, "app_208_clk", "pll208",
-> -                                       0, 1, 1);
-> -       clk = clk_register_fixed_factor(NULL, "app_104_clk", "pll208",
-> -                                       0, 1, 2);
-> -       clk = clk_register_fixed_factor(NULL, "app_52_clk", "pll208",
-> -                                       0, 1, 4);
-> -       /* The 52 MHz is divided down to 26 MHz */
-> -       clk = clk_register_fixed_factor(NULL, "app_26_clk", "app_52_clk",
-> -                                       0, 1, 2);
-> +       of_clk_init(u300_clk_match);
->  
->         /* Directly on the AMBA interconnect */
->         clk = syscon_clk_register(NULL, "cpu_clk", "app_208_clk", 0, true,
-> -- 
-> 1.7.11.3
+> +static struct irqaction pit_timer_irq = {
+> +	.name		= "VF pit timer",
+> +	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+> +	.handler	= pit_timer_interrupt,
+> +	.dev_id		= &clockevent_pit,
+> +};
+> +
+> +static int __init pit_clockevent_init(unsigned long rate, int irq)
+> +{
+> +	__raw_writel(0, clkevt_base + PITTCTRL);
+> +	__raw_writel(PITTFLG_TIF, clkevt_base + PITTFLG);
+> +
+> +	BUG_ON(setup_irq(irq, &pit_timer_irq));
+> +
+> +	clockevent_pit.cpumask = cpumask_of(0);
+> +	clockevent_pit.irq = irq;
+> +	/*
+> +	 * The value for the LDVAL register trigger is calculated as:
+> +	 * LDVAL trigger = (period / clock period) - 1
+> +	 * The pit is a 32-bit down count timer, when the conter value
+> +	 * reaches 0, it will generate an interrupt, thus the minimal
+> +	 * LDVAL trigger value is 1. And then the min_delta is
+> +	 * minimal LDVAL trigger value + 1, and the max_delta is full 32-bit.
+> +	 */
+> +	clockevents_config_and_register(&clockevent_pit, rate, 2, 0xffffffff);
+> +
+> +	return 0;
+> +}
+> +
+> +static void __init pit_timer_init(struct device_node *np)
+> +{
+> +	struct clk *pit_clk;
+> +	void __iomem *timer_base;
+> +	unsigned long clk_rate;
+> +	int irq;
+> +
+> +	timer_base = of_iomap(np, 0);
+> +	BUG_ON(!timer_base);
+> +
+> +	/*
+> +	 * PIT0 and PIT1 can be chained to build a 64-bit timer,
+> +	 * so choose PIT2 as clocksource, PIT3 as clockevent device,
+> +	 * and leave PIT0 and PIT1 unused for anyone else who needs them.
+> +	 */
+> +	clksrc_base = timer_base + PITn_OFFSET(2);
+> +	clkevt_base = timer_base + PITn_OFFSET(3);
+> +
+> +	irq = irq_of_parse_and_map(np, 0);
+> +	BUG_ON(irq <= 0);
+> +
+> +	pit_clk = of_clk_get(np, 0);
+> +	BUG_ON(IS_ERR(pit_clk));
+> +
+> +	BUG_ON(clk_prepare_enable(pit_clk));
+> +
+> +	clk_rate = clk_get_rate(pit_clk);
+> +	cycle_per_jiffy = clk_rate / (HZ);
+> +
+> +	/* enable the pit module */
+> +	__raw_writel(~PITMCR_MDIS, timer_base + PITMCR);
+> +
+> +	BUG_ON(pit_clocksource_init(clk_rate));
+> +
+> +	pit_clockevent_init(clk_rate, irq);
+> +}
+> +CLOCKSOURCE_OF_DECLARE(vf610, "fsl,vf610-pit", pit_timer_init);
+> 
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
