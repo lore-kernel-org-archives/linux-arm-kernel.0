@@ -1,28 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 May 2013 09:41:38 +0200
-Subject: [PATCH -next v2] dmaengine: ste_dma40: fix error return code in
- d40_probe()
-In-Reply-To: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
-References: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
-Message-ID: <CACRpkdYBfvr0kA7bd-6Ns78UH7JtBCFDzFxyHLgtReB32O4D+w@mail.gmail.com>
+Date: Thu, 30 May 2013 09:44:49 +0200
+Subject: [PATCH 20/39] usb: musb: ux500: move channel number knowledge
+ into the driver
+In-Reply-To: <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-21-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkda+C7qzKSssXStkcM4eOQaHUcWEUd6txfV-pAWdTT=YEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 6:32 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> For all ux500 based platforms the maximum number of end-points are used.
+> Move this knowledge into the driver so we can relinquish the burden from
+> platform data. This also removes quite a bit of complexity from the driver
+> and will aid us when we come to enable the driver for Device Tree.
 >
-> In many of the error handling case, the return value 'ret' not set
-> and 0 will be return from d40_probe() even if error, but we should
-> return a negative error code instead in those error handling case.
-> This patch fixed them, and also removed useless variable 'err'.
->
-> Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> ---
-> v1 -> v2: rebased on linux-next.git
+> Cc: Felipe Balbi <balbi@ti.com>
+> Cc: linux-usb at vger.kernel.org
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Acked-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I've tentatively applied this to my dma40 branch, waiting for Vinod
-to ACK it.
+Patch applied to my dma40 branch with Felipe's ACK.
 
-Yours,
+Thanks!
 Linus Walleij
