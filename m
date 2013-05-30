@@ -1,37 +1,29 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Thu, 30 May 2013 11:19:33 +0200
-Subject: [PATCH 1/2] gpiolib: add gpio_export_with_name
-In-Reply-To: <20121126135911.2F1D33E187C@localhost>
-References: <20121121101259.GQ4398@game.jcrosoft.org>
- <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
- <20121126135911.2F1D33E187C@localhost>
-Message-ID: <51A719A5.50906@epfl.ch>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 30 May 2013 11:21:34 +0200
+Subject: [PATCH v6 01/10] ASoC: phycore-ac97: Add DT support
+In-Reply-To: <20130528145603.GR21462@opensource.wolfsonmicro.com>
+References: <1369752478-30260-1-git-send-email-mpa@pengutronix.de>
+ <1369752478-30260-2-git-send-email-mpa@pengutronix.de>
+ <20130528145603.GR21462@opensource.wolfsonmicro.com>
+Message-ID: <20130530092134.GC31548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Grant,
+On Tue, May 28, 2013 at 03:56:03PM +0100, Mark Brown wrote:
+> On Tue, May 28, 2013 at 04:47:49PM +0200, Markus Pargmann wrote:
+> > Add devicetree support for this audio soc fabric driver.
+> 
+> What is an "audio soc fabric driver"?
+> 
 
-On 11/26/2012 02:59 PM, Grant Likely wrote:
-> On Wed, 21 Nov 2012 11:14:08 +0100, Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com> wrote:
->> allow to specify a name to an exported gpio
->>
->> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->
-> The gpio sysfs ABI is already horrible, racy, and unsafe. Really, we
-> need a proper chrdev interface for controlling gpios. Sysfs is fine for
-> poking around and experimenting, but we cannot provide any fine grained
-> access control, locking or faster IO with the one-file-per-gpio sysfs
-> model. So, no, I don't think this is a good idea to extend gpiolib in
-> this way.
->
+I changed both, driver name and commit message.
 
-Would it make sense to provide only the DT binding to export a GPIO,
-without changing the sysfs ABI? Even if work is progressing towards
-having gpio-controlled reset pins [1], some boards still need GPIOs to
-be exported to userspace for other functionalities.
+Thanks,
 
-Regards,
+Markus
 
-Florian
-
-[1] http://article.gmane.org/gmane.linux.power-management.general/31364
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
