@@ -1,30 +1,85 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Thu, 30 May 2013 10:55:04 +0530
-Subject: [PATCH v1 0/3] Polling support for s3c64xx spi controller
-In-Reply-To: <1369032694-13183-1-git-send-email-ks.giri@samsung.com>
-References: <1369032694-13183-1-git-send-email-ks.giri@samsung.com>
-Message-ID: <CAKrE-KcRNRJ-U_qR8UnVa1TJ6dJAF9ZDmuUX5dBOM3XxvOPZZg@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Thu, 30 May 2013 08:32:33 +0300
+Subject: [RFC PATCH 2/2] clocksource: dw_apb: allow build for
+ architectures other than arm
+In-Reply-To: <51A51271.2070506@linaro.org>
+References: <1369570367-994-2-git-send-email-baruch@tkos.co.il>
+ <51A51271.2070506@linaro.org>
+Message-ID: <20130530053233.GL25186@sapphire.tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
+Hi John,
 
-Can you please check the performance with this patch set
+On Tue, May 28, 2013 at 01:24:17PM -0700, John Stultz wrote:
+> On 05/26/2013 05:12 AM, Baruch Siach wrote:
+> >ARM is the only architecture providing sched_clock.h and setup_sched_clock().
+> >Implement sched_clock() for use by other architectures.
+> >
+> >Cc: Ingo Molnar <mingo@redhat.com>
+> >Cc: Peter Zijlstra <peterz@infradead.org>
+> >Cc: John Stultz <john.stultz@linaro.org>
+> >Cc: Thomas Gleixner <tglx@linutronix.de>
+> >Cc: Jamie Iles <jamie@jamieiles.com>
+> >Cc: Dinh Nguyen <dinguyen@altera.com>
+> >Signed-off-by: Baruch Siach <baruch@tkos.co.il>
+> >---
 
-On Mon, May 20, 2013 at 12:21 PM, Girish K S <girishks2000@gmail.com> wrote:
-> This patch series adds support for the polling mode only. Also 2nd patch
-> in the series adds support for dedicated cs pin. After Thomas's patch for
-> using default gpio is merged(commit id: 00ab539), one of the patch in this
-> series is dropped and new series is generated.
->
-> Girish K S (3):
->   spi: s3c64xx: added support for polling mode
->   spi: s3c64xx: Added provision for dedicated cs pin
->   spi: s3c64xx: Added support for exynos5440 spi
->
->  drivers/spi/spi-s3c64xx.c |  197 ++++++++++++++++++++++++++++++++-------------
->  1 files changed, 140 insertions(+), 57 deletions(-)
->
-> --
-> 1.7.5.4
->
+[snip]
+
+> >@@ -73,6 +77,9 @@ static void add_clocksource(struct device_node 
+> >  *source_timer)
+> >  }
+> >  static void __iomem *sched_io_base;
+> >+#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
+> >+static u64 sched_clock_mult __read_mostly;
+> >+#endif
+> >  static u32 read_sched_clock(void)
+> >  {
+> >@@ -97,7 +104,11 @@ static void init_sched_clock(void)
+> >  	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
+> >  	of_node_put(sched_timer);
+> >+#ifdef CONFIG_HAVE_SETUP_SCHED_CLOCK
+> >  	setup_sched_clock(read_sched_clock, 32, rate);
+> >+#else
+> >+	sched_clock_mult = NSEC_PER_SEC / rate;
+> >+#endif
+> >  }
+> 
+> Can you rework this to not use #ifdefs within the function? They
+> make it annoying to read the code.
+> 
+> Instead maybe have a local setup_sched_clock() function that sets
+> the mult value for the !CONFIG_HAVE_SETUP_SCHED_CLOCK case?
+> 
+> >  static const struct of_device_id osctimer_ids[] __initconst = {
+> >@@ -124,3 +135,10 @@ void __init dw_apb_timer_init(void)
+> >  	init_sched_clock();
+> >  }
+> >+
+> >+#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
+> >+unsigned long long notrace sched_clock()
+> >+{
+> >+	return read_sched_clock() * sched_clock_mult;
+> >+}
+> >+#endif
+> 
+> Also, can you try to condense the number of #ifndef
+> CONFIG_HAVE_SETUP_SCHED_CLOCK checks to one, and consolidate the
+> needed functions all in that one conditional?
+
+Thanks for your comments. I'll rework the patch and resubmit.
+
+I've just noticed that I have a bigger problem. read_sched_clock() returns 
+u32, not u64. This means that in a rate of, say, 100MHz it will wrap around 
+after a little more than 40 seconds. Would it make sense to put ARM's 32 bin 
+sched_clock extension code (arch/arm/kernel/sched_clock.c) is a common place 
+(maybe drivers/clocksource), and use that? There seems to be nothing ARM 
+specific in this code, after all.
+
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
