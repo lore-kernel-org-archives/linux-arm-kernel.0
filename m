@@ -1,33 +1,43 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 30 May 2013 12:13:22 +0300
-Subject: [PATCH] ARM: OMAP2+: omap-usb-host: clean up pin mux setup code
-In-Reply-To: <20130508235232.GW32546@atomide.com>
-References: <1366624673-2684-1-git-send-email-rogerq@ti.com>
- <20130508235232.GW32546@atomide.com>
-Message-ID: <51A71832.70305@ti.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Thu, 30 May 2013 11:13:43 +0200
+Subject: [PATCH v6 01/10] ASoC: phycore-ac97: Add DT support
+In-Reply-To: <CAOZdJXVL2uP-qW=kydgS-t3C=C+6Cn9D3FWqbMuoK2c-EnckyA@mail.gmail.com>
+References: <1369752478-30260-1-git-send-email-mpa@pengutronix.de>
+ <1369752478-30260-2-git-send-email-mpa@pengutronix.de>
+ <20130529135342.GB29528@S2101-09.ap.freescale.net>
+ <CAOZdJXVL2uP-qW=kydgS-t3C=C+6Cn9D3FWqbMuoK2c-EnckyA@mail.gmail.com>
+Message-ID: <20130530091343.GB31548@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2013 02:52 AM, Tony Lindgren wrote:
-> * Roger Quadros <rogerq@ti.com> [130422 03:02]:
->> The USB host pins are named quite differently between OMAP3 and
->> OMAP4+ SoCs. To make this managable in code, we create a pin mapping
->> table (pin_names) that maps pin function to pin name.
->>
->> This pin mapping table is populated at runtime based on a pin
->> name template. Templates are provided for OMAP3 and 4 SoCs.
->>
->> The setup_io_mux() function uses the pin mapping table to
->> setup the pin mux.
->>
->> The resulting code is a lot more clean, manageable and scalable.
+On Wed, May 29, 2013 at 10:41:58AM -0500, Timur Tabi wrote:
+> On Wed, May 29, 2013 at 8:53 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> >
+> >
+> > This function is unavailable until patch #7, right?
 > 
-> I'm planning to drop all the omap4 pdata soonish. Will post some
-> patches after -rc1 to do that. Do you still need this patch
-> considering that?
+> 
+> May I suggest that Markus run this script:
+> 
+> for i in 1 2 3 4 5 6 7 8 9
+> do
+>   git checkout HEAD^
+>   make
+> done
+> 
+> It's important that each commit in a patchset be compilable, otherwise
+> git-bisect will break.
 > 
 
-In that case we don't need this.
+I will reorder the patches in the series so that the kernel is
+compilable after each patch.
 
-cheers,
--roger
+Thanks,
+
+Markus
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
