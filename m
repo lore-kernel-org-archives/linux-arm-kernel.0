@@ -1,76 +1,36 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 May 2013 15:49:25 +0200
-Subject: [PATCHv4 6/6] ARM: sunxi: Add EMAC Controller to Hackberry dt
-In-Reply-To: <1369921765-3367-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1369921765-3367-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1369921765-3367-7-git-send-email-maxime.ripard@free-electrons.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Thu, 30 May 2013 15:51:53 +0200
+Subject: [PATCH 0/3] mfd: twl4030-power: Start DT conversion
+Message-ID: <1369921916-7435-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Hackberry has a PHY that needs to be powered up through a GPIO, so
-we need to use a fixed regulator here.
+Hello,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Tested-by: Richard Genoud <richard.genoud@gmail.com>
----
- arch/arm/boot/dts/sun4i-a10-hackberry.dts | 41 +++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+This series enables a partial DT support for twl4030-power. The
+missing part is the power management scripts, as the required
+binding should be defined first. It however enables the complete
+shutdown of the processor at poweroff when booting with DT,
+dropping the power consumption from around 350 mA on Overo+Tobi
+to about 40 mA.
 
-diff --git a/arch/arm/boot/dts/sun4i-a10-hackberry.dts b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-index b9efac1..3514b37 100644
---- a/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-+++ b/arch/arm/boot/dts/sun4i-a10-hackberry.dts
-@@ -23,10 +23,51 @@
- 	};
- 
- 	soc at 01c20000 {
-+		emac: ethernet at 01c0b000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&emac_pins_a>;
-+			phy = <&phy0>;
-+			status = "okay";
-+		};
-+
-+		mdio at 01c0b080 {
-+			phy-supply = <&reg_emac_3v3>;
-+			status = "okay";
-+
-+			phy0: ethernet-phy at 0 {
-+				reg = <0>;
-+			};
-+		};
-+
-+		pio: pinctrl at 01c20800 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&hackberry_hogs>;
-+
-+			hackberry_hogs: hogs at 0 {
-+				allwinner,pins = "PH19";
-+				allwinner,function = "gpio_out";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			pinctrl-names = "default";
- 			pinctrl-0 = <&uart0_pins_a>;
- 			status = "okay";
- 		};
- 	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+
-+		reg_emac_3v3: emac-3v3 {
-+			compatible = "regulator-fixed";
-+			regulator-name = "emac-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			enable-active-high;
-+			gpio = <&pio 7 19 0>;
-+		};
-+	};
- };
+The poweroff callback was tested with both DT and non-DT boots.
+
+Best regards,
+
+Florian
+
+Florian Vaussard (3):
+  mfd: twl4030-power: Split from twl-core into a dedicated module
+  mfd: twl4030-power: Start transition to DT
+  mfd: twl4030-power: Simplify error path
+
+ .../devicetree/bindings/mfd/twl4030-power.txt      |   28 ++++
+ drivers/mfd/twl-core.c                             |   12 +-
+ drivers/mfd/twl4030-power.c                        |  149 +++++++++++++++-----
+ include/linux/i2c/twl.h                            |    1 -
+ 4 files changed, 148 insertions(+), 42 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/twl4030-power.txt
+
 -- 
-1.8.2.3
+1.7.5.4
