@@ -1,37 +1,26 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 30 May 2013 12:04:20 -0600
-Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
-In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91B616BEA6@BGMAIL01.nvidia.com>
-References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
- <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
- <518A8596.7070702@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B616BE9B@BGMAIL01.nvidia.com>
- <51A62042.7070304@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91B616BEA6@BGMAIL01.nvidia.com>
-Message-ID: <51A794A4.1010502@wwwdotorg.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 May 2013 20:04:40 +0200
+Subject: [PATCH 00/11] Convert GPIO Davinci to platform driver
+In-Reply-To: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <CACRpkdbJY1mZWzFUqWmUR_C8wjis0xtXLOGYNZB9ewqBuxcd5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2013 11:37 AM, Jay Agarwal wrote:
-...
-> I have taken care of all your comments, but Ethernet device is not working for me neither on cardhu nor harmony. 
-> Could be related to my process or board, Currently debugging this.
+On Wed, May 22, 2013 at 9:10 AM, Philip Avinash <avinashphilip@ti.com> wrote:
 
-Are you talking about a PCIe-based Ethernet device on Harmony, or the
-one that's built into the board?
+> GPIO Davinci driver converted to platform driver to support DT booting.
+> In this patch series
+> - Cleaned gpio Davinci driver code with proper commenting style and appropriate
+>   variable names.
+> - Create platform driver for GPIO Davinci in da8xx and dm* platforms and removed
+>   gpio related member updation in davinci_soc_info structure.
+> - DT support added for da850 board and tested on da850 EVM.
+> - Remove soc_info reference in the gpio davinci driver and start uses
+>   gpiolib interface.
 
-The on-board Ethernet device is USB, and should work fine already, and
-irrespective of any PCIe patches.
+I'll go over and review this. I assume this will then go through
+some DaVinci tree and up into ARM SoC when/if I ACK it.
 
-I have only tried an XHCI USB controller in the PCIe slot on Harmony, so
-I can't say if Ethernet not working is a regression or not. Does the
-Ethernet device work with just Thierry's patches and not yours?
-
-> Parallely, should I push my patches for review so that it is clear from other aspects?
-
-Well, if the patches don't work, I suppose there's not much use posting
-them since they'll just need changes before they can be usefully applied
-anyway. IIRC, most of my comments last time were fairly minor, so there
-isn't much need for a separate review of them, right?
+Yours,
+Linus Walleij
