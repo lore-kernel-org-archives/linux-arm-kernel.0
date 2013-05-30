@@ -1,32 +1,68 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Thu, 30 May 2013 15:27:45 +0200
-Subject: [PATCH 5/5] mfd: ab8500-core: Add of_compatible property for
- ab8500-codec
-In-Reply-To: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <1369920465-13905-6-git-send-email-fabio.baltieri@linaro.org>
+From: subashrp@gmail.com (Subash Patel)
+Date: Thu, 30 May 2013 19:01:09 +0530
+Subject: [PATCH 00/14] Random LPAE-related patches
+In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+Message-ID: <51A7549D.9000103@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add of_compatible string to the ab8500-codec cell to allow the driver to
-grab handlers such as regulators from device-tree when available.
+Hi Will,
 
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
- drivers/mfd/ab8500-core.c | 1 +
- 1 file changed, 1 insertion(+)
+Sorry for late response, as I was on vacation.
 
-diff --git a/drivers/mfd/ab8500-core.c b/drivers/mfd/ab8500-core.c
-index 1863985..3efb356 100644
---- a/drivers/mfd/ab8500-core.c
-+++ b/drivers/mfd/ab8500-core.c
-@@ -1120,6 +1120,7 @@ static struct mfd_cell ab8500_devs[] = {
- 	},
- 	{
- 		.name = "ab8500-codec",
-+		.of_compatible = "stericsson,ab8500-codec",
- 	},
- };
- 
--- 
-1.8.2
+Thanks for these patches. I have tested these patches on exynos5440 
+platform. It hasnt affected LPAE functionality for us from previous 
+versions(posted by Cyril). You can use "Tested-By: Subash Patel 
+<subash.rp@samsung.com>" as you deem necessary.
+
+Regards,
+Subash
+
+On 05/17/2013 10:37 PM, Will Deacon wrote:
+> Hello,
+>
+> This is a collection of LPAE-related patches (mostly fixes) that have
+> been kicking around for a while and I've been collecting in one place.
+> There were some extra patches for bootmem, but they produced lots of
+> warnings and need more thought, so they've not been included here.
+>
+> All comments welcome,
+>
+> Will
+>
+> Cyril Chemparathy (9):
+>    ARM: LPAE: use signed arithmetic for mask definitions
+>    ARM: LPAE: use phys_addr_t in switch_mm()
+>    ARM: LPAE: use 64-bit accessors for TTBR registers
+>    ARM: LPAE: factor out T1SZ and TTBR1 computations
+>    ARM: LPAE: accomodate >32-bit addresses for page table base
+>    ARM: mm: use physical addresses in highmem sanity checks
+>    ARM: fix type of PHYS_PFN_OFFSET to unsigned long
+>    ARM: mm: cleanup checks for membank overlap with vmalloc area
+>    ARM: mm: clean up membank size limit checks
+>
+> Vitaly Andrianov (3):
+>    ARM: LPAE: use phys_addr_t in alloc_init_pud()
+>    ARM: LPAE: use phys_addr_t in free_memmap()
+>    ARM: LPAE: use phys_addr_t for initrd location
+>
+> Will Deacon (2):
+>    ARM: lpae: fix definition of PTE_HWTABLE_PTRS
+>    ARM: elf: add new hwcap for identifying atomic ldrd/strd instructions
+>
+>   arch/arm/include/asm/memory.h               | 18 +++++++++-
+>   arch/arm/include/asm/page.h                 |  2 +-
+>   arch/arm/include/asm/pgtable-3level-hwdef.h | 20 +++++++++++
+>   arch/arm/include/asm/pgtable-3level.h       |  8 ++---
+>   arch/arm/include/asm/proc-fns.h             | 26 ++++++++++----
+>   arch/arm/include/uapi/asm/hwcap.h           |  2 +-
+>   arch/arm/kernel/head.S                      | 10 +++---
+>   arch/arm/kernel/setup.c                     |  8 ++++-
+>   arch/arm/kernel/smp.c                       | 11 ++++--
+>   arch/arm/mm/context.c                       |  9 ++---
+>   arch/arm/mm/init.c                          | 19 ++++++-----
+>   arch/arm/mm/mmu.c                           | 49 +++++++++-----------------
+>   arch/arm/mm/proc-v7-3level.S                | 53 +++++++++++++++--------------
+>   13 files changed, 139 insertions(+), 96 deletions(-)
+>
