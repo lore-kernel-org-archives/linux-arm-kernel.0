@@ -1,40 +1,33 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 30 May 2013 11:27:31 +0200
-Subject: [PATCH v6 03/10] ASoC: imx-pcm-fiq: Introduce pcm-fiq-params
-In-Reply-To: <20130529142648.GC29528@S2101-09.ap.freescale.net>
-References: <1369752478-30260-1-git-send-email-mpa@pengutronix.de>
- <1369752478-30260-4-git-send-email-mpa@pengutronix.de>
- <20130529142648.GC29528@S2101-09.ap.freescale.net>
-Message-ID: <20130530092731.GD31548@pengutronix.de>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 30 May 2013 02:42:01 -0700 (PDT)
+Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
+In-Reply-To: <51A5BA86.3070609@free-electrons.com>
+References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <20130528.130920.1604291112518863799.davem@davemloft.net>
+ <51A5BA86.3070609@free-electrons.com>
+Message-ID: <20130530.024201.1913984663902628192.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 10:26:50PM +0800, Shawn Guo wrote:
-> On Tue, May 28, 2013 at 04:47:51PM +0200, Markus Pargmann wrote:
-> > @@ -47,7 +56,8 @@ static inline void imx_pcm_dma_exit(struct platform_device *pdev)
-> >  #endif
-> >  
-> >  #ifdef CONFIG_SND_SOC_IMX_PCM_FIQ
-> > -int imx_pcm_fiq_init(struct platform_device *pdev);
-> > +int imx_pcm_fiq_init(struct platform_device *pdev,
-> > +		struct imx_pcm_fiq_params *params);
-> >  void imx_pcm_fiq_exit(struct platform_device *pdev);
-> >  #else
-> >  static inline int imx_pcm_fiq_init(struct platform_device *pdev)
-> 
-> This one also needs update with a new parameter.
+From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Date: Wed, 29 May 2013 10:21:26 +0200
 
-Fixed, thanks,
+> On 28/05/2013 22:09, David Miller wrote:
+>>
+>> This is the wrong way to go about this.
+>>
+>> If the arch code absolutely requires CONFIG_PHYLIB=y then express that
+>> dependency in the arch Kconfig.  The arch code in question should not
+>> be compiled at all if CONFIG_PHYLIB has an incompatible setting.
+> But that is making it impossible to compile a kernel without any network
+> stack for those platforms or we are going back to either enclosing the
+> calls to phy_register_fixup{,_for_uid,_for_id} with #ifdef CONFIG_PHYLIB
+> or if(IS_BUILTIN(CONFIG_PHYLIB)). And as you can see, it is quite error
+> prone and is done only done for 2 platforms on a total of 6. I believe
+> fixing that in phy.h is more foolproof.
 
-Markus
+Or you properly segregate the networking bits of the platform code so
+that it can be built only when the necessary networking portions are
+enabled.
 
-> 
-> Shawn
-> 
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sometimes having dummy stubs makes sense, but not in this situation.
