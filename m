@@ -1,92 +1,241 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 May 2013 11:22:48 +0800
-Subject: [RFC 2/3] SPI: imx: Using SPI-master "cs_gpios" field for array
- of chipselects instead of private
-In-Reply-To: <1369847430-10799-2-git-send-email-shc_work@mail.ru>
+Date: Thu, 30 May 2013 11:36:14 +0800
+Subject: [RFC 3/3] SPI: imx: Using dynamic count of chipselects provided
+ by of_spi_register_master
+In-Reply-To: <1369847430-10799-3-git-send-email-shc_work@mail.ru>
 References: <20130529144909.GT3660@sirena.org.uk>
  <1369847430-10799-1-git-send-email-shc_work@mail.ru>
- <1369847430-10799-2-git-send-email-shc_work@mail.ru>
-Message-ID: <20130530032246.GD1875@S2101-09.ap.freescale.net>
+ <1369847430-10799-3-git-send-email-shc_work@mail.ru>
+Message-ID: <20130530033612.GE1875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 09:10:29PM +0400, Alexander Shiyan wrote:
-> @@ -356,11 +356,12 @@ static void __maybe_unused mx31_trigger(struct spi_imx_data *spi_imx)
->  	writel(reg, spi_imx->base + MXC_CSPICTRL);
->  }
+On Wed, May 29, 2013 at 09:10:30PM +0400, Alexander Shiyan wrote:
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  .../devicetree/bindings/spi/fsl-imx-cspi.txt       |  2 -
+>  arch/arm/boot/dts/imx27-apf27dev.dts               |  2 -
+>  arch/arm/boot/dts/imx51-apf51dev.dts               |  2 -
+>  arch/arm/boot/dts/imx51-babbage.dts                |  1 -
+>  arch/arm/boot/dts/imx53-evk.dts                    |  1 -
+>  arch/arm/boot/dts/imx53-smd.dts                    |  1 -
+>  arch/arm/boot/dts/imx53-tqma53.dtsi                |  2 -
+>  arch/arm/boot/dts/imx6q-sabrelite.dts              |  1 -
+>  drivers/spi/spi-imx.c                              | 51 ++++++++++------------
+>  9 files changed, 22 insertions(+), 41 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+> index 4256a6d..069592d 100644
+> --- a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+> @@ -5,7 +5,6 @@ Required properties:
+>  - compatible : Should be "fsl,<soc>-cspi" or "fsl,<soc>-ecspi"
+>  - reg : Offset and length of the register set for the device
+>  - interrupts : Should contain CSPI/eCSPI interrupt
+> -- fsl,spi-num-chipselects : Contains the number of the chipselect
+>  - cs-gpios : Specifies the gpio pins to be used for chipselects.
 >  
-> -static int __maybe_unused mx31_config(struct spi_imx_data *spi_imx,
-> +static int __maybe_unused mx31_config(struct spi_device *spi,
->  		struct spi_imx_config *config)
->  {
-> +	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
->  	unsigned int reg = MX31_CSPICTRL_ENABLE | MX31_CSPICTRL_MASTER;
-> -	int cs = spi_imx->chipselect[config->cs];
-> +	int cs = spi->master->cs_gpios[config->cs];
+>  Example:
+> @@ -16,7 +15,6 @@ ecspi at 70010000 {
+>  	compatible = "fsl,imx51-ecspi";
+>  	reg = <0x70010000 0x4000>;
+>  	interrupts = <36>;
+> -	fsl,spi-num-chipselects = <2>;
+>  	cs-gpios = <&gpio3 24 0>, /* GPIO3_24 */
+>  		   <&gpio3 25 0>; /* GPIO3_25 */
+>  };
+> diff --git a/arch/arm/boot/dts/imx27-apf27dev.dts b/arch/arm/boot/dts/imx27-apf27dev.dts
+> index 66b8e1c..6e71949 100644
+> --- a/arch/arm/boot/dts/imx27-apf27dev.dts
+> +++ b/arch/arm/boot/dts/imx27-apf27dev.dts
+> @@ -38,13 +38,11 @@
+>  };
+>  
+>  &cspi1 {
+> -	fsl,spi-num-chipselects = <1>;
+>  	cs-gpios = <&gpio4 28 1>;
+>  	status = "okay";
+>  };
+>  
+>  &cspi2 {
+> -	fsl,spi-num-chipselects = <3>;
+>  	cs-gpios = <&gpio4 21 1>, <&gpio4 27 1>,
+>  			<&gpio2 17 1>;
+>  	status = "okay";
+> diff --git a/arch/arm/boot/dts/imx51-apf51dev.dts b/arch/arm/boot/dts/imx51-apf51dev.dts
+> index 123fe84..557b616 100644
+> --- a/arch/arm/boot/dts/imx51-apf51dev.dts
+> +++ b/arch/arm/boot/dts/imx51-apf51dev.dts
+> @@ -40,7 +40,6 @@
+>  &ecspi1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> -	fsl,spi-num-chipselects = <2>;
+>  	cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
+>  	status = "okay";
+>  };
+> @@ -48,7 +47,6 @@
+>  &ecspi2 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi2_1>;
+> -	fsl,spi-num-chipselects = <2>;
+>  	cs-gpios = <&gpio3 28 1>, <&gpio3 27 1>;
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+> index 6dd9486..0a6c443 100644
+> --- a/arch/arm/boot/dts/imx51-babbage.dts
+> +++ b/arch/arm/boot/dts/imx51-babbage.dts
+> @@ -89,7 +89,6 @@
+>  &ecspi1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> -	fsl,spi-num-chipselects = <2>;
+>  	cs-gpios = <&gpio4 24 0>, <&gpio4 25 0>;
+>  	status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/imx53-evk.dts b/arch/arm/boot/dts/imx53-evk.dts
+> index 801fda7..6a9b1e7 100644
+> --- a/arch/arm/boot/dts/imx53-evk.dts
+> +++ b/arch/arm/boot/dts/imx53-evk.dts
+> @@ -43,7 +43,6 @@
+>  &ecspi1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> -	fsl,spi-num-chipselects = <2>;
+>  	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
+>  	status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/imx53-smd.dts b/arch/arm/boot/dts/imx53-smd.dts
+> index a9b6e10..6d86ae8 100644
+> --- a/arch/arm/boot/dts/imx53-smd.dts
+> +++ b/arch/arm/boot/dts/imx53-smd.dts
+> @@ -63,7 +63,6 @@
+>  &ecspi1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> -	fsl,spi-num-chipselects = <2>;
+>  	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>;
+>  	status = "okay";
+>  
+> diff --git a/arch/arm/boot/dts/imx53-tqma53.dtsi b/arch/arm/boot/dts/imx53-tqma53.dtsi
+> index 38bed3e..bd5a024 100644
+> --- a/arch/arm/boot/dts/imx53-tqma53.dtsi
+> +++ b/arch/arm/boot/dts/imx53-tqma53.dtsi
+> @@ -50,7 +50,6 @@
+>  &ecspi1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> -	fsl,spi-num-chipselects = <4>;
+>  	cs-gpios = <&gpio2 30 0>, <&gpio3 19 0>,
+>  		   <&gpio3 24 0>, <&gpio3 25 0>;
+>  	status = "disabled";
+> @@ -133,7 +132,6 @@
+>  &cspi {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_cspi_1>;
+> -	fsl,spi-num-chipselects = <3>;
+>  	cs-gpios = <&gpio1 18 0>, <&gpio1 19 0>,
+>  		   <&gpio1 21 0>;
+>  	status = "disabled";
+> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> index 6a00066..a47647d 100644
+> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
+> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
+> @@ -66,7 +66,6 @@
+>  };
+>  
+>  &ecspi1 {
+> -	fsl,spi-num-chipselects = <1>;
+>  	cs-gpios = <&gpio3 19 0>;
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&pinctrl_ecspi1_1>;
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 3a11b20..5384a42 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -761,53 +761,46 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  	struct spi_imx_data *spi_imx;
+>  	struct resource *res;
+>  	struct pinctrl *pinctrl;
+> -	int i, irq, ret, num_cs;
+> +	int i, irq, ret;
+>  
+>  	if (!np && !mxc_platform_info) {
+>  		dev_err(&pdev->dev, "can't get the platform data\n");
+>  		return -EINVAL;
+>  	}
+>  
+> -	ret = of_property_read_u32(np, "fsl,spi-num-chipselects", &num_cs);
+> -	if (ret < 0) {
+> -		if (mxc_platform_info)
+> -			num_cs = mxc_platform_info->num_chipselect;
+> -		else
+> -			return ret;
+> -	}
+> -
+>  	master = spi_alloc_master(&pdev->dev, sizeof(struct spi_imx_data));
+>  	if (!master)
+>  		return -ENOMEM;
+>  
+> -	master->cs_gpios = devm_kzalloc(&pdev->dev, sizeof(int) * num_cs,
+> -					GFP_KERNEL);
+> -	if (!master->cs_gpios) {
+> -		ret = -ENOMEM;
+> -		goto out_master_free;
+> +	if (!np && mxc_platform_info) {
+> +		master->num_chipselect = mxc_platform_info->num_chipselect;
+> +
+> +		master->cs_gpios = devm_kzalloc(&pdev->dev, sizeof(int) *
+> +						master->num_chipselect,
+> +						GFP_KERNEL);
+> +		if (!master->cs_gpios) {
+> +			ret = -ENOMEM;
+> +			goto out_master_free;
+> +		}
+> +
+> +		for (i = 0; i < master->num_chipselect; i++) {
+> +			master->cs_gpios[i] = mxc_platform_info->chipselect[i];
+> +			ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
+> +						DRIVER_NAME);
+> +			if (ret) {
+> +				dev_err(&pdev->dev, "can't get cs gpio %i\n",
+> +					master->cs_gpios[i]);
+> +				goto out_gpio_free;
+> +			}
+> +		}
+>  	}
+>  
+>  	platform_set_drvdata(pdev, master);
+>  
+>  	master->bus_num = pdev->id;
+> -	master->num_chipselect = num_cs;
+>  
+>  	spi_imx = spi_master_get_devdata(master);
+>  	spi_imx->bitbang.master = spi_master_get(master);
+> -
+> -	for (i = 0; i < master->num_chipselect; i++) {
+> -		int cs_gpio = of_get_named_gpio(np, "cs-gpios", i);
+> -		if (!gpio_is_valid(cs_gpio) && mxc_platform_info)
+> -			cs_gpio = mxc_platform_info->chipselect[i];
+> -
+> -		master->cs_gpios[i] = cs_gpio;
+> -		ret = devm_gpio_request(&pdev->dev, cs_gpio, DRIVER_NAME);
 
-Hmm, just took another look and found it (and all the following) can be
-even simpler like:
-
-	int cs = spi->cs_gpio;
+It seems that of_spi_register_master() does not request gpio, right?
 
 Shawn
 
->  
->  	reg |= spi_imx_clkdiv_2(spi_imx->spi_clk, config->speed_hz) <<
->  		MX31_CSPICTRL_DR_SHIFT;
-> @@ -434,11 +435,12 @@ static void __maybe_unused mx21_trigger(struct spi_imx_data *spi_imx)
->  	writel(reg, spi_imx->base + MXC_CSPICTRL);
->  }
->  
-> -static int __maybe_unused mx21_config(struct spi_imx_data *spi_imx,
-> +static int __maybe_unused mx21_config(struct spi_device *spi,
->  		struct spi_imx_config *config)
->  {
-> +	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
->  	unsigned int reg = MX21_CSPICTRL_ENABLE | MX21_CSPICTRL_MASTER;
-> -	int cs = spi_imx->chipselect[config->cs];
-> +	int cs = spi->master->cs_gpios[config->cs];
->  	unsigned int max = is_imx27_cspi(spi_imx) ? 16 : 18;
->  
->  	reg |= spi_imx_clkdiv_1(spi_imx->spi_clk, config->speed_hz, max) <<
-> @@ -501,9 +503,10 @@ static void __maybe_unused mx1_trigger(struct spi_imx_data *spi_imx)
->  	writel(reg, spi_imx->base + MXC_CSPICTRL);
->  }
->  
-> -static int __maybe_unused mx1_config(struct spi_imx_data *spi_imx,
-> +static int __maybe_unused mx1_config(struct spi_device *spi,
->  		struct spi_imx_config *config)
->  {
-> +	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
->  	unsigned int reg = MX1_CSPICTRL_ENABLE | MX1_CSPICTRL_MASTER;
->  
->  	reg |= spi_imx_clkdiv_2(spi_imx->spi_clk, config->speed_hz) <<
-> @@ -622,8 +625,7 @@ static const struct of_device_id spi_imx_dt_ids[] = {
->  
->  static void spi_imx_chipselect(struct spi_device *spi, int is_active)
->  {
-> -	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-> -	int gpio = spi_imx->chipselect[spi->chip_select];
-> +	int gpio = spi->master->cs_gpios[spi->chip_select];
->  	int active = is_active != BITBANG_CS_INACTIVE;
->  	int dev_is_lowactive = !(spi->mode & SPI_CS_HIGH);
->  
-> @@ -703,7 +705,7 @@ static int spi_imx_setupxfer(struct spi_device *spi,
->  	} else
->  		BUG();
->  
-> -	spi_imx->devtype_data->config(spi_imx, &config);
-> +	spi_imx->devtype_data->config(spi, &config);
->  
->  	return 0;
->  }
-> @@ -731,8 +733,7 @@ static int spi_imx_transfer(struct spi_device *spi,
->  
->  static int spi_imx_setup(struct spi_device *spi)
->  {
-> -	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
-> -	int gpio = spi_imx->chipselect[spi->chip_select];
-> +	int gpio = spi->master->cs_gpios[spi->chip_select];
->  
->  	dev_dbg(&spi->dev, "%s: mode %d, %u bpw, %d hz\n", __func__,
->  		 spi->mode, spi->bits_per_word, spi->max_speed_hz);
+> -		if (ret) {
+> -			dev_err(&pdev->dev, "can't get cs gpio %i\n", cs_gpio);
+> -			goto out_gpio_free;
+> -		}
+> -	}
+> -
+>  	spi_imx->bitbang.chipselect = spi_imx_chipselect;
+>  	spi_imx->bitbang.setup_transfer = spi_imx_setupxfer;
+>  	spi_imx->bitbang.txrx_bufs = spi_imx_transfer;
+> -- 
+> 1.8.1.5
+> 
