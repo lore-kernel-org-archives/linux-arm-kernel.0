@@ -1,42 +1,50 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 30 May 2013 09:07:30 +0530
-Subject: [PATCH] ARM: EXYNOS: Update defconfig for Arndale and Origen board
-In-Reply-To: <CAOesGMiYs6GfaWGWYB8cw_cJ6_RmmZTb4oPfXo1PYJT8-jdHzw@mail.gmail.com>
-References: <1368168599-28507-1-git-send-email-tushar.behera@linaro.org>
- <87sj1qzaov.fsf@linaro.org> <5191AA89.6010901@linaro.org>
- <20130528231740.GA28879@quad.lixom.net> <51A57D39.8030506@linaro.org>
- <CAOesGMh50Dzr_jczHZC5_txfW=6a+7EgFKvgZgj9MhUcVUTJ1Q@mail.gmail.com>
- <51A5C16D.20408@linaro.org> <000001ce5c4f$839f4cb0$8adde610$@samsung.com>
- <CAOesGMiYs6GfaWGWYB8cw_cJ6_RmmZTb4oPfXo1PYJT8-jdHzw@mail.gmail.com>
-Message-ID: <51A6C97A.6030306@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 May 2013 12:06:11 +0800
+Subject: [RFC 1/3] SPI: imx: Convert to devm_* API
+In-Reply-To: <1369885838.170762928@f286.mail.ru>
+References: <20130529144909.GT3660@sirena.org.uk>
+ <1369847430-10799-1-git-send-email-shc_work@mail.ru>
+ <20130530020524.GB1875@S2101-09.ap.freescale.net>
+ <1369885838.170762928@f286.mail.ru>
+Message-ID: <20130530040609.GA2161@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2013 12:16 AM, Olof Johansson wrote:
-> On Wed, May 29, 2013 at 2:33 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+On Thu, May 30, 2013 at 07:50:38AM +0400, Alexander Shiyan wrote:
+> > On Wed, May 29, 2013 at 09:10:28PM +0400, Alexander Shiyan wrote:
+> > > Use devm_* functions for the driver.
+> > > This ensures more consistent error values and simplifies error paths.
+> > > 
+> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > > ---
+> > >  drivers/spi/spi-imx.c | 79 ++++++++++++++-------------------------------------
+> > >  1 file changed, 21 insertions(+), 58 deletions(-)
+> > > 
+> > > diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> ...
+> > >  	master->dev.of_node = pdev->dev.of_node;
+> > >  	ret = spi_bitbang_start(&spi_imx->bitbang);
+> > 
+> > ---8<-----
+> > > -	if (ret) {
+> > > -		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
+> > > -		goto out_clk_put;
+> > > -	}
+> > > -
+> > > -	dev_info(&pdev->dev, "probed\n");
+> > > +	if (!ret)
+> > > +		return 0;
+> > >  
+> > > -	return ret;
+> > > +	dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
+> > >  
+> > > -out_clk_put:
+> > --->8------
+> > 
+> > I do not understand why above changes are necessary.
 > 
->> However, Olof Johansson mentioned, 'drivers/platform/arm/board_arndale.c'
->> would be a good alternative.
+> This just simplifies the error path and removes one "goto".
 > 
-> 
-> Whoa. I didn't quite realize what I proposed, or rather, how what I
-> proposed could be perceived. I take it back. :)
-> 
-> We must _not_ introduce something that will be abused as a new home
-> for board file junk. If we do introduce a platform glue directory it
-> would need to be very limited in scope. Compare to what's in
-> drivers/platform/x86 today.
-> 
-> 
-> -Olof
-> 
+Sorry, I do not get it and take this as a diff stat churn.
 
-This was my proof-of-concept for moving USB hub reset code out of USB
-driver. Verified that it works.
-
-I would wait for your patches for wifi-reset sequence and then will add
-hub-reset code for Arndale.
-
-
--- 
-Tushar Behera
+Shawn
