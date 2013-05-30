@@ -1,108 +1,87 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 May 2013 12:41:12 +0100
-Subject: A bug about system call on ARM
-In-Reply-To: <20130530090949.GC7483@mudshark.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
- <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
- <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
- <20130529094826.GD13095@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
- <20130530090949.GC7483@mudshark.cambridge.arm.com>
-Message-ID: <20130530114112.GH7483@mudshark.cambridge.arm.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Thu, 30 May 2013 13:44:23 +0200
+Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
+In-Reply-To: <51A61E60.4070708@wwwdotorg.org>
+References: <cover.1369658705.git.afzal@ti.com>
+ <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
+ <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
+ <51A5BEB6.6070809@ti.com> <51A61E60.4070708@wwwdotorg.org>
+Message-ID: <51A73B97.2020701@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 10:09:49AM +0100, Will Deacon wrote:
-> On Thu, May 30, 2013 at 02:41:42AM +0100, Wang, Yalin wrote:
-> > If you have some patch for this issue,
-> > I can do the test for it .
+Hi Stephen,
+
+On 05/29/2013 05:27 PM, Stephen Warren wrote:
+> On 05/29/2013 02:39 AM, Benoit Cousson wrote:
+>> Hi Afzal,
+>>
+>> On 05/29/2013 10:06 AM, Mohammed, Afzal wrote:
+>>> Hi Jon,
+>>>
+>>> On Wed, May 29, 2013 at 03:35:10, Stephen Warren wrote:
+>>>> On 05/28/2013 03:25 PM, Jon Hunter wrote:
+>>>
+>>>>>>  			ti,am335x-timer	(applicable to AM335x devices)
+>>>>>>  			ti,am335x-timer-1ms (applicable to AM335x devices)
+>>>>>> +			"ti,am4372-timer-1ms", "ti,am335x-timer-1ms" for AM43x 1ms timer
+>>>>>> +			"ti,am4372-timer", "ti,am335x-timer" for AM43x timers other than 1ms one
+>>>
+>>>>> If you are adding more compatibility strings, then this implies that the
+>>>>> AM43x timers are not 100% compatible with any other device listed (such
+>>>>> as am335x or any omap device). That's fine but you should state that in
+>>>>> the changelog. If the AM43x timer registers are 100% compatible with
+>>>>> existing devices you should not add these.
+>>>>
+>>>> I'm not sure that's true; .dts files should always include a compatible
+>>>> value that describes the most specific model of the HW, plus any
+>>>> baseline compatible value that the HW is compatible with. This allows
+>>>> any required quirks/fixes/... to be applied for the specific HW model
+>>>> later even if nobody knows right now they'll be needed. Hence, defining
+>>>> new compatible values doesn't necessarily mean incompatible HW.
+>>>
+>>> Stephen took words out of my finger ;)
+>>>  
+>>> Some explanations,I don;t 
+>>>
+>>> 1. first compatible should be exact device [A], followed by compatible
+>>> model (if one)
+>>> 2. Minor effort in getting DT right the first time may help prevent
+>>> difficult effort later modifying it (if a necessity comes), considering
+>>> the fact that DT sources has  to move out of Kernel at some point of
+>>> time. And DT is not supposed to be modified, which may cause difficulty
+>>> for the users (I had been a minor victim of this during rebase).
+>>>
+>>> As we both were in GPMC land earlier, an example,
+>>>
+>>> If my memory is right, GPMC IP in am335x is rev 6, and IP has 8 chip
+>>> select, but one is not pinned out. Now assume that same IP is integrated
+>>> in another SoC (probably OMAP4 has rev 6). Here if we use same compatible
+>>> for both, driver cannot handle it properly (w/o knowledge about platform).
+>>> But if exact compatible is mentioned, without modifying DT (which should
+>>> be considered as a firmware) just by modifying Kernel, deciding based on
+>>> compatible would help achieve what is required.
+>>
+>> That's true for the DTS itself, but here your are changing the binding
+>> documentation which is supposed to reflect the driver "interface" in the
+>> Device Tree model description.
+>>
+>> Since the driver does not support any new compatible string, you should
+>> not update the binding.
 > 
-> I'll have a look at cooking something which uses an exception table entry
-> to rewind the PC and retry the system call. That's simpler than directly
-> injecting a user page fault from the system call path.
+> I don't agree here; the DT binding should define all the required and/or
+> allowed values that must/should/can be present in the DT - the entire
+> legal schema. The set of all compatible values is included in that,
+> irrespective of whether a particular value actually (currently) defines
+> a different HW interface or not.
 
-Ok, please can you try the following?
+Well, I tend to agree on the principle, but so far it was never really
+done like that. That's not necessarily a good excuse, but if we start
+adding new bindings for the huge number of OMAP|AM variants TI has been
+introduced for 10 years, I'd rather use a wildcard than a exhaustive
+list of all the devices.
+Something like ti,[omap|am]*-timer for example .
 
-Will
-
---->8
-
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index bc5bc0a..855926e 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -361,6 +361,15 @@ ENTRY(vector_swi)
- 	str	r8, [sp, #S_PSR]		@ Save CPSR
- 	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
- 	zero_fp
-+	enable_irq
-+	ct_user_exit
-+
-+#ifdef CONFIG_ALIGNMENT_TRAP
-+	ldr	ip, __cr_alignment
-+	ldr	ip, [ip]
-+	mcr	p15, 0, ip, c1, c0		@ update control register
-+#endif
-+	get_thread_info tsk
- 
- 	/*
- 	 * Get the system call number.
-@@ -375,9 +384,9 @@ ENTRY(vector_swi)
- #ifdef CONFIG_ARM_THUMB
- 	tst	r8, #PSR_T_BIT
- 	movne	r10, #0				@ no thumb OABI emulation
--	ldreq	r10, [lr, #-4]			@ get SWI instruction
-+ USER(	ldreq	r10, [lr, #-4]		)	@ get SWI instruction
- #else
--	ldr	r10, [lr, #-4]			@ get SWI instruction
-+ USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
- #endif
- #ifdef CONFIG_CPU_ENDIAN_BE8
- 	rev	r10, r10			@ little endian instruction
-@@ -392,22 +401,13 @@ ENTRY(vector_swi)
- 	/* Legacy ABI only, possibly thumb mode. */
- 	tst	r8, #PSR_T_BIT			@ this is SPSR from save_user_regs
- 	addne	scno, r7, #__NR_SYSCALL_BASE	@ put OS number in
--	ldreq	scno, [lr, #-4]
-+ USER(	ldreq	scno, [lr, #-4]		)
- 
- #else
- 	/* Legacy ABI only. */
--	ldr	scno, [lr, #-4]			@ get SWI instruction
--#endif
--
--#ifdef CONFIG_ALIGNMENT_TRAP
--	ldr	ip, __cr_alignment
--	ldr	ip, [ip]
--	mcr	p15, 0, ip, c1, c0		@ update control register
-+ USER(	ldr	scno, [lr, #-4]		)	@ get SWI instruction
- #endif
--	enable_irq
--	ct_user_exit
- 
--	get_thread_info tsk
- 	adr	tbl, sys_call_table		@ load syscall table pointer
- 
- #if defined(CONFIG_OABI_COMPAT)
-@@ -442,6 +442,18 @@ local_restart:
- 	eor	r0, scno, #__NR_SYSCALL_BASE	@ put OS number back
- 	bcs	arm_syscall	
- 	b	sys_ni_syscall			@ not private func
-+
-+#if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
-+	/*
-+	 * We may have faulted trying to load the SWI instruction due to
-+	 * concurrent page aging on another CPU. In this case, return
-+	 * back to the swi instruction and fault the page back.
-+	 */
-+9001:
-+	sub	lr, lr, #4
-+	str	lr, [sp, #S_PC]
-+	b	ret_fast_syscall
-+#endif
- ENDPROC(vector_swi)
- 
- 	/*
+Regards,
+Benoit
