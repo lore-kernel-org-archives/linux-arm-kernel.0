@@ -1,91 +1,55 @@
-From: ludovic.desroches@atmel.com (ludovic.desroches at atmel.com)
-Date: Thu, 30 May 2013 18:08:23 +0200
-Subject: [PATCH 3/3] at_hdmac: add FIFO configuration parameter to DMA DT
- binding
-In-Reply-To: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <1369930103-11963-4-git-send-email-ludovic.desroches@atmel.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Thu, 30 May 2013 09:11:17 -0700
+Subject: [RFC PATCH 2/2] clocksource: dw_apb: allow build for architectures
+ other than arm
+In-Reply-To: <20130530053233.GL25186@sapphire.tkos.co.il>
+References: <1369570367-994-2-git-send-email-baruch@tkos.co.il>
+ <51A51271.2070506@linaro.org> <20130530053233.GL25186@sapphire.tkos.co.il>
+Message-ID: <51A77A25.8080306@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On 05/29/2013 10:32 PM, Baruch Siach wrote:
+> Hi John,
+>
+> On Tue, May 28, 2013 at 01:24:17PM -0700, John Stultz wrote:
+>> On 05/26/2013 05:12 AM, Baruch Siach wrote:
+>>>   static const struct of_device_id osctimer_ids[] __initconst = {
+>>> @@ -124,3 +135,10 @@ void __init dw_apb_timer_init(void)
+>>>   	init_sched_clock();
+>>>   }
+>>> +
+>>> +#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
+>>> +unsigned long long notrace sched_clock()
+>>> +{
+>>> +	return read_sched_clock() * sched_clock_mult;
+>>> +}
+>>> +#endif
+>> Also, can you try to condense the number of #ifndef
+>> CONFIG_HAVE_SETUP_SCHED_CLOCK checks to one, and consolidate the
+>> needed functions all in that one conditional?
+> Thanks for your comments. I'll rework the patch and resubmit.
+>
+> I've just noticed that I have a bigger problem. read_sched_clock() returns
+> u32, not u64. This means that in a rate of, say, 100MHz it will wrap around
+> after a little more than 40 seconds. Would it make sense to put ARM's 32 bin
+> sched_clock extension code (arch/arm/kernel/sched_clock.c) is a common place
+> (maybe drivers/clocksource), and use that? There seems to be nothing ARM
+> specific in this code, after all.
 
-For most devices the FIFO configuration is the same i.e. when half FIFO size is
-available/filled, a source/destination request is serviced. But USART devices
-have to do it when there is enough space/data available to perform a single
-AHB access so the ASAP configuration.
+Yea, working out an actual generic sched_clock implementation is 
+something I'd like to see done.
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
- drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++++----
- 2 files changed, 26 insertions(+), 6 deletions(-)
+Though I'd really rather we not toss yet another chunk of infrastructure 
+in the drivers/clocksource directory. Instead we should probably have a 
+kernel/time/sched_clock.c.
 
-diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-index c80e8a3..c280a0e 100644
---- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-@@ -24,8 +24,11 @@ The three cells in order are:
- 1. A phandle pointing to the DMA controller.
- 2. The memory interface (16 most significant bits), the peripheral interface
- (16 less significant bits).
--3. The peripheral identifier for the hardware handshaking interface. The
--identifier can be different for tx and rx.
-+3. Parameters for the at91 DMA configuration register which are device
-+dependant:
-+  - bit 7-0: peripheral identifier for the hardware handshaking interface. The
-+  identifier can be different for tx and rx.
-+  - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 1 for ASAP.
- 
- Example:
- 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index e923cda..bfd73e1 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -14,6 +14,7 @@
-  * found on AT91SAM9263.
-  */
- 
-+#include <dt-bindings/dma/at91.h>
- #include <linux/clk.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
-@@ -1223,14 +1224,30 @@ static struct dma_chan *at_dma_xlate(struct of_phandle_args *dma_spec,
- 	atslave = devm_kzalloc(&dmac_pdev->dev, sizeof(*atslave), GFP_KERNEL);
- 	if (!atslave)
- 		return NULL;
-+
-+	atslave->cfg = ATC_DST_H2SEL_HW | ATC_SRC_H2SEL_HW;
- 	/*
- 	 * We can fill both SRC_PER and DST_PER, one of these fields will be
- 	 * ignored depending on DMA transfer direction.
- 	 */
--	per_id = dma_spec->args[1];
--	atslave->cfg = ATC_FIFOCFG_HALFFIFO | ATC_DST_H2SEL_HW
--		      | ATC_SRC_H2SEL_HW | ATC_DST_PER(per_id)
--		      | ATC_SRC_PER(per_id);
-+	per_id = dma_spec->args[1] & AT91_DMA_CFG_PER_ID_MASK;
-+	atslave->cfg |= ATC_DST_PER(per_id) | ATC_SRC_PER(per_id);
-+	/*
-+	 * We have to translate the value we get from the device tree since
-+	 * the half FIFO configuration value had to be 0 to keep backward
-+	 * compatibility.
-+	 */
-+	switch(dma_spec->args[1] & AT91_DMA_CFG_FIFOCFG_MASK) {
-+		case AT91_DMA_CFG_FIFOCFG_ALAP:
-+			atslave->cfg |= ATC_FIFOCFG_LARGESTBURST;
-+			break;
-+		case AT91_DMA_CFG_FIFOCFG_ASAP:
-+			atslave->cfg |= ATC_FIFOCFG_ENOUGHSPACE;
-+			break;
-+		case AT91_DMA_CFG_FIFOCFG_HALF:
-+		default:
-+			atslave->cfg |= ATC_FIFOCFG_HALFFIFO;
-+	}
- 	atslave->dma_dev = &dmac_pdev->dev;
- 
- 	chan = dma_request_channel(mask, at_dma_filter, atslave);
--- 
-1.7.11.3
+Then its just the issue of tying that and the clocksource code together 
+so you just register existing capable clocksources with a SCHED_CLOCK 
+flag or via a different registration hook.
+
+I don't think it will be an easy job, but if you want to give it a shot, 
+I'd be quite interested in reviewing the patches!
+
+thanks
+-john
