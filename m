@@ -1,32 +1,33 @@
-From: pavel@denx.de (Pavel Machek)
-Date: Thu, 30 May 2013 12:38:44 +0200
-Subject: [PATCH v7] reset: Add driver for gpio-controlled reset pins
-In-Reply-To: <51A68CF8.7000303@wwwdotorg.org>
-References: <1369753575-9818-1-git-send-email-p.zabel@pengutronix.de>
- <51A68CF8.7000303@wwwdotorg.org>
-Message-ID: <20130530103843.GB24712@amd.pavel.ucw.cz>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Thu, 30 May 2013 19:19:39 +0800
+Subject: [PATCH 0/3] ARM: tegra114: cpuidle: add power down state
+Message-ID: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2013-05-29 17:19:20, Stephen Warren wrote:
-> On 05/28/2013 09:06 AM, Philipp Zabel wrote:
-> > This driver implements a reset controller device that toggle a gpio
-> > connected to a reset pin of a peripheral IC. The delay between assertion
-> > and de-assertion of the reset signal can be configured via device tree.
-> 
-> > diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
-> 
-> > +static void __gpio_reset_set(struct reset_controller_dev *rcdev, int asserted)
-> 
-> Nit: Technically I think __ is a reserved name-space, so you shouldn't
-> prefix "user-level" (rather than libc/similar) symbols with it, but it's
-> not a big deal.
+This series introduce CPU core power down state for CPU idle. When CPU go
+into this state, it saves it's context and needs a proper configuration
+in flow controller to power gate the CPU when CPU runs into WFI
+instruction. And the CPU also needs to set the IRQ as CPU power down idle
+wake up event in flow controller.
 
-Well.. this is kernel :-). We don't have libc around... and this
-standard is normally ignored here. __ is normally used as a prefix for
-"simpler" function.
+To prevent race conditions and ensure proper interrupt routing on
+Cortex-A15 CPUs when they are power-gated, add a CPU PM notifier
+call-back to reprogram the GIC CPU interface on PM entry. The
+GIC CPU interface will be reset back to its normal state by
+the common GIC CPU PM exit callback when the CPU wakes up.
 
-								Pavel
+Joseph Lo (3):
+  ARM: tegra114: Reprogram GIC CPU interface to bypass IRQ on CPU PM
+    entry
+  ARM: tegra114: add low level support for CPU idle powered-down mode
+  ARM: tegra114: cpuidle: add powered-down state
+
+ arch/arm/mach-tegra/cpuidle-tegra114.c | 62 +++++++++++++++++++++++++++++++++-
+ arch/arm/mach-tegra/flowctrl.h         |  2 ++
+ arch/arm/mach-tegra/irq.c              | 40 ++++++++++++++++++++++
+ arch/arm/mach-tegra/sleep-tegra30.S    |  2 ++
+ 4 files changed, 105 insertions(+), 1 deletion(-)
+
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.3
