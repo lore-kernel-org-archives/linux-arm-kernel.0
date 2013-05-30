@@ -1,57 +1,25 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Wed, 29 May 2013 18:46:37 -0700
-Subject: [PATCH v2 1/2] clk: Disable unused clocks after deferred probing
- is done
-In-Reply-To: <20130529075126.6058.58923@quantum>
-References: <1368124502-18830-1-git-send-email-skannan@codeaurora.org>
- <519461BB.3010209@codeaurora.org> <20130529075126.6058.58923@quantum>
-Message-ID: <51A6AF7D.8080706@codeaurora.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 May 2013 09:50:08 +0800
+Subject: [PATCH] SPI: Unify simple platform data for some controllers
+In-Reply-To: <1962597.10ArYKg8M9@wuerfel>
+References: <1369809742-4220-1-git-send-email-shc_work@mail.ru>
+ <20130529144909.GT3660@sirena.org.uk>
+ <1369847158.250798748@f433.i.mail.ru> <1962597.10ArYKg8M9@wuerfel>
+Message-ID: <20130530015006.GA1875@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/29/2013 12:51 AM, Mike Turquette wrote:
-> Quoting Saravana Kannan (2013-05-15 21:34:03)
->> On 05/09/2013 11:35 AM, Saravana Kannan wrote:
->>> With deferred probing, late_initcall() is too soon to declare a clock as
->>> unused. Wait for deferred probing to finish before declaring a clock as
->>> unused. Since deferred probing is done in late_initcall(), do the unused
->>> check to late_initcall_sync.
->>>
->>> Signed-off-by: Saravana Kannan <skannan@codeaurora.org>
->>> ---
->>>    drivers/clk/clk.c |    2 +-
->>>    1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->>> index fe4055f..5ecb64c 100644
->>> --- a/drivers/clk/clk.c
->>> +++ b/drivers/clk/clk.c
->>> @@ -534,7 +534,7 @@ static int clk_disable_unused(void)
->>>
->>>        return 0;
->>>    }
->>> -late_initcall(clk_disable_unused);
->>> +late_initcall_sync(clk_disable_unused);
->>>
->>>    /***    helper functions   ***/
->>
->> Mike,
->>
->> Thoughts? Picking it up? Removing the existing auto-disable code (I
->> think they are still useful)?
->>
->
-> Hi Saravana,
->
-> I've taken this into clk-next for testing.
->
-> Regards,
-> Mike
->
+On Wed, May 29, 2013 at 08:10:05PM +0200, Arnd Bergmann wrote:
+> The plan for i.MX is to move to DT-only in the long run, but
+> AFAIK a lot of people still rely on board files and they are
+> not trivial to convert without access to test hardware.
+> 
+> Any new i.MX hardware should certainly be DT-only.
+> 
+> Shawn can probably comment better on the time line.
+> 
+It's progressing slowly, and I can not really commit a time line because
+there are too many board files to be converted, and more importantly
+I haven't seen too much effort from board owners on this work.
 
-Thanks.
-
--Saravana
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Shawn
