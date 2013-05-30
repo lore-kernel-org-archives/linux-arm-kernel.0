@@ -1,23 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 May 2013 16:51:59 +0800
-Subject: [PATCH v6 09/10] ASoC: fsl: Move fsl-ssi binding doc to sound/
-In-Reply-To: <1369752478-30260-10-git-send-email-mpa@pengutronix.de>
-References: <1369752478-30260-1-git-send-email-mpa@pengutronix.de>
- <1369752478-30260-10-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130530085156.GC2670@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 May 2013 10:52:13 +0200
+Subject: [PATCH 30/39] ARM: ux500: Replace ST-E's home-brew DMA direction
+ definition with the generic one
+In-Reply-To: <1368611522-9984-31-git-send-email-lee.jones@linaro.org>
+References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
+ <1368611522-9984-31-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdZfw9ACS9=Nx9NuQqca_cvrdYwNOSWfpigMU1x94goZcA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 04:47:57PM +0200, Markus Pargmann wrote:
-> fsl-ssi was located in powerpc/fsl/ssi.txt. This is no powerpc specific
-> device, so it should be moved to sound/ as it connects to differen audio
-> codecs.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  .../devicetree/bindings/powerpc/fsl/ssi.txt        | 73 ----------------------
->  .../devicetree/bindings/sound/fsl,ssi.txt          | 73 ++++++++++++++++++++++
+On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Please add -M to git format-patch command.
+> STEDMA40_*_TO_* direction definitions are identical in all but name to
+> the pre-defined generic DMA_*_TO_* ones. Let's make things easy by not
+> duplicating such things.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Shawn
+Vinod, I'm lacking your ACK on this patch, but have tentatively
+queued it anyway. Maybe you missed it?
+
+Yours,
+Linus Walleij
