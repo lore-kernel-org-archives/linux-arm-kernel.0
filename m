@@ -1,33 +1,66 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 May 2013 13:31:33 -0700
-Subject: MUSB multiplatform work?
-In-Reply-To: <CACRpkdZHupVFS+pNADpaJjunPa3fEtyCqLwbL-etHs3gt8EW0Q@mail.gmail.com>
-References: <201305271702.09203.arnd@arndb.de>
- <20130528163548.GC28253@arwen.pp.htv.fi>
- <20130530201854.GB6467@atomide.com>
- <CACRpkdZHupVFS+pNADpaJjunPa3fEtyCqLwbL-etHs3gt8EW0Q@mail.gmail.com>
-Message-ID: <20130530203132.GC6467@atomide.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Thu, 30 May 2013 22:38:37 +0200
+Subject: [PATCH 1/2] gpiolib: add gpio_export_with_name
+In-Reply-To: <CACRpkdb9F+wJ0hkNqPTP34r3JAEp2s07Q8U24fD6oCdj7MqCFA@mail.gmail.com>
+References: <20121121101259.GQ4398@game.jcrosoft.org>
+ <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
+ <20121126135911.2F1D33E187C@localhost> <51A719A5.50906@epfl.ch>
+ <CACRpkdb9F+wJ0hkNqPTP34r3JAEp2s07Q8U24fD6oCdj7MqCFA@mail.gmail.com>
+Message-ID: <51A7B8CD.4080702@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130530 13:27]:
-> On Thu, May 30, 2013 at 10:18 PM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > TUSB would work with dmaengine, but AFAIK we're still missing the
-> > dmaengine configuration options to support increasing device end
-> > FIFO address.
-> 
-> Can you elaborate on this? What is the usecase here?
+Hello Linus,
 
-There are many devices where the device FIFO is memory mapped to the
-GPMC bus on omaps, like TUSB, OneNAND, smc911x etc. I believe the
-only reason why these have not been converted to the dmaengine is
-the fact that dmaengine cannot configure the DMA hardware to do
-autoincrement and loop over the device FIFO.
+On 05/30/2013 10:03 PM, Linus Walleij wrote:
+> On Thu, May 30, 2013 at 11:19 AM, Florian Vaussard
+> <florian.vaussard@epfl.ch> wrote:
+>
+>> Even if work is progressing towards
+>> having gpio-controlled reset pins [1], some boards still need GPIOs to
+>> be exported to userspace for other functionalities.
+>
+> Which are these?
+>
 
-You can see an example of this in tusb_omap_dma_program() if you
-look at the various dma_params entries and omap_set_dma_* functions.
+Sorry, I should have been more precise.
 
-Regards,
+> When I have inquired I have heard all kind of horrible things:
+>
+> - Userspace replicating drivers/leds/leds-gpio.c to
+>    turn on/off and even PWM (!) LEDs from userspace, when we have
+>    a standard sysfs interface for LEDs.
+>
+> - Userspace replicating drivers/input/keyboard/gpio_keys[_polled].c
+>    to "just read this one button" instead of going through the
+>    Linux input subsystem like everyone else.
+>
+> - Userspace replicating drivers/regulator/gpio-regulator.c
+>    to "turn on just this one voltage source".
+>
+> All invalid reasons for using the sysfs ABI and trying to do the
+> kernels work. All creating horrs for users and developers who now
+> have to stash everything were trying to stach into the device tree
+> (the above is all perfectly expressed with DT nodes) into their
+> userspace app and then requiring their users to match a certain
+> app to a certain board.
+>
 
-Tony
+100% agree with you.
+
+> The only examples I've really come to accept considers using
+> things like relays and switches on factory lines where the meaning
+> (semantics) of the GPIOs can only be properly understood from the
+> GUI in the userspace APP running that factory line. Or robotics.
+> In both cases presumably RT processes.
+>
+
+Indeed, I work in a robotics lab :-) One of our board (mach-imx/
+mx31moboard*.c) controls for example the multiplexing of two cameras
+sharing the same acquisition bus (I know, a bit hackish).
+I developed a similar board with an OMAP3. Such control do not
+fit well in the above-mentioned cases, but we do not need RT processes.
+
+Best regards,
+
+Florian
