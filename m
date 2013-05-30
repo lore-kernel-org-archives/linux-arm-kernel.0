@@ -1,68 +1,56 @@
-From: subashrp@gmail.com (Subash Patel)
-Date: Thu, 30 May 2013 19:01:09 +0530
-Subject: [PATCH 00/14] Random LPAE-related patches
-In-Reply-To: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
-Message-ID: <51A7549D.9000103@gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 30 May 2013 14:33:42 +0100
+Subject: [PATCH v5 0/4] xen/arm: CONFIG_PARAVIRT and stolen ticks
+ accounting
+Message-ID: <alpine.DEB.2.02.1305301426520.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Hi all,
+this patch series introduces stolen ticks accounting for Xen on ARM.
+Stolen ticks are clocksource ticks that have been "stolen" from the cpu,
+typically because Linux is running in a virtual machine and the vcpu has
+been descheduled.
+To account for these ticks we introduce CONFIG_PARAVIRT and pv_time_ops
+so that we can make use of:
 
-Sorry for late response, as I was on vacation.
+kernel/sched/cputime.c:steal_account_process_tick
 
-Thanks for these patches. I have tested these patches on exynos5440 
-platform. It hasnt affected LPAE functionality for us from previous 
-versions(posted by Cyril). You can use "Tested-By: Subash Patel 
-<subash.rp@samsung.com>" as you deem necessary.
 
-Regards,
-Subash
+I am starting to be pretty confident about this patch series.
 
-On 05/17/2013 10:37 PM, Will Deacon wrote:
-> Hello,
->
-> This is a collection of LPAE-related patches (mostly fixes) that have
-> been kicking around for a while and I've been collecting in one place.
-> There were some extra patches for bootmem, but they produced lots of
-> warnings and need more thought, so they've not been included here.
->
-> All comments welcome,
->
-> Will
->
-> Cyril Chemparathy (9):
->    ARM: LPAE: use signed arithmetic for mask definitions
->    ARM: LPAE: use phys_addr_t in switch_mm()
->    ARM: LPAE: use 64-bit accessors for TTBR registers
->    ARM: LPAE: factor out T1SZ and TTBR1 computations
->    ARM: LPAE: accomodate >32-bit addresses for page table base
->    ARM: mm: use physical addresses in highmem sanity checks
->    ARM: fix type of PHYS_PFN_OFFSET to unsigned long
->    ARM: mm: cleanup checks for membank overlap with vmalloc area
->    ARM: mm: clean up membank size limit checks
->
-> Vitaly Andrianov (3):
->    ARM: LPAE: use phys_addr_t in alloc_init_pud()
->    ARM: LPAE: use phys_addr_t in free_memmap()
->    ARM: LPAE: use phys_addr_t for initrd location
->
-> Will Deacon (2):
->    ARM: lpae: fix definition of PTE_HWTABLE_PTRS
->    ARM: elf: add new hwcap for identifying atomic ldrd/strd instructions
->
->   arch/arm/include/asm/memory.h               | 18 +++++++++-
->   arch/arm/include/asm/page.h                 |  2 +-
->   arch/arm/include/asm/pgtable-3level-hwdef.h | 20 +++++++++++
->   arch/arm/include/asm/pgtable-3level.h       |  8 ++---
->   arch/arm/include/asm/proc-fns.h             | 26 ++++++++++----
->   arch/arm/include/uapi/asm/hwcap.h           |  2 +-
->   arch/arm/kernel/head.S                      | 10 +++---
->   arch/arm/kernel/setup.c                     |  8 ++++-
->   arch/arm/kernel/smp.c                       | 11 ++++--
->   arch/arm/mm/context.c                       |  9 ++---
->   arch/arm/mm/init.c                          | 19 ++++++-----
->   arch/arm/mm/mmu.c                           | 49 +++++++++-----------------
->   arch/arm/mm/proc-v7-3level.S                | 53 +++++++++++++++--------------
->   13 files changed, 139 insertions(+), 96 deletions(-)
->
+Please advice on what tree I should use to get this stuff upstream: most
+of the changes are Xen specific, but it also contains few generic ARM
+changes (the introduction of CONFIG_PARAVIRT and paravirt.c on ARM) and
+a couple of lines in kernel/sched/cputime.c (a missing include).
+
+
+
+Stefano Stabellini (4):
+      xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
+      kernel: missing include in cputime.c
+      arm: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+      xen/arm: account for stolen ticks
+
+ arch/arm/Kconfig                |   20 +++++++++
+ arch/arm/include/asm/paravirt.h |   19 ++++++++
+ arch/arm/kernel/Makefile        |    1 +
+ arch/arm/kernel/paravirt.c      |   25 +++++++++++
+ arch/arm/xen/enlighten.c        |   21 +++++++++
+ arch/ia64/xen/time.c            |   48 +++------------------
+ arch/x86/xen/time.c             |   76 +--------------------------------
+ drivers/xen/Makefile            |    2 +-
+ drivers/xen/time.c              |   91 +++++++++++++++++++++++++++++++++++++++
+ include/xen/xen-ops.h           |    5 ++
+ kernel/sched/cputime.c          |    4 +-
+ 11 files changed, 193 insertions(+), 119 deletions(-)
+ create mode 100644 arch/arm/include/asm/paravirt.h
+ create mode 100644 arch/arm/kernel/paravirt.c
+ create mode 100644 drivers/xen/time.c
+
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git lost_ticks_5
+
+Cheers,
+
+Stefano
