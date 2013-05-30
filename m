@@ -1,37 +1,19 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Thu, 30 May 2013 23:03:26 +0530
-Subject: [PATCH -next v2] dmaengine: ste_dma40: fix error return code
- in d40_probe()
-In-Reply-To: <CACRpkdYBfvr0kA7bd-6Ns78UH7JtBCFDzFxyHLgtReB32O4D+w@mail.gmail.com>
-References: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
- <CACRpkdYBfvr0kA7bd-6Ns78UH7JtBCFDzFxyHLgtReB32O4D+w@mail.gmail.com>
-Message-ID: <20130530173326.GD3767@intel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 May 2013 20:12:26 +0200
+Subject: [PATCH 03/11] gpio: davinci: Modify to platform driver
+In-Reply-To: <1369206634-6778-4-git-send-email-avinashphilip@ti.com>
+References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+ <1369206634-6778-4-git-send-email-avinashphilip@ti.com>
+Message-ID: <CACRpkdb9vW6Jo0T+boW0hkF6AuRNb72MgFSgwzctO=U_4XB3Yg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 09:41:38AM +0200, Linus Walleij wrote:
-> On Thu, May 30, 2013 at 6:32 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
-> 
-> > From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> >
-> > In many of the error handling case, the return value 'ret' not set
-> > and 0 will be return from d40_probe() even if error, but we should
-> > return a negative error code instead in those error handling case.
-> > This patch fixed them, and also removed useless variable 'err'.
-> >
-> > Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> > ---
-> > v1 -> v2: rebased on linux-next.git
-> 
-> I've tentatively applied this to my dma40 branch, waiting for Vinod
-> to ACK it.
-I though you wanted me to apply this :)
+On Wed, May 22, 2013 at 9:10 AM, Philip Avinash <avinashphilip@ti.com> wrote:
 
-Nevertheless, Acked-by: Vinod Koul <vinod.koul@intel.com>
+Why not squash patch 1 into this patch?
 
-Can you CC stable too, pls.
+Anyway, this bring us closer to the model of other drivers so:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
---
-~Vinod
-
--- 
+Yours,
+Linus Walleij
