@@ -1,64 +1,173 @@
-From: egtvedt@samfundet.no (Hans-Christian Egtvedt)
-Date: Thu, 30 May 2013 16:05:55 +0200
-Subject: [PATCH 1/8] video: atmel_lcdfb: fix platform data struct
-In-Reply-To: <20130530072328.GE19468@game.jcrosoft.org>
-References: <20130411145741.GB25242@game.jcrosoft.org>
- <1365692422-9565-1-git-send-email-plagnioj@jcrosoft.com>
- <CACQ1gAjF5kuu-czkj56-pQdTBUhvY5VodvfnF3RA_DN-O0b9NQ@mail.gmail.com>
- <20130529173538.GC23899@game.jcrosoft.org>
- <CACQ1gAhhsMw1-Znd8BC=A0rJBrB4pphCtH9v9qOQR+j2dY3vCw@mail.gmail.com>
- <20130529193220.GB19468@game.jcrosoft.org>
- <CACQ1gAj_m_aWaq5J41SY8EPwOH5-3zYPsf2WJCunvVnBCyq00Q@mail.gmail.com>
- <20130530072328.GE19468@game.jcrosoft.org>
-Message-ID: <20130530140555.GA10370@samfundet.no>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 May 2013 22:23:32 +0800
+Subject: [PATCH v3] dma: imx-sdma: move to generic device tree bindings
+Message-ID: <1369923812-21767-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Around Thu 30 May 2013 09:23:28 +0200 or thereabout, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 08:39 Thu 30 May     , Richard Genoud wrote:
->> 2013/5/29 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> > On 19:44 Wed 29 May     , Richard Genoud wrote:
->> >> 2013/5/29 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
->> >> > On 16:36 Wed 29 May     , Richard Genoud wrote:
->> >> >> 2013/4/11 Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>:
+Update imx-sdma driver to adopt generic DMA device tree bindings.  It
+calls of_dma_controller_register() with imx-sdma specific of_dma_xlate
+to get the generic DMA device tree helper support.  The #dma-cells for
+imx-sdma must be 3, which includes request ID, peripheral type and
+priority.
 
-<snipp diff>
+The existing way of requesting channel, clients directly call
+dma_request_channel(), still work there, and will be removed after
+all imx-sdma clients get converted to generic DMA device tree helper.
 
->> >> >> > +       bool                    lcdcon_pol_negative;
->> >> >> I think lcdcon_pol_negative should be part of pdata, because it really
->> >> >> depends on how the PWM is wired on the board.
->> >> >>
->> >> >
->> >> > maybe but no one mainline use it on any pdata for non-dt boars
->> >> > so I did not want to expose it
->> >> Well, at least, I'm using it :)
->> >> (and I guess that Andreas is using it also, otherwise he wouldn't have
->> >> introduce it !)
->> >
->> > yes but pdata is for non-dt boards, for dt you can keep it in struct
->> > atmel_lcdfb_info and add a property
->> >
->> > if non-dt boards want it my answer is I do not care switch to DT
->> 
->> ok (I use a full DT board based on sam9g35)
->> 
->> so I'll add something like
->> sinfo->lcdcon_pol_negative = of_property_read_bool(display_np,
->> "atmel,lcdcon-pwm-pulse-low");
->> in /atmel_lcdfb.c
->> 
->> But I thought the goal of this patch was to separate driver data from
->> platform specific data, and IMHO, lcdcon_pol_negative is a specificity
->> of the platform.
-> 
-> You are right but as non one mainline use it as pdata I choose to drop it
-> and only keep it on the driver as we can still use it for DT
->
-> It's a way to force peopoe to switch to DT
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Changes since v2:
+ * Do not use macro for transfer type and priority, and hence the
+   patch 1/2 in previous version is dropped.
 
-FYI AVR32 architecture doesn't support device tree, nor is it likely to do
-so. However there are no users of the PWM output from the LCDC block for the
-boards in the current kernel, and I doubt new boards will pop.
+ .../devicetree/bindings/dma/fsl-imx-sdma.txt       |   56 ++++++++++++++++++++
+ drivers/dma/imx-sdma.c                             |   40 ++++++++++++++
+ 2 files changed, 96 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+index d1e3f44..68cee4f5 100644
+--- a/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
++++ b/Documentation/devicetree/bindings/dma/fsl-imx-sdma.txt
+@@ -4,14 +4,70 @@ Required properties:
+ - compatible : Should be "fsl,<chip>-sdma"
+ - reg : Should contain SDMA registers location and length
+ - interrupts : Should contain SDMA interrupt
++- #dma-cells : Must be <3>.
++  The first cell specifies the DMA request/event ID.  See details below
++  about the second and third cell.
+ - fsl,sdma-ram-script-name : Should contain the full path of SDMA RAM
+   scripts firmware
+ 
++The second cell of dma phandle specifies the peripheral type of DMA transfer.
++The full ID of peripheral types can be found below.
++
++	ID	transfer type
++	---------------------
++	0	MCU domain SSI
++	1	Shared SSI
++	2	MMC
++	3	SDHC
++	4	MCU domain UART
++	5	Shared UART
++	6	FIRI
++	7	MCU domain CSPI
++	8	Shared CSPI
++	9	SIM
++	10	ATA
++	11	CCM
++	12	External peripheral
++	13	Memory Stick Host Controller
++	14	Shared Memory Stick Host Controller
++	15	DSP
++	16	Memory
++	17	FIFO type Memory
++	18	SPDIF
++	19	IPU Memory
++	20	ASRC
++	21	ESAI
++
++The third cell specifies the transfer priority as below.
++
++	ID	transfer priority
++	-------------------------
++	0	High
++	1	Medium
++	2	Low
++
+ Examples:
+ 
+ sdma at 83fb0000 {
+ 	compatible = "fsl,imx51-sdma", "fsl,imx35-sdma";
+ 	reg = <0x83fb0000 0x4000>;
+ 	interrupts = <6>;
++	#dma-cells = <3>;
+ 	fsl,sdma-ram-script-name = "sdma-imx51.bin";
+ };
++
++DMA clients connected to the i.MX SDMA controller must use the format
++described in the dma.txt file.
++
++Examples:
++
++ssi2: ssi at 70014000 {
++	compatible = "fsl,imx51-ssi", "fsl,imx21-ssi";
++	reg = <0x70014000 0x4000>;
++	interrupts = <30>;
++	clocks = <&clks 49>;
++	dmas = <&sdma 24 1 0>,
++	       <&sdma 25 1 0>;
++	dma-names = "rx", "tx";
++	fsl,fifo-depth = <15>;
++};
+diff --git a/drivers/dma/imx-sdma.c b/drivers/dma/imx-sdma.c
+index 092867b..1e44b8c 100644
+--- a/drivers/dma/imx-sdma.c
++++ b/drivers/dma/imx-sdma.c
+@@ -36,6 +36,7 @@
+ #include <linux/dmaengine.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/of_dma.h>
+ 
+ #include <asm/irq.h>
+ #include <linux/platform_data/dma-imx-sdma.h>
+@@ -1296,6 +1297,35 @@ err_dma_alloc:
+ 	return ret;
+ }
+ 
++static bool sdma_filter_fn(struct dma_chan *chan, void *fn_param)
++{
++	struct imx_dma_data *data = fn_param;
++
++	if (!imx_dma_is_general_purpose(chan))
++		return false;
++
++	chan->private = data;
++
++	return true;
++}
++
++static struct dma_chan *sdma_xlate(struct of_phandle_args *dma_spec,
++				   struct of_dma *ofdma)
++{
++	struct sdma_engine *sdma = ofdma->of_dma_data;
++	dma_cap_mask_t mask = sdma->dma_device.cap_mask;
++	struct imx_dma_data data;
++
++	if (dma_spec->args_count != 3)
++		return NULL;
++
++	data.dma_request = dma_spec->args[0];
++	data.peripheral_type = dma_spec->args[1];
++	data.priority = dma_spec->args[2];
++
++	return dma_request_channel(mask, sdma_filter_fn, &data);
++}
++
+ static int __init sdma_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id *of_id =
+@@ -1443,10 +1473,20 @@ static int __init sdma_probe(struct platform_device *pdev)
+ 		goto err_init;
+ 	}
+ 
++	if (np) {
++		ret = of_dma_controller_register(np, sdma_xlate, sdma);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to register controller\n");
++			goto err_register;
++		}
++	}
++
+ 	dev_info(sdma->dev, "initialized\n");
+ 
+ 	return 0;
+ 
++err_register:
++	dma_async_device_unregister(&sdma->dma_device);
+ err_init:
+ 	kfree(sdma->script_addrs);
+ err_alloc:
 -- 
-Hans-Christian Egtvedt
+1.7.9.5
