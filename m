@@ -1,34 +1,37 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Thu, 30 May 2013 19:50:24 +0200
-Subject: [PATCHv3 RESEND 0/6] ARM: sunxi: Add support for A10 Ethernet
- controller
-In-Reply-To: <20130530081129.GF9799@lukather>
-References: <1369387394-9453-1-git-send-email-maxime.ripard@free-electrons.com>
- <CACQ1gAgp6o8HqQcv=4cWoAZze3wtXHMX+g+7KvV-pnC2W5=iyg@mail.gmail.com>
- <20130530081129.GF9799@lukather>
-Message-ID: <CACQ1gAhu0P0BvfNkhsSgdzeU7Pf+CxesVJ87ok2FMpfBmaRMXA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 30 May 2013 12:04:20 -0600
+Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
+In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91B616BEA6@BGMAIL01.nvidia.com>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+ <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
+ <518A8596.7070702@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B616BE9B@BGMAIL01.nvidia.com>
+ <51A62042.7070304@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEA6@BGMAIL01.nvidia.com>
+Message-ID: <51A794A4.1010502@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/30 Maxime Ripard <maxime.ripard@free-electrons.com>:
->
-> Did you look at the load while iperf was running? I guess we can expect
-> it to be pretty high since it runs without DMA.
+On 05/30/2013 11:37 AM, Jay Agarwal wrote:
+...
+> I have taken care of all your comments, but Ethernet device is not working for me neither on cardhu nor harmony. 
+> Could be related to my process or board, Currently debugging this.
 
-I just did the test.
-cpu is at 55%-60%
+Are you talking about a PCIe-based Ethernet device on Harmony, or the
+one that's built into the board?
 
-root at debian:~# date ; iperf -c 192.168.1.10 -t 300 ; cat /proc/loadavg
-Thu May 30 17:43:13 UTC 2013
-------------------------------------------------------------
-Client connecting to 192.168.1.10, TCP port 5001
-TCP window size: 20.0 KByte (default)
-------------------------------------------------------------
-[  3] local 192.168.1.235 port 45459 connected with 192.168.1.10 port 5001
-[ ID] Interval       Transfer     Bandwidth
-[  3]  0.0-300.0 sec  3.28 GBytes  94.0 Mbits/sec
-0.83 0.71 0.43 1/46 1770
+The on-board Ethernet device is USB, and should work fine already, and
+irrespective of any PCIe patches.
 
-loadavg over a 5min at 0.71, yeah, that's pretty high...
+I have only tried an XHCI USB controller in the PCIe slot on Harmony, so
+I can't say if Ethernet not working is a regression or not. Does the
+Ethernet device work with just Thierry's patches and not yours?
 
-Richard.
+> Parallely, should I push my patches for review so that it is clear from other aspects?
+
+Well, if the patches don't work, I suppose there's not much use posting
+them since they'll just need changes before they can be usefully applied
+anyway. IIRC, most of my comments last time were fairly minor, so there
+isn't much need for a separate review of them, right?
