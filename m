@@ -1,49 +1,36 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 30 May 2013 15:09:58 +0200
-Subject: [PATCH 1/2] ARM: imx6q: Add GPR6 and GPR7 register definitions for
- iomuxc gpr
-Message-ID: <1369919399-24370-1-git-send-email-mpa@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 May 2013 15:16:21 +0200
+Subject: [PATCH v7] reset: Add driver for gpio-controlled reset pins
+In-Reply-To: <20130530103843.GB24712@amd.pavel.ucw.cz>
+References: <1369753575-9818-1-git-send-email-p.zabel@pengutronix.de>
+ <51A68CF8.7000303@wwwdotorg.org> <20130530103843.GB24712@amd.pavel.ucw.cz>
+Message-ID: <201305301516.22111.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Philipp Zabel <p.zabel@pengutronix.de>
+On Thursday 30 May 2013, Pavel Machek wrote:
+> On Wed 2013-05-29 17:19:20, Stephen Warren wrote:
+> > On 05/28/2013 09:06 AM, Philipp Zabel wrote:
+> > > This driver implements a reset controller device that toggle a gpio
+> > > connected to a reset pin of a peripheral IC. The delay between assertion
+> > > and de-assertion of the reset signal can be configured via device tree.
+> > 
+> > > diff --git a/drivers/reset/gpio-reset.c b/drivers/reset/gpio-reset.c
+> > 
+> > > +static void __gpio_reset_set(struct reset_controller_dev *rcdev, int asserted)
+> > 
+> > Nit: Technically I think __ is a reserved name-space, so you shouldn't
+> > prefix "user-level" (rather than libc/similar) symbols with it, but it's
+> > not a big deal.
+> 
+> Well.. this is kernel :-). We don't have libc around... and this
+> standard is normally ignored here. __ is normally used as a prefix for
+> "simpler" function.
 
-Masks for IPU AXI transaction QoS settings
+We're not really consistent in the kernel, but I agree the most common
+use is where you have a wrapper calling the __foo function and normal
+drivers are supposed to call foo instead. My reading is usually that
+by calling __foo, the caller says "I know exactly what I'm doing so
+I can optimize this".
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
- include/linux/mfd/syscon/imx6q-iomuxc-gpr.h | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
-
-diff --git a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-index dab34a1..2e1709b 100644
---- a/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-+++ b/include/linux/mfd/syscon/imx6q-iomuxc-gpr.h
-@@ -241,6 +241,24 @@
- 
- #define IMX6Q_GPR5_L2_CLK_STOP			BIT(8)
- 
-+#define IMX6Q_GPR6_IPU1_ID00_WR_QOS_MASK	(0xf << 0)
-+#define IMX6Q_GPR6_IPU1_ID01_WR_QOS_MASK	(0xf << 4)
-+#define IMX6Q_GPR6_IPU1_ID10_WR_QOS_MASK	(0xf << 8)
-+#define IMX6Q_GPR6_IPU1_ID11_WR_QOS_MASK	(0xf << 12)
-+#define IMX6Q_GPR6_IPU1_ID00_RD_QOS_MASK	(0xf << 16)
-+#define IMX6Q_GPR6_IPU1_ID01_RD_QOS_MASK	(0xf << 20)
-+#define IMX6Q_GPR6_IPU1_ID10_RD_QOS_MASK	(0xf << 24)
-+#define IMX6Q_GPR6_IPU1_ID11_RD_QOS_MASK	(0xf << 28)
-+
-+#define IMX6Q_GPR7_IPU2_ID00_WR_QOS_MASK	(0xf << 0)
-+#define IMX6Q_GPR7_IPU2_ID01_WR_QOS_MASK	(0xf << 4)
-+#define IMX6Q_GPR7_IPU2_ID10_WR_QOS_MASK	(0xf << 8)
-+#define IMX6Q_GPR7_IPU2_ID11_WR_QOS_MASK	(0xf << 12)
-+#define IMX6Q_GPR7_IPU2_ID00_RD_QOS_MASK	(0xf << 16)
-+#define IMX6Q_GPR7_IPU2_ID01_RD_QOS_MASK	(0xf << 20)
-+#define IMX6Q_GPR7_IPU2_ID10_RD_QOS_MASK	(0xf << 24)
-+#define IMX6Q_GPR7_IPU2_ID11_RD_QOS_MASK	(0xf << 28)
-+
- #define IMX6Q_GPR9_TZASC2_BYP			BIT(1)
- #define IMX6Q_GPR9_TZASC1_BYP			BIT(0)
- 
--- 
-1.8.2.1
+	Arnd
