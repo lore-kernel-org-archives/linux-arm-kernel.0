@@ -1,101 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 May 2013 18:32:16 +0200
-Subject: [PATCH 3/3] at_hdmac: add FIFO configuration parameter to DMA
- DT binding
-In-Reply-To: <1369930103-11963-4-git-send-email-ludovic.desroches@atmel.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 30 May 2013 18:37:54 +0200
+Subject: [PATCH 0/3] at_hdmac: dt dma bindings update
+In-Reply-To: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
 References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
- <1369930103-11963-4-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <51A77F10.8020808@atmel.com>
+Message-ID: <20130530163754.GB23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/2013 18:08, ludovic.desroches at atmel.com :
+On 18:08 Thu 30 May     , ludovic.desroches at atmel.com wrote:
 > From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> For most devices the FIFO configuration is the same i.e. when half FIFO size is
-> available/filled, a source/destination request is serviced. But USART devices
-> have to do it when there is enough space/data available to perform a single
-> AHB access so the ASAP configuration.
->
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> 
+> Hi,
+> 
+> This set of patches update the dt dma binding for at_hdmac since we need one
+> more parameter. In order to keep backward compatibility, an existing cell will
+> be used to add this parameter. Since the content of that cell will become a
+> magic value due to the concatenation of the two parameters, it is time to
+> use macros.
 
-Clear and neat: thanks Ludo.
+For the record this is based on the cleanup branch for 3.11
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-
-> ---
->   .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
->   drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++++----
->   2 files changed, 26 insertions(+), 6 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> index c80e8a3..c280a0e 100644
-> --- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> +++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-> @@ -24,8 +24,11 @@ The three cells in order are:
->   1. A phandle pointing to the DMA controller.
->   2. The memory interface (16 most significant bits), the peripheral interface
->   (16 less significant bits).
-> -3. The peripheral identifier for the hardware handshaking interface. The
-> -identifier can be different for tx and rx.
-> +3. Parameters for the at91 DMA configuration register which are device
-> +dependant:
-> +  - bit 7-0: peripheral identifier for the hardware handshaking interface. The
-> +  identifier can be different for tx and rx.
-> +  - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 1 for ASAP.
->
->   Example:
->
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index e923cda..bfd73e1 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -14,6 +14,7 @@
->    * found on AT91SAM9263.
->    */
->
-> +#include <dt-bindings/dma/at91.h>
->   #include <linux/clk.h>
->   #include <linux/dmaengine.h>
->   #include <linux/dma-mapping.h>
-> @@ -1223,14 +1224,30 @@ static struct dma_chan *at_dma_xlate(struct of_phandle_args *dma_spec,
->   	atslave = devm_kzalloc(&dmac_pdev->dev, sizeof(*atslave), GFP_KERNEL);
->   	if (!atslave)
->   		return NULL;
-> +
-> +	atslave->cfg = ATC_DST_H2SEL_HW | ATC_SRC_H2SEL_HW;
->   	/*
->   	 * We can fill both SRC_PER and DST_PER, one of these fields will be
->   	 * ignored depending on DMA transfer direction.
->   	 */
-> -	per_id = dma_spec->args[1];
-> -	atslave->cfg = ATC_FIFOCFG_HALFFIFO | ATC_DST_H2SEL_HW
-> -		      | ATC_SRC_H2SEL_HW | ATC_DST_PER(per_id)
-> -		      | ATC_SRC_PER(per_id);
-> +	per_id = dma_spec->args[1] & AT91_DMA_CFG_PER_ID_MASK;
-> +	atslave->cfg |= ATC_DST_PER(per_id) | ATC_SRC_PER(per_id);
-> +	/*
-> +	 * We have to translate the value we get from the device tree since
-> +	 * the half FIFO configuration value had to be 0 to keep backward
-> +	 * compatibility.
-> +	 */
-> +	switch(dma_spec->args[1] & AT91_DMA_CFG_FIFOCFG_MASK) {
-> +		case AT91_DMA_CFG_FIFOCFG_ALAP:
-> +			atslave->cfg |= ATC_FIFOCFG_LARGESTBURST;
-> +			break;
-> +		case AT91_DMA_CFG_FIFOCFG_ASAP:
-> +			atslave->cfg |= ATC_FIFOCFG_ENOUGHSPACE;
-> +			break;
-> +		case AT91_DMA_CFG_FIFOCFG_HALF:
-> +		default:
-> +			atslave->cfg |= ATC_FIFOCFG_HALFFIFO;
-> +	}
->   	atslave->dma_dev = &dmac_pdev->dev;
->
->   	chan = dma_request_channel(mask, at_dma_filter, atslave);
->
-
-
--- 
-Nicolas Ferre
+Best Regards,
+J.
+> 
+> Regards
+> 
+> Ludovic Desroches (3):
+>   ARM: at91: dt: add header to define at_hdmac configuration
+>   ARM: at91: dt: switch DMA DT bindings to pre-processor
+>   at_hdmac: add FIFO configuration parameter to DMA DT binding
+> 
+>  .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
+>  arch/arm/boot/dts/at91sam9g45.dtsi                 |  5 ++--
+>  arch/arm/boot/dts/at91sam9n12.dtsi                 | 11 +++++----
+>  arch/arm/boot/dts/at91sam9x5.dtsi                  | 17 +++++++-------
+>  arch/arm/boot/dts/sama5d3.dtsi                     | 19 +++++++--------
+>  drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++----
+>  include/dt-bindings/dma/at91.h                     | 27 ++++++++++++++++++++++
+>  7 files changed, 81 insertions(+), 30 deletions(-)
+>  create mode 100644 include/dt-bindings/dma/at91.h
+> 
+> -- 
+> 1.7.11.3
+> 
