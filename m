@@ -1,32 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 May 2013 20:14:06 +0200
-Subject: [PATCH 04/11] ARM: davinci: da8xx: creation of gpio platform
- device
-In-Reply-To: <1369206634-6778-5-git-send-email-avinashphilip@ti.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
- <1369206634-6778-5-git-send-email-avinashphilip@ti.com>
-Message-ID: <CACRpkdaKjfyJWbr3HjHWCeFPeg0mrwDZ+G7Fn_y8Z_PGg2JM2A@mail.gmail.com>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Thu, 30 May 2013 12:13:53 -0600
+Subject: [RFCv1 09/11] pci: mvebu: add MSI support
+In-Reply-To: <20130530121518.GA20267@mithrandir>
+References: <1364316746-8702-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1364316746-8702-10-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAErSpo7yC_97Vg-zuype-jyfqiY+77OE97cxYoEO9ZZnXjQ95A@mail.gmail.com>
+ <20130530121518.GA20267@mithrandir>
+Message-ID: <CAErSpo7P-fs_C+Eoc1ppyWz=rGrw4idcziRf9s=h0OsxVqJhLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 22, 2013 at 9:10 AM, Philip Avinash <avinashphilip@ti.com> wrote:
-
-> From: KV Sujith <sujithkv@ti.com>
+On Thu, May 30, 2013 at 6:15 AM, Thierry Reding
+<thierry.reding@gmail.com> wrote:
+> On Mon, Apr 08, 2013 at 04:29:07PM -0600, Bjorn Helgaas wrote:
+>> On Tue, Mar 26, 2013 at 10:52 AM, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
+> [...]
+>> > +static int mvebu_pcie_setup_msi_irq(struct msi_chip *chip,
+>> > +                                   struct pci_dev *pdev,
+>> > +                                   struct msi_desc *desc)
+>> > +{
+>> > +       struct mvebu_pcie_msi *msi = to_mvebu_msi(chip);
+>>
+>> If this took only the pci_dev (not the msi_chip), I think you could do this:
+>>
+>>   struct mvebu_pcie_msi *msi = &pdev->bus->sysdata->msi;
 >
-> gpio controller resource information being associated with
-> davinci_soc_info structure and not created any device. Hence davinci
-> gpio didn't fall under proper device model. This patch creates gpio
-> davinci as a platform device for da8xx platforms.
+> That would mean that the arch_setup_msi_irq() and friends could still be
+> architecture-agnostic because they only pass around pci_dev, and the
+> driver specific implementations would know how to lookup sysdata and
+> from there the MSI chip.
 >
-> - Add Memory and IRQ resources for DA8xx.
-> - Register GPIO platform driver for DA8xx.
-> - Add da8xx_register_gpio API to create platform device for da8xx
->   platforms.
+> So I was almost convinced that putting the struct msi_chip pointer into
+> sysdata is a good idea. However that also means that each PCI host
+> bridge driver becomes architecture-specific. If we ever get a driver
+> that can be used on multiple architectures (however unlikely), the only
+> way to make it work would be to #ifdef those parts. We could make that
+> easier to deal with by providing an accessor (pci_sysdata_set_msi_chip()
+> or similar), though.
 >
-> Signed-off-by: KV Sujith <sujithkv@ti.com>
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> But maybe it's something we don't need to be concerned about because no
+> PCI host bridge driver will ever support two different architecture?
+>
+> One related point is compile coverage. If the drivers are completely
+> architecture-agnostic it makes it a lot easier to compile-test all
+> drivers, which might come in useful when doing core changes and such.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Hmm, I've forgotten what I was thinking here.  (And I'm the *worst*
+about reviving ancient threads myself).  So I drop whatever objection
+I had :)
 
-Yours,
-Linus Walleij
+Bjorn
