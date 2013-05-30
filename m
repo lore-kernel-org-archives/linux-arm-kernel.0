@@ -1,217 +1,84 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Thu, 30 May 2013 14:44:55 +0200
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Thu, 30 May 2013 14:51:13 +0200
 Subject: [PATCH] ARM: imx: Remove mxc specific ulpi access ops
-Message-ID: <1369917895-9562-1-git-send-email-mpa@pengutronix.de>
+In-Reply-To: <1369917895-9562-1-git-send-email-mpa@pengutronix.de>
+References: <1369917895-9562-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <51A74B41.5010909@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are ulpi access ops implemented in drivers/usb/phy/phy-ulpi.c.
-mxc access ops implement the same access operations within mach-imx. This
-patch removes the mxc ulpi file and uses phy-ulpi instead for
-imx_otg_ulpi_create.
+On 05/30/2013 02:44 PM, Markus Pargmann wrote:
+> There are ulpi access ops implemented in drivers/usb/phy/phy-ulpi.c.
+> mxc access ops implement the same access operations within mach-imx. This
+> patch removes the mxc ulpi file and uses phy-ulpi instead for
+> imx_otg_ulpi_create.
+> 
+> phy-ulpi successfully tested with i.MX27 Phytec phyCARD-S (pca100).
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/Kconfig       |   1 +
+>  arch/arm/mach-imx/Makefile      |   1 -
+>  arch/arm/mach-imx/mach-pca100.c |   4 +-
+>  arch/arm/mach-imx/ulpi.c        | 118 ----------------------------------------
+>  arch/arm/mach-imx/ulpi.h        |   9 ++-
+>  5 files changed, 9 insertions(+), 124 deletions(-)
+>  delete mode 100644 arch/arm/mach-imx/ulpi.c
+> 
+> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+> index ba44328..ca59799 100644
+> --- a/arch/arm/mach-imx/Kconfig
+> +++ b/arch/arm/mach-imx/Kconfig
+> @@ -58,6 +58,7 @@ config MXC_USE_EPIT
+>  
+>  config MXC_ULPI
+>  	bool
+> +	select USB_ULPI_VIEWPORT
+>  
+>  config ARCH_HAS_RNGA
+>  	bool
+> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+> index 70ae7c4..dcb8291 100644
+> --- a/arch/arm/mach-imx/Makefile
+> +++ b/arch/arm/mach-imx/Makefile
+> @@ -23,7 +23,6 @@ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
+>  obj-$(CONFIG_MXC_TZIC) += tzic.o
+>  obj-$(CONFIG_MXC_AVIC) += avic.o
+>  
+> -obj-$(CONFIG_MXC_ULPI) += ulpi.o
+>  obj-$(CONFIG_MXC_USE_EPIT) += epit.o
+>  obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
+>  
+> diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
+> index b8b15bb..19bb644 100644
+> --- a/arch/arm/mach-imx/mach-pca100.c
+> +++ b/arch/arm/mach-imx/mach-pca100.c
+> @@ -398,8 +398,8 @@ static void __init pca100_init(void)
+>  		imx27_add_fsl_usb2_udc(&otg_device_pdata);
+>  	}
+>  
+> -	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
+> -				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
+> +	usbh2_pdata.otg = imx_otg_ulpi_create(
+> +			ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
 
-phy-ulpi successfully tested with i.MX27 Phytec phyCARD-S (pca100).
+Why don't you keep otg_ulpi_create()?
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/Kconfig       |   1 +
- arch/arm/mach-imx/Makefile      |   1 -
- arch/arm/mach-imx/mach-pca100.c |   4 +-
- arch/arm/mach-imx/ulpi.c        | 118 ----------------------------------------
- arch/arm/mach-imx/ulpi.h        |   9 ++-
- 5 files changed, 9 insertions(+), 124 deletions(-)
- delete mode 100644 arch/arm/mach-imx/ulpi.c
+http://lxr.free-electrons.com/source/include/linux/usb/ulpi.h#L185
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index ba44328..ca59799 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -58,6 +58,7 @@ config MXC_USE_EPIT
- 
- config MXC_ULPI
- 	bool
-+	select USB_ULPI_VIEWPORT
- 
- config ARCH_HAS_RNGA
- 	bool
-diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-index 70ae7c4..dcb8291 100644
---- a/arch/arm/mach-imx/Makefile
-+++ b/arch/arm/mach-imx/Makefile
-@@ -23,7 +23,6 @@ obj-$(CONFIG_ARCH_MXC_IOMUX_V3) += iomux-v3.o
- obj-$(CONFIG_MXC_TZIC) += tzic.o
- obj-$(CONFIG_MXC_AVIC) += avic.o
- 
--obj-$(CONFIG_MXC_ULPI) += ulpi.o
- obj-$(CONFIG_MXC_USE_EPIT) += epit.o
- obj-$(CONFIG_MXC_DEBUG_BOARD) += 3ds_debugboard.o
- 
-diff --git a/arch/arm/mach-imx/mach-pca100.c b/arch/arm/mach-imx/mach-pca100.c
-index b8b15bb..19bb644 100644
---- a/arch/arm/mach-imx/mach-pca100.c
-+++ b/arch/arm/mach-imx/mach-pca100.c
-@@ -398,8 +398,8 @@ static void __init pca100_init(void)
- 		imx27_add_fsl_usb2_udc(&otg_device_pdata);
- 	}
- 
--	usbh2_pdata.otg = otg_ulpi_create(&mxc_ulpi_access_ops,
--				ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
-+	usbh2_pdata.otg = imx_otg_ulpi_create(
-+			ULPI_OTG_DRVVBUS | ULPI_OTG_DRVVBUS_EXT);
- 
- 	if (usbh2_pdata.otg)
- 		imx27_add_mxc_ehci_hs(2, &usbh2_pdata);
-diff --git a/arch/arm/mach-imx/ulpi.c b/arch/arm/mach-imx/ulpi.c
-deleted file mode 100644
-index 0f05195..0000000
---- a/arch/arm/mach-imx/ulpi.c
-+++ /dev/null
-@@ -1,118 +0,0 @@
--/*
-- * Copyright 2008 Sascha Hauer, Pengutronix <s.hauer@pengutronix.de>
-- * Copyright 2009 Daniel Mack <daniel@caiaq.de>
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA  02110-1301, USA.
-- */
--
--#include <linux/module.h>
--#include <linux/kernel.h>
--#include <linux/io.h>
--#include <linux/delay.h>
--#include <linux/usb/otg.h>
--#include <linux/usb/ulpi.h>
--
--#include "ulpi.h"
--
--/* ULPIVIEW register bits */
--#define ULPIVW_WU		(1 << 31)	/* Wakeup */
--#define ULPIVW_RUN		(1 << 30)	/* read/write run */
--#define ULPIVW_WRITE		(1 << 29)	/* 0 = read  1 = write */
--#define ULPIVW_SS		(1 << 27)	/* SyncState */
--#define ULPIVW_PORT_MASK	0x07	/* Port field */
--#define ULPIVW_PORT_SHIFT	24
--#define ULPIVW_ADDR_MASK	0xff	/* data address field */
--#define ULPIVW_ADDR_SHIFT	16
--#define ULPIVW_RDATA_MASK	0xff	/* read data field */
--#define ULPIVW_RDATA_SHIFT	8
--#define ULPIVW_WDATA_MASK	0xff	/* write data field */
--#define ULPIVW_WDATA_SHIFT	0
--
--static int ulpi_poll(void __iomem *view, u32 bit)
--{
--	int timeout = 10000;
--
--	while (timeout--) {
--		u32 data = __raw_readl(view);
--
--		if (!(data & bit))
--			return 0;
--
--		cpu_relax();
--	};
--
--	printk(KERN_WARNING "timeout polling for ULPI device\n");
--
--	return -ETIMEDOUT;
--}
--
--static int ulpi_read(struct usb_phy *otg, u32 reg)
--{
--	int ret;
--	void __iomem *view = otg->io_priv;
--
--	/* make sure interface is running */
--	if (!(__raw_readl(view) & ULPIVW_SS)) {
--		__raw_writel(ULPIVW_WU, view);
--
--		/* wait for wakeup */
--		ret = ulpi_poll(view, ULPIVW_WU);
--		if (ret)
--			return ret;
--	}
--
--	/* read the register */
--	__raw_writel((ULPIVW_RUN | (reg << ULPIVW_ADDR_SHIFT)), view);
--
--	/* wait for completion */
--	ret = ulpi_poll(view, ULPIVW_RUN);
--	if (ret)
--		return ret;
--
--	return (__raw_readl(view) >> ULPIVW_RDATA_SHIFT) & ULPIVW_RDATA_MASK;
--}
--
--static int ulpi_write(struct usb_phy *otg, u32 val, u32 reg)
--{
--	int ret;
--	void __iomem *view = otg->io_priv;
--
--	/* make sure the interface is running */
--	if (!(__raw_readl(view) & ULPIVW_SS)) {
--		__raw_writel(ULPIVW_WU, view);
--		/* wait for wakeup */
--		ret = ulpi_poll(view, ULPIVW_WU);
--		if (ret)
--			return ret;
--	}
--
--	__raw_writel((ULPIVW_RUN | ULPIVW_WRITE |
--		      (reg << ULPIVW_ADDR_SHIFT) |
--		      ((val & ULPIVW_WDATA_MASK) << ULPIVW_WDATA_SHIFT)), view);
--
--	/* wait for completion */
--	return ulpi_poll(view, ULPIVW_RUN);
--}
--
--struct usb_phy_io_ops mxc_ulpi_access_ops = {
--	.read	= ulpi_read,
--	.write	= ulpi_write,
--};
--EXPORT_SYMBOL_GPL(mxc_ulpi_access_ops);
--
--struct usb_phy *imx_otg_ulpi_create(unsigned int flags)
--{
--	return otg_ulpi_create(&mxc_ulpi_access_ops, flags);
--}
-diff --git a/arch/arm/mach-imx/ulpi.h b/arch/arm/mach-imx/ulpi.h
-index 42bdaca..8bb0230 100644
---- a/arch/arm/mach-imx/ulpi.h
-+++ b/arch/arm/mach-imx/ulpi.h
-@@ -1,8 +1,13 @@
- #ifndef __MACH_ULPI_H
- #define __MACH_ULPI_H
- 
-+#include <linux/usb/ulpi.h>
-+
- #ifdef CONFIG_USB_ULPI
--struct usb_phy *imx_otg_ulpi_create(unsigned int flags);
-+static inline struct usb_phy *imx_otg_ulpi_create(unsigned int flags)
-+{
-+	return otg_ulpi_create(&ulpi_viewport_access_ops, flags);
-+}
- #else
- static inline struct usb_phy *imx_otg_ulpi_create(unsigned int flags)
- {
-@@ -10,7 +15,5 @@ static inline struct usb_phy *imx_otg_ulpi_create(unsigned int flags)
- }
- #endif
- 
--extern struct usb_phy_io_ops mxc_ulpi_access_ops;
--
- #endif /* __MACH_ULPI_H */
- 
+Marc
+
 -- 
-1.8.2.1
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130530/7195f3ed/attachment.sig>
