@@ -1,40 +1,69 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 May 2013 19:38:12 +0200
-Subject: [RFC/PATCH v2 2/2] gpio-rcar: Add DT support
-In-Reply-To: <1369136406-23800-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1369136406-23800-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CACRpkdb8GYpx3ASzXB7HX5oEpAUBe-yBo0N5Ep9S+DqoE6oCLw@mail.gmail.com>
+From: jagarwal@nvidia.com (Jay Agarwal)
+Date: Thu, 30 May 2013 23:07:57 +0530
+Subject: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
+In-Reply-To: <51A62042.7070304@wwwdotorg.org>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+ <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
+ <518A8596.7070702@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B616BE9B@BGMAIL01.nvidia.com>
+ <51A62042.7070304@wwwdotorg.org>
+Message-ID: <C79B248886DD134989C8FF6B096A91AB91B616BEA6@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 21, 2013 at 1:40 PM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
+> On 05/29/2013 04:10 AM, Jay Agarwal wrote:
+> >>>> So, if I apply this series, I do see the PCIe bridge and Ethernet
+> >>>> device get enumerated, but I don't see the USB3 controller get
+> >>>> enumerated. I believe that is a PCIe device behind the same bridge
+> >>>> on the
+> >>> same Tegra PCIe port.
+> >>>> Shouldn't this device show up?
+> >>> I have also reproduced this problem. I see somehow no non-
+> >>> prefetchable memory is assigned to any of pcie devices.
+> >>> Probably that is the reason for USB3 (pci 0000:04:00.0) not getting
+> >>> enumerated since it uses only non-prefetchable memory.
+> >>
+> >> 1. Bus4(on which usb3 device resides) always return 0xffffffff from
+> >> it's config space. which means device is not present?
+> >> 2. That's why it is not assigned any resources and hence no usb3
+> >> probe happens.
+> >> 3. But same bus does return valid info like vendor/device id etc from
+> >> it's config space in downstream kernel and hence usb3 probe does
+> happen.
+> >>
+> >> Thierry, Stephen,
+> >> 4. Any idea why bus4 should return 0xffffffff values in upstream kernel?
+> >> Anything missing?
+> >> 5. Also, how config space of all pcie devices are mapped? I mean if I
+> >> change the config space offset in dts file, then also I find correct
+> >> vendor/device id etc for bus0/device0/fun0.
+> >>     So how this mapping happens that even after changing the config
+> >> space offset in PCIe address space, it always finds correct vendor/device
+> id.
+> >
+> >  Any idea on this?
+> 
+> I did already reply the same day you sent the original email. My response
+> was:
+> 
+> Is there some reset/enable GPIO or regulator that needs to be programmed
+> to enable the PCIe USB3 controller? Take a look at the schematic. If you can
+> make it work by tweaking those GPIOs/... manually, then we can ignore this
+> issue and fix it up later, since it's not directly related to the PCIe controller
+> driver patches. It's more important to get the Ethernet working than USB, I
+> think.
+> 
+> To be honest though, I would expect you to be asking around inside NVIDIA
+> to determine the answer here. As the PCIe SW expert, I'd expect you to
+> drive this process. Try asking the Cardhu board and PCIe HW experts within
+> NVIDIA.
+> 
+> Did you make any progress on the issues with the Ethernet device?
 
-> Add DT bindings for the gpio-rcar driver and read the device
-> configuration from the DT node at probe time if available.
->
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-I am assuming this will go through Simon's tree?
-
-Note:
-
-> +  - gpio-ranges: Range of pins managed by the GPIO controller as a 4-cells
-> +    tuple using the following syntax.
-> +
-> +    <[phandle of the pin controller node]
-> +     0
-> +     [index of the first pin]
-> +     [number of pins]>
-> +
-> +Please refer to gpio.txt in this directory for details of the common GPIO
-> +bindings used by client devices.
-
-The above ranges are part of that document.
-
-Yours,
-Linus Walleij
+Stephen, 
+I have taken care of all your comments, but Ethernet device is not working for me neither on cardhu nor harmony. 
+Could be related to my process or board, Currently debugging this.
+Parallely, should I push my patches for review so that it is clear from other aspects?
+ 
