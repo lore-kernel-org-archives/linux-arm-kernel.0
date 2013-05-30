@@ -1,96 +1,20 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 May 2013 22:57:25 +0800
-Subject: [PATCH 2/2] ARM: imx6q: Mark VPU and IPU AXI transfers as
- cacheable, increase IPU priority
-In-Reply-To: <1369919399-24370-2-git-send-email-mpa@pengutronix.de>
-References: <1369919399-24370-1-git-send-email-mpa@pengutronix.de>
- <1369919399-24370-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20130530145703.GB22013@S2101-09.ap.freescale.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 May 2013 16:03:07 +0100
+Subject: [PATCH 00/14] Random LPAE-related patches
+In-Reply-To: <51A7549D.9000103@gmail.com>
+References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
+ <51A7549D.9000103@gmail.com>
+Message-ID: <20130530150307.GU7483@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 03:09:59PM +0200, Markus Pargmann wrote:
-> From: Philipp Zabel <p.zabel@pengutronix.de>
-> 
-> This is needed so that the IPU framebuffer scanout cannot be starved
-> by VPU or GPU activity.
-> The Freescale SabreLite and SabreSD boards seem to set this in the boot
-> rom already,
+On Thu, May 30, 2013 at 02:31:09PM +0100, Subash Patel wrote:
+> Thanks for these patches. I have tested these patches on exynos5440 
+> platform. It hasnt affected LPAE functionality for us from previous 
+> versions(posted by Cyril). You can use "Tested-By: Subash Patel 
+> <subash.rp@samsung.com>" as you deem necessary.
 
-The boot rom is not board specific but SoC, so you meant boot loader?
+Thanks Subash. I'll add your tag and send a pull to Russell when he's back
+from holiday.
 
-> but the documented register reset values do not contain
-> the necessary settings.
-> 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
->  arch/arm/mach-imx/mach-imx6q.c | 32 ++++++++++++++++++++++++++++++++
->  1 file changed, 32 insertions(+)
-> 
-> diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-> index 5536fd8..7bef242 100644
-> --- a/arch/arm/mach-imx/mach-imx6q.c
-> +++ b/arch/arm/mach-imx/mach-imx6q.c
-> @@ -29,6 +29,7 @@
->  #include <linux/regmap.h>
->  #include <linux/micrel_phy.h>
->  #include <linux/mfd/syscon.h>
-> +#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
->  #include <asm/hardware/cache-l2x0.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
-> @@ -161,6 +162,36 @@ static void __init imx6q_usb_init(void)
->  	imx_anatop_usb_chrg_detect_disable();
->  }
->  
-> +static void __init imx6q_gpr_init(void)
-> +{
-> +	struct regmap *gpr;
-> +
-> +	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
-> +	if (IS_ERR(gpr)) {
-> +		pr_warn("failed to find fsl,imx6q-iomuxc-gpr regmap\n");
-> +		return;
-> +	}
-> +
-> +	/* Enable the cacheable attribute of VPU and IPU AXI transactions */
-> +	regmap_update_bits(gpr, IOMUXC_GPR4, 0,
-> +			IMX6Q_GPR4_VPU_WR_CACHE_SEL |
-> +			IMX6Q_GPR4_VPU_RD_CACHE_SEL |
-> +			IMX6Q_GPR4_VPU_P_WR_CACHE_VAL |
-> +			IMX6Q_GPR4_VPU_P_RD_CACHE_VAL_MASK |
-> +			IMX6Q_GPR4_IPU_WR_CACHE_CTL |
-> +			IMX6Q_GPR4_IPU_RD_CACHE_CTL);
-> +
-> +	/* Increase IPU read QoS priority */
-> +	regmap_update_bits(gpr, IOMUXC_GPR6,
-> +			IMX6Q_GPR6_IPU1_ID00_RD_QOS_MASK |
-> +			IMX6Q_GPR6_IPU1_ID01_RD_QOS_MASK,
-> +			(0xf << 16) | (0x7 << 20));
-> +	regmap_update_bits(gpr, IOMUXC_GPR7,
-> +			IMX6Q_GPR7_IPU2_ID00_RD_QOS_MASK |
-> +			IMX6Q_GPR7_IPU2_ID01_RD_QOS_MASK,
-> +			(0xf << 16) | (0x7 << 20));
-> +}
-> +
->  static void __init imx6q_init_machine(void)
->  {
->  	if (of_machine_is_compatible("fsl,imx6q-sabrelite"))
-> @@ -172,6 +203,7 @@ static void __init imx6q_init_machine(void)
->  	imx6q_pm_init();
->  	imx6q_usb_init();
->  	imx6q_1588_init();
-> +	imx6q_gpr_init();
-
-The function imx6q_1588_init() is all about setting up some IOMUXC GPR
-bits, so can you consolidate it into imx6q_gpr_init()?
-
-Shawn
-
->  }
->  
->  #define OCOTP_CFG3			0x440
-> -- 
-> 1.8.2.1
-> 
+Will
