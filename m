@@ -1,50 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 May 2013 12:06:11 +0800
-Subject: [RFC 1/3] SPI: imx: Convert to devm_* API
-In-Reply-To: <1369885838.170762928@f286.mail.ru>
-References: <20130529144909.GT3660@sirena.org.uk>
- <1369847430-10799-1-git-send-email-shc_work@mail.ru>
- <20130530020524.GB1875@S2101-09.ap.freescale.net>
- <1369885838.170762928@f286.mail.ru>
-Message-ID: <20130530040609.GA2161@S2101-09.ap.freescale.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 29 May 2013 22:07:39 -0600
+Subject: [PATCH] ARM: bcm2835: override the HW UART periphid
+Message-ID: <1369886859-22114-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 07:50:38AM +0400, Alexander Shiyan wrote:
-> > On Wed, May 29, 2013 at 09:10:28PM +0400, Alexander Shiyan wrote:
-> > > Use devm_* functions for the driver.
-> > > This ensures more consistent error values and simplifies error paths.
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > ---
-> > >  drivers/spi/spi-imx.c | 79 ++++++++++++++-------------------------------------
-> > >  1 file changed, 21 insertions(+), 58 deletions(-)
-> > > 
-> > > diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> ...
-> > >  	master->dev.of_node = pdev->dev.of_node;
-> > >  	ret = spi_bitbang_start(&spi_imx->bitbang);
-> > 
-> > ---8<-----
-> > > -	if (ret) {
-> > > -		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
-> > > -		goto out_clk_put;
-> > > -	}
-> > > -
-> > > -	dev_info(&pdev->dev, "probed\n");
-> > > +	if (!ret)
-> > > +		return 0;
-> > >  
-> > > -	return ret;
-> > > +	dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
-> > >  
-> > > -out_clk_put:
-> > --->8------
-> > 
-> > I do not understand why above changes are necessary.
-> 
-> This just simplifies the error path and removes one "goto".
-> 
-Sorry, I do not get it and take this as a diff stat churn.
+From: Jongsung Kim <neidhard.kim@lge.com>
 
-Shawn
+Stephen Warren reported the recent commit 78506f2 (add support for
+extended FIFO-size of PL011-r1p5) breaks the serial port on the
+BCM2835 ARM SoC.
+
+A UART compatible with the ARM PL011-r1p5 should have 32-deep FIFOs.
+The BCM2835 UART just looks like an ARM PL011-r1p5, but has 16-deep
+FIFOs just like PL011-r1p4 or earlier revisions. As a workaround for
+this compatibility issue, this patch overrides the HW UART periphid
+register values with the actually compatible UART periphid 0x00241011
+(r1p3 or r1p4).
+
+Reported-by: Stephen Warren <swarren@wwwdotorg.org>
+Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
+Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+---
+This is a fix for v3.10-rc*.
+
+ arch/arm/boot/dts/bcm2835.dtsi |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/bcm2835.dtsi b/arch/arm/boot/dts/bcm2835.dtsi
+index f0052dc..1e12aef 100644
+--- a/arch/arm/boot/dts/bcm2835.dtsi
++++ b/arch/arm/boot/dts/bcm2835.dtsi
+@@ -44,6 +44,7 @@
+ 			reg = <0x7e201000 0x1000>;
+ 			interrupts = <2 25>;
+ 			clock-frequency = <3000000>;
++			arm,primecell-periphid = <0x00241011>;
+ 		};
+ 
+ 		gpio: gpio {
+-- 
+1.7.10.4
