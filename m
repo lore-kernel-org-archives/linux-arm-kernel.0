@@ -1,84 +1,43 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 31 May 2013 07:54:50 -0400
-Subject: [PATCH v5 12/13] ARM: kirkwood: remove redundant DT board files
-In-Reply-To: <87txlknluf.fsf@natisbad.org>
-References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369855975-21489-13-git-send-email-sebastian.hesselbarth@gmail.com>
- <8738t4q1kv.fsf@natisbad.org>
- <20130530193708.GC31290@titan.lakedaemon.net>
- <87txlknluf.fsf@natisbad.org>
-Message-ID: <20130531115450.GA3803@titan.lakedaemon.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 May 2013 13:55:56 +0200
+Subject: [PATCH 31/39] ARM: u300: add syscon node
+In-Reply-To: <14733989.vf3LkZC316@wuerfel>
+References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
+ <1369991954-17406-32-git-send-email-linus.walleij@stericsson.com>
+ <14733989.vf3LkZC316@wuerfel>
+Message-ID: <CACRpkdaPXLuyXWSrMipZs6L973-8C=iaeOWYZ_zCKCSZNn2cQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnaud,
+On Fri, May 31, 2013 at 12:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 31 May 2013 11:19:06 Linus Walleij wrote:
 
-On Fri, May 31, 2013 at 12:28:56AM +0200, Arnaud Ebalard wrote:
-> Hi,
-> 
-> Jason Cooper <jason@lakedaemon.net> writes:
-> 
-> >> For instance 6bd98481ab34 (arm: kirkwood: NETGEAR ReadyNAS Duo v2 init
-> >> PCIe via DT) currently sitting in jcooper/mvebu/pcie_kirkwood removes
-> >> the PCIE init routine in board-readynas.c, and yours remove ge00
-> >> init. With both applied, the whole file can go away.
-> >> 
-> >> AFAICT, this may be the case soon for:
-> >> 
-> >>  arch/arm/mach-kirkwood/board-iconnect.c   (36e5722089)
-> >>  arch/arm/mach-kirkwood/board-mplcec4.c    (9470fbfb8d)
-> >>  arch/arm/mach-kirkwood/board-nsa310.c     (40fa8e5da2)
-> >>  arch/arm/mach-kirkwood/board-readynas.c   (6bd98481ab)
-> >>  arch/arm/mach-kirkwood/board-ts219.c      (259e234608)
-> >
-> > Would you mind putting a patch together (for after v3.10 drops) to do
-> > this?  If you applied Sebastian's series on top of mvebu/pcie_kirkwood,
-> > that should get you almost there.  The last half of his series is going
-> > in after v3.10...
-> 
-> Something like the quick quilt-generated patch at the end of this email
-> (done after a dummy merge of Sebastian's set in mvebu/pcie_kirkwood)? 
+>>  compatible="stericsson,u300";
+>>
+>> +Required node: syscon
+>> +This contains the system controller.
+>> +- compatible: must be "stericsson,u300-syscon".
+>> +- reg: the base address and size of the system controller.
+>> +
+>
+> Any reason why you are not making it compatible with "syscon", to use
+> the drivers/mfd/syscon.c driver?
 
-yep.
+For the first lookup at irq_init() we cannot use it.
 
-> I will take a look at what remains after Sebastian's set hit one of
-> your branch but I guess he will have included most of what is in the
-> patch to help you with the merge.
-> 
-> Anyway, at the end here is what DT board files would remain:
-> 
-> $ ls -1 arch/arm/mach-kirkwood/board-*.c
-> arch/arm/mach-kirkwood/board-dnskw.c
+This is because that needs to be initialized at irq_init() time
+to set up the clocks, which are needed by the interrupt controller,
+it cannot use device matching, as the platform devices are not
+probed yet.
 
-This one seems to just be setting a gpio to enable reboot after power
-failure.  Should be simple to move to DT.
+However I can make it compatible for the board power snippet
+to make use of it for sure.
 
-> arch/arm/mach-kirkwood/board-dt.c
+But I find no good examples in the kernel on how to grab a
+referenced syscon node and use the regmap API to read/write
+registers :-(
 
-We obviously need this one. ;-)
+Dong: do you have some example to point at for this?
 
-> arch/arm/mach-kirkwood/board-lsxl.c
-
-This is taken care of in mvebu/boards
-
-  391a16c ARM: Kirkwood: Convert LSXL to restart-poweroff driver.
-
-> arch/arm/mach-kirkwood/board-ts219.c
-
-Also in mvebu/boards
-
-  4350a47 ARM: Kirkwood: Make use of the QNAP Power off driver.
-
-> Just one question though: the removal of MACH_*_DT in Kconfig removes
-> the automatic selection of useful board specific options like
-> ARM_APPENDED_DTB, ARM_ATAG_DTB_COMPAT, POWER_RESET_RESTART,
-> POWER_RESET_QNAP. Is that expected?
-
-I would select POWER_RESET_QNAP and POWER_RESET_RESTART in Kconfig for
-ARCH_KIRKWOOD_DT, and put ARM_APPENDED_DTB and ARM_ATAG_DTB_COMPAT into
-the defconfig.
-
-thx,
-
-Jason.
+Yours,
+Linus Walleij
