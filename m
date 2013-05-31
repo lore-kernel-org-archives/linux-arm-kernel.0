@@ -1,47 +1,69 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Fri, 31 May 2013 07:17:59 +0200
-Subject: [PATCH v2 0/5] Zynq: revised CCF code
-In-Reply-To: <20130530184443.4470.73215@quantum>
-References: <1368467199-8702-1-git-send-email-soren.brinkmann@xilinx.com>
- <51961F37.3030202@monstr.eu> <20130530184443.4470.73215@quantum>
-Message-ID: <51A83287.3010604@monstr.eu>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 31 May 2013 08:32:47 +0300
+Subject: [RFC PATCH 2/2] clocksource: dw_apb: allow build for
+ architectures other than arm
+In-Reply-To: <51A77A25.8080306@linaro.org>
+References: <1369570367-994-2-git-send-email-baruch@tkos.co.il>
+ <51A51271.2070506@linaro.org>
+ <20130530053233.GL25186@sapphire.tkos.co.il>
+ <51A77A25.8080306@linaro.org>
+Message-ID: <20130531053247.GX5037@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2013 08:44 PM, Mike Turquette wrote:
-> Quoting Michal Simek (2013-05-17 05:14:47)
->> Hi Mike,
->>
->> I have sent email to Greg to take this patch from this series
->> though his serial tree because it is unrelated to this clock stuff.
->>
->> Can you please give me your ACK for these patches or add them
->> to your CLK tree?
->>
+Hi John,
+
+On Thu, May 30, 2013 at 09:11:17AM -0700, John Stultz wrote:
+> On 05/29/2013 10:32 PM, Baruch Siach wrote:
+> >On Tue, May 28, 2013 at 01:24:17PM -0700, John Stultz wrote:
+> >>On 05/26/2013 05:12 AM, Baruch Siach wrote:
+> >>>  static const struct of_device_id osctimer_ids[] __initconst = {
+> >>>@@ -124,3 +135,10 @@ void __init dw_apb_timer_init(void)
+> >>>  	init_sched_clock();
+> >>>  }
+> >>>+
+> >>>+#ifndef CONFIG_HAVE_SETUP_SCHED_CLOCK
+> >>>+unsigned long long notrace sched_clock()
+> >>>+{
+> >>>+	return read_sched_clock() * sched_clock_mult;
+> >>>+}
+> >>>+#endif
+> >>Also, can you try to condense the number of #ifndef
+> >>CONFIG_HAVE_SETUP_SCHED_CLOCK checks to one, and consolidate the
+> >>needed functions all in that one conditional?
+> >Thanks for your comments. I'll rework the patch and resubmit.
+> >
+> >I've just noticed that I have a bigger problem. read_sched_clock() returns
+> >u32, not u64. This means that in a rate of, say, 100MHz it will wrap around
+> >after a little more than 40 seconds. Would it make sense to put ARM's 32 bin
+> >sched_clock extension code (arch/arm/kernel/sched_clock.c) is a common place
+> >(maybe drivers/clocksource), and use that? There seems to be nothing ARM
+> >specific in this code, after all.
 > 
-> For the four clock-related patches:
+> Yea, working out an actual generic sched_clock implementation is
+> something I'd like to see done.
 > 
-> Acked-by: Mike Turquette <mturquette@linaro.org>
+> Though I'd really rather we not toss yet another chunk of
+> infrastructure in the drivers/clocksource directory. Instead we
+> should probably have a kernel/time/sched_clock.c.
+> 
+> Then its just the issue of tying that and the clocksource code
+> together so you just register existing capable clocksources with a
+> SCHED_CLOCK flag or via a different registration hook.
+> 
+> I don't think it will be an easy job, but if you want to give it a
+> shot, I'd be quite interested in reviewing the patches!
 
-I have already sent pull request to Arnd and Olof.
-Or is it you who should take these patches through your tree?
+Although I'd very much like to contribute in this area, I'm afraid I don't 
+have time for this now. My problem is much narrower in scope, though, and I 
+think it can be solved without a generic sched_clock implementation at first 
+step. All I want is to use a 32 bit counter for sched_clock. The code enabling 
+this is currently only available for ARM (arch/arm/kernel/sched_clock.c). 
+Should this part of the code move to kernel/time/sched_clock.c?
 
-Thanks.
-Michal
-
+baruch
 
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130531/7746093e/attachment.sig>
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
