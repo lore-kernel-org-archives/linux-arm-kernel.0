@@ -1,29 +1,26 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 May 2013 16:09:06 +0100
-Subject: [PATCH] ARM: ux500: Enable HIGHMEM in the u8540 defconfig
-Message-ID: <1370012946-7374-1-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 17:11:59 +0200
+Subject: [PATCH 1/2] ARM: shmobile: sdhi: pass DMA filter from platform
+ code
+In-Reply-To: <alpine.DEB.2.00.1305311611460.7395@axis700.grange>
+References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
+ <alpine.DEB.2.00.1305311611460.7395@axis700.grange>
+Message-ID: <2862988.jnTv0iSQcj@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to utilise all of the memory located on ux500 based devices
-we have to enable HIGHMEM. Without it the kernel truncates memory down
-to what's left after the PAGE_OFFSET has been applied, which doesn't
-leave an awful lot, especially if we're running large rootfs' such
-as full Linux desktop distributions or Android.
+On Friday 31 May 2013 16:52:13 Guennadi Liakhovetski wrote:
+> 
+> Thanks for the patches. How about this fix:
+> 
+> http://thread.gmane.org/gmane.linux.kernel.mmc/20619
+> 
+> I think it's a better fix. SHDMA users cannot use other DMA drivers, so, I 
+> don't think we need to pass the filter via the platform data.
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/u8500_defconfig |    1 +
- 1 file changed, 1 insertion(+)
+I think it's more a matter of using the API correctly. The dmaengine
+API is an abstraction to separate the slave driver from the master
+through well-defined calls. If you make additional assumptions
+in the slave driver about the master, that is a layering violation.
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 2d322d2..38d633a 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_HIGHMEM=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
--- 
-1.7.10.4
+	Arnd
