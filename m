@@ -1,57 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 22:59:44 +0200
-Subject: [PATCH] clocksource: kona: adapt to CLOCKSOURCE_OF_DECLARE change
-Message-ID: <3174210.ZivUajNGev@wuerfel>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Fri, 31 May 2013 14:10:05 -0700
+Subject: [BUG] zynq | CCF | SRCU
+In-Reply-To: <20130531195235.21525.64931@quantum>
+References: <42b8bfd5-3012-4c49-b9ef-7a9beb5956f1@VA3EHSMHS041.ehs.local>
+ <20130531195235.21525.64931@quantum>
+Message-ID: <09ee3179-5100-4c7c-bf3d-0a659a3e7633@DB8EHSMHS026.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CLOCKSOURCE_OF_DECLARE functions now take a device_node pointer
-as their argument, as of the clksrc/cleanup branch in arm-soc.
-This patch adapts the bcm_kona_timer driver to the new interface.
+Hi Mike,
 
-This causes an annoying but harmless build-time warning, it would
-be nice to have this fixed in 3.10.
+On Fri, May 31, 2013 at 12:52:35PM -0700, Mike Turquette wrote:
+> Quoting S?ren Brinkmann (2013-05-31 12:12:07)
+> > Hi,
+> > 
+> > we recently encountered some kernel panics when we compiled one of our
+> > drivers as module and tested inserting/removing the module.
+> > Trying to debug this issue, I could reproduce it on the mainline kernel
+> > with a dummy module.
+> > 
+> > What happens is, that when on driver remove clk_notifier_unregister() is
+> > called and no other notifier for that clock is registered, the kernel
+> > panics.
+> > I'm not sure what is going wrong here. If there is a bug (and if where)
+> > or I'm just using the infrastructure the wrong way,... So, any hint is
+> > appreciated.
+> > 
+> > I attach the output from the crashing system. The stacktrace indicates a
+> > crash in 'srcu_readers_seq_idx()'.
+> > I also attach the module I used to trigger the issue and a patch on top
+> > of mainline commit a93cb29acaa8f75618c3f202d1cf43c231984644 which has
+> > the DT modifications I need to make the module find its clock and boot
+> > with my initramfs.
+> > 
+> 
+> Soren,
+> 
+> I only took a quick look at this so the following is a shot in the dark.
+> notifier_block->next should be protected by an RCU lock, and the way you
+> open-code the initialization struck me as a bit weird.  Can you change
+> your code to the following and let me know if it makes any difference?
+> 
+> static struct notifier_block nb = {
+>         .notifier_call = clk_notif_dbg_cb;
+> };
+> 
+> static int clk_notif_dbg_cb(struct notifier_block *nb,
+>                 unsigned long event, void *data)
+> {
+>         pr_info("clk_notif_dbg_cb\n");
+> 
+>         return NOTIFY_OK;
+> }
+> 
+> static int clk_notif_dbg_probe(struct platform_device *pdev)
+> {
+>         ...
+>         if (clk_notifier_register(clk, &nb))
+>                 dev_warn(&pdev->dev, "clk_notifier_register failed\n");
+>         ...
+> 
+> 
+> That is a small difference, but that style of initializing the
+> notifier_block has always worked for me when using clk rate-change
+> notifiers.  However I'm sure the bug you mention is far more evil and
+> nefarious than that ;-)
+I changed the module like this (I hope this is what you suggested):
+	8,9d7
+	< static struct notifier_block nb;
+	< 
+	17a16,19
+	> static struct notifier_block nb = {
+	>       .notifier_call = clk_notif_dbg_cb
+	> };
+	> 
+	20,22d21
+	<       nb.next = NULL;
+	<       nb.notifier_call = clk_notif_dbg_cb;
+	<
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Christian Daudt <csd@broadcom.com>
-Cc: John Stultz <john.stultz@linaro.org>
----
-diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-index 350f493..ba3d859 100644
---- a/drivers/clocksource/bcm_kona_timer.c
-+++ b/drivers/clocksource/bcm_kona_timer.c
-@@ -103,16 +103,10 @@ static const struct of_device_id bcm_timer_ids[] __initconst = {
- 	{},
- };
- 
--static void __init kona_timers_init(void)
-+static void __init kona_timers_init(struct device_node *node)
- {
--	struct device_node *node;
- 	u32 freq;
- 
--	node = of_find_matching_node(NULL, bcm_timer_ids);
--
--	if (!node)
--		panic("No timer");
--
- 	if (!of_property_read_u32(node, "clock-frequency", &freq))
- 		arch_timer_rate = freq;
- 	else
-@@ -199,13 +193,12 @@ static struct irqaction kona_timer_irq = {
- 	.handler = kona_timer_interrupt,
- };
- 
--static void __init kona_timer_init(void)
-+static void __init kona_timer_init(struct device_node *node)
- {
--	kona_timers_init();
-+	kona_timers_init(node);
- 	kona_timer_clockevents_init();
- 	setup_irq(timers.tmr_irq, &kona_timer_irq);
- 	kona_timer_set_next_event((arch_timer_rate / HZ), NULL);
- }
- 
--CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer",
--	kona_timer_init);
-+CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer", kona_timer_init);
+The result is the same. It crashes in srcu_readers_seq_idx().
+
+	Thanks,
+	S?ren
