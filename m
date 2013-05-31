@@ -1,44 +1,53 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat,  1 Jun 2013 00:22:39 +0200
-Subject: [PATCH 02/15] mtd: omap2: allow bulding as a module
+Date: Sat,  1 Jun 2013 00:22:48 +0200
+Subject: [PATCH 11/15] iwlegacy: il_pm_ops is only provided for PM_SLEEP
 In-Reply-To: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
 References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
-Message-ID: <1370038972-2318779-3-git-send-email-arnd@arndb.de>
+Message-ID: <1370038972-2318779-12-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The omap2 nand device driver calls into the the elm code, which can
-be a loadable module, and in that case it cannot be built-in itself.
-I can see no reason why the omap2 driver cannot also be a module,
-so let's make the option "tristate" in Kconfig to fix this allmodconfig
-build error:
+This makes sure the conditionals for the declaration match the
+definition, so we provide the alternative
 
-ERROR: "elm_config" [drivers/mtd/nand/omap2.ko] undefined!
-ERROR: "elm_decode_bch_error_page" [drivers/mtd/nand/omap2.ko] undefined!
+ #else
+ #define IL_LEGACY_PM_OPS NULL
+ #endif
 
+in the correct cases. As suggested by Borislav Petkov, this removes
+the comments for the #else and #endif lines.
+
+drivers/built-in.o:(.data+0x57974): undefined reference to `il_pm_ops'
+
+Cc: Johannes Berg <johannes.berg@intel.com>
+Cc: John W. Linville <linville@tuxdriver.com>
+Cc: Borislav Petkov <bp@alien8.de>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Tony Lindgren <tony@atomide.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: Afzal Mohammed <afzal@ti.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: linux-mtd at lists.infradead.org
 ---
- drivers/mtd/nand/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/wireless/iwlegacy/common.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
-index 3ae9105..5ef8f5e 100644
---- a/drivers/mtd/nand/Kconfig
-+++ b/drivers/mtd/nand/Kconfig
-@@ -95,7 +95,7 @@ config MTD_NAND_OMAP2
+diff --git a/drivers/net/wireless/iwlegacy/common.h b/drivers/net/wireless/iwlegacy/common.h
+index f8246f2..30dda98 100644
+--- a/drivers/net/wireless/iwlegacy/common.h
++++ b/drivers/net/wireless/iwlegacy/common.h
+@@ -1832,14 +1832,14 @@ u32 il_usecs_to_beacons(struct il_priv *il, u32 usec, u32 beacon_interval);
+ __le32 il_add_beacon_time(struct il_priv *il, u32 base, u32 addon,
+ 			  u32 beacon_interval);
  
- config MTD_NAND_OMAP_BCH
- 	depends on MTD_NAND && MTD_NAND_OMAP2 && ARCH_OMAP3
--	bool "Enable support for hardware BCH error correction"
-+	tristate "Enable support for hardware BCH error correction"
- 	default n
- 	select BCH
- 	select BCH_CONST_PARAMS
+-#ifdef CONFIG_PM
++#ifdef CONFIG_PM_SLEEP
+ extern const struct dev_pm_ops il_pm_ops;
+ 
+ #define IL_LEGACY_PM_OPS	(&il_pm_ops)
+ 
+-#else /* !CONFIG_PM */
++#else
+ 
+-#define IL_LEGACY_PM_OPS	NULL
++#define
+ 
+ #endif /* !CONFIG_PM */
+ 
 -- 
 1.8.1.2
