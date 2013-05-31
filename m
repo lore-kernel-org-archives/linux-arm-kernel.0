@@ -1,118 +1,30 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 31 May 2013 16:06:42 +0200
-Subject: [PATCH v7] ARM: dts: omap4-panda: Update the LED support for
- the panda DTS
-In-Reply-To: <1369826427-31963-1-git-send-email-dmurphy@ti.com>
-References: <1369826427-31963-1-git-send-email-dmurphy@ti.com>
-Message-ID: <51A8AE72.5010601@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 31 May 2013 10:07:35 -0400 (EDT)
+Subject: [PATCH V2 1/2] USB: OHCI: make ohci-platform a separate driver
+In-Reply-To: <51a892db.3077420a.5699.0f88@mx.google.com>
+Message-ID: <Pine.LNX.4.44L0.1305311005520.1276-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+On Fri, 31 May 2013 manjunath.goudar at linaro.org wrote:
 
-On 05/29/2013 01:20 PM, Dan Murphy wrote:
-> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
-> are different.
+> From: Manjunath Goudar <manjunath.goudar@linaro.org>
 > 
-> A1-A3 = gpio_wk7clean
-> ES = gpio_110
+> This patch splits the ohci-platform code from ohci-hcd out
+> into its own separate driver module.This work is part of enabling
+> multi-platform kernels on ARM.
 > 
-> There is no change to LED D2
-> 
-> Abstract away the pinmux and the LED definitions for the two boards into
-> the respective DTS files.
-> 
-> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> In V2:
+>   -Passed "hcd" argment instead of "ohci" in ohci_setup() because it is
+>    using "struct usb_hcd" argment.
 
-That patch was good... until Florian introduces some new constant to
-improve the readability of the DTS [1].
+> @@ -30,58 +42,17 @@ static int ohci_platform_reset(struct usb_hcd *hcd)
 
-Could you rebase on the lastest for_3.11/dts and use the macros for the
-GPIO and pinctrl nodes?
+...
 
-Thanks,
-Benoit
+> +	return ohci_setup(ohci_to_hcd(ohci));
 
-[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg89684.html
+You don't need to use ohci_to_hcd(), because the hcd value is already a 
+parameter in this function.
 
-> ---
-> v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
-> v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
-> v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
-> 
->  arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
->  arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
->  2 files changed, 43 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> index 03bd60d..5fd59b3 100644
-> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-> @@ -16,8 +16,13 @@
->  		reg = <0x80000000 0x40000000>; /* 1 GB */
->  	};
->  
-> -	leds {
-> +	leds: leds {
->  		compatible = "gpio-leds";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <
-> +			&led_wkgpio_pins
-> +		>;
-> +
->  		heartbeat {
->  			label = "pandaboard::status1";
->  			gpios = <&gpio1 7 0>;
-> @@ -137,6 +142,15 @@
->  	};
->  };
->  
-> +&omap4_pmx_wkup {
-> +	led_wkgpio_pins: pinmux_leds_wkpins {
-> +		pinctrl-single,pins = <
-> +			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
-> +			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
-> +		>;
-> +	};
-> +};
-> +
->  &i2c1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&i2c1_pins>;
-> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-> index f1d8c21..c968a3b 100644
-> --- a/arch/arm/boot/dts/omap4-panda-es.dts
-> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
-> @@ -34,3 +34,31 @@
->  		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
->  		>;
->  };
-> +
-> +&omap4_pmx_core {
-> +	led_gpio_pins: gpio_led_pmx {
-> +		pinctrl-single,pins = <
-> +			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
-> +		>;
-> +	};
-> +};
-> +
-> +&led_wkgpio_pins {
-> +	pinctrl-single,pins = <
-> +		0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
-> +	>;
-> +};
-> +
-> +&leds {
-> +	pinctrl-0 = <
-> +		&led_gpio_pins
-> +		&led_wkgpio_pins
-> +	>;
-> +
-> +	heartbeat {
-> +		gpios = <&gpio4 14 0>;
-> +	};
-> +	mmc {
-> +		gpios = <&gpio1 8 0>;
-> +	};
-> +};
-> 
+Alan Stern
