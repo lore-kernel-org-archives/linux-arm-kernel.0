@@ -1,64 +1,58 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 May 2013 13:26:31 +0200
-Subject: [PATCH 02/39] ARM: u300: device tree support for the timer
-In-Reply-To: <7742928.6bJiIVUE0X@wuerfel>
-References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
- <1369991954-17406-3-git-send-email-linus.walleij@stericsson.com>
- <7742928.6bJiIVUE0X@wuerfel>
-Message-ID: <CACRpkdZYsnUhjYO_U4L56TMY+fs+ZU9zk3zLWnjPtf8Bmmn0YQ@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 31 May 2013 19:30:38 +0800
+Subject: A bug about system call on ARM
+In-Reply-To: <20130531111305.GI4928@mudshark.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
+ <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+ <20130529094826.GD13095@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
+ <20130530090949.GC7483@mudshark.cambridge.arm.com>
+ <20130530114112.GH7483@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
+ <20130531084638.GB4928@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
+ <20130531111305.GI4928@mudshark.cambridge.arm.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 12:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 31 May 2013 11:18:37 Linus Walleij wrote:
+Hi Will,
 
->> +void __init u300_timer_init()
->> +{
->> +       u300_timer_setup(U300_TIMER_APP_VBASE, IRQ_U300_TIMER_APP_GP1);
->> +}
->> +
->> +#ifdef CONFIG_OF
->> +
->> +static void __init u300_timer_init_of(struct device_node *np)
->> +{
->> +       void __iomem *base;
->> +       struct resource irq_res;
->> +       int irq;
->> +
->> +       base = of_iomap(np, 0);
->> +       /* Get the IRQ for the GP1 timer */
->> +       irq = of_irq_to_resource(np, 2, &irq_res);
->> +       u300_timer_setup(base, irq);
->> +}
->> +
->> +CLOCKSOURCE_OF_DECLARE(u300_timer, "stericsson,u300-apptimer",
->> +                      u300_timer_init_of);
->> +
->> +#endif
->
-> You should not need the CONFIG_OF #ifdef, since the CLOCKSOURCE_OF_DECLARE
-> macro is designed to let the function get dropped by the compiler when
-> that is not set.
->
-> You might want a CONFIG_ATAGS check for the other function though.
+I see,
+I will make one more test .
 
-Both the other function and the #ifdef CONFIG_OF are deleted in
-patch 21. Is this OK?
+Thanks for your clarification .
 
->> diff --git a/arch/arm/mach-u300/timer.h b/arch/arm/mach-u300/timer.h
->> index d34287b..7766dfa 100644
->> --- a/arch/arm/mach-u300/timer.h
->> +++ b/arch/arm/mach-u300/timer.h
->> @@ -1 +1,2 @@
->>  extern void u300_timer_init(void);
->> +
->
-> You probably didn't mean to include this newline.
+-----Original Message-----
+From: Will Deacon [mailto:will.deacon at arm.com] 
+Sent: Friday, May 31, 2013 7:13 PM
+To: Wang, Yalin
+Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
+Subject: Re: A bug about system call on ARM
 
-This entire file is also deleted in patch 21.
+On Fri, May 31, 2013 at 12:02:49PM +0100, Wang, Yalin wrote:
+> Hi  Will,
+> 
+> I have merge your code ,
+> But there is a different ,
+> 
+> +	
+> +	ct_user_exit
 
-I can fix it up if you absolutely want to but it feels like
-something of an academic exercise.
+I thought you didn't have ct_user_exit? In which case, just delete this line.
 
-Yours,
-Linus Walleij
+> +#ifdef CONFIG_ALIGNMENT_TRAP
+> +	ldr	ip, __cr_alignment
+> +	ldr	ip, [ip]
+> +	mcr	p15, 0, ip, c1, c0		@ update control register
+> +#endif
+> 
+> +	enable_irq
+> +	get_thread_info tsk
+
+Hard to tell without context. You can take a look at my git tree if you like (I fixed it up based on Nico's comment):
+
+  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=misc-patches
+
+Will
