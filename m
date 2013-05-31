@@ -1,112 +1,78 @@
-From: vikas.sajjan@linaro.org (Vikas Sajjan)
-Date: Fri, 31 May 2013 18:01:36 +0530
-Subject: [PATCH v3 6/6] clk: samsung: Add EPLL and VPLL freq table for
- exynos5250 SoC
-In-Reply-To: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
-References: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <1370003496-19288-7-git-send-email-vikas.sajjan@linaro.org>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Fri, 31 May 2013 14:32:58 +0200
+Subject: [PATCH v4 4/5] ARM: dts: OMAP2+: Header file for pinctrl constants
+In-Reply-To: <1370003579-30219-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1370003579-30219-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1370003579-30219-5-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds the EPLL and VPLL freq table for exynos5250 SoC.
+Most of the constants are taken from arch/arm/mach-omap2/mux.h.
+Define some others for the PIN_OUTPUT_* flavours.
 
-Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Reviewed-by: Stephen Warren <swarren@nvidia.com>
 ---
- drivers/clk/samsung/clk-exynos5250.c |   48 +++++++++++++++++++++++++++++++---
- drivers/clk/samsung/clk.h            |    2 ++
- 2 files changed, 47 insertions(+), 3 deletions(-)
+ include/dt-bindings/pinctrl/omap.h |   50 ++++++++++++++++++++++++++++++++++++
+ 1 files changed, 50 insertions(+), 0 deletions(-)
+ create mode 100644 include/dt-bindings/pinctrl/omap.h
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index b0e6680..0566421 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -473,11 +473,32 @@ static __initdata struct of_device_id ext_clk_match[] = {
- 	{ },
- };
- 
-+static const struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_36XX_RATE(rate, m, p, s, k) */
-+	PLL_36XX_RATE(266000000, 266, 3, 3, 0),
-+	PLL_36XX_RATE(70500000, 94, 2, 4, 0),
-+};
+diff --git a/include/dt-bindings/pinctrl/omap.h b/include/dt-bindings/pinctrl/omap.h
+new file mode 100644
+index 0000000..370df3f
+--- /dev/null
++++ b/include/dt-bindings/pinctrl/omap.h
+@@ -0,0 +1,50 @@
++/*
++ * This header provides constants for OMAP pinctrl bindings.
++ *
++ * Copyright (C) 2009 Nokia
++ * Copyright (C) 2009-2010 Texas Instruments
++ */
 +
-+static const struct samsung_pll_rate_table epll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_36XX_RATE(rate, m, p, s, k) */
-+	PLL_36XX_RATE(192000000, 48, 3, 1, 0),
-+	PLL_36XX_RATE(180633600, 45, 3, 1, 10381),
-+	PLL_36XX_RATE(180000000, 45, 3, 1, 0),
-+	PLL_36XX_RATE(73728000, 73, 3, 3, 47710),
-+	PLL_36XX_RATE(67737600, 90, 4, 3, 20762),
-+	PLL_36XX_RATE(49152000, 49, 3, 3, 9962),
-+	PLL_36XX_RATE(45158400, 45, 3, 3, 10381),
-+	PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
-+};
++/* 34xx mux mode options for each pin. See TRM for options */
++#define MUX_MODE0	0
++#define MUX_MODE1	1
++#define MUX_MODE2	2
++#define MUX_MODE3	3
++#define MUX_MODE4	4
++#define MUX_MODE5	5
++#define MUX_MODE6	6
++#define MUX_MODE7	7
 +
- /* register exynox5250 clocks */
- void __init exynos5250_clk_init(struct device_node *np)
- {
- 	void __iomem *reg_base;
- 	struct clk *apll, *mpll, *epll, *vpll, *bpll, *gpll, *cpll;
-+	unsigned long fin_pll_rate, mout_vpllsrc_rate;
- 
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -497,6 +518,9 @@ void __init exynos5250_clk_init(struct device_node *np)
- 	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
- 			ARRAY_SIZE(exynos5250_pll_pmux_clks));
- 
-+	fin_pll_rate = _get_rate("fin_pll");
-+	mout_vpllsrc_rate = _get_rate("mout_vpllsrc");
++/* 24xx/34xx mux bit defines */
++#define PULL_ENA		(1 << 3)
++#define PULL_UP			(1 << 4)
++#define ALTELECTRICALSEL	(1 << 5)
 +
- 	apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
- 			reg_base, NULL, 0);
- 	mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
-@@ -507,10 +531,28 @@ void __init exynos5250_clk_init(struct device_node *np)
- 			reg_base + 0x10050, NULL, 0);
- 	cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
- 			reg_base + 0x10020, NULL, 0);
--	epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
--			reg_base + 0x10030, NULL, 0);
--	vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
++/* 34xx specific mux bit defines */
++#define INPUT_EN		(1 << 8)
++#define OFF_EN			(1 << 9)
++#define OFFOUT_EN		(1 << 10)
++#define OFFOUT_VAL		(1 << 11)
++#define OFF_PULL_EN		(1 << 12)
++#define OFF_PULL_UP		(1 << 13)
++#define WAKEUP_EN		(1 << 14)
 +
-+	if (fin_pll_rate == (24 * MHZ)) {
-+		epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-+				reg_base + 0x10030, epll_24mhz_tbl,
-+				ARRAY_SIZE(epll_24mhz_tbl));
-+	} else {
-+		pr_warn("Exynos5250: valid epll rate_table missing for\n"
-+			"parent fin_pll:%lu hz\n", fin_pll_rate);
-+		epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-+				reg_base + 0x10030, NULL, 0);
-+	}
++/* 44xx specific mux bit defines */
++#define WAKEUP_EVENT		(1 << 15)
 +
-+	if (mout_vpllsrc_rate == (24 * MHZ)) {
-+		vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc"
-+			, reg_base + 0x10040, vpll_24mhz_tbl,
-+			ARRAY_SIZE(vpll_24mhz_tbl));
-+	} else {
-+		pr_warn("Exynos5250: valid vpll rate_table missing for\n"
-+			"parent mout_vpllsrc_rate:%lu hz\n", mout_vpllsrc_rate);
-+		samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
- 			reg_base + 0x10040, NULL, 0);
-+	}
- 
- 	samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
- 			ARRAY_SIZE(exynos5250_fixed_rate_clks));
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index e4ad6ea..c997649 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -20,6 +20,8 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
- 
-+#define MHZ (1000*1000)
++/* Active pin states */
++#define PIN_OUTPUT		0
++#define PIN_OUTPUT_PULLUP	(PIN_OUTPUT | PULL_ENA | PULL_UP)
++#define PIN_OUTPUT_PULLDOWN	(PIN_OUTPUT | PULL_ENA)
++#define PIN_INPUT		INPUT_EN
++#define PIN_INPUT_PULLUP	(PULL_ENA | INPUT_EN | PULL_UP)
++#define PIN_INPUT_PULLDOWN	(PULL_ENA | INPUT_EN)
 +
- /**
-  * struct samsung_clock_alias: information about mux clock
-  * @id: platform specific id of the clock.
++/* Off mode states */
++#define PIN_OFF_NONE		0
++#define PIN_OFF_OUTPUT_HIGH	(OFF_EN | OFFOUT_EN | OFFOUT_VAL)
++#define PIN_OFF_OUTPUT_LOW	(OFF_EN | OFFOUT_EN)
++#define PIN_OFF_INPUT_PULLUP	(OFF_EN | OFF_PULL_EN | OFF_PULL_UP)
++#define PIN_OFF_INPUT_PULLDOWN	(OFF_EN | OFF_PULL_EN)
++#define PIN_OFF_WAKEUPENABLE	WAKEUP_EN
++
 -- 
-1.7.9.5
+1.7.5.4
