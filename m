@@ -1,112 +1,59 @@
 From: vikas.sajjan@linaro.org (Vikas Sajjan)
-Date: Fri, 31 May 2013 18:01:34 +0530
-Subject: [PATCH v3 4/6] clk: samsung: Add set_rate() clk_ops for PLL36xx
+Date: Fri, 31 May 2013 18:01:35 +0530
+Subject: [PATCH v3 5/6] clk: samsung: Add alias for mout_vpllsrc and reorder
+ MUX registration for it
 In-Reply-To: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
 References: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <1370003496-19288-5-git-send-email-vikas.sajjan@linaro.org>
+Message-ID: <1370003496-19288-6-git-send-email-vikas.sajjan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds set_rate and round_rate clk_ops for PLL36xx
+While trying to get rate of "mout_vpllsrc" MUX (parent) for registering the
+"fout_vpll" (child), we found get rate was failing.
 
-Reviewed-by: Doug Anderson <dianders@chromium.org>
+So this patch moves the mout_vpllsrc MUX out of the existing common list
+and registers the mout_vpllsrc MUX before the PLL registrations.
+Its also adds the alias for the mout_vpllsrc MUX.
+
 Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
+Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
 ---
- drivers/clk/samsung/clk-pll.c |   59 +++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+ drivers/clk/samsung/clk-exynos5250.c |    9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
-index 9591560..7143ed89 100644
---- a/drivers/clk/samsung/clk-pll.c
-+++ b/drivers/clk/samsung/clk-pll.c
-@@ -210,6 +210,9 @@ struct clk * __init samsung_clk_register_pll35xx(const char *name,
- #define PLL36XX_CON0_OFFSET	(0x100)
- #define PLL36XX_CON1_OFFSET	(0x104)
- 
-+/* Maximum lock time can be 3000 * PDIV cycles */
-+#define PLL36XX_LOCK_FACTOR	(3000)
-+
- #define PLL36XX_KDIV_MASK	(0xFFFF)
- #define PLL36XX_MDIV_MASK	(0x1FF)
- #define PLL36XX_PDIV_MASK	(0x3F)
-@@ -217,6 +220,8 @@ struct clk * __init samsung_clk_register_pll35xx(const char *name,
- #define PLL36XX_MDIV_SHIFT	(16)
- #define PLL36XX_PDIV_SHIFT	(8)
- #define PLL36XX_SDIV_SHIFT	(0)
-+#define PLL36XX_KDIV_SHIFT	(0)
-+#define PLL36XX_LOCK_STAT_SHIFT	(29)
- 
- static unsigned long samsung_pll36xx_recalc_rate(struct clk_hw *hw,
- 				unsigned long parent_rate)
-@@ -239,8 +244,57 @@ static unsigned long samsung_pll36xx_recalc_rate(struct clk_hw *hw,
- 	return (unsigned long)fvco;
- }
- 
-+static int samsung_pll36xx_set_rate(struct clk_hw *hw, unsigned long drate,
-+					unsigned long parent_rate)
-+{
-+	struct samsung_clk_pll *pll = to_clk_pll(hw);
-+	u32 tmp, pll_con0, pll_con1;
-+	const struct samsung_pll_rate_table *rate;
-+
-+	rate = samsung_get_pll_settings(pll, drate);
-+	if (!rate) {
-+		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
-+			drate, __clk_get_name(hw->clk));
-+		return -EINVAL;
-+	}
-+
-+	pll_con0 = pll_readl(pll, PLL36XX_CON0_OFFSET);
-+	pll_con1 = pll_readl(pll, PLL36XX_CON1_OFFSET);
-+
-+	/* Set PLL lock time. */
-+	pll_writel(pll, (rate->pdiv * PLL36XX_LOCK_FACTOR),
-+			PLL36XX_LOCK_OFFSET);
-+
-+	 /* Change PLL PMS values */
-+	pll_con0 &= ~((PLL36XX_MDIV_MASK << PLL36XX_MDIV_SHIFT) |
-+			(PLL36XX_PDIV_MASK << PLL36XX_PDIV_SHIFT) |
-+			(PLL36XX_SDIV_MASK << PLL36XX_SDIV_SHIFT));
-+	pll_con0 |= (rate->mdiv << PLL36XX_MDIV_SHIFT) |
-+			(rate->pdiv << PLL36XX_PDIV_SHIFT) |
-+			(rate->sdiv << PLL36XX_SDIV_SHIFT);
-+	pll_writel(pll, pll_con0, PLL36XX_CON0_OFFSET);
-+
-+	pll_con1 &= ~(PLL36XX_KDIV_MASK << PLL36XX_KDIV_SHIFT);
-+	pll_con1 |= rate->kdiv << PLL36XX_KDIV_SHIFT;
-+	pll_writel(pll, pll_con1, PLL36XX_CON1_OFFSET);
-+
-+	/* wait_lock_time */
-+	do {
-+		cpu_relax();
-+		tmp = pll_readl(pll, PLL36XX_CON0_OFFSET);
-+	} while (!(tmp & (1 << PLL36XX_LOCK_STAT_SHIFT)));
-+
-+	return 0;
-+}
-+
- static const struct clk_ops samsung_pll36xx_clk_ops = {
- 	.recalc_rate = samsung_pll36xx_recalc_rate,
-+	.set_rate = samsung_pll36xx_set_rate,
-+	.round_rate = samsung_pll_round_rate,
-+};
-+
-+static const struct clk_ops samsung_pll36xx_clk_min_ops = {
-+	.recalc_rate = samsung_pll36xx_recalc_rate,
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index ddf10ca..b0e6680 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -207,6 +207,11 @@ struct samsung_fixed_factor_clock exynos5250_fixed_factor_clks[] __initdata = {
+ 	FFACTOR(none, "fout_bplldiv2", "fout_bpll", 1, 2, 0),
  };
  
- struct clk * __init samsung_clk_register_pll36xx(const char *name,
-@@ -264,6 +318,11 @@ struct clk * __init samsung_clk_register_pll36xx(const char *name,
- 	init.parent_names = &pname;
- 	init.num_parents = 1;
- 
-+	if (rate_table && rate_count)
-+		init.ops = &samsung_pll36xx_clk_ops;
-+	else
-+		init.ops = &samsung_pll36xx_clk_min_ops;
++struct samsung_mux_clock exynos5250_pll_pmux_clks[] __initdata = {
++	MUX_A(none, "mout_vpllsrc", mout_vpllsrc_p, SRC_TOP2, 0, 1,
++			"mout_vpllsrc"),
++};
 +
- 	pll->hw.init = &init;
- 	pll->base = base;
- 	pll->rate_table = rate_table;
+ struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+ 	MUX(none, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
+ 	MUX(none, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
+@@ -214,7 +219,6 @@ struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
+ 	MUX(none, "sclk_mpll", mout_mpll_p, SRC_CORE1, 8, 1),
+ 	MUX(none, "mout_bpll_fout", mout_bpll_fout_p, PLL_DIV2_SEL, 0, 1),
+ 	MUX(none, "sclk_bpll", mout_bpll_p, SRC_CDREX, 0, 1),
+-	MUX(none, "mout_vpllsrc", mout_vpllsrc_p, SRC_TOP2, 0, 1),
+ 	MUX(none, "sclk_vpll", mout_vpll_p, SRC_TOP2, 16, 1),
+ 	MUX(none, "sclk_epll", mout_epll_p, SRC_TOP2, 12, 1),
+ 	MUX(none, "sclk_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
+@@ -490,6 +494,9 @@ void __init exynos5250_clk_init(struct device_node *np)
+ 			ARRAY_SIZE(exynos5250_fixed_rate_ext_clks),
+ 			ext_clk_match);
+ 
++	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
++			ARRAY_SIZE(exynos5250_pll_pmux_clks));
++
+ 	apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
+ 			reg_base, NULL, 0);
+ 	mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
 -- 
 1.7.9.5
