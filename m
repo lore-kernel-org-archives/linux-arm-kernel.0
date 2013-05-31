@@ -1,49 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 30 May 2013 21:43:08 -0700
-Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
-In-Reply-To: <20130531001735.GA26684@verge.net.au>
-References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
- <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
- <CACRpkdZxWsJuvrtH-=VVqAGUCpdgS3W52R4tw5-_QGpggB+1uw@mail.gmail.com>
- <20130531001735.GA26684@verge.net.au>
-Message-ID: <CAOesGMiTXW0mVmbBbha5S4O64yu_vM=eLxM4JyctsfONCAo4qg@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 31 May 2013 07:17:59 +0200
+Subject: [PATCH v2 0/5] Zynq: revised CCF code
+In-Reply-To: <20130530184443.4470.73215@quantum>
+References: <1368467199-8702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <51961F37.3030202@monstr.eu> <20130530184443.4470.73215@quantum>
+Message-ID: <51A83287.3010604@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, May 30, 2013 at 5:17 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, May 30, 2013 at 10:08:56PM +0200, Linus Walleij wrote:
->> On Thu, May 30, 2013 at 12:28 AM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
+On 05/30/2013 08:44 PM, Mike Turquette wrote:
+> Quoting Michal Simek (2013-05-17 05:14:47)
+>> Hi Mike,
 >>
->> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->> >
->> > The USB_OVCn pins are alternate options for USB over-current detection
->> > when using a 3.3V USB interface. As they're not mandatory they can be
->> > used independently of the USB PENC pins. Don't group the USB_OVCn and
->> > PENC pins to avoid conflicts when the USB_OVCn pins are used by another
->> > function.
->> >
->> > Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> I have sent email to Greg to take this patch from this series
+>> though his serial tree because it is unrelated to this clock stuff.
 >>
->> OK, Acked-by, do you want me to take this as a fix in the pinctrl
->> tree for v3.10?
+>> Can you please give me your ACK for these patches or add them
+>> to your CLK tree?
 >>
->> Just asking because Simon usually takes everything else relating to
->> the SH. ...
->
-> This was a pull request from my tree to arm-soc, so thats they way
-> I was planning to handle things.
->
-> Olof, Arnd,
->
-> should I re-spin the pull request to include Linus's ack?
+> 
+> For the four clock-related patches:
+> 
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-You can if you want, but for an odd and specific fix like this we'll
-all know he's ok with the code going in.
+I have already sent pull request to Arnd and Olof.
+Or is it you who should take these patches through your tree?
+
+Thanks.
+Michal
 
 
--Olof
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130531/7746093e/attachment.sig>
