@@ -1,215 +1,145 @@
-From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Fri, 31 May 2013 15:43:11 +0530
-Subject: [PATCH 11/11] i2c: omap: enhance pinctrl support
-In-Reply-To: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1369995191-20855-12-git-send-email-gururaja.hebbar@ti.com>
+From: c.hemp@phytec.de (Christian Hemp)
+Date: Fri, 31 May 2013 11:56:54 +0200
+Subject: [PATCH 2/2] ARM: dts: Phytec phyFLEX-i.MX6 support
+In-Reply-To: <20130530063124.GB2602@S2101-09.ap.freescale.net>
+References: <1369861609-30408-1-git-send-email-c.hemp@phytec.de>
+ <1369861609-30408-3-git-send-email-c.hemp@phytec.de>
+ <20130530063124.GB2602@S2101-09.ap.freescale.net>
+Message-ID: <1369994214.2535.33.camel@lws-hemp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend the I2C omap pin controller to optionally take a pin control
-handle and set the state of the pins to:
+Hello Shawn,
 
-- "default" on boot, resume and before performing an i2c transfer
-- "idle" after initial default, after resume default, and after each
-i2c xfer
-- "sleep" on suspend()
+Am Donnerstag, den 30.05.2013, 14:31 +0800 schrieb Shawn Guo:
+> On Wed, May 29, 2013 at 11:06:49PM +0200, Christian Hemp wrote:
+> > Add support for Phytec phyFLEX-i.MX6 board
+> 
+> It's a board supporting all i.MX6 family?
 
-By optionally putting the pins into sleep state in the suspend callback
-we can accomplish two things.
-- One is to minimize current leakage from pins and thus save power,
-- second, we can prevent the IP from driving pins output in an
-uncontrolled manner, which may happen if the power domain drops the
-domain regulator.
+At the moment only i.MX6q but this will change.
 
-Note:
-A .suspend & .resume callback is added which simply puts the pins to sleep
-state upon suspend & are moved to default & idle state upon resume.
+>   Can we name it using SoC than
+> family name?
 
-If any of the above pin states are missing in dt, a warning message
-about the missing state is displayed.
-If certain pin-states are not available, to remove this warning message
-pass respective state name with null phandler.
+Okay. 
 
-(Changes based on i2c-nomadik.c)
 
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Wolfram Sang <wsa@the-dreams.de>
-Cc: linux-omap at vger.kernel.org
-Cc: linux-i2c at vger.kernel.org
----
-:100644 100644 e02f9e3... 588ba28... M	drivers/i2c/busses/i2c-omap.c
- drivers/i2c/busses/i2c-omap.c |  112 ++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 105 insertions(+), 7 deletions(-)
+Christian
 
-diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
-index e02f9e3..588ba28 100644
---- a/drivers/i2c/busses/i2c-omap.c
-+++ b/drivers/i2c/busses/i2c-omap.c
-@@ -214,7 +214,11 @@ struct omap_i2c_dev {
- 	u16			westate;
- 	u16			errata;
- 
--	struct pinctrl		*pins;
-+	/* Three pin states - default, idle & sleep */
-+	struct pinctrl			*pinctrl;
-+	struct pinctrl_state		*pins_default;
-+	struct pinctrl_state		*pins_idle;
-+	struct pinctrl_state		*pins_sleep;
- };
- 
- static const u8 reg_map_ip_v1[] = {
-@@ -641,6 +645,11 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 	if (IS_ERR_VALUE(r))
- 		goto out;
- 
-+	/* Optionaly enable pins to be muxed in and configured */
-+	if (!IS_ERR(dev->pins_default))
-+		if (pinctrl_select_state(dev->pinctrl, dev->pins_default))
-+			dev_err(dev->dev, "could not set default pins\n");
-+
- 	r = omap_i2c_wait_for_bb(dev);
- 	if (r < 0)
- 		goto out;
-@@ -664,7 +673,13 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
- 
- out:
- 	pm_runtime_mark_last_busy(dev->dev);
-+
- 	pm_runtime_put_autosuspend(dev->dev);
-+	/* Optionally let pins go into idle state */
-+	if (!IS_ERR(dev->pins_idle))
-+		if (pinctrl_select_state(dev->pinctrl, dev->pins_idle))
-+			dev_err(dev->dev, "could not set pins to idle state\n");
-+
- 	return r;
- }
- 
-@@ -1123,14 +1138,47 @@ omap_i2c_probe(struct platform_device *pdev)
- 		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
- 	}
- 
--	dev->pins = devm_pinctrl_get_select_default(&pdev->dev);
--	if (IS_ERR(dev->pins)) {
--		if (PTR_ERR(dev->pins) == -EPROBE_DEFER)
-+	dev->pinctrl = devm_pinctrl_get(&pdev->dev);
-+	if (!IS_ERR(dev->pinctrl)) {
-+		dev->pins_default = pinctrl_lookup_state(dev->pinctrl,
-+							 PINCTRL_STATE_DEFAULT);
-+		if (IS_ERR(dev->pins_default))
-+			dev_dbg(&pdev->dev, "could not get default pinstate\n");
-+		else
-+			if (pinctrl_select_state(dev->pinctrl,
-+						 dev->pins_default))
-+				dev_err(&pdev->dev,
-+					"could not set default pinstate\n");
-+
-+		dev->pins_idle = pinctrl_lookup_state(dev->pinctrl,
-+						      PINCTRL_STATE_IDLE);
-+		if (IS_ERR(dev->pins_idle))
-+			dev_dbg(&pdev->dev, "could not get idle pinstate\n");
-+		else
-+			/* If possible, let's idle until the first transfer */
-+			if (pinctrl_select_state(dev->pinctrl, dev->pins_idle))
-+				dev_err(&pdev->dev,
-+					"could not set idle pinstate\n");
-+
-+		dev->pins_sleep = pinctrl_lookup_state(dev->pinctrl,
-+						       PINCTRL_STATE_SLEEP);
-+		if (IS_ERR(dev->pins_sleep))
-+			dev_dbg(&pdev->dev, "could not get sleep pinstate\n");
-+	} else {
-+		if (PTR_ERR(dev->pinctrl) == -EPROBE_DEFER)
- 			return -EPROBE_DEFER;
- 
--		dev_warn(&pdev->dev, "did not get pins for i2c error: %li\n",
--			 PTR_ERR(dev->pins));
--		dev->pins = NULL;
-+		/*
-+		* Since we continue even when pinctrl node is not found,
-+		* Invalidate pins as not available. This is to make sure that
-+		* IS_ERR(pins_xxx) results in failure when used.
-+		*/
-+		dev->pins_default = ERR_PTR(-ENODATA);
-+		dev->pins_idle = ERR_PTR(-ENODATA);
-+		dev->pins_sleep = ERR_PTR(-ENODATA);
-+
-+		dev_dbg(&pdev->dev, "did not get pins for i2c error: %li\n",
-+			PTR_ERR(dev->pinctrl));
- 	}
- 
- 	dev->dev = &pdev->dev;
-@@ -1300,6 +1348,10 @@ static int omap_i2c_runtime_suspend(struct device *dev)
- 		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
- 	}
- 
-+	if (!IS_ERR(_dev->pins_idle))
-+		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_idle))
-+			dev_err(dev, "could not set pins to idle state\n");
-+
- 	return 0;
- }
- 
-@@ -1311,13 +1363,59 @@ static int omap_i2c_runtime_resume(struct device *dev)
- 	if (!_dev->regs)
- 		return 0;
- 
-+	/* Optionally place the pins to the default state */
-+	if (!IS_ERR(_dev->pins_default))
-+		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_default))
-+			dev_err(dev, "could not set pins to default state\n");
-+
- 	__omap_i2c_init(_dev);
- 
- 	return 0;
- }
- #endif /* CONFIG_PM_RUNTIME */
- 
-+#ifdef CONFIG_PM_SLEEP
-+static int omap_i2c_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-+
-+	pm_runtime_get_sync(dev);
-+	if (omap_i2c_wait_for_bb(_dev) < 0) {
-+		pm_runtime_put_sync(dev);
-+		return -EBUSY;
-+	}
-+	pm_runtime_put_sync(dev);
-+
-+	if (!IS_ERR(_dev->pins_sleep))
-+		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_sleep))
-+			dev_err(dev, "could not set pins to sleep state\n");
-+
-+	return 0;
-+}
-+
-+static int omap_i2c_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
-+
-+	/* First go to the default state */
-+	if (!IS_ERR(_dev->pins_default))
-+		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_default))
-+			dev_err(dev, "could not set pins to default state\n");
-+
-+	/* Then let's idle the pins until the next transfer happens */
-+	if (!IS_ERR(_dev->pins_idle))
-+		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_idle))
-+			dev_err(dev, "could not set pins to idle state\n");
-+
-+	return 0;
-+}
-+#endif
-+
-+
- static struct dev_pm_ops omap_i2c_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend, omap_i2c_resume)
- 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
- 			   omap_i2c_runtime_resume, NULL)
- };
--- 
-1.7.9.5
+> > 
+> > Signed-off-by: Christian Hemp <c.hemp@phytec.de>
+> > ---
+> >  arch/arm/boot/dts/Makefile                 |    1 +
+> >  arch/arm/boot/dts/imx6q-phytec-phyflex.dts |   76 ++++++++++++++++++++++++++++
+> >  2 files changed, 77 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/imx6q-phytec-phyflex.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index 4c58951..6ffdaa1 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -118,6 +118,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+> >  	imx6dl-sabresd.dtb \
+> >  	imx6dl-wandboard.dtb \
+> >  	imx6q-arm2.dtb \
+> > +	imx6q-phytec-phyflex.dtb \
+> >  	imx6q-sabreauto.dtb \
+> >  	imx6q-sabrelite.dtb \
+> >  	imx6q-sabresd.dtb \
+> > diff --git a/arch/arm/boot/dts/imx6q-phytec-phyflex.dts b/arch/arm/boot/dts/imx6q-phytec-phyflex.dts
+> > new file mode 100644
+> > index 0000000..9690691
+> > --- /dev/null
+> > +++ b/arch/arm/boot/dts/imx6q-phytec-phyflex.dts
+> > @@ -0,0 +1,76 @@
+> > +/*
+> > + * Copyright 2013 Christian Hemp, Phytec Messtechnik GmbH
+> > + *
+> > + * The code contained herein is licensed under the GNU General Public
+> > + * License. You may obtain a copy of the GNU General Public License
+> > + * Version 2 or later at the following locations:
+> > + *
+> > + * http://www.opensource.org/licenses/gpl-license.html
+> > + * http://www.gnu.org/copyleft/gpl.html
+> > + */
+> > +
+> > +/dts-v1/;
+> > +#include "imx6q.dtsi"
+> > +
+> > +/ {
+> > +	model = "Phytec phyFLEX-i.MX6";
+> > +	compatible = "phytec,phyflex-imx6", "fsl,imx6q";
+> 
+> ditto
+> 
+> Shawn
+> 
+> > +
+> > +	memory {
+> > +		reg = <0x10000000 0x80000000>;
+> > +	};
+> > +};
+> > +
+> > +&iomuxc {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_hog>;
+> > +
+> > +	hog {
+> > +                pinctrl_hog: hoggrp {
+> > +                        fsl,pins = <
+> > +				MX6Q_PAD_EIM_D23__GPIO3_IO23    0x80000000
+> > +			>;
+> > +		};
+> > +	};
+> > +
+> > +	phyflex {
+> > +		pinctrl_usdhc3_phyflex: usdhc3grp-phyflex {
+> > +			fsl,pins = <
+> > +				MX6Q_PAD_ENET_RXD0__GPIO1_IO27  0x80000000
+> > +				MX6Q_PAD_ENET_TXD1__GPIO1_IO29  0x80000000
+> > +			>;
+> > +		};
+> > +	};
+> > +};
+> > +
+> > +&fec {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_enet_3>;
+> > +	phy-mode = "rgmii";
+> > +	phy-reset-gpios = <&gpio3 23 0>;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&uart4 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_uart4_1>;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usdhc2 {
+> > +	pinctrl-names = "default";
+> > +	pinctrl-0 = <&pinctrl_usdhc2_2>;
+> > +	cd-gpios = <&gpio1 4 0>;
+> > +	wp-gpios = <&gpio1 2 0>;
+> > +	status = "okay";
+> > +};
+> > +
+> > +&usdhc3 {
+> > +        pinctrl-names = "default";
+> > +        pinctrl-0 = <&pinctrl_usdhc3_2
+> > +		     &pinctrl_usdhc3_phyflex>;
+> > +        cd-gpios = <&gpio1 27 0>;
+> > +        wp-gpios = <&gpio1 29 0>;
+> > +        status = "okay";
+> > +};
+> > +
+> > -- 
+> > 1.7.9.5
+> > 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
