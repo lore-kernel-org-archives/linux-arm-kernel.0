@@ -1,63 +1,36 @@
-From: s-anna@ti.com (Anna, Suman)
-Date: Fri, 31 May 2013 22:17:13 +0000
-Subject: [PATCH 1/2] ARM: dts: OMAP5: add PWM capability to timer nodes
- missing it
-In-Reply-To: <516F3696.9080008@ti.com>
-References: <1366240995-53538-1-git-send-email-s-anna@ti.com>
- <516F3696.9080008@ti.com>
-Message-ID: <37C860A02101E749A747FA2D3C1E3C504BE487@DLEE11.ent.ti.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Fri, 31 May 2013 23:37:03 +0100
+Subject: [PATCH 11/21] irqdomain: export irq_domain_add_simple
+In-Reply-To: <20130426005012.GB20070@verge.net.au>
+References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
+ <1366910944-3033663-12-git-send-email-arnd@arndb.de>
+ <20130426005012.GB20070@verge.net.au>
+Message-ID: <20130531223703.CFB573E08FE@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit, Tony,
- 
-> On 04/17/2013 06:23 PM, Suman Anna wrote:
-> > OMAP5 has 6 timers (GPTimers 5, 6, 8 to 11) that are capable of PWM.
-> > The PWM capability property is missing from the node definitions of
-> > couple of timers, and this has been fixed.
-> >
-> > Signed-off-by: Suman Anna <s-anna@ti.com>
-> > ---
-> >  arch/arm/boot/dts/omap5.dtsi | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> > index 790bb2a..0d155f5 100644
-> > --- a/arch/arm/boot/dts/omap5.dtsi
-> > +++ b/arch/arm/boot/dts/omap5.dtsi
-> > @@ -422,6 +422,7 @@
-> >  			interrupts = <0 41 0x4>;
-> >  			ti,hwmods = "timer5";
-> >  			ti,timer-dsp;
-> > +			ti,timer-pwm;
-> >  		};
-> >
-> >  		timer6: timer at 4013a000 {
-> > @@ -458,6 +459,7 @@
-> >  			reg = <0x4803e000 0x80>;
-> >  			interrupts = <0 45 0x4>;
-> >  			ti,hwmods = "timer9";
-> > +			ti,timer-pwm;
-> >  		};
-> >
-> >  		timer10: timer at 48086000 {
-> > @@ -465,6 +467,7 @@
-> >  			reg = <0x48086000 0x80>;
-> >  			interrupts = <0 46 0x4>;
-> >  			ti,hwmods = "timer10";
-> > +			ti,timer-pwm;
-> >  		};
-> >
-> >  		timer11: timer at 48088000 {
+On Fri, 26 Apr 2013 09:50:12 +0900, Simon Horman <horms@verge.net.au> wrote:
+> On Thu, Apr 25, 2013 at 07:28:54PM +0200, Arnd Bergmann wrote:
+> > All other irq_domain_add_* functions are exported already, and apparently
+> > this one got left out by mistake, which causes build errors for ARM
+> > allmodconfig kernels:
+> > 
+> > ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-rcar.ko] undefined!
+> > ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-em.ko] undefined!
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Simon Horman <horms+renesas@verge.net.au>
+> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > Cc: Magnus Damm <damm@opensource.se>
 > 
-> Make sure you copy the linux-arm and device-tree mailing lists.
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Acked-by: Jon Hunter <jon-hunter@ti.com>
+> Grant, could consider taking this one?
 > 
 
-Can you include this patch in your next fixes pull request (if you haven't
-already done so)? The other patch in the series is a feature change, but
-this is a fix, and can go into 3.10 itself.
+Applied, thanks. I'll push out to Linus shortly.
 
-Regards
-Suman
+g.
