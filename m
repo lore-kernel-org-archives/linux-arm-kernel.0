@@ -1,146 +1,47 @@
-From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Fri, 31 May 2013 12:03:25 +0530
-Subject: [PATCH 2/2] rtc: omap: add rtc wakeup support to alarm events
-In-Reply-To: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1369982005-8572-3-git-send-email-gururaja.hebbar@ti.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 30 May 2013 23:32:25 -0700
+Subject: [PATCH v2 0/5] Zynq: revised CCF code
+In-Reply-To: <51A83287.3010604@monstr.eu>
+References: <1368467199-8702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <51961F37.3030202@monstr.eu> <20130530184443.4470.73215@quantum>
+ <51A83287.3010604@monstr.eu>
+Message-ID: <20130531063225.21525.49143@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
-is available to enable Wakeup feature for Alarm Events.
+Quoting Michal Simek (2013-05-30 22:17:59)
+> On 05/30/2013 08:44 PM, Mike Turquette wrote:
+> > Quoting Michal Simek (2013-05-17 05:14:47)
+> >> Hi Mike,
+> >>
+> >> I have sent email to Greg to take this patch from this series
+> >> though his serial tree because it is unrelated to this clock stuff.
+> >>
+> >> Can you please give me your ACK for these patches or add them
+> >> to your CLK tree?
+> >>
+> > 
+> > For the four clock-related patches:
+> > 
+> > Acked-by: Mike Turquette <mturquette@linaro.org>
+> 
+> I have already sent pull request to Arnd and Olof.
+> Or is it you who should take these patches through your tree?
+> 
 
-Since new platforms/Boards are now added through DT only, this feature
-is supported via DT property only.
+Either way is fine.  Since you have already sent the pull request to the
+arm-soc tree then that is probably the best path.
 
-Platforms using such IP should add the property "ti,has_irq_wake_enb"
-in rtc DT node.
+Regards,
+Mike
 
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
----
-:100644 100644 108a629... b870d87... M	Documentation/devicetree/bindings/rtc/rtc-omap.txt
-:100644 100644 000a02f... 5e9c0dd... M	drivers/rtc/rtc-omap.c
- Documentation/devicetree/bindings/rtc/rtc-omap.txt |    2 +
- drivers/rtc/rtc-omap.c                             |   47 ++++++++++++++++----
- 2 files changed, 41 insertions(+), 8 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-omap.txt b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-index 108a629..b870d87 100644
---- a/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-+++ b/Documentation/devicetree/bindings/rtc/rtc-omap.txt
-@@ -9,6 +9,8 @@ Required properties:
- Optional properties:
- - ti,wakeup_capable: Inform the rtc driver that this module is wake-up
-   capable so that rtcwake and suspend tests can work.
-+- ti,has_irq_wake_enb: Inform rtc driver that this module has a a
-+  special register to enable Wakeup feature for Alarm events.
- 
- Example:
- 
-diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-index 000a02f..5e9c0dd 100644
---- a/drivers/rtc/rtc-omap.c
-+++ b/drivers/rtc/rtc-omap.c
-@@ -72,6 +72,8 @@
- #define OMAP_RTC_KICK0_REG		0x6c
- #define OMAP_RTC_KICK1_REG		0x70
- 
-+#define OMAP_RTC_IRQWAKEEN		0x7C
-+
- /* OMAP_RTC_CTRL_REG bit fields: */
- #define OMAP_RTC_CTRL_SPLIT		(1<<7)
- #define OMAP_RTC_CTRL_DISABLE		(1<<6)
-@@ -96,6 +98,9 @@
- #define OMAP_RTC_INTERRUPTS_IT_ALARM    (1<<3)
- #define OMAP_RTC_INTERRUPTS_IT_TIMER    (1<<2)
- 
-+/* OMAP_RTC_IRQWAKEEN bit fields: */
-+#define OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN    (1<<1)
-+
- /* OMAP_RTC_KICKER values */
- #define	KICK0_VALUE			0x83e70b13
- #define	KICK1_VALUE			0x95a4f1e0
-@@ -103,6 +108,7 @@
- #define	OMAP_RTC_HAS_KICKER		0x1
- 
- static void __iomem	*rtc_base;
-+static unsigned int	has_irq_wake_enb_bit;
- 
- #define rtc_read(addr)		readb(rtc_base + (addr))
- #define rtc_write(val, addr)	writeb(val, rtc_base + (addr))
-@@ -425,9 +431,14 @@ static int __init omap_rtc_probe(struct platform_device *pdev)
- 
- 	/* Fixup wakeup-enable feature based on the device tree */
- 	if (of_id && of_find_property(pdev->dev.of_node,
--				      "ti,wakeup_capable", NULL))
-+				      "ti,wakeup_capable", NULL)) {
- 		device_init_wakeup(&pdev->dev, 1);
- 
-+		if (of_find_property(pdev->dev.of_node,
-+				     "ti,has_irq_wake_enb", NULL))
-+			has_irq_wake_enb_bit = true;
-+	}
-+
- 	if (new_ctrl & (u8) OMAP_RTC_CTRL_SPLIT)
- 		pr_info("%s: split power mode\n", pdev->name);
- 
-@@ -469,16 +480,26 @@ static u8 irqstat;
- 
- static int omap_rtc_suspend(struct device *dev)
- {
-+	u8 irqwake_stat;
-+
- 	irqstat = rtc_read(OMAP_RTC_INTERRUPTS_REG);
- 
--	/* FIXME the RTC alarm is not currently acting as a wakeup event
--	 * source, and in fact this enable() call is just saving a flag
--	 * that's never used...
-+	/*
-+	 * FIXME. On some platforms the RTC alarm is not currently acting as a
-+	 * wakeup event source, and in fact this enable() call is just saving a
-+	 * flag that's never used...
- 	 */
--	if (device_may_wakeup(dev))
-+	if (device_may_wakeup(dev)) {
- 		enable_irq_wake(omap_rtc_alarm);
--	else
-+
-+		if (has_irq_wake_enb_bit == true) {
-+			irqwake_stat = rtc_read(OMAP_RTC_IRQWAKEEN);
-+			irqwake_stat |= OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN;
-+			rtc_write(irqwake_stat, OMAP_RTC_IRQWAKEEN);
-+		}
-+	} else {
- 		rtc_write(0, OMAP_RTC_INTERRUPTS_REG);
-+	}
- 
- 	/* Disable the clock/module */
- 	pm_runtime_put_sync(dev);
-@@ -488,13 +509,23 @@ static int omap_rtc_suspend(struct device *dev)
- 
- static int omap_rtc_resume(struct device *dev)
- {
-+	u8 irqwake_stat;
-+
- 	/* Enable the clock/module so that we can access the registers */
- 	pm_runtime_get_sync(dev);
- 
--	if (device_may_wakeup(dev))
-+	if (device_may_wakeup(dev)) {
- 		disable_irq_wake(omap_rtc_alarm);
--	else
-+
-+		if (has_irq_wake_enb_bit == true) {
-+			irqwake_stat = rtc_read(OMAP_RTC_IRQWAKEEN);
-+			irqwake_stat &= ~OMAP_RTC_IRQWAKEEN_ALARM_WAKEEN;
-+			rtc_write(irqwake_stat, OMAP_RTC_IRQWAKEEN);
-+		}
-+	} else {
- 		rtc_write(irqstat, OMAP_RTC_INTERRUPTS_REG);
-+	}
-+
- 	return 0;
- }
- #endif
--- 
-1.7.9.5
+> Thanks.
+> Michal
+> 
+> 
+> -- 
+> Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+> w: www.monstr.eu p: +42-0-721842854
+> Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+> Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+> Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
