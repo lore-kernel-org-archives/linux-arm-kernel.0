@@ -1,75 +1,84 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 31 May 2013 19:44:40 +0800
-Subject: [PATCH 3/3] ARM: tegra114: cpuidle: add powered-down state
-In-Reply-To: <1369999870.7804.78.camel@jlo-ubuntu-64.nvidia.com>
-References: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
- <1369912782-30663-4-git-send-email-josephl@nvidia.com>
- <51A763BD.6070001@linaro.org>
- <1369991550.7804.37.camel@jlo-ubuntu-64.nvidia.com>
- <51A86D11.8060305@linaro.org>
- <1369997278.7804.73.camel@jlo-ubuntu-64.nvidia.com>
- <1369999870.7804.78.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <1370000680.7804.83.camel@jlo-ubuntu-64.nvidia.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 31 May 2013 07:54:50 -0400
+Subject: [PATCH v5 12/13] ARM: kirkwood: remove redundant DT board files
+In-Reply-To: <87txlknluf.fsf@natisbad.org>
+References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369855975-21489-13-git-send-email-sebastian.hesselbarth@gmail.com>
+ <8738t4q1kv.fsf@natisbad.org>
+ <20130530193708.GC31290@titan.lakedaemon.net>
+ <87txlknluf.fsf@natisbad.org>
+Message-ID: <20130531115450.GA3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-05-31 at 19:31 +0800, Joseph Lo wrote:
-> On Fri, 2013-05-31 at 18:47 +0800, Joseph Lo wrote:
-> > On Fri, 2013-05-31 at 17:27 +0800, Daniel Lezcano wrote:
-> > > On 05/31/2013 11:12 AM, Joseph Lo wrote:
-> > > > Hi Daniel,
-> > > > 
-> > > > Thanks for your review.
-> > > > 
-> > > > On Thu, 2013-05-30 at 22:35 +0800, Daniel Lezcano wrote:
-> > > >> On 05/30/2013 01:19 PM, Joseph Lo wrote:
-> > > >>> This supports CPU core power down on each CPU when CPU idle. When CPU go
-> > > >>> into this state, it saves it's context and needs a proper configuration
-> > > >>> in flow controller to power gate the CPU when CPU runs into WFI
-> > > >>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
-> > > >>> wake up event in flow controller.
-> > > >>>
-> > > >>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> > > >>> ---
-> > > >>
-> > > >> Hi Joseph,
-> > > >>
-> > > >> a new flag has been added in the cpuidle framework to let this one to
-> > > >> handle the timer broadcast : CPUIDLE_FLAG_TIMER_STOP
-> > > >>
-> > > >> It is the commit b60e6a0eb0273132cbb60a9806abf5f47a4aee1c
-> > > >>
-> > > >> You can get rid of the clockevent notify stuff by adding this flag to
-> > > >> the state.
-> > > >>
-> > > > 
-> > > > I just tested this flag on Tegra20, 30 and 114. It is only OK on
-> > > > Tegra20. It caused a warning message below on Tegra30/114 at boot time.
-> > > > 
-> > > > I gave it a quick check I found it can't clean
-> > > > tick_broadcast_pending_mask sometimes if apply the flag. But I keep the
-> > > > code right now it's always OK. Not sure why? 
-> > > 
-> > > Is it possible you didn't intialized the timer broadcast with
-> > > CLOCK_EVT_NOTIFY_BROADCAST_ON in the driver and then this one is
-> > > actually disabled for you driver ?
-> > > 
-> > I found if I don't apply the CPUIDLE_FLAG_TIMER_STOP flag, the function
-> > "cpuidle_setup_broadcast_timer" (drivers/cpuidle/driver.c) would not be
-> > called. Then it's OK.
-> > 
-> > If I apply this flag (with no CONFIG_CPU_IDLE_MULTIPLE_DRIVERS), the
-> > cpuidle_register_driver only register for CPU0. Then the
-> > "cpuidle_setup_broadcast_timer" only turn on for CPU0. I think this
-> > might be the root cause. Not sure this also can reproduce on the other
-> > SoCs?
-> > 
-> Looks it's not related to CLOCK_EVT_NOTIFY_BROADCAST_ON. I still saw the
-> warning message even enable CONFIG_CPU_IDLE_MULTIPLE_DRIVERS. But if I
-> move the clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT from idle
-> framework back to driver, then everything is OK.
+Arnaud,
+
+On Fri, May 31, 2013 at 12:28:56AM +0200, Arnaud Ebalard wrote:
+> Hi,
 > 
-Once I move the clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT
-right after "local_irq_enable" in the
-"cpuidle_enter_state" (drivers/cpuidle/cpuidle.c). Then the warning
-message shows up.
+> Jason Cooper <jason@lakedaemon.net> writes:
+> 
+> >> For instance 6bd98481ab34 (arm: kirkwood: NETGEAR ReadyNAS Duo v2 init
+> >> PCIe via DT) currently sitting in jcooper/mvebu/pcie_kirkwood removes
+> >> the PCIE init routine in board-readynas.c, and yours remove ge00
+> >> init. With both applied, the whole file can go away.
+> >> 
+> >> AFAICT, this may be the case soon for:
+> >> 
+> >>  arch/arm/mach-kirkwood/board-iconnect.c   (36e5722089)
+> >>  arch/arm/mach-kirkwood/board-mplcec4.c    (9470fbfb8d)
+> >>  arch/arm/mach-kirkwood/board-nsa310.c     (40fa8e5da2)
+> >>  arch/arm/mach-kirkwood/board-readynas.c   (6bd98481ab)
+> >>  arch/arm/mach-kirkwood/board-ts219.c      (259e234608)
+> >
+> > Would you mind putting a patch together (for after v3.10 drops) to do
+> > this?  If you applied Sebastian's series on top of mvebu/pcie_kirkwood,
+> > that should get you almost there.  The last half of his series is going
+> > in after v3.10...
+> 
+> Something like the quick quilt-generated patch at the end of this email
+> (done after a dummy merge of Sebastian's set in mvebu/pcie_kirkwood)? 
+
+yep.
+
+> I will take a look at what remains after Sebastian's set hit one of
+> your branch but I guess he will have included most of what is in the
+> patch to help you with the merge.
+> 
+> Anyway, at the end here is what DT board files would remain:
+> 
+> $ ls -1 arch/arm/mach-kirkwood/board-*.c
+> arch/arm/mach-kirkwood/board-dnskw.c
+
+This one seems to just be setting a gpio to enable reboot after power
+failure.  Should be simple to move to DT.
+
+> arch/arm/mach-kirkwood/board-dt.c
+
+We obviously need this one. ;-)
+
+> arch/arm/mach-kirkwood/board-lsxl.c
+
+This is taken care of in mvebu/boards
+
+  391a16c ARM: Kirkwood: Convert LSXL to restart-poweroff driver.
+
+> arch/arm/mach-kirkwood/board-ts219.c
+
+Also in mvebu/boards
+
+  4350a47 ARM: Kirkwood: Make use of the QNAP Power off driver.
+
+> Just one question though: the removal of MACH_*_DT in Kconfig removes
+> the automatic selection of useful board specific options like
+> ARM_APPENDED_DTB, ARM_ATAG_DTB_COMPAT, POWER_RESET_RESTART,
+> POWER_RESET_QNAP. Is that expected?
+
+I would select POWER_RESET_QNAP and POWER_RESET_RESTART in Kconfig for
+ARCH_KIRKWOOD_DT, and put ARM_APPENDED_DTB and ARM_ATAG_DTB_COMPAT into
+the defconfig.
+
+thx,
+
+Jason.
