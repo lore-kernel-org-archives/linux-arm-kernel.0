@@ -1,91 +1,50 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 31 May 2013 13:21:00 +0100
-Subject: [PATCH 2/2] ARM: shmobile: irqpin: map spurious interrupts in DT
- case
-In-Reply-To: <Pine.LNX.4.64.1305241112210.1090@axis700.grange>
-References: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
- <Pine.LNX.4.64.1305241112210.1090@axis700.grange>
-Message-ID: <20130531122100.BEC173E0901@localhost>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 31 May 2013 20:24:43 +0800
+Subject: [PATCH v1 1/2] ARM:prima2: move sirfsoc_of_rstc_init to
+ .init_early
+In-Reply-To: <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
+ <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <CAGsJ_4z65+SOCQM2XKmrda+5Hu9wRuZviSvW3As1ROa0SmdXqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 May 2013 11:13:07 +0200 (CEST), Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> In the non-DT case all interrupts get mapped statically during probing,
-> therefore, if a spurious interrupt arrives, it can easily be mapped back
-> to hardware registers and bits and handled. In the DT case interrupts are
-> mapped only when a device, using that interrupt is instantiated from DT.
-> So, spurious interrupts occur unmapped and thus cannot be handled properly.
-> This patch fixes this by mapping such interrupts as they occur.
+2013/5/31 Srinivas KANDAGATLA <srinivas.kandagatla@st.com>:
+> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>
+> This patch moves sirfsoc_of_rstc_init from early_initcall to .init_early
+> in machine descriptor, doing this way a multi_v7 kernel will not crash
+> on non-prima2 SOCs.
+>
+> Without this patch the multi_v7 kernel panics if we boot it on any non
+> prima2 parts with below log:
+>
+> Kernel panic - not syncing: unable to find compatible rstc node in dtb
+>
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc3-00535-gc3cc4ac #62
+> [<c001387c>] (unwind_backtrace+0x0/0xf8) from [<c00111cc>]
+> (show_stack+0x10/0x14)
+> [<c00111cc>] (show_stack+0x10/0x14) from [<c03417f4>] (panic+0x90/0x1e4)
+> [<c03417f4>] (panic+0x90/0x1e4) from [<c04256d0>]
+> (sirfsoc_of_rstc_init+0x24/0x5c)
+> [<c04256d0>] (sirfsoc_of_rstc_init+0x24/0x5c) from [<c041f854>]
+> (do_one_initcall+0x90/0x150)
+> [<c041f854>] (do_one_initcall+0x90/0x150) from [<c041f978>]
+> (kernel_init_freeable+0x64/0x1c4)
+> [<c041f978>] (kernel_init_freeable+0x64/0x1c4) from [<c033d344>]
+> (kernel_init+0x8/0xe4)
+> [<c033d344>] (kernel_init+0x8/0xe4) from [<c000ded8>]
+> (ret_from_fork+0x14/0x3c)
+>
+> Initially detected when booting Stih415 SOC with multi_v7_defconfig.
+>
+> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-That sounds like a bad approach. If the driver really requires the irqs
-to be mapped, then it should do all of them when the controller is set
-up. Mapping at interrupt handling time is absolutely the wrong time to
-do it.
+hi Sriniva,
+i think my "arm: prima2: move to generic reset controller driver
+framework" fixs this too:
+http://www.spinics.net/lists/arm-kernel/msg246206.html
 
-Also, why is mapping the irq necessary to handle it? You don't want to
-call generic_handle_irq() on a bad interrupt because there won't be
-anything listening for it. First of all, that particular irq should be
-entirely disabled if at all possible. Second, if it isn't possible to
-disable it, then the handler function should clear the state and get out
-of the handler as quickly as possible.
+Arnd, will you ack that one so that i will send a pull request with that.
 
-g.
-
-> 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> ---
->  drivers/irqchip/irq-renesas-intc-irqpin.c |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> index 82cec63..e62d76d 100644
-> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> @@ -71,6 +71,7 @@ struct intc_irqpin_priv {
->  	struct intc_irqpin_iomem iomem[INTC_IRQPIN_REG_NR];
->  	struct intc_irqpin_irq irq[INTC_IRQPIN_MAX];
->  	struct renesas_intc_irqpin_config config;
-> +	unsigned int min_irq;
->  	unsigned int number_of_irqs;
->  	struct platform_device *pdev;
->  	struct irq_chip irq_chip;
-> @@ -274,6 +275,10 @@ static irqreturn_t intc_irqpin_irq_handler(int irq, void *dev_id)
->  	struct intc_irqpin_priv *p = i->p;
->  	unsigned long bit;
->  
-> +	if (!i->domain_irq)
-> +		/* unmapped: spurious IRQ, map it now */
-> +		irq_create_mapping(p->irq_domain, irq - p->min_irq);
-> +
->  	intc_irqpin_dbg(i, "demux1");
->  	bit = intc_irqpin_hwirq_mask(p, INTC_IRQPIN_REG_SOURCE, i->hw_irq);
->  
-> @@ -372,6 +377,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> +	p->min_irq = INT_MAX;
->  	/* allow any number of IRQs between 1 and INTC_IRQPIN_MAX */
->  	for (k = 0; k < INTC_IRQPIN_MAX; k++) {
->  		irq = platform_get_resource(pdev, IORESOURCE_IRQ, k);
-> @@ -380,6 +386,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
->  
->  		p->irq[k].p = p;
->  		p->irq[k].requested_irq = irq->start;
-> +		if (p->min_irq > irq->start)
-> +			p->min_irq = irq->start;
->  	}
->  
->  	p->number_of_irqs = k;
-> -- 
-> 1.7.2.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+-barry
