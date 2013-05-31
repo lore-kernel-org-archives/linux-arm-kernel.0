@@ -1,45 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 31 May 2013 12:13:05 +0100
-Subject: A bug about system call on ARM
-In-Reply-To: <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
-References: <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
- <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
- <20130529094826.GD13095@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
- <20130530090949.GC7483@mudshark.cambridge.arm.com>
- <20130530114112.GH7483@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
- <20130531084638.GB4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
-Message-ID: <20130531111305.GI4928@mudshark.cambridge.arm.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Fri, 31 May 2013 06:18:31 -0500
+Subject: [PATCH v2] dmaengine: shdma: fix a build failure on platforms
+ with no DMA support
+In-Reply-To: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
+References: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
+Message-ID: <51A88707.4040601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 12:02:49PM +0100, Wang, Yalin wrote:
-> Hi  Will,
-> 
-> I have merge your code ,
-> But there is a different ,
-> 
-> +	
-> +	ct_user_exit
+On 05/30/2013 10:01 PM, Guennadi Liakhovetski wrote:
+> On platforms with no support for the shdma dmaengine driver build is
+> currently failing with
+>
+> drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+> drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+>
+> Fix the breakage by defining shdma_chan_filter to NULL in such
+> configurations.
+>
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> ---
+>
+> v2: in "next" shdma_chan_filter() is defined in shdma-base.c, which is 
+> built if CONFIG_SH_DMAE_BASE is defined. This version uses the correct 
+> symbol.
+>
+> This is for "next." Compile-tested only. I'll test it on hardware next 
+> week, but I don't think it shall break anything.
+>
+>  include/linux/sh_dma.h |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
+>
+> diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
+> index b64d6be..1fd8a20 100644
+> --- a/include/linux/sh_dma.h
+> +++ b/include/linux/sh_dma.h
+> @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
+>  #define CHCR_TE	0x00000002
+>  #define CHCR_IE	0x00000004
+>  
+> +#if IS_ENABLED(CONFIG_SH_DMAE_BASE)
+>  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
+> +#else
+> +#define shdma_chan_filter NULL
+OK I did not see a reply to my previous comment
+Would this not be better as a
+#else
+static inline bool shdma_chan_filter(struct dma_chan *chan, void *arg) { return false; }
+#endif
 
-I thought you didn't have ct_user_exit? In which case, just delete this
-line.
+Otherwise runtime will call a NULL pointer
+> +#endif
+>  
+>  #endif
 
-> +#ifdef CONFIG_ALIGNMENT_TRAP
-> +	ldr	ip, __cr_alignment
-> +	ldr	ip, [ip]
-> +	mcr	p15, 0, ip, c1, c0		@ update control register
-> +#endif 
-> 
-> +	enable_irq
-> +	get_thread_info tsk
 
-Hard to tell without context. You can take a look at my git tree if you
-like (I fixed it up based on Nico's comment):
-
-  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=misc-patches
-
-Will
+-- 
+------------------
+Dan Murphy
