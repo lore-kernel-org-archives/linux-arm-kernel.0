@@ -1,46 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 12:47:44 +0200
-Subject: [PATCH 31/39] ARM: u300: add syscon node
-In-Reply-To: <1369991954-17406-32-git-send-email-linus.walleij@stericsson.com>
-References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
- <1369991954-17406-32-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <14733989.vf3LkZC316@wuerfel>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 31 May 2013 18:47:58 +0800
+Subject: [PATCH 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <51A86D11.8060305@linaro.org>
+References: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
+ <1369912782-30663-4-git-send-email-josephl@nvidia.com>
+ <51A763BD.6070001@linaro.org>
+ <1369991550.7804.37.camel@jlo-ubuntu-64.nvidia.com>
+ <51A86D11.8060305@linaro.org>
+Message-ID: <1369997278.7804.73.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 May 2013 11:19:06 Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, 2013-05-31 at 17:27 +0800, Daniel Lezcano wrote:
+> On 05/31/2013 11:12 AM, Joseph Lo wrote:
+> > Hi Daniel,
+> > 
+> > Thanks for your review.
+> > 
+> > On Thu, 2013-05-30 at 22:35 +0800, Daniel Lezcano wrote:
+> >> On 05/30/2013 01:19 PM, Joseph Lo wrote:
+> >>> This supports CPU core power down on each CPU when CPU idle. When CPU go
+> >>> into this state, it saves it's context and needs a proper configuration
+> >>> in flow controller to power gate the CPU when CPU runs into WFI
+> >>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
+> >>> wake up event in flow controller.
+> >>>
+> >>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> >>> ---
+> >>
+> >> Hi Joseph,
+> >>
+> >> a new flag has been added in the cpuidle framework to let this one to
+> >> handle the timer broadcast : CPUIDLE_FLAG_TIMER_STOP
+> >>
+> >> It is the commit b60e6a0eb0273132cbb60a9806abf5f47a4aee1c
+> >>
+> >> You can get rid of the clockevent notify stuff by adding this flag to
+> >> the state.
+> >>
+> > 
+> > I just tested this flag on Tegra20, 30 and 114. It is only OK on
+> > Tegra20. It caused a warning message below on Tegra30/114 at boot time.
+> > 
+> > I gave it a quick check I found it can't clean
+> > tick_broadcast_pending_mask sometimes if apply the flag. But I keep the
+> > code right now it's always OK. Not sure why? 
 > 
-> This adds a device tree node for the U300 system controller
-> and remaps this dynamically instead of using hard-coded
-> virtual addresses. The board power set-up code is altered
-> to fetch a reference to the syscon using ampersand <&syscon>
-> notation. This way of passing a pointer to the syscon will
-> also be used by the clocks.
+> Is it possible you didn't intialized the timer broadcast with
+> CLOCK_EVT_NOTIFY_BROADCAST_ON in the driver and then this one is
+> actually disabled for you driver ?
 > 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  Documentation/devicetree/bindings/arm/ste-u300.txt | 30 +++++++++++++++++++---
->  arch/arm/boot/dts/ste-u300.dts                     |  6 +++++
->  arch/arm/mach-u300/core.c                          | 22 +++++++++++++---
->  arch/arm/mach-u300/regulator.c                     | 21 ++++++++++++---
->  4 files changed, 69 insertions(+), 10 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/ste-u300.txt b/Documentation/devicetree/bindings/arm/ste-u300.txt
-> index cd9001a..69b5ab0 100644
-> --- a/Documentation/devicetree/bindings/arm/ste-u300.txt
-> +++ b/Documentation/devicetree/bindings/arm/ste-u300.txt
-> @@ -8,15 +8,39 @@ Required root node property:
->  
->  compatible="stericsson,u300";
->  
-> +Required node: syscon
-> +This contains the system controller.
-> +- compatible: must be "stericsson,u300-syscon".
-> +- reg: the base address and size of the system controller.
-> +
+I found if I don't apply the CPUIDLE_FLAG_TIMER_STOP flag, the function
+"cpuidle_setup_broadcast_timer" (drivers/cpuidle/driver.c) would not be
+called. Then it's OK.
 
-Any reason why you are not making it compatible with "syscon", to use
-the drivers/mfd/syscon.c driver?
-
-	Arnd 
+If I apply this flag (with no CONFIG_CPU_IDLE_MULTIPLE_DRIVERS), the
+cpuidle_register_driver only register for CPU0. Then the
+"cpuidle_setup_broadcast_timer" only turn on for CPU0. I think this
+might be the root cause. Not sure this also can reproduce on the other
+SoCs?
