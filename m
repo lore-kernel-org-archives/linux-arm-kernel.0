@@ -1,98 +1,60 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 30 May 2013 18:16:06 -0700
-Subject: [RFC PATCHv4 3/6] clk: TI-Nspire clock drivers
-In-Reply-To: <1369480087-24786-4-git-send-email-dt.tangr@gmail.com>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <1369480087-24786-4-git-send-email-dt.tangr@gmail.com>
-Message-ID: <20130531011606.21525.92648@quantum>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 31 May 2013 03:20:08 +0200
+Subject: [RFC/PATCH v2 2/2] gpio-rcar: Add DT support
+In-Reply-To: <CACRpkdb8GYpx3ASzXB7HX5oEpAUBe-yBo0N5Ep9S+DqoE6oCLw@mail.gmail.com>
+References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1369136406-23800-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CACRpkdb8GYpx3ASzXB7HX5oEpAUBe-yBo0N5Ep9S+DqoE6oCLw@mail.gmail.com>
+Message-ID: <4678059.RuWR6CiQ8n@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Daniel Tang (2013-05-25 04:08:04)
-> diff --git a/drivers/clk/clk-nspire.c b/drivers/clk/clk-nspire.c
-> new file mode 100644
-> index 0000000..2546f7d
-> --- /dev/null
-> +++ b/drivers/clk/clk-nspire.c
-> @@ -0,0 +1,155 @@
-> +/*
-> + *  linux/drivers/clk/clk-nspire.c
+Hi Linus,
 
-Hi Daniel,
+On Thursday 30 May 2013 19:38:12 Linus Walleij wrote:
+> On Tue, May 21, 2013 at 1:40 PM, Laurent Pinchart
+> <laurent.pinchart+renesas@ideasonboard.com> wrote:
+> > Add DT bindings for the gpio-rcar driver and read the device
+> > configuration from the DT node at probe time if available.
+> > 
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> I am assuming this will go through Simon's tree?
 
-It's best not to put any file path here, since it could change in the
-future.  Please remove it.
+I've so far pushed GPIO and pinctrl patches for SH through Simon's tree due to 
+the many cross-dependencies between SH arch code and the GPIO and pinctrl 
+drivers. As the situation now stabilizes, we could now push the patches 
+through their respective subsystem trees.
 
-> + *
-> + *  Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + */
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +
-> +#define MHZ (1000 * 1000)
-> +
-> +#define BASE_CPU_SHIFT         1
-> +#define BASE_CPU_MASK          0x7F
-> +
-> +#define CPU_AHB_SHIFT          12
-> +#define CPU_AHB_MASK           0x07
-> +
-> +#define FIXED_BASE_SHIFT       8
-> +#define FIXED_BASE_MASK                0x01
-> +
-> +#define CLASSIC_BASE_SHIFT     16
-> +#define CLASSIC_BASE_MASK      0x1F
-> +
-> +#define CX_BASE_SHIFT          15
-> +#define CX_BASE_MASK           0x3F
-> +
-> +#define CX_UNKNOWN_SHIFT       21
-> +#define CX_UNKNOWN_MASK                0x03
-> +
-> +struct nspire_clk_info {
-> +       u32 base_clock;
-> +       u16 base_cpu_ratio;
-> +       u16 base_ahb_ratio;
-> +};
-> +
-> +
-> +#define EXTRACT(var, prop) (((var)>>prop##_SHIFT) & prop##_MASK)
-> +static void nspire_clkinfo_cx(u32 val, struct nspire_clk_info *clk)
-> +{
-> +       if (EXTRACT(val, FIXED_BASE))
-> +               clk->base_clock = 48 * MHZ;
-> +       else
-> +               clk->base_clock = 6 * EXTRACT(val, CX_BASE) * MHZ;
-> +
-> +       clk->base_cpu_ratio = EXTRACT(val, BASE_CPU) * EXTRACT(val, CX_UNKNOWN);
-> +       clk->base_ahb_ratio = clk->base_cpu_ratio * (EXTRACT(val, CPU_AHB) + 1);
-> +}
-> +
-> +static void nspire_clkinfo_classic(u32 val, struct nspire_clk_info *clk)
-> +{
-> +       if (EXTRACT(val, FIXED_BASE))
-> +               clk->base_clock = 27 * MHZ;
-> +       else
-> +               clk->base_clock = (300 - 6 * EXTRACT(val, CLASSIC_BASE)) * MHZ;
-> +
-> +       clk->base_cpu_ratio = EXTRACT(val, BASE_CPU) * 2;
-> +       clk->base_ahb_ratio = clk->base_cpu_ratio * (EXTRACT(val, CPU_AHB) + 1);
-> +}
-> +#undef EXTRACT
+Simon, Linus, any opinion/preference on that ?
 
-Any particular reason for the undef?
+> Note:
+> > +  - gpio-ranges: Range of pins managed by the GPIO controller as a
+> > 4-cells
+> > +    tuple using the following syntax.
+> > +
+> > +    <[phandle of the pin controller node]
+> > +     0
+> > +     [index of the first pin]
+> > +     [number of pins]>
+> > +
+> > +Please refer to gpio.txt in this directory for details of the common GPIO
+> > +bindings used by client devices.
+> 
+> The above ranges are part of that document.
 
-Rest looks good to me.  If you can respin this patch I'll take it into
-clk-next.
+What about replacing that with
 
-Thanks,
-Mike
+  - gpio-ranges: Range of pins managed by the GPIO controller.
+
+Please refer to gpio.txt in this directory for details of gpio-ranges property 
+and the common GPIO bindings used by client devices.
+
+-- 
+Regards,
+
+Laurent Pinchart
