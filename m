@@ -1,37 +1,133 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 May 2013 15:24:31 +0100
-Subject: [PATCH 1/2] ARM: ux500: Allocate correct amount of memory for the
- u8540 in DT
-Message-ID: <1370010272-25520-1-git-send-email-lee.jones@linaro.org>
+Date: Fri, 31 May 2013 15:24:32 +0100
+Subject: [PATCH 2/2] ARM: ux500: Enable HIGHMEM in the u8540 defconfig
+In-Reply-To: <1370010272-25520-1-git-send-email-lee.jones@linaro.org>
+References: <1370010272-25520-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370010272-25520-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it stands, the memory node in the u8540 Device Tree is ignored and
-memory is actually stipulated by the bootloader via ATAGS. ARM core
-architecture code then extracts the memory ATAG and inserts it into the
-Device Tree. In the u8540 the LittleKernel bootloader only stipulates
-512MB of memory; however, the u8540 actually has 4GB. We're taking the
-responsibility to register the remainder from Device Tree here.
+In order to utilise all of the memory located on ux500 based devices
+we have to enable HIGHMEM. Without it the kernel truncates memory down
+to what's left after the PAGE_OFFSET has been applied, which doesn't
+leave an awful lot, especially if we're running large rootfs' such
+as full Linux desktop distributions or Android.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/ccu8540.dts |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/configs/u8500_defconfig |    1 +
+ drivers/of/fdt.c                 |   52 +++++++-------------------------------
+ 2 files changed, 10 insertions(+), 43 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ccu8540.dts b/arch/arm/boot/dts/ccu8540.dts
-index 12f0bc2..199866b 100644
---- a/arch/arm/boot/dts/ccu8540.dts
-+++ b/arch/arm/boot/dts/ccu8540.dts
-@@ -16,8 +16,8 @@
- 	model = "ST-Ericsson U8540 platform with Device Tree";
- 	compatible = "st-ericsson,ccu8540", "st-ericsson,u8540";
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index 2d322d2..38d633a 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -1,3 +1,4 @@
++CONFIG_HIGHMEM=y
+ # CONFIG_SWAP is not set
+ CONFIG_SYSVIPC=y
+ CONFIG_NO_HZ=y
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 5439925..808be06 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -43,7 +43,7 @@ void *of_fdt_get_property(struct boot_param_header *blob,
  
--	memory {
--		reg = <0x00000000 0x20000000>;
-+	memory at 0 {
-+		reg = <0x20000000 0x3f000000>, <0xc0000000 0x3f000000>;
- 	};
+ 	do {
+ 		u32 tag = be32_to_cpup((__be32 *)p);
+-		u32 sz, noff, i;
++		u32 sz, noff;
+ 		const char *nstr;
  
- 	soc {
+ 		p += 4;
+@@ -66,10 +66,6 @@ void *of_fdt_get_property(struct boot_param_header *blob,
+ 		if (strcmp(name, nstr) == 0) {
+ 			if (size)
+ 				*size = sz;
+-
+-	print_hex_dump(KERN_ERR, "node: ", DUMP_PREFIX_ADDRESS,
+-		       16, 1, (__be32 *)node, p - node, true);
+-
+ 			return (void *)p;
+ 		}
+ 		p += sz;
+@@ -624,68 +620,38 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
+ 	__be32 *reg, *endp;
+ 	unsigned long l;
+ 
+-	printk("LEE: ******************************************* \n");
+-	printk("LEE: ******************************************* \n");
+-	printk("LEE: ******************************************* \n");
+-	printk("LEE: ******************************************* \n");
+-	printk("LEE: ******************************************* \n");
+-	printk("LEE: ******************************************* \n");
+-	printk("LEE: ******************************************* \n");
+-
+ 	/* We are scanning "memory" nodes only */
+ 	if (type == NULL) {
+-		printk("LEE: 1\n");
+ 		/*
+ 		 * The longtrail doesn't have a device_type on the
+ 		 * /memory node, so look for the node called /memory at 0.
+ 		 */
+-		if (depth != 1 || strcmp(uname, "memory at 0") != 0) {
+-			printk("LEE: 2\n");
++		if (depth != 1 || strcmp(uname, "memory at 0") != 0)
+ 			return 0;
+-		}
+-	} else if (strcmp(type, "memory") != 0) {
+-		printk("LEE: 3\n");
++	} else if (strcmp(type, "memory") != 0)
+ 		return 0;
+-	}
+ 
+ 	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &l);
+-	if (reg == NULL) {
++	if (reg == NULL)
+ 		reg = of_get_flat_dt_prop(node, "reg", &l);
+-		printk("LEE: This is correct \n");
+-	}
+-	if (reg == NULL) {
+-		printk("LEE: 4\n");
+-       		return 0;
+-	}
+-
+-	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
+-	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
+-	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
+-	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
+-	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
+-	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
+-	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
++	if (reg == NULL)
++		return 0;
+ 
+ 	endp = reg + (l / sizeof(__be32));
+ 
+-	printk("LEE: reg: 0x%p\n", reg);
+-
+-	printk("memory scan node %s, reg size %ld, data: %x %x %x %x,\n",
++	pr_debug("memory scan node %s, reg size %ld, data: %x %x %x %x,\n",
+ 	    uname, l, reg[0], reg[1], reg[2], reg[3]);
+ 
+-	printk("extras: %x %x %x %x,\n", reg[4], reg[5], reg[6], reg[7]);
+-
+ 	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
+ 		u64 base, size;
+ 
+ 		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
+ 		size = dt_mem_next_cell(dt_root_size_cells, &reg);
+ 
+-		printk(" - %llx ,  %llx\n", (unsigned long long)base,
+-		    (unsigned long long)size);
+-
+ 		if (size == 0)
+ 			continue;
++		pr_debug(" - %llx ,  %llx\n", (unsigned long long)base,
++		    (unsigned long long)size);
+ 
+ 		early_init_dt_add_memory_arch(base, size);
+ 	}
 -- 
 1.7.10.4
