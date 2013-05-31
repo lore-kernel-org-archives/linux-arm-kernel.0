@@ -1,36 +1,62 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 31 May 2013 23:37:03 +0100
-Subject: [PATCH 11/21] irqdomain: export irq_domain_add_simple
-In-Reply-To: <20130426005012.GB20070@verge.net.au>
-References: <1366910944-3033663-1-git-send-email-arnd@arndb.de>
- <1366910944-3033663-12-git-send-email-arnd@arndb.de>
- <20130426005012.GB20070@verge.net.au>
-Message-ID: <20130531223703.CFB573E08FE@localhost>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 31 May 2013 15:37:07 -0700
+Subject: [PATCH] rtc: rtc-twl: ensure IRQ is wakeup enabled
+Message-ID: <1370039827-25033-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 26 Apr 2013 09:50:12 +0900, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Apr 25, 2013 at 07:28:54PM +0200, Arnd Bergmann wrote:
-> > All other irq_domain_add_* functions are exported already, and apparently
-> > this one got left out by mistake, which causes build errors for ARM
-> > allmodconfig kernels:
-> > 
-> > ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-rcar.ko] undefined!
-> > ERROR: "irq_domain_add_simple" [drivers/gpio/gpio-em.ko] undefined!
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Thomas Gleixner <tglx@linutronix.de>
-> > Cc: Simon Horman <horms+renesas@verge.net.au>
-> > Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > Cc: Magnus Damm <damm@opensource.se>
-> 
-> Acked-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Grant, could consider taking this one?
-> 
+Currently, the RTC IRQ is never wakeup-enabled so is not capable of
+bringing the system out of suspend.
 
-Applied, thanks. I'll push out to Linus shortly.
+On OMAP platforms, we have gotten by without this because the TWL RTC
+is on an I2C-connected chip which is capable of waking up the OMAP via
+the IO ring when the OMAP is in low-power states.
 
-g.
+However, if the OMAP suspends without hitting the low-power states
+(and the IO ring is not enabled), RTC wakeups will not work because
+the IRQ is not wakeup enabled.
+
+To fix, ensure the RTC IRQ is wakeup enabled whenever the RTC alarm is
+set.
+
+Cc: Alessandro Zummo <a.zummo@towertech.it>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/rtc/rtc-twl.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
+index 8751a52..bbda0fd 100644
+--- a/drivers/rtc/rtc-twl.c
++++ b/drivers/rtc/rtc-twl.c
+@@ -213,12 +213,24 @@ static int mask_rtc_irq_bit(unsigned char bit)
+ 
+ static int twl_rtc_alarm_irq_enable(struct device *dev, unsigned enabled)
+ {
++	struct platform_device *pdev = to_platform_device(dev);
++	int irq = platform_get_irq(pdev, 0);
++	static bool twl_rtc_wake_enabled;
+ 	int ret;
+ 
+-	if (enabled)
++	if (enabled) {
+ 		ret = set_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
+-	else
++		if (device_can_wakeup(dev) && !twl_rtc_wake_enabled) {
++			enable_irq_wake(irq);
++			twl_rtc_wake_enabled = true;
++		}
++	} else {
+ 		ret = mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
++		if (twl_rtc_wake_enabled) {
++			disable_irq_wake(irq);
++			twl_rtc_wake_enabled = false;
++		}
++	}
+ 
+ 	return ret;
+ }
+-- 
+1.8.2
