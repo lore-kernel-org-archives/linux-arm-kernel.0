@@ -1,133 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 May 2013 15:24:32 +0100
-Subject: [PATCH 2/2] ARM: ux500: Enable HIGHMEM in the u8540 defconfig
-In-Reply-To: <1370010272-25520-1-git-send-email-lee.jones@linaro.org>
-References: <1370010272-25520-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370010272-25520-2-git-send-email-lee.jones@linaro.org>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Fri, 31 May 2013 09:29:42 -0500
+Subject: [PATCH v7] ARM: dts: omap4-panda: Update the LED support for
+ the panda DTS
+In-Reply-To: <51A8AE72.5010601@ti.com>
+References: <1369826427-31963-1-git-send-email-dmurphy@ti.com>
+ <51A8AE72.5010601@ti.com>
+Message-ID: <51A8B3D6.1020608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to utilise all of the memory located on ux500 based devices
-we have to enable HIGHMEM. Without it the kernel truncates memory down
-to what's left after the PAGE_OFFSET has been applied, which doesn't
-leave an awful lot, especially if we're running large rootfs' such
-as full Linux desktop distributions or Android.
+Hi
+On 05/31/2013 09:06 AM, Benoit Cousson wrote:
+> Hi Dan,
+>
+> On 05/29/2013 01:20 PM, Dan Murphy wrote:
+>> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+>> are different.
+>>
+>> A1-A3 = gpio_wk7clean
+>> ES = gpio_110
+>>
+>> There is no change to LED D2
+>>
+>> Abstract away the pinmux and the LED definitions for the two boards into
+>> the respective DTS files.
+>>
+>> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> That patch was good... until Florian introduces some new constant to
+> improve the readability of the DTS [1].
+>
+> Could you rebase on the lastest for_3.11/dts and use the macros for the
+> GPIO and pinctrl nodes?
+N/P working on it now
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/configs/u8500_defconfig |    1 +
- drivers/of/fdt.c                 |   52 +++++++-------------------------------
- 2 files changed, 10 insertions(+), 43 deletions(-)
+Thanks
+> Thanks,
+> Benoit
+>
+> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg89684.html
+>
 
-diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
-index 2d322d2..38d633a 100644
---- a/arch/arm/configs/u8500_defconfig
-+++ b/arch/arm/configs/u8500_defconfig
-@@ -1,3 +1,4 @@
-+CONFIG_HIGHMEM=y
- # CONFIG_SWAP is not set
- CONFIG_SYSVIPC=y
- CONFIG_NO_HZ=y
-diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-index 5439925..808be06 100644
---- a/drivers/of/fdt.c
-+++ b/drivers/of/fdt.c
-@@ -43,7 +43,7 @@ void *of_fdt_get_property(struct boot_param_header *blob,
- 
- 	do {
- 		u32 tag = be32_to_cpup((__be32 *)p);
--		u32 sz, noff, i;
-+		u32 sz, noff;
- 		const char *nstr;
- 
- 		p += 4;
-@@ -66,10 +66,6 @@ void *of_fdt_get_property(struct boot_param_header *blob,
- 		if (strcmp(name, nstr) == 0) {
- 			if (size)
- 				*size = sz;
--
--	print_hex_dump(KERN_ERR, "node: ", DUMP_PREFIX_ADDRESS,
--		       16, 1, (__be32 *)node, p - node, true);
--
- 			return (void *)p;
- 		}
- 		p += sz;
-@@ -624,68 +620,38 @@ int __init early_init_dt_scan_memory(unsigned long node, const char *uname,
- 	__be32 *reg, *endp;
- 	unsigned long l;
- 
--	printk("LEE: ******************************************* \n");
--	printk("LEE: ******************************************* \n");
--	printk("LEE: ******************************************* \n");
--	printk("LEE: ******************************************* \n");
--	printk("LEE: ******************************************* \n");
--	printk("LEE: ******************************************* \n");
--	printk("LEE: ******************************************* \n");
--
- 	/* We are scanning "memory" nodes only */
- 	if (type == NULL) {
--		printk("LEE: 1\n");
- 		/*
- 		 * The longtrail doesn't have a device_type on the
- 		 * /memory node, so look for the node called /memory at 0.
- 		 */
--		if (depth != 1 || strcmp(uname, "memory at 0") != 0) {
--			printk("LEE: 2\n");
-+		if (depth != 1 || strcmp(uname, "memory at 0") != 0)
- 			return 0;
--		}
--	} else if (strcmp(type, "memory") != 0) {
--		printk("LEE: 3\n");
-+	} else if (strcmp(type, "memory") != 0)
- 		return 0;
--	}
- 
- 	reg = of_get_flat_dt_prop(node, "linux,usable-memory", &l);
--	if (reg == NULL) {
-+	if (reg == NULL)
- 		reg = of_get_flat_dt_prop(node, "reg", &l);
--		printk("LEE: This is correct \n");
--	}
--	if (reg == NULL) {
--		printk("LEE: 4\n");
--       		return 0;
--	}
--
--	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
--	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
--	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
--	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
--	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
--	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
--	printk("LEE: !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! \n");
-+	if (reg == NULL)
-+		return 0;
- 
- 	endp = reg + (l / sizeof(__be32));
- 
--	printk("LEE: reg: 0x%p\n", reg);
--
--	printk("memory scan node %s, reg size %ld, data: %x %x %x %x,\n",
-+	pr_debug("memory scan node %s, reg size %ld, data: %x %x %x %x,\n",
- 	    uname, l, reg[0], reg[1], reg[2], reg[3]);
- 
--	printk("extras: %x %x %x %x,\n", reg[4], reg[5], reg[6], reg[7]);
--
- 	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
- 		u64 base, size;
- 
- 		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
- 		size = dt_mem_next_cell(dt_root_size_cells, &reg);
- 
--		printk(" - %llx ,  %llx\n", (unsigned long long)base,
--		    (unsigned long long)size);
--
- 		if (size == 0)
- 			continue;
-+		pr_debug(" - %llx ,  %llx\n", (unsigned long long)base,
-+		    (unsigned long long)size);
- 
- 		early_init_dt_add_memory_arch(base, size);
- 	}
 -- 
-1.7.10.4
+------------------
+Dan Murphy
