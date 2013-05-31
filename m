@@ -1,58 +1,98 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 31 May 2013 09:07:36 +0800
-Subject: [PATCH -next v2] dmaengine: ste_dma40: fix error return code in
- d40_probe()
-In-Reply-To: <CAHp75Vf+ifmn62vRNZbqpVX1hnqeUkenzvY81gZLenFkEJ9pFA@mail.gmail.com>
-References: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
- <CAHp75Vf+ifmn62vRNZbqpVX1hnqeUkenzvY81gZLenFkEJ9pFA@mail.gmail.com>
-Message-ID: <CAPgLHd-Gj0UXLdMYdQyGtyHY8T_c=XENc-=SZ=nejCKMiAFXkQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 30 May 2013 18:16:06 -0700
+Subject: [RFC PATCHv4 3/6] clk: TI-Nspire clock drivers
+In-Reply-To: <1369480087-24786-4-git-send-email-dt.tangr@gmail.com>
+References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
+ <1369480087-24786-4-git-send-email-dt.tangr@gmail.com>
+Message-ID: <20130531011606.21525.92648@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2013 02:29 AM, Andy Shevchenko wrote:
-> On Thu, May 30, 2013 at 7:32 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
->> In many of the error handling case, the return value 'ret' not set
->> and 0 will be return from d40_probe() even if error, but we should
->> return a negative error code instead in those error handling case.
->> This patch fixed them, and also removed useless variable 'err'.
-> Hold on, please.
->
->> --- a/drivers/dma/ste_dma40.c
->> +++ b/drivers/dma/ste_dma40.c
->> @@ -3619,6 +3618,7 @@ static int __init d40_probe(struct platform_device *pdev)
->>                 if (IS_ERR(base->lcpa_regulator)) {
->>                         d40_err(&pdev->dev, "Failed to get lcpa_regulator\n");
->>                         base->lcpa_regulator = NULL;
->> +                       ret = PTR_ERR(base->lcpa_regulator);
-> Is it really what we want?
->
-> I thixh you may remove that NULL assignment.
+Quoting Daniel Tang (2013-05-25 04:08:04)
+> diff --git a/drivers/clk/clk-nspire.c b/drivers/clk/clk-nspire.c
+> new file mode 100644
+> index 0000000..2546f7d
+> --- /dev/null
+> +++ b/drivers/clk/clk-nspire.c
+> @@ -0,0 +1,155 @@
+> +/*
+> + *  linux/drivers/clk/clk-nspire.c
 
-Ohh, I will move the ret = PTR_ERR(base->lcpa_regulator) above the NULL
-assignment, the failure path test for base->lcpa_regulator to release regulator.
+Hi Daniel,
 
-        if (base->lcpa_regulator) {
-            regulator_disable(base->lcpa_regulator);
-            regulator_put(base->lcpa_regulator);
-        }
+It's best not to put any file path here, since it could change in the
+future.  Please remove it.
 
->
->
->>                         goto failure;
->>                 }
->>
->> @@ -3647,8 +3647,8 @@ static int __init d40_probe(struct platform_device *pdev)
->>         d40_hw_init(base);
->>
->>         if (np) {
->> -               err = of_dma_controller_register(np, d40_xlate, NULL);
->> -               if (err && err != -ENODEV)
->> +               ret = of_dma_controller_register(np, d40_xlate, NULL);
->> +               if (ret && ret != -ENODEV)
-> >From the discussion of dw_dmac I remember we decide that ENODEV check
-> is redundant.
+> + *
+> + *  Copyright (C) 2013 Daniel Tang <tangrs@tangrs.id.au>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2, as
+> + * published by the Free Software Foundation.
+> + *
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/err.h>
+> +#include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +
+> +#define MHZ (1000 * 1000)
+> +
+> +#define BASE_CPU_SHIFT         1
+> +#define BASE_CPU_MASK          0x7F
+> +
+> +#define CPU_AHB_SHIFT          12
+> +#define CPU_AHB_MASK           0x07
+> +
+> +#define FIXED_BASE_SHIFT       8
+> +#define FIXED_BASE_MASK                0x01
+> +
+> +#define CLASSIC_BASE_SHIFT     16
+> +#define CLASSIC_BASE_MASK      0x1F
+> +
+> +#define CX_BASE_SHIFT          15
+> +#define CX_BASE_MASK           0x3F
+> +
+> +#define CX_UNKNOWN_SHIFT       21
+> +#define CX_UNKNOWN_MASK                0x03
+> +
+> +struct nspire_clk_info {
+> +       u32 base_clock;
+> +       u16 base_cpu_ratio;
+> +       u16 base_ahb_ratio;
+> +};
+> +
+> +
+> +#define EXTRACT(var, prop) (((var)>>prop##_SHIFT) & prop##_MASK)
+> +static void nspire_clkinfo_cx(u32 val, struct nspire_clk_info *clk)
+> +{
+> +       if (EXTRACT(val, FIXED_BASE))
+> +               clk->base_clock = 48 * MHZ;
+> +       else
+> +               clk->base_clock = 6 * EXTRACT(val, CX_BASE) * MHZ;
+> +
+> +       clk->base_cpu_ratio = EXTRACT(val, BASE_CPU) * EXTRACT(val, CX_UNKNOWN);
+> +       clk->base_ahb_ratio = clk->base_cpu_ratio * (EXTRACT(val, CPU_AHB) + 1);
+> +}
+> +
+> +static void nspire_clkinfo_classic(u32 val, struct nspire_clk_info *clk)
+> +{
+> +       if (EXTRACT(val, FIXED_BASE))
+> +               clk->base_clock = 27 * MHZ;
+> +       else
+> +               clk->base_clock = (300 - 6 * EXTRACT(val, CLASSIC_BASE)) * MHZ;
+> +
+> +       clk->base_cpu_ratio = EXTRACT(val, BASE_CPU) * 2;
+> +       clk->base_ahb_ratio = clk->base_cpu_ratio * (EXTRACT(val, CPU_AHB) + 1);
+> +}
+> +#undef EXTRACT
 
-Get it, I will remove the ENODEV check.
+Any particular reason for the undef?
+
+Rest looks good to me.  If you can respin this patch I'll take it into
+clk-next.
 
 Thanks,
-Yongjun Wei
+Mike
