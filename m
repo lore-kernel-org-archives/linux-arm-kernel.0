@@ -1,145 +1,55 @@
-From: c.hemp@phytec.de (Christian Hemp)
-Date: Fri, 31 May 2013 11:56:54 +0200
-Subject: [PATCH 2/2] ARM: dts: Phytec phyFLEX-i.MX6 support
-In-Reply-To: <20130530063124.GB2602@S2101-09.ap.freescale.net>
-References: <1369861609-30408-1-git-send-email-c.hemp@phytec.de>
- <1369861609-30408-3-git-send-email-c.hemp@phytec.de>
- <20130530063124.GB2602@S2101-09.ap.freescale.net>
-Message-ID: <1369994214.2535.33.camel@lws-hemp>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 12:31:41 +0200
+Subject: [PATCH 02/39] ARM: u300: device tree support for the timer
+In-Reply-To: <1369991954-17406-3-git-send-email-linus.walleij@stericsson.com>
+References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
+ <1369991954-17406-3-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <7742928.6bJiIVUE0X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Shawn,
+On Friday 31 May 2013 11:18:37 Linus Walleij wrote:
+> +
+> +
+> +void __init u300_timer_init()
+> +{
+> +       u300_timer_setup(U300_TIMER_APP_VBASE, IRQ_U300_TIMER_APP_GP1);
+> +}
+> +
+> +#ifdef CONFIG_OF
+> +
+> +static void __init u300_timer_init_of(struct device_node *np)
+> +{
+> +       void __iomem *base;
+> +       struct resource irq_res;
+> +       int irq;
+> +
+> +       base = of_iomap(np, 0);
+> +       /* Get the IRQ for the GP1 timer */
+> +       irq = of_irq_to_resource(np, 2, &irq_res);
+> +       u300_timer_setup(base, irq);
+> +}
+> +
+> +CLOCKSOURCE_OF_DECLARE(u300_timer, "stericsson,u300-apptimer",
+> +                      u300_timer_init_of);
+> +
+> +#endif
 
-Am Donnerstag, den 30.05.2013, 14:31 +0800 schrieb Shawn Guo:
-> On Wed, May 29, 2013 at 11:06:49PM +0200, Christian Hemp wrote:
-> > Add support for Phytec phyFLEX-i.MX6 board
+You should not need the CONFIG_OF #ifdef, since the CLOCKSOURCE_OF_DECLARE
+macro is designed to let the function get dropped by the compiler when
+that is not set.
+
+You might want a CONFIG_ATAGS check for the other function though.
+
+> diff --git a/arch/arm/mach-u300/timer.h b/arch/arm/mach-u300/timer.h
+> index d34287b..7766dfa 100644
+> --- a/arch/arm/mach-u300/timer.h
+> +++ b/arch/arm/mach-u300/timer.h
+> @@ -1 +1,2 @@
+>  extern void u300_timer_init(void);
+> +
 > 
-> It's a board supporting all i.MX6 family?
 
-At the moment only i.MX6q but this will change.
+You probably didn't mean to include this newline.
 
->   Can we name it using SoC than
-> family name?
-
-Okay. 
-
-
-Christian
-
-> > 
-> > Signed-off-by: Christian Hemp <c.hemp@phytec.de>
-> > ---
-> >  arch/arm/boot/dts/Makefile                 |    1 +
-> >  arch/arm/boot/dts/imx6q-phytec-phyflex.dts |   76 ++++++++++++++++++++++++++++
-> >  2 files changed, 77 insertions(+)
-> >  create mode 100644 arch/arm/boot/dts/imx6q-phytec-phyflex.dts
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index 4c58951..6ffdaa1 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -118,6 +118,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
-> >  	imx6dl-sabresd.dtb \
-> >  	imx6dl-wandboard.dtb \
-> >  	imx6q-arm2.dtb \
-> > +	imx6q-phytec-phyflex.dtb \
-> >  	imx6q-sabreauto.dtb \
-> >  	imx6q-sabrelite.dtb \
-> >  	imx6q-sabresd.dtb \
-> > diff --git a/arch/arm/boot/dts/imx6q-phytec-phyflex.dts b/arch/arm/boot/dts/imx6q-phytec-phyflex.dts
-> > new file mode 100644
-> > index 0000000..9690691
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/imx6q-phytec-phyflex.dts
-> > @@ -0,0 +1,76 @@
-> > +/*
-> > + * Copyright 2013 Christian Hemp, Phytec Messtechnik GmbH
-> > + *
-> > + * The code contained herein is licensed under the GNU General Public
-> > + * License. You may obtain a copy of the GNU General Public License
-> > + * Version 2 or later at the following locations:
-> > + *
-> > + * http://www.opensource.org/licenses/gpl-license.html
-> > + * http://www.gnu.org/copyleft/gpl.html
-> > + */
-> > +
-> > +/dts-v1/;
-> > +#include "imx6q.dtsi"
-> > +
-> > +/ {
-> > +	model = "Phytec phyFLEX-i.MX6";
-> > +	compatible = "phytec,phyflex-imx6", "fsl,imx6q";
-> 
-> ditto
-> 
-> Shawn
-> 
-> > +
-> > +	memory {
-> > +		reg = <0x10000000 0x80000000>;
-> > +	};
-> > +};
-> > +
-> > +&iomuxc {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_hog>;
-> > +
-> > +	hog {
-> > +                pinctrl_hog: hoggrp {
-> > +                        fsl,pins = <
-> > +				MX6Q_PAD_EIM_D23__GPIO3_IO23    0x80000000
-> > +			>;
-> > +		};
-> > +	};
-> > +
-> > +	phyflex {
-> > +		pinctrl_usdhc3_phyflex: usdhc3grp-phyflex {
-> > +			fsl,pins = <
-> > +				MX6Q_PAD_ENET_RXD0__GPIO1_IO27  0x80000000
-> > +				MX6Q_PAD_ENET_TXD1__GPIO1_IO29  0x80000000
-> > +			>;
-> > +		};
-> > +	};
-> > +};
-> > +
-> > +&fec {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_enet_3>;
-> > +	phy-mode = "rgmii";
-> > +	phy-reset-gpios = <&gpio3 23 0>;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&uart4 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_uart4_1>;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usdhc2 {
-> > +	pinctrl-names = "default";
-> > +	pinctrl-0 = <&pinctrl_usdhc2_2>;
-> > +	cd-gpios = <&gpio1 4 0>;
-> > +	wp-gpios = <&gpio1 2 0>;
-> > +	status = "okay";
-> > +};
-> > +
-> > +&usdhc3 {
-> > +        pinctrl-names = "default";
-> > +        pinctrl-0 = <&pinctrl_usdhc3_2
-> > +		     &pinctrl_usdhc3_phyflex>;
-> > +        cd-gpios = <&gpio1 27 0>;
-> > +        wp-gpios = <&gpio1 29 0>;
-> > +        status = "okay";
-> > +};
-> > +
-> > -- 
-> > 1.7.9.5
-> > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+	Arnd
