@@ -1,43 +1,107 @@
-From: Catalin.Marinas@arm.com (Catalin Marinas)
-Date: Fri, 31 May 2013 16:25:39 +0100
-Subject: [GIT PULL] arm64 fixes for 3.10
-Message-ID: <20130531152539.GE15551@arm.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 31 May 2013 17:24:05 +0200
+Subject: [PATCHv2 3/3] arm: dts: add bandgap entry for OMAP4460 devices
+In-Reply-To: <5194D123.4060403@ti.com>
+References: <1368629928-6723-1-git-send-email-eduardo.valentin@ti.com>
+ <1368629928-6723-4-git-send-email-eduardo.valentin@ti.com>
+ <5193A875.1020000@ti.com> <5193B9AA.7020507@ti.com>
+ <20130515165726.GK22508@game.jcrosoft.org>
+ <5194D123.4060403@ti.com>
+Message-ID: <20130531152405.GH23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 08:29 Thu 16 May     , Eduardo Valentin wrote:
+> On 15-05-2013 12:57, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 12:36 Wed 15 May     , Eduardo Valentin wrote:
+> >> On 15-05-2013 11:23, Benoit Cousson wrote:
+> >>> Hi Eduardo,
+> >>>
+> >>> On 05/15/2013 04:58 PM, Eduardo Valentin wrote:
+> >>>> Include bandgap devices for OMAP4460 devices.
+> >>>>
+> >>>> Cc: "Beno?t Cousson" <b-cousson@ti.com>
+> >>>> Cc: Tony Lindgren <tony@atomide.com>
+> >>>> Cc: Russell King <linux@arm.linux.org.uk>
+> >>>> Cc: linux-omap at vger.kernel.org
+> >>>> Cc: devicetree-discuss at lists.ozlabs.org
+> >>>> Cc: linux-arm-kernel at lists.infradead.org
+> >>>> Cc: linux-kernel at vger.kernel.org
+> >>>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+> >>>> ---
+> >>>>  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
+> >>>>  1 file changed, 9 insertions(+)
+> >>>>
+> >>>> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+> >>>> index 2cf227c..e5bfbfe 100644
+> >>>> --- a/arch/arm/boot/dts/omap4460.dtsi
+> >>>> +++ b/arch/arm/boot/dts/omap4460.dtsi
+> >>>> @@ -29,4 +29,13 @@
+> >>>>  			     <0 55 0x4>;
+> >>>>  		ti,hwmods = "debugss";
+> >>>>  	};
+> >>>> +
+> >>>> +	bandgap {
+> >>>> +		reg = <0x4a002260 0x4
+> >>>> +			0x4a00232C 0x4
+> >>>> +			0x4a002378 0x18>;
+> >>>> +		compatible = "ti,omap4460-bandgap";
+> >>>> +		interrupts = <0 126 4>; /* talert */
+> >>>> +		ti,tshut-gpio = <86>;
+> >>
+> >>
+> >>
+> >>>
+> >>> Why do you need a custom attribute for GPIO? Cannot you use the standard
+> >>> one?
+> >>
+> >> I believe it was by your suggestion :-), during the first attempts to
+> >> send this driver. But could not find the thread link :-( sorry.
+> >>
+> >>
+> >> I guess the reasoning to mark it as a ti specific is because it will be
+> >> used as IRQ line to treat thermal shutdown (in SW).
+> > so use interrup-parent
+> 
+> 
+> Jean-Christophe,
+> 
+> That will change the controller and break the configuration for the
+> other IRQ line, coming from GIC.
 
-Please pull the arm64 patches below. Thanks.
+put this on hold I'm preparing a fix for this
+I've discuss with Grant already.
 
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+This way for me is buggy
 
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
-
-for you to fetch changes up to 9955ac47f4ba1c95ecb6092aeaefb40a22e99268:
-
-  arm64: don't kill the kernel on a bad esr from el0 (2013-05-31 16:04:51 +0100)
-
-----------------------------------------------------------------
-- Module compilation issues (symbol not exported).
-- Plug a hole where user space can bring the kernel down.
-
-----------------------------------------------------------------
-Catalin Marinas (1):
-      arm64: Do not report user faults for handled signals
-
-Chen Gang (1):
-      arm64: kernel: compiling issue, need 'EXPORT_SYMBOL(clear_page)'
-
-Mark Rutland (2):
-      arm64: treat unhandled compat el0 traps as undef
-      arm64: don't kill the kernel on a bad esr from el0
-
- arch/arm64/kernel/arm64ksyms.c |  1 +
- arch/arm64/kernel/entry.S      | 10 ++++++++++
- arch/arm64/kernel/traps.c      | 17 ++++++++++++-----
- arch/arm64/mm/fault.c          |  3 ++-
- 4 files changed, 25 insertions(+), 6 deletions(-)
+Best Regards,
+J.
+> 
+> >>
+> >>>
+> >>> Where is the gpio controller phandle?
+> >>>
+> >>> Usually it looks like this:
+> >>>
+> >>> 	gpios = <&gpio1 8 0>;
+> >>>
+> >>>
+> >>> Regards,
+> >>> Benoit
+> >>>
+> >>>
+> >>>
+> >>
+> >>
+> > 
+> > 
+> > 
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> > 
+> > 
+> 
+> 
