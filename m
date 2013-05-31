@@ -1,16 +1,18 @@
 From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Fri, 31 May 2013 15:43:10 +0530
-Subject: [PATCH 10/11] video: da8xx-fb: adopt pinctrl support
+Date: Fri, 31 May 2013 15:43:11 +0530
+Subject: [PATCH 11/11] i2c: omap: enhance pinctrl support
 In-Reply-To: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
 References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1369995191-20855-11-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1369995191-20855-12-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend the da8xx-fb controller to optionally take a pin control handle
-and set the state of the pins to:
+Amend the I2C omap pin controller to optionally take a pin control
+handle and set the state of the pins to:
 
-- "default" on boot, resume
+- "default" on boot, resume and before performing an i2c transfer
+- "idle" after initial default, after resume default, and after each
+i2c xfer
 - "sleep" on suspend()
 
 By optionally putting the pins into sleep state in the suspend callback
@@ -20,108 +22,194 @@ we can accomplish two things.
 uncontrolled manner, which may happen if the power domain drops the
 domain regulator.
 
+Note:
+A .suspend & .resume callback is added which simply puts the pins to sleep
+state upon suspend & are moved to default & idle state upon resume.
+
 If any of the above pin states are missing in dt, a warning message
 about the missing state is displayed.
 If certain pin-states are not available, to remove this warning message
 pass respective state name with null phandler.
 
-Todo:
-        - if an idle state is available for pins, add support for it.
+(Changes based on i2c-nomadik.c)
 
 Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
-Cc: linux-fbdev at vger.kernel.org
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Wolfram Sang <wsa@the-dreams.de>
+Cc: linux-omap at vger.kernel.org
+Cc: linux-i2c at vger.kernel.org
 ---
-:100644 100644 0810939... 10c8036... M	drivers/video/da8xx-fb.c
- drivers/video/da8xx-fb.c |   48 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 48 insertions(+)
+:100644 100644 e02f9e3... 588ba28... M	drivers/i2c/busses/i2c-omap.c
+ drivers/i2c/busses/i2c-omap.c |  112 ++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 105 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
-index 0810939..10c8036 100644
---- a/drivers/video/da8xx-fb.c
-+++ b/drivers/video/da8xx-fb.c
-@@ -36,6 +36,7 @@
- #include <linux/slab.h>
- #include <linux/delay.h>
- #include <linux/lcm.h>
-+#include <linux/pinctrl/consumer.h>
- #include <video/da8xx-fb.h>
- #include <asm/div64.h>
+diff --git a/drivers/i2c/busses/i2c-omap.c b/drivers/i2c/busses/i2c-omap.c
+index e02f9e3..588ba28 100644
+--- a/drivers/i2c/busses/i2c-omap.c
++++ b/drivers/i2c/busses/i2c-omap.c
+@@ -214,7 +214,11 @@ struct omap_i2c_dev {
+ 	u16			westate;
+ 	u16			errata;
  
-@@ -182,6 +183,11 @@ struct da8xx_fb_par {
- #endif
- 	void (*panel_power_ctrl)(int);
- 	u32 pseudo_palette[16];
-+
-+	/* two pin states - default, sleep */
+-	struct pinctrl		*pins;
++	/* Three pin states - default, idle & sleep */
 +	struct pinctrl			*pinctrl;
 +	struct pinctrl_state		*pins_default;
++	struct pinctrl_state		*pins_idle;
 +	struct pinctrl_state		*pins_sleep;
  };
  
- /* Variable Screen Information */
-@@ -1306,6 +1312,36 @@ static int fb_probe(struct platform_device *device)
- 	par->lcd_fck_rate = clk_get_rate(fb_clk);
- #endif
- 	par->pxl_clk = lcdc_info->pixclock;
+ static const u8 reg_map_ip_v1[] = {
+@@ -641,6 +645,11 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 	if (IS_ERR_VALUE(r))
+ 		goto out;
+ 
++	/* Optionaly enable pins to be muxed in and configured */
++	if (!IS_ERR(dev->pins_default))
++		if (pinctrl_select_state(dev->pinctrl, dev->pins_default))
++			dev_err(dev->dev, "could not set default pins\n");
 +
-+	par->pinctrl = devm_pinctrl_get(&device->dev);
-+	if (!IS_ERR(par->pinctrl)) {
-+		par->pins_default = pinctrl_lookup_state(par->pinctrl,
+ 	r = omap_i2c_wait_for_bb(dev);
+ 	if (r < 0)
+ 		goto out;
+@@ -664,7 +673,13 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+ 
+ out:
+ 	pm_runtime_mark_last_busy(dev->dev);
++
+ 	pm_runtime_put_autosuspend(dev->dev);
++	/* Optionally let pins go into idle state */
++	if (!IS_ERR(dev->pins_idle))
++		if (pinctrl_select_state(dev->pinctrl, dev->pins_idle))
++			dev_err(dev->dev, "could not set pins to idle state\n");
++
+ 	return r;
+ }
+ 
+@@ -1123,14 +1138,47 @@ omap_i2c_probe(struct platform_device *pdev)
+ 		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+ 	}
+ 
+-	dev->pins = devm_pinctrl_get_select_default(&pdev->dev);
+-	if (IS_ERR(dev->pins)) {
+-		if (PTR_ERR(dev->pins) == -EPROBE_DEFER)
++	dev->pinctrl = devm_pinctrl_get(&pdev->dev);
++	if (!IS_ERR(dev->pinctrl)) {
++		dev->pins_default = pinctrl_lookup_state(dev->pinctrl,
 +							 PINCTRL_STATE_DEFAULT);
-+		if (IS_ERR(par->pins_default))
-+			dev_dbg(&device->dev, "could not get default pinstate\n");
++		if (IS_ERR(dev->pins_default))
++			dev_dbg(&pdev->dev, "could not get default pinstate\n");
 +		else
-+			if (pinctrl_select_state(par->pinctrl,
-+						 par->pins_default))
-+				dev_err(&device->dev,
++			if (pinctrl_select_state(dev->pinctrl,
++						 dev->pins_default))
++				dev_err(&pdev->dev,
 +					"could not set default pinstate\n");
 +
-+		par->pins_sleep = pinctrl_lookup_state(par->pinctrl,
++		dev->pins_idle = pinctrl_lookup_state(dev->pinctrl,
++						      PINCTRL_STATE_IDLE);
++		if (IS_ERR(dev->pins_idle))
++			dev_dbg(&pdev->dev, "could not get idle pinstate\n");
++		else
++			/* If possible, let's idle until the first transfer */
++			if (pinctrl_select_state(dev->pinctrl, dev->pins_idle))
++				dev_err(&pdev->dev,
++					"could not set idle pinstate\n");
++
++		dev->pins_sleep = pinctrl_lookup_state(dev->pinctrl,
 +						       PINCTRL_STATE_SLEEP);
-+		if (IS_ERR(par->pins_sleep))
-+			dev_dbg(&device->dev, "could not get sleep pinstate\n");
++		if (IS_ERR(dev->pins_sleep))
++			dev_dbg(&pdev->dev, "could not get sleep pinstate\n");
 +	} else {
++		if (PTR_ERR(dev->pinctrl) == -EPROBE_DEFER)
+ 			return -EPROBE_DEFER;
+ 
+-		dev_warn(&pdev->dev, "did not get pins for i2c error: %li\n",
+-			 PTR_ERR(dev->pins));
+-		dev->pins = NULL;
 +		/*
 +		* Since we continue even when pinctrl node is not found,
 +		* Invalidate pins as not available. This is to make sure that
 +		* IS_ERR(pins_xxx) results in failure when used.
 +		*/
-+		par->pins_default = ERR_PTR(-ENODATA);
-+		par->pins_sleep = ERR_PTR(-ENODATA);
++		dev->pins_default = ERR_PTR(-ENODATA);
++		dev->pins_idle = ERR_PTR(-ENODATA);
++		dev->pins_sleep = ERR_PTR(-ENODATA);
 +
-+		dev_dbg(&device->dev, "did not get pins for lcd error: %li\n",
-+			PTR_ERR(par->pinctrl));
-+	}
-+
- 	if (fb_pdata->panel_power_ctrl) {
- 		par->panel_power_ctrl = fb_pdata->panel_power_ctrl;
- 		par->panel_power_ctrl(1);
-@@ -1551,6 +1587,12 @@ static int fb_suspend(struct platform_device *dev, pm_message_t state)
- 	pm_runtime_put_sync(&dev->dev);
- 	console_unlock();
++		dev_dbg(&pdev->dev, "did not get pins for i2c error: %li\n",
++			PTR_ERR(dev->pinctrl));
+ 	}
  
-+	/* Optionally let pins go into sleep states */
-+	if (!IS_ERR(par->pins_sleep))
-+		if (pinctrl_select_state(par->pinctrl, par->pins_sleep))
-+			dev_err(&dev->dev,
-+				"could not set pins to sleep state\n");
+ 	dev->dev = &pdev->dev;
+@@ -1300,6 +1348,10 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+ 		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
+ 	}
+ 
++	if (!IS_ERR(_dev->pins_idle))
++		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_idle))
++			dev_err(dev, "could not set pins to idle state\n");
 +
  	return 0;
  }
- static int fb_resume(struct platform_device *dev)
-@@ -1560,6 +1602,12 @@ static int fb_resume(struct platform_device *dev)
  
- 	console_lock();
- 	pm_runtime_get_sync(&dev->dev);
+@@ -1311,13 +1363,59 @@ static int omap_i2c_runtime_resume(struct device *dev)
+ 	if (!_dev->regs)
+ 		return 0;
+ 
++	/* Optionally place the pins to the default state */
++	if (!IS_ERR(_dev->pins_default))
++		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_default))
++			dev_err(dev, "could not set pins to default state\n");
 +
-+	/* Optionaly enable pins to be muxed in and configured */
-+	if (!IS_ERR(par->pins_default))
-+		if (pinctrl_select_state(par->pinctrl, par->pins_default))
-+			dev_err(&dev->dev, "could not set default pins\n");
+ 	__omap_i2c_init(_dev);
+ 
+ 	return 0;
+ }
+ #endif /* CONFIG_PM_RUNTIME */
+ 
++#ifdef CONFIG_PM_SLEEP
++static int omap_i2c_suspend(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
 +
- 	lcd_context_restore();
- 	if (par->blank == FB_BLANK_UNBLANK) {
- 		lcd_enable_raster();
++	pm_runtime_get_sync(dev);
++	if (omap_i2c_wait_for_bb(_dev) < 0) {
++		pm_runtime_put_sync(dev);
++		return -EBUSY;
++	}
++	pm_runtime_put_sync(dev);
++
++	if (!IS_ERR(_dev->pins_sleep))
++		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_sleep))
++			dev_err(dev, "could not set pins to sleep state\n");
++
++	return 0;
++}
++
++static int omap_i2c_resume(struct device *dev)
++{
++	struct platform_device *pdev = to_platform_device(dev);
++	struct omap_i2c_dev *_dev = platform_get_drvdata(pdev);
++
++	/* First go to the default state */
++	if (!IS_ERR(_dev->pins_default))
++		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_default))
++			dev_err(dev, "could not set pins to default state\n");
++
++	/* Then let's idle the pins until the next transfer happens */
++	if (!IS_ERR(_dev->pins_idle))
++		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_idle))
++			dev_err(dev, "could not set pins to idle state\n");
++
++	return 0;
++}
++#endif
++
++
+ static struct dev_pm_ops omap_i2c_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(omap_i2c_suspend, omap_i2c_resume)
+ 	SET_RUNTIME_PM_OPS(omap_i2c_runtime_suspend,
+ 			   omap_i2c_runtime_resume, NULL)
+ };
 -- 
 1.7.9.5
