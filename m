@@ -1,41 +1,77 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 May 2013 16:18:50 +0100
-Subject: [PATCH 2/2] ARM: ux500: Enable HIGHMEM in the u8540 defconfig
-In-Reply-To: <38058740.G1EqTG95pA@wuerfel>
-References: <1370010272-25520-1-git-send-email-lee.jones@linaro.org>
- <1370010272-25520-2-git-send-email-lee.jones@linaro.org>
- <38058740.G1EqTG95pA@wuerfel>
-Message-ID: <20130531151850.GC12488@gmail.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Fri, 31 May 2013 10:19:44 -0500
+Subject: [PATCH v8] ARM: dts: omap4-panda: Update the LED support for
+ the panda DTS
+In-Reply-To: <CABxcv=mCh38XgFoRSrZ8BK5U5EFDb-1Fb70FoLyNqb0V3WQm-g@mail.gmail.com>
+References: <1370011682-20675-1-git-send-email-dmurphy@ti.com>
+ <CABxcv=mCh38XgFoRSrZ8BK5U5EFDb-1Fb70FoLyNqb0V3WQm-g@mail.gmail.com>
+Message-ID: <51A8BF90.4060509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013, Arnd Bergmann wrote:
-
-> On Friday 31 May 2013 15:24:32 Lee Jones wrote:
-> > In order to utilise all of the memory located on ux500 based devices
-> > we have to enable HIGHMEM. Without it the kernel truncates memory down
-> > to what's left after the PAGE_OFFSET has been applied, which doesn't
-> > leave an awful lot, especially if we're running large rootfs' such
-> > as full Linux desktop distributions or Android.
-> > 
-> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> How much memory do those devices have? Enabling HIGHMEM is quite expensive.
-
-Another 1GB.
-
-> > diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
-> > index 5439925..808be06 100644
-> > --- a/drivers/of/fdt.c
-> > +++ b/drivers/of/fdt.c
-> 
-> You should probably resend the patch without the second half that got
-> in it by accident.
-
-I did already, thanks.
+On 05/31/2013 10:05 AM, Javier Martinez Canillas wrote:
+> On Fri, May 31, 2013 at 4:48 PM, Dan Murphy <dmurphy@ti.com> wrote:
+>> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+>> are different.
+>>
+>> A1-A3 = gpio_wk7
+>> ES = gpio_110
+>>
+>> There is no change to LED D2
+>>
+>> Abstract away the pinmux and the LED definitions for the two boards into
+>> the respective DTS files.
+>>
+>> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+>> ---
+>> v8 - Rebase to latest and use pinctrl macros - https://patchwork.kernel.org/patch/2629351/
+>> v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
+>> v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
+>> v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
+>>
+>>  arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
+>>  arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
+>>  2 files changed, 43 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>> index d5d144a..523a800 100644
+>> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+>> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+>> @@ -16,8 +16,13 @@
+>>                 reg = <0x80000000 0x40000000>; /* 1 GB */
+>>         };
+>>
+>> -       leds {
+>> +       leds: leds {
+>>                 compatible = "gpio-leds";
+>> +               pinctrl-names = "default";
+>> +               pinctrl-0 = <
+>> +                       &led_wkgpio_pins
+>> +               >;
+>> +
+>>                 heartbeat {
+>>                         label = "pandaboard::status1";
+>>                         gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+>> @@ -157,6 +162,15 @@
+>>         };
+>>  };
+>>
+>> +&omap4_pmx_wkup {
+>> +       led_wkgpio_pins: pinmux_leds_wkpins {
+>> +               pinctrl-single,pins = <
+>> +                       0x1a (PIN_OUTPUT | MUX_MODE3)   /* gpio_wk7 OUTPUT | MODE 3 */
+>> +                       0x1c (PIN_OUTPUT | MUX_MODE3)   /* gpio_wk8 OUTPUT | MODE 3 */
+> Hello Dan,
+>
+> The OUTPUT | MODE 3 in the comments were added so people shouldn't
+> have to look at the TRM to find what each constant number meant. But
+> now using the macros this is not needed anymore, so I don't think is
+> necessary to keep that on the comments.
+>
+> Best regards,
+> Javier
+Yes you are correct sending update to remove the comments
 
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+------------------
+Dan Murphy
