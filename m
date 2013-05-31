@@ -1,39 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 May 2013 09:01:44 +0200
-Subject: [RFC/PATCH v2 2/2] gpio-rcar: Add DT support
-In-Reply-To: <4678059.RuWR6CiQ8n@avalon>
-References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1369136406-23800-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CACRpkdb8GYpx3ASzXB7HX5oEpAUBe-yBo0N5Ep9S+DqoE6oCLw@mail.gmail.com>
- <4678059.RuWR6CiQ8n@avalon>
-Message-ID: <CACRpkda4rRWcVkdGPcSvJeQq_KaJE5uxD+0P62Ot8=Xuf2-B+A@mail.gmail.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Fri, 31 May 2013 09:03:33 +0200
+Subject: [PATCH v2 0/5] Zynq: revised CCF code
+In-Reply-To: <20130531063225.21525.49143@quantum>
+References: <1368467199-8702-1-git-send-email-soren.brinkmann@xilinx.com>
+ <51961F37.3030202@monstr.eu> <20130530184443.4470.73215@quantum>
+ <51A83287.3010604@monstr.eu> <20130531063225.21525.49143@quantum>
+Message-ID: <51A84B45.3070804@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 3:20 AM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
+On 05/31/2013 08:32 AM, Mike Turquette wrote:
+> Quoting Michal Simek (2013-05-30 22:17:59)
+>> On 05/30/2013 08:44 PM, Mike Turquette wrote:
+>>> Quoting Michal Simek (2013-05-17 05:14:47)
+>>>> Hi Mike,
+>>>>
+>>>> I have sent email to Greg to take this patch from this series
+>>>> though his serial tree because it is unrelated to this clock stuff.
+>>>>
+>>>> Can you please give me your ACK for these patches or add them
+>>>> to your CLK tree?
+>>>>
+>>>
+>>> For the four clock-related patches:
+>>>
+>>> Acked-by: Mike Turquette <mturquette@linaro.org>
+>>
+>> I have already sent pull request to Arnd and Olof.
+>> Or is it you who should take these patches through your tree?
+>>
+> 
+> Either way is fine.  Since you have already sent the pull request to the
+> arm-soc tree then that is probably the best path.
 
-> I've so far pushed GPIO and pinctrl patches for SH through Simon's tree due to
-> the many cross-dependencies between SH arch code and the GPIO and pinctrl
-> drivers. As the situation now stabilizes, we could now push the patches
-> through their respective subsystem trees.
->
-> Simon, Linus, any opinion/preference on that ?
+ok. I will keep my eyes on it.
 
-Depends, if they are still large patch sets I'd prefer Simon to
-take it, but once the drivers are in place and going to maintenance
-mode I'll handle them in pinctrl.
+Thanks,
+Michal
 
->> The above ranges are part of that document.
->
-> What about replacing that with
->
->   - gpio-ranges: Range of pins managed by the GPIO controller.
->
-> Please refer to gpio.txt in this directory for details of gpio-ranges property
-> and the common GPIO bindings used by client devices.
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Go for it!
 
-Yours,
-Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130531/75d93eb1/attachment.sig>
