@@ -1,59 +1,35 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 31 May 2013 22:54:00 +0200
-Subject: [PATCH 0/2] ARM: dts: add watchdog device tree node in at91 dts
- files
-In-Reply-To: <CACQ1gAjF=L+tVcJc3QMv7HEYcny2y-HcDLGJ5N7XbM=_vL+dFQ@mail.gmail.com>
-References: <1369969744-3428-1-git-send-email-wenyou.yang@atmel.com>
- <1369969893-7992-1-git-send-email-wenyou.yang@atmel.com>
- <CACQ1gAjF=L+tVcJc3QMv7HEYcny2y-HcDLGJ5N7XbM=_vL+dFQ@mail.gmail.com>
-Message-ID: <51A90DE8.1010009@atmel.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 31 May 2013 13:56:34 -0700
+Subject: [PATCH] mfd: twl-core: convert to module_init()
+Message-ID: <1370033794-5357-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/2013 11:39, Richard Genoud :
-> 2013/5/31 Wenyou Yang <wenyou.yang@atmel.com>:
->> Hello,
->>
->> The patches is to add watchdog device tree node for at91 SoC and board dts files.
->>
->> Since the watchdog is disabled in the at91bootstrap with default configuration,
->> if you want to use the watchdog in the kernel, you must make sure the watchdog
->> doesn't be disabled in the at91bootstrap.
->>
->> It is tested on at91sam9g20ek, at91sam9263ek, at91sam9g25ek
->> using Documentation/watchdog/src/watchdog-simple.c.
->>
->> It is based on v3.10-rc3, tested on linux-watchdog git tree as well.
->>
->> Best Regards,
->> Wenyou Yang
->>
->> Wenyou Yang (2):
->>    ARM: dts: add the watchdog nodes for at91 SoC
->>    ARM: dts: add the watchdog nodes for at91 boards
->>
->>   arch/arm/boot/dts/at91sam9263ek.dts         |    4 ++++
->>   arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    4 ++++
->>   arch/arm/boot/dts/at91sam9m10g45ek.dts      |    4 ++++
->>   arch/arm/boot/dts/at91sam9n12.dtsi          |    6 ++++++
->>   arch/arm/boot/dts/at91sam9n12ek.dts         |    4 ++++
->>   arch/arm/boot/dts/at91sam9x5.dtsi           |    6 ++++++
->>   arch/arm/boot/dts/at91sam9x5ek.dtsi         |    4 ++++
->>   7 files changed, 32 insertions(+)
->>
->> --
->> 1.7.9.5
->>
->
-> Those patches haven been floating around from quite some time.
-> Let's merge them !
->
-> Tested on sam9g35, v3.10-rc2
->
-> Tested-by: Richard Genoud <richard.genoud@gmail.com>
+There's no reason for twl-core to be subsys_inicall anymore.  Anything
+using twl that early needs a rethink, or deferred probe changes.
 
-Both patches added to the at91-3.11-dt branch. Thanks!
+Boot tested and RTC wake tested (via TWL RTC) on OMAP platforms:
+3530/Beagle, 3730/Beagle-xM, 3530/Overo, 3730/Overo-STORM, 4430/Panda,
+4460/Panda-ES.
 
-Bye,
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/mfd/twl-core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+index 89ab4d9..7749b9e 100644
+--- a/drivers/mfd/twl-core.c
++++ b/drivers/mfd/twl-core.c
+@@ -1309,7 +1309,7 @@ static int __init twl_init(void)
+ {
+ 	return i2c_add_driver(&twl_driver);
+ }
+-subsys_initcall(twl_init);
++module_init(twl_init);
+ 
+ static void __exit twl_exit(void)
+ {
 -- 
-Nicolas Ferre
+1.8.2
