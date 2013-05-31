@@ -1,42 +1,45 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 31 May 2013 12:20:39 +0530
-Subject: [PATCH 2/2] rtc: omap: add rtc wakeup support to alarm events
-In-Reply-To: <1369982005-8572-3-git-send-email-gururaja.hebbar@ti.com>
-References: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
- <1369982005-8572-3-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <CA+V-a8tpPV35Z22YCNKOvCP36+v1sF8+9Fiy_Wrk4T-iCVv4nw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 31 May 2013 07:55:32 +0100
+Subject: [PATCH 0/4] clk, mfd: u8540 clock tree definition
+In-Reply-To: <20130531012509.21525.90187@quantum>
+References: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
+ <20130531012509.21525.90187@quantum>
+Message-ID: <20130531065532.GA10355@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gururaja,
+On Thu, 30 May 2013, Mike Turquette wrote:
 
-Thanks for the patch.
+> Quoting Philippe Begnic (2013-05-27 05:41:28)
+> > From: Philippe Begnic <philippe.begnic@st.com>
+> > 
+> > Create U8540 clock tree definitions for common clock framework
+> > 
+> 
+> The clock changes look good to me.  How did you want to merge the
+> patches?
 
-On Fri, May 31, 2013 at 12:03 PM, Hebbar Gururaja
-<gururaja.hebbar@ti.com> wrote:
-> On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
-[snip]
->  - ti,wakeup_capable: Inform the rtc driver that this module is wake-up
->    capable so that rtcwake and suspend tests can work.
-> +- ti,has_irq_wake_enb: Inform rtc driver that this module has a a
-same comment applies here as well.
-s/has a a/ has a
+You may as well take them through your tree Mike.
 
-> +  special register to enable Wakeup feature for Alarm events.
->
->  Example:
->
-> diff --git a/drivers/rtc/rtc-omap.c b/drivers/rtc/rtc-omap.c
-> index 000a02f..5e9c0dd 100644
-> --- a/drivers/rtc/rtc-omap.c
-> +++ b/drivers/rtc/rtc-omap.c
-> @@ -72,6 +72,8 @@
->  #define OMAP_RTC_KICK0_REG             0x6c
->  #define OMAP_RTC_KICK1_REG             0x70
->
-> +#define OMAP_RTC_IRQWAKEEN             0x7C
-> +
-why not have the hex values in smaller case as done in the rest of the file ?
+> > Philippe Begnic (4):
+> >   clk: ux500: Pass clock base adresses in initcall for u8540 and u9540
+> >   mfd: db8500: Update register definition for u8540 clock
+> >   mfd: db8500: Update BML clock register for db8580
+> >   clk: ux500: Clocks definition for u8540
+> > 
+> >  arch/arm/mach-ux500/cpu.c                 |    6 +-
+> >  drivers/clk/ux500/u8540_clk.c             |  564 ++++++++++++++++++++++++++++-
+> >  drivers/clk/ux500/u9540_clk.c             |    4 +-
+> >  drivers/mfd/db8500-prcmu.c                |    1 +
+> >  drivers/mfd/dbx500-prcmu-regs.h           |    1 +
+> >  include/linux/mfd/abx500/ab8500-sysctrl.h |    4 +-
+> >  include/linux/mfd/dbx500-prcmu.h          |   12 +
+> >  include/linux/platform_data/clk-ux500.h   |    6 +-
+> >  8 files changed, 587 insertions(+), 11 deletions(-)
+> > 
 
-Regards,
---Prabhakar Lad
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
