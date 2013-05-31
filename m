@@ -1,58 +1,71 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 31 May 2013 09:43:30 +0200
-Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
-In-Reply-To: <1369738372.3148.7.camel@hornet>
-References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
- <201305271231.40693.arnd@arndb.de> <1369738372.3148.7.camel@hornet>
-Message-ID: <2266847.DGUdOCUR2h@avalon>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 31 May 2013 16:43:26 +0900
+Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
+In-Reply-To: <CAOesGMgrdyFi3GMz52CVnhzmOYHbR5=29Ua0iS8cNbSjg6r-2A@mail.gmail.com>
+References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
+ <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
+ <CACRpkdZxWsJuvrtH-=VVqAGUCpdgS3W52R4tw5-_QGpggB+1uw@mail.gmail.com>
+ <20130531001735.GA26684@verge.net.au>
+ <CAOesGMiTXW0mVmbBbha5S4O64yu_vM=eLxM4JyctsfONCAo4qg@mail.gmail.com>
+ <20130531054517.GC5009@verge.net.au>
+ <CAOesGMgrdyFi3GMz52CVnhzmOYHbR5=29Ua0iS8cNbSjg6r-2A@mail.gmail.com>
+Message-ID: <20130531074323.GA22356@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pawel,
-
-Sorry for the late reply, I'm currently attending LinuxCon Japan, my mail 
-backlog is growing.
-
-On Tuesday 28 May 2013 11:52:52 Pawel Moll wrote:
-> On Mon, 2013-05-27 at 11:31 +0100, Arnd Bergmann wrote:
-> > On Monday 27 May 2013, Daniel Tang wrote:
-> > > > The one remaining bit that sticks out is the clcd platform data. As I
-> > > > said before, I won't require you to convert that to DT in order to
-> > > > get your code merged, but I'd also really like to see that happen,
-> > > > as we will also need that to get rid of auxdata on the ARM reference
-> > > > platforms (integrator, versatile, realview, vexpress).
-> > > 
-> > > How would you like me to convert the platform data to DT? AFAIK, the
-> > > clcd driver isn't aware of DT so the only way is to use the AUXDATA
-> > > right now.
-> > 
-> > Linus Walleij mentioned on IRC that Pawel Moll already posted a series
-> > that adds DT support for clcd:
-> > 
-> > http://lists.freedesktop.org/archives/dri-devel/2013-April/037519.html
-> > 
-> > The series does a few more things, but you can probbly split out the
-> > parts you need and base on that.
+On Thu, May 30, 2013 at 11:11:36PM -0700, Olof Johansson wrote:
+> On Thu, May 30, 2013 at 10:45 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, May 30, 2013 at 09:43:08PM -0700, Olof Johansson wrote:
+> >> Hi,
+> >>
+> >> On Thu, May 30, 2013 at 5:17 PM, Simon Horman <horms@verge.net.au> wrote:
+> >> > On Thu, May 30, 2013 at 10:08:56PM +0200, Linus Walleij wrote:
+> >> >> On Thu, May 30, 2013 at 12:28 AM, Simon Horman
+> >> >> <horms+renesas@verge.net.au> wrote:
+> >> >>
+> >> >> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> >> >> >
+> >> >> > The USB_OVCn pins are alternate options for USB over-current detection
+> >> >> > when using a 3.3V USB interface. As they're not mandatory they can be
+> >> >> > used independently of the USB PENC pins. Don't group the USB_OVCn and
+> >> >> > PENC pins to avoid conflicts when the USB_OVCn pins are used by another
+> >> >> > function.
+> >> >> >
+> >> >> > Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >> >> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >> >>
+> >> >> OK, Acked-by, do you want me to take this as a fix in the pinctrl
+> >> >> tree for v3.10?
+> >> >>
+> >> >> Just asking because Simon usually takes everything else relating to
+> >> >> the SH. ...
+> >> >
+> >> > This was a pull request from my tree to arm-soc, so thats they way
+> >> > I was planning to handle things.
+> >> >
+> >> > Olof, Arnd,
+> >> >
+> >> > should I re-spin the pull request to include Linus's ack?
+> >>
+> >> You can if you want, but for an odd and specific fix like this we'll
+> >> all know he's ok with the code going in.
+> >
+> > In that case my preference is to leave the pull request as is.
+> > Could you consider merging it?
 > 
-> The main "issue" with the series is its dependency on Laurent Pinchart's
-> Common Display Framework (or rather on the progress of its upstreaming).
-> I'm planning to discuss this in details in during the Linaro Connect in
-> Dublin, but generally, if it's not getting merged in the next window,
-> I'll spin the series to use the standard video modes bindings instead of
-> CDF. This will make me hurt on Versatile Express, but should work for
-> others.
+> Yes, I will do a pass tomorrow and handle the outstanding merges.
+> 
+> > As an aside, I do expect to send some more v3.10 fixes for shmobile.
+> > There seem to be more than usual.
+> 
+> A little unfortunate but it's hard to do much about.
+> 
+> Please be conservative with what you pick up for 3.10 vs 3.11 -- Linus
+> has said he really wants to see things slow down.
+> 
+> And please make our case as easy as possible by making sure it's
+> pretty clear from the patch descriptions what kind of bugs they fix
+> (and if they are regressions).
 
-I've met with Tomi Valkeinen (TI), Alexandre Courbot (NVidia) and Tomasz Figa 
-(Samsung) recently, For the first time the meetings helped narrowing the 
-options *down*. It seems a path is slowly unfolding, and I would like to 
-target v3.13 for a first (possibly limited) version.
-
-Regarding the DT bindings, Alexandre and Tomasz will look into the V4L2 DT 
-bindings to see whether/how they can be reused/leveraged for the CDF bindings. 
-In both case we need to describe a graph of connected entities, and there's 
-not much in the V4L2 DT bindings that is V4L2-specific in that regard.
-
--- 
-Regards,
-
-Laurent Pinchart
+Understood. I will be careful to only send the bare essentials for v3.10.
