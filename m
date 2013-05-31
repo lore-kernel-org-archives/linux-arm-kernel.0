@@ -1,210 +1,522 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 22:48:34 +0200
-Subject: [PATCH] ARM: pxa: propagate errors from regulator_enable() to
- pxamci
-In-Reply-To: <2578085.T8WORaQtxA@wuerfel>
-References: <2578085.T8WORaQtxA@wuerfel>
-Message-ID: <2230532.ij37rWB9OD@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 31 May 2013 22:52:37 +0200
+Subject: [PATCH v2] ARM: at91/dt: add pinctrl definition for at91 tc blocks
+In-Reply-To: <1369389956-30466-1-git-send-email-b.brezillon@overkiz.com>
+References: <1369389956-30466-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370033557-17114-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[using Mark's proper address. I did the patch a while ago before it was changed]
+From: Boris BREZILLON <b.brezillon@overkiz.com>
 
-On Friday 31 May 2013 22:41:16 Arnd Bergmann wrote:
-> The em_x270_mci_setpower() and em_x270_usb_hub_init() functions
-> call regulator_enable(), which may return an error that must
-> be checked.
-> 
-> This changes the em_x270_usb_hub_init() function to bail out
-> if it fails, and changes the pxamci_platform_data->setpower
-> callback so that the a failed em_x270_mci_setpower call
-> can be propagated by the pxamci driver into the mmc core.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Mike Rapoport <mike@compulab.co.il>
-> Cc: Paul Gortmaker <paul.gortmaker@windriver.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Chris Ball <cjb@laptop.org>
-> 
-> diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-> index 446563a..1df06c2 100644
-> --- a/arch/arm/mach-pxa/em-x270.c
-> +++ b/arch/arm/mach-pxa/em-x270.c
-> @@ -477,16 +477,24 @@ static int em_x270_usb_hub_init(void)
->  	/* USB Hub power-on and reset */
->  	gpio_direction_output(usb_hub_reset, 1);
->  	gpio_direction_output(GPIO9_USB_VBUS_EN, 0);
-> -	regulator_enable(em_x270_usb_ldo);
-> +	err = regulator_enable(em_x270_usb_ldo);
-> +	if (err)
-> +		goto err_free_rst_gpio;
-> +
->  	gpio_set_value(usb_hub_reset, 0);
->  	gpio_set_value(usb_hub_reset, 1);
->  	regulator_disable(em_x270_usb_ldo);
-> -	regulator_enable(em_x270_usb_ldo);
-> +	if (err)
-> +		goto err_free_rst_gpio;
-> +
-> +	err = regulator_enable(em_x270_usb_ldo);
->  	gpio_set_value(usb_hub_reset, 0);
->  	gpio_set_value(GPIO9_USB_VBUS_EN, 1);
->  
->  	return 0;
->  
-> +err_free_rst_gpio:
-> +	gpio_free(usb_hub_reset);
->  err_free_vbus_gpio:
->  	gpio_free(GPIO9_USB_VBUS_EN);
->  err_free_usb_ldo:
-> @@ -592,7 +600,7 @@ err_irq:
->  	return err;
->  }
->  
-> -static void em_x270_mci_setpower(struct device *dev, unsigned int vdd)
-> +static int em_x270_mci_setpower(struct device *dev, unsigned int vdd)
->  {
->  	struct pxamci_platform_data* p_d = dev->platform_data;
->  
-> @@ -600,10 +608,11 @@ static void em_x270_mci_setpower(struct device *dev, unsigned int vdd)
->  		int vdd_uV = (2000 + (vdd - __ffs(MMC_VDD_20_21)) * 100) * 1000;
->  
->  		regulator_set_voltage(em_x270_sdio_ldo, vdd_uV, vdd_uV);
-> -		regulator_enable(em_x270_sdio_ldo);
-> +		return regulator_enable(em_x270_sdio_ldo);
->  	} else {
->  		regulator_disable(em_x270_sdio_ldo);
->  	}
-> +	return 0;
->  }
->  
->  static void em_x270_mci_exit(struct device *dev, void *data)
-> diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
-> index 7a12c1b..4c72fa6 100644
-> --- a/arch/arm/mach-pxa/mainstone.c
-> +++ b/arch/arm/mach-pxa/mainstone.c
-> @@ -408,7 +408,7 @@ static int mainstone_mci_init(struct device *dev, irq_handler_t mstone_detect_in
->  	return err;
->  }
->  
-> -static void mainstone_mci_setpower(struct device *dev, unsigned int vdd)
-> +static int mainstone_mci_setpower(struct device *dev, unsigned int vdd)
->  {
->  	struct pxamci_platform_data* p_d = dev->platform_data;
->  
-> @@ -420,6 +420,7 @@ static void mainstone_mci_setpower(struct device *dev, unsigned int vdd)
->  		printk(KERN_DEBUG "%s: off\n", __func__);
->  		MST_MSCWR1 &= ~MST_MSCWR1_MMC_ON;
->  	}
-> +	return 0;
->  }
->  
->  static void mainstone_mci_exit(struct device *dev, void *data)
-> diff --git a/arch/arm/mach-pxa/pcm990-baseboard.c b/arch/arm/mach-pxa/pcm990-baseboard.c
-> index fb7f1d1..13e5b00 100644
-> --- a/arch/arm/mach-pxa/pcm990-baseboard.c
-> +++ b/arch/arm/mach-pxa/pcm990-baseboard.c
-> @@ -335,7 +335,7 @@ static int pcm990_mci_init(struct device *dev, irq_handler_t mci_detect_int,
->  	return err;
->  }
->  
-> -static void pcm990_mci_setpower(struct device *dev, unsigned int vdd)
-> +static int pcm990_mci_setpower(struct device *dev, unsigned int vdd)
->  {
->  	struct pxamci_platform_data *p_d = dev->platform_data;
->  	u8 val;
-> @@ -348,6 +348,7 @@ static void pcm990_mci_setpower(struct device *dev, unsigned int vdd)
->  		val &= ~PCM990_CTRL_MMC2PWR;
->  
->  	pcm990_cpld_writeb(PCM990_CTRL_MMC2PWR, PCM990_CTRL_REG5);
-> +	return 0;
->  }
->  
->  static void pcm990_mci_exit(struct device *dev, void *data)
-> diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
-> index 50ccd5f..cb374c2 100644
-> --- a/arch/arm/mach-pxa/poodle.c
-> +++ b/arch/arm/mach-pxa/poodle.c
-> @@ -258,7 +258,7 @@ err_free_2:
->  	return err;
->  }
->  
-> -static void poodle_mci_setpower(struct device *dev, unsigned int vdd)
-> +static int poodle_mci_setpower(struct device *dev, unsigned int vdd)
->  {
->  	struct pxamci_platform_data* p_d = dev->platform_data;
->  
-> @@ -270,6 +270,8 @@ static void poodle_mci_setpower(struct device *dev, unsigned int vdd)
->  		gpio_set_value(POODLE_GPIO_SD_PWR1, 0);
->  		gpio_set_value(POODLE_GPIO_SD_PWR, 0);
->  	}
-> +
-> +	return 0;
->  }
->  
->  static void poodle_mci_exit(struct device *dev, void *data)
-> diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
-> index 362726c..49bfcd7 100644
-> --- a/arch/arm/mach-pxa/spitz.c
-> +++ b/arch/arm/mach-pxa/spitz.c
-> @@ -597,7 +597,7 @@ static inline void spitz_spi_init(void) {}
->   * NOTE: The card detect interrupt isn't debounced so we delay it by 250ms to
->   * give the card a chance to fully insert/eject.
->   */
-> -static void spitz_mci_setpower(struct device *dev, unsigned int vdd)
-> +static int spitz_mci_setpower(struct device *dev, unsigned int vdd)
->  {
->  	struct pxamci_platform_data* p_d = dev->platform_data;
->  
-> @@ -605,6 +605,8 @@ static void spitz_mci_setpower(struct device *dev, unsigned int vdd)
->  		spitz_card_pwr_ctrl(SCOOP_CPR_SD_3V, SCOOP_CPR_SD_3V);
->  	else
->  		spitz_card_pwr_ctrl(SCOOP_CPR_SD_3V, 0x0);
-> +
-> +	return 0;
->  }
->  
->  static struct pxamci_platform_data spitz_mci_platform_data = {
-> diff --git a/arch/arm/mach-pxa/stargate2.c b/arch/arm/mach-pxa/stargate2.c
-> index 88fde43..62aea3e 100644
-> --- a/arch/arm/mach-pxa/stargate2.c
-> +++ b/arch/arm/mach-pxa/stargate2.c
-> @@ -734,9 +734,10 @@ static int stargate2_mci_init(struct device *dev,
->   *
->   * Very simple control. Either it is on or off and is controlled by
->   * a gpio pin */
-> -static void stargate2_mci_setpower(struct device *dev, unsigned int vdd)
-> +static int stargate2_mci_setpower(struct device *dev, unsigned int vdd)
->  {
->  	gpio_set_value(SG2_SD_POWER_ENABLE, !!vdd);
-> +	return 0;
->  }
->  
->  static void stargate2_mci_exit(struct device *dev, void *data)
-> diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-> index 847b199..2c5a91b 100644
-> --- a/drivers/mmc/host/pxamci.c
-> +++ b/drivers/mmc/host/pxamci.c
-> @@ -128,7 +128,7 @@ static inline int pxamci_set_power(struct pxamci_host *host,
->  			       !!on ^ host->pdata->gpio_power_invert);
->  	}
->  	if (!host->vcc && host->pdata && host->pdata->setpower)
-> -		host->pdata->setpower(mmc_dev(host->mmc), vdd);
-> +		return host->pdata->setpower(mmc_dev(host->mmc), vdd);
->  
->  	return 0;
->  }
-> diff --git a/include/linux/platform_data/mmc-pxamci.h b/include/linux/platform_data/mmc-pxamci.h
-> index 9eb515b..1706b35 100644
-> --- a/include/linux/platform_data/mmc-pxamci.h
-> +++ b/include/linux/platform_data/mmc-pxamci.h
-> @@ -12,7 +12,7 @@ struct pxamci_platform_data {
->  	unsigned long detect_delay_ms;		/* delay in millisecond before detecting cards after interrupt */
->  	int (*init)(struct device *, irq_handler_t , void *);
->  	int (*get_ro)(struct device *);
-> -	void (*setpower)(struct device *, unsigned int);
-> +	int (*setpower)(struct device *, unsigned int);
->  	void (*exit)(struct device *, void *);
->  	int gpio_card_detect;			/* gpio detecting card insertion */
->  	int gpio_card_ro;			/* gpio detecting read only toggle */
+This patch adds pinctrl configurations for at91 Timer Counter blocks.
+These pin definitions can be referenced by "atmel,tcb-pwm" devices to
+setup pins as PWM output for instance.
+
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+[nicolas.ferre at atmel.com: switch to pinctrl pre-processor macros]
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Hi Boris,
+
+Here is your patch modified with pinctrl macros used.
+I plan to stack it on top of our at91-3.11-dt branch now.
+
+Thanks and best regards,
+
+Nicolas Ferre
+
+ arch/arm/boot/dts/at91rm9200.dtsi  | 76 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9260.dtsi | 76 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9263.dtsi | 38 +++++++++++++++++++
+ arch/arm/boot/dts/at91sam9g45.dtsi | 76 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9n12.dtsi | 76 ++++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/at91sam9x5.dtsi  | 76 ++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 418 insertions(+)
+
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index 4aad0d9..b91cf78 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -398,6 +398,82 @@
+ 					};
+ 				};
+ 
++				tcb0 {
++					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
++						atmel,pins = <AT91_PIOA 13 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
++						atmel,pins = <AT91_PIOA 14 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
++						atmel,pins = <AT91_PIOA 15 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
++						atmel,pins = <AT91_PIOA 17 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
++						atmel,pins = <AT91_PIOA 19 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
++						atmel,pins = <AT91_PIOA 21 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
++						atmel,pins = <AT91_PIOA 18 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
++						atmel,pins = <AT91_PIOA 20 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
++						atmel,pins = <AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++				};
++
++				tcb1 {
++					pinctrl_tcb1_tclk0: tcb1_tclk0-0 {
++						atmel,pins = <AT91_PIOA 27 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk1: tcb1_tclk1-0 {
++						atmel,pins = <AT91_PIOA 28 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk2: tcb1_tclk2-0 {
++						atmel,pins = <AT91_PIOA 29 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa0: tcb1_tioa0-0 {
++						atmel,pins = <AT91_PIOB 6 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa1: tcb1_tioa1-0 {
++						atmel,pins = <AT91_PIOB 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa2: tcb1_tioa2-0 {
++						atmel,pins = <AT91_PIOB 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob0: tcb1_tiob0-0 {
++						atmel,pins = <AT91_PIOB 7 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob1: tcb1_tiob1-0 {
++						atmel,pins = <AT91_PIOB 9 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob2: tcb1_tiob2-0 {
++						atmel,pins = <AT91_PIOB 11 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index de571d9..899a7cf 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -355,6 +355,82 @@
+ 					};
+ 				};
+ 
++				tcb0 {
++					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
++						atmel,pins = <AT91_PIOA 25 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
++						atmel,pins = <AT91_PIOB 6 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
++						atmel,pins = <AT91_PIOB 7 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
++						atmel,pins = <AT91_PIOA 26 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
++						atmel,pins = <AT91_PIOA 27 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
++						atmel,pins = <AT91_PIOA 28 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
++						atmel,pins = <AT91_PIOC 9 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
++						atmel,pins = <AT91_PIOC 7 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
++						atmel,pins = <AT91_PIOC 6 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++				};
++
++				tcb1 {
++					pinctrl_tcb1_tclk0: tcb1_tclk0-0 {
++						atmel,pins = <AT91_PIOB 16 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk1: tcb1_tclk1-0 {
++						atmel,pins = <AT91_PIOB 17 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk2: tcb1_tclk2-0 {
++						atmel,pins = <AT91_PIOC 22 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa0: tcb1_tioa0-0 {
++						atmel,pins = <AT91_PIOB 0 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa1: tcb1_tioa1-0 {
++						atmel,pins = <AT91_PIOB 2 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa2: tcb1_tioa2-0 {
++						atmel,pins = <AT91_PIOB 3 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob0: tcb1_tiob0-0 {
++						atmel,pins = <AT91_PIOB 1 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob1: tcb1_tiob1-0 {
++						atmel,pins = <AT91_PIOB 18 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob2: tcb1_tiob2-0 {
++						atmel,pins = <AT91_PIOB 19 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
+index d9cf51a..ff63811 100644
+--- a/arch/arm/boot/dts/at91sam9263.dtsi
++++ b/arch/arm/boot/dts/at91sam9263.dtsi
+@@ -324,6 +324,44 @@
+ 					};
+ 				};
+ 
++				tcb0 {
++					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
++						atmel,pins = <AT91_PIOB 28 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
++						atmel,pins = <AT91_PIOC 28 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
++						atmel,pins = <AT91_PIOA 15 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
++						atmel,pins = <AT91_PIOE 18 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
++						atmel,pins = <AT91_PIOE 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
++						atmel,pins = <AT91_PIOB 17 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
++						atmel,pins = <AT91_PIOE 19 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
++						atmel,pins = <AT91_PIOE 9 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
++						atmel,pins = <AT91_PIOB 18 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++				};
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
+index f0091af..faec17d 100644
+--- a/arch/arm/boot/dts/at91sam9g45.dtsi
++++ b/arch/arm/boot/dts/at91sam9g45.dtsi
+@@ -344,6 +344,82 @@
+ 					};
+ 				};
+ 
++				tcb0 {
++					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
++						atmel,pins = <AT91_PIOD 23 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
++						atmel,pins = <AT91_PIOD 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
++						atmel,pins = <AT91_PIOC 10 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
++						atmel,pins = <AT91_PIOD 20 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
++						atmel,pins = <AT91_PIOD 21 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
++						atmel,pins = <AT91_PIOD 22 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
++						atmel,pins = <AT91_PIOD 30 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
++						atmel,pins = <AT91_PIOD 31 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
++						atmel,pins = <AT91_PIOA 26 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++				};
++
++				tcb1 {
++					pinctrl_tcb1_tclk0: tcb1_tclk0-0 {
++						atmel,pins = <AT91_PIOA 0 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk1: tcb1_tclk1-0 {
++						atmel,pins = <AT91_PIOA 3 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk2: tcb1_tclk2-0 {
++						atmel,pins = <AT91_PIOD 9 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa0: tcb1_tioa0-0 {
++						atmel,pins = <AT91_PIOA 1 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa1: tcb1_tioa1-0 {
++						atmel,pins = <AT91_PIOA 4 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa2: tcb1_tioa2-0 {
++						atmel,pins = <AT91_PIOD 7 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob0: tcb1_tiob0-0 {
++						atmel,pins = <AT91_PIOA 2 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob1: tcb1_tiob1-0 {
++						atmel,pins = <AT91_PIOA 5 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob2: tcb1_tiob2-0 {
++						atmel,pins = <AT91_PIOD 8 AT91_PERIPH_B AT91_PINCTRL_NONE>;
++					};
++				};
++
+ 				pioA: gpio at fffff200 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff200 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
+index d12da33..3166e1d 100644
+--- a/arch/arm/boot/dts/at91sam9n12.dtsi
++++ b/arch/arm/boot/dts/at91sam9n12.dtsi
+@@ -285,6 +285,82 @@
+ 					};
+ 				};
+ 
++				tcb0 {
++					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
++						atmel,pins = <AT91_PIOA 24 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
++						atmel,pins = <AT91_PIOA 25 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
++						atmel,pins = <AT91_PIOA 26 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
++						atmel,pins = <AT91_PIOA 21 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
++						atmel,pins = <AT91_PIOA 22 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
++						atmel,pins = <AT91_PIOA 23 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
++						atmel,pins = <AT91_PIOA 27 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
++						atmel,pins = <AT91_PIOA 28 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
++						atmel,pins = <AT91_PIOA 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++				};
++
++				tcb1 {
++					pinctrl_tcb1_tclk0: tcb1_tclk0-0 {
++						atmel,pins = <AT91_PIOC 4 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk1: tcb1_tclk1-0 {
++						atmel,pins = <AT91_PIOC 7 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk2: tcb1_tclk2-0 {
++						atmel,pins = <AT91_PIOC 14 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa0: tcb1_tioa0-0 {
++						atmel,pins = <AT91_PIOC 2 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa1: tcb1_tioa1-0 {
++						atmel,pins = <AT91_PIOC 5 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa2: tcb1_tioa2-0 {
++						atmel,pins = <AT91_PIOC 12 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob0: tcb1_tiob0-0 {
++						atmel,pins = <AT91_PIOC 3 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob1: tcb1_tiob1-0 {
++						atmel,pins = <AT91_PIOC 6 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob2: tcb1_tiob2-0 {
++						atmel,pins = <AT91_PIOC 13 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
+index 5635064..e77106e 100644
+--- a/arch/arm/boot/dts/at91sam9x5.dtsi
++++ b/arch/arm/boot/dts/at91sam9x5.dtsi
+@@ -414,6 +414,82 @@
+ 					};
+ 				};
+ 
++				tcb0 {
++					pinctrl_tcb0_tclk0: tcb0_tclk0-0 {
++						atmel,pins = <AT91_PIOA 24 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk1: tcb0_tclk1-0 {
++						atmel,pins = <AT91_PIOA 25 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tclk2: tcb0_tclk2-0 {
++						atmel,pins = <AT91_PIOA 26 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa0: tcb0_tioa0-0 {
++						atmel,pins = <AT91_PIOA 21 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa1: tcb0_tioa1-0 {
++						atmel,pins = <AT91_PIOA 22 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tioa2: tcb0_tioa2-0 {
++						atmel,pins = <AT91_PIOA 23 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob0: tcb0_tiob0-0 {
++						atmel,pins = <AT91_PIOA 27 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob1: tcb0_tiob1-0 {
++						atmel,pins = <AT91_PIOA 28 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb0_tiob2: tcb0_tiob2-0 {
++						atmel,pins = <AT91_PIOA 29 AT91_PERIPH_A AT91_PINCTRL_NONE>;
++					};
++				};
++
++				tcb1 {
++					pinctrl_tcb1_tclk0: tcb1_tclk0-0 {
++						atmel,pins = <AT91_PIOC 4 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk1: tcb1_tclk1-0 {
++						atmel,pins = <AT91_PIOC 7 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tclk2: tcb1_tclk2-0 {
++						atmel,pins = <AT91_PIOC 14 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa0: tcb1_tioa0-0 {
++						atmel,pins = <AT91_PIOC 2 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa1: tcb1_tioa1-0 {
++						atmel,pins = <AT91_PIOC 5 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tioa2: tcb1_tioa2-0 {
++						atmel,pins = <AT91_PIOC 12 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob0: tcb1_tiob0-0 {
++						atmel,pins = <AT91_PIOC 3 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob1: tcb1_tiob1-0 {
++						atmel,pins = <AT91_PIOC 6 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++
++					pinctrl_tcb1_tiob2: tcb1_tiob2-0 {
++						atmel,pins = <AT91_PIOC 13 AT91_PERIPH_C AT91_PINCTRL_NONE>;
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91sam9x5-gpio", "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+-- 
+1.8.0
