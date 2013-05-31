@@ -1,48 +1,103 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 May 2013 16:30:13 +0200
-Subject: [GIT PULL] ux500 fixes for the v3.10 series
-Message-ID: <CACRpkdY11CLBVTtWcXFDfWjrgfizhK45WnkR8b7CL8JwqQy8pg@mail.gmail.com>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Fri, 31 May 2013 09:48:02 -0500
+Subject: [PATCH v8] ARM: dts: omap4-panda: Update the LED support for the
+ panda DTS
+Message-ID: <1370011682-20675-1-git-send-email-dmurphy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+are different.
 
-here are two fixes from Lee Jones which hopefully fixes up the
-last pieces of fallout from the v3.10 merge window. Description
-in the signed tag.
+A1-A3 = gpio_wk7
+ES = gpio_110
 
-Please pull them in for fixes to Torvalds.
+There is no change to LED D2
 
-Yours,
-Linus Walleij
+Abstract away the pinmux and the LED definitions for the two boards into
+the respective DTS files.
 
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+---
+v8 - Rebase to latest and use pinctrl macros - https://patchwork.kernel.org/patch/2629351/
+v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
+v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
+v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
 
-The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
+ arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
+ 2 files changed, 43 insertions(+), 1 deletions(-)
 
-  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-arm-soc-v3.10-fixes-2
-
-for you to fetch changes up to 67b7c75e1a42f8288450203cd80a26b11dab8582:
-
-  ARM: ux500: Provide supplies for AUX1, AUX2 and AUX3 (2013-05-27
-14:08:20 +0200)
-
-----------------------------------------------------------------
-Ux500 fixes for v3.10:
-- A multiplatform fix making sure ux500_idle_init() is only
-  executed on ux500.
-- A regulator fix making sure the MMC/SD card regulator is
-  not disabled on boot.
-
-----------------------------------------------------------------
-Lee Jones (2):
-      ARM: ux500: Only configure wake-up reasons on ux500 based platforms
-      ARM: ux500: Provide supplies for AUX1, AUX2 and AUX3
-
- arch/arm/mach-ux500/board-mop500-regulators.c | 3 +++
- arch/arm/mach-ux500/cpuidle.c                 | 4 ++++
- 2 files changed, 7 insertions(+)
+diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+index d5d144a..523a800 100644
+--- a/arch/arm/boot/dts/omap4-panda-common.dtsi
++++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+@@ -16,8 +16,13 @@
+ 		reg = <0x80000000 0x40000000>; /* 1 GB */
+ 	};
+ 
+-	leds {
++	leds: leds {
+ 		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <
++			&led_wkgpio_pins
++		>;
++
+ 		heartbeat {
+ 			label = "pandaboard::status1";
+ 			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+@@ -157,6 +162,15 @@
+ 	};
+ };
+ 
++&omap4_pmx_wkup {
++	led_wkgpio_pins: pinmux_leds_wkpins {
++		pinctrl-single,pins = <
++			0x1a (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk7 OUTPUT | MODE 3 */
++			0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 OUTPUT | MODE 3 */
++		>;
++	};
++};
++
+ &i2c1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c1_pins>;
+diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+index 5cfdf19..5551ec6 100644
+--- a/arch/arm/boot/dts/omap4-panda-es.dts
++++ b/arch/arm/boot/dts/omap4-panda-es.dts
+@@ -34,3 +34,31 @@
+ 		0x5e (PIN_INPUT | MUX_MODE0)		/* hdmi_sda.hdmi_sda */
+ 		>;
+ };
++
++&omap4_pmx_core {
++	led_gpio_pins: gpio_led_pmx {
++		pinctrl-single,pins = <
++			0xb6 (PIN_OUTPUT | MUX_MODE3)	/* gpio_110 OUTPUT | MODE 3 */
++		>;
++	};
++};
++
++&led_wkgpio_pins {
++	pinctrl-single,pins = <
++		0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 OUTPUT | MODE 3 */
++	>;
++};
++
++&leds {
++	pinctrl-0 = <
++		&led_gpio_pins
++		&led_wkgpio_pins
++	>;
++
++	heartbeat {
++		gpios = <&gpio4 14 0>;
++	};
++	mmc {
++		gpios = <&gpio1 8 0>;
++	};
++};
+-- 
+1.7.5.4
