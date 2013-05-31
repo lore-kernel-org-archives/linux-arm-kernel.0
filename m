@@ -1,43 +1,118 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 31 May 2013 10:05:41 -0400 (EDT)
-Subject: [RFC PATCH 2/2] USB: OHCI: add a name for the platform-private
- field
-In-Reply-To: <CAJFYCKECv-a8TkngRZzKfPi4apRTRtjDj2tQfRMJS94n7sSsFQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1305311005050.1276-100000@iolanthe.rowland.org>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 31 May 2013 16:06:42 +0200
+Subject: [PATCH v7] ARM: dts: omap4-panda: Update the LED support for
+ the panda DTS
+In-Reply-To: <1369826427-31963-1-git-send-email-dmurphy@ti.com>
+References: <1369826427-31963-1-git-send-email-dmurphy@ti.com>
+Message-ID: <51A8AE72.5010601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013, Manjunath Goudar wrote:
+Hi Dan,
 
-> On 30 May 2013 22:56, Alan Stern <stern@rowland.harvard.edu> wrote:
+On 05/29/2013 01:20 PM, Dan Murphy wrote:
+> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+> are different.
 > 
-> > On Thu, 30 May 2013, Manjunath Goudar wrote:
-> >
-> > > This patch adds an ohci->priv field for private use by OHCI
-> > > platform drivers.
-> > >
-> > > Until now none of the platform drivers has used this private space,
-> > > but that's about to change in the next patch of this series.
-> >
-> > As far as I'm concerned, this doesn't need to be in a patch of its own.
-> > It can be merged into the 1/3 patch of the previous series.  After all,
-> > that patch adds the extra_priv_size field in ohci_driver_overrides,
-> > which doesn't make much sense unless there's a way to refer to the
-> > private part of the ohci_hcd structure
+> A1-A3 = gpio_wk7clean
+> ES = gpio_110
 > 
+> There is no change to LED D2
 > 
+> Abstract away the pinmux and the LED definitions for the two boards into
+> the respective DTS files.
 > 
->  Already 1/3 patch is merged into main line kernel.
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
 
-Yeah, too late now.
+That patch was good... until Florian introduces some new constant to
+improve the readability of the DTS [1].
 
-> Two days back only I started making ohci-spera a separate driver ,that time
-> I felt extra_priv_size field is required in ohci_driver_overrides that what
-> I created separate patch.
+Could you rebase on the lastest for_3.11/dts and use the macros for the
+GPIO and pinctrl nodes?
+
+Thanks,
+Benoit
+
+[1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg89684.html
+
+> ---
+> v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
+> v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
+> v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
 > 
-> extra_priv_size patch is related to Spear patch,If you are agree,I can add
-> this patch with Spear patch,making Spear patch series.
-
-No, we may as well keep it separate like this.
-
-Alan Stern
+>  arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
+>  arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
+>  2 files changed, 43 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index 03bd60d..5fd59b3 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -16,8 +16,13 @@
+>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+>  	};
+>  
+> -	leds {
+> +	leds: leds {
+>  		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <
+> +			&led_wkgpio_pins
+> +		>;
+> +
+>  		heartbeat {
+>  			label = "pandaboard::status1";
+>  			gpios = <&gpio1 7 0>;
+> @@ -137,6 +142,15 @@
+>  	};
+>  };
+>  
+> +&omap4_pmx_wkup {
+> +	led_wkgpio_pins: pinmux_leds_wkpins {
+> +		pinctrl-single,pins = <
+> +			0x1a 0x3	/* gpio_wk7 OUTPUT | MODE 3 */
+> +			0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
+> +		>;
+> +	};
+> +};
+> +
+>  &i2c1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&i2c1_pins>;
+> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+> index f1d8c21..c968a3b 100644
+> --- a/arch/arm/boot/dts/omap4-panda-es.dts
+> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
+> @@ -34,3 +34,31 @@
+>  		0x5e 0x100	/* hdmi_sda.hdmi_sda INPUT | MODE 0 */
+>  		>;
+>  };
+> +
+> +&omap4_pmx_core {
+> +	led_gpio_pins: gpio_led_pmx {
+> +		pinctrl-single,pins = <
+> +			0xb6 0x3	/* gpio_110 OUTPUT | MODE 3 */
+> +		>;
+> +	};
+> +};
+> +
+> +&led_wkgpio_pins {
+> +	pinctrl-single,pins = <
+> +		0x1c 0x3	/* gpio_wk8 OUTPUT | MODE 3 */
+> +	>;
+> +};
+> +
+> +&leds {
+> +	pinctrl-0 = <
+> +		&led_gpio_pins
+> +		&led_wkgpio_pins
+> +	>;
+> +
+> +	heartbeat {
+> +		gpios = <&gpio4 14 0>;
+> +	};
+> +	mmc {
+> +		gpios = <&gpio1 8 0>;
+> +	};
+> +};
+> 
