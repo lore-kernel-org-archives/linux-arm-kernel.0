@@ -1,51 +1,37 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 31 May 2013 11:39:01 +0200
-Subject: [PATCH 0/2] ARM: dts: add watchdog device tree node in at91 dts
- files
-In-Reply-To: <1369969893-7992-1-git-send-email-wenyou.yang@atmel.com>
-References: <1369969744-3428-1-git-send-email-wenyou.yang@atmel.com>
- <1369969893-7992-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <CACQ1gAjF=L+tVcJc3QMv7HEYcny2y-HcDLGJ5N7XbM=_vL+dFQ@mail.gmail.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Fri, 31 May 2013 10:43:59 +0100
+Subject: [PATCH v1 0/2] ARM:prima2: multi_v7 kernel fixes.
+Message-ID: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/31 Wenyou Yang <wenyou.yang@atmel.com>:
-> Hello,
->
-> The patches is to add watchdog device tree node for at91 SoC and board dts files.
->
-> Since the watchdog is disabled in the at91bootstrap with default configuration,
-> if you want to use the watchdog in the kernel, you must make sure the watchdog
-> doesn't be disabled in the at91bootstrap.
->
-> It is tested on at91sam9g20ek, at91sam9263ek, at91sam9g25ek
-> using Documentation/watchdog/src/watchdog-simple.c.
->
-> It is based on v3.10-rc3, tested on linux-watchdog git tree as well.
->
-> Best Regards,
-> Wenyou Yang
->
-> Wenyou Yang (2):
->   ARM: dts: add the watchdog nodes for at91 SoC
->   ARM: dts: add the watchdog nodes for at91 boards
->
->  arch/arm/boot/dts/at91sam9263ek.dts         |    4 ++++
->  arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    4 ++++
->  arch/arm/boot/dts/at91sam9m10g45ek.dts      |    4 ++++
->  arch/arm/boot/dts/at91sam9n12.dtsi          |    6 ++++++
->  arch/arm/boot/dts/at91sam9n12ek.dts         |    4 ++++
->  arch/arm/boot/dts/at91sam9x5.dtsi           |    6 ++++++
->  arch/arm/boot/dts/at91sam9x5ek.dtsi         |    4 ++++
->  7 files changed, 32 insertions(+)
->
-> --
-> 1.7.9.5
->
+From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-Those patches haven been floating around from quite some time.
-Let's merge them !
+If we try to boot a multi_v7_defconfig kernel on any ARM parts other than 
+prima2, you will hit kernel panics. This is because some of the code is still
+using explicit early_initcall and postcore_initcalls.
 
-Tested on sam9g35, v3.10-rc2
+Moving these calls to machine descriptor level is the right way to fix this
+issue. Also the calls will not be attempted to run on any non-prima2 parts.
 
-Tested-by: Richard Genoud <richard.genoud@gmail.com>
+As I do not have any prima2 boards, I could not test these patches.
+However I feel that these are safe patches.
+
+Barry, can you give it a quick test please.
+
+Thankyou,
+srini
+
+Srinivas Kandagatla (2):
+  ARM:prima2: move sirfsoc_of_rstc_init to .init_early
+  ARM:prima2:move postcore_initcalls to init_machine.
+
+ arch/arm/mach-prima2/common.c |    6 ++++++
+ arch/arm/mach-prima2/common.h |    1 +
+ arch/arm/mach-prima2/pm.c     |    6 ++----
+ arch/arm/mach-prima2/pm.h     |    2 ++
+ arch/arm/mach-prima2/rstc.c   |    5 +----
+ 5 files changed, 12 insertions(+), 8 deletions(-)
+
+-- 
+1.7.6.5
