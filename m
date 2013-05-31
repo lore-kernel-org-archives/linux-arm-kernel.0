@@ -1,7 +1,9 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Fri, 31 May 2013 11:09:04 +0800
+Date: Fri, 31 May 2013 11:10:01 +0800
 Subject: [PATCH 0/2] ARM: dts: add watchdog device tree node in at91 dts files
-Message-ID: <1369969744-3428-1-git-send-email-wenyou.yang@atmel.com>
+In-Reply-To: <1369969744-3428-1-git-send-email-wenyou.yang@atmel.com>
+References: <1369969744-3428-1-git-send-email-wenyou.yang@atmel.com>
+Message-ID: <1369969802-7840-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
