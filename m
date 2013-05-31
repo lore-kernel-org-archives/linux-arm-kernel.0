@@ -1,41 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat,  1 Jun 2013 00:22:51 +0200
-Subject: [PATCH 14/15] clk: tegra: provide tegra_periph_reset_assert
- alternative
+Date: Sat,  1 Jun 2013 00:22:43 +0200
+Subject: [PATCH 06/15] cpuidle: calxeda: select ARM_CPU_SUSPEND
 In-Reply-To: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
 References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
-Message-ID: <1370038972-2318779-15-git-send-email-arnd@arndb.de>
+Message-ID: <1370038972-2318779-7-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We have some tegra device drivers that are written to be platform
-independent but still use the tegra specific tegra_periph_reset_assert
-function. In order to build and link them without errors,
-this provides a static inline version of these functions that
-does nothing when Tegra support is disabled.
+Like other ARM specific drivers, this one requires ARM_CPU_SUSPEND,
+as shown by this linker error:
+
+drivers/built-in.o: In function `calxeda_pwrdown_idle':
+drivers/cpuidle/cpuidle-calxeda.c:84: undefined reference to `cpu_suspend'
+drivers/cpuidle/cpuidle-calxeda.c:86: undefined reference to `cpu_resume'
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Acked-by: Rafael J. Wysocki <rjw@sisk.pl>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: linux-pm at vger.kernel.org
 ---
- include/linux/clk/tegra.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/cpuidle/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/linux/clk/tegra.h b/include/linux/clk/tegra.h
-index 642789b..1397190 100644
---- a/include/linux/clk/tegra.h
-+++ b/include/linux/clk/tegra.h
-@@ -120,8 +120,13 @@ static inline void tegra_cpu_clock_resume(void)
- }
- #endif
- 
-+#ifdef ARCH_TEGRA
- void tegra_periph_reset_deassert(struct clk *c);
- void tegra_periph_reset_assert(struct clk *c);
-+#else
-+static inline void tegra_periph_reset_deassert(struct clk *c) {}
-+static inline void tegra_periph_reset_assert(struct clk *c) {}
-+#endif
- void tegra_clocks_init(void);
- void tegra_clocks_apply_init_table(void);
+diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+index c4cc27e..e21cdfa 100644
+--- a/drivers/cpuidle/Kconfig
++++ b/drivers/cpuidle/Kconfig
+@@ -36,6 +36,7 @@ if CPU_IDLE
+ config CPU_IDLE_CALXEDA
+ 	bool "CPU Idle Driver for Calxeda processors"
+ 	depends on ARCH_HIGHBANK
++	select ARM_CPU_SUSPEND
+ 	help
+ 	  Select this to enable cpuidle on Calxeda processors.
  
 -- 
 1.8.1.2
