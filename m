@@ -1,82 +1,70 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Fri, 31 May 2013 12:32:11 -0700
-Subject: [PATCH v2 1/1] ARM : omap3 : fix wrong container_of in clock36xx.c
-In-Reply-To: <1369903827-2025-1-git-send-email-jp.francois@cynove.com>
-References: <1369903827-2025-1-git-send-email-jp.francois@cynove.com>
-Message-ID: <20130531193211.21525.68958@quantum>
+Date: Fri, 31 May 2013 12:52:35 -0700
+Subject: [BUG] zynq | CCF | SRCU
+In-Reply-To: <42b8bfd5-3012-4c49-b9ef-7a9beb5956f1@VA3EHSMHS041.ehs.local>
+References: <42b8bfd5-3012-4c49-b9ef-7a9beb5956f1@VA3EHSMHS041.ehs.local>
+Message-ID: <20130531195235.21525.64931@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jean-Philippe Francois (2013-05-30 01:50:27)
-> omap36xx_pwrdn_clk_enable_with_hsdiv_restore expects the parent hw of the clock
-> to be a clk_hw_omap. However, looking at cclock3xxx_data.c, all concerned clock
-> have parent defined as clk_divider. Instead of using container_of to eventually get
-> to the register and directly mess with the divider, change freq via clk_set_rate, 
-> and let the clock framework toggle the divider value.
-> Tested with  3.9 on dm3730.
+Quoting S?ren Brinkmann (2013-05-31 12:12:07)
+> Hi,
 > 
-> Signed-off-by: Jean-Philippe Fran??ois <jp.francois@cynove.com>
+> we recently encountered some kernel panics when we compiled one of our
+> drivers as module and tested inserting/removing the module.
+> Trying to debug this issue, I could reproduce it on the mainline kernel
+> with a dummy module.
+> 
+> What happens is, that when on driver remove clk_notifier_unregister() is
+> called and no other notifier for that clock is registered, the kernel
+> panics.
+> I'm not sure what is going wrong here. If there is a bug (and if where)
+> or I'm just using the infrastructure the wrong way,... So, any hint is
+> appreciated.
+> 
+> I attach the output from the crashing system. The stacktrace indicates a
+> crash in 'srcu_readers_seq_idx()'.
+> I also attach the module I used to trigger the issue and a patch on top
+> of mainline commit a93cb29acaa8f75618c3f202d1cf43c231984644 which has
+> the DT modifications I need to make the module find its clock and boot
+> with my initramfs.
+> 
 
-Did you use git-format-patch to create this patch?  Its a bit nicer to
-use that or if you just use diff then use "diff -up" or "diff -uprN"
-(taken from Documentation/SubmittingPatches.txt).
+Soren,
 
-Also did you test this to make sure it works?  I don't mean a boot test,
-but actually disabling/re-enabling an HSDIVIDER on 3630?  The previous
-code just programmed the clksel field to 1, and this code divides the
-rate by 2, then restores it.  I just used that as an example in my
-previous email and it needs to be verified that it works (though it
-should if I remember this errata correctly).
+I only took a quick look at this so the following is a shot in the dark.
+notifier_block->next should be protected by an RCU lock, and the way you
+open-code the initialization struck me as a bit weird.  Can you change
+your code to the following and let me know if it makes any difference?
 
-If that testing is done and everything looks good then please add:
+static struct notifier_block nb = {
+        .notifier_call = clk_notif_dbg_cb;
+};
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+static int clk_notif_dbg_cb(struct notifier_block *nb,
+                unsigned long event, void *data)
+{
+        pr_info("clk_notif_dbg_cb\n");
+
+        return NOTIFY_OK;
+}
+
+static int clk_notif_dbg_probe(struct platform_device *pdev)
+{
+        ...
+        if (clk_notifier_register(clk, &nb))
+                dev_warn(&pdev->dev, "clk_notifier_register failed\n");
+        ...
+
+
+That is a small difference, but that style of initializing the
+notifier_block has always worked for me when using clk rate-change
+notifiers.  However I'm sure the bug you mention is far more evil and
+nefarious than that ;-)
+
+Regards,
+Mike
 
 > 
-> Index: b/arch/arm/mach-omap2/clock36xx.c
-> ===================================================================
-> --- a/arch/arm/mach-omap2/clock36xx.c
-> +++ b/arch/arm/mach-omap2/clock36xx.c
-> @@ -39,30 +39,25 @@
->   */
->  int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
->  {
-> -       struct clk_hw_omap *parent;
-> -       struct clk_hw *parent_hw;
-> -       u32 dummy_v, orig_v, clksel_shift;
->         int ret;
->  
->         /* Clear PWRDN bit of HSDIVIDER */
->         ret = omap2_dflt_clk_enable(clk);
->  
-> -       parent_hw = __clk_get_hw(__clk_get_parent(clk->clk));
-> -       parent = to_clk_hw_omap(parent_hw);
-> -
-> -       /* Restore the dividers */
-> +       /* kick parent's clksel register after toggling PWRDN bit */
->         if (!ret) {
-> -               clksel_shift = __ffs(parent->clksel_mask);
-> -               orig_v = __raw_readl(parent->clksel_reg);
-> -               dummy_v = orig_v;
-> -
-> -               /* Write any other value different from the Read value */
-> -               dummy_v ^= (1 << clksel_shift);
-> -               __raw_writel(dummy_v, parent->clksel_reg);
-> -
-> -               /* Write the original divider */
-> -               __raw_writel(orig_v, parent->clksel_reg);
-> +               struct clk *parent = clk_get_parent(clk->clk);
-> +               unsigned long parent_rate = clk_get_rate(parent);
-> +               ret = clk_set_rate(parent, parent_rate/2);
-> +               if(ret)
-> +                       goto badfreq;
-> +               ret = clk_set_rate(parent, parent_rate);
-> +               if(ret)
-> +                       goto badfreq;
->         }
-> +       return ret;
->  
-> + badfreq :
-> +       omap2_dflt_clk_disable(clk);
->         return ret;
->  }
+>         Thanks,
+>         S?ren
