@@ -1,46 +1,47 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 31 May 2013 11:59:15 +0100
-Subject: [PATCH RFC 5/6] arm64/xen: implement xen_remap on arm64
-In-Reply-To: <1369930713-6063-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Fri, 31 May 2013 12:02:26 +0100
+Subject: [PATCH RFC 6/6] arm64/xen: introduce CONFIG_XEN and hypercall.S
+ on ARM64
+In-Reply-To: <1369930713-6063-6-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
- <1369930713-6063-5-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130531105915.GC18045@localhost.cambridge.arm.com>
+ <1369930713-6063-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130531110225.GD18045@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 05:18:32PM +0100, Stefano Stabellini wrote:
-> --- a/arch/arm/include/asm/xen/page.h
-> +++ b/arch/arm/include/asm/xen/page.h
-> @@ -90,6 +90,10 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
->  	return __set_phys_to_machine(pfn, mfn);
->  }
+On Thu, May 30, 2013 at 05:18:33PM +0100, Stefano Stabellini wrote:
+> Introduce CONFIG_XEN and the implementation of hypercall.S (that is
+> the only ARMv8 specific code in Xen support for ARM).
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> ---
+>  arch/arm64/Kconfig         |   11 +++++
+>  arch/arm64/Makefile        |    1 +
+>  arch/arm64/xen/Makefile    |    1 +
+>  arch/arm64/xen/hypercall.S |  105 ++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 118 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm64/xen/Makefile
+>  create mode 100644 arch/arm64/xen/hypercall.S
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 56b3f6d..f35751f 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -182,6 +182,17 @@ config HW_PERF_EVENTS
 >  
-> +#ifdef CONFIG_ARM64
-> +#define xen_remap(cookie, size) __ioremap((cookie), (size), __pgprot(PROT_NORMAL))
-> +#else
->  #define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
-> +#endif
-
-Now I saw the ARM-specific part. Can you not use something like
-ioremap_cached() which would give normal cacheable memory (at least on
-ARMv7).
-
->  #endif /* _ASM_ARM_XEN_PAGE_H */
-> diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-> index 2e12258..0e9c9ac 100644
-> --- a/arch/arm64/include/asm/io.h
-> +++ b/arch/arm64/include/asm/io.h
-> @@ -228,6 +228,7 @@ extern void __iounmap(volatile void __iomem *addr);
->  #define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_DIRTY)
->  #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
->  #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL_NC))
-> +#define PROT_NORMAL		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+>  source "mm/Kconfig"
 >  
->  #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
->  #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
+> +config XEN_DOM0
+> +	def_bool y
+> +	depends on XEN
+> +
+> +config XEN
+> +	bool "Xen guest support on ARM64 (EXPERIMENTAL)"
+> +	depends on ARM64 && OF
+> +	depends on !GENERIC_ATOMIC64
 
-Of course we need to add ioremap_cached() for arm64 but until now we
-didn't need it.
+I don't think we need this depends on !GENERIC_ATOMIC64, we don't enable
+it on arm64.
 
 -- 
 Catalin
