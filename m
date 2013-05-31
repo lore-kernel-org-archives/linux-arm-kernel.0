@@ -1,126 +1,65 @@
 From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Fri, 31 May 2013 15:43:03 +0530
-Subject: [PATCH 03/11] Input: gpio_keys: Adopt pinctrl support
-In-Reply-To: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
-References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1369995191-20855-4-git-send-email-gururaja.hebbar@ti.com>
+Date: Fri, 31 May 2013 15:43:00 +0530
+Subject: [PATCH 00/11] drivers: Add Pinctrl PM support
+Message-ID: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend gpio-keys driver to optionally take a pin control handle and set
-the state of the pins to:
-
-- "default" on boot, resume
-- "sleep" on suspend()
-
-By Optionally putting the pins into sleep state in the suspend callback
-we can accomplish two things.
+By optionally putting the pins into sleep state in the suspend [or in
+runtime_suspend] callback we can accomplish two things.
 - One is to minimize current leakage from pins and thus save power,
 - second, we can prevent the IP from driving pins output in an
 uncontrolled manner, which may happen if the power domain drops the
 domain regulator.
 
-If any of the above pin states are missing in dt, a warning message
-about the missing state is displayed.
-If certain pin-states are not available, to remove this warning message
-pass respective state name with null phandler.
+These states can be specified in the DT blob and corresponding driver
+can pick these states during probe & set the related values during
+idle/suspend.
 
-Todo:
-- if an idle state is available for pins, add support for it.
+Not all drivers support/has idle state. Drivers like i2c, spi, mmc has
+idle states and hence these drivers are updated to support all the
+three states
+- default  : during regular operation
+- idle : when the module is in idle state
+- sleep : when the module is in suspend state
 
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-Cc: linux-input at vger.kernel.org
----
-:100644 100644 b29ca65... ca615a4... M	drivers/input/keyboard/gpio_keys.c
- drivers/input/keyboard/gpio_keys.c |   47 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+For those drivers which doesn't support/have idle state (at least at
+the moment), only default & sleep state is added.
 
-diff --git a/drivers/input/keyboard/gpio_keys.c b/drivers/input/keyboard/gpio_keys.c
-index b29ca65..ca615a4 100644
---- a/drivers/input/keyboard/gpio_keys.c
-+++ b/drivers/input/keyboard/gpio_keys.c
-@@ -28,6 +28,7 @@
- #include <linux/gpio.h>
- #include <linux/of_platform.h>
- #include <linux/of_gpio.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/spinlock.h>
- 
- struct gpio_button_data {
-@@ -47,6 +48,10 @@ struct gpio_keys_drvdata {
- 	struct input_dev *input;
- 	struct mutex disable_lock;
- 	struct gpio_button_data data[0];
-+	/* Two optional pin states - default & sleep */
-+	struct pinctrl		*pinctrl;
-+	struct pinctrl_state	*pins_default;
-+	struct pinctrl_state	*pins_sleep;
- };
- 
- /*
-@@ -709,6 +714,35 @@ static int gpio_keys_probe(struct platform_device *pdev)
- 		goto fail1;
- 	}
- 
-+	ddata->pinctrl = devm_pinctrl_get(dev);
-+	if (!IS_ERR(ddata->pinctrl)) {
-+		ddata->pins_default = pinctrl_lookup_state(ddata->pinctrl,
-+						PINCTRL_STATE_DEFAULT);
-+		/* enable pins to be muxed in and configured */
-+		if (IS_ERR(ddata->pins_default))
-+			dev_dbg(dev, "could not get default pinstate\n");
-+		else
-+			if (pinctrl_select_state(ddata->pinctrl,
-+						 ddata->pins_default))
-+				dev_err(dev,
-+					"could not set default pinstate\n");
-+
-+		ddata->pins_sleep = pinctrl_lookup_state(ddata->pinctrl,
-+						PINCTRL_STATE_SLEEP);
-+		if (IS_ERR(ddata->pins_sleep))
-+			dev_dbg(dev, "could not get sleep pinstate\n");
-+	} else {
-+		/*
-+		* Since we continue even when pinctrl node is not found,
-+		* Invalidate pins as not available. This is to make sure that
-+		* IS_ERR(pins_xxx) results in failure when used.
-+		*/
-+		ddata->pins_default = ERR_PTR(-ENODATA);
-+		ddata->pins_sleep = ERR_PTR(-ENODATA);
-+
-+		dev_dbg(dev, "pins are not configured from the driver\n");
-+	}
-+
- 	ddata->pdata = pdata;
- 	ddata->input = input;
- 	mutex_init(&ddata->disable_lock);
-@@ -816,6 +850,13 @@ static int gpio_keys_suspend(struct device *dev)
- 				enable_irq_wake(bdata->irq);
- 		}
- 	} else {
-+		/* Optionally let pins go into sleep states */
-+		if (!IS_ERR(ddata->pins_sleep))
-+			if (pinctrl_select_state(ddata->pinctrl,
-+						 ddata->pins_sleep))
-+				dev_err(dev,
-+					"could not set pins to sleep state\n");
-+
- 		mutex_lock(&input->mutex);
- 		if (input->users)
- 			gpio_keys_close(input);
-@@ -839,6 +880,12 @@ static int gpio_keys_resume(struct device *dev)
- 				disable_irq_wake(bdata->irq);
- 		}
- 	} else {
-+		/* Optionaly enable pins to be muxed in and configured */
-+		if (!IS_ERR(ddata->pins_default))
-+			if (pinctrl_select_state(ddata->pinctrl,
-+						 ddata->pins_default))
-+				dev_err(dev, "could not set default pins\n");
-+
- 		mutex_lock(&input->mutex);
- 		if (input->users)
- 			error = gpio_keys_open(input);
+The modification expects DT blob to provide the phandler & the pinctrl
+states otherwise it gives a warning message. To remove this warning
+message pass default state with null phandler to pinctrl in device node
+
+Kernel Base for the series is
+	> git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/
+	linux-2.6.git
+	> tag: v3.10-rc3
+
+Hebbar Gururaja (11):
+  pinctrl: single: adopt pinctrl sleep mode management
+  leds: leds-gpio: Enhance pinctrl support
+  Input: gpio_keys: Adopt pinctrl support
+  Input: matrix-keypad: Adopt pinctrl support
+  spi: omap2-mcspi: enhance pinctrl support
+  usb: musb: dsps: Adopt pinctrl support
+  pwm: pwm-tiehrpwm: enhance pinctrl support
+  pwm: pwm-tiecap: enhance pinctrl support
+  mmc: omap_hsmmc: enhance pinctrl support
+  video: da8xx-fb: adopt pinctrl support
+  i2c: omap: enhance pinctrl support
+
+ drivers/i2c/busses/i2c-omap.c          |  112 ++++++++++++++++++++++++++++++--
+ drivers/input/keyboard/gpio_keys.c     |   47 ++++++++++++++
+ drivers/input/keyboard/matrix_keypad.c |   48 ++++++++++++++
+ drivers/leds/leds-gpio.c               |   81 +++++++++++++++++++++--
+ drivers/mmc/host/omap_hsmmc.c          |   79 ++++++++++++++++++++--
+ drivers/pinctrl/pinctrl-single.c       |   27 ++++++++
+ drivers/pwm/pwm-tiecap.c               |   48 ++++++++++++--
+ drivers/pwm/pwm-tiehrpwm.c             |   49 ++++++++++++--
+ drivers/spi/spi-omap2-mcspi.c          |   89 +++++++++++++++++++++++--
+ drivers/usb/musb/musb_dsps.c           |   46 +++++++++++++
+ drivers/video/da8xx-fb.c               |   48 ++++++++++++++
+ 11 files changed, 641 insertions(+), 33 deletions(-)
+
 -- 
 1.7.9.5
