@@ -1,43 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 May 2013 13:55:56 +0200
-Subject: [PATCH 31/39] ARM: u300: add syscon node
-In-Reply-To: <14733989.vf3LkZC316@wuerfel>
-References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
- <1369991954-17406-32-git-send-email-linus.walleij@stericsson.com>
- <14733989.vf3LkZC316@wuerfel>
-Message-ID: <CACRpkdaPXLuyXWSrMipZs6L973-8C=iaeOWYZ_zCKCSZNn2cQQ@mail.gmail.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 31 May 2013 13:02:04 +0100
+Subject: [PATCH RFC 1/6] [HACK!] arm64/xen: create links to arch/arm
+ include files and Xen code
+In-Reply-To: <20130531103617.GA18045@localhost.cambridge.arm.com>
+References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
+ <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130531103617.GA18045@localhost.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1305311259090.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 12:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 31 May 2013 11:19:06 Linus Walleij wrote:
+On Fri, 31 May 2013, Catalin Marinas wrote:
+> On Thu, May 30, 2013 at 05:18:28PM +0100, Stefano Stabellini wrote:
+> > Most of Xen support for ARM is common between ARMv7 and ARMv8.
+> > Create links to the code under arch/arm (bleah).
+> > 
+> > Other, probably better alternatives:
+> > 
+> > - move the code to a different location, maybe the header files to
+> > include/xen/arm and the code to drivers/xen/arm (still pretty ugly)?
+> > 
+> > - create a copy of the code to arch/arm64 (even worse);
+> 
+> KVM handles this in the Makefile by referencing back to arch/arm or even
+> the generic kvm directory. I think that's the 'cleanest' ;)
 
->>  compatible="stericsson,u300";
->>
->> +Required node: syscon
->> +This contains the system controller.
->> +- compatible: must be "stericsson,u300-syscon".
->> +- reg: the base address and size of the system controller.
->> +
->
-> Any reason why you are not making it compatible with "syscon", to use
-> the drivers/mfd/syscon.c driver?
+Do you mean creating links in the Makefile or generating header file
+copies from the Makefile?
+Or do you mean using something like "-I arch/arm/include/asm/xen" in the
+arch/arm64 Makefile?
 
-For the first lookup at irq_init() we cannot use it.
-
-This is because that needs to be initialized at irq_init() time
-to set up the clocks, which are needed by the interrupt controller,
-it cannot use device matching, as the platform devices are not
-probed yet.
-
-However I can make it compatible for the board power snippet
-to make use of it for sure.
-
-But I find no good examples in the kernel on how to grab a
-referenced syscon node and use the regmap API to read/write
-registers :-(
-
-Dong: do you have some example to point at for this?
-
-Yours,
-Linus Walleij
+I tried to find exactly what KVM is doing but I couldn't find the code
+you are talking about..
