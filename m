@@ -1,37 +1,31 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Fri, 31 May 2013 10:17:22 +0200
-Subject: [PATCH 1/2] gpiolib: add gpio_export_with_name
-In-Reply-To: <CACRpkdZMj-Xin5PMDWavaWOTCSZF3NBWXk4fG4QXsJzhwBcs_Q@mail.gmail.com>
-References: <20121121101259.GQ4398@game.jcrosoft.org>
- <1353492849-29397-1-git-send-email-plagnioj@jcrosoft.com>
- <20121126135911.2F1D33E187C@localhost> <51A719A5.50906@epfl.ch>
- <CACRpkdb9F+wJ0hkNqPTP34r3JAEp2s07Q8U24fD6oCdj7MqCFA@mail.gmail.com>
- <51A7B8CD.4080702@epfl.ch>
- <CACRpkdZMj-Xin5PMDWavaWOTCSZF3NBWXk4fG4QXsJzhwBcs_Q@mail.gmail.com>
-Message-ID: <51A85C92.4090701@epfl.ch>
+From: prabhakar.csengg@gmail.com (Prabhakar Lad)
+Date: Fri, 31 May 2013 14:13:00 +0530
+Subject: [PATCH v2 1/4] ARM: davinci: dm365 evm: remove init_enable from
+ ths7303 pdata
+In-Reply-To: <CA+V-a8sAXXq=gBO_uDsOS1MonXJan+mpBwo15tvp+wR40kAMKA@mail.gmail.com>
+References: <1369503576-22271-1-git-send-email-prabhakar.csengg@gmail.com>
+ <1369503576-22271-2-git-send-email-prabhakar.csengg@gmail.com>
+ <CA+V-a8sAXXq=gBO_uDsOS1MonXJan+mpBwo15tvp+wR40kAMKA@mail.gmail.com>
+Message-ID: <CA+V-a8t8vx2S0rAZrZysF9PT2zVwx+EM0B5D=t50qoSiW8U_GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Linus,
+Hi Sekhar,
 
-On 05/30/2013 11:11 PM, Linus Walleij wrote:
-> On Thu, May 30, 2013 at 10:38 PM, Florian Vaussard
-> <florian.vaussard@epfl.ch> wrote:
+On Sat, May 25, 2013 at 11:13 PM, Prabhakar Lad
+<prabhakar.csengg@gmail.com> wrote:
+> Hi Sekhar,
 >
->> Indeed, I work in a robotics lab :-) One of our board (mach-imx/
->> mx31moboard*.c) controls for example the multiplexing of two cameras
->> sharing the same acquisition bus (I know, a bit hackish).
->> I developed a similar board with an OMAP3. Such control do not
->> fit well in the above-mentioned cases, but we do not need RT processes.
->
-> It does seem to fit well with V4L and/or the media controller
-> framework though, or is this one of those "oh, we don't really
-> like to use V4L so we have this special hack instead" things?
->
-
-Sorry, I was not aware of this mux capability inside V4L. Thank
-you. So we can live without gpio-export for most of our hardware.
+> On Sat, May 25, 2013 at 11:09 PM, Prabhakar Lad
+> <prabhakar.csengg@gmail.com> wrote:
+>> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
+>>
+>> remove init_enable from ths7303 pdata as it is being dropped
+>> from ths7303_platform_data.
+>>
+> Can you please ack this patch as I intend to take this patch via media
+> tree.
+gentle ping.
 
 Regards,
-
-Florian
+--Prabhakar
