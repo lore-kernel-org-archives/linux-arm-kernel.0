@@ -1,60 +1,62 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 31 May 2013 03:20:08 +0200
-Subject: [RFC/PATCH v2 2/2] gpio-rcar: Add DT support
-In-Reply-To: <CACRpkdb8GYpx3ASzXB7HX5oEpAUBe-yBo0N5Ep9S+DqoE6oCLw@mail.gmail.com>
-References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1369136406-23800-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <CACRpkdb8GYpx3ASzXB7HX5oEpAUBe-yBo0N5Ep9S+DqoE6oCLw@mail.gmail.com>
-Message-ID: <4678059.RuWR6CiQ8n@avalon>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 30 May 2013 18:20:14 -0700
+Subject: [PATCH] clk: use platform_{get,set}_drvdata()
+In-Reply-To: <000401ce581b$a9224600$fb66d200$@samsung.com>
+References: <000401ce581b$a9224600$fb66d200$@samsung.com>
+Message-ID: <20130531012014.21525.39312@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Thursday 30 May 2013 19:38:12 Linus Walleij wrote:
-> On Tue, May 21, 2013 at 1:40 PM, Laurent Pinchart
-> <laurent.pinchart+renesas@ideasonboard.com> wrote:
-> > Add DT bindings for the gpio-rcar driver and read the device
-> > configuration from the DT node at probe time if available.
-> > 
-> > Cc: devicetree-discuss at lists.ozlabs.org
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
+Quoting Jingoo Han (2013-05-23 18:11:46)
+> Use the wrapper functions for getting and setting the driver data using
+> platform_device instead of using dev_{get,set}_drvdata() with &pdev->dev,
+> so we can directly pass a struct platform_device.
 > 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+
+Taken into clk-next.
+
+Thanks for the patch,
+Mike
+
+> ---
+>  drivers/clk/clk-twl6040.c |    4 ++--
+>  drivers/clk/clk-wm831x.c  |    2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> I am assuming this will go through Simon's tree?
-
-I've so far pushed GPIO and pinctrl patches for SH through Simon's tree due to 
-the many cross-dependencies between SH arch code and the GPIO and pinctrl 
-drivers. As the situation now stabilizes, we could now push the patches 
-through their respective subsystem trees.
-
-Simon, Linus, any opinion/preference on that ?
-
-> Note:
-> > +  - gpio-ranges: Range of pins managed by the GPIO controller as a
-> > 4-cells
-> > +    tuple using the following syntax.
-> > +
-> > +    <[phandle of the pin controller node]
-> > +     0
-> > +     [index of the first pin]
-> > +     [number of pins]>
-> > +
-> > +Please refer to gpio.txt in this directory for details of the common GPIO
-> > +bindings used by client devices.
-> 
-> The above ranges are part of that document.
-
-What about replacing that with
-
-  - gpio-ranges: Range of pins managed by the GPIO controller.
-
-Please refer to gpio.txt in this directory for details of gpio-ranges property 
-and the common GPIO bindings used by client devices.
-
--- 
-Regards,
-
-Laurent Pinchart
+> diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
+> index 3af729b..1ada79a 100644
+> --- a/drivers/clk/clk-twl6040.c
+> +++ b/drivers/clk/clk-twl6040.c
+> @@ -95,14 +95,14 @@ static int twl6040_clk_probe(struct platform_device *pdev)
+>         if (IS_ERR(clkdata->clk))
+>                 return PTR_ERR(clkdata->clk);
+>  
+> -       dev_set_drvdata(&pdev->dev, clkdata);
+> +       platform_set_drvdata(pdev, clkdata);
+>  
+>         return 0;
+>  }
+>  
+>  static int twl6040_clk_remove(struct platform_device *pdev)
+>  {
+> -       struct twl6040_clk *clkdata = dev_get_drvdata(&pdev->dev);
+> +       struct twl6040_clk *clkdata = platform_get_drvdata(pdev);
+>  
+>         clk_unregister(clkdata->clk);
+>  
+> diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
+> index 16ed068..0d3c04e 100644
+> --- a/drivers/clk/clk-wm831x.c
+> +++ b/drivers/clk/clk-wm831x.c
+> @@ -384,7 +384,7 @@ static int wm831x_clk_probe(struct platform_device *pdev)
+>         if (IS_ERR(clkdata->clkout))
+>                 return PTR_ERR(clkdata->clkout);
+>  
+> -       dev_set_drvdata(&pdev->dev, clkdata);
+> +       platform_set_drvdata(pdev, clkdata);
+>  
+>         return 0;
+>  }
+> -- 
+> 1.7.10.4
