@@ -1,31 +1,53 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Fri, 31 May 2013 10:45:22 -0500
-Subject: [PATCH v1] ARM: dts: omap4-panda: Update the twl6040 gpio to macro
- definition
-Message-ID: <1370015122-26792-1-git-send-email-dmurphy@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 17:49:28 +0200
+Subject: [PATCH] ARM: nomadik: fix clocksource warning
+Message-ID: <41518453.ApMFpK6n11@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the dt property ti,audpwron-gpio to use the
-gpio macro definition for GPIO_ACTIVE_HIGH.
+The clocksource API has changed slightly, which causes a harmless
+warning:
 
-Signed-off-by: Dan Murphy <dmurphy@ti.com>
+/git/arm-soc/drivers/clocksource/nomadik-mtu.c:259:28: warning: 'nmdk_timer_match' defined but not used [-Wunused-variable]
+ static struct of_device_id nmdk_timer_match[] __initconst = {
+                            ^
+
+Fortunately, the same API change also lets us simplify the code
+while removing the warning.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 800fa4e..00cbaa5 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -190,7 +190,7 @@
- 		/* IRQ# = 119 */
- 		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_2N cascaded to gic */
- 		interrupt-parent = <&gic>;
--		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
-+		ti,audpwron-gpio = <&gpio4 31 GPIO_ACTIVE_HIGH>;  /* gpio line 127 */
+I've applied this patch on top of next/dt to remove the warning introduced
+by Linus' patch.
+
+diff --git a/drivers/clocksource/nomadik-mtu.c b/drivers/clocksource/nomadik-mtu.c
+index 7982cb0..b9415b6 100644
+--- a/drivers/clocksource/nomadik-mtu.c
++++ b/drivers/clocksource/nomadik-mtu.c
+@@ -256,23 +256,13 @@ void __init nmdk_timer_init(void __iomem *base, int irq)
+ 	__nmdk_timer_init(base, irq, pclk0, clk0);
+ }
  
- 		vio-supply = <&v1v8>;
- 		v2v1-supply = <&v2v1>;
--- 
-1.7.5.4
+-static struct of_device_id nmdk_timer_match[] __initconst = {
+-	{ .compatible = "st,nomadik-mtu" },
+-	{}
+-};
+-
+-static void __init nmdk_timer_of_init(void)
++static void __init nmdk_timer_of_init(struct device_node *node)
+ {
+-	struct device_node *node;
+ 	struct clk *pclk;
+ 	struct clk *clk;
+ 	void __iomem *base;
+ 	int irq;
+ 
+-	node = of_find_matching_node(NULL, nmdk_timer_match);
+-	if (!node)
+-		panic("No timer node");
+-
+ 	base = of_iomap(node, 0);
+ 	if (!base)
+ 		panic("Can't remap registers");
