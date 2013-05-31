@@ -1,51 +1,43 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 31 May 2013 16:23:20 +0100
-Subject: [PATCH RFC 5/6] arm64/xen: implement xen_remap on arm64
-In-Reply-To: <alpine.DEB.2.02.1305311530440.4799@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
- <1369930713-6063-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130531105915.GC18045@localhost.cambridge.arm.com>
- <alpine.DEB.2.02.1305311419280.4799@kaball.uk.xensource.com>
- <20130531141601.GC15551@arm.com>
- <alpine.DEB.2.02.1305311530440.4799@kaball.uk.xensource.com>
-Message-ID: <alpine.DEB.2.02.1305311622150.4799@kaball.uk.xensource.com>
+From: Catalin.Marinas@arm.com (Catalin Marinas)
+Date: Fri, 31 May 2013 16:25:39 +0100
+Subject: [GIT PULL] arm64 fixes for 3.10
+Message-ID: <20130531152539.GE15551@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013, Stefano Stabellini wrote:
-> On Fri, 31 May 2013, Catalin Marinas wrote:
-> > On Fri, May 31, 2013 at 02:21:16PM +0100, Stefano Stabellini wrote:
-> > > On Fri, 31 May 2013, Catalin Marinas wrote:
-> > > > On Thu, May 30, 2013 at 05:18:32PM +0100, Stefano Stabellini wrote:
-> > > > > --- a/arch/arm/include/asm/xen/page.h
-> > > > > +++ b/arch/arm/include/asm/xen/page.h
-> > > > > @@ -90,6 +90,10 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-> > > > >  	return __set_phys_to_machine(pfn, mfn);
-> > > > >  }
-> > > > >  
-> > > > > +#ifdef CONFIG_ARM64
-> > > > > +#define xen_remap(cookie, size) __ioremap((cookie), (size), __pgprot(PROT_NORMAL))
-> > > > > +#else
-> > > > >  #define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
-> > > > > +#endif
-> > > > 
-> > > > Now I saw the ARM-specific part. Can you not use something like
-> > > > ioremap_cached() which would give normal cacheable memory (at least on
-> > > > ARMv7).
-> > > 
-> > > No, I cannot because ioremap_cached uses MT_DEVICE_CACHED, while this
-> > > needs to be MT_MEMORY. It is used for normal memory pages, not device
-> > > memory.
-> > 
-> > MT_DEVICE_CACHED is Normal memory for ARMv7.
-> 
-> I didn't realize that MT_DEVICE_CACHED and MT_MEMORY end up having the
-> same AttrIndx encoding!
-> In that case yes, I should be able to use it.
-> I take that I should just implement ioremap_cached on arm64 as well?
-> 
+Hi Linus,
 
-Should just use MT_MEMORY and call it PROT_NORMAL?
+Please pull the arm64 patches below. Thanks.
 
-#define PROT_NORMAL     (PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
-#define ioremap_cached(addr, size)     __ioremap((addr), (size), __pgprot(PROT_NORMAL))
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-aarch64.git tags/arm64-stable
+
+for you to fetch changes up to 9955ac47f4ba1c95ecb6092aeaefb40a22e99268:
+
+  arm64: don't kill the kernel on a bad esr from el0 (2013-05-31 16:04:51 +0100)
+
+----------------------------------------------------------------
+- Module compilation issues (symbol not exported).
+- Plug a hole where user space can bring the kernel down.
+
+----------------------------------------------------------------
+Catalin Marinas (1):
+      arm64: Do not report user faults for handled signals
+
+Chen Gang (1):
+      arm64: kernel: compiling issue, need 'EXPORT_SYMBOL(clear_page)'
+
+Mark Rutland (2):
+      arm64: treat unhandled compat el0 traps as undef
+      arm64: don't kill the kernel on a bad esr from el0
+
+ arch/arm64/kernel/arm64ksyms.c |  1 +
+ arch/arm64/kernel/entry.S      | 10 ++++++++++
+ arch/arm64/kernel/traps.c      | 17 ++++++++++++-----
+ arch/arm64/mm/fault.c          |  3 ++-
+ 4 files changed, 25 insertions(+), 6 deletions(-)
