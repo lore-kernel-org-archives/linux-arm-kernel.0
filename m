@@ -1,34 +1,34 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 31 May 2013 13:02:04 +0100
-Subject: [PATCH RFC 1/6] [HACK!] arm64/xen: create links to arch/arm
- include files and Xen code
-In-Reply-To: <20130531103617.GA18045@localhost.cambridge.arm.com>
-References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
- <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130531103617.GA18045@localhost.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.02.1305311259090.4799@kaball.uk.xensource.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Fri, 31 May 2013 17:19:01 +0530
+Subject: [PATCH 0/3] Consolidate uncompress code for Samsung platform
+Message-ID: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013, Catalin Marinas wrote:
-> On Thu, May 30, 2013 at 05:18:28PM +0100, Stefano Stabellini wrote:
-> > Most of Xen support for ARM is common between ARMv7 and ARMv8.
-> > Create links to the code under arch/arm (bleah).
-> > 
-> > Other, probably better alternatives:
-> > 
-> > - move the code to a different location, maybe the header files to
-> > include/xen/arm and the code to drivers/xen/arm (still pretty ugly)?
-> > 
-> > - create a copy of the code to arch/arm64 (even worse);
-> 
-> KVM handles this in the Makefile by referencing back to arch/arm or even
-> the generic kvm directory. I think that's the 'cleanest' ;)
+The patches are based on v3.10-rc3.
 
-Do you mean creating links in the Makefile or generating header file
-copies from the Makefile?
-Or do you mean using something like "-I arch/arm/include/asm/xen" in the
-arch/arm64 Makefile?
+They are build tested for s3c2410_defconfig, s3c6400_defconfig,
+s5p64x0_defconfig, s5pc100_defconfig, s5pv210_defconfig,
+exynos4_defconfig and exynos_defconfig.
 
-I tried to find exactly what KVM is doing but I couldn't find the code
-you are talking about..
+Since they affect all the Samsung boards, testing them on different
+machines would be essential. Unfortunately I can only test on Exynos here.
+
+Tested on Exynos5250 based Arndale board.
+
+Tushar Behera (3):
+  ARM: EXYNOS: uncompress - print debug messages if DEBUG_LL is defined
+  ARM: SAMSUNG: Consolidate uncompress subroutine
+  ARM: S5P64X0: Remove duplicate uncompress code
+
+ arch/arm/mach-exynos/include/mach/uncompress.h  |   14 +-
+ arch/arm/mach-s3c24xx/include/mach/uncompress.h |    7 +
+ arch/arm/mach-s3c64xx/include/mach/uncompress.h |    7 +
+ arch/arm/mach-s5p64x0/include/mach/uncompress.h |  163 ++---------------------
+ arch/arm/mach-s5pc100/include/mach/uncompress.h |    6 +
+ arch/arm/mach-s5pv210/include/mach/uncompress.h |    6 +
+ arch/arm/plat-samsung/include/plat/uncompress.h |   16 ++-
+ 7 files changed, 53 insertions(+), 166 deletions(-)
+
+-- 
+1.7.9.5
