@@ -1,220 +1,39 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 31 May 2013 10:17:14 +0300
-Subject: [PATCH] ARM: OMAP2+: omap-usb-host: Fix memory leaks
-In-Reply-To: <20130530210025.GE6467@atomide.com>
-References: <1369400818-31625-1-git-send-email-rogerq@ti.com>
- <20130530210025.GE6467@atomide.com>
-Message-ID: <51A84E7A.106@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 May 2013 09:21:46 +0200
+Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
+In-Reply-To: <CAOesGMgrdyFi3GMz52CVnhzmOYHbR5=29Ua0iS8cNbSjg6r-2A@mail.gmail.com>
+References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
+ <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
+ <CACRpkdZxWsJuvrtH-=VVqAGUCpdgS3W52R4tw5-_QGpggB+1uw@mail.gmail.com>
+ <20130531001735.GA26684@verge.net.au>
+ <CAOesGMiTXW0mVmbBbha5S4O64yu_vM=eLxM4JyctsfONCAo4qg@mail.gmail.com>
+ <20130531054517.GC5009@verge.net.au>
+ <CAOesGMgrdyFi3GMz52CVnhzmOYHbR5=29Ua0iS8cNbSjg6r-2A@mail.gmail.com>
+Message-ID: <CACRpkda9tjydo038exS2a=Gsvum41LyvXd=GwKh3b0Zi4rOA9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Fri, May 31, 2013 at 8:11 AM, Olof Johansson <olof@lixom.net> wrote:
+> [Simon]
+>> As an aside, I do expect to send some more v3.10 fixes for shmobile.
+>> There seem to be more than usual.
+>
+> A little unfortunate but it's hard to do much about.
+>
+> Please be conservative with what you pick up for 3.10 vs 3.11 -- Linus
+> has said he really wants to see things slow down.
 
-On 05/31/2013 12:00 AM, Tony Lindgren wrote:
-> Hi Roger,
-> 
-> * Roger Quadros <rogerq@ti.com> [130524 06:12]:
->> Fix memory leaks in the error path.
->> Also, use platform_device_register_full() to allocate
->> the platform devices and set platform data.
-> 
-> If you need this for the v3.10-rc, you should describe why this patch
-> is needed and ideally have some oops or regression causing commit
-> listed. Care to update the description for that?
+What we might need to think about is the evolutional pace of the ARM
+kernel - compared to a few years back we have increased the change
+rate by orders of a magnitude (at least that is my feeling...)
 
-There is no oops or regression happening. Just that there will be a
-small memory leak if any of the memory allocations fail or if the
-platform device is destroyed.
+There may be some point where we actually need to tell people to
+hold changes back because they are just pushing too large volumes
+through one merge window, resulting in a corresponding amount of
+fixes.
 
-If it doesn't look that serious to you then it can wait.
-But if we move to device tree only boot then this patch and the file
-"usb-host.c" might not be required at all.
+This merge window both Samsung Exynos and SH mobile seem to
+have been a little bit trigger-happy :-/
 
-cheers,
--roger
-
->  
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> ---
->>  arch/arm/mach-omap2/usb-host.c |  106 +++++++++++++++++++++-------------------
->>  1 files changed, 56 insertions(+), 50 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/usb-host.c b/arch/arm/mach-omap2/usb-host.c
->> index aa27d7f..609b330 100644
->> --- a/arch/arm/mach-omap2/usb-host.c
->> +++ b/arch/arm/mach-omap2/usb-host.c
->> @@ -28,6 +28,7 @@
->>  #include <linux/io.h>
->>  #include <linux/gpio.h>
->>  #include <linux/usb/phy.h>
->> +#include <linux/usb/nop-usb-xceiv.h>
->>  
->>  #include "soc.h"
->>  #include "omap_device.h"
->> @@ -560,7 +561,8 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
->>  	struct regulator_init_data *reg_data;
->>  	struct fixed_voltage_config *config;
->>  	struct platform_device *pdev;
->> -	int ret;
->> +	struct platform_device_info pdevinfo;
->> +	int ret = -ENOMEM;
->>  
->>  	supplies = kzalloc(sizeof(*supplies), GFP_KERNEL);
->>  	if (!supplies)
->> @@ -571,7 +573,7 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
->>  
->>  	reg_data = kzalloc(sizeof(*reg_data), GFP_KERNEL);
->>  	if (!reg_data)
->> -		return -ENOMEM;
->> +		goto err_data;
->>  
->>  	reg_data->constraints.valid_ops_mask = REGULATOR_CHANGE_STATUS;
->>  	reg_data->consumer_supplies = supplies;
->> @@ -580,39 +582,53 @@ static int usbhs_add_regulator(char *name, char *dev_id, char *dev_supply,
->>  	config = kmemdup(&hsusb_reg_config, sizeof(hsusb_reg_config),
->>  			GFP_KERNEL);
->>  	if (!config)
->> -		return -ENOMEM;
->> +		goto err_config;
->> +
->> +	config->supply_name = kstrdup(name, GFP_KERNEL);
->> +	if (!config->supply_name)
->> +		goto err_supplyname;
->>  
->> -	config->supply_name = name;
->>  	config->gpio = gpio;
->>  	config->enable_high = polarity;
->>  	config->init_data = reg_data;
->>  
->>  	/* create a regulator device */
->> -	pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
->> -	if (!pdev)
->> -		return -ENOMEM;
->> +	memset(&pdevinfo, 0, sizeof(pdevinfo));
->> +	pdevinfo.name = reg_name;
->> +	pdevinfo.id = PLATFORM_DEVID_AUTO;
->> +	pdevinfo.data = config;
->> +	pdevinfo.size_data = sizeof(*config);
->>  
->> -	pdev->id = PLATFORM_DEVID_AUTO;
->> -	pdev->name = reg_name;
->> -	pdev->dev.platform_data = config;
->> +	pdev = platform_device_register_full(&pdevinfo);
->> +	if (IS_ERR(pdev)) {
->> +		ret = PTR_ERR(pdev);
->> +		pr_err("%s: Failed registering regulator %s for %s : %d\n",
->> +				__func__, name, dev_id, ret);
->> +		goto err_register;
->> +	}
->>  
->> -	ret = platform_device_register(pdev);
->> -	if (ret)
->> -		pr_err("%s: Failed registering regulator %s for %s\n",
->> -				__func__, name, dev_id);
->> +	return 0;
->>  
->> +err_register:
->> +	kfree(config->supply_name);
->> +err_supplyname:
->> +	kfree(config);
->> +err_config:
->> +	kfree(reg_data);
->> +err_data:
->> +	kfree(supplies);
->>  	return ret;
->>  }
->>  
->> +#define MAX_STR 20
->> +
->>  int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys)
->>  {
->> -	char *rail_name;
->> -	int i, len;
->> +	char rail_name[MAX_STR];
->> +	int i;
->>  	struct platform_device *pdev;
->>  	char *phy_id;
->> -
->> -	/* the phy_id will be something like "nop_usb_xceiv.1" */
->> -	len = strlen(nop_name) + 3; /* 3 -> ".1" and NULL terminator */
->> +	struct platform_device_info pdevinfo;
->>  
->>  	for (i = 0; i < num_phys; i++) {
->>  
->> @@ -627,25 +643,26 @@ int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys)
->>  			!gpio_is_valid(phy->vcc_gpio))
->>  			continue;
->>  
->> -		/* create a NOP PHY device */
->> -		pdev = kzalloc(sizeof(*pdev), GFP_KERNEL);
->> -		if (!pdev)
->> -			return -ENOMEM;
->> -
->> -		pdev->id = phy->port;
->> -		pdev->name = nop_name;
->> -		pdev->dev.platform_data = phy->platform_data;
->> -
->> -		phy_id = kmalloc(len, GFP_KERNEL);
->> -		if (!phy_id)
->> +		phy_id = kmalloc(MAX_STR, GFP_KERNEL);
->> +		if (!phy_id) {
->> +			pr_err("%s: kmalloc() failed\n", __func__);
->>  			return -ENOMEM;
->> +		}
->>  
->> -		scnprintf(phy_id, len, "nop_usb_xceiv.%d\n",
->> -					pdev->id);
->> -
->> -		if (platform_device_register(pdev)) {
->> -			pr_err("%s: Failed to register device %s\n",
->> -				__func__,  phy_id);
->> +		/* create a NOP PHY device */
->> +		memset(&pdevinfo, 0, sizeof(pdevinfo));
->> +		pdevinfo.name = nop_name;
->> +		pdevinfo.id = phy->port;
->> +		pdevinfo.data = phy->platform_data;
->> +		pdevinfo.size_data = sizeof(struct nop_usb_xceiv_platform_data);
->> +
->> +		scnprintf(phy_id, MAX_STR, "nop_usb_xceiv.%d",
->> +					phy->port);
->> +		pdev = platform_device_register_full(&pdevinfo);
->> +		if (IS_ERR(pdev)) {
->> +			pr_err("%s: Failed to register device %s : %ld\n",
->> +				__func__,  phy_id, PTR_ERR(pdev));
->> +			kfree(phy_id);
->>  			continue;
->>  		}
->>  
->> @@ -653,26 +670,15 @@ int usbhs_init_phys(struct usbhs_phy_data *phy, int num_phys)
->>  
->>  		/* Do we need RESET regulator ? */
->>  		if (gpio_is_valid(phy->reset_gpio)) {
->> -
->> -			rail_name = kmalloc(13, GFP_KERNEL);
->> -			if (!rail_name)
->> -				return -ENOMEM;
->> -
->> -			scnprintf(rail_name, 13, "hsusb%d_reset", phy->port);
->> -
->> +			scnprintf(rail_name, MAX_STR,
->> +					"hsusb%d_reset", phy->port);
->>  			usbhs_add_regulator(rail_name, phy_id, "reset",
->>  						phy->reset_gpio, 1);
->>  		}
->>  
->>  		/* Do we need VCC regulator ? */
->>  		if (gpio_is_valid(phy->vcc_gpio)) {
->> -
->> -			rail_name = kmalloc(13, GFP_KERNEL);
->> -			if (!rail_name)
->> -				return -ENOMEM;
->> -
->> -			scnprintf(rail_name, 13, "hsusb%d_vcc", phy->port);
->> -
->> +			scnprintf(rail_name, MAX_STR, "hsusb%d_vcc", phy->port);
->>  			usbhs_add_regulator(rail_name, phy_id, "vcc",
->>  					phy->vcc_gpio, phy->vcc_polarity);
->>  		}
->> -- 
->> 1.7.4.1
->>
+Yours,
+Linus Walleij
