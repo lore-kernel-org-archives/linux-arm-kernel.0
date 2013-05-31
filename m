@@ -1,34 +1,41 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 31 May 2013 19:02:24 +0200
-Subject: [PATCH] arm: allow all architectures to change max zone order
-Message-ID: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Fri, 31 May 2013 10:04:37 -0700
+Subject: [PATCH 00/11] drivers: Add Pinctrl PM support
+In-Reply-To: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20130531170437.GA17591@core.coreip.homeip.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Many multimedia applications on architectures without an
-IOMMU need large physically contiguous buffers and so need
-to adjust the max zone order of the page allocator.
+Hi Hebbar,
 
-There is zero reason to not allow this adjustment on arches
-other than SHMOBILE.
+On Fri, May 31, 2013 at 03:43:00PM +0530, Hebbar Gururaja wrote:
+> By optionally putting the pins into sleep state in the suspend [or in
+> runtime_suspend] callback we can accomplish two things.
+> - One is to minimize current leakage from pins and thus save power,
+> - second, we can prevent the IP from driving pins output in an
+> uncontrolled manner, which may happen if the power domain drops the
+> domain regulator.
+> 
+> These states can be specified in the DT blob and corresponding driver
+> can pick these states during probe & set the related values during
+> idle/suspend.
+> 
+> Not all drivers support/has idle state. Drivers like i2c, spi, mmc has
+> idle states and hence these drivers are updated to support all the
+> three states
+> - default  : during regular operation
+> - idle : when the module is in idle state
+> - sleep : when the module is in suspend state
+> 
+> For those drivers which doesn't support/have idle state (at least at
+> the moment), only default & sleep state is added.
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+As with the original introduction of pinctrl states my question is: "Can
+all of this be handled in the driver/bus core instead of adding a lot
+of boilerplate code to the individual drivers".
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..6ceace8 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1710,7 +1710,7 @@ config HW_PERF_EVENTS
- source "mm/Kconfig"
- 
- config FORCE_MAX_ZONEORDER
--	int "Maximum zone order" if ARCH_SHMOBILE
-+	int "Maximum zone order"
- 	range 11 64 if ARCH_SHMOBILE
- 	default "12" if SOC_AM33XX
- 	default "9" if SA1111
+Thanks.
+
 -- 
-1.7.10.4
+Dmitry
