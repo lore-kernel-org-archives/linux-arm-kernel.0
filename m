@@ -1,31 +1,64 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 May 2013 11:07:48 +0900
-Subject: [PATCH 2/2] ARM: shmobile: r8A7779: fix Ether device name
-In-Reply-To: <51A744A4.5020909@cogentembedded.com>
-References: <1369645206-3682-1-git-send-email-horms+renesas@verge.net.au>
- <1369645206-3682-3-git-send-email-horms+renesas@verge.net.au>
- <20130528040043.GL13532@quad.lixom.net>
- <51A744A4.5020909@cogentembedded.com>
-Message-ID: <20130531020748.GA29074@verge.net.au>
+Date: Fri, 31 May 2013 11:44:38 +0900
+Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
+ no DMA support
+In-Reply-To: <51A77CF1.7040105@ti.com>
+References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
+ <51A77CF1.7040105@ti.com>
+Message-ID: <20130531024438.GB32564@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 04:23:00PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Thu, May 30, 2013 at 11:23:13AM -0500, Dan Murphy wrote:
+> On 05/30/2013 11:02 AM, Guennadi Liakhovetski wrote:
+> > On platforms with no support for the shdma dmaengine driver build is
+> > currently failing with
+> >
+> > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+> > drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+> >
+> > Fix the breakage by defining shdma_chan_filter to NULL in such
+> > configurations.
+> >
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > ---
+> >
+> > This is for "next." Compile-tested only. I'll test it on hardware next 
+> > week, but I don't think it shall break anything.
+> >
+> >  include/linux/sh_dma.h |    4 ++++
+> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
+> > index b64d6be..1fd8a20 100644
+> > --- a/include/linux/sh_dma.h
+> > +++ b/include/linux/sh_dma.h
+> > @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
+> >  #define CHCR_TE	0x00000002
+> >  #define CHCR_IE	0x00000004
+> >  
+> > +#if IS_ENABLED(CONFIG_SH_DMAE)
+> >  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
+> > +#else
+> > +#define shdma_chan_filter NULL
+> Would this not be better as a
+> #else
+> static inline bool shdma_chan_filter(struct dma_chan *chan, void *arg)
+> {
+>     return false;
+> }
+> #endif
 > 
-> On 28-05-2013 8:00, Olof Johansson wrote:
+> Otherwise runtime will call a NULL pointer
 > 
-> >>From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >>While recasting the commit "ARM: shmobile: R8A7779: add Ether support", I made a
-> >>typo in the platform device's name: used underscore instead of hyphen.
-> 
-> >Minor nit: if this has been merged, then including the SHA is useful too.
-> 
->    Yes, it has been merged in 3.10. Simon, can you do this without
-> me reposting the patch? The defective commit's SHA1 ID is
-> dace48d04dee46a3409d5e13cd98031522e46377.
->    Note that there is analogous R8A7778 Ether fix, the SHA1 for its
-> defective commit is 524219146a89aee5366326c225ccd71231419d89.
+> > +#endif
+> >  
+> >  #endif
 
-Thanks, I will fix up the commit messages.
+Hi Guennadi,
+
+thanks for this. I will wait for a refresh (as we discussed earlier today).
+Can I confirm that this is a fix for v3.10? If so, could ou note
+that when you post your revised patch?
+
+Thanks
