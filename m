@@ -1,49 +1,42 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 31 May 2013 08:28:16 +0530
-Subject: [PATCH] ARM: EXYNOS: Consolidate multiple low-level UART port
- definitions
-In-Reply-To: <CAOesGMgt=zvPM7WoHn4VcUkw28j7+HDUvU2n3hNojx7Nr5PqJQ@mail.gmail.com>
-References: <1369888827-9427-1-git-send-email-tushar.behera@linaro.org>
- <CAOesGMgt=zvPM7WoHn4VcUkw28j7+HDUvU2n3hNojx7Nr5PqJQ@mail.gmail.com>
-Message-ID: <51A811C8.9090509@linaro.org>
+From: zhangwm@marvell.com (Neil Zhang)
+Date: Fri, 31 May 2013 10:58:34 +0800
+Subject: [PATCH v2] bring up pxa988 with DT
+Message-ID: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2013 02:41 AM, Olof Johansson wrote:
-> Hi,
-> 
-> On Wed, May 29, 2013 at 9:40 PM, Tushar Behera <tushar.behera@linaro.org> wrote:
->> There are two definitions for low-level UART ports for Exynos platform.
->> CONFIG_S3C_LOWLEVEL_UART_PORT is used for printing "Uncompressing
->> Linux... done, booting the kernel." and CONFIG_S3C_UART for other
->> low-level messages.
->>
->> The assumption for both the uart ports is that they are pre-configured
->> in the bootloader. Since they are essentially the same always, it
->> would be good to consolidate them to use only one macro, in this case
->> 'DEBUG_S3C_UART' would be a better option.
->>
->> 'DEBUG_S3C_UART' is defined only if DEBUG_LL is enabled. We can safely
->> disable this option when DEBUG_LL is not defined and we can boot various
->> boards with different UART port settings. Only drawback of this
->> approach is that when DEBUG_LL is not defined, we would be missing the
->> print "Uncompressing Linux... done, booting the kernel."
->>
->> Since CONFIG_S3C_LOWLEVEL_UART_PORT is still used by other Samsung
->> boards, the consolidation applies only for ARCH_EXYNOS.
->>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> 
-> This looks reasonable, but you have to convert the other samsung
-> platforms too -- it's not ok to ignore them.
-> 
+This patch is supposed to bring up pxa988 SMP.
+will change to use CLOCKSOURCE later.
 
-Sure thing. I will update those platforms in a subsequent patchset.
+ChangeLog
+V2:
+1. use early_init call for handler init.
+2. Add sanity check for maximum core count.
 
-> 
-> -Olof
-> 
+Neil Zhang (1):
+  ARM: mmp: bring up pxa988 with device tree support
 
+ arch/arm/boot/dts/pxa988-dkb.dts          |   36 ++++++
+ arch/arm/boot/dts/pxa988.dtsi             |  189 +++++++++++++++++++++++++++++
+ arch/arm/mach-mmp/Kconfig                 |   27 ++++
+ arch/arm/mach-mmp/Makefile                |    2 +
+ arch/arm/mach-mmp/common.c                |   11 ++-
+ arch/arm/mach-mmp/common.h                |    2 +
+ arch/arm/mach-mmp/headsmp.S               |  104 ++++++++++++++++
+ arch/arm/mach-mmp/include/mach/addr-map.h |    6 +
+ arch/arm/mach-mmp/mmpx-dt.c               |   74 +++++++++++
+ arch/arm/mach-mmp/platsmp.c               |  167 +++++++++++++++++++++++++
+ arch/arm/mach-mmp/reset.c                 |   68 ++++++++++
+ arch/arm/mach-mmp/reset.h                 |   28 +++++
+ drivers/clk/mmp/Makefile                  |    1 +
+ 13 files changed, 714 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/boot/dts/pxa988-dkb.dts
+ create mode 100644 arch/arm/boot/dts/pxa988.dtsi
+ create mode 100644 arch/arm/mach-mmp/headsmp.S
+ create mode 100644 arch/arm/mach-mmp/mmpx-dt.c
+ create mode 100644 arch/arm/mach-mmp/platsmp.c
+ create mode 100644 arch/arm/mach-mmp/reset.c
+ create mode 100644 arch/arm/mach-mmp/reset.h
 
 -- 
-Tushar Behera
+1.7.4.1
