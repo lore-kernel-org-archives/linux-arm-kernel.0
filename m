@@ -1,36 +1,39 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 18:02:31 +0200
-Subject: [PATCH 1/2] ARM: shmobile: sdhi: pass DMA filter from platform
- code
-In-Reply-To: <alpine.DEB.2.00.1305311721160.7395@axis700.grange>
-References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
- <2862988.jnTv0iSQcj@wuerfel>
- <alpine.DEB.2.00.1305311721160.7395@axis700.grange>
-Message-ID: <3675801.kLfsmmiSOq@wuerfel>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Fri, 31 May 2013 18:12:56 +0200
+Subject: [PATCH v1] ARM: dts: omap4-panda: Update the twl6040 gpio to
+ macro definition
+In-Reply-To: <1370015122-26792-1-git-send-email-dmurphy@ti.com>
+References: <1370015122-26792-1-git-send-email-dmurphy@ti.com>
+Message-ID: <51A8CC08.6090305@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 May 2013 17:30:01 Guennadi Liakhovetski wrote:
-> On Fri, 31 May 2013, Arnd Bergmann wrote:
-> > On Friday 31 May 2013 16:52:13 Guennadi Liakhovetski wrote:
+Hello Dan,
 
-> > I think it's more a matter of using the API correctly. The dmaengine
-> > API is an abstraction to separate the slave driver from the master
-> > through well-defined calls. If you make additional assumptions
-> > in the slave driver about the master, that is a layering violation.
-> 
-> I think it is a common practice, see e.g.
-> 
-> drivers/mmc/host/omap_hsmmc.c
-> drivers/mmc/host/davinci_mmc.c
+On 05/31/2013 05:45 PM, Dan Murphy wrote:
+> Update the dt property ti,audpwron-gpio to use the
+> gpio macro definition for GPIO_ACTIVE_HIGH.
+>
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+> ---
+>   arch/arm/boot/dts/omap4-panda-common.dtsi |    2 +-
+>   1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index 800fa4e..00cbaa5 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -190,7 +190,7 @@
+>   		/* IRQ# = 119 */
+>   		interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>; /* IRQ_SYS_2N cascaded to gic */
+>   		interrupt-parent = <&gic>;
+> -		ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
+> +		ti,audpwron-gpio = <&gpio4 31 GPIO_ACTIVE_HIGH>;  /* gpio line 127 */
+>
+>   		vio-supply = <&v1v8>;
+>   		v2v1-supply = <&v2v1>;
+>
 
-Yes, those should be fixed as well.
+I missed it during the conversion, thank you.
 
-> And what do you do for DT-based platforms?
-
-Once the driver is DT-enabled, we no longer have to pass
-a filter function at all because the slave id and all settings
-will get pulled out of the DT using the dma engine's xlate()
-callback.
-
-	Arnd
+Reviewed-by: Florian Vaussard <florian.vaussard@epfl.ch>
