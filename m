@@ -1,46 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 15:51:58 +0200
-Subject: [PATCH 12/39] ARM: u300: set up board power from device tree
-In-Reply-To: <CACRpkdYXfm4xzqn2Kb0fw2_+BSSXBoNXye2zu3fpv1sPQcHO9w@mail.gmail.com>
+Date: Fri, 31 May 2013 15:53:10 +0200
+Subject: [PATCH 02/39] ARM: u300: device tree support for the timer
+In-Reply-To: <CACRpkdZYsnUhjYO_U4L56TMY+fs+ZU9zk3zLWnjPtf8Bmmn0YQ@mail.gmail.com>
 References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
- <6621177.ZgrPQ48FXE@wuerfel>
- <CACRpkdYXfm4xzqn2Kb0fw2_+BSSXBoNXye2zu3fpv1sPQcHO9w@mail.gmail.com>
-Message-ID: <4270774.6CqcMSP3z0@wuerfel>
+ <7742928.6bJiIVUE0X@wuerfel>
+ <CACRpkdZYsnUhjYO_U4L56TMY+fs+ZU9zk3zLWnjPtf8Bmmn0YQ@mail.gmail.com>
+Message-ID: <2014595.XlPVsySsVh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 May 2013 13:33:45 Linus Walleij wrote:
-> Mark remarked on the first iteration that:
+On Friday 31 May 2013 13:26:31 Linus Walleij wrote:
 > 
-> > I would expect this to be bound based on the board name that appears in
-> > the device tree which (given the way this stuff mostly works) I'd expect
-> > to have a device node available.
+> > You should not need the CONFIG_OF #ifdef, since the CLOCKSOURCE_OF_DECLARE
+> > macro is designed to let the function get dropped by the compiler when
+> > that is not set.
+> >
+> > You might want a CONFIG_ATAGS check for the other function though.
 > 
-> This is what I'm trying to do here.
+> Both the other function and the #ifdef CONFIG_OF are deleted in
+> patch 21. Is this OK?
+
+Ok, that's fine then.
+
+> >> diff --git a/arch/arm/mach-u300/timer.h b/arch/arm/mach-u300/timer.h
+> >> index d34287b..7766dfa 100644
+> >> --- a/arch/arm/mach-u300/timer.h
+> >> +++ b/arch/arm/mach-u300/timer.h
+> >> @@ -1 +1,2 @@
+> >>  extern void u300_timer_init(void);
+> >> +
+> >
+> > You probably didn't mean to include this newline.
 > 
-> The root node which actually contains the compatible-string
-> for the board itself can *not* be used, as the OF platform core
-> code does not create a platform device for this node, and it
-> cannot reference anything either.
+> This entire file is also deleted in patch 21.
 > 
-> So a single board node directly in the root was the best
-> I could come up with, other suggestions welcome...
+> I can fix it up if you absolutely want to but it feels like
+> something of an academic exercise.
 
-I think I would actually put this into a machine_desc callback for a
-machine that matches just this one board: If this is truly board
-specific, this is where it belongs.
-
-Of course we try to have a single machine_desc work with any board
-normally, but the machine_desc is also the abstraction we already
-have for boards. There is a device_node for '/', but as you say
-there is no 'struct device' attached to it.
-
-If it is not really a property of a particular board, but something
-that you would need for other boards as well, it could perhaps
-be tied to the syscon functionality, or to ab3100:
-
-ab3100_regulators_probe() could itself set up the the supply
-and then set the syscon bit. Basically you just move all of 
-arch/arm/mach-u300/regulator.c into drivers/regulator/ab3100.c
+No, not if that is the only change you'd do to this patch.
 
 	Arnd
