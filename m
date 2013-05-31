@@ -1,320 +1,37 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 31 May 2013 11:19:07 +0200
-Subject: [PATCH 32/39] ARM: u300: remove register definition file
+Date: Fri, 31 May 2013 11:19:13 +0200
+Subject: [PATCH 38/39] spi: pl022: use DMA by default when probing from DT
 In-Reply-To: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
 References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1369991954-17406-33-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1369991954-17406-39-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-Now that the core file is the only one actually using any
-of the base addresses, we can delete that header and move
-the base address definitions into the one and only core
-file.
+In the past we controlled the selection of DMA for a certain
+host by a boolean switch in the platform data. Currently
+there is no way to enable DMA on a PL022 probed from the
+device tree. Let's default to trying to obtain DMA channels
+in the DT case, and then we can always fail (and thus fall
+back to PIO mode).
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-u300/core.c      | 113 +++++++++++++++++++++++++++-
- arch/arm/mach-u300/u300-regs.h | 165 -----------------------------------------
- 2 files changed, 112 insertions(+), 166 deletions(-)
- delete mode 100644 arch/arm/mach-u300/u300-regs.h
+ drivers/spi/spi-pl022.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-u300/core.c b/arch/arm/mach-u300/core.c
-index 8cfca45..6e5744a 100644
---- a/arch/arm/mach-u300/core.c
-+++ b/arch/arm/mach-u300/core.c
-@@ -22,7 +22,118 @@
- #include <asm/mach/map.h>
- #include <asm/mach/arch.h>
+diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
+index 371cc66f..3b24654 100644
+--- a/drivers/spi/spi-pl022.c
++++ b/drivers/spi/spi-pl022.c
+@@ -2083,6 +2083,7 @@ pl022_platform_data_dt_get(struct device *dev)
+ 	}
  
--#include "u300-regs.h"
-+/*
-+ * These are the large blocks of memory allocated for I/O.
-+ * the defines are used for setting up the I/O memory mapping.
-+ */
-+
-+/* NAND Flash CS0 */
-+#define U300_NAND_CS0_PHYS_BASE		0x80000000
-+/* NFIF */
-+#define U300_NAND_IF_PHYS_BASE		0x9f800000
-+/* ALE, CLE offset for FSMC NAND */
-+#define PLAT_NAND_CLE			(1 << 16)
-+#define PLAT_NAND_ALE			(1 << 17)
-+/* AHB Peripherals */
-+#define U300_AHB_PER_PHYS_BASE		0xa0000000
-+#define U300_AHB_PER_VIRT_BASE		0xff010000
-+/* FAST Peripherals */
-+#define U300_FAST_PER_PHYS_BASE		0xc0000000
-+#define U300_FAST_PER_VIRT_BASE		0xff020000
-+/* SLOW Peripherals */
-+#define U300_SLOW_PER_PHYS_BASE		0xc0010000
-+#define U300_SLOW_PER_VIRT_BASE		0xff000000
-+/* Boot ROM */
-+#define U300_BOOTROM_PHYS_BASE		0xffff0000
-+#define U300_BOOTROM_VIRT_BASE		0xffff0000
-+/* SEMI config base */
-+#define U300_SEMI_CONFIG_BASE		0x2FFE0000
-+
-+/*
-+ * AHB peripherals
-+ */
-+
-+/* AHB Peripherals Bridge Controller */
-+#define U300_AHB_BRIDGE_BASE		(U300_AHB_PER_PHYS_BASE+0x0000)
-+/* Vectored Interrupt Controller 0, servicing 32 interrupts */
-+#define U300_INTCON0_BASE		(U300_AHB_PER_PHYS_BASE+0x1000)
-+#define U300_INTCON0_VBASE		IOMEM(U300_AHB_PER_VIRT_BASE+0x1000)
-+/* Vectored Interrupt Controller 1, servicing 32 interrupts */
-+#define U300_INTCON1_BASE		(U300_AHB_PER_PHYS_BASE+0x2000)
-+#define U300_INTCON1_VBASE		IOMEM(U300_AHB_PER_VIRT_BASE+0x2000)
-+/* Memory Stick Pro (MSPRO) controller */
-+#define U300_MSPRO_BASE			(U300_AHB_PER_PHYS_BASE+0x3000)
-+/* EMIF Configuration Area */
-+#define U300_EMIF_CFG_BASE		(U300_AHB_PER_PHYS_BASE+0x4000)
-+
-+/*
-+ * FAST peripherals
-+ */
-+
-+/* FAST bridge control */
-+#define U300_FAST_BRIDGE_BASE		(U300_FAST_PER_PHYS_BASE+0x0000)
-+/* MMC/SD controller */
-+#define U300_MMCSD_BASE			(U300_FAST_PER_PHYS_BASE+0x1000)
-+/* PCM I2S0 controller */
-+#define U300_PCM_I2S0_BASE		(U300_FAST_PER_PHYS_BASE+0x2000)
-+/* PCM I2S1 controller */
-+#define U300_PCM_I2S1_BASE		(U300_FAST_PER_PHYS_BASE+0x3000)
-+/* I2C0 controller */
-+#define U300_I2C0_BASE			(U300_FAST_PER_PHYS_BASE+0x4000)
-+/* I2C1 controller */
-+#define U300_I2C1_BASE			(U300_FAST_PER_PHYS_BASE+0x5000)
-+/* SPI controller */
-+#define U300_SPI_BASE			(U300_FAST_PER_PHYS_BASE+0x6000)
-+/* Fast UART1 on U335 only */
-+#define U300_UART1_BASE			(U300_FAST_PER_PHYS_BASE+0x7000)
-+
-+/*
-+ * SLOW peripherals
-+ */
-+
-+/* SLOW bridge control */
-+#define U300_SLOW_BRIDGE_BASE		(U300_SLOW_PER_PHYS_BASE)
-+/* SYSCON */
-+#define U300_SYSCON_BASE		(U300_SLOW_PER_PHYS_BASE+0x1000)
-+#define U300_SYSCON_VBASE		IOMEM(U300_SLOW_PER_VIRT_BASE+0x1000)
-+/* Watchdog */
-+#define U300_WDOG_BASE			(U300_SLOW_PER_PHYS_BASE+0x2000)
-+/* UART0 */
-+#define U300_UART0_BASE			(U300_SLOW_PER_PHYS_BASE+0x3000)
-+/* APP side special timer */
-+#define U300_TIMER_APP_BASE		(U300_SLOW_PER_PHYS_BASE+0x4000)
-+#define U300_TIMER_APP_VBASE		IOMEM(U300_SLOW_PER_VIRT_BASE+0x4000)
-+/* Keypad */
-+#define U300_KEYPAD_BASE		(U300_SLOW_PER_PHYS_BASE+0x5000)
-+/* GPIO */
-+#define U300_GPIO_BASE			(U300_SLOW_PER_PHYS_BASE+0x6000)
-+/* RTC */
-+#define U300_RTC_BASE			(U300_SLOW_PER_PHYS_BASE+0x7000)
-+/* Bus tracer */
-+#define U300_BUSTR_BASE			(U300_SLOW_PER_PHYS_BASE+0x8000)
-+/* Event handler (hardware queue) */
-+#define U300_EVHIST_BASE		(U300_SLOW_PER_PHYS_BASE+0x9000)
-+/* Genric Timer */
-+#define U300_TIMER_BASE			(U300_SLOW_PER_PHYS_BASE+0xa000)
-+/* PPM */
-+#define U300_PPM_BASE			(U300_SLOW_PER_PHYS_BASE+0xb000)
-+
-+/*
-+ * REST peripherals
-+ */
-+
-+/* ISP (image signal processor) */
-+#define U300_ISP_BASE			(0xA0008000)
-+/* DMA Controller base */
-+#define U300_DMAC_BASE			(0xC0020000)
-+/* MSL Base */
-+#define U300_MSL_BASE			(0xc0022000)
-+/* APEX Base */
-+#define U300_APEX_BASE			(0xc0030000)
-+/* Video Encoder Base */
-+#define U300_VIDEOENC_BASE		(0xc0080000)
-+/* XGAM Base */
-+#define U300_XGAM_BASE			(0xd0000000)
- 
- /*
-  * SYSCON addresses applicable to the core machine.
-diff --git a/arch/arm/mach-u300/u300-regs.h b/arch/arm/mach-u300/u300-regs.h
-deleted file mode 100644
-index 0320495..0000000
---- a/arch/arm/mach-u300/u300-regs.h
-+++ /dev/null
-@@ -1,165 +0,0 @@
--/*
-- *
-- * arch/arm/mach-u300/include/mach/u300-regs.h
-- *
-- *
-- * Copyright (C) 2006-2009 ST-Ericsson AB
-- * License terms: GNU General Public License (GPL) version 2
-- * Basic register address definitions in physical memory and
-- * some block definitions for core devices like the timer.
-- * Author: Linus Walleij <linus.walleij@stericsson.com>
-- */
--
--#ifndef __MACH_U300_REGS_H
--#define __MACH_U300_REGS_H
--
--/*
-- * These are the large blocks of memory allocated for I/O.
-- * the defines are used for setting up the I/O memory mapping.
-- */
--
--/* NAND Flash CS0 */
--#define U300_NAND_CS0_PHYS_BASE		0x80000000
--
--/* NFIF */
--#define U300_NAND_IF_PHYS_BASE		0x9f800000
--
--/* ALE, CLE offset for FSMC NAND */
--#define PLAT_NAND_CLE			(1 << 16)
--#define PLAT_NAND_ALE			(1 << 17)
--
--/* AHB Peripherals */
--#define U300_AHB_PER_PHYS_BASE		0xa0000000
--#define U300_AHB_PER_VIRT_BASE		0xff010000
--
--/* FAST Peripherals */
--#define U300_FAST_PER_PHYS_BASE		0xc0000000
--#define U300_FAST_PER_VIRT_BASE		0xff020000
--
--/* SLOW Peripherals */
--#define U300_SLOW_PER_PHYS_BASE		0xc0010000
--#define U300_SLOW_PER_VIRT_BASE		0xff000000
--
--/* Boot ROM */
--#define U300_BOOTROM_PHYS_BASE		0xffff0000
--#define U300_BOOTROM_VIRT_BASE		0xffff0000
--
--/* SEMI config base */
--#define U300_SEMI_CONFIG_BASE		0x2FFE0000
--
--/*
-- * AHB peripherals
-- */
--
--/* AHB Peripherals Bridge Controller */
--#define U300_AHB_BRIDGE_BASE		(U300_AHB_PER_PHYS_BASE+0x0000)
--
--/* Vectored Interrupt Controller 0, servicing 32 interrupts */
--#define U300_INTCON0_BASE		(U300_AHB_PER_PHYS_BASE+0x1000)
--#define U300_INTCON0_VBASE		IOMEM(U300_AHB_PER_VIRT_BASE+0x1000)
--
--/* Vectored Interrupt Controller 1, servicing 32 interrupts */
--#define U300_INTCON1_BASE		(U300_AHB_PER_PHYS_BASE+0x2000)
--#define U300_INTCON1_VBASE		IOMEM(U300_AHB_PER_VIRT_BASE+0x2000)
--
--/* Memory Stick Pro (MSPRO) controller */
--#define U300_MSPRO_BASE			(U300_AHB_PER_PHYS_BASE+0x3000)
--
--/* EMIF Configuration Area */
--#define U300_EMIF_CFG_BASE		(U300_AHB_PER_PHYS_BASE+0x4000)
--
--
--/*
-- * FAST peripherals
-- */
--
--/* FAST bridge control */
--#define U300_FAST_BRIDGE_BASE		(U300_FAST_PER_PHYS_BASE+0x0000)
--
--/* MMC/SD controller */
--#define U300_MMCSD_BASE			(U300_FAST_PER_PHYS_BASE+0x1000)
--
--/* PCM I2S0 controller */
--#define U300_PCM_I2S0_BASE		(U300_FAST_PER_PHYS_BASE+0x2000)
--
--/* PCM I2S1 controller */
--#define U300_PCM_I2S1_BASE		(U300_FAST_PER_PHYS_BASE+0x3000)
--
--/* I2C0 controller */
--#define U300_I2C0_BASE			(U300_FAST_PER_PHYS_BASE+0x4000)
--
--/* I2C1 controller */
--#define U300_I2C1_BASE			(U300_FAST_PER_PHYS_BASE+0x5000)
--
--/* SPI controller */
--#define U300_SPI_BASE			(U300_FAST_PER_PHYS_BASE+0x6000)
--
--/* Fast UART1 on U335 only */
--#define U300_UART1_BASE			(U300_FAST_PER_PHYS_BASE+0x7000)
--
--/*
-- * SLOW peripherals
-- */
--
--/* SLOW bridge control */
--#define U300_SLOW_BRIDGE_BASE		(U300_SLOW_PER_PHYS_BASE)
--
--/* SYSCON */
--#define U300_SYSCON_BASE		(U300_SLOW_PER_PHYS_BASE+0x1000)
--#define U300_SYSCON_VBASE		IOMEM(U300_SLOW_PER_VIRT_BASE+0x1000)
--
--/* Watchdog */
--#define U300_WDOG_BASE			(U300_SLOW_PER_PHYS_BASE+0x2000)
--
--/* UART0 */
--#define U300_UART0_BASE			(U300_SLOW_PER_PHYS_BASE+0x3000)
--
--/* APP side special timer */
--#define U300_TIMER_APP_BASE		(U300_SLOW_PER_PHYS_BASE+0x4000)
--#define U300_TIMER_APP_VBASE		IOMEM(U300_SLOW_PER_VIRT_BASE+0x4000)
--
--/* Keypad */
--#define U300_KEYPAD_BASE		(U300_SLOW_PER_PHYS_BASE+0x5000)
--
--/* GPIO */
--#define U300_GPIO_BASE			(U300_SLOW_PER_PHYS_BASE+0x6000)
--
--/* RTC */
--#define U300_RTC_BASE			(U300_SLOW_PER_PHYS_BASE+0x7000)
--
--/* Bus tracer */
--#define U300_BUSTR_BASE			(U300_SLOW_PER_PHYS_BASE+0x8000)
--
--/* Event handler (hardware queue) */
--#define U300_EVHIST_BASE		(U300_SLOW_PER_PHYS_BASE+0x9000)
--
--/* Genric Timer */
--#define U300_TIMER_BASE			(U300_SLOW_PER_PHYS_BASE+0xa000)
--
--/* PPM */
--#define U300_PPM_BASE			(U300_SLOW_PER_PHYS_BASE+0xb000)
--
--
--/*
-- * REST peripherals
-- */
--
--/* ISP (image signal processor) */
--#define U300_ISP_BASE			(0xA0008000)
--
--/* DMA Controller base */
--#define U300_DMAC_BASE			(0xC0020000)
--
--/* MSL Base */
--#define U300_MSL_BASE			(0xc0022000)
--
--/* APEX Base */
--#define U300_APEX_BASE			(0xc0030000)
--
--/* Video Encoder Base */
--#define U300_VIDEOENC_BASE		(0xc0080000)
--
--/* XGAM Base */
--#define U300_XGAM_BASE			(0xd0000000)
--
--#endif
+ 	pd->bus_id = -1;
++	pd->enable_dma = 1;
+ 	of_property_read_u32(np, "num-cs", &tmp);
+ 	pd->num_chipselect = tmp;
+ 	of_property_read_u32(np, "pl022,autosuspend-delay",
 -- 
 1.7.11.3
