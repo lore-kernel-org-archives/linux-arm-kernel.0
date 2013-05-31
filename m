@@ -1,31 +1,65 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Fri, 31 May 2013 14:13:00 +0530
-Subject: [PATCH v2 1/4] ARM: davinci: dm365 evm: remove init_enable from
- ths7303 pdata
-In-Reply-To: <CA+V-a8sAXXq=gBO_uDsOS1MonXJan+mpBwo15tvp+wR40kAMKA@mail.gmail.com>
-References: <1369503576-22271-1-git-send-email-prabhakar.csengg@gmail.com>
- <1369503576-22271-2-git-send-email-prabhakar.csengg@gmail.com>
- <CA+V-a8sAXXq=gBO_uDsOS1MonXJan+mpBwo15tvp+wR40kAMKA@mail.gmail.com>
-Message-ID: <CA+V-a8t8vx2S0rAZrZysF9PT2zVwx+EM0B5D=t50qoSiW8U_GA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 31 May 2013 09:45:08 +0100
+Subject: A bug about system call on ARM
+In-Reply-To: <alpine.LFD.2.03.1305302319430.30828@syhkavp.arg>
+References: <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
+ <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+ <20130529094826.GD13095@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
+ <20130530090949.GC7483@mudshark.cambridge.arm.com>
+ <20130530114112.GH7483@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1305302319430.30828@syhkavp.arg>
+Message-ID: <20130531084508.GA4928@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Fri, May 31, 2013 at 04:54:56AM +0100, Nicolas Pitre wrote:
+> On Thu, 30 May 2013, Will Deacon wrote:
+> 
+> > On Thu, May 30, 2013 at 10:09:49AM +0100, Will Deacon wrote:
+> > > On Thu, May 30, 2013 at 02:41:42AM +0100, Wang, Yalin wrote:
+> > > > If you have some patch for this issue,
+> > > > I can do the test for it .
+> > > 
+> > > I'll have a look at cooking something which uses an exception table entry
+> > > to rewind the PC and retry the system call. That's simpler than directly
+> > > injecting a user page fault from the system call path.
+> > 
+> > Ok, please can you try the following?
+> > 
+> > Will
+> > 
+> > --->8
+> > 
+> > diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+> > index bc5bc0a..855926e 100644
+> > --- a/arch/arm/kernel/entry-common.S
+> > +++ b/arch/arm/kernel/entry-common.S
+> > @@ -361,6 +361,15 @@ ENTRY(vector_swi)
+> >  	str	r8, [sp, #S_PSR]		@ Save CPSR
+> >  	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
+> >  	zero_fp
+> > +	enable_irq
+> > +	ct_user_exit
+> > +
+> > +#ifdef CONFIG_ALIGNMENT_TRAP
+> > +	ldr	ip, __cr_alignment
+> > +	ldr	ip, [ip]
+> > +	mcr	p15, 0, ip, c1, c0		@ update control register
+> > +#endif
+> 
+> This is wrong.  you must set up the align bit in the control register 
+> _before_ enabling IRQs or an IRQ handler might run without alignment 
+> fixup.
 
-On Sat, May 25, 2013 at 11:13 PM, Prabhakar Lad
-<prabhakar.csengg@gmail.com> wrote:
-> Hi Sekhar,
->
-> On Sat, May 25, 2013 at 11:09 PM, Prabhakar Lad
-> <prabhakar.csengg@gmail.com> wrote:
->> From: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->>
->> remove init_enable from ths7303 pdata as it is being dropped
->> from ths7303_platform_data.
->>
-> Can you please ack this patch as I intend to take this patch via media
-> tree.
-gentle ping.
+Okey doke, I can fix that up. I thought it was only needed for the network
+layer, but I suppose they have interrupts over there too :)
 
-Regards,
---Prabhakar
+> Otherwise the patch looks good to me.
+
+Thanks Nicolas.
+
+Will
