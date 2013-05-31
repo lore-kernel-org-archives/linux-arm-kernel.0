@@ -1,47 +1,38 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 31 May 2013 05:01:31 +0200 (CEST)
-Subject: [PATCH v2] dmaengine: shdma: fix a build failure on platforms with
- no DMA support
-Message-ID: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
+From: wenyou.yang@atmel.com (Wenyou Yang)
+Date: Fri, 31 May 2013 11:09:04 +0800
+Subject: [PATCH 0/2] ARM: dts: add watchdog device tree node in at91 dts files
+Message-ID: <1369969744-3428-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On platforms with no support for the shdma dmaengine driver build is
-currently failing with
+Hello,
 
-drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+The patches is to add watchdog device tree node for at91 SoC and board dts files.
 
-Fix the breakage by defining shdma_chan_filter to NULL in such
-configurations.
+Since the watchdog is disabled in the at91bootstrap with default configuration,
+if you want to use the watchdog in the kernel, you must make sure the watchdog
+doesn't be disabled in the at91bootstrap.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
----
+It is tested on at91sam9g20ek, at91sam9263ek, at91sam9g25ek
+using Documentation/watchdog/src/watchdog-simple.c.
 
-v2: in "next" shdma_chan_filter() is defined in shdma-base.c, which is 
-built if CONFIG_SH_DMAE_BASE is defined. This version uses the correct 
-symbol.
+It is based on v3.10-rc3, tested on linux-watchdog git tree as well.
 
-This is for "next." Compile-tested only. I'll test it on hardware next 
-week, but I don't think it shall break anything.
+Best Regards,
+Wenyou Yang
 
- include/linux/sh_dma.h |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Wenyou Yang (2):
+  ARM: dts: add the watchdog nodes for at91 SoC
+  ARM: dts: add the watchdog nodes for at91 boards
 
-diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
-index b64d6be..1fd8a20 100644
---- a/include/linux/sh_dma.h
-+++ b/include/linux/sh_dma.h
-@@ -99,6 +99,10 @@ struct sh_dmae_pdata {
- #define CHCR_TE	0x00000002
- #define CHCR_IE	0x00000004
- 
-+#if IS_ENABLED(CONFIG_SH_DMAE_BASE)
- bool shdma_chan_filter(struct dma_chan *chan, void *arg);
-+#else
-+#define shdma_chan_filter NULL
-+#endif
- 
- #endif
+ arch/arm/boot/dts/at91sam9263ek.dts         |    4 ++++
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |    4 ++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |    4 ++++
+ arch/arm/boot/dts/at91sam9n12.dtsi          |    6 ++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |    4 ++++
+ arch/arm/boot/dts/at91sam9x5.dtsi           |    6 ++++++
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |    4 ++++
+ 7 files changed, 32 insertions(+)
+
 -- 
-1.7.2.5
+1.7.9.5
