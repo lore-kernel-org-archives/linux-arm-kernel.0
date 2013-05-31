@@ -1,86 +1,91 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 31 May 2013 17:19:02 +0530
-Subject: [PATCH 1/3] ARM: EXYNOS: uncompress - print debug messages if
- DEBUG_LL is defined
-In-Reply-To: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
-References: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1370000944-19786-2-git-send-email-tushar.behera@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 31 May 2013 13:21:00 +0100
+Subject: [PATCH 2/2] ARM: shmobile: irqpin: map spurious interrupts in DT
+ case
+In-Reply-To: <Pine.LNX.4.64.1305241112210.1090@axis700.grange>
+References: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
+ <Pine.LNX.4.64.1305241112210.1090@axis700.grange>
+Message-ID: <20130531122100.BEC173E0901@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Printing low-level debug messages make an assumption that the specified
-UART port has been preconfigured by the bootloader. Incorrectly
-specified UART port results in system getting stalled while printing the
-message "Uncompressing Linux... done, booting the kernel"
+On Fri, 24 May 2013 11:13:07 +0200 (CEST), Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> In the non-DT case all interrupts get mapped statically during probing,
+> therefore, if a spurious interrupt arrives, it can easily be mapped back
+> to hardware registers and bits and handled. In the DT case interrupts are
+> mapped only when a device, using that interrupt is instantiated from DT.
+> So, spurious interrupts occur unmapped and thus cannot be handled properly.
+> This patch fixes this by mapping such interrupts as they occur.
 
-This UART port number is specified through S3C_LOWLEVEL_UART_PORT. Since
-the UART port might different for different board, it is not possible to
-specify it correctly for every board that use a common defconfig file.
+That sounds like a bad approach. If the driver really requires the irqs
+to be mapped, then it should do all of them when the controller is set
+up. Mapping at interrupt handling time is absolutely the wrong time to
+do it.
 
-Calling this print subroutine only when DEBUG_LL fixes the problem. By
-disabling DEBUG_LL in default config file, we would be able to boot
-multiple boards with different default UART ports.
+Also, why is mapping the irq necessary to handle it? You don't want to
+call generic_handle_irq() on a bad interrupt because there won't be
+anything listening for it. First of all, that particular irq should be
+entirely disabled if at all possible. Second, if it isn't possible to
+disable it, then the handler function should clear the state and get out
+of the handler as quickly as possible.
 
-With this current approach, we miss the print "Uncompressing Linux...
-done, booting the kernel." when DEBUG_LL is not defined.
+g.
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
- arch/arm/mach-exynos/include/mach/uncompress.h  |   11 ++++++++---
- arch/arm/plat-samsung/include/plat/uncompress.h |   10 +++++++++-
- 2 files changed, 17 insertions(+), 4 deletions(-)
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+>  drivers/irqchip/irq-renesas-intc-irqpin.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> index 82cec63..e62d76d 100644
+> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
+> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> @@ -71,6 +71,7 @@ struct intc_irqpin_priv {
+>  	struct intc_irqpin_iomem iomem[INTC_IRQPIN_REG_NR];
+>  	struct intc_irqpin_irq irq[INTC_IRQPIN_MAX];
+>  	struct renesas_intc_irqpin_config config;
+> +	unsigned int min_irq;
+>  	unsigned int number_of_irqs;
+>  	struct platform_device *pdev;
+>  	struct irq_chip irq_chip;
+> @@ -274,6 +275,10 @@ static irqreturn_t intc_irqpin_irq_handler(int irq, void *dev_id)
+>  	struct intc_irqpin_priv *p = i->p;
+>  	unsigned long bit;
+>  
+> +	if (!i->domain_irq)
+> +		/* unmapped: spurious IRQ, map it now */
+> +		irq_create_mapping(p->irq_domain, irq - p->min_irq);
+> +
+>  	intc_irqpin_dbg(i, "demux1");
+>  	bit = intc_irqpin_hwirq_mask(p, INTC_IRQPIN_REG_SOURCE, i->hw_irq);
+>  
+> @@ -372,6 +377,7 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> +	p->min_irq = INT_MAX;
+>  	/* allow any number of IRQs between 1 and INTC_IRQPIN_MAX */
+>  	for (k = 0; k < INTC_IRQPIN_MAX; k++) {
+>  		irq = platform_get_resource(pdev, IORESOURCE_IRQ, k);
+> @@ -380,6 +386,8 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+>  
+>  		p->irq[k].p = p;
+>  		p->irq[k].requested_irq = irq->start;
+> +		if (p->min_irq > irq->start)
+> +			p->min_irq = irq->start;
+>  	}
+>  
+>  	p->number_of_irqs = k;
+> -- 
+> 1.7.2.5
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
-index 2979995..730f69f 100644
---- a/arch/arm/mach-exynos/include/mach/uncompress.h
-+++ b/arch/arm/mach-exynos/include/mach/uncompress.h
-@@ -37,11 +37,16 @@ static void arch_detect_cpu(void)
- 	chip_id >>= 20;
- 	chip_id &= 0xf;
- 
-+#ifdef CONFIG_DEBUG_LL
- 	if (chip_id == 0x5)
--		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
-+		uart_base = (volatile u8 *)EXYNOS5_PA_UART +
-+			(S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
- 	else
--		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
--
-+		uart_base = (volatile u8 *)EXYNOS4_PA_UART +
-+			(S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
-+#else
-+	uart_base = NULL;
-+#endif
- 	/*
- 	 * For preventing FIFO overrun or infinite loop of UART console,
- 	 * fifo_max should be the minimum fifo size of all of the UART channels
-diff --git a/arch/arm/plat-samsung/include/plat/uncompress.h b/arch/arm/plat-samsung/include/plat/uncompress.h
-index 438b248..350032b 100644
---- a/arch/arm/plat-samsung/include/plat/uncompress.h
-+++ b/arch/arm/plat-samsung/include/plat/uncompress.h
-@@ -66,6 +66,9 @@ uart_rd(unsigned int reg)
- 
- static void putc(int ch)
- {
-+	if (!uart_base)
-+		return;
-+
- 	if (uart_rd(S3C2410_UFCON) & S3C2410_UFCON_FIFOMODE) {
- 		int level;
- 
-@@ -118,7 +121,12 @@ static void arch_decomp_error(const char *x)
- #ifdef CONFIG_S3C_BOOT_UART_FORCE_FIFO
- static inline void arch_enable_uart_fifo(void)
- {
--	u32 fifocon = uart_rd(S3C2410_UFCON);
-+	u32 fifocon;
-+
-+	if (!uart_base)
-+		return;
-+
-+	fifocon = uart_rd(S3C2410_UFCON);
- 
- 	if (!(fifocon & S3C2410_UFCON_FIFOMODE)) {
- 		fifocon |= S3C2410_UFCON_RESETBOTH;
 -- 
-1.7.9.5
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
