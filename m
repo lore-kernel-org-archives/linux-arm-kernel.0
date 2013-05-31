@@ -1,71 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 May 2013 16:43:26 +0900
-Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
-In-Reply-To: <CAOesGMgrdyFi3GMz52CVnhzmOYHbR5=29Ua0iS8cNbSjg6r-2A@mail.gmail.com>
-References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
- <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
- <CACRpkdZxWsJuvrtH-=VVqAGUCpdgS3W52R4tw5-_QGpggB+1uw@mail.gmail.com>
- <20130531001735.GA26684@verge.net.au>
- <CAOesGMiTXW0mVmbBbha5S4O64yu_vM=eLxM4JyctsfONCAo4qg@mail.gmail.com>
- <20130531054517.GC5009@verge.net.au>
- <CAOesGMgrdyFi3GMz52CVnhzmOYHbR5=29Ua0iS8cNbSjg6r-2A@mail.gmail.com>
-Message-ID: <20130531074323.GA22356@verge.net.au>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 31 May 2013 09:54:49 +0200
+Subject: [PATCH v3 0/5] rtc-at91rm9200: add shadow interrupt mask
+In-Reply-To: <51A7DE20.5080603@interlog.com>
+References: <1364983415-20298-1-git-send-email-jhovold@gmail.com>
+ <1369298335-24597-1-git-send-email-jhovold@gmail.com>
+ <20130529133354.dd181c845ee4e96527483345@linux-foundation.org>
+ <CAOCHtYiK8Y6iTnb4dWAE+cKHqEta-64gj+PorSFVGBF5wmg1+Q@mail.gmail.com>
+ <51A704C3.6010109@atmel.com>
+ <20130530123609.6e2966a66dd7b131961ed052@linux-foundation.org>
+ <51A7DE20.5080603@interlog.com>
+Message-ID: <51A85749.6060005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 11:11:36PM -0700, Olof Johansson wrote:
-> On Thu, May 30, 2013 at 10:45 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, May 30, 2013 at 09:43:08PM -0700, Olof Johansson wrote:
-> >> Hi,
-> >>
-> >> On Thu, May 30, 2013 at 5:17 PM, Simon Horman <horms@verge.net.au> wrote:
-> >> > On Thu, May 30, 2013 at 10:08:56PM +0200, Linus Walleij wrote:
-> >> >> On Thu, May 30, 2013 at 12:28 AM, Simon Horman
-> >> >> <horms+renesas@verge.net.au> wrote:
-> >> >>
-> >> >> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> >> >> >
-> >> >> > The USB_OVCn pins are alternate options for USB over-current detection
-> >> >> > when using a 3.3V USB interface. As they're not mandatory they can be
-> >> >> > used independently of the USB PENC pins. Don't group the USB_OVCn and
-> >> >> > PENC pins to avoid conflicts when the USB_OVCn pins are used by another
-> >> >> > function.
-> >> >> >
-> >> >> > Reported-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >> >> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> >> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >> >>
-> >> >> OK, Acked-by, do you want me to take this as a fix in the pinctrl
-> >> >> tree for v3.10?
-> >> >>
-> >> >> Just asking because Simon usually takes everything else relating to
-> >> >> the SH. ...
-> >> >
-> >> > This was a pull request from my tree to arm-soc, so thats they way
-> >> > I was planning to handle things.
-> >> >
-> >> > Olof, Arnd,
-> >> >
-> >> > should I re-spin the pull request to include Linus's ack?
-> >>
-> >> You can if you want, but for an odd and specific fix like this we'll
-> >> all know he's ok with the code going in.
-> >
-> > In that case my preference is to leave the pull request as is.
-> > Could you consider merging it?
-> 
-> Yes, I will do a pass tomorrow and handle the outstanding merges.
-> 
-> > As an aside, I do expect to send some more v3.10 fixes for shmobile.
-> > There seem to be more than usual.
-> 
-> A little unfortunate but it's hard to do much about.
-> 
-> Please be conservative with what you pick up for 3.10 vs 3.11 -- Linus
-> has said he really wants to see things slow down.
-> 
-> And please make our case as easy as possible by making sure it's
-> pretty clear from the patch descriptions what kind of bugs they fix
-> (and if they are regressions).
+On 31/05/2013 01:17, Douglas Gilbert :
+> On 13-05-30 03:36 PM, Andrew Morton wrote:
+>> On Thu, 30 May 2013 09:50:27 +0200 Nicolas Ferre
+>> <nicolas.ferre@atmel.com> wrote:
+>>
+>>> The review of this patch series was in my TODO list for some time...
+>>>
+>>> Today, I magically took time to review it ;-)
+>>> The patch series is good and I (even if it is too late) here is my:
+>>>
+>>> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>
+>>> I do not know if the series can be stacked for inclusion in 3.10-rc but
+>>> the resolution of this bug can help a lot (as Douglas is saying in
+>>> subsequent email...).
+>>
+>> We can do that, but looking through the discussion and changelogs I
+>> can't seem to find a usable description of what impact the bug (and its
+>> fix) have upon end-users.
+>>
+>> A nicely packaged description of that impact would help grease the
+>> wheels, please.
+>
+> How about this:
+>
+> The members of Atmel's at91sam9x5 family (9x5) have
+> a broken RTC interrupt mask register (AT91_RTC_IMR).
+> It does not reflect enabled interrupts but instead
+> always returns zero.
+>
+> The kernel's rtc-at91rm9200 driver handles the RTC
+> for the 9x5 family. Currently when the date/time is
+> set, an interrupt is generated and this driver neglects
+> to handle the interrupt. The kernel complains about the
+> un-handled interrupt and disables it henceforth. This
+> not only breaks the RTC function, but since that
+> interrupt is shared (Atmel's SYS interrupt) then other
+> things break as well (e.g. the debug port no longer
+> accepts characters).
+>
+> Tested on the at91sam9g25. Bug confirmed by Atmel.
 
-Understood. I will be careful to only send the bare essentials for v3.10.
+Absolutely. Thank you Douglas for the detailed description.
+
+>
+> Edit as you please.
+>
+> Doug Gilbert
+>
+>
+
+
+-- 
+Nicolas Ferre
