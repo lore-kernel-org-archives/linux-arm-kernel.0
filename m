@@ -1,30 +1,36 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Fri, 31 May 2013 08:28:58 +0200
-Subject: [PATCH v5 00/13] net: mv643xx_eth DT support and fixes
-In-Reply-To: <20130530.175549.407800685811475192.davem@davemloft.net>
-References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130530.175549.407800685811475192.davem@davemloft.net>
-Message-ID: <51A8432A.4000602@gmail.com>
+From: gururaja.hebbar@ti.com (Hebbar Gururaja)
+Date: Fri, 31 May 2013 12:03:23 +0530
+Subject: [PATCH 0/2] rtc: rtc-omap: add support for DT wakeup & alarm events
+Message-ID: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2013 02:55 AM, David Miller wrote:
-> From: Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>
-> Date: Wed, 29 May 2013 21:32:42 +0200
->
->> For the patches above I suggest to take Patches 1-6 through David
->> Miller's branch, and Patches 7-12 through Jason Cooper's when the
->> former have appeared on mainline linux. The patch set has been based
->> on v3.10-rc3.
->
-> Patches 1-6 applied to net-next, and patch #1 queued up for -stable.
+Current rtc-omap driver expects the rtc module wake-up capabilities to
+be set up by board specific code. However, in case of DT, this is not
+possible.
 
-David,
+So, add a DT property "ti,wakeup_capable" to indicate that the module
+is wake-up capable.
 
-thanks for pulling these in. I finally found how to check if a patch
-already went into -stable. As Jason already said, the mdio patch that
-#1 fixes did not yet went into -stable. Can you unqueue it? Sorry for
-the confusion.
+Also, on some platforms (like AM33xx), a special register
+(RTC_IRQWAKEEN) is available to enable Wakeup feature for Alarm Events.
 
-Sebastian
+Since new platforms/Boards are now added through DT only, this feature
+is supported via DT property only. Platforms using such IP should add
+the property "ti,has_irq_wake_enb" in rtc DT node.
+
+Kernel Base for the series is
+	> git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/
+linux-omap-dt.git
+	> linux-omap-git/for_3.11/dts
+
+Hebbar Gururaja (2):
+  rtc: omap: add option to indicate wakeup support through DT
+  rtc: omap: add rtc wakeup support to alarm events
+
+ Documentation/devicetree/bindings/rtc/rtc-omap.txt |    6 +++
+ drivers/rtc/rtc-omap.c                             |   50 +++++++++++++++++---
+ 2 files changed, 49 insertions(+), 7 deletions(-)
+
+-- 
+1.7.9.5
