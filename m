@@ -1,50 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat,  1 Jun 2013 00:22:46 +0200
-Subject: [PATCH 09/15] drm: always provide debugfs function prototypes
+Date: Sat,  1 Jun 2013 00:22:50 +0200
+Subject: [PATCH 13/15] [media] omap3isp: include linux/mm_types.h
 In-Reply-To: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
 References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
-Message-ID: <1370038972-2318779-10-git-send-email-arnd@arndb.de>
+Message-ID: <1370038972-2318779-14-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is generally considered bad style to enclose function prototypes
-in header files in #ifdef. This case illustrates why that is:
-The tegra host1x driver calls into the debugfs functions if
-CONFIG_DEBUG_FS is enabled, but that code is otherwise already
-discarded by the compiler, so leaving the prototype in place
-actually makes everything work.
+The ispqueue.h file uses vm_flags_t, which is defined in
+linux/mm_types.h, so we must include that header in order
+to build in all configurations.
 
-drivers/gpu/host1x/drm/dc.c: In function 'tegra_dc_debugfs_init':
-drivers/gpu/host1x/drm/dc.c:1004:2: error: implicit declaration of function 'drm_debugfs_create_files' [-Werror=implicit-function-declaration]
-drivers/gpu/host1x/drm/dc.c: In function 'tegra_dc_debugfs_exit': drivers/gpu/host1x/drm/dc.c:1026:2: error: implicit declaration of function 'drm_debugfs_remove_files' [-Werror=implicit-function-declaration]
-
-Cc: Ben Gamari <bgamari@gmail.com>
-Cc: Dave Airlie <airlied@redhat.com>
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: linux-media at vger.kernel.org
+Cc: Konstantin Khlebnikov <khlebnikov@openvz.org>
+Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- include/drm/drmP.h | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/media/platform/omap3isp/ispqueue.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/include/drm/drmP.h b/include/drm/drmP.h
-index 63d17ee..8bc105e 100644
---- a/include/drm/drmP.h
-+++ b/include/drm/drmP.h
-@@ -1551,7 +1551,7 @@ extern int drm_proc_init(struct drm_minor *minor, struct proc_dir_entry *root);
- extern int drm_proc_cleanup(struct drm_minor *minor, struct proc_dir_entry *root);
+diff --git a/drivers/media/platform/omap3isp/ispqueue.h b/drivers/media/platform/omap3isp/ispqueue.h
+index 908dfd7..e6e720c 100644
+--- a/drivers/media/platform/omap3isp/ispqueue.h
++++ b/drivers/media/platform/omap3isp/ispqueue.h
+@@ -31,6 +31,7 @@
+ #include <linux/mutex.h>
+ #include <linux/videodev2.h>
+ #include <linux/wait.h>
++#include <linux/mm_types.h>
  
- 				/* Debugfs support */
--#if defined(CONFIG_DEBUG_FS)
-+
- extern int drm_debugfs_init(struct drm_minor *minor, int minor_id,
- 			    struct dentry *root);
- extern int drm_debugfs_create_files(struct drm_info_list *files, int count,
-@@ -1559,7 +1559,6 @@ extern int drm_debugfs_create_files(struct drm_info_list *files, int count,
- extern int drm_debugfs_remove_files(struct drm_info_list *files, int count,
-                                     struct drm_minor *minor);
- extern int drm_debugfs_cleanup(struct drm_minor *minor);
--#endif
- 
- 				/* Info file support */
- extern int drm_name_info(struct seq_file *m, void *data);
+ struct isp_video_queue;
+ struct page;
 -- 
 1.8.1.2
