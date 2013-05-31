@@ -1,41 +1,46 @@
-From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Fri, 31 May 2013 12:44:23 +0200
-Subject: [PATCH 4/4] ARM: imx: clk-imx6q: correct some clocks' initial
- enable_count
-In-Reply-To: <1370034115-24006-4-git-send-email-b20788@freescale.com>
-References: <1370034115-24006-1-git-send-email-b20788@freescale.com>
- <1370034115-24006-4-git-send-email-b20788@freescale.com>
-Message-ID: <51A87F07.3080402@de.bosch.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 12:47:44 +0200
+Subject: [PATCH 31/39] ARM: u300: add syscon node
+In-Reply-To: <1369991954-17406-32-git-send-email-linus.walleij@stericsson.com>
+References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
+ <1369991954-17406-32-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <14733989.vf3LkZC316@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31.05.2013 23:01, Anson Huang wrote:
-> Those always-on clocks need to be added into init_on array, this
-> is to avoid confusion when we dump the clock tree, the result
-> shows that some clocks are on but their enabled_count is 0.
->
-> Signed-off-by: Anson Huang <b20788@freescale.com>
+On Friday 31 May 2013 11:19:06 Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This adds a device tree node for the U300 system controller
+> and remaps this dynamically instead of using hard-coded
+> virtual addresses. The board power set-up code is altered
+> to fetch a reference to the syscon using ampersand <&syscon>
+> notation. This way of passing a pointer to the syscon will
+> also be used by the clocks.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->   arch/arm/mach-imx/clk-imx6q.c |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> index 390950e..66831a6 100644
-> --- a/arch/arm/mach-imx/clk-imx6q.c
-> +++ b/arch/arm/mach-imx/clk-imx6q.c
-> @@ -247,7 +247,7 @@ static struct clk *clk[clk_max];
->   static struct clk_onecell_data clk_data;
->
->   static enum mx6q_clks const clks_init_on[] __initconst = {
-> -	mmdc_ch0_axi, rom, pll1_sys,
-> +	mmdc_ch0_axi, rom, pll1_sys, ckil, ocram, axi, ipg_per, mx6fast1, per2_main, aips_tz1, aips_tz2, mmdc_ch0_ipg, mmdc_ch1_ipg,
+>  Documentation/devicetree/bindings/arm/ste-u300.txt | 30 +++++++++++++++++++---
+>  arch/arm/boot/dts/ste-u300.dts                     |  6 +++++
+>  arch/arm/mach-u300/core.c                          | 22 +++++++++++++---
+>  arch/arm/mach-u300/regulator.c                     | 21 ++++++++++++---
+>  4 files changed, 69 insertions(+), 10 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/ste-u300.txt b/Documentation/devicetree/bindings/arm/ste-u300.txt
+> index cd9001a..69b5ab0 100644
+> --- a/Documentation/devicetree/bindings/arm/ste-u300.txt
+> +++ b/Documentation/devicetree/bindings/arm/ste-u300.txt
+> @@ -8,15 +8,39 @@ Required root node property:
+>  
+>  compatible="stericsson,u300";
+>  
+> +Required node: syscon
+> +This contains the system controller.
+> +- compatible: must be "stericsson,u300-syscon".
+> +- reg: the base address and size of the system controller.
+> +
 
+Any reason why you are not making it compatible with "syscon", to use
+the drivers/mfd/syscon.c driver?
 
-All clocks added with patch 1/4 but not listed here will be disabled by 
-the kernel, then? Is this intended? I just ask because it might change 
-the boards behavior in case the boot loader touches one of the clocks 
-from 1/4 and now they are disabled by the kernel.
-
-Best regards
-
-Dirk
+	Arnd 
