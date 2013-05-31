@@ -1,62 +1,81 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 31 May 2013 15:37:07 -0700
-Subject: [PATCH] rtc: rtc-twl: ensure IRQ is wakeup enabled
-Message-ID: <1370039827-25033-1-git-send-email-khilman@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 31 May 2013 19:42:07 -0300
+Subject: [PATCH v2 2/2] ARM: mxs: Pass the system revision
+In-Reply-To: <1370040127-15072-1-git-send-email-festevam@gmail.com>
+References: <1370040127-15072-1-git-send-email-festevam@gmail.com>
+Message-ID: <1370040127-15072-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the RTC IRQ is never wakeup-enabled so is not capable of
-bringing the system out of suspend.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-On OMAP platforms, we have gotten by without this because the TWL RTC
-is on an I2C-connected chip which is capable of waking up the OMAP via
-the IO ring when the OMAP is in low-power states.
+Some mxs userspace tools, such as multimedia plugins and kobs-ng (tool used to 
+burn boot images to NAND) rely on the 'Revision' field reported by 
+'/proc/cpuinfo'.
 
-However, if the OMAP suspends without hitting the low-power states
-(and the IO ring is not enabled), RTC wakeups will not work because
-the IRQ is not wakeup enabled.
+Provide a mechanism to pass such information, so that now we can get:
 
-To fix, ensure the RTC IRQ is wakeup enabled whenever the RTC alarm is
-set.
+$ cat /proc/cpuinfo                                             
+processor       : 0                                                             
+model name      : ARM926EJ-S rev 5 (v5l)                                        
+BogoMIPS        : 226.09                                                        
+Features        : swp half fastmult edsp java                                   
+CPU implementer : 0x41                                                          
+CPU architecture: 5TEJ                                                          
+CPU variant     : 0x0                                                           
+CPU part        : 0x926                                                         
+CPU revision    : 5                                                             
+                                                                                
+Hardware        : Freescale i.MX28 Evaluation Kit                               
+Revision        : 28012                                                         
+Serial          : 0000000000000000 
 
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com> 
 ---
- drivers/rtc/rtc-twl.c | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+Changes since v1:
+- No changes
 
-diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-index 8751a52..bbda0fd 100644
---- a/drivers/rtc/rtc-twl.c
-+++ b/drivers/rtc/rtc-twl.c
-@@ -213,12 +213,24 @@ static int mask_rtc_irq_bit(unsigned char bit)
+ arch/arm/mach-mxs/mach-mxs.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
+index 462fa14..0d7e1eb 100644
+--- a/arch/arm/mach-mxs/mach-mxs.c
++++ b/arch/arm/mach-mxs/mach-mxs.c
+@@ -29,6 +29,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+ #include <asm/system_misc.h>
++#include <asm/system_info.h>
  
- static int twl_rtc_alarm_irq_enable(struct device *dev, unsigned enabled)
- {
-+	struct platform_device *pdev = to_platform_device(dev);
-+	int irq = platform_get_irq(pdev, 0);
-+	static bool twl_rtc_wake_enabled;
- 	int ret;
+ #include "pm.h"
  
--	if (enabled)
-+	if (enabled) {
- 		ret = set_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
--	else
-+		if (device_can_wakeup(dev) && !twl_rtc_wake_enabled) {
-+			enable_irq_wake(irq);
-+			twl_rtc_wake_enabled = true;
-+		}
-+	} else {
- 		ret = mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
-+		if (twl_rtc_wake_enabled) {
-+			disable_irq_wake(irq);
-+			twl_rtc_wake_enabled = false;
-+		}
-+	}
- 
- 	return ret;
+@@ -442,12 +443,26 @@ static void mxs_print_silicon_rev(const char *cpu, int srev)
+ 				cpu, (srev >> 4) & 0xf, srev & 0xf);
  }
+ 
++static void mxs_pass_sysrev(void)
++{
++	int cputype = 0;
++
++	if (strcmp(mxs_get_cpu_type(), "MX23"))
++		cputype = 0x23000;
++
++	if (strcmp(mxs_get_cpu_type(), "MX28"))
++		cputype = 0x28000;
++
++	system_rev = (cputype | mxs_get_cpu_rev());
++}
++
+ static void __init mxs_machine_init(void)
+ {
+ 	const char *cpu_char = mxs_get_cpu_type();
+ 	int cpu_rev = mxs_get_cpu_rev();
+ 
+ 	mxs_print_silicon_rev(cpu_char, cpu_rev);
++	mxs_pass_sysrev();
+ 
+ 	if (of_machine_is_compatible("fsl,imx28-evk"))
+ 		imx28_evk_init();
 -- 
-1.8.2
+1.8.1.2
