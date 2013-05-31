@@ -1,29 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 31 May 2013 16:02:34 +0200
-Subject: [PATCH 12/39] ARM: u300: set up board power from device tree
-In-Reply-To: <4270774.6CqcMSP3z0@wuerfel>
-References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
- <6621177.ZgrPQ48FXE@wuerfel>
- <CACRpkdYXfm4xzqn2Kb0fw2_+BSSXBoNXye2zu3fpv1sPQcHO9w@mail.gmail.com>
- <4270774.6CqcMSP3z0@wuerfel>
-Message-ID: <CACRpkdb=Z8oFpvxni6jyaWHoQOjhFkWQ_71ku=h5UFk9pzJZ2A@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 31 May 2013 10:05:41 -0400 (EDT)
+Subject: [RFC PATCH 2/2] USB: OHCI: add a name for the platform-private
+ field
+In-Reply-To: <CAJFYCKECv-a8TkngRZzKfPi4apRTRtjDj2tQfRMJS94n7sSsFQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1305311005050.1276-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 3:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Fri, 31 May 2013, Manjunath Goudar wrote:
 
-> If it is not really a property of a particular board, but something
-> that you would need for other boards as well, it could perhaps
-> be tied to the syscon functionality, or to ab3100:
->
-> ab3100_regulators_probe() could itself set up the the supply
-> and then set the syscon bit. Basically you just move all of
-> arch/arm/mach-u300/regulator.c into drivers/regulator/ab3100.c
+> On 30 May 2013 22:56, Alan Stern <stern@rowland.harvard.edu> wrote:
+> 
+> > On Thu, 30 May 2013, Manjunath Goudar wrote:
+> >
+> > > This patch adds an ohci->priv field for private use by OHCI
+> > > platform drivers.
+> > >
+> > > Until now none of the platform drivers has used this private space,
+> > > but that's about to change in the next patch of this series.
+> >
+> > As far as I'm concerned, this doesn't need to be in a patch of its own.
+> > It can be merged into the 1/3 patch of the previous series.  After all,
+> > that patch adds the extra_priv_size field in ohci_driver_overrides,
+> > which doesn't make much sense unless there's a way to refer to the
+> > private part of the ohci_hcd structure
+> 
+> 
+> 
+>  Already 1/3 patch is merged into main line kernel.
 
-I think this is more likely the case.
+Yeah, too late now.
 
-Mark: would you be OK with the ab3100 driver hogging one of its
-own regulators?
+> Two days back only I started making ohci-spera a separate driver ,that time
+> I felt extra_priv_size field is required in ohci_driver_overrides that what
+> I created separate patch.
+> 
+> extra_priv_size patch is related to Spear patch,If you are agree,I can add
+> this patch with Spear patch,making Spear patch series.
 
-Yours,
-Linus Walleij
+No, we may as well keep it separate like this.
+
+Alan Stern
