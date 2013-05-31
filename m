@@ -1,27 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 31 May 2013 11:36:17 +0100
-Subject: [PATCH RFC 1/6] [HACK!] arm64/xen: create links to arch/arm
- include files and Xen code
-In-Reply-To: <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
- <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130531103617.GA18045@localhost.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 12:37:12 +0200
+Subject: [PATCH 12/39] ARM: u300: set up board power from device tree
+In-Reply-To: <1369991954-17406-13-git-send-email-linus.walleij@stericsson.com>
+References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
+ <1369991954-17406-13-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <6621177.ZgrPQ48FXE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 05:18:28PM +0100, Stefano Stabellini wrote:
-> Most of Xen support for ARM is common between ARMv7 and ARMv8.
-> Create links to the code under arch/arm (bleah).
+On Friday 31 May 2013 11:18:47 Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Other, probably better alternatives:
+> This adds support for setting up the board power from the
+> device tree on the U300. We use a board-specific node in the
+> device tree for the S365 board and bind a regulator for the
+> board power to this node.
 > 
-> - move the code to a different location, maybe the header files to
-> include/xen/arm and the code to drivers/xen/arm (still pretty ugly)?
-> 
-> - create a copy of the code to arch/arm64 (even worse);
+> Cc: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-KVM handles this in the Makefile by referencing back to arch/arm or even
-the generic kvm directory. I think that's the 'cleanest' ;)
+This is fairly unusual, I think I've never seen a platform driver
+registered for a board.  Is that the intended method for hogging
+a regulator?
 
--- 
-Catalin
+	Arnd
