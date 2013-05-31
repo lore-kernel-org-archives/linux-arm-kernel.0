@@ -1,58 +1,68 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Fri, 31 May 2013 19:30:38 +0800
-Subject: A bug about system call on ARM
-In-Reply-To: <20130531111305.GI4928@mudshark.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
- <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
- <20130529094826.GD13095@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
- <20130530090949.GC7483@mudshark.cambridge.arm.com>
- <20130530114112.GH7483@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
- <20130531084638.GB4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
- <20130531111305.GI4928@mudshark.cambridge.arm.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Fri, 31 May 2013 19:31:10 +0800
+Subject: [PATCH 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <1369997278.7804.73.camel@jlo-ubuntu-64.nvidia.com>
+References: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
+ <1369912782-30663-4-git-send-email-josephl@nvidia.com>
+ <51A763BD.6070001@linaro.org>
+ <1369991550.7804.37.camel@jlo-ubuntu-64.nvidia.com>
+ <51A86D11.8060305@linaro.org>
+ <1369997278.7804.73.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <1369999870.7804.78.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-I see,
-I will make one more test .
-
-Thanks for your clarification .
-
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com] 
-Sent: Friday, May 31, 2013 7:13 PM
-To: Wang, Yalin
-Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
-Subject: Re: A bug about system call on ARM
-
-On Fri, May 31, 2013 at 12:02:49PM +0100, Wang, Yalin wrote:
-> Hi  Will,
+On Fri, 2013-05-31 at 18:47 +0800, Joseph Lo wrote:
+> On Fri, 2013-05-31 at 17:27 +0800, Daniel Lezcano wrote:
+> > On 05/31/2013 11:12 AM, Joseph Lo wrote:
+> > > Hi Daniel,
+> > > 
+> > > Thanks for your review.
+> > > 
+> > > On Thu, 2013-05-30 at 22:35 +0800, Daniel Lezcano wrote:
+> > >> On 05/30/2013 01:19 PM, Joseph Lo wrote:
+> > >>> This supports CPU core power down on each CPU when CPU idle. When CPU go
+> > >>> into this state, it saves it's context and needs a proper configuration
+> > >>> in flow controller to power gate the CPU when CPU runs into WFI
+> > >>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
+> > >>> wake up event in flow controller.
+> > >>>
+> > >>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> > >>> ---
+> > >>
+> > >> Hi Joseph,
+> > >>
+> > >> a new flag has been added in the cpuidle framework to let this one to
+> > >> handle the timer broadcast : CPUIDLE_FLAG_TIMER_STOP
+> > >>
+> > >> It is the commit b60e6a0eb0273132cbb60a9806abf5f47a4aee1c
+> > >>
+> > >> You can get rid of the clockevent notify stuff by adding this flag to
+> > >> the state.
+> > >>
+> > > 
+> > > I just tested this flag on Tegra20, 30 and 114. It is only OK on
+> > > Tegra20. It caused a warning message below on Tegra30/114 at boot time.
+> > > 
+> > > I gave it a quick check I found it can't clean
+> > > tick_broadcast_pending_mask sometimes if apply the flag. But I keep the
+> > > code right now it's always OK. Not sure why? 
+> > 
+> > Is it possible you didn't intialized the timer broadcast with
+> > CLOCK_EVT_NOTIFY_BROADCAST_ON in the driver and then this one is
+> > actually disabled for you driver ?
+> > 
+> I found if I don't apply the CPUIDLE_FLAG_TIMER_STOP flag, the function
+> "cpuidle_setup_broadcast_timer" (drivers/cpuidle/driver.c) would not be
+> called. Then it's OK.
 > 
-> I have merge your code ,
-> But there is a different ,
+> If I apply this flag (with no CONFIG_CPU_IDLE_MULTIPLE_DRIVERS), the
+> cpuidle_register_driver only register for CPU0. Then the
+> "cpuidle_setup_broadcast_timer" only turn on for CPU0. I think this
+> might be the root cause. Not sure this also can reproduce on the other
+> SoCs?
 > 
-> +	
-> +	ct_user_exit
-
-I thought you didn't have ct_user_exit? In which case, just delete this line.
-
-> +#ifdef CONFIG_ALIGNMENT_TRAP
-> +	ldr	ip, __cr_alignment
-> +	ldr	ip, [ip]
-> +	mcr	p15, 0, ip, c1, c0		@ update control register
-> +#endif
-> 
-> +	enable_irq
-> +	get_thread_info tsk
-
-Hard to tell without context. You can take a look at my git tree if you like (I fixed it up based on Nico's comment):
-
-  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=misc-patches
-
-Will
+Looks it's not related to CLOCK_EVT_NOTIFY_BROADCAST_ON. I still saw the
+warning message even enable CONFIG_CPU_IDLE_MULTIPLE_DRIVERS. But if I
+move the clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT from idle
+framework back to driver, then everything is OK.
