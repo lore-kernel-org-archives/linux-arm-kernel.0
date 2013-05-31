@@ -1,82 +1,90 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 31 May 2013 15:08:29 +0200 (CEST)
-Subject: [PATCH v2] dmaengine: shdma: fix a build failure on platforms
- with no DMA support
-In-Reply-To: <51A88707.4040601@ti.com>
-References: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
- <51A88707.4040601@ti.com>
-Message-ID: <alpine.DEB.2.00.1305311504460.6919@axis700.grange>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 31 May 2013 15:18:35 +0200
+Subject: [PATCH 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <1370000680.7804.83.camel@jlo-ubuntu-64.nvidia.com>
+References: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
+ <1369912782-30663-4-git-send-email-josephl@nvidia.com>
+ <51A763BD.6070001@linaro.org>
+ <1369991550.7804.37.camel@jlo-ubuntu-64.nvidia.com>
+ <51A86D11.8060305@linaro.org>
+ <1369997278.7804.73.camel@jlo-ubuntu-64.nvidia.com>
+ <1369999870.7804.78.camel@jlo-ubuntu-64.nvidia.com>
+ <1370000680.7804.83.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <51A8A32B.6080303@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013, Dan Murphy wrote:
+On 05/31/2013 01:44 PM, Joseph Lo wrote:
+> On Fri, 2013-05-31 at 19:31 +0800, Joseph Lo wrote:
+>> On Fri, 2013-05-31 at 18:47 +0800, Joseph Lo wrote:
+>>> On Fri, 2013-05-31 at 17:27 +0800, Daniel Lezcano wrote:
+>>>> On 05/31/2013 11:12 AM, Joseph Lo wrote:
+>>>>> Hi Daniel,
+>>>>>
+>>>>> Thanks for your review.
+>>>>>
+>>>>> On Thu, 2013-05-30 at 22:35 +0800, Daniel Lezcano wrote:
+>>>>>> On 05/30/2013 01:19 PM, Joseph Lo wrote:
+>>>>>>> This supports CPU core power down on each CPU when CPU idle. When CPU go
+>>>>>>> into this state, it saves it's context and needs a proper configuration
+>>>>>>> in flow controller to power gate the CPU when CPU runs into WFI
+>>>>>>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
+>>>>>>> wake up event in flow controller.
+>>>>>>>
+>>>>>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>>>>>>> ---
+>>>>>>
+>>>>>> Hi Joseph,
+>>>>>>
+>>>>>> a new flag has been added in the cpuidle framework to let this one to
+>>>>>> handle the timer broadcast : CPUIDLE_FLAG_TIMER_STOP
+>>>>>>
+>>>>>> It is the commit b60e6a0eb0273132cbb60a9806abf5f47a4aee1c
+>>>>>>
+>>>>>> You can get rid of the clockevent notify stuff by adding this flag to
+>>>>>> the state.
+>>>>>>
+>>>>>
+>>>>> I just tested this flag on Tegra20, 30 and 114. It is only OK on
+>>>>> Tegra20. It caused a warning message below on Tegra30/114 at boot time.
+>>>>>
+>>>>> I gave it a quick check I found it can't clean
+>>>>> tick_broadcast_pending_mask sometimes if apply the flag. But I keep the
+>>>>> code right now it's always OK. Not sure why? 
+>>>>
+>>>> Is it possible you didn't intialized the timer broadcast with
+>>>> CLOCK_EVT_NOTIFY_BROADCAST_ON in the driver and then this one is
+>>>> actually disabled for you driver ?
+>>>>
+>>> I found if I don't apply the CPUIDLE_FLAG_TIMER_STOP flag, the function
+>>> "cpuidle_setup_broadcast_timer" (drivers/cpuidle/driver.c) would not be
+>>> called. Then it's OK.
+>>>
+>>> If I apply this flag (with no CONFIG_CPU_IDLE_MULTIPLE_DRIVERS), the
+>>> cpuidle_register_driver only register for CPU0. Then the
+>>> "cpuidle_setup_broadcast_timer" only turn on for CPU0. I think this
+>>> might be the root cause. Not sure this also can reproduce on the other
+>>> SoCs?
+>>>
+>> Looks it's not related to CLOCK_EVT_NOTIFY_BROADCAST_ON. I still saw the
+>> warning message even enable CONFIG_CPU_IDLE_MULTIPLE_DRIVERS. But if I
+>> move the clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT from idle
+>> framework back to driver, then everything is OK.
+>>
+> Once I move the clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT
+> right after "local_irq_enable" in the
+> "cpuidle_enter_state" (drivers/cpuidle/cpuidle.c). Then the warning
+> message shows up.
 
-> On 05/30/2013 10:01 PM, Guennadi Liakhovetski wrote:
-> > On platforms with no support for the shdma dmaengine driver build is
-> > currently failing with
-> >
-> > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-> > drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
-> >
-> > Fix the breakage by defining shdma_chan_filter to NULL in such
-> > configurations.
-> >
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> > ---
-> >
-> > v2: in "next" shdma_chan_filter() is defined in shdma-base.c, which is 
-> > built if CONFIG_SH_DMAE_BASE is defined. This version uses the correct 
-> > symbol.
-> >
-> > This is for "next." Compile-tested only. I'll test it on hardware next 
-> > week, but I don't think it shall break anything.
-> >
-> >  include/linux/sh_dma.h |    4 ++++
-> >  1 files changed, 4 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
-> > index b64d6be..1fd8a20 100644
-> > --- a/include/linux/sh_dma.h
-> > +++ b/include/linux/sh_dma.h
-> > @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
-> >  #define CHCR_TE	0x00000002
-> >  #define CHCR_IE	0x00000004
-> >  
-> > +#if IS_ENABLED(CONFIG_SH_DMAE_BASE)
-> >  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
-> > +#else
-> > +#define shdma_chan_filter NULL
-> OK I did not see a reply to my previous comment
-> Would this not be better as a
-> #else
-> static inline bool shdma_chan_filter(struct dma_chan *chan, void *arg) { return false; }
-> #endif
-> 
-> Otherwise runtime will call a NULL pointer
-
-Have you looked at the code?:
-
-		if (fn && !fn(chan, fn_param)) {
-
-Have you considered, when this channel allocation at all has a chance to 
-get as far as to checking the filter? Have you thought about the meaning 
-of "inline" when uing a function to assign it to a pointer? Are you sure 
-"will" is the right word here?
+Is it possible you pastebin you kernel config file ? I would like to
+check a couple of things before investigating the code.
 
 Thanks
-Guennadi
 
-> > +#endif
-> >  
-> >  #endif
-> 
-> 
-> -- 
-> ------------------
-> Dan Murphy
-> 
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
