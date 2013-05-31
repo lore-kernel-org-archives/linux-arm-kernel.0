@@ -1,90 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 31 May 2013 15:18:35 +0200
-Subject: [PATCH 3/3] ARM: tegra114: cpuidle: add powered-down state
-In-Reply-To: <1370000680.7804.83.camel@jlo-ubuntu-64.nvidia.com>
-References: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
- <1369912782-30663-4-git-send-email-josephl@nvidia.com>
- <51A763BD.6070001@linaro.org>
- <1369991550.7804.37.camel@jlo-ubuntu-64.nvidia.com>
- <51A86D11.8060305@linaro.org>
- <1369997278.7804.73.camel@jlo-ubuntu-64.nvidia.com>
- <1369999870.7804.78.camel@jlo-ubuntu-64.nvidia.com>
- <1370000680.7804.83.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <51A8A32B.6080303@linaro.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 31 May 2013 14:21:16 +0100
+Subject: [PATCH RFC 5/6] arm64/xen: implement xen_remap on arm64
+In-Reply-To: <20130531105915.GC18045@localhost.cambridge.arm.com>
+References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
+ <1369930713-6063-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130531105915.GC18045@localhost.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1305311419280.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2013 01:44 PM, Joseph Lo wrote:
-> On Fri, 2013-05-31 at 19:31 +0800, Joseph Lo wrote:
->> On Fri, 2013-05-31 at 18:47 +0800, Joseph Lo wrote:
->>> On Fri, 2013-05-31 at 17:27 +0800, Daniel Lezcano wrote:
->>>> On 05/31/2013 11:12 AM, Joseph Lo wrote:
->>>>> Hi Daniel,
->>>>>
->>>>> Thanks for your review.
->>>>>
->>>>> On Thu, 2013-05-30 at 22:35 +0800, Daniel Lezcano wrote:
->>>>>> On 05/30/2013 01:19 PM, Joseph Lo wrote:
->>>>>>> This supports CPU core power down on each CPU when CPU idle. When CPU go
->>>>>>> into this state, it saves it's context and needs a proper configuration
->>>>>>> in flow controller to power gate the CPU when CPU runs into WFI
->>>>>>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
->>>>>>> wake up event in flow controller.
->>>>>>>
->>>>>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
->>>>>>> ---
->>>>>>
->>>>>> Hi Joseph,
->>>>>>
->>>>>> a new flag has been added in the cpuidle framework to let this one to
->>>>>> handle the timer broadcast : CPUIDLE_FLAG_TIMER_STOP
->>>>>>
->>>>>> It is the commit b60e6a0eb0273132cbb60a9806abf5f47a4aee1c
->>>>>>
->>>>>> You can get rid of the clockevent notify stuff by adding this flag to
->>>>>> the state.
->>>>>>
->>>>>
->>>>> I just tested this flag on Tegra20, 30 and 114. It is only OK on
->>>>> Tegra20. It caused a warning message below on Tegra30/114 at boot time.
->>>>>
->>>>> I gave it a quick check I found it can't clean
->>>>> tick_broadcast_pending_mask sometimes if apply the flag. But I keep the
->>>>> code right now it's always OK. Not sure why? 
->>>>
->>>> Is it possible you didn't intialized the timer broadcast with
->>>> CLOCK_EVT_NOTIFY_BROADCAST_ON in the driver and then this one is
->>>> actually disabled for you driver ?
->>>>
->>> I found if I don't apply the CPUIDLE_FLAG_TIMER_STOP flag, the function
->>> "cpuidle_setup_broadcast_timer" (drivers/cpuidle/driver.c) would not be
->>> called. Then it's OK.
->>>
->>> If I apply this flag (with no CONFIG_CPU_IDLE_MULTIPLE_DRIVERS), the
->>> cpuidle_register_driver only register for CPU0. Then the
->>> "cpuidle_setup_broadcast_timer" only turn on for CPU0. I think this
->>> might be the root cause. Not sure this also can reproduce on the other
->>> SoCs?
->>>
->> Looks it's not related to CLOCK_EVT_NOTIFY_BROADCAST_ON. I still saw the
->> warning message even enable CONFIG_CPU_IDLE_MULTIPLE_DRIVERS. But if I
->> move the clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT from idle
->> framework back to driver, then everything is OK.
->>
-> Once I move the clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT
-> right after "local_irq_enable" in the
-> "cpuidle_enter_state" (drivers/cpuidle/cpuidle.c). Then the warning
-> message shows up.
+On Fri, 31 May 2013, Catalin Marinas wrote:
+> On Thu, May 30, 2013 at 05:18:32PM +0100, Stefano Stabellini wrote:
+> > --- a/arch/arm/include/asm/xen/page.h
+> > +++ b/arch/arm/include/asm/xen/page.h
+> > @@ -90,6 +90,10 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+> >  	return __set_phys_to_machine(pfn, mfn);
+> >  }
+> >  
+> > +#ifdef CONFIG_ARM64
+> > +#define xen_remap(cookie, size) __ioremap((cookie), (size), __pgprot(PROT_NORMAL))
+> > +#else
+> >  #define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
+> > +#endif
+> 
+> Now I saw the ARM-specific part. Can you not use something like
+> ioremap_cached() which would give normal cacheable memory (at least on
+> ARMv7).
 
-Is it possible you pastebin you kernel config file ? I would like to
-check a couple of things before investigating the code.
-
-Thanks
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+No, I cannot because ioremap_cached uses MT_DEVICE_CACHED, while this
+needs to be MT_MEMORY. It is used for normal memory pages, not device
+memory.
