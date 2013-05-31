@@ -1,103 +1,43 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Fri, 31 May 2013 09:48:02 -0500
-Subject: [PATCH v8] ARM: dts: omap4-panda: Update the LED support for the
- panda DTS
-Message-ID: <1370011682-20675-1-git-send-email-dmurphy@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 31 May 2013 15:50:16 +0100
+Subject: [PATCH RFC 5/6] arm64/xen: implement xen_remap on arm64
+In-Reply-To: <20130531141601.GC15551@arm.com>
+References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
+ <1369930713-6063-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130531105915.GC18045@localhost.cambridge.arm.com>
+ <alpine.DEB.2.02.1305311419280.4799@kaball.uk.xensource.com>
+ <20130531141601.GC15551@arm.com>
+Message-ID: <alpine.DEB.2.02.1305311530440.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
-are different.
+On Fri, 31 May 2013, Catalin Marinas wrote:
+> On Fri, May 31, 2013 at 02:21:16PM +0100, Stefano Stabellini wrote:
+> > On Fri, 31 May 2013, Catalin Marinas wrote:
+> > > On Thu, May 30, 2013 at 05:18:32PM +0100, Stefano Stabellini wrote:
+> > > > --- a/arch/arm/include/asm/xen/page.h
+> > > > +++ b/arch/arm/include/asm/xen/page.h
+> > > > @@ -90,6 +90,10 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+> > > >  	return __set_phys_to_machine(pfn, mfn);
+> > > >  }
+> > > >  
+> > > > +#ifdef CONFIG_ARM64
+> > > > +#define xen_remap(cookie, size) __ioremap((cookie), (size), __pgprot(PROT_NORMAL))
+> > > > +#else
+> > > >  #define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
+> > > > +#endif
+> > > 
+> > > Now I saw the ARM-specific part. Can you not use something like
+> > > ioremap_cached() which would give normal cacheable memory (at least on
+> > > ARMv7).
+> > 
+> > No, I cannot because ioremap_cached uses MT_DEVICE_CACHED, while this
+> > needs to be MT_MEMORY. It is used for normal memory pages, not device
+> > memory.
+> 
+> MT_DEVICE_CACHED is Normal memory for ARMv7.
 
-A1-A3 = gpio_wk7
-ES = gpio_110
-
-There is no change to LED D2
-
-Abstract away the pinmux and the LED definitions for the two boards into
-the respective DTS files.
-
-Signed-off-by: Dan Murphy <dmurphy@ti.com>
----
-v8 - Rebase to latest and use pinctrl macros - https://patchwork.kernel.org/patch/2629351/
-v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
-v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
-v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
-
- arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
- arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index d5d144a..523a800 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -16,8 +16,13 @@
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
- 
--	leds {
-+	leds: leds {
- 		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <
-+			&led_wkgpio_pins
-+		>;
-+
- 		heartbeat {
- 			label = "pandaboard::status1";
- 			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-@@ -157,6 +162,15 @@
- 	};
- };
- 
-+&omap4_pmx_wkup {
-+	led_wkgpio_pins: pinmux_leds_wkpins {
-+		pinctrl-single,pins = <
-+			0x1a (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk7 OUTPUT | MODE 3 */
-+			0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 OUTPUT | MODE 3 */
-+		>;
-+	};
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
-diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index 5cfdf19..5551ec6 100644
---- a/arch/arm/boot/dts/omap4-panda-es.dts
-+++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -34,3 +34,31 @@
- 		0x5e (PIN_INPUT | MUX_MODE0)		/* hdmi_sda.hdmi_sda */
- 		>;
- };
-+
-+&omap4_pmx_core {
-+	led_gpio_pins: gpio_led_pmx {
-+		pinctrl-single,pins = <
-+			0xb6 (PIN_OUTPUT | MUX_MODE3)	/* gpio_110 OUTPUT | MODE 3 */
-+		>;
-+	};
-+};
-+
-+&led_wkgpio_pins {
-+	pinctrl-single,pins = <
-+		0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 OUTPUT | MODE 3 */
-+	>;
-+};
-+
-+&leds {
-+	pinctrl-0 = <
-+		&led_gpio_pins
-+		&led_wkgpio_pins
-+	>;
-+
-+	heartbeat {
-+		gpios = <&gpio4 14 0>;
-+	};
-+	mmc {
-+		gpios = <&gpio1 8 0>;
-+	};
-+};
--- 
-1.7.5.4
+I didn't realize that MT_DEVICE_CACHED and MT_MEMORY end up having the
+same AttrIndx encoding!
+In that case yes, I should be able to use it.
+I take that I should just implement ioremap_cached on arm64 as well?
