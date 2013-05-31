@@ -1,27 +1,24 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 31 May 2013 00:03:35 -0400 (EDT)
-Subject: =?GB2312?Q?Re=3A_=B4=F0=B8=B4=3A_A_bug_about_system_call_on_ARM?=
-In-Reply-To: <ih0015wu30o5nq4ajf437rl7.1369916575726@email.android.com>
-References: <ih0015wu30o5nq4ajf437rl7.1369916575726@email.android.com>
-Message-ID: <alpine.LFD.2.03.1305302356140.30828@syhkavp.arg>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Fri, 31 May 2013 12:31:59 +0800
+Subject: [PATCH V1] ARM: mm: lazy cache flushing on non-mapped pages
+In-Reply-To: <20130530154047.GW7483@mudshark.cambridge.arm.com>
+References: <1369839416-27817-1-git-send-email-ming.lei@canonical.com>
+ <20130530154047.GW7483@mudshark.cambridge.arm.com>
+Message-ID: <CACVXFVNL032TY7b=YHEg9aaT_WNW3R8JOzaVqSbq09t2kcVOQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 May 2013, Wang, Yalin wrote:
+On Thu, May 30, 2013 at 11:40 PM, Will Deacon <will.deacon@arm.com> wrote:
+> Does the page_mapped test make the mapping_mapped test redundant? It sounds
+> strange if it's possible to get a non-zero mapcount for a page when its
+> address space isn't mapped.
 
-> Hi Will,
-> 
-> i see your solution,
-> i Will test it tomorrow,
-> and report the result to you ASAP!
+Yes, page_mapped() should always return correct value for a page in page
+cache.
 
-This is good if you can report success without changing any of your 
-current configuration.  This issue is worth fixing.
+I keep the previous check just for safe reason, and I can remove it if
+you care.
 
-However, as others have mentioned already, you most likely can set 
-CONFIG_OABI_COMPAT to n afterwards.  Not only will this make you immune 
-to the bug you reported, but that will also make the syscall path more 
-efficient as well.
-
-
-Nicolas
+Thanks
+--
+Ming Lei
