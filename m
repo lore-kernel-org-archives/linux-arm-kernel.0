@@ -1,71 +1,39 @@
-From: weiyj.lk@gmail.com (Wei Yongjun)
-Date: Fri, 31 May 2013 09:50:07 +0800
-Subject: [PATCH -next v3] dmaengine: ste_dma40: fix error return code in
- d40_probe()
-Message-ID: <CAPgLHd_uppj5twah650PqQnYw1JZp-GKrnBF+ZrXRarJQSNkug@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 31 May 2013 09:51:03 +0800
+Subject: [PATCH v7 08/11] ASoC: phycore-ac97: Add DT support
+In-Reply-To: <1369925513-19329-9-git-send-email-mpa@pengutronix.de>
+References: <1369925513-19329-1-git-send-email-mpa@pengutronix.de>
+ <1369925513-19329-9-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130531015101.GA22536@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+On Thu, May 30, 2013 at 04:51:50PM +0200, Markus Pargmann wrote:
+> Add devicetree support for phycore-ac97 driver.
+> 
+> platform_of_node and cpu_of_node are set according to the fsl,audmux
+> phandle.
+> 
+> This patch adds handling of ac97 reset functions according to fsl ac97
+> support. They are setup from here to avoid board specific code in the
+> generic fsl-ssi driver.
+> 
+> This patch changes the handling of pca100 boards from non-DT to DT only.
+> pcm043 is still handled without DT.
+> 
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 
-In many of the error handling case, the return value 'ret' not set
-and 0 will be return from d40_probe() even if error, but we should
-return a negative error code instead in those error handling case.
-This patch fixed them, and also removed useless variable 'err'.
+Compiling phycore-ac97 as module,  I got the following errors.
 
-Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
----
-v2 -> v3: move NULL assign below set ret, and remove redundant ENODEV check.
----
- drivers/dma/ste_dma40.c | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+  CC [M]  sound/soc/fsl/phycore-ac97.o
+sound/soc/fsl/phycore-ac97.c:305:1: error: redefinition of ?__inittest?
+sound/soc/fsl/phycore-ac97.c:146:1: note: previous definition of ?__inittest? was here
+sound/soc/fsl/phycore-ac97.c:305:1: error: redefinition of ?init_module?
+sound/soc/fsl/phycore-ac97.c:146:1: note: previous definition of ?init_module? was here
+sound/soc/fsl/phycore-ac97.c:305:1: error: redefinition of ?__exittest?
+sound/soc/fsl/phycore-ac97.c:147:1: note: previous definition of ?__exittest? was here
+sound/soc/fsl/phycore-ac97.c:305:1: error: redefinition of ?cleanup_module?
+sound/soc/fsl/phycore-ac97.c:147:1: note: previous definition of ?cleanup_module? was here
+make[4]: *** [sound/soc/fsl/phycore-ac97.o] Error 1
 
-diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
-index 7f23d45..88e3cd4 100644
---- a/drivers/dma/ste_dma40.c
-+++ b/drivers/dma/ste_dma40.c
-@@ -3506,7 +3506,6 @@ static int __init d40_probe(struct platform_device *pdev)
- {
- 	struct stedma40_platform_data *plat_data = pdev->dev.platform_data;
- 	struct device_node *np = pdev->dev.of_node;
--	int err;
- 	int ret = -ENOENT;
- 	struct d40_base *base = NULL;
- 	struct resource *res = NULL;
-@@ -3618,6 +3617,7 @@ static int __init d40_probe(struct platform_device *pdev)
- 		base->lcpa_regulator = regulator_get(base->dev, "lcla_esram");
- 		if (IS_ERR(base->lcpa_regulator)) {
- 			d40_err(&pdev->dev, "Failed to get lcpa_regulator\n");
-+			ret = PTR_ERR(base->lcpa_regulator);
- 			base->lcpa_regulator = NULL;
- 			goto failure;
- 		}
-@@ -3633,13 +3633,13 @@ static int __init d40_probe(struct platform_device *pdev)
- 	}
- 
- 	base->initialized = true;
--	err = d40_dmaengine_init(base, num_reserved_chans);
--	if (err)
-+	ret = d40_dmaengine_init(base, num_reserved_chans);
-+	if (ret)
- 		goto failure;
- 
- 	base->dev->dma_parms = &base->dma_parms;
--	err = dma_set_max_seg_size(base->dev, STEDMA40_MAX_SEG_SIZE);
--	if (err) {
-+	ret = dma_set_max_seg_size(base->dev, STEDMA40_MAX_SEG_SIZE);
-+	if (ret) {
- 		d40_err(&pdev->dev, "Failed to set dma max seg size\n");
- 		goto failure;
- 	}
-@@ -3647,8 +3647,8 @@ static int __init d40_probe(struct platform_device *pdev)
- 	d40_hw_init(base);
- 
- 	if (np) {
--		err = of_dma_controller_register(np, d40_xlate, NULL);
--		if (err && err != -ENODEV)
-+		ret = of_dma_controller_register(np, d40_xlate, NULL);
-+		if (ret)
- 			dev_err(&pdev->dev,
- 				"could not register of_dma_controller\n");
- 	}
+Shawn
