@@ -1,50 +1,59 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 31 May 2013 20:24:43 +0800
-Subject: [PATCH v1 1/2] ARM:prima2: move sirfsoc_of_rstc_init to
- .init_early
-In-Reply-To: <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
- <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <CAGsJ_4z65+SOCQM2XKmrda+5Hu9wRuZviSvW3As1ROa0SmdXqw@mail.gmail.com>
+From: vikas.sajjan@linaro.org (Vikas Sajjan)
+Date: Fri, 31 May 2013 18:01:30 +0530
+Subject: [PATCH v3 0/6] Add generic set_rate clk_ops for PLL35xx and PLL36xx
+ for samsung SoCs
+Message-ID: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/31 Srinivas KANDAGATLA <srinivas.kandagatla@st.com>:
-> From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->
-> This patch moves sirfsoc_of_rstc_init from early_initcall to .init_early
-> in machine descriptor, doing this way a multi_v7 kernel will not crash
-> on non-prima2 SOCs.
->
-> Without this patch the multi_v7 kernel panics if we boot it on any non
-> prima2 parts with below log:
->
-> Kernel panic - not syncing: unable to find compatible rstc node in dtb
->
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc3-00535-gc3cc4ac #62
-> [<c001387c>] (unwind_backtrace+0x0/0xf8) from [<c00111cc>]
-> (show_stack+0x10/0x14)
-> [<c00111cc>] (show_stack+0x10/0x14) from [<c03417f4>] (panic+0x90/0x1e4)
-> [<c03417f4>] (panic+0x90/0x1e4) from [<c04256d0>]
-> (sirfsoc_of_rstc_init+0x24/0x5c)
-> [<c04256d0>] (sirfsoc_of_rstc_init+0x24/0x5c) from [<c041f854>]
-> (do_one_initcall+0x90/0x150)
-> [<c041f854>] (do_one_initcall+0x90/0x150) from [<c041f978>]
-> (kernel_init_freeable+0x64/0x1c4)
-> [<c041f978>] (kernel_init_freeable+0x64/0x1c4) from [<c033d344>]
-> (kernel_init+0x8/0xe4)
-> [<c033d344>] (kernel_init+0x8/0xe4) from [<c000ded8>]
-> (ret_from_fork+0x14/0x3c)
->
-> Initially detected when booting Stih415 SOC with multi_v7_defconfig.
->
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+This patch series does the following: 
 
-hi Sriniva,
-i think my "arm: prima2: move to generic reset controller driver
-framework" fixs this too:
-http://www.spinics.net/lists/arm-kernel/msg246206.html
+ 1) Factors out possible common code, unifies the clk strutures used
+    for PLL35xx & PLL36xx and usues clk->base instead of clk->con0
 
-Arnd, will you ack that one so that i will send a pull request with that.
+ 2) Defines a common rate_table which will contain recommended p, m, s and k
+    values for supported rates that needs to be changed for changing
+    corresponding PLL's rate
 
--barry
+ 3) Adds set_rate() and round_rate() clk_ops for PLL35xx and PLL36xx
+
+changes since v2:
+	- Added new patch to reorder the MUX registration for mout_vpllsrc MUX
+	before the PLL registrations. And to add the alias for the mout_vpllsrc MUX.
+        - Added a check to confirm parent rate while registrating the PLL
+	rate tables.
+
+changes since v1:
+	- removed sorting and bsearch
+	- modified the definition of struct "samsung_pll_rate_table"
+	- added generic round_rate()
+	- rectified the ops assignment for "rate table passed as NULL"
+	  during PLL registration
+
+Is rebased on branch kgene's "for-next"
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+
+And tested these patch on chromebook for EPLL settings for Audio on our chrome tree.
+
+
+Vikas Sajjan (3):
+  clk: samsung: Add set_rate() clk_ops for PLL36xx
+  clk: samsung: Add alias for mout_vpllsrc and reorder MUX registration
+    for it
+  clk: samsung: Add EPLL and VPLL freq table for exynos5250 SoC
+
+Yadwinder Singh Brar (3):
+  clk: samsung: Use clk->base instead of directly using clk->con0 for
+    PLL3xxx
+  clk: samsung: Add support to register rate_table for PLL3xxx
+  clk: samsung: Add set_rate() clk_ops for PLL35xx
+
+ drivers/clk/samsung/clk-exynos4.c    |   10 +-
+ drivers/clk/samsung/clk-exynos5250.c |   69 +++++++++--
+ drivers/clk/samsung/clk-pll.c        |  226 ++++++++++++++++++++++++++++++----
+ drivers/clk/samsung/clk-pll.h        |   35 +++++-
+ drivers/clk/samsung/clk.h            |    2 +
+ 5 files changed, 300 insertions(+), 42 deletions(-)
+
+-- 
+1.7.9.5
