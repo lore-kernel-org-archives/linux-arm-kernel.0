@@ -1,44 +1,30 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Fri, 31 May 2013 17:02:00 +0200
-Subject: [PATCH 2/2] ARM: at91: dt: at91sam9x5: add SPI DMA client infos
-In-Reply-To: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
-References: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <1370012520-30539-2-git-send-email-richard.genoud@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 17:02:53 +0200
+Subject: [PATCH 2/2] ARM: ux500: Enable HIGHMEM in the u8540 defconfig
+In-Reply-To: <1370010272-25520-2-git-send-email-lee.jones@linaro.org>
+References: <1370010272-25520-1-git-send-email-lee.jones@linaro.org>
+ <1370010272-25520-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <38058740.G1EqTG95pA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
----
- arch/arm/boot/dts/at91sam9x5.dtsi |    6 ++++++
- 1 file changed, 6 insertions(+)
+On Friday 31 May 2013 15:24:32 Lee Jones wrote:
+> In order to utilise all of the memory located on ux500 based devices
+> we have to enable HIGHMEM. Without it the kernel truncates memory down
+> to what's left after the PAGE_OFFSET has been applied, which doesn't
+> leave an awful lot, especially if we're running large rootfs' such
+> as full Linux desktop distributions or Android.
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-rebased on linux-next next-20130531
-plus Ludovic Desroches' patch "ARM: at91: dt: add header to define at_hdmac configuration"
-to get the AT91_DMA_CFG_PER_ID() macro
+How much memory do those devices have? Enabling HIGHMEM is quite expensive.
 
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index af91599..a5942d0 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -629,6 +629,9 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0000000 0x100>;
- 				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
-+				dmas = <&dma0 1 AT91_DMA_CFG_PER_ID(1)>,
-+				       <&dma0 1 AT91_DMA_CFG_PER_ID(2)>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi0>;
- 				status = "disabled";
-@@ -640,6 +643,9 @@
- 				compatible = "atmel,at91rm9200-spi";
- 				reg = <0xf0004000 0x100>;
- 				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 3>;
-+				dmas = <&dma1 1 AT91_DMA_CFG_PER_ID(1)>,
-+				       <&dma1 1 AT91_DMA_CFG_PER_ID(2)>;
-+				dma-names = "tx", "rx";
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi1>;
- 				status = "disabled";
--- 
-1.7.10.4
+> diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+> index 5439925..808be06 100644
+> --- a/drivers/of/fdt.c
+> +++ b/drivers/of/fdt.c
+
+You should probably resend the patch without the second half that got
+in it by accident.
+
+	ARnd
