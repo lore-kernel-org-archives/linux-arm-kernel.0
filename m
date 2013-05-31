@@ -1,37 +1,25 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 31 May 2013 11:20:45 -0700
-Subject: [PATCH] ARM: EXYNOS: Consolidate multiple low-level UART port
- definitions
-In-Reply-To: <1369888827-9427-1-git-send-email-tushar.behera@linaro.org>
- (Tushar Behera's message of "Thu, 30 May 2013 10:10:27 +0530")
-References: <1369888827-9427-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <871u8n105e.fsf@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 31 May 2013 11:38:28 -0700
+Subject: [PATCHv6 07/11] ARM: PRIMA2: Divorce timer-marco from local
+ timer API
+In-Reply-To: <1368473175-4841-8-git-send-email-sboyd@codeaurora.org>
+References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
+ <1368473175-4841-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130531183828.GE599@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera <tushar.behera@linaro.org> writes:
+On 05/13, Stephen Boyd wrote:
+> Separate the marco local timers from the local timer API. This
+> will allow us to remove ARM local timer support in the near future
+> and gets us closer to moving this driver to drivers/clocksource.
+> 
+> Cc: Barry Song <baohua.song@csr.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-> There are two definitions for low-level UART ports for Exynos platform.
-> CONFIG_S3C_LOWLEVEL_UART_PORT is used for printing "Uncompressing
-> Linux... done, booting the kernel." and CONFIG_S3C_UART for other
-> low-level messages.
->
-> The assumption for both the uart ports is that they are pre-configured
-> in the bootloader. Since they are essentially the same always, it
-> would be good to consolidate them to use only one macro, in this case
-> 'DEBUG_S3C_UART' would be a better option.
->
-> 'DEBUG_S3C_UART' is defined only if DEBUG_LL is enabled. We can safely
-> disable this option when DEBUG_LL is not defined and we can boot various
-> boards with different UART port settings. Only drawback of this
-> approach is that when DEBUG_LL is not defined, we would be missing the
-> print "Uncompressing Linux... done, booting the kernel."
+Barry, have you been able to test this patch?
 
-Perfectly acceptable to me (and already the case on OMAP.)
-
-> Since CONFIG_S3C_LOWLEVEL_UART_PORT is still used by other Samsung
-> boards, the consolidation applies only for ARCH_EXYNOS.
->
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-
-Acked-by: Kevin Hilman <khilman@linaro.org>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
