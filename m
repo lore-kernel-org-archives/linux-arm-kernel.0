@@ -1,27 +1,21 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 31 May 2013 09:38:16 +0900
-Subject: [PATCH 00/14] Random LPAE-related patches
-In-Reply-To: <20130530150307.GU7483@mudshark.cambridge.arm.com>
-References: <1368810473-26070-1-git-send-email-will.deacon@arm.com>
- <51A7549D.9000103@gmail.com>
- <20130530150307.GU7483@mudshark.cambridge.arm.com>
-Message-ID: <019601ce5d97$23f75660$6be60320$%kim@samsung.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 30 May 2013 17:55:49 -0700 (PDT)
+Subject: [PATCH v5 00/13] net: mv643xx_eth DT support and fixes
+In-Reply-To: <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1369154510-4927-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1369855975-21489-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <20130530.175549.407800685811475192.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will Deacon wrote:
-> 
-> On Thu, May 30, 2013 at 02:31:09PM +0100, Subash Patel wrote:
-> > Thanks for these patches. I have tested these patches on exynos5440
-> > platform. It hasnt affected LPAE functionality for us from previous
-> > versions(posted by Cyril). You can use "Tested-By: Subash Patel
-> > <subash.rp@samsung.com>" as you deem necessary.
-> 
-> Thanks Subash. I'll add your tag and send a pull to Russell when he's back
-> from holiday.
-> 
-Sounds good, so we can support LPAE on exynos5440 with mainline soon.
+From: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Date: Wed, 29 May 2013 21:32:42 +0200
 
-Thanks.
+> For the patches above I suggest to take Patches 1-6 through David
+> Miller's branch, and Patches 7-12 through Jason Cooper's when the
+> former have appeared on mainline linux. The patch set has been based
+> on v3.10-rc3.
 
-- Kukjin
+Patches 1-6 applied to net-next, and patch #1 queued up for -stable.
+
+Thanks!
