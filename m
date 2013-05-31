@@ -1,85 +1,99 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Fri, 31 May 2013 14:10:05 -0700
-Subject: [BUG] zynq | CCF | SRCU
-In-Reply-To: <20130531195235.21525.64931@quantum>
-References: <42b8bfd5-3012-4c49-b9ef-7a9beb5956f1@VA3EHSMHS041.ehs.local>
- <20130531195235.21525.64931@quantum>
-Message-ID: <09ee3179-5100-4c7c-bf3d-0a659a3e7633@DB8EHSMHS026.ehs.local>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 31 May 2013 23:17:19 +0200
+Subject: [GIT PULL] at91: Device Tree update for 3.11 #1
+Message-ID: <1370035039-17757-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
+Arnd, Olof,
 
-On Fri, May 31, 2013 at 12:52:35PM -0700, Mike Turquette wrote:
-> Quoting S?ren Brinkmann (2013-05-31 12:12:07)
-> > Hi,
-> > 
-> > we recently encountered some kernel panics when we compiled one of our
-> > drivers as module and tested inserting/removing the module.
-> > Trying to debug this issue, I could reproduce it on the mainline kernel
-> > with a dummy module.
-> > 
-> > What happens is, that when on driver remove clk_notifier_unregister() is
-> > called and no other notifier for that clock is registered, the kernel
-> > panics.
-> > I'm not sure what is going wrong here. If there is a bug (and if where)
-> > or I'm just using the infrastructure the wrong way,... So, any hint is
-> > appreciated.
-> > 
-> > I attach the output from the crashing system. The stacktrace indicates a
-> > crash in 'srcu_readers_seq_idx()'.
-> > I also attach the module I used to trigger the issue and a patch on top
-> > of mainline commit a93cb29acaa8f75618c3f202d1cf43c231984644 which has
-> > the DT modifications I need to make the module find its clock and boot
-> > with my initramfs.
-> > 
-> 
-> Soren,
-> 
-> I only took a quick look at this so the following is a shot in the dark.
-> notifier_block->next should be protected by an RCU lock, and the way you
-> open-code the initialization struck me as a bit weird.  Can you change
-> your code to the following and let me know if it makes any difference?
-> 
-> static struct notifier_block nb = {
->         .notifier_call = clk_notif_dbg_cb;
-> };
-> 
-> static int clk_notif_dbg_cb(struct notifier_block *nb,
->                 unsigned long event, void *data)
-> {
->         pr_info("clk_notif_dbg_cb\n");
-> 
->         return NOTIFY_OK;
-> }
-> 
-> static int clk_notif_dbg_probe(struct platform_device *pdev)
-> {
->         ...
->         if (clk_notifier_register(clk, &nb))
->                 dev_warn(&pdev->dev, "clk_notifier_register failed\n");
->         ...
-> 
-> 
-> That is a small difference, but that style of initializing the
-> notifier_block has always worked for me when using clk rate-change
-> notifiers.  However I'm sure the bug you mention is far more evil and
-> nefarious than that ;-)
-I changed the module like this (I hope this is what you suggested):
-	8,9d7
-	< static struct notifier_block nb;
-	< 
-	17a16,19
-	> static struct notifier_block nb = {
-	>       .notifier_call = clk_notif_dbg_cb
-	> };
-	> 
-	20,22d21
-	<       nb.next = NULL;
-	<       nb.notifier_call = clk_notif_dbg_cb;
-	<
+This is the pull-request for DT update on AT91. As said earlier, and like any
+other patches that will be produced for 3.11, it is based on material already
+included in arm-soc/at91/cleanup branch.
 
-The result is the same. It crashes in srcu_readers_seq_idx().
+A little conflict may appear while merging with already-sent pull-request for
+the USBA driver ([GIT PULL] at91: USBA DT support for 3.11). I have resolved
+the conflict and pushed the result branch as: at91-at91-3.11-driver-usba-dt+resolved
 
-	Thanks,
-	S?ren
+Thanks, best regards,
+
+The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+
+  ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-dt
+
+for you to fetch changes up to 028633c238f91dc113520a7ad25d37b2ba9068af:
+
+  ARM: at91/dt: add pinctrl definition for at91 tc blocks (2013-05-31 22:40:37 +0200)
+
+----------------------------------------------------------------
+Big DT-centric update for AT91:
+- Calao boards update, removal of one board C file and
+  associated defconfig, Kconfig Makefile lines
+- several Acme boards updates
+- addition of watchdog, uart and pinctrl descriptions for
+  several products
+- modification of RTC compatible string for 9x5 family
+
+----------------------------------------------------------------
+Boris BREZILLON (1):
+      ARM: at91/dt: add pinctrl definition for at91 tc blocks
+
+Douglas Gilbert (1):
+      ARM: at91: add Acme Systems Fox G20 board
+
+Jean-Christophe PLAGNIOL-VILLARD (6):
+      ARM: at91: dt: sam9260: add i2c gpio pinctrl
+      ARM: at91: dt: usb-a9260: update shutdown controller
+      ARM: at91: dt: usb-a9263: update shutdown controller
+      ARM: at91: dt: usb-a9263: add dataflash support
+      ARM: at91: dt: add Calao USB-A9G20 low power version
+      ARM: at91: drop non DT: Calao USB-A96x
+
+Nicolas Ferre (5):
+      ARM: at91: at91sam9x5 RTC is not compatible with at91rm9200 one
+      ARM: at91/at91-ariag25.dts: add RTC node
+      ARM: at91/at91sam9x5.dtsi: add UART0/1 nodes
+      ARM: at91/at91-ariag25.dts: UART0/1 nodes are disabled
+      ARM: at91: switch Fox G20 board .dts to pre-processor defines
+
+Wenyou Yang (2):
+      ARM: at91/dtsi: add the watchdog nodes for at91 SoC
+      ARM: at91/dts: add the watchdog nodes for at91 boards
+
+ arch/arm/boot/dts/Makefile                  |   2 +
+ arch/arm/boot/dts/at91-ariag25.dts          |  21 +-
+ arch/arm/boot/dts/at91-foxg20.dts           | 157 ++++++++++++
+ arch/arm/boot/dts/at91rm9200.dtsi           |  76 ++++++
+ arch/arm/boot/dts/at91sam9260.dtsi          |  86 +++++++
+ arch/arm/boot/dts/at91sam9263.dtsi          |  38 +++
+ arch/arm/boot/dts/at91sam9263ek.dts         |   4 +
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   4 +
+ arch/arm/boot/dts/at91sam9g45.dtsi          |  76 ++++++
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |   4 +
+ arch/arm/boot/dts/at91sam9n12.dtsi          |  82 ++++++
+ arch/arm/boot/dts/at91sam9n12ek.dts         |   4 +
+ arch/arm/boot/dts/at91sam9x5.dtsi           | 102 +++++++-
+ arch/arm/boot/dts/at91sam9x5ek.dtsi         |   4 +
+ arch/arm/boot/dts/usb_a9260.dts             |   9 +
+ arch/arm/boot/dts/usb_a9263.dts             |  14 +
+ arch/arm/boot/dts/usb_a9g20.dts             |  18 +-
+ arch/arm/boot/dts/usb_a9g20_common.dtsi     |  27 ++
+ arch/arm/boot/dts/usb_a9g20_lpw.dts         |  31 +++
+ arch/arm/configs/at91_dt_defconfig          |   2 +
+ arch/arm/configs/at91sam9260_9g20_defconfig |   1 -
+ arch/arm/configs/at91sam9263_defconfig      |   1 -
+ arch/arm/mach-at91/Kconfig.non_dt           |  19 --
+ arch/arm/mach-at91/Makefile                 |   3 -
+ arch/arm/mach-at91/board-usb-a926x.c        | 384 ----------------------------
+ 25 files changed, 737 insertions(+), 432 deletions(-)
+ create mode 100644 arch/arm/boot/dts/at91-foxg20.dts
+ create mode 100644 arch/arm/boot/dts/usb_a9g20_common.dtsi
+ create mode 100644 arch/arm/boot/dts/usb_a9g20_lpw.dts
+ delete mode 100644 arch/arm/mach-at91/board-usb-a926x.c
+
+-- 
+Nicolas Ferre
