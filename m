@@ -1,49 +1,29 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 31 May 2013 14:20:04 -0700
-Subject: [PATCH] mfd: twl-core: convert to module_init()
-In-Reply-To: <1370033794-5357-1-git-send-email-khilman@linaro.org>
-References: <1370033794-5357-1-git-send-email-khilman@linaro.org>
-Message-ID: <20130531212003.GR6467@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 23:30:29 +0200
+Subject: [PATCH 1/3] ARM: at91: dt: add header to define at_hdmac
+ configuration
+In-Reply-To: <1369930103-11963-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
+ <1369930103-11963-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <201305312330.29364.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [130531 14:02]:
-> There's no reason for twl-core to be subsys_inicall anymore.  Anything
-> using twl that early needs a rethink, or deferred probe changes.
-> 
-> Boot tested and RTC wake tested (via TWL RTC) on OMAP platforms:
-> 3530/Beagle, 3730/Beagle-xM, 3530/Overo, 3730/Overo-STORM, 4430/Panda,
-> 4460/Panda-ES.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+On Thursday 30 May 2013, ludovic.desroches at atmel.com wrote:
+> +/*
+> + * Source and/or destination peripheral ID
+> + */
+> +#define AT91_DMA_CFG_PER_ID_MASK       (0xff)
+> +#define AT91_DMA_CFG_PER_ID(id)                (id & AT91_DMA_CFG_PER_ID_MASK)
+> +
 
-Totally agree:
+I'm a little worried about macros like this one spreading in the name
+of readability, and I don't see this as actual value-add here:
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+The output of the macro is always the same as the input, and passing
+an invalid number still results in an invalid output and no error message,
+it actually prevents us from warning about the mistake at run-time.
 
-> ---
->  drivers/mfd/twl-core.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-> index 89ab4d9..7749b9e 100644
-> --- a/drivers/mfd/twl-core.c
-> +++ b/drivers/mfd/twl-core.c
-> @@ -1309,7 +1309,7 @@ static int __init twl_init(void)
->  {
->  	return i2c_add_driver(&twl_driver);
->  }
-> -subsys_initcall(twl_init);
-> +module_init(twl_init);
->  
->  static void __exit twl_exit(void)
->  {
-> -- 
-> 1.8.2
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+The other macros are fine.
+
+	Arnd
