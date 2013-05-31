@@ -1,30 +1,22 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 31 May 2013 10:07:35 -0400 (EDT)
-Subject: [PATCH V2 1/2] USB: OHCI: make ohci-platform a separate driver
-In-Reply-To: <51a892db.3077420a.5699.0f88@mx.google.com>
-Message-ID: <Pine.LNX.4.44L0.1305311005520.1276-100000@iolanthe.rowland.org>
+Date: Fri, 31 May 2013 10:12:38 -0400 (EDT)
+Subject: [PATCH V8 0/3] USB: OHCI: Start splitting up the driver
+In-Reply-To: <201305300002.45754.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.44L0.1305311011570.1276-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013 manjunath.goudar at linaro.org wrote:
+On Thu, 30 May 2013, Arnd Bergmann wrote:
 
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
+> > I'll try to replicate your result.  I don't have my USB audio device 
+> > here today, so it will have to wait until tomorrow.
 > 
-> This patch splits the ohci-platform code from ohci-hcd out
-> into its own separate driver module.This work is part of enabling
-> multi-platform kernels on ARM.
+> Strange enough, it seems to be working now, on a different base.
 > 
-> In V2:
->   -Passed "hcd" argment instead of "ohci" in ohci_setup() because it is
->    using "struct usb_hcd" argment.
+> The kernel I tried last (based on yesterday's linux-next) also
+> had other issues and was very slow, so it may have been something
+> different.
 
-> @@ -30,58 +42,17 @@ static int ohci_platform_reset(struct usb_hcd *hcd)
-
-...
-
-> +	return ohci_setup(ohci_to_hcd(ohci));
-
-You don't need to use ohci_to_hcd(), because the hcd value is already a 
-parameter in this function.
+My test ran successfully, no problems.  I guess we can ignore this.
 
 Alan Stern
