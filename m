@@ -1,94 +1,84 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 31 May 2013 11:18:41 +0200
-Subject: [PATCH 06/39] i2c: stu300: device tree support
+Date: Fri, 31 May 2013 11:18:43 +0200
+Subject: [PATCH 08/39] watchdog: coh901327: devicetree support
 In-Reply-To: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
 References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1369991954-17406-7-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1369991954-17406-9-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This adds device tree support for the ST DDC I2C driver known
-as "stu300" in the kernel tree.
+This adds support for probing the COH 901 327 watchdog from
+the device tree and also adds associated bindings.
 
-Reviewed-by: Wolfram Sang <wsa@the-dreams.de>
+Acked-by: Wim Van Sebroeck <wim@iguana.be>
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt | 15 +++++++++++++++
- drivers/i2c/busses/i2c-stu300.c                         | 12 ++++++++++++
- 2 files changed, 27 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt
+ .../bindings/watchdog/stericsson-coh901327.txt        | 19 +++++++++++++++++++
+ drivers/watchdog/coh901327_wdt.c                      | 12 +++++++++---
+ 2 files changed, 28 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt b/Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt
+diff --git a/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt b/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
 new file mode 100644
-index 0000000..bd81a48
+index 0000000..8ffb88e
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-st-ddci2c.txt
-@@ -0,0 +1,15 @@
-+ST Microelectronics DDC I2C
++++ b/Documentation/devicetree/bindings/watchdog/stericsson-coh901327.txt
+@@ -0,0 +1,19 @@
++ST-Ericsson COH 901 327 Watchdog timer
 +
-+Required properties :
-+- compatible : Must be "st,ddci2c"
++Required properties:
++- compatible: must be "stericsson,coh901327".
 +- reg: physical base address of the controller and length of memory mapped
-+     region.
-+- interrupts: interrupt number to the cpu.
-+- #address-cells = <1>;
-+- #size-cells = <0>;
++  region.
++- interrupts: the interrupt used for the watchdog timeout warning.
 +
 +Optional properties:
-+- Child nodes conforming to i2c bus binding
++- timeout-sec: contains the watchdog timeout in seconds.
 +
-+Examples :
++Example:
 +
-diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
-index 0a6f941..1beaa05a 100644
---- a/drivers/i2c/busses/i2c-stu300.c
-+++ b/drivers/i2c/busses/i2c-stu300.c
-@@ -17,6 +17,7 @@
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/slab.h>
-+#include <linux/of_i2c.h>
++watchdog: watchdog at c0012000 {
++	compatible = "stericsson,coh901327";
++	reg = <0xc0012000 0x1000>;
++	interrupts = <3>;
++	timeout-sec = <60>;
++};
+diff --git a/drivers/watchdog/coh901327_wdt.c b/drivers/watchdog/coh901327_wdt.c
+index b9b8a8b..4bd070f 100644
+--- a/drivers/watchdog/coh901327_wdt.c
++++ b/drivers/watchdog/coh901327_wdt.c
+@@ -354,9 +354,9 @@ static int __init coh901327_probe(struct platform_device *pdev)
  
- /* the name of this kernel module */
- #define NAME "stu300"
-@@ -923,6 +924,7 @@ stu300_probe(struct platform_device *pdev)
- 	adap->nr = bus_nr;
- 	adap->algo = &stu300_algo;
- 	adap->dev.parent = &pdev->dev;
-+	adap->dev.of_node = pdev->dev.of_node;
- 	i2c_set_adapdata(adap, dev);
+ 	clk_disable(clk);
  
- 	/* i2c device drivers may be active on return from add_adapter() */
-@@ -934,6 +936,10 @@ stu300_probe(struct platform_device *pdev)
- 	}
+-	if (margin < 1 || margin > 327)
+-		margin = 60;
+-	coh901327_wdt.timeout = margin;
++	ret = watchdog_init_timeout(&coh901327_wdt, margin, &pdev->dev);
++	if (ret < 0)
++		coh901327_wdt.timeout = 60;
  
- 	platform_set_drvdata(pdev, dev);
-+	dev_info(&pdev->dev, "ST DDC I2C @ %p, irq %d\n",
-+		 dev->virtbase, dev->irq);
-+	of_i2c_register_devices(adap);
-+
- 	return 0;
+ 	ret = watchdog_register_device(&coh901327_wdt);
+ 	if (ret == 0)
+@@ -441,10 +441,16 @@ void coh901327_watchdog_reset(void)
+ 	/* Return and await doom */
  }
  
-@@ -978,11 +984,17 @@ stu300_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+static const struct of_device_id stu300_dt_match[] = {
-+	{ .compatible = "st,ddci2c" },
++static const struct of_device_id coh901327_dt_match[] = {
++	{ .compatible = "stericsson,coh901327" },
 +	{},
 +};
 +
- static struct platform_driver stu300_i2c_driver = {
+ static struct platform_driver coh901327_driver = {
  	.driver = {
- 		.name	= NAME,
  		.owner	= THIS_MODULE,
- 		.pm	= STU300_I2C_PM,
-+		.of_match_table = stu300_dt_match,
+ 		.name	= "coh901327_wdog",
++		.of_match_table = coh901327_dt_match,
  	},
- 	.remove		= __exit_p(stu300_remove),
- 
+ 	.remove		= __exit_p(coh901327_remove),
+ 	.suspend	= coh901327_suspend,
 -- 
 1.7.11.3
