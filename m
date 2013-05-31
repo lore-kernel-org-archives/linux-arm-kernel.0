@@ -1,133 +1,206 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Sat, 1 Jun 2013 00:16:16 +0200
-Subject: [PATCHv2 1/3] Add support for GMT G762/G763 PWM fan controller
-In-Reply-To: <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
-References: <cover.1369687670.git.arno@natisbad.org>
- <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
-Message-ID: <20130531221616.GG7626@kw.sim.vm.gnt>
+From: andre.przywara@linaro.org (Andre Przywara)
+Date: Sat,  1 Jun 2013 00:39:12 +0200
+Subject: [PATCH] ARM/KVM: save and restore generic timer registers
+Message-ID: <1370039952-20888-1-git-send-email-andre.przywara@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 12:03:14AM +0200, Arnaud Ebalard wrote:
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  drivers/hwmon/Kconfig              |   10 +
->  drivers/hwmon/Makefile             |    1 +
->  drivers/hwmon/g762.c               | 1012 ++++++++++++++++++++++++++++++++++++
->  include/linux/platform_data/g762.h |   54 ++
->  4 files changed, 1077 insertions(+)
->  create mode 100644 drivers/hwmon/g762.c
->  create mode 100644 include/linux/platform_data/g762.h
+For migration to work we need to save (and later restore) the state of
+each cores virtual generic timer.
+Since this is per VCPU, we can use the [gs]et_one_reg ioctl and just
+need to add the three registers (control, counter, compare value) to
+the list of saved registers. However we provide special accessor
+functions to get the value of each register, since the content can
+change anytime.
 
-Hi Arnaud,
+Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+---
+ arch/arm/include/asm/kvm_asm.h  |  7 ++++++-
+ arch/arm/include/asm/kvm_host.h |  3 +++
+ arch/arm/include/uapi/asm/kvm.h | 16 ++++++++++++++++
+ arch/arm/kvm/arch_timer.c       | 32 ++++++++++++++++++++++++++++++++
+ arch/arm/kvm/coproc.c           | 30 ++++++++++++++++++++++++++++++
+ 5 files changed, 87 insertions(+), 1 deletion(-)
 
-After more tests on my 2Big Network v2 board, it appears that the fan
-doesn't rotate when PWM mode (the preferred operating mode for this
-board) is selected. Nevertheless, DC mode is usable (even if not ideal
-given the hardware). After some investigations I noticed that an extra
-initialization is needed to enable PWM mode on my board: the set_cnt
-register must be set to 0 while the default value is 0xff. Is that
-specific to my hardware ? Is PWM mode working on your ReadyNAS with
-the default set_cnt value ?
-
-I haven't noticed this issue while testing your v1 patch series because
-at the time I was using a board with an U-Boot modified by LaCie. This
-last sets the set_cnt register to 0 while U-Boot mainline don't.
-Actually, the 2Big fan is not configured nor even started by U-Boot
-mainline. I have to fix this but maybe that something can be done in
-the g762 Linux driver too ?
-
-> 
-> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> index 0428e8a..142bdf8 100644
-> --- a/drivers/hwmon/Kconfig
-> +++ b/drivers/hwmon/Kconfig
-
-Snip
-
-> diff --git a/include/linux/platform_data/g762.h b/include/linux/platform_data/g762.h
-> new file mode 100644
-> index 0000000..29e3934
-> --- /dev/null
-> +++ b/include/linux/platform_data/g762.h
-> @@ -0,0 +1,54 @@
-> +/*
-> + * Platform data structure for g762 fan controller driver
-> + *
-> + * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-> + */
-> +#ifndef __LINUX_PLATFORM_DATA_G762_H__
-> +#define __LINUX_PLATFORM_DATA_G762_H__
-> +
-> +#define G762_DEFAULT_NO_OVERLOAD 0xffffffff
-> +
-> +struct g762_platform_data {
-> +	u32 fan_startv;
-> +	u32 fan_gear_mode;
-> +	u32 fan_div;
-> +	u32 fan_pulses;
-> +	u32 fan_target;
-> +	u32 pwm_polarity;
-> +	u32 pwm_enable;
-> +	u32 pwm_freq;
-> +	u32 pwm_mode;
-> +};
-> +
-> +/* When filling a g762_platform_data structure to be passed during platform
-> + * init to the driver, it needs to be initialized to the following default
-> + * value before changing specific fields. This is needed to avoid a sparse
-> + * initialization to have current values replaced by 0 */
-
-In other places, you use this multi-line comment format:
-
-/*
- * ...
- * ...
- */
-
-> +
-> +static const struct g762_platform_data G762_DEFAULT_PDATA = {
-> +	.fan_startv = G762_DEFAULT_NO_OVERLOAD,
-> +	.fan_gear_mode = G762_DEFAULT_NO_OVERLOAD,
-> +	.fan_div = G762_DEFAULT_NO_OVERLOAD,
-> +	.fan_pulses = G762_DEFAULT_NO_OVERLOAD,
-> +	.fan_target = G762_DEFAULT_NO_OVERLOAD,
-> +	.pwm_polarity = G762_DEFAULT_NO_OVERLOAD,
-> +	.pwm_enable = G762_DEFAULT_NO_OVERLOAD,
-> +	.pwm_freq = G762_DEFAULT_NO_OVERLOAD,
-> +	.pwm_mode = G762_DEFAULT_NO_OVERLOAD,
-> +};
-
-Are you sure that all this settings are needed ? IMHO the g762 platform
-data should only holds the platform specific configuration: fan_startv,
-fan_gear_mode, fan_div and fan_pulses. The other settings are not really
-related with the platform but more with the operating fan configuration.
-For my part, I am happy enough with the sysfs hwmon interface.
-
-The same comment applies to the g762 DT binding properties.
-
-Regards,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130601/03ad877d/attachment.sig>
+diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+index 18d5032..a732b17 100644
+--- a/arch/arm/include/asm/kvm_asm.h
++++ b/arch/arm/include/asm/kvm_asm.h
+@@ -46,7 +46,12 @@
+ #define c13_TID_URO	24	/* Thread ID, User R/O */
+ #define c13_TID_PRIV	25	/* Thread ID, Privileged */
+ #define c14_CNTKCTL	26	/* Timer Control Register (PL1) */
+-#define NR_CP15_REGS	27	/* Number of regs (incl. invalid) */
++#define c14_CNTV_CTL	27	/* Virtual Timer Control Register */
++#define c14_CNTVCT	28	/* Virtual Timer Counter Register */
++#define c14_CNTVCT_high	29	/* Virtual Timer Counter Register */
++#define c14_CNTV_CVAL	30	/* Virtual Timer Counter Register */
++#define c14_CNTV_CVAL_high	31	/* Virtual Timer Counter Register */
++#define NR_CP15_REGS	32	/* Number of regs (incl. invalid) */
+ 
+ #define ARM_EXCEPTION_RESET	  0
+ #define ARM_EXCEPTION_UNDEFINED   1
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 57cb786..80714ab 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -224,4 +224,7 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+ int kvm_perf_init(void);
+ int kvm_perf_teardown(void);
+ 
++u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
++void kvm_arm_timer_set_reg(struct kvm_vcpu *, const struct kvm_one_reg *, u64);
++
+ #endif /* __ARM_KVM_HOST_H__ */
+diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+index c1ee007..e3b0115 100644
+--- a/arch/arm/include/uapi/asm/kvm.h
++++ b/arch/arm/include/uapi/asm/kvm.h
+@@ -118,6 +118,22 @@ struct kvm_arch_memory_slot {
+ #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
+ #define KVM_REG_ARM_32_CRN_SHIFT	11
+ 
++#define KVM_REG_ARM_32_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U32      | \
++					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
++#define KVM_REG_ARM_64_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U64      | \
++					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
++#define KVM_REG_ARM_TIMER_CTL		(KVM_REG_ARM_32_CP15                 | \
++					( 3ULL << KVM_REG_ARM_CRM_SHIFT)     | \
++					(14ULL << KVM_REG_ARM_32_CRN_SHIFT)  | \
++					( 0ULL << KVM_REG_ARM_OPC1_SHIFT)    | \
++					( 1ULL << KVM_REG_ARM_32_OPC2_SHIFT))
++#define KVM_REG_ARM_TIMER_CNT		(KVM_REG_ARM_64_CP15 | \
++					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
++					( 1ULL << KVM_REG_ARM_OPC1_SHIFT))
++#define KVM_REG_ARM_TIMER_CVAL		(KVM_REG_ARM_64_CP15 | \
++					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
++					( 3ULL << KVM_REG_ARM_OPC1_SHIFT))
++
+ /* Normal registers are mapped as coprocessor 16. */
+ #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+ #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
+diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+index c55b608..64a8920b 100644
+--- a/arch/arm/kvm/arch_timer.c
++++ b/arch/arm/kvm/arch_timer.c
+@@ -171,6 +171,38 @@ static void kvm_timer_init_interrupt(void *info)
+ 	enable_percpu_irq(timer_irq.irq, 0);
+ }
+ 
++void kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu,
++			   const struct kvm_one_reg *reg, u64 val)
++{
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++
++	switch (reg->id) {
++	case KVM_REG_ARM_TIMER_CTL:
++		timer->cntv_ctl = val;
++		break;
++	case KVM_REG_ARM_TIMER_CNT:
++		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - val;
++		break;
++	case KVM_REG_ARM_TIMER_CVAL:
++		timer->cntv_cval = val;
++		break;
++	}
++}
++
++u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
++{
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
++
++	switch (reg->id) {
++	case KVM_REG_ARM_TIMER_CTL:
++		return timer->cntv_ctl;
++	case KVM_REG_ARM_TIMER_CNT:
++		return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
++	case KVM_REG_ARM_TIMER_CVAL:
++		return timer->cntv_cval;
++	}
++	return 0;
++}
+ 
+ static int kvm_timer_cpu_notify(struct notifier_block *self,
+ 				unsigned long action, void *cpu)
+diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+index 8eea97b..63b2e89 100644
+--- a/arch/arm/kvm/coproc.c
++++ b/arch/arm/kvm/coproc.c
+@@ -156,6 +156,8 @@ static const struct coproc_reg cp15_regs[] = {
+ 	/* TTBR0/TTBR1: swapped by interrupt.S. */
+ 	{ CRm( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
+ 	{ CRm( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
++	{ CRm(14), Op1( 1), is64, NULL, reset_unknown64, c14_CNTVCT},
++	{ CRm(14), Op1( 3), is64, NULL, reset_unknown64, c14_CNTV_CVAL},
+ 
+ 	/* TTBCR: swapped by interrupt.S. */
+ 	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
+@@ -226,6 +228,8 @@ static const struct coproc_reg cp15_regs[] = {
+ 	/* CNTKCTL: swapped by interrupt.S. */
+ 	{ CRn(14), CRm( 1), Op1( 0), Op2( 0), is32,
+ 			NULL, reset_val, c14_CNTKCTL, 0x00000000 },
++	{ CRn(14), CRm( 3), Op1( 0), Op2( 1), is32,
++			NULL, reset_val, c14_CNTV_CTL, 0x00000000 },
+ };
+ 
+ /* Target specific emulation tables */
+@@ -823,10 +827,22 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
+ }
+ #endif /* !CONFIG_VFPv3 */
+ 
++static bool is_timer_reg(u64 index)
++{
++	switch (index) {
++	case KVM_REG_ARM_TIMER_CTL:
++	case KVM_REG_ARM_TIMER_CNT:
++	case KVM_REG_ARM_TIMER_CVAL:
++		return true;
++	}
++	return false;
++}
++
+ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ {
+ 	const struct coproc_reg *r;
+ 	void __user *uaddr = (void __user *)(long)reg->addr;
++	u64 val;
+ 
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
+ 		return demux_c15_get(reg->id, uaddr);
+@@ -834,6 +850,11 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_VFP)
+ 		return vfp_get_reg(vcpu, reg->id, uaddr);
+ 
++	if (is_timer_reg(reg->id)) {
++		val = kvm_arm_timer_get_reg(vcpu, reg);
++		return reg_to_user(uaddr, &val, reg->id);
++	}
++
+ 	r = index_to_coproc_reg(vcpu, reg->id);
+ 	if (!r)
+ 		return get_invariant_cp15(reg->id, uaddr);
+@@ -846,6 +867,8 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ {
+ 	const struct coproc_reg *r;
+ 	void __user *uaddr = (void __user *)(long)reg->addr;
++	u64 val;
++	int ret;
+ 
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
+ 		return demux_c15_set(reg->id, uaddr);
+@@ -853,6 +876,13 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+ 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_VFP)
+ 		return vfp_set_reg(vcpu, reg->id, uaddr);
+ 
++	if (is_timer_reg(reg->id)) {
++		ret = reg_from_user(&val, uaddr, reg->id);
++		if (ret == 0)
++			kvm_arm_timer_set_reg(vcpu, reg, val);
++		return ret;
++	}
++
+ 	r = index_to_coproc_reg(vcpu, reg->id);
+ 	if (!r)
+ 		return set_invariant_cp15(reg->id, uaddr);
+-- 
+1.7.12.1
