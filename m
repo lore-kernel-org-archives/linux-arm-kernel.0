@@ -1,48 +1,46 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 31 May 2013 14:10:38 +0100
-Subject: [PATCH RFC 1/6] [HACK!] arm64/xen: create links to arch/arm
- include files and Xen code
-In-Reply-To: <alpine.DEB.2.02.1305311259090.4799@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
- <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130531103617.GA18045@localhost.cambridge.arm.com>
- <alpine.DEB.2.02.1305311259090.4799@kaball.uk.xensource.com>
-Message-ID: <20130531131038.GA15551@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 15:51:58 +0200
+Subject: [PATCH 12/39] ARM: u300: set up board power from device tree
+In-Reply-To: <CACRpkdYXfm4xzqn2Kb0fw2_+BSSXBoNXye2zu3fpv1sPQcHO9w@mail.gmail.com>
+References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
+ <6621177.ZgrPQ48FXE@wuerfel>
+ <CACRpkdYXfm4xzqn2Kb0fw2_+BSSXBoNXye2zu3fpv1sPQcHO9w@mail.gmail.com>
+Message-ID: <4270774.6CqcMSP3z0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 01:02:04PM +0100, Stefano Stabellini wrote:
-> On Fri, 31 May 2013, Catalin Marinas wrote:
-> > On Thu, May 30, 2013 at 05:18:28PM +0100, Stefano Stabellini wrote:
-> > > Most of Xen support for ARM is common between ARMv7 and ARMv8.
-> > > Create links to the code under arch/arm (bleah).
-> > > 
-> > > Other, probably better alternatives:
-> > > 
-> > > - move the code to a different location, maybe the header files to
-> > > include/xen/arm and the code to drivers/xen/arm (still pretty ugly)?
-> > > 
-> > > - create a copy of the code to arch/arm64 (even worse);
-> > 
-> > KVM handles this in the Makefile by referencing back to arch/arm or even
-> > the generic kvm directory. I think that's the 'cleanest' ;)
+On Friday 31 May 2013 13:33:45 Linus Walleij wrote:
+> Mark remarked on the first iteration that:
 > 
-> Do you mean creating links in the Makefile or generating header file
-> copies from the Makefile?
-> Or do you mean using something like "-I arch/arm/include/asm/xen" in the
-> arch/arm64 Makefile?
+> > I would expect this to be bound based on the board name that appears in
+> > the device tree which (given the way this stuff mostly works) I'd expect
+> > to have a device node available.
+> 
+> This is what I'm trying to do here.
+> 
+> The root node which actually contains the compatible-string
+> for the board itself can *not* be used, as the OF platform core
+> code does not create a platform device for this node, and it
+> cannot reference anything either.
+> 
+> So a single board node directly in the root was the best
+> I could come up with, other suggestions welcome...
 
-I meant C files being compiled directly from arch/arm (no links).
+I think I would actually put this into a machine_desc callback for a
+machine that matches just this one board: If this is truly board
+specific, this is where it belongs.
 
-For headers, if they are specific to arm or arm64, just copy the header
-in each place (e.g. not using regs->pstate in the arch/arm code with
-#ifdef's). For the rest, if they cannot be made generic, one way is to
-have a dummy file including the arm equivalent:
+Of course we try to have a single machine_desc work with any board
+normally, but the machine_desc is also the abstraction we already
+have for boards. There is a device_node for '/', but as you say
+there is no 'struct device' attached to it.
 
-#include <../../arm/include/asm/xen/events.h>
+If it is not really a property of a particular board, but something
+that you would need for other boards as well, it could perhaps
+be tied to the syscon functionality, or to ab3100:
 
-Passing -I is dangerous as you actually need "-I arch/arm/include" which
-could bring other files.
+ab3100_regulators_probe() could itself set up the the supply
+and then set the syscon bit. Basically you just move all of 
+arch/arm/mach-u300/regulator.c into drivers/regulator/ab3100.c
 
--- 
-Catalin
+	Arnd
