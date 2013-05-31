@@ -1,32 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 31 May 2013 17:52:50 +0100
-Subject: A bug about system call on ARM
-In-Reply-To: <alpine.LFD.2.03.1305311247280.30828@syhkavp.arg>
-References: <20130529094826.GD13095@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
- <20130530090949.GC7483@mudshark.cambridge.arm.com>
- <20130530114112.GH7483@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
- <20130531084638.GB4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
- <20130531111305.GI4928@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1305311247280.30828@syhkavp.arg>
-Message-ID: <20130531165250.GU4928@mudshark.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri, 31 May 2013 19:02:24 +0200
+Subject: [PATCH] arm: allow all architectures to change max zone order
+Message-ID: <1370019744-7588-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 05:48:56PM +0100, Nicolas Pitre wrote:
-> On Fri, 31 May 2013, Will Deacon wrote:
-> 
-> > Hard to tell without context. You can take a look at my git tree if you
-> > like (I fixed it up based on Nico's comment):
-> > 
-> >   https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=misc-patches
-> 
-> If you like, you may add "Reviewed-by: Nicolas Pitre <nico@linaro.org>" 
-> to it.
+Many multimedia applications on architectures without an
+IOMMU need large physically contiguous buffers and so need
+to adjust the max zone order of the page allocator.
 
-Cheers Nicolas, will do.
+There is zero reason to not allow this adjustment on arches
+other than SHMOBILE.
 
-Will
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 49d993c..6ceace8 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1710,7 +1710,7 @@ config HW_PERF_EVENTS
+ source "mm/Kconfig"
+ 
+ config FORCE_MAX_ZONEORDER
+-	int "Maximum zone order" if ARCH_SHMOBILE
++	int "Maximum zone order"
+ 	range 11 64 if ARCH_SHMOBILE
+ 	default "12" if SOC_AM33XX
+ 	default "9" if SA1111
+-- 
+1.7.10.4
