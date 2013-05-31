@@ -1,43 +1,46 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Fri, 31 May 2013 15:50:16 +0100
-Subject: [PATCH RFC 5/6] arm64/xen: implement xen_remap on arm64
-In-Reply-To: <20130531141601.GC15551@arm.com>
-References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
- <1369930713-6063-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130531105915.GC18045@localhost.cambridge.arm.com>
- <alpine.DEB.2.02.1305311419280.4799@kaball.uk.xensource.com>
- <20130531141601.GC15551@arm.com>
-Message-ID: <alpine.DEB.2.02.1305311530440.4799@kaball.uk.xensource.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 16:51:52 +0200
+Subject: [PATCH v2] dmaengine: shdma: fix a build failure on platforms
+ with no DMA support
+In-Reply-To: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
+References: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
+Message-ID: <3410825.gK3KBC8v80@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013, Catalin Marinas wrote:
-> On Fri, May 31, 2013 at 02:21:16PM +0100, Stefano Stabellini wrote:
-> > On Fri, 31 May 2013, Catalin Marinas wrote:
-> > > On Thu, May 30, 2013 at 05:18:32PM +0100, Stefano Stabellini wrote:
-> > > > --- a/arch/arm/include/asm/xen/page.h
-> > > > +++ b/arch/arm/include/asm/xen/page.h
-> > > > @@ -90,6 +90,10 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-> > > >  	return __set_phys_to_machine(pfn, mfn);
-> > > >  }
-> > > >  
-> > > > +#ifdef CONFIG_ARM64
-> > > > +#define xen_remap(cookie, size) __ioremap((cookie), (size), __pgprot(PROT_NORMAL))
-> > > > +#else
-> > > >  #define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
-> > > > +#endif
-> > > 
-> > > Now I saw the ARM-specific part. Can you not use something like
-> > > ioremap_cached() which would give normal cacheable memory (at least on
-> > > ARMv7).
-> > 
-> > No, I cannot because ioremap_cached uses MT_DEVICE_CACHED, while this
-> > needs to be MT_MEMORY. It is used for normal memory pages, not device
-> > memory.
+On Friday 31 May 2013 05:01:31 Guennadi Liakhovetski wrote:
+> On platforms with no support for the shdma dmaengine driver build is
+> currently failing with
 > 
-> MT_DEVICE_CACHED is Normal memory for ARMv7.
+> drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+> drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+> 
+> Fix the breakage by defining shdma_chan_filter to NULL in such
+> configurations.
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 
-I didn't realize that MT_DEVICE_CACHED and MT_MEMORY end up having the
-same AttrIndx encoding!
-In that case yes, I should be able to use it.
-I take that I should just implement ioremap_cached on arm64 as well?
+Sorry, I saw your patch too late and already spent some time doing a different one.
+
+> diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
+> index b64d6be..1fd8a20 100644
+> --- a/include/linux/sh_dma.h
+> +++ b/include/linux/sh_dma.h
+> @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
+>  #define CHCR_TE        0x00000002
+>  #define CHCR_IE        0x00000004
+>  
+> +#if IS_ENABLED(CONFIG_SH_DMAE_BASE)
+>  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
+> +#else
+> +#define shdma_chan_filter NULL
+> +#endif
+
+I still think that this is not the right solution, or at least not
+complete: No slave driver should care about which dma-engine it is
+connected to. You have already done most of the necessary conversion,
+so it would be straightforward to also pass the filter function
+pointer to the sdhi driver along with the data that gets passed into
+it.
+
+	Arnd
