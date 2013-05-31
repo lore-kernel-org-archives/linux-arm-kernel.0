@@ -1,228 +1,64 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 13:24:59 +0200
-Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
-In-Reply-To: <1369969115-4279-2-git-send-email-zhangwm@marvell.com>
-References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
- <1369969115-4279-2-git-send-email-zhangwm@marvell.com>
-Message-ID: <1726105.oKcjXShr89@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 May 2013 13:26:31 +0200
+Subject: [PATCH 02/39] ARM: u300: device tree support for the timer
+In-Reply-To: <7742928.6bJiIVUE0X@wuerfel>
+References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
+ <1369991954-17406-3-git-send-email-linus.walleij@stericsson.com>
+ <7742928.6bJiIVUE0X@wuerfel>
+Message-ID: <CACRpkdZYsnUhjYO_U4L56TMY+fs+ZU9zk3zLWnjPtf8Bmmn0YQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 May 2013 10:58:35 Neil Zhang wrote:
-> bring up pxa988 with device tree support.
-> 
-> Change-Id: I6fc869b7d5ff8dc6e4eb0042a89429200f7a9fb1
+On Fri, May 31, 2013 at 12:31 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 31 May 2013 11:18:37 Linus Walleij wrote:
 
-Please don't post silly extra headers like that.
+>> +void __init u300_timer_init()
+>> +{
+>> +       u300_timer_setup(U300_TIMER_APP_VBASE, IRQ_U300_TIMER_APP_GP1);
+>> +}
+>> +
+>> +#ifdef CONFIG_OF
+>> +
+>> +static void __init u300_timer_init_of(struct device_node *np)
+>> +{
+>> +       void __iomem *base;
+>> +       struct resource irq_res;
+>> +       int irq;
+>> +
+>> +       base = of_iomap(np, 0);
+>> +       /* Get the IRQ for the GP1 timer */
+>> +       irq = of_irq_to_resource(np, 2, &irq_res);
+>> +       u300_timer_setup(base, irq);
+>> +}
+>> +
+>> +CLOCKSOURCE_OF_DECLARE(u300_timer, "stericsson,u300-apptimer",
+>> +                      u300_timer_init_of);
+>> +
+>> +#endif
+>
+> You should not need the CONFIG_OF #ifdef, since the CLOCKSOURCE_OF_DECLARE
+> macro is designed to let the function get dropped by the compiler when
+> that is not set.
+>
+> You might want a CONFIG_ATAGS check for the other function though.
 
-> Signed-off-by: Neil Zhang <zhangwm@marvell.com>
+Both the other function and the #ifdef CONFIG_OF are deleted in
+patch 21. Is this OK?
 
-A couple of comments on the DT structure:
+>> diff --git a/arch/arm/mach-u300/timer.h b/arch/arm/mach-u300/timer.h
+>> index d34287b..7766dfa 100644
+>> --- a/arch/arm/mach-u300/timer.h
+>> +++ b/arch/arm/mach-u300/timer.h
+>> @@ -1 +1,2 @@
+>>  extern void u300_timer_init(void);
+>> +
+>
+> You probably didn't mean to include this newline.
 
-> +	gic: interrupt-controller at d1dfe100 {
-> +		compatible = "arm,cortex-a9-gic";
-> +		interrupt-controller;
-> +		#interrupt-cells = <3>;
-> +		reg = <0xd1dff000 0x1000>,
-> +		      <0xd1dfe100 0x0100>;
-> +	};
-> +
-> +	L2: l2-cache-controller at d1dfb000 {
-> +		compatible = "arm,pl310-cache";
-> +		reg = <0xd1dfb000 0x1000>;
-> +		arm,data-latency = <2 1 1>;
-> +		arm,tag-latency = <2 1 1>;
-> +		arm,pwr-dynamic-clk-gating;
-> +		arm,pwr-standby-mode;
-> +		cache-unified;
-> +		cache-level = <2>;
-> +	};
-> +
-> +	local-timer at d1dfe600 {
-> +		compatible = "arm,cortex-a9-twd-timer";
-> +		reg = <0xd1dfe600 0x20>;
-> +		interrupts = <1 13 0x304>;
-> +	};
+This entire file is also deleted in patch 21.
 
-Why are these all top-level devices, rather than part of the
-'soc' node?
+I can fix it up if you absolutely want to but it feels like
+something of an academic exercise.
 
-> +	soc {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "simple-bus";
-> +		interrupt-parent = <&gic>;
-> +		ranges;
-> +
-> +		axi at d4200000 {	/* AXI */
-> +			compatible = "mrvl,axi-bus", "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0xd4200000 0x00200000>;
-> +			ranges;
-> +
-> +			intc: wakeupgen at d4282000 {
-> +				compatible = "mrvl,mmp-intc";
-> +				reg = <0xd4282000 0x1000>;
-> +				mrvl,intc-wakeup = <0x114 0x3
-> +						    0x144 0x3>;
-> +			};
-> +
-> +		};
-
-What is a 'mrvl,axi-bus'? Is that different from ARM's AXI bus?
-
-The documented vendor prefix for Marvell is 'marvell', not 'mrvl',
-please be consistent with that.
-
-What is the purpose of the 'reg' property in the axi bus? I notice
-that it overlaps with its own children, wich seens very strange.
-Maybe you meant this:
-
-	axi {
-		ranges = <0xd4200000 0xd4200000 0x00200000>;
-		...
-	};
-
-> +		apb at d4000000 {	/* APB */
-> +			compatible = "mrvl,apb-bus", "simple-bus";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			reg = <0xd4000000 0x00200000>;
-> +			ranges;
-
-Same comments apply here.
-
-> diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-> index ebdda83..0955191 100644
-> --- a/arch/arm/mach-mmp/Kconfig
-> +++ b/arch/arm/mach-mmp/Kconfig
-> @@ -107,6 +107,16 @@ config MACH_MMP2_DT
->  	  Include support for Marvell MMP2 based platforms using
->  	  the device tree.
->  
-> +config MACH_MMPX_DT
-> +	bool "Support no-PJ/PJ4(ARMv7) platforms from device tree"
-> +	depends on !CPU_MOHAWK && !CPU_PJ4
-> +	select CPU_PXA988
-> +	select USE_OF
-> +	select PINCTRL
-> +	select PINCTRL_SINGLE
-
-Why would this be mutually exclusive with PJ4? Cortex-A9 and PJ4
-are both ARMv7 based, so we should be able to have them in the
-same kernel.
-
-> +	help
-> +	  Include support for Marvell MMP2 based platforms using
-> +	  the device tree.
->  endmenu
-
-You should probably change the help texts to say different things
-here, e.g. list the models supported under these.
-
-> diff --git a/arch/arm/mach-mmp/common.c b/arch/arm/mach-mmp/common.c
-> index 9292b79..0c621bc 100644
-> --- a/arch/arm/mach-mmp/common.c
-> +++ b/arch/arm/mach-mmp/common.c
-> @@ -11,6 +11,10 @@
->  #include <linux/init.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/io.h>
-> +#include <linux/ioport.h>
-> +#include <linux/of_address.h>
->  
->  #include <asm/page.h>
->  #include <asm/mach/map.h>
-> @@ -36,7 +40,12 @@ static struct map_desc standard_io_desc[] __initdata = {
->  		.virtual	= (unsigned long)AXI_VIRT_BASE,
->  		.length		= AXI_PHYS_SIZE,
->  		.type		= MT_DEVICE,
-> -	},
-> +	}, {
-> +		.pfn		= __phys_to_pfn(MMP_CORE_PERIPH_PHYS_BASE),
-> +		.virtual	= (unsigned long)MMP_CORE_PERIPH_VIRT_BASE,
-> +		.length		= MMP_CORE_PERIPH_PHYS_SIZE,
-> +		.type		= MT_DEVICE,
-> +	}
->  };
->  
->  void __init mmp_map_io(void)
-
-What is this needed for?
-
-> +/* PXA988 */
-> +static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst = {
-> +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0", NULL),
-> +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1", NULL),
-> +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000, "pxa2xx-uart.2", NULL),
-> +	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0", NULL),
-> +	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1", NULL),
-> +	OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
-> +	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
-> +	{}
-> +};
-
-Why do you need auxdata?
-
-> +void __init pxa988_dt_init_timer(void)
-> +{
-> +	extern void __init mmp_dt_init_timer(void);
-
-You should never put 'extern' declarations into a .c file.
-
-> +	/*
-> +	 * Is is a SOC timer, and will be used for broadcasting
-> +	 * when local timers are disabled.
-> +	 */
-> +	mmp_dt_init_timer();
-> +
-> +	clocksource_of_init();
-> +}
-
-Please just change the mmp_dt_init_timer function to use
-CLOCKSOURCE_OF_DECLARE(), and if possible move the file to
-drivers/clocksource.
-
-> +static const char *pxa988_dt_board_compat[] __initdata = {
-> +	"mrvl,pxa988-dkb",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(PXA988_DT, "Marvell PXA988 (Device Tree Support)")
-> +	.smp		= smp_ops(mmp_smp_ops),
-> +	.map_io		= mmp_map_io,
-> +	.init_irq	= irqchip_init,
-
-You can leave out the init_irq, it's implicit.
-
-> +	.init_time	= pxa988_dt_init_timer,
-> +	.init_machine	= pxa988_dt_init_machine,
-> +	.dt_compat	= pxa988_dt_board_compat,
-> +MACHINE_END
-
-
-> +
-> +static int __init mmp_entry_vector_init(void)
-> +{
-> +	int cpu;
-> +
-> +	/* We will reset from DDR directly by default */
-> +	writel(__pa(mmp_cpu_reset_entry), CIU_CA9_WARM_RESET_VECTOR);
-> +
-> +	for (cpu = 1; cpu < CONFIG_NR_CPUS; cpu++)
-> +		mmp_set_entry_vector(cpu, __pa(mmp_secondary_startup));
-> +}
-> +
-> +early_initcall(mmp_entry_vector_init);
-
-You need to check which machine you are running on here. Best just move
-the call into one of the init functions of the machine descriptor,
-e.g. init_machine or init_late.
-
-CONFIG_NR_CPUS is probably the wrong constant to use here, it does
-not have to match the physically present CPU cores.
-
-	Arnd
+Yours,
+Linus Walleij
