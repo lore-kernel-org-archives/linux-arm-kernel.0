@@ -1,31 +1,37 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 31 May 2013 13:42:54 +0100
-Subject: [PATCH v1 1/2] ARM:prima2: move sirfsoc_of_rstc_init to
- .init_early
-In-Reply-To: <CAGsJ_4z65+SOCQM2XKmrda+5Hu9wRuZviSvW3As1ROa0SmdXqw@mail.gmail.com>
-References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
- <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
- <CAGsJ_4z65+SOCQM2XKmrda+5Hu9wRuZviSvW3As1ROa0SmdXqw@mail.gmail.com>
-Message-ID: <51A89ACE.8030604@st.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Fri, 31 May 2013 14:53:56 +0200
+Subject: [PATCH v4 0/5] ARM: dts: OMAP2+: Use preprocessor for device trees
+In-Reply-To: <1370003579-30219-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1370003579-30219-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <51A89D64.9000803@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/13 13:24, Barry Song wrote:
->> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> hi Sriniva,
-> i think my "arm: prima2: move to generic reset controller driver
-> framework" fixs this too:
-> http://www.spinics.net/lists/arm-kernel/msg246206.html
-I did look at the patch, I think it will fix it.
+Hi Florian,
 
-But the patch is still using arch_initcall directly, which means this
-call will be attempted by every SOC in multi_v7 kernel.
-This call can be easily hooked into machine descriptor.
-In that way only prima compatible machines will attempt to call this
-function in first place.
+On 05/31/2013 02:32 PM, Florian Vaussard wrote:
+> Hello,
+> 
+> Following a similar proposal by Stephen Warren for tegra [1], this series
+> makes use of the C preprocessor when compiling OMAP DT files, and
+> accomplishes some improvements to improve overall readability.
+> 
+> Patch 1 is a preparation for the rest of the series.
+> Patch 2 uses existing constants for GPIOs. Patch 3 does the same for
+> IRQs. Patch 4 creates a new header for OMAP's padmux, and patch 5 uses
+> it to simplify pinctrl DT.
+> 
+> As for previous versions, the .dtb files were diff-tested before and after
+> applying the series to guarantee identity for all targets.
+> 
+> The same series for AM3XXX will follow shortly.
+> 
+> Best regards,
+> 
+> Florian
 
-Do you know if the second issue of postcore init is fixed in any other
-patches.
+Thanks for the series. I've just applied it and will push the update
+for_3.11/dts branch ASAP.
 
-thanks,
-srini
+Regards,
+Benoit
