@@ -1,55 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 12:31:41 +0200
-Subject: [PATCH 02/39] ARM: u300: device tree support for the timer
-In-Reply-To: <1369991954-17406-3-git-send-email-linus.walleij@stericsson.com>
-References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
- <1369991954-17406-3-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <7742928.6bJiIVUE0X@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 31 May 2013 11:36:17 +0100
+Subject: [PATCH RFC 1/6] [HACK!] arm64/xen: create links to arch/arm
+ include files and Xen code
+In-Reply-To: <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
+ <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130531103617.GA18045@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 May 2013 11:18:37 Linus Walleij wrote:
-> +
-> +
-> +void __init u300_timer_init()
-> +{
-> +       u300_timer_setup(U300_TIMER_APP_VBASE, IRQ_U300_TIMER_APP_GP1);
-> +}
-> +
-> +#ifdef CONFIG_OF
-> +
-> +static void __init u300_timer_init_of(struct device_node *np)
-> +{
-> +       void __iomem *base;
-> +       struct resource irq_res;
-> +       int irq;
-> +
-> +       base = of_iomap(np, 0);
-> +       /* Get the IRQ for the GP1 timer */
-> +       irq = of_irq_to_resource(np, 2, &irq_res);
-> +       u300_timer_setup(base, irq);
-> +}
-> +
-> +CLOCKSOURCE_OF_DECLARE(u300_timer, "stericsson,u300-apptimer",
-> +                      u300_timer_init_of);
-> +
-> +#endif
-
-You should not need the CONFIG_OF #ifdef, since the CLOCKSOURCE_OF_DECLARE
-macro is designed to let the function get dropped by the compiler when
-that is not set.
-
-You might want a CONFIG_ATAGS check for the other function though.
-
-> diff --git a/arch/arm/mach-u300/timer.h b/arch/arm/mach-u300/timer.h
-> index d34287b..7766dfa 100644
-> --- a/arch/arm/mach-u300/timer.h
-> +++ b/arch/arm/mach-u300/timer.h
-> @@ -1 +1,2 @@
->  extern void u300_timer_init(void);
-> +
+On Thu, May 30, 2013 at 05:18:28PM +0100, Stefano Stabellini wrote:
+> Most of Xen support for ARM is common between ARMv7 and ARMv8.
+> Create links to the code under arch/arm (bleah).
 > 
+> Other, probably better alternatives:
+> 
+> - move the code to a different location, maybe the header files to
+> include/xen/arm and the code to drivers/xen/arm (still pretty ugly)?
+> 
+> - create a copy of the code to arch/arm64 (even worse);
 
-You probably didn't mean to include this newline.
+KVM handles this in the Makefile by referencing back to arch/arm or even
+the generic kvm directory. I think that's the 'cleanest' ;)
 
-	Arnd
+-- 
+Catalin
