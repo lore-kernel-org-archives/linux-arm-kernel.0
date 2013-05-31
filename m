@@ -1,32 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 17:59:46 +0200
-Subject: [PATCH] gpio/omap: omap_gpio_init_context stub must be inline
-Message-ID: <2942784.trumtc2GjZ@wuerfel>
+Date: Fri, 31 May 2013 18:02:31 +0200
+Subject: [PATCH 1/2] ARM: shmobile: sdhi: pass DMA filter from platform
+ code
+In-Reply-To: <alpine.DEB.2.00.1305311721160.7395@axis700.grange>
+References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
+ <2862988.jnTv0iSQcj@wuerfel>
+ <alpine.DEB.2.00.1305311721160.7395@axis700.grange>
+Message-ID: <3675801.kLfsmmiSOq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The bug fix 352a2d5bf "gpio/omap: ensure gpio context is initialised"
-has caused a new warning for omap1_defconfig:
+On Friday 31 May 2013 17:30:01 Guennadi Liakhovetski wrote:
+> On Fri, 31 May 2013, Arnd Bergmann wrote:
+> > On Friday 31 May 2013 16:52:13 Guennadi Liakhovetski wrote:
 
-drivers/gpio/gpio-omap.c:1465:13: warning: 'omap_gpio_init_context' defined but not used [-Wunused-function]
- static void omap_gpio_init_context(struct gpio_bank *p) {}
-             ^
+> > I think it's more a matter of using the API correctly. The dmaengine
+> > API is an abstraction to separate the slave driver from the master
+> > through well-defined calls. If you make additional assumptions
+> > in the slave driver about the master, that is a layering violation.
+> 
+> I think it is a common practice, see e.g.
+> 
+> drivers/mmc/host/omap_hsmmc.c
+> drivers/mmc/host/davinci_mmc.c
 
-The solution is to mark the stub function as 'static inline' so
-it gets left out of the build when unused.
+Yes, those should be fixed as well.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index d3f7d2d..e5fba65 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -1462,7 +1462,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
- #else
- #define omap_gpio_runtime_suspend NULL
- #define omap_gpio_runtime_resume NULL
--static void omap_gpio_init_context(struct gpio_bank *p) {}
-+static inline void omap_gpio_init_context(struct gpio_bank *p) {}
- #endif
- 
- static const struct dev_pm_ops gpio_pm_ops = {
+> And what do you do for DT-based platforms?
+
+Once the driver is DT-enabled, we no longer have to pass
+a filter function at all because the slave id and all settings
+will get pulled out of the DT using the dma engine's xlate()
+callback.
+
+	Arnd
