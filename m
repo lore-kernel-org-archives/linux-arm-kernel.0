@@ -1,99 +1,64 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 31 May 2013 17:08:33 +0200
-Subject: [PATCH 1/2] spi: atmel: convert to
- dma_request_slave_channel_compat()
-In-Reply-To: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
-References: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
-Message-ID: <20130531150833.GF23653@game.jcrosoft.org>
+Date: Fri, 31 May 2013 17:11:25 +0200
+Subject: [PATCH 3/3] at_hdmac: add FIFO configuration parameter to DMA
+ DT binding
+In-Reply-To: <51A86DF5.4010808@atmel.com>
+References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
+ <1369930103-11963-4-git-send-email-ludovic.desroches@atmel.com>
+ <51A77F10.8020808@atmel.com>
+ <20130530163936.GC23653@game.jcrosoft.org>
+ <20130531091627.GD11384@ludovic.desroches@atmel.com>
+ <51A86DF5.4010808@atmel.com>
+Message-ID: <20130531151125.GG23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:01 Fri 31 May     , Richard Genoud wrote:
-> Use generic DMA DT helper.
-> Platforms booting with or without DT populated are both supported.
+On 11:31 Fri 31 May     , Nicolas Ferre wrote:
+> On 31/05/2013 11:16, Ludovic Desroches :
+> >On Thu, May 30, 2013 at 06:39:36PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >>On 18:32 Thu 30 May     , Nicolas Ferre wrote:
+> >>>On 30/05/2013 18:08, ludovic.desroches at atmel.com :
+> >>>>From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>>>
+> >>>>For most devices the FIFO configuration is the same i.e. when half FIFO size is
+> >>>>available/filled, a source/destination request is serviced. But USART devices
+> >>>>have to do it when there is enough space/data available to perform a single
+> >>>>AHB access so the ASAP configuration.
+> >>>>
+> >>>>Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >>>>Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>>
+> >>>Clear and neat: thanks Ludo.
+> >>
+> >>agreed
+> >>
+> >>can we apply this via AT91 as this depends on some cleanup I did on DT and
+> >>could result on some nigthmware conflict
+> >>
+> >
+> >In fact, I am not sure it's the best solution. I have noticed that there is a
+> >conflict with a patch sent by Nicolas (dmaengine: at_hdmac: extend hardware
+> >handshaking interface identification) which is already in Vinod's tree but
+> >which is not present on Jean-Christophe's cleanup tree on which I based these
+> >patches.
+> >
+> >Moreover this patch doesn't use macros introduced by Nicolas' patch. I may
+> >update it and it should go through Vinod's tree with a dependence on patch 1/3.
+> >
+> >What's your point of view?
 > 
-> Based on Ludovic Desroches <ludovic.desroches@atmel.com> patchset
-> "ARM: at91: move to generic DMA device tree binding"
+> Indeed. Another option could be to push patches 1 and 3 in
+> dmaengine's tree and make the 2nd patch go through arm-soc with a
+> dependency on slave-dma GIT tree (it seems it is an usual patern).
 > 
-> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> Arnd, Jean-Christophe, what do you think?
 
-Ludo please take a look but this looks ok to me
+Nico I let you handle this one my only concern is that the cleanup work can
+cause nightware conflict
 
 Best Regards,
 J.
-> ---
->  drivers/spi/spi-atmel.c |   42 +++++++++++++++++++++++++++---------------
->  1 file changed, 27 insertions(+), 15 deletions(-)
 > 
-> rebased on linux-next next-20130531
-> 
-> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
-> index 31cfc87..ea1ec00 100644
-> --- a/drivers/spi/spi-atmel.c
-> +++ b/drivers/spi/spi-atmel.c
-> @@ -424,10 +424,15 @@ static int atmel_spi_dma_slave_config(struct atmel_spi *as,
->  	return err;
->  }
->  
-> -static bool filter(struct dma_chan *chan, void *slave)
-> +static bool filter(struct dma_chan *chan, void *pdata)
->  {
-> -	struct	at_dma_slave *sl = slave;
-> +	struct atmel_spi_dma *sl_pdata = pdata;
-> +	struct at_dma_slave *sl;
->  
-> +	if (!sl_pdata)
-> +		return false;
-> +
-> +	sl = &sl_pdata->dma_slave;
->  	if (sl->dma_dev == chan->device->dev) {
->  		chan->private = sl;
->  		return true;
-> @@ -438,24 +443,31 @@ static bool filter(struct dma_chan *chan, void *slave)
->  
->  static int atmel_spi_configure_dma(struct atmel_spi *as)
->  {
-> -	struct at_dma_slave *sdata = &as->dma.dma_slave;
->  	struct dma_slave_config	slave_config;
-> +	struct device *dev = &as->pdev->dev;
->  	int err;
->  
-> -	if (sdata && sdata->dma_dev) {
-> -		dma_cap_mask_t mask;
-> +	dma_cap_mask_t mask;
-> +	dma_cap_zero(mask);
-> +	dma_cap_set(DMA_SLAVE, mask);
->  
-> -		/* Try to grab two DMA channels */
-> -		dma_cap_zero(mask);
-> -		dma_cap_set(DMA_SLAVE, mask);
-> -		as->dma.chan_tx = dma_request_channel(mask, filter, sdata);
-> -		if (as->dma.chan_tx)
-> -			as->dma.chan_rx =
-> -				dma_request_channel(mask, filter, sdata);
-> +	as->dma.chan_tx = dma_request_slave_channel_compat(mask, filter,
-> +							   &as->dma,
-> +							   dev, "tx");
-> +	if (!as->dma.chan_tx) {
-> +		dev_err(dev,
-> +			"DMA TX channel not available, SPI unable to use DMA\n");
-> +		err = -EBUSY;
-> +		goto error;
->  	}
-> -	if (!as->dma.chan_rx || !as->dma.chan_tx) {
-> -		dev_err(&as->pdev->dev,
-> -			"DMA channel not available, SPI unable to use DMA\n");
-> +
-> +	as->dma.chan_rx = dma_request_slave_channel_compat(mask, filter,
-> +							   &as->dma,
-> +							   dev, "rx");
-> +
-> +	if (!as->dma.chan_rx) {
-> +		dev_err(dev,
-> +			"DMA RX channel not available, SPI unable to use DMA\n");
->  		err = -EBUSY;
->  		goto error;
->  	}
+> Bye,
 > -- 
-> 1.7.10.4
-> 
+> Nicolas Ferre
