@@ -1,77 +1,133 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat,  1 Jun 2013 00:22:37 +0200
-Subject: [PATCH 00/15] Linux-3.10 ARM randconfig fixes
-Message-ID: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Sat, 1 Jun 2013 00:16:16 +0200
+Subject: [PATCHv2 1/3] Add support for GMT G762/G763 PWM fan controller
+In-Reply-To: <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
+References: <cover.1369687670.git.arno@natisbad.org>
+ <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
+Message-ID: <20130531221616.GG7626@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi subsystem maintainers,
+On Tue, May 28, 2013 at 12:03:14AM +0200, Arnaud Ebalard wrote:
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+>  drivers/hwmon/Kconfig              |   10 +
+>  drivers/hwmon/Makefile             |    1 +
+>  drivers/hwmon/g762.c               | 1012 ++++++++++++++++++++++++++++++++++++
+>  include/linux/platform_data/g762.h |   54 ++
+>  4 files changed, 1077 insertions(+)
+>  create mode 100644 drivers/hwmon/g762.c
+>  create mode 100644 include/linux/platform_data/g762.h
 
-These are a few patches left over from doing randconfig tests
-a couple of weeks ago. Please apply them directly into your
-trees unless you see problems. All patches can theoretically
-be seen as bug fixes for 3.10, but they are not critical,
-so applying them for 3.11 is fine as well.
+Hi Arnaud,
 
-	Arnd
+After more tests on my 2Big Network v2 board, it appears that the fan
+doesn't rotate when PWM mode (the preferred operating mode for this
+board) is selected. Nevertheless, DC mode is usable (even if not ideal
+given the hardware). After some investigations I noticed that an extra
+initialization is needed to enable PWM mode on my board: the set_cnt
+register must be set to 0 while the default value is 0xff. Is that
+specific to my hardware ? Is PWM mode working on your ReadyNAS with
+the default set_cnt value ?
 
-Arnd Bergmann (15):
-  irqdomain: export irq_domain_add_simple
-  mtd: omap2: allow bulding as a module
-  drm/nouveau: use mdelay instead of large udelay constants
-  [SCSI] nsp32: use mdelay instead of large udelay constants
-  hwrng: bcm2835: fix MODULE_LICENSE tag
-  cpuidle: calxeda: select ARM_CPU_SUSPEND
-  cpufreq: spear needs cpufreq table
-  thermal: cpu_cooling: fix stub function
-  drm: always provide debugfs function prototypes
-  drm/tilcd: select BACKLIGHT_LCD_SUPPORT
-  iwlegacy: il_pm_ops is only provided for PM_SLEEP
-  [media] davinci: vpfe_capture needs i2c
-  [media] omap3isp: include linux/mm_types.h
-  clk: tegra: provide tegra_periph_reset_assert alternative
-  OF: remove #ifdef from linux/of_platform.h
+I haven't noticed this issue while testing your v1 patch series because
+at the time I was using a board with an U-Boot modified by LaCie. This
+last sets the set_cnt register to 0 while U-Boot mainline don't.
+Actually, the 2Big fan is not configured nor even started by U-Boot
+mainline. I have to fix this but maybe that something can be done in
+the g762 Linux driver too ?
 
- drivers/char/hw_random/bcm2835-rng.c               |  2 +-
- drivers/cpufreq/Kconfig.arm                        |  1 +
- drivers/cpuidle/Kconfig                            |  1 +
- drivers/gpu/drm/nouveau/core/engine/disp/dacnv50.c |  3 ++-
- drivers/gpu/drm/tilcdc/Kconfig                     |  1 +
- drivers/media/platform/davinci/Kconfig             |  3 +++
- drivers/media/platform/omap3isp/ispqueue.h         |  1 +
- drivers/mtd/nand/Kconfig                           |  2 +-
- drivers/net/wireless/iwlegacy/common.h             |  6 +++---
- drivers/scsi/nsp32.c                               |  2 +-
- include/drm/drmP.h                                 |  3 +--
- include/linux/clk/tegra.h                          |  5 +++++
- include/linux/cpu_cooling.h                        |  4 ++--
- include/linux/of_platform.h                        | 14 +++-----------
- kernel/irq/irqdomain.c                             |  1 +
- 15 files changed, 27 insertions(+), 22 deletions(-)
+> 
+> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+> index 0428e8a..142bdf8 100644
+> --- a/drivers/hwmon/Kconfig
+> +++ b/drivers/hwmon/Kconfig
 
-Cc: "James E.J. Bottomley" <JBottomley@parallels.com>
-Cc: Artem Bityutskiy <artem.bityutskiy@linux.intel.com>
-Cc: Dave Airlie <airlied@redhat.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: John W. Linville <linville@tuxdriver.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Rafael J. Wysocki <rjw@sisk.pl>
-Cc: Rob Clark <robdclark@gmail.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: Stephen Warren <swarren@wwwdotorg.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: cpufreq at vger.kernel.org
-Cc: dri-devel at lists.freedesktop.org
-Cc: linux-media at vger.kernel.org
-Cc: linux-mtd at lists.infradead.org
-Cc: linux-pm at vger.kernel.org
-Cc: linux-rpi-kernel at lists.infradead.org
-Cc: linux-scsi at vger.kernel.org
+Snip
 
+> diff --git a/include/linux/platform_data/g762.h b/include/linux/platform_data/g762.h
+> new file mode 100644
+> index 0000000..29e3934
+> --- /dev/null
+> +++ b/include/linux/platform_data/g762.h
+> @@ -0,0 +1,54 @@
+> +/*
+> + * Platform data structure for g762 fan controller driver
+> + *
+> + * Copyright (C) 2013, Arnaud EBALARD <arno@natisbad.org>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + */
+> +#ifndef __LINUX_PLATFORM_DATA_G762_H__
+> +#define __LINUX_PLATFORM_DATA_G762_H__
+> +
+> +#define G762_DEFAULT_NO_OVERLOAD 0xffffffff
+> +
+> +struct g762_platform_data {
+> +	u32 fan_startv;
+> +	u32 fan_gear_mode;
+> +	u32 fan_div;
+> +	u32 fan_pulses;
+> +	u32 fan_target;
+> +	u32 pwm_polarity;
+> +	u32 pwm_enable;
+> +	u32 pwm_freq;
+> +	u32 pwm_mode;
+> +};
+> +
+> +/* When filling a g762_platform_data structure to be passed during platform
+> + * init to the driver, it needs to be initialized to the following default
+> + * value before changing specific fields. This is needed to avoid a sparse
+> + * initialization to have current values replaced by 0 */
 
--- 
-1.8.1.2
+In other places, you use this multi-line comment format:
+
+/*
+ * ...
+ * ...
+ */
+
+> +
+> +static const struct g762_platform_data G762_DEFAULT_PDATA = {
+> +	.fan_startv = G762_DEFAULT_NO_OVERLOAD,
+> +	.fan_gear_mode = G762_DEFAULT_NO_OVERLOAD,
+> +	.fan_div = G762_DEFAULT_NO_OVERLOAD,
+> +	.fan_pulses = G762_DEFAULT_NO_OVERLOAD,
+> +	.fan_target = G762_DEFAULT_NO_OVERLOAD,
+> +	.pwm_polarity = G762_DEFAULT_NO_OVERLOAD,
+> +	.pwm_enable = G762_DEFAULT_NO_OVERLOAD,
+> +	.pwm_freq = G762_DEFAULT_NO_OVERLOAD,
+> +	.pwm_mode = G762_DEFAULT_NO_OVERLOAD,
+> +};
+
+Are you sure that all this settings are needed ? IMHO the g762 platform
+data should only holds the platform specific configuration: fan_startv,
+fan_gear_mode, fan_div and fan_pulses. The other settings are not really
+related with the platform but more with the operating fan configuration.
+For my part, I am happy enough with the sysfs hwmon interface.
+
+The same comment applies to the g762 DT binding properties.
+
+Regards,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130601/03ad877d/attachment.sig>
