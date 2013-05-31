@@ -1,42 +1,82 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 31 May 2013 20:56:58 +0800
-Subject: [PATCH v1 1/2] ARM:prima2: move sirfsoc_of_rstc_init to
- .init_early
-In-Reply-To: <51A89ACE.8030604@st.com>
-References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
- <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
- <CAGsJ_4z65+SOCQM2XKmrda+5Hu9wRuZviSvW3As1ROa0SmdXqw@mail.gmail.com>
- <51A89ACE.8030604@st.com>
-Message-ID: <CAGsJ_4zaW_y0VCxZzwoK5s-Mv+M9yFXWfWuiMJ_fG9qKqDG3uQ@mail.gmail.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 31 May 2013 15:08:29 +0200 (CEST)
+Subject: [PATCH v2] dmaengine: shdma: fix a build failure on platforms
+ with no DMA support
+In-Reply-To: <51A88707.4040601@ti.com>
+References: <Pine.LNX.4.64.1305310423360.1470@axis700.grange>
+ <51A88707.4040601@ti.com>
+Message-ID: <alpine.DEB.2.00.1305311504460.6919@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/5/31 Srinivas KANDAGATLA <srinivas.kandagatla@st.com>:
-> On 31/05/13 13:24, Barry Song wrote:
->>> > Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->> hi Sriniva,
->> i think my "arm: prima2: move to generic reset controller driver
->> framework" fixs this too:
->> http://www.spinics.net/lists/arm-kernel/msg246206.html
-> I did look at the patch, I think it will fix it.
->
-> But the patch is still using arch_initcall directly, which means this
-> call will be attempted by every SOC in multi_v7 kernel.
-> This call can be easily hooked into machine descriptor.
-> In that way only prima compatible machines will attempt to call this
-> function in first place.
+On Fri, 31 May 2013, Dan Murphy wrote:
 
-mine should fix panic as it returns 0 instead of using BUG(). but i do
-think we should merge yours too to avoid redundant execution path.
+> On 05/30/2013 10:01 PM, Guennadi Liakhovetski wrote:
+> > On platforms with no support for the shdma dmaengine driver build is
+> > currently failing with
+> >
+> > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
+> > drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
+> >
+> > Fix the breakage by defining shdma_chan_filter to NULL in such
+> > configurations.
+> >
+> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> > ---
+> >
+> > v2: in "next" shdma_chan_filter() is defined in shdma-base.c, which is 
+> > built if CONFIG_SH_DMAE_BASE is defined. This version uses the correct 
+> > symbol.
+> >
+> > This is for "next." Compile-tested only. I'll test it on hardware next 
+> > week, but I don't think it shall break anything.
+> >
+> >  include/linux/sh_dma.h |    4 ++++
+> >  1 files changed, 4 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
+> > index b64d6be..1fd8a20 100644
+> > --- a/include/linux/sh_dma.h
+> > +++ b/include/linux/sh_dma.h
+> > @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
+> >  #define CHCR_TE	0x00000002
+> >  #define CHCR_IE	0x00000004
+> >  
+> > +#if IS_ENABLED(CONFIG_SH_DMAE_BASE)
+> >  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
+> > +#else
+> > +#define shdma_chan_filter NULL
+> OK I did not see a reply to my previous comment
+> Would this not be better as a
+> #else
+> static inline bool shdma_chan_filter(struct dma_chan *chan, void *arg) { return false; }
+> #endif
+> 
+> Otherwise runtime will call a NULL pointer
 
->
-> Do you know if the second issue of postcore init is fixed in any other
-> patches.
+Have you looked at the code?:
 
-no. i will test your v2.
+		if (fn && !fn(chan, fn_param)) {
 
->
-> thanks,
-> srini
+Have you considered, when this channel allocation at all has a chance to 
+get as far as to checking the filter? Have you thought about the meaning 
+of "inline" when uing a function to assign it to a pointer? Are you sure 
+"will" is the right word here?
 
--barry
+Thanks
+Guennadi
+
+> > +#endif
+> >  
+> >  #endif
+> 
+> 
+> -- 
+> ------------------
+> Dan Murphy
+> 
+
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
