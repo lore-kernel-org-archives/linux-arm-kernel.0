@@ -1,45 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 31 May 2013 07:55:32 +0100
-Subject: [PATCH 0/4] clk, mfd: u8540 clock tree definition
-In-Reply-To: <20130531012509.21525.90187@quantum>
-References: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
- <20130531012509.21525.90187@quantum>
-Message-ID: <20130531065532.GA10355@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 May 2013 09:01:44 +0200
+Subject: [RFC/PATCH v2 2/2] gpio-rcar: Add DT support
+In-Reply-To: <4678059.RuWR6CiQ8n@avalon>
+References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1369136406-23800-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CACRpkdb8GYpx3ASzXB7HX5oEpAUBe-yBo0N5Ep9S+DqoE6oCLw@mail.gmail.com>
+ <4678059.RuWR6CiQ8n@avalon>
+Message-ID: <CACRpkda4rRWcVkdGPcSvJeQq_KaJE5uxD+0P62Ot8=Xuf2-B+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 May 2013, Mike Turquette wrote:
+On Fri, May 31, 2013 at 3:20 AM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
 
-> Quoting Philippe Begnic (2013-05-27 05:41:28)
-> > From: Philippe Begnic <philippe.begnic@st.com>
-> > 
-> > Create U8540 clock tree definitions for common clock framework
-> > 
-> 
-> The clock changes look good to me.  How did you want to merge the
-> patches?
+> I've so far pushed GPIO and pinctrl patches for SH through Simon's tree due to
+> the many cross-dependencies between SH arch code and the GPIO and pinctrl
+> drivers. As the situation now stabilizes, we could now push the patches
+> through their respective subsystem trees.
+>
+> Simon, Linus, any opinion/preference on that ?
 
-You may as well take them through your tree Mike.
+Depends, if they are still large patch sets I'd prefer Simon to
+take it, but once the drivers are in place and going to maintenance
+mode I'll handle them in pinctrl.
 
-> > Philippe Begnic (4):
-> >   clk: ux500: Pass clock base adresses in initcall for u8540 and u9540
-> >   mfd: db8500: Update register definition for u8540 clock
-> >   mfd: db8500: Update BML clock register for db8580
-> >   clk: ux500: Clocks definition for u8540
-> > 
-> >  arch/arm/mach-ux500/cpu.c                 |    6 +-
-> >  drivers/clk/ux500/u8540_clk.c             |  564 ++++++++++++++++++++++++++++-
-> >  drivers/clk/ux500/u9540_clk.c             |    4 +-
-> >  drivers/mfd/db8500-prcmu.c                |    1 +
-> >  drivers/mfd/dbx500-prcmu-regs.h           |    1 +
-> >  include/linux/mfd/abx500/ab8500-sysctrl.h |    4 +-
-> >  include/linux/mfd/dbx500-prcmu.h          |   12 +
-> >  include/linux/platform_data/clk-ux500.h   |    6 +-
-> >  8 files changed, 587 insertions(+), 11 deletions(-)
-> > 
+>> The above ranges are part of that document.
+>
+> What about replacing that with
+>
+>   - gpio-ranges: Range of pins managed by the GPIO controller.
+>
+> Please refer to gpio.txt in this directory for details of gpio-ranges property
+> and the common GPIO bindings used by client devices.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Go for it!
+
+Yours,
+Linus Walleij
