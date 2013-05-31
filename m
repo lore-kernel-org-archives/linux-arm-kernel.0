@@ -1,35 +1,36 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 31 May 2013 14:44:54 -0700
-Subject: [PATCH] mfd: twl4030: allow IRQ wake enable to succeed on subchip IRQs
-Message-ID: <1370036694-26210-1-git-send-email-khilman@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 31 May 2013 15:13:58 -0700
+Subject: [PATCH 5/4] sched: Make ARM's sched_clock generic for all
+ architectures
+In-Reply-To: <51A90ACE.7070906@linaro.org>
+References: <1366417746-24990-1-git-send-email-sboyd@codeaurora.org>
+ <1367369675-13535-1-git-send-email-sboyd@codeaurora.org>
+ <51A90ACE.7070906@linaro.org>
+Message-ID: <20130531221358.GF599@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The genirq IRQ wake method will default to failure if the irq_chip
-does not provide a set_wake method.  However, for TWL4030 sub-chip
-IRQs, we want the wake enable to succeed even though we don't provide
-a set_wake method.  This allows sub-chip IRQs to still be flagged as
-wakeup capable, and allow them to wakeup from suspend (or abort
-suspend if they fire during suspend.)
+On 05/31, John Stultz wrote:
+> On 04/30/2013 05:54 PM, Stephen Boyd wrote:
+> >Here's the patch to make sched_clock generic. I didn't know
+> >where to put it so I just made a new file in kernel/sched
+> >for now.
+> >
+> >Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> 
+> Hey Stephen,
+>     Baruch just asked a question about moving arm's sched_clock.c to
+> be generic, and it sounded familiar, so I dug around and found this
+> mail from a few months ago.
+> 
+> Just wanted to follow up and see what the status is with this? Is
+> this queued somewhere already?
+> 
 
-To fix, use the IRQCHIP_SKIP_SET_WAKE flag in the irq_chip.
+As far as I know nothing has been queued. I refreshed the
+patchset against 3.10-rc2 but haven't sent it out since it wasn't
+clear if anyone wanted it. Shall I send it again?
 
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- drivers/mfd/twl4030-irq.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/mfd/twl4030-irq.c b/drivers/mfd/twl4030-irq.c
-index a5f9888..3fa7df2 100644
---- a/drivers/mfd/twl4030-irq.c
-+++ b/drivers/mfd/twl4030-irq.c
-@@ -573,6 +573,7 @@ static struct irq_chip twl4030_sih_irq_chip = {
- 	.irq_set_type	= twl4030_sih_set_type,
- 	.irq_bus_lock	= twl4030_sih_bus_lock,
- 	.irq_bus_sync_unlock = twl4030_sih_bus_sync_unlock,
-+	.flags		= IRQCHIP_SKIP_SET_WAKE,
- };
- 
- /*----------------------------------------------------------------------*/
 -- 
-1.8.2
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
