@@ -1,103 +1,52 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Fri, 31 May 2013 10:19:51 -0500
-Subject: [PATCH v9] ARM: dts: omap4-panda: Update the LED support for the
- panda DTS
-Message-ID: <1370013591-25957-1-git-send-email-dmurphy@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 31 May 2013 16:20:02 +0100
+Subject: [PATCH RFC 1/6] [HACK!] arm64/xen: create links to arch/arm
+ include files and Xen code
+In-Reply-To: <20130531131038.GA15551@arm.com>
+References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
+ <1369930713-6063-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130531103617.GA18045@localhost.cambridge.arm.com>
+ <alpine.DEB.2.02.1305311259090.4799@kaball.uk.xensource.com>
+ <20130531131038.GA15551@arm.com>
+Message-ID: <alpine.DEB.2.02.1305311446360.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
-are different.
+On Fri, 31 May 2013, Catalin Marinas wrote:
+> On Fri, May 31, 2013 at 01:02:04PM +0100, Stefano Stabellini wrote:
+> > On Fri, 31 May 2013, Catalin Marinas wrote:
+> > > On Thu, May 30, 2013 at 05:18:28PM +0100, Stefano Stabellini wrote:
+> > > > Most of Xen support for ARM is common between ARMv7 and ARMv8.
+> > > > Create links to the code under arch/arm (bleah).
+> > > > 
+> > > > Other, probably better alternatives:
+> > > > 
+> > > > - move the code to a different location, maybe the header files to
+> > > > include/xen/arm and the code to drivers/xen/arm (still pretty ugly)?
+> > > > 
+> > > > - create a copy of the code to arch/arm64 (even worse);
+> > > 
+> > > KVM handles this in the Makefile by referencing back to arch/arm or even
+> > > the generic kvm directory. I think that's the 'cleanest' ;)
+> > 
+> > Do you mean creating links in the Makefile or generating header file
+> > copies from the Makefile?
+> > Or do you mean using something like "-I arch/arm/include/asm/xen" in the
+> > arch/arm64 Makefile?
+> 
+> I meant C files being compiled directly from arch/arm (no links).
 
-A1-A3 = gpio_wk7
-ES = gpio_110
+OK.
 
-There is no change to LED D2
 
-Abstract away the pinmux and the LED definitions for the two boards into
-the respective DTS files.
+> For headers, if they are specific to arm or arm64, just copy the header
+> in each place (e.g. not using regs->pstate in the arch/arm code with
+> #ifdef's). For the rest, if they cannot be made generic, one way is to
+> have a dummy file including the arm equivalent:
+> 
+> #include <../../arm/include/asm/xen/events.h>
+> 
+> Passing -I is dangerous as you actually need "-I arch/arm/include" which
+> could bring other files.
 
-Signed-off-by: Dan Murphy <dmurphy@ti.com>
----
-v9 - Removed comments for mux config - https://patchwork.kernel.org/patch/2644391/
-v8 - Rebase to latest and use pinctrl macros - https://patchwork.kernel.org/patch/2629351/
-v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
-v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
-v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
- arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
- arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index d5d144a..800fa4e 100644
---- a/arch/arm/boot/dts/omap4-panda-common.dtsi
-+++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -16,8 +16,13 @@
- 		reg = <0x80000000 0x40000000>; /* 1 GB */
- 	};
- 
--	leds {
-+	leds: leds {
- 		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <
-+			&led_wkgpio_pins
-+		>;
-+
- 		heartbeat {
- 			label = "pandaboard::status1";
- 			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
-@@ -157,6 +162,15 @@
- 	};
- };
- 
-+&omap4_pmx_wkup {
-+	led_wkgpio_pins: pinmux_leds_wkpins {
-+		pinctrl-single,pins = <
-+			0x1a (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk7 */
-+			0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 */
-+		>;
-+	};
-+};
-+
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_pins>;
-diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
-index 5cfdf19..0a7812f 100644
---- a/arch/arm/boot/dts/omap4-panda-es.dts
-+++ b/arch/arm/boot/dts/omap4-panda-es.dts
-@@ -34,3 +34,31 @@
- 		0x5e (PIN_INPUT | MUX_MODE0)		/* hdmi_sda.hdmi_sda */
- 		>;
- };
-+
-+&omap4_pmx_core {
-+	led_gpio_pins: gpio_led_pmx {
-+		pinctrl-single,pins = <
-+			0xb6 (PIN_OUTPUT | MUX_MODE3)	/* gpio_110 */
-+		>;
-+	};
-+};
-+
-+&led_wkgpio_pins {
-+	pinctrl-single,pins = <
-+		0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 */
-+	>;
-+};
-+
-+&leds {
-+	pinctrl-0 = <
-+		&led_gpio_pins
-+		&led_wkgpio_pins
-+	>;
-+
-+	heartbeat {
-+		gpios = <&gpio4 14 0>;
-+	};
-+	mmc {
-+		gpios = <&gpio1 8 0>;
-+	};
-+};
--- 
-1.7.5.4
+Thanks, that is a good idea, I'll do that.
