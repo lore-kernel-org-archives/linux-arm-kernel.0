@@ -1,68 +1,57 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 31 May 2013 19:31:10 +0800
-Subject: [PATCH 3/3] ARM: tegra114: cpuidle: add powered-down state
-In-Reply-To: <1369997278.7804.73.camel@jlo-ubuntu-64.nvidia.com>
-References: <1369912782-30663-1-git-send-email-josephl@nvidia.com>
- <1369912782-30663-4-git-send-email-josephl@nvidia.com>
- <51A763BD.6070001@linaro.org>
- <1369991550.7804.37.camel@jlo-ubuntu-64.nvidia.com>
- <51A86D11.8060305@linaro.org>
- <1369997278.7804.73.camel@jlo-ubuntu-64.nvidia.com>
-Message-ID: <1369999870.7804.78.camel@jlo-ubuntu-64.nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 31 May 2013 13:33:45 +0200
+Subject: [PATCH 12/39] ARM: u300: set up board power from device tree
+In-Reply-To: <6621177.ZgrPQ48FXE@wuerfel>
+References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
+ <1369991954-17406-13-git-send-email-linus.walleij@stericsson.com>
+ <6621177.ZgrPQ48FXE@wuerfel>
+Message-ID: <CACRpkdYXfm4xzqn2Kb0fw2_+BSSXBoNXye2zu3fpv1sPQcHO9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-05-31 at 18:47 +0800, Joseph Lo wrote:
-> On Fri, 2013-05-31 at 17:27 +0800, Daniel Lezcano wrote:
-> > On 05/31/2013 11:12 AM, Joseph Lo wrote:
-> > > Hi Daniel,
-> > > 
-> > > Thanks for your review.
-> > > 
-> > > On Thu, 2013-05-30 at 22:35 +0800, Daniel Lezcano wrote:
-> > >> On 05/30/2013 01:19 PM, Joseph Lo wrote:
-> > >>> This supports CPU core power down on each CPU when CPU idle. When CPU go
-> > >>> into this state, it saves it's context and needs a proper configuration
-> > >>> in flow controller to power gate the CPU when CPU runs into WFI
-> > >>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
-> > >>> wake up event in flow controller.
-> > >>>
-> > >>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> > >>> ---
-> > >>
-> > >> Hi Joseph,
-> > >>
-> > >> a new flag has been added in the cpuidle framework to let this one to
-> > >> handle the timer broadcast : CPUIDLE_FLAG_TIMER_STOP
-> > >>
-> > >> It is the commit b60e6a0eb0273132cbb60a9806abf5f47a4aee1c
-> > >>
-> > >> You can get rid of the clockevent notify stuff by adding this flag to
-> > >> the state.
-> > >>
-> > > 
-> > > I just tested this flag on Tegra20, 30 and 114. It is only OK on
-> > > Tegra20. It caused a warning message below on Tegra30/114 at boot time.
-> > > 
-> > > I gave it a quick check I found it can't clean
-> > > tick_broadcast_pending_mask sometimes if apply the flag. But I keep the
-> > > code right now it's always OK. Not sure why? 
-> > 
-> > Is it possible you didn't intialized the timer broadcast with
-> > CLOCK_EVT_NOTIFY_BROADCAST_ON in the driver and then this one is
-> > actually disabled for you driver ?
-> > 
-> I found if I don't apply the CPUIDLE_FLAG_TIMER_STOP flag, the function
-> "cpuidle_setup_broadcast_timer" (drivers/cpuidle/driver.c) would not be
-> called. Then it's OK.
-> 
-> If I apply this flag (with no CONFIG_CPU_IDLE_MULTIPLE_DRIVERS), the
-> cpuidle_register_driver only register for CPU0. Then the
-> "cpuidle_setup_broadcast_timer" only turn on for CPU0. I think this
-> might be the root cause. Not sure this also can reproduce on the other
-> SoCs?
-> 
-Looks it's not related to CLOCK_EVT_NOTIFY_BROADCAST_ON. I still saw the
-warning message even enable CONFIG_CPU_IDLE_MULTIPLE_DRIVERS. But if I
-move the clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT from idle
-framework back to driver, then everything is OK.
+On Fri, May 31, 2013 at 12:37 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 31 May 2013 11:18:47 Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This adds support for setting up the board power from the
+>> device tree on the U300. We use a board-specific node in the
+>> device tree for the S365 board and bind a regulator for the
+>> board power to this node.
+>>
+>> Cc: Mark Brown <broonie@kernel.org>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>
+> This is fairly unusual, I think I've never seen a platform driver
+> registered for a board.  Is that the intended method for hogging
+> a regulator?
+
+There are no precedents AFAICT.
+
+As you can see the previous code uses:
+regulator_get(NULL, "vana15");
+
+But that does not match with device tree: it needs some node
+to tie the regulator to, i.e. a platform device. Else we leave the
+system in some half-transition to DT.
+
+The siutation is similar to our inability to use clk_get_sys()
+in pure DT platforms - no node/device there either.
+
+Mark remarked on the first iteration that:
+
+> I would expect this to be bound based on the board name that appears in
+> the device tree which (given the way this stuff mostly works) I'd expect
+> to have a device node available.
+
+This is what I'm trying to do here.
+
+The root node which actually contains the compatible-string
+for the board itself can *not* be used, as the OF platform core
+code does not create a platform device for this node, and it
+cannot reference anything either.
+
+So a single board node directly in the root was the best
+I could come up with, other suggestions welcome...
+
+Yours,
+Linus Walleij
