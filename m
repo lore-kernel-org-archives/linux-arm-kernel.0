@@ -1,34 +1,79 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 31 May 2013 10:20:12 -0700
-Subject: [PATCH v3 5/6] clk: samsung: Add alias for mout_vpllsrc and
- reorder MUX registration for it
-In-Reply-To: <1370003496-19288-6-git-send-email-vikas.sajjan@linaro.org>
-References: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
- <1370003496-19288-6-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <CAD=FV=Wcw7OArXr6mEoSWzvbhqQWGGTP88fc=kTq6iUzqj0YTQ@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 31 May 2013 10:34:59 -0700
+Subject: [PATCH 11/11] i2c: omap: enhance pinctrl support
+In-Reply-To: <1369995191-20855-12-git-send-email-gururaja.hebbar@ti.com>
+ (Hebbar Gururaja's message of "Fri, 31 May 2013 15:43:11 +0530")
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369995191-20855-12-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <87k3mf2gu4.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas and Yadwinder,
+Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
 
-On Fri, May 31, 2013 at 5:31 AM, Vikas Sajjan <vikas.sajjan@linaro.org> wrote:
-> While trying to get rate of "mout_vpllsrc" MUX (parent) for registering the
-> "fout_vpll" (child), we found get rate was failing.
+> Amend the I2C omap pin controller to optionally take a pin control
+> handle and set the state of the pins to:
 >
-> So this patch moves the mout_vpllsrc MUX out of the existing common list
-> and registers the mout_vpllsrc MUX before the PLL registrations.
-> Its also adds the alias for the mout_vpllsrc MUX.
+> - "default" on boot, resume and before performing an i2c transfer
+> - "idle" after initial default, after resume default, and after each
+> i2c xfer
+> - "sleep" on suspend()
+>
+> By optionally putting the pins into sleep state in the suspend callback
+> we can accomplish two things.
+> - One is to minimize current leakage from pins and thus save power,
+> - second, we can prevent the IP from driving pins output in an
+> uncontrolled manner, which may happen if the power domain drops the
+> domain regulator.
+>
+> Note:
+> A .suspend & .resume callback is added which simply puts the pins to sleep
+> state upon suspend & are moved to default & idle state upon resume.
+>
+> If any of the above pin states are missing in dt, a warning message
+> about the missing state is displayed.
+> If certain pin-states are not available, to remove this warning message
+> pass respective state name with null phandler.
+>
+> (Changes based on i2c-nomadik.c)
+>
+> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-i2c at vger.kernel.org
 
-I think the moving makes sense, but not the alias.  IMHO global
-aliases should be avoided unless they can be strongly justified.
+[...]
 
-In part 6 of this series I see where you're using the alias but I
-don't think you need it.  In your case you are a clock provider, so I
-think you can use __clk_lookup("mout_vpllsrc") to find your clock.
+> @@ -664,7 +673,13 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>  
+>  out:
+>  	pm_runtime_mark_last_busy(dev->dev);
+> +
+>  	pm_runtime_put_autosuspend(dev->dev);
+> +	/* Optionally let pins go into idle state */
+> +	if (!IS_ERR(dev->pins_idle))
+> +		if (pinctrl_select_state(dev->pinctrl, dev->pins_idle))
+> +			dev_err(dev->dev, "could not set pins to idle state\n");
 
-I will post an update on our gerrit and you can see what you think.
-If someone on the list thinks that using __clk_lookup() is a bad idea
-and they'd rather see the global alias, please shout.
+This is wrong.  You're changing the muxing before the device actually
+goes idle.  Anything you want to happen when the device actually idles
+for real has to be in runtime PM callbacks.
 
+Looking below, I see it's already in the callbacks, so why is it here also?
 
--Doug
+[...]
+
+> @@ -1300,6 +1348,10 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+>  		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
+>  	}
+>  
+> +	if (!IS_ERR(_dev->pins_idle))
+> +		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_idle))
+> +			dev_err(dev, "could not set pins to idle state\n");
+> +
+>  	return 0;
+>  }
+>  
+
+Kevin
