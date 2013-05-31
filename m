@@ -1,143 +1,47 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 31 May 2013 11:19:08 +0200
-Subject: [PATCH 33/39] clk: move the U300 fixed and fixed-factor to DT
+Date: Fri, 31 May 2013 11:19:09 +0200
+Subject: [PATCH 34/39] i2c: stu300: do not request a specific clock name
 In-Reply-To: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
 References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1369991954-17406-34-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1369991954-17406-35-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This converts the fixed and fixed-factor clocks in the U300
-platform to register themselves from the device tree.
+We have used the default clock associated with the block
+for a long time, only heuristics in the clock system has
+made this work anyway. This needs to be done away with as
+we start probing this driver and its clocks exclusively
+from the device tree.
 
-Acked-by: Mike Turquette <mturquette@linaro.org>
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/ste-u300.dts | 44 ++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/clk-u300.c         | 33 +++++++++++++------------------
- 2 files changed, 57 insertions(+), 20 deletions(-)
+ drivers/i2c/busses/i2c-stu300.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
-index 644befd..203ec1fc 100644
---- a/arch/arm/boot/dts/ste-u300.dts
-+++ b/arch/arm/boot/dts/ste-u300.dts
-@@ -33,6 +33,49 @@
- 	syscon: syscon at c0011000 {
- 		compatible = "stericsson,u300-syscon";
- 		reg = <0xc0011000 0x1000>;
-+		clk32: app_32_clk at 32k {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
-+		pll13: pll13 at 13M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <13000000>;
-+		};
-+		pll208: pll208 at 208M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <208000000>;
-+		};
-+		app208: app_208_clk at 208M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <1>;
-+			clock-mult = <1>;
-+			clocks = <&pll208>;
-+		};
-+		app104: app_104_clk at 104M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+			clocks = <&pll208>;
-+		};
-+		app52: app_52_clk at 52M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <4>;
-+			clock-mult = <1>;
-+			clocks = <&pll208>;
-+		};
-+		app26: app_26_clk at 26M {
-+			#clock-cells = <0>;
-+			compatible = "fixed-factor-clock";
-+			clock-div = <2>;
-+			clock-mult = <1>;
-+			clocks = <&app52>;
-+		};
- 	};
+diff --git a/drivers/i2c/busses/i2c-stu300.c b/drivers/i2c/busses/i2c-stu300.c
+index 1beaa05a..d1a6b20 100644
+--- a/drivers/i2c/busses/i2c-stu300.c
++++ b/drivers/i2c/busses/i2c-stu300.c
+@@ -868,7 +868,6 @@ stu300_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	int bus_nr;
+ 	int ret = 0;
+-	char clk_name[] = "I2C0";
  
- 	timer: timer at c0014000 {
-@@ -65,6 +108,7 @@
- 		reg = <0xc0012000 0x1000>;
- 		interrupt-parent = <&vicb>;
- 		interrupts = <3>;
-+		clocks = <&clk32>;
- 	};
+ 	dev = devm_kzalloc(&pdev->dev, sizeof(struct stu300_dev), GFP_KERNEL);
+ 	if (!dev) {
+@@ -877,8 +876,7 @@ stu300_probe(struct platform_device *pdev)
+ 	}
  
- 	rtc: rtc at c0017000 {
-diff --git a/drivers/clk/clk-u300.c b/drivers/clk/clk-u300.c
-index a41e42e..bebd6c9 100644
---- a/drivers/clk/clk-u300.c
-+++ b/drivers/clk/clk-u300.c
-@@ -11,6 +11,7 @@
- #include <linux/io.h>
- #include <linux/clk-provider.h>
- #include <linux/spinlock.h>
-+#include <linux/of.h>
- 
- /* APP side SYSCON registers */
- /* CLK Control Register 16bit (R/W) */
-@@ -931,6 +932,17 @@ mclk_clk_register(struct device *dev, const char *name,
- 	return clk;
- }
- 
-+static const __initconst struct of_device_id u300_clk_match[] = {
-+	{
-+		.compatible = "fixed-clock",
-+		.data = of_fixed_clk_setup,
-+	},
-+	{
-+		.compatible = "fixed-factor-clock",
-+		.data = of_fixed_factor_clk_setup,
-+	},
-+};
-+
- void __init u300_clk_init(void __iomem *base)
- {
- 	u16 val;
-@@ -951,26 +963,7 @@ void __init u300_clk_init(void __iomem *base)
- 	val |= U300_SYSCON_PMCR_PWR_MGNT_ENABLE;
- 	writew(val, syscon_vbase + U300_SYSCON_PMCR);
- 
--	/* These are always available (RTC and PLL13) */
--	clk = clk_register_fixed_rate(NULL, "app_32_clk", NULL,
--				      CLK_IS_ROOT, 32768);
--	/* The watchdog sits directly on the 32 kHz clock */
--	clk_register_clkdev(clk, NULL, "coh901327_wdog");
--	clk = clk_register_fixed_rate(NULL, "pll13", NULL,
--				      CLK_IS_ROOT, 13000000);
--
--	/* These derive from PLL208 */
--	clk = clk_register_fixed_rate(NULL, "pll208", NULL,
--				      CLK_IS_ROOT, 208000000);
--	clk = clk_register_fixed_factor(NULL, "app_208_clk", "pll208",
--					0, 1, 1);
--	clk = clk_register_fixed_factor(NULL, "app_104_clk", "pll208",
--					0, 1, 2);
--	clk = clk_register_fixed_factor(NULL, "app_52_clk", "pll208",
--					0, 1, 4);
--	/* The 52 MHz is divided down to 26 MHz */
--	clk = clk_register_fixed_factor(NULL, "app_26_clk", "app_52_clk",
--					0, 1, 2);
-+	of_clk_init(u300_clk_match);
- 
- 	/* Directly on the AMBA interconnect */
- 	clk = syscon_clk_register(NULL, "cpu_clk", "app_208_clk", 0, true,
+ 	bus_nr = pdev->id;
+-	clk_name[3] += (char)bus_nr;
+-	dev->clk = devm_clk_get(&pdev->dev, clk_name);
++	dev->clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(dev->clk)) {
+ 		dev_err(&pdev->dev, "could not retrieve i2c bus clock\n");
+ 		return PTR_ERR(dev->clk);
 -- 
 1.7.11.3
