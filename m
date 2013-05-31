@@ -1,64 +1,136 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 31 May 2013 11:44:38 +0900
-Subject: [PATCH] dmaengine: shdma: fix a build failure on platforms with
- no DMA support
-In-Reply-To: <51A77CF1.7040105@ti.com>
-References: <Pine.LNX.4.64.1305301650290.29171@axis700.grange>
- <51A77CF1.7040105@ti.com>
-Message-ID: <20130531024438.GB32564@verge.net.au>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 31 May 2013 10:56:31 +0800
+Subject: A bug about system call on ARM
+In-Reply-To: <20130530114112.GH7483@mudshark.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
+ <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
+ <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
+ <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+ <20130529094826.GD13095@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
+ <20130530090949.GC7483@mudshark.cambridge.arm.com>
+ <20130530114112.GH7483@mudshark.cambridge.arm.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 11:23:13AM -0500, Dan Murphy wrote:
-> On 05/30/2013 11:02 AM, Guennadi Liakhovetski wrote:
-> > On platforms with no support for the shdma dmaengine driver build is
-> > currently failing with
-> >
-> > drivers/built-in.o: In function `sh_mobile_sdhi_probe':
-> > drivers/mmc/host/sh_mobile_sdhi.c:170: undefined reference to`shdma_chan_filter'
-> >
-> > Fix the breakage by defining shdma_chan_filter to NULL in such
-> > configurations.
-> >
-> > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-> > ---
-> >
-> > This is for "next." Compile-tested only. I'll test it on hardware next 
-> > week, but I don't think it shall break anything.
-> >
-> >  include/linux/sh_dma.h |    4 ++++
-> >  1 files changed, 4 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/include/linux/sh_dma.h b/include/linux/sh_dma.h
-> > index b64d6be..1fd8a20 100644
-> > --- a/include/linux/sh_dma.h
-> > +++ b/include/linux/sh_dma.h
-> > @@ -99,6 +99,10 @@ struct sh_dmae_pdata {
-> >  #define CHCR_TE	0x00000002
-> >  #define CHCR_IE	0x00000004
-> >  
-> > +#if IS_ENABLED(CONFIG_SH_DMAE)
-> >  bool shdma_chan_filter(struct dma_chan *chan, void *arg);
-> > +#else
-> > +#define shdma_chan_filter NULL
-> Would this not be better as a
-> #else
-> static inline bool shdma_chan_filter(struct dma_chan *chan, void *arg)
-> {
->     return false;
-> }
-> #endif
+Hi Will,
+
+Thanks for your patch ,
+
+But I found  I don't have ct_user_exit  macro 
+In my arch/arm/kernel/entry-common.S 
+
+My kernel version is 3.4.0 
+
+I have add the file as attachment,
+
+Could you make a patch for this file ?
+
+Thank you !
+
+-----Original Message-----
+From: Will Deacon [mailto:will.deacon at arm.com] 
+Sent: Thursday, May 30, 2013 7:41 PM
+To: Wang, Yalin
+Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
+Subject: Re: A bug about system call on ARM
+
+On Thu, May 30, 2013 at 10:09:49AM +0100, Will Deacon wrote:
+> On Thu, May 30, 2013 at 02:41:42AM +0100, Wang, Yalin wrote:
+> > If you have some patch for this issue, I can do the test for it .
 > 
-> Otherwise runtime will call a NULL pointer
-> 
-> > +#endif
-> >  
-> >  #endif
+> I'll have a look at cooking something which uses an exception table 
+> entry to rewind the PC and retry the system call. That's simpler than 
+> directly injecting a user page fault from the system call path.
 
-Hi Guennadi,
+Ok, please can you try the following?
 
-thanks for this. I will wait for a refresh (as we discussed earlier today).
-Can I confirm that this is a fix for v3.10? If so, could ou note
-that when you post your revised patch?
+Will
 
-Thanks
+--->8
+
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S index bc5bc0a..855926e 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -361,6 +361,15 @@ ENTRY(vector_swi)
+ 	str	r8, [sp, #S_PSR]		@ Save CPSR
+ 	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
+ 	zero_fp
++	enable_irq
++	ct_user_exit
++
++#ifdef CONFIG_ALIGNMENT_TRAP
++	ldr	ip, __cr_alignment
++	ldr	ip, [ip]
++	mcr	p15, 0, ip, c1, c0		@ update control register
++#endif
++	get_thread_info tsk
+ 
+ 	/*
+ 	 * Get the system call number.
+@@ -375,9 +384,9 @@ ENTRY(vector_swi)
+ #ifdef CONFIG_ARM_THUMB
+ 	tst	r8, #PSR_T_BIT
+ 	movne	r10, #0				@ no thumb OABI emulation
+-	ldreq	r10, [lr, #-4]			@ get SWI instruction
++ USER(	ldreq	r10, [lr, #-4]		)	@ get SWI instruction
+ #else
+-	ldr	r10, [lr, #-4]			@ get SWI instruction
++ USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
+ #endif
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 	rev	r10, r10			@ little endian instruction
+@@ -392,22 +401,13 @@ ENTRY(vector_swi)
+ 	/* Legacy ABI only, possibly thumb mode. */
+ 	tst	r8, #PSR_T_BIT			@ this is SPSR from save_user_regs
+ 	addne	scno, r7, #__NR_SYSCALL_BASE	@ put OS number in
+-	ldreq	scno, [lr, #-4]
++ USER(	ldreq	scno, [lr, #-4]		)
+ 
+ #else
+ 	/* Legacy ABI only. */
+-	ldr	scno, [lr, #-4]			@ get SWI instruction
+-#endif
+-
+-#ifdef CONFIG_ALIGNMENT_TRAP
+-	ldr	ip, __cr_alignment
+-	ldr	ip, [ip]
+-	mcr	p15, 0, ip, c1, c0		@ update control register
++ USER(	ldr	scno, [lr, #-4]		)	@ get SWI instruction
+ #endif
+-	enable_irq
+-	ct_user_exit
+ 
+-	get_thread_info tsk
+ 	adr	tbl, sys_call_table		@ load syscall table pointer
+ 
+ #if defined(CONFIG_OABI_COMPAT)
+@@ -442,6 +442,18 @@ local_restart:
+ 	eor	r0, scno, #__NR_SYSCALL_BASE	@ put OS number back
+ 	bcs	arm_syscall	
+ 	b	sys_ni_syscall			@ not private func
++
++#if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
++	/*
++	 * We may have faulted trying to load the SWI instruction due to
++	 * concurrent page aging on another CPU. In this case, return
++	 * back to the swi instruction and fault the page back.
++	 */
++9001:
++	sub	lr, lr, #4
++	str	lr, [sp, #S_PC]
++	b	ret_fast_syscall
++#endif
+ ENDPROC(vector_swi)
+ 
+ 	/*
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: entry-common.S
+Type: application/octet-stream
+Size: 15071 bytes
+Desc: entry-common.S
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130531/acc75b68/attachment-0001.obj>
