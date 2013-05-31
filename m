@@ -1,37 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 31 May 2013 17:54:39 +0200
-Subject: warning introduced in "DMA: AT91: Get residual bytes in dma buffer"
-Message-ID: <5527092.NRqFJAfgoB@wuerfel>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 31 May 2013 16:56:13 +0100
+Subject: [PATCH RFC 5/6] arm64/xen: implement xen_remap on arm64
+In-Reply-To: <alpine.DEB.2.02.1305311622150.4799@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
+ <1369930713-6063-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130531105915.GC18045@localhost.cambridge.arm.com>
+ <alpine.DEB.2.02.1305311419280.4799@kaball.uk.xensource.com>
+ <20130531141601.GC15551@arm.com>
+ <alpine.DEB.2.02.1305311530440.4799@kaball.uk.xensource.com>
+ <alpine.DEB.2.02.1305311622150.4799@kaball.uk.xensource.com>
+Message-ID: <20130531155613.GF15551@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch 7c407d3e "DMA: AT91: Get residual bytes in dma buffer" 
-causes a build warning 
+On Fri, May 31, 2013 at 04:23:20PM +0100, Stefano Stabellini wrote:
+> On Fri, 31 May 2013, Stefano Stabellini wrote:
+> > On Fri, 31 May 2013, Catalin Marinas wrote:
+> > > On Fri, May 31, 2013 at 02:21:16PM +0100, Stefano Stabellini wrote:
+> > > > On Fri, 31 May 2013, Catalin Marinas wrote:
+> > > > > On Thu, May 30, 2013 at 05:18:32PM +0100, Stefano Stabellini wrote:
+> > > > > > --- a/arch/arm/include/asm/xen/page.h
+> > > > > > +++ b/arch/arm/include/asm/xen/page.h
+> > > > > > @@ -90,6 +90,10 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+> > > > > >  	return __set_phys_to_machine(pfn, mfn);
+> > > > > >  }
+> > > > > >  
+> > > > > > +#ifdef CONFIG_ARM64
+> > > > > > +#define xen_remap(cookie, size) __ioremap((cookie), (size), __pgprot(PROT_NORMAL))
+> > > > > > +#else
+> > > > > >  #define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
+> > > > > > +#endif
+> > > > > 
+> > > > > Now I saw the ARM-specific part. Can you not use something like
+> > > > > ioremap_cached() which would give normal cacheable memory (at least on
+> > > > > ARMv7).
+> > > > 
+> > > > No, I cannot because ioremap_cached uses MT_DEVICE_CACHED, while this
+> > > > needs to be MT_MEMORY. It is used for normal memory pages, not device
+> > > > memory.
+> > > 
+> > > MT_DEVICE_CACHED is Normal memory for ARMv7.
+> > 
+> > I didn't realize that MT_DEVICE_CACHED and MT_MEMORY end up having the
+> > same AttrIndx encoding!
+> > In that case yes, I should be able to use it.
+> > I take that I should just implement ioremap_cached on arm64 as well?
+> > 
+> 
+> Should just use MT_MEMORY and call it PROT_NORMAL?
+> 
+> #define PROT_NORMAL     (PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+> #define ioremap_cached(addr, size)     __ioremap((addr), (size), __pgprot(PROT_NORMAL))
 
-/git/arm-soc/drivers/dma/at_hdmac.c:424:13: warning: 'atc_cleanup_descriptors' defined but not used [-Wunused-function]
- static void atc_cleanup_descriptors(struct at_dma_chan *atchan)
-             ^
+Looks fine.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-
-This may not be the right solution, but it should get fixed
-in linux-next in some way.
-
-Elen, please address this appropriately.
-
-	Arnd
-
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 6db5228..09929c8 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -421,7 +421,7 @@ static void atc_complete_all(struct at_dma_chan *atchan)
-  *
-  * Called with atchan->lock held and bh disabled
-  */
--static void atc_cleanup_descriptors(struct at_dma_chan *atchan)
-+static void __maybe_unused atc_cleanup_descriptors(struct at_dma_chan *atchan)
- {
- 	struct at_desc	*desc, *_desc;
- 	struct at_desc	*child;
+-- 
+Catalin
