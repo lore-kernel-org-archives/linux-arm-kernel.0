@@ -1,60 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 30 May 2013 23:54:56 -0400 (EDT)
-Subject: A bug about system call on ARM
-In-Reply-To: <20130530114112.GH7483@mudshark.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
- <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
- <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
- <20130529094826.GD13095@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
- <20130530090949.GC7483@mudshark.cambridge.arm.com>
- <20130530114112.GH7483@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1305302319430.30828@syhkavp.arg>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 31 May 2013 07:00:04 +0300
+Subject: MUSB multiplatform work?
+In-Reply-To: <20130530205448.GD6467@atomide.com>
+References: <201305271702.09203.arnd@arndb.de>
+ <20130528163548.GC28253@arwen.pp.htv.fi>
+ <20130530201854.GB6467@atomide.com>
+ <20130530205448.GD6467@atomide.com>
+Message-ID: <20130531040004.GA7879@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 May 2013, Will Deacon wrote:
-
-> On Thu, May 30, 2013 at 10:09:49AM +0100, Will Deacon wrote:
-> > On Thu, May 30, 2013 at 02:41:42AM +0100, Wang, Yalin wrote:
-> > > If you have some patch for this issue,
-> > > I can do the test for it .
+On Thu, May 30, 2013 at 01:54:49PM -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [130530 13:25]:
 > > 
-> > I'll have a look at cooking something which uses an exception table entry
-> > to rewind the PC and retry the system call. That's simpler than directly
-> > injecting a user page fault from the system call path.
+> > TUSB we can make depend on ARMv7, the only implementation we have
+> > is for omap2420, which is ARMv6. This should solve the issue for
+> > ARMv7 multiplatform builds for now.
 > 
-> Ok, please can you try the following?
-> 
-> Will
-> 
-> --->8
-> 
-> diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-> index bc5bc0a..855926e 100644
-> --- a/arch/arm/kernel/entry-common.S
-> +++ b/arch/arm/kernel/entry-common.S
-> @@ -361,6 +361,15 @@ ENTRY(vector_swi)
->  	str	r8, [sp, #S_PSR]		@ Save CPSR
->  	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
->  	zero_fp
-> +	enable_irq
-> +	ct_user_exit
-> +
-> +#ifdef CONFIG_ALIGNMENT_TRAP
-> +	ldr	ip, __cr_alignment
-> +	ldr	ip, [ip]
-> +	mcr	p15, 0, ip, c1, c0		@ update control register
-> +#endif
+> Sorry mean depend on !ARMv7. But thinking about it more, that does
+> not make much sense as it would break things for omap2plus_defconfig
+> at least which is multiplatform v6 and v7. For now TUSB can be made
+> to depend on MACH_NOKIA_N8X0. I doubt that anybody is using the add
+> on cards for H4 boards any longer..
 
-This is wrong.  you must set up the align bit in the control register 
-_before_ enabling IRQs or an IRQ handler might run without alignment 
-fixup.
+could also be made to depend on BROKEN. I don't think anyone *really*
+cares about that glue layer other than the very few in the world who
+still like the nostalgic feeling of booting current linux releases on
+n8x0 devices.
 
-Otherwise the patch looks good to me.
-
-
-Nicolas
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130531/90cafc85/attachment.sig>
