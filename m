@@ -1,62 +1,39 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Thu, 30 May 2013 18:20:14 -0700
-Subject: [PATCH] clk: use platform_{get,set}_drvdata()
-In-Reply-To: <000401ce581b$a9224600$fb66d200$@samsung.com>
-References: <000401ce581b$a9224600$fb66d200$@samsung.com>
-Message-ID: <20130531012014.21525.39312@quantum>
+Date: Thu, 30 May 2013 18:25:09 -0700
+Subject: [PATCH 0/4] clk, mfd: u8540 clock tree definition
+In-Reply-To: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
+References: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
+Message-ID: <20130531012509.21525.90187@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Jingoo Han (2013-05-23 18:11:46)
-> Use the wrapper functions for getting and setting the driver data using
-> platform_device instead of using dev_{get,set}_drvdata() with &pdev->dev,
-> so we can directly pass a struct platform_device.
+Quoting Philippe Begnic (2013-05-27 05:41:28)
+> From: Philippe Begnic <philippe.begnic@st.com>
 > 
-> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> Create U8540 clock tree definitions for common clock framework
+> 
 
-Taken into clk-next.
+The clock changes look good to me.  How did you want to merge the
+patches?
 
-Thanks for the patch,
+Regards,
 Mike
 
-> ---
->  drivers/clk/clk-twl6040.c |    4 ++--
->  drivers/clk/clk-wm831x.c  |    2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
+> Philippe Begnic (4):
+>   clk: ux500: Pass clock base adresses in initcall for u8540 and u9540
+>   mfd: db8500: Update register definition for u8540 clock
+>   mfd: db8500: Update BML clock register for db8580
+>   clk: ux500: Clocks definition for u8540
 > 
-> diff --git a/drivers/clk/clk-twl6040.c b/drivers/clk/clk-twl6040.c
-> index 3af729b..1ada79a 100644
-> --- a/drivers/clk/clk-twl6040.c
-> +++ b/drivers/clk/clk-twl6040.c
-> @@ -95,14 +95,14 @@ static int twl6040_clk_probe(struct platform_device *pdev)
->         if (IS_ERR(clkdata->clk))
->                 return PTR_ERR(clkdata->clk);
->  
-> -       dev_set_drvdata(&pdev->dev, clkdata);
-> +       platform_set_drvdata(pdev, clkdata);
->  
->         return 0;
->  }
->  
->  static int twl6040_clk_remove(struct platform_device *pdev)
->  {
-> -       struct twl6040_clk *clkdata = dev_get_drvdata(&pdev->dev);
-> +       struct twl6040_clk *clkdata = platform_get_drvdata(pdev);
->  
->         clk_unregister(clkdata->clk);
->  
-> diff --git a/drivers/clk/clk-wm831x.c b/drivers/clk/clk-wm831x.c
-> index 16ed068..0d3c04e 100644
-> --- a/drivers/clk/clk-wm831x.c
-> +++ b/drivers/clk/clk-wm831x.c
-> @@ -384,7 +384,7 @@ static int wm831x_clk_probe(struct platform_device *pdev)
->         if (IS_ERR(clkdata->clkout))
->                 return PTR_ERR(clkdata->clkout);
->  
-> -       dev_set_drvdata(&pdev->dev, clkdata);
-> +       platform_set_drvdata(pdev, clkdata);
->  
->         return 0;
->  }
+>  arch/arm/mach-ux500/cpu.c                 |    6 +-
+>  drivers/clk/ux500/u8540_clk.c             |  564 ++++++++++++++++++++++++++++-
+>  drivers/clk/ux500/u9540_clk.c             |    4 +-
+>  drivers/mfd/db8500-prcmu.c                |    1 +
+>  drivers/mfd/dbx500-prcmu-regs.h           |    1 +
+>  include/linux/mfd/abx500/ab8500-sysctrl.h |    4 +-
+>  include/linux/mfd/dbx500-prcmu.h          |   12 +
+>  include/linux/platform_data/clk-ux500.h   |    6 +-
+>  8 files changed, 587 insertions(+), 11 deletions(-)
+> 
 > -- 
-> 1.7.10.4
+> 1.7.9.5
