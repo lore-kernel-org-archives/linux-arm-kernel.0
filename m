@@ -1,41 +1,32 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 31 May 2013 17:30:01 +0200 (CEST)
-Subject: [PATCH 1/2] ARM: shmobile: sdhi: pass DMA filter from platform
- code
-In-Reply-To: <2862988.jnTv0iSQcj@wuerfel>
-References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
- <alpine.DEB.2.00.1305311611460.7395@axis700.grange>
- <2862988.jnTv0iSQcj@wuerfel>
-Message-ID: <alpine.DEB.2.00.1305311721160.7395@axis700.grange>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 17:36:44 +0200
+Subject: [PATCH 2/2] ARM: ux500: Enable HIGHMEM in the u8540 defconfig
+In-Reply-To: <20130531151850.GC12488@gmail.com>
+References: <1370010272-25520-1-git-send-email-lee.jones@linaro.org>
+ <38058740.G1EqTG95pA@wuerfel> <20130531151850.GC12488@gmail.com>
+Message-ID: <1902994.0Kq6C7Rx1R@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013, Arnd Bergmann wrote:
-
-> On Friday 31 May 2013 16:52:13 Guennadi Liakhovetski wrote:
-> > 
-> > Thanks for the patches. How about this fix:
-> > 
-> > http://thread.gmane.org/gmane.linux.kernel.mmc/20619
-> > 
-> > I think it's a better fix. SHDMA users cannot use other DMA drivers, so, I 
-> > don't think we need to pass the filter via the platform data.
+On Friday 31 May 2013 16:18:50 Lee Jones wrote:
+> On Fri, 31 May 2013, Arnd Bergmann wrote:
 > 
-> I think it's more a matter of using the API correctly. The dmaengine
-> API is an abstraction to separate the slave driver from the master
-> through well-defined calls. If you make additional assumptions
-> in the slave driver about the master, that is a layering violation.
+> > On Friday 31 May 2013 15:24:32 Lee Jones wrote:
+> > > In order to utilise all of the memory located on ux500 based devices
+> > > we have to enable HIGHMEM. Without it the kernel truncates memory down
+> > > to what's left after the PAGE_OFFSET has been applied, which doesn't
+> > > leave an awful lot, especially if we're running large rootfs' such
+> > > as full Linux desktop distributions or Android.
+> > > 
+> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > 
+> > How much memory do those devices have? Enabling HIGHMEM is quite expensive.
+> 
+> Another 1GB.
 
-I think it is a common practice, see e.g.
+You mean you have 2GB total or 1.75GB?  You could just use
+CONFIG_VMSPLIT_2G to an extra GB compared to the default, which
+is what vexpress, imx and s5p already do, but you still have to
+put the vmalloc area in the low 2GB then.
 
-drivers/mmc/host/omap_hsmmc.c
-drivers/mmc/host/davinci_mmc.c
-
-And what do you do for DT-based platforms?
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+	Arnd
