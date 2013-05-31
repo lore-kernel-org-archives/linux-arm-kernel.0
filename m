@@ -1,53 +1,41 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 31 May 2013 10:48:03 -0700
-Subject: [PATCH 1/2] rtc: omap: add option to indicate wakeup support
- through DT
-In-Reply-To: <1369982005-8572-2-git-send-email-gururaja.hebbar@ti.com> (Hebbar
- Gururaja's message of "Fri, 31 May 2013 12:03:24 +0530")
-References: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
- <1369982005-8572-2-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <87wqqf11nw.fsf@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 31 May 2013 10:52:30 -0700
+Subject: MUSB multiplatform work?
+In-Reply-To: <20130531040004.GA7879@arwen.pp.htv.fi>
+References: <201305271702.09203.arnd@arndb.de>
+ <20130528163548.GC28253@arwen.pp.htv.fi>
+ <20130530201854.GB6467@atomide.com>
+ <20130530205448.GD6467@atomide.com>
+ <20130531040004.GA7879@arwen.pp.htv.fi>
+Message-ID: <20130531175228.GP6467@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
+* Felipe Balbi <balbi@ti.com> [130530 21:06]:
+> On Thu, May 30, 2013 at 01:54:49PM -0700, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [130530 13:25]:
+> > > 
+> > > TUSB we can make depend on ARMv7, the only implementation we have
+> > > is for omap2420, which is ARMv6. This should solve the issue for
+> > > ARMv7 multiplatform builds for now.
+> > 
+> > Sorry mean depend on !ARMv7. But thinking about it more, that does
+> > not make much sense as it would break things for omap2plus_defconfig
+> > at least which is multiplatform v6 and v7. For now TUSB can be made
+> > to depend on MACH_NOKIA_N8X0. I doubt that anybody is using the add
+> > on cards for H4 boards any longer..
+> 
+> could also be made to depend on BROKEN. I don't think anyone *really*
+> cares about that glue layer other than the very few in the world who
+> still like the nostalgic feeling of booting current linux releases on
+> n8x0 devices.
 
-> Even though RTC-IP is wakeup capable, Not all Boards support it.
->
-> For example
-> The rtc alarm wakeup is available in rtc-ip since omap1 days but alarm
-> was not wired properly in previous ompa1 boards.
->
-> 	commit fa5b07820fe3a0fc06ac368516e71f10a59b9539
-> 	Author: Sekhar Nori <nsekhar@ti.com>
-> 	Date:   Wed Oct 27 15:33:05 2010 -0700
->
-> 	rtc: omap: let device wakeup capability be configured from chip
-> 	init logic
->
-> 	The rtc-omap driver currently hardcodes the RTC wakeup
-> 	capability to be "not capable".  While this seems to be true for
-> 	existing OMAP1 boards which are not wired for this, the
-> 	DA850/OMAP-L138 SoC, the RTC can always be wake up source from
-> 	its "deep sleep" mode.
->
-> Current rtc-omap driver expects the rtc module wake-up capabilities to
-> be set up by board specific code. However, in case of DT, this is not
-> possible.
->
-> So, add a DT property "ti,wakeup_capable" to indicate that the module is
-> wake-up capable.
+Unfortunately that's the best test case we have for GPMC and DMA stress
+testing so it's good to keep around.
 
-Why is this a TI-specific property?  
+And n8x0 is still quite usable general purpose pocket computer with
+keyboard and WLAN and tons of storage :)
 
-Also, I think we can do this without a new DT property.Did you see this
-patch from Tony which is already queued for v3.11:
+Regards,
 
-    http://marc.info/?l=linux-omap&m=136917244530612&w=2
-
-I think this is the right way to go.  Platforms that don't want/need
-wakeup support can disable it from userspace via:
-
-    echo disabled > /sys/devices/.../power/wakeup
-
-Kevin
+Tony
