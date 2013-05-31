@@ -1,74 +1,74 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 31 May 2013 10:58:07 -0700
-Subject: [PATCH v3 6/6] clk: samsung: Add EPLL and VPLL freq table for
- exynos5250 SoC
-In-Reply-To: <1370003496-19288-7-git-send-email-vikas.sajjan@linaro.org>
-References: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
- <1370003496-19288-7-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <CAD=FV=UXV59zcrhLxjnU0LgX1LR855mQUd-xMM4bbXhRmB7UyQ@mail.gmail.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 31 May 2013 11:07:02 -0700
+Subject: [PATCH 11/11] i2c: omap: enhance pinctrl support
+In-Reply-To: <1369995191-20855-12-git-send-email-gururaja.hebbar@ti.com>
+ (Hebbar Gururaja's message of "Fri, 31 May 2013 15:43:11 +0530")
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369995191-20855-12-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <87bo7r10s9.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas and Yadwinder,
++Linus Walleij (pinctrl maintainer)
 
-On Fri, May 31, 2013 at 5:31 AM, Vikas Sajjan <vikas.sajjan@linaro.org> wrote:
-> Adds the EPLL and VPLL freq table for exynos5250 SoC.
+Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
+
+> Amend the I2C omap pin controller to optionally take a pin control
+> handle and set the state of the pins to:
 >
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
-> ---
->  drivers/clk/samsung/clk-exynos5250.c |   48 +++++++++++++++++++++++++++++++---
->  drivers/clk/samsung/clk.h            |    2 ++
->  2 files changed, 47 insertions(+), 3 deletions(-)
+> - "default" on boot, resume and before performing an i2c transfer
+> - "idle" after initial default, after resume default, and after each
+> i2c xfer
+> - "sleep" on suspend()
 >
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-> index b0e6680..0566421 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -473,11 +473,32 @@ static __initdata struct of_device_id ext_clk_match[] = {
->         { },
->  };
+> By optionally putting the pins into sleep state in the suspend callback
+> we can accomplish two things.
+> - One is to minimize current leakage from pins and thus save power,
+> - second, we can prevent the IP from driving pins output in an
+> uncontrolled manner, which may happen if the power domain drops the
+> domain regulator.
 >
-> +static const struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
-> +       /* sorted in descending order */
-> +       /* PLL_36XX_RATE(rate, m, p, s, k) */
-> +       PLL_36XX_RATE(266000000, 266, 3, 3, 0),
-> +       PLL_36XX_RATE(70500000, 94, 2, 4, 0),
+> Note:
+> A .suspend & .resume callback is added which simply puts the pins to sleep
+> state upon suspend & are moved to default & idle state upon resume.
+>
+> If any of the above pin states are missing in dt, a warning message
+> about the missing state is displayed.
+> If certain pin-states are not available, to remove this warning message
+> pass respective state name with null phandler.
+>
+> (Changes based on i2c-nomadik.c)
+>
+> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: linux-omap at vger.kernel.org
+> Cc: linux-i2c at vger.kernel.org
 
-Would be nice to include the comment that you included in our gerrit:
-that the 70.5 is not in the manual but is used by exynos5250-snow.
+[...]
 
+> @@ -1123,14 +1138,47 @@ omap_i2c_probe(struct platform_device *pdev)
+>  		dev->set_mpu_wkup_lat = pdata->set_mpu_wkup_lat;
+>  	}
+>  
+> -	dev->pins = devm_pinctrl_get_select_default(&pdev->dev);
+> -	if (IS_ERR(dev->pins)) {
+> -		if (PTR_ERR(dev->pins) == -EPROBE_DEFER)
+> +	dev->pinctrl = devm_pinctrl_get(&pdev->dev);
+> +	if (!IS_ERR(dev->pinctrl)) {
+> +		dev->pins_default = pinctrl_lookup_state(dev->pinctrl,
+> +							 PINCTRL_STATE_DEFAULT);
 
-> +       fin_pll_rate = _get_rate("fin_pll");
-> +       mout_vpllsrc_rate = _get_rate("mout_vpllsrc");
+This part is already done by probe in driver core, why does it need to
+be done again.  dev->pins->default_state should already have this.
+(c.f. pinctrl_bind_pins() in drivers/base/pinctrl.c)
 
-This line is why you added an alias for mout_vpllsrc.  I'd rather not
-see that since it also exports the clock to other places.
+But that brings up a bigger question about whether or not we should be
+doing the rest of this (idle/sleep) pin management in the drivers or in
+the driver core as well.  I would much prefer it be handled by the
+driver core.
 
-I've changed this to use __clk_lookup().  That function _is_ exported
-by <linux/clk-provider.h> and we are a clock provider, so it seems
-legit to use that.  ...and it's nice not to have an extra clock alias.
+In fact, since these are all PM related events, it should probably be
+handled by the PM core and seems pretty straight forward to do so.
 
-See my changes to <https://gerrit.chromium.org/gerrit/#/c/56797/> for
-an example.
-
-
-> @@ -507,10 +531,28 @@ void __init exynos5250_clk_init(struct device_node *np)
->                         reg_base + 0x10050, NULL, 0);
->         cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
->                         reg_base + 0x10020, NULL, 0);
-> -       epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-> -                       reg_base + 0x10030, NULL, 0);
-> -       vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
-> +
-> +       if (fin_pll_rate == (24 * MHZ)) {
-> +               epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-> +                               reg_base + 0x10030, epll_24mhz_tbl,
-> +                               ARRAY_SIZE(epll_24mhz_tbl));
-> +       } else {
-> +               pr_warn("Exynos5250: valid epll rate_table missing for\n"
-> +                       "parent fin_pll:%lu hz\n", fin_pll_rate);
-
-nit: use %s and __func__ rather than adding Exynos5250 hardcoded in here?
-
-
--Doug
+Kevin
