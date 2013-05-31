@@ -1,33 +1,61 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 31 May 2013 15:23:37 +0200
-Subject: [GIT PULL] ARM: OMAP: dts fixes for 3.10-rc4
-Message-ID: <51A8A459.1000706@ti.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Fri, 31 May 2013 14:25:20 +0100
+Subject: [PATCH RFC 2/6] arm64/xen: arm/xen header changes to compile on
+ arm64
+In-Reply-To: <20130531104303.GB18045@localhost.cambridge.arm.com>
+References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
+ <1369930713-6063-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130531104303.GB18045@localhost.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.02.1305311422250.4799@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Fri, 31 May 2013, Catalin Marinas wrote:
+> On Thu, May 30, 2013 at 05:18:29PM +0100, Stefano Stabellini wrote:
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > ---
+> >  arch/arm/include/asm/xen/events.h |    4 ++++
+> >  arch/arm/include/asm/xen/page.h   |    2 ++
+> >  2 files changed, 6 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/include/asm/xen/events.h b/arch/arm/include/asm/xen/events.h
+> > index 8b1f37b..12e4e0b 100644
+> > --- a/arch/arm/include/asm/xen/events.h
+> > +++ b/arch/arm/include/asm/xen/events.h
+> > @@ -13,7 +13,11 @@ enum ipi_vector {
+> >  
+> >  static inline int xen_irqs_disabled(struct pt_regs *regs)
+> >  {
+> > +#ifdef CONFIG_ARM
+> >  	return raw_irqs_disabled_flags(regs->ARM_cpsr);
+> > +#else
+> > +	return raw_irqs_disabled_flags((unsigned long) regs->pstate);
+> > +#endif
+> >  }
+> 
+> At least for this part, it makes sense to live in the arch/arm64
+> directory.
 
-Please pull two DTS fixes for the next -rc.
-
-Thanks,
-Benoit
+Yes, good idea, there isn't much else in that header file anyway.
 
 
-The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
-  Linus Torvalds (1):
-        Linux 3.10-rc3
+> >  #define xchg_xen_ulong(ptr, val) atomic64_xchg(container_of((ptr),	\
+> > diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+> > index 30cdacb..cb2fa15 100644
+> > --- a/arch/arm/include/asm/xen/page.h
+> > +++ b/arch/arm/include/asm/xen/page.h
+> > @@ -1,7 +1,9 @@
+> >  #ifndef _ASM_ARM_XEN_PAGE_H
+> >  #define _ASM_ARM_XEN_PAGE_H
+> >  
+> > +#ifdef ARM
+> >  #include <asm/mach/map.h>
+> > +#endif
+> >  #include <asm/page.h>
+> >  #include <asm/pgtable.h>
+> 
+> Is there anything ARM-specific in this file?
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git dts-fixes-for-3.10
-
-Kevin Hilman (1):
-      ARM: dts: omap4-panda|sdp: Fix mux for twl6030 IRQ pin and msecure line
-
-Lars Poeschel (1):
-      ARM: dts: AM33xx: Fix properties on gpmc node
-
- arch/arm/boot/dts/am33xx.dtsi             |    4 ++--
- arch/arm/boot/dts/omap4-panda-common.dtsi |   20 ++++++++++++++++++++
- arch/arm/boot/dts/omap4-sdp.dts           |   20 ++++++++++++++++++++
- 3 files changed, 42 insertions(+), 2 deletions(-)
+The only ARM-specific stuff here is the definition of xen_remap, like
+you have spotted in the other email. The inclusion of asm/mach/map.h is
+needed because it containes the definition of MT_MEMORY.
