@@ -1,132 +1,66 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Fri, 31 May 2013 10:45:17 +0100
-Subject: [PATCH v1 2/2] ARM:prima2:move postcore_initcalls to init_machine.
-In-Reply-To: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <1369993517-24735-1-git-send-email-srinivas.kandagatla@st.com>
+From: gururaja.hebbar@ti.com (Hebbar Gururaja)
+Date: Fri, 31 May 2013 15:43:01 +0530
+Subject: [PATCH 01/11] pinctrl: single: adopt pinctrl sleep mode management
+In-Reply-To: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1369995191-20855-2-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Make pinctrl-single able to handle suspend/resume events and change
+hogged pins states accordingly.
 
-This patch moves all  postcore_initcalls to very first calls in
-init_machine. This should achieve the same sequencing as done via
-postcore_initcalls.
-Without this patch a multi_v7 kernel panics if we boot it on any
-non prima2 parts with below log:
-
-Kernel panic - not syncing: unable to find compatible pwrc node in dtb
-
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc3-00536-ge2f1bc1 #63
-[<c001387c>] (unwind_backtrace+0x0/0xf8) from [<c00111cc>]
-(show_stack+0x10/0x14)
-[<c00111cc>] (show_stack+0x10/0x14) from [<c0341834>] (panic+0x90/0x1e4)
-[<c0341834>] (panic+0x90/0x1e4) from [<c0425784>]
-(sirfsoc_of_pwrc_init+0x24/0x58)
-[<c0425784>] (sirfsoc_of_pwrc_init+0x24/0x58) from [<c041f854>]
-(do_one_initcall+0x90/0x150)
-[<c041f854>] (do_one_initcall+0x90/0x150) from [<c041fa10>]
-(kernel_init_freeable+0xfc/0x1c4)
-[<c041fa10>] (kernel_init_freeable+0xfc/0x1c4) from [<c033d384>]
-(kernel_init+0x8/0xe4)
-[<c033d384>] (kernel_init+0x8/0xe4) from [<c000ded8>]
-(ret_from_fork+0x14/0x3c)
-CPU1: stopping
-CPU: 1 PID: 0 Comm: swapper/1 Not tainted 3.10.0-rc3-00536-ge2f1bc1 #63
-[<c001387c>] (unwind_backtrace+0x0/0xf8) from [<c00111cc>]
-(show_stack+0x10/0x14)
-[<c00111cc>] (show_stack+0x10/0x14) from [<c0012030>]
-(handle_IPI+0xf8/0x12c)
-[<c0012030>] (handle_IPI+0xf8/0x12c) from [<c0008600>]
-(gic_handle_irq+0x54/0x5c)
-[<c0008600>] (gic_handle_irq+0x54/0x5c) from [<c000da80>]
-(__irq_svc+0x40/0x50)
-Exception stack(0xef079fa0 to 0xef079fe8)
-9fa0: c0ddd6d8 00000000 000002d2 00000000 ef078000 c04888f5 00000001
-c04888f5
-9fc0: c045c490 c045c42c c0348f38 00000000 01000000 ef079fe8 c000f018
-c000f01c
-9fe0: 60000113 ffffffff
-[<c000da80>] (__irq_svc+0x40/0x50) from [<c000f01c>]
-(arch_cpu_idle+0x28/0x30)
-[<c000f01c>] (arch_cpu_idle+0x28/0x30) from [<c0051080>]
-(cpu_startup_entry+0x60/0x130)
-[<c0051080>] (cpu_startup_entry+0x60/0x130) from [<6033dfc4>]
-(0x6033dfc4)
-
-Initially detected when booting Stih415 SOC with multi_v7_defconfig.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-prima2/common.c |    3 +++
- arch/arm/mach-prima2/pm.c     |    6 ++----
- arch/arm/mach-prima2/pm.h     |    2 ++
- 3 files changed, 7 insertions(+), 4 deletions(-)
+:100644 100644 b9fa046... bfd4f6a... M	drivers/pinctrl/pinctrl-single.c
+ drivers/pinctrl/pinctrl-single.c |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index 9aefcd6..8e27cb7 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -16,6 +16,7 @@
- #include <linux/of.h>
- #include <linux/of_platform.h>
- #include "common.h"
-+#include "pm.h"
- 
- static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
- 	{ .compatible = "simple-bus", },
-@@ -24,6 +25,8 @@ static struct of_device_id sirfsoc_of_bus_ids[] __initdata = {
- 
- void __init sirfsoc_mach_init(void)
- {
-+	sirfsoc_of_pwrc_init();
-+	sirfsoc_memc_init();
- 	of_platform_bus_probe(NULL, sirfsoc_of_bus_ids, NULL);
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index b9fa046..bfd4f6a 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1346,6 +1346,29 @@ static int pcs_add_gpio_func(struct device_node *node, struct pcs_device *pcs)
+ 	return ret;
  }
  
-diff --git a/arch/arm/mach-prima2/pm.c b/arch/arm/mach-prima2/pm.c
-index 9936c18..8850e3b 100644
---- a/arch/arm/mach-prima2/pm.c
-+++ b/arch/arm/mach-prima2/pm.c
-@@ -96,7 +96,7 @@ static const struct of_device_id pwrc_ids[] = {
- 	{}
- };
- 
--static int __init sirfsoc_of_pwrc_init(void)
-+int __init sirfsoc_of_pwrc_init(void)
++static int pinctrl_single_suspend(struct platform_device *pdev,
++					pm_message_t state)
++{
++	struct pcs_device *pcs;
++
++	pcs = platform_get_drvdata(pdev);
++	if (!pcs)
++		return -EINVAL;
++
++	return pinctrl_force_sleep(pcs->pctl);
++}
++
++static int pinctrl_single_resume(struct platform_device *pdev)
++{
++	struct pcs_device *pcs;
++
++	pcs = platform_get_drvdata(pdev);
++	if (!pcs)
++		return -EINVAL;
++
++	return pinctrl_force_default(pcs->pctl);
++}
++
+ static int pcs_probe(struct platform_device *pdev)
  {
- 	struct device_node *np;
- 
-@@ -116,7 +116,6 @@ static int __init sirfsoc_of_pwrc_init(void)
- 
- 	return 0;
- }
--postcore_initcall(sirfsoc_of_pwrc_init);
- 
- static const struct of_device_id memc_ids[] = {
- 	{ .compatible = "sirf,prima2-memc" },
-@@ -143,8 +142,7 @@ static struct platform_driver sirfsoc_memc_driver = {
+ 	struct device_node *np = pdev->dev.of_node;
+@@ -1494,6 +1517,10 @@ static struct platform_driver pcs_driver = {
+ 		.name		= DRIVER_NAME,
+ 		.of_match_table	= pcs_of_match,
  	},
++#ifdef CONFIG_PM
++	.suspend = pinctrl_single_suspend,
++	.resume = pinctrl_single_resume,
++#endif
  };
  
--static int __init sirfsoc_memc_init(void)
-+int __init sirfsoc_memc_init(void)
- {
- 	return platform_driver_register(&sirfsoc_memc_driver);
- }
--postcore_initcall(sirfsoc_memc_init);
-diff --git a/arch/arm/mach-prima2/pm.h b/arch/arm/mach-prima2/pm.h
-index bae6d77..b658d66 100644
---- a/arch/arm/mach-prima2/pm.h
-+++ b/arch/arm/mach-prima2/pm.h
-@@ -23,6 +23,8 @@
- 
- #ifndef __ASSEMBLY__
- extern int sirfsoc_finish_suspend(unsigned long);
-+extern int __init sirfsoc_of_pwrc_init(void);
-+extern int __init sirfsoc_memc_init(void);
- #endif
- 
- #endif
+ module_platform_driver(pcs_driver);
 -- 
-1.7.6.5
+1.7.9.5
