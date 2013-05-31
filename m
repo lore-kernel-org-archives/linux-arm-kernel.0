@@ -1,18 +1,16 @@
 From: gururaja.hebbar@ti.com (Hebbar Gururaja)
-Date: Fri, 31 May 2013 15:43:09 +0530
-Subject: [PATCH 09/11] mmc: omap_hsmmc: enhance pinctrl support
+Date: Fri, 31 May 2013 15:43:10 +0530
+Subject: [PATCH 10/11] video: da8xx-fb: adopt pinctrl support
 In-Reply-To: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
 References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <1369995191-20855-11-git-send-email-gururaja.hebbar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amend the hsmmc controller to optionally take a pin control handle and
-set the state of the pins to:
+Amend the da8xx-fb controller to optionally take a pin control handle
+and set the state of the pins to:
 
-- "default" on boot, resume and before performing a mmc transfer
-- "idle" after initial default, after resume default, and after each
-mmc/sd card access
+- "default" on boot, resume
 - "sleep" on suspend()
 
 By optionally putting the pins into sleep state in the suspend callback
@@ -27,147 +25,103 @@ about the missing state is displayed.
 If certain pin-states are not available, to remove this warning message
 pass respective state name with null phandler.
 
-Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
-Cc: Balaji T K <balajitk@ti.com>
-Cc: Chris Ball <cjb@laptop.org>
-Cc: linux-mmc at vger.kernel.org
-Cc: linux-omap at vger.kernel.org
----
-:100644 100644 6e44025... a2d69aa... M	drivers/mmc/host/omap_hsmmc.c
- drivers/mmc/host/omap_hsmmc.c |   79 ++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 74 insertions(+), 5 deletions(-)
+Todo:
+        - if an idle state is available for pins, add support for it.
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 6e44025..a2d69aa 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -183,6 +183,12 @@ struct omap_hsmmc_host {
- 	struct omap_hsmmc_next	next_data;
+Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+Cc: Florian Tobias Schandinat <FlorianSchandinat@gmx.de>
+Cc: linux-fbdev at vger.kernel.org
+---
+:100644 100644 0810939... 10c8036... M	drivers/video/da8xx-fb.c
+ drivers/video/da8xx-fb.c |   48 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
+
+diff --git a/drivers/video/da8xx-fb.c b/drivers/video/da8xx-fb.c
+index 0810939..10c8036 100644
+--- a/drivers/video/da8xx-fb.c
++++ b/drivers/video/da8xx-fb.c
+@@ -36,6 +36,7 @@
+ #include <linux/slab.h>
+ #include <linux/delay.h>
+ #include <linux/lcm.h>
++#include <linux/pinctrl/consumer.h>
+ #include <video/da8xx-fb.h>
+ #include <asm/div64.h>
  
- 	struct	omap_mmc_platform_data	*pdata;
+@@ -182,6 +183,11 @@ struct da8xx_fb_par {
+ #endif
+ 	void (*panel_power_ctrl)(int);
+ 	u32 pseudo_palette[16];
 +
-+	/* Three pin states - default, idle & sleep */
++	/* two pin states - default, sleep */
 +	struct pinctrl			*pinctrl;
 +	struct pinctrl_state		*pins_default;
-+	struct pinctrl_state		*pins_idle;
 +	struct pinctrl_state		*pins_sleep;
  };
  
- static int omap_hsmmc_card_detect(struct device *dev, int slot)
-@@ -1775,7 +1781,6 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 	const struct of_device_id *match;
- 	dma_cap_mask_t mask;
- 	unsigned tx_req, rx_req;
--	struct pinctrl *pinctrl;
- 
- 	match = of_match_device(of_match_ptr(omap_mmc_of_match), &pdev->dev);
- 	if (match) {
-@@ -1982,10 +1987,46 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
- 
- 	omap_hsmmc_disable_irq(host);
- 
--	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
--	if (IS_ERR(pinctrl))
--		dev_warn(&pdev->dev,
--			"pins are not configured from the driver\n");
-+	host->pinctrl = devm_pinctrl_get(&pdev->dev);
-+	if (!IS_ERR(host->pinctrl)) {
-+		host->pins_default = pinctrl_lookup_state(host->pinctrl,
-+							PINCTRL_STATE_DEFAULT);
-+		if (IS_ERR(host->pins_default))
-+			dev_dbg(&pdev->dev, "could not get default pinstate\n");
+ /* Variable Screen Information */
+@@ -1306,6 +1312,36 @@ static int fb_probe(struct platform_device *device)
+ 	par->lcd_fck_rate = clk_get_rate(fb_clk);
+ #endif
+ 	par->pxl_clk = lcdc_info->pixclock;
++
++	par->pinctrl = devm_pinctrl_get(&device->dev);
++	if (!IS_ERR(par->pinctrl)) {
++		par->pins_default = pinctrl_lookup_state(par->pinctrl,
++							 PINCTRL_STATE_DEFAULT);
++		if (IS_ERR(par->pins_default))
++			dev_dbg(&device->dev, "could not get default pinstate\n");
 +		else
-+			if (pinctrl_select_state(host->pinctrl,
-+						 host->pins_default))
-+				dev_err(&pdev->dev,
++			if (pinctrl_select_state(par->pinctrl,
++						 par->pins_default))
++				dev_err(&device->dev,
 +					"could not set default pinstate\n");
 +
-+		host->pins_idle = pinctrl_lookup_state(host->pinctrl,
-+							PINCTRL_STATE_IDLE);
-+		if (IS_ERR(host->pins_idle))
-+			dev_dbg(&pdev->dev, "could not get idle pinstate\n");
-+		else
-+			/* If possible, let's idle until the first transfer */
-+			if (pinctrl_select_state(host->pinctrl,
-+						 host->pins_idle))
-+				dev_err(&pdev->dev,
-+					"could not set idle pinstate\n");
-+
-+		host->pins_sleep = pinctrl_lookup_state(host->pinctrl,
-+							PINCTRL_STATE_SLEEP);
-+		if (IS_ERR(host->pins_sleep))
-+			dev_dbg(&pdev->dev, "could not get sleep pinstate\n");
++		par->pins_sleep = pinctrl_lookup_state(par->pinctrl,
++						       PINCTRL_STATE_SLEEP);
++		if (IS_ERR(par->pins_sleep))
++			dev_dbg(&device->dev, "could not get sleep pinstate\n");
 +	} else {
 +		/*
 +		* Since we continue even when pinctrl node is not found,
 +		* Invalidate pins as not available. This is to make sure that
 +		* IS_ERR(pins_xxx) results in failure when used.
 +		*/
-+		host->pins_default = ERR_PTR(-ENODATA);
-+		host->pins_idle = ERR_PTR(-ENODATA);
-+		host->pins_sleep = ERR_PTR(-ENODATA);
++		par->pins_default = ERR_PTR(-ENODATA);
++		par->pins_sleep = ERR_PTR(-ENODATA);
 +
-+		dev_dbg(&pdev->dev, "did not get pins for mmc error: %li\n",
-+			PTR_ERR(host->pinctrl));
++		dev_dbg(&device->dev, "did not get pins for lcd error: %li\n",
++			PTR_ERR(par->pinctrl));
 +	}
- 
- 	omap_hsmmc_protect_card(host);
- 
-@@ -2135,6 +2176,12 @@ static int omap_hsmmc_suspend(struct device *dev)
- 		clk_disable_unprepare(host->dbclk);
- err:
- 	pm_runtime_put_sync(host->dev);
 +
+ 	if (fb_pdata->panel_power_ctrl) {
+ 		par->panel_power_ctrl = fb_pdata->panel_power_ctrl;
+ 		par->panel_power_ctrl(1);
+@@ -1551,6 +1587,12 @@ static int fb_suspend(struct platform_device *dev, pm_message_t state)
+ 	pm_runtime_put_sync(&dev->dev);
+ 	console_unlock();
+ 
 +	/* Optionally let pins go into sleep states */
-+	if (!IS_ERR(host->pins_sleep))
-+		if (pinctrl_select_state(host->pinctrl, host->pins_sleep))
-+			dev_err(dev, "could not set pins to sleep state\n");
++	if (!IS_ERR(par->pins_sleep))
++		if (pinctrl_select_state(par->pinctrl, par->pins_sleep))
++			dev_err(&dev->dev,
++				"could not set pins to sleep state\n");
 +
- 	return ret;
- }
- 
-@@ -2152,6 +2199,16 @@ static int omap_hsmmc_resume(struct device *dev)
- 
- 	pm_runtime_get_sync(host->dev);
- 
-+	/* First go to the default state */
-+	if (!IS_ERR(host->pins_default))
-+		if (pinctrl_select_state(host->pinctrl, host->pins_default))
-+			dev_err(host->dev, "could not set pins to default state\n");
-+
-+	/* Then let's idle the pins until the next transfer happens */
-+	if (!IS_ERR(host->pins_idle))
-+		if (pinctrl_select_state(host->pinctrl, host->pins_idle))
-+			dev_err(host->dev, "couldn't set pins to idle state\n");
-+
- 	if (host->dbclk)
- 		clk_prepare_enable(host->dbclk);
- 
-@@ -2185,6 +2242,12 @@ static int omap_hsmmc_runtime_suspend(struct device *dev)
- 
- 	host = platform_get_drvdata(to_platform_device(dev));
- 	omap_hsmmc_context_save(host);
-+
-+	/* Optionally let pins go into sleep states */
-+	if (!IS_ERR(host->pins_idle))
-+		if (pinctrl_select_state(host->pinctrl, host->pins_idle))
-+			dev_err(dev, "could not set pins to idle state\n");
-+
- 	dev_dbg(dev, "disabled\n");
- 
  	return 0;
-@@ -2195,6 +2258,12 @@ static int omap_hsmmc_runtime_resume(struct device *dev)
- 	struct omap_hsmmc_host *host;
+ }
+ static int fb_resume(struct platform_device *dev)
+@@ -1560,6 +1602,12 @@ static int fb_resume(struct platform_device *dev)
  
- 	host = platform_get_drvdata(to_platform_device(dev));
+ 	console_lock();
+ 	pm_runtime_get_sync(&dev->dev);
 +
 +	/* Optionaly enable pins to be muxed in and configured */
-+	if (!IS_ERR(host->pins_default))
-+		if (pinctrl_select_state(host->pinctrl, host->pins_default))
-+			dev_err(host->dev, "could not set default pins\n");
++	if (!IS_ERR(par->pins_default))
++		if (pinctrl_select_state(par->pinctrl, par->pins_default))
++			dev_err(&dev->dev, "could not set default pins\n");
 +
- 	omap_hsmmc_context_restore(host);
- 	dev_dbg(dev, "enabled\n");
- 
+ 	lcd_context_restore();
+ 	if (par->blank == FB_BLANK_UNBLANK) {
+ 		lcd_enable_raster();
 -- 
 1.7.9.5
