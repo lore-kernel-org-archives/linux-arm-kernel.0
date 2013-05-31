@@ -1,121 +1,128 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 31 May 2013 11:18:47 +0200
-Subject: [PATCH 12/39] ARM: u300: set up board power from device tree
+Date: Fri, 31 May 2013 11:18:48 +0200
+Subject: [PATCH 13/39] ARM: u300: support regulators in the device tree
 In-Reply-To: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
 References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1369991954-17406-13-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1369991954-17406-14-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This adds support for setting up the board power from the
-device tree on the U300. We use a board-specific node in the
-device tree for the S365 board and bind a regulator for the
-board power to this node.
+Now that we have enabled board power and the AB3100 regulators,
+put the regulator data into the device tree and enable it so
+we can start to tie regulators to devices. To begin with we're
+only supplying the power to the board itself.
 
 Cc: Mark Brown <broonie@kernel.org>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/ste-u300.txt | 13 +++++++
- arch/arm/mach-u300/regulator.c                     | 42 ++++++++++++++++++++--
- 2 files changed, 52 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/ste-u300.dts | 79 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 79 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/ste-u300.txt b/Documentation/devicetree/bindings/arm/ste-u300.txt
-index 222dca5..cd9001a 100644
---- a/Documentation/devicetree/bindings/arm/ste-u300.txt
-+++ b/Documentation/devicetree/bindings/arm/ste-u300.txt
-@@ -7,3 +7,16 @@ or board power regulator supplies.
- Required root node property:
+diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
+index 711a2d9..d1ab4e9 100644
+--- a/arch/arm/boot/dts/ste-u300.dts
++++ b/arch/arm/boot/dts/ste-u300.dts
+@@ -24,6 +24,11 @@
+ 		reg = <0x48000000 0x03c00000>;
+ 	};
  
- compatible="stericsson,u300";
++	s365 {
++		compatible = "stericsson,s365";
++		vana15-supply = <&ab3100_ldo_d_reg>;
++	};
 +
-+Boards with the U300 SoC include:
-+
-+S365 "Small Board U365":
-+
-+Required node: s365
-+
-+Example:
-+
-+s365 {
-+	compatible = "stericsson,s365";
-+	vana15-supply = <&ab3100_ldo_d_reg>;
-+};
-diff --git a/arch/arm/mach-u300/regulator.c b/arch/arm/mach-u300/regulator.c
-index 9c53f01..8a67dc6 100644
---- a/arch/arm/mach-u300/regulator.c
-+++ b/arch/arm/mach-u300/regulator.c
-@@ -10,9 +10,14 @@
- #include <linux/device.h>
- #include <linux/signal.h>
- #include <linux/err.h>
-+#include <linux/of.h>
-+#include <linux/module.h>
-+#include <linux/platform_device.h>
-+#include <linux/regulator/machine.h>
- #include <linux/regulator/consumer.h>
- /* Those are just for writing in syscon */
- #include <linux/io.h>
-+#include <asm/mach-types.h>
- #include <mach/hardware.h>
- #include <mach/syscon.h>
+ 	timer: timer at c0014000 {
+ 		compatible = "stericsson,u300-apptimer";
+ 		reg = <0xc0014000 0x1000>;
+@@ -70,6 +75,74 @@
+ 		interrupts = <8>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		ab3100: ab3100 at 0x48 {
++			compatible = "stericsson,ab3100";
++			reg = <0x48>;
++			interrupt-parent = <&vica>;
++			interrupts = <0>; /* EXT0 IRQ */
++			ab3100-regulators {
++				compatible = "stericsson,ab3100-regulators";
++				ab3100_ldo_a_reg: ab3100_ldo_a {
++					regulator-compatible = "ab3100_ldo_a";
++					startup-delay-us = <200>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++				ab3100_ldo_c_reg: ab3100_ldo_c {
++					regulator-compatible = "ab3100_ldo_c";
++					startup-delay-us = <200>;
++				};
++				ab3100_ldo_d_reg: ab3100_ldo_d {
++					regulator-compatible = "ab3100_ldo_d";
++					startup-delay-us = <200>;
++				};
++				ab3100_ldo_e_reg: ab3100_ldo_e {
++					regulator-compatible = "ab3100_ldo_e";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <1800000>;
++					startup-delay-us = <200>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++				ab3100_ldo_f_reg: ab3100_ldo_f {
++					regulator-compatible = "ab3100_ldo_f";
++					regulator-min-microvolt = <2500000>;
++					regulator-max-microvolt = <2500000>;
++					startup-delay-us = <600>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++				ab3100_ldo_g_reg: ab3100_ldo_g {
++					regulator-compatible = "ab3100_ldo_g";
++					regulator-min-microvolt = <1500000>;
++					regulator-max-microvolt = <2850000>;
++					startup-delay-us = <400>;
++				};
++				ab3100_ldo_h_reg: ab3100_ldo_h {
++					regulator-compatible = "ab3100_ldo_h";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <2750000>;
++					startup-delay-us = <200>;
++				};
++				ab3100_ldo_k_reg: ab3100_ldo_k {
++					regulator-compatible = "ab3100_ldo_k";
++					regulator-min-microvolt = <1800000>;
++					regulator-max-microvolt = <2750000>;
++					startup-delay-us = <200>;
++				};
++				ab3100_ext_reg: ab3100_ext {
++					regulator-compatible = "ab3100_ext";
++				};
++				ab3100_buck_reg: ab3100_buck {
++					regulator-compatible = "ab3100_buck";
++					regulator-min-microvolt = <1200000>;
++					regulator-max-microvolt = <1800000>;
++					startup-delay-us = <1000>;
++					regulator-always-on;
++					regulator-boot-on;
++				};
++			};
++		};
+ 	};
  
-@@ -47,13 +52,17 @@ void u300_pm_poweroff(void)
- /*
-  * Hog the regulators needed to power up the board.
-  */
--static int __init u300_init_boardpower(void)
-+static int __init __u300_init_boardpower(struct platform_device *pdev)
- {
- 	int err;
- 	u32 val;
+ 	i2c1: i2c at c0005000 {
+@@ -79,6 +152,12 @@
+ 		interrupts = <9>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		fwcam0: fwcam at 0x10 {
++			reg = <0x10>;
++		};
++		fwcam1: fwcam at 0x5d {
++			reg = <0x5d>;
++		};
+ 	};
  
- 	pr_info("U300: setting up board power\n");
--	main_power_15 = regulator_get(NULL, "vana15");
-+	if (pdev)
-+		main_power_15 = regulator_get(&pdev->dev, "vana15");
-+	else
-+		main_power_15 = regulator_get(NULL, "vana15");
-+
- 	if (IS_ERR(main_power_15)) {
- 		pr_err("could not get vana15");
- 		return PTR_ERR(main_power_15);
-@@ -82,7 +91,34 @@ static int __init u300_init_boardpower(void)
- 	return 0;
- }
- 
-+static int __init s365_board_probe(struct platform_device *pdev)
-+{
-+	return __u300_init_boardpower(pdev);
-+}
-+
-+static const struct of_device_id s365_board_match[] = {
-+	{ .compatible = "stericsson,s365" },
-+	{},
-+};
-+
-+static struct platform_driver s365_board_driver = {
-+	.driver		= {
-+		.name   = "s365-board",
-+		.owner  = THIS_MODULE,
-+		.of_match_table = s365_board_match,
-+	},
-+};
-+
- /*
-  * So at module init time we hog the regulator!
-  */
--module_init(u300_init_boardpower);
-+static int __init u300_init_boardpower(void)
-+{
-+	if (of_have_populated_dt())
-+		return platform_driver_probe(&s365_board_driver,
-+					     s365_board_probe);
-+	/* Only call this on non-DT boots */
-+	return __u300_init_boardpower(NULL);
-+}
-+
-+device_initcall(u300_init_boardpower);
+ 	amba {
 -- 
 1.7.11.3
