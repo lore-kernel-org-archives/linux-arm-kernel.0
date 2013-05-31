@@ -1,39 +1,27 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 31 May 2013 07:00:04 +0300
-Subject: MUSB multiplatform work?
-In-Reply-To: <20130530205448.GD6467@atomide.com>
-References: <201305271702.09203.arnd@arndb.de>
- <20130528163548.GC28253@arwen.pp.htv.fi>
- <20130530201854.GB6467@atomide.com>
- <20130530205448.GD6467@atomide.com>
-Message-ID: <20130531040004.GA7879@arwen.pp.htv.fi>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 31 May 2013 00:03:35 -0400 (EDT)
+Subject: =?GB2312?Q?Re=3A_=B4=F0=B8=B4=3A_A_bug_about_system_call_on_ARM?=
+In-Reply-To: <ih0015wu30o5nq4ajf437rl7.1369916575726@email.android.com>
+References: <ih0015wu30o5nq4ajf437rl7.1369916575726@email.android.com>
+Message-ID: <alpine.LFD.2.03.1305302356140.30828@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 01:54:49PM -0700, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [130530 13:25]:
-> > 
-> > TUSB we can make depend on ARMv7, the only implementation we have
-> > is for omap2420, which is ARMv6. This should solve the issue for
-> > ARMv7 multiplatform builds for now.
+On Thu, 30 May 2013, Wang, Yalin wrote:
+
+> Hi Will,
 > 
-> Sorry mean depend on !ARMv7. But thinking about it more, that does
-> not make much sense as it would break things for omap2plus_defconfig
-> at least which is multiplatform v6 and v7. For now TUSB can be made
-> to depend on MACH_NOKIA_N8X0. I doubt that anybody is using the add
-> on cards for H4 boards any longer..
+> i see your solution,
+> i Will test it tomorrow,
+> and report the result to you ASAP!
 
-could also be made to depend on BROKEN. I don't think anyone *really*
-cares about that glue layer other than the very few in the world who
-still like the nostalgic feeling of booting current linux releases on
-n8x0 devices.
+This is good if you can report success without changing any of your 
+current configuration.  This issue is worth fixing.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130531/90cafc85/attachment.sig>
+However, as others have mentioned already, you most likely can set 
+CONFIG_OABI_COMPAT to n afterwards.  Not only will this make you immune 
+to the bug you reported, but that will also make the syscall path more 
+efficient as well.
+
+
+Nicolas
