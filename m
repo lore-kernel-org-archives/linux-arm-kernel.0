@@ -1,21 +1,38 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 31 May 2013 15:38:08 +0800
-Subject: [PATCH v4 4/4] ARM: dts: add initial VF610 Tower board dts support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851CE3E6@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1369732343-2982-1-git-send-email-b35083@freescale.com>
- <1369732343-2982-5-git-send-email-b35083@freescale.com>
- <20130529111605.GA25053@S2101-09.ap.freescale.net>
- <B56CDBE15CE27145A4B77D2D24263E851CE3E6@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <20130531073806.GA6520@S2101-09.ap.freescale.net>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 31 May 2013 10:37:51 +0300
+Subject: [PATCH 0/3] ARM: OMAP: add corrected DSS regulator supplies
+Message-ID: <1369985874-8571-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 06:48:27AM +0000, Lu Jingchang-B35083 wrote:
-> [Lu Jingchang-B35083] 
->   I have test on linux-next-20130530 and linux-next-20130531 kernel tree, all things work well on my side, NFS rootfs is mounted successfully. The VF610 supporting patches seem has no problem. Does it work now on your side? Thanks!
-> 
+Hi Tony,
 
-Yeah, I can boot into console using next-20130531 now.  Will applied the
-patches.  Thanks.
+Here are a few patches adding corrected DSS regulator supplies. The current
+ones in the board files are not really correct, although the dss driver works
+ok with them.
 
-Shawn
+So these patches add new regulator supply entries. When these are merged, I'll
+change omapdss driver to use the new ones, instead of the old ones. After that,
+we can remove the old ones from the board files.
+
+Note that these patches were also present in the big DSS series I sent
+yesterday. There's no reason for these patches to be there, so I'm sending them
+separately, and will drop these from my DSS series.
+
+ Tomi
+
+Tomi Valkeinen (3):
+  ARM: OMAP: fix dsi regulator names
+  ARM: OMAP: add vdds_dsi supply for omapdss_dpi.0
+  ARM: OMAP: add vdds_sdi supply for omapdss_sdi.0
+
+ arch/arm/mach-omap2/board-cm-t35.c           | 3 ++-
+ arch/arm/mach-omap2/board-devkit8000.c       | 1 +
+ arch/arm/mach-omap2/board-ldp.c              | 3 ++-
+ arch/arm/mach-omap2/board-omap3pandora.c     | 1 +
+ arch/arm/mach-omap2/board-rx51-peripherals.c | 1 +
+ arch/arm/mach-omap2/twl-common.c             | 1 +
+ 6 files changed, 8 insertions(+), 2 deletions(-)
+
+-- 
+1.8.1.2
