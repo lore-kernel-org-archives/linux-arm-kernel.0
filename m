@@ -1,203 +1,126 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri, 31 May 2013 17:19:04 +0530
-Subject: [PATCH 3/3] ARM: S5P64X0: Remove duplicate uncompress code
-In-Reply-To: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
-References: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1370000944-19786-4-git-send-email-tushar.behera@linaro.org>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 31 May 2013 08:05:19 -0400
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130530164335.GK23631@arm.com>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130529110508.GH17767@MacBook-Pro.local>
+ <20130529191657.GA13047@schnuecks.de>
+ <20130530164335.GK23631@arm.com>
+Message-ID: <20130531120519.GB3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uncompress code in S5P64X0 is almost same as the uncompress code
-defined in plat-samsung. Better to reuse that code.
+On Thu, May 30, 2013 at 05:43:35PM +0100, Catalin Marinas wrote:
+> On Wed, May 29, 2013 at 08:16:57PM +0100, Simon Baatz wrote:
+> > On Wed, May 29, 2013 at 12:05:09PM +0100, Catalin Marinas wrote:
+> > > On Sun, May 12, 2013 at 06:35:56AM +0100, Simon Baatz wrote:
+> > > > Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
+> > > > it needs to handle are kernel mapped only.  However, for example when doing
+> > > > direct I/O, pages with user space mappings may occur.
+> > > 
+> > > After Nico's clarification, I think the original commit introducing this
+> > > function was also incomplete (commit 73be1591 - [ARM] 5545/2: add
+> > > flush_kernel_dcache_page() for ARM) since it ignores highmem pages and
+> > > their flushing could be deferred for a long time.
+> > 
+> > Yes, I agree.
+> >  
+> > > For my understanding (if I re-read this tread) - basically code like
+> > > this should not leave the user mapping inconsistent:
+> > > 
+> > > kmap()
+> > > ...
+> > > flush_kernel_dcache_page()
+> > > kunmap()
+> > 
+> > s/user mapping/kernel mapping/ 
+> > The user mapping(s) can be assumed to be consistent when entering
+> > such code. Either there is none or the page was obtained by a
+> > mechanism like __get_user_pages(). Otherwise, we have a problem
+> > anyway when accessing the page via the kernel mapping.
+> 
+> Indeed. What I meant was user mapping inconsistent with the kernel
+> mapping. It's the latter that needs flushing.
+> 
+> > > > Thus, continue to do lazy flushing if there are no user space mappings.
+> > > > Otherwise, flush the kernel cache lines directly.
+> > > ...
+> > > >  /*
+> > > > + * Ensure cache coherency for kernel mapping of this page.
+> > > > + *
+> > > > + * If the page only exists in the page cache and there are no user
+> > > > + * space mappings, this is a no-op since the page was already marked
+> > > > + * dirty at creation.  Otherwise, we need to flush the dirty kernel
+> > > > + * cache lines directly.
+> > > > + */
+> > > > +void flush_kernel_dcache_page(struct page *page)
+> > > > +{
+> > > > +	if (cache_is_vivt() || cache_is_vipt_aliasing()) {
+> > > > +		struct address_space *mapping;
+> > > > +
+> > > > +		mapping = page_mapping(page);
+> > > > +
+> > > > +		if (!mapping || mapping_mapped(mapping))
+> > > > +			__flush_kernel_dcache_page(page);
+> > > > +	}
+> > > > +}
+> > > 
+> > > BTW, does the mapping check optimise anything for the
+> > > flush_kernel_dcache_page() uses? Would we have a mapping anyway (or
+> > > anonymous page) in most cases?
+> > 
+> > Looking at the relevant uses in the kernel, we have:
+> > 
+> >     drivers/scsi/libsas/sas_host_smp.c
+> >     drivers/mmc/host/mmc_spi.c
+> >     drivers/block/ps3disk.c
+> >     fs/exec.c
+> >     lib/scatterlist.c
+> >  
+> > That is not much (I omit my usual rant here that many uses of
+> > flush_dcache_page() in drivers are incorrect and should be uses of
+> > flush_kernel_dcache_page() ...).
+> > 
+> > Without looking at the actual code, we seem to have two basic use
+> > cases:
+> > 
+> > 1. Block drivers (the ones listed above + those using the memory
+> > scatterlist iterator in scatterlist.c)
+> > 
+> > These will probably almost exclusively use page cache pages for which
+> > we can be lazy.  Other pages only occur in special I/O situations
+> > like direct I/O.
+> > 
+> > 2. fs/exec.c
+> > 
+> > I think these are anonymous pages only
+> > 
+> > Thus depending on the actual drivers used, usage can be dominated by
+> > page cache pages on one setup and anon pages on the other.
+> > 
+> > I prefer the currently proposed way since it prevents massive
+> > overflushing if flush_kernel_dcache_page() is used in an I/O path.
+> > 
+> > (Btw. I am still puzzled as to why making flush_kernel_dcache_page()
+> > the current nop apparently did not cause problems in fs/exec.c.)
+> 
+> We get extra flushing via flush_old_exec() -> exec_mmap() -> mmput() ->
+> exit_mmap() -> flush_cache_mm() before we actually start the new exec so
+> this would flush the arg page as well.
+> 
+> > > Otherwise the patch looks good.
+> > 
+> > Thanks. Especially, thanks for pointing out the highmem case.
+> 
+> You can add my ack (before I forget the whole discussion ;))
+> 
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
- arch/arm/mach-s5p64x0/include/mach/uncompress.h |  163 ++---------------------
- 1 file changed, 8 insertions(+), 155 deletions(-)
+wrt to 73be1591, this appears to go all the way back to v2.6.31.x... Can
+Simon go ahead and put this in rmk's patch tracker and mention that it
+should go to all -stable trees?
 
-diff --git a/arch/arm/mach-s5p64x0/include/mach/uncompress.h b/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-index 19e0d64..b28a551 100644
---- a/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-+++ b/arch/arm/mach-s5p64x0/include/mach/uncompress.h
-@@ -14,171 +14,24 @@
- #define __ASM_ARCH_UNCOMPRESS_H
- 
- #include <mach/map.h>
-+#include <plat/uncompress.h>
- 
--/*
-- * cannot use commonly <plat/uncompress.h>
-- * because uart base of S5P6440 and S5P6450 is different
-- */
--
--typedef unsigned int upf_t;	/* cannot include linux/serial_core.h */
--
--/* uart setup */
--
--unsigned int fifo_mask;
--unsigned int fifo_max;
--
--/* forward declerations */
--
--static void arch_detect_cpu(void);
--
--/* defines for UART registers */
--
--#include <plat/regs-serial.h>
--#include <plat/regs-watchdog.h>
--
--/* working in physical space... */
--#undef S3C2410_WDOGREG
--#define S3C2410_WDOGREG(x) ((S3C24XX_PA_WATCHDOG + (x)))
--
--/* how many bytes we allow into the FIFO at a time in FIFO mode */
--#define FIFO_MAX	 (14)
--
--unsigned long uart_base;
--
--static __inline__ void get_uart_base(void)
-+static void arch_detect_cpu(void)
- {
- 	unsigned int chipid;
- 
- 	chipid = *(const volatile unsigned int __force *) 0xE0100118;
- 
--	uart_base = S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT;
--
-+#ifdef DEBUG_LL
- 	if ((chipid & 0xff000) == 0x50000)
--		uart_base += 0xEC800000;
-+		uart_base = S5P6450_PA_UART(CONFIG_S3C_LOWLEVEL_UART_PORT);
- 	else
--		uart_base += 0xEC000000;
--}
--
--static __inline__ void uart_wr(unsigned int reg, unsigned int val)
--{
--	volatile unsigned int *ptr;
--
--	get_uart_base();
--	ptr = (volatile unsigned int *)(reg + uart_base);
--	*ptr = val;
--}
--
--static __inline__ unsigned int uart_rd(unsigned int reg)
--{
--	volatile unsigned int *ptr;
--
--	get_uart_base();
--	ptr = (volatile unsigned int *)(reg + uart_base);
--	return *ptr;
--}
--
--/*
-- * we can deal with the case the UARTs are being run
-- * in FIFO mode, so that we don't hold up our execution
-- * waiting for tx to happen...
-- */
--
--static void putc(int ch)
--{
--	if (uart_rd(S3C2410_UFCON) & S3C2410_UFCON_FIFOMODE) {
--		int level;
--
--		while (1) {
--			level = uart_rd(S3C2410_UFSTAT);
--			level &= fifo_mask;
--
--			if (level < fifo_max)
--				break;
--		}
--
--	} else {
--		/* not using fifos */
--
--		while ((uart_rd(S3C2410_UTRSTAT) & S3C2410_UTRSTAT_TXE) != S3C2410_UTRSTAT_TXE)
--			barrier();
--	}
--
--	/* write byte to transmission register */
--	uart_wr(S3C2410_UTXH, ch);
--}
--
--static inline void flush(void)
--{
--}
--
--#define __raw_writel(d, ad)			\
--	do {							\
--		*((volatile unsigned int __force *)(ad)) = (d); \
--	} while (0)
--
--
--#ifdef CONFIG_S3C_BOOT_ERROR_RESET
--
--static void arch_decomp_error(const char *x)
--{
--	putstr("\n\n");
--	putstr(x);
--	putstr("\n\n -- System resetting\n");
--
--	__raw_writel(0x4000, S3C2410_WTDAT);
--	__raw_writel(0x4000, S3C2410_WTCNT);
--	__raw_writel(S3C2410_WTCON_ENABLE | S3C2410_WTCON_DIV128 | S3C2410_WTCON_RSTEN | S3C2410_WTCON_PRESCALE(0x40), S3C2410_WTCON);
--
--	while(1);
--}
--
--#define arch_error arch_decomp_error
--#endif
--
--#ifdef CONFIG_S3C_BOOT_UART_FORCE_FIFO
--static inline void arch_enable_uart_fifo(void)
--{
--	u32 fifocon = uart_rd(S3C2410_UFCON);
--
--	if (!(fifocon & S3C2410_UFCON_FIFOMODE)) {
--		fifocon |= S3C2410_UFCON_RESETBOTH;
--		uart_wr(S3C2410_UFCON, fifocon);
--
--		/* wait for fifo reset to complete */
--		while (1) {
--			fifocon = uart_rd(S3C2410_UFCON);
--			if (!(fifocon & S3C2410_UFCON_RESETBOTH))
--				break;
--		}
--	}
--}
-+		uart_base = S5P6440_PA_UART(CONFIG_S3C_LOWLEVEL_UART_PORT);
- #else
--#define arch_enable_uart_fifo() do { } while(0)
-+	uart_base = NULL;
- #endif
- 
--static void arch_decomp_setup(void)
--{
--	/*
--	 * we may need to setup the uart(s) here if we are not running
--	 * on an BAST... the BAST will have left the uarts configured
--	 * after calling linux.
--	 */
--
--	arch_detect_cpu();
--
--	/*
--	 * Enable the UART FIFOs if they where not enabled and our
--	 * configuration says we should turn them on.
--	 */
--
--	arch_enable_uart_fifo();
-+	fifo_mask = S3C2440_UFSTAT_TXMASK;
-+	fifo_max = 63 << S3C2440_UFSTAT_TXSHIFT;
- }
--
--
--
--static void arch_detect_cpu(void)
--{
--	/* we do not need to do any cpu detection here@the moment. */
--}
--
- #endif /* __ASM_ARCH_UNCOMPRESS_H */
--- 
-1.7.9.5
+thx,
+
+Jason.
