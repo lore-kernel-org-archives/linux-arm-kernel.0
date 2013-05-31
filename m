@@ -1,91 +1,58 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 31 May 2013 10:37:53 +0300
-Subject: [PATCH 2/3] ARM: OMAP: add vdds_dsi supply for omapdss_dpi.0
-In-Reply-To: <1369985874-8571-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1369985874-8571-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1369985874-8571-3-git-send-email-tomi.valkeinen@ti.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 31 May 2013 09:43:30 +0200
+Subject: [RFC PATCHv4 0/6] arm: Initial TI-Nspire support
+In-Reply-To: <1369738372.3148.7.camel@hornet>
+References: <1369480087-24786-1-git-send-email-dt.tangr@gmail.com>
+ <201305271231.40693.arnd@arndb.de> <1369738372.3148.7.camel@hornet>
+Message-ID: <2266847.DGUdOCUR2h@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DPI driver gets currently the vdds_dsi regulator via omapdss device.
-This is not correct, and we'll change the DPI driver to get the
-regulator directly via omapdss_dpi.0 device.
+Hi Pawel,
 
-This patch changes the relevant board files to add vdds_dsi supply for
-omapdss_dpi.0 device.
+Sorry for the late reply, I'm currently attending LinuxCon Japan, my mail 
+backlog is growing.
 
-Note that the vdds_dsi supply for omapdss device is still left there, as
-the current display driver uses it. When both the board files and the
-display driver has been changed, we can remove the unused supply.
+On Tuesday 28 May 2013 11:52:52 Pawel Moll wrote:
+> On Mon, 2013-05-27 at 11:31 +0100, Arnd Bergmann wrote:
+> > On Monday 27 May 2013, Daniel Tang wrote:
+> > > > The one remaining bit that sticks out is the clcd platform data. As I
+> > > > said before, I won't require you to convert that to DT in order to
+> > > > get your code merged, but I'd also really like to see that happen,
+> > > > as we will also need that to get rid of auxdata on the ARM reference
+> > > > platforms (integrator, versatile, realview, vexpress).
+> > > 
+> > > How would you like me to convert the platform data to DT? AFAIK, the
+> > > clcd driver isn't aware of DT so the only way is to use the AUXDATA
+> > > right now.
+> > 
+> > Linus Walleij mentioned on IRC that Pawel Moll already posted a series
+> > that adds DT support for clcd:
+> > 
+> > http://lists.freedesktop.org/archives/dri-devel/2013-April/037519.html
+> > 
+> > The series does a few more things, but you can probbly split out the
+> > parts you need and base on that.
+> 
+> The main "issue" with the series is its dependency on Laurent Pinchart's
+> Common Display Framework (or rather on the progress of its upstreaming).
+> I'm planning to discuss this in details in during the Linaro Connect in
+> Dublin, but generally, if it's not getting merged in the next window,
+> I'll spin the series to use the standard video modes bindings instead of
+> CDF. This will make me hurt on Versatile Express, but should work for
+> others.
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/mach-omap2/board-cm-t35.c       | 1 +
- arch/arm/mach-omap2/board-devkit8000.c   | 1 +
- arch/arm/mach-omap2/board-ldp.c          | 1 +
- arch/arm/mach-omap2/board-omap3pandora.c | 1 +
- arch/arm/mach-omap2/twl-common.c         | 1 +
- 5 files changed, 5 insertions(+)
+I've met with Tomi Valkeinen (TI), Alexandre Courbot (NVidia) and Tomasz Figa 
+(Samsung) recently, For the first time the meetings helped narrowing the 
+options *down*. It seems a path is slowly unfolding, and I would like to 
+target v3.13 for a first (possibly limited) version.
 
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index ce00968..d4622ed 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -293,6 +293,7 @@ static struct regulator_consumer_supply cm_t35_vsim_supply[] = {
- static struct regulator_consumer_supply cm_t35_vio_supplies[] = {
- 	REGULATOR_SUPPLY("vcc", "spi1.0"),
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dpi.0"),
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
- };
- 
-diff --git a/arch/arm/mach-omap2/board-devkit8000.c b/arch/arm/mach-omap2/board-devkit8000.c
-index 5764205..f1d91ba 100644
---- a/arch/arm/mach-omap2/board-devkit8000.c
-+++ b/arch/arm/mach-omap2/board-devkit8000.c
-@@ -222,6 +222,7 @@ static struct twl4030_gpio_platform_data devkit8000_gpio_data = {
- 
- static struct regulator_consumer_supply devkit8000_vpll1_supplies[] = {
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dpi.0"),
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
- };
- 
-diff --git a/arch/arm/mach-omap2/board-ldp.c b/arch/arm/mach-omap2/board-ldp.c
-index 3dbc881..62e4f70 100644
---- a/arch/arm/mach-omap2/board-ldp.c
-+++ b/arch/arm/mach-omap2/board-ldp.c
-@@ -272,6 +272,7 @@ static struct regulator_init_data ldp_vaux1 = {
- 
- static struct regulator_consumer_supply ldp_vpll2_supplies[] = {
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dpi.0"),
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
- };
- 
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index 28133d5..b1547a0 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -343,6 +343,7 @@ static struct regulator_consumer_supply pandora_vmmc3_supply[] = {
- static struct regulator_consumer_supply pandora_vdds_supplies[] = {
- 	REGULATOR_SUPPLY("vdds_sdi", "omapdss"),
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dpi.0"),
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
- };
- 
-diff --git a/arch/arm/mach-omap2/twl-common.c b/arch/arm/mach-omap2/twl-common.c
-index 51e138c..c05898f 100644
---- a/arch/arm/mach-omap2/twl-common.c
-+++ b/arch/arm/mach-omap2/twl-common.c
-@@ -140,6 +140,7 @@ static struct regulator_init_data omap3_vdac_idata = {
- 
- static struct regulator_consumer_supply omap3_vpll2_supplies[] = {
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss"),
-+	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dpi.0"),
- 	REGULATOR_SUPPLY("vdds_dsi", "omapdss_dsi.0"),
- };
- 
+Regarding the DT bindings, Alexandre and Tomasz will look into the V4L2 DT 
+bindings to see whether/how they can be reused/leveraged for the CDF bindings. 
+In both case we need to describe a graph of connected entities, and there's 
+not much in the V4L2 DT bindings that is V4L2-specific in that regard.
+
 -- 
-1.8.1.2
+Regards,
+
+Laurent Pinchart
