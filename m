@@ -1,58 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 31 May 2013 16:56:13 +0100
-Subject: [PATCH RFC 5/6] arm64/xen: implement xen_remap on arm64
-In-Reply-To: <alpine.DEB.2.02.1305311622150.4799@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1305301705500.4799@kaball.uk.xensource.com>
- <1369930713-6063-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20130531105915.GC18045@localhost.cambridge.arm.com>
- <alpine.DEB.2.02.1305311419280.4799@kaball.uk.xensource.com>
- <20130531141601.GC15551@arm.com>
- <alpine.DEB.2.02.1305311530440.4799@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1305311622150.4799@kaball.uk.xensource.com>
-Message-ID: <20130531155613.GF15551@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 31 May 2013 17:59:46 +0200
+Subject: [PATCH] gpio/omap: omap_gpio_init_context stub must be inline
+Message-ID: <2942784.trumtc2GjZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 04:23:20PM +0100, Stefano Stabellini wrote:
-> On Fri, 31 May 2013, Stefano Stabellini wrote:
-> > On Fri, 31 May 2013, Catalin Marinas wrote:
-> > > On Fri, May 31, 2013 at 02:21:16PM +0100, Stefano Stabellini wrote:
-> > > > On Fri, 31 May 2013, Catalin Marinas wrote:
-> > > > > On Thu, May 30, 2013 at 05:18:32PM +0100, Stefano Stabellini wrote:
-> > > > > > --- a/arch/arm/include/asm/xen/page.h
-> > > > > > +++ b/arch/arm/include/asm/xen/page.h
-> > > > > > @@ -90,6 +90,10 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
-> > > > > >  	return __set_phys_to_machine(pfn, mfn);
-> > > > > >  }
-> > > > > >  
-> > > > > > +#ifdef CONFIG_ARM64
-> > > > > > +#define xen_remap(cookie, size) __ioremap((cookie), (size), __pgprot(PROT_NORMAL))
-> > > > > > +#else
-> > > > > >  #define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
-> > > > > > +#endif
-> > > > > 
-> > > > > Now I saw the ARM-specific part. Can you not use something like
-> > > > > ioremap_cached() which would give normal cacheable memory (at least on
-> > > > > ARMv7).
-> > > > 
-> > > > No, I cannot because ioremap_cached uses MT_DEVICE_CACHED, while this
-> > > > needs to be MT_MEMORY. It is used for normal memory pages, not device
-> > > > memory.
-> > > 
-> > > MT_DEVICE_CACHED is Normal memory for ARMv7.
-> > 
-> > I didn't realize that MT_DEVICE_CACHED and MT_MEMORY end up having the
-> > same AttrIndx encoding!
-> > In that case yes, I should be able to use it.
-> > I take that I should just implement ioremap_cached on arm64 as well?
-> > 
-> 
-> Should just use MT_MEMORY and call it PROT_NORMAL?
-> 
-> #define PROT_NORMAL     (PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
-> #define ioremap_cached(addr, size)     __ioremap((addr), (size), __pgprot(PROT_NORMAL))
+The bug fix 352a2d5bf "gpio/omap: ensure gpio context is initialised"
+has caused a new warning for omap1_defconfig:
 
-Looks fine.
+drivers/gpio/gpio-omap.c:1465:13: warning: 'omap_gpio_init_context' defined but not used [-Wunused-function]
+ static void omap_gpio_init_context(struct gpio_bank *p) {}
+             ^
 
--- 
-Catalin
+The solution is to mark the stub function as 'static inline' so
+it gets left out of the build when unused.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index d3f7d2d..e5fba65 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1462,7 +1462,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
+ #else
+ #define omap_gpio_runtime_suspend NULL
+ #define omap_gpio_runtime_resume NULL
+-static void omap_gpio_init_context(struct gpio_bank *p) {}
++static inline void omap_gpio_init_context(struct gpio_bank *p) {}
+ #endif
+ 
+ static const struct dev_pm_ops gpio_pm_ops = {
