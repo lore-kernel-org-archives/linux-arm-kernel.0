@@ -1,15 +1,15 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 31 May 2013 23:19:07 -0700
-Subject: [GIT PULL 3/5] ARM: kirkwood: pcie driver for v3.11
-In-Reply-To: <20130528202632.GI31290@titan.lakedaemon.net>
+Date: Fri, 31 May 2013 23:24:50 -0700
+Subject: [GIT PULL 4/5] ARM: mvebu: pcie bridge enhancements for v3.11
+In-Reply-To: <20130528202828.GJ31290@titan.lakedaemon.net>
 References: <20130528202140.GG31290@titan.lakedaemon.net>
  <20130528202433.GH31290@titan.lakedaemon.net>
- <20130528202632.GI31290@titan.lakedaemon.net>
-Message-ID: <20130601061907.GQ5189@quad.lixom.net>
+ <20130528202828.GJ31290@titan.lakedaemon.net>
+Message-ID: <20130601062450.GR5189@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 04:26:32PM -0400, Jason Cooper wrote:
+On Tue, May 28, 2013 at 04:28:28PM -0400, Jason Cooper wrote:
 > 
 > The following changes since commit 3d9939c92efdd4ced672b94994959ca71b141cb8:
 > 
@@ -17,13 +17,14 @@ On Tue, May 28, 2013 at 04:26:32PM -0400, Jason Cooper wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/users/jcooper/linux.git tags/pcie_kw-3.11
+>   git://git.infradead.org/users/jcooper/linux.git tags/pcie_bridge-3.11
 > 
-> for you to fetch changes up to 0d0632f523fa040b307688ae421a1debf79af2d7:
+> for you to fetch changes up to 6eb237c41acc1cf00b3b1176ad4a0ed3f221d630:
 > 
->   arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree (2013-05-27 16:02:13 +0000)
+>   pci: mvebu: fix the emulation of the status register (2013-05-27 16:01:15 +0000)
 
-Pulled.
+Pulled. Could have gone into the main pcie pull request though, but I'm
+guessing it's split up for historical purposes.
 
 
 -Olof
