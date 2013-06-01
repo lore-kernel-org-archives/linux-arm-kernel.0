@@ -1,77 +1,83 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Sat, 01 Jun 2013 12:25:07 +0400
-Subject: =?UTF-8?B?UmVbM106IFtQQVRDSCA0LzRdIEFSTTogZHRzOiBpbXgyNy1waHl0ZWMtcGh5?=
- =?UTF-8?B?Y29yZS1zb206IEFkZCBpbml0aWFsIHN1cHBvcnQgZm9yIFBDTTk3MCBSREs=?=
-In-Reply-To: <1370073957.890623727@f333.mail.ru>
-References: <1370066053-25030-1-git-send-email-shc_work@mail.ru>
- <20130601080232.GM32299@pengutronix.de>
- <1370073957.890623727@f333.mail.ru>
-Message-ID: <1370075107.917140229@f267.mail.ru>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Sat, 01 Jun 2013 10:29:05 +0200
+Subject: [PATCH V3 0/4] clk: Samsung: audss: Register audio subsytem clocks
+ using common clk framework
+In-Reply-To: <1369735378-10003-1-git-send-email-padma.v@samsung.com>
+References: <1369735378-10003-1-git-send-email-padma.v@samsung.com>
+Message-ID: <51A9B0D1.2090408@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > On Sat, Jun 01, 2013 at 09:54:13AM +0400, Alexander Shiyan wrote:
-> > > Patch adds initial dts for Phytec PCM970 Rapid development kit.
-> > > - Added definition for UART0 and UART1.
-> > > - Added additional SPI chipselect which used on RDK for ZegBee module.
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > ---
-> > >  arch/arm/boot/dts/Makefile                     |  1 +
-> > >  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 29 ++++++++++++++++++++++++++
-> > >  2 files changed, 30 insertions(+)
-> > >  create mode 100644 arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> > > 
-> > > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > > index 8450c14..eee371f 100644
-> > > --- a/arch/arm/boot/dts/Makefile
-> > > +++ b/arch/arm/boot/dts/Makefile
-> > > @@ -108,6 +108,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
-> > >  	imx27-apf27dev.dtb \
-> > >  	imx27-pdk.dtb \
-> > >  	imx27-phytec-phycore-som.dtb \
-> > > +	imx27-phytec-phycore-rdk.dtb \
-> > >  	imx31-bug.dtb \
-> > >  	imx51-apf51.dtb \
-> > >  	imx51-apf51dev.dtb \
-> > > diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> > > new file mode 100644
-> > > index 0000000..f8a7a49
-> > > --- /dev/null
-> > > +++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> > > @@ -0,0 +1,29 @@
-> > > +/*
-> > > + * The code contained herein is licensed under the GNU General Public
-> > > + * License. You may obtain a copy of the GNU General Public License
-> > > + * Version 2 or later at the following locations:
-> > > + *
-> > > + * http://www.opensource.org/licenses/gpl-license.html
-> > > + * http://www.gnu.org/copyleft/gpl.html
-> > > + */
-> > > +
-> > > +#include "imx27-phytec-phycore-som.dts"
-> > > +
-> > > +/ {
-> > > +	model = "Phytec pcm970";
-> > > +	compatible = "phytec,imx27-pcm970", "phytec,imx27-pcm038", "fsl,imx27";
-> > > +};
-> > > +
-> > > +&cspi1 {
-> > > +	fsl,spi-num-chipselects = <2>;
-> > > +	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
-> > > +};
-> > 
-> > The first chipselect connects to the mc13783 PMIC which is on the
-> > module, not on the baseboard. Also this is a no-op since the status
-> > property of the cspi is not changed to 'okay'.
-> > I suspect you already have a patch adding mc13783 support to the module
-> > which should be in this series ;)
-> 
-> MC13783 is already here. See my previous patch for this SOM:
-> http://www.spinics.net/lists/arm-kernel/msg240873.html
+Padmavathi,
 
-I have given you a wrong link. Sorry. This is a patch for MC13783 regulator.
-Here is a patch for add dt-node to the module:
-http://comments.gmane.org/gmane.linux.ports.arm.kernel/234757
+On 05/28/2013 12:02 PM, Padmavathi Venna wrote:
+> Samsung S5PV210 and Exynos SoC has a separate subsystem for audio. This subsystem
+> has a internal clock controller which controls i2s0 and pcm0 clocks. This patch
+> series adds the Samsung audio subsytem clock to the common clock framework and
+> provides the I2S controllers clock information in the dtsi file.
+>
+> This patch series is made based on Kukjin Kim for-next branch
+>
+> Changes since V2:
+> 	- Removed s5pv210 compatible name from driver as it is
+> 	  not yet supported which is different from Exynos series
+> 	  audio subsystem clock conroller.
+> 	- Removed clkdev lookup support and added alias names in
+> 	  the i2s0 controller node.
+> Changes since V1:
+>          - Reworked on all review comments by Sylwester Nawrocki
+>          - Added a header file for all clock indexes as requested by Sylwester
+>          - Added different compatible names for s5pv210, exynos4 and exynos5
+>          - Registered the pcm clocks with common clock framework
 
----
+Overall it looks good to me. I'm only a bit uncomfortable with using 
+SAMSUNG_
+prefix for the clock index definitions. Ideally it should be something more
+specific to the SoC family. But I can't think of anything better at the 
+moment.
+This covers the Exynos and S5P SoCs, hence EXYNOS_ would not be appropriate.
+
+The patch series:
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+
+Thanks,
+Sylwester
+
+> Padmavathi Venna (4):
+>    ARM: samsung: use #include for all device trees
+>    clk: samsung: register audio subsystem clocks using common clock
+>      framework
+>    ARM: dts: add Exynos audio subsystem clock controller node
+>    ARM: dts: add clock provider information for i2s controllers in
+>      Exynos5250
+>
+>   .../bindings/clock/clk-samsung-audss.txt           |   64 ++++++++++
+>   arch/arm/boot/dts/exynos4.dtsi                     |    2 +-
+>   arch/arm/boot/dts/exynos4210-origen.dts            |    2 +-
+>   arch/arm/boot/dts/exynos4210-smdkv310.dts          |    2 +-
+>   arch/arm/boot/dts/exynos4210-trats.dts             |    2 +-
+>   arch/arm/boot/dts/exynos4210-universal_c210.dts    |    2 +-
+>   arch/arm/boot/dts/exynos4210.dtsi                  |    4 +-
+>   arch/arm/boot/dts/exynos4212.dtsi                  |    2 +-
+>   arch/arm/boot/dts/exynos4412-odroidx.dts           |    2 +-
+>   arch/arm/boot/dts/exynos4412-origen.dts            |    2 +-
+>   arch/arm/boot/dts/exynos4412-smdk4412.dts          |    2 +-
+>   arch/arm/boot/dts/exynos4412.dtsi                  |    2 +-
+>   arch/arm/boot/dts/exynos4x12.dtsi                  |    4 +-
+>   arch/arm/boot/dts/exynos5250-arndale.dts           |    2 +-
+>   arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 +-
+>   arch/arm/boot/dts/exynos5250-snow.dts              |    4 +-
+>   arch/arm/boot/dts/exynos5250.dtsi                  |   23 +++-
+>   arch/arm/boot/dts/exynos5440-sd5v1.dts             |    2 +-
+>   arch/arm/boot/dts/exynos5440-ssdk5440.dts          |    2 +-
+>   arch/arm/boot/dts/exynos5440.dtsi                  |    2 +-
+>   arch/arm/boot/dts/s3c2416-smdk2416.dts             |    2 +-
+>   arch/arm/boot/dts/s3c2416.dtsi                     |    4 +-
+>   arch/arm/boot/dts/s3c24xx.dtsi                     |    2 +-
+>   drivers/clk/samsung/Makefile                       |    1 +
+>   drivers/clk/samsung/clk-samsung-audss.c            |  133 ++++++++++++++++++++
+>   include/dt-bindings/clk/samsung-audss-clk.h        |   25 ++++
+>   26 files changed, 269 insertions(+), 27 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/clock/clk-samsung-audss.txt
+>   create mode 100644 drivers/clk/samsung/clk-samsung-audss.c
+>   create mode 100644 include/dt-bindings/clk/samsung-audss-clk.h
