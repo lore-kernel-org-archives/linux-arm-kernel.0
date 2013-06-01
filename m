@@ -1,70 +1,38 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  1 Jun 2013 09:54:13 +0400
-Subject: [PATCH 4/4] ARM: dts: imx27-phytec-phycore-som: Add initial support
- for PCM970 RDK
-In-Reply-To: <1370066053-25030-1-git-send-email-shc_work@mail.ru>
-References: <1370066053-25030-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1370066053-25030-4-git-send-email-shc_work@mail.ru>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 1 Jun 2013 00:40:20 -0700
+Subject: [GIT PULL] at91: Device Tree update for 3.11 #1
+In-Reply-To: <1370035039-17757-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1370035039-17757-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <CAOesGMgz6AnQr2TMEMJdxtYpcQ=Ye2ZsTRt3QPM+gckzE1iCHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch adds initial dts for Phytec PCM970 Rapid development kit.
-- Added definition for UART0 and UART1.
-- Added additional SPI chipselect which used on RDK for ZegBee module.
+On Fri, May 31, 2013 at 2:17 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> Arnd, Olof,
+>
+> This is the pull-request for DT update on AT91. As said earlier, and like any
+> other patches that will be produced for 3.11, it is based on material already
+> included in arm-soc/at91/cleanup branch.
+>
+> A little conflict may appear while merging with already-sent pull-request for
+> the USBA driver ([GIT PULL] at91: USBA DT support for 3.11). I have resolved
+> the conflict and pushed the result branch as: at91-at91-3.11-driver-usba-dt+resolved
+>
+> Thanks, best regards,
+>
+> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+>
+>   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+>
+> are available in the git repository at:
+>
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+>
+> for you to fetch changes up to 028633c238f91dc113520a7ad25d37b2ba9068af:
+>
+>   ARM: at91/dt: add pinctrl definition for at91 tc blocks (2013-05-31 22:40:37 +0200)
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/Makefile                     |  1 +
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 29 ++++++++++++++++++++++++++
- 2 files changed, 30 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+Pulled, thanks.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8450c14..eee371f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -108,6 +108,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx27-apf27dev.dtb \
- 	imx27-pdk.dtb \
- 	imx27-phytec-phycore-som.dtb \
-+	imx27-phytec-phycore-rdk.dtb \
- 	imx31-bug.dtb \
- 	imx51-apf51.dtb \
- 	imx51-apf51dev.dtb \
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-new file mode 100644
-index 0000000..f8a7a49
---- /dev/null
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -0,0 +1,29 @@
-+/*
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include "imx27-phytec-phycore-som.dts"
-+
-+/ {
-+	model = "Phytec pcm970";
-+	compatible = "phytec,imx27-pcm970", "phytec,imx27-pcm038", "fsl,imx27";
-+};
-+
-+&cspi1 {
-+	fsl,spi-num-chipselects = <2>;
-+	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
-+};
-+
-+&uart1 {
-+	fsl,uart-has-rtscts;
-+};
-+
-+&uart2 {
-+	fsl,uart-has-rtscts;
-+	status = "okay";
-+};
--- 
-1.8.1.5
+
+-Olof
