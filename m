@@ -1,33 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 31 May 2013 23:43:13 -0700
-Subject: [PATCH] ARM: bcm2835: override the HW UART periphid
-In-Reply-To: <1369886859-22114-1-git-send-email-swarren@wwwdotorg.org>
-References: <1369886859-22114-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130601064313.GA9010@quad.lixom.net>
+Date: Fri, 31 May 2013 23:47:02 -0700
+Subject: [PATCH] ARM: nomadik: fix clocksource warning
+In-Reply-To: <41518453.ApMFpK6n11@wuerfel>
+References: <41518453.ApMFpK6n11@wuerfel>
+Message-ID: <20130601064702.GB9010@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 10:07:39PM -0600, Stephen Warren wrote:
-> From: Jongsung Kim <neidhard.kim@lge.com>
+On Fri, May 31, 2013 at 05:49:28PM +0200, Arnd Bergmann wrote:
+> The clocksource API has changed slightly, which causes a harmless
+> warning:
 > 
-> Stephen Warren reported the recent commit 78506f2 (add support for
-> extended FIFO-size of PL011-r1p5) breaks the serial port on the
-> BCM2835 ARM SoC.
+> /git/arm-soc/drivers/clocksource/nomadik-mtu.c:259:28: warning: 'nmdk_timer_match' defined but not used [-Wunused-variable]
+>  static struct of_device_id nmdk_timer_match[] __initconst = {
+>                             ^
 > 
-> A UART compatible with the ARM PL011-r1p5 should have 32-deep FIFOs.
-> The BCM2835 UART just looks like an ARM PL011-r1p5, but has 16-deep
-> FIFOs just like PL011-r1p4 or earlier revisions. As a workaround for
-> this compatibility issue, this patch overrides the HW UART periphid
-> register values with the actually compatible UART periphid 0x00241011
-> (r1p3 or r1p4).
+> Fortunately, the same API change also lets us simplify the code
+> while removing the warning.
 > 
-> Reported-by: Stephen Warren <swarren@wwwdotorg.org>
-> Signed-off-by: Jongsung Kim <neidhard.kim@lge.com>
-> Signed-off-by: Stephen Warren <swarren@wwwdotorg.org>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
 > ---
-> This is a fix for v3.10-rc*.
+> 
+> I've applied this patch on top of next/dt to remove the warning introduced
+> by Linus' patch.
 
-Applied.
+I didn't see that make it to the repo though?
+
+Since you'd have to rebase anyway, I'll just apply it here and will
+include it with the other branch updates.
 
 
 -Olof
