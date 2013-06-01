@@ -1,24 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 1 Jun 2013 22:13:47 +0200
-Subject: [PATCH V4 2/3] ARM: mmc: bcm281xx SDHCI driver
-In-Reply-To: <51A93DA0.3070909@broadcom.com>
-References: <1369860607-25572-1-git-send-email-csd@broadcom.com>
- <87d2s7ceh0.fsf@octavius.laptop.org> <51A93DA0.3070909@broadcom.com>
-Message-ID: <201306012213.47386.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 01 Jun 2013 15:30:08 -0500
+Subject: [PATCH 15/15] OF: remove #ifdef from linux/of_platform.h
+In-Reply-To: <201306012203.39133.arnd@arndb.de>
+References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
+ <1370038972-2318779-16-git-send-email-arnd@arndb.de>
+ <CAL_Jsq+-7RizbVQSA-JnJRZFc9-3RFCXuCOXP=GfCin2Losfeg@mail.gmail.com>
+ <201306012203.39133.arnd@arndb.de>
+Message-ID: <51AA59D0.7020805@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 June 2013, Christian Daudt wrote:
-> I looked into it and it can replace just about everything that our own 
-> dt parsing code is doing. The only problem is with cd_gpio. If I call 
-> mmc_of_parse, then it will install its own irq handler for cd gpio, and 
-> our driver needs a different handler. the mmc irq handler can call a 
-> card_event callback, but that is already pointing to sdhci_card_event. 
-> So the only way I can use mmc_of_parse that I can see is by adding a 
-> flag to it to skip cd_gpio parsing which only this driver will then set 
-> to true. Any other ideas ?
+On 06/01/2013 03:03 PM, Arnd Bergmann wrote:
+> On Saturday 01 June 2013, Rob Herring wrote:
+>> On Fri, May 31, 2013 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> A lot of code uses the functions from of_platform.h when built for
+>>> devicetree-enabled platforms but can also be built without them.
+>>> In order to avoid using #ifdef everywhere in drivers, this
+>>> makes all the function declarations visible, which means we
+>>> can use "if (IS_ENABLED(CONFIG_OF))" in driver code and get build
+>>> coverage over the code but let the compiler drop the reference
+>>> in the object code.
+>>>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> Cc: Grant Likely <grant.likely@linaro.org>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>
+>> I've got a more complete series for 3.11 that removes OF_DEVICE and
+>> of_platform_driver completely. I'm waiting on ack from Ben H.
+> 
+> Ok. Does your series also remove the #ifdef CONFIG_OF part from this
+> header?
 
-Can't you add a callback handler into sdhci_card_event that can call
-a platform specific function?
+No, we still need empty functions. Here is what of_device.h looks like:
 
-	Arnd
+http://tinyurl.com/l2azz5m
+
+BTW, it has your ack.
+
+Rob
