@@ -1,32 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 1 Jun 2013 22:04:30 +0200
-Subject: [PATCH 13/15] [media] omap3isp: include linux/mm_types.h
-In-Reply-To: <3507557.BiLMFItQuE@avalon>
-References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
- <1370038972-2318779-14-git-send-email-arnd@arndb.de>
- <3507557.BiLMFItQuE@avalon>
-Message-ID: <201306012204.30778.arnd@arndb.de>
+Date: Sat, 1 Jun 2013 22:13:47 +0200
+Subject: [PATCH V4 2/3] ARM: mmc: bcm281xx SDHCI driver
+In-Reply-To: <51A93DA0.3070909@broadcom.com>
+References: <1369860607-25572-1-git-send-email-csd@broadcom.com>
+ <87d2s7ceh0.fsf@octavius.laptop.org> <51A93DA0.3070909@broadcom.com>
+Message-ID: <201306012213.47386.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 June 2013, Laurent Pinchart wrote:
-> > diff --git a/drivers/media/platform/omap3isp/ispqueue.h
-> > b/drivers/media/platform/omap3isp/ispqueue.h index 908dfd7..e6e720c 100644
-> > --- a/drivers/media/platform/omap3isp/ispqueue.h
-> > +++ b/drivers/media/platform/omap3isp/ispqueue.h
-> > @@ -31,6 +31,7 @@
-> >  #include <linux/mutex.h>
-> >  #include <linux/videodev2.h>
-> >  #include <linux/wait.h>
-> > +#include <linux/mm_types.h>
-> 
-> Could you please make sure the headers are sorted alphabetically ?
+On Saturday 01 June 2013, Christian Daudt wrote:
+> I looked into it and it can replace just about everything that our own 
+> dt parsing code is doing. The only problem is with cd_gpio. If I call 
+> mmc_of_parse, then it will install its own irq handler for cd gpio, and 
+> our driver needs a different handler. the mmc irq handler can call a 
+> card_event callback, but that is already pointing to sdhci_card_event. 
+> So the only way I can use mmc_of_parse that I can see is by adding a 
+> flag to it to skip cd_gpio parsing which only this driver will then set 
+> to true. Any other ideas ?
 
-I normally do. Sorry for missing it this time.
-
-> Would you like me to take the patch in my tree ? If so I'll sort the headers 
-> myself.
-
-Yes, that would be nice, thanks!
+Can't you add a callback handler into sdhci_card_event that can call
+a platform specific function?
 
 	Arnd
