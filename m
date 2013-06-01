@@ -1,62 +1,76 @@
-From: grygorii.strashko@ti.com (Strashko, Grygorii)
-Date: Sat, 1 Jun 2013 07:59:03 +0000
-Subject: [PATCH] mfd: twl-core: convert to module_init()
-In-Reply-To: <1370033794-5357-1-git-send-email-khilman@linaro.org>
-References: <1370033794-5357-1-git-send-email-khilman@linaro.org>
-Message-ID: <902E09E6452B0E43903E4F2D568737AB31F402@DNCE04.ent.ti.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 1 Jun 2013 10:02:32 +0200
+Subject: [PATCH 4/4] ARM: dts: imx27-phytec-phycore-som: Add initial
+ support for PCM970 RDK
+In-Reply-To: <1370066053-25030-4-git-send-email-shc_work@mail.ru>
+References: <1370066053-25030-1-git-send-email-shc_work@mail.ru>
+ <1370066053-25030-4-git-send-email-shc_work@mail.ru>
+Message-ID: <20130601080232.GM32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Sat, Jun 01, 2013 at 09:54:13AM +0400, Alexander Shiyan wrote:
+> Patch adds initial dts for Phytec PCM970 Rapid development kit.
+> - Added definition for UART0 and UART1.
+> - Added additional SPI chipselect which used on RDK for ZegBee module.
+> 
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/boot/dts/Makefile                     |  1 +
+>  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 29 ++++++++++++++++++++++++++
+>  2 files changed, 30 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 8450c14..eee371f 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -108,6 +108,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
+>  	imx27-apf27dev.dtb \
+>  	imx27-pdk.dtb \
+>  	imx27-phytec-phycore-som.dtb \
+> +	imx27-phytec-phycore-rdk.dtb \
+>  	imx31-bug.dtb \
+>  	imx51-apf51.dtb \
+>  	imx51-apf51dev.dtb \
+> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+> new file mode 100644
+> index 0000000..f8a7a49
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+> @@ -0,0 +1,29 @@
+> +/*
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include "imx27-phytec-phycore-som.dts"
+> +
+> +/ {
+> +	model = "Phytec pcm970";
+> +	compatible = "phytec,imx27-pcm970", "phytec,imx27-pcm038", "fsl,imx27";
+> +};
+> +
+> +&cspi1 {
+> +	fsl,spi-num-chipselects = <2>;
+> +	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
+> +};
 
-It's done alreday here:
-https://patchwork.kernel.org/patch/2477541/ - mfd: twl-core: convert to module_i2c_driver()
- (Samuel has taken this one)
-- and -
-https://patchwork.kernel.org/patch/2477561/ - i2c: omap: convert to module_platform_driver()
- (you can vote here - TWL can't be shifted without I2C)
+The first chipselect connects to the mc13783 PMIC which is on the
+module, not on the baseboard. Also this is a no-op since the status
+property of the cspi is not changed to 'okay'.
+I suspect you already have a patch adding mc13783 support to the module
+which should be in this series ;)
 
-(Sent from Web Outlook - sorry if format is wrong)
-Best regards,
-- Grygorii Strashko 
+Sascha
 
-________________________________________
-From: linux-omap-owner@vger.kernel.org [linux-omap-owner at vger.kernel.org] on behalf of Kevin Hilman [khilman at linaro.org]
-Sent: Friday, May 31, 2013 11:56 PM
-To: Samuel Ortiz; Tony Lindgren
-Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; open list
-Subject: [PATCH] mfd: twl-core: convert to module_init()
 
-There's no reason for twl-core to be subsys_inicall anymore.  Anything
-using twl that early needs a rethink, or deferred probe changes.
-
-Boot tested and RTC wake tested (via TWL RTC) on OMAP platforms:
-3530/Beagle, 3730/Beagle-xM, 3530/Overo, 3730/Overo-STORM, 4430/Panda,
-4460/Panda-ES.
-
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
- drivers/mfd/twl-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
-index 89ab4d9..7749b9e 100644
---- a/drivers/mfd/twl-core.c
-+++ b/drivers/mfd/twl-core.c
-@@ -1309,7 +1309,7 @@ static int __init twl_init(void)
- {
-        return i2c_add_driver(&twl_driver);
- }
--subsys_initcall(twl_init);
-+module_init(twl_init);
-
- static void __exit twl_exit(void)
- {
---
-1.8.2
-
---
-To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-the body of a message to majordomo at vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
