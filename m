@@ -1,36 +1,32 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Sat, 1 Jun 2013 20:27:26 +0100
-Subject: [PATCH 05/11] spi: omap2-mcspi: enhance pinctrl support
-In-Reply-To: <1369995191-20855-6-git-send-email-gururaja.hebbar@ti.com>
-References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
- <1369995191-20855-6-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20130601192726.GS16790@sirena.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 1 Jun 2013 22:03:38 +0200
+Subject: [PATCH 15/15] OF: remove #ifdef from linux/of_platform.h
+In-Reply-To: <CAL_Jsq+-7RizbVQSA-JnJRZFc9-3RFCXuCOXP=GfCin2Losfeg@mail.gmail.com>
+References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
+ <1370038972-2318779-16-git-send-email-arnd@arndb.de>
+ <CAL_Jsq+-7RizbVQSA-JnJRZFc9-3RFCXuCOXP=GfCin2Losfeg@mail.gmail.com>
+Message-ID: <201306012203.39133.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 03:43:05PM +0530, Hebbar Gururaja wrote:
-> Amend the spi omap controller to optionally take a pin control
-> handle and set the state of the pins to:
+On Saturday 01 June 2013, Rob Herring wrote:
+> On Fri, May 31, 2013 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > A lot of code uses the functions from of_platform.h when built for
+> > devicetree-enabled platforms but can also be built without them.
+> > In order to avoid using #ifdef everywhere in drivers, this
+> > makes all the function declarations visible, which means we
+> > can use "if (IS_ENABLED(CONFIG_OF))" in driver code and get build
+> > coverage over the code but let the compiler drop the reference
+> > in the object code.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Grant Likely <grant.likely@linaro.org>
+> > Cc: Rob Herring <rob.herring@calxeda.com>
 > 
-> - "default" on boot, resume and before performing an spi transfer
-> - "idle" after initial default, after resume default, and after each
-> spi xfer
-> - "sleep" on suspend()
+> I've got a more complete series for 3.11 that removes OF_DEVICE and
+> of_platform_driver completely. I'm waiting on ack from Ben H.
 
-Looking at this code I can't really see what's OMAP-specific about it -
-exactly the same flow should apply to pretty much any SPI controller,
-especially given that the code will happily ignore missing states.
-We're just setting the idle state when not actively transferring data
-which seems sensible and generic.
+Ok. Does your series also remove the #ifdef CONFIG_OF part from this
+header?
 
-This suggests to me that we should be adding this code into the core,
-probably joined up with the transfer_one_message stuff, so that any
-hardware which has an idle state will be able to get the benefit.  Can
-anyone think of a reason why we shouldn't do that?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130601/7602bb88/attachment.sig>
+	Arnd
