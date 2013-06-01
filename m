@@ -1,26 +1,64 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 31 May 2013 22:28:11 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes-non-critical for v3.11
-In-Reply-To: <20130528183110.GZ31290@titan.lakedaemon.net>
-References: <20130528183110.GZ31290@titan.lakedaemon.net>
-Message-ID: <20130601052811.GG5189@quad.lixom.net>
+Date: Fri, 31 May 2013 22:36:05 -0700
+Subject: [GIT PULL] ARM: mvebu: cleanup for v3.11 (round 3 cumulative)
+In-Reply-To: <20130528183422.GA31290@titan.lakedaemon.net>
+References: <20130528183422.GA31290@titan.lakedaemon.net>
+Message-ID: <20130601053605.GH5189@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 02:31:10PM -0400, Jason Cooper wrote:
+Hi Jason,
+
+On Tue, May 28, 2013 at 02:34:22PM -0400, Jason Cooper wrote:
 > Olof,
 > 
-> As asked, these were pulled out of mvebu/fixes.
+> This is the latest for cleanup, and the summary includes everything so
+> far for this window.
 > 
 > 
-> The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 > 
->   Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+>   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/users/jcooper/linux.git tags/fixes-non-3.11-1
+>   git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-3
+> 
 
-Pulled.
+Something odd is going on here.
+
+> for you to fetch changes up to c589f9b4b51317cfc530812fe90a9895bd51430e:
+> 
+>   arm: mvebu: mark functions of armada-370-xp.c as static (2013-05-21 13:44:32 +0000)
+> 
+> ----------------------------------------------------------------
+> mvebu cleanup for v3.11 (round 3)
+> 
+>  - mvebu
+>     - mark functions in armada-370-xp.c as static
+> 
+> ----------------------------------------------------------------
+> Andrew Lunn (1):
+>       ARM: Orion: Remove redundant init_dma_coherent_pool_size()
+> 
+> Maxime Ripard (1):
+>       ARM: mvebu: Remove init_irq declaration in machine description
+> 
+> Thomas Petazzoni (1):
+>       arm: mvebu: mark functions of armada-370-xp.c as static
+> 
+>  arch/arm/mach-kirkwood/common.c     |  6 ------
+>  arch/arm/mach-mvebu/armada-370-xp.c | 15 +++------------
+>  arch/arm/mach-orion5x/common.c      |  7 -------
+>  3 files changed, 3 insertions(+), 25 deletions(-)
+
+Two of the above patches are already in mainline, so the diffstat don't match.
+
+Did you base your cleanup branch on your previous fixes branch, and not take
+that into consideration when you generated the pull request? Can you fix your
+scripts to do so, please?
+
+
+Thanks,
 
 -Olof
