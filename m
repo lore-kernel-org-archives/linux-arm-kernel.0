@@ -1,53 +1,68 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Sat, 01 Jun 2013 11:56:17 +0200
-Subject: [PATCH v2] can: flexcan: remove HAVE_CAN_FLEXCAN Kconfig symbol
-In-Reply-To: <4297748.x0TtCUl2dJ@wuerfel>
-References: <1368781157-4646-1-git-send-email-mkl@pengutronix.de>
- <4297748.x0TtCUl2dJ@wuerfel>
-Message-ID: <51A9C541.9080300@pengutronix.de>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sat, 1 Jun 2013 18:27:38 +0800
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130531185414.GA19061@schnuecks.de>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <CACVXFVOo6HNXeZ95QqAXU64aAmXXrTVsHJ9TvgirWKOWmwnSfA@mail.gmail.com>
+ <20130531185414.GA19061@schnuecks.de>
+Message-ID: <CACVXFVMU+pHrtezStKRNzhhJWg7L1NTBQKwhwLe+-9Yh5JhgiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2013 10:59 AM, Arnd Bergmann wrote:
-> On Friday 17 May 2013 10:59:17 Marc Kleine-Budde wrote:
->> This patch removes the Kconfig symbol HAVE_CAN_FLEXCAN from arch/{arm,powerpc}
->> and allowing compilation unconditionally on all arm and powerpc platforms.
+On Sat, Jun 1, 2013 at 2:54 AM, Simon Baatz <gmbnomis@gmail.com> wrote:
+> On Fri, May 31, 2013 at 05:07:22PM +0800, Ming Lei wrote:
+>> On Sun, May 12, 2013 at 1:35 PM, Simon Baatz <gmbnomis@gmail.com> wrote:
+>> > +void flush_kernel_dcache_page(struct page *page)
+>> > +{
+>> > +       if (cache_is_vivt() || cache_is_vipt_aliasing()) {
+>> > +               struct address_space *mapping;
+>> > +
+>> > +               mapping = page_mapping(page);
+>> > +
+>> > +               if (!mapping || mapping_mapped(mapping))
 >>
->> This brings a bigger compile time coverage and removes the following dependency
->> warning found by Arnd Bergmann:
+>> It is better to replace mapping_mapped(mapping) with page_mapped(page).
+>
+> Good point. I did not have the time to look into your proposed change
+> for flush_dcache_page() yet.
+>
+> However, this patch here is a fix for a long standing bug, which
+> should also be applied to stable in one form or another.  I would not
+> like to mix it with a separate performance improvement.
+
+OK, got it, so you should have added "CC: stable", and it is better to add
+the bug fix description in your change log, :-)
+
+>
+> But, of course, if we decide to change the respective condition in
+> flush_dcache_page(), we should also change it in
+> flush_kernel_dcache_page() at the same time (provided this patch gets
+> accepted).
+>
+>> > +                       __flush_kernel_dcache_page(page);
 >>
->>     warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 && IMX_HAVE_PLATFORM_FLEXCAN &&
->>         SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
->>     which has unmet direct dependencies (NET && CAN && CAN_DEV)
->>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->> Cc: Kumar Gala <galak@kernel.crashing.org>
->> Cc: U Bhaskar-B22300 <B22300@freescale.com>
->> Cc: linux-arm-kernel at lists.infradead.org
->> Cc: linuxppc-dev at lists.ozlabs.org
->> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Thanks for addressing this!
+>> I am wondering if I-cache should be flushed here since the user mapping
+>> on the page may be executable and I/D coherency should be maintained.
+>
+> Me too. In fact, I wondered so much that I proposed it myself in a
+> previous version of the patch (see [1]) :-) However, this has never
+> been part of flush_kernel_dcache_page() and it is not clear whether
+> the flush for I/D-cache coherency is really needed here (or in
+> flush_dcache_page() for that matter) or whether it is sufficient to
+> do it when mapping the page into user space.
 
-I'll include this patch in my next pull request to David Miller.
+After reading cachetlb.txt again, looks your patch is correct, because
+this kernel API is called in the situations:
 
-Tnx,
-Marc
+        It is assumed here that the user has no incoherent cached copies
+       (i.e. the original page was obtained from a mechanism like
+get_user_pages()).
 
+So only flushing kernel mapping for the page is correct if callers of the API
+obey the rule.
+
+
+Thanks,
 -- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130601/4b7f9be7/attachment.sig>
+Ming Lei
