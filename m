@@ -1,48 +1,55 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 1 Jun 2013 11:58:18 -0300
-Subject: [PATCH v2 2/2] ARM: mxs: Pass the system revision
-In-Reply-To: <3068502.pO6ZTjjROM@kerker>
-References: <1370040127-15072-1-git-send-email-festevam@gmail.com>
- <1370040127-15072-2-git-send-email-festevam@gmail.com>
- <3068502.pO6ZTjjROM@kerker>
-Message-ID: <CAOMZO5DqQXDbHEdD+SMtQLkAVrx0AffDL46=JoiqFnc_-6wTFQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 01 Jun 2013 17:30:17 +0200
+Subject: [PATCH 13/15] [media] omap3isp: include linux/mm_types.h
+In-Reply-To: <1370038972-2318779-14-git-send-email-arnd@arndb.de>
+References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
+ <1370038972-2318779-14-git-send-email-arnd@arndb.de>
+Message-ID: <3507557.BiLMFItQuE@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Michael,
+Hi Arnd,
 
-On Sat, Jun 1, 2013 at 9:19 AM, Michael Heimpold <mhei@heimpold.de> wrote:
+Thank you for the patch.
 
-> I think it would be difficult to use system_rev for this purpose as some
-> boards I know about are using this field to pass a board/PCB revision from
-> U-Boot to the kernel.
+On Saturday 01 June 2013 00:22:50 Arnd Bergmann wrote:
+> The ispqueue.h file uses vm_flags_t, which is defined in
+> linux/mm_types.h, so we must include that header in order
+> to build in all configurations.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+> Cc: linux-media at vger.kernel.org
+> Cc: Konstantin Khlebnikov <khlebnikov@openvz.org>
+> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-Can you please provide some real examples?
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-For mx28 I see no boards passing ATAGS from bootloader to the kernel.
+(with a minor nitpick below)
 
-If you look at FSL kernel code the system revision is hardcoded in the
-board file.
+> ---
+>  drivers/media/platform/omap3isp/ispqueue.h | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/media/platform/omap3isp/ispqueue.h
+> b/drivers/media/platform/omap3isp/ispqueue.h index 908dfd7..e6e720c 100644
+> --- a/drivers/media/platform/omap3isp/ispqueue.h
+> +++ b/drivers/media/platform/omap3isp/ispqueue.h
+> @@ -31,6 +31,7 @@
+>  #include <linux/mutex.h>
+>  #include <linux/videodev2.h>
+>  #include <linux/wait.h>
+> +#include <linux/mm_types.h>
 
-For mx5/mx6 boards we do pass ATAGS from bootloader to kernel in the
-same format it was used here.
+Could you please make sure the headers are sorted alphabetically ?
 
-For example: on mx53 it will be 0x53112 (where 0x53 means mx53, 1 is
-the board revision and 12 means TO1.2)
+Would you like me to take the patch in my tree ? If so I'll sort the headers 
+myself.
 
-> After spending a short look through documentation in kernel and U-Boot
-> I did not find any hint whether this was the indended usage of this field.
->
-> I would rather argue about introducing a new line
-> "SoC revision: ..." as this is the revision you want to pass to user-space.
->
-> The lines "Revision" and "Serial" should IMHO left
-> alone for usage by board vendors.
+>  struct isp_video_queue;
+>  struct page;
 
-As I mentioned in the commit log, the only reason we are doing this
-here is to allow a mainline kernel to run som mxs applications like
-Gstreamer plugins and kobs-ng.
-
+-- 
 Regards,
 
-Fabio Estevam
+Laurent Pinchart
