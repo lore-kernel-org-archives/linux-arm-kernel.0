@@ -1,20 +1,65 @@
-From: elezegarcia@gmail.com (Ezequiel Garcia)
-Date: Fri, 31 May 2013 23:17:48 -0300
-Subject: [PATCH 07/15] cpufreq: spear needs cpufreq table
-In-Reply-To: <1370038972-2318779-8-git-send-email-arnd@arndb.de>
-References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
- <1370038972-2318779-8-git-send-email-arnd@arndb.de>
-Message-ID: <CALF0-+XYhpLaJLSZqamuV0aQFwxtu4WS7RNpbU6Li78gmMSOWw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 31 May 2013 20:59:29 -0700
+Subject: [PATCH 1/3] ARM: EXYNOS: uncompress - print debug messages if
+ DEBUG_LL is defined
+In-Reply-To: <1370000944-19786-2-git-send-email-tushar.behera@linaro.org>
+References: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
+ <1370000944-19786-2-git-send-email-tushar.behera@linaro.org>
+Message-ID: <20130601035929.GA3868@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 7:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Like a lot of the other cpufreq drivers, this one needs to
-> select CONFIG_CPU_FREQ_TABLE to avoid a build error like
->
+On Fri, May 31, 2013 at 05:19:02PM +0530, Tushar Behera wrote:
+> Printing low-level debug messages make an assumption that the specified
+> UART port has been preconfigured by the bootloader. Incorrectly
+> specified UART port results in system getting stalled while printing the
+> message "Uncompressing Linux... done, booting the kernel"
+> 
+> This UART port number is specified through S3C_LOWLEVEL_UART_PORT. Since
+> the UART port might different for different board, it is not possible to
+> specify it correctly for every board that use a common defconfig file.
+> 
+> Calling this print subroutine only when DEBUG_LL fixes the problem. By
+> disabling DEBUG_LL in default config file, we would be able to boot
+> multiple boards with different default UART ports.
+> 
+> With this current approach, we miss the print "Uncompressing Linux...
+> done, booting the kernel." when DEBUG_LL is not defined.
+> 
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+>  arch/arm/mach-exynos/include/mach/uncompress.h  |   11 ++++++++---
+>  arch/arm/plat-samsung/include/plat/uncompress.h |   10 +++++++++-
+>  2 files changed, 17 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
+> index 2979995..730f69f 100644
+> --- a/arch/arm/mach-exynos/include/mach/uncompress.h
+> +++ b/arch/arm/mach-exynos/include/mach/uncompress.h
+> @@ -37,11 +37,16 @@ static void arch_detect_cpu(void)
+>  	chip_id >>= 20;
+>  	chip_id &= 0xf;
+>  
+> +#ifdef CONFIG_DEBUG_LL
+>  	if (chip_id == 0x5)
+> -		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
+> +		uart_base = (volatile u8 *)EXYNOS5_PA_UART +
+> +			(S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
+>  	else
+> -		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
+> -
+> +		uart_base = (volatile u8 *)EXYNOS4_PA_UART +
+> +			(S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
+> +#else
+> +	uart_base = NULL;
+> +#endif
 
-Indeed. I found the same thing while playing with Kirkwood's.
+You can do:
 
-@Andrew, I have a patch sitting here, but feel free to send it if you want.
--- 
-    Ezequiel
+	if (!config_enabled(CONFIG_DEBUG_LL))
+		return;
+
+Since uart_base will be set to 0 by being in BSS anyway.
+
+
+-Olof
