@@ -1,38 +1,62 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 1 Jun 2013 00:40:20 -0700
-Subject: [GIT PULL] at91: Device Tree update for 3.11 #1
-In-Reply-To: <1370035039-17757-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1370035039-17757-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <CAOesGMgz6AnQr2TMEMJdxtYpcQ=Ye2ZsTRt3QPM+gckzE1iCHQ@mail.gmail.com>
+From: grygorii.strashko@ti.com (Strashko, Grygorii)
+Date: Sat, 1 Jun 2013 07:59:03 +0000
+Subject: [PATCH] mfd: twl-core: convert to module_init()
+In-Reply-To: <1370033794-5357-1-git-send-email-khilman@linaro.org>
+References: <1370033794-5357-1-git-send-email-khilman@linaro.org>
+Message-ID: <902E09E6452B0E43903E4F2D568737AB31F402@DNCE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 2:17 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> Arnd, Olof,
->
-> This is the pull-request for DT update on AT91. As said earlier, and like any
-> other patches that will be produced for 3.11, it is based on material already
-> included in arm-soc/at91/cleanup branch.
->
-> A little conflict may appear while merging with already-sent pull-request for
-> the USBA driver ([GIT PULL] at91: USBA DT support for 3.11). I have resolved
-> the conflict and pushed the result branch as: at91-at91-3.11-driver-usba-dt+resolved
->
-> Thanks, best regards,
->
-> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
->
->   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
->
-> are available in the git repository at:
->
->   git://github.com/at91linux/linux-at91.git tags/at91-dt
->
-> for you to fetch changes up to 028633c238f91dc113520a7ad25d37b2ba9068af:
->
->   ARM: at91/dt: add pinctrl definition for at91 tc blocks (2013-05-31 22:40:37 +0200)
+Hi Kevin,
 
-Pulled, thanks.
+It's done alreday here:
+https://patchwork.kernel.org/patch/2477541/ - mfd: twl-core: convert to module_i2c_driver()
+ (Samuel has taken this one)
+- and -
+https://patchwork.kernel.org/patch/2477561/ - i2c: omap: convert to module_platform_driver()
+ (you can vote here - TWL can't be shifted without I2C)
 
+(Sent from Web Outlook - sorry if format is wrong)
+Best regards,
+- Grygorii Strashko 
 
--Olof
+________________________________________
+From: linux-omap-owner@vger.kernel.org [linux-omap-owner at vger.kernel.org] on behalf of Kevin Hilman [khilman at linaro.org]
+Sent: Friday, May 31, 2013 11:56 PM
+To: Samuel Ortiz; Tony Lindgren
+Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; open list
+Subject: [PATCH] mfd: twl-core: convert to module_init()
+
+There's no reason for twl-core to be subsys_inicall anymore.  Anything
+using twl that early needs a rethink, or deferred probe changes.
+
+Boot tested and RTC wake tested (via TWL RTC) on OMAP platforms:
+3530/Beagle, 3730/Beagle-xM, 3530/Overo, 3730/Overo-STORM, 4430/Panda,
+4460/Panda-ES.
+
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+ drivers/mfd/twl-core.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/mfd/twl-core.c b/drivers/mfd/twl-core.c
+index 89ab4d9..7749b9e 100644
+--- a/drivers/mfd/twl-core.c
++++ b/drivers/mfd/twl-core.c
+@@ -1309,7 +1309,7 @@ static int __init twl_init(void)
+ {
+        return i2c_add_driver(&twl_driver);
+ }
+-subsys_initcall(twl_init);
++module_init(twl_init);
+
+ static void __exit twl_exit(void)
+ {
+--
+1.8.2
+
+--
+To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
