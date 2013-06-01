@@ -1,40 +1,66 @@
-From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
-Date: Sat, 01 Jun 2013 09:40:30 +1000
-Subject: [PATCH v2] can: flexcan: remove HAVE_CAN_FLEXCAN Kconfig symbol
-In-Reply-To: <519A4A00.8000109@pengutronix.de>
-References: <1368781157-4646-1-git-send-email-mkl@pengutronix.de>
- <20130517090949.GI8607@S2101-09.ap.freescale.net>
- <519A4A00.8000109@pengutronix.de>
-Message-ID: <1370043630.3928.166.camel@pasglop>
+From: horms@verge.net.au (Simon Horman)
+Date: Sat, 1 Jun 2013 09:00:18 +0900
+Subject: [PATCH 1/2] sh-pfc: r8a7779: Don't group USB OVC and PENC pins
+In-Reply-To: <CACRpkda9tjydo038exS2a=Gsvum41LyvXd=GwKh3b0Zi4rOA9g@mail.gmail.com>
+References: <1369866529-6372-1-git-send-email-horms+renesas@verge.net.au>
+ <1369866529-6372-2-git-send-email-horms+renesas@verge.net.au>
+ <CACRpkdZxWsJuvrtH-=VVqAGUCpdgS3W52R4tw5-_QGpggB+1uw@mail.gmail.com>
+ <20130531001735.GA26684@verge.net.au>
+ <CAOesGMiTXW0mVmbBbha5S4O64yu_vM=eLxM4JyctsfONCAo4qg@mail.gmail.com>
+ <20130531054517.GC5009@verge.net.au>
+ <CAOesGMgrdyFi3GMz52CVnhzmOYHbR5=29Ua0iS8cNbSjg6r-2A@mail.gmail.com>
+ <CACRpkda9tjydo038exS2a=Gsvum41LyvXd=GwKh3b0Zi4rOA9g@mail.gmail.com>
+Message-ID: <20130601000018.GB3673@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-05-20 at 18:06 +0200, Marc Kleine-Budde wrote:
-> On 05/17/2013 11:09 AM, Shawn Guo wrote:
-> > On Fri, May 17, 2013 at 10:59:17AM +0200, Marc Kleine-Budde wrote:
-> >> This patch removes the Kconfig symbol HAVE_CAN_FLEXCAN from arch/{arm,powerpc}
-> >> and allowing compilation unconditionally on all arm and powerpc platforms.
-> >>
-> >> This brings a bigger compile time coverage and removes the following dependency
-> >> warning found by Arnd Bergmann:
-> >>
-> >>     warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 && IMX_HAVE_PLATFORM_FLEXCAN &&
-> >>         SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
-> >>     which has unmet direct dependencies (NET && CAN && CAN_DEV)
-> >>
-> >> Cc: Arnd Bergmann <arnd@arndb.de>
-> >> Cc: Shawn Guo <shawn.guo@linaro.org>
-> > 
-> > Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On Fri, May 31, 2013 at 09:21:46AM +0200, Linus Walleij wrote:
+> On Fri, May 31, 2013 at 8:11 AM, Olof Johansson <olof@lixom.net> wrote:
+> > [Simon]
+> >> As an aside, I do expect to send some more v3.10 fixes for shmobile.
+> >> There seem to be more than usual.
+> >
+> > A little unfortunate but it's hard to do much about.
+> >
+> > Please be conservative with what you pick up for 3.10 vs 3.11 -- Linus
+> > has said he really wants to see things slow down.
 > 
-> Thanks.
+> What we might need to think about is the evolutional pace of the ARM
+> kernel - compared to a few years back we have increased the change
+> rate by orders of a magnitude (at least that is my feeling...)
 > 
-> An Acked-by by the powerpc people would be fine. However, if nobody
-> doesn't object, I'm sending this patch via linux-can and net-next upstream.
+> There may be some point where we actually need to tell people to
+> hold changes back because they are just pushing too large volumes
+> through one merge window, resulting in a corresponding amount of
+> fixes.
+> 
+> This merge window both Samsung Exynos and SH mobile seem to
+> have been a little bit trigger-happy :-/
 
-Sorry, missed it, if it's still out there, add my
+To quantify things, for shmobile I am currently aware of 4 problems that
+seem to be worthy of fixing for v3.10. A patche for one has been
+accepted into arm-soc, Patches for two are this pull request. And one more
+has a patch in the pipeline.
 
-Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+These known problems seem to fall into two categories:
 
-Cheers,
-Ben.
+1. Problems that have been in linux-next for a while but only recently
+   appeared in the renesas tree. These were observed when boot testing kernels
+   during the course of rebasing the renesas tree on v3.10-rcX.
+
+   I believe that these problems could and should have been
+   spotted earlier by boot testing linux-next more often,
+   allowing them to be resolved in the merge-window rather than
+   at -rc time.
+
+   I intend to make this happen.
+
+2. Problems that have been present in the renesas tree and
+   thus linux-next for a while but were not observed as
+   early as they might have been.
+
+   Statistically the rate of these problems could have
+   been reduced by accepting changes more slowly.
+   But at this point we are talking about one or two bugs out
+   of many many changes. Bugs that only affect a small
+   subset of shmobile hardware support.
