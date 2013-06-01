@@ -1,32 +1,41 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Sat, 1 Jun 2013 17:11:48 +0530
-Subject: MUSB multiplatform work?
-In-Reply-To: <20130530203132.GC6467@atomide.com>
-References: <201305271702.09203.arnd@arndb.de>
- <20130528163548.GC28253@arwen.pp.htv.fi>
- <20130530201854.GB6467@atomide.com>
- <CACRpkdZHupVFS+pNADpaJjunPa3fEtyCqLwbL-etHs3gt8EW0Q@mail.gmail.com>
- <20130530203132.GC6467@atomide.com>
-Message-ID: <CAJe_Zhc14i77zKmnRRkFRXo+rEGfFa5kD1ag+CZSocKRztH=Jg@mail.gmail.com>
+From: sourav.poddar@ti.com (Sourav Poddar)
+Date: Sat, 1 Jun 2013 17:18:12 +0530
+Subject: [PATCH] serial: omap: repair building without PM_SLEEP
+In-Reply-To: <1844339.mxci2DdvBF@wuerfel>
+References: <1844339.mxci2DdvBF@wuerfel>
+Message-ID: <51A9DF7C.30303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 May 2013 02:01, Tony Lindgren <tony@atomide.com> wrote:
-> * Linus Walleij <linus.walleij@linaro.org> [130530 13:27]:
->> On Thu, May 30, 2013 at 10:18 PM, Tony Lindgren <tony@atomide.com> wrote:
->>
->> > TUSB would work with dmaengine, but AFAIK we're still missing the
->> > dmaengine configuration options to support increasing device end
->> > FIFO address.
->>
->> Can you elaborate on this? What is the usecase here?
+Hi Arnd,
+On Saturday 01 June 2013 02:48 PM, Arnd Bergmann wrote:
+> A recent bug fix in 3.10, ddd85e225c "serial: omap: prevent runtime PM for
+> "no_console_suspend"", introduced a regression from an obvious typo:
 >
-> There are many devices where the device FIFO is memory mapped to the
-> GPMC bus on omaps, like TUSB, OneNAND, smc911x etc. I believe the
-> only reason why these have not been converted to the dmaengine is
-> the fact that dmaengine cannot configure the DMA hardware to do
-> autoincrement and loop over the device FIFO.
+> drivers/tty/serial/omap-serial.c:1677:14: error: 'serial_omap_complete'
+> 	undeclared here (not in a function)
 >
-Doesn't device_prep_interleaved_dma() help?
-
--jassi
+> This changes the incorrectly added macro to the one that we need instead.
+>
+> Signed-off-by: Arnd Bergmann<arnd@arndb.de>
+> ---
+> Please apply for 3.10-rc
+>
+> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+> index 393a8eb..1aaeca8 100644
+> --- a/drivers/tty/serial/omap-serial.c
+> +++ b/drivers/tty/serial/omap-serial.c
+> @@ -1326,7 +1326,7 @@ static int serial_omap_resume(struct device *dev)
+>   }
+>   #else
+>   #define serial_omap_prepare NULL
+> -#define serial_omap_prepare NULL
+> +#define serial_omap_complete NULL
+>   #endif /* CONFIG_PM_SLEEP */
+>
+>   static void omap_serial_fill_features_erratas(struct uart_omap_port *up)
+>
+Yes, this bug was noticed last week and a patch for it has already been 
+posted to the
+serial mailing list[1].
+[1]: http://www.spinics.net/lists/linux-serial/msg09741.html
