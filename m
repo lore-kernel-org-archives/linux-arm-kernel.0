@@ -1,34 +1,23 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Fri, 31 May 2013 17:17:36 -0700
-Subject: [PATCH V4 2/3] ARM: mmc: bcm281xx SDHCI driver
-In-Reply-To: <87d2s7ceh0.fsf@octavius.laptop.org>
-References: <1369860607-25572-1-git-send-email-csd@broadcom.com>
- <1369860607-25572-2-git-send-email-csd@broadcom.com>
- <87d2s7ceh0.fsf@octavius.laptop.org>
-Message-ID: <51A93DA0.3070909@broadcom.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 31 May 2013 17:23:36 -0700 (PDT)
+Subject: [PATCHv4 0/6] ARM: sunxi: Add support for A10 Ethernet controller
+In-Reply-To: <1369921765-3367-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1369921765-3367-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130531.172336.1848458955586893446.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
-On 13-05-31 09:15 AM, Chris Ball wrote:
->
-> Could you investigate replacing this section of code with a call to
-> mmc_of_parse(), please?  It should be able to replace your parsing
-> and handling of bus-width, cd-gpios, wp-gpios, and non-removable
-> (other than the initialization quirks specific to your hardware).
->
-> I'd like to avoid every driver having its own DT parsing.
-> Thanks,
->
-> - Chris.
-I looked into it and it can replace just about everything that our own 
-dt parsing code is doing. The only problem is with cd_gpio. If I call 
-mmc_of_parse, then it will install its own irq handler for cd gpio, and 
-our driver needs a different handler. the mmc irq handler can call a 
-card_event callback, but that is already pointing to sdhci_card_event. 
-So the only way I can use mmc_of_parse that I can see is by adding a 
-flag to it to skip cd_gpio parsing which only this driver will then set 
-to true. Any other ideas ?
+From: Maxime Ripard <maxime.ripard@free-electrons.com>
+Date: Thu, 30 May 2013 15:49:19 +0200
 
-  Thanks,
-    csd
+> The Allwinner A10 SoC has an ethernet controller that seem to be specific to
+> Allwinner. This IP has no public documentation, so exact
+> details are quite sparse, and this code come from refactored Allwinner
+> code.
+> 
+> The rework to use NAPI is taking more time than expected, I'm still working
+> on it, but it could probably be sent as a follow-up patch.
+
+Looks good.
+
+All applied to net-next, thanks.
