@@ -1,60 +1,89 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Sat, 01 Jun 2013 14:27:12 +0200
-Subject: [PATCH v2] arch: arm: plat-samsung: dependency, S5P_SLEEP depends
- on ARM_CPU_SUSPEND
-In-Reply-To: <51A33C1F.3000804@asianux.com>
-References: <5199E4AF.7040607@asianux.com> <51A32FD4.4000001@asianux.com>
- <158201ce5ac2$a7843de0$f68cb9a0$%kim@samsung.com>
- <51A33A53.1050502@asianux.com> <51A33C1F.3000804@asianux.com>
-Message-ID: <51A9E8A0.3050906@gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sat, 1 Jun 2013 09:01:07 -0500
+Subject: [PATCH 15/15] OF: remove #ifdef from linux/of_platform.h
+In-Reply-To: <1370038972-2318779-16-git-send-email-arnd@arndb.de>
+References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
+ <1370038972-2318779-16-git-send-email-arnd@arndb.de>
+Message-ID: <CAL_Jsq+-7RizbVQSA-JnJRZFc9-3RFCXuCOXP=GfCin2Losfeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2013 12:57 PM, Chen Gang wrote:
+On Fri, May 31, 2013 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> A lot of code uses the functions from of_platform.h when built for
+> devicetree-enabled platforms but can also be built without them.
+> In order to avoid using #ifdef everywhere in drivers, this
+> makes all the function declarations visible, which means we
+> can use "if (IS_ENABLED(CONFIG_OF))" in driver code and get build
+> coverage over the code but let the compiler drop the reference
+> in the object code.
 >
-> When randconfig with MMU for arm s5pv210 (and select all cpu type),
-> need let S5P_SLEEP depend on ARM_CPU_SUSPEND, or will cause issue below:
->
->    arch/arm/plat-samsung/built-in.o: In function `s3c_cpu_resume':
->    arch/arm/plat-samsung/s5p-sleep.S:83: undefined reference to `cpu_resume'
->
->
-> Signed-off-by: Chen Gang<gang.chen@asianux.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+
+I've got a more complete series for 3.11 that removes OF_DEVICE and
+of_platform_driver completely. I'm waiting on ack from Ben H.
+
+Rob
+
 > ---
->   arch/arm/plat-samsung/Kconfig |    1 +
->   1 files changed, 1 insertions(+), 0 deletions(-)
+>  include/linux/of_platform.h | 14 +++-----------
+>  1 file changed, 3 insertions(+), 11 deletions(-)
 >
-> diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-> index f8ed2de..b388d93 100644
-> --- a/arch/arm/plat-samsung/Kconfig
-> +++ b/arch/arm/plat-samsung/Kconfig
-> @@ -483,6 +483,7 @@ config S5P_PM
+> diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
+> index 2a93b64..7747ad0 100644
+> --- a/include/linux/of_platform.h
+> +++ b/include/linux/of_platform.h
+> @@ -13,8 +13,6 @@
 >
->   config S5P_SLEEP
->   	bool
-> +	select ARM_CPU_SUSPEND if PM
->   	help
->   	  Internal config node to apply common S5P sleep management code.
->   	  Can be selected by S5P and newer SoCs with similar sleep procedure.
-
-We have discussed this about two months ago [1] and the conclusion was 
-to also
-remove "select ARM_CPU_SUSPEND if PM" line from 
-arch/arm/mach-exynos/Kconfig.
-It is still unresolved then, I'm getting similar linker errors with
-s3c2410_defconfig...
-
-   LD      init/built-in.o
-arch/arm/mach-s3c24xx/built-in.o: In function `s3c_cpu_resume':
-/home/snawrocki/linux/media_tree/arch/arm/mach-s3c24xx/sleep.S:83: 
-undefined reference to `cpu_resume'
-arch/arm/plat-samsung/built-in.o: In function `s3c_pm_enter':
-/home/snawrocki/linux/media_tree/arch/arm/plat-samsung/pm.c:305: 
-undefined reference to `cpu_suspend'
-make: *** [vmlinux] Error 1
-
-
-[1] https://patchwork.kernel.org/patch/2406351
-
-Thanks,
-Sylwester
+>  #include <linux/device.h>
+>  #include <linux/mod_devicetable.h>
+> -
+> -#ifdef CONFIG_OF_DEVICE
+>  #include <linux/pm.h>
+>  #include <linux/of_device.h>
+>  #include <linux/platform_device.h>
+> @@ -82,7 +80,6 @@ extern struct platform_device *of_device_alloc(struct device_node *np,
+>                                          struct device *parent);
+>  extern struct platform_device *of_find_device_by_node(struct device_node *np);
+>
+> -#ifdef CONFIG_OF_ADDRESS /* device reg helpers depend on OF_ADDRESS */
+>  /* Platform devices and busses creation */
+>  extern struct platform_device *of_platform_device_create(struct device_node *np,
+>                                                    const char *bus_id,
+> @@ -91,17 +88,12 @@ extern struct platform_device *of_platform_device_create(struct device_node *np,
+>  extern int of_platform_bus_probe(struct device_node *root,
+>                                  const struct of_device_id *matches,
+>                                  struct device *parent);
+> +#ifdef CONFIG_OF_ADDRESS
+>  extern int of_platform_populate(struct device_node *root,
+>                                 const struct of_device_id *matches,
+>                                 const struct of_dev_auxdata *lookup,
+>                                 struct device *parent);
+> -#endif /* CONFIG_OF_ADDRESS */
+> -
+> -#endif /* CONFIG_OF_DEVICE */
+> -
+> -#if !defined(CONFIG_OF_ADDRESS)
+> -struct of_dev_auxdata;
+> -struct device_node;
+> +#else
+>  static inline int of_platform_populate(struct device_node *root,
+>                                         const struct of_device_id *matches,
+>                                         const struct of_dev_auxdata *lookup,
+> @@ -109,6 +101,6 @@ static inline int of_platform_populate(struct device_node *root,
+>  {
+>         return -ENODEV;
+>  }
+> -#endif /* !CONFIG_OF_ADDRESS */
+> +#endif
+>
+>  #endif /* _LINUX_OF_PLATFORM_H */
+> --
+> 1.8.1.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
