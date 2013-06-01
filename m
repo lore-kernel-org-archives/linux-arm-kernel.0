@@ -1,40 +1,60 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 31 May 2013 22:41:24 -0700
-Subject: [GIT PULL v2] ARM: mvebu: soc changes for v3.11 (round 2
- cumulative)
-In-Reply-To: <20130529193654.GZ31290@titan.lakedaemon.net>
-References: <20130528183617.GB31290@titan.lakedaemon.net>
- <20130529193654.GZ31290@titan.lakedaemon.net>
-Message-ID: <20130601054124.GJ5189@quad.lixom.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 31 May 2013 22:43:23 -0700
+Subject: [PATCH 11/15] iwlegacy: il_pm_ops is only provided for PM_SLEEP
+In-Reply-To: <1370038972-2318779-12-git-send-email-arnd@arndb.de>
+References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
+ <1370038972-2318779-12-git-send-email-arnd@arndb.de>
+Message-ID: <CAN8TOE8Y_2RMSrgMw7KwML88_1VA=QcJwuuMKEZpZCF5_dAQ=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 03:36:54PM -0400, Jason Cooper wrote:
-> Olof,
-> 
-> Since I have a few hours, I added a Tested-by that I thought I
-> missed.  No other changes.
-> 
-> 
-> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-> 
->   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/soc-3.11-2
-> 
-> for you to fetch changes up to 0e2ee0c0610ec211a9f0ebf3088cbf4da422ebf8:
-> 
->   arm: kirkwood: Instantiate cpufreq driver (2013-05-29 19:32:04 +0000)
-> 
-> ----------------------------------------------------------------
-> mvebu soc changes for v3.11 (round 2)
-> 
->  - kirkwood
->     - use the cpufreq driver
+Hi Arnd,
 
-Btw, if the subject says cumulative, then the tag should probably also be.
+On Fri, May 31, 2013 at 3:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> This makes sure the conditionals for the declaration match the
+> definition, so we provide the alternative
+>
+>  #else
+>  #define IL_LEGACY_PM_OPS NULL
+>  #endif
+>
+> in the correct cases. As suggested by Borislav Petkov, this removes
+> the comments for the #else and #endif lines.
 
+You seem to have missed the #endif line.
 
--Olof
+> drivers/built-in.o:(.data+0x57974): undefined reference to `il_pm_ops'
+>
+> Cc: Johannes Berg <johannes.berg@intel.com>
+> Cc: John W. Linville <linville@tuxdriver.com>
+> Cc: Borislav Petkov <bp@alien8.de>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+>  drivers/net/wireless/iwlegacy/common.h | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/net/wireless/iwlegacy/common.h b/drivers/net/wireless/iwlegacy/common.h
+> index f8246f2..30dda98 100644
+> --- a/drivers/net/wireless/iwlegacy/common.h
+> +++ b/drivers/net/wireless/iwlegacy/common.h
+> @@ -1832,14 +1832,14 @@ u32 il_usecs_to_beacons(struct il_priv *il, u32 usec, u32 beacon_interval);
+>  __le32 il_add_beacon_time(struct il_priv *il, u32 base, u32 addon,
+>                           u32 beacon_interval);
+>
+> -#ifdef CONFIG_PM
+> +#ifdef CONFIG_PM_SLEEP
+>  extern const struct dev_pm_ops il_pm_ops;
+>
+>  #define IL_LEGACY_PM_OPS       (&il_pm_ops)
+>
+> -#else /* !CONFIG_PM */
+> +#else
+>
+> -#define IL_LEGACY_PM_OPS       NULL
+> +#define
+>
+>  #endif /* !CONFIG_PM */
+
+This should not be "!CONFIG_PM" any more.
+
+Brian
