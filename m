@@ -1,34 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 1 Jun 2013 11:47:30 +0200
-Subject: [PATCH V2 3/6] ARM: tegra: make tegra_resume can work for Tegra114
-In-Reply-To: <51A9364B.4090002@wwwdotorg.org>
-References: <1369046369-12489-1-git-send-email-josephl@nvidia.com>
- <201306010041.07230.arnd@arndb.de> <51A9364B.4090002@wwwdotorg.org>
-Message-ID: <201306011147.30379.arnd@arndb.de>
+From: mkl@pengutronix.de (Marc Kleine-Budde)
+Date: Sat, 01 Jun 2013 11:56:17 +0200
+Subject: [PATCH v2] can: flexcan: remove HAVE_CAN_FLEXCAN Kconfig symbol
+In-Reply-To: <4297748.x0TtCUl2dJ@wuerfel>
+References: <1368781157-4646-1-git-send-email-mkl@pengutronix.de>
+ <4297748.x0TtCUl2dJ@wuerfel>
+Message-ID: <51A9C541.9080300@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 June 2013, Stephen Warren wrote:
-> On 05/31/2013 04:41 PM, Arnd Bergmann wrote:
-> > On Monday 20 May 2013, Joseph Lo wrote:
-> >> +       cpu_to_csr_req r1, r0
-> >> +       mov32   r2, TEGRA_FLOW_CTRL_BASE
-> >> +       ldr     r1, [r2, r1]
-> > 
-> > This causes build errors now, since cpu_to_csr_req is not defined anywhere.
+On 06/01/2013 10:59 AM, Arnd Bergmann wrote:
+> On Friday 17 May 2013 10:59:17 Marc Kleine-Budde wrote:
+>> This patch removes the Kconfig symbol HAVE_CAN_FLEXCAN from arch/{arm,powerpc}
+>> and allowing compilation unconditionally on all arm and powerpc platforms.
+>>
+>> This brings a bigger compile time coverage and removes the following dependency
+>> warning found by Arnd Bergmann:
+>>
+>>     warning: (SOC_IMX28 && SOC_IMX25 && SOC_IMX35 && IMX_HAVE_PLATFORM_FLEXCAN &&
+>>         SOC_IMX53 && SOC_IMX6Q) selects HAVE_CAN_FLEXCAN
+>>     which has unmet direct dependencies (NET && CAN && CAN_DEV)
+>>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Shawn Guo <shawn.guo@linaro.org>
+>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
+>> Cc: Kumar Gala <galak@kernel.crashing.org>
+>> Cc: U Bhaskar-B22300 <B22300@freescale.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linuxppc-dev at lists.ozlabs.org
+>> Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
 > 
-> What build error are you seeing? I built next-20130531 earlier today
-> without any issue.
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> I do remember making a similar comment during review of this patch that
-> cpu_to_csr_req wasn't defined anywhere, but IIRC Joseph pointed me to
-> another patch in the series which had added it, or something like that.
+> Thanks for addressing this!
 
-Sorry, I should have mentioned it was using randconfig, all the defconfig
-builds work fine. The code is inside of "#ifndef CONFIG_ARCH_TEGRA_2x_SOC",
-but Tegra2 is normally enabled in defconfig, so it does not get built.
+I'll include this patch in my next pull request to David Miller.
 
-I suspect the #ifdef is wrong as well, and should have been "if tegra3
-or tegra4" instead. Joseph, can you clarify the intent of this?
+Tnx,
+Marc
 
-	Arnd
+-- 
+Pengutronix e.K.                  | Marc Kleine-Budde           |
+Industrial Linux Solutions        | Phone: +49-231-2826-924     |
+Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
+Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130601/4b7f9be7/attachment.sig>
