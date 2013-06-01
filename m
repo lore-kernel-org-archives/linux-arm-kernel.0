@@ -1,40 +1,25 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sat, 01 Jun 2013 15:30:08 -0500
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 1 Jun 2013 22:57:02 +0200
 Subject: [PATCH 15/15] OF: remove #ifdef from linux/of_platform.h
-In-Reply-To: <201306012203.39133.arnd@arndb.de>
+In-Reply-To: <51AA59D0.7020805@gmail.com>
 References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
- <1370038972-2318779-16-git-send-email-arnd@arndb.de>
- <CAL_Jsq+-7RizbVQSA-JnJRZFc9-3RFCXuCOXP=GfCin2Losfeg@mail.gmail.com>
- <201306012203.39133.arnd@arndb.de>
-Message-ID: <51AA59D0.7020805@gmail.com>
+ <201306012203.39133.arnd@arndb.de> <51AA59D0.7020805@gmail.com>
+Message-ID: <201306012257.02327.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2013 03:03 PM, Arnd Bergmann wrote:
-> On Saturday 01 June 2013, Rob Herring wrote:
->> On Fri, May 31, 2013 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>> A lot of code uses the functions from of_platform.h when built for
->>> devicetree-enabled platforms but can also be built without them.
->>> In order to avoid using #ifdef everywhere in drivers, this
->>> makes all the function declarations visible, which means we
->>> can use "if (IS_ENABLED(CONFIG_OF))" in driver code and get build
->>> coverage over the code but let the compiler drop the reference
->>> in the object code.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Cc: Grant Likely <grant.likely@linaro.org>
->>> Cc: Rob Herring <rob.herring@calxeda.com>
->>
->> I've got a more complete series for 3.11 that removes OF_DEVICE and
->> of_platform_driver completely. I'm waiting on ack from Ben H.
+On Saturday 01 June 2013, Rob Herring wrote:
+> No, we still need empty functions. Here is what of_device.h looks like:
 > 
-> Ok. Does your series also remove the #ifdef CONFIG_OF part from this
-> header?
+> http://tinyurl.com/l2azz5m
+> 
+> BTW, it has your ack.
+> 
 
-No, we still need empty functions. Here is what of_device.h looks like:
+Could you add a patch on top that only puts the function declarations
+inside of #ifdef that don't have an inline wrapper?
 
-http://tinyurl.com/l2azz5m
+It's really annoying to have to change the header file every time one
+needs to call a function from a driver in the DT-only case.
 
-BTW, it has your ack.
-
-Rob
+	Arnd
