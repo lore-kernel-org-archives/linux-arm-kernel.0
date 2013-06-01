@@ -1,60 +1,28 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 31 May 2013 22:43:23 -0700
-Subject: [PATCH 11/15] iwlegacy: il_pm_ops is only provided for PM_SLEEP
-In-Reply-To: <1370038972-2318779-12-git-send-email-arnd@arndb.de>
-References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
- <1370038972-2318779-12-git-send-email-arnd@arndb.de>
-Message-ID: <CAN8TOE8Y_2RMSrgMw7KwML88_1VA=QcJwuuMKEZpZCF5_dAQ=w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 31 May 2013 22:46:34 -0700
+Subject: [GIT PULL] ARM: mvebu: boards for v3.11 (round 2 cumulative)
+In-Reply-To: <20130528183822.GC31290@titan.lakedaemon.net>
+References: <20130528183822.GC31290@titan.lakedaemon.net>
+Message-ID: <20130601054634.GK5189@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, May 28, 2013 at 02:38:22PM -0400, Jason Cooper wrote:
+> 
+> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> 
+>   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.infradead.org/users/jcooper/linux.git tags/boards-3.11-2
+> 
+> for you to fetch changes up to 391a16c7783a64309dc930c6d454372d7a8beb12:
+> 
+>   ARM: Kirkwood: Convert LSXL to restart-poweroff driver. (2013-05-26 01:12:34 +0000)
 
-On Fri, May 31, 2013 at 3:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> This makes sure the conditionals for the declaration match the
-> definition, so we provide the alternative
->
->  #else
->  #define IL_LEGACY_PM_OPS NULL
->  #endif
->
-> in the correct cases. As suggested by Borislav Petkov, this removes
-> the comments for the #else and #endif lines.
 
-You seem to have missed the #endif line.
+Pulled.
 
-> drivers/built-in.o:(.data+0x57974): undefined reference to `il_pm_ops'
->
-> Cc: Johannes Berg <johannes.berg@intel.com>
-> Cc: John W. Linville <linville@tuxdriver.com>
-> Cc: Borislav Petkov <bp@alien8.de>
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->  drivers/net/wireless/iwlegacy/common.h | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/net/wireless/iwlegacy/common.h b/drivers/net/wireless/iwlegacy/common.h
-> index f8246f2..30dda98 100644
-> --- a/drivers/net/wireless/iwlegacy/common.h
-> +++ b/drivers/net/wireless/iwlegacy/common.h
-> @@ -1832,14 +1832,14 @@ u32 il_usecs_to_beacons(struct il_priv *il, u32 usec, u32 beacon_interval);
->  __le32 il_add_beacon_time(struct il_priv *il, u32 base, u32 addon,
->                           u32 beacon_interval);
->
-> -#ifdef CONFIG_PM
-> +#ifdef CONFIG_PM_SLEEP
->  extern const struct dev_pm_ops il_pm_ops;
->
->  #define IL_LEGACY_PM_OPS       (&il_pm_ops)
->
-> -#else /* !CONFIG_PM */
-> +#else
->
-> -#define IL_LEGACY_PM_OPS       NULL
-> +#define
->
->  #endif /* !CONFIG_PM */
 
-This should not be "!CONFIG_PM" any more.
-
-Brian
+-Olof
