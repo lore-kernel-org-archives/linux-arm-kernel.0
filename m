@@ -1,32 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 1 Jun 2013 22:03:38 +0200
-Subject: [PATCH 15/15] OF: remove #ifdef from linux/of_platform.h
-In-Reply-To: <CAL_Jsq+-7RizbVQSA-JnJRZFc9-3RFCXuCOXP=GfCin2Losfeg@mail.gmail.com>
+Date: Sat, 1 Jun 2013 22:04:30 +0200
+Subject: [PATCH 13/15] [media] omap3isp: include linux/mm_types.h
+In-Reply-To: <3507557.BiLMFItQuE@avalon>
 References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
- <1370038972-2318779-16-git-send-email-arnd@arndb.de>
- <CAL_Jsq+-7RizbVQSA-JnJRZFc9-3RFCXuCOXP=GfCin2Losfeg@mail.gmail.com>
-Message-ID: <201306012203.39133.arnd@arndb.de>
+ <1370038972-2318779-14-git-send-email-arnd@arndb.de>
+ <3507557.BiLMFItQuE@avalon>
+Message-ID: <201306012204.30778.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 01 June 2013, Rob Herring wrote:
-> On Fri, May 31, 2013 at 5:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > A lot of code uses the functions from of_platform.h when built for
-> > devicetree-enabled platforms but can also be built without them.
-> > In order to avoid using #ifdef everywhere in drivers, this
-> > makes all the function declarations visible, which means we
-> > can use "if (IS_ENABLED(CONFIG_OF))" in driver code and get build
-> > coverage over the code but let the compiler drop the reference
-> > in the object code.
-> >
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Grant Likely <grant.likely@linaro.org>
-> > Cc: Rob Herring <rob.herring@calxeda.com>
+On Saturday 01 June 2013, Laurent Pinchart wrote:
+> > diff --git a/drivers/media/platform/omap3isp/ispqueue.h
+> > b/drivers/media/platform/omap3isp/ispqueue.h index 908dfd7..e6e720c 100644
+> > --- a/drivers/media/platform/omap3isp/ispqueue.h
+> > +++ b/drivers/media/platform/omap3isp/ispqueue.h
+> > @@ -31,6 +31,7 @@
+> >  #include <linux/mutex.h>
+> >  #include <linux/videodev2.h>
+> >  #include <linux/wait.h>
+> > +#include <linux/mm_types.h>
 > 
-> I've got a more complete series for 3.11 that removes OF_DEVICE and
-> of_platform_driver completely. I'm waiting on ack from Ben H.
+> Could you please make sure the headers are sorted alphabetically ?
 
-Ok. Does your series also remove the #ifdef CONFIG_OF part from this
-header?
+I normally do. Sorry for missing it this time.
+
+> Would you like me to take the patch in my tree ? If so I'll sort the headers 
+> myself.
+
+Yes, that would be nice, thanks!
 
 	Arnd
