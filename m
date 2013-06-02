@@ -1,53 +1,40 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Sun, 02 Jun 2013 23:36:28 +0200
-Subject: [PATCHv2 1/3] Add support for GMT G762/G763 PWM fan controller
-In-Reply-To: <20130602203553.GA7920@roeck-us.net> (Guenter Roeck's message of
- "Sun, 2 Jun 2013 13:35:53 -0700")
-References: <cover.1369687670.git.arno@natisbad.org>
- <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
- <20130531221616.GG7626@kw.sim.vm.gnt> <87fvx1pwrl.fsf@natisbad.org>
- <87ip1w8qix.fsf@natisbad.org> <20130602203553.GA7920@roeck-us.net>
-Message-ID: <87ppw442lf.fsf@natisbad.org>
+From: linux@baker-net.org.uk (Adam Baker)
+Date: Sun, 02 Jun 2013 22:59:50 +0100
+Subject: [PATCH] ARM: Kirkwood add cpus definition needed by cpufreq driver
+ to dtsi
+Message-ID: <51ABC056.5000804@baker-net.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Guenter,
+The Kirkwood CPU Freq driver needs a CPU definition in order for the probe
+routine to activate it. Add a suitable definition to kirkwood.dtsi
 
-Guenter Roeck <linux@roeck-us.net> writes:
+This definition is only correct for single core SoCs. There is a dual core
+SoC in the kirkwood family (88F632X) but the rest of the Kirkwood drivers in
+the kernel don't currently support it. If they ever do the cpus definition
+would need to be duplicated in each of the SoC specific include files.
 
-> On Sun, Jun 02, 2013 at 05:45:58PM +0200, Arnaud Ebalard wrote:
->> Hi,
->> 
->> >> I haven't noticed this issue while testing your v1 patch series because
->> >> at the time I was using a board with an U-Boot modified by LaCie. This
->> >> last sets the set_cnt register to 0 while U-Boot mainline don't.
->> >> Actually, the 2Big fan is not configured nor even started by U-Boot
->> >> mainline. I have to fix this but maybe that something can be done in
->> >> the g762 Linux driver too ?
->> 
->> At the moment, DT bindings and platform_data structure both allow
->> setting an initial fan_target value. I could add a 'pwm' binding for DT  
->> and an assoicated field in platform_data to allow passing an initial
->> value so that maintainers of platforms with a 2 wire fan (open loop) can
->> still make the fan somewhat rotate at boot.
->> 
-> Devicetree properties are supposed to describe the system, not its configuration.
-> There are exceptions, but I don't recall seeing a case where a parameter
-> can be set both with devicetree properties and sysfs attributes.
->
-> Before going further on this, we will need to have an ack from devicetree
-> maintainers which specifically permits your dual-configuration approach.
-> Even with that, you'll still have convince me that you need both (while
-> so far no other driver needed it).
+Signed-off-by: Adam Baker <linux@baker-net.org.uk>
 
-If you are not convinced yet, what I can do is remove the code in question
-in a v4 and work on remaining issues (e.g. platform data init, fan_target
-and pwm1 access for closed-loop) based on your feedback. If during the
-process or after inclusion of this minimal version someone brings new
-arguments to add the code back, this should be fairly easy to do.
 
-Thanks for your time and patience dealing with me.
-
-Cheers,
-
-a+
+--- a/arch/arm/boot/dts/kirkwood.dtsi	2013-05-19 22:57:07.000000000 +0100
++++ b/arch/arm/boot/dts/kirkwood.dtsi	2013-05-30 23:32:18.000000000 +0100
+@@ -4,6 +4,18 @@
+ 	compatible = "marvell,kirkwood";
+ 	interrupt-parent = <&intc>;
+ 
++        cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu at 0 {
++		      device_type = "cpu";
++		      compatible = "marvell,feroceon";
++		      clocks = <&core_clk 1>, <&core_clk 3>, <&gate_clk 11>;
++		      clock-names = "cpu_clk", "ddrclk", "powersave";
++		};
++	};
++
+ 	aliases {
+ 	       gpio0 = &gpio0;
+ 	       gpio1 = &gpio1;
