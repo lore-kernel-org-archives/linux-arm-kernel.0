@@ -1,35 +1,30 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sat, 01 Jun 2013 16:47:08 -0700
-Subject: [GIT PULL] arm-soc: Xilinx zynq clock changes for v3.11
-In-Reply-To: <20130601051913.GC5189@quad.lixom.net>
-References: <51A31045.1060406@monstr.eu> <20130601051913.GC5189@quad.lixom.net>
-Message-ID: <20130601234708.21525.1684@quantum>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Sat, 01 Jun 2013 23:07:50 -0600
+Subject: [PATCH v2] video: simplefb: add mode parsing function
+In-Reply-To: <20130601051223.GB5189@quad.lixom.net>
+References: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
+ <51A42ED5.2060104@wwwdotorg.org> <20130601051223.GB5189@quad.lixom.net>
+Message-ID: <51AAD326.4040809@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Olof Johansson (2013-05-31 22:19:13)
-> On Mon, May 27, 2013 at 09:50:29AM +0200, Michal Simek wrote:
-> > Hi Arnd and Olof,
-> > 
-> > please pull the following changes to your arm-soc tree.
-> > We haven't got any response from audience or clk maintainer
-> > but we discussed these changes with him in several threads.
-> > The major change is to have easy to going DT clock description
-> > in one node and do not describe the whole clock tree in details
-> > which none uses.
+On 05/31/2013 11:12 PM, Olof Johansson wrote:
+> On Mon, May 27, 2013 at 10:13:09PM -0600, Stephen Warren wrote:
+>> On 05/26/2013 09:53 PM, Alexandre Courbot wrote:
+>>> The naming scheme of simplefb's mode is precise enough to allow building
+>>> the mode structure from it instead of using a static list of modes. This
+>>> patch introduces a function that does this. In case exotic modes that
+>>> cannot be represented from their name alone are needed, the static list
+>>> of modes is still available as a backup.
+...
+>> As such, we should either:
+>>
+>> a) Just add new entries into the format array that already exists in the
+>> driver. Given David's response, this might be simplest.
 > 
-> Hi,
-> 
-> I don't see any acks from Mike Turquette on any of these. Mike?
-> 
+> I think so too. Is this even needed? Do we have any users of the newer formats
+> or is it just someone trying to feature-creep this driver to make the "simple"
+> part of the name inaccurate? :)
 
-I Acked it but they were never applied since my Ack came after the pull
-request had been sent:
-
-http://article.gmane.org/gmane.linux.kernel/1499697
-
-Regards,
-Mike
-
-> 
-> -Olof
+Alex is working on board support for a new NVIDIA board, where IIRC the
+bootloader sets up some 32-bit ARGB format for the panel.
