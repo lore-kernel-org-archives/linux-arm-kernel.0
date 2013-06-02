@@ -1,27 +1,30 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sun, 2 Jun 2013 14:20:34 -0400 (EDT)
-Subject: [PATCH V2 1/2] USB: OHCI: make ohci-platform a separate driver
-In-Reply-To: <CAJFYCKGU2u6EQ8FoG-7uDk6o_uTWad=F7SDRNMjLTQGvMxZOwA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306021419490.16951-100000@netrider.rowland.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 02 Jun 2013 22:52:36 +0400
+Subject: [PATCH v3 1/1] ARM: shmobile: r8a7778: add I2C support
+In-Reply-To: <201304232015.59697.sergei.shtylyov@cogentembedded.com>
+References: <201304232012.57619.sergei.shtylyov@cogentembedded.com>
+ <201304232015.59697.sergei.shtylyov@cogentembedded.com>
+Message-ID: <51AB9474.3040900@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2 Jun 2013, Manjunath Goudar wrote:
+Hello.
 
-> On 31 May 2013 19:37, Alan Stern <stern@rowland.harvard.edu> wrote:
-> 
+On 04/23/2013 08:15 PM, Sergei Shtylyov wrote:
 
-> > > +     return ohci_setup(ohci_to_hcd(ohci));
-> >
-> > You don't need to use ohci_to_hcd(), because the hcd value is already a
-> > parameter in this function.
-> >
-> >
-> After setting ohci's flag and  num_ports,we need to convert ohci to hcd
-> that is what called ohci_to_hcd() function.
+> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>
+> Add I2C clocks and platform devices for R8A7778 SoC.
+> Don't forget to also add the peripheral clock which the I2C driver uses.
+>
+> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> [Sergei: changed the registration function to platform_device_register_simple(),
+> annotated I2C resources as '__initdata', regrouped MSTPxxx *enum* members, added
+> the copyright.]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-No, you don't need to convert it.  Just do:
+    Simon, I'm calling back this patch. Morimoto-san's patch posted recently
+(preferably to be reposted once more) should be used instead.
 
-	return ohci_setup(hcd);
-
-Alan Stern
+WBR, Sergei
