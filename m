@@ -1,38 +1,33 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 1 Jun 2013 22:09:04 -0700
-Subject: [PATCH v2] video: simplefb: add mode parsing function
-In-Reply-To: <51AAD326.4040809@wwwdotorg.org>
-References: <1369626821-28494-1-git-send-email-acourbot@nvidia.com>
- <51A42ED5.2060104@wwwdotorg.org>
- <20130601051223.GB5189@quad.lixom.net>
- <51AAD326.4040809@wwwdotorg.org>
-Message-ID: <CAOesGMi=f=2S9y96-DtBzOZydhsJ1pF+m26AzdQjj59qtQu-oA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Sat,  1 Jun 2013 23:39:38 -0700
+Subject: [PATCHv2 1/6] ARM: sched_clock: Remove unused needs_suspend member
+In-Reply-To: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1370155183-31421-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 1, 2013 at 10:07 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 05/31/2013 11:12 PM, Olof Johansson wrote:
->> On Mon, May 27, 2013 at 10:13:09PM -0600, Stephen Warren wrote:
->>> On 05/26/2013 09:53 PM, Alexandre Courbot wrote:
->>>> The naming scheme of simplefb's mode is precise enough to allow building
->>>> the mode structure from it instead of using a static list of modes. This
->>>> patch introduces a function that does this. In case exotic modes that
->>>> cannot be represented from their name alone are needed, the static list
->>>> of modes is still available as a backup.
-> ...
->>> As such, we should either:
->>>
->>> a) Just add new entries into the format array that already exists in the
->>> driver. Given David's response, this might be simplest.
->>
->> I think so too. Is this even needed? Do we have any users of the newer formats
->> or is it just someone trying to feature-creep this driver to make the "simple"
->> part of the name inaccurate? :)
->
-> Alex is working on board support for a new NVIDIA board, where IIRC the
-> bootloader sets up some 32-bit ARGB format for the panel.
+The needs_suspend member is unused now that we always do the
+suspend/resume handling (see 6a4dae5 (ARM: 7565/1: sched: stop
+sched_clock() during suspend, 2012-10-23)).
 
-Ah, ok. Let's just implement that one format too then. :)
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/kernel/sched_clock.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-
--Olof
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index e8edcaa..45efe86 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -24,7 +24,6 @@ struct clock_data {
+ 	u32 mult;
+ 	u32 shift;
+ 	bool suspended;
+-	bool needs_suspend;
+ };
+ 
+ static void sched_clock_poll(unsigned long wrap_ticks);
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
