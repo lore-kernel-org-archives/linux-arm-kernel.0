@@ -1,127 +1,215 @@
-From: oliver+list@schinagl.nl (Oliver Schinagl)
-Date: Sun, 02 Jun 2013 17:21:51 +0200
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <20130602150946.GF18614@n2100.arm.linux.org.uk>
-References: <1370185130-15332-1-git-send-email-oliver+list@schinagl.nl>
- <1370185130-15332-2-git-send-email-oliver+list@schinagl.nl>
- <20130602150946.GF18614@n2100.arm.linux.org.uk>
-Message-ID: <51AB630F.9040109@schinagl.nl>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sun, 02 Jun 2013 17:39:23 +0200
+Subject: [PATCHv2 1/3] Add support for GMT G762/G763 PWM fan controller
+References: <cover.1369687670.git.arno@natisbad.org>
+ <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
+ <20130601143304.GA6580@roeck-us.net>
+Message-ID: <87mwr88qtw.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/13 17:09, Russell King - ARM Linux wrote:
-> On Sun, Jun 02, 2013 at 04:58:49PM +0200, Oliver Schinagl wrote:
->> +#include <asm/io.h>
->
-> We have an include file called linux/io.h.  Please use linux/*.h files which
-> include asm/*.h files in preference to directly using asm/*.h.
->
-> In fact, no driver should include an asm/*.h header.
-And I didn't have that there, but it kept refusing to find ioread32be. 
-Of course, now I change it back to linux/io.h (which I had, I swear) and 
-all works swell.
+Hi Guenter,
 
-Concider it changed.
+apologies for the looong email ...
+
+Guenter Roeck <linux@roeck-us.net> writes:
+
+>> +	return (clk*30*gear_mult)/((cnt ? cnt : 1)*p*clk_div);
 >
->> +#include <linux/compiler.h>
->> +#include <linux/device.h>
->> +#include <linux/err.h>
->> +#include <linux/errno.h>
->> +#include <linux/export.h>
->> +#include <linux/fs.h>
->> +#include <linux/init.h>
->> +#include <linux/kernel.h>
->> +#include <linux/kobject.h>
->> +#include <linux/module.h>
->> +#include <linux/of_address.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/random.h>
->> +#include <linux/stat.h>
->> +#include <linux/sysfs.h>
->> +#include <linux/types.h>
+> Please follow CodingStyle and add spaces between operators (not just
+> here).
+
+done.
+
+
+>> +static struct g762_data *g762_update_client(struct device *dev)
+>> +{
+>> +	struct i2c_client *client = to_i2c_client(dev);
+>> +	struct g762_data *data = i2c_get_clientdata(client);
 >> +
->> +#define DRV_NAME "sunxi-sid"
->> +#define DRV_VERSION "1.0"
+>> +	mutex_lock(&data->update_lock);
+>> +	if (time_before(jiffies, data->last_updated + G762_UPDATE_INTERVAL) &&
+>> +	    likely(data->valid))
+>> +		goto out;
 >> +
->> +/* There are 4 32-bit keys */
->> +#define SID_KEYS 4
->> +/* and 4 byte sized keys per 32-bit key */
->> +#define SID_SIZE (SID_KEYS * 4)
+>> +	data->set_cnt =  i2c_smbus_read_byte_data(client, G762_REG_SET_CNT);
+>> +	data->act_cnt =  i2c_smbus_read_byte_data(client, G762_REG_ACT_CNT);
+>> +	data->fan_sta =  i2c_smbus_read_byte_data(client, G762_REG_FAN_STA);
+>> +	data->set_out =  i2c_smbus_read_byte_data(client, G762_REG_SET_OUT);
+>> +	data->fan_cmd1 = i2c_smbus_read_byte_data(client, G762_REG_FAN_CMD1);
+>> +	data->fan_cmd2 = i2c_smbus_read_byte_data(client, G762_REG_FAN_CMD2);
 >> +
->> +static void __iomem *p_sid_reg_base;
+> Failed i2c reads (returning negative values) not a problem ? Driver
+> operation will be more or less random in that case, and may result in
+> erratic behavior.
+
+Now checking return value of both i2c_smbus_{read,write}_byte_data(). I
+also created wrappers for both functions to report some info upon error.
+
+
+>> +/* Set fan RPM value. This only makes sense in closed-loop mode. */
+>> +static int do_set_fan_target(struct device *dev, unsigned long val)
+>> +{
+>> +	struct i2c_client *client = to_i2c_client(dev);
+>> +	struct g762_data *data = g762_update_client(dev);
+>> +	int ret = -EINVAL;
 >> +
->> +/* We read the entire key, but only return the requested byte. This is of
->> + * course slower then it could be and uses 4 times more reads as needed but
->> + * keeps code a simpler.
+>> +	mutex_lock(&data->update_lock);
+>> +	if (data->fan_cmd1 & G762_REG_FAN_CMD1_FAN_MODE) { /* closed-loop */
+>> +		data->set_cnt = cnt_from_rpm(val, data->clk,
+>> +					     PULSE_FROM_REG(data->fan_cmd1),
+>> +					     CLKDIV_FROM_REG(data->fan_cmd1),
+>> +					     GEARMULT_FROM_REG(data->fan_cmd2));
+>> +		ret = i2c_smbus_write_byte_data(client, G762_REG_SET_CNT,
+>> +						data->set_cnt);
+>
+> In closed loop mode you have two paths to set the same register. Given that,
+> it doesn't make sense to me to set the fan target with set_pwm as
+> well.
+
+It does not seems logical to me to remove access to pwm1 in closed-loop
+mode, i.e. prevent the user to have access to the 0-255 interface now
+that she can pass RPM values.
+
+I am not an expert but utilities like fancontrol/pwmconfig work with
+pwm1 sysfs entry, not fan1_target. AFAICT from sysfs doc, this simple
+and agnostic interface (0 to 255 value) should work for all
+combinations: DC vs PWM, closed vs open-loop. If I make pwm1 unavailable
+in closed-loop mode to keep only fan1_target as a unique path to control
+the speed, then this goes against least expectation principle and
+requires hacks from user or .dts writer: one of those will have to force
+open-loop to change the value. On ReadyNAS Duo v2 and 102, if I do not
+provide a .dts file which changes the default value of the chip (not 
+modified by u-boot), pwmconfig/fancontrol will not work by default.
+
+As I do not have your background on the topic, I'll let you decide but
+here is what seems logical to me (considering ReadyNAS hardware and
+default values, how the chip works and the experience I had w/
+fancontrol and pwmconfig):   
+
+ - let pwm1 available in all cases: DC/PWM and closed/open-loop. This
+   makes fancontrol usable in all cases w/o any user interaction.
+
+ - provide fan_target in closed-loop mode only and do not accept values
+   before the mode is indeed closed-loop. I think we can expect the
+   user who uses this interface to have read some documentation. For
+   instance, you need to know which value makes sense on your platform,
+   which is not that obvious.
+
+Guenter, if you still think it is a good idea to make pwm1 unavailable
+in closed-loop mode, I will make the change and stop arguing.
+
+
+> If you use one attribute (set_pwm) for setting set_out, and the other for
+> set_cnt, your problems with conditional command acceptance should be solved.
+
+I do not have problems with current logic: in practice, for a given
+board, mode will be set (by u-boot or driver) before the speed related
+registers are modified. I even take care in pdata attributes import to
+set fan_target after everything else.
+
+
+>> +static void g762_platform_data_of_overload(struct i2c_client *client,
+>> +					   struct g762_platform_data *pdata)
+>> +{
+>> +	if (!client->dev.of_node)
+>> +		return;
+>> +
+>> +	g762_of_import_one_prop(client, &pdata->fan_gear_mode, "fan_gear_mode");
+>> +	g762_of_import_one_prop(client, &pdata->pwm_polarity, "pwm_polarity");
+>> +	g762_of_import_one_prop(client, &pdata->fan_startv, "fan_startv");
+>> +	g762_of_import_one_prop(client, &pdata->pwm_freq, "pwm_freq");
+>> +	g762_of_import_one_prop(client, &pdata->fan_div, "fan_div");
+>> +	g762_of_import_one_prop(client, &pdata->fan_pulses, "fan_pulses");
+>> +	g762_of_import_one_prop(client, &pdata->pwm_mode, "pwm_mode");
+>> +	g762_of_import_one_prop(client, &pdata->fan_target, "fan_target");
+>> +	g762_of_import_one_prop(client, &pdata->pwm_enable, "pwm_enable");
+>
+> I second the other comments ... why not use the sysfs interface to set the
+> values it supports ?
+
+answer in previous email to Simon.
+
+
+>> +/*
+>> + * Read and write functions for pwm1 sysfs file. Get and set the fan speed
+>> + * in both open and closed-loop mode. Speed is given as a relative value
+>> + * between 0 and 255, where 255 is maximum speed. Note that due to rounding
+>> + * errors it is possible that you don't read back exactly the value you have
+>> + * set.
 >> + */
->> +u8 sunxi_sid_read_byte(const int offset)
+>> +static ssize_t get_pwm(struct device *dev, struct device_attribute *da,
+>> +		       char *buf)
 >> +{
->> +	u32 sid_key;
->> +	u8 ret;
+>> +	struct g762_data *data = g762_update_client(dev);
+>> +	int val;
 >> +
->> +	ret = 0;
->> +
->> +	if (likely((SID_SIZE))) {
->> +		sid_key = ioread32be(p_sid_reg_base + round_down(offset, 4));
->> +		sid_key >>= (offset % 4) * 8;
->> +		ret = sid_key & 0xff;
+>> +	mutex_lock(&data->update_lock);
+>> +	if (data->fan_cmd1 & G762_REG_FAN_CMD1_FAN_MODE) { /* closed-loop */
+>> +		val = PWM_FROM_CNT(data->set_cnt);
+>> +	} else {                                           /* open-loop */
+>> +		val = data->set_out;
 >> +	}
 >
-> What happens if you unbind the device in sysfs and then try and use
-> this function?
->
->> +static int sunxi_sid_remove(struct platform_device *pdev)
->> +{
->> +	device_remove_bin_file(&pdev->dev, &sid_bin_attr);
->> +	dev_info(&pdev->dev, "Sunxi SID driver unloaded successfully.\n");
->
-> Maybe you want to set p_sid_reg_base to NULL here?
->
+> Again, this is not very consistent, as set_cnt is pretty much reported twice
+> (as pwm and as target speed) in closed loop mode. Just report set_out here.
+
+will do if you decide I should kill pwm1 in closed-loop mode. 
+
+
+> Side note: { } is not needed in single-statement conditionals.
+
+Will be fixed in v3.
+
+
+>> +/* When filling a g762_platform_data structure to be passed during platform
+>> + * init to the driver, it needs to be initialized to the following default
+>> + * value before changing specific fields. This is needed to avoid a sparse
+>> + * initialization to have current values replaced by 0 */
 >> +
->> +	return 0;
->> +}
+> comment style
+
+Will be fixed in v3.
+
+
+>> +static const struct g762_platform_data G762_DEFAULT_PDATA = {
+>> +	.fan_startv = G762_DEFAULT_NO_OVERLOAD,
+>> +	.fan_gear_mode = G762_DEFAULT_NO_OVERLOAD,
+>> +	.fan_div = G762_DEFAULT_NO_OVERLOAD,
+>> +	.fan_pulses = G762_DEFAULT_NO_OVERLOAD,
+>> +	.fan_target = G762_DEFAULT_NO_OVERLOAD,
+>> +	.pwm_polarity = G762_DEFAULT_NO_OVERLOAD,
+>> +	.pwm_enable = G762_DEFAULT_NO_OVERLOAD,
+>> +	.pwm_freq = G762_DEFAULT_NO_OVERLOAD,
+>> +	.pwm_mode = G762_DEFAULT_NO_OVERLOAD,
+>> +};
 >> +
->> +static int __init sunxi_sid_probe(struct platform_device *pdev)
->> +{
->> +	int entropy[SID_SIZE], i, ret;
->> +	struct device *dev;
->> +	struct resource *res;
->> +	void __iomem *sid_reg_base;
->> +
->> +	dev = &pdev->dev;
->> +	if (unlikely(!pdev->dev.of_node)) {
->> +		dev_err(dev, "No devicetree data available\n");
->> +		ret = -EFAULT;
->> +		goto exit;
->> +	}
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
->> +	if (IS_ERR(sid_reg_base)) {
->> +		dev_err(dev, "Unable to obtain resource\n");
->> +		ret = PTR_ERR(sid_reg_base);
->> +		goto exit;
->> +	}
->> +	platform_set_drvdata(pdev, sid_reg_base);
->> +	p_sid_reg_base = sid_reg_base;
->
-> So what happens if you have two of these devices?  Maybe you want to check
-> whether p_sid_reg_base is already set?
->
->> +
->> +	ret = device_create_bin_file(dev, &sid_bin_attr);
->> +	if (unlikely(ret)) {
->> +		dev_err(dev, "Unable to create sysfs bin entry\n");
->> +		goto exit;
->> +	}
->> +
->> +	for (i = 0; i < SID_SIZE; i++)
->> +		entropy[i] = sunxi_sid_read_byte(i);
->> +	add_device_randomness(entropy, SID_SIZE);
->> +
->> +	dev_info(dev, "Sunxi SID driver loaded successfully.\n");
->
-> Do we really need to report that the driver "loaded successfully" ?
-> Do we need lots of lines in the kernel log telling us simply that
-> random driver X was built into the kernel or the module was loaded?
->
+> A constant array in an include file ? Please not; this is completely
+> unacceptable. You can pass platform data to the driver like every other
+> driver does. The entire approach with G762_DEFAULT_NO_OVERLOAD is odd anyway;
+> it would be great if you could come up with another mechanism to pass platform
+> data. It is quite common to use '0' for 'default' to avoid having to initialize
+> all default fields.
+
+My life would be easier if I could use 0 and just let the developer pass
+a sparse g762_platform_data, initialized only with the value she has
+interest in, but as discussed in previous email to Simon, 0 is a valid
+value for some attributes (fan_startv, fan_gear_mode, pwm_polarity,
+pwm_mode at least) which prevents using it as a 'default' value. If a
+good pattern exists for that problem I would happy to learn it.
+
+In a first version of v3, I first replaced G762_DEFAULT_PDATA by the
+declaration of a function which sets all the fields of the structure one
+bye one to G762_DEFAULT_NO_OVERLOAD. The header looked better but I don't
+think the whole approach did.
+
+So I changed my mind and went for the following: a wrapper for passing
+attribute values, which sets MSB of passed value to 1. This allows to
+spot initialized values in a sparse init. I put some info and an example
+at the beginning of the header.
+
+I am currently rereading v3 and will post it soon.
+
+Cheers,
+
+a+
