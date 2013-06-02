@@ -1,30 +1,22 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 02 Jun 2013 22:52:36 +0400
-Subject: [PATCH v3 1/1] ARM: shmobile: r8a7778: add I2C support
-In-Reply-To: <201304232015.59697.sergei.shtylyov@cogentembedded.com>
-References: <201304232012.57619.sergei.shtylyov@cogentembedded.com>
- <201304232015.59697.sergei.shtylyov@cogentembedded.com>
-Message-ID: <51AB9474.3040900@cogentembedded.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 2 Jun 2013 11:53:09 -0700
+Subject: [GIT PULL] ux500 fixes for the v3.10 series
+In-Reply-To: <CACRpkdY11CLBVTtWcXFDfWjrgfizhK45WnkR8b7CL8JwqQy8pg@mail.gmail.com>
+References: <CACRpkdY11CLBVTtWcXFDfWjrgfizhK45WnkR8b7CL8JwqQy8pg@mail.gmail.com>
+Message-ID: <CAOesGMjOG7eGF_498cY3ou_fAf21Xim277Yi9=L4W16P9Cw9+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 04/23/2013 08:15 PM, Sergei Shtylyov wrote:
-
-> From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+On Fri, May 31, 2013 at 7:30 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Hi ARM SoC folks,
 >
-> Add I2C clocks and platform devices for R8A7778 SoC.
-> Don't forget to also add the peripheral clock which the I2C driver uses.
+> here are two fixes from Lee Jones which hopefully fixes up the
+> last pieces of fallout from the v3.10 merge window. Description
+> in the signed tag.
 >
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> [Sergei: changed the registration function to platform_device_register_simple(),
-> annotated I2C resources as '__initdata', regrouped MSTPxxx *enum* members, added
-> the copyright.]
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Please pull them in for fixes to Torvalds.
 
-    Simon, I'm calling back this patch. Morimoto-san's patch posted recently
-(preferably to be reposted once more) should be used instead.
+Thanks, pulled.
 
-WBR, Sergei
+
+-Olof
