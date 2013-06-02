@@ -1,47 +1,66 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Sat,  1 Jun 2013 23:39:39 -0700
-Subject: [PATCHv2 2/6] ARM: sched_clock: Return suspended count earlier
-In-Reply-To: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1370155183-31421-3-git-send-email-sboyd@codeaurora.org>
+Date: Sat,  1 Jun 2013 23:39:37 -0700
+Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
+Message-ID: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we're suspended and sched_clock() is called we're going to
-read the hardware one more time and throw away that value and
-return back the cached value we saved during the suspend
-callback. This is wasteful. Let's short circuit all that and
-return the cached value as early as possible if we're suspended.
+This is mostly a resend of a patch series I sent a little over a month
+ago. I've reordered the patches so that John can pick up the first three
+and get a generic sched_clock layer without having to take the 64 bit
+patches. The last three patches add 64 bit support and move the architected
+timers on ARM64 and ARM to use it.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/sched_clock.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+Stephen Boyd (6):
+  ARM: sched_clock: Remove unused needs_suspend member
+  ARM: sched_clock: Return suspended count earlier
+  sched_clock: Make ARM's sched_clock generic for all architectures
+  sched_clock: Add support for >32 bit sched_clock
+  ARM: arch_timer: Move to setup_sched_clock_64()
+  arm64: Move to generic sched_clock infrastructure
 
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 45efe86..a781c59 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -55,9 +55,6 @@ static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
- 	u64 epoch_ns;
- 	u32 epoch_cyc;
- 
--	if (cd.suspended)
--		return cd.epoch_ns;
--
- 	/*
- 	 * Load the epoch_cyc and epoch_ns atomically.  We do this by
- 	 * ensuring that we always write epoch_cyc, epoch_ns and
-@@ -174,6 +171,9 @@ unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
- 
- unsigned long long notrace sched_clock(void)
- {
-+	if (cd.suspended)
-+		return cd.epoch_ns;
-+
- 	return sched_clock_func();
- }
- 
+ arch/arm/Kconfig                                   |   1 +
+ arch/arm/common/timer-sp.c                         |   2 +-
+ arch/arm/kernel/Makefile                           |   2 +-
+ arch/arm/kernel/arch_timer.c                       |  16 +--
+ arch/arm/kernel/time.c                             |   4 +-
+ arch/arm/mach-davinci/time.c                       |   2 +-
+ arch/arm/mach-imx/time.c                           |   2 +-
+ arch/arm/mach-integrator/integrator_ap.c           |   2 +-
+ arch/arm/mach-ixp4xx/common.c                      |   2 +-
+ arch/arm/mach-mmp/time.c                           |   2 +-
+ arch/arm/mach-msm/timer.c                          |   2 +-
+ arch/arm/mach-omap1/time.c                         |   2 +-
+ arch/arm/mach-omap2/timer.c                        |   2 +-
+ arch/arm/mach-pxa/time.c                           |   2 +-
+ arch/arm/mach-sa1100/time.c                        |   2 +-
+ arch/arm/mach-u300/timer.c                         |   2 +-
+ arch/arm/plat-iop/time.c                           |   2 +-
+ arch/arm/plat-omap/counter_32k.c                   |   2 +-
+ arch/arm/plat-orion/time.c                         |   2 +-
+ arch/arm/plat-samsung/samsung-time.c               |   2 +-
+ arch/arm/plat-versatile/sched-clock.c              |   2 +-
+ arch/arm64/Kconfig                                 |   1 +
+ arch/arm64/kernel/time.c                           |  11 +-
+ drivers/clocksource/bcm2835_timer.c                |   2 +-
+ drivers/clocksource/clksrc-dbx500-prcmu.c          |   3 +-
+ drivers/clocksource/dw_apb_timer_of.c              |   2 +-
+ drivers/clocksource/mxs_timer.c                    |   2 +-
+ drivers/clocksource/nomadik-mtu.c                  |   2 +-
+ drivers/clocksource/samsung_pwm_timer.c            |   2 +-
+ drivers/clocksource/tegra20_timer.c                |   2 +-
+ drivers/clocksource/time-armada-370-xp.c           |   2 +-
+ drivers/clocksource/timer-marco.c                  |   2 +-
+ drivers/clocksource/timer-prima2.c                 |   2 +-
+ .../include/asm => include/linux}/sched_clock.h    |  14 ++-
+ init/Kconfig                                       |   3 +
+ init/main.c                                        |   2 +
+ kernel/time/Makefile                               |   1 +
+ {arch/arm/kernel => kernel/time}/sched_clock.c     | 114 +++++++++++++++------
+ 38 files changed, 132 insertions(+), 92 deletions(-)
+ rename {arch/arm/include/asm => include/linux}/sched_clock.h (62%)
+ rename {arch/arm/kernel => kernel/time}/sched_clock.c (74%)
+
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
