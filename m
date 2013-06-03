@@ -1,38 +1,73 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 3 Jun 2013 16:36:42 +0200
-Subject: [GIT PULL v2] ARM: dts: OMAP fixes for 3.10-rc5
-Message-ID: <51ACA9FA.9000308@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 3 Jun 2013 10:44:05 -0400
+Subject: [GIT PULL] ARM: mvebu: cleanup for v3.11 (round 3 cumulative)
+In-Reply-To: <20130601053605.GH5189@quad.lixom.net>
+References: <20130528183422.GA31290@titan.lakedaemon.net>
+ <20130601053605.GH5189@quad.lixom.net>
+Message-ID: <20130603144405.GH3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Fri, May 31, 2013 at 10:36:05PM -0700, Olof Johansson wrote:
+> Hi Jason,
+> 
+> On Tue, May 28, 2013 at 02:34:22PM -0400, Jason Cooper wrote:
+> > Olof,
+> > 
+> > This is the latest for cleanup, and the summary includes everything so
+> > far for this window.
+> > 
+> > 
+> > The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> > 
+> >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-3
+> > 
+> 
+> Something odd is going on here.
+> 
+> > for you to fetch changes up to c589f9b4b51317cfc530812fe90a9895bd51430e:
+> > 
+> >   arm: mvebu: mark functions of armada-370-xp.c as static (2013-05-21 13:44:32 +0000)
+> > 
+> > ----------------------------------------------------------------
+> > mvebu cleanup for v3.11 (round 3)
+> > 
+> >  - mvebu
+> >     - mark functions in armada-370-xp.c as static
+> > 
+> > ----------------------------------------------------------------
+> > Andrew Lunn (1):
+> >       ARM: Orion: Remove redundant init_dma_coherent_pool_size()
+> > 
+> > Maxime Ripard (1):
+> >       ARM: mvebu: Remove init_irq declaration in machine description
+> > 
+> > Thomas Petazzoni (1):
+> >       arm: mvebu: mark functions of armada-370-xp.c as static
+> > 
+> >  arch/arm/mach-kirkwood/common.c     |  6 ------
+> >  arch/arm/mach-mvebu/armada-370-xp.c | 15 +++------------
+> >  arch/arm/mach-orion5x/common.c      |  7 -------
+> >  3 files changed, 3 insertions(+), 25 deletions(-)
+> 
+> Two of the above patches are already in mainline, so the diffstat don't match.
 
-Please pull three DTS fixes for the next -rc.
+Sorry, this was due to my mis-understanding of an off-list comment.  I
+mis-read 'send fresh pull requests (paraphrased)' to mean you weren't
+pulling my first series of small PRs and I should just do inclusive PRs.
 
-Thanks,
-Benoit
+So, the tag annotation was for everything (one patch) since
+cleanup-3.11-2, and the PR summary was from v3.10-rc1 so you could see
+everything you were pulling in.  I didn't change this tag because,
+presumably, you would be getting the previous tags in the pull.
 
+Clearly, I over-thought this.  I'll ask next time a request sounds odd.
+:)
 
+thx,
 
-The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
-  Linus Torvalds (1):
-        Linux 3.10-rc4
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git dts-fixes-for-3.10
-
-Kevin Hilman (1):
-      ARM: dts: omap4-panda|sdp: Fix mux for twl6030 IRQ pin and msecure line
-
-Lars Poeschel (1):
-      ARM: dts: AM33xx: Fix properties on gpmc node
-
-Suman Anna (1):
-      ARM: dts: OMAP5: Fix missing PWM capability to timer nodes
-
- arch/arm/boot/dts/am33xx.dtsi             |    4 ++--
- arch/arm/boot/dts/omap4-panda-common.dtsi |   20 ++++++++++++++++++++
- arch/arm/boot/dts/omap4-sdp.dts           |   20 ++++++++++++++++++++
- arch/arm/boot/dts/omap5.dtsi              |    3 +++
- 4 files changed, 45 insertions(+), 2 deletions(-)
+Jason.
