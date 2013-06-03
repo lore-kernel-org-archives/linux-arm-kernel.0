@@ -1,33 +1,19 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Jun 2013 04:07:37 +0200
-Subject: arm: add basic support for Rockchip Cortex-A9 SoCs
-In-Reply-To: <201306030055.15413.heiko@sntech.de>
+Date: Mon, 03 Jun 2013 04:08:37 +0200
+Subject: [PATCH 09/10] arm: add debug uarts for rockchip rk29xx and rk3xxx
+ series
+In-Reply-To: <201306030101.04370.heiko@sntech.de>
 References: <201306030055.15413.heiko@sntech.de>
-Message-ID: <2754292.oXzDNzH2Zs@wuerfel>
+ <201306030101.04370.heiko@sntech.de>
+Message-ID: <19033743.NUXvdvXthR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 June 2013 00:55:15 Heiko St?bner wrote:
-> Prepare your eggs and tomatoes please, I got myself a second playground  .
-> 
-> As the title implies this series adds basic support for Rockchip's Cortex-A9
-> SoCs, like the RK3066 used in many cheaper tablets.
-> 
-> On the periphal side it's very lightweight, as it seems someone from Rockchip
-> was shopping in the DesignWare store.
-> 
-> This makes the pinctrl driver the biggest hunk in the series, but to get some
-> bonus points I used the generic_irq implementation for the interrupt handling,
-> based on Thomas' irqdomain support series.
-> 
-> Supported periphals are, the timers, uarts and mmc controllers, so interested
-> parties will need a serial console for now.
-> 
-> Hopefully I didn't mess up to much 
+On Monday 03 June 2013 01:01:03 Heiko St?bner wrote:
+> +#if defined(CONFIG_DEBUG_RK29_UART0)
+> +#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x20060000
+> +#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfe060000
 
-Great stuff! I have a few small comments for later, but I'm basically fine
-with it going in as-is.
-
-Needs review from the clk and pinctrl maintainers of course.
+0xfed60000 maybe? looks like a typo.
 
 	Arnd
