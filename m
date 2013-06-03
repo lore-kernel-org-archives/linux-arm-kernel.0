@@ -1,89 +1,101 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  3 Jun 2013 18:45:37 +0200
-Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
-Message-ID: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Mon,  3 Jun 2013 18:47:36 +0200
+Subject: [PATCH] ARM: mvebu: set aliases for ethernet controllers
+Message-ID: <1370278056-3058-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Willy Tarreau <w@1wt.eu>
 
-Marvell uses a specific atag in its u-boot which includes among other
-information the MAC addresses for up to 4 network interfaces. This
-atag is parsed, and if found the MAC addresses are extracted there and
-assigned to node aliases eth0..3 with the name "mac-address".
-
-This allows, with the non-DT capable bootloaders currently used on
-most Marvell platforms, to get a proper MAC address for the different
-interfaces.
+These aliases are used when feeding the DT from ATAGS to set the
+devices MAC addresses.
 
 Signed-off-by: Willy Tarreau <w@1wt.eu>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/boot/compressed/atags_to_fdt.c |  8 +++++++-
- arch/arm/include/uapi/asm/setup.h       | 18 ++++++++++++++++++
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi     | 9 +++++++--
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 3 ++-
+ arch/arm/boot/dts/armada-xp.dtsi         | 6 +++++-
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index aabc02a..7f405ed 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -16,7 +16,7 @@ static int node_offset(void *fdt, const char *node_path)
- }
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 550eb77..8f69cf4 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -22,6 +22,11 @@
+ 	model = "Marvell Armada 370 and XP SoC";
+ 	compatible = "marvell,armada-370-xp";
  
- static int setprop(void *fdt, const char *node_path, const char *property,
--		   uint32_t *val_array, int size)
-+		   void *val_array, int size)
- {
- 	int offset = node_offset(fdt, node_path);
- 	if (offset < 0)
-@@ -147,6 +147,12 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
- 					initrd_start);
- 			setprop_cell(fdt, "/chosen", "linux,initrd-end",
- 					initrd_start + initrd_size);
-+		} else if (atag->hdr.tag == ATAG_MV_UBOOT) {
-+			/* This ATAG provides up to 4 MAC addresses */
-+			setprop(fdt, "eth0", "mac-address", atag->u.mv_uboot.macaddr[0], 6);
-+			setprop(fdt, "eth1", "mac-address", atag->u.mv_uboot.macaddr[1], 6);
-+			setprop(fdt, "eth2", "mac-address", atag->u.mv_uboot.macaddr[2], 6);
-+			setprop(fdt, "eth3", "mac-address", atag->u.mv_uboot.macaddr[3], 6);
- 		}
- 	}
- 
-diff --git a/arch/arm/include/uapi/asm/setup.h b/arch/arm/include/uapi/asm/setup.h
-index 979ff40..5588b1f 100644
---- a/arch/arm/include/uapi/asm/setup.h
-+++ b/arch/arm/include/uapi/asm/setup.h
-@@ -143,6 +143,19 @@ struct tag_memclk {
- 	__u32 fmemclk;
- };
- 
-+/* Marvell uboot parameters */
-+#define ATAG_MV_UBOOT	0x41000403
++	aliases {
++		eth0 = &eth0;
++		eth1 = &eth1;
++	};
 +
-+struct tag_mv_uboot {
-+	__u32 uboot_version;
-+	__u32 tclk;
-+	__u32 sysclk;
-+	__u32 isusbhost;
-+	__u8  macaddr[4][6];
-+	__u16 mtu[4];
-+	__u32 nand_ecc;
-+};
-+
- struct tag {
- 	struct tag_header hdr;
- 	union {
-@@ -165,6 +178,11 @@ struct tag {
- 		 * DC21285 specific
- 		 */
- 		struct tag_memclk	memclk;
-+
-+		/*
-+		 * Marvell specific
-+		 */
-+		struct tag_mv_uboot	mv_uboot;
- 	} u;
- };
+ 	cpus {
+ 		cpu at 0 {
+ 			compatible = "marvell,sheeva-v7";
+@@ -94,7 +99,7 @@
+ 				reg = <0x72004 0x4>;
+ 			};
  
+-			ethernet at 70000 {
++			eth0: ethernet at 70000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x70000 0x2500>;
+ 				interrupts = <8>;
+@@ -102,7 +107,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			ethernet at 74000 {
++			eth1: ethernet at 74000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x74000 0x2500>;
+ 				interrupts = <10>;
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 6ab56bd..386f0ce 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -23,6 +23,7 @@
+ 		gpio0 = &gpio0;
+ 		gpio1 = &gpio1;
+ 		gpio2 = &gpio2;
++		eth3 = &eth3;
+ 	};
+ 
+ 
+@@ -105,7 +106,7 @@
+ 				interrupts = <91>;
+ 			};
+ 
+-			ethernet at 34000 {
++			eth3: ethernet at 34000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x34000 0x2500>;
+ 				interrupts = <14>;
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 5b902f9..e481d54 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -22,6 +22,10 @@
+ 	model = "Marvell Armada XP family SoC";
+ 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
+ 
++	aliases {
++		eth2 = &eth2;
++	};
++
+ 	soc {
+ 		internal-regs {
+ 			L2: l2-cache {
+@@ -86,7 +90,7 @@
+ 				reg = <0x18200 0x500>;
+ 			};
+ 
+-			ethernet at 30000 {
++			eth2: ethernet at 30000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x30000 0x2500>;
+ 				interrupts = <12>;
 -- 
 1.8.1.2
