@@ -1,90 +1,81 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 03 Jun 2013 14:43:32 +0200
-Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
-In-Reply-To: <51AC672A.5050501@monstr.eu>
-References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
- <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
-Message-ID: <51AC8F74.2060302@linaro.org>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 03 Jun 2013 14:49:28 +0200
+Subject: [PATCH 0/6] Samsung watchdog support clean-up
+In-Reply-To: <51A9ADF4.8010102@gmail.com>
+References: <1368916627-23139-1-git-send-email-tomasz.figa@gmail.com>
+ <51A9ADF4.8010102@gmail.com>
+Message-ID: <1850418.EOBZxN7PB0@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 11:51 AM, Michal Simek wrote:
-> Hi,
->
-> On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
->> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
->>> The current code considers every wakeup as spurious, which is not
->>> correct. Handle the same way as other arm platforms are doing.
->>>
->>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
->> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>
->>
->>> ---
->>>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
->>> index c89672b..a1ab22c 100644
->>> --- a/arch/arm/mach-zynq/hotplug.c
->>> +++ b/arch/arm/mach-zynq/hotplug.c
->>> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
->>>  		dsb();
->>>  		wfi();
->>>  
->>> +		if (pen_release == cpu_logical_map(cpu)) {
->>> +			/*
->>> +			 * OK, proper wakeup, we're done
->>> +			 */
->>> +			break;
->>> +		}
->>> +
-> what pen_release stands for?
-> I have looked at it and others platform are also using it in platsmp
-> code which is not zynq case.
-> How is it supposed to work and how this variable should be used?
+Hi Sylwester, Kukjin,
 
-This variable is used to serialize the secondary cpus boot process.
+On Saturday 01 of June 2013 10:16:52 Sylwester Nawrocki wrote:
+> Hi Tomasz,
+> 
+> On 05/19/2013 12:37 AM, Tomasz Figa wrote:
+> > This series is aiming at cleaning up a bit watchdog support on Samsung
+> > SoCs. The patches tweak a bit all the watchdog handling code here and
+> > there, with the goal of making it DT- and multiplatform-friendly.
+> > 
+> > See particular patches for more detailed descriptions.
+> > 
+> > On S3C6410-based Tiny6410 board (Mini6410-compatible):
+> > 
+> > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
+> 
+> I've tested this series on a s3c2440 based board. The system restart
+> works fine.
+> 
+> Tested-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
 
-When the processors boot, all the processors except the CPU0 are in WFI.
+Thank you Sylwester for testing this series.
 
-Then it is up to CPU0 to wake up the secondary processors:
-1. it writes the cpu id of the secondary processor in the pen_release
-variable
-2. it sends a IPI to the secondary cpu in order to make it exiting the
-WFI mode
-2.1 the secondary processor boots and, when finished, writes the value
-'-1' in the pen_release variable
-3. meanwhile CPU0 waits for the pen_release to be '-1' before continuing
-to boot the other secondary processors
+Kukjin, since it has been already tested on s3c24xx and s3c64xx and nobody 
+seems to care about s5p64x0 and s5pc100 (although I don't see a reason why 
+these patches should break them), could we have this series applied?
 
-In the case of the routine "zynq_platform_do_lowpower", the same
-sequence occurs with 'cpu_up', that means you are at the beginning of
-the boot up sequence. So the pen_release value is the cpu id value when
-exiting from WFI (remember it sets to -1 when finished).
-
-If the cpu exits the lopower mode but the pen_release is not the cpu id,
-that means there is something wrong because the cpu exited the WFI mode
-without being in the booting process (the cpu shouldn't receive an hw
-interrupt because they should have been migrated, but just a wake up
-IPI). This is why there's "spurious".
-
-The pen_release contains the hardware id of the CPU, this is why
-cpu_logical_map is used.
-
-I hope that helps
-
--- Daniel
-
-ps : sorry for my bad English :)
-
-
-
-
-
+Best regards,
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+Tomasz Figa
+Linux Kernel Developer
+Samsung R&D Institute Poland
+Samsung Electronics
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> > Depends on:
+> >   - [PATCH] ARM: s5p64x0: Use common uncompress.h part for plat-samsung
+> > 
+> > Tomasz Figa (6):
+> >    watchdog: s3c2410_wdt: Use local register definitions
+> >    ARM: SAMSUNG: uncompress: Use local definitions of watchdog registers
+> >    ARM: SAMSUNG: Add watchdog reset driver
+> >    ARM: SAMSUNG: Let platforms use the new watchdog reset driver
+> >    ARM: SAMSUNG: Remove legacy watchdog reset code
+> >    ARM: SAMSUNG: Remove unused plat/regs-watchdog.h header
+> >   
+> >   arch/arm/Kconfig                                   |  3 +
+> >   arch/arm/mach-s3c24xx/Kconfig                      |  2 +
+> >   arch/arm/mach-s3c24xx/s3c2410.c                    |  3 +-
+> >   arch/arm/mach-s3c24xx/s3c244x.c                    |  3 +-
+> >   arch/arm/mach-s3c64xx/common.c                     |  8 +-
+> >   arch/arm/mach-s5p64x0/common.c                     |  4 +-
+> >   arch/arm/mach-s5pc100/common.c                     |  3 +-
+> >   arch/arm/plat-samsung/Kconfig                      |  6 ++
+> >   arch/arm/plat-samsung/Makefile                     |  1 +
+> >   arch/arm/plat-samsung/include/plat/regs-watchdog.h | 41 ---------
+> >   arch/arm/plat-samsung/include/plat/uncompress.h    | 15 +++-
+> >   .../arm/plat-samsung/include/plat/watchdog-reset.h | 38 ++-------
+> >   arch/arm/plat-samsung/watchdog-reset.c             | 97
+> >   ++++++++++++++++++++++ drivers/watchdog/s3c2410_wdt.c                  
+> >     | 17 +++-
+> >   14 files changed, 156 insertions(+), 85 deletions(-)
+> >   delete mode 100644 arch/arm/plat-samsung/include/plat/regs-watchdog.h
+> >   create mode 100644 arch/arm/plat-samsung/watchdog-reset.c>
+> 
+> --
+> Regards,
+> Sylwester
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+> in the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
