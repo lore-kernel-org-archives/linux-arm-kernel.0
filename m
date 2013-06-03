@@ -1,119 +1,119 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 03 Jun 2013 11:36:31 +0200
-Subject: [PATCH 1/3] ARM: DTS: OMAP3: beagle/overo: mux console UART,
- enable wakeup
-In-Reply-To: <1370040357-25794-2-git-send-email-khilman@linaro.org>
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370040357-25794-2-git-send-email-khilman@linaro.org>
-Message-ID: <51AC639F.3040504@epfl.ch>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 3 Jun 2013 09:36:56 +0000 (UTC)
+Subject: [PATCH v2 1/1] ARM : omap3 : fix wrong container_of in clock36xx.c
+In-Reply-To: <1369903827-2025-1-git-send-email-jp.francois@cynove.com>
+References: <1369903827-2025-1-git-send-email-jp.francois@cynove.com>
+Message-ID: <alpine.DEB.2.02.1306030932520.4435@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kevin,
+On Thu, 30 May 2013, Jean-Philippe Francois wrote:
 
-On 06/01/2013 12:45 AM, Kevin Hilman wrote:
-> Ensure the console uart (UART3) on these boards is mux'd correctly, and
-> IO ring wakeup is enabled.
->
-> This is needed for serial console wakeups when using DT boot.
->
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
->   arch/arm/boot/dts/omap3-beagle-xm.dts | 14 ++++++++++++++
->   arch/arm/boot/dts/omap3-beagle.dts    | 12 ++++++++++++
->   arch/arm/boot/dts/omap3-overo.dtsi    | 14 ++++++++++++++
->   3 files changed, 40 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> index 3046d1f..ca067b0 100644
-> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> @@ -126,3 +126,17 @@
->   	mode = <3>;
->   	power = <50>;
->   };
-> +
-> +&omap3_pmx_core {
-> +	uart3_pins: pinmux_uart3_pins {
-> +		pinctrl-single,pins = <
-> +			0x16e 0x4100	/* uart3_rx_irrx.uart3_rx_irrx WAKEUP | INPUT | MODE0 */
-> +			0x170 0x0	/* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
+> omap36xx_pwrdn_clk_enable_with_hsdiv_restore expects the parent hw of the clock
+> to be a clk_hw_omap. However, looking at cclock3xxx_data.c, all concerned clock
+> have parent defined as clk_divider. Instead of using container_of to eventually get
+> to the register and directly mess with the divider, change freq via clk_set_rate, 
+> and let the clock framework toggle the divider value.
+> Tested with  3.9 on dm3730.
+> 
+> Signed-off-by: Jean-Philippe Fran??ois <jp.francois@cynove.com>
 
-If you go through Benoit's tree, could you use the newly introduced 
-constants [1]? They are defined
-in include/dt-bindings/pinctrl/omap.h. The above will look:
+Queued for 3.10-rc fixes with Mike's ack, after fixing the checkpatch.pl 
+errors listed below.  Please don't forget to run scripts/checkpatch.pl on 
+future patches -- Documentation/SubmittingPatches has more info about 
+this.
 
-			0x16e (PIN_INPUT | WAKEUP_EVENT | MUX_MODE0)	/* 
-uart3_rx_irrx.uart3_rx_irrx */
-			0x170 (PIN_OUTPUT | MUX_MODE0)			/* uart3_tx_irtx.uart3_tx_irtx */
 
-> +		>;
-> +	};
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart3_pins>;
-> +};
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index 6eec699..b004372 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -95,6 +95,13 @@
->   			0x1ae 0x10b  /* USBB2_ULPITLL_CLK_MUXMODE.usbb1_ulpiphy_dat7 INPUT | PULLDOWN */
->   		>;
->   	};
-> +
-> +	uart3_pins: pinmux_uart3_pins {
-> +		pinctrl-single,pins = <
-> +			0x16e 0x4100	/* uart3_rx_irrx.uart3_rx_irrx WAKEUP | INPUT | MODE0 */
-> +			0x170 0x0	/* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
+ERROR: space required before the open parenthesis '('
+#59: FILE: arch/arm/mach-omap2/clock36xx.c:52:
++		if(ret)
 
-Same here
+ERROR: space required before the open parenthesis '('
+#62: FILE: arch/arm/mach-omap2/clock36xx.c:55:
++		if(ret)
 
-> +		>;
-> +	};
->   };
->
->   &i2c1 {
-> @@ -142,3 +149,8 @@
->   	 */
->   	ti,pulldowns = <0x03a1c4>;
->   };
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart3_pins>;
-> +};
-> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-> index a626c50..d63ed39 100644
-> --- a/arch/arm/boot/dts/omap3-overo.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
-> @@ -77,3 +77,17 @@
->   	mode = <3>;
->   	power = <50>;
->   };
-> +
-> +&omap3_pmx_core {
-> +	uart3_pins: pinmux_uart3_pins {
-> +		pinctrl-single,pins = <
-> +			0x16e 0x4100	/* uart3_rx_irrx.uart3_rx_irrx WAKEUP | INPUT | MODE0 */
-> +			0x170 0x0	/* uart3_tx_irtx.uart3_tx_irtx OUTPUT | MODE0 */
+WARNING: please, no spaces at the start of a line
+#67: FILE: arch/arm/mach-omap2/clock36xx.c:60:
++ badfreq :$
 
-Same here
+ERROR: space prohibited before that ':' (ctx:WxE)
+#67: FILE: arch/arm/mach-omap2/clock36xx.c:60:
++ badfreq :
+          ^
 
-> +		>;
-> +	};
-> +};
-> +
-> +&uart3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&uart3_pins>;
-> +};
->
+Updated patch follows.
 
-Regards,
 
-Florian
+- Paul
 
-[1] http://thread.gmane.org/gmane.linux.drivers.devicetree/36951
+From: Jean-Philippe Francois <jp.francois@cynove.com>
+Date: Thu, 30 May 2013 10:50:27 +0200
+Subject: [PATCH] ARM: omap3: clock: fix wrong container_of in clock36xx.c
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+omap36xx_pwrdn_clk_enable_with_hsdiv_restore expects the parent hw of
+the clock to be a clk_hw_omap. However, looking at cclock3xxx_data.c,
+all concerned clock have parent defined as clk_divider. Instead of
+using container_of to eventually get to the register and directly mess
+with the divider, change freq via clk_set_rate, and let the clock
+framework toggle the divider value.
+Tested with 3.9 on dm3730.
+
+Signed-off-by: Jean-Philippe Fran?ois <jp.francois@cynove.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
+Signed-off-by: Paul Walmsley <paul@pwsan.com>
+---
+ arch/arm/mach-omap2/clock36xx.c |   29 ++++++++++++-----------------
+ 1 file changed, 12 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clock36xx.c b/arch/arm/mach-omap2/clock36xx.c
+index 8f3bf4e..7f69fbb 100644
+--- a/arch/arm/mach-omap2/clock36xx.c
++++ b/arch/arm/mach-omap2/clock36xx.c
+@@ -39,30 +39,25 @@
+  */
+ int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
+ {
+-	struct clk_hw_omap *parent;
+-	struct clk_hw *parent_hw;
+-	u32 dummy_v, orig_v, clksel_shift;
+ 	int ret;
+ 
+ 	/* Clear PWRDN bit of HSDIVIDER */
+ 	ret = omap2_dflt_clk_enable(clk);
+ 
+-	parent_hw = __clk_get_hw(__clk_get_parent(clk->clk));
+-	parent = to_clk_hw_omap(parent_hw);
+-
+-	/* Restore the dividers */
++	/* kick parent's clksel register after toggling PWRDN bit */
+ 	if (!ret) {
+-		clksel_shift = __ffs(parent->clksel_mask);
+-		orig_v = __raw_readl(parent->clksel_reg);
+-		dummy_v = orig_v;
+-
+-		/* Write any other value different from the Read value */
+-		dummy_v ^= (1 << clksel_shift);
+-		__raw_writel(dummy_v, parent->clksel_reg);
+-
+-		/* Write the original divider */
+-		__raw_writel(orig_v, parent->clksel_reg);
++		struct clk *parent = clk_get_parent(clk->clk);
++		unsigned long parent_rate = clk_get_rate(parent);
++		ret = clk_set_rate(parent, parent_rate/2);
++		if (ret)
++			goto badfreq;
++		ret = clk_set_rate(parent, parent_rate);
++		if (ret)
++			goto badfreq;
+ 	}
++	return ret;
+ 
++badfreq:
++	omap2_dflt_clk_disable(clk);
+ 	return ret;
+ }
+-- 
+1.7.10.4
