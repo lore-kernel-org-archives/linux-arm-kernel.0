@@ -1,32 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 3 Jun 2013 17:25:18 +0100
-Subject: [PATCH v2 5/5] arm64/xen: introduce CONFIG_XEN and hypercall.S
- on ARM64
-In-Reply-To: <1370273624-26976-5-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
- <1370273624-26976-5-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130603162517.GC32295@arm.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 3 Jun 2013 12:25:49 -0400
+Subject: [PATCH] ARM: Kirkwood add cpus definition needed by cpufreq
+ driver to dtsi
+In-Reply-To: <51ABC056.5000804@baker-net.org.uk>
+References: <51ABC056.5000804@baker-net.org.uk>
+Message-ID: <20130603162549.GK3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 04:33:44PM +0100, Stefano Stabellini wrote:
-> --- /dev/null
-> +++ b/arch/arm64/xen/hypercall.S
-...
-> +/*
-> + * The Xen hypercall calling convention is very similar to the ARM AEBI
-> + * procedure calling convention: the first paramter is passed in x0, the
-> + * second in x1, the third in x2 and the fourth in x3. Considering that
-> + * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
-> + * in rx, differently from the procedure calling convention of using the
-> + * stack for that case.
+On Sun, Jun 02, 2013 at 10:59:50PM +0100, Adam Baker wrote:
+> The Kirkwood CPU Freq driver needs a CPU definition in order for the probe
+> routine to activate it. Add a suitable definition to kirkwood.dtsi
+> 
+> This definition is only correct for single core SoCs. There is a dual core
+> SoC in the kirkwood family (88F632X) but the rest of the Kirkwood drivers in
+> the kernel don't currently support it. If they ever do the cpus definition
+> would need to be duplicated in each of the SoC specific include files.
+> 
+> Signed-off-by: Adam Baker <linux@baker-net.org.uk>
 
-You may want to use the AArch64 ABI here where parameters are passed in
-x0-x7, return in x0.
+hmm, diffstat is missing.  Please make sure you are using git
+format-patch properly in the future.
 
-BTW, I think it's missing a MAINTAINERS file update.
+After cleaning up some minor whitespace (needed leading tabs), applied
+to mvebu/dt
 
-Otherwise, the series looks good. How do you plan to upstream this?
+thx,
 
--- 
-Catalin
+Jason.
