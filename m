@@ -1,71 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 23:45:55 +0100
-Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
-In-Reply-To: <51AD1AB3.9050908@codeaurora.org>
-References: <1368049671-22879-1-git-send-email-sboyd@codeaurora.org>
- <5193E424.9090605@codeaurora.org> <519E57D2.3050000@codeaurora.org>
- <20130523231531.GT18614@n2100.arm.linux.org.uk>
- <20130524220539.GB599@codeaurora.org> <51AD0703.6050408@codeaurora.org>
- <20130603222321.GP18614@n2100.arm.linux.org.uk>
- <51AD1AB3.9050908@codeaurora.org>
-Message-ID: <20130603224555.GR18614@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 4 Jun 2013 00:48:13 +0200
+Subject: [PATCH] ARM: tegra: remove the ifdef of ARCH SoC in the
+ tegra_resume
+In-Reply-To: <51ACB59D.9030005@wwwdotorg.org>
+References: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
+ <51ACB59D.9030005@wwwdotorg.org>
+Message-ID: <201306040048.13612.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 03:37:39PM -0700, Stephen Boyd wrote:
-> On 06/03/13 15:23, Russell King - ARM Linux wrote:
-> > On Mon, Jun 03, 2013 at 02:13:39PM -0700, Stephen Boyd wrote:
-> >> We
-> >> can't get any information about why the decompression failed if
-> >> we have debug_ll enabled. I had to patch the error() routine to
-> >> not while loop forever to get that print after do_decompress to
-> >> be useful.)
-> > Maybe your implementation of puts() for the decompressor is faulty then?
-> > Because it works for me - when something goes wrong with the decompression,
-> > I get a message such as:
-> >
-> > Decompressing kernel...
-> >
-> > CRC error
-> >
-> >  -- System halted
-> >
-> 
-> I was expecting to see
-> 
-> Decompressing kernel...
-> 
-> CRC error
-> 
-> decompressor returned an error
-> 
-> 
-> but since we loop forever this code in arch/arm/boot/compressed/misc.c
-> doesn't do anything:
-> 
->         if (ret)
->                 error("decompressor returned an error");
+On Monday 03 June 2013, Stephen Warren wrote:
+> Was that ifdef completely incorrect before? I can see why the cmp/beq
+> might be ifdef'd (although it's not worth it), but I assume the code
+> after that beq was intended to run on all chips after Tegra20. The ifdef
+> as it was written does something rather different; it prevents any of
+> that code from running unless the kernel doesn't have Tegra20 support.
+> So, I think that the removal of the ifdef is more of a bug-fix that
+> "because we always build with all Tegra SoCs support. Let me know, and
+> I'll re-write the commit description to something more accurate...
 
-I think that's just a final catch-all in case one of the decompressors
-doesn't use the error() function pointer it was passed.
+The #ifdef was recently changed from #if TEGRA3 to #if !TEGRA2, which support
+for TEGRA4 was added. I think this is where it broke.
 
-> In my case I'm booting a kernel with textoffset = 0x208000 but RAM
-> starts at 0x0. Does "minimum of RAM start" mean 0x0 or 0x200000?
-
-The basic requirement for zImage's is no less than the start of RAM
-plus 32K.  Or let me put it another way - start of writable memory
-plus 32K.
-
-Whether you need an offset of 0x200000 or not is not for the
-decompressor to know.  If you're having to avoid the first 0x200000
-bytes of memory for some reason (eg, secure firmware or DSP needs
-it left free) then there's no way for the decompressor to know that,
-so it's irrelevant.
-
-So, lets say that your platform has a DSP which needs the first 0x200000
-bytes left free.  So the boot loader _already_ needs to know to load
-the image not at zero, but above 0x200000.  The additional 32K
-requirement is really nothing new and so should be treated in just the
-same way.
-
-Leave at least 32K of usable memory below the zImage at all times.
+	Arnd
