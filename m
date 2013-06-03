@@ -1,41 +1,76 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 18:10:18 +0100
-Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
-In-Reply-To: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130603171017.GN18614@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Mon, 3 Jun 2013 10:29:08 -0700
+Subject: [PATCH v5] tty: serial: add Freescale lpuart driver support
+In-Reply-To: <1369893217-27809-1-git-send-email-b35083@freescale.com>
+References: <1369893217-27809-1-git-send-email-b35083@freescale.com>
+Message-ID: <20130603172908.GA3272@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 06:45:37PM +0200, Thomas Petazzoni wrote:
-> From: Willy Tarreau <w@1wt.eu>
+On Thu, May 30, 2013 at 01:53:37PM +0800, Jingchang Lu wrote:
+> Add Freescale lpuart driver support. The lpuart device
+> can be found on Vybrid VF610 and Layerscape LS-1 SoCs.
 > 
-> Marvell uses a specific atag in its u-boot which includes among other
-> information the MAC addresses for up to 4 network interfaces. This
-> atag is parsed, and if found the MAC addresses are extracted there and
-> assigned to node aliases eth0..3 with the name "mac-address".
+> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> changes in v5:
+>  Coding style fix, remove redundant code.
+>  Checking clk_prepare_enable return value.
+>  Using devm_ioremap_resource instead of devm_request_and_ioremap.
 > 
-> This allows, with the non-DT capable bootloaders currently used on
-> most Marvell platforms, to get a proper MAC address for the different
-> interfaces.
+> changes in v4:
+>  Change Vybrid VF610 SoC compatible string to "fsl,vf610-lpuart"
 > 
-> Signed-off-by: Willy Tarreau <w@1wt.eu>
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> changes in v3:
+>  Use general driver name lpuart instead of mvf for further share between SoCs.
+>  Add bind doc in Documentation/devicetree/bindings/tty/serial.
+>  Remove unused #include header lines and clean up code.
+> 
+> changes in v2:
+>  Remove unused variables and clean up the code.
+> 
+>  .../devicetree/bindings/tty/serial/fsl-lpuart.txt  |  14 +
+>  drivers/tty/serial/Kconfig                         |  14 +
+>  drivers/tty/serial/Makefile                        |   1 +
+>  drivers/tty/serial/fsl_lpuart.c                    | 873 +++++++++++++++++++++
+>  include/uapi/linux/serial_core.h                   |   3 +
+>  5 files changed, 905 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-lpuart.txt
+>  create mode 100644 drivers/tty/serial/fsl_lpuart.c
+> 
+> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-lpuart.txt
+> new file mode 100644
+> index 0000000..6fd1dd1
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-lpuart.txt
+> @@ -0,0 +1,14 @@
+> +* Freescale low power universal asynchronous receiver/transmitter (lpuart)
+> +
+> +Required properties:
+> +- compatible : Should be "fsl,<soc>-lpuart"
+> +- reg : Address and length of the register set for the device
+> +- interrupts : Should contain uart interrupt
+> +
+> +Example:
+> +
+> +uart0: serial at 40027000 {
+> +	       compatible = "fsl,vf610-lpuart";
+> +	       reg = <0x40027000 0x1000>;
+> +	       interrupts = <0 61 0x00>;
+> +       };
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 7e7006f..aee7030 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -1484,6 +1484,20 @@ config SERIAL_RP2_NR_UARTS
+>  	  If multiple cards are present, the default limit of 32 ports may
+>  	  need to be increased.
+>  
+> +config SERIAL_FSL_LPUART
+> +	bool "Freescale lpuart serial port support"
 
-You know, my reaction to this is to nack it because:
+Why can't this be built as a module?  I can't force users to only build
+this driver into the kernel, sorry.
 
-(a) Marvell didn't talk to me about adding a new tag.
-(b) There is an established precident that we do not pass MAC addresses
-    to the kernel in this way (such attempts have been rejected in the
-    past.)
-(c) It goes completely against the design spirit of ATAGs by combining
-    many different types and instances of information into one tag.
-(d) It picks a tag ID without understanding how tag IDs are allocated.
-    (the idea is 0x41NNNNVV where NNNN = machine ID for machine specific
-    tags.)
-
-Everyone who has gone around extending ATAG stuff has made exactly the
-same mistakes time and time again - mostly stemming from the fact that
-no one wants to talk to me up front.
-
-So, this is another NACK.
+greg k-h
