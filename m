@@ -1,23 +1,32 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 3 Jun 2013 08:55:44 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc1
-In-Reply-To: <874ndwmdis.fsf@linaro.org>
-References: <alpine.DEB.2.00.1305192159080.2656@utopia.booyaka.com>
- <alpine.DEB.2.00.1305192219240.2656@utopia.booyaka.com>
- <874ndwmdis.fsf@linaro.org>
-Message-ID: <alpine.DEB.2.02.1306030854520.4635@utopia.booyaka.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon, 03 Jun 2013 09:56:51 +0100
+Subject: [PATCH v1 2/2] ARM:prima2:move postcore_initcalls to init_machine.
+In-Reply-To: <CAGsJ_4yu2MT5o7hbX67KPhrejS9D1BbPcship4zxtXs3G9tE-Q@mail.gmail.com>
+References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
+ <1369993517-24735-1-git-send-email-srinivas.kandagatla@st.com>
+ <CAGsJ_4yu2MT5o7hbX67KPhrejS9D1BbPcship4zxtXs3G9tE-Q@mail.gmail.com>
+Message-ID: <51AC5A53.1090700@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 May 2013, Kevin Hilman wrote:
-
-> I also just noticed that 3730beaglexm has stopped waking from suspend
-> via RTC (non-DT boot.)  Waking from UART console still works.
+On 03/06/13 04:51, Barry Song wrote:
+> did you see this one?
 > 
-> Worked fine on v3.9, so there's a regressions somewhere.
+> [PATCH v2] arm: prima2: use of_platform_populate instead of
+> of_platform_bus_probe
+> http://www.spinics.net/lists/arm-kernel/msg243710.html
 
-Thanks Kevin, noted this in the logs.  Please let me know when it starts 
-working again.
+Yes, I think this is a nice cleanup for simplest case. But Prima
+platforms do much more checking at the same init level. An attempt to
+get rid of postcore and early init calls might introduce this back.
 
+You could solve both the early and postcore initcall issues by returning
+instead of panic, and let every NON Prima platforms call this function.
+Or
+Do it the right way and clean it up.
 
-- Paul
+I will leave it up to you to decide on how you want to fix the multi_v7
+kernel issue.
+
+Thanks,
+srini
