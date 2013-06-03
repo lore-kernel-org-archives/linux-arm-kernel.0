@@ -1,48 +1,49 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Tue, 04 Jun 2013 07:39:14 +1200
-Subject: [GIT PULL] vt8500 devicetree updates for 3.11
-Message-ID: <51ACF0E2.2000206@prisktech.co.nz>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 03 Jun 2013 15:46:13 -0400 (EDT)
+Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
+In-Reply-To: <20130603191730.GR3803@titan.lakedaemon.net>
+References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130603171017.GN18614@n2100.arm.linux.org.uk> <20130603175629.GH5008@1wt.eu>
+ <20130603181437.GO3803@titan.lakedaemon.net> <20130603183057.GA9868@1wt.eu>
+ <20130603184148.GQ3803@titan.lakedaemon.net>
+ <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
+ <20130603191730.GR3803@titan.lakedaemon.net>
+Message-ID: <alpine.LFD.2.03.1306031538250.1200@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+On Mon, 3 Jun 2013, Jason Cooper wrote:
 
-   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> On Mon, Jun 03, 2013 at 03:07:45PM -0400, Nicolas Pitre wrote:
+> > On Mon, 3 Jun 2013, Jason Cooper wrote:
+> > 
+> > > On Mon, Jun 03, 2013 at 08:30:57PM +0200, Willy Tarreau wrote:
+> > > > Well, in fact u-boot sets it on the MAC used to boot from the network
+> > > > if such a boot is performed, but that's all. So in practice you boot
+> > > > without the MAC address anywhere but in the ATAGs. I'd be happy to
+> > > > find a way to parse non-standard atags in a board-specific file but
+> > > > they're lost early it seems :-(
+> > > 
+> > > I assume they are in the u-boot environment.  As such, the only answer
+> > > may be to have user space utilities like flash-kernel parse the
+> > > environment and then customize the appended DT for the specific board.
+> > 
+> > Or some board specific code could dig them out of the flash.  That at 
+> > least would make this hack localized while keeping the common code 
+> > clean.
+> 
+> If it comes to that, I think I would rather tell users to put the mac
+> address on the commandline.
 
-are available in the git repository at:
+That is certainly a simple and viable option.  You can manage your 
+U-Boot environment to construct the final command line from multiple 
+variables so that some are kept static and some others are user 
+editable.
 
-   git://github.com/linux-wmt/linux-vtwm.git tags/vt8500/dts-3.11
+But for the record, there is a precedent for digging MAC addresses out 
+of flash memory -- see
 
-for you to fetch changes up to e36572b64df358f0bc3a508e8761c81d7f3b8215:
+arch/arm/mach-orion5x/tsx09-common.c:qnap_tsx09_find_mac_addr()
 
-   dts: vt8500: Correct reference clock on WM8850 SoCs (2013-06-04 
-07:31:22 +1200)
 
-----------------------------------------------------------------
-Devicetree updates for 3.11
-
-----------------------------------------------------------------
-Tony Prisk (7):
-       dts: vt8500: Fix invalid/missing cpu nodes for soc files.
-       dts: vt8500: Add devicetree support for WM8750 SoC and APC8750 board
-       dts: vt8500: Update serial nodes and disable by default in SoC files
-       dts: clk: vt8500: Update SoC dtsi to use WM8850 PLL clocks
-       dts: vt8500: Populate missing PLL nodes
-       dts: vt8500: Add ARM, AHB, APB and DDR clock nodes to SoC files
-       dts: vt8500: Correct reference clock on WM8850 SoCs
-
-  arch/arm/boot/dts/Makefile           |    1 +
-  arch/arm/boot/dts/vt8500-bv07.dts    |    4 +
-  arch/arm/boot/dts/vt8500.dtsi        |   29 ++-
-  arch/arm/boot/dts/wm8505-ref.dts     |    4 +
-  arch/arm/boot/dts/wm8505.dtsi        |   84 +++++++-
-  arch/arm/boot/dts/wm8650-mid.dts     |    3 +
-  arch/arm/boot/dts/wm8650.dtsi        |   79 +++++++-
-  arch/arm/boot/dts/wm8750-apc8750.dts |   30 +++
-  arch/arm/boot/dts/wm8750.dtsi        |  347 
-++++++++++++++++++++++++++++++++++
-  arch/arm/boot/dts/wm8850-w70v2.dts   |    4 +
-  arch/arm/boot/dts/wm8850.dtsi        |   94 ++++++++-
-  11 files changed, 649 insertions(+), 30 deletions(-)
-  create mode 100644 arch/arm/boot/dts/wm8750-apc8750.dts
-  create mode 100644 arch/arm/boot/dts/wm8750.dtsi
+Nicolas
