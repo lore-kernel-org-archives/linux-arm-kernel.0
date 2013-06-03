@@ -1,43 +1,36 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 3 Jun 2013 14:15:27 +0100
-Subject: [RFC PATCH 2/3] drivers: mfd: vexpress: add timeout API to
- vexpress config interface
-In-Reply-To: <1370261030.16073.5.camel@linaro1.home>
-References: <1369399986-15649-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1369399986-15649-3-git-send-email-lorenzo.pieralisi@arm.com>
- <1370254532.3407.36.camel@linaro1.home>
- <20130603115219.GA22821@e102568-lin.cambridge.arm.com>
- <1370261030.16073.5.camel@linaro1.home>
-Message-ID: <20130603131527.GC22821@e102568-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Jun 2013 15:18:46 +0200
+Subject: [PATCH] drivers/bus: arm-cci: fix combined ARMv6+v7 build
+Message-ID: <2485806.Uv8bUctxav@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 01:03:50PM +0100, Jon Medhurst (Tixy) wrote:
-> On Mon, 2013-06-03 at 12:52 +0100, Lorenzo Pieralisi wrote:
-> > On Mon, Jun 03, 2013 at 11:15:32AM +0100, Jon Medhurst (Tixy) wrote:
-> > > On Fri, 2013-05-24 at 13:53 +0100, Lorenzo Pieralisi wrote:
-> > > > In case some transactions to the Serial Power Controller (SPC) are lost owing
-> > > > to multiple operations handled at once by the M3 controller the OS needs to
-> > > > rely on a configuration API that can time out so that failures do not result
-> > > > in an unusable system.
-> > > > 
-> > > > This patch adds a timeout API to the vexpress config programming interface,
-> > > > and refactors the existing read/write functions so that they can be reused
-> > > > seamlessly on top of the newly defined API.
-> > > 
-> > > Isn't one of the main purposes of the config interface to serialise
-> > > transactions to the config bus, so why would the SPC be handling
-> > > multiple transactions at once? And if we can in fact loose transactions
-> > > doesn't this mean we get random failures in the system? E.g. if this
-> > > happened at boot in vexpress_spc_populate_opps then cpufreq will fail.
-> > 
-> > It has more to do with firmware carrying out background operations like
-> > powering up a cluster when a DVFS is requested.
-> 
-> Would that make it drop transactions or just take a longer time to get
-> around to servicing them?
+When we build a kernel with support for both ARMv6 and ARMv7,
+gas is trying to be helpful by pointing out that the arm-cci
+driver would not work on ARMv6:
 
-It should just take longer to service them, that's what the behaviour
-should be.
+/tmp/ccu1LDeU.s: Assembler messages:
+/tmp/ccu1LDeU.s:450: Error: selected processor does not support ARM mode `wfi '
+/tmp/ccu1LDeU.s:451: Error: selected processor does not support ARM mode `wfe '
+make[4]: *** [drivers/bus/arm-cci.o] Error 1
 
-Lorenzo
+We know that the driver will only be used on ARMv7, hence we
+can annotate the inline assembly listing to allow those instructions.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Dave Martin <dave.martin@linaro.org>
+
+diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+index 380319e..7332889 100644
+--- a/drivers/bus/arm-cci.c
++++ b/drivers/bus/arm-cci.c
+@@ -253,7 +253,7 @@ EXPORT_SYMBOL_GPL(cci_disable_port_by_cpu);
+ asmlinkage void __naked cci_enable_port_for_self(void)
+ {
+ 	asm volatile ("\n"
+-
++"	.arch armv7-a\n"
+ "	mrc	p15, 0, r0, c0, c0, 5	@ get MPIDR value \n"
+ "	and	r0, r0, #"__stringify(MPIDR_HWID_BITMASK)" \n"
+ "	adr	r1, 5f \n"
