@@ -1,7 +1,7 @@
 From: jiada_wang@mentor.com (Jiada Wang)
-Date: Mon, 3 Jun 2013 16:27:34 +0900
+Date: Mon, 3 Jun 2013 16:29:45 +0900
 Subject: [PATCH] clk: implement clk_unregister
-Message-ID: <1370244454-2584-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <1370244585-2646-1-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,7 +10,7 @@ sub modules want actually remove clk device registered by clk_register.
 This patch adds the implementation of clk_unregiser.
 
 Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-CC: Dmitry Eremin-Solenikov <notifications@github.com>
+CC: Eremin, Dmitry <Dmitry_Eremin@mentor.com>
 CC: Dirk Behme <dirk.behme@de.bosch.com>
 ---
  drivers/clk/clk.c | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
