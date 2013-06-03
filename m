@@ -1,141 +1,51 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 03 Jun 2013 17:25:10 +0200
-Subject: [PATCH v2 2/5] clk: samsung: Add support to register rate_table
- for PLL3xxx
-In-Reply-To: <CAKew6eVGnHNN7Fk=sqzE1iV+SFtJ1z4k1freeWdbGaYPXqpUvQ@mail.gmail.com>
-References: <1369834677-20312-1-git-send-email-vikas.sajjan@linaro.org>
- <CAD=FV=VDi+SfebiFnPNp8qR__9L=o9TJ+WSPRfRQLX+p+TMmJw@mail.gmail.com>
- <CAKew6eVGnHNN7Fk=sqzE1iV+SFtJ1z4k1freeWdbGaYPXqpUvQ@mail.gmail.com>
-Message-ID: <1710144.fZn06WrzIc@amdc1227>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 03 Jun 2013 09:26:21 -0600
+Subject: [PATCH] ARM: tegra: remove the ifdef of ARCH SoC in the
+ tegra_resume
+In-Reply-To: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
+References: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51ACB59D.9030005@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yadwinder,
+On 06/03/2013 02:10 AM, Joseph Lo wrote:
+> Removing the ifdef of ARCH_TEGRA_SoC in the tegra_resume function. Because
+> we always build with all Tegra SoCs support and had a runtime chip
+> detection code there. And we expect most of the chips would need the code
+> in the future.
+> 
+> We also fix a typo of a macro name that cause a build error.
 
-On Thursday 30 of May 2013 12:25:40 Yadwinder Singh Brar wrote:
-> Hi Doug,
-> 
-> On Thu, May 30, 2013 at 5:14 AM, Doug Anderson <dianders@chromium.org> 
-wrote:
-> > Vikas / Yadwinder,
-> > 
-> > On Wed, May 29, 2013 at 6:37 AM, Vikas Sajjan <vikas.sajjan@linaro.org> 
-wrote:
-> >> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> >> 
-> >> This patch defines a common rate_table which will contain recommended p,
-> >> m, s, k values for supported rates that needs to be changed for changing
-> >> corresponding PLL's rate.
-> >> 
-> >> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> >> ---
-> >> 
-> >>  drivers/clk/samsung/clk-exynos4.c    |    8 ++++----
-> >>  drivers/clk/samsung/clk-exynos5250.c |   14 +++++++-------
-> >>  drivers/clk/samsung/clk-pll.c        |   14 ++++++++++++--
-> >>  drivers/clk/samsung/clk-pll.h        |   33
-> >>  +++++++++++++++++++++++++++++++-- 4 files changed, 54 insertions(+), 15
-> >>  deletions(-)
-> > 
-> > I also reviewed this in our gerrit
-> > <https://gerrit.chromium.org/gerrit/#/c/56742/>, but I'll summarize
-> > here for the list...
-> > 
-> >>  struct clk * __init samsung_clk_register_pll35xx(const char *name,
-> >> 
-> >> -                       const char *pname, const void __iomem *base)
-> >> +                       const char *pname, const void __iomem *base,
-> >> +                       const struct samsung_pll_rate_table *rate_table,
-> >> +                       const unsigned int rate_count)
-> > 
-> > Feels like you should document here that rate_table needs to be sorted
-> > and the sort order.
-> 
-> sure,  we will add comment  to sort the table in descending order.
-> 
-> >> +struct samsung_pll_rate_table {
-> >> +       unsigned  int rate;
-> > 
-> > nit: extra space before "int" should be removed.
-> 
-> ok
-> 
-> > Also: you can include rate here if you need a convenient place to
-> > store it (which sadly means that this structure can't be const).
-> > ...but I do like Tomasz's idea of actually calculating it.  You can't
-> > know it at compile time since the parent rate comes from the device
-> > tree.
-> > 
-> > compatible = "samsung,clock-xxti";
-> > clock-frequency = <24000000>;
-> 
-> Actually this table should contain the recommended values
-> and if we see the user manual, the input(parent) rate is also a part
-> of recommended
-> table of different output rate for a particular PLL for that SoC.
+OK, this fixes the build issue, but this patch raises some questions
+about the code...
 
->From what I understood in the documentation is that there is a set of 
-recommended P, M, S (, K) tuples for each PLL and they are not dependent on 
-input frequency - f_in and f_out are provided in the table just for reference 
-to see the relation between output frequency and input frequency.
+> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
 
-I think we should ask some H/W engineer about that to make sure and choose the 
-proper implementation, which will work properly for future cases, instead of 
-ending with something that works just with current cases.
+> -#ifndef CONFIG_ARCH_TEGRA_2x_SOC
+>  	/* Are we on Tegra20? */
+>  	cmp	r6, #TEGRA20
+>  	beq	1f				@ Yes
 
-Best regards,
--- 
-Tomasz Figa
-Linux Kernel Developer
-Samsung R&D Institute Poland
-Samsung Electronics
+Was that ifdef completely incorrect before? I can see why the cmp/beq
+might be ifdef'd (although it's not worth it), but I assume the code
+after that beq was intended to run on all chips after Tegra20. The ifdef
+as it was written does something rather different; it prevents any of
+that code from running unless the kernel doesn't have Tegra20 support.
+So, I think that the removal of the ifdef is more of a bug-fix that
+"because we always build with all Tegra SoCs support. Let me know, and
+I'll re-write the commit description to something more accurate...
 
-> So as Tomasz said input(parent) rate may change with board,
-> then, do those corresponding recommended p, m, s, k will be valid?
-> 
-> In case, input(parent) rate changes then we may need different set of p, m
-> ,s, k values recommended for new input rate to get required(recommended to
-> use) output rate.
->
-> So, we think its better that the p, m, s and k along with the parent
-> is known at the compile time ( or DT ?),
-> as these p, m, s, k values are very much coupled with the parent rate
-> to achieve the
->  required(recommended to use) output rate.
-> 
-> Also, since the sorted table is required (sorted based on "rate"),
-> its better to have the rate in a const rate table.
-> 
-> And the whole set of recommended values should come from same place(DT
-> or static table),
-> to keep the things simple and consistent.
-> 
-> Moreover, practically for a particular SoC , we use the recommended
-> input(parent) rate only for a PLL.
-> So we should keep the things simple here presently.
-> 
-> >> +       unsigned int pdiv;
-> >> +       unsigned int mdiv;
-> >> +       unsigned int sdiv;
-> >> +       unsigned int kdiv;
-> > 
-> > I think kdiv is signed.
-> 
-> No, as these values should be the recommended values to be written in
-> corresponding  register bits. So it should remain unsigned.
-> 
-> K value should be considered as negative only while recalculating rate.
-> 
-> As per exynos5250 user manual's section 7.3.2 :
-> " K value description "Postive value (Negative value)":
-> Postive values is that you should write EPLLCON/VPLLCON register.
-> Negative value is that you can calculate PLL output frequency with it."
-> 
-> > -Doug
-> 
-> Regards,
-> Yadwinder & Vikas.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>  	/* Clear the flow controller flags for this CPU. */
+> -	cpu_to_csr_req r1, r0
+> +	cpu_to_csr_reg r1, r0
+>  	mov32	r2, TEGRA_FLOW_CTRL_BASE
+>  	ldr	r1, [r2, r1]
+>  	/* Clear event & intr flag */
+> @@ -70,7 +69,6 @@ no_cpu0_chk:
+>  	bic	r1, r1, r0
+>  	str	r1, [r2]
+>  1:
+> -#endif
+>  
+>  	check_cpu_part_num 0xc09, r8, r9
+>  	bne	not_ca9
