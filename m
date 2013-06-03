@@ -1,73 +1,135 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Jun 2013 10:44:05 -0400
-Subject: [GIT PULL] ARM: mvebu: cleanup for v3.11 (round 3 cumulative)
-In-Reply-To: <20130601053605.GH5189@quad.lixom.net>
-References: <20130528183422.GA31290@titan.lakedaemon.net>
- <20130601053605.GH5189@quad.lixom.net>
-Message-ID: <20130603144405.GH3803@titan.lakedaemon.net>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon,  3 Jun 2013 22:44:39 +0800
+Subject: [PATCH v2] ARM: mm: lazy cache flushing on non-mapped pages
+Message-ID: <1370270680-729-1-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 10:36:05PM -0700, Olof Johansson wrote:
-> Hi Jason,
-> 
-> On Tue, May 28, 2013 at 02:34:22PM -0400, Jason Cooper wrote:
-> > Olof,
-> > 
-> > This is the latest for cleanup, and the summary includes everything so
-> > far for this window.
-> > 
-> > 
-> > The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
-> > 
-> >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-3
-> > 
-> 
-> Something odd is going on here.
-> 
-> > for you to fetch changes up to c589f9b4b51317cfc530812fe90a9895bd51430e:
-> > 
-> >   arm: mvebu: mark functions of armada-370-xp.c as static (2013-05-21 13:44:32 +0000)
-> > 
-> > ----------------------------------------------------------------
-> > mvebu cleanup for v3.11 (round 3)
-> > 
-> >  - mvebu
-> >     - mark functions in armada-370-xp.c as static
-> > 
-> > ----------------------------------------------------------------
-> > Andrew Lunn (1):
-> >       ARM: Orion: Remove redundant init_dma_coherent_pool_size()
-> > 
-> > Maxime Ripard (1):
-> >       ARM: mvebu: Remove init_irq declaration in machine description
-> > 
-> > Thomas Petazzoni (1):
-> >       arm: mvebu: mark functions of armada-370-xp.c as static
-> > 
-> >  arch/arm/mach-kirkwood/common.c     |  6 ------
-> >  arch/arm/mach-mvebu/armada-370-xp.c | 15 +++------------
-> >  arch/arm/mach-orion5x/common.c      |  7 -------
-> >  3 files changed, 3 insertions(+), 25 deletions(-)
-> 
-> Two of the above patches are already in mainline, so the diffstat don't match.
+Currently flush_dcache_page() thinks pages as non-mapped if
+mapping_mapped(mapping) return false. This approach is very
+coase:
+	- mmap on part of file may cause all pages backed on
+	the file being thought as mmaped
 
-Sorry, this was due to my mis-understanding of an off-list comment.  I
-mis-read 'send fresh pull requests (paraphrased)' to mean you weren't
-pulling my first series of small PRs and I should just do inclusive PRs.
+	- file-backed pages aren't mapped into user space actually
+	if the memory mmaped on the file isn't accessed
 
-So, the tag annotation was for everything (one patch) since
-cleanup-3.11-2, and the PR summary was from v3.10-rc1 so you could see
-everything you were pulling in.  I didn't change this tag because,
-presumably, you would be getting the previous tags in the pull.
+This patch uses page_mapped() to decide if the page has been
+mapped.
 
-Clearly, I over-thought this.  I'll ask next time a request sounds odd.
-:)
+>From the attached test code, I find there is much performance
+improvement(>25%) when accessing page caches via read under this
+situations, so memcpy benefits a lot from not flushing cache
+under this situation.
 
-thx,
+No.   read time without the patch	No. read time with the patch
+================================================================
+No. 0, time  22615636 us		No. 0, time  22014717 us
+No. 1, time  4387851 us 		No. 1, time  3113184 us
+No. 2, time  4276535 us 		No. 2, time  3005244 us
+No. 3, time  4259821 us 		No. 3, time  3001565 us
+No. 4, time  4263811 us 		No. 4, time  3002748 us
+No. 5, time  4258486 us 		No. 5, time  3004104 us
+No. 6, time  4253009 us 		No. 6, time  3002188 us
+No. 7, time  4262809 us 		No. 7, time  2998196 us
+No. 8, time  4264525 us 		No. 8, time  3007255 us
+No. 9, time  4267795 us 		No. 9, time  3005094 us
 
-Jason.
+1), No.0. is to read the file from storage device, and others are
+to read the file from page caches basically.
+2), file size is 512M, and is on ext4 over usb mass storage.
+3), the test is done on Pandaboard.
+
+unsigned int  sum = 0;
+unsigned long sum_val = 0;
+
+static unsigned long tv_diff(struct timeval *tv1, struct timeval *tv2)
+{
+	return (tv2->tv_sec - tv1->tv_sec) * 1000000 +
+		(tv2->tv_usec - tv1->tv_usec);
+}
+
+int main(int argc, char *argv[])
+{
+	char *mbuf, fbuf;
+	int fd;
+	int i;
+	unsigned long page_size, size;
+	struct stat stat;
+	struct timeval t1, t2;
+	unsigned char *rbuf = malloc(32 * page_size);
+
+	if (!rbuf) {
+		printf("	%s\n", "malloc failed");
+		exit(-1);
+	}
+
+	page_size = getpagesize();
+	fd = open(argv[1], O_RDWR);
+	assert(fd >= 0);
+
+	fstat(fd, &stat);
+	size = stat.st_size;
+	printf("%s: file %s, size %lu, page size %lu\n",
+		argv[0],
+		argv[1], size, page_size);
+
+	gettimeofday(&t1, NULL);
+	mbuf = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (!mbuf) {
+		printf("	%s\n", "mmap failed");
+		exit(-1);
+	}
+
+	for (i = 0 ; i < size ; i += (page_size * 32)) {
+		int rcnt;
+		lseek(fd, i, SEEK_SET);
+		rcnt = read(fd, rbuf, page_size * 32);
+		if (rcnt != page_size * 32) {
+			printf("%s: read faild\n", __func__);
+			exit(-1);
+		}
+	}
+	free(rbuf);
+	munmap(mbuf, size);
+	gettimeofday(&t2, NULL);
+	printf("\tread mmaped time: %luus\n", tv_diff(&t1, &t2));
+
+	close(fd);
+}
+
+Cc: Michel Lespinasse <walken@google.com>
+Cc: Andrew Morton <akpm@linux-foundation.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Ming Lei <ming.lei@canonical.com>
+---
+V2:
+	- take Will's suggestion to remove check on
+	!mapping_mapped(mapping) because mapcount of
+	file-backed page always repsents the correct
+	mapping count of the page
+
+V1:
+        - take Catalin's suggestion to use page_mapped()
+
+ arch/arm/mm/flush.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 0d473cc..2ff66eb 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -287,7 +287,7 @@ void flush_dcache_page(struct page *page)
+ 	mapping = page_mapping(page);
+ 
+ 	if (!cache_ops_need_broadcast() &&
+-	    mapping && !mapping_mapped(mapping))
++	    mapping && !page_mapped(page))
+ 		clear_bit(PG_dcache_clean, &page->flags);
+ 	else {
+ 		__flush_dcache_page(mapping, page);
+-- 
+1.7.9.5
