@@ -1,22 +1,105 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 3 Jun 2013 10:32:44 +0200
-Subject: [PATCH v2] clk: implement clk_unregister
-In-Reply-To: <1370247855-3547-1-git-send-email-jiada_wang@mentor.com>
-References: <1370247855-3547-1-git-send-email-jiada_wang@mentor.com>
-Message-ID: <20130603083244.GA23140@pengutronix.de>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 3 Jun 2013 10:37:23 +0200
+Subject: [PATCH 1/2] spi: atmel: convert to
+ dma_request_slave_channel_compat()
+In-Reply-To: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
+References: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <20130603083723.GI11384@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, May 31, 2013 at 05:01:59PM +0200, Richard Genoud wrote:
+> Use generic DMA DT helper.
+> Platforms booting with or without DT populated are both supported.
+> 
+> Based on Ludovic Desroches <ludovic.desroches@atmel.com> patchset
+> "ARM: at91: move to generic DMA device tree binding"
+> 
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
 
-On Mon, Jun 03, 2013 at 05:24:15PM +0900, Jiada Wang wrote:
-> Currently clk_unregister is unimplemented, it is required in case
-> sub modules want actually remove clk device registered by clk_register.
-> This patch adds the implementation of clk_unregiser.
-s/unregiser/unregister/
+Looks fine for me to so
+Acked-by: Ludovic Desroches <ludovic.desroches@gmail.com>
 
-Uwe
+One comment below
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> ---
+>  drivers/spi/spi-atmel.c |   42 +++++++++++++++++++++++++++---------------
+>  1 file changed, 27 insertions(+), 15 deletions(-)
+> 
+> rebased on linux-next next-20130531
+> 
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 31cfc87..ea1ec00 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -424,10 +424,15 @@ static int atmel_spi_dma_slave_config(struct atmel_spi *as,
+>  	return err;
+>  }
+>  
+> -static bool filter(struct dma_chan *chan, void *slave)
+> +static bool filter(struct dma_chan *chan, void *pdata)
+>  {
+> -	struct	at_dma_slave *sl = slave;
+> +	struct atmel_spi_dma *sl_pdata = pdata;
+> +	struct at_dma_slave *sl;
+>  
+> +	if (!sl_pdata)
+> +		return false;
+> +
+> +	sl = &sl_pdata->dma_slave;
+>  	if (sl->dma_dev == chan->device->dev) {
+
+I am wondering if a null pointer dereference can happen here. In
+atmel_spi_configure_dma sdata was checked so maybe sl should be check
+here.
+
+>  		chan->private = sl;
+>  		return true;
+> @@ -438,24 +443,31 @@ static bool filter(struct dma_chan *chan, void *slave)
+>  
+>  static int atmel_spi_configure_dma(struct atmel_spi *as)
+>  {
+> -	struct at_dma_slave *sdata = &as->dma.dma_slave;
+>  	struct dma_slave_config	slave_config;
+> +	struct device *dev = &as->pdev->dev;
+>  	int err;
+>  
+> -	if (sdata && sdata->dma_dev) {
+> -		dma_cap_mask_t mask;
+> +	dma_cap_mask_t mask;
+> +	dma_cap_zero(mask);
+> +	dma_cap_set(DMA_SLAVE, mask);
+>  
+> -		/* Try to grab two DMA channels */
+> -		dma_cap_zero(mask);
+> -		dma_cap_set(DMA_SLAVE, mask);
+> -		as->dma.chan_tx = dma_request_channel(mask, filter, sdata);
+> -		if (as->dma.chan_tx)
+> -			as->dma.chan_rx =
+> -				dma_request_channel(mask, filter, sdata);
+> +	as->dma.chan_tx = dma_request_slave_channel_compat(mask, filter,
+> +							   &as->dma,
+> +							   dev, "tx");
+> +	if (!as->dma.chan_tx) {
+> +		dev_err(dev,
+> +			"DMA TX channel not available, SPI unable to use DMA\n");
+> +		err = -EBUSY;
+> +		goto error;
+>  	}
+> -	if (!as->dma.chan_rx || !as->dma.chan_tx) {
+> -		dev_err(&as->pdev->dev,
+> -			"DMA channel not available, SPI unable to use DMA\n");
+> +
+> +	as->dma.chan_rx = dma_request_slave_channel_compat(mask, filter,
+> +							   &as->dma,
+> +							   dev, "rx");
+> +
+> +	if (!as->dma.chan_rx) {
+> +		dev_err(dev,
+> +			"DMA RX channel not available, SPI unable to use DMA\n");
+>  		err = -EBUSY;
+>  		goto error;
+>  	}
+> -- 
+> 1.7.10.4
+> 
