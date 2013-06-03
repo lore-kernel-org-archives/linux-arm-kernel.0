@@ -1,41 +1,35 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 03 Jun 2013 10:07:49 -0700
-Subject: [PATCH v3 11/11] ARCH: mmp: support clocksource in timer
-In-Reply-To: <1370251845-31373-12-git-send-email-haojian.zhuang@gmail.com>
-References: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
- <1370251845-31373-12-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <51ACCD65.8030204@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 3 Jun 2013 19:09:54 +0200
+Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
+In-Reply-To: <20130603165753.GL3803@titan.lakedaemon.net>
+References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130603165753.GL3803@titan.lakedaemon.net>
+Message-ID: <20130603190954.3bd52784@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 02:30 AM, Haojian Zhuang wrote:
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index f151c6c..f429f68 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -72,6 +72,12 @@ config CLKSRC_METAG_GENERIC
->   	help
->   	  This option enables support for the Meta per-thread timers.
->   
-> +config CLKSRC_MMP
-> +	def_bool y if ARCH_MMP
-> +	select CLKSRC_OF if OF
-> +	help
-> +	  This option enables support for the MMP timer.
-> +
->   config CLKSRC_EXYNOS_MCT
->   	def_bool y if ARCH_EXYNOS
->   	help
->
+Dear Jason Cooper,
 
-If I'm reading the above right, CONFIG_CLKSRC_MMP is identical to 
-CONFIG_ARCH_MMP, no?
+On Mon, 3 Jun 2013 12:57:53 -0400, Jason Cooper wrote:
 
-Why not just use CONFIG_ARCH_MMP for configuration conditional code (and 
-have that config select CLKSRC_OF if appropriate)?
+> Won't this override a user editing the 'local-mac-address' property in
+> the dts?  Since we're dealing with appended dtbs, there's a higher
+> probability of the user doing such a thing.
+> 
+> I'll admit it's a corner case, but I'd like to make sure we've thought
+> through the use cases and aren't making things more complicated than
+> necessary.
 
-Otherwise we just start adding extra unnecessary config options that 
-really don't add any real meaning to things.
+I don't have a strong opinion about this one, so if it's seen as being
+necessary to preserve a potentially existing 'local-mac-address', then
+I'll add the necessary checks to only update the property if it doesn't
+already exist.
 
-thanks
--john
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
