@@ -1,90 +1,90 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 03 Jun 2013 15:19:25 -0700
-Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
- line
-In-Reply-To: <51AC667D.6070409@epfl.ch> (Florian Vaussard's message of "Mon,
- 03 Jun 2013 11:48:45 +0200")
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370040357-25794-4-git-send-email-khilman@linaro.org>
- <51AC667D.6070409@epfl.ch>
-Message-ID: <87mwr6kfbm.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jun 2013 23:23:22 +0100
+Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
+In-Reply-To: <51AD0703.6050408@codeaurora.org>
+References: <1368049671-22879-1-git-send-email-sboyd@codeaurora.org>
+ <5193E424.9090605@codeaurora.org> <519E57D2.3050000@codeaurora.org>
+ <20130523231531.GT18614@n2100.arm.linux.org.uk>
+ <20130524220539.GB599@codeaurora.org> <51AD0703.6050408@codeaurora.org>
+Message-ID: <20130603222321.GP18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Florian Vaussard <florian.vaussard@epfl.ch> writes:
+On Mon, Jun 03, 2013 at 02:13:39PM -0700, Stephen Boyd wrote:
+> Resending due to rmk's vacation.
+> 
+> On 05/24/13 15:05, Stephen Boyd wrote:
+> > I've noticed another problem now that our caches are used. On MSM
+> > we have TEXT_OFFSET set to at least 0x208000 if we've built-in
+> > support for MSM8x60/8960. If I boot a kernel with the MSM code
+> > built-in that requires the higher text offset, but I load my
+> > compressed kernel below that address (such as 0x0) the
+> > decompression fails.
+> >
+> > This happens because the page tables are written into the
+> > compressed data region before we relocate ourself to a higher
+> > location.
 
-> Hello Kevin,
->
-> On 06/01/2013 12:45 AM, Kevin Hilman wrote:
->> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
->> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
->> SYS_NIRQ pin in the twl4030 DTS file.
->>
->> Boards that hook up the twl4030 differently can easily override this
->> in their board-specific DTS file.
->>
->> This allows RTC wake from off-mode to work again on OMAP3-based
->> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
->> 3530/Overo, 3730/Overo-STORM.
->>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> ---
->>   arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
->>   1 file changed, 17 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
->> index b3034da..c7fe9f6 100644
->> --- a/arch/arm/boot/dts/twl4030.dtsi
->> +++ b/arch/arm/boot/dts/twl4030.dtsi
->> @@ -13,6 +13,8 @@
->>   	compatible = "ti,twl4030";
->>   	interrupt-controller;
->>   	#interrupt-cells = <1>;
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&twl4030_pins>;
->>
->>   	rtc {
->>   		compatible = "ti,twl4030-rtc";
->> @@ -92,3 +94,18 @@
->>   		#pwm-cells = <2>;
->>   	};
->>   };
->> +
->> +&omap3_pmx_core {
->
-> Here you are making the TWL4030 to explicitly depend on OMAP3. Could
-> this chip be used by another target? If the case, I would put this
-> piece of code in the files including twl4030. Otherwise it's ok here.
+We've always required kernel images to be loaded above RAM+32K for
+exactly this issue.
 
-I talked this over with Tony before posting.  In theorry, it could be
-used on other platforms.  In practice, it's only used on OMAP.  We can
-easily move this to board files if needed later, but thought it would be
-simpler to put it here.  I'll let Benoit decide.
+> > This is bad because we just wrote our page tables into the
+> > compressed data. Nobody notices though and we finish relocating
+> > ourselves and then we call decompress_kernel() which fails
+> > randomly. (BTW, why does error() sit in a while loop forever?
 
->> +	/*
->> +	 * On most OMAP3 platforms, the twl4030 IRQ line is connected
->> +         * to the SYS_NIRQ line on OMAP.  Therefore, configure the
->> +         * defaults for the SYS_NIRQ pin here.  Boards that hook up
->> +         * the twl4030 differently can easily override this in their
->> +         * board-specific DTS file.
->> +	 */
->> +	twl4030_pins: pinmux_twl4030_pins {
->> +		pinctrl-single,pins = <
->> +			0x1b0 0x4118 /*	sys_nirq.sys_nirq WAKEUP | INPUT_PULLUP | MODE 0 */
->
-> By using pinctrl constants:
->
-> 			0x1b0 (PIN_INPUT_PULLUP | WAKEUP_EN | MUX_MODE0)	/* sys_nirq.sys_nirq */
+It loops forever because there is _nothing_ else to be done.  It's
+already printed a message explaining why stuff has failed:
 
-Yup.
+void error(char *x)
+{
+        arch_error(x);
 
->> +		>;
->> +	};
->> +};
->>
->
-> I will test this afternoon on an Overo.
+        putstr("\n\n");
+        putstr(x);
+        putstr("\n\n -- System halted");
 
-Thanks,
+        while(1);       /* Halt */
+}
 
-Kevin
+and the while loop is to prevent us trying to do something stupid
+after failure.  Basically, error() never returns.
+
+I've no idea why you say the following:
+
+> > We
+> > can't get any information about why the decompression failed if
+> > we have debug_ll enabled. I had to patch the error() routine to
+> > not while loop forever to get that print after do_decompress to
+> > be useful.)
+
+Maybe your implementation of puts() for the decompressor is faulty then?
+Because it works for me - when something goes wrong with the decompression,
+I get a message such as:
+
+Decompressing kernel...
+
+CRC error
+
+ -- System halted
+
+> > I see a few solutions.
+> >
+> >  1) Relocate with caches off and then turn on caches after we're
+> >     running in a location where we won't overwrite ourselves.
+> >
+> >  2) Have temporary page tables for the relocation phase that live
+> >     just below the location we're going to relocate to.
+> >
+> >  3) Force bootloaders loading these types of images to load the
+> >     zImage at least as high as the TEXT_OFFSET is compiled to.
+> >
+> > I don't think we can convince everyone that #3 is ok to do. I'm
+> > leaning towards #2 since we get all the benefits of the cache
+> > during the relocation phase but #1 is the obviously simple fix.
+
+(3) is what we've always required in the past.  We already have code
+to relocate the compressed image, so we _might_ be able to do (1).
+
+The easy solution is to continue saying "minimum of RAM start + 32K"
+as we've always had in the past though.
