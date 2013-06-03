@@ -1,233 +1,46 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 03 Jun 2013 17:04:10 +0200
-Subject: [PATCH v3] arm: zynq: Add cpuidle support
-In-Reply-To: <51ACA237.8070004@linaro.org>
-References: <2ba502c172f5374ed2e424292fb50345c9dd007a.1370266815.git.michal.simek@xilinx.com>
- <51ACA237.8070004@linaro.org>
-Message-ID: <51ACB06A.2050206@monstr.eu>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Jun 2013 23:09:56 +0800
+Subject: [GIT PULL] ARM: imx: fixes for 3.10, take 2
+Message-ID: <20130603150953.GA13853@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 04:03 PM, Daniel Lezcano wrote:
-> On 06/03/2013 03:40 PM, Michal Simek wrote:
->> Add support for cpuidle.
->>
->> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
->> ---
->> Changes in v3:
->> - Move driver to drivers/cpuidle/
->> - Check zynq compatible string suggested by Arnd
->> - Use zynq_ function prefix because of multiplatform kernel
->> - Incorporate comments from Daniel Lezcano
->> - Rebase on the top of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
->>
->> Changes in v2:
->> - Fix file header
->>
->> Changes in v1:
->> - It was the part of Zynq core changes
->>   https://patchwork.kernel.org/patch/2342511/
->>
->>  drivers/cpuidle/Kconfig        |   6 +++
->>  drivers/cpuidle/Makefile       |   1 +
->>  drivers/cpuidle/cpuidle-zynq.c | 100 +++++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 107 insertions(+)
->>  create mode 100644 drivers/cpuidle/cpuidle-zynq.c
->>
->> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
->> index c4cc27e..8272a08 100644
->> --- a/drivers/cpuidle/Kconfig
->> +++ b/drivers/cpuidle/Kconfig
->> @@ -39,4 +39,10 @@ config CPU_IDLE_CALXEDA
->>  	help
->>  	  Select this to enable cpuidle on Calxeda processors.
->>
->> +config CPU_IDLE_ZYNQ
->> +	bool "CPU Idle Driver for Xilinx Zynq processors"
->> +	depends on ARCH_ZYNQ
->> +	help
->> +	  Select this to enable cpuidle on Xilinx Zynq processors.
->> +
->>  endif
->> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
->> index 0d8bd55..8767a7b 100644
->> --- a/drivers/cpuidle/Makefile
->> +++ b/drivers/cpuidle/Makefile
->> @@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
->>
->>  obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
->>  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
->> +obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
->> diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
->> new file mode 100644
->> index 0000000..afe6af3
->> --- /dev/null
->> +++ b/drivers/cpuidle/cpuidle-zynq.c
->> @@ -0,0 +1,100 @@
->> +/*
->> + * Copyright (C) 2012-2013 Xilinx
->> + *
->> + * CPU idle support for Xilinx Zynq
->> + *
->> + * based on arch/arm/mach-at91/cpuidle.c
->> + *
->> + * This file is licensed under the terms of the GNU General Public
->> + * License version 2.  This program is licensed "as is" without any
->> + * warranty of any kind, whether express or implied.
->> + *
->> + * The cpu idle uses wait-for-interrupt and RAM self refresh in order
->> + * to implement two idle states -
->> + * #1 wait-for-interrupt
->> + * #2 wait-for-interrupt and RAM self refresh
->> + */
-> 
-> Please check you headers, it seems you are including unused headers.
-> 
->> +#include <linux/kernel.h>
->> +#include <linux/init.h>
->> +#include <linux/platform_device.h>
->> +#include <linux/cpuidle.h>
->> +#include <linux/io.h>
-> 
-> ^^^^^
-> 
->> +#include <linux/export.h>
-> 
-> ^^^^^
-> 
->> +#include <linux/clockchips.h>
-> 
-> ^^^^^
-> 
->> +#include <linux/cpu_pm.h>
->> +#include <linux/clk.h>
-> 
-> ^^^^
-> 
->> +#include <linux/err.h>
->> +#include <linux/of.h>
->> +#include <asm/proc-fns.h>
->> +#include <asm/cpuidle.h>
->> +
->> +#define ZYNQ_MAX_STATES		2
->> +
->> +static DEFINE_PER_CPU(struct cpuidle_device, zynq_cpuidle_device);
-> 
-> see below.
-> 
->> +
->> +/* Actual code that puts the SoC in different idle states */
->> +static int zynq_enter_idle(struct cpuidle_device *dev,
->> +		struct cpuidle_driver *drv, int index)
-> 
-> Indentation.
-> 
->> +{
->> +	/* Devices must be stopped here */
->> +	cpu_pm_enter();
->> +
->> +	/* Add code for DDR self refresh start */
->> +	cpu_do_idle();
->> +
->> +	/* Add code for DDR self refresh stop */
->> +	cpu_pm_exit();
->> +
->> +	return index;
->> +}
->> +
->> +static struct cpuidle_driver zynq_idle_driver = {
->> +	.name = "zynq_idle",
->> +	.owner = THIS_MODULE,
->> +	.states = {
->> +		ARM_CPUIDLE_WFI_STATE,
->> +		{
->> +			.enter            = zynq_enter_idle,
->> +			.exit_latency     = 10,
->> +			.target_residency = 10000,
->> +			.flags            = CPUIDLE_FLAG_TIME_VALID,
->> +					    CPUIDLE_FLAG_TIMER_STOP,
->> +			.name             = "RAM_SR",
->> +			.desc             = "WFI and RAM Self Refresh",
->> +		},
->> +	},
->> +	.safe_state_index = 0,
->> +	.state_count = ZYNQ_MAX_STATES,
->> +};
->> +
->> +/* Initialize CPU idle by registering the idle states */
->> +static int zynq_init_cpuidle(void)
->> +{
->> +	unsigned int cpu;
->> +	struct cpuidle_device *device;
->> +	int ret;
->> +
->> +	if (!of_machine_is_compatible("xlnx,zynq-7000"))
->> +		return -ENODEV;
->> +
->> +	ret = cpuidle_register_driver(&zynq_idle_driver);
->> +	if (ret) {
->> +		pr_err("%s: Driver registration failed\n", __func__);
->> +		return ret;
->> +	}
->> +
->> +	for_each_possible_cpu(cpu) {
->> +		device = &per_cpu(zynq_cpuidle_device, cpu);
->> +		device->cpu = cpu;
->> +		ret = cpuidle_register_device(device);
->> +		if (ret) {
->> +			pr_err("%s: Device registration failed\n", __func__);
->> +			return ret;
->> +		}
->> +	}
->> +
->> +	pr_info("Xilinx Zynq CpuIdle Driver started\n");
-> 
-> Hi Michal,
-> 
-> actually you can replace this code by
-> 
-> cpuidle_register(&zynq_idle_driver, NULL);
-> 
-> and remove the zynq_cpuidle_device.
-> 
-> The framework will take care of registering the driver and the devices.
+The following changes since commit de78a23d73ba7f1d08f3e1aeaa0a03cb912c62a0:
 
-Will change.
+  ARM: imx: fix typo in gpu3d_shader_sels (2013-05-12 21:39:51 +0800)
 
+are available in the git repository at:
 
->> +	return 0;
->> +}
->> +module_init(zynq_init_cpuidle);
-> 
-> Do you really want it as module ?
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.10-2
 
-kirkwood is a module
-but in Makefile depends directly on ARCH
-obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+for you to fetch changes up to a08b9bc586a7810cdebbc316d5cbaed56a2a04a9:
 
-Calxeda uses module_init() which is in this configuration device_initcall.
+  ARM: imx: clk-imx6q: AXI clock select index is incorrect (2013-06-03 13:47:12 +0800)
 
-Any advantage to write it as module?
-Maybe for testing purpose will be helpful to have it as module too.
-What do you think?
+----------------------------------------------------------------
+The imx fixes for 3.10, take 2:
 
-BTW: I will also add entry to MAINTAINERS file and list myself in this header.
+- One device tree fix for all spi node to have per clock added.
+  The clock is needed by spi driver to calculate bit rate divisor.
+  The spi node in the current device trees either does not have the
+  clock or is defined as dummy clock, in which case the driver probe
+  will fail or spi will run at a wrong bit rate.
 
-Thanks,
-Michal
+- Two imx6q clock fixes, which correct axi_sels and ldb_di_sels.
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+----------------------------------------------------------------
+Anson Huang (1):
+      ARM: imx: clk-imx6q: AXI clock select index is incorrect
 
+Jiada Wang (1):
+      ARM i.MX6q: fix for ldb_di_sels
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130603/dfe10d66/attachment.sig>
+Jonas Andersson (1):
+      ARM: dts: imx: fix clocks for cspi
+
+ arch/arm/boot/dts/imx25.dtsi  |   12 ++++++------
+ arch/arm/boot/dts/imx27.dtsi  |    6 +++---
+ arch/arm/boot/dts/imx51.dtsi  |    2 +-
+ arch/arm/boot/dts/imx53.dtsi  |    2 +-
+ arch/arm/mach-imx/clk-imx6q.c |    4 ++--
+ 5 files changed, 13 insertions(+), 13 deletions(-)
