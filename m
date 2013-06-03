@@ -1,166 +1,48 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 3 Jun 2013 10:37:58 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc4
-Message-ID: <alpine.DEB.2.02.1306031029050.8116@utopia.booyaka.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Mon, 3 Jun 2013 11:40:11 +0100
+Subject: [PATCH v2 0/4] ARM: mm: HugeTLB + THP support.
+In-Reply-To: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+Message-ID: <20130603104010.GA26112@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, May 23, 2013 at 04:31:16PM +0100, Steve Capper wrote:
+> The following patches bring both HugeTLB support and Transparent
+> HugePage (THP) support to ARM.
+> 
+> Only long descriptors (LPAE) are supported in this series.
+> 
+> The code has been tested on an Arndale board (Exynos 5250).
+> 
+> This patch set is based on 3.10-rc2.
+> 
+> Major changes since the Patch:
+>  * LPAE code has been separated from non-LPAE code (this series
+>    is the LPAE code).
+>  * PROT_NONE support for HugeTLB and THP has been implemented.
+> 
+> Major changes since the RFC:
+>  * huge pmd sharing removed from the 3-level code as this was
+>    found to be very rarely, if ever?, used. This allowed for some
+>    code simplification.
+> 
+>  * hardware pmd bits for 2-levels of paging are now taken from
+>    mmu.c. Also the mapping code now uses pte/pmd bit helper
+>    functions rather than the custom pre-processor logic.
+> 
+> Cheers,
+> -- 
+> Steve
+> 
 
+Hello,
+I was wondering if anyone had any further comments on this series?
 
-Here are some basic OMAP test results for Linux v3.10-rc4.
-Logs and other details at:
+Russell,
+Are you happy for these to go into your patch system, or should anything be
+changed?
 
-    http://www.pwsan.com/omap/testlogs/test_v3.10-rc4/20130603034317/
-
-
-Test summary
-------------
-
-Build: uImage:
-    Pass (16/16): am33xx_only, n800_multi_omap2xxx, n800_only_a,
-                  omap1_defconfig, omap1_defconfig_1510innovator_only, 
-                  omap1_defconfig_5912osk_only, omap2plus_defconfig, 
-                  omap2plus_defconfig_2430sdp_only
-                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm, 
-                  omap2plus_defconfig_omap2_4_only, 
-                  omap2plus_defconfig_omap3_4_only, 
-                  rmk_omap3430_ldp_allnoconfig, 
-                  rmk_omap3430_ldp_oldconfig, 
-                  rmk_omap4430_sdp_allnoconfig, 
-                  rmk_omap4430_sdp_oldconfig
-
-Build: zImage:
-    Pass ( 1/ 1): omap2plus_defconfig
-
-Boot to userspace:
-    FAIL ( 3/12): 37xxevm, am335xbone, am335xbonelt
-    Pass ( 9/12): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-                  3730beaglexm, 4430es2panda, 4460pandaes, 5912osk,
-                  cmt3517
-
-PM: chip retention via suspend:
-    FAIL ( 3/ 6): 2430sdp, 37xxevm, 4430es2panda
-    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 4460pandaes
-
-PM: chip retention via dynamic idle:
-    FAIL ( 4/ 6): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 2/ 6): 3530es3beagle, 3730beaglexm
-
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 1/ 4): 3530es3beagle
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 1/ 4): 3530es3beagle
-
-
-Failing tests: fixed by posted patches
---------------------------------------
-
-(none)
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Boot tests:
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-  - Longstanding bug
-  - Not currently part of the automated test suite
-
-* 37xx EVM: boot fails
-  - Cause unknown
-
-Boot warnings:
-
-* 2420N800, 2430sdp: failed to get counter_32k resource
-  - "omap2_sync32k_clocksource_init: failed to get counter_32k resource"
-  - Cause unknown
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-* 2430SDP, 3730 Beagle XM, 3530 Beagle, 3517EVM, CM-T3517: {dmic,mcpdm} lookup failure
-  - Cause unknown
-  - These IP blocks don't exist on OMAP3xxx/AM35xx chips
-
-* 3730 Beagle XM, am335xbone, CM-T3517: uart4_rx.uart4_rx mux failure
-  - Cause unknown
-
-PM tests:
-
-* 2430sdp: power domains not entering retention
-  - Cause unknown
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock-gate ("debug ignore_loglevel")
-  - Cause unknown
-  - Not yet part of the automated test suite
-  - Re-tested at v3.7; still failing:
-    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
-
-* 4430es2panda: pwrdm state mismatch on CAM, DSS
-
-* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
-  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
-    per discussion with Tero Kristo
-  - Likely dependent on the bootloader version
-    - fails with 2012.07-00136-g755de79
-  - http://marc.info/?l=linux-arm-kernel&m=136432340618226&w=2
-
-* 4430es2panda: MPU, ABE didn't enter target state
-  - New for v3.10-rc
-
-* 4460pandaes: pwrdm state mismatch on DSS, ABE, IVAHD, TESLA
-
-* 4460pandaes: chip not entering retention in dynamic idle
-  - Presumably 4430es2panda also fails this
-  - Suspend-to-RAM enters full chip retention
-
-Other:
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter and Santosh Shilimkar report this does not appear with
-    the same X-loader/bootloader on his 4430ES2.3 Panda, so could be
-    ES-level dependent
-
-Failing tests: reported by others 
----------------------------------
-
-- RTC wakeup from suspend broken on 3730beaglexm
-  - as of v3.10-rc1
-  - discussion here: http://marc.info/?l=linux-omap&m=136915841625434&w=2
-
-
-vmlinux object size
-(delta in bytes from test_v3.10-rc3 
-(e4aa937ec75df0eea0bee03bffa3303ad36c986b)):
-   text     data      bss    total  kernel
-   -328        0        0     -328  am33xx_only
-    +64        0        0      +64  n800_multi_omap2xxx
-    +32        0        0      +32  n800_only_a
-   -512        0        0     -512  omap1_defconfig
-   -512        0        0     -512  omap1_defconfig_1510innovator_only
-   -512        0        0     -512  omap1_defconfig_5912osk_only
-   -328        0        0     -328  omap2plus_defconfig
-   -376        0        0     -376  omap2plus_defconfig_2430sdp_only
-   -328        0        0     -328  omap2plus_defconfig_cpupm
-   -328        0        0     -328  omap2plus_defconfig_no_pm
-   -328        0        0     -328  omap2plus_defconfig_omap2_4_only
-   -328        0        0     -328  omap2plus_defconfig_omap3_4_only
-   -384        0        0     -384  rmk_omap3430_ldp_allnoconfig
-    +79      +16        0      +95  rmk_omap3430_ldp_oldconfig
-   -384        0        0     -384  rmk_omap4430_sdp_allnoconfig
-   +115      -16        0      +99  rmk_omap4430_sdp_oldconfig
+Thanks,
+-- 
+Steve 
