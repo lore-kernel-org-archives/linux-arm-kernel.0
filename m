@@ -1,69 +1,35 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Mon, 3 Jun 2013 23:39:38 +0200
-Subject: [PATCH RFC 2/3] clk: dt: binding for basic multiplexor clock
-In-Reply-To: <201306032215.45983.heiko@sntech.de>
-References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
- <20130603200722.6077.85426@quantum> <201306032215.45983.heiko@sntech.de>
-Message-ID: <201306032339.39176.heiko@sntech.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Jun 2013 23:41:14 +0200
+Subject: [PATCH] cpufreq: bit.LITTLE needs cpufreq table
+Message-ID: <3453738.rxYxRehmQz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. Juni 2013, 22:15:45 schrieb Heiko St?bner:
-> Am Montag, 3. Juni 2013, 22:07:22 schrieb Mike Turquette:
-> > Quoting Heiko St?bner (2013-06-03 12:33:19)
-> > 
-> > > Hi Mike,
-> > > 
-> > > I think it's a multiplexEr clock in the patch title, and see below
-> > 
-> > Doh, you are right.  But "xor" is so much cooler looking than "xer"...
-> > 
-> > > Am Montag, 3. Juni 2013, 19:53:09 schrieb Mike Turquette:
-> > > > Device Tree binding for the basic clock multiplexor, plus the setup
-> > > > function to register the clock.  Based on the existing fixed-clock
-> > > > binding.
-> > > > 
-> > > > Also relocate declaration of of_fixed_factor_clk_setup to keep things
-> > > > tidy.
-> > > > 
-> > > > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > > 
-> > > [...]
-> > > 
-> > > > +
-> > > > +     reg = of_iomap(node, 0);
-> > > > +     pr_err("%s: reg is 0x%p\n", __func__, reg);
-> > > > +
-> > > > +     if (of_property_read_u32(node, "mask", &mask)) {
-> > > > +             pr_err("%s: missing mask property for %s\n", __func__,
-> > > > node->name); +             return;
-> > > > +     }
-> > > > +
-> > > > +     if (of_property_read_u32(node, "shift", &shift))
-> > > > +             pr_debug("%s: missing shift property defaults to zero
-> > > > for %s\n", +                             __func__, node->name);
-> > > > +
-> > > > +     if (of_property_read_bool(node, "index_one"))
-> > > > +             clk_mux_flags |= CLK_MUX_INDEX_ONE;
-> > > > +
-> > > > +     clk = clk_register_mux_table(NULL, clk_name, parent_names,
-> > > > num_parents, +                     0, reg, 0, mask, clk_mux_flags,
-> > > > 
-> > >                       ^- should probably be shift
-> > > 
-> > > Otherwise looks cool and I'm currently trying it with my Rockchip code.
-> > 
-> > Right again.  My test platform seems to not shift the mask at all so
-> > this did not cause a visible bug for me.
-> 
-> I'm currently converting my rockchip stuff to it, as it would solve a lot
-> of problems with the numerous clock types I'm defining just to put the
-> shift and mask values somewhere.
-> 
-> So lets see if anything more turns up ;-)
+Like a lot of the other cpufreq drivers, this one needs to
+select CONFIG_CPU_FREQ_TABLE to avoid a build error like
 
-yep ... of_mux_clk_setup is quite talkative ... there are quite some (debug-?) 
-pr_errs in it ;-)
+built-in.o: In function `bL_cpufreq_set_target':
+cpufreq/arm_big_little.c:71: undefined reference to `cpufreq_frequency_table_target'
+built-in.o: In function `bL_cpufreq_verify_policy':
+cpufreq/arm_big_little.c:55: undefined reference to `cpufreq_frequency_table_verify'
+built-in.o: In function `bL_cpufreq_init':
+cpufreq/arm_big_little.c:170: undefined reference to `cpufreq_frequency_table_cpuinfo'
+cpufreq/arm_big_little.c:178: undefined reference to `cpufreq_frequency_table_get_attr'
+built-in.o:(.data+0x5a80c): undefined reference to `cpufreq_freq_attr_scaling_available_freqs'
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Rafael J. Wysocki <rjw@sisk.pl>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
 
-Heiko
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index d3f2c6b..d1486d4 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -5,6 +5,7 @@
+ config ARM_BIG_LITTLE_CPUFREQ
+ 	tristate "Generic ARM big LITTLE CPUfreq driver"
+ 	depends on ARM_CPU_TOPOLOGY && PM_OPP && HAVE_CLK
++	select CPU_FREQ_TABLE
+ 	help
+ 	  This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
+ 
