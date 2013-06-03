@@ -1,103 +1,46 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Mon, 3 Jun 2013 16:29:45 +0900
-Subject: [PATCH] clk: implement clk_unregister
-Message-ID: <1370244585-2646-1-git-send-email-jiada_wang@mentor.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 3 Jun 2013 09:32:26 +0200
+Subject: [PATCH 1/3] ARM: at91: dt: add header to define at_hdmac
+ configuration
+In-Reply-To: <201305312330.29364.arnd@arndb.de>
+References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
+ <1369930103-11963-2-git-send-email-ludovic.desroches@atmel.com>
+ <201305312330.29364.arnd@arndb.de>
+Message-ID: <20130603073226.GG11384@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently clk_unregister is unimplemented, it is required in case
-sub modules want actually remove clk device registered by clk_register.
-This patch adds the implementation of clk_unregiser.
+On Fri, May 31, 2013 at 11:30:29PM +0200, Arnd Bergmann wrote:
+> On Thursday 30 May 2013, ludovic.desroches at atmel.com wrote:
+> > +/*
+> > + * Source and/or destination peripheral ID
+> > + */
+> > +#define AT91_DMA_CFG_PER_ID_MASK       (0xff)
+> > +#define AT91_DMA_CFG_PER_ID(id)                (id & AT91_DMA_CFG_PER_ID_MASK)
+> > +
+> 
+> I'm a little worried about macros like this one spreading in the name
+> of readability, and I don't see this as actual value-add here:
+> 
+> The output of the macro is always the same as the input, and passing
+> an invalid number still results in an invalid output and no error message,
+> it actually prevents us from warning about the mistake at run-time.
+> 
 
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-CC: Eremin, Dmitry <Dmitry_Eremin@mentor.com>
-CC: Dirk Behme <dirk.behme@de.bosch.com>
----
- drivers/clk/clk.c | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 55 insertions(+), 2 deletions(-)
+You are right, this macro is here only for readability in order to not have
+something like this:
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 545d8dd..f9944b2 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -152,6 +152,25 @@ out:
- }
- 
- /**
-+ * clk_debug_unregister - remove a clk node from the debugfs clk tree
-+ * @clk: the clk being removed from the debugfs clk tree
-+ *
-+ * Dynamically removes a clk and all it's children clk nodes from the
-+ * debugfs clk tree if clk->dentry points to debugfs created by
-+ * clk_debug_register in __clk_init.
-+ *
-+ * Caller must hold prepare_lock.
-+ *
-+ */
-+static void clk_debug_unregister(struct clk *clk)
-+{
-+	if (!clk || !clk->dentry)
-+		return;
-+
-+	debugfs_remove_recursive(clk->dentry);
-+}
-+
-+/**
-  * clk_debug_init - lazily create the debugfs clk tree visualization
-  *
-  * clks are often initialized very early during boot before memory can
-@@ -195,6 +214,7 @@ static int __init clk_debug_init(void)
- late_initcall(clk_debug_init);
- #else
- static inline int clk_debug_register(struct clk *clk) { return 0; }
-+static inline void clk_debug_unregister(struct clk *clk) { return; }
- #endif
- 
- /* caller must hold prepare_lock */
-@@ -1447,9 +1467,42 @@ EXPORT_SYMBOL_GPL(clk_register);
-  * clk_unregister - unregister a currently registered clock
-  * @clk: clock to unregister
-  *
-- * Currently unimplemented.
-  */
--void clk_unregister(struct clk *clk) {}
-+void clk_unregister(struct clk *clk)
-+{
-+	int i;
-+
-+	if (!clk)
-+		return;
-+
-+	mutex_lock(&prepare_lock);
-+	if (clk->prepare_count) {
-+		pr_debug("%s: can't unregister clk %s, it is prepared\n",
-+				__func__, clk->name);
-+		goto out;
-+	}
-+
-+	if (!hlist_empty(&clk->children)) {
-+		pr_debug("%s: clk %s has registered children\n",
-+				__func__, clk->name);
-+		goto out;
-+	}
-+
-+	clk_debug_unregister(clk);
-+
-+	hlist_del_init(&clk->child_node);
-+
-+	kfree(clk->parents);
-+	i = clk->num_parents;
-+	while (--i >= 0)
-+		kfree(clk->parent_names[i]);
-+	kfree(clk->parent_names);
-+	kfree(clk->name);
-+	kfree(clk);
-+out:
-+	mutex_unlock(&prepare_lock);
-+	return;
-+}
- EXPORT_SYMBOL_GPL(clk_unregister);
- 
- /***        clk rate change notifiers        ***/
--- 
-1.8.1.1
+dmas = <&dma0 AT91_DMA_CFG_FIFOCFG_ASAP | 13>
+
+In this case, I prefer having a macro instead of using a numeric value which
+can stand for other things than the peripheral id and which could conflict
+with other parameters such as the FIFO configuration.
+
+If adding this macro is really an issue, it could be removed of course but
+in this case I am in favour of readability.
+
+Ludovic
+
+> The other macros are fine.
+> 
+> 	Arnd
