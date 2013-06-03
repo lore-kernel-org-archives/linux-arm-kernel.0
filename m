@@ -1,34 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Jun 2013 15:54:07 +0200
-Subject: [PATCH 08/21] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <1370266965-7901-9-git-send-email-lee.jones@linaro.org>
-References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
- <1370266965-7901-9-git-send-email-lee.jones@linaro.org>
-Message-ID: <2199337.TqRF93pcHr@wuerfel>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Jun 2013 21:59:03 +0800
+Subject: [PATCH] thermal: thermal_core: policy store via sysfs is broken
+Message-ID: <1370267943-13297-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 June 2013 14:42:32 Lee Jones wrote:
-> @@ -559,6 +559,8 @@
->                         v-i2c-supply = <&db8500_vape_reg>;
->  
->                         clock-frequency = <400000>;
-> +                       clocks = <&clk 100>, <&clk 67>;
-> +                       clock-names = "nmk-i2c.0", "apb_pclk";
->                 };
->  
->                 i2c at 80122000 {
-> @@ -572,6 +574,9 @@
->                         v-i2c-supply = <&db8500_vape_reg>;
->  
->                         clock-frequency = <400000>;
-> +
-> +                       clocks = <&clk 85>, <&clk 42>;
-> +                       clock-names = "nmk-i2c.1", "apb_pclk";
->                 };
+When function __find_governor() gets called from policy_store(), the
+argument 'buf' has a '\n' character at the end.  This causes strnicmp()
+mismatches all the time.  Consequently, policy_store() will always
+return -EINVAL, and hence the policy store via sysfs will always fail
+even when users store a correct policy name.
 
-Same comment actually as for the uart patch, also SDI and MSP
-have the same problem.
+Fix the problem by using strncasecmp() for policy name matching in
+__find_governor().
 
-	Arnd
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/thermal/thermal_core.c |    5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/thermal/thermal_core.c b/drivers/thermal/thermal_core.c
+index d755440..6ba869f 100644
+--- a/drivers/thermal/thermal_core.c
++++ b/drivers/thermal/thermal_core.c
+@@ -57,9 +57,10 @@ static struct thermal_governor *__find_governor(const char *name)
+ {
+ 	struct thermal_governor *pos;
+ 
+-	list_for_each_entry(pos, &thermal_governor_list, governor_list)
+-		if (!strnicmp(name, pos->name, THERMAL_NAME_LENGTH))
++	list_for_each_entry(pos, &thermal_governor_list, governor_list) {
++		if (!strncasecmp(name, pos->name, strlen(pos->name)))
+ 			return pos;
++	}
+ 
+ 	return NULL;
+ }
+-- 
+1.7.9.5
