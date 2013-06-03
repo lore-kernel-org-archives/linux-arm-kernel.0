@@ -1,65 +1,76 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Mon, 03 Jun 2013 10:49:04 +0530
-Subject: [PATCH V4 4/4] ARM: dts: add clock provider information for i2s
- controllers in Exynos5250
-In-Reply-To: <1370236744-16802-1-git-send-email-padma.v@samsung.com>
-References: <1370236744-16802-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1370236744-16802-5-git-send-email-padma.v@samsung.com>
+Date: Mon, 03 Jun 2013 10:52:34 +0530
+Subject: [PATCH V2] ARM: dts: wm8994: Add wm8994 regulator support on smdk5250.
+Message-ID: <1370236954-16863-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock lookup information for i2s controllers on exynos5250 SoC.
+This patch adds the required regulator supplies and properties
+for wm8994 codec on smdk5250 board.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 ---
- arch/arm/boot/dts/exynos5250.dtsi |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 388983e..2b917ba 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -20,6 +20,8 @@
- #include "skeleton.dtsi"
- #include "exynos5250-pinctrl.dtsi"
+Changes since V1:
+	- Clubbed the same supply regulators as suggested by Mark.
+
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   37 +++++++++++++++++++++++++++-
+ 1 files changed, 35 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index f2a025e..dc2ec25 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -37,6 +37,30 @@
+ 		};
+ 	};
  
-+#include <dt-bindings/clk/exynos-audss-clk.h>
++	vdd:fixed-regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd-supply";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
 +
- / {
- 	compatible = "samsung,exynos5250";
- 	interrupt-parent = <&gic>;
-@@ -457,6 +459,13 @@
- 			&pdma0 9
- 			&pdma0 8>;
- 		dma-names = "tx", "rx", "tx-sec";
-+		clocks = <&clock_audss EXYNOS_I2S_BUS>,
-+			<&clock_audss EXYNOS_I2S_BUS>,
-+			<&clock_audss EXYNOS_SCLK_I2S>,
-+			<&clock_audss EXYNOS_MOUT_AUDSS>,
-+			<&clock_audss EXYNOS_MOUT_I2S>;
-+		clock-names = "iis", "i2s_opclk0", "i2s_opclk1",
-+				"mout_audss", "mout_i2s";
- 		samsung,supports-6ch;
- 		samsung,supports-rstclr;
- 		samsung,supports-secdai;
-@@ -471,6 +480,8 @@
- 		dmas = <&pdma1 12
- 			&pdma1 11>;
- 		dma-names = "tx", "rx";
-+		clocks = <&clock 307>;
-+		clock-names = "iis";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s1_bus>;
++	dbvdd:fixed-regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "dbvdd-supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	spkvdd:fixed-regulator at 2 {
++		compatible = "regulator-fixed";
++		regulator-name = "spkvdd-supply";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++
+ 	i2c at 12C70000 {
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-max-bus-freq = <20000>;
+@@ -47,8 +71,17 @@
+ 		};
+ 
+ 		wm8994: wm8994 at 1a {
+-			 compatible = "wlf,wm8994";
+-			 reg = <0x1a>;
++			compatible = "wlf,wm8994";
++			reg = <0x1a>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			AVDD2-supply = <&vdd>;
++			CPVDD-supply = <&vdd>;
++			DBVDD-supply = <&dbvdd>;
++			SPKVDD1-supply = <&spkvdd>;
++			SPKVDD2-supply = <&spkvdd>;
+ 		};
  	};
-@@ -481,6 +492,8 @@
- 		dmas = <&pdma0 12
- 			&pdma0 11>;
- 		dma-names = "tx", "rx";
-+		clocks = <&clock 308>;
-+		clock-names = "iis";
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&i2s2_bus>;
- 	};
+ 
 -- 
 1.7.4.4
