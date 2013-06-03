@@ -1,40 +1,35 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 3 Jun 2013 23:15:32 +0800
-Subject: [PATCH] ARM: mxs: icoll: Fix interrupts gpio bank 0
-In-Reply-To: <20130529144256.GD29528@S2101-09.ap.freescale.net>
-References: <1369753257-11091-1-git-send-email-mpa@pengutronix.de>
- <20130529144256.GD29528@S2101-09.ap.freescale.net>
-Message-ID: <20130603151530.GB23090@S2101-09.ap.freescale.net>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Mon,  3 Jun 2013 20:46:07 +0530
+Subject: [PATCH V3 0/2] USB: OHCI: Splitting ohci-platform into independent
+ driver
+In-Reply-To: <1369907454-11003-2-git-send-email-manjunath.goudar@linaro.org>
+References: <1369907454-11003-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1370272569-463-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 29, 2013 at 10:42:58PM +0800, Shawn Guo wrote:
-> On Tue, May 28, 2013 at 05:00:57PM +0200, Markus Pargmann wrote:
-> > The mxs interrupt controller does not support polling for interrupts,
-> > but the driver still does it, which is a relict from
-> > pre-MULTI_IRQ_HANDLER times.
-> > 
-> > The existing code assumes that 0x7f means no interrupt, but this value
-> > is an actually valid irq number, namely gpio bank 0's irq. This results
-> > in the driver not detecting when irq 0x7f is active which makes the
-> > machine effectively dead lock.
-> > 
-> > This patch removes the interrupt poll loop and allows usage of gpio0
-> > interrupt without an infinite loop.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > Cc: stable at vger.kernel.org
-> 
-> Thomas, can you please help handle the fix?  If yes, here is my ack.
-> 
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> 
-> Otherwise, I can send it through arm-soc tree if you're fine with it.
+This series patch begins the process of splitting ohci-platform up
+into independent driver modules and add a name for the platform-private field.
 
-Thomas,
+Patch 1/2 separate ohci-platform into independent driver modules.
 
-I'm sending the fix through arm-soc, and let me know if you have problem
-with that.
+V2 to V3:
+Directly Passed "hcd" argument without calling ohci_to_hcd() function.
 
-Shawn
+Patch 2/2 adds an ohci->priv field for private use by OHCI platform drivers.
+V2 to V3:
+No changes.
+ 
+Manjunath Goudar (2):
+  USB: OHCI: make ohci-platform a separate driver
+  USB: OHCI: add a name for the platform-private field
+
+ drivers/usb/host/Kconfig         |    2 +-
+ drivers/usb/host/Makefile        |    1 +
+ drivers/usb/host/ohci-hcd.c      |    6 +--
+ drivers/usb/host/ohci-platform.c |   88 ++++++++++++++++++--------------------
+ drivers/usb/host/ohci.h          |    3 ++
+ 5 files changed, 47 insertions(+), 53 deletions(-)
+
+-- 
+1.7.9.5
