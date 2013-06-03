@@ -1,46 +1,85 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 3 Jun 2013 09:32:26 +0200
-Subject: [PATCH 1/3] ARM: at91: dt: add header to define at_hdmac
- configuration
-In-Reply-To: <201305312330.29364.arnd@arndb.de>
+Date: Mon, 3 Jun 2013 09:39:07 +0200
+Subject: [PATCH 3/3] at_hdmac: add FIFO configuration parameter to DMA DT
+ binding
+In-Reply-To: <CAOesGMhQetZfyzMpCax63xoRqtRW2ZRXt04MCbgCT-CcvUq43A@mail.gmail.com>
 References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
- <1369930103-11963-2-git-send-email-ludovic.desroches@atmel.com>
- <201305312330.29364.arnd@arndb.de>
-Message-ID: <20130603073226.GG11384@ludovic.desroches@atmel.com>
+ <1369930103-11963-4-git-send-email-ludovic.desroches@atmel.com>
+ <51A77F10.8020808@atmel.com>
+ <20130530163936.GC23653@game.jcrosoft.org>
+ <51A86DF5.4010808@atmel.com>
+ <CAOesGMhQetZfyzMpCax63xoRqtRW2ZRXt04MCbgCT-CcvUq43A@mail.gmail.com>
+Message-ID: <20130603073907.GH11384@ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 11:30:29PM +0200, Arnd Bergmann wrote:
-> On Thursday 30 May 2013, ludovic.desroches at atmel.com wrote:
-> > +/*
-> > + * Source and/or destination peripheral ID
-> > + */
-> > +#define AT91_DMA_CFG_PER_ID_MASK       (0xff)
-> > +#define AT91_DMA_CFG_PER_ID(id)                (id & AT91_DMA_CFG_PER_ID_MASK)
-> > +
+On Fri, May 31, 2013 at 04:11:40PM -0700, Olof Johansson wrote:
+> On Fri, May 31, 2013 at 2:31 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> > On 31/05/2013 11:16, Ludovic Desroches :
+> >>
+> >> On Thu, May 30, 2013 at 06:39:36PM +0200, Jean-Christophe PLAGNIOL-VILLARD
+> >> wrote:
+> >>>
+> >>> On 18:32 Thu 30 May     , Nicolas Ferre wrote:
+> >>>>
+> >>>> On 30/05/2013 18:08, ludovic.desroches at atmel.com :
+> >>>>>
+> >>>>> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>>>>
+> >>>>> For most devices the FIFO configuration is the same i.e. when half FIFO
+> >>>>> size is
+> >>>>> available/filled, a source/destination request is serviced. But USART
+> >>>>> devices
+> >>>>> have to do it when there is enough space/data available to perform a
+> >>>>> single
+> >>>>> AHB access so the ASAP configuration.
+> >>>>>
+> >>>>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> >>>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> >>>>
+> >>>>
+> >>>> Clear and neat: thanks Ludo.
+> >>>
+> >>>
+> >>> agreed
+> >>>
+> >>> can we apply this via AT91 as this depends on some cleanup I did on DT
+> >>> and
+> >>> could result on some nigthmware conflict
+> >>>
+> >>
+> >> In fact, I am not sure it's the best solution. I have noticed that there
+> >> is a
+> >> conflict with a patch sent by Nicolas (dmaengine: at_hdmac: extend
+> >> hardware
+> >> handshaking interface identification) which is already in Vinod's tree but
+> >> which is not present on Jean-Christophe's cleanup tree on which I based
+> >> these
+> >> patches.
+> >>
+> >> Moreover this patch doesn't use macros introduced by Nicolas' patch. I may
+> >> update it and it should go through Vinod's tree with a dependence on patch
+> >> 1/3.
+> >>
+> >> What's your point of view?
+> >
+> >
+> > Indeed. Another option could be to push patches 1 and 3 in dmaengine's tree
+> > and make the 2nd patch go through arm-soc with a dependency on slave-dma GIT
+> > tree (it seems it is an usual patern).
+> >
+> > Arnd, Jean-Christophe, what do you think?
 > 
-> I'm a little worried about macros like this one spreading in the name
-> of readability, and I don't see this as actual value-add here:
-> 
-> The output of the macro is always the same as the input, and passing
-> an invalid number still results in an invalid output and no error message,
-> it actually prevents us from warning about the mistake at run-time.
+> I'm not sure patch 1 needs to go through the dma-engine tree? Sure,
+> it's a dma-related header file but it's only used to craft the device
+> tree in patch 2, it doesn't affect the driver.
 > 
 
-You are right, this macro is here only for readability in order to not have
-something like this:
-
-dmas = <&dma0 AT91_DMA_CFG_FIFOCFG_ASAP | 13>
-
-In this case, I prefer having a macro instead of using a numeric value which
-can stand for other things than the peripheral id and which could conflict
-with other parameters such as the FIFO configuration.
-
-If adding this macro is really an issue, it could be removed of course but
-in this case I am in favour of readability.
+Some macros are used into the at_hdmac driver. 
 
 Ludovic
 
-> The other macros are fine.
+> (Arnd has comments on the patch that should be resolved though).
 > 
-> 	Arnd
+> 
+> -Olof
