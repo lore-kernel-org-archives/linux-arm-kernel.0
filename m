@@ -1,55 +1,99 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Mon, 3 Jun 2013 10:29:00 -0700
-Subject: [PATCH] ARM: ux500: register LP5521 LEDs in the device tree
-In-Reply-To: <20130603081805.GC3370@gmail.com>
-References: <1369210331-18545-1-git-send-email-linus.walleij@stericsson.com>
- <CAK5ve-+oJL0fbtM=5xRSBjCztX1fP-fcwUvZurnj42hiXR5X+Q@mail.gmail.com>
- <20130603081805.GC3370@gmail.com>
-Message-ID: <CAK5ve-+ykvTfpfsyAfnoURwuZt1nF4aFPGU5yQa0HXXBmWW_9Q@mail.gmail.com>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Mon, 3 Jun 2013 19:38:18 +0200
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130531141508.GB15551@arm.com>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130529110508.GH17767@MacBook-Pro.local>
+ <20130529191657.GA13047@schnuecks.de>
+ <20130530164335.GK23631@arm.com>
+ <20130531120519.GB3803@titan.lakedaemon.net>
+ <20130531141508.GB15551@arm.com>
+Message-ID: <20130603173817.GA32211@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 3, 2013 at 1:18 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 31 May 2013, Bryan Wu wrote:
->
->> On Wed, May 22, 2013 at 1:12 AM, Linus Walleij
->> <linus.walleij@stericsson.com> wrote:
->> > From: Linus Walleij <linus.walleij@linaro.org>
->> >
->> > Based on pending device tree support in the LP55xx drivers
->> > we can add the correct LED and channel configuration from the
->> > ux500 device tree for all HREF variants.
->> >
->> > Cc: Milo Kim <Milo.Kim@ti.com>
->> > Cc: Bryan Wu <cooloney@gmail.com>
->> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> > ---
->> >  arch/arm/boot/dts/href.dtsi | 38 ++++++++++++++++++++++++++++++++------
->> >  1 file changed, 32 insertions(+), 6 deletions(-)
->> >
->> > diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
->> > index 62523f6..e315429 100644
->> > --- a/arch/arm/boot/dts/href.dtsi
->> > +++ b/arch/arm/boot/dts/href.dtsi
->> > @@ -63,16 +63,42 @@
->> >                 };
->> >
->> >                 i2c at 80128000 {
->> > -                       lp5521 at 0x33 {
->> > -                               compatible = "lp5521";
->> > +                       lp5521 at 33 {
->>
->> Is this right, I guess it should be still "lp5521 at 0x33", although it's
->> just a name.
->
-> What makes you say that Bryan?
->
-> All other nodes drop the '0x', as it's implied.
->
+Hi Catalin,
 
-But I still got this in this patch
-"  bh1780 at 0x29 {"
+On Fri, May 31, 2013 at 03:15:08PM +0100, Catalin Marinas wrote:
+> On Fri, May 31, 2013 at 01:05:19PM +0100, Jason Cooper wrote:
+> > On Thu, May 30, 2013 at 05:43:35PM +0100, Catalin Marinas wrote:
+> > > On Wed, May 29, 2013 at 08:16:57PM +0100, Simon Baatz wrote:
+> > > > On Wed, May 29, 2013 at 12:05:09PM +0100, Catalin Marinas wrote:
+> > > > > On Sun, May 12, 2013 at 06:35:56AM +0100, Simon Baatz wrote:
+> > > > > > Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
+> > > > > > it needs to handle are kernel mapped only.  However, for example when doing
+> > > > > > direct I/O, pages with user space mappings may occur.
+> > > > > 
+> > > > > After Nico's clarification, I think the original commit introducing this
+> > > > > function was also incomplete (commit 73be1591 - [ARM] 5545/2: add
+> > > > > flush_kernel_dcache_page() for ARM) since it ignores highmem pages and
+> > > > > their flushing could be deferred for a long time.
+> > > > 
+> > > > Yes, I agree.
+> > > >  
+> > > > > For my understanding (if I re-read this tread) - basically code like
+> > > > > this should not leave the user mapping inconsistent:
+> > > > > 
+> > > > > kmap()
+> > > > > ...
+> > > > > flush_kernel_dcache_page()
+> > > > > kunmap()
+> ...
+> > 
+> > wrt to 73be1591, this appears to go all the way back to v2.6.31.x... Can
+> > Simon go ahead and put this in rmk's patch tracker and mention that it
+> > should go to all -stable trees?
+> 
+> I'm not sure how easy it is to apply this patch on past stable versions.
+> Maybe something simpler for stable like always flushing the cache in
+> flush_kernel_dcache_page() with optimisation only in recent stable
+> versions.
 
-which is not changed. So which one should be the right?
+Looking at how to adapt the change to previous kernel versions, it
+occurred to me that we could probably simplify the current patch
+since we can make stronger assumptions than __flush_dcache_page()
+can do. As discussed, __flush_dcache_page() does:
 
--Bryan
+                        addr = kmap_high_get(page);
+                        if (addr) {
+                                __cpuc_flush_dcache_area(addr, PAGE_SIZE);
+                                kunmap_high(page);
+                        }
+
+The kmap_high_get() is used to ensure that the page is/remains pinned
+during the flush.  However, the API of flush_kernel_dcache_page()
+ensures that the page is already kmapped when it is called (as in the
+quoted example above).
+
+Thus, it is already pinned and we can simply look at page_address(). 
+If it is NULL, the page must have been obtained via kmap_atomic() and
+we don't need to flush anyway since kunmap_atomic() will do this. 
+
+The actual flush covering both the lowmem and highmem cases actually
+is as simple as this (inspired by __flush_dcache_page() in 2.6.32):
+
+	addr = page_address(page);
+#ifdef CONFIG_HIGHMEM
+	/*
+	 * kmap_atomic() doesn't set the page virtual address, and
+	 * kunmap_atomic() takes care of cache flushing already.
+	 */
+	if (addr)
+#endif
+		__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+
+If you agree that this makes sense, I will send a new version.
+
+If we change the patch this way, there is no need to split off
+__flush_kernel_dcache_page() from __flush_dcache_page(), which also
+makes it simpler to apply to past stable kernels.
+
+The only thing we need to be aware of is the change of
+flush_kernel_dcache_page() in 2.6.37 (commit f8b63c1).  In earlier
+versions, we would only need to fix the highmem case.  However, I
+wonder whether it makes sense to apply a fix to 2.6.32 and 2.6.34
+without this ever being reported as a problem.
+
+
+- Simon
