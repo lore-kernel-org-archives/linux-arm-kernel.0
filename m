@@ -1,51 +1,45 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 3 Jun 2013 16:20:25 +0200
-Subject: [PATCH v1] ARM: dts: omap4-panda: Update the twl6040 gpio to
- macro definition
-In-Reply-To: <51A8CC08.6090305@epfl.ch>
-References: <1370015122-26792-1-git-send-email-dmurphy@ti.com>
- <51A8CC08.6090305@epfl.ch>
-Message-ID: <51ACA629.3060505@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 3 Jun 2013 15:27:55 +0100
+Subject: [PATCH 08/21] ARM: ux500: Supply the I2C clocks lookup to the
+ DBX500 DT
+In-Reply-To: <2199337.TqRF93pcHr@wuerfel>
+References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
+ <1370266965-7901-9-git-send-email-lee.jones@linaro.org>
+ <2199337.TqRF93pcHr@wuerfel>
+Message-ID: <20130603142755.GH3370@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
+On Mon, 03 Jun 2013, Arnd Bergmann wrote:
 
-On 05/31/2013 06:12 PM, Florian Vaussard wrote:
-> Hello Dan,
+> On Monday 03 June 2013 14:42:32 Lee Jones wrote:
+> > @@ -559,6 +559,8 @@
+> >                         v-i2c-supply = <&db8500_vape_reg>;
+> >  
+> >                         clock-frequency = <400000>;
+> > +                       clocks = <&clk 100>, <&clk 67>;
+> > +                       clock-names = "nmk-i2c.0", "apb_pclk";
+> >                 };
+> >  
+> >                 i2c at 80122000 {
+> > @@ -572,6 +574,9 @@
+> >                         v-i2c-supply = <&db8500_vape_reg>;
+> >  
+> >                         clock-frequency = <400000>;
+> > +
+> > +                       clocks = <&clk 85>, <&clk 42>;
+> > +                       clock-names = "nmk-i2c.1", "apb_pclk";
+> >                 };
 > 
-> On 05/31/2013 05:45 PM, Dan Murphy wrote:
->> Update the dt property ti,audpwron-gpio to use the
->> gpio macro definition for GPIO_ACTIVE_HIGH.
->>
->> Signed-off-by: Dan Murphy <dmurphy@ti.com>
->> ---
->>   arch/arm/boot/dts/omap4-panda-common.dtsi |    2 +-
->>   1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi
->> b/arch/arm/boot/dts/omap4-panda-common.dtsi
->> index 800fa4e..00cbaa5 100644
->> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
->> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
->> @@ -190,7 +190,7 @@
->>           /* IRQ# = 119 */
->>           interrupts = <GIC_SPI 119 IRQ_TYPE_LEVEL_HIGH>; /*
->> IRQ_SYS_2N cascaded to gic */
->>           interrupt-parent = <&gic>;
->> -        ti,audpwron-gpio = <&gpio4 31 0>;  /* gpio line 127 */
->> +        ti,audpwron-gpio = <&gpio4 31 GPIO_ACTIVE_HIGH>;  /* gpio
->> line 127 */
->>
->>           vio-supply = <&v1v8>;
->>           v2v1-supply = <&v2v1>;
->>
-> 
-> I missed it during the conversion, thank you.
-> 
-> Reviewed-by: Florian Vaussard <florian.vaussard@epfl.ch>
+> Same comment actually as for the uart patch, also SDI and MSP
+> have the same problem.
 
-I've just applied it with Florian's Reviewed-by.
+I was only using the names in the same manor as the API does, to fetch
+the 'clocks =' index. Do you mean that I should be using 'uartclk',
+'i2cclk', 'sdmmcclk' and 'msp1clk' instead?
 
-Thanks,
-Benoit
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
