@@ -1,86 +1,139 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Jun 2013 15:17:31 -0400
-Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
-In-Reply-To: <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
-References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130603171017.GN18614@n2100.arm.linux.org.uk>
- <20130603175629.GH5008@1wt.eu>
- <20130603181437.GO3803@titan.lakedaemon.net>
- <20130603183057.GA9868@1wt.eu>
- <20130603184148.GQ3803@titan.lakedaemon.net>
- <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
-Message-ID: <20130603191730.GR3803@titan.lakedaemon.net>
+Date: Mon, 3 Jun 2013 15:22:30 -0400
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130603180339.GN3803@titan.lakedaemon.net>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130529110508.GH17767@MacBook-Pro.local>
+ <20130529191657.GA13047@schnuecks.de>
+ <20130530164335.GK23631@arm.com>
+ <20130531120519.GB3803@titan.lakedaemon.net>
+ <20130531141508.GB15551@arm.com>
+ <20130603173817.GA32211@schnuecks.de>
+ <20130603180339.GN3803@titan.lakedaemon.net>
+Message-ID: <20130603192230.GS3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 03:07:45PM -0400, Nicolas Pitre wrote:
-> On Mon, 3 Jun 2013, Jason Cooper wrote:
+It would be helpful if I actually did as I stated ;-)
+
+Adding Greg for real this time.
+
+On Mon, Jun 03, 2013 at 02:03:39PM -0400, Jason Cooper wrote:
+> All,
 > 
-> > On Mon, Jun 03, 2013 at 08:30:57PM +0200, Willy Tarreau wrote:
-> > > Hi Jason,
-> > > 
-> > > On Mon, Jun 03, 2013 at 02:14:37PM -0400, Jason Cooper wrote:
-> > > > > I understand your points, but then what could we do to get our devices
-> > > > > to have properly working ethernet interfaces ? These devices have already
-> > > > > been sold, and from what I've seen they've been using this ID since at
-> > > > > least the Kirkwood devices.
-> > > > > 
-> > > > > I found no other way to get the MAC address once the system is booted.
-> > > > > I would have no problem having some board-spec code locate the atags
-> > > > > and set the MAC, but it looks like the information is lost very early
-> > > > > and is not available anymore soon after the boot (or at least I couldn't
-> > > > > find it anywhere else).
-> > > > > 
-> > > > > It's really not with happiness that I had to add this part to the ATAGs,
-> > > > > but because I didn't find another solution :-(
-> > > > 
-> > > > Please take a look at Sebastian's approach, it's currently a wip:
-> > > > 
-> > > >   ARM: kirkwood: proper retain MAC address workaround on DT ethernet
-> > > > 
-> > > > The discussion following that patch should give you some good ideas.
-> > > 
-> > > I remember this discussion, but it is different and does not apply here.
-> > > Sebastian fixed an issue with a properly configured NIC which used to
-> > > lose its MAC, so the solution consisted in saving it early in the DT.
-> > > 
-> > > In the mv_neta case, the NICs are not configured yet and we need to
-> > > find the MAC somewhere. I only found it in the ATAGs and nowhere else.
-> > 
-> > ahhh, that's annoying.  :-(
-> > 
-> > > Well, in fact u-boot sets it on the MAC used to boot from the network
-> > > if such a boot is performed, but that's all. So in practice you boot
-> > > without the MAC address anywhere but in the ATAGs. I'd be happy to
-> > > find a way to parse non-standard atags in a board-specific file but
-> > > they're lost early it seems :-(
-> > 
-> > I assume they are in the u-boot environment.  As such, the only answer
-> > may be to have user space utilities like flash-kernel parse the
-> > environment and then customize the appended DT for the specific board.
+> Adding gregkh for insight into -stable and applying fixes to previous
+> kernels when the bug was not against them (but the offending commit
+> exists in them).
 > 
-> Or some board specific code could dig them out of the flash.  That at 
-> least would make this hack localized while keeping the common code 
-> clean.
-
-If it comes to that, I think I would rather tell users to put the mac
-address on the commandline.
-
-> Isn't upstream U-Boot supporting Marvell devices properly these days?  
-> If so maybe considering a U-Boot upgrade would be the best way forward?
-
-Yes, both u-boot and barebox are supporting Marvell devices, however, a
-lot of the devices on the consumer market are not easy/failsafe to
-upgrade the bootloader.  Especially for tinkerers and hobbyists.
-
-We've been trying to avoid telling hobbyists, "In order to support
-mainline kernels, you must upgrade the bootloader".
-
-At any rate, a lot of the boards currently supported by the kernel are
-not supported by u-boot or barebox.  u-boot seems to take a while to get
-patches merged.  Barebox is very responsive, board patches are small,
-but not many folks know about it yet...
-
-thx,
-
-Jason.
+> Greg,
+> 
+> Some history:  This bug stems from attempting to write O_DIRECT to a
+> dm-crypt device on ARM architectures.  In my case, it was trying (years
+> ago!) to put an LVM into a dm-crypt container.  This data corruption can
+> be more readily seen by using dd to write to a dm-crypt device with the
+> direct flag.
+> 
+> On Mon, Jun 03, 2013 at 07:38:18PM +0200, Simon Baatz wrote:
+> > Hi Catalin,
+> > 
+> > On Fri, May 31, 2013 at 03:15:08PM +0100, Catalin Marinas wrote:
+> > > On Fri, May 31, 2013 at 01:05:19PM +0100, Jason Cooper wrote:
+> > > > On Thu, May 30, 2013 at 05:43:35PM +0100, Catalin Marinas wrote:
+> > > > > On Wed, May 29, 2013 at 08:16:57PM +0100, Simon Baatz wrote:
+> > > > > > On Wed, May 29, 2013 at 12:05:09PM +0100, Catalin Marinas wrote:
+> > > > > > > On Sun, May 12, 2013 at 06:35:56AM +0100, Simon Baatz wrote:
+> > > > > > > > Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
+> > > > > > > > it needs to handle are kernel mapped only.  However, for example when doing
+> > > > > > > > direct I/O, pages with user space mappings may occur.
+> > > > > > > 
+> > > > > > > After Nico's clarification, I think the original commit introducing this
+> > > > > > > function was also incomplete (commit 73be1591 - [ARM] 5545/2: add
+> > > > > > > flush_kernel_dcache_page() for ARM) since it ignores highmem pages and
+> > > > > > > their flushing could be deferred for a long time.
+> > > > > > 
+> > > > > > Yes, I agree.
+> > > > > >  
+> > > > > > > For my understanding (if I re-read this tread) - basically code like
+> > > > > > > this should not leave the user mapping inconsistent:
+> > > > > > > 
+> > > > > > > kmap()
+> > > > > > > ...
+> > > > > > > flush_kernel_dcache_page()
+> > > > > > > kunmap()
+> > > ...
+> > > > 
+> > > > wrt to 73be1591, this appears to go all the way back to v2.6.31.x... Can
+> > > > Simon go ahead and put this in rmk's patch tracker and mention that it
+> > > > should go to all -stable trees?
+> > > 
+> > > I'm not sure how easy it is to apply this patch on past stable versions.
+> > > Maybe something simpler for stable like always flushing the cache in
+> > > flush_kernel_dcache_page() with optimisation only in recent stable
+> > > versions.
+> > 
+> > Looking at how to adapt the change to previous kernel versions, it
+> > occurred to me that we could probably simplify the current patch
+> > since we can make stronger assumptions than __flush_dcache_page()
+> > can do. As discussed, __flush_dcache_page() does:
+> > 
+> >                         addr = kmap_high_get(page);
+> >                         if (addr) {
+> >                                 __cpuc_flush_dcache_area(addr, PAGE_SIZE);
+> >                                 kunmap_high(page);
+> >                         }
+> > 
+> > The kmap_high_get() is used to ensure that the page is/remains pinned
+> > during the flush.  However, the API of flush_kernel_dcache_page()
+> > ensures that the page is already kmapped when it is called (as in the
+> > quoted example above).
+> > 
+> > Thus, it is already pinned and we can simply look at page_address(). 
+> > If it is NULL, the page must have been obtained via kmap_atomic() and
+> > we don't need to flush anyway since kunmap_atomic() will do this. 
+> > 
+> > The actual flush covering both the lowmem and highmem cases actually
+> > is as simple as this (inspired by __flush_dcache_page() in 2.6.32):
+> > 
+> > 	addr = page_address(page);
+> > #ifdef CONFIG_HIGHMEM
+> > 	/*
+> > 	 * kmap_atomic() doesn't set the page virtual address, and
+> > 	 * kunmap_atomic() takes care of cache flushing already.
+> > 	 */
+> > 	if (addr)
+> > #endif
+> > 		__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+> > 
+> > If you agree that this makes sense, I will send a new version.
+> > 
+> > If we change the patch this way, there is no need to split off
+> > __flush_kernel_dcache_page() from __flush_dcache_page(), which also
+> > makes it simpler to apply to past stable kernels.
+> > 
+> > The only thing we need to be aware of is the change of
+> > flush_kernel_dcache_page() in 2.6.37 (commit f8b63c1).  In earlier
+> > versions, we would only need to fix the highmem case.  However, I
+> > wonder whether it makes sense to apply a fix to 2.6.32 and 2.6.34
+> > without this ever being reported as a problem.
+> 
+> imho, if you discover a problem while running kernel v3.9.x, and the
+> commit causing the problem goes all the way back to 2.6.32, then the fix
+> should go back that far as well (assuming those kernels are still
+> actively maintained).  I don't think we would need a bug report for each
+> kernel version.
+> 
+> However, some more nuanced problems are not the result of a single
+> commit, but potentially the interaction of several commits.  In this
+> case, a more conservative application may be in order.
+> 
+> Greg, any thoughts?
+> 
+> thx,
+> 
+> Jason.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
