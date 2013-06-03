@@ -1,60 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  3 Jun 2013 17:52:55 +0100
-Subject: [PATCH] ARM: spinlock: retry trylock operation if strex fails on free
- lock
-Message-ID: <1370278375-13171-1-git-send-email-will.deacon@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Mon, 03 Jun 2013 09:52:59 -0700
+Subject: [PATCH] net: mvneta: read MAC address from hardware when available
+In-Reply-To: <1370277707-2468-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370277707-2468-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370278379.2025.40.camel@joe-AO722>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-An exclusive store instruction may fail for reasons other than lock
-contention (e.g. a cache eviction during the critical section) so, in
-line with other architectures using similar exclusive instructions
-(alpha, mips, powerpc), retry the trylock operation if the lock appears
-to be free but the strex reported failure.
+On Mon, 2013-06-03 at 18:41 +0200, Thomas Petazzoni wrote:
+> This patch improves the logic used by the mvneta driver to find a MAC
+> address for a particular interface. Until now, it was only looking at
+> the Device Tree, and if no address was found, was falling back to
+> generating a random MAC address.
+[]
+> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
+[]
+> @@ -2740,6 +2748,17 @@ static int mvneta_probe(struct platform_device *pdev)
+[]
+> +	dt_mac_addr = of_get_mac_address(dn);
+> +	if (dt_mac_addr && is_valid_ether_addr(dt_mac_addr))
+> +		memcpy(dev->dev_addr, dt_mac_addr, ETH_ALEN);
+> +	else {
+> +		mvneta_get_mac_addr(pp, hw_mac_addr);
+> +		if (is_valid_ether_addr(hw_mac_addr))
+> +			memcpy(dev->dev_addr, hw_mac_addr, ETH_ALEN);
+> +		else
+> +			eth_hw_addr_random(dev);
+> +	}
 
-Reported-by: Tony Thompson <anthony.thompson@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/include/asm/spinlock.h | 25 ++++++++++++++-----------
- 1 file changed, 14 insertions(+), 11 deletions(-)
+maybe there could be a dmesg line like:
 
-diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-index 6220e9f..f8b8965 100644
---- a/arch/arm/include/asm/spinlock.h
-+++ b/arch/arm/include/asm/spinlock.h
-@@ -97,19 +97,22 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
- 
- static inline int arch_spin_trylock(arch_spinlock_t *lock)
- {
--	unsigned long tmp;
-+	unsigned long contended, res;
- 	u32 slock;
- 
--	__asm__ __volatile__(
--"	ldrex	%0, [%2]\n"
--"	subs	%1, %0, %0, ror #16\n"
--"	addeq	%0, %0, %3\n"
--"	strexeq	%1, %0, [%2]"
--	: "=&r" (slock), "=&r" (tmp)
--	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
--	: "cc");
--
--	if (tmp == 0) {
-+	do {
-+		__asm__ __volatile__(
-+		"	ldrex	%0, [%3]\n"
-+		"	mov	%2, #0\n"
-+		"	subs	%1, %0, %0, ror #16\n"
-+		"	addeq	%0, %0, %4\n"
-+		"	strexeq	%2, %0, [%3]"
-+		: "=&r" (slock), "=&r" (contended), "=r" (res)
-+		: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
-+		: "cc");
-+	} while (res);
-+
-+	if (!contended) {
- 		smp_mb();
- 		return 1;
- 	} else {
--- 
-1.8.2.2
+	const char *mac_from;
+[...]
+		mac_from = "device tree"
+	else
+[...]
+			mac_from = "hardware"
+		else
+			mac_from = "random"
+[...]
+	netdev_info(dev, "Using %s mac address %pM\n",
+		    mac_from, dev->dev_addr);
