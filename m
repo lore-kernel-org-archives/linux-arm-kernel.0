@@ -1,139 +1,143 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Jun 2013 15:22:30 -0400
-Subject: [PATCH V4] ARM: handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130603180339.GN3803@titan.lakedaemon.net>
-References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
- <20130529110508.GH17767@MacBook-Pro.local>
- <20130529191657.GA13047@schnuecks.de>
- <20130530164335.GK23631@arm.com>
- <20130531120519.GB3803@titan.lakedaemon.net>
- <20130531141508.GB15551@arm.com>
- <20130603173817.GA32211@schnuecks.de>
- <20130603180339.GN3803@titan.lakedaemon.net>
-Message-ID: <20130603192230.GS3803@titan.lakedaemon.net>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 03 Jun 2013 15:33:24 -0400 (EDT)
+Subject: [PATCH] ARM: pcpu: ensure __my_cpu_offset cannot be re-ordered
+ across barrier()
+In-Reply-To: <1370278405-13261-1-git-send-email-will.deacon@arm.com>
+References: <1370278405-13261-1-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.LFD.2.03.1306031339010.1200@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It would be helpful if I actually did as I stated ;-)
+On Mon, 3 Jun 2013, Will Deacon wrote:
 
-Adding Greg for real this time.
+> __my_cpu_offset is non-volatile, since we want its value to be cached
+> when we access several per-cpu variables in a row with preemption
+> disabled. This means that we rely on preempt_{en,dis}able to hazard
+> with the operation via the barrier() macro, so that we can't end up
+> migrating CPUs without reloading the per-cpu offset.
+> 
+> Unfortunately, GCC doesn't treat a "memory" clobber on a non-volatile
+> asm block as a side-effect, and will happily re-order it before other
+> memory clobbers (including those in prempt_disable()) and cache the
+> value. This has been observed to break the cmpxchg logic in the slub
+> allocator, leading to livelock in kmem_cache_alloc in mainline kernels.
+> 
+> This patch adds a dummy memory output operand to __my_cpu_offset,
+> forcing it to be ordered with respect to the barrier() macro.
+> 
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/include/asm/percpu.h | 8 ++++++--
+>  1 file changed, 6 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+> index 968c0a1..93970eb 100644
+> --- a/arch/arm/include/asm/percpu.h
+> +++ b/arch/arm/include/asm/percpu.h
+> @@ -30,8 +30,12 @@ static inline void set_my_cpu_offset(unsigned long off)
+>  static inline unsigned long __my_cpu_offset(void)
+>  {
+>  	unsigned long off;
+> -	/* Read TPIDRPRW */
+> -	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : : "memory");
+> +	/*
+> +	 * Read TPIDRPRW.
+> +	 * We want to allow caching the value, so avoid using volatile and
+> +	 * instead use a fake memory access to hazard against barrier().
+> +	 */
+> +	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off), "=Qo" (off));
+>  	return off;
+>  }
 
-On Mon, Jun 03, 2013 at 02:03:39PM -0400, Jason Cooper wrote:
-> All,
-> 
-> Adding gregkh for insight into -stable and applying fixes to previous
-> kernels when the bug was not against them (but the offending commit
-> exists in them).
-> 
-> Greg,
-> 
-> Some history:  This bug stems from attempting to write O_DIRECT to a
-> dm-crypt device on ARM architectures.  In my case, it was trying (years
-> ago!) to put an LVM into a dm-crypt container.  This data corruption can
-> be more readily seen by using dd to write to a dm-crypt device with the
-> direct flag.
-> 
-> On Mon, Jun 03, 2013 at 07:38:18PM +0200, Simon Baatz wrote:
-> > Hi Catalin,
-> > 
-> > On Fri, May 31, 2013 at 03:15:08PM +0100, Catalin Marinas wrote:
-> > > On Fri, May 31, 2013 at 01:05:19PM +0100, Jason Cooper wrote:
-> > > > On Thu, May 30, 2013 at 05:43:35PM +0100, Catalin Marinas wrote:
-> > > > > On Wed, May 29, 2013 at 08:16:57PM +0100, Simon Baatz wrote:
-> > > > > > On Wed, May 29, 2013 at 12:05:09PM +0100, Catalin Marinas wrote:
-> > > > > > > On Sun, May 12, 2013 at 06:35:56AM +0100, Simon Baatz wrote:
-> > > > > > > > Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
-> > > > > > > > it needs to handle are kernel mapped only.  However, for example when doing
-> > > > > > > > direct I/O, pages with user space mappings may occur.
-> > > > > > > 
-> > > > > > > After Nico's clarification, I think the original commit introducing this
-> > > > > > > function was also incomplete (commit 73be1591 - [ARM] 5545/2: add
-> > > > > > > flush_kernel_dcache_page() for ARM) since it ignores highmem pages and
-> > > > > > > their flushing could be deferred for a long time.
-> > > > > > 
-> > > > > > Yes, I agree.
-> > > > > >  
-> > > > > > > For my understanding (if I re-read this tread) - basically code like
-> > > > > > > this should not leave the user mapping inconsistent:
-> > > > > > > 
-> > > > > > > kmap()
-> > > > > > > ...
-> > > > > > > flush_kernel_dcache_page()
-> > > > > > > kunmap()
-> > > ...
-> > > > 
-> > > > wrt to 73be1591, this appears to go all the way back to v2.6.31.x... Can
-> > > > Simon go ahead and put this in rmk's patch tracker and mention that it
-> > > > should go to all -stable trees?
-> > > 
-> > > I'm not sure how easy it is to apply this patch on past stable versions.
-> > > Maybe something simpler for stable like always flushing the cache in
-> > > flush_kernel_dcache_page() with optimisation only in recent stable
-> > > versions.
-> > 
-> > Looking at how to adapt the change to previous kernel versions, it
-> > occurred to me that we could probably simplify the current patch
-> > since we can make stronger assumptions than __flush_dcache_page()
-> > can do. As discussed, __flush_dcache_page() does:
-> > 
-> >                         addr = kmap_high_get(page);
-> >                         if (addr) {
-> >                                 __cpuc_flush_dcache_area(addr, PAGE_SIZE);
-> >                                 kunmap_high(page);
-> >                         }
-> > 
-> > The kmap_high_get() is used to ensure that the page is/remains pinned
-> > during the flush.  However, the API of flush_kernel_dcache_page()
-> > ensures that the page is already kmapped when it is called (as in the
-> > quoted example above).
-> > 
-> > Thus, it is already pinned and we can simply look at page_address(). 
-> > If it is NULL, the page must have been obtained via kmap_atomic() and
-> > we don't need to flush anyway since kunmap_atomic() will do this. 
-> > 
-> > The actual flush covering both the lowmem and highmem cases actually
-> > is as simple as this (inspired by __flush_dcache_page() in 2.6.32):
-> > 
-> > 	addr = page_address(page);
-> > #ifdef CONFIG_HIGHMEM
-> > 	/*
-> > 	 * kmap_atomic() doesn't set the page virtual address, and
-> > 	 * kunmap_atomic() takes care of cache flushing already.
-> > 	 */
-> > 	if (addr)
-> > #endif
-> > 		__cpuc_flush_dcache_area(addr, PAGE_SIZE);
-> > 
-> > If you agree that this makes sense, I will send a new version.
-> > 
-> > If we change the patch this way, there is no need to split off
-> > __flush_kernel_dcache_page() from __flush_dcache_page(), which also
-> > makes it simpler to apply to past stable kernels.
-> > 
-> > The only thing we need to be aware of is the change of
-> > flush_kernel_dcache_page() in 2.6.37 (commit f8b63c1).  In earlier
-> > versions, we would only need to fix the highmem case.  However, I
-> > wonder whether it makes sense to apply a fix to 2.6.32 and 2.6.34
-> > without this ever being reported as a problem.
-> 
-> imho, if you discover a problem while running kernel v3.9.x, and the
-> commit causing the problem goes all the way back to 2.6.32, then the fix
-> should go back that far as well (assuming those kernels are still
-> actively maintained).  I don't think we would need a bug report for each
-> kernel version.
-> 
-> However, some more nuanced problems are not the result of a single
-> commit, but potentially the interaction of several commits.  In this
-> case, a more conservative application may be in order.
-> 
-> Greg, any thoughts?
-> 
-> thx,
-> 
-> Jason.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+This doesn't work with the little test I wrote to see the compiler 
+behavior change.  Here's my test in case it is flawed:
+
+static inline unsigned long __my_cpu_offset(void)
+{
+       unsigned long off;
+       //asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : : "memory");
+       asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off), "=Qo" (off));
+       return off;
+}
+
+#define barrier() asm volatile ("" : : : "memory")
+
+int foo(int *a, int *b, char *c)
+{
+	int x, y, z;
+
+	x = a[__my_cpu_offset()];
+	barrier();
+	y = b[__my_cpu_offset()];
+	z = c[__my_cpu_offset()];
+	barrier();
+	return  x + y + z + a[__my_cpu_offset()];
+}
+
+With the original memory clobber (commented out above) the asm output 
+is:
+
+foo:
+        mrc     p15, 0, r3, c13, c0, 4
+        ldr     ip, [r0, r3, asl #2]
+        ldr     r1, [r1, r3, asl #2]
+        ldrb    r2, [r2, r3]    @ zero_extendqisi2
+        ldr     r3, [r0, r3, asl #2]
+        add     r0, ip, r1
+        add     r0, r0, r2
+        add     r0, r0, r3
+        bx      lr
+
+So to confirm that no memory barrier is respected in any way.
+
+With your change we get this instead:
+
+foo:
+        sub     sp, sp, #8
+        mrc     p15, 0, r3, c13, c0, 4
+        str     r3, [sp, #4]
+        ldr     ip, [r0, r3, asl #2]
+        ldr     r1, [r1, r3, asl #2]
+        str     r3, [sp, #4]
+        ldrb    r2, [r2, r3]    @ zero_extendqisi2
+        ldr     r3, [r0, r3, asl #2]
+        add     r0, ip, r1
+        add     r0, r0, r2
+        add     r0, r0, r3
+        add     sp, sp, #8
+        bx      lr
+
+So not only the barrier is completely ineffective at reloading the CPU 
+offset, but it introduces a useless store onto the stack.  Same behavior 
+with gcc versions 4.7.3, 4.6.2 and 4.5.1 (yes, that's really what I have 
+on my system -- waiting for 4.8.4 now).
+
+So if the preemption count is really what this should be protected 
+against, we should simply be adding that as an input dependency to the 
+inline asm constraint as follows:
+
+diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+index 968c0a14e0..52f9ca33e7 100644
+--- a/arch/arm/include/asm/percpu.h
++++ b/arch/arm/include/asm/percpu.h
+@@ -31,7 +31,9 @@ static inline unsigned long __my_cpu_offset(void)
+ {
+ 	unsigned long off;
+ 	/* Read TPIDRPRW */
+-	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : : "memory");
++	asm("mrc p15, 0, %0, c13, c0, 4"
++	    : "=r" (off)
++	    : "m" (current_thread_info()->preempt_count));
+ 	return off;
+ }
+ #define __my_cpu_offset __my_cpu_offset()
+
+The problem with this approach is that current_thread_info() is not a 
+static location either as it is always derrived from the stack pointer, 
+so it needlessly computes it even when nothing else uses it in the same 
+function.
+
+
+Nicolas
