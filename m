@@ -1,56 +1,65 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Mon, 3 Jun 2013 17:58:18 +0800
-Subject: A bug about system call on ARM
-In-Reply-To: <20130603095425.GA32242@mudshark.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
- <20130530090949.GC7483@mudshark.cambridge.arm.com>
- <20130530114112.GH7483@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
- <20130531084638.GB4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
- <20130531111305.GI4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B87B@CNBJMBX05.corpusers.net>
- <20130603095425.GA32242@mudshark.cambridge.arm.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D1610991B87E@CNBJMBX05.corpusers.net>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 03 Jun 2013 11:51:38 +0200
+Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
+In-Reply-To: <51AC5060.80806@linaro.org>
+References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
+ <51AC5060.80806@linaro.org>
+Message-ID: <51AC672A.5050501@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi  Will
+Hi,
 
-Oh  I see,
-Thanks for your reply 
-
-Yes ,  we are testing for it ,
-But need some time to wait for the result ,
-Because The stability test need some time to reproduce
-this issue , And this issue doesn't reproduce 100% .
-
-
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com] 
-Sent: Monday, June 03, 2013 5:54 PM
-To: Wang, Yalin
-Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
-Subject: Re: A bug about system call on ARM
-
-On Mon, Jun 03, 2013 at 06:25:26AM +0100, Wang, Yalin wrote:
-> Hi  Will,
+On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
+> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
+>> The current code considers every wakeup as spurious, which is not
+>> correct. Handle the same way as other arm platforms are doing.
+>>
+>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
 > 
-> I have a question about this patch .
-> 
-> If the user space is thumb mode,
-> The PC should be rewind by 2 bytes,
-> So the fix_up code should be
-> 
-> Sub lr, lr, #2 .
+> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > 
 > 
-> Am I right ?
+>> ---
+>>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
+>>  1 file changed, 7 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+>> index c89672b..a1ab22c 100644
+>> --- a/arch/arm/mach-zynq/hotplug.c
+>> +++ b/arch/arm/mach-zynq/hotplug.c
+>> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
+>>  		dsb();
+>>  		wfi();
+>>  
+>> +		if (pen_release == cpu_logical_map(cpu)) {
+>> +			/*
+>> +			 * OK, proper wakeup, we're done
+>> +			 */
+>> +			break;
+>> +		}
+>> +
 
-No, because we don't have OABI-compat support for Thumb applications and force everything down the EABI path instead.
+what pen_release stands for?
+I have looked at it and others platform are also using it in platsmp
+code which is not zynq case.
+How is it supposed to work and how this variable should be used?
 
-Did you manage to test the patch?
+Thanks,
+Michal
 
-Will
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130603/0494cd1f/attachment-0001.sig>
