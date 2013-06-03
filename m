@@ -1,48 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 23:38:29 +0100
-Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
-In-Reply-To: <alpine.LFD.2.03.1306031726410.1200@syhkavp.arg>
-References: <1368049671-22879-1-git-send-email-sboyd@codeaurora.org>
- <5193E424.9090605@codeaurora.org> <519E57D2.3050000@codeaurora.org>
- <20130523231531.GT18614@n2100.arm.linux.org.uk>
- <20130524220539.GB599@codeaurora.org> <51AD0703.6050408@codeaurora.org>
- <alpine.LFD.2.03.1306031726410.1200@syhkavp.arg>
-Message-ID: <20130603223829.GQ18614@n2100.arm.linux.org.uk>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 3 Jun 2013 18:39:35 -0400
+Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
+ line
+In-Reply-To: <87mwr6kfbm.fsf@linaro.org>
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+ <1370040357-25794-4-git-send-email-khilman@linaro.org>
+ <51AC667D.6070409@epfl.ch> <87mwr6kfbm.fsf@linaro.org>
+Message-ID: <20130603223935.GU3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 05:33:45PM -0400, Nicolas Pitre wrote:
-> > On 05/24/13 15:05, Stephen Boyd wrote:
-> > > I see a few solutions.
-> > >
-> > >  1) Relocate with caches off and then turn on caches after we're
-> > >     running in a location where we won't overwrite ourselves.
+On Mon, Jun 03, 2013 at 03:19:25PM -0700, Kevin Hilman wrote:
+> Florian Vaussard <florian.vaussard@epfl.ch> writes:
 > 
-> Due to the cost of doing memory copy with the cache off, thisoption 
-> should be conditionally used and only when there is an actual conflict.
+> > Hello Kevin,
+> >
+> > On 06/01/2013 12:45 AM, Kevin Hilman wrote:
+> >> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+> >> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
+> >> SYS_NIRQ pin in the twl4030 DTS file.
+> >>
+> >> Boards that hook up the twl4030 differently can easily override this
+> >> in their board-specific DTS file.
+> >>
+> >> This allows RTC wake from off-mode to work again on OMAP3-based
+> >> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+> >> 3530/Overo, 3730/Overo-STORM.
+> >>
+> >> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> >> ---
+> >>   arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
+> >>   1 file changed, 17 insertions(+)
+> >>
+> >> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+> >> index b3034da..c7fe9f6 100644
+> >> --- a/arch/arm/boot/dts/twl4030.dtsi
+> >> +++ b/arch/arm/boot/dts/twl4030.dtsi
+> >> @@ -13,6 +13,8 @@
+> >>   	compatible = "ti,twl4030";
+> >>   	interrupt-controller;
+> >>   	#interrupt-cells = <1>;
+> >> +	pinctrl-names = "default";
+> >> +	pinctrl-0 = <&twl4030_pins>;
+> >>
+> >>   	rtc {
+> >>   		compatible = "ti,twl4030-rtc";
+> >> @@ -92,3 +94,18 @@
+> >>   		#pwm-cells = <2>;
+> >>   	};
+> >>   };
+> >> +
+> >> +&omap3_pmx_core {
+> >
+> > Here you are making the TWL4030 to explicitly depend on OMAP3. Could
+> > this chip be used by another target? If the case, I would put this
+> > piece of code in the files including twl4030. Otherwise it's ok here.
 > 
-> > >  2) Have temporary page tables for the relocation phase that live
-> > >     just below the location we're going to relocate to.
-> > >
-> > >  3) Force bootloaders loading these types of images to load the
-> > >     zImage at least as high as the TEXT_OFFSET is compiled to.
-> > >
-> > > I don't think we can convince everyone that #3 is ok to do. I'm
-> > > leaning towards #2 since we get all the benefits of the cache
-> > > during the relocation phase but #1 is the obviously simple fix.
-> 
-> I'd consider #2 too.
+> I talked this over with Tony before posting.  In theorry, it could be
+> used on other platforms.  In practice, it's only used on OMAP.  We can
+> easily move this to board files if needed later, but thought it would be
+> simpler to put it here.  I'll let Benoit decide.
 
-The problem with #2 is the added complexity it brings.  The _whole_
-point of loading the kernel at RAM+32K is so that we know that the
-32K below the image is available for our use cheaply without playing
-all sorts of stupid games with turning caches on and off multiple
-times, or changing page tables and such like.
+What about omap boards that don't use the twl4030?  eg I'm currently
+tinkering with a board that uses a tps6507x...
 
-The initialization is already complicated enough, it doesn't need to
-become any more complicated.
+thx,
 
-An even simpler solution to this would be to pad the decompressor
-with a branch, and 32K-4 of zeros.  That removes the whole problem
-without adding much more code, but at the expense of 32K of bloat.
-32K is nothing compared to the >1.5MB zImage size we have today.
+Jason.
