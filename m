@@ -1,29 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  3 Jun 2013 14:46:15 +0100
-Subject: [PATCH] ARM: ux500: Remove SSP AUXDATA pertaining to DMA bindings
-Message-ID: <1370267175-8117-1-git-send-email-lee.jones@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Jun 2013 15:50:20 +0200
+Subject: [PATCH 09/21] ARM: ux500: Supply the UART clocks lookup to the
+ DBX500 DT
+In-Reply-To: <1370266965-7901-10-git-send-email-lee.jones@linaro.org>
+References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
+ <1370266965-7901-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <196465635.q8uKhQ7JEM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These are now cared for from the Device Tree.
+On Monday 03 June 2013 14:42:33 Lee Jones wrote:
+> @@ -650,6 +650,9 @@
+>                                <&dma 13 0 0x0>; /* Logical - MemToDev */
+>                         dma-names = "rx", "tx";
+>  
+> +                       clocks = <&clk 83>, <&clk 40>;
+> +                       clock-names = "uart0", "apb_pclk";
+> +
+>                         status = "disabled";
+>                 };
+>  
+> @@ -662,6 +665,9 @@
+>                                <&dma 12 0 0x0>; /* Logical - MemToDev */
+>                         dma-names = "rx", "tx";
+>  
+> +                       clocks = <&clk 84>, <&clk 41>;
+> +                       clock-names = "uart1", "apb_pclk";
+> +
+>                         status = "disabled";
+>                 };
+>  
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/cpu-db8500.c |    2 --
- 1 file changed, 2 deletions(-)
+This seems wrong: why would one of them have a clock named "uart0"
+and the other one call it "uart1"? The clock name should be defined
+in the binding and specific to the driver using it, not a string that
+indicates where it is connected to.
 
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 5f9b089..dab8f27 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -218,8 +218,6 @@ struct device * __init u8500_init_devices(void)
- static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires call-back bindings. */
- 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
--	/* Requires DMA bindings. */
--	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
- 	/* Requires non-DT:able platform data. */
- 	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu",
- 			&db8500_prcmu_pdata),
--- 
-1.7.10.4
+	Arnd
