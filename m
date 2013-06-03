@@ -1,26 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Jun 2013 00:05:07 +0200
-Subject: [PATCH] clk: spear: fix build error for spear3xx
-Message-ID: <2592841.P0ZcyhdZJA@wuerfel>
+Date: Tue, 04 Jun 2013 00:09:14 +0200
+Subject: [PATCH] ARM: psci: fix building without HOTPLUG_CPU
+Message-ID: <18058683.rI3Z0PFpBd@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is required to be able to disable spear320 support
-after the spear320_clk_init() prototype changed for the real
-function but not for the dummy.
+The cpu_die field in smp_operations is not valid with CONFIG_HOTPLUG_CPU,
+so we must enclose it in #ifdef, but at least that lets us remove
+two other lines.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+---
+KernelVersion: devel-stable
 
-diff --git a/drivers/clk/spear/spear3xx_clock.c b/drivers/clk/spear/spear3xx_clock.c
-index f9ec43f..080c3c5 100644
---- a/drivers/clk/spear/spear3xx_clock.c
-+++ b/drivers/clk/spear/spear3xx_clock.c
-@@ -369,7 +369,7 @@ static void __init spear320_clk_init(void __iomem *soc_config_base)
- 	clk_register_clkdev(clk, NULL, "60100000.serial");
+diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+index 23a1142..219f1d7 100644
+--- a/arch/arm/kernel/psci_smp.c
++++ b/arch/arm/kernel/psci_smp.c
+@@ -68,8 +68,6 @@ void __ref psci_cpu_die(unsigned int cpu)
+        /* We should never return */
+        panic("psci: cpu %d failed to shutdown\n", cpu);
  }
- #else
--static inline void spear320_clk_init(void) { }
-+static inline void spear320_clk_init(void __iomem *soc_config_base) { }
+-#else
+-#define psci_cpu_die NULL
  #endif
  
- void __init spear3xx_clk_init(void __iomem *misc_base, void __iomem *soc_config_base)
+ bool __init psci_smp_available(void)
+@@ -80,5 +78,7 @@ bool __init psci_smp_available(void)
+ 
+ struct smp_operations __initdata psci_smp_ops = {
+ 	.smp_boot_secondary	= psci_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
+ 	.cpu_die		= psci_cpu_die,
++#endif
+ };
