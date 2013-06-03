@@ -1,62 +1,31 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Mon, 3 Jun 2013 22:15:45 +0200
-Subject: [PATCH RFC 2/3] clk: dt: binding for basic multiplexor clock
-In-Reply-To: <20130603200722.6077.85426@quantum>
-References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
- <201306032133.20039.heiko@sntech.de> <20130603200722.6077.85426@quantum>
-Message-ID: <201306032215.45983.heiko@sntech.de>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 3 Jun 2013 13:18:01 -0700
+Subject: [PATCH V4 4/4] ARM: dts: add clock provider information for i2s
+ controllers in Exynos5250
+In-Reply-To: <1370236744-16802-5-git-send-email-padma.v@samsung.com>
+References: <1370236744-16802-1-git-send-email-padma.v@samsung.com>
+ <1370236744-16802-5-git-send-email-padma.v@samsung.com>
+Message-ID: <CAD=FV=X_XVmQ-jyorxATqBad5hhdFe5dodg_AzjsRQ-S+1=NeA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. Juni 2013, 22:07:22 schrieb Mike Turquette:
-> Quoting Heiko St?bner (2013-06-03 12:33:19)
-> 
-> > Hi Mike,
-> > 
-> > I think it's a multiplexEr clock in the patch title, and see below
-> 
-> Doh, you are right.  But "xor" is so much cooler looking than "xer"...
-> 
-> > Am Montag, 3. Juni 2013, 19:53:09 schrieb Mike Turquette:
-> > > Device Tree binding for the basic clock multiplexor, plus the setup
-> > > function to register the clock.  Based on the existing fixed-clock
-> > > binding.
-> > > 
-> > > Also relocate declaration of of_fixed_factor_clk_setup to keep things
-> > > tidy.
-> > > 
-> > > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > 
-> > [...]
-> > 
-> > > +
-> > > +     reg = of_iomap(node, 0);
-> > > +     pr_err("%s: reg is 0x%p\n", __func__, reg);
-> > > +
-> > > +     if (of_property_read_u32(node, "mask", &mask)) {
-> > > +             pr_err("%s: missing mask property for %s\n", __func__,
-> > > node->name); +             return;
-> > > +     }
-> > > +
-> > > +     if (of_property_read_u32(node, "shift", &shift))
-> > > +             pr_debug("%s: missing shift property defaults to zero for
-> > > %s\n", +                             __func__, node->name);
-> > > +
-> > > +     if (of_property_read_bool(node, "index_one"))
-> > > +             clk_mux_flags |= CLK_MUX_INDEX_ONE;
-> > > +
-> > > +     clk = clk_register_mux_table(NULL, clk_name, parent_names,
-> > > num_parents, +                     0, reg, 0, mask, clk_mux_flags,
-> > > 
-> >                       ^- should probably be shift
-> > 
-> > Otherwise looks cool and I'm currently trying it with my Rockchip code.
-> 
-> Right again.  My test platform seems to not shift the mask at all so
-> this did not cause a visible bug for me.
+Padmavathi,
 
-I'm currently converting my rockchip stuff to it, as it would solve a lot of 
-problems with the numerous clock types I'm defining just to put the shift and 
-mask values somewhere.
+On Sun, Jun 2, 2013 at 10:19 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+> +               clocks = <&clock_audss EXYNOS_I2S_BUS>,
+> +                       <&clock_audss EXYNOS_I2S_BUS>,
+> +                       <&clock_audss EXYNOS_SCLK_I2S>,
+> +                       <&clock_audss EXYNOS_MOUT_AUDSS>,
+> +                       <&clock_audss EXYNOS_MOUT_I2S>;
+> +               clock-names = "iis", "i2s_opclk0", "i2s_opclk1",
+> +                               "mout_audss", "mout_i2s";
 
-So lets see if anything more turns up ;-)
+Are there bindings for these clocks? Would be nice to see a
+description for what they are supposed to be.
+
+I looked up i2s_opclk0 / i2s_opclk1 and they look reasonable at a
+quick glance. ...and it does seem right that iis and i2s_opclk0 are
+the same. ...but I don't see any place that uses the last two. Is
+there an in-flight patch?
+
+-Doug
