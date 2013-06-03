@@ -1,52 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 3 Jun 2013 13:46:59 +0800
-Subject: [PATCH 2/4] ARM: imx: clk-imx6q: per1_bch's parent is wrong
-In-Reply-To: <20130603012939.GB13970@S2101-09.ap.freescale.net>
-References: <1370034115-24006-1-git-send-email-b20788@freescale.com>
- <1370034115-24006-2-git-send-email-b20788@freescale.com>
- <20130603012939.GB13970@S2101-09.ap.freescale.net>
-Message-ID: <20130603054655.GA23090@S2101-09.ap.freescale.net>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 3 Jun 2013 14:28:48 +0800
+Subject: [GIT PULL] SiRF fixes for the v3.10 series
+Message-ID: <CAGsJ_4xTVms1wZVgBDE-+qZMGxKT4s_u-A=wXiB2Xq0NztpOUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 09:29:41AM +0800, Shawn Guo wrote:
-> On Fri, May 31, 2013 at 05:01:53PM -0400, Anson Huang wrote:
-> > per1_bch is sourced from ahb, previous parent
-> > info is incorrect.
-> > 
-> > Signed-off-by: Anson Huang <b20788@freescale.com>
-> 
-> Applied, thanks.
-> 
-I just pulled it out.  As Reference Manual does not mention it, we need
-to confirm with designer about the correct parent of per1_bch.
+The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
 
-Shawn
+  Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
 
-> > ---
-> >  arch/arm/mach-imx/clk-imx6q.c |    2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
-> > index dfb77c1..c501947 100644
-> > --- a/arch/arm/mach-imx/clk-imx6q.c
-> > +++ b/arch/arm/mach-imx/clk-imx6q.c
-> > @@ -518,7 +518,7 @@ int __init mx6q_clocks_init(void)
-> >  	clk[openvg_axi]   = imx_clk_gate2("openvg_axi",    "axi",               base + 0x74, 30);
-> >  	clk[pcie_axi]     = imx_clk_gate2("pcie_axi",      "pcie_axi_sel",      base + 0x78, 0);
-> >  	clk[mx6fast1]     = imx_clk_gate2("mx6fast1",      "ahb",               base + 0x78, 8);
-> > -	clk[per1_bch]     = imx_clk_gate2("per1_bch",      "usdhc3",            base + 0x78, 12);
-> > +	clk[per1_bch]     = imx_clk_gate2("per1_bch",      "ahb",               base + 0x78, 12);
-> >  	clk[per2_main]    = imx_clk_gate2("per2_main",     "ahb",               base + 0x78, 14);
-> >  	clk[pwm1]         = imx_clk_gate2("pwm1",          "ipg_per",           base + 0x78, 16);
-> >  	clk[pwm2]         = imx_clk_gate2("pwm2",          "ipg_per",           base + 0x78, 18);
-> > -- 
-> > 1.7.9.5
-> > 
-> > 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+are available in the git repository at:
+
+  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
+tags/sirf-arm-soc-v3.10-fixes
+
+for you to fetch changes up to 3cc3b617dc39dad1e566ccfc4500154cb7c51aa3:
+
+  arm: prima2: use of_platform_populate instead of
+of_platform_bus_probe (2013-06-03 13:51:58 +0800)
+
+----------------------------------------------------------------
+SiRF fixes for V3.10
+
+- Replace include linux/module.h with linux/export.h
+- fix a checkpatch issue
+- use of_platform_populate instead of of_platform_bus_probe
+
+----------------------------------------------------------------
+Barry Song (2):
+      ARM: prima2: fix a checkpatch issue
+      arm: prima2: use of_platform_populate instead of of_platform_bus_probe
+
+Syam Sidhardhan (1):
+      ARM: prima2: Replace include linux/module.h with linux/export.h
+
+ arch/arm/mach-prima2/common.c | 17 ++---------------
+ arch/arm/mach-prima2/pm.c     |  2 +-
+ 2 files changed, 3 insertions(+), 16 deletions(-)
