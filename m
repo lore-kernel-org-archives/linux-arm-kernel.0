@@ -1,26 +1,114 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Jun 2013 10:15:22 -0400
-Subject: [PATCHv3 0/3] Add G762/G763 PWM fan controller
-In-Reply-To: <20130603023053.GA11723@roeck-us.net>
-References: <cover.1370202835.git.arno@natisbad.org>
- <20130603023053.GA11723@roeck-us.net>
-Message-ID: <20130603141522.GE3803@titan.lakedaemon.net>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 3 Jun 2013 16:16:19 +0200
+Subject: [PATCH v10 1/2] ARM: dts: omap4-panda: Update the LED support
+ for the panda DTS
+In-Reply-To: <1370015095-26746-1-git-send-email-dmurphy@ti.com>
+References: <1370015095-26746-1-git-send-email-dmurphy@ti.com>
+Message-ID: <51ACA533.8080904@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 02, 2013 at 07:30:53PM -0700, Guenter Roeck wrote:
-> On Sun, Jun 02, 2013 at 10:14:05PM +0200, Arnaud Ebalard wrote:
-...
-> > note: this should not be an issue but this v3 is based on
-> >       jcooper/mvebu/fixes branch. 
-> > 
-> I don't know about this branch/repository. If there are hwmon fixes in it,
-> they should be submitted to the lm-sensors mailing list.
+Hi Dan,
 
-Yes, please, unless you *need* a patch to build/boot that isn't in
-mainline yet, always base off of one of Linus' tags, eg v3.10-rc4.  Then,
-if asked, rebase as needed.
+On 05/31/2013 05:44 PM, Dan Murphy wrote:
+> The GPIO for LED D1 on the omap4-panda a1-a3 rev and the omap4-panda-es
+> are different.
+> 
+> A1-A3 = gpio_wk7
+> ES = gpio_110
+> 
+> There is no change to LED D2
+> 
+> Abstract away the pinmux and the LED definitions for the two boards into
+> the respective DTS files.
+> 
+> Signed-off-by: Dan Murphy <dmurphy@ti.com>
 
-thx,
+Thanks, I've just applied it in my branch.
 
-Jason.
+Regards,
+Benoit
+
+> ---
+> v10 - Update gpio entries to use gpio macros - https://patchwork.kernel.org/patch/2644561/ 
+> v9 - Removed comments for mux config - https://patchwork.kernel.org/patch/2644391/
+> v8 - Rebase to latest and use pinctrl macros - https://patchwork.kernel.org/patch/2629351/
+> v7 - Update headline to add spaces - https://patchwork.kernel.org/patch/2583661/
+> v6 - Review comments updated - https://patchwork.kernel.org/patch/2582771/
+> v5 - Provide pincrtl phandle to the gpio-led driver - https://patchwork.kernel.org/patch/2573981/
+>  arch/arm/boot/dts/omap4-panda-common.dtsi |   16 +++++++++++++++-
+>  arch/arm/boot/dts/omap4-panda-es.dts      |   28 ++++++++++++++++++++++++++++
+>  2 files changed, 43 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index d5d144a..800fa4e 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -16,8 +16,13 @@
+>  		reg = <0x80000000 0x40000000>; /* 1 GB */
+>  	};
+>  
+> -	leds {
+> +	leds: leds {
+>  		compatible = "gpio-leds";
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <
+> +			&led_wkgpio_pins
+> +		>;
+> +
+>  		heartbeat {
+>  			label = "pandaboard::status1";
+>  			gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+> @@ -157,6 +162,15 @@
+>  	};
+>  };
+>  
+> +&omap4_pmx_wkup {
+> +	led_wkgpio_pins: pinmux_leds_wkpins {
+> +		pinctrl-single,pins = <
+> +			0x1a (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk7 */
+> +			0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 */
+> +		>;
+> +	};
+> +};
+> +
+>  &i2c1 {
+>  	pinctrl-names = "default";
+>  	pinctrl-0 = <&i2c1_pins>;
+> diff --git a/arch/arm/boot/dts/omap4-panda-es.dts b/arch/arm/boot/dts/omap4-panda-es.dts
+> index 5cfdf19..56c4354 100644
+> --- a/arch/arm/boot/dts/omap4-panda-es.dts
+> +++ b/arch/arm/boot/dts/omap4-panda-es.dts
+> @@ -34,3 +34,31 @@
+>  		0x5e (PIN_INPUT | MUX_MODE0)		/* hdmi_sda.hdmi_sda */
+>  		>;
+>  };
+> +
+> +&omap4_pmx_core {
+> +	led_gpio_pins: gpio_led_pmx {
+> +		pinctrl-single,pins = <
+> +			0xb6 (PIN_OUTPUT | MUX_MODE3)	/* gpio_110 */
+> +		>;
+> +	};
+> +};
+> +
+> +&led_wkgpio_pins {
+> +	pinctrl-single,pins = <
+> +		0x1c (PIN_OUTPUT | MUX_MODE3)	/* gpio_wk8 */
+> +	>;
+> +};
+> +
+> +&leds {
+> +	pinctrl-0 = <
+> +		&led_gpio_pins
+> +		&led_wkgpio_pins
+> +	>;
+> +
+> +	heartbeat {
+> +		gpios = <&gpio4 14 GPIO_ACTIVE_HIGH>;
+> +	};
+> +	mmc {
+> +		gpios = <&gpio1 8 GPIO_ACTIVE_HIGH>;
+> +	};
+> +};
+> 
