@@ -1,180 +1,69 @@
-From: j-keerthy@ti.com (J, KEERTHY)
-Date: Mon, 3 Jun 2013 06:55:56 +0000
-Subject: [PATCH v10 01/12] mfd: DT bindings for the palmas family MFD
-In-Reply-To: <51A7DAC2.80602@wwwdotorg.org>
-References: <1363964122-19201-1-git-send-email-ian@slimlogic.co.uk>
- <1363964122-19201-2-git-send-email-ian@slimlogic.co.uk>
- <5150906F.9040202@wwwdotorg.org> <51A73908.7020206@ti.com>
- <51A7DAC2.80602@wwwdotorg.org>
-Message-ID: <DC88CAD03C0052499C1907B327FC63229E662E@DBDE04.ent.ti.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 3 Jun 2013 10:12:35 +0300
+Subject: [PATCHv2 3/6] sched_clock: Make ARM's sched_clock generic for
+ all architectures
+In-Reply-To: <1370155183-31421-4-git-send-email-sboyd@codeaurora.org>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+ <1370155183-31421-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130603071235.GO11798@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Stephen,
 
-> -----Original Message-----
-> From: Stephen Warren [mailto:swarren at wwwdotorg.org]
-> Sent: Friday, May 31, 2013 4:34 AM
-> To: J, KEERTHY
-> Cc: gg at slimlogic.co.uk; Ian Lartey; linux-kernel at vger.kernel.org;
-> linux-doc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> leds at vger.kernel.org; linux-watchdog at vger.kernel.org; devicetree-
-> discuss at lists.ozlabs.org; grant.likely at secretlab.ca;
-> broonie at opensource.wolfsonmicro.com; rob.herring at calxeda.com;
-> rob at landley.net; mturquette at linaro.org; linus.walleij at linaro.org;
-> cooloney at gmail.com; sfr at canb.auug.org.au; rpurdie at rpsys.net;
-> akpm at linux-foundation.org; sameo at linux.intel.com; wim at iguana.be;
-> lgirdwood at gmail.com; ldewangan at nvidia.com; Kristo, Tero
-> Subject: Re: [PATCH v10 01/12] mfd: DT bindings for the palmas family
-> MFD
+On Sat, Jun 01, 2013 at 11:39:40PM -0700, Stephen Boyd wrote:
+> Nothing about the sched_clock implementation in the ARM port is
+> specific to the architecture. Generalize the code so that other
+> architectures can use it by selecting GENERIC_SCHED_CLOCK.
 > 
-> On 05/30/2013 05:33 AM, keerthy wrote:
-> >
-> > On 03/25/2013 11:29 PM, Stephen Warren wrote:
-> >
-> >> On 03/22/2013 08:55 AM, Ian Lartey wrote:
-> >>> From: Graeme Gregory <gg@slimlogic.co.uk>
-> >>>
-> >>> Add the various binding files for the palmas family of chips. There
-> >>> is a top level MFD binding then a seperate binding for IP blocks on
-> chips.
-> >>
-> >>> diff --git a/Documentation/devicetree/bindings/clock/palmas-clk.txt
-> >>> b/Documentation/devicetree/bindings/clock/palmas-clk.txt
-> >>
-> >> Where is the reg property; if you're instantiating the clk device as
-> >> a standalone DT node and driver, it should be possible to retrieve
-> >> the address of this IP block instance from DT, not using driver-
-> internal APIs.
-> >>
-> >> This same comment likely applies everywhere, so I won't repeat it.
-> >>
-> >>> +Example:
-> >>> +
-> >>> +clk {
-> >>> +    compatible = "ti,twl6035-clk", "ti,palmas-clk";
-> >>> +    ti,clk32kg-mode-sleep = <0>;
-> >>> +    ti,clk32kgaudio-mode-sleep = <0>;
-> >>
-> >>> +    #clock-cells = <1>;
-> >>> +    clock-frequency = <32000000>;
-> >>> +    clock-names = "clk32kg", "clk32kgaudio";
-> >>
-> >> The binding description itself should describe what clocks this node
-> >> provides and consumes.
-> >>
-> >> What is clock-frequency; which clock does it affect?
-> >>
-> >> The presence of #clock-cells implies this is a clock provider. This
-> >> binding should define the format of the clock cells that this
-> >> property implies. I assume it's just the ID of the output clocks,
-> but
-> >> what values correspond to which output clocks? That mapping table
-> >> needs to be listed here.
-> >>
-> >> The presence of clock-names implies this is a clock consumer.
-> >> However, there is no clocks property in the example. Is clks missing
-> >> from the example, or should this property be clock-output-names
-> >> instead? If this node is a clock consumer, the list of which clocks
-> >> it requires should be documented.
-> >>
-> >>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-palmas.txt
-> >>> b/Documentation/devicetree/bindings/gpio/gpio-palmas.txt
-> >>
-> >>> +- gpio-controller: mark the device as a GPIO controller
-> >>> +- gpio-cells = <1>:  GPIO lines are provided.
-> >>
-> >> That's #gpio-cells not gpio-cells.
-> >>
-> >> I assume that cell simply contains the GPIO ID/number. That should
-> be
-> >> documented for clarity.
-> >>
-> >> Surely gpio-cells should be 2 not 1, so there is space for flags. At
-> >> least an "inverted" or "active-low" flag should be included; GPIO
-> >> consumers would typically implement that flag in SW, so there' no
-> >> requirement that the flag only be supported if the HW supports the
-> feature.
-> >>
-> >>> +- interrupt-controller : palmas has its own internal IRQs
-> >>> +- #interrupt-cells : should be set to 2 for IRQ number and flags
-> >>> +  The first cell is the IRQ number.
-> >>> +  The second cell is the flags, encoded as the trigger masks from
-> >>> +  Documentation/devicetree/bindings/interrupts.txt
-> >>
-> >> You need "/interrupt-controller" before the filename there.
-> >>
-> >>> +- interrupt-parent : The parent interrupt controller.
-> >>
-> >> If this IP block has interrupt outputs, it should require an
-> >> "interrupts" property too. This is the same concept that drives the
-> >> need for a reg property. This same comment likely applies
-> everywhere,
-> >> so I won't repeat it.
-> >>
-> >>> diff --git
-> >>> a/Documentation/devicetree/bindings/input/palmas-pwrbutton.txt
-> >>> b/Documentation/devicetree/bindings/input/palmas-pwrbutton.txt
-> >>
-> >>> +- interrupts: the interrupt outputs of the controller.
-> >>
-> >> How many entries are there, what do they mean, and in what order
-> must
-> >> they appear? (Note that the binding of a node must define the order
-> >> of the interrupts property, since historically it's been accessed by
-> >> index, not by name, and all bindings must allow that access method
-> to be used).
-> >>
-> >>> +- interrupt-names : Should be the name of irq resource. Each
-> >>> +interrupt
-> >>> +  binds its interrupt-name.
-> >>
-> >> The binding needs to define standard names for the entries in this
-> >> property, or define that interrupts are only retrieved by index, in
-> >> which case interrupt-names shouldn't be present. This same comment
-> >> likely applies everywhere, so I won't repeat it.
-> >>
-> >>> diff --git a/Documentation/devicetree/bindings/mfd/palmas.txt
-> >>> b/Documentation/devicetree/bindings/mfd/palmas.txt
-> >>
-> >>> +Required properties:
-> >> ...
-> >>
-> >> I believe the Palmas devices have many separate I2C addresses, even
-> >> buses, which are I think are at least partially independently SW
-> >> configurable. In that case, the reg property for this node should
-> >> probably enumerate all the I2C addresses that this chip responds to,
-> >> so that they can each be passed down to the child nodes.
-> >
-> >
-> > Stephen,
-> >
-> > The palmas devices do have multiple I2C slave IDs. From OMAP5 as the
-> > master all the palmas slave devices are connected via I2C1 bus.
-> >
-> > I did not understand the SW configurable part. It is more board
-> > dependent. Correct me if i understood it wrongly.
-> 
-> IIRC (and I may not sine it's been a while since I looked at this),
-> there are SW registers that can modify the I2C address that the chip
-> will respond to, so you could access the main I2C address, then program
-> which other I2C addresses get used.
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>  arch/arm/Kconfig                                      | 1 +
+>  arch/arm/common/timer-sp.c                            | 2 +-
+>  arch/arm/kernel/Makefile                              | 2 +-
+>  arch/arm/kernel/arch_timer.c                          | 2 +-
+>  arch/arm/kernel/time.c                                | 4 +---
+>  arch/arm/mach-davinci/time.c                          | 2 +-
+>  arch/arm/mach-imx/time.c                              | 2 +-
+>  arch/arm/mach-integrator/integrator_ap.c              | 2 +-
+>  arch/arm/mach-ixp4xx/common.c                         | 2 +-
+>  arch/arm/mach-mmp/time.c                              | 2 +-
+>  arch/arm/mach-msm/timer.c                             | 2 +-
+>  arch/arm/mach-omap1/time.c                            | 2 +-
+>  arch/arm/mach-omap2/timer.c                           | 2 +-
+>  arch/arm/mach-pxa/time.c                              | 2 +-
+>  arch/arm/mach-sa1100/time.c                           | 2 +-
+>  arch/arm/mach-u300/timer.c                            | 2 +-
+>  arch/arm/plat-iop/time.c                              | 2 +-
+>  arch/arm/plat-omap/counter_32k.c                      | 2 +-
+>  arch/arm/plat-orion/time.c                            | 2 +-
+>  arch/arm/plat-samsung/samsung-time.c                  | 2 +-
+>  arch/arm/plat-versatile/sched-clock.c                 | 2 +-
+>  drivers/clocksource/bcm2835_timer.c                   | 2 +-
+>  drivers/clocksource/clksrc-dbx500-prcmu.c             | 3 +--
+>  drivers/clocksource/dw_apb_timer_of.c                 | 2 +-
+>  drivers/clocksource/mxs_timer.c                       | 2 +-
+>  drivers/clocksource/nomadik-mtu.c                     | 2 +-
+>  drivers/clocksource/samsung_pwm_timer.c               | 2 +-
+>  drivers/clocksource/tegra20_timer.c                   | 2 +-
+>  drivers/clocksource/time-armada-370-xp.c              | 2 +-
+>  drivers/clocksource/timer-marco.c                     | 2 +-
+>  drivers/clocksource/timer-prima2.c                    | 2 +-
+>  {arch/arm/include/asm => include/linux}/sched_clock.h | 9 +++++++--
 
-Ok. I guess you are referring to the I2C_SPI register of Palmas.
-This register is indeed SW configurable and I tried changing the
-Slave IDs on the fly and I could change them. AFAIK these are OTP
-And never changed through software on the fly.
+Shouldn't we just merge this header into the existing linux/sched.h?
 
-> 
-> Or, perhaps I was just thinking of the fact that there are strapping
-> pins on the chip that affect both the main I2C address, and some/all of
-> the other I2C addresses, so the driver needs to be told each and every
-> I2C address, not just one single overall I2C address.
+baruch
 
-Looking at the register spec there seem to be 2 possible combinations:
-0x48, 0x49, 0x4A or 0x58, 0x59, 0x5A. Again these are OTP. By default
-It is 0x48, 0x49, 0x4A. So passing 0x48 or 0x58 as the main I2C
-Address seems sufficient here.
+>  init/Kconfig                                          | 3 +++
+>  init/main.c                                           | 2 ++
+>  kernel/time/Makefile                                  | 1 +
+>  {arch/arm/kernel => kernel/time}/sched_clock.c        | 3 +--
+>  36 files changed, 45 insertions(+), 37 deletions(-)
+>  rename {arch/arm/include/asm => include/linux}/sched_clock.h (75%)
+>  rename {arch/arm/kernel => kernel/time}/sched_clock.c (99%)
 
-Regards,
-Keerthy
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
