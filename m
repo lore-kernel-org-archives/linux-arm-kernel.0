@@ -1,92 +1,36 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 3 Jun 2013 11:52:51 +0300
-Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
-In-Reply-To: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130603085251.GQ11798@tarshish>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 03 Jun 2013 09:54:03 +0100
+Subject: [PATCHv6 00/11] Remove ARM local timer API
+In-Reply-To: <20130531221633.GG599@codeaurora.org>
+References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
+ <20130531174526.GD599@codeaurora.org> <51A8E71D.1000407@linaro.org>
+ <20130531221633.GG599@codeaurora.org>
+Message-ID: <51AC59AB.4080802@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Sat, Jun 01, 2013 at 11:39:37PM -0700, Stephen Boyd wrote:
-> This is mostly a resend of a patch series I sent a little over a month
-> ago. I've reordered the patches so that John can pick up the first three
-> and get a generic sched_clock layer without having to take the 64 bit
-> patches. The last three patches add 64 bit support and move the architected
-> timers on ARM64 and ARM to use it.
-
-You can have my
-
-Build-tested-by: Baruch Siach <baruch@tkos.co.il>
-
-for xtensa target, with the dw_apb_timer driver (no real hardware yet).
-
-Thanks for pushing this series.
-
-baruch
-
-> Stephen Boyd (6):
->   ARM: sched_clock: Remove unused needs_suspend member
->   ARM: sched_clock: Return suspended count earlier
->   sched_clock: Make ARM's sched_clock generic for all architectures
->   sched_clock: Add support for >32 bit sched_clock
->   ARM: arch_timer: Move to setup_sched_clock_64()
->   arm64: Move to generic sched_clock infrastructure
+On 31/05/13 23:16, Stephen Boyd wrote:
+> On 05/31, John Stultz wrote:
+>> On 05/31/2013 10:45 AM, Stephen Boyd wrote:
+>>> Comments have been light for this round so I think we're about
+>>> ready to merge. John/Thomas, can you pick up these patches or
+>>> shall I route them through arm-soc or something else?
+>>
+>>
+>> So there looks to be a fair amount of additions in the ARM tree, do
+>> those already have acks from Arnd/Olof/other folks? (I think I was
+>> only cc'ed on the first two patches).
 > 
->  arch/arm/Kconfig                                   |   1 +
->  arch/arm/common/timer-sp.c                         |   2 +-
->  arch/arm/kernel/Makefile                           |   2 +-
->  arch/arm/kernel/arch_timer.c                       |  16 +--
->  arch/arm/kernel/time.c                             |   4 +-
->  arch/arm/mach-davinci/time.c                       |   2 +-
->  arch/arm/mach-imx/time.c                           |   2 +-
->  arch/arm/mach-integrator/integrator_ap.c           |   2 +-
->  arch/arm/mach-ixp4xx/common.c                      |   2 +-
->  arch/arm/mach-mmp/time.c                           |   2 +-
->  arch/arm/mach-msm/timer.c                          |   2 +-
->  arch/arm/mach-omap1/time.c                         |   2 +-
->  arch/arm/mach-omap2/timer.c                        |   2 +-
->  arch/arm/mach-pxa/time.c                           |   2 +-
->  arch/arm/mach-sa1100/time.c                        |   2 +-
->  arch/arm/mach-u300/timer.c                         |   2 +-
->  arch/arm/plat-iop/time.c                           |   2 +-
->  arch/arm/plat-omap/counter_32k.c                   |   2 +-
->  arch/arm/plat-orion/time.c                         |   2 +-
->  arch/arm/plat-samsung/samsung-time.c               |   2 +-
->  arch/arm/plat-versatile/sched-clock.c              |   2 +-
->  arch/arm64/Kconfig                                 |   1 +
->  arch/arm64/kernel/time.c                           |  11 +-
->  drivers/clocksource/bcm2835_timer.c                |   2 +-
->  drivers/clocksource/clksrc-dbx500-prcmu.c          |   3 +-
->  drivers/clocksource/dw_apb_timer_of.c              |   2 +-
->  drivers/clocksource/mxs_timer.c                    |   2 +-
->  drivers/clocksource/nomadik-mtu.c                  |   2 +-
->  drivers/clocksource/samsung_pwm_timer.c            |   2 +-
->  drivers/clocksource/tegra20_timer.c                |   2 +-
->  drivers/clocksource/time-armada-370-xp.c           |   2 +-
->  drivers/clocksource/timer-marco.c                  |   2 +-
->  drivers/clocksource/timer-prima2.c                 |   2 +-
->  .../include/asm => include/linux}/sched_clock.h    |  14 ++-
->  init/Kconfig                                       |   3 +
->  init/main.c                                        |   2 +
->  kernel/time/Makefile                               |   1 +
->  {arch/arm/kernel => kernel/time}/sched_clock.c     | 114 +++++++++++++++------
->  38 files changed, 132 insertions(+), 92 deletions(-)
->  rename {arch/arm/include/asm => include/linux}/sched_clock.h (62%)
->  rename {arch/arm/kernel => kernel/time}/sched_clock.c (74%)
-> 
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> hosted by The Linux Foundation
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I'm still missing acks from Kukjin and Barry.
 
+I don't think that should hold off the patch series. It's been tested on
+most other platforms over the course of several months. If the platform
+maintainers aren't responsive enough, fixing the issues becomes their
+problem.
+
+FWIW, have my
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+	M.
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Jazz is not dead. It just smells funny...
