@@ -1,76 +1,55 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Mon, 3 Jun 2013 10:29:08 -0700
-Subject: [PATCH v5] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <1369893217-27809-1-git-send-email-b35083@freescale.com>
-References: <1369893217-27809-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130603172908.GA3272@kroah.com>
+From: cooloney@gmail.com (Bryan Wu)
+Date: Mon, 3 Jun 2013 10:29:00 -0700
+Subject: [PATCH] ARM: ux500: register LP5521 LEDs in the device tree
+In-Reply-To: <20130603081805.GC3370@gmail.com>
+References: <1369210331-18545-1-git-send-email-linus.walleij@stericsson.com>
+ <CAK5ve-+oJL0fbtM=5xRSBjCztX1fP-fcwUvZurnj42hiXR5X+Q@mail.gmail.com>
+ <20130603081805.GC3370@gmail.com>
+Message-ID: <CAK5ve-+ykvTfpfsyAfnoURwuZt1nF4aFPGU5yQa0HXXBmWW_9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 01:53:37PM +0800, Jingchang Lu wrote:
-> Add Freescale lpuart driver support. The lpuart device
-> can be found on Vybrid VF610 and Layerscape LS-1 SoCs.
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> Acked-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> changes in v5:
->  Coding style fix, remove redundant code.
->  Checking clk_prepare_enable return value.
->  Using devm_ioremap_resource instead of devm_request_and_ioremap.
-> 
-> changes in v4:
->  Change Vybrid VF610 SoC compatible string to "fsl,vf610-lpuart"
-> 
-> changes in v3:
->  Use general driver name lpuart instead of mvf for further share between SoCs.
->  Add bind doc in Documentation/devicetree/bindings/tty/serial.
->  Remove unused #include header lines and clean up code.
-> 
-> changes in v2:
->  Remove unused variables and clean up the code.
-> 
->  .../devicetree/bindings/tty/serial/fsl-lpuart.txt  |  14 +
->  drivers/tty/serial/Kconfig                         |  14 +
->  drivers/tty/serial/Makefile                        |   1 +
->  drivers/tty/serial/fsl_lpuart.c                    | 873 +++++++++++++++++++++
->  include/uapi/linux/serial_core.h                   |   3 +
->  5 files changed, 905 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-lpuart.txt
->  create mode 100644 drivers/tty/serial/fsl_lpuart.c
-> 
-> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-lpuart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-lpuart.txt
-> new file mode 100644
-> index 0000000..6fd1dd1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-lpuart.txt
-> @@ -0,0 +1,14 @@
-> +* Freescale low power universal asynchronous receiver/transmitter (lpuart)
-> +
-> +Required properties:
-> +- compatible : Should be "fsl,<soc>-lpuart"
-> +- reg : Address and length of the register set for the device
-> +- interrupts : Should contain uart interrupt
-> +
-> +Example:
-> +
-> +uart0: serial at 40027000 {
-> +	       compatible = "fsl,vf610-lpuart";
-> +	       reg = <0x40027000 0x1000>;
-> +	       interrupts = <0 61 0x00>;
-> +       };
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 7e7006f..aee7030 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -1484,6 +1484,20 @@ config SERIAL_RP2_NR_UARTS
->  	  If multiple cards are present, the default limit of 32 ports may
->  	  need to be increased.
->  
-> +config SERIAL_FSL_LPUART
-> +	bool "Freescale lpuart serial port support"
+On Mon, Jun 3, 2013 at 1:18 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Fri, 31 May 2013, Bryan Wu wrote:
+>
+>> On Wed, May 22, 2013 at 1:12 AM, Linus Walleij
+>> <linus.walleij@stericsson.com> wrote:
+>> > From: Linus Walleij <linus.walleij@linaro.org>
+>> >
+>> > Based on pending device tree support in the LP55xx drivers
+>> > we can add the correct LED and channel configuration from the
+>> > ux500 device tree for all HREF variants.
+>> >
+>> > Cc: Milo Kim <Milo.Kim@ti.com>
+>> > Cc: Bryan Wu <cooloney@gmail.com>
+>> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> > ---
+>> >  arch/arm/boot/dts/href.dtsi | 38 ++++++++++++++++++++++++++++++++------
+>> >  1 file changed, 32 insertions(+), 6 deletions(-)
+>> >
+>> > diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
+>> > index 62523f6..e315429 100644
+>> > --- a/arch/arm/boot/dts/href.dtsi
+>> > +++ b/arch/arm/boot/dts/href.dtsi
+>> > @@ -63,16 +63,42 @@
+>> >                 };
+>> >
+>> >                 i2c at 80128000 {
+>> > -                       lp5521 at 0x33 {
+>> > -                               compatible = "lp5521";
+>> > +                       lp5521 at 33 {
+>>
+>> Is this right, I guess it should be still "lp5521 at 0x33", although it's
+>> just a name.
+>
+> What makes you say that Bryan?
+>
+> All other nodes drop the '0x', as it's implied.
+>
 
-Why can't this be built as a module?  I can't force users to only build
-this driver into the kernel, sorry.
+But I still got this in this patch
+"  bh1780 at 0x29 {"
 
-greg k-h
+which is not changed. So which one should be the right?
+
+-Bryan
