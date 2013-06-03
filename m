@@ -1,44 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 03 Jun 2013 07:27:25 -0500
-Subject: [RFC] dw_apb_timer_of: use clocksource_of_init
-In-Reply-To: <201306031415.29411.heiko@sntech.de>
-References: <201306030055.15413.heiko@sntech.de>
- <201306031146.57611.heiko@sntech.de> <1822564.TIKVDZSzqK@wuerfel>
- <201306031415.29411.heiko@sntech.de>
-Message-ID: <51AC8BAD.4020607@gmail.com>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 03 Jun 2013 21:29:14 +0900
+Subject: mvebu: 3.10-rc1 and fixes branch doesn't boot on OpenBlocks
+ AX3
+In-Reply-To: <51AC6380.9050607@free-electrons.com>
+References: <51AC5E14.1050207@hitachi.com>
+ <51AC6380.9050607@free-electrons.com>
+Message-ID: <51AC8C1A.2060809@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 07:15 AM, Heiko St?bner wrote:
-> dw_apb_timer_init used to search the devicetree for matching timer
-> devices, making calls to it from board files necessary.
+(2013/06/03 18:36), Gregory CLEMENT wrote:
+> On 06/03/2013 11:12 AM, Masami Hiramatsu wrote:
+>> Hi,
+> Hi
 > 
-> Change the dw_apb_timer_init to work with CLOCKSOURCE_OF_DECLARE.
-> With this change the function gets called once for each timer node
-> and tracks these number of calls to attach clockevent and clocksource
-> devices to the nodes.
+>>
+>> I've tried 3.10-rc1 and
+>> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes branch on my
+>> OpenBlocks AX3-4 and failed to boot both kernel
+>> as below.
 > 
-> Also convert all previous users of dw_apb_timer_init to use
-> clocksource_of_init.
+> Since 3.10 the memory description for the Armada XP is 64 bits, to
+> allow to use more than 4GB of RAM with LPAE.
+> Unfortunately the ATAGS are 32 bits only.
+> If you use more than 4GB your only possibility is to disable
+> the ATAG support and only rely on the information written in
+> the dts: disable CONFIG_ARM_ATAG_DTB_COMPAT.
 > 
-> Tested on the upcoming rk3066 code.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> If you don't have more than 4GB of RAM then you can also apply this
+> patch: https://patchwork.kernel.org/patch/2566771/
+> It allows to use the ATAG and to keep the CONFIG_ARM_ATAG_DTB_COMPAT
+> option.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+Thanks for the information!
+That patch solves my issue :)
 
-But 1 comment:
+Best regards,
 
-> @@ -88,7 +88,7 @@ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
->  	.map_io		= picoxcell_map_io,
->  	.nr_irqs	= NR_IRQS_LEGACY,
->  	.init_irq	= irqchip_init,
-> -	.init_time	= dw_apb_timer_init,
-> +	.init_time	= clocksource_of_init,
 
-clocksource_of_init is the default now, so you can just remove this and
-the one in socfpga.
-
-Same for irqchip_init BTW, but that's another patch.
-
-Rob
+-- 
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
