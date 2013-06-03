@@ -1,51 +1,36 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 03 Jun 2013 09:26:21 -0600
-Subject: [PATCH] ARM: tegra: remove the ifdef of ARCH SoC in the
- tegra_resume
-In-Reply-To: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
-References: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51ACB59D.9030005@wwwdotorg.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Jun 2013 23:28:07 +0800
+Subject: [GIT PULL] ARM: mxs: fixes for 3.10
+Message-ID: <20130603152803.GB13853@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 02:10 AM, Joseph Lo wrote:
-> Removing the ifdef of ARCH_TEGRA_SoC in the tegra_resume function. Because
-> we always build with all Tegra SoCs support and had a runtime chip
-> detection code there. And we expect most of the chips would need the code
-> in the future.
-> 
-> We also fix a typo of a macro name that cause a build error.
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-OK, this fixes the build issue, but this patch raises some questions
-about the code...
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 
-> diff --git a/arch/arm/mach-tegra/reset-handler.S b/arch/arm/mach-tegra/reset-handler.S
+are available in the git repository at:
 
-> -#ifndef CONFIG_ARCH_TEGRA_2x_SOC
->  	/* Are we on Tegra20? */
->  	cmp	r6, #TEGRA20
->  	beq	1f				@ Yes
+  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.10
 
-Was that ifdef completely incorrect before? I can see why the cmp/beq
-might be ifdef'd (although it's not worth it), but I assume the code
-after that beq was intended to run on all chips after Tegra20. The ifdef
-as it was written does something rather different; it prevents any of
-that code from running unless the kernel doesn't have Tegra20 support.
-So, I think that the removal of the ifdef is more of a bug-fix that
-"because we always build with all Tegra SoCs support. Let me know, and
-I'll re-write the commit description to something more accurate...
+for you to fetch changes up to b5f83e9b069f4bf19214ca6130947806a2b853fa:
 
->  	/* Clear the flow controller flags for this CPU. */
-> -	cpu_to_csr_req r1, r0
-> +	cpu_to_csr_reg r1, r0
->  	mov32	r2, TEGRA_FLOW_CTRL_BASE
->  	ldr	r1, [r2, r1]
->  	/* Clear event & intr flag */
-> @@ -70,7 +69,6 @@ no_cpu0_chk:
->  	bic	r1, r1, r0
->  	str	r1, [r2]
->  1:
-> -#endif
->  
->  	check_cpu_part_num 0xc09, r8, r9
->  	bne	not_ca9
+  ARM: mxs: icoll: Fix interrupts gpio bank 0 (2013-06-03 23:18:15 +0800)
+
+----------------------------------------------------------------
+The mxs fixes for 3.10:
+
+- Since the time we move to MULTI_IRQ_HANDLER, the 0x7f polling for no
+  interrupt in icoll_handle_irq() becomes insane, because 0x7f is an
+  valid interrupt number, the irq of gpio bank 0.  That unnecessary
+  polling results in the driver not detecting when irq 0x7f is active
+  which makes the machine effectively dead lock.  The fix removes the
+  interrupt poll loop and allows usage of gpio0 interrupt without an
+  infinite loop.
+
+----------------------------------------------------------------
+Markus Pargmann (1):
+      ARM: mxs: icoll: Fix interrupts gpio bank 0
+
+ drivers/irqchip/irq-mxs.c |   14 ++++----------
+ 1 file changed, 4 insertions(+), 10 deletions(-)
