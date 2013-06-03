@@ -1,48 +1,55 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon, 3 Jun 2013 18:06:05 +0800
-Subject: [PATCH v3 02/11] irqchip: mmp: support irqchip
-In-Reply-To: <20130603094200.GH18614@n2100.arm.linux.org.uk>
-References: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
- <1370251845-31373-3-git-send-email-haojian.zhuang@gmail.com>
- <20130603094200.GH18614@n2100.arm.linux.org.uk>
-Message-ID: <CAN1soZxWDGit540wZvxUDMDCUO_BTZnBLXrMKU4NAYeaEfe7BA@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 3 Jun 2013 18:07:27 +0800
+Subject: [PATCH v1 2/2] ARM:prima2:move postcore_initcalls to init_machine.
+In-Reply-To: <51AC5A53.1090700@st.com>
+References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
+ <1369993517-24735-1-git-send-email-srinivas.kandagatla@st.com>
+ <CAGsJ_4yu2MT5o7hbX67KPhrejS9D1BbPcship4zxtXs3G9tE-Q@mail.gmail.com>
+ <51AC5A53.1090700@st.com>
+Message-ID: <CAGsJ_4zTJamdH2-3vfqPSrOA+egST3rH_+2mPrhy6=1ZWJxnRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 3, 2013 at 5:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 03, 2013 at 05:30:36PM +0800, Haojian Zhuang wrote:
->> @@ -64,7 +60,7 @@ static const char *mmp_dt_board_compat[] __initdata = {
->>
->>  DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
->>       .map_io         = mmp_map_io,
->> -     .init_irq       = mmp_dt_irq_init,
->> +     .init_irq       = irqchip_init,
->>       .init_time      = mmp_dt_init_timer,
->>       .init_machine   = pxa168_dt_init,
->>       .dt_compat      = mmp_dt_board_compat,
->> @@ -72,7 +68,7 @@ MACHINE_END
->>
->>  DT_MACHINE_START(PXA910_DT, "Marvell PXA910 (Device Tree Support)")
->>       .map_io         = mmp_map_io,
->> -     .init_irq       = mmp_dt_irq_init,
->> +     .init_irq       = irqchip_init,
->
-> This is what's in linux-next:
->
-> void __init init_IRQ(void)
-> {
->         if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
->                 irqchip_init();
->         else
->                 machine_desc->init_irq();
-> }
->
-> So just set your .init_irq to NULL after basing your patchset on
-> ebafed7ab9b637656b685f1dc1ee528c77241a0d (ARM: irq: Call irqchip_init
-> if no init_irq function is specified).
+Hi Srinivas,
 
-OK. I'll update it.
+2013/6/3 Srinivas KANDAGATLA <srinivas.kandagatla@st.com>:
+> On 03/06/13 04:51, Barry Song wrote:
+>> did you see this one?
+>>
+>> [PATCH v2] arm: prima2: use of_platform_populate instead of
+>> of_platform_bus_probe
+>> http://www.spinics.net/lists/arm-kernel/msg243710.html
+>
+> Yes, I think this is a nice cleanup for simplest case. But Prima
+> platforms do much more checking at the same init level. An attempt to
+> get rid of postcore and early init calls might introduce this back.
+>
+> You could solve both the early and postcore initcall issues by returning
+> instead of panic, and let every NON Prima platforms call this function.
+> Or
+> Do it the right way and clean it up.
+>
+> I will leave it up to you to decide on how you want to fix the multi_v7
+> kernel issue.
 
-Regards
-Haojian
+i want to move sirfsoc_of_pwrc_init and sirfsoc_of_pwrc_init to
+sirfsoc_pm_init as only suspend entries need them. then the result is
+like:
+
+ int __init sirfsoc_pm_init(void)
+ {
++       sirfsoc_of_pwrc_init();
++       sirfsoc_memc_init();
+        suspend_set_ops(&sirfsoc_pm_ops);
+        return 0;
+ }
+@@ -98,7 +103,7 @@ static const struct of_device_id pwrc_ids[] = {
+        {}
+ };
+
+
+>
+> Thanks,
+> srini
+
+-barry
