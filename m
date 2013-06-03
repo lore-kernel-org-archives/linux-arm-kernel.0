@@ -1,38 +1,21 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 03 Jun 2013 11:50:09 -0700
-Subject: [PATCH] serial: omap: repair building without PM_SLEEP
-In-Reply-To: <20130603170730.GA30767@kroah.com> (Greg Kroah-Hartman's message
- of "Mon, 3 Jun 2013 10:07:30 -0700")
-References: <1844339.mxci2DdvBF@wuerfel> <20130603170730.GA30767@kroah.com>
-Message-ID: <871u8jm3ku.fsf@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 3 Jun 2013 20:55:38 +0200
+Subject: [PATCH] ARM: nomadik: fix clocksource warning
+In-Reply-To: <20130601064702.GB9010@quad.lixom.net>
+References: <41518453.ApMFpK6n11@wuerfel>
+ <20130601064702.GB9010@quad.lixom.net>
+Message-ID: <201306032055.39204.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg Kroah-Hartman <gregkh@linuxfoundation.org> writes:
+On Saturday 01 June 2013, Olof Johansson wrote:
 
-> On Sat, Jun 01, 2013 at 11:18:13AM +0200, Arnd Bergmann wrote:
->> A recent bug fix in 3.10, ddd85e225c "serial: omap: prevent runtime PM for
->> "no_console_suspend"", introduced a regression from an obvious typo:
->
-> I don't see that commit id, or commit, in Linus's tree at all.  Where do
-> you see it?
+> I didn't see that make it to the repo though?
+> 
+> Since you'd have to rebase anyway, I'll just apply it here and will
+> include it with the other branch updates.
+> 
 
-It's in linux-next (from your tty-next branch.)
+Thanks. I had applied it locally but then forgot to push it out.
 
->> drivers/tty/serial/omap-serial.c:1677:14: error: 'serial_omap_complete' 
->> 	undeclared here (not in a function)
->> 
->> This changes the incorrectly added macro to the one that we need instead.
->> 
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Acked-by: Kevin Hilman <khilman@linaro.org>
-
->> ---
->> Please apply for 3.10-rc
->
-> Really?  It doesn't apply to 3.10-rc3 or -rc4 from what I can tell.
-
-Right, this is -next material, not v3.10.
-
-Kevin
+	Arnd
