@@ -1,65 +1,48 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 03 Jun 2013 11:51:38 +0200
-Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
-In-Reply-To: <51AC5060.80806@linaro.org>
-References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
- <51AC5060.80806@linaro.org>
-Message-ID: <51AC672A.5050501@monstr.eu>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Mon, 3 Jun 2013 18:06:05 +0800
+Subject: [PATCH v3 02/11] irqchip: mmp: support irqchip
+In-Reply-To: <20130603094200.GH18614@n2100.arm.linux.org.uk>
+References: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
+ <1370251845-31373-3-git-send-email-haojian.zhuang@gmail.com>
+ <20130603094200.GH18614@n2100.arm.linux.org.uk>
+Message-ID: <CAN1soZxWDGit540wZvxUDMDCUO_BTZnBLXrMKU4NAYeaEfe7BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
-> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
->> The current code considers every wakeup as spurious, which is not
->> correct. Handle the same way as other arm platforms are doing.
+On Mon, Jun 3, 2013 at 5:42 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 03, 2013 at 05:30:36PM +0800, Haojian Zhuang wrote:
+>> @@ -64,7 +60,7 @@ static const char *mmp_dt_board_compat[] __initdata = {
 >>
->> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
-> 
-> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> 
-> 
->> ---
->>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
->>  1 file changed, 7 insertions(+)
+>>  DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
+>>       .map_io         = mmp_map_io,
+>> -     .init_irq       = mmp_dt_irq_init,
+>> +     .init_irq       = irqchip_init,
+>>       .init_time      = mmp_dt_init_timer,
+>>       .init_machine   = pxa168_dt_init,
+>>       .dt_compat      = mmp_dt_board_compat,
+>> @@ -72,7 +68,7 @@ MACHINE_END
 >>
->> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
->> index c89672b..a1ab22c 100644
->> --- a/arch/arm/mach-zynq/hotplug.c
->> +++ b/arch/arm/mach-zynq/hotplug.c
->> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
->>  		dsb();
->>  		wfi();
->>  
->> +		if (pen_release == cpu_logical_map(cpu)) {
->> +			/*
->> +			 * OK, proper wakeup, we're done
->> +			 */
->> +			break;
->> +		}
->> +
+>>  DT_MACHINE_START(PXA910_DT, "Marvell PXA910 (Device Tree Support)")
+>>       .map_io         = mmp_map_io,
+>> -     .init_irq       = mmp_dt_irq_init,
+>> +     .init_irq       = irqchip_init,
+>
+> This is what's in linux-next:
+>
+> void __init init_IRQ(void)
+> {
+>         if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+>                 irqchip_init();
+>         else
+>                 machine_desc->init_irq();
+> }
+>
+> So just set your .init_irq to NULL after basing your patchset on
+> ebafed7ab9b637656b685f1dc1ee528c77241a0d (ARM: irq: Call irqchip_init
+> if no init_irq function is specified).
 
-what pen_release stands for?
-I have looked at it and others platform are also using it in platsmp
-code which is not zynq case.
-How is it supposed to work and how this variable should be used?
+OK. I'll update it.
 
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130603/0494cd1f/attachment-0001.sig>
+Regards
+Haojian
