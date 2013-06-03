@@ -1,49 +1,63 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 03 Jun 2013 15:46:13 -0400 (EDT)
-Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
-In-Reply-To: <20130603191730.GR3803@titan.lakedaemon.net>
-References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130603171017.GN18614@n2100.arm.linux.org.uk> <20130603175629.GH5008@1wt.eu>
- <20130603181437.GO3803@titan.lakedaemon.net> <20130603183057.GA9868@1wt.eu>
- <20130603184148.GQ3803@titan.lakedaemon.net>
- <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
- <20130603191730.GR3803@titan.lakedaemon.net>
-Message-ID: <alpine.LFD.2.03.1306031538250.1200@syhkavp.arg>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 03 Jun 2013 12:50:12 -0700
+Subject: [PATCHv2 3/6] sched_clock: Make ARM's sched_clock generic for
+ all architectures
+In-Reply-To: <20130603071235.GO11798@tarshish>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+ <1370155183-31421-4-git-send-email-sboyd@codeaurora.org>
+ <20130603071235.GO11798@tarshish>
+Message-ID: <51ACF374.5040606@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 3 Jun 2013, Jason Cooper wrote:
+On 06/03/13 00:12, Baruch Siach wrote:
+> Hi Stephen,
+>
+> On Sat, Jun 01, 2013 at 11:39:40PM -0700, Stephen Boyd wrote:
+>> Nothing about the sched_clock implementation in the ARM port is
+>> specific to the architecture. Generalize the code so that other
+>> architectures can use it by selecting GENERIC_SCHED_CLOCK.
+>>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> ---
+>>  arch/arm/Kconfig                                      | 1 +
+>>  arch/arm/common/timer-sp.c                            | 2 +-
+>>  arch/arm/kernel/Makefile                              | 2 +-
+>>  arch/arm/kernel/arch_timer.c                          | 2 +-
+>>  arch/arm/kernel/time.c                                | 4 +---
+>>  arch/arm/mach-davinci/time.c                          | 2 +-
+>>  arch/arm/mach-imx/time.c                              | 2 +-
+>>  arch/arm/mach-integrator/integrator_ap.c              | 2 +-
+>>  arch/arm/mach-ixp4xx/common.c                         | 2 +-
+>>  arch/arm/mach-mmp/time.c                              | 2 +-
+>>  arch/arm/mach-msm/timer.c                             | 2 +-
+>>  arch/arm/mach-omap1/time.c                            | 2 +-
+>>  arch/arm/mach-omap2/timer.c                           | 2 +-
+>>  arch/arm/mach-pxa/time.c                              | 2 +-
+>>  arch/arm/mach-sa1100/time.c                           | 2 +-
+>>  arch/arm/mach-u300/timer.c                            | 2 +-
+>>  arch/arm/plat-iop/time.c                              | 2 +-
+>>  arch/arm/plat-omap/counter_32k.c                      | 2 +-
+>>  arch/arm/plat-orion/time.c                            | 2 +-
+>>  arch/arm/plat-samsung/samsung-time.c                  | 2 +-
+>>  arch/arm/plat-versatile/sched-clock.c                 | 2 +-
+>>  drivers/clocksource/bcm2835_timer.c                   | 2 +-
+>>  drivers/clocksource/clksrc-dbx500-prcmu.c             | 3 +--
+>>  drivers/clocksource/dw_apb_timer_of.c                 | 2 +-
+>>  drivers/clocksource/mxs_timer.c                       | 2 +-
+>>  drivers/clocksource/nomadik-mtu.c                     | 2 +-
+>>  drivers/clocksource/samsung_pwm_timer.c               | 2 +-
+>>  drivers/clocksource/tegra20_timer.c                   | 2 +-
+>>  drivers/clocksource/time-armada-370-xp.c              | 2 +-
+>>  drivers/clocksource/timer-marco.c                     | 2 +-
+>>  drivers/clocksource/timer-prima2.c                    | 2 +-
+>>  {arch/arm/include/asm => include/linux}/sched_clock.h | 9 +++++++--
+> Shouldn't we just merge this header into the existing linux/sched.h?
 
-> On Mon, Jun 03, 2013 at 03:07:45PM -0400, Nicolas Pitre wrote:
-> > On Mon, 3 Jun 2013, Jason Cooper wrote:
-> > 
-> > > On Mon, Jun 03, 2013 at 08:30:57PM +0200, Willy Tarreau wrote:
-> > > > Well, in fact u-boot sets it on the MAC used to boot from the network
-> > > > if such a boot is performed, but that's all. So in practice you boot
-> > > > without the MAC address anywhere but in the ATAGs. I'd be happy to
-> > > > find a way to parse non-standard atags in a board-specific file but
-> > > > they're lost early it seems :-(
-> > > 
-> > > I assume they are in the u-boot environment.  As such, the only answer
-> > > may be to have user space utilities like flash-kernel parse the
-> > > environment and then customize the appended DT for the specific board.
-> > 
-> > Or some board specific code could dig them out of the flash.  That at 
-> > least would make this hack localized while keeping the common code 
-> > clean.
-> 
-> If it comes to that, I think I would rather tell users to put the mac
-> address on the commandline.
+I don't know. John/Thomas, any thoughts? One benefit with it this way is
+that we don't have to recompile all the timer drivers if we change
+sched.h for other reasons.
 
-That is certainly a simple and viable option.  You can manage your 
-U-Boot environment to construct the final command line from multiple 
-variables so that some are kept static and some others are user 
-editable.
-
-But for the record, there is a precedent for digging MAC addresses out 
-of flash memory -- see
-
-arch/arm/mach-orion5x/tsx09-common.c:qnap_tsx09_find_mac_addr()
-
-
-Nicolas
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
