@@ -1,81 +1,75 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 03 Jun 2013 14:49:28 +0200
-Subject: [PATCH 0/6] Samsung watchdog support clean-up
-In-Reply-To: <51A9ADF4.8010102@gmail.com>
-References: <1368916627-23139-1-git-send-email-tomasz.figa@gmail.com>
- <51A9ADF4.8010102@gmail.com>
-Message-ID: <1850418.EOBZxN7PB0@amdc1227>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 3 Jun 2013 14:55:27 +0200
+Subject: [PATCH 1/2] ARM: dts: OMAP5: add PWM capability to timer nodes
+ missing it
+In-Reply-To: <37C860A02101E749A747FA2D3C1E3C504BE487@DLEE11.ent.ti.com>
+References: <1366240995-53538-1-git-send-email-s-anna@ti.com>
+ <516F3696.9080008@ti.com>
+ <37C860A02101E749A747FA2D3C1E3C504BE487@DLEE11.ent.ti.com>
+Message-ID: <51AC923F.2010607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sylwester, Kukjin,
+Hi Suman,
 
-On Saturday 01 of June 2013 10:16:52 Sylwester Nawrocki wrote:
-> Hi Tomasz,
+On 06/01/2013 12:17 AM, Anna, Suman wrote:
+> Benoit, Tony,
+>  
+>> On 04/17/2013 06:23 PM, Suman Anna wrote:
+>>> OMAP5 has 6 timers (GPTimers 5, 6, 8 to 11) that are capable of PWM.
+>>> The PWM capability property is missing from the node definitions of
+>>> couple of timers, and this has been fixed.
+>>>
+>>> Signed-off-by: Suman Anna <s-anna@ti.com>
+>>> ---
+>>>  arch/arm/boot/dts/omap5.dtsi | 3 +++
+>>>  1 file changed, 3 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+>>> index 790bb2a..0d155f5 100644
+>>> --- a/arch/arm/boot/dts/omap5.dtsi
+>>> +++ b/arch/arm/boot/dts/omap5.dtsi
+>>> @@ -422,6 +422,7 @@
+>>>  			interrupts = <0 41 0x4>;
+>>>  			ti,hwmods = "timer5";
+>>>  			ti,timer-dsp;
+>>> +			ti,timer-pwm;
+>>>  		};
+>>>
+>>>  		timer6: timer at 4013a000 {
+>>> @@ -458,6 +459,7 @@
+>>>  			reg = <0x4803e000 0x80>;
+>>>  			interrupts = <0 45 0x4>;
+>>>  			ti,hwmods = "timer9";
+>>> +			ti,timer-pwm;
+>>>  		};
+>>>
+>>>  		timer10: timer at 48086000 {
+>>> @@ -465,6 +467,7 @@
+>>>  			reg = <0x48086000 0x80>;
+>>>  			interrupts = <0 46 0x4>;
+>>>  			ti,hwmods = "timer10";
+>>> +			ti,timer-pwm;
+>>>  		};
+>>>
+>>>  		timer11: timer at 48088000 {
+>>
+>> Make sure you copy the linux-arm and device-tree mailing lists.
+>>
+>> Acked-by: Jon Hunter <jon-hunter@ti.com>
+>>
 > 
-> On 05/19/2013 12:37 AM, Tomasz Figa wrote:
-> > This series is aiming at cleaning up a bit watchdog support on Samsung
-> > SoCs. The patches tweak a bit all the watchdog handling code here and
-> > there, with the goal of making it DT- and multiplatform-friendly.
-> > 
-> > See particular patches for more detailed descriptions.
-> > 
-> > On S3C6410-based Tiny6410 board (Mini6410-compatible):
-> > 
-> > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
-> 
-> I've tested this series on a s3c2440 based board. The system restart
-> works fine.
-> 
-> Tested-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
+> Can you include this patch in your next fixes pull request (if you haven't
+> already done so)? The other patch in the series is a feature change, but
+> this is a fix, and can go into 3.10 itself.
 
-Thank you Sylwester for testing this series.
+I've just sent a pull request with two fixes to Tony. Since -rc4 is
+already there, I'll update it with this fix.
 
-Kukjin, since it has been already tested on s3c24xx and s3c64xx and nobody 
-seems to care about s5p64x0 and s5pc100 (although I don't see a reason why 
-these patches should break them), could we have this series applied?
+Tony,
 
-Best regards,
--- 
-Tomasz Figa
-Linux Kernel Developer
-Samsung R&D Institute Poland
-Samsung Electronics
+I will resend a new pull-request rebased on -rc4 that will include this
+new fix.
 
-> > Depends on:
-> >   - [PATCH] ARM: s5p64x0: Use common uncompress.h part for plat-samsung
-> > 
-> > Tomasz Figa (6):
-> >    watchdog: s3c2410_wdt: Use local register definitions
-> >    ARM: SAMSUNG: uncompress: Use local definitions of watchdog registers
-> >    ARM: SAMSUNG: Add watchdog reset driver
-> >    ARM: SAMSUNG: Let platforms use the new watchdog reset driver
-> >    ARM: SAMSUNG: Remove legacy watchdog reset code
-> >    ARM: SAMSUNG: Remove unused plat/regs-watchdog.h header
-> >   
-> >   arch/arm/Kconfig                                   |  3 +
-> >   arch/arm/mach-s3c24xx/Kconfig                      |  2 +
-> >   arch/arm/mach-s3c24xx/s3c2410.c                    |  3 +-
-> >   arch/arm/mach-s3c24xx/s3c244x.c                    |  3 +-
-> >   arch/arm/mach-s3c64xx/common.c                     |  8 +-
-> >   arch/arm/mach-s5p64x0/common.c                     |  4 +-
-> >   arch/arm/mach-s5pc100/common.c                     |  3 +-
-> >   arch/arm/plat-samsung/Kconfig                      |  6 ++
-> >   arch/arm/plat-samsung/Makefile                     |  1 +
-> >   arch/arm/plat-samsung/include/plat/regs-watchdog.h | 41 ---------
-> >   arch/arm/plat-samsung/include/plat/uncompress.h    | 15 +++-
-> >   .../arm/plat-samsung/include/plat/watchdog-reset.h | 38 ++-------
-> >   arch/arm/plat-samsung/watchdog-reset.c             | 97
-> >   ++++++++++++++++++++++ drivers/watchdog/s3c2410_wdt.c                  
-> >     | 17 +++-
-> >   14 files changed, 156 insertions(+), 85 deletions(-)
-> >   delete mode 100644 arch/arm/plat-samsung/include/plat/regs-watchdog.h
-> >   create mode 100644 arch/arm/plat-samsung/watchdog-reset.c>
-> 
-> --
-> Regards,
-> Sylwester
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
-> in the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Benoit
