@@ -1,31 +1,38 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 3 Jun 2013 13:18:01 -0700
-Subject: [PATCH V4 4/4] ARM: dts: add clock provider information for i2s
- controllers in Exynos5250
-In-Reply-To: <1370236744-16802-5-git-send-email-padma.v@samsung.com>
-References: <1370236744-16802-1-git-send-email-padma.v@samsung.com>
- <1370236744-16802-5-git-send-email-padma.v@samsung.com>
-Message-ID: <CAD=FV=X_XVmQ-jyorxATqBad5hhdFe5dodg_AzjsRQ-S+1=NeA@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 03 Jun 2013 14:31:26 -0600
+Subject: [PATCH 2/4] ARM: tegra: hook tegra_tear_down_cpu function in
+ the PM suspend init function
+In-Reply-To: <1370258267-30184-3-git-send-email-josephl@nvidia.com>
+References: <1370258267-30184-1-git-send-email-josephl@nvidia.com>
+ <1370258267-30184-3-git-send-email-josephl@nvidia.com>
+Message-ID: <51ACFD1E.4070102@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi,
+On 06/03/2013 05:17 AM, Joseph Lo wrote:
+> The tegra_tear_down_cpu was used to cut off the CPU rail for various Tegra
+> SoCs. Hooking it in the PM suspend init function and making the CPUidle
+> driver more generic.
 
-On Sun, Jun 2, 2013 at 10:19 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> +               clocks = <&clock_audss EXYNOS_I2S_BUS>,
-> +                       <&clock_audss EXYNOS_I2S_BUS>,
-> +                       <&clock_audss EXYNOS_SCLK_I2S>,
-> +                       <&clock_audss EXYNOS_MOUT_AUDSS>,
-> +                       <&clock_audss EXYNOS_MOUT_I2S>;
-> +               clock-names = "iis", "i2s_opclk0", "i2s_opclk1",
-> +                               "mout_audss", "mout_i2s";
+> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
 
-Are there bindings for these clocks? Would be nice to see a
-description for what they are supposed to be.
+> +static void tegra_tear_down_cpu_init(void)
+> +{
+> +	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC) && tegra_chip_id == TEGRA20)
+> +		tegra_tear_down_cpu = tegra20_tear_down_cpu;
+> +	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) && tegra_chip_id == TEGRA30)
+> +		tegra_tear_down_cpu = tegra30_tear_down_cpu;
+> +}
 
-I looked up i2s_opclk0 / i2s_opclk1 and they look reasonable at a
-quick glance. ...and it does seem right that iis and i2s_opclk0 are
-the same. ...but I don't see any place that uses the last two. Is
-there an in-flight patch?
+I think you should use a switch statement there instead:
 
--Doug
+switch (tegra_chip_id) {
+case TEGRA20:
+	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
+		tegra_tear_down_cpu = tegra20_tear_down_cpu;
+	break;
+...
+
+Similar for patch 3/4. This makes it a lot more obvious that it's
+selecting an option based on the runtime SoC, rather than just a bunch
+of if conditions that each may or may-not be doing similar things.
