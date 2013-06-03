@@ -1,82 +1,47 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 03 Jun 2013 10:27:06 +0530
-Subject: [PATCH 1/3] ARM: EXYNOS: uncompress - print debug messages if
- DEBUG_LL is defined
-In-Reply-To: <20130601035929.GA3868@quad.lixom.net>
-References: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
- <1370000944-19786-2-git-send-email-tushar.behera@linaro.org>
- <20130601035929.GA3868@quad.lixom.net>
-Message-ID: <51AC2222.8000604@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 3 Jun 2013 07:05:50 +0200
+Subject: [PATCH] ARM: Kirkwood add cpus definition needed by cpufreq
+ driver to dtsi
+In-Reply-To: <51ABC056.5000804@baker-net.org.uk>
+References: <51ABC056.5000804@baker-net.org.uk>
+Message-ID: <20130603050550.GB10843@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2013 09:29 AM, Olof Johansson wrote:
-> On Fri, May 31, 2013 at 05:19:02PM +0530, Tushar Behera wrote:
->> Printing low-level debug messages make an assumption that the specified
->> UART port has been preconfigured by the bootloader. Incorrectly
->> specified UART port results in system getting stalled while printing the
->> message "Uncompressing Linux... done, booting the kernel"
->>
->> This UART port number is specified through S3C_LOWLEVEL_UART_PORT. Since
->> the UART port might different for different board, it is not possible to
->> specify it correctly for every board that use a common defconfig file.
->>
->> Calling this print subroutine only when DEBUG_LL fixes the problem. By
->> disabling DEBUG_LL in default config file, we would be able to boot
->> multiple boards with different default UART ports.
->>
->> With this current approach, we miss the print "Uncompressing Linux...
->> done, booting the kernel." when DEBUG_LL is not defined.
->>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->> ---
->>  arch/arm/mach-exynos/include/mach/uncompress.h  |   11 ++++++++---
->>  arch/arm/plat-samsung/include/plat/uncompress.h |   10 +++++++++-
->>  2 files changed, 17 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
->> index 2979995..730f69f 100644
->> --- a/arch/arm/mach-exynos/include/mach/uncompress.h
->> +++ b/arch/arm/mach-exynos/include/mach/uncompress.h
->> @@ -37,11 +37,16 @@ static void arch_detect_cpu(void)
->>  	chip_id >>= 20;
->>  	chip_id &= 0xf;
->>  
->> +#ifdef CONFIG_DEBUG_LL
->>  	if (chip_id == 0x5)
->> -		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
->> +		uart_base = (volatile u8 *)EXYNOS5_PA_UART +
->> +			(S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
->>  	else
->> -		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
->> -
->> +		uart_base = (volatile u8 *)EXYNOS4_PA_UART +
->> +			(S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
->> +#else
->> +	uart_base = NULL;
->> +#endif
+On Sun, Jun 02, 2013 at 10:59:50PM +0100, Adam Baker wrote:
+> The Kirkwood CPU Freq driver needs a CPU definition in order for the probe
+> routine to activate it. Add a suitable definition to kirkwood.dtsi
 > 
-> You can do:
+> This definition is only correct for single core SoCs. There is a dual core
+> SoC in the kirkwood family (88F632X) but the rest of the Kirkwood drivers in
+> the kernel don't currently support it. If they ever do the cpus definition
+> would need to be duplicated in each of the SoC specific include files.
 > 
-> 	if (!config_enabled(CONFIG_DEBUG_LL))
-> 		return;
-> 
+> Signed-off-by: Adam Baker <linux@baker-net.org.uk>
 
-Thanks for the hint.
+Tested-by: Andrew Lunn <andrew@lunn.ch>
 
-Or rather, we calculate uart_base unconditionally in mach/uncompress.h
-and replace check for uart_base with config_enabled(CONFIG_DEBUG_LL) in
-plat/uncompress.h. That would get rid of all the ifdef's in the
-mach/uncompress.h files.
-
-Let me spin out another version with this change.
-
-> Since uart_base will be set to 0 by being in BSS anyway.
+	   Andrew
 > 
 > 
-> -Olof
-> 
-
-
--- 
-Tushar Behera
+> --- a/arch/arm/boot/dts/kirkwood.dtsi	2013-05-19 22:57:07.000000000 +0100
+> +++ b/arch/arm/boot/dts/kirkwood.dtsi	2013-05-30 23:32:18.000000000 +0100
+> @@ -4,6 +4,18 @@
+>  	compatible = "marvell,kirkwood";
+>  	interrupt-parent = <&intc>;
+>  
+> +        cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +		      device_type = "cpu";
+> +		      compatible = "marvell,feroceon";
+> +		      clocks = <&core_clk 1>, <&core_clk 3>, <&gate_clk 11>;
+> +		      clock-names = "cpu_clk", "ddrclk", "powersave";
+> +		};
+> +	};
+> +
+>  	aliases {
+>  	       gpio0 = &gpio0;
+>  	       gpio1 = &gpio1;
