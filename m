@@ -1,38 +1,62 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 03 Jun 2013 14:31:26 -0600
-Subject: [PATCH 2/4] ARM: tegra: hook tegra_tear_down_cpu function in
- the PM suspend init function
-In-Reply-To: <1370258267-30184-3-git-send-email-josephl@nvidia.com>
-References: <1370258267-30184-1-git-send-email-josephl@nvidia.com>
- <1370258267-30184-3-git-send-email-josephl@nvidia.com>
-Message-ID: <51ACFD1E.4070102@wwwdotorg.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon,  3 Jun 2013 13:33:54 -0700
+Subject: [PATCHv7 03/11] ARM: smp: Remove duplicate dummy timer implementation
+In-Reply-To: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
+References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1370291642-13259-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 05:17 AM, Joseph Lo wrote:
-> The tegra_tear_down_cpu was used to cut off the CPU rail for various Tegra
-> SoCs. Hooking it in the PM suspend init function and making the CPUidle
-> driver more generic.
+Drop ARM's version of the dummy timer now that we have a generic
+implementation in drivers/clocksource.
 
-> diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>,
+Cc: Russell King <linux@arm.linux.org.uk>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/kernel/smp.c | 22 ++--------------------
+ 1 file changed, 2 insertions(+), 20 deletions(-)
 
-> +static void tegra_tear_down_cpu_init(void)
-> +{
-> +	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC) && tegra_chip_id == TEGRA20)
-> +		tegra_tear_down_cpu = tegra20_tear_down_cpu;
-> +	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) && tegra_chip_id == TEGRA30)
-> +		tegra_tear_down_cpu = tegra30_tear_down_cpu;
-> +}
-
-I think you should use a switch statement there instead:
-
-switch (tegra_chip_id) {
-case TEGRA20:
-	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
-		tegra_tear_down_cpu = tegra20_tear_down_cpu;
-	break;
-...
-
-Similar for patch 3/4. This makes it a lot more obvious that it's
-selecting an option based on the runtime SoC, rather than just a bunch
-of if conditions that each may or may-not be doing similar things.
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 47ab905..4dc883a 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -503,24 +503,6 @@ void tick_broadcast(const struct cpumask *mask)
+ }
+ #endif
+ 
+-static void broadcast_timer_set_mode(enum clock_event_mode mode,
+-	struct clock_event_device *evt)
+-{
+-}
+-
+-static void __cpuinit broadcast_timer_setup(struct clock_event_device *evt)
+-{
+-	evt->name	= "dummy_timer";
+-	evt->features	= CLOCK_EVT_FEAT_ONESHOT |
+-			  CLOCK_EVT_FEAT_PERIODIC |
+-			  CLOCK_EVT_FEAT_DUMMY;
+-	evt->rating	= 100;
+-	evt->mult	= 1;
+-	evt->set_mode	= broadcast_timer_set_mode;
+-
+-	clockevents_register_device(evt);
+-}
+-
+ static struct local_timer_ops *lt_ops;
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+@@ -544,8 +526,8 @@ static void __cpuinit percpu_timer_setup(void)
+ 
+ 	evt->cpumask = cpumask_of(cpu);
+ 
+-	if (!lt_ops || lt_ops->setup(evt))
+-		broadcast_timer_setup(evt);
++	if (lt_ops)
++		lt_ops->setup(evt);
+ }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
