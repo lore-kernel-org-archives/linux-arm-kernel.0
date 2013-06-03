@@ -1,51 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 10:39:38 +0100
-Subject: [PATCHv2 4/6] sched_clock: Add support for >32 bit sched_clock
-In-Reply-To: <1370155183-31421-5-git-send-email-sboyd@codeaurora.org>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <1370155183-31421-5-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130603093938.GG18614@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 03 Jun 2013 18:41:08 +0900
+Subject: [PATCHv6 00/11] Remove ARM local timer API
+In-Reply-To: <51AC59AB.4080802@arm.com>
+References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
+ <20130531174526.GD599@codeaurora.org> <51A8E71D.1000407@linaro.org>
+ <20130531221633.GG599@codeaurora.org> <51AC59AB.4080802@arm.com>
+Message-ID: <049801ce603e$79aad240$6d0076c0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 01, 2013 at 11:39:41PM -0700, Stephen Boyd wrote:
-> The ARM architected system counter has at least 56 useable bits.
-> Add support for counters with more than 32 bits to the generic
-> sched_clock implementation so we can avoid the complexity of
-> dealing with wrap-around on these devices while benefiting from
-> the irqtime accounting and suspend/resume handling that the
-> generic sched_clock code already has.
+Marc Zyngier wrote:
+> 
+> On 31/05/13 23:16, Stephen Boyd wrote:
+> > On 05/31, John Stultz wrote:
+> >> On 05/31/2013 10:45 AM, Stephen Boyd wrote:
+> >>> Comments have been light for this round so I think we're about
+> >>> ready to merge. John/Thomas, can you pick up these patches or
+> >>> shall I route them through arm-soc or something else?
+> >>
+> >>
+> >> So there looks to be a fair amount of additions in the ARM tree, do
+> >> those already have acks from Arnd/Olof/other folks? (I think I was
+> >> only cc'ed on the first two patches).
+> >
+> > I'm still missing acks from Kukjin and Barry.
+> 
+Stephen, I replied on exynos stuff in this series.
 
-This looks like a horrid hack to me.
+> I don't think that should hold off the patch series. It's been tested on
+> most other platforms over the course of several months. If the platform
+> maintainers aren't responsive enough, fixing the issues becomes their
+> problem.
+> 
+Marc, I understand what you're saying. Let me look at the regarding exynos
+stuff carefully.
 
-> +static unsigned long long notrace sched_clock_64(void)
-> +{
-> +	u64 cyc = read_sched_clock_64() - cd.epoch_ns;
-> +	return cyc * cd.mult;
+Thanks.
 
-So, the use of cd.mult implies that the return value from
-read_sched_clock_64() is not nanoseconds but something else.  But then
-we subtract it from the nanoseconds epoch - which has to be nanoseconds
-because you simply return that when suspended.
-
-> +}
-> +
-> +void __init
-> +setup_sched_clock_64(u64 (*read)(void), int bits, unsigned long rate)
-> +{
-> +	if (cd.rate > rate)
-> +		return;
-> +
-> +	BUG_ON(bits <= 32);
-> +	WARN_ON(!irqs_disabled());
-> +	read_sched_clock_64 = read;
-> +	sched_clock_func = sched_clock_64;
-> +	cd.rate = rate;
-> +	cd.mult = NSEC_PER_SEC / rate;
-
-Here, you don't check that the (2^bits) * mult results in a wrap of the
-resulting 64-bit number, which is a _basic_ requirement for sched_clock
-(hence all the code for <=32bit clocks, otherwise we wouldn't need this
-complexity in the first place.)
-
-So, I think this whole approach is broken.
+- Kukjin
