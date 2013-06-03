@@ -1,200 +1,215 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon,  3 Jun 2013 13:33:58 -0700
-Subject: [PATCHv7 07/11] ARM: PRIMA2: Divorce timer-marco from local timer API
+Date: Mon,  3 Jun 2013 13:34:02 -0700
+Subject: [PATCHv7 11/11] ARM: smp: Remove local timer API
 In-Reply-To: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
 References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1370291642-13259-8-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1370291642-13259-12-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the marco local timers from the local timer API. This
-will allow us to remove ARM local timer support in the near future
-and gets us closer to moving this driver to drivers/clocksource.
+There are no more users of this API, remove it.
 
+Acked-by: Tony Lindgren <tony@atomide.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>,
-Cc: Barry Song <baohua.song@csr.com>
+Cc: Russell King <linux@arm.linux.org.uk>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clocksource/timer-marco.c | 100 ++++++++++++++++++++------------------
- 1 file changed, 54 insertions(+), 46 deletions(-)
+ arch/arm/Kconfig                  | 10 ------
+ arch/arm/include/asm/localtimer.h | 34 -------------------
+ arch/arm/kernel/smp.c             | 69 ---------------------------------------
+ 3 files changed, 113 deletions(-)
+ delete mode 100644 arch/arm/include/asm/localtimer.h
 
-diff --git a/drivers/clocksource/timer-marco.c b/drivers/clocksource/timer-marco.c
-index 97738db..ba97bc1 100644
---- a/drivers/clocksource/timer-marco.c
-+++ b/drivers/clocksource/timer-marco.c
-@@ -10,6 +10,7 @@
- #include <linux/interrupt.h>
- #include <linux/clockchips.h>
- #include <linux/clocksource.h>
-+#include <linux/cpu.h>
- #include <linux/bitops.h>
- #include <linux/irq.h>
- #include <linux/clk.h>
-@@ -18,7 +19,6 @@
- #include <linux/of_irq.h>
- #include <linux/of_address.h>
- #include <asm/sched_clock.h>
--#include <asm/localtimer.h>
- #include <asm/mach/time.h>
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 177cb39..626a272 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1542,16 +1542,6 @@ config ARM_PSCI
+ 	  0022A ("Power State Coordination Interface System Software on
+ 	  ARM processors").
  
- #define SIRFSOC_TIMER_32COUNTER_0_CTRL			0x0000
-@@ -151,13 +151,7 @@ static void sirfsoc_clocksource_resume(struct clocksource *cs)
- 		BIT(1) | BIT(0), sirfsoc_timer_base + SIRFSOC_TIMER_64COUNTER_CTRL);
- }
- 
--static struct clock_event_device sirfsoc_clockevent = {
--	.name = "sirfsoc_clockevent",
--	.rating = 200,
--	.features = CLOCK_EVT_FEAT_ONESHOT,
--	.set_mode = sirfsoc_timer_set_mode,
--	.set_next_event = sirfsoc_timer_set_next_event,
+-config LOCAL_TIMERS
+-	bool "Use local timer interrupts"
+-	depends on SMP
+-	default y
+-	help
+-	  Enable support for local timers on SMP platforms, rather then the
+-	  legacy IPI broadcast method.  Local timers allows the system
+-	  accounting to be spread across the timer interval, preventing a
+-	  "thundering herd" at every timer tick.
+-
+ # The GPIO number here must be sorted by descending number. In case of
+ # a multiplatform kernel, we just want the highest value required by the
+ # selected platforms.
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+deleted file mode 100644
+index f77ffc1..0000000
+--- a/arch/arm/include/asm/localtimer.h
++++ /dev/null
+@@ -1,34 +0,0 @@
+-/*
+- *  arch/arm/include/asm/localtimer.h
+- *
+- *  Copyright (C) 2004-2005 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#ifndef __ASM_ARM_LOCALTIMER_H
+-#define __ASM_ARM_LOCALTIMER_H
+-
+-#include <linux/errno.h>
+-
+-struct clock_event_device;
+-
+-struct local_timer_ops {
+-	int  (*setup)(struct clock_event_device *);
+-	void (*stop)(struct clock_event_device *);
 -};
-+static struct clock_event_device __percpu *sirfsoc_clockevent;
- 
- static struct clocksource sirfsoc_clocksource = {
- 	.name = "sirfsoc_clocksource",
-@@ -173,11 +167,8 @@ static struct irqaction sirfsoc_timer_irq = {
- 	.name = "sirfsoc_timer0",
- 	.flags = IRQF_TIMER | IRQF_NOBALANCING,
- 	.handler = sirfsoc_timer_interrupt,
--	.dev_id = &sirfsoc_clockevent,
- };
- 
+-
 -#ifdef CONFIG_LOCAL_TIMERS
--
- static struct irqaction sirfsoc_timer1_irq = {
- 	.name = "sirfsoc_timer1",
- 	.flags = IRQF_TIMER | IRQF_NOBALANCING,
-@@ -186,56 +177,77 @@ static struct irqaction sirfsoc_timer1_irq = {
- 
- static int __cpuinit sirfsoc_local_timer_setup(struct clock_event_device *ce)
- {
--	/* Use existing clock_event for cpu 0 */
--	if (!smp_processor_id())
--		return 0;
-+	int cpu = smp_processor_id();
-+	struct irqaction *action;
-+
-+	if (cpu == 0)
-+		action = &sirfsoc_timer_irq;
-+	else
-+		action = &sirfsoc_timer1_irq;
- 
--	ce->irq = sirfsoc_timer1_irq.irq;
-+	ce->irq = action->irq;
- 	ce->name = "local_timer";
--	ce->features = sirfsoc_clockevent.features;
--	ce->rating = sirfsoc_clockevent.rating;
-+	ce->features = CLOCK_EVT_FEAT_ONESHOT;
-+	ce->rating = 200;
- 	ce->set_mode = sirfsoc_timer_set_mode;
- 	ce->set_next_event = sirfsoc_timer_set_next_event;
--	ce->shift = sirfsoc_clockevent.shift;
--	ce->mult = sirfsoc_clockevent.mult;
--	ce->max_delta_ns = sirfsoc_clockevent.max_delta_ns;
--	ce->min_delta_ns = sirfsoc_clockevent.min_delta_ns;
-+	clockevents_calc_mult_shift(ce, CLOCK_TICK_RATE, 60);
-+	ce->max_delta_ns = clockevent_delta2ns(-2, ce);
-+	ce->min_delta_ns = clockevent_delta2ns(2, ce);
-+	ce->cpumask = cpumask_of(cpu);
- 
--	sirfsoc_timer1_irq.dev_id = ce;
--	BUG_ON(setup_irq(ce->irq, &sirfsoc_timer1_irq));
--	irq_set_affinity(sirfsoc_timer1_irq.irq, cpumask_of(1));
-+	action->dev_id = ce;
-+	BUG_ON(setup_irq(ce->irq, action));
-+	irq_set_affinity(action->irq, cpumask_of(cpu));
- 
- 	clockevents_register_device(ce);
- 	return 0;
- }
- 
--static void sirfsoc_local_timer_stop(struct clock_event_device *ce)
-+static void __cpuinit sirfsoc_local_timer_stop(struct clock_event_device *ce)
- {
-+	int cpu = smp_processor_id();
-+
- 	sirfsoc_timer_count_disable(1);
- 
--	remove_irq(sirfsoc_timer1_irq.irq, &sirfsoc_timer1_irq);
-+	if (cpu == 0)
-+		remove_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq);
-+	else
-+		remove_irq(sirfsoc_timer1_irq.irq, &sirfsoc_timer1_irq);
- }
- 
--static struct local_timer_ops sirfsoc_local_timer_ops __cpuinitdata = {
--	.setup	= sirfsoc_local_timer_setup,
--	.stop	= sirfsoc_local_timer_stop,
-+static int __cpuinit sirfsoc_cpu_notify(struct notifier_block *self,
-+					   unsigned long action, void *hcpu)
-+{
-+	/*
-+	 * Grab cpu pointer in each case to avoid spurious
-+	 * preemptible warnings
-+	 */
-+	switch (action & ~CPU_TASKS_FROZEN) {
-+	case CPU_STARTING:
-+		sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
-+		break;
-+	case CPU_DYING:
-+		sirfsoc_local_timer_stop(this_cpu_ptr(sirfsoc_clockevent));
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block sirfsoc_cpu_nb __cpuinitdata = {
-+	.notifier_call = sirfsoc_cpu_notify,
- };
--#endif /* CONFIG_LOCAL_TIMERS */
- 
- static void __init sirfsoc_clockevent_init(void)
- {
--	clockevents_calc_mult_shift(&sirfsoc_clockevent, CLOCK_TICK_RATE, 60);
--
--	sirfsoc_clockevent.max_delta_ns =
--		clockevent_delta2ns(-2, &sirfsoc_clockevent);
--	sirfsoc_clockevent.min_delta_ns =
--		clockevent_delta2ns(2, &sirfsoc_clockevent);
--
--	sirfsoc_clockevent.cpumask = cpumask_of(0);
--	clockevents_register_device(&sirfsoc_clockevent);
--#ifdef CONFIG_LOCAL_TIMERS
--	local_timer_register(&sirfsoc_local_timer_ops);
+-/*
+- * Register a local timer driver
+- */
+-int local_timer_register(struct local_timer_ops *);
+-#else
+-static inline int local_timer_register(struct local_timer_ops *ops)
+-{
+-	return -ENXIO;
+-}
 -#endif
-+	sirfsoc_clockevent = alloc_percpu(struct clock_event_device);
-+	BUG_ON(!sirfsoc_clockevent);
-+
-+	BUG_ON(register_cpu_notifier(&sirfsoc_cpu_nb));
-+
-+	/* Immediately configure the timer on the boot CPU */
-+	sirfsoc_local_timer_setup(this_cpu_ptr(sirfsoc_clockevent));
- }
- 
- /* initialize the kernel jiffy timer source */
-@@ -273,8 +285,6 @@ static void __init sirfsoc_marco_timer_init(void)
- 
- 	BUG_ON(clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE));
- 
--	BUG_ON(setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq));
 -
- 	sirfsoc_clockevent_init();
- }
- 
-@@ -288,11 +298,9 @@ static void __init sirfsoc_of_timer_init(struct device_node *np)
- 	if (!sirfsoc_timer_irq.irq)
- 		panic("No irq passed for timer0 via DT\n");
- 
--#ifdef CONFIG_LOCAL_TIMERS
- 	sirfsoc_timer1_irq.irq = irq_of_parse_and_map(np, 1);
- 	if (!sirfsoc_timer1_irq.irq)
- 		panic("No irq passed for timer1 via DT\n");
 -#endif
- 
- 	sirfsoc_marco_timer_init();
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 4dc883a..54aa994 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -41,7 +41,6 @@
+ #include <asm/sections.h>
+ #include <asm/tlbflush.h>
+ #include <asm/ptrace.h>
+-#include <asm/localtimer.h>
+ #include <asm/smp_plat.h>
+ #include <asm/virt.h>
+ #include <asm/mach/arch.h>
+@@ -133,8 +132,6 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
  }
+ 
+ #ifdef CONFIG_HOTPLUG_CPU
+-static void percpu_timer_stop(void);
+-
+ static int platform_cpu_kill(unsigned int cpu)
+ {
+ 	if (smp_ops.cpu_kill)
+@@ -178,11 +175,6 @@ int __cpuinit __cpu_disable(void)
+ 	migrate_irqs();
+ 
+ 	/*
+-	 * Stop the local timer for this CPU.
+-	 */
+-	percpu_timer_stop();
+-
+-	/*
+ 	 * Flush user cache and TLB mappings, and then remove this CPU
+ 	 * from the vm mask set of all processes.
+ 	 *
+@@ -303,8 +295,6 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+ 	store_cpu_topology(cpuid);
+ }
+ 
+-static void percpu_timer_setup(void);
+-
+ /*
+  * This is the secondary CPU boot entry.  We're using this CPUs
+  * idle thread stack, but a set of temporary page tables.
+@@ -359,11 +349,6 @@ asmlinkage void __cpuinit secondary_start_kernel(void)
+ 	set_cpu_online(cpu, true);
+ 	complete(&cpu_running);
+ 
+-	/*
+-	 * Setup the percpu timer for this CPU.
+-	 */
+-	percpu_timer_setup();
+-
+ 	local_irq_enable();
+ 	local_fiq_enable();
+ 
+@@ -410,12 +395,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 		max_cpus = ncores;
+ 	if (ncores > 1 && max_cpus) {
+ 		/*
+-		 * Enable the local timer or broadcast device for the
+-		 * boot CPU, but only if we have more than one CPU.
+-		 */
+-		percpu_timer_setup();
+-
+-		/*
+ 		 * Initialise the present map, which describes the set of CPUs
+ 		 * actually populated at the present time. A platform should
+ 		 * re-initialize the map in the platforms smp_prepare_cpus()
+@@ -491,11 +470,6 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
+ 	return sum;
+ }
+ 
+-/*
+- * Timer (local or broadcast) support
+- */
+-static DEFINE_PER_CPU(struct clock_event_device, percpu_clockevent);
+-
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+ void tick_broadcast(const struct cpumask *mask)
+ {
+@@ -503,49 +477,6 @@ void tick_broadcast(const struct cpumask *mask)
+ }
+ #endif
+ 
+-static struct local_timer_ops *lt_ops;
+-
+-#ifdef CONFIG_LOCAL_TIMERS
+-int local_timer_register(struct local_timer_ops *ops)
+-{
+-	if (!is_smp() || !setup_max_cpus)
+-		return -ENXIO;
+-
+-	if (lt_ops)
+-		return -EBUSY;
+-
+-	lt_ops = ops;
+-	return 0;
+-}
+-#endif
+-
+-static void __cpuinit percpu_timer_setup(void)
+-{
+-	unsigned int cpu = smp_processor_id();
+-	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
+-
+-	evt->cpumask = cpumask_of(cpu);
+-
+-	if (lt_ops)
+-		lt_ops->setup(evt);
+-}
+-
+-#ifdef CONFIG_HOTPLUG_CPU
+-/*
+- * The generic clock events code purposely does not stop the local timer
+- * on CPU_DEAD/CPU_DEAD_FROZEN hotplug events, so we have to do it
+- * manually here.
+- */
+-static void percpu_timer_stop(void)
+-{
+-	unsigned int cpu = smp_processor_id();
+-	struct clock_event_device *evt = &per_cpu(percpu_clockevent, cpu);
+-
+-	if (lt_ops)
+-		lt_ops->stop(evt);
+-}
+-#endif
+-
+ static DEFINE_RAW_SPINLOCK(stop_lock);
+ 
+ /*
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
