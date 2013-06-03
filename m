@@ -1,128 +1,96 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 3 Jun 2013 11:11:16 +0200
-Subject: [PATCH v3] clk: implement clk_unregister
-In-Reply-To: <1370248626-3760-1-git-send-email-jiada_wang@mentor.com>
-References: <1370248626-3760-1-git-send-email-jiada_wang@mentor.com>
-Message-ID: <20130603091116.GB23140@pengutronix.de>
+From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
+Date: Mon, 03 Jun 2013 18:12:52 +0900
+Subject: mvebu: 3.10-rc1 and fixes branch doesn't boot on OpenBlocks AX3
+Message-ID: <51AC5E14.1050207@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi,
 
-On Mon, Jun 03, 2013 at 05:37:06PM +0900, Jiada Wang wrote:
-> Currently clk_unregister is unimplemented, it is required in case
-> sub modules want actually remove clk device registered by clk_register.
-> This patch adds the implementation of clk_unregister.
-> 
-> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
-> ---
->  drivers/clk/clk.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
->  1 file changed, 57 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> index 934cfd1..0b9e13c 100644
-> --- a/drivers/clk/clk.c
-> +++ b/drivers/clk/clk.c
-> @@ -342,6 +342,25 @@ out:
->  	return ret;
->  }
->  
-> + /**
-> + * clk_debug_unregister - remove a clk node from the debugfs clk tree
-> + * @clk: the clk being removed from the debugfs clk tree
-> + *
-> + * Dynamically removes a clk and all it's children clk nodes from the
-> + * debugfs clk tree if clk->dentry points to debugfs created by
-> + * clk_debug_register in __clk_init.
-> + *
-> + * Caller must hold prepare_lock.
-> + *
-> + */
-> +static void clk_debug_unregister(struct clk *clk)
-> +{
-> +	if (!clk || !clk->dentry)
-> +		return;
-!clk can never trigger because clk_unregister doesn't call it in this
-case and debugfs_remove_recursive checks for dentry being NULL itself.
-So you can drop this check. Maybe you can even call
-debugfs_remove_recursive even in the case where CONFIG_COMMON_CLK_DEBUG
-is off?
+I've tried 3.10-rc1 and
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes branch on my
+OpenBlocks AX3-4 and failed to boot both kernel
+as below.
 
-> +
-> +	debugfs_remove_recursive(clk->dentry);
-> +}
-> +
->  /**
->   * clk_debug_reparent - reparent clk node in the debugfs clk tree
->   * @clk: the clk being reparented
-> @@ -432,6 +451,9 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
->  static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
->  {
->  }
-> +static inline void clk_debug_unregister(struct clk *clk)
-> +{
-> +}
->  #endif
->  
->  /* caller must hold prepare_lock */
-> @@ -1790,9 +1812,42 @@ EXPORT_SYMBOL_GPL(clk_register);
->   * clk_unregister - unregister a currently registered clock
->   * @clk: clock to unregister
->   *
-> - * Currently unimplemented.
->   */
-> -void clk_unregister(struct clk *clk) {}
-> +void clk_unregister(struct clk *clk)
-> +{
-> +	int i;
-> +
-> +	if (!clk)
-> +		return;
-> +
-> +	mutex_lock(&prepare_lock);
-> +	if (clk->prepare_count) {
-> +		pr_debug("%s: can't unregister clk %s, it is prepared\n",
-> +				__func__, clk->name);
-> +		goto out;
-Hmm, there is no way for the caller to detect this error. Probably it
-cannot do anything about it most of the time, but still it would be nice
-to signal the problem by letting clk_unregister return an int instead of
-void.
+---
+Loading file "uImage" from ide device 0:1 (hda1)
+2486993 bytes read
+Loading file "uInitrd" from ide device 0:1 (hda1)
+1851769 bytes read
+## Booting kernel from Legacy Image at 02000000 ...
+   Image Name:   Linux-marvell
+   Created:      2013-05-27   3:43:33 UTC
+   Image Type:   ARM Linux Kernel Image (uncompressed)
+   Data Size:    2486929 Bytes =  2.4 MB
+   Load Address: 00008000
+   Entry Point:  00008000
+   Verifying Checksum ... OK
+## Loading init Ramdisk from Legacy Image at 01100000 ...
+   Image Name:   Linux-initrd
+   Created:      2013-05-27   7:42:37 UTC
+   Image Type:   ARM Linux RAMDisk Image (uncompressed)
+   Data Size:    1851705 Bytes =  1.8 MB
+   Load Address: 00000000
+   Entry Point:  00000000
+   Verifying Checksum ... OK
+   Loading Kernel Image ... OK
+OK
 
-Best regards
-Uwe
+Starting kernel ...
 
-> +	}
-> +
-> +	if (!hlist_empty(&clk->children)) {
-> +		pr_debug("%s: clk %s has registered children\n",
-> +				__func__, clk->name);
-> +		goto out;
-> +	}
-> +
-> +	clk_debug_unregister(clk);
-> +
-> +	hlist_del_init(&clk->child_node);
-> +
-> +	kfree(clk->parents);
-> +	i = clk->num_parents;
-> +	while (--i >= 0)
-> +		kfree(clk->parent_names[i]);
-> +	kfree(clk->parent_names);
-> +	kfree(clk->name);
-> +	kfree(clk);
-> +out:
-> +	mutex_unlock(&prepare_lock);
-> +	return;
-> +}
->  EXPORT_SYMBOL_GPL(clk_unregister);
->  
->  static void devm_clk_release(struct device *dev, void *res)
-> -- 
-> 1.8.1.1
-> 
-> 
+Uncompressing Linux... done, booting the kernel.
+Booting Linux on physical CPU 0x0
+Initializing cgroup subsys cpuset
+Initializing cgroup subsys cpu
+Initializing cgroup subsys cpuacct
+Linux version 3.10.0-rc2-00054-gf4ae176 (mhiramat at mhiramat-M0-7522) (gcc version
+4.6.3 20120624 (prerelease) (Ubuntu/Linaro 4.6.3-8ubuntu1) ) #99 SMP Mon May 27
+12:43:19 JST 2013
+CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
+CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+Machine: Marvell Armada 370/XP (Device Tree), model: PlatHome OpenBlocks AX3-4 board
+bootconsole [earlycon0] enabled
+debug: skip boot console de-registration.
+INITRD: 0x01100040+0x001c4139 is not a memory region - disabling initrd
+Memory policy: ECC disabled, Data cache writealloc
+Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
+
+CPU: 0 PID: 0 Comm: swapper Not tainted 3.10.0-rc2-00054-gf4ae176 #99
+Backtrace: invalid frame pointer 0xc0661eb4
+---
+
+It seems that newer mvebu kernel has a corrupt description in device tree
+or should I run mkimage with different parameters for making uInitrd?
+
+I'm using mkimage with parameters below for uimage
+
+  scripts/mkuboot.sh -A arm -O linux -T kernel -C none \
+  -a 0x8000 -e 0x8000 -n "Linux-marvell" -d zImage uImage
+
+and
+
+  mkimage -A arm -O linux -T ramdisk -C none -a 0x0000 -e 0x0000 \
+  -n "Linux-initrd" -d /boot/initrd.img-$KVER /boot/uInitrd-$KVER
+
+for uinitrd.
+And boot the image from sata by uboot as below:
+---
+ide reset
+ext2load ide 0:1 0x2000000 uImage
+ext2load ide 0:1 0x1100000 uInitrd
+setenv bootargs console=ttyS0,115200 earlyprintk=ttyS0 root=/dev/sda3
+rootflags=subvol=@ ro keep_bootcon=1
+bootm 0x2000000 0x1100000
+---
+
+BTW, should I enable CONFIG_ARM_LPAE even if the board has only
+3GB memory?
+
+Thank you,
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Masami HIRAMATSU
+IT Management Research Dept. Linux Technology Center
+Hitachi, Ltd., Yokohama Research Laboratory
+E-mail: masami.hiramatsu.pt at hitachi.com
