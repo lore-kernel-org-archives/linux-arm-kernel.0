@@ -1,63 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 03 Jun 2013 12:50:12 -0700
-Subject: [PATCHv2 3/6] sched_clock: Make ARM's sched_clock generic for
- all architectures
-In-Reply-To: <20130603071235.GO11798@tarshish>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <1370155183-31421-4-git-send-email-sboyd@codeaurora.org>
- <20130603071235.GO11798@tarshish>
-Message-ID: <51ACF374.5040606@codeaurora.org>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 3 Jun 2013 21:57:40 +0200
+Subject: [PATCH 0/3] dw_apb_timer: osc as sched_clock,
+ clocks and clocksource_of support
+Message-ID: <201306032157.40488.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/13 00:12, Baruch Siach wrote:
-> Hi Stephen,
->
-> On Sat, Jun 01, 2013 at 11:39:40PM -0700, Stephen Boyd wrote:
->> Nothing about the sched_clock implementation in the ARM port is
->> specific to the architecture. Generalize the code so that other
->> architectures can use it by selecting GENERIC_SCHED_CLOCK.
->>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
->> ---
->>  arch/arm/Kconfig                                      | 1 +
->>  arch/arm/common/timer-sp.c                            | 2 +-
->>  arch/arm/kernel/Makefile                              | 2 +-
->>  arch/arm/kernel/arch_timer.c                          | 2 +-
->>  arch/arm/kernel/time.c                                | 4 +---
->>  arch/arm/mach-davinci/time.c                          | 2 +-
->>  arch/arm/mach-imx/time.c                              | 2 +-
->>  arch/arm/mach-integrator/integrator_ap.c              | 2 +-
->>  arch/arm/mach-ixp4xx/common.c                         | 2 +-
->>  arch/arm/mach-mmp/time.c                              | 2 +-
->>  arch/arm/mach-msm/timer.c                             | 2 +-
->>  arch/arm/mach-omap1/time.c                            | 2 +-
->>  arch/arm/mach-omap2/timer.c                           | 2 +-
->>  arch/arm/mach-pxa/time.c                              | 2 +-
->>  arch/arm/mach-sa1100/time.c                           | 2 +-
->>  arch/arm/mach-u300/timer.c                            | 2 +-
->>  arch/arm/plat-iop/time.c                              | 2 +-
->>  arch/arm/plat-omap/counter_32k.c                      | 2 +-
->>  arch/arm/plat-orion/time.c                            | 2 +-
->>  arch/arm/plat-samsung/samsung-time.c                  | 2 +-
->>  arch/arm/plat-versatile/sched-clock.c                 | 2 +-
->>  drivers/clocksource/bcm2835_timer.c                   | 2 +-
->>  drivers/clocksource/clksrc-dbx500-prcmu.c             | 3 +--
->>  drivers/clocksource/dw_apb_timer_of.c                 | 2 +-
->>  drivers/clocksource/mxs_timer.c                       | 2 +-
->>  drivers/clocksource/nomadik-mtu.c                     | 2 +-
->>  drivers/clocksource/samsung_pwm_timer.c               | 2 +-
->>  drivers/clocksource/tegra20_timer.c                   | 2 +-
->>  drivers/clocksource/time-armada-370-xp.c              | 2 +-
->>  drivers/clocksource/timer-marco.c                     | 2 +-
->>  drivers/clocksource/timer-prima2.c                    | 2 +-
->>  {arch/arm/include/asm => include/linux}/sched_clock.h | 9 +++++++--
-> Shouldn't we just merge this header into the existing linux/sched.h?
+This is split off of my Rockchip support series from yesterday. It's now
+a patch more than before, as the third patch enables the timer to be used
+thru clocksource_of_init and moves picoxcell and socfpga to it.
+ 
 
-I don't know. John/Thomas, any thoughts? One benefit with it this way is
-that we don't have to recompile all the timer drivers if we change
-sched.h for other reasons.
+Heiko Stuebner (3):
+  clocksource: dw_apb_timer_of: use the clocksource as sched clock if
+    necessary
+  clocksource: dw_apb_timer_of: add clock-handling
+  clocksource: dw_apb_timer_of: use clocksource_of_init
+
+ Documentation/devicetree/bindings/rtc/dw-apb.txt |   19 +++++
+ arch/arm/mach-picoxcell/Kconfig                  |    1 +
+ arch/arm/mach-picoxcell/common.c                 |    2 -
+ arch/arm/mach-socfpga/Kconfig                    |    1 +
+ arch/arm/mach-socfpga/socfpga.c                  |    2 -
+ drivers/clocksource/dw_apb_timer_of.c            |   95 ++++++++++++++-------
+ include/linux/dw_apb_timer.h                     |    1 -
+ 7 files changed, 84 insertions(+), 37 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.2.3
