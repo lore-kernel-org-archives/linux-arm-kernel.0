@@ -1,135 +1,160 @@
 From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Mon,  3 Jun 2013 17:30:41 +0800
-Subject: [PATCH v3 07/11] ARM: mmp: move timer registers into driver
+Date: Mon,  3 Jun 2013 17:30:42 +0800
+Subject: [PATCH v3 08/11] ARM: pxa: init dma debugfs in late level
 In-Reply-To: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
 References: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <1370251845-31373-8-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <1370251845-31373-9-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the definition of timer registers into timer-mmp driver.
-And map timer registers in driver.
+Remove pxa_init_dma() from core_initcall level since it's unncecssary
+for DT mode. But dma debugfs is also included in pxa_init_dma().
+So only initiliaze dma debugfs in late_initcall level.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@gmail.com>
 ---
- arch/arm/mach-mmp/include/mach/regs-timers.h | 44 ----------------------------
- drivers/clocksource/timer-mmp.c              | 38 ++++++++++++++++++++----
- 2 files changed, 33 insertions(+), 49 deletions(-)
- delete mode 100644 arch/arm/mach-mmp/include/mach/regs-timers.h
+ arch/arm/mach-mmp/mmp2.c   |  2 +-
+ arch/arm/mach-mmp/pxa168.c |  2 +-
+ arch/arm/mach-mmp/pxa910.c |  2 +-
+ arch/arm/plat-pxa/dma.c    | 30 ++++++++++++++++++++----------
+ 4 files changed, 23 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/include/mach/regs-timers.h b/arch/arm/mach-mmp/include/mach/regs-timers.h
-deleted file mode 100644
-index 45589fe..0000000
---- a/arch/arm/mach-mmp/include/mach/regs-timers.h
-+++ /dev/null
-@@ -1,44 +0,0 @@
--/*
-- * linux/arch/arm/mach-mmp/include/mach/regs-timers.h
-- *
-- *   Timers Module
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#ifndef __ASM_MACH_REGS_TIMERS_H
--#define __ASM_MACH_REGS_TIMERS_H
--
--#include <mach/addr-map.h>
--
--#define TIMERS1_VIRT_BASE	(APB_VIRT_BASE + 0x14000)
--#define TIMERS2_VIRT_BASE	(APB_VIRT_BASE + 0x16000)
--
--#define TMR_CCR		(0x0000)
--#define TMR_TN_MM(n, m)	(0x0004 + ((n) << 3) + (((n) + (m)) << 2))
--#define TMR_CR(n)	(0x0028 + ((n) << 2))
--#define TMR_SR(n)	(0x0034 + ((n) << 2))
--#define TMR_IER(n)	(0x0040 + ((n) << 2))
--#define TMR_PLVR(n)	(0x004c + ((n) << 2))
--#define TMR_PLCR(n)	(0x0058 + ((n) << 2))
--#define TMR_WMER	(0x0064)
--#define TMR_WMR		(0x0068)
--#define TMR_WVR		(0x006c)
--#define TMR_WSR		(0x0070)
--#define TMR_ICR(n)	(0x0074 + ((n) << 2))
--#define TMR_WICR	(0x0080)
--#define TMR_CER		(0x0084)
--#define TMR_CMR		(0x0088)
--#define TMR_ILR(n)	(0x008c + ((n) << 2))
--#define TMR_WCR		(0x0098)
--#define TMR_WFAR	(0x009c)
--#define TMR_WSAR	(0x00A0)
--#define TMR_CVWR(n)	(0x00A4 + ((n) << 2))
--
--#define TMR_CCR_CS_0(x)	(((x) & 0x3) << 0)
--#define TMR_CCR_CS_1(x)	(((x) & 0x7) << 2)
--#define TMR_CCR_CS_2(x)	(((x) & 0x3) << 5)
--
--#endif /* __ASM_MACH_REGS_TIMERS_H */
-diff --git a/drivers/clocksource/timer-mmp.c b/drivers/clocksource/timer-mmp.c
-index 553e3de..75cc961 100644
---- a/drivers/clocksource/timer-mmp.c
-+++ b/drivers/clocksource/timer-mmp.c
-@@ -30,19 +30,44 @@
- #include <linux/of_irq.h>
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index 4dbf3e0..c0cdb62 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -114,7 +114,6 @@ static int __init mmp2_init(void)
  
- #include <asm/sched_clock.h>
--#include <mach/addr-map.h>
--#include <mach/regs-timers.h>
--#include <mach/regs-apbc.h>
- #include <mach/irqs.h>
- #include <mach/cputype.h>
- #include <asm/mach/time.h>
+ 	return 0;
+ }
+-postcore_initcall(mmp2_init);
  
--#define TIMERS_VIRT_BASE	TIMERS1_VIRT_BASE
-+#define TMR_CCR		(0x0000)
-+#define TMR_TN_MM(n, m)	(0x0004 + ((n) << 3) + (((n) + (m)) << 2))
-+#define TMR_CR(n)	(0x0028 + ((n) << 2))
-+#define TMR_SR(n)	(0x0034 + ((n) << 2))
-+#define TMR_IER(n)	(0x0040 + ((n) << 2))
-+#define TMR_PLVR(n)	(0x004c + ((n) << 2))
-+#define TMR_PLCR(n)	(0x0058 + ((n) << 2))
-+#define TMR_WMER	(0x0064)
-+#define TMR_WMR		(0x0068)
-+#define TMR_WVR		(0x006c)
-+#define TMR_WSR		(0x0070)
-+#define TMR_ICR(n)	(0x0074 + ((n) << 2))
-+#define TMR_WICR	(0x0080)
-+#define TMR_CER		(0x0084)
-+#define TMR_CMR		(0x0088)
-+#define TMR_ILR(n)	(0x008c + ((n) << 2))
-+#define TMR_WCR		(0x0098)
-+#define TMR_WFAR	(0x009c)
-+#define TMR_WSAR	(0x00A0)
-+#define TMR_CVWR(n)	(0x00A4 + ((n) << 2))
-+
-+#define TMR_CCR_CS_0(x)	(((x) & 0x3) << 0)
-+#define TMR_CCR_CS_1(x)	(((x) & 0x7) << 2)
-+#define TMR_CCR_CS_2(x)	(((x) & 0x3) << 5)
-+
-+#define TIMERS1_PHY_BASE	(0xd4000000 + 0x14000)
-+#define TIMERS2_PHY_BASE	(0xd4000000 + 0x16000)
-+
-+#define TIMERS_PHY_BASE		TIMERS1_PHY_BASE
+ #define APBC_TIMERS	APBC_REG(0x024)
  
- #define MAX_DELTA		(0xfffffffe)
- #define MIN_DELTA		(16)
- 
--static void __iomem *mmp_timer_base = TIMERS_VIRT_BASE;
-+static void __iomem *mmp_timer_base;
- 
- /*
-  * FIXME: the timer needs some delay to stablize the counter capture
-@@ -191,6 +216,9 @@ static struct irqaction timer_irq = {
- 
- void __init timer_init(int irq)
+@@ -122,6 +121,7 @@ void __init mmp2_timer_init(void)
  {
-+	mmp_timer_base = ioremap(TIMERS_PHY_BASE, PAGE_SIZE);
-+	BUG_ON(!mmp_timer_base);
-+
- 	timer_config();
+ 	unsigned long clk_rst;
  
- 	setup_sched_clock(mmp_read_sched_clock, 32, CLOCK_TICK_RATE);
++	mmp2_init();
+ 	__raw_writel(APBC_APBCLK | APBC_RST, APBC_TIMERS);
+ 
+ 	/*
+diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+index a30dcf3..87e1bcb 100644
+--- a/arch/arm/mach-mmp/pxa168.c
++++ b/arch/arm/mach-mmp/pxa168.c
+@@ -61,7 +61,6 @@ static int __init pxa168_init(void)
+ 
+ 	return 0;
+ }
+-postcore_initcall(pxa168_init);
+ 
+ /* system timer - clock enabled, 3.25MHz */
+ #define TIMER_CLK_RST	(APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(3))
+@@ -69,6 +68,7 @@ postcore_initcall(pxa168_init);
+ 
+ void __init pxa168_timer_init(void)
+ {
++	pxa168_init();
+ 	/* this is early, we have to initialize the CCU registers by
+ 	 * ourselves instead of using clk_* API. Clock rate is defined
+ 	 * by APBC_TIMERS_CLK_RST (3.25MHz) and enabled free-running
+diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+index df7e33f..da5c299 100644
+--- a/arch/arm/mach-mmp/pxa910.c
++++ b/arch/arm/mach-mmp/pxa910.c
+@@ -100,7 +100,6 @@ static int __init pxa910_init(void)
+ 
+ 	return 0;
+ }
+-postcore_initcall(pxa910_init);
+ 
+ /* system timer - clock enabled, 3.25MHz */
+ #define TIMER_CLK_RST	(APBC_APBCLK | APBC_FNCLK | APBC_FNCLKSEL(3))
+@@ -108,6 +107,7 @@ postcore_initcall(pxa910_init);
+ 
+ void __init pxa910_timer_init(void)
+ {
++	pxa910_init();
+ 	/* reset and configure */
+ 	__raw_writel(APBC_APBCLK | APBC_RST, APBC_TIMERS);
+ 	__raw_writel(TIMER_CLK_RST, APBC_TIMERS);
+diff --git a/arch/arm/plat-pxa/dma.c b/arch/arm/plat-pxa/dma.c
+index 79ef102..6c5472b 100644
+--- a/arch/arm/plat-pxa/dma.c
++++ b/arch/arm/plat-pxa/dma.c
+@@ -228,36 +228,46 @@ err_state:
+ 	return NULL;
+ }
+ 
+-static void pxa_dma_init_debugfs(void)
++static int __init pxa_dma_init_debugfs(void)
+ {
+-	int i;
++	int i, ret;
+ 	struct dentry *chandir;
+ 
+ 	dbgfs_root = debugfs_create_dir(DMA_DEBUG_NAME, NULL);
+-	if (IS_ERR(dbgfs_root) || !dbgfs_root)
++	if (IS_ERR(dbgfs_root) || !dbgfs_root) {
++		ret = -EINVAL;
+ 		goto err_root;
++	}
+ 
+ 	dbgfs_state = debugfs_create_file("state", 0400, dbgfs_root, NULL,
+ 					  &dbg_fops_state);
+-	if (!dbgfs_state)
++	if (!dbgfs_state) {
++		ret = -EINVAL;
+ 		goto err_state;
++	}
+ 
+ 	dbgfs_chan = kmalloc(sizeof(*dbgfs_state) * num_dma_channels,
+ 			     GFP_KERNEL);
+-	if (!dbgfs_chan)
++	if (!dbgfs_chan) {
++		ret = -ENOMEM;
+ 		goto err_alloc;
++	}
+ 
+ 	chandir = debugfs_create_dir("channels", dbgfs_root);
+-	if (!chandir)
++	if (!chandir) {
++		ret = -EINVAL;
+ 		goto err_chandir;
++	}
+ 
+ 	for (i = 0; i < num_dma_channels; i++) {
+ 		dbgfs_chan[i] = pxa_dma_dbg_alloc_chan(i, chandir);
+-		if (!dbgfs_chan[i])
++		if (!dbgfs_chan[i]) {
++			ret = -EINVAL;
+ 			goto err_chans;
++		}
+ 	}
+ 
+-	return;
++	return 0;
+ err_chans:
+ err_chandir:
+ 	kfree(dbgfs_chan);
+@@ -266,7 +276,9 @@ err_state:
+ 	debugfs_remove_recursive(dbgfs_root);
+ err_root:
+ 	pr_err("pxa_dma: debugfs is not available\n");
++	return ret;
+ }
++late_initcall(pxa_dma_init_debugfs);
+ 
+ static void __exit pxa_dma_cleanup_debugfs(void)
+ {
+@@ -385,7 +397,5 @@ int __init pxa_init_dma(int irq, int num_ch)
+ 	}
+ 	num_dma_channels = num_ch;
+ 
+-	pxa_dma_init_debugfs();
+-
+ 	return 0;
+ }
 -- 
 1.8.1.2
