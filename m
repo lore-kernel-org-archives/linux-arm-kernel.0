@@ -1,56 +1,41 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Mon, 03 Jun 2013 09:49:18 +0200
-Subject: [GIT PULL] arm-soc: Xilinx zynq clock changes for v3.11
-In-Reply-To: <20130601234708.21525.1684@quantum>
-References: <51A31045.1060406@monstr.eu>
- <20130601051913.GC5189@quad.lixom.net> <20130601234708.21525.1684@quantum>
-Message-ID: <51AC4A7E.1070509@monstr.eu>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 3 Jun 2013 07:49:28 +0000
+Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
+In-Reply-To: <51A60427.6010409@ti.com>
+References: <cover.1369658705.git.afzal@ti.com>
+ <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
+ <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
+ <51A5BEB6.6070809@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAFB174@DBDE04.ent.ti.com>
+ <51A60427.6010409@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB1238B@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2013 01:47 AM, Mike Turquette wrote:
-> Quoting Olof Johansson (2013-05-31 22:19:13)
->> On Mon, May 27, 2013 at 09:50:29AM +0200, Michal Simek wrote:
->>> Hi Arnd and Olof,
->>>
->>> please pull the following changes to your arm-soc tree.
->>> We haven't got any response from audience or clk maintainer
->>> but we discussed these changes with him in several threads.
->>> The major change is to have easy to going DT clock description
->>> in one node and do not describe the whole clock tree in details
->>> which none uses.
->>
->> Hi,
->>
->> I don't see any acks from Mike Turquette on any of these. Mike?
->>
+Hi Benoit,
+
+On Wed, May 29, 2013 at 19:05:35, Cousson, Benoit wrote:
+
+> And in this case, you do not introduce any new revision.
 > 
-> I Acked it but they were never applied since my Ack came after the pull
-> request had been sent:
+> There is no point to update the binding each time we add a new SoC
+> variant that will contain the exact same IP.
 > 
-> http://article.gmane.org/gmane.linux.kernel/1499697
+> I think it will mainly confuse the user that will wonder what is
+> different in that version compare to the previous one, moreover we can
+> end up with hundred of entries for the exact same IP for nothing.
+> 
+> The real problem is due to the introduction of the SoC name in the
+> device compatible name. That does introduced a SoC level information
+> that is mostly irrelevant at device level. I can understand why it was
+> done for practical aspect when the IP version is not well identified,
+> but that can lead to this proliferation of new pointless bindings.
 
-Yep. I can look how time went but I wait at least week for any reaction.
-Mike was probably out that's why I have added patches to the branch
-and sent pull request and then Mike sent his ACK.
-If you like I can add Mike's ack to that patches and send you new pull
-request.
+As opinions on $subject seems not yet to be conclusive, I plan to
+rebase DTS patch (14/14) over your 'for_3.11/dts' branch (that makes
+use of C preprocessor on OMAP DTS) and post separately dropping
+11-14 patches, is that okay ?
 
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130603/fcc4a712/attachment-0001.sig>
+Regards
+Afzal
