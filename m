@@ -1,35 +1,36 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  3 Jun 2013 14:42:25 +0100
-Subject: [PATCH 01/21] ARM: ux500: Supply the PRCMU Clock node
+Date: Mon,  3 Jun 2013 14:42:26 +0100
+Subject: [PATCH 02/21] ARM: ux500: Supply the Ethernet clock lookup to
+ Snowball's DT
 In-Reply-To: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
 References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370266965-7901-2-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370266965-7901-3-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |    8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/snowball.dts |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index fd5794a..6c445d5 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -243,7 +243,13 @@
- 				interrupts = <21 0x4>, <22 0x4>;
- 				interrupt-names = "IRQ_HOTMON_LOW", "IRQ_HOTMON_HIGH";
- 				status = "disabled";
--			 };
-+			};
-+
-+			clk: prcmu-clock {
-+				compatible = "stericsson,u8500-clk";
-+
-+				#clock-cells = <1>;
-+			};
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index db5db24..cb37851 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -137,12 +137,13 @@
+ 				vdd33a-supply = <&en_3v3_reg>;
+ 				vddvario-supply = <&db8500_vape_reg>;
  
- 			db8500-prcmu-regulators {
- 				compatible = "stericsson,db8500-prcmu-regulator";
+-
+ 				reg-shift = <1>;
+ 				reg-io-width = <2>;
+ 				smsc,force-internal-phy;
+ 				smsc,irq-active-high;
+ 				smsc,irq-push-pull;
++
++				clocks = <&clk 64>;
+ 			};
+ 		};
+ 
 -- 
 1.7.10.4
