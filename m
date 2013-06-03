@@ -1,138 +1,103 @@
-From: alior@marvell.com (Lior Amsalem)
-Date: Mon, 3 Jun 2013 10:16:56 +0300
-Subject: [PATCH 3/3] ARM PJ4B: Add support for errata 4611
-In-Reply-To: <20130529112207.GG13095@mudshark.cambridge.arm.com>
-References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
- <1369822618-26797-4-git-send-email-gregory.clement@free-electrons.com>
- <20130529112207.GG13095@mudshark.cambridge.arm.com>
-Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56CF1A398@IL-MB01.marvell.com>
+From: jiada_wang@mentor.com (Jiada Wang)
+Date: Mon, 3 Jun 2013 16:27:34 +0900
+Subject: [PATCH] clk: implement clk_unregister
+Message-ID: <1370244454-2584-1-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Will Deacon [mailto:will.deacon at arm.com]
-> Sent: Wednesday, May 29, 2013 2:22 PM
-> 
-> On Wed, May 29, 2013 at 11:16:58AM +0100, Gregory CLEMENT wrote:
-> > From: Lior Amsalem <alior@marvell.com>
-> >
-> > A CP15 clean operation can result in a dead lock state if it is hit by
-> > an incoming snoop event. the fiw to this issue is the following:
-[Snip]
-> > a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-> > index e3a8064..112f778 100644
-> > --- a/arch/arm/include/asm/tlbflush.h
-> > +++ b/arch/arm/include/asm/tlbflush.h
-> > @@ -475,11 +475,22 @@ static inline void flush_pmd_entry(void *pmd)  {
-> >  	const unsigned int __tlb_flag = __cpu_tlb_flags;
-> >
-> > +#ifdef CONFIG_PJ4B_ERRATA_4611
-> > +	unsigned long flags;
-> > +	raw_local_irq_save(flags);
-> > +	dmb();
-> > +#endif
-> > +
-> >  #ifdef CONFIG_PJ4B_ERRATA_6124
-> >  	tlb_op(TLB_DCLEAN, "c7, c14, 1	@ flush_pmd", pmd);
-> >  #else
-> >  	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
-> >  #endif
-> > +
-> > +#ifdef CONFIG_PJ4B_ERRATA_4611
-> > +	raw_local_irq_restore(flags);
-> > +#endif
-> 
-> Eeek. Why do you have to disable interrupts during this? Again, are there no
-> chicken bits to save you?
+Currently clk_unregister is unimplemented, it is required in case
+sub modules want actually remove clk device registered by clk_register.
+This patch adds the implementation of clk_unregiser.
 
-It's there in order to avoid an exception that will cause the workaround (of adding a DMB) 
-to be dismissed.
-No chicken bit for it...
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+CC: Dmitry Eremin-Solenikov <notifications@github.com>
+CC: Dirk Behme <dirk.behme@de.bosch.com>
+---
+ drivers/clk/clk.c | 57 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 55 insertions(+), 2 deletions(-)
 
-> 
-> >  	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
-> >
-> >  	if (tlb_flag(TLB_WB))
-> > @@ -490,11 +501,22 @@ static inline void clean_pmd_entry(void *pmd)  {
-> >  	const unsigned int __tlb_flag = __cpu_tlb_flags;
-> >
-> > +#ifdef CONFIG_PJ4B_ERRATA_4611
-> > +	unsigned long flags;
-> > +	raw_local_irq_save(flags);
-> > +	dmb();
-> > +#endif
-> > +
-> >  #ifdef CONFIG_PJ4B_ERRATA_6124
-> >  	tlb_op(TLB_DCLEAN, "c7, c14, 1	@ flush_pmd", pmd);
-> >  #else
-> >  	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
-> >  #endif
-> > +
-> > +#ifdef CONFIG_PJ4B_ERRATA_4611
-> > +	raw_local_irq_restore(flags);
-> > +#endif
-> > +
-> >  	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);  }
-> >
-> > diff --git a/arch/arm/mm/copypage-v6.c b/arch/arm/mm/copypage-v6.c
-> > index b9bcc9d..20b69ad 100644
-> > --- a/arch/arm/mm/copypage-v6.c
-> > +++ b/arch/arm/mm/copypage-v6.c
-> > @@ -59,11 +59,22 @@ static void
-> v6_clear_user_highpage_nonaliasing(struct page *page, unsigned long
-> >   */
-> >  static void discard_old_kernel_data(void *kto)  {
-> > +#ifdef CONFIG_PJ4B_ERRATA_4611
-> > +        unsigned long flags;
-> > +
-> > +        raw_local_irq_save(flags);
-> > +        dmb();
-> > +#endif
-> > +
-> >  	__asm__("mcrr	p15, 0, %1, %0, c6	@ 0xec401f06"
-> >  	   :
-> >  	   : "r" (kto),
-> >  	     "r" ((unsigned long)kto + PAGE_SIZE - L1_CACHE_BYTES)
-> >  	   : "cc");
-> > +
-> > +#ifdef CONFIG_PJ4B_ERRATA_4611
-> > +        raw_local_irq_restore(flags); #endif
-> 
-> Do you actually have an aliasing vipt cache? If not, you don't care about this
-> function.
-
-No, It's a mistake, will be removed. 10x for pointing that out.
-
-> 
-> > diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-> > index f9a0aa7..ca81291 100644
-> > --- a/arch/arm/mm/proc-macros.S
-> > +++ b/arch/arm/mm/proc-macros.S
-> > @@ -178,7 +178,20 @@
-> >  #endif
-> >
-> >  	str	r3, [r0]
-> > +
-> > +#ifdef CONFIG_PJ4B_ERRATA_4611
-> > +	mrs     r2, cpsr
-> > +	orr     r3, r2, #PSR_F_BIT | PSR_I_BIT
-> > +	msr     cpsr_c, r3                      @ Disable interrupts
-> > +	dmb                                     @ ensure ordering with previous memory
-> accesses
-> > +#endif
-> > +
-> >  	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-> > +
-> > +#ifdef CONFIG_PJ4B_ERRATA_4611
-> > +	msr     cpsr_c, r2                      @ Restore interrupts
-> > +	mcr     p15, 0, r0, c7, c10, 4          @ drain write buffer
-> > +#endif
-> 
-> This could be a dsb.
-
-Yes it can.
-
-> 
-> Will
-
-Regards,
-Lior Amsalem
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 545d8dd..f9944b2 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -152,6 +152,25 @@ out:
+ }
+ 
+ /**
++ * clk_debug_unregister - remove a clk node from the debugfs clk tree
++ * @clk: the clk being removed from the debugfs clk tree
++ *
++ * Dynamically removes a clk and all it's children clk nodes from the
++ * debugfs clk tree if clk->dentry points to debugfs created by
++ * clk_debug_register in __clk_init.
++ *
++ * Caller must hold prepare_lock.
++ *
++ */
++static void clk_debug_unregister(struct clk *clk)
++{
++	if (!clk || !clk->dentry)
++		return;
++
++	debugfs_remove_recursive(clk->dentry);
++}
++
++/**
+  * clk_debug_init - lazily create the debugfs clk tree visualization
+  *
+  * clks are often initialized very early during boot before memory can
+@@ -195,6 +214,7 @@ static int __init clk_debug_init(void)
+ late_initcall(clk_debug_init);
+ #else
+ static inline int clk_debug_register(struct clk *clk) { return 0; }
++static inline void clk_debug_unregister(struct clk *clk) { return; }
+ #endif
+ 
+ /* caller must hold prepare_lock */
+@@ -1447,9 +1467,42 @@ EXPORT_SYMBOL_GPL(clk_register);
+  * clk_unregister - unregister a currently registered clock
+  * @clk: clock to unregister
+  *
+- * Currently unimplemented.
+  */
+-void clk_unregister(struct clk *clk) {}
++void clk_unregister(struct clk *clk)
++{
++	int i;
++
++	if (!clk)
++		return;
++
++	mutex_lock(&prepare_lock);
++	if (clk->prepare_count) {
++		pr_debug("%s: can't unregister clk %s, it is prepared\n",
++				__func__, clk->name);
++		goto out;
++	}
++
++	if (!hlist_empty(&clk->children)) {
++		pr_debug("%s: clk %s has registered children\n",
++				__func__, clk->name);
++		goto out;
++	}
++
++	clk_debug_unregister(clk);
++
++	hlist_del_init(&clk->child_node);
++
++	kfree(clk->parents);
++	i = clk->num_parents;
++	while (--i >= 0)
++		kfree(clk->parent_names[i]);
++	kfree(clk->parent_names);
++	kfree(clk->name);
++	kfree(clk);
++out:
++	mutex_unlock(&prepare_lock);
++	return;
++}
+ EXPORT_SYMBOL_GPL(clk_unregister);
+ 
+ /***        clk rate change notifiers        ***/
+-- 
+1.8.1.1
