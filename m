@@ -1,69 +1,71 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Jun 2013 18:39:35 -0400
-Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
- line
-In-Reply-To: <87mwr6kfbm.fsf@linaro.org>
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370040357-25794-4-git-send-email-khilman@linaro.org>
- <51AC667D.6070409@epfl.ch> <87mwr6kfbm.fsf@linaro.org>
-Message-ID: <20130603223935.GU3803@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jun 2013 23:45:55 +0100
+Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
+In-Reply-To: <51AD1AB3.9050908@codeaurora.org>
+References: <1368049671-22879-1-git-send-email-sboyd@codeaurora.org>
+ <5193E424.9090605@codeaurora.org> <519E57D2.3050000@codeaurora.org>
+ <20130523231531.GT18614@n2100.arm.linux.org.uk>
+ <20130524220539.GB599@codeaurora.org> <51AD0703.6050408@codeaurora.org>
+ <20130603222321.GP18614@n2100.arm.linux.org.uk>
+ <51AD1AB3.9050908@codeaurora.org>
+Message-ID: <20130603224555.GR18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 03:19:25PM -0700, Kevin Hilman wrote:
-> Florian Vaussard <florian.vaussard@epfl.ch> writes:
-> 
-> > Hello Kevin,
+On Mon, Jun 03, 2013 at 03:37:39PM -0700, Stephen Boyd wrote:
+> On 06/03/13 15:23, Russell King - ARM Linux wrote:
+> > On Mon, Jun 03, 2013 at 02:13:39PM -0700, Stephen Boyd wrote:
+> >> We
+> >> can't get any information about why the decompression failed if
+> >> we have debug_ll enabled. I had to patch the error() routine to
+> >> not while loop forever to get that print after do_decompress to
+> >> be useful.)
+> > Maybe your implementation of puts() for the decompressor is faulty then?
+> > Because it works for me - when something goes wrong with the decompression,
+> > I get a message such as:
 > >
-> > On 06/01/2013 12:45 AM, Kevin Hilman wrote:
-> >> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
-> >> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
-> >> SYS_NIRQ pin in the twl4030 DTS file.
-> >>
-> >> Boards that hook up the twl4030 differently can easily override this
-> >> in their board-specific DTS file.
-> >>
-> >> This allows RTC wake from off-mode to work again on OMAP3-based
-> >> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
-> >> 3530/Overo, 3730/Overo-STORM.
-> >>
-> >> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> >> ---
-> >>   arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
-> >>   1 file changed, 17 insertions(+)
-> >>
-> >> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
-> >> index b3034da..c7fe9f6 100644
-> >> --- a/arch/arm/boot/dts/twl4030.dtsi
-> >> +++ b/arch/arm/boot/dts/twl4030.dtsi
-> >> @@ -13,6 +13,8 @@
-> >>   	compatible = "ti,twl4030";
-> >>   	interrupt-controller;
-> >>   	#interrupt-cells = <1>;
-> >> +	pinctrl-names = "default";
-> >> +	pinctrl-0 = <&twl4030_pins>;
-> >>
-> >>   	rtc {
-> >>   		compatible = "ti,twl4030-rtc";
-> >> @@ -92,3 +94,18 @@
-> >>   		#pwm-cells = <2>;
-> >>   	};
-> >>   };
-> >> +
-> >> +&omap3_pmx_core {
+> > Decompressing kernel...
 > >
-> > Here you are making the TWL4030 to explicitly depend on OMAP3. Could
-> > this chip be used by another target? If the case, I would put this
-> > piece of code in the files including twl4030. Otherwise it's ok here.
+> > CRC error
+> >
+> >  -- System halted
+> >
 > 
-> I talked this over with Tony before posting.  In theorry, it could be
-> used on other platforms.  In practice, it's only used on OMAP.  We can
-> easily move this to board files if needed later, but thought it would be
-> simpler to put it here.  I'll let Benoit decide.
+> I was expecting to see
+> 
+> Decompressing kernel...
+> 
+> CRC error
+> 
+> decompressor returned an error
+> 
+> 
+> but since we loop forever this code in arch/arm/boot/compressed/misc.c
+> doesn't do anything:
+> 
+>         if (ret)
+>                 error("decompressor returned an error");
 
-What about omap boards that don't use the twl4030?  eg I'm currently
-tinkering with a board that uses a tps6507x...
+I think that's just a final catch-all in case one of the decompressors
+doesn't use the error() function pointer it was passed.
 
-thx,
+> In my case I'm booting a kernel with textoffset = 0x208000 but RAM
+> starts at 0x0. Does "minimum of RAM start" mean 0x0 or 0x200000?
 
-Jason.
+The basic requirement for zImage's is no less than the start of RAM
+plus 32K.  Or let me put it another way - start of writable memory
+plus 32K.
+
+Whether you need an offset of 0x200000 or not is not for the
+decompressor to know.  If you're having to avoid the first 0x200000
+bytes of memory for some reason (eg, secure firmware or DSP needs
+it left free) then there's no way for the decompressor to know that,
+so it's irrelevant.
+
+So, lets say that your platform has a DSP which needs the first 0x200000
+bytes left free.  So the boot loader _already_ needs to know to load
+the image not at zero, but above 0x200000.  The additional 32K
+requirement is really nothing new and so should be treated in just the
+same way.
+
+Leave at least 32K of usable memory below the zImage at all times.
