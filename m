@@ -1,99 +1,76 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Mon, 3 Jun 2013 19:38:18 +0200
-Subject: [PATCH V4] ARM: handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130531141508.GB15551@arm.com>
-References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
- <20130529110508.GH17767@MacBook-Pro.local>
- <20130529191657.GA13047@schnuecks.de>
- <20130530164335.GK23631@arm.com>
- <20130531120519.GB3803@titan.lakedaemon.net>
- <20130531141508.GB15551@arm.com>
-Message-ID: <20130603173817.GA32211@schnuecks.de>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Mon, 3 Jun 2013 13:42:10 -0400
+Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
+In-Reply-To: <20130603190954.3bd52784@skate>
+References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130603165753.GL3803@titan.lakedaemon.net>
+ <20130603190954.3bd52784@skate>
+Message-ID: <20130603174210.GM3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
-
-On Fri, May 31, 2013 at 03:15:08PM +0100, Catalin Marinas wrote:
-> On Fri, May 31, 2013 at 01:05:19PM +0100, Jason Cooper wrote:
-> > On Thu, May 30, 2013 at 05:43:35PM +0100, Catalin Marinas wrote:
-> > > On Wed, May 29, 2013 at 08:16:57PM +0100, Simon Baatz wrote:
-> > > > On Wed, May 29, 2013 at 12:05:09PM +0100, Catalin Marinas wrote:
-> > > > > On Sun, May 12, 2013 at 06:35:56AM +0100, Simon Baatz wrote:
-> > > > > > Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
-> > > > > > it needs to handle are kernel mapped only.  However, for example when doing
-> > > > > > direct I/O, pages with user space mappings may occur.
-> > > > > 
-> > > > > After Nico's clarification, I think the original commit introducing this
-> > > > > function was also incomplete (commit 73be1591 - [ARM] 5545/2: add
-> > > > > flush_kernel_dcache_page() for ARM) since it ignores highmem pages and
-> > > > > their flushing could be deferred for a long time.
-> > > > 
-> > > > Yes, I agree.
-> > > >  
-> > > > > For my understanding (if I re-read this tread) - basically code like
-> > > > > this should not leave the user mapping inconsistent:
-> > > > > 
-> > > > > kmap()
-> > > > > ...
-> > > > > flush_kernel_dcache_page()
-> > > > > kunmap()
-> ...
-> > 
-> > wrt to 73be1591, this appears to go all the way back to v2.6.31.x... Can
-> > Simon go ahead and put this in rmk's patch tracker and mention that it
-> > should go to all -stable trees?
+On Mon, Jun 03, 2013 at 07:09:54PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> I'm not sure how easy it is to apply this patch on past stable versions.
-> Maybe something simpler for stable like always flushing the cache in
-> flush_kernel_dcache_page() with optimisation only in recent stable
-> versions.
+> On Mon, 3 Jun 2013 12:57:53 -0400, Jason Cooper wrote:
+> 
+> > Won't this override a user editing the 'local-mac-address' property in
+> > the dts?  Since we're dealing with appended dtbs, there's a higher
+> > probability of the user doing such a thing.
+> > 
+> > I'll admit it's a corner case, but I'd like to make sure we've thought
+> > through the use cases and aren't making things more complicated than
+> > necessary.
+> 
+> I don't have a strong opinion about this one, so if it's seen as being
+> necessary to preserve a potentially existing 'local-mac-address', then
+> I'll add the necessary checks to only update the property if it doesn't
+> already exist.
 
-Looking at how to adapt the change to previous kernel versions, it
-occurred to me that we could probably simplify the current patch
-since we can make stronger assumptions than __flush_dcache_page()
-can do. As discussed, __flush_dcache_page() does:
+hmmm, of_get_mac_address() give preferences to 'mac_address' and has the
+following comment:
 
-                        addr = kmap_high_get(page);
-                        if (addr) {
-                                __cpuc_flush_dcache_area(addr, PAGE_SIZE);
-                                kunmap_high(page);
-                        }
+/**
+ * Search the device tree for the best MAC address to use.
+ * 'mac-address' is checked first, because that is supposed to contain
+ * to "most recent" MAC address. If that isn't set, then
+ * 'local-mac-address' is checked next, because that is the default
+ * address.  If that isn't set, then the obsolete 'address' is checked,
+ * just in case we're using an old device tree.
+ *
+ * Note that the 'address' property is supposed to contain a virtual
+ * address of the register set, but some DTS files have redefined that
+ * property to be the MAC address.
+ *
+ * All-zero MAC addresses are rejected, because those could be
+ * properties that exist in the device tree, but were not set by U-Boot.
+ * For example, the DTS could define 'mac-address' and
+ * 'local-mac-address', with zero MAC addresses.  Some older U-Boots
+ * only initialized 'local-mac-address'.  In this case, the real MAC is
+ * in 'local-mac-address', and 'mac-address' exists but is all zeros.
+*/
 
-The kmap_high_get() is used to ensure that the page is/remains pinned
-during the flush.  However, the API of flush_kernel_dcache_page()
-ensures that the page is already kmapped when it is called (as in the
-quoted example above).
+So the real (minor) problem is that we require 'local-mac-address' in the
+binding.  And say nothing about mac-address.
 
-Thus, it is already pinned and we can simply look at page_address(). 
-If it is NULL, the page must have been obtained via kmap_atomic() and
-we don't need to flush anyway since kunmap_atomic() will do this. 
+u-boot, v2013.04 sets both mac-address and local-mac-address
+from the environment in fdt_fixup_ethernet() and doesn't check to see if
+it's already populated with a valid mac :(
 
-The actual flush covering both the lowmem and highmem cases actually
-is as simple as this (inspired by __flush_dcache_page() in 2.6.32):
+barebox doesn't appear to set the mac-address, and relies on the dtb.
 
-	addr = page_address(page);
-#ifdef CONFIG_HIGHMEM
-	/*
-	 * kmap_atomic() doesn't set the page virtual address, and
-	 * kunmap_atomic() takes care of cache flushing already.
-	 */
-	if (addr)
-#endif
-		__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+Since we really only have to worry about legacy u-boot with ATAGs, we
+should mimic the behavior of u-boot to date.  The mac address found in
+the u-boot environment is the canonical source for the mac address.
+This would have the added bonus that flash-kernel (debian kernel
+installer) wouldn't need to dig up the mac address and add it to the
+appended dtb.
 
-If you agree that this makes sense, I will send a new version.
+So, I'm happy with it the way it is.  If we want to dot our i's and
+cross our t's, we could also set local-mac-address from the atag,
+however, this isn't necessary because of the precedence in
+of_get_mac_address().
 
-If we change the patch this way, there is no need to split off
-__flush_kernel_dcache_page() from __flush_dcache_page(), which also
-makes it simpler to apply to past stable kernels.
+thx,
 
-The only thing we need to be aware of is the change of
-flush_kernel_dcache_page() in 2.6.37 (commit f8b63c1).  In earlier
-versions, we would only need to fix the highmem case.  However, I
-wonder whether it makes sense to apply a fix to 2.6.32 and 2.6.34
-without this ever being reported as a problem.
-
-
-- Simon
+Jason.
