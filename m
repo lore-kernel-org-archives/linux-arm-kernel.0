@@ -1,41 +1,22 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 4 Jun 2013 00:31:02 +0200
-Subject: [PATCH RFC 0/3] clk: dt: bindings for mux & divider clocks
-In-Reply-To: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
-References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
-Message-ID: <201306040031.02935.heiko@sntech.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 4 Jun 2013 00:31:31 +0200
+Subject: [PATCH v3 07/11] ARM: mmp: move timer registers into driver
+In-Reply-To: <1370251845-31373-8-git-send-email-haojian.zhuang@gmail.com>
+References: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
+ <1370251845-31373-8-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <201306040031.32043.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. Juni 2013, 19:53:07 schrieb Mike Turquette:
-> This series introduces binding definitions for common register-mapped
-> clock multiplexor and divider IP blocks, and the corresponding setup
-> functions once they are matched.  The bindings are close the struct
-> definitions but please don't hold that against the binding: the struct
-> definitions closely model the hardware.
-> 
-> The only missing basic clock type is the gate clock.  A binding for that
-> was posted some time back and is similar in spirit to these[1].  I guess
-> we'll need to decide whether register-level programming details belong
-> in DT.  I believe they do since those details describe the hardware.
-> 
-> Note that there is still no generic clock driver that matches these
-> basic types, but it would be trivial to write one.  Thoughts on that?
-> Is it better for each of the basic clock types to be a driver that
-> matches, or should there be one drivers/clk/clk-basic.c which matches
-> all of the basic clock building blocks?  I like the latter for aesthetic
-> purposes.
-> 
-> I am using this code while converting the OMAP4 clock data over to DT
-> and some common boilerplate code can be factored out of several clock
-> drivers if this is merged.
+On Monday 03 June 2013, Haojian Zhuang wrote:
+>  void __init timer_init(int irq)
+>  {
+> +       mmp_timer_base = ioremap(TIMERS_PHY_BASE, PAGE_SIZE);
+> +       BUG_ON(!mmp_timer_base);
+> +
 
-apart from the stuff pointed out in the replies to the patches this works 
-really well on my upcoming Rockchip platform and saves quite a lot silly clock 
-definitions whose only purpose is to hold the shift and width values.
+Here I would pass TIMERS_PHY_BASE as another argument, and move the
+definition of that macro back into platform code. Device drivers should
+be written not to care about physical addresses.
 
-
-So, for this series:
-
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+	Arnd
