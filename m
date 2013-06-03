@@ -1,81 +1,35 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Mon, 03 Jun 2013 11:48:45 +0200
-Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
- line
-In-Reply-To: <1370040357-25794-4-git-send-email-khilman@linaro.org>
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370040357-25794-4-git-send-email-khilman@linaro.org>
-Message-ID: <51AC667D.6070409@epfl.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jun 2013 10:50:14 +0100
+Subject: [PATCH] serial: imx: enable the clocks only when the uart is used
+In-Reply-To: <1370245331-12501-1-git-send-email-b32955@freescale.com>
+References: <1370245331-12501-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130603095014.GJ18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kevin,
-
-On 06/01/2013 12:45 AM, Kevin Hilman wrote:
-> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
-> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
-> SYS_NIRQ pin in the twl4030 DTS file.
->
-> Boards that hook up the twl4030 differently can easily override this
-> in their board-specific DTS file.
->
-> This allows RTC wake from off-mode to work again on OMAP3-based
-> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
-> 3530/Overo, 3730/Overo-STORM.
->
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+On Mon, Jun 03, 2013 at 03:42:11PM +0800, Huang Shijie wrote:
+> Current code opens the clocks when the uart driver is probed.
+> This will wastes some power if several uarts are enabled, but not really
+> used.
+> 
+> So close these clocks for uart, and enable the clocks only when
+> the uart is used.
+> 
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 > ---
->   arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
->   1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
-> index b3034da..c7fe9f6 100644
-> --- a/arch/arm/boot/dts/twl4030.dtsi
-> +++ b/arch/arm/boot/dts/twl4030.dtsi
-> @@ -13,6 +13,8 @@
->   	compatible = "ti,twl4030";
->   	interrupt-controller;
->   	#interrupt-cells = <1>;
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&twl4030_pins>;
->
->   	rtc {
->   		compatible = "ti,twl4030-rtc";
-> @@ -92,3 +94,18 @@
->   		#pwm-cells = <2>;
->   	};
->   };
-> +
-> +&omap3_pmx_core {
+>  drivers/tty/serial/imx.c |   12 +++++++++---
+>  1 files changed, 9 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> index 72bc1db..5705fc8 100644
+> --- a/drivers/tty/serial/imx.c
+> +++ b/drivers/tty/serial/imx.c
+> @@ -699,6 +699,9 @@ static int imx_startup(struct uart_port *port)
+>  	int retval;
+>  	unsigned long flags, temp;
+>  
+> +	clk_prepare_enable(sport->clk_per);
+> +	clk_prepare_enable(sport->clk_ipg);
 
-Here you are making the TWL4030 to explicitly depend on OMAP3. Could 
-this chip be
-used by another target? If the case, I would put this piece of code in 
-the files
-including twl4030. Otherwise it's ok here.
-
-> +	/*
-> +	 * On most OMAP3 platforms, the twl4030 IRQ line is connected
-> +         * to the SYS_NIRQ line on OMAP.  Therefore, configure the
-> +         * defaults for the SYS_NIRQ pin here.  Boards that hook up
-> +         * the twl4030 differently can easily override this in their
-> +         * board-specific DTS file.
-> +	 */
-> +	twl4030_pins: pinmux_twl4030_pins {
-> +		pinctrl-single,pins = <
-> +			0x1b0 0x4118 /*	sys_nirq.sys_nirq WAKEUP | INPUT_PULLUP | MODE 0 */
-
-By using pinctrl constants:
-
-			0x1b0 (PIN_INPUT_PULLUP | WAKEUP_EN | MUX_MODE0)	/* sys_nirq.sys_nirq */
-
-> +		>;
-> +	};
-> +};
->
-
-I will test this afternoon on an Overo.
-
-Regards,
-
-Florian
+You should check the return value.  I've a good mind to mark these
+functions with __must_check...
