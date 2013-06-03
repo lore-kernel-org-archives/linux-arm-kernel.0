@@ -1,148 +1,63 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 3 Jun 2013 19:17:47 +0800
-Subject: [PATCH 4/4] ARM: tegra: check processor id in tegra_{set,
- clear}_cpu_in_lp2
-In-Reply-To: <1370258267-30184-1-git-send-email-josephl@nvidia.com>
-References: <1370258267-30184-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1370258267-30184-5-git-send-email-josephl@nvidia.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 03 Jun 2013 13:40:49 +0200
+Subject: [PATCH 3/3] ARM: S5P64X0: Remove duplicate uncompress code
+In-Reply-To: <51AC18FF.9010108@linaro.org>
+References: <1370000944-19786-1-git-send-email-tushar.behera@linaro.org>
+ <51A9B3BC.9000405@gmail.com> <51AC18FF.9010108@linaro.org>
+Message-ID: <13570629.4jzYey0dyq@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The tegra_set_cpu_in_lp2 was used in the Tegra reset handler to know the
-CPU were coming up with which state then redirect to the appropriate
-handler. So we need to pass the processor id every time when we use the
-function. Now moving the code into the function.
+Hi Tushar,
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/cpuidle-tegra20.c |  7 +++----
- arch/arm/mach-tegra/cpuidle-tegra30.c |  7 +++----
- arch/arm/mach-tegra/pm.c              | 10 ++++++----
- arch/arm/mach-tegra/pm.h              |  4 ++--
- 4 files changed, 14 insertions(+), 14 deletions(-)
+On Monday 03 of June 2013 09:48:07 Tushar Behera wrote:
+> On 06/01/2013 02:11 PM, Sylwester Nawrocki wrote:
+> > Hi,
+> > 
+> > On 05/31/2013 01:49 PM, Tushar Behera wrote:
+> >> The uncompress code in S5P64X0 is almost same as the uncompress code
+> >> defined in plat-samsung. Better to reuse that code.
+> >> 
+> >> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
+> >> ---
+> >> 
+> >>   arch/arm/mach-s5p64x0/include/mach/uncompress.h |  163
+> >> 
+> >> ++---------------------
+> >> 
+> >>   1 file changed, 8 insertions(+), 155 deletions(-)
+> > 
+> > Not sure if you are aware of it, Tomasz has already posted a patch that
+> > removes this duplicated code: https://patchwork.kernel.org/patch/2589331
+> > I think that patch is not yet merged though.
+> > 
+> > Regards,
+> > Sylwester
+> 
+> Tomasz,
+> 
+> I had somehow missed that mail.
+> 
+> The patch that I have additionally makes calculation of uart_base
+> conditional on DEBUG_LL in line with the rest of the patches.
+> 
+> Would you mind re-spining your patch with those changes?
+> 
+> Alternately, I can take your patch and do above modifications in them.
 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
-index d667513..706aa42 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra20.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
-@@ -177,7 +177,6 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
- 				    struct cpuidle_driver *drv,
- 				    int index)
- {
--	u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
- 	bool entered_lp2 = false;
- 
- 	if (tegra_pending_sgi())
-@@ -193,16 +192,16 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
- 
- 	local_fiq_disable();
- 
--	tegra_set_cpu_in_lp2(cpu);
-+	tegra_set_cpu_in_lp2();
- 	cpu_pm_enter();
- 
--	if (cpu == 0)
-+	if (dev->cpu == 0)
- 		entered_lp2 = tegra20_cpu_cluster_power_down(dev, drv, index);
- 	else
- 		entered_lp2 = tegra20_idle_enter_lp2_cpu_1(dev, drv, index);
- 
- 	cpu_pm_exit();
--	tegra_clear_cpu_in_lp2(cpu);
-+	tegra_clear_cpu_in_lp2();
- 
- 	local_fiq_enable();
- 
-diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
-index 9d9f554..ed2a2a7 100644
---- a/arch/arm/mach-tegra/cpuidle-tegra30.c
-+++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
-@@ -114,16 +114,15 @@ static int tegra30_idle_lp2(struct cpuidle_device *dev,
- 			    struct cpuidle_driver *drv,
- 			    int index)
- {
--	u32 cpu = is_smp() ? cpu_logical_map(dev->cpu) : dev->cpu;
- 	bool entered_lp2 = false;
- 	bool last_cpu;
- 
- 	local_fiq_disable();
- 
--	last_cpu = tegra_set_cpu_in_lp2(cpu);
-+	last_cpu = tegra_set_cpu_in_lp2();
- 	cpu_pm_enter();
- 
--	if (cpu == 0) {
-+	if (dev->cpu == 0) {
- 		if (last_cpu)
- 			entered_lp2 = tegra30_cpu_cluster_power_down(dev, drv,
- 								     index);
-@@ -134,7 +133,7 @@ static int tegra30_idle_lp2(struct cpuidle_device *dev,
- 	}
- 
- 	cpu_pm_exit();
--	tegra_clear_cpu_in_lp2(cpu);
-+	tegra_clear_cpu_in_lp2();
- 
- 	local_fiq_enable();
- 
-diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
-index 779dbb4..8f8678b 100644
---- a/arch/arm/mach-tegra/pm.c
-+++ b/arch/arm/mach-tegra/pm.c
-@@ -99,8 +99,9 @@ static void suspend_cpu_complex(void)
- 	flowctrl_cpu_suspend_enter(cpu);
- }
- 
--void tegra_clear_cpu_in_lp2(int phy_cpu_id)
-+void tegra_clear_cpu_in_lp2(void)
- {
-+	int phy_cpu_id = cpu_logical_map(smp_processor_id());
- 	u32 *cpu_in_lp2 = tegra_cpu_lp2_mask;
- 
- 	spin_lock(&tegra_lp2_lock);
-@@ -111,8 +112,9 @@ void tegra_clear_cpu_in_lp2(int phy_cpu_id)
- 	spin_unlock(&tegra_lp2_lock);
- }
- 
--bool tegra_set_cpu_in_lp2(int phy_cpu_id)
-+bool tegra_set_cpu_in_lp2(void)
- {
-+	int phy_cpu_id = cpu_logical_map(smp_processor_id());
- 	bool last_cpu = false;
- 	cpumask_t *cpu_lp2_mask = tegra_cpu_lp2_mask;
- 	u32 *cpu_in_lp2 = tegra_cpu_lp2_mask;
-@@ -200,7 +202,7 @@ static int __cpuinit tegra_suspend_enter(suspend_state_t state)
- 	suspend_cpu_complex();
- 	switch (mode) {
- 	case TEGRA_SUSPEND_LP2:
--		tegra_set_cpu_in_lp2(0);
-+		tegra_set_cpu_in_lp2();
- 		break;
- 	default:
- 		break;
-@@ -210,7 +212,7 @@ static int __cpuinit tegra_suspend_enter(suspend_state_t state)
- 
- 	switch (mode) {
- 	case TEGRA_SUSPEND_LP2:
--		tegra_clear_cpu_in_lp2(0);
-+		tegra_clear_cpu_in_lp2();
- 		break;
- 	default:
- 		break;
-diff --git a/arch/arm/mach-tegra/pm.h b/arch/arm/mach-tegra/pm.h
-index 778a4aa..94c4b9d 100644
---- a/arch/arm/mach-tegra/pm.h
-+++ b/arch/arm/mach-tegra/pm.h
-@@ -28,8 +28,8 @@ extern unsigned long l2x0_saved_regs_addr;
- void save_cpu_arch_register(void);
- void restore_cpu_arch_register(void);
- 
--void tegra_clear_cpu_in_lp2(int phy_cpu_id);
--bool tegra_set_cpu_in_lp2(int phy_cpu_id);
-+void tegra_clear_cpu_in_lp2(void);
-+bool tegra_set_cpu_in_lp2(void);
- 
- void tegra_idle_lp2_last(void);
- extern void (*tegra_tear_down_cpu)(void);
+Unfortunately I'm unlikely to find time to do it myself in nearest future, so 
+feel free to do it. Thanks.
+
+Keep in mind, however, that this patch was a dependency of
+
+[PATCH 0/6] Samsung watchdog support clean-up
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/18736/focus=18951
+
+so I would like to keep this series applicable.
+
+Best regards,
 -- 
-1.8.3
+Tomasz Figa
+Linux Kernel Developer
+Samsung R&D Institute Poland
+Samsung Electronics
