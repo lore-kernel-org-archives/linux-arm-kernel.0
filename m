@@ -1,94 +1,76 @@
 From: josephl@nvidia.com (Joseph Lo)
-Date: Mon, 3 Jun 2013 19:17:44 +0800
-Subject: [PATCH 1/4] ARM: tegra: cpuidle: move the init function behind the
+Date: Mon, 3 Jun 2013 19:17:45 +0800
+Subject: [PATCH 2/4] ARM: tegra: hook tegra_tear_down_cpu function in the PM
  suspend init function
 In-Reply-To: <1370258267-30184-1-git-send-email-josephl@nvidia.com>
 References: <1370258267-30184-1-git-send-email-josephl@nvidia.com>
-Message-ID: <1370258267-30184-2-git-send-email-josephl@nvidia.com>
+Message-ID: <1370258267-30184-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the state of CPUidle on Tegra can power gate the CPU and the
-vdd_cpu rail. But it depends on some configurations from DT and a common
-hook function for different Tegra SoCs to power gate the CPU rail. And
-these stuffs are initialized after common Tegra suspend init function. So
-we move the CPUidle init behind the suspend init function. And making the
-CPUidle driver more generic.
+The tegra_tear_down_cpu was used to cut off the CPU rail for various Tegra
+SoCs. Hooking it in the PM suspend init function and making the CPUidle
+driver more generic.
 
 Signed-off-by: Joseph Lo <josephl@nvidia.com>
 ---
- arch/arm/mach-tegra/common.c  |  2 ++
- arch/arm/mach-tegra/cpuidle.c | 14 ++++----------
- arch/arm/mach-tegra/cpuidle.h |  6 ++++++
- 3 files changed, 12 insertions(+), 10 deletions(-)
+ arch/arm/mach-tegra/cpuidle-tegra20.c | 3 ---
+ arch/arm/mach-tegra/cpuidle-tegra30.c | 3 ---
+ arch/arm/mach-tegra/pm.c              | 9 +++++++++
+ 3 files changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-index 9f852c6..ec5836b 100644
---- a/arch/arm/mach-tegra/common.c
-+++ b/arch/arm/mach-tegra/common.c
-@@ -29,6 +29,7 @@
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+index 0cdba8d..d667513 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra20.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+@@ -214,8 +214,5 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
  
- #include "board.h"
- #include "common.h"
-+#include "cpuidle.h"
- #include "fuse.h"
- #include "iomap.h"
- #include "irq.h"
-@@ -108,5 +109,6 @@ void __init tegra_init_early(void)
- void __init tegra_init_late(void)
+ int __init tegra20_cpuidle_init(void)
  {
- 	tegra_init_suspend();
-+	tegra_cpuidle_init();
- 	tegra_powergate_debugfs_init();
+-#ifdef CONFIG_PM_SLEEP
+-	tegra_tear_down_cpu = tegra20_tear_down_cpu;
+-#endif
+ 	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
  }
-diff --git a/arch/arm/mach-tegra/cpuidle.c b/arch/arm/mach-tegra/cpuidle.c
-index 4b744c4..4a7a788 100644
---- a/arch/arm/mach-tegra/cpuidle.c
-+++ b/arch/arm/mach-tegra/cpuidle.c
-@@ -27,25 +27,19 @@
- #include "fuse.h"
- #include "cpuidle.h"
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+index 3cf9aca..9d9f554 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra30.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
+@@ -146,8 +146,5 @@ static int tegra30_idle_lp2(struct cpuidle_device *dev,
  
--static int __init tegra_cpuidle_init(void)
-+void __init tegra_cpuidle_init(void)
+ int __init tegra30_cpuidle_init(void)
  {
--	int ret;
--
- 	switch (tegra_chip_id) {
- 	case TEGRA20:
--		ret = tegra20_cpuidle_init();
-+		tegra20_cpuidle_init();
- 		break;
- 	case TEGRA30:
--		ret = tegra30_cpuidle_init();
-+		tegra30_cpuidle_init();
- 		break;
- 	case TEGRA114:
--		ret = tegra114_cpuidle_init();
-+		tegra114_cpuidle_init();
- 		break;
- 	default:
--		ret = -ENODEV;
- 		break;
- 	}
--
--	return ret;
+-#ifdef CONFIG_PM_SLEEP
+-	tegra_tear_down_cpu = tegra30_tear_down_cpu;
+-#endif
+ 	return cpuidle_register(&tegra_idle_driver, NULL);
  }
--device_initcall(tegra_cpuidle_init);
-diff --git a/arch/arm/mach-tegra/cpuidle.h b/arch/arm/mach-tegra/cpuidle.h
-index d733f75..9bcf61f 100644
---- a/arch/arm/mach-tegra/cpuidle.h
-+++ b/arch/arm/mach-tegra/cpuidle.h
-@@ -35,4 +35,10 @@ int tegra114_cpuidle_init(void);
- static inline int tegra114_cpuidle_init(void) { return -ENODEV; }
- #endif
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 45cf52c..779dbb4 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -44,6 +44,14 @@
+ static DEFINE_SPINLOCK(tegra_lp2_lock);
+ void (*tegra_tear_down_cpu)(void);
  
-+#ifdef CONFIG_CPU_IDLE
-+void tegra_cpuidle_init(void);
-+#else
-+static inline void tegra_cpuidle_init(void) {}
-+#endif
++static void tegra_tear_down_cpu_init(void)
++{
++	if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC) && tegra_chip_id == TEGRA20)
++		tegra_tear_down_cpu = tegra20_tear_down_cpu;
++	if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC) && tegra_chip_id == TEGRA30)
++		tegra_tear_down_cpu = tegra30_tear_down_cpu;
++}
 +
- #endif
+ /*
+  * restore_cpu_complex
+  *
+@@ -224,6 +232,7 @@ void __init tegra_init_suspend(void)
+ 	if (tegra_pmc_get_suspend_mode() == TEGRA_SUSPEND_NONE)
+ 		return;
+ 
++	tegra_tear_down_cpu_init();
+ 	tegra_pmc_suspend_init();
+ 
+ 	suspend_set_ops(&tegra_suspend_ops);
 -- 
 1.8.3
