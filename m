@@ -1,47 +1,89 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Mon, 3 Jun 2013 11:53:27 +0200
-Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
-In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EB1238B@DBDE04.ent.ti.com>
-References: <cover.1369658705.git.afzal@ti.com>
- <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
- <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
- <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
- <51A5BEB6.6070809@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EAFB174@DBDE04.ent.ti.com>
- <51A60427.6010409@ti.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EB1238B@DBDE04.ent.ti.com>
-Message-ID: <51AC6797.1040304@ti.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Mon,  3 Jun 2013 11:53:52 +0200
+Subject: [PATCH] zynq: Not to rewrite jump code when starting address is 0x0
+Message-ID: <7f0e7852622e72e0e3cb9ccec0b6409b8e32e530.1370253191.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Afzal,
+This configuration is used by remoteproc.
 
-On 06/03/2013 09:49 AM, Mohammed, Afzal wrote:
-> Hi Benoit,
-> 
-> On Wed, May 29, 2013 at 19:05:35, Cousson, Benoit wrote:
-> 
->> And in this case, you do not introduce any new revision.
->>
->> There is no point to update the binding each time we add a new SoC
->> variant that will contain the exact same IP.
->>
->> I think it will mainly confuse the user that will wonder what is
->> different in that version compare to the previous one, moreover we can
->> end up with hundred of entries for the exact same IP for nothing.
->>
->> The real problem is due to the introduction of the SoC name in the
->> device compatible name. That does introduced a SoC level information
->> that is mostly irrelevant at device level. I can understand why it was
->> done for practical aspect when the IP version is not well identified,
->> but that can lead to this proliferation of new pointless bindings.
-> 
-> As opinions on $subject seems not yet to be conclusive, I plan to
-> rebase DTS patch (14/14) over your 'for_3.11/dts' branch (that makes
-> use of C preprocessor on OMAP DTS) and post separately dropping
-> 11-14 patches, is that okay ?
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+---
+ arch/arm/mach-zynq/platsmp.c | 52 ++++++++++++++++++++++----------------------
+ 1 file changed, 26 insertions(+), 26 deletions(-)
 
-Yes, that sounds good to me.
+diff --git a/arch/arm/mach-zynq/platsmp.c b/arch/arm/mach-zynq/platsmp.c
+index 5fc167e..023f225 100644
+--- a/arch/arm/mach-zynq/platsmp.c
++++ b/arch/arm/mach-zynq/platsmp.c
+@@ -53,34 +53,34 @@ int __cpuinit zynq_cpun_start(u32 address, int cpu)
+ 						&zynq_secondary_trampoline;
 
-Thanks,
-Benoit
+ 		zynq_slcr_cpu_stop(cpu);
+-
+-		if (__pa(PAGE_OFFSET)) {
+-			zero = ioremap(0, trampoline_code_size);
+-			if (!zero) {
+-				pr_warn("BOOTUP jump vectors not accessible\n");
+-				return -1;
++		if (address) {
++			if (__pa(PAGE_OFFSET)) {
++				zero = ioremap(0, trampoline_code_size);
++				if (!zero) {
++					pr_warn("BOOTUP jump vectors not accessible\n");
++					return -1;
++				}
++			} else {
++				zero = (__force u8 __iomem *)PAGE_OFFSET;
+ 			}
+-		} else {
+-			zero = (__force u8 __iomem *)PAGE_OFFSET;
+-		}
+-
+-		/*
+-		 * This is elegant way how to jump to any address
+-		 * 0x0: Load address at 0x8 to r0
+-		 * 0x4: Jump by mov instruction
+-		 * 0x8: Jumping address
+-		 */
+-		memcpy((__force void *)zero, &zynq_secondary_trampoline,
+-						trampoline_size);
+-		writel(address, zero + trampoline_size);
+-
+-		flush_cache_all();
+-		outer_flush_range(0, trampoline_code_size);
+-		smp_wmb();
+-
+-		if (__pa(PAGE_OFFSET))
+-			iounmap(zero);
+
++			/*
++			* This is elegant way how to jump to any address
++			* 0x0: Load address at 0x8 to r0
++			* 0x4: Jump by mov instruction
++			* 0x8: Jumping address
++			*/
++			memcpy((__force void *)zero, &zynq_secondary_trampoline,
++							trampoline_size);
++			writel(address, zero + trampoline_size);
++
++			flush_cache_all();
++			outer_flush_range(0, trampoline_code_size);
++			smp_wmb();
++
++			if (__pa(PAGE_OFFSET))
++				iounmap(zero);
++		}
+ 		zynq_slcr_cpu_start(cpu);
+
+ 		return 0;
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130603/d72dd9ff/attachment.sig>
