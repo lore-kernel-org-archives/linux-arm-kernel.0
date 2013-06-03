@@ -1,55 +1,54 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 03 Jun 2013 10:39:28 +0200
-Subject: [PATCHv6 00/11] Remove ARM local timer API
-In-Reply-To: <20130531221633.GG599@codeaurora.org>
-References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
- <20130531174526.GD599@codeaurora.org> <51A8E71D.1000407@linaro.org>
- <20130531221633.GG599@codeaurora.org>
-Message-ID: <51AC5640.5060202@linaro.org>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 3 Jun 2013 10:45:15 +0200
+Subject: linux-next: Tree for May 30
+In-Reply-To: <20130603163633.e392dffdacc316b490b12a26@canb.auug.org.au>
+References: <20130530163334.105322d3c166b74165f1dad4@canb.auug.org.au>
+ <CAMuHMdXNzmJtfxzzt3kuzROzJmfsTKkp_4_8pdg=ahLv2LdU+Q@mail.gmail.com>
+ <20130603163633.e392dffdacc316b490b12a26@canb.auug.org.au>
+Message-ID: <51AC579B.8040902@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2013 12:16 AM, Stephen Boyd wrote:
-> On 05/31, John Stultz wrote:
->> On 05/31/2013 10:45 AM, Stephen Boyd wrote:
->>> Comments have been light for this round so I think we're about
->>> ready to merge. John/Thomas, can you pick up these patches or
->>> shall I route them through arm-soc or something else?
+On 03/06/2013 08:36, Stephen Rothwell :
+> Hi Geert,
+>
+> On Thu, 30 May 2013 10:07:48 +0200 Geert Uytterhoeven <geert@linux-m68k.org> wrote:
 >>
+>> The following defconfigs fail without anything useful in the log:
+>>    - at91sam9g20_defconfig
+>>    - at91sam9261_defconfig
+>>    - at91sam9260_defconfig
 >>
->> So there looks to be a fair amount of additions in the ARM tree, do
->> those already have acks from Arnd/Olof/other folks? (I think I was
->> only cc'ed on the first two patches).
-> 
-> I'm still missing acks from Kukjin and Barry.
-> 
+>> A manual run reveals why:
+>> Can't find default configuration "arch/arm/configs/at91sam9g20_defconfig"!
 >>
->> Daniel (cc'ed) has just started helping out here, and should be able
->> to review and hopefully ack or pick up the timer related
->> drivers/clocksource changes to feed to Thomas' tree. Not sure if
->> he's got them in his mailbox so you might want to resend them and
->> make sure he's CC'ed.
+>> This is due to the merge of several config files:
 >>
->> If Arnd/Olof/whomever else from the arm side has acked things,
->> Daniel probably could queue the arm changes too, but it might be
->> better just to get Daniel's ack on the drivers/clocksource changes
->> and then queue things via arm-soc?
-> 
-> Either way works for me. I would just like to see this merged
-> into 3.11. I guess I will resend one more time.
+>> commit b3f442b0eedbc20b5ce3f4a96530588d14901199
+>> Author: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Date:   Wed May 15 17:19:21 2013 +0200
+>>
+>>      ARM: at91: udpate defconfigs
+>>
+>>      Merge 9g20 with 9260 and 9g10 with 9261 as those SoCs can run from the same
+>>      kernel even in non DT world.
+>>
+>>      Fix the sam9261ek to allow 9g10 and sam9261 to compile together.
+>>
+>>      Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>      Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>
+> Thanks for letting me know.  I have stopped those three configs from
+> being built.
 
-Yes please, resend. I will review them.
+Stephen, Geert,
 
-queuing the patches via arm-soc makes sense for me, but I prefer to
-review them before we decide to which tree we get them merged.
+Thanks for having taking care about this.
 
-Thanks
- -- Daniel
+Is it possible for you to move the building to the replacement defconfigs:
+at91sam9260_9g20_defconfig
+at91sam9261_9g10_defconfig
 
-
+Best regards,
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Nicolas Ferre
