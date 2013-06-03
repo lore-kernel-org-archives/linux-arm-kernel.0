@@ -1,65 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 11:45:34 +0100
-Subject: A bug about system call on ARM
-In-Reply-To: <20130603102723.GD32242@mudshark.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
- <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
- <20130529094826.GD13095@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
- <20130530090949.GC7483@mudshark.cambridge.arm.com>
- <20130530114112.GH7483@mudshark.cambridge.arm.com>
- <20130603101809.GK18614@n2100.arm.linux.org.uk>
- <20130603102723.GD32242@mudshark.cambridge.arm.com>
-Message-ID: <20130603104534.GL18614@n2100.arm.linux.org.uk>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon, 03 Jun 2013 11:46:11 +0100
+Subject: [PATCH v1 2/2] ARM:prima2:move postcore_initcalls to init_machine.
+In-Reply-To: <CAGsJ_4zTJamdH2-3vfqPSrOA+egST3rH_+2mPrhy6=1ZWJxnRg@mail.gmail.com>
+References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
+ <1369993517-24735-1-git-send-email-srinivas.kandagatla@st.com>
+ <CAGsJ_4yu2MT5o7hbX67KPhrejS9D1BbPcship4zxtXs3G9tE-Q@mail.gmail.com>
+ <51AC5A53.1090700@st.com>
+ <CAGsJ_4zTJamdH2-3vfqPSrOA+egST3rH_+2mPrhy6=1ZWJxnRg@mail.gmail.com>
+Message-ID: <51AC73F3.3040300@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 11:27:23AM +0100, Will Deacon wrote:
-> Hi Russell,
+On 03/06/13 11:07, Barry Song wrote:
+> i want to move sirfsoc_of_pwrc_init and sirfsoc_of_pwrc_init to
+> sirfsoc_pm_init as only suspend entries need them. then the result is
+> like:
 > 
-> On Mon, Jun 03, 2013 at 11:18:09AM +0100, Russell King - ARM Linux wrote:
-> > On Thu, May 30, 2013 at 12:41:12PM +0100, Will Deacon wrote:
-> > > +#if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
-> > > +	/*
-> > > +	 * We may have faulted trying to load the SWI instruction due to
-> > > +	 * concurrent page aging on another CPU. In this case, return
-> > > +	 * back to the swi instruction and fault the page back.
-> > > +	 */
-> > > +9001:
-> > > +	sub	lr, lr, #4
-> > > +	str	lr, [sp, #S_PC]
-> > > +	b	ret_fast_syscall
-> > > +#endif
-> > 
-> > The comment is wrong.  If we get here, it means that the fault from
-> > trying to loading the instruction can't be fixed up.  Arguably, that
-> > should result in a SIGSEGV being sent immediately, but we'll get to
-> > that when we then try to re-load the instruction.
-> 
-> Why would we kill the application in this case? The reported problem is
-> where one CPU ages the page containing the swi instruction (mkold =>
-> clears L_PTE_YOUNG => write 0 to the pte) in between the other CPU executing
-> the swi and the kernel trying to read the immediate. The VMA is fine.
+>  int __init sirfsoc_pm_init(void)
+>  {
+> +       sirfsoc_of_pwrc_init();
+> +       sirfsoc_memc_init();
+>         suspend_set_ops(&sirfsoc_pm_ops);
+>         return 0;
+>  }
+> @@ -98,7 +103,7 @@ static const struct of_device_id pwrc_ids[] = {
+>         {}
+>  };
 
-If you mark the instruction was a user-accessing instruction, the kernel
-will handle the resulting exception, trying to make the page accessible.
-If it is successful, then execution resumes as normal at the faulting
-instruction and continues as if nothing happened.
-
-If it can't make the page accessible (eg, out of memory) the exception
-handler path (your code above) will be called instead.  Normal action in
-that case would be for a system call to return -EFAULT, but in this case
-we can't know what the syscall was, so we don't know if userspace will
-even pay attention to the returned error code.  In any case, if the page
-is no longer accessible, it's going to end up being killed by a SEGV
-when we eventually return to userspace anyway.
-
-> > What it means is that the page we were trying to execute has been
-> > unmapped beneath us.
-> 
-> Yes, as a result of the kernel aging it.
-
-No - see above.  The exception path is for more serious conditions than
-that.
+It looks good, and should fix the issue too.
