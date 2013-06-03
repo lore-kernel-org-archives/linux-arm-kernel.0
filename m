@@ -1,138 +1,82 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 3 Jun 2013 13:26:20 +0800
-Subject: [RFC v2 2/5] SPI: imx: Using existing properties for chipselects
-In-Reply-To: <1370168531-22718-2-git-send-email-shc_work@mail.ru>
-References: <1370168531-22718-1-git-send-email-shc_work@mail.ru>
- <1370168531-22718-2-git-send-email-shc_work@mail.ru>
-Message-ID: <20130603052618.GH13970@S2101-09.ap.freescale.net>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Mon, 3 Jun 2013 13:25:26 +0800
+Subject: A bug about system call on ARM
+In-Reply-To: <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
+References: <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
+ <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+ <20130529094826.GD13095@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
+ <20130530090949.GC7483@mudshark.cambridge.arm.com>
+ <20130530114112.GH7483@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
+ <20130531084638.GB4928@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
+ <20130531111305.GI4928@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
+Message-ID: <35FD53F367049845BC99AC72306C23D1610991B87B@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 02, 2013 at 02:22:08PM +0400, Alexander Shiyan wrote:
-> Patch reuse existing "cs_gpios" field for master and "cs_gpio" for devices.
+Hi  Will,
+
+I have a question about this patch .
+
+If the user space is thumb mode,
+The PC should be rewind by 2 bytes,
+So the fix_up code should be 
+
+Sub lr, lr, #2 .
+
+
+Am I right ?
+
+
+Thanks for your help .
+
+-----Original Message-----
+From: Wang, Yalin 
+Sent: Friday, May 31, 2013 7:31 PM
+To: 'Will Deacon'
+Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
+Subject: RE: A bug about system call on ARM
+
+Hi Will,
+
+I see,
+I will make one more test .
+
+Thanks for your clarification .
+
+-----Original Message-----
+From: Will Deacon [mailto:will.deacon at arm.com] 
+Sent: Friday, May 31, 2013 7:13 PM
+To: Wang, Yalin
+Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
+Subject: Re: A bug about system call on ARM
+
+On Fri, May 31, 2013 at 12:02:49PM +0100, Wang, Yalin wrote:
+> Hi  Will,
 > 
-It seems that the patch does a little bit more than these.  At least, it
-reuses chip_select for spi_device as well.
-
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  drivers/spi/spi-imx.c | 76 +++++++++++++++++++++++++--------------------------
->  1 file changed, 37 insertions(+), 39 deletions(-)
+> I have merge your code ,
+> But there is a different ,
 > 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 1a53e7d..65f73d6 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -56,7 +56,6 @@ struct spi_imx_config {
->  	unsigned int speed_hz;
->  	unsigned int bpw;
->  	unsigned int mode;
-> -	u8 cs;
->  };
->  
->  enum spi_imx_devtype {
-> @@ -72,7 +71,7 @@ struct spi_imx_data;
->  
->  struct spi_imx_devtype_data {
->  	void (*intctrl)(struct spi_imx_data *, int);
-> -	int (*config)(struct spi_imx_data *, struct spi_imx_config *);
-> +	int (*config)(struct spi_device *, struct spi_imx_config *);
->  	void (*trigger)(struct spi_imx_data *);
->  	int (*rx_available)(struct spi_imx_data *);
->  	void (*reset)(struct spi_imx_data *);
-> @@ -96,7 +95,6 @@ struct spi_imx_data {
->  	unsigned int txfifo; /* number of words pushed in tx FIFO */
->  
->  	const struct spi_imx_devtype_data *devtype_data;
-> -	int chipselect[0];
->  };
->  
->  static inline int is_imx27_cspi(struct spi_imx_data *d)
-> @@ -259,9 +257,10 @@ static void __maybe_unused mx51_ecspi_trigger(struct spi_imx_data *spi_imx)
->  	writel(reg, spi_imx->base + MX51_ECSPI_CTRL);
->  }
->  
-> -static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
-> +static int __maybe_unused mx51_ecspi_config(struct spi_device *spi,
->  		struct spi_imx_config *config)
->  {
-> +	struct spi_imx_data *spi_imx = spi_master_get_devdata(spi->master);
->  	u32 ctrl = MX51_ECSPI_CTRL_ENABLE, cfg = 0;
->  
->  	/*
-> @@ -277,21 +276,21 @@ static int __maybe_unused mx51_ecspi_config(struct spi_imx_data *spi_imx,
->  	ctrl |= mx51_ecspi_clkdiv(spi_imx->spi_clk, config->speed_hz);
->  
->  	/* set chip select to use */
-> -	ctrl |= MX51_ECSPI_CTRL_CS(config->cs);
-> +	ctrl |= MX51_ECSPI_CTRL_CS(spi->chip_select);
->  
->  	ctrl |= (config->bpw - 1) << MX51_ECSPI_CTRL_BL_OFFSET;
->  
-> -	cfg |= MX51_ECSPI_CONFIG_SBBCTRL(config->cs);
-> +	cfg |= MX51_ECSPI_CONFIG_SBBCTRL(spi->chip_select);
->  
->  	if (config->mode & SPI_CPHA)
-> -		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(config->cs);
-> +		cfg |= MX51_ECSPI_CONFIG_SCLKPHA(spi->chip_select);
->  
->  	if (config->mode & SPI_CPOL) {
-> -		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(config->cs);
-> -		cfg |= MX51_ECSPI_CONFIG_SCLKCTL(config->cs);
-> +		cfg |= MX51_ECSPI_CONFIG_SCLKPOL(spi->chip_select);
-> +		cfg |= MX51_ECSPI_CONFIG_SCLKCTL(spi->chip_select);
->  	}
->  	if (config->mode & SPI_CS_HIGH)
-> -		cfg |= MX51_ECSPI_CONFIG_SSBPOL(config->cs);
-> +		cfg |= MX51_ECSPI_CONFIG_SSBPOL(spi->chip_select);
->  
->  	writel(ctrl, spi_imx->base + MX51_ECSPI_CTRL);
->  	writel(cfg, spi_imx->base + MX51_ECSPI_CONFIG);
+> +	
+> +	ct_user_exit
 
-<snip>
+I thought you didn't have ct_user_exit? In which case, just delete this line.
 
-> @@ -772,11 +767,17 @@ static int spi_imx_probe(struct platform_device *pdev)
->  			return ret;
->  	}
->  
-> -	master = spi_alloc_master(&pdev->dev,
-> -			sizeof(struct spi_imx_data) + sizeof(int) * num_cs);
-> +	master = spi_alloc_master(&pdev->dev, sizeof(struct spi_imx_data));
->  	if (!master)
->  		return -ENOMEM;
->  
-> +	master->cs_gpios = devm_kzalloc(&pdev->dev, sizeof(int) * num_cs,
-> +					GFP_KERNEL);
-> +	if (!master->cs_gpios) {
-> +		ret = -ENOMEM;
-> +		goto out_master_free;
-> +	}
-> +
+> +#ifdef CONFIG_ALIGNMENT_TRAP
+> +	ldr	ip, __cr_alignment
+> +	ldr	ip, [ip]
+> +	mcr	p15, 0, ip, c1, c0		@ update control register
+> +#endif
+> 
+> +	enable_irq
+> +	get_thread_info tsk
 
-For DT case, of_spi_register_master() will set master->cs_gpios up over
-again with the memory it allocates, so the memory allocated here will be
-leaked?
+Hard to tell without context. You can take a look at my git tree if you like (I fixed it up based on Nico's comment):
 
-Shawn
+  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/commit/?h=misc-patches
 
->  	platform_set_drvdata(pdev, master);
->  
->  	master->bits_per_word_mask = SPI_BPW_RANGE_MASK(1, 32);
-> @@ -791,14 +792,10 @@ static int spi_imx_probe(struct platform_device *pdev)
->  		if (!gpio_is_valid(cs_gpio) && mxc_platform_info)
->  			cs_gpio = mxc_platform_info->chipselect[i];
->  
-> -		spi_imx->chipselect[i] = cs_gpio;
-> -		if (!gpio_is_valid(cs_gpio))
-> -			continue;
-> -
-> -		ret = devm_gpio_request(&pdev->dev, spi_imx->chipselect[i],
-> -					DRIVER_NAME);
-> +		master->cs_gpios[i] = cs_gpio;
-> +		ret = devm_gpio_request(&pdev->dev, cs_gpio, DRIVER_NAME);
->  		if (ret) {
-> -			dev_err(&pdev->dev, "can't get cs gpios\n");
-> +			dev_err(&pdev->dev, "can't get cs gpio %i\n", cs_gpio);
->  			goto out_master_put;
->  		}
->  	}
+Will
