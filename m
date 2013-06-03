@@ -1,43 +1,51 @@
-From: joe@perches.com (Joe Perches)
-Date: Mon, 03 Jun 2013 09:52:59 -0700
-Subject: [PATCH] net: mvneta: read MAC address from hardware when available
-In-Reply-To: <1370277707-2468-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370277707-2468-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1370278379.2025.40.camel@joe-AO722>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  3 Jun 2013 17:53:25 +0100
+Subject: [PATCH] ARM: pcpu: ensure __my_cpu_offset cannot be re-ordered across
+ barrier()
+Message-ID: <1370278405-13261-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-06-03 at 18:41 +0200, Thomas Petazzoni wrote:
-> This patch improves the logic used by the mvneta driver to find a MAC
-> address for a particular interface. Until now, it was only looking at
-> the Device Tree, and if no address was found, was falling back to
-> generating a random MAC address.
-[]
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-[]
-> @@ -2740,6 +2748,17 @@ static int mvneta_probe(struct platform_device *pdev)
-[]
-> +	dt_mac_addr = of_get_mac_address(dn);
-> +	if (dt_mac_addr && is_valid_ether_addr(dt_mac_addr))
-> +		memcpy(dev->dev_addr, dt_mac_addr, ETH_ALEN);
-> +	else {
-> +		mvneta_get_mac_addr(pp, hw_mac_addr);
-> +		if (is_valid_ether_addr(hw_mac_addr))
-> +			memcpy(dev->dev_addr, hw_mac_addr, ETH_ALEN);
-> +		else
-> +			eth_hw_addr_random(dev);
-> +	}
+__my_cpu_offset is non-volatile, since we want its value to be cached
+when we access several per-cpu variables in a row with preemption
+disabled. This means that we rely on preempt_{en,dis}able to hazard
+with the operation via the barrier() macro, so that we can't end up
+migrating CPUs without reloading the per-cpu offset.
 
-maybe there could be a dmesg line like:
+Unfortunately, GCC doesn't treat a "memory" clobber on a non-volatile
+asm block as a side-effect, and will happily re-order it before other
+memory clobbers (including those in prempt_disable()) and cache the
+value. This has been observed to break the cmpxchg logic in the slub
+allocator, leading to livelock in kmem_cache_alloc in mainline kernels.
 
-	const char *mac_from;
-[...]
-		mac_from = "device tree"
-	else
-[...]
-			mac_from = "hardware"
-		else
-			mac_from = "random"
-[...]
-	netdev_info(dev, "Using %s mac address %pM\n",
-		    mac_from, dev->dev_addr);
+This patch adds a dummy memory output operand to __my_cpu_offset,
+forcing it to be ordered with respect to the barrier() macro.
+
+Cc: Rob Herring <rob.herring@calxeda.com>
+Cc: Nicolas Pitre <nico@fluxnic.net>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/percpu.h | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+index 968c0a1..93970eb 100644
+--- a/arch/arm/include/asm/percpu.h
++++ b/arch/arm/include/asm/percpu.h
+@@ -30,8 +30,12 @@ static inline void set_my_cpu_offset(unsigned long off)
+ static inline unsigned long __my_cpu_offset(void)
+ {
+ 	unsigned long off;
+-	/* Read TPIDRPRW */
+-	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : : "memory");
++	/*
++	 * Read TPIDRPRW.
++	 * We want to allow caching the value, so avoid using volatile and
++	 * instead use a fake memory access to hazard against barrier().
++	 */
++	asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off), "=Qo" (off));
+ 	return off;
+ }
+ #define __my_cpu_offset __my_cpu_offset()
+-- 
+1.8.2.2
