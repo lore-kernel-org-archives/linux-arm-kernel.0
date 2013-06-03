@@ -1,42 +1,52 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 3 Jun 2013 15:41:01 +1000
-Subject: linux-next: manual merge of the imx-mxs tree with the arm-soc tree
-Message-ID: <20130603154101.f35d9198796f9735f0c886ad@canb.auug.org.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Jun 2013 13:46:59 +0800
+Subject: [PATCH 2/4] ARM: imx: clk-imx6q: per1_bch's parent is wrong
+In-Reply-To: <20130603012939.GB13970@S2101-09.ap.freescale.net>
+References: <1370034115-24006-1-git-send-email-b20788@freescale.com>
+ <1370034115-24006-2-git-send-email-b20788@freescale.com>
+ <20130603012939.GB13970@S2101-09.ap.freescale.net>
+Message-ID: <20130603054655.GA23090@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Mon, Jun 03, 2013 at 09:29:41AM +0800, Shawn Guo wrote:
+> On Fri, May 31, 2013 at 05:01:53PM -0400, Anson Huang wrote:
+> > per1_bch is sourced from ahb, previous parent
+> > info is incorrect.
+> > 
+> > Signed-off-by: Anson Huang <b20788@freescale.com>
+> 
+> Applied, thanks.
+> 
+I just pulled it out.  As Reference Manual does not mention it, we need
+to confirm with designer about the correct parent of per1_bch.
 
-Today's linux-next merge of the imx-mxs tree got a conflict in
-arch/arm/mach-mxs/mach-mxs.c between commit 6aaab172c99b ("ARM: mxs:
-remove the .map_io declaration") from the arm-soc tree and commit
-fe7149dfa886 ("ARM: mxs: Remove init_irq declaration in machine
-description") from the imx-mxs tree.
+Shawn
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
-
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
-
-diff --cc arch/arm/mach-mxs/mach-mxs.c
-index d67ecc1,66fe810..0000000
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@@ -434,7 -433,7 +433,6 @@@ static const char *mxs_dt_compat[] __in
-  };
-  
-  DT_MACHINE_START(MXS, "Freescale MXS (Device Tree)")
-- 	.init_irq	= irqchip_init,
- -	.map_io		= debug_ll_io_init,
-  	.handle_irq	= icoll_handle_irq,
-  	.init_time	= mxs_timer_init,
-  	.init_machine	= mxs_machine_init,
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130603/c8c6782a/attachment.sig>
+> > ---
+> >  arch/arm/mach-imx/clk-imx6q.c |    2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
+> > index dfb77c1..c501947 100644
+> > --- a/arch/arm/mach-imx/clk-imx6q.c
+> > +++ b/arch/arm/mach-imx/clk-imx6q.c
+> > @@ -518,7 +518,7 @@ int __init mx6q_clocks_init(void)
+> >  	clk[openvg_axi]   = imx_clk_gate2("openvg_axi",    "axi",               base + 0x74, 30);
+> >  	clk[pcie_axi]     = imx_clk_gate2("pcie_axi",      "pcie_axi_sel",      base + 0x78, 0);
+> >  	clk[mx6fast1]     = imx_clk_gate2("mx6fast1",      "ahb",               base + 0x78, 8);
+> > -	clk[per1_bch]     = imx_clk_gate2("per1_bch",      "usdhc3",            base + 0x78, 12);
+> > +	clk[per1_bch]     = imx_clk_gate2("per1_bch",      "ahb",               base + 0x78, 12);
+> >  	clk[per2_main]    = imx_clk_gate2("per2_main",     "ahb",               base + 0x78, 14);
+> >  	clk[pwm1]         = imx_clk_gate2("pwm1",          "ipg_per",           base + 0x78, 16);
+> >  	clk[pwm2]         = imx_clk_gate2("pwm2",          "ipg_per",           base + 0x78, 18);
+> > -- 
+> > 1.7.9.5
+> > 
+> > 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
