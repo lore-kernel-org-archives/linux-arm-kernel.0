@@ -1,41 +1,40 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Mon,  3 Jun 2013 20:44:16 +0530
-Subject: [PATCH 2/2] USB: OHCI: add a name for the platform-private field
-In-Reply-To: <1370272457-25983-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1369907454-11003-2-git-send-email-manjunath.goudar@linaro.org>
- <1370272457-25983-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1370272457-25983-3-git-send-email-manjunath.goudar@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Jun 2013 23:15:32 +0800
+Subject: [PATCH] ARM: mxs: icoll: Fix interrupts gpio bank 0
+In-Reply-To: <20130529144256.GD29528@S2101-09.ap.freescale.net>
+References: <1369753257-11091-1-git-send-email-mpa@pengutronix.de>
+ <20130529144256.GD29528@S2101-09.ap.freescale.net>
+Message-ID: <20130603151530.GB23090@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an ohci->priv field for private use by OHCI
-platform drivers.
+On Wed, May 29, 2013 at 10:42:58PM +0800, Shawn Guo wrote:
+> On Tue, May 28, 2013 at 05:00:57PM +0200, Markus Pargmann wrote:
+> > The mxs interrupt controller does not support polling for interrupts,
+> > but the driver still does it, which is a relict from
+> > pre-MULTI_IRQ_HANDLER times.
+> > 
+> > The existing code assumes that 0x7f means no interrupt, but this value
+> > is an actually valid irq number, namely gpio bank 0's irq. This results
+> > in the driver not detecting when irq 0x7f is active which makes the
+> > machine effectively dead lock.
+> > 
+> > This patch removes the interrupt poll loop and allows usage of gpio0
+> > interrupt without an infinite loop.
+> > 
+> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > Cc: stable at vger.kernel.org
+> 
+> Thomas, can you please help handle the fix?  If yes, here is my ack.
+> 
+> Acked-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> Otherwise, I can send it through arm-soc tree if you're fine with it.
 
-Until now none of the platform drivers has used this private space,
-but that's about to change in the next patch of this series.
+Thomas,
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: linux-usb at vger.kernel.org
----
- drivers/usb/host/ohci.h |    3 +++
- 1 file changed, 3 insertions(+)
+I'm sending the fix through arm-soc, and let me know if you have problem
+with that.
 
-diff --git a/drivers/usb/host/ohci.h b/drivers/usb/host/ohci.h
-index 3b58482..e2e5faa 100644
---- a/drivers/usb/host/ohci.h
-+++ b/drivers/usb/host/ohci.h
-@@ -421,6 +421,9 @@ struct ohci_hcd {
- 	struct dentry		*debug_periodic;
- 	struct dentry		*debug_registers;
- #endif
-+	/* platform-specific data -- must come last */
-+	unsigned long           priv[0] __aligned(sizeof(s64));
-+
- };
- 
- #ifdef CONFIG_PCI
--- 
-1.7.9.5
+Shawn
