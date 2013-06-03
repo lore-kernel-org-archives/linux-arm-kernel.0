@@ -1,111 +1,103 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 3 Jun 2013 10:23:49 +0200
-Subject: [PATCH 10/10] arm: add basic support for Rockchip RK3066a boards
-In-Reply-To: <5760087.7O4UgypAot@wuerfel>
-References: <201306030055.15413.heiko@sntech.de>
- <201306030102.20890.heiko@sntech.de> <5760087.7O4UgypAot@wuerfel>
-Message-ID: <201306031023.49364.heiko@sntech.de>
+From: jiada_wang@mentor.com (Jiada Wang)
+Date: Mon, 3 Jun 2013 17:24:15 +0900
+Subject: [PATCH v2] clk: implement clk_unregister
+Message-ID: <1370247855-3547-1-git-send-email-jiada_wang@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. Juni 2013, 04:15:46 schrieb Arnd Bergmann:
-> On Monday 03 June 2013 01:02:20 Heiko St?bner wrote:
-> > index 0000000..094b37d
-> > --- /dev/null
-> > +++ b/arch/arm/mach-rockchip/rockchip.c
-> 
-> If all goes well, this file can be removed again in 3.11 since it's
-> all generic, but let's add it for now.
-> 
-> > +
-> > +static void __init rockchip_timer_init(void)
-> > +{
-> > +       rockchip_init_clocks();
-> > +       dw_apb_timer_init();
-> > +}
-> 
-> Can't you use
-> 
-> 	of_clk_init(NULL);
-> 	clocksource_of_init();
-> 
-> here and change the two drivers to provide the respective macros?
+Currently clk_unregister is unimplemented, it is required in case
+sub modules want actually remove clk device registered by clk_register.
+This patch adds the implementation of clk_unregiser.
 
-hmm, while this would make a lot of things easier I don't see right now how 
-this would work.
+Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
+---
+ drivers/clk/clk.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 57 insertions(+), 2 deletions(-)
 
-The dw_apb_timer clocksource does not have its own device node, but instead 
-uses two timer devices as clocksource and clockevent.
-
-Hmm ... one idea would be to wrap them in the dt, like
-
-	clocksource {
-		compatible = "snps,dw-apb-clocksource"
-
-		timer at 2003a000 {
-			compatible = "snps,dw-apb-timer-osc";
-			reg = <0x2003a000 0x100>;
-			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&clk_gates1 1>, <&clk_gates7 8>;
-			clock-names = "timer", "pclk";
-		};
-
-		timer at 2000e000 {
-			compatible = "snps,dw-apb-timer-osc";
-			reg = <0x2000e000 0x100>;
-			interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
-			clocks = <&clk_gates1 2>, <&clk_gates7 9>;
-			clock-names = "timer", "pclk";
-		};
-	};
-
-> > +
-> > +static void __init rockchip_dt_init(void)
-> > +{
-> > +#ifdef CONFIG_CACHE_L2X0
-> > +       l2x0_of_init(0, ~0UL);
-> > +#endif
-> > +       of_platform_populate(NULL, of_default_bus_match_table, NULL,
-> > NULL); +}
-> 
-> We still need to find a common location to call l2x0_of_init.
-> 
-> > +
-> > +static const char * const rockchip_board_dt_compat[] = {
-> > +       "rockchip,rk2928", /* single core */
-> > +       "rockchip,rk30xx", /* dual cores */
-> > +       "rockchip,rk31xx", /* dual and quad cores */
-> > +       NULL,
-> > +};
-> 
-> Please use real numbers instead of wildcards: rockchip,rk3066
-> not rockchip,rk30xx.
-
-ok
-
-> > +DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
-> > +       .map_io         = debug_ll_io_init,
-> > +       .init_machine   = rockchip_dt_init,
-> > +       .init_time      = rockchip_timer_init,
-> > +       .dt_compat      = rockchip_board_dt_compat,
-> > +MACHINE_END
-> 
-> The map_io line can already get removed.
-
-Yesterday I did grep thru the linux-next I was using as base looking for the 
-debug_ll_io_init default I read about but was not able to find it ... most 
-likely my linux-next is a tad to old.
-
-
-> What about SMP support? Still working on it?
-
-I haven't even looked into it yet ;-) . But this is one of the next items on 
-my wishlist ... which also contains making the SoC run at more than 600MHz 
-(due to the currently read-only pll which starts at this value and needs to be 
-set)
-
-Reading the "upstream" kernel code to get the necessary informations does not 
-make this easier ;-)
-
-
-Heiko
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 934cfd1..0b9e13c 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -342,6 +342,25 @@ out:
+ 	return ret;
+ }
+ 
++ /**
++ * clk_debug_unregister - remove a clk node from the debugfs clk tree
++ * @clk: the clk being removed from the debugfs clk tree
++ *
++ * Dynamically removes a clk and all it's children clk nodes from the
++ * debugfs clk tree if clk->dentry points to debugfs created by
++ * clk_debug_register in __clk_init.
++ *
++ * Caller must hold prepare_lock.
++ *
++ */
++static void clk_debug_unregister(struct clk *clk)
++{
++	if (!clk || !clk->dentry)
++		return;
++
++	debugfs_remove_recursive(clk->dentry);
++}
++
+ /**
+  * clk_debug_reparent - reparent clk node in the debugfs clk tree
+  * @clk: the clk being reparented
+@@ -432,6 +451,9 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
+ static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
+ {
+ }
++static inline void clk_debug_unregister(struct clk *clk)
++{
++}
+ #endif
+ 
+ /* caller must hold prepare_lock */
+@@ -1790,9 +1812,42 @@ EXPORT_SYMBOL_GPL(clk_register);
+  * clk_unregister - unregister a currently registered clock
+  * @clk: clock to unregister
+  *
+- * Currently unimplemented.
+  */
+-void clk_unregister(struct clk *clk) {}
++void clk_unregister(struct clk *clk)
++{
++	int i;
++
++	if (!clk)
++		return;
++
++	mutex_lock(&prepare_lock);
++	if (clk->prepare_count) {
++		pr_debug("%s: can't unregister clk %s, it is prepared\n",
++				__func__, clk->name);
++		goto out;
++	}
++
++	if (!hlist_empty(&clk->children)) {
++		pr_debug("%s: clk %s has registered children\n",
++				__func__, clk->name);
++		goto out;
++	}
++
++	clk_debug_unregister(clk);
++
++	hlist_del_init(&clk->child_node);
++
++	kfree(clk->parents);
++	i = clk->num_parents;
++	while (--i >= 0)
++		kfree(clk->parent_names[i]);
++	kfree(clk->parent_names);
++	kfree(clk->name);
++	kfree(clk);
++out:
++	mutex_unlock(&prepare_lock);
++	return;
++}
+ EXPORT_SYMBOL_GPL(clk_unregister);
+ 
+ static void devm_clk_release(struct device *dev, void *res)
+-- 
+1.8.1.1
