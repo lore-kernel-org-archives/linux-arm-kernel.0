@@ -1,86 +1,90 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 4 Jun 2013 00:18:32 +0200
-Subject: [PATCH RFC 3/3] clk: dt: binding for basic divider clock
-In-Reply-To: <1370281990-15090-4-git-send-email-mturquette@linaro.org>
-References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
- <1370281990-15090-4-git-send-email-mturquette@linaro.org>
-Message-ID: <201306040018.33236.heiko@sntech.de>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Mon, 03 Jun 2013 15:19:25 -0700
+Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
+ line
+In-Reply-To: <51AC667D.6070409@epfl.ch> (Florian Vaussard's message of "Mon,
+ 03 Jun 2013 11:48:45 +0200")
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+ <1370040357-25794-4-git-send-email-khilman@linaro.org>
+ <51AC667D.6070409@epfl.ch>
+Message-ID: <87mwr6kfbm.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. Juni 2013, 19:53:10 schrieb Mike Turquette:
-> Devicetree binding for the basic clock divider, plus the setup function
-> to register the clock.  Based on the existing fixed-clock binding.
-> 
-> Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> ---
+Florian Vaussard <florian.vaussard@epfl.ch> writes:
 
-[...]
+> Hello Kevin,
+>
+> On 06/01/2013 12:45 AM, Kevin Hilman wrote:
+>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+>> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
+>> SYS_NIRQ pin in the twl4030 DTS file.
+>>
+>> Boards that hook up the twl4030 differently can easily override this
+>> in their board-specific DTS file.
+>>
+>> This allows RTC wake from off-mode to work again on OMAP3-based
+>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+>> 3530/Overo, 3730/Overo-STORM.
+>>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>>   arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
+>>   1 file changed, 17 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+>> index b3034da..c7fe9f6 100644
+>> --- a/arch/arm/boot/dts/twl4030.dtsi
+>> +++ b/arch/arm/boot/dts/twl4030.dtsi
+>> @@ -13,6 +13,8 @@
+>>   	compatible = "ti,twl4030";
+>>   	interrupt-controller;
+>>   	#interrupt-cells = <1>;
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&twl4030_pins>;
+>>
+>>   	rtc {
+>>   		compatible = "ti,twl4030-rtc";
+>> @@ -92,3 +94,18 @@
+>>   		#pwm-cells = <2>;
+>>   	};
+>>   };
+>> +
+>> +&omap3_pmx_core {
+>
+> Here you are making the TWL4030 to explicitly depend on OMAP3. Could
+> this chip be used by another target? If the case, I would put this
+> piece of code in the files including twl4030. Otherwise it's ok here.
 
-> +/**
-> + * of_div_clk_setup() - Setup function for simple div rate clock
-> + */
-> +void of_divider_clk_setup(struct device_node *node)
-> +{
-> +	struct clk *clk;
-> +	const char *clk_name = node->name;
-> +	void __iomem *reg;
-> +	const char *parent_name;
-> +	u8 clk_divider_flags = 0;
-> +	u8 mask = 0;
-> +	u8 shift = 0;
+I talked this over with Tony before posting.  In theorry, it could be
+used on other platforms.  In practice, it's only used on OMAP.  We can
+easily move this to board files if needed later, but thought it would be
+simpler to put it here.  I'll let Benoit decide.
 
-in the mux-clock these 3 are unsigned long and u32 types ... what is correct?
+>> +	/*
+>> +	 * On most OMAP3 platforms, the twl4030 IRQ line is connected
+>> +         * to the SYS_NIRQ line on OMAP.  Therefore, configure the
+>> +         * defaults for the SYS_NIRQ pin here.  Boards that hook up
+>> +         * the twl4030 differently can easily override this in their
+>> +         * board-specific DTS file.
+>> +	 */
+>> +	twl4030_pins: pinmux_twl4030_pins {
+>> +		pinctrl-single,pins = <
+>> +			0x1b0 0x4118 /*	sys_nirq.sys_nirq WAKEUP | INPUT_PULLUP | MODE 0 */
+>
+> By using pinctrl constants:
+>
+> 			0x1b0 (PIN_INPUT_PULLUP | WAKEUP_EN | MUX_MODE0)	/* sys_nirq.sys_nirq */
 
+Yup.
 
-> +	struct clk_div_table *table;
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +	parent_name = of_clk_get_parent_name(node, 0);
-> +
-> +	reg = of_iomap(node, 0);
-> +
-> +	if (of_property_read_u8(node, "mask", &mask)) {
-> +		pr_err("%s: missing mask property for %s\n", __func__, node->name);
-> +		return;
-> +	}
-> +
-> +	if (of_property_read_u8(node, "shift", &shift))
-> +		pr_debug("%s: missing shift property defaults to zero for %s\n",
-> +				__func__, node->name);
+>> +		>;
+>> +	};
+>> +};
+>>
+>
+> I will test this afternoon on an Overo.
 
-same here ... mux reads u32
+Thanks,
 
-> +	if (of_property_read_bool(node, "index_one"))
-> +		clk_divider_flags |= CLK_DIVIDER_ONE_BASED;
-> +
-> +	if (of_property_read_bool(node, "index_power_of_two"))
-> +		clk_divider_flags |= CLK_DIVIDER_POWER_OF_TWO;
-> +
-> +	if (of_property_read_bool(node, "index_allow_zero"))
-> +		clk_divider_flags |= CLK_DIVIDER_ALLOW_ZERO;
-> +
-> +	table = of_clk_get_div_table(node);
-> +	if (IS_ERR(table))
-> +		return;
-> +
-> +	clk = clk_register_divider_table(NULL, clk_name,
-> +			parent_name, 0,
-> +			reg, shift, mask,
-> +			clk_divider_flags, table,
-> +			NULL);
-
-this causes trouble, as the divider clock code above still requires a width 
-instead of a mask. I remember talk about this going to change separately, but 
-couldn't find anything of the sort in linux-next.
-
-
-
-> +
-> +	if (!IS_ERR(clk))
-> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> +}
-> +EXPORT_SYMBOL_GPL(of_divider_clk_setup);
-> +CLK_OF_DECLARE(divider_clk, "divider-clock", of_divider_clk_setup);
-> +#endif
+Kevin
