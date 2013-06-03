@@ -1,35 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 10:50:14 +0100
-Subject: [PATCH] serial: imx: enable the clocks only when the uart is used
-In-Reply-To: <1370245331-12501-1-git-send-email-b32955@freescale.com>
-References: <1370245331-12501-1-git-send-email-b32955@freescale.com>
-Message-ID: <20130603095014.GJ18614@n2100.arm.linux.org.uk>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 3 Jun 2013 11:53:27 +0200
+Subject: [PATCH v2 11/14] Documentation: dt: binding: omap: am43x timer
+In-Reply-To: <C8443D0743D26F4388EA172BF4E2A7A93EB1238B@DBDE04.ent.ti.com>
+References: <cover.1369658705.git.afzal@ti.com>
+ <223d90dc9eeab13d8496690d336cdf0f7d27cd22.1369658705.git.afzal@ti.com>
+ <51A520B5.8040803@gmail.com> <51A52A16.1040204@wwwdotorg.org>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAFB044@DBDE04.ent.ti.com>
+ <51A5BEB6.6070809@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EAFB174@DBDE04.ent.ti.com>
+ <51A60427.6010409@ti.com>
+ <C8443D0743D26F4388EA172BF4E2A7A93EB1238B@DBDE04.ent.ti.com>
+Message-ID: <51AC6797.1040304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 03:42:11PM +0800, Huang Shijie wrote:
-> Current code opens the clocks when the uart driver is probed.
-> This will wastes some power if several uarts are enabled, but not really
-> used.
-> 
-> So close these clocks for uart, and enable the clocks only when
-> the uart is used.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  drivers/tty/serial/imx.c |   12 +++++++++---
->  1 files changed, 9 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-> index 72bc1db..5705fc8 100644
-> --- a/drivers/tty/serial/imx.c
-> +++ b/drivers/tty/serial/imx.c
-> @@ -699,6 +699,9 @@ static int imx_startup(struct uart_port *port)
->  	int retval;
->  	unsigned long flags, temp;
->  
-> +	clk_prepare_enable(sport->clk_per);
-> +	clk_prepare_enable(sport->clk_ipg);
+Hi Afzal,
 
-You should check the return value.  I've a good mind to mark these
-functions with __must_check...
+On 06/03/2013 09:49 AM, Mohammed, Afzal wrote:
+> Hi Benoit,
+> 
+> On Wed, May 29, 2013 at 19:05:35, Cousson, Benoit wrote:
+> 
+>> And in this case, you do not introduce any new revision.
+>>
+>> There is no point to update the binding each time we add a new SoC
+>> variant that will contain the exact same IP.
+>>
+>> I think it will mainly confuse the user that will wonder what is
+>> different in that version compare to the previous one, moreover we can
+>> end up with hundred of entries for the exact same IP for nothing.
+>>
+>> The real problem is due to the introduction of the SoC name in the
+>> device compatible name. That does introduced a SoC level information
+>> that is mostly irrelevant at device level. I can understand why it was
+>> done for practical aspect when the IP version is not well identified,
+>> but that can lead to this proliferation of new pointless bindings.
+> 
+> As opinions on $subject seems not yet to be conclusive, I plan to
+> rebase DTS patch (14/14) over your 'for_3.11/dts' branch (that makes
+> use of C preprocessor on OMAP DTS) and post separately dropping
+> 11-14 patches, is that okay ?
+
+Yes, that sounds good to me.
+
+Thanks,
+Benoit
