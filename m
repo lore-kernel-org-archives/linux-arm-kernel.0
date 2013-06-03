@@ -1,45 +1,49 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Jun 2013 15:27:55 +0100
-Subject: [PATCH 08/21] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <2199337.TqRF93pcHr@wuerfel>
-References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
- <1370266965-7901-9-git-send-email-lee.jones@linaro.org>
- <2199337.TqRF93pcHr@wuerfel>
-Message-ID: <20130603142755.GH3370@gmail.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 3 Jun 2013 16:34:33 +0200
+Subject: [GIT PULL] ARM: OMAP: dts fixes for 3.10-rc4
+In-Reply-To: <51A8A459.1000706@ti.com>
+References: <51A8A459.1000706@ti.com>
+Message-ID: <51ACA979.9060801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 03 Jun 2013, Arnd Bergmann wrote:
+Hi Tony,
 
-> On Monday 03 June 2013 14:42:32 Lee Jones wrote:
-> > @@ -559,6 +559,8 @@
-> >                         v-i2c-supply = <&db8500_vape_reg>;
-> >  
-> >                         clock-frequency = <400000>;
-> > +                       clocks = <&clk 100>, <&clk 67>;
-> > +                       clock-names = "nmk-i2c.0", "apb_pclk";
-> >                 };
-> >  
-> >                 i2c at 80122000 {
-> > @@ -572,6 +574,9 @@
-> >                         v-i2c-supply = <&db8500_vape_reg>;
-> >  
-> >                         clock-frequency = <400000>;
-> > +
-> > +                       clocks = <&clk 85>, <&clk 42>;
-> > +                       clock-names = "nmk-i2c.1", "apb_pclk";
-> >                 };
+On 05/31/2013 03:23 PM, Benoit Cousson wrote:
+> Hi Tony,
 > 
-> Same comment actually as for the uart patch, also SDI and MSP
-> have the same problem.
+> Please pull two DTS fixes for the next -rc.
 
-I was only using the names in the same manor as the API does, to fetch
-the 'clocks =' index. Do you mean that I should be using 'uartclk',
-'i2cclk', 'sdmmcclk' and 'msp1clk' instead?
+Please ignore that one. I'll send a new one with one more fix ASAP.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Thanks,
+Benoit
+
+> 
+> Thanks,
+> Benoit
+> 
+> 
+> The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+>   Linus Torvalds (1):
+>         Linux 3.10-rc3
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git dts-fixes-for-3.10
+> 
+> Kevin Hilman (1):
+>       ARM: dts: omap4-panda|sdp: Fix mux for twl6030 IRQ pin and msecure line
+> 
+> Lars Poeschel (1):
+>       ARM: dts: AM33xx: Fix properties on gpmc node
+> 
+>  arch/arm/boot/dts/am33xx.dtsi             |    4 ++--
+>  arch/arm/boot/dts/omap4-panda-common.dtsi |   20 ++++++++++++++++++++
+>  arch/arm/boot/dts/omap4-sdp.dts           |   20 ++++++++++++++++++++
+>  3 files changed, 42 insertions(+), 2 deletions(-)
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
+> 
