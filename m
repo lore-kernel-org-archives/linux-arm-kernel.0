@@ -1,71 +1,41 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 3 Jun 2013 19:10:03 +0200
-Subject: [GIT PULL v2] at91: USBA DT support / drivers update for 3.11 #1
-In-Reply-To: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20130526083430.GP24476@game.jcrosoft.org>
- <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <51ACCDEB.8000803@atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jun 2013 18:10:18 +0100
+Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
+In-Reply-To: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130603171017.GN18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/06/2013 19:05, Nicolas Ferre :
-> Arnd, Olof,
->
-> This is a rework of the previous pull-request done by Jean-Christophe
-> PLAGNIOL-VILLARD last week ([GIT PULL] at91: USBA DT support for 3.11).
-> You should see that this material is based on the cleanup branch that you
-> already have in arm-soc/at91/cleanup.
->
-> This adds the DT support for USBA gadget driver present in the most recent
-> AT91 SoCs.
-> As agreed with Arnd and Felipe we send these drivers updates via arm-soc.
->
-> Thanks, best regards,
->
-> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
->
->    ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
->
-> are available in the git repository at:
->
->    git://github.com/at91linux/linux-at91.git tags/at91-drivers
->
-> for you to fetch changes up to a375f12dde25a7e89acd75d066d0225657d7dfc2:
->
->    ARM: at91: sam9m10g45ek add udc DT support (2013-05-24 07:15:20 +0800)
->
-> ----------------------------------------------------------------
-> Adding the DT support to UBB gadget High-Speed aka usba.
+On Mon, Jun 03, 2013 at 06:45:37PM +0200, Thomas Petazzoni wrote:
+> From: Willy Tarreau <w@1wt.eu>
+> 
+> Marvell uses a specific atag in its u-boot which includes among other
+> information the MAC addresses for up to 4 network interfaces. This
+> atag is parsed, and if found the MAC addresses are extracted there and
+> assigned to node aliases eth0..3 with the name "mac-address".
+> 
+> This allows, with the non-DT capable bootloaders currently used on
+> most Marvell platforms, to get a proper MAC address for the different
+> interfaces.
+> 
+> Signed-off-by: Willy Tarreau <w@1wt.eu>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 
----------------------------^^^
+You know, my reaction to this is to nack it because:
 
-Typo corrected in "at91-drivers" tag pushed now! (sorry for the noise).
+(a) Marvell didn't talk to me about adding a new tag.
+(b) There is an established precident that we do not pass MAC addresses
+    to the kernel in this way (such attempts have been rejected in the
+    past.)
+(c) It goes completely against the design spirit of ATAGs by combining
+    many different types and instances of information into one tag.
+(d) It picks a tag ID without understanding how tag IDs are allocated.
+    (the idea is 0x41NNNNVV where NNNN = machine ID for machine specific
+    tags.)
 
-> It updates the driver and all device tree files
->
-> ----------------------------------------------------------------
-> Jean-Christophe PLAGNIOL-VILLARD (7):
->        USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
->        USB: gadget: atmel_usba: allow multi instance
->        USB: gadget: atmel_usba: add DT support
->        ARM: at91: sam9x5 add udc DT support
->        ARM: at91: sam9x5ek add udc DT support
->        ARM: at91: sam9g45 add udc DT support
->        ARM: at91: sam9m10g45ek add udc DT support
->
->   .../devicetree/bindings/usb/atmel-usb.txt          |  82 +++++++
->   arch/arm/boot/dts/at91sam9g45.dtsi                 |  62 +++++
->   arch/arm/boot/dts/at91sam9m10g45ek.dts             |   5 +
->   arch/arm/boot/dts/at91sam9x5.dtsi                  |  62 +++++
->   arch/arm/boot/dts/at91sam9x5ek.dtsi                |   5 +
->   arch/arm/mach-at91/at91sam9g45.c                   |   2 +
->   arch/arm/mach-at91/at91sam9x5.c                    |   2 +
->   drivers/usb/gadget/Kconfig                         |   2 +-
->   drivers/usb/gadget/atmel_usba_udc.c                | 264 ++++++++++++++-------
->   drivers/usb/gadget/atmel_usba_udc.h                |   2 +
->   10 files changed, 407 insertions(+), 81 deletions(-)
->
+Everyone who has gone around extending ATAG stuff has made exactly the
+same mistakes time and time again - mostly stemming from the fact that
+no one wants to talk to me up front.
 
-
--- 
-Nicolas Ferre
+So, this is another NACK.
