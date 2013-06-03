@@ -1,103 +1,55 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Mon, 3 Jun 2013 17:37:06 +0900
-Subject: [PATCH v3] clk: implement clk_unregister
-Message-ID: <1370248626-3760-1-git-send-email-jiada_wang@mentor.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 03 Jun 2013 10:39:28 +0200
+Subject: [PATCHv6 00/11] Remove ARM local timer API
+In-Reply-To: <20130531221633.GG599@codeaurora.org>
+References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
+ <20130531174526.GD599@codeaurora.org> <51A8E71D.1000407@linaro.org>
+ <20130531221633.GG599@codeaurora.org>
+Message-ID: <51AC5640.5060202@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently clk_unregister is unimplemented, it is required in case
-sub modules want actually remove clk device registered by clk_register.
-This patch adds the implementation of clk_unregister.
+On 06/01/2013 12:16 AM, Stephen Boyd wrote:
+> On 05/31, John Stultz wrote:
+>> On 05/31/2013 10:45 AM, Stephen Boyd wrote:
+>>> Comments have been light for this round so I think we're about
+>>> ready to merge. John/Thomas, can you pick up these patches or
+>>> shall I route them through arm-soc or something else?
+>>
+>>
+>> So there looks to be a fair amount of additions in the ARM tree, do
+>> those already have acks from Arnd/Olof/other folks? (I think I was
+>> only cc'ed on the first two patches).
+> 
+> I'm still missing acks from Kukjin and Barry.
+> 
+>>
+>> Daniel (cc'ed) has just started helping out here, and should be able
+>> to review and hopefully ack or pick up the timer related
+>> drivers/clocksource changes to feed to Thomas' tree. Not sure if
+>> he's got them in his mailbox so you might want to resend them and
+>> make sure he's CC'ed.
+>>
+>> If Arnd/Olof/whomever else from the arm side has acked things,
+>> Daniel probably could queue the arm changes too, but it might be
+>> better just to get Daniel's ack on the drivers/clocksource changes
+>> and then queue things via arm-soc?
+> 
+> Either way works for me. I would just like to see this merged
+> into 3.11. I guess I will resend one more time.
 
-Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
----
- drivers/clk/clk.c | 59 +++++++++++++++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 57 insertions(+), 2 deletions(-)
+Yes please, resend. I will review them.
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 934cfd1..0b9e13c 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -342,6 +342,25 @@ out:
- 	return ret;
- }
- 
-+ /**
-+ * clk_debug_unregister - remove a clk node from the debugfs clk tree
-+ * @clk: the clk being removed from the debugfs clk tree
-+ *
-+ * Dynamically removes a clk and all it's children clk nodes from the
-+ * debugfs clk tree if clk->dentry points to debugfs created by
-+ * clk_debug_register in __clk_init.
-+ *
-+ * Caller must hold prepare_lock.
-+ *
-+ */
-+static void clk_debug_unregister(struct clk *clk)
-+{
-+	if (!clk || !clk->dentry)
-+		return;
-+
-+	debugfs_remove_recursive(clk->dentry);
-+}
-+
- /**
-  * clk_debug_reparent - reparent clk node in the debugfs clk tree
-  * @clk: the clk being reparented
-@@ -432,6 +451,9 @@ static inline int clk_debug_register(struct clk *clk) { return 0; }
- static inline void clk_debug_reparent(struct clk *clk, struct clk *new_parent)
- {
- }
-+static inline void clk_debug_unregister(struct clk *clk)
-+{
-+}
- #endif
- 
- /* caller must hold prepare_lock */
-@@ -1790,9 +1812,42 @@ EXPORT_SYMBOL_GPL(clk_register);
-  * clk_unregister - unregister a currently registered clock
-  * @clk: clock to unregister
-  *
-- * Currently unimplemented.
-  */
--void clk_unregister(struct clk *clk) {}
-+void clk_unregister(struct clk *clk)
-+{
-+	int i;
-+
-+	if (!clk)
-+		return;
-+
-+	mutex_lock(&prepare_lock);
-+	if (clk->prepare_count) {
-+		pr_debug("%s: can't unregister clk %s, it is prepared\n",
-+				__func__, clk->name);
-+		goto out;
-+	}
-+
-+	if (!hlist_empty(&clk->children)) {
-+		pr_debug("%s: clk %s has registered children\n",
-+				__func__, clk->name);
-+		goto out;
-+	}
-+
-+	clk_debug_unregister(clk);
-+
-+	hlist_del_init(&clk->child_node);
-+
-+	kfree(clk->parents);
-+	i = clk->num_parents;
-+	while (--i >= 0)
-+		kfree(clk->parent_names[i]);
-+	kfree(clk->parent_names);
-+	kfree(clk->name);
-+	kfree(clk);
-+out:
-+	mutex_unlock(&prepare_lock);
-+	return;
-+}
- EXPORT_SYMBOL_GPL(clk_unregister);
- 
- static void devm_clk_release(struct device *dev, void *res)
+queuing the patches via arm-soc makes sense for me, but I prefer to
+review them before we decide to which tree we get them merged.
+
+Thanks
+ -- Daniel
+
+
 -- 
-1.8.1.1
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
