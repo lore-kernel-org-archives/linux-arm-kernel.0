@@ -1,48 +1,65 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Mon, 3 Jun 2013 11:40:11 +0100
-Subject: [PATCH v2 0/4] ARM: mm: HugeTLB + THP support.
-In-Reply-To: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
-References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
-Message-ID: <20130603104010.GA26112@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jun 2013 11:45:34 +0100
+Subject: A bug about system call on ARM
+In-Reply-To: <20130603102723.GD32242@mudshark.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
+ <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
+ <20130529094826.GD13095@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
+ <20130530090949.GC7483@mudshark.cambridge.arm.com>
+ <20130530114112.GH7483@mudshark.cambridge.arm.com>
+ <20130603101809.GK18614@n2100.arm.linux.org.uk>
+ <20130603102723.GD32242@mudshark.cambridge.arm.com>
+Message-ID: <20130603104534.GL18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 23, 2013 at 04:31:16PM +0100, Steve Capper wrote:
-> The following patches bring both HugeTLB support and Transparent
-> HugePage (THP) support to ARM.
+On Mon, Jun 03, 2013 at 11:27:23AM +0100, Will Deacon wrote:
+> Hi Russell,
 > 
-> Only long descriptors (LPAE) are supported in this series.
+> On Mon, Jun 03, 2013 at 11:18:09AM +0100, Russell King - ARM Linux wrote:
+> > On Thu, May 30, 2013 at 12:41:12PM +0100, Will Deacon wrote:
+> > > +#if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
+> > > +	/*
+> > > +	 * We may have faulted trying to load the SWI instruction due to
+> > > +	 * concurrent page aging on another CPU. In this case, return
+> > > +	 * back to the swi instruction and fault the page back.
+> > > +	 */
+> > > +9001:
+> > > +	sub	lr, lr, #4
+> > > +	str	lr, [sp, #S_PC]
+> > > +	b	ret_fast_syscall
+> > > +#endif
+> > 
+> > The comment is wrong.  If we get here, it means that the fault from
+> > trying to loading the instruction can't be fixed up.  Arguably, that
+> > should result in a SIGSEGV being sent immediately, but we'll get to
+> > that when we then try to re-load the instruction.
 > 
-> The code has been tested on an Arndale board (Exynos 5250).
-> 
-> This patch set is based on 3.10-rc2.
-> 
-> Major changes since the Patch:
->  * LPAE code has been separated from non-LPAE code (this series
->    is the LPAE code).
->  * PROT_NONE support for HugeTLB and THP has been implemented.
-> 
-> Major changes since the RFC:
->  * huge pmd sharing removed from the 3-level code as this was
->    found to be very rarely, if ever?, used. This allowed for some
->    code simplification.
-> 
->  * hardware pmd bits for 2-levels of paging are now taken from
->    mmu.c. Also the mapping code now uses pte/pmd bit helper
->    functions rather than the custom pre-processor logic.
-> 
-> Cheers,
-> -- 
-> Steve
-> 
+> Why would we kill the application in this case? The reported problem is
+> where one CPU ages the page containing the swi instruction (mkold =>
+> clears L_PTE_YOUNG => write 0 to the pte) in between the other CPU executing
+> the swi and the kernel trying to read the immediate. The VMA is fine.
 
-Hello,
-I was wondering if anyone had any further comments on this series?
+If you mark the instruction was a user-accessing instruction, the kernel
+will handle the resulting exception, trying to make the page accessible.
+If it is successful, then execution resumes as normal at the faulting
+instruction and continues as if nothing happened.
 
-Russell,
-Are you happy for these to go into your patch system, or should anything be
-changed?
+If it can't make the page accessible (eg, out of memory) the exception
+handler path (your code above) will be called instead.  Normal action in
+that case would be for a system call to return -EFAULT, but in this case
+we can't know what the syscall was, so we don't know if userspace will
+even pay attention to the returned error code.  In any case, if the page
+is no longer accessible, it's going to end up being killed by a SEGV
+when we eventually return to userspace anyway.
 
-Thanks,
--- 
-Steve 
+> > What it means is that the page we were trying to execute has been
+> > unmapped beneath us.
+> 
+> Yes, as a result of the kernel aging it.
+
+No - see above.  The exception path is for more serious conditions than
+that.
