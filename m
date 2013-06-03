@@ -1,52 +1,49 @@
-From: elen.song@atmel.com (elen.song)
-Date: Mon, 3 Jun 2013 11:10:06 +0800
-Subject: warning introduced in "DMA: AT91: Get residual bytes in dma
- buffer"
-In-Reply-To: <5527092.NRqFJAfgoB@wuerfel>
-References: <5527092.NRqFJAfgoB@wuerfel>
-Message-ID: <51AC090E.9090908@atmel.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 3 Jun 2013 06:22:19 +0300
+Subject: [PATCH 02/10] clocksource: dw_apb_timer_of: add clock-handling
+In-Reply-To: <201306030056.37724.heiko@sntech.de>
+References: <201306030055.15413.heiko@sntech.de>
+ <201306030056.37724.heiko@sntech.de>
+Message-ID: <20130603032219.GM11798@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd:
+Hi Heiko,
 
-On 5/31/2013 11:54 PM, Arnd Bergmann wrote:
-> Patch 7c407d3e "DMA: AT91: Get residual bytes in dma buffer"
-> causes a build warning
->
-> /git/arm-soc/drivers/dma/at_hdmac.c:424:13: warning: 'atc_cleanup_descriptors' defined but not used [-Wunused-function]
->   static void atc_cleanup_descriptors(struct at_dma_chan *atchan)
->               ^
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Mon, Jun 03, 2013 at 12:56:37AM +0200, Heiko St?bner wrote:
+> Add the possibility to get the clock-frequency from a timer clock instead
+> of specifying it as dt property. Additionally also add the possibility
+> to also define a controlling periphal clock for the timer block.
+> 
+> The clock-frequency property is kept to act as fallback if no clocks
+> are specified.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
->
-> This may not be the right solution, but it should get fixed
-> in linux-next in some way.
->
-> Elen, please address this appropriately.
-OK.
->
-> 	Arnd
->
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index 6db5228..09929c8 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -421,7 +421,7 @@ static void atc_complete_all(struct at_dma_chan *atchan)
->    *
->    * Called with atchan->lock held and bh disabled
->    */
-> -static void atc_cleanup_descriptors(struct at_dma_chan *atchan)
-> +static void __maybe_unused atc_cleanup_descriptors(struct at_dma_chan *atchan)
->   {
->   	struct at_desc	*desc, *_desc;
->   	struct at_desc	*child;
->
-Hi Nicolas and Ludovic:
+>  Documentation/devicetree/bindings/rtc/dw-apb.txt |   19 ++++++++++++++++
+>  drivers/clocksource/dw_apb_timer_of.c            |   26 +++++++++++++++++++++-
+>  2 files changed, 44 insertions(+), 1 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> index 93e2b0f..80ab1c1 100644
+> --- a/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> +++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+> @@ -5,9 +5,20 @@ Required properties:
+>  - reg: physical base address of the controller and length of memory mapped
+>    region.
+>  - interrupts: IRQ line for the timer.
+> +- either clocks+clock-names or clock-frequency properties
+> +
+> +Optional properties:
+> +- clocks	: list of clock specifiers, corresponding to entries in
+> +		  the clock-names property;
+> +- clock-names	: should contain "timer and "pclk" entries, matching entries
 
-I think atc_cleanup_descriptors could be removed, because ATC_DONE will 
-no longer support, what you think?
+Missing closing quotes around "timer".
 
-Best Regards
-Elen song
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
