@@ -1,47 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Jun 2013 17:17:18 +0200
-Subject: [PATCHv4 2/9] i2c: mv64xxx: make the registers offset configurable
-In-Reply-To: <20130612145139.GS18614@n2100.arm.linux.org.uk>
-References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
- <1371024438-16631-3-git-send-email-maxime.ripard@free-electrons.com>
- <20130612135735.GR18614@n2100.arm.linux.org.uk>
- <20130612144447.GI16699@lukather>
- <20130612145139.GS18614@n2100.arm.linux.org.uk>
-Message-ID: <20130612151718.GK16699@lukather>
+From: yadi.brar@samsung.com (Yadwinder Singh Brar)
+Date: Mon, 03 Jun 2013 20:39:50 +0530
+Subject: [PATCH v4 0/6] Add generic set_rate clk_ops for PLL35xx and PLL36xx
+ for samsung SoCs
+Message-ID: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 03:51:39PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 12, 2013 at 04:44:47PM +0200, Maxime Ripard wrote:
-> > Hi Russel,
-> > 
-> > On Wed, Jun 12, 2013 at 02:57:35PM +0100, Russell King - ARM Linux wrote:
-> > > It'd be much better to copy the offsets themselves in drv_data.  You're
-> > > only talking about 7 bytes here, so there's no worry about bloating the
-> > > drv_data structure.
-> > 
-> > It was more about keeping things separated. Moreover, the probe
-> > function gets smaller, since you have only a pointer to pass on, instead
-> > of assigning those 7 bytes.
-> 
-> 	struct driver_data {
-> 		struct mv64xxx_i2c_regs reg_offsets;
-> 	};
-> 
-> 	struct driver_data *drv_data;
-> 
-> 	memcpy(drv_data->reg_offsets, reg_offsets, sizeof(drv_data->reg_offsets));
-> 
-> No need to write it each member as a separate assignment.
+This patch series does the following:
 
-Ah right. I previously understood that you wanted a single variable for
-each register in the driver data structure.
+ 1) Unifies the clk strutures used for PLL35xx & PLL36xx and usues clk->base
+    instead of clk->con0, to factor out possible common code.
 
-I'll do like you suggested.
+ 2) Defines a common rate_table which will contain recommended p, m, s and k
+    values for supported rates that needs to be changed for changing
+    corresponding PLL's rate
 
-Maxime
+ 3) Adds set_rate() and round_rate() clk_ops for PLL35xx and PLL36xx
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+changes since v3:
+	- Used __clk_lookup() instead of adding alias for mout_vpllsrc
+	- Added check for changing only M value in samsung_pll36xx_set_rate()
+	- Modified samsung_pll35xx_mp_change() & samsung_pll35xx_set_rate()
+	to improve readabilty.
+	- Made the input rate_table as __init_data which is to be provided while
+	registering PLL and made a copy of that table while registering, so
+	that if multiple tables are their, they can be freed after getting the
+	P, M, S, K setting values from required one.
+
+changes since v2:
+	- Added new patch to reorder the MUX registration for mout_vpllsrc MUX
+	before the PLL registrations. And to add the alias for the mout_vpllsrc MUX.
+        - Added a check to confirm parent rate while registrating the PLL
+	rate tables.
+
+changes since v1:
+	- removed sorting and bsearch
+	- modified the definition of struct "samsung_pll_rate_table"
+	- added generic round_rate()
+	- rectified the ops assignment for "rate table passed as NULL"
+	  during PLL registration
+
+Is rebased on branch kgene's "for-next"
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+
+Vikas Sajjan (3):
+  clk: samsung: Add set_rate() clk_ops for PLL36xx
+  clk: samsung: Reorder MUX registration for mout_vpllsrc
+  clk: samsung: Add EPLL and VPLL freq table for exynos5250 SoC
+
+Yadwinder Singh Brar (3):
+  clk: samsung: Use clk->base instead of directly using clk->con0 for
+    PLL3xxx
+  clk: samsung: Add support to register rate_table for PLL3xxx
+  clk: samsung: Add set_rate() clk_ops for PLL35xx
+
+ drivers/clk/samsung/clk-exynos4.c    |   10 +-
+ drivers/clk/samsung/clk-exynos5250.c |   73 +++++++++--
+ drivers/clk/samsung/clk-pll.c        |  255 ++++++++++++++++++++++++++++++----
+ drivers/clk/samsung/clk-pll.h        |   35 +++++-
+ drivers/clk/samsung/clk.h            |    2 +
+ 5 files changed, 332 insertions(+), 43 deletions(-)
