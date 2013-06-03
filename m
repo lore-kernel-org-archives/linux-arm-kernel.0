@@ -1,47 +1,73 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 3 Jun 2013 07:05:50 +0200
-Subject: [PATCH] ARM: Kirkwood add cpus definition needed by cpufreq
- driver to dtsi
-In-Reply-To: <51ABC056.5000804@baker-net.org.uk>
-References: <51ABC056.5000804@baker-net.org.uk>
-Message-ID: <20130603050550.GB10843@lunn.ch>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Mon, 03 Jun 2013 10:49:00 +0530
+Subject: [PATCH V4 0/4] clk: Samsung: audss: Register audio subsytem clocks
+ using common clk framework
+Message-ID: <1370236744-16802-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 02, 2013 at 10:59:50PM +0100, Adam Baker wrote:
-> The Kirkwood CPU Freq driver needs a CPU definition in order for the probe
-> routine to activate it. Add a suitable definition to kirkwood.dtsi
-> 
-> This definition is only correct for single core SoCs. There is a dual core
-> SoC in the kirkwood family (88F632X) but the rest of the Kirkwood drivers in
-> the kernel don't currently support it. If they ever do the cpus definition
-> would need to be duplicated in each of the SoC specific include files.
-> 
-> Signed-off-by: Adam Baker <linux@baker-net.org.uk>
+Samsung S5PV210 and Exynos SoC has a separate subsystem for audio. This subsystem
+has a internal clock controller which controls i2s0 and pcm0 clocks. This patch
+series adds the Samsung audio subsytem clock to the common clock framework and
+provides the I2S controllers clock information in the dtsi file.
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
+This patch series is made based on Kukjin Kim for-next branch
 
-	   Andrew
-> 
-> 
-> --- a/arch/arm/boot/dts/kirkwood.dtsi	2013-05-19 22:57:07.000000000 +0100
-> +++ b/arch/arm/boot/dts/kirkwood.dtsi	2013-05-30 23:32:18.000000000 +0100
-> @@ -4,6 +4,18 @@
->  	compatible = "marvell,kirkwood";
->  	interrupt-parent = <&intc>;
->  
-> +        cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		cpu at 0 {
-> +		      device_type = "cpu";
-> +		      compatible = "marvell,feroceon";
-> +		      clocks = <&core_clk 1>, <&core_clk 3>, <&gate_clk 11>;
-> +		      clock-names = "cpu_clk", "ddrclk", "powersave";
-> +		};
-> +	};
-> +
->  	aliases {
->  	       gpio0 = &gpio0;
->  	       gpio1 = &gpio1;
+Changes since V3:
+	- Replaced samsung with exynos in the macro prefixes and function names
+	  as this driver supports mainly exynos and s5p family.
+	- Added Reviewed-by:Sylwester Nawrocki <s.nawrocki@samsung.com>
+
+Changes since V2:
+        - Removed s5pv210 compatible name from driver as it is
+          not yet supported which is different from Exynos series
+          audio subsystem clock conroller.
+        - Removed clkdev lookup support and added alias names in
+          the i2s0 controller node.
+Changes since V1:
+        - Reworked on all review comments by Sylwester Nawrocki
+        - Added a header file for all clock indexes as requested by Sylwester
+        - Added different compatible names for s5pv210, exynos4 and exynos5
+        - Registered the pcm clocks with common clock framework
+
+Padmavathi Venna (4):
+  ARM: samsung: use #include for all device trees
+  clk: samsung: register audio subsystem clocks using common clock
+    framework
+  ARM: dts: add Exynos audio subsystem clock controller node
+  ARM: dts: add clock provider information for i2s controllers in
+    Exynos5250
+
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |   64 ++++++++++
+ arch/arm/boot/dts/exynos4.dtsi                     |    2 +-
+ arch/arm/boot/dts/exynos4210-origen.dts            |    2 +-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |    2 +-
+ arch/arm/boot/dts/exynos4210-trats.dts             |    2 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |    2 +-
+ arch/arm/boot/dts/exynos4210.dtsi                  |    4 +-
+ arch/arm/boot/dts/exynos4212.dtsi                  |    2 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |    2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts            |    2 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts          |    2 +-
+ arch/arm/boot/dts/exynos4412.dtsi                  |    2 +-
+ arch/arm/boot/dts/exynos4x12.dtsi                  |    4 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 +-
+ arch/arm/boot/dts/exynos5250-snow.dts              |    4 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   23 +++-
+ arch/arm/boot/dts/exynos5440-sd5v1.dts             |    2 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts          |    2 +-
+ arch/arm/boot/dts/exynos5440.dtsi                  |    2 +-
+ arch/arm/boot/dts/s3c2416-smdk2416.dts             |    2 +-
+ arch/arm/boot/dts/s3c2416.dtsi                     |    4 +-
+ arch/arm/boot/dts/s3c24xx.dtsi                     |    2 +-
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos-audss.c             |  133 ++++++++++++++++++++
+ include/dt-bindings/clk/exynos-audss-clk.h         |   25 ++++
+ 26 files changed, 269 insertions(+), 27 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+ create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
+ create mode 100644 include/dt-bindings/clk/exynos-audss-clk.h
+
+-- 
+1.7.4.4
