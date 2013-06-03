@@ -1,36 +1,23 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 03 Jun 2013 09:54:03 +0100
-Subject: [PATCHv6 00/11] Remove ARM local timer API
-In-Reply-To: <20130531221633.GG599@codeaurora.org>
-References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
- <20130531174526.GD599@codeaurora.org> <51A8E71D.1000407@linaro.org>
- <20130531221633.GG599@codeaurora.org>
-Message-ID: <51AC59AB.4080802@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 3 Jun 2013 08:55:44 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc1
+In-Reply-To: <874ndwmdis.fsf@linaro.org>
+References: <alpine.DEB.2.00.1305192159080.2656@utopia.booyaka.com>
+ <alpine.DEB.2.00.1305192219240.2656@utopia.booyaka.com>
+ <874ndwmdis.fsf@linaro.org>
+Message-ID: <alpine.DEB.2.02.1306030854520.4635@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/13 23:16, Stephen Boyd wrote:
-> On 05/31, John Stultz wrote:
->> On 05/31/2013 10:45 AM, Stephen Boyd wrote:
->>> Comments have been light for this round so I think we're about
->>> ready to merge. John/Thomas, can you pick up these patches or
->>> shall I route them through arm-soc or something else?
->>
->>
->> So there looks to be a fair amount of additions in the ARM tree, do
->> those already have acks from Arnd/Olof/other folks? (I think I was
->> only cc'ed on the first two patches).
+On Tue, 21 May 2013, Kevin Hilman wrote:
+
+> I also just noticed that 3730beaglexm has stopped waking from suspend
+> via RTC (non-DT boot.)  Waking from UART console still works.
 > 
-> I'm still missing acks from Kukjin and Barry.
+> Worked fine on v3.9, so there's a regressions somewhere.
 
-I don't think that should hold off the patch series. It's been tested on
-most other platforms over the course of several months. If the platform
-maintainers aren't responsive enough, fixing the issues becomes their
-problem.
+Thanks Kevin, noted this in the logs.  Please let me know when it starts 
+working again.
 
-FWIW, have my
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+- Paul
