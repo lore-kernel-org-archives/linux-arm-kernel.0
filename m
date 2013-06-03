@@ -1,57 +1,46 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Mon, 3 Jun 2013 23:28:37 +0800
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <20130517191753.468.1734.stgit@localhost>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191753.468.1734.stgit@localhost>
-Message-ID: <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Jun 2013 17:29:52 +0200
+Subject: [PATCH 08/21] ARM: ux500: Supply the I2C clocks lookup to the
+ DBX500 DT
+In-Reply-To: <20130603142755.GH3370@gmail.com>
+References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
+ <2199337.TqRF93pcHr@wuerfel> <20130603142755.GH3370@gmail.com>
+Message-ID: <2173992.VOFqBIP467@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Monday 03 June 2013 15:27:55 Lee Jones wrote:
+> On Mon, 03 Jun 2013, Arnd Bergmann wrote:
+> 
+> > On Monday 03 June 2013 14:42:32 Lee Jones wrote:
+> > > @@ -559,6 +559,8 @@
+> > >                         v-i2c-supply = <&db8500_vape_reg>;
+> > >  
+> > >                         clock-frequency = <400000>;
+> > > +                       clocks = <&clk 100>, <&clk 67>;
+> > > +                       clock-names = "nmk-i2c.0", "apb_pclk";
+> > >                 };
+> > >  
+> > >                 i2c at 80122000 {
+> > > @@ -572,6 +574,9 @@
+> > >                         v-i2c-supply = <&db8500_vape_reg>;
+> > >  
+> > >                         clock-frequency = <400000>;
+> > > +
+> > > +                       clocks = <&clk 85>, <&clk 42>;
+> > > +                       clock-names = "nmk-i2c.1", "apb_pclk";
+> > >                 };
+> > 
+> > Same comment actually as for the uart patch, also SDI and MSP
+> > have the same problem.
+> 
+> I was only using the names in the same manor as the API does, to fetch
+> the 'clocks =' index. Do you mean that I should be using 'uartclk',
+> 'i2cclk', 'sdmmcclk' and 'msp1clk' instead?
 
-On Sat, May 18, 2013 at 3:17 AM, Tony Lindgren <tony@atomide.com> wrote:
-> We can now boot with device tree. If you don't want to update u-boot,
-> you can boot with appended DTB with the following instructions:
->
-> 1. Make sure you have the appended DTB support in .config
->
->    CONFIG_ARM_APPENDED_DTB=y
->    CONFIG_ARM_ATAG_DTB_COMPAT=y
->    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
->
-> 2. Build the zImage
->
->    $ ARCH=arm CROSS_COMPILE=... make zImage
->
-> 3. Build the device tree blobs
->
->    $ ARCH=arm CROSS_COMPILE=... make dtbs
->
-> 4. Append the correct panda dtb to zImage
->
->    Depending on your hardware it's omap4-panda.dtb, omap4-panda-a4.dtb
->    or omap4-panda-es.dtb.
->
->    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-panda-es.dtb > /tmp/appended
->
-> 5. Use mkimage to produce the appended device tree uImage
->
->    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
->      -n "Linux" -d /tmp/appended /tmp/uImage
+Yes, that would be better. I suppose you can actually leave out the
+'clk' part and just call them 'i2c', 'sdmmc', 'msp' and 'uart',
+but you should check if any of the driver already specify the
+clock names in their DT bindings.
 
-I followed the above steps and tried devicetree on Pandaboard against
-3.10.0-rc3-next-20130528, and the board will hang during boot, but works
-well with legacy mode.
-
-         Hardware: Pandaboard A1
-         dtb: omap4-panda.dtb
-
-See 'dmesg' on below link:
-
-         http://kernel.ubuntu.com/~ming/up/panda-dts.dmesg
-
-
-Thanks,
--- 
-Ming Lei
+	Arnd
