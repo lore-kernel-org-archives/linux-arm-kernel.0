@@ -1,101 +1,172 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon,  3 Jun 2013 18:47:36 +0200
-Subject: [PATCH] ARM: mvebu: set aliases for ethernet controllers
-Message-ID: <1370278056-3058-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Mon, 3 Jun 2013 09:49:53 -0700
+Subject: [PATCH] clk: remove the clk_notifier from clk_notifier_list
+ before free it (was: Re: [BUG] zynq | CCF | SRCU)
+In-Reply-To: <51AC5F1B.4020409@cn.fujitsu.com>
+References: <42b8bfd5-3012-4c49-b9ef-7a9beb5956f1@VA3EHSMHS041.ehs.local>
+ <51AC5F1B.4020409@cn.fujitsu.com>
+Message-ID: <b6422bc1-70b4-4942-a594-3f0e7b0fa04a@CO1EHSMHS001.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Willy Tarreau <w@1wt.eu>
+Hi Lai,
 
-These aliases are used when feeding the DT from ATAGS to set the
-devices MAC addresses.
+On Mon, Jun 03, 2013 at 05:17:15PM +0800, Lai Jiangshan wrote:
+> On 06/01/2013 03:12 AM, S?ren Brinkmann wrote:
+> > Hi,
+> > 
+> > we recently encountered some kernel panics when we compiled one of our
+> > drivers as module and tested inserting/removing the module.
+> > Trying to debug this issue, I could reproduce it on the mainline kernel
+> > with a dummy module.
+> > 
+> > What happens is, that when on driver remove clk_notifier_unregister() is
+> > called and no other notifier for that clock is registered, the kernel
+> > panics.
+> > I'm not sure what is going wrong here. If there is a bug (and if where)
+> > or I'm just using the infrastructure the wrong way,... So, any hint is
+> > appreciated.
+> > 
+> > I attach the output from the crashing system. The stacktrace indicates a
+> > crash in 'srcu_readers_seq_idx()'.
+> > I also attach the module I used to trigger the issue and a patch on top
+> > of mainline commit a93cb29acaa8f75618c3f202d1cf43c231984644 which has
+> > the DT modifications I need to make the module find its clock and boot
+> > with my initramfs.
+> > 
+> > 
+> > 	Thanks,
+> > 	S?ren
+> > 
+> 
+> 
+> 
+> Hi, S?ren Brinkmann
+> 
+> I guess:
+> 
+> modprobe clk_notif_dbg
+> modprobe clk_notif_dbg -r  # memory corrupt here
+> modprobe clk_notif_dbg     # access corrupted memroy, but no visiable bug
+> modprobe clk_notif_dbg -r  # access corrupted memroy, BUG
+> 
+> 
+> How the first "modprobe clk_notif_dbg -r" corrupt memroy:
+> 
+> =========
+> 
+> int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb)
+> {
+> 	struct clk_notifier *cn = NULL;
+> 	int ret = -EINVAL;
+> 
+> 	if (!clk || !nb)
+> 		return -EINVAL;
+> 
+> 	clk_prepare_lock();
+> 
+> 	list_for_each_entry(cn, &clk_notifier_list, node)
+> 		if (cn->clk == clk)
+> 			break;
+> 
+> 	if (cn->clk == clk) {
+> 		ret = srcu_notifier_chain_unregister(&cn->notifier_head, nb);
+> 
+> 		clk->notifier_count--;
+> 
+> 		/* XXX the notifier code should handle this better */
+> 		if (!cn->notifier_head.head) {
+> 			srcu_cleanup_notifier_head(&cn->notifier_head);
+> 
+> ===========> the code forgot to remove @cn from the clk_notifier_list
+> ===========> the second "modprobe clk_notif_dbg" will the same @clk and use the same corrupt @cn
+> 
+> 			kfree(cn);
+> 		}
+> 
+> 	} else {
+> 		ret = -ENOENT;
+> 	}
+> 
+> 	clk_prepare_unlock();
+> 
+> 	return ret;
+> }
+> 
+> ===========
+> 
+> Could you retry with the following patch?
+Thanks for the patch. This fixes it. I can add/remove my module, and it
+didn't crash since.
+I had some trouble applying it though, due to some encoding hiccups. I
+think the '?' in my name might be the culprit. I never know where things
+go wrong, whether it's format-patch, or something in the email
+transport, the sender or receiver side... But well, looks like full
+UTF-8 support is missing somewhere.
 
-Signed-off-by: Willy Tarreau <w@1wt.eu>
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370-xp.dtsi     | 9 +++++++--
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 3 ++-
- arch/arm/boot/dts/armada-xp.dtsi         | 6 +++++-
- 3 files changed, 14 insertions(+), 4 deletions(-)
+> 
+> Thanks,
+> Lai
+> 
+> From 5e26b626724139070148df9f6bd0607bc7bc3812 Mon Sep 17 00:00:00 2001
+> From: Lai Jiangshan <laijs@cn.fujitsu.com>
+> Date: Mon, 3 Jun 2013 16:59:50 +0800
+> Subject: [PATCH] clk: remove the clk_notifier from clk_notifier_list before
+>  free it
+> MIME-Version: 1.0
+> Content-Type: text/plain; charset=UTF-8
+> Content-Transfer-Encoding: 8bit
+> 
+> The @cn is stay in @clk_notifier_list after it is freed, it cause
+> memory corruption.
+> 
+> Example, if @clk is registered(first), unregistered(first),
+> registered(second), unregistered(second).
+> 
+> The freed @cn will be used when @clk is registered(second),
+> and the bug will be happened when @clk is unregistered(second):
+> 
+> [  517.040000] clk_notif_dbg clk_notif_dbg.1: clk_notifier_unregister()
+> [  517.040000] Unable to handle kernel paging request at virtual address 00df3008
+> [  517.050000] pgd = ed858000
+> [  517.050000] [00df3008] *pgd=00000000
+> [  517.060000] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+> [  517.060000] Modules linked in: clk_notif_dbg(O-) [last unloaded: clk_notif_dbg]
+> [  517.060000] CPU: 1 PID: 499 Comm: modprobe Tainted: G           O 3.10.0-rc3-00119-ga93cb29-dirty #85
+> [  517.060000] task: ee1e0180 ti: ee3e6000 task.ti: ee3e6000
+> [  517.060000] PC is at srcu_readers_seq_idx+0x48/0x84
+> [  517.060000] LR is at srcu_readers_seq_idx+0x60/0x84
+> [  517.060000] pc : [<c0052720>]    lr : [<c0052738>]    psr: 80070013
+> [  517.060000] sp : ee3e7d48  ip : 00000000  fp : ee3e7d6c
+> [  517.060000] r10: 00000000  r9 : ee3e6000  r8 : 00000000
+> [  517.060000] r7 : ed84fe4c  r6 : c068ec90  r5 : c068e430  r4 : 00000000
+> [  517.060000] r3 : 00df3000  r2 : 00000000  r1 : 00000002  r0 : 00000000
+> [  517.060000] Flags: Nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> [  517.060000] Control: 18c5387d  Table: 2d85804a  DAC: 00000015
+> [  517.060000] Process modprobe (pid: 499, stack limit = 0xee3e6238)
+> [  517.060000] Stack: (0xee3e7d48 to 0xee3e8000)
+> ....
+> [  517.060000] [<c0052720>] (srcu_readers_seq_idx+0x48/0x84) from [<c0052790>] (try_check_zero+0x34/0xfc)
+> [  517.060000] [<c0052790>] (try_check_zero+0x34/0xfc) from [<c00528b0>] (srcu_advance_batches+0x58/0x114)
+> [  517.060000] [<c00528b0>] (srcu_advance_batches+0x58/0x114) from [<c0052c30>] (__synchronize_srcu+0x114/0x1ac)
+> [  517.060000] [<c0052c30>] (__synchronize_srcu+0x114/0x1ac) from [<c0052d14>] (synchronize_srcu+0x2c/0x34)
+> [  517.060000] [<c0052d14>] (synchronize_srcu+0x2c/0x34) from [<c0053a08>] (srcu_notifier_chain_unregister+0x68/0x74)
+> [  517.060000] [<c0053a08>] (srcu_notifier_chain_unregister+0x68/0x74) from [<c0375a78>] (clk_notifier_unregister+0x7c/0xc0)
+> [  517.060000] [<c0375a78>] (clk_notifier_unregister+0x7c/0xc0) from [<bf008034>] (clk_notif_dbg_remove+0x34/0x9c [clk_notif_dbg])
+> [  517.060000] [<bf008034>] (clk_notif_dbg_remove+0x34/0x9c [clk_notif_dbg]) from [<c02bb974>] (platform_drv_remove+0x24/0x28)
+> [  517.060000] [<c02bb974>] (platform_drv_remove+0x24/0x28) from [<c02b9bf8>] (__device_release_driver+0x8c/0xd4)
+> [  517.060000] [<c02b9bf8>] (__device_release_driver+0x8c/0xd4) from [<c02ba680>] (driver_detach+0x9c/0xc4)
+> [  517.060000] [<c02ba680>] (driver_detach+0x9c/0xc4) from [<c02b99c4>] (bus_remove_driver+0xcc/0xfc)
+> [  517.060000] [<c02b99c4>] (bus_remove_driver+0xcc/0xfc) from [<c02bace4>] (driver_unregister+0x54/0x78)
+> [  517.060000] [<c02bace4>] (driver_unregister+0x54/0x78) from [<c02bbb44>] (platform_driver_unregister+0x1c/0x20)
+> [  517.060000] [<c02bbb44>] (platform_driver_unregister+0x1c/0x20) from [<bf0081f8>] (clk_notif_dbg_driver_exit+0x14/0x1c [clk_notif_dbg])
+> [  517.060000] [<bf0081f8>] (clk_notif_dbg_driver_exit+0x14/0x1c [clk_notif_dbg]) from [<c00835e4>] (SyS_delete_module+0x200/0x28c)
+> [  517.060000] [<c00835e4>] (SyS_delete_module+0x200/0x28c) from [<c000edc0>] (ret_fast_syscall+0x0/0x48)
+> [  517.060000] Code: e5973004 e7911102 e0833001 e2881002 (e7933101)
+> 
+> CC: stable at kernel.org
+> Reported-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Lai Jiangshan <laijs@cn.fujitsu.com>
+Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 550eb77..8f69cf4 100644
---- a/arch/arm/boot/dts/armada-370-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -22,6 +22,11 @@
- 	model = "Marvell Armada 370 and XP SoC";
- 	compatible = "marvell,armada-370-xp";
- 
-+	aliases {
-+		eth0 = &eth0;
-+		eth1 = &eth1;
-+	};
-+
- 	cpus {
- 		cpu at 0 {
- 			compatible = "marvell,sheeva-v7";
-@@ -94,7 +99,7 @@
- 				reg = <0x72004 0x4>;
- 			};
- 
--			ethernet at 70000 {
-+			eth0: ethernet at 70000 {
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0x70000 0x2500>;
- 				interrupts = <8>;
-@@ -102,7 +107,7 @@
- 				status = "disabled";
- 			};
- 
--			ethernet at 74000 {
-+			eth1: ethernet at 74000 {
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0x74000 0x2500>;
- 				interrupts = <10>;
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index 6ab56bd..386f0ce 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -23,6 +23,7 @@
- 		gpio0 = &gpio0;
- 		gpio1 = &gpio1;
- 		gpio2 = &gpio2;
-+		eth3 = &eth3;
- 	};
- 
- 
-@@ -105,7 +106,7 @@
- 				interrupts = <91>;
- 			};
- 
--			ethernet at 34000 {
-+			eth3: ethernet at 34000 {
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0x34000 0x2500>;
- 				interrupts = <14>;
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 5b902f9..e481d54 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -22,6 +22,10 @@
- 	model = "Marvell Armada XP family SoC";
- 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
- 
-+	aliases {
-+		eth2 = &eth2;
-+	};
-+
- 	soc {
- 		internal-regs {
- 			L2: l2-cache {
-@@ -86,7 +90,7 @@
- 				reg = <0x18200 0x500>;
- 			};
- 
--			ethernet at 30000 {
-+			eth2: ethernet at 30000 {
- 				compatible = "marvell,armada-370-neta";
- 				reg = <0x30000 0x2500>;
- 				interrupts = <12>;
--- 
-1.8.1.2
+	S?ren
