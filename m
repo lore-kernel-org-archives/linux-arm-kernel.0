@@ -1,35 +1,71 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 3 Jun 2013 19:09:54 +0200
-Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
-In-Reply-To: <20130603165753.GL3803@titan.lakedaemon.net>
-References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130603165753.GL3803@titan.lakedaemon.net>
-Message-ID: <20130603190954.3bd52784@skate>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 3 Jun 2013 19:10:03 +0200
+Subject: [GIT PULL v2] at91: USBA DT support / drivers update for 3.11 #1
+In-Reply-To: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
+References: <20130526083430.GP24476@game.jcrosoft.org>
+ <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <51ACCDEB.8000803@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On 03/06/2013 19:05, Nicolas Ferre :
+> Arnd, Olof,
+>
+> This is a rework of the previous pull-request done by Jean-Christophe
+> PLAGNIOL-VILLARD last week ([GIT PULL] at91: USBA DT support for 3.11).
+> You should see that this material is based on the cleanup branch that you
+> already have in arm-soc/at91/cleanup.
+>
+> This adds the DT support for USBA gadget driver present in the most recent
+> AT91 SoCs.
+> As agreed with Arnd and Felipe we send these drivers updates via arm-soc.
+>
+> Thanks, best regards,
+>
+> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+>
+>    ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+>
+> are available in the git repository at:
+>
+>    git://github.com/at91linux/linux-at91.git tags/at91-drivers
+>
+> for you to fetch changes up to a375f12dde25a7e89acd75d066d0225657d7dfc2:
+>
+>    ARM: at91: sam9m10g45ek add udc DT support (2013-05-24 07:15:20 +0800)
+>
+> ----------------------------------------------------------------
+> Adding the DT support to UBB gadget High-Speed aka usba.
 
-On Mon, 3 Jun 2013 12:57:53 -0400, Jason Cooper wrote:
+---------------------------^^^
 
-> Won't this override a user editing the 'local-mac-address' property in
-> the dts?  Since we're dealing with appended dtbs, there's a higher
-> probability of the user doing such a thing.
-> 
-> I'll admit it's a corner case, but I'd like to make sure we've thought
-> through the use cases and aren't making things more complicated than
-> necessary.
+Typo corrected in "at91-drivers" tag pushed now! (sorry for the noise).
 
-I don't have a strong opinion about this one, so if it's seen as being
-necessary to preserve a potentially existing 'local-mac-address', then
-I'll add the necessary checks to only update the property if it doesn't
-already exist.
+> It updates the driver and all device tree files
+>
+> ----------------------------------------------------------------
+> Jean-Christophe PLAGNIOL-VILLARD (7):
+>        USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
+>        USB: gadget: atmel_usba: allow multi instance
+>        USB: gadget: atmel_usba: add DT support
+>        ARM: at91: sam9x5 add udc DT support
+>        ARM: at91: sam9x5ek add udc DT support
+>        ARM: at91: sam9g45 add udc DT support
+>        ARM: at91: sam9m10g45ek add udc DT support
+>
+>   .../devicetree/bindings/usb/atmel-usb.txt          |  82 +++++++
+>   arch/arm/boot/dts/at91sam9g45.dtsi                 |  62 +++++
+>   arch/arm/boot/dts/at91sam9m10g45ek.dts             |   5 +
+>   arch/arm/boot/dts/at91sam9x5.dtsi                  |  62 +++++
+>   arch/arm/boot/dts/at91sam9x5ek.dtsi                |   5 +
+>   arch/arm/mach-at91/at91sam9g45.c                   |   2 +
+>   arch/arm/mach-at91/at91sam9x5.c                    |   2 +
+>   drivers/usb/gadget/Kconfig                         |   2 +-
+>   drivers/usb/gadget/atmel_usba_udc.c                | 264 ++++++++++++++-------
+>   drivers/usb/gadget/atmel_usba_udc.h                |   2 +
+>   10 files changed, 407 insertions(+), 81 deletions(-)
+>
 
-Best regards,
 
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Nicolas Ferre
