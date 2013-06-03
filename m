@@ -1,47 +1,86 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 23:12:11 +0100
-Subject: [PATCHv2 4/6] sched_clock: Add support for >32 bit sched_clock
-In-Reply-To: <51AD069F.1060308@codeaurora.org>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <1370155183-31421-5-git-send-email-sboyd@codeaurora.org>
- <20130603093938.GG18614@n2100.arm.linux.org.uk>
- <51AD069F.1060308@codeaurora.org>
-Message-ID: <20130603221210.GO18614@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 4 Jun 2013 00:18:32 +0200
+Subject: [PATCH RFC 3/3] clk: dt: binding for basic divider clock
+In-Reply-To: <1370281990-15090-4-git-send-email-mturquette@linaro.org>
+References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
+ <1370281990-15090-4-git-send-email-mturquette@linaro.org>
+Message-ID: <201306040018.33236.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 02:11:59PM -0700, Stephen Boyd wrote:
-> On 06/03/13 02:39, Russell King - ARM Linux wrote:
-> > On Sat, Jun 01, 2013 at 11:39:41PM -0700, Stephen Boyd wrote:
-> >> +}
-> >> +
-> >> +void __init
-> >> +setup_sched_clock_64(u64 (*read)(void), int bits, unsigned long rate)
-> >> +{
-> >> +	if (cd.rate > rate)
-> >> +		return;
-> >> +
-> >> +	BUG_ON(bits <= 32);
-> >> +	WARN_ON(!irqs_disabled());
-> >> +	read_sched_clock_64 = read;
-> >> +	sched_clock_func = sched_clock_64;
-> >> +	cd.rate = rate;
-> >> +	cd.mult = NSEC_PER_SEC / rate;
-> > Here, you don't check that the (2^bits) * mult results in a wrap of the
-> > resulting 64-bit number, which is a _basic_ requirement for sched_clock
-> > (hence all the code for <=32bit clocks, otherwise we wouldn't need this
-> > complexity in the first place.)
+Am Montag, 3. Juni 2013, 19:53:10 schrieb Mike Turquette:
+> Devicetree binding for the basic clock divider, plus the setup function
+> to register the clock.  Based on the existing fixed-clock binding.
 > 
-> Ok I will use clocks_calc_mult_shift() here.
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> ---
 
-No, that's not the problem.
+[...]
 
-If you have a 56-bit clock which ticks at a period of 1ns, then
-cd.rate = 1, and your sched_clock() values will be truncated to 56-bits.
-The scheduler always _requires_ 64-bits from sched_clock.  That's why we
-have the complicated code to extend the 32-bits-or-less to a _full_
-64-bit value.
+> +/**
+> + * of_div_clk_setup() - Setup function for simple div rate clock
+> + */
+> +void of_divider_clk_setup(struct device_node *node)
+> +{
+> +	struct clk *clk;
+> +	const char *clk_name = node->name;
+> +	void __iomem *reg;
+> +	const char *parent_name;
+> +	u8 clk_divider_flags = 0;
+> +	u8 mask = 0;
+> +	u8 shift = 0;
 
-Let me make this clearer: sched_clock() return values _must_ without
-exception monotonically increment from zero to 2^64-1 and then wrap
-back to zero.  No other behaviour is acceptable for sched_clock().
+in the mux-clock these 3 are unsigned long and u32 types ... what is correct?
+
+
+> +	struct clk_div_table *table;
+> +
+> +	of_property_read_string(node, "clock-output-names", &clk_name);
+> +
+> +	parent_name = of_clk_get_parent_name(node, 0);
+> +
+> +	reg = of_iomap(node, 0);
+> +
+> +	if (of_property_read_u8(node, "mask", &mask)) {
+> +		pr_err("%s: missing mask property for %s\n", __func__, node->name);
+> +		return;
+> +	}
+> +
+> +	if (of_property_read_u8(node, "shift", &shift))
+> +		pr_debug("%s: missing shift property defaults to zero for %s\n",
+> +				__func__, node->name);
+
+same here ... mux reads u32
+
+> +	if (of_property_read_bool(node, "index_one"))
+> +		clk_divider_flags |= CLK_DIVIDER_ONE_BASED;
+> +
+> +	if (of_property_read_bool(node, "index_power_of_two"))
+> +		clk_divider_flags |= CLK_DIVIDER_POWER_OF_TWO;
+> +
+> +	if (of_property_read_bool(node, "index_allow_zero"))
+> +		clk_divider_flags |= CLK_DIVIDER_ALLOW_ZERO;
+> +
+> +	table = of_clk_get_div_table(node);
+> +	if (IS_ERR(table))
+> +		return;
+> +
+> +	clk = clk_register_divider_table(NULL, clk_name,
+> +			parent_name, 0,
+> +			reg, shift, mask,
+> +			clk_divider_flags, table,
+> +			NULL);
+
+this causes trouble, as the divider clock code above still requires a width 
+instead of a mask. I remember talk about this going to change separately, but 
+couldn't find anything of the sort in linux-next.
+
+
+
+> +
+> +	if (!IS_ERR(clk))
+> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +}
+> +EXPORT_SYMBOL_GPL(of_divider_clk_setup);
+> +CLK_OF_DECLARE(divider_clk, "divider-clock", of_divider_clk_setup);
+> +#endif
