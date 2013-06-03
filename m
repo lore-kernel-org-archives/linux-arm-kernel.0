@@ -1,42 +1,34 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sun, 2 Jun 2013 19:34:44 -0700
-Subject: [PATCHv3 1/3] Add support for GMT G762/G763 PWM fan controller
-In-Reply-To: <a7bfda1de9cce8044434369428341d3fb05cf42c.1370202835.git.arno@natisbad.org>
-References: <cover.1370202835.git.arno@natisbad.org>
- <a7bfda1de9cce8044434369428341d3fb05cf42c.1370202835.git.arno@natisbad.org>
-Message-ID: <20130603023444.GB11723@roeck-us.net>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 3 Jun 2013 10:54:36 +0800
+Subject: [RFC v2 1/5] SPI: imx: Convert to devm_* API
+In-Reply-To: <1370168531-22718-1-git-send-email-shc_work@mail.ru>
+References: <1370168531-22718-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130603025434.GG13970@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 02, 2013 at 10:14:19PM +0200, Arnaud Ebalard wrote:
-> 
-> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
-> ---
->  drivers/hwmon/Kconfig              |   10 +
->  drivers/hwmon/Makefile             |    1 +
->  drivers/hwmon/g762.c               | 1179 ++++++++++++++++++++++++++++++++++++
->  include/linux/platform_data/g762.h |   51 ++
->  4 files changed, 1241 insertions(+)
->  create mode 100644 drivers/hwmon/g762.c
->  create mode 100644 include/linux/platform_data/g762.h
-> 
-[ ... ]
+On Sun, Jun 02, 2013 at 02:22:07PM +0400, Alexander Shiyan wrote:
+> @@ -869,56 +858,34 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  
+>  	master->dev.of_node = pdev->dev.of_node;
+>  	ret = spi_bitbang_start(&spi_imx->bitbang);
+> -	if (ret) {
+> -		dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
+> -		goto out_clk_put;
+> -	}
+> +	if (!ret)
+> +		return 0;
+>  
+> -	dev_info(&pdev->dev, "probed\n");
+> +	dev_err(&pdev->dev, "bitbang start failed with %d\n", ret);
+>  
+> -	return ret;
+> -
+> -out_clk_put:
+>  	clk_disable_unprepare(spi_imx->clk_per);
+>  	clk_disable_unprepare(spi_imx->clk_ipg);
 
-> +static inline int g762_read_byte(const struct i2c_client *client, u8 reg,
-> +				 u8 *dest)
-> +{
-> +	int ret;
-> +
-> +	ret = i2c_smbus_read_byte_data(client, reg);
-> +	if (ret < 0) {
-> +		dev_err(&client->dev, "failed to read reg %x02x, err %d\n",
-> +			(int)reg, ret);
+It seems that my comment on v1 is confusing.  I meant the above code
+change is completely a diff stat churn to me.
 
-I would suggest to write a piece of test code for the above statement and
-observe its output. "printf("%x02x\n", 0x1234);" should do.
-
-Is the error message really needed ? If there is a persistent error,
-it will clog the log.
-
-Thanks,
-Guenter
+Shawn
