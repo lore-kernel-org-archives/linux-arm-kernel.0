@@ -1,51 +1,118 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 3 Jun 2013 10:33:10 +0100
-Subject: [PATCH V4] ARM: handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <CACVXFVMU+pHrtezStKRNzhhJWg7L1NTBQKwhwLe+-9Yh5JhgiA@mail.gmail.com>
-References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
- <CACVXFVOo6HNXeZ95QqAXU64aAmXXrTVsHJ9TvgirWKOWmwnSfA@mail.gmail.com>
- <20130531185414.GA19061@schnuecks.de>
- <CACVXFVMU+pHrtezStKRNzhhJWg7L1NTBQKwhwLe+-9Yh5JhgiA@mail.gmail.com>
-Message-ID: <20130603093309.GA32295@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 03 Jun 2013 11:36:00 +0200
+Subject: mvebu: 3.10-rc1 and fixes branch doesn't boot on OpenBlocks AX3
+In-Reply-To: <51AC5E14.1050207@hitachi.com>
+References: <51AC5E14.1050207@hitachi.com>
+Message-ID: <51AC6380.9050607@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 01, 2013 at 11:27:38AM +0100, Ming Lei wrote:
-> On Sat, Jun 1, 2013 at 2:54 AM, Simon Baatz <gmbnomis@gmail.com> wrote:
-> > On Fri, May 31, 2013 at 05:07:22PM +0800, Ming Lei wrote:
-> >> On Sun, May 12, 2013 at 1:35 PM, Simon Baatz <gmbnomis@gmail.com> wrote:
-> >> > +                       __flush_kernel_dcache_page(page);
-> >>
-> >> I am wondering if I-cache should be flushed here since the user mapping
-> >> on the page may be executable and I/D coherency should be maintained.
-> >
-> > Me too. In fact, I wondered so much that I proposed it myself in a
-> > previous version of the patch (see [1]) :-) However, this has never
-> > been part of flush_kernel_dcache_page() and it is not clear whether
-> > the flush for I/D-cache coherency is really needed here (or in
-> > flush_dcache_page() for that matter) or whether it is sufficient to
-> > do it when mapping the page into user space.
-> 
-> After reading cachetlb.txt again, looks your patch is correct, because
-> this kernel API is called in the situations:
-> 
->         It is assumed here that the user has no incoherent cached copies
->        (i.e. the original page was obtained from a mechanism like
-> get_user_pages()).
-> 
-> So only flushing kernel mapping for the page is correct if callers of the API
-> obey the rule.
+On 06/03/2013 11:12 AM, Masami Hiramatsu wrote:
+> Hi,
+Hi
 
-I think we should stick with just the D-cache flushing here. We can
-revisit when we see a clear scenario where I-cache maintenance is
-needed.
+> 
+> I've tried 3.10-rc1 and
+> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes branch on my
+> OpenBlocks AX3-4 and failed to boot both kernel
+> as below.
 
-Regarding the 'user has no incoherent cached copies', this would work on
-ARMv5 but not on ARMv7 unless you unmap the page from user space
-(because of speculative loads into both I and D caches). Since we only
-target the D-cache, we just leave flush_kernel_dcache_page() as no-op on
-ARMv7 (non-aliasing VIPT).
+Since 3.10 the memory description for the Armada XP is 64 bits, to
+allow to use more than 4GB of RAM with LPAE.
+Unfortunately the ATAGS are 32 bits only.
+If you use more than 4GB your only possibility is to disable
+the ATAG support and only rely on the information written in
+the dts: disable CONFIG_ARM_ATAG_DTB_COMPAT.
+
+If you don't have more than 4GB of RAM then you can also apply this
+patch: https://patchwork.kernel.org/patch/2566771/
+It allows to use the ATAG and to keep the CONFIG_ARM_ATAG_DTB_COMPAT
+option.
+
+Regards,
+
+> 
+> ---
+> Loading file "uImage" from ide device 0:1 (hda1)
+> 2486993 bytes read
+> Loading file "uInitrd" from ide device 0:1 (hda1)
+> 1851769 bytes read
+> ## Booting kernel from Legacy Image at 02000000 ...
+>    Image Name:   Linux-marvell
+>    Created:      2013-05-27   3:43:33 UTC
+>    Image Type:   ARM Linux Kernel Image (uncompressed)
+>    Data Size:    2486929 Bytes =  2.4 MB
+>    Load Address: 00008000
+>    Entry Point:  00008000
+>    Verifying Checksum ... OK
+> ## Loading init Ramdisk from Legacy Image at 01100000 ...
+>    Image Name:   Linux-initrd
+>    Created:      2013-05-27   7:42:37 UTC
+>    Image Type:   ARM Linux RAMDisk Image (uncompressed)
+>    Data Size:    1851705 Bytes =  1.8 MB
+>    Load Address: 00000000
+>    Entry Point:  00000000
+>    Verifying Checksum ... OK
+>    Loading Kernel Image ... OK
+> OK
+> 
+> Starting kernel ...
+> 
+> Uncompressing Linux... done, booting the kernel.
+> Booting Linux on physical CPU 0x0
+> Initializing cgroup subsys cpuset
+> Initializing cgroup subsys cpu
+> Initializing cgroup subsys cpuacct
+> Linux version 3.10.0-rc2-00054-gf4ae176 (mhiramat at mhiramat-M0-7522) (gcc version
+> 4.6.3 20120624 (prerelease) (Ubuntu/Linaro 4.6.3-8ubuntu1) ) #99 SMP Mon May 27
+> 12:43:19 JST 2013
+> CPU: ARMv7 Processor [562f5842] revision 2 (ARMv7), cr=10c53c7d
+> CPU: PIPT / VIPT nonaliasing data cache, PIPT instruction cache
+> Machine: Marvell Armada 370/XP (Device Tree), model: PlatHome OpenBlocks AX3-4 board
+> bootconsole [earlycon0] enabled
+> debug: skip boot console de-registration.
+> INITRD: 0x01100040+0x001c4139 is not a memory region - disabling initrd
+> Memory policy: ECC disabled, Data cache writealloc
+> Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 bytes below 0x0.
+> 
+> CPU: 0 PID: 0 Comm: swapper Not tainted 3.10.0-rc2-00054-gf4ae176 #99
+> Backtrace: invalid frame pointer 0xc0661eb4
+> ---
+> 
+> It seems that newer mvebu kernel has a corrupt description in device tree
+> or should I run mkimage with different parameters for making uInitrd?
+> 
+> I'm using mkimage with parameters below for uimage
+> 
+>   scripts/mkuboot.sh -A arm -O linux -T kernel -C none \
+>   -a 0x8000 -e 0x8000 -n "Linux-marvell" -d zImage uImage
+> 
+> and
+> 
+>   mkimage -A arm -O linux -T ramdisk -C none -a 0x0000 -e 0x0000 \
+>   -n "Linux-initrd" -d /boot/initrd.img-$KVER /boot/uInitrd-$KVER
+> 
+> for uinitrd.
+> And boot the image from sata by uboot as below:
+> ---
+> ide reset
+> ext2load ide 0:1 0x2000000 uImage
+> ext2load ide 0:1 0x1100000 uInitrd
+> setenv bootargs console=ttyS0,115200 earlyprintk=ttyS0 root=/dev/sda3
+> rootflags=subvol=@ ro keep_bootcon=1
+> bootm 0x2000000 0x1100000
+> ---
+> 
+> BTW, should I enable CONFIG_ARM_LPAE even if the board has only
+> 3GB memory?
+> 
+> Thank you,
+> 
+> 
+
 
 -- 
-Catalin
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
