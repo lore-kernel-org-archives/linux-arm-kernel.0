@@ -1,73 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon,  3 Jun 2013 14:42:34 +0100
-Subject: [PATCH 10/21] ARM: ux500: Supply the SDI (MMC) clocks lookup to the
- DBX500 DT
+Date: Mon,  3 Jun 2013 14:42:36 +0100
+Subject: [PATCH 12/21] ARM: ux500: Remove AUXDATA relating to GPIO clock-name
+ bindings
 In-Reply-To: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
 References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370266965-7901-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370266965-7901-13-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |   17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ arch/arm/mach-ux500/cpu-db8500.c |    9 ---------
+ 1 file changed, 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index f2fe7d9..e5a5e9f 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -710,6 +710,9 @@
- 			       <&dma 32 0 0x0>; /* Logical - MemToDev */
- 			dma-names = "rx", "tx";
- 
-+			clocks = <&clk 96>, <&clk 58>;
-+			clock-names = "sdi1", "apb_pclk";
-+
- 			status = "disabled";
- 		};
- 
-@@ -722,6 +725,9 @@
- 			       <&dma 28 0 0x0>; /* Logical - MemToDev */
- 			dma-names = "rx", "tx";
- 
-+			clocks = <&clk 101>, <&clk 68>;
-+			clock-names = "sdi2", "apb_pclk";
-+
- 			status = "disabled";
- 		};
- 
-@@ -729,6 +735,10 @@
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x80119000 0x1000>;
- 			interrupts = <0 59 0x4>;
-+
-+			clocks = <&clk 97>, <&clk 59>;
-+			clock-names = "sdi3", "apb_pclk";
-+
- 			status = "disabled";
- 		};
- 
-@@ -741,6 +751,9 @@
- 			       <&dma 42 0 0x0>; /* Logical - MemToDev */
- 			dma-names = "rx", "tx";
- 
-+			clocks = <&clk 94>, <&clk 56>;
-+			clock-names = "sdi4", "apb_pclk";
-+
- 			status = "disabled";
- 		};
- 
-@@ -748,6 +761,10 @@
- 			compatible = "arm,pl18x", "arm,primecell";
- 			reg = <0x80008000 0x1000>;
- 			interrupts = <0 100 0x4>;
-+
-+			clocks = <&clk 104>, <&clk 71>;
-+			clock-names = "sdi5", "apb_pclk";
-+
- 			status = "disabled";
- 		};
- 
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 3b77e36..53187fc 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -228,15 +228,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  NULL),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  NULL),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e080, "gpio.1", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e000, "gpio.2", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e080, "gpio.3", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e100, "gpio.4", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e180, "gpio.5", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e000, "gpio.6", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e080, "gpio.7", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0xa03fe000, "gpio.8", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80004000, "nmk-i2c.0", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80122000, "nmk-i2c.1", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
 -- 
 1.7.10.4
