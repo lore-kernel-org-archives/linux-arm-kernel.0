@@ -1,40 +1,21 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 10:42:00 +0100
-Subject: [PATCH v3 02/11] irqchip: mmp: support irqchip
-In-Reply-To: <1370251845-31373-3-git-send-email-haojian.zhuang@gmail.com>
-References: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
- <1370251845-31373-3-git-send-email-haojian.zhuang@gmail.com>
-Message-ID: <20130603094200.GH18614@n2100.arm.linux.org.uk>
+Date: Mon, 3 Jun 2013 10:46:02 +0100
+Subject: [PATCH v3] clk: implement clk_unregister
+In-Reply-To: <1370248626-3760-1-git-send-email-jiada_wang@mentor.com>
+References: <1370248626-3760-1-git-send-email-jiada_wang@mentor.com>
+Message-ID: <20130603094602.GI18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 05:30:36PM +0800, Haojian Zhuang wrote:
-> @@ -64,7 +60,7 @@ static const char *mmp_dt_board_compat[] __initdata = {
->  
->  DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
->  	.map_io		= mmp_map_io,
-> -	.init_irq	= mmp_dt_irq_init,
-> +	.init_irq	= irqchip_init,
->  	.init_time	= mmp_dt_init_timer,
->  	.init_machine	= pxa168_dt_init,
->  	.dt_compat	= mmp_dt_board_compat,
-> @@ -72,7 +68,7 @@ MACHINE_END
->  
->  DT_MACHINE_START(PXA910_DT, "Marvell PXA910 (Device Tree Support)")
->  	.map_io		= mmp_map_io,
-> -	.init_irq	= mmp_dt_irq_init,
-> +	.init_irq	= irqchip_init,
+On Mon, Jun 03, 2013 at 05:37:06PM +0900, Jiada Wang wrote:
+> Currently clk_unregister is unimplemented, it is required in case
+> sub modules want actually remove clk device registered by clk_register.
+> This patch adds the implementation of clk_unregister.
 
-This is what's in linux-next:
+So what if someone has clk_get()'d this clock but not prepared it?
+No, this is the wrong approach.  If we want to do this then clocks
+must be reference counted and freed when the refcount gets to zero,
+just like struct device etc.
 
-void __init init_IRQ(void)
-{
-        if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
-                irqchip_init();
-        else
-                machine_desc->init_irq();
-}
-
-So just set your .init_irq to NULL after basing your patchset on
-ebafed7ab9b637656b685f1dc1ee528c77241a0d (ARM: irq: Call irqchip_init
-if no init_irq function is specified).
+We have struct kref as the base structure in the kernel for dealing
+with these problems, please look at using it.
