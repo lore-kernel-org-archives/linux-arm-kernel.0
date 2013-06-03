@@ -1,66 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Jun 2013 04:15:46 +0200
-Subject: [PATCH 10/10] arm: add basic support for Rockchip RK3066a boards
-In-Reply-To: <201306030102.20890.heiko@sntech.de>
-References: <201306030055.15413.heiko@sntech.de>
- <201306030102.20890.heiko@sntech.de>
-Message-ID: <5760087.7O4UgypAot@wuerfel>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Mon, 3 Jun 2013 10:16:06 +0800
+Subject: [PATCH V2 3/6] ARM: tegra: make tegra_resume can work for Tegra114
+In-Reply-To: <201306011147.30379.arnd@arndb.de>
+References: <1369046369-12489-1-git-send-email-josephl@nvidia.com>
+ <201306010041.07230.arnd@arndb.de> <51A9364B.4090002@wwwdotorg.org>
+ <201306011147.30379.arnd@arndb.de>
+Message-ID: <1370225766.15568.6.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 June 2013 01:02:20 Heiko St?bner wrote:
-> index 0000000..094b37d
-> --- /dev/null
-> +++ b/arch/arm/mach-rockchip/rockchip.c
+On Sat, 2013-06-01 at 17:47 +0800, Arnd Bergmann wrote:
+> On Saturday 01 June 2013, Stephen Warren wrote:
+> > On 05/31/2013 04:41 PM, Arnd Bergmann wrote:
+> > > On Monday 20 May 2013, Joseph Lo wrote:
+> > >> +       cpu_to_csr_req r1, r0
+> > >> +       mov32   r2, TEGRA_FLOW_CTRL_BASE
+> > >> +       ldr     r1, [r2, r1]
+> > > 
+> > > This causes build errors now, since cpu_to_csr_req is not defined anywhere.
+> > 
+> > What build error are you seeing? I built next-20130531 earlier today
+> > without any issue.
+> > 
+> > I do remember making a similar comment during review of this patch that
+> > cpu_to_csr_req wasn't defined anywhere, but IIRC Joseph pointed me to
+> > another patch in the series which had added it, or something like that.
+> 
+> Sorry, I should have mentioned it was using randconfig, all the defconfig
+> builds work fine. The code is inside of "#ifndef CONFIG_ARCH_TEGRA_2x_SOC",
+> but Tegra2 is normally enabled in defconfig, so it does not get built.
+> 
+> I suspect the #ifdef is wrong as well, and should have been "if tegra3
+> or tegra4" instead. Joseph, can you clarify the intent of this?
+> 
+> 	Arnd
 
-If all goes well, this file can be removed again in 3.11 since it's
-all generic, but let's add it for now.
+Arnd,
 
-> +
-> +static void __init rockchip_timer_init(void)
-> +{
-> +       rockchip_init_clocks();
-> +       dw_apb_timer_init();
-> +}
+I think the "ifdef" should be removed here because we had a runtime
+Tegra SoC detection code here, the "ifdef" here would cause the code
+won't be built for the tegra_defconfig that we are using. And a typo
+need to fix here, it should be "cpu_to_csr_reg" not "cpu_to_csr_req".
+Sorry.
 
-Can't you use 
+Thanks for report. Will provide a fix.
 
-	of_clk_init(NULL);
-	clocksource_of_init();
-
-here and change the two drivers to provide the respective macros?
-
-> +
-> +static void __init rockchip_dt_init(void)
-> +{
-> +#ifdef CONFIG_CACHE_L2X0
-> +       l2x0_of_init(0, ~0UL);
-> +#endif
-> +       of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
-
-We still need to find a common location to call l2x0_of_init.
-
-> +
-> +static const char * const rockchip_board_dt_compat[] = {
-> +       "rockchip,rk2928", /* single core */
-> +       "rockchip,rk30xx", /* dual cores */
-> +       "rockchip,rk31xx", /* dual and quad cores */
-> +       NULL,
-> +};
-
-Please use real numbers instead of wildcards: rockchip,rk3066
-not rockchip,rk30xx.
-
-> +DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
-> +       .map_io         = debug_ll_io_init,
-> +       .init_machine   = rockchip_dt_init,
-> +       .init_time      = rockchip_timer_init,
-> +       .dt_compat      = rockchip_board_dt_compat,
-> +MACHINE_END
-
-The map_io line can already get removed.
-
-What about SMP support? Still working on it?
-
-	Arnd
+Joseph
