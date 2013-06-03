@@ -1,65 +1,40 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 3 Jun 2013 17:41:34 +0800
-Subject: [PATCH v1 1/2] ARM:prima2: move sirfsoc_of_rstc_init to
- .init_early
-In-Reply-To: <51AC5827.4040801@st.com>
-References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
- <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
- <CAGsJ_4xqGZVL7ZsYx1gpeUVoQan4hn=05_v51Kar78Vdkz0hig@mail.gmail.com>
- <51AC5827.4040801@st.com>
-Message-ID: <CAGsJ_4wEvAeUy3gLkBCoYPAMmbQEsxT0wLDcA4-aELnRx0ivag@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 3 Jun 2013 10:42:00 +0100
+Subject: [PATCH v3 02/11] irqchip: mmp: support irqchip
+In-Reply-To: <1370251845-31373-3-git-send-email-haojian.zhuang@gmail.com>
+References: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
+ <1370251845-31373-3-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20130603094200.GH18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Srinivas,
+On Mon, Jun 03, 2013 at 05:30:36PM +0800, Haojian Zhuang wrote:
+> @@ -64,7 +60,7 @@ static const char *mmp_dt_board_compat[] __initdata = {
+>  
+>  DT_MACHINE_START(PXA168_DT, "Marvell PXA168 (Device Tree Support)")
+>  	.map_io		= mmp_map_io,
+> -	.init_irq	= mmp_dt_irq_init,
+> +	.init_irq	= irqchip_init,
+>  	.init_time	= mmp_dt_init_timer,
+>  	.init_machine	= pxa168_dt_init,
+>  	.dt_compat	= mmp_dt_board_compat,
+> @@ -72,7 +68,7 @@ MACHINE_END
+>  
+>  DT_MACHINE_START(PXA910_DT, "Marvell PXA910 (Device Tree Support)")
+>  	.map_io		= mmp_map_io,
+> -	.init_irq	= mmp_dt_irq_init,
+> +	.init_irq	= irqchip_init,
 
-2013/6/3 Srinivas KANDAGATLA <srinivas.kandagatla@st.com>:
-> Hi Barry,
-> Thanks for testing,
-> I think this patch introduced a sequencing issue.
->
-> Just re-looking at the code, is there any reason for this to be
-> init_earlycall? And do a ioremap at that early stage?
->
-> Can't we move it to device_init level function "sirfsoc_mach_init()" at
-> which it will be safe to do a ioremap with all mm setup finished?
->
+This is what's in linux-next:
 
-i think it is ok as actually we wanted the reset controller module
-ready before any users need it. the users include gps, graphics, usb
-and some other peripheral drivers.
-now they are actually initialized after init_machine().
+void __init init_IRQ(void)
+{
+        if (IS_ENABLED(CONFIG_OF) && !machine_desc->init_irq)
+                irqchip_init();
+        else
+                machine_desc->init_irq();
+}
 
->
-> Thanks,
-> srini
->
-> On 03/06/13 03:19, Barry Song wrote:
->> this broke SiRF by:
->> Uncompressing Linux... done, booting the kernel.
->> [    0.000000] Booting Linux on physical CPU 0x0
->> [    0.000000] Linux version 3.10.0-rc2-00723-gd1a0472-dirty
->> (barry at barry-laptop) (gcc version 4.5.4 20110505 (prerelease)
->> (Ubuntu/Linaro 4.5-2011.5-csr-build) ) #35 SMP PREEMPT Mon Jun 3
->> 09:51:59 CST 2013
->> [    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
->> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
->> instruction cache
->> [    0.000000] Machine: Generic ATLAS6 (Flattened Device Tree), model:
->> CSR SiRFatlas6 Evaluation Board
->> [    0.000000] bootconsole [earlycon0] enabled
->> [    0.000000] Memory policy: ECC disabled, Data cache writealloc
->> [    0.000000] Unable to handle kernel NULL pointer dereference at
->> virtual address 00000000
->> [    0.000000] pgd = c0004000
->> [    0.000000] [00000000] *pgd=00000000
->> [    0.000000] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
->> [    0.000000] Modules linked in:
->> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
->> 3.10.0-rc2-00723-gd1a0472-dirty #35
->> [    0.000000] task: c05cfb40 ti: c05c4000 task.ti: c05c4000
->> [    0.000000] PC is at kmem_cache_alloc+0x2c/0x124
->> [    0.000000] LR is at __get_vm_area_node.clone.26+0x7c/0x190
->
-
--barry
+So just set your .init_irq to NULL after basing your patchset on
+ebafed7ab9b637656b685f1dc1ee528c77241a0d (ARM: irq: Call irqchip_init
+if no init_irq function is specified).
