@@ -1,122 +1,166 @@
-From: richard.genoud@gmail.com (Richard Genoud)
-Date: Mon, 3 Jun 2013 12:31:22 +0200
-Subject: [PATCH 1/2] spi: atmel: convert to
- dma_request_slave_channel_compat()
-In-Reply-To: <51ac5610.87ebc20a.4198.ffffdc38SMTPIN_ADDED_BROKEN@mx.google.com>
-References: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
- <51ac5610.87ebc20a.4198.ffffdc38SMTPIN_ADDED_BROKEN@mx.google.com>
-Message-ID: <CACQ1gAgYj7tPqQ01oYiRZiuMAS3XQhsp9t3t4boPjZCV2wtBBw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 3 Jun 2013 10:37:58 +0000 (UTC)
+Subject: OMAP baseline test results for v3.10-rc4
+Message-ID: <alpine.DEB.2.02.1306031029050.8116@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/3 Ludovic Desroches <ludovic.desroches@atmel.com>:
-> On Fri, May 31, 2013 at 05:01:59PM +0200, Richard Genoud wrote:
->> Use generic DMA DT helper.
->> Platforms booting with or without DT populated are both supported.
->>
->> Based on Ludovic Desroches <ludovic.desroches@atmel.com> patchset
->> "ARM: at91: move to generic DMA device tree binding"
->>
->> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
->
-> Looks fine for me to so
-> Acked-by: Ludovic Desroches <ludovic.desroches@gmail.com>
->
-> One comment below
->
-Response below.
->> ---
->>  drivers/spi/spi-atmel.c |   42 +++++++++++++++++++++++++++---------------
->>  1 file changed, 27 insertions(+), 15 deletions(-)
->>
->> rebased on linux-next next-20130531
->>
->> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
->> index 31cfc87..ea1ec00 100644
->> --- a/drivers/spi/spi-atmel.c
->> +++ b/drivers/spi/spi-atmel.c
->> @@ -424,10 +424,15 @@ static int atmel_spi_dma_slave_config(struct atmel_spi *as,
->>       return err;
->>  }
->>
->> -static bool filter(struct dma_chan *chan, void *slave)
->> +static bool filter(struct dma_chan *chan, void *pdata)
->>  {
->> -     struct  at_dma_slave *sl = slave;
->> +     struct atmel_spi_dma *sl_pdata = pdata;
->> +     struct at_dma_slave *sl;
->>
->> +     if (!sl_pdata)
->> +             return false;
->> +
->> +     sl = &sl_pdata->dma_slave;
->>       if (sl->dma_dev == chan->device->dev) {
->
-> I am wondering if a null pointer dereference can happen here. In
-> atmel_spi_configure_dma sdata was checked so maybe sl should be check
-> here.
-
-sdata was checked, but there was no point checking it:
-if as is not null, as->dma.dma_slave is defined ; so its address is not null.
-it's the same in the filter function now:
-if sl_pdata is not null, sl_pdata->dma_slave is defined ; so its
-address is not null.
-
-I added a check on sl_pdata in this patch, maybe a (BUG|WARN)_ON()
-would have been better, as it really should not happen.
 
 
->>               chan->private = sl;
->>               return true;
->> @@ -438,24 +443,31 @@ static bool filter(struct dma_chan *chan, void *slave)
->>
->>  static int atmel_spi_configure_dma(struct atmel_spi *as)
->>  {
->> -     struct at_dma_slave *sdata = &as->dma.dma_slave;
->>       struct dma_slave_config slave_config;
->> +     struct device *dev = &as->pdev->dev;
->>       int err;
->>
->> -     if (sdata && sdata->dma_dev) {
->> -             dma_cap_mask_t mask;
->> +     dma_cap_mask_t mask;
->> +     dma_cap_zero(mask);
->> +     dma_cap_set(DMA_SLAVE, mask);
->>
->> -             /* Try to grab two DMA channels */
->> -             dma_cap_zero(mask);
->> -             dma_cap_set(DMA_SLAVE, mask);
->> -             as->dma.chan_tx = dma_request_channel(mask, filter, sdata);
->> -             if (as->dma.chan_tx)
->> -                     as->dma.chan_rx =
->> -                             dma_request_channel(mask, filter, sdata);
->> +     as->dma.chan_tx = dma_request_slave_channel_compat(mask, filter,
->> +                                                        &as->dma,
->> +                                                        dev, "tx");
->> +     if (!as->dma.chan_tx) {
->> +             dev_err(dev,
->> +                     "DMA TX channel not available, SPI unable to use DMA\n");
->> +             err = -EBUSY;
->> +             goto error;
->>       }
->> -     if (!as->dma.chan_rx || !as->dma.chan_tx) {
->> -             dev_err(&as->pdev->dev,
->> -                     "DMA channel not available, SPI unable to use DMA\n");
->> +
->> +     as->dma.chan_rx = dma_request_slave_channel_compat(mask, filter,
->> +                                                        &as->dma,
->> +                                                        dev, "rx");
->> +
->> +     if (!as->dma.chan_rx) {
->> +             dev_err(dev,
->> +                     "DMA RX channel not available, SPI unable to use DMA\n");
->>               err = -EBUSY;
->>               goto error;
->>       }
->> --
->> 1.7.10.4
->>
+Here are some basic OMAP test results for Linux v3.10-rc4.
+Logs and other details at:
 
-Best regards,
+    http://www.pwsan.com/omap/testlogs/test_v3.10-rc4/20130603034317/
 
-Richard.
+
+Test summary
+------------
+
+Build: uImage:
+    Pass (16/16): am33xx_only, n800_multi_omap2xxx, n800_only_a,
+                  omap1_defconfig, omap1_defconfig_1510innovator_only, 
+                  omap1_defconfig_5912osk_only, omap2plus_defconfig, 
+                  omap2plus_defconfig_2430sdp_only
+                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm, 
+                  omap2plus_defconfig_omap2_4_only, 
+                  omap2plus_defconfig_omap3_4_only, 
+                  rmk_omap3430_ldp_allnoconfig, 
+                  rmk_omap3430_ldp_oldconfig, 
+                  rmk_omap4430_sdp_allnoconfig, 
+                  rmk_omap4430_sdp_oldconfig
+
+Build: zImage:
+    Pass ( 1/ 1): omap2plus_defconfig
+
+Boot to userspace:
+    FAIL ( 3/12): 37xxevm, am335xbone, am335xbonelt
+    Pass ( 9/12): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
+                  3730beaglexm, 4430es2panda, 4460pandaes, 5912osk,
+                  cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 3/ 6): 2430sdp, 37xxevm, 4430es2panda
+    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 4460pandaes
+
+PM: chip retention via dynamic idle:
+    FAIL ( 4/ 6): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes
+    Pass ( 2/ 6): 3530es3beagle, 3730beaglexm
+
+PM: chip off except CORE via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off except CORE via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
+    Pass ( 1/ 4): 3530es3beagle
+
+PM: chip off via dynamic idle:
+    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
+    Pass ( 1/ 4): 3530es3beagle
+
+
+Failing tests: fixed by posted patches
+--------------------------------------
+
+(none)
+
+
+Failing tests: needing investigation
+------------------------------------
+
+Boot tests:
+
+* 3517EVM & CM-T3517: boot hangs with NFS root
+  - Likely some Kconfig, board file, and PM issues with EMAC
+  - Longstanding bug
+  - Not currently part of the automated test suite
+
+* 37xx EVM: boot fails
+  - Cause unknown
+
+Boot warnings:
+
+* 2420N800, 2430sdp: failed to get counter_32k resource
+  - "omap2_sync32k_clocksource_init: failed to get counter_32k resource"
+  - Cause unknown
+
+* CM-T3517: L3 in-band error with IPSS during boot
+  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
+  - Longstanding issue; does not occur on the 3517EVM
+
+* 2430SDP, 3730 Beagle XM, 3530 Beagle, 3517EVM, CM-T3517: {dmic,mcpdm} lookup failure
+  - Cause unknown
+  - These IP blocks don't exist on OMAP3xxx/AM35xx chips
+
+* 3730 Beagle XM, am335xbone, CM-T3517: uart4_rx.uart4_rx mux failure
+  - Cause unknown
+
+PM tests:
+
+* 2430sdp: power domains not entering retention
+  - Cause unknown
+
+* 3730 Beagle XM: does not serial wake from off-idle suspend when console
+  UART doesn't clock-gate ("debug ignore_loglevel")
+  - Cause unknown
+  - Not yet part of the automated test suite
+  - Re-tested at v3.7; still failing:
+    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
+
+* 4430es2panda: pwrdm state mismatch on CAM, DSS
+
+* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
+  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
+    per discussion with Tero Kristo
+  - Likely dependent on the bootloader version
+    - fails with 2012.07-00136-g755de79
+  - http://marc.info/?l=linux-arm-kernel&m=136432340618226&w=2
+
+* 4430es2panda: MPU, ABE didn't enter target state
+  - New for v3.10-rc
+
+* 4460pandaes: pwrdm state mismatch on DSS, ABE, IVAHD, TESLA
+
+* 4460pandaes: chip not entering retention in dynamic idle
+  - Presumably 4430es2panda also fails this
+  - Suspend-to-RAM enters full chip retention
+
+Other:
+
+* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
+  - Unknown cause; could be due to the lack of hierarchical enable/disable
+    in hwmod code
+  - Jon Hunter and Santosh Shilimkar report this does not appear with
+    the same X-loader/bootloader on his 4430ES2.3 Panda, so could be
+    ES-level dependent
+
+Failing tests: reported by others 
+---------------------------------
+
+- RTC wakeup from suspend broken on 3730beaglexm
+  - as of v3.10-rc1
+  - discussion here: http://marc.info/?l=linux-omap&m=136915841625434&w=2
+
+
+vmlinux object size
+(delta in bytes from test_v3.10-rc3 
+(e4aa937ec75df0eea0bee03bffa3303ad36c986b)):
+   text     data      bss    total  kernel
+   -328        0        0     -328  am33xx_only
+    +64        0        0      +64  n800_multi_omap2xxx
+    +32        0        0      +32  n800_only_a
+   -512        0        0     -512  omap1_defconfig
+   -512        0        0     -512  omap1_defconfig_1510innovator_only
+   -512        0        0     -512  omap1_defconfig_5912osk_only
+   -328        0        0     -328  omap2plus_defconfig
+   -376        0        0     -376  omap2plus_defconfig_2430sdp_only
+   -328        0        0     -328  omap2plus_defconfig_cpupm
+   -328        0        0     -328  omap2plus_defconfig_no_pm
+   -328        0        0     -328  omap2plus_defconfig_omap2_4_only
+   -328        0        0     -328  omap2plus_defconfig_omap3_4_only
+   -384        0        0     -384  rmk_omap3430_ldp_allnoconfig
+    +79      +16        0      +95  rmk_omap3430_ldp_oldconfig
+   -384        0        0     -384  rmk_omap4430_sdp_allnoconfig
+   +115      -16        0      +99  rmk_omap4430_sdp_oldconfig
