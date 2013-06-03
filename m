@@ -1,48 +1,84 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 03 Jun 2013 09:44:42 -0600
-Subject: [PATCH] spi: sirf: avoid uninitialized-use warning
-In-Reply-To: <2423840.pM7qIRtGlE@wuerfel>
-References: <2423840.pM7qIRtGlE@wuerfel>
-Message-ID: <51ACB9EA.2030807@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 03 Jun 2013 17:49:54 +0200
+Subject: [PATCH 21/21] clk: ux500: Supply provider look-up functionality
+ to support Device Tree
+In-Reply-To: <1370266965-7901-22-git-send-email-lee.jones@linaro.org>
+References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
+ <1370266965-7901-22-git-send-email-lee.jones@linaro.org>
+Message-ID: <2458719.gboIs9CIQE@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 07:24 AM, Arnd Bergmann wrote:
-> 24778be20 "spi: convert drivers to use bits_per_word_mask"
-> removed the "default" statement in the spi_sirfsoc_setup_transfer
-> switch, causing a new warning:
-> 
-> drivers/spi/spi-sirf.c: In function 'spi_sirfsoc_setup_transfer':
-> arch/arm/include/asm/io.h:90:2: warning: 'rxfifo_ctrl' may be used uninitialized in this function [-Wmaybe-uninitialized]
->   asm volatile("str %1, %0"
->   ^
-> drivers/spi/spi-sirf.c:364:19: note: 'rxfifo_ctrl' was declared here
->   u32 txfifo_ctrl, rxfifo_ctrl;
->                    ^
-> 
-> The compiler has correctly identified that this case may happen,
-> but since we know that things are horribly broken if bits_per_word
-> is ever something other than the values we tested, calling BUG()
-> is an appropriate action and tells the compiler that execution
-> will not continue afterwards.
+On Monday 03 June 2013 14:42:45 Lee Jones wrote:
+> In this patch we're populating a clk_data array, one clock per element to
+> act as a clk look-up using indexes supplied from Device Tree.
 
-I guess this is fine, although BUG() seems a little scary, even though
-it is a bug.
+This is the first time I actually take a closer look at clock bindings.
+It feels odd to have a single index when you have multiple clock
+providers in hardware.
 
-In some of the other drivers, I converted:
+> +struct clk *clks[CLK_MAX];
+> +
+> +const static struct of_device_id u8500_clk_of_match[] = {
+> +	{ .compatible = "stericsson,u8500-clk", },
+> +	{ },
+> +};
 
-if () {
-} else if () {
-} else {
-    error
-}
+>From the code in drivers/clk/ux500, I would have expected two separate
+clock nodes: the prcmu and the prcc, each with their own number
+space.
 
-... to:
+>  void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+>  		    u32 clkrst5_base, u32 clkrst6_base)
+>  {
+>  	struct prcmu_fw_version *fw_version;
+>  	const char *sgaclk_parent = NULL;
+> +	static struct clk_onecell_data clk_data;
+> +	struct device_node *np = NULL;
+>  	struct clk *clk;
+>  
+>  	/* Clock sources */
+>  	clk = clk_reg_prcmu_gate("soc0_pll", NULL, PRCMU_PLLSOC0,
+>  				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
+>  	clk_register_clkdev(clk, "soc0_pll", NULL);
+> +	clks[soc0_pll] = clk;
+>  
+>  	clk = clk_reg_prcmu_gate("soc1_pll", NULL, PRCMU_PLLSOC1,
+>  				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
+>  	clk_register_clkdev(clk, "soc1_pll", NULL);
+> +	clks[soc1_pll] = clk;
+>  
+>  	clk = clk_reg_prcmu_gate("ddr_pll", NULL, PRCMU_PLLDDR,
+>  				CLK_IS_ROOT|CLK_IGNORE_UNUSED);
+>  	clk_register_clkdev(clk, "ddr_pll", NULL);
+> +	clks[ddr_pll] = clk;
 
-if () {
-} else {
-}
+It seems the actual numbers for the PCRMU clocks are defined
+in drivers/mfd/dbx500-prcmu-regs.h, at PRCM_ACLK_MGT through
+PRCM_MSP1CLK_MGT, where each clock has its own register.
 
-... the equivalent of which would be to just add a "default:" to, say,
-the 8-bpw case in the switch. But I guess I don't feel too strongly
-either way.
+> @@ -218,106 +296,130 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
+>  	clk = clk_reg_prcc_pclk("p1_pclk0", "per1clk", clkrst1_base,
+>  				BIT(0), 0);
+>  	clk_register_clkdev(clk, "apb_pclk", "uart0");
+> +	clks[uart0] = clk;
+>  
+>  	clk = clk_reg_prcc_pclk("p1_pclk1", "per1clk", clkrst1_base,
+>  				BIT(1), 0);
+>  	clk_register_clkdev(clk, "apb_pclk", "uart1");
+> +	clks[uart1] = clk;
+>  
+>  	clk = clk_reg_prcc_pclk("p1_pclk2", "per1clk", clkrst1_base,
+>  				BIT(2), 0);
+>  	clk_register_clkdev(clk, "apb_pclk", "nmk-i2c.1");
+> +	clks[nmk_i2c1] = clk;
+
+The prcc clocks are inherently numbered, there is a set of six
+registers with 8 bits each, so the number you use can simply
+be the index from 0 to 48, or use #clock-cells=<2> and pass both.
+Using the same numbers as the hardware in the binding is much less
+ambiguous than making up your own number space that you have to
+then document in the binding and update every time a new chip
+gets released.
+
+	Arnd
