@@ -1,70 +1,27 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 3 Jun 2013 14:06:27 -0700
-Subject: [PATCH v3 0/6] Add generic set_rate clk_ops for PLL35xx and
- PLL36xx for samsung SoCs
-In-Reply-To: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
-References: <1370003496-19288-1-git-send-email-vikas.sajjan@linaro.org>
-Message-ID: <CAD=FV=X_ZnqFiduxYYkXT9Qyu_ton962S5uDQFQUP_Q5VQULYA@mail.gmail.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Mon, 3 Jun 2013 23:07:21 +0200
+Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
+In-Reply-To: <20130603191730.GR3803@titan.lakedaemon.net>
+References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130603171017.GN18614@n2100.arm.linux.org.uk>
+ <20130603175629.GH5008@1wt.eu> <20130603181437.GO3803@titan.lakedaemon.net>
+ <20130603183057.GA9868@1wt.eu> <20130603184148.GQ3803@titan.lakedaemon.net>
+ <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
+ <20130603191730.GR3803@titan.lakedaemon.net>
+Message-ID: <20130603210721.GC9868@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vikas,
+On Mon, Jun 03, 2013 at 03:17:31PM -0400, Jason Cooper wrote:
+> > Or some board specific code could dig them out of the flash.  That at 
+> > least would make this hack localized while keeping the common code 
+> > clean.
+> 
+> If it comes to that, I think I would rather tell users to put the mac
+> address on the commandline.
 
-On Fri, May 31, 2013 at 5:31 AM, Vikas Sajjan <vikas.sajjan@linaro.org> wrote:
-> This patch series does the following:
->
->  1) Factors out possible common code, unifies the clk strutures used
->     for PLL35xx & PLL36xx and usues clk->base instead of clk->con0
->
->  2) Defines a common rate_table which will contain recommended p, m, s and k
->     values for supported rates that needs to be changed for changing
->     corresponding PLL's rate
->
->  3) Adds set_rate() and round_rate() clk_ops for PLL35xx and PLL36xx
->
-> changes since v2:
->         - Added new patch to reorder the MUX registration for mout_vpllsrc MUX
->         before the PLL registrations. And to add the alias for the mout_vpllsrc MUX.
->         - Added a check to confirm parent rate while registrating the PLL
->         rate tables.
->
-> changes since v1:
->         - removed sorting and bsearch
->         - modified the definition of struct "samsung_pll_rate_table"
->         - added generic round_rate()
->         - rectified the ops assignment for "rate table passed as NULL"
->           during PLL registration
->
-> Is rebased on branch kgene's "for-next"
-> https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
->
-> And tested these patch on chromebook for EPLL settings for Audio on our chrome tree.
->
->
-> Vikas Sajjan (3):
->   clk: samsung: Add set_rate() clk_ops for PLL36xx
->   clk: samsung: Add alias for mout_vpllsrc and reorder MUX registration
->     for it
->   clk: samsung: Add EPLL and VPLL freq table for exynos5250 SoC
->
-> Yadwinder Singh Brar (3):
->   clk: samsung: Use clk->base instead of directly using clk->con0 for
->     PLL3xxx
->   clk: samsung: Add support to register rate_table for PLL3xxx
->   clk: samsung: Add set_rate() clk_ops for PLL35xx
->
->  drivers/clk/samsung/clk-exynos4.c    |   10 +-
->  drivers/clk/samsung/clk-exynos5250.c |   69 +++++++++--
->  drivers/clk/samsung/clk-pll.c        |  226 ++++++++++++++++++++++++++++++----
->  drivers/clk/samsung/clk-pll.h        |   35 +++++-
->  drivers/clk/samsung/clk.h            |    2 +
->  5 files changed, 300 insertions(+), 42 deletions(-)
+Yes, I think that's the least annoying solution for the end user. We
+could even have the driver complain and explain to the user what to
+do when it has to generate a random MAC address.
 
-I'm hoping that we'll see a v4 of this series after you and Tomasz
-figure out what to do about the fin_pll issue.  Ideally you can pick
-up the little tweaks I added before landing this series in kernel-next
-for ChromeOS (if you are OK with them, that is).
-
-Thanks!
-
--Doug
+Willy
