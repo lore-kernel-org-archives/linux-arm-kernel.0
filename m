@@ -1,43 +1,36 @@
-From: marc.ceeeee@gmail.com (Marc C)
-Date: Mon, 3 Jun 2013 16:35:59 -0700
-Subject: [RFC PATCH] ARM: update legacy CPU ID in decompressor cache support
- jump table
-Message-ID: <CAO1A-8AaWyp6eq7c5nkU=KBxwrm1CM3erXcsxLmYpCn2mHhMUA@mail.gmail.com>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Mon, 3 Jun 2013 16:46:09 -0700
+Subject: [PATCH V4 2/4] clk: samsung: register audio subsystem clocks
+ using common clock framework
+In-Reply-To: <CAD=FV=XOfi=BsaF+-96SqKwyiwP9h0h3MCJxJ+qWNKaGoP=CcA@mail.gmail.com>
+References: <1370236744-16802-1-git-send-email-padma.v@samsung.com>
+ <1370236744-16802-3-git-send-email-padma.v@samsung.com>
+ <CAD=FV=XOfi=BsaF+-96SqKwyiwP9h0h3MCJxJ+qWNKaGoP=CcA@mail.gmail.com>
+Message-ID: <CAL1qeaEkomoDQPyGqqLL-WzoLS=nND-eXeRAGD2HpoV6WW3yRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+>> +static unsigned long reg_save[][2] = {
+>> +       {ASS_CLK_SRC,  0},
+>> +       {ASS_CLK_DIV,  0},
+>> +       {ASS_CLK_GATE, 0},
+>> +};
+>> +
+>> +/* list of all parent clock list */
+>> +static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
+>
+> I think this is supposed to be "xxti" which might or might not be
+> "fin_pll".  In the exynos4 code these are two different clocks that
+> are chosen by OM[0].  I'd bet that 99% of the time they are the same,
+> but it seems better to use "xxti".
 
-The following is a formal RFC PATCH for the suggestion offered by rmk
-in this thread:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-January/007871.html
+OM[0] also appears to mux the input here between "xxti" and "xusbxti"
+as well.  So this should probably remain "fin_pll".
 
-The previous mask values for the legacy ARM CPU IDs were conflicting
-with the CPU ID assignments for late-generation CPUs (like the
-Qualcomm MSM/QSD or Broadcom Brahma-15 processors). This change
-corrects the legacy ARM CPU ID value so that the jump table can
-fall-through to the appropriate cache maintenance / MMU functions.
+> At the moment the 5250 code doesn't expose "xxti".  It probably
+> should.  Andrew (CCed) is looking at this.
 
-To: linux-arm-kernel at lists.infradead.org
-Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
----
- arch/arm/boot/compressed/head.S |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Yes, xxti is used directly elsewhere (SPI and UART, from what I can
+tell), but not here.
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index fe4d9c3..a1b9e83 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -805,8 +805,8 @@ call_cache_fn:      adr     r12, proc_types
-                .align  2
-                .type   proc_types,#object
- proc_types:
--               .word   0x00000000              @ old ARM ID
--               .word   0x0000f000
-+               .word   0x41000000              @ old ARM ID
-+               .word   0xff00f000
-                mov     pc, lr
-  THUMB(                nop                             )
-                mov     pc, lr
---
-1.7.6
+-Andrew
