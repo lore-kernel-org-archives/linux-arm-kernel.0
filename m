@@ -1,38 +1,17 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Jun 2013 14:26:09 -0400
+From: w@1wt.eu (Willy Tarreau)
+Date: Mon, 3 Jun 2013 20:30:57 +0200
 Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
 In-Reply-To: <20130603181437.GO3803@titan.lakedaemon.net>
 References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <20130603171017.GN18614@n2100.arm.linux.org.uk>
- <20130603175629.GH5008@1wt.eu>
- <20130603181437.GO3803@titan.lakedaemon.net>
-Message-ID: <20130603182608.GP3803@titan.lakedaemon.net>
+ <20130603175629.GH5008@1wt.eu> <20130603181437.GO3803@titan.lakedaemon.net>
+Message-ID: <20130603183057.GA9868@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Jason,
+
 On Mon, Jun 03, 2013 at 02:14:37PM -0400, Jason Cooper wrote:
-> On Mon, Jun 03, 2013 at 07:56:29PM +0200, Willy Tarreau wrote:
-> > Hi Russell,
-> > 
-> > On Mon, Jun 03, 2013 at 06:10:18PM +0100, Russell King - ARM Linux wrote:
-> > > You know, my reaction to this is to nack it because:
-> > > 
-> > > (a) Marvell didn't talk to me about adding a new tag.
-> > > (b) There is an established precident that we do not pass MAC addresses
-> > >     to the kernel in this way (such attempts have been rejected in the
-> > >     past.)
-> > > (c) It goes completely against the design spirit of ATAGs by combining
-> > >     many different types and instances of information into one tag.
-> > > (d) It picks a tag ID without understanding how tag IDs are allocated.
-> > >     (the idea is 0x41NNNNVV where NNNN = machine ID for machine specific
-> > >     tags.)
-> > > 
-> > > Everyone who has gone around extending ATAG stuff has made exactly the
-> > > same mistakes time and time again - mostly stemming from the fact that
-> > > no one wants to talk to me up front.
-> > > 
-> > > So, this is another NACK.
-> > 
 > > I understand your points, but then what could we do to get our devices
 > > to have properly working ethernet interfaces ? These devices have already
 > > been sold, and from what I've seen they've been using this ID since at
@@ -53,10 +32,17 @@ On Mon, Jun 03, 2013 at 02:14:37PM -0400, Jason Cooper wrote:
 > 
 > The discussion following that patch should give you some good ideas.
 
-Gah, here's the direct link to the patch:
+I remember this discussion, but it is different and does not apply here.
+Sebastian fixed an issue with a properly configured NIC which used to
+lose its MAC, so the solution consisted in saving it early in the DT.
 
-https://lkml.org/lkml/2013/5/22/541
+In the mv_neta case, the NICs are not configured yet and we need to
+find the MAC somewhere. I only found it in the ATAGs and nowhere else.
+Well, in fact u-boot sets it on the MAC used to boot from the network
+if such a boot is performed, but that's all. So in practice you boot
+without the MAC address anywhere but in the ATAGs. I'd be happy to
+find a way to parse non-standard atags in a board-specific file but
+they're lost early it seems :-(
 
-hth,
-
-Jason.
+Thanks,
+Willy
