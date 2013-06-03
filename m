@@ -1,83 +1,60 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 03 Jun 2013 20:52:00 +0400
-Subject: [PATCH] net: mvneta: read MAC address from hardware when available
-In-Reply-To: <1370277707-2468-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370277707-2468-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <51ACC9B0.2050201@cogentembedded.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon,  3 Jun 2013 17:52:55 +0100
+Subject: [PATCH] ARM: spinlock: retry trylock operation if strex fails on free
+ lock
+Message-ID: <1370278375-13171-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+An exclusive store instruction may fail for reasons other than lock
+contention (e.g. a cache eviction during the critical section) so, in
+line with other architectures using similar exclusive instructions
+(alpha, mips, powerpc), retry the trylock operation if the lock appears
+to be free but the strex reported failure.
 
-On 06/03/2013 08:41 PM, Thomas Petazzoni wrote:
+Reported-by: Tony Thompson <anthony.thompson@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/spinlock.h | 25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
 
-> This patch improves the logic used by the mvneta driver to find a MAC
-> address for a particular interface. Until now, it was only looking at
-> the Device Tree, and if no address was found, was falling back to
-> generating a random MAC address.
->
-> This patch adds the intermediate solution of reading the MAC address
-> from the hardware registers, in case it has been set by the
-> bootloader. So the order is now:
->
->   1) MAC address from the Device Tree
->   2) MAC address from the hardware registers
->   3) Random MAC address
->
-> This requires moving the MAC address initialization a little bit later
-> in the ->probe() code, because it now requires the hardware registers
-> to be remapped.
->
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->   drivers/net/ethernet/marvell/mvneta.c | 35 +++++++++++++++++++++++++++--------
->   1 file changed, 27 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/net/ethernet/marvell/mvneta.c b/drivers/net/ethernet/marvell/mvneta.c
-> index c966785..8c05cc5 100644
-> --- a/drivers/net/ethernet/marvell/mvneta.c
-> +++ b/drivers/net/ethernet/marvell/mvneta.c
-> @@ -2251,6 +2251,20 @@ static int mvneta_change_mtu(struct net_device *dev, int mtu)
->   	return 0;
->   }
->   
-> +/* Get mac address */
-> +static void mvneta_get_mac_addr(struct mvneta_port *pp, unsigned char *addr)
-> +{
-> +	u32 mac_addr_l, mac_addr_h;
-
-    Empty line wouldn't hurt here, after declaration.
-
-> +	mac_addr_l = mvreg_read(pp, MVNETA_MAC_ADDR_LOW);
-> +	mac_addr_h = mvreg_read(pp, MVNETA_MAC_ADDR_HIGH);
-> +	addr[0] = (mac_addr_h >> 24) & 0xFF;
-> +	addr[1] = (mac_addr_h >> 16) & 0xFF;
-> +	addr[2] = (mac_addr_h >> 8) & 0xFF;
-> +	addr[3] = mac_addr_h & 0xFF;
-> +	addr[4] = (mac_addr_l >> 8) & 0xFF;
-> +	addr[5] = mac_addr_l & 0xFF;
-> +}
-> +
->   /* Handle setting mac address */
->   static int mvneta_set_mac_addr(struct net_device *dev, void *addr)
->   {
->   
-[...]
-> @@ -2740,6 +2748,17 @@ static int mvneta_probe(struct platform_device *pdev)
->   
->   	clk_prepare_enable(pp->clk);
->   
-> +	dt_mac_addr = of_get_mac_address(dn);
-> +	if (dt_mac_addr && is_valid_ether_addr(dt_mac_addr))
-> +		memcpy(dev->dev_addr, dt_mac_addr, ETH_ALEN);
-> +	else {
-> +		mvneta_get_mac_addr(pp, hw_mac_addr);
-> +		if (is_valid_ether_addr(hw_mac_addr))
-> +			memcpy(dev->dev_addr, hw_mac_addr, ETH_ALEN);
-> +		else
-> +			eth_hw_addr_random(dev);
-> +	}
-
-    {} should be on both arms of the *if* statement.
-
-WBR, Sergei
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index 6220e9f..f8b8965 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -97,19 +97,22 @@ static inline void arch_spin_lock(arch_spinlock_t *lock)
+ 
+ static inline int arch_spin_trylock(arch_spinlock_t *lock)
+ {
+-	unsigned long tmp;
++	unsigned long contended, res;
+ 	u32 slock;
+ 
+-	__asm__ __volatile__(
+-"	ldrex	%0, [%2]\n"
+-"	subs	%1, %0, %0, ror #16\n"
+-"	addeq	%0, %0, %3\n"
+-"	strexeq	%1, %0, [%2]"
+-	: "=&r" (slock), "=&r" (tmp)
+-	: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
+-	: "cc");
+-
+-	if (tmp == 0) {
++	do {
++		__asm__ __volatile__(
++		"	ldrex	%0, [%3]\n"
++		"	mov	%2, #0\n"
++		"	subs	%1, %0, %0, ror #16\n"
++		"	addeq	%0, %0, %4\n"
++		"	strexeq	%2, %0, [%3]"
++		: "=&r" (slock), "=&r" (contended), "=r" (res)
++		: "r" (&lock->slock), "I" (1 << TICKET_SHIFT)
++		: "cc");
++	} while (res);
++
++	if (!contended) {
+ 		smp_mb();
+ 		return 1;
+ 	} else {
+-- 
+1.8.2.2
