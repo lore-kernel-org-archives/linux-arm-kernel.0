@@ -1,40 +1,43 @@
-From: philippe.retornaz@epfl.ch (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
-Date: Mon, 03 Jun 2013 18:35:24 +0200
-Subject: [PATCH 1/3] leds: leds-mc13783: Prepare driver to support MC13892
- LEDs
-In-Reply-To: <1370273916-29852-1-git-send-email-shc_work@mail.ru>
-References: <1370273916-29852-1-git-send-email-shc_work@mail.ru>
-Message-ID: <51ACC5CC.3000700@epfl.ch>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Mon, 3 Jun 2013 17:37:35 +0100
+Subject: [Xen-devel] [PATCH v2 5/5] arm64/xen: introduce CONFIG_XEN and
+ hypercall.S on ARM64
+In-Reply-To: <20130603162517.GC32295@arm.com>
+References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
+ <1370273624-26976-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130603162517.GC32295@arm.com>
+Message-ID: <1370277455.24512.46.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon, 2013-06-03 at 17:25 +0100, Catalin Marinas wrote:
+> On Mon, Jun 03, 2013 at 04:33:44PM +0100, Stefano Stabellini wrote:
+> > --- /dev/null
+> > +++ b/arch/arm64/xen/hypercall.S
+> ...
+> > +/*
+> > + * The Xen hypercall calling convention is very similar to the ARM AEBI
+> > + * procedure calling convention: the first paramter is passed in x0, the
+> > + * second in x1, the third in x2 and the fourth in x3. Considering that
+> > + * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
 
-> @@ -341,51 +362,55 @@ static int mc13783_led_probe(struct platform_device *pdev)
->
->   err_register:
->   	for (i = i - 1; i >= 0; i--) {
-> -		led_classdev_unregister(&led[i].cdev);
->   		cancel_work_sync(&led[i].work);
-> +		led_classdev_unregister(&led[i].cdev);
->   	}
->
->   	return ret;
->   }
->
-> +static int mc13xxx_led_remove(struct platform_device *pdev)
-(..)
->
->   	for (i = 0; i < pdata->num_leds; i++) {
-> -		led_classdev_unregister(&led[i].cdev);
->   		cancel_work_sync(&led[i].work);
-> +		led_classdev_unregister(&led[i].cdev);
->   	}
->
+                                                          parameter
 
+> > + * in rx, differently from the procedure calling convention of using the
 
-Why changing the order ?
+          ^x4 not rx
 
-Thanks,
+> > + * stack for that case.
+> 
+> You may want to use the AArch64 ABI here where parameters are passed in
+> x0-x7, return in x0.
 
-Philippe
+I think that is actually what we are doing (up to 5 arguments), the
+"Considering that ..." bit at the end is a left over of the 32 bit
+version I think.
+
+> 
+> BTW, I think it's missing a MAINTAINERS file update.
+> 
+> Otherwise, the series looks good. How do you plan to upstream this?
+> 
