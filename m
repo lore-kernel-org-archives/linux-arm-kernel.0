@@ -1,42 +1,81 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 3 Jun 2013 11:18:09 +0100
-Subject: A bug about system call on ARM
-In-Reply-To: <20130530114112.GH7483@mudshark.cambridge.arm.com>
-References: <35FD53F367049845BC99AC72306C23D1610991B85B@CNBJMBX05.corpusers.net>
- <CAFLxGvy39xWdZmtiVHP+y=zH1coCVmMuREcmD25wSb=w-VK7Xg@mail.gmail.com>
- <35FD53F367049845BC99AC72306C23D1610991B85D@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B85E@CNBJMBX05.corpusers.net>
- <CAFLxGvyy=73dGQqG8W6SXZah7WQZ4gJAeeHXN8opKaOuG-5yUQ@mail.gmail.com>
- <20130529094826.GD13095@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
- <20130530090949.GC7483@mudshark.cambridge.arm.com>
- <20130530114112.GH7483@mudshark.cambridge.arm.com>
-Message-ID: <20130603101809.GK18614@n2100.arm.linux.org.uk>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Mon, 03 Jun 2013 18:19:37 +0800
+Subject: [PATCH v2] arch: arm: plat-samsung: dependency, S5P_SLEEP depends
+ on ARM_CPU_SUSPEND
+In-Reply-To: <51A9E8A0.3050906@gmail.com>
+References: <5199E4AF.7040607@asianux.com> <51A32FD4.4000001@asianux.com>
+ <158201ce5ac2$a7843de0$f68cb9a0$%kim@samsung.com>
+ <51A33A53.1050502@asianux.com> <51A33C1F.3000804@asianux.com>
+ <51A9E8A0.3050906@gmail.com>
+Message-ID: <51AC6DB9.1080407@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 12:41:12PM +0100, Will Deacon wrote:
-> +#if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
-> +	/*
-> +	 * We may have faulted trying to load the SWI instruction due to
-> +	 * concurrent page aging on another CPU. In this case, return
-> +	 * back to the swi instruction and fault the page back.
-> +	 */
-> +9001:
-> +	sub	lr, lr, #4
-> +	str	lr, [sp, #S_PC]
-> +	b	ret_fast_syscall
-> +#endif
+On 06/01/2013 08:27 PM, Sylwester Nawrocki wrote:
+> On 05/27/2013 12:57 PM, Chen Gang wrote:
+>>
+>> When randconfig with MMU for arm s5pv210 (and select all cpu type),
+>> need let S5P_SLEEP depend on ARM_CPU_SUSPEND, or will cause issue below:
+>>
+>>    arch/arm/plat-samsung/built-in.o: In function `s3c_cpu_resume':
+>>    arch/arm/plat-samsung/s5p-sleep.S:83: undefined reference to
+>> `cpu_resume'
+>>
+>>
+>> Signed-off-by: Chen Gang<gang.chen@asianux.com>
+>> ---
+>>   arch/arm/plat-samsung/Kconfig |    1 +
+>>   1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-samsung/Kconfig
+>> b/arch/arm/plat-samsung/Kconfig
+>> index f8ed2de..b388d93 100644
+>> --- a/arch/arm/plat-samsung/Kconfig
+>> +++ b/arch/arm/plat-samsung/Kconfig
+>> @@ -483,6 +483,7 @@ config S5P_PM
+>>
+>>   config S5P_SLEEP
+>>       bool
+>> +    select ARM_CPU_SUSPEND if PM
+>>       help
+>>         Internal config node to apply common S5P sleep management code.
+>>         Can be selected by S5P and newer SoCs with similar sleep
+>> procedure.
+> 
+> We have discussed this about two months ago [1] and the conclusion was
+> to also
+> remove "select ARM_CPU_SUSPEND if PM" line from
+> arch/arm/mach-exynos/Kconfig.
+> It is still unresolved then, I'm getting similar linker errors with
+> s3c2410_defconfig...
+> 
 
-The comment is wrong.  If we get here, it means that the fault from
-trying to loading the instruction can't be fixed up.  Arguably, that
-should result in a SIGSEGV being sent immediately, but we'll get to
-that when we then try to re-load the instruction.
+I do not think they are the same.
 
-What it means is that the page we were trying to execute has been
-unmapped beneath us.
+This patch says: S5P_SLEEP need ARM_CPU_SUSPEND, or can not pass
+compiling (S5P_SLEEP need some functions in ARM_CPU_SUSPEND).
 
-BTW, I notice that the kernel oops was never posted to the list, so it's
-impossible for other people following this thread to see what the real
-problem is...
+Your patch means PLAT_SAMSUNG need ARM_CPU_SUSPEND, but in fact,
+PLAT_SAMSUNG may not need ARM_CPU_SUSPEND.
+
+
+>   LD      init/built-in.o
+> arch/arm/mach-s3c24xx/built-in.o: In function `s3c_cpu_resume':
+> /home/snawrocki/linux/media_tree/arch/arm/mach-s3c24xx/sleep.S:83:
+> undefined reference to `cpu_resume'
+> arch/arm/plat-samsung/built-in.o: In function `s3c_pm_enter':
+> /home/snawrocki/linux/media_tree/arch/arm/plat-samsung/pm.c:305:
+> undefined reference to `cpu_suspend'
+> make: *** [vmlinux] Error 1
+> 
+> 
+
+I guess, this error output means S5P_SLEEP and PM need ARM_CPU_SUSPEND
+(which has the implementation of 'cpu_resume' and 'cpu_suspend')
+
+
+Thanks.
+-- 
+Chen Gang
+
+Asianux Corporation
