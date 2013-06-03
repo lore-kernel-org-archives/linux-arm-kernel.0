@@ -1,40 +1,65 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 03 Jun 2013 18:41:08 +0900
-Subject: [PATCHv6 00/11] Remove ARM local timer API
-In-Reply-To: <51AC59AB.4080802@arm.com>
-References: <1368473175-4841-1-git-send-email-sboyd@codeaurora.org>
- <20130531174526.GD599@codeaurora.org> <51A8E71D.1000407@linaro.org>
- <20130531221633.GG599@codeaurora.org> <51AC59AB.4080802@arm.com>
-Message-ID: <049801ce603e$79aad240$6d0076c0$%kim@samsung.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 3 Jun 2013 17:41:34 +0800
+Subject: [PATCH v1 1/2] ARM:prima2: move sirfsoc_of_rstc_init to
+ .init_early
+In-Reply-To: <51AC5827.4040801@st.com>
+References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
+ <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
+ <CAGsJ_4xqGZVL7ZsYx1gpeUVoQan4hn=05_v51Kar78Vdkz0hig@mail.gmail.com>
+ <51AC5827.4040801@st.com>
+Message-ID: <CAGsJ_4wEvAeUy3gLkBCoYPAMmbQEsxT0wLDcA4-aELnRx0ivag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Zyngier wrote:
-> 
-> On 31/05/13 23:16, Stephen Boyd wrote:
-> > On 05/31, John Stultz wrote:
-> >> On 05/31/2013 10:45 AM, Stephen Boyd wrote:
-> >>> Comments have been light for this round so I think we're about
-> >>> ready to merge. John/Thomas, can you pick up these patches or
-> >>> shall I route them through arm-soc or something else?
-> >>
-> >>
-> >> So there looks to be a fair amount of additions in the ARM tree, do
-> >> those already have acks from Arnd/Olof/other folks? (I think I was
-> >> only cc'ed on the first two patches).
-> >
-> > I'm still missing acks from Kukjin and Barry.
-> 
-Stephen, I replied on exynos stuff in this series.
+hi Srinivas,
 
-> I don't think that should hold off the patch series. It's been tested on
-> most other platforms over the course of several months. If the platform
-> maintainers aren't responsive enough, fixing the issues becomes their
-> problem.
-> 
-Marc, I understand what you're saying. Let me look at the regarding exynos
-stuff carefully.
+2013/6/3 Srinivas KANDAGATLA <srinivas.kandagatla@st.com>:
+> Hi Barry,
+> Thanks for testing,
+> I think this patch introduced a sequencing issue.
+>
+> Just re-looking at the code, is there any reason for this to be
+> init_earlycall? And do a ioremap at that early stage?
+>
+> Can't we move it to device_init level function "sirfsoc_mach_init()" at
+> which it will be safe to do a ioremap with all mm setup finished?
+>
 
-Thanks.
+i think it is ok as actually we wanted the reset controller module
+ready before any users need it. the users include gps, graphics, usb
+and some other peripheral drivers.
+now they are actually initialized after init_machine().
 
-- Kukjin
+>
+> Thanks,
+> srini
+>
+> On 03/06/13 03:19, Barry Song wrote:
+>> this broke SiRF by:
+>> Uncompressing Linux... done, booting the kernel.
+>> [    0.000000] Booting Linux on physical CPU 0x0
+>> [    0.000000] Linux version 3.10.0-rc2-00723-gd1a0472-dirty
+>> (barry at barry-laptop) (gcc version 4.5.4 20110505 (prerelease)
+>> (Ubuntu/Linaro 4.5-2011.5-csr-build) ) #35 SMP PREEMPT Mon Jun 3
+>> 09:51:59 CST 2013
+>> [    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
+>> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
+>> instruction cache
+>> [    0.000000] Machine: Generic ATLAS6 (Flattened Device Tree), model:
+>> CSR SiRFatlas6 Evaluation Board
+>> [    0.000000] bootconsole [earlycon0] enabled
+>> [    0.000000] Memory policy: ECC disabled, Data cache writealloc
+>> [    0.000000] Unable to handle kernel NULL pointer dereference at
+>> virtual address 00000000
+>> [    0.000000] pgd = c0004000
+>> [    0.000000] [00000000] *pgd=00000000
+>> [    0.000000] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+>> [    0.000000] Modules linked in:
+>> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
+>> 3.10.0-rc2-00723-gd1a0472-dirty #35
+>> [    0.000000] task: c05cfb40 ti: c05c4000 task.ti: c05c4000
+>> [    0.000000] PC is at kmem_cache_alloc+0x2c/0x124
+>> [    0.000000] LR is at __get_vm_area_node.clone.26+0x7c/0x190
+>
+
+-barry
