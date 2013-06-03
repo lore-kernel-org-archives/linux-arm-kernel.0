@@ -1,115 +1,18 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Mon,  3 Jun 2013 21:21:11 +0530
-Subject: [PATCH] arm64: Add support to pass earlyprintk argument via device
- tree
-Message-ID: <1370274671-23812-1-git-send-email-pranavkumar@linaro.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 3 Jun 2013 12:01:36 -0400 (EDT)
+Subject: [PATCH V3 2/2] USB: OHCI: add a name for the platform-private
+ field
+In-Reply-To: <1370272569-463-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306031201140.1304-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for defining and passing earlyprintk
-related information i.e. device and address information via
-device tree by adding it inside "chosen" node.
+On Mon, 3 Jun 2013, Manjunath Goudar wrote:
 
-This will help user to just specify "earlyprintk" from bootargs
-without actually knowing the address and device to enable
-earlyprintk.
+> This patch adds an ohci->priv field for private use by OHCI
+> platform drivers.
+> 
+> Until now none of the platform drivers has used this private space,
+> but that's about to change in the next patch of this series.
 
-Mechanism:
-
-One can just append earlyprintk=device-type,address (same as we pass
-through command line) in "/chosen" node to notify kernel which is the
-earlyprintk device and what is its address.
-
-Backward Compatibility:
-
-This patch also allows existing method of specifying earlyprintk
-parameter via bootargs.
-
-Existing method i.e. passing via bootargs will still have precedence
-over device tree i.e. if one specifies earlyprintk=device-type,address
-in bootargs then kernel will use information from bootargs instead of
-device tree.
-
-If user just specifies earlyprintk (without =...) then kernel will
-look for device tree earlyprintk parameter.
-
-Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-Signed-off-by: Anup Patel <anup.patel@linaro.org>
----
- arch/arm64/kernel/early_printk.c |    7 +++++++
- arch/arm64/kernel/setup.c        |   21 ++++++++++++++++++++-
- 2 files changed, 27 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
-index fbb6e18..4e6f845 100644
---- a/arch/arm64/kernel/early_printk.c
-+++ b/arch/arm64/kernel/early_printk.c
-@@ -29,6 +29,8 @@
- static void __iomem *early_base;
- static void (*printch)(char ch);
- 
-+extern char *earlyprintk_dt_args;
-+
- /*
-  * PL011 single character TX.
-  */
-@@ -116,6 +118,11 @@ static int __init setup_early_printk(char *buf)
- 	phys_addr_t paddr = 0;
- 
- 	if (!buf) {
-+		/* Try to check if Device Tree has this argument or not ? */
-+		buf = earlyprintk_dt_args;
-+	}
-+
-+	if (!buf) {
- 		pr_warning("No earlyprintk arguments passed.\n");
- 		return 0;
- 	}
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 6a9a532..fb2d56f 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -60,6 +60,8 @@ EXPORT_SYMBOL(processor_id);
- unsigned int elf_hwcap __read_mostly;
- EXPORT_SYMBOL_GPL(elf_hwcap);
- 
-+char *earlyprintk_dt_args;
-+
- static const char *cpu_name;
- static const char *machine_name;
- phys_addr_t __fdt_pointer __initdata;
-@@ -122,6 +124,23 @@ static void __init setup_processor(void)
- 	elf_hwcap = 0;
- }
- 
-+int __init early_init_dt_scan_chosen_arm64(unsigned long node,
-+					   const char *uname,
-+					   int depth, void *data)
-+{
-+	char *prop;
-+
-+	/* Check if this is chosen node */
-+	if (early_init_dt_scan_chosen(node, uname, depth, data) == 0)
-+		return 0;
-+
-+	prop = of_get_flat_dt_prop(node, "earlyprintk", NULL);
-+	if (prop)
-+		earlyprintk_dt_args = prop;
-+
-+	return 1;
-+}
-+
- static void __init setup_machine_fdt(phys_addr_t dt_phys)
- {
- 	struct boot_param_header *devtree;
-@@ -165,7 +184,7 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
- 	pr_info("Machine: %s\n", machine_name);
- 
- 	/* Retrieve various information from the /chosen node */
--	of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
-+	of_scan_flat_dt(early_init_dt_scan_chosen_arm64, boot_command_line);
- 	/* Initialize {size,address}-cells info */
- 	of_scan_flat_dt(early_init_dt_scan_root, NULL);
- 	/* Setup memory, calling early_init_dt_add_memory_arch */
--- 
-1.7.9.5
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
