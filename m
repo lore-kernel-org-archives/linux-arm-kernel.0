@@ -1,52 +1,92 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Mon, 03 Jun 2013 09:47:35 +0100
-Subject: [PATCH v1 1/2] ARM:prima2: move sirfsoc_of_rstc_init to
- .init_early
-In-Reply-To: <CAGsJ_4xqGZVL7ZsYx1gpeUVoQan4hn=05_v51Kar78Vdkz0hig@mail.gmail.com>
-References: <1369993439-24216-1-git-send-email-srinivas.kandagatla@st.com>
- <1369993501-24309-1-git-send-email-srinivas.kandagatla@st.com>
- <CAGsJ_4xqGZVL7ZsYx1gpeUVoQan4hn=05_v51Kar78Vdkz0hig@mail.gmail.com>
-Message-ID: <51AC5827.4040801@st.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 3 Jun 2013 11:52:51 +0300
+Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
+In-Reply-To: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20130603085251.GQ11798@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Barry,
-Thanks for testing,
-I think this patch introduced a sequencing issue.
+Hi Stephen,
 
-Just re-looking at the code, is there any reason for this to be
-init_earlycall? And do a ioremap at that early stage?
+On Sat, Jun 01, 2013 at 11:39:37PM -0700, Stephen Boyd wrote:
+> This is mostly a resend of a patch series I sent a little over a month
+> ago. I've reordered the patches so that John can pick up the first three
+> and get a generic sched_clock layer without having to take the 64 bit
+> patches. The last three patches add 64 bit support and move the architected
+> timers on ARM64 and ARM to use it.
 
-Can't we move it to device_init level function "sirfsoc_mach_init()" at
-which it will be safe to do a ioremap with all mm setup finished?
+You can have my
 
+Build-tested-by: Baruch Siach <baruch@tkos.co.il>
 
-Thanks,
-srini
+for xtensa target, with the dw_apb_timer driver (no real hardware yet).
 
-On 03/06/13 03:19, Barry Song wrote:
-> this broke SiRF by:
-> Uncompressing Linux... done, booting the kernel.
-> [    0.000000] Booting Linux on physical CPU 0x0
-> [    0.000000] Linux version 3.10.0-rc2-00723-gd1a0472-dirty
-> (barry at barry-laptop) (gcc version 4.5.4 20110505 (prerelease)
-> (Ubuntu/Linaro 4.5-2011.5-csr-build) ) #35 SMP PREEMPT Mon Jun 3
-> 09:51:59 CST 2013
-> [    0.000000] CPU: ARMv7 Processor [413fc090] revision 0 (ARMv7), cr=10c53c7d
-> [    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing
-> instruction cache
-> [    0.000000] Machine: Generic ATLAS6 (Flattened Device Tree), model:
-> CSR SiRFatlas6 Evaluation Board
-> [    0.000000] bootconsole [earlycon0] enabled
-> [    0.000000] Memory policy: ECC disabled, Data cache writealloc
-> [    0.000000] Unable to handle kernel NULL pointer dereference at
-> virtual address 00000000
-> [    0.000000] pgd = c0004000
-> [    0.000000] [00000000] *pgd=00000000
-> [    0.000000] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
-> [    0.000000] Modules linked in:
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted
-> 3.10.0-rc2-00723-gd1a0472-dirty #35
-> [    0.000000] task: c05cfb40 ti: c05c4000 task.ti: c05c4000
-> [    0.000000] PC is at kmem_cache_alloc+0x2c/0x124
-> [    0.000000] LR is at __get_vm_area_node.clone.26+0x7c/0x190
+Thanks for pushing this series.
+
+baruch
+
+> Stephen Boyd (6):
+>   ARM: sched_clock: Remove unused needs_suspend member
+>   ARM: sched_clock: Return suspended count earlier
+>   sched_clock: Make ARM's sched_clock generic for all architectures
+>   sched_clock: Add support for >32 bit sched_clock
+>   ARM: arch_timer: Move to setup_sched_clock_64()
+>   arm64: Move to generic sched_clock infrastructure
+> 
+>  arch/arm/Kconfig                                   |   1 +
+>  arch/arm/common/timer-sp.c                         |   2 +-
+>  arch/arm/kernel/Makefile                           |   2 +-
+>  arch/arm/kernel/arch_timer.c                       |  16 +--
+>  arch/arm/kernel/time.c                             |   4 +-
+>  arch/arm/mach-davinci/time.c                       |   2 +-
+>  arch/arm/mach-imx/time.c                           |   2 +-
+>  arch/arm/mach-integrator/integrator_ap.c           |   2 +-
+>  arch/arm/mach-ixp4xx/common.c                      |   2 +-
+>  arch/arm/mach-mmp/time.c                           |   2 +-
+>  arch/arm/mach-msm/timer.c                          |   2 +-
+>  arch/arm/mach-omap1/time.c                         |   2 +-
+>  arch/arm/mach-omap2/timer.c                        |   2 +-
+>  arch/arm/mach-pxa/time.c                           |   2 +-
+>  arch/arm/mach-sa1100/time.c                        |   2 +-
+>  arch/arm/mach-u300/timer.c                         |   2 +-
+>  arch/arm/plat-iop/time.c                           |   2 +-
+>  arch/arm/plat-omap/counter_32k.c                   |   2 +-
+>  arch/arm/plat-orion/time.c                         |   2 +-
+>  arch/arm/plat-samsung/samsung-time.c               |   2 +-
+>  arch/arm/plat-versatile/sched-clock.c              |   2 +-
+>  arch/arm64/Kconfig                                 |   1 +
+>  arch/arm64/kernel/time.c                           |  11 +-
+>  drivers/clocksource/bcm2835_timer.c                |   2 +-
+>  drivers/clocksource/clksrc-dbx500-prcmu.c          |   3 +-
+>  drivers/clocksource/dw_apb_timer_of.c              |   2 +-
+>  drivers/clocksource/mxs_timer.c                    |   2 +-
+>  drivers/clocksource/nomadik-mtu.c                  |   2 +-
+>  drivers/clocksource/samsung_pwm_timer.c            |   2 +-
+>  drivers/clocksource/tegra20_timer.c                |   2 +-
+>  drivers/clocksource/time-armada-370-xp.c           |   2 +-
+>  drivers/clocksource/timer-marco.c                  |   2 +-
+>  drivers/clocksource/timer-prima2.c                 |   2 +-
+>  .../include/asm => include/linux}/sched_clock.h    |  14 ++-
+>  init/Kconfig                                       |   3 +
+>  init/main.c                                        |   2 +
+>  kernel/time/Makefile                               |   1 +
+>  {arch/arm/kernel => kernel/time}/sched_clock.c     | 114 +++++++++++++++------
+>  38 files changed, 132 insertions(+), 92 deletions(-)
+>  rename {arch/arm/include/asm => include/linux}/sched_clock.h (62%)
+>  rename {arch/arm/kernel => kernel/time}/sched_clock.c (74%)
+> 
+> -- 
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
