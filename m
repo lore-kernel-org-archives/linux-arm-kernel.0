@@ -1,36 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 3 Jun 2013 23:28:07 +0800
-Subject: [GIT PULL] ARM: mxs: fixes for 3.10
-Message-ID: <20130603152803.GB13853@S2101-09.ap.freescale.net>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 3 Jun 2013 23:28:37 +0800
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <20130517191753.468.1734.stgit@localhost>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191753.468.1734.stgit@localhost>
+Message-ID: <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+Hi,
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+On Sat, May 18, 2013 at 3:17 AM, Tony Lindgren <tony@atomide.com> wrote:
+> We can now boot with device tree. If you don't want to update u-boot,
+> you can boot with appended DTB with the following instructions:
+>
+> 1. Make sure you have the appended DTB support in .config
+>
+>    CONFIG_ARM_APPENDED_DTB=y
+>    CONFIG_ARM_ATAG_DTB_COMPAT=y
+>    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+>
+> 2. Build the zImage
+>
+>    $ ARCH=arm CROSS_COMPILE=... make zImage
+>
+> 3. Build the device tree blobs
+>
+>    $ ARCH=arm CROSS_COMPILE=... make dtbs
+>
+> 4. Append the correct panda dtb to zImage
+>
+>    Depending on your hardware it's omap4-panda.dtb, omap4-panda-a4.dtb
+>    or omap4-panda-es.dtb.
+>
+>    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-panda-es.dtb > /tmp/appended
+>
+> 5. Use mkimage to produce the appended device tree uImage
+>
+>    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
+>      -n "Linux" -d /tmp/appended /tmp/uImage
 
-are available in the git repository at:
+I followed the above steps and tried devicetree on Pandaboard against
+3.10.0-rc3-next-20130528, and the board will hang during boot, but works
+well with legacy mode.
 
-  git://git.linaro.org/people/shawnguo/linux-2.6.git tags/mxs-fixes-3.10
+         Hardware: Pandaboard A1
+         dtb: omap4-panda.dtb
 
-for you to fetch changes up to b5f83e9b069f4bf19214ca6130947806a2b853fa:
+See 'dmesg' on below link:
 
-  ARM: mxs: icoll: Fix interrupts gpio bank 0 (2013-06-03 23:18:15 +0800)
+         http://kernel.ubuntu.com/~ming/up/panda-dts.dmesg
 
-----------------------------------------------------------------
-The mxs fixes for 3.10:
 
-- Since the time we move to MULTI_IRQ_HANDLER, the 0x7f polling for no
-  interrupt in icoll_handle_irq() becomes insane, because 0x7f is an
-  valid interrupt number, the irq of gpio bank 0.  That unnecessary
-  polling results in the driver not detecting when irq 0x7f is active
-  which makes the machine effectively dead lock.  The fix removes the
-  interrupt poll loop and allows usage of gpio0 interrupt without an
-  infinite loop.
-
-----------------------------------------------------------------
-Markus Pargmann (1):
-      ARM: mxs: icoll: Fix interrupts gpio bank 0
-
- drivers/irqchip/irq-mxs.c |   14 ++++----------
- 1 file changed, 4 insertions(+), 10 deletions(-)
+Thanks,
+-- 
+Ming Lei
