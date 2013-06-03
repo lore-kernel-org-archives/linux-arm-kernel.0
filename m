@@ -1,76 +1,53 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 3 Jun 2013 13:42:10 -0400
-Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
-In-Reply-To: <20130603190954.3bd52784@skate>
-References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130603165753.GL3803@titan.lakedaemon.net>
- <20130603190954.3bd52784@skate>
-Message-ID: <20130603174210.GM3803@titan.lakedaemon.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon,  3 Jun 2013 10:53:08 -0700
+Subject: [PATCH RFC 1/3] clk: of: helper for determining number of parent
+ clocks
+In-Reply-To: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
+References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
+Message-ID: <1370281990-15090-2-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 07:09:54PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Mon, 3 Jun 2013 12:57:53 -0400, Jason Cooper wrote:
-> 
-> > Won't this override a user editing the 'local-mac-address' property in
-> > the dts?  Since we're dealing with appended dtbs, there's a higher
-> > probability of the user doing such a thing.
-> > 
-> > I'll admit it's a corner case, but I'd like to make sure we've thought
-> > through the use cases and aren't making things more complicated than
-> > necessary.
-> 
-> I don't have a strong opinion about this one, so if it's seen as being
-> necessary to preserve a potentially existing 'local-mac-address', then
-> I'll add the necessary checks to only update the property if it doesn't
-> already exist.
+Walks the "clocks" array of parent clock phandles and returns the
+number.
 
-hmmm, of_get_mac_address() give preferences to 'mac_address' and has the
-following comment:
+Signed-off-by: Mike Turquette <mturquette@linaro.org>
+---
+DT gurus, please let me know if this is stupid.  I am unfamiliar with
+parsing DT blobs and associated APIs.
 
-/**
- * Search the device tree for the best MAC address to use.
- * 'mac-address' is checked first, because that is supposed to contain
- * to "most recent" MAC address. If that isn't set, then
- * 'local-mac-address' is checked next, because that is the default
- * address.  If that isn't set, then the obsolete 'address' is checked,
- * just in case we're using an old device tree.
- *
- * Note that the 'address' property is supposed to contain a virtual
- * address of the register set, but some DTS files have redefined that
- * property to be the MAC address.
- *
- * All-zero MAC addresses are rejected, because those could be
- * properties that exist in the device tree, but were not set by U-Boot.
- * For example, the DTS could define 'mac-address' and
- * 'local-mac-address', with zero MAC addresses.  Some older U-Boots
- * only initialized 'local-mac-address'.  In this case, the real MAC is
- * in 'local-mac-address', and 'mac-address' exists but is all zeros.
-*/
+ drivers/clk/clk.c            | 6 ++++++
+ include/linux/clk-provider.h | 1 +
+ 2 files changed, 7 insertions(+)
 
-So the real (minor) problem is that we require 'local-mac-address' in the
-binding.  And say nothing about mac-address.
-
-u-boot, v2013.04 sets both mac-address and local-mac-address
-from the environment in fdt_fixup_ethernet() and doesn't check to see if
-it's already populated with a valid mac :(
-
-barebox doesn't appear to set the mac-address, and relies on the dtb.
-
-Since we really only have to worry about legacy u-boot with ATAGs, we
-should mimic the behavior of u-boot to date.  The mac address found in
-the u-boot environment is the canonical source for the mac address.
-This would have the added bonus that flash-kernel (debian kernel
-installer) wouldn't need to dig up the mac address and add it to the
-appended dtb.
-
-So, I'm happy with it the way it is.  If we want to dot our i's and
-cross our t's, we could also set local-mac-address from the atag,
-however, this isn't necessary because of the precedence in
-of_get_mac_address().
-
-thx,
-
-Jason.
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index af0dbcc..73e0358 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -2082,6 +2082,12 @@ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec)
+ 	return clk;
+ }
+ 
++int of_clk_get_parent_count(struct device_node *np)
++{
++	return of_count_phandle_with_args(np, "clocks", "#clock-cells");
++}
++EXPORT_SYMBOL_GPL(of_clk_get_parent_count);
++
+ const char *of_clk_get_parent_name(struct device_node *np, int index)
+ {
+ 	struct of_phandle_args clkspec;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 265f384..f8d38f2 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -442,6 +442,7 @@ void of_clk_del_provider(struct device_node *np);
+ struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
+ 				  void *data);
+ struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data);
++int of_clk_get_parent_count(struct device_node *np);
+ const char *of_clk_get_parent_name(struct device_node *np, int index);
+ 
+ void of_clk_init(const struct of_device_id *matches);
+-- 
+1.8.1.2
