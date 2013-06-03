@@ -1,45 +1,49 @@
-From: masami.hiramatsu.pt@hitachi.com (Masami Hiramatsu)
-Date: Mon, 03 Jun 2013 21:29:14 +0900
-Subject: mvebu: 3.10-rc1 and fixes branch doesn't boot on OpenBlocks
- AX3
-In-Reply-To: <51AC6380.9050607@free-electrons.com>
-References: <51AC5E14.1050207@hitachi.com>
- <51AC6380.9050607@free-electrons.com>
-Message-ID: <51AC8C1A.2060809@hitachi.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 3 Jun 2013 14:35:33 +0200
+Subject: [PATCH 0/2] ARM: OMAP AM33XX: clock data: Enable clkout2 output
+ on SoC pad
+In-Reply-To: <alpine.DEB.2.02.1305291902450.9052@utopia.booyaka.com>
+References: <1367919574-21353-1-git-send-email-hvaibhav@ti.com>
+ <79CD15C6BA57404B839C016229A409A83EC8C081@DBDE04.ent.ti.com>
+ <alpine.DEB.2.00.1305200246080.2656@utopia.booyaka.com>
+ <51A35123.6040600@ti.com>
+ <alpine.DEB.2.02.1305291902450.9052@utopia.booyaka.com>
+Message-ID: <51AC8D95.40705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(2013/06/03 18:36), Gregory CLEMENT wrote:
-> On 06/03/2013 11:12 AM, Masami Hiramatsu wrote:
->> Hi,
-> Hi
+Salut Paul,
+
+On 05/29/2013 09:06 PM, Paul Walmsley wrote:
+> Salut Beno?t,
 > 
+> On Mon, 27 May 2013, Benoit Cousson wrote:
+> 
+>> On 05/20/2013 04:47 AM, Paul Walmsley wrote:
+>>> On Fri, 17 May 2013, Hiremath, Vaibhav wrote:
+>>>
+>>>> Tony, Paul and Benoit,
+>>>>
+>>>> Any update on this series?
+>>>
+>>> Most of the changes are DT-related, so it should probably go in via 
+>>> Beno?t.  I'll ack the clock side, but have a comment on patch 2, to be 
+>>> sent shortly.
 >>
->> I've tried 3.10-rc1 and
->> git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git fixes branch on my
->> OpenBlocks AX3-4 and failed to boot both kernel
->> as below.
+>> I've tried to apply that patch, but unfortunately, it does depend on
+>> that one:
+>>
+>> https://patchwork.kernel.org/patch/2212081/
+>>
+>> If you did not already pulled the first one I can take both with your
+>> acked-by.
+>> Otherwise, I can take only the DTS ones.
+>>
+>> Is that OK?
 > 
-> Since 3.10 the memory description for the Armada XP is 64 bits, to
-> allow to use more than 4GB of RAM with LPAE.
-> Unfortunately the ATAGS are 32 bits only.
-> If you use more than 4GB your only possibility is to disable
-> the ATAG support and only rely on the information written in
-> the dts: disable CONFIG_ARM_ATAG_DTB_COMPAT.
-> 
-> If you don't have more than 4GB of RAM then you can also apply this
-> patch: https://patchwork.kernel.org/patch/2566771/
-> It allows to use the ATAG and to keep the CONFIG_ARM_ATAG_DTB_COMPAT
-> option.
+> Will ack that first patch now.  
 
-Thanks for the information!
-That patch solves my issue :)
+Cool, Thanks Paul.
 
-Best regards,
-
-
--- 
-Masami HIRAMATSU
-IT Management Research Dept. Linux Technology Center
-Hitachi, Ltd., Yokohama Research Laboratory
-E-mail: masami.hiramatsu.pt at hitachi.com
+Regards,
+Benoit
