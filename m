@@ -1,46 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 03 Jun 2013 17:29:52 +0200
-Subject: [PATCH 08/21] ARM: ux500: Supply the I2C clocks lookup to the
- DBX500 DT
-In-Reply-To: <20130603142755.GH3370@gmail.com>
-References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
- <2199337.TqRF93pcHr@wuerfel> <20130603142755.GH3370@gmail.com>
-Message-ID: <2173992.VOFqBIP467@wuerfel>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Mon, 3 Jun 2013 16:32:55 +0100
+Subject: [PATCH v2 0/5] Introduce Xen support to ARM64
+Message-ID: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 June 2013 15:27:55 Lee Jones wrote:
-> On Mon, 03 Jun 2013, Arnd Bergmann wrote:
-> 
-> > On Monday 03 June 2013 14:42:32 Lee Jones wrote:
-> > > @@ -559,6 +559,8 @@
-> > >                         v-i2c-supply = <&db8500_vape_reg>;
-> > >  
-> > >                         clock-frequency = <400000>;
-> > > +                       clocks = <&clk 100>, <&clk 67>;
-> > > +                       clock-names = "nmk-i2c.0", "apb_pclk";
-> > >                 };
-> > >  
-> > >                 i2c at 80122000 {
-> > > @@ -572,6 +574,9 @@
-> > >                         v-i2c-supply = <&db8500_vape_reg>;
-> > >  
-> > >                         clock-frequency = <400000>;
-> > > +
-> > > +                       clocks = <&clk 85>, <&clk 42>;
-> > > +                       clock-names = "nmk-i2c.1", "apb_pclk";
-> > >                 };
-> > 
-> > Same comment actually as for the uart patch, also SDI and MSP
-> > have the same problem.
-> 
-> I was only using the names in the same manor as the API does, to fetch
-> the 'clocks =' index. Do you mean that I should be using 'uartclk',
-> 'i2cclk', 'sdmmcclk' and 'msp1clk' instead?
+Hi all,
+this patch series introduces Xen support to arch/arm64.
 
-Yes, that would be better. I suppose you can actually leave out the
-'clk' part and just call them 'i2c', 'sdmmc', 'msp' and 'uart',
-but you should check if any of the driver already specify the
-clock names in their DT bindings.
+As you can see from the following patches, there is very little arm64
+specific code here, basically only one assembly file
+(arch/arm64/xen/hypercall.S).
 
-	Arnd
+Everything else is common with Xen for ARMv7, in particular the code
+under arch/arm/xen (enlighten.c and the stubs in grant-table.c) and most
+of the header files under arch/arm/include/asm/xen (hypercall.h,
+hypervisor.h, interface.h, page.h) can be reused as-is.
+
+
+Stefano Stabellini (5):
+      arm/xen: define xen_remap as ioremap_cached
+      arm64/xen: introduce asm/xen header files on arm64
+      arm64/xen: implement ioremap_cached on arm64
+      arm64/xen: use XEN_IO_PROTO_ABI_ARM on ARM64
+      arm64/xen: introduce CONFIG_XEN and hypercall.S on ARM64
+
+ arch/arm/include/asm/xen/page.h         |    3 +-
+ arch/arm64/Kconfig                      |   10 +++
+ arch/arm64/Makefile                     |    1 +
+ arch/arm64/include/asm/hypervisor.h     |    6 ++
+ arch/arm64/include/asm/io.h             |    2 +
+ arch/arm64/include/asm/sync_bitops.h    |   26 +++++++++
+ arch/arm64/include/asm/xen/events.h     |   21 +++++++
+ arch/arm64/include/asm/xen/hypercall.h  |    1 +
+ arch/arm64/include/asm/xen/hypervisor.h |    1 +
+ arch/arm64/include/asm/xen/interface.h  |    1 +
+ arch/arm64/include/asm/xen/page.h       |    1 +
+ arch/arm64/xen/Makefile                 |    2 +
+ arch/arm64/xen/hypercall.S              |   94 +++++++++++++++++++++++++++++++
+ include/xen/interface/io/protocols.h    |    2 +-
+ 14 files changed, 168 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm64/include/asm/hypervisor.h
+ create mode 100644 arch/arm64/include/asm/sync_bitops.h
+ create mode 100644 arch/arm64/include/asm/xen/events.h
+ create mode 100644 arch/arm64/include/asm/xen/hypercall.h
+ create mode 100644 arch/arm64/include/asm/xen/hypervisor.h
+ create mode 100644 arch/arm64/include/asm/xen/interface.h
+ create mode 100644 arch/arm64/include/asm/xen/page.h
+ create mode 100644 arch/arm64/xen/Makefile
+ create mode 100644 arch/arm64/xen/hypercall.S
+
+
+git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen.git xen-arm64-2
+
+- Stefano
