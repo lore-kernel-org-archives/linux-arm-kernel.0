@@ -1,30 +1,20 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Mon, 3 Jun 2013 09:52:48 +0200
-Subject: [PATCH 08/10] clk: add basic Rockchip rk3066a clock support
-In-Reply-To: <20130603032711.GA3379@quad.lixom.net>
+Date: Mon, 3 Jun 2013 09:54:10 +0200
+Subject: [PATCH 09/10] arm: add debug uarts for rockchip rk29xx and rk3xxx
+ series
+In-Reply-To: <19033743.NUXvdvXthR@wuerfel>
 References: <201306030055.15413.heiko@sntech.de>
- <201306030100.31647.heiko@sntech.de> <20130603032711.GA3379@quad.lixom.net>
-Message-ID: <201306030952.49089.heiko@sntech.de>
+ <201306030101.04370.heiko@sntech.de> <19033743.NUXvdvXthR@wuerfel>
+Message-ID: <201306030954.10891.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 3. Juni 2013, 05:27:11 schrieb Olof Johansson:
-> On Mon, Jun 03, 2013 at 01:00:31AM +0200, Heiko St?bner wrote:
-> > This adds basic support for clocks on Rockchip rk3066 SoCs.
-> > The clock handling thru small dt nodes is heavily inspired by the
-> > sunxi clk code.
-> > 
-> > The clock specifiers are named as "x-cortex-a9-x", because the clock
-> > semantics are the same thru the whole cortex-a9 series (rk30xx,
-> > rk3188, rk2928; but not the other rk29 SoCs, which are Cortex-A8 based).
+Am Montag, 3. Juni 2013, 04:08:37 schrieb Arnd Bergmann:
+> On Monday 03 June 2013 01:01:03 Heiko St?bner wrote:
+> > +#if defined(CONFIG_DEBUG_RK29_UART0)
+> > +#define ROCKCHIP_UART_DEBUG_PHYS_BASE 0x20060000
+> > +#define ROCKCHIP_UART_DEBUG_VIRT_BASE 0xfe060000
 > 
-> Hi,
-> 
-> I think you're better off naming them after the first SoC of that series.
-> Otherwise, if there's an A9-based platform in the future that is not
-> compatible, things will get complicated.
-> 
-> It's pretty common that we do this for other kinds of devices, so it seems
-> appropriate for clock drivers too.
+> 0xfed60000 maybe? looks like a typo.
 
-ok, I'll rename them
+ha, correct ... thanks
