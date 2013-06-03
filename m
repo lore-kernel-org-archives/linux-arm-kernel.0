@@ -1,56 +1,48 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 3 Jun 2013 09:15:04 +0100
-Subject: [PATCH 0/4] clk, mfd: u8540 clock tree definition
-In-Reply-To: <20130531191437.21525.40759@quantum>
-References: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
- <20130531012509.21525.90187@quantum>
- <20130531065532.GA10355@gmail.com>
- <20130531191437.21525.40759@quantum>
-Message-ID: <20130603081504.GB3370@gmail.com>
+Date: Mon, 3 Jun 2013 09:18:05 +0100
+Subject: [PATCH] ARM: ux500: register LP5521 LEDs in the device tree
+In-Reply-To: <CAK5ve-+oJL0fbtM=5xRSBjCztX1fP-fcwUvZurnj42hiXR5X+Q@mail.gmail.com>
+References: <1369210331-18545-1-git-send-email-linus.walleij@stericsson.com>
+ <CAK5ve-+oJL0fbtM=5xRSBjCztX1fP-fcwUvZurnj42hiXR5X+Q@mail.gmail.com>
+Message-ID: <20130603081805.GC3370@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 31 May 2013, Mike Turquette wrote:
+On Fri, 31 May 2013, Bryan Wu wrote:
 
-> Quoting Lee Jones (2013-05-30 23:55:32)
-> > On Thu, 30 May 2013, Mike Turquette wrote:
-> > 
-> > > Quoting Philippe Begnic (2013-05-27 05:41:28)
-> > > > From: Philippe Begnic <philippe.begnic@st.com>
-> > > > 
-> > > > Create U8540 clock tree definitions for common clock framework
-> > > > 
-> > > 
-> > > The clock changes look good to me.  How did you want to merge the
-> > > patches?
-> > 
-> > You may as well take them through your tree Mike.
-> > 
+> On Wed, May 22, 2013 at 1:12 AM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
+> > From: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > Based on pending device tree support in the LP55xx drivers
+> > we can add the correct LED and channel configuration from the
+> > ux500 device tree for all HREF variants.
+> >
+> > Cc: Milo Kim <Milo.Kim@ti.com>
+> > Cc: Bryan Wu <cooloney@gmail.com>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> >  arch/arm/boot/dts/href.dtsi | 38 ++++++++++++++++++++++++++++++++------
+> >  1 file changed, 32 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
+> > index 62523f6..e315429 100644
+> > --- a/arch/arm/boot/dts/href.dtsi
+> > +++ b/arch/arm/boot/dts/href.dtsi
+> > @@ -63,16 +63,42 @@
+> >                 };
+> >
+> >                 i2c at 80128000 {
+> > -                       lp5521 at 0x33 {
+> > -                               compatible = "lp5521";
+> > +                       lp5521 at 33 {
 > 
-> Sure I can take them but it would be best to wait for an Ack from Samuel
-> for the MFD parts, if only so that we are coordinated.
+> Is this right, I guess it should be still "lp5521 at 0x33", although it's
+> just a name.
 
-You don't need it. Apply with mine instead:
+What makes you say that Bryan?
 
-Acked-by: Lee Jones <lee.jones@linaro.org>
-
-> > > > Philippe Begnic (4):
-> > > >   clk: ux500: Pass clock base adresses in initcall for u8540 and u9540
-> > > >   mfd: db8500: Update register definition for u8540 clock
-> > > >   mfd: db8500: Update BML clock register for db8580
-> > > >   clk: ux500: Clocks definition for u8540
-> > > > 
-> > > >  arch/arm/mach-ux500/cpu.c                 |    6 +-
-> > > >  drivers/clk/ux500/u8540_clk.c             |  564 ++++++++++++++++++++++++++++-
-> > > >  drivers/clk/ux500/u9540_clk.c             |    4 +-
-> > > >  drivers/mfd/db8500-prcmu.c                |    1 +
-> > > >  drivers/mfd/dbx500-prcmu-regs.h           |    1 +
-> > > >  include/linux/mfd/abx500/ab8500-sysctrl.h |    4 +-
-> > > >  include/linux/mfd/dbx500-prcmu.h          |   12 +
-> > > >  include/linux/platform_data/clk-ux500.h   |    6 +-
-> > > >  8 files changed, 587 insertions(+), 11 deletions(-)
-> > > > 
-> > 
+All other nodes drop the '0x', as it's implied.
 
 -- 
 Lee Jones
