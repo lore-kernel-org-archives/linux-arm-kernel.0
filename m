@@ -1,49 +1,30 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Mon, 3 Jun 2013 06:22:19 +0300
-Subject: [PATCH 02/10] clocksource: dw_apb_timer_of: add clock-handling
-In-Reply-To: <201306030056.37724.heiko@sntech.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 2 Jun 2013 20:27:11 -0700
+Subject: [PATCH 08/10] clk: add basic Rockchip rk3066a clock support
+In-Reply-To: <201306030100.31647.heiko@sntech.de>
 References: <201306030055.15413.heiko@sntech.de>
- <201306030056.37724.heiko@sntech.de>
-Message-ID: <20130603032219.GM11798@tarshish>
+ <201306030100.31647.heiko@sntech.de>
+Message-ID: <20130603032711.GA3379@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On Mon, Jun 03, 2013 at 12:56:37AM +0200, Heiko St?bner wrote:
-> Add the possibility to get the clock-frequency from a timer clock instead
-> of specifying it as dt property. Additionally also add the possibility
-> to also define a controlling periphal clock for the timer block.
+On Mon, Jun 03, 2013 at 01:00:31AM +0200, Heiko St?bner wrote:
+> This adds basic support for clocks on Rockchip rk3066 SoCs.
+> The clock handling thru small dt nodes is heavily inspired by the
+> sunxi clk code.
 > 
-> The clock-frequency property is kept to act as fallback if no clocks
-> are specified.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  Documentation/devicetree/bindings/rtc/dw-apb.txt |   19 ++++++++++++++++
->  drivers/clocksource/dw_apb_timer_of.c            |   26 +++++++++++++++++++++-
->  2 files changed, 44 insertions(+), 1 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
-> index 93e2b0f..80ab1c1 100644
-> --- a/Documentation/devicetree/bindings/rtc/dw-apb.txt
-> +++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
-> @@ -5,9 +5,20 @@ Required properties:
->  - reg: physical base address of the controller and length of memory mapped
->    region.
->  - interrupts: IRQ line for the timer.
-> +- either clocks+clock-names or clock-frequency properties
-> +
-> +Optional properties:
-> +- clocks	: list of clock specifiers, corresponding to entries in
-> +		  the clock-names property;
-> +- clock-names	: should contain "timer and "pclk" entries, matching entries
+> The clock specifiers are named as "x-cortex-a9-x", because the clock
+> semantics are the same thru the whole cortex-a9 series (rk30xx,
+> rk3188, rk2928; but not the other rk29 SoCs, which are Cortex-A8 based).
 
-Missing closing quotes around "timer".
+Hi,
 
-baruch
+I think you're better off naming them after the first SoC of that series.
+Otherwise, if there's an A9-based platform in the future that is not
+compatible, things will get complicated.
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+It's pretty common that we do this for other kinds of devices, so it seems
+appropriate for clock drivers too.
+
+
+-Olof
