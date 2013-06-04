@@ -1,33 +1,31 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue,  4 Jun 2013 14:03:18 -0300
-Subject: [PATCH] cpufreq: kirkwood: Select CPU_FREQ_TABLE option
-Message-ID: <1370365398-484-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 4 Jun 2013 10:09:24 -0700
+Subject: [PATCH V5 2/5] clk: samsung: register audio subsystem clocks
+ using common clock framework
+In-Reply-To: <1370348890-6645-3-git-send-email-padma.v@samsung.com>
+References: <1370348890-6645-1-git-send-email-padma.v@samsung.com>
+ <1370348890-6645-3-git-send-email-padma.v@samsung.com>
+Message-ID: <CAD=FV=X6FNsYDwrcd1ksF47F5MEq=9-=iX1ifP6S5vKRUVm=uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to select CPU_FREQ_TABLE in order to build without
-this kind of errors:
+Padmavathi,
 
-drivers/built-in.o: In function `kirkwood_cpufreq_cpu_exit':
-/home/zeta/linux-devel/marvell-legacy/drivers/cpufreq/kirkwood-cpufreq.c:145:
-undefined reference to `cpufreq_frequency_table_put_attr'
+On Tue, Jun 4, 2013 at 5:28 AM, Padmavathi Venna <padma.v@samsung.com> wrote:
+> Audio subsystem is introduced in s5pv210 and exynos platforms.
+> This has seperate clock controller which can control i2s0 and
+> pcm0 clocks. This patch registers the audio subsystem clocks
+> with the common clock framework on Exynos family.
+>
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> ---
+>  .../devicetree/bindings/clock/clk-exynos-audss.txt |   64 ++++++++++
+>  drivers/clk/samsung/Makefile                       |    1 +
+>  drivers/clk/samsung/clk-exynos-audss.c             |  133 ++++++++++++++++++++
+>  include/dt-bindings/clk/exynos-audss-clk.h         |   25 ++++
+>  4 files changed, 223 insertions(+), 0 deletions(-)
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
- drivers/cpufreq/Kconfig.arm | 1 +
- 1 file changed, 1 insertion(+)
+Thanks for fixing up my nits.  This looks good to me.
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 6e57543..a2f0f08 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -86,6 +86,7 @@ config ARM_INTEGRATOR
- 
- config ARM_KIRKWOOD_CPUFREQ
- 	def_bool ARCH_KIRKWOOD && OF
-+	select CPU_FREQ_TABLE
- 	help
- 	  This adds the CPUFreq driver for Marvell Kirkwood
- 	  SoCs.
--- 
-1.8.1.5
+Reviewed-by: Doug Anderson <dianders@chromium.org>
