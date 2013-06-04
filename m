@@ -1,30 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Jun 2013 19:17:59 +0200
-Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
-In-Reply-To: <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
-References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
- <1394174.ONngHnHYKL@wuerfel>
- <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
-Message-ID: <10306449.AbS8Q0UukT@wuerfel>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 04 Jun 2013 19:19:35 +0200
+Subject: [PATCH v2 1/2] ARM PJ4B: Add support for errata 4742
+In-Reply-To: <20130604145958.GY18614@n2100.arm.linux.org.uk>
+References: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
+ <1370354598-12920-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130604145958.GY18614@n2100.arm.linux.org.uk>
+Message-ID: <51AE21A7.5080907@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 June 2013 17:09:26 Florian Fainelli wrote:
-> You would just need to define a stub for your arch_foo_phy_fixup()
-> which has a different definition depending on whether CONFIG_PHYLIB is
-> defined or not.
+Dear Russell King,
 
-Yes, same thing. For a function that is called in only one place,
-I would always prefer if(IS_ENABLED()) over a stub though.
-
-> This would be just one function, instead of the whole bunch of stubs
-> needed for phylib. Right now its probably 1 vs 3, so it does not make
-> that much of a difference but who knows, if we had more phylib stubs
-> and forget to update the stubs? (which tends to happen pretty often).
+On 06/04/2013 04:59 PM, Russell King - ARM Linux wrote:
+> On Tue, Jun 04, 2013 at 04:03:17PM +0200, Gregory CLEMENT wrote:
+>> From: Lior Amsalem <alior@marvell.com>
+>>
+>> This commit fixes the regression on Armada 370 (the kernal hang during
+>> boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
+>> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
+>>
+>> When coming out of either a Wait for Interrupt (WFI) or a Wait for
+>> Event (WFE) IDLE states, a specific timing sensitivity exists between
+>> the retiring WFI/WFE instructions and the newly issued subsequent
+>> instructions. This sensitivity can result in a CPU hang scenario.  The
+>> workaround is to insert either a Data Synchronization Barrier (DSB) or
+>> Data Memory Barrier (DMB) command immediately after the WFI/WFE
+>> instruction
 > 
-> The size savings are exactly the same in both approaches anyway.
+> Wouldn't a DMB be cheaper than a full blown DSB here?
 
-So should we just stick to the current method then and use
-if (IS_ENABLED(CONFIG_NET)) for calling the function?
+I let Lior answer to this question.
 
-	Arnd
+> 
+> Also, we could detect the PJ4B and only implement the workaround
+> on those CPUs rather than having to have it on every v7 CPU - which
+> is important when you consider the single zImage issues.
+
+At least we can detect the PJ4B and maybe even the detect the if it
+is the PJ4B or the PJ4B-MP.
+
+Do you mean to add this test in the cpu_v7_do_idle() function?
+
+Or patching the pointer to the cpu_v7_do_idle() on the fly? In this
+last case it seems a little tricky to me, as we should have to modify
+a pointer function in the .proc.info.init section.
+
+Thanks for your review,
+
+Gregory
