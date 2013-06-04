@@ -1,46 +1,39 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 04 Jun 2013 11:34:49 -0700
-Subject: [PATCH RFC 2/3] ARM: dts: omap4 clock data
-In-Reply-To: <20130604145543.GK3331@atomide.com>
-References: <1370327958-19776-1-git-send-email-mturquette@linaro.org>
- <1370327958-19776-3-git-send-email-mturquette@linaro.org>
- <20130604145543.GK3331@atomide.com>
-Message-ID: <20130604183449.10233.48956@quantum>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 4 Jun 2013 19:37:54 +0100
+Subject: [PATCH 00/11] drivers: Add Pinctrl PM support
+In-Reply-To: <87k3m92148.fsf@linaro.org>
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <20130531170437.GA17591@core.coreip.homeip.net>
+ <CACRpkdYnhjpFp1CM=P_hddBe4qVigtE0c+CN9NKvk3nFgJS-ig@mail.gmail.com>
+ <87k3m92148.fsf@linaro.org>
+Message-ID: <20130604183754.GT31367@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Tony Lindgren (2013-06-04 07:55:43)
-> * Mike Turquette <mturquette@linaro.org> [130603 23:45]:
-> > This is a first pass at creating a unique node for each clock in the
-> > OMAP4 power, reset and & clock manager (PRCM).  So far I have only
-> > converted mux clocks & fixed-rate clocks, which coexist with the current
-> > clock data in the kernel.  The rest needs to be done but better to
-> > publish early and often to see what others think of this approach.
-> 
-> > +/* FIXME need to print the address directly */
-> > +/*
-> > +#include "../../mach-omap2/prm44xx.h"
-> > +#include "../../mach-omap2/cm2_44xx.h"
-> > +#include "../../mach-omap2/cm1_44xx.h"
-> > +*/
-> 
-> I don't think you're using the above includes any longer
-> in this file?
-> 
+On Tue, Jun 04, 2013 at 11:15:51AM -0700, Kevin Hilman wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
 
-Correct.  I actually spotted this before emailing the patches out at
-midnight, but by then I didn't care to fix it.  The benefits of marking
-a patch as "RFC" ;-)
+> > I think this will save a *lot* of identical code in all the
+> > drivers, that will just have to call
+> > pinctrl_select_pm_sleep(), pinctrl_select_pm_default()
+> > pinctrl_select_pm_idle() instead of all the complex code.
 
-I had a mind to use the new preprocessor capabilities of dtc for the
-PRCM bit masks and shift values, but instead I ended up using the raw
-hex values.  I've actually come to prefer using the raw hex values for
-DT, which I think makes more sense for a description of the hardware
-which is not tied to any Linux implementation.
+> > This is what I planned to do but never got around to.
 
-Regards,
-Mike
+> What about taking it one tiny step further, and having it done by the PM
+> core itself?
 
-> Regards,
-> 
-> Tony
+> Seems like something that should just be done as part of runtime PM
+> transitions and the suspend/resume process.
+
+Indeed, I remember suggesting this as part of the original discussion of
+having the code do the default state setting.  It seems like there ought
+to be very few devices which actively manage pinctrl themselves,
+otherwise we'll get a lot of boilerplate.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/aea822c8/attachment.sig>
