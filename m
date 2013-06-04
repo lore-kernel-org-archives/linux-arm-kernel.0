@@ -1,53 +1,34 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 04 Jun 2013 11:15:51 -0700
-Subject: [PATCH 00/11] drivers: Add Pinctrl PM support
-In-Reply-To: <CACRpkdYnhjpFp1CM=P_hddBe4qVigtE0c+CN9NKvk3nFgJS-ig@mail.gmail.com>
- (Linus Walleij's message of "Tue, 4 Jun 2013 09:25:02 +0200")
-References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
- <20130531170437.GA17591@core.coreip.homeip.net>
- <CACRpkdYnhjpFp1CM=P_hddBe4qVigtE0c+CN9NKvk3nFgJS-ig@mail.gmail.com>
-Message-ID: <87k3m92148.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Jun 2013 19:16:08 +0100
+Subject: [PATCHv2 3/6] sched_clock: Make ARM's sched_clock generic for
+ all architectures
+In-Reply-To: <51AE2A30.4010903@linaro.org>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+ <1370155183-31421-4-git-send-email-sboyd@codeaurora.org>
+ <20130603071235.GO11798@tarshish> <51ACF374.5040606@codeaurora.org>
+ <51AE2A30.4010903@linaro.org>
+Message-ID: <20130604181608.GB18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Tue, Jun 04, 2013 at 10:56:00AM -0700, John Stultz wrote:
+> On 06/03/2013 12:50 PM, Stephen Boyd wrote:
+>> On 06/03/13 00:12, Baruch Siach wrote:
+>>> Hi Stephen,
+>>>
+>>> On Sat, Jun 01, 2013 at 11:39:40PM -0700, Stephen Boyd wrote:
+>>>>   {arch/arm/include/asm => include/linux}/sched_clock.h | 9 +++++++--
+>>> Shouldn't we just merge this header into the existing linux/sched.h?
+>> I don't know. John/Thomas, any thoughts? One benefit with it this way is
+>> that we don't have to recompile all the timer drivers if we change
+>> sched.h for other reasons.
+>
+> Yea, I'm fine keeping it separate for now. We can merge them together if  
+> we see fit later.
+>
+> But if anyone feels particularly strongly, let me know.
 
-Linus Walleij <linus.walleij@linaro.org> writes:
-
-> On Fri, May 31, 2013 at 7:04 PM, Dmitry Torokhov
-> <dmitry.torokhov@gmail.com> wrote:
->
->> As with the original introduction of pinctrl states my question is: "Can
->> all of this be handled in the driver/bus core instead of adding a lot
->> of boilerplate code to the individual drivers".
->
-> It can. Per the suggestion in 2/11:
->
-> - Adding pins_sleep and pins_idle to struct dev_pin_info
->   in include/linux/pinctrl/devinfo.h
->
-> - Modify drivers/base/pinctrl.c to optionally look up
->   sleep and idle states, you can make that code
->   #ifdef CONFIG_PM I think.
->
-> - Add something like static inline functions to
->   include/linux/pinctrl/consumer.h
->   with names like pinctrl_select_pm_idle(struct device *)
->   pinctrl_select_pm_sleep(struct device *) to switch states
->   using the device core containers, and includes
->   checking IS_ERR() on the handles etc.
->
-> I think this will save a *lot* of identical code in all the
-> drivers, that will just have to call
-> pinctrl_select_pm_sleep(), pinctrl_select_pm_default()
-> pinctrl_select_pm_idle() instead of all the complex code.
->
-> This is what I planned to do but never got around to.
-
-What about taking it one tiny step further, and having it done by the PM
-core itself?
-
-Seems like something that should just be done as part of runtime PM
-transitions and the suspend/resume process.
-
-Kevin
+I'd suggest keeping it separate.  linux/sched.h is already a big source of
+rebuilds because it's included by virtually the entire kernel.  Having
+linux/sched.h carved up into smaller chunks (maybe moving the definition
+of task_struct and associated bits out of it) would probably be a good idea.
