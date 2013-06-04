@@ -1,41 +1,16 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 4 Jun 2013 07:46:33 -0700
-Subject: [PATCH 09/11] mmc: omap_hsmmc: enhance pinctrl support
-In-Reply-To: <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
-References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
- <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
-Message-ID: <20130604144632.GI3331@atomide.com>
+From: konrad.wilk@oracle.com (Konrad Rzeszutek Wilk)
+Date: Tue, 4 Jun 2013 10:47:41 -0400
+Subject: [PATCH v2 5/5] arm64/xen: introduce CONFIG_XEN and hypercall.S
+ on ARM64
+In-Reply-To: <20130603162517.GC32295@arm.com>
+References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
+ <1370273624-26976-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130603162517.GC32295@arm.com>
+Message-ID: <20130604144741.GF7110@phenom.dumpdata.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Hebbar Gururaja <gururaja.hebbar@ti.com> [130531 03:19]:
-> Amend the hsmmc controller to optionally take a pin control handle and
-> set the state of the pins to:
-> 
-> - "default" on boot, resume and before performing a mmc transfer
-> - "idle" after initial default, after resume default, and after each
-> mmc/sd card access
-> - "sleep" on suspend()
-> 
-> By optionally putting the pins into sleep state in the suspend callback
-> we can accomplish two things.
-> - One is to minimize current leakage from pins and thus save power,
-> - second, we can prevent the IP from driving pins output in an
-> uncontrolled manner, which may happen if the power domain drops the
-> domain regulator.
-> 
-> If any of the above pin states are missing in dt, a warning message
-> about the missing state is displayed.
-> If certain pin-states are not available, to remove this warning message
-> pass respective state name with null phandler.
+> BTW, I think it's missing a MAINTAINERS file update.
 
-There's a similar patch in the "[RESEND PATCH v2 1/3] mmc: omap_hsmmc:
-Enable SDIO IRQ using a GPIO in idle mode" thread. It also makes the
-SDIO interrupts to work, so we need to consider that too.
-
-We can merge the dynamic pinmuxing parts separately, but they should
-be in a separate function like I posted later on in the thread above.
-
-Regards,
-
-Tony 
+I presume you mean that Stefano should have the MAINTAINERS file updated to include
+him being the maintainer of arch/arm64/xen* ?
