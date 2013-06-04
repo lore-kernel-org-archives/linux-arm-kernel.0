@@ -1,73 +1,41 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 4 Jun 2013 15:37:04 +0100
-Subject: [PATCH v2 0/4] ARM: mm: HugeTLB + THP support.
-In-Reply-To: <20130604130329.GR27516@mudshark.cambridge.arm.com>
-References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
- <20130603104010.GA26112@linaro.org>
- <20130604125610.GA16818@linaro.org>
- <20130604130329.GR27516@mudshark.cambridge.arm.com>
-Message-ID: <20130604143702.GA18323@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 4 Jun 2013 07:46:33 -0700
+Subject: [PATCH 09/11] mmc: omap_hsmmc: enhance pinctrl support
+In-Reply-To: <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <20130604144632.GI3331@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 02:03:29PM +0100, Will Deacon wrote:
-> On Tue, Jun 04, 2013 at 01:56:12PM +0100, Steve Capper wrote:
-> > On Mon, Jun 03, 2013 at 11:40:11AM +0100, Steve Capper wrote:
-> > > On Thu, May 23, 2013 at 04:31:16PM +0100, Steve Capper wrote:
-> > > > The following patches bring both HugeTLB support and Transparent
-> > > > HugePage (THP) support to ARM.
-> > > > 
-> > > > Only long descriptors (LPAE) are supported in this series.
-> > > > 
-> > > > The code has been tested on an Arndale board (Exynos 5250).
-> > > > 
-> > > > This patch set is based on 3.10-rc2.
-> > > > 
-> > > > Major changes since the Patch:
-> > > >  * LPAE code has been separated from non-LPAE code (this series
-> > > >    is the LPAE code).
-> > > >  * PROT_NONE support for HugeTLB and THP has been implemented.
-> > > > 
-> > > > Major changes since the RFC:
-> > > >  * huge pmd sharing removed from the 3-level code as this was
-> > > >    found to be very rarely, if ever?, used. This allowed for some
-> > > >    code simplification.
-> > > > 
-> > > >  * hardware pmd bits for 2-levels of paging are now taken from
-> > > >    mmu.c. Also the mapping code now uses pte/pmd bit helper
-> > > >    functions rather than the custom pre-processor logic.
-> > > > 
-> > > > Cheers,
-> > > > -- 
-> > > > Steve
-> > > > 
-> > > 
-
-[ ... ]
-
-> > 
-> > Just a polite ping on the above.
-> > 
-> > Are people happy to have this patch set merged?
+* Hebbar Gururaja <gururaja.hebbar@ti.com> [130531 03:19]:
+> Amend the hsmmc controller to optionally take a pin control handle and
+> set the state of the pins to:
 > 
-> Looks good to me, but worth checking that it doesn't conflict with the LPAE
-> fixes I plan to send for 3.11 (since they're not terribly critical):
+> - "default" on boot, resume and before performing a mmc transfer
+> - "idle" after initial default, after resume default, and after each
+> mmc/sd card access
+> - "sleep" on suspend()
 > 
->   https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=for-rmk/lpae
+> By optionally putting the pins into sleep state in the suspend callback
+> we can accomplish two things.
+> - One is to minimize current leakage from pins and thus save power,
+> - second, we can prevent the IP from driving pins output in an
+> uncontrolled manner, which may happen if the power domain drops the
+> domain regulator.
 > 
-> Of course, I can fix things up in my branch if necessary (just send me a
-> pointer to your git repo).
+> If any of the above pin states are missing in dt, a warning message
+> about the missing state is displayed.
+> If certain pin-states are not available, to remove this warning message
+> pass respective state name with null phandler.
 
-Hey Will,
-I've rebased the series against to 3.10-rc4, and merged in your for-rmk/lpae
-branch.
+There's a similar patch in the "[RESEND PATCH v2 1/3] mmc: omap_hsmmc:
+Enable SDIO IRQ using a GPIO in idle mode" thread. It also makes the
+SDIO interrupts to work, so we need to consider that too.
 
-It builds, and I've run my way through the libhugetlbfs unit tests
-successfully on a Versatile Express (TC2 tile). I get THP collapses, splits
-and allocs too when I rebuild the test suite.
+We can merge the dynamic pinmuxing parts separately, but they should
+be in a separate function like I posted later on in the thread above.
 
-It looks good to me so far.
+Regards,
 
-Thanks,
--- 
-Steve
+Tony 
