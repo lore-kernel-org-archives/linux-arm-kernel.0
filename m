@@ -1,52 +1,83 @@
-From: 21cnbao@gmail.com (21cnbao at gmail.com)
-Date: Tue,  4 Jun 2013 20:17:57 +0800
-Subject: [PATCH] usb: chipidea: udc: fix potential kernel panic
-In-Reply-To: <y>
-References: <y>
-Message-ID: <1370348277-24709-1-git-send-email-21cnbao@gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Tue, 4 Jun 2013 14:18:15 +0200
+Subject: DT version of kirkwood_ge0x_init()
+In-Reply-To: <20130604120500.GZ3803@titan.lakedaemon.net>
+References: <51ADBEE0.5040500@keymile.com> <51ADC2C2.6010106@gmail.com>
+ <20130604104302.GX3803@titan.lakedaemon.net>
+ <20130604115927.GJ7626@kw.sim.vm.gnt>
+ <20130604120500.GZ3803@titan.lakedaemon.net>
+Message-ID: <20130604121815.GK7626@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rong Wang <Rong.Wang@csr.com>
+On Tue, Jun 04, 2013 at 08:05:00AM -0400, Jason Cooper wrote:
+> On Tue, Jun 04, 2013 at 01:59:27PM +0200, Simon Guinot wrote:
+> > On Tue, Jun 04, 2013 at 06:43:02AM -0400, Jason Cooper wrote:
+> > > On Tue, Jun 04, 2013 at 12:34:42PM +0200, Sebastian Hesselbarth wrote:
+> > > > On 06/04/13 12:18, Gerlando Falauto wrote:
+> > > > >I noticed how most of the DT-aware board-setup files only have a single
+> > > > ><board>_init() function, calling kirkwood_ge00_init() with a struct
+> > > > >mv643xx_eth_platform_data as a single argument.
+> > > > >
+> > > > >I was wondering -- is there a reason why we cannot remove all this
+> > > > >board-specific code and move all this to the DT?
+> > > > 
+> > > > Gerlando,
+> > > > 
+> > > > DT for mv643xx_eth is on the way (https://lkml.org/lkml/2013/5/29/527).
+> > > > We wait for the driver to surface to relax branch dependencies and then
+> > > > move all DT Orion SoCs to it.
+> > > > 
+> > > > > I would really love to have all our boards under a single
+> > > > > CONFIG_<FAMILY>_DT and a single compatible string, with all the
+> > > > > differences within the DTs itself -- no more #ifdef CONFIG_<BOARD>,
+> > > > > no more of_machine_is_compatible("boardXXX").
+> > > > 
+> > > > All those will happen if there is DT support for mv643xx_eth which
+> > > > is the only driver left without DT and board dependencies. But there
+> > > > will be no CONFIG_LACIE_DT or whatever, but just CONFIG_KIRKWOOD_DT
+> > > > and board dependent stuff described in the corresponding dts.
+> > > 
+> > > Gerlando,
+> > > 
+> > > Yes, the mess you describe is temporary.  Those board files used to have
+> > > a lot more code in them, legacy init of partitions, MPP, LEDs, etc.  As
+> > > we have converted drivers, they have gotten smaller and smaller.
+> > > 
+> > > Now, with Sebastian's hard work, we'll finally be able to remove them
+> > > and kirkwood will be completely DT.  We're very excited about this. :)
+> > > 
+> > > Next, we'll move the Marvell DT boards over to mach-mvebu/ and only
+> > > legacy boards in -kirkwood/, -orion5x/, -dove/, and -mv78xx0/ will
+> > > remain.  After a few releases we will deprecate any legacy boards which
+> > > haven't been converted to DT.
+> > 
+> > Hi Jason,
+> > 
+> > While I have obviously planed to convert all the LaCie boards to DT,
+> > I think that removing the legacy support so quickly is a little bit
+> > harsh.
+> 
+> Yeah, my wording might not have been the best.  See below.
+> 
+> > IMHO, it could be nice to wait the end-of-life for all this products
+> > before removing their support.
+> 
+> I'd prefer to convert them to DT, then keep them as long as folks are
+> interested in them.  If no one cares about a board, and no one wants to
+> convert it to DT or test the conversion, why keep it around?
+> 
+> Let me clarify, by 'deprecate them' I meant *begin* the process of
+> deprecating them.  eg marking them as deprecated for around three
+> releases or so.
 
-If global_phy is used when CONFIG_USB_PHY is not defined,
-usb_get_phy() returns ERR_PTR(-ENXIO). If we only check
-ci->transceiver is NULL or not in vbus_draw callback, it
-will return true and continue to dereference ERR_PTR(-ENXIO)
-which will cause a kernel panic.
+OK. Thanks for the clarifications.
 
-Tested on CSR SiRFatlasVI SoC platform which licensed chipidea.
-
-Signed-off-by: Rong Wang <Rong.Wang@csr.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- drivers/usb/chipidea/udc.c |    7 ++++---
- 1 files changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/usb/chipidea/udc.c b/drivers/usb/chipidea/udc.c
-index 519ead2..822194b 100644
---- a/drivers/usb/chipidea/udc.c
-+++ b/drivers/usb/chipidea/udc.c
-@@ -1392,7 +1392,7 @@ static int ci13xxx_vbus_draw(struct usb_gadget *_gadget, unsigned mA)
- {
- 	struct ci13xxx *ci = container_of(_gadget, struct ci13xxx, gadget);
- 
--	if (ci->transceiver)
-+	if (!IS_ERR_OR_NULL(ci->transceiver))
- 		return usb_phy_set_power(ci->transceiver, mA);
- 	return -ENOTSUPP;
- }
-@@ -1682,8 +1682,9 @@ static int udc_start(struct ci13xxx *ci)
- 		ci->transceiver = usb_get_phy(USB_PHY_TYPE_USB2);
- 
- 	if (ci->platdata->flags & CI13XXX_REQUIRE_TRANSCEIVER) {
--		if (ci->transceiver == NULL) {
--			retval = -ENODEV;
-+		if (IS_ERR_OR_NULL(ci->transceiver)) {
-+			retval = ci->transceiver ?
-+				PTR_ERR(ci->transceiver) : -ENODEV;
- 			goto destroy_eps;
- 		}
- 	}
--- 
-1.7.5.4
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/0305b17c/attachment.sig>
