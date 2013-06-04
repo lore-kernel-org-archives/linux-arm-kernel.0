@@ -1,111 +1,65 @@
-From: ambresh@ti.com (Ambresh K)
-Date: Tue, 4 Jun 2013 12:46:32 +0530
-Subject: [Patch 3/3] clk: Avoid re-parenting orphan clk's having invalid
- parent index.
-In-Reply-To: <20130529071809.6058.24017@quantum>
-References: <1367475929-32166-1-git-send-email-ambresh@ti.com>
- <1367475929-32166-4-git-send-email-ambresh@ti.com>
- <20130529071809.6058.24017@quantum>
-Message-ID: <51AD9450.5090107@ti.com>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 04 Jun 2013 09:15:07 +0200
+Subject: [PATCHv4 3/3] Add DT bindings documentation for g762 driver
+In-Reply-To: <cover.1340327864.git.arno@natisbad.org>
+References: <cover.1340327864.git.arno@natisbad.org>
+Message-ID: <0162ace15ab54e9b585af0f91588552fbd39ad39.1370327864.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+---
+ Documentation/devicetree/bindings/hwmon/g762.txt |   41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/hwmon/g762.txt
 
-On Wednesday 29 May 2013 12:48 PM, Mike Turquette wrote:
-> Quoting Ambresh K (2013-05-01 23:25:29)
->> From: Ambresh K <ambresh@ti.com>
->>
->> Add orhan clk nodes having invalid parent index to list and use
->> the list to skip re-parenting orphan clk having invalid parents.
->>
->> Signed-off-by: Ambresh K <ambresh@ti.com>
->> ---
->>  drivers/clk/clk.c |   21 +++++++++++++++++++--
->>  1 files changed, 19 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index f4d2c73..54d2aa3 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -32,6 +32,7 @@ static int enable_refcnt;
->>  
->>  static HLIST_HEAD(clk_root_list);
->>  static HLIST_HEAD(clk_orphan_list);
->> +static HLIST_HEAD(clk_orphan_invalid_parent);
-> 
-> Why not re-use the clk_orphan_list?  Having an invalid value programmed
-> into the hardware for selecting a parent essetially orphans a clock
-> from a software point of view.  Is there a specific need for the new
-> list?
-
-Sorry for not being descriptive in commit message.  
-
-a) Avoids unnecessary re-parenting cycle for orphan clock's with invalid parent for every clock
-
-b) With patch [1/3], after a clk with invalid parent was encountered, for every clk registered thereafter seeing following logs. 
-<Snippet>
-[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent  
-
-Please advice, if can be handled better. 
-
-Thanks, 
-Ambresh
-
-
-> 
-> Regards,
-> Mike
-> 
->>  static LIST_HEAD(clk_notifier_list);
->>  
->>  /***           locking             ***/
->> @@ -1532,8 +1533,8 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
->>   */
->>  int __clk_init(struct device *dev, struct clk *clk)
->>  {
->> -       int i, ret = 0;
->> -       struct clk *orphan;
->> +       int i, ret = 0, skip = 0;
->> +       struct clk *orphan, *has_invalid_parent;
->>         struct hlist_node *tmp2;
->>  
->>         if (!clk)
->> @@ -1639,11 +1640,27 @@ int __clk_init(struct device *dev, struct clk *clk)
->>                 if (!strcmp(clk->name, orphan->name))
->>                         continue;
->>  
->> +               /* Skip iteration if orphan has invalid parent */
->> +               hlist_for_each_entry(has_invalid_parent,
->> +                               &clk_orphan_invalid_parent, child_node) {
->> +                       if (!strcmp(orphan->name, has_invalid_parent->name)) {
->> +                               skip = 1;
->> +                               break;
->> +                       }
->> +               }
->> +
->> +               if (skip) {
->> +                       skip = 0;
->> +                       continue;
->> +               }
->> +
->>                 if (orphan->ops->get_parent) {
->>                         i = orphan->ops->get_parent(orphan->hw);
->>                         if (i < 0) {
->>                                 pr_err("%s: orphan clk(%s) invalid parent\n",
->>                                                 __func__, orphan->name);
->> +                               hlist_add_head(&orphan->child_node,
->> +                                               &clk_orphan_invalid_parent);
->>                                 continue;
->>                         }
->>                         if (!strcmp(clk->name, orphan->parent_names[i]))
->> -- 
->> 1.7.4.1
-> 
+diff --git a/Documentation/devicetree/bindings/hwmon/g762.txt b/Documentation/devicetree/bindings/hwmon/g762.txt
+new file mode 100644
+index 0000000..574524d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/hwmon/g762.txt
+@@ -0,0 +1,41 @@
++GMT G762/G763 PWM Fan controller
++
++Required node properties:
++
++ - "compatible": must be either "gmt,g762" or "gmt,g763"
++ - "reg": I2C bus address of the device
++
++Optional properties:
++
++ - "pwm_freq": reference clock frequency for PWM mode in Hz. If not set,
++               default value is 32768.
++
++ - "fan_pulses": number of pulses per fan revolution. Supported values
++               are 2 and 4.
++
++ - "fan_startv": fan startup voltage. Accepted values are 0, 1, 2 and 3.
++               The higher the more.
++
++ - "pwm_polarity": pwm polarity. Accepted values are 0 (positive duty)
++               and 1 (negative duty).
++
++ - "fan_gear_mode": fan gear mode. Supported values are 0, 1 and 2.
++
++If an optional property is not set in .dts file, then current value is kept
++unmodified (e.g. u-boot installed value).
++
++Additional information on operational parameters for the device is available
++in Documentation/hwmon/g762. A detailed datasheet for the device is available
++at http://natisbad.org/NAS/refs/GMT_EDS-762_763-080710-0.2.pdf.
++
++Example g762 node:
++
++   g762: g762 at 3e {
++	compatible = "gmt,g762";
++	reg = <0x3e>;
++	pwm_freq = <8192>;   /* PWM reference clock freq */
++	fan_pulses = <2>;    /* 2 pulses per rev */
++	fan_gear_mode = <0>; /* chip default */
++	fan_startv = <1>;    /* chip default */
++	pwm_polarity = <0>;  /* chip default */
++   };
+-- 
+1.7.10.4
