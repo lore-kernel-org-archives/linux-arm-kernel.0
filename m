@@ -1,126 +1,168 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  4 Jun 2013 12:30:46 +0100
-Subject: [PATCH v2] ARM: oabi: handle faults when loading swi instruction from
- userspace
-Message-ID: <1370345446-32010-1-git-send-email-will.deacon@arm.com>
+From: yadi.brar01@gmail.com (Yadwinder Singh Brar)
+Date: Tue, 4 Jun 2013 17:02:48 +0530
+Subject: [PATCH v2 2/5] clk: samsung: Add support to register rate_table
+ for PLL3xxx
+In-Reply-To: <1710144.fZn06WrzIc@amdc1227>
+References: <1369834677-20312-1-git-send-email-vikas.sajjan@linaro.org>
+ <CAD=FV=VDi+SfebiFnPNp8qR__9L=o9TJ+WSPRfRQLX+p+TMmJw@mail.gmail.com>
+ <CAKew6eVGnHNN7Fk=sqzE1iV+SFtJ1z4k1freeWdbGaYPXqpUvQ@mail.gmail.com>
+ <1710144.fZn06WrzIc@amdc1227>
+Message-ID: <CAKew6eXTepPS2Z+Rws-GWpWfb7=WFtiMn9uZonQYcCcdMYaLpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Running an OABI_COMPAT kernel on an SMP platform can lead to fun and
-games with page aging.
+Hi Tomasz,
 
-If one CPU issues a swi instruction immediately before another CPU
-decides to mkold the page containing the swi instruction, then we will
-fault attempting to load the instruction during the vector_swi handler
-in order to retrieve its immediate field. Since this fault is not
-currently dealt with by our exception tables, this results in a panic:
+On Mon, Jun 3, 2013 at 8:55 PM, Tomasz Figa <t.figa@samsung.com> wrote:
+> Hi Yadwinder,
+>
+> On Thursday 30 of May 2013 12:25:40 Yadwinder Singh Brar wrote:
+>> Hi Doug,
+>>
+>> On Thu, May 30, 2013 at 5:14 AM, Doug Anderson <dianders@chromium.org>
+> wrote:
+>> > Vikas / Yadwinder,
+>> >
+>> > On Wed, May 29, 2013 at 6:37 AM, Vikas Sajjan <vikas.sajjan@linaro.org>
+> wrote:
+>> >> From: Yadwinder Singh Brar <yadi.brar@samsung.com>
+>> >>
+>> >> This patch defines a common rate_table which will contain recommended p,
+>> >> m, s, k values for supported rates that needs to be changed for changing
+>> >> corresponding PLL's rate.
+>> >>
+>> >> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+>> >> ---
+>> >>
+>> >>  drivers/clk/samsung/clk-exynos4.c    |    8 ++++----
+>> >>  drivers/clk/samsung/clk-exynos5250.c |   14 +++++++-------
+>> >>  drivers/clk/samsung/clk-pll.c        |   14 ++++++++++++--
+>> >>  drivers/clk/samsung/clk-pll.h        |   33
+>> >>  +++++++++++++++++++++++++++++++-- 4 files changed, 54 insertions(+), 15
+>> >>  deletions(-)
+>> >
+>> > I also reviewed this in our gerrit
+>> > <https://gerrit.chromium.org/gerrit/#/c/56742/>, but I'll summarize
+>> > here for the list...
+>> >
+>> >>  struct clk * __init samsung_clk_register_pll35xx(const char *name,
+>> >>
+>> >> -                       const char *pname, const void __iomem *base)
+>> >> +                       const char *pname, const void __iomem *base,
+>> >> +                       const struct samsung_pll_rate_table *rate_table,
+>> >> +                       const unsigned int rate_count)
+>> >
+>> > Feels like you should document here that rate_table needs to be sorted
+>> > and the sort order.
+>>
+>> sure,  we will add comment  to sort the table in descending order.
+>>
+>> >> +struct samsung_pll_rate_table {
+>> >> +       unsigned  int rate;
+>> >
+>> > nit: extra space before "int" should be removed.
+>>
+>> ok
+>>
+>> > Also: you can include rate here if you need a convenient place to
+>> > store it (which sadly means that this structure can't be const).
+>> > ...but I do like Tomasz's idea of actually calculating it.  You can't
+>> > know it at compile time since the parent rate comes from the device
+>> > tree.
+>> >
+>> > compatible = "samsung,clock-xxti";
+>> > clock-frequency = <24000000>;
+>>
+>> Actually this table should contain the recommended values
+>> and if we see the user manual, the input(parent) rate is also a part
+>> of recommended
+>> table of different output rate for a particular PLL for that SoC.
+>
+> From what I understood in the documentation is that there is a set of
+> recommended P, M, S (, K) tuples for each PLL and they are not dependent on
+> input frequency - f_in and f_out are provided in the table just for reference
+> to see the relation between output frequency and input frequency.
+>
 
-  Unable to handle kernel paging request at virtual address 4020841c
-  pgd = c490c000
-  [4020841c] *pgd=84451831, *pte=bf05859d, *ppte=00000000
-  Internal error: Oops: 17 [#1] PREEMPT SMP ARM
-  Modules linked in: hid_sony(O)
-  CPU: 1    Tainted: G        W  O  (3.4.0-perf-gf496dca-01162-gcbcc62b #1)
-  PC is at vector_swi+0x28/0x88
-  LR is at 0x40208420
+If input rate(f_in) gets changed for PLL, then the corresponding
+output rates(f_out)
+will change by using same(common) set of  recommended P, M, S (, K),
+and the new set of  output rates(f_out) may not be the _required_ set
+of target rates.
+So we need different set of P, M, S (,K) values for different f_in.
 
-This patch wraps all of the swi instruction loads with the USER macro
-and provides a shared exception table entry which simply rewinds the
-saved user PC and returns from the system call (without setting tbl, so
-there's no worries with tracing or syscall restarting). Returning to
-userspace will re-enter the page fault handler, from where we will
-probably send SIGSEGV to the current task.
+Table should contain set of P, M, S (,K) values for the _required_
+target(f_out) rates
+for a particular input(f_in) rate.
 
-Reported-by: Wang, Yalin <yalin.wang@sonymobile.com>
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+> I think we should ask some H/W engineer about that to make sure and choose the
+> proper implementation, which will work properly for future cases, instead of
+> ending with something that works just with current cases.
+>
 
-v1 -> v2: Fixed comment to indicate that the fixup is only to deal with
-          fatal faults.
+We already asked hardware engineer about PMS values for PLL,
+and we got a table containing recommended  P, M ,S values for a given
+f_in(24 MHz)
+and required f_out rates.
 
- arch/arm/kernel/entry-common.S | 42 +++++++++++++++++++++++++++++-------------
- 1 file changed, 29 insertions(+), 13 deletions(-)
+Please let me know, why you think we are specific to current cases only ?
 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index bc5bc0a..4bc816a 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -362,6 +362,16 @@ ENTRY(vector_swi)
- 	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
- 	zero_fp
- 
-+#ifdef CONFIG_ALIGNMENT_TRAP
-+	ldr	ip, __cr_alignment
-+	ldr	ip, [ip]
-+	mcr	p15, 0, ip, c1, c0		@ update control register
-+#endif
-+
-+	enable_irq
-+	ct_user_exit
-+	get_thread_info tsk
-+
- 	/*
- 	 * Get the system call number.
- 	 */
-@@ -375,9 +385,9 @@ ENTRY(vector_swi)
- #ifdef CONFIG_ARM_THUMB
- 	tst	r8, #PSR_T_BIT
- 	movne	r10, #0				@ no thumb OABI emulation
--	ldreq	r10, [lr, #-4]			@ get SWI instruction
-+ USER(	ldreq	r10, [lr, #-4]		)	@ get SWI instruction
- #else
--	ldr	r10, [lr, #-4]			@ get SWI instruction
-+ USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
- #endif
- #ifdef CONFIG_CPU_ENDIAN_BE8
- 	rev	r10, r10			@ little endian instruction
-@@ -392,22 +402,13 @@ ENTRY(vector_swi)
- 	/* Legacy ABI only, possibly thumb mode. */
- 	tst	r8, #PSR_T_BIT			@ this is SPSR from save_user_regs
- 	addne	scno, r7, #__NR_SYSCALL_BASE	@ put OS number in
--	ldreq	scno, [lr, #-4]
-+ USER(	ldreq	scno, [lr, #-4]		)
- 
- #else
- 	/* Legacy ABI only. */
--	ldr	scno, [lr, #-4]			@ get SWI instruction
-+ USER(	ldr	scno, [lr, #-4]		)	@ get SWI instruction
- #endif
- 
--#ifdef CONFIG_ALIGNMENT_TRAP
--	ldr	ip, __cr_alignment
--	ldr	ip, [ip]
--	mcr	p15, 0, ip, c1, c0		@ update control register
--#endif
--	enable_irq
--	ct_user_exit
--
--	get_thread_info tsk
- 	adr	tbl, sys_call_table		@ load syscall table pointer
- 
- #if defined(CONFIG_OABI_COMPAT)
-@@ -442,6 +443,21 @@ local_restart:
- 	eor	r0, scno, #__NR_SYSCALL_BASE	@ put OS number back
- 	bcs	arm_syscall	
- 	b	sys_ni_syscall			@ not private func
-+
-+#if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
-+	/*
-+	 * We failed to handle a fault trying to access the page
-+	 * containing the swi instruction, but we're not really in a
-+	 * position to return -EFAULT. Instead, return back to the
-+	 * instruction and re-enter the user fault handling path trying
-+	 * to page it in. This will likely result in sending SEGV to the
-+	 * current task.
-+	 */
-+9001:
-+	sub	lr, lr, #4
-+	str	lr, [sp, #S_PC]
-+	b	ret_fast_syscall
-+#endif
- ENDPROC(vector_swi)
- 
- 	/*
--- 
-1.8.2.2
+Regards,
+Yadwinder
+
+> Best regards,
+> --
+> Tomasz Figa
+> Linux Kernel Developer
+> Samsung R&D Institute Poland
+> Samsung Electronics
+>
+>> So as Tomasz said input(parent) rate may change with board,
+>> then, do those corresponding recommended p, m, s, k will be valid?
+>>
+>> In case, input(parent) rate changes then we may need different set of p, m
+>> ,s, k values recommended for new input rate to get required(recommended to
+>> use) output rate.
+>>
+>> So, we think its better that the p, m, s and k along with the parent
+>> is known at the compile time ( or DT ?),
+>> as these p, m, s, k values are very much coupled with the parent rate
+>> to achieve the
+>>  required(recommended to use) output rate.
+>>
+>> Also, since the sorted table is required (sorted based on "rate"),
+>> its better to have the rate in a const rate table.
+>>
+>> And the whole set of recommended values should come from same place(DT
+>> or static table),
+>> to keep the things simple and consistent.
+>>
+>> Moreover, practically for a particular SoC , we use the recommended
+>> input(parent) rate only for a PLL.
+>> So we should keep the things simple here presently.
+>>
+>> >> +       unsigned int pdiv;
+>> >> +       unsigned int mdiv;
+>> >> +       unsigned int sdiv;
+>> >> +       unsigned int kdiv;
+>> >
+>> > I think kdiv is signed.
+>>
+>> No, as these values should be the recommended values to be written in
+>> corresponding  register bits. So it should remain unsigned.
+>>
+>> K value should be considered as negative only while recalculating rate.
+>>
+>> As per exynos5250 user manual's section 7.3.2 :
+>> " K value description "Postive value (Negative value)":
+>> Postive values is that you should write EPLLCON/VPLLCON register.
+>> Negative value is that you can calculate PLL output frequency with it."
+>>
+>> > -Doug
+>>
+>> Regards,
+>> Yadwinder & Vikas.
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc"
+>> in the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
