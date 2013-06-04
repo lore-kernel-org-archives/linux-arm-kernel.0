@@ -1,38 +1,39 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 04 Jun 2013 13:29:34 +0100
-Subject: Planning the merge of KVM/arm64
-Message-ID: <51ADDDAE.4040705@arm.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 04 Jun 2013 17:58:08 +0530
+Subject: [PATCH V5 3/5] ARM: dts: add Exynos audio subsystem clock controller
+ node
+In-Reply-To: <1370348890-6645-1-git-send-email-padma.v@samsung.com>
+References: <1370348890-6645-1-git-send-email-padma.v@samsung.com>
+Message-ID: <1370348890-6645-4-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys,
+Audio subsystem introduced in s5pv210 and exynos platforms
+which has a internal clock controller. This patch adds a node
+for the same on exynos5250.
 
-The KVM/arm64 code is now, as it seems, in good enough shape to be
-merged. I've so far addressed all the comments, and it doesn't seem any
-worse then what is queued for its 32bit counterpart.
+Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+---
+ arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
+ 1 files changed, 6 insertions(+), 0 deletions(-)
 
-For reference, it is sitting there:
-git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-kvm-arm64/kvm
-
-What is not defined yet is the merge path:
-- It is touching some of the arm64 core code, so it would be better if
-it was merged through the arm64 tree
-- It is depending on some of the patches in the core KVM queue (the
-vgic/timer move to virt/kvm/arm/)
-- It is also depending on some of the patches that are in the KVM/ARM
-queue (parametrized timer interrupt, some MMU/MMIO fixes)
-
-So I can see two possibilities:
-- Either I can rely on a stable branch from both KVM and KVM/ARM trees
-on which I can base my tree for Catalin/Will to pull,
-- Or I ask Catalin to only pull the arm64 part *minus the Kconfig*, and
-only merge this last bit when the dependencies are satisfied in Linus' tree.
-
-What do you guys think?
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index bccda67..388983e 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -72,6 +72,12 @@
+ 		#clock-cells = <1>;
+ 	};
+ 
++	clock_audss: audss-clock-controller at 3810000 {
++		compatible = "samsung,exynos5250-audss-clock";
++		reg = <0x03810000 0x0C>;
++		#clock-cells = <1>;
++	};
++
+ 	gic:interrupt-controller at 10481000 {
+ 		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+ 		#interrupt-cells = <3>;
 -- 
-Jazz is not dead. It just smells funny...
+1.7.4.4
