@@ -1,113 +1,50 @@
 From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 04 Jun 2013 08:52:12 +0200
-Subject: [PATCHv2 1/3] Add support for GMT G762/G763 PWM fan controller
-References: <cover.1369687670.git.arno@natisbad.org>
- <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
- <20130531221616.GG7626@kw.sim.vm.gnt> <87fvx1pwrl.fsf@natisbad.org>
- <20130602215904.GH7626@kw.sim.vm.gnt>
-Message-ID: <87sj0yz7tv.fsf@natisbad.org>
+Date: Tue, 04 Jun 2013 08:54:23 +0200
+Subject: [PATCHv3 1/3] Add support for GMT G762/G763 PWM fan controller
+References: <cover.1370202835.git.arno@natisbad.org>
+ <a7bfda1de9cce8044434369428341d3fb05cf42c.1370202835.git.arno@natisbad.org>
+ <20130603023444.GB11723@roeck-us.net>
+Message-ID: <87li6qz7q8.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi,
 
-Simon Guinot <simon.guinot@sequanux.org> writes:
+Guenter Roeck <linux@roeck-us.net> writes:
 
-> On Sat, Jun 01, 2013 at 07:26:54PM +0200, Arnaud Ebalard wrote:
->> Hi Simon and Guenter,
+> On Sun, Jun 02, 2013 at 10:14:19PM +0200, Arnaud Ebalard wrote:
 >> 
->> Simon Guinot <simon.guinot@sequanux.org> writes:
+>> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+>> ---
+>>  drivers/hwmon/Kconfig              |   10 +
+>>  drivers/hwmon/Makefile             |    1 +
+>>  drivers/hwmon/g762.c               | 1179 ++++++++++++++++++++++++++++++++++++
+>>  include/linux/platform_data/g762.h |   51 ++
+>>  4 files changed, 1241 insertions(+)
+>>  create mode 100644 drivers/hwmon/g762.c
+>>  create mode 100644 include/linux/platform_data/g762.h
 >> 
->> > On Tue, May 28, 2013 at 12:03:14AM +0200, Arnaud Ebalard wrote:
->> >> 
->> >> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
->> >> ---
->> >>  drivers/hwmon/Kconfig              |   10 +
->> >>  drivers/hwmon/Makefile             |    1 +
->> >>  drivers/hwmon/g762.c               | 1012 ++++++++++++++++++++++++++++++++++++
->> >>  include/linux/platform_data/g762.h |   54 ++
->> >>  4 files changed, 1077 insertions(+)
->> >>  create mode 100644 drivers/hwmon/g762.c
->> >>  create mode 100644 include/linux/platform_data/g762.h
->> >
->> > Hi Arnaud,
->> >
->> > After more tests on my 2Big Network v2 board, it appears that the fan
->> > doesn't rotate when PWM mode (the preferred operating mode for this
->> > board) is selected. Nevertheless, DC mode is usable (even if not ideal
->> > given the hardware). After some investigations I noticed that an extra
->> > initialization is needed to enable PWM mode on my board: the set_cnt
->> > register must be set to 0 while the default value is 0xff. Is that
->> > specific to my hardware ? Is PWM mode working on your ReadyNAS with
->> > the default set_cnt value ?
->> 
->> First, thanks for testing this!
->> 
->> Regarding your problem, I first started by booting current version of my
->> driver on the Duo v2 w/o touching chip registers (only clock reference
->> value). This way, I inherit the values installed by (NETGEAR's) u-boot:
->> 
->> $ for k in fan* pwm* ; do echo -n "$k:" ; echo `cat $k `; done
->> fan1_alarm:0
->> fan1_div:2
->> fan1_fault:0
->> fan1_input:1807
->> fan1_target:1807
->> pwm1:221
->> pwm1_enable:2        /* closed-loop, i.e. config is done via set_cnt */
->> pwm1_mode:1          /* PWM mode */ 
+> [ ... ]
 >
-> Sorry, I realize that I have not been very accurate in my description of
-> the problem: The fan doesn't rotate when PWM _and_ open-loop control are
-> selected. On the 2Big2 board, 2 wires are used to drive the fan.
+>> +static inline int g762_read_byte(const struct i2c_client *client, u8 reg,
+>> +				 u8 *dest)
+>> +{
+>> +	int ret;
+>> +
+>> +	ret = i2c_smbus_read_byte_data(client, reg);
+>> +	if (ret < 0) {
+>> +		dev_err(&client->dev, "failed to read reg %x02x, err %d\n",
+>> +			(int)reg, ret);
 >
-> Then with pwm1_mode=1, pwm1_enable=1 and set_cnt=0xff (default value),
-> nothing happen whatever the value I write in pwm1.
+> I would suggest to write a piece of test code for the above statement and
+> observe its output. "printf("%x02x\n", 0x1234);" should do.
 
-After boot, with set_cnt and set_out untouched by me (set_cnt set to
-0x5a by u-boot, i.e. 255-0x5a read on pwm1):
+good catch. s/%x02x/0x%02x/.
 
-fan1_alarm:0
-fan1_div:1
-fan1_fault:0
-fan1_input:1365
-fan1_target:1365
-pwm1:0                  /* set_out is 0 (considering fan1_target,
-                           set_cnt is 0x5a)*/
-pwm1_enable:2           /* closed-loop */
-pwm1_mode:0             /* DC mode */
+> Is the error message really needed ? If there is a persistent error,
+> it will clog the log.
 
-# echo 1 > pwm1_mode    /* PWM mode */       # fan rotates 
-# echo 1 > pwm1_enable  /* open-loop */      # fan stops rotating
-
-At that point we have:
-
-fan1_alarm:0
-fan1_div:1
-fan1_fault:0
-fan1_input:0
-fan1_target:1365
-pwm1:0                  /* set_out is 0, set_cnt is still 0x5a */
-pwm1_enable:1
-pwm1_mode:1
-
-Then:
-
-# echo 100 > pwm1                            # fan rotates
-
-
-> By testing, I have discovered that writing 0 into set_cnt allows to work
-> around the issue. I can do this by using the closed-loop control:
-> pwm1_mode=1, pwm1_enable=2 and pwm=255. Now, set_cnt worths 0 and if I
-> switch back to open-loop control, all works as expected.
->
-> Can you try open-loop control and PWM mode with your board ? I wonder if
-> this issue is specific to the 2Big2 hardware.
-
-AFAICT, set_cnt has never been set to 0 in my test and PWM+open-loop
-works as expected, i.e. just by setting a non-zero value in set_out.
-Tell me if I missed something or if you want me to perform another
-test.
+I removed it in v4 to come.
 
 Cheers,
 
