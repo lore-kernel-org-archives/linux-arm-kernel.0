@@ -1,29 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 4 Jun 2013 02:06:40 -0300
-Subject: [PATCH v6] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <B56CDBE15CE27145A4B77D2D24263E851CF068@039-SN1MPN1-003.039d.mgd.msft.net>
-References: <1370309270-21019-1-git-send-email-b35083@freescale.com>
- <CAOMZO5BNbbbX0wycis_3nyg-B76kJYrQu-e+D1SpGLs10Zp3yw@mail.gmail.com>
- <B56CDBE15CE27145A4B77D2D24263E851CEFD9@039-SN1MPN1-003.039d.mgd.msft.net>
- <CAOMZO5DzVhh4REj5S=cVVVrGzxmTxY9s_h_6ZQ-G8wOxi+KG=A@mail.gmail.com>
- <CAOMZO5Bo58Qa0Rmz+oKt0ZOUjYDDskBsPykCVc79j4mybcG8rA@mail.gmail.com>
- <B56CDBE15CE27145A4B77D2D24263E851CF068@039-SN1MPN1-003.039d.mgd.msft.net>
-Message-ID: <CAOMZO5BQ6kef8u4_K3S6vCAa0Ym4HJhg1TcmpYx7i8gFphTnew@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 4 Jun 2013 14:09:17 +0900
+Subject: [PATCH 09/12] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
+In-Reply-To: <20130528035019.GI13532@quad.lixom.net>
+References: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
+ <1369645193-3595-10-git-send-email-horms+renesas@verge.net.au>
+ <20130528035019.GI13532@quad.lixom.net>
+Message-ID: <20130604050915.GU23054@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 4, 2013 at 1:55 AM, Lu Jingchang-B35083
-<B35083@freescale.com> wrote:
+On Mon, May 27, 2013 at 08:50:19PM -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, May 27, 2013 at 05:59:50PM +0900, Simon Horman wrote:
+> > From: Bastian Hecht <hechtb@gmail.com>
+> > 
+> > We add 2 Suspend to RAM modes:
+> > - A3SM PLL0 on/off:     Power domain A3SM that contains the ARM core
+> >                         and the 2nd level cache with either PLL0 on
+> >                         or off
+> > 
+> > As the suspend to memory mechanism we use A3SM PLL off. A3SM PLL on
+> > is included here too, so CPUIdle can use both power down modes (not
+> > included in this patch).
+> > 
+> > The setup of the SYSC regarding the external IRQs is taken from
+> > pm-sh7372.c from Magnus Damm.
+> > 
+> > Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> 
+> Missing S-o-b from you, Simon?
+> 
+> > +	.text
+> > +ENTRY(v7_cpu_resume)
+> > +	bl	v7_invalidate_l1
+> > +	b	cpu_resume
+> > +ENDPROC(v7_cpu_resume)
+> 
+> This is a global namespace so it'll conflict with i.MX whenever
+> you multiplatform enable shmobile. Might want to pick a more
+> unique name.
 
->   From your patch of " serial: imx: Allow module build", I think the code between #ifdef CONFIG_SERIAL_IMX_CONSOLE ... #else in imx.c won't be built because the configuration is CONFIG_SERIAL_IMX_CONSOLE_MODULE now. So it is the same as if disable CONFIG_SERIAL_IMX_CONSOLE when built the driver as a module, isn't it?
->  On other hand, if enable CONFIG_SERIAL_X_CONSOLE option when the driver is configured as module, the build will fail with message like ERROR: "uart_console_device" [drivers/tty/serial/**.ko] undefined! Stephen Rothwel gives the solution once at url:
-> http://www.linuxhorizon.com/9-linux/42b33a65f64d95a2.htm
->   I have checked drivers/tty/serial/Kconfig to make sure that other serial drivers indeed did this way.
-
-Maybe we need to use "#if IS_ENABLED(CONFIG_SERIAL_IMX_CONSOLE)"
-
-I will resend the series tomorrow.
-
-Thanks,
-
-Fabio Estevam
+I have decided to drop this and related cpuidle and suspend-to-ram
+patches for r8a7740 after discussion with Magnus.
