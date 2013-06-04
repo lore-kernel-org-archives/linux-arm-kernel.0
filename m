@@ -1,36 +1,80 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 4 Jun 2013 11:36:09 +0200
-Subject: [PATCH v2 0/4] dw_apb_timer: osc as sched_clock,
- clocks and clocksource_of support
-Message-ID: <201306041136.09566.heiko@sntech.de>
+Date: Tue, 4 Jun 2013 11:37:02 +0200
+Subject: [PATCH v2 1/4] clocksource: dw_apb_timer_of: enable the use the
+ clocksource as sched clock
+In-Reply-To: <201306041136.09566.heiko@sntech.de>
+References: <201306041136.09566.heiko@sntech.de>
+Message-ID: <201306041137.03319.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is split off of my Rockchip support series from yesterday. It's now
-a patch more than before, as the third patch enables the timer to be used
-thru clocksource_of_init and moves picoxcell and socfpga to it.
+Currently the dw_apb_timer always expects a separate special timer to be
+availbable for the sched_clock. Some devices using dw_apb_timers do not
+have this sptimer but can use the clocksource as sched_clock instead.
 
-changes since v1:
-- hopefully improve the patch description of patch 1
-  after a suggestion by Linus Walleij
-- move the selection of DW_APB_TIMER and CLKSRC_OF into DW_APB_TIMER_OF
-  after a suggestion by Baruch Siach
+Therefore enable the driver to distiguish between devices with and without
+sptimer based on the devicetree data and select the correct timer as
+sched_clock.
 
-Heiko Stuebner (4):
-  clocksource: dw_apb_timer_of: enable the use the clocksource as sched clock
-  clocksource: dw_apb_timer_of: add clock-handling
-  clocksource: dw_apb_timer_of: select DW_APB_TIMER
-  clocksource: dw_apb_timer_of: use clocksource_of_init
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/clocksource/dw_apb_timer_of.c |   26 +++++++++++++++++---------
+ 1 files changed, 17 insertions(+), 9 deletions(-)
 
- Documentation/devicetree/bindings/rtc/dw-apb.txt |   19 +++++
- arch/arm/mach-picoxcell/Kconfig                  |    1 -
- arch/arm/mach-picoxcell/common.c                 |    2 -
- arch/arm/mach-socfpga/Kconfig                    |    1 -
- arch/arm/mach-socfpga/socfpga.c                  |    2 -
- drivers/clocksource/Kconfig                      |    2 +
- drivers/clocksource/dw_apb_timer_of.c            |   95 ++++++++++++++-------
- include/linux/dw_apb_timer.h                     |    1 -
- 8 files changed, 84 insertions(+), 39 deletions(-)
-
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index ab09ed3..d6c0fda 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -57,6 +57,9 @@ static void add_clockevent(struct device_node *event_timer)
+ 	dw_apb_clockevent_register(ced);
+ }
+ 
++static void __iomem *sched_io_base;
++static u32 sched_rate;
++
+ static void add_clocksource(struct device_node *source_timer)
+ {
+ 	void __iomem *iobase;
+@@ -71,9 +74,15 @@ static void add_clocksource(struct device_node *source_timer)
+ 
+ 	dw_apb_clocksource_start(cs);
+ 	dw_apb_clocksource_register(cs);
+-}
+ 
+-static void __iomem *sched_io_base;
++	/*
++	 * Fallback to use the clocksource as sched_clock if no separate
++	 * timer is found. sched_io_base then points to the current_value
++	 * register of the clocksource timer.
++	 */
++	sched_io_base = iobase + 0x04;
++	sched_rate = rate;
++}
+ 
+ static u32 read_sched_clock(void)
+ {
+@@ -89,16 +98,15 @@ static const struct of_device_id sptimer_ids[] __initconst = {
+ static void init_sched_clock(void)
+ {
+ 	struct device_node *sched_timer;
+-	u32 rate;
+ 
+ 	sched_timer = of_find_matching_node(NULL, sptimer_ids);
+-	if (!sched_timer)
+-		panic("No RTC for sched clock to use");
+-
+-	timer_get_base_and_rate(sched_timer, &sched_io_base, &rate);
+-	of_node_put(sched_timer);
++	if (sched_timer) {
++		timer_get_base_and_rate(sched_timer, &sched_io_base,
++					&sched_rate);
++		of_node_put(sched_timer);
++	}
+ 
+-	setup_sched_clock(read_sched_clock, 32, rate);
++	setup_sched_clock(read_sched_clock, 32, sched_rate);
+ }
+ 
+ static const struct of_device_id osctimer_ids[] __initconst = {
 -- 
 1.7.2.3
