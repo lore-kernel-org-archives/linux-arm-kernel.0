@@ -1,59 +1,43 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 4 Jun 2013 16:36:50 +0100
-Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
-In-Reply-To: <6466898.RnYOe3jpGG@wuerfel>
-References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
- <51A5BA86.3070609@free-electrons.com>
- <20130530.024201.1913984663902628192.davem@davemloft.net>
- <6466898.RnYOe3jpGG@wuerfel>
-Message-ID: <CAGVrzcbRS3x5fgD1BfOk4-oTUsAY9FA2V621OvZLJQNZ01brCg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Jun 2013 16:40:23 +0100
+Subject: Planning the merge of KVM/arm64
+In-Reply-To: <51AE082C.6050907@redhat.com>
+References: <51ADDDAE.4040705@arm.com>
+ <CAMJs5B_PB1pNVCO_EK7aTghN23L+d0RovAFi7inrVsJb5STWOA@mail.gmail.com>
+ <51AE00D7.9030607@arm.com> <51AE082C.6050907@redhat.com>
+Message-ID: <20130604154023.GS27516@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/4 Arnd Bergmann <arnd@arndb.de>:
->> Or you properly segregate the networking bits of the platform code so
->> that it can be built only when the necessary networking portions are
->> enabled.
->>
->> Sometimes having dummy stubs makes sense, but not in this situation.
->
-> Currently most users of this function are doing something like
->
-> static int foo_phy_fixup(struct phy_device *phydev)
-> {
->         ...
-> }
->
-> static int __init boo_board_init(void)
-> {
->          if (IS_BUILTIN(CONFIG_PHYLIB))
->                 phy_register_fixup_for_uid(phy_id, foo_phy_fixup);
-> }
->
-> which is practically the same as having a dummy stub. It leads to
-> the foo_phy_fixup() function always getting compiled and then discarded
-> by gcc when CONFIG_PHYLIB is disabled.
->
-> The method is currently broken when network drivers are enabled as
-> modules, because we are missing the fixup then.
->
-> I think we should use IS_ENABLED() here to force a build error
-> in that case, and have something like
->
-> config ARCH_FOO
->         bool "support for the foo platform"
->         select PHYLIB if NET
->
-> in the platform Kconfig file, to ensure PHYLIB is always built-in.
->
-> I still think the inline alternatives would be helpful, but using
-> if (IS_ENABLED(CONFIG_PHYLIB)) in the platform code would also
-> work.
+On Tue, Jun 04, 2013 at 04:30:52PM +0100, Paolo Bonzini wrote:
+> Il 04/06/2013 16:59, Marc Zyngier ha scritto:
+> >>> >> - Either I can rely on a stable branch from both KVM and KVM/ARM trees
+> >>> >> on which I can base my tree for Catalin/Will to pull,
+> >>> >> - Or I ask Catalin to only pull the arm64 part *minus the Kconfig*, and
+> >>> >> only merge this last bit when the dependencies are satisfied in Linus' tree.
+> >>> >>
+> >>> >> What do you guys think?
+> >>> >>
+> >> > I would think you would prefer option (1) to get the code in cleaner.
+> >> > Both the KVM/next tree is stable and I can provide you with a stable
+> >> > KVM/ARM tree. But I really don't feel strongly about this.
+> > That'd be my preferred choice too. Let's see what the KVM maintainers'
+> > position on that.
+> 
+> I wonder if Linus would complain about irrelevant KVM changes in
+> Will/Catalin's pull request.  The KVM/next tree has other patches below
+> the ones you need.
+> 
+> What we usually do for x86 is get an Acked-by from the other part.  If
+> there are no dependencies on other aarch64 core changes, it'd be better
+> to go through the KVM tree.  Otherwise separating the Kconfig change
+> should be okay (perhaps add it with depends on BROKEN, and remove the
+> dependency later?).
 
-It seems to me that what David proposes is to have say an
-arch/arm/mach-foo/phy-fixups.c file which is only enabled when
-CONFIG_PHYLIB is set (obj-$(CONFIG_PHYLIB) += phy-fixup.o), such that
-it does not need to have any conditionnals when calling
-phy_register_fixup. This sounds a little unusual, but why not.
---
-Florian
+Well you can certainly have my ack for the series but, as you say, it
+depends whether there are further dependencies on patches queued for aarch64
+core. For 3.11, conflicts with Steve's (CC'd) hugetlb stuff are likely.
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
