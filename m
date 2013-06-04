@@ -1,68 +1,60 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Tue, 4 Jun 2013 10:33:46 -0700
-Subject: [PATCH] ARM: ux500: register LP5521 LEDs in the device tree
-In-Reply-To: <20130604073507.GL3370@gmail.com>
-References: <1369210331-18545-1-git-send-email-linus.walleij@stericsson.com>
- <CAK5ve-+oJL0fbtM=5xRSBjCztX1fP-fcwUvZurnj42hiXR5X+Q@mail.gmail.com>
- <20130603081805.GC3370@gmail.com>
- <CAK5ve-+ykvTfpfsyAfnoURwuZt1nF4aFPGU5yQa0HXXBmWW_9Q@mail.gmail.com>
- <20130604073507.GL3370@gmail.com>
-Message-ID: <CAK5ve-Ke62f0q-BeALPj4ToE2a3f-b7VvAGwMeQJwt=WZ+fRyg@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Jun 2013 18:35:32 +0100
+Subject: [PATCH v2 1/2] ARM PJ4B: Add support for errata 4742
+In-Reply-To: <51AE21A7.5080907@free-electrons.com>
+References: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
+ <1370354598-12920-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130604145958.GY18614@n2100.arm.linux.org.uk>
+ <51AE21A7.5080907@free-electrons.com>
+Message-ID: <20130604173532.GB27516@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 4, 2013 at 12:35 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Mon, 03 Jun 2013, Bryan Wu wrote:
->
->> On Mon, Jun 3, 2013 at 1:18 AM, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Fri, 31 May 2013, Bryan Wu wrote:
->> >
->> >> On Wed, May 22, 2013 at 1:12 AM, Linus Walleij
->> >> <linus.walleij@stericsson.com> wrote:
->> >> > From: Linus Walleij <linus.walleij@linaro.org>
->> >> >
->> >> > Based on pending device tree support in the LP55xx drivers
->> >> > we can add the correct LED and channel configuration from the
->> >> > ux500 device tree for all HREF variants.
->> >> >
->> >> > Cc: Milo Kim <Milo.Kim@ti.com>
->> >> > Cc: Bryan Wu <cooloney@gmail.com>
->> >> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->> >> > ---
->> >> >  arch/arm/boot/dts/href.dtsi | 38 ++++++++++++++++++++++++++++++++------
->> >> >  1 file changed, 32 insertions(+), 6 deletions(-)
->> >> >
->> >> > diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
->> >> > index 62523f6..e315429 100644
->> >> > --- a/arch/arm/boot/dts/href.dtsi
->> >> > +++ b/arch/arm/boot/dts/href.dtsi
->> >> > @@ -63,16 +63,42 @@
->> >> >                 };
->> >> >
->> >> >                 i2c at 80128000 {
->> >> > -                       lp5521 at 0x33 {
->> >> > -                               compatible = "lp5521";
->> >> > +                       lp5521 at 33 {
->> >>
->> >> Is this right, I guess it should be still "lp5521 at 0x33", although it's
->> >> just a name.
->> >
->> > What makes you say that Bryan?
->> >
->> > All other nodes drop the '0x', as it's implied.
->> >
->>
->> But I still got this in this patch
->> "  bh1780 at 0x29 {"
->>
->> which is not changed. So which one should be the right?
->
-> The one without the '0x' is correct.
->
-> If there are any of these left over that Linus hasn't fixed yet, I'm
-> happy to fix.
+On Tue, Jun 04, 2013 at 06:19:35PM +0100, Gregory CLEMENT wrote:
+> On 06/04/2013 04:59 PM, Russell King - ARM Linux wrote:
+> > On Tue, Jun 04, 2013 at 04:03:17PM +0200, Gregory CLEMENT wrote:
+> >> From: Lior Amsalem <alior@marvell.com>
+> >>
+> >> This commit fixes the regression on Armada 370 (the kernal hang during
+> >> boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
+> >> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
+> >>
+> >> When coming out of either a Wait for Interrupt (WFI) or a Wait for
+> >> Event (WFE) IDLE states, a specific timing sensitivity exists between
+> >> the retiring WFI/WFE instructions and the newly issued subsequent
+> >> instructions. This sensitivity can result in a CPU hang scenario.  The
+> >> workaround is to insert either a Data Synchronization Barrier (DSB) or
+> >> Data Memory Barrier (DMB) command immediately after the WFI/WFE
+> >> instruction
+> > 
+> > Wouldn't a DMB be cheaper than a full blown DSB here?
+> 
+> I let Lior answer to this question.
+> 
+> > 
+> > Also, we could detect the PJ4B and only implement the workaround
+> > on those CPUs rather than having to have it on every v7 CPU - which
+> > is important when you consider the single zImage issues.
+> 
+> At least we can detect the PJ4B and maybe even the detect the if it
+> is the PJ4B or the PJ4B-MP.
+> 
+> Do you mean to add this test in the cpu_v7_do_idle() function?
 
-Sure, no problem. I just found this inconsistence confused me.
+I don't like the sound of that -- coming out of idle is basically all
+overhead, so adding to it doesn't sound pleasant. Also, given that we won't
+actually have any pending memory transactions at this point, a dsb needn't
+be too expensive because there's nothing to make visible (obviously requires
+benchmarking).
 
-Thanks,
--Bryan
+An alternative is disabling wfi/wfe on your core, if that's possible.
+
+> Or patching the pointer to the cpu_v7_do_idle() on the fly? In this
+> last case it seems a little tricky to me, as we should have to modify
+> a pointer function in the .proc.info.init section.
+
+Maybe you could hack glue-proc.h to define MULTI_CPU if this workaround is
+selected, then patch the pointer in struct processor. (apologies if this
+suggestion made you ill :).
+
+Will
