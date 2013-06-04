@@ -1,86 +1,126 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Jun 2013 12:28:34 +0100
-Subject: [PATCH v2 1/5] arm/xen: define xen_remap as ioremap_cached
-In-Reply-To: <1370337650.24512.88.camel@zakaz.uk.xensource.com>
-References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
- <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1370337650.24512.88.camel@zakaz.uk.xensource.com>
-Message-ID: <20130604112834.GA3234@MacBook-Pro.local>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue,  4 Jun 2013 12:30:46 +0100
+Subject: [PATCH v2] ARM: oabi: handle faults when loading swi instruction from
+ userspace
+Message-ID: <1370345446-32010-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 10:20:50AM +0100, Ian Campbell wrote:
-> On Mon, 2013-06-03 at 16:33 +0100, Stefano Stabellini wrote:
-> > Define xen_remap as ioremap_cache (MT_MEMORY and MT_DEVICE_CACHED end up
-> > having the same AttrIndx encoding).
-> 
-> The entries in static struct mem_type mem_types[] look entirely
-> different to me.  What am I missing?
-> 	[MT_DEVICE_CACHED] = {	  /* ioremap_cached */
-> 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
-> 		.prot_l1	= PMD_TYPE_TABLE,
-> 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
-> 		.domain		= DOMAIN_IO,
-> 	},
-> 	[MT_MEMORY] = {
-> 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
-> 		.prot_l1   = PMD_TYPE_TABLE,
-> 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
-> 		.domain    = DOMAIN_KERNEL,
-> 	},
-> 
-> I can see in pgtable-3level.h how L_PTE_MT_DEV_CACHED and
-> L_PTE_MT_WRITEBACK are the same but not where the MT_WRITEBACK comes
-> from for MT_MEMORY. Things are less clear in pgtable-2level.h, where one
-> is 0x3 and the other is 0xb. I can see that the entries are the same in
-> armv6_mt_table but how that would apply to a v7 processor?
+Running an OABI_COMPAT kernel on an SMP platform can lead to fun and
+games with page aging.
 
-PROT_PTE_DEVICE and PROT_SECT_DEVICE above don't contain any memory type
-information, just attributes/permission - present, young, dirty and XN:
+If one CPU issues a swi instruction immediately before another CPU
+decides to mkold the page containing the swi instruction, then we will
+fault attempting to load the instruction during the vector_swi handler
+in order to retrieve its immediate field. Since this fault is not
+currently dealt with by our exception tables, this results in a panic:
 
-#define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
-#define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+  Unable to handle kernel paging request at virtual address 4020841c
+  pgd = c490c000
+  [4020841c] *pgd=84451831, *pte=bf05859d, *ppte=00000000
+  Internal error: Oops: 17 [#1] PREEMPT SMP ARM
+  Modules linked in: hid_sony(O)
+  CPU: 1    Tainted: G        W  O  (3.4.0-perf-gf496dca-01162-gcbcc62b #1)
+  PC is at vector_swi+0x28/0x88
+  LR is at 0x40208420
 
-The memory type is given by the L_PTE_MT_DEV_CACHED and PMD_SECT_WB
-macros. Let's take prot_sect first as it's simpler. For MT_DEVICE_CACHED
-we have:
+This patch wraps all of the swi instruction loads with the USER macro
+and provides a shared exception table entry which simply rewinds the
+saved user PC and returns from the system call (without setting tbl, so
+there's no worries with tracing or syscall restarting). Returning to
+userspace will re-enter the page fault handler, from where we will
+probably send SIGSEGV to the current task.
 
-.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_WB
+Reported-by: Wang, Yalin <yalin.wang@sonymobile.com>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
 
-For MT_MEMORY we have:
+v1 -> v2: Fixed comment to indicate that the fixup is only to deal with
+          fatal faults.
 
-.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE
+ arch/arm/kernel/entry-common.S | 42 +++++++++++++++++++++++++++++-------------
+ 1 file changed, 29 insertions(+), 13 deletions(-)
 
-The cache policy is added later to MT_MEMORY which is either WB or WBWA
-(based on SMP, no particular reason as these are just processor hints;
-for some historical reasons we enabled WBWA for ARM11MPCore but we could
-leave it on all the time).
-
-Similarly for prot_pte, present, young, dirty are the same.
-
-Regarding the type, on ARMv7 (with or without LPAE) we use TEX remapping
-and L_PTE_MT_DEVICE has the same index (3-bit TEX[0], C, B for NMRR/PRRR
-or TEX[2:0] for MAIR0/MAIR1 registers) as Normal Cacheable Writeback
-memory (there is no such thing as Device memory with cacheability
-attributes, only Normal Cacheable memory).
-
-We have XN in addition for MT_DEVICE_CACHED to prevent speculative
-instruction fetches. However, you still get speculative D-cache line
-fills since the memory is Normal Cacheable.
-
-> Anyhow, even if I'm prepared to believe that MT_MEMORY and
-> MT_DEVICE_CACHED end up being the same thing (which TBH I am) it seems
-> that the level of abstraction involved makes us vulnerable to future
-> changes subtly breaking things for us. What about:
-> 
->         /* Device shared memory */
->         #define ioremap_shm(cookie,size)		__arm_ioremap((cookie), (size), MT_MEMORY)
-
-For my understanding, what is Xen doing with such mapping? I would
-rather make ioremap_cached() use MT_MEMORY on ARMv6/v7 (or make it
-closer to that, I'm not sure about the implications on ARMv5 and earlier
-but for newer architectures I don't see the point in pretending to have
-Cacheable Device memory). That's however for Russell to comment.
-
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index bc5bc0a..4bc816a 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -362,6 +362,16 @@ ENTRY(vector_swi)
+ 	str	r0, [sp, #S_OLD_R0]		@ Save OLD_R0
+ 	zero_fp
+ 
++#ifdef CONFIG_ALIGNMENT_TRAP
++	ldr	ip, __cr_alignment
++	ldr	ip, [ip]
++	mcr	p15, 0, ip, c1, c0		@ update control register
++#endif
++
++	enable_irq
++	ct_user_exit
++	get_thread_info tsk
++
+ 	/*
+ 	 * Get the system call number.
+ 	 */
+@@ -375,9 +385,9 @@ ENTRY(vector_swi)
+ #ifdef CONFIG_ARM_THUMB
+ 	tst	r8, #PSR_T_BIT
+ 	movne	r10, #0				@ no thumb OABI emulation
+-	ldreq	r10, [lr, #-4]			@ get SWI instruction
++ USER(	ldreq	r10, [lr, #-4]		)	@ get SWI instruction
+ #else
+-	ldr	r10, [lr, #-4]			@ get SWI instruction
++ USER(	ldr	r10, [lr, #-4]		)	@ get SWI instruction
+ #endif
+ #ifdef CONFIG_CPU_ENDIAN_BE8
+ 	rev	r10, r10			@ little endian instruction
+@@ -392,22 +402,13 @@ ENTRY(vector_swi)
+ 	/* Legacy ABI only, possibly thumb mode. */
+ 	tst	r8, #PSR_T_BIT			@ this is SPSR from save_user_regs
+ 	addne	scno, r7, #__NR_SYSCALL_BASE	@ put OS number in
+-	ldreq	scno, [lr, #-4]
++ USER(	ldreq	scno, [lr, #-4]		)
+ 
+ #else
+ 	/* Legacy ABI only. */
+-	ldr	scno, [lr, #-4]			@ get SWI instruction
++ USER(	ldr	scno, [lr, #-4]		)	@ get SWI instruction
+ #endif
+ 
+-#ifdef CONFIG_ALIGNMENT_TRAP
+-	ldr	ip, __cr_alignment
+-	ldr	ip, [ip]
+-	mcr	p15, 0, ip, c1, c0		@ update control register
+-#endif
+-	enable_irq
+-	ct_user_exit
+-
+-	get_thread_info tsk
+ 	adr	tbl, sys_call_table		@ load syscall table pointer
+ 
+ #if defined(CONFIG_OABI_COMPAT)
+@@ -442,6 +443,21 @@ local_restart:
+ 	eor	r0, scno, #__NR_SYSCALL_BASE	@ put OS number back
+ 	bcs	arm_syscall	
+ 	b	sys_ni_syscall			@ not private func
++
++#if defined(CONFIG_OABI_COMPAT) || !defined(CONFIG_AEABI)
++	/*
++	 * We failed to handle a fault trying to access the page
++	 * containing the swi instruction, but we're not really in a
++	 * position to return -EFAULT. Instead, return back to the
++	 * instruction and re-enter the user fault handling path trying
++	 * to page it in. This will likely result in sending SEGV to the
++	 * current task.
++	 */
++9001:
++	sub	lr, lr, #4
++	str	lr, [sp, #S_PC]
++	b	ret_fast_syscall
++#endif
+ ENDPROC(vector_swi)
+ 
+ 	/*
 -- 
-Catalin
+1.8.2.2
