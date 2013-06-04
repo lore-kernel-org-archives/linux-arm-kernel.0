@@ -1,34 +1,53 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 03 Jun 2013 17:19:48 -0700
-Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
-In-Reply-To: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51AD32A4.5070609@linaro.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 3 Jun 2013 17:35:25 -0700
+Subject: [RFC PATCH] ARM: update legacy CPU ID in decompressor cache
+ support jump table
+In-Reply-To: <CAO1A-8AaWyp6eq7c5nkU=KBxwrm1CM3erXcsxLmYpCn2mHhMUA@mail.gmail.com>
+References: <CAO1A-8AaWyp6eq7c5nkU=KBxwrm1CM3erXcsxLmYpCn2mHhMUA@mail.gmail.com>
+Message-ID: <20130604003525.GI599@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2013 11:39 PM, Stephen Boyd wrote:
-> This is mostly a resend of a patch series I sent a little over a month
-> ago. I've reordered the patches so that John can pick up the first three
-> and get a generic sched_clock layer without having to take the 64 bit
-> patches. The last three patches add 64 bit support and move the architected
-> timers on ARM64 and ARM to use it.
+On 06/03, Marc C wrote:
+> Hello,
+> 
+> The following is a formal RFC PATCH for the suggestion offered by rmk
+> in this thread:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-January/007871.html
+> 
+> The previous mask values for the legacy ARM CPU IDs were conflicting
+> with the CPU ID assignments for late-generation CPUs (like the
+> Qualcomm MSM/QSD or Broadcom Brahma-15 processors). This change
+> corrects the legacy ARM CPU ID value so that the jump table can
+> fall-through to the appropriate cache maintenance / MMU functions.
+> 
+> To: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+> ---
+>  arch/arm/boot/compressed/head.S |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index fe4d9c3..a1b9e83 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -805,8 +805,8 @@ call_cache_fn:      adr     r12, proc_types
+>                 .align  2
+>                 .type   proc_types,#object
+>  proc_types:
+> -               .word   0x00000000              @ old ARM ID
+> -               .word   0x0000f000
+> +               .word   0x41000000              @ old ARM ID
+> +               .word   0xff00f000
+>                 mov     pc, lr
+>   THUMB(                nop                             )
+>                 mov     pc, lr
 
+I sent a similar patch and Russell just applied it[1]. It removes
+this entry on V7 builds. Your patch will also work for me.
 
-Yea, so from the initial look over it, I think I'm happy with queuing 
-the first three patches, although I'd like to get some acks from arm 
-folks on at least the first two, just so no one is surprised with it 
-going through the -tip tree.
+[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7736/1
 
-It looks like the arm64 bit stuff needs a few more iterations w/ 
-Russell, so I'll not touch those.
-
-We still have a ways to go to consolidate x86 into this (need to handle 
-pv hooks), but it should provide a base to get some of the simpler 
-arches sharing the same infrastructure.
-
-Also I suspect we can maybe further combine this with the 
-kernel/sched/clock.c code, but I think this is a good start for now.
-
-thanks
--john
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
