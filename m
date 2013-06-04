@@ -1,45 +1,66 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 4 Jun 2013 09:54:33 -0400
-Subject: [GIT PULL 2/2] ARM: mvebu: pcie kirkwood for v3.11 (round 2)
-Message-ID: <20130604135433.GD3803@titan.lakedaemon.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 4 Jun 2013 14:58:57 +0100
+Subject: [PATCH v2 1/5] arm/xen: define xen_remap as ioremap_cached
+In-Reply-To: <20130604112834.GA3234@MacBook-Pro.local>
+References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
+ <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1370337650.24512.88.camel@zakaz.uk.xensource.com>
+ <20130604112834.GA3234@MacBook-Pro.local>
+Message-ID: <20130604135857.GV18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+On Tue, Jun 04, 2013 at 12:28:34PM +0100, Catalin Marinas wrote:
+> PROT_PTE_DEVICE and PROT_SECT_DEVICE above don't contain any memory type
+> information, just attributes/permission - present, young, dirty and XN:
+> 
+> #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+> #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+> 
+> The memory type is given by the L_PTE_MT_DEV_CACHED and PMD_SECT_WB
+> macros. Let's take prot_sect first as it's simpler. For MT_DEVICE_CACHED
+> we have:
+> 
+> .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_WB
+> 
+> For MT_MEMORY we have:
+> 
+> .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE
+> 
+> The cache policy is added later to MT_MEMORY which is either WB or WBWA
+> (based on SMP, no particular reason as these are just processor hints;
+> for some historical reasons we enabled WBWA for ARM11MPCore but we could
+> leave it on all the time).
 
-Here's a patch catching up a missed board in the DT conversion of
-kirkwood pcie.  There shouldn't be any more like this, so I'm just
-sending the single patch.
+They may be reported to be just hints, but SMP, particularly ARM11MPCore,
+the SMP guys at ARM Ltd were very particular about _requiring_ and stating
+that it is required that WBWA must be used in the page tables for SMP,
+and not WB.  That suggests while the ARM ARM may say that they're hints,
+there's slightly more to it when it comes to SMP, and WBWA is a hard
+requirement there.
 
-This has also been in -next for five days or so.
+Indeed, that's something we enforce in the kernel because of the statements
+from the SMP development group.
 
+> Similarly for prot_pte, present, young, dirty are the same.
+> 
+> Regarding the type, on ARMv7 (with or without LPAE) we use TEX remapping
+> and L_PTE_MT_DEVICE has the same index (3-bit TEX[0], C, B for NMRR/PRRR
+> or TEX[2:0] for MAIR0/MAIR1 registers) as Normal Cacheable Writeback
+> memory (there is no such thing as Device memory with cacheability
+> attributes, only Normal Cacheable memory).
 
-The following changes since commit 0d0632f523fa040b307688ae421a1debf79af2d7:
+You don't mean L_PTE_MT_DEVICE there. Thankfully, L_PTE_MT_DEVICE doesn't
+exist, so it's not that confusing.  What you mean is L_PTE_MT_DEV_CACHED,
+which _does_ map to "normal cacheable writeback memory" irrespective of
+the mappings which the kernel uses for RAM.
 
-  arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree (2013-05-27 16:02:13 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/pcie_kw-3.11-2
-
-for you to fetch changes up to 6bd98481ab346964344e05a041f35ff83cb3d00c:
-
-  arm: kirkwood: NETGEAR ReadyNAS Duo v2 init PCIe via DT (2013-05-29 11:45:24 +0000)
-
-----------------------------------------------------------------
-mvebu pcie driver (kirkwood) for v3.11 (round 2)
-
- - kirkwood
-    - migrate Netgear ReadyNAS Duo v2 to pcie DT init
-
-depends
- - mvebu/pcie
-    - mvebu/of_pci
-
-----------------------------------------------------------------
-Arnaud Ebalard (1):
-      arm: kirkwood: NETGEAR ReadyNAS Duo v2 init PCIe via DT
-
- arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 8 ++++++++
- arch/arm/mach-kirkwood/board-readynas.c                | 1 -
- 2 files changed, 8 insertions(+), 1 deletion(-)
+However, that mapping type (which is used for MT_DEVICE_CACHED) should
+not be used if you really do want normal memory.  And using MT_* definitions
+_not_ in asm/io.h with ioremap() is really... silly.  It's not something
+that is intended, nor is it something which I intend to be supportable
+into the future on ARM.  That's why the definitions are separate - see
+the comments in asm/io.h about "types 4 onwards are undefined for
+ioremap" - I'm not sure how more explicit to make that statement.  And
+as I _have_ made the statement, if I see people violating it, I won't
+care about their code if/when I decide to change the ioremap() behaviour.
