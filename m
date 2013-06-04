@@ -1,88 +1,117 @@
 From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue,  4 Jun 2013 13:07:11 +0200
-Subject: [PATCH 4/8] ARM i.MX53: mba53: add sound support
+Date: Tue,  4 Jun 2013 13:07:14 +0200
+Subject: [PATCH 7/8] ARM i.MX53: mba53: fix lvds/disp pinctrl
 In-Reply-To: <1370344035-7417-1-git-send-email-s.trumtrar@pengutronix.de>
 References: <1370344035-7417-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1370344035-7417-5-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <1370344035-7417-8-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Niebel <Markus.Niebel@tqs.de>
-
-Enable the sgtl5000 found on MBa53 mainboard.
-Also enable audio muxer and ssi, which are needed for sound to work.
+use NO_PAD_CTL / 0x80000000 instead of 0x10000 to prevent misconfigured pads
 
 Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+[Steffen: split up patch into tqma53+mba53 part]
 Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
 ---
- arch/arm/boot/dts/imx53-mba53.dts | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/imx53-mba53.dts | 74 +++++++++++++++++++--------------------
+ 1 file changed, 37 insertions(+), 37 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
-index 2889bab..b171c00 100644
+index 4515d01..869aa3e 100644
 --- a/arch/arm/boot/dts/imx53-mba53.dts
 +++ b/arch/arm/boot/dts/imx53-mba53.dts
-@@ -42,6 +42,28 @@
- 		interface-pix-fmt = "rgb24";
- 		status = "disabled";
+@@ -76,21 +76,21 @@
+ 	lvds1 {
+ 		pinctrl_lvds1_1: lvds1-grp1 {
+ 			fsl,pins = <
+-				MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3 0x10000
+-				MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK 0x10000
+-				MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2 0x10000
+-				MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1 0x10000
+-				MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0 0x10000
++				MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3 0x80000000
++				MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK 0x80000000
++				MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2 0x80000000
++				MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1 0x80000000
++				MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0 0x80000000
+ 			>;
+ 		};
+ 
+ 		pinctrl_lvds1_2: lvds1-grp2 {
+ 			fsl,pins = <
+-				MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3 0x10000
+-				MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2 0x10000
+-				MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK 0x10000
+-				MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1 0x10000
+-				MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0 0x10000
++				MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3 0x80000000
++				MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2 0x80000000
++				MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK 0x80000000
++				MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1 0x80000000
++				MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0 0x80000000
+ 			>;
+ 		};
  	};
-+
-+	reg_3p2v: 3p2v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P2V";
-+		regulator-min-microvolt = <3200000>;
-+		regulator-max-microvolt = <3200000>;
-+		regulator-always-on;
-+	};
-+
-+	sound {
-+		compatible = "tq,imx53-mba53-sgtl5000",
-+			     "fsl,imx-audio-sgtl5000";
-+		model = "imx53-mba53-sgtl5000";
-+		ssi-controller = <&ssi2>;
-+		audio-codec = <&codec>;
-+		audio-routing =
-+			"MIC_IN", "Mic Jack",
-+			"Mic Jack", "Mic Bias",
-+			"Headphone Jack", "HP_OUT";
-+		mux-int-port = <2>;
-+		mux-ext-port = <5>;
-+	};
- };
- 
- &ldb {
-@@ -122,10 +144,19 @@
- 	status = "okay";
- };
- 
-+&audmux {
-+	status = "okay";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux_1>;
-+};
-+
- &i2c2 {
- 	codec: sgtl5000 at a {
- 		compatible = "fsl,sgtl5000";
- 		reg = <0x0a>;
-+		clocks = <&clks 150>;
-+		VDDA-supply = <&reg_3p2v>;
-+		VDDIO-supply = <&reg_3p2v>;
+@@ -98,33 +98,33 @@
+ 	disp1 {
+ 		pinctrl_disp1_1: disp1-grp1 {
+ 			fsl,pins = <
+-				MX53_PAD_EIM_DA10__IPU_DI1_PIN15   0x10000 /* DISP1_DRDY */
+-				MX53_PAD_EIM_D23__IPU_DI1_PIN2     0x10000 /* DISP1_HSYNC */
+-				MX53_PAD_EIM_EB3__IPU_DI1_PIN3     0x10000 /* DISP1_VSYNC */
+-				MX53_PAD_EIM_D26__IPU_DISP1_DAT_22 0x10000
+-				MX53_PAD_EIM_D27__IPU_DISP1_DAT_23 0x10000
+-				MX53_PAD_EIM_D30__IPU_DISP1_DAT_21 0x10000
+-				MX53_PAD_EIM_D31__IPU_DISP1_DAT_20 0x10000
+-				MX53_PAD_EIM_A24__IPU_DISP1_DAT_19 0x10000
+-				MX53_PAD_EIM_A23__IPU_DISP1_DAT_18 0x10000
+-				MX53_PAD_EIM_A22__IPU_DISP1_DAT_17 0x10000
+-				MX53_PAD_EIM_A21__IPU_DISP1_DAT_16 0x10000
+-				MX53_PAD_EIM_A20__IPU_DISP1_DAT_15 0x10000
+-				MX53_PAD_EIM_A19__IPU_DISP1_DAT_14 0x10000
+-				MX53_PAD_EIM_A18__IPU_DISP1_DAT_13 0x10000
+-				MX53_PAD_EIM_A17__IPU_DISP1_DAT_12 0x10000
+-				MX53_PAD_EIM_EB0__IPU_DISP1_DAT_11 0x10000
+-				MX53_PAD_EIM_EB1__IPU_DISP1_DAT_10 0x10000
+-				MX53_PAD_EIM_DA0__IPU_DISP1_DAT_9  0x10000
+-				MX53_PAD_EIM_DA1__IPU_DISP1_DAT_8  0x10000
+-				MX53_PAD_EIM_DA2__IPU_DISP1_DAT_7  0x10000
+-				MX53_PAD_EIM_DA3__IPU_DISP1_DAT_6  0x10000
+-				MX53_PAD_EIM_DA4__IPU_DISP1_DAT_5  0x10000
+-				MX53_PAD_EIM_DA5__IPU_DISP1_DAT_4  0x10000
+-				MX53_PAD_EIM_DA6__IPU_DISP1_DAT_3  0x10000
+-				MX53_PAD_EIM_DA7__IPU_DISP1_DAT_2  0x10000
+-				MX53_PAD_EIM_DA8__IPU_DISP1_DAT_1  0x10000
+-				MX53_PAD_EIM_DA9__IPU_DISP1_DAT_0  0x10000
++				MX53_PAD_EIM_DA10__IPU_DI1_PIN15   0x80000000 /* DISP1_DRDY */
++				MX53_PAD_EIM_D23__IPU_DI1_PIN2     0x80000000 /* DISP1_HSYNC */
++				MX53_PAD_EIM_EB3__IPU_DI1_PIN3     0x80000000 /* DISP1_VSYNC */
++				MX53_PAD_EIM_D26__IPU_DISP1_DAT_22 0x80000000
++				MX53_PAD_EIM_D27__IPU_DISP1_DAT_23 0x80000000
++				MX53_PAD_EIM_D30__IPU_DISP1_DAT_21 0x80000000
++				MX53_PAD_EIM_D31__IPU_DISP1_DAT_20 0x80000000
++				MX53_PAD_EIM_A24__IPU_DISP1_DAT_19 0x80000000
++				MX53_PAD_EIM_A23__IPU_DISP1_DAT_18 0x80000000
++				MX53_PAD_EIM_A22__IPU_DISP1_DAT_17 0x80000000
++				MX53_PAD_EIM_A21__IPU_DISP1_DAT_16 0x80000000
++				MX53_PAD_EIM_A20__IPU_DISP1_DAT_15 0x80000000
++				MX53_PAD_EIM_A19__IPU_DISP1_DAT_14 0x80000000
++				MX53_PAD_EIM_A18__IPU_DISP1_DAT_13 0x80000000
++				MX53_PAD_EIM_A17__IPU_DISP1_DAT_12 0x80000000
++				MX53_PAD_EIM_EB0__IPU_DISP1_DAT_11 0x80000000
++				MX53_PAD_EIM_EB1__IPU_DISP1_DAT_10 0x80000000
++				MX53_PAD_EIM_DA0__IPU_DISP1_DAT_9  0x80000000
++				MX53_PAD_EIM_DA1__IPU_DISP1_DAT_8  0x80000000
++				MX53_PAD_EIM_DA2__IPU_DISP1_DAT_7  0x80000000
++				MX53_PAD_EIM_DA3__IPU_DISP1_DAT_6  0x80000000
++				MX53_PAD_EIM_DA4__IPU_DISP1_DAT_5  0x80000000
++				MX53_PAD_EIM_DA5__IPU_DISP1_DAT_4  0x80000000
++				MX53_PAD_EIM_DA6__IPU_DISP1_DAT_3  0x80000000
++				MX53_PAD_EIM_DA7__IPU_DISP1_DAT_2  0x80000000
++				MX53_PAD_EIM_DA8__IPU_DISP1_DAT_1  0x80000000
++				MX53_PAD_EIM_DA9__IPU_DISP1_DAT_0  0x80000000
+ 			>;
+ 		};
  	};
- 
- 	expander: pca9554 at 20 {
-@@ -169,6 +200,11 @@
- 	status = "okay";
- };
- 
-+&ssi2 {
-+	fsl,mode = "i2s-slave";
-+	status = "okay";
-+};
-+
- &uart2 {
- 	status = "okay";
- };
 -- 
 1.8.2.rc2
