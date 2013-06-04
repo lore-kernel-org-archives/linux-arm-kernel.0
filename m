@@ -1,34 +1,60 @@
-From: mindentropy@gmail.com (mind entropy)
-Date: Tue, 4 Jun 2013 14:59:17 +0530
-Subject: On mini2440 IO mappings.
-In-Reply-To: <3308480.LZZ0YkAPVH@wuerfel>
-References: <CAM2a4uxNKhD_+zr7mZOV0eR7u_VTCSZyEcsj_uNA5MuuKPFbDQ@mail.gmail.com>
- <3308480.LZZ0YkAPVH@wuerfel>
-Message-ID: <CAM2a4uw_mq=NZHrg32KRf7js8+3iC59SB1NPdP8EwCov7z0DnQ@mail.gmail.com>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Tue, 4 Jun 2013 17:30:04 +0800
+Subject: A bug about system call on ARM
+In-Reply-To: <20130604084832.GA27516@mudshark.cambridge.arm.com>
+References: <20130530114112.GH7483@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
+ <20130531084638.GB4928@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
+ <20130531111305.GI4928@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B87B@CNBJMBX05.corpusers.net>
+ <20130603095425.GA32242@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B87E@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B883@CNBJMBX05.corpusers.net>
+ <20130604084832.GA27516@mudshark.cambridge.arm.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D1610991B88F@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 4, 2013 at 2:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 04 June 2013 13:11:04 mind entropy wrote:
+Hi Will,
 
->> arch/arm/mach-s3c24xx/include/mach/map.h S3C24XX_SZ_IRQ is set to
->> SZ_1M but in the documentation (Pg 1-27 of s3c2440.pdf datasheet) the
->> physical address extends from 0X4A000000 to 0X4A00001C. So shouldn't a
->> size of 4K(small page) or 1K(tiny page) be enough?
->
-> Yes, that would be enough, but I think it makes little difference
-> either way.
->
+Thanks for your reply,
+I see your meaning ,
+But it seems my apply for joining into 'linux-arm-kernel at lists.infradead.org'
+Is not approved ,  
+How to join in this mail-list ?
 
-Just to clarify, this would create an overlap i.e. 2 different virtual
-address will point to the same physical address right?
+Thanks for your help .
 
-> What kind of board port are you doing? New ports would look quite
-> different from s3c24xx/mini2440, so it might not be the best
-> example to look at.
->
->         Arnd
+-----Original Message-----
+From: Will Deacon [mailto:will.deacon at arm.com] 
+Sent: Tuesday, June 04, 2013 4:49 PM
+To: Wang, Yalin
+Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
+Subject: Re: A bug about system call on ARM
 
-I am just trying my hand on the minimal bootup of the board. I am
-looking at the existing port and trying to write my own. I am using
-the 3.9 vanilla kernel with pengutronix patches.
+On Tue, Jun 04, 2013 at 06:33:20AM +0100, Wang, Yalin wrote:
+> Hi  Will,
+
+Hello,
+
+> Could I know  what's your git branch is  mainly used for ?
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git
+> 
+> 
+> I mean if the branch is used for ARM arch maintenance ?
+
+I send most of my patches via Russell, and the tree above is where I keep my patches whilst they're not yet in mainline.
+
+> If yes, I think I can send future bugs about ARM to you directly, And 
+> do not need ping-pang in the mail list .
+
+Quite the opposite! Having discussions on the mailing list is key to how the kernel is developed, so please continue to send questions, bug reports and patches there. As has been pointed out previously in this thread, you need to choose the right list in the first place, rather than just sending to LKML.
+
+Of course, you can always CC me on arm/arm64 patches if you like.
+
+Cheers,
+
+Will
