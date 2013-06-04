@@ -1,61 +1,53 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 4 Jun 2013 16:28:54 +0300
-Subject: [PATCH RFC 0/3] first pass converting omap4 clock data to DT
-In-Reply-To: <1370327958-19776-1-git-send-email-mturquette@linaro.org>
-References: <1370327958-19776-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1370352534.25965.52.camel@sokoban>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 4 Jun 2013 14:41:11 +0100
+Subject: Planning the merge of KVM/arm64
+In-Reply-To: <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
+References: <51ADDDAE.4040705@arm.com>
+ <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
+Message-ID: <20130604134110.GA25090@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike,
-
-On Mon, 2013-06-03 at 23:39 -0700, Mike Turquette wrote:
-> This is a very incomplete conversion of a handful of OMAP4 PRCM clocks
-> from the statically defined clock data in
-> arch/arm/mach-omap2/cclock44xx_data.c to a new dts file in
-> arch/arm/boot/dts/omap4-clocks.dtsi.
-
-I gave a quick try for this set and it seems to be working nicely, so
-for at least me this approach is fine. Feel free to add tested-by me if
-you like (for the basic clock bindings also.) Can't comment much on the
-DT stuff though as my experience is rather limited on it.
-
-> I am not a DT expert so many of the choices here may be quite disgusting
-> to look at, or may be on the right path.  In particular I simply include
-> the new omap4-clocks.dtsi from omap4.dtsi, which feels a bit kludgey.
-> Also this series depends on the basic clock bindings RFC I posted
-> earlier today[1].
+On Tue, Jun 04, 2013 at 02:13:52PM +0100, Anup Patel wrote:
+> Hi Marc,
 > 
-> I actually have an omap4-clock.dtsi file with many more clocks converted
-> to the mux-clock, divider-clock, fixed-clock, fixed-factor and
-> (unpublished) gate-clock bindings in my local repo, but it is not
-> currently booting.  I wanted to get this early preview out regardless.
+> On Tue, Jun 4, 2013 at 5:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > Guys,
+> >
+> > The KVM/arm64 code is now, as it seems, in good enough shape to be
+> > merged. I've so far addressed all the comments, and it doesn't seem any
+> > worse then what is queued for its 32bit counterpart.
+> >
+> > For reference, it is sitting there:
+> > git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+> > kvm-arm64/kvm
+> >
+> > What is not defined yet is the merge path:
+> > - It is touching some of the arm64 core code, so it would be better if
+> > it was merged through the arm64 tree
+> > - It is depending on some of the patches in the core KVM queue (the
+> > vgic/timer move to virt/kvm/arm/)
+> > - It is also depending on some of the patches that are in the KVM/ARM
+> > queue (parametrized timer interrupt, some MMU/MMIO fixes)
+> >
+> > So I can see two possibilities:
+> > - Either I can rely on a stable branch from both KVM and KVM/ARM trees
+> > on which I can base my tree for Catalin/Will to pull,
+> > - Or I ask Catalin to only pull the arm64 part *minus the Kconfig*, and
+> > only merge this last bit when the dependencies are satisfied in Linus' tree.
+> >
+> > What do you guys think?
+> 
+> I had quick look at your kvm-arm64/kvm branch. I agree with the approach
+> of going through arm64 tree.
+> 
+> FYI, latest tested branch on APM ARMv8 board is kvm-arm64/kvm-3.10-rc3
+> branch.
+> 
+> From my side, +1 for the second option that is "pull the arm64 part *minus
+> the Kconfig*, and ..."
 
-Any way I can get access to your local tree? Can you push a branch
-somewhere? I could provide you debugging support on this at least, as I
-spent quite a bit of time earlier moving the clock data under
-drivers/clk... I guess you are probably seeing similar issues I faced.
++1 as well for the second option.
 
--Tero
-
-> 
-> [1] http://article.gmane.org/gmane.linux.kernel/1501216
-> 
-> Mike Turquette (3):
->   clk: omap: introduce clock driver
->   ARM: dts: omap4 clock data
->   ARM: omap4: register DT clocks & remove old data
-> 
->  arch/arm/boot/dts/omap4-clocks.dtsi   | 128 ++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap4.dtsi          |   2 +
->  arch/arm/mach-omap2/cclock44xx_data.c |  54 ++------------
->  drivers/clk/Makefile                  |   1 +
->  drivers/clk/omap/Makefile             |   1 +
->  drivers/clk/omap/clk.c                |  55 +++++++++++++++
->  include/linux/clk/omap.h              |  24 +++++++
->  7 files changed, 217 insertions(+), 48 deletions(-)
->  create mode 100644 arch/arm/boot/dts/omap4-clocks.dtsi
->  create mode 100644 drivers/clk/omap/Makefile
->  create mode 100644 drivers/clk/omap/clk.c
->  create mode 100644 include/linux/clk/omap.h
-> 
+-- 
+Catalin
