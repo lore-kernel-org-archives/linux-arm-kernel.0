@@ -1,46 +1,51 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 4 Jun 2013 12:19:49 +0100
-Subject: [PATCH] ARM: psci: fix building without HOTPLUG_CPU
-In-Reply-To: <18058683.rI3Z0PFpBd@wuerfel>
-References: <18058683.rI3Z0PFpBd@wuerfel>
-Message-ID: <alpine.DEB.2.02.1306041218200.4589@kaball.uk.xensource.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Tue, 4 Jun 2013 11:25:45 +0000
+Subject: [PATCH v2 00/14] ARM: OMAP2+: AM43x initial support
+In-Reply-To: <cover.1369658705.git.afzal@ti.com>
+References: <cover.1369658705.git.afzal@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB14140@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Jun 2013, Arnd Bergmann wrote:
-> The cpu_die field in smp_operations is not valid with CONFIG_HOTPLUG_CPU,
-> so we must enclose it in #ifdef, but at least that lets us remove
-> two other lines.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
+Hi Tony,
 
-Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On Mon, May 27, 2013 at 20:03:27, Mohammed, Afzal wrote:
 
+> This series adds initial support for AM43x based SoC's. To boot
+> AM43x, in addition to these patches, PRCM support is also needed,
+> which would be posted later as a separate series. DT sources doesn't
+> have "ti,hwmod" entry - this would be added along with PRCM support.
+> 
+> AM43x SoC's are based on ARM Cortex-A9 with one core. AM43x is similar
+> to AM335x in it's peripheral capabilities, except a few additional
+> ones, with many of the peripheral register mapping's similar. AM43x
+> has a sync timer, which is being used as clocksource. Clockevent used
+> is 1ms dmtimer.
+> 
+> SoC has PL310 L2 cache, support for it would be added later.
+> 
+> soc_is_am43xx() is introduced to handle AM43x specific details and
+> soc_is_am437x() is a subclass of it - first member of the class.
+> 
+> AM43x is currently in pre-silicon stage and currently there are no
+> public documents.
+> 
+> This has been tested on a pre-silicon platform that emulates AM43x SoC
+> with additional changes on top of this.
+> 
+> AM335x based board (AM335x EVM) has been verfied to boot as earlier
+> with this series.
+> 
+> Baseline: v3.10-rc3
+> Dependency: "ARM: OMAP3+: am33xx id: Add new am33xx specific function to check dev_feature"
+> 		by Vaibhav Hiremath <hvaibhav@ti.com>
 
-> KernelVersion: devel-stable
-> 
-> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
-> index 23a1142..219f1d7 100644
-> --- a/arch/arm/kernel/psci_smp.c
-> +++ b/arch/arm/kernel/psci_smp.c
-> @@ -68,8 +68,6 @@ void __ref psci_cpu_die(unsigned int cpu)
->         /* We should never return */
->         panic("psci: cpu %d failed to shutdown\n", cpu);
->  }
-> -#else
-> -#define psci_cpu_die NULL
->  #endif
->  
->  bool __init psci_smp_available(void)
-> @@ -80,5 +78,7 @@ bool __init psci_smp_available(void)
->  
->  struct smp_operations __initdata psci_smp_ops = {
->  	.smp_boot_secondary	= psci_boot_secondary,
-> +#ifdef CONFIG_HOTPLUG_CPU
->  	.cpu_die		= psci_cpu_die,
-> +#endif
->  };
-> 
+If you have any comments on this series please let me know, else if
+you are okay with this, please consider patches 1-10 for inclusion
+in the coming merge window.
+
+Patch 14/14 has been taken by Benoit and patches 11-13 are to be
+dropped (as per discussion in 11/14 thread)
+
+Regards
+Afzal
