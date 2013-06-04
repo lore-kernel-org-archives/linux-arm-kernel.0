@@ -1,26 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Jun 2013 11:05:18 +0200
-Subject: [PATCH 5/5] mfd: ab8500-core: Add of_compatible property for
- ab8500-codec
-In-Reply-To: <1369920465-13905-6-git-send-email-fabio.baltieri@linaro.org>
+Date: Tue, 4 Jun 2013 11:06:14 +0200
+Subject: [PATCH 0/5] Various DT fixes related to ux500 ASoC driver
+In-Reply-To: <20130530145323.GB1915@gmail.com>
 References: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
- <1369920465-13905-6-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <CACRpkdYTt+0AmqV62WWfLLQE24a7=q0Ahdcm9QLRy6wPSG4MdA@mail.gmail.com>
+ <20130530145323.GB1915@gmail.com>
+Message-ID: <CACRpkdYfrQfvk0v7TmbtAOuYQpN5UuA0V3wL=0sT_SaOFcg_OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 3:27 PM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
+On Thu, May 30, 2013 at 4:53 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-> Add of_compatible string to the ab8500-codec cell to allow the driver to
-> grab handlers such as regulators from device-tree when available.
+> All look good to me.
 >
-> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> For patches 1-4:
+>
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+OK added this.
 
-I think Lee is queueing ab8500 patches for Sam these days
-to smoothen things, so letting him pick this up.
+> For patch 5:
+> Applied thanks.
+
+Thanks!
 
 Yours,
 Linus Walleij
