@@ -1,57 +1,53 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Jun 2013 19:10:30 +0100
-Subject: [PATCH v2 1/2] ARM PJ4B: Add support for errata 4742
-In-Reply-To: <alpine.LFD.2.03.1306041348400.1200@syhkavp.arg>
-References: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
- <1370354598-12920-2-git-send-email-gregory.clement@free-electrons.com>
- <20130604145958.GY18614@n2100.arm.linux.org.uk>
- <51AE21A7.5080907@free-electrons.com>
- <20130604173737.GZ18614@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1306041348400.1200@syhkavp.arg>
-Message-ID: <20130604181030.GA18614@n2100.arm.linux.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 04 Jun 2013 11:15:51 -0700
+Subject: [PATCH 00/11] drivers: Add Pinctrl PM support
+In-Reply-To: <CACRpkdYnhjpFp1CM=P_hddBe4qVigtE0c+CN9NKvk3nFgJS-ig@mail.gmail.com>
+ (Linus Walleij's message of "Tue, 4 Jun 2013 09:25:02 +0200")
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <20130531170437.GA17591@core.coreip.homeip.net>
+ <CACRpkdYnhjpFp1CM=P_hddBe4qVigtE0c+CN9NKvk3nFgJS-ig@mail.gmail.com>
+Message-ID: <87k3m92148.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 02:07:29PM -0400, Nicolas Pitre wrote:
-> It could be nicer on the symbol table especially when debugging if the 
-> pj4b was made into a separate branch table e.g.:
-> 
-> ENTRY(cpu_pj4b_switch_mm)
-> 	b	cpu_v7_switch_mm
-> ENDPROC(cpu_pj4b_switch_mm)
-> 
-> Otherwise the objdump output will always select the first symbol for any 
-> given address in alphabetical order, masking away cpu_v7_switch_mm.
+Hi Linus,
 
-That adds unnecessary runtime expense.
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-> Alternatively, the following could be done:
-> 
-> #ifdef CONFIG_CPU_PJ4B
-> 
-> 	.equ	cpu_pj4b_switch_mm,	cpu_v7_switch_mm
-> 	.equ	cpu_pj4b_set_pte_ex,	cpu_v7_set_pte_ex
+> On Fri, May 31, 2013 at 7:04 PM, Dmitry Torokhov
+> <dmitry.torokhov@gmail.com> wrote:
+>
+>> As with the original introduction of pinctrl states my question is: "Can
+>> all of this be handled in the driver/bus core instead of adding a lot
+>> of boilerplate code to the individual drivers".
+>
+> It can. Per the suggestion in 2/11:
+>
+> - Adding pins_sleep and pins_idle to struct dev_pin_info
+>   in include/linux/pinctrl/devinfo.h
+>
+> - Modify drivers/base/pinctrl.c to optionally look up
+>   sleep and idle states, you can make that code
+>   #ifdef CONFIG_PM I think.
+>
+> - Add something like static inline functions to
+>   include/linux/pinctrl/consumer.h
+>   with names like pinctrl_select_pm_idle(struct device *)
+>   pinctrl_select_pm_sleep(struct device *) to switch states
+>   using the device core containers, and includes
+>   checking IS_ERR() on the handles etc.
+>
+> I think this will save a *lot* of identical code in all the
+> drivers, that will just have to call
+> pinctrl_select_pm_sleep(), pinctrl_select_pm_default()
+> pinctrl_select_pm_idle() instead of all the complex code.
+>
+> This is what I planned to do but never got around to.
 
-No, that doesn't work.  I did forget a hunk from my patch though, which
-needs the pj4b symbols to be global:
+What about taking it one tiny step further, and having it done by the PM
+core itself?
 
-diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
-index ac1dd54..8017e94 100644
---- a/arch/arm/include/asm/glue-proc.h
-+++ b/arch/arm/include/asm/glue-proc.h
-@@ -230,6 +230,15 @@
- # endif
- #endif
- 
-+#ifdef CONFIG_CPU_PJ4B
-+# ifdef CPU_NAME
-+#  undef  MULTI_CPU
-+#  define MULTI_CPU
-+# else
-+#  define CPU_NAME cpu_pj4b
-+# endif
-+#endif
-+
- #ifndef MULTI_CPU
- #define cpu_proc_init			__glue(CPU_NAME,_proc_init)
- #define cpu_proc_fin			__glue(CPU_NAME,_proc_fin)
+Seems like something that should just be done as part of runtime PM
+transitions and the suspend/resume process.
+
+Kevin
