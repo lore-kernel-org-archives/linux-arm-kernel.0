@@ -1,53 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 4 Jun 2013 14:41:11 +0100
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
-References: <51ADDDAE.4040705@arm.com>
- <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
-Message-ID: <20130604134110.GA25090@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 04 Jun 2013 15:43:18 +0200
+Subject: [PATCH v6 1/9] drivers: phy: add generic PHY framework
+In-Reply-To: <51ADDCD9.8080400@ti.com>
+References: <1367229812-30574-1-git-send-email-kishon@ti.com>
+ <1367229812-30574-2-git-send-email-kishon@ti.com>
+ <51ADBF9B.5060403@samsung.com> <51ADDCD9.8080400@ti.com>
+Message-ID: <51ADEEF6.1030200@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 02:13:52PM +0100, Anup Patel wrote:
-> Hi Marc,
-> 
-> On Tue, Jun 4, 2013 at 5:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > Guys,
-> >
-> > The KVM/arm64 code is now, as it seems, in good enough shape to be
-> > merged. I've so far addressed all the comments, and it doesn't seem any
-> > worse then what is queued for its 32bit counterpart.
-> >
-> > For reference, it is sitting there:
-> > git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-> > kvm-arm64/kvm
-> >
-> > What is not defined yet is the merge path:
-> > - It is touching some of the arm64 core code, so it would be better if
-> > it was merged through the arm64 tree
-> > - It is depending on some of the patches in the core KVM queue (the
-> > vgic/timer move to virt/kvm/arm/)
-> > - It is also depending on some of the patches that are in the KVM/ARM
-> > queue (parametrized timer interrupt, some MMU/MMIO fixes)
-> >
-> > So I can see two possibilities:
-> > - Either I can rely on a stable branch from both KVM and KVM/ARM trees
-> > on which I can base my tree for Catalin/Will to pull,
-> > - Or I ask Catalin to only pull the arm64 part *minus the Kconfig*, and
-> > only merge this last bit when the dependencies are satisfied in Linus' tree.
-> >
-> > What do you guys think?
-> 
-> I had quick look at your kvm-arm64/kvm branch. I agree with the approach
-> of going through arm64 tree.
-> 
-> FYI, latest tested branch on APM ARMv8 board is kvm-arm64/kvm-3.10-rc3
-> branch.
-> 
-> From my side, +1 for the second option that is "pull the arm64 part *minus
-> the Kconfig*, and ..."
+Hi,
 
-+1 as well for the second option.
+On 06/04/2013 02:26 PM, Kishon Vijay Abraham I wrote:
+>>> +static inline int phy_init(struct phy *phy)
+>>> +{
+>>> +	pm_runtime_get_sync(&phy->dev);
+>>
+>> Hmm, no need to check return value here ? Also it looks a bit unexpected to
+> 
+> I purposely dint check the return values in order to support platforms 
+> that don?t enable pm_runtime.
 
--- 
-Catalin
+Then I guess this should be called conditionally and any errors returned
+if runtime PM is enabled ? Not sure if pm_runtime_enabled() would be
+helpful such situation.
+
+>> possibly have runtime_resume callback of a PHY device called before ops->init()
+>> call ? It seems a bit unclear what the purpose of init() callback is.
+> 
+> Not really. Anything that is used to initialize the PHY (internal 
+> configuration) can go in phy_init. Usually in runtime_resume callback, 
+> optional functional clocks are enabled and also in some cases context 
+> restore is done. So it really makes sense to enable clocks/module 
+> (pm_runtime_get_sync) before doing a PHY configuration (phy_init).
+
+OK, that makes sense. All PHY device resources must be prepared anyway
+before a PHY object is registered with the PHY core.
+
+>>> +	if (phy->ops->init)
+>>> +		return phy->ops->init(phy);
+>>> +
+>>> +	return -EINVAL;
+>>> +}
+>>> +
+>>> +static inline int phy_exit(struct phy *phy)
+>>> +{
+>>> +	int ret = -EINVAL;
+>>> +
+>>> +	if (phy->ops->exit)
+>>> +		ret = phy->ops->exit(phy);
+>>> +
+>>> +	pm_runtime_put_sync(&phy->dev);
+>>> +
+>>> +	return ret;
+>>> +}
+>>
+>> Do phy_init/phy_exit need to be mandatory ? What if there is really
+> 
+> No. phy_init/phy_exit is not mandatory at all.
+>> nothing to do in those callbacks ? Perhaps -ENOIOCTLCMD should be
+>> returned if a callback is not implemented, so PHY users can recognize
+>> such situation and proceed ?
+> 
+> So currently these APIs return -EINVAL if these callbacks are not 
+> populated which is good enough IMHO.
+
+But -EINVAL could be well returned from the callback function. Perhaps
+ENOTSUPP could be used instead ?
+
+
+Thanks,
+Sylwester
