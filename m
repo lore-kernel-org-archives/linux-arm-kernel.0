@@ -1,49 +1,29 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 04 Jun 2013 15:13:05 +0530
-Subject: [PATCH] ARM: EXYNOS: Consolidate multiple low-level UART port
- definitions
-In-Reply-To: <871u8n105e.fsf@linaro.org>
-References: <1369888827-9427-1-git-send-email-tushar.behera@linaro.org>
- <871u8n105e.fsf@linaro.org>
-Message-ID: <51ADB6A9.8030006@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Jun 2013 11:43:59 +0200
+Subject: [PATCH 01/10] clocksource: dw_apb_timer_of: use the clocksource
+ as sched clock if necessary
+In-Reply-To: <201306041029.39053.heiko@sntech.de>
+References: <201306030055.15413.heiko@sntech.de>
+ <201306030056.03522.heiko@sntech.de>
+ <CACRpkdYAvUQ+aymJm1Fw1bE1aGdO7RUqLR9byvoT7ECTk4tkpw@mail.gmail.com>
+ <201306041029.39053.heiko@sntech.de>
+Message-ID: <CACRpkdYXhsTRVaqi-KKLsuJut1Eq2kzSbSYzaZT=5FpMHSsouA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2013 11:50 PM, Kevin Hilman wrote:
-> Tushar Behera <tushar.behera@linaro.org> writes:
-> 
->> There are two definitions for low-level UART ports for Exynos platform.
->> CONFIG_S3C_LOWLEVEL_UART_PORT is used for printing "Uncompressing
->> Linux... done, booting the kernel." and CONFIG_S3C_UART for other
->> low-level messages.
->>
->> The assumption for both the uart ports is that they are pre-configured
->> in the bootloader. Since they are essentially the same always, it
->> would be good to consolidate them to use only one macro, in this case
->> 'DEBUG_S3C_UART' would be a better option.
->>
->> 'DEBUG_S3C_UART' is defined only if DEBUG_LL is enabled. We can safely
->> disable this option when DEBUG_LL is not defined and we can boot various
->> boards with different UART port settings. Only drawback of this
->> approach is that when DEBUG_LL is not defined, we would be missing the
->> print "Uncompressing Linux... done, booting the kernel."
-> 
-> Perfectly acceptable to me (and already the case on OMAP.)
-> 
->> Since CONFIG_S3C_LOWLEVEL_UART_PORT is still used by other Samsung
->> boards, the consolidation applies only for ARCH_EXYNOS.
->>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> 
-> Acked-by: Kevin Hilman <khilman@linaro.org>
-> 
+On Tue, Jun 4, 2013 at 10:29 AM, Heiko St?bner <heiko@sntech.de> wrote:
 
-Thanks Kevin.
+> How about:
+>
+> Currently the dw_apb_timer always expects a separate special timer to be
+> availbable for the sched_clock. Some devices using dw_apb_timers do not
+> have this sptimer but can use the clocksource as sched_clock instead.
+>
+> Therefore enable the driver to distiguish between devices with and without
+> sptimer based on the devicetree data and select the correct timer as
+> sched_clock.
 
-I have an updated version of this patch updated for all of Samsung
-platforms.[1]
+Allright, Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-[1] http://www.gossamer-threads.com/lists/linux/kernel/1723429
-
--- 
-Tushar Behera
+Yours,
+Linus Walleij
