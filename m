@@ -1,128 +1,98 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Tue, 4 Jun 2013 10:34:14 +0800
-Subject: [PATCH 1/2] ARM:prima2: move sirfsoc_of_rstc_init to .init_machine
-In-Reply-To: <1370313255-20396-1-git-send-email-Baohua.Song@csr.com>
-References: <1370313255-20396-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <1370313255-20396-2-git-send-email-Baohua.Song@csr.com>
+From: wenyou.yang@atmel.com (Yang Wenyou)
+Date: Tue, 4 Jun 2013 10:43:15 +0800
+Subject: [PATCH 1/2] spi: atmel: convert to
+ dma_request_slave_channel_compat()
+In-Reply-To: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
+References: <1370012520-30539-1-git-send-email-richard.genoud@gmail.com>
+Message-ID: <51AD5443.8050900@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves sirfsoc_of_rstc_init from early_initcall to .init_machine
-in machine descriptor, doing this way a multi_v7 kernel will not crash
-on non-prima2 SOCs.
+Richard Genoud wrote:
+> Use generic DMA DT helper.
+> Platforms booting with or without DT populated are both supported.
+>
+> Based on Ludovic Desroches <ludovic.desroches@atmel.com> patchset
+> "ARM: at91: move to generic DMA device tree binding"
+>
+> Signed-off-by: Richard Genoud <richard.genoud@gmail.com>
+> ---
+>  drivers/spi/spi-atmel.c |   42 +++++++++++++++++++++++++++---------------
+>  1 file changed, 27 insertions(+), 15 deletions(-)
+>
+> rebased on linux-next next-20130531
+>   
+Tested on at91sam9g25ek,
+Based on linux-next, next-20130603
+plus Ludovic Desroches' patch "ARM: at91: dt: add header to define 
+at_hdmac configuration"
 
-Without this patch the multi_v7 kernel panics if we boot it on any non
-prima2 parts with below log:
-
-Kernel panic - not syncing: unable to find compatible rstc node in dtb
-
-CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc3-00535-gc3cc4ac #62
-[<c001387c>] (unwind_backtrace+0x0/0xf8) from [<c00111cc>]
-(show_stack+0x10/0x14)
-[<c00111cc>] (show_stack+0x10/0x14) from [<c03417f4>] (panic+0x90/0x1e4)
-[<c03417f4>] (panic+0x90/0x1e4) from [<c04256d0>]
-(sirfsoc_of_rstc_init+0x24/0x5c)
-[<c04256d0>] (sirfsoc_of_rstc_init+0x24/0x5c) from [<c041f854>]
-(do_one_initcall+0x90/0x150)
-[<c041f854>] (do_one_initcall+0x90/0x150) from [<c041f978>]
-(kernel_init_freeable+0x64/0x1c4)
-[<c041f978>] (kernel_init_freeable+0x64/0x1c4) from [<c033d344>]
-(kernel_init+0x8/0xe4)
-[<c033d344>] (kernel_init+0x8/0xe4) from [<c000ded8>]
-(ret_from_fork+0x14/0x3c)
-
-Initially detected when booting Stih415 SOC with multi_v7_defconfig.
-
-Cc: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- arch/arm/mach-prima2/common.c | 10 ++++++++++
- arch/arm/mach-prima2/common.h |  1 +
- arch/arm/mach-prima2/rstc.c   |  5 +----
- 3 files changed, 12 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-prima2/common.c b/arch/arm/mach-prima2/common.c
-index e588c21..383aa41 100644
---- a/arch/arm/mach-prima2/common.c
-+++ b/arch/arm/mach-prima2/common.c
-@@ -17,6 +17,13 @@
- #include <linux/of_platform.h>
- #include "common.h"
- 
-+void __init sirfsoc_init_mach(void)
-+{
-+	sirfsoc_of_rstc_init();
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+		NULL, NULL);
-+}
-+
- void __init sirfsoc_init_late(void)
- {
- 	sirfsoc_pm_init();
-@@ -47,6 +54,7 @@ DT_MACHINE_START(ATLAS6_DT, "Generic ATLAS6 (Flattened Device Tree)")
- 	.map_io         = sirfsoc_map_io,
- 	.init_irq	= irqchip_init,
- 	.init_time	= sirfsoc_init_time,
-+	.init_machine	= sirfsoc_init_mach,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = atlas6_dt_match,
- 	.restart	= sirfsoc_restart,
-@@ -65,6 +73,7 @@ DT_MACHINE_START(PRIMA2_DT, "Generic PRIMA2 (Flattened Device Tree)")
- 	.map_io         = sirfsoc_map_io,
- 	.init_irq	= irqchip_init,
- 	.init_time	= sirfsoc_init_time,
-+	.init_machine   = sirfsoc_init_mach,
- 	.dma_zone_size	= SZ_256M,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = prima2_dt_match,
-@@ -84,6 +93,7 @@ DT_MACHINE_START(MARCO_DT, "Generic MARCO (Flattened Device Tree)")
- 	.map_io         = sirfsoc_map_io,
- 	.init_irq	= irqchip_init,
- 	.init_time	= sirfsoc_init_time,
-+	.init_machine   = sirfsoc_init_mach,
- 	.init_late	= sirfsoc_init_late,
- 	.dt_compat      = marco_dt_match,
- 	.restart	= sirfsoc_restart,
-diff --git a/arch/arm/mach-prima2/common.h b/arch/arm/mach-prima2/common.h
-index 81135cd..095a16f 100644
---- a/arch/arm/mach-prima2/common.h
-+++ b/arch/arm/mach-prima2/common.h
-@@ -20,6 +20,7 @@ extern struct smp_operations   sirfsoc_smp_ops;
- extern void sirfsoc_secondary_startup(void);
- extern void sirfsoc_cpu_die(unsigned int cpu);
- 
-+extern void __init sirfsoc_of_rstc_init(void);
- extern void __init sirfsoc_of_irq_init(void);
- extern void __init sirfsoc_of_clk_init(void);
- extern void sirfsoc_restart(char, const char *);
-diff --git a/arch/arm/mach-prima2/rstc.c b/arch/arm/mach-prima2/rstc.c
-index 435019c..60fae92 100644
---- a/arch/arm/mach-prima2/rstc.c
-+++ b/arch/arm/mach-prima2/rstc.c
-@@ -23,7 +23,7 @@ static struct of_device_id rstc_ids[]  = {
- 	{},
- };
- 
--static int __init sirfsoc_of_rstc_init(void)
-+void __init sirfsoc_of_rstc_init(void)
- {
- 	struct device_node *np;
- 
-@@ -36,10 +36,7 @@ static int __init sirfsoc_of_rstc_init(void)
- 		panic("unable to map rstc cpu registers\n");
- 
- 	of_node_put(np);
--
--	return 0;
- }
--early_initcall(sirfsoc_of_rstc_init);
- 
- int sirfsoc_reset_device(struct device *dev)
- {
--- 
-1.8.2.3
-
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+Tested-by: Wenyou Yang<wenyou.yang@atmel.com>
+> diff --git a/drivers/spi/spi-atmel.c b/drivers/spi/spi-atmel.c
+> index 31cfc87..ea1ec00 100644
+> --- a/drivers/spi/spi-atmel.c
+> +++ b/drivers/spi/spi-atmel.c
+> @@ -424,10 +424,15 @@ static int atmel_spi_dma_slave_config(struct atmel_spi *as,
+>  	return err;
+>  }
+>  
+> -static bool filter(struct dma_chan *chan, void *slave)
+> +static bool filter(struct dma_chan *chan, void *pdata)
+>  {
+> -	struct	at_dma_slave *sl = slave;
+> +	struct atmel_spi_dma *sl_pdata = pdata;
+> +	struct at_dma_slave *sl;
+>  
+> +	if (!sl_pdata)
+> +		return false;
+> +
+> +	sl = &sl_pdata->dma_slave;
+>  	if (sl->dma_dev == chan->device->dev) {
+>  		chan->private = sl;
+>  		return true;
+> @@ -438,24 +443,31 @@ static bool filter(struct dma_chan *chan, void *slave)
+>  
+>  static int atmel_spi_configure_dma(struct atmel_spi *as)
+>  {
+> -	struct at_dma_slave *sdata = &as->dma.dma_slave;
+>  	struct dma_slave_config	slave_config;
+> +	struct device *dev = &as->pdev->dev;
+>  	int err;
+>  
+> -	if (sdata && sdata->dma_dev) {
+> -		dma_cap_mask_t mask;
+> +	dma_cap_mask_t mask;
+> +	dma_cap_zero(mask);
+> +	dma_cap_set(DMA_SLAVE, mask);
+>  
+> -		/* Try to grab two DMA channels */
+> -		dma_cap_zero(mask);
+> -		dma_cap_set(DMA_SLAVE, mask);
+> -		as->dma.chan_tx = dma_request_channel(mask, filter, sdata);
+> -		if (as->dma.chan_tx)
+> -			as->dma.chan_rx =
+> -				dma_request_channel(mask, filter, sdata);
+> +	as->dma.chan_tx = dma_request_slave_channel_compat(mask, filter,
+> +							   &as->dma,
+> +							   dev, "tx");
+> +	if (!as->dma.chan_tx) {
+> +		dev_err(dev,
+> +			"DMA TX channel not available, SPI unable to use DMA\n");
+> +		err = -EBUSY;
+> +		goto error;
+>  	}
+> -	if (!as->dma.chan_rx || !as->dma.chan_tx) {
+> -		dev_err(&as->pdev->dev,
+> -			"DMA channel not available, SPI unable to use DMA\n");
+> +
+> +	as->dma.chan_rx = dma_request_slave_channel_compat(mask, filter,
+> +							   &as->dma,
+> +							   dev, "rx");
+> +
+> +	if (!as->dma.chan_rx) {
+> +		dev_err(dev,
+> +			"DMA RX channel not available, SPI unable to use DMA\n");
+>  		err = -EBUSY;
+>  		goto error;
+>  	}
+>   
