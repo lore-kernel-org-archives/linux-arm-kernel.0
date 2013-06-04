@@ -1,39 +1,81 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Jun 2013 14:25:39 +0200
-Subject: [GIT PULL 3/5]: ux500 pinctrl changes for v3.11
-Message-ID: <CACRpkdbFs=pX+Yc8EzgVyi-k5HypkHO9jMGMU+VkYfRYyinDSA@mail.gmail.com>
+From: padma.v@samsung.com (Padmavathi Venna)
+Date: Tue, 04 Jun 2013 17:58:05 +0530
+Subject: [PATCH V5 0/5]  clk: Samsung: audss: Register audio subsytem clocks
+ using common clk framework
+Message-ID: <1370348890-6645-1-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC folks,
+Samsung S5PV210 and Exynos SoC has a separate subsystem for audio. This subsystem
+has a internal clock controller which controls i2s0 and pcm0 clocks. This patch
+series adds the Samsung audio subsytem clock to the common clock framework and
+provides the I2S controllers clock information in the dtsi file.
 
-this is the ux500 pin control changes for v3.11. See the signed
-tag for details.
+This patch series is made based on Kukjin Kim for-next branch
 
-The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+Changes since V4:
+        - Reworked on the nits given by Doug.
+        - Removed mout_audss and mout_i2s from i2s nodes as we are not
+          getting these clocks in the i2s driver.
+        - Modified the I2S binding documentation for clocks and pinmux.
 
-  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+Changes since V3:
+        - Replaced samsung with exynos in the macro prefixes and function names
+          as this driver supports mainly exynos and s5p family.
+        - Added Reviewed-by:Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-are available in the git repository at:
+Changes since V2:
+        - Removed s5pv210 compatible name from driver as it is
+          not yet supported which is different from Exynos series
+          audio subsystem clock conroller.
+        - Removed clkdev lookup support and added alias names in
+          the i2s0 controller node.
+Changes since V1:
+        - Reworked on all review comments by Sylwester Nawrocki
+        - Added a header file for all clock indexes as requested by Sylwester
+        - Added different compatible names for s5pv210, exynos4 and exynos5
+        - Registered the pcm clocks with common clock framework
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-tags/ux500-pinctrl-for-arm-soc
+Padmavathi Venna (5):
+  ARM: samsung: use #include for all device trees
+  clk: samsung: register audio subsystem clocks using common clock
+    framework
+  ARM: dts: add Exynos audio subsystem clock controller node
+  ARM: dts: add clock provider information for i2s controllers in
+    Exynos5250
+  ARM: dts: Update Samsung I2S documentation
 
-for you to fetch changes up to 8258b187c2ba91ba1ff276fd0413f5b655824247:
+ .../devicetree/bindings/clock/clk-exynos-audss.txt |   64 ++++++++++
+ .../devicetree/bindings/sound/samsung-i2s.txt      |   40 ++----
+ arch/arm/boot/dts/exynos4.dtsi                     |    2 +-
+ arch/arm/boot/dts/exynos4210-origen.dts            |    2 +-
+ arch/arm/boot/dts/exynos4210-smdkv310.dts          |    2 +-
+ arch/arm/boot/dts/exynos4210-trats.dts             |    2 +-
+ arch/arm/boot/dts/exynos4210-universal_c210.dts    |    2 +-
+ arch/arm/boot/dts/exynos4210.dtsi                  |    4 +-
+ arch/arm/boot/dts/exynos4212.dtsi                  |    2 +-
+ arch/arm/boot/dts/exynos4412-odroidx.dts           |    2 +-
+ arch/arm/boot/dts/exynos4412-origen.dts            |    2 +-
+ arch/arm/boot/dts/exynos4412-smdk4412.dts          |    2 +-
+ arch/arm/boot/dts/exynos4412.dtsi                  |    2 +-
+ arch/arm/boot/dts/exynos4x12.dtsi                  |    4 +-
+ arch/arm/boot/dts/exynos5250-arndale.dts           |    2 +-
+ arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 +-
+ arch/arm/boot/dts/exynos5250-snow.dts              |    4 +-
+ arch/arm/boot/dts/exynos5250.dtsi                  |   20 +++-
+ arch/arm/boot/dts/exynos5440-sd5v1.dts             |    2 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts          |    2 +-
+ arch/arm/boot/dts/exynos5440.dtsi                  |    2 +-
+ arch/arm/boot/dts/s3c2416-smdk2416.dts             |    2 +-
+ arch/arm/boot/dts/s3c2416.dtsi                     |    4 +-
+ arch/arm/boot/dts/s3c24xx.dtsi                     |    2 +-
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-exynos-audss.c             |  133 ++++++++++++++++++++
+ include/dt-bindings/clk/exynos-audss-clk.h         |   25 ++++
+ 27 files changed, 279 insertions(+), 54 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+ create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
+ create mode 100644 include/dt-bindings/clk/exynos-audss-clk.h
 
-  ARM: ux500: add ABx500 pinctrl tables (2013-05-31 16:30:38 +0200)
-
-----------------------------------------------------------------
-Ux500 pinctrl changes:
-- Updates to MSP pinctrl entry for ALSA SoC
-- ABx500 pinctrl tables
-
-----------------------------------------------------------------
-Fabio Baltieri (1):
-      ARM: ux500: update MSP1 pinctrl defintions
-
-Patrice Chotard (1):
-      ARM: ux500: add ABx500 pinctrl tables
-
- arch/arm/mach-ux500/board-mop500-pins.c | 279 ++++++++++++++++++++++++++++++--
- 1 file changed, 268 insertions(+), 11 deletions(-)
+-- 
+1.7.4.4
