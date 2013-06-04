@@ -1,26 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Jun 2013 10:34:03 +0100
-Subject: [RFC PATCH] ARM: update legacy CPU ID in decompressor cache
- support jump table
-In-Reply-To: <CAO1A-8BtUvDELaPvTw_gG1MB4JdMUYt8rmVP2oy+YoJENTvW2Q@mail.gmail.com>
-References: <CAO1A-8AaWyp6eq7c5nkU=KBxwrm1CM3erXcsxLmYpCn2mHhMUA@mail.gmail.com>
- <20130604003525.GI599@codeaurora.org>
- <CAO1A-8BtUvDELaPvTw_gG1MB4JdMUYt8rmVP2oy+YoJENTvW2Q@mail.gmail.com>
-Message-ID: <20130604093403.GT18614@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 4 Jun 2013 11:36:09 +0200
+Subject: [PATCH v2 0/4] dw_apb_timer: osc as sched_clock,
+ clocks and clocksource_of support
+Message-ID: <201306041136.09566.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 07:23:09PM -0700, Marc C wrote:
-> Hi Russell,
-> 
-> Stephen pointed out a patch by Brian [1] which switches out the
-> initial entry in the cache/MMU jump table so that ARM-v7 processors
-> from non-ARM vendors can use the appropriate cache maintenance and MMU
-> setup routines. Your response to an RFC [2] solves this problem
-> without requiring adding an #if/#endif to boot.S. Which method would
-> you prefer?
-> 
-> [1] - http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7736/1
-> [2] - http://lists.infradead.org/pipermail/linux-arm-kernel/2010-January/007871.html
+This is split off of my Rockchip support series from yesterday. It's now
+a patch more than before, as the third patch enables the timer to be used
+thru clocksource_of_init and moves picoxcell and socfpga to it.
 
-I'd actually prefer your method over removing it completely.
+changes since v1:
+- hopefully improve the patch description of patch 1
+  after a suggestion by Linus Walleij
+- move the selection of DW_APB_TIMER and CLKSRC_OF into DW_APB_TIMER_OF
+  after a suggestion by Baruch Siach
+
+Heiko Stuebner (4):
+  clocksource: dw_apb_timer_of: enable the use the clocksource as sched clock
+  clocksource: dw_apb_timer_of: add clock-handling
+  clocksource: dw_apb_timer_of: select DW_APB_TIMER
+  clocksource: dw_apb_timer_of: use clocksource_of_init
+
+ Documentation/devicetree/bindings/rtc/dw-apb.txt |   19 +++++
+ arch/arm/mach-picoxcell/Kconfig                  |    1 -
+ arch/arm/mach-picoxcell/common.c                 |    2 -
+ arch/arm/mach-socfpga/Kconfig                    |    1 -
+ arch/arm/mach-socfpga/socfpga.c                  |    2 -
+ drivers/clocksource/Kconfig                      |    2 +
+ drivers/clocksource/dw_apb_timer_of.c            |   95 ++++++++++++++-------
+ include/linux/dw_apb_timer.h                     |    1 -
+ 8 files changed, 84 insertions(+), 39 deletions(-)
+
+-- 
+1.7.2.3
