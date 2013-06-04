@@ -1,100 +1,61 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 4 Jun 2013 17:06:29 +0200
-Subject: [PATCH v2 4/4] clocksource: dw_apb_timer_of: use
- clocksource_of_init
-In-Reply-To: <20130604142120.GD5308@maple>
-References: <201306041136.09566.heiko@sntech.de>
- <201306041138.42639.heiko@sntech.de> <20130604142120.GD5308@maple>
-Message-ID: <201306041706.30112.heiko@sntech.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Jun 2013 17:07:39 +0200
+Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
+In-Reply-To: <20130530.024201.1913984663902628192.davem@davemloft.net>
+References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <51A5BA86.3070609@free-electrons.com>
+ <20130530.024201.1913984663902628192.davem@davemloft.net>
+Message-ID: <6466898.RnYOe3jpGG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 4. Juni 2013, 16:21:20 schrieb Jamie Iles:
-> Hi Heiko,
+On Thursday 30 May 2013 02:42:01 David Miller wrote:
+> From: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> > On 28/05/2013 22:09, David Miller wrote:
+> > But that is making it impossible to compile a kernel without any network
+> > stack for those platforms or we are going back to either enclosing the
+> > calls to phy_register_fixup{,_for_uid,_for_id} with #ifdef CONFIG_PHYLIB
+> > or if(IS_BUILTIN(CONFIG_PHYLIB)). And as you can see, it is quite error
+> > prone and is done only done for 2 platforms on a total of 6. I believe
+> > fixing that in phy.h is more foolproof.
 > 
-> On Tue, Jun 04, 2013 at 11:38:42AM +0200, Heiko St?bner wrote:
-> > dw_apb_timer_init used to search the devicetree for matching timer
-> > devices, making calls to it from board files necessary.
-> > 
-> > Change the dw_apb_timer_init to work with CLOCKSOURCE_OF_DECLARE.
-> > With this change the function gets called once for each timer node
-> > and tracks these number of calls to attach clockevent and clocksource
-> > devices to the nodes.
-> > 
-> > Also remove the calls to dw_apb_timer_init from all previous users, as
-> > clocksource_of_init is the default for init_time now.
-> > 
-> > Tested on the upcoming rk3066 code.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > Acked-by: Rob Herring <rob.herring@calxeda.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
+> Or you properly segregate the networking bits of the platform code so
+> that it can be built only when the necessary networking portions are
+> enabled.
 > 
-> ...
-> 
-> > -void __init dw_apb_timer_init(void)
-> > +static int num_called;
-> > +static void __init dw_apb_timer_init(struct device_node *timer)
-> > 
-> >  {
-> > 
-> > -	struct device_node *event_timer, *source_timer;
-> > -
-> > -	event_timer = of_find_matching_node(NULL, osctimer_ids);
-> > -	if (!event_timer)
-> > -		panic("No timer for clockevent");
-> > -	add_clockevent(event_timer);
-> > -
-> > -	source_timer = of_find_matching_node(event_timer, osctimer_ids);
-> > -	if (!source_timer)
-> > -		panic("No timer for clocksource");
-> > -	add_clocksource(source_timer);
-> > -
-> > -	of_node_put(source_timer);
-> > +	switch (num_called) {
-> > +	case 0:
-> > +		pr_debug("%s: found clockevent timer\n", __func__);
-> > +		add_clockevent(timer);
-> > +		of_node_put(timer);
-> > +		break;
-> > +	case 1:
-> > +		pr_debug("%s: found clocksource timer\n", __func__);
-> > +		add_clocksource(timer);
-> > +		of_node_put(timer);
-> > +		init_sched_clock();
-> > +		break;
-> > +	default:
-> > +		break;
-> > +	}
-> > 
-> > -	init_sched_clock();
-> > +	num_called++;
-> > 
-> >  }
-> > 
-> > +CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer",
-> > dw_apb_timer_init); +CLOCKSOURCE_OF_DECLARE(apb_timer,
-> > "snps,dw-apb-timer-osc", dw_apb_timer_init);
-> 
-> I think maybe we also want CLOCKSOURCE_OF_DECLARE() instances for the
-> contents of sptimer_ids for completeness, otherwise looks good.
+> Sometimes having dummy stubs makes sense, but not in this situation.
 
-Hmm ... difficult.
+Currently most users of this function are doing something like
 
-As you can see, currently we call init_sched_clock when the second timer is 
-found, which then tries to find the sptimer or uses the clocksource as 
-sched_clock.
+static int foo_phy_fixup(struct phy_device *phydev)
+{
+	...
+}
 
-So to use CLOCKSOURCE_OF_DECLARE for the sptimer the init_sched_clock call 
-would need to move to its init function. So on system without sptimer (like 
-mine) this third call would never happen, and the system would be missing a 
-sched_clock.
+static int __init boo_board_init(void)
+{
+	 if (IS_BUILTIN(CONFIG_PHYLIB))
+		phy_register_fixup_for_uid(phy_id, foo_phy_fixup);
+}
 
-Or I just don't see the solution currently. In any case this could probably be 
-handled by someone with the relevant hardware to test ;-) .
+which is practically the same as having a dummy stub. It leads to
+the foo_phy_fixup() function always getting compiled and then discarded
+by gcc when CONFIG_PHYLIB is disabled.
 
+The method is currently broken when network drivers are enabled as
+modules, because we are missing the fixup then.
 
-> Acked-by: Jamie Iles <jamie@jamieiles.com>
+I think we should use IS_ENABLED() here to force a build error
+in that case, and have something like
 
-thanks
+config ARCH_FOO
+	bool "support for the foo platform"
+	select PHYLIB if NET
+
+in the platform Kconfig file, to ensure PHYLIB is always built-in.
+
+I still think the inline alternatives would be helpful, but using
+if (IS_ENABLED(CONFIG_PHYLIB)) in the platform code would also
+work.
+
+	Arnd
