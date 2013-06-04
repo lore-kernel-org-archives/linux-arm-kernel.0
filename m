@@ -1,50 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Jun 2013 17:16:36 +0200
-Subject: [PATCH v2 5/6] ARM: hi3xxx: add board support with device tree
-In-Reply-To: <1370358317-12768-6-git-send-email-haojian.zhuang@linaro.org>
-References: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
- <1370358317-12768-6-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1456134.qV9IZTo572@wuerfel>
+From: sanjay.rawat@linaro.org (Sanjay Singh Rawat)
+Date: Tue, 04 Jun 2013 20:50:35 +0530
+Subject: [PATCH 2/8] ARM: RealView: use generic cpu idle function for wfi
+In-Reply-To: <1369665166-13049-3-git-send-email-sanjay.rawat@linaro.org>
+References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
+ <1369665166-13049-3-git-send-email-sanjay.rawat@linaro.org>
+Message-ID: <51AE05C3.2090404@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 June 2013 23:05:16 Haojian Zhuang wrote:
+Hello Russell,
 
-> +static void __init hi3xxx_timer_init(void)
-> +{
-> +	of_clk_init(NULL);
-> +	clocksource_of_init();
-> +}
+can you please review this patch?
 
-I plan to make this the default, so maybe we will be able to get rid
-of this function soon. Right now it is still needed, as we only
-call clocksource_of_init() but not of_clk_init().
-
-> +static void __init hs_init(void)
-> +{
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
-
-However, this is the default already. You can remove.
-
-> +static const char *hs_compat[] __initdata = {
-> +	"hisilicon,hi3620-hi4511",
-> +	NULL,
-> +};
-> +
-> +DT_MACHINE_START(HI3xxx, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
-> +	/* Maintainer: Haojian Zhuang <haojian.zhuang@linaro.org> */
-> +	.map_io		= debug_ll_io_init,
-> +	.init_time	= hi3xxx_timer_init,
-> +	.init_machine	= hs_init,
-> +	.dt_compat	= hs_compat,
-> +MACHINE_END
-
-Same for debug_ll_io_init. You can remove the map_io and init_machine lines
-here.
-
-With those gone,
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-	Arnd
+On Monday 27 May 2013 08:02 PM, Sanjay Singh Rawat wrote:
+> use cpu_do_idle for entering the wfi mode
+>
+> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+> ---
+>   arch/arm/mach-realview/hotplug.c |    9 ++-------
+>   1 file changed, 2 insertions(+), 7 deletions(-)
+>
+> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+> index ac22dd4..c42022b 100644
+> --- a/arch/arm/mach-realview/hotplug.c
+> +++ b/arch/arm/mach-realview/hotplug.c
+> @@ -59,13 +59,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>   	 * code will have already disabled interrupts
+>   	 */
+>   	for (;;) {
+> -		/*
+> -		 * here's the WFI
+> -		 */
+> -		asm(".word	0xe320f003\n"
+> -		    :
+> -		    :
+> -		    : "memory", "cc");
+> +		/* enter WFI mode */
+> +		cpu_do_idle();
+>
+>   		if (pen_release == cpu_logical_map(cpu)) {
+>   			/*
+>
