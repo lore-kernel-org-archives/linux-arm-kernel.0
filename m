@@ -1,45 +1,32 @@
 From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 4 Jun 2013 10:24:26 +0100
-Subject: [PATCH v2 2/5] arm64/xen: introduce asm/xen header files on arm64
-In-Reply-To: <1370273624-26976-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Tue, 4 Jun 2013 10:25:12 +0100
+Subject: [PATCH v2 4/5] arm64/xen: use XEN_IO_PROTO_ABI_ARM on ARM64
+In-Reply-To: <1370273624-26976-4-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
- <1370273624-26976-2-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1370337866.24512.90.camel@zakaz.uk.xensource.com>
+ <1370273624-26976-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1370337912.24512.91.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 2013-06-03 at 16:33 +0100, Stefano Stabellini wrote:
-> asm/xen/hypercall.h, asm/xen/hypervisor.h, asm/xen/interface.h and
-> asm/xen/page.h are indentical so to avoid code duplication we are just
-
-"identical"
-
-> including the original arm header files here.
-> 
-> asm/xen/events.h is slightly different, so introduce a different file
-> here (use xchg to implement xchg_xen_ulong and pass regs->pstate to
-> raw_irqs_disabled_flags).
-> 
-> Also introduce asm/hypervisor.h and asm/sync_bitops.h.
-> 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 Acked-by: Ian Campbell <ian.campbell@citrix.com>
 
-[...]
-> +/* sync_bitops functions are equivalent to the SMP implementation of the
-> + * original functions, independently from CONFIG_SMP being defined.
-> + *
-> + * We need them because _set_bit etc are not SMP safe if !CONFIG_SMP. But
-> + * under Xen you might be communicating with a completely external entity
-> + * who might be on another CPU (e.g. two uniprocessor guests communicating
-> + * via event channels and grant tables). So we need a variant of the bit
-> + * ops which are SMP safe even on a UP kernel.
-> + */
-> +
-> +#define sync_set_bit(nr, p)            set_bit(nr, p)
-
-Oh, arm64 seems to have optimised bitops now, which means I can ditch
-the skanky versions in Xen in favour of these. Nice.
-
-Ian.
+> ---
+>  include/xen/interface/io/protocols.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/include/xen/interface/io/protocols.h b/include/xen/interface/io/protocols.h
+> index 0eafaf2..056744b 100644
+> --- a/include/xen/interface/io/protocols.h
+> +++ b/include/xen/interface/io/protocols.h
+> @@ -15,7 +15,7 @@
+>  # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_IA64
+>  #elif defined(__powerpc64__)
+>  # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_POWERPC64
+> -#elif defined(__arm__)
+> +#elif defined(__arm__) || defined(__aarch64__)
+>  # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_ARM
+>  #else
+>  # error arch fixup needed here
