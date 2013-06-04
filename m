@@ -1,41 +1,64 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Tue, 04 Jun 2013 12:18:08 +0200
-Subject: DT version of kirkwood_ge0x_init()
-Message-ID: <51ADBEE0.5040500@keymile.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Tue, 04 Jun 2013 12:19:12 +0200
+Subject: [PATCH v6 1/9] drivers: phy: add generic PHY framework
+In-Reply-To: <51A59466.6090504@ti.com>
+References: <1367229812-30574-1-git-send-email-kishon@ti.com>
+ <1367229812-30574-2-git-send-email-kishon@ti.com> <51A531A9.4030800@gmail.com>
+ <51A59466.6090504@ti.com>
+Message-ID: <51ADBF20.3050905@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+Hi,
 
-I noticed how most of the DT-aware board-setup files only have a single
-<board>_init() function, calling kirkwood_ge00_init() with a struct 
-mv643xx_eth_platform_data as a single argument.
+On 05/29/2013 07:38 AM, Kishon Vijay Abraham I wrote:
+> On Wednesday 29 May 2013 04:07 AM, Sylwester Nawrocki wrote:
+>> > On 04/29/2013 12:03 PM, Kishon Vijay Abraham I wrote:
+>>> >> The PHY framework provides a set of APIs for the PHY drivers to
+>>> >> create/destroy a PHY and APIs for the PHY users to obtain a reference
+>>> >> to the
+>>> >> PHY with or without using phandle. For dt-boot, the PHY drivers should
+>>> >> also register *PHY provider* with the framework.
+>>> >>
+>>> >> PHY drivers should create the PHY by passing id and ops like init, exit,
+>>> >> power_on and power_off. This framework is also pm runtime enabled.
+>>> >>
+>>> >> The documentation for the generic PHY framework is added in
+>>> >> Documentation/phy.txt and the documentation for dt binding can be
+>>> >> found at
+>>> >> Documentation/devicetree/bindings/phy/phy-bindings.txt
+>>> >>
+>>> >> Signed-off-by: Kishon Vijay Abraham I<kishon@ti.com>
+>> >
+>> > Thanks for working on this. For the record, I plan to give this a try
+>> > in the end of this week, with my simple MIPI CSI/DSI PHY driver. I might
+>> > have some more comments then. For now just couple of remarks after
+>> > reading the documentation.
+>
+> Thanks for reviewing. I'll wait for your comments before posting the 
+> next version.
 
-I was wondering -- is there a reason why we cannot remove all this 
-board-specific code and move all this to the DT?
+So I've used this API for the Exynos SoC MIPI CSI-2 and MIPI DSI DPHYs.
+I could remove all the local modifications, comparing to your v5, since 
+this iteration already have what's needed, thanks! In my case the PHY 
+provider was a platform device and so were the PHY consumer devices. Those 
+PHYs are very simple, there is less than one register per PHY (some bits 
+are shared across the MIPI CSI-2 receiver and MIPI DSI transmitter DPHYs), 
+but having this generic PHY driver means, among others, there is a proper 
+DT support. I could finally get rid of the the platform callback at 
+arch/arm/plat-samsung/setup-mipiphy.c.
 
-I noticed how NS2 can somehow trick this value depeding on the 
-compatible string, so I assume it's not really *THAT* early, as the 
-whole DT infrastructure is already available:
+I found this code useful as is, except previous minor comments I don't 
+really have more remarks now. This API looks quite good, and it seems much 
+lighter comparing to the original version.
 
-	if (of_machine_is_compatible("lacie,cloudbox") ||
-	    of_machine_is_compatible("lacie,netspace_lite_v2") ||
-	    of_machine_is_compatible("lacie,netspace_mini_v2"))
-		ns2_ge00_data.phy_addr = MV643XX_ETH_PHY_ADDR(0);
-	kirkwood_ge00_init(&ns2_ge00_data);
+I assume, the way it is designed now, allows it to be used also with PHYs that 
+hang off other buses, e.g. I2C.
 
-I guess we could remove a lot of board-specific code if we could move 
-this last bit of information to the DT.
-Unless compatibility with existing DTs is an issue -- but what about new 
-boards?
+It would be nice to get this in 3.11.
 
-I would really love to have all our boards under a single 
-CONFIG_<FAMILY>_DT and a single compatible string, with all the 
-differences within the DTs itself -- no more #ifdef CONFIG_<BOARD>, no 
-more of_machine_is_compatible("boardXXX").
+Hmm, actually I have some doubts, let me comment in other e-mail..
 
-Any feedback (swearwords included -- in case I'm talking non-sense) 
-would be more than welcome.
 
-Thank you!
-Gerlando
+Regards,
+Sylwester
