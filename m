@@ -1,34 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Jun 2013 11:23:48 +0200
-Subject: [PATCH] ARM: ux500: avoid warning in ux500_read_asicid
-In-Reply-To: <2475820.dXNmmAuTaP@wuerfel>
-References: <2475820.dXNmmAuTaP@wuerfel>
-Message-ID: <CACRpkdZapi-xERDkjNz03VOJFFga090xvdqUrHUdY+05GS4MdA@mail.gmail.com>
+From: Ian.Campbell@citrix.com (Ian Campbell)
+Date: Tue, 4 Jun 2013 10:24:26 +0100
+Subject: [PATCH v2 2/5] arm64/xen: introduce asm/xen header files on arm64
+In-Reply-To: <1370273624-26976-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
+ <1370273624-26976-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1370337866.24512.90.camel@zakaz.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 10:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Mon, 2013-06-03 at 16:33 +0100, Stefano Stabellini wrote:
+> asm/xen/hypercall.h, asm/xen/hypervisor.h, asm/xen/interface.h and
+> asm/xen/page.h are indentical so to avoid code duplication we are just
 
-> phys_addr_t may be 64 bit, which causes this harmless warning
-> in ux500_read_asicid:
->
-> arch/arm/mach-ux500/id.c: In function 'ux500_read_asicid':
-> arch/arm/include/asm/io.h:159:19: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->  #define IOMEM(x) ((void __force __iomem *)(x))
->                    ^
-> arch/arm/mach-ux500/id.c:40:9: note: in expansion of macro 'readl'
->   return readl(IOMEM(UX500_VIRT_ROM + (addr & 0xfff)));
->
-> We can solve this in a nicer way by making UX500_VIRT_ROM have a proper
-> type to start with and calculating the address using pointer arithmetic.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+"identical"
 
-Patch applied to ux500-core for v3.11, as it doesn't seem to
-be a dangerous regression.
+> including the original arm header files here.
+> 
+> asm/xen/events.h is slightly different, so introduce a different file
+> here (use xchg to implement xchg_xen_ulong and pass regs->pstate to
+> raw_irqs_disabled_flags).
+> 
+> Also introduce asm/hypervisor.h and asm/sync_bitops.h.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-You'll get this back by pull request soon-ish.
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
 
-Yours,
-Linus Walleij
+[...]
+> +/* sync_bitops functions are equivalent to the SMP implementation of the
+> + * original functions, independently from CONFIG_SMP being defined.
+> + *
+> + * We need them because _set_bit etc are not SMP safe if !CONFIG_SMP. But
+> + * under Xen you might be communicating with a completely external entity
+> + * who might be on another CPU (e.g. two uniprocessor guests communicating
+> + * via event channels and grant tables). So we need a variant of the bit
+> + * ops which are SMP safe even on a UP kernel.
+> + */
+> +
+> +#define sync_set_bit(nr, p)            set_bit(nr, p)
+
+Oh, arm64 seems to have optimised bitops now, which means I can ditch
+the skanky versions in Xen in favour of these. Nice.
+
+Ian.
