@@ -1,50 +1,28 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Tue, 4 Jun 2013 09:25:27 +0800
-Subject: [PATCH v3 11/11] ARCH: mmp: support clocksource in timer
-In-Reply-To: <51ACCD65.8030204@linaro.org>
-References: <1370251845-31373-1-git-send-email-haojian.zhuang@gmail.com>
- <1370251845-31373-12-git-send-email-haojian.zhuang@gmail.com>
- <51ACCD65.8030204@linaro.org>
-Message-ID: <CAN1soZwdc1jEK7t2kLHMNdRr+79vKwQRQxnTV0c9Nu1MOu_qcA@mail.gmail.com>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 4 Jun 2013 09:25:47 +0800
+Subject: [PATCH] ARM: tegra: remove the ifdef of ARCH SoC in the
+ tegra_resume
+In-Reply-To: <201306040048.13612.arnd@arndb.de>
+References: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
+ <51ACB59D.9030005@wwwdotorg.org>  <201306040048.13612.arnd@arndb.de>
+Message-ID: <1370309147.2341.6.camel@jlo-ubuntu-64.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 4, 2013 at 1:07 AM, John Stultz <john.stultz@linaro.org> wrote:
-> On 06/03/2013 02:30 AM, Haojian Zhuang wrote:
->>
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index f151c6c..f429f68 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -72,6 +72,12 @@ config CLKSRC_METAG_GENERIC
->>         help
->>           This option enables support for the Meta per-thread timers.
->>   +config CLKSRC_MMP
->> +       def_bool y if ARCH_MMP
->> +       select CLKSRC_OF if OF
->> +       help
->> +         This option enables support for the MMP timer.
->> +
->>   config CLKSRC_EXYNOS_MCT
->>         def_bool y if ARCH_EXYNOS
->>         help
->>
->
-> If I'm reading the above right, CONFIG_CLKSRC_MMP is identical to
-> CONFIG_ARCH_MMP, no?
->
-> Why not just use CONFIG_ARCH_MMP for configuration conditional code (and
-> have that config select CLKSRC_OF if appropriate)?
->
-> Otherwise we just start adding extra unnecessary config options that really
-> don't add any real meaning to things.
->
-> thanks
-> -john
->
->
->
-It's also OK. I can remove it.
+On Tue, 2013-06-04 at 06:48 +0800, Arnd Bergmann wrote:
+> On Monday 03 June 2013, Stephen Warren wrote:
+> > Was that ifdef completely incorrect before? I can see why the cmp/beq
+> > might be ifdef'd (although it's not worth it), but I assume the code
+> > after that beq was intended to run on all chips after Tegra20. The ifdef
+> > as it was written does something rather different; it prevents any of
+> > that code from running unless the kernel doesn't have Tegra20 support.
+> > So, I think that the removal of the ifdef is more of a bug-fix that
+> > "because we always build with all Tegra SoCs support. Let me know, and
+> > I'll re-write the commit description to something more accurate...
+> 
+> The #ifdef was recently changed from #if TEGRA3 to #if !TEGRA2, which support
+> for TEGRA4 was added. I think this is where it broke.
+> 
+Yes, exactly. Sorry again for the error code.
 
-Regards
-Haojian
+Joseph
