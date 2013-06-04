@@ -1,83 +1,67 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 4 Jun 2013 09:10:03 -0400
-Subject: DT version of kirkwood_ge0x_init()
-In-Reply-To: <20130604120500.GZ3803@titan.lakedaemon.net>
-References: <51ADBEE0.5040500@keymile.com> <51ADC2C2.6010106@gmail.com>
- <20130604104302.GX3803@titan.lakedaemon.net>
- <20130604115927.GJ7626@kw.sim.vm.gnt>
- <20130604120500.GZ3803@titan.lakedaemon.net>
-Message-ID: <20130604131003.GA3803@titan.lakedaemon.net>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 4 Jun 2013 14:13:22 +0100
+Subject: [PATCH v2 0/4] ARM: mm: HugeTLB + THP support.
+In-Reply-To: <20130604130329.GR27516@mudshark.cambridge.arm.com>
+References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+ <20130603104010.GA26112@linaro.org>
+ <20130604125610.GA16818@linaro.org>
+ <20130604130329.GR27516@mudshark.cambridge.arm.com>
+Message-ID: <20130604131320.GA17244@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 08:05:00AM -0400, Jason Cooper wrote:
-> On Tue, Jun 04, 2013 at 01:59:27PM +0200, Simon Guinot wrote:
-> > On Tue, Jun 04, 2013 at 06:43:02AM -0400, Jason Cooper wrote:
-> > > On Tue, Jun 04, 2013 at 12:34:42PM +0200, Sebastian Hesselbarth wrote:
-> > > > On 06/04/13 12:18, Gerlando Falauto wrote:
-> > > > >I noticed how most of the DT-aware board-setup files only have a single
-> > > > ><board>_init() function, calling kirkwood_ge00_init() with a struct
-> > > > >mv643xx_eth_platform_data as a single argument.
-> > > > >
-> > > > >I was wondering -- is there a reason why we cannot remove all this
-> > > > >board-specific code and move all this to the DT?
+On Tue, Jun 04, 2013 at 02:03:29PM +0100, Will Deacon wrote:
+> On Tue, Jun 04, 2013 at 01:56:12PM +0100, Steve Capper wrote:
+> > On Mon, Jun 03, 2013 at 11:40:11AM +0100, Steve Capper wrote:
+> > > On Thu, May 23, 2013 at 04:31:16PM +0100, Steve Capper wrote:
+> > > > The following patches bring both HugeTLB support and Transparent
+> > > > HugePage (THP) support to ARM.
 > > > > 
-> > > > Gerlando,
+> > > > Only long descriptors (LPAE) are supported in this series.
 > > > > 
-> > > > DT for mv643xx_eth is on the way (https://lkml.org/lkml/2013/5/29/527).
-> > > > We wait for the driver to surface to relax branch dependencies and then
-> > > > move all DT Orion SoCs to it.
+> > > > The code has been tested on an Arndale board (Exynos 5250).
 > > > > 
-> > > > > I would really love to have all our boards under a single
-> > > > > CONFIG_<FAMILY>_DT and a single compatible string, with all the
-> > > > > differences within the DTs itself -- no more #ifdef CONFIG_<BOARD>,
-> > > > > no more of_machine_is_compatible("boardXXX").
+> > > > This patch set is based on 3.10-rc2.
 > > > > 
-> > > > All those will happen if there is DT support for mv643xx_eth which
-> > > > is the only driver left without DT and board dependencies. But there
-> > > > will be no CONFIG_LACIE_DT or whatever, but just CONFIG_KIRKWOOD_DT
-> > > > and board dependent stuff described in the corresponding dts.
-> > > 
-> > > Gerlando,
-> > > 
-> > > Yes, the mess you describe is temporary.  Those board files used to have
-> > > a lot more code in them, legacy init of partitions, MPP, LEDs, etc.  As
-> > > we have converted drivers, they have gotten smaller and smaller.
-> > > 
-> > > Now, with Sebastian's hard work, we'll finally be able to remove them
-> > > and kirkwood will be completely DT.  We're very excited about this. :)
-> > > 
-> > > Next, we'll move the Marvell DT boards over to mach-mvebu/ and only
-> > > legacy boards in -kirkwood/, -orion5x/, -dove/, and -mv78xx0/ will
-> > > remain.  After a few releases we will deprecate any legacy boards which
-> > > haven't been converted to DT.
+> > > > Major changes since the Patch:
+> > > >  * LPAE code has been separated from non-LPAE code (this series
+> > > >    is the LPAE code).
+> > > >  * PROT_NONE support for HugeTLB and THP has been implemented.
+> > > > 
+> > > > Major changes since the RFC:
+> > > >  * huge pmd sharing removed from the 3-level code as this was
+> > > >    found to be very rarely, if ever?, used. This allowed for some
+> > > >    code simplification.
+> > > > 
+> > > >  * hardware pmd bits for 2-levels of paging are now taken from
+> > > >    mmu.c. Also the mapping code now uses pte/pmd bit helper
+> > > >    functions rather than the custom pre-processor logic.
+> > > > 
+> > > > Cheers,
+> > > > -- 
+> > > > Steve
+> > > > 
+
+[ ... ]
+
 > > 
-> > Hi Jason,
+> > Just a polite ping on the above.
 > > 
-> > While I have obviously planed to convert all the LaCie boards to DT,
-> > I think that removing the legacy support so quickly is a little bit
-> > harsh.
+> > Are people happy to have this patch set merged?
 > 
-> Yeah, my wording might not have been the best.  See below.
+> Looks good to me, but worth checking that it doesn't conflict with the LPAE
+> fixes I plan to send for 3.11 (since they're not terribly critical):
 > 
-> > IMHO, it could be nice to wait the end-of-life for all this products
-> > before removing their support.
+>   https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=for-rmk/lpae
 > 
-> I'd prefer to convert them to DT, then keep them as long as folks are
-> interested in them.  If no one cares about a board, and no one wants to
-> convert it to DT or test the conversion, why keep it around?
-> 
-> Let me clarify, by 'deprecate them' I meant *begin* the process of
-> deprecating them.  eg marking them as deprecated for around three
-> releases or so.
+> Of course, I can fix things up in my branch if necessary (just send me a
+> pointer to your git repo).
 
-And, now that I've had some coffee, I should also mention that any
-boards that are removed can always be brought back by reverting the
-commit.  Sometimes people don't complain until it outright disappears
-;-)
+Thanks, I'll take a look at the above now.
 
-Heads up:  complain = "volunteer to convert to DT"
+For reference these patches can be found at:
+git://git.linaro.org/people/stevecapper/linux.git arm-hugepages-20130523
 
-thx,
-
-Jason.
+Cheers,
+-- 
+Steve
