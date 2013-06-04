@@ -1,9 +1,9 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue,  4 Jun 2013 12:25:30 -0700
-Subject: [PATCH 04/12] msm_sdcc: Convert to clk_prepare/unprepare
+Date: Tue,  4 Jun 2013 12:25:27 -0700
+Subject: [PATCH 01/12] msm_serial: Convert to clk_prepare/unprepare
 In-Reply-To: <1370373938-32417-1-git-send-email-sboyd@codeaurora.org>
 References: <1370373938-32417-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1370373938-32417-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1370373938-32417-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,44 +12,53 @@ the common clock framework.
 
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/mmc/host/msm_sdcc.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/tty/serial/msm_serial.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
-index 0ee4a57..b900de4 100644
---- a/drivers/mmc/host/msm_sdcc.c
-+++ b/drivers/mmc/host/msm_sdcc.c
-@@ -1268,10 +1268,18 @@ msmsdcc_probe(struct platform_device *pdev)
- 		goto clk_put;
- 	}
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index b11e997..0149603 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -408,9 +408,9 @@ static void msm_init_clock(struct uart_port *port)
+ {
+ 	struct msm_port *msm_port = UART_TO_MSM(port);
  
-+	ret = clk_prepare(host->pclk);
-+	if (ret)
-+		goto clk_put;
-+
-+	ret = clk_prepare(host->clk);
-+	if (ret)
-+		goto clk_unprepare_p;
-+
- 	/* Enable clocks */
- 	ret = msmsdcc_enable_clocks(host);
- 	if (ret)
--		goto clk_put;
-+		goto clk_unprepare;
+-	clk_enable(msm_port->clk);
++	clk_prepare_enable(msm_port->clk);
+ 	if (!IS_ERR(msm_port->pclk))
+-		clk_enable(msm_port->pclk);
++		clk_prepare_enable(msm_port->pclk);
+ 	msm_serial_set_mnd_regs(port);
+ }
  
- 	host->pclk_rate = clk_get_rate(host->pclk);
- 	host->clk_rate = clk_get_rate(host->clk);
-@@ -1386,6 +1394,10 @@ msmsdcc_probe(struct platform_device *pdev)
- 		free_irq(host->stat_irq, host);
-  clk_disable:
- 	msmsdcc_disable_clocks(host, 0);
-+ clk_unprepare:
-+	clk_unprepare(host->clk);
-+ clk_unprepare_p:
-+	clk_unprepare(host->pclk);
-  clk_put:
- 	clk_put(host->clk);
-  pclk_put:
+@@ -486,7 +486,7 @@ static void msm_shutdown(struct uart_port *port)
+ 	msm_port->imr = 0;
+ 	msm_write(port, 0, UART_IMR); /* disable interrupts */
+ 
+-	clk_disable(msm_port->clk);
++	clk_disable_unprepare(msm_port->clk);
+ 
+ 	free_irq(port->irq, port);
+ }
+@@ -688,14 +688,14 @@ static void msm_power(struct uart_port *port, unsigned int state,
+ 
+ 	switch (state) {
+ 	case 0:
+-		clk_enable(msm_port->clk);
++		clk_prepare_enable(msm_port->clk);
+ 		if (!IS_ERR(msm_port->pclk))
+-			clk_enable(msm_port->pclk);
++			clk_prepare_enable(msm_port->pclk);
+ 		break;
+ 	case 3:
+-		clk_disable(msm_port->clk);
++		clk_disable_unprepare(msm_port->clk);
+ 		if (!IS_ERR(msm_port->pclk))
+-			clk_disable(msm_port->pclk);
++			clk_disable_unprepare(msm_port->pclk);
+ 		break;
+ 	default:
+ 		printk(KERN_ERR "msm_serial: Unknown PM state %d\n", state);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
