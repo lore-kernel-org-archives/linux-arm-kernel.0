@@ -1,46 +1,34 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 04 Jun 2013 14:22:03 +0400
-Subject: [PATCH v8 2/3] ARM: shmobile: r8a7778: add USB support
-In-Reply-To: <87zjv64eg1.wl%kuninori.morimoto.gx@renesas.com>
-References: <201306020206.47199.sergei.shtylyov@cogentembedded.com>
- <201306020210.37520.sergei.shtylyov@cogentembedded.com>
- <87bo7ooxc9.wl%kuninori.morimoto.gx@renesas.com>
- <51AC6C78.7020900@cogentembedded.com>
- <87zjv64eg1.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <51ADBFCB.8040206@cogentembedded.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 04 Jun 2013 12:34:42 +0200
+Subject: DT version of kirkwood_ge0x_init()
+In-Reply-To: <51ADBEE0.5040500@keymile.com>
+References: <51ADBEE0.5040500@keymile.com>
+Message-ID: <51ADC2C2.6010106@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On 06/04/13 12:18, Gerlando Falauto wrote:
+> I noticed how most of the DT-aware board-setup files only have a single
+> <board>_init() function, calling kirkwood_ge00_init() with a struct
+> mv643xx_eth_platform_data as a single argument.
+>
+> I was wondering -- is there a reason why we cannot remove all this
+> board-specific code and move all this to the DT?
 
-On 04-06-2013 9:45, Kuninori Morimoto wrote:
+Gerlando,
 
->>> The ohci/ehci resource will be  used vainly if platform doesn't have USB
+DT for mv643xx_eth is on the way (https://lkml.org/lkml/2013/5/29/527).
+We wait for the driver to surface to relax branch dependencies and then
+move all DT Orion SoCs to it.
 
->>      The platform device resources are never used vainly. And remember
->> that if PHY doesn't get registered, OHCI/EHCI won't get probed
->> successfully either -- mind the usb_power_on() platform method.
+ > I would really love to have all our boards under a single
+ > CONFIG_<FAMILY>_DT and a single compatible string, with all the
+ > differences within the DTs itself -- no more #ifdef CONFIG_<BOARD>,
+ > no more of_machine_is_compatible("boardXXX").
 
-> ?
-> Could you please teach me who/how/when free resource memory
-> which was kmemdup'ed by platform_device_add_xxx()
-> (and kmalloc'ed dma_mask) on platform_device_register_full() ??
+All those will happen if there is DT support for mv643xx_eth which
+is the only driver left without DT and board dependencies. But there
+will be no CONFIG_LACIE_DT or whatever, but just CONFIG_KIRKWOOD_DT
+and board dependent stuff described in the corresponding dts.
 
-    I don't think there's a need to free them. The EHCI/OHCI devices
-are always there after all.
-
->>> ohci/ehci and phy should be registered in same time/function.
-
->>     I just copied your approach from the R8A7779 code.
-
-> Ahh, yes, indeed
-
-     Moreover, from our prior testing, I'm afraid registering USB PHY 
-and EHCI/OHCI in one function wouldn't work. Unless maybe if it's done 
-from the init_late() machine's method...
-
-> Best regards
-> ---
-> Kuninori Morimoto
-
-WBR, Sergei
+Sebastian
