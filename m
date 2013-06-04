@@ -1,121 +1,83 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 04 Jun 2013 15:09:21 +0200
-Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
-In-Reply-To: <51ADE04D.2090901@linaro.org>
-References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
- <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
- <51AC8F74.2060302@linaro.org> <51AD9765.3000406@monstr.eu>
- <51ADE04D.2090901@linaro.org>
-Message-ID: <51ADE701.5010000@monstr.eu>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Tue, 4 Jun 2013 09:10:03 -0400
+Subject: DT version of kirkwood_ge0x_init()
+In-Reply-To: <20130604120500.GZ3803@titan.lakedaemon.net>
+References: <51ADBEE0.5040500@keymile.com> <51ADC2C2.6010106@gmail.com>
+ <20130604104302.GX3803@titan.lakedaemon.net>
+ <20130604115927.GJ7626@kw.sim.vm.gnt>
+ <20130604120500.GZ3803@titan.lakedaemon.net>
+Message-ID: <20130604131003.GA3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2013 02:40 PM, Daniel Lezcano wrote:
-> On 06/04/2013 09:29 AM, Michal Simek wrote:
->> On 06/03/2013 02:43 PM, Daniel Lezcano wrote:
->>> On 06/03/2013 11:51 AM, Michal Simek wrote:
->>>> Hi,
->>>>
->>>> On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
->>>>> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
->>>>>> The current code considers every wakeup as spurious, which is not
->>>>>> correct. Handle the same way as other arm platforms are doing.
->>>>>>
->>>>>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
->>>>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>>
->>>>>
->>>>>> ---
->>>>>>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
->>>>>>  1 file changed, 7 insertions(+)
->>>>>>
->>>>>> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
->>>>>> index c89672b..a1ab22c 100644
->>>>>> --- a/arch/arm/mach-zynq/hotplug.c
->>>>>> +++ b/arch/arm/mach-zynq/hotplug.c
->>>>>> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
->>>>>>  		dsb();
->>>>>>  		wfi();
->>>>>>  
->>>>>> +		if (pen_release == cpu_logical_map(cpu)) {
->>>>>> +			/*
->>>>>> +			 * OK, proper wakeup, we're done
->>>>>> +			 */
->>>>>> +			break;
->>>>>> +		}
->>>>>> +
->>>> what pen_release stands for?
->>>> I have looked at it and others platform are also using it in platsmp
->>>> code which is not zynq case.
->>>> How is it supposed to work and how this variable should be used?
->>>
->>> This variable is used to serialize the secondary cpus boot process.
->>>
->>> When the processors boot, all the processors except the CPU0 are in WFI.
->>>
->>> Then it is up to CPU0 to wake up the secondary processors:
->>> 1. it writes the cpu id of the secondary processor in the pen_release
->>> variable
->>> 2. it sends a IPI to the secondary cpu in order to make it exiting the
->>> WFI mode
->>> 2.1 the secondary processor boots and, when finished, writes the value
->>> '-1' in the pen_release variable
->>> 3. meanwhile CPU0 waits for the pen_release to be '-1' before continuing
->>> to boot the other secondary processors
->>>
->>> In the case of the routine "zynq_platform_do_lowpower", the same
->>> sequence occurs with 'cpu_up', that means you are at the beginning of
->>> the boot up sequence. So the pen_release value is the cpu id value when
->>> exiting from WFI (remember it sets to -1 when finished).
->>>
->>> If the cpu exits the lopower mode but the pen_release is not the cpu id,
->>> that means there is something wrong because the cpu exited the WFI mode
->>> without being in the booting process (the cpu shouldn't receive an hw
->>> interrupt because they should have been migrated, but just a wake up
->>> IPI). This is why there's "spurious".
->>>
->>> The pen_release contains the hardware id of the CPU, this is why
->>> cpu_logical_map is used.
->>>
->>> I hope that helps
->>
->> Thanks for explanation.
->> I have added this patch to zynq/cleanup branch.
+On Tue, Jun 04, 2013 at 08:05:00AM -0400, Jason Cooper wrote:
+> On Tue, Jun 04, 2013 at 01:59:27PM +0200, Simon Guinot wrote:
+> > On Tue, Jun 04, 2013 at 06:43:02AM -0400, Jason Cooper wrote:
+> > > On Tue, Jun 04, 2013 at 12:34:42PM +0200, Sebastian Hesselbarth wrote:
+> > > > On 06/04/13 12:18, Gerlando Falauto wrote:
+> > > > >I noticed how most of the DT-aware board-setup files only have a single
+> > > > ><board>_init() function, calling kirkwood_ge00_init() with a struct
+> > > > >mv643xx_eth_platform_data as a single argument.
+> > > > >
+> > > > >I was wondering -- is there a reason why we cannot remove all this
+> > > > >board-specific code and move all this to the DT?
+> > > > 
+> > > > Gerlando,
+> > > > 
+> > > > DT for mv643xx_eth is on the way (https://lkml.org/lkml/2013/5/29/527).
+> > > > We wait for the driver to surface to relax branch dependencies and then
+> > > > move all DT Orion SoCs to it.
+> > > > 
+> > > > > I would really love to have all our boards under a single
+> > > > > CONFIG_<FAMILY>_DT and a single compatible string, with all the
+> > > > > differences within the DTs itself -- no more #ifdef CONFIG_<BOARD>,
+> > > > > no more of_machine_is_compatible("boardXXX").
+> > > > 
+> > > > All those will happen if there is DT support for mv643xx_eth which
+> > > > is the only driver left without DT and board dependencies. But there
+> > > > will be no CONFIG_LACIE_DT or whatever, but just CONFIG_KIRKWOOD_DT
+> > > > and board dependent stuff described in the corresponding dts.
+> > > 
+> > > Gerlando,
+> > > 
+> > > Yes, the mess you describe is temporary.  Those board files used to have
+> > > a lot more code in them, legacy init of partitions, MPP, LEDs, etc.  As
+> > > we have converted drivers, they have gotten smaller and smaller.
+> > > 
+> > > Now, with Sebastian's hard work, we'll finally be able to remove them
+> > > and kirkwood will be completely DT.  We're very excited about this. :)
+> > > 
+> > > Next, we'll move the Marvell DT boards over to mach-mvebu/ and only
+> > > legacy boards in -kirkwood/, -orion5x/, -dove/, and -mv78xx0/ will
+> > > remain.  After a few releases we will deprecate any legacy boards which
+> > > haven't been converted to DT.
+> > 
+> > Hi Jason,
+> > 
+> > While I have obviously planed to convert all the LaCie boards to DT,
+> > I think that removing the legacy support so quickly is a little bit
+> > harsh.
 > 
-> Actually, I noticed in the boot secondary cpu the pen_release is not
-> initialized at all. The patch is correct but with undefined behavior.
-
-I know, it is not changed.
-__cpu_logical_map is initialized as 0 in setup.c
-pen_release as -1 in smp.c
-
-> Normally, the secondary cpu are powered on and stays in WFI or whatever
-> more power efficient but the algorithm is to initialize the pen_release
-> with the cpu id physical id, send an IPI and wait for the pen_release to
-> be equal to -1.
+> Yeah, my wording might not have been the best.  See below.
 > 
-> There is a good example in mach-ux500/platform.c
+> > IMHO, it could be nice to wait the end-of-life for all this products
+> > before removing their support.
 > 
-> And a good explanation in the "Cortex -A Series programmer's guide" page
-> 23-10.
+> I'd prefer to convert them to DT, then keep them as long as folks are
+> interested in them.  If no one cares about a board, and no one wants to
+> convert it to DT or test the conversion, why keep it around?
+> 
+> Let me clarify, by 'deprecate them' I meant *begin* the process of
+> deprecating them.  eg marking them as deprecated for around three
+> releases or so.
 
-Where exactly cpus are waiting in WFI loop?
+And, now that I've had some coffee, I should also mention that any
+boards that are removed can always be brought back by reverting the
+commit.  Sometimes people don't complain until it outright disappears
+;-)
 
-Thanks,
-Michal
+Heads up:  complain = "volunteer to convert to DT"
 
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+thx,
 
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/2ecd24c5/attachment-0001.sig>
+Jason.
