@@ -1,66 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Jun 2013 14:58:57 +0100
-Subject: [PATCH v2 1/5] arm/xen: define xen_remap as ioremap_cached
-In-Reply-To: <20130604112834.GA3234@MacBook-Pro.local>
-References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
- <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1370337650.24512.88.camel@zakaz.uk.xensource.com>
- <20130604112834.GA3234@MacBook-Pro.local>
-Message-ID: <20130604135857.GV18614@n2100.arm.linux.org.uk>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue,  4 Jun 2013 16:03:16 +0200
+Subject: [PATCH v2 0/2] ARM: PJ4B: fixes for 3.10-rc
+Message-ID: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 12:28:34PM +0100, Catalin Marinas wrote:
-> PROT_PTE_DEVICE and PROT_SECT_DEVICE above don't contain any memory type
-> information, just attributes/permission - present, young, dirty and XN:
-> 
-> #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
-> #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
-> 
-> The memory type is given by the L_PTE_MT_DEV_CACHED and PMD_SECT_WB
-> macros. Let's take prot_sect first as it's simpler. For MT_DEVICE_CACHED
-> we have:
-> 
-> .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_WB
-> 
-> For MT_MEMORY we have:
-> 
-> .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE
-> 
-> The cache policy is added later to MT_MEMORY which is either WB or WBWA
-> (based on SMP, no particular reason as these are just processor hints;
-> for some historical reasons we enabled WBWA for ARM11MPCore but we could
-> leave it on all the time).
+Hello,
 
-They may be reported to be just hints, but SMP, particularly ARM11MPCore,
-the SMP guys at ARM Ltd were very particular about _requiring_ and stating
-that it is required that WBWA must be used in the page tables for SMP,
-and not WB.  That suggests while the ARM ARM may say that they're hints,
-there's slightly more to it when it comes to SMP, and WBWA is a hard
-requirement there.
+This path set allows to fix some errata for PJ4B CPUs.
 
-Indeed, that's something we enforce in the kernel because of the statements
-from the SMP development group.
+Without the first one, the Armada 370 based board can't boot anymore
+since 3.10-rc1 . So this one really need to be applied on 3.10-rc.
 
-> Similarly for prot_pte, present, young, dirty are the same.
-> 
-> Regarding the type, on ARMv7 (with or without LPAE) we use TEX remapping
-> and L_PTE_MT_DEVICE has the same index (3-bit TEX[0], C, B for NMRR/PRRR
-> or TEX[2:0] for MAIR0/MAIR1 registers) as Normal Cacheable Writeback
-> memory (there is no such thing as Device memory with cacheability
-> attributes, only Normal Cacheable memory).
+It should be a good thing to apply the other one on the 3.10-rc, even
+if we didn't observe get feedback from user who had a problem related
+to these errata, it may happen.
 
-You don't mean L_PTE_MT_DEVICE there. Thankfully, L_PTE_MT_DEVICE doesn't
-exist, so it's not that confusing.  What you mean is L_PTE_MT_DEV_CACHED,
-which _does_ map to "normal cacheable writeback memory" irrespective of
-the mappings which the kernel uses for RAM.
+Note that currently PJ4B is a symbol for 2 different CPUs:
 
-However, that mapping type (which is used for MT_DEVICE_CACHED) should
-not be used if you really do want normal memory.  And using MT_* definitions
-_not_ in asm/io.h with ioremap() is really... silly.  It's not something
-that is intended, nor is it something which I intend to be supportable
-into the future on ARM.  That's why the definitions are separate - see
-the comments in asm/io.h about "types 4 onwards are undefined for
-ioremap" - I'm not sure how more explicit to make that statement.  And
-as I _have_ made the statement, if I see people violating it, I won't
-care about their code if/when I decide to change the ioremap() behaviour.
+- the one used in Armada 370 is a PJ4B
+- the ones used in Armada XP are actually PJ4B-MP
+
+So I planed to introduce a new symbol PJ4B-MP but for 3.11 as it is
+not related to a critical fix. Awaiting these new symbols I made the
+errata depends on ARMADA_370 in the Kconfig.
+
+Russell,
+
+I am aware that you didn't read the first version as you were on not
+available. But this first version was usefull as we get many
+interesting comments from Will Deacon. I addressed all of them when it
+was possible.
+
+Thanks,
+
+Changelog:
+V1 -> V2;
+ - Fixed various coding style and typo issues
+ - Replaced the "mcr p15, 0, r0, c7, c10, 4" by  "dsb"
+ - Removed the fix for errata 4611 in discard_old_kernel_data function,
+   as we don't use it
+
+Lior Amsalem (2):
+  ARM PJ4B: Add support for errata 4742
+  ARM PJ4B: Add support for errata 4611
+
+ arch/arm/Kconfig                | 22 ++++++++++++++++++++++
+ arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
+ arch/arm/mm/proc-macros.S       | 13 +++++++++++++
+ arch/arm/mm/proc-v7.S           |  3 +++
+ 4 files changed, 60 insertions(+)
+
+-- 
+1.8.1.2
