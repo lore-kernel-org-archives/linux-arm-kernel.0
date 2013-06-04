@@ -1,40 +1,29 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 4 Jun 2013 10:29:38 +0200
-Subject: [PATCH 01/10] clocksource: dw_apb_timer_of: use the clocksource
- as sched clock if necessary
-In-Reply-To: <CACRpkdYAvUQ+aymJm1Fw1bE1aGdO7RUqLR9byvoT7ECTk4tkpw@mail.gmail.com>
-References: <201306030055.15413.heiko@sntech.de>
- <201306030056.03522.heiko@sntech.de>
- <CACRpkdYAvUQ+aymJm1Fw1bE1aGdO7RUqLR9byvoT7ECTk4tkpw@mail.gmail.com>
-Message-ID: <201306041029.39053.heiko@sntech.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 04 Jun 2013 10:43:05 +0200
+Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
+In-Reply-To: <20130604101030.232b3743@skate>
+References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130603171017.GN18614@n2100.arm.linux.org.uk>
+ <20130603175629.GH5008@1wt.eu> <20130603181437.GO3803@titan.lakedaemon.net>
+ <20130603183057.GA9868@1wt.eu> <20130603184148.GQ3803@titan.lakedaemon.net>
+ <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
+ <20130604101030.232b3743@skate>
+Message-ID: <51ADA899.80602@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 4. Juni 2013, 08:34:44 schrieb Linus Walleij:
-> On Mon, Jun 3, 2013 at 12:56 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > Currently the dw_apb_timer always expects a separate special timer to be
-> > availbable for the sched_clock. Some devices using dw_apb_timers do not
-> > have the sptimer but can use the clocksource as sched_clock.
-> > Therefore this patch adds using the clocksource timer as
-> > a fallback if no usable sched timer is found.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> 
-> Is this really what the patch does? I mean "ass the clocksourse as
-> fallback", it seems more like that is controlled from the device tree,
-> this looks more like some more careful handling of the device tree
-> input making the sched_timer optional, it doesn't really "add"
-> anything, does it?
+On 06/04/13 10:10, Thomas Petazzoni wrote:
+> On Mon, 03 Jun 2013 15:07:45 -0400 (EDT), Nicolas Pitre wrote:
+>> Isn't upstream U-Boot supporting Marvell devices properly these days?
+ >
+> And as Jason said, even though Armada 370 and Armada XP have a working
+> UART-based recovery method, users are also scared of doing bootloader
+> updates, and on some consumer products, the UART is not necessarily
+> easily available to the average users (may need some soldering skills,
+> a level-shifter to use the TTL UART of the board, etc.).
 
-Right, the commit message is probably based a bit to much on the before-state 
-of the driver, always expecting the "sptimer" and panicing if not found.
+Also remember that not all Kirkwoods support UART boot mode. If your
+BootROM is too old, you will have to unbrick through JTAG. I have such
+an old BootROM on my Dockstar.
 
-How about:
-
-Currently the dw_apb_timer always expects a separate special timer to be
-availbable for the sched_clock. Some devices using dw_apb_timers do not
-have this sptimer but can use the clocksource as sched_clock instead.
-
-Therefore enable the driver to distiguish between devices with and without
-sptimer based on the devicetree data and select the correct timer as
-sched_clock.
+Sebastian
