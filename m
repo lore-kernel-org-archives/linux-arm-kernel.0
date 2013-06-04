@@ -1,150 +1,113 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Tue,  4 Jun 2013 23:32:32 +0200
-Subject: [PATCH] arm: kirkwood: sheevaplug: move pinmux configs to the right
- devices
-Message-ID: <1370381552-9498-1-git-send-email-gmbnomis@gmail.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 04 Jun 2013 23:40:51 +0200
+Subject: [PATCH V2 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <1370342880-422-4-git-send-email-josephl@nvidia.com>
+References: <1370342880-422-1-git-send-email-josephl@nvidia.com>
+ <1370342880-422-4-git-send-email-josephl@nvidia.com>
+Message-ID: <51AE5EE3.3010607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the pinmux mechanism was added in Kirkwood, the device driver
-core was not yet providing the possibility of attaching pinmux
-configurations to all devices, drivers had to do it explicitly, and
-not all drivers were doing this.
+On 06/04/2013 12:48 PM, Joseph Lo wrote:
+> This supports CPU core power down on each CPU when CPU idle. When CPU go
+> into this state, it saves it's context and needs a proper configuration
+> in flow controller to power gate the CPU when CPU runs into WFI
+> instruction. And the CPU also needs to set the IRQ as CPU power down idle
+> wake up event in flow controller.
+> 
+> Signed-off-by: Joseph Lo <josephl@nvidia.com>
 
-Now that the driver core does that in a generic way, it makes sense to
-attach the pinmux configuration to their corresponding devices.
+I would like to understand why there is a WARN with the
+CPUIDLE_FLAG_TIMER_STOP flag set before queuing this patch and ensure it
+is not the tree hiding the forest.
 
-Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
----
+Thanks
+  -- Daniel
 
-Hi,
+> ---
+> V2:
+> * remove some redundant code of memory barrier
+> * remove the function declaration by rearranging the coding sequence 
+> ---
+>  arch/arm/mach-tegra/cpuidle-tegra114.c | 51 +++++++++++++++++++++++++++++++++-
+>  1 file changed, 50 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-tegra/cpuidle-tegra114.c b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> index 1d1c602..e0b8730 100644
+> --- a/arch/arm/mach-tegra/cpuidle-tegra114.c
+> +++ b/arch/arm/mach-tegra/cpuidle-tegra114.c
+> @@ -17,15 +17,64 @@
+>  #include <linux/kernel.h>
+>  #include <linux/module.h>
+>  #include <linux/cpuidle.h>
+> +#include <linux/cpu_pm.h>
+> +#include <linux/clockchips.h>
+>  
+>  #include <asm/cpuidle.h>
+> +#include <asm/suspend.h>
+> +#include <asm/smp_plat.h>
+> +
+> +#include "pm.h"
+> +#include "sleep.h"
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +#define TEGRA114_MAX_STATES 2
+> +#else
+> +#define TEGRA114_MAX_STATES 1
+> +#endif
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int tegra114_idle_power_down(struct cpuidle_device *dev,
+> +				    struct cpuidle_driver *drv,
+> +				    int index)
+> +{
+> +	local_fiq_disable();
+> +
+> +	tegra_set_cpu_in_lp2();
+> +	cpu_pm_enter();
+> +
+> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_ENTER, &dev->cpu);
+> +
+> +	cpu_suspend(0, tegra30_sleep_cpu_secondary_finish);
+> +
+> +	clockevents_notify(CLOCK_EVT_NOTIFY_BROADCAST_EXIT, &dev->cpu);
+> +
+> +	cpu_pm_exit();
+> +	tegra_clear_cpu_in_lp2();
+> +
+> +	local_fiq_enable();
+> +
+> +	return index;
+> +}
+> +#endif
+>  
+>  static struct cpuidle_driver tegra_idle_driver = {
+>  	.name = "tegra_idle",
+>  	.owner = THIS_MODULE,
+> -	.state_count = 1,
+> +	.state_count = TEGRA114_MAX_STATES,
+>  	.states = {
+>  		[0] = ARM_CPUIDLE_WFI_STATE_PWR(600),
+> +#ifdef CONFIG_PM_SLEEP
+> +		[1] = {
+> +			.enter			= tegra114_idle_power_down,
+> +			.exit_latency		= 500,
+> +			.target_residency	= 1000,
+> +			.power_usage		= 0,
+> +			.flags			= CPUIDLE_FLAG_TIME_VALID,
+> +			.name			= "powered-down",
+> +			.desc			= "CPU power gated",
+> +		},
+> +#endif
+>  	},
+>  };
+>  
+> 
 
-the patch series by Thomas to move the pinmux configs was prepared in
-parallel to the dts files for Sheevaplug.  Here is the corresponding
-patch in order to adapt these files as well.
 
-- Simon
-
- arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi |   16 ++++++----------
- arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts   |   21 ++++++++++++---------
- arch/arm/boot/dts/kirkwood-sheevaplug.dts         |   18 ++++++++----------
- 3 files changed, 26 insertions(+), 29 deletions(-)
-
-diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-index 9d59475..f7143f1 100644
---- a/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-+++ b/arch/arm/boot/dts/kirkwood-sheevaplug-common.dtsi
-@@ -44,10 +44,14 @@
- 			};
- 		};
- 		serial at 12000 {
-+			pinctrl-0 = <&pmx_uart0>;
-+			pinctrl-names = "default";
- 			status = "okay";
- 		};
- 
- 		nand at 3000000 {
-+			pinctrl-0 = <&pmx_nand>;
-+			pinctrl-names = "default";
- 			status = "okay";
- 
- 			partition at 0 {
-@@ -71,6 +75,8 @@
- 		compatible = "simple-bus";
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_usb_power_enable>;
-+		pinctrl-names = "default";
- 
- 		usb_power: regulator at 1 {
- 			compatible = "regulator-fixed";
-@@ -84,14 +90,4 @@
- 			gpio = <&gpio0 29 0>;
- 		};
- 	};
--
--	gpio-leds {
--		compatible = "gpio-leds";
--
--		health {
--			label = "sheevaplug:blue:health";
--			gpios = <&gpio1 17 1>;
--			linux,default-trigger = "default-on";
--		};
--	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts b/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
-index 1c6946a..f620ce4 100644
---- a/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
-+++ b/arch/arm/boot/dts/kirkwood-sheevaplug-esata.dts
-@@ -15,15 +15,6 @@
- 	compatible = "globalscale,sheevaplug-esata-rev13", "globalscale,sheevaplug-esata", "globalscale,sheevaplug", "marvell,kirkwood-88f6281", "marvell,kirkwood";
- 
- 	ocp at f1000000 {
--		pinctrl: pinctrl at 10000 {
--
--			pinctrl-0 = < &pmx_nand &pmx_uart0
--				      &pmx_usb_power_enable
--				      &pmx_led_blue>;
--			pinctrl-names = "default";
--
--		};
--
- 		sata at 80000 {
- 			status = "okay";
- 			nr-ports = <2>;
-@@ -37,4 +28,16 @@
- 			wp-gpios = <&gpio1 15 0>;
- 		};
- 	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_blue>;
-+		pinctrl-names = "default";
-+
-+		health {
-+			label = "sheevaplug:blue:health";
-+			gpios = <&gpio1 17 1>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
- };
-diff --git a/arch/arm/boot/dts/kirkwood-sheevaplug.dts b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
-index f7684066..bf1dff2 100644
---- a/arch/arm/boot/dts/kirkwood-sheevaplug.dts
-+++ b/arch/arm/boot/dts/kirkwood-sheevaplug.dts
-@@ -15,16 +15,6 @@
- 	compatible = "globalscale,sheevaplug", "marvell,kirkwood-88f6281", "marvell,kirkwood";
- 
- 	ocp at f1000000 {
--		pinctrl: pinctrl at 10000 {
--
--			pinctrl-0 = < &pmx_nand &pmx_uart0
--				      &pmx_usb_power_enable
--				      &pmx_led_red
--				      &pmx_led_blue>;
--			pinctrl-names = "default";
--
--		};
--
- 		mvsdio at 90000 {
- 			pinctrl-0 = <&pmx_sdio>;
- 			pinctrl-names = "default";
-@@ -36,6 +26,14 @@
- 
- 	gpio-leds {
- 		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_blue &pmx_led_red>;
-+		pinctrl-names = "default";
-+
-+		health {
-+			label = "sheevaplug:blue:health";
-+			gpios = <&gpio1 17 1>;
-+			linux,default-trigger = "default-on";
-+		};
- 
- 		misc {
- 			label = "sheevaplug:red:misc";
 -- 
-1.7.9.5
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
