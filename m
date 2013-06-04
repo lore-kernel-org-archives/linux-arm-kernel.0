@@ -1,45 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Jun 2013 13:53:02 +0200
-Subject: [PATCH] driver core: firmware loader: fix build error
-Message-ID: <1563703.RysIHVehbx@wuerfel>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 04 Jun 2013 13:58:31 +0200
+Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
+In-Reply-To: <CAP245DUsRcomDaNKbxYry39ZLCrR33SDRRAhNCdR91e17sHF-A@mail.gmail.com>
+References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
+ <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
+ <51AC8F74.2060302@linaro.org>
+ <CAP245DUsRcomDaNKbxYry39ZLCrR33SDRRAhNCdR91e17sHF-A@mail.gmail.com>
+Message-ID: <51ADD667.3010203@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch af5bc11e9 "driver core: firmware loader: kill FW_ACTION_NOHOTPLUG
-requests before suspend" caused a regression for the case where
-CONFIG_FW_LOADER_USER_HELPER is not enabled, because it adds
-references to code that is not available in that configuration:
+On 06/04/2013 01:39 PM, Amit Kucheria wrote:
+> On Mon, Jun 3, 2013 at 6:13 PM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> On 06/03/2013 11:51 AM, Michal Simek wrote:
+>>> Hi,
+>>>
+>>> On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
+>>>> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
+>>>>> The current code considers every wakeup as spurious, which is not
+>>>>> correct. Handle the same way as other arm platforms are doing.
+>>>>>
+>>>>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+>>>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>
+>>>>
+>>>>> ---
+>>>>>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
+>>>>>  1 file changed, 7 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+>>>>> index c89672b..a1ab22c 100644
+>>>>> --- a/arch/arm/mach-zynq/hotplug.c
+>>>>> +++ b/arch/arm/mach-zynq/hotplug.c
+>>>>> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
+>>>>>             dsb();
+>>>>>             wfi();
+>>>>>
+>>>>> +           if (pen_release == cpu_logical_map(cpu)) {
+>>>>> +                   /*
+>>>>> +                    * OK, proper wakeup, we're done
+>>>>> +                    */
+>>>>> +                   break;
+>>>>> +           }
+>>>>> +
+>>> what pen_release stands for?
+>>> I have looked at it and others platform are also using it in platsmp
+>>> code which is not zynq case.
+>>> How is it supposed to work and how this variable should be used?
+>>
+>> This variable is used to serialize the secondary cpus boot process.
+> 
+> I'm curious why it is called pen_release. :) Is there some historical
+> link to some HW lines?
 
-drivers/base/firmware_class.c: In function 'kill_requests_without_uevent':
-drivers/base/firmware_class.c:1424:49: error: 'struct firmware_buf' has no member named 'pending_list'
-  list_for_each_entry_safe(buf, next, &pending_fw_head, pending_list) {
-drivers/base/firmware_class.c:1426:5: error: implicit declaration of function 'fw_load_abort' [-Werror=implicit-function-declaration]
+I tried to figure out the same but I did not found any information on
+that. I assumed the name could be referring to a simplified mutual
+exclusion algorithm from the 'Dining philosophers problem' [1] where the
+fork is a pen.
 
-This fixes the build error by making the new code conditional
-as well. Found using ARM ape6evm_defconfig on today's linux-next.
+But maybe I am totally wrong :)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Ming Lei <ming.lei@canonical.com>
-Cc: Takashi Iwai <tiwai@suse.de>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+[1] http://en.wikipedia.org/wiki/Dining_philosophers_problem
 
-diff --git a/drivers/base/firmware_class.c b/drivers/base/firmware_class.c
-index c415043..6cca468 100644
---- a/drivers/base/firmware_class.c
-+++ b/drivers/base/firmware_class.c
-@@ -1417,6 +1417,7 @@ static void __device_uncache_fw_images(void)
- /* kill pending requests without uevent to avoid blocking suspend */
- static void kill_requests_without_uevent(void)
- {
-+#ifdef CONFIG_FW_LOADER_USER_HELPER
- 	struct firmware_buf *buf;
- 	struct firmware_buf *next;
- 
-@@ -1426,6 +1427,7 @@ static void kill_requests_without_uevent(void)
- 			 fw_load_abort(buf);
- 	}
- 	mutex_unlock(&fw_lock);
-+#endif
- }
- 
- /**
+
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
