@@ -1,32 +1,45 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Tue, 4 Jun 2013 18:04:40 +1000
-Subject: linux-next: Tree for May 30
-In-Reply-To: <51AC579B.8040902@atmel.com>
-References: <20130530163334.105322d3c166b74165f1dad4@canb.auug.org.au>
- <CAMuHMdXNzmJtfxzzt3kuzROzJmfsTKkp_4_8pdg=ahLv2LdU+Q@mail.gmail.com>
- <20130603163633.e392dffdacc316b490b12a26@canb.auug.org.au>
- <51AC579B.8040902@atmel.com>
-Message-ID: <20130604180440.852c851802ce2e83c014d2ef@canb.auug.org.au>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 4 Jun 2013 10:05:18 +0200
+Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
+In-Reply-To: <20130603183057.GA9868@1wt.eu>
+References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130603171017.GN18614@n2100.arm.linux.org.uk>
+ <20130603175629.GH5008@1wt.eu>
+ <20130603181437.GO3803@titan.lakedaemon.net>
+ <20130603183057.GA9868@1wt.eu>
+Message-ID: <20130604100518.167484e1@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Willy, Jason,
 
-On Mon, 3 Jun 2013 10:45:15 +0200 Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->
-> Is it possible for you to move the building to the replacement defconfigs:
-> at91sam9260_9g20_defconfig
-> at91sam9261_9g10_defconfig
+On Mon, 3 Jun 2013 20:30:57 +0200, Willy Tarreau wrote:
 
-Done.
+> I remember this discussion, but it is different and does not apply here.
+> Sebastian fixed an issue with a properly configured NIC which used to
+> lose its MAC, so the solution consisted in saving it early in the DT.
+> 
+> In the mv_neta case, the NICs are not configured yet and we need to
+> find the MAC somewhere. I only found it in the ATAGs and nowhere else.
+> Well, in fact u-boot sets it on the MAC used to boot from the network
+> if such a boot is performed, but that's all. So in practice you boot
+> without the MAC address anywhere but in the ATAGs. I'd be happy to
+> find a way to parse non-standard atags in a board-specific file but
+> they're lost early it seems :-(
 
+I confirm this. Only the one NIC that was used for network booting gets
+its MAC address assigned in the hardware registers, the other three NIC
+have their MAC address left to zero by the bootloader. And of course,
+if you don't do network booting, the four NICs will have their MAC left
+to zero.
+
+So Sebastian's approach does not work for mvneta.
+
+Best regards,
+
+Thomas
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/13378b39/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
