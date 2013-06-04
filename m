@@ -1,60 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Jun 2013 18:35:32 +0100
-Subject: [PATCH v2 1/2] ARM PJ4B: Add support for errata 4742
-In-Reply-To: <51AE21A7.5080907@free-electrons.com>
-References: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
- <1370354598-12920-2-git-send-email-gregory.clement@free-electrons.com>
- <20130604145958.GY18614@n2100.arm.linux.org.uk>
- <51AE21A7.5080907@free-electrons.com>
-Message-ID: <20130604173532.GB27516@mudshark.cambridge.arm.com>
+From: neko@bakuhatsu.net (Matt Sealey)
+Date: Tue, 4 Jun 2013 12:39:53 -0500
+Subject: [PATCH RFC 3/3] clk: dt: binding for basic divider clock
+In-Reply-To: <51AE1FBB.1070806@codeaurora.org>
+References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
+ <1370281990-15090-4-git-send-email-mturquette@linaro.org>
+ <51AE1FBB.1070806@codeaurora.org>
+Message-ID: <CAHCPf3tZAbdVZPuKOjxJbCOAE76Pa6wMVHjnBRPhSpj0aMBMHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 06:19:35PM +0100, Gregory CLEMENT wrote:
-> On 06/04/2013 04:59 PM, Russell King - ARM Linux wrote:
-> > On Tue, Jun 04, 2013 at 04:03:17PM +0200, Gregory CLEMENT wrote:
-> >> From: Lior Amsalem <alior@marvell.com>
-> >>
-> >> This commit fixes the regression on Armada 370 (the kernal hang during
-> >> boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
-> >> TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
-> >>
-> >> When coming out of either a Wait for Interrupt (WFI) or a Wait for
-> >> Event (WFE) IDLE states, a specific timing sensitivity exists between
-> >> the retiring WFI/WFE instructions and the newly issued subsequent
-> >> instructions. This sensitivity can result in a CPU hang scenario.  The
-> >> workaround is to insert either a Data Synchronization Barrier (DSB) or
-> >> Data Memory Barrier (DMB) command immediately after the WFI/WFE
-> >> instruction
-> > 
-> > Wouldn't a DMB be cheaper than a full blown DSB here?
-> 
-> I let Lior answer to this question.
-> 
-> > 
-> > Also, we could detect the PJ4B and only implement the workaround
-> > on those CPUs rather than having to have it on every v7 CPU - which
-> > is important when you consider the single zImage issues.
-> 
-> At least we can detect the PJ4B and maybe even the detect the if it
-> is the PJ4B or the PJ4B-MP.
-> 
-> Do you mean to add this test in the cpu_v7_do_idle() function?
+On Tue, Jun 4, 2013 at 12:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/03/13 10:53, Mike Turquette wrote:
+>> +Required properties:
+>> +- compatible : shall be "divider-clock".
+>> +- #clock-cells : from common clock binding; shall be set to 0.
+>> +- clocks : link to phandle of parent clock
+>> +- reg : base address for register controlling adjustable divider
+>> +- mask : arbitrary bitmask for programming the adjustable divider
+>> +
+>> +Optional properties:
+>> +- clock-output-names : From common clock binding.
+>> +- table : array of integer pairs defining divisors & bitfield values
+>> +- shift : number of bits to shift the mask, defaults to 0 if not present
+>> +- index_one : valid divisor programming starts at 1, not zero
+>> +- index_power_of_two : valid divisor programming must be a power of two
+>> +- allow_zero : implies index_one, and programming zero results in
+>> +  divide-by-one
+>
+> It's preferred that property names have dashes instead of underscores.
 
-I don't like the sound of that -- coming out of idle is basically all
-overhead, so adding to it doesn't sound pleasant. Also, given that we won't
-actually have any pending memory transactions at this point, a dsb needn't
-be too expensive because there's nothing to make visible (obviously requires
-benchmarking).
+I think I have a suggestion or two here..
 
-An alternative is disabling wfi/wfe on your core, if that's possible.
+I mailed one to Mike earlier, I have had some mailing list problems
+which I think are solved now..
 
-> Or patching the pointer to the cpu_v7_do_idle() on the fly? In this
-> last case it seems a little tricky to me, as we should have to modify
-> a pointer function in the .proc.info.init section.
+If you provide a mask for programming the divider, surely the "shift"
+property is therefore redundant. Unless some device has a completely
+strange way of doing things and uses two seperated bitfields for
+programming in the same register, the shift value is simply a function
+of ffs() on the mask, isn't it? It is nice to put the information
+specifically in the device tree, but where a shift is not specified
+it'd probably be a good idea to go about deriving that value that way
+anyway, right, and if we're doing that.. why specify it?
 
-Maybe you could hack glue-proc.h to define MULTI_CPU if this workaround is
-selected, then patch the pointer in struct processor. (apologies if this
-suggestion made you ill :).
+Also it may be much simpler to simply define the default clock setup
+as being an integer divider that follows the form 2^n - I am not sure
+I can think off the top of my head of any clock dividers doing the
+rounds that have divide-by-non-power-of-two and if they exist out
+there (please correct me) they would be the rare ones. I think
+properties that modify behavior should err on the side of being rarely
+used and to define unusual behavior, not confirm the status quo.
 
-Will
+Just to be sure, though, someone would need to go visit a bunch of
+current clock handlers already implemented or read a lot of docs to
+see how they're expecting their dividers. Maybe some of the Samsung,
+Qualcomm, TI, Freescale guys can comment on what is the most common
+case inside their SoCs.
+
+In any case, once you figure out that, rather than specifying a full
+table of <0 1>, <1 2>, <2, 4> and creating a big list, you could just
+give the lower and upper limits and let the driver figure out what is
+in between with two values. If there were gaps, a full table would be
+necessary. The allow zero property might be better served by the very
+same range property.
+
+I would also say.. bit-mask rather than mask, divider-table rather
+than table, divider-range (modifying the idea above). While we're
+inside a particular namespace in the binding I think naming properties
+with their intent (i.e. what table is it?) is good behavior.
+
+--
+Matt Sealey <matt@genesi-usa.com>
