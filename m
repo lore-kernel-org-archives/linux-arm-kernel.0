@@ -1,60 +1,28 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 04 Jun 2013 21:04:09 +0200
-Subject: [PATCH v2 1/2] ARM PJ4B: Add support for errata 4742
-In-Reply-To: <alpine.LFD.2.03.1306041429380.1200@syhkavp.arg>
-References: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
- <1370354598-12920-2-git-send-email-gregory.clement@free-electrons.com>
- <20130604145958.GY18614@n2100.arm.linux.org.uk>
- <51AE21A7.5080907@free-electrons.com>
- <20130604173737.GZ18614@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1306041348400.1200@syhkavp.arg>
- <20130604181030.GA18614@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1306041412490.1200@syhkavp.arg>
- <20130604182137.GC18614@n2100.arm.linux.org.uk>
- <alpine.LFD.2.03.1306041429380.1200@syhkavp.arg>
-Message-ID: <51AE3A29.3080807@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 04 Jun 2013 13:08:08 -0600
+Subject: [PATCH V3 1/4] ARM: tegra30: clocks: Fix pciex clock registration
+In-Reply-To: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
+References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
+Message-ID: <51AE3B18.9010604@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2013 08:32 PM, Nicolas Pitre wrote:
-> On Tue, 4 Jun 2013, Russell King - ARM Linux wrote:
+On 06/04/2013 12:57 PM, Jay Agarwal wrote:
+> Registering pciex as peripheral clock instead of fixed clock
+> as tegra_perih_reset_assert(deassert) api of this clock api
+> gives warning and ultimately does not succeed to assert(deassert).
 > 
->> On Tue, Jun 04, 2013 at 02:19:32PM -0400, Nicolas Pitre wrote:
->>> On Tue, 4 Jun 2013, Russell King - ARM Linux wrote:
->>>
->>>> On Tue, Jun 04, 2013 at 02:07:29PM -0400, Nicolas Pitre wrote:
->>>>> Alternatively, the following could be done:
->>>>>
->>>>> #ifdef CONFIG_CPU_PJ4B
->>>>>
->>>>> 	.equ	cpu_pj4b_switch_mm,	cpu_v7_switch_mm
->>>>> 	.equ	cpu_pj4b_set_pte_ex,	cpu_v7_set_pte_ex
->>>>
->>>> No, that doesn't work.  I did forget a hunk from my patch though, which
->>>> needs the pj4b symbols to be global:
->>>
->>> 	.macro globl_equ x, y
->>> 	.globl	x
->>> 	.equ	x, y
->>> 	.endm
->>>
->>> 	.globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
->>> 	.globl_equ	cpu_pj4b_set_pte_ex,	cpu_v7_set_pte_ex
->>
->> Which is really no different from doing what I did.
-> 
-> This can be wrapped inside #ifdef CONFIG_CPU_PJ4B clearing the symbol 
-> aliasing confusion I mentioned when not configured, and can be done in a 
-> single location instead of being spread all over.  Other than that, this 
-> is functionally equivalent to what you did indeed.
-> 
-> 
-Russell, Nicolas,
+> Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
+> ---
+> Patch is based on remotes/gitorious_thierryreding_linux/tegra/next and should be applied on top of this.
 
-Thanks for both of you for help. As you both agree that your variants are functionally
-equivalent and as the variant of Nicolas seems to be more easy to debug, I will
-adopt Nicolas' version. Unless, there was a drawback you didn't mention yet.
+For this change, Mike may as well apply it directly to the clock tree.
+Thierry can then pick it up when he rebases his tegra/next tree.
 
-Regards,
-
-Gregory
+That said, I don't think you should need any of the
+TEGRA_CLK_DUPLICATE() entries; the PCIe driver should get its clocks
+from device tree now, and hence the driver name in the clock
+registration shouldn't be necessary. All of these TEGRA_CLK_DUPLICATE()
+entries should be removed en mass sometime soon with luck. So, can you
+simply leave the two TEGRA_CLK_DUPLICATE() entries untouched, rather
+than changing them?
