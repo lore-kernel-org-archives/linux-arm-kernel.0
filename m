@@ -1,80 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 4 Jun 2013 19:51:00 +0200
-Subject: [PATCH 15/15] OF: remove #ifdef from linux/of_platform.h
-In-Reply-To: <CAL_JsqKMOy4CM=FXbsy7mQ1f0DLyK6n_cuZ92uhsSM2Mq-3B1g@mail.gmail.com>
-References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
- <201306012257.02327.arnd@arndb.de>
- <CAL_JsqKMOy4CM=FXbsy7mQ1f0DLyK6n_cuZ92uhsSM2Mq-3B1g@mail.gmail.com>
-Message-ID: <201306041951.00447.arnd@arndb.de>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 04 Jun 2013 10:53:04 -0700
+Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
+In-Reply-To: <20130604160907.GW27516@mudshark.cambridge.arm.com>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+ <51AD32A4.5070609@linaro.org>
+ <20130604160907.GW27516@mudshark.cambridge.arm.com>
+Message-ID: <51AE2980.6010005@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 June 2013, Rob Herring wrote:
-> On Sat, Jun 1, 2013 at 3:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Saturday 01 June 2013, Rob Herring wrote:
-> >> No, we still need empty functions. Here is what of_device.h looks like:
-> >>
-> >> http://tinyurl.com/l2azz5m
-> >>
-> >> BTW, it has your ack.
-> >>
-> >
-> > Could you add a patch on top that only puts the function declarations
-> > inside of #ifdef that don't have an inline wrapper?
-> 
-> I'm confused. You mean that DO have an inline? Like this:
-> 
-> void foo(void);
-> 
-> #ifdef CONFIG_OF
-> void bar(void);
-> #else
-> static inline void bar(void) {}
-> #endif
+On 06/04/2013 09:09 AM, Will Deacon wrote:
+> On Tue, Jun 04, 2013 at 01:19:48AM +0100, John Stultz wrote:
+>> On 06/01/2013 11:39 PM, Stephen Boyd wrote:
+>>> This is mostly a resend of a patch series I sent a little over a month
+>>> ago. I've reordered the patches so that John can pick up the first three
+>>> and get a generic sched_clock layer without having to take the 64 bit
+>>> patches. The last three patches add 64 bit support and move the architected
+>>> timers on ARM64 and ARM to use it.
+>>
+>> Yea, so from the initial look over it, I think I'm happy with queuing
+>> the first three patches, although I'd like to get some acks from arm
+>> folks on at least the first two, just so no one is surprised with it
+>> going through the -tip tree.
+> The first two patches are pretty simple so, FWIW, you can add my ack on those:
+>
+>    Acked-by: Will Deacon <will.deacon@arm.com>
+Thanks! Added to the commits.
 
-Yes, sorry. That's what I meant.
-
-> > It's really annoying to have to change the header file every time one
-> > needs to call a function from a driver in the DT-only case.
-> 
-> The functions without inlines are ones that drivers should not call
-> and should only be called from OF enabled code. That's why we have not
-> done a complete pass of adding inlines for everything.
-
-The problem is that it's a bad default. The convention in kernel code
-is not to hide declarations in #ifdef, for multiple reasons:
-
-* It avoids unnecessary code rebuilds when the symbol changes between 
-  two 'make' runs.
-
-* It lets drivers and platform code call the function from dead code
-  without causing a build error, thus improving compile coverage.
-
-* It's much nicer to read when can write your code like
-
-void __init exynos_init_io(struct map_desc *mach_desc, int size)
-{
-        if (IS_ENABLED_(CONFIG_OF) && initial_boot_params)
-                of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
-        else
-                iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
-	...
-}
-
-instead of
-
-void __init exynos_init_io(struct map_desc *mach_desc, int size)
-{
-#ifdef CONFIG_OF
-        if (initial_boot_params)
-                of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
-        else
-#endif
-                iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
-	...
-}
-
-The first one looks like actual C code, the second is really ugly,
-and an inline wrapper wouldn't even do the right thing here.
-
-	Arnd
+-john
