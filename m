@@ -1,49 +1,45 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 4 Jun 2013 09:49:58 -0400
-Subject: [GIT PULL 1/2] ARM: mvebu: dt changes for v3.11 (round 4)
-Message-ID: <20130604134958.GC3803@titan.lakedaemon.net>
+Date: Tue, 4 Jun 2013 09:54:33 -0400
+Subject: [GIT PULL 2/2] ARM: mvebu: pcie kirkwood for v3.11 (round 2)
+Message-ID: <20130604135433.GD3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-resending with the Cc: list added, oops.
-
 Olof,
 
-Here's some DT patches I've had in -next for about a week
+Here's a patch catching up a missed board in the DT conversion of
+kirkwood pcie.  There shouldn't be any more like this, so I'm just
+sending the single patch.
+
+This has also been in -next for five days or so.
 
 
-The following changes since commit 9196024a989ace933d6b17e0a56c847d02d81240:
+The following changes since commit 0d0632f523fa040b307688ae421a1debf79af2d7:
 
-  arm: kirkwood: openblocks-a6: add support for Init button (2013-05-27 15:35:04 +0000)
+  arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree (2013-05-27 16:02:13 +0000)
 
 are available in the git repository at:
 
-  git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-4
+  git://git.infradead.org/users/jcooper/linux.git tags/pcie_kw-3.11-2
 
-for you to fetch changes up to 33a6675485f27adc182faa856944836e85520fa1:
+for you to fetch changes up to 6bd98481ab346964344e05a041f35ff83cb3d00c:
 
-  ARM: Kirkwood add cpus definition needed by cpufreq driver to dtsi (2013-06-03 16:23:24 +0000)
+  arm: kirkwood: NETGEAR ReadyNAS Duo v2 init PCIe via DT (2013-05-29 11:45:24 +0000)
 
 ----------------------------------------------------------------
-mvebu dt changes for v3.11 (round 4)
+mvebu pcie driver (kirkwood) for v3.11 (round 2)
 
  - kirkwood
-    - reshuffle nodes from kirkwood.dtsi to -6281.dtsi, etc
-    - add i2c-gpio for km_kirkwood
-    - add cpu node so pending cpufreq driver will init
+    - migrate Netgear ReadyNAS Duo v2 to pcie DT init
+
+depends
+ - mvebu/pcie
+    - mvebu/of_pci
 
 ----------------------------------------------------------------
-Adam Baker (1):
-      ARM: Kirkwood add cpus definition needed by cpufreq driver to dtsi
+Arnaud Ebalard (1):
+      arm: kirkwood: NETGEAR ReadyNAS Duo v2 init PCIe via DT
 
-Valentin Longchamp (2):
-      ARM: kirkwood: refactor dtsi to largest common nodes
-      ARM: kirkwood: add i2c-gpio controller for km_kirkwood
-
- arch/arm/boot/dts/kirkwood-6281.dtsi       | 28 +++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-6282.dtsi       | 28 +++++++++++++++++++++
- arch/arm/boot/dts/kirkwood-km_kirkwood.dts |  7 ++++++
- arch/arm/boot/dts/kirkwood-nsa310.dts      |  1 +
- arch/arm/boot/dts/kirkwood.dtsi            | 40 +++++++++---------------------
- 5 files changed, 76 insertions(+), 28 deletions(-)
+ arch/arm/boot/dts/kirkwood-netgear_readynas_duo_v2.dts | 8 ++++++++
+ arch/arm/mach-kirkwood/board-readynas.c                | 1 -
+ 2 files changed, 8 insertions(+), 1 deletion(-)
