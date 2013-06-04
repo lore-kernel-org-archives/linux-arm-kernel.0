@@ -1,28 +1,32 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Tue, 4 Jun 2013 09:25:47 +0800
-Subject: [PATCH] ARM: tegra: remove the ifdef of ARCH SoC in the
- tegra_resume
-In-Reply-To: <201306040048.13612.arnd@arndb.de>
-References: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
- <51ACB59D.9030005@wwwdotorg.org>  <201306040048.13612.arnd@arndb.de>
-Message-ID: <1370309147.2341.6.camel@jlo-ubuntu-64.nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 4 Jun 2013 10:33:09 +0900
+Subject: [PATCH v3 1/1] ARM: shmobile: r8a7778: add I2C support
+In-Reply-To: <51AB9474.3040900@cogentembedded.com>
+References: <201304232012.57619.sergei.shtylyov@cogentembedded.com>
+ <201304232015.59697.sergei.shtylyov@cogentembedded.com>
+ <51AB9474.3040900@cogentembedded.com>
+Message-ID: <20130604013309.GI23054@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-06-04 at 06:48 +0800, Arnd Bergmann wrote:
-> On Monday 03 June 2013, Stephen Warren wrote:
-> > Was that ifdef completely incorrect before? I can see why the cmp/beq
-> > might be ifdef'd (although it's not worth it), but I assume the code
-> > after that beq was intended to run on all chips after Tegra20. The ifdef
-> > as it was written does something rather different; it prevents any of
-> > that code from running unless the kernel doesn't have Tegra20 support.
-> > So, I think that the removal of the ifdef is more of a bug-fix that
-> > "because we always build with all Tegra SoCs support. Let me know, and
-> > I'll re-write the commit description to something more accurate...
+On Sun, Jun 02, 2013 at 10:52:36PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> The #ifdef was recently changed from #if TEGRA3 to #if !TEGRA2, which support
-> for TEGRA4 was added. I think this is where it broke.
+> On 04/23/2013 08:15 PM, Sergei Shtylyov wrote:
 > 
-Yes, exactly. Sorry again for the error code.
+> >From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> >
+> >Add I2C clocks and platform devices for R8A7778 SoC.
+> >Don't forget to also add the peripheral clock which the I2C driver uses.
+> >
+> >Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> >[Sergei: changed the registration function to platform_device_register_simple(),
+> >annotated I2C resources as '__initdata', regrouped MSTPxxx *enum* members, added
+> >the copyright.]
+> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> 
+>    Simon, I'm calling back this patch. Morimoto-san's patch posted recently
+> (preferably to be reposted once more) should be used instead.
 
-Joseph
+Thanks, noted.
