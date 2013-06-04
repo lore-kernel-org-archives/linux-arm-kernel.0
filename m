@@ -1,111 +1,78 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 04 Jun 2013 08:55:06 +0200
-Subject: [PATCHv4 0/3] Add G762/G763 PWM fan controller
-Message-ID: <cover.1370327864.git.arno@natisbad.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 04 Jun 2013 08:54:59 +0200
+Subject: [PATCH] net/macb: fix ISR clear-on-write behavior only for some
+ SoC
+In-Reply-To: <20130604064940.GA5107@pengutronix.de>
+References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
+ <FE065E51-1EAA-47ED-8C7B-0F2E6418F349@jcrosoft.com>
+ <51918C23.7040106@yahoo.es> <20130514055256.GD22508@game.jcrosoft.org>
+ <51AD8611.8070102@monstr.eu> <20130604064940.GA5107@pengutronix.de>
+Message-ID: <51AD8F43.4090107@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/04/2013 08:49 AM, Steffen Trumtrar wrote:
+> On Tue, Jun 04, 2013 at 08:15:45AM +0200, Michal Simek wrote:
+>> On 05/14/2013 07:52 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>> On 08:58 Tue 14 May     , Hein Tibosch wrote:
+>>>> On 5/14/2013 12:05 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>>> On May 14, 2013, at 12:05 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>>>>
+>>>>>> Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
+>>>>>> introduces clear-on-write on ISR register. This behavior is not always
+>>>>>> implemented when using Cadence MACB/GEM and is breaking other platforms.
+>>>>>> We are using a new Device Tree compatibility string and a capability
+>>>>>> property to actually activate this clear-on-write behavior on ISR.
+>>>>>>
+>>>>>> Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
+>>>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>>>> can we detect it via the IP?
+>>>>
+>>>> This was my first proposal, have it based on the value of MACB's
+>>>> register 'MID' (offset 0x00fc, lower 16 bits).
+>>>> On avr32 it reads: 0x0000010D, on Zynq it reports 0x00000119
+>>>>
+>>>> So for the moment, CAPS_ISR_CLEAR_ON_WRITE could be set if the revision
+>>>> equals to 0x00000119?
+>>> so no it will not work
+>>>
+>>> as the gem on sama5 is 00020119
+>>>
+>>> so version 0x119 too
+>>>
+>>> nico 
+>>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>
+>> Was this added to any queue or branch?
+>> I would like to enable macb for zynq and not sure if "cdns,zynq-7000-gem"
+>> compatible string goes to mainline.
+>>
+> 
+> Hi!
+> 
+> This is already in next, but you can use the default compatible as the
+> DCR1 is used instead of DT binding.
 
-This series adds support for GMT G762/G763. This work is based on a
-basic version for 2.6.31 kernel developed Olivier Mouchet for LaCie
-NAS. Updates have been performed to run on recent kernels. Support has
-been completed and additional features added: ability to configure
-various characteristics from .dts file, better initialization, alarms
-and error reporting support, gear mode, polarity, fan pulse per
-revolution, fan startup voltage control. The following detailed
-datasheet has been used as a basis for this work:
+Ah ok. It was added there without cdns,zynq-7000-gem compatible string.
 
-  http://natisbad.org/NAS/refs/GMT_EDS-762_763-080710-0.2.pdf
+BTW: I have asked Soren to update your patch on the top of his clock changes.
 
-The patch was developed for and tested against the GMT G762 fan
-controller used in a Netgear ReadyNAS Duo v2 (kirkwood 88F6282-based
-NAS). This is the main reason for the device tree bindings provided in
-first patch. The driver also support init via board file. Patch 2 and
-3 provides documentation for the driver and DT bindings, respectively.
+Thanks,
+Michal
 
-Comments welcome,
-
-Cheers,
-
-a+
-
-Changes since v3:
-    rebased patch set against current head of Linus tree
-    removed dev_err() call when i2c_smbus_read/write_byte_data() fails
-    pwm1 sets SET_OUT reg, fan1_target sets SET_CNT reg, both unconditionally
-    removed all DT and platform_data knobs available via sysfs
-    updated documentation files to reflect two previous changes
-
-Changes since v2:
-    set ref_clk value to 32768 if not overloaded
-    fixed multi-line comment format in g762.h
-    removed static const G762_DEFAULT_PDATA in g762.h for a function
-    CodingStyle: add spaces between operatoirs when missing
-    check return value of i2c_smbus_{read,write}_byte_data()
-    remove { } is not needed in single-statement conditionals
-    introduced G762_ATTR_VAL() to allow sparse init of platform_data struc
-    changed missed reference to linear mode for DC mode
-
-Changes since v1
-    Changed author
-    removed bad tabs
-    Provide datasheet link w/o fud in g762 documentation
-    removed documentation for removed fan_gear_mode sysfs entry
-    removed tested-by from patch
-    removed FSF address in header file
-    removed useless include of <linux/slab.h>
-    removed useless parenthesis against HZ in define
-    use spaces around binary operators
-    use i2c_smbus_{read,write}_byte_data() instead of g762_{read,write}_value()
-    use return value of i2c_smbus_write_byte_data()
-    use true for initializing boolean
-    removed useless blank lines
-    do not enforce single return point rule where less readable
-    use dev_err() and dev_dbg() instead of dev_info() when it makes sense
-    remove leading '&' for function passed as pointers
-    allow passing parameter via platform_data struct for non-DT enabled boards
-    set data->valid to false when config is modified
-    s/linear/DC/ for mode (g762 datasheet uses linear)
-    more tests on rpm_from_cnt() and cnt_from_rpm() formula
-    dont overload     
-
-Changes since v0
-    removed forward declaration 
-    use bool for valid field instead of bit field.
-    protect macro args
-    fixed typo in subject line
-    Added mention for G763 support in Kconfig
-    fixed typo in driver name in Kconfig
-    do not use DRVNAME in i2c_device_id g762_id[] 
-    Following discussions, kept DEVICE_ATTR (i.e. no switch to SENSOR_DEVICE_ATTR)
-    removed useless casts when flipping bit values
-    Sanity check user input value (e.g. to prevent 256 to silenty become 0)
-    Added extra lines for multi line comments when needed
-    removed various testing knobs
-    make removed knobs available via DT
-    passed checkpatch script on the patch
-    removed useless lock protection againt clk setting
-    moved all setter at the beginning of the file
-    removed bad (u16) casts in g762_write_value() calls
-
-
-Arnaud Ebalard (3):
-  Add support for GMT G762/G763 PWM fan controller
-  Add documentation for g762 driver
-  Add DT bindings documentation for g762 driver
-
- Documentation/devicetree/bindings/hwmon/g762.txt |   41 +
- Documentation/hwmon/g762                         |   62 ++
- drivers/hwmon/Kconfig                            |   10 +
- drivers/hwmon/Makefile                           |    1 +
- drivers/hwmon/g762.c                             | 1111 ++++++++++++++++++++++
- include/linux/platform_data/g762.h               |   47 +
- 6 files changed, 1272 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/g762.txt
- create mode 100644 Documentation/hwmon/g762
- create mode 100644 drivers/hwmon/g762.c
- create mode 100644 include/linux/platform_data/g762.h
 
 -- 
-1.7.10.4
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/ab3c08fb/attachment.sig>
