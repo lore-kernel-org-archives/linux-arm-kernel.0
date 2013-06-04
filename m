@@ -1,73 +1,25 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Tue, 4 Jun 2013 09:48:25 +0000
-Subject: [PATCH 1/2] rtc: omap: add option to indicate wakeup support
- through DT
-In-Reply-To: <87wqqf11nw.fsf@linaro.org>
-References: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
- <1369982005-8572-2-git-send-email-gururaja.hebbar@ti.com>
- <87wqqf11nw.fsf@linaro.org>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC22315@DBDE04.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Jun 2013 11:49:27 +0200
+Subject: [PATCH] ARM: ux500: avoid warning in ux500_read_asicid
+In-Reply-To: <CACRpkdZapi-xERDkjNz03VOJFFga090xvdqUrHUdY+05GS4MdA@mail.gmail.com>
+References: <2475820.dXNmmAuTaP@wuerfel>
+ <CACRpkdZapi-xERDkjNz03VOJFFga090xvdqUrHUdY+05GS4MdA@mail.gmail.com>
+Message-ID: <2569975.7k6RRgccL8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 23:18:03, Kevin Hilman wrote:
-> Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
+On Tuesday 04 June 2013 11:23:48 Linus Walleij wrote:
+> On Fri, May 31, 2013 at 10:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> > Even though RTC-IP is wakeup capable, Not all Boards support it.
+> > phys_addr_t may be 64 bit, which causes this harmless warning
+> > in ux500_read_asicid:
 > >
-> > For example
-> > The rtc alarm wakeup is available in rtc-ip since omap1 days but alarm
-> > was not wired properly in previous ompa1 boards.
-> >
-> > 	commit fa5b07820fe3a0fc06ac368516e71f10a59b9539
-> > 	Author: Sekhar Nori <nsekhar@ti.com>
-> > 	Date:   Wed Oct 27 15:33:05 2010 -0700
-> >
-> > 	rtc: omap: let device wakeup capability be configured from chip
-> > 	init logic
-> >
-> > 	The rtc-omap driver currently hardcodes the RTC wakeup
-> > 	capability to be "not capable".  While this seems to be true for
-> > 	existing OMAP1 boards which are not wired for this, the
-> > 	DA850/OMAP-L138 SoC, the RTC can always be wake up source from
-> > 	its "deep sleep" mode.
-> >
-> > Current rtc-omap driver expects the rtc module wake-up capabilities to
-> > be set up by board specific code. However, in case of DT, this is not
-> > possible.
-> >
-> > So, add a DT property "ti,wakeup_capable" to indicate that the module is
-> > wake-up capable.
 > 
-> Why is this a TI-specific property?  
-
-May be I am wrong but isn't this driver used only be TI SoC (Davinci, OMAP ...)
-
+> Patch applied to ux500-core for v3.11, as it doesn't seem to
+> be a dangerous regression.
 > 
-> Also, I think we can do this without a new DT property.Did you see this
-> patch from Tony which is already queued for v3.11:
-> 
->     http://marc.info/?l=linux-omap&m=136917244530612&w=2
+> You'll get this back by pull request soon-ish.
 
-AFAIK, all boards that use twl rtc IP by default support rtc wakeup.
+Ok, thanks!
 
-However, as mentioned in the commit message not all boards that uses
-OMAP rtc IP supports rtc wake up (due to somoe wiring issue).
-Hence I am adding a new DT property for this.
-
-> 
-> I think this is the right way to go.  Platforms that don't want/need
-> wakeup support can disable it from userspace via:
-> 
->     echo disabled > /sys/devices/.../power/wakeup
-
-Hmmm. Debatable. Let me get some more info about this and come back
-
-> 
-> Kevin
-> 
-> 
-
-
-Regards, 
-Gururaja
+	Arnd
