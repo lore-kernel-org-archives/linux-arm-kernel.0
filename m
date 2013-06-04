@@ -1,56 +1,90 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 4 Jun 2013 17:17:02 +0100
-Subject: [GIT PULL] HugeTLB and THP support for ARM.
-Message-ID: <20130604161701.GA20682@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 4 Jun 2013 17:26:04 +0100
+Subject: [PATCH v2 1/5] arm/xen: define xen_remap as ioremap_cached
+In-Reply-To: <20130604135857.GV18614@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
+ <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1370337650.24512.88.camel@zakaz.uk.xensource.com>
+ <20130604112834.GA3234@MacBook-Pro.local>
+ <20130604135857.GV18614@n2100.arm.linux.org.uk>
+Message-ID: <20130604162603.GA30685@localhost.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-Here is a pull request introducing HugeTLB + THP support for ARM.
+On Tue, Jun 04, 2013 at 02:58:57PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 04, 2013 at 12:28:34PM +0100, Catalin Marinas wrote:
+> > PROT_PTE_DEVICE and PROT_SECT_DEVICE above don't contain any memory type
+> > information, just attributes/permission - present, young, dirty and XN:
+> > 
+> > #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+> > #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+> > 
+> > The memory type is given by the L_PTE_MT_DEV_CACHED and PMD_SECT_WB
+> > macros. Let's take prot_sect first as it's simpler. For MT_DEVICE_CACHED
+> > we have:
+> > 
+> > .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_WB
+> > 
+> > For MT_MEMORY we have:
+> > 
+> > .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE
+> > 
+> > The cache policy is added later to MT_MEMORY which is either WB or WBWA
+> > (based on SMP, no particular reason as these are just processor hints;
+> > for some historical reasons we enabled WBWA for ARM11MPCore but we could
+> > leave it on all the time).
+> 
+> They may be reported to be just hints, but SMP, particularly ARM11MPCore,
+> the SMP guys at ARM Ltd were very particular about _requiring_ and stating
+> that it is required that WBWA must be used in the page tables for SMP,
+> and not WB.  That suggests while the ARM ARM may say that they're hints,
+> there's slightly more to it when it comes to SMP, and WBWA is a hard
+> requirement there.
 
-There are no extra depencies required by the series.
+It may have been a hard requirement in the early days (FPGA?), I don't
+fully remember. The ARM11MPCore TRM for r1p0 states "Inner Write-Back No
+Allocate on Write behaves as Write-back Write-Allocate".
 
-Thanks,
+Anyway, my comment above was for leaving it on all the time (v6 and v7).
+
+> > Similarly for prot_pte, present, young, dirty are the same.
+> > 
+> > Regarding the type, on ARMv7 (with or without LPAE) we use TEX remapping
+> > and L_PTE_MT_DEVICE has the same index (3-bit TEX[0], C, B for NMRR/PRRR
+> > or TEX[2:0] for MAIR0/MAIR1 registers) as Normal Cacheable Writeback
+> > memory (there is no such thing as Device memory with cacheability
+> > attributes, only Normal Cacheable memory).
+> 
+> You don't mean L_PTE_MT_DEVICE there. Thankfully, L_PTE_MT_DEVICE doesn't
+> exist, so it's not that confusing.  What you mean is L_PTE_MT_DEV_CACHED,
+> which _does_ map to "normal cacheable writeback memory" irrespective of
+> the mappings which the kernel uses for RAM.
+
+Yes, that's what I meant.
+
+> However, that mapping type (which is used for MT_DEVICE_CACHED) should
+> not be used if you really do want normal memory. 
+
+Well, you want some range mapped as cacheable, so on ARM
+MT_DEVICE_CACHED gives you normal memory. I'm not sure in the Xen
+context where this memory comes from, it looks like some physical
+address not under kernel control. There are other ways to map this but
+ioremap_cached() seems right for this situation (x86 has a similar
+definition for xen_remap).
+
+BTW, it looks like 3 architectures call this 'ioremap_cached' while
+other 3 (or 4) call it 'ioremap_cache'. Not a standard API.
+
+> And using MT_* definitions
+> _not_ in asm/io.h with ioremap() is really... silly.  It's not something
+> that is intended, nor is it something which I intend to be supportable
+> into the future on ARM.  That's why the definitions are separate - see
+> the comments in asm/io.h about "types 4 onwards are undefined for
+> ioremap" - I'm not sure how more explicit to make that statement.  And
+> as I _have_ made the statement, if I see people violating it, I won't
+> care about their code if/when I decide to change the ioremap() behaviour.
+
+That's a fair point.
+
 -- 
-Steve
-
---->8
-
-The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
-
-  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
-
-are available in the git repository at:
-
-  git://git.linaro.org/people/stevecapper/linux.git for-rmk/hugepages
-
-for you to fetch changes up to 8d962507007357d6fbbcbdd1647faa389a9aed6d:
-
-  ARM: mm: Transparent huge page support for LPAE systems. (2013-06-04 16:52:38 +0100)
-
-----------------------------------------------------------------
-Catalin Marinas (2):
-      ARM: mm: HugeTLB support for LPAE systems.
-      ARM: mm: Transparent huge page support for LPAE systems.
-
-Steve Capper (2):
-      ARM: mm: correct pte_same behaviour for LPAE.
-      ARM: mm: Add support for flushing HugeTLB pages.
-
- arch/arm/Kconfig                            |   8 +++
- arch/arm/include/asm/hugetlb-3level.h       |  71 +++++++++++++++++++
- arch/arm/include/asm/hugetlb.h              |  84 +++++++++++++++++++++++
- arch/arm/include/asm/pgtable-3level-hwdef.h |   4 ++
- arch/arm/include/asm/pgtable-3level.h       |  88 ++++++++++++++++++++++++
- arch/arm/include/asm/pgtable.h              |   3 +
- arch/arm/include/asm/tlb.h                  |   6 ++
- arch/arm/include/asm/tlbflush.h             |   2 +
- arch/arm/mm/Makefile                        |   1 +
- arch/arm/mm/dma-mapping.c                   |   2 +-
- arch/arm/mm/flush.c                         |  25 ++++---
- arch/arm/mm/fsr-3level.c                    |   4 +-
- arch/arm/mm/hugetlbpage.c                   | 101 ++++++++++++++++++++++++++++
- 13 files changed, 386 insertions(+), 13 deletions(-)
- create mode 100644 arch/arm/include/asm/hugetlb-3level.h
- create mode 100644 arch/arm/include/asm/hugetlb.h
- create mode 100644 arch/arm/mm/hugetlbpage.c
+Catalin
