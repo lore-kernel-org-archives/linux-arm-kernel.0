@@ -1,63 +1,149 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 4 Jun 2013 11:38:11 +0200
-Subject: [PATCH v2 3/4] clocksource: dw_apb_timer_of: select DW_APB_TIMER
+Date: Tue, 4 Jun 2013 11:38:42 +0200
+Subject: [PATCH v2 4/4] clocksource: dw_apb_timer_of: use clocksource_of_init
 In-Reply-To: <201306041136.09566.heiko@sntech.de>
 References: <201306041136.09566.heiko@sntech.de>
-Message-ID: <201306041138.11447.heiko@sntech.de>
+Message-ID: <201306041138.42639.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dw_apb_timer_of is the driver part facing devicetree platforms and
-calls into dw_apb_timer with the data gathered from the dt.
+dw_apb_timer_init used to search the devicetree for matching timer
+devices, making calls to it from board files necessary.
 
-Currently the two platforms using the dw_apb_timer_of select both
-the options for the core timer and the dt addon.
+Change the dw_apb_timer_init to work with CLOCKSOURCE_OF_DECLARE.
+With this change the function gets called once for each timer node
+and tracks these number of calls to attach clockevent and clocksource
+devices to the nodes.
 
-As dw_apb_timer_of always depends on dw_apb_timer let it select
-DW_APB_TIMER itself without the need for every platform to do it.
+Also remove the calls to dw_apb_timer_init from all previous users, as
+clocksource_of_init is the default for init_time now.
+
+Tested on the upcoming rk3066 code.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm/mach-picoxcell/Kconfig |    1 -
- arch/arm/mach-socfpga/Kconfig   |    1 -
- drivers/clocksource/Kconfig     |    1 +
- 3 files changed, 1 insertions(+), 2 deletions(-)
+ arch/arm/mach-picoxcell/common.c      |    2 -
+ arch/arm/mach-socfpga/socfpga.c       |    2 -
+ drivers/clocksource/Kconfig           |    1 +
+ drivers/clocksource/dw_apb_timer_of.c |   41 ++++++++++++++++-----------------
+ include/linux/dw_apb_timer.h          |    1 -
+ 5 files changed, 21 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm/mach-picoxcell/Kconfig b/arch/arm/mach-picoxcell/Kconfig
-index 13bae78..b1022f4 100644
---- a/arch/arm/mach-picoxcell/Kconfig
-+++ b/arch/arm/mach-picoxcell/Kconfig
-@@ -4,7 +4,6 @@ config ARCH_PICOXCELL
- 	select ARM_PATCH_PHYS_VIRT
- 	select ARM_VIC
- 	select CPU_V6K
--	select DW_APB_TIMER
- 	select DW_APB_TIMER_OF
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_TCM
-diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
-index 566e804..a279fb3 100644
---- a/arch/arm/mach-socfpga/Kconfig
-+++ b/arch/arm/mach-socfpga/Kconfig
-@@ -7,7 +7,6 @@ config ARCH_SOCFPGA
- 	select CLKDEV_LOOKUP
- 	select COMMON_CLK
- 	select CPU_V7
--	select DW_APB_TIMER
- 	select DW_APB_TIMER_OF
- 	select GENERIC_CLOCKEVENTS
- 	select GPIO_PL061 if GPIOLIB
+diff --git a/arch/arm/mach-picoxcell/common.c b/arch/arm/mach-picoxcell/common.c
+index 70b441a..7cde042 100644
+--- a/arch/arm/mach-picoxcell/common.c
++++ b/arch/arm/mach-picoxcell/common.c
+@@ -15,7 +15,6 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_platform.h>
+-#include <linux/dw_apb_timer.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -88,7 +87,6 @@ DT_MACHINE_START(PICOXCELL, "Picochip picoXcell")
+ 	.map_io		= picoxcell_map_io,
+ 	.nr_irqs	= NR_IRQS_LEGACY,
+ 	.init_irq	= irqchip_init,
+-	.init_time	= dw_apb_timer_init,
+ 	.init_machine	= picoxcell_init_machine,
+ 	.dt_compat	= picoxcell_dt_match,
+ 	.restart	= picoxcell_wdt_restart,
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index 46a0513..8ea11b47 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -14,7 +14,6 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
+-#include <linux/dw_apb_timer.h>
+ #include <linux/clk-provider.h>
+ #include <linux/irqchip.h>
+ #include <linux/of_address.h>
+@@ -120,7 +119,6 @@ DT_MACHINE_START(SOCFPGA, "Altera SOCFPGA")
+ 	.smp		= smp_ops(socfpga_smp_ops),
+ 	.map_io		= socfpga_map_io,
+ 	.init_irq	= socfpga_init_irq,
+-	.init_time	= dw_apb_timer_init,
+ 	.init_machine	= socfpga_cyclone5_init,
+ 	.restart	= socfpga_cyclone5_restart,
+ 	.dt_compat	= altera_dt_match,
 diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index f151c6c..48a0f2e 100644
+index 48a0f2e..5871933 100644
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -21,6 +21,7 @@ config DW_APB_TIMER
- 
+@@ -22,6 +22,7 @@ config DW_APB_TIMER
  config DW_APB_TIMER_OF
  	bool
-+	select DW_APB_TIMER
+ 	select DW_APB_TIMER
++	select CLKSRC_OF
  
  config ARMADA_370_XP_TIMER
  	bool
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index 1964f87..cef5544 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -133,27 +133,26 @@ static void init_sched_clock(void)
+ 	setup_sched_clock(read_sched_clock, 32, sched_rate);
+ }
+ 
+-static const struct of_device_id osctimer_ids[] __initconst = {
+-	{ .compatible = "picochip,pc3x2-timer" },
+-	{ .compatible = "snps,dw-apb-timer-osc" },
+-	{},
+-};
+-
+-void __init dw_apb_timer_init(void)
++static int num_called;
++static void __init dw_apb_timer_init(struct device_node *timer)
+ {
+-	struct device_node *event_timer, *source_timer;
+-
+-	event_timer = of_find_matching_node(NULL, osctimer_ids);
+-	if (!event_timer)
+-		panic("No timer for clockevent");
+-	add_clockevent(event_timer);
+-
+-	source_timer = of_find_matching_node(event_timer, osctimer_ids);
+-	if (!source_timer)
+-		panic("No timer for clocksource");
+-	add_clocksource(source_timer);
+-
+-	of_node_put(source_timer);
++	switch (num_called) {
++	case 0:
++		pr_debug("%s: found clockevent timer\n", __func__);
++		add_clockevent(timer);
++		of_node_put(timer);
++		break;
++	case 1:
++		pr_debug("%s: found clocksource timer\n", __func__);
++		add_clocksource(timer);
++		of_node_put(timer);
++		init_sched_clock();
++		break;
++	default:
++		break;
++	}
+ 
+-	init_sched_clock();
++	num_called++;
+ }
++CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
+diff --git a/include/linux/dw_apb_timer.h b/include/linux/dw_apb_timer.h
+index dd755ce..07261d5 100644
+--- a/include/linux/dw_apb_timer.h
++++ b/include/linux/dw_apb_timer.h
+@@ -53,5 +53,4 @@ void dw_apb_clocksource_start(struct dw_apb_clocksource *dw_cs);
+ cycle_t dw_apb_clocksource_read(struct dw_apb_clocksource *dw_cs);
+ void dw_apb_clocksource_unregister(struct dw_apb_clocksource *dw_cs);
+ 
+-extern void dw_apb_timer_init(void);
+ #endif /* __DW_APB_TIMER_H__ */
 -- 
 1.7.2.3
