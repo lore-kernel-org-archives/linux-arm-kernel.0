@@ -1,27 +1,17 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 4 Jun 2013 10:12:32 +0530
-Subject: [PATCH] cpufreq: bit.LITTLE needs cpufreq table
-In-Reply-To: <3453738.rxYxRehmQz@wuerfel>
-References: <3453738.rxYxRehmQz@wuerfel>
-Message-ID: <CAKohponKKMvHQQvr+K44YfpD0Ykxj_OKc5K+LhKShGXQV3aYgg@mail.gmail.com>
+Date: Tue, 4 Jun 2013 10:14:00 +0530
+Subject: [PATCH] clk: spear: fix build error for spear3xx
+In-Reply-To: <2592841.P0ZcyhdZJA@wuerfel>
+References: <2592841.P0ZcyhdZJA@wuerfel>
+Message-ID: <CAOh2x=ne4k9fmVaDpnP-e_pmBdBMX4PY0FP0wg8cw1=3dd3GuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2013 03:11, Arnd Bergmann <arnd@arndb.de> wrote:
-> Like a lot of the other cpufreq drivers, this one needs to
-> select CONFIG_CPU_FREQ_TABLE to avoid a build error like
->
-> built-in.o: In function `bL_cpufreq_set_target':
-> cpufreq/arm_big_little.c:71: undefined reference to `cpufreq_frequency_table_target'
-> built-in.o: In function `bL_cpufreq_verify_policy':
-> cpufreq/arm_big_little.c:55: undefined reference to `cpufreq_frequency_table_verify'
-> built-in.o: In function `bL_cpufreq_init':
-> cpufreq/arm_big_little.c:170: undefined reference to `cpufreq_frequency_table_cpuinfo'
-> cpufreq/arm_big_little.c:178: undefined reference to `cpufreq_frequency_table_get_attr'
-> built-in.o:(.data+0x5a80c): undefined reference to `cpufreq_freq_attr_scaling_available_freqs'
+On Tue, Jun 4, 2013 at 3:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> This patch is required to be able to disable spear320 support
+> after the spear320_clk_init() prototype changed for the real
+> function but not for the dummy.
 >
 > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Rafael J. Wysocki <rjw@sisk.pl>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
 
-Applied.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
