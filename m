@@ -1,47 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Jun 2013 09:48:32 +0100
-Subject: A bug about system call on ARM
-In-Reply-To: <35FD53F367049845BC99AC72306C23D1610991B883@CNBJMBX05.corpusers.net>
-References: <20130530114112.GH7483@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
- <20130531084638.GB4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
- <20130531111305.GI4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B87B@CNBJMBX05.corpusers.net>
- <20130603095425.GA32242@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B87E@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B883@CNBJMBX05.corpusers.net>
-Message-ID: <20130604084832.GA27516@mudshark.cambridge.arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 04 Jun 2013 10:48:51 +0200
+Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
+In-Reply-To: <20130604101335.6be6ed3b@skate>
+References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130603171017.GN18614@n2100.arm.linux.org.uk>
+ <20130603175629.GH5008@1wt.eu> <20130603181437.GO3803@titan.lakedaemon.net>
+ <20130603183057.GA9868@1wt.eu> <20130603184148.GQ3803@titan.lakedaemon.net>
+ <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
+ <20130603191730.GR3803@titan.lakedaemon.net> <20130604101335.6be6ed3b@skate>
+Message-ID: <51ADA9F3.9000703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 06:33:20AM +0100, Wang, Yalin wrote:
-> Hi  Will,
+On 06/04/13 10:13, Thomas Petazzoni wrote:
+> On Mon, 3 Jun 2013 15:17:31 -0400, Jason Cooper wrote:
+>>> Isn't upstream U-Boot supporting Marvell devices properly these days?
+>>> If so maybe considering a U-Boot upgrade would be the best way forward?
+>>
+>> Yes, both u-boot and barebox are supporting Marvell devices,
+>
+> Sorry Jason, but you're overstating the status of this support:
+>
+>   * Barebox has only *minimal* support for Marvell SoCs, i.e only the
+>     serial console and timers are supported. There is no support for
+>     network, NAND, SPI or anything that even allows to load a kernel and
+>     boot it.
 
-Hello,
+That remembers me that I wanted to make it boot from DT so we don't
+start adding drivers and add DT later on.
 
-> Could I know  what's your git branch is  mainly used for ?
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git
-> 
-> 
-> I mean if the branch is used for ARM arch maintenance ?
+>   * U-Boot has zero support for Armada 370 and Armada XP, and Sebastian
+>     has tried for several months to push support for Marvell Dove,
+>     without success (lack of review/interest from the U-Boot
+>     maintainers, if I remember correctly).
 
-I send most of my patches via Russell, and the tree above is where I keep my
-patches whilst they're not yet in mainline.
+True. It took about 2 month for a useful review and then the discussion
+was only about naming it orion-something or mv-something. Recently,
+someone picked up that patches and reposted them.. but don't expect them
+to get in quickly.
 
-> If yes, I think I can send future bugs about ARM to you directly,
-> And do not need ping-pang in the mail list .
+> So as of today, the Marvell-specific U-Boot is the /only/ working
+> solution for Armada 370 and Armada XP based platforms, and it will
+> remain this way at least for several months, until we've pushed enough
+> work into Barebox. And even at that time, as you say, users may not
+> necessarily be willing to upgrade their bootloader.
 
-Quite the opposite! Having discussions on the mailing list is key to how the
-kernel is developed, so please continue to send questions, bug reports and
-patches there. As has been pointed out previously in this thread, you need
-to choose the right list in the first place, rather than just sending to
-LKML.
+Well, there is still the possibility to have board-specific dts files.
+If you are stuck for whatever reason with an old boot loader, append a
+dtb with MAC addresses set for your board. IMHO, adding workarounds for
+every single boot loader just because we don't want anybody to either
+update or manually patch the dts is ridiculous.
 
-Of course, you can always CC me on arm/arm64 patches if you like.
-
-Cheers,
-
-Will
+Sebastian
