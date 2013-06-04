@@ -1,48 +1,50 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 4 Jun 2013 14:13:52 +0900
-Subject: [PATCH 2/2] ARM: shmobile: r8A7779: fix Ether device name
-In-Reply-To: <20130528040043.GL13532@quad.lixom.net>
-References: <1369645206-3682-1-git-send-email-horms+renesas@verge.net.au>
- <1369645206-3682-3-git-send-email-horms+renesas@verge.net.au>
- <20130528040043.GL13532@quad.lixom.net>
-Message-ID: <20130604051352.GW23054@verge.net.au>
+Date: Tue, 4 Jun 2013 14:20:43 +0900
+Subject: [PATCH 1/8] ARM: shmobile: sh73a0 pinmux platform device cleanup
+In-Reply-To: <20130528040243.GM13532@quad.lixom.net>
+References: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
+ <1369645252-3847-2-git-send-email-horms+renesas@verge.net.au>
+ <51A36A02.9050200@cogentembedded.com>
+ <20130528040243.GM13532@quad.lixom.net>
+Message-ID: <20130604052043.GX23054@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 09:00:43PM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> 
-> On Mon, May 27, 2013 at 06:00:06PM +0900, Simon Horman wrote:
-> > From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Mon, May 27, 2013 at 09:02:43PM -0700, Olof Johansson wrote:
+> On Mon, May 27, 2013 at 06:13:22PM +0400, Sergei Shtylyov wrote:
+> > Hello.
 > > 
-> > While recasting the commit "ARM: shmobile: R8A7779: add Ether support", I made a
-> > typo in the platform device's name: used underscore instead of hyphen.
+> > On 27-05-2013 13:00, Simon Horman wrote:
+> > 
+> > >From: Magnus Damm <damm@opensource.se>
+> > 
+> > >Use DEFINE_RES_MEM() and platform_device_register_simple()
+> > >to save a couple of lines of code.
+> > 
+> > >Signed-off-by: Magnus Damm <damm@opensource.se>
+> > >Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > >---
+> > >  arch/arm/mach-shmobile/setup-sh73a0.c |   25 ++++++-------------------
+> > >  1 file changed, 6 insertions(+), 19 deletions(-)
+> > 
+> > >diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+> > >index fdf3894..f8f4261 100644
+> > >--- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> > >+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> > >@@ -61,29 +61,16 @@ void __init sh73a0_map_io(void)
+> > [...]
+> > >+/* PFC */
+> > >+static const struct resource pfc_resources[] = {
+> > 
+> >    Should have been annotated as __initdata... too late, need
+> > another patch.
 > 
-> Minor nit: if this has been merged, then including the SHA is useful too.
+> See comments on other patches/pull requests, I think there's time to revisit
+> this. I.e. I'll hold off on pulling this based on the other feedback.
 
-Thanks, I have updated the changelog to:
+As I am respining I will fix this.
 
-ARM: shmobile: r8A7779: fix Ether device name
-
-While recasting the commit dace48d04dee46a3409d5e13cd98031522e46377
-("ARM: shmobile: R8A7779: add Ether support"), I made a
-typo in the platform device's name: used underscore instead of hyphen.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-[horms+renesas at verge.net.au Add SHA of referenced commit to changlog]
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index b0b3948..c14a69b 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -443,7 +443,7 @@ void __init r8a7779_add_standard_devices(void)
- 
- void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
- {
--	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
-+	platform_device_register_resndata(&platform_bus, "sh-eth", -1,
- 					  ether_resources,
- 					  ARRAY_SIZE(ether_resources),
- 					  pdata, sizeof(*pdata));
+However, it had been reviewed and I think that ordinarily
+it would be reasonable to perform further clean-up
+work in a subsequent patch.
