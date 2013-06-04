@@ -1,83 +1,37 @@
-From: simon.guinot@sequanux.org (Simon Guinot)
-Date: Tue, 4 Jun 2013 14:18:15 +0200
-Subject: DT version of kirkwood_ge0x_init()
-In-Reply-To: <20130604120500.GZ3803@titan.lakedaemon.net>
-References: <51ADBEE0.5040500@keymile.com> <51ADC2C2.6010106@gmail.com>
- <20130604104302.GX3803@titan.lakedaemon.net>
- <20130604115927.GJ7626@kw.sim.vm.gnt>
- <20130604120500.GZ3803@titan.lakedaemon.net>
-Message-ID: <20130604121815.GK7626@kw.sim.vm.gnt>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Jun 2013 14:19:30 +0200
+Subject: [GIT PULL 0/5] ux500 changes for v3.11
+Message-ID: <CACRpkda7LTeamKWyPVRy1_iOkAvGzb_XZ3sBNPLR_tNerKG4wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 08:05:00AM -0400, Jason Cooper wrote:
-> On Tue, Jun 04, 2013 at 01:59:27PM +0200, Simon Guinot wrote:
-> > On Tue, Jun 04, 2013 at 06:43:02AM -0400, Jason Cooper wrote:
-> > > On Tue, Jun 04, 2013 at 12:34:42PM +0200, Sebastian Hesselbarth wrote:
-> > > > On 06/04/13 12:18, Gerlando Falauto wrote:
-> > > > >I noticed how most of the DT-aware board-setup files only have a single
-> > > > ><board>_init() function, calling kirkwood_ge00_init() with a struct
-> > > > >mv643xx_eth_platform_data as a single argument.
-> > > > >
-> > > > >I was wondering -- is there a reason why we cannot remove all this
-> > > > >board-specific code and move all this to the DT?
-> > > > 
-> > > > Gerlando,
-> > > > 
-> > > > DT for mv643xx_eth is on the way (https://lkml.org/lkml/2013/5/29/527).
-> > > > We wait for the driver to surface to relax branch dependencies and then
-> > > > move all DT Orion SoCs to it.
-> > > > 
-> > > > > I would really love to have all our boards under a single
-> > > > > CONFIG_<FAMILY>_DT and a single compatible string, with all the
-> > > > > differences within the DTs itself -- no more #ifdef CONFIG_<BOARD>,
-> > > > > no more of_machine_is_compatible("boardXXX").
-> > > > 
-> > > > All those will happen if there is DT support for mv643xx_eth which
-> > > > is the only driver left without DT and board dependencies. But there
-> > > > will be no CONFIG_LACIE_DT or whatever, but just CONFIG_KIRKWOOD_DT
-> > > > and board dependent stuff described in the corresponding dts.
-> > > 
-> > > Gerlando,
-> > > 
-> > > Yes, the mess you describe is temporary.  Those board files used to have
-> > > a lot more code in them, legacy init of partitions, MPP, LEDs, etc.  As
-> > > we have converted drivers, they have gotten smaller and smaller.
-> > > 
-> > > Now, with Sebastian's hard work, we'll finally be able to remove them
-> > > and kirkwood will be completely DT.  We're very excited about this. :)
-> > > 
-> > > Next, we'll move the Marvell DT boards over to mach-mvebu/ and only
-> > > legacy boards in -kirkwood/, -orion5x/, -dove/, and -mv78xx0/ will
-> > > remain.  After a few releases we will deprecate any legacy boards which
-> > > haven't been converted to DT.
-> > 
-> > Hi Jason,
-> > 
-> > While I have obviously planed to convert all the LaCie boards to DT,
-> > I think that removing the legacy support so quickly is a little bit
-> > harsh.
-> 
-> Yeah, my wording might not have been the best.  See below.
-> 
-> > IMHO, it could be nice to wait the end-of-life for all this products
-> > before removing their support.
-> 
-> I'd prefer to convert them to DT, then keep them as long as folks are
-> interested in them.  If no one cares about a board, and no one wants to
-> convert it to DT or test the conversion, why keep it around?
-> 
-> Let me clarify, by 'deprecate them' I meant *begin* the process of
-> deprecating them.  eg marking them as deprecated for around three
-> releases or so.
+Hi ARM SoC folks,
 
-OK. Thanks for the clarifications.
+These are five (5) pull requests for ux500 stuff for v3.11
+that I've got queued up. I've done my best to split onto relevant
+topic branches, but feel free to merge these any way you like.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/0305b17c/attachment.sig>
+1: ux500-core: misc ux500 CPU/SoC changes
+2: ux500-clksrc: clocksource changes
+3: ux500-pinctrl: pinctrl tables
+4: ux500-dma40: DMA40 device tree and refactoring
+5: ux500-devicetree: device tree updates
+
+The last two (DMA40 and devicetree) will have a conflict in
+arch/arm/mach-ux500/cpu-db8500.c as the DMA40 patch
+set removes DMA related platform data.
+
+Typically 4 & 5 are also the larges pull requests so I won't
+try to merge them to resolve that conflict, instead I dump
+this on you...
+
+Have a look and see what you think. All patches have been
+reviewed and ACKed as far as possible and now we need
+some linux-next rotation.
+
+I have a sixth branch with defconfig changes but that should
+possibly even go in after the merge window. I'm holding it back
+for now.
+
+Yours,
+Linus Walleij
