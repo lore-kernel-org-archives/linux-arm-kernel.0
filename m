@@ -1,55 +1,43 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Tue, 4 Jun 2013 17:09:55 +0530
-Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
-In-Reply-To: <51AC8F74.2060302@linaro.org>
-References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
- <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
- <51AC8F74.2060302@linaro.org>
-Message-ID: <CAP245DUsRcomDaNKbxYry39ZLCrR33SDRRAhNCdR91e17sHF-A@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Jun 2013 13:39:57 +0200
+Subject: [PATCH 3/3] ARM PJ4B: Add support for errata 4611
+In-Reply-To: <EE71107DF0D1F24FA2D95041E64AB9E801A56CF1A8AB@IL-MB01.marvell.com>
+References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
+ <2479964.1Q22eHuH4J@wuerfel>
+ <EE71107DF0D1F24FA2D95041E64AB9E801A56CF1A8AB@IL-MB01.marvell.com>
+Message-ID: <10384353.qafBWKgARt@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 3, 2013 at 6:13 PM, Daniel Lezcano
-<daniel.lezcano@linaro.org> wrote:
-> On 06/03/2013 11:51 AM, Michal Simek wrote:
->> Hi,
->>
->> On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
->>> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
->>>> The current code considers every wakeup as spurious, which is not
->>>> correct. Handle the same way as other arm platforms are doing.
->>>>
->>>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
->>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>
->>>
->>>> ---
->>>>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
->>>>  1 file changed, 7 insertions(+)
->>>>
->>>> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
->>>> index c89672b..a1ab22c 100644
->>>> --- a/arch/arm/mach-zynq/hotplug.c
->>>> +++ b/arch/arm/mach-zynq/hotplug.c
->>>> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
->>>>             dsb();
->>>>             wfi();
->>>>
->>>> +           if (pen_release == cpu_logical_map(cpu)) {
->>>> +                   /*
->>>> +                    * OK, proper wakeup, we're done
->>>> +                    */
->>>> +                   break;
->>>> +           }
->>>> +
->> what pen_release stands for?
->> I have looked at it and others platform are also using it in platsmp
->> code which is not zynq case.
->> How is it supposed to work and how this variable should be used?
->
-> This variable is used to serialize the secondary cpus boot process.
+On Tuesday 04 June 2013 14:34:53 Lior Amsalem wrote:
+> > From: Arnd Bergmann [mailto:arnd at arndb.de]
+> > Sent: Wednesday, May 29, 2013 4:33 PM
+> > 
+> > On Wednesday 29 May 2013 15:27:31 Gregory CLEMENT wrote:
+> > > OK I will see what kind of information I can gather and which ones I
+> > > can add to the Documentation/arm/Marvell/README file.
+> > >
+> > > My current understanding is that there are at least 3 kind of CPU:
+> > > PJ4, PJ4B and PJ4B-MP and all of them belongs to the Sheeva family.
+> > 
+> > Ok. So I guess PJ4B adds LPAE support, and PJ4B-MP adds SMP support,
+> > right? Do either of them support hypervisor mode?
+> 
+> It goes like this:
+> PJ4B: improved version of PJ4.
+> PJ4B-MP: adds LPAE and SMP.
+> No support for virtualization on any.
 
-I'm curious why it is called pen_release. :) Is there some historical
-link to some HW lines?
+Ah, interesting. So PJ4B is just faster than PJ4 and has no extra
+instructions or other features?
 
-> When the processors boot, all the processors except the CPU0 are in WFI.
+> > Regarding the errata: are those needed for production-level chips, or just for
+> > prototypes?
+> 
+> These are production level chips.
+
+Ok, thanks for the information. To clarify, does that mean that
+all future PJ4B and PJ4B-MP based chips also need the errata, or
+is there is a chance they will be fixed in future revisions?
+
+	Arnd
