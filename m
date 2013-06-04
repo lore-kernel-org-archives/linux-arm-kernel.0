@@ -1,73 +1,58 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 04 Jun 2013 15:43:18 +0200
-Subject: [PATCH v6 1/9] drivers: phy: add generic PHY framework
-In-Reply-To: <51ADDCD9.8080400@ti.com>
-References: <1367229812-30574-1-git-send-email-kishon@ti.com>
- <1367229812-30574-2-git-send-email-kishon@ti.com>
- <51ADBF9B.5060403@samsung.com> <51ADDCD9.8080400@ti.com>
-Message-ID: <51ADEEF6.1030200@samsung.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 4 Jun 2013 21:44:29 +0800
+Subject: [PATCH] driver core: firmware loader: fix build error
+In-Reply-To: <1563703.RysIHVehbx@wuerfel>
+References: <1563703.RysIHVehbx@wuerfel>
+Message-ID: <CACVXFVMcVfec7tTLsxFDCav-cB7cc74s-XkN=4a1toDBJC_e0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-On 06/04/2013 02:26 PM, Kishon Vijay Abraham I wrote:
->>> +static inline int phy_init(struct phy *phy)
->>> +{
->>> +	pm_runtime_get_sync(&phy->dev);
->>
->> Hmm, no need to check return value here ? Also it looks a bit unexpected to
-> 
-> I purposely dint check the return values in order to support platforms 
-> that don?t enable pm_runtime.
+Thanks for the fix.
 
-Then I guess this should be called conditionally and any errors returned
-if runtime PM is enabled ? Not sure if pm_runtime_enabled() would be
-helpful such situation.
+On Tue, Jun 4, 2013 at 7:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Patch af5bc11e9 "driver core: firmware loader: kill FW_ACTION_NOHOTPLUG
+> requests before suspend" caused a regression for the case where
+> CONFIG_FW_LOADER_USER_HELPER is not enabled, because it adds
+> references to code that is not available in that configuration:
+>
+> drivers/base/firmware_class.c: In function 'kill_requests_without_uevent':
+> drivers/base/firmware_class.c:1424:49: error: 'struct firmware_buf' has no member named 'pending_list'
+>   list_for_each_entry_safe(buf, next, &pending_fw_head, pending_list) {
+> drivers/base/firmware_class.c:1426:5: error: implicit declaration of function 'fw_load_abort' [-Werror=implicit-function-declaration]
+>
+> This fixes the build error by making the new code conditional
+> as well. Found using ARM ape6evm_defconfig on today's linux-next.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Ming Lei <ming.lei@canonical.com>
+> Cc: Takashi Iwai <tiwai@suse.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>
+> diff --git a/drivers/base/firmware_class.c b/drivers/base/firmware_class.c
+> index c415043..6cca468 100644
+> --- a/drivers/base/firmware_class.c
+> +++ b/drivers/base/firmware_class.c
+> @@ -1417,6 +1417,7 @@ static void __device_uncache_fw_images(void)
+>  /* kill pending requests without uevent to avoid blocking suspend */
+>  static void kill_requests_without_uevent(void)
+>  {
+> +#ifdef CONFIG_FW_LOADER_USER_HELPER
+>         struct firmware_buf *buf;
+>         struct firmware_buf *next;
+>
+> @@ -1426,6 +1427,7 @@ static void kill_requests_without_uevent(void)
+>                          fw_load_abort(buf);
+>         }
+>         mutex_unlock(&fw_lock);
+> +#endif
 
->> possibly have runtime_resume callback of a PHY device called before ops->init()
->> call ? It seems a bit unclear what the purpose of init() callback is.
-> 
-> Not really. Anything that is used to initialize the PHY (internal 
-> configuration) can go in phy_init. Usually in runtime_resume callback, 
-> optional functional clocks are enabled and also in some cases context 
-> restore is done. So it really makes sense to enable clocks/module 
-> (pm_runtime_get_sync) before doing a PHY configuration (phy_init).
+Fenggang's kbuild robot captured the build failure, and a similar fix patch
+has been posted out:
 
-OK, that makes sense. All PHY device resources must be prepared anyway
-before a PHY object is registered with the PHY core.
-
->>> +	if (phy->ops->init)
->>> +		return phy->ops->init(phy);
->>> +
->>> +	return -EINVAL;
->>> +}
->>> +
->>> +static inline int phy_exit(struct phy *phy)
->>> +{
->>> +	int ret = -EINVAL;
->>> +
->>> +	if (phy->ops->exit)
->>> +		ret = phy->ops->exit(phy);
->>> +
->>> +	pm_runtime_put_sync(&phy->dev);
->>> +
->>> +	return ret;
->>> +}
->>
->> Do phy_init/phy_exit need to be mandatory ? What if there is really
-> 
-> No. phy_init/phy_exit is not mandatory at all.
->> nothing to do in those callbacks ? Perhaps -ENOIOCTLCMD should be
->> returned if a callback is not implemented, so PHY users can recognize
->> such situation and proceed ?
-> 
-> So currently these APIs return -EINVAL if these callbacks are not 
-> populated which is good enough IMHO.
-
-But -EINVAL could be well returned from the callback function. Perhaps
-ENOTSUPP could be used instead ?
-
+      http://marc.info/?l=linux-kernel&m=137031139632564&w=2
 
 Thanks,
-Sylwester
+--
+Ming Lei
