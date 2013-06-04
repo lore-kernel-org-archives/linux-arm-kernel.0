@@ -1,129 +1,45 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Mon, 3 Jun 2013 23:35:06 -0700
-Subject: [Patch 1/3] clk: fix clk_mux_get_parent return's signed value
-In-Reply-To: <51AD88D2.7060107@ti.com>
-References: <1367475929-32166-1-git-send-email-ambresh@ti.com>
- <1367475929-32166-2-git-send-email-ambresh@ti.com>
- <20130529072118.6058.14433@quantum> <51AD88D2.7060107@ti.com>
-Message-ID: <CAPtuhTia_6SM-V2Q7ix=9LS0_Wm4DQQTzarxADcYhdpSe4bfqg@mail.gmail.com>
+Date: Mon,  3 Jun 2013 23:39:15 -0700
+Subject: [PATCH RFC 0/3] first pass converting omap4 clock data to DT
+Message-ID: <1370327958-19776-1-git-send-email-mturquette@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 3, 2013 at 11:27 PM, Ambresh K <ambresh@ti.com> wrote:
->
->>
->> clksel is an omap-centric term.  How about:
->>
->> "clk_mux_get_parent should return an error if the value read from the
->> register is erroneous."
->>
->
-> Make sense, will fix it.
->
->> The general approach looks good to me.  Can you submit a V2 which
->> removes all of the clksel-isms and updates definitions for .get_parent
->> functions to avoid the warnings you mentioned in the cover letter?  You
->> might find cocinelle useful for that last task.
->>
->
-> Thanks!
-> Will fix them and add your ack to it?
+This is a very incomplete conversion of a handful of OMAP4 PRCM clocks
+from the statically defined clock data in
+arch/arm/mach-omap2/cclock44xx_data.c to a new dts file in
+arch/arm/boot/dts/omap4-clocks.dtsi.
 
-Great, thanks!  Don't worry about the Ack.  I'll take the patch
-through the clk tree so it will have my SoB.
+I am not a DT expert so many of the choices here may be quite disgusting
+to look at, or may be on the right path.  In particular I simply include
+the new omap4-clocks.dtsi from omap4.dtsi, which feels a bit kludgey.
+Also this series depends on the basic clock bindings RFC I posted
+earlier today[1].
 
-Regards,
-Mike
+I actually have an omap4-clock.dtsi file with many more clocks converted
+to the mux-clock, divider-clock, fixed-clock, fixed-factor and
+(unpublished) gate-clock bindings in my local repo, but it is not
+currently booting.  I wanted to get this early preview out regardless.
 
->
->
->> Regards,
->> Mike
->>
->>> Currently if the value read is greater than the number of
->>> available parents clk_mux_get_parent return's signed error
->>> which will result in NULL pointer dereferencing in the
->>> calling functions.
->>>
->>> Signed-off-by: Ambresh K <ambresh@ti.com>
->>> ---
->>>  drivers/clk/clk-mux.c        |    2 +-
->>>  drivers/clk/clk.c            |   12 +++++++++++-
->>>  include/linux/clk-provider.h |    4 ++--
->>>  3 files changed, 14 insertions(+), 4 deletions(-)
->>>
->>> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
->>> index 25b1734..be0857e 100644
->>> --- a/drivers/clk/clk-mux.c
->>> +++ b/drivers/clk/clk-mux.c
->>> @@ -29,7 +29,7 @@
->>>
->>>  #define to_clk_mux(_hw) container_of(_hw, struct clk_mux, hw)
->>>
->>> -static u8 clk_mux_get_parent(struct clk_hw *hw)
->>> +static int clk_mux_get_parent(struct clk_hw *hw)
->>>  {
->>>         struct clk_mux *mux = to_clk_mux(hw);
->>>         int num_parents = __clk_get_num_parents(hw->clk);
->>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->>> index 934cfd1..c187321 100644
->>> --- a/drivers/clk/clk.c
->>> +++ b/drivers/clk/clk.c
->>> @@ -1281,7 +1281,7 @@ EXPORT_SYMBOL_GPL(clk_get_parent);
->>>  static struct clk *__clk_init_parent(struct clk *clk)
->>>  {
->>>         struct clk *ret = NULL;
->>> -       u8 index;
->>> +       int index;
->>>
->>>         /* handle the trivial cases */
->>>
->>> @@ -1309,6 +1309,11 @@ static struct clk *__clk_init_parent(struct clk *clk)
->>>          */
->>>
->>>         index = clk->ops->get_parent(clk->hw);
->>> +       if (index < 0) {
->>> +               pr_err("%s: clk(%s) invalid parent clk_sel index(%d)\n",
->>> +                               __func__, clk->name, index);
->>> +               goto out;
->>> +       }
->>>
->>>         if (!clk->parents)
->>>                 clk->parents =
->>> @@ -1632,6 +1637,11 @@ int __clk_init(struct device *dev, struct clk *clk)
->>>         hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
->>>                 if (orphan->ops->get_parent) {
->>>                         i = orphan->ops->get_parent(orphan->hw);
->>> +                       if (i < 0) {
->>> +                               pr_err("%s: orphan clk(%s) invalid parent\n",
->>> +                                               __func__, orphan->name);
->>> +                               continue;
->>> +                       }
->>>                         if (!strcmp(clk->name, orphan->parent_names[i]))
->>>                                 __clk_reparent(orphan, clk);
->>>                         continue;
->>> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
->>> index 1186098..96337a1 100644
->>> --- a/include/linux/clk-provider.h
->>> +++ b/include/linux/clk-provider.h
->>> @@ -80,7 +80,7 @@ struct clk_hw;
->>>   *             supported by the clock.
->>>   *
->>>   * @get_parent:        Queries the hardware to determine the parent of a clock.  The
->>> - *             return value is a u8 which specifies the index corresponding to
->>> + *             return value which specifies the index corresponding to
->>>   *             the parent clock.  This index can be applied to either the
->>>   *             .parent_names or .parents arrays.  In short, this function
->>>   *             translates the parent value read from hardware into an array
->>> @@ -127,7 +127,7 @@ struct clk_ops {
->>>         long            (*round_rate)(struct clk_hw *hw, unsigned long,
->>>                                         unsigned long *);
->>>         int             (*set_parent)(struct clk_hw *hw, u8 index);
->>> -       u8              (*get_parent)(struct clk_hw *hw);
->>> +       int             (*get_parent)(struct clk_hw *hw);
->>>         int             (*set_rate)(struct clk_hw *hw, unsigned long,
->>>                                     unsigned long);
->>>         void            (*init)(struct clk_hw *hw);
->>> --
->>> 1.7.4.1
->>
+[1] http://article.gmane.org/gmane.linux.kernel/1501216
+
+Mike Turquette (3):
+  clk: omap: introduce clock driver
+  ARM: dts: omap4 clock data
+  ARM: omap4: register DT clocks & remove old data
+
+ arch/arm/boot/dts/omap4-clocks.dtsi   | 128 ++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap4.dtsi          |   2 +
+ arch/arm/mach-omap2/cclock44xx_data.c |  54 ++------------
+ drivers/clk/Makefile                  |   1 +
+ drivers/clk/omap/Makefile             |   1 +
+ drivers/clk/omap/clk.c                |  55 +++++++++++++++
+ include/linux/clk/omap.h              |  24 +++++++
+ 7 files changed, 217 insertions(+), 48 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-clocks.dtsi
+ create mode 100644 drivers/clk/omap/Makefile
+ create mode 100644 drivers/clk/omap/clk.c
+ create mode 100644 include/linux/clk/omap.h
+
+-- 
+1.8.1.2
