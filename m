@@ -1,65 +1,178 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 04 Jun 2013 09:15:07 +0200
-Subject: [PATCHv4 3/3] Add DT bindings documentation for g762 driver
-In-Reply-To: <cover.1340327864.git.arno@natisbad.org>
-References: <cover.1340327864.git.arno@natisbad.org>
-Message-ID: <0162ace15ab54e9b585af0f91588552fbd39ad39.1370327864.git.arno@natisbad.org>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue,  4 Jun 2013 09:17:39 +0200
+Subject: [PATCH v4] arm: zynq: Add cpuidle support
+Message-ID: <360abe7d7e8b8a0f785ec846c24fa5cb6658b956.1370330248.git.michal.simek@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support for cpuidle.
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+Signed-off-by: Michal Simek <michal.simek@xilinx.com>
 ---
- Documentation/devicetree/bindings/hwmon/g762.txt |   41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/hwmon/g762.txt
+Changes in v4:
+- Add record to MAINTAINERS file
+- Use long license in header + Maintainer record
+- Remove unused headers
+- Fix indentations
+- s/zynq_init_cpuidle/zynq_cpuidle_init/g
+- use cpuidle_register function
+- Do not use module_init, use device_initcall instead
+  (Using it as module is not possible because some
+   arm core functions are not exported for modules)
 
-diff --git a/Documentation/devicetree/bindings/hwmon/g762.txt b/Documentation/devicetree/bindings/hwmon/g762.txt
+Changes in v3:
+- Move driver to drivers/cpuidle/
+- Check zynq compatible string suggested by Arnd
+- Use zynq_ function prefix because of multiplatform kernel
+- Incorporate comments from Daniel Lezcano
+- Rebase on the top of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+
+Changes in v2:
+- Fix file header
+
+Changes in v1:
+- It was the part of Zynq core changes
+  https://patchwork.kernel.org/patch/2342511/
+
+ MAINTAINERS                    |  1 +
+ drivers/cpuidle/Kconfig        |  6 +++
+ drivers/cpuidle/Makefile       |  1 +
+ drivers/cpuidle/cpuidle-zynq.c | 83 ++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 91 insertions(+)
+ create mode 100644 drivers/cpuidle/cpuidle-zynq.c
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 90f45f4..6e4d4e0 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1309,6 +1309,7 @@ W:	http://wiki.xilinx.com
+ T:	git git://git.xilinx.com/linux-xlnx.git
+ S:	Supported
+ F:	arch/arm/mach-zynq/
++F:	drivers/cpuidle/cpuidle-zynq.c
+
+ ARM64 PORT (AARCH64 ARCHITECTURE)
+ M:	Catalin Marinas <catalin.marinas@arm.com>
+diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+index c4cc27e..8272a08 100644
+--- a/drivers/cpuidle/Kconfig
++++ b/drivers/cpuidle/Kconfig
+@@ -39,4 +39,10 @@ config CPU_IDLE_CALXEDA
+ 	help
+ 	  Select this to enable cpuidle on Calxeda processors.
+
++config CPU_IDLE_ZYNQ
++	bool "CPU Idle Driver for Xilinx Zynq processors"
++	depends on ARCH_ZYNQ
++	help
++	  Select this to enable cpuidle on Xilinx Zynq processors.
++
+ endif
+diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+index 0d8bd55..8767a7b 100644
+--- a/drivers/cpuidle/Makefile
++++ b/drivers/cpuidle/Makefile
+@@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+
+ obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+ obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
++obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
 new file mode 100644
-index 0000000..574524d
+index 0000000..38e03a1
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/hwmon/g762.txt
-@@ -0,0 +1,41 @@
-+GMT G762/G763 PWM Fan controller
++++ b/drivers/cpuidle/cpuidle-zynq.c
+@@ -0,0 +1,83 @@
++/*
++ * Copyright (C) 2012-2013 Xilinx
++ *
++ * CPU idle support for Xilinx Zynq
++ *
++ * based on arch/arm/mach-at91/cpuidle.c
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ *
++ * The cpu idle uses wait-for-interrupt and RAM self refresh in order
++ * to implement two idle states -
++ * #1 wait-for-interrupt
++ * #2 wait-for-interrupt and RAM self refresh
++ *
++ * Maintainer: Michal Simek <michal.simek@xilinx.com>
++ */
 +
-+Required node properties:
++#include <linux/init.h>
++#include <linux/cpu_pm.h>
++#include <linux/cpuidle.h>
++#include <linux/of.h>
++#include <asm/proc-fns.h>
++#include <asm/cpuidle.h>
 +
-+ - "compatible": must be either "gmt,g762" or "gmt,g763"
-+ - "reg": I2C bus address of the device
++#define ZYNQ_MAX_STATES		2
 +
-+Optional properties:
++/* Actual code that puts the SoC in different idle states */
++static int zynq_enter_idle(struct cpuidle_device *dev,
++			   struct cpuidle_driver *drv, int index)
++{
++	/* Devices must be stopped here */
++	cpu_pm_enter();
 +
-+ - "pwm_freq": reference clock frequency for PWM mode in Hz. If not set,
-+               default value is 32768.
++	/* Add code for DDR self refresh start */
++	cpu_do_idle();
 +
-+ - "fan_pulses": number of pulses per fan revolution. Supported values
-+               are 2 and 4.
++	/* Add code for DDR self refresh stop */
++	cpu_pm_exit();
 +
-+ - "fan_startv": fan startup voltage. Accepted values are 0, 1, 2 and 3.
-+               The higher the more.
++	return index;
++}
 +
-+ - "pwm_polarity": pwm polarity. Accepted values are 0 (positive duty)
-+               and 1 (negative duty).
++static struct cpuidle_driver zynq_idle_driver = {
++	.name = "zynq_idle",
++	.owner = THIS_MODULE,
++	.states = {
++		ARM_CPUIDLE_WFI_STATE,
++		{
++			.enter			= zynq_enter_idle,
++			.exit_latency		= 10,
++			.target_residency	= 10000,
++			.flags			= CPUIDLE_FLAG_TIME_VALID |
++						  CPUIDLE_FLAG_TIMER_STOP,
++			.name			= "RAM_SR",
++			.desc			= "WFI and RAM Self Refresh",
++		},
++	},
++	.safe_state_index = 0,
++	.state_count = ZYNQ_MAX_STATES,
++};
 +
-+ - "fan_gear_mode": fan gear mode. Supported values are 0, 1 and 2.
++/* Initialize CPU idle by registering the idle states */
++static int __init zynq_cpuidle_init(void)
++{
++	if (!of_machine_is_compatible("xlnx,zynq-7000"))
++		return -ENODEV;
 +
-+If an optional property is not set in .dts file, then current value is kept
-+unmodified (e.g. u-boot installed value).
++	pr_info("Xilinx Zynq CpuIdle Driver started\n");
 +
-+Additional information on operational parameters for the device is available
-+in Documentation/hwmon/g762. A detailed datasheet for the device is available
-+at http://natisbad.org/NAS/refs/GMT_EDS-762_763-080710-0.2.pdf.
++	return cpuidle_register(&zynq_idle_driver, NULL);
++}
 +
-+Example g762 node:
-+
-+   g762: g762 at 3e {
-+	compatible = "gmt,g762";
-+	reg = <0x3e>;
-+	pwm_freq = <8192>;   /* PWM reference clock freq */
-+	fan_pulses = <2>;    /* 2 pulses per rev */
-+	fan_gear_mode = <0>; /* chip default */
-+	fan_startv = <1>;    /* chip default */
-+	pwm_polarity = <0>;  /* chip default */
-+   };
--- 
-1.7.10.4
++device_initcall(zynq_cpuidle_init);
+--
+1.8.2.3
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/c09d0a32/attachment-0001.sig>
