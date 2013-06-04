@@ -1,36 +1,62 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 04 Jun 2013 17:30:52 +0200
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <51AE00D7.9030607@arm.com>
-References: <51ADDDAE.4040705@arm.com>
- <CAMJs5B_PB1pNVCO_EK7aTghN23L+d0RovAFi7inrVsJb5STWOA@mail.gmail.com>
- <51AE00D7.9030607@arm.com>
-Message-ID: <51AE082C.6050907@redhat.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Tue, 4 Jun 2013 17:34:30 +0200
+Subject: [PATCH 09/12] ARM: shmobile: r8a7740: Add Suspend-To-RAM A3SM
+In-Reply-To: <20130604050915.GU23054@verge.net.au>
+References: <1369645193-3595-1-git-send-email-horms+renesas@verge.net.au>
+ <1369645193-3595-10-git-send-email-horms+renesas@verge.net.au>
+ <20130528035019.GI13532@quad.lixom.net>
+ <20130604050915.GU23054@verge.net.au>
+Message-ID: <CABYn4syfNmb6RmG83Pkke2fK1Z8GC8x9Jv0=woazdiJQ+fVXWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 04/06/2013 16:59, Marc Zyngier ha scritto:
->>> >> - Either I can rely on a stable branch from both KVM and KVM/ARM trees
->>> >> on which I can base my tree for Catalin/Will to pull,
->>> >> - Or I ask Catalin to only pull the arm64 part *minus the Kconfig*, and
->>> >> only merge this last bit when the dependencies are satisfied in Linus' tree.
->>> >>
->>> >> What do you guys think?
->>> >>
->> > I would think you would prefer option (1) to get the code in cleaner.
->> > Both the KVM/next tree is stable and I can provide you with a stable
->> > KVM/ARM tree. But I really don't feel strongly about this.
-> That'd be my preferred choice too. Let's see what the KVM maintainers'
-> position on that.
+Hi Simon,
 
-I wonder if Linus would complain about irrelevant KVM changes in
-Will/Catalin's pull request.  The KVM/next tree has other patches below
-the ones you need.
+quite some effort has gone into this patch. People from ARM Ltd. have
+discussed issues about the shutdown in other threads and I spent quite
+some time on it. What are the problems? Are we concerned about the
+stability of our system? The CPUIdle feature shut down my r8a7740 on
+the Armadillo board more than 1 million times successfully. Further
+CPUIdle is deselected as default config anyway. And single
+suspend/resume cycles should be even less problematic.
 
-What we usually do for x86 is get an Acked-by from the other part.  If
-there are no dependencies on other aarch64 core changes, it'd be better
-to go through the KVM tree.  Otherwise separating the Kconfig change
-should be okay (perhaps add it with depends on BROKEN, and remove the
-dependency later?).
+Thanks,
 
-Paolo
+ Bastian
+
+
+2013/6/4 Simon Horman <horms@verge.net.au>:
+> On Mon, May 27, 2013 at 08:50:19PM -0700, Olof Johansson wrote:
+>> Hi,
+>>
+>> On Mon, May 27, 2013 at 05:59:50PM +0900, Simon Horman wrote:
+>> > From: Bastian Hecht <hechtb@gmail.com>
+>> >
+>> > We add 2 Suspend to RAM modes:
+>> > - A3SM PLL0 on/off:     Power domain A3SM that contains the ARM core
+>> >                         and the 2nd level cache with either PLL0 on
+>> >                         or off
+>> >
+>> > As the suspend to memory mechanism we use A3SM PLL off. A3SM PLL on
+>> > is included here too, so CPUIdle can use both power down modes (not
+>> > included in this patch).
+>> >
+>> > The setup of the SYSC regarding the external IRQs is taken from
+>> > pm-sh7372.c from Magnus Damm.
+>> >
+>> > Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+>>
+>> Missing S-o-b from you, Simon?
+>>
+>> > +   .text
+>> > +ENTRY(v7_cpu_resume)
+>> > +   bl      v7_invalidate_l1
+>> > +   b       cpu_resume
+>> > +ENDPROC(v7_cpu_resume)
+>>
+>> This is a global namespace so it'll conflict with i.MX whenever
+>> you multiplatform enable shmobile. Might want to pick a more
+>> unique name.
+>
+> I have decided to drop this and related cpuidle and suspend-to-ram
+> patches for r8a7740 after discussion with Magnus.
