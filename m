@@ -1,79 +1,61 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 04 Jun 2013 09:57:24 +0200
-Subject: [PATCH] net/macb: fix ISR clear-on-write behavior only for some
- SoC
-In-Reply-To: <51AD9C94.4080606@atmel.com>
-References: <1368461105-23128-1-git-send-email-nicolas.ferre@atmel.com>
- <FE065E51-1EAA-47ED-8C7B-0F2E6418F349@jcrosoft.com>
- <51918C23.7040106@yahoo.es> <20130514055256.GD22508@game.jcrosoft.org>
- <51AD8611.8070102@monstr.eu> <20130604064940.GA5107@pengutronix.de>
- <51AD9C94.4080606@atmel.com>
-Message-ID: <51AD9DE4.7070907@monstr.eu>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 4 Jun 2013 09:57:27 +0200
+Subject: [PATCH 3/3] clocksource: dw_apb_timer_of: use clocksource_of_init
+In-Reply-To: <20130604043620.GU11798@tarshish>
+References: <201306032157.40488.heiko@sntech.de>
+ <201306032159.55685.heiko@sntech.de> <20130604043620.GU11798@tarshish>
+Message-ID: <201306040957.27920.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2013 09:51 AM, Nicolas Ferre wrote:
-> On 04/06/2013 08:49, Steffen Trumtrar :
->> On Tue, Jun 04, 2013 at 08:15:45AM +0200, Michal Simek wrote:
->>> On 05/14/2013 07:52 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>> On 08:58 Tue 14 May     , Hein Tibosch wrote:
->>>>> On 5/14/2013 12:05 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>>>> On May 14, 2013, at 12:05 AM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
->>>>>>
->>>>>>> Commit 749a2b6 (net/macb: clear tx/rx completion flags in ISR)
->>>>>>> introduces clear-on-write on ISR register. This behavior is not always
->>>>>>> implemented when using Cadence MACB/GEM and is breaking other platforms.
->>>>>>> We are using a new Device Tree compatibility string and a capability
->>>>>>> property to actually activate this clear-on-write behavior on ISR.
->>>>>>>
->>>>>>> Reported-by: Hein Tibosch <hein_tibosch@yahoo.es>
->>>>>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>>>>> can we detect it via the IP?
->>>>>
->>>>> This was my first proposal, have it based on the value of MACB's
->>>>> register 'MID' (offset 0x00fc, lower 16 bits).
->>>>> On avr32 it reads: 0x0000010D, on Zynq it reports 0x00000119
->>>>>
->>>>> So for the moment, CAPS_ISR_CLEAR_ON_WRITE could be set if the revision
->>>>> equals to 0x00000119?
->>>> so no it will not work
->>>>
->>>> as the gem on sama5 is 00020119
->>>>
->>>> so version 0x119 too
->>>>
->>>> nico
->>>> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
->>>
->>> Was this added to any queue or branch?
->>> I would like to enable macb for zynq and not sure if "cdns,zynq-7000-gem"
->>> compatible string goes to mainline.
->>>
->>
->> Hi!
->>
->> This is already in next, but you can use the default compatible as the
+Am Dienstag, 4. Juni 2013, 06:36:20 schrieb Baruch Siach:
+> Hi Heiko,
 > 
-> Even more: already in Linus' tree!
+> On Mon, Jun 03, 2013 at 09:59:55PM +0200, Heiko St?bner wrote:
+> > dw_apb_timer_init used to search the devicetree for matching timer
+> > devices, making calls to it from board files necessary.
+> > 
+> > Change the dw_apb_timer_init to work with CLOCKSOURCE_OF_DECLARE.
+> > With this change the function gets called once for each timer node
+> > and tracks these number of calls to attach clockevent and clocksource
+> > devices to the nodes.
+> > 
+> > Also remove the calls to dw_apb_timer_init from all previous users, as
+> > clocksource_of_init is the default for init_time now.
+> > 
+> > Tested on the upcoming rk3066 code.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > Acked-by: Rob Herring <rob.herring@calxeda.com>
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > 
+> >  arch/arm/mach-picoxcell/Kconfig       |    1 +
+> >  arch/arm/mach-picoxcell/common.c      |    2 -
+> >  arch/arm/mach-socfpga/Kconfig         |    1 +
+> >  arch/arm/mach-socfpga/socfpga.c       |    2 -
+> >  drivers/clocksource/dw_apb_timer_of.c |   41
+> >  ++++++++++++++++----------------- include/linux/dw_apb_timer.h         
+> >  |    1 -
+> >  6 files changed, 22 insertions(+), 26 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-picoxcell/Kconfig
+> > b/arch/arm/mach-picoxcell/Kconfig index 13bae78..3ef6bbe 100644
+> > --- a/arch/arm/mach-picoxcell/Kconfig
+> > +++ b/arch/arm/mach-picoxcell/Kconfig
+> > @@ -6,6 +6,7 @@ config ARCH_PICOXCELL
+> > 
+> >  	select CPU_V6K
+> >  	select DW_APB_TIMER
+> >  	select DW_APB_TIMER_OF
+> > 
+> > +	select CLKSRC_OF
+> 
+> Shouldn't DW_APB_TIMER 'select CLKSRC_OF if OF' instead of selecting is for
+> each and every platform? While at it we can do the same to DW_APB_TIMER_OF.
 
-Ah I see. v2 is in thunderbird in the same thread and I didn't check this
-version for compatible string.
+if anything DW_APB_TIMER_OF should select both DW_APB_TIMER and 'CLKSRC_OF if 
+OF', as the base DW_APB_TIMER_OF is the platform glue, that uses DW_APB_TIMER 
+internally.
 
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/a14efdca/attachment.sig>
+But otherwise sounds sensible to not duplicate these selects everywhere.
