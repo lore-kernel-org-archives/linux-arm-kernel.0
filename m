@@ -1,44 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 4 Jun 2013 15:10:17 +0100
-Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
-In-Reply-To: <51ADD667.3010203@linaro.org>
-References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
- <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
- <51AC8F74.2060302@linaro.org>
- <CAP245DUsRcomDaNKbxYry39ZLCrR33SDRRAhNCdR91e17sHF-A@mail.gmail.com>
- <51ADD667.3010203@linaro.org>
-Message-ID: <20130604141017.GW18614@n2100.arm.linux.org.uk>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 04 Jun 2013 16:12:24 +0200
+Subject: [PATCH v3] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+In-Reply-To: <51ADF04D.3040703@atmel.com>
+References: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <51A34BF9.5000905@atmel.com> <6343931.uK9ItNlUFg@wuerfel>
+ <51ADF04D.3040703@atmel.com>
+Message-ID: <51ADF5C8.80007@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 01:58:31PM +0200, Daniel Lezcano wrote:
-> On 06/04/2013 01:39 PM, Amit Kucheria wrote:
-> > I'm curious why it is called pen_release. :) Is there some historical
-> > link to some HW lines?
-> 
-> I tried to figure out the same but I did not found any information on
-> that. I assumed the name could be referring to a simplified mutual
-> exclusion algorithm from the 'Dining philosophers problem' [1] where the
-> fork is a pen.
+On 04/06/2013 15:49, Nicolas Ferre wrote:
+>
+> ... simply use this "IS_BUILTIN(CONFIG_PHYLIB)" here -----^^^^^^^^^
+> (and not above as suggested by Arnd).
+>
+> Jean-Christophe, Alexandre: do you agree with this conclusion?
+>
+> I plan to stack this patch for next at91-fixes batch.
+>
 
-Where it comes from is the original ARM SMP patches from early 2000, which
-everyone has blindly copied with no thought about what they're doing.  This
-is why I'm totally against any consolidation of this code, because I'm of
-the opinion that _no one_ other than the ARM Ltd development platforms
-should be using it.
+Yeah, I prepared and tested that last week but didn't send it yet. I can
+do it now if you want but you could probably just edit my patch. I'd
+like to fix the other platforms too but that probably can wait.
 
-"pen" means "holding pen".  It comes about because early on in the SMP
-development, ARM SMP platforms had four CPUs, and it was only possible to
-release all three secondary CPUs from the boot loader simultaneously to
-a common piece of code.
+I believe we would still have to fix the phy_register_fixup*() works as
+it is always called from arch/ and is clearly not fool proofed enough.
+Maybe DT could help ?
 
-As the kernel was not able to serialize the release of each CPU, ARM Ltd
-worked around this problem by having all the CPUs jump to assembly code
-which "holds" the CPUs which we didn't want to boot yet, and the CPUs
-are released one at a time by setting pen_release to the hardware CPU
-number.
+Arnd, do you have any input ?
 
-Modern platforms either have just one secondary CPU, or they have a way
-to control the reset/power to the secondary CPU.  This makes the holding
-pen entirely redundant, and such platforms should _not_ make use of any
-kind of holding pen.
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
