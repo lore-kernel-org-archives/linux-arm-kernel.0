@@ -1,43 +1,161 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Jun 2013 13:39:57 +0200
-Subject: [PATCH 3/3] ARM PJ4B: Add support for errata 4611
-In-Reply-To: <EE71107DF0D1F24FA2D95041E64AB9E801A56CF1A8AB@IL-MB01.marvell.com>
-References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
- <2479964.1Q22eHuH4J@wuerfel>
- <EE71107DF0D1F24FA2D95041E64AB9E801A56CF1A8AB@IL-MB01.marvell.com>
-Message-ID: <10384353.qafBWKgARt@wuerfel>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 4 Jun 2013 14:39:36 +0300
+Subject: [PATCH 11/11] i2c: omap: enhance pinctrl support
+In-Reply-To: <87k3mf2gu4.fsf@linaro.org>
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369995191-20855-12-git-send-email-gururaja.hebbar@ti.com>
+ <87k3mf2gu4.fsf@linaro.org>
+Message-ID: <51ADD1F8.7070405@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 June 2013 14:34:53 Lior Amsalem wrote:
-> > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> > Sent: Wednesday, May 29, 2013 4:33 PM
-> > 
-> > On Wednesday 29 May 2013 15:27:31 Gregory CLEMENT wrote:
-> > > OK I will see what kind of information I can gather and which ones I
-> > > can add to the Documentation/arm/Marvell/README file.
-> > >
-> > > My current understanding is that there are at least 3 kind of CPU:
-> > > PJ4, PJ4B and PJ4B-MP and all of them belongs to the Sheeva family.
-> > 
-> > Ok. So I guess PJ4B adds LPAE support, and PJ4B-MP adds SMP support,
-> > right? Do either of them support hypervisor mode?
-> 
-> It goes like this:
-> PJ4B: improved version of PJ4.
-> PJ4B-MP: adds LPAE and SMP.
-> No support for virtualization on any.
+Hi Kevin, Gururaja
 
-Ah, interesting. So PJ4B is just faster than PJ4 and has no extra
-instructions or other features?
+On 05/31/2013 08:34 PM, Kevin Hilman wrote:
+> Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
+>
+>> Amend the I2C omap pin controller to optionally take a pin control
+>> handle and set the state of the pins to:
+>>
+>> - "default" on boot, resume and before performing an i2c transfer
+>> - "idle" after initial default, after resume default, and after each
+>> i2c xfer
+>> - "sleep" on suspend()
+>>
+>> By optionally putting the pins into sleep state in the suspend callback
+>> we can accomplish two things.
+>> - One is to minimize current leakage from pins and thus save power,
+>> - second, we can prevent the IP from driving pins output in an
+>> uncontrolled manner, which may happen if the power domain drops the
+>> domain regulator.
+>>
+>> Note:
+>> A .suspend & .resume callback is added which simply puts the pins to sleep
+>> state upon suspend & are moved to default & idle state upon resume.
+>>
+>> If any of the above pin states are missing in dt, a warning message
+>> about the missing state is displayed.
+>> If certain pin-states are not available, to remove this warning message
+>> pass respective state name with null phandler.
+>>
+>> (Changes based on i2c-nomadik.c)
+>>
+>> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>> Cc: linux-omap at vger.kernel.org
+>> Cc: linux-i2c at vger.kernel.org
+> [...]
+>
+>> @@ -664,7 +673,13 @@ omap_i2c_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
+>>   
+>>   out:
+>>   	pm_runtime_mark_last_busy(dev->dev);
+>> +
+>>   	pm_runtime_put_autosuspend(dev->dev);
+>> +	/* Optionally let pins go into idle state */
+>> +	if (!IS_ERR(dev->pins_idle))
+>> +		if (pinctrl_select_state(dev->pinctrl, dev->pins_idle))
+>> +			dev_err(dev->dev, "could not set pins to idle state\n");
+> This is wrong.  You're changing the muxing before the device actually
+> goes idle.  Anything you want to happen when the device actually idles
+> for real has to be in runtime PM callbacks.
+>
+> Looking below, I see it's already in the callbacks, so why is it here also?
 
-> > Regarding the errata: are those needed for production-level chips, or just for
-> > prototypes?
-> 
-> These are production level chips.
+I have two questions regarding this patch & the whole series:
 
-Ok, thanks for the information. To clarify, does that mean that
-all future PJ4B and PJ4B-MP based chips also need the errata, or
-is there is a chance they will be fixed in future revisions?
+1) PM runtime suspend/resume
+Current sequence:
+- resume
+   |- omap_hwmod_enable()
+      |- _enable()
+          |- omap_hwmod_mux(oh->mux, _HWMOD_STATE_ENABLED)
+             |- enable module (sysc&clocks)
+   |- omap_i2c_runtime_resume()
+- suspend
+   |- omap_i2c_runtime_suspend()
+   |- omap_hwmod_idle()
+      |- _idle()
+          |- disbale module (sysc&clocks)
+          |- omap_hwmod_mux(oh->mux, _HWMOD_STATE_IDLE);
 
-	Arnd
+The new order will change this sequence - *Is it safe?*:
+- resume
+   |- omap_hwmod_enable()
+      |- _enable()
+         |- enable module (sysc&clocks) <---- Is it valid to enable 
+module before PINs?
+   |- omap_i2c_runtime_resume()
+      |- PINs state set to DEFAULT
+- suspend
+   |- omap_i2c_runtime_suspend()
+      |- PINs state set to IDLE
+   |- omap_hwmod_idle()
+      |- _idle()
+          |- disbale module (sysc&clocks) <---- Is it valid to disable 
+module after PINs?
+
+2) System suspend (OFF-mode) with assumption that "noirq" stage will be 
+used for PINs cfg
+Current implementation: handled in the same way as PM runtime
+
+
+The new implementation:   -- total mess is here((:
+- suspend_noirq - I2C device can be still active because of PM auto-suspend
+   |-_od_suspend_noirq
+      |- omap_i2c_suspend_noirq
+         |- PINs state set to SLEEP
+   |- pm_generic_runtime_suspend
+      |- omap_i2c_runtime_suspend()
+         |- PINs state set to IDLE  <--- *oops* PINs state is IDLE and 
+not SLEEP
+   |- omap_device_idle()
+      |- omap_hwmod_idle()
+         |- _idle()
+            |- disbale module (sysc&clocks)
+
+- resume_noirq - I2C was active before suspend
+   |-_od_resume_noirq
+      |- omap_hwmod_enable()
+         |- _enable()
+            |- enable module (sysc&clocks)
+      |- pm_generic_runtime_resume
+         |- omap_i2c_runtime_resume()
+            |- PINs state set to DEFAULT  <--- !!!!
+      |- omap_i2c_resume_noirq
+         |- PINs state set to DEFAULT
+         |- PINs state set to IDLE        <--- *big oops* we have active 
+module and its
+                                               PINs state is IDLE
+
+All mentioned above, applicable for most of all patches in series.
+And It seems, that this functionality can't be implemented in such way (
+- OMAP device FW and Driver core might handle PINs states changing and
+   drivers (DT) should provide set of available states only.
+
+Am I wrong?
+
+Regards,
+-grygorii
+
+
+>
+> [...]
+>
+>> @@ -1300,6 +1348,10 @@ static int omap_i2c_runtime_suspend(struct device *dev)
+>>   		omap_i2c_read_reg(_dev, OMAP_I2C_STAT_REG);
+>>   	}
+>>   
+>> +	if (!IS_ERR(_dev->pins_idle))
+>> +		if (pinctrl_select_state(_dev->pinctrl, _dev->pins_idle))
+>> +			dev_err(dev, "could not set pins to idle state\n");
+>> +
+>>   	return 0;
+>>   }
+>>   
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
