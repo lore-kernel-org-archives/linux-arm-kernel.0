@@ -1,54 +1,60 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Wed, 5 Jun 2013 00:27:32 +0530
-Subject: [PATCH V3 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
-In-Reply-To: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
-References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
-Message-ID: <1370372252-4332-4-git-send-email-jagarwal@nvidia.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 04 Jun 2013 21:04:09 +0200
+Subject: [PATCH v2 1/2] ARM PJ4B: Add support for errata 4742
+In-Reply-To: <alpine.LFD.2.03.1306041429380.1200@syhkavp.arg>
+References: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
+ <1370354598-12920-2-git-send-email-gregory.clement@free-electrons.com>
+ <20130604145958.GY18614@n2100.arm.linux.org.uk>
+ <51AE21A7.5080907@free-electrons.com>
+ <20130604173737.GZ18614@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1306041348400.1200@syhkavp.arg>
+ <20130604181030.GA18614@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1306041412490.1200@syhkavp.arg>
+ <20130604182137.GC18614@n2100.arm.linux.org.uk>
+ <alpine.LFD.2.03.1306041429380.1200@syhkavp.arg>
+Message-ID: <51AE3A29.3080807@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-- Enable PCIe controller on Cardhu
-- Only port 2 is connected on this board
-- Add regulators required for Tegra30
+On 06/04/2013 08:32 PM, Nicolas Pitre wrote:
+> On Tue, 4 Jun 2013, Russell King - ARM Linux wrote:
+> 
+>> On Tue, Jun 04, 2013 at 02:19:32PM -0400, Nicolas Pitre wrote:
+>>> On Tue, 4 Jun 2013, Russell King - ARM Linux wrote:
+>>>
+>>>> On Tue, Jun 04, 2013 at 02:07:29PM -0400, Nicolas Pitre wrote:
+>>>>> Alternatively, the following could be done:
+>>>>>
+>>>>> #ifdef CONFIG_CPU_PJ4B
+>>>>>
+>>>>> 	.equ	cpu_pj4b_switch_mm,	cpu_v7_switch_mm
+>>>>> 	.equ	cpu_pj4b_set_pte_ex,	cpu_v7_set_pte_ex
+>>>>
+>>>> No, that doesn't work.  I did forget a hunk from my patch though, which
+>>>> needs the pj4b symbols to be global:
+>>>
+>>> 	.macro globl_equ x, y
+>>> 	.globl	x
+>>> 	.equ	x, y
+>>> 	.endm
+>>>
+>>> 	.globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
+>>> 	.globl_equ	cpu_pj4b_set_pte_ex,	cpu_v7_set_pte_ex
+>>
+>> Which is really no different from doing what I did.
+> 
+> This can be wrapped inside #ifdef CONFIG_CPU_PJ4B clearing the symbol 
+> aliasing confusion I mentioned when not configured, and can be done in a 
+> single location instead of being spread all over.  Other than that, this 
+> is functionally equivalent to what you did indeed.
+> 
+> 
+Russell, Nicolas,
 
-Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
----
-Patch is based on remotes/gitorious_thierryreding_linux/tegra/next and should be applied on top of this.
+Thanks for both of you for help. As you both agree that your variants are functionally
+equivalent and as the variant of Nicolas seems to be more easy to debug, I will
+adopt Nicolas' version. Unless, there was a drawback you didn't mention yet.
 
-Changes in V3:
-- Added num-lanes property for cardhu as per review comments
+Regards,
 
- arch/arm/boot/dts/tegra30-cardhu.dtsi |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/boot/dts/tegra30-cardhu.dtsi b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-index 8ad4841..b6270e3 100644
---- a/arch/arm/boot/dts/tegra30-cardhu.dtsi
-+++ b/arch/arm/boot/dts/tegra30-cardhu.dtsi
-@@ -27,6 +27,24 @@
- 	model = "NVIDIA Tegra30 Cardhu evaluation board";
- 	compatible = "nvidia,cardhu", "nvidia,tegra30";
- 
-+	pcie-controller {
-+		status = "okay";
-+		pex-clk-supply = <&pex_hvdd_3v3_reg>;
-+		vdd-supply = <&ldo1_reg>;
-+		avdd-supply = <&ldo2_reg>;
-+
-+		pci at 1,0 {
-+			nvidia,num-lanes = <4>;
-+		};
-+		pci at 2,0 {
-+			nvidia,num-lanes = <1>;
-+		};
-+		pci at 3,0 {
-+			status = "okay";
-+			nvidia,num-lanes = <1>;
-+		};
-+	};
-+
- 	host1x {
- 		dc at 54200000 {
- 			rgb {
--- 
-1.7.0.4
+Gregory
