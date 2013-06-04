@@ -1,42 +1,46 @@
-From: sanjay.rawat@linaro.org (Sanjay Singh Rawat)
-Date: Tue, 04 Jun 2013 20:55:19 +0530
-Subject: [PATCH 1/8] ARM: EXYNOS: use generic cpu idle function for wfi
-In-Reply-To: <1369665166-13049-2-git-send-email-sanjay.rawat@linaro.org>
-References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
- <1369665166-13049-2-git-send-email-sanjay.rawat@linaro.org>
-Message-ID: <51AE06DF.1000407@linaro.org>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 4 Jun 2013 10:28:50 -0500
+Subject: [PATCH v2 0/4] dw_apb_timer: osc as sched_clock, clocks and
+ clocksource_of support
+In-Reply-To: <201306041136.09566.heiko@sntech.de>
+References: <201306041136.09566.heiko@sntech.de>
+Message-ID: <1370359730.16167.4.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+Hi Heiko,
 
-can you please review the patch?
+On Tue, 2013-06-04 at 11:36 +0200, Heiko St?bner wrote:
+> This is split off of my Rockchip support series from yesterday. It's now
+> a patch more than before, as the third patch enables the timer to be used
+> thru clocksource_of_init and moves picoxcell and socfpga to it.
+> 
+> changes since v1:
+> - hopefully improve the patch description of patch 1
+>   after a suggestion by Linus Walleij
+> - move the selection of DW_APB_TIMER and CLKSRC_OF into DW_APB_TIMER_OF
+>   after a suggestion by Baruch Siach
+> 
+> Heiko Stuebner (4):
+>   clocksource: dw_apb_timer_of: enable the use the clocksource as sched clock
+>   clocksource: dw_apb_timer_of: add clock-handling
+>   clocksource: dw_apb_timer_of: select DW_APB_TIMER
+>   clocksource: dw_apb_timer_of: use clocksource_of_init
+> 
+>  Documentation/devicetree/bindings/rtc/dw-apb.txt |   19 +++++
+>  arch/arm/mach-picoxcell/Kconfig                  |    1 -
+>  arch/arm/mach-picoxcell/common.c                 |    2 -
+>  arch/arm/mach-socfpga/Kconfig                    |    1 -
+>  arch/arm/mach-socfpga/socfpga.c                  |    2 -
+>  drivers/clocksource/Kconfig                      |    2 +
+>  drivers/clocksource/dw_apb_timer_of.c            |   95 ++++++++++++++-------
+>  include/linux/dw_apb_timer.h                     |    1 -
+>  8 files changed, 84 insertions(+), 39 deletions(-)
+> 
 
-On Monday 27 May 2013 08:02 PM, Sanjay Singh Rawat wrote:
-> use cpu_do_idle for entering the WFI mode.
->
-> Signed-off-by: Sanjay Singh Rawat<sanjay.rawat@linaro.org>
-> ---
->   arch/arm/mach-exynos/hotplug.c |    9 ++-------
->   1 file changed, 2 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
-> index af90cfa..7fcedd8 100644
-> --- a/arch/arm/mach-exynos/hotplug.c
-> +++ b/arch/arm/mach-exynos/hotplug.c
-> @@ -98,13 +98,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->   		if (cpu == 1)
->   			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
->
-> -		/*
-> -		 * here's the WFI
-> -		 */
-> -		asm(".word	0xe320f003\n"
-> -		    :
-> -		    :
-> -		    : "memory", "cc");
-> +		/* enter WFI mode */
-> +		cpu_do_idle();
->
->   		if (pen_release == cpu_logical_map(cpu)) {
->   			/*
+For all the mach-socfpga parts:
+
+Acked-by: Dinh Nguyen <dinguyen@altera.com>
+
+Thanks,
+Dinh
