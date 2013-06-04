@@ -1,137 +1,105 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Tue, 4 Jun 2013 16:29:04 +0900
-Subject: [PATCH v3] clk: implement clk_unregister
-In-Reply-To: <857E9EDCA6C0904DB3357321AA9123EB6246498A@NA-MBX-03.mgc.mentorg.com>
-References: <1370248626-3760-1-git-send-email-jiada_wang@mentor.com>
- <20130603091116.GB23140@pengutronix.de>
- <857E9EDCA6C0904DB3357321AA9123EB6246498A@NA-MBX-03.mgc.mentorg.com>
-Message-ID: <51AD9740.6080208@mentor.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 04 Jun 2013 09:29:41 +0200
+Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
+In-Reply-To: <51AC8F74.2060302@linaro.org>
+References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
+ <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
+ <51AC8F74.2060302@linaro.org>
+Message-ID: <51AD9765.3000406@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe
+On 06/03/2013 02:43 PM, Daniel Lezcano wrote:
+> On 06/03/2013 11:51 AM, Michal Simek wrote:
+>> Hi,
+>>
+>> On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
+>>> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
+>>>> The current code considers every wakeup as spurious, which is not
+>>>> correct. Handle the same way as other arm platforms are doing.
+>>>>
+>>>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+>>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>
+>>>
+>>>> ---
+>>>>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
+>>>>  1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+>>>> index c89672b..a1ab22c 100644
+>>>> --- a/arch/arm/mach-zynq/hotplug.c
+>>>> +++ b/arch/arm/mach-zynq/hotplug.c
+>>>> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
+>>>>  		dsb();
+>>>>  		wfi();
+>>>>  
+>>>> +		if (pen_release == cpu_logical_map(cpu)) {
+>>>> +			/*
+>>>> +			 * OK, proper wakeup, we're done
+>>>> +			 */
+>>>> +			break;
+>>>> +		}
+>>>> +
+>> what pen_release stands for?
+>> I have looked at it and others platform are also using it in platsmp
+>> code which is not zynq case.
+>> How is it supposed to work and how this variable should be used?
+> 
+> This variable is used to serialize the secondary cpus boot process.
+> 
+> When the processors boot, all the processors except the CPU0 are in WFI.
+> 
+> Then it is up to CPU0 to wake up the secondary processors:
+> 1. it writes the cpu id of the secondary processor in the pen_release
+> variable
+> 2. it sends a IPI to the secondary cpu in order to make it exiting the
+> WFI mode
+> 2.1 the secondary processor boots and, when finished, writes the value
+> '-1' in the pen_release variable
+> 3. meanwhile CPU0 waits for the pen_release to be '-1' before continuing
+> to boot the other secondary processors
+> 
+> In the case of the routine "zynq_platform_do_lowpower", the same
+> sequence occurs with 'cpu_up', that means you are at the beginning of
+> the boot up sequence. So the pen_release value is the cpu id value when
+> exiting from WFI (remember it sets to -1 when finished).
+> 
+> If the cpu exits the lopower mode but the pen_release is not the cpu id,
+> that means there is something wrong because the cpu exited the WFI mode
+> without being in the booting process (the cpu shouldn't receive an hw
+> interrupt because they should have been migrated, but just a wake up
+> IPI). This is why there's "spurious".
+> 
+> The pen_release contains the hardware id of the CPU, this is why
+> cpu_logical_map is used.
+> 
+> I hope that helps
 
-Wang, Jiada (ESD) wrote:
-> -----Original Message-----
-> From: Uwe Kleine-K?nig [mailto:u.kleine-koenig at pengutronix.de]
-> Sent: Monday, June 03, 2013 6:11 PM
-> To: Wang, Jiada (ESD)
-> Cc: linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3] clk: implement clk_unregister
->
-> Hello,
->
-> On Mon, Jun 03, 2013 at 05:37:06PM +0900, Jiada Wang wrote:
->> Currently clk_unregister is unimplemented, it is required in case sub
->> modules want actually remove clk device registered by clk_register.
->> This patch adds the implementation of clk_unregister.
->>
->> Signed-off-by: Jiada Wang <jiada_wang@mentor.com>
->> ---
->>   drivers/clk/clk.c | 59
->> +++++++++++++++++++++++++++++++++++++++++++++++++++++--
->>   1 file changed, 57 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c index
->> 934cfd1..0b9e13c 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -342,6 +342,25 @@ out:
->>   	return ret;
->>   }
->>
->> + /**
->> + * clk_debug_unregister - remove a clk node from the debugfs clk tree
->> + * @clk: the clk being removed from the debugfs clk tree
->> + *
->> + * Dynamically removes a clk and all it's children clk nodes from the
->> + * debugfs clk tree if clk->dentry points to debugfs created by
->> + * clk_debug_register in __clk_init.
->> + *
->> + * Caller must hold prepare_lock.
->> + *
->> + */
->> +static void clk_debug_unregister(struct clk *clk) {
->> +	if (!clk || !clk->dentry)
->> +		return;
-> !clk can never trigger because clk_unregister doesn't call it in this case and debugfs_remove_recursive checks for dentry being NULL itself.
-> So you can drop this check. Maybe you can even call debugfs_remove_recursive even in the case where CONFIG_COMMON_CLK_DEBUG is off?
->
-Yes, check of clk->dentry is not necessary, will remove it,
-although currently clk_debug_unregister() is only called by 
-clk_unregister(), but for future-proof, better to check !clk before call 
-debugfs_remove_recursive(), what do you think?
->> +
->> +	debugfs_remove_recursive(clk->dentry);
->> +}
->> +
->>   /**
->>    * clk_debug_reparent - reparent clk node in the debugfs clk tree
->>    * @clk: the clk being reparented
->> @@ -432,6 +451,9 @@ static inline int clk_debug_register(struct clk
->> *clk) { return 0; }  static inline void clk_debug_reparent(struct clk
->> *clk, struct clk *new_parent)  {  }
->> +static inline void clk_debug_unregister(struct clk *clk) { }
->>   #endif
->>
->>   /* caller must hold prepare_lock */
->> @@ -1790,9 +1812,42 @@ EXPORT_SYMBOL_GPL(clk_register);
->>    * clk_unregister - unregister a currently registered clock
->>    * @clk: clock to unregister
->>    *
->> - * Currently unimplemented.
->>    */
->> -void clk_unregister(struct clk *clk) {}
->> +void clk_unregister(struct clk *clk)
->> +{
->> +	int i;
->> +
->> +	if (!clk)
->> +		return;
->> +
->> +	mutex_lock(&prepare_lock);
->> +	if (clk->prepare_count) {
->> +		pr_debug("%s: can't unregister clk %s, it is prepared\n",
->> +				__func__, clk->name);
->> +		goto out;
-> Hmm, there is no way for the caller to detect this error. Probably it cannot do anything about it most of the time, but still it would be nice to signal the problem by letting clk_unregister return an int instead of void.
->
-> Best regards
-> Uwe
->
-yes, it makes sense, although all callers of clk_unregister() is not 
-checking return value now, but it wont prevent us to change it to "int".
+Thanks for explanation.
+I have added this patch to zynq/cleanup branch.
+
+> -- Daniel
+> 
+> ps : sorry for my bad English :)
+
+No reason to apologise.
 
 Thanks,
-jiada
->> +	}
->> +
->> +	if (!hlist_empty(&clk->children)) {
->> +		pr_debug("%s: clk %s has registered children\n",
->> +				__func__, clk->name);
->> +		goto out;
->> +	}
->> +
->> +	clk_debug_unregister(clk);
->> +
->> +	hlist_del_init(&clk->child_node);
->> +
->> +	kfree(clk->parents);
->> +	i = clk->num_parents;
->> +	while (--i >= 0)
->> +		kfree(clk->parent_names[i]);
->> +	kfree(clk->parent_names);
->> +	kfree(clk->name);
->> +	kfree(clk);
->> +out:
->> +	mutex_unlock(&prepare_lock);
->> +	return;
->> +}
->>   EXPORT_SYMBOL_GPL(clk_unregister);
->>
->>   static void devm_clk_release(struct device *dev, void *res)
->> --
->> 1.8.1.1
->>
->>
->
+Michal
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/be013185/attachment-0001.sig>
