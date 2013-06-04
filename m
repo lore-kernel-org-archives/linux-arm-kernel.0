@@ -1,47 +1,86 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 4 Jun 2013 15:17:06 +0800
-Subject: [PATCH] ARM: dts: imx: add tempmon node for imx6q thermal support
-In-Reply-To: <1370330008-5982-1-git-send-email-shawn.guo@linaro.org>
-References: <1370330008-5982-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1370330226-6030-1-git-send-email-shawn.guo@linaro.org>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Tue, 04 Jun 2013 09:14:47 +0200
+Subject: [PATCHv4 2/3] Add documentation for g762 driver
+In-Reply-To: <cover.1340327864.git.arno@natisbad.org>
+References: <cover.1370327864.git.arno@natisbad.org>
+Message-ID: <424fad46a59b886551c905024f8707ad83b80762.1370327864.git.arno@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark ocotp as a syscon node and add tempmon for imx6q thermal support.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi |   11 +++++++++--
- 1 file changed, 9 insertions(+), 2 deletions(-)
+ Documentation/hwmon/g762 |   62 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+ create mode 100644 Documentation/hwmon/g762
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index 9e8296e..13e1d7f 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -489,6 +489,13 @@
- 				};
- 			};
- 
-+			tempmon: tempmon {
-+				compatible = "fsl,imx6q-tempmon";
-+				interrupts = <0 49 0x04>;
-+				fsl,tempmon = <&anatop>;
-+				fsl,tempmon-data = <&ocotp>;
-+			};
+diff --git a/Documentation/hwmon/g762 b/Documentation/hwmon/g762
+new file mode 100644
+index 0000000..8cdb0dc
+--- /dev/null
++++ b/Documentation/hwmon/g762
+@@ -0,0 +1,62 @@
++Kernel driver g762
++==================
 +
- 			usbphy1: usbphy at 020c9000 {
- 				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020c9000 0x1000>;
-@@ -747,8 +754,8 @@
- 				interrupts = <0 14 0x04>;
- 			};
- 
--			ocotp at 021bc000 {
--				compatible = "fsl,imx6q-ocotp";
-+			ocotp: ocotp at 021bc000 {
-+				compatible = "fsl,imx6q-ocotp", "syscon";
- 				reg = <0x021bc000 0x4000>;
- 			};
- 
++The GMT G762 Fan Speed PWM Controller is connected directly to a fan
++and performs closed-loop or open-loop control of the fan speed. Two
++modes - PWM or DC - are supported by the device.
++
++For additional information, a detailed datasheet is available at
++http://natisbad.org/NAS/ref/GMT_EDS-762_763-080710-0.2.pdf. sysfs
++bindings are described in Documentation/hwmon/sysfs-interface.
++
++The following entries are available to the user in a subdirectory of
++/sys/bus/i2c/drivers/g762/ to control the operation of the device.
++This can be done manually using the following entries but is usually
++done via a userland daemon like fancontrol.
++
++Note that those entries do not provide ways to setup the specific
++hardware characteristics of the system (reference clock, pulses per
++fan revolution, ...); Those can be modified via devicetree bindings
++documented in Documentation/devicetree/bindings/hwmon/g762.txt or
++using a specific platform_data structure in board initialization
++file (see include/linux/platform_data/g762.h).
++
++  fan1_target: set desired fan speed. This only makes sense in closed-loop
++            fan speed control (i.e. when pwm1_enable is set to 2).
++
++  fan1_input: provide current fan rotation value in RPM as reported by
++            the fan to the device.
++
++  fan1_div: fan clock divisor. Supported value are 1, 2, 4 and 8.
++
++  fan1_fault: reports fan failure, i.e. no transition on fan gear pin for
++            about 0.7s (if the fan is not voluntarily set off).
++
++  fan1_alarm: in closed-loop control mode, if fan RPM value is 25% out
++            of the programmed value for over 6 seconds 'fan1_alarm' is
++            set to 1.
++
++  pwm1_enable: set current fan speed control mode i.e. 1 for manual fan
++            speed control (open-loop) via pwm1 described below, 2 for
++            automatic fan speed control (closed-loop) via fan1_target
++            above (pwm1 is also usable).
++
++  pwm1_mode: set or get fan driving mode: 1 for PWM mode, 0 for DC mode.
++
++  pwm1: get or set PWM fan control value in open-loop mode. This is an
++            integer value between 0 and 255. 0 stops the fan, 255 makes
++            it run at full speed.
++
++Both in PWM mode ('pwm1_mode' set to 1) and DC mode ('pwm1_mode' set to 0),
++when current fan speed control mode is open-loop ('pwm1_enable' set to 1),
++the fan speed is programmed by setting a value between 0 and 255 via 'pwm1'
++entry (0 stops the fan, 255 makes it run at full speed). In closed-loop mode
++('pwm1_enable' set to 2), the expected rotation speed in RPM can be passed to
++the chip via 'fan1_target'. In closed-loop mode, the target speed is compared
++with current speed (available via 'fan1_input') by the device and a feedback
++is performed to match that target value. The fan speed value is computed
++based on the parameters associated with the physical characteristics of the
++system: a reference clock source frequency, a number of pulses per fan
++revolution, etc.
++
++Note that the driver will update its values at most once per second.
 -- 
-1.7.9.5
+1.7.10.4
