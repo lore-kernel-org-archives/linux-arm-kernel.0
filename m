@@ -1,50 +1,63 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 04 Jun 2013 18:37:54 +0900
-Subject: [PATCH 0/6] Samsung watchdog support clean-up
-In-Reply-To: <1850418.EOBZxN7PB0@amdc1227>
-References: <1368916627-23139-1-git-send-email-tomasz.figa@gmail.com>
- <51A9ADF4.8010102@gmail.com> <1850418.EOBZxN7PB0@amdc1227>
-Message-ID: <06d601ce6107$304078c0$90c16a40$%kim@samsung.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 4 Jun 2013 11:38:11 +0200
+Subject: [PATCH v2 3/4] clocksource: dw_apb_timer_of: select DW_APB_TIMER
+In-Reply-To: <201306041136.09566.heiko@sntech.de>
+References: <201306041136.09566.heiko@sntech.de>
+Message-ID: <201306041138.11447.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa wrote:
-> 
-> Hi Sylwester, Kukjin,
-> 
-Hi,
+dw_apb_timer_of is the driver part facing devicetree platforms and
+calls into dw_apb_timer with the data gathered from the dt.
 
-> On Saturday 01 of June 2013 10:16:52 Sylwester Nawrocki wrote:
-> > Hi Tomasz,
-> >
-> > On 05/19/2013 12:37 AM, Tomasz Figa wrote:
-> > > This series is aiming at cleaning up a bit watchdog support on Samsung
-> > > SoCs. The patches tweak a bit all the watchdog handling code here and
-> > > there, with the goal of making it DT- and multiplatform-friendly.
-> > >
-> > > See particular patches for more detailed descriptions.
-> > >
-> > > On S3C6410-based Tiny6410 board (Mini6410-compatible):
-> > >
-> > > Tested-by: Tomasz Figa<tomasz.figa@gmail.com>
-> >
-> > I've tested this series on a s3c2440 based board. The system restart
-> > works fine.
-> >
-> > Tested-by: Sylwester Nawrocki <sylvester.nawrocki@gmail.com>
-> 
-> Thank you Sylwester for testing this series.
-> 
-Thanks again :-)
+Currently the two platforms using the dw_apb_timer_of select both
+the options for the core timer and the dt addon.
 
-> Kukjin, since it has been already tested on s3c24xx and s3c64xx and nobody
-> seems to care about s5p64x0 and s5pc100 (although I don't see a reason why
-> these patches should break them), could we have this series applied?
-> 
-OK, let me test this series on the smdk64x0 then, will apply.
+As dw_apb_timer_of always depends on dw_apb_timer let it select
+DW_APB_TIMER itself without the need for every platform to do it.
 
-If any problems, let you know.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/mach-picoxcell/Kconfig |    1 -
+ arch/arm/mach-socfpga/Kconfig   |    1 -
+ drivers/clocksource/Kconfig     |    1 +
+ 3 files changed, 1 insertions(+), 2 deletions(-)
 
-Thanks for your gentle reminder.
-
-- Kukjin
+diff --git a/arch/arm/mach-picoxcell/Kconfig b/arch/arm/mach-picoxcell/Kconfig
+index 13bae78..b1022f4 100644
+--- a/arch/arm/mach-picoxcell/Kconfig
++++ b/arch/arm/mach-picoxcell/Kconfig
+@@ -4,7 +4,6 @@ config ARCH_PICOXCELL
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select ARM_VIC
+ 	select CPU_V6K
+-	select DW_APB_TIMER
+ 	select DW_APB_TIMER_OF
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_TCM
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 566e804..a279fb3 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -7,7 +7,6 @@ config ARCH_SOCFPGA
+ 	select CLKDEV_LOOKUP
+ 	select COMMON_CLK
+ 	select CPU_V7
+-	select DW_APB_TIMER
+ 	select DW_APB_TIMER_OF
+ 	select GENERIC_CLOCKEVENTS
+ 	select GPIO_PL061 if GPIOLIB
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index f151c6c..48a0f2e 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -21,6 +21,7 @@ config DW_APB_TIMER
+ 
+ config DW_APB_TIMER_OF
+ 	bool
++	select DW_APB_TIMER
+ 
+ config ARMADA_370_XP_TIMER
+ 	bool
+-- 
+1.7.2.3
