@@ -1,62 +1,53 @@
-From: anup@brainfault.org (Anup Patel)
-Date: Tue, 4 Jun 2013 18:43:52 +0530
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <51ADDDAE.4040705@arm.com>
-References: <51ADDDAE.4040705@arm.com>
-Message-ID: <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 4 Jun 2013 15:17:45 +0200
+Subject: [PATCH 1/3] ARM: at91: dt: add header to define at_hdmac
+ configuration
+In-Reply-To: <20130603073226.GG11384@ludovic.desroches@atmel.com>
+References: <1369930103-11963-1-git-send-email-ludovic.desroches@atmel.com>
+ <1369930103-11963-2-git-send-email-ludovic.desroches@atmel.com>
+ <201305312330.29364.arnd@arndb.de>
+ <20130603073226.GG11384@ludovic.desroches@atmel.com>
+Message-ID: <51ADE8F9.7090200@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+On 03/06/2013 09:32, Ludovic Desroches :
+> On Fri, May 31, 2013 at 11:30:29PM +0200, Arnd Bergmann wrote:
+>> On Thursday 30 May 2013, ludovic.desroches at atmel.com wrote:
+>>> +/*
+>>> + * Source and/or destination peripheral ID
+>>> + */
+>>> +#define AT91_DMA_CFG_PER_ID_MASK       (0xff)
+>>> +#define AT91_DMA_CFG_PER_ID(id)                (id & AT91_DMA_CFG_PER_ID_MASK)
+>>> +
+>>
+>> I'm a little worried about macros like this one spreading in the name
+>> of readability, and I don't see this as actual value-add here:
+>>
+>> The output of the macro is always the same as the input, and passing
+>> an invalid number still results in an invalid output and no error message,
+>> it actually prevents us from warning about the mistake at run-time.
+>>
+>
+> You are right, this macro is here only for readability in order to not have
+> something like this:
+>
+> dmas = <&dma0 AT91_DMA_CFG_FIFOCFG_ASAP | 13>
+>
+> In this case, I prefer having a macro instead of using a numeric value which
+> can stand for other things than the peripheral id and which could conflict
+> with other parameters such as the FIFO configuration.
+>
+> If adding this macro is really an issue, it could be removed of course but
+> in this case I am in favor of readability.
 
-On Tue, Jun 4, 2013 at 5:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> Guys,
->
-> The KVM/arm64 code is now, as it seems, in good enough shape to be
-> merged. I've so far addressed all the comments, and it doesn't seem any
-> worse then what is queued for its 32bit counterpart.
->
-> For reference, it is sitting there:
-> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
-> kvm-arm64/kvm
->
-> What is not defined yet is the merge path:
-> - It is touching some of the arm64 core code, so it would be better if
-> it was merged through the arm64 tree
-> - It is depending on some of the patches in the core KVM queue (the
-> vgic/timer move to virt/kvm/arm/)
-> - It is also depending on some of the patches that are in the KVM/ARM
-> queue (parametrized timer interrupt, some MMU/MMIO fixes)
->
-> So I can see two possibilities:
-> - Either I can rely on a stable branch from both KVM and KVM/ARM trees
-> on which I can base my tree for Catalin/Will to pull,
-> - Or I ask Catalin to only pull the arm64 part *minus the Kconfig*, and
-> only merge this last bit when the dependencies are satisfied in Linus' tree.
->
-> What do you guys think?
+Arnd,
 
-I had quick look at your kvm-arm64/kvm branch. I agree with the approach
-of going through arm64 tree.
+I think that the case highlighted by Ludovic is indeed a case where 
+someone can be confused by the presentation of data in the cell... even 
+if I like the use of macro as implemented by Ludovic, I do not have a 
+strong opinion about this.
 
-FYI, latest tested branch on APM ARMv8 board is kvm-arm64/kvm-3.10-rc3
-branch.
-
->From my side, +1 for the second option that is "pull the arm64 part *minus
-the Kconfig*, and ..."
-
->
-> Thanks,
->
->         M.
-> --
-> Jazz is not dead. It just smells funny...
->
->
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
-
-Regards,
-Anup
+Best regards,
+-- 
+Nicolas Ferre
