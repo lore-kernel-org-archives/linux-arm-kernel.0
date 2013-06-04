@@ -1,26 +1,34 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 3 Jun 2013 17:07:26 -0700
-Subject: [PATCH V4 2/4] clk: samsung: register audio subsystem clocks
- using common clock framework
-In-Reply-To: <CAL1qeaEkomoDQPyGqqLL-WzoLS=nND-eXeRAGD2HpoV6WW3yRQ@mail.gmail.com>
-References: <1370236744-16802-1-git-send-email-padma.v@samsung.com>
- <1370236744-16802-3-git-send-email-padma.v@samsung.com>
- <CAD=FV=XOfi=BsaF+-96SqKwyiwP9h0h3MCJxJ+qWNKaGoP=CcA@mail.gmail.com>
- <CAL1qeaEkomoDQPyGqqLL-WzoLS=nND-eXeRAGD2HpoV6WW3yRQ@mail.gmail.com>
-Message-ID: <CAD=FV=Wu6u=gvh5Anut8MtC+Bb43EG7hxRN=vs-ML35P1qTJYQ@mail.gmail.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 03 Jun 2013 17:19:48 -0700
+Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
+In-Reply-To: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51AD32A4.5070609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew,
+On 06/01/2013 11:39 PM, Stephen Boyd wrote:
+> This is mostly a resend of a patch series I sent a little over a month
+> ago. I've reordered the patches so that John can pick up the first three
+> and get a generic sched_clock layer without having to take the 64 bit
+> patches. The last three patches add 64 bit support and move the architected
+> timers on ARM64 and ARM to use it.
 
-On Mon, Jun 3, 2013 at 4:46 PM, Andrew Bresticker <abrestic@chromium.org> wrote:
->> I think this is supposed to be "xxti" which might or might not be
->> "fin_pll".  In the exynos4 code these are two different clocks that
->> are chosen by OM[0].  I'd bet that 99% of the time they are the same,
->> but it seems better to use "xxti".
->
-> OM[0] also appears to mux the input here between "xxti" and "xusbxti"
-> as well.  So this should probably remain "fin_pll".
 
-Thanks!  ...so I'm OK with this landing "as-is" or a re-spin with nits
-fixed, since all of the rest of my comments were just nits...
+Yea, so from the initial look over it, I think I'm happy with queuing 
+the first three patches, although I'd like to get some acks from arm 
+folks on at least the first two, just so no one is surprised with it 
+going through the -tip tree.
+
+It looks like the arm64 bit stuff needs a few more iterations w/ 
+Russell, so I'll not touch those.
+
+We still have a ways to go to consolidate x86 into this (need to handle 
+pv hooks), but it should provide a base to get some of the simpler 
+arches sharing the same infrastructure.
+
+Also I suspect we can maybe further combine this with the 
+kernel/sched/clock.c code, but I think this is a good start for now.
+
+thanks
+-john
