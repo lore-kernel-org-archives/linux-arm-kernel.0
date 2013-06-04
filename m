@@ -1,62 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Jun 2013 11:47:10 +0200
-Subject: On mini2440 IO mappings.
-In-Reply-To: <CAM2a4uw_mq=NZHrg32KRf7js8+3iC59SB1NPdP8EwCov7z0DnQ@mail.gmail.com>
-References: <CAM2a4uxNKhD_+zr7mZOV0eR7u_VTCSZyEcsj_uNA5MuuKPFbDQ@mail.gmail.com>
- <3308480.LZZ0YkAPVH@wuerfel>
- <CAM2a4uw_mq=NZHrg32KRf7js8+3iC59SB1NPdP8EwCov7z0DnQ@mail.gmail.com>
-Message-ID: <5390072.c6vttxqWyK@wuerfel>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 04 Jun 2013 15:17:03 +0530
+Subject: [PATCH] ARM: s5p64x0: Use common uncompress.h part for
+ plat-samsung
+In-Reply-To: <1368916282-22896-1-git-send-email-tomasz.figa@gmail.com>
+References: <1368916282-22896-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <51ADB797.8020502@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 June 2013 14:59:17 mind entropy wrote:
-> On Tue, Jun 4, 2013 at 2:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 04 June 2013 13:11:04 mind entropy wrote:
+On 05/19/2013 04:01 AM, Tomasz Figa wrote:
+> Since uart_base can be set dynamically in arch_detect_cpu(), there is no
+> need to have a copy of all code locally, just to override UART base
+> address.
 > 
-> >> arch/arm/mach-s3c24xx/include/mach/map.h S3C24XX_SZ_IRQ is set to
-> >> SZ_1M but in the documentation (Pg 1-27 of s3c2440.pdf datasheet) the
-> >> physical address extends from 0X4A000000 to 0X4A00001C. So shouldn't a
-> >> size of 4K(small page) or 1K(tiny page) be enough?
-> >
-> > Yes, that would be enough, but I think it makes little difference
-> > either way.
-> >
+> This patch removes any duplicate code in uncompress.h variant of s5p64x0
+> and implements proper arch_detect_cpu() function to initialize UART with
+> SoC-specific parameters.
 > 
-> Just to clarify, this would create an overlap i.e. 2 different virtual
-> address will point to the same physical address right?
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  arch/arm/mach-s5p64x0/include/mach/uncompress.h | 155 +-----------------------
+>  1 file changed, 5 insertions(+), 150 deletions(-)
+> 
 
-I don't think it does. The mappings are
+This patch (with a minor modification) has been included in the
+patchset[1] to consolidate uncompress subroutine for Samsung platforms.
 
-static struct map_desc s3c_iodesc[] __initdata = {
-        IODESC_ENT(GPIO),
-        IODESC_ENT(IRQ),
-        IODESC_ENT(MEMCTRL),
-        IODESC_ENT(UART)
-};
+[1] [PATCH v2 0/3] Consolidate uncompress code for Samsung platform
+http://www.gossamer-threads.com/lists/linux/kernel/1723429
 
-using these virtual addresses:
 
-#define S3C_ADDR_BASE   0xF6000000
-#define S3C_ADDR(x)     ((void __iomem __force *)S3C_ADDR_BASE + (x))
-#define S3C_VA_IRQ      S3C_ADDR(0x00000000)    /* irq controller(s) */
-#define S3C_VA_SYS      S3C_ADDR(0x00100000)    /* system control */
-#define S3C_VA_MEM      S3C_ADDR(0x00200000)    /* memory control */
-#define S3C_VA_UART     S3C_ADDR(0x01000000)    /* UART */
-#define S3C24XX_VA_GPIO   ((S3C24XX_PA_GPIO - S3C24XX_PA_UART) + S3C24XX_VA_UART)
-
-and these physical addresses
-
-#define S3C2410_PA_UART         (0x50000000)
-#define S3C2410_PA_GPIO         (0x56000000)
-#define S3C2410_PA_IRQ          (0x4A000000)
-#define S3C2410_PA_MEMCTRL      (0x48000000)
-
-Everything is aligned to full megabytes.
-
-> I am just trying my hand on the minimal bootup of the board. I am
-> looking at the existing port and trying to write my own. I am using
-> the 3.9 vanilla kernel with pengutronix patches.
-
-Ok, I see.
-
-	Arnd
+-- 
+Tushar Behera
