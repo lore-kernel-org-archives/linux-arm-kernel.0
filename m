@@ -1,39 +1,96 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Tue, 4 Jun 2013 09:53:04 +0000
-Subject: [PATCH 05/11] spi: omap2-mcspi: enhance pinctrl support
-In-Reply-To: <20130601192726.GS16790@sirena.org.uk>
-References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
- <1369995191-20855-6-git-send-email-gururaja.hebbar@ti.com>
- <20130601192726.GS16790@sirena.org.uk>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC22370@DBDE04.ent.ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 4 Jun 2013 11:53:16 +0200
+Subject: [PATCH] ARM: ux500: drop any 0x prefix from I2C DT devices
+Message-ID: <1370339596-21606-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 02, 2013 at 00:57:26, Mark Brown wrote:
-> On Fri, May 31, 2013 at 03:43:05PM +0530, Hebbar Gururaja wrote:
-> > Amend the spi omap controller to optionally take a pin control
-> > handle and set the state of the pins to:
-> > 
-> > - "default" on boot, resume and before performing an spi transfer
-> > - "idle" after initial default, after resume default, and after each
-> > spi xfer
-> > - "sleep" on suspend()
-> 
-> Looking at this code I can't really see what's OMAP-specific about it -
-> exactly the same flow should apply to pretty much any SPI controller,
-> especially given that the code will happily ignore missing states.
-> We're just setting the idle state when not actively transferring data
-> which seems sensible and generic.
-> 
-> This suggests to me that we should be adding this code into the core,
-> probably joined up with the transfer_one_message stuff, so that any
-> hardware which has an idle state will be able to get the benefit.  Can
-> anyone think of a reason why we shouldn't do that?
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Let me pull out some info about these and come back
+This removes the "0x" prefix in front of the I2C DT device
+address designation for each I2C DT node in the ux500
+devicetree files.
 
-> 
+Reported-by: Bryan Wu <cooloney@gmail.com>
+Cc: Lee Jones <lee.jones@linaro.org>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/href.dtsi      | 2 +-
+ arch/arm/boot/dts/hrefprev60.dts | 2 +-
+ arch/arm/boot/dts/snowball.dts   | 6 +++---
+ arch/arm/boot/dts/stuib.dtsi     | 4 ++--
+ 4 files changed, 7 insertions(+), 7 deletions(-)
 
-
-Regards, 
-Gururaja
+diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
+index 080c530..9db41b9 100644
+--- a/arch/arm/boot/dts/href.dtsi
++++ b/arch/arm/boot/dts/href.dtsi
+@@ -100,7 +100,7 @@
+ 					max-cur = /bits/ 8 <0x5f>;
+ 				};
+ 			};
+-			bh1780 at 0x29 {
++			bh1780 at 29 {
+ 				compatible = "rohm,bh1780gli";
+ 				reg = <0x33>;
+ 			};
+diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
+index 23c6dc1..c6bb07d 100644
+--- a/arch/arm/boot/dts/hrefprev60.dts
++++ b/arch/arm/boot/dts/hrefprev60.dts
+@@ -41,7 +41,7 @@
+ 		};
+ 
+ 		i2c at 80110000 {
+-			bu21013_tp at 0x5c {
++			bu21013_tp at 5c {
+ 				reset-gpio = <&tc3589x_gpio 13 0x4>;
+ 			};
+ 		};
+diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
+index 92c2f5ad..fb9dce5 100644
+--- a/arch/arm/boot/dts/snowball.dts
++++ b/arch/arm/boot/dts/snowball.dts
+@@ -178,15 +178,15 @@
+ 		};
+ 
+ 		i2c at 80128000 {
+-			lp5521 at 0x33 {
++			lp5521 at 33 {
+ 				// compatible = "lp5521";
+ 				reg = <0x33>;
+ 			};
+-			lp5521 at 0x34 {
++			lp5521 at 34 {
+ 				// compatible = "lp5521";
+ 				reg = <0x34>;
+ 			};
+-			bh1780 at 0x29 {
++			bh1780 at 29 {
+ 				// compatible = "rohm,bh1780gli";
+ 				reg = <0x33>;
+ 			};
+diff --git a/arch/arm/boot/dts/stuib.dtsi b/arch/arm/boot/dts/stuib.dtsi
+index b47b62a..524e332 100644
+--- a/arch/arm/boot/dts/stuib.dtsi
++++ b/arch/arm/boot/dts/stuib.dtsi
+@@ -54,7 +54,7 @@
+ 		};
+ 
+ 		i2c at 80110000 {
+-			bu21013_tp at 0x5c {
++			bu21013_tp at 5c {
+ 				compatible = "rohm,bu21013_tp";
+ 				reg = <0x5c>;
+ 				touch-gpio = <&gpio2 20 0x4>;
+@@ -65,7 +65,7 @@
+ 				rohm,flip-y;
+ 			};
+ 
+-			bu21013_tp at 0x5d {
++			bu21013_tp at 5d {
+ 				compatible = "rohm,bu21013_tp";
+ 				reg = <0x5d>;
+ 				touch-gpio = <&gpio2 20 0x4>;
+-- 
+1.7.11.3
