@@ -1,27 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Jun 2013 12:50:29 +0200
-Subject: [PATCH] ARM: ux500: Remove SSP AUXDATA pertaining to DMA bindings
-In-Reply-To: <1370267175-8117-1-git-send-email-lee.jones@linaro.org>
-References: <1370267175-8117-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYE75qwqjaFGNgyJB+JuUFHf8rtRePW=sasi3jsX79jww@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 4 Jun 2013 12:52:07 +0200
+Subject: [PATCH v2 1/4] clocksource: dw_apb_timer_of: enable the use the
+ clocksource as sched clock
+In-Reply-To: <201306041137.03319.heiko@sntech.de>
+References: <201306041136.09566.heiko@sntech.de>
+ <201306041137.03319.heiko@sntech.de>
+Message-ID: <201306041252.07877.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 3, 2013 at 3:46 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Am Dienstag, 4. Juni 2013, 11:37:02 schrieb Heiko St?bner:
+> Currently the dw_apb_timer always expects a separate special timer to be
+> availbable for the sched_clock. Some devices using dw_apb_timers do not
+> have this sptimer but can use the clocksource as sched_clock instead.
+> 
+> Therefore enable the driver to distiguish between devices with and without
+> sptimer based on the devicetree data and select the correct timer as
+> sched_clock.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-> These are now cared for from the Device Tree.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+in the original thread "arm: add basic support for Rockchip Cortex-A9 SoCs" 
+this patch with the updated description now also got a
 
-These are not only used for the DMA bindings, so
-the clock patches need to be finalized before this
-patch I think...
 
-git grep ssp0 drivers/clk/ux500/
-drivers/clk/ux500/u8500_clk.c:  clk_register_clkdev(clk, "apb_pclk", "ssp0");
-drivers/clk/ux500/u8500_clk.c:  clk =
-clk_reg_prcc_kclk("p3_ssp0_kclk", "sspclk",
-drivers/clk/ux500/u8500_clk.c:  clk_register_clkdev(clk, NULL, "ssp0");
-
-Yours,
-Linus Walleij
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
