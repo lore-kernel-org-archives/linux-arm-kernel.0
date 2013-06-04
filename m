@@ -1,67 +1,57 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Tue,  4 Jun 2013 23:05:13 +0800
-Subject: [PATCH v2 2/6] clk: mux: add CLK_MUX_HIWORD_MASK
+Date: Tue,  4 Jun 2013 23:05:14 +0800
+Subject: [PATCH v2 3/6] clk: divider: add CLK_DIVIDER_HIWORD_MASK flag
 In-Reply-To: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1370358317-12768-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1370358317-12768-4-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a HIWORD mask field in Hisilicon Hi3620 clock mux register. This
-field must be set while update the clk mux register. In order to reuse
-the clk-mux driver, append the CLK_MUX_HIWORD_MASK field into mux->flags.
+In Hisilicon Hi3620 clock divider register, 16-bit HIWORD is mask field.
+Support the HIWORD mask to reuse clock divider driver.
 
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/clk/clk-mux.c        | 8 ++++++++
+ drivers/clk/clk-divider.c    | 6 ++++++
  include/linux/clk-provider.h | 2 ++
- 2 files changed, 10 insertions(+)
+ 2 files changed, 8 insertions(+)
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 25b1734..887f462 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -70,6 +70,7 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- {
- 	struct clk_mux *mux = to_clk_mux(hw);
- 	u32 val;
-+	u8 width = 0;
- 	unsigned long flags = 0;
- 
- 	if (mux->table)
-@@ -89,6 +90,13 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- 	val = readl(mux->reg);
- 	val &= ~(mux->mask << mux->shift);
- 	val |= index << mux->shift;
-+	if (mux->flags & CLK_MUX_HIWORD_MASK) {
-+		width = fls(mux->mask) - ffs(mux->mask) + 1;
-+		if (width + mux->shift > 16)
-+			pr_warn("mux value exceeds LOWORD field\n");
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 6d96741..4c344b4 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -220,6 +220,12 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	val = readl(divider->reg);
+ 	val &= ~(div_mask(divider) << divider->shift);
+ 	val |= value << divider->shift;
++	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
++		if (divider->width + divider->shift > 16)
++			pr_warn("divider value exceeds LOWORD field\n");
 +		else
-+			val |= mux->mask << (mux->shift + 16);
++			val |= div_mask(divider) << (divider->shift + 16);
 +	}
- 	writel(val, mux->reg);
+ 	writel(val, divider->reg);
  
- 	if (mux->lock)
+ 	if (divider->lock)
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 1186098..6ba32bc 100644
+index 6ba32bc..dbb9bd9 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -299,6 +299,7 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
-  * Flags:
-  * CLK_MUX_INDEX_ONE - register index starts at 1, not 0
-  * CLK_MUX_INDEX_BIT - register index is a single bit (power of two)
-+ * CLK_MUX_HIWORD_MASK - register contains high 16-bit as mask field
+@@ -257,6 +257,7 @@ struct clk_div_table {
+  *	Some hardware implementations gracefully handle this case and allow a
+  *	zero divisor by not modifying their input clock
+  *	(divide by one / bypass).
++ * CLK_DIVIDER_HIWORD_MASK - register contains high 16-bit as mask field
   */
- struct clk_mux {
+ struct clk_divider {
  	struct clk_hw	hw;
-@@ -312,6 +313,7 @@ struct clk_mux {
+@@ -271,6 +272,7 @@ struct clk_divider {
+ #define CLK_DIVIDER_ONE_BASED		BIT(0)
+ #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
+ #define CLK_DIVIDER_ALLOW_ZERO		BIT(2)
++#define CLK_DIVIDER_HIWORD_MASK		BIT(3)
  
- #define CLK_MUX_INDEX_ONE		BIT(0)
- #define CLK_MUX_INDEX_BIT		BIT(1)
-+#define CLK_MUX_HIWORD_MASK		BIT(2)
- 
- extern const struct clk_ops clk_mux_ops;
- 
+ extern const struct clk_ops clk_divider_ops;
+ struct clk *clk_register_divider(struct device *dev, const char *name,
 -- 
 1.8.1.2
