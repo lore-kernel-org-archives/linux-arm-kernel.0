@@ -1,35 +1,55 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 4 Jun 2013 10:18:44 -0300
-Subject: [PATCH v3 1/2] ARM: dts: mx28: Adjust the digctl compatible string
-Message-ID: <1370351925-27915-1-git-send-email-fabio.estevam@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 04 Jun 2013 14:19:22 +0100
+Subject: Planning the merge of KVM/arm64
+In-Reply-To: <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
+References: <51ADDDAE.4040705@arm.com>
+ <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
+Message-ID: <51ADE95A.1090208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX28 has the same DIGCTL block as MX23, so adjust the compatible string to
-reflect that.
+On 04/06/13 14:13, Anup Patel wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v2:
-- None
-Changes since v1:
-- None. Newly introduced in this series
+Hi Anup,
 
- arch/arm/boot/dts/imx28.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> On Tue, Jun 4, 2013 at 5:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Guys,
+>>
+>> The KVM/arm64 code is now, as it seems, in good enough shape to be
+>> merged. I've so far addressed all the comments, and it doesn't seem any
+>> worse then what is queued for its 32bit counterpart.
+>>
+>> For reference, it is sitting there:
+>> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+>> kvm-arm64/kvm
+>>
+>> What is not defined yet is the merge path:
+>> - It is touching some of the arm64 core code, so it would be better if
+>> it was merged through the arm64 tree
+>> - It is depending on some of the patches in the core KVM queue (the
+>> vgic/timer move to virt/kvm/arm/)
+>> - It is also depending on some of the patches that are in the KVM/ARM
+>> queue (parametrized timer interrupt, some MMU/MMIO fixes)
+>>
+>> So I can see two possibilities:
+>> - Either I can rely on a stable branch from both KVM and KVM/ARM trees
+>> on which I can base my tree for Catalin/Will to pull,
+>> - Or I ask Catalin to only pull the arm64 part *minus the Kconfig*, and
+>> only merge this last bit when the dependencies are satisfied in Linus' tree.
+>>
+>> What do you guys think?
+> 
+> I had quick look at your kvm-arm64/kvm branch. I agree with the approach
+> of going through arm64 tree.
+> 
+> FYI, latest tested branch on APM ARMv8 board is kvm-arm64/kvm-3.10-rc3
+> branch.
 
-diff --git a/arch/arm/boot/dts/imx28.dtsi b/arch/arm/boot/dts/imx28.dtsi
-index 62fb4a2..095e50b 100644
---- a/arch/arm/boot/dts/imx28.dtsi
-+++ b/arch/arm/boot/dts/imx28.dtsi
-@@ -702,7 +702,7 @@
- 			};
- 
- 			digctl at 8001c000 {
--				compatible = "fsl,imx28-digctl";
-+				compatible = "fsl,imx28-digctl", "fsl,imx23-digctl";
- 				reg = <0x8001c000 0x2000>;
- 				interrupts = <89>;
- 				status = "disabled";
+This is the exact same code, just a slightly different patch split to
+implement the separate Kconfig option.
+
+Thanks for testing,
+
+	M.
 -- 
-1.8.1.2
+Jazz is not dead. It just smells funny...
