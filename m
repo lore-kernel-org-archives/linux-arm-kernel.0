@@ -1,41 +1,89 @@
-From: alior@marvell.com (Lior Amsalem)
-Date: Tue, 4 Jun 2013 14:34:53 +0300
-Subject: [PATCH 3/3] ARM PJ4B: Add support for errata 4611
-In-Reply-To: <2479964.1Q22eHuH4J@wuerfel>
-References: <1369822618-26797-1-git-send-email-gregory.clement@free-electrons.com>
- <4523769.Zp7B72tmfz@wuerfel> <51A60243.3000800@free-electrons.com>
- <2479964.1Q22eHuH4J@wuerfel>
-Message-ID: <EE71107DF0D1F24FA2D95041E64AB9E801A56CF1A8AB@IL-MB01.marvell.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 4 Jun 2013 12:35:20 +0100
+Subject: [PATCH v2 1/5] arm/xen: define xen_remap as ioremap_cached
+In-Reply-To: <20130604112834.GA3234@MacBook-Pro.local>
+References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
+ <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1370337650.24512.88.camel@zakaz.uk.xensource.com>
+ <20130604112834.GA3234@MacBook-Pro.local>
+Message-ID: <alpine.DEB.2.02.1306041230080.4589@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, May 29, 2013 4:33 PM
+On Tue, 4 Jun 2013, Catalin Marinas wrote:
+> On Tue, Jun 04, 2013 at 10:20:50AM +0100, Ian Campbell wrote:
+> > On Mon, 2013-06-03 at 16:33 +0100, Stefano Stabellini wrote:
+> > > Define xen_remap as ioremap_cache (MT_MEMORY and MT_DEVICE_CACHED end up
+> > > having the same AttrIndx encoding).
+> > 
+> > The entries in static struct mem_type mem_types[] look entirely
+> > different to me.  What am I missing?
+> > 	[MT_DEVICE_CACHED] = {	  /* ioremap_cached */
+> > 		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
+> > 		.prot_l1	= PMD_TYPE_TABLE,
+> > 		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
+> > 		.domain		= DOMAIN_IO,
+> > 	},
+> > 	[MT_MEMORY] = {
+> > 		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
+> > 		.prot_l1   = PMD_TYPE_TABLE,
+> > 		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
+> > 		.domain    = DOMAIN_KERNEL,
+> > 	},
+> > 
+> > I can see in pgtable-3level.h how L_PTE_MT_DEV_CACHED and
+> > L_PTE_MT_WRITEBACK are the same but not where the MT_WRITEBACK comes
+> > from for MT_MEMORY. Things are less clear in pgtable-2level.h, where one
+> > is 0x3 and the other is 0xb. I can see that the entries are the same in
+> > armv6_mt_table but how that would apply to a v7 processor?
 > 
-> On Wednesday 29 May 2013 15:27:31 Gregory CLEMENT wrote:
-> > OK I will see what kind of information I can gather and which ones I
-> > can add to the Documentation/arm/Marvell/README file.
-> >
-> > My current understanding is that there are at least 3 kind of CPU:
-> > PJ4, PJ4B and PJ4B-MP and all of them belongs to the Sheeva family.
+> PROT_PTE_DEVICE and PROT_SECT_DEVICE above don't contain any memory type
+> information, just attributes/permission - present, young, dirty and XN:
 > 
-> Ok. So I guess PJ4B adds LPAE support, and PJ4B-MP adds SMP support,
-> right? Do either of them support hypervisor mode?
-
-It goes like this:
-PJ4B: improved version of PJ4.
-PJ4B-MP: adds LPAE and SMP.
-No support for virtualization on any.
-
+> #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+> #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
 > 
-> Regarding the errata: are those needed for production-level chips, or just for
-> prototypes?
-
-These are production level chips.
-
+> The memory type is given by the L_PTE_MT_DEV_CACHED and PMD_SECT_WB
+> macros. Let's take prot_sect first as it's simpler. For MT_DEVICE_CACHED
+> we have:
 > 
-> 	Arnd
+> .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_WB
+> 
+> For MT_MEMORY we have:
+> 
+> .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE
+> 
+> The cache policy is added later to MT_MEMORY which is either WB or WBWA
+> (based on SMP, no particular reason as these are just processor hints;
+> for some historical reasons we enabled WBWA for ARM11MPCore but we could
+> leave it on all the time).
+> 
+> Similarly for prot_pte, present, young, dirty are the same.
+> 
+> Regarding the type, on ARMv7 (with or without LPAE) we use TEX remapping
+> and L_PTE_MT_DEVICE has the same index (3-bit TEX[0], C, B for NMRR/PRRR
+> or TEX[2:0] for MAIR0/MAIR1 registers) as Normal Cacheable Writeback
+> memory (there is no such thing as Device memory with cacheability
+> attributes, only Normal Cacheable memory).
+> 
+> We have XN in addition for MT_DEVICE_CACHED to prevent speculative
+> instruction fetches. However, you still get speculative D-cache line
+> fills since the memory is Normal Cacheable.
+> 
+> > Anyhow, even if I'm prepared to believe that MT_MEMORY and
+> > MT_DEVICE_CACHED end up being the same thing (which TBH I am) it seems
+> > that the level of abstraction involved makes us vulnerable to future
+> > changes subtly breaking things for us. What about:
+> > 
+> >         /* Device shared memory */
+> >         #define ioremap_shm(cookie,size)		__arm_ioremap((cookie), (size), MT_MEMORY)
+> 
+> For my understanding, what is Xen doing with such mapping? I would
+> rather make ioremap_cached() use MT_MEMORY on ARMv6/v7 (or make it
+> closer to that, I'm not sure about the implications on ARMv5 and earlier
+> but for newer architectures I don't see the point in pretending to have
+> Cacheable Device memory). That's however for Russell to comment.
 
-Regards,
-Lior Amsalem
+Xen guests share these pages with one another and place a lockless ring
+buffer on it for bidirectional communication. So the page that is being
+ioremapped actually belongs to another guest and it's RAM.
