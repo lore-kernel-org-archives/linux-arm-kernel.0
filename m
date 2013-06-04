@@ -1,52 +1,85 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 4 Jun 2013 06:43:02 -0400
-Subject: DT version of kirkwood_ge0x_init()
-In-Reply-To: <51ADC2C2.6010106@gmail.com>
-References: <51ADBEE0.5040500@keymile.com>
- <51ADC2C2.6010106@gmail.com>
-Message-ID: <20130604104302.GX3803@titan.lakedaemon.net>
+From: josephl@nvidia.com (Joseph Lo)
+Date: Tue, 4 Jun 2013 18:47:33 +0800
+Subject: [PATCH V2 2/4] ARM: tegra: hook tegra_tear_down_cpu function in the
+ PM suspend init function
+In-Reply-To: <1370342855-32705-1-git-send-email-josephl@nvidia.com>
+References: <1370342855-32705-1-git-send-email-josephl@nvidia.com>
+Message-ID: <1370342855-32705-3-git-send-email-josephl@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 12:34:42PM +0200, Sebastian Hesselbarth wrote:
-> On 06/04/13 12:18, Gerlando Falauto wrote:
-> >I noticed how most of the DT-aware board-setup files only have a single
-> ><board>_init() function, calling kirkwood_ge00_init() with a struct
-> >mv643xx_eth_platform_data as a single argument.
-> >
-> >I was wondering -- is there a reason why we cannot remove all this
-> >board-specific code and move all this to the DT?
-> 
-> Gerlando,
-> 
-> DT for mv643xx_eth is on the way (https://lkml.org/lkml/2013/5/29/527).
-> We wait for the driver to surface to relax branch dependencies and then
-> move all DT Orion SoCs to it.
-> 
-> > I would really love to have all our boards under a single
-> > CONFIG_<FAMILY>_DT and a single compatible string, with all the
-> > differences within the DTs itself -- no more #ifdef CONFIG_<BOARD>,
-> > no more of_machine_is_compatible("boardXXX").
-> 
-> All those will happen if there is DT support for mv643xx_eth which
-> is the only driver left without DT and board dependencies. But there
-> will be no CONFIG_LACIE_DT or whatever, but just CONFIG_KIRKWOOD_DT
-> and board dependent stuff described in the corresponding dts.
+The tegra_tear_down_cpu was used to cut off the CPU rail for various Tegra
+SoCs. Hooking it in the PM suspend init function and making the CPUidle
+driver more generic.
 
-Gerlando,
+Signed-off-by: Joseph Lo <josephl@nvidia.com>
+---
+V2:
+* fix the coding style of the runtime chip selection
+---
+ arch/arm/mach-tegra/cpuidle-tegra20.c |  3 ---
+ arch/arm/mach-tegra/cpuidle-tegra30.c |  3 ---
+ arch/arm/mach-tegra/pm.c              | 15 +++++++++++++++
+ 3 files changed, 15 insertions(+), 6 deletions(-)
 
-Yes, the mess you describe is temporary.  Those board files used to have
-a lot more code in them, legacy init of partitions, MPP, LEDs, etc.  As
-we have converted drivers, they have gotten smaller and smaller.
-
-Now, with Sebastian's hard work, we'll finally be able to remove them
-and kirkwood will be completely DT.  We're very excited about this. :)
-
-Next, we'll move the Marvell DT boards over to mach-mvebu/ and only
-legacy boards in -kirkwood/, -orion5x/, -dove/, and -mv78xx0/ will
-remain.  After a few releases we will deprecate any legacy boards which
-haven't been converted to DT.
-
-thx,
-
-Jason.
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra20.c b/arch/arm/mach-tegra/cpuidle-tegra20.c
+index 0cdba8d..d667513 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra20.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra20.c
+@@ -214,8 +214,5 @@ static int tegra20_idle_lp2_coupled(struct cpuidle_device *dev,
+ 
+ int __init tegra20_cpuidle_init(void)
+ {
+-#ifdef CONFIG_PM_SLEEP
+-	tegra_tear_down_cpu = tegra20_tear_down_cpu;
+-#endif
+ 	return cpuidle_register(&tegra_idle_driver, cpu_possible_mask);
+ }
+diff --git a/arch/arm/mach-tegra/cpuidle-tegra30.c b/arch/arm/mach-tegra/cpuidle-tegra30.c
+index 3cf9aca..9d9f554 100644
+--- a/arch/arm/mach-tegra/cpuidle-tegra30.c
++++ b/arch/arm/mach-tegra/cpuidle-tegra30.c
+@@ -146,8 +146,5 @@ static int tegra30_idle_lp2(struct cpuidle_device *dev,
+ 
+ int __init tegra30_cpuidle_init(void)
+ {
+-#ifdef CONFIG_PM_SLEEP
+-	tegra_tear_down_cpu = tegra30_tear_down_cpu;
+-#endif
+ 	return cpuidle_register(&tegra_idle_driver, NULL);
+ }
+diff --git a/arch/arm/mach-tegra/pm.c b/arch/arm/mach-tegra/pm.c
+index 45cf52c..5e6fb31 100644
+--- a/arch/arm/mach-tegra/pm.c
++++ b/arch/arm/mach-tegra/pm.c
+@@ -44,6 +44,20 @@
+ static DEFINE_SPINLOCK(tegra_lp2_lock);
+ void (*tegra_tear_down_cpu)(void);
+ 
++static void tegra_tear_down_cpu_init(void)
++{
++	switch (tegra_chip_id) {
++	case TEGRA20:
++		if (IS_ENABLED(CONFIG_ARCH_TEGRA_2x_SOC))
++			tegra_tear_down_cpu = tegra20_tear_down_cpu;
++		break;
++	case TEGRA30:
++		if (IS_ENABLED(CONFIG_ARCH_TEGRA_3x_SOC))
++			tegra_tear_down_cpu = tegra30_tear_down_cpu;
++		break;
++	}
++}
++
+ /*
+  * restore_cpu_complex
+  *
+@@ -224,6 +238,7 @@ void __init tegra_init_suspend(void)
+ 	if (tegra_pmc_get_suspend_mode() == TEGRA_SUSPEND_NONE)
+ 		return;
+ 
++	tegra_tear_down_cpu_init();
+ 	tegra_pmc_suspend_init();
+ 
+ 	suspend_set_ops(&tegra_suspend_ops);
+-- 
+1.8.3
