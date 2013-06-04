@@ -1,51 +1,30 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Tue, 4 Jun 2013 11:25:45 +0000
-Subject: [PATCH v2 00/14] ARM: OMAP2+: AM43x initial support
-In-Reply-To: <cover.1369658705.git.afzal@ti.com>
-References: <cover.1369658705.git.afzal@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB14140@DBDE04.ent.ti.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Tue, 4 Jun 2013 14:25:43 +0300
+Subject: [PATCH] clk: tegra114: Fix msenc clock register
+Message-ID: <1370345143-4885-1-git-send-email-mperttunen@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+The msenc clock's register was set to the usb3 clock's register.
 
-On Mon, May 27, 2013 at 20:03:27, Mohammed, Afzal wrote:
+Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-tegra114.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> This series adds initial support for AM43x based SoC's. To boot
-> AM43x, in addition to these patches, PRCM support is also needed,
-> which would be posted later as a separate series. DT sources doesn't
-> have "ti,hwmod" entry - this would be added along with PRCM support.
-> 
-> AM43x SoC's are based on ARM Cortex-A9 with one core. AM43x is similar
-> to AM335x in it's peripheral capabilities, except a few additional
-> ones, with many of the peripheral register mapping's similar. AM43x
-> has a sync timer, which is being used as clocksource. Clockevent used
-> is 1ms dmtimer.
-> 
-> SoC has PL310 L2 cache, support for it would be added later.
-> 
-> soc_is_am43xx() is introduced to handle AM43x specific details and
-> soc_is_am437x() is a subclass of it - first member of the class.
-> 
-> AM43x is currently in pre-silicon stage and currently there are no
-> public documents.
-> 
-> This has been tested on a pre-silicon platform that emulates AM43x SoC
-> with additional changes on top of this.
-> 
-> AM335x based board (AM335x EVM) has been verfied to boot as earlier
-> with this series.
-> 
-> Baseline: v3.10-rc3
-> Dependency: "ARM: OMAP3+: am33xx id: Add new am33xx specific function to check dev_feature"
-> 		by Vaibhav Hiremath <hvaibhav@ti.com>
-
-If you have any comments on this series please let me know, else if
-you are okay with this, please consider patches 1-10 for inclusion
-in the coming merge window.
-
-Patch 14/14 has been taken by Benoit and patches 11-13 are to be
-dropped (as per discussion in 11/14 thread)
-
-Regards
-Afzal
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index d78e16e..c4f2e0a 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -1747,7 +1747,7 @@ static struct tegra_periph_init_data tegra_periph_clk_list[] = {
+ 	TEGRA_INIT_DATA_MUX("vi_sensor", "vi_sensor", "tegra_camera", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR, 20, &periph_l_regs, TEGRA_PERIPH_NO_RESET, vi_sensor),
+ 	TEGRA_INIT_DATA_INT8("vi", "vi", "tegra_camera", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI, 20, &periph_l_regs, 0, vi),
+ 	TEGRA_INIT_DATA_INT8("epp", NULL, "epp", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_EPP, 19, &periph_l_regs, 0, epp),
+-	TEGRA_INIT_DATA_INT8("msenc", NULL, "msenc", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_MSENC, 91, &periph_h_regs, TEGRA_PERIPH_WAR_1005168, msenc),
++	TEGRA_INIT_DATA_INT8("msenc", NULL, "msenc", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_MSENC, 91, &periph_u_regs, TEGRA_PERIPH_WAR_1005168, msenc),
+ 	TEGRA_INIT_DATA_INT8("tsec", NULL, "tsec", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_TSEC, 83, &periph_u_regs, 0, tsec),
+ 	TEGRA_INIT_DATA_INT8("host1x", NULL, "host1x", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_HOST1X, 28, &periph_l_regs, 0, host1x),
+ 	TEGRA_INIT_DATA_MUX8("hdmi", NULL, "hdmi", mux_pllp_pllm_plld_plla_pllc_plld2_clkm, CLK_SOURCE_HDMI, 51, &periph_h_regs, 0, hdmi),
+-- 
+1.8.1.5
