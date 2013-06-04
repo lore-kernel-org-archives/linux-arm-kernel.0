@@ -1,7 +1,7 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 4 Jun 2013 10:10:30 +0200
+Date: Tue, 4 Jun 2013 10:13:35 +0200
 Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
-In-Reply-To: <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
+In-Reply-To: <20130603191730.GR3803@titan.lakedaemon.net>
 References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
  <20130603171017.GN18614@n2100.arm.linux.org.uk>
  <20130603175629.GH5008@1wt.eu>
@@ -9,33 +9,37 @@ References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.co
  <20130603183057.GA9868@1wt.eu>
  <20130603184148.GQ3803@titan.lakedaemon.net>
  <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
-Message-ID: <20130604101030.232b3743@skate>
+ <20130603191730.GR3803@titan.lakedaemon.net>
+Message-ID: <20130604101335.6be6ed3b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Nicolas Pitre,
+Dear Jason Cooper,
 
-On Mon, 03 Jun 2013 15:07:45 -0400 (EDT), Nicolas Pitre wrote:
+On Mon, 3 Jun 2013 15:17:31 -0400, Jason Cooper wrote:
 
-> Isn't upstream U-Boot supporting Marvell devices properly these days?  
+> > Isn't upstream U-Boot supporting Marvell devices properly these days?  
+> > If so maybe considering a U-Boot upgrade would be the best way forward?
+> 
+> Yes, both u-boot and barebox are supporting Marvell devices,
 
-No, upstream U-Boot has no support for Armada 370 and Armada XP.
-Sebastian and I have started adding support for Armada 370 and Armada
-XP in Barebox, but it's gonna take a while before it has enough
-features to be practically useful.
+Sorry Jason, but you're overstating the status of this support:
 
-And as Jason said, even though Armada 370 and Armada XP have a working
-UART-based recovery method, users are also scared of doing bootloader
-updates, and on some consumer products, the UART is not necessarily
-easily available to the average users (may need some soldering skills,
-a level-shifter to use the TTL UART of the board, etc.).
+ * Barebox has only *minimal* support for Marvell SoCs, i.e only the
+   serial console and timers are supported. There is no support for
+   network, NAND, SPI or anything that even allows to load a kernel and
+   boot it.
 
-Practically, even on platforms such as Kirkwood that do have upstream
-U-Boot support, I believe the vast majority of people are still running
-the original U-Boot, even though they decided to use an upstream kernel
-by installing for example Debian on their NAS. So the use case of a
-mainline kernel on a Marvell-specific U-Boot should be supported is
-pretty common.
+ * U-Boot has zero support for Armada 370 and Armada XP, and Sebastian
+   has tried for several months to push support for Marvell Dove,
+   without success (lack of review/interest from the U-Boot
+   maintainers, if I remember correctly).
+
+So as of today, the Marvell-specific U-Boot is the /only/ working
+solution for Armada 370 and Armada XP based platforms, and it will
+remain this way at least for several months, until we've pushed enough
+work into Barebox. And even at that time, as you say, users may not
+necessarily be willing to upgrade their bootloader.
 
 Best regards,
 
