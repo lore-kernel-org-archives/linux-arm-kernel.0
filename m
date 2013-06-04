@@ -1,31 +1,26 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 04 Jun 2013 17:51:41 +0200
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <CAMJs5B9PxHfUrugov4HJknQ24fG7MNp8obziqu9dnSztsGBksQ@mail.gmail.com>
-References: <51ADDDAE.4040705@arm.com>
- <CAMJs5B_PB1pNVCO_EK7aTghN23L+d0RovAFi7inrVsJb5STWOA@mail.gmail.com>
- <51AE00D7.9030607@arm.com> <51AE082C.6050907@redhat.com>
- <CAMJs5B9PxHfUrugov4HJknQ24fG7MNp8obziqu9dnSztsGBksQ@mail.gmail.com>
-Message-ID: <51AE0D0D.3030106@redhat.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Jun 2013 17:55:31 +0200
+Subject: [PATCH 1/2] ARM: ux500: Silence compiler warnings due to missing
+ ux500_read_asicid() __init
+In-Reply-To: <1370360208-6500-1-git-send-email-lee.jones@linaro.org>
+References: <1370360208-6500-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <2771350.uHLSSD79no@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Il 04/06/2013 17:43, Christoffer Dall ha scritto:
-> Hi Paolo,
+On Tuesday 04 June 2013 16:36:47 Lee Jones wrote:
+> WARNING: vmlinux.o(.text.unlikely+0x1e8): Section mismatch in reference from\
+>  the function ux500_read_asicid() to the function .init.text:iotable_init()
+> The function ux500_read_asicid() references
+> the function __init iotable_init().
+> This is often because ux500_read_asicid lacks a __init
 > 
-> I don't think this is an issue. Gleb and Marcelo for example pulled
-> RMK's stable tree for my KVM/ARM updates for the 3.10 merge window and
-> that wasn't an issue.  If Linus pulls the kvm/next tree first the
-> diffstat should be similar and everything clean enough, no?
-> 
-> Catalin has previously expressed his wish to upstream the kvm/arm64
-> patches directly through him given the churn in a completely new
-> architecture and he wants to make sure that everything looks right.
-> 
-> It's a pretty clean implementation with quite few dependencies and
-> merging as a working series should be a priority instead of the
-> Kconfig hack, imho.
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-Ok, let's see what Gleb says.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Paolo
+This is also part of my other patch to ux500_read_asicid that
+Linus just applied, but we could take yours for 3.10 if he thinks
+it's important.
+
+	Arnd
