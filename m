@@ -1,33 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Jun 2013 18:01:07 +0200
-Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
-In-Reply-To: <CAGVrzcbRS3x5fgD1BfOk4-oTUsAY9FA2V621OvZLJQNZ01brCg@mail.gmail.com>
-References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
- <6466898.RnYOe3jpGG@wuerfel>
- <CAGVrzcbRS3x5fgD1BfOk4-oTUsAY9FA2V621OvZLJQNZ01brCg@mail.gmail.com>
-Message-ID: <1394174.ONngHnHYKL@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 4 Jun 2013 17:01:47 +0100
+Subject: [PATCH v2] ARM: mm: lazy cache flushing on non-mapped pages
+In-Reply-To: <1370270680-729-1-git-send-email-ming.lei@canonical.com>
+References: <1370270680-729-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <20130604160147.GV27516@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 June 2013 16:36:50 Florian Fainelli wrote:
-> It seems to me that what David proposes is to have say an
-> arch/arm/mach-foo/phy-fixups.c file which is only enabled when
-> CONFIG_PHYLIB is set (obj-$(CONFIG_PHYLIB) += phy-fixup.o), such that
-> it does not need to have any conditionnals when calling
-> phy_register_fixup. This sounds a little unusual, but why not.
+On Mon, Jun 03, 2013 at 03:44:39PM +0100, Ming Lei wrote:
+> Currently flush_dcache_page() thinks pages as non-mapped if
+> mapping_mapped(mapping) return false. This approach is very
+> coase:
+> 	- mmap on part of file may cause all pages backed on
+> 	the file being thought as mmaped
+> 
+> 	- file-backed pages aren't mapped into user space actually
+> 	if the memory mmaped on the file isn't accessed
+> 
+> This patch uses page_mapped() to decide if the page has been
+> mapped.
 
-I don't think it would actually help us, because then we still need
-to declare a local function that gets called from the board init
-code. Instead of doing
+[...]
 
-	if (IS_ENABLED(CONFIG_PHYLIB))
-		 phy_register_fixup_for_uid(phy_id, foo_phy_fixup);
+>  arch/arm/mm/flush.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index 0d473cc..2ff66eb 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -287,7 +287,7 @@ void flush_dcache_page(struct page *page)
+>  	mapping = page_mapping(page);
+>  
+>  	if (!cache_ops_need_broadcast() &&
+> -	    mapping && !mapping_mapped(mapping))
+> +	    mapping && !page_mapped(page))
+>  		clear_bit(PG_dcache_clean, &page->flags);
+>  	else {
+>  		__flush_dcache_page(mapping, page);
 
-we would then do
+Looks alright to me, but a decent stretch in -next wouldn't hurt:
 
-	if (IS_ENABLED(CONFIG_PHYLIB))
-		foo_phy_fixup_register();
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-which is not much different at all.
-
-	Arnd
+Will
