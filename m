@@ -1,52 +1,37 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 3 Jun 2013 17:35:25 -0700
-Subject: [RFC PATCH] ARM: update legacy CPU ID in decompressor cache
- support jump table
-In-Reply-To: <CAO1A-8AaWyp6eq7c5nkU=KBxwrm1CM3erXcsxLmYpCn2mHhMUA@mail.gmail.com>
-References: <CAO1A-8AaWyp6eq7c5nkU=KBxwrm1CM3erXcsxLmYpCn2mHhMUA@mail.gmail.com>
-Message-ID: <20130604003525.GI599@codeaurora.org>
+Date: Mon, 3 Jun 2013 18:04:05 -0700
+Subject: [PATCH] clocksource: armada-xp: always register local_timer_ops
+In-Reply-To: <3039627.dHjlxm4JCV@wuerfel>
+References: <3039627.dHjlxm4JCV@wuerfel>
+Message-ID: <20130604010405.GJ599@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03, Marc C wrote:
-> Hello,
+On 06/04, Arnd Bergmann wrote:
+> The call to local_timer_register is hidden behind an #ifdef, which
+> turns the armada_370_xp_local_timer_ops into a potentially unused
+> variable, causing this warning:
 > 
-> The following is a formal RFC PATCH for the suggestion offered by rmk
-> in this thread:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-January/007871.html
+> time-armada-370-xp.c:208:31: warning: 'armada_370_xp_local_timer_ops' defined but not used [-Wunused-variable]
+>  static struct local_timer_ops armada_370_xp_local_timer_ops __cpuinitdata = {
+>                                ^
 > 
-> The previous mask values for the legacy ARM CPU IDs were conflicting
-> with the CPU ID assignments for late-generation CPUs (like the
-> Qualcomm MSM/QSD or Broadcom Brahma-15 processors). This change
-> corrects the legacy ARM CPU ID value so that the jump table can
-> fall-through to the appropriate cache maintenance / MMU functions.
+> Since local_timer_register() itself doesn't do anything, just removing
+> the #ifdef makes the code look nicer and gets rid of the warning.
 > 
-> To: linux-arm-kernel at lists.infradead.org
-> Signed-off-by: Marc Carino <marc.ceeeee@gmail.com>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Cc: Jason Cooper <jason@lakedaemon.net>
 > ---
->  arch/arm/boot/compressed/head.S |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> index fe4d9c3..a1b9e83 100644
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -805,8 +805,8 @@ call_cache_fn:      adr     r12, proc_types
->                 .align  2
->                 .type   proc_types,#object
->  proc_types:
-> -               .word   0x00000000              @ old ARM ID
-> -               .word   0x0000f000
-> +               .word   0x41000000              @ old ARM ID
-> +               .word   0xff00f000
->                 mov     pc, lr
->   THUMB(                nop                             )
->                 mov     pc, lr
+> Please apply for 3.11
+> 
 
-I sent a similar patch and Russell just applied it[1]. It removes
-this entry on V7 builds. Your patch will also work for me.
+This will conflict slightly with my series[1]. If this is targeted
+for 3.11 it may be better to just drop this patch and let my
+series remove the ops structure entirely.
 
-[1] http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7736/1
+[1] https://lkml.org/lkml/2013/6/3/583
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
