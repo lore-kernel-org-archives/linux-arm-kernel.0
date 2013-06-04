@@ -1,112 +1,30 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Tue, 4 Jun 2013 22:47:14 +0530
-Subject: FW: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
-In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91B616BEC1@BGMAIL01.nvidia.com>
-References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
- <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
- <518A8596.7070702@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B616BE9B@BGMAIL01.nvidia.com>
- <51A62042.7070304@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91B616BEA6@BGMAIL01.nvidia.com>
- <51A794A4.1010502@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91B616BEAD@BGMAIL01.nvidia.com>
- <51A8DE3A.6080503@wwwdotorg.org>
- <C79B248886DD134989C8FF6B096A91AB91B616BEB3@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B616BEB4@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B616BEB5@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B616BEBE@BGMAIL01.nvidia.com>
- <C79B248886DD134989C8FF6B096A91AB91B616BEC1@BGMAIL01.nvidia.com>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B603D82B@BGMAIL01.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Jun 2013 19:17:59 +0200
+Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
+In-Reply-To: <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
+References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <1394174.ONngHnHYKL@wuerfel>
+ <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
+Message-ID: <10306449.AbS8Q0UukT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<Forwarding to bigger aliases>
+On Tuesday 04 June 2013 17:09:26 Florian Fainelli wrote:
+> You would just need to define a stub for your arch_foo_phy_fixup()
+> which has a different definition depending on whether CONFIG_PHYLIB is
+> defined or not.
 
-Anybody aware of hang in r8169 driver over pcie interface mentioned at bottom of this mail?
+Yes, same thing. For a function that is called in only one place,
+I would always prefer if(IS_ENABLED()) over a stub though.
 
------Original Message-----
-From: Jay Agarwal 
-Sent: Tuesday, June 04, 2013 7:17 PM
-To: 'Stephen Warren'
-Cc: 'thierry.reding at avionic-design.de'
-Subject: RE: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
-
-> > > > > On 05/31/2013 06:17 AM, Jay Agarwal wrote:
-> > > > > >>> I have taken care of all your comments, but Ethernet 
-> > > > > >>> device is not working
-> > > > > >> for me neither on cardhu nor harmony.
-> > > > > >>> Could be related to my process or board, Currently 
-> > > > > >>> debugging
-> this.
-> > > > > >>
-> > > > > >> Are you talking about a PCIe-based Ethernet device on 
-> > > > > >> Harmony, or the one that's built into the board?
-> > > > > >>
-> > > > > >> The on-board Ethernet device is USB, and should work fine 
-> > > > > >> already, and irrespective of any PCIe patches.
-> > > > > >
-> > > > > > No I am talking about ethernet over PCIe interface.  There 
-> > > > > > is no problem
-> > > > > with built-in ethernet over USB.
-> > > > > >
-> > > > > >> I have only tried an XHCI USB controller in the PCIe slot 
-> > > > > >> on Harmony, so I can't say if Ethernet not working is a 
-> > > > > >> regression or not. Does the Ethernet device work with just 
-> > > > > >> Thierry's patches and not
-> > > > yours?
-> > > > > >
-> > > > > > It does not work w/o any of my patches also.
-> > > > > >
-> > > > > > Thierry,
-> > > > > > Have you verified any ethernet card working on harmony?
-> > > > > > I am using Broadcom Ethernet card with TIGON3 driver, but it 
-> > > > > > does not
-> > > > > work although PCIe enumeration and driver probe looks fine as
-> > > attached.
-> > > > > > Any idea?
-> > > > >
-> > > > > Oh, one thing to consider here: PCIe interrupts don't work 
-> > > > > correctly when
-> > > > > LP2 is enabled, at least in the upstream kernel. It's 
-> > > > > something I've been trying to investigate, but haven't tracked down yet.
-> > > > >
-> > > > > Anyway, you need to disable the LP2 CPU power management state 
-> > > > > for sure.
-> > > > > Hopefully this will solve the issue for you. One way to do 
-> > > > > this is the following patch, although we need a better 
-> > > > > solution before we can actually merge anything:
-> > > > >
-> > > > > https://patchwork.kernel.org/patch/2525151/
-> > > > Stephen,
-> > > > This patch also did not resolve the issue although I do get 
-> > > > "Disabling
-> > > > LP2 cpuidle state..."  message in logs.
-> > >
-> > > It stucks as below:
-> > >
-> > > root at localhost:~# dhclient eth0
-> > > [ 1444.579544] smsc95xx 3-1.1:1.0 eth0: hardware isn't capable of 
-> > > remote wakeup [ 1444.587300] IPv6: ADDRCONF(NETDEV_UP): eth0: link 
-> > > is not ready
-> >
-> > My system does not have ping command, so dhclient fails like below:
-> > /sbin/dhclient-script: line 325: ping: command not found
-> >
-> > So I provided static IP as : ifconfig eth0 <IP> but it also did not help.
+> This would be just one function, instead of the whole bunch of stubs
+> needed for phylib. Right now its probably 1 vs 3, so it does not make
+> that much of a difference but who knows, if we had more phylib stubs
+> and forget to update the stubs? (which tends to happen pretty often).
 > 
->  Actually sorry, I was using wrong Ethernet interface(eth0) on 
-> harmony, but correct one is eth1(over pcie interface) which works fine 
-> on Thierry's repo after applying patches to disable LP2.
-> Now I will try after applying my patches on both harmony and cardhu.
+> The size savings are exactly the same in both approaches anyway.
 
-Ethernet is working on harmony is working w/ & a/o my patches but cardhu is hanging as below:
+So should we just stick to the current method then and use
+if (IS_ENABLED(CONFIG_NET)) for calling the function?
 
-root at localhost:~# ifconfig eth0 10.19.65.115 [  102.525245] r8169 0000:03:00.0 eth0: unable to load firmware patch rtl_nic/rtl8168e-3.fw (-2) [  102.951516] r8169 0000:03:00.0 eth0: rtl_phyar_cond == 1 (loop: 20, delay: 25).
-<System hangs here..>
-
-1. Harmony is using Broadcom pcie Ethernet card and cardhu is using realtek one.
-2. Enumeration and lspci seems to be fine though.
-3. I tried applying similar patches for disabling LP2 for tegra 3 as well but it did not help.
-4. Any idea/opinion?
+	Arnd
