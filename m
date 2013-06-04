@@ -1,60 +1,116 @@
-From: Yalin.Wang@sonymobile.com (Wang, Yalin)
-Date: Tue, 4 Jun 2013 17:30:04 +0800
-Subject: A bug about system call on ARM
-In-Reply-To: <20130604084832.GA27516@mudshark.cambridge.arm.com>
-References: <20130530114112.GH7483@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
- <20130531084638.GB4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
- <20130531111305.GI4928@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B87B@CNBJMBX05.corpusers.net>
- <20130603095425.GA32242@mudshark.cambridge.arm.com>
- <35FD53F367049845BC99AC72306C23D1610991B87E@CNBJMBX05.corpusers.net>
- <35FD53F367049845BC99AC72306C23D1610991B883@CNBJMBX05.corpusers.net>
- <20130604084832.GA27516@mudshark.cambridge.arm.com>
-Message-ID: <35FD53F367049845BC99AC72306C23D1610991B88F@CNBJMBX05.corpusers.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue,  4 Jun 2013 10:34:11 +0100
+Subject: [RFC PATCH 0/2] ARM: MPIDR linearization
+Message-ID: <1370338453-8749-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+Cores in ARM SMP systems are identified through coprocessor registers,
+so that every core, by executing a coprocessor read, can detect its own
+identifier. The CPU identifier evolved from a simple CPU ID on ARM 11 MPcore
+SMP, where the CPU ID was split in two subfields (CPU ID and CLUSTER ID)
+to the v7 MPIDR, where the MPIDR[23:0] bits define three affinity levels
+that can describe thread, core, cluster topology identifiers.
+According to the ARM 11 MPcore TRM and for architecture versions later
+than v7 (MPIDR), to the ARM ARM, the identifier registers format is as follows:
 
-Thanks for your reply,
-I see your meaning ,
-But it seems my apply for joining into 'linux-arm-kernel at lists.infradead.org'
-Is not approved ,  
-How to join in this mail-list ?
+NR: non-relevant for identification
 
-Thanks for your help .
+ARM11 MPCORE: CPU ID register
 
------Original Message-----
-From: Will Deacon [mailto:will.deacon at arm.com] 
-Sent: Tuesday, June 04, 2013 4:49 PM
-To: Wang, Yalin
-Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
-Subject: Re: A bug about system call on ARM
+31                                    12 11          8 7       4 3        0
+---------------------------------------------------------------------------
+|                 NR                    |  CLUSTER ID |    NR   |  CPU ID |
+--------------------------------------------------------------------------
 
-On Tue, Jun 04, 2013 at 06:33:20AM +0100, Wang, Yalin wrote:
-> Hi  Will,
+ARM v7: MPIDR
 
-Hello,
+31       24 23                 16 15                 8 7                  0
+---------------------------------------------------------------------------
+|   NR     |      AFFINITY 2     |     AFFINITY 1     |    AFFINITY 0     |
+---------------------------------------------------------------------------
 
-> Could I know  what's your git branch is  mainly used for ?
-> 
-> https://git.kernel.org/cgit/linux/kernel/git/will/linux.git
-> 
-> 
-> I mean if the branch is used for ARM arch maintenance ?
+The split of CPU identifiers in multiple affinity levels implies that
+the CPU ID, and later the MPIDR, cannot be used as simple indexes, since
+the bit representation can contain holes:
 
-I send most of my patches via Russell, and the tree above is where I keep my patches whilst they're not yet in mainline.
+eg 4 CPUs, in two separate clusters with two CPUs each:
 
-> If yes, I think I can send future bugs about ARM to you directly, And 
-> do not need ping-pang in the mail list .
+CPU0: MPIDR = 0x0
+CPU1: MPIDR = 0x1
+CPU2: MPIDR = 0x100
+CPU3: MPIDR = 0x101
 
-Quite the opposite! Having discussions on the mailing list is key to how the kernel is developed, so please continue to send questions, bug reports and patches there. As has been pointed out previously in this thread, you need to choose the right list in the first place, rather than just sending to LKML.
+In order to carry out operations that rely on the HW CPUID/MPIDR (CCI
+disabling, context save/restore) the association of the CPU ID, or MPIDR
+to an index is needed so that the CPU can be associated with a set of
+resources. Resources look-up through the HW CPU ID is carried out in
+code paths usually executed in power down procedures, that have to be
+fast and look-up should be performed with few instructions that may be
+executing in physical address space, with the MMU off.
+In order to provide a fast conversion from [CPU ID, MPIDR] values to indexes
+this set provides methods to build a simple collision-free hash function based
+on shifting and OR'ing of CPU ID values, with shifts precomputed at boot by
+scanning the cpu_logical_map entries (that contain the CPUID/MPIDR) of
+possible CPUs.
 
-Of course, you can always CC me on arm/arm64 patches if you like.
+By scanning the cpu_logical_map, the boot code detects how many bits are really
+required to represent HW identifiers in the system and map them to a set of
+buckets that actually represent the given index a HW id correspond to. The
+hashing algorithm inherently takes advantage of a-priori knowledge of the
+CPUIDs/MPIDRs allowed bits layout and it can be executed with few instructions
+even in code paths where caching and the MMU are turned off (e.g resuming from
+idle, S2R, hibernation).
 
-Cheers,
+One drawback of the current hashing algorithm is that it may result in a big
+number of buckets if the recommendations on the CPUID/MPIDR layout are not
+respected in the CPUID/MPIDR configuration; code warns on hash table
+sizes bigger than 4 times the number of possible CPUs, which is a
+symptom of a weird CPUID/MPIDR HW configuration and should be the exception
+not the rule.
 
-Will
+The first patch in the series provides a function that precomputes all
+required hashing parameters by scanning the cpu_logical_map (that
+contains HW identifiers), computes and stashes the hash parameters in a
+structure exported to all kernel components for further usage.
+
+The second patch fixes the current cpu_{suspend}/{resume} functionality,
+so that all levels of CPUID/MPIDR are supported and cpu_{suspend}/{resume}
+can be used on systems where affinity levels 1 and 2 are actually populated.
+The fix carries out dynamic allocation of the array used to save the context
+pointers, with size equal to the number of precomputed CPUID/MPIDR hash
+buckets. To access the array, the CPUID/MPIDR values are hashed through the
+algorithm built in patch 1 so that a hash value is retrieved and the array can
+be indexed properly through it.
+
+Context pointer array is allocated through kmalloc, so that it is made
+up of a contiguous chunk of memory whose virtual address can be safely
+converted to physical address (used in the MMU off path) through a
+static mapping translation valid for all pages (if more than one) making
+up the context pointer array. Context pointer array base address is
+stashed in a structure easily retrieved in assembly through a pc relative
+load that provides both virtual and physical address so that address
+translation is not needed in the cpu_resume path, saving a few instructions.
+
+Code will be improved later through dynamic patching so that the mask
+and shifts in the hashing algorithm will be embedded in the assembly
+instructions as immediates, removing the need for multiple loads to
+memory to retrieve them at every given cpu_{suspend}/{resume} cycle.
+
+Tested on TC2 through CPU idle deep C-states allowing A15 and A7 shutdown
+mode.
+
+Lorenzo Pieralisi (2):
+  ARM: kernel: build MPIDR hash function data structure
+  ARM: kernel: implement stack pointer save array through MPIDR hashing
+
+ arch/arm/include/asm/smp_plat.h | 18 ++++++++
+ arch/arm/include/asm/suspend.h  |  5 +++
+ arch/arm/kernel/asm-offsets.c   |  6 +++
+ arch/arm/kernel/setup.c         | 67 +++++++++++++++++++++++++++++
+ arch/arm/kernel/sleep.S         | 94 +++++++++++++++++++++++++++++++++--------
+ arch/arm/kernel/suspend.c       | 20 +++++++++
+ 6 files changed, 193 insertions(+), 17 deletions(-)
+
+-- 
+1.8.2.2
