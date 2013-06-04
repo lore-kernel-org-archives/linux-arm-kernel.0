@@ -1,37 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Jun 2013 14:19:30 +0200
-Subject: [GIT PULL 0/5] ux500 changes for v3.11
-Message-ID: <CACRpkda7LTeamKWyPVRy1_iOkAvGzb_XZ3sBNPLR_tNerKG4wQ@mail.gmail.com>
+Date: Tue, 4 Jun 2013 14:23:21 +0200
+Subject: [GIT PULL 2/5]: ux500 clocksource changes for v3.11
+Message-ID: <CACRpkdbPBvEU0V29YCqL6Tp0XGbjfJebrZu1TZ_4OFkjB9dMww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi ARM SoC folks,
 
-These are five (5) pull requests for ux500 stuff for v3.11
-that I've got queued up. I've done my best to split onto relevant
-topic branches, but feel free to merge these any way you like.
+this is the ux500 clocksource changes for v3.11. See the signed
+tag for details.
 
-1: ux500-core: misc ux500 CPU/SoC changes
-2: ux500-clksrc: clocksource changes
-3: ux500-pinctrl: pinctrl tables
-4: ux500-dma40: DMA40 device tree and refactoring
-5: ux500-devicetree: device tree updates
+The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
 
-The last two (DMA40 and devicetree) will have a conflict in
-arch/arm/mach-ux500/cpu-db8500.c as the DMA40 patch
-set removes DMA related platform data.
+  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
 
-Typically 4 & 5 are also the larges pull requests so I won't
-try to merge them to resolve that conflict, instead I dump
-this on you...
+are available in the git repository at:
 
-Have a look and see what you think. All patches have been
-reviewed and ACKed as far as possible and now we need
-some linux-next rotation.
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+tags/ux500-clksrc-for-arm-soc
 
-I have a sixth branch with defconfig changes but that should
-possibly even go in after the merge window. I'm holding it back
-for now.
+for you to fetch changes up to 807eba55f73e98b76d0afdc197d942c46122bdca:
 
-Yours,
-Linus Walleij
+  clocksource: dbx500-prcmu: comment cleanup (2013-05-27 14:05:54 +0200)
+
+----------------------------------------------------------------
+Ux500 clocksource updates:
+- Use relaxed readl() variant
+- Fix a single comment
+
+----------------------------------------------------------------
+Fabio Baltieri (1):
+      clocksource: dbx500-prcmu: comment cleanup
+
+Rabin Vincent (1):
+      clocksource: dbx500-prcmu: use relaxed readl variant
+
+ drivers/clocksource/clksrc-dbx500-prcmu.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
