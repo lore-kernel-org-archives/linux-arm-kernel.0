@@ -1,75 +1,55 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 4 Jun 2013 14:32:01 +0300
-Subject: [PATCH] rtc: rtc-twl: ensure IRQ is wakeup enabled
-In-Reply-To: <1370039827-25033-1-git-send-email-khilman@linaro.org>
-References: <1370039827-25033-1-git-send-email-khilman@linaro.org>
-Message-ID: <51ADD031.2090808@ti.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Tue, 4 Jun 2013 17:09:55 +0530
+Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
+In-Reply-To: <51AC8F74.2060302@linaro.org>
+References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
+ <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
+ <51AC8F74.2060302@linaro.org>
+Message-ID: <CAP245DUsRcomDaNKbxYry39ZLCrR33SDRRAhNCdR91e17sHF-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+On Mon, Jun 3, 2013 at 6:13 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+> On 06/03/2013 11:51 AM, Michal Simek wrote:
+>> Hi,
+>>
+>> On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
+>>> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
+>>>> The current code considers every wakeup as spurious, which is not
+>>>> correct. Handle the same way as other arm platforms are doing.
+>>>>
+>>>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+>>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>
+>>>
+>>>> ---
+>>>>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
+>>>>  1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+>>>> index c89672b..a1ab22c 100644
+>>>> --- a/arch/arm/mach-zynq/hotplug.c
+>>>> +++ b/arch/arm/mach-zynq/hotplug.c
+>>>> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
+>>>>             dsb();
+>>>>             wfi();
+>>>>
+>>>> +           if (pen_release == cpu_logical_map(cpu)) {
+>>>> +                   /*
+>>>> +                    * OK, proper wakeup, we're done
+>>>> +                    */
+>>>> +                   break;
+>>>> +           }
+>>>> +
+>> what pen_release stands for?
+>> I have looked at it and others platform are also using it in platsmp
+>> code which is not zynq case.
+>> How is it supposed to work and how this variable should be used?
+>
+> This variable is used to serialize the secondary cpus boot process.
 
-On 06/01/2013 01:37 AM, Kevin Hilman wrote:
-> Currently, the RTC IRQ is never wakeup-enabled so is not capable of
-> bringing the system out of suspend.
->
-> On OMAP platforms, we have gotten by without this because the TWL RTC
-> is on an I2C-connected chip which is capable of waking up the OMAP via
-> the IO ring when the OMAP is in low-power states.
->
-> However, if the OMAP suspends without hitting the low-power states
-> (and the IO ring is not enabled), RTC wakeups will not work because
-> the IRQ is not wakeup enabled.
-As I understand, IRQ wake up capabilities are set/clear simultaneously with
-IRQ unmasking/masking on OMAP4+ in omap-wakeupgen.c.
-So, it should work without this patch on OMAP4+.
-But if TWL is used on non OMAP4+ platform then it is needed.
-(OMAP3: I haven't found the place where IRQ wakeup capabilities are 
-configured,
-would be appreciate if you can point me on)
->
-> To fix, ensure the RTC IRQ is wakeup enabled whenever the RTC alarm is
-> set.
->
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Cc: Andrew Morton <akpm@linux-foundation.org>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
->   drivers/rtc/rtc-twl.c | 16 ++++++++++++++--
->   1 file changed, 14 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/rtc/rtc-twl.c b/drivers/rtc/rtc-twl.c
-> index 8751a52..bbda0fd 100644
-> --- a/drivers/rtc/rtc-twl.c
-> +++ b/drivers/rtc/rtc-twl.c
-> @@ -213,12 +213,24 @@ static int mask_rtc_irq_bit(unsigned char bit)
->   
->   static int twl_rtc_alarm_irq_enable(struct device *dev, unsigned enabled)
->   {
-> +	struct platform_device *pdev = to_platform_device(dev);
-> +	int irq = platform_get_irq(pdev, 0);
-> +	static bool twl_rtc_wake_enabled;
->   	int ret;
->   
-> -	if (enabled)
-> +	if (enabled) {
->   		ret = set_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
-> -	else
-> +		if (device_can_wakeup(dev) && !twl_rtc_wake_enabled) {
-> +			enable_irq_wake(irq);
-> +			twl_rtc_wake_enabled = true;
-> +		}
-> +	} else {
->   		ret = mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
-> +		if (twl_rtc_wake_enabled) {
-> +			disable_irq_wake(irq);
-> +			twl_rtc_wake_enabled = false;
-> +		}
-> +	}
->   
->   	return ret;
->   }
-twl-rtc has suspend/resume callbacks implemented, so I think it's the 
-better place
-for this code and twl_rtc_wake_enabled can be dropped.
+I'm curious why it is called pen_release. :) Is there some historical
+link to some HW lines?
+
+> When the processors boot, all the processors except the CPU0 are in WFI.
