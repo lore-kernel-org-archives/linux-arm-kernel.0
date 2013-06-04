@@ -1,79 +1,79 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 4 Jun 2013 15:21:20 +0100
-Subject: [PATCH v2 4/4] clocksource: dw_apb_timer_of: use
- clocksource_of_init
-In-Reply-To: <201306041138.42639.heiko@sntech.de>
-References: <201306041136.09566.heiko@sntech.de>
- <201306041138.42639.heiko@sntech.de>
-Message-ID: <20130604142120.GD5308@maple>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 4 Jun 2013 15:14:38 +0100
+Subject: [PATCH v2 1/5] arm/xen: define xen_remap as ioremap_cached
+In-Reply-To: <20130604135857.GV18614@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
+ <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1370337650.24512.88.camel@zakaz.uk.xensource.com>
+ <20130604112834.GA3234@MacBook-Pro.local>
+ <20130604135857.GV18614@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.02.1306041509530.4589@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On Tue, Jun 04, 2013 at 11:38:42AM +0200, Heiko St?bner wrote:
-> dw_apb_timer_init used to search the devicetree for matching timer
-> devices, making calls to it from board files necessary.
+On Tue, 4 Jun 2013, Russell King - ARM Linux wrote:
+> On Tue, Jun 04, 2013 at 12:28:34PM +0100, Catalin Marinas wrote:
+> > PROT_PTE_DEVICE and PROT_SECT_DEVICE above don't contain any memory type
+> > information, just attributes/permission - present, young, dirty and XN:
+> > 
+> > #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
+> > #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
+> > 
+> > The memory type is given by the L_PTE_MT_DEV_CACHED and PMD_SECT_WB
+> > macros. Let's take prot_sect first as it's simpler. For MT_DEVICE_CACHED
+> > we have:
+> > 
+> > .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_WB
+> > 
+> > For MT_MEMORY we have:
+> > 
+> > .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE
+> > 
+> > The cache policy is added later to MT_MEMORY which is either WB or WBWA
+> > (based on SMP, no particular reason as these are just processor hints;
+> > for some historical reasons we enabled WBWA for ARM11MPCore but we could
+> > leave it on all the time).
 > 
-> Change the dw_apb_timer_init to work with CLOCKSOURCE_OF_DECLARE.
-> With this change the function gets called once for each timer node
-> and tracks these number of calls to attach clockevent and clocksource
-> devices to the nodes.
+> They may be reported to be just hints, but SMP, particularly ARM11MPCore,
+> the SMP guys at ARM Ltd were very particular about _requiring_ and stating
+> that it is required that WBWA must be used in the page tables for SMP,
+> and not WB.  That suggests while the ARM ARM may say that they're hints,
+> there's slightly more to it when it comes to SMP, and WBWA is a hard
+> requirement there.
 > 
-> Also remove the calls to dw_apb_timer_init from all previous users, as
-> clocksource_of_init is the default for init_time now.
+> Indeed, that's something we enforce in the kernel because of the statements
+> from the SMP development group.
 > 
-> Tested on the upcoming rk3066 code.
+> > Similarly for prot_pte, present, young, dirty are the same.
+> > 
+> > Regarding the type, on ARMv7 (with or without LPAE) we use TEX remapping
+> > and L_PTE_MT_DEVICE has the same index (3-bit TEX[0], C, B for NMRR/PRRR
+> > or TEX[2:0] for MAIR0/MAIR1 registers) as Normal Cacheable Writeback
+> > memory (there is no such thing as Device memory with cacheability
+> > attributes, only Normal Cacheable memory).
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-...
-> -void __init dw_apb_timer_init(void)
-> +static int num_called;
-> +static void __init dw_apb_timer_init(struct device_node *timer)
->  {
-> -	struct device_node *event_timer, *source_timer;
-> -
-> -	event_timer = of_find_matching_node(NULL, osctimer_ids);
-> -	if (!event_timer)
-> -		panic("No timer for clockevent");
-> -	add_clockevent(event_timer);
-> -
-> -	source_timer = of_find_matching_node(event_timer, osctimer_ids);
-> -	if (!source_timer)
-> -		panic("No timer for clocksource");
-> -	add_clocksource(source_timer);
-> -
-> -	of_node_put(source_timer);
-> +	switch (num_called) {
-> +	case 0:
-> +		pr_debug("%s: found clockevent timer\n", __func__);
-> +		add_clockevent(timer);
-> +		of_node_put(timer);
-> +		break;
-> +	case 1:
-> +		pr_debug("%s: found clocksource timer\n", __func__);
-> +		add_clocksource(timer);
-> +		of_node_put(timer);
-> +		init_sched_clock();
-> +		break;
-> +	default:
-> +		break;
-> +	}
->  
-> -	init_sched_clock();
-> +	num_called++;
->  }
-> +CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
-> +CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
+> You don't mean L_PTE_MT_DEVICE there. Thankfully, L_PTE_MT_DEVICE doesn't
+> exist, so it's not that confusing.  What you mean is L_PTE_MT_DEV_CACHED,
+> which _does_ map to "normal cacheable writeback memory" irrespective of
+> the mappings which the kernel uses for RAM.
+> 
+> However, that mapping type (which is used for MT_DEVICE_CACHED) should
+> not be used if you really do want normal memory.  And using MT_* definitions
+> _not_ in asm/io.h with ioremap() is really... silly.  It's not something
+> that is intended, nor is it something which I intend to be supportable
+> into the future on ARM.  That's why the definitions are separate - see
+> the comments in asm/io.h about "types 4 onwards are undefined for
+> ioremap" - I'm not sure how more explicit to make that statement.  And
+> as I _have_ made the statement, if I see people violating it, I won't
+> care about their code if/when I decide to change the ioremap() behaviour.
 
-I think maybe we also want CLOCKSOURCE_OF_DECLARE() instances for the 
-contents of sptimer_ids for completeness, otherwise looks good.
+Fair enough. In that case what do you suggest we should do? 
+Given that ioremap_cached is already taken for "device cacheable memory", maybe we
+could introduce ioremap_memory for "normal memory" on ARM and ARM64:
 
-Acked-by: Jamie Iles <jamie@jamieiles.com>
+#define ioremap_memory(cookie,size) __arm_ioremap((cookie), (size), MT_MEMORY)
 
-Thanks,
+that would require us moving the MT_MEMORY definition to
+arch/arm/include/asm/io.h though.
 
-Jamie
+I am open to any suggestions.
