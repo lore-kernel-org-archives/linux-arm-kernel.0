@@ -1,203 +1,48 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Jun 2013 09:08:09 +0200
-Subject: [PATCH 07/10] pinctrl: add pinctrl driver for Rockchip SoCs
-In-Reply-To: <201306030059.47611.heiko@sntech.de>
-References: <201306030055.15413.heiko@sntech.de>
- <201306030059.47611.heiko@sntech.de>
-Message-ID: <CACRpkdbBr7s1NoTQewVOotorHJHLL8Z6-_gAx5GC0x6uNUX0gw@mail.gmail.com>
+Date: Tue, 4 Jun 2013 09:11:00 +0200
+Subject: [PATCH 09/11] mmc: omap_hsmmc: enhance pinctrl support
+In-Reply-To: <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
+Message-ID: <CACRpkdbiYX5q8rvtV3Xcv7VdiJo2-6rGHNtvB1V=8C_qCpc=JA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 3, 2013 at 12:59 AM, Heiko St?bner <heiko@sntech.de> wrote:
+On Fri, May 31, 2013 at 12:13 PM, Hebbar Gururaja
+<gururaja.hebbar@ti.com> wrote:
 
-> This driver adds support the Cortex-A9 based SoCs from Rockchip,
-> so at least the RK2928, RK3066 (a and b) and RK3188.
-> Earlier Rockchip SoCs seem to use similar mechanics for gpio
-> handling so should be supportable with relative small changes.
-> Pull handling on the rk3188 is currently a stub, due to it being
-> a bit different to the earlier SoCs.
+> Amend the hsmmc controller to optionally take a pin control handle and
+> set the state of the pins to:
 >
-> Pinmuxing as well as gpio (and interrupt-) handling tested on
-> a rk3066a based machine.
+> - "default" on boot, resume and before performing a mmc transfer
+> - "idle" after initial default, after resume default, and after each
+> mmc/sd card access
+> - "sleep" on suspend()
 >
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> By optionally putting the pins into sleep state in the suspend callback
+> we can accomplish two things.
+> - One is to minimize current leakage from pins and thus save power,
+> - second, we can prevent the IP from driving pins output in an
+> uncontrolled manner, which may happen if the power domain drops the
+> domain regulator.
+>
+> If any of the above pin states are missing in dt, a warning message
+> about the missing state is displayed.
+> If certain pin-states are not available, to remove this warning message
+> pass respective state name with null phandler.
+>
+> Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> Cc: Balaji T K <balajitk@ti.com>
+> Cc: Chris Ball <cjb@laptop.org>
+> Cc: linux-mmc at vger.kernel.org
+> Cc: linux-omap at vger.kernel.org
 
-Overall this is looking very good, mainly minor comments.
+This is perfectly correct.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-> +++ b/Documentation/devicetree/bindings/pinctrl/rockchip-pinctrl.txt
-
-Please name this beginning with the vendor and similar to
-the compatible string: rockchip,pinctrl or something.
-(Check the neighbors.)
-
-(...)
-> +Required properties for gpio sub nodes:
-> +  - compatible: "rockchip,gpio-bank"
-> +  - reg: register of the gpio bank (different than the iomux registerset)
-> +  - interrupts: base interrupt of the gpio bank in the interrupt controller
-> +  - clocks: clock that drives this bank
-> +  - gpio-controller: identifies the node as a gpio controller and pin bank.
-> +  - #gpio-cells: number of cells in GPIO specifier. Since the generic GPIO
-> +    binding is used, the amount of cells must be specified as 2. See generic
-> +    GPIO binding documentation for description of particular cells.
-> +  - interrupt-controller: identifies the controller node as interrupt-parent.
-> +  - #interrupt-cells: the value of this property should be 2.
-> +     - First Cell: represents the external gpio interrupt number local to the
-> +       external gpio interrupt space of the controller.
-> +     - Second Cell: flags to identify the type of the interrupt
-> +       - 1 = rising edge triggered
-> +       - 2 = falling edge triggered
-> +       - 3 = rising and falling edge triggered
-> +       - 4 = high level triggered
-> +       - 8 = low level triggered
-
-Can't you just reference
-Documentation/devicetree/bindings/interrupt-controller/interrupts.txt?
-
-> +Required properties for pin configuration node:
-> +  - rockchip,pins: 4 integers array, represents a group of pins mux and config
-> +    setting. The format is rockchip,pins = <PIN_BANK PIN_BANK_NUM MUX CONFIG>.
-> +    The MUX 0 means gpio and MUX 1 to 3 mean the specific device function
-> +
-> +Bits used for CONFIG:
-> +PULL_AUTO      (1 << 0): indicate this pin needs a pull setting for SoCs
-> +                         that determine the pull up or down themselfs
-
-Hm, never saw that before...
-
-(...)
-> +       uart2 {
-> +               uart2_xfer: uart2-xfer {
-> +                       rockchip,pins = <RK_GPIO1 8 1 RK_PINCTRL_PULL_AUTO>,
-> +                                       <RK_GPIO1 9 1 RK_PINCTRL_PULL_AUTO>;
-> +               };
-
-This looks like you're using #include to define these constants,
-probably you should include that in the example or mention it?
-
-> +uart2: serial at 20064000 {
-> +       compatible = "snps,dw-apb-uart";
-> +       reg = <0x20064000 0x400>;
-> +       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
-
-Using #defines, nice!
-
-(...)
-+++ b/drivers/pinctrl/Kconfig
-@@ -158,6 +158,12 @@ config PINCTRL_DB8540
-        bool "DB8540 pin controller driver"
-        depends on PINCTRL_NOMADIK && ARCH_U8500
-
-+config PINCTRL_ROCKCHIP
-+       bool
-+       select PINMUX
-+       select PINCONF
-+       select GENERIC_IRQ_CHIP
-
-Why is this super-simple pin config thing not using
-GENERIC_PINCONF?
-
-I *know* it is simpler to implement your own thing, but think of the
-poor maintainers that have to wade through 50 identical implementations.
-Do this, it pays off.
-
-BTW: it leads to wanting to use generic pinconf DT bindings as experienced
-by Laurent and others. We need to fix that too...
-
-(...)
-> +++ b/drivers/pinctrl/pinctrl-rockchip.c
-> +static void rockchip_pin_dbg_show(struct pinctrl_dev *pctldev,
-> +                                       struct seq_file *s, unsigned offset)
-> +{
-> +       seq_printf(s, "%s", dev_name(pctldev->dev));
-> +}
-
-Nothing else you want to say about the pins here?
-(No big deal for sure, but....)
-
-> +static int rockchip_get_pull(struct rockchip_pin_bank *bank, int pin_num)
-> +{
-> +       struct rockchip_pinctrl *info = bank->drvdata;
-> +       void __iomem *reg;
-> +       int bit;
-
-Is that really an int? I'd guess more like u8...
-
-> +       u32 data;
-> +
-> +       /* rk3066b does support any pulls */
-> +       if (!info->ctrl->pull_offset)
-> +               return 0;
-> +
-> +       reg = info->reg_base + info->ctrl->pull_offset;
-> +
-> +       if (info->ctrl->pull_auto) {
-> +               reg += bank->bank_num * 8;
-
-I'd define some constant like
-
-#define RK_BANK_STRIDE 8
-reg += bank->bank_num * RK_BANK_STRIDE;
-(Since 8 bytes of stride is no natural law.)
-
-And then use that here and elsewhere.
-
-> +               reg += (pin_num / 16) * 4;
-> +               bit = pin_num % 16;
-
-This is clear however.
-
-> +
-> +               data = readl_relaxed(reg);
-> +               data >>= bit;
-> +               data &= 1;
-> +
-> +               return !data;
-
-
-That's a bit hard to read, I'd just:
-
-#include <linux/bitops.h>
-return !(readl_relaxed(reg) & BIT(bit));
-
-And skip the "data" variable. The ! operator will
-clamp this to a bool (0/1).
-
-But we all have our habits.
-
-> +static int rockchip_set_pull(struct rockchip_pin_bank *bank,
-> +                                       int pin_num, int pull)
-
-Similar comments for this function.
-
-> +static int rockchip_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-> +                                             struct pinctrl_gpio_range *range,
-> +                                             unsigned offset, bool input)
-(...)
-> +       /* set bit to 1 for output, 0 for input */
-> +       if (!input)
-> +               data |= (1 << pin);
-> +       else
-> +               data &= ~(1 << pin);
-
-Here again I would use <linux/bitops.h> and:
-
-data |= BIT(pin);
-
-etc, but it's a matter of taste so if you prefer this, do keep it.
-
-(...)
-> +static int rockchip_irq_set_type(struct irq_data *d, unsigned int type)
-> +{
-> +       struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-> +       struct rockchip_pin_bank *bank = gc->private;
-> +       u32 bit = (1 << d->hwirq);
-
-Name that something like "mask" to match other naming in the
-kernel. "bit" sort of implies a number between 0 and 31 and that
-is not the case.
-
-All I could think of right now...
+As the PM code seems to be similar across platforms I have had
+loose plans to move this to the device core as well, but right now
+I'm too busy with other things, and it can surely be refactored later.
 
 Yours,
 Linus Walleij
