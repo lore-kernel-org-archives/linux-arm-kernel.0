@@ -1,86 +1,111 @@
-From: arno@natisbad.org (Arnaud Ebalard)
-Date: Tue, 04 Jun 2013 09:14:47 +0200
-Subject: [PATCHv4 2/3] Add documentation for g762 driver
-In-Reply-To: <cover.1340327864.git.arno@natisbad.org>
-References: <cover.1370327864.git.arno@natisbad.org>
-Message-ID: <424fad46a59b886551c905024f8707ad83b80762.1370327864.git.arno@natisbad.org>
+From: ambresh@ti.com (Ambresh K)
+Date: Tue, 4 Jun 2013 12:46:32 +0530
+Subject: [Patch 3/3] clk: Avoid re-parenting orphan clk's having invalid
+ parent index.
+In-Reply-To: <20130529071809.6058.24017@quantum>
+References: <1367475929-32166-1-git-send-email-ambresh@ti.com>
+ <1367475929-32166-4-git-send-email-ambresh@ti.com>
+ <20130529071809.6058.24017@quantum>
+Message-ID: <51AD9450.5090107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
----
- Documentation/hwmon/g762 |   62 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
- create mode 100644 Documentation/hwmon/g762
 
-diff --git a/Documentation/hwmon/g762 b/Documentation/hwmon/g762
-new file mode 100644
-index 0000000..8cdb0dc
---- /dev/null
-+++ b/Documentation/hwmon/g762
-@@ -0,0 +1,62 @@
-+Kernel driver g762
-+==================
-+
-+The GMT G762 Fan Speed PWM Controller is connected directly to a fan
-+and performs closed-loop or open-loop control of the fan speed. Two
-+modes - PWM or DC - are supported by the device.
-+
-+For additional information, a detailed datasheet is available at
-+http://natisbad.org/NAS/ref/GMT_EDS-762_763-080710-0.2.pdf. sysfs
-+bindings are described in Documentation/hwmon/sysfs-interface.
-+
-+The following entries are available to the user in a subdirectory of
-+/sys/bus/i2c/drivers/g762/ to control the operation of the device.
-+This can be done manually using the following entries but is usually
-+done via a userland daemon like fancontrol.
-+
-+Note that those entries do not provide ways to setup the specific
-+hardware characteristics of the system (reference clock, pulses per
-+fan revolution, ...); Those can be modified via devicetree bindings
-+documented in Documentation/devicetree/bindings/hwmon/g762.txt or
-+using a specific platform_data structure in board initialization
-+file (see include/linux/platform_data/g762.h).
-+
-+  fan1_target: set desired fan speed. This only makes sense in closed-loop
-+            fan speed control (i.e. when pwm1_enable is set to 2).
-+
-+  fan1_input: provide current fan rotation value in RPM as reported by
-+            the fan to the device.
-+
-+  fan1_div: fan clock divisor. Supported value are 1, 2, 4 and 8.
-+
-+  fan1_fault: reports fan failure, i.e. no transition on fan gear pin for
-+            about 0.7s (if the fan is not voluntarily set off).
-+
-+  fan1_alarm: in closed-loop control mode, if fan RPM value is 25% out
-+            of the programmed value for over 6 seconds 'fan1_alarm' is
-+            set to 1.
-+
-+  pwm1_enable: set current fan speed control mode i.e. 1 for manual fan
-+            speed control (open-loop) via pwm1 described below, 2 for
-+            automatic fan speed control (closed-loop) via fan1_target
-+            above (pwm1 is also usable).
-+
-+  pwm1_mode: set or get fan driving mode: 1 for PWM mode, 0 for DC mode.
-+
-+  pwm1: get or set PWM fan control value in open-loop mode. This is an
-+            integer value between 0 and 255. 0 stops the fan, 255 makes
-+            it run at full speed.
-+
-+Both in PWM mode ('pwm1_mode' set to 1) and DC mode ('pwm1_mode' set to 0),
-+when current fan speed control mode is open-loop ('pwm1_enable' set to 1),
-+the fan speed is programmed by setting a value between 0 and 255 via 'pwm1'
-+entry (0 stops the fan, 255 makes it run at full speed). In closed-loop mode
-+('pwm1_enable' set to 2), the expected rotation speed in RPM can be passed to
-+the chip via 'fan1_target'. In closed-loop mode, the target speed is compared
-+with current speed (available via 'fan1_input') by the device and a feedback
-+is performed to match that target value. The fan speed value is computed
-+based on the parameters associated with the physical characteristics of the
-+system: a reference clock source frequency, a number of pulses per fan
-+revolution, etc.
-+
-+Note that the driver will update its values at most once per second.
--- 
-1.7.10.4
+On Wednesday 29 May 2013 12:48 PM, Mike Turquette wrote:
+> Quoting Ambresh K (2013-05-01 23:25:29)
+>> From: Ambresh K <ambresh@ti.com>
+>>
+>> Add orhan clk nodes having invalid parent index to list and use
+>> the list to skip re-parenting orphan clk having invalid parents.
+>>
+>> Signed-off-by: Ambresh K <ambresh@ti.com>
+>> ---
+>>  drivers/clk/clk.c |   21 +++++++++++++++++++--
+>>  1 files changed, 19 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+>> index f4d2c73..54d2aa3 100644
+>> --- a/drivers/clk/clk.c
+>> +++ b/drivers/clk/clk.c
+>> @@ -32,6 +32,7 @@ static int enable_refcnt;
+>>  
+>>  static HLIST_HEAD(clk_root_list);
+>>  static HLIST_HEAD(clk_orphan_list);
+>> +static HLIST_HEAD(clk_orphan_invalid_parent);
+> 
+> Why not re-use the clk_orphan_list?  Having an invalid value programmed
+> into the hardware for selecting a parent essetially orphans a clock
+> from a software point of view.  Is there a specific need for the new
+> list?
+
+Sorry for not being descriptive in commit message.  
+
+a) Avoids unnecessary re-parenting cycle for orphan clock's with invalid parent for every clock
+
+b) With patch [1/3], after a clk with invalid parent was encountered, for every clk registered thereafter seeing following logs. 
+<Snippet>
+[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+[    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent  
+
+Please advice, if can be handled better. 
+
+Thanks, 
+Ambresh
+
+
+> 
+> Regards,
+> Mike
+> 
+>>  static LIST_HEAD(clk_notifier_list);
+>>  
+>>  /***           locking             ***/
+>> @@ -1532,8 +1533,8 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
+>>   */
+>>  int __clk_init(struct device *dev, struct clk *clk)
+>>  {
+>> -       int i, ret = 0;
+>> -       struct clk *orphan;
+>> +       int i, ret = 0, skip = 0;
+>> +       struct clk *orphan, *has_invalid_parent;
+>>         struct hlist_node *tmp2;
+>>  
+>>         if (!clk)
+>> @@ -1639,11 +1640,27 @@ int __clk_init(struct device *dev, struct clk *clk)
+>>                 if (!strcmp(clk->name, orphan->name))
+>>                         continue;
+>>  
+>> +               /* Skip iteration if orphan has invalid parent */
+>> +               hlist_for_each_entry(has_invalid_parent,
+>> +                               &clk_orphan_invalid_parent, child_node) {
+>> +                       if (!strcmp(orphan->name, has_invalid_parent->name)) {
+>> +                               skip = 1;
+>> +                               break;
+>> +                       }
+>> +               }
+>> +
+>> +               if (skip) {
+>> +                       skip = 0;
+>> +                       continue;
+>> +               }
+>> +
+>>                 if (orphan->ops->get_parent) {
+>>                         i = orphan->ops->get_parent(orphan->hw);
+>>                         if (i < 0) {
+>>                                 pr_err("%s: orphan clk(%s) invalid parent\n",
+>>                                                 __func__, orphan->name);
+>> +                               hlist_add_head(&orphan->child_node,
+>> +                                               &clk_orphan_invalid_parent);
+>>                                 continue;
+>>                         }
+>>                         if (!strcmp(clk->name, orphan->parent_names[i]))
+>> -- 
+>> 1.7.4.1
+> 
