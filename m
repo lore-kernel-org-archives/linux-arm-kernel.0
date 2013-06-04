@@ -1,79 +1,73 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 4 Jun 2013 15:14:38 +0100
-Subject: [PATCH v2 1/5] arm/xen: define xen_remap as ioremap_cached
-In-Reply-To: <20130604135857.GV18614@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
- <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <1370337650.24512.88.camel@zakaz.uk.xensource.com>
- <20130604112834.GA3234@MacBook-Pro.local>
- <20130604135857.GV18614@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.02.1306041509530.4589@kaball.uk.xensource.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 4 Jun 2013 15:37:04 +0100
+Subject: [PATCH v2 0/4] ARM: mm: HugeTLB + THP support.
+In-Reply-To: <20130604130329.GR27516@mudshark.cambridge.arm.com>
+References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
+ <20130603104010.GA26112@linaro.org>
+ <20130604125610.GA16818@linaro.org>
+ <20130604130329.GR27516@mudshark.cambridge.arm.com>
+Message-ID: <20130604143702.GA18323@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Jun 2013, Russell King - ARM Linux wrote:
-> On Tue, Jun 04, 2013 at 12:28:34PM +0100, Catalin Marinas wrote:
-> > PROT_PTE_DEVICE and PROT_SECT_DEVICE above don't contain any memory type
-> > information, just attributes/permission - present, young, dirty and XN:
-> > 
-> > #define PROT_PTE_DEVICE		L_PTE_PRESENT|L_PTE_YOUNG|L_PTE_DIRTY|L_PTE_XN
-> > #define PROT_SECT_DEVICE	PMD_TYPE_SECT|PMD_SECT_AP_WRITE
-> > 
-> > The memory type is given by the L_PTE_MT_DEV_CACHED and PMD_SECT_WB
-> > macros. Let's take prot_sect first as it's simpler. For MT_DEVICE_CACHED
-> > we have:
-> > 
-> > .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_WB
-> > 
-> > For MT_MEMORY we have:
-> > 
-> > .prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE
-> > 
-> > The cache policy is added later to MT_MEMORY which is either WB or WBWA
-> > (based on SMP, no particular reason as these are just processor hints;
-> > for some historical reasons we enabled WBWA for ARM11MPCore but we could
-> > leave it on all the time).
-> 
-> They may be reported to be just hints, but SMP, particularly ARM11MPCore,
-> the SMP guys at ARM Ltd were very particular about _requiring_ and stating
-> that it is required that WBWA must be used in the page tables for SMP,
-> and not WB.  That suggests while the ARM ARM may say that they're hints,
-> there's slightly more to it when it comes to SMP, and WBWA is a hard
-> requirement there.
-> 
-> Indeed, that's something we enforce in the kernel because of the statements
-> from the SMP development group.
-> 
-> > Similarly for prot_pte, present, young, dirty are the same.
-> > 
-> > Regarding the type, on ARMv7 (with or without LPAE) we use TEX remapping
-> > and L_PTE_MT_DEVICE has the same index (3-bit TEX[0], C, B for NMRR/PRRR
-> > or TEX[2:0] for MAIR0/MAIR1 registers) as Normal Cacheable Writeback
-> > memory (there is no such thing as Device memory with cacheability
-> > attributes, only Normal Cacheable memory).
-> 
-> You don't mean L_PTE_MT_DEVICE there. Thankfully, L_PTE_MT_DEVICE doesn't
-> exist, so it's not that confusing.  What you mean is L_PTE_MT_DEV_CACHED,
-> which _does_ map to "normal cacheable writeback memory" irrespective of
-> the mappings which the kernel uses for RAM.
-> 
-> However, that mapping type (which is used for MT_DEVICE_CACHED) should
-> not be used if you really do want normal memory.  And using MT_* definitions
-> _not_ in asm/io.h with ioremap() is really... silly.  It's not something
-> that is intended, nor is it something which I intend to be supportable
-> into the future on ARM.  That's why the definitions are separate - see
-> the comments in asm/io.h about "types 4 onwards are undefined for
-> ioremap" - I'm not sure how more explicit to make that statement.  And
-> as I _have_ made the statement, if I see people violating it, I won't
-> care about their code if/when I decide to change the ioremap() behaviour.
+On Tue, Jun 04, 2013 at 02:03:29PM +0100, Will Deacon wrote:
+> On Tue, Jun 04, 2013 at 01:56:12PM +0100, Steve Capper wrote:
+> > On Mon, Jun 03, 2013 at 11:40:11AM +0100, Steve Capper wrote:
+> > > On Thu, May 23, 2013 at 04:31:16PM +0100, Steve Capper wrote:
+> > > > The following patches bring both HugeTLB support and Transparent
+> > > > HugePage (THP) support to ARM.
+> > > > 
+> > > > Only long descriptors (LPAE) are supported in this series.
+> > > > 
+> > > > The code has been tested on an Arndale board (Exynos 5250).
+> > > > 
+> > > > This patch set is based on 3.10-rc2.
+> > > > 
+> > > > Major changes since the Patch:
+> > > >  * LPAE code has been separated from non-LPAE code (this series
+> > > >    is the LPAE code).
+> > > >  * PROT_NONE support for HugeTLB and THP has been implemented.
+> > > > 
+> > > > Major changes since the RFC:
+> > > >  * huge pmd sharing removed from the 3-level code as this was
+> > > >    found to be very rarely, if ever?, used. This allowed for some
+> > > >    code simplification.
+> > > > 
+> > > >  * hardware pmd bits for 2-levels of paging are now taken from
+> > > >    mmu.c. Also the mapping code now uses pte/pmd bit helper
+> > > >    functions rather than the custom pre-processor logic.
+> > > > 
+> > > > Cheers,
+> > > > -- 
+> > > > Steve
+> > > > 
+> > > 
 
-Fair enough. In that case what do you suggest we should do? 
-Given that ioremap_cached is already taken for "device cacheable memory", maybe we
-could introduce ioremap_memory for "normal memory" on ARM and ARM64:
+[ ... ]
 
-#define ioremap_memory(cookie,size) __arm_ioremap((cookie), (size), MT_MEMORY)
+> > 
+> > Just a polite ping on the above.
+> > 
+> > Are people happy to have this patch set merged?
+> 
+> Looks good to me, but worth checking that it doesn't conflict with the LPAE
+> fixes I plan to send for 3.11 (since they're not terribly critical):
+> 
+>   https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=for-rmk/lpae
+> 
+> Of course, I can fix things up in my branch if necessary (just send me a
+> pointer to your git repo).
 
-that would require us moving the MT_MEMORY definition to
-arch/arm/include/asm/io.h though.
+Hey Will,
+I've rebased the series against to 3.10-rc4, and merged in your for-rmk/lpae
+branch.
 
-I am open to any suggestions.
+It builds, and I've run my way through the libhugetlbfs unit tests
+successfully on a Versatile Express (TC2 tile). I get THP collapses, splits
+and allocs too when I rebuild the test suite.
+
+It looks good to me so far.
+
+Thanks,
+-- 
+Steve
