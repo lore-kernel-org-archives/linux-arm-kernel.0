@@ -1,54 +1,27 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 04 Jun 2013 10:48:51 +0200
-Subject: [PATCH] ARM: atags: add support for Marvell's u-boot
-In-Reply-To: <20130604101335.6be6ed3b@skate>
-References: <1370277937-2965-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130603171017.GN18614@n2100.arm.linux.org.uk>
- <20130603175629.GH5008@1wt.eu> <20130603181437.GO3803@titan.lakedaemon.net>
- <20130603183057.GA9868@1wt.eu> <20130603184148.GQ3803@titan.lakedaemon.net>
- <alpine.LFD.2.03.1306031502450.1200@syhkavp.arg>
- <20130603191730.GR3803@titan.lakedaemon.net> <20130604101335.6be6ed3b@skate>
-Message-ID: <51ADA9F3.9000703@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Jun 2013 10:52:16 +0200
+Subject: On mini2440 IO mappings.
+In-Reply-To: <CAM2a4uxNKhD_+zr7mZOV0eR7u_VTCSZyEcsj_uNA5MuuKPFbDQ@mail.gmail.com>
+References: <CAM2a4uxNKhD_+zr7mZOV0eR7u_VTCSZyEcsj_uNA5MuuKPFbDQ@mail.gmail.com>
+Message-ID: <3308480.LZZ0YkAPVH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/13 10:13, Thomas Petazzoni wrote:
-> On Mon, 3 Jun 2013 15:17:31 -0400, Jason Cooper wrote:
->>> Isn't upstream U-Boot supporting Marvell devices properly these days?
->>> If so maybe considering a U-Boot upgrade would be the best way forward?
->>
->> Yes, both u-boot and barebox are supporting Marvell devices,
->
-> Sorry Jason, but you're overstating the status of this support:
->
->   * Barebox has only *minimal* support for Marvell SoCs, i.e only the
->     serial console and timers are supported. There is no support for
->     network, NAND, SPI or anything that even allows to load a kernel and
->     boot it.
+On Tuesday 04 June 2013 13:11:04 mind entropy wrote:
+> 
+>    I am going through the mini2440 source code for my understanding of
+> porting an ARM board to linux. I have a doubt regarding initial
+> mappings sizes of the IRQ, GPIO etc. In
+> arch/arm/mach-s3c24xx/include/mach/map.h S3C24XX_SZ_IRQ is set to
+> SZ_1M but in the documentation (Pg 1-27 of s3c2440.pdf datasheet) the
+> physical address extends from 0X4A000000 to 0X4A00001C. So shouldn't a
+> size of 4K(small page) or 1K(tiny page) be enough?
 
-That remembers me that I wanted to make it boot from DT so we don't
-start adding drivers and add DT later on.
+Yes, that would be enough, but I think it makes little difference
+either way.
 
->   * U-Boot has zero support for Armada 370 and Armada XP, and Sebastian
->     has tried for several months to push support for Marvell Dove,
->     without success (lack of review/interest from the U-Boot
->     maintainers, if I remember correctly).
+What kind of board port are you doing? New ports would look quite
+different from s3c24xx/mini2440, so it might not be the best
+example to look at.
 
-True. It took about 2 month for a useful review and then the discussion
-was only about naming it orion-something or mv-something. Recently,
-someone picked up that patches and reposted them.. but don't expect them
-to get in quickly.
-
-> So as of today, the Marvell-specific U-Boot is the /only/ working
-> solution for Armada 370 and Armada XP based platforms, and it will
-> remain this way at least for several months, until we've pushed enough
-> work into Barebox. And even at that time, as you say, users may not
-> necessarily be willing to upgrade their bootloader.
-
-Well, there is still the possibility to have board-specific dts files.
-If you are stuck for whatever reason with an old boot loader, append a
-dtb with MAC addresses set for your board. IMHO, adding workarounds for
-every single boot loader just because we don't want anybody to either
-update or manually patch the dts is ridiculous.
-
-Sebastian
+	Arnd
