@@ -1,46 +1,56 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Tue, 4 Jun 2013 17:09:26 +0100
-Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
-In-Reply-To: <1394174.ONngHnHYKL@wuerfel>
-References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
- <6466898.RnYOe3jpGG@wuerfel>
- <CAGVrzcbRS3x5fgD1BfOk4-oTUsAY9FA2V621OvZLJQNZ01brCg@mail.gmail.com>
- <1394174.ONngHnHYKL@wuerfel>
-Message-ID: <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
+From: steve.capper@linaro.org (Steve Capper)
+Date: Tue, 4 Jun 2013 17:17:02 +0100
+Subject: [GIT PULL] HugeTLB and THP support for ARM.
+Message-ID: <20130604161701.GA20682@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/4 Arnd Bergmann <arnd@arndb.de>:
-> On Tuesday 04 June 2013 16:36:50 Florian Fainelli wrote:
->> It seems to me that what David proposes is to have say an
->> arch/arm/mach-foo/phy-fixups.c file which is only enabled when
->> CONFIG_PHYLIB is set (obj-$(CONFIG_PHYLIB) += phy-fixup.o), such that
->> it does not need to have any conditionnals when calling
->> phy_register_fixup. This sounds a little unusual, but why not.
->
-> I don't think it would actually help us, because then we still need
-> to declare a local function that gets called from the board init
-> code. Instead of doing
->
->         if (IS_ENABLED(CONFIG_PHYLIB))
->                  phy_register_fixup_for_uid(phy_id, foo_phy_fixup);
->
-> we would then do
->
->         if (IS_ENABLED(CONFIG_PHYLIB))
->                 foo_phy_fixup_register();
->
-> which is not much different at all.
+Hi Russell,
+Here is a pull request introducing HugeTLB + THP support for ARM.
 
-You would just need to define a stub for your arch_foo_phy_fixup()
-which has a different definition depending on whether CONFIG_PHYLIB is
-defined or not.
+There are no extra depencies required by the series.
 
-This would be just one function, instead of the whole bunch of stubs
-needed for phylib. Right now its probably 1 vs 3, so it does not make
-that much of a difference but who knows, if we had more phylib stubs
-and forget to update the stubs? (which tends to happen pretty often).
+Thanks,
+-- 
+Steve
 
-The size savings are exactly the same in both approaches anyway.
---
-Florian
+--->8
+
+The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+
+  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/stevecapper/linux.git for-rmk/hugepages
+
+for you to fetch changes up to 8d962507007357d6fbbcbdd1647faa389a9aed6d:
+
+  ARM: mm: Transparent huge page support for LPAE systems. (2013-06-04 16:52:38 +0100)
+
+----------------------------------------------------------------
+Catalin Marinas (2):
+      ARM: mm: HugeTLB support for LPAE systems.
+      ARM: mm: Transparent huge page support for LPAE systems.
+
+Steve Capper (2):
+      ARM: mm: correct pte_same behaviour for LPAE.
+      ARM: mm: Add support for flushing HugeTLB pages.
+
+ arch/arm/Kconfig                            |   8 +++
+ arch/arm/include/asm/hugetlb-3level.h       |  71 +++++++++++++++++++
+ arch/arm/include/asm/hugetlb.h              |  84 +++++++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   4 ++
+ arch/arm/include/asm/pgtable-3level.h       |  88 ++++++++++++++++++++++++
+ arch/arm/include/asm/pgtable.h              |   3 +
+ arch/arm/include/asm/tlb.h                  |   6 ++
+ arch/arm/include/asm/tlbflush.h             |   2 +
+ arch/arm/mm/Makefile                        |   1 +
+ arch/arm/mm/dma-mapping.c                   |   2 +-
+ arch/arm/mm/flush.c                         |  25 ++++---
+ arch/arm/mm/fsr-3level.c                    |   4 +-
+ arch/arm/mm/hugetlbpage.c                   | 101 ++++++++++++++++++++++++++++
+ 13 files changed, 386 insertions(+), 13 deletions(-)
+ create mode 100644 arch/arm/include/asm/hugetlb-3level.h
+ create mode 100644 arch/arm/include/asm/hugetlb.h
+ create mode 100644 arch/arm/mm/hugetlbpage.c
