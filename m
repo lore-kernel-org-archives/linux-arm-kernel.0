@@ -1,22 +1,22 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Jun 2013 10:54:44 +0200
-Subject: [PATCH] ARM: ux500: Reduce PRCMU reg-names to shorter form for
- u8540 DT
-In-Reply-To: <1369902675-5170-1-git-send-email-lee.jones@linaro.org>
-References: <1369902675-5170-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaJMkkwicCNfQpG=w0AOnmEeSLTJF4-C+ZV1v=8MKvsQA@mail.gmail.com>
+Date: Tue, 4 Jun 2013 10:59:04 +0200
+Subject: [PATCH 1/5] ARM: ux500: Fix trivial typo in v-anamic1 comment
+In-Reply-To: <1369920465-13905-2-git-send-email-fabio.baltieri@linaro.org>
+References: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
+ <1369920465-13905-2-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <CACRpkda1ALmtphZJ_gibt9ESSkt9N+zpU7GPQUtCX2jY6gJ1QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 10:31 AM, Lee Jones <lee.jones@linaro.org> wrote:
+On Thu, May 30, 2013 at 3:27 PM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
 
-> After some discussion and deliberation we have decided to only use the
-> short form of the PRCMU register names i.e. not mention the peripheral
-> in which the registers reside.
+> Fix VAMIC1 LDO comment in DT files to be make it coherent with the
+> others.
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
 
-Patch applied.
+Patch applied to my ux500-devicetree branch.
 
 Yours,
 Linus Walleij
