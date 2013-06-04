@@ -1,58 +1,91 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 4 Jun 2013 21:44:29 +0800
-Subject: [PATCH] driver core: firmware loader: fix build error
-In-Reply-To: <1563703.RysIHVehbx@wuerfel>
-References: <1563703.RysIHVehbx@wuerfel>
-Message-ID: <CACVXFVMcVfec7tTLsxFDCav-cB7cc74s-XkN=4a1toDBJC_e0w@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 4 Jun 2013 15:49:01 +0200
+Subject: [PATCH v3] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+In-Reply-To: <6343931.uK9ItNlUFg@wuerfel>
+References: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <51A34BF9.5000905@atmel.com> <6343931.uK9ItNlUFg@wuerfel>
+Message-ID: <51ADF04D.3040703@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-Thanks for the fix.
-
-On Tue, Jun 4, 2013 at 7:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Patch af5bc11e9 "driver core: firmware loader: kill FW_ACTION_NOHOTPLUG
-> requests before suspend" caused a regression for the case where
-> CONFIG_FW_LOADER_USER_HELPER is not enabled, because it adds
-> references to code that is not available in that configuration:
+On 27/05/2013 14:42, Arnd Bergmann :
+> On Monday 27 May 2013 14:05:13 Nicolas Ferre wrote:
+>> On 27/05/2013 12:48, Alexandre Belloni :
+>> A v3 is not needed simply for this. Thanks, anyway!
+>>
+>> One question though: why not just add
+>>
+>>           select PHYLIB
+>>
+>> In Kconfig entry:
+>>
+>>    config MACH_SAMA5_DT
+>>
+>> ?
+>>
+>> (note that I like to play with everybody's nerves ;-))
 >
-> drivers/base/firmware_class.c: In function 'kill_requests_without_uevent':
-> drivers/base/firmware_class.c:1424:49: error: 'struct firmware_buf' has no member named 'pending_list'
->   list_for_each_entry_safe(buf, next, &pending_fw_head, pending_list) {
-> drivers/base/firmware_class.c:1426:5: error: implicit declaration of function 'fw_load_abort' [-Werror=implicit-function-declaration]
+> That would make it impossible to build a sama5 kernel without networking
+> support, which is probably not what you want.
 >
-> This fixes the build error by making the new code conditional
-> as well. Found using ARM ape6evm_defconfig on today's linux-next.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Ming Lei <ming.lei@canonical.com>
-> Cc: Takashi Iwai <tiwai@suse.de>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->
-> diff --git a/drivers/base/firmware_class.c b/drivers/base/firmware_class.c
-> index c415043..6cca468 100644
-> --- a/drivers/base/firmware_class.c
-> +++ b/drivers/base/firmware_class.c
-> @@ -1417,6 +1417,7 @@ static void __device_uncache_fw_images(void)
->  /* kill pending requests without uevent to avoid blocking suspend */
->  static void kill_requests_without_uevent(void)
->  {
-> +#ifdef CONFIG_FW_LOADER_USER_HELPER
->         struct firmware_buf *buf;
->         struct firmware_buf *next;
->
-> @@ -1426,6 +1427,7 @@ static void kill_requests_without_uevent(void)
->                          fw_load_abort(buf);
->         }
->         mutex_unlock(&fw_lock);
-> +#endif
+> Jean-Christophe's suggestion to add the inline helper is best.
 
-Fenggang's kbuild robot captured the build failure, and a similar fix patch
-has been posted out:
+It seems that it has been clearly rejected by David. So the best 
+solution remains to...
 
-      http://marc.info/?l=linux-kernel&m=137031139632564&w=2
+> Aside from
+> that, please note that
+>
+>>> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+>>> index 705305e..e9ce541 100644
+>>> --- a/arch/arm/mach-at91/board-dt-sama5.c
+>>> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+>>> @@ -47,22 +47,24 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
+>>>    #define GMII_ERCR	11
+>>>    #define GMII_ERDWR	12
+>>>
+>>> -	/* Set delay values */
+>>> -	value = GMII_RCCPSR | 0x8000;
+>>> -	phy_write(phy, GMII_ERCR, value);
+>>> -	value = 0xF2F4;
+>>> -	phy_write(phy, GMII_ERDWR, value);
+>>> -	value = GMII_RRDPSR | 0x8000;
+>>> -	phy_write(phy, GMII_ERCR, value);
+>>> -	value = 0x2222;
+>>> -	phy_write(phy, GMII_ERDWR, value);
+>>> +	if (IS_BUILTIN(CONFIG_PHYLIB)) {
+>>> +		/* Set delay values */
+>>> +		value = GMII_RCCPSR | 0x8000;
+>>> +		phy_write(phy, GMII_ERCR, value);
+>>> +		value = 0xF2F4;
+>>> +		phy_write(phy, GMII_ERDWR, value);
+>>> +		value = GMII_RRDPSR | 0x8000;
+>>> +		phy_write(phy, GMII_ERCR, value);
+>>> +		value = 0x2222;
+>>> +		phy_write(phy, GMII_ERDWR, value);
+>>> +	}
+>>>
+>>>    	return 0;
+>>>    }
+>
+> This part of the patch is not actually needed if you
+>
+>>>    static void __init sama5_dt_device_init(void)
+>>>    {
+>>> -	if (of_machine_is_compatible("atmel,sama5d3xcm"))
+>>> +	if (of_machine_is_compatible("atmel,sama5d3xcm") && IS_BUILTIN(CONFIG_PHYLIB))
+>>>    		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+>>>    			ksz9021rn_phy_fixup);
+>
+> do this change, or the inline helper.
 
-Thanks,
---
-Ming Lei
+... simply use this "IS_BUILTIN(CONFIG_PHYLIB)" here -----^^^^^^^^^ (and 
+not above as suggested by Arnd).
+
+Jean-Christophe, Alexandre: do you agree with this conclusion?
+
+I plan to stack this patch for next at91-fixes batch.
+
+Bye,
+-- 
+Nicolas Ferre
