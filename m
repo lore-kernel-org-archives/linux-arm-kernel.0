@@ -1,75 +1,112 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Jun 2013 18:15:06 +0100
-Subject: [PATCH] ARM: pcpu: ensure __my_cpu_offset cannot be re-ordered
- across barrier()
-In-Reply-To: <20130604103953.GL27516@mudshark.cambridge.arm.com>
-References: <1370278405-13261-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.03.1306031339010.1200@syhkavp.arg>
- <20130604103953.GL27516@mudshark.cambridge.arm.com>
-Message-ID: <20130604171506.GZ27516@mudshark.cambridge.arm.com>
+From: jagarwal@nvidia.com (Jay Agarwal)
+Date: Tue, 4 Jun 2013 22:47:14 +0530
+Subject: FW: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
+In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91B616BEC1@BGMAIL01.nvidia.com>
+References: <1368010660-31465-1-git-send-email-jagarwal@nvidia.com>
+ <1368010660-31465-4-git-send-email-jagarwal@nvidia.com>
+ <518A8596.7070702@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B5D@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B4886B6C@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B616BE9B@BGMAIL01.nvidia.com>
+ <51A62042.7070304@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEA6@BGMAIL01.nvidia.com>
+ <51A794A4.1010502@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEAD@BGMAIL01.nvidia.com>
+ <51A8DE3A.6080503@wwwdotorg.org>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEB3@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEB4@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEB5@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEBE@BGMAIL01.nvidia.com>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEC1@BGMAIL01.nvidia.com>
+Message-ID: <C79B248886DD134989C8FF6B096A91AB91B603D82B@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 11:39:53AM +0100, Will Deacon wrote:
-> However, if you instead add a dependency on something that already lives in a
-> register, like __builtin_return_address, you get:
+<Forwarding to bigger aliases>
+
+Anybody aware of hang in r8169 driver over pcie interface mentioned at bottom of this mail?
+
+-----Original Message-----
+From: Jay Agarwal 
+Sent: Tuesday, June 04, 2013 7:17 PM
+To: 'Stephen Warren'
+Cc: 'thierry.reding at avionic-design.de'
+Subject: RE: [PATCH 4/4] ARM: tegra: pcie: Enable PCIe controller on Cardhu
+
+> > > > > On 05/31/2013 06:17 AM, Jay Agarwal wrote:
+> > > > > >>> I have taken care of all your comments, but Ethernet 
+> > > > > >>> device is not working
+> > > > > >> for me neither on cardhu nor harmony.
+> > > > > >>> Could be related to my process or board, Currently 
+> > > > > >>> debugging
+> this.
+> > > > > >>
+> > > > > >> Are you talking about a PCIe-based Ethernet device on 
+> > > > > >> Harmony, or the one that's built into the board?
+> > > > > >>
+> > > > > >> The on-board Ethernet device is USB, and should work fine 
+> > > > > >> already, and irrespective of any PCIe patches.
+> > > > > >
+> > > > > > No I am talking about ethernet over PCIe interface.  There 
+> > > > > > is no problem
+> > > > > with built-in ethernet over USB.
+> > > > > >
+> > > > > >> I have only tried an XHCI USB controller in the PCIe slot 
+> > > > > >> on Harmony, so I can't say if Ethernet not working is a 
+> > > > > >> regression or not. Does the Ethernet device work with just 
+> > > > > >> Thierry's patches and not
+> > > > yours?
+> > > > > >
+> > > > > > It does not work w/o any of my patches also.
+> > > > > >
+> > > > > > Thierry,
+> > > > > > Have you verified any ethernet card working on harmony?
+> > > > > > I am using Broadcom Ethernet card with TIGON3 driver, but it 
+> > > > > > does not
+> > > > > work although PCIe enumeration and driver probe looks fine as
+> > > attached.
+> > > > > > Any idea?
+> > > > >
+> > > > > Oh, one thing to consider here: PCIe interrupts don't work 
+> > > > > correctly when
+> > > > > LP2 is enabled, at least in the upstream kernel. It's 
+> > > > > something I've been trying to investigate, but haven't tracked down yet.
+> > > > >
+> > > > > Anyway, you need to disable the LP2 CPU power management state 
+> > > > > for sure.
+> > > > > Hopefully this will solve the issue for you. One way to do 
+> > > > > this is the following patch, although we need a better 
+> > > > > solution before we can actually merge anything:
+> > > > >
+> > > > > https://patchwork.kernel.org/patch/2525151/
+> > > > Stephen,
+> > > > This patch also did not resolve the issue although I do get 
+> > > > "Disabling
+> > > > LP2 cpuidle state..."  message in logs.
+> > >
+> > > It stucks as below:
+> > >
+> > > root at localhost:~# dhclient eth0
+> > > [ 1444.579544] smsc95xx 3-1.1:1.0 eth0: hardware isn't capable of 
+> > > remote wakeup [ 1444.587300] IPv6: ADDRCONF(NETDEV_UP): eth0: link 
+> > > is not ready
+> >
+> > My system does not have ping command, so dhclient fails like below:
+> > /sbin/dhclient-script: line 325: ping: command not found
+> >
+> > So I provided static IP as : ifconfig eth0 <IP> but it also did not help.
 > 
-> c001cd44:       e92d4010        push    {r4, lr}
-> c001cd48:       ee1dcf90        mrc     15, 0, ip, cr13, cr0, {4}
-> c001cd4c:       e790410c        ldr     r4, [r0, ip, lsl #2]
-> c001cd50:       ee1dcf90        mrc     15, 0, ip, cr13, cr0, {4}
-> c001cd54:       e791110c        ldr     r1, [r1, ip, lsl #2]
-> c001cd58:       e792210c        ldr     r2, [r2, ip, lsl #2]
-> c001cd5c:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
-> c001cd60:       e7903103        ldr     r3, [r0, r3, lsl #2]
-> c001cd64:       e0840001        add     r0, r4, r1
-> c001cd68:       e0800002        add     r0, r0, r2
-> c001cd6c:       e0800003        add     r0, r0, r3
-> c001cd70:       e8bd8010        pop     {r4, pc}
+>  Actually sorry, I was using wrong Ethernet interface(eth0) on 
+> harmony, but correct one is eth1(over pcie interface) which works fine 
+> on Thierry's repo after applying patches to disable LP2.
+> Now I will try after applying my patches on both harmony and cardhu.
 
-Actually, I've managed to improve this further using sp instead (see diff
-below), which also prevents GCC from moving the lr into other registers for
-no reason. The code generated for your test is:
+Ethernet is working on harmony is working w/ & a/o my patches but cardhu is hanging as below:
 
-c001cda4:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
-c001cda8:       e790c103        ldr     ip, [r0, r3, lsl #2]
-c001cdac:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
-c001cdb0:       e7911103        ldr     r1, [r1, r3, lsl #2]
-c001cdb4:       e7922103        ldr     r2, [r2, r3, lsl #2]
-c001cdb8:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
-c001cdbc:       e7903103        ldr     r3, [r0, r3, lsl #2]
-c001cdc0:       e08c0001        add     r0, ip, r1
-c001cdc4:       e0800002        add     r0, r0, r2
-c001cdc8:       e0800003        add     r0, r0, r3
-c001cdcc:       e12fff1e        bx      lr
+root at localhost:~# ifconfig eth0 10.19.65.115 [  102.525245] r8169 0000:03:00.0 eth0: unable to load firmware patch rtl_nic/rtl8168e-3.fw (-2) [  102.951516] r8169 0000:03:00.0 eth0: rtl_phyar_cond == 1 (loop: 20, delay: 25).
+<System hangs here..>
 
-I spoke to the tools guys and they'll look into why the original patch
-didn't work, since that could have wider implications on our use of
-barrier().
-
-Will
-
---->8
-
-diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
-index 968c0a1..209e650 100644
---- a/arch/arm/include/asm/percpu.h
-+++ b/arch/arm/include/asm/percpu.h
-@@ -30,8 +30,15 @@ static inline void set_my_cpu_offset(unsigned long off)
- static inline unsigned long __my_cpu_offset(void)
- {
-        unsigned long off;
--       /* Read TPIDRPRW */
--       asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : : "memory");
-+       register unsigned long *sp asm ("sp");
-+
-+       /*
-+        * Read TPIDRPRW.
-+        * We want to allow caching the value, so avoid using volatile and
-+        * instead use a fake stack read to hazard against barrier().
-+        */
-+       asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (*sp));
-+
-        return off;
- }
- #define __my_cpu_offset __my_cpu_offset()
+1. Harmony is using Broadcom pcie Ethernet card and cardhu is using realtek one.
+2. Enumeration and lspci seems to be fine though.
+3. I tried applying similar patches for disabling LP2 for tegra 3 as well but it did not help.
+4. Any idea/opinion?
