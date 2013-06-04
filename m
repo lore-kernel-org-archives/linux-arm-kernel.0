@@ -1,97 +1,77 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 4 Jun 2013 18:57:40 +0100
-Subject: [RFC PATCH 1/2] ARM: kernel: build MPIDR hash function data
- structure
-In-Reply-To: <alpine.LFD.2.03.1306041330380.1200@syhkavp.arg>
-References: <1370338453-8749-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1370338453-8749-2-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.03.1306041330380.1200@syhkavp.arg>
-Message-ID: <20130604175740.GB21719@e102568-lin.cambridge.arm.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Tue, 04 Jun 2013 10:58:46 -0700
+Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
+ line
+In-Reply-To: <20130603223935.GU3803@titan.lakedaemon.net> (Jason Cooper's
+ message of "Mon, 3 Jun 2013 18:39:35 -0400")
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+ <1370040357-25794-4-git-send-email-khilman@linaro.org>
+ <51AC667D.6070409@epfl.ch> <87mwr6kfbm.fsf@linaro.org>
+ <20130603223935.GU3803@titan.lakedaemon.net>
+Message-ID: <878v2p3gh5.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 06:31:33PM +0100, Nicolas Pitre wrote:
-> On Tue, 4 Jun 2013, Lorenzo Pieralisi wrote:
-> 
-> > On ARM SMP systems, cores are identified by their MPIDR register.
-> > The MPIDR guidelines in the ARM ARM do not provide strict enforcement of
-> > MPIDR layout, only recommendations that, if followed, split the MPIDR
-> > on ARM 32 bit platforms in three affinity levels. In multi-cluster
-> > systems like big.LITTLE, if the affinity guidelines are followed, the
-> > MPIDR can not be considered an index anymore. This means that the
-> > association between logical CPU in the kernel and the HW CPU identifier
-> > becomes somewhat more complicated requiring methods like hashing to
-> > associate a given MPIDR to a CPU logical index, in order for the look-up
-> > to be carried out in an efficient and scalable way.
-> > 
-> > This patch provides a function in the kernel that starting from the
-> > cpu_logical_map, implement collision-free hashing of MPIDR values by checking
-> > all significative bits of MPIDR affinity level bitfields. The hashing
-> > can then be carried out through bits shifting and ORing; the resulting
-> > hash algorithm is a collision-free though not minimal hash that can be
-> > executed with few assembly instructions. The mpidr is filtered through a
-> > mpidr mask that is built by checking all bits that toggle in the set of
-> > MPIDRs corresponding to possible CPUs. Bits that do not toggle do not carry
-> > information so they do not contribute to the resulting hash.
-> > 
-> > Pseudo code:
-> > 
-> > /* check all bits that toggle, so they are required */
-> > for (i = 1, mpidr_mask = 0; i < num_possible_cpus(); i++)
-> > 	mpidr_mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
-> > 
-> > /*
-> >  * Build shifts to be applied to aff0, aff1, aff2 values to hash the mpidr
-> >  * fls() returns the last bit set in a word, 0 if none
-> >  * ffs() returns the first bit set in a word, 0 if none
-> >  */
-> > fs0 = mpidr_mask[7:0] ? ffs(mpidr_mask[7:0]) - 1 : 0;
-> > fs1 = mpidr_mask[15:8] ? ffs(mpidr_mask[15:8]) - 1 : 0;
-> > fs2 = mpidr_mask[23:16] ? ffs(mpidr_mask[23:16]) - 1 : 0;
-> > ls0 = fls(mpidr_mask[7:0]);
-> > ls1 = fls(mpidr_mask[15:8]);
-> > ls2 = fls(mpidr_mask[23:16]);
-> > bits0 = ls0 - fs0;
-> > bits1 = ls1 - fs1;
-> > bits2 = ls2 - fs2;
-> > aff0_shift = fs0;
-> > aff1_shift = 8 + fs1 - bits0;
-> > aff2_shift = 16 + fs2 - (bits0 + bits1);
-> > u32 hash(u32 mpidr) {
-> > 	u32 l0, l1, l2;
-> > 	u32 mpidr_masked = mpidr & mpidr_mask;
-> > 	l0 = mpidr_masked & 0xff;
-> > 	l1 = mpidr_masked & 0xff00;
-> > 	l2 = mpidr_masked & 0xff0000;
-> > 	return (l0 >> aff0_shift | l1 >> aff1_shift | l2 >> aff2_shift);
-> > }
-> > 
-> > The hashing algorithm relies on the inherent properties set in the ARM ARM
-> > recommendations for the MPIDR. Exotic configurations, where for instance the
-> > MPIDR values at a given affinity level have large holes, can end up requiring
-> > big hash tables since the compression of values that can be achieved through
-> > shifting is somewhat crippled when holes are present. Kernel warns if
-> > the number of buckets of the resulting hash table exceeds the number of
-> > possible CPUs by a factor of 4, which is a symptom of a very sparse HW
-> > MPIDR configuration.
-> > 
-> > The hash algorithm is quite simple and can easily be implemented in assembly
-> > code, to be used in code paths where the kernel virtual address space is
-> > not set-up (ie cpu_resume) and instruction and data fetches are strongly
-> > ordered so code must be compact and must carry out few data accesses.
-> > 
-> > Cc: Dave Martin <dave.martin@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Cc: Colin Cross <ccross@android.com>
-> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> > Cc: Amit Kucheria <amit.kucheria@linaro.org>
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> 
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Jason Cooper <jason@lakedaemon.net> writes:
 
-Thank you very much !
-Lorenzo
+> On Mon, Jun 03, 2013 at 03:19:25PM -0700, Kevin Hilman wrote:
+>> Florian Vaussard <florian.vaussard@epfl.ch> writes:
+>> 
+>> > Hello Kevin,
+>> >
+>> > On 06/01/2013 12:45 AM, Kevin Hilman wrote:
+>> >> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+>> >> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
+>> >> SYS_NIRQ pin in the twl4030 DTS file.
+>> >>
+>> >> Boards that hook up the twl4030 differently can easily override this
+>> >> in their board-specific DTS file.
+>> >>
+>> >> This allows RTC wake from off-mode to work again on OMAP3-based
+>> >> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+>> >> 3530/Overo, 3730/Overo-STORM.
+>> >>
+>> >> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> >> ---
+>> >>   arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
+>> >>   1 file changed, 17 insertions(+)
+>> >>
+>> >> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+>> >> index b3034da..c7fe9f6 100644
+>> >> --- a/arch/arm/boot/dts/twl4030.dtsi
+>> >> +++ b/arch/arm/boot/dts/twl4030.dtsi
+>> >> @@ -13,6 +13,8 @@
+>> >>   	compatible = "ti,twl4030";
+>> >>   	interrupt-controller;
+>> >>   	#interrupt-cells = <1>;
+>> >> +	pinctrl-names = "default";
+>> >> +	pinctrl-0 = <&twl4030_pins>;
+>> >>
+>> >>   	rtc {
+>> >>   		compatible = "ti,twl4030-rtc";
+>> >> @@ -92,3 +94,18 @@
+>> >>   		#pwm-cells = <2>;
+>> >>   	};
+>> >>   };
+>> >> +
+>> >> +&omap3_pmx_core {
+>> >
+>> > Here you are making the TWL4030 to explicitly depend on OMAP3. Could
+>> > this chip be used by another target? If the case, I would put this
+>> > piece of code in the files including twl4030. Otherwise it's ok here.
+>> 
+>> I talked this over with Tony before posting.  In theorry, it could be
+>> used on other platforms.  In practice, it's only used on OMAP.  We can
+>> easily move this to board files if needed later, but thought it would be
+>> simpler to put it here.  I'll let Benoit decide.
+>
+> What about omap boards that don't use the twl4030?  eg I'm currently
+> tinkering with a board that uses a tps6507x...
+
+Then you'll be inclding tps6507x.dtsi instead of twl4030.dtsi and won't
+be affected by this patch at all.
+
+Your board file should setup the muxing (using this as an example) for
+how your board wires the TPS chip to the OMAP.
+
+Kevin
