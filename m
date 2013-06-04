@@ -1,34 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Tue,  4 Jun 2013 16:36:47 +0100
-Subject: [PATCH 1/2] ARM: ux500: Silence compiler warnings due to missing
- ux500_read_asicid() __init
-Message-ID: <1370360208-6500-1-git-send-email-lee.jones@linaro.org>
+Date: Tue,  4 Jun 2013 16:36:48 +0100
+Subject: [PATCH 2/2] ARM: ux500: Silence compiler warnings due to missing
+ __cpuinitdata
+In-Reply-To: <1370360208-6500-1-git-send-email-lee.jones@linaro.org>
+References: <1370360208-6500-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370360208-6500-2-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-WARNING: vmlinux.o(.text.unlikely+0x1e8): Section mismatch in reference from\
- the function ux500_read_asicid() to the function .init.text:iotable_init()
-The function ux500_read_asicid() references
-the function __init iotable_init().
-This is often because ux500_read_asicid lacks a __init
+WARNING: vmlinux.o(.text.unlikely+0x25c): Section mismatch in reference \
+  from the function write_pen_release() to the variable                 \
+  .cpuinit.data:pen_release
+The function write_pen_release() references
+the variable __cpuinitdata pen_release.
+This is often because write_pen_release lacks a __cpuinitdata
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/id.c |    2 +-
+ arch/arm/mach-ux500/platsmp.c |    2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-ux500/id.c b/arch/arm/mach-ux500/id.c
-index 0d33d1a..b16e7c1 100644
---- a/arch/arm/mach-ux500/id.c
-+++ b/arch/arm/mach-ux500/id.c
-@@ -21,7 +21,7 @@
- 
- struct dbx500_asic_id dbx500_id;
- 
--static unsigned int ux500_read_asicid(phys_addr_t addr)
-+static unsigned int __init ux500_read_asicid(phys_addr_t addr)
+diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
+index 14d9046..3a455d5 100644
+--- a/arch/arm/mach-ux500/platsmp.c
++++ b/arch/arm/mach-ux500/platsmp.c
+@@ -34,7 +34,7 @@ extern void u8500_secondary_startup(void);
+  * observers, irrespective of whether they're taking part in coherency
+  * or not.  This is necessary for the hotplug code to work reliably.
+  */
+-static void write_pen_release(int val)
++static void __cpuinitdata write_pen_release(int val)
  {
- 	phys_addr_t base = addr & ~0xfff;
- 	struct map_desc desc = {
+ 	pen_release = val;
+ 	smp_wmb();
 -- 
 1.7.10.4
