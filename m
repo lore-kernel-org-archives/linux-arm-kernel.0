@@ -1,224 +1,78 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 4 Jun 2013 14:15:43 +0800
-Subject: [PATCH v2 2/2] ARM: mxs: Use soc bus infrastructure
-In-Reply-To: <1370322142-23926-2-git-send-email-festevam@gmail.com>
-References: <1370322142-23926-1-git-send-email-festevam@gmail.com>
- <1370322142-23926-2-git-send-email-festevam@gmail.com>
-Message-ID: <20130604061537.GB17607@S2101-09.ap.freescale.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Mon, 3 Jun 2013 23:14:58 -0700
+Subject: [PATCH RFC 2/3] clk: dt: binding for basic multiplexor clock
+In-Reply-To: <201306032339.39176.heiko@sntech.de>
+References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
+ <20130603200722.6077.85426@quantum> <201306032215.45983.heiko@sntech.de>
+ <201306032339.39176.heiko@sntech.de>
+Message-ID: <CAPtuhTitiDVBTLF==je9_Ydks5OCqM1cDv-UwPsGkkgwEj6VWQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 02:02:22AM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> Using the soc bus infrastructure is helpful for reporting several SoC related
-> information such as: family, machine, SoC name and SoC revision.
-> 
-> $ cat /sys/bus/soc/devices/soc0/family 
-> Freescale MXS Family
-> 
-> $ cat /sys/bus/soc/devices/soc0/machine 
-> Freescale i.MX28 Evaluation Kit
-> 
-> $ cat /sys/bus/soc/devices/soc0/soc_id 
-> i.MX28
-> 
-> $ cat /sys/bus/soc/devices/soc0/revision 
-> TO1.2
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> Changes since v1:
-> - Read the chipid register only once
-> - Fix the digctl compatible string
-> - Do not check for  "if (!root)"
-> - Free 'soc_dev_attr->revision'
-> 
->  arch/arm/mach-mxs/Kconfig    |   1 +
->  arch/arm/mach-mxs/mach-mxs.c | 117 ++++++++++++++++++++++++++++++++++++++++++-
->  2 files changed, 117 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 4dc2fbb..59c30ef 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -25,6 +25,7 @@ config ARCH_MXS
->  	select GENERIC_CLOCKEVENTS
->  	select HAVE_CLK_PREPARE
->  	select PINCTRL
-> +	select SOC_BUS
->  	select SOC_IMX23
->  	select SOC_IMX28
->  	select STMP_DEVICE
-> diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-> index bd225e9..568aa5a 100644
-> --- a/arch/arm/mach-mxs/mach-mxs.c
-> +++ b/arch/arm/mach-mxs/mach-mxs.c
-> @@ -25,6 +25,7 @@
->  #include <linux/of_platform.h>
->  #include <linux/phy.h>
->  #include <linux/pinctrl/consumer.h>
-> +#include <linux/sys_soc.h>
->  #include <asm/mach/arch.h>
->  #include <asm/mach/map.h>
->  #include <asm/mach/time.h>
-> @@ -38,12 +39,28 @@
->  #define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR0		0x2
->  #define MXS_DIGCTL_SAIF_CLKMUX_EXTMSTR1		0x3
->  
-> +#define HW_DIGCTL_CHIPID	0x310
-> +#define HW_DIGCTL_CHIPID_MASK	(0xffff << 16)
-> +#define HW_DIGCTL_REV_MASK	0xff
-> +#define HW_DIGCTL_CHIPID_MX23	(0x3780 << 16)
-> +#define HW_DIGCTL_CHIPID_MX28	(0x2800 << 16)
-> +
-> +#define MXS_CHIP_REVISION_1_0	0x10
-> +#define MXS_CHIP_REVISION_1_1	0x11
-> +#define MXS_CHIP_REVISION_1_2	0x12
-> +#define MXS_CHIP_REVISION_1_3	0x13
-> +#define MXS_CHIP_REVISION_1_4	0x14
-> +#define MXS_CHIP_REV_UNKNOWN	0xff
-> +
->  #define MXS_GPIO_NR(bank, nr)	((bank) * 32 + (nr))
->  
->  #define MXS_SET_ADDR		0x4
->  #define MXS_CLR_ADDR		0x8
->  #define MXS_TOG_ADDR		0xc
->  
-> +static u32 chipid;
-> +static u32 socid;
-> +
->  static inline void __mxs_setl(u32 mask, void __iomem *reg)
->  {
->  	__raw_writel(mask, reg + MXS_SET_ADDR);
-> @@ -361,8 +378,106 @@ static void __init cfa10037_init(void)
->  	update_fec_mac_prop(OUI_CRYSTALFONTZ);
->  }
->  
-> +static const char __init *mxs_get_soc_id(void)
-> +{
-> +	struct device_node *np;
-> +	static void __iomem *digctl_base;
+On Mon, Jun 3, 2013 at 2:39 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Montag, 3. Juni 2013, 22:15:45 schrieb Heiko St?bner:
+>> Am Montag, 3. Juni 2013, 22:07:22 schrieb Mike Turquette:
+>> > Quoting Heiko St?bner (2013-06-03 12:33:19)
+>> >
+>> > > Hi Mike,
+>> > >
+>> > > I think it's a multiplexEr clock in the patch title, and see below
+>> >
+>> > Doh, you are right.  But "xor" is so much cooler looking than "xer"...
+>> >
+>> > > Am Montag, 3. Juni 2013, 19:53:09 schrieb Mike Turquette:
+>> > > > Device Tree binding for the basic clock multiplexor, plus the setup
+>> > > > function to register the clock.  Based on the existing fixed-clock
+>> > > > binding.
+>> > > >
+>> > > > Also relocate declaration of of_fixed_factor_clk_setup to keep things
+>> > > > tidy.
+>> > > >
+>> > > > Signed-off-by: Mike Turquette <mturquette@linaro.org>
+>> > >
+>> > > [...]
+>> > >
+>> > > > +
+>> > > > +     reg = of_iomap(node, 0);
+>> > > > +     pr_err("%s: reg is 0x%p\n", __func__, reg);
+>> > > > +
+>> > > > +     if (of_property_read_u32(node, "mask", &mask)) {
+>> > > > +             pr_err("%s: missing mask property for %s\n", __func__,
+>> > > > node->name); +             return;
+>> > > > +     }
+>> > > > +
+>> > > > +     if (of_property_read_u32(node, "shift", &shift))
+>> > > > +             pr_debug("%s: missing shift property defaults to zero
+>> > > > for %s\n", +                             __func__, node->name);
+>> > > > +
+>> > > > +     if (of_property_read_bool(node, "index_one"))
+>> > > > +             clk_mux_flags |= CLK_MUX_INDEX_ONE;
+>> > > > +
+>> > > > +     clk = clk_register_mux_table(NULL, clk_name, parent_names,
+>> > > > num_parents, +                     0, reg, 0, mask, clk_mux_flags,
+>> > > >
+>> > >                       ^- should probably be shift
+>> > >
+>> > > Otherwise looks cool and I'm currently trying it with my Rockchip code.
+>> >
+>> > Right again.  My test platform seems to not shift the mask at all so
+>> > this did not cause a visible bug for me.
+>>
+>> I'm currently converting my rockchip stuff to it, as it would solve a lot
+>> of problems with the numerous clock types I'm defining just to put the
+>> shift and mask values somewhere.
+>>
+>> So lets see if anything more turns up ;-)
+>
+> yep ... of_mux_clk_setup is quite talkative ... there are quite some (debug-?)
+> pr_errs in it ;-)
+>
 
-Drop static.
+Yes I realized that after sending.  Hopefully not too many curse words
+in the trace messages.  Will remove for v2.
 
-> +
-> +	np = of_find_compatible_node(NULL, NULL, "fsl,imx23-digctl");
-> +	digctl_base = of_iomap(np, 0);
-> +	WARN_ON(!digctl_base);
-> +
-> +	chipid = readl(digctl_base + HW_DIGCTL_CHIPID);
-> +	socid = chipid & HW_DIGCTL_CHIPID_MASK;
-> +
-We can call iounmap(digctl_base) here now.
+Regards,
+Mike
 
-> +	of_node_put(np);
-> +
-> +	switch (socid) {
-> +	case HW_DIGCTL_CHIPID_MX23:
-> +		return "i.MX23";
-> +	case HW_DIGCTL_CHIPID_MX28:
-> +		return "i.MX28";
-> +	default:
-> +		return "unknown";
-
-s/unknown/Unknown to align with the string used in mxs_get_revision()?
-
-> +	}
-> +}
-> +
-> +static u32 __init mxs_get_cpu_rev(void)
-> +{
-> +	u32 rev = chipid & HW_DIGCTL_REV_MASK;
-> +
-> +	switch (socid) {
-> +	case HW_DIGCTL_CHIPID_MX23:
-> +		switch (rev) {
-> +		case 0x0:
-> +			return MXS_CHIP_REVISION_1_0;
-> +		case 0x1:
-> +			return MXS_CHIP_REVISION_1_1;
-> +		case 0x2:
-> +			return MXS_CHIP_REVISION_1_2;
-> +		case 0x3:
-> +			return MXS_CHIP_REVISION_1_3;
-> +		case 0x4:
-> +			return MXS_CHIP_REVISION_1_4;
-> +		default:
-> +			return MXS_CHIP_REV_UNKNOWN;
-> +		}
-> +	case HW_DIGCTL_CHIPID_MX28:
-> +		switch (rev) {
-> +		case 0x0:
-> +			return MXS_CHIP_REVISION_1_1;
-> +		case 0x1:
-> +			return MXS_CHIP_REVISION_1_2;
-> +		default:
-> +			return MXS_CHIP_REV_UNKNOWN;
-> +		}
-> +	default:
-> +		return MXS_CHIP_REV_UNKNOWN;
-> +	}
-> +}
-> +
-> +static const char __init *mxs_get_revision(void)
-> +{
-> +	u32 rev = mxs_get_cpu_rev();
-> +
-> +	if (rev != MXS_CHIP_REV_UNKNOWN)
-> +		return kasprintf(GFP_KERNEL, "TO%d.%d", (rev >> 4) & 0xf,
-> +				rev & 0xf);
-> +
-Drop the blank line.
-
-Shawn
-
-> +	else
-> +		return kasprintf(GFP_KERNEL, "%s", "Unknown");
-> +}
-> +
->  static void __init mxs_machine_init(void)
->  {
-> +	struct device_node *root;
-> +	struct device *parent;
-> +	struct soc_device *soc_dev;
-> +	struct soc_device_attribute *soc_dev_attr;
-> +	int ret;
-> +
-> +	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
-> +	if (!soc_dev_attr)
-> +		return;
-> +
-> +	root = of_find_node_by_path("/");
-> +	ret = of_property_read_string(root, "model", &soc_dev_attr->machine);
-> +	if (ret)
-> +		return;
-> +
-> +	soc_dev_attr->family = "Freescale MXS Family";
-> +	soc_dev_attr->soc_id = mxs_get_soc_id();
-> +	soc_dev_attr->revision = mxs_get_revision();
-> +
-> +	soc_dev = soc_device_register(soc_dev_attr);
-> +	if (IS_ERR(soc_dev)) {
-> +		kfree(soc_dev_attr->revision);
-> +		kfree(soc_dev_attr);
-> +		return;
-> +	}
-> +
-> +	parent = soc_device_to_device(soc_dev);
-> +
->  	if (of_machine_is_compatible("fsl,imx28-evk"))
->  		imx28_evk_init();
->  	else if (of_machine_is_compatible("bluegiga,apx4devkit"))
-> @@ -373,7 +488,7 @@ static void __init mxs_machine_init(void)
->  		cfa10049_init();
->  
->  	of_platform_populate(NULL, of_default_bus_match_table,
-> -			     mxs_auxdata_lookup, NULL);
-> +			     mxs_auxdata_lookup, parent);
->  
->  	if (of_machine_is_compatible("karo,tx28"))
->  		tx28_post_init();
-> -- 
-> 1.8.1.2
-> 
+>
+> Heiko
