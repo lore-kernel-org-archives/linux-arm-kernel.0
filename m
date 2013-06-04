@@ -1,81 +1,164 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Tue, 04 Jun 2013 17:58:05 +0530
-Subject: [PATCH V5 0/5]  clk: Samsung: audss: Register audio subsytem clocks
- using common clk framework
-Message-ID: <1370348890-6645-1-git-send-email-padma.v@samsung.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 4 Jun 2013 17:56:01 +0530
+Subject: [PATCH v6 1/9] drivers: phy: add generic PHY framework
+In-Reply-To: <51ADBF9B.5060403@samsung.com>
+References: <1367229812-30574-1-git-send-email-kishon@ti.com>
+ <1367229812-30574-2-git-send-email-kishon@ti.com>
+ <51ADBF9B.5060403@samsung.com>
+Message-ID: <51ADDCD9.8080400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samsung S5PV210 and Exynos SoC has a separate subsystem for audio. This subsystem
-has a internal clock controller which controls i2s0 and pcm0 clocks. This patch
-series adds the Samsung audio subsytem clock to the common clock framework and
-provides the I2S controllers clock information in the dtsi file.
+Hi,
 
-This patch series is made based on Kukjin Kim for-next branch
+On Tuesday 04 June 2013 03:51 PM, Sylwester Nawrocki wrote:
+> On 04/29/2013 12:03 PM, Kishon Vijay Abraham I wrote:
+>> The PHY framework provides a set of APIs for the PHY drivers to
+>> create/destroy a PHY and APIs for the PHY users to obtain a reference to the
+>> PHY with or without using phandle. For dt-boot, the PHY drivers should
+>> also register *PHY provider* with the framework.
+>>
+>> PHY drivers should create the PHY by passing id and ops like init, exit,
+>> power_on and power_off. This framework is also pm runtime enabled.
+>>
+>> The documentation for the generic PHY framework is added in
+>> Documentation/phy.txt and the documentation for dt binding can be found at
+>> Documentation/devicetree/bindings/phy/phy-bindings.txt
+>>
+>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>> ---
+>>   .../devicetree/bindings/phy/phy-bindings.txt       |   66 +++
+>>   Documentation/phy.txt                              |  123 +++++
+>>   MAINTAINERS                                        |    7 +
+>>   drivers/Kconfig                                    |    2 +
+>>   drivers/Makefile                                   |    2 +
+>>   drivers/phy/Kconfig                                |   13 +
+>>   drivers/phy/Makefile                               |    5 +
+>>   drivers/phy/phy-core.c                             |  539 ++++++++++++++++++++
+>>   include/linux/phy/phy.h                            |  248 +++++++++
+>>   9 files changed, 1005 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/phy/phy-bindings.txt
+>>   create mode 100644 Documentation/phy.txt
+>>   create mode 100644 drivers/phy/Kconfig
+>>   create mode 100644 drivers/phy/Makefile
+>>   create mode 100644 drivers/phy/phy-core.c
+>>   create mode 100644 include/linux/phy/phy.h
+>
+>> +static inline int phy_init(struct phy *phy)
+>> +{
+>> +	pm_runtime_get_sync(&phy->dev);
+>
+> Hmm, no need to check return value here ? Also it looks a bit unexpected to
 
-Changes since V4:
-        - Reworked on the nits given by Doug.
-        - Removed mout_audss and mout_i2s from i2s nodes as we are not
-          getting these clocks in the i2s driver.
-        - Modified the I2S binding documentation for clocks and pinmux.
+I purposely dint check the return values in order to support platforms 
+that don?t enable pm_runtime.
+> possibly have runtime_resume callback of a PHY device called before ops->init()
+> call ? It seems a bit unclear what the purpose of init() callback is.
 
-Changes since V3:
-        - Replaced samsung with exynos in the macro prefixes and function names
-          as this driver supports mainly exynos and s5p family.
-        - Added Reviewed-by:Sylwester Nawrocki <s.nawrocki@samsung.com>
+Not really. Anything that is used to initialize the PHY (internal 
+configuration) can go in phy_init. Usually in runtime_resume callback, 
+optional functional clocks are enabled and also in some cases context 
+restore is done. So it really makes sense to enable clocks/module 
+(pm_runtime_get_sync) before doing a PHY configuration (phy_init).
 
-Changes since V2:
-        - Removed s5pv210 compatible name from driver as it is
-          not yet supported which is different from Exynos series
-          audio subsystem clock conroller.
-        - Removed clkdev lookup support and added alias names in
-          the i2s0 controller node.
-Changes since V1:
-        - Reworked on all review comments by Sylwester Nawrocki
-        - Added a header file for all clock indexes as requested by Sylwester
-        - Added different compatible names for s5pv210, exynos4 and exynos5
-        - Registered the pcm clocks with common clock framework
+>
+>> +	if (phy->ops->init)
+>> +		return phy->ops->init(phy);
+>> +
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +static inline int phy_exit(struct phy *phy)
+>> +{
+>> +	int ret = -EINVAL;
+>> +
+>> +	if (phy->ops->exit)
+>> +		ret = phy->ops->exit(phy);
+>> +
+>> +	pm_runtime_put_sync(&phy->dev);
+>> +
+>> +	return ret;
+>> +}
+>
+> Do phy_init/phy_exit need to be mandatory ? What if there is really
 
-Padmavathi Venna (5):
-  ARM: samsung: use #include for all device trees
-  clk: samsung: register audio subsystem clocks using common clock
-    framework
-  ARM: dts: add Exynos audio subsystem clock controller node
-  ARM: dts: add clock provider information for i2s controllers in
-    Exynos5250
-  ARM: dts: Update Samsung I2S documentation
+No. phy_init/phy_exit is not mandatory at all.
+> nothing to do in those callbacks ? Perhaps -ENOIOCTLCMD should be
+> returned if a callback is not implemented, so PHY users can recognize
+> such situation and proceed ?
 
- .../devicetree/bindings/clock/clk-exynos-audss.txt |   64 ++++++++++
- .../devicetree/bindings/sound/samsung-i2s.txt      |   40 ++----
- arch/arm/boot/dts/exynos4.dtsi                     |    2 +-
- arch/arm/boot/dts/exynos4210-origen.dts            |    2 +-
- arch/arm/boot/dts/exynos4210-smdkv310.dts          |    2 +-
- arch/arm/boot/dts/exynos4210-trats.dts             |    2 +-
- arch/arm/boot/dts/exynos4210-universal_c210.dts    |    2 +-
- arch/arm/boot/dts/exynos4210.dtsi                  |    4 +-
- arch/arm/boot/dts/exynos4212.dtsi                  |    2 +-
- arch/arm/boot/dts/exynos4412-odroidx.dts           |    2 +-
- arch/arm/boot/dts/exynos4412-origen.dts            |    2 +-
- arch/arm/boot/dts/exynos4412-smdk4412.dts          |    2 +-
- arch/arm/boot/dts/exynos4412.dtsi                  |    2 +-
- arch/arm/boot/dts/exynos4x12.dtsi                  |    4 +-
- arch/arm/boot/dts/exynos5250-arndale.dts           |    2 +-
- arch/arm/boot/dts/exynos5250-smdk5250.dts          |    2 +-
- arch/arm/boot/dts/exynos5250-snow.dts              |    4 +-
- arch/arm/boot/dts/exynos5250.dtsi                  |   20 +++-
- arch/arm/boot/dts/exynos5440-sd5v1.dts             |    2 +-
- arch/arm/boot/dts/exynos5440-ssdk5440.dts          |    2 +-
- arch/arm/boot/dts/exynos5440.dtsi                  |    2 +-
- arch/arm/boot/dts/s3c2416-smdk2416.dts             |    2 +-
- arch/arm/boot/dts/s3c2416.dtsi                     |    4 +-
- arch/arm/boot/dts/s3c24xx.dtsi                     |    2 +-
- drivers/clk/samsung/Makefile                       |    1 +
- drivers/clk/samsung/clk-exynos-audss.c             |  133 ++++++++++++++++++++
- include/dt-bindings/clk/exynos-audss-clk.h         |   25 ++++
- 27 files changed, 279 insertions(+), 54 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
- create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
- create mode 100644 include/dt-bindings/clk/exynos-audss-clk.h
+So currently these APIs return -EINVAL if these callbacks are not 
+populated which is good enough IMHO.
+>
+>> +static inline int phy_power_on(struct phy *phy)
+>> +{
+>> +	if (phy->ops->power_on)
+>> +		return phy->ops->power_on(phy);
+>> +
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +static inline int phy_power_off(struct phy *phy)
+>> +{
+>> +	if (phy->ops->power_off)
+>> +		return phy->ops->power_off(phy);
+>> +
+>> +	return -EINVAL;
+>> +}
+>> +
+>> +static inline int phy_pm_runtime_get(struct phy *phy)
+>> +{
+>> +	if (WARN(IS_ERR(phy), "Invalid PHY reference\n"))
+>> +		return -EINVAL;
+>> +
+>> +	return pm_runtime_get(&phy->dev);
+>> +}
+>> +
+>> +static inline int phy_pm_runtime_get_sync(struct phy *phy)
+>> +{
+>> +	if (WARN(IS_ERR(phy), "Invalid PHY reference\n"))
+>> +		return -EINVAL;
+>> +
+>> +	return pm_runtime_get_sync(&phy->dev);
+>> +}
+>> +
+>> +static inline int phy_pm_runtime_put(struct phy *phy)
+>> +{
+>> +	if (WARN(IS_ERR(phy), "Invalid PHY reference\n"))
+>> +		return -EINVAL;
+>> +
+>> +	return pm_runtime_put(&phy->dev);
+>> +}
+>> +
+>> +static inline int phy_pm_runtime_put_sync(struct phy *phy)
+>> +{
+>> +	if (WARN(IS_ERR(phy), "Invalid PHY reference\n"))
+>> +		return -EINVAL;
+>> +
+>> +	return pm_runtime_put_sync(&phy->dev);
+>> +}
+>> +
+>> +static inline void phy_pm_runtime_allow(struct phy *phy)
+>> +{
+>> +	if (WARN(IS_ERR(phy), "Invalid PHY reference\n"))
+>> +		return;
+>> +
+>> +	pm_runtime_allow(&phy->dev);
+>> +}
+>> +
+>> +static inline void phy_pm_runtime_forbid(struct phy *phy)
+>> +{
+>> +	if (WARN(IS_ERR(phy), "Invalid PHY reference\n"))
+>> +		return;
+>> +
+>> +	pm_runtime_forbid(&phy->dev);
+>> +}
+>
+> Do we need to have all these runtime PM wrappers ? I guess you
+> intended to avoid referencing phy->dev from the PHY consumers ?
 
--- 
-1.7.4.4
+Yeah.. I dint want pm_runtime of phy core device to be called from PHY 
+consumers.
+
+Thanks
+Kishon
