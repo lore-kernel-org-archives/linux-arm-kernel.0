@@ -1,96 +1,41 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 4 Jun 2013 11:53:16 +0200
-Subject: [PATCH] ARM: ux500: drop any 0x prefix from I2C DT devices
-Message-ID: <1370339596-21606-1-git-send-email-linus.walleij@stericsson.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Tue, 4 Jun 2013 11:56:57 +0200
+Subject: [PATCH 4/5] ARM: ux500: Provide auxdata to ux500 ASoC driver
+In-Reply-To: <CACRpkda8h_zewd2M7QzvoLn15iDEUv8XYCGqro62chiCcYaM8Q@mail.gmail.com>
+References: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
+ <1369920465-13905-5-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkda8h_zewd2M7QzvoLn15iDEUv8XYCGqro62chiCcYaM8Q@mail.gmail.com>
+Message-ID: <20130604095657.GA9581@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, Jun 04, 2013 at 11:03:41AM +0200, Linus Walleij wrote:
+> On Thu, May 30, 2013 at 3:27 PM, Fabio Baltieri
+> <fabio.baltieri@linaro.org> wrote:
+> 
+> > Ux500 ASoC driver is expected to have a specific device name to get
+> > clock resources correctly.  This patch provides the necessary
+> > OF_DEV_AUXDATA to match the name in DT and non-DT cases.
+> >
+> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> 
+> Patch applied to my ux500-devicetree branch after some rebasing.
 
-This removes the "0x" prefix in front of the I2C DT device
-address designation for each I2C DT node in the ux500
-devicetree files.
+Thanks!  I saw that a lot patches are stacking up in the tree, do you
+plan to send an intermediate pull request to get these on
+arm-soc/for-next (and linux-next)?
 
-Reported-by: Bryan Wu <cooloney@gmail.com>
-Cc: Lee Jones <lee.jones@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/href.dtsi      | 2 +-
- arch/arm/boot/dts/hrefprev60.dts | 2 +-
- arch/arm/boot/dts/snowball.dts   | 6 +++---
- arch/arm/boot/dts/stuib.dtsi     | 4 ++--
- 4 files changed, 7 insertions(+), 7 deletions(-)
+Thanks,
+Fabio
 
-diff --git a/arch/arm/boot/dts/href.dtsi b/arch/arm/boot/dts/href.dtsi
-index 080c530..9db41b9 100644
---- a/arch/arm/boot/dts/href.dtsi
-+++ b/arch/arm/boot/dts/href.dtsi
-@@ -100,7 +100,7 @@
- 					max-cur = /bits/ 8 <0x5f>;
- 				};
- 			};
--			bh1780 at 0x29 {
-+			bh1780 at 29 {
- 				compatible = "rohm,bh1780gli";
- 				reg = <0x33>;
- 			};
-diff --git a/arch/arm/boot/dts/hrefprev60.dts b/arch/arm/boot/dts/hrefprev60.dts
-index 23c6dc1..c6bb07d 100644
---- a/arch/arm/boot/dts/hrefprev60.dts
-+++ b/arch/arm/boot/dts/hrefprev60.dts
-@@ -41,7 +41,7 @@
- 		};
- 
- 		i2c at 80110000 {
--			bu21013_tp at 0x5c {
-+			bu21013_tp at 5c {
- 				reset-gpio = <&tc3589x_gpio 13 0x4>;
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/snowball.dts b/arch/arm/boot/dts/snowball.dts
-index 92c2f5ad..fb9dce5 100644
---- a/arch/arm/boot/dts/snowball.dts
-+++ b/arch/arm/boot/dts/snowball.dts
-@@ -178,15 +178,15 @@
- 		};
- 
- 		i2c at 80128000 {
--			lp5521 at 0x33 {
-+			lp5521 at 33 {
- 				// compatible = "lp5521";
- 				reg = <0x33>;
- 			};
--			lp5521 at 0x34 {
-+			lp5521 at 34 {
- 				// compatible = "lp5521";
- 				reg = <0x34>;
- 			};
--			bh1780 at 0x29 {
-+			bh1780 at 29 {
- 				// compatible = "rohm,bh1780gli";
- 				reg = <0x33>;
- 			};
-diff --git a/arch/arm/boot/dts/stuib.dtsi b/arch/arm/boot/dts/stuib.dtsi
-index b47b62a..524e332 100644
---- a/arch/arm/boot/dts/stuib.dtsi
-+++ b/arch/arm/boot/dts/stuib.dtsi
-@@ -54,7 +54,7 @@
- 		};
- 
- 		i2c at 80110000 {
--			bu21013_tp at 0x5c {
-+			bu21013_tp at 5c {
- 				compatible = "rohm,bu21013_tp";
- 				reg = <0x5c>;
- 				touch-gpio = <&gpio2 20 0x4>;
-@@ -65,7 +65,7 @@
- 				rohm,flip-y;
- 			};
- 
--			bu21013_tp at 0x5d {
-+			bu21013_tp at 5d {
- 				compatible = "rohm,bu21013_tp";
- 				reg = <0x5d>;
- 				touch-gpio = <&gpio2 20 0x4>;
+> 
+> Yours,
+> Linus Walleij
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
 -- 
-1.7.11.3
+Fabio Baltieri
