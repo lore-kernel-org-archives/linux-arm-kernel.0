@@ -1,104 +1,26 @@
-From: jh80.chung@samsung.com (Jaehoon Chung)
-Date: Tue, 04 Jun 2013 13:06:39 +0900
-Subject: [PATCH 06/10] mmc: dw_mmc-pltfm: add Rockchip variant
-In-Reply-To: <201306030059.03783.heiko@sntech.de>
-References: <201306030055.15413.heiko@sntech.de>
- <201306030059.03783.heiko@sntech.de>
-Message-ID: <51AD67CF.60300@samsung.com>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Tue,  4 Jun 2013 12:12:42 +0800
+Subject: [PATCH v4 00/10] update irqchip, clocksource, clk for mmp
+Message-ID: <1370319172-31788-1-git-send-email-haojian.zhuang@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 07:59 AM, Heiko St?bner wrote:
-> Cortex-A9 SoCs from Rockchip use a slightly modified variant of dw_mmc
-> controllers that seems to require the SDMMC_CMD_USE_HOLD_REG bit to
-> always be set.
-> 
-> There also seem to be no other modifications (additional register etc)
-> present, so to keep the footprint low, add this small variant to the
-> pltfm driver.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/mmc/host/dw_mmc-pltfm.c |   48 +++++++++++++++++++++++++++-----------
->  1 files changed, 34 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-> index 0048da8..7d041b5 100644
-> --- a/drivers/mmc/host/dw_mmc-pltfm.c
-> +++ b/drivers/mmc/host/dw_mmc-pltfm.c
-> @@ -24,6 +24,16 @@
->  
->  #include "dw_mmc.h"
->  
-> +
-> +static void dw_mci_rockchip_prepare_command(struct dw_mci *host, u32 *cmdr)
-How about using "dw_mci_pltfm_prepare_command()"?
-Maybe HOLD_REG could be used at other SoC.
-> +{
-> +	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-> +}
-> +
-> +static const struct dw_mci_drv_data rockchip_drv_data = {
-> +	.prepare_command	= dw_mci_rockchip_prepare_command,
-> +};
-> +
->  int dw_mci_pltfm_register(struct platform_device *pdev,
->  				const struct dw_mci_drv_data *drv_data)
->  {
-> @@ -63,20 +73,6 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
->  }
->  EXPORT_SYMBOL_GPL(dw_mci_pltfm_register);
->  
-> -static int dw_mci_pltfm_probe(struct platform_device *pdev)
-> -{
-> -	return dw_mci_pltfm_register(pdev, NULL);
-> -}
-> -
-> -int dw_mci_pltfm_remove(struct platform_device *pdev)
-> -{
-> -	struct dw_mci *host = platform_get_drvdata(pdev);
-> -
-> -	dw_mci_remove(host);
-> -	return 0;
-> -}
-> -EXPORT_SYMBOL_GPL(dw_mci_pltfm_remove);
-> -
->  #ifdef CONFIG_PM_SLEEP
->  /*
->   * TODO: we should probably disable the clock to the card in the suspend path.
-> @@ -114,10 +110,34 @@ EXPORT_SYMBOL_GPL(dw_mci_pltfm_pmops);
->  
->  static const struct of_device_id dw_mci_pltfm_match[] = {
->  	{ .compatible = "snps,dw-mshc", },
-> +	{ .compatible = "rockchip,cortex-a9-dw-mshc",
-> +		.data = &rockchip_drv_data },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
->  
-> +static int dw_mci_pltfm_probe(struct platform_device *pdev)
-> +{
-> +	const struct dw_mci_drv_data *drv_data = NULL;
-> +	const struct of_device_id *match;
-> +
-> +	if (pdev->dev.of_node) {
-> +		match = of_match_node(dw_mci_pltfm_match, pdev->dev.of_node);
-> +		drv_data = match->data;
-> +	}
-> +
-> +	return dw_mci_pltfm_register(pdev, drv_data);
-> +}
-> +
-> +int dw_mci_pltfm_remove(struct platform_device *pdev)
-> +{
-> +	struct dw_mci *host = platform_get_drvdata(pdev);
-> +
-> +	dw_mci_remove(host);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(dw_mci_pltfm_remove);
-> +
->  static struct platform_driver dw_mci_pltfm_driver = {
->  	.probe		= dw_mci_pltfm_probe,
->  	.remove		= dw_mci_pltfm_remove,
-> 
+Changelog:
+v4:
+1. Remove .init_irq in mmp & mmp2 DT machine descriptor.
+2. Use an argument to replace TIMER_PHYS_BASE. Now transfer virtual
+address directly.
+3. Merge 10th & 11th patches together. Remove the redundant changes
+on drivers/clocksource/Kconfig & drivers/clocksource/Makefile.
+
+v3:
+1. Don't use include/linux/irqchip/mmp.h since we don't need to
+move <mach/irqs.h> to <include/linux/irqchip/mmp.h>.
+2. Move timer-mmp driver into clocksource directory & support
+clocksource.
+3. Support clksrc in mmp & parse all clock from DTS.
+
+v2:
+1. Avoid to include <mach/irqs.h>. Move the head file into
+? ?include/linux/irqchip directory.
+2. Avoid to include <mach/pm-pxa910.h> & <mach/pm-mmp2.h>.
