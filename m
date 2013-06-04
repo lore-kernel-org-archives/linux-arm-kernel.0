@@ -1,83 +1,87 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 04 Jun 2013 10:54:54 -0700
-Subject: [PATCH] rtc: rtc-twl: ensure IRQ is wakeup enabled
-In-Reply-To: <20130603161303.55e9da049744656541e9048f@linux-foundation.org>
- (Andrew Morton's message of "Mon, 3 Jun 2013 16:13:03 -0700")
-References: <1370039827-25033-1-git-send-email-khilman@linaro.org>
- <20130603161303.55e9da049744656541e9048f@linux-foundation.org>
-Message-ID: <87k3m93gnl.fsf@linaro.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 4 Jun 2013 18:55:10 +0100
+Subject: [RFC PATCH 2/2] ARM: kernel: implement stack pointer save array
+ through MPIDR hashing
+In-Reply-To: <alpine.LFD.2.03.1306041235290.1200@syhkavp.arg>
+References: <1370338453-8749-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1370338453-8749-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <alpine.LFD.2.03.1306041235290.1200@syhkavp.arg>
+Message-ID: <20130604175509.GA21719@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Morton <akpm@linux-foundation.org> writes:
+On Tue, Jun 04, 2013 at 06:30:30PM +0100, Nicolas Pitre wrote:
+> On Tue, 4 Jun 2013, Lorenzo Pieralisi wrote:
+> 
+> > index 987dcf3..da1b65f 100644
+> > --- a/arch/arm/kernel/sleep.S
+> > +++ b/arch/arm/kernel/sleep.S
+> > @@ -7,6 +7,48 @@
+> >  	.text
+> >  
+> >  /*
+> > + * Implementation of MPIDR hash algorithm through shifting
+> > + * and OR'ing.
+> > + *
+> > + * @dst: register containing hash result
+> > + * @rtemp0: scratch register 0
+> > + * @rtemp1: scratch register 1
+> > + * @rtemp2: scratch register 2
+> > + * @rs0: register containing affinity level 0 bit shift
+> > + * @rs1: register containing affinity level 1 bit shift
+> > + * @rs2: register containing affinity level 2 bit shift
+> > + * @mpidr: register containing MPIDR value
+> > + * @mask: register containing MPIDR mask
+> > + *
+> > + * Pseudo C-code:
+> > + *
+> > + *u32 dst;
+> > + *
+> > + *compute_mpidr_hash(u32 rs0, u32 rs1, u32 rs2, u32 mpidr, u32 mask) {
+> > + *	u32 rtemp0, rtemp1, rtemp2;
+> > + *	u32 mpidr_masked = mpidr & mask;
+> > + *	rtemp0 = mpidr_masked & 0xff;
+> > + *	rtemp1 = mpidr_masked & 0xff00;
+> > + *	rtemp2 = mpidr_masked & 0xff0000;
+> > + *	dst = (rtemp0 >> rs0 | rtemp1 >> rs1 | rtemp2 >> rs2);
+> > + *}
+> > + */
+> > +.macro compute_mpidr_hash dst, rtemp0, rtemp1, rtemp2, rs0, rs1, 
+> rs2, mpidr, mask
+> > +	and	\mpidr, \mpidr, \mask		@ mask out unused MPIDR bits
+> > +	and	\rtemp0, \mpidr, #0xff		@ extracts aff0
+> > +	and	\rtemp1, \mpidr, #0xff00	@ extracts aff1
+> > +	and	\rtemp2, \mpidr, #0xff0000	@ extracts aff2
+> > +  ARM(	mov	\dst, \rtemp0, lsr \rs0)	@ dst=aff0>>rs0
+> > +  ARM(	orr	\dst, \dst, \rtemp1, lsr \rs1)	@ dst|=(aff1>>rs1)
+> > +  ARM(	orr	\dst, \dst, \rtemp2, lsr \rs2)		@ dst|=(aff2>>rs2)
+> > +THUMB(	mov	\rtemp0, \rtemp0, lsr \rs0)		@ aff0>>=rs0
+> > +THUMB(	mov	\rtemp1, \rtemp1, lsr \rs1)		@ aff1>>=rs1
+> > +THUMB(	mov	\rtemp2, \rtemp2, lsr \rs2)		@ aff2>>=rs2
+> > +THUMB(	orr	\dst, \rtemp0, \rtemp1)			@ dst = aff0 | aff1
+> > +THUMB(	orr	\dst, \dst, \rtemp2)			@ dts |= aff2
+> > +.endm
+> 
+> This would be much nicer by useing fewer registers.  I'd suggest this 
+> instead of guessing which registers can be duplicated in the 
+> macro invokation:
+> 
+> .macro compute_mpidr_hash dst, rs0, rs1, rs2, mpidr, mask
+> 	and	\mpidr, \mpidr, \mask		@ mask out unused MPIDR bits
+> 	and	\dst, \mpidr, #0xff		@ extracts aff0
+>    ARM(	mov	\dst, \dst, lsr \rs0 )	@ dst = aff0 >> rs0
+>  THUMB(	lsr	\dst, \rs0 )
+> 	and	\mask, \mpidr, #0xff00	@ extracts aff1
+>    ARM(	orr	\dst, \dst, \mask, lsr \rs1 )	@ dst |= (aff1 >> rs1)
+>  THUMB(	lsr	\mask, \rs1 )
+>  THUMB(	orr	\dst, \mask )
+> 	and	\mask, \mpidr, #0xff0000	@ extracts aff2
+>    ARM(	orr	\dst, \dst, \mask, lsr \rs2 )	@ dst |= (aff2 >> rs1)
+>  THUMB(	lsr	\mask, \rs2 )
+>  THUMB(	orr	\dst, \mask )
+> .endm
 
-> On Fri, 31 May 2013 15:37:07 -0700 Kevin Hilman <khilman@linaro.org> wrote:
->
->> Currently, the RTC IRQ is never wakeup-enabled so is not capable of
->> bringing the system out of suspend.
->> 
->> On OMAP platforms, we have gotten by without this because the TWL RTC
->> is on an I2C-connected chip which is capable of waking up the OMAP via
->> the IO ring when the OMAP is in low-power states.
->> 
->> However, if the OMAP suspends without hitting the low-power states
->> (and the IO ring is not enabled), RTC wakeups will not work because
->> the IRQ is not wakeup enabled.
->> 
->> To fix, ensure the RTC IRQ is wakeup enabled whenever the RTC alarm is
->> set.
->> 
->> --- a/drivers/rtc/rtc-twl.c
->> +++ b/drivers/rtc/rtc-twl.c
->> @@ -213,12 +213,24 @@ static int mask_rtc_irq_bit(unsigned char bit)
->>  
->>  static int twl_rtc_alarm_irq_enable(struct device *dev, unsigned enabled)
->>  {
->> +	struct platform_device *pdev = to_platform_device(dev);
->> +	int irq = platform_get_irq(pdev, 0);
->> +	static bool twl_rtc_wake_enabled;
->>  	int ret;
->>  
->> -	if (enabled)
->> +	if (enabled) {
->>  		ret = set_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
->> -	else
->> +		if (device_can_wakeup(dev) && !twl_rtc_wake_enabled) {
->> +			enable_irq_wake(irq);
->> +			twl_rtc_wake_enabled = true;
->> +		}
->> +	} else {
->>  		ret = mask_rtc_irq_bit(BIT_RTC_INTERRUPTS_REG_IT_ALARM_M);
->> +		if (twl_rtc_wake_enabled) {
->> +			disable_irq_wake(irq);
->> +			twl_rtc_wake_enabled = false;
->> +		}
->> +	}
->
-> Why do we need this (slightly racy) logic with twl_rtc_wake_enabled? 
-> Other drivers don't do this.
+It _is_ nicer and probably faster in the cpu_resume path. Consider it applied.
 
-I suspect the other drivers don't do this because they're making these
-calls in their suspend/resume callbacks and can make assumptions about 
-the order and balance of the calls (e.g. the PM core will not call your
-resume callback if your suspend callback hasn't been called.)  What's
-being protected against is imbalanced calling of the IRQ wake calls
-(e.g. calling disable_irq_wake() on an IRQ where enable_irq_wake() has
-not been called.)
-
-In this patch, I'm using the rtc_alarm_irq_enable() function instead of
-the suspend/resume functions because of some limitations of parent
-device of this one (I described that at the end of a previous reponse to
-this thread[1].)  Because of that, I cannot make the same assumptions
-about the ordering of enable/disable calls to this function.
-
-> Should we test device_may_wakeup() befre running disable_irq_wake()? 
-> Most drivers seem to do this, but it's all a bit foggy.
-
-I suppose I could've added that check too for symmetry, but it would be
-redundant because the twl_rtc_wake_enabled flag can only be set when
-device_can_wakeup() == true.
-
-Kevin
-
-[1] http://marc.info/?l=linux-omap&m=137036801320665&w=2
+Thank you very much,
+Lorenzo
