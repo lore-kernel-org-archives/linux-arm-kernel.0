@@ -1,73 +1,87 @@
-From: neko@bakuhatsu.net (Matt Sealey)
-Date: Tue, 4 Jun 2013 12:39:53 -0500
-Subject: [PATCH RFC 3/3] clk: dt: binding for basic divider clock
-In-Reply-To: <51AE1FBB.1070806@codeaurora.org>
-References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
- <1370281990-15090-4-git-send-email-mturquette@linaro.org>
- <51AE1FBB.1070806@codeaurora.org>
-Message-ID: <CAHCPf3tZAbdVZPuKOjxJbCOAE76Pa6wMVHjnBRPhSpj0aMBMHg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 04 Jun 2013 13:39:42 -0400 (EDT)
+Subject: [PATCH] ARM: pcpu: ensure __my_cpu_offset cannot be re-ordered
+ across barrier()
+In-Reply-To: <20130604171506.GZ27516@mudshark.cambridge.arm.com>
+References: <1370278405-13261-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1306031339010.1200@syhkavp.arg>
+ <20130604103953.GL27516@mudshark.cambridge.arm.com>
+ <20130604171506.GZ27516@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1306041336060.1200@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 4, 2013 at 12:11 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/03/13 10:53, Mike Turquette wrote:
->> +Required properties:
->> +- compatible : shall be "divider-clock".
->> +- #clock-cells : from common clock binding; shall be set to 0.
->> +- clocks : link to phandle of parent clock
->> +- reg : base address for register controlling adjustable divider
->> +- mask : arbitrary bitmask for programming the adjustable divider
->> +
->> +Optional properties:
->> +- clock-output-names : From common clock binding.
->> +- table : array of integer pairs defining divisors & bitfield values
->> +- shift : number of bits to shift the mask, defaults to 0 if not present
->> +- index_one : valid divisor programming starts at 1, not zero
->> +- index_power_of_two : valid divisor programming must be a power of two
->> +- allow_zero : implies index_one, and programming zero results in
->> +  divide-by-one
->
-> It's preferred that property names have dashes instead of underscores.
+On Tue, 4 Jun 2013, Will Deacon wrote:
 
-I think I have a suggestion or two here..
+> On Tue, Jun 04, 2013 at 11:39:53AM +0100, Will Deacon wrote:
+> > However, if you instead add a dependency on something that already lives in a
+> > register, like __builtin_return_address, you get:
+> > 
+> > c001cd44:       e92d4010        push    {r4, lr}
+> > c001cd48:       ee1dcf90        mrc     15, 0, ip, cr13, cr0, {4}
+> > c001cd4c:       e790410c        ldr     r4, [r0, ip, lsl #2]
+> > c001cd50:       ee1dcf90        mrc     15, 0, ip, cr13, cr0, {4}
+> > c001cd54:       e791110c        ldr     r1, [r1, ip, lsl #2]
+> > c001cd58:       e792210c        ldr     r2, [r2, ip, lsl #2]
+> > c001cd5c:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
+> > c001cd60:       e7903103        ldr     r3, [r0, r3, lsl #2]
+> > c001cd64:       e0840001        add     r0, r4, r1
+> > c001cd68:       e0800002        add     r0, r0, r2
+> > c001cd6c:       e0800003        add     r0, r0, r3
+> > c001cd70:       e8bd8010        pop     {r4, pc}
+> 
+> Actually, I've managed to improve this further using sp instead (see diff
+> below), which also prevents GCC from moving the lr into other registers for
+> no reason. The code generated for your test is:
+> 
+> c001cda4:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
+> c001cda8:       e790c103        ldr     ip, [r0, r3, lsl #2]
+> c001cdac:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
+> c001cdb0:       e7911103        ldr     r1, [r1, r3, lsl #2]
+> c001cdb4:       e7922103        ldr     r2, [r2, r3, lsl #2]
+> c001cdb8:       ee1d3f90        mrc     15, 0, r3, cr13, cr0, {4}
+> c001cdbc:       e7903103        ldr     r3, [r0, r3, lsl #2]
+> c001cdc0:       e08c0001        add     r0, ip, r1
+> c001cdc4:       e0800002        add     r0, r0, r2
+> c001cdc8:       e0800003        add     r0, r0, r3
+> c001cdcc:       e12fff1e        bx      lr
 
-I mailed one to Mike earlier, I have had some mailing list problems
-which I think are solved now..
+Excellent.
 
-If you provide a mask for programming the divider, surely the "shift"
-property is therefore redundant. Unless some device has a completely
-strange way of doing things and uses two seperated bitfields for
-programming in the same register, the shift value is simply a function
-of ffs() on the mask, isn't it? It is nice to put the information
-specifically in the device tree, but where a shift is not specified
-it'd probably be a good idea to go about deriving that value that way
-anyway, right, and if we're doing that.. why specify it?
+> I spoke to the tools guys and they'll look into why the original patch
+> didn't work, since that could have wider implications on our use of
+> barrier().
 
-Also it may be much simpler to simply define the default clock setup
-as being an integer divider that follows the form 2^n - I am not sure
-I can think off the top of my head of any clock dividers doing the
-rounds that have divide-by-non-power-of-two and if they exist out
-there (please correct me) they would be the rare ones. I think
-properties that modify behavior should err on the side of being rarely
-used and to define unusual behavior, not confirm the status quo.
+Good.  However, given the wide range of gcc versions exhibiting the same 
+behavior, I think your patch is the best way forward even if gcc were to 
+be broken and eventually fixed.
 
-Just to be sure, though, someone would need to go visit a bunch of
-current clock handlers already implemented or read a lot of docs to
-see how they're expecting their dividers. Maybe some of the Samsung,
-Qualcomm, TI, Freescale guys can comment on what is the most common
-case inside their SoCs.
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-In any case, once you figure out that, rather than specifying a full
-table of <0 1>, <1 2>, <2, 4> and creating a big list, you could just
-give the lower and upper limits and let the driver figure out what is
-in between with two values. If there were gaps, a full table would be
-necessary. The allow zero property might be better served by the very
-same range property.
+I'd suggest queuing it for stable as well.
 
-I would also say.. bit-mask rather than mask, divider-table rather
-than table, divider-range (modifying the idea above). While we're
-inside a particular namespace in the binding I think naming properties
-with their intent (i.e. what table is it?) is good behavior.
-
---
-Matt Sealey <matt@genesi-usa.com>
+> --->8
+> 
+> diff --git a/arch/arm/include/asm/percpu.h b/arch/arm/include/asm/percpu.h
+> index 968c0a1..209e650 100644
+> --- a/arch/arm/include/asm/percpu.h
+> +++ b/arch/arm/include/asm/percpu.h
+> @@ -30,8 +30,15 @@ static inline void set_my_cpu_offset(unsigned long off)
+>  static inline unsigned long __my_cpu_offset(void)
+>  {
+>         unsigned long off;
+> -       /* Read TPIDRPRW */
+> -       asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : : "memory");
+> +       register unsigned long *sp asm ("sp");
+> +
+> +       /*
+> +        * Read TPIDRPRW.
+> +        * We want to allow caching the value, so avoid using volatile and
+> +        * instead use a fake stack read to hazard against barrier().
+> +        */
+> +       asm("mrc p15, 0, %0, c13, c0, 4" : "=r" (off) : "Q" (*sp));
+> +
+>         return off;
+>  }
+>  #define __my_cpu_offset __my_cpu_offset()
+> 
