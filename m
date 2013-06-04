@@ -1,45 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 04 Jun 2013 17:12:10 +0200
-Subject: [PATCH v3] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
-In-Reply-To: <51ADF5C8.80007@free-electrons.com>
-References: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
- <51ADF04D.3040703@atmel.com> <51ADF5C8.80007@free-electrons.com>
-Message-ID: <1900947.vroxSJEyuA@wuerfel>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 4 Jun 2013 08:15:00 -0700
+Subject: [PATCH V4 3/4] ARM: dts: add Exynos audio subsystem clock
+ controller node
+In-Reply-To: <CAAgF-Bds5yy3J4fMQXhR4LEw5-6gtd2sHZOA+1dR-poASxrj4A@mail.gmail.com>
+References: <1370236744-16802-1-git-send-email-padma.v@samsung.com>
+ <1370236744-16802-4-git-send-email-padma.v@samsung.com>
+ <CAD=FV=WXEDA+R3BSn7TgSB5BpS2yuWGGmFDpxcQoYmQHGTAQMw@mail.gmail.com>
+ <CAAgF-Bds5yy3J4fMQXhR4LEw5-6gtd2sHZOA+1dR-poASxrj4A@mail.gmail.com>
+Message-ID: <CAD=FV=Wpm0bch13c6KmZmuH0OkRr-ts_DcbTa315KZ9tnxujkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 June 2013 16:12:24 Alexandre Belloni wrote:
-> On 04/06/2013 15:49, Nicolas Ferre wrote:
-> >
-> > ... simply use this "IS_BUILTIN(CONFIG_PHYLIB)" here -----^^^^^^^^^
-> > (and not above as suggested by Arnd).
-> >
-> > Jean-Christophe, Alexandre: do you agree with this conclusion?
-> >
-> > I plan to stack this patch for next at91-fixes batch.
-> >
-> 
-> Yeah, I prepared and tested that last week but didn't send it yet. I can
-> do it now if you want but you could probably just edit my patch. I'd
-> like to fix the other platforms too but that probably can wait.
-> 
-> I believe we would still have to fix the phy_register_fixup*() works as
-> it is always called from arch/ and is clearly not fool proofed enough.
-> Maybe DT could help ?
-> 
-> Arnd, do you have any input ?
+Padma,
 
-I've replied to the earlier thread now. Using if(IS_ENABLED(CONFIG_NET))
-or if(IS_ENABLED(CONFIG_PHYLIB)) in platform code should be just fine and
-is not a lof of extra effort.
+On Mon, Jun 3, 2013 at 9:25 PM, Padma Venkat <padma.kvr@gmail.com> wrote:
+> Hi Doug,
+>
+> On Tue, Jun 4, 2013 at 1:43 AM, Doug Anderson <dianders@chromium.org> wrote:
+>> Padmavathi,
+>>
+>> On Sun, Jun 2, 2013 at 10:19 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+>>> Audio subsystem introduced in s5pv210 and exynos platforms
+>>> which has a internal clock controller. This patch adds a node
+>>> for the same on exynos5250.
+>>>
+>>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>>> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> ---
+>>>  arch/arm/boot/dts/exynos5250.dtsi |    6 ++++++
+>>>  1 files changed, 6 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+>>> index bccda67..388983e 100644
+>>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>>> @@ -72,6 +72,12 @@
+>>>                 #clock-cells = <1>;
+>>>         };
+>>>
+>>> +       clock_audss: audss-clock-controller at 3810000 {
+>
+> I removed this leading 0 as Tomasz Figa suggested.
 
-As I explained in the other mail, I think IS_ENABLED() is better than
-IS_BUILTIN() because the case where the network driver is a loadable
-module would cause a silent run-time error with IS_BUILTIN, but a
-link time error with IS_ENABLED, and we can prevent that error by
-correctly expressing the dependency in Kconfig, e.g.
+Let's just leave this as-is if Tomasz wants no leading 0.  I don't
+much care either way but it's really nice if we're consistent within
+the file.
 
-config THIS_BOARD
-	select PHYLIB if THIS_BOARDS_NIC
 
-	Arnd
+>> Nit: other places in the same file have the leading 0, like
+>>   i2s0: i2s at 03830000 {
+>
+> This was the patch which got merged earlier. So I didn't modify this.
+> Is it okey if I remove  leading 0 for both of the nodes now?
+
+No, don't touch the i2s0 one in this patch.  I guess we'll have to
+merge a "cleanup" patch sometime later to try to normalize all this
+stuff, since nobody seems to be keeping a close eye on keeping it
+consistent.  I also see a whole bunch that have the 0x in the name
+which is yet another inconsistency.
+
+
+Reviewed-by: Doug Anderson <dianders@chromium.org>
