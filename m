@@ -1,117 +1,46 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Tue,  4 Jun 2013 13:07:14 +0200
-Subject: [PATCH 7/8] ARM i.MX53: mba53: fix lvds/disp pinctrl
-In-Reply-To: <1370344035-7417-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1370344035-7417-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <1370344035-7417-8-git-send-email-s.trumtrar@pengutronix.de>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 4 Jun 2013 12:19:49 +0100
+Subject: [PATCH] ARM: psci: fix building without HOTPLUG_CPU
+In-Reply-To: <18058683.rI3Z0PFpBd@wuerfel>
+References: <18058683.rI3Z0PFpBd@wuerfel>
+Message-ID: <alpine.DEB.2.02.1306041218200.4589@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-use NO_PAD_CTL / 0x80000000 instead of 0x10000 to prevent misconfigured pads
+On Tue, 4 Jun 2013, Arnd Bergmann wrote:
+> The cpu_die field in smp_operations is not valid with CONFIG_HOTPLUG_CPU,
+> so we must enclose it in #ifdef, but at least that lets us remove
+> two other lines.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
-[Steffen: split up patch into tqma53+mba53 part]
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
- arch/arm/boot/dts/imx53-mba53.dts | 74 +++++++++++++++++++--------------------
- 1 file changed, 37 insertions(+), 37 deletions(-)
+Reviewed-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
-diff --git a/arch/arm/boot/dts/imx53-mba53.dts b/arch/arm/boot/dts/imx53-mba53.dts
-index 4515d01..869aa3e 100644
---- a/arch/arm/boot/dts/imx53-mba53.dts
-+++ b/arch/arm/boot/dts/imx53-mba53.dts
-@@ -76,21 +76,21 @@
- 	lvds1 {
- 		pinctrl_lvds1_1: lvds1-grp1 {
- 			fsl,pins = <
--				MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3 0x10000
--				MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK 0x10000
--				MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2 0x10000
--				MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1 0x10000
--				MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0 0x10000
-+				MX53_PAD_LVDS0_TX3_P__LDB_LVDS0_TX3 0x80000000
-+				MX53_PAD_LVDS0_CLK_P__LDB_LVDS0_CLK 0x80000000
-+				MX53_PAD_LVDS0_TX2_P__LDB_LVDS0_TX2 0x80000000
-+				MX53_PAD_LVDS0_TX1_P__LDB_LVDS0_TX1 0x80000000
-+				MX53_PAD_LVDS0_TX0_P__LDB_LVDS0_TX0 0x80000000
- 			>;
- 		};
- 
- 		pinctrl_lvds1_2: lvds1-grp2 {
- 			fsl,pins = <
--				MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3 0x10000
--				MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2 0x10000
--				MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK 0x10000
--				MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1 0x10000
--				MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0 0x10000
-+				MX53_PAD_LVDS1_TX3_P__LDB_LVDS1_TX3 0x80000000
-+				MX53_PAD_LVDS1_TX2_P__LDB_LVDS1_TX2 0x80000000
-+				MX53_PAD_LVDS1_CLK_P__LDB_LVDS1_CLK 0x80000000
-+				MX53_PAD_LVDS1_TX1_P__LDB_LVDS1_TX1 0x80000000
-+				MX53_PAD_LVDS1_TX0_P__LDB_LVDS1_TX0 0x80000000
- 			>;
- 		};
- 	};
-@@ -98,33 +98,33 @@
- 	disp1 {
- 		pinctrl_disp1_1: disp1-grp1 {
- 			fsl,pins = <
--				MX53_PAD_EIM_DA10__IPU_DI1_PIN15   0x10000 /* DISP1_DRDY */
--				MX53_PAD_EIM_D23__IPU_DI1_PIN2     0x10000 /* DISP1_HSYNC */
--				MX53_PAD_EIM_EB3__IPU_DI1_PIN3     0x10000 /* DISP1_VSYNC */
--				MX53_PAD_EIM_D26__IPU_DISP1_DAT_22 0x10000
--				MX53_PAD_EIM_D27__IPU_DISP1_DAT_23 0x10000
--				MX53_PAD_EIM_D30__IPU_DISP1_DAT_21 0x10000
--				MX53_PAD_EIM_D31__IPU_DISP1_DAT_20 0x10000
--				MX53_PAD_EIM_A24__IPU_DISP1_DAT_19 0x10000
--				MX53_PAD_EIM_A23__IPU_DISP1_DAT_18 0x10000
--				MX53_PAD_EIM_A22__IPU_DISP1_DAT_17 0x10000
--				MX53_PAD_EIM_A21__IPU_DISP1_DAT_16 0x10000
--				MX53_PAD_EIM_A20__IPU_DISP1_DAT_15 0x10000
--				MX53_PAD_EIM_A19__IPU_DISP1_DAT_14 0x10000
--				MX53_PAD_EIM_A18__IPU_DISP1_DAT_13 0x10000
--				MX53_PAD_EIM_A17__IPU_DISP1_DAT_12 0x10000
--				MX53_PAD_EIM_EB0__IPU_DISP1_DAT_11 0x10000
--				MX53_PAD_EIM_EB1__IPU_DISP1_DAT_10 0x10000
--				MX53_PAD_EIM_DA0__IPU_DISP1_DAT_9  0x10000
--				MX53_PAD_EIM_DA1__IPU_DISP1_DAT_8  0x10000
--				MX53_PAD_EIM_DA2__IPU_DISP1_DAT_7  0x10000
--				MX53_PAD_EIM_DA3__IPU_DISP1_DAT_6  0x10000
--				MX53_PAD_EIM_DA4__IPU_DISP1_DAT_5  0x10000
--				MX53_PAD_EIM_DA5__IPU_DISP1_DAT_4  0x10000
--				MX53_PAD_EIM_DA6__IPU_DISP1_DAT_3  0x10000
--				MX53_PAD_EIM_DA7__IPU_DISP1_DAT_2  0x10000
--				MX53_PAD_EIM_DA8__IPU_DISP1_DAT_1  0x10000
--				MX53_PAD_EIM_DA9__IPU_DISP1_DAT_0  0x10000
-+				MX53_PAD_EIM_DA10__IPU_DI1_PIN15   0x80000000 /* DISP1_DRDY */
-+				MX53_PAD_EIM_D23__IPU_DI1_PIN2     0x80000000 /* DISP1_HSYNC */
-+				MX53_PAD_EIM_EB3__IPU_DI1_PIN3     0x80000000 /* DISP1_VSYNC */
-+				MX53_PAD_EIM_D26__IPU_DISP1_DAT_22 0x80000000
-+				MX53_PAD_EIM_D27__IPU_DISP1_DAT_23 0x80000000
-+				MX53_PAD_EIM_D30__IPU_DISP1_DAT_21 0x80000000
-+				MX53_PAD_EIM_D31__IPU_DISP1_DAT_20 0x80000000
-+				MX53_PAD_EIM_A24__IPU_DISP1_DAT_19 0x80000000
-+				MX53_PAD_EIM_A23__IPU_DISP1_DAT_18 0x80000000
-+				MX53_PAD_EIM_A22__IPU_DISP1_DAT_17 0x80000000
-+				MX53_PAD_EIM_A21__IPU_DISP1_DAT_16 0x80000000
-+				MX53_PAD_EIM_A20__IPU_DISP1_DAT_15 0x80000000
-+				MX53_PAD_EIM_A19__IPU_DISP1_DAT_14 0x80000000
-+				MX53_PAD_EIM_A18__IPU_DISP1_DAT_13 0x80000000
-+				MX53_PAD_EIM_A17__IPU_DISP1_DAT_12 0x80000000
-+				MX53_PAD_EIM_EB0__IPU_DISP1_DAT_11 0x80000000
-+				MX53_PAD_EIM_EB1__IPU_DISP1_DAT_10 0x80000000
-+				MX53_PAD_EIM_DA0__IPU_DISP1_DAT_9  0x80000000
-+				MX53_PAD_EIM_DA1__IPU_DISP1_DAT_8  0x80000000
-+				MX53_PAD_EIM_DA2__IPU_DISP1_DAT_7  0x80000000
-+				MX53_PAD_EIM_DA3__IPU_DISP1_DAT_6  0x80000000
-+				MX53_PAD_EIM_DA4__IPU_DISP1_DAT_5  0x80000000
-+				MX53_PAD_EIM_DA5__IPU_DISP1_DAT_4  0x80000000
-+				MX53_PAD_EIM_DA6__IPU_DISP1_DAT_3  0x80000000
-+				MX53_PAD_EIM_DA7__IPU_DISP1_DAT_2  0x80000000
-+				MX53_PAD_EIM_DA8__IPU_DISP1_DAT_1  0x80000000
-+				MX53_PAD_EIM_DA9__IPU_DISP1_DAT_0  0x80000000
- 			>;
- 		};
- 	};
--- 
-1.8.2.rc2
+
+> KernelVersion: devel-stable
+> 
+> diff --git a/arch/arm/kernel/psci_smp.c b/arch/arm/kernel/psci_smp.c
+> index 23a1142..219f1d7 100644
+> --- a/arch/arm/kernel/psci_smp.c
+> +++ b/arch/arm/kernel/psci_smp.c
+> @@ -68,8 +68,6 @@ void __ref psci_cpu_die(unsigned int cpu)
+>         /* We should never return */
+>         panic("psci: cpu %d failed to shutdown\n", cpu);
+>  }
+> -#else
+> -#define psci_cpu_die NULL
+>  #endif
+>  
+>  bool __init psci_smp_available(void)
+> @@ -80,5 +78,7 @@ bool __init psci_smp_available(void)
+>  
+>  struct smp_operations __initdata psci_smp_ops = {
+>  	.smp_boot_secondary	= psci_boot_secondary,
+> +#ifdef CONFIG_HOTPLUG_CPU
+>  	.cpu_die		= psci_cpu_die,
+> +#endif
+>  };
+> 
