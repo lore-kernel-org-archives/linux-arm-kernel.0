@@ -1,33 +1,29 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 4 Jun 2013 12:57:06 +0200
-Subject: [PATCH 21/21] clk: ux500: Supply provider look-up functionality
- to support Device Tree
-In-Reply-To: <1370266965-7901-22-git-send-email-lee.jones@linaro.org>
-References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
- <1370266965-7901-22-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdaNMR=6JT+pi+9aqOJXW3gK9Yb4hztx3rOiY3c+f3UTRA@mail.gmail.com>
+Date: Tue, 4 Jun 2013 12:59:28 +0200
+Subject: [PATCH 4/5] ARM: ux500: Provide auxdata to ux500 ASoC driver
+In-Reply-To: <20130604095657.GA9581@balto.lan>
+References: <1369920465-13905-1-git-send-email-fabio.baltieri@linaro.org>
+ <1369920465-13905-5-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkda8h_zewd2M7QzvoLn15iDEUv8XYCGqro62chiCcYaM8Q@mail.gmail.com>
+ <20130604095657.GA9581@balto.lan>
+Message-ID: <CACRpkda6L+mr-CYSmLY9i=uE4dZiXfo1QhtbfBjxo2mC2orK-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 3, 2013 at 3:42 PM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> In this patch we're populating a clk_data array, one clock per element to
-> act as a clk look-up using indexes supplied from Device Tree.
+On Tue, Jun 4, 2013 at 11:56 AM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
+> On Tue, Jun 04, 2013 at 11:03:41AM +0200, Linus Walleij wrote:
+>>
+>> Patch applied to my ux500-devicetree branch after some rebasing.
 >
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> Thanks!  I saw that a lot patches are stacking up in the tree, do you
+> plan to send an intermediate pull request to get these on
+> arm-soc/for-next (and linux-next)?
 
-This needs to be patch 1/21 because otherwise the rest of the
-stuff is non-bisectable right? It's being broken the first time
-you remove auxdata and not fixed until this patch.
+Yes it's just that new things come in all the time.
 
-The whole thing is very different from other DT clock things
-I've seen, usually you add a compatible node for each
-clock type, and a node for each physical gate. But there
-may be several ways to skin this cat...
-
-Make sure to include devicetree-discuss in the series for
-an OS-neutral review opportunity.
+I might just draw a line at some point and say any more
+changes need to go into v3.12.
 
 Yours,
 Linus Walleij
