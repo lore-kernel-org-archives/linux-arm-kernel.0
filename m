@@ -1,33 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 4 Jun 2013 23:21:57 +0300
-Subject: [PATCH 03/12] usb: otg: msm: Convert to clk_prepare/unprepare
-In-Reply-To: <1370373938-32417-4-git-send-email-sboyd@codeaurora.org>
-References: <1370373938-32417-1-git-send-email-sboyd@codeaurora.org>
- <1370373938-32417-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20130604202157.GD28302@arwen.pp.htv.fi>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 4 Jun 2013 22:52:03 +0200
+Subject: [PATCH 21/21] clk: ux500: Supply provider look-up functionality
+ to support Device Tree
+In-Reply-To: <CACRpkdaNMR=6JT+pi+9aqOJXW3gK9Yb4hztx3rOiY3c+f3UTRA@mail.gmail.com>
+References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
+ <1370266965-7901-22-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaNMR=6JT+pi+9aqOJXW3gK9Yb4hztx3rOiY3c+f3UTRA@mail.gmail.com>
+Message-ID: <201306042252.03340.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 04, 2013 at 12:25:29PM -0700, Stephen Boyd wrote:
-> Add calls to clk_prepare and unprepare so that MSM can migrate to
-> the common clock framework.
+On Tuesday 04 June 2013, Linus Walleij wrote:
+> The whole thing is very different from other DT clock things
+> I've seen, usually you add a compatible node for each
+> clock type, and a node for each physical gate. But there
+> may be several ways to skin this cat...
 > 
-> Cc: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-it's best if this goes with the rest of the series, for that:
+Based on the IRC discussion we had, I would think that the "prcc" clocks
+would best be represented using multiple clock-cells since you can describe
+them easily a tuple of register index, bit number some way to distinguish
+the two types.
 
+The "prcmu" clocks are harder, and we probably need either a more verbose
+representation using one node per clock there, or have a single node
+for the entire prcmu and not bother to describe them in DT but hardcode
+everything in the source. The current patch does the latter, which is
+easier now but means we cannot simplify the code much in the future
+when we remove ATAGS boot support.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+I hope Mike can give some better insight to what his preferences are.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/d5e8e3f8/attachment.sig>
+	Arnd
