@@ -1,72 +1,34 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Tue, 4 Jun 2013 10:20:50 +0100
-Subject: [PATCH v2 1/5] arm/xen: define xen_remap as ioremap_cached
-In-Reply-To: <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
- <1370273624-26976-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1370337650.24512.88.camel@zakaz.uk.xensource.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 4 Jun 2013 11:23:48 +0200
+Subject: [PATCH] ARM: ux500: avoid warning in ux500_read_asicid
+In-Reply-To: <2475820.dXNmmAuTaP@wuerfel>
+References: <2475820.dXNmmAuTaP@wuerfel>
+Message-ID: <CACRpkdZapi-xERDkjNz03VOJFFga090xvdqUrHUdY+05GS4MdA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-06-03 at 16:33 +0100, Stefano Stabellini wrote:
-> Define xen_remap as ioremap_cache (MT_MEMORY and MT_DEVICE_CACHED end up
-> having the same AttrIndx encoding).
+On Fri, May 31, 2013 at 10:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-The entries in static struct mem_type mem_types[] look entirely
-different to me.  What am I missing?
-	[MT_DEVICE_CACHED] = {	  /* ioremap_cached */
-		.prot_pte	= PROT_PTE_DEVICE | L_PTE_MT_DEV_CACHED,
-		.prot_l1	= PMD_TYPE_TABLE,
-		.prot_sect	= PROT_SECT_DEVICE | PMD_SECT_WB,
-		.domain		= DOMAIN_IO,
-	},
-	[MT_MEMORY] = {
-		.prot_pte  = L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_DIRTY,
-		.prot_l1   = PMD_TYPE_TABLE,
-		.prot_sect = PMD_TYPE_SECT | PMD_SECT_AP_WRITE,
-		.domain    = DOMAIN_KERNEL,
-	},
+> phys_addr_t may be 64 bit, which causes this harmless warning
+> in ux500_read_asicid:
+>
+> arch/arm/mach-ux500/id.c: In function 'ux500_read_asicid':
+> arch/arm/include/asm/io.h:159:19: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+>  #define IOMEM(x) ((void __force __iomem *)(x))
+>                    ^
+> arch/arm/mach-ux500/id.c:40:9: note: in expansion of macro 'readl'
+>   return readl(IOMEM(UX500_VIRT_ROM + (addr & 0xfff)));
+>
+> We can solve this in a nicer way by making UX500_VIRT_ROM have a proper
+> type to start with and calculating the address using pointer arithmetic.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-I can see in pgtable-3level.h how L_PTE_MT_DEV_CACHED and
-L_PTE_MT_WRITEBACK are the same but not where the MT_WRITEBACK comes
-from for MT_MEMORY. Things are less clear in pgtable-2level.h, where one
-is 0x3 and the other is 0xb. I can see that the entries are the same in
-armv6_mt_table but how that would apply to a v7 processor?
+Patch applied to ux500-core for v3.11, as it doesn't seem to
+be a dangerous regression.
 
-Anyhow, even if I'm prepared to believe that MT_MEMORY and
-MT_DEVICE_CACHED end up being the same thing (which TBH I am) it seems
-that the level of abstraction involved makes us vulnerable to future
-changes subtly breaking things for us. What about:
+You'll get this back by pull request soon-ish.
 
-        /* Device shared memory */
-        #define ioremap_shm(cookie,size)		__arm_ioremap((cookie), (size), MT_MEMORY)
-
-Ian.
-
-> Remove include asm/mach/map.h, not unneeded.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> ---
->  arch/arm/include/asm/xen/page.h |    3 +--
->  1 files changed, 1 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-> index 30cdacb..359a7b5 100644
-> --- a/arch/arm/include/asm/xen/page.h
-> +++ b/arch/arm/include/asm/xen/page.h
-> @@ -1,7 +1,6 @@
->  #ifndef _ASM_ARM_XEN_PAGE_H
->  #define _ASM_ARM_XEN_PAGE_H
->  
-> -#include <asm/mach/map.h>
->  #include <asm/page.h>
->  #include <asm/pgtable.h>
->  
-> @@ -88,6 +87,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
->  	return __set_phys_to_machine(pfn, mfn);
->  }
->  
-> -#define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
-> +#define xen_remap(cookie, size) ioremap_cached((cookie), (size));
->  
->  #endif /* _ASM_ARM_XEN_PAGE_H */
+Yours,
+Linus Walleij
