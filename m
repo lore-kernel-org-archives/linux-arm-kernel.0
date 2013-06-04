@@ -1,34 +1,73 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 04 Jun 2013 15:17:03 +0530
-Subject: [PATCH] ARM: s5p64x0: Use common uncompress.h part for
- plat-samsung
-In-Reply-To: <1368916282-22896-1-git-send-email-tomasz.figa@gmail.com>
-References: <1368916282-22896-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <51ADB797.8020502@linaro.org>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Tue, 4 Jun 2013 09:48:25 +0000
+Subject: [PATCH 1/2] rtc: omap: add option to indicate wakeup support
+ through DT
+In-Reply-To: <87wqqf11nw.fsf@linaro.org>
+References: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369982005-8572-2-git-send-email-gururaja.hebbar@ti.com>
+ <87wqqf11nw.fsf@linaro.org>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC22315@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2013 04:01 AM, Tomasz Figa wrote:
-> Since uart_base can be set dynamically in arch_detect_cpu(), there is no
-> need to have a copy of all code locally, just to override UART base
-> address.
+On Fri, May 31, 2013 at 23:18:03, Kevin Hilman wrote:
+> Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
 > 
-> This patch removes any duplicate code in uncompress.h variant of s5p64x0
-> and implements proper arch_detect_cpu() function to initialize UART with
-> SoC-specific parameters.
+> > Even though RTC-IP is wakeup capable, Not all Boards support it.
+> >
+> > For example
+> > The rtc alarm wakeup is available in rtc-ip since omap1 days but alarm
+> > was not wired properly in previous ompa1 boards.
+> >
+> > 	commit fa5b07820fe3a0fc06ac368516e71f10a59b9539
+> > 	Author: Sekhar Nori <nsekhar@ti.com>
+> > 	Date:   Wed Oct 27 15:33:05 2010 -0700
+> >
+> > 	rtc: omap: let device wakeup capability be configured from chip
+> > 	init logic
+> >
+> > 	The rtc-omap driver currently hardcodes the RTC wakeup
+> > 	capability to be "not capable".  While this seems to be true for
+> > 	existing OMAP1 boards which are not wired for this, the
+> > 	DA850/OMAP-L138 SoC, the RTC can always be wake up source from
+> > 	its "deep sleep" mode.
+> >
+> > Current rtc-omap driver expects the rtc module wake-up capabilities to
+> > be set up by board specific code. However, in case of DT, this is not
+> > possible.
+> >
+> > So, add a DT property "ti,wakeup_capable" to indicate that the module is
+> > wake-up capable.
 > 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  arch/arm/mach-s5p64x0/include/mach/uncompress.h | 155 +-----------------------
->  1 file changed, 5 insertions(+), 150 deletions(-)
+> Why is this a TI-specific property?  
+
+May be I am wrong but isn't this driver used only be TI SoC (Davinci, OMAP ...)
+
+> 
+> Also, I think we can do this without a new DT property.Did you see this
+> patch from Tony which is already queued for v3.11:
+> 
+>     http://marc.info/?l=linux-omap&m=136917244530612&w=2
+
+AFAIK, all boards that use twl rtc IP by default support rtc wakeup.
+
+However, as mentioned in the commit message not all boards that uses
+OMAP rtc IP supports rtc wake up (due to somoe wiring issue).
+Hence I am adding a new DT property for this.
+
+> 
+> I think this is the right way to go.  Platforms that don't want/need
+> wakeup support can disable it from userspace via:
+> 
+>     echo disabled > /sys/devices/.../power/wakeup
+
+Hmmm. Debatable. Let me get some more info about this and come back
+
+> 
+> Kevin
+> 
 > 
 
-This patch (with a minor modification) has been included in the
-patchset[1] to consolidate uncompress subroutine for Samsung platforms.
 
-[1] [PATCH v2 0/3] Consolidate uncompress code for Samsung platform
-http://www.gossamer-threads.com/lists/linux/kernel/1723429
-
-
--- 
-Tushar Behera
+Regards, 
+Gururaja
