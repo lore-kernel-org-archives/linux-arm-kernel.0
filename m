@@ -1,68 +1,121 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 4 Jun 2013 14:03:29 +0100
-Subject: [PATCH v2 0/4] ARM: mm: HugeTLB + THP support.
-In-Reply-To: <20130604125610.GA16818@linaro.org>
-References: <1369323080-9673-1-git-send-email-steve.capper@linaro.org>
- <20130603104010.GA26112@linaro.org>
- <20130604125610.GA16818@linaro.org>
-Message-ID: <20130604130329.GR27516@mudshark.cambridge.arm.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 04 Jun 2013 15:09:21 +0200
+Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
+In-Reply-To: <51ADE04D.2090901@linaro.org>
+References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
+ <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
+ <51AC8F74.2060302@linaro.org> <51AD9765.3000406@monstr.eu>
+ <51ADE04D.2090901@linaro.org>
+Message-ID: <51ADE701.5010000@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 01:56:12PM +0100, Steve Capper wrote:
-> On Mon, Jun 03, 2013 at 11:40:11AM +0100, Steve Capper wrote:
-> > On Thu, May 23, 2013 at 04:31:16PM +0100, Steve Capper wrote:
-> > > The following patches bring both HugeTLB support and Transparent
-> > > HugePage (THP) support to ARM.
-> > > 
-> > > Only long descriptors (LPAE) are supported in this series.
-> > > 
-> > > The code has been tested on an Arndale board (Exynos 5250).
-> > > 
-> > > This patch set is based on 3.10-rc2.
-> > > 
-> > > Major changes since the Patch:
-> > >  * LPAE code has been separated from non-LPAE code (this series
-> > >    is the LPAE code).
-> > >  * PROT_NONE support for HugeTLB and THP has been implemented.
-> > > 
-> > > Major changes since the RFC:
-> > >  * huge pmd sharing removed from the 3-level code as this was
-> > >    found to be very rarely, if ever?, used. This allowed for some
-> > >    code simplification.
-> > > 
-> > >  * hardware pmd bits for 2-levels of paging are now taken from
-> > >    mmu.c. Also the mapping code now uses pte/pmd bit helper
-> > >    functions rather than the custom pre-processor logic.
-> > > 
-> > > Cheers,
-> > > -- 
-> > > Steve
-> > > 
-> > 
-> > Hello,
-> > I was wondering if anyone had any further comments on this series?
-> > 
-> > Russell,
-> > Are you happy for these to go into your patch system, or should anything be
-> > changed?
-> > 
-> > Thanks,
-> > -- 
-> > Steve 
+On 06/04/2013 02:40 PM, Daniel Lezcano wrote:
+> On 06/04/2013 09:29 AM, Michal Simek wrote:
+>> On 06/03/2013 02:43 PM, Daniel Lezcano wrote:
+>>> On 06/03/2013 11:51 AM, Michal Simek wrote:
+>>>> Hi,
+>>>>
+>>>> On 06/03/2013 10:14 AM, Daniel Lezcano wrote:
+>>>>> On 05/31/2013 12:44 PM, Sanjay Singh Rawat wrote:
+>>>>>> The current code considers every wakeup as spurious, which is not
+>>>>>> correct. Handle the same way as other arm platforms are doing.
+>>>>>>
+>>>>>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+>>>>> Reviewed-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>>
+>>>>>
+>>>>>> ---
+>>>>>>  arch/arm/mach-zynq/hotplug.c |    7 +++++++
+>>>>>>  1 file changed, 7 insertions(+)
+>>>>>>
+>>>>>> diff --git a/arch/arm/mach-zynq/hotplug.c b/arch/arm/mach-zynq/hotplug.c
+>>>>>> index c89672b..a1ab22c 100644
+>>>>>> --- a/arch/arm/mach-zynq/hotplug.c
+>>>>>> +++ b/arch/arm/mach-zynq/hotplug.c
+>>>>>> @@ -67,6 +67,13 @@ static inline void zynq_platform_do_lowpower(unsigned int cpu, int *spurious)
+>>>>>>  		dsb();
+>>>>>>  		wfi();
+>>>>>>  
+>>>>>> +		if (pen_release == cpu_logical_map(cpu)) {
+>>>>>> +			/*
+>>>>>> +			 * OK, proper wakeup, we're done
+>>>>>> +			 */
+>>>>>> +			break;
+>>>>>> +		}
+>>>>>> +
+>>>> what pen_release stands for?
+>>>> I have looked at it and others platform are also using it in platsmp
+>>>> code which is not zynq case.
+>>>> How is it supposed to work and how this variable should be used?
+>>>
+>>> This variable is used to serialize the secondary cpus boot process.
+>>>
+>>> When the processors boot, all the processors except the CPU0 are in WFI.
+>>>
+>>> Then it is up to CPU0 to wake up the secondary processors:
+>>> 1. it writes the cpu id of the secondary processor in the pen_release
+>>> variable
+>>> 2. it sends a IPI to the secondary cpu in order to make it exiting the
+>>> WFI mode
+>>> 2.1 the secondary processor boots and, when finished, writes the value
+>>> '-1' in the pen_release variable
+>>> 3. meanwhile CPU0 waits for the pen_release to be '-1' before continuing
+>>> to boot the other secondary processors
+>>>
+>>> In the case of the routine "zynq_platform_do_lowpower", the same
+>>> sequence occurs with 'cpu_up', that means you are at the beginning of
+>>> the boot up sequence. So the pen_release value is the cpu id value when
+>>> exiting from WFI (remember it sets to -1 when finished).
+>>>
+>>> If the cpu exits the lopower mode but the pen_release is not the cpu id,
+>>> that means there is something wrong because the cpu exited the WFI mode
+>>> without being in the booting process (the cpu shouldn't receive an hw
+>>> interrupt because they should have been migrated, but just a wake up
+>>> IPI). This is why there's "spurious".
+>>>
+>>> The pen_release contains the hardware id of the CPU, this is why
+>>> cpu_logical_map is used.
+>>>
+>>> I hope that helps
+>>
+>> Thanks for explanation.
+>> I have added this patch to zynq/cleanup branch.
 > 
-> Just a polite ping on the above.
+> Actually, I noticed in the boot secondary cpu the pen_release is not
+> initialized at all. The patch is correct but with undefined behavior.
+
+I know, it is not changed.
+__cpu_logical_map is initialized as 0 in setup.c
+pen_release as -1 in smp.c
+
+> Normally, the secondary cpu are powered on and stays in WFI or whatever
+> more power efficient but the algorithm is to initialize the pen_release
+> with the cpu id physical id, send an IPI and wait for the pen_release to
+> be equal to -1.
 > 
-> Are people happy to have this patch set merged?
+> There is a good example in mach-ux500/platform.c
+> 
+> And a good explanation in the "Cortex -A Series programmer's guide" page
+> 23-10.
 
-Looks good to me, but worth checking that it doesn't conflict with the LPAE
-fixes I plan to send for 3.11 (since they're not terribly critical):
+Where exactly cpus are waiting in WFI loop?
 
-  https://git.kernel.org/cgit/linux/kernel/git/will/linux.git/log/?h=for-rmk/lpae
+Thanks,
+Michal
 
-Of course, I can fix things up in my branch if necessary (just send me a
-pointer to your git repo).
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-Cheers,
 
-Will
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/2ecd24c5/attachment-0001.sig>
