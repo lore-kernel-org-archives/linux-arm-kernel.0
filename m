@@ -1,43 +1,31 @@
-From: sanjay.rawat@linaro.org (Sanjay Singh Rawat)
-Date: Tue, 04 Jun 2013 20:50:35 +0530
-Subject: [PATCH 2/8] ARM: RealView: use generic cpu idle function for wfi
-In-Reply-To: <1369665166-13049-3-git-send-email-sanjay.rawat@linaro.org>
-References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
- <1369665166-13049-3-git-send-email-sanjay.rawat@linaro.org>
-Message-ID: <51AE05C3.2090404@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 04 Jun 2013 17:20:45 +0200
+Subject: [PATCH v2 6/6] ARM: hi3xxx: enable hi4511 with device tree
+In-Reply-To: <1370358317-12768-7-git-send-email-haojian.zhuang@linaro.org>
+References: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
+ <1370358317-12768-7-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <4616948.RsjYUavD65@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Tuesday 04 June 2013 23:05:17 Haojian Zhuang wrote:
+> Enable Hisilicon Hi4511 development platform with device tree support.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 
-can you please review this patch?
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-On Monday 27 May 2013 08:02 PM, Sanjay Singh Rawat wrote:
-> use cpu_do_idle for entering the wfi mode
->
-> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
-> ---
->   arch/arm/mach-realview/hotplug.c |    9 ++-------
->   1 file changed, 2 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-> index ac22dd4..c42022b 100644
-> --- a/arch/arm/mach-realview/hotplug.c
-> +++ b/arch/arm/mach-realview/hotplug.c
-> @@ -59,13 +59,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
->   	 * code will have already disabled interrupts
->   	 */
->   	for (;;) {
-> -		/*
-> -		 * here's the WFI
-> -		 */
-> -		asm(".word	0xe320f003\n"
-> -		    :
-> -		    :
-> -		    : "memory", "cc");
-> +		/* enter WFI mode */
-> +		cpu_do_idle();
->
->   		if (pen_release == cpu_logical_map(cpu)) {
->   			/*
->
+
+>  arch/arm/boot/dts/Makefile          |    1 +
+>  arch/arm/boot/dts/hi3620.dtsi       | 1169 +++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/hi4511.dts        |  738 ++++++++++++++++++++++
+>  arch/arm/configs/multi_v7_defconfig |    1 +
+>  4 files changed, 1909 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
+>  create mode 100644 arch/arm/boot/dts/hi4511.dts
+
+I received the patch in private mail, but apparently the linux-arm-kernel
+list rejected it. It's probably too large, can you send out separate
+patches for the two files next time? 
+
+	Arnd
