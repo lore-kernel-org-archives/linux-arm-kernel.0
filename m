@@ -1,55 +1,72 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  4 Jun 2013 16:03:16 +0200
-Subject: [PATCH v2 0/2] ARM: PJ4B: fixes for 3.10-rc
-Message-ID: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue,  4 Jun 2013 16:03:17 +0200
+Subject: [PATCH v2 1/2] ARM PJ4B: Add support for errata 4742
+In-Reply-To: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1370354598-12920-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Lior Amsalem <alior@marvell.com>
 
-This path set allows to fix some errata for PJ4B CPUs.
+This commit fixes the regression on Armada 370 (the kernal hang during
+boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
+TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
 
-Without the first one, the Armada 370 based board can't boot anymore
-since 3.10-rc1 . So this one really need to be applied on 3.10-rc.
+When coming out of either a Wait for Interrupt (WFI) or a Wait for
+Event (WFE) IDLE states, a specific timing sensitivity exists between
+the retiring WFI/WFE instructions and the newly issued subsequent
+instructions. This sensitivity can result in a CPU hang scenario.  The
+workaround is to insert either a Data Synchronization Barrier (DSB) or
+Data Memory Barrier (DMB) command immediately after the WFI/WFE
+instruction
 
-It should be a good thing to apply the other one on the 3.10-rc, even
-if we didn't observe get feedback from user who had a problem related
-to these errata, it may happen.
+[gregory.clement at free-electrons.com:add errata description in changelog]
+[gregory.clement at free-electrons.com:make this errata depend on Armada 370]
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/Kconfig      | 13 +++++++++++++
+ arch/arm/mm/proc-v7.S |  3 +++
+ 2 files changed, 16 insertions(+)
 
-Note that currently PJ4B is a symbol for 2 different CPUs:
-
-- the one used in Armada 370 is a PJ4B
-- the ones used in Armada XP are actually PJ4B-MP
-
-So I planed to introduce a new symbol PJ4B-MP but for 3.11 as it is
-not related to a critical fix. Awaiting these new symbols I made the
-errata depends on ARMADA_370 in the Kconfig.
-
-Russell,
-
-I am aware that you didn't read the first version as you were on not
-available. But this first version was usefull as we get many
-interesting comments from Will Deacon. I addressed all of them when it
-was possible.
-
-Thanks,
-
-Changelog:
-V1 -> V2;
- - Fixed various coding style and typo issues
- - Replaced the "mcr p15, 0, r0, c7, c10, 4" by  "dsb"
- - Removed the fix for errata 4611 in discard_old_kernel_data function,
-   as we don't use it
-
-Lior Amsalem (2):
-  ARM PJ4B: Add support for errata 4742
-  ARM PJ4B: Add support for errata 4611
-
- arch/arm/Kconfig                | 22 ++++++++++++++++++++++
- arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
- arch/arm/mm/proc-macros.S       | 13 +++++++++++++
- arch/arm/mm/proc-v7.S           |  3 +++
- 4 files changed, 60 insertions(+)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 49d993c..95cbe9d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1087,6 +1087,19 @@ if !MMU
+ source "arch/arm/Kconfig-nommu"
+ endif
+ 
++config PJ4B_ERRATA_4742
++	bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
++	depends on CPU_PJ4B && MACH_ARMADA_370
++	help
++	  When coming out of either a Wait for Interrupt (WFI) or a Wait for
++	  Event (WFE) IDLE states, a specific timing sensitivity exists between
++	  the retiring WFI/WFE instructions and the newly issued subsequent
++	  instructions.  This sensitivity can result in a CPU hang scenario.
++	  Workaround:
++	  The software must insert either a Data Synchronization Barrier (DSB)
++	  or Data Memory Barrier (DMB) command immediately after the WFI/WFE
++	  instruction
++
+ config ARM_ERRATA_326103
+ 	bool "ARM errata: FSR write bit incorrect on a SWP to read-only memory"
+ 	depends on CPU_V6
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 2c73a73..784bef1 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -71,6 +71,9 @@ ENDPROC(cpu_v7_reset)
+ ENTRY(cpu_v7_do_idle)
+ 	dsb					@ WFI may enter a low-power mode
+ 	wfi
++#ifdef CONFIG_PJ4B_ERRATA_4742
++	dsb					@barrier
++#endif
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_do_idle)
+ 
 -- 
 1.8.1.2
