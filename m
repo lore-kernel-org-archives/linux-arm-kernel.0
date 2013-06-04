@@ -1,151 +1,284 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Mon,  3 Jun 2013 23:39:18 -0700
-Subject: [PATCH RFC 3/3] ARM: omap4: register DT clocks & remove old data
-In-Reply-To: <1370327958-19776-1-git-send-email-mturquette@linaro.org>
-References: <1370327958-19776-1-git-send-email-mturquette@linaro.org>
-Message-ID: <1370327958-19776-4-git-send-email-mturquette@linaro.org>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 04 Jun 2013 08:47:34 +0200
+Subject: [PATCH v3] arm: zynq: Add cpuidle support
+In-Reply-To: <51ACC20C.7000005@linaro.org>
+References: <2ba502c172f5374ed2e424292fb50345c9dd007a.1370266815.git.michal.simek@xilinx.com>
+ <51ACA237.8070004@linaro.org> <51ACB06A.2050206@monstr.eu>
+ <51ACC20C.7000005@linaro.org>
+Message-ID: <51AD8D86.8080906@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that some of the OMAP4 PRCM clock data has been converted to a
-DeviceTree representation it is no longer needed as static clock data.
-Register the DT clocks first, followed by the remaining static clocks.
+On 06/03/2013 06:19 PM, Daniel Lezcano wrote:
+> On 06/03/2013 05:04 PM, Michal Simek wrote:
+>> On 06/03/2013 04:03 PM, Daniel Lezcano wrote:
+>>> On 06/03/2013 03:40 PM, Michal Simek wrote:
+>>>> Add support for cpuidle.
+>>>>
+>>>> Signed-off-by: Michal Simek <michal.simek@xilinx.com>
+>>>> ---
+>>>> Changes in v3:
+>>>> - Move driver to drivers/cpuidle/
+>>>> - Check zynq compatible string suggested by Arnd
+>>>> - Use zynq_ function prefix because of multiplatform kernel
+>>>> - Incorporate comments from Daniel Lezcano
+>>>> - Rebase on the top of git://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
+>>>>
+>>>> Changes in v2:
+>>>> - Fix file header
+>>>>
+>>>> Changes in v1:
+>>>> - It was the part of Zynq core changes
+>>>>   https://patchwork.kernel.org/patch/2342511/
+>>>>
+>>>>  drivers/cpuidle/Kconfig        |   6 +++
+>>>>  drivers/cpuidle/Makefile       |   1 +
+>>>>  drivers/cpuidle/cpuidle-zynq.c | 100 +++++++++++++++++++++++++++++++++++++++++
+>>>>  3 files changed, 107 insertions(+)
+>>>>  create mode 100644 drivers/cpuidle/cpuidle-zynq.c
+>>>>
+>>>> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+>>>> index c4cc27e..8272a08 100644
+>>>> --- a/drivers/cpuidle/Kconfig
+>>>> +++ b/drivers/cpuidle/Kconfig
+>>>> @@ -39,4 +39,10 @@ config CPU_IDLE_CALXEDA
+>>>>  	help
+>>>>  	  Select this to enable cpuidle on Calxeda processors.
+>>>>
+>>>> +config CPU_IDLE_ZYNQ
+>>>> +	bool "CPU Idle Driver for Xilinx Zynq processors"
+>>>> +	depends on ARCH_ZYNQ
+>>>> +	help
+>>>> +	  Select this to enable cpuidle on Xilinx Zynq processors.
+>>>> +
+>>>>  endif
+>>>> diff --git a/drivers/cpuidle/Makefile b/drivers/cpuidle/Makefile
+>>>> index 0d8bd55..8767a7b 100644
+>>>> --- a/drivers/cpuidle/Makefile
+>>>> +++ b/drivers/cpuidle/Makefile
+>>>> @@ -7,3 +7,4 @@ obj-$(CONFIG_ARCH_NEEDS_CPU_IDLE_COUPLED) += coupled.o
+>>>>
+>>>>  obj-$(CONFIG_CPU_IDLE_CALXEDA) += cpuidle-calxeda.o
+>>>>  obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+>>>> +obj-$(CONFIG_CPU_IDLE_ZYNQ) += cpuidle-zynq.o
+>>>> diff --git a/drivers/cpuidle/cpuidle-zynq.c b/drivers/cpuidle/cpuidle-zynq.c
+>>>> new file mode 100644
+>>>> index 0000000..afe6af3
+>>>> --- /dev/null
+>>>> +++ b/drivers/cpuidle/cpuidle-zynq.c
+>>>> @@ -0,0 +1,100 @@
+>>>> +/*
+>>>> + * Copyright (C) 2012-2013 Xilinx
+>>>> + *
+>>>> + * CPU idle support for Xilinx Zynq
+>>>> + *
+>>>> + * based on arch/arm/mach-at91/cpuidle.c
+>>>> + *
+>>>> + * This file is licensed under the terms of the GNU General Public
+>>>> + * License version 2.  This program is licensed "as is" without any
+>>>> + * warranty of any kind, whether express or implied.
+>>>> + *
+>>>> + * The cpu idle uses wait-for-interrupt and RAM self refresh in order
+>>>> + * to implement two idle states -
+>>>> + * #1 wait-for-interrupt
+>>>> + * #2 wait-for-interrupt and RAM self refresh
+>>>> + */
+>>>
+>>> Please check you headers, it seems you are including unused headers.
+>>>
+>>>> +#include <linux/kernel.h>
+>>>> +#include <linux/init.h>
+>>>> +#include <linux/platform_device.h>
+>>>> +#include <linux/cpuidle.h>
+>>>> +#include <linux/io.h>
+>>>
+>>> ^^^^^
+>>>
+>>>> +#include <linux/export.h>
+>>>
+>>> ^^^^^
+>>>
+>>>> +#include <linux/clockchips.h>
+>>>
+>>> ^^^^^
+>>>
+>>>> +#include <linux/cpu_pm.h>
+>>>> +#include <linux/clk.h>
+>>>
+>>> ^^^^
+>>>
+>>>> +#include <linux/err.h>
+>>>> +#include <linux/of.h>
+>>>> +#include <asm/proc-fns.h>
+>>>> +#include <asm/cpuidle.h>
+>>>> +
+>>>> +#define ZYNQ_MAX_STATES		2
+>>>> +
+>>>> +static DEFINE_PER_CPU(struct cpuidle_device, zynq_cpuidle_device);
+>>>
+>>> see below.
+>>>
+>>>> +
+>>>> +/* Actual code that puts the SoC in different idle states */
+>>>> +static int zynq_enter_idle(struct cpuidle_device *dev,
+>>>> +		struct cpuidle_driver *drv, int index)
+>>>
+>>> Indentation.
+>>>
+>>>> +{
+>>>> +	/* Devices must be stopped here */
+>>>> +	cpu_pm_enter();
+>>>> +
+>>>> +	/* Add code for DDR self refresh start */
+>>>> +	cpu_do_idle();
+>>>> +
+>>>> +	/* Add code for DDR self refresh stop */
+>>>> +	cpu_pm_exit();
+>>>> +
+>>>> +	return index;
+>>>> +}
+>>>> +
+>>>> +static struct cpuidle_driver zynq_idle_driver = {
+>>>> +	.name = "zynq_idle",
+>>>> +	.owner = THIS_MODULE,
+>>>> +	.states = {
+>>>> +		ARM_CPUIDLE_WFI_STATE,
+>>>> +		{
+>>>> +			.enter            = zynq_enter_idle,
+>>>> +			.exit_latency     = 10,
+>>>> +			.target_residency = 10000,
+>>>> +			.flags            = CPUIDLE_FLAG_TIME_VALID,
+>>>> +					    CPUIDLE_FLAG_TIMER_STOP,
+>>>> +			.name             = "RAM_SR",
+>>>> +			.desc             = "WFI and RAM Self Refresh",
+>>>> +		},
+>>>> +	},
+>>>> +	.safe_state_index = 0,
+>>>> +	.state_count = ZYNQ_MAX_STATES,
+>>>> +};
+>>>> +
+>>>> +/* Initialize CPU idle by registering the idle states */
+>>>> +static int zynq_init_cpuidle(void)
+>>>> +{
+>>>> +	unsigned int cpu;
+>>>> +	struct cpuidle_device *device;
+>>>> +	int ret;
+>>>> +
+>>>> +	if (!of_machine_is_compatible("xlnx,zynq-7000"))
+>>>> +		return -ENODEV;
+>>>> +
+>>>> +	ret = cpuidle_register_driver(&zynq_idle_driver);
+>>>> +	if (ret) {
+>>>> +		pr_err("%s: Driver registration failed\n", __func__);
+>>>> +		return ret;
+>>>> +	}
+>>>> +
+>>>> +	for_each_possible_cpu(cpu) {
+>>>> +		device = &per_cpu(zynq_cpuidle_device, cpu);
+>>>> +		device->cpu = cpu;
+>>>> +		ret = cpuidle_register_device(device);
+>>>> +		if (ret) {
+>>>> +			pr_err("%s: Device registration failed\n", __func__);
+>>>> +			return ret;
+>>>> +		}
+>>>> +	}
+>>>> +
+>>>> +	pr_info("Xilinx Zynq CpuIdle Driver started\n");
+>>>
+>>> Hi Michal,
+>>>
+>>> actually you can replace this code by
+>>>
+>>> cpuidle_register(&zynq_idle_driver, NULL);
+>>>
+>>> and remove the zynq_cpuidle_device.
+>>>
+>>> The framework will take care of registering the driver and the devices.
+>>
+>> Will change.
+>>
+>>
+>>>> +	return 0;
+>>>> +}
+>>>> +module_init(zynq_init_cpuidle);
+>>>
+>>> Do you really want it as module ?
+>>
+>> kirkwood is a module
+>> but in Makefile depends directly on ARCH
+>> obj-$(CONFIG_ARCH_KIRKWOOD) += cpuidle-kirkwood.o
+>>
+>> Calxeda uses module_init() which is in this configuration device_initcall.
+>>
+>> Any advantage to write it as module?
+>> Maybe for testing purpose will be helpful to have it as module too.
+>> What do you think?
+> 
+> I don't see any reasons it couldn't be written as a module. It is up to
+> you, if you think there could be any benefit on that, feel free to write
+> it as a module. Otherwise it could be enabled in the kernel.
+> 
+> If it is only for testing purpose, that means a very specific use case
+> where the module is loaded from NFS and a server doing cross compiling.
+> Not sure it is worth to do finally.
 
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Joel A Fernandes <joelagnel@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Mike Turquette <mturquette@linaro.org>
----
- arch/arm/mach-omap2/cclock44xx_data.c | 54 ++++-------------------------------
- 1 file changed, 6 insertions(+), 48 deletions(-)
+Let me try to create module from it and also enable this option in Kconfig
+and test it and I will see if there is any problem or not.
+If not, I will do it as module because as I said I see only one
+reason why this could be helpful which is testing.
+Because you can run set of testcases with this module and without
+but on the same kernel configuration. And you don't need to recompile
+the kernel and reload it.
 
-diff --git a/arch/arm/mach-omap2/cclock44xx_data.c b/arch/arm/mach-omap2/cclock44xx_data.c
-index 88e37a4..97fd65c 100644
---- a/arch/arm/mach-omap2/cclock44xx_data.c
-+++ b/arch/arm/mach-omap2/cclock44xx_data.c
-@@ -27,6 +27,7 @@
- #include <linux/clk-private.h>
- #include <linux/clkdev.h>
- #include <linux/io.h>
-+#include <linux/clk/omap.h>
- 
- #include "soc.h"
- #include "iomap.h"
-@@ -61,18 +62,12 @@
- 
- /* Root clocks */
- 
--DEFINE_CLK_FIXED_RATE(extalt_clkin_ck, CLK_IS_ROOT, 59000000, 0x0);
--
- DEFINE_CLK_FIXED_RATE(pad_clks_src_ck, CLK_IS_ROOT, 12000000, 0x0);
- 
- DEFINE_CLK_GATE(pad_clks_ck, "pad_clks_src_ck", &pad_clks_src_ck, 0x0,
- 		OMAP4430_CM_CLKSEL_ABE, OMAP4430_PAD_CLKS_GATE_SHIFT,
- 		0x0, NULL);
- 
--DEFINE_CLK_FIXED_RATE(pad_slimbus_core_clks_ck, CLK_IS_ROOT, 12000000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(secure_32k_clk_src_ck, CLK_IS_ROOT, 32768, 0x0);
--
- DEFINE_CLK_FIXED_RATE(slimbus_src_clk, CLK_IS_ROOT, 12000000, 0x0);
- 
- DEFINE_CLK_GATE(slimbus_clk, "slimbus_src_clk", &slimbus_src_clk, 0x0,
-@@ -81,20 +76,6 @@ DEFINE_CLK_GATE(slimbus_clk, "slimbus_src_clk", &slimbus_src_clk, 0x0,
- 
- DEFINE_CLK_FIXED_RATE(sys_32k_ck, CLK_IS_ROOT, 32768, 0x0);
- 
--DEFINE_CLK_FIXED_RATE(virt_12000000_ck, CLK_IS_ROOT, 12000000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(virt_13000000_ck, CLK_IS_ROOT, 13000000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(virt_16800000_ck, CLK_IS_ROOT, 16800000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(virt_19200000_ck, CLK_IS_ROOT, 19200000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(virt_26000000_ck, CLK_IS_ROOT, 26000000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(virt_27000000_ck, CLK_IS_ROOT, 27000000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(virt_38400000_ck, CLK_IS_ROOT, 38400000, 0x0);
--
- static const char *sys_clkin_ck_parents[] = {
- 	"virt_12000000_ck", "virt_13000000_ck", "virt_16800000_ck",
- 	"virt_19200000_ck", "virt_26000000_ck", "virt_27000000_ck",
-@@ -105,16 +86,6 @@ DEFINE_CLK_MUX(sys_clkin_ck, sys_clkin_ck_parents, NULL, 0x0,
- 	       OMAP4430_CM_SYS_CLKSEL, OMAP4430_SYS_CLKSEL_SHIFT,
- 	       OMAP4430_SYS_CLKSEL_WIDTH, CLK_MUX_INDEX_ONE, NULL);
- 
--DEFINE_CLK_FIXED_RATE(tie_low_clock_ck, CLK_IS_ROOT, 0, 0x0);
--
--DEFINE_CLK_FIXED_RATE(utmi_phy_clkout_ck, CLK_IS_ROOT, 60000000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(xclk60mhsp1_ck, CLK_IS_ROOT, 60000000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(xclk60mhsp2_ck, CLK_IS_ROOT, 60000000, 0x0);
--
--DEFINE_CLK_FIXED_RATE(xclk60motg_ck, CLK_IS_ROOT, 60000000, 0x0);
--
- /* Module clocks and DPLL outputs */
- 
- static const char *abe_dpll_bypass_clk_mux_ck_parents[] = {
-@@ -826,7 +797,7 @@ DEFINE_CLK_GATE(dss_sys_clk, "syc_clk_div_ck", &syc_clk_div_ck, 0x0,
- 		OMAP4430_CM_DSS_DSS_CLKCTRL,
- 		OMAP4430_OPTFCLKEN_SYS_CLK_SHIFT, 0x0, NULL);
- 
--DEFINE_CLK_GATE(dss_tv_clk, "extalt_clkin_ck", &extalt_clkin_ck, 0x0,
-+DEFINE_CLK_GATE(dss_tv_clk, "extalt_clkin_ck", NULL, 0x0,
- 		OMAP4430_CM_DSS_DSS_CLKCTRL,
- 		OMAP4430_OPTFCLKEN_TV_CLK_SHIFT, 0x0, NULL);
- 
-@@ -1051,7 +1022,7 @@ DEFINE_CLK_GATE(slimbus2_fclk_0, "func_24mc_fclk", &func_24mc_fclk, 0x0,
- 		OMAP4430_OPTFCLKEN_PER24MC_GFCLK_SHIFT, 0x0, NULL);
- 
- DEFINE_CLK_GATE(slimbus2_slimbus_clk, "pad_slimbus_core_clks_ck",
--		&pad_slimbus_core_clks_ck, 0x0,
-+		NULL, 0x0,
- 		OMAP4430_CM_L4PER_SLIMBUS2_CLKCTRL,
- 		OMAP4430_OPTFCLKEN_SLIMBUS_CLK_SHIFT, 0x0, NULL);
- 
-@@ -1442,27 +1413,11 @@ static struct omap_clk omap443x_clks[] = {
-  * clocks common to omap44xx
-  */
- static struct omap_clk omap44xx_clks[] = {
--	CLK(NULL,	"extalt_clkin_ck",		&extalt_clkin_ck),
- 	CLK(NULL,	"pad_clks_src_ck",		&pad_clks_src_ck),
- 	CLK(NULL,	"pad_clks_ck",			&pad_clks_ck),
--	CLK(NULL,	"pad_slimbus_core_clks_ck",	&pad_slimbus_core_clks_ck),
--	CLK(NULL,	"secure_32k_clk_src_ck",	&secure_32k_clk_src_ck),
- 	CLK(NULL,	"slimbus_src_clk",		&slimbus_src_clk),
- 	CLK(NULL,	"slimbus_clk",			&slimbus_clk),
- 	CLK(NULL,	"sys_32k_ck",			&sys_32k_ck),
--	CLK(NULL,	"virt_12000000_ck",		&virt_12000000_ck),
--	CLK(NULL,	"virt_13000000_ck",		&virt_13000000_ck),
--	CLK(NULL,	"virt_16800000_ck",		&virt_16800000_ck),
--	CLK(NULL,	"virt_19200000_ck",		&virt_19200000_ck),
--	CLK(NULL,	"virt_26000000_ck",		&virt_26000000_ck),
--	CLK(NULL,	"virt_27000000_ck",		&virt_27000000_ck),
--	CLK(NULL,	"virt_38400000_ck",		&virt_38400000_ck),
--	CLK(NULL,	"sys_clkin_ck",			&sys_clkin_ck),
--	CLK(NULL,	"tie_low_clock_ck",		&tie_low_clock_ck),
--	CLK(NULL,	"utmi_phy_clkout_ck",		&utmi_phy_clkout_ck),
--	CLK(NULL,	"xclk60mhsp1_ck",		&xclk60mhsp1_ck),
--	CLK(NULL,	"xclk60mhsp2_ck",		&xclk60mhsp2_ck),
--	CLK(NULL,	"xclk60motg_ck",		&xclk60motg_ck),
- 	CLK(NULL,	"abe_dpll_bypass_clk_mux_ck",	&abe_dpll_bypass_clk_mux_ck),
- 	CLK(NULL,	"abe_dpll_refclk_mux_ck",	&abe_dpll_refclk_mux_ck),
- 	CLK(NULL,	"dpll_abe_ck",			&dpll_abe_ck),
-@@ -1690,6 +1645,9 @@ int __init omap4xxx_clk_init(void)
- {
- 	int rc;
- 
-+	/* FIXME register clocks from DT first */
-+	dt_omap_clk_init();
-+
- 	if (cpu_is_omap443x()) {
- 		cpu_mask = RATE_IN_4430;
- 		omap_clocks_register(omap443x_clks, ARRAY_SIZE(omap443x_clks));
+> In the future, I hope we can do a single entry for an ARM driver based
+> on the device tree choosing the right back end driver in the case of the
+> single kernel image. In this case, it won't be consistent to have some
+> of the drivers being modules and others not. But the future does not
+> exist (yet) ... :)
+
+There shouldn't be a problem to use this as module too.
+
+> I am a bit worried about the moment the driver is initialized because if
+> we try to make all the drivers to converge to a single one, that means
+> it will be initialized at a moment compatible with all the drivers.
+> 
+> Just to summarize:
+> 
+> cpuidle framework: core_initcall
+> 
+> calxeda:     module_platform_driver => module_init
+
+Based on Kconfig(bool) this is also device_initcall
+
+> kirkwood:    module_init
+
+But based on Makefile(depends on ARCH_KIRKWOOD) as I wrote this is device_initcall
+
+> davinci      device_initcall
+> omap3/omap4: device_initcall
+> at91:        device_initcall
+> shmobile:    init_late
+> imx5/6:      init_late
+> s3c64:       device_initcall
+> ux500:       device_initcall
+> tegra1/2/3:  device_initcall
+
+Thanks,
+Michal
+
+
 -- 
-1.8.1.2
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130604/7a7e3c86/attachment-0001.sig>
