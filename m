@@ -1,59 +1,83 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 4 Jun 2013 11:26:38 -0600
-Subject: [PATCH] ARM: Orion: Hoist bridge interrupt handling out of the
- timer
-In-Reply-To: <50C48CE8.9070400@gmail.com>
-References: <20121207225507.GB29262@obsidianresearch.com>
- <20121208112624.GD25315@lunn.ch>
- <20121209025748.GA10405@obsidianresearch.com>
- <20121209083046.GA25466@lunn.ch> <50C48CE8.9070400@gmail.com>
-Message-ID: <20130604172638.GB13745@obsidianresearch.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 4 Jun 2013 13:30:30 -0400 (EDT)
+Subject: [RFC PATCH 2/2] ARM: kernel: implement stack pointer save array
+ through MPIDR hashing
+In-Reply-To: <1370338453-8749-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1370338453-8749-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1370338453-8749-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.03.1306041235290.1200@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 09, 2012 at 02:06:48PM +0100, Sebastian Hesselbarth wrote:
+On Tue, 4 Jun 2013, Lorenzo Pieralisi wrote:
 
-> The main irq controller will be required for sure, but for the secondary
-> irq controller we had a discussion long ago. IIRC Gregory proposed to have
-> shared irqs handled by timer and watchdog, I was proposing chained irqs.
+> index 987dcf3..da1b65f 100644
+> --- a/arch/arm/kernel/sleep.S
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -7,6 +7,48 @@
+>  	.text
+>  
+>  /*
+> + * Implementation of MPIDR hash algorithm through shifting
+> + * and OR'ing.
+> + *
+> + * @dst: register containing hash result
+> + * @rtemp0: scratch register 0
+> + * @rtemp1: scratch register 1
+> + * @rtemp2: scratch register 2
+> + * @rs0: register containing affinity level 0 bit shift
+> + * @rs1: register containing affinity level 1 bit shift
+> + * @rs2: register containing affinity level 2 bit shift
+> + * @mpidr: register containing MPIDR value
+> + * @mask: register containing MPIDR mask
+> + *
+> + * Pseudo C-code:
+> + *
+> + *u32 dst;
+> + *
+> + *compute_mpidr_hash(u32 rs0, u32 rs1, u32 rs2, u32 mpidr, u32 mask) {
+> + *	u32 rtemp0, rtemp1, rtemp2;
+> + *	u32 mpidr_masked = mpidr & mask;
+> + *	rtemp0 = mpidr_masked & 0xff;
+> + *	rtemp1 = mpidr_masked & 0xff00;
+> + *	rtemp2 = mpidr_masked & 0xff0000;
+> + *	dst = (rtemp0 >> rs0 | rtemp1 >> rs1 | rtemp2 >> rs2);
+> + *}
+> + */
+> +.macro compute_mpidr_hash dst, rtemp0, rtemp1, rtemp2, rs0, rs1, 
+rs2, mpidr, mask
+> +	and	\mpidr, \mpidr, \mask		@ mask out unused MPIDR bits
+> +	and	\rtemp0, \mpidr, #0xff		@ extracts aff0
+> +	and	\rtemp1, \mpidr, #0xff00	@ extracts aff1
+> +	and	\rtemp2, \mpidr, #0xff0000	@ extracts aff2
+> +  ARM(	mov	\dst, \rtemp0, lsr \rs0)	@ dst=aff0>>rs0
+> +  ARM(	orr	\dst, \dst, \rtemp1, lsr \rs1)	@ dst|=(aff1>>rs1)
+> +  ARM(	orr	\dst, \dst, \rtemp2, lsr \rs2)		@ dst|=(aff2>>rs2)
+> +THUMB(	mov	\rtemp0, \rtemp0, lsr \rs0)		@ aff0>>=rs0
+> +THUMB(	mov	\rtemp1, \rtemp1, lsr \rs1)		@ aff1>>=rs1
+> +THUMB(	mov	\rtemp2, \rtemp2, lsr \rs2)		@ aff2>>=rs2
+> +THUMB(	orr	\dst, \rtemp0, \rtemp1)			@ dst = aff0 | aff1
+> +THUMB(	orr	\dst, \dst, \rtemp2)			@ dts |= aff2
+> +.endm
 
-+1 on decoded IRQs for bridge. I've been running that configuration
-now since this patch set was first posted.
+This would be much nicer by useing fewer registers.  I'd suggest this 
+instead of guessing which registers can be duplicated in the 
+macro invokation:
 
-There is too much HW variance, the timer, watchdog, etc drivers should
-not have to poke into SOC specific registers just to get an interrupt.
+.macro compute_mpidr_hash dst, rs0, rs1, rs2, mpidr, mask
+	and	\mpidr, \mpidr, \mask		@ mask out unused MPIDR bits
+	and	\dst, \mpidr, #0xff		@ extracts aff0
+   ARM(	mov	\dst, \dst, lsr \rs0 )	@ dst = aff0 >> rs0
+ THUMB(	lsr	\dst, \rs0 )
+	and	\mask, \mpidr, #0xff00	@ extracts aff1
+   ARM(	orr	\dst, \dst, \mask, lsr \rs1 )	@ dst |= (aff1 >> rs1)
+ THUMB(	lsr	\mask, \rs1 )
+ THUMB(	orr	\dst, \mask )
+	and	\mask, \mpidr, #0xff0000	@ extracts aff2
+   ARM(	orr	\dst, \dst, \mask, lsr \rs2 )	@ dst |= (aff2 >> rs1)
+ THUMB(	lsr	\mask, \rs2 )
+ THUMB(	orr	\dst, \mask )
+.endm
 
-The bridge decode can either be via a chained handler, or by incorporating
-the bridge decode into the main kirkwood handler - the latter having
-lower overhead for timer ticks.
 
-> For mvebu archs, IIRC, we have wrt to timer-related irqs:
-> - Armada 370/XP with different irq handler and timer irq handling within
->   timer registers.
-> - Orion SoCs with Bridge irq registers for timer related stuff (timer0/1)
-> - Kirkwood and Dove with watchdog timers (both with wdt irq in bridge irqs)
-> - RTC in bridge irqs, but Dove with RTC connected to PMU irqs
-
-> I think we should have patches for irqchip-orion first and then rethink
-> if we want a standalone timer-orion or merge it with timer-mvebu. Having
-> watchdog using irqs is kind of independent from this.
-
-I would think the logical progression is:
-- irq-chip orion combined with work to keep the existing timer working
-- Patch to add the bridge irq-chip
-- Patches to support orion/kirkwood/dove/etc in the existing timer drivers
-- Patch to update the DT to switch to the bridge and updated timer
-- Patch to remove the old timer
-
-When I last looked briefly, it seems like merging with timer-mvebu was
-fairly straightforward..
-
-> Back in the days when Gregory, Thomas, and I were looking into merged timer
-> we agreed not to have an extra check on 25MHz support. If you put the
-> property in the node, it will try to set the timer to fixed 25MHz. If you
-> use the property on Orion timer, it will just break timer handling.
-
-As for the mveth case we should have a compatible tag for each SOC,
-the driver can ignore it, but it should be in the DT for future use..
-
-Jason
+Nicolas
