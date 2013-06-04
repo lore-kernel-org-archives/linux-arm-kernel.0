@@ -1,98 +1,52 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 4 Jun 2013 17:24:51 -0500
-Subject: [PATCH 15/15] OF: remove #ifdef from linux/of_platform.h
-In-Reply-To: <201306041951.00447.arnd@arndb.de>
-References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
- <201306012257.02327.arnd@arndb.de>
- <CAL_JsqKMOy4CM=FXbsy7mQ1f0DLyK6n_cuZ92uhsSM2Mq-3B1g@mail.gmail.com>
- <201306041951.00447.arnd@arndb.de>
-Message-ID: <CAL_JsqLRJ1cEWBfAdHEyngJHQKauJ6XzWH2JwXh1qDusMkzUGA@mail.gmail.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Tue, 04 Jun 2013 19:21:34 +0200
+Subject: [ 004/184] clockevents: Dont allow dummy broadcast timers
+In-Reply-To: <58df134a4b98edf5b0073e2e1e988fe6@local>
+Message-ID: <20130604172130.471073557@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 4, 2013 at 12:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 04 June 2013, Rob Herring wrote:
->> On Sat, Jun 1, 2013 at 3:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Saturday 01 June 2013, Rob Herring wrote:
->> >> No, we still need empty functions. Here is what of_device.h looks like:
->> >>
->> >> http://tinyurl.com/l2azz5m
->> >>
->> >> BTW, it has your ack.
->> >>
->> >
->> > Could you add a patch on top that only puts the function declarations
->> > inside of #ifdef that don't have an inline wrapper?
->>
->> I'm confused. You mean that DO have an inline? Like this:
->>
->> void foo(void);
->>
->> #ifdef CONFIG_OF
->> void bar(void);
->> #else
->> static inline void bar(void) {}
->> #endif
->
-> Yes, sorry. That's what I meant.
->
->> > It's really annoying to have to change the header file every time one
->> > needs to call a function from a driver in the DT-only case.
->>
->> The functions without inlines are ones that drivers should not call
->> and should only be called from OF enabled code. That's why we have not
->> done a complete pass of adding inlines for everything.
->
-> The problem is that it's a bad default. The convention in kernel code
-> is not to hide declarations in #ifdef, for multiple reasons:
->
-> * It avoids unnecessary code rebuilds when the symbol changes between
->   two 'make' runs.
->
-> * It lets drivers and platform code call the function from dead code
->   without causing a build error, thus improving compile coverage.
->
-> * It's much nicer to read when can write your code like
->
-> void __init exynos_init_io(struct map_desc *mach_desc, int size)
-> {
->         if (IS_ENABLED_(CONFIG_OF) && initial_boot_params)
->                 of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
->         else
->                 iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
->         ...
-> }
->
-> instead of
->
-> void __init exynos_init_io(struct map_desc *mach_desc, int size)
-> {
-> #ifdef CONFIG_OF
->         if (initial_boot_params)
->                 of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
->         else
-> #endif
->                 iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
->         ...
-> }
->
-> The first one looks like actual C code, the second is really ugly,
-> and an inline wrapper wouldn't even do the right thing here.
+2.6.32-longterm review patch.  If anyone has any objections, please let me know.
 
-Right. I get all that. You still have to go add inlines if you want to make:
+------------------
 
-if (IS_ENABLED(CONFIG_OF))
-    of_foo();
+From: Mark Rutland <mark.rutland@arm.com>
 
-just be:
+commit a7dc19b8652c862d5b7c4d2339bd3c428bd29c4a upstream.
 
-of_foo();
+Currently tick_check_broadcast_device doesn't reject clock_event_devices
+with CLOCK_EVT_FEAT_DUMMY, and may select them in preference to real
+hardware if they have a higher rating value. In this situation, the
+dummy timer is responsible for broadcasting to itself, and the core
+clockevents code may attempt to call non-existent callbacks for
+programming the dummy, eventually leading to a panic.
 
-There are situations for both and only inlines cover both cases. I
-don't see a reason we would want to allow the first case and not allow
-the second case. I am tired of taking patches adding the inlines 1 by
-1, so perhaps we need to refactor the OF headers to better separate
-core infrastructure includes vs. driver only includes if that is
-really a concern.
+This patch makes tick_check_broadcast_device always reject dummy timers,
+preventing this problem.
 
-Rob
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Jon Medhurst (Tixy) <tixy@linaro.org>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Willy Tarreau <w@1wt.eu>
+---
+ kernel/time/tick-broadcast.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/kernel/time/tick-broadcast.c b/kernel/time/tick-broadcast.c
+index 57b953f..67fe3d9 100644
+--- a/kernel/time/tick-broadcast.c
++++ b/kernel/time/tick-broadcast.c
+@@ -67,7 +67,8 @@ static void tick_broadcast_start_periodic(struct clock_event_device *bc)
+  */
+ int tick_check_broadcast_device(struct clock_event_device *dev)
+ {
+-	if ((tick_broadcast_device.evtdev &&
++	if ((dev->features & CLOCK_EVT_FEAT_DUMMY) ||
++	    (tick_broadcast_device.evtdev &&
+ 	     tick_broadcast_device.evtdev->rating >= dev->rating) ||
+ 	     (dev->features & CLOCK_EVT_FEAT_C3STOP))
+ 		return 0;
+-- 
+1.7.12.2.21.g234cd45.dirty
