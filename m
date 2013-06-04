@@ -1,74 +1,143 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 4 Jun 2013 08:05:00 -0400
-Subject: DT version of kirkwood_ge0x_init()
-In-Reply-To: <20130604115927.GJ7626@kw.sim.vm.gnt>
-References: <51ADBEE0.5040500@keymile.com> <51ADC2C2.6010106@gmail.com>
- <20130604104302.GX3803@titan.lakedaemon.net>
- <20130604115927.GJ7626@kw.sim.vm.gnt>
-Message-ID: <20130604120500.GZ3803@titan.lakedaemon.net>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 4 Jun 2013 14:05:12 +0200
+Subject: [PATCH 07/10] pinctrl: add pinctrl driver for Rockchip SoCs
+In-Reply-To: <CACRpkdbBr7s1NoTQewVOotorHJHLL8Z6-_gAx5GC0x6uNUX0gw@mail.gmail.com>
+References: <201306030055.15413.heiko@sntech.de>
+ <201306030059.47611.heiko@sntech.de>
+ <CACRpkdbBr7s1NoTQewVOotorHJHLL8Z6-_gAx5GC0x6uNUX0gw@mail.gmail.com>
+Message-ID: <201306041405.13320.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 01:59:27PM +0200, Simon Guinot wrote:
-> On Tue, Jun 04, 2013 at 06:43:02AM -0400, Jason Cooper wrote:
-> > On Tue, Jun 04, 2013 at 12:34:42PM +0200, Sebastian Hesselbarth wrote:
-> > > On 06/04/13 12:18, Gerlando Falauto wrote:
-> > > >I noticed how most of the DT-aware board-setup files only have a single
-> > > ><board>_init() function, calling kirkwood_ge00_init() with a struct
-> > > >mv643xx_eth_platform_data as a single argument.
-> > > >
-> > > >I was wondering -- is there a reason why we cannot remove all this
-> > > >board-specific code and move all this to the DT?
-> > > 
-> > > Gerlando,
-> > > 
-> > > DT for mv643xx_eth is on the way (https://lkml.org/lkml/2013/5/29/527).
-> > > We wait for the driver to surface to relax branch dependencies and then
-> > > move all DT Orion SoCs to it.
-> > > 
-> > > > I would really love to have all our boards under a single
-> > > > CONFIG_<FAMILY>_DT and a single compatible string, with all the
-> > > > differences within the DTs itself -- no more #ifdef CONFIG_<BOARD>,
-> > > > no more of_machine_is_compatible("boardXXX").
-> > > 
-> > > All those will happen if there is DT support for mv643xx_eth which
-> > > is the only driver left without DT and board dependencies. But there
-> > > will be no CONFIG_LACIE_DT or whatever, but just CONFIG_KIRKWOOD_DT
-> > > and board dependent stuff described in the corresponding dts.
+Hi,
+
+I'll just skip over the "right, will fix that" issues and just address the 
+unclear ones.
+
+Am Dienstag, 4. Juni 2013, 09:08:09 schrieb Linus Walleij:
+> On Mon, Jun 3, 2013 at 12:59 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> > This driver adds support the Cortex-A9 based SoCs from Rockchip,
+> > so at least the RK2928, RK3066 (a and b) and RK3188.
+> > Earlier Rockchip SoCs seem to use similar mechanics for gpio
+> > handling so should be supportable with relative small changes.
+> > Pull handling on the rk3188 is currently a stub, due to it being
+> > a bit different to the earlier SoCs.
 > > 
-> > Gerlando,
+> > Pinmuxing as well as gpio (and interrupt-) handling tested on
+> > a rk3066a based machine.
 > > 
-> > Yes, the mess you describe is temporary.  Those board files used to have
-> > a lot more code in them, legacy init of partitions, MPP, LEDs, etc.  As
-> > we have converted drivers, they have gotten smaller and smaller.
-> > 
-> > Now, with Sebastian's hard work, we'll finally be able to remove them
-> > and kirkwood will be completely DT.  We're very excited about this. :)
-> > 
-> > Next, we'll move the Marvell DT boards over to mach-mvebu/ and only
-> > legacy boards in -kirkwood/, -orion5x/, -dove/, and -mv78xx0/ will
-> > remain.  After a few releases we will deprecate any legacy boards which
-> > haven't been converted to DT.
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > 
-> Hi Jason,
+> Overall this is looking very good, mainly minor comments.
+
+> > +Required properties for pin configuration node:
+> > +  - rockchip,pins: 4 integers array, represents a group of pins mux and
+> > config +    setting. The format is rockchip,pins = <PIN_BANK
+> > PIN_BANK_NUM MUX CONFIG>. +    The MUX 0 means gpio and MUX 1 to 3 mean
+> > the specific device function +
+> > +Bits used for CONFIG:
+> > +PULL_AUTO      (1 << 0): indicate this pin needs a pull setting for SoCs
+> > +                         that determine the pull up or down themselfs
 > 
-> While I have obviously planed to convert all the LaCie boards to DT,
-> I think that removing the legacy support so quickly is a little bit
-> harsh.
+> Hm, never saw that before...
 
-Yeah, my wording might not have been the best.  See below.
+Citing the original gpio driver:
 
-> IMHO, it could be nice to wait the end-of-life for all this products
-> before removing their support.
+	/*
+	 * Values written to this register independently
+	 * control Pullup/Pulldown or not for the
+	 * corresponding data bit in GPIO.
+	 * 0: pull up/down enable, PAD type will decide
+	 * to be up or down, not related with this value
+	 * 1: pull up/down disable
+	 */
 
-I'd prefer to convert them to DT, then keep them as long as folks are
-interested in them.  If no one cares about a board, and no one wants to
-convert it to DT or test the conversion, why keep it around?
+So if it's a pull up or down is decided based on the mux of the pin. Calling 
+everything a "pull down" (or up) when it isn't seemed somehow wrong to me.
 
-Let me clarify, by 'deprecate them' I meant *begin* the process of
-deprecating them.  eg marking them as deprecated for around three
-releases or so.
+The rk3188 on the other hand supports both pull up and down separately.
 
-thx,
+Or should this be selected as PULL_UP | PULL_DOWN in the config?
 
-Jason.
+
+> > +uart2: serial at 20064000 {
+> > +       compatible = "snps,dw-apb-uart";
+> > +       reg = <0x20064000 0x400>;
+> > +       interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
+> 
+> Using #defines, nice!
+
+everything for bonus-points ;-)
+
+And actually it's definitly easier on me as well, as I don't have to remember 
+what each integer value means.
+
+> +++ b/drivers/pinctrl/Kconfig
+> @@ -158,6 +158,12 @@ config PINCTRL_DB8540
+>         bool "DB8540 pin controller driver"
+>         depends on PINCTRL_NOMADIK && ARCH_U8500
+> 
+> +config PINCTRL_ROCKCHIP
+> +       bool
+> +       select PINMUX
+> +       select PINCONF
+> +       select GENERIC_IRQ_CHIP
+> 
+> Why is this super-simple pin config thing not using
+> GENERIC_PINCONF?
+> 
+> I *know* it is simpler to implement your own thing, but think of the
+> poor maintainers that have to wade through 50 identical implementations.
+> Do this, it pays off.
+
+generic pinconf sounds interesting ... will give it a try.
+
+The only problem is the pull stuff mentioned above that is either pull up or 
+down without the driver having knowledge about it. And generic_pinconf only 
+knows about them separately right now.
+
+
+> BTW: it leads to wanting to use generic pinconf DT bindings as experienced
+> by Laurent and others. We need to fix that too...
+> 
+> (...)
+> 
+> > +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> > +static void rockchip_pin_dbg_show(struct pinctrl_dev *pctldev,
+> > +                                       struct seq_file *s, unsigned
+> > offset) +{
+> > +       seq_printf(s, "%s", dev_name(pctldev->dev));
+> > +}
+> 
+> Nothing else you want to say about the pins here?
+> (No big deal for sure, but....)
+
+when using pinconfig_generic, its dump_pin function should be more talkative 
+right?
+
+
+> > +
+> > +               data = readl_relaxed(reg);
+> > +               data >>= bit;
+> > +               data &= 1;
+> > +
+> > +               return !data;
+> 
+> That's a bit hard to read, I'd just:
+> 
+> #include <linux/bitops.h>
+> return !(readl_relaxed(reg) & BIT(bit));
+> 
+> And skip the "data" variable. The ! operator will
+> clamp this to a bool (0/1).
+> 
+> But we all have our habits.
+
+yeah, but sometimes it's also good to try to break them ... your solution is 
+much nicer to read (and shorter).
+
+
+> All I could think of right now...
+
+Thanks for the review
+Heiko
