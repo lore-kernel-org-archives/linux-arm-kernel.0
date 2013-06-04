@@ -1,46 +1,59 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 4 Jun 2013 10:25:26 -0700
-Subject: [PATCH V5 5/5] ARM: dts: Update Samsung I2S documentation
-In-Reply-To: <1370348890-6645-6-git-send-email-padma.v@samsung.com>
-References: <1370348890-6645-1-git-send-email-padma.v@samsung.com>
- <1370348890-6645-6-git-send-email-padma.v@samsung.com>
-Message-ID: <CAD=FV=U9Fc=TTcbLCjTSvbk7pV5OdnBUwyxAss1_DX1dfKUQxA@mail.gmail.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 4 Jun 2013 11:26:38 -0600
+Subject: [PATCH] ARM: Orion: Hoist bridge interrupt handling out of the
+ timer
+In-Reply-To: <50C48CE8.9070400@gmail.com>
+References: <20121207225507.GB29262@obsidianresearch.com>
+ <20121208112624.GD25315@lunn.ch>
+ <20121209025748.GA10405@obsidianresearch.com>
+ <20121209083046.GA25466@lunn.ch> <50C48CE8.9070400@gmail.com>
+Message-ID: <20130604172638.GB13745@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi,
+On Sun, Dec 09, 2012 at 02:06:48PM +0100, Sebastian Hesselbarth wrote:
 
-On Tue, Jun 4, 2013 at 5:28 AM, Padmavathi Venna <padma.v@samsung.com> wrote:
-> This patch updates the samsung i2s documentation for pinmux and
-> clock entries.
->
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
->  .../devicetree/bindings/sound/samsung-i2s.txt      |   40 ++++++-------------
->  1 files changed, 13 insertions(+), 27 deletions(-)
+> The main irq controller will be required for sure, but for the secondary
+> irq controller we had a discussion long ago. IIRC Gregory proposed to have
+> shared irqs handled by timer and watchdog, I was proposing chained irqs.
 
-Whoops, just asked for this and now saw it.  Thanks for posting!
++1 on decoded IRQs for bridge. I've been running that configuration
+now since this patch set was first posted.
 
-One note: don't use the "dts" tag for this commit.  That should be
-only for things that are touching dts / dtsi files, not for updating
-docs.
+There is too much HW variance, the timer, watchdog, etc drivers should
+not have to poke into SOC specific registers just to get an interrupt.
 
+The bridge decode can either be via a chained handler, or by incorporating
+the bridge decode into the main kirkwood handler - the latter having
+lower overhead for timer ticks.
 
-> diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> index 3070046..6f9d29f 100644
-> --- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> +++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-> @@ -8,6 +8,10 @@ Required SoC Specific Properties:
->  - dmas: list of DMA controller phandle and DMA request line ordered pairs.
->  - dma-names: identifier string for each DMA request line in the dmas property.
->    These strings correspond 1:1 with the ordered pairs in dmas.
-> +- clocks: from common clock binding. Handle to iis clock and RCLK src clk.
-> +- clock-names: from common clock binding: Should be "iis","i2s_opclk0" and
-> +  "i2s_opclk1". "iis" is the i2s bus clock and i2s_opclk selects the src of
-> +  RCLK which is a mux inside i2s controller.
+> For mvebu archs, IIRC, we have wrt to timer-related irqs:
+> - Armada 370/XP with different irq handler and timer irq handling within
+>   timer registers.
+> - Orion SoCs with Bridge irq registers for timer related stuff (timer0/1)
+> - Kirkwood and Dove with watchdog timers (both with wdt irq in bridge irqs)
+> - RTC in bridge irqs, but Dove with RTC connected to PMU irqs
 
->From your other patch apparently opclk0 and/or opclk1 are not
-required.  Two of your i2c nodes don't have either, though I suspect
-that you at least need opclk0.  See my comments there.
+> I think we should have patches for irqchip-orion first and then rethink
+> if we want a standalone timer-orion or merge it with timer-mvebu. Having
+> watchdog using irqs is kind of independent from this.
 
--Doug
+I would think the logical progression is:
+- irq-chip orion combined with work to keep the existing timer working
+- Patch to add the bridge irq-chip
+- Patches to support orion/kirkwood/dove/etc in the existing timer drivers
+- Patch to update the DT to switch to the bridge and updated timer
+- Patch to remove the old timer
+
+When I last looked briefly, it seems like merging with timer-mvebu was
+fairly straightforward..
+
+> Back in the days when Gregory, Thomas, and I were looking into merged timer
+> we agreed not to have an extra check on 25MHz support. If you put the
+> property in the node, it will try to set the timer to fixed 25MHz. If you
+> use the property on Orion timer, it will just break timer handling.
+
+As for the mveth case we should have a compatible tag for each SOC,
+the driver can ignore it, but it should be in the DT for future use..
+
+Jason
