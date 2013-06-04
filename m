@@ -1,31 +1,79 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 4 Jun 2013 07:19:05 -0700
-Subject: [PATCH V4 2/3] ARM: mmc: bcm281xx SDHCI driver
-In-Reply-To: <201306012213.47386.arnd@arndb.de>
-References: <1369860607-25572-1-git-send-email-csd@broadcom.com>
- <87d2s7ceh0.fsf@octavius.laptop.org> <51A93DA0.3070909@broadcom.com>
- <201306012213.47386.arnd@arndb.de>
-Message-ID: <51ADF759.9000607@broadcom.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 4 Jun 2013 15:21:20 +0100
+Subject: [PATCH v2 4/4] clocksource: dw_apb_timer_of: use
+ clocksource_of_init
+In-Reply-To: <201306041138.42639.heiko@sntech.de>
+References: <201306041136.09566.heiko@sntech.de>
+ <201306041138.42639.heiko@sntech.de>
+Message-ID: <20130604142120.GD5308@maple>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-06-01 01:13 PM, Arnd Bergmann wrote:
-> On Saturday 01 June 2013, Christian Daudt wrote:
->> I looked into it and it can replace just about everything that our own
->> dt parsing code is doing. The only problem is with cd_gpio. If I call
->> mmc_of_parse, then it will install its own irq handler for cd gpio, and
->> our driver needs a different handler. the mmc irq handler can call a
->> card_event callback, but that is already pointing to sdhci_card_event.
->> So the only way I can use mmc_of_parse that I can see is by adding a
->> flag to it to skip cd_gpio parsing which only this driver will then set
->> to true. Any other ideas ?
-> Can't you add a callback handler into sdhci_card_event that can call
-> a platform specific function?
->
->
-I can add another layer of callbacks. I have to first check if I can 
-rework our driver to fit into this callback model. I'll update this when 
-I've tried it.
+Hi Heiko,
 
-  thanks,
-    csd
+On Tue, Jun 04, 2013 at 11:38:42AM +0200, Heiko St?bner wrote:
+> dw_apb_timer_init used to search the devicetree for matching timer
+> devices, making calls to it from board files necessary.
+> 
+> Change the dw_apb_timer_init to work with CLOCKSOURCE_OF_DECLARE.
+> With this change the function gets called once for each timer node
+> and tracks these number of calls to attach clockevent and clocksource
+> devices to the nodes.
+> 
+> Also remove the calls to dw_apb_timer_init from all previous users, as
+> clocksource_of_init is the default for init_time now.
+> 
+> Tested on the upcoming rk3066 code.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Acked-by: Rob Herring <rob.herring@calxeda.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+...
+> -void __init dw_apb_timer_init(void)
+> +static int num_called;
+> +static void __init dw_apb_timer_init(struct device_node *timer)
+>  {
+> -	struct device_node *event_timer, *source_timer;
+> -
+> -	event_timer = of_find_matching_node(NULL, osctimer_ids);
+> -	if (!event_timer)
+> -		panic("No timer for clockevent");
+> -	add_clockevent(event_timer);
+> -
+> -	source_timer = of_find_matching_node(event_timer, osctimer_ids);
+> -	if (!source_timer)
+> -		panic("No timer for clocksource");
+> -	add_clocksource(source_timer);
+> -
+> -	of_node_put(source_timer);
+> +	switch (num_called) {
+> +	case 0:
+> +		pr_debug("%s: found clockevent timer\n", __func__);
+> +		add_clockevent(timer);
+> +		of_node_put(timer);
+> +		break;
+> +	case 1:
+> +		pr_debug("%s: found clocksource timer\n", __func__);
+> +		add_clocksource(timer);
+> +		of_node_put(timer);
+> +		init_sched_clock();
+> +		break;
+> +	default:
+> +		break;
+> +	}
+>  
+> -	init_sched_clock();
+> +	num_called++;
+>  }
+> +CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
+
+I think maybe we also want CLOCKSOURCE_OF_DECLARE() instances for the 
+contents of sptimer_ids for completeness, otherwise looks good.
+
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+
+Thanks,
+
+Jamie
