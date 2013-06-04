@@ -1,55 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 04 Jun 2013 14:19:22 +0100
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
-References: <51ADDDAE.4040705@arm.com>
- <CAAhSdy1c-h3sh-x2_fu2aqhcijaz7FJ5-cZnEy9k2OeMAkxwrA@mail.gmail.com>
-Message-ID: <51ADE95A.1090208@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 4 Jun 2013 22:20:59 +0900
+Subject: [PATCH 1/8] ARM: shmobile: sh73a0 pinmux platform device cleanup
+In-Reply-To: <20130604052043.GX23054@verge.net.au>
+References: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
+ <1369645252-3847-2-git-send-email-horms+renesas@verge.net.au>
+ <51A36A02.9050200@cogentembedded.com>
+ <20130528040243.GM13532@quad.lixom.net>
+ <20130604052043.GX23054@verge.net.au>
+Message-ID: <20130604132058.GE3068@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/13 14:13, Anup Patel wrote:
-
-Hi Anup,
-
-> On Tue, Jun 4, 2013 at 5:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Guys,
->>
->> The KVM/arm64 code is now, as it seems, in good enough shape to be
->> merged. I've so far addressed all the comments, and it doesn't seem any
->> worse then what is queued for its 32bit counterpart.
->>
->> For reference, it is sitting there:
->> git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
->> kvm-arm64/kvm
->>
->> What is not defined yet is the merge path:
->> - It is touching some of the arm64 core code, so it would be better if
->> it was merged through the arm64 tree
->> - It is depending on some of the patches in the core KVM queue (the
->> vgic/timer move to virt/kvm/arm/)
->> - It is also depending on some of the patches that are in the KVM/ARM
->> queue (parametrized timer interrupt, some MMU/MMIO fixes)
->>
->> So I can see two possibilities:
->> - Either I can rely on a stable branch from both KVM and KVM/ARM trees
->> on which I can base my tree for Catalin/Will to pull,
->> - Or I ask Catalin to only pull the arm64 part *minus the Kconfig*, and
->> only merge this last bit when the dependencies are satisfied in Linus' tree.
->>
->> What do you guys think?
+On Tue, Jun 04, 2013 at 02:20:43PM +0900, Simon Horman wrote:
+> On Mon, May 27, 2013 at 09:02:43PM -0700, Olof Johansson wrote:
+> > On Mon, May 27, 2013 at 06:13:22PM +0400, Sergei Shtylyov wrote:
+> > > Hello.
+> > > 
+> > > On 27-05-2013 13:00, Simon Horman wrote:
+> > > 
+> > > >From: Magnus Damm <damm@opensource.se>
+> > > 
+> > > >Use DEFINE_RES_MEM() and platform_device_register_simple()
+> > > >to save a couple of lines of code.
+> > > 
+> > > >Signed-off-by: Magnus Damm <damm@opensource.se>
+> > > >Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > >---
+> > > >  arch/arm/mach-shmobile/setup-sh73a0.c |   25 ++++++-------------------
+> > > >  1 file changed, 6 insertions(+), 19 deletions(-)
+> > > 
+> > > >diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > >index fdf3894..f8f4261 100644
+> > > >--- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > >+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > >@@ -61,29 +61,16 @@ void __init sh73a0_map_io(void)
+> > > [...]
+> > > >+/* PFC */
+> > > >+static const struct resource pfc_resources[] = {
+> > > 
+> > >    Should have been annotated as __initdata... too late, need
+> > > another patch.
+> > 
+> > See comments on other patches/pull requests, I think there's time to revisit
+> > this. I.e. I'll hold off on pulling this based on the other feedback.
 > 
-> I had quick look at your kvm-arm64/kvm branch. I agree with the approach
-> of going through arm64 tree.
+> As I am respining I will fix this.
 > 
-> FYI, latest tested branch on APM ARMv8 board is kvm-arm64/kvm-3.10-rc3
-> branch.
+> However, it had been reviewed and I think that ordinarily
+> it would be reasonable to perform further clean-up
+> work in a subsequent patch.
 
-This is the exact same code, just a slightly different patch split to
-implement the separate Kconfig option.
-
-Thanks for testing,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+I decided to simply drop the patch and revisit it later.
