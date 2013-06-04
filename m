@@ -1,72 +1,116 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue,  4 Jun 2013 16:03:17 +0200
-Subject: [PATCH v2 1/2] ARM PJ4B: Add support for errata 4742
+Date: Tue,  4 Jun 2013 16:03:18 +0200
+Subject: [PATCH v2 2/2] ARM PJ4B: Add support for errata 4611
 In-Reply-To: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1370354598-12920-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1370354598-12920-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1370354598-12920-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Lior Amsalem <alior@marvell.com>
 
-This commit fixes the regression on Armada 370 (the kernal hang during
-boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
-TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
-
-When coming out of either a Wait for Interrupt (WFI) or a Wait for
-Event (WFE) IDLE states, a specific timing sensitivity exists between
-the retiring WFI/WFE instructions and the newly issued subsequent
-instructions. This sensitivity can result in a CPU hang scenario.  The
-workaround is to insert either a Data Synchronization Barrier (DSB) or
-Data Memory Barrier (DMB) command immediately after the WFI/WFE
-instruction
+A CP15 clean operation can result in a dead lock state if it is hit by
+an incoming snoop event. The fix to this issue is the following:
+before any CP15 clean type operation in Cache Coherency mode, issue a
+Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
+instruction.
 
 [gregory.clement at free-electrons.com:add errata description in changelog]
 [gregory.clement at free-electrons.com:make this errata depend on Armada 370]
 Signed-off-by: Lior Amsalem <alior@marvell.com>
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/Kconfig      | 13 +++++++++++++
- arch/arm/mm/proc-v7.S |  3 +++
- 2 files changed, 16 insertions(+)
+ arch/arm/Kconfig                |  9 +++++++++
+ arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
+ arch/arm/mm/proc-macros.S       | 13 +++++++++++++
+ 3 files changed, 44 insertions(+)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..95cbe9d 100644
+index 95cbe9d..3126557 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1087,6 +1087,19 @@ if !MMU
+@@ -1087,6 +1087,15 @@ if !MMU
  source "arch/arm/Kconfig-nommu"
  endif
  
-+config PJ4B_ERRATA_4742
-+	bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
++config PJ4B_ERRATA_4611
++	bool "PJ4B Errata 4611: A Deadlock can Occur if a CP15 Clean/Clean and Invalidate Operation is Hit By a Snoop Event"
 +	depends on CPU_PJ4B && MACH_ARMADA_370
 +	help
-+	  When coming out of either a Wait for Interrupt (WFI) or a Wait for
-+	  Event (WFE) IDLE states, a specific timing sensitivity exists between
-+	  the retiring WFI/WFE instructions and the newly issued subsequent
-+	  instructions.  This sensitivity can result in a CPU hang scenario.
-+	  Workaround:
-+	  The software must insert either a Data Synchronization Barrier (DSB)
-+	  or Data Memory Barrier (DMB) command immediately after the WFI/WFE
-+	  instruction
++	  A CP15 clean operation can result in a dead lock state if it is hit
++	  by an incoming snoop event.  Workaround: Before any CP15 clean type
++	  operation in Cache Coherency mode, issue a Data Memory Barrier (DMB)
++	  or a Data Synchronization Barrier (DSB) instruction.
 +
- config ARM_ERRATA_326103
- 	bool "ARM errata: FSR write bit incorrect on a SWP to read-only memory"
- 	depends on CPU_V6
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 2c73a73..784bef1 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -71,6 +71,9 @@ ENDPROC(cpu_v7_reset)
- ENTRY(cpu_v7_do_idle)
- 	dsb					@ WFI may enter a low-power mode
- 	wfi
-+#ifdef CONFIG_PJ4B_ERRATA_4742
-+	dsb					@barrier
+ config PJ4B_ERRATA_4742
+ 	bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
+ 	depends on CPU_PJ4B && MACH_ARMADA_370
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index a3625d1..f9129e4 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -475,7 +475,18 @@ static inline void flush_pmd_entry(void *pmd)
+ {
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	unsigned long flags;
++	raw_local_irq_save(flags);
++	dmb();
 +#endif
- 	mov	pc, lr
- ENDPROC(cpu_v7_do_idle)
++
+ 	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
++
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	raw_local_irq_restore(flags);
++#endif
++
+ 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+ 
+ 	if (tlb_flag(TLB_WB))
+@@ -486,7 +497,18 @@ static inline void clean_pmd_entry(void *pmd)
+ {
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	unsigned long flags;
++	raw_local_irq_save(flags);
++	dmb();
++#endif
++
+ 	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
++
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	raw_local_irq_restore(flags);
++#endif
++
+ 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+ }
+ 
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index f9a0aa7..9930e14 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -178,7 +178,20 @@
+ #endif
+ 
+ 	str	r3, [r0]
++
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	mrs     r2, cpsr
++	orr     r3, r2, #PSR_F_BIT | PSR_I_BIT
++	msr     cpsr_c, r3			@ Disable interrupts
++	dmb					@ ensure ordering with previous memory accesses
++#endif
++
+ 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
++
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	msr     cpsr_c, r2			@ Restore interrupts
++	dsb					@ drain write buffer
++#endif
+ 	.endm
+ 
  
 -- 
 1.8.1.2
