@@ -1,35 +1,25 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 04 Jun 2013 16:12:24 +0200
-Subject: [PATCH v3] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
-In-Reply-To: <51ADF04D.3040703@atmel.com>
-References: <1369651702-9207-1-git-send-email-alexandre.belloni@free-electrons.com>
- <51A34BF9.5000905@atmel.com> <6343931.uK9ItNlUFg@wuerfel>
- <51ADF04D.3040703@atmel.com>
-Message-ID: <51ADF5C8.80007@free-electrons.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 4 Jun 2013 15:13:42 +0100
+Subject: [PATCH v2 1/4] clocksource: dw_apb_timer_of: enable the use the
+ clocksource as sched clock
+In-Reply-To: <201306041137.03319.heiko@sntech.de>
+References: <201306041136.09566.heiko@sntech.de>
+ <201306041137.03319.heiko@sntech.de>
+Message-ID: <20130604141342.GA5308@maple>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2013 15:49, Nicolas Ferre wrote:
->
-> ... simply use this "IS_BUILTIN(CONFIG_PHYLIB)" here -----^^^^^^^^^
-> (and not above as suggested by Arnd).
->
-> Jean-Christophe, Alexandre: do you agree with this conclusion?
->
-> I plan to stack this patch for next at91-fixes batch.
->
+Looks goot to me, Heiko!
 
-Yeah, I prepared and tested that last week but didn't send it yet. I can
-do it now if you want but you could probably just edit my patch. I'd
-like to fix the other platforms too but that probably can wait.
+On Tue, Jun 04, 2013 at 11:37:02AM +0200, Heiko St?bner wrote:
+> Currently the dw_apb_timer always expects a separate special timer to be
+> availbable for the sched_clock. Some devices using dw_apb_timers do not
+> have this sptimer but can use the clocksource as sched_clock instead.
+> 
+> Therefore enable the driver to distiguish between devices with and without
+> sptimer based on the devicetree data and select the correct timer as
+> sched_clock.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-I believe we would still have to fix the phy_register_fixup*() works as
-it is always called from arch/ and is clearly not fool proofed enough.
-Maybe DT could help ?
-
-Arnd, do you have any input ?
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Acked-by: Jamie Iles <jamie@jamieiles.com>
