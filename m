@@ -1,161 +1,50 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 5 Jun 2013 17:08:29 +0300
-Subject: [PATCH 4/4] clk: tegra: Use override bits when needed
-In-Reply-To: <1370441329-8619-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1370441329-8619-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1370441329-8619-5-git-send-email-pdeschrijver@nvidia.com>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Wed, 5 Jun 2013 16:11:21 +0200
+Subject: [PATCH 06/10] mmc: dw_mmc-pltfm: add Rockchip variant
+In-Reply-To: <001601ce61f5$11b37b20$351a7160$%jun@samsung.com>
+References: <201306030055.15413.heiko@sntech.de>
+ <201306030059.03783.heiko@sntech.de>
+ <001601ce61f5$11b37b20$351a7160$%jun@samsung.com>
+Message-ID: <201306051611.21669.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PLLM has override bits in the PMC. Use those when PLLM_OVERRIDE_ENABLE
-is set.
+Am Mittwoch, 5. Juni 2013, 16:00:43 schrieb Seungwon Jeon:
+> On 06/03/13 7:59 AM, Heiko St?bner wrote:
+> > Cortex-A9 SoCs from Rockchip use a slightly modified variant of dw_mmc
+> > controllers that seems to require the SDMMC_CMD_USE_HOLD_REG bit to
+> > always be set.
+> > 
+> > There also seem to be no other modifications (additional register etc)
+> > present, so to keep the footprint low, add this small variant to the
+> > pltfm driver.
+> > 
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> > 
+> >  drivers/mmc/host/dw_mmc-pltfm.c |   48
+> >  +++++++++++++++++++++++++++----------- 1 files changed, 34
+> >  insertions(+), 14 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/dw_mmc-pltfm.c
+> > b/drivers/mmc/host/dw_mmc-pltfm.c index 0048da8..7d041b5 100644
+> > --- a/drivers/mmc/host/dw_mmc-pltfm.c
+> > +++ b/drivers/mmc/host/dw_mmc-pltfm.c
+> > @@ -24,6 +24,16 @@
+> > 
+> >  #include "dw_mmc.h"
+> > 
+> > +
+> > +static void dw_mci_rockchip_prepare_command(struct dw_mci *host, u32
+> > *cmdr) +{
+> > +	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
+> 
+> Currently, SDMMC_CMD_USE_HOLD_REG is defined in dw_mmc-exynos.c
+> It should be moved to dw_mmc.h
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/clk/tegra/clk-pll.c |   82 +++++++++++++++++++++++++-----------------
- 1 files changed, 49 insertions(+), 33 deletions(-)
+It's already done in another patch "mmc: dw_mmc: Add support DW SD/MMC driver 
+on SOCFPGA" from Dinh Nguyen <dinguyen@altera.com>, which I therefore named as 
+dependency in the cover letter.
 
-diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-index 3b778d3..4293643 100644
---- a/drivers/clk/tegra/clk-pll.c
-+++ b/drivers/clk/tegra/clk-pll.c
-@@ -117,10 +117,6 @@
- #define PLLCX_MISC2_DEFAULT 0x30211200
- #define PLLCX_MISC3_DEFAULT 0x200
- 
--#define PMC_PLLM_WB0_OVERRIDE	0x1dc
--#define PMC_PLLM_WB0_OVERRIDE_2	0x2b0
--#define PMC_PLLM_WB0_OVERRIDE_2_DIVP_MASK BIT(27)
--
- #define PMC_SATA_PWRGT 0x1ac
- #define PMC_SATA_PWRGT_PLLE_IDDQ_VALUE BIT(5)
- #define PMC_SATA_PWRGT_PLLE_IDDQ_SWCTL BIT(4)
-@@ -128,10 +124,12 @@
- #define pll_readl(offset, p) readl_relaxed(p->clk_base + offset)
- #define pll_readl_base(p) pll_readl(p->params->base_reg, p)
- #define pll_readl_misc(p) pll_readl(p->params->misc_reg, p)
-+#define pll_override_readl(offset, p) readl_relaxed(p->pmc + offset)
- 
- #define pll_writel(val, offset, p) writel_relaxed(val, p->clk_base + offset)
- #define pll_writel_base(val, p) pll_writel(val, p->params->base_reg, p)
- #define pll_writel_misc(val, p) pll_writel(val, p->params->misc_reg, p)
-+#define pll_override_writel(val, offset, p) writel(val, p->pmc + offset)
- 
- #define mask(w) ((1 << (w)) - 1)
- #define divm_mask(p) mask(p->params->div_nmp->divm_width)
-@@ -413,29 +411,61 @@ static void _update_pll_mnp(struct tegra_clk_pll *pll,
- 			    struct tegra_clk_pll_freq_table *cfg)
- {
- 	u32 val;
-+	struct tegra_clk_pll_params *params = pll->params;
-+	struct div_nmp *div_nmp = params->div_nmp;
-+
-+	if ((pll->flags & TEGRA_PLLM) &&
-+		(pll_override_readl(PMC_PLLP_WB0_OVERRIDE, pll) &
-+			PMC_PLLP_WB0_OVERRIDE_PLLM_OVERRIDE)) {
-+		val = pll_override_readl(params->pmc_divp_reg, pll);
-+		val &= ~(divp_mask(pll) << div_nmp->override_divp_shift);
-+		val |= cfg->p << div_nmp->override_divp_shift;
-+		pll_override_writel(val, params->pmc_divp_reg, pll);
-+
-+		val = pll_override_readl(params->pmc_divnm_reg, pll);
-+		val &= ~(divm_mask(pll) << div_nmp->override_divm_shift) |
-+			~(divn_mask(pll) << div_nmp->override_divn_shift);
-+		val |= (cfg->m << div_nmp->override_divm_shift) |
-+			(cfg->n << div_nmp->override_divn_shift);
-+		pll_override_writel(val, params->pmc_divnm_reg, pll);
-+	} else {
-+		val = pll_readl_base(pll);
- 
--	val = pll_readl_base(pll);
-+		val &= ~((divm_mask(pll) << div_nmp->divm_shift) |
-+		 (divn_mask(pll) << div_nmp->divn_shift) |
-+		 (divp_mask(pll) << div_nmp->divp_shift));
- 
--	val &= ~((divm_mask(pll) << pll->params->div_nmp->divm_shift) |
--		 (divn_mask(pll) << pll->params->div_nmp->divn_shift) |
--		 (divp_mask(pll) << pll->params->div_nmp->divp_shift));
--	val |= ((cfg->m << pll->params->div_nmp->divm_shift) |
--		(cfg->n << pll->params->div_nmp->divn_shift) |
--		(cfg->p << pll->params->div_nmp->divp_shift));
-+		val |= ((cfg->m << div_nmp->divm_shift) |
-+			(cfg->n << div_nmp->divn_shift) |
-+			(cfg->p << div_nmp->divp_shift));
- 
--	pll_writel_base(val, pll);
-+		pll_writel_base(val, pll);
-+	}
- }
- 
- static void _get_pll_mnp(struct tegra_clk_pll *pll,
- 			 struct tegra_clk_pll_freq_table *cfg)
- {
- 	u32 val;
-+	struct tegra_clk_pll_params *params = pll->params;
-+	struct div_nmp *div_nmp = params->div_nmp;
-+
-+	if ((pll->flags & TEGRA_PLLM) &&
-+		(pll_override_readl(PMC_PLLP_WB0_OVERRIDE, pll) &
-+			PMC_PLLP_WB0_OVERRIDE_PLLM_OVERRIDE)) {
-+		val = pll_override_readl(params->pmc_divp_reg, pll);
-+		cfg->p = (val >> div_nmp->override_divp_shift) & divp_mask(pll);
-+
-+		val = pll_override_readl(params->pmc_divnm_reg, pll);
-+		cfg->m = (val >> div_nmp->override_divm_shift) & divm_mask(pll);
-+		cfg->n = (val >> div_nmp->override_divn_shift) & divn_mask(pll);
-+	}  else {
-+		val = pll_readl_base(pll);
- 
--	val = pll_readl_base(pll);
--
--	cfg->m = (val >> pll->params->div_nmp->divm_shift) & (divm_mask(pll));
--	cfg->n = (val >> pll->params->div_nmp->divn_shift) & (divn_mask(pll));
--	cfg->p = (val >> pll->params->div_nmp->divp_shift) & (divp_mask(pll));
-+		cfg->m = (val >> div_nmp->divm_shift) & divm_mask(pll);
-+		cfg->n = (val >> div_nmp->divn_shift) & divn_mask(pll);
-+		cfg->p = (val >> div_nmp->divp_shift) & divp_mask(pll);
-+	}
- }
- 
- static void _update_pll_cpcon(struct tegra_clk_pll *pll,
-@@ -883,7 +913,6 @@ static int clk_pllm_set_rate(struct clk_hw *hw, unsigned long rate,
- 	struct tegra_clk_pll *pll = to_clk_pll(hw);
- 	unsigned long flags = 0;
- 	int state, ret = 0;
--	u32 val;
- 
- 	if (pll->lock)
- 		spin_lock_irqsave(pll->lock, flags);
-@@ -902,21 +931,7 @@ static int clk_pllm_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (ret < 0)
- 		goto out;
- 
--	val = readl_relaxed(pll->pmc + PMC_PLLM_WB0_OVERRIDE);
--	if (val & PMC_PLLP_WB0_OVERRIDE_PLLM_OVERRIDE) {
--		val = readl_relaxed(pll->pmc + PMC_PLLM_WB0_OVERRIDE_2);
--		val = cfg.p ? (val | PMC_PLLM_WB0_OVERRIDE_2_DIVP_MASK) :
--			(val & ~PMC_PLLM_WB0_OVERRIDE_2_DIVP_MASK);
--		writel_relaxed(val, pll->pmc + PMC_PLLM_WB0_OVERRIDE_2);
--
--		val = readl_relaxed(pll->pmc + PMC_PLLM_WB0_OVERRIDE);
--		val &= ~(divn_mask(pll) | divm_mask(pll));
--		val |= (cfg.m << pll->params->div_nmp->divm_shift) |
--			(cfg.n << pll->params->div_nmp->divn_shift);
--		writel_relaxed(val, pll->pmc + PMC_PLLM_WB0_OVERRIDE);
--	} else
--		_update_pll_mnp(pll, &cfg);
--
-+	_update_pll_mnp(pll, &cfg);
- 
- out:
- 	if (pll->lock)
-@@ -1461,6 +1476,7 @@ struct clk *tegra_clk_register_pllm(const char *name, const char *parent_name,
- 
- 	pll_flags |= TEGRA_PLL_BYPASS;
- 	pll_flags |= TEGRA_PLL_HAS_LOCK_ENABLE;
-+	pll_flags |= TEGRA_PLLM;
- 	pll = _tegra_init_pll(clk_base, pmc, fixed_rate, pll_params, pll_flags,
- 			      freq_table, lock);
- 	if (IS_ERR(pll))
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+Don't know if it's better to also include the move here again and let the 
+merging person sort out the conflict?
