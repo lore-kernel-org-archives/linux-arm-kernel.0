@@ -1,232 +1,74 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 5 Jun 2013 12:23:16 -0700
-Subject: [PATCH] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <1370039952-20888-1-git-send-email-andre.przywara@linaro.org>
-References: <1370039952-20888-1-git-send-email-andre.przywara@linaro.org>
-Message-ID: <20130605192316.GB9640@ubuntu>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Wed, 5 Jun 2013 21:55:55 +0200
+Subject: [PATCH V4] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130605135817.GL8758@arm.com>
+References: <1368336956-6693-1-git-send-email-gmbnomis@gmail.com>
+ <20130529110508.GH17767@MacBook-Pro.local>
+ <20130529191657.GA13047@schnuecks.de>
+ <20130530164335.GK23631@arm.com>
+ <20130531120519.GB3803@titan.lakedaemon.net>
+ <20130531141508.GB15551@arm.com>
+ <20130603173817.GA32211@schnuecks.de>
+ <20130605135817.GL8758@arm.com>
+Message-ID: <20130605195555.GA16341@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 01, 2013 at 12:39:12AM +0200, Andre Przywara wrote:
-> For migration to work we need to save (and later restore) the state of
-> each cores virtual generic timer.
-> Since this is per VCPU, we can use the [gs]et_one_reg ioctl and just
-> need to add the three registers (control, counter, compare value) to
-> the list of saved registers. However we provide special accessor
-> functions to get the value of each register, since the content can
-> change anytime.
+On Wed, Jun 05, 2013 at 02:58:17PM +0100, Catalin Marinas wrote:
+> On Mon, Jun 03, 2013 at 06:38:18PM +0100, Simon Baatz wrote:
+...
+> > The actual flush covering both the lowmem and highmem cases actually
+> > is as simple as this (inspired by __flush_dcache_page() in 2.6.32):
+> > 
+> > 	addr = page_address(page);
+> > #ifdef CONFIG_HIGHMEM
+> > 	/*
+> > 	 * kmap_atomic() doesn't set the page virtual address, and
+> > 	 * kunmap_atomic() takes care of cache flushing already.
+> > 	 */
+> > 	if (addr)
+> > #endif
+> > 		__cpuc_flush_dcache_area(addr, PAGE_SIZE);
+> > 
+> > If you agree that this makes sense, I will send a new version.
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_asm.h  |  7 ++++++-
->  arch/arm/include/asm/kvm_host.h |  3 +++
->  arch/arm/include/uapi/asm/kvm.h | 16 ++++++++++++++++
->  arch/arm/kvm/arch_timer.c       | 32 ++++++++++++++++++++++++++++++++
->  arch/arm/kvm/coproc.c           | 30 ++++++++++++++++++++++++++++++
->  5 files changed, 87 insertions(+), 1 deletion(-)
+> It makes sense (with the addition of the cache_is_vivt() check). Maybe
+> something like
 > 
-> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> index 18d5032..a732b17 100644
-> --- a/arch/arm/include/asm/kvm_asm.h
-> +++ b/arch/arm/include/asm/kvm_asm.h
-> @@ -46,7 +46,12 @@
->  #define c13_TID_URO	24	/* Thread ID, User R/O */
->  #define c13_TID_PRIV	25	/* Thread ID, Privileged */
->  #define c14_CNTKCTL	26	/* Timer Control Register (PL1) */
-> -#define NR_CP15_REGS	27	/* Number of regs (incl. invalid) */
-> +#define c14_CNTV_CTL	27	/* Virtual Timer Control Register */
-> +#define c14_CNTVCT	28	/* Virtual Timer Counter Register */
-> +#define c14_CNTVCT_high	29	/* Virtual Timer Counter Register */
-> +#define c14_CNTV_CVAL	30	/* Virtual Timer Counter Register */
-> +#define c14_CNTV_CVAL_high	31	/* Virtual Timer Counter Register */
-> +#define NR_CP15_REGS	32	/* Number of regs (incl. invalid) */
-
-To avoid the extra storage overhead here I suggest you just export the
-registers using a separate number space for the ONE_REG ioctl instead of
-piggybacking on the cp15 exports.
-
-The main rationale being that the cp15 registers are optional to the
-architecture, which fits nicely with having the extra struct (which is a
-kconfig option) included in the vcpu struct.
-
-The implementation is basically going to be the same, you just need to
-add specific handling for that number space, I recommend you use
-"coprocessor number 17" for this, so your pattern would look something
-like (note added benefit of direct 64 bit support):
-
-0x4020 0000 0013 <32 bit reg_id, indexed from 0:16>
-0x4030 0000 0013 <64 bit reg_id, indexed from 0:16>
-
->  
->  #define ARM_EXCEPTION_RESET	  0
->  #define ARM_EXCEPTION_UNDEFINED   1
-> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-> index 57cb786..80714ab 100644
-> --- a/arch/arm/include/asm/kvm_host.h
-> +++ b/arch/arm/include/asm/kvm_host.h
-> @@ -224,4 +224,7 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
->  int kvm_perf_init(void);
->  int kvm_perf_teardown(void);
->  
-> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
-> +void kvm_arm_timer_set_reg(struct kvm_vcpu *, const struct kvm_one_reg *, u64);
-> +
->  #endif /* __ARM_KVM_HOST_H__ */
-> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-> index c1ee007..e3b0115 100644
-> --- a/arch/arm/include/uapi/asm/kvm.h
-> +++ b/arch/arm/include/uapi/asm/kvm.h
-> @@ -118,6 +118,22 @@ struct kvm_arch_memory_slot {
->  #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
->  #define KVM_REG_ARM_32_CRN_SHIFT	11
->  
-> +#define KVM_REG_ARM_32_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U32      | \
-> +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
-> +#define KVM_REG_ARM_64_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U64      | \
-> +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
-> +#define KVM_REG_ARM_TIMER_CTL		(KVM_REG_ARM_32_CP15                 | \
-> +					( 3ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-> +					(14ULL << KVM_REG_ARM_32_CRN_SHIFT)  | \
-> +					( 0ULL << KVM_REG_ARM_OPC1_SHIFT)    | \
-> +					( 1ULL << KVM_REG_ARM_32_OPC2_SHIFT))
-> +#define KVM_REG_ARM_TIMER_CNT		(KVM_REG_ARM_64_CP15 | \
-> +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-> +					( 1ULL << KVM_REG_ARM_OPC1_SHIFT))
-> +#define KVM_REG_ARM_TIMER_CVAL		(KVM_REG_ARM_64_CP15 | \
-> +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-> +					( 3ULL << KVM_REG_ARM_OPC1_SHIFT))
-> +
->  /* Normal registers are mapped as coprocessor 16. */
->  #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
->  #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
-> diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
-> index c55b608..64a8920b 100644
-> --- a/arch/arm/kvm/arch_timer.c
-> +++ b/arch/arm/kvm/arch_timer.c
-> @@ -171,6 +171,38 @@ static void kvm_timer_init_interrupt(void *info)
->  	enable_percpu_irq(timer_irq.irq, 0);
->  }
->  
-> +void kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu,
-> +			   const struct kvm_one_reg *reg, u64 val)
-> +{
-> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> +
-> +	switch (reg->id) {
-> +	case KVM_REG_ARM_TIMER_CTL:
-> +		timer->cntv_ctl = val;
-> +		break;
-> +	case KVM_REG_ARM_TIMER_CNT:
-> +		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - val;
-> +		break;
-> +	case KVM_REG_ARM_TIMER_CVAL:
-> +		timer->cntv_cval = val;
-> +		break;
-> +	}
-> +}
-> +
-> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-> +{
-> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> +
-> +	switch (reg->id) {
-> +	case KVM_REG_ARM_TIMER_CTL:
-> +		return timer->cntv_ctl;
-> +	case KVM_REG_ARM_TIMER_CNT:
-> +		return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-> +	case KVM_REG_ARM_TIMER_CVAL:
-> +		return timer->cntv_cval;
-> +	}
-> +	return 0;
-> +}
->  
->  static int kvm_timer_cpu_notify(struct notifier_block *self,
->  				unsigned long action, void *cpu)
-> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-> index 8eea97b..63b2e89 100644
-> --- a/arch/arm/kvm/coproc.c
-> +++ b/arch/arm/kvm/coproc.c
-> @@ -156,6 +156,8 @@ static const struct coproc_reg cp15_regs[] = {
->  	/* TTBR0/TTBR1: swapped by interrupt.S. */
->  	{ CRm( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
->  	{ CRm( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
-> +	{ CRm(14), Op1( 1), is64, NULL, reset_unknown64, c14_CNTVCT},
-> +	{ CRm(14), Op1( 3), is64, NULL, reset_unknown64, c14_CNTV_CVAL},
->  
->  	/* TTBCR: swapped by interrupt.S. */
->  	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
-> @@ -226,6 +228,8 @@ static const struct coproc_reg cp15_regs[] = {
->  	/* CNTKCTL: swapped by interrupt.S. */
->  	{ CRn(14), CRm( 1), Op1( 0), Op2( 0), is32,
->  			NULL, reset_val, c14_CNTKCTL, 0x00000000 },
-> +	{ CRn(14), CRm( 3), Op1( 0), Op2( 1), is32,
-> +			NULL, reset_val, c14_CNTV_CTL, 0x00000000 },
->  };
->  
->  /* Target specific emulation tables */
-> @@ -823,10 +827,22 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
->  }
->  #endif /* !CONFIG_VFPv3 */
->  
-> +static bool is_timer_reg(u64 index)
-> +{
-> +	switch (index) {
-> +	case KVM_REG_ARM_TIMER_CTL:
-> +	case KVM_REG_ARM_TIMER_CNT:
-> +	case KVM_REG_ARM_TIMER_CVAL:
-> +		return true;
-> +	}
-> +	return false;
-> +}
-> +
->  int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  {
->  	const struct coproc_reg *r;
->  	void __user *uaddr = (void __user *)(long)reg->addr;
-> +	u64 val;
->  
->  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
->  		return demux_c15_get(reg->id, uaddr);
-> @@ -834,6 +850,11 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_VFP)
->  		return vfp_get_reg(vcpu, reg->id, uaddr);
->  
-> +	if (is_timer_reg(reg->id)) {
-> +		val = kvm_arm_timer_get_reg(vcpu, reg);
-> +		return reg_to_user(uaddr, &val, reg->id);
-> +	}
-> +
->  	r = index_to_coproc_reg(vcpu, reg->id);
->  	if (!r)
->  		return get_invariant_cp15(reg->id, uaddr);
-> @@ -846,6 +867,8 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  {
->  	const struct coproc_reg *r;
->  	void __user *uaddr = (void __user *)(long)reg->addr;
-> +	u64 val;
-> +	int ret;
->  
->  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
->  		return demux_c15_set(reg->id, uaddr);
-> @@ -853,6 +876,13 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
->  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_VFP)
->  		return vfp_set_reg(vcpu, reg->id, uaddr);
->  
-> +	if (is_timer_reg(reg->id)) {
-> +		ret = reg_from_user(&val, uaddr, reg->id);
-> +		if (ret == 0)
-> +			kvm_arm_timer_set_reg(vcpu, reg, val);
-> +		return ret;
-> +	}
-> +
->  	r = index_to_coproc_reg(vcpu, reg->id);
->  	if (!r)
->  		return set_invariant_cp15(reg->id, uaddr);
-> -- 
-> 1.7.12.1
+> 	if (IS_ENABLED(CONFIG_HIGHMEM) && addr)
 > 
+> to avoid the #ifdef.
+
+Yes, IS_ENABLED is much nicer. However, IS_ENABLED apparently is not
+available for <= 3.0.x. :-(
+ 
+> > If we change the patch this way, there is no need to split off
+> > __flush_kernel_dcache_page() from __flush_dcache_page(), which also
+> > makes it simpler to apply to past stable kernels.
+> > 
+> > The only thing we need to be aware of is the change of
+> > flush_kernel_dcache_page() in 2.6.37 (commit f8b63c1).  In earlier
+> > versions, we would only need to fix the highmem case.  However, I
+> > wonder whether it makes sense to apply a fix to 2.6.32 and 2.6.34
+> > without this ever being reported as a problem.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I think you can cc stable with a dependency for 2.6.37 onwards and send
+> a different patch for earlier versions directly to the
+> stable at vger.kernel.org alias, specifying the versions it needs to be
+> applied to.
+
+Ok. Next version of the patch then for >= 3.2.x. 3.0.x is special (#ifdef).
+
+2.6.3[24].x are special anyway. However, for the latter I still
+wonder whether this makes sense. "stable_kernel_rules.txt" states:
+
+ - It must fix a real bug that bothers people (not a, "This could be a
+   problem..." type thing).
+
+I don't know anyone who is/was bothered by the higmem bug. 
+
+(Btw. I verified that the highmem problem is really there (using
+current linux-next) and is fixed by the proposed patch.)
+
+- Simon
