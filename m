@@ -1,32 +1,38 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Jun 2013 22:49:21 +0900
-Subject: [PATCH 1/4] irqchip: irqc: Add runtime PM support
-In-Reply-To: <CANqRtoTxxtj-uKyM58dKfH6GV62G8nweQeh9W3+VW==USOkj9A@mail.gmail.com>
+Date: Wed, 5 Jun 2013 22:51:36 +0900
+Subject: [PATCH 2/4] irqchip: renesas-intc-irqpin: DT binding for sense
+ bitfield width
+In-Reply-To: <201306051352.52924.arnd@arndb.de>
 References: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
- <1370406751-3852-2-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoTxxtj-uKyM58dKfH6GV62G8nweQeh9W3+VW==USOkj9A@mail.gmail.com>
-Message-ID: <20130605134920.GB7451@verge.net.au>
+ <1370406751-3852-3-git-send-email-horms+renesas@verge.net.au>
+ <201306051352.52924.arnd@arndb.de>
+Message-ID: <20130605135136.GC7451@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 04:03:26PM +0900, Magnus Damm wrote:
-> Hi Simon and Morimoto-san,
+On Wed, Jun 05, 2013 at 01:52:52PM +0200, Arnd Bergmann wrote:
+> On Wednesday 05 June 2013, Simon Horman wrote:
+> > @@ -0,0 +1,13 @@
+> > +DT bindings for the R-/SH-Mobile irqpin controller
+> > +
+> > +Required properties:
+> > +
+> > +- compatible: has to be "renesas,intc-irqpin"
+> > +- #interrupt-cells: has to be <2>
+> > +
+> > +Optional properties:
+> > +
+> > +- any properties, listed in interrupts.txt in this directory, and any standard
+> > +  resource allocation properties
+> > +- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
+> > +  if different from the default 4 bits
 > 
-> On Wed, Jun 5, 2013 at 1:32 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > This was tested using the SMSC LAN on the APE6EVM board.
-> >
-> > Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> >  drivers/irqchip/irq-renesas-irqc.c | 8 ++++++++
-> >  1 file changed, 8 insertions(+)
-> 
-> Thanks for your patch. I am trying to understand how this controls the
-> actual hardware. Which clock and/or power domain is being controlled
-> using this patch?
+> I think you should add documentation here about how the two interrupt cells
+> are to be interpreted, to allow people to fill the values from a data sheet
+> or board schematic.
 
-This patch appears to resolve a problem which I discussed with
-Morimoto-san on the linux-sh ML and for which he proposed this solution.
-However, I never fully analysed its effect. I think that
-the best thing would be for me to drop this patch from the
-renesas tree for now it and come back to this problem later.
+I will drop this patch from the renesas tree pending some more work
+on the documentation.
+
+I'll put together an updated pull request for renesas-intc-irqpin
+without this or the runtime-pm patch, which Magnus commented on elsewhere.
