@@ -1,94 +1,117 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 06 Jun 2013 00:11:30 +0200
-Subject: getting allwinner SoC support upstream (was Re: Uploading linux
- (3.9.4-1))
-In-Reply-To: <CAKON4OyyRF4Z46RyJFDWUwo4L52Z8bgSH0CzDr2gDerw4iDwcw@mail.gmail.com>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Wed, 5 Jun 2013 23:20:23 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <1370468873.18839.22.camel@localhost>
 References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OyyRF4Z46RyJFDWUwo4L52Z8bgSH0CzDr2gDerw4iDwcw@mail.gmail.com>
-Message-ID: <3619282.JgdgeGHudI@flatron>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <CAPweEDzDC87KmOQ=0hyPcjPtPsRuXHxNTs97vbEqVNNnix69rA@mail.gmail.com>
+ <1370468873.18839.22.camel@localhost>
+Message-ID: <CAPweEDwrpoYCFuWJvF99Yua_TBoONeEH8UkTZvC7dTev6FAYfw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 of June 2013 16:48:27 jonsmirl at gmail.com wrote:
-> On Wed, Jun 5, 2013 at 3:46 PM, Luke Kenneth Casson Leighton
-> 
-> <lkcl@lkcl.net> wrote:
-> > On Fri, May 31, 2013 at 3:52 AM, Ben Hutchings <ben@decadent.org.uk> 
-wrote:
-> > > The 3.8.y branch is over, so I think we have to move to 3.9, ready
-> > > or
-> > > not.  I merged the work in progress from trunk to sid and am going
-> > > through the config changes at the moment.
-> > > 
-> > > I'm rather disappointed that nothing at all has been committed by
-> > > ARM
-> > > porters to either branch in the last month.
-> >  
-> >  *sigh* i didn't want to leave this as it stood, ben, purely for the
-> > 
-> > reason that i don't want to see you discouraged!  but, i also had to
-> > think a bit about what potentially to say.
-> > 
-> >  the one SoC family that's going to become increasingly important to
-> > 
-> > have both upstream and in debian is support for allwinner's
-> > processors.  with 40% world-wide tablet market share [*0], they must
-> > be doing something right, and it's basically getting a staggering
-> > price-performance value as well as having a set of interfaces and
-> > level of integration that is really second to none.
-> > 
-> >  to begin to describe the problem in getting allwinner soc source code
-> > 
-> > upstream is this: not only do we have the usual "let's get it out the
-> > door as fast as possible" learning curve of a very young, very new and
-> > bewilderingly-successful fabless SoC company, but we also have a
-> > completely new type of very successful and comprehensive
-> > device-tree-like dynamic configuration system to deal with, which
-> > allwinner have called "fex" [*1].
-> > 
-> >  basically at the time when device-tree was being thought of,
-> > 
-> > allwinner needed something that they could *right then* - not waiting
-> > for developers to finish device-tree - they needed to be able to
-> > reconfigure their customer's kernels *without* needing a recompile.
-> > so they invented the script.fex system, which is a simple config.ini
-> > file-format, compile it to binary, and get the bootloader to upload it
-> > to memory and read it.
-> 
-> Why don't you try converting the sunxi code over to device tree? I
-> don't think it will be as hard as you may think it is. Start off by
-> mapping the existing fex syntax into a DTS file. Send your DTS file to
-> devicetree-discuss to get help with the correct syntax. Once this DTS
-> template is constructed you can write a program to convert any fex
-> file into it.
-> 
-> Now boot with this DTB; that will get all of the existing info into
-> the kernel's internal FDT.  Then start converting your drivers over to
-> use the of_ support for accessing the FDT. You've already done all of
-> the hard work in making the drivers configurable at boot. As a
-> transition tool allow the kernel to boot with both fex and DT untill
-> you get all of the drivers converted.
-> 
-> BTW, device tree has been in the kernel since 2007 (or earlier).
-> About two years ago the ARM community decided to switch all new
-> development onto it in order to stop the proliferation of
-> platform/machine files. I believe the rule about no new non-DT ARM
-> platforms has been in place for over eighteen months.
+On Wed, Jun 5, 2013 at 10:47 PM, Henrik Nordstr?m
+<henrik@henriknordstrom.net> wrote:
+> ons 2013-06-05 klockan 22:15 +0100 skrev Luke Kenneth Casson Leighton:
+>
+>> what we do not want to happen is that they see upstream patches being
+>> submitted, they merge them into their internal tree (which to date has
+>> had zero upstream changes: they're currently only just getting round
+>> to doing 3.4 as we speak), and they *completely* ignore *absolutely
+>> everything* that's being done by the community, duplicating yet
+>> another set of device drivers (named drivers/*/sun8i_* and so on).
+>
+> Well, that will obviously happen one or two more rounds, a bit depending
+> on which kernel releases Android will use. But I hope the Allwinner
+> kernel team will rethink when they hit more current kernels.
 
-Well, it not only has been in the kernel, but has been extensively used 
-for PowerPC. Not even saying that the idea started even earlier, 
-originating from OpenFirmware.
+ yyyeahhh..... that's the whole point, henrik: i'd like to give
+allwinner a heads-up *before* that happens, and to also give the linux
+and sunxi kernel developer teams an opportunity to hear what allwinner
+would like to see happen (if anything).
 
-Allwinner has just reinvented a wheel, without even considering the fact 
-that it has been already invented. This is actually not so uncommon plot, 
-because for such companies it is often easier to develop (or hack up) a 
-completely new solution without any supervision, than to extend an 
-existing solution that would need cooperation with community and (whoaa) 
-being compliant with open source policy.
+ what i *really* don't want to happen is for them to get a nasty
+surprise some time around 3.9 or above, along with a hell of a lot of
+kernel conflicts that cause them to completely abandon the entire
+current linux directory conventions.
 
-IMHO this is completely wrong and can't be justified. Not even saying 
-about adopting such solution now that we already have a standard and 
-widely accepted one, which they could have used as well.
+ or worse, do "find . -name "*sunxi* | xargs git rm" on linux 3.9 [or
+above] prior to perging in *their* versions.
 
-Best regards,
-Tomasz
+
+>>  this proposal is a start: however what you have to bear in mind is
+>> that you now have to convince a very busy company that it is in their
+>> best interests to disrupt their schedule, to drop their existing
+>> working practices, to tell all their customers "please stop using the
+>> existing tools and please use these ones instead".
+>
+> Why?
+
+ taking this as a rhetorical question (kinda), what i believe jon
+proposed would have a knock-on effect of requiring that boot0 and
+boot1 be converted *away* from script.fex and onto DT.  therefore,
+automatically, all tools must now be converted to understand DT not
+fex.  that includes the (proprietary) equivalents of fex2bin and
+bin2fex [*1]
+
+ but, i could be wrong.
+
+>>  you also need to convince the creators of the proprietary
+>> firmware-flashing tools "livesuite" and "phoenix" to *also* convert
+>> their tools over to the new proposed idea.
+>
+> Why?
+>
+>>  can you provide such a supporting argument which would convince
+>> allwinner to accept the modifications to their working practices that
+>> you propose?
+>
+> It does not really need to be such big modifications to their working
+> practices. Their configuration working practices is all built around the
+> fex file, and the new practices can be
+>
+> 0. Assuming kernel drivers gets ported over to using device tree.
+>
+> 1. Do configuration as you have always done in the .fex
+>
+> 2. Modify the build script to build a device tree from the fex +
+> template, in addition to script.bin.
+>
+> 3. Tell u-boot to load the device tree for the kernel.
+>
+> That's it really.
+>
+> livesuit do not modify script.bin. script.bin is compiled from the .fex
+> at image creation time. A couple more lines in the build script (and a
+> suitable translation tool) and there is also a device tree built and
+> installed and you get a nice and smoot transition.
+
+ ok: great.  so we have something that i can potentially propose to
+them.   now: what reason can i give that they should accept this?
+what's the biggest incentive for them, here, to make these changes?
+what would they gain?
+
+
+>> > Device tree on ARM's goal is to achieve a single kernel across vendors, not
+>> > just a single kernel for a single vendor.
+>>
+>>  you'll be aware that i've mentioned a number of times and have
+>> discussed at some length why this is a goal that is completely
+>> impossible to achieve [*1].  sadly.
+>
+> Here I disagree. It is possible. Not across all vendors but a
+> significant share.
+
+time will tell, henrik [i mean that sincerely, not in a trite way].
+
+fortunately as you know (but many people on these various lists may
+not), with the eoma initiatives [*2], we bypass that possibility, and
+through hardware standardisation turn an N*M work problem into an
+N+M+2 work problem (where N is number-of-SoCs and M is number of
+product types).
+
+l.
+
+[*1] https://github.com/linux-sunxi/sunxi-tools
+[*2] http://elinux.org/Embedded_Open_Modular_Architecture
