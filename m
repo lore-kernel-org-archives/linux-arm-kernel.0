@@ -1,41 +1,30 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 5 Jun 2013 18:02:02 +0100
-Subject: [PATCH v4 1/6] arm/xen: define xen_remap as ioremap_cached
+Date: Wed, 5 Jun 2013 18:02:05 +0100
+Subject: [PATCH v4 4/6] arm64/xen: use XEN_IO_PROTO_ABI_ARM on ARM64
 In-Reply-To: <alpine.DEB.2.02.1306051605030.4589@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1306051605030.4589@kaball.uk.xensource.com>
-Message-ID: <1370451727-26826-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1370451727-26826-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define xen_remap as ioremap_cache (MT_MEMORY and MT_DEVICE_CACHED end up
-having the same AttrIndx encoding).
-
-Remove include asm/mach/map.h, not unneeded.
-
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Ian Campbell <ian.campbell@citrix.com>
 ---
- arch/arm/include/asm/xen/page.h |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+ include/xen/interface/io/protocols.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
-index 30cdacb..359a7b5 100644
---- a/arch/arm/include/asm/xen/page.h
-+++ b/arch/arm/include/asm/xen/page.h
-@@ -1,7 +1,6 @@
- #ifndef _ASM_ARM_XEN_PAGE_H
- #define _ASM_ARM_XEN_PAGE_H
- 
--#include <asm/mach/map.h>
- #include <asm/page.h>
- #include <asm/pgtable.h>
- 
-@@ -88,6 +87,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
- 	return __set_phys_to_machine(pfn, mfn);
- }
- 
--#define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
-+#define xen_remap(cookie, size) ioremap_cached((cookie), (size));
- 
- #endif /* _ASM_ARM_XEN_PAGE_H */
+diff --git a/include/xen/interface/io/protocols.h b/include/xen/interface/io/protocols.h
+index 0eafaf2..056744b 100644
+--- a/include/xen/interface/io/protocols.h
++++ b/include/xen/interface/io/protocols.h
+@@ -15,7 +15,7 @@
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_IA64
+ #elif defined(__powerpc64__)
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_POWERPC64
+-#elif defined(__arm__)
++#elif defined(__arm__) || defined(__aarch64__)
+ # define XEN_IO_PROTO_ABI_NATIVE XEN_IO_PROTO_ABI_ARM
+ #else
+ # error arch fixup needed here
 -- 
 1.7.2.5
