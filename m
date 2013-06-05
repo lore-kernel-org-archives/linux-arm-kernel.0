@@ -1,78 +1,38 @@
-From: dmurphy@ti.com (Dan Murphy)
-Date: Wed, 5 Jun 2013 12:04:15 -0500
-Subject: [PATCH 3/4] ARM: dts: omap5-uevm: Add LED support for uEVM blue
- LED
-In-Reply-To: <1370414770-1485-4-git-send-email-r.sricharan@ti.com>
-References: <1370414770-1485-1-git-send-email-r.sricharan@ti.com>
- <1370414770-1485-4-git-send-email-r.sricharan@ti.com>
-Message-ID: <51AF6F8F.4000702@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 5 Jun 2013 18:10:01 +0100
+Subject: [PATCH] dmatest: do not allow to interrupt ongoing tests
+In-Reply-To: <1369638667.29283.197.camel@smile>
+References: <1369308593-3723-1-git-send-email-andriy.shevchenko@linux.intel.com>
+ <Pine.LNX.4.64.1305242353210.7187@axis700.grange>
+ <1369638667.29283.197.camel@smile>
+Message-ID: <20130605171001.GC26663@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sricharan
+On Mon, May 27, 2013 at 08:11:07AM +0100, Andy Shevchenko wrote:
+> On Fri, 2013-05-24 at 23:55 +0200, Guennadi Liakhovetski wrote: 
+> > On Thu, 23 May 2013, Andy Shevchenko wrote:
+> > 
+> > > When user interrupts ongoing transfers the dmatest may end up with console
+> > > lockup, oops, or data mismatch. This patch prevents user to abort any ongoing
+> > > test.
+> > 
+> > Personally I would be against such a change. What about interrupting the 
+> > test with rmmod?
+> >  Is it still possible after this your patch or not? If not 
+> > - this doesn't seem like a good idea to me. Why don't we just fix those 
+> > bugs, that you're describing?
+> 
+> The behaviour of the module is returned to the same page by this patch
+> as it was before (w/o debugfs).
+> 
+> The user can interrupt tests by rmmod, but it will take time up to
+> timeout.
+> 
+> I appreciate if you can do a deeper analysis of what happened in
+> case Will reported.
 
-Thanks for sending this up in the series.
+Did this query hold up the application of this patch? I'd really like to see
+*something* in 3.10, otherwise dmatest will be broken.
 
-On 06/05/2013 01:46 AM, Sricharan R wrote:
-> From: Dan Murphy <dmurphy@ti.com>
->
-> Add support for blue LED 1 off of GPIO 153.
-> Make the LED a heartbeat LED
-> Configure the MUX for GPIO output.
->
-> Cc: Dan Murphy <dmurphy@ti.com>
-> Signed-off-by: Dan Murphy <dmurphy@ti.com>
-> [Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
->  arch/arm/boot/dts/omap5-uevm.dts |   17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-> index cf862df..a2aed5b 100644
-> --- a/arch/arm/boot/dts/omap5-uevm.dts
-> +++ b/arch/arm/boot/dts/omap5-uevm.dts
-> @@ -66,6 +66,16 @@
->  		device = <&hsusb2_phy>;
->  		clock-frequency = <19200000>; /* 19.2 MHz */
->  	};
-> +
-> +	leds {
-> +		compatible = "gpio-leds";
-> +		led at 1 {
-> +			label = "omap5:blue:usr1";
-> +			gpios = <&gpio5 25 GPIO_ACTIVE_HIGH>; /* gpio5_153 D1 LED */
-> +			linux,default-trigger = "heartbeat";
-> +			default-state = "off";
-> +		};
-> +	};
->  };
->  
->  &omap5_pmx_core {
-> @@ -77,6 +87,7 @@
->  			&mcbsp1_pins
->  			&mcbsp2_pins
->  			&usbhost_pins
-> +			&led_gpio_pins
->  	>;
->  
->  	twl6040_pins: pinmux_twl6040_pins {
-> @@ -175,6 +186,12 @@
->  			0x6e (PIN_OUTPUT | MUX_MODE6) /* gpio3_79 OUTPUT | MODE 6 ETH_NRESET */
->  		>;
->  	};
-> +
-> +	led_gpio_pins: pinmux_led_gpio_pins {
-> +		pinctrl-single,pins = <
-> +			0x196 (PIN_OUTPUT | MUX_MODE6) /* uart3_cts_rctx.gpio5_153 OUTPUT | MODE6 */
-Same comment from Florian.  We can drop the OUTPUT | MODE6 in the comment.
-> +		>;
-> +	};
->  };
->  
->  &omap5_pmx_wkup {
-
-
--- 
-------------------
-Dan Murphy
+Will
