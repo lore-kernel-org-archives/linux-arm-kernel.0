@@ -1,30 +1,94 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jun 2013 23:10:34 +0100
-Subject: getting allwinner SoC support upstream (was Re: Uploading
- linux (3.9.4-1))
-In-Reply-To: <20130605213845.GX11182@csclub.uwaterloo.ca>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 06 Jun 2013 00:11:30 +0200
+Subject: getting allwinner SoC support upstream (was Re: Uploading linux
+ (3.9.4-1))
+In-Reply-To: <CAKON4OyyRF4Z46RyJFDWUwo4L52Z8bgSH0CzDr2gDerw4iDwcw@mail.gmail.com>
 References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <20130605213845.GX11182@csclub.uwaterloo.ca>
-Message-ID: <20130605221034.GK18614@n2100.arm.linux.org.uk>
+ <CAKON4OyyRF4Z46RyJFDWUwo4L52Z8bgSH0CzDr2gDerw4iDwcw@mail.gmail.com>
+Message-ID: <3619282.JgdgeGHudI@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 05:38:45PM -0400, Lennart Sorensen wrote:
-> I haven't personally dealt with any nvidia arm devices, so I have no
-> idea how those are turning out, nor have I looked much at the marvell
-> ones yet (even though I have a cubox sitting on my desk I intend to play
-> around with).
+On Wednesday 05 of June 2013 16:48:27 jonsmirl at gmail.com wrote:
+> On Wed, Jun 5, 2013 at 3:46 PM, Luke Kenneth Casson Leighton
+> 
+> <lkcl@lkcl.net> wrote:
+> > On Fri, May 31, 2013 at 3:52 AM, Ben Hutchings <ben@decadent.org.uk> 
+wrote:
+> > > The 3.8.y branch is over, so I think we have to move to 3.9, ready
+> > > or
+> > > not.  I merged the work in progress from trunk to sid and am going
+> > > through the config changes at the moment.
+> > > 
+> > > I'm rather disappointed that nothing at all has been committed by
+> > > ARM
+> > > porters to either branch in the last month.
+> >  
+> >  *sigh* i didn't want to leave this as it stood, ben, purely for the
+> > 
+> > reason that i don't want to see you discouraged!  but, i also had to
+> > think a bit about what potentially to say.
+> > 
+> >  the one SoC family that's going to become increasingly important to
+> > 
+> > have both upstream and in debian is support for allwinner's
+> > processors.  with 40% world-wide tablet market share [*0], they must
+> > be doing something right, and it's basically getting a staggering
+> > price-performance value as well as having a set of interfaces and
+> > level of integration that is really second to none.
+> > 
+> >  to begin to describe the problem in getting allwinner soc source code
+> > 
+> > upstream is this: not only do we have the usual "let's get it out the
+> > door as fast as possible" learning curve of a very young, very new and
+> > bewilderingly-successful fabless SoC company, but we also have a
+> > completely new type of very successful and comprehensive
+> > device-tree-like dynamic configuration system to deal with, which
+> > allwinner have called "fex" [*1].
+> > 
+> >  basically at the time when device-tree was being thought of,
+> > 
+> > allwinner needed something that they could *right then* - not waiting
+> > for developers to finish device-tree - they needed to be able to
+> > reconfigure their customer's kernels *without* needing a recompile.
+> > so they invented the script.fex system, which is a simple config.ini
+> > file-format, compile it to binary, and get the bootloader to upload it
+> > to memory and read it.
+> 
+> Why don't you try converting the sunxi code over to device tree? I
+> don't think it will be as hard as you may think it is. Start off by
+> mapping the existing fex syntax into a DTS file. Send your DTS file to
+> devicetree-discuss to get help with the correct syntax. Once this DTS
+> template is constructed you can write a program to convert any fex
+> file into it.
+> 
+> Now boot with this DTB; that will get all of the existing info into
+> the kernel's internal FDT.  Then start converting your drivers over to
+> use the of_ support for accessing the FDT. You've already done all of
+> the hard work in making the drivers configurable at boot. As a
+> transition tool allow the kernel to boot with both fex and DT untill
+> you get all of the drivers converted.
+> 
+> BTW, device tree has been in the kernel since 2007 (or earlier).
+> About two years ago the ARM community decided to switch all new
+> development onto it in order to stop the proliferation of
+> platform/machine files. I believe the rule about no new non-DT ARM
+> platforms has been in place for over eighteen months.
 
-Cubox is Dove, which dates from way before DT on ARM, and there's
-relatively few people working on Dove support, so progress towards
-DT support is rather slow there.  I believe it to be at the point
-where it's possible to boot the Cubox using DT, but not all features
-are supported.
+Well, it not only has been in the kernel, but has been extensively used 
+for PowerPC. Not even saying that the idea started even earlier, 
+originating from OpenFirmware.
 
-But then, not all features of the Dove SoC are supported in mainline
-either; the port essentially stopped after a little more than basic
-support was merged.  Eg, no hardware monitoring driver, no video
-drivers, etc...
+Allwinner has just reinvented a wheel, without even considering the fact 
+that it has been already invented. This is actually not so uncommon plot, 
+because for such companies it is often easier to develop (or hack up) a 
+completely new solution without any supervision, than to extend an 
+existing solution that would need cooperation with community and (whoaa) 
+being compliant with open source policy.
+
+IMHO this is completely wrong and can't be justified. Not even saying 
+about adopting such solution now that we already have a standard and 
+widely accepted one, which they could have used as well.
+
+Best regards,
+Tomasz
