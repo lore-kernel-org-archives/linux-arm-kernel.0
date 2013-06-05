@@ -1,70 +1,113 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Wed, 5 Jun 2013 17:38:45 -0400
-Subject: getting allwinner SoC support upstream (was Re: Uploading
- linux (3.9.4-1))
-In-Reply-To: <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
-Message-ID: <20130605213845.GX11182@csclub.uwaterloo.ca>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Wed, 05 Jun 2013 22:48:17 +0100
+Subject: [PATCH 15/15] OF: remove #ifdef from linux/of_platform.h
+In-Reply-To: <CAL_JsqLRJ1cEWBfAdHEyngJHQKauJ6XzWH2JwXh1qDusMkzUGA@mail.gmail.com>
+References: <1370038972-2318779-1-git-send-email-arnd@arndb.de>
+ <201306012257.02327.arnd@arndb.de>
+ <CAL_JsqKMOy4CM=FXbsy7mQ1f0DLyK6n_cuZ92uhsSM2Mq-3B1g@mail.gmail.com>
+ <201306041951.00447.arnd@arndb.de>
+ <CAL_JsqLRJ1cEWBfAdHEyngJHQKauJ6XzWH2JwXh1qDusMkzUGA@mail.gmail.com>
+Message-ID: <20130605214817.A46223E10E4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 10:24:15PM +0100, Luke Kenneth Casson Leighton wrote:
->   https://github.com/linux-sunxi/u-boot-sunxi
+On Tue, 4 Jun 2013 17:24:51 -0500, Rob Herring <robherring2@gmail.com> wrote:
+> On Tue, Jun 4, 2013 at 12:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Tuesday 04 June 2013, Rob Herring wrote:
+> >> On Sat, Jun 1, 2013 at 3:57 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >> > On Saturday 01 June 2013, Rob Herring wrote:
+> >> >> No, we still need empty functions. Here is what of_device.h looks like:
+> >> >>
+> >> >> http://tinyurl.com/l2azz5m
+> >> >>
+> >> >> BTW, it has your ack.
+> >> >>
+> >> >
+> >> > Could you add a patch on top that only puts the function declarations
+> >> > inside of #ifdef that don't have an inline wrapper?
+> >>
+> >> I'm confused. You mean that DO have an inline? Like this:
+> >>
+> >> void foo(void);
+> >>
+> >> #ifdef CONFIG_OF
+> >> void bar(void);
+> >> #else
+> >> static inline void bar(void) {}
+> >> #endif
+> >
+> > Yes, sorry. That's what I meant.
+> >
+> >> > It's really annoying to have to change the header file every time one
+> >> > needs to call a function from a driver in the DT-only case.
+> >>
+> >> The functions without inlines are ones that drivers should not call
+> >> and should only be called from OF enabled code. That's why we have not
+> >> done a complete pass of adding inlines for everything.
+> >
+> > The problem is that it's a bad default. The convention in kernel code
+> > is not to hide declarations in #ifdef, for multiple reasons:
+> >
+> > * It avoids unnecessary code rebuilds when the symbol changes between
+> >   two 'make' runs.
+> >
+> > * It lets drivers and platform code call the function from dead code
+> >   without causing a build error, thus improving compile coverage.
+> >
+> > * It's much nicer to read when can write your code like
+> >
+> > void __init exynos_init_io(struct map_desc *mach_desc, int size)
+> > {
+> >         if (IS_ENABLED_(CONFIG_OF) && initial_boot_params)
+> >                 of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
+> >         else
+> >                 iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
+> >         ...
+> > }
+> >
+> > instead of
+> >
+> > void __init exynos_init_io(struct map_desc *mach_desc, int size)
+> > {
+> > #ifdef CONFIG_OF
+> >         if (initial_boot_params)
+> >                 of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
+> >         else
+> > #endif
+> >                 iotable_init(exynos_iodesc, ARRAY_SIZE(exynos_iodesc));
+> >         ...
+> > }
+
+A big part of the reason for not having the headers was to discourage
+code like the above; so instead of having a whole bunch of DT functions
+inline in a drivers probe hook, they would be collected off in a DT
+parse function that can all get compiled away as a block.
+
+However, that's the first time I've thought about the code coverage
+issue and it is a good point.
+
+> >
+> > The first one looks like actual C code, the second is really ugly,
+> > and an inline wrapper wouldn't even do the right thing here.
 > 
->  And Then Some, stephen.  there are two versions of u-boot being used:
-> one is the community-assembled [GPL-compliant] one, and the other
-> includes a [as-of-a-few-days-ago-but-no-longer, yay!]
-> formerly-GPL-violating one from allwinner.
+> Right. I get all that. You still have to go add inlines if you want to make:
 > 
->  the community-based one *doesn't* have fex integration (i don't
-> think, but henrik will know for sure), but the allwinner one
-> definitely does.
+> if (IS_ENABLED(CONFIG_OF))
+>     of_foo();
 > 
->  .... and then there's the boot0 and boot1 loaders, these *do* have
-> fex integration: they're absolutely tiny and they're designed to fit
-> into the 1st level cache.  the job of these bootloaders is to set up
-> the DDR3 RAM timings (so that you can access DRAM!!) and to then
-> decide whether to load from NAND, SD/MMC etc. and many other things.
+> just be:
 > 
->  these boot0 and boot1 loaders are themselves configureable so that
-> you can specify, through script.fex, what GPIO is to be the "reset
-> key" and so on.  that's a much simplified story btw.
+> of_foo();
 > 
->  so the point is: if anyone wishes me to propose to allwinner that
-> they convert over to devicetree, or any other proposal which involves
-> significant low-level changes to their working practices that could
-> potentially have a massive knock-on effect onto their
-> multi-million-dollar clients, it had better be a damn good story.
+> There are situations for both and only inlines cover both cases. I
+> don't see a reason we would want to allow the first case and not allow
+> the second case. I am tired of taking patches adding the inlines 1 by
+> 1, so perhaps we need to refactor the OF headers to better separate
+> core infrastructure includes vs. driver only includes if that is
+> really a concern.
 
-Well certainly anyone interested in being a customer of allwinner should
-very much encourage them to get with it.  Having support upstream really
-is very helpful when trying to use a chip.  Going off an inventing your
-own thing rather than talking to the linux kernel developers first is
-just a bad idea as far as long term support is concerned.  Had they asked
-they would probably have been told devicetree would be a good idea to use.
+I'm fine with that. Attitudes have changed quite a bit in the last few
+years about DT code in device drivers so it isn't as important to make a
+hard distinction about when DT functions can be called.
 
-Allwinner has some very nice chips, and it certainly would be nice if
-they would start doing things "properly".
-
-Texas instruments uses devicetree for their arm devices.  It's very nice.
-
-I haven't checked what freescale is doing yet, although at least for
-powerpc, freescale is very used to devicetree, so hopefully they are
-doing that for their arm chips too.
-
-Both are certainly pushing their drivers upstream for inclusion and seem
-to be listening to feedback on how to best do things.
-
-I haven't personally dealt with any nvidia arm devices, so I have no
-idea how those are turning out, nor have I looked much at the marvell
-ones yet (even though I have a cubox sitting on my desk I intend to play
-around with).
-
-Lots of others like qualcomm, samsung, and who knows who else.  No idea
-how they are doing things either.
-
--- 
-Len Sorensen
+g.
