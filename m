@@ -1,93 +1,117 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  5 Jun 2013 09:05:00 +0200
-Subject: [PATCH 7/8] arm: mvebu: add another earlyprintk Kconfig option
+Date: Wed,  5 Jun 2013 09:04:59 +0200
+Subject: [PATCH 6/8] arm: mvebu: don't hardcode the physical address for
+ mvebu-mbus
 In-Reply-To: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1370415901-4721-8-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370415901-4721-7-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support both old and new bootloaders, we add a new Kconfig
-option for the earlyprintk UART selection. The existing option allows
-to work with old bootloaders (that keep the internal registers mapped
-at 0xd0000000), while the newly introduced option allows to work with
-new bootloaders (that remap the internal registers at 0xf1000000).
+Since the mvebu-mbus driver doesn't yet have a DT binding (and this DT
+binding may not necessarily be ready for 3.11), the physical address
+of the mvebu-mbus registers are currently hardcoded. This doesn't play
+well with the fact that the internal registers base address may be
+different depending on the bootloader.
+
+In order to have only one central place for the physical address of
+the internal registers, we now use of_translate_address() to translate
+the mvebu-mbus register offsets into the real physical address, by
+using DT-based address translation. This will go away once the
+mvebu-mbus driver gains a proper DT binding.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/Kconfig.debug         | 30 ++++++++++++++++++++++++++++--
- arch/arm/include/debug/mvebu.S |  5 +++++
- 2 files changed, 33 insertions(+), 2 deletions(-)
+ arch/arm/mach-mvebu/armada-370-xp.c | 38 ++++++++++++++++++++++++++-----------
+ arch/arm/mach-mvebu/armada-370-xp.h |  8 --------
+ 2 files changed, 27 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 1d41908..e6a6ab1 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -303,12 +303,37 @@ choice
- 		  their output to the serial port on MSM 8960 devices.
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index c1c0556..0dbc370 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -14,6 +14,7 @@
  
- 	config DEBUG_MVEBU_UART
--		bool "Kernel low-level debugging messages via MVEBU UART"
-+		bool "Kernel low-level debugging messages via MVEBU UART (old bootloaders)"
- 		depends on ARCH_MVEBU
- 		help
- 		  Say Y here if you want kernel low-level debugging support
- 		  on MVEBU based platforms.
+ #include <linux/kernel.h>
+ #include <linux/init.h>
++#include <linux/of_address.h>
+ #include <linux/of_platform.h>
+ #include <linux/io.h>
+ #include <linux/time-armada-370-xp.h>
+@@ -33,29 +34,44 @@ static void __init armada_370_xp_map_io(void)
+ 	debug_ll_io_init();
+ }
  
-+		  This option should be used with the old bootloaders
-+		  that left the internal registers mapped at
-+		  0xd0000000. As of today, this is the case on
-+		  platforms such as the Globalscale Mirabox or the
-+		  Plathome OpenBlocks AX3, when using the original
-+		  bootloader.
+-static void __init armada_370_xp_timer_and_clk_init(void)
++/*
++ * This initialization will be replaced by a DT-based
++ * initialization once the mvebu-mbus driver gains DT support.
++ */
 +
-+		  If the wrong DEBUG_MVEBU_UART* option is selected,
-+		  when u-boot hands over to the kernel, the system
-+		  silently crashes, with no serial output at all.
++#define ARMADA_370_XP_MBUS_WINS_OFFS   0x20000
++#define ARMADA_370_XP_MBUS_WINS_SIZE   0x100
++#define ARMADA_370_XP_SDRAM_WINS_OFFS  0x20180
++#define ARMADA_370_XP_SDRAM_WINS_SIZE  0x20
 +
-+	config DEBUG_MVEBU_UART_ALTERNATE
-+		bool "Kernel low-level debugging messages via MVEBU UART (new bootloaders)"
-+		depends on ARCH_MVEBU
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on MVEBU based platforms.
-+
-+		  This option should be used with the new bootloaders
-+		  that remap the internal registers at 0xf1000000.
-+
-+		  If the wrong DEBUG_MVEBU_UART* option is selected,
-+		  when u-boot hands over to the kernel, the system
-+		  silently crashes, with no serial output at all.
-+
- 	config DEBUG_NOMADIK_UART
- 		bool "Kernel low-level debugging messages via NOMADIK UART"
- 		depends on ARCH_NOMADIK
-@@ -632,7 +657,8 @@ config DEBUG_LL_INCLUDE
- 				 DEBUG_IMX51_UART || \
- 				 DEBUG_IMX53_UART ||\
- 				 DEBUG_IMX6Q_UART
--	default "debug/mvebu.S" if DEBUG_MVEBU_UART
-+	default "debug/mvebu.S" if DEBUG_MVEBU_UART || \
-+				   DEBUG_MVEBU_UART_ALTERNATE
- 	default "debug/mxs.S" if DEBUG_IMX23_UART || DEBUG_IMX28_UART
- 	default "debug/nomadik.S" if DEBUG_NOMADIK_UART
- 	default "debug/omap2plus.S" if DEBUG_OMAP2PLUS_UART
-diff --git a/arch/arm/include/debug/mvebu.S b/arch/arm/include/debug/mvebu.S
-index df191af..6517311 100644
---- a/arch/arm/include/debug/mvebu.S
-+++ b/arch/arm/include/debug/mvebu.S
-@@ -11,7 +11,12 @@
-  * published by the Free Software Foundation.
- */
++static void __init armada_370_xp_mbus_init(void)
+ {
+ 	char *mbus_soc_name;
++	struct device_node *dn;
++	const __be32 mbus_wins_offs = cpu_to_be32(ARMADA_370_XP_MBUS_WINS_OFFS);
++	const __be32 sdram_wins_offs = cpu_to_be32(ARMADA_370_XP_SDRAM_WINS_OFFS);
  
-+#ifdef CONFIG_DEBUG_MVEBU_UART_ALTERNATE
-+#define ARMADA_370_XP_REGS_PHYS_BASE	0xf1000000
-+#else
- #define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
-+#endif
-+
- #define ARMADA_370_XP_REGS_VIRT_BASE	0xfec00000
+-	mvebu_clocks_init();
+-	armada_370_xp_timer_init();
+-	coherency_init();
+-
+-	/*
+-	 * This initialization will be replaced by a DT-based
+-	 * initialization once the mvebu-mbus driver gains DT support.
+-	 */
+ 	if (of_machine_is_compatible("marvell,armada370"))
+ 		mbus_soc_name = "marvell,armada370-mbus";
+ 	else
+ 		mbus_soc_name = "marvell,armadaxp-mbus";
  
- 	.macro	addruart, rp, rv, tmp
++	dn = of_find_node_by_name(NULL, "internal-regs");
++	BUG_ON(!dn);
++
+ 	mvebu_mbus_init(mbus_soc_name,
+-			ARMADA_370_XP_MBUS_WINS_BASE,
++			of_translate_address(dn, &mbus_wins_offs),
+ 			ARMADA_370_XP_MBUS_WINS_SIZE,
+-			ARMADA_370_XP_SDRAM_WINS_BASE,
++			of_translate_address(dn, &sdram_wins_offs),
+ 			ARMADA_370_XP_SDRAM_WINS_SIZE);
++}
+ 
++static void __init armada_370_xp_timer_and_clk_init(void)
++{
++	mvebu_clocks_init();
++	armada_370_xp_timer_init();
++	coherency_init();
++	armada_370_xp_mbus_init();
+ #ifdef CONFIG_CACHE_L2X0
+ 	l2x0_of_init(0, ~0UL);
+ #endif
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
+index 585e147..c612b2c 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.h
++++ b/arch/arm/mach-mvebu/armada-370-xp.h
+@@ -15,14 +15,6 @@
+ #ifndef __MACH_ARMADA_370_XP_H
+ #define __MACH_ARMADA_370_XP_H
+ 
+-#define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
+-
+-/* These defines can go away once mvebu-mbus has a DT binding */
+-#define ARMADA_370_XP_MBUS_WINS_BASE    (ARMADA_370_XP_REGS_PHYS_BASE + 0x20000)
+-#define ARMADA_370_XP_MBUS_WINS_SIZE    0x100
+-#define ARMADA_370_XP_SDRAM_WINS_BASE   (ARMADA_370_XP_REGS_PHYS_BASE + 0x20180)
+-#define ARMADA_370_XP_SDRAM_WINS_SIZE   0x20
+-
+ #ifdef CONFIG_SMP
+ #include <linux/cpumask.h>
+ 
 -- 
 1.8.1.2
