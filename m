@@ -1,41 +1,96 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Wed, 5 Jun 2013 12:53:08 +0200
-Subject: [PATCH 1/2] hwmon: mc13783-adc: Refactor source to indicate
- various mc13xxx chips
-In-Reply-To: <1370423952.906453652@f168.mail.ru>
-References: <1370422628-1073-1-git-send-email-shc_work@mail.ru>
- <20130605110206.02fc09f3@endymion.delvare>
- <1370423952.906453652@f168.mail.ru>
-Message-ID: <20130605125308.36ba40ab@endymion.delvare>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 5 Jun 2013 12:02:12 +0100
+Subject: [RFC PATCH 1/2] ARM: kernel: build MPIDR hash function data
+ structure
+In-Reply-To: <20130605103752.GB2492@localhost.localdomain>
+References: <1370338453-8749-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1370338453-8749-2-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130605103752.GB2492@localhost.localdomain>
+Message-ID: <20130605110212.GA32505@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Jun 2013 13:19:12 +0400, Alexander Shiyan wrote:
-> > On Wed,  5 Jun 2013 12:57:07 +0400, Alexander Shiyan wrote:
-> > > This patch renames structures, variables and functions to indicate support
-> > > for various MC13xxx chips.
-> > > 
-> > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > ---
-> > >  drivers/hwmon/mc13783-adc.c | 135 +++++++++++++++++++++-----------------------
-> > >  1 file changed, 63 insertions(+), 72 deletions(-)
+On Wed, Jun 05, 2013 at 11:37:52AM +0100, Dave Martin wrote:
+> On Tue, Jun 04, 2013 at 10:34:12AM +0100, Lorenzo Pieralisi wrote:
+> > On ARM SMP systems, cores are identified by their MPIDR register.
+> > The MPIDR guidelines in the ARM ARM do not provide strict enforcement of
+> > MPIDR layout, only recommendations that, if followed, split the MPIDR
+> > on ARM 32 bit platforms in three affinity levels. In multi-cluster
+> > systems like big.LITTLE, if the affinity guidelines are followed, the
+> > MPIDR can not be considered an index anymore. This means that the
+> > association between logical CPU in the kernel and the HW CPU identifier
+> > becomes somewhat more complicated requiring methods like hashing to
+> > associate a given MPIDR to a CPU logical index, in order for the look-up
+> > to be carried out in an efficient and scalable way.
 > > 
-> > Nack. This change serves absolutely no purpose, all it's doing it make
-> > everyone's life harder. Just don't do that, thanks.
+> > This patch provides a function in the kernel that starting from the
+> > cpu_logical_map, implement collision-free hashing of MPIDR values by checking
+> > all significative bits of MPIDR affinity level bitfields. The hashing
+> > can then be carried out through bits shifting and ORing; the resulting
+> > hash algorithm is a collision-free though not minimal hash that can be
+> > executed with few assembly instructions. The mpidr is filtered through a
+> > mpidr mask that is built by checking all bits that toggle in the set of
+> > MPIDRs corresponding to possible CPUs. Bits that do not toggle do not carry
+> > information so they do not contribute to the resulting hash.
+> > 
+> > Pseudo code:
+> > 
+> > /* check all bits that toggle, so they are required */
+> > for (i = 1, mpidr_mask = 0; i < num_possible_cpus(); i++)
+> > 	mpidr_mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
+> > 
+> > /*
+> >  * Build shifts to be applied to aff0, aff1, aff2 values to hash the mpidr
+> >  * fls() returns the last bit set in a word, 0 if none
+> >  * ffs() returns the first bit set in a word, 0 if none
+> >  */
+> > fs0 = mpidr_mask[7:0] ? ffs(mpidr_mask[7:0]) - 1 : 0;
+> > fs1 = mpidr_mask[15:8] ? ffs(mpidr_mask[15:8]) - 1 : 0;
+> > fs2 = mpidr_mask[23:16] ? ffs(mpidr_mask[23:16]) - 1 : 0;
+> > ls0 = fls(mpidr_mask[7:0]);
+> > ls1 = fls(mpidr_mask[15:8]);
+> > ls2 = fls(mpidr_mask[23:16]);
+> > bits0 = ls0 - fs0;
+> > bits1 = ls1 - fs1;
+> > bits2 = ls2 - fs2;
+> > aff0_shift = fs0;
+> > aff1_shift = 8 + fs1 - bits0;
+> > aff2_shift = 16 + fs2 - (bits0 + bits1);
+> > u32 hash(u32 mpidr) {
+> > 	u32 l0, l1, l2;
+> > 	u32 mpidr_masked = mpidr & mpidr_mask;
+> > 	l0 = mpidr_masked & 0xff;
+> > 	l1 = mpidr_masked & 0xff00;
+> > 	l2 = mpidr_masked & 0xff0000;
+> > 	return (l0 >> aff0_shift | l1 >> aff1_shift | l2 >> aff2_shift);
+> > }
+> > 
+> > The hashing algorithm relies on the inherent properties set in the ARM ARM
+> > recommendations for the MPIDR. Exotic configurations, where for instance the
+> > MPIDR values at a given affinity level have large holes, can end up requiring
+> > big hash tables since the compression of values that can be achieved through
+> > shifting is somewhat crippled when holes are present. Kernel warns if
+> > the number of buckets of the resulting hash table exceeds the number of
+> > possible CPUs by a factor of 4, which is a symptom of a very sparse HW
+> > MPIDR configuration.
+> > 
+> > The hash algorithm is quite simple and can easily be implemented in assembly
+> > code, to be used in code paths where the kernel virtual address space is
+> > not set-up (ie cpu_resume) and instruction and data fetches are strongly
+> > ordered so code must be compact and must carry out few data accesses.
+> > 
+> > Cc: Dave Martin <dave.martin@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Cc: Colin Cross <ccross@android.com>
+> > Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> > Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> > Cc: Amit Kucheria <amit.kucheria@linaro.org>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 > 
-> I do not understand stubbornness here.
-> The driver works for different chips, it should be reflected in the code.
+> Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 
-Let's look at it from another angle. What problem are you trying to
-solve? I see absolutely no problem with the current function and file
-names. Almost all Linux kernel drivers support more chips than their
-name says.
-
-On the other hand, changing all function names makes backporting fixes
-harder, and changing Kconfig symbol names makes upgrading to the new
-kernel version harder for everyone.
-
-So the cost of your proposal far outweighs the benefits.
-
--- 
-Jean Delvare
+Thank you very much !
+Lorenzo
