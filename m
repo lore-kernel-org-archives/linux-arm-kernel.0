@@ -1,71 +1,36 @@
-From: lkcl@lkcl.net (Luke Kenneth Casson Leighton)
-Date: Wed, 5 Jun 2013 22:24:15 +0100
-Subject: getting allwinner SoC support upstream (was Re: Uploading linux
- (3.9.4-1))
-In-Reply-To: <51AFA6DD.3000202@wwwdotorg.org>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
-Message-ID: <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Thu,  6 Jun 2013 01:29:56 +0400
+Subject: [PATCH] spi/sirf: fix error propagation in spi_sirfsoc_probe()
+Message-ID: <1370467796-4641-1-git-send-email-khoroshilov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ please remove debian-release from future replies!  my mistake -
-please don't propagate it, thanks ]
+If pinctrl_get_select_default() fails, spi_sirfsoc_probe()
+returns IS_ERR(sspi->p) instead of PTR_ERR(sspi->p).
 
-On Wed, Jun 5, 2013 at 10:00 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/05/2013 02:46 PM, jonsmirl at gmail.com wrote:
->> On Wed, Jun 5, 2013 at 3:46 PM, Luke Kenneth Casson Leighton
->> <lkcl at lkcl.net <mailto:lkcl@lkcl.net>> wrote:
-> ...
->>     the detect line, which is the write-protect line, to setting the DRAM
->>     clock timings, saying which kernel driver must be loaded to support
->>     the touchscreen, enabling debugging, JTAG, naming the GPIOs for easy
->>     and convenient use in the kernel code: basically there isn't a single
->>     piece of hardware on the allwinner SoC family which *isn't*
->>     reconfigureable through script.fex... and they've even integrated it
->>     into u-boot *and* their low-level (early) bootloader as well [which
->>
->>
->> Device tree support has been integrated into uboot for about five years now.
->
-> There are two aspects to DT support in U-Boot:
->
-> 1) Having U-Boot pass a DT to the kernel, possibly manipulating a few
-> properties on the way, e.g. RAM size. As you say, this has been around a
-> while.
->
-> 2) Having U-Boot itself read a DT and configure itself, just like the
-> kernel does. This is relatively new, and only supported by a few boards
-> (all Tegra to some extent, and a couple each Samsung Exynos and Xilinx
-> boards). I suspect/guess this is the kind of thing that Luke was
-> referring to re: U-Boot fex integration.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-  https://github.com/linux-sunxi/u-boot-sunxi
+Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+---
+ drivers/spi/spi-sirf.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
- And Then Some, stephen.  there are two versions of u-boot being used:
-one is the community-assembled [GPL-compliant] one, and the other
-includes a [as-of-a-few-days-ago-but-no-longer, yay!]
-formerly-GPL-violating one from allwinner.
-
- the community-based one *doesn't* have fex integration (i don't
-think, but henrik will know for sure), but the allwinner one
-definitely does.
-
- .... and then there's the boot0 and boot1 loaders, these *do* have
-fex integration: they're absolutely tiny and they're designed to fit
-into the 1st level cache.  the job of these bootloaders is to set up
-the DDR3 RAM timings (so that you can access DRAM!!) and to then
-decide whether to load from NAND, SD/MMC etc. and many other things.
-
- these boot0 and boot1 loaders are themselves configureable so that
-you can specify, through script.fex, what GPIO is to be the "reset
-key" and so on.  that's a much simplified story btw.
-
- so the point is: if anyone wishes me to propose to allwinner that
-they convert over to devicetree, or any other proposal which involves
-significant low-level changes to their working practices that could
-potentially have a massive knock-on effect onto their
-multi-million-dollar clients, it had better be a damn good story.
-
-l.
+diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
+index 0808cd5..94c3920 100644
+--- a/drivers/spi/spi-sirf.c
++++ b/drivers/spi/spi-sirf.c
+@@ -559,9 +559,10 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
+ 	sspi->bitbang.master->dev.of_node = pdev->dev.of_node;
+ 
+ 	sspi->p = pinctrl_get_select_default(&pdev->dev);
+-	ret = IS_ERR(sspi->p);
+-	if (ret)
++	if (IS_ERR(sspi->p)) {
++		ret = PTR_ERR(sspi->p);
+ 		goto free_master;
++	}
+ 
+ 	sspi->clk = clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(sspi->clk)) {
+-- 
+1.8.1.2
