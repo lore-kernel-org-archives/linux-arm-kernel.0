@@ -1,37 +1,24 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 5 Jun 2013 10:07:59 -0400
-Subject: [PATCH 7/8] arm: mvebu: add another earlyprintk Kconfig option
-In-Reply-To: <20130605154749.29b51f40@skate>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370415901-4721-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130605134552.GK3803@titan.lakedaemon.net>
- <20130605154749.29b51f40@skate>
-Message-ID: <20130605140759.GN3803@titan.lakedaemon.net>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 5 Jun 2013 17:08:25 +0300
+Subject: [PATCH 0/4] Override bits for PLLM
+Message-ID: <1370441329-8619-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 03:47:49PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Wed, 5 Jun 2013 09:45:52 -0400, Jason Cooper wrote:
-> 
-> > >  	config DEBUG_MVEBU_UART
-> > 
-> > Perhaps we should change this to DEBUG_MVEBU_UART_LEGACY?
-> 
-> > > +	config DEBUG_MVEBU_UART_ALTERNATE
-> > 
-> > And this to DEBUG_MVEBU_UART?
-> 
-> I'm fine with doing that, but it means that people who will keep their
-> current .config that has CONFIG_DEBUG_MVEBU_UART=y will suddenly see
-> their earlyprintk use 0xf1 instead of 0xd0. So in terms of kconfig
-> backward compatibility, it's not the nicest thing, but if you believe
-> that's ok, I'll change the patch as you proposed.
+PLLM has override bits on Tegra30 and Tegra114. This patchset implements
+support for them for both Tegra30 and Tegra114.
 
-Very true.  I was purely looking at form.  Backwards compatibility is
-definitely more important.
+Peter De Schrijver (4):
+  CHROMIUM: clk: tegra: Add fields for override bits
+  CHROMIUM: clk: tegra: override bits for Tegra114 PLLM
+  CHROMIUM: clk: tegra: override bits for Tegra30 PLLM
+  CHROMIUM: clk: tegra: Use override bits when needed
 
-thx,
+ drivers/clk/tegra/clk-pll.c      |   82 ++++++++++++++++++++++---------------
+ drivers/clk/tegra/clk-tegra114.c |   15 +++++++
+ drivers/clk/tegra/clk-tegra30.c  |   18 ++++++++
+ drivers/clk/tegra/clk.h          |    8 ++++
+ 4 files changed, 90 insertions(+), 33 deletions(-)
 
-Jason.
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
