@@ -1,35 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Jun 2013 11:22:49 -0600
-Subject: [PATCH 1/3] drivers: pinctrl sleep and idle states in the core
-In-Reply-To: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
-References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <51AF73E9.90506@wwwdotorg.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Wed, 05 Jun 2013 10:23:16 -0700
+Subject: pxa27x and pinctrl-single
+Message-ID: <51AF7404.3090003@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 07:44 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> If a device have sleep and idle states in addition to the
-> default state, look up these in the core and stash them in
-> the pinctrl state container.
-> 
-> Add accessor functions for pinctrl consumers to put the pins
-> into "default", "sleep" and "idle" states passing nothing but
-> the struct device * affected.
-> 
-> Solution suggested by Kevin Hilman, Mark Brown and Dmitry
-> Torokhov in response to a patch series from Hebbar
-> Gururaja.
+Hi,
 
-> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+I'd like to start converting to device tree usage some of the old pxa27x
+platforms I'm fond of, starting with adding pinctrl support.  If I'm not
+mistaken, this will clear the way for some ongoing updates to the pinctrl/gpio
+code used by newer Marvell arches.
 
-> +int pinctrl_pm_select_default_state(struct device *dev)
+I noticed that Haojian pulled the pinctrl-pxa driver from the kernel, in favor
+of using pinctrl-single, so I turned my attention to that.  From what I can
+tell, pinctrl-single is currently inadequate for pxa27x because:
 
-> +int pinctrl_pm_select_sleep_state(struct device *dev)
+(1) On the pxa27x, setting the mux for a pin involves configuring both the alt
+function register *and* the direction register, requiring the ability to specify
+in the device tree multiple reg/value pairs for each pin.
 
-> +int pinctrl_pm_select_idle_state(struct device *dev)
+(2) Some of the pinctrl-single code still assumes one register-per-pin; see for
+example the functions pcs_allocate_pin_table() and pcs_get_pin_by_offset().
+Curiously, the recently added pcs_request_gpio() function also suffers from
+this, unless I'm mistaken.
 
-The implementation of those 3 functions is basically identical. I'd be
-inclined to move it to a helper function, and just pass (dev,
-pins->xxx_state) to it.
+So I'm wondering if it's appropriate to patch pinctrl-single to make it suitable
+for pxa27x, or should there be a separate driver for pxa27x?
+
+Normally I'd just submit a patch for consideration, but I think that work is
+ongoing, so maybe I better ask first in case other plans are in progress.  Plus
+I'm new to pinctrl and device tree.  Any comments, suggestions, hints, etc
+appreciated.
+
+Thanks,
+Mike
