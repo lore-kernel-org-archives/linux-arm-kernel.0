@@ -1,59 +1,68 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 5 Jun 2013 09:23:25 -0400
-Subject: DT version of kirkwood_ge0x_init()
-In-Reply-To: <51AEFF26.8080004@gmail.com>
-References: <51ADBEE0.5040500@keymile.com> <51ADC2C2.6010106@gmail.com>
- <51AE53D4.5070208@keymile.com> <51AEFF26.8080004@gmail.com>
-Message-ID: <20130605132325.GI3803@titan.lakedaemon.net>
+Date: Wed, 5 Jun 2013 09:27:23 -0400
+Subject: [PATCH 2/5] arm: preserve ATAGS in /chosen/atags in the Device
+ Tree
+In-Reply-To: <1370414409-29991-3-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370414409-29991-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130605132723.GJ3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gerlando,
-
-On Wed, Jun 05, 2013 at 11:04:38AM +0200, Sebastian Hesselbarth wrote:
-> On 06/04/13 22:53, Gerlando Falauto wrote:
-...
-> >Sorry, I am really more than lost when it's about tracking
-> >how/where/when changes are pulled. Any "mainlining for dummies" pointer
-> >would be more than appreciated.
+On Wed, Jun 05, 2013 at 08:40:06AM +0200, Thomas Petazzoni wrote:
+> Some platforms have custom ATAGS that are too specific to be parsed by
+> generic code in atags_to_fdt.c, but that would nonetheless be
+> useful. For example, Marvell bootloaders pass a custom ATAG that
+> contain the MAC address for the various network interfaces of the
+> board.
 > 
-> Hmm, sometimes I am also lost especially about when branches will be
-> merged. Jason can tell you for sure. Basically, patches go into some
-> maintainer's or submaintainer's branch first.
+> This commit makes a small addition to the atags_to_fdt logic that
+> consists in storing the ATAGS contents in the /chosen/atags node of
+> the Device Tree. Some platform-specific can then later make use of
 
-In the simple case, we look at the diffstat to see what sections of the
-kernel are being changed.  drivers/net, arch/arm, arch/arm/mach-mvebu,
-arch/arm/mm are all maintained by different people.  Depending on where
-the changes are, that dictates who it will go through, DaveM, LinusW,
-Arnd and Olof, Russell King, etc.
+                                         ^code
 
-Any code changes in arch/arm that are SoC dependent go through arm-soc.
-Otherwise, it goes through Russell.  arm-soc is maintained by Arnd and
-Olof.  It's so large, that they've broken it up into sub-archs with
-maintainers for each.  Myself, Andrew Lunn, and Gregory Clemente
-maintain code changes in
-arch/arm/mach-{mvebu,kirkwood,orion5x,dove,mv78xx0}.  We feed those
-changes in the form of branches to arm-soc, who put it all together and
-send it to Linus.
-
-It gets complicated when part of a patch series, like Sebastian's, needs
-to go through -net, and the rest through arm-soc.  If the two halves
-don't depend on one another, then it's easy.  In this case, the arm-soc
-changes _do_ depend on the -net changes.  So, we wait for the -net
-changes to get into mainline Linux (because all of the branches from
-everyone will have merged together), in this case, in v3.11-rc1.  Once
-that lands, I'll base a branch off of it and include Sebastian's changes
-to mach-kirkwood.  It will then be sent up to arm-soc for inclusion in
-v3.12-rc1.
-
-There's also a corner case where a driver maintainer will Ack a patch
-series he would normally take and allow arm-soc to take it.  Usually
-this is only if the driver changes are limited to a SoC specific file,
-eg drivers/clk/mvebu/*, and the driver maintainer doesn't anticipate any
-drivers/clk/* changes that will conflict.  Then, we can take the whole
-series in one merge window through arm-soc.  But that's purely up to the
-driver maintainer(s), and is by exception, not the rule.
-
-hth,
+thx,
 
 Jason.
+
+> this data to parse some custom ATAGs.
+> 
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  arch/arm/boot/compressed/atags_to_fdt.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+> index aabc02a..8b2ae61 100644
+> --- a/arch/arm/boot/compressed/atags_to_fdt.c
+> +++ b/arch/arm/boot/compressed/atags_to_fdt.c
+> @@ -98,6 +98,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  	uint32_t mem_reg_property[2 * NR_BANKS];
+>  	int memcount = 0;
+>  	int ret;
+> +	int atagssize = 0;
+>  
+>  	/* make sure we've got an aligned pointer */
+>  	if ((u32)atag_list & 0x3)
+> @@ -119,6 +120,7 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  		return ret;
+>  
+>  	for_each_tag(atag, atag_list) {
+> +		atagssize += atag->hdr.size * 4;
+>  		if (atag->hdr.tag == ATAG_CMDLINE) {
+>  			/* Append the ATAGS command line to the device tree
+>  			 * command line.
+> @@ -153,5 +155,9 @@ int atags_to_fdt(void *atag_list, void *fdt, int total_space)
+>  	if (memcount)
+>  		setprop(fdt, "/memory", "reg", mem_reg_property, 4*memcount);
+>  
+> +	if (atagssize)
+> +		setprop(fdt, "/chosen", "atags", atag_list,
+> +			atagssize);
+> +
+>  	return fdt_pack(fdt);
+>  }
+> -- 
+> 1.8.1.2
+> 
