@@ -1,33 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 5 Jun 2013 10:59:53 +0100
-Subject: [PATCH] ARM: pcpu: ensure __my_cpu_offset cannot be re-ordered
- across barrier()
-In-Reply-To: <alpine.LFD.2.03.1306041336060.1200@syhkavp.arg>
-References: <1370278405-13261-1-git-send-email-will.deacon@arm.com>
- <alpine.LFD.2.03.1306031339010.1200@syhkavp.arg>
- <20130604103953.GL27516@mudshark.cambridge.arm.com>
- <20130604171506.GZ27516@mudshark.cambridge.arm.com>
- <alpine.LFD.2.03.1306041336060.1200@syhkavp.arg>
-Message-ID: <20130605095953.GB8577@mudshark.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Jun 2013 11:01:53 +0100
+Subject: arm64: opportunity for (micro) optimisation in set_bit et al?
+In-Reply-To: <1370424981.24512.163.camel@zakaz.uk.xensource.com>
+References: <1370424981.24512.163.camel@zakaz.uk.xensource.com>
+Message-ID: <20130605100152.GC8758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 06:39:42PM +0100, Nicolas Pitre wrote:
-> On Tue, 4 Jun 2013, Will Deacon wrote:
-> > I spoke to the tools guys and they'll look into why the original patch
-> > didn't work, since that could have wider implications on our use of
-> > barrier().
-> 
-> Good.  However, given the wide range of gcc versions exhibiting the same 
-> behavior, I think your patch is the best way forward even if gcc were to 
-> be broken and eventually fixed.
-> 
-> Reviewed-by: Nicolas Pitre <nico@linaro.org>
+Hi Ian,
 
-Thanks Nicolas.
+On Wed, Jun 05, 2013 at 10:36:21AM +0100, Ian Campbell wrote:
+> I was "borrowing" the arm64 Linux bitops for use in Xen and Tim Deegan
+> wondered about the use of eor in:
+>        and     x3, x0, #63             // Get bit offset
+>        eor     x0, x0, x3              // Clear low bits
+>        mov     x2, #1
+>        add     x1, x1, x0, lsr #3      // Get word offset
 
-> I'd suggest queuing it for stable as well.
+BTW, the latest kernel uses W registers (32-bit here since the function
+prototype has an 'int' and the compiler does not guarantee that the top
+32-bit are 0.
 
-Will do.
+> That eor has a dependency on the previous and instruction which could be
+> avoided using a bic or a lsr #5 followed by lsl #2 instead of the lsr #3
+> on the add (this is what arm32 does).
 
-Will
+Any of these would do (I haven't tried, bic #imm is an alias for and).
+I'll check with the hardware guys whether it makes any difference but it
+is a harmless change anyway.
+
+Thanks.
+
+-- 
+Catalin
