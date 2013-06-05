@@ -1,45 +1,171 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 04 Jun 2013 23:53:21 -0700
-Subject: [PATCH] clk: tegra114: Fix msenc clock register
-In-Reply-To: <1370345143-4885-1-git-send-email-mperttunen@nvidia.com>
-References: <1370345143-4885-1-git-send-email-mperttunen@nvidia.com>
-Message-ID: <20130605065321.10233.48172@quantum>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Wed, 5 Jun 2013 12:24:27 +0530
+Subject: [PATCH 1/4] ARM: dts: omap5: Rename omap5-evm to omap5-uevm
+Message-ID: <1370415267-1624-1-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Mikko Perttunen (2013-06-04 04:25:43)
-> The msenc clock's register was set to the usb3 clock's register.
-> 
-> Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
-> Acked-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+The uevm is the official board supported for the OMAP5 soc
+in mainline. The uevm has an OMAP5432 with a DDR3 memory.
+Renaming the board dts file and adding the following cleanups.
 
-Pulled into clk-next.
+ * There are no devices connected on I2C 2,3,4 buses. So remove
+   the pinmux data for the same.
 
-Thanks,
-Mike
+ * DDR3 memory is used in the uevm. Neither DVFS or temperature
+   polling is supported with DDR3. So remove the DDR3 device and
+   emif nodes.
 
-> ---
->  drivers/clk/tegra/clk-tegra114.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-> index d78e16e..c4f2e0a 100644
-> --- a/drivers/clk/tegra/clk-tegra114.c
-> +++ b/drivers/clk/tegra/clk-tegra114.c
-> @@ -1747,7 +1747,7 @@ static struct tegra_periph_init_data tegra_periph_clk_list[] = {
->         TEGRA_INIT_DATA_MUX("vi_sensor", "vi_sensor", "tegra_camera", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI_SENSOR, 20, &periph_l_regs, TEGRA_PERIPH_NO_RESET, vi_sensor),
->         TEGRA_INIT_DATA_INT8("vi", "vi", "tegra_camera", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_VI, 20, &periph_l_regs, 0, vi),
->         TEGRA_INIT_DATA_INT8("epp", NULL, "epp", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_EPP, 19, &periph_l_regs, 0, epp),
-> -       TEGRA_INIT_DATA_INT8("msenc", NULL, "msenc", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_MSENC, 91, &periph_h_regs, TEGRA_PERIPH_WAR_1005168, msenc),
-> +       TEGRA_INIT_DATA_INT8("msenc", NULL, "msenc", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_MSENC, 91, &periph_u_regs, TEGRA_PERIPH_WAR_1005168, msenc),
->         TEGRA_INIT_DATA_INT8("tsec", NULL, "tsec", mux_pllp_pllc2_c_c3_pllm_clkm, CLK_SOURCE_TSEC, 83, &periph_u_regs, 0, tsec),
->         TEGRA_INIT_DATA_INT8("host1x", NULL, "host1x", mux_pllm_pllc2_c_c3_pllp_plla, CLK_SOURCE_HOST1X, 28, &periph_l_regs, 0, host1x),
->         TEGRA_INIT_DATA_MUX8("hdmi", NULL, "hdmi", mux_pllp_pllm_plld_plla_pllc_plld2_clkm, CLK_SOURCE_HDMI, 51, &periph_h_regs, 0, hdmi),
-> -- 
-> 1.8.1.5
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ * Keypad is not supported on uevm. So remove the device node.
+
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+---
+ arch/arm/boot/dts/Makefile                         |    2 +-
+ .../arm/boot/dts/{omap5-evm.dts => omap5-uevm.dts} |   83 +-------------------
+ 2 files changed, 4 insertions(+), 81 deletions(-)
+ rename arch/arm/boot/dts/{omap5-evm.dts => omap5-uevm.dts} (73%)
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f0895c5..13b86bf 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -149,7 +149,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap4-panda-es.dtb \
+ 	omap4-var-som.dtb \
+ 	omap4-sdp.dtb \
+-	omap5-evm.dtb \
++	omap5-uevm.dtb \
+ 	am335x-evm.dtb \
+ 	am335x-evmsk.dtb \
+ 	am335x-bone.dtb
+diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+similarity index 73%
+rename from arch/arm/boot/dts/omap5-evm.dts
+rename to arch/arm/boot/dts/omap5-uevm.dts
+index 22e9ee8..843a001 100644
+--- a/arch/arm/boot/dts/omap5-evm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -8,11 +8,10 @@
+ /dts-v1/;
+ 
+ #include "omap5.dtsi"
+-#include "samsung_k3pe0e000b.dtsi"
+ 
+ / {
+-	model = "TI OMAP5 EVM board";
+-	compatible = "ti,omap5-evm", "ti,omap5";
++	model = "TI OMAP5 uEVM board";
++	compatible = "ti,omap5-uevm", "ti,omap5";
+ 
+ 	memory {
+ 		device_type = "memory";
+@@ -88,27 +87,6 @@
+ 		>;
+ 	};
+ 
+-	i2c2_pins: pinmux_i2c2_pins {
+-		pinctrl-single,pins = <
+-			0x178 (PIN_INPUT | MUX_MODE0)		/* i2c2_scl */
+-			0x17a (PIN_INPUT | MUX_MODE0)		/* i2c2_sda */
+-		>;
+-	};
+-
+-	i2c3_pins: pinmux_i2c3_pins {
+-		pinctrl-single,pins = <
+-			0x13a (PIN_INPUT | MUX_MODE0)		/* i2c3_scl */
+-			0x13c (PIN_INPUT | MUX_MODE0)		/* i2c3_sda */
+-		>;
+-	};
+-
+-	i2c4_pins: pinmux_i2c4_pins {
+-		pinctrl-single,pins = <
+-			0xb8 (PIN_INPUT | MUX_MODE0)		/* i2c4_scl */
+-			0xba (PIN_INPUT | MUX_MODE0)		/* i2c4_sda */
+-		>;
+-	};
+-
+ 	i2c5_pins: pinmux_i2c5_pins {
+ 		pinctrl-single,pins = <
+ 			0x184 (PIN_INPUT | MUX_MODE0)		/* i2c5_scl */
+@@ -175,39 +153,6 @@
+ 	clock-frequency = <400000>;
+ };
+ 
+-&i2c2 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c2_pins>;
+-
+-	clock-frequency = <400000>;
+-
+-	/* Pressure Sensor */
+-	bmp085 at 77 {
+-		compatible = "bosch,bmp085";
+-		reg = <0x77>;
+-	};
+-};
+-
+-&i2c3 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c3_pins>;
+-
+-	clock-frequency = <400000>;
+-};
+-
+-&i2c4 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&i2c4_pins>;
+-
+-	clock-frequency = <400000>;
+-
+-	/* Temperature Sensor */
+-	tmp102 at 48{
+-		compatible = "ti,tmp102";
+-		reg = <0x48>;
+-	};
+-};
+-
+ &i2c5 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&i2c5_pins>;
+@@ -215,32 +160,10 @@
+ 	clock-frequency = <400000>;
+ };
+ 
+-&keypad {
+-	keypad,num-rows = <8>;
+-	keypad,num-columns = <8>;
+-	linux,keymap = <0x02020073	/* VOLUP */
+-			0x02030072	/* VOLDOWM */
+-			0x020400e7	/* SEND */
+-			0x02050066	/* HOME */
+-			0x0206006b	/* END */
+-			0x020700d9>;	/* SEARCH */
+-	linux,input-no-autorepeat;
+-};
+-
+ &mcbsp3 {
+ 	status = "disabled";
+ };
+ 
+-&emif1 {
+-	cs1-used;
+-	device-handle = <&samsung_K3PE0E000B>;
+-};
+-
+-&emif2 {
+-	cs1-used;
+-	device-handle = <&samsung_K3PE0E000B>;
+-};
+-
+ &mcspi1 {
+ 
+ };
+-- 
+1.7.9.5
