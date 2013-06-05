@@ -1,50 +1,82 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:06 +0900
-Subject: [PATCH 075/130] ARM: shmobile: bonito: Register pinctrl mapping for
- SCIF
+Date: Wed,  5 Jun 2013 17:26:04 +0900
+Subject: [PATCH 073/130] ARM: shmobile: armadillo800eva: Replace GPIO_PORTx
+ with GPIO port numbers
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-76-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-74-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based SCIF pinmux configuration by a pinctrl mapping.
+The PFC GPIO API implementation moved to using port numbers. Replace all
+GPIO_PORTx enum usage with the corresponding port number. The GPIO_PORTx
+enum values are identical to the port number on this platform.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bonito.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bonito.c b/arch/arm/mach-shmobile/board-bonito.c
-index b111c13..b6620662 100644
---- a/arch/arm/mach-shmobile/board-bonito.c
-+++ b/arch/arm/mach-shmobile/board-bonito.c
-@@ -369,6 +369,12 @@ static void __init bonito_map_io(void)
- #define VCCQ1CR		IOMEM(0xE6058140)
- #define VCCQ1LCDCR	IOMEM(0xE6058186)
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 8ec6961..aafa99b 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -584,7 +584,7 @@ static struct regulator_init_data vcc_sdhi0_init_data = {
+ static struct fixed_voltage_config vcc_sdhi0_info = {
+ 	.supply_name = "SDHI0 Vcc",
+ 	.microvolts = 3300000,
+-	.gpio = GPIO_PORT75,
++	.gpio = 75,
+ 	.enable_high = 1,
+ 	.init_data = &vcc_sdhi0_init_data,
+ };
+@@ -615,7 +615,7 @@ static struct regulator_init_data vccq_sdhi0_init_data = {
+ };
  
-+static const struct pinctrl_map scifa5_pinctrl_map[] = {
-+	/* SCIFA5 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.5", "pfc-r8a7740",
-+				  "scifa5_data_2", "scifa5"),
-+};
-+
- static void __init bonito_init(void)
- {
- 	u16 val;
-@@ -423,8 +429,8 @@ static void __init bonito_init(void)
- 		if (BIT_OFF(bsw2, 1) &&	/* S38.3 = ON */
- 		    BIT_OFF(bsw3, 9) &&	/* S39.6 = ON */
- 		    BIT_OFF(bsw4, 4)) {	/* S43.1 = ON */
--			gpio_request(GPIO_FN_SCIFA5_TXD_PORT91,	NULL);
--			gpio_request(GPIO_FN_SCIFA5_RXD_PORT92,	NULL);
-+			pinctrl_register_mappings(scifa5_pinctrl_map,
-+						  ARRAY_SIZE(scifa5_pinctrl_map));
- 		}
+ static struct gpio vccq_sdhi0_gpios[] = {
+-	{GPIO_PORT17, GPIOF_OUT_INIT_LOW, "vccq-sdhi0" },
++	{17, GPIOF_OUT_INIT_LOW, "vccq-sdhi0" },
+ };
  
- 		/*
+ static struct gpio_regulator_state vccq_sdhi0_states[] = {
+@@ -626,7 +626,7 @@ static struct gpio_regulator_state vccq_sdhi0_states[] = {
+ static struct gpio_regulator_config vccq_sdhi0_info = {
+ 	.supply_name = "vqmmc",
+ 
+-	.enable_gpio = GPIO_PORT74,
++	.enable_gpio = 74,
+ 	.enable_high = 1,
+ 	.enabled_at_boot = 0,
+ 
+@@ -664,7 +664,7 @@ static struct regulator_init_data vcc_sdhi1_init_data = {
+ static struct fixed_voltage_config vcc_sdhi1_info = {
+ 	.supply_name = "SDHI1 Vcc",
+ 	.microvolts = 3300000,
+-	.gpio = GPIO_PORT16,
++	.gpio = 16,
+ 	.enable_high = 1,
+ 	.init_data = &vcc_sdhi1_init_data,
+ };
+@@ -693,7 +693,7 @@ static struct sh_mobile_sdhi_info sdhi0_info = {
+ 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
+ 			  MMC_CAP_POWER_OFF_CARD,
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_USE_GPIO_CD,
+-	.cd_gpio	= GPIO_PORT167,
++	.cd_gpio	= 167,
+ };
+ 
+ static struct resource sdhi0_resources[] = {
+@@ -736,7 +736,7 @@ static struct sh_mobile_sdhi_info sdhi1_info = {
+ 			  MMC_CAP_POWER_OFF_CARD,
+ 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_USE_GPIO_CD,
+ 	/* Port72 cannot generate IRQs, will be used in polling mode. */
+-	.cd_gpio	= GPIO_PORT72,
++	.cd_gpio	= 72,
+ };
+ 
+ static struct resource sdhi1_resources[] = {
 -- 
 1.8.2.1
