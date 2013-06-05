@@ -1,50 +1,36 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 05 Jun 2013 16:55:31 +0900
-Subject: [PATCH 02/02] ARM: shmobile: Remove romImage CONFIG_MEMORY_START
-In-Reply-To: <20130605075514.17653.77135.sendpatchset@w520>
-References: <20130605075514.17653.77135.sendpatchset@w520>
-Message-ID: <20130605075531.17653.38073.sendpatchset@w520>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 5 Jun 2013 09:57:10 +0200
+Subject: [PATCH 0/2 v4] net/macb: RX path enhancement
+Message-ID: <cover.1370418770.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Here is the patch series for modifying the RX path in macb driver.
+This change applies on GEM variant of the Cadence IP and introduces
+function pointers to match the path to the proper adapter. The move
+to RX buffers adapted to MTU and that can be DMAed directly in SKB
+is done in two steps but can be merged in a single patch.
 
-Instead of relying on CONFIG_MEMORY_START for memory
-base address, let each romImage board header file
-specify this information.
+v4: - rebased on top of net-next
+    - removed the last patch of the series which needs rework
 
-This is reworks code not to rely on CONFIG_MEMORY_START
-which in turn is needed for ARCH_MULTIPLATFORM.
+v3: - rebased on top of net-next (containing recently added
+      net/macb: fix ISR clear-on-write behavior only for some SoC)
+    - added the ___cacheline_aligned_in_smp qualifier to napi field
+      following Ben Hutchings' advice
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+v2: - gave up the idea of using non-coherent memory for
+      rx buffers
+    - addition of the struct macb layout optimization
 
- arch/arm/boot/compressed/head-shmobile.S    |    2 +-
- arch/arm/mach-shmobile/include/mach/zboot.h |    2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
 
---- 0025/arch/arm/boot/compressed/head-shmobile.S
-+++ work/arch/arm/boot/compressed/head-shmobile.S	2013-06-05 11:56:07.000000000 +0900
-@@ -46,7 +46,7 @@ __image_start:
- __image_end:
- 	.long	_got_end
- __load_base:
--	.long	CONFIG_MEMORY_START + 0x02000000 @ Load at 32Mb into SDRAM
-+	.long	MEMORY_START + 0x02000000 @ Load at 32Mb into SDRAM
- __loaded:
- 	.long	__continue
- 	.align
---- 0001/arch/arm/mach-shmobile/include/mach/zboot.h
-+++ work/arch/arm/mach-shmobile/include/mach/zboot.h	2013-06-05 11:55:55.000000000 +0900
-@@ -12,9 +12,11 @@
- 
- #ifdef CONFIG_MACH_AP4EVB
- #define MACH_TYPE	MACH_TYPE_AP4EVB
-+#define MEMORY_START	0x40000000
- #include "mach/head-ap4evb.txt"
- #elif defined(CONFIG_MACH_MACKEREL)
- #define MACH_TYPE	MACH_TYPE_MACKEREL
-+#define MEMORY_START	0x40000000
- #include "mach/head-mackerel.txt"
- #else
- #error "unsupported board."
+Nicolas Ferre (2):
+  net/macb: increase RX buffer size for GEM
+  net/macb: change RX path for GEM
+
+ drivers/net/ethernet/cadence/macb.c | 323 +++++++++++++++++++++++++++++++-----
+ drivers/net/ethernet/cadence/macb.h |  14 ++
+ 2 files changed, 295 insertions(+), 42 deletions(-)
+
+-- 
+1.8.2.2
