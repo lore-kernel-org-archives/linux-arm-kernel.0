@@ -1,66 +1,57 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:27 +0900
-Subject: [PATCH 036/130] ARM: shmobile: mackerel: Register pinctrl mapping for
- FSI
-In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-37-git-send-email-horms+renesas@verge.net.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 5 Jun 2013 17:51:27 +0900
+Subject: [PATCH 00/15] ARM: shmobile: uImage load address rework
+In-Reply-To: <87a9n5582w.wl%kuninori.morimoto.gx@renesas.com>
+References: <20130605070616.13311.69049.sendpatchset@w520>
+ <87a9n5582w.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <CANqRtoThDhpe17R5tq+RuSgt_72tuWUoK+5fGLK508tCxKj2jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Hi Morimoto-san,
 
-Replace the GPIO-based FSI pinmux configuration by a pinctrl mapping.
+On Wed, Jun 5, 2013 at 4:29 PM, Kuninori Morimoto
+<kuninori.morimoto.gx@renesas.com> wrote:
+>
+> Hi
+>
+>> ARM: shmobile: uImage load address rework
+>>
+>> [PATCH 01/15] ARM: shmobile: Per-board uImage load addresses
+>> [PATCH 02/15] ARM: shmobile: AG5EVM uImage rework
+>> [PATCH 03/15] ARM: shmobile: AP4EVB uImage rework
+>> [PATCH 04/15] ARM: shmobile: APE6EVM uImage rework
+>> [PATCH 05/15] ARM: shmobile: Armadillo800EVA uImage rework
+>> [PATCH 06/15] ARM: shmobile: Bock-W uImage rework
+>> [PATCH 07/15] ARM: shmobile: Bonito uImage rework
+>> [PATCH 08/15] ARM: shmobile: KZM9D uImage rework
+>> [PATCH 09/15] ARM: shmobile: KZM9G uImage rework
+>> [PATCH 10/15] ARM: shmobile: Kota2 uImage rework
+>> [PATCH 11/15] ARM: shmobile: Lager uImage rework
+>> [PATCH 12/15] ARM: shmobile: Mackerel uImage rework
+>> [PATCH 13/15] ARM: shmobile: Marzen uImage rework
+>> [PATCH 14/15] ARM: shmobile: Armadillo800EVA reference uImage rework
+>> [PATCH 15/15] ARM: shmobile: Remove MEMORY_START uImage load address
+>
+> I tested these patches on Bock-W board (as 0x60008000 binary),
+> and on Mackerel board (as 0x40008000 binary)
+> These work well for me :)
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-mackerel.c | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
+Thanks for testing.
 
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index 955fefd..f2e8740 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1328,6 +1328,16 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
- 				  "flctl_ce0", "flctl"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_flctl.0", "pfc-sh7372",
- 				  "flctl_ctrl", "flctl"),
-+	/* FSIA (AK4643) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
-+				  "fsia_sclk_in", "fsia"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
-+				  "fsia_data_in", "fsia"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
-+				  "fsia_data_out", "fsia"),
-+	/* FSIB (HDMI) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.1", "pfc-sh7372",
-+				  "fsib_mclk_in", "fsib"),
- 	/* SDHI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
- 				  "sdhi0_data4", "sdhi0"),
-@@ -1446,11 +1456,7 @@ static void __init mackerel_init(void)
- 	gpio_request_pulldown(GPIO_PORT167CR); /* VBUS0_1 pull down */
- 	gpio_request(GPIO_FN_IDIN_1_113, NULL);
- 
--	/* enable FSI2 port A (ak4643) */
--	gpio_request(GPIO_FN_FSIAIBT,	NULL);
--	gpio_request(GPIO_FN_FSIAILR,	NULL);
--	gpio_request(GPIO_FN_FSIAISLD,	NULL);
--	gpio_request(GPIO_FN_FSIAOSLD,	NULL);
-+	/* FSI2 port A (ak4643) */
- 	gpio_request_one(161, GPIOF_OUT_INIT_LOW, NULL); /* slave */
- 
- 	gpio_request(9,  NULL);
-@@ -1460,8 +1466,7 @@ static void __init mackerel_init(void)
- 
- 	intc_set_priority(IRQ_FSI, 3); /* irq priority FSI(3) > SMSC911X(2) */
- 
--	/* setup FSI2 port B (HDMI) */
--	gpio_request(GPIO_FN_FSIBCK, NULL);
-+	/* FSI2 port B (HDMI) */
- 	__raw_writew(__raw_readw(USCCR1) & ~(1 << 6), USCCR1); /* use SPDIF */
- 
- 	/* set SPU2 clock to 119.6 MHz */
--- 
-1.8.2.1
+> I have same opinion with Laurent.
+> 5) and 14) can be 1 patch if you need to sent v2 patches :P
+
+Gotcha!
+
+> for 6), 12) patch
+>
+> Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>
+> for all patches
+>
+> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+
+Thanks,
+
+/ magnus
