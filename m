@@ -1,59 +1,47 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 13:32:28 +0900
-Subject: [PATCH 1/4] irqchip: irqc: Add runtime PM support
-In-Reply-To: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370406751-3852-2-git-send-email-horms+renesas@verge.net.au>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Wed, 5 Jun 2013 14:22:26 +0900
+Subject: Active-low behavior in gpiolib
+Message-ID: <CAAVeFu+hQHScYYkvO1KOrUPLLaC0ju_O4SDZWyJE8KhLn_hibQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This was tested using the SMSC LAN on the APE6EVM board.
+Hi everyone,
 
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/irqchip/irq-renesas-irqc.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+While preparing the v2 of the descriptor-based GPIO interface (gpiod),
+I stumbled upon this point that looks like some inconsistency in the
+current interface.
 
-diff --git a/drivers/irqchip/irq-renesas-irqc.c b/drivers/irqchip/irq-renesas-irqc.c
-index 927bff3..649cd69 100644
---- a/drivers/irqchip/irq-renesas-irqc.c
-+++ b/drivers/irqchip/irq-renesas-irqc.c
-@@ -19,6 +19,7 @@
- 
- #include <linux/init.h>
- #include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
- #include <linux/spinlock.h>
- #include <linux/interrupt.h>
- #include <linux/ioport.h>
-@@ -181,6 +182,9 @@ static int irqc_probe(struct platform_device *pdev)
- 		goto err1;
- 	}
- 
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
-+
- 	/* allow any number of IRQs between 1 and IRQC_IRQ_MAX */
- 	for (k = 0; k < IRQC_IRQ_MAX; k++) {
- 		irq = platform_get_resource(pdev, IORESOURCE_IRQ, k);
-@@ -255,6 +259,8 @@ err3:
- err2:
- 	iounmap(p->iomem);
- err1:
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
- 	kfree(p);
- err0:
- 	return ret;
-@@ -270,6 +276,8 @@ static int irqc_remove(struct platform_device *pdev)
- 
- 	irq_domain_remove(p->irq_domain);
- 	iounmap(p->iomem);
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
- 	kfree(p);
- 	return 0;
- }
--- 
-1.8.2.1
+gpiolib.c defines the following flags that can influence the gpio
+output: FLAG_ACTIVE_LOW, FLAG_OPEN_DRAIN, and FLAG_OPEN_SOURCE.
+FLAG_OPEN_DRAIN and FLAG_OPEN_SOURCE, when set, take effet on all set
+operations no matter where they come from.
+
+FLAG_ACTIVE_LOW, on the other hand, is *only* set and used through
+sysfs operations. Independently, the active low property can be
+specified in gpio phandles and retrieved by
+of_get_(named_)gpio_flags() - only it has to be kept in a separate
+variable which must then be checked everytime one wants to change the
+GPIO value to set the correct level.
+
+I find it rather confusing and wonder if we could not come with a more
+consistent behavior for the gpiod interface. In particular:
+- the active low property could be specified when declaring GPIO
+mappings (either through DT or platform data)
+- gpiod_get() would retrieve it transparently and set it as a
+permanent property of the GPIO
+- gpiod_set/get_value() would take the active low property into
+account when setting the value - making these functions work with the
+actual *value* (as their name states) instead of the physical line
+level.
+
+The old gpio_* interface would still behave as usual, of course.
+
+This would make gpiolib behavior more consistent IMHO, at the price of
+a semantic difference between the otherwise very similar gpio and
+gpiod interfaces. Any thought for or against this? If we go this way
+and decide to allow gpiod to diverge, are there other things we are
+not satisfied with about the current gpio interface and that we want
+to improve?
+
+Thanks,
+Alex.
