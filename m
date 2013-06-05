@@ -1,44 +1,25 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 5 Jun 2013 12:11:39 -0700
-Subject: Error while running android as guest ---FastModels
-In-Reply-To: <CAJ30i6EVdXvbg=42iZ3dZb8ASnpDFvm5ZUUPhjLw8oNk057JQw@mail.gmail.com>
-References: <CAJ30i6EVdXvbg=42iZ3dZb8ASnpDFvm5ZUUPhjLw8oNk057JQw@mail.gmail.com>
-Message-ID: <20130605191139.GA9640@ubuntu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 5 Jun 2013 20:08:53 +0100
+Subject: Cache issues in vexpress cpu shutdown (regression in 3.10)
+In-Reply-To: <20130605120539.GC32505@e102568-lin.cambridge.arm.com>
+References: <1370430551.3387.11.camel@linaro1.home>
+ <20130605113912.GE18614@n2100.arm.linux.org.uk>
+ <20130605120539.GC32505@e102568-lin.cambridge.arm.com>
+Message-ID: <20130605190853.GF18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 08:31:13PM +0200, Mai Daftedar wrote:
-> Dear All,
+On Wed, Jun 05, 2013 at 01:05:39PM +0100, Lorenzo Pieralisi wrote:
+> There is an A9 errata (fixed in r1p0) whereby CLIDR[23:21] reads as 0
+> where it should read as 3'b001, so basically flush_cache_louis is not
+> flushing anything. If that's the problem, either we add a generic fix
+> in v7 cache assembly or we just fix it in platform code (by calling
+> flush_cache_all()), since there should not be many pre-r1p0 around.
 > 
-> After following the "Android on Fast Models" pdf. I managed to successfully
-> run android as the host and when running the following command to run
-> android as a guest:
-> 
-> ./qemu-system-arm \
-> -vnc :0 \
-> -k en-us \
-> -enable-kvm \
-> -serial stdio \
-> -kernel zImage \
-> -m 512 -M vexpress-a15 -cpu cortex-a15 \
-> -drive file=./android.img,id=virtio-blk,if=none \
-> -device virtio-blk,drive=virtio-blk,transport=virtio-mmio.0 \
-> -append "virtio_mmio.device=1M at 0x4e000000:74:0 init=/init
-> console=ttyAMA0 mem=512M root=/dev/vda rw"
-> 
-> The following errors appear:
-> 
-> *device virtio-blk, drive=virtio-blk, transport=virtio-mmio.0: No 'PCI' bus
-> found for device "virtio-blk-pci"*
-> 
-> Any suggestions on what I am missing out
-> 
+> Please let me know what you think.
 
-Sounds like you're using the wrong version of QEMU.  For virtio to work
-you need to use the rather old kvm-arm-virtio branch in my tree (it may
-be replicated elsewhere too).
-
-There is ongoing work to get this support updated to newer QEMU
-implementations.
-
--Christoffer
+If we're providing a flush_cache_louis() function, then it better do
+what it says or be removed.  So the right solution is to fix the
+function rather than working around it, because over time we'll only
+add more calls to flush_cache_louis() and it'll become a stumbling
+block.
