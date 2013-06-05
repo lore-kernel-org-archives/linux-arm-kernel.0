@@ -1,56 +1,152 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 4 Jun 2013 20:15:36 -0700
-Subject: [PATCH] ARM: samsung: avoid racy early printk at bootup
-In-Reply-To: <1370397539-21653-1-git-send-email-dianders@chromium.org>
-References: <1370397539-21653-1-git-send-email-dianders@chromium.org>
-Message-ID: <20130605031536.GA24910@quad.lixom.net>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Wed,  5 Jun 2013 11:56:04 +0800
+Subject: [PATCH v3 5/6] ARM: hi3xxx: add board support with device tree
+In-Reply-To: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1370404564-29104-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
 
-On Tue, Jun 04, 2013 at 06:58:59PM -0700, Doug Anderson wrote:
-> At boot, we've got a stack trace that looks something like this
-> (exynos5 as example)
-> * exynos5_map_io
-> * s3c_init_cpu
-> * exynos_init_io
-> * exynos5_dt_map_io
-> * paging_init
-> * setup_arch
-> 
-> When paging_init() runs we'll lose any early MMU mappings that we
-> might have had to allow us access to S3C_VA_UART.  We won't add those
-> mappings back in until after the SoC-specific map_io() function is
-> called.  However, we print the CPU ID _right before_ we call the
-> SoC-specific function.  Oops.
-> 
-> 
-> Things happen to work all right most of the time because the mapping
-> is sticking around in our TLB.  ...but if we get really unlucky (like
-> me!) or we put an explicit flush_tlb_all() at the start of
-> exynos_init_io(), then things go boom.
-> 
-> This patch moves the problematic printk() till after the cpu->map_io()
-> call.  It also switches it over to pr_info().  This patch _doesn't_
-> remove the questionable printks in the panic case, since we might get
-> lucky and the TLB might still let us print.  This patch also adds a
-> few warnings to help others avoid similar headaches.
+Changelog:
+v3:
+1. Remove .map_io() in DT machine descriptor. Since debug_ll_io_init()
+is called by default.
+2. Remove .init_machine() in DT machine descriptor. Since
+of_platform_populate() is called by default in DT mode.
 
-This seems to be caused by not calling iotable_ini() in exynos_init_io()
-when a device tree is passed into the kernel, thus not setting up the
-mapping for the UART in that case.
+v2:
+1. Remove .init_irq() in DT machine descriptor. Since irqchip_init()
+is called by default in DT mode.
 
-I think the solution is instead to map the uart earlier. The window of
-exposure is still there, but much smaller (and similar to how it always
-has been).
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ .../bindings/arm/hisilicon/hisilicon.txt           | 10 ++++++
+ arch/arm/Kconfig                                   |  2 ++
+ arch/arm/Makefile                                  |  1 +
+ arch/arm/mach-hi3xxx/Kconfig                       | 13 ++++++++
+ arch/arm/mach-hi3xxx/Makefile                      |  5 +++
+ arch/arm/mach-hi3xxx/hi3xxx.c                      | 37 ++++++++++++++++++++++
+ 6 files changed, 68 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+ create mode 100644 arch/arm/mach-hi3xxx/Kconfig
+ create mode 100644 arch/arm/mach-hi3xxx/Makefile
+ create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
 
-In current upstream, if there is no map_io mach_desc entry at all,
-debug_ll_io_init() will be called on all platforms. Seems appropriate
-to call that explicitly before of_scan_flat_dt() in exynos_init_io()
-in this case.
-
-Or am I missing something?
-
-
--Olof
+diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+new file mode 100644
+index 0000000..3be60c8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+@@ -0,0 +1,10 @@
++Hisilicon Platforms Device Tree Bindings
++----------------------------------------------------
++
++Hi3716 Development Board
++Required root node properties:
++	- compatible = "hisilicon,hi3716-dkb";
++
++Hi4511 Board
++Required root node properties:
++	- compatible = "hisilicon,hi3620-hi4511";
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 49d993c..acd2358 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -936,6 +936,8 @@ source "arch/arm/mach-footbridge/Kconfig"
+ 
+ source "arch/arm/mach-gemini/Kconfig"
+ 
++source "arch/arm/mach-hi3xxx/Kconfig"
++
+ source "arch/arm/mach-highbank/Kconfig"
+ 
+ source "arch/arm/mach-integrator/Kconfig"
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 1ba358b..748a9ca 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -147,6 +147,7 @@ machine-$(CONFIG_ARCH_DOVE)		+= dove
+ machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
+ machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
+ machine-$(CONFIG_ARCH_GEMINI)		+= gemini
++machine-$(CONFIG_ARCH_HI3xxx)		+= hi3xxx
+ machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
+ machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
+ machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
+diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
+new file mode 100644
+index 0000000..a991dee
+--- /dev/null
++++ b/arch/arm/mach-hi3xxx/Kconfig
+@@ -0,0 +1,13 @@
++config ARCH_HI3xxx
++	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
++	select ARM_AMBA
++	select ARM_GIC
++	select CACHE_L2X0
++	select CACHE_PL310
++	select CLKSRC_OF
++	select PINCTRL
++	select PINCTRL_SINGLE
++	select SERIAL_AMBA_PL011
++	select SERIAL_AMBA_PL011_CONSOLE
++	help
++	  Support for Hisilicon Hi36xx/Hi37xx processor family
+diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
+new file mode 100644
+index 0000000..d68ebb3
+--- /dev/null
++++ b/arch/arm/mach-hi3xxx/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for Hisilicon Hi36xx/Hi37xx processors line
++#
++
++obj-y	+= hi3xxx.o
+diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
+new file mode 100644
+index 0000000..064b303
+--- /dev/null
++++ b/arch/arm/mach-hi3xxx/hi3xxx.c
+@@ -0,0 +1,37 @@
++/*
++ * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
++ *
++ * Copyright (c) 2012-2013 Hisilicon Ltd.
++ * Copyright (c) 2012-2013 Linaro Ltd.
++ *
++ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++*/
++
++#include <linux/clk-provider.h>
++#include <linux/clocksource.h>
++#include <linux/irqchip.h>
++#include <linux/of_platform.h>
++
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++static void __init hi3xxx_timer_init(void)
++{
++	of_clk_init(NULL);
++	clocksource_of_init();
++}
++
++static const char *hs_compat[] __initdata = {
++	"hisilicon,hi3620-hi4511",
++	NULL,
++};
++
++DT_MACHINE_START(HI3xxx, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
++	/* Maintainer: Haojian Zhuang <haojian.zhuang@linaro.org> */
++	.init_time	= hi3xxx_timer_init,
++	.dt_compat	= hs_compat,
++MACHINE_END
+-- 
+1.8.1.2
