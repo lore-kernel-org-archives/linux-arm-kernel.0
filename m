@@ -1,48 +1,107 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:17 +0900
-Subject: [PATCH 086/130] ARM: shmobile: armadillo800eva: Convert SCIFA1 to
- pinctrl
+Date: Wed,  5 Jun 2013 17:26:18 +0900
+Subject: [PATCH 087/130] ARM: shmobile: r8a7740: Remove SCIF function GPIOs
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-87-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-88-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@gmail.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-We use the new pinctrl framework now.
+Those GPIOs have been deprecated by the pinctrl API. They are unused and
+unneeded, remove them.
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/include/mach/r8a7740.h | 74 ---------------------------
+ 1 file changed, 74 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index aafa99b..44a6215 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1087,6 +1087,9 @@ static const struct pinctrl_map eva_pinctrl_map[] = {
- 				  "mmc0_data8_1", "mmc0"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-r8a7740",
- 				  "mmc0_ctrl_1", "mmc0"),
-+	/* SCIFA1 */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.1", "pfc-r8a7740",
-+				  "scifa1_data", "scifa1"),
- 	/* SDHI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7740",
- 				  "sdhi0_data4", "sdhi0"),
-@@ -1154,10 +1157,6 @@ static void __init eva_init(void)
- 	r8a7740_pinmux_init();
- 	r8a7740_meram_workaround();
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
+index abdc4d4..bb207d8 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7740.h
+@@ -165,80 +165,6 @@ enum {
+ 	GPIO_FN_FMSOOBT,	GPIO_FN_FMSOSLD,
+ 	GPIO_FN_FMSOCK,
  
--	/* SCIFA1 */
--	gpio_request(GPIO_FN_SCIFA1_RXD, NULL);
--	gpio_request(GPIO_FN_SCIFA1_TXD, NULL);
+-	/* SCIFA0 */
+-	GPIO_FN_SCIFA0_SCK,	GPIO_FN_SCIFA0_CTS,
+-	GPIO_FN_SCIFA0_RTS,	GPIO_FN_SCIFA0_RXD,
+-	GPIO_FN_SCIFA0_TXD,
 -
- 	/* LCDC0 */
- 	gpio_request_one(61, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
- 	gpio_request_one(202, GPIOF_OUT_INIT_LOW, NULL); /* LCD0_LED_CONT */
+-	/* SCIFA1 */
+-	GPIO_FN_SCIFA1_CTS,	GPIO_FN_SCIFA1_SCK,
+-	GPIO_FN_SCIFA1_RXD,	GPIO_FN_SCIFA1_TXD,
+-	GPIO_FN_SCIFA1_RTS,
+-
+-	/* SCIFA2 */
+-	GPIO_FN_SCIFA2_SCK_PORT22, /* SCIFA2_SCK Port 22/199 */
+-	GPIO_FN_SCIFA2_SCK_PORT199,
+-	GPIO_FN_SCIFA2_RXD,	GPIO_FN_SCIFA2_TXD,
+-	GPIO_FN_SCIFA2_CTS,	GPIO_FN_SCIFA2_RTS,
+-
+-	/* SCIFA3 */
+-	GPIO_FN_SCIFA3_RTS_PORT105, /* MSEL5CR_8_0 */
+-	GPIO_FN_SCIFA3_SCK_PORT116,
+-	GPIO_FN_SCIFA3_CTS_PORT117,
+-	GPIO_FN_SCIFA3_RXD_PORT174,
+-	GPIO_FN_SCIFA3_TXD_PORT175,
+-
+-	GPIO_FN_SCIFA3_RTS_PORT161, /* MSEL5CR_8_1 */
+-	GPIO_FN_SCIFA3_SCK_PORT158,
+-	GPIO_FN_SCIFA3_CTS_PORT162,
+-	GPIO_FN_SCIFA3_RXD_PORT159,
+-	GPIO_FN_SCIFA3_TXD_PORT160,
+-
+-	/* SCIFA4 */
+-	GPIO_FN_SCIFA4_RXD_PORT12, /* MSEL5CR[12:11] = 00 */
+-	GPIO_FN_SCIFA4_TXD_PORT13,
+-
+-	GPIO_FN_SCIFA4_RXD_PORT204, /* MSEL5CR[12:11] = 01 */
+-	GPIO_FN_SCIFA4_TXD_PORT203,
+-
+-	GPIO_FN_SCIFA4_RXD_PORT94, /* MSEL5CR[12:11] = 10 */
+-	GPIO_FN_SCIFA4_TXD_PORT93,
+-
+-	GPIO_FN_SCIFA4_SCK_PORT21, /* SCIFA4_SCK Port 21/205 */
+-	GPIO_FN_SCIFA4_SCK_PORT205,
+-
+-	/* SCIFA5 */
+-	GPIO_FN_SCIFA5_TXD_PORT20, /* MSEL5CR[15:14] = 00 */
+-	GPIO_FN_SCIFA5_RXD_PORT10,
+-
+-	GPIO_FN_SCIFA5_RXD_PORT207, /* MSEL5CR[15:14] = 01 */
+-	GPIO_FN_SCIFA5_TXD_PORT208,
+-
+-	GPIO_FN_SCIFA5_TXD_PORT91, /* MSEL5CR[15:14] = 10 */
+-	GPIO_FN_SCIFA5_RXD_PORT92,
+-
+-	GPIO_FN_SCIFA5_SCK_PORT23, /* SCIFA5_SCK Port 23/206 */
+-	GPIO_FN_SCIFA5_SCK_PORT206,
+-
+-	/* SCIFA6 */
+-	GPIO_FN_SCIFA6_SCK,	GPIO_FN_SCIFA6_RXD,	GPIO_FN_SCIFA6_TXD,
+-
+-	/* SCIFA7 */
+-	GPIO_FN_SCIFA7_TXD,	GPIO_FN_SCIFA7_RXD,
+-
+-	/* SCIFAB */
+-	GPIO_FN_SCIFB_SCK_PORT190, /* MSEL5CR_17_0 */
+-	GPIO_FN_SCIFB_RXD_PORT191,
+-	GPIO_FN_SCIFB_TXD_PORT192,
+-	GPIO_FN_SCIFB_RTS_PORT186,
+-	GPIO_FN_SCIFB_CTS_PORT187,
+-
+-	GPIO_FN_SCIFB_SCK_PORT2, /* MSEL5CR_17_1 */
+-	GPIO_FN_SCIFB_RXD_PORT3,
+-	GPIO_FN_SCIFB_TXD_PORT4,
+-	GPIO_FN_SCIFB_RTS_PORT172,
+-	GPIO_FN_SCIFB_CTS_PORT173,
+-
+ 	/* LCD0 */
+ 	GPIO_FN_LCDC0_SELECT,
+ 
 -- 
 1.8.2.1
