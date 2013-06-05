@@ -1,80 +1,49 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Wed, 5 Jun 2013 20:27:44 +0530
-Subject: [PATCH V3 2/4] ARM: tegra: pcie: Add tegra3 support
-In-Reply-To: <51AE3D3B.6080102@wwwdotorg.org>
-References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
- <1370372252-4332-2-git-send-email-jagarwal@nvidia.com>
- <51AE3D3B.6080102@wwwdotorg.org>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B616BECE@BGMAIL01.nvidia.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 5 Jun 2013 10:02:52 -0500
+Subject: [PATCHv6 0/6] ARM: sofpga: Add SD/MMC, clk-gate,
+ and fix ethernet bindings
+Message-ID: <1370444578-25721-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > diff --git
-> > a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-> > b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-> 
-> > +- avdd-supply: Power supply for controller (1.05V)
-> 
-> > +  "cml": The Tegra clock of that name
-> 
-> Both those changes need to mention that those additions are only required
-> for Tegra30, not Tegra20. In other words,
-> 
-> +- avdd-supply: Power supply for controller (1.05V) (not required for
-> Tegra20)
-> 
-> +  "cml": The Tegra clock of that name (not required for Tegra20)
-> 
-> You probably also want to explicitly mention nvidia,tegra30-pcie as a legal
-> compatible value.
-> 
-> > diff --git a/drivers/pci/host/pci-tegra.c
-> > b/drivers/pci/host/pci-tegra.c
-> 
-> > +/* used to differentiate tegra chips code */ struct
-> > +tegra_pcie_soc_data {
-> > +	unsigned int num_max_ports;
-> 
-> nit: "num max" seems redundant. max_ports or num_ports would be better.
-> 
-> >  struct tegra_pcie_port {
-> > @@ -384,7 +408,7 @@ static int tegra_pcie_read_conf(struct pci_bus *bus,
-> unsigned int devfn,
-> >  		struct tegra_pcie_port *port;
-> >
-> >  		list_for_each_entry(port, &pcie->ports, list) {
-> > -			if (port->index + 1 == slot) {
-> > +			if (port->index == slot) {
-> 
-> This and the equivalent change in tegra_pcie_write_conf() seem like a bug-
-> fix unrelated to the addition of Tegra30 support. Hence, they should be a
-> separate patch.
-> 
-> 
-> > @@ -398,7 +422,6 @@ static int tegra_pcie_read_conf(struct pci_bus *bus,
-> unsigned int devfn,
-> >  			*value = 0xffffffff;
-> >  			return PCIBIOS_DEVICE_NOT_FOUND;
-> >  		}
-> > -
-> >  		addr += tegra_pcie_conf_offset(devfn, where);
-> 
-> Unnecessary white-space change.
-> 
-> > @@ -1549,10 +1660,9 @@ static int tegra_pcie_remove(struct
-> platform_device *pdev)
-> >  	struct tegra_pcie_bus *bus;
-> >  	int err;
-> >
-> > -	list_for_each_entry(bus, &pcie->busses, list) {
-> > +	list_for_each_entry(bus, &pcie->busses, list)
-> >  		vunmap(bus->area->addr);
-> > -		kfree(bus);
-> > -	}
-> > +	kfree(bus);
-> 
-> This doesn't look right. Can you please explain it further? This is looping
-> over every bus in a dynamic list, so surely each entry needs to be freed? Did
-> you do this to avoid a crash? If so, the issue is likely that the loop should use
-> list_for_each_entry_safe() rather than list_for_each_entry().
-Yes you are right, it is not required. I will revert it along with taking care of other comments.
+From: Dinh Nguyen <dinguyen@altera.com>
+
+Hi Arnd/Olof,
+
+Can you please apply this patch series? Patch 3/6 has gotten Mike Turquette's Ack.
+The SD/MMC patches have been reviewed by Seungwon Jeon, Jaehoon Chung and Arnd.
+
+Sorry, forgot to cc Arnd/Olof directly.
+
+Thanks,
+Dinh
+
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Olof Johansson <olof@lixom.net>
+
+Dinh Nguyen (6):
+  ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+  ARM: socfpga: dts: Add gate-clock bindings
+  ARM: socfpga: Add support to gate peripheral clocks
+  ARM: socfpga: Add syscon to be part of socfpga
+  ARM: socfpga: dts: Add support for SD/MMC
+  mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+
+ .../devicetree/bindings/clock/altr_socfpga.txt     |    7 +
+ .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   60 +++++
+ arch/arm/boot/dts/socfpga.dtsi                     |  230 +++++++++++++++++++-
+ arch/arm/boot/dts/socfpga_cyclone5.dts             |   26 +++
+ arch/arm/boot/dts/socfpga_vt.dts                   |   17 ++
+ arch/arm/mach-socfpga/Kconfig                      |    1 +
+ drivers/clk/socfpga/clk.c                          |  194 ++++++++++++++++-
+ drivers/mmc/host/Kconfig                           |    8 +
+ drivers/mmc/host/Makefile                          |    1 +
+ drivers/mmc/host/dw_mmc-exynos.c                   |    2 -
+ drivers/mmc/host/dw_mmc-socfpga.c                  |  138 ++++++++++++
+ drivers/mmc/host/dw_mmc.h                          |    1 +
+ 12 files changed, 671 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+ create mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
+
+-- 
+1.7.9.5
