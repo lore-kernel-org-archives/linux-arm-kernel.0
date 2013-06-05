@@ -1,62 +1,63 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 5 Jun 2013 14:49:00 +0200
-Subject: [PATCH v2 0/4] ARM: dts: AM3XXX: Use preprocessor for device trees
-In-Reply-To: <1370268745-15860-1-git-send-email-florian.vaussard@epfl.ch>
-References: <1370268745-15860-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <51AF33BC.4020708@ti.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 05 Jun 2013 14:50:44 +0200
+Subject: [PATCH] cpuidle: move ARCH_NEEDS_CPU_IDLE_COUPLED Kconfig option
+In-Reply-To: <1460854.rT4b7LefMM@wuerfel>
+References: <1460854.rT4b7LefMM@wuerfel>
+Message-ID: <51AF3424.5060200@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Afzal,
+On 06/05/2013 02:38 PM, Arnd Bergmann wrote:
+> There is no reason why ARCH_NEEDS_CPU_IDLE_COUPLED needs to be
+> hidden inside of "if CPU_IDLE", since it is a silent option.
+> Moving it outside lets platforms select this symbol unconditionally,
+> which avoid a warning from the ARM omap2plus_defconfig build:
+> 
+> warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects
+> 	ARCH_NEEDS_CPU_IDLE_COUPLED which has unmet direct
+> 	dependencies (CPU_IDLE)
 
-Hi Vaibhav and Afzal,
+IMHO, this option depends on CPU_IDLE and thus must be kept inside the
+CPU_IDLE menuconfig.
 
-Can someone test this series before I pull it. I still don't have any AM
-board to do it myself :-(
+The warning raised here is because this option is selected by the arch
+Kconfig without checking if CPU_IDLE is set or not.
 
-In theory, it should be fine since Florian already checked the diff, but
-just in case.
+I am in favor to change the OMAP / TEGRA Kconfigs instead, in this way:
 
-Thanks,
-Benoit
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index f49cd51..831e89e 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -83,7 +83,7 @@ config ARCH_OMAP4
+        depends on ARCH_OMAP2PLUS
+        depends on ARCH_MULTI_V7
+        select ARCH_HAS_OPP
+-       select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
++       select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
+        select ARM_CPU_SUSPEND if PM
+        select ARM_ERRATA_720789
+        select ARM_GIC
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 84d72fc..04c6221 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -23,7 +23,7 @@ menu "NVIDIA Tegra options"
 
+ config ARCH_TEGRA_2x_SOC
+        bool "Enable support for Tegra20 family"
+-       select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
++       select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
+        select ARM_ERRATA_720789
+        select ARM_ERRATA_754327 if SMP
+        select ARM_ERRATA_764369 if SMP
+diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
 
-On 06/03/2013 04:12 PM, Florian Vaussard wrote:
-> Hello,
-> 
-> Following my series for OMAP2+, this series makes use of the C preprocessor
-> when compiling AM3xxx DT files, and accomplishes some improvements to improve
-> overall readability.
-> 
-> The .dtb files were diff-tested before and after applying the series to
-> guarantee identity for all targets.
-> 
-> To enable pullup/down on the pad, the bit should be cleared on AM33xx, where
-> it should be set on OMAP3. This was wrong in my first version.
-> 
-> This series is based on Benoit's 'for_3.11/dts' branch.
-> 
-> Regards,
-> 
-> Florian
-> 
-> From v2:
-> - Rebased on Benoit's 'for_3.11/dts'
-> - Fixed inversed bit to enable pullups ('1' on OMAP, but '0' on AM33xx)
-> 
-> Florian Vaussard (4):
->   ARM: dts: AM3XXX: Use #include for all device trees
->   ARM: dts: AM33XX: Use existing constants for GPIOs
->   ARM: dts: AM33XX: Specific pinctrl header
->   ARM: dts: AM33XX: Use pinctrl constants
-> 
->  arch/arm/boot/dts/am335x-bone.dts       |   28 ++++++------
->  arch/arm/boot/dts/am335x-evm.dts        |   76 +++++++++++++++---------------
->  arch/arm/boot/dts/am335x-evmsk.dts      |   46 +++++++++---------
->  arch/arm/boot/dts/am33xx.dtsi           |    5 ++-
->  arch/arm/boot/dts/am3517-evm.dts        |    2 +-
->  arch/arm/boot/dts/am3517_mt_ventoux.dts |    2 +-
->  include/dt-bindings/pinctrl/am33xx.h    |   37 +++++++++++++++
->  7 files changed, 118 insertions(+), 78 deletions(-)
->  create mode 100644 include/dt-bindings/pinctrl/am33xx.h
-> 
+[ ... ]
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
