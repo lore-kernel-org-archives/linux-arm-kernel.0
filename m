@@ -1,282 +1,178 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Wed, 5 Jun 2013 09:56:54 -0500
-Subject: [PATCHv5 3/6] ARM: socfpga: Add support to gate peripheral clocks
+Date: Wed, 5 Jun 2013 09:56:56 -0500
+Subject: [PATCHv5 5/6] ARM: socfpga: dts: Add support for SD/MMC
 In-Reply-To: <1370444217-25498-1-git-send-email-dinguyen@altera.com>
 References: <1370444217-25498-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1370444217-25498-4-git-send-email-dinguyen@altera.com>
+Message-ID: <1370444217-25498-6-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Add support to gate the clocks that directly feed peripherals. For clocks
-with multiple parents, add the ability to determine the correct parent,
-and also set parents. Also add support to calculate and set the clocks'
-rate.
+Add bindings for SD/MMC for SOCFPGA.
+Add "syscon" to the "altr,sys-mgr" binding.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 Reviewed-by: Pavel Machek <pavel@denx.de>
-Acked-by: Mike Turquette <mturquette@linaro.org>
-Cc: Mike Turquette <mturquette@linaro.org>
 CC: Arnd Bergmann <arnd@arndb.de>
 CC: Olof Johansson <olof@lixom.net>
 Cc: Pavel Machek <pavel@denx.de>
 CC: <linux@arm.linux.org.uk>
 
-v4:
-- Add Acked-by: Mike Turquette
-
-v3:
-- Addressed comments from Pavel
-
 v2:
-- Fix space/indent errors
-- Add streq for strcmp == 0
+- Add "syscon" to "altr,sys-mgr"
+- Remove pwr-en field
 ---
- drivers/clk/socfpga/clk.c |  194 ++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 185 insertions(+), 9 deletions(-)
+ .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   60 ++++++++++++++++++++
+ arch/arm/boot/dts/socfpga.dtsi                     |   13 ++++-
+ arch/arm/boot/dts/socfpga_cyclone5.dts             |   13 +++++
+ arch/arm/boot/dts/socfpga_vt.dts                   |   12 ++++
+ 4 files changed, 97 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
 
-diff --git a/drivers/clk/socfpga/clk.c b/drivers/clk/socfpga/clk.c
-index bd11315..5bb848c 100644
---- a/drivers/clk/socfpga/clk.c
-+++ b/drivers/clk/socfpga/clk.c
-@@ -24,15 +24,17 @@
- #include <linux/of.h>
+diff --git a/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+new file mode 100644
+index 0000000..9d7062c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+@@ -0,0 +1,60 @@
++* Altera SOCFPGA specific extensions to the Synopsis Designware Mobile
++  Storage Host Controller
++
++Required Properties:
++
++* compatible: should be
++	- "altr,socfpga-dw-mshc": for controllers with Altera SOCFPGA
++	  specific extentions.
++
++* altr,dw-mshc-ciu-div: Specifies the divider value for the card interface
++  unit (ciu) clock. The value should be (n-1). For Altera's SOCFPGA, the divider
++  value is fixed at 3, which mean parent_clock/4.
++
++* altr,dw-mshc-sdr-timing: Specifies the value of CIU clock phase shift value
++  in transmit mode and CIU clock phase shift value in receive mode for single
++  data rate mode operation. Refer notes below for the order of the cells and the
++  valid values.
++
++  Notes for the sdr-timing values:
++
++    The order of the cells should be
++      - First Cell: CIU clock phase shift value for RX mode, smplsel bits in
++	the system manager SDMMC control group.
++      - Second Cell: CIU clock phase shift value for TX mode, drvsel bits in
++	the system manager SDMMC control group.
++
++    Valid values for SDR CIU clock timing for SOCFPGA:
++      - valid value for tx phase shift and rx phase shift is 0 to 7.
++
++Required properties for a slot:
++
++* bus-width: Data width for card slot. 4-bit or 8-bit data.
++
++Example:
++
++  The MSHC controller node can be split into two portions, SoC specific and
++  board specific portions as listed below.
++
++	dwmmc0 at ff704000 {
++		compatible = "altr,socfpga-dw-mshc";
++		reg = <0xff704000 0x1000>;
++		interrupts = <0 139 4>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
++
++	dwmmc0 at ff704000 {
++		num-slots = <1>;
++		supports-highspeed;
++		broken-cd;
++		fifo-depth = <0x400>;
++		altr,dw-mshc-ciu-div = <3>;
++      		altr,dw-mshc-sdr-timing = <0 3>;
++
++		slot at 0 {
++			reg = <0>;
++			bus-width = <4>;
++		};
++	};
++
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index bee62a2..dbf7f22 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -468,6 +468,17 @@
+ 			cache-level = <2>;
+ 		};
  
- /* Clock Manager offsets */
--#define CLKMGR_CTRL    0x0
--#define CLKMGR_BYPASS 0x4
-+#define CLKMGR_CTRL	0x0
-+#define CLKMGR_BYPASS	0x4
-+#define CLKMGR_L4SRC	0x70
-+#define CLKMGR_PERPLL_SRC	0xAC
++		mmc: dwmmc0 at ff704000 {
++			compatible = "altr,socfpga-dw-mshc";
++			reg = <0xff704000 0x1000>;
++			interrupts = <0 139 4>;
++			fifo-depth = <0x400>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++			clocks = <&l4_mp_clk>, <&sdmmc_clk>;
++			clock-names = "biu", "ciu";
++		};
++
+ 		/* Local timer */
+ 		timer at fffec600 {
+ 			compatible = "arm,cortex-a9-twd-timer";
+@@ -521,7 +532,7 @@
+ 			};
  
- /* Clock bypass bits */
--#define MAINPLL_BYPASS (1<<0)
--#define SDRAMPLL_BYPASS (1<<1)
--#define SDRAMPLL_SRC_BYPASS (1<<2)
--#define PERPLL_BYPASS (1<<3)
--#define PERPLL_SRC_BYPASS (1<<4)
-+#define MAINPLL_BYPASS		(1<<0)
-+#define SDRAMPLL_BYPASS		(1<<1)
-+#define SDRAMPLL_SRC_BYPASS	(1<<2)
-+#define PERPLL_BYPASS		(1<<3)
-+#define PERPLL_SRC_BYPASS	(1<<4)
+ 		sysmgr at ffd08000 {
+-				compatible = "altr,sys-mgr";
++				compatible = "altr,sys-mgr", "syscon";
+ 				reg = <0xffd08000 0x4000>;
+ 			};
+ 	};
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+index 973999d..1853cb1 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+@@ -54,6 +54,19 @@
+ 			status = "okay";
+ 		};
  
- #define SOCFPGA_PLL_BG_PWRDWN		0
- #define SOCFPGA_PLL_EXT_ENA		1
-@@ -41,6 +43,17 @@
- #define SOCFPGA_PLL_DIVF_SHIFT	3
- #define SOCFPGA_PLL_DIVQ_MASK		0x003F0000
- #define SOCFPGA_PLL_DIVQ_SHIFT	16
-+#define SOCFGPA_MAX_PARENTS	3
++		dwmmc0 at ff704000 {
++			num-slots = <1>;
++			supports-highspeed;
++			broken-cd;
++			altr,dw-mshc-ciu-div = <3>;
++			altr,dw-mshc-sdr-timing = <0 3>;
 +
-+#define SOCFPGA_L4_MP_CLK		"l4_mp_clk"
-+#define SOCFPGA_L4_SP_CLK		"l4_sp_clk"
-+#define SOCFPGA_NAND_CLK		"nand_clk"
-+#define SOCFPGA_NAND_X_CLK		"nand_x_clk"
-+#define SOCFPGA_MMC_CLK			"mmc_clk"
-+#define SOCFPGA_DB_CLK			"gpio_db_clk"
++			slot at 0 {
++				reg = <0>;
++				bus-width = <4>;
++			};
++		};
 +
-+#define div_mask(width)	((1 << (width)) - 1)
-+#define streq(a, b) (strcmp((a), (b)) == 0)
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <100000000>;
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index d1ec0ca..d93deb0 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -46,6 +46,18 @@
+ 			status = "okay";
+ 		};
  
- extern void __iomem *clk_mgr_base_addr;
- 
-@@ -49,6 +62,9 @@ struct socfpga_clk {
- 	char *parent_name;
- 	char *clk_name;
- 	u32 fixed_div;
-+	void __iomem *div_reg;
-+	u32 width;	/* only valid if div_reg != 0 */
-+	u32 shift;	/* only valid if div_reg != 0 */
- };
- #define to_socfpga_clk(p) container_of(p, struct socfpga_clk, hw.hw)
- 
-@@ -132,8 +148,9 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
- 
- 	socfpga_clk->hw.hw.init = &init;
- 
--	if (strcmp(clk_name, "main_pll") || strcmp(clk_name, "periph_pll") ||
--			strcmp(clk_name, "sdram_pll")) {
-+	if (streq(clk_name, "main_pll") ||
-+		streq(clk_name, "periph_pll") ||
-+		streq(clk_name, "sdram_pll")) {
- 		socfpga_clk->hw.bit_idx = SOCFPGA_PLL_EXT_ENA;
- 		clk_pll_ops.enable = clk_gate_ops.enable;
- 		clk_pll_ops.disable = clk_gate_ops.disable;
-@@ -148,6 +165,159 @@ static __init struct clk *socfpga_clk_init(struct device_node *node,
- 	return clk;
- }
- 
-+static u8 socfpga_clk_get_parent(struct clk_hw *hwclk)
-+{
-+	u32 l4_src;
-+	u32 perpll_src;
++		dwmmc0 at ff704000 {
++			num-slots = <1>;
++			supports-highspeed;
++			broken-cd;
++			altr,dw-mshc-ciu-div = <3>;
 +
-+	if (streq(hwclk->init->name, SOCFPGA_L4_MP_CLK)) {
-+		l4_src = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
-+		return l4_src &= 0x1;
-+	}
-+	if (streq(hwclk->init->name, SOCFPGA_L4_SP_CLK)) {
-+		l4_src = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
-+		return !!(l4_src & 2);
-+	}
++			slot at 0 {
++				reg = <0>;
++				bus-width = <4>;
++			};
++		};
 +
-+	perpll_src = readl(clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
-+	if (streq(hwclk->init->name, SOCFPGA_MMC_CLK))
-+		return perpll_src &= 0x3;
-+	if (streq(hwclk->init->name, SOCFPGA_NAND_CLK) ||
-+			streq(hwclk->init->name, SOCFPGA_NAND_X_CLK))
-+			return (perpll_src >> 2) & 3;
-+
-+	/* QSPI clock */
-+	return (perpll_src >> 4) & 3;
-+
-+}
-+
-+static int socfpga_clk_set_parent(struct clk_hw *hwclk, u8 parent)
-+{
-+	u32 src_reg;
-+
-+	if (streq(hwclk->init->name, SOCFPGA_L4_MP_CLK)) {
-+		src_reg = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
-+		src_reg &= ~0x1;
-+		src_reg |= parent;
-+		writel(src_reg, clk_mgr_base_addr + CLKMGR_L4SRC);
-+	} else if (streq(hwclk->init->name, SOCFPGA_L4_SP_CLK)) {
-+		src_reg = readl(clk_mgr_base_addr + CLKMGR_L4SRC);
-+		src_reg &= ~0x2;
-+		src_reg |= (parent << 1);
-+		writel(src_reg, clk_mgr_base_addr + CLKMGR_L4SRC);
-+	} else {
-+		src_reg = readl(clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
-+		if (streq(hwclk->init->name, SOCFPGA_MMC_CLK)) {
-+			src_reg &= ~0x3;
-+			src_reg |= parent;
-+		} else if (streq(hwclk->init->name, SOCFPGA_NAND_CLK) ||
-+			streq(hwclk->init->name, SOCFPGA_NAND_X_CLK)) {
-+			src_reg &= ~0xC;
-+			src_reg |= (parent << 2);
-+		} else {/* QSPI clock */
-+			src_reg &= ~0x30;
-+			src_reg |= (parent << 4);
-+		}
-+		writel(src_reg, clk_mgr_base_addr + CLKMGR_PERPLL_SRC);
-+	}
-+
-+	return 0;
-+}
-+
-+static unsigned long socfpga_clk_recalc_rate(struct clk_hw *hwclk,
-+	unsigned long parent_rate)
-+{
-+	struct socfpga_clk *socfpgaclk = to_socfpga_clk(hwclk);
-+	u32 div = 1, val;
-+
-+	if (socfpgaclk->fixed_div)
-+		div = socfpgaclk->fixed_div;
-+	else if (socfpgaclk->div_reg) {
-+		val = readl(socfpgaclk->div_reg) >> socfpgaclk->shift;
-+		val &= div_mask(socfpgaclk->width);
-+		if (streq(hwclk->init->name, SOCFPGA_DB_CLK))
-+			div = val + 1;
-+		else
-+			div = (1 << val);
-+	}
-+
-+	return parent_rate / div;
-+}
-+
-+static struct clk_ops gateclk_ops = {
-+	.recalc_rate = socfpga_clk_recalc_rate,
-+	.get_parent = socfpga_clk_get_parent,
-+	.set_parent = socfpga_clk_set_parent,
-+};
-+
-+static void __init socfpga_gate_clk_init(struct device_node *node,
-+	const struct clk_ops *ops)
-+{
-+	u32 clk_gate[2];
-+	u32 div_reg[3];
-+	u32 fixed_div;
-+	struct clk *clk;
-+	struct socfpga_clk *socfpga_clk;
-+	const char *clk_name = node->name;
-+	const char *parent_name[SOCFGPA_MAX_PARENTS];
-+	struct clk_init_data init;
-+	int rc;
-+	int i = 0;
-+
-+	socfpga_clk = kzalloc(sizeof(*socfpga_clk), GFP_KERNEL);
-+	if (WARN_ON(!socfpga_clk))
-+		return;
-+
-+	rc = of_property_read_u32_array(node, "clk-gate", clk_gate, 2);
-+	if (rc)
-+		clk_gate[0] = 0;
-+
-+	if (clk_gate[0]) {
-+		socfpga_clk->hw.reg = clk_mgr_base_addr + clk_gate[0];
-+		socfpga_clk->hw.bit_idx = clk_gate[1];
-+
-+		gateclk_ops.enable = clk_gate_ops.enable;
-+		gateclk_ops.disable = clk_gate_ops.disable;
-+	}
-+
-+	rc = of_property_read_u32(node, "fixed-divider", &fixed_div);
-+	if (rc)
-+		socfpga_clk->fixed_div = 0;
-+	else
-+		socfpga_clk->fixed_div = fixed_div;
-+
-+	rc = of_property_read_u32_array(node, "div-reg", div_reg, 3);
-+	if (!rc) {
-+		socfpga_clk->div_reg = clk_mgr_base_addr + div_reg[0];
-+		socfpga_clk->shift = div_reg[1];
-+		socfpga_clk->width = div_reg[2];
-+	} else {
-+		socfpga_clk->div_reg = 0;
-+	}
-+
-+	of_property_read_string(node, "clock-output-names", &clk_name);
-+
-+	init.name = clk_name;
-+	init.ops = ops;
-+	init.flags = 0;
-+	while (i < SOCFGPA_MAX_PARENTS && (parent_name[i] =
-+			of_clk_get_parent_name(node, i)) != NULL)
-+		i++;
-+
-+	init.parent_names = parent_name;
-+	init.num_parents = i;
-+	socfpga_clk->hw.hw.init = &init;
-+
-+	clk = clk_register(NULL, &socfpga_clk->hw.hw);
-+	if (WARN_ON(IS_ERR(clk))) {
-+		kfree(socfpga_clk);
-+		return;
-+	}
-+	rc = of_clk_add_provider(node, of_clk_src_simple_get, clk);
-+	if (WARN_ON(rc))
-+		return;
-+}
-+
- static void __init socfpga_pll_init(struct device_node *node)
- {
- 	socfpga_clk_init(node, &clk_pll_ops);
-@@ -160,6 +330,12 @@ static void __init socfpga_periph_init(struct device_node *node)
- }
- CLK_OF_DECLARE(socfpga_periph, "altr,socfpga-perip-clk", socfpga_periph_init);
- 
-+static void __init socfpga_gate_init(struct device_node *node)
-+{
-+	socfpga_gate_clk_init(node, &gateclk_ops);
-+}
-+CLK_OF_DECLARE(socfpga_gate, "altr,socfpga-gate-clk", socfpga_gate_init);
-+
- void __init socfpga_init_clocks(void)
- {
- 	struct clk *clk;
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <7000000>;
+ 		};
 -- 
 1.7.9.5
