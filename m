@@ -1,152 +1,36 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Wed,  5 Jun 2013 11:56:04 +0800
-Subject: [PATCH v3 5/6] ARM: hi3xxx: add board support with device tree
-In-Reply-To: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1370404564-29104-1-git-send-email-haojian.zhuang@linaro.org>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  5 Jun 2013 13:31:51 +0900
+Subject: [PATCH 4/6] ARM: shmobile: bockw: enable CONFIG_PM_RUNTIME in
+ defconfig
+In-Reply-To: <1370406713-26599-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370406713-26599-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370406713-26599-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Changelog:
-v3:
-1. Remove .map_io() in DT machine descriptor. Since debug_ll_io_init()
-is called by default.
-2. Remove .init_machine() in DT machine descriptor. Since
-of_platform_populate() is called by default in DT mode.
+Enable CONFIG_PM_RUNTIME in 'bockw_defconfig' -- it's already used by TMU, SCI,
+I2C, and Ether drivers to control the clocks...
 
-v2:
-1. Remove .init_irq() in DT machine descriptor. Since irqchip_init()
-is called by default in DT mode.
-
-Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../bindings/arm/hisilicon/hisilicon.txt           | 10 ++++++
- arch/arm/Kconfig                                   |  2 ++
- arch/arm/Makefile                                  |  1 +
- arch/arm/mach-hi3xxx/Kconfig                       | 13 ++++++++
- arch/arm/mach-hi3xxx/Makefile                      |  5 +++
- arch/arm/mach-hi3xxx/hi3xxx.c                      | 37 ++++++++++++++++++++++
- 6 files changed, 68 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
- create mode 100644 arch/arm/mach-hi3xxx/Kconfig
- create mode 100644 arch/arm/mach-hi3xxx/Makefile
- create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
+ arch/arm/configs/bockw_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-new file mode 100644
-index 0000000..3be60c8
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
-@@ -0,0 +1,10 @@
-+Hisilicon Platforms Device Tree Bindings
-+----------------------------------------------------
-+
-+Hi3716 Development Board
-+Required root node properties:
-+	- compatible = "hisilicon,hi3716-dkb";
-+
-+Hi4511 Board
-+Required root node properties:
-+	- compatible = "hisilicon,hi3620-hi4511";
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..acd2358 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -936,6 +936,8 @@ source "arch/arm/mach-footbridge/Kconfig"
- 
- source "arch/arm/mach-gemini/Kconfig"
- 
-+source "arch/arm/mach-hi3xxx/Kconfig"
-+
- source "arch/arm/mach-highbank/Kconfig"
- 
- source "arch/arm/mach-integrator/Kconfig"
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 1ba358b..748a9ca 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -147,6 +147,7 @@ machine-$(CONFIG_ARCH_DOVE)		+= dove
- machine-$(CONFIG_ARCH_EBSA110)		+= ebsa110
- machine-$(CONFIG_ARCH_EP93XX)		+= ep93xx
- machine-$(CONFIG_ARCH_GEMINI)		+= gemini
-+machine-$(CONFIG_ARCH_HI3xxx)		+= hi3xxx
- machine-$(CONFIG_ARCH_HIGHBANK)		+= highbank
- machine-$(CONFIG_ARCH_INTEGRATOR)	+= integrator
- machine-$(CONFIG_ARCH_IOP13XX)		+= iop13xx
-diff --git a/arch/arm/mach-hi3xxx/Kconfig b/arch/arm/mach-hi3xxx/Kconfig
-new file mode 100644
-index 0000000..a991dee
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/Kconfig
-@@ -0,0 +1,13 @@
-+config ARCH_HI3xxx
-+	bool "Hisilicon Hi36xx/Hi37xx family" if ARCH_MULTI_V7
-+	select ARM_AMBA
-+	select ARM_GIC
-+	select CACHE_L2X0
-+	select CACHE_PL310
-+	select CLKSRC_OF
-+	select PINCTRL
-+	select PINCTRL_SINGLE
-+	select SERIAL_AMBA_PL011
-+	select SERIAL_AMBA_PL011_CONSOLE
-+	help
-+	  Support for Hisilicon Hi36xx/Hi37xx processor family
-diff --git a/arch/arm/mach-hi3xxx/Makefile b/arch/arm/mach-hi3xxx/Makefile
-new file mode 100644
-index 0000000..d68ebb3
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/Makefile
-@@ -0,0 +1,5 @@
-+#
-+# Makefile for Hisilicon Hi36xx/Hi37xx processors line
-+#
-+
-+obj-y	+= hi3xxx.o
-diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
-new file mode 100644
-index 0000000..064b303
---- /dev/null
-+++ b/arch/arm/mach-hi3xxx/hi3xxx.c
-@@ -0,0 +1,37 @@
-+/*
-+ * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
-+ *
-+ * Copyright (c) 2012-2013 Hisilicon Ltd.
-+ * Copyright (c) 2012-2013 Linaro Ltd.
-+ *
-+ * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clocksource.h>
-+#include <linux/irqchip.h>
-+#include <linux/of_platform.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/map.h>
-+
-+static void __init hi3xxx_timer_init(void)
-+{
-+	of_clk_init(NULL);
-+	clocksource_of_init();
-+}
-+
-+static const char *hs_compat[] __initdata = {
-+	"hisilicon,hi3620-hi4511",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(HI3xxx, "Hisilicon Hi36xx/Hi37xx (Flattened Device Tree)")
-+	/* Maintainer: Haojian Zhuang <haojian.zhuang@linaro.org> */
-+	.init_time	= hi3xxx_timer_init,
-+	.dt_compat	= hs_compat,
-+MACHINE_END
+diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
+index 2c3f34e..a4bc76d 100644
+--- a/arch/arm/configs/bockw_defconfig
++++ b/arch/arm/configs/bockw_defconfig
+@@ -31,6 +31,7 @@ CONFIG_CMDLINE="console=ttySC0,115200 ignore_loglevel root=/dev/nfs ip=dhcp"
+ CONFIG_CMDLINE_FORCE=y
+ # CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+ # CONFIG_SUSPEND is not set
++CONFIG_PM_RUNTIME=y
+ CONFIG_NET=y
+ CONFIG_UNIX=y
+ CONFIG_INET=y
 -- 
-1.8.1.2
+1.8.2.1
