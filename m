@@ -1,113 +1,65 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Wed, 05 Jun 2013 23:00:43 +0900
-Subject: [PATCH 06/10] mmc: dw_mmc-pltfm: add Rockchip variant
-In-Reply-To: <201306030059.03783.heiko@sntech.de>
-References: <201306030055.15413.heiko@sntech.de>
- <201306030059.03783.heiko@sntech.de>
-Message-ID: <001601ce61f5$11b37b20$351a7160$%jun@samsung.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Wed, 5 Jun 2013 16:03:40 +0200
+Subject: [PATCH 1/3] drivers: pinctrl sleep and idle states in the core
+In-Reply-To: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130605140338.GC2934@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/13 7:59 AM, Heiko St?bner wrote:
-> Cortex-A9 SoCs from Rockchip use a slightly modified variant of dw_mmc
-> controllers that seems to require the SDMMC_CMD_USE_HOLD_REG bit to
-> always be set.
+On Wed, Jun 05, 2013 at 03:44:31PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> There also seem to be no other modifications (additional register etc)
-> present, so to keep the footprint low, add this small variant to the
-> pltfm driver.
+> If a device have sleep and idle states in addition to the
+> default state, look up these in the core and stash them in
+> the pinctrl state container.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/mmc/host/dw_mmc-pltfm.c |   48 +++++++++++++++++++++++++++-----------
->  1 files changed, 34 insertions(+), 14 deletions(-)
+> Add accessor functions for pinctrl consumers to put the pins
+> into "default", "sleep" and "idle" states passing nothing but
+> the struct device * affected.
 > 
-> diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-> index 0048da8..7d041b5 100644
-> --- a/drivers/mmc/host/dw_mmc-pltfm.c
-> +++ b/drivers/mmc/host/dw_mmc-pltfm.c
-> @@ -24,6 +24,16 @@
+> Solution suggested by Kevin Hilman, Mark Brown and Dmitry
+> Torokhov in response to a patch series from Hebbar
+> Gururaja.
 > 
->  #include "dw_mmc.h"
-> 
-> +
-> +static void dw_mci_rockchip_prepare_command(struct dw_mci *host, u32 *cmdr)
-> +{
-> +	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-Currently, SDMMC_CMD_USE_HOLD_REG is defined in dw_mmc-exynos.c
-It should be moved to dw_mmc.h
+> Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Thanks,
-Seungwon Jeon
-> +}
-> +
-> +static const struct dw_mci_drv_data rockchip_drv_data = {
-> +	.prepare_command	= dw_mci_rockchip_prepare_command,
-> +};
-> +
->  int dw_mci_pltfm_register(struct platform_device *pdev,
->  				const struct dw_mci_drv_data *drv_data)
->  {
-> @@ -63,20 +73,6 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
->  }
->  EXPORT_SYMBOL_GPL(dw_mci_pltfm_register);
-> 
-> -static int dw_mci_pltfm_probe(struct platform_device *pdev)
-> -{
-> -	return dw_mci_pltfm_register(pdev, NULL);
-> -}
-> -
-> -int dw_mci_pltfm_remove(struct platform_device *pdev)
-> -{
-> -	struct dw_mci *host = platform_get_drvdata(pdev);
-> -
-> -	dw_mci_remove(host);
-> -	return 0;
-> -}
-> -EXPORT_SYMBOL_GPL(dw_mci_pltfm_remove);
-> -
->  #ifdef CONFIG_PM_SLEEP
->  /*
->   * TODO: we should probably disable the clock to the card in the suspend path.
-> @@ -114,10 +110,34 @@ EXPORT_SYMBOL_GPL(dw_mci_pltfm_pmops);
-> 
->  static const struct of_device_id dw_mci_pltfm_match[] = {
->  	{ .compatible = "snps,dw-mshc", },
-> +	{ .compatible = "rockchip,cortex-a9-dw-mshc",
-> +		.data = &rockchip_drv_data },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
-> 
-> +static int dw_mci_pltfm_probe(struct platform_device *pdev)
-> +{
-> +	const struct dw_mci_drv_data *drv_data = NULL;
-> +	const struct of_device_id *match;
-> +
-> +	if (pdev->dev.of_node) {
-> +		match = of_match_node(dw_mci_pltfm_match, pdev->dev.of_node);
-> +		drv_data = match->data;
-> +	}
-> +
-> +	return dw_mci_pltfm_register(pdev, drv_data);
-> +}
-> +
-> +int dw_mci_pltfm_remove(struct platform_device *pdev)
-> +{
-> +	struct dw_mci *host = platform_get_drvdata(pdev);
-> +
-> +	dw_mci_remove(host);
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(dw_mci_pltfm_remove);
-> +
->  static struct platform_driver dw_mci_pltfm_driver = {
->  	.probe		= dw_mci_pltfm_probe,
->  	.remove		= dw_mci_pltfm_remove,
-> --
-> 1.7.2.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Some nits:
+
+> +	if (IS_ERR(pins->sleep_state))
+> +		return 0; /* No default state */
+
+Comment wants to say "sleep state"?
+
+> +	ret = pinctrl_select_state(pins->p, pins->sleep_state);
+> +	if (ret)
+> +		dev_err(dev, "failed to activate sleep pinctrl state\n");
+
+Better say "pinctrl sleep state"?
+
+> +	if (IS_ERR(pins->idle_state))
+> +		return 0; /* No default state */
+> +	ret = pinctrl_select_state(pins->p, pins->idle_state);
+> +	if (ret)
+> +		dev_err(dev, "failed to activate idle pinctrl state\n");
+
+Similar issues here...
+
+Other than that, on all 3 patches:
+
+Acked-by: Wolfram Sang <wsa@the-dreams.de>
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130605/6151fdf8/attachment.sig>
