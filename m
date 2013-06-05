@@ -1,69 +1,103 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:24:57 +0900
-Subject: [PATCH 006/130] ARM: shmobile: r8a7778: Register PFC device
+Date: Wed,  5 Jun 2013 17:25:01 +0900
+Subject: [PATCH 010/130] sh-pfc: r8a7790: Add ETH pin groups and functions
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-11-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig                |  1 +
- arch/arm/mach-shmobile/include/mach/r8a7778.h |  1 +
- arch/arm/mach-shmobile/setup-r8a7778.c        | 13 +++++++++++++
- 3 files changed, 15 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 58 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 1a517e2..06da4d3 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -37,6 +37,7 @@ config ARCH_R8A7740
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+index 42b0c55..3774242 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+@@ -20,7 +20,10 @@
+  * along with this program; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+  */
++
+ #include <linux/kernel.h>
++#include <linux/platform_data/gpio-rcar.h>
++
+ #include <mach/r8a7790.h>
  
- config ARCH_R8A7778
- 	bool "R-Car M1 (R8A77780)"
-+	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select CPU_V7
- 	select SH_CLK_CPG
- 	select ARM_GIC
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index 951149e..68053fc 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -28,5 +28,6 @@ extern void r8a7778_init_irq(void);
- extern void r8a7778_init_irq_dt(void);
- extern void r8a7778_clock_init(void);
- extern void r8a7778_init_irq_extpin(int irlm);
-+extern void r8a7778_pinmux_init(void);
+ #include "core.h"
+@@ -1820,6 +1823,57 @@ static struct sh_pfc_pin pinmux_pins[] = {
+ 	PINMUX_GPIO_GP_ALL(),
+ };
  
- #endif /* __ASM_R8A7778_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 30b4a33..0ca5701 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -94,6 +94,19 @@ static struct resource ether_resources[] = {
- 		&sh_tmu##idx##_platform_data,		\
- 		sizeof(sh_tmu##idx##_platform_data))
- 
-+/* PFC */
-+static struct resource pfc_resources[] = {
-+	DEFINE_RES_MEM(0xfffc0000, 0x118),
++/* - ETH -------------------------------------------------------------------- */
++static const unsigned int eth_link_pins[] = {
++	/* LINK */
++	RCAR_GP_PIN(2, 22),
++};
++static const unsigned int eth_link_mux[] = {
++	ETH_LINK_MARK,
++};
++static const unsigned int eth_magic_pins[] = {
++	/* MAGIC */
++	RCAR_GP_PIN(2, 27),
++};
++static const unsigned int eth_magic_mux[] = {
++	ETH_MAGIC_MARK,
++};
++static const unsigned int eth_mdio_pins[] = {
++	/* MDC, MDIO */
++	RCAR_GP_PIN(2, 29), RCAR_GP_PIN(2, 24),
++};
++static const unsigned int eth_mdio_mux[] = {
++	ETH_MDC_MARK, ETH_MDIO_MARK,
++};
++static const unsigned int eth_rmii_pins[] = {
++	/* RXD[0:1], RX_ER, CRS_DV, TXD[0:1], TX_EN, REF_CLK */
++	RCAR_GP_PIN(2, 20), RCAR_GP_PIN(2, 21), RCAR_GP_PIN(2, 19),
++	RCAR_GP_PIN(2, 18), RCAR_GP_PIN(2, 28), RCAR_GP_PIN(2, 25),
++	RCAR_GP_PIN(2, 26), RCAR_GP_PIN(2, 23),
++};
++static const unsigned int eth_rmii_mux[] = {
++	ETH_RXD0_MARK, ETH_RXD1_MARK, ETH_RX_ER_MARK, ETH_CRS_DV_MARK,
++	ETH_TXD0_MARK, ETH_TXD1_MARK, ETH_TX_EN_MARK, ETH_REF_CLK_MARK,
 +};
 +
-+void __init r8a7778_pinmux_init(void)
-+{
-+	platform_device_register_simple(
-+		"pfc-r8a7778", -1,
-+		pfc_resources,
-+		ARRAY_SIZE(pfc_resources));
-+}
++static const struct sh_pfc_pin_group pinmux_groups[] = {
++	SH_PFC_PIN_GROUP(eth_link),
++	SH_PFC_PIN_GROUP(eth_magic),
++	SH_PFC_PIN_GROUP(eth_mdio),
++	SH_PFC_PIN_GROUP(eth_rmii),
++};
 +
- void __init r8a7778_add_standard_devices(void)
- {
- 	int i;
++static const char * const eth_groups[] = {
++	"eth_link",
++	"eth_magic",
++	"eth_mdio",
++	"eth_rmii",
++};
++
++static const struct sh_pfc_function pinmux_functions[] = {
++	SH_PFC_FUNCTION(eth),
++};
++
+ #define PINMUX_FN_BASE	ARRAY_SIZE(pinmux_pins)
+ 
+ static const struct pinmux_func pinmux_func_gpios[] = {
+@@ -3226,6 +3280,10 @@ const struct sh_pfc_soc_info r8a7790_pinmux_info = {
+ 
+ 	.pins = pinmux_pins,
+ 	.nr_pins = ARRAY_SIZE(pinmux_pins),
++	.groups = pinmux_groups,
++	.nr_groups = ARRAY_SIZE(pinmux_groups),
++	.functions = pinmux_functions,
++	.nr_functions = ARRAY_SIZE(pinmux_functions),
+ 
+ 	.func_gpios	= pinmux_func_gpios,
+ 	.nr_func_gpios	= ARRAY_SIZE(pinmux_func_gpios),
 -- 
 1.8.2.1
