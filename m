@@ -1,172 +1,44 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Wed, 5 Jun 2013 20:20:02 +0530
-Subject: [PATCH V2] ARM: dts: tegra: Move PCIe node to correct place
-Message-ID: <1370443802-11189-1-git-send-email-jagarwal@nvidia.com>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Wed, 5 Jun 2013 09:56:51 -0500
+Subject: [PATCHv5 0/6] ARM: sofpga: Add SD/MMC, clk-gate,
+ and fix ethernet bindings
+Message-ID: <1370444217-25498-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving PCIe controller node to correct place so
-that it is sorted by register address in .dtsi file
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
----
-This patch is based on remotes/gitorious_thierryreding_linux/tegra/next and should be applied on top of this.
+Hi Arnd/Olof,
 
-changes in V2:
-Corrected patch synopsis
+Can you please apply this patch series? Patch 3/6 has gotten Mike Turquette's Ack.
+The SD/MMC patches have been reviewed by Seungwon Jeon, Jaehoon Chung and Arnd.
 
- arch/arm/boot/dts/tegra30.dtsi |  132 ++++++++++++++++++++--------------------
- 1 files changed, 66 insertions(+), 66 deletions(-)
+Thanks,
+Dinh
 
-diff --git a/arch/arm/boot/dts/tegra30.dtsi b/arch/arm/boot/dts/tegra30.dtsi
-index 5c1f7c0..a242b2e 100644
---- a/arch/arm/boot/dts/tegra30.dtsi
-+++ b/arch/arm/boot/dts/tegra30.dtsi
-@@ -12,6 +12,72 @@
- 		serial4 = &uarte;
- 	};
- 
-+	pcie-controller {
-+		compatible = "nvidia,tegra30-pcie";
-+		device_type = "pci";
-+		reg = <0x00003000 0x00000800   /* PADS registers */
-+		       0x00003800 0x00000200   /* AFI registers */
-+		       0x10000000 0x10000000>; /* configuration space */
-+		reg-names = "pads", "afi", "cs";
-+		interrupts = <0 98 0x04   /* controller interrupt */
-+		              0 99 0x04>; /* MSI interrupt */
-+
-+		bus-range = <0x00 0xff>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+
-+		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000   /* port 0 configuration space */
-+			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
-+			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
-+			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
-+			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
-+			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
-+
-+		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
-+			 <&tegra_car 118>, <&tegra_car 215>;
-+		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml";
-+		status = "disabled";
-+
-+		pci at 1,0 {
-+			device_type = "pci";
-+			assigned-addresses = <0x82000800 0 0x00000000 0 0x1000>;
-+			reg = <0x000800 0 0 0 0>;
-+			status = "disabled";
-+
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			nvidia,num-lanes = <2>;
-+		};
-+
-+		pci at 2,0 {
-+			device_type = "pci";
-+			assigned-addresses = <0x82001000 0 0x00001000 0 0x1000>;
-+			reg = <0x001000 0 0 0 0>;
-+			status = "disabled";
-+
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			nvidia,num-lanes = <2>;
-+		};
-+
-+		pci at 3,0 {
-+			device_type = "pci";
-+			assigned-addresses = <0x82001800 0 0x00004000 0 0x1000>;
-+			reg = <0x001800 0 0 0 0>;
-+			status = "disabled";
-+
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			ranges;
-+
-+			nvidia,num-lanes = <2>;
-+		};
-+	};
-+
- 	host1x {
- 		compatible = "nvidia,tegra30-host1x", "simple-bus";
- 		reg = <0x50000000 0x00024000>;
-@@ -115,72 +181,6 @@
- 		};
- 	};
- 
--	pcie-controller {
--		compatible = "nvidia,tegra30-pcie";
--		device_type = "pci";
--		reg = <0x00003000 0x00000800   /* PADS registers */
--		       0x00003800 0x00000200   /* AFI registers */
--		       0x10000000 0x10000000>; /* configuration space */
--		reg-names = "pads", "afi", "cs";
--		interrupts = <0 98 0x04   /* controller interrupt */
--		              0 99 0x04>; /* MSI interrupt */
--
--		bus-range = <0x00 0xff>;
--		#address-cells = <3>;
--		#size-cells = <2>;
--
--		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000   /* port 0 configuration space */
--			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
--			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
--			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
--			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
--			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
--
--		clocks = <&tegra_car 70>, <&tegra_car 72>, <&tegra_car 74>,
--			 <&tegra_car 118>, <&tegra_car 215>;
--		clock-names = "pex", "afi", "pcie_xclk", "pll_e", "cml";
--		status = "disabled";
--
--		pci at 1,0 {
--			device_type = "pci";
--			assigned-addresses = <0x82000800 0 0x00000000 0 0x1000>;
--			reg = <0x000800 0 0 0 0>;
--			status = "disabled";
--
--			#address-cells = <3>;
--			#size-cells = <2>;
--			ranges;
--
--			nvidia,num-lanes = <2>;
--		};
--
--		pci at 2,0 {
--			device_type = "pci";
--			assigned-addresses = <0x82001000 0 0x00001000 0 0x1000>;
--			reg = <0x001000 0 0 0 0>;
--			status = "disabled";
--
--			#address-cells = <3>;
--			#size-cells = <2>;
--			ranges;
--
--			nvidia,num-lanes = <2>;
--		};
--
--		pci at 3,0 {
--			device_type = "pci";
--			assigned-addresses = <0x82001800 0 0x00004000 0 0x1000>;
--			reg = <0x001800 0 0 0 0>;
--			status = "disabled";
--
--			#address-cells = <3>;
--			#size-cells = <2>;
--			ranges;
--
--			nvidia,num-lanes = <2>;
--		};
--	};
--
- 	timer at 50004600 {
- 		compatible = "arm,cortex-a9-twd-timer";
- 		reg = <0x50040600 0x20>;
+Dinh Nguyen (6):
+  ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+  ARM: socfpga: dts: Add gate-clock bindings
+  ARM: socfpga: Add support to gate peripheral clocks
+  ARM: socfpga: Add syscon to be part of socfpga
+  ARM: socfpga: dts: Add support for SD/MMC
+  mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+
+ .../devicetree/bindings/clock/altr_socfpga.txt     |    7 +
+ .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   60 +++++
+ arch/arm/boot/dts/socfpga.dtsi                     |  230 +++++++++++++++++++-
+ arch/arm/boot/dts/socfpga_cyclone5.dts             |   26 +++
+ arch/arm/boot/dts/socfpga_vt.dts                   |   17 ++
+ arch/arm/mach-socfpga/Kconfig                      |    1 +
+ drivers/clk/socfpga/clk.c                          |  194 ++++++++++++++++-
+ drivers/mmc/host/Kconfig                           |    8 +
+ drivers/mmc/host/Makefile                          |    1 +
+ drivers/mmc/host/dw_mmc-exynos.c                   |    2 -
+ drivers/mmc/host/dw_mmc-socfpga.c                  |  138 ++++++++++++
+ drivers/mmc/host/dw_mmc.h                          |    1 +
+ 12 files changed, 671 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+ create mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
+
 -- 
-1.7.0.4
+1.7.9.5
