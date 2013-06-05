@@ -1,24 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 5 Jun 2013 13:17:44 +0200
-Subject: [PATCHv4] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
-In-Reply-To: <1370425843-6802-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1370425843-6802-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <201306051317.44220.arnd@arndb.de>
+Date: Wed, 5 Jun 2013 13:21:00 +0200
+Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
+In-Reply-To: <51AF03AF.3080106@free-electrons.com>
+References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
+ <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
+ <51AF03AF.3080106@free-electrons.com>
+Message-ID: <201306051321.00264.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wednesday 05 June 2013, Alexandre Belloni wrote:
-> Fixes:
-> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
-> :(.text+0x1174): undefined reference to `mdiobus_write'
-> :(.text+0x1188): undefined reference to `mdiobus_write'
-> :(.text+0x119c): undefined reference to `mdiobus_write'
-> :(.text+0x11b0): undefined reference to `mdiobus_write'
-> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
-> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
-> 
-> when CONFIG_PHYLIB is not selected.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> However, it is becoming urgent for Atmel to get the fix in 3.10 so that
+> they never get a kernel compilation that breaks.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+I don't think it's urgent since this is only about rare configurations,
+and not a regression. We can queue the patch "ARM: at91: Fix link
+breakage when !CONFIG_PHYLIB" you just sent to fix this, but I
+would not consider it a serious problem to have it only in 3.11.
+
+	Arnd
