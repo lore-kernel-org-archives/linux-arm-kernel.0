@@ -1,60 +1,91 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Jun 2013 10:31:46 +0100
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <20130605060105.GA1187@redhat.com>
-References: <51ADDDAE.4040705@arm.com>
- <CAMJs5B_PB1pNVCO_EK7aTghN23L+d0RovAFi7inrVsJb5STWOA@mail.gmail.com>
- <51AE00D7.9030607@arm.com> <51AE082C.6050907@redhat.com>
- <CAMJs5B9PxHfUrugov4HJknQ24fG7MNp8obziqu9dnSztsGBksQ@mail.gmail.com>
- <51AE0D0D.3030106@redhat.com> <20130604163741.GA15299@redhat.com>
- <CAMJs5B8WqiMpqj3Mr=rPCr89k-jvY2i3BDbkPOsMb3PhCR1SWg@mail.gmail.com>
- <20130605060105.GA1187@redhat.com>
-Message-ID: <20130605093145.GB8758@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 05 Jun 2013 11:34:35 +0200
+Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
+In-Reply-To: <20130604141701.GX18614@n2100.arm.linux.org.uk>
+References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
+ <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
+ <51AC8F74.2060302@linaro.org>
+ <CAP245DUsRcomDaNKbxYry39ZLCrR33SDRRAhNCdR91e17sHF-A@mail.gmail.com>
+ <51ADD667.3010203@linaro.org> <20130604141017.GW18614@n2100.arm.linux.org.uk>
+ <20130604141701.GX18614@n2100.arm.linux.org.uk>
+Message-ID: <51AF062B.3080006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 07:01:05AM +0100, Gleb Natapov wrote:
-> On Tue, Jun 04, 2013 at 10:57:32PM -0700, Christoffer Dall wrote:
-> > On 4 June 2013 09:37, Gleb Natapov <gleb@redhat.com> wrote:
-> > > On Tue, Jun 04, 2013 at 05:51:41PM +0200, Paolo Bonzini wrote:
-> > >> Il 04/06/2013 17:43, Christoffer Dall ha scritto:
-> > >> > Hi Paolo,
-> > >> >
-> > >> > I don't think this is an issue. Gleb and Marcelo for example pulled
-> > >> > RMK's stable tree for my KVM/ARM updates for the 3.10 merge window and
-> > >> > that wasn't an issue.  If Linus pulls the kvm/next tree first the
-> > >> > diffstat should be similar and everything clean enough, no?
-> > >> >
-> > >> > Catalin has previously expressed his wish to upstream the kvm/arm64
-> > >> > patches directly through him given the churn in a completely new
-> > >> > architecture and he wants to make sure that everything looks right.
-> > >> >
-> > >> > It's a pretty clean implementation with quite few dependencies and
-> > >> > merging as a working series should be a priority instead of the
-> > >> > Kconfig hack, imho.
-> > >>
-> > >> Ok, let's see what Gleb says.
-> > >>
-> > > I have no objection to merge arm64 kvm trough Catalin if it mean less
-> > > churn for everyone. That's what we did with arm and mips. Arm64 kvm
-> > > has a dependency on kvm.git next though, so how Catalin make sure that
-> > > everything looks right? Will he merge kvm.git/next to arm64 tree?
-> > >
-> > Yes, that was the idea. Everything in kvm/next is considered stable, right?
-> > 
-> Right. Catalin should wait for kvm.git to be pulled by Linus next merge
-> windows before sending his pull request then.
+On 06/04/2013 04:17 PM, Russell King - ARM Linux wrote:
+> On Tue, Jun 04, 2013 at 03:10:17PM +0100, Russell King - ARM Linux wrote:
+>> On Tue, Jun 04, 2013 at 01:58:31PM +0200, Daniel Lezcano wrote:
+>>> On 06/04/2013 01:39 PM, Amit Kucheria wrote:
+>>>> I'm curious why it is called pen_release. :) Is there some historical
+>>>> link to some HW lines?
+>>>
+>>> I tried to figure out the same but I did not found any information on
+>>> that. I assumed the name could be referring to a simplified mutual
+>>> exclusion algorithm from the 'Dining philosophers problem' [1] where the
+>>> fork is a pen.
+>>
+>> Where it comes from is the original ARM SMP patches from early 2000, which
+>> everyone has blindly copied with no thought about what they're doing.  This
+>> is why I'm totally against any consolidation of this code, because I'm of
+>> the opinion that _no one_ other than the ARM Ltd development platforms
+>> should be using it.
+>>
+>> "pen" means "holding pen".  It comes about because early on in the SMP
+>> development, ARM SMP platforms had four CPUs, and it was only possible to
+>> release all three secondary CPUs from the boot loader simultaneously to
+>> a common piece of code.
+>>
+>> As the kernel was not able to serialize the release of each CPU, ARM Ltd
+>> worked around this problem by having all the CPUs jump to assembly code
+>> which "holds" the CPUs which we didn't want to boot yet, and the CPUs
+>> are released one at a time by setting pen_release to the hardware CPU
+>> number.
+>>
+>> Modern platforms either have just one secondary CPU, or they have a way
+>> to control the reset/power to the secondary CPU.  This makes the holding
+>> pen entirely redundant, and such platforms should _not_ make use of any
+>> kind of holding pen.
+> 
+> And yes, indeed, zynq can control the secondary CPU:
+> 
+> void zynq_slcr_cpu_start(int cpu)
+> {
+>         /* enable CPUn */
+>         writel(SLCR_A9_CPU_CLKSTOP << cpu,
+>                zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
+>         /* enable CLK for CPUn */
+>         writel(0x0 << cpu, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
+> }
+> 
+> void zynq_slcr_cpu_stop(int cpu)
+> {
+>         /* stop CLK and reset CPUn */
+>         writel((SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu,
+>                zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
+> }
+> 
+> So there's no need for the pen.  There's no need for the low power crap
+> in hotplug.c, there's no need for the pen in hotplug.c. 
 
-I think it's better if I push the bulk of the arm64 KVM branch but
-without Kconfig patch enabling it. This branch would be based on
-mainline rather than kvm/next. Once your code goes in mainline, I'll
-just push the Kconfig entry (for bisection reasons, it could be after
--rc1). This would keep the pull-request diffstat cleaner.
+Thanks Russell, that finishes to clarify what is the pen release for or
+better say 'was' :)
 
-As we discussed some time ago, after the core arm64 KVM is merged you
-will use the same workflow as for arm (merge via the kvm tree).
+So if I follow correctly, there are some inadequate code with different
+mach-* because they are using a WFI instructions instead of simply
+powering down the core, right ? (eg. mach-ux500/hotplug.c).
 
-Thanks.
+> You just arrange
+> for the secondary CPU to have its clock stopped and reset when it is
+> taken offline.
+> Hotplugging a CPU back in _should_ be no different from its initial
+> bringup into the kernel.
+
+Thanks
+  -- Daniel
 
 -- 
-Catalin
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
