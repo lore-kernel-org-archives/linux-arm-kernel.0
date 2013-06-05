@@ -1,36 +1,37 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 5 Jun 2013 23:33:21 +0200
-Subject: [PATCH 5/8] arm: mvebu: don't hardcode a physical address in
- headsmp.S
-In-Reply-To: <alpine.LFD.2.03.1306051637020.18597@syhkavp.arg>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <alpine.LFD.2.03.1306051637020.18597@syhkavp.arg>
-Message-ID: <20130605233321.5936fcca@skate>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Jun 2013 23:45:06 +0200
+Subject: [PATCH 10/10] arm: add basic support for Rockchip RK3066a boards
+In-Reply-To: <20130605091119.18432af4@skate>
+References: <201306030055.15413.heiko@sntech.de>
+ <201306030102.20890.heiko@sntech.de>
+ <20130605091119.18432af4@skate>
+Message-ID: <20130605214506.GC14209@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Nicolas Pitre,
+Hi Thomas,
 
-On Wed, 05 Jun 2013 16:42:20 -0400 (EDT), Nicolas Pitre wrote:
-
-> You may simplify the above like this:
+On Wed, Jun 05, 2013 at 09:11:19AM +0200, Thomas Petazzoni wrote:
+> Dear Heiko St?bner,
 > 
-> 	adr	r0, 1f
-> 	ldr	r1, [r0]
-> 	ldr	r0, [r0, r1]
-> 	...,
-> 1:	.long	coherency_phys_base - .
+> On Mon, 3 Jun 2013 01:02:20 +0200, Heiko St?bner wrote:
+> > index 0000000..a2d8c70
+> > --- /dev/null
+> > +++ b/arch/arm/mach-rockchip/Makefile.boot
+> > @@ -0,0 +1,3 @@
+> > +zreladdr-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60408000
+> > +params_phys-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60088000
+> > +initrd_phys-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60800000
+> 
+> Thanks to the AUTO_ZRELADDR thing that you're using as part of the
+> MULTIPLATFORM support, this Makefile.boot file is no longer useful. See
+> mach-socfpga, mach-mvebu, mach-bcm2835, mach-bcm, mach-highbank, etc.
+> 
+> Cc'ing Maxime Ripard, since I see that mach-sunxi does have a
+> Makefile.boot, even though I believe it is not needed.
 
-Ok, thanks, will try this. Note that the piece of code I've used was
-shamelessly copied from other headsmp.S implementations, such as
-plat-versatile, mach-ux500, mach-prima2 and mach-msm.
+Yes, it is a left-over and should be removed obviously.
 
-Thanks!
+Thanks for reminding it to me :)
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Maxime
