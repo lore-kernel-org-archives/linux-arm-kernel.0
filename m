@@ -1,36 +1,50 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 5 Jun 2013 09:11:19 +0200
-Subject: [PATCH 10/10] arm: add basic support for Rockchip RK3066a boards
-In-Reply-To: <201306030102.20890.heiko@sntech.de>
-References: <201306030055.15413.heiko@sntech.de>
- <201306030102.20890.heiko@sntech.de>
-Message-ID: <20130605091119.18432af4@skate>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 05 Jun 2013 09:13:10 +0200
+Subject: [PATCH 00/15] ARM: shmobile: uImage load address rework
+In-Reply-To: <20130605070616.13311.69049.sendpatchset@w520>
+References: <20130605070616.13311.69049.sendpatchset@w520>
+Message-ID: <1999331.JV7Y1ipABN@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Heiko St?bner,
+Hi Magnus,
 
-On Mon, 3 Jun 2013 01:02:20 +0200, Heiko St?bner wrote:
-> index 0000000..a2d8c70
-> --- /dev/null
-> +++ b/arch/arm/mach-rockchip/Makefile.boot
-> @@ -0,0 +1,3 @@
-> +zreladdr-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60408000
-> +params_phys-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60088000
-> +initrd_phys-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60800000
+On Wednesday 05 June 2013 16:06:16 Magnus Damm wrote:
+> ARM: shmobile: uImage load address rework
+> 
+> [PATCH 01/15] ARM: shmobile: Per-board uImage load addresses
+> [PATCH 02/15] ARM: shmobile: AG5EVM uImage rework
+> [PATCH 03/15] ARM: shmobile: AP4EVB uImage rework
+> [PATCH 04/15] ARM: shmobile: APE6EVM uImage rework
+> [PATCH 05/15] ARM: shmobile: Armadillo800EVA uImage rework
+> [PATCH 06/15] ARM: shmobile: Bock-W uImage rework
+> [PATCH 07/15] ARM: shmobile: Bonito uImage rework
+> [PATCH 08/15] ARM: shmobile: KZM9D uImage rework
+> [PATCH 09/15] ARM: shmobile: KZM9G uImage rework
+> [PATCH 10/15] ARM: shmobile: Kota2 uImage rework
+> [PATCH 11/15] ARM: shmobile: Lager uImage rework
+> [PATCH 12/15] ARM: shmobile: Mackerel uImage rework
+> [PATCH 13/15] ARM: shmobile: Marzen uImage rework
+> [PATCH 14/15] ARM: shmobile: Armadillo800EVA reference uImage rework
+> [PATCH 15/15] ARM: shmobile: Remove MEMORY_START uImage load address
+> 
+> Rework the mach-shmobile uImage load address calculation by storing
+> the per-board load addresses in Makefile.boot. This removes the
+> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
+> it possible to create safe kernel images that boot on multiple boards.
+> 
+> This is one of several series of code that reworks code not to rely on
+> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
 
-Thanks to the AUTO_ZRELADDR thing that you're using as part of the
-MULTIPLATFORM support, this Makefile.boot file is no longer useful. See
-mach-socfpga, mach-mvebu, mach-bcm2835, mach-bcm, mach-highbank, etc.
+Thank you for the patches. I've been waiting for this for a long time :-)
 
-Cc'ing Maxime Ripard, since I see that mach-sunxi does have a
-Makefile.boot, even though I believe it is not needed.
+If you need to submit a v2 you might want to squash 05/15 and 14/15.
 
-Best regards,
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Thomas
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+
+Laurent Pinchart
