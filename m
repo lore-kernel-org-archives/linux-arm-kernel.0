@@ -1,82 +1,105 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:04 +0900
-Subject: [PATCH 073/130] ARM: shmobile: armadillo800eva: Replace GPIO_PORTx
- with GPIO port numbers
+Date: Wed,  5 Jun 2013 17:26:10 +0900
+Subject: [PATCH 079/130] sh-pfc: r8a7740: Remove SCIF function GPIOS
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-74-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-80-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The PFC GPIO API implementation moved to using port numbers. Replace all
-GPIO_PORTx enum usage with the corresponding port number. The GPIO_PORTx
-enum values are identical to the port number on this platform.
+All r8a7740 platforms now use the pinctrl API to control the SCIF pins,
+the corresponding function GPIOS are unused. Remove them.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 72 ------------------------------------
+ 1 file changed, 72 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 8ec6961..aafa99b 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -584,7 +584,7 @@ static struct regulator_init_data vcc_sdhi0_init_data = {
- static struct fixed_voltage_config vcc_sdhi0_info = {
- 	.supply_name = "SDHI0 Vcc",
- 	.microvolts = 3300000,
--	.gpio = GPIO_PORT75,
-+	.gpio = 75,
- 	.enable_high = 1,
- 	.init_data = &vcc_sdhi0_init_data,
- };
-@@ -615,7 +615,7 @@ static struct regulator_init_data vccq_sdhi0_init_data = {
- };
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+index 9afc7b0..3b53193 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+@@ -3261,78 +3261,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(FMSOIBT),	GPIO_FN(FMSOOLR),	GPIO_FN(FMSOOBT),
+ 	GPIO_FN(FMSOSLD),	GPIO_FN(FMSOCK),
  
- static struct gpio vccq_sdhi0_gpios[] = {
--	{GPIO_PORT17, GPIOF_OUT_INIT_LOW, "vccq-sdhi0" },
-+	{17, GPIOF_OUT_INIT_LOW, "vccq-sdhi0" },
- };
- 
- static struct gpio_regulator_state vccq_sdhi0_states[] = {
-@@ -626,7 +626,7 @@ static struct gpio_regulator_state vccq_sdhi0_states[] = {
- static struct gpio_regulator_config vccq_sdhi0_info = {
- 	.supply_name = "vqmmc",
- 
--	.enable_gpio = GPIO_PORT74,
-+	.enable_gpio = 74,
- 	.enable_high = 1,
- 	.enabled_at_boot = 0,
- 
-@@ -664,7 +664,7 @@ static struct regulator_init_data vcc_sdhi1_init_data = {
- static struct fixed_voltage_config vcc_sdhi1_info = {
- 	.supply_name = "SDHI1 Vcc",
- 	.microvolts = 3300000,
--	.gpio = GPIO_PORT16,
-+	.gpio = 16,
- 	.enable_high = 1,
- 	.init_data = &vcc_sdhi1_init_data,
- };
-@@ -693,7 +693,7 @@ static struct sh_mobile_sdhi_info sdhi0_info = {
- 	.tmio_caps	= MMC_CAP_SD_HIGHSPEED | MMC_CAP_SDIO_IRQ |
- 			  MMC_CAP_POWER_OFF_CARD,
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_USE_GPIO_CD,
--	.cd_gpio	= GPIO_PORT167,
-+	.cd_gpio	= 167,
- };
- 
- static struct resource sdhi0_resources[] = {
-@@ -736,7 +736,7 @@ static struct sh_mobile_sdhi_info sdhi1_info = {
- 			  MMC_CAP_POWER_OFF_CARD,
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT | TMIO_MMC_USE_GPIO_CD,
- 	/* Port72 cannot generate IRQs, will be used in polling mode. */
--	.cd_gpio	= GPIO_PORT72,
-+	.cd_gpio	= 72,
- };
- 
- static struct resource sdhi1_resources[] = {
+-	/* SCIFA0 */
+-	GPIO_FN(SCIFA0_SCK),	GPIO_FN(SCIFA0_CTS),	GPIO_FN(SCIFA0_RTS),
+-	GPIO_FN(SCIFA0_RXD),	GPIO_FN(SCIFA0_TXD),
+-
+-	/* SCIFA1 */
+-	GPIO_FN(SCIFA1_CTS),	GPIO_FN(SCIFA1_SCK),
+-	GPIO_FN(SCIFA1_RXD),	GPIO_FN(SCIFA1_TXD),	GPIO_FN(SCIFA1_RTS),
+-
+-	/* SCIFA2 */
+-	GPIO_FN(SCIFA2_SCK_PORT22), /* SCIFA2_SCK Port 22/199 */
+-	GPIO_FN(SCIFA2_SCK_PORT199),
+-	GPIO_FN(SCIFA2_RXD),	GPIO_FN(SCIFA2_TXD),
+-	GPIO_FN(SCIFA2_CTS),	GPIO_FN(SCIFA2_RTS),
+-
+-	/* SCIFA3 */
+-	GPIO_FN(SCIFA3_RTS_PORT105), /* MSEL5CR_8_0 */
+-	GPIO_FN(SCIFA3_SCK_PORT116),
+-	GPIO_FN(SCIFA3_CTS_PORT117),
+-	GPIO_FN(SCIFA3_RXD_PORT174),
+-	GPIO_FN(SCIFA3_TXD_PORT175),
+-
+-	GPIO_FN(SCIFA3_RTS_PORT161), /* MSEL5CR_8_1 */
+-	GPIO_FN(SCIFA3_SCK_PORT158),
+-	GPIO_FN(SCIFA3_CTS_PORT162),
+-	GPIO_FN(SCIFA3_RXD_PORT159),
+-	GPIO_FN(SCIFA3_TXD_PORT160),
+-
+-	/* SCIFA4 */
+-	GPIO_FN(SCIFA4_RXD_PORT12), /* MSEL5CR[12:11] = 00 */
+-	GPIO_FN(SCIFA4_TXD_PORT13),
+-
+-	GPIO_FN(SCIFA4_RXD_PORT204), /* MSEL5CR[12:11] = 01 */
+-	GPIO_FN(SCIFA4_TXD_PORT203),
+-
+-	GPIO_FN(SCIFA4_RXD_PORT94), /* MSEL5CR[12:11] = 10 */
+-	GPIO_FN(SCIFA4_TXD_PORT93),
+-
+-	GPIO_FN(SCIFA4_SCK_PORT21), /* SCIFA4_SCK Port 21/205 */
+-	GPIO_FN(SCIFA4_SCK_PORT205),
+-
+-	/* SCIFA5 */
+-	GPIO_FN(SCIFA5_TXD_PORT20), /* MSEL5CR[15:14] = 00 */
+-	GPIO_FN(SCIFA5_RXD_PORT10),
+-
+-	GPIO_FN(SCIFA5_RXD_PORT207), /* MSEL5CR[15:14] = 01 */
+-	GPIO_FN(SCIFA5_TXD_PORT208),
+-
+-	GPIO_FN(SCIFA5_TXD_PORT91), /* MSEL5CR[15:14] = 10 */
+-	GPIO_FN(SCIFA5_RXD_PORT92),
+-
+-	GPIO_FN(SCIFA5_SCK_PORT23), /* SCIFA5_SCK Port 23/206 */
+-	GPIO_FN(SCIFA5_SCK_PORT206),
+-
+-	/* SCIFA6 */
+-	GPIO_FN(SCIFA6_SCK),	GPIO_FN(SCIFA6_RXD),	GPIO_FN(SCIFA6_TXD),
+-
+-	/* SCIFA7 */
+-	GPIO_FN(SCIFA7_TXD),	GPIO_FN(SCIFA7_RXD),
+-
+-	/* SCIFAB */
+-	GPIO_FN(SCIFB_SCK_PORT190), /* MSEL5CR_17_0 */
+-	GPIO_FN(SCIFB_RXD_PORT191),
+-	GPIO_FN(SCIFB_TXD_PORT192),
+-	GPIO_FN(SCIFB_RTS_PORT186),
+-	GPIO_FN(SCIFB_CTS_PORT187),
+-
+-	GPIO_FN(SCIFB_SCK_PORT2), /* MSEL5CR_17_1 */
+-	GPIO_FN(SCIFB_RXD_PORT3),
+-	GPIO_FN(SCIFB_TXD_PORT4),
+-	GPIO_FN(SCIFB_RTS_PORT172),
+-	GPIO_FN(SCIFB_CTS_PORT173),
+-
+ 	/* RSPI */
+ 	GPIO_FN(RSPI_SSL0_A),	GPIO_FN(RSPI_SSL1_A),	GPIO_FN(RSPI_SSL2_A),
+ 	GPIO_FN(RSPI_SSL3_A),	GPIO_FN(RSPI_CK_A),	GPIO_FN(RSPI_MOSI_A),
 -- 
 1.8.2.1
