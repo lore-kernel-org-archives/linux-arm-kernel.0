@@ -1,33 +1,41 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 5 Jun 2013 13:15:27 +0100
-Subject: [PATCH v3 3/6] arm64/xen: implement ioremap_cached on arm64
+Date: Wed, 5 Jun 2013 13:15:25 +0100
+Subject: [PATCH v3 1/6] arm/xen: define xen_remap as ioremap_cached
 In-Reply-To: <alpine.DEB.2.02.1306041712100.4589@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1306041712100.4589@kaball.uk.xensource.com>
-Message-ID: <1370434530-22428-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1370434530-22428-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Define xen_remap as ioremap_cache (MT_MEMORY and MT_DEVICE_CACHED end up
+having the same AttrIndx encoding).
+
+Remove include asm/mach/map.h, not unneeded.
+
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm64/include/asm/io.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/xen/page.h |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/include/asm/io.h b/arch/arm64/include/asm/io.h
-index 2e12258..1d12f89 100644
---- a/arch/arm64/include/asm/io.h
-+++ b/arch/arm64/include/asm/io.h
-@@ -228,10 +228,12 @@ extern void __iounmap(volatile void __iomem *addr);
- #define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_DIRTY)
- #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_ATTRINDX(MT_DEVICE_nGnRE))
- #define PROT_NORMAL_NC		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL_NC))
-+#define PROT_NORMAL		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
+diff --git a/arch/arm/include/asm/xen/page.h b/arch/arm/include/asm/xen/page.h
+index 30cdacb..359a7b5 100644
+--- a/arch/arm/include/asm/xen/page.h
++++ b/arch/arm/include/asm/xen/page.h
+@@ -1,7 +1,6 @@
+ #ifndef _ASM_ARM_XEN_PAGE_H
+ #define _ASM_ARM_XEN_PAGE_H
  
- #define ioremap(addr, size)		__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define ioremap_nocache(addr, size)	__ioremap((addr), (size), __pgprot(PROT_DEVICE_nGnRE))
- #define ioremap_wc(addr, size)		__ioremap((addr), (size), __pgprot(PROT_NORMAL_NC))
-+#define ioremap_cached(addr, size)	__ioremap((addr), (size), __pgprot(PROT_NORMAL))
- #define iounmap				__iounmap
+-#include <asm/mach/map.h>
+ #include <asm/page.h>
+ #include <asm/pgtable.h>
  
- #define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF)
+@@ -88,6 +87,6 @@ static inline bool set_phys_to_machine(unsigned long pfn, unsigned long mfn)
+ 	return __set_phys_to_machine(pfn, mfn);
+ }
+ 
+-#define xen_remap(cookie, size) __arm_ioremap((cookie), (size), MT_MEMORY);
++#define xen_remap(cookie, size) ioremap_cached((cookie), (size));
+ 
+ #endif /* _ASM_ARM_XEN_PAGE_H */
 -- 
 1.7.2.5
