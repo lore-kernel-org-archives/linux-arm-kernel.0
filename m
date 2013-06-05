@@ -1,37 +1,50 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Wed, 05 Jun 2013 10:23:16 -0700
-Subject: pxa27x and pinctrl-single
-Message-ID: <51AF7404.3090003@newsguy.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 5 Jun 2013 19:25:47 +0200 (CEST)
+Subject: [PATCH] dmatest: do not allow to interrupt ongoing tests
+In-Reply-To: <20130605171001.GC26663@mudshark.cambridge.arm.com>
+References: <1369308593-3723-1-git-send-email-andriy.shevchenko@linux.intel.com>
+ <Pine.LNX.4.64.1305242353210.7187@axis700.grange>
+ <1369638667.29283.197.camel@smile>
+ <20130605171001.GC26663@mudshark.cambridge.arm.com>
+Message-ID: <Pine.LNX.4.64.1306051924190.19739@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 5 Jun 2013, Will Deacon wrote:
 
-I'd like to start converting to device tree usage some of the old pxa27x
-platforms I'm fond of, starting with adding pinctrl support.  If I'm not
-mistaken, this will clear the way for some ongoing updates to the pinctrl/gpio
-code used by newer Marvell arches.
+> On Mon, May 27, 2013 at 08:11:07AM +0100, Andy Shevchenko wrote:
+> > On Fri, 2013-05-24 at 23:55 +0200, Guennadi Liakhovetski wrote: 
+> > > On Thu, 23 May 2013, Andy Shevchenko wrote:
+> > > 
+> > > > When user interrupts ongoing transfers the dmatest may end up with console
+> > > > lockup, oops, or data mismatch. This patch prevents user to abort any ongoing
+> > > > test.
+> > > 
+> > > Personally I would be against such a change. What about interrupting the 
+> > > test with rmmod?
+> > >  Is it still possible after this your patch or not? If not 
+> > > - this doesn't seem like a good idea to me. Why don't we just fix those 
+> > > bugs, that you're describing?
+> > 
+> > The behaviour of the module is returned to the same page by this patch
+> > as it was before (w/o debugfs).
+> > 
+> > The user can interrupt tests by rmmod, but it will take time up to
+> > timeout.
+> > 
+> > I appreciate if you can do a deeper analysis of what happened in
+> > case Will reported.
+> 
+> Did this query hold up the application of this patch? I'd really like to see
+> *something* in 3.10, otherwise dmatest will be broken.
 
-I noticed that Haojian pulled the pinctrl-pxa driver from the kernel, in favor
-of using pinctrl-single, so I turned my attention to that.  From what I can
-tell, pinctrl-single is currently inadequate for pxa27x because:
+Not from me, no. I just expressed a doubt, the author thinks there is no 
+problem, and I have no capacity atm to try to verify it, so, my query 
+shouldn't be considered a nak.
 
-(1) On the pxa27x, setting the mux for a pin involves configuring both the alt
-function register *and* the direction register, requiring the ability to specify
-in the device tree multiple reg/value pairs for each pin.
-
-(2) Some of the pinctrl-single code still assumes one register-per-pin; see for
-example the functions pcs_allocate_pin_table() and pcs_get_pin_by_offset().
-Curiously, the recently added pcs_request_gpio() function also suffers from
-this, unless I'm mistaken.
-
-So I'm wondering if it's appropriate to patch pinctrl-single to make it suitable
-for pxa27x, or should there be a separate driver for pxa27x?
-
-Normally I'd just submit a patch for consideration, but I think that work is
-ongoing, so maybe I better ask first in case other plans are in progress.  Plus
-I'm new to pinctrl and device tree.  Any comments, suggestions, hints, etc
-appreciated.
-
-Thanks,
-Mike
+Thanks
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
