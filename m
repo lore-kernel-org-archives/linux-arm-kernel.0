@@ -1,97 +1,48 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Wed, 5 Jun 2013 13:32:40 +0300
-Subject: [PATCH 2/4] ARM: dts: omap5-uevm: Add USB Host support
-In-Reply-To: <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
-References: <1370414770-1485-1-git-send-email-r.sricharan@ti.com>
- <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
-Message-ID: <51AF13C8.1010307@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 05 Jun 2013 19:44:27 +0900
+Subject: [PATCH 00/03] ARM: 64-bit memory fixes, APE6EVM second memory bank
+Message-ID: <20130605104427.1720.68752.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sricharan,
+ARM: 64-bit memory fixes, APE6EVM second memory bank
 
-Thanks for sending this, but some parts are outdated. See below.
+[PATCH 01/03] ARM: Let arm_add_memory() always use 64-bit arguments
+[PATCH 02/03] ARM: Handle 64-bit memory in case of 32-bit phys_addr_t
+[PATCH 03/03] ARM: shmobile: Add second memory bank to DTS for APE6EVM
 
-On 06/05/2013 09:46 AM, Sricharan R wrote:
-> From: Roger Quadros <rogerq@ti.com>
-> 
-> Provide the RESET regulators for the USB PHYs, the USB Host
-> port modes and the PHY devices.
-> 
-> Also provide pin multiplexer information for the USB host
-> pins.
-> 
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> [Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
->  arch/arm/boot/dts/omap5-uevm.dts |   77 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap5.dtsi     |   30 +++++++++++++++
->  2 files changed, 107 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-> index 843a001..cf862df 100644
-> --- a/arch/arm/boot/dts/omap5-uevm.dts
-> +++ b/arch/arm/boot/dts/omap5-uevm.dts
-> @@ -25,6 +25,47 @@
->  		regulator-max-microvolt = <3000000>;
->  	};
->  
-> +	/* HS USB Port 2 RESET */
-> +	hsusb2_reset: hsusb2_reset_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb2_reset";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio3 16 GPIO_ACTIVE_HIGH>; /* gpio3_80 HUB_NRESET */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
-> +
-> +	/* HS USB Host PHY on PORT 2 */
-> +	hsusb2_phy: hsusb2_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-supply = <&hsusb2_reset>;
-> +	};
-> +
-> +	/* HS USB Port 3 RESET */
-> +	hsusb3_reset: hsusb3_reset_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb3_reset";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>; /* gpio3_79 ETH_NRESET */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
-> +
-> +	/* HS USB Host PHY on PORT 3 */
-> +	hsusb3_phy: hsusb3_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-supply = <&hsusb3_reset>;
-> +	};
-> +
-> +	/* hsusb2_phy is clocked by FREF_CLK1 i.e. auxclk1 */
-> +	clock_alias {
-> +		clock-name = "auxclk1_ck";
-> +		clock-alias = "main_clk";
-> +		device = <&hsusb2_phy>;
-> +		clock-frequency = <19200000>; /* 19.2 MHz */
-> +	};
+This patch set contains two fixes and one mach-shmobile specific patch
+to add a second memory bank. The fixes attempt to improve the memory bank
+handling in the ARM kernel in case of 64-bit addresses.
 
-clock_alias node is not required. Instead we need to rely on proper clock binding
-and provide reference to the clock phandle in the PHY node.
+Without patch 1/3 and 2/3 but with patch 3/3 by itself:
 
-as an example please see here
-https://lkml.org/lkml/2013/4/19/124
+HIGHMEM=n, LPAE=n - OK (busted, second bank ignored with message [1])
+HIGHMEM=y, LPAE=n - NG (busted, board hangs on boot)
+HIGHMEM=n, LPAE=y - OK
+HIGHMEM=y, LPAE=y - OK
 
-However this clock binding technique is still under discussion/transition.
-https://patchwork.kernel.org/patch/2541331/
+[1] Ignoring RAM at 00000000-3fffffff (vmalloc region overlap).
 
-So, I suggest you leave the auxclk1 part out for now and we can get it in later once
-the clock binding stuff is sorted out. The side effect of this is that PORT 2 (i.e. USB Hub)
-will not work. USB Ethernet should still work IMO.
+With all patches applied:
 
-cheers,
--roger
+HIGHMEM=n, LPAE=n - OK
+HIGHMEM=y, LPAE=n - OK
+HIGHMEM=n, LPAE=y - OK
+HIGHMEM=y, LPAE=y - OK
+
+My opinion is that LPAE should be handled in a similar way to x86 PAE.
+This means the kernel should boot regardless of kernel config but 64-bit
+memory banks may be truncated if needed like when LPAE=n or HIGHMEN=n.
+
+Comments on how to implement this in a nicer way are very welcome!
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas.git renesas-next-20130604v2
+
+ arch/arm/boot/dts/r8a73a4-ape6evm.dts |    5 +++++
+ arch/arm/include/asm/setup.h          |    2 +-
+ arch/arm/kernel/setup.c               |   22 +++++++++++++++-------
+ 3 files changed, 21 insertions(+), 8 deletions(-)
