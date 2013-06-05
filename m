@@ -1,38 +1,39 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 5 Jun 2013 19:22:25 +0100
-Subject: [RFC PATCH v2 2/2] drivers: mfd: vexpress: add Serial Power
- Controller (SPC) support
-In-Reply-To: <1370455713.3496.22.camel@linaro1.home>
-References: <1370432767-6620-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1370432767-6620-3-git-send-email-lorenzo.pieralisi@arm.com>
- <1370455713.3496.22.camel@linaro1.home>
-Message-ID: <20130605182225.GB2650@e102568-lin.cambridge.arm.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 5 Jun 2013 20:50:00 +0200
+Subject: [PATCH 07/10] pinctrl: add pinctrl driver for Rockchip SoCs
+In-Reply-To: <51AF72F9.3060307@wwwdotorg.org>
+References: <201306030055.15413.heiko@sntech.de>
+ <CACRpkdZty-TszfBTOab4_PUi8dy5DYim=wNERv=pyqC3HNuT4w@mail.gmail.com>
+ <51AF72F9.3060307@wwwdotorg.org>
+Message-ID: <201306052050.00410.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 07:08:33PM +0100, Jon Medhurst (Tixy) wrote:
-> On Wed, 2013-06-05 at 12:46 +0100, Lorenzo Pieralisi wrote:
-> [...]
-> > +static const struct of_device_id vexpress_spc_ids[] __initconst = {
-> > +	{ .compatible = "arm,vexpress-spc,v2p-ca15_a7" },
-> > +	{ .compatible = "arm,vexpress-spc" },
-> > +	{},
-> > +};
-> > +
-> > +static int __init vexpress_spc_init(void)
-> > +{
-> > +	int ret;
-> > +	struct device_node *node = of_find_matching_node(NULL,
-> > +							 vexpress_spc_ids);
+Am Mittwoch, 5. Juni 2013, 19:18:49 schrieb Stephen Warren:
+> On 06/05/2013 01:01 AM, Linus Walleij wrote:
+> > On Tue, Jun 4, 2013 at 2:05 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> ...
 > 
-> To allow for devices without an SPC we should check for !node here and
-> bail out, otherwise we get an ugly message from the WARN_ON further
-> down. I see this on RTSM, and multiplatform kernels would suffer this as
-> well.
+> >> The only problem is the pull stuff mentioned above that is either pull
+> >> up or down without the driver having knowledge about it. And
+> >> generic_pinconf only knows about them separately right now.
+> > 
+> > Create a separate patch adding PIN_CONFIG_BIAS_PULL_AUTO
+> > to include/linux/pinctrl/pinconf-generic.h, don't forget the
+> > kerneldoc, and patching drivers/pinctrl/pinconf-generic.c.
 > 
-> Even if the ugly warning wasn't there, it still seems cleaner to me to
-> have a proper check for an absent spc node.
+> "AUTO" sounds really rather generic. Based on just the word "AUTO", I
+> have no idea if it's a HW- or SW-supplied default, or what the algorithm
+> is for determining the automatically selected value. Perhaps
+> s/AUTO/PIN_DEFAULT/ or something like that?
 
-Absolutely, I will apply both fixes, thanks a lot for the review.
+I would also go with PIN_DEFAULT, which somehow captures what the function 
+does better than "AUTO". So, if no-one objects I'll go with Stephen's 
+suggestion.
 
-Lorenzo
+
+> While the concept is simple enough, it's unusual enough that such a
+> patch would hopefully have a comment containing a full explanation of
+> exactly what this option means.
+
+of course :-)
