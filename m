@@ -1,92 +1,97 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:42 +0900
-Subject: [PATCH 111/130] sh-pfc: r8a7790: Add TPU pin groups and functions
+Date: Wed,  5 Jun 2013 17:26:46 +0900
+Subject: [PATCH 115/130] sh-pfc: r8a7779: add Ether pin groups
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-112-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-116-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Add Ether RMII/LINK/MAGIC pin groups to R8A7779 PFC driver.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Laurent Pinchart<laurent.pinchart@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 41 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7779.c | 42 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-index 1656915..5be2999 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-@@ -2342,6 +2342,35 @@ static const unsigned int scifb2_data_c_pins[] = {
- static const unsigned int scifb2_data_c_mux[] = {
- 	SCIFB2_RXD_C_MARK, SCIFB2_TXD_C_MARK,
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
+index 37ba571..96bdf48 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7779.c
+@@ -1640,6 +1640,38 @@ static const unsigned int du1_cde_pins[] = {
+ static const unsigned int du1_cde_mux[] = {
+ 	DU1_CDE_MARK
  };
-+/* - TPU0 ------------------------------------------------------------------- */
-+static const unsigned int tpu0_to0_pins[] = {
-+	/* TO */
-+	RCAR_GP_PIN(0, 20),
++/* - Ether ------------------------------------------------------------------ */
++static const unsigned int ether_rmii_pins[] = {
++	/*
++	 * ETH_TXD0, ETH_TXD1, ETH_TX_EN,  ETH_REFCLK,
++	 * ETH_RXD0, ETH_RXD1, ETH_CRS_DV, ETH_RX_ER,
++	 * ETH_MDIO, ETH_MDC
++	 */
++	RCAR_GP_PIN(2, 27), RCAR_GP_PIN(2, 16), RCAR_GP_PIN(2, 18),
++	RCAR_GP_PIN(2, 26),
++	RCAR_GP_PIN(2, 20), RCAR_GP_PIN(2, 21), RCAR_GP_PIN(2, 17),
++	RCAR_GP_PIN(2, 19),
++	RCAR_GP_PIN(2, 29), RCAR_GP_PIN(2, 28),
 +};
-+static const unsigned int tpu0_to0_mux[] = {
-+	TPU0TO0_MARK,
++static const unsigned int ether_rmii_mux[] = {
++	ETH_TXD0_MARK, ETH_TXD1_MARK, ETH_TX_EN_MARK,  ETH_REFCLK_MARK,
++	ETH_RXD0_MARK, ETH_RXD1_MARK, ETH_CRS_DV_MARK, ETH_RX_ER_MARK,
++	ETH_MDIO_MARK, ETH_MDC_MARK,
 +};
-+static const unsigned int tpu0_to1_pins[] = {
-+	/* TO */
-+	RCAR_GP_PIN(0, 21),
++static const unsigned int ether_link_pins[] = {
++	/* ETH_LINK */
++	RCAR_GP_PIN(2, 24),
 +};
-+static const unsigned int tpu0_to1_mux[] = {
-+	TPU0TO1_MARK,
++static const unsigned int ether_link_mux[] = {
++	ETH_LINK_MARK,
 +};
-+static const unsigned int tpu0_to2_pins[] = {
-+	/* TO */
-+	RCAR_GP_PIN(0, 22),
++static const unsigned int ether_magic_pins[] = {
++	/* ETH_MAGIC */
++	RCAR_GP_PIN(2, 25),
 +};
-+static const unsigned int tpu0_to2_mux[] = {
-+	TPU0TO2_MARK,
++static const unsigned int ether_magic_mux[] = {
++	ETH_MAGIC_MARK,
 +};
-+static const unsigned int tpu0_to3_pins[] = {
-+	/* TO */
-+	RCAR_GP_PIN(0, 23),
-+};
-+static const unsigned int tpu0_to3_mux[] = {
-+	TPU0TO3_MARK,
-+};
- 
- static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(eth_link),
-@@ -2416,6 +2445,10 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(scifb2_clk_b),
- 	SH_PFC_PIN_GROUP(scifb2_ctrl_b),
- 	SH_PFC_PIN_GROUP(scifb2_data_c),
-+	SH_PFC_PIN_GROUP(tpu0_to0),
-+	SH_PFC_PIN_GROUP(tpu0_to1),
-+	SH_PFC_PIN_GROUP(tpu0_to2),
-+	SH_PFC_PIN_GROUP(tpu0_to3),
+ /* - HSPI0 ------------------------------------------------------------------ */
+ static const unsigned int hspi0_pins[] = {
+ 	/* CLK, CS, RX, TX */
+@@ -2558,6 +2590,9 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(du1_sync_1),
+ 	SH_PFC_PIN_GROUP(du1_oddf),
+ 	SH_PFC_PIN_GROUP(du1_cde),
++	SH_PFC_PIN_GROUP(ether_rmii),
++	SH_PFC_PIN_GROUP(ether_link),
++	SH_PFC_PIN_GROUP(ether_magic),
+ 	SH_PFC_PIN_GROUP(hspi0),
+ 	SH_PFC_PIN_GROUP(hspi1),
+ 	SH_PFC_PIN_GROUP(hspi1_b),
+@@ -2703,6 +2738,12 @@ static const char * const du1_groups[] = {
+ 	"du1_cde",
  };
  
- static const char * const eth_groups[] = {
-@@ -2520,6 +2553,13 @@ static const char * const scifb2_groups[] = {
- 	"scifb2_data_c",
- };
- 
-+static const char * const tpu0_groups[] = {
-+	"tpu0_to0",
-+	"tpu0_to1",
-+	"tpu0_to2",
-+	"tpu0_to3",
++static const char * const ether_groups[] = {
++	"ether_rmii",
++	"ether_link",
++	"ether_magic",
 +};
 +
- static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(eth),
- 	SH_PFC_FUNCTION(intc),
-@@ -2531,6 +2571,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(scifb0),
- 	SH_PFC_FUNCTION(scifb1),
- 	SH_PFC_FUNCTION(scifb2),
-+	SH_PFC_FUNCTION(tpu0),
+ static const char * const hspi0_groups[] = {
+ 	"hspi0",
  };
- 
- static struct pinmux_cfg_reg pinmux_config_regs[] = {
+@@ -2898,6 +2939,7 @@ static const char * const vin3_groups[] = {
+ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(du0),
+ 	SH_PFC_FUNCTION(du1),
++	SH_PFC_FUNCTION(ether),
+ 	SH_PFC_FUNCTION(hspi0),
+ 	SH_PFC_FUNCTION(hspi1),
+ 	SH_PFC_FUNCTION(hspi2),
 -- 
 1.8.2.1
