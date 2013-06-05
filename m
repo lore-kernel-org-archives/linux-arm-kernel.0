@@ -1,35 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 5 Jun 2013 11:01:53 +0100
-Subject: arm64: opportunity for (micro) optimisation in set_bit et al?
-In-Reply-To: <1370424981.24512.163.camel@zakaz.uk.xensource.com>
-References: <1370424981.24512.163.camel@zakaz.uk.xensource.com>
-Message-ID: <20130605100152.GC8758@arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 5 Jun 2013 12:04:26 +0200
+Subject: [PATCH v2 0/7] pcmcia: at91_cf: clean up and add DT support
+In-Reply-To: <20130419225448.GA8242@kroah.com>
+References: <cover.1363865228.git.nicolas.ferre@atmel.com>
+ <CAHkwnC-aL=G9K9jttjD8Bk_ZKJ535vsGT26uCFbuFMeJUquYQw@mail.gmail.com>
+ <516E628B.1000104@atmel.com> <20130419225448.GA8242@kroah.com>
+Message-ID: <51AF0D2A.2@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ian,
+On 20/04/2013 00:54, Greg Kroah-Hartman :
+> On Wed, Apr 17, 2013 at 10:51:23AM +0200, Nicolas Ferre wrote:
+>> On 04/17/2013 10:39 AM, Fabio Porcedda :
+>>> On Thu, Mar 21, 2013 at 12:40 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+>>>> These patches clean up at91_cf a bit and add DT bindings.
+>>>> It is based on a previous series from Joachim Eastwood and other cleanup
+>>>> patches by Fabio and Laurent.
+>>>> I have collected them together as they are lying around for some time.
+>>>>
+>>>> Please tell me if It can go through PCMCIA tree or if Andrew or Greg can
+>>>> take them.
+>>>> Note that they are not bug fixes, so you can stack them for 3.10.
+>>>>
+>>>> Thanks for your help, best regards.
+>>>>
+>>>> v2: add 2 more cleanup patches:
+>>>>          - move to module_platform_driver_probe()
+>>>>          - little trivial indentation fix
+>>>>
+>>>> Fabio Porcedda (1):
+>>>>    pcmcia: at91_cf: use module_platform_driver_probe()
+>>>>
+>>>> Joachim Eastwood (5):
+>>>>    pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
+>>>>    pcmcia: at91_cf: convert to dev_ print functions
+>>>>    pcmcia: at91_cf: use devm_ functions for allocations
+>>>>    pcmcia: at91_cf: clean up header includes
+>>>>    pcmcia: at91_cf: add support for DT
+>>>>
+>>>> Laurent Navet (1):
+>>>>    pcmcia/trivial: at91_cf: fix checkpatch error
+>>>>
+>>>>   .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
+>>>>   drivers/pcmcia/Kconfig                             |   2 +-
+>>>>   drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
+>>>>   3 files changed, 108 insertions(+), 89 deletions(-)
+>>>>   create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
+>>>>
+>>>> --
+>>>> 1.8.0
+>>>>
+>>>
+>>> Ping?
+>>
+>> Andrew, Greg, can you please take this series?
+>>
+>> Here is the post on lkml:
+>> https://lkml.org/lkml/2013/3/21/246
+>>
+>> Here is the first patch in patchwork (1/7):
+>> https://patchwork.kernel.org/patch/2312691/
+>>
+>> Tell me if I can do something else to make this applied upstream...
+>
+> The PCMCIA maintainer should take these, not me.
 
-On Wed, Jun 05, 2013 at 10:36:21AM +0100, Ian Campbell wrote:
-> I was "borrowing" the arm64 Linux bitops for use in Xen and Tim Deegan
-> wondered about the use of eor in:
->        and     x3, x0, #63             // Get bit offset
->        eor     x0, x0, x3              // Clear low bits
->        mov     x2, #1
->        add     x1, x1, x0, lsr #3      // Get word offset
+I know Greg, but this patch series is still not taken by anyone 3 months 
+after its first submission and after several requests by both Fabio and 
+myself...
 
-BTW, the latest kernel uses W registers (32-bit here since the function
-prototype has an 'int' and the compiler does not guarantee that the top
-32-bit are 0.
+The series is still applying on linux-next today... Maybe it can go via 
+Andrew, then...
 
-> That eor has a dependency on the previous and instruction which could be
-> avoided using a bic or a lsr #5 followed by lsl #2 instead of the lsr #3
-> on the add (this is what arm32 does).
-
-Any of these would do (I haven't tried, bic #imm is an alias for and).
-I'll check with the hardware guys whether it makes any difference but it
-is a harmless change anyway.
-
-Thanks.
-
+Best regards,
 -- 
-Catalin
+Nicolas Ferre
