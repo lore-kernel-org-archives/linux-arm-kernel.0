@@ -1,65 +1,59 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Wed, 5 Jun 2013 16:03:40 +0200
-Subject: [PATCH 1/3] drivers: pinctrl sleep and idle states in the core
-In-Reply-To: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
-References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130605140338.GC2934@katana>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 5 Jun 2013 10:07:03 -0400 (EDT)
+Subject: [RFC PATCH v2 2/2] drivers: mfd: vexpress: add Serial Power
+ Controller (SPC) support
+In-Reply-To: <1370432767-6620-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1370432767-6620-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1370432767-6620-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.03.1306050956081.1200@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 03:44:31PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Wed, 5 Jun 2013, Lorenzo Pieralisi wrote:
+
+> The TC2 versatile express core tile integrates a logic block that provides the
+> interface between the dual cluster test-chip and the M3 microcontroller that
+> carries out power management. The logic block, called Serial Power Controller
+> (SPC), contains several memory mapped registers to control among other things
+> low-power states, operating points and reset control.
 > 
-> If a device have sleep and idle states in addition to the
-> default state, look up these in the core and stash them in
-> the pinctrl state container.
+> This patch provides a driver that enables run-time control of features
+> implemented by the SPC control logic.
 > 
-> Add accessor functions for pinctrl consumers to put the pins
-> into "default", "sleep" and "idle" states passing nothing but
-> the struct device * affected.
+> The driver also provides a bridge interface through the vexpress config
+> infrastructure. Operations allowing to read/write operating points are
+> made to go via the same interface as configuration transactions so that
+> all requests to M3 are serialized.
 > 
-> Solution suggested by Kevin Hilman, Mark Brown and Dmitry
-> Torokhov in response to a patch series from Hebbar
-> Gururaja.
+> Device tree bindings documentation for the SPC component is provided with
+> the patchset.
 > 
-> Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Some nits:
+[...]
 
-> +	if (IS_ERR(pins->sleep_state))
-> +		return 0; /* No default state */
+> +/*
+> + * Versatile Express Serial Power Controller (SPC) support
+> + *
+> + * Copyright (C) 2013 ARM Ltd.
+> + *
+> + * Author(s): Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> + *            Achin Gupta           <achin.gupta@arm.com>
+> + *            Lorenzo Pieralisi     <lorenzo.pieralisi@arm.com>
 
-Comment wants to say "sleep state"?
+I imagine "author(s)" can be written as "authors" without a doubt.  :-)
 
-> +	ret = pinctrl_select_state(pins->p, pins->sleep_state);
-> +	if (ret)
-> +		dev_err(dev, "failed to activate sleep pinctrl state\n");
+> +EXPORT_SYMBOL_GPL(vexpress_spc_write_resume_reg);
+> +EXPORT_SYMBOL_GPL(vexpress_spc_set_global_wakeup_intr);
+> +EXPORT_SYMBOL_GPL(vexpress_spc_set_cpu_wakeup_irq);
+> +EXPORT_SYMBOL_GPL(vexpress_spc_powerdown_enable);
 
-Better say "pinctrl sleep state"?
+I don't think anything that could possibly be made into modules should 
+ever have a need for those particular calls.  So I'd suggest not 
+exporting them.
 
-> +	if (IS_ERR(pins->idle_state))
-> +		return 0; /* No default state */
-> +	ret = pinctrl_select_state(pins->p, pins->idle_state);
-> +	if (ret)
-> +		dev_err(dev, "failed to activate idle pinctrl state\n");
+Other than that, you may add...
 
-Similar issues here...
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-Other than that, on all 3 patches:
 
-Acked-by: Wolfram Sang <wsa@the-dreams.de>
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130605/6151fdf8/attachment.sig>
+Nicolas
