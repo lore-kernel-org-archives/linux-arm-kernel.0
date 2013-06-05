@@ -1,26 +1,39 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Jun 2013 09:57:02 -0600
-Subject: [PATCH 2/4] clk: tegra: override bits for Tegra114 PLLM
-In-Reply-To: <1370441329-8619-3-git-send-email-pdeschrijver@nvidia.com>
-References: <1370441329-8619-1-git-send-email-pdeschrijver@nvidia.com>
- <1370441329-8619-3-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <51AF5FCE.6090501@wwwdotorg.org>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Wed, 05 Jun 2013 08:57:40 -0700
+Subject: [PATCH 1/3] drivers: pinctrl sleep and idle states in the core
+In-Reply-To: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+ (Linus Walleij's message of "Wed, 5 Jun 2013 15:44:31 +0200")
+References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <8761xszh1n.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 08:08 AM, Peter De Schrijver wrote:
+Linus Walleij <linus.walleij@stericsson.com> writes:
 
-Commit description?
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> If a device have sleep and idle states in addition to the
+> default state, look up these in the core and stash them in
+> the pinctrl state container.
+>
+> Add accessor functions for pinctrl consumers to put the pins
+> into "default", "sleep" and "idle" states passing nothing but
+> the struct device * affected.
+>
+> Solution suggested by Kevin Hilman, Mark Brown and Dmitry
+> Torokhov in response to a patch series from Hebbar
+> Gururaja.
+>
+> Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I'm seeking Gregs ACK on this in the end, so we can take this
+> in through the pinctrl tree. But first let's review!
 
-> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-
-> +#ifdef CONFIG_PM_SLEEP
-> +static struct cpu_clk_suspend_context {
-> +	u32 clk_csite_src;
-> +} tegra114_cpu_clk_sctx;
-> +#endif
-
-That generates:
-
-drivers/clk/tegra/clk-tegra114.c:263:3: warning: ?tegra114_cpu_clk_sctx?
-defined but not used [-Wunused-variable]
+Reviewed-by: Kevin Hilman <khilman@linaro.org>
