@@ -1,51 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 13:31:52 +0900
-Subject: [PATCH 5/6] ARM: shmobile: bockw: enable USB in defconfig
-In-Reply-To: <1370406713-26599-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370406713-26599-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370406713-26599-6-git-send-email-horms+renesas@verge.net.au>
+Date: Wed,  5 Jun 2013 13:32:09 +0900
+Subject: [PATCH 0/7] Renesas ARM-based SoC DT updates for v3.11
+Message-ID: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi Olof, Hi Arnd,
 
-Enable USB platform EHCI/OHCI and common PHY drivers in 'bockw_defconfig'.
-Enable USB storage driver and SCSI disk driver that it needs as well...
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/configs/bockw_defconfig | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index a4bc76d..d662608 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -49,6 +49,8 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
-+CONFIG_SCSI=y
-+CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
- # CONFIG_NET_CADENCE is not set
- # CONFIG_NET_VENDOR_BROADCOM is not set
-@@ -74,7 +76,14 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
- # CONFIG_HWMON is not set
- CONFIG_I2C=y
- CONFIG_I2C_RCAR=y
--# CONFIG_USB_SUPPORT is not set
-+CONFIG_USB=y
-+CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
-+CONFIG_USB_EHCI_HCD=y
-+CONFIG_USB_OHCI_HCD=y
-+CONFIG_USB_OHCI_HCD_PLATFORM=y
-+CONFIG_USB_EHCI_HCD_PLATFORM=y
-+CONFIG_USB_STORAGE=y
-+CONFIG_USB_RCAR_PHY=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHI=y
- CONFIG_UIO=y
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.11
+
+for you to fetch changes up to 24603f3caf07f5f65aa17ed7851ad4741595cf6a:
+
+  ARM: shmobile: marzen-reference: add irqpin support in DT (2013-06-04 18:05:59 +0900)
+
+----------------------------------------------------------------
+Renesas ARM-based SoC DT updates for v3.11
+
+* Armadillo800eva reference DT - bring up armadillo800eva baord
+  using DT as much as possible
+* Remove unused GIC dtsi entries for r8a7790 and r8a73a4
+* Add AS3711 and CPUFreq DT bindings for kzm9g-reference
+* Add irqpin DT support for marzen-reference
+
+----------------------------------------------------------------
+Bastian Hecht (3):
+      ARM: shmobile: r8a7740: Add OF support to initialze the GIC
+      ARM: shmobile: r8a7740: Prepare for reference DT setup
+      ARM: shmobile: armadillo800eva: Reference DT implementation
+
+Guennadi Liakhovetski (2):
+      ARM: shmobile: kzm9g-reference: add AS3711 and CPUFreq DT bindings
+      ARM: shmobile: marzen-reference: add irqpin support in DT
+
+Magnus Damm (2):
+      ARM: shmobile: Remove unused r8a73a4 GIC CPU interface DT bits
+      ARM: shmobile: Remove unused r8a7790 GIC CPU interface DT bits
+
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/r8a73a4.dtsi                     |   6 -
+ .../boot/dts/r8a7740-armadillo800eva-reference.dts |  45 +++++
+ arch/arm/boot/dts/r8a7740.dtsi                     | 117 +++++++++++
+ arch/arm/boot/dts/r8a7779.dtsi                     |  17 ++
+ arch/arm/boot/dts/r8a7790.dtsi                     |   6 -
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |  86 +++++++++
+ arch/arm/mach-shmobile/Kconfig                     |  14 ++
+ arch/arm/mach-shmobile/Makefile                    |   1 +
+ .../board-armadillo800eva-reference.c              | 213 +++++++++++++++++++++
+ arch/arm/mach-shmobile/include/mach/r8a7740.h      |   3 +
+ arch/arm/mach-shmobile/intc-r8a7740.c              |  24 ++-
+ arch/arm/mach-shmobile/setup-r8a7740.c             |  54 +++---
+ 13 files changed, 544 insertions(+), 43 deletions(-)
+ create mode 100644 arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
+ create mode 100644 arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+
 -- 
 1.8.2.1
