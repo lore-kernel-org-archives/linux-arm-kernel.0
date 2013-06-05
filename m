@@ -1,41 +1,29 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 4 Jun 2013 22:57:32 -0700
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <20130604163741.GA15299@redhat.com>
-References: <51ADDDAE.4040705@arm.com>
- <CAMJs5B_PB1pNVCO_EK7aTghN23L+d0RovAFi7inrVsJb5STWOA@mail.gmail.com>
- <51AE00D7.9030607@arm.com> <51AE082C.6050907@redhat.com>
- <CAMJs5B9PxHfUrugov4HJknQ24fG7MNp8obziqu9dnSztsGBksQ@mail.gmail.com>
- <51AE0D0D.3030106@redhat.com> <20130604163741.GA15299@redhat.com>
-Message-ID: <CAMJs5B8WqiMpqj3Mr=rPCr89k-jvY2i3BDbkPOsMb3PhCR1SWg@mail.gmail.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Wed, 5 Jun 2013 05:59:29 +0000 (UTC)
+Subject: Tegra baseline test results for v3.10-rc1
+Message-ID: <alpine.DEB.2.02.1306050558430.13098@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 June 2013 09:37, Gleb Natapov <gleb@redhat.com> wrote:
-> On Tue, Jun 04, 2013 at 05:51:41PM +0200, Paolo Bonzini wrote:
->> Il 04/06/2013 17:43, Christoffer Dall ha scritto:
->> > Hi Paolo,
->> >
->> > I don't think this is an issue. Gleb and Marcelo for example pulled
->> > RMK's stable tree for my KVM/ARM updates for the 3.10 merge window and
->> > that wasn't an issue.  If Linus pulls the kvm/next tree first the
->> > diffstat should be similar and everything clean enough, no?
->> >
->> > Catalin has previously expressed his wish to upstream the kvm/arm64
->> > patches directly through him given the churn in a completely new
->> > architecture and he wants to make sure that everything looks right.
->> >
->> > It's a pretty clean implementation with quite few dependencies and
->> > merging as a working series should be a priority instead of the
->> > Kconfig hack, imho.
->>
->> Ok, let's see what Gleb says.
->>
-> I have no objection to merge arm64 kvm trough Catalin if it mean less
-> churn for everyone. That's what we did with arm and mips. Arm64 kvm
-> has a dependency on kvm.git next though, so how Catalin make sure that
-> everything looks right? Will he merge kvm.git/next to arm64 tree?
->
-Yes, that was the idea. Everything in kvm/next is considered stable, right?
 
--Christoffer
+Here are some basic Tegra test results for Linux v3.10-rc1.
+Logs and other details at:
+
+    http://www.pwsan.com/tegra/testlogs/test_v3.10-rc1/20130518212204/
+
+
+Test summary
+------------
+
+Build: zImage:
+    Pass ( 1/ 1): tegra_defconfig
+
+Boot to userspace:
+    Pass ( 1/ 1): t33beaver
+
+
+---------------------------------------------------------------------
+Branch: test_v3.10-rc1
+Test-Serial: 20130519152115
+Commit-ID: f722406faae2d073cc1d01063d1123c35425939e
+Test-Target-Board-Count: 1
