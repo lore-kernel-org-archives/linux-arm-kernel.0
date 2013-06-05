@@ -1,32 +1,63 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 5 Jun 2013 14:12:17 -0700
-Subject: [PATCH v2] ARM: exynos: add debug_ll_io_init() call in
- exynos_init_io()
-In-Reply-To: <1370465793-7997-1-git-send-email-dianders@chromium.org>
-References: <1370397539-21653-1-git-send-email-dianders@chromium.org>
- <1370465793-7997-1-git-send-email-dianders@chromium.org>
-Message-ID: <CAOesGMhQX9ip=nb9AQa5fcDFRNpZZSxUO0N0GTX051dakWZD9Q@mail.gmail.com>
+From: lkcl@lkcl.net (Luke Kenneth Casson Leighton)
+Date: Wed, 5 Jun 2013 22:15:08 +0100
+Subject: getting allwinner SoC support upstream (was Re: Uploading linux
+ (3.9.4-1))
+In-Reply-To: <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+Message-ID: <CAPweEDzDC87KmOQ=0hyPcjPtPsRuXHxNTs97vbEqVNNnix69rA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 5, 2013 at 1:56 PM, Doug Anderson <dianders@chromium.org> wrote:
-> If the early MMU mapping of the UART happens to get booted out of the
-> TLB between the start of paging_init() and when we finally re-add the
-> UART at the very end of s3c_init_cpu(), we'll get a hang at bootup if
-> we've got early_printk enabled.  Avoid this hang by calling
-> debug_ll_io_init() early.
->
-> Without this patch, you can reliably reproduce a hang when early
-> printk is enabled by adding flush_tlb_all() at the start of
-> exynos_init_io().  After this patch the hang goes away.
->
-> Signed-off-by: Doug Anderson <dianders@chromium.org>
+[i've just received word, please remove debian-release from discussions!]
 
-Acked-by: Olof Johansson <olof@lixom.net>
+On Wed, Jun 5, 2013 at 9:46 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+
+> Why don't you try converting the sunxi code over to device tree?
+
+ok.  perhaps i wasn't clear.  whatever is proposed has to be be
+acceptable to allwinner, and i'm looking for proposals that i can put
+to them, i.e. i am going to act as the communications channel to them.
+
+what we do not want to happen is that they see upstream patches being
+submitted, they merge them into their internal tree (which to date has
+had zero upstream changes: they're currently only just getting round
+to doing 3.4 as we speak), and they *completely* ignore *absolutely
+everything* that's being done by the community, duplicating yet
+another set of device drivers (named drivers/*/sun8i_* and so on).
+
+> I don't
+> think it will be as hard as you may think it is. Start off by mapping the
+> existing fex syntax into a DTS file. Send your DTS file to
+> devicetree-discuss to get help with the correct syntax. Once this DTS
+> template is constructed you can write a program to convert any fex file into
+> it.
+
+ this proposal is a start: however what you have to bear in mind is
+that you now have to convince a very busy company that it is in their
+best interests to disrupt their schedule, to drop their existing
+working practices, to tell all their customers "please stop using the
+existing tools and please use these ones instead".
+
+ you also need to convince the creators of the proprietary
+firmware-flashing tools "livesuite" and "phoenix" to *also* convert
+their tools over to the new proposed idea.
+
+ so if that is to truly be accepted, it has to be framed in such a way
+that it will be clearly of financial benefit to the SoC vendor.
+
+ can you provide such a supporting argument which would convince
+allwinner to accept the modifications to their working practices that
+you propose?
 
 
-Kukjin, this seems appropriate for 3.10. Do you have other fixes
-queued or should I apply this directly?
+> Device tree on ARM's goal is to achieve a single kernel across vendors, not
+> just a single kernel for a single vendor.
 
+ you'll be aware that i've mentioned a number of times and have
+discussed at some length why this is a goal that is completely
+impossible to achieve [*1].  sadly.
 
--Olof
+l.
+
+[*1] without a hardware-level redesign i.e. hardware standardisation that is.
