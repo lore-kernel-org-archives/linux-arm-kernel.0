@@ -1,127 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:06 +0900
-Subject: [PATCH 015/130] sh-pfc: r8a7790: Don't use GPIO enum entries
+Date: Wed,  5 Jun 2013 17:25:18 +0900
+Subject: [PATCH 027/130] sh-pfc: sh7372: Add HDMI pin groups and functions
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-16-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-28-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Refactor the GPIO macro magic to use GPIO numbers directly instead of
-the GPIO_GP_x_y enum entries. This will allow removing the GPIO enum
-entries from the mach/r8a7790.h header.
-
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 90 ++++++++++++++++++++++++------------
- 1 file changed, 60 insertions(+), 30 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-index 51219e1..1656915 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-@@ -24,39 +24,69 @@
- #include <linux/kernel.h>
- #include <linux/platform_data/gpio-rcar.h>
+diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+index 641f6ee..73b9e25 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
++++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
+@@ -1178,6 +1178,14 @@ static const unsigned int fsib_mclk_in_pins[] = {
+ static const unsigned int fsib_mclk_in_mux[] = {
+ 	FSIBCK_MARK,
+ };
++/* - HDMI ------------------------------------------------------------------- */
++static const unsigned int hdmi_pins[] = {
++	/* HPD, CEC */
++	169, 170,
++};
++static const unsigned int hdmi_mux[] = {
++	HDMI_HPD_MARK, HDMI_CEC_MARK,
++};
+ /* - MMCIF ------------------------------------------------------------------ */
+ static const unsigned int mmc0_data1_0_pins[] = {
+ 	/* D[0] */
+@@ -1352,6 +1360,7 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(fsia_spdif_0),
+ 	SH_PFC_PIN_GROUP(fsia_spdif_1),
+ 	SH_PFC_PIN_GROUP(fsib_mclk_in),
++	SH_PFC_PIN_GROUP(hdmi),
+ 	SH_PFC_PIN_GROUP(mmc0_data1_0),
+ 	SH_PFC_PIN_GROUP(mmc0_data4_0),
+ 	SH_PFC_PIN_GROUP(mmc0_data8_0),
+@@ -1420,6 +1429,10 @@ static const char * const fsib_groups[] = {
+ 	"fsib_mclk_in",
+ };
  
--#include <mach/r8a7790.h>
--
- #include "core.h"
- #include "sh_pfc.h"
- 
--#define CPU_32_PORT(fn, pfx, sfx)				\
--	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
--	PORT_10(fn, pfx##2, sfx), PORT_1(fn, pfx##30, sfx),	\
--	PORT_1(fn, pfx##31, sfx)
--
--#define CPU_32_PORT1(fn, pfx, sfx)				\
--	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
--	PORT_10(fn, pfx##2, sfx)
--
--#define CPU_32_PORT2(fn, pfx, sfx)				\
--	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
--	PORT_10(fn, pfx##2, sfx)
--
--/* GP_0_0_DATA -> GP_5_31_DATA (except for GP1[30],GP1[31],GP2[30],GP2[31]) */
--#define CPU_ALL_PORT(fn, pfx, sfx)				\
--	CPU_32_PORT(fn, pfx##_0_, sfx),				\
--	CPU_32_PORT1(fn, pfx##_1_, sfx),			\
--	CPU_32_PORT2(fn, pfx##_2_, sfx),			\
--	CPU_32_PORT(fn, pfx##_3_, sfx),				\
--	CPU_32_PORT(fn, pfx##_4_, sfx),				\
--	CPU_32_PORT(fn, pfx##_5_, sfx)				\
--
--#define _GP_GPIO(pfx, sfx) PINMUX_GPIO(GPIO_GP##pfx, GP##pfx##_DATA)
--#define _GP_DATA(pfx, sfx) PINMUX_DATA(GP##pfx##_DATA, GP##pfx##_FN)
--
--#define GP_ALL(str)	CPU_ALL_PORT(_PORT_ALL, GP, str)
--#define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, , unused)
--#define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, , unused)
-+#define PORT_GP_1(bank, pin, fn, sfx) fn(bank, pin, GP_##bank##_##pin, sfx)
++static const char * const hdmi_groups[] = {
++	"hdmi",
++};
 +
-+#define PORT_GP_32(bank, fn, sfx)					\
-+	PORT_GP_1(bank, 0,  fn, sfx), PORT_GP_1(bank, 1,  fn, sfx),	\
-+	PORT_GP_1(bank, 2,  fn, sfx), PORT_GP_1(bank, 3,  fn, sfx),	\
-+	PORT_GP_1(bank, 4,  fn, sfx), PORT_GP_1(bank, 5,  fn, sfx),	\
-+	PORT_GP_1(bank, 6,  fn, sfx), PORT_GP_1(bank, 7,  fn, sfx),	\
-+	PORT_GP_1(bank, 8,  fn, sfx), PORT_GP_1(bank, 9,  fn, sfx),	\
-+	PORT_GP_1(bank, 10, fn, sfx), PORT_GP_1(bank, 11, fn, sfx),	\
-+	PORT_GP_1(bank, 12, fn, sfx), PORT_GP_1(bank, 13, fn, sfx),	\
-+	PORT_GP_1(bank, 14, fn, sfx), PORT_GP_1(bank, 15, fn, sfx),	\
-+	PORT_GP_1(bank, 16, fn, sfx), PORT_GP_1(bank, 17, fn, sfx),	\
-+	PORT_GP_1(bank, 18, fn, sfx), PORT_GP_1(bank, 19, fn, sfx),	\
-+	PORT_GP_1(bank, 20, fn, sfx), PORT_GP_1(bank, 21, fn, sfx),	\
-+	PORT_GP_1(bank, 22, fn, sfx), PORT_GP_1(bank, 23, fn, sfx),	\
-+	PORT_GP_1(bank, 24, fn, sfx), PORT_GP_1(bank, 25, fn, sfx),	\
-+	PORT_GP_1(bank, 26, fn, sfx), PORT_GP_1(bank, 27, fn, sfx),	\
-+	PORT_GP_1(bank, 28, fn, sfx), PORT_GP_1(bank, 29, fn, sfx),	\
-+	PORT_GP_1(bank, 30, fn, sfx), PORT_GP_1(bank, 31, fn, sfx)
-+
-+#define PORT_GP_32_REV(bank, fn, sfx)					\
-+	PORT_GP_1(bank, 31, fn, sfx), PORT_GP_1(bank, 30, fn, sfx),	\
-+	PORT_GP_1(bank, 29, fn, sfx), PORT_GP_1(bank, 28, fn, sfx),	\
-+	PORT_GP_1(bank, 27, fn, sfx), PORT_GP_1(bank, 26, fn, sfx),	\
-+	PORT_GP_1(bank, 25, fn, sfx), PORT_GP_1(bank, 24, fn, sfx),	\
-+	PORT_GP_1(bank, 23, fn, sfx), PORT_GP_1(bank, 22, fn, sfx),	\
-+	PORT_GP_1(bank, 21, fn, sfx), PORT_GP_1(bank, 20, fn, sfx),	\
-+	PORT_GP_1(bank, 19, fn, sfx), PORT_GP_1(bank, 18, fn, sfx),	\
-+	PORT_GP_1(bank, 17, fn, sfx), PORT_GP_1(bank, 16, fn, sfx),	\
-+	PORT_GP_1(bank, 15, fn, sfx), PORT_GP_1(bank, 14, fn, sfx),	\
-+	PORT_GP_1(bank, 13, fn, sfx), PORT_GP_1(bank, 12, fn, sfx),	\
-+	PORT_GP_1(bank, 11, fn, sfx), PORT_GP_1(bank, 10, fn, sfx),	\
-+	PORT_GP_1(bank, 9,  fn, sfx), PORT_GP_1(bank, 8,  fn, sfx),	\
-+	PORT_GP_1(bank, 7,  fn, sfx), PORT_GP_1(bank, 6,  fn, sfx),	\
-+	PORT_GP_1(bank, 5,  fn, sfx), PORT_GP_1(bank, 4,  fn, sfx),	\
-+	PORT_GP_1(bank, 3,  fn, sfx), PORT_GP_1(bank, 2,  fn, sfx),	\
-+	PORT_GP_1(bank, 1,  fn, sfx), PORT_GP_1(bank, 0,  fn, sfx)
-+
-+#define CPU_ALL_PORT(fn, sfx)						\
-+	PORT_GP_32(0, fn, sfx),						\
-+	PORT_GP_32(1, fn, sfx),						\
-+	PORT_GP_32(2, fn, sfx),						\
-+	PORT_GP_32(3, fn, sfx),						\
-+	PORT_GP_32(4, fn, sfx),						\
-+	PORT_GP_32(5, fn, sfx)
-+
-+#define _GP_PORT_ALL(bank, pin, name, sfx)	name##_##sfx
-+
-+#define _GP_GPIO(bank, pin, _name, sfx)					\
-+	[(bank * 32) + pin] = {						\
-+		.name = __stringify(_name),				\
-+		.enum_id = _name##_DATA,				\
-+	}
-+
-+#define _GP_DATA(bank, pin, name, sfx)					\
-+	PINMUX_DATA(name##_DATA, name##_FN)
-+
-+#define GP_ALL(str)		CPU_ALL_PORT(_GP_PORT_ALL, str)
-+#define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, unused)
-+#define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, unused)
- 
- #define PINMUX_IPSR_DATA(ipsr, fn) PINMUX_DATA(fn##_MARK, FN_##ipsr, FN_##fn)
- #define PINMUX_IPSR_MODSEL_DATA(ipsr, fn, ms) PINMUX_DATA(fn##_MARK, FN_##ms, \
+ static const char * const mmc0_groups[] = {
+ 	"mmc0_data1_0",
+ 	"mmc0_data4_0",
+@@ -1457,6 +1470,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(flctl),
+ 	SH_PFC_FUNCTION(fsia),
+ 	SH_PFC_FUNCTION(fsib),
++	SH_PFC_FUNCTION(hdmi),
+ 	SH_PFC_FUNCTION(mmc0),
+ 	SH_PFC_FUNCTION(sdhi0),
+ 	SH_PFC_FUNCTION(sdhi1),
 -- 
 1.8.2.1
