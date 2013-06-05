@@ -1,54 +1,45 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 6 Jun 2013 08:33:13 +0900
-Subject: [PATCH 2/2] ARM: shmobile: r8A7779: fix Ether device name
-In-Reply-To: <51AFB3F1.40603@cogentembedded.com>
-References: <1369645206-3682-1-git-send-email-horms+renesas@verge.net.au>
- <1369645206-3682-3-git-send-email-horms+renesas@verge.net.au>
- <20130528040043.GL13532@quad.lixom.net>
- <20130604051352.GW23054@verge.net.au>
- <51AFB3F1.40603@cogentembedded.com>
-Message-ID: <20130605233311.GA32023@verge.net.au>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 06 Jun 2013 00:34:22 +0100
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20130605233422.3D6DE3E10E4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 01:56:01AM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Fri,  5 Apr 2013 09:48:08 +0200, Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
+[...]
+> irq_of_parse_and_map() calls to irq_create_of_mapping() which calls to
+> the correct xlate function handler according to "#interrupt-cells"
+> (irq_domain_xlate_onecell or irq_domain_xlate_twocell) and to
+> irq_set_irq_type() to set the IRQ type.
 > 
-> On 06/04/2013 09:13 AM, Simon Horman wrote:
+> But the type is never returned so it can't be saved on the IRQ struct
+> resource flags member.
 > 
-> >>>From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >>>
-> >>>While recasting the commit "ARM: shmobile: R8A7779: add Ether support", I made a
-> >>>typo in the platform device's name: used underscore instead of hyphen.
-> >>Minor nit: if this has been merged, then including the SHA is useful too.
-> >Thanks, I have updated the changelog to:
-> >
-> >ARM: shmobile: r8A7779: fix Ether device name
-> >
-> >While recasting the commit dace48d04dee46a3409d5e13cd98031522e46377
-> >("ARM: shmobile: R8A7779: add Ether support"), I made a
-> >typo in the platform device's name: used underscore instead of hyphen.
-> >
-> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> >[horms+renesas at verge.net.au Add SHA of referenced commit to changlog]
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> >diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-> >index b0b3948..c14a69b 100644
-> >--- a/arch/arm/mach-shmobile/setup-r8a7779.c
-> >+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-> >@@ -443,7 +443,7 @@ void __init r8a7779_add_standard_devices(void)
-> >  void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
-> >  {
-> >-	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
-> >+	platform_device_register_resndata(&platform_bus, "sh-eth", -1,
-> >  					  ether_resources,
-> >  					  ARRAY_SIZE(ether_resources),
-> >  					  pdata, sizeof(*pdata));
+> This means that drivers that need the IRQ type/level flags defined in
+> the DT won't be able to get it.
 > 
->     Actually, if these patches aren't going into 3.10, I think it
-> makes sense to drop them,
-> since I'll be renaming the device and pushing this change thru the
-> net-next tree RSN...
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+[...]
+> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
+> index 535cecf..98aec57 100644
+> --- a/include/linux/of_irq.h
+> +++ b/include/linux/of_irq.h
+> @@ -66,6 +66,10 @@ extern int of_irq_map_one(struct device_node *device, int index,
+>  extern unsigned int irq_create_of_mapping(struct device_node *controller,
+>  					  const u32 *intspec,
+>  					  unsigned int intsize);
+> +extern unsigned int irq_create_of_mapping_type(struct device_node *controller,
+> +					       const u32 *intspec,
+> +					       unsigned int intsize,
+> +					       unsigned int *otype);
 
-Sure, I will drop them.
+I count 11 users of irq_create_of_mapping(). That's a managable number
+to update. Instead of creating a new function, please modify the
+existing one and split it off into a separate patch.
+
+Otherwise the patch looks fine to me.
+
+g.
