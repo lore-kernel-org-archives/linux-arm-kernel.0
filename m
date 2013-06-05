@@ -1,42 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 5 Jun 2013 08:38:47 -0700
-Subject: [PATCH] gpio/omap: omap_gpio_init_context stub must be inline
-In-Reply-To: <2942784.trumtc2GjZ@wuerfel>
-References: <2942784.trumtc2GjZ@wuerfel>
-Message-ID: <20130605153847.GV3331@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed,  5 Jun 2013 09:50:30 -0600
+Subject: [PATCH] MAINTAINERS: make drivers/clk entry match subdirs
+Message-ID: <1370447430-3466-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [130531 09:05]:
-> The bug fix 352a2d5bf "gpio/omap: ensure gpio context is initialised"
-> has caused a new warning for omap1_defconfig:
-> 
-> drivers/gpio/gpio-omap.c:1465:13: warning: 'omap_gpio_init_context' defined but not used [-Wunused-function]
->  static void omap_gpio_init_context(struct gpio_bank *p) {}
->              ^
-> 
-> The solution is to mark the stub function as 'static inline' so
-> it gets left out of the build when unused.
+From: Stephen Warren <swarren@nvidia.com>
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Modify the drivers/clk MAINTAINERS entry so that it matches the entire
+drivers/clk tree, with the exception of clkdev.c which has a separate
+entry. Make a similar change to pick up all clk-related header files.
+
+This causes get_maintainers.pl to spit out the expected results for any
+patches to clock drivers that are in sub-directories of drivers/clk,
+e.g. drivers/clk/tegra/.
+
+Signed-off-by: Stephen Warren <swarren@nvidia.com>
+---
+ MAINTAINERS | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/MAINTAINERS b/MAINTAINERS
+index fdd0544..e8e4696 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2125,9 +2125,10 @@ M:	Mike Turquette <mturquette@linaro.org>
+ L:	linux-arm-kernel at lists.infradead.org (same as CLK API & CLKDEV)
+ T:	git git://git.linaro.org/people/mturquette/linux.git
+ S:	Maintained
+-F:	drivers/clk/clk.c
+-F:	drivers/clk/clk-*
++F:	drivers/clk/
++X:	drivers/clk/clkdev.c
+ F:	include/linux/clk-pr*
++F:	include/linux/clk/
  
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-> index d3f7d2d..e5fba65 100644
-> --- a/drivers/gpio/gpio-omap.c
-> +++ b/drivers/gpio/gpio-omap.c
-> @@ -1462,7 +1462,7 @@ static void omap_gpio_restore_context(struct gpio_bank *bank)
->  #else
->  #define omap_gpio_runtime_suspend NULL
->  #define omap_gpio_runtime_resume NULL
-> -static void omap_gpio_init_context(struct gpio_bank *p) {}
-> +static inline void omap_gpio_init_context(struct gpio_bank *p) {}
->  #endif
->  
->  static const struct dev_pm_ops gpio_pm_ops = {
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+ COMMON INTERNET FILE SYSTEM (CIFS)
+ M:	Steve French <sfrench@samba.org>
+-- 
+1.8.1.5
