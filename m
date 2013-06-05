@@ -1,68 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 13:32:29 +0900
-Subject: [PATCH 2/4] irqchip: renesas-intc-irqpin: DT binding for sense
- bitfield width
+Date: Wed,  5 Jun 2013 13:32:31 +0900
+Subject: [PATCH 4/4] irqchip: Add irqchip_init dummy function
 In-Reply-To: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370406751-3852-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370406751-3852-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Bastian Hecht <hechtb@gmail.com>
 
-Most Renesas irqpin controllers have 4-bit sense fields, however, some
-have different widths. This patch adds a DT binding to optionally
-specify such non-standard values.
+We add an empty irqchip_init dummy function for cases in which
+CONFIG_IRQCHIP is not used. In these cases irqchip.c is not compiled,
+but a funtion call may still be present in architecture code, that in
+runtime doesn't get hit.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Acked-by: Magnus Damm <damm@opensource.se>
+E.g. this is needed in the arch/arm/mach-shmobile/intc-r8a7740.c
+interrupt setup code where OF use and non OF us is both handled in one
+file.
+
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+[horms+renesas at verge.net.au: Make non-CONFIG_IRQCHIP version static inline
+ and remove trailing ';'.]
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- .../bindings/interrupt-controller/renesas,intc-irqpin.txt   | 13 +++++++++++++
- drivers/irqchip/irq-renesas-intc-irqpin.c                   |  4 ++++
- 2 files changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+ include/linux/irqchip.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-new file mode 100644
-index 0000000..c6f09b7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-@@ -0,0 +1,13 @@
-+DT bindings for the R-/SH-Mobile irqpin controller
-+
-+Required properties:
-+
-+- compatible: has to be "renesas,intc-irqpin"
-+- #interrupt-cells: has to be <2>
-+
-+Optional properties:
-+
-+- any properties, listed in interrupts.txt in this directory, and any standard
-+  resource allocation properties
-+- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
-+  if different from the default 4 bits
-diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-index 5a68e5a..4aca1b2 100644
---- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-+++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-@@ -18,6 +18,7 @@
-  */
+diff --git a/include/linux/irqchip.h b/include/linux/irqchip.h
+index e0006f1..14d7913 100644
+--- a/include/linux/irqchip.h
++++ b/include/linux/irqchip.h
+@@ -11,6 +11,10 @@
+ #ifndef _LINUX_IRQCHIP_H
+ #define _LINUX_IRQCHIP_H
  
- #include <linux/init.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/interrupt.h>
-@@ -349,6 +350,9 @@ static int intc_irqpin_probe(struct platform_device *pdev)
- 	/* deal with driver instance configuration */
- 	if (pdata)
- 		memcpy(&p->config, pdata, sizeof(*pdata));
-+	else
-+		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
-+				     &p->config.sense_bitfield_width);
- 	if (!p->config.sense_bitfield_width)
- 		p->config.sense_bitfield_width = 4; /* default to 4 bits */
++#ifdef CONFIG_IRQCHIP
+ void irqchip_init(void);
++#else
++static inline void irqchip_init(void) {}
++#endif
  
+ #endif
 -- 
 1.8.2.1
