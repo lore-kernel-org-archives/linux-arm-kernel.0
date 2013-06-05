@@ -1,121 +1,346 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Wed, 05 Jun 2013 14:54:54 +0200
-Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
-In-Reply-To: <20130605112913.GD18614@n2100.arm.linux.org.uk>
-References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
- <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
- <51AC8F74.2060302@linaro.org>
- <CAP245DUsRcomDaNKbxYry39ZLCrR33SDRRAhNCdR91e17sHF-A@mail.gmail.com>
- <51ADD667.3010203@linaro.org> <20130604141017.GW18614@n2100.arm.linux.org.uk>
- <20130604141701.GX18614@n2100.arm.linux.org.uk> <51AF1752.1040804@monstr.eu>
- <20130605112913.GD18614@n2100.arm.linux.org.uk>
-Message-ID: <51AF351E.6010109@monstr.eu>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 5 Jun 2013 15:56:41 +0300
+Subject: [PATCH] clk: tegra: pllc and pllxc should use pdiv_map
+Message-ID: <1370437007-25596-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 01:29 PM, Russell King - ARM Linux wrote:
-> On Wed, Jun 05, 2013 at 12:47:46PM +0200, Michal Simek wrote:
->> On 06/04/2013 04:17 PM, Russell King - ARM Linux wrote:
->>> And yes, indeed, zynq can control the secondary CPU:
->>>
->>> void zynq_slcr_cpu_start(int cpu)
->>> {
->>>         /* enable CPUn */
->>>         writel(SLCR_A9_CPU_CLKSTOP << cpu,
->>>                zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
->>>         /* enable CLK for CPUn */
->>>         writel(0x0 << cpu, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
->>> }
->>>
->>> void zynq_slcr_cpu_stop(int cpu)
->>> {
->>>         /* stop CLK and reset CPUn */
->>>         writel((SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu,
->>>                zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
->>> }
->>>
->>> So there's no need for the pen.  There's no need for the low power crap
->>> in hotplug.c, there's no need for the pen in hotplug.c.  You just arrange
->>> for the secondary CPU to have its clock stopped and reset when it is
->>> taken offline.
->>>
->>> Hotplugging a CPU back in _should_ be no different from its initial
->>> bringup into the kernel.
->>
->> I have tested that and cpu_die code is performed on cpu which
->> should die.
->> And simple calling zynq_slcr_cpu_stop() on cpu which should die
->> just doesn't work.
->> There is probably any expectation which I can't see.
-> 
-> Have you checked whether the CPU to die can write to this register to
-> stop its own clock and reset itself?  Maybe you need a wfi() after
-> writing to that register to trigger the hardware to shutdown the CPU?
+The pllc and pllxc code weren't always using the correct pdiv_map to
+map between the post divider value and the hw p field. This could result
+in illegal values being programmed in the hw.
 
-One thing is clear here. Definitely cpu can't reset itself because
-it must be done in 3 steps and after the first cpu is in reset and without CLK.
-It means another cpu has to get another cpu out of reset.
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-pll.c |  162 ++++++++++++++++++++++---------------------
+ 1 files changed, 82 insertions(+), 80 deletions(-)
 
-Based on my tests cpu can't stop clock and reset itself.
-
-> It's also entirely possible that you need some other CPU to do those
-> steps while the CPU to die spins in a loop or a wfi or something like
-> that.  You can hook into that via the cpu_kill() callback, which will
-> have the CPU which is to die as its argument.
-
-That's how it is written in the code right now.
-Cpu 1, flush L1 cache and run that code in zynq_cpu_enter_lowpower code
-and then end up in wfi().
-Then cpu0 runs cpu_kill function with argument 1 which means kill cpu1.
-
-If cpu gets wakeup between wfi/cpu_kill is called then spurious is increase.
-
-> Without knowing how your hardware works, it's very difficult to be able
-> to positively point you in an appropriate direction, but the fact that
-> it's allegedly possible to turn the clock off and place the secondary
-> CPU in reset means that this should be possible somehow.
-
-I hope I have described zynq hw to get all information.
-
-Because what seems to me problematic is.
-1. In current code cpu1 is all the time in "for" loop and zynq_cpu_leave_lowpower
-is completely unused because there is no way to jump there
-2. I expect that smp.c/cpu_die() is designed for system which should after wake-up
-jump to secondary_start_kernel to boot it. And this wakeup is performed from cpu0 from
-boot_secondary code.
-
-Let me propose change for zynq which is like this.
-
-void zynq_platform_cpu_die(unsigned int cpu)
-{
-	zynq_cpu_enter_lowpower();
-	for (;;)
-		cpu_do_idle();
-}
-
-Remove zynq_cpu_leave_lowpower, zynq_platform_do_lowpower + spurious var.
-
-It never returns from zynq_platform_cpu_die function.
-It should enter to lowpower before wfi(if this make sense)
-to save energy because it can take some time till cpu0 calls kill function.
-
-Is this a sensible solution?
-
-Thanks,
-Michal
-
+diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+index 17c2cc0..85bec1d 100644
+--- a/drivers/clk/tegra/clk-pll.c
++++ b/drivers/clk/tegra/clk-pll.c
+@@ -143,24 +143,6 @@
+ #define divn_max(p) (divn_mask(p))
+ #define divp_max(p) (1 << (divp_mask(p)))
+ 
+-
+-#ifdef CONFIG_ARCH_TEGRA_114_SOC
+-/* PLLXC has 4-bit PDIV, but entry 15 is not allowed in h/w */
+-#define PLLXC_PDIV_MAX			14
+-
+-/* non-monotonic mapping below is not a typo */
+-static u8 pllxc_p[PLLXC_PDIV_MAX + 1] = {
+-	/* PDIV: 0, 1, 2, 3, 4, 5, 6,  7,  8,  9, 10, 11, 12, 13, 14 */
+-	/* p: */ 1, 2, 3, 4, 5, 6, 8, 10, 12, 16, 12, 16, 20, 24, 32
+-};
+-
+-#define PLLCX_PDIV_MAX 7
+-static u8 pllcx_p[PLLCX_PDIV_MAX + 1] = {
+-	/* PDIV: 0, 1, 2, 3, 4, 5,  6,  7 */
+-	/* p: */ 1, 2, 3, 4, 6, 8, 12, 16
+-};
+-#endif
+-
+ static void clk_pll_enable_lock(struct tegra_clk_pll *pll)
+ {
+ 	u32 val;
+@@ -297,6 +279,39 @@ static void clk_pll_disable(struct clk_hw *hw)
+ 		spin_unlock_irqrestore(pll->lock, flags);
+ }
+ 
++static int _p_div_to_hw(struct clk_hw *hw, u8 p_div)
++{
++	struct tegra_clk_pll *pll = to_clk_pll(hw);
++	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
++
++	if (p_tohw) {
++		while (p_tohw->pdiv) {
++			if (p_div <= p_tohw->pdiv)
++				return p_tohw->hw_val;
++			p_tohw++;
++		}
++		return -EINVAL;
++	}
++	return -EINVAL;
++}
++
++static int _hw_to_p_div(struct clk_hw *hw, u8 p_div_hw)
++{
++	struct tegra_clk_pll *pll = to_clk_pll(hw);
++	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
++
++	if (p_tohw) {
++		while (p_tohw->pdiv) {
++			if (p_div_hw == p_tohw->hw_val)
++				return p_tohw->pdiv;
++			p_tohw++;
++		}
++		return -EINVAL;
++	}
++
++	return 1 << p_div_hw;
++}
++
+ static int _get_table_rate(struct clk_hw *hw,
+ 			   struct tegra_clk_pll_freq_table *cfg,
+ 			   unsigned long rate, unsigned long parent_rate)
+@@ -326,9 +341,9 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+ 		      unsigned long rate, unsigned long parent_rate)
+ {
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
+-	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
+ 	unsigned long cfreq;
+ 	u32 p_div = 0;
++	int ret;
+ 
+ 	switch (parent_rate) {
+ 	case 12000000:
+@@ -369,20 +384,16 @@ static int _calc_rate(struct clk_hw *hw, struct tegra_clk_pll_freq_table *cfg,
+ 	    || cfg->output_rate > pll->params->vco_max) {
+ 		pr_err("%s: Failed to set %s rate %lu\n",
+ 		       __func__, __clk_get_name(hw->clk), rate);
++		WARN_ON(1);
+ 		return -EINVAL;
+ 	}
+ 
+-	if (p_tohw) {
+-		p_div = 1 << p_div;
+-		while (p_tohw->pdiv) {
+-			if (p_div <= p_tohw->pdiv) {
+-				cfg->p = p_tohw->hw_val;
+-				break;
+-			}
+-			p_tohw++;
+-		}
+-		if (!p_tohw->pdiv)
+-			return -EINVAL;
++	if (pll->params->pdiv_tohw) {
++		ret = _p_div_to_hw(hw, 1 << p_div);
++		if (ret < 0)
++			return ret;
++		else
++			cfg->p = ret;
+ 	} else
+ 		cfg->p = p_div;
+ 
+@@ -485,9 +496,10 @@ static int clk_pll_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	}
+ 
+ 	if (_get_table_rate(hw, &cfg, rate, parent_rate) &&
+-	    _calc_rate(hw, &cfg, rate, parent_rate))
++	    _calc_rate(hw, &cfg, rate, parent_rate)) {
++		WARN_ON(1);
+ 		return -EINVAL;
+-
++	}
+ 	if (pll->lock)
+ 		spin_lock_irqsave(pll->lock, flags);
+ 
+@@ -507,7 +519,6 @@ static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+ {
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
+ 	struct tegra_clk_pll_freq_table cfg;
+-	u64 output_rate = *prate;
+ 
+ 	if (pll->flags & TEGRA_PLL_FIXED)
+ 		return pll->fixed_rate;
+@@ -517,13 +528,12 @@ static long clk_pll_round_rate(struct clk_hw *hw, unsigned long rate,
+ 		return __clk_get_rate(hw->clk);
+ 
+ 	if (_get_table_rate(hw, &cfg, rate, *prate) &&
+-	    _calc_rate(hw, &cfg, rate, *prate))
++	    _calc_rate(hw, &cfg, rate, *prate)) {
++		WARN_ON(1);
+ 		return -EINVAL;
++	}
+ 
+-	output_rate *= cfg.n;
+-	do_div(output_rate, cfg.m * (1 << cfg.p));
+-
+-	return output_rate;
++	return cfg.output_rate;
+ }
+ 
+ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+@@ -531,7 +541,6 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+ {
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
+ 	struct tegra_clk_pll_freq_table cfg;
+-	struct pdiv_map *p_tohw = pll->params->pdiv_tohw;
+ 	u32 val;
+ 	u64 rate = parent_rate;
+ 	int pdiv;
+@@ -553,21 +562,11 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
+ 
+ 	_get_pll_mnp(pll, &cfg);
+ 
+-	if (p_tohw) {
+-		while (p_tohw->pdiv) {
+-			if (cfg.p == p_tohw->hw_val) {
+-				pdiv = p_tohw->pdiv;
+-				break;
+-			}
+-			p_tohw++;
+-		}
+-
+-		if (!p_tohw->pdiv) {
+-			WARN_ON(1);
+-			pdiv = 1;
+-		}
+-	} else
+-		pdiv = 1 << cfg.p;
++	pdiv = _hw_to_p_div(hw, cfg.p);
++	if (pdiv < 0) {
++		WARN_ON(1);
++		pdiv = 1;
++	}
+ 
+ 	cfg.m *= pdiv;
+ 
+@@ -769,16 +768,22 @@ static int _calc_dynamic_ramp_rate(struct clk_hw *hw,
+ {
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
+ 	unsigned int p;
++	int p_div;
+ 
+ 	if (!rate)
+ 		return -EINVAL;
+ 
+ 	p = DIV_ROUND_UP(pll->params->vco_min, rate);
+ 	cfg->m = _pll_fixed_mdiv(pll->params, parent_rate);
+-	cfg->p = p;
+-	cfg->output_rate = rate * cfg->p;
++	cfg->output_rate = rate * p;
+ 	cfg->n = cfg->output_rate * cfg->m / parent_rate;
+ 
++	p_div = _p_div_to_hw(hw, p);
++	if (p_div < 0)
++		return p_div;
++	else
++		cfg->p = p_div;
++
+ 	if (cfg->n > divn_max(pll) || cfg->output_rate > pll->params->vco_max)
+ 		return -EINVAL;
+ 
+@@ -790,18 +795,25 @@ static int _pll_ramp_calc_pll(struct clk_hw *hw,
+ 			      unsigned long rate, unsigned long parent_rate)
+ {
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
+-	int err = 0;
++	int err = 0, p_div;
+ 
+ 	err = _get_table_rate(hw, cfg, rate, parent_rate);
+ 	if (err < 0)
+ 		err = _calc_dynamic_ramp_rate(hw, cfg, rate, parent_rate);
+-	else if (cfg->m != _pll_fixed_mdiv(pll->params, parent_rate)) {
++	else {
++		if (cfg->m != _pll_fixed_mdiv(pll->params, parent_rate)) {
+ 			WARN_ON(1);
+ 			err = -EINVAL;
+ 			goto out;
++		}
++		p_div = _p_div_to_hw(hw, cfg->p);
++		if (p_div < 0)
++			return p_div;
++		else
++			cfg->p = p_div;
+ 	}
+ 
+-	if (!cfg->p || (cfg->p >  pll->params->max_p))
++	if (cfg->p >  pll->params->max_p)
+ 		err = -EINVAL;
+ 
+ out:
+@@ -815,7 +827,6 @@ static int clk_pllxc_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	struct tegra_clk_pll_freq_table cfg, old_cfg;
+ 	unsigned long flags = 0;
+ 	int ret = 0;
+-	u8 old_p;
+ 
+ 	ret = _pll_ramp_calc_pll(hw, &cfg, rate, parent_rate);
+ 	if (ret < 0)
+@@ -826,11 +837,8 @@ static int clk_pllxc_set_rate(struct clk_hw *hw, unsigned long rate,
+ 
+ 	_get_pll_mnp(pll, &old_cfg);
+ 
+-	old_p = pllxc_p[old_cfg.p];
+-	if (old_cfg.m != cfg.m || old_cfg.n != cfg.n || old_p != cfg.p) {
+-		cfg.p -= 1;
++	if (old_cfg.m != cfg.m || old_cfg.n != cfg.n || old_cfg.p != cfg.p)
+ 		ret = _program_pll(hw, &cfg, rate);
+-	}
+ 
+ 	if (pll->lock)
+ 		spin_unlock_irqrestore(pll->lock, flags);
+@@ -842,15 +850,19 @@ static long clk_pll_ramp_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long *prate)
+ {
+ 	struct tegra_clk_pll_freq_table cfg;
+-	int ret = 0;
++	int ret = 0, p_div;
+ 	u64 output_rate = *prate;
+ 
+ 	ret = _pll_ramp_calc_pll(hw, &cfg, rate, *prate);
+ 	if (ret < 0)
+ 		return ret;
+ 
++	p_div = _hw_to_p_div(hw, cfg.p);
++	if (p_div < 0)
++		return p_div;
++
+ 	output_rate *= cfg.n;
+-	do_div(output_rate, cfg.m * cfg.p);
++	do_div(output_rate, cfg.m * p_div);
+ 
+ 	return output_rate;
+ }
+@@ -881,8 +893,6 @@ static int clk_pllm_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (ret < 0)
+ 		goto out;
+ 
+-	cfg.p -= 1;
+-
+ 	val = readl_relaxed(pll->pmc + PMC_PLLM_WB0_OVERRIDE);
+ 	if (val & PMC_PLLP_WB0_OVERRIDE_PLLM_OVERRIDE) {
+ 		val = readl_relaxed(pll->pmc + PMC_PLLM_WB0_OVERRIDE_2);
+@@ -1010,13 +1020,10 @@ static int _pllcx_update_dynamic_coef(struct tegra_clk_pll *pll,
+ static int clk_pllc_set_rate(struct clk_hw *hw, unsigned long rate,
+ 				unsigned long parent_rate)
+ {
+-	struct tegra_clk_pll_freq_table cfg;
++	struct tegra_clk_pll_freq_table cfg, old_cfg;
+ 	struct tegra_clk_pll *pll = to_clk_pll(hw);
+ 	unsigned long flags = 0;
+ 	int state, ret = 0;
+-	u32 val;
+-	u16 old_m, old_n;
+-	u8 old_p;
+ 
+ 	if (pll->lock)
+ 		spin_lock_irqsave(pll->lock, flags);
+@@ -1025,21 +1032,16 @@ static int clk_pllc_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (ret < 0)
+ 		goto out;
+ 
+-	val = pll_readl_base(pll);
+-	old_m = (val >> pll->divm_shift) & (divm_mask(pll));
+-	old_n = (val >> pll->divn_shift) & (divn_mask(pll));
+-	old_p = pllcx_p[(val >> pll->divp_shift) & (divp_mask(pll))];
++	_get_pll_mnp(pll, &old_cfg);
+ 
+-	if (cfg.m != old_m) {
++	if (cfg.m != old_cfg.m) {
+ 		WARN_ON(1);
+ 		goto out;
+ 	}
+ 
+-	if (old_n == cfg.n && old_p == cfg.p)
++	if (old_cfg.n == cfg.n && old_cfg.p == cfg.p)
+ 		goto out;
+ 
+-	cfg.p -= 1;
+-
+ 	state = clk_pll_is_enabled(hw);
+ 	if (state)
+ 		_clk_pllc_disable(hw);
 -- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130605/512c2c67/attachment.sig>
+1.7.7.rc0.72.g4b5ea.dirty
