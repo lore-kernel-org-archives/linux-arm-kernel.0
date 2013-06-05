@@ -1,44 +1,43 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:28 +0900
-Subject: [PATCH 037/130] ARM: shmobile: mackerel: Register pinctrl mapping for
- HDMI
+Date: Wed,  5 Jun 2013 17:25:31 +0900
+Subject: [PATCH 040/130] ARM: shmobile: mackerel: Register IRQ pinctrl mapping
+ for SDHI0
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-38-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-41-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based HDMI pinmux configuration by a pinctrl mapping.
+Replace the GPIO-based SDHI0 IRQ pinmux configuration by a pinctrl
+mapping.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-mackerel.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/board-mackerel.c | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index f2e8740..e5bcd18 100644
+index bd3666b..4be236d 100644
 --- a/arch/arm/mach-shmobile/board-mackerel.c
 +++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1338,6 +1338,9 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
- 	/* FSIB (HDMI) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.1", "pfc-sh7372",
- 				  "fsib_mclk_in", "fsib"),
-+	/* HDMI */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-mobile-hdmi", "pfc-sh7372",
-+				  "hdmi", "hdmi"),
- 	/* SDHI0 */
+@@ -1359,6 +1359,8 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
+ 				  "sdhi0_ctrl", "sdhi0"),
  	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
- 				  "sdhi0_data4", "sdhi0"),
-@@ -1494,10 +1497,6 @@ static void __init mackerel_init(void)
- 	gpio_request(GPIO_FN_SCIFA2_TXD1, NULL);
- 	gpio_request(GPIO_FN_SCIFA2_RXD1, NULL);
+ 				  "sdhi0_wp", "sdhi0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
++				  "intc_irq26_1", "intc"),
+ 	/* SDHI1 */
+ #if !IS_ENABLED(CONFIG_MMC_SH_MMCIF)
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-sh7372",
+@@ -1469,9 +1471,6 @@ static void __init mackerel_init(void)
+ 	/* Accelerometer */
+ 	irq_set_irq_type(IRQ21, IRQ_TYPE_LEVEL_HIGH);
  
--	/* HDMI */
--	gpio_request(GPIO_FN_HDMI_HPD, NULL);
--	gpio_request(GPIO_FN_HDMI_CEC, NULL);
+-	/* SDHI0 PORT172 card-detect IRQ26 */
+-	gpio_request(GPIO_FN_IRQ26_172, NULL);
 -
  	/* Reset HDMI, must be held at least one EXTALR (32768Hz) period */
  	srcr4 = __raw_readl(SRCR4);
