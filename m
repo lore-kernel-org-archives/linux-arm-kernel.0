@@ -1,31 +1,44 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 5 Jun 2013 13:56:52 -0700
-Subject: [PATCH] ARM: samsung: avoid racy early printk at bootup
-In-Reply-To: <20130605031536.GA24910@quad.lixom.net>
+Date: Wed,  5 Jun 2013 13:56:33 -0700
+Subject: [PATCH v2] ARM: exynos: add debug_ll_io_init() call in
+ exynos_init_io()
+In-Reply-To: <1370397539-21653-1-git-send-email-dianders@chromium.org>
 References: <1370397539-21653-1-git-send-email-dianders@chromium.org>
- <20130605031536.GA24910@quad.lixom.net>
-Message-ID: <CAD=FV=UqLaAWh6pxAXXjcEu+D5ByoCB1V7F8Z2h-Ddq9ObS_6w@mail.gmail.com>
+Message-ID: <1370465793-7997-1-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+If the early MMU mapping of the UART happens to get booted out of the
+TLB between the start of paging_init() and when we finally re-add the
+UART at the very end of s3c_init_cpu(), we'll get a hang at bootup if
+we've got early_printk enabled.  Avoid this hang by calling
+debug_ll_io_init() early.
 
-On Tue, Jun 4, 2013 at 8:15 PM, Olof Johansson <olof@lixom.net> wrote:
-> This seems to be caused by not calling iotable_ini() in exynos_init_io()
-> when a device tree is passed into the kernel, thus not setting up the
-> mapping for the UART in that case.
->
-> I think the solution is instead to map the uart earlier. The window of
-> exposure is still there, but much smaller (and similar to how it always
-> has been).
->
-> In current upstream, if there is no map_io mach_desc entry at all,
-> debug_ll_io_init() will be called on all platforms. Seems appropriate
-> to call that explicitly before of_scan_flat_dt() in exynos_init_io()
-> in this case.
+Without this patch, you can reliably reproduce a hang when early
+printk is enabled by adding flush_tlb_all() at the start of
+exynos_init_io().  After this patch the hang goes away.
 
-Oh.  Ummm, right.  Yes, debug_ll_io_init() is exactly what's needed
-here instead of all the complexity of what I proposed.  New patch
-coming shortly.  Thanks!  :)
+Signed-off-by: Doug Anderson <dianders@chromium.org>
+---
+Changes in v2:
+- Use debug_ll_io_init() instead of reordering printks and adding
+  warnings.  Thanks Olof!
 
--Doug
+ arch/arm/mach-exynos/common.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 027c9e7..f7e504b 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -386,6 +386,8 @@ int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+ 
+ void __init exynos_init_io(struct map_desc *mach_desc, int size)
+ {
++	debug_ll_io_init();
++
+ #ifdef CONFIG_OF
+ 	if (initial_boot_params)
+ 		of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
+-- 
+1.8.3
