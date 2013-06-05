@@ -1,43 +1,54 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 06 Jun 2013 08:32:04 +0900
-Subject: [PATCH v2] ARM: exynos: add debug_ll_io_init() call in
- exynos_init_io()
-In-Reply-To: <CAOesGMhQX9ip=nb9AQa5fcDFRNpZZSxUO0N0GTX051dakWZD9Q@mail.gmail.com>
-References: <1370397539-21653-1-git-send-email-dianders@chromium.org>
- <1370465793-7997-1-git-send-email-dianders@chromium.org>
- <CAOesGMhQX9ip=nb9AQa5fcDFRNpZZSxUO0N0GTX051dakWZD9Q@mail.gmail.com>
-Message-ID: <09ca01ce6244$e2f0e7a0$a8d2b6e0$%kim@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 6 Jun 2013 08:33:13 +0900
+Subject: [PATCH 2/2] ARM: shmobile: r8A7779: fix Ether device name
+In-Reply-To: <51AFB3F1.40603@cogentembedded.com>
+References: <1369645206-3682-1-git-send-email-horms+renesas@verge.net.au>
+ <1369645206-3682-3-git-send-email-horms+renesas@verge.net.au>
+ <20130528040043.GL13532@quad.lixom.net>
+ <20130604051352.GW23054@verge.net.au>
+ <51AFB3F1.40603@cogentembedded.com>
+Message-ID: <20130605233311.GA32023@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson wrote:
+On Thu, Jun 06, 2013 at 01:56:01AM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> On Wed, Jun 5, 2013 at 1:56 PM, Doug Anderson <dianders@chromium.org>
-> wrote:
-> > If the early MMU mapping of the UART happens to get booted out of the
-> > TLB between the start of paging_init() and when we finally re-add the
-> > UART at the very end of s3c_init_cpu(), we'll get a hang at bootup if
-> > we've got early_printk enabled.  Avoid this hang by calling
-> > debug_ll_io_init() early.
+> On 06/04/2013 09:13 AM, Simon Horman wrote:
+> 
+> >>>From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>>
+> >>>While recasting the commit "ARM: shmobile: R8A7779: add Ether support", I made a
+> >>>typo in the platform device's name: used underscore instead of hyphen.
+> >>Minor nit: if this has been merged, then including the SHA is useful too.
+> >Thanks, I have updated the changelog to:
 > >
-> > Without this patch, you can reliably reproduce a hang when early
-> > printk is enabled by adding flush_tlb_all() at the start of
-> > exynos_init_io().  After this patch the hang goes away.
+> >ARM: shmobile: r8A7779: fix Ether device name
 > >
-> > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> >While recasting the commit dace48d04dee46a3409d5e13cd98031522e46377
+> >("ARM: shmobile: R8A7779: add Ether support"), I made a
+> >typo in the platform device's name: used underscore instead of hyphen.
+> >
+> >Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >[horms+renesas at verge.net.au Add SHA of referenced commit to changlog]
+> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> >diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+> >index b0b3948..c14a69b 100644
+> >--- a/arch/arm/mach-shmobile/setup-r8a7779.c
+> >+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+> >@@ -443,7 +443,7 @@ void __init r8a7779_add_standard_devices(void)
+> >  void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
+> >  {
+> >-	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
+> >+	platform_device_register_resndata(&platform_bus, "sh-eth", -1,
+> >  					  ether_resources,
+> >  					  ARRAY_SIZE(ether_resources),
+> >  					  pdata, sizeof(*pdata));
 > 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> 
-> Kukjin, this seems appropriate for 3.10. Do you have other fixes
-> queued or should I apply this directly?
-> 
-If I remember correctly, nothing in my tree for 3.10.
+>     Actually, if these patches aren't going into 3.10, I think it
+> makes sense to drop them,
+> since I'll be renaming the device and pushing this change thru the
+> net-next tree RSN...
 
-So please go ahead with my ack if you want,
-
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-
-Thanks.
-
-- Kukjin
+Sure, I will drop them.
