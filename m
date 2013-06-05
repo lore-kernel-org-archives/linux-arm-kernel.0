@@ -1,67 +1,59 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  5 Jun 2013 09:04:53 +0200
-Subject: [PATCH 0/8] Support Marvell bootloaders remapping registers at
- different locations
-Message-ID: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed,  5 Jun 2013 09:04:56 +0200
+Subject: [PATCH 3/8] arm: mvebu: move cache and mvebu-mbus initialization later
+In-Reply-To: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370415901-4721-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Current, the L2 cache and the mvebu-mbus drivers are initialized at
+->init_early() time. However, at ->init_early() time, ioremap() only
+works if a static I/O mapping has already been put in place. If it's
+not the case, it tries to do a memory allocation with kmalloc() which
+is not possible so early at this stage of the initialization.
 
-On Marvell platforms, the base address of the "internal registers"
-(i.e registers of all peripherals) can be configured at runtime. At
-reset, it is set to 0xD0000000, but it can freely be changed to some
-other location.
+Since we want to get rid of the static I/O mapping, we cannot
+initialize the L2 cache driver and the mvebu-mbus driver so early. So,
+we move their initialization to the ->init_time() level, which is
+slightly later (so ioremap() works properly), but sufficiently early
+to be before the call of the ->smp_prepare_cpus() hook, which creates
+an address decoding window for the BootROM, which requires the
+mvebu-mbus driver to be properly initialized.
 
-On all previous Marvell SoC families, Linux assumes the bootloader has
-remapped the internal registers at 0xF1000000, and Marvell is now
-moving to do the same on Armada 370/XP, since it allows to use as much
-RAM as possible in the 0 -> 4G area. However, due to early issues,
-until now, Marvell bootloaders were leaving the internal registers
-address set to 0xD0000000, and recently, Marvell has started shipping
-bootloaders that remapped those registers to 0xF1000000.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/mach-mvebu/armada-370-xp.c | 8 ++------
+ 1 file changed, 2 insertions(+), 6 deletions(-)
 
-In order to support those two cases, we want to make sure the Device
-Tree is the only location where the physical base address of the
-internal registers is stored. This patch set removes the places where
-the physical base address of the registers was hardcoded and provides
-two Kconfig options for the earlyprintk UART address selection (one
-for 0xD0000000 and one for 0xF1000000).
-
-It no longer uses the CP15 trick, nor it tries to do runtime remapping
-to 0xF1 if it wasn't done by the bootloader. But it allows to easily
-boot a kernel with both old and new bootloaders by doing a simple
-change, in a single location in the Device Tree.
-
-This patch series is based on jcooper/mvebu/fixes-non-critical and
-jcooper/mvebu/cleanup, which contains 3 patches that are necessary to
-make this patch series work properly.
-
-Thanks,
-
-Thomas
-
-Thomas Petazzoni (8):
-  arm: mvebu: remove dependency of SMP init on static I/O mapping
-  arm: mvebu: avoid hardcoded virtual address in coherency code
-  arm: mvebu: move cache and mvebu-mbus initialization later
-  arm: mvebu: remove hardcoded static I/O mapping
-  arm: mvebu: don't hardcode a physical address in headsmp.S
-  arm: mvebu: don't hardcode the physical address for mvebu-mbus
-  arm: mvebu: add another earlyprintk Kconfig option
-  arm: mvebu: disable DEBUG_LL/EARLY_PRINTK in defconfig
-
- arch/arm/Kconfig.debug              | 30 ++++++++++++++++++++--
- arch/arm/configs/mvebu_defconfig    |  2 --
- arch/arm/include/debug/mvebu.S      |  5 ++++
- arch/arm/mach-mvebu/armada-370-xp.c | 51 ++++++++++++++++++++-----------------
- arch/arm/mach-mvebu/armada-370-xp.h | 10 --------
- arch/arm/mach-mvebu/coherency.c     | 36 ++++++++++----------------
- arch/arm/mach-mvebu/coherency.h     |  4 ---
- arch/arm/mach-mvebu/common.h        |  2 ++
- arch/arm/mach-mvebu/headsmp.S       | 19 ++++++++------
- arch/arm/mach-mvebu/platsmp.c       | 10 +++++++-
- 10 files changed, 96 insertions(+), 73 deletions(-)
-
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index b9319c4..75ebf56 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -44,14 +44,11 @@ static void __init armada_370_xp_map_io(void)
+ 
+ static void __init armada_370_xp_timer_and_clk_init(void)
+ {
++	char *mbus_soc_name;
++
+ 	mvebu_clocks_init();
+ 	armada_370_xp_timer_init();
+ 	coherency_init();
+-}
+-
+-static void __init armada_370_xp_init_early(void)
+-{
+-	char *mbus_soc_name;
+ 
+ 	/*
+ 	 * This initialization will be replaced by a DT-based
+@@ -87,7 +84,6 @@ DT_MACHINE_START(ARMADA_XP_DT, "Marvell Armada 370/XP (Device Tree)")
+ 	.smp		= smp_ops(armada_xp_smp_ops),
+ 	.init_machine	= armada_370_xp_dt_init,
+ 	.map_io		= armada_370_xp_map_io,
+-	.init_early	= armada_370_xp_init_early,
+ 	.init_time	= armada_370_xp_timer_and_clk_init,
+ 	.restart	= mvebu_restart,
+ 	.dt_compat	= armada_370_xp_dt_compat,
 -- 
 1.8.1.2
