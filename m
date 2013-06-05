@@ -1,23 +1,16 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 5 Jun 2013 12:04:27 -0400
-Subject: [PATCH] gpio/omap: omap_gpio_init_context stub must be inline
-In-Reply-To: <2942784.trumtc2GjZ@wuerfel>
-References: <2942784.trumtc2GjZ@wuerfel>
-Message-ID: <51AF618B.9090605@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 05 Jun 2013 10:22:02 -0600
+Subject: [PATCH] clk: tegra: pllc and pllxc should use pdiv_map
+In-Reply-To: <1370437007-25596-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1370437007-25596-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <51AF65AA.2000702@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 31 May 2013 11:59 AM, Arnd Bergmann wrote:
-> The bug fix 352a2d5bf "gpio/omap: ensure gpio context is initialised"
-> has caused a new warning for omap1_defconfig:
-> 
-> drivers/gpio/gpio-omap.c:1465:13: warning: 'omap_gpio_init_context' defined but not used [-Wunused-function]
->  static void omap_gpio_init_context(struct gpio_bank *p) {}
->              ^
-> 
-> The solution is to mark the stub function as 'static inline' so
-> it gets left out of the build when unused.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On 06/05/2013 06:56 AM, Peter De Schrijver wrote:
+> The pllc and pllxc code weren't always using the correct pdiv_map to
+> map between the post divider value and the hw p field. This could result
+> in illegal values being programmed in the hw.
+
+Tested-by: Stephen Warren <swarren@nvidia.com>
+Acked-by: Stephen Warren <swarren@nvidia.com>
