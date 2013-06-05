@@ -1,63 +1,127 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:12 +0900
-Subject: [PATCH 021/130] sh-pfc: r8a7778: add common PFC macro helper
+Date: Wed,  5 Jun 2013 17:25:06 +0900
+Subject: [PATCH 015/130] sh-pfc: r8a7790: Don't use GPIO enum entries
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-22-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-16-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-pfc-r8a7778 will have many devices pfc support in the future,
-and current pfc-r8a7778 is using pin/mux definition macro for SCIF.
-The device definition style using macro is readable code IMO,
-but creating new macro for each devices is not good sense.
-This patch adds common SH_PFC_xx() macro for each new feature devices
+Refactor the GPIO macro magic to use GPIO numbers directly instead of
+the GPIO_GP_x_y enum entries. This will allow removing the GPIO enum
+entries from the mach/r8a7790.h header.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7778.c | 26 ++++++++++++++++++--------
- 1 file changed, 18 insertions(+), 8 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 90 ++++++++++++++++++++++++------------
+ 1 file changed, 60 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
-index ddbd27b..139f9dd 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
-@@ -1303,15 +1303,25 @@ static struct sh_pfc_pin pinmux_pins[] = {
-  */
- #define PIN_NUMBER(row, col)		(1000+((row)-1)*25+(col)-1)
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+index 51219e1..1656915 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
+@@ -24,39 +24,69 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_data/gpio-rcar.h>
  
--/* - SCIF macro ------------------------------------------------------------- */
--#define SCIF_PFC_PIN(name, args...)					\
-+/* - macro */
-+#define SH_PFC_PINS(name, args...) \
- 	static const unsigned int name ##_pins[] = { args }
--#define SCIF_PFC_DAT(name, tx, rx)					\
--	static const unsigned int name ##_mux[]  = { tx##_MARK, rx##_MARK, }
--#define SCIF_PFC_CTR(name, cts, rts)					\
--	static const unsigned int name ##_mux[]  = { cts##_MARK, rts##_MARK, }
--#define SCIF_PFC_CLK(name, sck)					\
--	static const unsigned int name ##_mux[]  = { sck##_MARK, }
-+#define SH_PFC_MUX1(name, arg1)					\
-+	static const unsigned int name ##_mux[]  = { arg1##_MARK }
-+#define SH_PFC_MUX2(name, arg1, arg2)					\
-+	static const unsigned int name ##_mux[]  = { arg1##_MARK, arg2##_MARK, }
-+#define SH_PFC_MUX3(name, arg1, arg2, arg3)					\
-+	static const unsigned int name ##_mux[]  = { arg1##_MARK, arg2##_MARK,	\
-+						     arg3##_MARK }
-+#define SH_PFC_MUX4(name, arg1, arg2, arg3, arg4)			\
-+	static const unsigned int name ##_mux[]  = { arg1##_MARK, arg2##_MARK, \
-+						     arg3##_MARK, arg4##_MARK }
+-#include <mach/r8a7790.h>
+-
+ #include "core.h"
+ #include "sh_pfc.h"
+ 
+-#define CPU_32_PORT(fn, pfx, sfx)				\
+-	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
+-	PORT_10(fn, pfx##2, sfx), PORT_1(fn, pfx##30, sfx),	\
+-	PORT_1(fn, pfx##31, sfx)
+-
+-#define CPU_32_PORT1(fn, pfx, sfx)				\
+-	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
+-	PORT_10(fn, pfx##2, sfx)
+-
+-#define CPU_32_PORT2(fn, pfx, sfx)				\
+-	PORT_10(fn, pfx, sfx), PORT_10(fn, pfx##1, sfx),	\
+-	PORT_10(fn, pfx##2, sfx)
+-
+-/* GP_0_0_DATA -> GP_5_31_DATA (except for GP1[30],GP1[31],GP2[30],GP2[31]) */
+-#define CPU_ALL_PORT(fn, pfx, sfx)				\
+-	CPU_32_PORT(fn, pfx##_0_, sfx),				\
+-	CPU_32_PORT1(fn, pfx##_1_, sfx),			\
+-	CPU_32_PORT2(fn, pfx##_2_, sfx),			\
+-	CPU_32_PORT(fn, pfx##_3_, sfx),				\
+-	CPU_32_PORT(fn, pfx##_4_, sfx),				\
+-	CPU_32_PORT(fn, pfx##_5_, sfx)				\
+-
+-#define _GP_GPIO(pfx, sfx) PINMUX_GPIO(GPIO_GP##pfx, GP##pfx##_DATA)
+-#define _GP_DATA(pfx, sfx) PINMUX_DATA(GP##pfx##_DATA, GP##pfx##_FN)
+-
+-#define GP_ALL(str)	CPU_ALL_PORT(_PORT_ALL, GP, str)
+-#define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, , unused)
+-#define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, , unused)
++#define PORT_GP_1(bank, pin, fn, sfx) fn(bank, pin, GP_##bank##_##pin, sfx)
 +
-+/* - SCIF macro ------------------------------------------------------------- */
-+#define SCIF_PFC_PIN(name, args...)	SH_PFC_PINS(name, args)
-+#define SCIF_PFC_DAT(name, tx, rx)	SH_PFC_MUX2(name, tx, rx)
-+#define SCIF_PFC_CTR(name, cts, rts)	SH_PFC_MUX2(name, cts, rts)
-+#define SCIF_PFC_CLK(name, sck)		SH_PFC_MUX1(name, sck)
++#define PORT_GP_32(bank, fn, sfx)					\
++	PORT_GP_1(bank, 0,  fn, sfx), PORT_GP_1(bank, 1,  fn, sfx),	\
++	PORT_GP_1(bank, 2,  fn, sfx), PORT_GP_1(bank, 3,  fn, sfx),	\
++	PORT_GP_1(bank, 4,  fn, sfx), PORT_GP_1(bank, 5,  fn, sfx),	\
++	PORT_GP_1(bank, 6,  fn, sfx), PORT_GP_1(bank, 7,  fn, sfx),	\
++	PORT_GP_1(bank, 8,  fn, sfx), PORT_GP_1(bank, 9,  fn, sfx),	\
++	PORT_GP_1(bank, 10, fn, sfx), PORT_GP_1(bank, 11, fn, sfx),	\
++	PORT_GP_1(bank, 12, fn, sfx), PORT_GP_1(bank, 13, fn, sfx),	\
++	PORT_GP_1(bank, 14, fn, sfx), PORT_GP_1(bank, 15, fn, sfx),	\
++	PORT_GP_1(bank, 16, fn, sfx), PORT_GP_1(bank, 17, fn, sfx),	\
++	PORT_GP_1(bank, 18, fn, sfx), PORT_GP_1(bank, 19, fn, sfx),	\
++	PORT_GP_1(bank, 20, fn, sfx), PORT_GP_1(bank, 21, fn, sfx),	\
++	PORT_GP_1(bank, 22, fn, sfx), PORT_GP_1(bank, 23, fn, sfx),	\
++	PORT_GP_1(bank, 24, fn, sfx), PORT_GP_1(bank, 25, fn, sfx),	\
++	PORT_GP_1(bank, 26, fn, sfx), PORT_GP_1(bank, 27, fn, sfx),	\
++	PORT_GP_1(bank, 28, fn, sfx), PORT_GP_1(bank, 29, fn, sfx),	\
++	PORT_GP_1(bank, 30, fn, sfx), PORT_GP_1(bank, 31, fn, sfx)
++
++#define PORT_GP_32_REV(bank, fn, sfx)					\
++	PORT_GP_1(bank, 31, fn, sfx), PORT_GP_1(bank, 30, fn, sfx),	\
++	PORT_GP_1(bank, 29, fn, sfx), PORT_GP_1(bank, 28, fn, sfx),	\
++	PORT_GP_1(bank, 27, fn, sfx), PORT_GP_1(bank, 26, fn, sfx),	\
++	PORT_GP_1(bank, 25, fn, sfx), PORT_GP_1(bank, 24, fn, sfx),	\
++	PORT_GP_1(bank, 23, fn, sfx), PORT_GP_1(bank, 22, fn, sfx),	\
++	PORT_GP_1(bank, 21, fn, sfx), PORT_GP_1(bank, 20, fn, sfx),	\
++	PORT_GP_1(bank, 19, fn, sfx), PORT_GP_1(bank, 18, fn, sfx),	\
++	PORT_GP_1(bank, 17, fn, sfx), PORT_GP_1(bank, 16, fn, sfx),	\
++	PORT_GP_1(bank, 15, fn, sfx), PORT_GP_1(bank, 14, fn, sfx),	\
++	PORT_GP_1(bank, 13, fn, sfx), PORT_GP_1(bank, 12, fn, sfx),	\
++	PORT_GP_1(bank, 11, fn, sfx), PORT_GP_1(bank, 10, fn, sfx),	\
++	PORT_GP_1(bank, 9,  fn, sfx), PORT_GP_1(bank, 8,  fn, sfx),	\
++	PORT_GP_1(bank, 7,  fn, sfx), PORT_GP_1(bank, 6,  fn, sfx),	\
++	PORT_GP_1(bank, 5,  fn, sfx), PORT_GP_1(bank, 4,  fn, sfx),	\
++	PORT_GP_1(bank, 3,  fn, sfx), PORT_GP_1(bank, 2,  fn, sfx),	\
++	PORT_GP_1(bank, 1,  fn, sfx), PORT_GP_1(bank, 0,  fn, sfx)
++
++#define CPU_ALL_PORT(fn, sfx)						\
++	PORT_GP_32(0, fn, sfx),						\
++	PORT_GP_32(1, fn, sfx),						\
++	PORT_GP_32(2, fn, sfx),						\
++	PORT_GP_32(3, fn, sfx),						\
++	PORT_GP_32(4, fn, sfx),						\
++	PORT_GP_32(5, fn, sfx)
++
++#define _GP_PORT_ALL(bank, pin, name, sfx)	name##_##sfx
++
++#define _GP_GPIO(bank, pin, _name, sfx)					\
++	[(bank * 32) + pin] = {						\
++		.name = __stringify(_name),				\
++		.enum_id = _name##_DATA,				\
++	}
++
++#define _GP_DATA(bank, pin, name, sfx)					\
++	PINMUX_DATA(name##_DATA, name##_FN)
++
++#define GP_ALL(str)		CPU_ALL_PORT(_GP_PORT_ALL, str)
++#define PINMUX_GPIO_GP_ALL()	CPU_ALL_PORT(_GP_GPIO, unused)
++#define PINMUX_DATA_GP_ALL()	CPU_ALL_PORT(_GP_DATA, unused)
  
- /* - HSCIF0 ----------------------------------------------------------------- */
- SCIF_PFC_PIN(hscif0_data_a,	RCAR_GP_PIN(1, 17),	RCAR_GP_PIN(1, 18));
+ #define PINMUX_IPSR_DATA(ipsr, fn) PINMUX_DATA(fn##_MARK, FN_##ipsr, FN_##fn)
+ #define PINMUX_IPSR_MODSEL_DATA(ipsr, fn, ms) PINMUX_DATA(fn##_MARK, FN_##ms, \
 -- 
 1.8.2.1
