@@ -1,37 +1,32 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 5 Jun 2013 13:23:52 +0100
-Subject: [PATCH v3 6/6] MAINTAINERS: add myself as arm64/xen maintainer
-In-Reply-To: <1370434530-22428-6-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1306041712100.4589@kaball.uk.xensource.com>
- <1370434530-22428-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <1370435032.24512.191.camel@zakaz.uk.xensource.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 5 Jun 2013 14:32:11 +0200
+Subject: [PATCH 1/2] ARM: ux500: Silence compiler warnings due to missing
+ ux500_read_asicid() __init
+In-Reply-To: <2771350.uHLSSD79no@wuerfel>
+References: <1370360208-6500-1-git-send-email-lee.jones@linaro.org>
+ <2771350.uHLSSD79no@wuerfel>
+Message-ID: <CACRpkdbs=K_aa+mS4EHZk3qVZ1GA-gT6sB1zPOMEVWP=h50WqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-06-05 at 13:15 +0100, Stefano Stabellini wrote:
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On Tue, Jun 4, 2013 at 5:55 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 04 June 2013 16:36:47 Lee Jones wrote:
+>> WARNING: vmlinux.o(.text.unlikely+0x1e8): Section mismatch in reference from\
+>>  the function ux500_read_asicid() to the function .init.text:iotable_init()
+>> The function ux500_read_asicid() references
+>> the function __init iotable_init().
+>> This is often because ux500_read_asicid lacks a __init
+>>
+>> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+>
+> This is also part of my other patch to ux500_read_asicid that
+> Linus just applied, but we could take yours for 3.10 if he thinks
+> it's important.
 
-Acked-by: Ian Campbell <ian.campbell@citrix.com>
+We don't need two patches conflicting about such small
+things, so I'll drop this in favor of your patch.
 
-> ---
->  MAINTAINERS |    7 +++++++
->  1 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index fd3a495..95a6a51 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -9096,6 +9096,13 @@ S:	Supported
->  F:	arch/arm/xen/
->  F:	arch/arm/include/asm/xen/
->  
-> +XEN HYPERVISOR ARM64
-> +M:	Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> +L:	xen-devel at lists.xensource.com (moderated for non-subscribers)
-> +S:	Supported
-> +F:	arch/arm64/xen/
-> +F:	arch/arm64/include/asm/xen/
-> +
->  XEN NETWORK BACKEND DRIVER
->  M:	Ian Campbell <ian.campbell@citrix.com>
->  L:	xen-devel at lists.xensource.com (moderated for non-subscribers)
+Yours,
+Linus Walleij
