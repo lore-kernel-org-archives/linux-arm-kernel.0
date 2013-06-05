@@ -1,17 +1,17 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 5 Jun 2013 15:44:32 +0200
-Subject: [PATCH 2/3] tty: serial: modify PL011 driver to use pinctrl PM helpers
+Date: Wed, 5 Jun 2013 15:44:33 +0200
+Subject: [PATCH 3/3] i2c: nomadik: use pinctrl PM helpers
 In-Reply-To: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
 References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1370439873-30053-2-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1370439873-30053-3-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This augments the PL011 UART driver to utilize the new pinctrl
-core PM helpers to transition the driver to default and sleep
-states, cutting away some boilerplate code.
+This utilize the new pinctrl core PM helpers to transition
+the driver to "sleep" and "idle" states, cutting away some
+boilerplate code.
 
 Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
 Cc: Mark Brown <broonie@kernel.org>
@@ -22,99 +22,166 @@ Cc: Stephen Warren <swarren@wwwdotorg.org>
 Cc: Wolfram Sang <wsa@the-dreams.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
-I'm seeking Greg's ACK on this as well so we can take the
-whole refactoring through the pinctrl tree.
+I'm seeking Wolfram's ACK on this to take it through the
+pinctrl tree in the end.
 ---
- drivers/tty/serial/amba-pl011.c | 42 +++--------------------------------------
- 1 file changed, 3 insertions(+), 39 deletions(-)
+ drivers/i2c/busses/i2c-nomadik.c | 90 +++++-----------------------------------
+ 1 file changed, 10 insertions(+), 80 deletions(-)
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index e2774f9..6ac3254 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -151,10 +151,6 @@ struct pl011_dmatx_data {
- struct uart_amba_port {
- 	struct uart_port	port;
- 	struct clk		*clk;
--	/* Two optional pin states - default & sleep */
--	struct pinctrl		*pinctrl;
--	struct pinctrl_state	*pins_default;
--	struct pinctrl_state	*pins_sleep;
- 	const struct vendor_data *vendor;
- 	unsigned int		dmacr;		/* dma control reg */
- 	unsigned int		im;		/* interrupt mask */
-@@ -1480,12 +1476,7 @@ static int pl011_hwinit(struct uart_port *port)
- 	int retval;
+diff --git a/drivers/i2c/busses/i2c-nomadik.c b/drivers/i2c/busses/i2c-nomadik.c
+index 650293f..c7e3b0c 100644
+--- a/drivers/i2c/busses/i2c-nomadik.c
++++ b/drivers/i2c/busses/i2c-nomadik.c
+@@ -148,10 +148,6 @@ struct i2c_nmk_client {
+  * @stop: stop condition.
+  * @xfer_complete: acknowledge completion for a I2C message.
+  * @result: controller propogated result.
+- * @pinctrl: pinctrl handle.
+- * @pins_default: default state for the pins.
+- * @pins_idle: idle state for the pins.
+- * @pins_sleep: sleep state for the pins.
+  * @busy: Busy doing transfer.
+  */
+ struct nmk_i2c_dev {
+@@ -165,11 +161,6 @@ struct nmk_i2c_dev {
+ 	int				stop;
+ 	struct completion		xfer_complete;
+ 	int				result;
+-	/* Three pin states - default, idle & sleep */
+-	struct pinctrl			*pinctrl;
+-	struct pinctrl_state		*pins_default;
+-	struct pinctrl_state		*pins_idle;
+-	struct pinctrl_state		*pins_sleep;
+ 	bool				busy;
+ };
  
- 	/* Optionaly enable pins to be muxed in and configured */
--	if (!IS_ERR(uap->pins_default)) {
--		retval = pinctrl_select_state(uap->pinctrl, uap->pins_default);
--		if (retval)
--			dev_err(port->dev,
--				"could not set default pins\n");
--	}
-+	pinctrl_pm_select_default_state(port->dev);
- 
- 	/*
- 	 * Try to enable the clock producer.
-@@ -1611,7 +1602,6 @@ static void pl011_shutdown(struct uart_port *port)
- {
- 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
- 	unsigned int cr;
--	int retval;
- 
- 	/*
- 	 * disable all interrupts
-@@ -1654,13 +1644,7 @@ static void pl011_shutdown(struct uart_port *port)
- 	 */
- 	clk_disable_unprepare(uap->clk);
- 	/* Optionally let pins go into sleep states */
--	if (!IS_ERR(uap->pins_sleep)) {
--		retval = pinctrl_select_state(uap->pinctrl, uap->pins_sleep);
--		if (retval)
--			dev_err(port->dev,
--				"could not set pins to sleep state\n");
--	}
--
-+	pinctrl_pm_select_sleep_state(port->dev);
- 
- 	if (uap->port.dev->platform_data) {
- 		struct amba_pl011_data *plat;
-@@ -2013,12 +1997,7 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 		return -ENODEV;
- 
- 	/* Allow pins to be muxed in and configured */
--	if (!IS_ERR(uap->pins_default)) {
--		ret = pinctrl_select_state(uap->pinctrl, uap->pins_default);
--		if (ret)
--			dev_err(uap->port.dev,
--				"could not set default pins\n");
--	}
-+	pinctrl_pm_select_default_state(uap->port.dev);
- 
- 	ret = clk_prepare(uap->clk);
- 	if (ret)
-@@ -2132,21 +2111,6 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 		goto out;
+@@ -645,13 +636,7 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
  	}
  
--	uap->pinctrl = devm_pinctrl_get(&dev->dev);
--	if (IS_ERR(uap->pinctrl)) {
--		ret = PTR_ERR(uap->pinctrl);
--		goto out;
+ 	/* Optionaly enable pins to be muxed in and configured */
+-	if (!IS_ERR(dev->pins_default)) {
+-		status = pinctrl_select_state(dev->pinctrl,
+-				dev->pins_default);
+-		if (status)
+-			dev_err(&dev->adev->dev,
+-				"could not set default pins\n");
 -	}
--	uap->pins_default = pinctrl_lookup_state(uap->pinctrl,
++	pinctrl_pm_select_default_state(&dev->adev->dev);
+ 
+ 	status = init_hw(dev);
+ 	if (status)
+@@ -681,13 +666,7 @@ out:
+ 	clk_disable_unprepare(dev->clk);
+ out_clk:
+ 	/* Optionally let pins go into idle state */
+-	if (!IS_ERR(dev->pins_idle)) {
+-		status = pinctrl_select_state(dev->pinctrl,
+-				dev->pins_idle);
+-		if (status)
+-			dev_err(&dev->adev->dev,
+-				"could not set pins to idle state\n");
+-	}
++	pinctrl_pm_select_idle_state(&dev->adev->dev);
+ 
+ 	pm_runtime_put_sync(&dev->adev->dev);
+ 
+@@ -882,41 +861,22 @@ static int nmk_i2c_suspend(struct device *dev)
+ {
+ 	struct amba_device *adev = to_amba_device(dev);
+ 	struct nmk_i2c_dev *nmk_i2c = amba_get_drvdata(adev);
+-	int ret;
+ 
+ 	if (nmk_i2c->busy)
+ 		return -EBUSY;
+ 
+-	if (!IS_ERR(nmk_i2c->pins_sleep)) {
+-		ret = pinctrl_select_state(nmk_i2c->pinctrl,
+-				nmk_i2c->pins_sleep);
+-		if (ret)
+-			dev_err(dev, "could not set pins to sleep state\n");
+-	}
++	pinctrl_pm_select_sleep_state(dev);
+ 
+ 	return 0;
+ }
+ 
+ static int nmk_i2c_resume(struct device *dev)
+ {
+-	struct amba_device *adev = to_amba_device(dev);
+-	struct nmk_i2c_dev *nmk_i2c = amba_get_drvdata(adev);
+-	int ret;
+-
+ 	/* First go to the default state */
+-	if (!IS_ERR(nmk_i2c->pins_default)) {
+-		ret = pinctrl_select_state(nmk_i2c->pinctrl,
+-				nmk_i2c->pins_default);
+-		if (ret)
+-			dev_err(dev, "could not set pins to default state\n");
+-	}
++	pinctrl_pm_select_default_state(dev);
+ 	/* Then let's idle the pins until the next transfer happens */
+-	if (!IS_ERR(nmk_i2c->pins_idle)) {
+-		ret = pinctrl_select_state(nmk_i2c->pinctrl,
+-				nmk_i2c->pins_idle);
+-		if (ret)
+-			dev_err(dev, "could not set pins to idle state\n");
+-	}
++	pinctrl_pm_select_idle_state(dev);
++
+ 	return 0;
+ }
+ #else
+@@ -1004,39 +964,10 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ 	dev->adev = adev;
+ 	amba_set_drvdata(adev, dev);
+ 
+-	dev->pinctrl = devm_pinctrl_get(&adev->dev);
+-	if (IS_ERR(dev->pinctrl)) {
+-		ret = PTR_ERR(dev->pinctrl);
+-		goto err_pinctrl;
+-	}
+-
+-	dev->pins_default = pinctrl_lookup_state(dev->pinctrl,
 -						 PINCTRL_STATE_DEFAULT);
--	if (IS_ERR(uap->pins_default))
--		dev_err(&dev->dev, "could not get default pinstate\n");
+-	if (IS_ERR(dev->pins_default)) {
+-		dev_err(&adev->dev, "could not get default pinstate\n");
+-	} else {
+-		ret = pinctrl_select_state(dev->pinctrl,
+-					   dev->pins_default);
+-		if (ret)
+-			dev_dbg(&adev->dev, "could not set default pinstate\n");
+-	}
 -
--	uap->pins_sleep = pinctrl_lookup_state(uap->pinctrl,
+-	dev->pins_idle = pinctrl_lookup_state(dev->pinctrl,
+-					      PINCTRL_STATE_IDLE);
+-	if (IS_ERR(dev->pins_idle)) {
+-		dev_dbg(&adev->dev, "could not get idle pinstate\n");
+-	} else {
+-		/* If possible, let's go to idle until the first transfer */
+-		ret = pinctrl_select_state(dev->pinctrl,
+-					   dev->pins_idle);
+-		if (ret)
+-			dev_dbg(&adev->dev, "could not set idle pinstate\n");
+-	}
+-
+-	dev->pins_sleep = pinctrl_lookup_state(dev->pinctrl,
 -					       PINCTRL_STATE_SLEEP);
--	if (IS_ERR(uap->pins_sleep))
--		dev_dbg(&dev->dev, "could not get sleep pinstate\n");
--
- 	uap->clk = devm_clk_get(&dev->dev, NULL);
- 	if (IS_ERR(uap->clk)) {
- 		ret = PTR_ERR(uap->clk);
+-	if (IS_ERR(dev->pins_sleep))
+-		dev_dbg(&adev->dev, "could not get sleep pinstate\n");
++	/* Select default pin state */
++	pinctrl_pm_select_default_state(&adev->dev);
++	/* If possible, let's go to idle until the first transfer */
++	pinctrl_pm_select_idle_state(&adev->dev);
+ 
+ 	dev->virtbase = ioremap(adev->res.start, resource_size(&adev->res));
+ 	if (!dev->virtbase) {
+@@ -1106,7 +1037,6 @@ static int nmk_i2c_probe(struct amba_device *adev, const struct amba_id *id)
+ 	iounmap(dev->virtbase);
+  err_no_ioremap:
+ 	kfree(dev);
+- err_pinctrl:
+  err_no_mem:
+ 
+ 	return ret;
 -- 
 1.7.11.3
