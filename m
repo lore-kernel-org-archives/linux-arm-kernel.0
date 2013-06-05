@@ -1,47 +1,39 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 5 Jun 2013 09:05:22 +0100
-Subject: [PATCH 21/21] clk: ux500: Supply provider look-up functionality
- to support Device Tree
-In-Reply-To: <201306042252.03340.arnd@arndb.de>
-References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
- <1370266965-7901-22-git-send-email-lee.jones@linaro.org>
- <CACRpkdaNMR=6JT+pi+9aqOJXW3gK9Yb4hztx3rOiY3c+f3UTRA@mail.gmail.com>
- <201306042252.03340.arnd@arndb.de>
-Message-ID: <20130605080522.GP3370@gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  5 Jun 2013 17:24:53 +0900
+Subject: [PATCH 002/130] gpio-rcar: Make the platform data gpio_base field
+ signed
+In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 04 Jun 2013, Arnd Bergmann wrote:
+From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-> On Tuesday 04 June 2013, Linus Walleij wrote:
-> > The whole thing is very different from other DT clock things
-> > I've seen, usually you add a compatible node for each
-> > clock type, and a node for each physical gate. But there
-> > may be several ways to skin this cat...
-> > 
-> 
-> Based on the IRC discussion we had, I would think that the "prcc" clocks
-> would best be represented using multiple clock-cells since you can describe
-> them easily a tuple of register index, bit number some way to distinguish
-> the two types.
-> 
-> The "prcmu" clocks are harder, and we probably need either a more verbose
-> representation using one node per clock there, or have a single node
-> for the entire prcmu and not bother to describe them in DT but hardcode
-> everything in the source. The current patch does the latter, which is
-> easier now but means we cannot simplify the code much in the future
-> when we remove ATAGS boot support.
+The gpio_base field is used to specify the desired GPIO base for the
+GPIO controller. The GPIO core can automatically allocate a GPIO number
+range when the base is set to -1. To make this possible, make the field
+signed.
 
-As already discussed, in the PRCMU case I'm going to make 'enum
-prcmu_clock {' look like register PRCM_YYCLKEN0_MGT_SET as described
-by the design specification, and use that as our indexer.
+Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ include/linux/platform_data/gpio-rcar.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> I hope Mike can give some better insight to what his preferences are.
-> 
-> 	Arnd
-
+diff --git a/include/linux/platform_data/gpio-rcar.h b/include/linux/platform_data/gpio-rcar.h
+index b253f77..aba7079 100644
+--- a/include/linux/platform_data/gpio-rcar.h
++++ b/include/linux/platform_data/gpio-rcar.h
+@@ -17,7 +17,7 @@
+ #define __GPIO_RCAR_H__
+ 
+ struct gpio_rcar_config {
+-	unsigned int gpio_base;
++	int gpio_base;
+ 	unsigned int irq_base;
+ 	unsigned int number_of_pins;
+ 	const char *pctl_name;
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.2.1
