@@ -1,44 +1,27 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 05 Jun 2013 15:14:39 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAxLzJdIGh3bW9uOiBtYzEzNzgzLWFkYzogUmVmYWN0?=
- =?UTF-8?B?b3Igc291cmNlIHRvIGluZGljYXRlIHZhcmlvdXMgbWMxM3h4eCBjaGlwcw==?=
-In-Reply-To: <20130605125308.36ba40ab@endymion.delvare>
-References: <1370422628-1073-1-git-send-email-shc_work@mail.ru>
- <1370423952.906453652@f168.mail.ru>
- <20130605125308.36ba40ab@endymion.delvare>
-Message-ID: <1370430879.384973987@f91.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 5 Jun 2013 13:17:02 +0200
+Subject: [PATCH 00/03] ARM: 64-bit memory fixes, APE6EVM second memory bank
+In-Reply-To: <20130605104427.1720.68752.sendpatchset@w520>
+References: <20130605104427.1720.68752.sendpatchset@w520>
+Message-ID: <201306051317.02284.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > On Wed,  5 Jun 2013 12:57:07 +0400, Alexander Shiyan wrote:
-> > > > This patch renames structures, variables and functions to indicate support
-> > > > for various MC13xxx chips.
-> > > > 
-> > > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> > > > ---
-> > > >  drivers/hwmon/mc13783-adc.c | 135 +++++++++++++++++++++-----------------------
-> > > >  1 file changed, 63 insertions(+), 72 deletions(-)
-> > > 
-> > > Nack. This change serves absolutely no purpose, all it's doing it make
-> > > everyone's life harder. Just don't do that, thanks.
-> > 
-> > I do not understand stubbornness here.
-> > The driver works for different chips, it should be reflected in the code.
+On Wednesday 05 June 2013, Magnus Damm wrote:
+> ARM: 64-bit memory fixes, APE6EVM second memory bank
 > 
-> Let's look at it from another angle. What problem are you trying to
-> solve? I see absolutely no problem with the current function and file
-> names. Almost all Linux kernel drivers support more chips than their
-> name says.
+> [PATCH 01/03] ARM: Let arm_add_memory() always use 64-bit arguments
+> [PATCH 02/03] ARM: Handle 64-bit memory in case of 32-bit phys_addr_t
+> [PATCH 03/03] ARM: shmobile: Add second memory bank to DTS for APE6EVM
 > 
-> On the other hand, changing all function names makes backporting fixes
-> harder, and changing Kconfig symbol names makes upgrading to the new
-> kernel version harder for everyone.
-> 
-> So the cost of your proposal far outweighs the benefits.
+> This patch set contains two fixes and one mach-shmobile specific patch
+> to add a second memory bank. The fixes attempt to improve the memory bank
+> handling in the ARM kernel in case of 64-bit addresses.
 
-Well, let's leave the kconfig symbol as is. But about the rest, that mc13783_*
-symbols in the log (debug) will say a developer who does not know about
-mc13892 compatibility with mc13783? I still believe that this should be reflected.
-Thanks.
+Please have a look at this patch that Stepan Moskovchenko posted:
 
----
+https://patchwork.kernel.org/patch/2639171/
+
+I think we are going to need only one of the two approaches.
+
+	Arnd
