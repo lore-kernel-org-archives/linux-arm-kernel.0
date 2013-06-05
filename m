@@ -1,61 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jun 2013 12:29:13 +0100
-Subject: [PATCH] ARM: zynq: wfi exit on same cpu is valid
-In-Reply-To: <51AF1752.1040804@monstr.eu>
-References: <1369997066-10585-1-git-send-email-sanjay.rawat@linaro.org>
- <51AC5060.80806@linaro.org> <51AC672A.5050501@monstr.eu>
- <51AC8F74.2060302@linaro.org>
- <CAP245DUsRcomDaNKbxYry39ZLCrR33SDRRAhNCdR91e17sHF-A@mail.gmail.com>
- <51ADD667.3010203@linaro.org> <20130604141017.GW18614@n2100.arm.linux.org.uk>
- <20130604141701.GX18614@n2100.arm.linux.org.uk> <51AF1752.1040804@monstr.eu>
-Message-ID: <20130605112913.GD18614@n2100.arm.linux.org.uk>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 05 Jun 2013 19:34:50 +0800
+Subject: [PATCH v2] arch/*/asm/include/bitops.h: api issue, find_*_bit()
+ defination are different with each other
+In-Reply-To: <20130605071915.GK23140@pengutronix.de>
+References: <51AE8FEF.1020809@asianux.com> <51AE903C.6010806@asianux.com>
+ <51AE909D.9080006@asianux.com> <20130605071915.GK23140@pengutronix.de>
+Message-ID: <51AF225A.5020703@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 12:47:46PM +0200, Michal Simek wrote:
-> On 06/04/2013 04:17 PM, Russell King - ARM Linux wrote:
-> > And yes, indeed, zynq can control the secondary CPU:
-> > 
-> > void zynq_slcr_cpu_start(int cpu)
-> > {
-> >         /* enable CPUn */
-> >         writel(SLCR_A9_CPU_CLKSTOP << cpu,
-> >                zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-> >         /* enable CLK for CPUn */
-> >         writel(0x0 << cpu, zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-> > }
-> > 
-> > void zynq_slcr_cpu_stop(int cpu)
-> > {
-> >         /* stop CLK and reset CPUn */
-> >         writel((SLCR_A9_CPU_CLKSTOP | SLCR_A9_CPU_RST) << cpu,
-> >                zynq_slcr_base + SLCR_A9_CPU_RST_CTRL);
-> > }
-> > 
-> > So there's no need for the pen.  There's no need for the low power crap
-> > in hotplug.c, there's no need for the pen in hotplug.c.  You just arrange
-> > for the secondary CPU to have its clock stopped and reset when it is
-> > taken offline.
-> > 
-> > Hotplugging a CPU back in _should_ be no different from its initial
-> > bringup into the kernel.
+On 06/05/2013 03:19 PM, Uwe ? wrote:
+> Hello,
 > 
-> I have tested that and cpu_die code is performed on cpu which
-> should die.
-> And simple calling zynq_slcr_cpu_stop() on cpu which should die
-> just doesn't work.
-> There is probably any expectation which I can't see.
+> On Wed, Jun 05, 2013 at 09:13:01AM +0800, Chen Gang wrote:
+>>
+>> For arm and m68k, they customize find_*_bit(), but the API is different
+>> with 'generic'.
+>>
+>> avr32, s390, and unicore32 also customize find_*_bit(), but the API is
+>> the same with 'generic', and the left architectures all use 'generic'.
+>>
+>> So need change arm and m68k related API to match the 'generic', then
+>> all another modules can face same public API for various architectures.
+>>
+>> Also beautify code and comments to pass "./scripts/checkpatch.pl"
+>>
+>>
+>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>> ---
+>>  arch/arm/include/asm/bitops.h  |   26 ++++++++++++++++++--------
+>>  arch/arm/lib/findbit.S         |   14 ++++++++++----
+>>  arch/m68k/include/asm/bitops.h |   25 ++++++++++++++-----------
+>>  3 files changed, 42 insertions(+), 23 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+>> index e691ec9..10566c8 100644
+>> --- a/arch/arm/include/asm/bitops.h
+>> +++ b/arch/arm/include/asm/bitops.h
+>> @@ -161,18 +161,28 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
+>>  /*
+>>   * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
+>>   */
+>> -extern int _find_first_zero_bit_le(const void * p, unsigned size);
+>> -extern int _find_next_zero_bit_le(const void * p, int size, int offset);
+>> -extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+>> -extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
+>> +extern unsigned long  _find_first_zero_bit_le(const void *p,
+> doesn't checkpatch critizise the double space in the line above?
+> 
 
-Have you checked whether the CPU to die can write to this register to
-stop its own clock and reset itself?  Maybe you need a wfi() after
-writing to that register to trigger the hardware to shutdown the CPU?
+Thank you very much for your carefully checking (could you tell me how
+do you find it ?)  :-)
 
-It's also entirely possible that you need some other CPU to do those
-steps while the CPU to die spins in a loop or a wfi or something like
-that.  You can hook into that via the cpu_kill() callback, which will
-have the CPU which is to die as its argument.
+I need wait for a day at least, if no another suggestions or
+completions, I should send patch v3.
 
-Without knowing how your hardware works, it's very difficult to be able
-to positively point you in an appropriate direction, but the fact that
-it's allegedly possible to turn the clock off and place the secondary
-CPU in reset means that this should be possible somehow.
+
+>> +						unsigned long size);
+>> +extern unsigned long _find_next_zero_bit_le(const void *p, unsigned long size,
+>> +						unsigned long offset);
+>> +extern unsigned long _find_first_bit_le(const unsigned long *p,
+>> +						unsigned long size);
+>> +extern unsigned long _find_next_bit_le(const unsigned long *p,
+>> +						unsigned long size,
+>> +						unsigned long offset);
+>>  
+>>  /*
+>>   * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
+>>   */
+>> -extern int _find_first_zero_bit_be(const void * p, unsigned size);
+>> -extern int _find_next_zero_bit_be(const void * p, int size, int offset);
+>> -extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+>> -extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+>> +extern unsigned long _find_first_zero_bit_be(const void *p,
+>> +						unsigned long size);
+>> +extern unsigned long _find_next_zero_bit_be(const void *p, unsigned long size,
+>> +						unsigned long offset);
+>> +extern unsigned long _find_first_bit_be(const unsigned long *p,
+>> +						unsigned long size);
+>> +extern unsigned long _find_next_bit_be(const unsigned long *p,
+>> +						unsigned long size,
+>> +						unsigned long offset);
+>>  
+>>  #ifndef CONFIG_SMP
+>>  /*
+>> diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
+>> index 64f6bc1..9e3263a 100644
+>> --- a/arch/arm/lib/findbit.S
+>> +++ b/arch/arm/lib/findbit.S
+>> @@ -19,7 +19,8 @@
+>>  
+>>  /*
+>>   * Purpose  : Find a 'zero' bit
+>> - * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
+>> + * Prototype: unsigned long  find_first_zero_bit(const void *p,
+> here is another one.
+> 
+
+Thanks.
+
+
+-- 
+Chen Gang
+
+Asianux Corporation
