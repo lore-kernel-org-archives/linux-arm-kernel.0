@@ -1,28 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 5 Jun 2013 20:20:19 +0100
-Subject: [PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
-In-Reply-To: <20130605073418.15758.93704.sendpatchset@w520>
-References: <20130605073410.15758.37563.sendpatchset@w520>
- <20130605073418.15758.93704.sendpatchset@w520>
-Message-ID: <20130605192019.GG18614@n2100.arm.linux.org.uk>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 5 Jun 2013 12:22:40 -0700
+Subject: [PATCH v2 0/7] pcmcia: at91_cf: clean up and add DT support
+In-Reply-To: <51AF0D2A.2@atmel.com>
+References: <cover.1363865228.git.nicolas.ferre@atmel.com>
+ <CAHkwnC-aL=G9K9jttjD8Bk_ZKJ535vsGT26uCFbuFMeJUquYQw@mail.gmail.com>
+ <516E628B.1000104@atmel.com> <20130419225448.GA8242@kroah.com>
+ <51AF0D2A.2@atmel.com>
+Message-ID: <20130605192240.GA5647@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 04:34:18PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Wed, Jun 05, 2013 at 12:04:26PM +0200, Nicolas Ferre wrote:
+> On 20/04/2013 00:54, Greg Kroah-Hartman :
+> >On Wed, Apr 17, 2013 at 10:51:23AM +0200, Nicolas Ferre wrote:
+> >>On 04/17/2013 10:39 AM, Fabio Porcedda :
+> >>>On Thu, Mar 21, 2013 at 12:40 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
+> >>>>These patches clean up at91_cf a bit and add DT bindings.
+> >>>>It is based on a previous series from Joachim Eastwood and other cleanup
+> >>>>patches by Fabio and Laurent.
+> >>>>I have collected them together as they are lying around for some time.
+> >>>>
+> >>>>Please tell me if It can go through PCMCIA tree or if Andrew or Greg can
+> >>>>take them.
+> >>>>Note that they are not bug fixes, so you can stack them for 3.10.
+> >>>>
+> >>>>Thanks for your help, best regards.
+> >>>>
+> >>>>v2: add 2 more cleanup patches:
+> >>>>         - move to module_platform_driver_probe()
+> >>>>         - little trivial indentation fix
+> >>>>
+> >>>>Fabio Porcedda (1):
+> >>>>   pcmcia: at91_cf: use module_platform_driver_probe()
+> >>>>
+> >>>>Joachim Eastwood (5):
+> >>>>   pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
+> >>>>   pcmcia: at91_cf: convert to dev_ print functions
+> >>>>   pcmcia: at91_cf: use devm_ functions for allocations
+> >>>>   pcmcia: at91_cf: clean up header includes
+> >>>>   pcmcia: at91_cf: add support for DT
+> >>>>
+> >>>>Laurent Navet (1):
+> >>>>   pcmcia/trivial: at91_cf: fix checkpatch error
+> >>>>
+> >>>>  .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
+> >>>>  drivers/pcmcia/Kconfig                             |   2 +-
+> >>>>  drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
+> >>>>  3 files changed, 108 insertions(+), 89 deletions(-)
+> >>>>  create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
+> >>>>
+> >>>>--
+> >>>>1.8.0
+> >>>>
+> >>>
+> >>>Ping?
+> >>
+> >>Andrew, Greg, can you please take this series?
+> >>
+> >>Here is the post on lkml:
+> >>https://lkml.org/lkml/2013/3/21/246
+> >>
+> >>Here is the first patch in patchwork (1/7):
+> >>https://patchwork.kernel.org/patch/2312691/
+> >>
+> >>Tell me if I can do something else to make this applied upstream...
+> >
+> >The PCMCIA maintainer should take these, not me.
 > 
-> Introduce SHMOBILE_FIXUP() as a helper function to
-> allow boards to specify their memory base and size.
+> I know Greg, but this patch series is still not taken by anyone 3
+> months after its first submission and after several requests by both
+> Fabio and myself...
+> 
+> The series is still applying on linux-next today... Maybe it can go
+> via Andrew, then...
 
-No.  I really don't like this idea (we've had people doing this in the
-past and I went around removing all that crap, and adding command line
-options into the defconfig files for those boards.)
+I can take them through my char/misc driver tree if it's been that long
+of a delay, care to resend them to me?
 
-I also fail to understand why in 2013, some 11 years after ATAG stuff
-was created, people _still_ can't get pass correct information into
-the kernel.
+thanks,
 
-It's exactly this kind of issue which makes me believe that stuff like
-ACPI, UEFI and DT are doomed to fail on ARM because this kind of problem
-constantly crops up time and time again.  People have seem to have this
-total inability to get the pre-kernel environment right.
+greg k-h
