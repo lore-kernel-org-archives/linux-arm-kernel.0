@@ -1,68 +1,24 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Wed, 05 Jun 2013 22:36:20 +0200
-Subject: [PATCH] cpuidle: move ARCH_NEEDS_CPU_IDLE_COUPLED Kconfig option
-In-Reply-To: <51AF3424.5060200@linaro.org>
-References: <1460854.rT4b7LefMM@wuerfel> <51AF3424.5060200@linaro.org>
-Message-ID: <2504003.GJXn0Z0NTJ@vostro.rjw.lan>
+From: pavel@denx.de (Pavel Machek)
+Date: Wed, 5 Jun 2013 22:30:50 +0200
+Subject: [PATCHv6 4/6] ARM: socfpga: Add syscon to be part of socfpga
+In-Reply-To: <1370444578-25721-5-git-send-email-dinguyen@altera.com>
+References: <1370444578-25721-1-git-send-email-dinguyen@altera.com>
+ <1370444578-25721-5-git-send-email-dinguyen@altera.com>
+Message-ID: <20130605203050.GA19905@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 05, 2013 02:50:44 PM Daniel Lezcano wrote:
-> On 06/05/2013 02:38 PM, Arnd Bergmann wrote:
-> > There is no reason why ARCH_NEEDS_CPU_IDLE_COUPLED needs to be
-> > hidden inside of "if CPU_IDLE", since it is a silent option.
-> > Moving it outside lets platforms select this symbol unconditionally,
-> > which avoid a warning from the ARM omap2plus_defconfig build:
-> > 
-> > warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects
-> > 	ARCH_NEEDS_CPU_IDLE_COUPLED which has unmet direct
-> > 	dependencies (CPU_IDLE)
+On Wed 2013-06-05 10:02:56, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
 > 
-> IMHO, this option depends on CPU_IDLE and thus must be kept inside the
-> CPU_IDLE menuconfig.
+> SOCFPGA has a system manager register block can be accessed by using
+> the syscon driver.
 > 
-> The warning raised here is because this option is selected by the arch
-> Kconfig without checking if CPU_IDLE is set or not.
-> 
-> I am in favor to change the OMAP / TEGRA Kconfigs instead, in this way:
-
-I prefer this one.
-
-Thanks,
-Rafael
+> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 
 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index f49cd51..831e89e 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -83,7 +83,7 @@ config ARCH_OMAP4
->         depends on ARCH_OMAP2PLUS
->         depends on ARCH_MULTI_V7
->         select ARCH_HAS_OPP
-> -       select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
-> +       select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
->         select ARM_CPU_SUSPEND if PM
->         select ARM_ERRATA_720789
->         select ARM_GIC
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> index 84d72fc..04c6221 100644
-> --- a/arch/arm/mach-tegra/Kconfig
-> +++ b/arch/arm/mach-tegra/Kconfig
-> @@ -23,7 +23,7 @@ menu "NVIDIA Tegra options"
-> 
->  config ARCH_TEGRA_2x_SOC
->         bool "Enable support for Tegra20 family"
-> -       select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
-> +       select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
->         select ARM_ERRATA_720789
->         select ARM_ERRATA_754327 if SMP
->         select ARM_ERRATA_764369 if SMP
-> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-> 
-> [ ... ]
-> 
-> 
+Reviewed-by: Pavel Machek <pavel@denx.de>
+
 -- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
