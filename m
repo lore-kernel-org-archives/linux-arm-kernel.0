@@ -1,64 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:25 +0900
-Subject: [PATCH 034/130] ARM: shmobile: mackerel: Register pinctrl mapping for
- CEU
+Date: Wed,  5 Jun 2013 17:25:12 +0900
+Subject: [PATCH 021/130] sh-pfc: r8a7778: add common PFC macro helper
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-35-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-22-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Replace the GPIO-based CEU pinmux configuration by a pinctrl mapping.
+pfc-r8a7778 will have many devices pfc support in the future,
+and current pfc-r8a7778 is using pin/mux definition macro for SCIF.
+The device definition style using macro is readable code IMO,
+but creating new macro for each devices is not good sense.
+This patch adds common SH_PFC_xx() macro for each new feature devices
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-mackerel.c | 24 +++++++++---------------
- 1 file changed, 9 insertions(+), 15 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7778.c | 26 ++++++++++++++++++--------
+ 1 file changed, 18 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index d40d9da..fdd7e3f 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1312,6 +1312,15 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
- 	/* ADXL34X */
- 	PIN_MAP_MUX_GROUP_DEFAULT("1-0053", "pfc-sh7372",
- 				  "intc_irq21", "intc"),
-+	/* CEU */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-sh7372",
-+				  "ceu_data_0_7", "ceu"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-sh7372",
-+				  "ceu_clk_0", "ceu"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-sh7372",
-+				  "ceu_sync", "ceu"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-sh7372",
-+				  "ceu_field", "ceu"),
- 	/* SDHI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
- 				  "sdhi0_data4", "sdhi0"),
-@@ -1497,21 +1506,6 @@ static void __init mackerel_init(void)
- 	gpio_request(GPIO_FN_SCIFA2_TXD1, NULL);
- 	gpio_request(GPIO_FN_SCIFA2_RXD1, NULL);
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
+index ddbd27b..139f9dd 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
+@@ -1303,15 +1303,25 @@ static struct sh_pfc_pin pinmux_pins[] = {
+  */
+ #define PIN_NUMBER(row, col)		(1000+((row)-1)*25+(col)-1)
  
--	/* CEU */
--	gpio_request(GPIO_FN_VIO_CLK, NULL);
--	gpio_request(GPIO_FN_VIO_VD, NULL);
--	gpio_request(GPIO_FN_VIO_HD, NULL);
--	gpio_request(GPIO_FN_VIO_FIELD, NULL);
--	gpio_request(GPIO_FN_VIO_CKO, NULL);
--	gpio_request(GPIO_FN_VIO_D7, NULL);
--	gpio_request(GPIO_FN_VIO_D6, NULL);
--	gpio_request(GPIO_FN_VIO_D5, NULL);
--	gpio_request(GPIO_FN_VIO_D4, NULL);
--	gpio_request(GPIO_FN_VIO_D3, NULL);
--	gpio_request(GPIO_FN_VIO_D2, NULL);
--	gpio_request(GPIO_FN_VIO_D1, NULL);
--	gpio_request(GPIO_FN_VIO_D0, NULL);
--
- 	/* HDMI */
- 	gpio_request(GPIO_FN_HDMI_HPD, NULL);
- 	gpio_request(GPIO_FN_HDMI_CEC, NULL);
+-/* - SCIF macro ------------------------------------------------------------- */
+-#define SCIF_PFC_PIN(name, args...)					\
++/* - macro */
++#define SH_PFC_PINS(name, args...) \
+ 	static const unsigned int name ##_pins[] = { args }
+-#define SCIF_PFC_DAT(name, tx, rx)					\
+-	static const unsigned int name ##_mux[]  = { tx##_MARK, rx##_MARK, }
+-#define SCIF_PFC_CTR(name, cts, rts)					\
+-	static const unsigned int name ##_mux[]  = { cts##_MARK, rts##_MARK, }
+-#define SCIF_PFC_CLK(name, sck)					\
+-	static const unsigned int name ##_mux[]  = { sck##_MARK, }
++#define SH_PFC_MUX1(name, arg1)					\
++	static const unsigned int name ##_mux[]  = { arg1##_MARK }
++#define SH_PFC_MUX2(name, arg1, arg2)					\
++	static const unsigned int name ##_mux[]  = { arg1##_MARK, arg2##_MARK, }
++#define SH_PFC_MUX3(name, arg1, arg2, arg3)					\
++	static const unsigned int name ##_mux[]  = { arg1##_MARK, arg2##_MARK,	\
++						     arg3##_MARK }
++#define SH_PFC_MUX4(name, arg1, arg2, arg3, arg4)			\
++	static const unsigned int name ##_mux[]  = { arg1##_MARK, arg2##_MARK, \
++						     arg3##_MARK, arg4##_MARK }
++
++/* - SCIF macro ------------------------------------------------------------- */
++#define SCIF_PFC_PIN(name, args...)	SH_PFC_PINS(name, args)
++#define SCIF_PFC_DAT(name, tx, rx)	SH_PFC_MUX2(name, tx, rx)
++#define SCIF_PFC_CTR(name, cts, rts)	SH_PFC_MUX2(name, cts, rts)
++#define SCIF_PFC_CLK(name, sck)		SH_PFC_MUX1(name, sck)
+ 
+ /* - HSCIF0 ----------------------------------------------------------------- */
+ SCIF_PFC_PIN(hscif0_data_a,	RCAR_GP_PIN(1, 17),	RCAR_GP_PIN(1, 18));
 -- 
 1.8.2.1
