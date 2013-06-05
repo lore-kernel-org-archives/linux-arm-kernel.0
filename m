@@ -1,15 +1,146 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Jun 2013 11:53:08 -0600
-Subject: [PATCH V2 0/4] ARM: tegra: cpuidle: some clean up for CPUidle
- driver
-In-Reply-To: <1370342855-32705-1-git-send-email-josephl@nvidia.com>
-References: <1370342855-32705-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51AF7B04.8090203@wwwdotorg.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Wed, 05 Jun 2013 19:08:33 +0100
+Subject: [RFC PATCH v2 2/2] drivers: mfd: vexpress: add Serial Power
+ Controller (SPC) support
+In-Reply-To: <1370432767-6620-3-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1370432767-6620-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1370432767-6620-3-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1370455713.3496.22.camel@linaro1.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2013 04:47 AM, Joseph Lo wrote:
-> This series has some clean ups for Tegra CPUidle drivers. Also make it
-> more gereric.
+On Wed, 2013-06-05 at 12:46 +0100, Lorenzo Pieralisi wrote:
+[...]
+> +static const struct of_device_id vexpress_spc_ids[] __initconst = {
+> +	{ .compatible = "arm,vexpress-spc,v2p-ca15_a7" },
+> +	{ .compatible = "arm,vexpress-spc" },
+> +	{},
+> +};
+> +
+> +static int __init vexpress_spc_init(void)
+> +{
+> +	int ret;
+> +	struct device_node *node = of_find_matching_node(NULL,
+> +							 vexpress_spc_ids);
 
-I have applied the series to Tegra's for-3.11/soc branch.
+To allow for devices without an SPC we should check for !node here and
+bail out, otherwise we get an ugly message from the WARN_ON further
+down. I see this on RTSM, and multiplatform kernels would suffer this as
+well.
+
+Even if the ugly warning wasn't there, it still seems cleaner to me to
+have a proper check for an absent spc node.
+
+> +	info = kzalloc(sizeof(*info), GFP_KERNEL);
+> +	if (!info) {
+> +		pr_err("%s: unable to allocate mem\n", __func__);
+> +		return -ENOMEM;
+> +	}
+> +	info->cur_req_type = INVALID_TYPE;
+> +
+> +	info->baseaddr = of_iomap(node, 0);
+> +	if (WARN_ON(!info->baseaddr)) {
+> +		ret = -ENXIO;
+> +		goto mem_free;
+> +	}
+> +
+> +	info->irq = irq_of_parse_and_map(node, 0);
+> +
+> +	if (WARN_ON(!info->irq)) {
+> +		ret = -ENXIO;
+> +		goto unmap;
+> +	}
+> +
+> +	readl_relaxed(info->baseaddr + PWC_STATUS);
+> +
+> +	ret = request_irq(info->irq, vexpress_spc_irq_handler,
+> +		IRQF_DISABLED | IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+> +		"arm-spc", info);
+> +
+> +	if (ret) {
+> +		pr_err("IRQ %d request failed\n", info->irq);
+> +		ret = -ENODEV;
+> +		goto unmap;
+> +	}
+> +
+> +	info->a15_clusid = readl_relaxed(info->baseaddr + A15_CONF) & 0xf;
+> +
+> +	vexpress_spc_config_bridge = vexpress_config_bridge_register(
+> +			node, &vexpress_spc_config_bridge_info);
+> +
+> +	if (WARN_ON(!vexpress_spc_config_bridge)) {
+> +		ret = -ENODEV;
+> +		goto unmap;
+> +	}
+> +
+> +	opp_func = vexpress_config_func_get(vexpress_spc_config_bridge, "opp");
+> +	perf_func =
+> +		vexpress_config_func_get(vexpress_spc_config_bridge, "perf");
+> +
+> +	if (!opp_func || !perf_func) {
+> +		ret = -ENODEV;
+> +		goto unmap;
+> +	}
+> +
+> +	if (vexpress_spc_populate_opps(0) || vexpress_spc_populate_opps(1)) {
+> +		if (info->irq)
+> +			free_irq(info->irq, info);
+> +		pr_err("failed to build OPP table\n");
+> +		ret = -ENODEV;
+> +		goto unmap;
+> +	}
+> +	/*
+> +	 * Multi-cluster systems may need this data when non-coherent, during
+> +	 * cluster power-up/power-down. Make sure it reaches main memory:
+> +	 */
+> +	sync_cache_w(info);
+> +	sync_cache_w(&info);
+> +	pr_info("vexpress-spc loaded at %p\n", info->baseaddr);
+> +	return 0;
+> +
+> +unmap:
+> +	iounmap(info->baseaddr);
+> +
+> +mem_free:
+> +	kfree(info);
+> +	return ret;
+> +}
+> +
+> +static bool __init __vexpress_spc_check_loaded(void);
+> +static bool (*spc_check_loaded)(void) = &__vexpress_spc_check_loaded;
+> +
+> +static bool __init __vexpress_spc_check_loaded(void)
+> +{
+> +	if (vexpress_spc_load_result == -EAGAIN)
+> +		vexpress_spc_load_result = vexpress_spc_init();
+> +	spc_check_loaded = &vexpress_spc_initialized;
+> +	return vexpress_spc_initialized();
+> +}
+> +
+> +/*
+> + * Function exported to manage early_initcall ordering.
+> + * SPC code is needed very early in the boot process
+> + * to bring CPUs out of reset and initialize power
+> + * management back-end. After boot swap pointers to
+> + * make the functionality check available to loadable
+> + * modules, when early boot init functions have been
+> + * already freed from kernel address space.
+> + */
+> +bool vexpress_spc_check_loaded(void)
+> +{
+> +	return spc_check_loaded();
+> +}
+> +EXPORT_SYMBOL_GPL(vexpress_spc_check_loaded);
+> +
+> +static int __init vexpress_spc_early_init(void)
+> +{
+> +	__vexpress_spc_check_loaded();
+> +	return vexpress_spc_load_result;
+> +}
+> +early_initcall(vexpress_spc_early_init);
+> +MODULE_LICENSE("GPL");
+> +MODULE_DESCRIPTION("Serial Power Controller (SPC) support");
+[...]
+
+-- 
+Tixy
