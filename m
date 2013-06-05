@@ -1,54 +1,47 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 5 Jun 2013 10:28:35 +0200 (CEST)
-Subject: [PATCH 1/2] ARM: shmobile: sdhi: pass DMA filter from platform
- code
-In-Reply-To: <3675801.kLfsmmiSOq@wuerfel>
-References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
- <2862988.jnTv0iSQcj@wuerfel>
- <alpine.DEB.2.00.1305311721160.7395@axis700.grange>
- <3675801.kLfsmmiSOq@wuerfel>
-Message-ID: <Pine.LNX.4.64.1306051020340.19739@axis700.grange>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  5 Jun 2013 17:25:41 +0900
+Subject: [PATCH 050/130] ARM: shmobile: ap4evb: Register pinctrl mapping for
+ SCIF
+In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-51-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-On Fri, 31 May 2013, Arnd Bergmann wrote:
+Replace the GPIO-based SCIF pinmux configuration by a pinctrl mapping.
 
-> On Friday 31 May 2013 17:30:01 Guennadi Liakhovetski wrote:
-> > On Fri, 31 May 2013, Arnd Bergmann wrote:
-> > > On Friday 31 May 2013 16:52:13 Guennadi Liakhovetski wrote:
-> 
-> > > I think it's more a matter of using the API correctly. The dmaengine
-> > > API is an abstraction to separate the slave driver from the master
-> > > through well-defined calls. If you make additional assumptions
-> > > in the slave driver about the master, that is a layering violation.
-> > 
-> > I think it is a common practice, see e.g.
-> > 
-> > drivers/mmc/host/omap_hsmmc.c
-> > drivers/mmc/host/davinci_mmc.c
-> 
-> Yes, those should be fixed as well.
-
-Then we'll have to fix quite a few of those - I only looked under 
-drivers/mmc for now.
-
-But isn't that a separate issue? The problem we have to address now is 
-broken compilation, for which, I think, my patch is the simplest solution. 
-DMA slave drivers being DMAC implementation agnostic is good, no doubt 
-about that, even though many of them will ever only use one DMAC type, but 
-isn't that a separate issue? Fixing it would require patching 3 locations: 
-a header to add a callback field, arches to add filters and drivers to 
-actually call them instead of hard-coded functions. In the worst case 
-those changes would go via 3 different git-trees, so, might take 3 kernel 
-releases... Ok, at least two if we puch the header change together with 
-arch updates via the same tree with suitable acks, still, that's too long, 
-IMHO.
-
-Thanks
-Guennadi
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+ arch/arm/mach-shmobile/board-ap4evb.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
+index c6e1e44..3163983 100644
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
++++ b/arch/arm/mach-shmobile/board-ap4evb.c
+@@ -1119,6 +1119,9 @@ static const struct pinctrl_map ap4evb_pinctrl_map[] = {
+ 				  "mmc0_data8_0", "mmc0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
+ 				  "mmc0_ctrl_0", "mmc0"),
++	/* SCIFA0 */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-sh7372",
++				  "scifa0_data", "scifa0"),
+ 	/* SDHI0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
+ 				  "sdhi0_data4", "sdhi0"),
+@@ -1165,10 +1168,6 @@ static void __init ap4evb_init(void)
+ 				  ARRAY_SIZE(ap4evb_pinctrl_map));
+ 	sh7372_pinmux_init();
+ 
+-	/* enable SCIFA0 */
+-	gpio_request(GPIO_FN_SCIFA0_TXD, NULL);
+-	gpio_request(GPIO_FN_SCIFA0_RXD, NULL);
+-
+ 	/* enable SMSC911X */
+ 	gpio_request(GPIO_FN_CS5A,	NULL);
+ 	gpio_request(GPIO_FN_IRQ6_39,	NULL);
+-- 
+1.8.2.1
