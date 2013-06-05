@@ -1,62 +1,169 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:57 +0900
-Subject: [PATCH 126/130] ARM: shmobile: r8a7740 pinmux platform device cleanup
+Date: Wed,  5 Jun 2013 17:25:55 +0900
+Subject: [PATCH 064/130] sh-pfc: r8a7740: Add FSI pin groups and functions
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-127-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-65-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Use DEFINE_RES_MEM() and platform_device_register_simple()
-to save a couple of lines of code.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7740.c | 24 +++++-------------------
- 1 file changed, 5 insertions(+), 19 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 118 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 118 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
-index 326a4ab..3a6b6fe 100644
---- a/arch/arm/mach-shmobile/setup-r8a7740.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7740.c
-@@ -70,29 +70,15 @@ void __init r8a7740_map_io(void)
- }
- 
- /* PFC */
--static struct resource r8a7740_pfc_resources[] = {
--	[0] = {
--		.start	= 0xe6050000,
--		.end	= 0xe6057fff,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= 0xe605800c,
--		.end	= 0xe605802b,
--		.flags	= IORESOURCE_MEM,
--	}
--};
--
--static struct platform_device r8a7740_pfc_device = {
--	.name		= "pfc-r8a7740",
--	.id		= -1,
--	.resource	= r8a7740_pfc_resources,
--	.num_resources	= ARRAY_SIZE(r8a7740_pfc_resources),
-+static const struct resource pfc_resources[] = {
-+	DEFINE_RES_MEM(0xe6050000, 0x8000),
-+	DEFINE_RES_MEM(0xe605800c, 0x0020),
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+index 71d7c1f..49da76a 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+@@ -1887,6 +1887,92 @@ static const unsigned int ceu1_field_pins[] = {
+ static const unsigned int ceu1_field_mux[] = {
+ 	VIO1_FIELD_MARK,
+ };
++/* - FSIA ------------------------------------------------------------------- */
++static const unsigned int fsia_mclk_in_pins[] = {
++	/* CK */
++	11,
++};
++static const unsigned int fsia_mclk_in_mux[] = {
++	FSIACK_MARK,
++};
++static const unsigned int fsia_mclk_out_pins[] = {
++	/* OMC */
++	10,
++};
++static const unsigned int fsia_mclk_out_mux[] = {
++	FSIAOMC_MARK,
++};
++static const unsigned int fsia_sclk_in_pins[] = {
++	/* ILR, IBT */
++	12, 13,
++};
++static const unsigned int fsia_sclk_in_mux[] = {
++	FSIAILR_MARK, FSIAIBT_MARK,
++};
++static const unsigned int fsia_sclk_out_pins[] = {
++	/* OLR, OBT */
++	7, 8,
++};
++static const unsigned int fsia_sclk_out_mux[] = {
++	FSIAOLR_MARK, FSIAOBT_MARK,
++};
++static const unsigned int fsia_data_in_0_pins[] = {
++	/* ISLD */
++	0,
++};
++static const unsigned int fsia_data_in_0_mux[] = {
++	FSIAISLD_PORT0_MARK,
++};
++static const unsigned int fsia_data_in_1_pins[] = {
++	/* ISLD */
++	5,
++};
++static const unsigned int fsia_data_in_1_mux[] = {
++	FSIAISLD_PORT5_MARK,
++};
++static const unsigned int fsia_data_out_0_pins[] = {
++	/* OSLD */
++	9,
++};
++static const unsigned int fsia_data_out_0_mux[] = {
++	FSIAOSLD_MARK,
++};
++static const unsigned int fsia_data_out_1_pins[] = {
++	/* OSLD */
++	0,
++};
++static const unsigned int fsia_data_out_1_mux[] = {
++	FSIAOSLD1_MARK,
++};
++static const unsigned int fsia_data_out_2_pins[] = {
++	/* OSLD */
++	1,
++};
++static const unsigned int fsia_data_out_2_mux[] = {
++	FSIAOSLD2_MARK,
++};
++static const unsigned int fsia_spdif_0_pins[] = {
++	/* SPDIF */
++	9,
++};
++static const unsigned int fsia_spdif_0_mux[] = {
++	FSIASPDIF_PORT9_MARK,
++};
++static const unsigned int fsia_spdif_1_pins[] = {
++	/* SPDIF */
++	18,
++};
++static const unsigned int fsia_spdif_1_mux[] = {
++	FSIASPDIF_PORT18_MARK,
++};
++/* - FSIB ------------------------------------------------------------------- */
++static const unsigned int fsib_mclk_in_pins[] = {
++	/* CK */
++	11,
++};
++static const unsigned int fsib_mclk_in_mux[] = {
++	FSIBCK_MARK,
++};
+ /* - GETHER ----------------------------------------------------------------- */
+ static const unsigned int gether_rmii_pins[] = {
+ 	/* RXD[0:1], RX_ER, CRS_DV, TXD[0:1], TX_EN, REF_CLK, MDC, MDIO */
+@@ -2683,6 +2769,18 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(ceu1_clk),
+ 	SH_PFC_PIN_GROUP(ceu1_sync),
+ 	SH_PFC_PIN_GROUP(ceu1_field),
++	SH_PFC_PIN_GROUP(fsia_mclk_in),
++	SH_PFC_PIN_GROUP(fsia_mclk_out),
++	SH_PFC_PIN_GROUP(fsia_sclk_in),
++	SH_PFC_PIN_GROUP(fsia_sclk_out),
++	SH_PFC_PIN_GROUP(fsia_data_in_0),
++	SH_PFC_PIN_GROUP(fsia_data_in_1),
++	SH_PFC_PIN_GROUP(fsia_data_out_0),
++	SH_PFC_PIN_GROUP(fsia_data_out_1),
++	SH_PFC_PIN_GROUP(fsia_data_out_2),
++	SH_PFC_PIN_GROUP(fsia_spdif_0),
++	SH_PFC_PIN_GROUP(fsia_spdif_1),
++	SH_PFC_PIN_GROUP(fsib_mclk_in),
+ 	SH_PFC_PIN_GROUP(gether_rmii),
+ 	SH_PFC_PIN_GROUP(gether_mii),
+ 	SH_PFC_PIN_GROUP(gether_gmii),
+@@ -2860,6 +2958,24 @@ static const char * const ceu1_groups[] = {
+ 	"ceu1_field",
  };
  
- void __init r8a7740_pinmux_init(void)
- {
--	platform_device_register(&r8a7740_pfc_device);
-+	platform_device_register_simple("pfc-r8a7740", -1, pfc_resources,
-+					ARRAY_SIZE(pfc_resources));
- }
- 
- static struct renesas_intc_irqpin_config irqpin0_platform_data = {
++static const char * const fsia_groups[] = {
++	"fsia_mclk_in",
++	"fsia_mclk_out",
++	"fsia_sclk_in",
++	"fsia_sclk_out",
++	"fsia_data_in_0",
++	"fsia_data_in_1",
++	"fsia_data_out_0",
++	"fsia_data_out_1",
++	"fsia_data_out_2",
++	"fsia_spdif_0",
++	"fsia_spdif_1",
++};
++
++static const char * const fsib_groups[] = {
++	"fsib_mclk_in",
++};
++
+ static const char * const gether_groups[] = {
+ 	"gether_rmii",
+ 	"gether_mii",
+@@ -3054,6 +3170,8 @@ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(bsc),
+ 	SH_PFC_FUNCTION(ceu0),
+ 	SH_PFC_FUNCTION(ceu1),
++	SH_PFC_FUNCTION(fsia),
++	SH_PFC_FUNCTION(fsib),
+ 	SH_PFC_FUNCTION(gether),
+ 	SH_PFC_FUNCTION(intc),
+ 	SH_PFC_FUNCTION(lcd0),
 -- 
 1.8.2.1
