@@ -1,63 +1,73 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 05 Jun 2013 16:45:53 +0900
-Subject: [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
-Message-ID: <20130605074553.16962.7736.sendpatchset@w520>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 05 Jun 2013 09:41:28 +0200
+Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
+ line
+In-Reply-To: <87mwr6kfbm.fsf@linaro.org>
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+ <1370040357-25794-4-git-send-email-khilman@linaro.org>
+ <51AC667D.6070409@epfl.ch> <87mwr6kfbm.fsf@linaro.org>
+Message-ID: <51AEEBA8.1070301@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
 
-Instead of having a hard coded virt-to-phys address
-conversion code in sleep-sh7372.S, rework the code
-to do the conversion in C using virt_to_phys().
 
-This removes the need for PLAT_PHYS_OFFSET which
-in turn is needed for ARCH_MULTIPLATFORM.
+On 06/04/2013 12:19 AM, Kevin Hilman wrote:
+> Florian Vaussard <florian.vaussard@epfl.ch> writes:
+>
+>> Hello Kevin,
+>>
+>> On 06/01/2013 12:45 AM, Kevin Hilman wrote:
+>>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+>>> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
+>>> SYS_NIRQ pin in the twl4030 DTS file.
+>>>
+>>> Boards that hook up the twl4030 differently can easily override this
+>>> in their board-specific DTS file.
+>>>
+>>> This allows RTC wake from off-mode to work again on OMAP3-based
+>>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+>>> 3530/Overo, 3730/Overo-STORM.
+>>>
+>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>>> ---
+>>>    arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
+>>>    1 file changed, 17 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+>>> index b3034da..c7fe9f6 100644
+>>> --- a/arch/arm/boot/dts/twl4030.dtsi
+>>> +++ b/arch/arm/boot/dts/twl4030.dtsi
+>>> @@ -13,6 +13,8 @@
+>>>    	compatible = "ti,twl4030";
+>>>    	interrupt-controller;
+>>>    	#interrupt-cells = <1>;
+>>> +	pinctrl-names = "default";
+>>> +	pinctrl-0 = <&twl4030_pins>;
+>>>
+>>>    	rtc {
+>>>    		compatible = "ti,twl4030-rtc";
+>>> @@ -92,3 +94,18 @@
+>>>    		#pwm-cells = <2>;
+>>>    	};
+>>>    };
+>>> +
+>>> +&omap3_pmx_core {
+>>
+>> Here you are making the TWL4030 to explicitly depend on OMAP3. Could
+>> this chip be used by another target? If the case, I would put this
+>> piece of code in the files including twl4030. Otherwise it's ok here.
+>
+> I talked this over with Tony before posting.  In theorry, it could be
+> used on other platforms.  In practice, it's only used on OMAP.  We can
+> easily move this to board files if needed later, but thought it would be
+> simpler to put it here.  I'll let Benoit decide.
+>
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Ok, so I am fine with your approach. If need arises later, we can have
+a .dtsi file in-between to make the glue layer and avoid duplication inside
+board files.
 
- Tested with A3SM Suspend-to-RAM on Mackerel.
+Regards,
 
- arch/arm/mach-shmobile/include/mach/sh7372.h |    2 ++
- arch/arm/mach-shmobile/pm-sh7372.c           |    3 +++
- arch/arm/mach-shmobile/sleep-sh7372.S        |    5 ++++-
- 3 files changed, 9 insertions(+), 1 deletion(-)
-
---- 0001/arch/arm/mach-shmobile/include/mach/sh7372.h
-+++ work/arch/arm/mach-shmobile/include/mach/sh7372.h	2013-06-05 16:40:41.000000000 +0900
-@@ -75,6 +75,8 @@ extern void sh7372_intcs_resume(void);
- extern void sh7372_intca_suspend(void);
- extern void sh7372_intca_resume(void);
- 
-+extern unsigned long sh7372_cpu_resume;
-+
- #ifdef CONFIG_PM
- extern void __init sh7372_init_pm_domains(void);
- #else
---- 0001/arch/arm/mach-shmobile/pm-sh7372.c
-+++ work/arch/arm/mach-shmobile/pm-sh7372.c	2013-06-05 16:40:41.000000000 +0900
-@@ -524,6 +524,9 @@ void __init sh7372_pm_init(void)
- 	/* do not convert A3SM, A3SP, A3SG, A4R power down into A4S */
- 	__raw_writel(0, PDNSEL);
- 
-+	/* pass physical address of cpu_resume() to assembly resume code */
-+	sh7372_cpu_resume = virt_to_phys(cpu_resume);
-+
- 	sh7372_pm_setup_smfram();
- 
- 	sh7372_suspend_init();
---- 0001/arch/arm/mach-shmobile/sleep-sh7372.S
-+++ work/arch/arm/mach-shmobile/sleep-sh7372.S	2013-06-05 16:41:01.000000000 +0900
-@@ -40,7 +40,10 @@
- 	.global sh7372_resume_core_standby_sysc
- sh7372_resume_core_standby_sysc:
- 	ldr     pc, 1f
--1:	.long   cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
-+
-+	.globl	sh7372_cpu_resume
-+sh7372_cpu_resume:
-+1:	.space	4
- 
- #define SPDCR 0xe6180008
- 
+Florian
