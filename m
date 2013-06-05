@@ -1,169 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:55 +0900
-Subject: [PATCH 064/130] sh-pfc: r8a7740: Add FSI pin groups and functions
+Date: Wed,  5 Jun 2013 17:25:58 +0900
+Subject: [PATCH 067/130] ARM: shmobile: armadillo800eva: Register pinctrl
+ mapping for INTC
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-65-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-68-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
+Replace the GPIO-based INTC pinmux configuration by a pinctrl mapping.
+
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 118 +++++++++++++++++++++++++++++++++++
- 1 file changed, 118 insertions(+)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 18 +++++++++++-------
+ 1 file changed, 11 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-index 71d7c1f..49da76a 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-@@ -1887,6 +1887,92 @@ static const unsigned int ceu1_field_pins[] = {
- static const unsigned int ceu1_field_mux[] = {
- 	VIO1_FIELD_MARK,
- };
-+/* - FSIA ------------------------------------------------------------------- */
-+static const unsigned int fsia_mclk_in_pins[] = {
-+	/* CK */
-+	11,
-+};
-+static const unsigned int fsia_mclk_in_mux[] = {
-+	FSIACK_MARK,
-+};
-+static const unsigned int fsia_mclk_out_pins[] = {
-+	/* OMC */
-+	10,
-+};
-+static const unsigned int fsia_mclk_out_mux[] = {
-+	FSIAOMC_MARK,
-+};
-+static const unsigned int fsia_sclk_in_pins[] = {
-+	/* ILR, IBT */
-+	12, 13,
-+};
-+static const unsigned int fsia_sclk_in_mux[] = {
-+	FSIAILR_MARK, FSIAIBT_MARK,
-+};
-+static const unsigned int fsia_sclk_out_pins[] = {
-+	/* OLR, OBT */
-+	7, 8,
-+};
-+static const unsigned int fsia_sclk_out_mux[] = {
-+	FSIAOLR_MARK, FSIAOBT_MARK,
-+};
-+static const unsigned int fsia_data_in_0_pins[] = {
-+	/* ISLD */
-+	0,
-+};
-+static const unsigned int fsia_data_in_0_mux[] = {
-+	FSIAISLD_PORT0_MARK,
-+};
-+static const unsigned int fsia_data_in_1_pins[] = {
-+	/* ISLD */
-+	5,
-+};
-+static const unsigned int fsia_data_in_1_mux[] = {
-+	FSIAISLD_PORT5_MARK,
-+};
-+static const unsigned int fsia_data_out_0_pins[] = {
-+	/* OSLD */
-+	9,
-+};
-+static const unsigned int fsia_data_out_0_mux[] = {
-+	FSIAOSLD_MARK,
-+};
-+static const unsigned int fsia_data_out_1_pins[] = {
-+	/* OSLD */
-+	0,
-+};
-+static const unsigned int fsia_data_out_1_mux[] = {
-+	FSIAOSLD1_MARK,
-+};
-+static const unsigned int fsia_data_out_2_pins[] = {
-+	/* OSLD */
-+	1,
-+};
-+static const unsigned int fsia_data_out_2_mux[] = {
-+	FSIAOSLD2_MARK,
-+};
-+static const unsigned int fsia_spdif_0_pins[] = {
-+	/* SPDIF */
-+	9,
-+};
-+static const unsigned int fsia_spdif_0_mux[] = {
-+	FSIASPDIF_PORT9_MARK,
-+};
-+static const unsigned int fsia_spdif_1_pins[] = {
-+	/* SPDIF */
-+	18,
-+};
-+static const unsigned int fsia_spdif_1_mux[] = {
-+	FSIASPDIF_PORT18_MARK,
-+};
-+/* - FSIB ------------------------------------------------------------------- */
-+static const unsigned int fsib_mclk_in_pins[] = {
-+	/* CK */
-+	11,
-+};
-+static const unsigned int fsib_mclk_in_mux[] = {
-+	FSIBCK_MARK,
-+};
- /* - GETHER ----------------------------------------------------------------- */
- static const unsigned int gether_rmii_pins[] = {
- 	/* RXD[0:1], RX_ER, CRS_DV, TXD[0:1], TX_EN, REF_CLK, MDC, MDIO */
-@@ -2683,6 +2769,18 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(ceu1_clk),
- 	SH_PFC_PIN_GROUP(ceu1_sync),
- 	SH_PFC_PIN_GROUP(ceu1_field),
-+	SH_PFC_PIN_GROUP(fsia_mclk_in),
-+	SH_PFC_PIN_GROUP(fsia_mclk_out),
-+	SH_PFC_PIN_GROUP(fsia_sclk_in),
-+	SH_PFC_PIN_GROUP(fsia_sclk_out),
-+	SH_PFC_PIN_GROUP(fsia_data_in_0),
-+	SH_PFC_PIN_GROUP(fsia_data_in_1),
-+	SH_PFC_PIN_GROUP(fsia_data_out_0),
-+	SH_PFC_PIN_GROUP(fsia_data_out_1),
-+	SH_PFC_PIN_GROUP(fsia_data_out_2),
-+	SH_PFC_PIN_GROUP(fsia_spdif_0),
-+	SH_PFC_PIN_GROUP(fsia_spdif_1),
-+	SH_PFC_PIN_GROUP(fsib_mclk_in),
- 	SH_PFC_PIN_GROUP(gether_rmii),
- 	SH_PFC_PIN_GROUP(gether_mii),
- 	SH_PFC_PIN_GROUP(gether_gmii),
-@@ -2860,6 +2958,24 @@ static const char * const ceu1_groups[] = {
- 	"ceu1_field",
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index b85b288..8d8b362 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1065,6 +1065,12 @@ static const struct pinctrl_map eva_pinctrl_map[] = {
+ 				  "sdhi0_ctrl", "sdhi0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7740",
+ 				  "sdhi0_wp", "sdhi0"),
++	/* ST1232 */
++	PIN_MAP_MUX_GROUP_DEFAULT("0-0055", "pfc-r8a7740",
++				  "intc_irq10", "intc"),
++	/* USBHS */
++	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs", "pfc-r8a7740",
++				  "intc_irq7_1", "intc"),
  };
  
-+static const char * const fsia_groups[] = {
-+	"fsia_mclk_in",
-+	"fsia_mclk_out",
-+	"fsia_sclk_in",
-+	"fsia_sclk_out",
-+	"fsia_data_in_0",
-+	"fsia_data_in_1",
-+	"fsia_data_out_0",
-+	"fsia_data_out_1",
-+	"fsia_data_out_2",
-+	"fsia_spdif_0",
-+	"fsia_spdif_1",
-+};
-+
-+static const char * const fsib_groups[] = {
-+	"fsib_mclk_in",
-+};
-+
- static const char * const gether_groups[] = {
- 	"gether_rmii",
- 	"gether_mii",
-@@ -3054,6 +3170,8 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(bsc),
- 	SH_PFC_FUNCTION(ceu0),
- 	SH_PFC_FUNCTION(ceu1),
-+	SH_PFC_FUNCTION(fsia),
-+	SH_PFC_FUNCTION(fsib),
- 	SH_PFC_FUNCTION(gether),
- 	SH_PFC_FUNCTION(intc),
- 	SH_PFC_FUNCTION(lcd0),
+ static void __init eva_clock_init(void)
+@@ -1130,7 +1136,7 @@ static void __init eva_init(void)
+ 	gpio_request_one(202, GPIOF_OUT_INIT_LOW, NULL); /* LCD0_LED_CONT */
+ 
+ 	/* Touchscreen */
+-	gpio_request(GPIO_FN_IRQ10,	NULL); /* TP_INT */
++	gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
+ 
+ 	/* GETHER */
+ 	gpio_request(GPIO_FN_ET_CRS,		NULL);
+@@ -1163,13 +1169,11 @@ static void __init eva_init(void)
+ 	} else {
+ 		/* USB Func */
+ 		/*
+-		 * A1 chip has 2 IRQ7 pin and it was controled by MSEL register.
+-		 * OTOH, usbhs interrupt needs its value (HI/LOW) to decide
+-		 * USB connection/disconnection (usbhsf_get_vbus()).
+-		 * This means we needs to select GPIO_FN_IRQ7_PORT209 first,
+-		 * and select GPIO 209 here
++		 * The USBHS interrupt handlers needs to read the IRQ pin value
++		 * (HI/LOW) to diffentiate USB connection and disconnection
++		 * events (usbhsf_get_vbus()). We thus need to select both the
++		 * intc_irq7_1 pin group and GPIO 209 here.
+ 		 */
+-		gpio_request(GPIO_FN_IRQ7_PORT209, NULL);
+ 		gpio_request_one(209, GPIOF_IN, NULL);
+ 
+ 		platform_device_register(&usbhsf_device);
 -- 
 1.8.2.1
