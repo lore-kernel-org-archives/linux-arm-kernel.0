@@ -1,113 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:46 +0900
-Subject: [PATCH 055/130] sh-pfc: sh7372: Replace GPIO_PORTx enum with GPIO
- port numbers
+Date: Wed,  5 Jun 2013 17:25:59 +0900
+Subject: [PATCH 068/130] ARM: shmobile: armadillo800eva: Register pinctrl
+ mapping for GETHER
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-56-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-69-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The PFC GPIO API implementation moved to using port numbers. Replace all
-GPIO_PORTx enum usage with the corresponding port number. The GPIO_PORTx
-enum values are identical to the port number on this platform.
+Replace the GPIO-based GETHER pinmux configuration by a pinctrl mapping.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-sh7372.c | 71 ++++++++++++++++++++-----------------
- 1 file changed, 39 insertions(+), 32 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 25 +++++--------------------
+ 1 file changed, 5 insertions(+), 20 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-index 4dc2ccb..70477ce 100644
---- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-@@ -34,6 +34,13 @@
- 	PORT_10(fn, pfx##16, sfx),	PORT_10(fn, pfx##17, sfx), \
- 	PORT_10(fn, pfx##18, sfx),	PORT_1(fn, pfx##190, sfx)
- 
-+#undef _GPIO_PORT
-+#define _GPIO_PORT(gpio, sfx)						\
-+	[gpio] = {							\
-+		.name = __stringify(PORT##gpio),			\
-+		.enum_id = PORT##gpio##_DATA,				\
-+	}
-+
- #define IRQC_PIN_MUX(irq, pin)						\
- static const unsigned int intc_irq##irq##_pins[] = {			\
- 	pin,								\
-@@ -2771,38 +2778,38 @@ static const struct pinmux_data_reg pinmux_data_regs[] = {
- #define EXT_IRQ16L(n) evt2irq(0x200 + ((n) << 5))
- #define EXT_IRQ16H(n) evt2irq(0x3200 + (((n) - 16) << 5))
- static const struct pinmux_irq pinmux_irqs[] = {
--	PINMUX_IRQ(EXT_IRQ16L(0), GPIO_PORT6, GPIO_PORT162),
--	PINMUX_IRQ(EXT_IRQ16L(1), GPIO_PORT12),
--	PINMUX_IRQ(EXT_IRQ16L(2), GPIO_PORT4, GPIO_PORT5),
--	PINMUX_IRQ(EXT_IRQ16L(3), GPIO_PORT8, GPIO_PORT16),
--	PINMUX_IRQ(EXT_IRQ16L(4), GPIO_PORT17, GPIO_PORT163),
--	PINMUX_IRQ(EXT_IRQ16L(5), GPIO_PORT18),
--	PINMUX_IRQ(EXT_IRQ16L(6), GPIO_PORT39, GPIO_PORT164),
--	PINMUX_IRQ(EXT_IRQ16L(7), GPIO_PORT40, GPIO_PORT167),
--	PINMUX_IRQ(EXT_IRQ16L(8), GPIO_PORT41, GPIO_PORT168),
--	PINMUX_IRQ(EXT_IRQ16L(9), GPIO_PORT42, GPIO_PORT169),
--	PINMUX_IRQ(EXT_IRQ16L(10), GPIO_PORT65),
--	PINMUX_IRQ(EXT_IRQ16L(11), GPIO_PORT67),
--	PINMUX_IRQ(EXT_IRQ16L(12), GPIO_PORT80, GPIO_PORT137),
--	PINMUX_IRQ(EXT_IRQ16L(13), GPIO_PORT81, GPIO_PORT145),
--	PINMUX_IRQ(EXT_IRQ16L(14), GPIO_PORT82, GPIO_PORT146),
--	PINMUX_IRQ(EXT_IRQ16L(15), GPIO_PORT83, GPIO_PORT147),
--	PINMUX_IRQ(EXT_IRQ16H(16), GPIO_PORT84, GPIO_PORT170),
--	PINMUX_IRQ(EXT_IRQ16H(17), GPIO_PORT85),
--	PINMUX_IRQ(EXT_IRQ16H(18), GPIO_PORT86),
--	PINMUX_IRQ(EXT_IRQ16H(19), GPIO_PORT87),
--	PINMUX_IRQ(EXT_IRQ16H(20), GPIO_PORT92),
--	PINMUX_IRQ(EXT_IRQ16H(21), GPIO_PORT93),
--	PINMUX_IRQ(EXT_IRQ16H(22), GPIO_PORT94),
--	PINMUX_IRQ(EXT_IRQ16H(23), GPIO_PORT95),
--	PINMUX_IRQ(EXT_IRQ16H(24), GPIO_PORT112),
--	PINMUX_IRQ(EXT_IRQ16H(25), GPIO_PORT119),
--	PINMUX_IRQ(EXT_IRQ16H(26), GPIO_PORT121, GPIO_PORT172),
--	PINMUX_IRQ(EXT_IRQ16H(27), GPIO_PORT122, GPIO_PORT180),
--	PINMUX_IRQ(EXT_IRQ16H(28), GPIO_PORT123, GPIO_PORT181),
--	PINMUX_IRQ(EXT_IRQ16H(29), GPIO_PORT129, GPIO_PORT182),
--	PINMUX_IRQ(EXT_IRQ16H(30), GPIO_PORT130, GPIO_PORT183),
--	PINMUX_IRQ(EXT_IRQ16H(31), GPIO_PORT138, GPIO_PORT184),
-+	PINMUX_IRQ(EXT_IRQ16L(0), 6, 162),
-+	PINMUX_IRQ(EXT_IRQ16L(1), 12),
-+	PINMUX_IRQ(EXT_IRQ16L(2), 4, 5),
-+	PINMUX_IRQ(EXT_IRQ16L(3), 8, 16),
-+	PINMUX_IRQ(EXT_IRQ16L(4), 17, 163),
-+	PINMUX_IRQ(EXT_IRQ16L(5), 18),
-+	PINMUX_IRQ(EXT_IRQ16L(6), 39, 164),
-+	PINMUX_IRQ(EXT_IRQ16L(7), 40, 167),
-+	PINMUX_IRQ(EXT_IRQ16L(8), 41, 168),
-+	PINMUX_IRQ(EXT_IRQ16L(9), 42, 169),
-+	PINMUX_IRQ(EXT_IRQ16L(10), 65),
-+	PINMUX_IRQ(EXT_IRQ16L(11), 67),
-+	PINMUX_IRQ(EXT_IRQ16L(12), 80, 137),
-+	PINMUX_IRQ(EXT_IRQ16L(13), 81, 145),
-+	PINMUX_IRQ(EXT_IRQ16L(14), 82, 146),
-+	PINMUX_IRQ(EXT_IRQ16L(15), 83, 147),
-+	PINMUX_IRQ(EXT_IRQ16H(16), 84, 170),
-+	PINMUX_IRQ(EXT_IRQ16H(17), 85),
-+	PINMUX_IRQ(EXT_IRQ16H(18), 86),
-+	PINMUX_IRQ(EXT_IRQ16H(19), 87),
-+	PINMUX_IRQ(EXT_IRQ16H(20), 92),
-+	PINMUX_IRQ(EXT_IRQ16H(21), 93),
-+	PINMUX_IRQ(EXT_IRQ16H(22), 94),
-+	PINMUX_IRQ(EXT_IRQ16H(23), 95),
-+	PINMUX_IRQ(EXT_IRQ16H(24), 112),
-+	PINMUX_IRQ(EXT_IRQ16H(25), 119),
-+	PINMUX_IRQ(EXT_IRQ16H(26), 121, 172),
-+	PINMUX_IRQ(EXT_IRQ16H(27), 122, 180),
-+	PINMUX_IRQ(EXT_IRQ16H(28), 123, 181),
-+	PINMUX_IRQ(EXT_IRQ16H(29), 129, 182),
-+	PINMUX_IRQ(EXT_IRQ16H(30), 130, 183),
-+	PINMUX_IRQ(EXT_IRQ16H(31), 138, 184),
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 8d8b362..328f650 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1046,6 +1046,11 @@ static struct platform_device *eva_devices[] __initdata = {
  };
  
- const struct sh_pfc_soc_info sh7372_pinmux_info = {
+ static const struct pinctrl_map eva_pinctrl_map[] = {
++	/* GETHER */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7740",
++				  "gether_mii", "gether"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7740",
++				  "gether_int", "gether"),
+ 	/* LCD0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
+ 				  "lcd0_data24_0", "lcd0"),
+@@ -1139,26 +1144,6 @@ static void __init eva_init(void)
+ 	gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
+ 
+ 	/* GETHER */
+-	gpio_request(GPIO_FN_ET_CRS,		NULL);
+-	gpio_request(GPIO_FN_ET_MDC,		NULL);
+-	gpio_request(GPIO_FN_ET_MDIO,		NULL);
+-	gpio_request(GPIO_FN_ET_TX_ER,		NULL);
+-	gpio_request(GPIO_FN_ET_RX_ER,		NULL);
+-	gpio_request(GPIO_FN_ET_ERXD0,		NULL);
+-	gpio_request(GPIO_FN_ET_ERXD1,		NULL);
+-	gpio_request(GPIO_FN_ET_ERXD2,		NULL);
+-	gpio_request(GPIO_FN_ET_ERXD3,		NULL);
+-	gpio_request(GPIO_FN_ET_TX_CLK,		NULL);
+-	gpio_request(GPIO_FN_ET_TX_EN,		NULL);
+-	gpio_request(GPIO_FN_ET_ETXD0,		NULL);
+-	gpio_request(GPIO_FN_ET_ETXD1,		NULL);
+-	gpio_request(GPIO_FN_ET_ETXD2,		NULL);
+-	gpio_request(GPIO_FN_ET_ETXD3,		NULL);
+-	gpio_request(GPIO_FN_ET_PHY_INT,	NULL);
+-	gpio_request(GPIO_FN_ET_COL,		NULL);
+-	gpio_request(GPIO_FN_ET_RX_DV,		NULL);
+-	gpio_request(GPIO_FN_ET_RX_CLK,		NULL);
+-
+ 	gpio_request_one(18, GPIOF_OUT_INIT_HIGH, NULL); /* PHY_RST */
+ 
+ 	/* USB */
 -- 
 1.8.2.1
