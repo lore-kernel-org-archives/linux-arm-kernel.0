@@ -1,66 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:37 +0900
-Subject: [PATCH 046/130] ARM: shmobile: ap4evb: Register pinctrl mapping for
- FSI
+Date: Wed,  5 Jun 2013 17:25:39 +0900
+Subject: [PATCH 048/130] ARM: shmobile: ap4evb: Register pinctrl mapping for
+ KEYSC
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-47-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-49-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based FSI pinmux configuration by a pinctrl mapping.
+Replace the GPIO-based KEYSC pinmux configuration by a pinctrl mapping.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ap4evb.c | 19 ++++++++++++-------
- 1 file changed, 12 insertions(+), 7 deletions(-)
+ arch/arm/mach-shmobile/board-ap4evb.c | 17 +++++------------
+ 1 file changed, 5 insertions(+), 12 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index f42e731..2f03685 100644
+index 2dfa235..c7a9efc 100644
 --- a/arch/arm/mach-shmobile/board-ap4evb.c
 +++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -1089,6 +1089,16 @@ static const struct pinctrl_map ap4evb_pinctrl_map[] = {
- 	/* CEU */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-sh7372",
- 				  "ceu_clk_0", "ceu"),
-+	/* FSIA (AK4643) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
-+				  "fsia_sclk_in", "fsia"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
-+				  "fsia_data_in", "fsia"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
-+				  "fsia_data_out", "fsia"),
-+	/* FSIB (HDMI) */
-+	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.1", "pfc-sh7372",
-+				  "fsib_mclk_in", "fsib"),
+@@ -1102,6 +1102,11 @@ static const struct pinctrl_map ap4evb_pinctrl_map[] = {
+ 	/* HDMI */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-mobile-hdmi", "pfc-sh7372",
+ 				  "hdmi", "hdmi"),
++	/* KEYSC */
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc", "pfc-sh7372",
++				  "keysc_in04_0", "keysc"),
++	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc", "pfc-sh7372",
++				  "keysc_out5", "keysc"),
  	/* MMCIF */
  	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
  				  "mmc0_data8_0", "mmc0"),
-@@ -1165,11 +1175,7 @@ static void __init ap4evb_init(void)
- 	/* setup USB phy */
- 	__raw_writew(0x8a0a, IOMEM(0xE6058130));	/* USBCR4 */
+@@ -1219,18 +1224,6 @@ static void __init ap4evb_init(void)
+ 	 * IRQ28 for Touch Panel, set dip switches S3, S43 as OFF, ON.
+ 	 */
  
--	/* enable FSI2 port A (ak4643) */
--	gpio_request(GPIO_FN_FSIAIBT,	NULL);
--	gpio_request(GPIO_FN_FSIAILR,	NULL);
--	gpio_request(GPIO_FN_FSIAISLD,	NULL);
--	gpio_request(GPIO_FN_FSIAOSLD,	NULL);
-+	/* FSI2 port A (ak4643) */
- 	gpio_request_one(161, GPIOF_OUT_INIT_LOW, NULL); /* slave */
+-	/* enable KEYSC */
+-	gpio_request(GPIO_FN_KEYOUT0, NULL);
+-	gpio_request(GPIO_FN_KEYOUT1, NULL);
+-	gpio_request(GPIO_FN_KEYOUT2, NULL);
+-	gpio_request(GPIO_FN_KEYOUT3, NULL);
+-	gpio_request(GPIO_FN_KEYOUT4, NULL);
+-	gpio_request(GPIO_FN_KEYIN0_136, NULL);
+-	gpio_request(GPIO_FN_KEYIN1_135, NULL);
+-	gpio_request(GPIO_FN_KEYIN2_134, NULL);
+-	gpio_request(GPIO_FN_KEYIN3_133, NULL);
+-	gpio_request(GPIO_FN_KEYIN4,     NULL);
+-
+ 	/* enable TouchScreen */
+ 	irq_set_irq_type(IRQ28, IRQ_TYPE_LEVEL_LOW);
  
- 	gpio_request(9, NULL);
-@@ -1180,8 +1186,7 @@ static void __init ap4evb_init(void)
- 	/* card detect pin for MMC slot (CN7) */
- 	gpio_request_one(41, GPIOF_IN, NULL);
- 
--	/* setup FSI2 port B (HDMI) */
--	gpio_request(GPIO_FN_FSIBCK, NULL);
-+	/* FSI2 port B (HDMI) */
- 	__raw_writew(__raw_readw(USCCR1) & ~(1 << 6), USCCR1); /* use SPDIF */
- 
- 	/* set SPU2 clock to 119.6 MHz */
 -- 
 1.8.2.1
