@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:21 +0900
-Subject: [PATCH 090/130] ARM: shmobile: r8a7740: Remove GETHER function GPIOs
+Date: Wed,  5 Jun 2013 17:26:22 +0900
+Subject: [PATCH 091/130] ARM: shmobile: r8a7740: Remove CEU function GPIOs
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-91-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-92-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,42 +15,47 @@ unneeded, remove them.
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7740.h | 23 -----------------------
- 1 file changed, 23 deletions(-)
+ arch/arm/mach-shmobile/include/mach/r8a7740.h | 28 ---------------------------
+ 1 file changed, 28 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-index 61cff39..0db82aa 100644
+index 0db82aa..08b7da0 100644
 --- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
 +++ b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-@@ -331,29 +331,6 @@ enum {
- 	GPIO_FN_IDE_INT,	GPIO_FN_IDE_RST,	GPIO_FN_IDE_DIRECTION,
- 	GPIO_FN_IDE_EXBUF_ENB,	GPIO_FN_IDE_IODACK,	GPIO_FN_IDE_IODREQ,
+@@ -143,34 +143,6 @@ enum {
+ 	GPIO_FN_RSPI_MOSI_A,	GPIO_FN_RSPI_MISO_A,
+ 	GPIO_FN_RSPI_CK_A,
  
--	/* RMII */
--	GPIO_FN_RMII_CRS_DV,	GPIO_FN_RMII_RX_ER,	GPIO_FN_RMII_RXD0,
--	GPIO_FN_RMII_RXD1,	GPIO_FN_RMII_TX_EN,	GPIO_FN_RMII_TXD0,
--	GPIO_FN_RMII_MDC,	GPIO_FN_RMII_TXD1,	GPIO_FN_RMII_MDIO,
--	GPIO_FN_RMII_REF50CK,	/* for RMII */
--	GPIO_FN_RMII_REF125CK,	/* for GMII */
+-	/* VIO CKO */
+-	GPIO_FN_VIO_CKO1,
+-	GPIO_FN_VIO_CKO2,
+-	GPIO_FN_VIO_CKO_1,
+-	GPIO_FN_VIO_CKO,
 -
--	/* GEther */
--	GPIO_FN_ET_TX_CLK,	GPIO_FN_ET_TX_EN,	GPIO_FN_ET_ETXD0,
--	GPIO_FN_ET_ETXD1,	GPIO_FN_ET_ETXD2,	GPIO_FN_ET_ETXD3,
--	GPIO_FN_ET_ETXD4,	GPIO_FN_ET_ETXD5, /* for GEther */
--	GPIO_FN_ET_ETXD6,	GPIO_FN_ET_ETXD7, /* for GEther */
--	GPIO_FN_ET_COL,		GPIO_FN_ET_TX_ER,
--	GPIO_FN_ET_RX_CLK,	GPIO_FN_ET_RX_DV,
--	GPIO_FN_ET_ERXD0,	GPIO_FN_ET_ERXD1,
--	GPIO_FN_ET_ERXD2,	GPIO_FN_ET_ERXD3,
--	GPIO_FN_ET_ERXD4,	GPIO_FN_ET_ERXD5, /* for GEther */
--	GPIO_FN_ET_ERXD6,	GPIO_FN_ET_ERXD7, /* for GEther */
--	GPIO_FN_ET_RX_ER,	GPIO_FN_ET_CRS,
--	GPIO_FN_ET_MDC,		GPIO_FN_ET_MDIO,
--	GPIO_FN_ET_LINK,	GPIO_FN_ET_PHY_INT,
--	GPIO_FN_ET_WOL,		GPIO_FN_ET_GTX_CLK,
+-	/* VIO0 */
+-	GPIO_FN_VIO0_D0,	GPIO_FN_VIO0_D1,	GPIO_FN_VIO0_D2,
+-	GPIO_FN_VIO0_D3,	GPIO_FN_VIO0_D4,	GPIO_FN_VIO0_D5,
+-	GPIO_FN_VIO0_D6,	GPIO_FN_VIO0_D7,	GPIO_FN_VIO0_D8,
+-	GPIO_FN_VIO0_D9,	GPIO_FN_VIO0_D10,	GPIO_FN_VIO0_D11,
+-	GPIO_FN_VIO0_D12,	GPIO_FN_VIO0_VD,	GPIO_FN_VIO0_HD,
+-	GPIO_FN_VIO0_CLK,	GPIO_FN_VIO0_FIELD,
 -
- 	/* DMA0 */
- 	GPIO_FN_DREQ0,		GPIO_FN_DACK0,
- 
+-	GPIO_FN_VIO0_D13_PORT26, /* MSEL5CR_27_0 */
+-	GPIO_FN_VIO0_D14_PORT25,
+-	GPIO_FN_VIO0_D15_PORT24,
+-
+-	GPIO_FN_VIO0_D13_PORT22, /* MSEL5CR_27_1 */
+-	GPIO_FN_VIO0_D14_PORT95,
+-	GPIO_FN_VIO0_D15_PORT96,
+-
+-	/* VIO1 */
+-	GPIO_FN_VIO1_D0,	GPIO_FN_VIO1_D1,	GPIO_FN_VIO1_D2,
+-	GPIO_FN_VIO1_D3,	GPIO_FN_VIO1_D4,	GPIO_FN_VIO1_D5,
+-	GPIO_FN_VIO1_D6,	GPIO_FN_VIO1_D7,	GPIO_FN_VIO1_VD,
+-	GPIO_FN_VIO1_HD,	GPIO_FN_VIO1_CLK,	GPIO_FN_VIO1_FIELD,
+-
+ 	/* TPU0 */
+ 	GPIO_FN_TPU0TO0,	GPIO_FN_TPU0TO1,
+ 	GPIO_FN_TPU0TO3,
 -- 
 1.8.2.1
