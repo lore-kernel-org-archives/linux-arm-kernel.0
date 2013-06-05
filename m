@@ -1,39 +1,97 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Wed, 5 Jun 2013 11:09:59 +0100
-Subject: arm64: opportunity for (micro) optimisation in set_bit et al?
-In-Reply-To: <20130605100152.GC8758@arm.com>
-References: <1370424981.24512.163.camel@zakaz.uk.xensource.com>
- <20130605100152.GC8758@arm.com>
-Message-ID: <1370426999.24512.181.camel@zakaz.uk.xensource.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Wed, 5 Jun 2013 13:32:40 +0300
+Subject: [PATCH 2/4] ARM: dts: omap5-uevm: Add USB Host support
+In-Reply-To: <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
+References: <1370414770-1485-1-git-send-email-r.sricharan@ti.com>
+ <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <51AF13C8.1010307@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-06-05 at 11:01 +0100, Catalin Marinas wrote:
-> Hi Ian,
+Hi Sricharan,
+
+Thanks for sending this, but some parts are outdated. See below.
+
+On 06/05/2013 09:46 AM, Sricharan R wrote:
+> From: Roger Quadros <rogerq@ti.com>
 > 
-> On Wed, Jun 05, 2013 at 10:36:21AM +0100, Ian Campbell wrote:
-> > I was "borrowing" the arm64 Linux bitops for use in Xen and Tim Deegan
-> > wondered about the use of eor in:
-> >        and     x3, x0, #63             // Get bit offset
-> >        eor     x0, x0, x3              // Clear low bits
-> >        mov     x2, #1
-> >        add     x1, x1, x0, lsr #3      // Get word offset
+> Provide the RESET regulators for the USB PHYs, the USB Host
+> port modes and the PHY devices.
 > 
-> BTW, the latest kernel uses W registers (32-bit here since the function
-> prototype has an 'int' and the compiler does not guarantee that the top
-> 32-bit are 0.
-
-Thanks, that was in the version I actually picked up (from v3.10-rc4) I
-just grabbed the wrong thing when cut-n-pasting here.
-
-> > That eor has a dependency on the previous and instruction which could be
-> > avoided using a bic or a lsr #5 followed by lsl #2 instead of the lsr #3
-> > on the add (this is what arm32 does).
+> Also provide pin multiplexer information for the USB host
+> pins.
 > 
-> Any of these would do (I haven't tried, bic #imm is an alias for and).
-> I'll check with the hardware guys whether it makes any difference but it
-> is a harmless change anyway.
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> [Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+>  arch/arm/boot/dts/omap5-uevm.dts |   77 ++++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/omap5.dtsi     |   30 +++++++++++++++
+>  2 files changed, 107 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> index 843a001..cf862df 100644
+> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> @@ -25,6 +25,47 @@
+>  		regulator-max-microvolt = <3000000>;
+>  	};
+>  
+> +	/* HS USB Port 2 RESET */
+> +	hsusb2_reset: hsusb2_reset_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb2_reset";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio3 16 GPIO_ACTIVE_HIGH>; /* gpio3_80 HUB_NRESET */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Host PHY on PORT 2 */
+> +	hsusb2_phy: hsusb2_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		reset-supply = <&hsusb2_reset>;
+> +	};
+> +
+> +	/* HS USB Port 3 RESET */
+> +	hsusb3_reset: hsusb3_reset_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb3_reset";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>; /* gpio3_79 ETH_NRESET */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Host PHY on PORT 3 */
+> +	hsusb3_phy: hsusb3_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		reset-supply = <&hsusb3_reset>;
+> +	};
+> +
+> +	/* hsusb2_phy is clocked by FREF_CLK1 i.e. auxclk1 */
+> +	clock_alias {
+> +		clock-name = "auxclk1_ck";
+> +		clock-alias = "main_clk";
+> +		device = <&hsusb2_phy>;
+> +		clock-frequency = <19200000>; /* 19.2 MHz */
+> +	};
 
-ACK, thanks.
+clock_alias node is not required. Instead we need to rely on proper clock binding
+and provide reference to the clock phandle in the PHY node.
 
-Ian.
+as an example please see here
+https://lkml.org/lkml/2013/4/19/124
+
+However this clock binding technique is still under discussion/transition.
+https://patchwork.kernel.org/patch/2541331/
+
+So, I suggest you leave the auxclk1 part out for now and we can get it in later once
+the clock binding stuff is sorted out. The side effect of this is that PORT 2 (i.e. USB Hub)
+will not work. USB Ethernet should still work IMO.
+
+cheers,
+-roger
