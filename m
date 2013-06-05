@@ -1,19 +1,37 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Jun 2013 11:44:24 -0600
-Subject: [PATCH] ARM: tegra: remove the ifdef of ARCH SoC in the
- tegra_resume
-In-Reply-To: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
-References: <1370247004-31846-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51AF78F8.8040609@wwwdotorg.org>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Thu,  6 Jun 2013 02:45:24 +0900
+Subject: [PATCH] ARM: dts: add vmmc regulator support for ODROID-X
+Message-ID: <1370454336-13003-1-git-send-email-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 02:10 AM, Joseph Lo wrote:
-> Removing the ifdef of ARCH_TEGRA_SoC in the tegra_resume function. Because
-> we always build with all Tegra SoCs support and had a runtime chip
-> detection code there. And we expect most of the chips would need the code
-> in the future.
-> 
-> We also fix a typo of a macro name that cause a build error.
+This patch is to add vmmc regulator node at MSHC and SDHCI for ODROID-X
+board file.
 
-Applied to Tegra's for-3.11/soc, with re-written commit description.
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+---
+ arch/arm/boot/dts/exynos4412-odroidx.dts |    2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+index 1786225..3f3d7c8 100644
+--- a/arch/arm/boot/dts/exynos4412-odroidx.dts
++++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+@@ -44,6 +44,7 @@
+ 		pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
+ 		pinctrl-names = "default";
+ 		status = "okay";
++		vmmc-supply = <&ldo20_reg &buck8_reg>;
+ 
+ 		num-slots = <1>;
+ 		supports-highspeed;
+@@ -78,6 +79,7 @@
+ 		bus-width = <4>;
+ 		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+ 		pinctrl-names = "default";
++		vmmc-supply = <&ldo4_reg &ldo21_reg>;
+ 		status = "okay";
+ 	};
+ 
+-- 
+1.7.9.5
