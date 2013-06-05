@@ -1,105 +1,89 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:50 +0900
-Subject: [PATCH 119/130] sh-pfc: r8a7778: add I2C pin groups
+Date: Wed,  5 Jun 2013 17:26:52 +0900
+Subject: [PATCH 121/130] sh-pfc: r8a7778: add MMCIF pin groups
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-120-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-122-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add I2C SDA/SCL pin groups to R8A7778 PFC driver.
+Add MMCIF CLK/CMD/DATA groups to R8A7778 PFC driver.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7778.c | 54 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 54 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7778.c | 38 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 38 insertions(+)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
-index 6b2c6b5..605f8ae 100644
+index bf5e3d8..1dcbabc 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
-@@ -1371,6 +1371,32 @@ SCIF_PFC_CLK(hscif1_clk_a,	HSCK1_A);
- SCIF_PFC_PIN(hscif1_clk_b,	RCAR_GP_PIN(4, 2));
- SCIF_PFC_CLK(hscif1_clk_b,	HSCK1_B);
+@@ -1434,6 +1434,32 @@ I2C_PFC_MUX(i2c3_b,	SDA3_B,			SCL3_B);
+ I2C_PFC_PIN(i2c3_c,	RCAR_GP_PIN(1, 22),	RCAR_GP_PIN(1, 23));
+ I2C_PFC_MUX(i2c3_c,	SDA3_C,			SCL3_C);
  
-+/* - I2C macro ------------------------------------------------------------- */
-+#define I2C_PFC_PIN(name, args...)	SH_PFC_PINS(name, args)
-+#define I2C_PFC_MUX(name, sda, scl)	SH_PFC_MUX2(name, sda, scl)
++/* - MMC macro -------------------------------------------------------------- */
++#define MMC_PFC_PINS(name, args...)		SH_PFC_PINS(name, args)
++#define MMC_PFC_CTRL(name, clk, cmd)		SH_PFC_MUX2(name, clk, cmd)
++#define MMC_PFC_DAT1(name, d0)			SH_PFC_MUX1(name, d0)
++#define MMC_PFC_DAT4(name, d0, d1, d2, d3)	SH_PFC_MUX4(name, d0, d1, d2, d3)
++#define MMC_PFC_DAT8(name, d0, d1, d2, d3, d4, d5, d6, d7)	\
++			SH_PFC_MUX8(name, d0, d1, d2, d3, d4, d5, d6, d7)
 +
-+/* - I2C1 ------------------------------------------------------------------ */
-+I2C_PFC_PIN(i2c1_a,	RCAR_GP_PIN(3, 8),	RCAR_GP_PIN(3, 9));
-+I2C_PFC_MUX(i2c1_a,	SDA1_A,			SCL1_A);
-+I2C_PFC_PIN(i2c1_b,	RCAR_GP_PIN(4, 17),	RCAR_GP_PIN(4, 18));
-+I2C_PFC_MUX(i2c1_b,	SDA1_B,			SCL1_B);
-+
-+/* - I2C2 ------------------------------------------------------------------ */
-+I2C_PFC_PIN(i2c2_a,	PIN_NUMBER(3, 20),	RCAR_GP_PIN(1, 3));
-+I2C_PFC_MUX(i2c2_a,	SDA2_A,			SCL2_A);
-+I2C_PFC_PIN(i2c2_b,	RCAR_GP_PIN(0, 3),	RCAR_GP_PIN(0, 4));
-+I2C_PFC_MUX(i2c2_b,	SDA2_B,			SCL2_B);
-+I2C_PFC_PIN(i2c2_c,	RCAR_GP_PIN(4, 15),	RCAR_GP_PIN(4, 16));
-+I2C_PFC_MUX(i2c2_c,	SDA2_C,			SCL2_C);
-+
-+/* - I2C3 ------------------------------------------------------------------ */
-+I2C_PFC_PIN(i2c3_a,	RCAR_GP_PIN(1, 14),	RCAR_GP_PIN(1, 15));
-+I2C_PFC_MUX(i2c3_a,	SDA3_A,			SCL3_A);
-+I2C_PFC_PIN(i2c3_b,	RCAR_GP_PIN(1, 16),	RCAR_GP_PIN(1, 19));
-+I2C_PFC_MUX(i2c3_b,	SDA3_B,			SCL3_B);
-+I2C_PFC_PIN(i2c3_c,	RCAR_GP_PIN(1, 22),	RCAR_GP_PIN(1, 23));
-+I2C_PFC_MUX(i2c3_c,	SDA3_C,			SCL3_C);
++/* - MMC -------------------------------------------------------------------- */
++MMC_PFC_PINS(mmc_ctrl,		RCAR_GP_PIN(1, 5),	RCAR_GP_PIN(1, 6));
++MMC_PFC_CTRL(mmc_ctrl,		MMC_CLK,		MMC_CMD);
++MMC_PFC_PINS(mmc_data1,		RCAR_GP_PIN(1, 7));
++MMC_PFC_DAT1(mmc_data1,		MMC_D0);
++MMC_PFC_PINS(mmc_data4,		RCAR_GP_PIN(1, 7),	RCAR_GP_PIN(2, 8),
++				RCAR_GP_PIN(0, 5),	RCAR_GP_PIN(0, 6));
++MMC_PFC_DAT4(mmc_data4,		MMC_D0,			MMC_D1,
++				MMC_D2,			MMC_D3);
++MMC_PFC_PINS(mmc_data8,		RCAR_GP_PIN(1, 7),	RCAR_GP_PIN(2, 8),
++				RCAR_GP_PIN(0, 5),	RCAR_GP_PIN(0, 6),
++				RCAR_GP_PIN(1, 4),	RCAR_GP_PIN(1, 0),
++				RCAR_GP_PIN(0, 30),	RCAR_GP_PIN(0, 31));
++MMC_PFC_DAT8(mmc_data8,		MMC_D0,			MMC_D1,
++				MMC_D2,			MMC_D3,
++				MMC_D4,			MMC_D5,
++				MMC_D6,			MMC_D7);
 +
  /* - SCIF CLOCK ------------------------------------------------------------- */
  SCIF_PFC_PIN(scif_clk,		RCAR_GP_PIN(1, 16));
  SCIF_PFC_CLK(scif_clk,		SCIF_CLK);
-@@ -1584,6 +1610,14 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(hscif1_ctrl_b),
- 	SH_PFC_PIN_GROUP(hscif1_clk_a),
- 	SH_PFC_PIN_GROUP(hscif1_clk_b),
-+	SH_PFC_PIN_GROUP(i2c1_a),
-+	SH_PFC_PIN_GROUP(i2c1_b),
-+	SH_PFC_PIN_GROUP(i2c2_a),
-+	SH_PFC_PIN_GROUP(i2c2_b),
-+	SH_PFC_PIN_GROUP(i2c2_c),
-+	SH_PFC_PIN_GROUP(i2c3_a),
-+	SH_PFC_PIN_GROUP(i2c3_b),
-+	SH_PFC_PIN_GROUP(i2c3_c),
+@@ -1661,6 +1687,10 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(i2c3_a),
+ 	SH_PFC_PIN_GROUP(i2c3_b),
+ 	SH_PFC_PIN_GROUP(i2c3_c),
++	SH_PFC_PIN_GROUP(mmc_ctrl),
++	SH_PFC_PIN_GROUP(mmc_data1),
++	SH_PFC_PIN_GROUP(mmc_data4),
++	SH_PFC_PIN_GROUP(mmc_data8),
  	SH_PFC_PIN_GROUP(scif_clk),
  	SH_PFC_PIN_GROUP(scif0_data_a),
  	SH_PFC_PIN_GROUP(scif0_data_b),
-@@ -1676,6 +1710,23 @@ static const char * const hscif1_groups[] = {
- 	"hscif1_clk_b",
+@@ -1785,6 +1815,13 @@ static const char * const i2c3_groups[] = {
+ 	"i2c3_c",
  };
  
-+static const char * const i2c1_groups[] = {
-+	"i2c1_a",
-+	"i2c1_b",
-+};
-+
-+static const char * const i2c2_groups[] = {
-+	"i2c2_a",
-+	"i2c2_b",
-+	"i2c2_c",
-+};
-+
-+static const char * const i2c3_groups[] = {
-+	"i2c3_a",
-+	"i2c3_b",
-+	"i2c3_c",
++static const char * const mmc_groups[] = {
++	"mmc_ctrl",
++	"mmc_data1",
++	"mmc_data4",
++	"mmc_data8",
 +};
 +
  static const char * const scif_clk_groups[] = {
  	"scif_clk",
  };
-@@ -1790,6 +1841,9 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(ether),
- 	SH_PFC_FUNCTION(hscif0),
- 	SH_PFC_FUNCTION(hscif1),
-+	SH_PFC_FUNCTION(i2c1),
-+	SH_PFC_FUNCTION(i2c2),
-+	SH_PFC_FUNCTION(i2c3),
+@@ -1905,6 +1942,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(i2c1),
+ 	SH_PFC_FUNCTION(i2c2),
+ 	SH_PFC_FUNCTION(i2c3),
++	SH_PFC_FUNCTION(mmc),
  	SH_PFC_FUNCTION(scif_clk),
  	SH_PFC_FUNCTION(scif0),
  	SH_PFC_FUNCTION(scif1),
