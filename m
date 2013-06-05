@@ -1,38 +1,32 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 5 Jun 2013 18:10:01 +0100
-Subject: [PATCH] dmatest: do not allow to interrupt ongoing tests
-In-Reply-To: <1369638667.29283.197.camel@smile>
-References: <1369308593-3723-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <Pine.LNX.4.64.1305242353210.7187@axis700.grange>
- <1369638667.29283.197.camel@smile>
-Message-ID: <20130605171001.GC26663@mudshark.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 05 Jun 2013 11:18:49 -0600
+Subject: [PATCH 07/10] pinctrl: add pinctrl driver for Rockchip SoCs
+In-Reply-To: <CACRpkdZty-TszfBTOab4_PUi8dy5DYim=wNERv=pyqC3HNuT4w@mail.gmail.com>
+References: <201306030055.15413.heiko@sntech.de>
+ <201306030059.47611.heiko@sntech.de>
+ <CACRpkdbBr7s1NoTQewVOotorHJHLL8Z6-_gAx5GC0x6uNUX0gw@mail.gmail.com>
+ <201306041405.13320.heiko@sntech.de>
+ <CACRpkdZty-TszfBTOab4_PUi8dy5DYim=wNERv=pyqC3HNuT4w@mail.gmail.com>
+Message-ID: <51AF72F9.3060307@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 27, 2013 at 08:11:07AM +0100, Andy Shevchenko wrote:
-> On Fri, 2013-05-24 at 23:55 +0200, Guennadi Liakhovetski wrote: 
-> > On Thu, 23 May 2013, Andy Shevchenko wrote:
-> > 
-> > > When user interrupts ongoing transfers the dmatest may end up with console
-> > > lockup, oops, or data mismatch. This patch prevents user to abort any ongoing
-> > > test.
-> > 
-> > Personally I would be against such a change. What about interrupting the 
-> > test with rmmod?
-> >  Is it still possible after this your patch or not? If not 
-> > - this doesn't seem like a good idea to me. Why don't we just fix those 
-> > bugs, that you're describing?
+On 06/05/2013 01:01 AM, Linus Walleij wrote:
+> On Tue, Jun 4, 2013 at 2:05 PM, Heiko St?bner <heiko@sntech.de> wrote:
+...
+>> The only problem is the pull stuff mentioned above that is either pull up or
+>> down without the driver having knowledge about it. And generic_pinconf only
+>> knows about them separately right now.
 > 
-> The behaviour of the module is returned to the same page by this patch
-> as it was before (w/o debugfs).
-> 
-> The user can interrupt tests by rmmod, but it will take time up to
-> timeout.
-> 
-> I appreciate if you can do a deeper analysis of what happened in
-> case Will reported.
+> Create a separate patch adding PIN_CONFIG_BIAS_PULL_AUTO
+> to include/linux/pinctrl/pinconf-generic.h, don't forget the
+> kerneldoc, and patching drivers/pinctrl/pinconf-generic.c.
 
-Did this query hold up the application of this patch? I'd really like to see
-*something* in 3.10, otherwise dmatest will be broken.
+"AUTO" sounds really rather generic. Based on just the word "AUTO", I
+have no idea if it's a HW- or SW-supplied default, or what the algorithm
+is for determining the automatically selected value. Perhaps
+s/AUTO/PIN_DEFAULT/ or something like that?
 
-Will
+While the concept is simple enough, it's unusual enough that such a
+patch would hopefully have a comment containing a full explanation of
+exactly what this option means.
