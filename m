@@ -1,78 +1,73 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Wed, 05 Jun 2013 10:57:09 +0200
-Subject: [PATCH] ARM: Orion: Hoist bridge interrupt handling out of the
- timer
-In-Reply-To: <20130604172638.GB13745@obsidianresearch.com>
-References: <20121207225507.GB29262@obsidianresearch.com>
- <20121208112624.GD25315@lunn.ch>
- <20121209025748.GA10405@obsidianresearch.com>
- <20121209083046.GA25466@lunn.ch> <50C48CE8.9070400@gmail.com>
- <20130604172638.GB13745@obsidianresearch.com>
-Message-ID: <51AEFD65.6030306@gmail.com>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Wed,  5 Jun 2013 12:57:08 +0400
+Subject: [PATCH 2/2] hwmon: mc13783-adc: Rename unit to indicate various
+ MC13xxx chips support
+In-Reply-To: <1370422628-1073-1-git-send-email-shc_work@mail.ru>
+References: <1370422628-1073-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1370422628-1073-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/13 19:26, Jason Gunthorpe wrote:
-> On Sun, Dec 09, 2012 at 02:06:48PM +0100, Sebastian Hesselbarth wrote:
->> The main irq controller will be required for sure, but for the secondary
->> irq controller we had a discussion long ago. IIRC Gregory proposed to have
->> shared irqs handled by timer and watchdog, I was proposing chained irqs.
->
-> +1 on decoded IRQs for bridge. I've been running that configuration
-> now since this patch set was first posted.
->
-> There is too much HW variance, the timer, watchdog, etc drivers should
-> not have to poke into SOC specific registers just to get an interrupt.
->
-> The bridge decode can either be via a chained handler, or by incorporating
-> the bridge decode into the main kirkwood handler - the latter having
-> lower overhead for timer ticks.
 
-Jason,
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/configs/imx_v4_v5_defconfig           |  2 +-
+ drivers/hwmon/Kconfig                          | 10 +++++-----
+ drivers/hwmon/Makefile                         |  2 +-
+ drivers/hwmon/{mc13783-adc.c => mc13xxx-adc.c} |  0
+ 4 files changed, 7 insertions(+), 7 deletions(-)
+ rename drivers/hwmon/{mc13783-adc.c => mc13xxx-adc.c} (100%)
 
-I have irqchip and clocksource drivers done for Orion, just need to
-find some time to rebase them.
-
->> For mvebu archs, IIRC, we have wrt to timer-related irqs:
->> - Armada 370/XP with different irq handler and timer irq handling within
->>    timer registers.
->> - Orion SoCs with Bridge irq registers for timer related stuff (timer0/1)
->> - Kirkwood and Dove with watchdog timers (both with wdt irq in bridge irqs)
->> - RTC in bridge irqs, but Dove with RTC connected to PMU irqs
->
->> I think we should have patches for irqchip-orion first and then rethink
->> if we want a standalone timer-orion or merge it with timer-mvebu. Having
->> watchdog using irqs is kind of independent from this.
-
-I suggest not to merge clocksource for Orion and Armada 370/XP. They
-are different enough to justify separate drivers. IIRC Armada 370/XP
-acks timer interrupts by clearing timer register bits that are not
-implemented in Orion SoCs.
-
-> I would think the logical progression is:
-> - irq-chip orion combined with work to keep the existing timer working
-> - Patch to add the bridge irq-chip
-> - Patches to support orion/kirkwood/dove/etc in the existing timer drivers
-> - Patch to update the DT to switch to the bridge and updated timer
-> - Patch to remove the old timer
-
-I'd rather have irqchip and clocksource mainlined and enable both
-drivers when they have surfaced. I try to sent patches by end of this week.
-
-> When I last looked briefly, it seems like merging with timer-mvebu was
-> fairly straightforward..
->
->> Back in the days when Gregory, Thomas, and I were looking into merged timer
->> we agreed not to have an extra check on 25MHz support. If you put the
->> property in the node, it will try to set the timer to fixed 25MHz. If you
->> use the property on Orion timer, it will just break timer handling.
->
-> As for the mveth case we should have a compatible tag for each SOC,
-> the driver can ignore it, but it should be in the DT for future use..
-
-We could have a single clocksource driver but as said above,
-clocksource is a tiny driver compared to others. Separate drivers will
-save us from checking SoC on every timer event or have a callback for 
-Armada 370/XP clearing timer irqs.
-
-Sebastian
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index 7fd9f9b..ba5b640 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -114,7 +114,7 @@ CONFIG_W1=y
+ CONFIG_W1_MASTER_MXC=y
+ CONFIG_W1_SLAVE_THERM=y
+ CONFIG_HWMON=m
+-CONFIG_SENSORS_MC13783_ADC=m
++CONFIG_SENSORS_MC13XXX_ADC=m
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
+ CONFIG_MFD_MC13XXX_SPI=y
+diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+index 4f71370..c28a362 100644
+--- a/drivers/hwmon/Kconfig
++++ b/drivers/hwmon/Kconfig
+@@ -1526,11 +1526,11 @@ config SENSORS_APPLESMC
+ 	  Say Y here if you have an applicable laptop and want to experience
+ 	  the awesome power of applesmc.
+ 
+-config SENSORS_MC13783_ADC
+-        tristate "Freescale MC13783/MC13892 ADC"
+-        depends on MFD_MC13XXX
+-        help
+-          Support for the A/D converter on MC13783 and MC13892 PMIC.
++config SENSORS_MC13XXX_ADC
++	tristate "Freescale MC13783/MC13892 ADC"
++	depends on MFD_MC13XXX
++	help
++	  Support for the A/D converter on MC13783 and MC13892 PMIC.
+ 
+ if ACPI
+ 
+diff --git a/drivers/hwmon/Makefile b/drivers/hwmon/Makefile
+index d17d3e6..b0cbc36f 100644
+--- a/drivers/hwmon/Makefile
++++ b/drivers/hwmon/Makefile
+@@ -106,7 +106,7 @@ obj-$(CONFIG_SENSORS_MAX6639)	+= max6639.o
+ obj-$(CONFIG_SENSORS_MAX6642)	+= max6642.o
+ obj-$(CONFIG_SENSORS_MAX6650)	+= max6650.o
+ obj-$(CONFIG_SENSORS_MAX6697)	+= max6697.o
+-obj-$(CONFIG_SENSORS_MC13783_ADC)+= mc13783-adc.o
++obj-$(CONFIG_SENSORS_MC13XXX_ADC)+= mc13xxx-adc.o
+ obj-$(CONFIG_SENSORS_MCP3021)	+= mcp3021.o
+ obj-$(CONFIG_SENSORS_NCT6775)	+= nct6775.o
+ obj-$(CONFIG_SENSORS_NTC_THERMISTOR)	+= ntc_thermistor.o
+diff --git a/drivers/hwmon/mc13783-adc.c b/drivers/hwmon/mc13xxx-adc.c
+similarity index 100%
+rename from drivers/hwmon/mc13783-adc.c
+rename to drivers/hwmon/mc13xxx-adc.c
+-- 
+1.8.1.5
