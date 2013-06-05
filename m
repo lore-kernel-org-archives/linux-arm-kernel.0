@@ -1,101 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed,  5 Jun 2013 16:54:44 -0700
-Subject: [PATCHv3 2/3] ARM: arch_timer: Move to generic sched_clock framework
-In-Reply-To: <1370476485-468-1-git-send-email-sboyd@codeaurora.org>
-References: <1370476485-468-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1370476485-468-3-git-send-email-sboyd@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu,  6 Jun 2013 01:57:24 +0200
+Subject: [PATCH 0/7] Common Clock Framework support for Samsung S3C64xx
+Message-ID: <1370476651-6743-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register with the generic sched_clock framework now that it
-supports 64 bits. This fixes two problems with the current
-sched_clock support for machines using the architected timers.
-First off, we don't subtract the start value from subsequent
-sched_clock calls so we can potentially start off with
-sched_clock returning gigantic numbers. Second, there is no
-support for suspend/resume handling so problems such as discussed
-in 6a4dae5 (ARM: 7565/1: sched: stop sched_clock() during
-suspend, 2012-10-23) can happen without this patch.
+This series is an attempt to move clock support on Samsung S3C64xx SoCs
+to Common Clock Framework.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/kernel/arch_timer.c | 14 ++------------
- include/linux/sched_clock.h  |  2 --
- kernel/time/sched_clock.c    | 13 ++++---------
- 3 files changed, 6 insertions(+), 23 deletions(-)
+First, support for PLL types present on S3C64xx SoCs is added to Samsung
+Common Clock Framework driver. Then the main clock driver for mentioned
+SoCs is introduced. Further patches contain fixes for drivers to make them
+compliant with CCF semantics, migration of platform code to use the new
+clock driver and removal of old clock management code.
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 221f07b..2966288 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -22,13 +22,6 @@ static unsigned long arch_timer_read_counter_long(void)
- 	return arch_timer_read_counter();
- }
- 
--static u32 sched_clock_mult __read_mostly;
--
--static unsigned long long notrace arch_timer_sched_clock(void)
--{
--	return arch_timer_read_counter() * sched_clock_mult;
--}
--
- static struct delay_timer arch_delay_timer;
- 
- static void __init arch_timer_delay_timer_register(void)
-@@ -48,11 +41,8 @@ int __init arch_timer_arch_init(void)
- 
- 	arch_timer_delay_timer_register();
- 
--	/* Cache the sched_clock multiplier to save a divide in the hot path. */
--	sched_clock_mult = NSEC_PER_SEC / arch_timer_rate;
--	sched_clock_func = arch_timer_sched_clock;
--	pr_info("sched_clock: ARM arch timer >56 bits at %ukHz, resolution %uns\n",
--		arch_timer_rate / 1000, sched_clock_mult);
-+	/* 56 bits minimum, so we assume worst case rollover */
-+	sched_clock_setup(arch_timer_read_counter, 56, arch_timer_rate);
- 
- 	return 0;
- }
-diff --git a/include/linux/sched_clock.h b/include/linux/sched_clock.h
-index 81baaef..04cee83 100644
---- a/include/linux/sched_clock.h
-+++ b/include/linux/sched_clock.h
-@@ -17,6 +17,4 @@ static inline void sched_clock_postinit(void) { }
- extern void setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate);
- extern void sched_clock_setup(u64 (*read)(void), int bits, unsigned long rate);
- 
--extern unsigned long long (*sched_clock_func)(void);
--
- #endif
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index 3478b6d..f69addf 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -173,20 +173,15 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	sched_clock_setup(read_sched_clock_32_wrapper, bits, rate);
- }
- 
--static unsigned long long notrace sched_clock_32(void)
--{
--	u64 cyc = read_sched_clock();
--	return cyc_to_sched_clock(cyc, sched_clock_mask);
--}
--
--unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
--
- unsigned long long notrace sched_clock(void)
- {
-+	u64 cyc;
-+
- 	if (cd.suspended)
- 		return cd.epoch_ns;
- 
--	return sched_clock_func();
-+	cyc = read_sched_clock();
-+	return cyc_to_sched_clock(cyc, sched_clock_mask);
- }
- 
- void __init sched_clock_postinit(void)
+Depends on:
+ - [PATCH 0/6] Samsung watchdog support clean-up
+   http://thread.gmane.org/gmane.linux.kernel.samsung-soc/18736/focus=18989
+ - [PATCH 00/15] Final Samsung PWM support cleanup
+   http://www.spinics.net/lists/arm-kernel/msg248725.html
+
+On S3C6410-based Tiny6410 board (Mini6410-compatible):
+
+Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
+
+Tomasz Figa (7):
+  clk: samsung: pll: Add support for PLL6552 and PLL6553
+  clk: samsung: Add clock driver for S3C64xx SoCs
+  ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
+  ARM: s3c64xx: dma: Use clk_prepare_enable/clk_disable_unprepare
+  usb: host: ohci-s3c2410 Use clk_prepare_enable/clk_disable_unprepare
+  ARM: s3c64xx: Migrate clock handling to Common Clock Framework
+  ARM: s3c64xx: Remove old clock management code
+
+ .../bindings/clock/samsung,s3c64xx-clock.txt       |   48 +
+ arch/arm/Kconfig                                   |    2 +-
+ arch/arm/mach-s3c64xx/Makefile                     |    2 +-
+ arch/arm/mach-s3c64xx/clock.c                      | 1007 --------------------
+ arch/arm/mach-s3c64xx/common.c                     |   21 +-
+ arch/arm/mach-s3c64xx/common.h                     |   12 +-
+ arch/arm/mach-s3c64xx/dma.c                        |    4 +-
+ arch/arm/mach-s3c64xx/include/mach/regs-clock.h    |  132 +--
+ arch/arm/mach-s3c64xx/mach-anw6410.c               |    2 +-
+ arch/arm/mach-s3c64xx/mach-crag6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-hmt.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-mini6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-ncp.c                   |    2 +-
+ arch/arm/mach-s3c64xx/mach-smartq.c                |   11 +-
+ arch/arm/mach-s3c64xx/mach-smdk6400.c              |    2 +-
+ arch/arm/mach-s3c64xx/mach-smdk6410.c              |    2 +-
+ arch/arm/mach-s3c64xx/pm.c                         |   21 -
+ arch/arm/mach-s3c64xx/s3c6400.c                    |    6 -
+ arch/arm/mach-s3c64xx/s3c6410.c                    |    7 -
+ arch/arm/plat-samsung/include/plat/cpu.h           |    4 +
+ drivers/clk/samsung/Makefile                       |    1 +
+ drivers/clk/samsung/clk-pll.c                      |  160 ++++
+ drivers/clk/samsung/clk-pll.h                      |    4 +
+ drivers/clk/samsung/clk-s3c64xx.c                  |  503 ++++++++++
+ drivers/usb/host/ohci-s3c2410.c                    |    8 +-
+ include/dt-bindings/clock/samsung,s3c64xx-clock.h  |  144 +++
+ 26 files changed, 907 insertions(+), 1204 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/samsung,s3c64xx-clock.txt
+ delete mode 100644 arch/arm/mach-s3c64xx/clock.c
+ create mode 100644 drivers/clk/samsung/clk-s3c64xx.c
+ create mode 100644 include/dt-bindings/clock/samsung,s3c64xx-clock.h
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.8.2.1
