@@ -1,80 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:32 +0900
-Subject: [PATCH 101/130] ARM: shmobile: r8a7790: Register GPIO devices
+Date: Wed,  5 Jun 2013 17:26:38 +0900
+Subject: [PATCH 107/130] ARM: shmobile: kzm9g-reference: Remove the VCCQ MC0
+ function GPIO
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-102-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-108-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Move GPIOs handling from the PFC device to separate GPIO devices.
+The VCCQ MC0 power gate is now controlled by a regulator registered by
+the PFC driver. Remove the corresponding function GPIO.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7790.c | 35 +++++++++++++++++++++++++++++++++-
- 1 file changed, 34 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-kzm9g-reference.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
-index 49de2d5..eeef5f6 100644
---- a/arch/arm/mach-shmobile/setup-r8a7790.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7790.c
-@@ -23,6 +23,7 @@
- #include <linux/kernel.h>
- #include <linux/of_platform.h>
- #include <linux/serial_sci.h>
-+#include <linux/platform_data/gpio-rcar.h>
- #include <linux/platform_data/irq-renesas-irqc.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
-@@ -31,13 +32,45 @@
+diff --git a/arch/arm/mach-shmobile/board-kzm9g-reference.c b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+index aefa50d..44055fe 100644
+--- a/arch/arm/mach-shmobile/board-kzm9g-reference.c
++++ b/arch/arm/mach-shmobile/board-kzm9g-reference.c
+@@ -79,7 +79,6 @@ static void __init kzm_init(void)
+ 	sh73a0_pinmux_init();
  
- static const struct resource pfc_resources[] = {
- 	DEFINE_RES_MEM(0xe6060000, 0x250),
--	DEFINE_RES_MEM(0xe6050000, 0x5050),
- };
+ 	/* enable SD */
+-	gpio_request(GPIO_FN_SDHI0_VCCQ_MC0_ON,	NULL);
+ 	gpio_request_one(15, GPIOF_OUT_INIT_HIGH, NULL); /* power */
  
-+#define R8A7790_GPIO(idx)						\
-+static struct resource r8a7790_gpio##idx##_resources[] = {		\
-+	DEFINE_RES_MEM(0xe6050000 + 0x1000 * (idx), 0x50),		\
-+	DEFINE_RES_IRQ(gic_spi(4 + (idx))),				\
-+};									\
-+									\
-+static struct gpio_rcar_config r8a7790_gpio##idx##_platform_data = {	\
-+	.gpio_base	= 32 * (idx),					\
-+	.irq_base	= 0,						\
-+	.number_of_pins	= 32,						\
-+	.pctl_name	= "pfc-r8a7790",				\
-+};									\
-+
-+R8A7790_GPIO(0);
-+R8A7790_GPIO(1);
-+R8A7790_GPIO(2);
-+R8A7790_GPIO(3);
-+R8A7790_GPIO(4);
-+R8A7790_GPIO(5);
-+
-+#define r8a7790_register_gpio(idx)					\
-+	platform_device_register_resndata(&platform_bus, "gpio_rcar", idx, \
-+		r8a7790_gpio##idx##_resources,				\
-+		ARRAY_SIZE(r8a7790_gpio##idx##_resources),		\
-+		&r8a7790_gpio##idx##_platform_data,			\
-+		sizeof(r8a7790_gpio##idx##_platform_data))
-+
- void __init r8a7790_pinmux_init(void)
- {
- 	platform_device_register_simple("pfc-r8a7790", -1, pfc_resources,
- 					ARRAY_SIZE(pfc_resources));
-+	r8a7790_register_gpio(0);
-+	r8a7790_register_gpio(1);
-+	r8a7790_register_gpio(2);
-+	r8a7790_register_gpio(3);
-+	r8a7790_register_gpio(4);
-+	r8a7790_register_gpio(5);
- }
- 
- #define SCIF_COMMON(scif_type, baseaddr, irq)			\
+ 	gpio_request_one(14, GPIOF_OUT_INIT_HIGH, NULL); /* power */
 -- 
 1.8.2.1
