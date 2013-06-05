@@ -1,82 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:57 +0900
-Subject: [PATCH 066/130] sh-pfc: r8a7740: Hardcode the LCDC0 output
+Date: Wed,  5 Jun 2013 17:26:01 +0900
+Subject: [PATCH 070/130] ARM: shmobile: armadillo800eva: Register pinctrl
+ mapping for FSI
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-67-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-71-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-The r8a7740 has two LCDC units and two sets of LCDC output signals. By
-default LCDC0 is routed to the LCD0 signals, and LCDC1 to the LCD1
-signals. However, LCDC1 can be routed to the LCD0 signals by setting bit
-MSEL6 in MSEL3CR (the LCD0 signals are further pinmuxed the usual way).
-
-This could be configured by duplicating the LCD0 pin groups for LCDC1.
-However, this would unnecessarily complicate the LCD pin groups, as no
-r8a7740 board supported in mainline use such a configuration. Hardcode
-the MSEL3CR MSEL6 bit to 0 for now.
+Replace the GPIO-based FSI pinmux configuration by a pinctrl mapping.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 14 +-------------
- 1 file changed, 1 insertion(+), 13 deletions(-)
+ arch/arm/mach-shmobile/board-armadillo800eva.c | 21 ++++++++++++---------
+ 1 file changed, 12 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-index 5a77d39..9afc7b0 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-@@ -277,8 +277,6 @@ enum {
- 	SCIFB_CTS_PORT173_MARK,
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
+index 4327f7e..4e1f8f3 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
+@@ -1055,6 +1055,18 @@ static const struct pinctrl_map eva_pinctrl_map[] = {
+ 				  "ceu0_sync", "ceu0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-r8a7740",
+ 				  "ceu0_field", "ceu0"),
++	/* FSIA */
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-r8a7740",
++				  "fsia_sclk_in", "fsia"),
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-r8a7740",
++				  "fsia_mclk_out", "fsia"),
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-r8a7740",
++				  "fsia_data_in_1", "fsia"),
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-r8a7740",
++				  "fsia_data_out_0", "fsia"),
++	/* FSIB */
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.1", "pfc-r8a7740",
++				  "fsib_mclk_in", "fsib"),
+ 	/* GETHER */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7740",
+ 				  "gether_mii", "gether"),
+@@ -1181,20 +1193,11 @@ static void __init eva_init(void)
+ 	gpio_request_one(158, GPIOF_OUT_INIT_LOW, NULL);  /* CAM_PON */
  
- 	/* LCD0 */
--	LCDC0_SELECT_MARK,
+ 	/* FSI-WM8978 */
+-	gpio_request(GPIO_FN_FSIAIBT,		NULL);
+-	gpio_request(GPIO_FN_FSIAILR,		NULL);
+-	gpio_request(GPIO_FN_FSIAOMC,		NULL);
+-	gpio_request(GPIO_FN_FSIAOSLD,		NULL);
+-	gpio_request(GPIO_FN_FSIAISLD_PORT5,	NULL);
 -
- 	LCD0_D0_MARK,	LCD0_D1_MARK,	LCD0_D2_MARK,	LCD0_D3_MARK,
- 	LCD0_D4_MARK,	LCD0_D5_MARK,	LCD0_D6_MARK,	LCD0_D7_MARK,
- 	LCD0_D8_MARK,	LCD0_D9_MARK,	LCD0_D10_MARK,	LCD0_D11_MARK,
-@@ -301,8 +299,6 @@ enum {
- 	LCD0_LCLK_PORT102_MARK,
+ 	gpio_request(7, NULL);
+ 	gpio_request(8, NULL);
+ 	gpio_direction_none(GPIO_PORT7CR); /* FSIAOBT needs no direction */
+ 	gpio_direction_none(GPIO_PORT8CR); /* FSIAOLR needs no direction */
  
- 	/* LCD1 */
--	LCDC1_SELECT_MARK,
+-	/* FSI-HDMI */
+-	gpio_request(GPIO_FN_FSIBCK,		NULL);
 -
- 	LCD1_D0_MARK,	LCD1_D1_MARK,	LCD1_D2_MARK,	LCD1_D3_MARK,
- 	LCD1_D4_MARK,	LCD1_D5_MARK,	LCD1_D6_MARK,	LCD1_D7_MARK,
- 	LCD1_D8_MARK,	LCD1_D9_MARK,	LCD1_D10_MARK,	LCD1_D11_MARK,
-@@ -1002,7 +998,7 @@ static const pinmux_enum_t pinmux_data[] = {
- 	PINMUX_DATA(IRQ27_PORT57_MARK,		PORT57_FN0,	MSEL1CR_27_1),
- 
- 	/* Port58 */
--	PINMUX_DATA(LCD0_D0_MARK,		PORT58_FN1),
-+	PINMUX_DATA(LCD0_D0_MARK,		PORT58_FN1,	MSEL3CR_6_0),
- 	PINMUX_DATA(KEYOUT7_MARK,		PORT58_FN3),
- 	PINMUX_DATA(KEYIN0_PORT58_MARK,		PORT58_FN4,	MSEL4CR_18_1),
- 	PINMUX_DATA(DV_D0_MARK,			PORT58_FN6),
-@@ -1649,10 +1645,6 @@ static const pinmux_enum_t pinmux_data[] = {
- 	PINMUX_DATA(IRQ16_PORT211_MARK,		PORT211_FN0,	MSEL1CR_16_1),
- 	PINMUX_DATA(HDMI_CEC_MARK,		PORT211_FN1),
- 
--	/* LCDC select */
--	PINMUX_DATA(LCDC0_SELECT_MARK,				MSEL3CR_6_0),
--	PINMUX_DATA(LCDC1_SELECT_MARK,				MSEL3CR_6_1),
--
- 	/* SDENC */
- 	PINMUX_DATA(SDENC_CPG_MARK,				MSEL4CR_19_0),
- 	PINMUX_DATA(SDENC_DV_CLKI_MARK,				MSEL4CR_19_1),
-@@ -3578,10 +3570,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	/* IRREM */
- 	GPIO_FN(IROUT),
- 
--	/* LCDC */
--	GPIO_FN(LCDC0_SELECT),
--	GPIO_FN(LCDC1_SELECT),
--
- 	/* SDENC */
- 	GPIO_FN(SDENC_CPG),
- 	GPIO_FN(SDENC_DV_CLKI),
+ 	/* HDMI */
+ 	gpio_request(GPIO_FN_HDMI_HPD,		NULL);
+ 	gpio_request(GPIO_FN_HDMI_CEC,		NULL);
 -- 
 1.8.2.1
