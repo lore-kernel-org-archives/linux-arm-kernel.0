@@ -1,48 +1,68 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 5 Jun 2013 15:44:14 -0700
-Subject: [PATCH] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <CAFEAcA8hp+fWWuvVVLSCxfPdN8itsMq9Jy6jgrcqAJ7bH4zmPA@mail.gmail.com>
-References: <1370039952-20888-1-git-send-email-andre.przywara@linaro.org>
- <20130605192316.GB9640@ubuntu> <51AFA992.4060803@linaro.org>
- <CAFEAcA8hp+fWWuvVVLSCxfPdN8itsMq9Jy6jgrcqAJ7bH4zmPA@mail.gmail.com>
-Message-ID: <20130605224414.GE9640@ubuntu>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Wed, 5 Jun 2013 23:47:13 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <1370469574.18839.33.camel@localhost>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+Message-ID: <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 10:18:28PM +0100, Peter Maydell wrote:
-> On 5 June 2013 22:11, Andre Przywara <andre.przywara@linaro.org> wrote:
-> > On 06/05/2013 09:23 PM, Christoffer Dall wrote:
-> >> To avoid the extra storage overhead here I suggest you just export the
-> >> registers using a separate number space for the ONE_REG ioctl instead of
-> >> piggybacking on the cp15 exports.
-> 
-> This is letting the kernel's internal implementation details
-> affect the userspace API -- I think that's a bad idea.
+On Wed, Jun 5, 2013 at 10:59 PM, Henrik Nordstr?m
+<henrik@henriknordstrom.net> wrote:
 
-OK, fair enough, they can be treated as regular cp15 registers.  But I
-looked at the patch again, and I don't see why we have to touch
-NR_CP15_REGS at all actually - even if we do keep the current ID for the
-one_reg id field.
+>>  .... and then there's the boot0 and boot1 loaders, these *do* have
 
-We don't need to fill in these registers in the coprocessor arrays just
-because they're encoded that way in the one_reg id field - that would be
-letting the user space API define the implementation in the kernel ;)
-Or did I miss something?
+> no, these are not tiny. boot0 is 24KB to fit the initial embedded SRAM
+> (not cache), but boot1 is on pair with u-boot in size and runs from
+> DRAM.
 
-(The truth is that the interface and implementation are probably not as
-separate concepts in the real world as we would sometimes like, but
-that's a different discussion.)
+ btw, please listen to henrik: he knows what he's talking about, as
+you can see :)   henrik, thank you for correcting my technical
+misunderstandings, i'll try to remember them and not propagate
+incorrect stuff.
 
-> As Andre says, we went through a round like this, and my
-> opinion was that since these are cp15 registers the logical
-> place to put them is in cp15 space.
-> 
+>>  so the point is: if anyone wishes me to propose to allwinner that
+>> they convert over to devicetree, or any other proposal which involves
+>> significant low-level changes to their working practices that could
+>> potentially have a massive knock-on effect onto their
+>> multi-million-dollar clients, it had better be a damn good story.
+>
+> Calm down.
 
-Well, that round wasn't public, so I didn't really have that background
-info, but I agree with your sentiment, and it does avoid us having to
-come up with encoding in an already existing number space (the cp15
-access numbers), but we want it to make sense for both the kernel and
-user space applications, and we don't want to be allocating random
-unused bytes on kernel data structures just for the fun of it.
+ i am - honest!  yes it's a little past my bed-time, but hey...
 
--Christoffer
+> It isn't really a significant difference to them outside of
+> the kernel. They do not need to change any of their configuraiton
+> methods, only a small toolchain change in how the resultig images are
+> built to have a corresponding device tree built.
+
+ henrik, jon (smirl), can i ask you both a favour?  could you write
+something up, preferably short, that i could put forward to allwinner?
+ describing what's needed, who would need to do what and so on.
+
+
+> But it is a fair bit of one-time changes kernel side. And some
+> scratching to figure out how to use/improve/ignore the stuff being
+> mainlined.
+
+ i still also - really - need a good justification for this.
+something which helps explain clearly what the immediate or perhaps
+strategic benefits would be to allwinner, as to why they should accept
+such changes.   i cannot emphasise enough how important that is.
+
+ if someone can please help come up with a good justification as to
+why allwinner should change their working practices, that would be
+enormously helpful i feel, to solving this issue.
+
+ otherwise we are stuck in the current situation which nobody really
+likes.  i'm inviting you - linux kernel developers - i'm giving you an
+opportunity to *fix* things.  you have 2 weeks to come up with a
+solution, which can be presented in a simple format.  that's the
+window of opportunity.
+
+l.
