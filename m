@@ -1,79 +1,90 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  5 Jun 2013 08:40:08 +0200
-Subject: [PATCH 4/5] arm: mxs: use the newly introduced of_set_mac_address()
- helper
+Date: Wed,  5 Jun 2013 08:40:07 +0200
+Subject: [PATCH 3/5] of: net: introduce a of_set_mac_address() helper function
 In-Reply-To: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1370414409-29991-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370414409-29991-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit refactors the existing mach-mxs code to use the newly
-introduced of_set_mac_address() OF helper.
+The ARM MXS code already has some code to allocate and setup a
+property that contains the MAC address, and the Marvell Armada 370/XP
+code is going to gain a similar copy of this code. Therefore, let's
+add a small helper function that does that, in drivers/of/of_net.c.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- arch/arm/mach-mxs/mach-mxs.c | 22 +++-------------------
- 1 file changed, 3 insertions(+), 19 deletions(-)
+ drivers/of/of_net.c    | 36 ++++++++++++++++++++++++++++++++++++
+ include/linux/of_net.h |  6 ++++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/arch/arm/mach-mxs/mach-mxs.c b/arch/arm/mach-mxs/mach-mxs.c
-index 5b62b64..5cdfa55 100644
---- a/arch/arm/mach-mxs/mach-mxs.c
-+++ b/arch/arm/mach-mxs/mach-mxs.c
-@@ -23,6 +23,7 @@
- #include <linux/irqchip/mxs.h>
- #include <linux/micrel_phy.h>
- #include <linux/of_address.h>
-+#include <linux/of_net.h>
- #include <linux/of_platform.h>
- #include <linux/phy.h>
- #include <linux/pinctrl/consumer.h>
-@@ -180,9 +181,8 @@ enum mac_oui {
- static void __init update_fec_mac_prop(enum mac_oui oui)
- {
- 	struct device_node *np, *from = NULL;
--	struct property *newmac;
- 	const u32 *ocotp = mxs_get_ocotp();
--	u8 *macaddr;
-+	u8 macaddr[ETH_ALEN];
- 	u32 val;
- 	int i;
- 
-@@ -193,26 +193,10 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
- 
- 		from = np;
- 
--		if (of_get_property(np, "local-mac-address", NULL))
--			continue;
--
--		newmac = kzalloc(sizeof(*newmac) + 6, GFP_KERNEL);
--		if (!newmac)
--			return;
--		newmac->value = newmac + 1;
--		newmac->length = 6;
--
--		newmac->name = kstrdup("local-mac-address", GFP_KERNEL);
--		if (!newmac->name) {
--			kfree(newmac);
--			return;
--		}
--
- 		/*
- 		 * OCOTP only stores the last 4 octets for each mac address,
- 		 * so hard-code OUI here.
- 		 */
--		macaddr = newmac->value;
- 		switch (oui) {
- 		case OUI_FSL:
- 			macaddr[0] = 0x00;
-@@ -235,7 +219,7 @@ static void __init update_fec_mac_prop(enum mac_oui oui)
- 		macaddr[4] = (val >> 8) & 0xff;
- 		macaddr[5] = (val >> 0) & 0xff;
- 
--		of_update_property(np, newmac);
-+		of_set_mac_address(np, macaddr);
- 	}
+diff --git a/drivers/of/of_net.c b/drivers/of/of_net.c
+index ffab033..02af898 100644
+--- a/drivers/of/of_net.c
++++ b/drivers/of/of_net.c
+@@ -92,3 +92,39 @@ const void *of_get_mac_address(struct device_node *np)
+ 	return NULL;
  }
+ EXPORT_SYMBOL(of_get_mac_address);
++
++/**
++ * Set a MAC address of a given network interface device tree node, if
++ * none was already defined.
++ */
++int of_set_mac_address(struct device_node *np, const void *mac)
++{
++	struct property *pp;
++	int ret;
++
++	if (of_get_mac_address(np))
++		return 0;
++
++	pp = kzalloc(sizeof(struct property) + ETH_ALEN, GFP_KERNEL);
++	if (!pp)
++		return -ENOMEM;
++
++	pp->value = pp + 1;
++	pp->length = ETH_ALEN;
++	memcpy(pp->value, mac, ETH_ALEN);
++	pp->name = kstrdup("local-mac-address", GFP_KERNEL);
++	if (!pp->name) {
++		kfree(pp);
++		return -ENOMEM;
++	}
++
++	ret = of_update_property(np, pp);
++	if (ret < 0) {
++		kfree(pp->name);
++		kfree(pp);
++		return ret;
++	}
++
++	return 0;
++}
++EXPORT_SYMBOL(of_set_mac_address);
+diff --git a/include/linux/of_net.h b/include/linux/of_net.h
+index 61bf53b..a5086d9 100644
+--- a/include/linux/of_net.h
++++ b/include/linux/of_net.h
+@@ -11,6 +11,7 @@
+ #include <linux/of.h>
+ extern const int of_get_phy_mode(struct device_node *np);
+ extern const void *of_get_mac_address(struct device_node *np);
++extern int of_set_mac_address(struct device_node *np, const void *mac);
+ #else
+ static inline const int of_get_phy_mode(struct device_node *np)
+ {
+@@ -21,6 +22,11 @@ static inline const void *of_get_mac_address(struct device_node *np)
+ {
+ 	return NULL;
+ }
++
++static inline int of_set_mac_address(struct device_node *np, const void *mac)
++{
++	return -ENODEV;
++}
+ #endif
  
+ #endif /* __LINUX_OF_NET_H */
 -- 
 1.8.1.2
