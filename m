@@ -1,15 +1,16 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Jun 2013 15:45:30 +0900
-Subject: [GIT PULL 0/7] Renesas ARM-based SoC DT updates for v3.11
-In-Reply-To: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130605064530.GB14490@verge.net.au>
+Date: Wed, 5 Jun 2013 15:45:45 +0900
+Subject: [GIT PULL 0/4] Update for Renesas INTC External IRQ pin driver
+ for v3.11
+In-Reply-To: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130605064545.GC14490@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 [ fix up subject to say GIT PULL ]
 
-On Wed, Jun 05, 2013 at 01:32:09PM +0900, Simon Horman wrote:
+On Wed, Jun 05, 2013 at 01:32:27PM +0900, Simon Horman wrote:
 > Hi Olof, Hi Arnd,
 > 
 > The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
@@ -18,51 +19,39 @@ On Wed, Jun 05, 2013 at 01:32:09PM +0900, Simon Horman wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.11
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq-for-v3.11
 > 
-> for you to fetch changes up to 24603f3caf07f5f65aa17ed7851ad4741595cf6a:
+> for you to fetch changes up to 14d064ad3881f47ae0a6f247c992652053c7f4d5:
 > 
->   ARM: shmobile: marzen-reference: add irqpin support in DT (2013-06-04 18:05:59 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas ARM-based SoC DT updates for v3.11
-> 
-> * Armadillo800eva reference DT - bring up armadillo800eva baord
->   using DT as much as possible
-> * Remove unused GIC dtsi entries for r8a7790 and r8a73a4
-> * Add AS3711 and CPUFreq DT bindings for kzm9g-reference
-> * Add irqpin DT support for marzen-reference
+>   irqchip: Add irqchip_init dummy function (2013-05-22 21:55:41 +0900)
 > 
 > ----------------------------------------------------------------
-> Bastian Hecht (3):
->       ARM: shmobile: r8a7740: Add OF support to initialze the GIC
->       ARM: shmobile: r8a7740: Prepare for reference DT setup
->       ARM: shmobile: armadillo800eva: Reference DT implementation
+> Update for Renesas INTC External IRQ pin driver for v3.11
 > 
-> Guennadi Liakhovetski (2):
->       ARM: shmobile: kzm9g-reference: add AS3711 and CPUFreq DT bindings
->       ARM: shmobile: marzen-reference: add irqpin support in DT
+> Add runtime PM support
+> Add DT binding for sense bitfield width
+> Correct error handing in irqc_probe
+> Add irqchip_init dummy function
 > 
-> Magnus Damm (2):
->       ARM: shmobile: Remove unused r8a73a4 GIC CPU interface DT bits
->       ARM: shmobile: Remove unused r8a7790 GIC CPU interface DT bits
+> ----------------------------------------------------------------
+> Axel Lin (1):
+>       irqchip: renesas-irqc: Fix irqc_probe error handling
 > 
->  arch/arm/boot/dts/Makefile                         |   1 +
->  arch/arm/boot/dts/r8a73a4.dtsi                     |   6 -
->  .../boot/dts/r8a7740-armadillo800eva-reference.dts |  45 +++++
->  arch/arm/boot/dts/r8a7740.dtsi                     | 117 +++++++++++
->  arch/arm/boot/dts/r8a7779.dtsi                     |  17 ++
->  arch/arm/boot/dts/r8a7790.dtsi                     |   6 -
->  arch/arm/boot/dts/sh73a0-kzm9g-reference.dts       |  86 +++++++++
->  arch/arm/mach-shmobile/Kconfig                     |  14 ++
->  arch/arm/mach-shmobile/Makefile                    |   1 +
->  .../board-armadillo800eva-reference.c              | 213 +++++++++++++++++++++
->  arch/arm/mach-shmobile/include/mach/r8a7740.h      |   3 +
->  arch/arm/mach-shmobile/intc-r8a7740.c              |  24 ++-
->  arch/arm/mach-shmobile/setup-r8a7740.c             |  54 +++---
->  13 files changed, 544 insertions(+), 43 deletions(-)
->  create mode 100644 arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
->  create mode 100644 arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+> Bastian Hecht (1):
+>       irqchip: Add irqchip_init dummy function
+> 
+> Guennadi Liakhovetski (1):
+>       irqchip: renesas-intc-irqpin: DT binding for sense bitfield width
+> 
+> Simon Horman (1):
+>       irqchip: irqc: Add runtime PM support
+> 
+>  .../bindings/interrupt-controller/renesas,intc-irqpin.txt   | 13 +++++++++++++
+>  drivers/irqchip/irq-renesas-intc-irqpin.c                   |  4 ++++
+>  drivers/irqchip/irq-renesas-irqc.c                          | 12 ++++++++++--
+>  include/linux/irqchip.h                                     |  4 ++++
+>  4 files changed, 31 insertions(+), 2 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
 > 
 > -- 
 > 1.8.2.1
