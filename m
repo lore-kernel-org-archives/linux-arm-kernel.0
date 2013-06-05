@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:15 +0900
-Subject: [PATCH 024/130] sh-pfc: sh7372: Add CEU pin groups and functions
+Date: Wed,  5 Jun 2013 17:25:20 +0900
+Subject: [PATCH 029/130] sh-pfc: sh7372: Add KEYSC pin groups and functions
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-25-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-30-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,108 +12,129 @@ From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-sh7372.c | 70 +++++++++++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-sh7372.c | 91 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-sh7372.c b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-index 9545b3c..3da8319 100644
+index def6e2c..50cbff6 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-sh7372.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-sh7372.c
-@@ -1029,6 +1029,58 @@ static const unsigned int bsc_wait_pins[] = {
- static const unsigned int bsc_wait_mux[] = {
- 	WAIT_MARK,
- };
-+/* - CEU -------------------------------------------------------------------- */
-+static const unsigned int ceu_data_0_7_pins[] = {
-+	/* D[0:7] */
-+	102, 103, 104, 105, 106, 107, 108, 109,
+@@ -1241,6 +1241,75 @@ IRQC_PINS_MUX(28, 123, 181);
+ IRQC_PINS_MUX(29, 129, 182);
+ IRQC_PINS_MUX(30, 130, 183);
+ IRQC_PINS_MUX(31, 138, 184);
++/* - KEYSC ------------------------------------------------------------------ */
++static const unsigned int keysc_in04_0_pins[] = {
++	/* KEYIN[0:4] */
++	136, 135, 134, 133, 132,
 +};
-+static const unsigned int ceu_data_0_7_mux[] = {
-+	VIO_D0_MARK, VIO_D1_MARK, VIO_D2_MARK, VIO_D3_MARK,
-+	VIO_D4_MARK, VIO_D5_MARK, VIO_D6_MARK, VIO_D7_MARK,
++static const unsigned int keysc_in04_0_mux[] = {
++	KEYIN0_136_MARK, KEYIN1_135_MARK, KEYIN2_134_MARK, KEYIN3_133_MARK,
++	KEYIN4_MARK,
 +};
-+static const unsigned int ceu_data_8_15_pins[] = {
-+	/* D[8:15] */
-+	110, 111, 112, 113, 114, 115, 116, 117,
++static const unsigned int keysc_in04_1_pins[] = {
++	/* KEYIN[0:4] */
++	121, 122, 123, 124, 132,
 +};
-+static const unsigned int ceu_data_8_15_mux[] = {
-+	VIO_D8_MARK, VIO_D9_MARK, VIO_D10_MARK, VIO_D11_MARK,
-+	VIO_D12_MARK, VIO_D13_MARK, VIO_D14_MARK, VIO_D15_MARK,
++static const unsigned int keysc_in04_1_mux[] = {
++	KEYIN0_121_MARK, KEYIN1_122_MARK, KEYIN2_123_MARK, KEYIN3_124_MARK,
++	KEYIN4_MARK,
 +};
-+static const unsigned int ceu_clk_0_pins[] = {
-+	/* CKO */
-+	120,
++static const unsigned int keysc_in5_pins[] = {
++	/* KEYIN5 */
++	131,
 +};
-+static const unsigned int ceu_clk_0_mux[] = {
-+	VIO_CKO_MARK,
++static const unsigned int keysc_in5_mux[] = {
++	KEYIN5_MARK,
 +};
-+static const unsigned int ceu_clk_1_pins[] = {
-+	/* CKO */
-+	16,
++static const unsigned int keysc_in6_pins[] = {
++	/* KEYIN6 */
++	130,
 +};
-+static const unsigned int ceu_clk_1_mux[] = {
-+	VIO_CKO1_MARK,
++static const unsigned int keysc_in6_mux[] = {
++	KEYIN6_MARK,
 +};
-+static const unsigned int ceu_clk_2_pins[] = {
-+	/* CKO */
-+	17,
++static const unsigned int keysc_in7_pins[] = {
++	/* KEYIN7 */
++	129,
 +};
-+static const unsigned int ceu_clk_2_mux[] = {
-+	VIO_CKO2_MARK,
++static const unsigned int keysc_in7_mux[] = {
++	KEYIN7_MARK,
 +};
-+static const unsigned int ceu_sync_pins[] = {
-+	/* CLK, VD, HD */
-+	118, 100, 101,
++static const unsigned int keysc_out4_pins[] = {
++	/* KEYOUT[0:3] */
++	128, 127, 126, 125,
 +};
-+static const unsigned int ceu_sync_mux[] = {
-+	VIO_CLK_MARK, VIO_VD_MARK, VIO_HD_MARK,
++static const unsigned int keysc_out4_mux[] = {
++	KEYOUT0_MARK, KEYOUT1_MARK, KEYOUT2_MARK, KEYOUT3_MARK,
 +};
-+static const unsigned int ceu_field_pins[] = {
-+	/* FIELD */
-+	119,
++static const unsigned int keysc_out5_pins[] = {
++	/* KEYOUT[0:4] */
++	128, 127, 126, 125, 124,
 +};
-+static const unsigned int ceu_field_mux[] = {
-+	VIO_FIELD_MARK,
++static const unsigned int keysc_out5_mux[] = {
++	KEYOUT0_MARK, KEYOUT1_MARK, KEYOUT2_MARK, KEYOUT3_MARK,
++	KEYOUT4_MARK,
++};
++static const unsigned int keysc_out6_pins[] = {
++	/* KEYOUT[0:5] */
++	128, 127, 126, 125, 124, 123,
++};
++static const unsigned int keysc_out6_mux[] = {
++	KEYOUT0_MARK, KEYOUT1_MARK, KEYOUT2_MARK, KEYOUT3_MARK,
++	KEYOUT4_MARK, KEYOUT5_MARK,
++};
++static const unsigned int keysc_out8_pins[] = {
++	/* KEYOUT[0:7] */
++	128, 127, 126, 125, 124, 123, 122, 121,
++};
++static const unsigned int keysc_out8_mux[] = {
++	KEYOUT0_MARK, KEYOUT1_MARK, KEYOUT2_MARK, KEYOUT3_MARK,
++	KEYOUT4_MARK, KEYOUT5_MARK, KEYOUT6_MARK, KEYOUT7_MARK,
 +};
  /* - MMCIF ------------------------------------------------------------------ */
  static const unsigned int mmc0_data1_0_pins[] = {
  	/* D[0] */
-@@ -1183,6 +1235,13 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(bsc_rd_we16),
- 	SH_PFC_PIN_GROUP(bsc_bs),
- 	SH_PFC_PIN_GROUP(bsc_rdwr),
-+	SH_PFC_PIN_GROUP(ceu_data_0_7),
-+	SH_PFC_PIN_GROUP(ceu_data_8_15),
-+	SH_PFC_PIN_GROUP(ceu_clk_0),
-+	SH_PFC_PIN_GROUP(ceu_clk_1),
-+	SH_PFC_PIN_GROUP(ceu_clk_2),
-+	SH_PFC_PIN_GROUP(ceu_sync),
-+	SH_PFC_PIN_GROUP(ceu_field),
+@@ -1467,6 +1536,15 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(intc_irq30_1),
+ 	SH_PFC_PIN_GROUP(intc_irq31_0),
+ 	SH_PFC_PIN_GROUP(intc_irq31_1),
++	SH_PFC_PIN_GROUP(keysc_in04_0),
++	SH_PFC_PIN_GROUP(keysc_in04_1),
++	SH_PFC_PIN_GROUP(keysc_in5),
++	SH_PFC_PIN_GROUP(keysc_in6),
++	SH_PFC_PIN_GROUP(keysc_in7),
++	SH_PFC_PIN_GROUP(keysc_out4),
++	SH_PFC_PIN_GROUP(keysc_out5),
++	SH_PFC_PIN_GROUP(keysc_out6),
++	SH_PFC_PIN_GROUP(keysc_out8),
  	SH_PFC_PIN_GROUP(mmc0_data1_0),
  	SH_PFC_PIN_GROUP(mmc0_data4_0),
  	SH_PFC_PIN_GROUP(mmc0_data8_0),
-@@ -1219,6 +1278,16 @@ static const char * const bsc_groups[] = {
- 	"bsc_rdwr",
+@@ -1593,6 +1671,18 @@ static const char * const intc_groups[] = {
+ 	"intc_irq31_1",
  };
  
-+static const char * const ceu_groups[] = {
-+	"ceu_data_0_7",
-+	"ceu_data_8_15",
-+	"ceu_clk_0",
-+	"ceu_clk_1",
-+	"ceu_clk_2",
-+	"ceu_sync",
-+	"ceu_field",
++static const char * const keysc_groups[] = {
++	"keysc_in04_0",
++	"keysc_in04_1",
++	"keysc_in5",
++	"keysc_in6",
++	"keysc_in7",
++	"keysc_out4",
++	"keysc_out5",
++	"keysc_out6",
++	"keysc_out8",
 +};
 +
  static const char * const mmc0_groups[] = {
  	"mmc0_data1_0",
  	"mmc0_data4_0",
-@@ -1252,6 +1321,7 @@ static const char * const sdhi2_groups[] = {
- 
- static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(bsc),
-+	SH_PFC_FUNCTION(ceu),
+@@ -1632,6 +1722,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(fsib),
+ 	SH_PFC_FUNCTION(hdmi),
+ 	SH_PFC_FUNCTION(intc),
++	SH_PFC_FUNCTION(keysc),
  	SH_PFC_FUNCTION(mmc0),
  	SH_PFC_FUNCTION(sdhi0),
  	SH_PFC_FUNCTION(sdhi1),
