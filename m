@@ -1,101 +1,63 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Wed, 5 Jun 2013 17:20:26 +0530
-Subject: [PATCH 2/4] ARM: dts: omap5-uevm: Add USB Host support
-In-Reply-To: <51AF13C8.1010307@ti.com>
-References: <1370414770-1485-1-git-send-email-r.sricharan@ti.com>
- <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
- <51AF13C8.1010307@ti.com>
-Message-ID: <51AF2602.1000904@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 5 Jun 2013 12:50:46 +0100
+Subject: Cache issues in vexpress cpu shutdown (regression in 3.10)
+In-Reply-To: <20130605113912.GE18614@n2100.arm.linux.org.uk>
+References: <1370430551.3387.11.camel@linaro1.home>
+ <20130605113912.GE18614@n2100.arm.linux.org.uk>
+Message-ID: <20130605115046.GA11402@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Roger,
+On Wed, Jun 05, 2013 at 12:39:12PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 05, 2013 at 12:09:11PM +0100, Jon Medhurst (Tixy) wrote:
+> > I've been investigating why reboot fails on Versatile Express with the
+> > CA9x4 CoreTile and the problem seems to get triggered by commit bca7a5a0
+> > (ARM: cpu hotplug: remove majority of cache flushing from platforms).
+> > 
+> > Putting back the flush_cache_all() removed by this patch in
+> > mach-vexpress/hotplug.c gets reboot working again. Without that I see
+> > the following during shutdown:
+> > 
+> > CPU 2 is in _cpu_down called from disable_nonboot_cpus, and is spinning
+> > in the loop:
+> > 
+> > 	while (!idle_cpu(cpu))
+> > 		cpu_relax();
+> > 
+> > cpu == 1 here and idle_cpu() is constantly returning false because
+> > rq->curr != rq->idle and it looks like the runqueue has one process:
+> > that which issued the 'reboot' command.
+> > 
+> > CPU 1 is spinning in platform_do_lowpower and waiting for pen release to
+> > equal 1 (it's -1). Looks like it got there via the smp_ops.cpu_die(cpu)
+> > call in cpu_die.
+> 
+> This sounds like CPU2 hasn't seen the updates to CPU1 inspite of pushing
+> the contents of CPU1's cache out to point of unification in the inner
+> sharable domain (the point where all CPUs should see the same view.)
+> 
+> Are you able to look at what's visible in the caches for both CPUs for
+> things like rq->curr for CPU 1?
+> 
+> I wonder if - even though we've pushed it out of CPU 1's local cache,
+> whether there's still something to do with the coherency stuff which
+> remains incomplete.
+> 
+> Either way, this has significant implications for everyone who uses
+> flush_cache_louis() in paths where the CPU loses state - it means that
+> something is wrong with the way data is pushed out of the CPU.
+> 
+> > I'm a bit stumped by all this as I don't see why flush_cache_louis is
+> > apparently insufficient to get changes on one core seen by the other.
+> 
+> Could it be that flush_cache_louis() doesn't actually do what it claims
+> to?
 
-On Wednesday 05 June 2013 04:02 PM, Roger Quadros wrote:
-> Hi Sricharan,
->
-> Thanks for sending this, but some parts are outdated. See below.
->
-> On 06/05/2013 09:46 AM, Sricharan R wrote:
->> From: Roger Quadros <rogerq@ti.com>
->>
->> Provide the RESET regulators for the USB PHYs, the USB Host
->> port modes and the PHY devices.
->>
->> Also provide pin multiplexer information for the USB host
->> pins.
->>
->> Cc: Roger Quadros <rogerq@ti.com>
->> Signed-off-by: Roger Quadros <rogerq@ti.com>
->> [Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
->> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->> ---
->>  arch/arm/boot/dts/omap5-uevm.dts |   77 ++++++++++++++++++++++++++++++++++++++
->>  arch/arm/boot/dts/omap5.dtsi     |   30 +++++++++++++++
->>  2 files changed, 107 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
->> index 843a001..cf862df 100644
->> --- a/arch/arm/boot/dts/omap5-uevm.dts
->> +++ b/arch/arm/boot/dts/omap5-uevm.dts
->> @@ -25,6 +25,47 @@
->>  		regulator-max-microvolt = <3000000>;
->>  	};
->>  
->> +	/* HS USB Port 2 RESET */
->> +	hsusb2_reset: hsusb2_reset_reg {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "hsusb2_reset";
->> +		regulator-min-microvolt = <3300000>;
->> +		regulator-max-microvolt = <3300000>;
->> +		gpio = <&gpio3 16 GPIO_ACTIVE_HIGH>; /* gpio3_80 HUB_NRESET */
->> +		startup-delay-us = <70000>;
->> +		enable-active-high;
->> +	};
->> +
->> +	/* HS USB Host PHY on PORT 2 */
->> +	hsusb2_phy: hsusb2_phy {
->> +		compatible = "usb-nop-xceiv";
->> +		reset-supply = <&hsusb2_reset>;
->> +	};
->> +
->> +	/* HS USB Port 3 RESET */
->> +	hsusb3_reset: hsusb3_reset_reg {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "hsusb3_reset";
->> +		regulator-min-microvolt = <3300000>;
->> +		regulator-max-microvolt = <3300000>;
->> +		gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>; /* gpio3_79 ETH_NRESET */
->> +		startup-delay-us = <70000>;
->> +		enable-active-high;
->> +	};
->> +
->> +	/* HS USB Host PHY on PORT 3 */
->> +	hsusb3_phy: hsusb3_phy {
->> +		compatible = "usb-nop-xceiv";
->> +		reset-supply = <&hsusb3_reset>;
->> +	};
->> +
->> +	/* hsusb2_phy is clocked by FREF_CLK1 i.e. auxclk1 */
->> +	clock_alias {
->> +		clock-name = "auxclk1_ck";
->> +		clock-alias = "main_clk";
->> +		device = <&hsusb2_phy>;
->> +		clock-frequency = <19200000>; /* 19.2 MHz */
->> +	};
-> clock_alias node is not required. Instead we need to rely on proper clock binding
-> and provide reference to the clock phandle in the PHY node.
->
-> as an example please see here
-> https://lkml.org/lkml/2013/4/19/124
->
-> However this clock binding technique is still under discussion/transition.
-> https://patchwork.kernel.org/patch/2541331/
->
-> So, I suggest you leave the auxclk1 part out for now and we can get it in later once
-> the clock binding stuff is sorted out. The side effect of this is that PORT 2 (i.e. USB Hub)
-> will not work. USB Ethernet should still work IMO.
-  Ok will drop that part then.
+Smells like erratum #643719, which was fixed in r1p0 of A9. The LoUIS value
+in the CLIDR reports 0 instead of 1.
 
-Thanks,
- Sricharan
+Tixy -- if you can confirm the above (i.e. your register has the wrong
+value) then we can come up with a workaround. I'm not sure whether any
+platforms other than vexpress have such an early A9 revision though...
+
+Will
