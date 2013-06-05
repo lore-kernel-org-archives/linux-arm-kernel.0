@@ -1,44 +1,37 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed,  5 Jun 2013 13:56:33 -0700
-Subject: [PATCH v2] ARM: exynos: add debug_ll_io_init() call in
- exynos_init_io()
-In-Reply-To: <1370397539-21653-1-git-send-email-dianders@chromium.org>
-References: <1370397539-21653-1-git-send-email-dianders@chromium.org>
-Message-ID: <1370465793-7997-1-git-send-email-dianders@chromium.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 05 Jun 2013 15:00:13 -0600
+Subject: getting allwinner SoC support upstream (was Re: Uploading linux
+ (3.9.4-1))
+In-Reply-To: <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+Message-ID: <51AFA6DD.3000202@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the early MMU mapping of the UART happens to get booted out of the
-TLB between the start of paging_init() and when we finally re-add the
-UART at the very end of s3c_init_cpu(), we'll get a hang at bootup if
-we've got early_printk enabled.  Avoid this hang by calling
-debug_ll_io_init() early.
+On 06/05/2013 02:46 PM, jonsmirl at gmail.com wrote:
+> On Wed, Jun 5, 2013 at 3:46 PM, Luke Kenneth Casson Leighton
+> <lkcl at lkcl.net <mailto:lkcl@lkcl.net>> wrote:
+...
+>     the detect line, which is the write-protect line, to setting the DRAM
+>     clock timings, saying which kernel driver must be loaded to support
+>     the touchscreen, enabling debugging, JTAG, naming the GPIOs for easy
+>     and convenient use in the kernel code: basically there isn't a single
+>     piece of hardware on the allwinner SoC family which *isn't*
+>     reconfigureable through script.fex... and they've even integrated it
+>     into u-boot *and* their low-level (early) bootloader as well [which
+> 
+> 
+> Device tree support has been integrated into uboot for about five years now.
 
-Without this patch, you can reliably reproduce a hang when early
-printk is enabled by adding flush_tlb_all() at the start of
-exynos_init_io().  After this patch the hang goes away.
+There are two aspects to DT support in U-Boot:
 
-Signed-off-by: Doug Anderson <dianders@chromium.org>
----
-Changes in v2:
-- Use debug_ll_io_init() instead of reordering printks and adding
-  warnings.  Thanks Olof!
+1) Having U-Boot pass a DT to the kernel, possibly manipulating a few
+properties on the way, e.g. RAM size. As you say, this has been around a
+while.
 
- arch/arm/mach-exynos/common.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 027c9e7..f7e504b 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -386,6 +386,8 @@ int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
- 
- void __init exynos_init_io(struct map_desc *mach_desc, int size)
- {
-+	debug_ll_io_init();
-+
- #ifdef CONFIG_OF
- 	if (initial_boot_params)
- 		of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
--- 
-1.8.3
+2) Having U-Boot itself read a DT and configure itself, just like the
+kernel does. This is relatively new, and only supported by a few boards
+(all Tegra to some extent, and a couple each Samsung Exynos and Xilinx
+boards). I suspect/guess this is the kind of thing that Luke was
+referring to re: U-Boot fex integration.
