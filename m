@@ -1,117 +1,36 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  5 Jun 2013 09:04:59 +0200
-Subject: [PATCH 6/8] arm: mvebu: don't hardcode the physical address for
- mvebu-mbus
-In-Reply-To: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1370415901-4721-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed, 5 Jun 2013 09:11:19 +0200
+Subject: [PATCH 10/10] arm: add basic support for Rockchip RK3066a boards
+In-Reply-To: <201306030102.20890.heiko@sntech.de>
+References: <201306030055.15413.heiko@sntech.de>
+ <201306030102.20890.heiko@sntech.de>
+Message-ID: <20130605091119.18432af4@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since the mvebu-mbus driver doesn't yet have a DT binding (and this DT
-binding may not necessarily be ready for 3.11), the physical address
-of the mvebu-mbus registers are currently hardcoded. This doesn't play
-well with the fact that the internal registers base address may be
-different depending on the bootloader.
+Dear Heiko St?bner,
 
-In order to have only one central place for the physical address of
-the internal registers, we now use of_translate_address() to translate
-the mvebu-mbus register offsets into the real physical address, by
-using DT-based address translation. This will go away once the
-mvebu-mbus driver gains a proper DT binding.
+On Mon, 3 Jun 2013 01:02:20 +0200, Heiko St?bner wrote:
+> index 0000000..a2d8c70
+> --- /dev/null
+> +++ b/arch/arm/mach-rockchip/Makefile.boot
+> @@ -0,0 +1,3 @@
+> +zreladdr-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60408000
+> +params_phys-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60088000
+> +initrd_phys-$(CONFIG_ARCH_ROCKCHIP)	:= 0x60800000
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/mach-mvebu/armada-370-xp.c | 38 ++++++++++++++++++++++++++-----------
- arch/arm/mach-mvebu/armada-370-xp.h |  8 --------
- 2 files changed, 27 insertions(+), 19 deletions(-)
+Thanks to the AUTO_ZRELADDR thing that you're using as part of the
+MULTIPLATFORM support, this Makefile.boot file is no longer useful. See
+mach-socfpga, mach-mvebu, mach-bcm2835, mach-bcm, mach-highbank, etc.
 
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
-index c1c0556..0dbc370 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.c
-+++ b/arch/arm/mach-mvebu/armada-370-xp.c
-@@ -14,6 +14,7 @@
- 
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/of_address.h>
- #include <linux/of_platform.h>
- #include <linux/io.h>
- #include <linux/time-armada-370-xp.h>
-@@ -33,29 +34,44 @@ static void __init armada_370_xp_map_io(void)
- 	debug_ll_io_init();
- }
- 
--static void __init armada_370_xp_timer_and_clk_init(void)
-+/*
-+ * This initialization will be replaced by a DT-based
-+ * initialization once the mvebu-mbus driver gains DT support.
-+ */
-+
-+#define ARMADA_370_XP_MBUS_WINS_OFFS   0x20000
-+#define ARMADA_370_XP_MBUS_WINS_SIZE   0x100
-+#define ARMADA_370_XP_SDRAM_WINS_OFFS  0x20180
-+#define ARMADA_370_XP_SDRAM_WINS_SIZE  0x20
-+
-+static void __init armada_370_xp_mbus_init(void)
- {
- 	char *mbus_soc_name;
-+	struct device_node *dn;
-+	const __be32 mbus_wins_offs = cpu_to_be32(ARMADA_370_XP_MBUS_WINS_OFFS);
-+	const __be32 sdram_wins_offs = cpu_to_be32(ARMADA_370_XP_SDRAM_WINS_OFFS);
- 
--	mvebu_clocks_init();
--	armada_370_xp_timer_init();
--	coherency_init();
--
--	/*
--	 * This initialization will be replaced by a DT-based
--	 * initialization once the mvebu-mbus driver gains DT support.
--	 */
- 	if (of_machine_is_compatible("marvell,armada370"))
- 		mbus_soc_name = "marvell,armada370-mbus";
- 	else
- 		mbus_soc_name = "marvell,armadaxp-mbus";
- 
-+	dn = of_find_node_by_name(NULL, "internal-regs");
-+	BUG_ON(!dn);
-+
- 	mvebu_mbus_init(mbus_soc_name,
--			ARMADA_370_XP_MBUS_WINS_BASE,
-+			of_translate_address(dn, &mbus_wins_offs),
- 			ARMADA_370_XP_MBUS_WINS_SIZE,
--			ARMADA_370_XP_SDRAM_WINS_BASE,
-+			of_translate_address(dn, &sdram_wins_offs),
- 			ARMADA_370_XP_SDRAM_WINS_SIZE);
-+}
- 
-+static void __init armada_370_xp_timer_and_clk_init(void)
-+{
-+	mvebu_clocks_init();
-+	armada_370_xp_timer_init();
-+	coherency_init();
-+	armada_370_xp_mbus_init();
- #ifdef CONFIG_CACHE_L2X0
- 	l2x0_of_init(0, ~0UL);
- #endif
-diff --git a/arch/arm/mach-mvebu/armada-370-xp.h b/arch/arm/mach-mvebu/armada-370-xp.h
-index 585e147..c612b2c 100644
---- a/arch/arm/mach-mvebu/armada-370-xp.h
-+++ b/arch/arm/mach-mvebu/armada-370-xp.h
-@@ -15,14 +15,6 @@
- #ifndef __MACH_ARMADA_370_XP_H
- #define __MACH_ARMADA_370_XP_H
- 
--#define ARMADA_370_XP_REGS_PHYS_BASE	0xd0000000
--
--/* These defines can go away once mvebu-mbus has a DT binding */
--#define ARMADA_370_XP_MBUS_WINS_BASE    (ARMADA_370_XP_REGS_PHYS_BASE + 0x20000)
--#define ARMADA_370_XP_MBUS_WINS_SIZE    0x100
--#define ARMADA_370_XP_SDRAM_WINS_BASE   (ARMADA_370_XP_REGS_PHYS_BASE + 0x20180)
--#define ARMADA_370_XP_SDRAM_WINS_SIZE   0x20
--
- #ifdef CONFIG_SMP
- #include <linux/cpumask.h>
- 
+Cc'ing Maxime Ripard, since I see that mach-sunxi does have a
+Makefile.boot, even though I believe it is not needed.
+
+Best regards,
+
+Thomas
 -- 
-1.8.1.2
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
