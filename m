@@ -1,58 +1,74 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Jun 2013 15:45:45 +0900
-Subject: [GIT PULL 0/4] Update for Renesas INTC External IRQ pin driver
- for v3.11
-In-Reply-To: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130605064545.GC14490@verge.net.au>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 04 Jun 2013 23:45:45 -0700
+Subject: [PATCH RFC 0/3] first pass converting omap4 clock data to DT
+In-Reply-To: <1370352534.25965.52.camel@sokoban>
+References: <1370327958-19776-1-git-send-email-mturquette@linaro.org>
+ <1370352534.25965.52.camel@sokoban>
+Message-ID: <20130605064545.10233.72880@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ fix up subject to say GIT PULL ]
+Quoting Tero Kristo (2013-06-04 06:28:54)
+> Hi Mike,
+> 
+> On Mon, 2013-06-03 at 23:39 -0700, Mike Turquette wrote:
+> > This is a very incomplete conversion of a handful of OMAP4 PRCM clocks
+> > from the statically defined clock data in
+> > arch/arm/mach-omap2/cclock44xx_data.c to a new dts file in
+> > arch/arm/boot/dts/omap4-clocks.dtsi.
+> 
+> I gave a quick try for this set and it seems to be working nicely, so
+> for at least me this approach is fine. Feel free to add tested-by me if
+> you like (for the basic clock bindings also.) Can't comment much on the
+> DT stuff though as my experience is rather limited on it.
+> 
+> > I am not a DT expert so many of the choices here may be quite disgusting
+> > to look at, or may be on the right path.  In particular I simply include
+> > the new omap4-clocks.dtsi from omap4.dtsi, which feels a bit kludgey.
+> > Also this series depends on the basic clock bindings RFC I posted
+> > earlier today[1].
+> > 
+> > I actually have an omap4-clock.dtsi file with many more clocks converted
+> > to the mux-clock, divider-clock, fixed-clock, fixed-factor and
+> > (unpublished) gate-clock bindings in my local repo, but it is not
+> > currently booting.  I wanted to get this early preview out regardless.
+> 
+> Any way I can get access to your local tree? Can you push a branch
+> somewhere? I could provide you debugging support on this at least, as I
+> spent quite a bit of time earlier moving the clock data under
+> drivers/clk... I guess you are probably seeing similar issues I faced.
+> 
 
-On Wed, Jun 05, 2013 at 01:32:27PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+I'll be pushing changes to my github tree:
+git://github.com/mturquette/linux.git clk-next-omap-dt
+https://github.com/mturquette/linux/tree/clk-next-omap-dt
+
+For now it is just this series based on the prerequisites, based on
+clk-next, based on -rc3.
+
+Regards,
+Mike
+
+> -Tero
 > 
-> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-> 
->   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq-for-v3.11
-> 
-> for you to fetch changes up to 14d064ad3881f47ae0a6f247c992652053c7f4d5:
-> 
->   irqchip: Add irqchip_init dummy function (2013-05-22 21:55:41 +0900)
-> 
-> ----------------------------------------------------------------
-> Update for Renesas INTC External IRQ pin driver for v3.11
-> 
-> Add runtime PM support
-> Add DT binding for sense bitfield width
-> Correct error handing in irqc_probe
-> Add irqchip_init dummy function
-> 
-> ----------------------------------------------------------------
-> Axel Lin (1):
->       irqchip: renesas-irqc: Fix irqc_probe error handling
-> 
-> Bastian Hecht (1):
->       irqchip: Add irqchip_init dummy function
-> 
-> Guennadi Liakhovetski (1):
->       irqchip: renesas-intc-irqpin: DT binding for sense bitfield width
-> 
-> Simon Horman (1):
->       irqchip: irqc: Add runtime PM support
-> 
->  .../bindings/interrupt-controller/renesas,intc-irqpin.txt   | 13 +++++++++++++
->  drivers/irqchip/irq-renesas-intc-irqpin.c                   |  4 ++++
->  drivers/irqchip/irq-renesas-irqc.c                          | 12 ++++++++++--
->  include/linux/irqchip.h                                     |  4 ++++
->  4 files changed, 31 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> 
-> -- 
-> 1.8.2.1
-> 
+> > 
+> > [1] http://article.gmane.org/gmane.linux.kernel/1501216
+> > 
+> > Mike Turquette (3):
+> >   clk: omap: introduce clock driver
+> >   ARM: dts: omap4 clock data
+> >   ARM: omap4: register DT clocks & remove old data
+> > 
+> >  arch/arm/boot/dts/omap4-clocks.dtsi   | 128 ++++++++++++++++++++++++++++++++++
+> >  arch/arm/boot/dts/omap4.dtsi          |   2 +
+> >  arch/arm/mach-omap2/cclock44xx_data.c |  54 ++------------
+> >  drivers/clk/Makefile                  |   1 +
+> >  drivers/clk/omap/Makefile             |   1 +
+> >  drivers/clk/omap/clk.c                |  55 +++++++++++++++
+> >  include/linux/clk/omap.h              |  24 +++++++
+> >  7 files changed, 217 insertions(+), 48 deletions(-)
+> >  create mode 100644 arch/arm/boot/dts/omap4-clocks.dtsi
+> >  create mode 100644 drivers/clk/omap/Makefile
+> >  create mode 100644 drivers/clk/omap/clk.c
+> >  create mode 100644 include/linux/clk/omap.h
+> >
