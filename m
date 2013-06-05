@@ -1,39 +1,37 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 5 Jun 2013 20:50:00 +0200
-Subject: [PATCH 07/10] pinctrl: add pinctrl driver for Rockchip SoCs
-In-Reply-To: <51AF72F9.3060307@wwwdotorg.org>
-References: <201306030055.15413.heiko@sntech.de>
- <CACRpkdZty-TszfBTOab4_PUi8dy5DYim=wNERv=pyqC3HNuT4w@mail.gmail.com>
- <51AF72F9.3060307@wwwdotorg.org>
-Message-ID: <201306052050.00410.heiko@sntech.de>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 5 Jun 2013 11:54:05 -0700
+Subject: [PATCH 1/3] drivers: pinctrl sleep and idle states in the core
+In-Reply-To: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130605185405.GA18884@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 5. Juni 2013, 19:18:49 schrieb Stephen Warren:
-> On 06/05/2013 01:01 AM, Linus Walleij wrote:
-> > On Tue, Jun 4, 2013 at 2:05 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> ...
+On Wed, Jun 05, 2013 at 03:44:31PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> >> The only problem is the pull stuff mentioned above that is either pull
-> >> up or down without the driver having knowledge about it. And
-> >> generic_pinconf only knows about them separately right now.
-> > 
-> > Create a separate patch adding PIN_CONFIG_BIAS_PULL_AUTO
-> > to include/linux/pinctrl/pinconf-generic.h, don't forget the
-> > kerneldoc, and patching drivers/pinctrl/pinconf-generic.c.
+> If a device have sleep and idle states in addition to the
+> default state, look up these in the core and stash them in
+> the pinctrl state container.
 > 
-> "AUTO" sounds really rather generic. Based on just the word "AUTO", I
-> have no idea if it's a HW- or SW-supplied default, or what the algorithm
-> is for determining the automatically selected value. Perhaps
-> s/AUTO/PIN_DEFAULT/ or something like that?
+> Add accessor functions for pinctrl consumers to put the pins
+> into "default", "sleep" and "idle" states passing nothing but
+> the struct device * affected.
+> 
+> Solution suggested by Kevin Hilman, Mark Brown and Dmitry
+> Torokhov in response to a patch series from Hebbar
+> Gururaja.
+> 
+> Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> I'm seeking Gregs ACK on this in the end, so we can take this
+> in through the pinctrl tree. But first let's review!
 
-I would also go with PIN_DEFAULT, which somehow captures what the function 
-does better than "AUTO". So, if no-one objects I'll go with Stephen's 
-suggestion.
-
-
-> While the concept is simple enough, it's unusual enough that such a
-> patch would hopefully have a comment containing a full explanation of
-> exactly what this option means.
-
-of course :-)
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
