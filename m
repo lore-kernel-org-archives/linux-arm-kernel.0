@@ -1,29 +1,27 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Wed, 5 Jun 2013 06:19:55 +0000 (UTC)
-Subject: Tegra baseline test results for v3.10-rc4
-Message-ID: <alpine.DEB.2.02.1306050618190.13098@utopia.booyaka.com>
+From: mperttunen@nvidia.com (Mikko Perttunen)
+Date: Wed, 5 Jun 2013 09:27:34 +0300
+Subject: [PATCH] clk: tegra114: Fix msenc clock register
+In-Reply-To: <51AE0F1B.20602@wwwdotorg.org>
+References: <1370345143-4885-1-git-send-email-mperttunen@nvidia.com>
+ <51AE0F1B.20602@wwwdotorg.org>
+Message-ID: <op.wx6z781wpdlnwf@mperttunen-lnx>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Ah, sorry about that. I did actually use get_maintainer.pl, and it listed  
+you
+on the first line :) It looks like only drivers/clk/clk-* is assigned to  
+Mike
+according to MAINTAINERS, and the tegra/ subdirectory isn't.
 
-Here are some basic Tegra test results for Linux v3.10-rc4.
-Logs and other details at:
+On Tue, 04 Jun 2013 19:00:27 +0300, Stephen Warren <swarren@wwwdotorg.org>  
+wrote:
 
-    http://www.pwsan.com/tegra/testlogs/test_v3.10-rc4/20130603044655/
-
-
-Test summary
-------------
-
-Build: zImage:
-    Pass ( 1/ 1): tegra_defconfig
-
-Boot to userspace:
-    Pass ( 1/ 1): t33beaver
-
-
-vmlinux object size
-(delta in bytes from test_v3.10-rc3 
-(e4aa937ec75df0eea0bee03bffa3303ad36c986b)):
-   text     data      bss    total  kernel
-   -480        0        0     -480  tegra_defconfig
+> On 06/04/2013 05:25 AM, Mikko Perttunen wrote:
+>> The msenc clock's register was set to the usb3 clock's register.
+>
+> drivers/clk changes should be sent to Mike Turquette (CC'd here). See
+> the output of ./scripts/get_maintainer.pl and/or the MAINTAINERS file.
+>
+> Hopefully he can pick this up from the ARM mailing list - if not, I'm
+> sure he'll let you know to resend it.
