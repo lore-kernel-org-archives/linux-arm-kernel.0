@@ -1,36 +1,71 @@
-From: khoroshilov@ispras.ru (Alexey Khoroshilov)
-Date: Thu,  6 Jun 2013 01:29:56 +0400
-Subject: [PATCH] spi/sirf: fix error propagation in spi_sirfsoc_probe()
-Message-ID: <1370467796-4641-1-git-send-email-khoroshilov@ispras.ru>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 5 Jun 2013 23:31:44 +0200
+Subject: [PATCHv3 1/6] i2c: sunxi: Add Allwinner A1X i2c driver
+In-Reply-To: <20130605133945.GA2934@katana>
+References: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1369648843-1640-2-git-send-email-maxime.ripard@free-electrons.com>
+ <20130605133945.GA2934@katana>
+Message-ID: <20130605213144.GB14209@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If pinctrl_get_select_default() fails, spi_sirfsoc_probe()
-returns IS_ERR(sspi->p) instead of PTR_ERR(sspi->p).
+Hi Wolfram,
 
-Found by Linux Driver Verification project (linuxtesting.org).
+On Wed, Jun 05, 2013 at 03:39:47PM +0200, Wolfram Sang wrote:
+> 
+> > +#define SUNXI_I2C_ADDR_REG		(0x00)
+> > +#define SUNXI_I2C_ADDR_ADDR(v)			((v & 0x7f) << 1)
+> > +#define SUNXI_I2C_XADDR_REG		(0x04)
+> > +#define SUNXI_I2C_DATA_REG		(0x08)
+> > +#define SUNXI_I2C_CNTR_REG		(0x0c)
+> > +#define SUNXI_I2C_CNTR_ASSERT_ACK		BIT(2)
+> > +#define SUNXI_I2C_CNTR_INT_FLAG			BIT(3)
+> > +#define SUNXI_I2C_CNTR_MASTER_STOP		BIT(4)
+> > +#define SUNXI_I2C_CNTR_MASTER_START		BIT(5)
+> > +#define SUNXI_I2C_CNTR_BUS_ENABLE		BIT(6)
+> > +#define SUNXI_I2C_CNTR_INT_ENABLE		BIT(7)
+> > +#define SUNXI_I2C_STA_REG		(0x10)
+> > +#define SUNXI_I2C_STA_BUS_ERROR			(0x00)
+> > +#define SUNXI_I2C_STA_START			(0x08)
+> > +#define SUNXI_I2C_STA_START_REPEAT		(0x10)
+> > +#define SUNXI_I2C_STA_MASTER_WADDR_ACK		(0x18)
+> > +#define SUNXI_I2C_STA_MASTER_WADDR_NAK		(0x20)
+> > +#define SUNXI_I2C_STA_MASTER_DATA_SENT_ACK	(0x28)
+> > +#define SUNXI_I2C_STA_MASTER_DATA_SENT_NAK	(0x30)
+> > +#define SUNXI_I2C_STA_MASTER_RADDR_ACK		(0x40)
+> > +#define SUNXI_I2C_STA_MASTER_RADDR_NAK		(0x48)
+> > +#define SUNXI_I2C_STA_MASTER_DATA_RECV_ACK	(0x50)
+> > +#define SUNXI_I2C_STA_MASTER_DATA_RECV_NAK	(0x58)
+> > +#define SUNXI_I2C_CCR_REG		(0x14)
+> > +#define SUNXI_I2C_CCR_DIV_N(val)		(val & 0x3)
+> > +#define SUNXI_I2C_CCR_DIV_M(val)		((val & 0xf) << 3)
+> > +#define SUNXI_I2C_SRST_REG		(0x18)
+> > +#define SUNXI_I2C_SRST_RESET			BIT(0)
+> > +#define SUNXI_I2C_EFR_REG		(0x1c)
+> > +#define SUNXI_I2C_LCR_REG		(0x20)
+> > +
+> > +#define SUNXI_I2C_DONE			BIT(0)
+> > +#define SUNXI_I2C_ERROR			BIT(1)
+> > +#define SUNXI_I2C_NAK			BIT(2)
+> > +#define SUNXI_I2C_BUS_ERROR		BIT(3)
+> 
+> The register set looks similar to i2c-mv64xxx.c. Has it been considered
+> to merge the two drivers?
 
-Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
----
- drivers/spi/spi-sirf.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Hmm, right, the logic seems surprisingly similar. I wasn't aware of such
+a driver, so I didn't put much thought into merging them :)
 
-diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
-index 0808cd5..94c3920 100644
---- a/drivers/spi/spi-sirf.c
-+++ b/drivers/spi/spi-sirf.c
-@@ -559,9 +559,10 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
- 	sspi->bitbang.master->dev.of_node = pdev->dev.of_node;
- 
- 	sspi->p = pinctrl_get_select_default(&pdev->dev);
--	ret = IS_ERR(sspi->p);
--	if (ret)
-+	if (IS_ERR(sspi->p)) {
-+		ret = PTR_ERR(sspi->p);
- 		goto free_master;
-+	}
- 
- 	sspi->clk = clk_get(&pdev->dev, NULL);
- 	if (IS_ERR(sspi->clk)) {
--- 
-1.8.1.2
+However, the register layout is quite different enough to be quite
+painful to support: the XADDR register here seems to be equivalent to
+the Marvell's EXT_SLAVE_ADDR register, yet in the allwinner case, the
+offset is 0x4, while it's 0x1c in Marvell's case, which offsets all the
+other registers obviously. The status and clock registers in marvell
+case looks to be merged together, while they are separate registers
+here, etc.
+
+I guess it would make the code much more complicated for such simple
+drivers, so I wouldn't push too much for merging, but I guess it's your
+call.
+
+Thanks!
+Maxime
