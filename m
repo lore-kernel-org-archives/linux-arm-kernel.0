@@ -1,47 +1,89 @@
-From: gleb@redhat.com (Gleb Natapov)
-Date: Wed, 5 Jun 2013 09:01:05 +0300
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <CAMJs5B8WqiMpqj3Mr=rPCr89k-jvY2i3BDbkPOsMb3PhCR1SWg@mail.gmail.com>
-References: <51ADDDAE.4040705@arm.com>
- <CAMJs5B_PB1pNVCO_EK7aTghN23L+d0RovAFi7inrVsJb5STWOA@mail.gmail.com>
- <51AE00D7.9030607@arm.com> <51AE082C.6050907@redhat.com>
- <CAMJs5B9PxHfUrugov4HJknQ24fG7MNp8obziqu9dnSztsGBksQ@mail.gmail.com>
- <51AE0D0D.3030106@redhat.com> <20130604163741.GA15299@redhat.com>
- <CAMJs5B8WqiMpqj3Mr=rPCr89k-jvY2i3BDbkPOsMb3PhCR1SWg@mail.gmail.com>
-Message-ID: <20130605060105.GA1187@redhat.com>
+From: dirk.behme@de.bosch.com (Dirk Behme)
+Date: Wed, 5 Jun 2013 08:02:16 +0200
+Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
+In-Reply-To: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
+References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
+Message-ID: <51AED468.9040109@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 10:57:32PM -0700, Christoffer Dall wrote:
-> On 4 June 2013 09:37, Gleb Natapov <gleb@redhat.com> wrote:
-> > On Tue, Jun 04, 2013 at 05:51:41PM +0200, Paolo Bonzini wrote:
-> >> Il 04/06/2013 17:43, Christoffer Dall ha scritto:
-> >> > Hi Paolo,
-> >> >
-> >> > I don't think this is an issue. Gleb and Marcelo for example pulled
-> >> > RMK's stable tree for my KVM/ARM updates for the 3.10 merge window and
-> >> > that wasn't an issue.  If Linus pulls the kvm/next tree first the
-> >> > diffstat should be similar and everything clean enough, no?
-> >> >
-> >> > Catalin has previously expressed his wish to upstream the kvm/arm64
-> >> > patches directly through him given the churn in a completely new
-> >> > architecture and he wants to make sure that everything looks right.
-> >> >
-> >> > It's a pretty clean implementation with quite few dependencies and
-> >> > merging as a working series should be a priority instead of the
-> >> > Kconfig hack, imho.
-> >>
-> >> Ok, let's see what Gleb says.
-> >>
-> > I have no objection to merge arm64 kvm trough Catalin if it mean less
-> > churn for everyone. That's what we did with arm and mips. Arm64 kvm
-> > has a dependency on kvm.git next though, so how Catalin make sure that
-> > everything looks right? Will he merge kvm.git/next to arm64 tree?
-> >
-> Yes, that was the idea. Everything in kvm/next is considered stable, right?
-> 
-Right. Catalin should wait for kvm.git to be pulled by Linus next merge
-windows before sending his pull request then.
+On 28.09.2012 00:02, Russell King wrote:
+> If we are building for a LE platform, and we haven't overriden the
+> MMIO ops, then we can optimize the mem*io operations using the
+> standard string functions.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>   arch/arm/include/asm/io.h |   25 +++++++++++++++++++++++++
+>   1 files changed, 25 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+> index 815c669..ed0577e 100644
+> --- a/arch/arm/include/asm/io.h
+> +++ b/arch/arm/include/asm/io.h
+> @@ -23,6 +23,7 @@
+>
+>   #ifdef __KERNEL__
+>
+> +#include <linux/string.h>
+>   #include <linux/types.h>
+>   #include <asm/byteorder.h>
+>   #include <asm/memory.h>
+> @@ -249,9 +250,33 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+>   #define writesw(p,d,l)		__raw_writesw(p,d,l)
+>   #define writesl(p,d,l)		__raw_writesl(p,d,l)
+>
+> +#ifndef __ARMBE__
+> +static inline void memset_io(volatile void __iomem *dst, unsigned c,
+> +	size_t count)
+> +{
+> +	memset((void __force *)dst, c, count);
+> +}
+> +#define memset_io(dst,c,count) memset_io(dst,c,count)
+> +
+> +static inline void memcpy_fromio(void *to, const volatile void __iomem *from,
+> +	size_t count)
+> +{
+> +	memcpy(to, (const void __force *)from, count);
+> +}
+> +#define memcpy_fromio(to,from,count) memcpy_fromio(to,from,count)
+> +
+> +static inline void memcpy_toio(volatile void __iomem *to, const void *from,
+> +	size_t count)
+> +{
+> +	memcpy((void __force *)to, from, count);
+> +}
+> +#define memcpy_toio(to,from,count) memcpy_toio(to,from,count)
+> +
+> +#else
+>   #define memset_io(c,v,l)	_memset_io(c,(v),(l))
+>   #define memcpy_fromio(a,c,l)	_memcpy_fromio((a),c,(l))
+>   #define memcpy_toio(c,a,l)	_memcpy_toio(c,(a),(l))
+> +#endif
+>
+>   #endif	/* readl */
 
---
-			Gleb.
+I'd like to ask if there is any chance to get anything like this or the 
+even older proposal
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004077.html
+
+merged? Maybe an updated version incorporating the discussion conclusions?
+
+
+In the discussion of
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004077.html
+
+there have been some doubts if it's a good idea to enable it for all 
+SoCs. Therefore that patch introduced a
+
+config OPTIMIZED_IOMEM_MEMCPY
+
+which would allow us to enable it for only known to be compatible SoCs. 
+Just in case this helps to get it applied ;)
+
+
+Many thanks and best regards
+
+Dirk
