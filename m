@@ -1,475 +1,203 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 5 Jun 2013 09:57:12 +0200
-Subject: [PATCH 2/2 v4] net/macb: change RX path for GEM
-In-Reply-To: <cover.1370418770.git.nicolas.ferre@atmel.com>
-References: <cover.1370418770.git.nicolas.ferre@atmel.com>
-Message-ID: <fff0b34ee670e075bed9410a66b7c355402ccc12.1370418770.git.nicolas.ferre@atmel.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Wed, 05 Jun 2013 09:59:28 +0200
+Subject: [PATCH 2/4] ARM: dts: omap5-uevm: Add USB Host support
+In-Reply-To: <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
+References: <1370414770-1485-1-git-send-email-r.sricharan@ti.com>
+ <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
+Message-ID: <51AEEFE0.50107@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GEM is able to adapt its DMA buffer size, so change
-the RX path to take advantage of this possibility and
-remove all kind of memcpy in this path.
-This modification introduces function pointers for managing
-differences between MACB and GEM adapter type.
+Hello,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/net/ethernet/cadence/macb.c | 308 ++++++++++++++++++++++++++++++------
- drivers/net/ethernet/cadence/macb.h |  13 ++
- 2 files changed, 272 insertions(+), 49 deletions(-)
+Some very minor comments.
 
-diff --git a/drivers/net/ethernet/cadence/macb.c b/drivers/net/ethernet/cadence/macb.c
-index aab7bb2..d27672c 100644
---- a/drivers/net/ethernet/cadence/macb.c
-+++ b/drivers/net/ethernet/cadence/macb.c
-@@ -33,7 +33,6 @@
- #include "macb.h"
- 
- #define MACB_RX_BUFFER_SIZE	128
--#define GEM_RX_BUFFER_SIZE	2048
- #define RX_BUFFER_MULTIPLE	64  /* bytes */
- #define RX_RING_SIZE		512 /* must be power of 2 */
- #define RX_RING_BYTES		(sizeof(struct macb_dma_desc) * RX_RING_SIZE)
-@@ -530,6 +529,155 @@ static void macb_tx_interrupt(struct macb *bp)
- 		netif_wake_queue(bp->dev);
- }
- 
-+static void gem_rx_refill(struct macb *bp)
-+{
-+	unsigned int		entry;
-+	struct sk_buff		*skb;
-+	struct macb_dma_desc	*desc;
-+	dma_addr_t		paddr;
-+
-+	while (CIRC_SPACE(bp->rx_prepared_head, bp->rx_tail, RX_RING_SIZE) > 0) {
-+		u32 addr, ctrl;
-+
-+		entry = macb_rx_ring_wrap(bp->rx_prepared_head);
-+		desc = &bp->rx_ring[entry];
-+
-+		/* Make hw descriptor updates visible to CPU */
-+		rmb();
-+
-+		addr = desc->addr;
-+		ctrl = desc->ctrl;
-+		bp->rx_prepared_head++;
-+
-+		if ((addr & MACB_BIT(RX_USED)))
-+			continue;
-+
-+		if (bp->rx_skbuff[entry] == NULL) {
-+			/* allocate sk_buff for this free entry in ring */
-+			skb = netdev_alloc_skb(bp->dev, bp->rx_buffer_size);
-+			if (unlikely(skb == NULL)) {
-+				netdev_err(bp->dev,
-+					   "Unable to allocate sk_buff\n");
-+				break;
-+			}
-+			bp->rx_skbuff[entry] = skb;
-+
-+			/* now fill corresponding descriptor entry */
-+			paddr = dma_map_single(&bp->pdev->dev, skb->data,
-+					       bp->rx_buffer_size, DMA_FROM_DEVICE);
-+
-+			if (entry == RX_RING_SIZE - 1)
-+				paddr |= MACB_BIT(RX_WRAP);
-+			bp->rx_ring[entry].addr = paddr;
-+			bp->rx_ring[entry].ctrl = 0;
-+
-+			/* properly align Ethernet header */
-+			skb_reserve(skb, NET_IP_ALIGN);
-+		}
-+	}
-+
-+	/* Make descriptor updates visible to hardware */
-+	wmb();
-+
-+	netdev_vdbg(bp->dev, "rx ring: prepared head %d, tail %d\n",
-+		   bp->rx_prepared_head, bp->rx_tail);
-+}
-+
-+/* Mark DMA descriptors from begin up to and not including end as unused */
-+static void discard_partial_frame(struct macb *bp, unsigned int begin,
-+				  unsigned int end)
-+{
-+	unsigned int frag;
-+
-+	for (frag = begin; frag != end; frag++) {
-+		struct macb_dma_desc *desc = macb_rx_desc(bp, frag);
-+		desc->addr &= ~MACB_BIT(RX_USED);
-+	}
-+
-+	/* Make descriptor updates visible to hardware */
-+	wmb();
-+
-+	/*
-+	 * When this happens, the hardware stats registers for
-+	 * whatever caused this is updated, so we don't have to record
-+	 * anything.
-+	 */
-+}
-+
-+static int gem_rx(struct macb *bp, int budget)
-+{
-+	unsigned int		len;
-+	unsigned int		entry;
-+	struct sk_buff		*skb;
-+	struct macb_dma_desc	*desc;
-+	int			count = 0;
-+
-+	while (count < budget) {
-+		u32 addr, ctrl;
-+
-+		entry = macb_rx_ring_wrap(bp->rx_tail);
-+		desc = &bp->rx_ring[entry];
-+
-+		/* Make hw descriptor updates visible to CPU */
-+		rmb();
-+
-+		addr = desc->addr;
-+		ctrl = desc->ctrl;
-+
-+		if (!(addr & MACB_BIT(RX_USED)))
-+			break;
-+
-+		desc->addr &= ~MACB_BIT(RX_USED);
-+		bp->rx_tail++;
-+		count++;
-+
-+		if (!(ctrl & MACB_BIT(RX_SOF) && ctrl & MACB_BIT(RX_EOF))) {
-+			netdev_err(bp->dev,
-+				   "not whole frame pointed by descriptor\n");
-+			bp->stats.rx_dropped++;
-+			break;
-+		}
-+		skb = bp->rx_skbuff[entry];
-+		if (unlikely(!skb)) {
-+			netdev_err(bp->dev,
-+				   "inconsistent Rx descriptor chain\n");
-+			bp->stats.rx_dropped++;
-+			break;
-+		}
-+		/* now everything is ready for receiving packet */
-+		bp->rx_skbuff[entry] = NULL;
-+		len = MACB_BFEXT(RX_FRMLEN, ctrl);
-+
-+		netdev_vdbg(bp->dev, "gem_rx %u (len %u)\n", entry, len);
-+
-+		skb_put(skb, len);
-+		addr = MACB_BF(RX_WADDR, MACB_BFEXT(RX_WADDR, addr));
-+		dma_unmap_single(&bp->pdev->dev, addr,
-+				 len, DMA_FROM_DEVICE);
-+
-+		skb->protocol = eth_type_trans(skb, bp->dev);
-+		skb_checksum_none_assert(skb);
-+
-+		bp->stats.rx_packets++;
-+		bp->stats.rx_bytes += skb->len;
-+
-+#if defined(DEBUG) && defined(VERBOSE_DEBUG)
-+		netdev_vdbg(bp->dev, "received skb of length %u, csum: %08x\n",
-+			    skb->len, skb->csum);
-+		print_hex_dump(KERN_DEBUG, " mac: ", DUMP_PREFIX_ADDRESS, 16, 1,
-+			       skb->mac_header, 16, true);
-+		print_hex_dump(KERN_DEBUG, "data: ", DUMP_PREFIX_ADDRESS, 16, 1,
-+			       skb->data, 32, true);
-+#endif
-+
-+		netif_receive_skb(skb);
-+	}
-+
-+	gem_rx_refill(bp);
-+
-+	return count;
-+}
-+
- static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
- 			 unsigned int last_frag)
- {
-@@ -608,27 +756,6 @@ static int macb_rx_frame(struct macb *bp, unsigned int first_frag,
- 	return 0;
- }
- 
--/* Mark DMA descriptors from begin up to and not including end as unused */
--static void discard_partial_frame(struct macb *bp, unsigned int begin,
--				  unsigned int end)
--{
--	unsigned int frag;
--
--	for (frag = begin; frag != end; frag++) {
--		struct macb_dma_desc *desc = macb_rx_desc(bp, frag);
--		desc->addr &= ~MACB_BIT(RX_USED);
--	}
--
--	/* Make descriptor updates visible to hardware */
--	wmb();
--
--	/*
--	 * When this happens, the hardware stats registers for
--	 * whatever caused this is updated, so we don't have to record
--	 * anything.
--	 */
--}
--
- static int macb_rx(struct macb *bp, int budget)
- {
- 	int received = 0;
-@@ -689,7 +816,7 @@ static int macb_poll(struct napi_struct *napi, int budget)
- 	netdev_vdbg(bp->dev, "poll: status = %08lx, budget = %d\n",
- 		   (unsigned long)status, budget);
- 
--	work_done = macb_rx(bp, budget);
-+	work_done = bp->macbgem_ops.mog_rx(bp, budget);
- 	if (work_done < budget) {
- 		napi_complete(napi);
- 
-@@ -872,29 +999,63 @@ static int macb_start_xmit(struct sk_buff *skb, struct net_device *dev)
- 	return NETDEV_TX_OK;
- }
- 
--static void macb_init_rx_buffer_size(struct macb *bp)
-+static void macb_init_rx_buffer_size(struct macb *bp, size_t size)
- {
- 	if (!macb_is_gem(bp)) {
- 		bp->rx_buffer_size = MACB_RX_BUFFER_SIZE;
- 	} else {
--		bp->rx_buffer_size = GEM_RX_BUFFER_SIZE;
-+		bp->rx_buffer_size = size;
- 
--		if (bp->rx_buffer_size > PAGE_SIZE) {
--			netdev_warn(bp->dev,
--				    "RX buffer cannot be bigger than PAGE_SIZE, shrinking\n");
--			bp->rx_buffer_size = PAGE_SIZE;
--		}
- 		if (bp->rx_buffer_size % RX_BUFFER_MULTIPLE) {
--			netdev_warn(bp->dev,
--				    "RX buffer must be multiple of %d bytes, shrinking\n",
-+			netdev_dbg(bp->dev,
-+				    "RX buffer must be multiple of %d bytes, expanding\n",
- 				    RX_BUFFER_MULTIPLE);
- 			bp->rx_buffer_size =
--				rounddown(bp->rx_buffer_size, RX_BUFFER_MULTIPLE);
-+				roundup(bp->rx_buffer_size, RX_BUFFER_MULTIPLE);
- 		}
--		bp->rx_buffer_size = max(RX_BUFFER_MULTIPLE, GEM_RX_BUFFER_SIZE);
- 	}
-+
-+	netdev_dbg(bp->dev, "mtu [%d] rx_buffer_size [%d]\n",
-+		   bp->dev->mtu, bp->rx_buffer_size);
- }
- 
-+static void gem_free_rx_buffers(struct macb *bp)
-+{
-+	struct sk_buff		*skb;
-+	struct macb_dma_desc	*desc;
-+	dma_addr_t		addr;
-+	int i;
-+
-+	if (!bp->rx_skbuff)
-+		return;
-+
-+	for (i = 0; i < RX_RING_SIZE; i++) {
-+		skb = bp->rx_skbuff[i];
-+
-+		if (skb == NULL)
-+			continue;
-+
-+		desc = &bp->rx_ring[i];
-+		addr = MACB_BF(RX_WADDR, MACB_BFEXT(RX_WADDR, desc->addr));
-+		dma_unmap_single(&bp->pdev->dev, addr, skb->len,
-+				 DMA_FROM_DEVICE);
-+		dev_kfree_skb_any(skb);
-+		skb = NULL;
-+	}
-+
-+	kfree(bp->rx_skbuff);
-+	bp->rx_skbuff = NULL;
-+}
-+
-+static void macb_free_rx_buffers(struct macb *bp)
-+{
-+	if (bp->rx_buffers) {
-+		dma_free_coherent(&bp->pdev->dev,
-+				  RX_RING_SIZE * bp->rx_buffer_size,
-+				  bp->rx_buffers, bp->rx_buffers_dma);
-+		bp->rx_buffers = NULL;
-+	}
-+}
- 
- static void macb_free_consistent(struct macb *bp)
- {
-@@ -902,6 +1063,7 @@ static void macb_free_consistent(struct macb *bp)
- 		kfree(bp->tx_skb);
- 		bp->tx_skb = NULL;
- 	}
-+	bp->macbgem_ops.mog_free_rx_buffers(bp);
- 	if (bp->rx_ring) {
- 		dma_free_coherent(&bp->pdev->dev, RX_RING_BYTES,
- 				  bp->rx_ring, bp->rx_ring_dma);
-@@ -912,12 +1074,37 @@ static void macb_free_consistent(struct macb *bp)
- 				  bp->tx_ring, bp->tx_ring_dma);
- 		bp->tx_ring = NULL;
- 	}
--	if (bp->rx_buffers) {
--		dma_free_coherent(&bp->pdev->dev,
--				  RX_RING_SIZE * bp->rx_buffer_size,
--				  bp->rx_buffers, bp->rx_buffers_dma);
--		bp->rx_buffers = NULL;
--	}
-+}
-+
-+static int gem_alloc_rx_buffers(struct macb *bp)
-+{
-+	int size;
-+
-+	size = RX_RING_SIZE * sizeof(struct sk_buff *);
-+	bp->rx_skbuff = kzalloc(size, GFP_KERNEL);
-+	if (!bp->rx_skbuff)
-+		return -ENOMEM;
-+	else
-+		netdev_dbg(bp->dev,
-+			   "Allocated %d RX struct sk_buff entries at %p\n",
-+			   RX_RING_SIZE, bp->rx_skbuff);
-+	return 0;
-+}
-+
-+static int macb_alloc_rx_buffers(struct macb *bp)
-+{
-+	int size;
-+
-+	size = RX_RING_SIZE * bp->rx_buffer_size;
-+	bp->rx_buffers = dma_alloc_coherent(&bp->pdev->dev, size,
-+					    &bp->rx_buffers_dma, GFP_KERNEL);
-+	if (!bp->rx_buffers)
-+		return -ENOMEM;
-+	else
-+		netdev_dbg(bp->dev,
-+			   "Allocated RX buffers of %d bytes at %08lx (mapped %p)\n",
-+			   size, (unsigned long)bp->rx_buffers_dma, bp->rx_buffers);
-+	return 0;
- }
- 
- static int macb_alloc_consistent(struct macb *bp)
-@@ -947,14 +1134,8 @@ static int macb_alloc_consistent(struct macb *bp)
- 		   "Allocated TX ring of %d bytes at %08lx (mapped %p)\n",
- 		   size, (unsigned long)bp->tx_ring_dma, bp->tx_ring);
- 
--	size = RX_RING_SIZE * bp->rx_buffer_size;
--	bp->rx_buffers = dma_alloc_coherent(&bp->pdev->dev, size,
--					    &bp->rx_buffers_dma, GFP_KERNEL);
--	if (!bp->rx_buffers)
-+	if (bp->macbgem_ops.mog_alloc_rx_buffers(bp))
- 		goto out_err;
--	netdev_dbg(bp->dev,
--		   "Allocated RX buffers of %d bytes at %08lx (mapped %p)\n",
--		   size, (unsigned long)bp->rx_buffers_dma, bp->rx_buffers);
- 
- 	return 0;
- 
-@@ -963,6 +1144,21 @@ out_err:
- 	return -ENOMEM;
- }
- 
-+static void gem_init_rings(struct macb *bp)
-+{
-+	int i;
-+
-+	for (i = 0; i < TX_RING_SIZE; i++) {
-+		bp->tx_ring[i].addr = 0;
-+		bp->tx_ring[i].ctrl = MACB_BIT(TX_USED);
-+	}
-+	bp->tx_ring[TX_RING_SIZE - 1].ctrl |= MACB_BIT(TX_WRAP);
-+
-+	bp->rx_tail = bp->rx_prepared_head = bp->tx_head = bp->tx_tail = 0;
-+
-+	gem_rx_refill(bp);
-+}
-+
- static void macb_init_rings(struct macb *bp)
- {
- 	int i;
-@@ -1259,6 +1455,7 @@ EXPORT_SYMBOL_GPL(macb_set_rx_mode);
- static int macb_open(struct net_device *dev)
- {
- 	struct macb *bp = netdev_priv(dev);
-+	size_t bufsz = dev->mtu + ETH_HLEN + ETH_FCS_LEN + NET_IP_ALIGN;
- 	int err;
- 
- 	netdev_dbg(bp->dev, "open\n");
-@@ -1271,7 +1468,7 @@ static int macb_open(struct net_device *dev)
- 		return -EAGAIN;
- 
- 	/* RX buffers initialization */
--	macb_init_rx_buffer_size(bp);
-+	macb_init_rx_buffer_size(bp, bufsz);
- 
- 	err = macb_alloc_consistent(bp);
- 	if (err) {
-@@ -1282,7 +1479,7 @@ static int macb_open(struct net_device *dev)
- 
- 	napi_enable(&bp->napi);
- 
--	macb_init_rings(bp);
-+	bp->macbgem_ops.mog_init_rings(bp);
- 	macb_init_hw(bp);
- 
- 	/* schedule a link state check */
-@@ -1601,6 +1798,19 @@ static int __init macb_probe(struct platform_device *pdev)
- 
- 	dev->base_addr = regs->start;
- 
-+	/* setup appropriated routines according to adapter type */
-+	if (macb_is_gem(bp)) {
-+		bp->macbgem_ops.mog_alloc_rx_buffers = gem_alloc_rx_buffers;
-+		bp->macbgem_ops.mog_free_rx_buffers = gem_free_rx_buffers;
-+		bp->macbgem_ops.mog_init_rings = gem_init_rings;
-+		bp->macbgem_ops.mog_rx = gem_rx;
-+	} else {
-+		bp->macbgem_ops.mog_alloc_rx_buffers = macb_alloc_rx_buffers;
-+		bp->macbgem_ops.mog_free_rx_buffers = macb_free_rx_buffers;
-+		bp->macbgem_ops.mog_init_rings = macb_init_rings;
-+		bp->macbgem_ops.mog_rx = macb_rx;
-+	}
-+
- 	/* Set MII management clock divider */
- 	config = macb_mdc_clk_div(bp);
- 	config |= macb_dbw(bp);
-diff --git a/drivers/net/ethernet/cadence/macb.h b/drivers/net/ethernet/cadence/macb.h
-index 9b5e19f..f407615 100644
---- a/drivers/net/ethernet/cadence/macb.h
-+++ b/drivers/net/ethernet/cadence/macb.h
-@@ -545,11 +545,22 @@ struct gem_stats {
- 	u32	rx_udp_checksum_errors;
- };
- 
-+struct macb;
-+
-+struct macb_or_gem_ops {
-+	int	(*mog_alloc_rx_buffers)(struct macb *bp);
-+	void	(*mog_free_rx_buffers)(struct macb *bp);
-+	void	(*mog_init_rings)(struct macb *bp);
-+	int	(*mog_rx)(struct macb *bp, int budget);
-+};
-+
- struct macb {
- 	void __iomem		*regs;
- 
- 	unsigned int		rx_tail;
-+	unsigned int		rx_prepared_head;
- 	struct macb_dma_desc	*rx_ring;
-+	struct sk_buff		**rx_skbuff;
- 	void			*rx_buffers;
- 	size_t			rx_buffer_size;
- 
-@@ -574,6 +585,8 @@ struct macb {
- 	dma_addr_t		tx_ring_dma;
- 	dma_addr_t		rx_buffers_dma;
- 
-+	struct macb_or_gem_ops	macbgem_ops;
-+
- 	struct mii_bus		*mii_bus;
- 	struct phy_device	*phy_dev;
- 	unsigned int 		link;
--- 
-1.8.2.2
+On 06/05/2013 08:46 AM, Sricharan R wrote:
+> From: Roger Quadros <rogerq@ti.com>
+>
+> Provide the RESET regulators for the USB PHYs, the USB Host
+> port modes and the PHY devices.
+>
+> Also provide pin multiplexer information for the USB host
+> pins.
+>
+> Cc: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> [Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
+> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> ---
+>   arch/arm/boot/dts/omap5-uevm.dts |   77 ++++++++++++++++++++++++++++++++++++++
+>   arch/arm/boot/dts/omap5.dtsi     |   30 +++++++++++++++
+>   2 files changed, 107 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> index 843a001..cf862df 100644
+> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> @@ -25,6 +25,47 @@
+>   		regulator-max-microvolt = <3000000>;
+>   	};
+>
+> +	/* HS USB Port 2 RESET */
+> +	hsusb2_reset: hsusb2_reset_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb2_reset";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio3 16 GPIO_ACTIVE_HIGH>; /* gpio3_80 HUB_NRESET */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Host PHY on PORT 2 */
+> +	hsusb2_phy: hsusb2_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		reset-supply = <&hsusb2_reset>;
+> +	};
+> +
+> +	/* HS USB Port 3 RESET */
+> +	hsusb3_reset: hsusb3_reset_reg {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "hsusb3_reset";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>; /* gpio3_79 ETH_NRESET */
+> +		startup-delay-us = <70000>;
+> +		enable-active-high;
+> +	};
+> +
+> +	/* HS USB Host PHY on PORT 3 */
+> +	hsusb3_phy: hsusb3_phy {
+> +		compatible = "usb-nop-xceiv";
+> +		reset-supply = <&hsusb3_reset>;
+> +	};
+> +
+> +	/* hsusb2_phy is clocked by FREF_CLK1 i.e. auxclk1 */
+> +	clock_alias {
+> +		clock-name = "auxclk1_ck";
+> +		clock-alias = "main_clk";
+> +		device = <&hsusb2_phy>;
+> +		clock-frequency = <19200000>; /* 19.2 MHz */
+> +	};
+>   };
+>
+>   &omap5_pmx_core {
+> @@ -35,6 +76,7 @@
+>   			&dmic_pins
+>   			&mcbsp1_pins
+>   			&mcbsp2_pins
+> +			&usbhost_pins
+>   	>;
+>
+>   	twl6040_pins: pinmux_twl6040_pins {
+> @@ -120,6 +162,32 @@
+>   			0x16c (PIN_INPUT | MUX_MODE1)		/*  mcspi2_cs */
+>   		>;
+>   	};
+> +
+> +	usbhost_pins: pinmux_usbhost_pins {
+> +		pinctrl-single,pins = <
+> +			0x84 (PIN_INPUT | MUX_MODE0) /* usbb2_hsic_strobe INPUT | MODE 0 */
+> +			0x86 (PIN_INPUT | MUX_MODE0) /* usbb2_hsic_data INPUT | MODE 0 */
+
+Comments are redundant with the constants, so maybe you can leave this 
+part out.
+Same for a few others below.
+
+> +
+> +			0x19e (PIN_INPUT | MUX_MODE0) /* usbb3_hsic_strobe INPUT | MODE 0 */
+> +			0x1a0 (PIN_INPUT | MUX_MODE0) /* usbb3_hsic_data INPUT | MODE 0 */
+> +
+> +			0x70 (PIN_OUTPUT | MUX_MODE6) /* gpio3_80 OUTPUT | MODE 6 HUB_NRESET */
+> +			0x6e (PIN_OUTPUT | MUX_MODE6) /* gpio3_79 OUTPUT | MODE 6 ETH_NRESET */
+> +		>;
+> +	};
+> +};
+> +
+> +&omap5_pmx_wkup {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <
+> +			&usbhost_wkup_pins
+> +	>;
+> +
+> +	usbhost_wkup_pins: pinmux_usbhost_wkup_pins {
+> +		pinctrl-single,pins = <
+> +			0x1A (PIN_OUTPUT | MUX_MODE0) /* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
+
+Mismatch between constants and comments, which mode should it be?
+
+> +		>;
+> +	};
+>   };
+>
+>   &mmc1 {
+> @@ -164,6 +232,15 @@
+>   	status = "disabled";
+>   };
+>
+> +&usbhshost {
+> +	port2-mode = "ehci-hsic";
+> +	port3-mode = "ehci-hsic";
+> +};
+> +
+> +&usbhsehci {
+> +	phys = <0 &hsusb2_phy &hsusb3_phy>;
+> +};
+> +
+>   &mcspi1 {
+>
+>   };
+> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
+> index 1e84db8..67d6e1f 100644
+> --- a/arch/arm/boot/dts/omap5.dtsi
+> +++ b/arch/arm/boot/dts/omap5.dtsi
+> @@ -666,5 +666,35 @@
+>   				ctrl-module = <&omap_control_usb>;
+>   			};
+>   		};
+> +
+> +		usbhstll: usbhstll at 4a062000 {
+> +			compatible = "ti,usbhs-tll";
+> +			reg = <0x4a062000 0x1000>;
+> +			interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>;
+
+I guess that here you can replace '0' with GIC_SPI.
+
+> +			ti,hwmods = "usb_tll_hs";
+> +		};
+> +
+> +		usbhshost: usbhshost at 4a064000 {
+> +			compatible = "ti,usbhs-host";
+> +			reg = <0x4a064000 0x800>;
+> +			ti,hwmods = "usb_host_hs";
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges;
+> +
+> +			usbhsohci: ohci at 4a064800 {
+> +				compatible = "ti,ohci-omap3", "usb-ohci";
+> +				reg = <0x4a064800 0x400>;
+> +				interrupt-parent = <&gic>;
+> +				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
+
+Same here.
+
+> +			};
+> +
+> +			usbhsehci: ehci at 4a064c00 {
+> +				compatible = "ti,ehci-omap", "usb-ehci";
+> +				reg = <0x4a064c00 0x400>;
+> +				interrupt-parent = <&gic>;
+> +				interrupts = <0 77 IRQ_TYPE_LEVEL_HIGH>;
+
+And here.
+
+> +			};
+> +		};
+>   	};
+>   };
+>
+
+Regards,
+
+Florian
