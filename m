@@ -1,37 +1,32 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 5 Jun 2013 15:47:49 +0200
-Subject: [PATCH 7/8] arm: mvebu: add another earlyprintk Kconfig option
-In-Reply-To: <20130605134552.GK3803@titan.lakedaemon.net>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370415901-4721-8-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130605134552.GK3803@titan.lakedaemon.net>
-Message-ID: <20130605154749.29b51f40@skate>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 5 Jun 2013 22:49:21 +0900
+Subject: [PATCH 1/4] irqchip: irqc: Add runtime PM support
+In-Reply-To: <CANqRtoTxxtj-uKyM58dKfH6GV62G8nweQeh9W3+VW==USOkj9A@mail.gmail.com>
+References: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
+ <1370406751-3852-2-git-send-email-horms+renesas@verge.net.au>
+ <CANqRtoTxxtj-uKyM58dKfH6GV62G8nweQeh9W3+VW==USOkj9A@mail.gmail.com>
+Message-ID: <20130605134920.GB7451@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Wed, 5 Jun 2013 09:45:52 -0400, Jason Cooper wrote:
-
-> >  	config DEBUG_MVEBU_UART
+On Wed, Jun 05, 2013 at 04:03:26PM +0900, Magnus Damm wrote:
+> Hi Simon and Morimoto-san,
 > 
-> Perhaps we should change this to DEBUG_MVEBU_UART_LEGACY?
-
-> > +	config DEBUG_MVEBU_UART_ALTERNATE
+> On Wed, Jun 5, 2013 at 1:32 PM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > This was tested using the SMSC LAN on the APE6EVM board.
+> >
+> > Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > ---
+> >  drivers/irqchip/irq-renesas-irqc.c | 8 ++++++++
+> >  1 file changed, 8 insertions(+)
 > 
-> And this to DEBUG_MVEBU_UART?
+> Thanks for your patch. I am trying to understand how this controls the
+> actual hardware. Which clock and/or power domain is being controlled
+> using this patch?
 
-I'm fine with doing that, but it means that people who will keep their
-current .config that has CONFIG_DEBUG_MVEBU_UART=y will suddenly see
-their earlyprintk use 0xf1 instead of 0xd0. So in terms of kconfig
-backward compatibility, it's not the nicest thing, but if you believe
-that's ok, I'll change the patch as you proposed.
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+This patch appears to resolve a problem which I discussed with
+Morimoto-san on the linux-sh ML and for which he proposed this solution.
+However, I never fully analysed its effect. I think that
+the best thing would be for me to drop this patch from the
+renesas tree for now it and come back to this problem later.
