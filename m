@@ -1,54 +1,78 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 5 Jun 2013 14:24:38 +0530
-Subject: [PATCH v9 1/9] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <1362586540-10393-2-git-send-email-mporter@ti.com>
-References: <1362586540-10393-1-git-send-email-mporter@ti.com>
- <1362586540-10393-2-git-send-email-mporter@ti.com>
-Message-ID: <51AEFCCE.4040608@ti.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 05 Jun 2013 10:57:09 +0200
+Subject: [PATCH] ARM: Orion: Hoist bridge interrupt handling out of the
+ timer
+In-Reply-To: <20130604172638.GB13745@obsidianresearch.com>
+References: <20121207225507.GB29262@obsidianresearch.com>
+ <20121208112624.GD25315@lunn.ch>
+ <20121209025748.GA10405@obsidianresearch.com>
+ <20121209083046.GA25466@lunn.ch> <50C48CE8.9070400@gmail.com>
+ <20130604172638.GB13745@obsidianresearch.com>
+Message-ID: <51AEFD65.6030306@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On 06/04/13 19:26, Jason Gunthorpe wrote:
+> On Sun, Dec 09, 2012 at 02:06:48PM +0100, Sebastian Hesselbarth wrote:
+>> The main irq controller will be required for sure, but for the secondary
+>> irq controller we had a discussion long ago. IIRC Gregory proposed to have
+>> shared irqs handled by timer and watchdog, I was proposing chained irqs.
+>
+> +1 on decoded IRQs for bridge. I've been running that configuration
+> now since this patch set was first posted.
+>
+> There is too much HW variance, the timer, watchdog, etc drivers should
+> not have to poke into SOC specific registers just to get an interrupt.
+>
+> The bridge decode can either be via a chained handler, or by incorporating
+> the bridge decode into the main kirkwood handler - the latter having
+> lower overhead for timer ticks.
 
-On 3/6/2013 9:45 PM, Matt Porter wrote:
-> Move mach-davinci/dma.c to common/edma.c so it can be used
-> by OMAP (specifically AM33xx) as well.
-> 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> Acked-by: Sekhar Nori <nsekhar@ti.com>
+Jason,
 
-Can you please ack this movement of davinci private EDMA implementation
-to arch/arm/common? I would like to take this patch through davinci tree
-for v3.11.
+I have irqchip and clocksource drivers done for Orion, just need to
+find some time to rebase them.
 
-Thanks,
-Sekhar
+>> For mvebu archs, IIRC, we have wrt to timer-related irqs:
+>> - Armada 370/XP with different irq handler and timer irq handling within
+>>    timer registers.
+>> - Orion SoCs with Bridge irq registers for timer related stuff (timer0/1)
+>> - Kirkwood and Dove with watchdog timers (both with wdt irq in bridge irqs)
+>> - RTC in bridge irqs, but Dove with RTC connected to PMU irqs
+>
+>> I think we should have patches for irqchip-orion first and then rethink
+>> if we want a standalone timer-orion or merge it with timer-mvebu. Having
+>> watchdog using irqs is kind of independent from this.
 
-> ---
->  arch/arm/Kconfig                                   |    1 +
->  arch/arm/common/Kconfig                            |    3 +
->  arch/arm/common/Makefile                           |    1 +
->  arch/arm/{mach-davinci/dma.c => common/edma.c}     |    2 +-
->  arch/arm/mach-davinci/Makefile                     |    2 +-
->  arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
->  arch/arm/mach-davinci/davinci.h                    |    2 +-
->  arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
->  arch/arm/mach-davinci/devices.c                    |    6 +-
->  arch/arm/mach-davinci/dm355.c                      |    2 +-
->  arch/arm/mach-davinci/dm365.c                      |    2 +-
->  arch/arm/mach-davinci/dm644x.c                     |    2 +-
->  arch/arm/mach-davinci/dm646x.c                     |    2 +-
->  arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
->  drivers/dma/edma.c                                 |    2 +-
->  drivers/mmc/host/davinci_mmc.c                     |    1 +
->  include/linux/mfd/davinci_voicecodec.h             |    3 +-
->  .../mach => include/linux/platform_data}/edma.h    |   89 +-------------------
->  include/linux/platform_data/spi-davinci.h          |    2 +-
->  sound/soc/davinci/davinci-evm.c                    |    1 +
->  sound/soc/davinci/davinci-pcm.c                    |    1 +
->  sound/soc/davinci/davinci-pcm.h                    |    2 +-
->  sound/soc/davinci/davinci-sffsdr.c                 |    5 +-
->  23 files changed, 33 insertions(+), 104 deletions(-)
->  rename arch/arm/{mach-davinci/dma.c => common/edma.c} (99%)
->  rename {arch/arm/mach-davinci/include/mach => include/linux/platform_data}/edma.h (59%)
-> 
+I suggest not to merge clocksource for Orion and Armada 370/XP. They
+are different enough to justify separate drivers. IIRC Armada 370/XP
+acks timer interrupts by clearing timer register bits that are not
+implemented in Orion SoCs.
+
+> I would think the logical progression is:
+> - irq-chip orion combined with work to keep the existing timer working
+> - Patch to add the bridge irq-chip
+> - Patches to support orion/kirkwood/dove/etc in the existing timer drivers
+> - Patch to update the DT to switch to the bridge and updated timer
+> - Patch to remove the old timer
+
+I'd rather have irqchip and clocksource mainlined and enable both
+drivers when they have surfaced. I try to sent patches by end of this week.
+
+> When I last looked briefly, it seems like merging with timer-mvebu was
+> fairly straightforward..
+>
+>> Back in the days when Gregory, Thomas, and I were looking into merged timer
+>> we agreed not to have an extra check on 25MHz support. If you put the
+>> property in the node, it will try to set the timer to fixed 25MHz. If you
+>> use the property on Orion timer, it will just break timer handling.
+>
+> As for the mveth case we should have a compatible tag for each SOC,
+> the driver can ignore it, but it should be in the DT for future use..
+
+We could have a single clocksource driver but as said above,
+clocksource is a tiny driver compared to others. Separate drivers will
+save us from checking SoC on every timer event or have a callback for 
+Armada 370/XP clearing timer irqs.
+
+Sebastian
