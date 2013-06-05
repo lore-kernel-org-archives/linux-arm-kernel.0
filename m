@@ -1,57 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:39 +0900
-Subject: [PATCH 048/130] ARM: shmobile: ap4evb: Register pinctrl mapping for
- KEYSC
+Date: Wed,  5 Jun 2013 17:25:51 +0900
+Subject: [PATCH 060/130] sh-pfc: r8a7740: Declare missing INTC function
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-49-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-61-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based KEYSC pinmux configuration by a pinctrl mapping.
+When adding the INTC pin groups the INTC function hasn't been added to
+the functions list. Fix it.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-ap4evb.c | 17 +++++------------
- 1 file changed, 5 insertions(+), 12 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index 2dfa235..c7a9efc 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -1102,6 +1102,11 @@ static const struct pinctrl_map ap4evb_pinctrl_map[] = {
- 	/* HDMI */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-mobile-hdmi", "pfc-sh7372",
- 				  "hdmi", "hdmi"),
-+	/* KEYSC */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc", "pfc-sh7372",
-+				  "keysc_in04_0", "keysc"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc", "pfc-sh7372",
-+				  "keysc_out5", "keysc"),
- 	/* MMCIF */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
- 				  "mmc0_data8_0", "mmc0"),
-@@ -1219,18 +1224,6 @@ static void __init ap4evb_init(void)
- 	 * IRQ28 for Touch Panel, set dip switches S3, S43 as OFF, ON.
- 	 */
+diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+index 58b0284..da00bc4 100644
+--- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
++++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
+@@ -2694,6 +2694,7 @@ static const char * const sdhi2_groups[] = {
+ };
  
--	/* enable KEYSC */
--	gpio_request(GPIO_FN_KEYOUT0, NULL);
--	gpio_request(GPIO_FN_KEYOUT1, NULL);
--	gpio_request(GPIO_FN_KEYOUT2, NULL);
--	gpio_request(GPIO_FN_KEYOUT3, NULL);
--	gpio_request(GPIO_FN_KEYOUT4, NULL);
--	gpio_request(GPIO_FN_KEYIN0_136, NULL);
--	gpio_request(GPIO_FN_KEYIN1_135, NULL);
--	gpio_request(GPIO_FN_KEYIN2_134, NULL);
--	gpio_request(GPIO_FN_KEYIN3_133, NULL);
--	gpio_request(GPIO_FN_KEYIN4,     NULL);
--
- 	/* enable TouchScreen */
- 	irq_set_irq_type(IRQ28, IRQ_TYPE_LEVEL_LOW);
- 
+ static const struct sh_pfc_function pinmux_functions[] = {
++	SH_PFC_FUNCTION(intc),
+ 	SH_PFC_FUNCTION(lcd0),
+ 	SH_PFC_FUNCTION(lcd1),
+ 	SH_PFC_FUNCTION(mmc0),
 -- 
 1.8.2.1
