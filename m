@@ -1,36 +1,33 @@
-From: gerlando.falauto@keymile.com (Gerlando Falauto)
-Date: Wed, 05 Jun 2013 11:55:10 +0200
-Subject: DT version of kirkwood_ge0x_init()
-In-Reply-To: <51AF0990.7090406@gmail.com>
-References: <51ADBEE0.5040500@keymile.com> <51ADC2C2.6010106@gmail.com>
- <51AE53D4.5070208@keymile.com> <51AEFF26.8080004@gmail.com>
- <51AF06E0.6040103@keymile.com> <51AF0990.7090406@gmail.com>
-Message-ID: <51AF0AFE.1000503@keymile.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 5 Jun 2013 10:59:53 +0100
+Subject: [PATCH] ARM: pcpu: ensure __my_cpu_offset cannot be re-ordered
+ across barrier()
+In-Reply-To: <alpine.LFD.2.03.1306041336060.1200@syhkavp.arg>
+References: <1370278405-13261-1-git-send-email-will.deacon@arm.com>
+ <alpine.LFD.2.03.1306031339010.1200@syhkavp.arg>
+ <20130604103953.GL27516@mudshark.cambridge.arm.com>
+ <20130604171506.GZ27516@mudshark.cambridge.arm.com>
+ <alpine.LFD.2.03.1306041336060.1200@syhkavp.arg>
+Message-ID: <20130605095953.GB8577@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 11:49 AM, Sebastian Hesselbarth wrote:
-> On 06/05/13 11:37, Gerlando Falauto wrote:
->> On 06/05/2013 11:04 AM, Sebastian Hesselbarth wrote:
->> [...]
->>>
->>> I have irqchip and clocksource drivers ready for Orion SoCs (Kirkwood,
->>> Dove, Orion5x, MV78x00). Just need some time to rebase and send patches.
->>
->> [sorry we've moved to a different topic]
->> [adding Thomas Gleixner]
->> You mean the driver in arch/arm/plat-orion/gpio.c or the generic
->> one in drivers/gpio/gpio-mvebu.c?
->
-> For Kirkwood and Dove, DT kernels use gpio-mvebu. And that is there
-> from a time when there was no irqdomain support in generic chip. That
-> should be updated.
+On Tue, Jun 04, 2013 at 06:39:42PM +0100, Nicolas Pitre wrote:
+> On Tue, 4 Jun 2013, Will Deacon wrote:
+> > I spoke to the tools guys and they'll look into why the original patch
+> > didn't work, since that could have wider implications on our use of
+> > barrier().
+> 
+> Good.  However, given the wide range of gcc versions exhibiting the same 
+> behavior, I think your patch is the best way forward even if gcc were to 
+> be broken and eventually fixed.
+> 
+> Reviewed-by: Nicolas Pitre <nico@linaro.org>
 
-I know, that's why I was wondering how it is possible to update this 
-driver and yet support per-cpu registers.
-But I am admittedly not 100% sure I know what I'm talking about.
+Thanks Nicolas.
 
-Anyway, could you please Cc: me when you post those patches?
+> I'd suggest queuing it for stable as well.
 
-Thank you,
-Gerlando
+Will do.
+
+Will
