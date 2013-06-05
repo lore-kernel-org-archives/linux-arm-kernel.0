@@ -1,35 +1,66 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 05 Jun 2013 10:36:01 -0600
-Subject: [PATCH V4 2/4] ARM: tegra: pcie: Add tegra3 support
-In-Reply-To: <1370445221-17696-1-git-send-email-jagarwal@nvidia.com>
-References: <1370445221-17696-1-git-send-email-jagarwal@nvidia.com>
-Message-ID: <51AF68F1.8080307@wwwdotorg.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 5 Jun 2013 17:37:18 +0100
+Subject: [GIT PULL] LPAE fixes for 3.11
+Message-ID: <20130605163718.GI11402@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 09:13 AM, Jay Agarwal wrote:
-> - Make private data structure for each SoC
-> - Add required Tegra30 clocks and regulators
-> - Add Tegra30 specific code in enable controller
-> - Added Tegra30 specific properties in pci binding document
+Hi Russell,
 
-It's a bit odd to send an updated version of just some of the patches;
-reposting a whole series is much easier for the person applying the
-patches. However, hopefully Thierry can handle it in this case.
+Please pull these miscellaneous LPAE fixes I've been collecting for a while
+now for 3.11. They've been tested and reviewed by quite a few people, and most
+of the patches are pretty trivial.
 
-> diff --git a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
+Cheers,
 
->  Required properties:
-> -- compatible: "nvidia,tegra20-pcie"
-> +- compatible: "nvidia,tegra20-pcie" "nvidia,tegra30-pcie"
+Will
 
-perhaps add "or" between those two entries?
+--->8
 
-> +- avdd-supply: Power supply for controller (1.05V) (not required for tegra20)
-...
-> +  "cml": The Tegra clock of that name (not required for tegra20)
+The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
 
-Tegra20 should be capitalized in both those two lines.
+  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
 
-I assume that Thierry can fix up these nits when he applies the patches,
-so you don't need to repost. Thierry can correct me if I'm wrong.
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git for-rmk/lpae
+
+for you to fetch changes up to a469abd0f868c902b75532579bf87553dcf1b360:
+
+  ARM: elf: add new hwcap for identifying atomic ldrd/strd instructions (2013-05-30 16:02:34 +0100)
+
+----------------------------------------------------------------
+Cyril Chemparathy (9):
+      ARM: LPAE: use signed arithmetic for mask definitions
+      ARM: LPAE: use phys_addr_t in switch_mm()
+      ARM: LPAE: use 64-bit accessors for TTBR registers
+      ARM: LPAE: factor out T1SZ and TTBR1 computations
+      ARM: LPAE: accomodate >32-bit addresses for page table base
+      ARM: mm: use physical addresses in highmem sanity checks
+      ARM: fix type of PHYS_PFN_OFFSET to unsigned long
+      ARM: mm: cleanup checks for membank overlap with vmalloc area
+      ARM: mm: clean up membank size limit checks
+
+Vitaly Andrianov (3):
+      ARM: LPAE: use phys_addr_t in alloc_init_pud()
+      ARM: LPAE: use phys_addr_t in free_memmap()
+      ARM: LPAE: use phys_addr_t for initrd location
+
+Will Deacon (2):
+      ARM: lpae: fix definition of PTE_HWTABLE_PTRS
+      ARM: elf: add new hwcap for identifying atomic ldrd/strd instructions
+
+ arch/arm/include/asm/memory.h               | 18 +++++++++++++++++-
+ arch/arm/include/asm/page.h                 |  2 +-
+ arch/arm/include/asm/pgtable-3level-hwdef.h | 20 ++++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level.h       |  8 ++++----
+ arch/arm/include/asm/proc-fns.h             | 26 +++++++++++++++++++-------
+ arch/arm/include/uapi/asm/hwcap.h           |  2 +-
+ arch/arm/kernel/head.S                      | 10 ++++------
+ arch/arm/kernel/setup.c                     |  8 +++++++-
+ arch/arm/kernel/smp.c                       | 11 +++++++++--
+ arch/arm/mm/context.c                       |  9 ++-------
+ arch/arm/mm/init.c                          | 19 ++++++++++---------
+ arch/arm/mm/mmu.c                           | 49 +++++++++++++++++--------------------------------
+ arch/arm/mm/proc-v7-3level.S                | 53 ++++++++++++++++++++++++++++-------------------------
+ 13 files changed, 139 insertions(+), 96 deletions(-)
