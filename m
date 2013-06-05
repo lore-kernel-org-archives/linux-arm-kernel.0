@@ -1,62 +1,44 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Wed, 05 Jun 2013 12:09:11 +0100
-Subject: Cache issues in vexpress cpu shutdown (regression in 3.10)
-Message-ID: <1370430551.3387.11.camel@linaro1.home>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 05 Jun 2013 15:14:39 +0400
+Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAxLzJdIGh3bW9uOiBtYzEzNzgzLWFkYzogUmVmYWN0?=
+ =?UTF-8?B?b3Igc291cmNlIHRvIGluZGljYXRlIHZhcmlvdXMgbWMxM3h4eCBjaGlwcw==?=
+In-Reply-To: <20130605125308.36ba40ab@endymion.delvare>
+References: <1370422628-1073-1-git-send-email-shc_work@mail.ru>
+ <1370423952.906453652@f168.mail.ru>
+ <20130605125308.36ba40ab@endymion.delvare>
+Message-ID: <1370430879.384973987@f91.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been investigating why reboot fails on Versatile Express with the
-CA9x4 CoreTile and the problem seems to get triggered by commit bca7a5a0
-(ARM: cpu hotplug: remove majority of cache flushing from platforms).
+> > > On Wed,  5 Jun 2013 12:57:07 +0400, Alexander Shiyan wrote:
+> > > > This patch renames structures, variables and functions to indicate support
+> > > > for various MC13xxx chips.
+> > > > 
+> > > > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> > > > ---
+> > > >  drivers/hwmon/mc13783-adc.c | 135 +++++++++++++++++++++-----------------------
+> > > >  1 file changed, 63 insertions(+), 72 deletions(-)
+> > > 
+> > > Nack. This change serves absolutely no purpose, all it's doing it make
+> > > everyone's life harder. Just don't do that, thanks.
+> > 
+> > I do not understand stubbornness here.
+> > The driver works for different chips, it should be reflected in the code.
+> 
+> Let's look at it from another angle. What problem are you trying to
+> solve? I see absolutely no problem with the current function and file
+> names. Almost all Linux kernel drivers support more chips than their
+> name says.
+> 
+> On the other hand, changing all function names makes backporting fixes
+> harder, and changing Kconfig symbol names makes upgrading to the new
+> kernel version harder for everyone.
+> 
+> So the cost of your proposal far outweighs the benefits.
 
-Putting back the flush_cache_all() removed by this patch in
-mach-vexpress/hotplug.c gets reboot working again. Without that I see
-the following during shutdown:
+Well, let's leave the kconfig symbol as is. But about the rest, that mc13783_*
+symbols in the log (debug) will say a developer who does not know about
+mc13892 compatibility with mc13783? I still believe that this should be reflected.
+Thanks.
 
-CPU 2 is in _cpu_down called from disable_nonboot_cpus, and is spinning
-in the loop:
-
-	while (!idle_cpu(cpu))
-		cpu_relax();
-
-cpu == 1 here and idle_cpu() is constantly returning false because
-rq->curr != rq->idle and it looks like the runqueue has one process:
-that which issued the 'reboot' command.
-
-CPU 1 is spinning in platform_do_lowpower and waiting for pen release to
-equal 1 (it's -1). Looks like it got there via the smp_ops.cpu_die(cpu)
-call in cpu_die.
-
-CPU 0 and 3 are at wfi in cpu_v7_do_idle
-
-Sometimes I see a different symptoms where it appears that some CPUs
-reboot whilst the system still hasn't shut down. (Possibly because it
-is returning from cpu_die and jumping to secondary_start_kernel?)
-
-The cache flushing for cpu_die was moved to generic code by the commit
-previous to the one mentioned above, i.e. 51acdfd1 (ARM: smp: flush L1
-cache in cpu_die()). This added flush_cache_louis to the generic code so
-I thought I would see what replacing these with flush_cache_all would
-do...
-
-Replacing the first flush_cache_louis in cpu_die with flush_cache_all
-allows reboot to happen, but I see
-
-   * Will now restart
-  CPU1: cpu didn't die
-  CPU2: cpu didn't die
-  CPU3: cpu didn't die
-  Restarting system.
-
-Speculation: means the complete(&cpu_died) after that cache flush didn't
-get seen?
-
-Replacing the second flush_cache_louis instead makes every work fine; as
-we would expect as it is equivalent to putting original flush_cache_all
-back in the vexpress code.
-
-I'm a bit stumped by all this as I don't see why flush_cache_louis is
-apparently insufficient to get changes on one core seen by the other.
-
--- 
-Tixy
+---
