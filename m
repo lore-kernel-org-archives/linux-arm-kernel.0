@@ -1,51 +1,60 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 5 Jun 2013 17:08:26 +0300
-Subject: [PATCH 1/4] clk: tegra: Add fields for override bits
+Date: Wed, 5 Jun 2013 17:08:27 +0300
+Subject: [PATCH 2/4] clk: tegra: override bits for Tegra114 PLLM
 In-Reply-To: <1370441329-8619-1-git-send-email-pdeschrijver@nvidia.com>
 References: <1370441329-8619-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1370441329-8619-2-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1370441329-8619-3-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PLLM can have override bits in the PMC. Describe those in the PLL parameters.
-
 Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 ---
- drivers/clk/tegra/clk.h |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/clk/tegra/clk-tegra114.c |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index d70eb2d..e01ac46 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -136,6 +136,9 @@ struct pdiv_map {
-  * @divm_width:	width of the input divider bit field
-  * @divp_shift:	shift to the post divider bit field
-  * @divp_width:	width of the post divider bit field
-+ * @override_divn_shift: shift to the feedback divider bitfield in override reg
-+ * @override_divm_shift: shift to the input divider bitfield in override reg
-+ * @override_divp_shift: shift to the post divider bitfield in override reg
-  */
- struct div_nmp {
- 	u8		divn_shift;
-@@ -144,6 +147,9 @@ struct div_nmp {
- 	u8		divm_width;
- 	u8		divp_shift;
- 	u8		divp_width;
-+	u8		override_divn_shift;
-+	u8		override_divm_shift;
-+	u8		override_divp_shift;
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index d29ad1d..2774379e 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -254,6 +254,16 @@
+ /* Tegra CPU clock and reset control regs */
+ #define CLK_RST_CONTROLLER_CPU_CMPLX_STATUS	0x470
+ 
++/* PLLM override registers */
++#define PMC_PLLM_WB0_OVERRIDE 0x1dc
++#define PMC_PLLM_WB0_OVERRIDE_2 0x2b0
++
++#ifdef CONFIG_PM_SLEEP
++static struct cpu_clk_suspend_context {
++	u32 clk_csite_src;
++} tegra114_cpu_clk_sctx;
++#endif
++
+ static int periph_clk_enb_refcnt[CLK_OUT_ENB_NUM * 32];
+ 
+ static void __iomem *clk_base;
+@@ -398,10 +408,13 @@ static struct tegra_clk_pll_params pll_c3_params = {
+ static struct div_nmp pllm_nmp = {
+ 	.divm_shift = 0,
+ 	.divm_width = 8,
++	.override_divm_shift = 0,
+ 	.divn_shift = 8,
+ 	.divn_width = 8,
++	.override_divn_shift = 8,
+ 	.divp_shift = 20,
+ 	.divp_width = 1,
++	.override_divp_shift = 27,
  };
  
- /**
-@@ -180,6 +186,8 @@ struct tegra_clk_pll_params {
- 	u32		aux_reg;
- 	u32		dyn_ramp_reg;
- 	u32		ext_misc_reg[3];
-+	u32		pmc_divnm_reg;
-+	u32		pmc_divp_reg;
- 	int		stepa_shift;
- 	int		stepb_shift;
- 	int		lock_delay;
+ static struct pdiv_map pllm_p[] = {
+@@ -434,6 +447,8 @@ static struct tegra_clk_pll_params pll_m_params = {
+ 	.max_p = 2,
+ 	.pdiv_tohw = pllm_p,
+ 	.div_nmp = &pllm_nmp,
++	.pmc_divnm_reg = PMC_PLLM_WB0_OVERRIDE,
++	.pmc_divp_reg = PMC_PLLM_WB0_OVERRIDE_2,
+ };
+ 
+ static struct div_nmp pllp_nmp = {
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
