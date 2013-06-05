@@ -1,57 +1,106 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 06 Jun 2013 00:22:55 +0200
-Subject: getting allwinner SoC support upstream (was Re: Uploading linux
- (3.9.4-1))
-In-Reply-To: <20130605211637.GH18614@n2100.arm.linux.org.uk>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <20130605211637.GH18614@n2100.arm.linux.org.uk>
-Message-ID: <1494529.ijR1yO8EGg@flatron>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 05 Jun 2013 23:33:55 +0100
+Subject: [BISECTED] 3.10-rc1 OMAP1 GPIO IRQ regression
+In-Reply-To: <20130520174621.GI10378@atomide.com>
+References: <20130513205302.GA3157@blackmetal.musicnaut.iki.fi>
+ <20130516180933.GG5600@atomide.com>
+ <20130516210006.GA31836@blackmetal.musicnaut.iki.fi>
+ <20130516214430.GN5600@atomide.com> <20130520174621.GI10378@atomide.com>
+Message-ID: <20130605223355.EDC113E10E4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 of June 2013 22:16:37 Russell King - ARM Linux wrote:
-> On Wed, Jun 05, 2013 at 03:00:13PM -0600, Stephen Warren wrote:
-> > 2) Having U-Boot itself read a DT and configure itself, just like the
-> > kernel does. This is relatively new, and only supported by a few
-> > boards
-> > (all Tegra to some extent, and a couple each Samsung Exynos and Xilinx
-> > boards). I suspect/guess this is the kind of thing that Luke was
-> > referring to re: U-Boot fex integration.
+On Mon, 20 May 2013 10:46:21 -0700, Tony Lindgren <tony@atomide.com> wrote:
+> * Tony Lindgren <tony@atomide.com> [130516 14:50]:
+> > * Aaro Koskinen <aaro.koskinen@iki.fi> [130516 14:05]:
+> > > On Thu, May 16, 2013 at 11:09:34AM -0700, Tony Lindgren wrote:
+> > > > * Aaro Koskinen <aaro.koskinen@iki.fi> [130513 13:58]:
+> > > > > I tested 3.10-rc1 on OMAP1 / Nokia 770, and Retu MFD probe is broken:
+> > > > > 
+> > > > > [    2.264221] retu-mfd 2-0001: Retu v3.2 found
+> > > > > [    2.281951] retu-mfd 2-0001: Failed to allocate IRQs: -12
+> > > > > [    2.300140] retu-mfd: probe of 2-0001 failed with error -12
+> > > > > 
+> > > > > The error is coming from regmap code. According to git bisect, it is
+> > > > > caused by:
+> > > > > 
+> > > > > 	commit ede4d7a5b9835510fd1f724367f68d2fa4128453
+> > > > > 	Author: Jon Hunter <jon-hunter@ti.com>
+> > > > > 	Date:   Fri Mar 1 11:22:47 2013 -0600
+> > > > > 
+> > > > > 	    gpio/omap: convert gpio irq domain to linear mapping
+> > > > > 
+> > > > > The commit does not anymore revert cleanly, and I haven't yet tried
+> > > > > crafting a manual revert, so any fix proposals/ideas are welcome...
+> > > > 
+> > > > Hmm this might be a bit trickier to fix. Obviously the real solution
+> > > > is to convert omap1 to SPARSE_IRQ like we did for omap2+.
+> > > > 
+> > > > For the -rc cycle, it might be possible to fix this by adding a
+> > > > different irq_to_gpio() and gpio_to_irq() functions for omap1.
+> > > 
+> > > The commit reverts cleanly if we also revert
+> > > 3513cdeccc647d41c4a9ff923af17deaaac04a66 (gpio/omap: optimise interrupt
+> > > service routine), which seems to be just some minor optimization. The
+> > > result is below, and with it 770 works again.
+> > 
+> > Hmm in this case it seems that we should just fix it rather than go back
+> > to the old code, so let's take a look at that first.
 > 
-> Reading what I have of this thread, this is just another case of
-> $company runs of and does their own unique way of doing something,
-> which is in a totally different direction from that path chosen by
-> Linux kernel developers, and Linux kernel developers are _expected_
-> to roll over and accept $company's unique way of doing it.
+> Does the following fix it for you or do we need to fix something else
+> there too?
 > 
-> $company could have assisted with the DT effort, helping to sort out
-> the common arch issues (which haven't been all that much), converting
-> drivers to DT and such like.  But no, instead they've gone off and
-> created their own thing.
-> 
-> I wonder how many more of these cases there needs to be before people
-> get the message that Linux kernel developers *do* *not* like this
-> behaviour, and if you do this, then chances are you're going to be
-> stuck with having code which isn't able to be merged into mainline.
-> 
-> And I don't buy the argument that we were still sorting out DT.  DT has
-> been well defined for many many years before we started using it on ARM.
-> It has been used for years on both PowerPC and Sparc architectures to
-> describe their hardware, and all of the DT infrastructure was already
-> present in the kernel.  What was left for us were:
-> 
-> * converting our platform-data based drivers to use data from DT.
-> * come up with ways of dealing with SoC issues such as clock
->   representation, pin muxing and such like in DT.
-> 
-> But no... all that had to be created in this custom fex stuff which now
-> presents a barrier with getting support for something merged.
-> 
-> And somehow people make out that this is _our_ problem...
 
-Well said. And the problem is that this is not the first and probably not 
-the last such case.
+Hi Tony,
 
-Best regards,
-Tomasz
+Do you want me to apply this fix? It sounds like it solves the symptoms,
+but I'd like to know more about what the root cause is.
+
+Send me your s-o-b line and I'll apply the patch
+
+g.
+
+> 
+> 
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -1094,6 +1094,7 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>  	const struct omap_gpio_platform_data *pdata;
+>  	struct resource *res;
+>  	struct gpio_bank *bank;
+> +	int irq_base;
+>  
+>  	match = of_match_device(of_match_ptr(omap_gpio_match), dev);
+>  
+> @@ -1135,11 +1136,23 @@ static int omap_gpio_probe(struct platform_device *pdev)
+>  				pdata->get_context_loss_count;
+>  	}
+>  
+> -
+> -	bank->domain = irq_domain_add_linear(node, bank->width,
+> -					     &irq_domain_simple_ops, NULL);
+> -	if (!bank->domain)
+> +	/*
+> +	 * REVISIT: Once we have omap1 supporting  SPARSE_IRQ, we can drop
+> +	 * irq_alloc_descs() and irq_domain_add_legacy() and just do:
+> +	 *
+> +	 * bank->domain = irq_domain_add_linear(node, bank->width,
+> +	 *				     &irq_domain_simple_ops, NULL);
+> +	 * if (!bank->domain)
+> +	 *	return -ENODEV;
+> +	 */
+> +	irq_base = irq_alloc_descs(-1, 0, bank->width, 0);
+> +	if (irq_base < 0) {
+> +		dev_err(dev, "Couldn't allocate IRQ numbers\n");
+>  		return -ENODEV;
+> +	}
+> +
+> +	bank->domain = irq_domain_add_legacy(node, bank->width, irq_base,
+> +					     0, &irq_domain_simple_ops, NULL);
+>  
+>  	if (bank->regs->set_dataout && bank->regs->clr_dataout)
+>  		bank->set_dataout = _set_gpio_dataout_reg;
+
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
