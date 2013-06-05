@@ -1,80 +1,207 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Wed, 5 Jun 2013 15:52:09 +0200
-Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
- line
-In-Reply-To: <87mwr6kfbm.fsf@linaro.org>
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370040357-25794-4-git-send-email-khilman@linaro.org>
- <51AC667D.6070409@epfl.ch> <87mwr6kfbm.fsf@linaro.org>
-Message-ID: <51AF4289.50602@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 5 Jun 2013 16:51:26 +0300
+Subject: [PATCH 2/2] clk: tegra: PLL m,n,p init for Tegra114
+In-Reply-To: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1370440301-3562-3-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Kevin,
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-tegra114.c |   77 ++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 77 insertions(+), 0 deletions(-)
 
-On 06/04/2013 12:19 AM, Kevin Hilman wrote:
-> Florian Vaussard <florian.vaussard@epfl.ch> writes:
-> 
->> Hello Kevin,
->>
->> On 06/01/2013 12:45 AM, Kevin Hilman wrote:
->>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
->>> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
->>> SYS_NIRQ pin in the twl4030 DTS file.
->>>
->>> Boards that hook up the twl4030 differently can easily override this
->>> in their board-specific DTS file.
->>>
->>> This allows RTC wake from off-mode to work again on OMAP3-based
->>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
->>> 3530/Overo, 3730/Overo-STORM.
->>>
->>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->>> ---
->>>   arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
->>>   1 file changed, 17 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
->>> index b3034da..c7fe9f6 100644
->>> --- a/arch/arm/boot/dts/twl4030.dtsi
->>> +++ b/arch/arm/boot/dts/twl4030.dtsi
->>> @@ -13,6 +13,8 @@
->>>   	compatible = "ti,twl4030";
->>>   	interrupt-controller;
->>>   	#interrupt-cells = <1>;
->>> +	pinctrl-names = "default";
->>> +	pinctrl-0 = <&twl4030_pins>;
->>>
->>>   	rtc {
->>>   		compatible = "ti,twl4030-rtc";
->>> @@ -92,3 +94,18 @@
->>>   		#pwm-cells = <2>;
->>>   	};
->>>   };
->>> +
->>> +&omap3_pmx_core {
->>
->> Here you are making the TWL4030 to explicitly depend on OMAP3. Could
->> this chip be used by another target? If the case, I would put this
->> piece of code in the files including twl4030. Otherwise it's ok here.
-> 
-> I talked this over with Tony before posting.  In theorry, it could be
-> used on other platforms.  In practice, it's only used on OMAP.  We can
-> easily move this to board files if needed later, but thought it would be
-> simpler to put it here.  I'll let Benoit decide.
-
-Yeah, I don't like that either. Some twl variants are used on other
-platform. And these variants might include the original twl4030 as a
-base. None of them are in mainline for sure, but anyway adding SoC stuff
-in external IC file is not a good practice.
-
-I don't want people in the future using that as an excuse for similar hacks.
-
-The easiest way is to create an extra file including the platform free
-twl4030 file and adding the OMAP3 specific config on top of that.
-Every OMAP3 boards will the used that file. Otherwise you can hack each
-boards.
-
-
-Regards,
-Benoit
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index 5e029fe..d29ad1d 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -268,6 +268,15 @@ static DEFINE_SPINLOCK(clk_doubler_lock);
+ static DEFINE_SPINLOCK(clk_out_lock);
+ static DEFINE_SPINLOCK(sysrate_lock);
+ 
++static struct div_nmp pllxc_nmp = {
++	.divm_shift = 0,
++	.divm_width = 8,
++	.divn_shift = 8,
++	.divn_width = 8,
++	.divp_shift = 20,
++	.divp_width = 4,
++};
++
+ static struct pdiv_map pllxc_p[] = {
+ 	{ .pdiv = 1, .hw_val = 0 },
+ 	{ .pdiv = 2, .hw_val = 1 },
+@@ -316,6 +325,16 @@ static struct tegra_clk_pll_params pll_c_params = {
+ 	.stepa_shift = 17,
+ 	.stepb_shift = 9,
+ 	.pdiv_tohw = pllxc_p,
++	.div_nmp = &pllxc_nmp,
++};
++
++static struct div_nmp pllcx_nmp = {
++	.divm_shift = 0,
++	.divm_width = 2,
++	.divn_shift = 8,
++	.divn_width = 8,
++	.divp_shift = 20,
++	.divp_width = 3,
+ };
+ 
+ static struct pdiv_map pllc_p[] = {
+@@ -349,6 +368,8 @@ static struct tegra_clk_pll_params pll_c2_params = {
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ 	.pdiv_tohw = pllc_p,
++	.div_nmp = &pllcx_nmp,
++	.max_p = 7,
+ 	.ext_misc_reg[0] = 0x4f0,
+ 	.ext_misc_reg[1] = 0x4f4,
+ 	.ext_misc_reg[2] = 0x4f8,
+@@ -367,11 +388,22 @@ static struct tegra_clk_pll_params pll_c3_params = {
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
+ 	.pdiv_tohw = pllc_p,
++	.div_nmp = &pllcx_nmp,
++	.max_p = 7,
+ 	.ext_misc_reg[0] = 0x504,
+ 	.ext_misc_reg[1] = 0x508,
+ 	.ext_misc_reg[2] = 0x50c,
+ };
+ 
++static struct div_nmp pllm_nmp = {
++	.divm_shift = 0,
++	.divm_width = 8,
++	.divn_shift = 8,
++	.divn_width = 8,
++	.divp_shift = 20,
++	.divp_width = 1,
++};
++
+ static struct pdiv_map pllm_p[] = {
+ 	{ .pdiv = 1, .hw_val = 0 },
+ 	{ .pdiv = 2, .hw_val = 1 },
+@@ -401,6 +433,16 @@ static struct tegra_clk_pll_params pll_m_params = {
+ 	.lock_delay = 300,
+ 	.max_p = 2,
+ 	.pdiv_tohw = pllm_p,
++	.div_nmp = &pllm_nmp,
++};
++
++static struct div_nmp pllp_nmp = {
++	.divm_shift = 0,
++	.divm_width = 5,
++	.divn_shift = 8,
++	.divn_width = 10,
++	.divp_shift = 20,
++	.divp_width = 3,
+ };
+ 
+ static struct tegra_clk_pll_freq_table pll_p_freq_table[] = {
+@@ -424,6 +466,7 @@ static struct tegra_clk_pll_params pll_p_params = {
+ 	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
++	.div_nmp = &pllp_nmp,
+ };
+ 
+ static struct tegra_clk_pll_freq_table pll_a_freq_table[] = {
+@@ -450,6 +493,7 @@ static struct tegra_clk_pll_params pll_a_params = {
+ 	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLL_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
++	.div_nmp = &pllp_nmp,
+ };
+ 
+ static struct tegra_clk_pll_freq_table pll_d_freq_table[] = {
+@@ -485,6 +529,7 @@ static struct tegra_clk_pll_params pll_d_params = {
+ 	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
++	.div_nmp = &pllp_nmp,
+ };
+ 
+ static struct tegra_clk_pll_params pll_d2_params = {
+@@ -499,6 +544,7 @@ static struct tegra_clk_pll_params pll_d2_params = {
+ 	.lock_mask = PLL_BASE_LOCK,
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
++	.div_nmp = &pllp_nmp,
+ };
+ 
+ static struct pdiv_map pllu_p[] = {
+@@ -507,6 +553,15 @@ static struct pdiv_map pllu_p[] = {
+ 	{ .pdiv = 0, .hw_val = 0 },
+ };
+ 
++static struct div_nmp pllu_nmp = {
++	.divm_shift = 0,
++	.divm_width = 5,
++	.divn_shift = 8,
++	.divn_width = 10,
++	.divp_shift = 20,
++	.divp_width = 1,
++};
++
+ static struct tegra_clk_pll_freq_table pll_u_freq_table[] = {
+ 	{12000000, 480000000, 960, 12, 0, 12},
+ 	{13000000, 480000000, 960, 13, 0, 12},
+@@ -529,6 +584,7 @@ static struct tegra_clk_pll_params pll_u_params = {
+ 	.lock_enable_bit_idx = PLLDU_MISC_LOCK_ENABLE,
+ 	.lock_delay = 1000,
+ 	.pdiv_tohw = pllu_p,
++	.div_nmp = &pllu_nmp,
+ };
+ 
+ static struct tegra_clk_pll_freq_table pll_x_freq_table[] = {
+@@ -561,6 +617,7 @@ static struct tegra_clk_pll_params pll_x_params = {
+ 	.stepa_shift = 16,
+ 	.stepb_shift = 24,
+ 	.pdiv_tohw = pllxc_p,
++	.div_nmp = &pllxc_nmp,
+ };
+ 
+ static struct tegra_clk_pll_freq_table pll_e_freq_table[] = {
+@@ -570,6 +627,15 @@ static struct tegra_clk_pll_freq_table pll_e_freq_table[] = {
+ 	{0, 0, 0, 0, 0, 0},
+ };
+ 
++static struct div_nmp plle_nmp = {
++	.divm_shift = 0,
++	.divm_width = 8,
++	.divn_shift = 8,
++	.divn_width = 8,
++	.divp_shift = 24,
++	.divp_width = 4,
++};
++
+ static struct tegra_clk_pll_params pll_e_params = {
+ 	.input_min = 12000000,
+ 	.input_max = 1000000000,
+@@ -583,6 +649,16 @@ static struct tegra_clk_pll_params pll_e_params = {
+ 	.lock_mask = PLLE_MISC_LOCK,
+ 	.lock_enable_bit_idx = PLLE_MISC_LOCK_ENABLE,
+ 	.lock_delay = 300,
++	.div_nmp = &plle_nmp,
++};
++
++static struct div_nmp pllre_nmp = {
++	.divm_shift = 0,
++	.divm_width = 8,
++	.divn_shift = 8,
++	.divn_width = 8,
++	.divp_shift = 16,
++	.divp_width = 4,
+ };
+ 
+ static struct tegra_clk_pll_params pll_re_vco_params = {
+@@ -599,6 +675,7 @@ static struct tegra_clk_pll_params pll_re_vco_params = {
+ 	.lock_delay = 300,
+ 	.iddq_reg = PLLRE_MISC,
+ 	.iddq_bit_idx = PLLRE_IDDQ_BIT,
++	.div_nmp = &pllre_nmp,
+ };
+ 
+ /* Peripheral clock registers */
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
