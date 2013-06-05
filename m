@@ -1,32 +1,63 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 5 Jun 2013 16:31:27 +0900
-Subject: [PATCH 00/06] ARM: shmobile: Per-board memory size fixups
-In-Reply-To: <20130605073410.15758.37563.sendpatchset@w520>
-References: <20130605073410.15758.37563.sendpatchset@w520>
-Message-ID: <CANqRtoSwAxyDDB2WZLKNTQQrgSz9YVWsd0bcy7OqwLYWeWhhnQ@mail.gmail.com>
+Date: Wed, 05 Jun 2013 16:45:53 +0900
+Subject: [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
+Message-ID: <20130605074553.16962.7736.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 5, 2013 at 4:34 PM, Magnus Damm <magnus.damm@gmail.com> wrote:
-> ARM: shmobile: Per-board memory size fixups
->
-> [PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
-> [PATCH 02/06] ARM: shmobile: AG5EVM memory config via ATAGS fixup
-> [PATCH 03/06] ARM: shmobile: AP4EVB memory config via ATAGS fixup
-> [PATCH 04/06] ARM: shmobile: Bonito memory config via ATAGS fixup
-> [PATCH 05/06] ARM: shmobile: Kota2 memory config via ATAGS fixup
-> [PATCH 06/06] ARM: shmobile: Marzen memory config via ATAGS fixup
+From: Magnus Damm <damm@opensource.se>
 
-Oh, ok, the above turned out to be an old version of the patch names.
-Before I cause more confusion, the patch names are supposed to be like this:
+Instead of having a hard coded virt-to-phys address
+conversion code in sleep-sh7372.S, rework the code
+to do the conversion in C using virt_to_phys().
 
-[PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
-[PATCH 02/06] ARM: shmobile: AG5EVM memory size fixup
-[PATCH 03/06] ARM: shmobile: AP4EVB memory size fixup
-[PATCH 04/06] ARM: shmobile: Bonito memory size fixup
-[PATCH 05/06] ARM: shmobile: Kota2 memory size fixup
-[PATCH 06/06] ARM: shmobile: Marzen memory size fixup
+This removes the need for PLAT_PHYS_OFFSET which
+in turn is needed for ARCH_MULTIPLATFORM.
 
-Thanks,
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-/ magnus
+ Tested with A3SM Suspend-to-RAM on Mackerel.
+
+ arch/arm/mach-shmobile/include/mach/sh7372.h |    2 ++
+ arch/arm/mach-shmobile/pm-sh7372.c           |    3 +++
+ arch/arm/mach-shmobile/sleep-sh7372.S        |    5 ++++-
+ 3 files changed, 9 insertions(+), 1 deletion(-)
+
+--- 0001/arch/arm/mach-shmobile/include/mach/sh7372.h
++++ work/arch/arm/mach-shmobile/include/mach/sh7372.h	2013-06-05 16:40:41.000000000 +0900
+@@ -75,6 +75,8 @@ extern void sh7372_intcs_resume(void);
+ extern void sh7372_intca_suspend(void);
+ extern void sh7372_intca_resume(void);
+ 
++extern unsigned long sh7372_cpu_resume;
++
+ #ifdef CONFIG_PM
+ extern void __init sh7372_init_pm_domains(void);
+ #else
+--- 0001/arch/arm/mach-shmobile/pm-sh7372.c
++++ work/arch/arm/mach-shmobile/pm-sh7372.c	2013-06-05 16:40:41.000000000 +0900
+@@ -524,6 +524,9 @@ void __init sh7372_pm_init(void)
+ 	/* do not convert A3SM, A3SP, A3SG, A4R power down into A4S */
+ 	__raw_writel(0, PDNSEL);
+ 
++	/* pass physical address of cpu_resume() to assembly resume code */
++	sh7372_cpu_resume = virt_to_phys(cpu_resume);
++
+ 	sh7372_pm_setup_smfram();
+ 
+ 	sh7372_suspend_init();
+--- 0001/arch/arm/mach-shmobile/sleep-sh7372.S
++++ work/arch/arm/mach-shmobile/sleep-sh7372.S	2013-06-05 16:41:01.000000000 +0900
+@@ -40,7 +40,10 @@
+ 	.global sh7372_resume_core_standby_sysc
+ sh7372_resume_core_standby_sysc:
+ 	ldr     pc, 1f
+-1:	.long   cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
++
++	.globl	sh7372_cpu_resume
++sh7372_cpu_resume:
++1:	.space	4
+ 
+ #define SPDCR 0xe6180008
+ 
