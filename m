@@ -1,203 +1,47 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Wed, 05 Jun 2013 09:59:28 +0200
-Subject: [PATCH 2/4] ARM: dts: omap5-uevm: Add USB Host support
-In-Reply-To: <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
-References: <1370414770-1485-1-git-send-email-r.sricharan@ti.com>
- <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
-Message-ID: <51AEEFE0.50107@epfl.ch>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 5 Jun 2013 09:05:22 +0100
+Subject: [PATCH 21/21] clk: ux500: Supply provider look-up functionality
+ to support Device Tree
+In-Reply-To: <201306042252.03340.arnd@arndb.de>
+References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
+ <1370266965-7901-22-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaNMR=6JT+pi+9aqOJXW3gK9Yb4hztx3rOiY3c+f3UTRA@mail.gmail.com>
+ <201306042252.03340.arnd@arndb.de>
+Message-ID: <20130605080522.GP3370@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Tue, 04 Jun 2013, Arnd Bergmann wrote:
 
-Some very minor comments.
+> On Tuesday 04 June 2013, Linus Walleij wrote:
+> > The whole thing is very different from other DT clock things
+> > I've seen, usually you add a compatible node for each
+> > clock type, and a node for each physical gate. But there
+> > may be several ways to skin this cat...
+> > 
+> 
+> Based on the IRC discussion we had, I would think that the "prcc" clocks
+> would best be represented using multiple clock-cells since you can describe
+> them easily a tuple of register index, bit number some way to distinguish
+> the two types.
+> 
+> The "prcmu" clocks are harder, and we probably need either a more verbose
+> representation using one node per clock there, or have a single node
+> for the entire prcmu and not bother to describe them in DT but hardcode
+> everything in the source. The current patch does the latter, which is
+> easier now but means we cannot simplify the code much in the future
+> when we remove ATAGS boot support.
 
-On 06/05/2013 08:46 AM, Sricharan R wrote:
-> From: Roger Quadros <rogerq@ti.com>
->
-> Provide the RESET regulators for the USB PHYs, the USB Host
-> port modes and the PHY devices.
->
-> Also provide pin multiplexer information for the USB host
-> pins.
->
-> Cc: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> [Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
-> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> ---
->   arch/arm/boot/dts/omap5-uevm.dts |   77 ++++++++++++++++++++++++++++++++++++++
->   arch/arm/boot/dts/omap5.dtsi     |   30 +++++++++++++++
->   2 files changed, 107 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-> index 843a001..cf862df 100644
-> --- a/arch/arm/boot/dts/omap5-uevm.dts
-> +++ b/arch/arm/boot/dts/omap5-uevm.dts
-> @@ -25,6 +25,47 @@
->   		regulator-max-microvolt = <3000000>;
->   	};
->
-> +	/* HS USB Port 2 RESET */
-> +	hsusb2_reset: hsusb2_reset_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb2_reset";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio3 16 GPIO_ACTIVE_HIGH>; /* gpio3_80 HUB_NRESET */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
-> +
-> +	/* HS USB Host PHY on PORT 2 */
-> +	hsusb2_phy: hsusb2_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-supply = <&hsusb2_reset>;
-> +	};
-> +
-> +	/* HS USB Port 3 RESET */
-> +	hsusb3_reset: hsusb3_reset_reg {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "hsusb3_reset";
-> +		regulator-min-microvolt = <3300000>;
-> +		regulator-max-microvolt = <3300000>;
-> +		gpio = <&gpio3 15 GPIO_ACTIVE_HIGH>; /* gpio3_79 ETH_NRESET */
-> +		startup-delay-us = <70000>;
-> +		enable-active-high;
-> +	};
-> +
-> +	/* HS USB Host PHY on PORT 3 */
-> +	hsusb3_phy: hsusb3_phy {
-> +		compatible = "usb-nop-xceiv";
-> +		reset-supply = <&hsusb3_reset>;
-> +	};
-> +
-> +	/* hsusb2_phy is clocked by FREF_CLK1 i.e. auxclk1 */
-> +	clock_alias {
-> +		clock-name = "auxclk1_ck";
-> +		clock-alias = "main_clk";
-> +		device = <&hsusb2_phy>;
-> +		clock-frequency = <19200000>; /* 19.2 MHz */
-> +	};
->   };
->
->   &omap5_pmx_core {
-> @@ -35,6 +76,7 @@
->   			&dmic_pins
->   			&mcbsp1_pins
->   			&mcbsp2_pins
-> +			&usbhost_pins
->   	>;
->
->   	twl6040_pins: pinmux_twl6040_pins {
-> @@ -120,6 +162,32 @@
->   			0x16c (PIN_INPUT | MUX_MODE1)		/*  mcspi2_cs */
->   		>;
->   	};
-> +
-> +	usbhost_pins: pinmux_usbhost_pins {
-> +		pinctrl-single,pins = <
-> +			0x84 (PIN_INPUT | MUX_MODE0) /* usbb2_hsic_strobe INPUT | MODE 0 */
-> +			0x86 (PIN_INPUT | MUX_MODE0) /* usbb2_hsic_data INPUT | MODE 0 */
+As already discussed, in the PRCMU case I'm going to make 'enum
+prcmu_clock {' look like register PRCM_YYCLKEN0_MGT_SET as described
+by the design specification, and use that as our indexer.
 
-Comments are redundant with the constants, so maybe you can leave this 
-part out.
-Same for a few others below.
+> I hope Mike can give some better insight to what his preferences are.
+> 
+> 	Arnd
 
-> +
-> +			0x19e (PIN_INPUT | MUX_MODE0) /* usbb3_hsic_strobe INPUT | MODE 0 */
-> +			0x1a0 (PIN_INPUT | MUX_MODE0) /* usbb3_hsic_data INPUT | MODE 0 */
-> +
-> +			0x70 (PIN_OUTPUT | MUX_MODE6) /* gpio3_80 OUTPUT | MODE 6 HUB_NRESET */
-> +			0x6e (PIN_OUTPUT | MUX_MODE6) /* gpio3_79 OUTPUT | MODE 6 ETH_NRESET */
-> +		>;
-> +	};
-> +};
-> +
-> +&omap5_pmx_wkup {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <
-> +			&usbhost_wkup_pins
-> +	>;
-> +
-> +	usbhost_wkup_pins: pinmux_usbhost_wkup_pins {
-> +		pinctrl-single,pins = <
-> +			0x1A (PIN_OUTPUT | MUX_MODE0) /* fref_clk1_out OUTPUT | MODE 7 for USB hub clk */
-
-Mismatch between constants and comments, which mode should it be?
-
-> +		>;
-> +	};
->   };
->
->   &mmc1 {
-> @@ -164,6 +232,15 @@
->   	status = "disabled";
->   };
->
-> +&usbhshost {
-> +	port2-mode = "ehci-hsic";
-> +	port3-mode = "ehci-hsic";
-> +};
-> +
-> +&usbhsehci {
-> +	phys = <0 &hsusb2_phy &hsusb3_phy>;
-> +};
-> +
->   &mcspi1 {
->
->   };
-> diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-> index 1e84db8..67d6e1f 100644
-> --- a/arch/arm/boot/dts/omap5.dtsi
-> +++ b/arch/arm/boot/dts/omap5.dtsi
-> @@ -666,5 +666,35 @@
->   				ctrl-module = <&omap_control_usb>;
->   			};
->   		};
-> +
-> +		usbhstll: usbhstll at 4a062000 {
-> +			compatible = "ti,usbhs-tll";
-> +			reg = <0x4a062000 0x1000>;
-> +			interrupts = <0 78 IRQ_TYPE_LEVEL_HIGH>;
-
-I guess that here you can replace '0' with GIC_SPI.
-
-> +			ti,hwmods = "usb_tll_hs";
-> +		};
-> +
-> +		usbhshost: usbhshost at 4a064000 {
-> +			compatible = "ti,usbhs-host";
-> +			reg = <0x4a064000 0x800>;
-> +			ti,hwmods = "usb_host_hs";
-> +			#address-cells = <1>;
-> +			#size-cells = <1>;
-> +			ranges;
-> +
-> +			usbhsohci: ohci at 4a064800 {
-> +				compatible = "ti,ohci-omap3", "usb-ohci";
-> +				reg = <0x4a064800 0x400>;
-> +				interrupt-parent = <&gic>;
-> +				interrupts = <0 76 IRQ_TYPE_LEVEL_HIGH>;
-
-Same here.
-
-> +			};
-> +
-> +			usbhsehci: ehci at 4a064c00 {
-> +				compatible = "ti,ehci-omap", "usb-ehci";
-> +				reg = <0x4a064c00 0x400>;
-> +				interrupt-parent = <&gic>;
-> +				interrupts = <0 77 IRQ_TYPE_LEVEL_HIGH>;
-
-And here.
-
-> +			};
-> +		};
->   	};
->   };
->
-
-Regards,
-
-Florian
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
