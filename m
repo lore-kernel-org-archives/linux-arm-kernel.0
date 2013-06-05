@@ -1,60 +1,103 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed,  5 Jun 2013 08:40:04 +0200
-Subject: [PATCH 0/5] Mechanism for platform-specific parsing of ATAGs
-Message-ID: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Wed,  5 Jun 2013 08:40:05 +0200
+Subject: [PATCH 1/5] ARM: mvebu: set aliases for ethernet controllers
+In-Reply-To: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370414409-29991-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, Nicolas,
+From: Willy Tarreau <w@1wt.eu>
 
-Following your comments on the patch that was adding the parsing of a
-Marvell-specific ATAG in the generic atags_to_fdt.c, here is a new
-proposal that allows this parsing to be entirely contained into code
-specific to the Marvell platform.
+These aliases are used when feeding the DT from ATAGS to set the
+devices MAC addresses.
 
-The idea, implement in 'PATCH 2/5' is that the atags_to_fdt code
-copies the ATAGs contents into the /chosen/atags DT property. This
-adds 6 lines of code in atags_to_fdt.c that are completely generic,
-and avoid cluttering this part of the code with platform-specific
-ATAGs parsing.
+Signed-off-by: Willy Tarreau <w@1wt.eu>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ arch/arm/boot/dts/armada-370-xp.dtsi     | 9 +++++++--
+ arch/arm/boot/dts/armada-xp-mv78460.dtsi | 3 ++-
+ arch/arm/boot/dts/armada-xp.dtsi         | 6 +++++-
+ 3 files changed, 14 insertions(+), 4 deletions(-)
 
-Once this is in place, PATCH 5/5 modifies the Armada 370/XP specific
-platform code to use this /chosen/atags DT property to find the
-Marvell-specific ATAG, and assign the MAC addresses properly. In order
-to assign the MAC addresses, an OF helper function
-of_set_mac_address() is introduced in PATCH 3/5, and the mach-mxs code
-is refactored to also use it (in PATCH 4/5).
-
-What do you think about this approach? I believe it is much more
-contained in the platform-specific code, and hopefully should address
-your concerns.
-
-Thanks!
-
-Thomas
-
-PS: Jason, I noticed you already merged 'ARM: mvebu: set aliases for
-ethernet controllers', but I kept it here to expose the full solution.
-
-Thomas Petazzoni (4):
-  arm: preserve ATAGS in /chosen/atags in the Device Tree
-  of: net: introduce a of_set_mac_address() helper function
-  arm: mxs: use the newly introduced of_set_mac_address() helper
-  arm: mvebu: parse ATAGS to find the network interfaces MAC addresses
-
-Willy Tarreau (1):
-  ARM: mvebu: set aliases for ethernet controllers
-
- arch/arm/boot/compressed/atags_to_fdt.c  |  6 ++++
- arch/arm/boot/dts/armada-370-xp.dtsi     |  9 ++++--
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |  3 +-
- arch/arm/boot/dts/armada-xp.dtsi         |  6 +++-
- arch/arm/mach-mvebu/armada-370-xp.c      | 52 ++++++++++++++++++++++++++++++++
- arch/arm/mach-mvebu/armada-370-xp.h      | 13 ++++++++
- arch/arm/mach-mxs/mach-mxs.c             | 22 ++------------
- drivers/of/of_net.c                      | 36 ++++++++++++++++++++++
- include/linux/of_net.h                   |  6 ++++
- 9 files changed, 130 insertions(+), 23 deletions(-)
-
+diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
+index 550eb77..8f69cf4 100644
+--- a/arch/arm/boot/dts/armada-370-xp.dtsi
++++ b/arch/arm/boot/dts/armada-370-xp.dtsi
+@@ -22,6 +22,11 @@
+ 	model = "Marvell Armada 370 and XP SoC";
+ 	compatible = "marvell,armada-370-xp";
+ 
++	aliases {
++		eth0 = &eth0;
++		eth1 = &eth1;
++	};
++
+ 	cpus {
+ 		cpu at 0 {
+ 			compatible = "marvell,sheeva-v7";
+@@ -94,7 +99,7 @@
+ 				reg = <0x72004 0x4>;
+ 			};
+ 
+-			ethernet at 70000 {
++			eth0: ethernet at 70000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x70000 0x2500>;
+ 				interrupts = <8>;
+@@ -102,7 +107,7 @@
+ 				status = "disabled";
+ 			};
+ 
+-			ethernet at 74000 {
++			eth1: ethernet at 74000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x74000 0x2500>;
+ 				interrupts = <10>;
+diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+index 6ab56bd..386f0ce 100644
+--- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
++++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
+@@ -23,6 +23,7 @@
+ 		gpio0 = &gpio0;
+ 		gpio1 = &gpio1;
+ 		gpio2 = &gpio2;
++		eth3 = &eth3;
+ 	};
+ 
+ 
+@@ -105,7 +106,7 @@
+ 				interrupts = <91>;
+ 			};
+ 
+-			ethernet at 34000 {
++			eth3: ethernet at 34000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x34000 0x2500>;
+ 				interrupts = <14>;
+diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
+index 5b902f9..e481d54 100644
+--- a/arch/arm/boot/dts/armada-xp.dtsi
++++ b/arch/arm/boot/dts/armada-xp.dtsi
+@@ -22,6 +22,10 @@
+ 	model = "Marvell Armada XP family SoC";
+ 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
+ 
++	aliases {
++		eth2 = &eth2;
++	};
++
+ 	soc {
+ 		internal-regs {
+ 			L2: l2-cache {
+@@ -86,7 +90,7 @@
+ 				reg = <0x18200 0x500>;
+ 			};
+ 
+-			ethernet at 30000 {
++			eth2: ethernet at 30000 {
+ 				compatible = "marvell,armada-370-neta";
+ 				reg = <0x30000 0x2500>;
+ 				interrupts = <12>;
 -- 
 1.8.1.2
