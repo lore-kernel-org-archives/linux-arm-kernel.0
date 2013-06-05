@@ -1,34 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 13:31:48 +0900
-Subject: [PATCH 1/6] ARM: shmobile: armadillo800eva: Fix maximum number of SCIF
-In-Reply-To: <1370406713-26599-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370406713-26599-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370406713-26599-2-git-send-email-horms+renesas@verge.net.au>
+Date: Wed,  5 Jun 2013 13:32:12 +0900
+Subject: [PATCH 3/7] ARM: shmobile: Remove unused r8a73a4 GIC CPU interface DT
+ bits
+In-Reply-To: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370406736-32272-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-The r8a77740 has 9ch SCIF. It is not 8ch.
+Remove unused GIC CPU interface DT bits for r8a73a4.
 
-Signed-off-by: Nobuhiro Iwamatsu <nobuhiro.iwamatsu.yj@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/armadillo800eva_defconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a73a4.dtsi | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm/configs/armadillo800eva_defconfig b/arch/arm/configs/armadillo800eva_defconfig
-index 0f2d80d..fae939d 100644
---- a/arch/arm/configs/armadillo800eva_defconfig
-+++ b/arch/arm/configs/armadillo800eva_defconfig
-@@ -86,7 +86,7 @@ CONFIG_TOUCHSCREEN_ST1232=y
- # CONFIG_SERIO is not set
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_SH_SCI=y
--CONFIG_SERIAL_SH_SCI_NR_UARTS=8
-+CONFIG_SERIAL_SH_SCI_NR_UARTS=9
- CONFIG_SERIAL_SH_SCI_CONSOLE=y
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index fde2a33..4ff2019 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -37,12 +37,6 @@
+ 			<0 0xf1004000 0 0x2000>,
+ 			<0 0xf1006000 0 0x2000>;
+ 		interrupts = <1 9 0xf04>;
+-
+-		gic-cpuif at 4 {
+-			compatible = "arm,gic-cpuif";
+-			cpuif-id = <4>;
+-			cpu = <&cpu0>;
+-		};
+ 	};
+ 
+ 	timer {
 -- 
 1.8.2.1
