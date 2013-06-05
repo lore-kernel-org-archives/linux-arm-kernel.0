@@ -1,191 +1,184 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 4 Jun 2013 22:23:01 -0400 (EDT)
-Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
-In-Reply-To: <20130604214501.GL599@codeaurora.org>
-References: <20130523231531.GT18614@n2100.arm.linux.org.uk>
- <20130524220539.GB599@codeaurora.org> <51AD0703.6050408@codeaurora.org>
- <20130603222321.GP18614@n2100.arm.linux.org.uk>
- <51AD1AB3.9050908@codeaurora.org>
- <20130603224555.GR18614@n2100.arm.linux.org.uk>
- <51AD1FE9.80709@codeaurora.org>
- <alpine.LFD.2.03.1306040032510.1200@syhkavp.arg>
- <20130604194705.GK599@codeaurora.org>
- <alpine.LFD.2.03.1306041559440.1200@syhkavp.arg>
- <20130604214501.GL599@codeaurora.org>
-Message-ID: <alpine.LFD.2.03.1306041751470.1200@syhkavp.arg>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Wed, 05 Jun 2013 09:13:01 +0800
+Subject: [PATCH v2] arch/*/asm/include/bitops.h: api issue,
+ find_*_bit() defination are different with each other
+In-Reply-To: <51AE903C.6010806@asianux.com>
+References: <51AE8FEF.1020809@asianux.com> <51AE903C.6010806@asianux.com>
+Message-ID: <51AE909D.9080006@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 4 Jun 2013, Stephen Boyd wrote:
 
-> On 06/04, Nicolas Pitre wrote:
-> > diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-> > index 9a94f344df..773bc35f92 100644
-> > --- a/arch/arm/boot/compressed/head.S
-> > +++ b/arch/arm/boot/compressed/head.S
-> > @@ -178,11 +178,23 @@ not_angel:
-> >  		mov	r4, pc
-> >  		and	r4, r4, #0xf8000000
-> >  		add	r4, r4, #TEXT_OFFSET
-> > +		bl	cache_on
-> >  #else
-> >  		ldr	r4, =zreladdr
-> > -#endif
-> >  
-> > -		bl	cache_on
-> > +		/*
-> > +		 * Set up a page table only if we don't overwrite ourself.
-> > +		 * That means r4 < pc && r4 - 4K > &_end.
-> > +		 * Given that r4 > &_en is most unfrequent, we add a rough
-> > +		 * additional 1MB of room for a possible appended DTB.
-> > +		 */
-> > +		mov	r0, pc
-> > +		cmp	r0, r4
-> > +		ldrcc	r0, LC0+32
-> > +		addcc	r0, r0, pc
-> > +		cmpcc	r4, r0
-> > +		blcs	cache_on
-> > +#endif
-> 
-> But this looks backwards? Shouldn't we put it in the
-> CONFIG_AUTO_ZRELADDR case?
+For arm and m68k, they customize find_*_bit(), but the API is different
+with 'generic'.
 
-Obviously.  I was looking for zreladdr only. In fact this should be done 
-in both cases.
+avr32, s390, and unicore32 also customize find_*_bit(), but the API is
+the same with 'generic', and the left architectures all use 'generic'.
 
-> >  restart:	adr	r0, LC0
-> >  		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
-> > @@ -464,6 +476,16 @@ not_relocated:	mov	r0, #0
-> >  		cmp	r2, r3
-> >  		blo	1b
-> >  
-> > +#if defined(CONFIG_AUTO_ZRELADDR) && defined(CONFIG_CPU_CP15)
-> > +		/*
-> > +		 * Did we skip the cache setup earlier?
-> > +		 * Do it now if so.
-> > +		 */
-> > +		mrc     p15, 0, r0, c1, c0, 0	@ read control register
-> > +		tst	r0, #1			@ MMU bit set?
-> > +		bleq	cache_on		@ no: set it up
-> > +#endif
-> 
-> Too bad we can't store one more variable into LC0 that says we
-> turned the caches on. Then we could read that here and detect it
-> without CP15 accessors required.
+So need change arm and m68k related API to match the 'generic', then
+all another modules can face same public API for various architectures.
 
-The LC0 area should be considered read-only as it may be located in 
-flash.
+Also beautify code and comments to pass "./scripts/checkpatch.pl"
 
-Here's what I came with instead:
 
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date: Tue, 4 Jun 2013 17:01:30 -0400
-Subject: [PATCH] ARM: zImage: don't overwrite ourself with a page table
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/include/asm/bitops.h  |   26 ++++++++++++++++++--------
+ arch/arm/lib/findbit.S         |   14 ++++++++++----
+ arch/m68k/include/asm/bitops.h |   25 ++++++++++++++-----------
+ 3 files changed, 42 insertions(+), 23 deletions(-)
 
-When zImage is loaded into RAM at a low address but TEXT_OFFSET
-is set higher, we risk overwriting ourself with the page table
-needed to turn on the cache as it is located relative to the relocation
-address.  Let's defer the cache setup after relocation in that case.
-
-Signed-off-by: Nicolas Pitre <nico@linaro.org>
-
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 9a94f344df..aa909393f2 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -182,7 +182,19 @@ not_angel:
- 		ldr	r4, =zreladdr
- #endif
- 
--		bl	cache_on
-+		/*
-+		 * Set up a page table only if it won't overwrite ourself.
-+		 * That means r4 < pc && r4 - 16k page directory > &_end.
-+		 * Given that r4 > &_en is most unfrequent, we add a rough
-+		 * additional 1MB of room for a possible appended DTB.
-+		 */
-+		mov	r0, pc
-+		cmp	r0, r4
-+		ldrcc	r0, LC0+32
-+		addcc	r0, r0, pc
-+		cmpcc	r4, r0
-+		orrcc	r4, r4, #1		@ remember we skipped cache_on
-+		blcs	cache_on
- 
- restart:	adr	r0, LC0
- 		ldmia	r0, {r1, r2, r3, r6, r10, r11, r12}
-@@ -228,7 +240,7 @@ restart:	adr	r0, LC0
-  *   r0  = delta
-  *   r2  = BSS start
-  *   r3  = BSS end
-- *   r4  = final kernel address
-+ *   r4  = final kernel address (possibly with LSB set)
-  *   r5  = appended dtb size (still unknown)
-  *   r6  = _edata
-  *   r7  = architecture ID
-@@ -276,6 +288,7 @@ restart:	adr	r0, LC0
- 		 */
- 		cmp	r0, #1
- 		sub	r0, r4, #TEXT_OFFSET
-+		bic	r0, r0, #1
- 		add	r0, r0, #0x100
- 		mov	r1, r6
- 		sub	r2, sp, r6
-@@ -322,12 +335,13 @@ dtb_check_done:
- 
+diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+index e691ec9..10566c8 100644
+--- a/arch/arm/include/asm/bitops.h
++++ b/arch/arm/include/asm/bitops.h
+@@ -161,18 +161,28 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
  /*
-  * Check to see if we will overwrite ourselves.
-- *   r4  = final kernel address
-+ *   r4  = final kernel address (possibly with LSB set)
-  *   r9  = size of decompressed image
-  *   r10 = end of this image, including  bss/stack/malloc space if non XIP
-  * We basically want:
-  *   r4 - 16k page directory >= r10 -> OK
-  *   r4 + image length <= address of wont_overwrite -> OK
-+ * Note: the possible LSB in r4 is harmless here.
+  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
   */
- 		add	r10, r10, #16384
- 		cmp	r4, r10
-@@ -389,7 +403,8 @@ dtb_check_done:
- 		add	sp, sp, r6
- #endif
+-extern int _find_first_zero_bit_le(const void * p, unsigned size);
+-extern int _find_next_zero_bit_le(const void * p, int size, int offset);
+-extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+-extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
++extern unsigned long  _find_first_zero_bit_le(const void *p,
++						unsigned long size);
++extern unsigned long _find_next_zero_bit_le(const void *p, unsigned long size,
++						unsigned long offset);
++extern unsigned long _find_first_bit_le(const unsigned long *p,
++						unsigned long size);
++extern unsigned long _find_next_bit_le(const unsigned long *p,
++						unsigned long size,
++						unsigned long offset);
  
--		bl	cache_clean_flush
-+		tst	r4, #1
-+		bleq	cache_clean_flush
- 
- 		adr	r0, BSYM(restart)
- 		add	r0, r0, r6
-@@ -401,7 +416,7 @@ wont_overwrite:
-  *   r0  = delta
-  *   r2  = BSS start
-  *   r3  = BSS end
-- *   r4  = kernel execution address
-+ *   r4  = kernel execution address (possibly with LSB set)
-  *   r5  = appended dtb size (0 if not present)
-  *   r7  = architecture ID
-  *   r8  = atags pointer
-@@ -464,6 +479,15 @@ not_relocated:	mov	r0, #0
- 		cmp	r2, r3
- 		blo	1b
- 
-+		/*
-+		 * Did we skip the cache setup earlier?
-+		 * That is indicated by the LSB in r4.
-+		 * Do it now if so.
-+		 */
-+		tst	r4, #1
-+		bic	r4, r4, #1
-+		blne	cache_on
-+
  /*
-  * The C runtime environment should now be setup sufficiently.
-  * Set up some pointers, and start decompressing.
-@@ -512,6 +536,7 @@ LC0:		.word	LC0			@ r1
- 		.word	_got_start		@ r11
- 		.word	_got_end		@ ip
- 		.word	.L_user_stack_end	@ sp
-+		.word	_end - restart + 16384 + 1024*1024
- 		.size	LC0, . - LC0
+  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
+  */
+-extern int _find_first_zero_bit_be(const void * p, unsigned size);
+-extern int _find_next_zero_bit_be(const void * p, int size, int offset);
+-extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+-extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
++extern unsigned long _find_first_zero_bit_be(const void *p,
++						unsigned long size);
++extern unsigned long _find_next_zero_bit_be(const void *p, unsigned long size,
++						unsigned long offset);
++extern unsigned long _find_first_bit_be(const unsigned long *p,
++						unsigned long size);
++extern unsigned long _find_next_bit_be(const unsigned long *p,
++						unsigned long size,
++						unsigned long offset);
  
- #ifdef CONFIG_ARCH_RPC
+ #ifndef CONFIG_SMP
+ /*
+diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
+index 64f6bc1..9e3263a 100644
+--- a/arch/arm/lib/findbit.S
++++ b/arch/arm/lib/findbit.S
+@@ -19,7 +19,8 @@
+ 
+ /*
+  * Purpose  : Find a 'zero' bit
+- * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
++ * Prototype: unsigned long  find_first_zero_bit(const void *p,
++ *						unsigned long size);
+  */
+ ENTRY(_find_first_zero_bit_le)
+ 		teq	r1, #0	
+@@ -40,7 +41,9 @@ ENDPROC(_find_first_zero_bit_le)
+ 
+ /*
+  * Purpose  : Find next 'zero' bit
+- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
++ * Prototype: unsigned long find_next_zero_bit(const void *p,
++ *						unsigned long size,
++ *						unsigned long offset);
+  */
+ ENTRY(_find_next_zero_bit_le)
+ 		teq	r1, #0
+@@ -60,7 +63,8 @@ ENDPROC(_find_next_zero_bit_le)
+ 
+ /*
+  * Purpose  : Find a 'one' bit
+- * Prototype: int find_first_bit(const unsigned long *addr, unsigned int maxbit);
++ * Prototype: unsigned long find_first_bit(const unsigned long *p,
++ *					unsigned long size);
+  */
+ ENTRY(_find_first_bit_le)
+ 		teq	r1, #0	
+@@ -81,7 +85,9 @@ ENDPROC(_find_first_bit_le)
+ 
+ /*
+  * Purpose  : Find next 'one' bit
+- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
++ * Prototype: unsigned long find_next_bit(const unsigned long *p,
++ *					unsigned long size,
++ *					unsigned long offset);
+  */
+ ENTRY(_find_next_bit_le)
+ 		teq	r1, #0
+diff --git a/arch/m68k/include/asm/bitops.h b/arch/m68k/include/asm/bitops.h
+index c6baa91..b1d8752 100644
+--- a/arch/m68k/include/asm/bitops.h
++++ b/arch/m68k/include/asm/bitops.h
+@@ -320,11 +320,11 @@ static inline int bfchg_mem_test_and_change_bit(int nr,
+ #include <asm-generic/bitops/ffz.h>
+ #else
+ 
+-static inline int find_first_zero_bit(const unsigned long *vaddr,
+-				      unsigned size)
++static inline unsigned long find_first_zero_bit(const unsigned long *vaddr,
++				      unsigned long size)
+ {
+ 	const unsigned long *p = vaddr;
+-	int res = 32;
++	unsigned int res = 32;
+ 	unsigned int words;
+ 	unsigned long num;
+ 
+@@ -346,11 +346,12 @@ out:
+ }
+ #define find_first_zero_bit find_first_zero_bit
+ 
+-static inline int find_next_zero_bit(const unsigned long *vaddr, int size,
+-				     int offset)
++static inline unsigned long find_next_zero_bit(const unsigned long *vaddr,
++						unsigned long size,
++						unsigned long offset)
+ {
+ 	const unsigned long *p = vaddr + (offset >> 5);
+-	int bit = offset & 31UL, res;
++	unsigned int bit = offset & 31UL, res;
+ 
+ 	if (offset >= size)
+ 		return size;
+@@ -376,10 +377,11 @@ static inline int find_next_zero_bit(const unsigned long *vaddr, int size,
+ }
+ #define find_next_zero_bit find_next_zero_bit
+ 
+-static inline int find_first_bit(const unsigned long *vaddr, unsigned size)
++static inline unsigned long find_first_bit(const unsigned long *vaddr,
++						unsigned long size)
+ {
+ 	const unsigned long *p = vaddr;
+-	int res = 32;
++	unsigned int res = 32;
+ 	unsigned int words;
+ 	unsigned long num;
+ 
+@@ -401,11 +403,12 @@ out:
+ }
+ #define find_first_bit find_first_bit
+ 
+-static inline int find_next_bit(const unsigned long *vaddr, int size,
+-				int offset)
++static inline unsigned long find_next_bit(const unsigned long *vaddr,
++						unsigned long size,
++						unsigned long offset)
+ {
+ 	const unsigned long *p = vaddr + (offset >> 5);
+-	int bit = offset & 31UL, res;
++	unsigned int bit = offset & 31UL, res;
+ 
+ 	if (offset >= size)
+ 		return size;
+-- 
+1.7.7.6
