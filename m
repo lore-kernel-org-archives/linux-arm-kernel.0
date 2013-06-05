@@ -1,83 +1,81 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:39 +0900
-Subject: [PATCH 108/130] sh-pfc: r8a7778: add USB pin groups
+Date: Wed,  5 Jun 2013 17:26:45 +0900
+Subject: [PATCH 114/130] sh-pfc: r8a7778: add Ether pin groups
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-109-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-115-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Add USB0/1 PENC/USB_OVC pin groups to R8A7778 PFC driver.
+Add Ether RMII/LINK/MAGIC pin groups to R8A7778 PFC driver.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Acked-by: Laurent Pinchart<laurent.pinchart@ideasonboard.com>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7778.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7778.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
-index 15295a5..1f692e5 100644
+index e518c33..bc20083 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7778.c
-@@ -1501,6 +1501,18 @@ SDHI_PFC_WPPN(sdhi2_wp_a,	SD2_WP_A);
- SDHI_PFC_PINS(sdhi2_wp_b,	RCAR_GP_PIN(3, 28));
- SDHI_PFC_WPPN(sdhi2_wp_b,	SD2_WP_B);
+@@ -1323,6 +1323,22 @@ static struct sh_pfc_pin pinmux_pins[] = {
+ 						     arg5##_MARK, arg6##_MARK, \
+ 						     arg7##_MARK, arg8##_MARK, }
  
-+/* - USB0 ------------------------------------------------------------------- */
-+SH_PFC_PINS(usb0,		RCAR_GP_PIN(0, 1));
-+SH_PFC_MUX1(usb0,		PENC0);
-+SH_PFC_PINS(usb0_ovc,		RCAR_GP_PIN(0, 3));
-+SH_PFC_MUX1(usb0_ovc,		USB_OVC0);
++/* - Ether ------------------------------------------------------------------ */
++SH_PFC_PINS(ether_rmii,		RCAR_GP_PIN(4, 10),	RCAR_GP_PIN(4, 11),
++				RCAR_GP_PIN(4, 13),	RCAR_GP_PIN(4, 9),
++				RCAR_GP_PIN(4, 15),	RCAR_GP_PIN(4, 16),
++				RCAR_GP_PIN(4, 12),	RCAR_GP_PIN(4, 14),
++				RCAR_GP_PIN(4, 18),	RCAR_GP_PIN(4, 17));
++static const unsigned int ether_rmii_mux[] = {
++	ETH_TXD0_MARK, ETH_TXD1_MARK, ETH_TX_EN_MARK,  ETH_REF_CLK_MARK,
++	ETH_RXD0_MARK, ETH_RXD1_MARK, ETH_CRS_DV_MARK, ETH_RX_ER_MARK,
++	ETH_MDIO_MARK, ETH_MDC_MARK,
++};
++SH_PFC_PINS(ether_link,		RCAR_GP_PIN(4, 19));
++SH_PFC_MUX1(ether_link,		ETH_LINK);
++SH_PFC_PINS(ether_magic,	RCAR_GP_PIN(4, 20));
++SH_PFC_MUX1(ether_magic,	ETH_MAGIC);
 +
-+/* - USB1 ------------------------------------------------------------------- */
-+SH_PFC_PINS(usb1,		RCAR_GP_PIN(0, 2));
-+SH_PFC_MUX1(usb1,		PENC1);
-+SH_PFC_PINS(usb1_ovc,		RCAR_GP_PIN(0, 4));
-+SH_PFC_MUX1(usb1_ovc,		USB_OVC1);
-+
+ /* - SCIF macro ------------------------------------------------------------- */
+ #define SCIF_PFC_PIN(name, args...)	SH_PFC_PINS(name, args)
+ #define SCIF_PFC_DAT(name, tx, rx)	SH_PFC_MUX2(name, tx, rx)
+@@ -1554,6 +1570,9 @@ VIN_PFC_PINS(vin1_sync,		RCAR_GP_PIN(3, 21),	RCAR_GP_PIN(3, 22));
+ VIN_PFC_SYNC(vin1_sync,		VI1_HSYNC,		VI1_VSYNC);
+ 
  static const struct sh_pfc_pin_group pinmux_groups[] = {
++	SH_PFC_PIN_GROUP(ether_rmii),
++	SH_PFC_PIN_GROUP(ether_link),
++	SH_PFC_PIN_GROUP(ether_magic),
  	SH_PFC_PIN_GROUP(hscif0_data_a),
  	SH_PFC_PIN_GROUP(hscif0_data_b),
-@@ -1570,6 +1582,10 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(sdhi2_data4_b),
- 	SH_PFC_PIN_GROUP(sdhi2_wp_a),
- 	SH_PFC_PIN_GROUP(sdhi2_wp_b),
-+	SH_PFC_PIN_GROUP(usb0),
-+	SH_PFC_PIN_GROUP(usb0_ovc),
-+	SH_PFC_PIN_GROUP(usb1),
-+	SH_PFC_PIN_GROUP(usb1_ovc),
+ 	SH_PFC_PIN_GROUP(hscif0_ctrl_a),
+@@ -1634,6 +1653,12 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(vin1_sync),
  };
  
++static const char * const ether_groups[] = {
++	"ether_rmii",
++	"ether_link",
++	"ether_magic",
++};
++
  static const char * const hscif0_groups[] = {
-@@ -1677,6 +1693,16 @@ static const char * const sdhi2_groups[] = {
- 	"sdhi2_wp_b",
+ 	"hscif0_data_a",
+ 	"hscif0_data_b",
+@@ -1762,6 +1787,7 @@ static const char * const vin1_groups[] = {
  };
  
-+static const char * const usb0_groups[] = {
-+	"usb0",
-+	"usb0_ovc",
-+};
-+
-+static const char * const usb1_groups[] = {
-+	"usb1",
-+	"usb1_ovc",
-+};
-+
  static const struct sh_pfc_function pinmux_functions[] = {
++	SH_PFC_FUNCTION(ether),
  	SH_PFC_FUNCTION(hscif0),
  	SH_PFC_FUNCTION(hscif1),
-@@ -1690,6 +1716,8 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(sdhi0),
- 	SH_PFC_FUNCTION(sdhi1),
- 	SH_PFC_FUNCTION(sdhi2),
-+	SH_PFC_FUNCTION(usb0),
-+	SH_PFC_FUNCTION(usb1),
- };
- 
- static struct pinmux_cfg_reg pinmux_config_regs[] = {
+ 	SH_PFC_FUNCTION(scif_clk),
 -- 
 1.8.2.1
