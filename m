@@ -1,24 +1,36 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Wed, 5 Jun 2013 22:18:28 +0100
-Subject: [PATCH] ARM/KVM: save and restore generic timer registers
-In-Reply-To: <51AFA992.4060803@linaro.org>
-References: <1370039952-20888-1-git-send-email-andre.przywara@linaro.org>
- <20130605192316.GB9640@ubuntu> <51AFA992.4060803@linaro.org>
-Message-ID: <CAFEAcA8hp+fWWuvVVLSCxfPdN8itsMq9Jy6jgrcqAJ7bH4zmPA@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed,  5 Jun 2013 23:18:16 +0200
+Subject: [PATCH 11/15] pwm: Remove superseded pwm-samsung-legacy driver
+In-Reply-To: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1370467100-10820-12-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 June 2013 22:11, Andre Przywara <andre.przywara@linaro.org> wrote:
-> On 06/05/2013 09:23 PM, Christoffer Dall wrote:
->> To avoid the extra storage overhead here I suggest you just export the
->> registers using a separate number space for the ONE_REG ioctl instead of
->> piggybacking on the cp15 exports.
+This patch removes the now unused pwm-samsung-legacy driver, which was
+replaced by new pwm-samsung driver.
 
-This is letting the kernel's internal implementation details
-affect the userspace API -- I think that's a bad idea.
-As Andre says, we went through a round like this, and my
-opinion was that since these are cp15 registers the logical
-place to put them is in cp15 space.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/pwm/Makefile             |   1 -
+ drivers/pwm/pwm-samsung-legacy.c | 353 ---------------------------------------
+ 2 files changed, 354 deletions(-)
+ delete mode 100644 drivers/pwm/pwm-samsung-legacy.c
 
-thanks
--- PMM
+diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+index 833c3ac..94ba21e 100644
+--- a/drivers/pwm/Makefile
++++ b/drivers/pwm/Makefile
+@@ -8,7 +8,6 @@ obj-$(CONFIG_PWM_LPC32XX)	+= pwm-lpc32xx.o
+ obj-$(CONFIG_PWM_MXS)		+= pwm-mxs.o
+ obj-$(CONFIG_PWM_PUV3)		+= pwm-puv3.o
+ obj-$(CONFIG_PWM_PXA)		+= pwm-pxa.o
+-obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung-legacy.o
+ obj-$(CONFIG_PWM_SAMSUNG)	+= pwm-samsung.o
+ obj-$(CONFIG_PWM_SPEAR)		+= pwm-spear.o
+ obj-$(CONFIG_PWM_TEGRA)		+= pwm-tegra.o
+diff --git a/drivers/pwm/pwm-samsung-legacy.c b/drivers/pwm/pwm-samsung-legacy.c
+deleted file mode 100644
+index a0ece50..0000000
+-- 
+1.8.2.1
