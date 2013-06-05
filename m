@@ -1,69 +1,52 @@
-From: lkcl@lkcl.net (Luke Kenneth Casson Leighton)
-Date: Thu, 6 Jun 2013 00:46:14 +0100
-Subject: getting allwinner SoC support upstream (was Re: Uploading linux
- (3.9.4-1))
-In-Reply-To: <31150421.hoVuV4C56M@flatron>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <19865137.ey1FePPnmD@flatron>
- <CAPweEDzk0T+fZ1aW16D8K4XpvRR2GRrOFtfcjzstnmEJWxmREg@mail.gmail.com>
- <31150421.hoVuV4C56M@flatron>
-Message-ID: <CAPweEDyiH_F24fV5_S=a17c=YW-j4gyVaOP030HNONayLGSy0A@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 6 Jun 2013 08:47:33 +0900
+Subject: [PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
+In-Reply-To: <20130605192019.GG18614@n2100.arm.linux.org.uk>
+References: <20130605073410.15758.37563.sendpatchset@w520>
+ <20130605073418.15758.93704.sendpatchset@w520>
+ <20130605192019.GG18614@n2100.arm.linux.org.uk>
+Message-ID: <CANqRtoRXDpdzTxJAZRe1cAVg0sPj8UuVfkR_bFUY-sKe7gnHUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 12:27 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+Hi Russell,
 
->>  their sheer overwhelming success provides us with mass-volume
->> ultra-low cost hardware.  to not make an effort to accommodate them
->> would in this specific instance be a huge missed opportunity,
+On Thu, Jun 6, 2013 at 4:20 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jun 05, 2013 at 04:34:18PM +0900, Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> Introduce SHMOBILE_FIXUP() as a helper function to
+>> allow boards to specify their memory base and size.
+>
+> No.  I really don't like this idea (we've had people doing this in the
+> past and I went around removing all that crap, and adding command line
+> options into the defconfig files for those boards.)
+>
+> I also fail to understand why in 2013, some 11 years after ATAG stuff
+> was created, people _still_ can't get pass correct information into
+> the kernel.
+>
+> It's exactly this kind of issue which makes me believe that stuff like
+> ACPI, UEFI and DT are doomed to fail on ARM because this kind of problem
+> constantly crops up time and time again.  People have seem to have this
+> total inability to get the pre-kernel environment right.
 
-> OK, this is a large volume of hardware that can be used to run free
-> software, point taken.
+Thanks for your comments. As you probably saw in patch 00/06, the goal
+with this series is to remove CONFIG_MEMORY_START/SIZE from
+mach-shmobile.
 
- as it's a shorter URL by 200% than the original it refers to here's a link:
-   http://lists.phcomp.co.uk/pipermail/arm-netbook/2013-May/007532.html
+I myself am quite happy to keep on using the kernel configuration to
+describe the main memory window like today, this is exactly how we
+used to do it on SH as well. What is a bit difficult is that we for
+mach-shmobile are requested to consolidate the kernel configurations
+and move to CONFIG_MULTIPLATFORM.
 
- the key bit is a dec 2012 china visit by the author of that [insanely
-long, even by my standards] report, where he does a double-take,
-believing that he's mis-heard due to his poor understanding of
-chinese, and he *literally* goes into shock when he works out that
-he's been told that the 7in tablet being offered to him, even before
-"haggling", is $USD 35, and yet its specification neither blows nor
-sucks.
+My main concern is that I'd like to keep per-board memory
+configuration somewhere, just removing it seems like a regression in
+usefulness to me. Do you have any recommendation for me how to
+proceed?
 
- with allwinner bringing out the A31, i really have absolutely no idea
-how any other company is going to compete in this market, except by
-adding extra value such as R.F. base-band and that's sewn up by
-mediatek.  the only saving grace for the competition is that
-allwinner, due to their inexperience, bought the imgtec kool-aid and
-deployed PowerVR's latest SGX545MP2 offering [*1]
+Thanks,
 
-
-> I don't say that having mainline support for this platform wouldn't be
-> nice. Sure, it would. But if the company doesn't want to cooperate and
-> comply to existing rules, I don't think it can be helped.
-
- they've got no idea that there *are* any - they don't speak english!
-(and the team has a manager who is a fucking dickhead, who amongst
-other things has been responsible for disobeying the Director's
-explicit instructions to be GPL-compliant as well as ordering the
-team's engineers to create a script that destroys Allwinner Copyright
-notices and replaces it with Copyright 2010-2017 reilllumatech.com,
-but that's another story that's being addressed)
-
- ok it's very late here tomasz, i'll read more of this tomorrow: i've
-started the discussion but i am actually completely overwhelmed so may
-have to leave it to people to get back to me with some options for
-proposals preferably by the beginning of next week (10th june) at the
-latest, to give allwinner an opportunity to go over this early.
-
-i'd greatly appreciate if people could run the gamut from one extreme
-to the other: ideas such as "why not put script.fex verbatim as a blob
-into a device-tree entry" all the way through to "why not rip
-script.fex out completely and convert everything to devicetree for
-them".
-
-l.
-
-[*1] http://www.youtube.com/watch?v=W-HCb55X_XU - 35 minutes in.  libv
-talking about why for god's sake don't ever get involved with powervr.
+/ magnus
