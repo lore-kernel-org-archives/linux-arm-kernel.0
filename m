@@ -1,210 +1,80 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 5 Jun 2013 16:51:25 +0300
-Subject: [PATCH 1/2] clk: tegra: allow PLL m,n,p init from SoC files
-In-Reply-To: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <1370440301-3562-2-git-send-email-pdeschrijver@nvidia.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Wed, 5 Jun 2013 15:52:09 +0200
+Subject: [PATCH 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
+ line
+In-Reply-To: <87mwr6kfbm.fsf@linaro.org>
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+ <1370040357-25794-4-git-send-email-khilman@linaro.org>
+ <51AC667D.6070409@epfl.ch> <87mwr6kfbm.fsf@linaro.org>
+Message-ID: <51AF4289.50602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The m,n,p fields don't have the same bit offset and width across all PLLs.
-This patch allows SoC specific files to indicate the offset and width.
+Salut Kevin,
 
-Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
----
- drivers/clk/tegra/clk-pll.c |   60 +++++++++++++++++++++++-------------------
- drivers/clk/tegra/clk.h     |   32 ++++++++++++++--------
- 2 files changed, 53 insertions(+), 39 deletions(-)
+On 06/04/2013 12:19 AM, Kevin Hilman wrote:
+> Florian Vaussard <florian.vaussard@epfl.ch> writes:
+> 
+>> Hello Kevin,
+>>
+>> On 06/01/2013 12:45 AM, Kevin Hilman wrote:
+>>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+>>> SYS_NIRQ line on OMAP.  Therefore, configure the defaults for the
+>>> SYS_NIRQ pin in the twl4030 DTS file.
+>>>
+>>> Boards that hook up the twl4030 differently can easily override this
+>>> in their board-specific DTS file.
+>>>
+>>> This allows RTC wake from off-mode to work again on OMAP3-based
+>>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+>>> 3530/Overo, 3730/Overo-STORM.
+>>>
+>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>>> ---
+>>>   arch/arm/boot/dts/twl4030.dtsi | 17 +++++++++++++++++
+>>>   1 file changed, 17 insertions(+)
+>>>
+>>> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+>>> index b3034da..c7fe9f6 100644
+>>> --- a/arch/arm/boot/dts/twl4030.dtsi
+>>> +++ b/arch/arm/boot/dts/twl4030.dtsi
+>>> @@ -13,6 +13,8 @@
+>>>   	compatible = "ti,twl4030";
+>>>   	interrupt-controller;
+>>>   	#interrupt-cells = <1>;
+>>> +	pinctrl-names = "default";
+>>> +	pinctrl-0 = <&twl4030_pins>;
+>>>
+>>>   	rtc {
+>>>   		compatible = "ti,twl4030-rtc";
+>>> @@ -92,3 +94,18 @@
+>>>   		#pwm-cells = <2>;
+>>>   	};
+>>>   };
+>>> +
+>>> +&omap3_pmx_core {
+>>
+>> Here you are making the TWL4030 to explicitly depend on OMAP3. Could
+>> this chip be used by another target? If the case, I would put this
+>> piece of code in the files including twl4030. Otherwise it's ok here.
+> 
+> I talked this over with Tony before posting.  In theorry, it could be
+> used on other platforms.  In practice, it's only used on OMAP.  We can
+> easily move this to board files if needed later, but thought it would be
+> simpler to put it here.  I'll let Benoit decide.
 
-diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
-index 85bec1d..3b778d3 100644
---- a/drivers/clk/tegra/clk-pll.c
-+++ b/drivers/clk/tegra/clk-pll.c
-@@ -134,15 +134,24 @@
- #define pll_writel_misc(val, p) pll_writel(val, p->params->misc_reg, p)
- 
- #define mask(w) ((1 << (w)) - 1)
--#define divm_mask(p) mask(p->divm_width)
--#define divn_mask(p) mask(p->divn_width)
-+#define divm_mask(p) mask(p->params->div_nmp->divm_width)
-+#define divn_mask(p) mask(p->params->div_nmp->divn_width)
- #define divp_mask(p) (p->flags & TEGRA_PLLU ? PLLU_POST_DIVP_MASK :	\
--		      mask(p->divp_width))
-+		      mask(p->params->div_nmp->divp_width))
- 
- #define divm_max(p) (divm_mask(p))
- #define divn_max(p) (divn_mask(p))
- #define divp_max(p) (1 << (divp_mask(p)))
- 
-+static struct div_nmp default_nmp = {
-+	.divn_shift = PLL_BASE_DIVN_SHIFT,
-+	.divn_width = PLL_BASE_DIVN_WIDTH,
-+	.divm_shift = PLL_BASE_DIVM_SHIFT,
-+	.divm_width = PLL_BASE_DIVM_WIDTH,
-+	.divp_shift = PLL_BASE_DIVP_SHIFT,
-+	.divp_width = PLL_BASE_DIVP_WIDTH,
-+};
-+
- static void clk_pll_enable_lock(struct tegra_clk_pll *pll)
- {
- 	u32 val;
-@@ -407,12 +416,12 @@ static void _update_pll_mnp(struct tegra_clk_pll *pll,
- 
- 	val = pll_readl_base(pll);
- 
--	val &= ~((divm_mask(pll) << pll->divm_shift) |
--		 (divn_mask(pll) << pll->divn_shift) |
--		 (divp_mask(pll) << pll->divp_shift));
--	val |= ((cfg->m << pll->divm_shift) |
--		(cfg->n << pll->divn_shift) |
--		(cfg->p << pll->divp_shift));
-+	val &= ~((divm_mask(pll) << pll->params->div_nmp->divm_shift) |
-+		 (divn_mask(pll) << pll->params->div_nmp->divn_shift) |
-+		 (divp_mask(pll) << pll->params->div_nmp->divp_shift));
-+	val |= ((cfg->m << pll->params->div_nmp->divm_shift) |
-+		(cfg->n << pll->params->div_nmp->divn_shift) |
-+		(cfg->p << pll->params->div_nmp->divp_shift));
- 
- 	pll_writel_base(val, pll);
- }
-@@ -424,9 +433,9 @@ static void _get_pll_mnp(struct tegra_clk_pll *pll,
- 
- 	val = pll_readl_base(pll);
- 
--	cfg->m = (val >> pll->divm_shift) & (divm_mask(pll));
--	cfg->n = (val >> pll->divn_shift) & (divn_mask(pll));
--	cfg->p = (val >> pll->divp_shift) & (divp_mask(pll));
-+	cfg->m = (val >> pll->params->div_nmp->divm_shift) & (divm_mask(pll));
-+	cfg->n = (val >> pll->params->div_nmp->divn_shift) & (divn_mask(pll));
-+	cfg->p = (val >> pll->params->div_nmp->divp_shift) & (divp_mask(pll));
- }
- 
- static void _update_pll_cpcon(struct tegra_clk_pll *pll,
-@@ -646,9 +655,9 @@ static int clk_plle_enable(struct clk_hw *hw)
- 		val = pll_readl_base(pll);
- 		val &= ~(divm_mask(pll) | divn_mask(pll) | divp_mask(pll));
- 		val &= ~(PLLE_BASE_DIVCML_WIDTH << PLLE_BASE_DIVCML_SHIFT);
--		val |= sel.m << pll->divm_shift;
--		val |= sel.n << pll->divn_shift;
--		val |= sel.p << pll->divp_shift;
-+		val |= sel.m << pll->params->div_nmp->divm_shift;
-+		val |= sel.n << pll->params->div_nmp->divn_shift;
-+		val |= sel.p << pll->params->div_nmp->divp_shift;
- 		val |= sel.cpcon << PLLE_BASE_DIVCML_SHIFT;
- 		pll_writel_base(val, pll);
- 	}
-@@ -679,9 +688,9 @@ static unsigned long clk_plle_recalc_rate(struct clk_hw *hw,
- 	u32 divn = 0, divm = 0, divp = 0;
- 	u64 rate = parent_rate;
- 
--	divp = (val >> pll->divp_shift) & (divp_mask(pll));
--	divn = (val >> pll->divn_shift) & (divn_mask(pll));
--	divm = (val >> pll->divm_shift) & (divm_mask(pll));
-+	divp = (val >> pll->params->div_nmp->divp_shift) & (divp_mask(pll));
-+	divn = (val >> pll->params->div_nmp->divn_shift) & (divn_mask(pll));
-+	divm = (val >> pll->params->div_nmp->divm_shift) & (divm_mask(pll));
- 	divm *= divp;
- 
- 	rate *= divn;
-@@ -902,7 +911,8 @@ static int clk_pllm_set_rate(struct clk_hw *hw, unsigned long rate,
- 
- 		val = readl_relaxed(pll->pmc + PMC_PLLM_WB0_OVERRIDE);
- 		val &= ~(divn_mask(pll) | divm_mask(pll));
--		val |= (cfg.m << pll->divm_shift) | (cfg.n << pll->divn_shift);
-+		val |= (cfg.m << pll->params->div_nmp->divm_shift) |
-+			(cfg.n << pll->params->div_nmp->divn_shift);
- 		writel_relaxed(val, pll->pmc + PMC_PLLM_WB0_OVERRIDE);
- 	} else
- 		_update_pll_mnp(pll, &cfg);
-@@ -1180,8 +1190,8 @@ static int clk_plle_tegra114_enable(struct clk_hw *hw)
- 	val = pll_readl_base(pll);
- 	val &= ~(divm_mask(pll) | divn_mask(pll) | divp_mask(pll));
- 	val &= ~(PLLE_BASE_DIVCML_WIDTH << PLLE_BASE_DIVCML_SHIFT);
--	val |= sel.m << pll->divm_shift;
--	val |= sel.n << pll->divn_shift;
-+	val |= sel.m << pll->params->div_nmp->divm_shift;
-+	val |= sel.n << pll->params->div_nmp->divn_shift;
- 	val |= sel.cpcon << PLLE_BASE_DIVCML_SHIFT;
- 	pll_writel_base(val, pll);
- 	udelay(1);
-@@ -1242,12 +1252,8 @@ static struct tegra_clk_pll *_tegra_init_pll(void __iomem *clk_base,
- 	pll->flags = pll_flags;
- 	pll->lock = lock;
- 
--	pll->divp_shift = PLL_BASE_DIVP_SHIFT;
--	pll->divp_width = PLL_BASE_DIVP_WIDTH;
--	pll->divn_shift = PLL_BASE_DIVN_SHIFT;
--	pll->divn_width = PLL_BASE_DIVN_WIDTH;
--	pll->divm_shift = PLL_BASE_DIVM_SHIFT;
--	pll->divm_width = PLL_BASE_DIVM_WIDTH;
-+	if (!pll_params->div_nmp)
-+		pll_params->div_nmp = &default_nmp;
- 
- 	return pll;
- }
-diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
-index 11278a8..d70eb2d 100644
---- a/drivers/clk/tegra/clk.h
-+++ b/drivers/clk/tegra/clk.h
-@@ -128,6 +128,25 @@ struct pdiv_map {
- };
- 
- /**
-+ * struct div_nmp - offset and width of m,n and p fields
-+ *
-+ * @divn_shift:	shift to the feedback divider bit field
-+ * @divn_width:	width of the feedback divider bit field
-+ * @divm_shift:	shift to the input divider bit field
-+ * @divm_width:	width of the input divider bit field
-+ * @divp_shift:	shift to the post divider bit field
-+ * @divp_width:	width of the post divider bit field
-+ */
-+struct div_nmp {
-+	u8		divn_shift;
-+	u8		divn_width;
-+	u8		divm_shift;
-+	u8		divm_width;
-+	u8		divp_shift;
-+	u8		divp_width;
-+};
-+
-+/**
-  * struct clk_pll_params - PLL parameters
-  *
-  * @input_min:			Minimum input frequency
-@@ -166,6 +185,7 @@ struct tegra_clk_pll_params {
- 	int		lock_delay;
- 	int		max_p;
- 	struct pdiv_map *pdiv_tohw;
-+	struct div_nmp	*div_nmp;
- };
- 
- /**
-@@ -179,12 +199,6 @@ struct tegra_clk_pll_params {
-  * @flags:	PLL flags
-  * @fixed_rate:	PLL rate if it is fixed
-  * @lock:	register lock
-- * @divn_shift:	shift to the feedback divider bit field
-- * @divn_width:	width of the feedback divider bit field
-- * @divm_shift:	shift to the input divider bit field
-- * @divm_width:	width of the input divider bit field
-- * @divp_shift:	shift to the post divider bit field
-- * @divp_width:	width of the post divider bit field
-  *
-  * Flags:
-  * TEGRA_PLL_USE_LOCK - This flag indicated to use lock bits for
-@@ -214,12 +228,6 @@ struct tegra_clk_pll {
- 	u32		flags;
- 	unsigned long	fixed_rate;
- 	spinlock_t	*lock;
--	u8		divn_shift;
--	u8		divn_width;
--	u8		divm_shift;
--	u8		divm_width;
--	u8		divp_shift;
--	u8		divp_width;
- 	struct tegra_clk_pll_freq_table	*freq_table;
- 	struct tegra_clk_pll_params	*params;
- };
--- 
-1.7.7.rc0.72.g4b5ea.dirty
+Yeah, I don't like that either. Some twl variants are used on other
+platform. And these variants might include the original twl4030 as a
+base. None of them are in mainline for sure, but anyway adding SoC stuff
+in external IC file is not a good practice.
+
+I don't want people in the future using that as an excuse for similar hacks.
+
+The easiest way is to create an extra file including the platform free
+twl4030 file and adding the OMAP3 specific config on top of that.
+Every OMAP3 boards will the used that file. Otherwise you can hack each
+boards.
+
+
+Regards,
+Benoit
