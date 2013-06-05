@@ -1,62 +1,60 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 05 Jun 2013 11:23:59 +0200
-Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
-In-Reply-To: <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
-References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
- <6466898.RnYOe3jpGG@wuerfel>
- <CAGVrzcbRS3x5fgD1BfOk4-oTUsAY9FA2V621OvZLJQNZ01brCg@mail.gmail.com>
- <1394174.ONngHnHYKL@wuerfel>
- <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
-Message-ID: <51AF03AF.3080106@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Jun 2013 10:31:46 +0100
+Subject: Planning the merge of KVM/arm64
+In-Reply-To: <20130605060105.GA1187@redhat.com>
+References: <51ADDDAE.4040705@arm.com>
+ <CAMJs5B_PB1pNVCO_EK7aTghN23L+d0RovAFi7inrVsJb5STWOA@mail.gmail.com>
+ <51AE00D7.9030607@arm.com> <51AE082C.6050907@redhat.com>
+ <CAMJs5B9PxHfUrugov4HJknQ24fG7MNp8obziqu9dnSztsGBksQ@mail.gmail.com>
+ <51AE0D0D.3030106@redhat.com> <20130604163741.GA15299@redhat.com>
+ <CAMJs5B8WqiMpqj3Mr=rPCr89k-jvY2i3BDbkPOsMb3PhCR1SWg@mail.gmail.com>
+ <20130605060105.GA1187@redhat.com>
+Message-ID: <20130605093145.GB8758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/06/2013 18:09, Florian Fainelli wrote:
-> 2013/6/4 Arnd Bergmann <arnd@arndb.de>:
->> On Tuesday 04 June 2013 16:36:50 Florian Fainelli wrote:
->>> It seems to me that what David proposes is to have say an
->>> arch/arm/mach-foo/phy-fixups.c file which is only enabled when
->>> CONFIG_PHYLIB is set (obj-$(CONFIG_PHYLIB) += phy-fixup.o), such that
->>> it does not need to have any conditionnals when calling
->>> phy_register_fixup. This sounds a little unusual, but why not.
->> I don't think it would actually help us, because then we still need
->> to declare a local function that gets called from the board init
->> code. Instead of doing
->>
->>         if (IS_ENABLED(CONFIG_PHYLIB))
->>                  phy_register_fixup_for_uid(phy_id, foo_phy_fixup);
->>
->> we would then do
->>
->>         if (IS_ENABLED(CONFIG_PHYLIB))
->>                 foo_phy_fixup_register();
->>
->> which is not much different at all.
-> You would just need to define a stub for your arch_foo_phy_fixup()
-> which has a different definition depending on whether CONFIG_PHYLIB is
-> defined or not.
->
-> This would be just one function, instead of the whole bunch of stubs
-> needed for phylib. Right now its probably 1 vs 3, so it does not make
-> that much of a difference but who knows, if we had more phylib stubs
-> and forget to update the stubs? (which tends to happen pretty often).
+On Wed, Jun 05, 2013 at 07:01:05AM +0100, Gleb Natapov wrote:
+> On Tue, Jun 04, 2013 at 10:57:32PM -0700, Christoffer Dall wrote:
+> > On 4 June 2013 09:37, Gleb Natapov <gleb@redhat.com> wrote:
+> > > On Tue, Jun 04, 2013 at 05:51:41PM +0200, Paolo Bonzini wrote:
+> > >> Il 04/06/2013 17:43, Christoffer Dall ha scritto:
+> > >> > Hi Paolo,
+> > >> >
+> > >> > I don't think this is an issue. Gleb and Marcelo for example pulled
+> > >> > RMK's stable tree for my KVM/ARM updates for the 3.10 merge window and
+> > >> > that wasn't an issue.  If Linus pulls the kvm/next tree first the
+> > >> > diffstat should be similar and everything clean enough, no?
+> > >> >
+> > >> > Catalin has previously expressed his wish to upstream the kvm/arm64
+> > >> > patches directly through him given the churn in a completely new
+> > >> > architecture and he wants to make sure that everything looks right.
+> > >> >
+> > >> > It's a pretty clean implementation with quite few dependencies and
+> > >> > merging as a working series should be a priority instead of the
+> > >> > Kconfig hack, imho.
+> > >>
+> > >> Ok, let's see what Gleb says.
+> > >>
+> > > I have no objection to merge arm64 kvm trough Catalin if it mean less
+> > > churn for everyone. That's what we did with arm and mips. Arm64 kvm
+> > > has a dependency on kvm.git next though, so how Catalin make sure that
+> > > everything looks right? Will he merge kvm.git/next to arm64 tree?
+> > >
+> > Yes, that was the idea. Everything in kvm/next is considered stable, right?
+> > 
+> Right. Catalin should wait for kvm.git to be pulled by Linus next merge
+> windows before sending his pull request then.
 
-The fact is that for now it is called on 6 different platforms. Of those:
- - two (imx and mxs) are now doing it right *after* discovering the issue
- - two always selecting PHYLIB and can't be compiled without NET
- - two will break at compile time.
+I think it's better if I push the bulk of the arm64 KVM branch but
+without Kconfig patch enabling it. This branch would be based on
+mainline rather than kvm/next. Once your code goes in mainline, I'll
+just push the Kconfig entry (for bisection reasons, it could be after
+-rc1). This would keep the pull-request diffstat cleaner.
 
-I'm really concerned about getting more platforms getting it wrong. I
-think it boils down to who wants to take the maintenance burden. I would
-believe that doing it in phylib is more future proof. But I'm fine
-with whatever the consensus will be.
+As we discussed some time ago, after the core arm64 KVM is merged you
+will use the same workflow as for arm (merge via the kvm tree).
 
-However, it is becoming urgent for Atmel to get the fix in 3.10 so that
-they never get a kernel compilation that breaks.
-
-Regards,
+Thanks.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Catalin
