@@ -1,27 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 5 Jun 2013 13:17:02 +0200
-Subject: [PATCH 00/03] ARM: 64-bit memory fixes, APE6EVM second memory bank
-In-Reply-To: <20130605104427.1720.68752.sendpatchset@w520>
-References: <20130605104427.1720.68752.sendpatchset@w520>
-Message-ID: <201306051317.02284.arnd@arndb.de>
+Date: Wed, 5 Jun 2013 13:17:44 +0200
+Subject: [PATCHv4] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+In-Reply-To: <1370425843-6802-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1370425843-6802-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <201306051317.44220.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 June 2013, Magnus Damm wrote:
-> ARM: 64-bit memory fixes, APE6EVM second memory bank
+On Wednesday 05 June 2013, Alexandre Belloni wrote:
+> Fixes:
+> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
+> :(.text+0x1174): undefined reference to `mdiobus_write'
+> :(.text+0x1188): undefined reference to `mdiobus_write'
+> :(.text+0x119c): undefined reference to `mdiobus_write'
+> :(.text+0x11b0): undefined reference to `mdiobus_write'
+> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
+> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
 > 
-> [PATCH 01/03] ARM: Let arm_add_memory() always use 64-bit arguments
-> [PATCH 02/03] ARM: Handle 64-bit memory in case of 32-bit phys_addr_t
-> [PATCH 03/03] ARM: shmobile: Add second memory bank to DTS for APE6EVM
+> when CONFIG_PHYLIB is not selected.
 > 
-> This patch set contains two fixes and one mach-shmobile specific patch
-> to add a second memory bank. The fixes attempt to improve the memory bank
-> handling in the ARM kernel in case of 64-bit addresses.
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Please have a look at this patch that Stepan Moskovchenko posted:
-
-https://patchwork.kernel.org/patch/2639171/
-
-I think we are going to need only one of the two approaches.
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
