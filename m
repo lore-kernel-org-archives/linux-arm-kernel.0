@@ -1,40 +1,69 @@
-From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
-Date: Thu, 06 Jun 2013 01:15:15 +0200
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Thu, 6 Jun 2013 00:26:35 +0100
 Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
  Uploading linux (3.9.4-1))
-In-Reply-To: <51AFC19F.9040601@wwwdotorg.org>
+In-Reply-To: <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
 References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
  <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
  <51AFA6DD.3000202@wwwdotorg.org>
  <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost> <51AFC19F.9040601@wwwdotorg.org>
-Message-ID: <1370474115.20454.26.camel@localhost>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+Message-ID: <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ons 2013-06-05 klockan 16:54 -0600 skrev Stephen Warren:
+On Thu, Jun 6, 2013 at 12:07 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Wed, Jun 5, 2013 at 6:47 PM, luke.leighton <luke.leighton@gmail.com> wrote:
+>> On Wed, Jun 5, 2013 at 10:59 PM, Henrik Nordstr?m
+>> <henrik@henriknordstrom.net> wrote:
+>>
+>>>>  .... and then there's the boot0 and boot1 loaders, these *do* have
+>>
+>>> no, these are not tiny. boot0 is 24KB to fit the initial embedded SRAM
+>>> (not cache), but boot1 is on pair with u-boot in size and runs from
+>>> DRAM.
+>>
+>>  btw, please listen to henrik: he knows what he's talking about, as
+>> you can see :)   henrik, thank you for correcting my technical
+>> misunderstandings, i'll try to remember them and not propagate
+>> incorrect stuff.
+>
+> This is not about the fex syntax or uboot. The root problem is needing
+> two sets of binding for every device driver in the kernel. Pick a
+> random driver like gpio-pca953x.c and look at the source. In that file
+> there are #ifdef CONFIG_OF_ sections. Those sections are directly
+> reading the FDT binary via calls like of_get_property(node,
+> "linux,gpio-base", &size);. If fex is added to the kernel every driver
+> driver will now need both a #ifdef CONFIG_OF_ section and also a
+> #ifdef CONFIG_FEX_ section. Doing that is just crazy.
 
-> 1) Put all the parameters in the U-Boot configuration header. This is
-> normal.
+ yes.  which is why they haven't done it.
 
-Yes, we do so today for U-Boot SPL. But this won't fit very well with
-the Allwinner ODM workflow where one binary image works on a wide range
-of board configurations probed while flashing the image to the board,
-but on the other hand there is no real need for them to use u-boot as
-the primary boot loader, just keep using boot0 + boot1 + u-boot chain as
-they have always done.
+> Is Allwinner
+> going to add fex support to every single device driver in the kernel?
 
-> 2) Read some data structure at run-time. This data structure could in
-> theory be some SoC-specific blob format (e.g. the packed version of
-> information that some tool extracts from FEX/DT), a whole FEX blob, or
-> device tree.
+ no john - they've only added it to the multiplexed sections of the
+drivers which they themselves have written.  such as
+drivers/usb/sun{N}i_usb/*.[ch], drivers/block/nand/sun{N}_i,
+arch/arm/mach-sun{N}i and so on.
 
-This is likely to happen for the sunxi U-Boot SPL due to the sheer
-amount of boards involved, and is done to some extents for other boards
-as well. In the SPL there generally isn't room for full DT support. Main
-u-boot HW configuration could be done runtime via DT alone but we are
-not quite there yet, nothing major missing however other than getting it
-done.
+even the touchscreen driver that they wrote, that's got nothing to do
+with any other code in the touchscreen linux kernel source tree: it's
+more of a "meta-"driver which even has the name of the linux kernel
+module that needs to be loaded and what I2C address, GPIO options etc.
+to pass in [normally done as modprobe options in userspace].
 
-Regards
-Henrik
+ to be honest, there are better people to fully answer this question
+(alejandro and henrik are two that spring to mind) but you're
+definitely off-base, jon.  the script.fex system deals with the pinmux
+issue in a very neat way that:
+
+  a) has very little impact on the rest of the kernel tree [citation
+needed!  i'm saying that: could someone please confirm if it's true]
+
+  b) the linux kernel developers could, instead of criticising it,
+actually learn a great deal from.
+
+l.
