@@ -1,63 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:00 +0900
-Subject: [PATCH 009/130] sh-pfc: Remove dependency on GPIOLIB
+Date: Wed,  5 Jun 2013 17:24:57 +0900
+Subject: [PATCH 006/130] ARM: shmobile: r8a7778: Register PFC device
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Make GPIO support optional for platforms that don't support GPIOLIB.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/Kconfig  | 2 --
- drivers/pinctrl/sh-pfc/core.h   | 1 +
- drivers/pinctrl/sh-pfc/sh_pfc.h | 2 +-
- 3 files changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/mach-shmobile/Kconfig                |  1 +
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |  1 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        | 13 +++++++++++++
+ 3 files changed, 15 insertions(+)
 
-diff --git a/drivers/pinctrl/sh-pfc/Kconfig b/drivers/pinctrl/sh-pfc/Kconfig
-index 9f0217b..a0b6bd0 100644
---- a/drivers/pinctrl/sh-pfc/Kconfig
-+++ b/drivers/pinctrl/sh-pfc/Kconfig
-@@ -5,8 +5,6 @@
- if ARCH_SHMOBILE || SUPERH
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 1a517e2..06da4d3 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -37,6 +37,7 @@ config ARCH_R8A7740
  
- config PINCTRL_SH_PFC
--	# XXX move off the gpio dependency
--	depends on GPIOLIB
- 	select GPIO_SH_PFC if ARCH_REQUIRE_GPIOLIB
- 	select PINMUX
- 	select PINCONF
-diff --git a/drivers/pinctrl/sh-pfc/core.h b/drivers/pinctrl/sh-pfc/core.h
-index ee4a4d6..6ec746f 100644
---- a/drivers/pinctrl/sh-pfc/core.h
-+++ b/drivers/pinctrl/sh-pfc/core.h
-@@ -11,6 +11,7 @@
- #define __SH_PFC_CORE_H__
+ config ARCH_R8A7778
+ 	bool "R-Car M1 (R8A77780)"
++	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select CPU_V7
+ 	select SH_CLK_CPG
+ 	select ARM_GIC
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index 951149e..68053fc 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -28,5 +28,6 @@ extern void r8a7778_init_irq(void);
+ extern void r8a7778_init_irq_dt(void);
+ extern void r8a7778_clock_init(void);
+ extern void r8a7778_init_irq_extpin(int irlm);
++extern void r8a7778_pinmux_init(void);
  
- #include <linux/compiler.h>
-+#include <linux/spinlock.h>
- #include <linux/types.h>
+ #endif /* __ASM_R8A7778_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 30b4a33..0ca5701 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -94,6 +94,19 @@ static struct resource ether_resources[] = {
+ 		&sh_tmu##idx##_platform_data,		\
+ 		sizeof(sh_tmu##idx##_platform_data))
  
- #include "sh_pfc.h"
-diff --git a/drivers/pinctrl/sh-pfc/sh_pfc.h b/drivers/pinctrl/sh-pfc/sh_pfc.h
-index 3b785fc..b170761 100644
---- a/drivers/pinctrl/sh-pfc/sh_pfc.h
-+++ b/drivers/pinctrl/sh-pfc/sh_pfc.h
-@@ -11,8 +11,8 @@
- #ifndef __SH_PFC_H
- #define __SH_PFC_H
- 
-+#include <linux/bug.h>
- #include <linux/stringify.h>
--#include <asm-generic/gpio.h>
- 
- typedef unsigned short pinmux_enum_t;
- 
++/* PFC */
++static struct resource pfc_resources[] = {
++	DEFINE_RES_MEM(0xfffc0000, 0x118),
++};
++
++void __init r8a7778_pinmux_init(void)
++{
++	platform_device_register_simple(
++		"pfc-r8a7778", -1,
++		pfc_resources,
++		ARRAY_SIZE(pfc_resources));
++}
++
+ void __init r8a7778_add_standard_devices(void)
+ {
+ 	int i;
 -- 
 1.8.2.1
