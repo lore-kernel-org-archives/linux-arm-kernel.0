@@ -1,69 +1,61 @@
-From: luke.leighton@gmail.com (luke.leighton)
-Date: Thu, 6 Jun 2013 00:26:35 +0100
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
-Message-ID: <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 06 Jun 2013 00:26:47 +0100
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <51634835.5010302@collabora.co.uk>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+ <51633F26.7000400@gmail.com> <51634835.5010302@collabora.co.uk>
+Message-ID: <20130605232647.55C8B3E10E4@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 12:07 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
-> On Wed, Jun 5, 2013 at 6:47 PM, luke.leighton <luke.leighton@gmail.com> wrote:
->> On Wed, Jun 5, 2013 at 10:59 PM, Henrik Nordstr?m
->> <henrik@henriknordstrom.net> wrote:
->>
->>>>  .... and then there's the boot0 and boot1 loaders, these *do* have
->>
->>> no, these are not tiny. boot0 is 24KB to fit the initial embedded SRAM
->>> (not cache), but boot1 is on pair with u-boot in size and runs from
->>> DRAM.
->>
->>  btw, please listen to henrik: he knows what he's talking about, as
->> you can see :)   henrik, thank you for correcting my technical
->> misunderstandings, i'll try to remember them and not propagate
->> incorrect stuff.
->
-> This is not about the fex syntax or uboot. The root problem is needing
-> two sets of binding for every device driver in the kernel. Pick a
-> random driver like gpio-pca953x.c and look at the source. In that file
-> there are #ifdef CONFIG_OF_ sections. Those sections are directly
-> reading the FDT binary via calls like of_get_property(node,
-> "linux,gpio-base", &size);. If fex is added to the kernel every driver
-> driver will now need both a #ifdef CONFIG_OF_ section and also a
-> #ifdef CONFIG_FEX_ section. Doing that is just crazy.
+On Tue, 09 Apr 2013 00:44:05 +0200, Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
+> On 04/09/2013 12:05 AM, Rob Herring wrote:
+> > On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+> >> This means that drivers that need the IRQ type/level flags defined in
+> >> the DT won't be able to get it.
+> > 
+> > But the interrupt controllers that need the information should be able
+> > to get to it via irqd_get_trigger_type. What problem exactly are you
+> > trying to fix? What driver would use this?
+> >
+> 
+> Yes but this is not about the interrupt controller wanting this information but
+> a device driver that is using the IORESOURCE_IRQ struct resource that has the
+> information about the virtual IRQ associated with a GPIO-IRQ.
+> 
+> The driver doesn't know neither care if its IRQ line is connected to a line of
+> an real IRQ controller or to a GPIO controller that allows a GPIO line to be
+> used as an IRQ.
+> 
+> > My understanding of the IORESOURCE_IRQ_xxx (and DMA) bits are they are
+> > ISA specific and therefore should not be used on non-ISA buses.
+> > 
+> 
+> Many TI OMAP2+ SoC based boards have an SMSC LAN911x/912x controller
+> (drivers/net/ethernet/smsc/smsc911x.c) that is connected to the OMAP processor
+> through its General-Purpose Memory Controller (GPMC) and this LAN driver obtain
+> its IRQ and I/O address space from a struct resource IORESOURCE_IRQ and
+> IORESOURCE_MEM respectively, that is filled by the DeviceTree core.
+> 
+> It does this:
+> 
+> irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+> 
+> Since of_irq_to_resource() doesn't fill the trigger/level flags on the
+> IORESOURCE_IRQ struct resource, irq_flags will always be 0 regarding the value
+> specified on the second cell of the "interrupts" DT property.
+> 
+> A previous discussion about this can be found here [1].
 
- yes.  which is why they haven't done it.
+I can't remember if there was ever a reason for not returning the IRQ
+flags, but I don't have any major objection to doing so if drivers find
+them useful. The one concern I do have however is if it will cause any
+problems with drivers that expect flags == IORESOURCE_IRQ without any
+additional flags. Any users doing that are buggy anyway, but I do want
+to be careful about breakage.
 
-> Is Allwinner
-> going to add fex support to every single device driver in the kernel?
+I'll go over your patch and reply with comments.
 
- no john - they've only added it to the multiplexed sections of the
-drivers which they themselves have written.  such as
-drivers/usb/sun{N}i_usb/*.[ch], drivers/block/nand/sun{N}_i,
-arch/arm/mach-sun{N}i and so on.
-
-even the touchscreen driver that they wrote, that's got nothing to do
-with any other code in the touchscreen linux kernel source tree: it's
-more of a "meta-"driver which even has the name of the linux kernel
-module that needs to be loaded and what I2C address, GPIO options etc.
-to pass in [normally done as modprobe options in userspace].
-
- to be honest, there are better people to fully answer this question
-(alejandro and henrik are two that spring to mind) but you're
-definitely off-base, jon.  the script.fex system deals with the pinmux
-issue in a very neat way that:
-
-  a) has very little impact on the rest of the kernel tree [citation
-needed!  i'm saying that: could someone please confirm if it's true]
-
-  b) the linux kernel developers could, instead of criticising it,
-actually learn a great deal from.
-
-l.
+g.
