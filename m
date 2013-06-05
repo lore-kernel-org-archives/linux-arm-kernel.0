@@ -1,85 +1,63 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:02 +0900
-Subject: [PATCH 011/130] sh-pfc: r8a7790: Add INTC pin groups and functions
+Date: Wed,  5 Jun 2013 17:25:00 +0900
+Subject: [PATCH 009/130] sh-pfc: Remove dependency on GPIOLIB
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-10-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
+Make GPIO support optional for platforms that don't support GPIOLIB.
+
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7790.c | 40 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 40 insertions(+)
+ drivers/pinctrl/sh-pfc/Kconfig  | 2 --
+ drivers/pinctrl/sh-pfc/core.h   | 1 +
+ drivers/pinctrl/sh-pfc/sh_pfc.h | 2 +-
+ 3 files changed, 2 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-index 3774242..a92b204 100644
---- a/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-+++ b/drivers/pinctrl/sh-pfc/pfc-r8a7790.c
-@@ -1855,12 +1855,45 @@ static const unsigned int eth_rmii_mux[] = {
- 	ETH_RXD0_MARK, ETH_RXD1_MARK, ETH_RX_ER_MARK, ETH_CRS_DV_MARK,
- 	ETH_TXD0_MARK, ETH_TXD1_MARK, ETH_TX_EN_MARK, ETH_REF_CLK_MARK,
- };
-+/* - INTC ------------------------------------------------------------------- */
-+static const unsigned int intc_irq0_pins[] = {
-+	/* IRQ */
-+	RCAR_GP_PIN(1, 25),
-+};
-+static const unsigned int intc_irq0_mux[] = {
-+	IRQ0_MARK,
-+};
-+static const unsigned int intc_irq1_pins[] = {
-+	/* IRQ */
-+	RCAR_GP_PIN(1, 27),
-+};
-+static const unsigned int intc_irq1_mux[] = {
-+	IRQ1_MARK,
-+};
-+static const unsigned int intc_irq2_pins[] = {
-+	/* IRQ */
-+	RCAR_GP_PIN(1, 29),
-+};
-+static const unsigned int intc_irq2_mux[] = {
-+	IRQ2_MARK,
-+};
-+static const unsigned int intc_irq3_pins[] = {
-+	/* IRQ */
-+	RCAR_GP_PIN(1, 23),
-+};
-+static const unsigned int intc_irq3_mux[] = {
-+	IRQ3_MARK,
-+};
+diff --git a/drivers/pinctrl/sh-pfc/Kconfig b/drivers/pinctrl/sh-pfc/Kconfig
+index 9f0217b..a0b6bd0 100644
+--- a/drivers/pinctrl/sh-pfc/Kconfig
++++ b/drivers/pinctrl/sh-pfc/Kconfig
+@@ -5,8 +5,6 @@
+ if ARCH_SHMOBILE || SUPERH
  
- static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(eth_link),
- 	SH_PFC_PIN_GROUP(eth_magic),
- 	SH_PFC_PIN_GROUP(eth_mdio),
- 	SH_PFC_PIN_GROUP(eth_rmii),
-+	SH_PFC_PIN_GROUP(intc_irq0),
-+	SH_PFC_PIN_GROUP(intc_irq1),
-+	SH_PFC_PIN_GROUP(intc_irq2),
-+	SH_PFC_PIN_GROUP(intc_irq3),
- };
+ config PINCTRL_SH_PFC
+-	# XXX move off the gpio dependency
+-	depends on GPIOLIB
+ 	select GPIO_SH_PFC if ARCH_REQUIRE_GPIOLIB
+ 	select PINMUX
+ 	select PINCONF
+diff --git a/drivers/pinctrl/sh-pfc/core.h b/drivers/pinctrl/sh-pfc/core.h
+index ee4a4d6..6ec746f 100644
+--- a/drivers/pinctrl/sh-pfc/core.h
++++ b/drivers/pinctrl/sh-pfc/core.h
+@@ -11,6 +11,7 @@
+ #define __SH_PFC_CORE_H__
  
- static const char * const eth_groups[] = {
-@@ -1870,8 +1903,15 @@ static const char * const eth_groups[] = {
- 	"eth_rmii",
- };
+ #include <linux/compiler.h>
++#include <linux/spinlock.h>
+ #include <linux/types.h>
  
-+static const char * const intc_groups[] = {
-+	"intc_irq0",
-+	"intc_irq1",
-+	"intc_irq2",
-+	"intc_irq3",
-+};
- static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(eth),
-+	SH_PFC_FUNCTION(intc),
- };
+ #include "sh_pfc.h"
+diff --git a/drivers/pinctrl/sh-pfc/sh_pfc.h b/drivers/pinctrl/sh-pfc/sh_pfc.h
+index 3b785fc..b170761 100644
+--- a/drivers/pinctrl/sh-pfc/sh_pfc.h
++++ b/drivers/pinctrl/sh-pfc/sh_pfc.h
+@@ -11,8 +11,8 @@
+ #ifndef __SH_PFC_H
+ #define __SH_PFC_H
  
- #define PINMUX_FN_BASE	ARRAY_SIZE(pinmux_pins)
++#include <linux/bug.h>
+ #include <linux/stringify.h>
+-#include <asm-generic/gpio.h>
+ 
+ typedef unsigned short pinmux_enum_t;
+ 
 -- 
 1.8.2.1
