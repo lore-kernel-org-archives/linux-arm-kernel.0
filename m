@@ -1,54 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 5 Jun 2013 09:13:54 +0200
-Subject: [PATCH 3/5] of: net: introduce a of_set_mac_address() helper
- function
-In-Reply-To: <1370414409-29991-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370414409-29991-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130605071354.GW8681@lunn.ch>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 5 Jun 2013 16:16:36 +0900
+Subject: [PATCH 00/15] ARM: shmobile: uImage load address rework
+In-Reply-To: <1999331.JV7Y1ipABN@avalon>
+References: <20130605070616.13311.69049.sendpatchset@w520>
+ <1999331.JV7Y1ipABN@avalon>
+Message-ID: <CANqRtoTM6pvezV8fRE3CwTGgz9e334p=QD+NLU2BfsTvAtASyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 08:40:07AM +0200, Thomas Petazzoni wrote:
-> The ARM MXS code already has some code to allocate and setup a
-> property that contains the MAC address, and the Marvell Armada 370/XP
-> code is going to gain a similar copy of this code. Therefore, let's
-> add a small helper function that does that, in drivers/of/of_net.c.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/of/of_net.c    | 36 ++++++++++++++++++++++++++++++++++++
->  include/linux/of_net.h |  6 ++++++
->  2 files changed, 42 insertions(+)
-> 
-> diff --git a/drivers/of/of_net.c b/drivers/of/of_net.c
-> index ffab033..02af898 100644
-> --- a/drivers/of/of_net.c
-> +++ b/drivers/of/of_net.c
-> @@ -92,3 +92,39 @@ const void *of_get_mac_address(struct device_node *np)
->  	return NULL;
->  }
->  EXPORT_SYMBOL(of_get_mac_address);
-> +
-> +/**
-> + * Set a MAC address of a given network interface device tree node, if
-> + * none was already defined.
-> + */
-> +int of_set_mac_address(struct device_node *np, const void *mac)
-> +{
-> +	struct property *pp;
-> +	int ret;
-> +
-> +	if (of_get_mac_address(np))
-> +		return 0;
+Hi Laurent,
 
-Hi Thomas
+On Wed, Jun 5, 2013 at 4:13 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Magnus,
+>
+> On Wednesday 05 June 2013 16:06:16 Magnus Damm wrote:
+>> ARM: shmobile: uImage load address rework
+>>
+>> [PATCH 01/15] ARM: shmobile: Per-board uImage load addresses
+>> [PATCH 02/15] ARM: shmobile: AG5EVM uImage rework
+>> [PATCH 03/15] ARM: shmobile: AP4EVB uImage rework
+>> [PATCH 04/15] ARM: shmobile: APE6EVM uImage rework
+>> [PATCH 05/15] ARM: shmobile: Armadillo800EVA uImage rework
+>> [PATCH 06/15] ARM: shmobile: Bock-W uImage rework
+>> [PATCH 07/15] ARM: shmobile: Bonito uImage rework
+>> [PATCH 08/15] ARM: shmobile: KZM9D uImage rework
+>> [PATCH 09/15] ARM: shmobile: KZM9G uImage rework
+>> [PATCH 10/15] ARM: shmobile: Kota2 uImage rework
+>> [PATCH 11/15] ARM: shmobile: Lager uImage rework
+>> [PATCH 12/15] ARM: shmobile: Mackerel uImage rework
+>> [PATCH 13/15] ARM: shmobile: Marzen uImage rework
+>> [PATCH 14/15] ARM: shmobile: Armadillo800EVA reference uImage rework
+>> [PATCH 15/15] ARM: shmobile: Remove MEMORY_START uImage load address
+>>
+>> Rework the mach-shmobile uImage load address calculation by storing
+>> the per-board load addresses in Makefile.boot. This removes the
+>> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
+>> it possible to create safe kernel images that boot on multiple boards.
+>>
+>> This is one of several series of code that reworks code not to rely on
+>> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
+>
+> Thank you for the patches. I've been waiting for this for a long time :-)
+>
+> If you need to submit a v2 you might want to squash 05/15 and 14/15.
 
-The semantics is a bit odd here for a set function. Only set if not
-already set. From the function name, its not clear it has this extra
-semantics. of_set_if_not_set_mac_address() seems a bit long, but makes
-it clearer. Or maybe of_set_default_mac_address()?
+Yeah, agree, it should have been like that. The KZM9G and Marzen
+boards are like that.
 
-I've no strong preference here, i just see the potential for bugs.
+The reason is that I happened to discover  the Armadillo800EVA DT
+reference code rather late so to fix that I sneaked in an incremental
+fix as 14/15.
 
-     Andrew
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+
+Thanks!
+
+/ magnus
