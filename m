@@ -1,303 +1,464 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  5 Jun 2013 09:59:24 +0400
-Subject: [PATCH RESEND v2 1/3] GPIO: clps711x: Rewrite driver for using
- generic GPIO code
+Date: Wed,  5 Jun 2013 09:59:27 +0400
+Subject: [PATCH RESEND 07/15] ARM: clps711x: p720t: Define PLD registers as
+ GPIOs
 In-Reply-To: <1370411967-29451-1-git-send-email-shc_work@mail.ru>
 References: <1370411967-29451-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1370411967-29451-17-git-send-email-shc_work@mail.ru>
+Message-ID: <1370411967-29451-20-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provides rewritten driver for CLPS711X GPIO which uses
-generic GPIO code.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- drivers/gpio/Kconfig         |   5 +-
- drivers/gpio/gpio-clps711x.c | 226 +++++++++++--------------------------------
- 2 files changed, 63 insertions(+), 168 deletions(-)
+ arch/arm/mach-clps711x/board-p720t.c         | 245 +++++++++++++++++++++------
+ arch/arm/mach-clps711x/include/mach/syspld.h | 116 -------------
+ 2 files changed, 193 insertions(+), 168 deletions(-)
+ delete mode 100644 arch/arm/mach-clps711x/include/mach/syspld.h
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 30d89ed..b0d967b 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -109,8 +109,11 @@ config GPIO_MAX730X
- comment "Memory mapped GPIO drivers:"
- 
- config GPIO_CLPS711X
--	def_bool y
-+	tristate "CLPS711X GPIO support"
- 	depends on ARCH_CLPS711X
-+	select GPIO_GENERIC
-+	help
-+	  Say yes here to support GPIO on CLPS711X SoCs.
- 
- config GPIO_GENERIC_PLATFORM
- 	tristate "Generic memory-mapped GPIO controller support (MMIO platform device)"
-diff --git a/drivers/gpio/gpio-clps711x.c b/drivers/gpio/gpio-clps711x.c
-index ce63b75..6ce8a8c 100644
---- a/drivers/gpio/gpio-clps711x.c
-+++ b/drivers/gpio/gpio-clps711x.c
-@@ -1,7 +1,7 @@
- /*
-  *  CLPS711X GPIO driver
-  *
-- *  Copyright (C) 2012 Alexander Shiyan <shc_work@mail.ru>
-+ *  Copyright (C) 2012,2013 Alexander Shiyan <shc_work@mail.ru>
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-@@ -9,191 +9,83 @@
-  * (at your option) any later version.
-  */
- 
--#include <linux/io.h>
--#include <linux/slab.h>
-+#include <linux/err.h>
- #include <linux/gpio.h>
- #include <linux/module.h>
--#include <linux/spinlock.h>
+diff --git a/arch/arm/mach-clps711x/board-p720t.c b/arch/arm/mach-clps711x/board-p720t.c
+index 48d0737..601ef38 100644
+--- a/arch/arm/mach-clps711x/board-p720t.c
++++ b/arch/arm/mach-clps711x/board-p720t.c
+@@ -23,10 +23,12 @@
+ #include <linux/string.h>
+ #include <linux/mm.h>
+ #include <linux/io.h>
++#include <linux/gpio.h>
+ #include <linux/slab.h>
+ #include <linux/leds.h>
+ #include <linux/sizes.h>
+ #include <linux/backlight.h>
 +#include <linux/basic_mmio_gpio.h>
  #include <linux/platform_device.h>
+ #include <linux/mtd/partitions.h>
+ #include <linux/mtd/nand-gpio.h>
+@@ -38,7 +40,6 @@
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-#include <mach/syspld.h>
  
--#include <mach/hardware.h>
--
--#define CLPS711X_GPIO_PORTS	5
--#define CLPS711X_GPIO_NAME	"gpio-clps711x"
--
--struct clps711x_gpio {
--	struct gpio_chip	chip[CLPS711X_GPIO_PORTS];
--	spinlock_t		lock;
--};
--
--static void __iomem *clps711x_ports[] = {
--	CLPS711X_VIRT_BASE + PADR,
--	CLPS711X_VIRT_BASE + PBDR,
--	CLPS711X_VIRT_BASE + PCDR,
--	CLPS711X_VIRT_BASE + PDDR,
--	CLPS711X_VIRT_BASE + PEDR,
--};
--
--static void __iomem *clps711x_pdirs[] = {
--	CLPS711X_VIRT_BASE + PADDR,
--	CLPS711X_VIRT_BASE + PBDDR,
--	CLPS711X_VIRT_BASE + PCDDR,
--	CLPS711X_VIRT_BASE + PDDDR,
--	CLPS711X_VIRT_BASE + PEDDR,
--};
--
--#define clps711x_port(x)	clps711x_ports[x->base / 8]
--#define clps711x_pdir(x)	clps711x_pdirs[x->base / 8]
--
--static int gpio_clps711x_get(struct gpio_chip *chip, unsigned offset)
-+static int clps711x_gpio_probe(struct platform_device *pdev)
- {
--	return !!(readb(clps711x_port(chip)) & (1 << offset));
--}
-+	void __iomem *dat, *dir;
-+	struct bgpio_chip *bgc;
-+	struct resource *res;
-+	int err, id = pdev->id;
+ #include <video/platform_lcd.h>
  
--static void gpio_clps711x_set(struct gpio_chip *chip, unsigned offset,
--			      int value)
--{
--	int tmp;
--	unsigned long flags;
--	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+	if ((id < 0) || (id > 4))
-+		return -ENODEV;
+@@ -52,6 +53,178 @@
  
--	spin_lock_irqsave(&gpio->lock, flags);
--	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
--	if (value)
--		tmp |= 1 << offset;
--	writeb(tmp, clps711x_port(chip));
--	spin_unlock_irqrestore(&gpio->lock, flags);
--}
--
--static int gpio_clps711x_dir_in(struct gpio_chip *chip, unsigned offset)
--{
--	int tmp;
--	unsigned long flags;
--	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
--
--	spin_lock_irqsave(&gpio->lock, flags);
--	tmp = readb(clps711x_pdir(chip)) & ~(1 << offset);
--	writeb(tmp, clps711x_pdir(chip));
--	spin_unlock_irqrestore(&gpio->lock, flags);
--
--	return 0;
--}
-+	bgc = devm_kzalloc(&pdev->dev, sizeof(*bgc), GFP_KERNEL);
-+	if (!bgc)
-+		return -ENOMEM;
+ #define P720T_NAND_BASE		(CLPS711X_SDRAM1_BASE)
  
--static int gpio_clps711x_dir_out(struct gpio_chip *chip, unsigned offset,
--				 int value)
--{
--	int tmp;
--	unsigned long flags;
--	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	dat = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(dat))
-+		return PTR_ERR(dat);
++#define P720T_MMGPIO_BASE	(CLPS711X_NR_GPIO)
 +
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
-+	dir = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(dir))
-+		return PTR_ERR(dir);
++#define SYSPLD_PHYS_BASE	IOMEM(CS1_PHYS_BASE)
 +
-+	switch (id) {
-+	case 3:
-+		/* PORTD is inverted logic for direction register */
-+		err = bgpio_init(bgc, &pdev->dev, 1, dat, NULL, NULL,
-+				 NULL, dir, 0);
-+		break;
-+	default:
-+		err = bgpio_init(bgc, &pdev->dev, 1, dat, NULL, NULL,
-+				 dir, NULL, 0);
-+		break;
-+	}
- 
--	spin_lock_irqsave(&gpio->lock, flags);
--	tmp = readb(clps711x_pdir(chip)) | (1 << offset);
--	writeb(tmp, clps711x_pdir(chip));
--	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
--	if (value)
--		tmp |= 1 << offset;
--	writeb(tmp, clps711x_port(chip));
--	spin_unlock_irqrestore(&gpio->lock, flags);
-+	if (err)
-+		return err;
- 
--	return 0;
--}
--
--static int gpio_clps711x_dir_in_inv(struct gpio_chip *chip, unsigned offset)
--{
--	int tmp;
--	unsigned long flags;
--	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+	switch (id) {
-+	case 4:
-+		/* PORTE is 3 lines only */
-+		bgc->gc.ngpio = 3;
-+		break;
-+	default:
-+		break;
-+	}
- 
--	spin_lock_irqsave(&gpio->lock, flags);
--	tmp = readb(clps711x_pdir(chip)) | (1 << offset);
--	writeb(tmp, clps711x_pdir(chip));
--	spin_unlock_irqrestore(&gpio->lock, flags);
-+	bgc->gc.base = id * 8;
-+	platform_set_drvdata(pdev, bgc);
- 
--	return 0;
-+	return gpiochip_add(&bgc->gc);
- }
- 
--static int gpio_clps711x_dir_out_inv(struct gpio_chip *chip, unsigned offset,
--				     int value)
-+static int clps711x_gpio_remove(struct platform_device *pdev)
- {
--	int tmp;
--	unsigned long flags;
--	struct clps711x_gpio *gpio = dev_get_drvdata(chip->dev);
-+	struct bgpio_chip *bgc = platform_get_drvdata(pdev);
- 
--	spin_lock_irqsave(&gpio->lock, flags);
--	tmp = readb(clps711x_pdir(chip)) & ~(1 << offset);
--	writeb(tmp, clps711x_pdir(chip));
--	tmp = readb(clps711x_port(chip)) & ~(1 << offset);
--	if (value)
--		tmp |= 1 << offset;
--	writeb(tmp, clps711x_port(chip));
--	spin_unlock_irqrestore(&gpio->lock, flags);
--
--	return 0;
-+	return bgpio_remove(bgc);
- }
- 
--static struct {
--	char	*name;
--	int	nr;
--	int	inv_dir;
--} clps711x_gpio_ports[] __initconst = {
--	{ "PORTA", 8, 0, },
--	{ "PORTB", 8, 0, },
--	{ "PORTC", 8, 0, },
--	{ "PORTD", 8, 1, },
--	{ "PORTE", 3, 0, },
-+static struct platform_driver clps711x_gpio_driver = {
-+	.driver	= {
-+		.name	= "clps711x-gpio",
-+		.owner	= THIS_MODULE,
++#define PLD_INT			(SYSPLD_PHYS_BASE + 0x000000)
++#define PLD_INT_MMGPIO_BASE	(P720T_MMGPIO_BASE + 0)
++#define PLD_INT_PENIRQ		(PLD_INT_MMGPIO_BASE + 5)
++#define PLD_INT_UCB_IRQ		(PLD_INT_MMGPIO_BASE + 1)
++#define PLD_INT_KBD_ATN		(PLD_INT_MMGPIO_BASE + 0) /* EINT1 */
++
++#define PLD_PWR			(SYSPLD_PHYS_BASE + 0x000004)
++#define PLD_PWR_MMGPIO_BASE	(P720T_MMGPIO_BASE + 8)
++#define PLD_PWR_EXT		(PLD_PWR_MMGPIO_BASE + 5)
++#define PLD_PWR_MODE		(PLD_PWR_MMGPIO_BASE + 4) /* 1 = PWM, 0 = PFM */
++#define PLD_S4_ON		(PLD_PWR_MMGPIO_BASE + 3) /* LCD bias voltage enable */
++#define PLD_S3_ON		(PLD_PWR_MMGPIO_BASE + 2) /* LCD backlight enable */
++#define PLD_S2_ON		(PLD_PWR_MMGPIO_BASE + 1) /* LCD 3V3 supply enable */
++#define PLD_S1_ON		(PLD_PWR_MMGPIO_BASE + 0) /* LCD 3V supply enable */
++
++#define PLD_KBD			(SYSPLD_PHYS_BASE + 0x000008)
++#define PLD_KBD_MMGPIO_BASE	(P720T_MMGPIO_BASE + 16)
++#define PLD_KBD_WAKE		(PLD_KBD_MMGPIO_BASE + 1)
++#define PLD_KBD_EN		(PLD_KBD_MMGPIO_BASE + 0)
++
++#define PLD_SPI			(SYSPLD_PHYS_BASE + 0x00000c)
++#define PLD_SPI_MMGPIO_BASE	(P720T_MMGPIO_BASE + 24)
++#define PLD_SPI_EN		(PLD_SPI_MMGPIO_BASE + 0)
++
++#define PLD_IO			(SYSPLD_PHYS_BASE + 0x000010)
++#define PLD_IO_MMGPIO_BASE	(P720T_MMGPIO_BASE + 32)
++#define PLD_IO_BOOTSEL		(PLD_IO_MMGPIO_BASE + 6) /* Boot sel switch */
++#define PLD_IO_USER		(PLD_IO_MMGPIO_BASE + 5) /* User defined switch */
++#define PLD_IO_LED3		(PLD_IO_MMGPIO_BASE + 4)
++#define PLD_IO_LED2		(PLD_IO_MMGPIO_BASE + 3)
++#define PLD_IO_LED1		(PLD_IO_MMGPIO_BASE + 2)
++#define PLD_IO_LED0		(PLD_IO_MMGPIO_BASE + 1)
++#define PLD_IO_LEDEN		(PLD_IO_MMGPIO_BASE + 0)
++
++#define PLD_IRDA		(SYSPLD_PHYS_BASE + 0x000014)
++#define PLD_IRDA_MMGPIO_BASE	(P720T_MMGPIO_BASE + 40)
++#define PLD_IRDA_EN		(PLD_IRDA_MMGPIO_BASE + 0)
++
++#define PLD_COM2		(SYSPLD_PHYS_BASE + 0x000018)
++#define PLD_COM2_MMGPIO_BASE	(P720T_MMGPIO_BASE + 48)
++#define PLD_COM2_EN		(PLD_COM2_MMGPIO_BASE + 0)
++
++#define PLD_COM1		(SYSPLD_PHYS_BASE + 0x00001c)
++#define PLD_COM1_MMGPIO_BASE	(P720T_MMGPIO_BASE + 56)
++#define PLD_COM1_EN		(PLD_COM1_MMGPIO_BASE + 0)
++
++#define PLD_AUD			(SYSPLD_PHYS_BASE + 0x000020)
++#define PLD_AUD_MMGPIO_BASE	(P720T_MMGPIO_BASE + 64)
++#define PLD_AUD_DIV1		(PLD_AUD_MMGPIO_BASE + 6)
++#define PLD_AUD_DIV0		(PLD_AUD_MMGPIO_BASE + 5)
++#define PLD_AUD_CLK_SEL1	(PLD_AUD_MMGPIO_BASE + 4)
++#define PLD_AUD_CLK_SEL0	(PLD_AUD_MMGPIO_BASE + 3)
++#define PLD_AUD_MIC_PWR		(PLD_AUD_MMGPIO_BASE + 2)
++#define PLD_AUD_MIC_GAIN	(PLD_AUD_MMGPIO_BASE + 1)
++#define PLD_AUD_CODEC_EN	(PLD_AUD_MMGPIO_BASE + 0)
++
++#define PLD_CF			(SYSPLD_PHYS_BASE + 0x000024)
++#define PLD_CF_MMGPIO_BASE	(P720T_MMGPIO_BASE + 72)
++#define PLD_CF2_SLEEP		(PLD_CF_MMGPIO_BASE + 5)
++#define PLD_CF1_SLEEP		(PLD_CF_MMGPIO_BASE + 4)
++#define PLD_CF2_nPDREQ		(PLD_CF_MMGPIO_BASE + 3)
++#define PLD_CF1_nPDREQ		(PLD_CF_MMGPIO_BASE + 2)
++#define PLD_CF2_nIRQ		(PLD_CF_MMGPIO_BASE + 1)
++#define PLD_CF1_nIRQ		(PLD_CF_MMGPIO_BASE + 0)
++
++#define PLD_SDC			(SYSPLD_PHYS_BASE + 0x000028)
++#define PLD_SDC_MMGPIO_BASE	(P720T_MMGPIO_BASE + 80)
++#define PLD_SDC_INT_EN		(PLD_SDC_MMGPIO_BASE + 2)
++#define PLD_SDC_WP		(PLD_SDC_MMGPIO_BASE + 1)
++#define PLD_SDC_CD		(PLD_SDC_MMGPIO_BASE + 0)
++
++#define PLD_CODEC		(SYSPLD_PHYS_BASE + 0x400000)
++#define PLD_CODEC_MMGPIO_BASE	(P720T_MMGPIO_BASE + 88)
++#define PLD_CODEC_IRQ3		(PLD_CODEC_MMGPIO_BASE + 4)
++#define PLD_CODEC_IRQ2		(PLD_CODEC_MMGPIO_BASE + 3)
++#define PLD_CODEC_IRQ1		(PLD_CODEC_MMGPIO_BASE + 2)
++#define PLD_CODEC_EN		(PLD_CODEC_MMGPIO_BASE + 0)
++
++#define PLD_BRITE		(SYSPLD_PHYS_BASE + 0x400004)
++#define PLD_BRITE_MMGPIO_BASE	(P720T_MMGPIO_BASE + 96)
++#define PLD_BRITE_UP		(PLD_BRITE_MMGPIO_BASE + 1)
++#define PLD_BRITE_DN		(PLD_BRITE_MMGPIO_BASE + 0)
++
++#define PLD_LCDEN		(SYSPLD_PHYS_BASE + 0x400008)
++#define PLD_LCDEN_MMGPIO_BASE	(P720T_MMGPIO_BASE + 104)
++#define PLD_LCDEN_EN		(PLD_LCDEN_MMGPIO_BASE + 0)
++
++#define PLD_TCH			(SYSPLD_PHYS_BASE + 0x400010)
++#define PLD_TCH_MMGPIO_BASE	(P720T_MMGPIO_BASE + 112)
++#define PLD_TCH_PENIRQ		(PLD_TCH_MMGPIO_BASE + 1)
++#define PLD_TCH_EN		(PLD_TCH_MMGPIO_BASE + 0)
++
++#define PLD_GPIO		(SYSPLD_PHYS_BASE + 0x400014)
++#define PLD_GPIO_MMGPIO_BASE	(P720T_MMGPIO_BASE + 120)
++#define PLD_GPIO2		(PLD_GPIO_MMGPIO_BASE + 2)
++#define PLD_GPIO1		(PLD_GPIO_MMGPIO_BASE + 1)
++#define PLD_GPIO0		(PLD_GPIO_MMGPIO_BASE + 0)
++
++static struct gpio p720t_gpios[] __initconst = {
++	{ PLD_S1_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S1_ON" },
++	{ PLD_S2_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S2_ON" },
++	{ PLD_S3_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S3_ON" },
++	{ PLD_S4_ON,	GPIOF_OUT_INIT_LOW,	"PLD_S4_ON" },
++	{ PLD_KBD_EN,	GPIOF_OUT_INIT_LOW,	"PLD_KBD_EN" },
++	{ PLD_SPI_EN,	GPIOF_OUT_INIT_LOW,	"PLD_SPI_EN" },
++	{ PLD_IO_USER,	GPIOF_OUT_INIT_LOW,	"PLD_IO_USER" },
++	{ PLD_IO_LED0,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED0" },
++	{ PLD_IO_LED1,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED1" },
++	{ PLD_IO_LED2,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED2" },
++	{ PLD_IO_LED3,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LED3" },
++	{ PLD_IO_LEDEN,	GPIOF_OUT_INIT_LOW,	"PLD_IO_LEDEN" },
++	{ PLD_IRDA_EN,	GPIOF_OUT_INIT_LOW,	"PLD_IRDA_EN" },
++	{ PLD_COM1_EN,	GPIOF_OUT_INIT_HIGH,	"PLD_COM1_EN" },
++	{ PLD_COM2_EN,	GPIOF_OUT_INIT_HIGH,	"PLD_COM2_EN" },
++	{ PLD_CODEC_EN,	GPIOF_OUT_INIT_LOW,	"PLD_CODEC_EN" },
++	{ PLD_LCDEN_EN,	GPIOF_OUT_INIT_LOW,	"PLD_LCDEN_EN" },
++	{ PLD_TCH_EN,	GPIOF_OUT_INIT_LOW,	"PLD_TCH_EN" },
++	{ P720T_USERLED,GPIOF_OUT_INIT_LOW,	"USER_LED" },
++};
++
++static struct resource p720t_mmgpio_resource[] __initdata = {
++	DEFINE_RES_MEM_NAMED(0, 4, "dat"),
++};
++
++static struct bgpio_pdata p720t_mmgpio_pdata = {
++	.ngpio	= 8,
++};
++
++static struct platform_device p720t_mmgpio __initdata = {
++	.name		= "basic-mmio-gpio",
++	.id		= -1,
++	.resource	= p720t_mmgpio_resource,
++	.num_resources	= ARRAY_SIZE(p720t_mmgpio_resource),
++	.dev		= {
++		.platform_data	= &p720t_mmgpio_pdata,
 +	},
-+	.probe	= clps711x_gpio_probe,
-+	.remove	= clps711x_gpio_remove,
++};
++
++static void __init p720t_mmgpio_init(void __iomem *addrbase, int gpiobase)
++{
++	p720t_mmgpio_resource[0].start = (unsigned long)addrbase;
++	p720t_mmgpio_pdata.base = gpiobase;
++
++	platform_device_register(&p720t_mmgpio);
++}
++
++static struct {
++	void __iomem	*addrbase;
++	int		gpiobase;
++} mmgpios[] __initconst = {
++	{ PLD_INT,	PLD_INT_MMGPIO_BASE },
++	{ PLD_PWR,	PLD_PWR_MMGPIO_BASE },
++	{ PLD_KBD,	PLD_KBD_MMGPIO_BASE },
++	{ PLD_SPI,	PLD_SPI_MMGPIO_BASE },
++	{ PLD_IO,	PLD_IO_MMGPIO_BASE },
++	{ PLD_IRDA,	PLD_IRDA_MMGPIO_BASE },
++	{ PLD_COM2,	PLD_COM2_MMGPIO_BASE },
++	{ PLD_COM1,	PLD_COM1_MMGPIO_BASE },
++	{ PLD_AUD,	PLD_AUD_MMGPIO_BASE },
++	{ PLD_CF,	PLD_CF_MMGPIO_BASE },
++	{ PLD_SDC,	PLD_SDC_MMGPIO_BASE },
++	{ PLD_CODEC,	PLD_CODEC_MMGPIO_BASE },
++	{ PLD_BRITE,	PLD_BRITE_MMGPIO_BASE },
++	{ PLD_LCDEN,	PLD_LCDEN_MMGPIO_BASE },
++	{ PLD_TCH,	PLD_TCH_MMGPIO_BASE },
++	{ PLD_GPIO,	PLD_GPIO_MMGPIO_BASE },
++};
++
+ static struct resource p720t_nand_resource[] __initdata = {
+ 	DEFINE_RES_MEM(P720T_NAND_BASE, SZ_4),
  };
-+module_platform_driver(clps711x_gpio_driver);
+@@ -93,11 +266,15 @@ static struct platform_device p720t_nand_pdev __initdata = {
+ static void p720t_lcd_power_set(struct plat_lcd_data *pd, unsigned int power)
+ {
+ 	if (power) {
+-		PLD_LCDEN = PLD_LCDEN_EN;
+-		PLD_PWR |= PLD_S4_ON | PLD_S2_ON | PLD_S1_ON;
++		gpio_set_value(PLD_LCDEN_EN, 1);
++		gpio_set_value(PLD_S1_ON, 1);
++		gpio_set_value(PLD_S2_ON, 1);
++		gpio_set_value(PLD_S4_ON, 1);
+ 	} else {
+-		PLD_PWR &= ~(PLD_S4_ON | PLD_S2_ON | PLD_S1_ON);
+-		PLD_LCDEN = 0;
++		gpio_set_value(PLD_S1_ON, 0);
++		gpio_set_value(PLD_S2_ON, 0);
++		gpio_set_value(PLD_S4_ON, 0);
++		gpio_set_value(PLD_LCDEN_EN, 0);
+ 	}
+ }
  
--static int __init gpio_clps711x_init(void)
+@@ -107,10 +284,7 @@ static struct plat_lcd_data p720t_lcd_power_pdata = {
+ 
+ static void p720t_lcd_backlight_set_intensity(int intensity)
+ {
+-	if (intensity)
+-		PLD_PWR |= PLD_S3_ON;
+-	else
+-		PLD_PWR = 0;
++	gpio_set_value(PLD_S3_ON, intensity);
+ }
+ 
+ static struct generic_bl_info p720t_lcd_backlight_pdata = {
+@@ -120,19 +294,6 @@ static struct generic_bl_info p720t_lcd_backlight_pdata = {
+ 	.set_bl_intensity	= p720t_lcd_backlight_set_intensity,
+ };
+ 
+-/*
+- * Map the P720T system PLD. It occupies two address spaces:
+- * 0x10000000 and 0x10400000. We map both regions as one.
+- */
+-static struct map_desc p720t_io_desc[] __initdata = {
+-	{
+-		.virtual	= SYSPLD_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(SYSPLD_PHYS_BASE),
+-		.length		= SZ_8M,
+-		.type		= MT_DEVICE,
+-	},
+-};
+-
+ static void __init
+ fixup_p720t(struct tag *tag, char **cmdline, struct meminfo *mi)
+ {
+@@ -158,33 +319,6 @@ fixup_p720t(struct tag *tag, char **cmdline, struct meminfo *mi)
+ 	}
+ }
+ 
+-static void __init p720t_map_io(void)
 -{
--	int i;
--	struct platform_device *pdev;
--	struct clps711x_gpio *gpio;
--
--	pdev = platform_device_alloc(CLPS711X_GPIO_NAME, 0);
--	if (!pdev) {
--		pr_err("Cannot create platform device: %s\n",
--		       CLPS711X_GPIO_NAME);
--		return -ENOMEM;
--	}
--
--	platform_device_add(pdev);
--
--	gpio = devm_kzalloc(&pdev->dev, sizeof(struct clps711x_gpio),
--			    GFP_KERNEL);
--	if (!gpio) {
--		dev_err(&pdev->dev, "GPIO allocating memory error\n");
--		platform_device_unregister(pdev);
--		return -ENOMEM;
--	}
--
--	platform_set_drvdata(pdev, gpio);
--
--	spin_lock_init(&gpio->lock);
--
--	for (i = 0; i < CLPS711X_GPIO_PORTS; i++) {
--		gpio->chip[i].owner		= THIS_MODULE;
--		gpio->chip[i].dev		= &pdev->dev;
--		gpio->chip[i].label		= clps711x_gpio_ports[i].name;
--		gpio->chip[i].base		= i * 8;
--		gpio->chip[i].ngpio		= clps711x_gpio_ports[i].nr;
--		gpio->chip[i].get		= gpio_clps711x_get;
--		gpio->chip[i].set		= gpio_clps711x_set;
--		if (!clps711x_gpio_ports[i].inv_dir) {
--			gpio->chip[i].direction_input = gpio_clps711x_dir_in;
--			gpio->chip[i].direction_output = gpio_clps711x_dir_out;
--		} else {
--			gpio->chip[i].direction_input = gpio_clps711x_dir_in_inv;
--			gpio->chip[i].direction_output = gpio_clps711x_dir_out_inv;
--		}
--		WARN_ON(gpiochip_add(&gpio->chip[i]));
--	}
--
--	dev_info(&pdev->dev, "GPIO driver initialized\n");
--
--	return 0;
+-	clps711x_map_io();
+-	iotable_init(p720t_io_desc, ARRAY_SIZE(p720t_io_desc));
 -}
--arch_initcall(gpio_clps711x_init);
 -
--MODULE_LICENSE("GPL v2");
-+MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Alexander Shiyan <shc_work@mail.ru>");
- MODULE_DESCRIPTION("CLPS711X GPIO driver");
+-static void __init p720t_init_early(void)
+-{
+-	/*
+-	 * Power down as much as possible in case we don't
+-	 * have the drivers loaded.
+-	 */
+-	PLD_LCDEN = 0;
+-	PLD_PWR  &= ~(PLD_S4_ON|PLD_S3_ON|PLD_S2_ON|PLD_S1_ON);
+-
+-	PLD_KBD   = 0;
+-	PLD_IO    = 0;
+-	PLD_IRDA  = 0;
+-	PLD_CODEC = 0;
+-	PLD_TCH   = 0;
+-	PLD_SPI   = 0;
+-	if (!IS_ENABLED(CONFIG_DEBUG_LL)) {
+-		PLD_COM2 = 0;
+-		PLD_COM1 = 0;
+-	}
+-}
+-
+ static struct gpio_led p720t_gpio_leds[] = {
+ 	{
+ 		.name			= "User LED",
+@@ -200,12 +334,20 @@ static struct gpio_led_platform_data p720t_gpio_led_pdata __initdata = {
+ 
+ static void __init p720t_init(void)
+ {
++	int i;
++
+ 	clps711x_devices_init();
++
++	for (i = 0; i < ARRAY_SIZE(mmgpios); i++)
++		p720t_mmgpio_init(mmgpios[i].addrbase, mmgpios[i].gpiobase);
++
++	platform_device_register(&p720t_nand_pdev);
+ }
+ 
+ static void __init p720t_init_late(void)
+ {
+-	platform_device_register(&p720t_nand_pdev);
++	WARN_ON(gpio_request_array(p720t_gpios, ARRAY_SIZE(p720t_gpios)));
++
+ 	platform_device_register_data(&platform_bus, "platform-lcd", 0,
+ 				      &p720t_lcd_power_pdata,
+ 				      sizeof(p720t_lcd_power_pdata));
+@@ -223,8 +365,7 @@ MACHINE_START(P720T, "ARM-Prospector720T")
+ 	.atag_offset	= 0x100,
+ 	.nr_irqs	= CLPS711X_NR_IRQS,
+ 	.fixup		= fixup_p720t,
+-	.map_io		= p720t_map_io,
+-	.init_early	= p720t_init_early,
++	.map_io		= clps711x_map_io,
+ 	.init_irq	= clps711x_init_irq,
+ 	.init_time	= clps711x_timer_init,
+ 	.init_machine	= p720t_init,
+diff --git a/arch/arm/mach-clps711x/include/mach/syspld.h b/arch/arm/mach-clps711x/include/mach/syspld.h
+deleted file mode 100644
+index 9a43315..0000000
+--- a/arch/arm/mach-clps711x/include/mach/syspld.h
++++ /dev/null
+@@ -1,116 +0,0 @@
+-/*
+- *  arch/arm/mach-clps711x/include/mach/syspld.h
+- *
+- *  System Control PLD register definitions.
+- *
+- *  Copyright (C) 2000 Deep Blue Solutions Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-#ifndef __ASM_ARCH_SYSPLD_H
+-#define __ASM_ARCH_SYSPLD_H
+-
+-#define SYSPLD_PHYS_BASE	(0x10000000)
+-#define SYSPLD_VIRT_BASE	IO_ADDRESS(SYSPLD_PHYS_BASE)
+-
+-#define SYSPLD_REG(type, off)	(*(volatile type *)(SYSPLD_VIRT_BASE + (off)))
+-
+-#define PLD_INT		SYSPLD_REG(u32, 0x000000)
+-#define PLD_INT_PENIRQ		(1 << 5)
+-#define PLD_INT_UCB_IRQ		(1 << 1)
+-#define PLD_INT_KBD_ATN		(1 << 0)	/* EINT1 */
+-
+-#define PLD_PWR		SYSPLD_REG(u32, 0x000004)
+-#define PLD_PWR_EXT		(1 << 5)
+-#define PLD_PWR_MODE		(1 << 4)	/* 1 = PWM, 0 = PFM */
+-#define PLD_S4_ON		(1 << 3)	/* LCD bias voltage enable */
+-#define PLD_S3_ON		(1 << 2)	/* LCD backlight enable */
+-#define PLD_S2_ON		(1 << 1)	/* LCD 3V3 supply enable */
+-#define PLD_S1_ON		(1 << 0)	/* LCD 3V supply enable */
+-
+-#define PLD_KBD		SYSPLD_REG(u32, 0x000008)
+-#define PLD_KBD_WAKE		(1 << 1)
+-#define PLD_KBD_EN		(1 << 0)
+-
+-#define PLD_SPI		SYSPLD_REG(u32, 0x00000c)
+-#define PLD_SPI_EN		(1 << 0)
+-
+-#define PLD_IO		SYSPLD_REG(u32, 0x000010)
+-#define PLD_IO_BOOTSEL		(1 << 6)	/* boot sel switch */
+-#define PLD_IO_USER		(1 << 5)	/* user defined switch */
+-#define PLD_IO_LED3		(1 << 4)
+-#define PLD_IO_LED2		(1 << 3)
+-#define PLD_IO_LED1		(1 << 2)
+-#define PLD_IO_LED0		(1 << 1)
+-#define PLD_IO_LEDEN		(1 << 0)
+-
+-#define PLD_IRDA	SYSPLD_REG(u32, 0x000014)
+-#define PLD_IRDA_EN		(1 << 0)
+-
+-#define PLD_COM2	SYSPLD_REG(u32, 0x000018)
+-#define PLD_COM2_EN		(1 << 0)
+-
+-#define PLD_COM1	SYSPLD_REG(u32, 0x00001c)
+-#define PLD_COM1_EN		(1 << 0)
+-
+-#define PLD_AUD		SYSPLD_REG(u32, 0x000020)
+-#define PLD_AUD_DIV1		(1 << 6)
+-#define PLD_AUD_DIV0		(1 << 5)
+-#define PLD_AUD_CLK_SEL1	(1 << 4)
+-#define PLD_AUD_CLK_SEL0	(1 << 3)
+-#define PLD_AUD_MIC_PWR		(1 << 2)
+-#define PLD_AUD_MIC_GAIN	(1 << 1)
+-#define PLD_AUD_CODEC_EN	(1 << 0)
+-
+-#define PLD_CF		SYSPLD_REG(u32, 0x000024)
+-#define PLD_CF2_SLEEP		(1 << 5)
+-#define PLD_CF1_SLEEP		(1 << 4)
+-#define PLD_CF2_nPDREQ		(1 << 3)
+-#define PLD_CF1_nPDREQ		(1 << 2)
+-#define PLD_CF2_nIRQ		(1 << 1)
+-#define PLD_CF1_nIRQ		(1 << 0)
+-
+-#define PLD_SDC		SYSPLD_REG(u32, 0x000028)
+-#define PLD_SDC_INT_EN		(1 << 2)
+-#define PLD_SDC_WP		(1 << 1)
+-#define PLD_SDC_CD		(1 << 0)
+-
+-#define PLD_FPGA	SYSPLD_REG(u32, 0x00002c)
+-
+-#define PLD_CODEC	SYSPLD_REG(u32, 0x400000)
+-#define PLD_CODEC_IRQ3		(1 << 4)
+-#define PLD_CODEC_IRQ2		(1 << 3)
+-#define PLD_CODEC_IRQ1		(1 << 2)
+-#define PLD_CODEC_EN		(1 << 0)
+-
+-#define PLD_BRITE	SYSPLD_REG(u32, 0x400004)
+-#define PLD_BRITE_UP		(1 << 1)
+-#define PLD_BRITE_DN		(1 << 0)
+-
+-#define PLD_LCDEN	SYSPLD_REG(u32, 0x400008)
+-#define PLD_LCDEN_EN		(1 << 0)
+-
+-#define PLD_ID		SYSPLD_REG(u32, 0x40000c)
+-
+-#define PLD_TCH		SYSPLD_REG(u32, 0x400010)
+-#define PLD_TCH_PENIRQ		(1 << 1)
+-#define PLD_TCH_EN		(1 << 0)
+-
+-#define PLD_GPIO	SYSPLD_REG(u32, 0x400014)
+-#define PLD_GPIO2		(1 << 2)
+-#define PLD_GPIO1		(1 << 1)
+-#define PLD_GPIO0		(1 << 0)
+-
+-#endif
 -- 
 1.8.1.5
