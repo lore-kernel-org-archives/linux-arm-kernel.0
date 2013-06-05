@@ -1,42 +1,96 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 5 Jun 2013 09:18:27 +0200
-Subject: [PATCH 3/5] of: net: introduce a of_set_mac_address() helper
- function
-In-Reply-To: <20130605071354.GW8681@lunn.ch>
-References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370414409-29991-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130605071354.GW8681@lunn.ch>
-Message-ID: <20130605091827.603c9315@skate>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 5 Jun 2013 09:19:15 +0200
+Subject: [PATCH v2] arch/*/asm/include/bitops.h: api issue, find_*_bit()
+ defination are different with each other
+In-Reply-To: <51AE909D.9080006@asianux.com>
+References: <51AE8FEF.1020809@asianux.com> <51AE903C.6010806@asianux.com>
+ <51AE909D.9080006@asianux.com>
+Message-ID: <20130605071915.GK23140@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Andrew Lunn,
+Hello,
 
-On Wed, 5 Jun 2013 09:13:54 +0200, Andrew Lunn wrote:
-
-> The semantics is a bit odd here for a set function. Only set if not
-> already set. From the function name, its not clear it has this extra
-> semantics. of_set_if_not_set_mac_address() seems a bit long, but makes
-> it clearer. Or maybe of_set_default_mac_address()?
+On Wed, Jun 05, 2013 at 09:13:01AM +0800, Chen Gang wrote:
 > 
-> I've no strong preference here, i just see the potential for bugs.
+> For arm and m68k, they customize find_*_bit(), but the API is different
+> with 'generic'.
+> 
+> avr32, s390, and unicore32 also customize find_*_bit(), but the API is
+> the same with 'generic', and the left architectures all use 'generic'.
+> 
+> So need change arm and m68k related API to match the 'generic', then
+> all another modules can face same public API for various architectures.
+> 
+> Also beautify code and comments to pass "./scripts/checkpatch.pl"
+> 
+> 
+> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+> ---
+>  arch/arm/include/asm/bitops.h  |   26 ++++++++++++++++++--------
+>  arch/arm/lib/findbit.S         |   14 ++++++++++----
+>  arch/m68k/include/asm/bitops.h |   25 ++++++++++++++-----------
+>  3 files changed, 42 insertions(+), 23 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+> index e691ec9..10566c8 100644
+> --- a/arch/arm/include/asm/bitops.h
+> +++ b/arch/arm/include/asm/bitops.h
+> @@ -161,18 +161,28 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
+>  /*
+>   * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
+>   */
+> -extern int _find_first_zero_bit_le(const void * p, unsigned size);
+> -extern int _find_next_zero_bit_le(const void * p, int size, int offset);
+> -extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+> -extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
+> +extern unsigned long  _find_first_zero_bit_le(const void *p,
+doesn't checkpatch critizise the double space in the line above?
 
-Yes, I agree that a set function that doesn't always set is not
-entirely nice, but the part I wanted to get reviewed and hopefully
-accepted is PATCH 2/5. If that gets accepted, then I'm all open to
-suggestions to improve this PATCH 3/5 by either renaming the function
-to a more appropriate name, or change its behavior, depending on
-reviewers suggestions.
+> +						unsigned long size);
+> +extern unsigned long _find_next_zero_bit_le(const void *p, unsigned long size,
+> +						unsigned long offset);
+> +extern unsigned long _find_first_bit_le(const unsigned long *p,
+> +						unsigned long size);
+> +extern unsigned long _find_next_bit_le(const unsigned long *p,
+> +						unsigned long size,
+> +						unsigned long offset);
+>  
+>  /*
+>   * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
+>   */
+> -extern int _find_first_zero_bit_be(const void * p, unsigned size);
+> -extern int _find_next_zero_bit_be(const void * p, int size, int offset);
+> -extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+> -extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
+> +extern unsigned long _find_first_zero_bit_be(const void *p,
+> +						unsigned long size);
+> +extern unsigned long _find_next_zero_bit_be(const void *p, unsigned long size,
+> +						unsigned long offset);
+> +extern unsigned long _find_first_bit_be(const unsigned long *p,
+> +						unsigned long size);
+> +extern unsigned long _find_next_bit_be(const unsigned long *p,
+> +						unsigned long size,
+> +						unsigned long offset);
+>  
+>  #ifndef CONFIG_SMP
+>  /*
+> diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
+> index 64f6bc1..9e3263a 100644
+> --- a/arch/arm/lib/findbit.S
+> +++ b/arch/arm/lib/findbit.S
+> @@ -19,7 +19,8 @@
+>  
+>  /*
+>   * Purpose  : Find a 'zero' bit
+> - * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
+> + * Prototype: unsigned long  find_first_zero_bit(const void *p,
+here is another one.
 
-Maybe of_set_mac_address() should simply be setting it, and callers are
-responsible for checking with of_get_mac_address() first if no MAC
-address is already set?
+Best regards
+Uwe
 
-Best regards,
 
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
