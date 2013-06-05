@@ -1,19 +1,33 @@
 From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Wed, 5 Jun 2013 18:06:34 +0300
-Subject: [PATCH 0/2] Fix some uses of clk->rate
-Message-ID: <1370444796-18648-1-git-send-email-pdeschrijver@nvidia.com>
+Date: Wed, 5 Jun 2013 18:06:36 +0300
+Subject: [PATCH 2/2] clk: honor CLK_GET_RATE_NOCACHE in clk_set_rate
+In-Reply-To: <1370444796-18648-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1370444796-18648-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <1370444796-18648-3-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Using clk->rate directly does not take the CLK_GET_RATE_NOCACHE flag into
-account. This can cause wrong results if the flag is set.
+clk_set_rate() uses clk->rate directly. This causes problems if the clock
+is marked as CLK_GET_RATE_NOCACHE. Hence call clk_get_rate() to get the
+current rate.
 
-Peter De Schrijver (2):
-  clk: use clk_get_rate() for debugfs
-  clk: honor CLK_GET_RATE_NOCACHE in clk_set_rate
+Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/clk.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
- drivers/clk/clk.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 9b2f941..2e669a8 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1216,7 +1216,7 @@ int clk_set_rate(struct clk *clk, unsigned long rate)
+ 	clk_prepare_lock();
+ 
+ 	/* bail early if nothing to do */
+-	if (rate == clk->rate)
++	if (rate == clk_get_rate(clk))
+ 		goto out;
+ 
+ 	if ((clk->flags & CLK_SET_RATE_GATE) && clk->prepare_count) {
 -- 
 1.7.7.rc0.72.g4b5ea.dirty
