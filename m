@@ -1,34 +1,74 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  5 Jun 2013 12:34:35 +0400
-Subject: [PATCH v2 0/4] leds: leds-mc13xxx
-Message-ID: <1370421279-23348-1-git-send-email-shc_work@mail.ru>
+Date: Wed,  5 Jun 2013 12:34:38 +0400
+Subject: [PATCH v2 3/4] leds: leds-mc13783: Rename unit to indicate various
+ MC13xxx chips support
+In-Reply-To: <1370421279-23348-1-git-send-email-shc_work@mail.ru>
+References: <1370421279-23348-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1370421279-23348-4-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is series for add MC13892 LED support into mc13783 (mc13xxx) LED driver.
-Further development of drivers I see it as follows:
-I think that we need to replace all the variables from the platform_data
-to the default register values (reg0=xxx, reg1=xxx etc.).
-It is not too complicate the use of platform_data and will add DT-support
-for the driver.
-Comments are welcome.
 
-Alexander Shiyan (4):
-  leds: leds-mc13783: Prepare driver to support MC13892 LEDs
-  leds: leds-mc13783: Add MC13892 LED support
-  leds: leds-mc13783: Rename unit to indicate various MC13xxx chips
-    support
-  leds: leds-mc13xxx: Use module_platform_driver_probe for driver
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ arch/arm/configs/imx_v4_v5_defconfig            | 2 +-
+ drivers/leds/Kconfig                            | 8 ++++----
+ drivers/leds/Makefile                           | 2 +-
+ drivers/leds/{leds-mc13783.c => leds-mc13xxx.c} | 0
+ 4 files changed, 6 insertions(+), 6 deletions(-)
+ rename drivers/leds/{leds-mc13783.c => leds-mc13xxx.c} (100%)
 
- arch/arm/configs/imx_v4_v5_defconfig |   2 +-
- drivers/leds/Kconfig                 |   8 +-
- drivers/leds/Makefile                |   2 +-
- drivers/leds/leds-mc13783.c          | 391 -------------------------
- drivers/leds/leds-mc13xxx.c          | 545 +++++++++++++++++++++++++++++++++++
- include/linux/mfd/mc13xxx.h          |  49 +++-
- 6 files changed, 586 insertions(+), 411 deletions(-)
- delete mode 100644 drivers/leds/leds-mc13783.c
- create mode 100644 drivers/leds/leds-mc13xxx.c
-
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index f07a847..7fd9f9b 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -166,7 +166,7 @@ CONFIG_MMC_MXC=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
+ CONFIG_LEDS_GPIO=y
+-CONFIG_LEDS_MC13783=y
++CONFIG_LEDS_MC13XXX=y
+ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_TIMER=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
+index ef99229..c9a4eb2 100644
+--- a/drivers/leds/Kconfig
++++ b/drivers/leds/Kconfig
+@@ -387,13 +387,13 @@ config LEDS_DELL_NETBOOKS
+ 	  This adds support for the Latitude 2100 and similar
+ 	  notebooks that have an external LED.
+ 
+-config LEDS_MC13783
+-	tristate "LED Support for MC13783 PMIC"
++config LEDS_MC13XXX
++	tristate "LED Support for MC13XXX PMIC"
+ 	depends on LEDS_CLASS
+-	depends on MFD_MC13783
++	depends on MFD_MC13XXX
+ 	help
+ 	  This option enable support for on-chip LED drivers found
+-	  on Freescale Semiconductor MC13783 PMIC.
++	  on Freescale Semiconductor MC13783/MC13892 PMIC.
+ 
+ config LEDS_NS2
+ 	tristate "LED support for Network Space v2 GPIO LEDs"
+diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+index ac28977..70329f7 100644
+--- a/drivers/leds/Makefile
++++ b/drivers/leds/Makefile
+@@ -45,7 +45,7 @@ obj-$(CONFIG_LEDS_INTEL_SS4200)		+= leds-ss4200.o
+ obj-$(CONFIG_LEDS_LT3593)		+= leds-lt3593.o
+ obj-$(CONFIG_LEDS_ADP5520)		+= leds-adp5520.o
+ obj-$(CONFIG_LEDS_DELL_NETBOOKS)	+= dell-led.o
+-obj-$(CONFIG_LEDS_MC13783)		+= leds-mc13783.o
++obj-$(CONFIG_LEDS_MC13XXX)		+= leds-mc13xxx.o
+ obj-$(CONFIG_LEDS_NS2)			+= leds-ns2.o
+ obj-$(CONFIG_LEDS_NETXBIG)		+= leds-netxbig.o
+ obj-$(CONFIG_LEDS_ASIC3)		+= leds-asic3.o
+diff --git a/drivers/leds/leds-mc13783.c b/drivers/leds/leds-mc13xxx.c
+similarity index 100%
+rename from drivers/leds/leds-mc13783.c
+rename to drivers/leds/leds-mc13xxx.c
 -- 
 1.8.1.5
