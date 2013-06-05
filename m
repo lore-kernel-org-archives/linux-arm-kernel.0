@@ -1,52 +1,64 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 6 Jun 2013 08:47:33 +0900
-Subject: [PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
-In-Reply-To: <20130605192019.GG18614@n2100.arm.linux.org.uk>
-References: <20130605073410.15758.37563.sendpatchset@w520>
- <20130605073418.15758.93704.sendpatchset@w520>
- <20130605192019.GG18614@n2100.arm.linux.org.uk>
-Message-ID: <CANqRtoRXDpdzTxJAZRe1cAVg0sPj8UuVfkR_bFUY-sKe7gnHUg@mail.gmail.com>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Thu, 6 Jun 2013 00:52:42 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAKON4Oz79hUE_ReAqjeynwL6ZWntX2W1uw3YOg0G2AiY7Gjs=g@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <CAKON4Oz79hUE_ReAqjeynwL6ZWntX2W1uw3YOg0G2AiY7Gjs=g@mail.gmail.com>
+Message-ID: <CAPweEDyO+Sc1aQ64HBeh1OSzmPNsnwMwEo5kbHSan5vw_YEjXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Thu, Jun 6, 2013 at 12:40 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
 
-On Thu, Jun 6, 2013 at 4:20 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Wed, Jun 05, 2013 at 04:34:18PM +0900, Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
->>
->> Introduce SHMOBILE_FIXUP() as a helper function to
->> allow boards to specify their memory base and size.
+> I have a Cubieboard and I have a pca9532 on my desk. Now I want to
+> attach this pca9532 to the Cubieboard so I wire them together on I2C.
 >
-> No.  I really don't like this idea (we've had people doing this in the
-> past and I went around removing all that crap, and adding command line
-> options into the defconfig files for those boards.)
->
-> I also fail to understand why in 2013, some 11 years after ATAG stuff
-> was created, people _still_ can't get pass correct information into
-> the kernel.
->
-> It's exactly this kind of issue which makes me believe that stuff like
-> ACPI, UEFI and DT are doomed to fail on ARM because this kind of problem
-> constantly crops up time and time again.  People have seem to have this
-> total inability to get the pre-kernel environment right.
+> How is the Allwinner kernel going to load the driver for the pca9532?
+> The mainline pca9532 driver does not understand fex so it can't read
+> the necessary initialization data.
 
-Thanks for your comments. As you probably saw in patch 00/06, the goal
-with this series is to remove CONFIG_MEMORY_START/SIZE from
-mach-shmobile.
+ jon: you're immediately outside of the target market for which
+allwinner designed and deployed script.fex.
 
-I myself am quite happy to keep on using the kernel configuration to
-describe the main memory window like today, this is exactly how we
-used to do it on SH as well. What is a bit difficult is that we for
-mach-shmobile are requested to consolidate the kernel configurations
-and move to CONFIG_MULTIPLATFORM.
+> Luke, you of all people should see what is going on. Take an EOMA
+> module based on an A10. Now plug it into ten different hosts with
+> widely varying hardware support - like each of the ten hosts has a
+> different lm-sensor type chip. Where are the fex drivers for those ten
+> different lm-sensor chips going to come from? We already have DT
+> support for them.
 
-My main concern is that I'd like to keep per-board memory
-configuration somewhere, just removing it seems like a regression in
-usefulness to me. Do you have any recommendation for me how to
-proceed?
+ that's fantastic, because as you can see, the two systems complement
+each other.
 
-Thanks,
+> fex is only supported on the small number of peripheral chips
+> Allwinner has blessed. Use any chip outside of that set and it isn't
+> going to boot.
 
-/ magnus
+ eeexactly.  i did say "target market".
+
+ so, we have a clear illustration that neither script.fex nor
+devicetree actually help solve the "chip proliferation" problem.  but
+that's another story, and getting off-topic.
+
+ what i need is a clear set of proposals, discussed and then the best
+one(s) that people can come up with be then summarised so that i can
+get them clearly and succinctly across to allwinner, along with the
+benefits to allwinner of each of the options.
+
+ time is of the essence, speaking of which i'm pushing things to the
+limit including my health so i *really* have to go, i'm going to leave
+this up to everyone to discuss, please nominate someone to email me
+directly [on a different subject] so that i can read the proposals
+summaries should people choose to write any.
+
+ thanks.
+
+l.
