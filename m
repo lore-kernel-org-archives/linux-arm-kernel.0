@@ -1,22 +1,36 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 05 Jun 2013 15:13:05 +0100
-Subject: Cache issues in vexpress cpu shutdown (regression in 3.10)
-In-Reply-To: <20130605135831.GE11402@mudshark.cambridge.arm.com>
-References: <1370430551.3387.11.camel@linaro1.home>
- <20130605113912.GE18614@n2100.arm.linux.org.uk>
- <20130605115046.GA11402@mudshark.cambridge.arm.com>
- <1370439902.3446.15.camel@linaro1.home>
- <20130605135831.GE11402@mudshark.cambridge.arm.com>
-Message-ID: <1370441585.4507.18.camel@hornet>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 5 Jun 2013 10:15:39 -0400 (EDT)
+Subject: [RFC PATCH v2 0/2] drivers: mfd: Versatile Express SPC support
+In-Reply-To: <1370432767-6620-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1370432767-6620-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <alpine.LFD.2.03.1306051008590.1200@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2013-06-05 at 14:58 +0100, Will Deacon wrote:
-> Hence my question earlier on: does any platform other than VE actually have
-> a pre r1p0 A9 in it? 
+On Wed, 5 Jun 2013, Lorenzo Pieralisi wrote:
 
-Not to my knowledge, no. Even the earliest OMAP4s were r1px (and there
-was nothing between r0p1 and r1p0). I'll try to ask the hardware support
-people - if anyone knows otherwise, it's them.
+> This patch is v2 of a previous posting:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170624.html
+> 
+> V2 changes:
+> 
+> - Dropped timeout interface patch
+> - Converted interfaces to non-timeout ones, integrated and retested
+> - Removed mutex used at init
+> - Refactored code to work around init sections warning
+> - Fixed interface type enumeration init
+> - Fixed data write in SYSCFG write commands
+> 
+> This patch series introduces support for the Versatile Express Serial
+> Power Controller (SPC) present in ARM Versatile Express TC2 core tiles.
+> SPC driver is a fundamental component of TC2 power management and allows
+> to carry out C-state management and DVFS for A15 and A7 clusters.
+[...]
 
-Pawe?
+The MCPM backend for TC2 obviously depends on these patches and it 
+should probably be merged via the ARM SoC tree.  Could those patches go 
+with it as well?  If so, Samuel's ACK would be appreciated.
+
+
+Nicolas
