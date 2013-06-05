@@ -1,64 +1,65 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Wed, 05 Jun 2013 16:01:58 +0400
-Subject: =?UTF-8?B?UmVbMl06IFtQQVRDSCAxLzJdIGh3bW9uOiBtYzEzNzgzLWFkYzogUmVmYWN0?=
- =?UTF-8?B?b3Igc291cmNlIHRvIGluZGljYXRlIHZhcmlvdXMgbWMxM3h4eCBjaGlwcw==?=
-In-Reply-To: <20130605134530.12e8b7c2@endymion.delvare>
-References: <1370422628-1073-1-git-send-email-shc_work@mail.ru>
- <1370430879.384973987@f91.mail.ru>
- <20130605134530.12e8b7c2@endymion.delvare>
-Message-ID: <1370433718.509579856@f214.mail.ru>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 5 Jun 2013 13:05:39 +0100
+Subject: Cache issues in vexpress cpu shutdown (regression in 3.10)
+In-Reply-To: <20130605113912.GE18614@n2100.arm.linux.org.uk>
+References: <1370430551.3387.11.camel@linaro1.home>
+ <20130605113912.GE18614@n2100.arm.linux.org.uk>
+Message-ID: <20130605120539.GC32505@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-
-?????,  5 ???? 2013, 13:45 +02:00 ?? Jean Delvare <khali@linux-fr.org>:
-> On Wed, 05 Jun 2013 15:14:39 +0400, Alexander Shiyan wrote:
-> > > Let's look at it from another angle. What problem are you trying to
-> > > solve? I see absolutely no problem with the current function and file
-> > > names. Almost all Linux kernel drivers support more chips than their
-> > > name says.
-> > > 
-> > > On the other hand, changing all function names makes backporting fixes
-> > > harder, and changing Kconfig symbol names makes upgrading to the new
-> > > kernel version harder for everyone.
-> > > 
-> > > So the cost of your proposal far outweighs the benefits.
+On Wed, Jun 05, 2013 at 12:39:12PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 05, 2013 at 12:09:11PM +0100, Jon Medhurst (Tixy) wrote:
+> > I've been investigating why reboot fails on Versatile Express with the
+> > CA9x4 CoreTile and the problem seems to get triggered by commit bca7a5a0
+> > (ARM: cpu hotplug: remove majority of cache flushing from platforms).
 > > 
-> > Well, let's leave the kconfig symbol as is. But about the rest, that mc13783_*
-> > symbols in the log (debug) will say a developer who does not know about
-> > mc13892 compatibility with mc13783? I still believe that this should be reflected.
+> > Putting back the flush_cache_all() removed by this patch in
+> > mach-vexpress/hotplug.c gets reboot working again. Without that I see
+> > the following during shutdown:
+> > 
+> > CPU 2 is in _cpu_down called from disable_nonboot_cpus, and is spinning
+> > in the loop:
+> > 
+> > 	while (!idle_cpu(cpu))
+> > 		cpu_relax();
+> > 
+> > cpu == 1 here and idle_cpu() is constantly returning false because
+> > rq->curr != rq->idle and it looks like the runqueue has one process:
+> > that which issued the 'reboot' command.
+> > 
+> > CPU 1 is spinning in platform_do_lowpower and waiting for pen release to
+> > equal 1 (it's -1). Looks like it got there via the smp_ops.cpu_die(cpu)
+> > call in cpu_die.
 > 
-> You're splitting hairs here. mc13783_* symbols in the log mean this
-> comes from a driver named mc13783, period. A developer drawing
-> conclusions beyond that needs to be educated. Which device the driver
-> is driving can be retried from the log itself, or from sysfs. Or the
-> hardware board datasheet. "mc13xxx" would tell no more, BTW.
+> This sounds like CPU2 hasn't seen the updates to CPU1 inspite of pushing
+> the contents of CPU1's cache out to point of unification in the inner
+> sharable domain (the point where all CPUs should see the same view.)
 > 
-> Also note that the name mc13xxx is wrong as well, as the mc13xxx-i2c
-> and mc13xxx-spi drivers handle the MC34708 chip too. So you'd have to
-> name all these drivers and functions mcxxxxx* to cover all the
-> supported chip. Which makes no sense at all, because so many x's are
-> confusing, and because the mask then matches many devices the drivers
-> do _not_ handle.
+> Are you able to look at what's visible in the caches for both CPUs for
+> things like rq->curr for CPU 1?
 > 
-> So please forget about this and move on to something else. There are
-> many many code cleanups and improvements, and bug fixes, all way more
-> important than this. So I'm sure you can find better ways to spend your
-> time, and mine.
+> I wonder if - even though we've pushed it out of CPU 1's local cache,
+> whether there's still something to do with the coherency stuff which
+> remains incomplete.
+> 
+> Either way, this has significant implications for everyone who uses
+> flush_cache_louis() in paths where the CPU loses state - it means that
+> something is wrong with the way data is pushed out of the CPU.
+> 
+> > I'm a bit stumped by all this as I don't see why flush_cache_louis is
+> > apparently insufficient to get changes on one core seen by the other.
+> 
+> Could it be that flush_cache_louis() doesn't actually do what it claims
+> to?
 
-Agree, we have a lot of places in the kernel to be cleared.
-For the same driver MC13XXX, at least we need to remove a useless symbol
-MFD_M13783 which is selected automatically if we select MFD_MC13XXX, 
-mc13xxx_lock/unlock functions in the driver has long been not needed because
-we use regmap etc.
-But to start in my opinion you need with just such trifles as rename etc...
-But even at this stage of obstacles have come up against ...
-Well, by and large it does not change code but rather a grooming code, 
-so I can easily give it up. But, in my opinion, the purity and clarity of the code
-has never harmed.
-OK, lets drop these patches.
-Thanks.
+There is an A9 errata (fixed in r1p0) whereby CLIDR[23:21] reads as 0
+where it should read as 3'b001, so basically flush_cache_louis is not
+flushing anything. If that's the problem, either we add a generic fix
+in v7 cache assembly or we just fix it in platform code (by calling
+flush_cache_all()), since there should not be many pre-r1p0 around.
 
----
+Please let me know what you think.
+
+Thanks,
+Lorenzo
