@@ -1,51 +1,129 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 13:32:27 +0900
-Subject: [PATCH 0/4] Update for Renesas INTC External IRQ pin driver for v3.11
-Message-ID: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
+Date: Wed,  5 Jun 2013 13:32:15 +0900
+Subject: [PATCH 6/7] ARM: shmobile: kzm9g-reference: add AS3711 and CPUFreq DT
+ bindings
+In-Reply-To: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370406736-32272-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+This adds DT bindings for an AS3711 PMIC, used for supplying power to the
+CPU, some peripherals and the backlight, as well as extends the cpu0 DT
+node with OPPs and a reference to the PMIC to support the CPUFreq and
+CPU DVFS functions.
 
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/sh73a0-kzm9g-reference.dts | 86 ++++++++++++++++++++++++++++
+ 1 file changed, 86 insertions(+)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq-for-v3.11
-
-for you to fetch changes up to 14d064ad3881f47ae0a6f247c992652053c7f4d5:
-
-  irqchip: Add irqchip_init dummy function (2013-05-22 21:55:41 +0900)
-
-----------------------------------------------------------------
-Update for Renesas INTC External IRQ pin driver for v3.11
-
-Add runtime PM support
-Add DT binding for sense bitfield width
-Correct error handing in irqc_probe
-Add irqchip_init dummy function
-
-----------------------------------------------------------------
-Axel Lin (1):
-      irqchip: renesas-irqc: Fix irqc_probe error handling
-
-Bastian Hecht (1):
-      irqchip: Add irqchip_init dummy function
-
-Guennadi Liakhovetski (1):
-      irqchip: renesas-intc-irqpin: DT binding for sense bitfield width
-
-Simon Horman (1):
-      irqchip: irqc: Add runtime PM support
-
- .../bindings/interrupt-controller/renesas,intc-irqpin.txt   | 13 +++++++++++++
- drivers/irqchip/irq-renesas-intc-irqpin.c                   |  4 ++++
- drivers/irqchip/irq-renesas-irqc.c                          | 12 ++++++++++--
- include/linux/irqchip.h                                     |  4 ++++
- 4 files changed, 31 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-
+diff --git a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+index 5972abb..b6f759e 100644
+--- a/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
++++ b/arch/arm/boot/dts/sh73a0-kzm9g-reference.dts
+@@ -18,6 +18,19 @@
+ 	model = "KZM-A9-GT";
+ 	compatible = "renesas,kzm9g-reference", "renesas,sh73a0";
+ 
++	cpus {
++		cpu at 0 {
++			cpu0-supply = <&vdd_dvfs>;
++			operating-points = <
++				/* kHz  uV */
++				1196000 1315000
++				 598000 1175000
++				 398667 1065000
++			>;
++			voltage-tolerance = <1>; /* 1% */
++		};
++	};
++
+ 	chosen {
+ 		bootargs = "console=tty0 console=ttySC4,115200 root=/dev/nfs ip=dhcp ignore_loglevel earlyprintk=sh-sci.4,115200";
+ 	};
+@@ -59,6 +72,79 @@
+ 	};
+ };
+ 
++&i2c0 {
++	as3711 at 40 {
++		compatible = "ams,as3711";
++		reg = <0x40>;
++
++		regulators {
++			vdd_dvfs: sd1 {
++				regulator-name = "1.315V CPU";
++				regulator-min-microvolt = <1050000>;
++				regulator-max-microvolt = <1350000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			sd2 {
++				regulator-name = "1.8V";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			sd4 {
++				regulator-name = "1.215V";
++				regulator-min-microvolt = <1215000>;
++				regulator-max-microvolt = <1235000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo2 {
++				regulator-name = "2.8V CPU";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo3 {
++				regulator-name = "3.0V CPU";
++				regulator-min-microvolt = <3000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo4 {
++				regulator-name = "2.8V";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo5 {
++				regulator-name = "2.8V #2";
++				regulator-min-microvolt = <2800000>;
++				regulator-max-microvolt = <2800000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo7 {
++				regulator-name = "1.15V CPU";
++				regulator-min-microvolt = <1150000>;
++				regulator-max-microvolt = <1150000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++			ldo8 {
++				regulator-name = "1.15V CPU #2";
++				regulator-min-microvolt = <1150000>;
++				regulator-max-microvolt = <1150000>;
++				regulator-always-on;
++				regulator-boot-on;
++			};
++		};
++	};
++};
++
+ &mmcif {
+ 	bus-width = <8>;
+ 	vmmc-supply = <&reg_1p8v>;
 -- 
 1.8.2.1
