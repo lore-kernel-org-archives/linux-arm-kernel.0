@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:18 +0900
-Subject: [PATCH 087/130] ARM: shmobile: r8a7740: Remove SCIF function GPIOs
+Date: Wed,  5 Jun 2013 17:26:21 +0900
+Subject: [PATCH 090/130] ARM: shmobile: r8a7740: Remove GETHER function GPIOs
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-88-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-91-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,93 +15,42 @@ unneeded, remove them.
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7740.h | 74 ---------------------------
- 1 file changed, 74 deletions(-)
+ arch/arm/mach-shmobile/include/mach/r8a7740.h | 23 -----------------------
+ 1 file changed, 23 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-index abdc4d4..bb207d8 100644
+index 61cff39..0db82aa 100644
 --- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
 +++ b/arch/arm/mach-shmobile/include/mach/r8a7740.h
-@@ -165,80 +165,6 @@ enum {
- 	GPIO_FN_FMSOOBT,	GPIO_FN_FMSOSLD,
- 	GPIO_FN_FMSOCK,
+@@ -331,29 +331,6 @@ enum {
+ 	GPIO_FN_IDE_INT,	GPIO_FN_IDE_RST,	GPIO_FN_IDE_DIRECTION,
+ 	GPIO_FN_IDE_EXBUF_ENB,	GPIO_FN_IDE_IODACK,	GPIO_FN_IDE_IODREQ,
  
--	/* SCIFA0 */
--	GPIO_FN_SCIFA0_SCK,	GPIO_FN_SCIFA0_CTS,
--	GPIO_FN_SCIFA0_RTS,	GPIO_FN_SCIFA0_RXD,
--	GPIO_FN_SCIFA0_TXD,
+-	/* RMII */
+-	GPIO_FN_RMII_CRS_DV,	GPIO_FN_RMII_RX_ER,	GPIO_FN_RMII_RXD0,
+-	GPIO_FN_RMII_RXD1,	GPIO_FN_RMII_TX_EN,	GPIO_FN_RMII_TXD0,
+-	GPIO_FN_RMII_MDC,	GPIO_FN_RMII_TXD1,	GPIO_FN_RMII_MDIO,
+-	GPIO_FN_RMII_REF50CK,	/* for RMII */
+-	GPIO_FN_RMII_REF125CK,	/* for GMII */
 -
--	/* SCIFA1 */
--	GPIO_FN_SCIFA1_CTS,	GPIO_FN_SCIFA1_SCK,
--	GPIO_FN_SCIFA1_RXD,	GPIO_FN_SCIFA1_TXD,
--	GPIO_FN_SCIFA1_RTS,
+-	/* GEther */
+-	GPIO_FN_ET_TX_CLK,	GPIO_FN_ET_TX_EN,	GPIO_FN_ET_ETXD0,
+-	GPIO_FN_ET_ETXD1,	GPIO_FN_ET_ETXD2,	GPIO_FN_ET_ETXD3,
+-	GPIO_FN_ET_ETXD4,	GPIO_FN_ET_ETXD5, /* for GEther */
+-	GPIO_FN_ET_ETXD6,	GPIO_FN_ET_ETXD7, /* for GEther */
+-	GPIO_FN_ET_COL,		GPIO_FN_ET_TX_ER,
+-	GPIO_FN_ET_RX_CLK,	GPIO_FN_ET_RX_DV,
+-	GPIO_FN_ET_ERXD0,	GPIO_FN_ET_ERXD1,
+-	GPIO_FN_ET_ERXD2,	GPIO_FN_ET_ERXD3,
+-	GPIO_FN_ET_ERXD4,	GPIO_FN_ET_ERXD5, /* for GEther */
+-	GPIO_FN_ET_ERXD6,	GPIO_FN_ET_ERXD7, /* for GEther */
+-	GPIO_FN_ET_RX_ER,	GPIO_FN_ET_CRS,
+-	GPIO_FN_ET_MDC,		GPIO_FN_ET_MDIO,
+-	GPIO_FN_ET_LINK,	GPIO_FN_ET_PHY_INT,
+-	GPIO_FN_ET_WOL,		GPIO_FN_ET_GTX_CLK,
 -
--	/* SCIFA2 */
--	GPIO_FN_SCIFA2_SCK_PORT22, /* SCIFA2_SCK Port 22/199 */
--	GPIO_FN_SCIFA2_SCK_PORT199,
--	GPIO_FN_SCIFA2_RXD,	GPIO_FN_SCIFA2_TXD,
--	GPIO_FN_SCIFA2_CTS,	GPIO_FN_SCIFA2_RTS,
--
--	/* SCIFA3 */
--	GPIO_FN_SCIFA3_RTS_PORT105, /* MSEL5CR_8_0 */
--	GPIO_FN_SCIFA3_SCK_PORT116,
--	GPIO_FN_SCIFA3_CTS_PORT117,
--	GPIO_FN_SCIFA3_RXD_PORT174,
--	GPIO_FN_SCIFA3_TXD_PORT175,
--
--	GPIO_FN_SCIFA3_RTS_PORT161, /* MSEL5CR_8_1 */
--	GPIO_FN_SCIFA3_SCK_PORT158,
--	GPIO_FN_SCIFA3_CTS_PORT162,
--	GPIO_FN_SCIFA3_RXD_PORT159,
--	GPIO_FN_SCIFA3_TXD_PORT160,
--
--	/* SCIFA4 */
--	GPIO_FN_SCIFA4_RXD_PORT12, /* MSEL5CR[12:11] = 00 */
--	GPIO_FN_SCIFA4_TXD_PORT13,
--
--	GPIO_FN_SCIFA4_RXD_PORT204, /* MSEL5CR[12:11] = 01 */
--	GPIO_FN_SCIFA4_TXD_PORT203,
--
--	GPIO_FN_SCIFA4_RXD_PORT94, /* MSEL5CR[12:11] = 10 */
--	GPIO_FN_SCIFA4_TXD_PORT93,
--
--	GPIO_FN_SCIFA4_SCK_PORT21, /* SCIFA4_SCK Port 21/205 */
--	GPIO_FN_SCIFA4_SCK_PORT205,
--
--	/* SCIFA5 */
--	GPIO_FN_SCIFA5_TXD_PORT20, /* MSEL5CR[15:14] = 00 */
--	GPIO_FN_SCIFA5_RXD_PORT10,
--
--	GPIO_FN_SCIFA5_RXD_PORT207, /* MSEL5CR[15:14] = 01 */
--	GPIO_FN_SCIFA5_TXD_PORT208,
--
--	GPIO_FN_SCIFA5_TXD_PORT91, /* MSEL5CR[15:14] = 10 */
--	GPIO_FN_SCIFA5_RXD_PORT92,
--
--	GPIO_FN_SCIFA5_SCK_PORT23, /* SCIFA5_SCK Port 23/206 */
--	GPIO_FN_SCIFA5_SCK_PORT206,
--
--	/* SCIFA6 */
--	GPIO_FN_SCIFA6_SCK,	GPIO_FN_SCIFA6_RXD,	GPIO_FN_SCIFA6_TXD,
--
--	/* SCIFA7 */
--	GPIO_FN_SCIFA7_TXD,	GPIO_FN_SCIFA7_RXD,
--
--	/* SCIFAB */
--	GPIO_FN_SCIFB_SCK_PORT190, /* MSEL5CR_17_0 */
--	GPIO_FN_SCIFB_RXD_PORT191,
--	GPIO_FN_SCIFB_TXD_PORT192,
--	GPIO_FN_SCIFB_RTS_PORT186,
--	GPIO_FN_SCIFB_CTS_PORT187,
--
--	GPIO_FN_SCIFB_SCK_PORT2, /* MSEL5CR_17_1 */
--	GPIO_FN_SCIFB_RXD_PORT3,
--	GPIO_FN_SCIFB_TXD_PORT4,
--	GPIO_FN_SCIFB_RTS_PORT172,
--	GPIO_FN_SCIFB_CTS_PORT173,
--
- 	/* LCD0 */
- 	GPIO_FN_LCDC0_SELECT,
+ 	/* DMA0 */
+ 	GPIO_FN_DREQ0,		GPIO_FN_DACK0,
  
 -- 
 1.8.2.1
