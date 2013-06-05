@@ -1,50 +1,50 @@
-From: khali@linux-fr.org (Jean Delvare)
-Date: Wed, 5 Jun 2013 13:45:30 +0200
-Subject: [PATCH 1/2] hwmon: mc13783-adc: Refactor source to indicate
- various mc13xxx chips
-In-Reply-To: <1370430879.384973987@f91.mail.ru>
-References: <1370422628-1073-1-git-send-email-shc_work@mail.ru>
- <1370423952.906453652@f168.mail.ru>
- <20130605125308.36ba40ab@endymion.delvare>
- <1370430879.384973987@f91.mail.ru>
-Message-ID: <20130605134530.12e8b7c2@endymion.delvare>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed,  5 Jun 2013 12:46:05 +0100
+Subject: [RFC PATCH v2 0/2] drivers: mfd: Versatile Express SPC support
+Message-ID: <1370432767-6620-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Jun 2013 15:14:39 +0400, Alexander Shiyan wrote:
-> > Let's look at it from another angle. What problem are you trying to
-> > solve? I see absolutely no problem with the current function and file
-> > names. Almost all Linux kernel drivers support more chips than their
-> > name says.
-> > 
-> > On the other hand, changing all function names makes backporting fixes
-> > harder, and changing Kconfig symbol names makes upgrading to the new
-> > kernel version harder for everyone.
-> > 
-> > So the cost of your proposal far outweighs the benefits.
-> 
-> Well, let's leave the kconfig symbol as is. But about the rest, that mc13783_*
-> symbols in the log (debug) will say a developer who does not know about
-> mc13892 compatibility with mc13783? I still believe that this should be reflected.
+This patch is v2 of a previous posting:
 
-You're splitting hairs here. mc13783_* symbols in the log mean this
-comes from a driver named mc13783, period. A developer drawing
-conclusions beyond that needs to be educated. Which device the driver
-is driving can be retried from the log itself, or from sysfs. Or the
-hardware board datasheet. "mc13xxx" would tell no more, BTW.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170624.html
 
-Also note that the name mc13xxx is wrong as well, as the mc13xxx-i2c
-and mc13xxx-spi drivers handle the MC34708 chip too. So you'd have to
-name all these drivers and functions mcxxxxx* to cover all the
-supported chip. Which makes no sense at all, because so many x's are
-confusing, and because the mask then matches many devices the drivers
-do _not_ handle.
+V2 changes:
 
-So please forget about this and move on to something else. There are
-many many code cleanups and improvements, and bug fixes, all way more
-important than this. So I'm sure you can find better ways to spend your
-time, and mine.
+- Dropped timeout interface patch
+- Converted interfaces to non-timeout ones, integrated and retested
+- Removed mutex used at init
+- Refactored code to work around init sections warning
+- Fixed interface type enumeration init
+- Fixed data write in SYSCFG write commands
 
-Thanks,
+This patch series introduces support for the Versatile Express Serial
+Power Controller (SPC) present in ARM Versatile Express TC2 core tiles.
+SPC driver is a fundamental component of TC2 power management and allows
+to carry out C-state management and DVFS for A15 and A7 clusters.
+
+First patch provides changes required by SPC to comply with the
+Versatile Express config API, second patch is the SPC driver implementation.
+
+Code extensively exercised through CPUidle and CPUfreq power states and
+operating point transitions.
+
+Lorenzo Pieralisi (1):
+  drivers: mfd: vexpress: add Serial Power Controller (SPC) support
+
+Pawel Moll (1):
+  drivers: mfd: refactor the vexpress config bridge API
+
+ .../devicetree/bindings/mfd/vexpress-spc.txt       |  35 ++
+ drivers/mfd/Kconfig                                |   7 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/vexpress-config.c                      |  61 +-
+ drivers/mfd/vexpress-spc.c                         | 630 +++++++++++++++++++++
+ drivers/mfd/vexpress-sysreg.c                      |   2 +-
+ include/linux/vexpress.h                           |  59 +-
+ 7 files changed, 767 insertions(+), 28 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mfd/vexpress-spc.txt
+ create mode 100644 drivers/mfd/vexpress-spc.c
+
 -- 
-Jean Delvare
+1.8.2.2
