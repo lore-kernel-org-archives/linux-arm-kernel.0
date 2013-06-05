@@ -1,52 +1,42 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Wed, 05 Jun 2013 17:29:52 +0900
-Subject: [PATCH 01/05] ARM: shmobile: r8a73a4 SMP prototype v1 (CA15 x 4)
-In-Reply-To: <20130530085201.24374.97084.sendpatchset@w520>
-References: <20130530085152.24374.64208.sendpatchset@w520>
- <20130530085201.24374.97084.sendpatchset@w520>
-Message-ID: <51AEF700.7010003@renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 05 Jun 2013 10:29:56 +0200
+Subject: [PATCH 00/15] ARM: shmobile: uImage load address rework
+In-Reply-To: <20130605070616.13311.69049.sendpatchset@w520>
+References: <20130605070616.13311.69049.sendpatchset@w520>
+Message-ID: <2463304.ZF9315IS5c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On Wednesday 05 June 2013 16:06:16 Magnus Damm wrote:
+> ARM: shmobile: uImage load address rework
+> 
+> [PATCH 01/15] ARM: shmobile: Per-board uImage load addresses
+> [PATCH 02/15] ARM: shmobile: AG5EVM uImage rework
+> [PATCH 03/15] ARM: shmobile: AP4EVB uImage rework
+> [PATCH 04/15] ARM: shmobile: APE6EVM uImage rework
+> [PATCH 05/15] ARM: shmobile: Armadillo800EVA uImage rework
+> [PATCH 06/15] ARM: shmobile: Bock-W uImage rework
+> [PATCH 07/15] ARM: shmobile: Bonito uImage rework
+> [PATCH 08/15] ARM: shmobile: KZM9D uImage rework
+> [PATCH 09/15] ARM: shmobile: KZM9G uImage rework
+> [PATCH 10/15] ARM: shmobile: Kota2 uImage rework
+> [PATCH 11/15] ARM: shmobile: Lager uImage rework
+> [PATCH 12/15] ARM: shmobile: Mackerel uImage rework
+> [PATCH 13/15] ARM: shmobile: Marzen uImage rework
+> [PATCH 14/15] ARM: shmobile: Armadillo800EVA reference uImage rework
+> [PATCH 15/15] ARM: shmobile: Remove MEMORY_START uImage load address
+> 
+> Rework the mach-shmobile uImage load address calculation by storing
+> the per-board load addresses in Makefile.boot. This removes the
+> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
+> it possible to create safe kernel images that boot on multiple boards.
+> 
+> This is one of several series of code that reworks code not to rely on
+> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
 
-On 5/30/2013 5:52 PM, Magnus Damm wrote:
-> --- 0003/arch/arm/boot/dts/r8a73a4.dtsi
-> +++ work/arch/arm/boot/dts/r8a73a4.dtsi	2013-05-22 13:21:21.000000000 +0900
-> @@ -25,6 +25,27 @@
->  			reg = <0>;
->  			clock-frequency = <1500000000>;
->  		};
-> +
-> +		cpu1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <1>;
-> +			clock-frequency = <1500000000>;
-> +		};
-> +
-> +		cpu2: cpu at 2 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <2>;
-> +			clock-frequency = <1500000000>;
-> +		};
-> +
-> +		cpu3: cpu at 3 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a15";
-> +			reg = <3>;
-> +			clock-frequency = <1500000000>;
-> +		};
->  	};
+Looks good to me. I just really wouldn't bother creating so many patches
+for this when you just modify a single file multiple times. A single
+patch would be just as good, unless you are desperate to top the LWN
+patch statistics ;-)
 
-The frequency of the EXTAL on APE6EVM machine is 26MHz, and the Generic
-Timers are clocked at EXTAL x1/2 (=13MHz).  Do not copy-and-paste wrong
-clock-frequency properties currently we have, but fix cpu0 along with
-adding cpu1..3, please.
-
-Furthermore you don't have (should not) to use clock-frequency property
-if you set up CNTFRQ to an appropriate value one by one in PATCH 05/05.
---
-Shinya Kuribayashi
-Renesas Electronics
+	Arnd
