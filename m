@@ -1,96 +1,69 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Wed, 5 Jun 2013 19:40:18 -0400
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+From: lkcl@lkcl.net (Luke Kenneth Casson Leighton)
+Date: Thu, 6 Jun 2013 00:46:14 +0100
+Subject: getting allwinner SoC support upstream (was Re: Uploading linux
+ (3.9.4-1))
+In-Reply-To: <31150421.hoVuV4C56M@flatron>
 References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
-Message-ID: <CAKON4Oz79hUE_ReAqjeynwL6ZWntX2W1uw3YOg0G2AiY7Gjs=g@mail.gmail.com>
+ <19865137.ey1FePPnmD@flatron>
+ <CAPweEDzk0T+fZ1aW16D8K4XpvRR2GRrOFtfcjzstnmEJWxmREg@mail.gmail.com>
+ <31150421.hoVuV4C56M@flatron>
+Message-ID: <CAPweEDyiH_F24fV5_S=a17c=YW-j4gyVaOP030HNONayLGSy0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 5, 2013 at 7:26 PM, luke.leighton <luke.leighton@gmail.com> wrote:
-> On Thu, Jun 6, 2013 at 12:07 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> On Wed, Jun 5, 2013 at 6:47 PM, luke.leighton <luke.leighton@gmail.com> wrote:
->>> On Wed, Jun 5, 2013 at 10:59 PM, Henrik Nordstr?m
->>> <henrik@henriknordstrom.net> wrote:
->>>
->>>>>  .... and then there's the boot0 and boot1 loaders, these *do* have
->>>
->>>> no, these are not tiny. boot0 is 24KB to fit the initial embedded SRAM
->>>> (not cache), but boot1 is on pair with u-boot in size and runs from
->>>> DRAM.
->>>
->>>  btw, please listen to henrik: he knows what he's talking about, as
->>> you can see :)   henrik, thank you for correcting my technical
->>> misunderstandings, i'll try to remember them and not propagate
->>> incorrect stuff.
->>
->> This is not about the fex syntax or uboot. The root problem is needing
->> two sets of binding for every device driver in the kernel. Pick a
->> random driver like gpio-pca953x.c and look at the source. In that file
->> there are #ifdef CONFIG_OF_ sections. Those sections are directly
->> reading the FDT binary via calls like of_get_property(node,
->> "linux,gpio-base", &size);. If fex is added to the kernel every driver
->> driver will now need both a #ifdef CONFIG_OF_ section and also a
->> #ifdef CONFIG_FEX_ section. Doing that is just crazy.
->
->  yes.  which is why they haven't done it.
->
->> Is Allwinner
->> going to add fex support to every single device driver in the kernel?
->
->  no john - they've only added it to the multiplexed sections of the
-> drivers which they themselves have written.  such as
-> drivers/usb/sun{N}i_usb/*.[ch], drivers/block/nand/sun{N}_i,
-> arch/arm/mach-sun{N}i and so on.
->
-> even the touchscreen driver that they wrote, that's got nothing to do
-> with any other code in the touchscreen linux kernel source tree: it's
-> more of a "meta-"driver which even has the name of the linux kernel
-> module that needs to be loaded and what I2C address, GPIO options etc.
-> to pass in [normally done as modprobe options in userspace].
->
->  to be honest, there are better people to fully answer this question
-> (alejandro and henrik are two that spring to mind) but you're
-> definitely off-base, jon.  the script.fex system deals with the pinmux
-> issue in a very neat way that:
+On Thu, Jun 6, 2013 at 12:27 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-I have a Cubieboard and I have a pca9532 on my desk. Now I want to
-attach this pca9532 to the Cubieboard so I wire them together on I2C.
+>>  their sheer overwhelming success provides us with mass-volume
+>> ultra-low cost hardware.  to not make an effort to accommodate them
+>> would in this specific instance be a huge missed opportunity,
 
-How is the Allwinner kernel going to load the driver for the pca9532?
-The mainline pca9532 driver does not understand fex so it can't read
-the necessary initialization data.
+> OK, this is a large volume of hardware that can be used to run free
+> software, point taken.
 
-Luke, you of all people should see what is going on. Take an EOMA
-module based on an A10. Now plug it into ten different hosts with
-widely varying hardware support - like each of the ten hosts has a
-different lm-sensor type chip. Where are the fex drivers for those ten
-different lm-sensor chips going to come from? We already have DT
-support for them.
+ as it's a shorter URL by 200% than the original it refers to here's a link:
+   http://lists.phcomp.co.uk/pipermail/arm-netbook/2013-May/007532.html
 
-fex is only supported on the small number of peripheral chips
-Allwinner has blessed. Use any chip outside of that set and it isn't
-going to boot.
+ the key bit is a dec 2012 china visit by the author of that [insanely
+long, even by my standards] report, where he does a double-take,
+believing that he's mis-heard due to his poor understanding of
+chinese, and he *literally* goes into shock when he works out that
+he's been told that the 7in tablet being offered to him, even before
+"haggling", is $USD 35, and yet its specification neither blows nor
+sucks.
 
->
->   a) has very little impact on the rest of the kernel tree [citation
-> needed!  i'm saying that: could someone please confirm if it's true]
->
->   b) the linux kernel developers could, instead of criticising it,
-> actually learn a great deal from.
->
-> l.
+ with allwinner bringing out the A31, i really have absolutely no idea
+how any other company is going to compete in this market, except by
+adding extra value such as R.F. base-band and that's sewn up by
+mediatek.  the only saving grace for the competition is that
+allwinner, due to their inexperience, bought the imgtec kool-aid and
+deployed PowerVR's latest SGX545MP2 offering [*1]
 
 
+> I don't say that having mainline support for this platform wouldn't be
+> nice. Sure, it would. But if the company doesn't want to cooperate and
+> comply to existing rules, I don't think it can be helped.
 
---
-Jon Smirl
-jonsmirl at gmail.com
+ they've got no idea that there *are* any - they don't speak english!
+(and the team has a manager who is a fucking dickhead, who amongst
+other things has been responsible for disobeying the Director's
+explicit instructions to be GPL-compliant as well as ordering the
+team's engineers to create a script that destroys Allwinner Copyright
+notices and replaces it with Copyright 2010-2017 reilllumatech.com,
+but that's another story that's being addressed)
+
+ ok it's very late here tomasz, i'll read more of this tomorrow: i've
+started the discussion but i am actually completely overwhelmed so may
+have to leave it to people to get back to me with some options for
+proposals preferably by the beginning of next week (10th june) at the
+latest, to give allwinner an opportunity to go over this early.
+
+i'd greatly appreciate if people could run the gamut from one extreme
+to the other: ideas such as "why not put script.fex verbatim as a blob
+into a device-tree entry" all the way through to "why not rip
+script.fex out completely and convert everything to devicetree for
+them".
+
+l.
+
+[*1] http://www.youtube.com/watch?v=W-HCb55X_XU - 35 minutes in.  libv
+talking about why for god's sake don't ever get involved with powervr.
