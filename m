@@ -1,82 +1,232 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 5 Jun 2013 12:22:40 -0700
-Subject: [PATCH v2 0/7] pcmcia: at91_cf: clean up and add DT support
-In-Reply-To: <51AF0D2A.2@atmel.com>
-References: <cover.1363865228.git.nicolas.ferre@atmel.com>
- <CAHkwnC-aL=G9K9jttjD8Bk_ZKJ535vsGT26uCFbuFMeJUquYQw@mail.gmail.com>
- <516E628B.1000104@atmel.com> <20130419225448.GA8242@kroah.com>
- <51AF0D2A.2@atmel.com>
-Message-ID: <20130605192240.GA5647@kroah.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 5 Jun 2013 12:23:16 -0700
+Subject: [PATCH] ARM/KVM: save and restore generic timer registers
+In-Reply-To: <1370039952-20888-1-git-send-email-andre.przywara@linaro.org>
+References: <1370039952-20888-1-git-send-email-andre.przywara@linaro.org>
+Message-ID: <20130605192316.GB9640@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 12:04:26PM +0200, Nicolas Ferre wrote:
-> On 20/04/2013 00:54, Greg Kroah-Hartman :
-> >On Wed, Apr 17, 2013 at 10:51:23AM +0200, Nicolas Ferre wrote:
-> >>On 04/17/2013 10:39 AM, Fabio Porcedda :
-> >>>On Thu, Mar 21, 2013 at 12:40 PM, Nicolas Ferre <nicolas.ferre@atmel.com> wrote:
-> >>>>These patches clean up at91_cf a bit and add DT bindings.
-> >>>>It is based on a previous series from Joachim Eastwood and other cleanup
-> >>>>patches by Fabio and Laurent.
-> >>>>I have collected them together as they are lying around for some time.
-> >>>>
-> >>>>Please tell me if It can go through PCMCIA tree or if Andrew or Greg can
-> >>>>take them.
-> >>>>Note that they are not bug fixes, so you can stack them for 3.10.
-> >>>>
-> >>>>Thanks for your help, best regards.
-> >>>>
-> >>>>v2: add 2 more cleanup patches:
-> >>>>         - move to module_platform_driver_probe()
-> >>>>         - little trivial indentation fix
-> >>>>
-> >>>>Fabio Porcedda (1):
-> >>>>   pcmcia: at91_cf: use module_platform_driver_probe()
-> >>>>
-> >>>>Joachim Eastwood (5):
-> >>>>   pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
-> >>>>   pcmcia: at91_cf: convert to dev_ print functions
-> >>>>   pcmcia: at91_cf: use devm_ functions for allocations
-> >>>>   pcmcia: at91_cf: clean up header includes
-> >>>>   pcmcia: at91_cf: add support for DT
-> >>>>
-> >>>>Laurent Navet (1):
-> >>>>   pcmcia/trivial: at91_cf: fix checkpatch error
-> >>>>
-> >>>>  .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
-> >>>>  drivers/pcmcia/Kconfig                             |   2 +-
-> >>>>  drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
-> >>>>  3 files changed, 108 insertions(+), 89 deletions(-)
-> >>>>  create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
-> >>>>
-> >>>>--
-> >>>>1.8.0
-> >>>>
-> >>>
-> >>>Ping?
-> >>
-> >>Andrew, Greg, can you please take this series?
-> >>
-> >>Here is the post on lkml:
-> >>https://lkml.org/lkml/2013/3/21/246
-> >>
-> >>Here is the first patch in patchwork (1/7):
-> >>https://patchwork.kernel.org/patch/2312691/
-> >>
-> >>Tell me if I can do something else to make this applied upstream...
-> >
-> >The PCMCIA maintainer should take these, not me.
+On Sat, Jun 01, 2013 at 12:39:12AM +0200, Andre Przywara wrote:
+> For migration to work we need to save (and later restore) the state of
+> each cores virtual generic timer.
+> Since this is per VCPU, we can use the [gs]et_one_reg ioctl and just
+> need to add the three registers (control, counter, compare value) to
+> the list of saved registers. However we provide special accessor
+> functions to get the value of each register, since the content can
+> change anytime.
 > 
-> I know Greg, but this patch series is still not taken by anyone 3
-> months after its first submission and after several requests by both
-> Fabio and myself...
+> Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_asm.h  |  7 ++++++-
+>  arch/arm/include/asm/kvm_host.h |  3 +++
+>  arch/arm/include/uapi/asm/kvm.h | 16 ++++++++++++++++
+>  arch/arm/kvm/arch_timer.c       | 32 ++++++++++++++++++++++++++++++++
+>  arch/arm/kvm/coproc.c           | 30 ++++++++++++++++++++++++++++++
+>  5 files changed, 87 insertions(+), 1 deletion(-)
 > 
-> The series is still applying on linux-next today... Maybe it can go
-> via Andrew, then...
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 18d5032..a732b17 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -46,7 +46,12 @@
+>  #define c13_TID_URO	24	/* Thread ID, User R/O */
+>  #define c13_TID_PRIV	25	/* Thread ID, Privileged */
+>  #define c14_CNTKCTL	26	/* Timer Control Register (PL1) */
+> -#define NR_CP15_REGS	27	/* Number of regs (incl. invalid) */
+> +#define c14_CNTV_CTL	27	/* Virtual Timer Control Register */
+> +#define c14_CNTVCT	28	/* Virtual Timer Counter Register */
+> +#define c14_CNTVCT_high	29	/* Virtual Timer Counter Register */
+> +#define c14_CNTV_CVAL	30	/* Virtual Timer Counter Register */
+> +#define c14_CNTV_CVAL_high	31	/* Virtual Timer Counter Register */
+> +#define NR_CP15_REGS	32	/* Number of regs (incl. invalid) */
 
-I can take them through my char/misc driver tree if it's been that long
-of a delay, care to resend them to me?
+To avoid the extra storage overhead here I suggest you just export the
+registers using a separate number space for the ONE_REG ioctl instead of
+piggybacking on the cp15 exports.
 
-thanks,
+The main rationale being that the cp15 registers are optional to the
+architecture, which fits nicely with having the extra struct (which is a
+kconfig option) included in the vcpu struct.
 
-greg k-h
+The implementation is basically going to be the same, you just need to
+add specific handling for that number space, I recommend you use
+"coprocessor number 17" for this, so your pattern would look something
+like (note added benefit of direct 64 bit support):
+
+0x4020 0000 0013 <32 bit reg_id, indexed from 0:16>
+0x4030 0000 0013 <64 bit reg_id, indexed from 0:16>
+
+>  
+>  #define ARM_EXCEPTION_RESET	  0
+>  #define ARM_EXCEPTION_UNDEFINED   1
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 57cb786..80714ab 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -224,4 +224,7 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
+>  int kvm_perf_init(void);
+>  int kvm_perf_teardown(void);
+>  
+> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
+> +void kvm_arm_timer_set_reg(struct kvm_vcpu *, const struct kvm_one_reg *, u64);
+> +
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
+> index c1ee007..e3b0115 100644
+> --- a/arch/arm/include/uapi/asm/kvm.h
+> +++ b/arch/arm/include/uapi/asm/kvm.h
+> @@ -118,6 +118,22 @@ struct kvm_arch_memory_slot {
+>  #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
+>  #define KVM_REG_ARM_32_CRN_SHIFT	11
+>  
+> +#define KVM_REG_ARM_32_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U32      | \
+> +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
+> +#define KVM_REG_ARM_64_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U64      | \
+> +					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CTL		(KVM_REG_ARM_32_CP15                 | \
+> +					( 3ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					(14ULL << KVM_REG_ARM_32_CRN_SHIFT)  | \
+> +					( 0ULL << KVM_REG_ARM_OPC1_SHIFT)    | \
+> +					( 1ULL << KVM_REG_ARM_32_OPC2_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CNT		(KVM_REG_ARM_64_CP15 | \
+> +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					( 1ULL << KVM_REG_ARM_OPC1_SHIFT))
+> +#define KVM_REG_ARM_TIMER_CVAL		(KVM_REG_ARM_64_CP15 | \
+> +					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
+> +					( 3ULL << KVM_REG_ARM_OPC1_SHIFT))
+> +
+>  /* Normal registers are mapped as coprocessor 16. */
+>  #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
+>  #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
+> diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
+> index c55b608..64a8920b 100644
+> --- a/arch/arm/kvm/arch_timer.c
+> +++ b/arch/arm/kvm/arch_timer.c
+> @@ -171,6 +171,38 @@ static void kvm_timer_init_interrupt(void *info)
+>  	enable_percpu_irq(timer_irq.irq, 0);
+>  }
+>  
+> +void kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu,
+> +			   const struct kvm_one_reg *reg, u64 val)
+> +{
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +	switch (reg->id) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +		timer->cntv_ctl = val;
+> +		break;
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - val;
+> +		break;
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		timer->cntv_cval = val;
+> +		break;
+> +	}
+> +}
+> +
+> +u64 kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+> +{
+> +	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> +
+> +	switch (reg->id) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +		return timer->cntv_ctl;
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +		return kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		return timer->cntv_cval;
+> +	}
+> +	return 0;
+> +}
+>  
+>  static int kvm_timer_cpu_notify(struct notifier_block *self,
+>  				unsigned long action, void *cpu)
+> diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
+> index 8eea97b..63b2e89 100644
+> --- a/arch/arm/kvm/coproc.c
+> +++ b/arch/arm/kvm/coproc.c
+> @@ -156,6 +156,8 @@ static const struct coproc_reg cp15_regs[] = {
+>  	/* TTBR0/TTBR1: swapped by interrupt.S. */
+>  	{ CRm( 2), Op1( 0), is64, NULL, reset_unknown64, c2_TTBR0 },
+>  	{ CRm( 2), Op1( 1), is64, NULL, reset_unknown64, c2_TTBR1 },
+> +	{ CRm(14), Op1( 1), is64, NULL, reset_unknown64, c14_CNTVCT},
+> +	{ CRm(14), Op1( 3), is64, NULL, reset_unknown64, c14_CNTV_CVAL},
+>  
+>  	/* TTBCR: swapped by interrupt.S. */
+>  	{ CRn( 2), CRm( 0), Op1( 0), Op2( 2), is32,
+> @@ -226,6 +228,8 @@ static const struct coproc_reg cp15_regs[] = {
+>  	/* CNTKCTL: swapped by interrupt.S. */
+>  	{ CRn(14), CRm( 1), Op1( 0), Op2( 0), is32,
+>  			NULL, reset_val, c14_CNTKCTL, 0x00000000 },
+> +	{ CRn(14), CRm( 3), Op1( 0), Op2( 1), is32,
+> +			NULL, reset_val, c14_CNTV_CTL, 0x00000000 },
+>  };
+>  
+>  /* Target specific emulation tables */
+> @@ -823,10 +827,22 @@ static int vfp_set_reg(struct kvm_vcpu *vcpu, u64 id, const void __user *uaddr)
+>  }
+>  #endif /* !CONFIG_VFPv3 */
+>  
+> +static bool is_timer_reg(u64 index)
+> +{
+> +	switch (index) {
+> +	case KVM_REG_ARM_TIMER_CTL:
+> +	case KVM_REG_ARM_TIMER_CNT:
+> +	case KVM_REG_ARM_TIMER_CVAL:
+> +		return true;
+> +	}
+> +	return false;
+> +}
+> +
+>  int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  {
+>  	const struct coproc_reg *r;
+>  	void __user *uaddr = (void __user *)(long)reg->addr;
+> +	u64 val;
+>  
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
+>  		return demux_c15_get(reg->id, uaddr);
+> @@ -834,6 +850,11 @@ int kvm_arm_coproc_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_VFP)
+>  		return vfp_get_reg(vcpu, reg->id, uaddr);
+>  
+> +	if (is_timer_reg(reg->id)) {
+> +		val = kvm_arm_timer_get_reg(vcpu, reg);
+> +		return reg_to_user(uaddr, &val, reg->id);
+> +	}
+> +
+>  	r = index_to_coproc_reg(vcpu, reg->id);
+>  	if (!r)
+>  		return get_invariant_cp15(reg->id, uaddr);
+> @@ -846,6 +867,8 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  {
+>  	const struct coproc_reg *r;
+>  	void __user *uaddr = (void __user *)(long)reg->addr;
+> +	u64 val;
+> +	int ret;
+>  
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_DEMUX)
+>  		return demux_c15_set(reg->id, uaddr);
+> @@ -853,6 +876,13 @@ int kvm_arm_coproc_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
+>  	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_VFP)
+>  		return vfp_set_reg(vcpu, reg->id, uaddr);
+>  
+> +	if (is_timer_reg(reg->id)) {
+> +		ret = reg_from_user(&val, uaddr, reg->id);
+> +		if (ret == 0)
+> +			kvm_arm_timer_set_reg(vcpu, reg, val);
+> +		return ret;
+> +	}
+> +
+>  	r = index_to_coproc_reg(vcpu, reg->id);
+>  	if (!r)
+>  		return set_invariant_cp15(reg->id, uaddr);
+> -- 
+> 1.7.12.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
