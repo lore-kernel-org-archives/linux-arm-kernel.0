@@ -1,37 +1,43 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu,  6 Jun 2013 01:57:27 +0200
-Subject: [PATCH 3/7] ARM: SAMSUNG: Add soc_is_s3c6400/s3c6410 macros
+Date: Thu,  6 Jun 2013 01:57:28 +0200
+Subject: [PATCH 4/7] ARM: s3c64xx: dma: Use
+ clk_prepare_enable/clk_disable_unprepare
 In-Reply-To: <1370476651-6743-1-git-send-email-tomasz.figa@gmail.com>
 References: <1370476651-6743-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1370476651-6743-4-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1370476651-6743-5-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds soc_is_s3c6400() and soc_is_s3c6410() macros that allow
-to distinguish between specific SoCs from s3c64xx series that is needed
-to handle differences between them.
+This patch modifies s3c64xx DMA driver to prepare and unprepare clocks
+in addition to enableind and disabling, since it is required by common
+clock framework.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/plat-samsung/include/plat/cpu.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-s3c64xx/dma.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-index 989fefe..8e55196 100644
---- a/arch/arm/plat-samsung/include/plat/cpu.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -85,8 +85,12 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
- #endif
+diff --git a/arch/arm/mach-s3c64xx/dma.c b/arch/arm/mach-s3c64xx/dma.c
+index 759846c..c511dfa 100644
+--- a/arch/arm/mach-s3c64xx/dma.c
++++ b/arch/arm/mach-s3c64xx/dma.c
+@@ -677,7 +677,7 @@ static int s3c64xx_dma_init1(int chno, enum dma_ch chbase,
+ 		goto err_map;
+ 	}
  
- #if defined(CONFIG_CPU_S3C6400) || defined(CONFIG_CPU_S3C6410)
-+# define soc_is_s3c6400()	is_samsung_s3c6400()
-+# define soc_is_s3c6410()	is_samsung_s3c6410()
- # define soc_is_s3c64xx()	(is_samsung_s3c6400() || is_samsung_s3c6410())
- #else
-+# define soc_is_s3c6400()	0
-+# define soc_is_s3c6410()	0
- # define soc_is_s3c64xx()	0
- #endif
+-	clk_enable(dmac->clk);
++	clk_prepare_enable(dmac->clk);
  
+ 	dmac->regs = regs;
+ 	dmac->chanbase = chbase;
+@@ -711,7 +711,7 @@ static int s3c64xx_dma_init1(int chno, enum dma_ch chbase,
+ 	return 0;
+ 
+ err_clk:
+-	clk_disable(dmac->clk);
++	clk_disable_unprepare(dmac->clk);
+ 	clk_put(dmac->clk);
+ err_map:
+ 	iounmap(regs);
 -- 
 1.8.2.1
