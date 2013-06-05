@@ -1,39 +1,40 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 05 Jun 2013 16:34:10 +0900
-Subject: [PATCH 00/06] ARM: shmobile: Per-board memory size fixups
-Message-ID: <20130605073410.15758.37563.sendpatchset@w520>
+Date: Wed, 05 Jun 2013 16:34:18 +0900
+Subject: [PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
+In-Reply-To: <20130605073410.15758.37563.sendpatchset@w520>
+References: <20130605073410.15758.37563.sendpatchset@w520>
+Message-ID: <20130605073418.15758.93704.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM: shmobile: Per-board memory size fixups
+From: Magnus Damm <damm@opensource.se>
 
-[PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
-[PATCH 02/06] ARM: shmobile: AG5EVM memory config via ATAGS fixup
-[PATCH 03/06] ARM: shmobile: AP4EVB memory config via ATAGS fixup
-[PATCH 04/06] ARM: shmobile: Bonito memory config via ATAGS fixup
-[PATCH 05/06] ARM: shmobile: Kota2 memory config via ATAGS fixup
-[PATCH 06/06] ARM: shmobile: Marzen memory config via ATAGS fixup
-
-This series adds memory size and base address fixups to
-non-DT mach-shmobile boards. This way the ATAGS code in
-arch/arm/kernel/atags_parse.c can be overriden on a per-
-board basis without the need of any global MEM_SIZE or
-PHYS_OFFSET settings.
-
-This is one of several series of code that reworks code
-not to rely on CONFIG_MEMORY_START/SIZE which in turn is
-needed for ARCH_MULTIPLATFORM.
+Introduce SHMOBILE_FIXUP() as a helper function to
+allow boards to specify their memory base and size.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Written against renesas.git renesas-next-20130604v2
-
- arch/arm/mach-shmobile/Kconfig               |    5 +++++
- arch/arm/mach-shmobile/board-ag5evm.c        |    4 ++++
- arch/arm/mach-shmobile/board-ap4evb.c        |    3 +++
- arch/arm/mach-shmobile/board-bonito.c        |    4 ++++
- arch/arm/mach-shmobile/board-kota2.c         |    4 ++++
- arch/arm/mach-shmobile/board-marzen.c        |    4 ++++
  arch/arm/mach-shmobile/include/mach/common.h |   13 +++++++++++++
- 7 files changed, 37 insertions(+)
+ 1 file changed, 13 insertions(+)
+
+--- 0001/arch/arm/mach-shmobile/include/mach/common.h
++++ work/arch/arm/mach-shmobile/include/mach/common.h	2013-06-04 13:01:40.000000000 +0900
+@@ -37,4 +37,17 @@ static inline void __init shmobile_init_
+ 	shmobile_cpuidle_init();
+ }
+ 
++#define SHMOBILE_FIXUP(boardname, mem_start, mem_size)			\
++static void __init boardname##_fixup(struct tag *tag, char **cmdline,	\
++				struct meminfo *mi)			\
++{									\
++	for (; tag->hdr.size; tag = tag_next(tag)) {			\
++		if (tag->hdr.tag == ATAG_MEM) {				\
++			tag->u.mem.start = (mem_start);			\
++			tag->u.mem.size = (mem_size);			\
++			break;						\
++		}							\
++	}								\
++}
++
+ #endif /* __ARCH_MACH_COMMON_H */
