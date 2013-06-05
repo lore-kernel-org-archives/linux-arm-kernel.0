@@ -1,30 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 5 Jun 2013 17:11:52 +0530
-Subject: [PATCH v2 5/5] ARM: davinci: serial: platform code cleanup
-In-Reply-To: <1369729686-6595-6-git-send-email-prakash.pm@ti.com>
-References: <1369729686-6595-1-git-send-email-prakash.pm@ti.com>
- <1369729686-6595-6-git-send-email-prakash.pm@ti.com>
-Message-ID: <51AF2400.3020906@ti.com>
+From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
+Date: Wed, 05 Jun 2013 15:43:07 +0400
+Subject: =?UTF-8?B?UmVbNF06IFtQQVRDSCAxLzJdIGh3bW9uOiBtYzEzNzgzLWFkYzogUmVmYWN0?=
+ =?UTF-8?B?b3Igc291cmNlIHRvIGluZGljYXRlIHZhcmlvdXMgbWMxM3h4eCBjaGlwcw==?=
+In-Reply-To: <201306051336.49776.arnd@arndb.de>
+References: <1370422628-1073-1-git-send-email-shc_work@mail.ru>
+ <1370430879.384973987@f91.mail.ru>
+ <201306051336.49776.arnd@arndb.de>
+Message-ID: <1370432587.906000493@f233.mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 5/28/2013 1:58 PM, Manjunathappa, Prakash wrote:
-> 1) "struct davinci_uart_config" is introduced to specify
->    UART ports brought out or enabled on the board. But
->    none of the boards use them for that purpose, so clean
->    it up.
-> 2) Have pointer to platform device as a argument for
->    davinci_serial_init(), no need of serial_dev in
->    struct soc_info now.
-> 3) No need of davinci_serial_setup_clk(), not called from
->    multiple places, hence reduce function call overhead.
+> On Wednesday 05 June 2013, Alexander Shiyan wrote:
+> > Well, let's leave the kconfig symbol as is. But about the rest, that mc13783_*
+> > symbols in the log (debug) will say a developer who does not know about
+> > mc13892 compatibility with mc13783? I still believe that this should be reflected.
 > 
-> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
-> Suggested-by: Sekhar Nori <nsekhar@ti.com>
+> If the log messages use dev_printk, they will use the correct device name already,
+> if not, that can be fixed.
+> 
+> I agree with Jean: we don't just rename things unless there is a significant
+> benefit, which I don't see here. There is also the risk that we need to support
+> a different chip named mc13xxx in the future that is different enough to require
+> a new driver and then the naming is even more screwed up.
 
-We generally clean up code before undertaking modifications. Is there a
-reason why this cannot be done first-up?
+It is a pity that the revision and updating of the code of this driver died.
+Well, lets drop thesepatches.
+Thanks.
 
-Thanks,
-Sekhar
+---
