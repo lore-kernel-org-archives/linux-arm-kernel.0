@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:52 +0900
-Subject: [PATCH 061/130] sh-pfc: r8a7740: Add BSC pin groups and functions
+Date: Wed,  5 Jun 2013 17:25:53 +0900
+Subject: [PATCH 062/130] sh-pfc: r8a7740: Add GETHER pin groups and functions
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-62-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-63-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,193 +12,120 @@ From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 155 +++++++++++++++++++++++++++++++++++
- 1 file changed, 155 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 82 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 82 insertions(+)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-index da00bc4..f17a39a 100644
+index f17a39a..1b98990 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-@@ -1674,6 +1674,127 @@ static struct sh_pfc_pin pinmux_pins[] = {
- 	GPIO_PORT_ALL(),
+@@ -1795,6 +1795,72 @@ static const unsigned int bsc_rdwr_pins[] = {
+ static const unsigned int bsc_rdwr_mux[] = {
+ 	RDWR_MARK,
  };
- 
-+/* - BSC -------------------------------------------------------------------- */
-+static const unsigned int bsc_data8_pins[] = {
-+	/* D[0:7] */
-+	157, 156, 155, 154, 153, 152, 151, 150,
++/* - GETHER ----------------------------------------------------------------- */
++static const unsigned int gether_rmii_pins[] = {
++	/* RXD[0:1], RX_ER, CRS_DV, TXD[0:1], TX_EN, REF_CLK, MDC, MDIO */
++	195, 196, 194, 193, 200, 201, 199, 159, 202, 208,
 +};
-+static const unsigned int bsc_data8_mux[] = {
-+	D0_NAF0_MARK, D1_NAF1_MARK, D2_NAF2_MARK, D3_NAF3_MARK,
-+	D4_NAF4_MARK, D5_NAF5_MARK, D6_NAF6_MARK, D7_NAF7_MARK,
++static const unsigned int gether_rmii_mux[] = {
++	RMII_RXD0_MARK, RMII_RXD1_MARK, RMII_RX_ER_MARK, RMII_CRS_DV_MARK,
++	RMII_TXD0_MARK, RMII_TXD1_MARK, RMII_TX_EN_MARK, RMII_REF50CK_MARK,
++	RMII_MDC_MARK, RMII_MDIO_MARK,
 +};
-+static const unsigned int bsc_data16_pins[] = {
-+	/* D[0:15] */
-+	157, 156, 155, 154, 153, 152, 151, 150,
-+	149, 148, 147, 146, 145, 144, 143, 142,
++static const unsigned int gether_mii_pins[] = {
++	/* RXD[0:3], RX_CLK, RX_DV, RX_ER
++	 * TXD[0:3], TX_CLK, TX_EN, TX_ER
++	 * CRS, COL, MDC, MDIO,
++	 */
++	185, 186, 187, 188, 174, 161, 204,
++	171, 170, 169, 168, 184, 183, 203,
++	205, 163, 206, 207,
 +};
-+static const unsigned int bsc_data16_mux[] = {
-+	D0_NAF0_MARK, D1_NAF1_MARK, D2_NAF2_MARK, D3_NAF3_MARK,
-+	D4_NAF4_MARK, D5_NAF5_MARK, D6_NAF6_MARK, D7_NAF7_MARK,
-+	D8_NAF8_MARK, D9_NAF9_MARK, D10_NAF10_MARK, D11_NAF11_MARK,
-+	D12_NAF12_MARK, D13_NAF13_MARK, D14_NAF14_MARK, D15_NAF15_MARK,
++static const unsigned int gether_mii_mux[] = {
++	ET_ERXD0_MARK, ET_ERXD1_MARK, ET_ERXD2_MARK, ET_ERXD3_MARK,
++	ET_RX_CLK_MARK, ET_RX_DV_MARK, ET_RX_ER_MARK,
++	ET_ETXD0_MARK, ET_ETXD1_MARK, ET_ETXD2_MARK, ET_ETXD3_MARK,
++	ET_TX_CLK_MARK, ET_TX_EN_MARK, ET_TX_ER_MARK,
++	ET_CRS_MARK, ET_COL_MARK, ET_MDC_MARK, ET_MDIO_MARK,
 +};
-+static const unsigned int bsc_data32_pins[] = {
-+	/* D[0:31] */
-+	157, 156, 155, 154, 153, 152, 151, 150,
-+	149, 148, 147, 146, 145, 144, 143, 142,
-+	171, 170, 169, 168, 167, 166, 173, 172,
-+	165, 164, 163, 162, 161, 160, 159, 158,
++static const unsigned int gether_gmii_pins[] = {
++	/* RXD[0:7], RX_CLK, RX_DV, RX_ER
++	 * TXD[0:7], GTX_CLK, TX_CLK, TX_EN, TX_ER
++	 * CRS, COL, MDC, MDIO, REF125CK_MARK,
++	 */
++	185, 186, 187, 188, 189, 190, 191, 192, 174, 161, 204,
++	171, 170, 169, 168, 167, 166, 173, 172, 176, 184, 183, 203,
++	205, 163, 206, 207,
 +};
-+static const unsigned int bsc_data32_mux[] = {
-+	D0_NAF0_MARK, D1_NAF1_MARK, D2_NAF2_MARK, D3_NAF3_MARK,
-+	D4_NAF4_MARK, D5_NAF5_MARK, D6_NAF6_MARK, D7_NAF7_MARK,
-+	D8_NAF8_MARK, D9_NAF9_MARK, D10_NAF10_MARK, D11_NAF11_MARK,
-+	D12_NAF12_MARK, D13_NAF13_MARK, D14_NAF14_MARK, D15_NAF15_MARK,
-+	D16_MARK, D17_MARK, D18_MARK, D19_MARK,
-+	D20_MARK, D21_MARK, D22_MARK, D23_MARK,
-+	D24_MARK, D25_MARK, D26_MARK, D27_MARK,
-+	D28_MARK, D29_MARK, D30_MARK, D31_MARK,
++static const unsigned int gether_gmii_mux[] = {
++	ET_ERXD0_MARK, ET_ERXD1_MARK, ET_ERXD2_MARK, ET_ERXD3_MARK,
++	ET_ERXD4_MARK, ET_ERXD5_MARK, ET_ERXD6_MARK, ET_ERXD7_MARK,
++	ET_RX_CLK_MARK, ET_RX_DV_MARK, ET_RX_ER_MARK,
++	ET_ETXD0_MARK, ET_ETXD1_MARK, ET_ETXD2_MARK, ET_ETXD3_MARK,
++	ET_ETXD4_MARK, ET_ETXD5_MARK, ET_ETXD6_MARK, ET_ETXD7_MARK,
++	ET_GTX_CLK_MARK, ET_TX_CLK_MARK, ET_TX_EN_MARK, ET_TX_ER_MARK,
++	ET_CRS_MARK, ET_COL_MARK, ET_MDC_MARK, ET_MDIO_MARK,
++	RMII_REF125CK_MARK,
 +};
-+static const unsigned int bsc_cs0_pins[] = {
-+	/* CS */
-+	109,
++static const unsigned int gether_int_pins[] = {
++	/* PHY_INT */
++	164,
 +};
-+static const unsigned int bsc_cs0_mux[] = {
-+	CS0_MARK,
++static const unsigned int gether_int_mux[] = {
++	ET_PHY_INT_MARK,
 +};
-+static const unsigned int bsc_cs2_pins[] = {
-+	/* CS */
-+	110,
++static const unsigned int gether_link_pins[] = {
++	/* LINK */
++	177,
 +};
-+static const unsigned int bsc_cs2_mux[] = {
-+	CS2_MARK,
++static const unsigned int gether_link_mux[] = {
++	ET_LINK_MARK,
 +};
-+static const unsigned int bsc_cs4_pins[] = {
-+	/* CS */
-+	111,
-+};
-+static const unsigned int bsc_cs4_mux[] = {
-+	CS4_MARK,
-+};
-+static const unsigned int bsc_cs5a_0_pins[] = {
-+	/* CS */
-+	105,
-+};
-+static const unsigned int bsc_cs5a_0_mux[] = {
-+	CS5A_PORT105_MARK,
-+};
-+static const unsigned int bsc_cs5a_1_pins[] = {
-+	/* CS */
-+	19,
-+};
-+static const unsigned int bsc_cs5a_1_mux[] = {
-+	CS5A_PORT19_MARK,
-+};
-+static const unsigned int bsc_cs5b_pins[] = {
-+	/* CS */
-+	103,
-+};
-+static const unsigned int bsc_cs5b_mux[] = {
-+	CS5B_MARK,
-+};
-+static const unsigned int bsc_cs6a_pins[] = {
-+	/* CS */
-+	104,
-+};
-+static const unsigned int bsc_cs6a_mux[] = {
-+	CS6A_MARK,
-+};
-+static const unsigned int bsc_rd_we8_pins[] = {
-+	/* RD, WE[0] */
-+	115, 113,
-+};
-+static const unsigned int bsc_rd_we8_mux[] = {
-+	RD_FSC_MARK, WE0_FWE_MARK,
-+};
-+static const unsigned int bsc_rd_we16_pins[] = {
-+	/* RD, WE[0:1] */
-+	115, 113, 112,
-+};
-+static const unsigned int bsc_rd_we16_mux[] = {
-+	RD_FSC_MARK, WE0_FWE_MARK, WE1_MARK,
-+};
-+static const unsigned int bsc_rd_we32_pins[] = {
-+	/* RD, WE[0:3] */
-+	115, 113, 112, 108, 107,
-+};
-+static const unsigned int bsc_rd_we32_mux[] = {
-+	RD_FSC_MARK, WE0_FWE_MARK, WE1_MARK, WE2_ICIORD_MARK, WE3_ICIOWR_MARK,
-+};
-+static const unsigned int bsc_bs_pins[] = {
-+	/* BS */
++static const unsigned int gether_wol_pins[] = {
++	/* WOL */
 +	175,
 +};
-+static const unsigned int bsc_bs_mux[] = {
-+	BS_MARK,
-+};
-+static const unsigned int bsc_rdwr_pins[] = {
-+	/* RDWR */
-+	114,
-+};
-+static const unsigned int bsc_rdwr_mux[] = {
-+	RDWR_MARK,
++static const unsigned int gether_wol_mux[] = {
++	ET_WOL_MARK,
 +};
  /* - INTC ------------------------------------------------------------------- */
  IRQC_PINS_MUX(0, 0, 2);
  IRQC_PINS_MUX(0, 1, 13);
-@@ -2377,6 +2498,21 @@ static const unsigned int sdhi2_wp_1_mux[] = {
- };
- 
- static const struct sh_pfc_pin_group pinmux_groups[] = {
-+	SH_PFC_PIN_GROUP(bsc_data8),
-+	SH_PFC_PIN_GROUP(bsc_data16),
-+	SH_PFC_PIN_GROUP(bsc_data32),
-+	SH_PFC_PIN_GROUP(bsc_cs0),
-+	SH_PFC_PIN_GROUP(bsc_cs2),
-+	SH_PFC_PIN_GROUP(bsc_cs4),
-+	SH_PFC_PIN_GROUP(bsc_cs5a_0),
-+	SH_PFC_PIN_GROUP(bsc_cs5a_1),
-+	SH_PFC_PIN_GROUP(bsc_cs5b),
-+	SH_PFC_PIN_GROUP(bsc_cs6a),
-+	SH_PFC_PIN_GROUP(bsc_rd_we8),
-+	SH_PFC_PIN_GROUP(bsc_rd_we16),
-+	SH_PFC_PIN_GROUP(bsc_rd_we32),
-+	SH_PFC_PIN_GROUP(bsc_bs),
-+	SH_PFC_PIN_GROUP(bsc_rdwr),
+@@ -2513,6 +2579,12 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(bsc_rd_we32),
+ 	SH_PFC_PIN_GROUP(bsc_bs),
+ 	SH_PFC_PIN_GROUP(bsc_rdwr),
++	SH_PFC_PIN_GROUP(gether_rmii),
++	SH_PFC_PIN_GROUP(gether_mii),
++	SH_PFC_PIN_GROUP(gether_gmii),
++	SH_PFC_PIN_GROUP(gether_int),
++	SH_PFC_PIN_GROUP(gether_link),
++	SH_PFC_PIN_GROUP(gether_wol),
  	SH_PFC_PIN_GROUP(intc_irq0_0),
  	SH_PFC_PIN_GROUP(intc_irq0_1),
  	SH_PFC_PIN_GROUP(intc_irq1),
-@@ -2512,6 +2648,24 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(sdhi2_wp_1),
+@@ -2666,6 +2738,15 @@ static const char * const bsc_groups[] = {
+ 	"bsc_rdwr",
  };
  
-+static const char * const bsc_groups[] = {
-+	"bsc_data8",
-+	"bsc_data16",
-+	"bsc_data32",
-+	"bsc_cs0",
-+	"bsc_cs2",
-+	"bsc_cs4",
-+	"bsc_cs5a_0",
-+	"bsc_cs5a_1",
-+	"bsc_cs5b",
-+	"bsc_cs6a",
-+	"bsc_rd_we8",
-+	"bsc_rd_we16",
-+	"bsc_rd_we32",
-+	"bsc_bs",
-+	"bsc_rdwr",
++static const char * const gether_groups[] = {
++	"gether_rmii",
++	"gether_mii",
++	"gether_gmii",
++	"gether_int",
++	"gether_link",
++	"gether_wol",
 +};
 +
  static const char * const intc_groups[] = {
  	"intc_irq0_0",
  	"intc_irq0_1",
-@@ -2694,6 +2848,7 @@ static const char * const sdhi2_groups[] = {
- };
+@@ -2849,6 +2930,7 @@ static const char * const sdhi2_groups[] = {
  
  static const struct sh_pfc_function pinmux_functions[] = {
-+	SH_PFC_FUNCTION(bsc),
+ 	SH_PFC_FUNCTION(bsc),
++	SH_PFC_FUNCTION(gether),
  	SH_PFC_FUNCTION(intc),
  	SH_PFC_FUNCTION(lcd0),
  	SH_PFC_FUNCTION(lcd1),
