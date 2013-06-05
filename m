@@ -1,44 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 05 Jun 2013 10:34:36 +0200
-Subject: [PATCH 0/8] Support Marvell bootloaders remapping registers at
- different locations
-In-Reply-To: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <6040042.l4nODfuSDT@wuerfel>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  5 Jun 2013 17:26:20 +0900
+Subject: [PATCH 089/130] ARM: shmobile: r8a7740: Remove BSC function GPIOs
+In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-90-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 June 2013 09:04:53 Thomas Petazzoni wrote:
-> 
-> On Marvell platforms, the base address of the "internal registers"
-> (i.e registers of all peripherals) can be configured at runtime. At
-> reset, it is set to 0xD0000000, but it can freely be changed to some
-> other location.
-> 
-> On all previous Marvell SoC families, Linux assumes the bootloader has
-> remapped the internal registers at 0xF1000000, and Marvell is now
-> moving to do the same on Armada 370/XP, since it allows to use as much
-> RAM as possible in the 0 -> 4G area. However, due to early issues,
-> until now, Marvell bootloaders were leaving the internal registers
-> address set to 0xD0000000, and recently, Marvell has started shipping
-> bootloaders that remapped those registers to 0xF1000000.
-> 
-> In order to support those two cases, we want to make sure the Device
-> Tree is the only location where the physical base address of the
-> internal registers is stored. This patch set removes the places where
-> the physical base address of the registers was hardcoded and provides
-> two Kconfig options for the earlyprintk UART address selection (one
-> for 0xD0000000 and one for 0xF1000000).
-> 
-> It no longer uses the CP15 trick, nor it tries to do runtime remapping
-> to 0xF1 if it wasn't done by the bootloader. But it allows to easily
-> boot a kernel with both old and new bootloaders by doing a simple
-> change, in a single location in the Device Tree.
-> 
-> This patch series is based on jcooper/mvebu/fixes-non-critical and
-> jcooper/mvebu/cleanup, which contains 3 patches that are necessary to
-> make this patch series work properly.
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Looks all good to me, thanks a lot for sorting this out!
+Those GPIOs have been deprecated by the pinctrl API. They are unused and
+unneeded, remove them.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/include/mach/r8a7740.h | 27 ++-------------------------
+ 1 file changed, 2 insertions(+), 25 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7740.h b/arch/arm/mach-shmobile/include/mach/r8a7740.h
+index dea430e..61cff39 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7740.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7740.h
+@@ -297,11 +297,7 @@ enum {
+ 	GPIO_FN_BBIF2_TSCK2_PORT89,
+ 	GPIO_FN_BBIF2_TSYNC2_PORT184,
+ 
+-	/* BSC / FLCTL / PCMCIA */
+-	GPIO_FN_CS0,	GPIO_FN_CS2,	GPIO_FN_CS4,
+-	GPIO_FN_CS5B,	GPIO_FN_CS6A,
+-	GPIO_FN_CS5A_PORT105, /* CS5A PORT 19/105 */
+-	GPIO_FN_CS5A_PORT19,
++	/* FLCTL / PCMCIA */
+ 	GPIO_FN_IOIS16, /* ? */
+ 
+ 	GPIO_FN_A0,	GPIO_FN_A1,	GPIO_FN_A2,	GPIO_FN_A3,
+@@ -314,26 +310,7 @@ enum {
+ 	GPIO_FN_A22,	GPIO_FN_A23,	GPIO_FN_A24,	GPIO_FN_A25,
+ 	GPIO_FN_A26,
+ 
+-	GPIO_FN_D0_NAF0,	GPIO_FN_D1_NAF1,	/* share with FLCTL */
+-	GPIO_FN_D2_NAF2,	GPIO_FN_D3_NAF3,	/* share with FLCTL */
+-	GPIO_FN_D4_NAF4,	GPIO_FN_D5_NAF5,	/* share with FLCTL */
+-	GPIO_FN_D6_NAF6,	GPIO_FN_D7_NAF7,	/* share with FLCTL */
+-	GPIO_FN_D8_NAF8,	GPIO_FN_D9_NAF9,	/* share with FLCTL */
+-	GPIO_FN_D10_NAF10,	GPIO_FN_D11_NAF11,	/* share with FLCTL */
+-	GPIO_FN_D12_NAF12,	GPIO_FN_D13_NAF13,	/* share with FLCTL */
+-	GPIO_FN_D14_NAF14,	GPIO_FN_D15_NAF15,	/* share with FLCTL */
+-
+-	GPIO_FN_D16,	GPIO_FN_D17,	GPIO_FN_D18,	GPIO_FN_D19,
+-	GPIO_FN_D20,	GPIO_FN_D21,	GPIO_FN_D22,	GPIO_FN_D23,
+-	GPIO_FN_D24,	GPIO_FN_D25,	GPIO_FN_D26,	GPIO_FN_D27,
+-	GPIO_FN_D28,	GPIO_FN_D29,	GPIO_FN_D30,	GPIO_FN_D31,
+-
+-	GPIO_FN_WE0_FWE,	/* share with FLCTL */
+-	GPIO_FN_WE1,
+-	GPIO_FN_WE2_ICIORD,	/* share with PCMCIA */
+-	GPIO_FN_WE3_ICIOWR,	/* share with PCMCIA */
+-	GPIO_FN_CKO,	GPIO_FN_BS,	GPIO_FN_RDWR,
+-	GPIO_FN_RD_FSC,		/* share with FLCTL */
++	GPIO_FN_CKO,
+ 	GPIO_FN_WAIT_PORT177,	/* WAIT Port 90/177 */
+ 	GPIO_FN_WAIT_PORT90,
+ 
+-- 
+1.8.2.1
