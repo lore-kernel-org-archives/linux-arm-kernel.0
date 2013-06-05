@@ -1,9 +1,9 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:56 +0900
-Subject: [PATCH 065/130] sh-pfc: r8a7740: Add HDMI pin groups and functions
+Date: Wed,  5 Jun 2013 17:25:54 +0900
+Subject: [PATCH 063/130] sh-pfc: r8a7740: Add CEU pin groups and functions
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-66-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-64-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,54 +12,164 @@ From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 124 +++++++++++++++++++++++++++++++++++
+ 1 file changed, 124 insertions(+)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-index 49da76a..5a77d39 100644
+index 1b98990..71d7c1f 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-@@ -2039,6 +2039,14 @@ static const unsigned int gether_wol_pins[] = {
- static const unsigned int gether_wol_mux[] = {
- 	ET_WOL_MARK,
+@@ -1795,6 +1795,98 @@ static const unsigned int bsc_rdwr_pins[] = {
+ static const unsigned int bsc_rdwr_mux[] = {
+ 	RDWR_MARK,
  };
-+/* - HDMI ------------------------------------------------------------------- */
-+static const unsigned int hdmi_pins[] = {
-+	/* HPD, CEC */
-+	210, 211,
++/* - CEU0 ------------------------------------------------------------------- */
++static const unsigned int ceu0_data_0_7_pins[] = {
++	/* D[0:7] */
++	34, 33, 32, 31, 30, 29, 28, 27,
 +};
-+static const unsigned int hdmi_mux[] = {
-+	HDMI_HPD_MARK, HDMI_CEC_MARK,
++static const unsigned int ceu0_data_0_7_mux[] = {
++	VIO0_D0_MARK, VIO0_D1_MARK, VIO0_D2_MARK, VIO0_D3_MARK,
++	VIO0_D4_MARK, VIO0_D5_MARK, VIO0_D6_MARK, VIO0_D7_MARK,
 +};
- /* - INTC ------------------------------------------------------------------- */
- IRQC_PINS_MUX(0, 0, 2);
- IRQC_PINS_MUX(0, 1, 13);
-@@ -2787,6 +2795,7 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
- 	SH_PFC_PIN_GROUP(gether_int),
- 	SH_PFC_PIN_GROUP(gether_link),
- 	SH_PFC_PIN_GROUP(gether_wol),
-+	SH_PFC_PIN_GROUP(hdmi),
- 	SH_PFC_PIN_GROUP(intc_irq0_0),
- 	SH_PFC_PIN_GROUP(intc_irq0_1),
- 	SH_PFC_PIN_GROUP(intc_irq1),
-@@ -2985,6 +2994,10 @@ static const char * const gether_groups[] = {
- 	"gether_wol",
++static const unsigned int ceu0_data_8_15_0_pins[] = {
++	/* D[8:15] */
++	182, 181, 180, 179, 178, 26, 25, 24,
++};
++static const unsigned int ceu0_data_8_15_0_mux[] = {
++	VIO0_D8_MARK, VIO0_D9_MARK, VIO0_D10_MARK, VIO0_D11_MARK,
++	VIO0_D12_MARK, VIO0_D13_PORT26_MARK, VIO0_D14_PORT25_MARK,
++	VIO0_D15_PORT24_MARK,
++};
++static const unsigned int ceu0_data_8_15_1_pins[] = {
++	/* D[8:15] */
++	182, 181, 180, 179, 178, 22, 95, 96,
++};
++static const unsigned int ceu0_data_8_15_1_mux[] = {
++	VIO0_D8_MARK, VIO0_D9_MARK, VIO0_D10_MARK, VIO0_D11_MARK,
++	VIO0_D12_MARK, VIO0_D13_PORT22_MARK, VIO0_D14_PORT95_MARK,
++	VIO0_D15_PORT96_MARK,
++};
++static const unsigned int ceu0_clk_0_pins[] = {
++	/* CKO */
++	36,
++};
++static const unsigned int ceu0_clk_0_mux[] = {
++	VIO_CKO_MARK,
++};
++static const unsigned int ceu0_clk_1_pins[] = {
++	/* CKO */
++	14,
++};
++static const unsigned int ceu0_clk_1_mux[] = {
++	VIO_CKO1_MARK,
++};
++static const unsigned int ceu0_clk_2_pins[] = {
++	/* CKO */
++	15,
++};
++static const unsigned int ceu0_clk_2_mux[] = {
++	VIO_CKO2_MARK,
++};
++static const unsigned int ceu0_sync_pins[] = {
++	/* CLK, VD, HD */
++	35, 39, 37,
++};
++static const unsigned int ceu0_sync_mux[] = {
++	VIO0_CLK_MARK, VIO0_VD_MARK, VIO0_HD_MARK,
++};
++static const unsigned int ceu0_field_pins[] = {
++	/* FIELD */
++	38,
++};
++static const unsigned int ceu0_field_mux[] = {
++	VIO0_FIELD_MARK,
++};
++/* - CEU1 ------------------------------------------------------------------- */
++static const unsigned int ceu1_data_pins[] = {
++	/* D[0:7] */
++	182, 181, 180, 179, 178, 26, 25, 24,
++};
++static const unsigned int ceu1_data_mux[] = {
++	VIO1_D0_MARK, VIO1_D1_MARK, VIO1_D2_MARK, VIO1_D3_MARK,
++	VIO1_D4_MARK, VIO1_D5_MARK, VIO1_D6_MARK, VIO1_D7_MARK,
++};
++static const unsigned int ceu1_clk_pins[] = {
++	/* CKO */
++	23,
++};
++static const unsigned int ceu1_clk_mux[] = {
++	VIO_CKO_1_MARK,
++};
++static const unsigned int ceu1_sync_pins[] = {
++	/* CLK, VD, HD */
++	197, 198, 160,
++};
++static const unsigned int ceu1_sync_mux[] = {
++	VIO1_CLK_MARK, VIO1_VD_MARK, VIO1_HD_MARK,
++};
++static const unsigned int ceu1_field_pins[] = {
++	/* FIELD */
++	21,
++};
++static const unsigned int ceu1_field_mux[] = {
++	VIO1_FIELD_MARK,
++};
+ /* - GETHER ----------------------------------------------------------------- */
+ static const unsigned int gether_rmii_pins[] = {
+ 	/* RXD[0:1], RX_ER, CRS_DV, TXD[0:1], TX_EN, REF_CLK, MDC, MDIO */
+@@ -2579,6 +2671,18 @@ static const struct sh_pfc_pin_group pinmux_groups[] = {
+ 	SH_PFC_PIN_GROUP(bsc_rd_we32),
+ 	SH_PFC_PIN_GROUP(bsc_bs),
+ 	SH_PFC_PIN_GROUP(bsc_rdwr),
++	SH_PFC_PIN_GROUP(ceu0_data_0_7),
++	SH_PFC_PIN_GROUP(ceu0_data_8_15_0),
++	SH_PFC_PIN_GROUP(ceu0_data_8_15_1),
++	SH_PFC_PIN_GROUP(ceu0_clk_0),
++	SH_PFC_PIN_GROUP(ceu0_clk_1),
++	SH_PFC_PIN_GROUP(ceu0_clk_2),
++	SH_PFC_PIN_GROUP(ceu0_sync),
++	SH_PFC_PIN_GROUP(ceu0_field),
++	SH_PFC_PIN_GROUP(ceu1_data),
++	SH_PFC_PIN_GROUP(ceu1_clk),
++	SH_PFC_PIN_GROUP(ceu1_sync),
++	SH_PFC_PIN_GROUP(ceu1_field),
+ 	SH_PFC_PIN_GROUP(gether_rmii),
+ 	SH_PFC_PIN_GROUP(gether_mii),
+ 	SH_PFC_PIN_GROUP(gether_gmii),
+@@ -2738,6 +2842,24 @@ static const char * const bsc_groups[] = {
+ 	"bsc_rdwr",
  };
  
-+static const char * const hdmi_groups[] = {
-+	"hdmi",
++static const char * const ceu0_groups[] = {
++	"ceu0_data_0_7",
++	"ceu0_data_8_15_0",
++	"ceu0_data_8_15_1",
++	"ceu0_clk_0",
++	"ceu0_clk_1",
++	"ceu0_clk_2",
++	"ceu0_sync",
++	"ceu0_field",
 +};
 +
- static const char * const intc_groups[] = {
- 	"intc_irq0_0",
- 	"intc_irq0_1",
-@@ -3173,6 +3186,7 @@ static const struct sh_pfc_function pinmux_functions[] = {
- 	SH_PFC_FUNCTION(fsia),
- 	SH_PFC_FUNCTION(fsib),
++static const char * const ceu1_groups[] = {
++	"ceu1_data",
++	"ceu1_clk",
++	"ceu1_sync",
++	"ceu1_field",
++};
++
+ static const char * const gether_groups[] = {
+ 	"gether_rmii",
+ 	"gether_mii",
+@@ -2930,6 +3052,8 @@ static const char * const sdhi2_groups[] = {
+ 
+ static const struct sh_pfc_function pinmux_functions[] = {
+ 	SH_PFC_FUNCTION(bsc),
++	SH_PFC_FUNCTION(ceu0),
++	SH_PFC_FUNCTION(ceu1),
  	SH_PFC_FUNCTION(gether),
-+	SH_PFC_FUNCTION(hdmi),
  	SH_PFC_FUNCTION(intc),
  	SH_PFC_FUNCTION(lcd0),
- 	SH_PFC_FUNCTION(lcd1),
 -- 
 1.8.2.1
