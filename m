@@ -1,65 +1,66 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:59 +0900
-Subject: [PATCH 068/130] ARM: shmobile: armadillo800eva: Register pinctrl
- mapping for GETHER
+Date: Wed,  5 Jun 2013 17:25:27 +0900
+Subject: [PATCH 036/130] ARM: shmobile: mackerel: Register pinctrl mapping for
+ FSI
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-69-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-37-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based GETHER pinmux configuration by a pinctrl mapping.
+Replace the GPIO-based FSI pinmux configuration by a pinctrl mapping.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-armadillo800eva.c | 25 +++++--------------------
- 1 file changed, 5 insertions(+), 20 deletions(-)
+ arch/arm/mach-shmobile/board-mackerel.c | 19 ++++++++++++-------
+ 1 file changed, 12 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva.c b/arch/arm/mach-shmobile/board-armadillo800eva.c
-index 8d8b362..328f650 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva.c
-@@ -1046,6 +1046,11 @@ static struct platform_device *eva_devices[] __initdata = {
- };
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index 955fefd..f2e8740 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -1328,6 +1328,16 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
+ 				  "flctl_ce0", "flctl"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_flctl.0", "pfc-sh7372",
+ 				  "flctl_ctrl", "flctl"),
++	/* FSIA (AK4643) */
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
++				  "fsia_sclk_in", "fsia"),
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
++				  "fsia_data_in", "fsia"),
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
++				  "fsia_data_out", "fsia"),
++	/* FSIB (HDMI) */
++	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.1", "pfc-sh7372",
++				  "fsib_mclk_in", "fsib"),
+ 	/* SDHI0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
+ 				  "sdhi0_data4", "sdhi0"),
+@@ -1446,11 +1456,7 @@ static void __init mackerel_init(void)
+ 	gpio_request_pulldown(GPIO_PORT167CR); /* VBUS0_1 pull down */
+ 	gpio_request(GPIO_FN_IDIN_1_113, NULL);
  
- static const struct pinctrl_map eva_pinctrl_map[] = {
-+	/* GETHER */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7740",
-+				  "gether_mii", "gether"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7740",
-+				  "gether_int", "gether"),
- 	/* LCD0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
- 				  "lcd0_data24_0", "lcd0"),
-@@ -1139,26 +1144,6 @@ static void __init eva_init(void)
- 	gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
+-	/* enable FSI2 port A (ak4643) */
+-	gpio_request(GPIO_FN_FSIAIBT,	NULL);
+-	gpio_request(GPIO_FN_FSIAILR,	NULL);
+-	gpio_request(GPIO_FN_FSIAISLD,	NULL);
+-	gpio_request(GPIO_FN_FSIAOSLD,	NULL);
++	/* FSI2 port A (ak4643) */
+ 	gpio_request_one(161, GPIOF_OUT_INIT_LOW, NULL); /* slave */
  
- 	/* GETHER */
--	gpio_request(GPIO_FN_ET_CRS,		NULL);
--	gpio_request(GPIO_FN_ET_MDC,		NULL);
--	gpio_request(GPIO_FN_ET_MDIO,		NULL);
--	gpio_request(GPIO_FN_ET_TX_ER,		NULL);
--	gpio_request(GPIO_FN_ET_RX_ER,		NULL);
--	gpio_request(GPIO_FN_ET_ERXD0,		NULL);
--	gpio_request(GPIO_FN_ET_ERXD1,		NULL);
--	gpio_request(GPIO_FN_ET_ERXD2,		NULL);
--	gpio_request(GPIO_FN_ET_ERXD3,		NULL);
--	gpio_request(GPIO_FN_ET_TX_CLK,		NULL);
--	gpio_request(GPIO_FN_ET_TX_EN,		NULL);
--	gpio_request(GPIO_FN_ET_ETXD0,		NULL);
--	gpio_request(GPIO_FN_ET_ETXD1,		NULL);
--	gpio_request(GPIO_FN_ET_ETXD2,		NULL);
--	gpio_request(GPIO_FN_ET_ETXD3,		NULL);
--	gpio_request(GPIO_FN_ET_PHY_INT,	NULL);
--	gpio_request(GPIO_FN_ET_COL,		NULL);
--	gpio_request(GPIO_FN_ET_RX_DV,		NULL);
--	gpio_request(GPIO_FN_ET_RX_CLK,		NULL);
--
- 	gpio_request_one(18, GPIOF_OUT_INIT_HIGH, NULL); /* PHY_RST */
+ 	gpio_request(9,  NULL);
+@@ -1460,8 +1466,7 @@ static void __init mackerel_init(void)
  
- 	/* USB */
+ 	intc_set_priority(IRQ_FSI, 3); /* irq priority FSI(3) > SMSC911X(2) */
+ 
+-	/* setup FSI2 port B (HDMI) */
+-	gpio_request(GPIO_FN_FSIBCK, NULL);
++	/* FSI2 port B (HDMI) */
+ 	__raw_writew(__raw_readw(USCCR1) & ~(1 << 6), USCCR1); /* use SPDIF */
+ 
+ 	/* set SPU2 clock to 119.6 MHz */
 -- 
 1.8.2.1
