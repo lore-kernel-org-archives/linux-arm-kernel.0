@@ -1,74 +1,74 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  5 Jun 2013 12:34:38 +0400
-Subject: [PATCH v2 3/4] leds: leds-mc13783: Rename unit to indicate various
- MC13xxx chips support
+Date: Wed,  5 Jun 2013 12:34:39 +0400
+Subject: [PATCH v2 4/4] leds: leds-mc13xxx: Use module_platform_driver_probe
+ for driver
 In-Reply-To: <1370421279-23348-1-git-send-email-shc_work@mail.ru>
 References: <1370421279-23348-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1370421279-23348-4-git-send-email-shc_work@mail.ru>
+Message-ID: <1370421279-23348-5-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+MC13XXX LEDs is a part of MC13XXX MFD and driver loaded from
+parent MFD driver, so replace module_platform_driver with
+module_platform_driver_probe.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/configs/imx_v4_v5_defconfig            | 2 +-
- drivers/leds/Kconfig                            | 8 ++++----
- drivers/leds/Makefile                           | 2 +-
- drivers/leds/{leds-mc13783.c => leds-mc13xxx.c} | 0
- 4 files changed, 6 insertions(+), 6 deletions(-)
- rename drivers/leds/{leds-mc13783.c => leds-mc13xxx.c} (100%)
+ drivers/leds/leds-mc13xxx.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index f07a847..7fd9f9b 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -166,7 +166,7 @@ CONFIG_MMC_MXC=y
- CONFIG_NEW_LEDS=y
- CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
--CONFIG_LEDS_MC13783=y
-+CONFIG_LEDS_MC13XXX=y
- CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index ef99229..c9a4eb2 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -387,13 +387,13 @@ config LEDS_DELL_NETBOOKS
- 	  This adds support for the Latitude 2100 and similar
- 	  notebooks that have an external LED.
+diff --git a/drivers/leds/leds-mc13xxx.c b/drivers/leds/leds-mc13xxx.c
+index 53d7afd..3b64cc9 100644
+--- a/drivers/leds/leds-mc13xxx.c
++++ b/drivers/leds/leds-mc13xxx.c
+@@ -175,7 +175,7 @@ static void mc13xxx_led_set(struct led_classdev *led_cdev,
+ 	schedule_work(&led->work);
+ }
  
--config LEDS_MC13783
--	tristate "LED Support for MC13783 PMIC"
-+config LEDS_MC13XXX
-+	tristate "LED Support for MC13XXX PMIC"
- 	depends on LEDS_CLASS
--	depends on MFD_MC13783
-+	depends on MFD_MC13XXX
- 	help
- 	  This option enable support for on-chip LED drivers found
--	  on Freescale Semiconductor MC13783 PMIC.
-+	  on Freescale Semiconductor MC13783/MC13892 PMIC.
+-static int mc13xxx_led_setup(struct mc13xxx_led *led, int max_current)
++static int __init mc13xxx_led_setup(struct mc13xxx_led *led, int max_current)
+ {
+ 	int shift, mask, reg, ret, bank;
  
- config LEDS_NS2
- 	tristate "LED support for Network Space v2 GPIO LEDs"
-diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-index ac28977..70329f7 100644
---- a/drivers/leds/Makefile
-+++ b/drivers/leds/Makefile
-@@ -45,7 +45,7 @@ obj-$(CONFIG_LEDS_INTEL_SS4200)		+= leds-ss4200.o
- obj-$(CONFIG_LEDS_LT3593)		+= leds-lt3593.o
- obj-$(CONFIG_LEDS_ADP5520)		+= leds-adp5520.o
- obj-$(CONFIG_LEDS_DELL_NETBOOKS)	+= dell-led.o
--obj-$(CONFIG_LEDS_MC13783)		+= leds-mc13783.o
-+obj-$(CONFIG_LEDS_MC13XXX)		+= leds-mc13xxx.o
- obj-$(CONFIG_LEDS_NS2)			+= leds-ns2.o
- obj-$(CONFIG_LEDS_NETXBIG)		+= leds-netxbig.o
- obj-$(CONFIG_LEDS_ASIC3)		+= leds-asic3.o
-diff --git a/drivers/leds/leds-mc13783.c b/drivers/leds/leds-mc13xxx.c
-similarity index 100%
-rename from drivers/leds/leds-mc13783.c
-rename to drivers/leds/leds-mc13xxx.c
+@@ -244,7 +244,7 @@ static int mc13xxx_led_setup(struct mc13xxx_led *led, int max_current)
+ 	return ret;
+ }
+ 
+-static int mc13783_leds_startup(struct platform_device *pdev)
++static int __init mc13783_leds_startup(struct platform_device *pdev)
+ {
+ 	struct mc13xxx_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
+ 	struct mc13xxx *dev = dev_get_drvdata(pdev->dev.parent);
+@@ -341,7 +341,7 @@ static void mc13783_leds_shutdown(struct platform_device *pdev)
+ 	mc13xxx_unlock(dev);
+ }
+ 
+-static int mc13892_leds_startup(struct platform_device *pdev)
++static int __init mc13892_leds_startup(struct platform_device *pdev)
+ {
+ 	struct mc13xxx_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
+ 	struct mc13xxx *dev = dev_get_drvdata(pdev->dev.parent);
+@@ -401,7 +401,7 @@ static void mc13892_leds_shutdown(struct platform_device *pdev)
+ 	mc13xxx_unlock(dev);
+ }
+ 
+-static int mc13xxx_led_probe(struct platform_device *pdev)
++static int __init mc13xxx_led_probe(struct platform_device *pdev)
+ {
+ 	struct mc13xxx_leds_platform_data *pdata = dev_get_platdata(&pdev->dev);
+ 	struct mc13xxx_led_devtype *devtype =
+@@ -535,11 +535,10 @@ static struct platform_driver mc13xxx_led_driver = {
+ 		.name	= "mc13xxx-led",
+ 		.owner	= THIS_MODULE,
+ 	},
+-	.probe		= mc13xxx_led_probe,
+ 	.remove		= mc13xxx_led_remove,
+ 	.id_table	= mc13xxx_led_id_table,
+ };
+-module_platform_driver(mc13xxx_led_driver);
++module_platform_driver_probe(mc13xxx_led_driver, mc13xxx_led_probe);
+ 
+ MODULE_DESCRIPTION("LEDs driver for Freescale MC13XXX PMIC");
+ MODULE_AUTHOR("Philippe Retornaz <philippe.retornaz@epfl.ch>");
 -- 
 1.8.1.5
