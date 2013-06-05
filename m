@@ -1,41 +1,60 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  5 Jun 2013 09:59:21 +0400
-Subject: [PATCH RESEND 13/15] ARM: clps711x: edb7211: Control LCD backlight
- via PWM
+Date: Wed,  5 Jun 2013 09:59:23 +0400
+Subject: [PATCH RESEND 15/15] ARM: clps711x: Update defconfig
 In-Reply-To: <1370411967-29451-1-git-send-email-shc_work@mail.ru>
 References: <1370411967-29451-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1370411967-29451-14-git-send-email-shc_work@mail.ru>
+Message-ID: <1370411967-29451-16-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch provide control LCD backlight via PWM. GPIO is used
-only for switch backlight ON and OFF.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/board-edb7211.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/configs/clps711x_defconfig | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-index 970f4e1..9dfb990 100644
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ b/arch/arm/mach-clps711x/board-edb7211.c
-@@ -109,13 +109,14 @@ static struct plat_lcd_data edb7211_lcd_power_pdata = {
- 
- static void edb7211_lcd_backlight_set_intensity(int intensity)
- {
--	gpio_set_value(EDB7211_LCDBL, intensity);
-+	gpio_set_value(EDB7211_LCDBL, !!intensity);
-+	clps_writel((clps_readl(PMPCON) & 0xf0ff) | (intensity << 8), PMPCON);
- }
- 
- static struct generic_bl_info edb7211_lcd_backlight_pdata = {
- 	.name			= "lcd-backlight.0",
- 	.default_intensity	= 0x01,
--	.max_intensity		= 0x01,
-+	.max_intensity		= 0x0f,
- 	.set_bl_intensity	= edb7211_lcd_backlight_set_intensity,
- };
- 
+diff --git a/arch/arm/configs/clps711x_defconfig b/arch/arm/configs/clps711x_defconfig
+index 1cd94c3..9e8c831 100644
+--- a/arch/arm/configs/clps711x_defconfig
++++ b/arch/arm/configs/clps711x_defconfig
+@@ -31,21 +31,18 @@ CONFIG_EP7211_DONGLE=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+-CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
+ CONFIG_MTD_CFI=y
+ CONFIG_MTD_JEDECPROBE=y
+ CONFIG_MTD_CFI_INTELEXT=y
+ CONFIG_MTD_CFI_AMDSTD=y
+ CONFIG_MTD_CFI_STAA=y
+-CONFIG_MTD_AUTCPU12=y
+ CONFIG_MTD_PLATRAM=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_GPIO=y
+ CONFIG_NETDEVICES=y
+ # CONFIG_NET_CADENCE is not set
+ # CONFIG_NET_VENDOR_BROADCOM is not set
+-# CONFIG_NET_VENDOR_CHELSIO is not set
+ CONFIG_CS89x0=y
+ CONFIG_CS89x0_PLATFORM=y
+ # CONFIG_NET_VENDOR_FARADAY is not set
+@@ -63,7 +60,11 @@ CONFIG_CS89x0_PLATFORM=y
+ # CONFIG_VT is not set
+ CONFIG_SERIAL_CLPS711X_CONSOLE=y
+ # CONFIG_HW_RANDOM is not set
++CONFIG_I2C=y
++CONFIG_I2C_GPIO=y
+ CONFIG_SPI=y
++CONFIG_SPI_CLPS711X=y
++CONFIG_GPIO_CLPS711X=y
+ CONFIG_GPIO_GENERIC_PLATFORM=y
+ # CONFIG_HWMON is not set
+ CONFIG_FB=y
+@@ -87,4 +88,3 @@ CONFIG_DEBUG_LL=y
+ CONFIG_EARLY_PRINTK=y
+ # CONFIG_CRYPTO_ANSI_CPRNG is not set
+ # CONFIG_CRYPTO_HW is not set
+-# CONFIG_CRC32 is not set
 -- 
 1.8.1.5
