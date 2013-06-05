@@ -1,59 +1,37 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 5 Jun 2013 10:07:03 -0400 (EDT)
-Subject: [RFC PATCH v2 2/2] drivers: mfd: vexpress: add Serial Power
- Controller (SPC) support
-In-Reply-To: <1370432767-6620-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1370432767-6620-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1370432767-6620-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <alpine.LFD.2.03.1306050956081.1200@syhkavp.arg>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Wed, 5 Jun 2013 10:07:59 -0400
+Subject: [PATCH 7/8] arm: mvebu: add another earlyprintk Kconfig option
+In-Reply-To: <20130605154749.29b51f40@skate>
+References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370415901-4721-8-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130605134552.GK3803@titan.lakedaemon.net>
+ <20130605154749.29b51f40@skate>
+Message-ID: <20130605140759.GN3803@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Jun 2013, Lorenzo Pieralisi wrote:
-
-> The TC2 versatile express core tile integrates a logic block that provides the
-> interface between the dual cluster test-chip and the M3 microcontroller that
-> carries out power management. The logic block, called Serial Power Controller
-> (SPC), contains several memory mapped registers to control among other things
-> low-power states, operating points and reset control.
+On Wed, Jun 05, 2013 at 03:47:49PM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
 > 
-> This patch provides a driver that enables run-time control of features
-> implemented by the SPC control logic.
+> On Wed, 5 Jun 2013 09:45:52 -0400, Jason Cooper wrote:
 > 
-> The driver also provides a bridge interface through the vexpress config
-> infrastructure. Operations allowing to read/write operating points are
-> made to go via the same interface as configuration transactions so that
-> all requests to M3 are serialized.
+> > >  	config DEBUG_MVEBU_UART
+> > 
+> > Perhaps we should change this to DEBUG_MVEBU_UART_LEGACY?
 > 
-> Device tree bindings documentation for the SPC component is provided with
-> the patchset.
+> > > +	config DEBUG_MVEBU_UART_ALTERNATE
+> > 
+> > And this to DEBUG_MVEBU_UART?
 > 
+> I'm fine with doing that, but it means that people who will keep their
+> current .config that has CONFIG_DEBUG_MVEBU_UART=y will suddenly see
+> their earlyprintk use 0xf1 instead of 0xd0. So in terms of kconfig
+> backward compatibility, it's not the nicest thing, but if you believe
+> that's ok, I'll change the patch as you proposed.
 
-[...]
+Very true.  I was purely looking at form.  Backwards compatibility is
+definitely more important.
 
-> +/*
-> + * Versatile Express Serial Power Controller (SPC) support
-> + *
-> + * Copyright (C) 2013 ARM Ltd.
-> + *
-> + * Author(s): Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
-> + *            Achin Gupta           <achin.gupta@arm.com>
-> + *            Lorenzo Pieralisi     <lorenzo.pieralisi@arm.com>
+thx,
 
-I imagine "author(s)" can be written as "authors" without a doubt.  :-)
-
-> +EXPORT_SYMBOL_GPL(vexpress_spc_write_resume_reg);
-> +EXPORT_SYMBOL_GPL(vexpress_spc_set_global_wakeup_intr);
-> +EXPORT_SYMBOL_GPL(vexpress_spc_set_cpu_wakeup_irq);
-> +EXPORT_SYMBOL_GPL(vexpress_spc_powerdown_enable);
-
-I don't think anything that could possibly be made into modules should 
-ever have a need for those particular calls.  So I'd suggest not 
-exporting them.
-
-Other than that, you may add...
-
-Reviewed-by: Nicolas Pitre <nico@linaro.org>
-
-
-Nicolas
+Jason.
