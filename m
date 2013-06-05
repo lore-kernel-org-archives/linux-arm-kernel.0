@@ -1,63 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 05 Jun 2013 14:50:44 +0200
-Subject: [PATCH] cpuidle: move ARCH_NEEDS_CPU_IDLE_COUPLED Kconfig option
-In-Reply-To: <1460854.rT4b7LefMM@wuerfel>
-References: <1460854.rT4b7LefMM@wuerfel>
-Message-ID: <51AF3424.5060200@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 5 Jun 2013 13:50:51 +0100
+Subject: [PATCH v3 5/6] arm64/xen: introduce CONFIG_XEN and hypercall.S
+ on ARM64
+In-Reply-To: <1471793.18ZhhAHKN9@wuerfel>
+References: <alpine.DEB.2.02.1306041712100.4589@kaball.uk.xensource.com>
+ <1370434530-22428-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1471793.18ZhhAHKN9@wuerfel>
+Message-ID: <20130605125051.GB11402@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 02:38 PM, Arnd Bergmann wrote:
-> There is no reason why ARCH_NEEDS_CPU_IDLE_COUPLED needs to be
-> hidden inside of "if CPU_IDLE", since it is a silent option.
-> Moving it outside lets platforms select this symbol unconditionally,
-> which avoid a warning from the ARM omap2plus_defconfig build:
+On Wed, Jun 05, 2013 at 01:44:55PM +0100, Arnd Bergmann wrote:
+> On Wednesday 05 June 2013 13:15:29 Stefano Stabellini wrote:
+> > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> > index c95c5cb..79dd13d 100644
+> > --- a/arch/arm64/Makefile
+> > +++ b/arch/arm64/Makefile
+> > @@ -37,6 +37,7 @@ TEXT_OFFSET := 0x00080000
+> >  export TEXT_OFFSET GZFLAGS
+> >  
+> >  core-y         += arch/arm64/kernel/ arch/arm64/mm/
+> > +core-$(CONFIG_XEN)             += arch/arm64/xen/
+> >  libs-y         := arch/arm64/lib/ $(libs-y)
+> >  libs-y         += $(LIBGCC)
+> >  
+> > diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
+> > new file mode 100644
+> > index 0000000..be24040
+> > --- /dev/null
+> > +++ b/arch/arm64/xen/Makefile
+> > @@ -0,0 +1,2 @@
+> > +xen-arm-y      += $(addprefix ../../arm/xen/, enlighten.o grant-table.o)
+> > +obj-y          := xen-arm.o hypercall.o
 > 
-> warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects
-> 	ARCH_NEEDS_CPU_IDLE_COUPLED which has unmet direct
-> 	dependencies (CPU_IDLE)
+> I think it would be nicer to redirect the entire directory, not just
+> the enlighten.o and grant-table.o files. You could do in arch/arm64/Makefile:
+> 
+> core-(CONFIG_XEN) += arch/arm/xen/
+> 
+> That leaves a small difference in hypercall.o, which I think you can
+> handle with an #ifdef.
+> 
+> I believe the reason why KVM does the more elaborate variant is that
+> they want to be able to build their code as a loadable module that
+> also includes code from virt/kvm, which you don't need.
 
-IMHO, this option depends on CPU_IDLE and thus must be kept inside the
-CPU_IDLE menuconfig.
+I thought we scrapped the idea of KVM as a loadable module on ARM, mainly
+due to the complexities with retrospective initialisation of HYP mode/EL2?
 
-The warning raised here is because this option is selected by the arch
-Kconfig without checking if CPU_IDLE is set or not.
-
-I am in favor to change the OMAP / TEGRA Kconfigs instead, in this way:
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index f49cd51..831e89e 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -83,7 +83,7 @@ config ARCH_OMAP4
-        depends on ARCH_OMAP2PLUS
-        depends on ARCH_MULTI_V7
-        select ARCH_HAS_OPP
--       select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
-+       select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
-        select ARM_CPU_SUSPEND if PM
-        select ARM_ERRATA_720789
-        select ARM_GIC
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 84d72fc..04c6221 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -23,7 +23,7 @@ menu "NVIDIA Tegra options"
-
- config ARCH_TEGRA_2x_SOC
-        bool "Enable support for Tegra20 family"
--       select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
-+       select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
-        select ARM_ERRATA_720789
-        select ARM_ERRATA_754327 if SMP
-        select ARM_ERRATA_764369 if SMP
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-
-[ ... ]
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Will
