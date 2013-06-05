@@ -1,77 +1,43 @@
-From: jonsmirl@gmail.com (jonsmirl at gmail.com)
-Date: Wed, 5 Jun 2013 19:28:42 -0400
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
-Message-ID: <CAKON4OyWaUod8m-7Fn5qdjnMs8o+ajqdOJ=XRmw_v=93L00fWQ@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 06 Jun 2013 08:32:04 +0900
+Subject: [PATCH v2] ARM: exynos: add debug_ll_io_init() call in
+ exynos_init_io()
+In-Reply-To: <CAOesGMhQX9ip=nb9AQa5fcDFRNpZZSxUO0N0GTX051dakWZD9Q@mail.gmail.com>
+References: <1370397539-21653-1-git-send-email-dianders@chromium.org>
+ <1370465793-7997-1-git-send-email-dianders@chromium.org>
+ <CAOesGMhQX9ip=nb9AQa5fcDFRNpZZSxUO0N0GTX051dakWZD9Q@mail.gmail.com>
+Message-ID: <09ca01ce6244$e2f0e7a0$a8d2b6e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 5, 2013 at 7:26 PM, luke.leighton <luke.leighton@gmail.com> wrote:
-> On Thu, Jun 6, 2013 at 12:07 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> On Wed, Jun 5, 2013 at 6:47 PM, luke.leighton <luke.leighton@gmail.com> wrote:
->>> On Wed, Jun 5, 2013 at 10:59 PM, Henrik Nordstr?m
->>> <henrik@henriknordstrom.net> wrote:
->>>
->>>>>  .... and then there's the boot0 and boot1 loaders, these *do* have
->>>
->>>> no, these are not tiny. boot0 is 24KB to fit the initial embedded SRAM
->>>> (not cache), but boot1 is on pair with u-boot in size and runs from
->>>> DRAM.
->>>
->>>  btw, please listen to henrik: he knows what he's talking about, as
->>> you can see :)   henrik, thank you for correcting my technical
->>> misunderstandings, i'll try to remember them and not propagate
->>> incorrect stuff.
->>
->> This is not about the fex syntax or uboot. The root problem is needing
->> two sets of binding for every device driver in the kernel. Pick a
->> random driver like gpio-pca953x.c and look at the source. In that file
->> there are #ifdef CONFIG_OF_ sections. Those sections are directly
->> reading the FDT binary via calls like of_get_property(node,
->> "linux,gpio-base", &size);. If fex is added to the kernel every driver
->> driver will now need both a #ifdef CONFIG_OF_ section and also a
->> #ifdef CONFIG_FEX_ section. Doing that is just crazy.
->
->  yes.  which is why they haven't done it.
->
->> Is Allwinner
->> going to add fex support to every single device driver in the kernel?
->
->  no john - they've only added it to the multiplexed sections of the
-> drivers which they themselves have written.  such as
-> drivers/usb/sun{N}i_usb/*.[ch], drivers/block/nand/sun{N}_i,
-> arch/arm/mach-sun{N}i and so on.
->
-> even the touchscreen driver that they wrote, that's got nothing to do
-> with any other code in the touchscreen linux kernel source tree: it's
-> more of a "meta-"driver which even has the name of the linux kernel
-> module that needs to be loaded and what I2C address, GPIO options etc.
-> to pass in [normally done as modprobe options in userspace].
->
->  to be honest, there are better people to fully answer this question
-> (alejandro and henrik are two that spring to mind) but you're
-> definitely off-base, jon.  the script.fex system deals with the pinmux
-> issue in a very neat way that:
->
->   a) has very little impact on the rest of the kernel tree [citation
-> needed!  i'm saying that: could someone please confirm if it's true]
->
->   b) the linux kernel developers could, instead of criticising it,
-> actually learn a great deal from.
->
-> l.
+Olof Johansson wrote:
+> 
+> On Wed, Jun 5, 2013 at 1:56 PM, Doug Anderson <dianders@chromium.org>
+> wrote:
+> > If the early MMU mapping of the UART happens to get booted out of the
+> > TLB between the start of paging_init() and when we finally re-add the
+> > UART at the very end of s3c_init_cpu(), we'll get a hang at bootup if
+> > we've got early_printk enabled.  Avoid this hang by calling
+> > debug_ll_io_init() early.
+> >
+> > Without this patch, you can reliably reproduce a hang when early
+> > printk is enabled by adding flush_tlb_all() at the start of
+> > exynos_init_io().  After this patch the hang goes away.
+> >
+> > Signed-off-by: Doug Anderson <dianders@chromium.org>
+> 
+> Acked-by: Olof Johansson <olof@lixom.net>
+> 
+> 
+> Kukjin, this seems appropriate for 3.10. Do you have other fixes
+> queued or should I apply this directly?
+> 
+If I remember correctly, nothing in my tree for 3.10.
 
+So please go ahead with my ack if you want,
 
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
--- 
-Jon Smirl
-jonsmirl at gmail.com
+Thanks.
+
+- Kukjin
