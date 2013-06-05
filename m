@@ -1,71 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 05 Jun 2013 14:13:59 +0100
-Subject: Planning the merge of KVM/arm64
-In-Reply-To: <20130605125740.GA4725@redhat.com>
-References: <51ADDDAE.4040705@arm.com>
- <CAMJs5B_PB1pNVCO_EK7aTghN23L+d0RovAFi7inrVsJb5STWOA@mail.gmail.com>
- <51AE00D7.9030607@arm.com> <51AE082C.6050907@redhat.com>
- <CAMJs5B9PxHfUrugov4HJknQ24fG7MNp8obziqu9dnSztsGBksQ@mail.gmail.com>
- <51AE0D0D.3030106@redhat.com> <20130604163741.GA15299@redhat.com>
- <CAMJs5B8WqiMpqj3Mr=rPCr89k-jvY2i3BDbkPOsMb3PhCR1SWg@mail.gmail.com>
- <20130605060105.GA1187@redhat.com> <20130605093145.GB8758@arm.com>
- <20130605125740.GA4725@redhat.com>
-Message-ID: <51AF3997.2030909@arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 5 Jun 2013 14:21:17 +0100
+Subject: [PATCH v2 5/5] arm64/xen: introduce CONFIG_XEN and hypercall.S
+ on ARM64
+In-Reply-To: <alpine.DEB.2.02.1306031745460.4589@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1306031157020.4589@kaball.uk.xensource.com>
+ <1370273624-26976-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20130603162517.GC32295@arm.com>
+ <alpine.DEB.2.02.1306031745460.4589@kaball.uk.xensource.com>
+Message-ID: <20130605132117.GK8758@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/13 13:57, Gleb Natapov wrote:
-> On Wed, Jun 05, 2013 at 10:31:46AM +0100, Catalin Marinas wrote:
->> On Wed, Jun 05, 2013 at 07:01:05AM +0100, Gleb Natapov wrote:
->>> On Tue, Jun 04, 2013 at 10:57:32PM -0700, Christoffer Dall wrote:
->>>> On 4 June 2013 09:37, Gleb Natapov <gleb@redhat.com> wrote:
->>>>> On Tue, Jun 04, 2013 at 05:51:41PM +0200, Paolo Bonzini wrote:
->>>>>> Il 04/06/2013 17:43, Christoffer Dall ha scritto:
->>>>>>> Hi Paolo,
->>>>>>>
->>>>>>> I don't think this is an issue. Gleb and Marcelo for example pulled
->>>>>>> RMK's stable tree for my KVM/ARM updates for the 3.10 merge window and
->>>>>>> that wasn't an issue.  If Linus pulls the kvm/next tree first the
->>>>>>> diffstat should be similar and everything clean enough, no?
->>>>>>>
->>>>>>> Catalin has previously expressed his wish to upstream the kvm/arm64
->>>>>>> patches directly through him given the churn in a completely new
->>>>>>> architecture and he wants to make sure that everything looks right.
->>>>>>>
->>>>>>> It's a pretty clean implementation with quite few dependencies and
->>>>>>> merging as a working series should be a priority instead of the
->>>>>>> Kconfig hack, imho.
->>>>>>
->>>>>> Ok, let's see what Gleb says.
->>>>>>
->>>>> I have no objection to merge arm64 kvm trough Catalin if it mean less
->>>>> churn for everyone. That's what we did with arm and mips. Arm64 kvm
->>>>> has a dependency on kvm.git next though, so how Catalin make sure that
->>>>> everything looks right? Will he merge kvm.git/next to arm64 tree?
->>>>>
->>>> Yes, that was the idea. Everything in kvm/next is considered stable, right?
->>>>
->>> Right. Catalin should wait for kvm.git to be pulled by Linus next merge
->>> windows before sending his pull request then.
->>
->> I think it's better if I push the bulk of the arm64 KVM branch but
->> without Kconfig patch enabling it. This branch would be based on
->> mainline rather than kvm/next. Once your code goes in mainline, I'll
->> just push the Kconfig entry (for bisection reasons, it could be after
->> -rc1). This would keep the pull-request diffstat cleaner.
->>
-> If there will be no non trivial conflicts between your tree and kvm/next
-> it should be OK too.
+On Mon, Jun 03, 2013 at 05:51:53PM +0100, Stefano Stabellini wrote:
+> On Mon, 3 Jun 2013, Catalin Marinas wrote:
+> > Otherwise, the series looks good. How do you plan to upstream this?
+> 
+> Good question.
+> Traditionally Xen stuff goes to Linus directly via one of the Xen trees
+> (Konrad's or mine), but since this is the very first Xen patch series
+> for arm64 if you prefer I can submit a pull request to you instead.
+> Just let me know, I am happy either way.
 
-In order to make sure no userspace ABI breakage occur during the merge,
-can you please make sure that the following values are reserved:
-- Capability KVM_CAP_ARM_EL1_32BIT, 93
-- ONE_REG architecture KVM_REG_ARM64, 0x6000000000000000ULL
+I can take the first series and subsequent merges can go via the Xen
+tree (KVM has a similar approach).
 
-So far, nothing clashes with it in kvm/next, but I'd like to be 100% sure...
+> In any case, are you OK with sending it upstream during the next merge
+> window?
 
-Thanks,
+Yes, if I get a pull request in time ;)
 
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Catalin
