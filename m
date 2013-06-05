@@ -1,88 +1,262 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed,  5 Jun 2013 23:18:10 +0200
-Subject: [PATCH 05/15] ARM: SAMSUNG: Remove old samsung-time driver
+Date: Wed,  5 Jun 2013 23:18:08 +0200
+Subject: [PATCH 03/15] ARM: SAMSUNG: Set PWM platform data
 In-Reply-To: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
 References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1370467100-10820-6-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1370467100-10820-4-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/plat-samsung/Kconfig                     |   8 -
- arch/arm/plat-samsung/Makefile                    |   1 -
- arch/arm/plat-samsung/include/plat/samsung-time.h |  23 --
- arch/arm/plat-samsung/samsung-time.c              | 394 ----------------------
- 4 files changed, 426 deletions(-)
- delete mode 100644 arch/arm/plat-samsung/samsung-time.c
+From: Tomasz Figa <t.figa@samsung.com>
 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index f8ed2de..e88adc0 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -60,14 +60,6 @@ config S3C_LOWLEVEL_UART_PORT
- 	  this configuration should be between zero and two. The port
- 	  must have been initialised by the boot-loader before use.
+This patch adds PWM platform data needed for legacy (non-DT) platforms
+to handle SoC-specific bits of the PWM/timer block.
+
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/common.c  |  3 +++
+ arch/arm/mach-s3c24xx/common.c | 11 +++++++++++
+ arch/arm/mach-s3c64xx/common.c | 11 +++++++++++
+ arch/arm/mach-s5p64x0/common.c | 10 ++++++++++
+ arch/arm/mach-s5pc100/common.c | 11 +++++++++++
+ arch/arm/mach-s5pv210/common.c | 11 +++++++++++
+ 6 files changed, 57 insertions(+)
+
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 027c9e7..6b368a8 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -52,6 +52,7 @@
+ #include <plat/fb-core.h>
+ #include <plat/fimc-core.h>
+ #include <plat/iic-core.h>
++#include <plat/pwm-core.h>
+ #include <plat/tv-core.h>
+ #include <plat/spi-core.h>
+ #include <plat/regs-serial.h>
+@@ -443,6 +444,8 @@ static void __init exynos4_map_io(void)
+ 	s5p_hdmi_setname("exynos4-hdmi");
  
--# timer options
--
--config SAMSUNG_HRT
--	bool
--	select SAMSUNG_DEV_PWM
--	help
--	  Use the High Resolution timer support
--
- # clock options
+ 	s3c64xx_spi_setname("exynos4210-spi");
++
++	samsung_pwm_set_platdata(&exynos4_pwm_variant);
+ }
  
- config SAMSUNG_CLOCK
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index a23c460..87494e1 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -12,7 +12,6 @@ obj-				:=
- # Objects we always build independent of SoC choice
+ static void __init exynos5_map_io(void)
+diff --git a/arch/arm/mach-s3c24xx/common.c b/arch/arm/mach-s3c24xx/common.c
+index c157103..e5e7d7d 100644
+--- a/arch/arm/mach-s3c24xx/common.c
++++ b/arch/arm/mach-s3c24xx/common.c
+@@ -27,6 +27,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/ioport.h>
+ #include <linux/serial_core.h>
++#include <clocksource/samsung_pwm.h>
+ #include <linux/platform_device.h>
+ #include <linux/delay.h>
+ #include <linux/io.h>
+@@ -49,6 +50,7 @@
+ #include <plat/clock.h>
+ #include <plat/cpu-freq.h>
+ #include <plat/pll.h>
++#include <plat/pwm-core.h>
  
- obj-y				+= init.o cpu.o
--obj-$(CONFIG_SAMSUNG_HRT) 	+= samsung-time.o
+ #include "common.h"
  
- obj-$(CONFIG_SAMSUNG_CLOCK)	+= clock.o
- obj-$(CONFIG_SAMSUNG_CLOCK)	+= pwm-clock.o
-diff --git a/arch/arm/plat-samsung/include/plat/samsung-time.h b/arch/arm/plat-samsung/include/plat/samsung-time.h
-index 4cc99bb..209464a 100644
---- a/arch/arm/plat-samsung/include/plat/samsung-time.h
-+++ b/arch/arm/plat-samsung/include/plat/samsung-time.h
-@@ -22,29 +22,6 @@ enum samsung_timer_mode {
- 	SAMSUNG_PWM4,
+@@ -216,6 +218,13 @@ static void s3c24xx_default_idle(void)
+ 		     S3C2410_CLKCON);
+ }
+ 
++static struct samsung_pwm_variant s3c24xx_pwm_variant = {
++	.bits		= 16,
++	.div_base	= 1,
++	.has_tint_cstat	= false,
++	.tclk_mask	= (1 << 4),
++};
++
+ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
+ {
+ 	arm_pm_idle = s3c24xx_default_idle;
+@@ -232,6 +241,8 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
+ 	s3c24xx_init_cpu();
+ 
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
++
++	samsung_pwm_set_platdata(&s3c24xx_pwm_variant);
+ }
+ 
+ /* Serial port registrations */
+diff --git a/arch/arm/mach-s3c64xx/common.c b/arch/arm/mach-s3c64xx/common.c
+index 0b9c0ba..5f3530e 100644
+--- a/arch/arm/mach-s3c64xx/common.c
++++ b/arch/arm/mach-s3c64xx/common.c
+@@ -26,6 +26,7 @@
+ #include <linux/irq.h>
+ #include <linux/gpio.h>
+ #include <linux/irqchip/arm-vic.h>
++#include <clocksource/samsung_pwm.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -42,6 +43,7 @@
+ #include <plat/gpio-cfg.h>
+ #include <plat/irq-uart.h>
+ #include <plat/irq-vic-timer.h>
++#include <plat/pwm-core.h>
+ #include <plat/regs-irqtype.h>
+ #include <plat/regs-serial.h>
+ #include <plat/watchdog-reset.h>
+@@ -148,6 +150,13 @@ static struct device s3c64xx_dev = {
+ 	.bus	= &s3c64xx_subsys,
  };
  
--struct samsung_timer_source {
--	unsigned int event_id;
--	unsigned int source_id;
--};
--
--/* Be able to sleep for atleast 4 seconds (usually more) */
--#define SAMSUNG_TIMER_MIN_RANGE	4
--
--#if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S5PC100)
--#define TCNT_MAX		0xffff
--#define TSCALER_DIV		25
--#define TDIV			50
--#define TSIZE			16
--#else
--#define TCNT_MAX		0xffffffff
--#define TSCALER_DIV		2
--#define TDIV			2
--#define TSIZE			32
--#endif
--
--#define NON_PERIODIC		0
--#define PERIODIC		1
--
- extern void __init samsung_set_timer_source(enum samsung_timer_mode event,
- 					enum samsung_timer_mode source);
++static struct samsung_pwm_variant s3c64xx_pwm_variant = {
++	.bits		= 32,
++	.div_base	= 0,
++	.has_tint_cstat	= true,
++	.tclk_mask	= (1 << 7) | (1 << 6) | (1 << 5),
++};
++
+ /* read cpu identification code */
  
-diff --git a/arch/arm/plat-samsung/samsung-time.c b/arch/arm/plat-samsung/samsung-time.c
-deleted file mode 100644
-index f899cbc..0000000
+ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
+@@ -160,6 +169,8 @@ void __init s3c64xx_init_io(struct map_desc *mach_desc, int size)
+ 	s3c64xx_init_cpu();
+ 
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
++
++	samsung_pwm_set_platdata(&s3c64xx_pwm_variant);
+ }
+ 
+ static __init int s3c64xx_dev_init(void)
+diff --git a/arch/arm/mach-s5p64x0/common.c b/arch/arm/mach-s5p64x0/common.c
+index 8ae5800..50edd3c 100644
+--- a/arch/arm/mach-s5p64x0/common.c
++++ b/arch/arm/mach-s5p64x0/common.c
+@@ -19,6 +19,7 @@
+ #include <linux/io.h>
+ #include <linux/device.h>
+ #include <linux/serial_core.h>
++#include <clocksource/samsung_pwm.h>
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
+ #include <linux/dma-mapping.h>
+@@ -46,6 +47,7 @@
+ #include <plat/fb-core.h>
+ #include <plat/spi-core.h>
+ #include <plat/gpio-cfg.h>
++#include <plat/pwm-core.h>
+ #include <plat/regs-irqtype.h>
+ #include <plat/regs-serial.h>
+ #include <plat/watchdog-reset.h>
+@@ -156,6 +158,13 @@ static void s5p64x0_idle(void)
+ 	cpu_do_idle();
+ }
+ 
++static struct samsung_pwm_variant s5p64x0_pwm_variant = {
++	.bits		= 32,
++	.div_base	= 0,
++	.has_tint_cstat	= true,
++	.tclk_mask	= 0,
++};
++
+ /*
+  * s5p64x0_map_io
+  *
+@@ -173,6 +182,7 @@ void __init s5p64x0_init_io(struct map_desc *mach_desc, int size)
+ 	s5p_init_cpu(S5P64X0_SYS_ID);
+ 
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
++	samsung_pwm_set_platdata(&s5p64x0_pwm_variant);
+ }
+ 
+ void __init s5p6440_map_io(void)
+diff --git a/arch/arm/mach-s5pc100/common.c b/arch/arm/mach-s5pc100/common.c
+index cc6e561..e56a4d8 100644
+--- a/arch/arm/mach-s5pc100/common.c
++++ b/arch/arm/mach-s5pc100/common.c
+@@ -22,6 +22,7 @@
+ #include <linux/io.h>
+ #include <linux/device.h>
+ #include <linux/serial_core.h>
++#include <clocksource/samsung_pwm.h>
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
+ 
+@@ -45,6 +46,7 @@
+ #include <plat/fb-core.h>
+ #include <plat/iic-core.h>
+ #include <plat/onenand-core.h>
++#include <plat/pwm-core.h>
+ #include <plat/spi-core.h>
+ #include <plat/regs-serial.h>
+ #include <plat/watchdog-reset.h>
+@@ -131,6 +133,13 @@ static struct map_desc s5pc100_iodesc[] __initdata = {
+ 	}
+ };
+ 
++static struct samsung_pwm_variant s5pc100_pwm_variant = {
++	.bits		= 32,
++	.div_base	= 0,
++	.has_tint_cstat	= true,
++	.tclk_mask	= (1 << 5),
++};
++
+ /*
+  * s5pc100_map_io
+  *
+@@ -148,6 +157,8 @@ void __init s5pc100_init_io(struct map_desc *mach_desc, int size)
+ 	s5p_init_cpu(S5P_VA_CHIPID);
+ 
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
++
++	samsung_pwm_set_platdata(&s5pc100_pwm_variant);
+ }
+ 
+ void __init s5pc100_map_io(void)
+diff --git a/arch/arm/mach-s5pv210/common.c b/arch/arm/mach-s5pv210/common.c
+index 9dfe93e..4eba33d 100644
+--- a/arch/arm/mach-s5pv210/common.c
++++ b/arch/arm/mach-s5pv210/common.c
+@@ -19,6 +19,7 @@
+ #include <linux/clk.h>
+ #include <linux/io.h>
+ #include <linux/device.h>
++#include <clocksource/samsung_pwm.h>
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
+ #include <linux/dma-mapping.h>
+@@ -42,6 +43,7 @@
+ #include <plat/fimc-core.h>
+ #include <plat/iic-core.h>
+ #include <plat/keypad-core.h>
++#include <plat/pwm-core.h>
+ #include <plat/tv-core.h>
+ #include <plat/spi-core.h>
+ #include <plat/regs-serial.h>
+@@ -148,6 +150,13 @@ void s5pv210_restart(char mode, const char *cmd)
+ 	__raw_writel(0x1, S5P_SWRESET);
+ }
+ 
++static struct samsung_pwm_variant s5pv210_pwm_variant = {
++	.bits		= 32,
++	.div_base	= 0,
++	.has_tint_cstat	= true,
++	.tclk_mask	= (1 << 5),
++};
++
+ /*
+  * s5pv210_map_io
+  *
+@@ -165,6 +174,8 @@ void __init s5pv210_init_io(struct map_desc *mach_desc, int size)
+ 	s5p_init_cpu(S5P_VA_CHIPID);
+ 
+ 	s3c_init_cpu(samsung_cpu_id, cpu_ids, ARRAY_SIZE(cpu_ids));
++
++	samsung_pwm_set_platdata(&s5pv210_pwm_variant);
+ }
+ 
+ void __init s5pv210_map_io(void)
 -- 
 1.8.2.1
