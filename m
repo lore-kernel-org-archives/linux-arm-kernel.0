@@ -1,38 +1,22 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 5 Jun 2013 22:51:36 +0900
-Subject: [PATCH 2/4] irqchip: renesas-intc-irqpin: DT binding for sense
- bitfield width
-In-Reply-To: <201306051352.52924.arnd@arndb.de>
-References: <1370406751-3852-1-git-send-email-horms+renesas@verge.net.au>
- <1370406751-3852-3-git-send-email-horms+renesas@verge.net.au>
- <201306051352.52924.arnd@arndb.de>
-Message-ID: <20130605135136.GC7451@verge.net.au>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Wed, 5 Jun 2013 16:51:24 +0300
+Subject: [PATCH 0/2] PLL m,n,p init from SoC files
+Message-ID: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 01:52:52PM +0200, Arnd Bergmann wrote:
-> On Wednesday 05 June 2013, Simon Horman wrote:
-> > @@ -0,0 +1,13 @@
-> > +DT bindings for the R-/SH-Mobile irqpin controller
-> > +
-> > +Required properties:
-> > +
-> > +- compatible: has to be "renesas,intc-irqpin"
-> > +- #interrupt-cells: has to be <2>
-> > +
-> > +Optional properties:
-> > +
-> > +- any properties, listed in interrupts.txt in this directory, and any standard
-> > +  resource allocation properties
-> > +- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
-> > +  if different from the default 4 bits
-> 
-> I think you should add documentation here about how the two interrupt cells
-> are to be interpreted, to allow people to fill the values from a data sheet
-> or board schematic.
+The m,n,p fields don't have the same bit offset and width across all PLLs.
+This patchset allows SoC specific files to indicate the offset and width.
+It also provides the data for Tegra114.
 
-I will drop this patch from the renesas tree pending some more work
-on the documentation.
+Peter De Schrijver (2):
+  clk: tegra: allow PLL m,n,p init from SoC files
+  clk: tegra: PLL m,n,p init for Tegra114
 
-I'll put together an updated pull request for renesas-intc-irqpin
-without this or the runtime-pm patch, which Magnus commented on elsewhere.
+ drivers/clk/tegra/clk-pll.c      |   60 ++++++++++++++++-------------
+ drivers/clk/tegra/clk-tegra114.c |   77 ++++++++++++++++++++++++++++++++++++++
+ drivers/clk/tegra/clk.h          |   32 ++++++++++------
+ 3 files changed, 130 insertions(+), 39 deletions(-)
+
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
