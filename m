@@ -1,71 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:25:26 +0900
-Subject: [PATCH 035/130] ARM: shmobile: mackerel: Register pinctrl mapping for
- FLCTL
+Date: Wed,  5 Jun 2013 17:25:35 +0900
+Subject: [PATCH 044/130] ARM: shmobile: mackerel: Register pinctrl mapping for
+ USBHS
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-36-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-45-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Replace the GPIO-based FLCTL pinmux configuration by a pinctrl mapping.
+Replace the GPIO-based USBHS pinmux configuration by a pinctrl mapping.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-mackerel.c | 31 +++++++------------------------
- 1 file changed, 7 insertions(+), 24 deletions(-)
+ arch/arm/mach-shmobile/board-mackerel.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index fdd7e3f..955fefd 100644
+index 397e73c..85f51a8 100644
 --- a/arch/arm/mach-shmobile/board-mackerel.c
 +++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1321,6 +1321,13 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
- 				  "ceu_sync", "ceu"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-sh7372",
- 				  "ceu_field", "ceu"),
-+	/* FLCTL */
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_flctl.0", "pfc-sh7372",
-+				  "flctl_data", "flctl"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_flctl.0", "pfc-sh7372",
-+				  "flctl_ce0", "flctl"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_flctl.0", "pfc-sh7372",
-+				  "flctl_ctrl", "flctl"),
- 	/* SDHI0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
- 				  "sdhi0_data4", "sdhi0"),
-@@ -1478,30 +1485,6 @@ static void __init mackerel_init(void)
- 	/* SDHI0 PORT172 card-detect IRQ26 */
- 	gpio_request(GPIO_FN_IRQ26_172, NULL);
+@@ -1390,6 +1390,14 @@ static const struct pinctrl_map mackerel_pinctrl_map[] = {
+ 	/* TCA6416 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("0-0020", "pfc-sh7372",
+ 				  "intc_irq9_0", "intc"),
++	/* USBHS0 */
++	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs.0", "pfc-sh7372",
++				  "usb0_vbus", "usb0"),
++	/* USBHS1 */
++	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs.1", "pfc-sh7372",
++				  "usb1_vbus", "usb1"),
++	PIN_MAP_MUX_GROUP_DEFAULT("renesas_usbhs.1", "pfc-sh7372",
++				  "usb1_otg_id_0", "usb1"),
+ };
  
--	/* FLCTL */
--	gpio_request(GPIO_FN_D0_NAF0, NULL);
--	gpio_request(GPIO_FN_D1_NAF1, NULL);
--	gpio_request(GPIO_FN_D2_NAF2, NULL);
--	gpio_request(GPIO_FN_D3_NAF3, NULL);
--	gpio_request(GPIO_FN_D4_NAF4, NULL);
--	gpio_request(GPIO_FN_D5_NAF5, NULL);
--	gpio_request(GPIO_FN_D6_NAF6, NULL);
--	gpio_request(GPIO_FN_D7_NAF7, NULL);
--	gpio_request(GPIO_FN_D8_NAF8, NULL);
--	gpio_request(GPIO_FN_D9_NAF9, NULL);
--	gpio_request(GPIO_FN_D10_NAF10, NULL);
--	gpio_request(GPIO_FN_D11_NAF11, NULL);
--	gpio_request(GPIO_FN_D12_NAF12, NULL);
--	gpio_request(GPIO_FN_D13_NAF13, NULL);
--	gpio_request(GPIO_FN_D14_NAF14, NULL);
--	gpio_request(GPIO_FN_D15_NAF15, NULL);
--	gpio_request(GPIO_FN_FCE0, NULL);
--	gpio_request(GPIO_FN_WE0_FWE, NULL);
--	gpio_request(GPIO_FN_FRB, NULL);
--	gpio_request(GPIO_FN_A4_FOE, NULL);
--	gpio_request(GPIO_FN_A5_FCDE, NULL);
--	gpio_request(GPIO_FN_RD_FSC, NULL);
--
- 	/* enable GPS module (GT-720F) */
- 	gpio_request(GPIO_FN_SCIFA2_TXD1, NULL);
- 	gpio_request(GPIO_FN_SCIFA2_RXD1, NULL);
+ #define GPIO_PORT9CR	IOMEM(0xE6051009)
+@@ -1439,13 +1447,10 @@ static void __init mackerel_init(void)
+ 	gpio_request_one(151, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
+ 
+ 	/* USBHS0 */
+-	gpio_request(GPIO_FN_VBUS0_0, NULL);
+ 	gpio_request_pulldown(GPIO_PORT168CR); /* VBUS0_0 pull down */
+ 
+ 	/* USBHS1 */
+-	gpio_request(GPIO_FN_VBUS0_1, NULL);
+ 	gpio_request_pulldown(GPIO_PORT167CR); /* VBUS0_1 pull down */
+-	gpio_request(GPIO_FN_IDIN_1_113, NULL);
+ 
+ 	/* FSI2 port A (ak4643) */
+ 	gpio_request_one(161, GPIOF_OUT_INIT_LOW, NULL); /* slave */
 -- 
 1.8.2.1
