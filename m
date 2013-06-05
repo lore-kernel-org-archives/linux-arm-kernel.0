@@ -1,21 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 5 Jun 2013 13:21:00 +0200
-Subject: [PATCHv2 1/3] net: phy: prevent linking breakage
-In-Reply-To: <51AF03AF.3080106@free-electrons.com>
-References: <1369741403-25315-2-git-send-email-alexandre.belloni@free-electrons.com>
- <CAGVrzcZcVB5+NqLop+ALrX4Jx_SyNatczLt4oNzXr7bjgKMXhg@mail.gmail.com>
- <51AF03AF.3080106@free-electrons.com>
-Message-ID: <201306051321.00264.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 05 Jun 2013 20:25:25 +0900
+Subject: [PATCH 1/2] ARM: dts: add DP clock reference to exynos5250 device
+ tree
+In-Reply-To: <CAGm_ybh_Uvs2dX3Ecgcwy=GFO6QH-Hj1jz3f1=cDbZGq0Q4qDQ@mail.gmail.com>
+References: <003001ce4e1b$24a28fc0$6de7af40$@samsung.com>
+ <CAGm_ybh_Uvs2dX3Ecgcwy=GFO6QH-Hj1jz3f1=cDbZGq0Q4qDQ@mail.gmail.com>
+Message-ID: <08da01ce61df$6013ba70$203b2f50$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 June 2013, Alexandre Belloni wrote:
-> However, it is becoming urgent for Atmel to get the fix in 3.10 so that
-> they never get a kernel compilation that breaks.
+Vikas Sajjan wrote:
+> 
+> Hi Mr. Jingoo Han,
+> 
+> On Sat, May 11, 2013 at 1:12 PM, Jingoo Han <jg1.han@samsung.com> wrote:
+> The transition to common clock happened; however, DP (Display Port)
+> clock node was not added. Thus, DP (Display Port) clock node should
+> be added to the device tree.
+> 
+> Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> ---
+> Tested on Exynos5250
+> 
+> ?arch/arm/boot/dts/exynos5250.dtsi | ? ?2 ++
+> ?1 files changed, 2 insertions(+), 0 deletions(-)
 
-I don't think it's urgent since this is only about rare configurations,
-and not a regression. We can queue the patch "ARM: at91: Fix link
-breakage when !CONFIG_PHYLIB" you just sent to fix this, but I
-would not consider it a serious problem to have it only in 3.11.
+[...]
 
-	Arnd
+> ?I have already sent similar patch on 8th May 2013.
+> 
+> http://www.spinics.net/lists/linux-samsung-soc/msg18136.html
+
+Vikas, please don't use html typed e-mail :-(
+
+OK, I found Jingoo's ack on that.
+
+Let me take that with Jingoo's ack and Doug's review tag.
+
+Thanks.
+
+- Kukjin
