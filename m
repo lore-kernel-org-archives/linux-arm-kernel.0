@@ -1,57 +1,54 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 5 Jun 2013 17:51:27 +0900
-Subject: [PATCH 00/15] ARM: shmobile: uImage load address rework
-In-Reply-To: <87a9n5582w.wl%kuninori.morimoto.gx@renesas.com>
-References: <20130605070616.13311.69049.sendpatchset@w520>
- <87a9n5582w.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <CANqRtoThDhpe17R5tq+RuSgt_72tuWUoK+5fGLK508tCxKj2jw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 5 Jun 2013 14:24:38 +0530
+Subject: [PATCH v9 1/9] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <1362586540-10393-2-git-send-email-mporter@ti.com>
+References: <1362586540-10393-1-git-send-email-mporter@ti.com>
+ <1362586540-10393-2-git-send-email-mporter@ti.com>
+Message-ID: <51AEFCCE.4040608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Morimoto-san,
+Hi Russell,
 
-On Wed, Jun 5, 2013 at 4:29 PM, Kuninori Morimoto
-<kuninori.morimoto.gx@renesas.com> wrote:
->
-> Hi
->
->> ARM: shmobile: uImage load address rework
->>
->> [PATCH 01/15] ARM: shmobile: Per-board uImage load addresses
->> [PATCH 02/15] ARM: shmobile: AG5EVM uImage rework
->> [PATCH 03/15] ARM: shmobile: AP4EVB uImage rework
->> [PATCH 04/15] ARM: shmobile: APE6EVM uImage rework
->> [PATCH 05/15] ARM: shmobile: Armadillo800EVA uImage rework
->> [PATCH 06/15] ARM: shmobile: Bock-W uImage rework
->> [PATCH 07/15] ARM: shmobile: Bonito uImage rework
->> [PATCH 08/15] ARM: shmobile: KZM9D uImage rework
->> [PATCH 09/15] ARM: shmobile: KZM9G uImage rework
->> [PATCH 10/15] ARM: shmobile: Kota2 uImage rework
->> [PATCH 11/15] ARM: shmobile: Lager uImage rework
->> [PATCH 12/15] ARM: shmobile: Mackerel uImage rework
->> [PATCH 13/15] ARM: shmobile: Marzen uImage rework
->> [PATCH 14/15] ARM: shmobile: Armadillo800EVA reference uImage rework
->> [PATCH 15/15] ARM: shmobile: Remove MEMORY_START uImage load address
->
-> I tested these patches on Bock-W board (as 0x60008000 binary),
-> and on Mackerel board (as 0x40008000 binary)
-> These work well for me :)
+On 3/6/2013 9:45 PM, Matt Porter wrote:
+> Move mach-davinci/dma.c to common/edma.c so it can be used
+> by OMAP (specifically AM33xx) as well.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Acked-by: Sekhar Nori <nsekhar@ti.com>
 
-Thanks for testing.
-
-> I have same opinion with Laurent.
-> 5) and 14) can be 1 patch if you need to sent v2 patches :P
-
-Gotcha!
-
-> for 6), 12) patch
->
-> Tested-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->
-> for all patches
->
-> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Can you please ack this movement of davinci private EDMA implementation
+to arch/arm/common? I would like to take this patch through davinci tree
+for v3.11.
 
 Thanks,
+Sekhar
 
-/ magnus
+> ---
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/common/Kconfig                            |    3 +
+>  arch/arm/common/Makefile                           |    1 +
+>  arch/arm/{mach-davinci/dma.c => common/edma.c}     |    2 +-
+>  arch/arm/mach-davinci/Makefile                     |    2 +-
+>  arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
+>  arch/arm/mach-davinci/davinci.h                    |    2 +-
+>  arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
+>  arch/arm/mach-davinci/devices.c                    |    6 +-
+>  arch/arm/mach-davinci/dm355.c                      |    2 +-
+>  arch/arm/mach-davinci/dm365.c                      |    2 +-
+>  arch/arm/mach-davinci/dm644x.c                     |    2 +-
+>  arch/arm/mach-davinci/dm646x.c                     |    2 +-
+>  arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
+>  drivers/dma/edma.c                                 |    2 +-
+>  drivers/mmc/host/davinci_mmc.c                     |    1 +
+>  include/linux/mfd/davinci_voicecodec.h             |    3 +-
+>  .../mach => include/linux/platform_data}/edma.h    |   89 +-------------------
+>  include/linux/platform_data/spi-davinci.h          |    2 +-
+>  sound/soc/davinci/davinci-evm.c                    |    1 +
+>  sound/soc/davinci/davinci-pcm.c                    |    1 +
+>  sound/soc/davinci/davinci-pcm.h                    |    2 +-
+>  sound/soc/davinci/davinci-sffsdr.c                 |    5 +-
+>  23 files changed, 33 insertions(+), 104 deletions(-)
+>  rename arch/arm/{mach-davinci/dma.c => common/edma.c} (99%)
+>  rename {arch/arm/mach-davinci/include/mach => include/linux/platform_data}/edma.h (59%)
+> 
