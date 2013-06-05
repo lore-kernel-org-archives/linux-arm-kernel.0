@@ -1,16 +1,33 @@
-From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
-Date: Wed, 05 Jun 2013 23:47:53 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 05 Jun 2013 23:52:26 +0200
+Subject: getting allwinner SoC support upstream (was Re: Uploading linux
+ (3.9.4-1))
 In-Reply-To: <CAPweEDzDC87KmOQ=0hyPcjPtPsRuXHxNTs97vbEqVNNnix69rA@mail.gmail.com>
 References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
  <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
  <CAPweEDzDC87KmOQ=0hyPcjPtPsRuXHxNTs97vbEqVNNnix69rA@mail.gmail.com>
-Message-ID: <1370468873.18839.22.camel@localhost>
+Message-ID: <19865137.ey1FePPnmD@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ons 2013-06-05 klockan 22:15 +0100 skrev Luke Kenneth Casson Leighton:
+Hi Luke,
+
+On Wednesday 05 of June 2013 22:15:08 Luke Kenneth Casson Leighton wrote:
+> [i've just received word, please remove debian-release from
+> discussions!]
+> On Wed, Jun 5, 2013 at 9:46 PM, jonsmirl at gmail.com <jonsmirl@gmail.com> 
+wrote:
+> > Why don't you try converting the sunxi code over to device tree?
+> 
+> ok.  perhaps i wasn't clear.  whatever is proposed has to be be
+> acceptable to allwinner, and i'm looking for proposals that i can put
+> to them, i.e. i am going to act as the communications channel to them.
+
+Well, device tree is the only method of hardware description supported by 
+Linux kernel on ARM at the moment (except for board files, but this is 
+deprecated). I don't see why it should change, considering the fact that 
+device tree is generic, extensible and described by standards. There is no 
+place for any proprietary solutions here.
 
 > what we do not want to happen is that they see upstream patches being
 > submitted, they merge them into their internal tree (which to date has
@@ -19,57 +36,68 @@ ons 2013-06-05 klockan 22:15 +0100 skrev Luke Kenneth Casson Leighton:
 > everything* that's being done by the community, duplicating yet
 > another set of device drivers (named drivers/*/sun8i_* and so on).
 
-Well, that will obviously happen one or two more rounds, a bit depending
-on which kernel releases Android will use. But I hope the Allwinner
-kernel team will rethink when they hit more current kernels.
+This is mostly their problem. If they don't care about work duplication on 
+their side then why bother?
 
+> > I don't
+> > think it will be as hard as you may think it is. Start off by mapping
+> > the existing fex syntax into a DTS file. Send your DTS file to
+> > devicetree-discuss to get help with the correct syntax. Once this DTS
+> > template is constructed you can write a program to convert any fex
+> > file into it.
+> 
 >  this proposal is a start: however what you have to bear in mind is
 > that you now have to convince a very busy company that it is in their
 > best interests to disrupt their schedule, to drop their existing
 > working practices, to tell all their customers "please stop using the
 > existing tools and please use these ones instead".
 
-Why?
+I'm not sure if I followed all the discussion (read 
+http://thread.gmane.org/gmane.linux.debian.devel.kernel/91136/focus=92096 
+which didn't seem to contain anything relevant), so I might not have the 
+full picture, but I'm going to put my two cents in.
+
+I tend to disagree with your view. Is it really our task to convince such 
+companies to work with open source community? If they don't see the 
+benefit of doing so, then IMHO it's their loss and loss of their customers 
+and end users. There are so many vendors backing open source at the moment 
+and they somehow don't have problems like this.
 
 >  you also need to convince the creators of the proprietary
 > firmware-flashing tools "livesuite" and "phoenix" to *also* convert
 > their tools over to the new proposed idea.
-
-Why?
-
+> 
+>  so if that is to truly be accepted, it has to be framed in such a way
+> that it will be clearly of financial benefit to the SoC vendor.
+> 
 >  can you provide such a supporting argument which would convince
 > allwinner to accept the modifications to their working practices that
 > you propose?
 
-It does not really need to be such big modifications to their working
-practices. Their configuration working practices is all built around the
-fex file, and the new practices can be
+There is one, very simple. If they don't, there is no community 
+cooperation for them, that's how it works. There is a set of unwritten (or 
+maybe even written) rules of open source communities that you must obey if 
+you want to work with them and you can't just get over that, because some 
+company don't want to change their practices.
 
-0. Assuming kernel drivers gets ported over to using device tree.
+Just see how many companies are backing open source at the moment, without 
+making problems like this. They have understood the benefits and taken the 
+effort to change their practices, because it was worth it. (I'm working 
+for such company at the moment and I can assure you that this is the 
+case.)
 
-1. Do configuration as you have always done in the .fex
-
-2. Modify the build script to build a device tree from the fex +
-template, in addition to script.bin.
-
-3. Tell u-boot to load the device tree for the kernel.
-
-That's it really.
-
-licesuit do not modify script.bin. script.bin is compiled from the .fex
-at image creation time. A couple more lines in the build script (and a
-suitable translation tool) and there is also a device tree built and
-installed and you get a nice and smoot transition.
-
-> > Device tree on ARM's goal is to achieve a single kernel across vendors, not
-> > just a single kernel for a single vendor.
+> > Device tree on ARM's goal is to achieve a single kernel across
+> > vendors, not just a single kernel for a single vendor.
 > 
 >  you'll be aware that i've mentioned a number of times and have
 > discussed at some length why this is a goal that is completely
 > impossible to achieve [*1].  sadly.
 
-Here I disagree. It is possible. Not across all vendors but a
-significant share.
+I tend to disagree on this as well, but it's another story. Have read one 
+of the discussions on this topic and it seemed to look more like lobbying 
+for one of the standards being promoted by some company, not anything 
+really close to the reality (where we can already successfully run 
+multiplatform kernels on platforms of different vendors...).
 
-Regards
-enrik
+Best regards,
+Tomasz
