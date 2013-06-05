@@ -1,53 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:13 +0900
-Subject: [PATCH 082/130] sh-pfc: r8a7740: Remove GETHER function GPIOS
+Date: Wed,  5 Jun 2013 17:26:16 +0900
+Subject: [PATCH 085/130] sh-pfc: r8a7740: Remove HDMI function GPIOS
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-83-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-86-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-All r8a7740 platforms now use the pinctrl API to control the GETHER
-pins, the corresponding function GPIOS are unused. Remove them.
+All r8a7740 platforms now use the pinctrl API to control the HDMI pins,
+the corresponding function GPIOS are unused. Remove them.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 20 --------------------
- 1 file changed, 20 deletions(-)
+ drivers/pinctrl/sh-pfc/pfc-r8a7740.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
 diff --git a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-index c78eda8..58fbe6b 100644
+index a93fd84..fb7a3e8 100644
 --- a/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
 +++ b/drivers/pinctrl/sh-pfc/pfc-r8a7740.c
-@@ -3410,26 +3410,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
- 	GPIO_FN(IDE_INT),	GPIO_FN(IDE_RST),	GPIO_FN(IDE_DIRECTION),
- 	GPIO_FN(IDE_EXBUF_ENB),	GPIO_FN(IDE_IODACK),	GPIO_FN(IDE_IODREQ),
+@@ -3386,10 +3386,6 @@ static const struct pinmux_func pinmux_func_gpios[] = {
+ 	GPIO_FN(SDENC_CPG),
+ 	GPIO_FN(SDENC_DV_CLKI),
  
--	/* RMII */
--	GPIO_FN(RMII_CRS_DV),	GPIO_FN(RMII_RX_ER),	GPIO_FN(RMII_RXD0),
--	GPIO_FN(RMII_RXD1),	GPIO_FN(RMII_TX_EN),	GPIO_FN(RMII_TXD0),
--	GPIO_FN(RMII_MDC),	GPIO_FN(RMII_TXD1),	GPIO_FN(RMII_MDIO),
--	GPIO_FN(RMII_REF50CK),	GPIO_FN(RMII_REF125CK),	/* for GMII */
+-	/* HDMI */
+-	GPIO_FN(HDMI_HPD),
+-	GPIO_FN(HDMI_CEC),
 -
--	/* GEther */
--	GPIO_FN(ET_TX_CLK),	GPIO_FN(ET_TX_EN),	GPIO_FN(ET_ETXD0),
--	GPIO_FN(ET_ETXD1),	GPIO_FN(ET_ETXD2),	GPIO_FN(ET_ETXD3),
--	GPIO_FN(ET_ETXD4),	GPIO_FN(ET_ETXD5), /* for GEther */
--	GPIO_FN(ET_ETXD6),	GPIO_FN(ET_ETXD7), /* for GEther */
--	GPIO_FN(ET_COL),	GPIO_FN(ET_TX_ER),	GPIO_FN(ET_RX_CLK),
--	GPIO_FN(ET_RX_DV),	GPIO_FN(ET_ERXD0),	GPIO_FN(ET_ERXD1),
--	GPIO_FN(ET_ERXD2),	GPIO_FN(ET_ERXD3),
--	GPIO_FN(ET_ERXD4),	GPIO_FN(ET_ERXD5), /* for GEther */
--	GPIO_FN(ET_ERXD6),	GPIO_FN(ET_ERXD7), /* for GEther */
--	GPIO_FN(ET_RX_ER),	GPIO_FN(ET_CRS),	GPIO_FN(ET_MDC),
--	GPIO_FN(ET_MDIO),	GPIO_FN(ET_LINK),	GPIO_FN(ET_PHY_INT),
--	GPIO_FN(ET_WOL),	GPIO_FN(ET_GTX_CLK),
--
- 	/* DMA0 */
- 	GPIO_FN(DREQ0),	GPIO_FN(DACK0),
- 
+ 	/* SYSC */
+ 	GPIO_FN(RESETP_PULLUP),
+ 	GPIO_FN(RESETP_PLAIN),
 -- 
 1.8.2.1
