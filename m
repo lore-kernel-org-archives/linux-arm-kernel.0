@@ -1,62 +1,134 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed,  5 Jun 2013 09:59:20 +0400
-Subject: [PATCH RESEND 12/15] ARM: clps711x: edb7211: Add support for I2C
+Date: Wed,  5 Jun 2013 09:59:18 +0400
+Subject: [PATCH RESEND 10/15] ARM: clps711x: Add clocksource framework
 In-Reply-To: <1370411967-29451-1-git-send-email-shc_work@mail.ru>
 References: <1370411967-29451-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1370411967-29451-13-git-send-email-shc_work@mail.ru>
+Message-ID: <1370411967-29451-11-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/mach-clps711x/board-edb7211.c | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/Kconfig                |  1 +
+ arch/arm/mach-clps711x/common.c | 48 ++++++++++++++++++++++++++++++++++-------
+ 2 files changed, 41 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-clps711x/board-edb7211.c b/arch/arm/mach-clps711x/board-edb7211.c
-index db804b4..970f4e1 100644
---- a/arch/arm/mach-clps711x/board-edb7211.c
-+++ b/arch/arm/mach-clps711x/board-edb7211.c
-@@ -12,6 +12,7 @@
- #include <linux/delay.h>
- #include <linux/memblock.h>
- #include <linux/types.h>
-+#include <linux/i2c-gpio.h>
- #include <linux/interrupt.h>
- #include <linux/backlight.h>
- #include <linux/platform_device.h>
-@@ -37,6 +38,9 @@
- #define EDB7211_LCDEN		CLPS711X_GPIO(3, 2)
- #define EDB7211_LCDBL		CLPS711X_GPIO(3, 3)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 10cdfa9..2af27f7 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -367,6 +367,7 @@ config ARCH_CLPS711X
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select AUTO_ZRELADDR
+ 	select CLKDEV_LOOKUP
++	select CLKSRC_MMIO
+ 	select COMMON_CLK
+ 	select CPU_ARM720T
+ 	select GENERIC_CLOCKEVENTS
+diff --git a/arch/arm/mach-clps711x/common.c b/arch/arm/mach-clps711x/common.c
+index 768d41c6..bd65839 100644
+--- a/arch/arm/mach-clps711x/common.c
++++ b/arch/arm/mach-clps711x/common.c
+@@ -27,12 +27,14 @@
+ #include <linux/clk.h>
+ #include <linux/clkdev.h>
+ #include <linux/clockchips.h>
++#include <linux/clocksource.h>
+ #include <linux/clk-provider.h>
  
-+#define EDB7211_I2C_SDA		CLPS711X_GPIO(3, 4)
-+#define EDB7211_I2C_SCL		CLPS711X_GPIO(3, 5)
-+
- #define EDB7211_FLASH0_BASE	(CS0_PHYS_BASE)
- #define EDB7211_FLASH1_BASE	(CS1_PHYS_BASE)
+ #include <asm/exception.h>
+ #include <asm/mach/irq.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
++#include <asm/sched_clock.h>
+ #include <asm/system_misc.h>
  
-@@ -46,6 +50,12 @@
- /* The extra 8 lines of the keyboard matrix */
- #define EDB7211_EXTKBD_BASE	(CS3_PHYS_BASE)
- 
-+static struct i2c_gpio_platform_data edb7211_i2c_pdata __initdata = {
-+	.sda_pin	= EDB7211_I2C_SDA,
-+	.scl_pin	= EDB7211_I2C_SCL,
-+	.scl_is_output_only = 1,
-+};
-+
- static struct resource edb7211_cs8900_resource[] __initdata = {
- 	DEFINE_RES_MEM(EDB7211_CS8900_BASE, SZ_1K),
- 	DEFINE_RES_IRQ(EDB7211_CS8900_IRQ),
-@@ -173,6 +183,9 @@ static void __init edb7211_init_late(void)
- 	platform_device_register_simple("video-clps711x", 0, NULL, 0);
- 	platform_device_register_simple("cs89x0", 0, edb7211_cs8900_resource,
- 					ARRAY_SIZE(edb7211_cs8900_resource));
-+	platform_device_register_data(&platform_bus, "i2c-gpio", 0,
-+				      &edb7211_i2c_pdata,
-+				      sizeof(edb7211_i2c_pdata));
+ #include <mach/hardware.h>
+@@ -251,13 +253,32 @@ asmlinkage void __exception_irq_entry clps711x_handle_irq(struct pt_regs *regs)
+ 		handle_IRQ(fls16(irqstat) + 16, regs);
  }
  
- MACHINE_START(EDB7211, "CL-EDB7211 (EP7211 eval board)")
++static u32 notrace clps711x_sched_clock_read(void)
++{
++	return ~readw_relaxed(CLPS711X_VIRT_BASE + TC1D);
++}
++
+ static void clps711x_clockevent_set_mode(enum clock_event_mode mode,
+ 					 struct clock_event_device *evt)
+ {
++	disable_irq(IRQ_TC2OI);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		enable_irq(IRQ_TC2OI);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* Not supported */
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_RESUME:
++		/* Left event sources disabled, no more interrupts appear */
++		break;
++	}
+ }
+ 
+ static struct clock_event_device clockevent_clps711x = {
+-	.name		= "CLPS711x Clockevents",
++	.name		= "clps711x-clockevent",
+ 	.rating		= 300,
+ 	.features	= CLOCK_EVT_FEAT_PERIODIC,
+ 	.set_mode	= clps711x_clockevent_set_mode,
+@@ -271,8 +292,8 @@ static irqreturn_t clps711x_timer_interrupt(int irq, void *dev_id)
+ }
+ 
+ static struct irqaction clps711x_timer_irq = {
+-	.name		= "CLPS711x Timer Tick",
+-	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.name		= "clps711x-timer",
++	.flags		= IRQF_TIMER | IRQF_IRQPOLL,
+ 	.handler	= clps711x_timer_interrupt,
+ };
+ 
+@@ -320,9 +341,9 @@ void __init clps711x_timer_init(void)
+ 		else
+ 			timh = 541440;
+ 	} else
+-		timh = cpu / 144;
++		timh = DIV_ROUND_CLOSEST(cpu, 144);
+ 
+-	timl = timh / 256;
++	timl = DIV_ROUND_CLOSEST(timh, 256);
+ 
+ 	/* All clocks are fixed */
+ 	add_fixed_clk(clk_pll, "pll", pll);
+@@ -335,13 +356,24 @@ void __init clps711x_timer_init(void)
+ 
+ 	pr_info("CPU frequency set at %i Hz.\n", cpu);
+ 
++	/* Start Timer1 in free running mode (Low frequency) */
++	tmp = clps_readl(SYSCON1) & ~(SYSCON1_TC1S | SYSCON1_TC1M);
++	clps_writel(tmp, SYSCON1);
++
++	setup_sched_clock(clps711x_sched_clock_read, 16, timl);
++
++	clocksource_mmio_init(CLPS711X_VIRT_BASE + TC1D,
++			      "clps711x_clocksource", timl, 300, 16,
++			      clocksource_mmio_readw_down);
++
++	/* Set Timer2 prescaler */
+ 	clps_writew(DIV_ROUND_CLOSEST(timh, HZ), TC2D);
+ 
+-	tmp = clps_readl(SYSCON1);
+-	tmp |= SYSCON1_TC2S | SYSCON1_TC2M;
++	/* Start Timer2 in prescale mode (High frequency)*/
++	tmp = clps_readl(SYSCON1) | SYSCON1_TC2M | SYSCON1_TC2S;
+ 	clps_writel(tmp, SYSCON1);
+ 
+-	clockevents_config_and_register(&clockevent_clps711x, timh, 1, 0xffff);
++	clockevents_config_and_register(&clockevent_clps711x, timh, 0, 0);
+ 
+ 	setup_irq(IRQ_TC2OI, &clps711x_timer_irq);
+ }
 -- 
 1.8.1.5
