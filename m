@@ -1,45 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  5 Jun 2013 17:26:58 +0900
-Subject: [PATCH 127/130] ARM: shmobile: kzm9g: tidyup FSI pinctrl
+Date: Wed,  5 Jun 2013 17:26:57 +0900
+Subject: [PATCH 126/130] ARM: shmobile: r8a7740 pinmux platform device cleanup
 In-Reply-To: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370420821-28420-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370420821-28420-128-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370420821-28420-127-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-sh73a0 needs "sh_fsi2", not "sh_fsi2.0"
+Use DEFINE_RES_MEM() and platform_device_register_simple()
+to save a couple of lines of code.
 
-Tested-by: Hiep Cao Minh <cm-hiep@jinso.co.jp>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-kzm9g.c | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7740.c | 24 +++++-------------------
+ 1 file changed, 5 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index fc4ca9b..1fdf05c 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -663,13 +663,13 @@ static unsigned long pin_pullup_conf[] = {
+diff --git a/arch/arm/mach-shmobile/setup-r8a7740.c b/arch/arm/mach-shmobile/setup-r8a7740.c
+index 326a4ab..3a6b6fe 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7740.c
++++ b/arch/arm/mach-shmobile/setup-r8a7740.c
+@@ -70,29 +70,15 @@ void __init r8a7740_map_io(void)
+ }
  
- static const struct pinctrl_map kzm_pinctrl_map[] = {
- 	/* FSIA (AK4648) */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2", "pfc-sh73a0",
- 				  "fsia_mclk_in", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2", "pfc-sh73a0",
- 				  "fsia_sclk_in", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2", "pfc-sh73a0",
- 				  "fsia_data_in", "fsia"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2.0", "pfc-sh73a0",
-+	PIN_MAP_MUX_GROUP_DEFAULT("sh_fsi2", "pfc-sh73a0",
- 				  "fsia_data_out", "fsia"),
- 	/* I2C3 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("i2c-sh_mobile.3", "pfc-sh73a0",
+ /* PFC */
+-static struct resource r8a7740_pfc_resources[] = {
+-	[0] = {
+-		.start	= 0xe6050000,
+-		.end	= 0xe6057fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= 0xe605800c,
+-		.end	= 0xe605802b,
+-		.flags	= IORESOURCE_MEM,
+-	}
+-};
+-
+-static struct platform_device r8a7740_pfc_device = {
+-	.name		= "pfc-r8a7740",
+-	.id		= -1,
+-	.resource	= r8a7740_pfc_resources,
+-	.num_resources	= ARRAY_SIZE(r8a7740_pfc_resources),
++static const struct resource pfc_resources[] = {
++	DEFINE_RES_MEM(0xe6050000, 0x8000),
++	DEFINE_RES_MEM(0xe605800c, 0x0020),
+ };
+ 
+ void __init r8a7740_pinmux_init(void)
+ {
+-	platform_device_register(&r8a7740_pfc_device);
++	platform_device_register_simple("pfc-r8a7740", -1, pfc_resources,
++					ARRAY_SIZE(pfc_resources));
+ }
+ 
+ static struct renesas_intc_irqpin_config irqpin0_platform_data = {
 -- 
 1.8.2.1
