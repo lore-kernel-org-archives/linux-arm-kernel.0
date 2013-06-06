@@ -1,234 +1,101 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:27 +0900
-Subject: [PATCH 14/23] ARM: shmobile: r8a7790: add main clock
+Date: Thu,  6 Jun 2013 16:28:35 +0900
+Subject: [PATCH 22/23] ARM: shmobile: sh73a0: do not overwrite all div4 clock
+ operations
 In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503716-31155-15-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503716-31155-23-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Almost all clock needs main clock which is basis clock on r8a7790.
-This patch adds it, and, set its parent/ratio via MD pin.
-It is based on v0.05 datasheet
+An earlier commit "ARM: shmobile: sh73a0: add support for adjusting CPU
+frequency" intended to replace some clock operations only for the Z-clock,
+instead it replaced them for all div4 clocks, since all div4 clocks share
+the same copy of clock operations. Fix this by using a separate clock
+operations structure for Z-clock.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 161 ++++++++++++++++++++++++++++++++-
- 1 file changed, 156 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/clock-sh73a0.c | 28 +++++++++++++++-------------
+ 1 file changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index bad9bf2..850e47f 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -22,32 +22,113 @@
- #include <linux/kernel.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
-+#include <mach/clock.h>
- #include <mach/common.h>
- 
-+/*
-+ *   MD		EXTAL		PLL0	PLL1	PLL3
-+ * 14 13 19	(MHz)		*1	*1
-+ *---------------------------------------------------
-+ * 0  0  0	15 x 1		x172/2	x208/2	x106
-+ * 0  0  1	15 x 1		x172/2	x208/2	x88
-+ * 0  1  0	20 x 1		x130/2	x156/2	x80
-+ * 0  1  1	20 x 1		x130/2	x156/2	x66
-+ * 1  0  0	26 / 2		x200/2	x240/2	x122
-+ * 1  0  1	26 / 2		x200/2	x240/2	x102
-+ * 1  1  0	30 / 2		x172/2	x208/2	x106
-+ * 1  1  1	30 / 2		x172/2	x208/2	x88
-+ *
-+ * *1 :	Table 7.6 indicates VCO ouput (PLLx = VCO/2)
-+ *	see "p1 / 2" on R8A7790_CLOCK_ROOT() below
-+ */
-+
-+#define MD(nr)	(1 << nr)
-+
- #define CPG_BASE 0xe6150000
- #define CPG_LEN 0x1000
- 
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR7 0xe615014c
- 
-+#define MODEMR		0xE6160060
-+
- static struct clk_mapping cpg_mapping = {
- 	.phys   = CPG_BASE,
- 	.len    = CPG_LEN,
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index acb9e09..d05cf90 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -257,9 +257,8 @@ static struct clk twd_clk = {
+ 	.ops = &twd_clk_ops,
  };
  
--static struct clk p_clk = {
--	.rate	= 65000000, /* shortcut for now */
-+static struct clk extal_clk = {
-+	/* .rate will be updated on r8a7790_clock_init() */
- 	.mapping	= &cpg_mapping,
- };
+-static int (*div4_set_rate)(struct clk *clk, unsigned long rate);
+-static unsigned long (*div4_recalc)(struct clk *clk);
+-static long (*div4_round_rate)(struct clk *clk, unsigned long rate);
++static struct sh_clk_ops zclk_ops;
++static const struct sh_clk_ops *div4_clk_ops;
  
--static struct clk mp_clk = {
--	.rate	= 52000000,  /* shortcut for now */
--	.mapping	= &cpg_mapping,
-+static struct sh_clk_ops followparent_clk_ops = {
-+	.recalc	= followparent_recalc,
- };
- 
-+static struct clk main_clk = {
-+	/* .parent will be set r8a73a4_clock_init */
-+	.ops	= &followparent_clk_ops,
-+};
-+
-+/*
-+ * clock ratio of these clock will be updated
-+ * on r8a7790_clock_init()
-+ */
-+SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
-+SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
-+SH_FIXED_RATIO_CLK_SET(lb_clk,			pll1_clk,	1, 1);
-+SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
-+
-+/* fixed ratio clock */
-+SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
-+SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_clk,	1, 2);
-+
-+SH_FIXED_RATIO_CLK_SET(pll1_div2_clk,		pll1_clk,	1, 2);
-+SH_FIXED_RATIO_CLK_SET(zg_clk,			pll1_clk,	1, 3);
-+SH_FIXED_RATIO_CLK_SET(zx_clk,			pll1_clk,	1, 3);
-+SH_FIXED_RATIO_CLK_SET(zs_clk,			pll1_clk,	1, 6);
-+SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
-+SH_FIXED_RATIO_CLK_SET(i_clk,			pll1_clk,	1, 2);
-+SH_FIXED_RATIO_CLK_SET(b_clk,			pll1_clk,	1, 12);
-+SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
-+SH_FIXED_RATIO_CLK_SET(cl_clk,			pll1_clk,	1, 48);
-+SH_FIXED_RATIO_CLK_SET(m2_clk,			pll1_clk,	1, 8);
-+SH_FIXED_RATIO_CLK_SET(imp_clk,			pll1_clk,	1, 4);
-+SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
-+SH_FIXED_RATIO_CLK_SET(oscclk_clk,		pll1_clk,	1, (12 * 1024));
-+
-+SH_FIXED_RATIO_CLK_SET(zb3_clk,			pll3_clk,	1, 4);
-+SH_FIXED_RATIO_CLK_SET(zb3d2_clk,		pll3_clk,	1, 8);
-+SH_FIXED_RATIO_CLK_SET(ddr_clk,			pll3_clk,	1, 8);
-+SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
-+
- static struct clk *main_clks[] = {
-+	&extal_clk,
-+	&extal_div2_clk,
-+	&main_clk,
-+	&pll1_clk,
-+	&pll1_div2_clk,
-+	&pll3_clk,
-+	&lb_clk,
-+	&qspi_clk,
-+	&zg_clk,
-+	&zx_clk,
-+	&zs_clk,
-+	&hp_clk,
-+	&i_clk,
-+	&b_clk,
- 	&p_clk,
-+	&cl_clk,
-+	&m2_clk,
-+	&imp_clk,
-+	&rclk_clk,
-+	&oscclk_clk,
-+	&zb3_clk,
-+	&zb3d2_clk,
-+	&ddr_clk,
- 	&mp_clk,
-+	&cp_clk,
- };
- 
- enum { MSTP721, MSTP720,
-@@ -64,6 +145,35 @@ static struct clk mstp_clks[MSTP_NR] = {
- };
- 
- static struct clk_lookup lookups[] = {
-+
-+	/* main clocks */
-+	CLKDEV_CON_ID("extal",		&extal_clk),
-+	CLKDEV_CON_ID("extal_div2",	&extal_div2_clk),
-+	CLKDEV_CON_ID("main",		&main_clk),
-+	CLKDEV_CON_ID("pll1",		&pll1_clk),
-+	CLKDEV_CON_ID("pll1_div2",	&pll1_div2_clk),
-+	CLKDEV_CON_ID("pll3",		&pll3_clk),
-+	CLKDEV_CON_ID("zg",		&zg_clk),
-+	CLKDEV_CON_ID("zx",		&zx_clk),
-+	CLKDEV_CON_ID("zs",		&zs_clk),
-+	CLKDEV_CON_ID("hp",		&hp_clk),
-+	CLKDEV_CON_ID("i",		&i_clk),
-+	CLKDEV_CON_ID("b",		&b_clk),
-+	CLKDEV_CON_ID("lb",		&lb_clk),
-+	CLKDEV_CON_ID("p",		&p_clk),
-+	CLKDEV_CON_ID("cl",		&cl_clk),
-+	CLKDEV_CON_ID("m2",		&m2_clk),
-+	CLKDEV_CON_ID("imp",		&imp_clk),
-+	CLKDEV_CON_ID("rclk",		&rclk_clk),
-+	CLKDEV_CON_ID("oscclk",		&oscclk_clk),
-+	CLKDEV_CON_ID("zb3",		&zb3_clk),
-+	CLKDEV_CON_ID("zb3d2",		&zb3d2_clk),
-+	CLKDEV_CON_ID("ddr",		&ddr_clk),
-+	CLKDEV_CON_ID("mp",		&mp_clk),
-+	CLKDEV_CON_ID("qspi",		&qspi_clk),
-+	CLKDEV_CON_ID("cp",		&cp_clk),
-+
-+	/* MSTP */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
-@@ -74,10 +184,51 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
- };
- 
-+#define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
-+	extal_clk.rate	= e * 1000 * 1000;			\
-+	main_clk.parent	= m;					\
-+	SH_CLK_SET_RATIO(&pll1_clk_ratio, p1 / 2, 1);		\
-+	if (mode & MD(19))					\
-+		SH_CLK_SET_RATIO(&pll3_clk_ratio, p31, 1);	\
-+	else							\
-+		SH_CLK_SET_RATIO(&pll3_clk_ratio, p30, 1)
-+
-+
- void __init r8a7790_clock_init(void)
+ static int zclk_set_rate(struct clk *clk, unsigned long rate)
  {
-+	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
-+	u32 mode;
- 	int k, ret = 0;
+@@ -275,7 +274,7 @@ static int zclk_set_rate(struct clk *clk, unsigned long rate)
+ 		/* 1:1 - switch off divider */
+ 		__raw_writel(__raw_readl(FRQCRB) & ~(1 << 28), FRQCRB);
+ 		/* nullify the divider to prepare for the next time */
+-		ret = div4_set_rate(clk, rate / 2);
++		ret = div4_clk_ops->set_rate(clk, rate / 2);
+ 		if (!ret)
+ 			ret = frqcr_kick();
+ 		if (ret > 0)
+@@ -290,7 +289,7 @@ static int zclk_set_rate(struct clk *clk, unsigned long rate)
+ 			 * set the divider - call the DIV4 method, it will kick
+ 			 * FRQCRB too
+ 			 */
+-			ret = div4_set_rate(clk, rate);
++			ret = div4_clk_ops->set_rate(clk, rate);
+ 		if (ret < 0)
+ 			goto esetrate;
+ 	}
+@@ -302,7 +301,7 @@ esetrate:
  
-+	BUG_ON(!modemr);
-+	mode = ioread32(modemr);
-+	iounmap(modemr);
-+
-+	switch (mode & (MD(14) | MD(13))) {
-+	case 0:
-+		R8A7790_CLOCK_ROOT(15, &extal_clk, 172, 208, 106, 88);
-+		break;
-+	case MD(13):
-+		R8A7790_CLOCK_ROOT(20, &extal_clk, 130, 156, 80, 66);
-+		break;
-+	case MD(14):
-+		R8A7790_CLOCK_ROOT(26, &extal_div2_clk, 200, 240, 122, 102);
-+		break;
-+	case MD(13) | MD(14):
-+		R8A7790_CLOCK_ROOT(30, &extal_div2_clk, 172, 208, 106, 88);
-+		break;
-+	}
-+
-+	if (mode & (MD(18)))
-+		SH_CLK_SET_RATIO(&lb_clk_ratio, 1, 36);
-+	else
-+		SH_CLK_SET_RATIO(&lb_clk_ratio, 1, 24);
-+
-+	if ((mode & (MD(3) | MD(2) | MD(1))) == MD(2))
-+		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 16);
-+	else
-+		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 20);
-+
- 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
- 		ret = clk_register(main_clks[k]);
+ static long zclk_round_rate(struct clk *clk, unsigned long rate)
+ {
+-	unsigned long div_freq = div4_round_rate(clk, rate),
++	unsigned long div_freq = div4_clk_ops->round_rate(clk, rate),
+ 		parent_freq = clk_get_rate(clk->parent);
  
+ 	if (rate > div_freq && abs(parent_freq - rate) < rate - div_freq)
+@@ -317,7 +316,7 @@ static unsigned long zclk_recalc(struct clk *clk)
+ 	 * Must recalculate frequencies in case PLL0 has been changed, even if
+ 	 * the divisor is unused ATM!
+ 	 */
+-	unsigned long div_freq = div4_recalc(clk);
++	unsigned long div_freq = div4_clk_ops->recalc(clk);
+ 
+ 	if (__raw_readl(FRQCRB) & (1 << 28))
+ 		return div_freq;
+@@ -327,13 +326,16 @@ static unsigned long zclk_recalc(struct clk *clk)
+ 
+ static void zclk_extend(void)
+ {
++	div4_clk_ops = div4_clks[DIV4_Z].ops;
++
+ 	/* We extend the DIV4 clock with a 1:1 pass-through case */
+-	div4_set_rate = div4_clks[DIV4_Z].ops->set_rate;
+-	div4_round_rate = div4_clks[DIV4_Z].ops->round_rate;
+-	div4_recalc = div4_clks[DIV4_Z].ops->recalc;
+-	div4_clks[DIV4_Z].ops->set_rate = zclk_set_rate;
+-	div4_clks[DIV4_Z].ops->round_rate = zclk_round_rate;
+-	div4_clks[DIV4_Z].ops->recalc = zclk_recalc;
++	zclk_ops = *div4_clk_ops;
++
++	zclk_ops.set_rate = zclk_set_rate;
++	zclk_ops.round_rate = zclk_round_rate;
++	zclk_ops.recalc = zclk_recalc;
++
++	div4_clks[DIV4_Z].ops = &zclk_ops;
+ }
+ 
+ enum { DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_ZB1,
 -- 
 1.8.2.1
