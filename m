@@ -1,31 +1,18 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 6 Jun 2013 21:28:14 +0800
-Subject: [PATCH 0/8] update MBa53 support
-In-Reply-To: <1370344035-7417-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1370344035-7417-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130606132811.GE11305@S2101-09.ap.freescale.net>
+Date: Thu, 6 Jun 2013 21:37:34 +0800
+Subject: [PATCH v3 1/2] ARM: dts: mx28: Adjust the digctl compatible string
+In-Reply-To: <1370351925-27915-1-git-send-email-fabio.estevam@freescale.com>
+References: <1370351925-27915-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20130606133732.GF11305@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 01:07:07PM +0200, Steffen Trumtrar wrote:
-> Markus Niebel (4):
->   ARM i.MX53: mba53: add sound support
->   ARM i.MX53: mba53: add missing gpio stuff for pca9554
->   ARM i.MX53: mba53: use reset gpio for FEC
->   ARM i.MX53: mba53: add DI1_CLK to pinctrl for disp1
+On Tue, Jun 04, 2013 at 10:18:44AM -0300, Fabio Estevam wrote:
+> MX28 has the same DIGCTL block as MX23, so adjust the compatible string to
+> reflect that.
 > 
-> Michael Olbrich (1):
->   ARM i.MX53: mba53: enable usbotg & usbh1
-> 
-> Philipp Zabel (1):
->   ARM i.MX53: mba53: add Tevision Encoder
-> 
-> Sascha Hauer (1):
->   ARM i.MX53: mba53: Add display support
-> 
-> Steffen Trumtrar (1):
->   ARM i.MX53: mba53: fix lvds/disp pinctrl
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-All applied, thanks.
+Both applied, thanks.
 
 Shawn
