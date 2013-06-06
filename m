@@ -1,39 +1,36 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Jun 2013 13:59:16 -0400
-Subject: [PATCH v2] arm: mvebu: don't hardcode a physical address in
- headsmp.S
-In-Reply-To: <1370514268-9159-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370514268-9159-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130606175916.GL23859@titan.lakedaemon.net>
+Date: Thu, 6 Jun 2013 14:02:01 -0400
+Subject: [PATCH 0/8] Support Marvell bootloaders remapping registers at
+ different locations
+In-Reply-To: <20130605210104.GQ3803@titan.lakedaemon.net>
+References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130605210104.GQ3803@titan.lakedaemon.net>
+Message-ID: <20130606180201.GM23859@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 12:24:28PM +0200, Thomas Petazzoni wrote:
-> Now that the coherency_init() function is called a bit earlier, we can
-> actually read the physical address of the coherency unit registers
-> from the Device Tree, and communicate that to the headsmp.S code,
-> which avoids hardcoding a physical address.
+On Wed, Jun 05, 2013 at 05:01:04PM -0400, Jason Cooper wrote:
+> On Wed, Jun 05, 2013 at 09:04:53AM +0200, Thomas Petazzoni wrote:
+> > This patch series is based on jcooper/mvebu/fixes-non-critical and
+> > jcooper/mvebu/cleanup, which contains 3 patches that are necessary to
+> > make this patch series work properly.
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
-> Changes from v1 to v2:
+> Thomas,
 > 
->  * Simplified the code in headsmp.S to compute the physical address of
->    the coherency unit base address. Suggested by Nicolas Pitre.
+> I've tentatively pulled your series into mvebu/regmap with appropriate
+> dependencies.
 > 
->  * Added a sync_cache_w() call to ensure the physical address of the
->    coherency unit stored in the coherency_phys_base is visible by the
->    other CPUs. The other CPUs are reading this before they join the
->    coherency fabric, so we need to make some manual cache coherency
->    here. Noticed by Will Deacon.
+> I was going to put this in for-next, but I got a build error after
+> merging it.  Could you do me a favor and try merging this with
+> mvebu/seb_clk?  Just shoot me the merge resolution that builds
+> mvebu_defconfig correctly, and I'll incorporate it into the merge.  No
+> need to rebase the series.
 > 
->  arch/arm/mach-mvebu/coherency.c | 12 ++++++++++++
->  arch/arm/mach-mvebu/headsmp.S   | 16 ++++++++--------
->  2 files changed, 20 insertions(+), 8 deletions(-)
+> If you want to reproduce what I saw, just merge mvebu/regmap with
+> for-next (up shortly), and build mvebu_defconfig.
 
-Inserted into (read: rebase!) mvebu/regmap with Acks/Reviewed-by's from
-Arnd, Nico and Will.
+This has now been resolved, whole series, with v2 of the one patch is in
+mvebu/regmap.
 
 thx,
 
