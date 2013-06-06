@@ -1,28 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Jun 2013 14:20:03 -0400
-Subject: [PATCH] ARM: Kirkwood: handle mv88f6282 cpu in
- __kirkwood_variant().
-In-Reply-To: <1370538046-1186-1-git-send-email-nschichan@freebox.fr>
-References: <1370538046-1186-1-git-send-email-nschichan@freebox.fr>
-Message-ID: <20130606182003.GO23859@titan.lakedaemon.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 06 Jun 2013 12:29:14 -0600
+Subject: [PATCH] ARM: tegra: add basic SecureOS support
+In-Reply-To: <20130606180824.GC3320@localhost.localdomain>
+References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+ <51B0BC80.9040007@wwwdotorg.org>
+ <20130606180824.GC3320@localhost.localdomain>
+Message-ID: <51B0D4FA.5070500@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 07:00:46PM +0200, Nicolas Schichan wrote:
-> MPP_F6281_MASK would be previously be returned when on mv88f6282,
-> which would disallow some valid MPP configurations.
+On 06/06/2013 12:08 PM, Dave Martin wrote:
+> On Thu, Jun 06, 2013 at 10:44:48AM -0600, Stephen Warren wrote:
+>> On 06/06/2013 01:28 AM, Alexandre Courbot wrote:
+>>> Boot loaders on some Tegra devices can be unlocked but do not let the
+>>> system operate without SecureOS. SecureOS prevents access to some
+>>> registers and requires the operating system to perform certain
+>>> operations through Secure Monitor Calls instead of directly accessing
+>>> the hardware.
+>>>
+>>> This patch introduces basic SecureOS support for Tegra. SecureOS support
+>>> can be enabled by adding a "nvidia,secure-os" property to the "chosen"
+>>> node of the device tree.
+...
+> So, something like
 > 
-> Commit 830f8b91 (arm: plat-orion: fix printing of "MPP config
-> unavailable on this hardware") made this problem visible as an invalid
-> MPP configuration is now correctly detected and not applied.
+> 	foo-firmware {
+> 		compatible = "vendor1,foo-firmware-1.0", "vendor1,foo-firmware";
+> 		method = "smc";
 > 
-> Signed-off-by: Nicolas Schichan <nschichan@freebox.fr>
-> ---
->  arch/arm/mach-kirkwood/mpp.c |    5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+> 		// ...
+> 	};
+> 
+> 	bar-firmware {
+> 		compatible = "vendor2,bar-firmware-1.6", "vendor2,bar-firmware";
+> 		method = "smc";
+> 
+> 		// ...
+> 	};
+> 
+> Could make sense.
 
-Applied to mvebu/fixes with Cc: to -stable for v3.9 and newer.
+I'm not sure if the method property is useful in most cases. For generic
+ABIs such as PSCI that actually support multiple communication paths,
+yes, it makes sense. However, it seems like for most custom ABIs, such
+as is presumably implemented by whatever "SecureOS" is on Tegra, the
+firmware type (or compatible value) directly implies that it operates
+over SMC not HVC. After all, presumably if the kernel was virtualized,
+it wouldn't have access to the raw secure monitor? I suppose you could
+argue that the hypervisor might end up emulating the same ABI over HVC
+instead? I'm not sure how likely that is. A compromise might be to
+assume SMC if no property was present, which would allow it to be
+optionally added later if it turned out to be useful.
 
-thx,
+> ...where we would require all new firmware interface bindings to
+> include the "-firmware" in their node names and compatible strings
+> (with a version suffix encouraged for the compatible strings, where
+> relevant).
 
-Jason.
+That's probably a good convention, but I'm not sure it should be
+required (or at least validated by code). Requiring this by code review
+might be OK. Node names aren't meant to be interpreted semantically.
