@@ -1,75 +1,186 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jun 2013 10:35:25 +0100
-Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
-References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <20130606093524.GM18614@n2100.arm.linux.org.uk>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Thu, 06 Jun 2013 17:37:41 +0800
+Subject: [PATCH v3] arch/*/asm/include/bitops.h: api issue,
+ find_*_bit() defination are different with each other
+In-Reply-To: <51AF225A.5020703@asianux.com>
+References: <51AE8FEF.1020809@asianux.com> <51AE903C.6010806@asianux.com>
+ <51AE909D.9080006@asianux.com> <20130605071915.GK23140@pengutronix.de>
+ <51AF225A.5020703@asianux.com>
+Message-ID: <51B05865.30305@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 04:28:07PM +0900, Alexandre Courbot wrote:
-> +static int __attribute__((used)) __tegra_smc_stack[10];
-> +
-> +/*
-> + * With EABI, subtype and arg already end up in r0, r1 and r2 as they are
-> + * function arguments, but we prefer to play safe here and explicitly move
-> + * these values into the expected registers anyway. mov instructions without
-> + * any side-effect are turned into nops by the assembler, which limits
-> + * overhead.
 
-No they aren't.  They will be preserved as:
-	mov r0, r0
-	mov r1, r1
-	mov r2, r2
+For arm and m68k, they customize find_*_bit(), but the API is different
+with 'generic'.
 
-Moreover, things will go wrong if the compiler decides for whatever reason
-to move 'arg' into r0 before calling your code sequence.  So really this
-is quite fragile.
+avr32, s390, and unicore32 also customize find_*_bit(), but the API is
+the same with 'generic', and the left architectures all use 'generic'.
 
-There's also no point in mentioning EABI in the above paragraph; all ARM
-ABIs under Linux have always placed the arguments in r0..r3 and then on
-the stack.  You can assert that this is always true by using the __asmeq()
-macro.
+So need change arm and m68k related API to match the 'generic', then
+all another modules can face same public API for various architectures.
 
-Also...
+Also beautify code and comments to pass "./scripts/checkpatch.pl"
 
-> + */
-> +static void tegra_generic_smc(u32 type, u32 subtype, u32 arg)
-> +{
-> +	asm volatile(
-> +		".arch_extension	sec\n\t"
-> +		"ldr	r3, =__tegra_smc_stack\n\t"
-> +		"stmia	r3, {r4-r12, lr}\n\t"
 
-using a statically allocated area to save the registers in this way is
-probably a bad move; although the hotplug code guarantees that there
-will be no concurrency between CPU hotplug operations, this sets a
-precident for it being used in places where no such protection exists.
+Signed-off-by: Chen Gang <gang.chen@asianux.com>
+---
+ arch/arm/include/asm/bitops.h  |   26 ++++++++++++++++++--------
+ arch/arm/lib/findbit.S         |   14 ++++++++++----
+ arch/m68k/include/asm/bitops.h |   25 ++++++++++++++-----------
+ 3 files changed, 42 insertions(+), 23 deletions(-)
 
-What is wrong with stacking r4-r12, lr onto the SVC stack?  You don't
-save the SVC stack pointer, so one can only assume that your SMC
-implmentation preserves this (if it doesn't, that's yet another bug
-with this assembly code.)
-
-Combining these two issues, you're probably far better off using an
-__attribute__((naked)) function for this - which means you get to
-write the entire function in assembly code without any compiler
-interference:
-
-static void __attribute__((naked)) tegra_generic_smc(u32 type, u32 subtype, u32 arg)
-{
-	asm volatile(
-		".arch_extension	sec\n\t"
-		"stmfd	sp!, {r4 - r12, lr}\n\t"
-		__asmeq("%0", "r0")
-		__asmeq("%1", "r1")
-		__asmeq("%2", "r2")
-		"mov	r3, #0\n\t"
-		"mov	r4, #0\n\t"
-		"dsb\n\t"
-		"smc	#0\n\t"
-		"ldmfd	sp!, {r4 - r12, pc}"
-		:
-		: "r" (type), "r" (subtype), "r" (arg)
-		: "memory");
-}
+diff --git a/arch/arm/include/asm/bitops.h b/arch/arm/include/asm/bitops.h
+index e691ec9..83e4d3a 100644
+--- a/arch/arm/include/asm/bitops.h
++++ b/arch/arm/include/asm/bitops.h
+@@ -161,18 +161,28 @@ extern int _test_and_change_bit(int nr, volatile unsigned long * p);
+ /*
+  * Little endian assembly bitops.  nr = 0 -> byte 0 bit 0.
+  */
+-extern int _find_first_zero_bit_le(const void * p, unsigned size);
+-extern int _find_next_zero_bit_le(const void * p, int size, int offset);
+-extern int _find_first_bit_le(const unsigned long *p, unsigned size);
+-extern int _find_next_bit_le(const unsigned long *p, int size, int offset);
++extern unsigned long _find_first_zero_bit_le(const void *p,
++						unsigned long size);
++extern unsigned long _find_next_zero_bit_le(const void *p, unsigned long size,
++						unsigned long offset);
++extern unsigned long _find_first_bit_le(const unsigned long *p,
++						unsigned long size);
++extern unsigned long _find_next_bit_le(const unsigned long *p,
++						unsigned long size,
++						unsigned long offset);
+ 
+ /*
+  * Big endian assembly bitops.  nr = 0 -> byte 3 bit 0.
+  */
+-extern int _find_first_zero_bit_be(const void * p, unsigned size);
+-extern int _find_next_zero_bit_be(const void * p, int size, int offset);
+-extern int _find_first_bit_be(const unsigned long *p, unsigned size);
+-extern int _find_next_bit_be(const unsigned long *p, int size, int offset);
++extern unsigned long _find_first_zero_bit_be(const void *p,
++						unsigned long size);
++extern unsigned long _find_next_zero_bit_be(const void *p, unsigned long size,
++						unsigned long offset);
++extern unsigned long _find_first_bit_be(const unsigned long *p,
++						unsigned long size);
++extern unsigned long _find_next_bit_be(const unsigned long *p,
++						unsigned long size,
++						unsigned long offset);
+ 
+ #ifndef CONFIG_SMP
+ /*
+diff --git a/arch/arm/lib/findbit.S b/arch/arm/lib/findbit.S
+index 64f6bc1..817dd70 100644
+--- a/arch/arm/lib/findbit.S
++++ b/arch/arm/lib/findbit.S
+@@ -19,7 +19,8 @@
+ 
+ /*
+  * Purpose  : Find a 'zero' bit
+- * Prototype: int find_first_zero_bit(void *addr, unsigned int maxbit);
++ * Prototype: unsigned long find_first_zero_bit(const void *p,
++ *						unsigned long size);
+  */
+ ENTRY(_find_first_zero_bit_le)
+ 		teq	r1, #0	
+@@ -40,7 +41,9 @@ ENDPROC(_find_first_zero_bit_le)
+ 
+ /*
+  * Purpose  : Find next 'zero' bit
+- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
++ * Prototype: unsigned long find_next_zero_bit(const void *p,
++ *						unsigned long size,
++ *						unsigned long offset);
+  */
+ ENTRY(_find_next_zero_bit_le)
+ 		teq	r1, #0
+@@ -60,7 +63,8 @@ ENDPROC(_find_next_zero_bit_le)
+ 
+ /*
+  * Purpose  : Find a 'one' bit
+- * Prototype: int find_first_bit(const unsigned long *addr, unsigned int maxbit);
++ * Prototype: unsigned long find_first_bit(const unsigned long *p,
++ *					unsigned long size);
+  */
+ ENTRY(_find_first_bit_le)
+ 		teq	r1, #0	
+@@ -81,7 +85,9 @@ ENDPROC(_find_first_bit_le)
+ 
+ /*
+  * Purpose  : Find next 'one' bit
+- * Prototype: int find_next_zero_bit(void *addr, unsigned int maxbit, int offset)
++ * Prototype: unsigned long find_next_bit(const unsigned long *p,
++ *					unsigned long size,
++ *					unsigned long offset);
+  */
+ ENTRY(_find_next_bit_le)
+ 		teq	r1, #0
+diff --git a/arch/m68k/include/asm/bitops.h b/arch/m68k/include/asm/bitops.h
+index c6baa91..b1d8752 100644
+--- a/arch/m68k/include/asm/bitops.h
++++ b/arch/m68k/include/asm/bitops.h
+@@ -320,11 +320,11 @@ static inline int bfchg_mem_test_and_change_bit(int nr,
+ #include <asm-generic/bitops/ffz.h>
+ #else
+ 
+-static inline int find_first_zero_bit(const unsigned long *vaddr,
+-				      unsigned size)
++static inline unsigned long find_first_zero_bit(const unsigned long *vaddr,
++				      unsigned long size)
+ {
+ 	const unsigned long *p = vaddr;
+-	int res = 32;
++	unsigned int res = 32;
+ 	unsigned int words;
+ 	unsigned long num;
+ 
+@@ -346,11 +346,12 @@ out:
+ }
+ #define find_first_zero_bit find_first_zero_bit
+ 
+-static inline int find_next_zero_bit(const unsigned long *vaddr, int size,
+-				     int offset)
++static inline unsigned long find_next_zero_bit(const unsigned long *vaddr,
++						unsigned long size,
++						unsigned long offset)
+ {
+ 	const unsigned long *p = vaddr + (offset >> 5);
+-	int bit = offset & 31UL, res;
++	unsigned int bit = offset & 31UL, res;
+ 
+ 	if (offset >= size)
+ 		return size;
+@@ -376,10 +377,11 @@ static inline int find_next_zero_bit(const unsigned long *vaddr, int size,
+ }
+ #define find_next_zero_bit find_next_zero_bit
+ 
+-static inline int find_first_bit(const unsigned long *vaddr, unsigned size)
++static inline unsigned long find_first_bit(const unsigned long *vaddr,
++						unsigned long size)
+ {
+ 	const unsigned long *p = vaddr;
+-	int res = 32;
++	unsigned int res = 32;
+ 	unsigned int words;
+ 	unsigned long num;
+ 
+@@ -401,11 +403,12 @@ out:
+ }
+ #define find_first_bit find_first_bit
+ 
+-static inline int find_next_bit(const unsigned long *vaddr, int size,
+-				int offset)
++static inline unsigned long find_next_bit(const unsigned long *vaddr,
++						unsigned long size,
++						unsigned long offset)
+ {
+ 	const unsigned long *p = vaddr + (offset >> 5);
+-	int bit = offset & 31UL, res;
++	unsigned int bit = offset & 31UL, res;
+ 
+ 	if (offset >= size)
+ 		return size;
+-- 
+1.7.7.6
