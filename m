@@ -1,34 +1,78 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 6 Jun 2013 23:09:37 +0800
-Subject: [PATCH v4 1/6] drivers: bus: add a new driver for WEIM
-In-Reply-To: <1369722012-6915-2-git-send-email-b32955@freescale.com>
-References: <1369722012-6915-1-git-send-email-b32955@freescale.com>
- <1369722012-6915-2-git-send-email-b32955@freescale.com>
-Message-ID: <20130606150935.GD28270@S2101-09.ap.freescale.net>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 06 Jun 2013 17:12:40 +0200
+Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over global
+ devices
+In-Reply-To: <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
+References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
+ <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51B0A6E8.20909@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 28, 2013 at 02:20:07PM +0800, Huang Shijie wrote:
-> The WEIM(Wireless External Interface Module) works like a bus.
-> You can attach many different devices on it, such as NOR, onenand.
+On 06/03/2013 10:33 PM, Stephen Boyd wrote:
+> On an SMP system with only one global clockevent and a dummy
+> clockevent per CPU we run into problems. We want the dummy
+> clockevents to be registered as the per CPU tick devices, but
+> we can only achieve that if we register the dummy clockevents
+> before the global clockevent or if we artificially inflate the
+> rating of the dummy clockevents to be higher than the rating
+> of the global clockevent. Failure to do so leads to boot
+> hangs when the dummy timers are registered on all other CPUs
+> besides the CPU that accepted the global clockevent as its tick
+> device and there is no broadcast timer to poke the dummy
+> devices.
 > 
-> In the case of i.MX6q-sabreauto, the NOR is connected to WEIM.
-> 
-> This patch also adds the devicetree binding document.
-> The driver only works when the devicetree is enabled.
-> 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> If we're registering multiple clockevents and one clockevent is
+> global and the other is local to a particular CPU we should
+> choose to use the local clockevent regardless of the rating of
+> the device. This way, if the clockevent is a dummy it will take
+> the tick device duty as long as there isn't a higher rated tick
+> device and any global clockevent will be bumped out into
+> broadcast mode, fixing the problem described above.
+
+It is not clear the connection between the changelog, the patch and the
+comment. Could you clarify a bit ?
+
+Thanks
+  -- Daniel
+
+
+
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: Mark Rutland <mark.rutland@arm.com>
+> Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>,
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 > ---
->  Documentation/devicetree/bindings/bus/imx-weim.txt |   49 +++++++
->  drivers/bus/Kconfig                                |    9 ++
->  drivers/bus/Makefile                               |    1 +
->  drivers/bus/imx-weim.c                             |  138 ++++++++++++++++++++
->  4 files changed, 197 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
->  create mode 100644 drivers/bus/imx-weim.c
+>  kernel/time/tick-common.c | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+> index 5d3fb10..3da62de 100644
+> --- a/kernel/time/tick-common.c
+> +++ b/kernel/time/tick-common.c
+> @@ -254,9 +254,10 @@ static int tick_check_new_device(struct clock_event_device *newdev)
+>  		    !(newdev->features & CLOCK_EVT_FEAT_ONESHOT))
+>  			goto out_bc;
+>  		/*
+> -		 * Check the rating
+> +		 * Check the rating, but prefer CPU local devices
+>  		 */
+> -		if (curdev->rating >= newdev->rating)
+> +		if (curdev->rating >= newdev->rating &&
+> +		    cpumask_equal(curdev->cpumask, newdev->cpumask))
+>  			goto out_bc;
+>  	}
+>  
+> 
 
-Since no one is collecting drivers/bus/ patches right now, I just
-applied the whole series to have the patch go via imx -> arm-soc.
-Please let me know if there is any problem.
 
-Shawn
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
