@@ -1,36 +1,41 @@
-From: Ian.Campbell@citrix.com (Ian Campbell)
-Date: Thu, 6 Jun 2013 10:29:50 +0100
-Subject: [Xen-devel] [PATCH v4 5/6] arm64/xen: introduce CONFIG_XEN on
- ARM64
-In-Reply-To: <20130606092723.GC28479@arm.com>
-References: <alpine.DEB.2.02.1306051605030.4589@kaball.uk.xensource.com>
- <1370451727-26826-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <1370509419.24512.224.camel@zakaz.uk.xensource.com>
- <20130606092723.GC28479@arm.com>
-Message-ID: <1370510990.24512.233.camel@zakaz.uk.xensource.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 6 Jun 2013 10:30:26 +0100
+Subject: Cache issues in vexpress cpu shutdown (regression in 3.10)
+In-Reply-To: <20130606092132.GB28479@arm.com>
+References: <1370430551.3387.11.camel@linaro1.home>
+ <20130605113912.GE18614@n2100.arm.linux.org.uk>
+ <20130605120539.GC32505@e102568-lin.cambridge.arm.com>
+ <20130605190853.GF18614@n2100.arm.linux.org.uk>
+ <20130606092132.GB28479@arm.com>
+Message-ID: <20130606093025.GC2650@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-06 at 10:27 +0100, Catalin Marinas wrote:
-> On Thu, Jun 06, 2013 at 10:03:39AM +0100, Ian Campbell wrote:
-> > On Wed, 2013-06-05 at 18:02 +0100, Stefano Stabellini wrote:
-> > > + * the second in r1/x1, the third in r2/x2 and the fourth in r3/x3.
-> > > + * Considering that Xen hypercalls have 5 arguments at most, the fifth
-> > > + * paramter is always passed in r4/x4, differently from the ARM
-> > > + * procedure calling convention of using the stack for that case.
+On Thu, Jun 06, 2013 at 10:21:32AM +0100, Catalin Marinas wrote:
+> On Wed, Jun 05, 2013 at 08:08:53PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jun 05, 2013 at 01:05:39PM +0100, Lorenzo Pieralisi wrote:
+> > > There is an A9 errata (fixed in r1p0) whereby CLIDR[23:21] reads as 0
+> > > where it should read as 3'b001, so basically flush_cache_louis is not
+> > > flushing anything. If that's the problem, either we add a generic fix
+> > > in v7 cache assembly or we just fix it in platform code (by calling
+> > > flush_cache_all()), since there should not be many pre-r1p0 around.
+> > > 
+> > > Please let me know what you think.
 > > 
-> > and "parameter" again.
-> > 
-> > Strictly speaking the fifth argument handling only differs from the
-> > 32-bit PCS, not the 64-bit one. Splitting hairs a bit there.
+> > If we're providing a flush_cache_louis() function, then it better do
+> > what it says or be removed.  So the right solution is to fix the
+> > function rather than working around it, because over time we'll only
+> > add more calls to flush_cache_louis() and it'll become a stumbling
+> > block.
 > 
-> I agree, just add "the fifth in x4" without "differently from ...", it's
-> not relevant.
+> I think at some point we should define this unification level in the DT,
+> maybe together with the CPU topology. We use LoUIS because it seems to
+> be the right thing on all the existing platforms but it's nothing in the
+> architecture that says LoUIS is the right level of flushing for the
+> CPU-local caches.
 
-Works for me.
+I definitely agree. For the time being, I am willing to patch the code
+with an errata fix, waiting for the link between cache levels and
+topology (and power domains) to get in the kernel.
 
-> You can also remove references to r? registers, they are only called x?.
-
-This is documenting both the Aarch32 and AArch64 conventions.
-
-Ian.
+Lorenzo
