@@ -1,69 +1,58 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Thu, 06 Jun 2013 10:47:55 +0200
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 6 Jun 2013 10:50:39 +0200
 Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
  flags
-In-Reply-To: <20130605233422.3D6DE3E10E4@localhost>
+In-Reply-To: <20130605232647.55C8B3E10E4@localhost>
 References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
- <20130605233422.3D6DE3E10E4@localhost>
-Message-ID: <51B04CBB.1000405@collabora.co.uk>
+ <51633F26.7000400@gmail.com> <51634835.5010302@collabora.co.uk>
+ <20130605232647.55C8B3E10E4@localhost>
+Message-ID: <20130606085039.GL23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2013 01:34 AM, Grant Likely wrote:
-> On Fri,  5 Apr 2013 09:48:08 +0200, Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
-> [...]
->> irq_of_parse_and_map() calls to irq_create_of_mapping() which calls to
->> the correct xlate function handler according to "#interrupt-cells"
->> (irq_domain_xlate_onecell or irq_domain_xlate_twocell) and to
->> irq_set_irq_type() to set the IRQ type.
->> 
->> But the type is never returned so it can't be saved on the IRQ struct
->> resource flags member.
->> 
->> This means that drivers that need the IRQ type/level flags defined in
->> the DT won't be able to get it.
->> 
->> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
-> [...]
->> diff --git a/include/linux/of_irq.h b/include/linux/of_irq.h
->> index 535cecf..98aec57 100644
->> --- a/include/linux/of_irq.h
->> +++ b/include/linux/of_irq.h
->> @@ -66,6 +66,10 @@ extern int of_irq_map_one(struct device_node *device, int index,
->>  extern unsigned int irq_create_of_mapping(struct device_node *controller,
->>  					  const u32 *intspec,
->>  					  unsigned int intsize);
->> +extern unsigned int irq_create_of_mapping_type(struct device_node *controller,
->> +					       const u32 *intspec,
->> +					       unsigned int intsize,
->> +					       unsigned int *otype);
+On 00:26 Thu 06 Jun     , Grant Likely wrote:
+> On Tue, 09 Apr 2013 00:44:05 +0200, Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
+> > On 04/09/2013 12:05 AM, Rob Herring wrote:
+> > > On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+> > >> This means that drivers that need the IRQ type/level flags defined in
+> > >> the DT won't be able to get it.
+> > > 
+> > > But the interrupt controllers that need the information should be able
+> > > to get to it via irqd_get_trigger_type. What problem exactly are you
+> > > trying to fix? What driver would use this?
+> > >
+> > 
+> > Yes but this is not about the interrupt controller wanting this information but
+> > a device driver that is using the IORESOURCE_IRQ struct resource that has the
+> > information about the virtual IRQ associated with a GPIO-IRQ.
+> > 
+> > The driver doesn't know neither care if its IRQ line is connected to a line of
+> > an real IRQ controller or to a GPIO controller that allows a GPIO line to be
+> > used as an IRQ.
+> > 
+> > > My understanding of the IORESOURCE_IRQ_xxx (and DMA) bits are they are
+> > > ISA specific and therefore should not be used on non-ISA buses.
+> > > 
+> > 
+> > Many TI OMAP2+ SoC based boards have an SMSC LAN911x/912x controller
+> > (drivers/net/ethernet/smsc/smsc911x.c) that is connected to the OMAP processor
+> > through its General-Purpose Memory Controller (GPMC) and this LAN driver obtain
+> > its IRQ and I/O address space from a struct resource IORESOURCE_IRQ and
+> > IORESOURCE_MEM respectively, that is filled by the DeviceTree core.
+> > 
+> > It does this:
+> > 
+> > irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> > irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+> > 
+> > Since of_irq_to_resource() doesn't fill the trigger/level flags on the
+> > IORESOURCE_IRQ struct resource, irq_flags will always be 0 regarding the value
+> > specified on the second cell of the "interrupts" DT property.
 
-Hi Grant, thanks a lot for your feedback.
+why do you need to known this in you driver this need to be handle in the irq
+chip
 
-> 
-> I count 11 users of irq_create_of_mapping(). That's a managable number
-> to update.
+I does use irq gpio without at all
 
-Yes, but since of_irq_to_resource() doesn't call irq_create_of_mapping()
-directly but it does though irq_of_parse_and_map(), then this function signature
-has to be modified too.
-
-I'm counting 223 users of irq_of_parse_and_map() so the change is not that small
-anymore. Another approach is to call of_irq_map_one() and
-irq_create_of_mapping() directly from of_irq_to_resource() instead of using
-irq_of_parse_and_map() but I don't like that...
-
-> Instead of creating a new function, please modify the
-> existing one and split it off into a separate patch.
-
-But that won't break git bisect-ability? or do you mean to first just change the
-functions signatures by adding an argument and update its users and then in a
-separate patch do the actual change to the functions to store the IRQ?
-
-> Otherwise the patch looks fine to me.
-> 
-> g.
-> 
-
-Best regards,
-Javier
+Best Regards,
+J.
