@@ -1,68 +1,44 @@
 From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Thu,  6 Jun 2013 16:31:18 +0530
-Subject: [PATCH 04/13] ARM: dts: list the CPU nodes for Exynos5250
+Date: Thu,  6 Jun 2013 16:31:21 +0530
+Subject: [PATCH 07/13] ARM: Exynos: use four additional chipid bits to
+ identify Exynos family
 In-Reply-To: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
 References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1370516488-25860-4-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1370516488-25860-7-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of having to specify the number for CPUs in Exynos5250 in platsmp.c
-file, let the number of CPUs be determined by having this information listed
-in Exynos5250 device tree file.
+Use chipid[27:20] bits to identify the Exynos family while setting up
+the serial port during the uncompression setup. This uses four additional
+bits of chipid to identify the Exynos family since this is required for
+identifying Exynos5420 SoC.
 
 Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
 ---
- arch/arm/boot/dts/exynos5250.dtsi |   14 ++++++++++++++
- arch/arm/mach-exynos/platsmp.c    |   10 +++++++---
- 2 files changed, 21 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/include/mach/uncompress.h |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index e571d3b..7f6b1c7 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -50,6 +50,20 @@
- 		pinctrl3 = &pinctrl_3;
- 	};
+diff --git a/arch/arm/mach-exynos/include/mach/uncompress.h b/arch/arm/mach-exynos/include/mach/uncompress.h
+index 2979995..1937e0f 100644
+--- a/arch/arm/mach-exynos/include/mach/uncompress.h
++++ b/arch/arm/mach-exynos/include/mach/uncompress.h
+@@ -31,13 +31,12 @@ static void arch_detect_cpu(void)
  
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		cpu at 0 {
-+			compatible = "arm,cortex-a15";
-+			reg = <0>;
-+		};
-+		cpu at 1 {
-+			compatible = "arm,cortex-a15";
-+			reg = <1>;
-+		};
-+	};
-+
- 	pd_gsc: gsc-power-domain at 0x10044000 {
- 		compatible = "samsung,exynos4210-pd";
- 		reg = <0x10044000 0x20>;
-diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-index 1a4e4e5..85ea4ca 100644
---- a/arch/arm/mach-exynos/platsmp.c
-+++ b/arch/arm/mach-exynos/platsmp.c
-@@ -180,10 +180,14 @@ static void __init exynos_smp_init_cpus(void)
- 	void __iomem *scu_base = scu_base_addr();
- 	unsigned int i, ncores;
+ 	/*
+ 	 * product_id is bits 31:12
+-	 *    bits 23:20 describe the exynosX family
+-	 *
++	 * bits 23:20 describe the exynosX family
++	 * bits 27:24 describe the exynosX family in exynos5420
+ 	 */
+ 	chip_id >>= 20;
+-	chip_id &= 0xf;
  
--	if (soc_is_exynos5250())
--		ncores = 2;
--	else
-+	if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
- 		ncores = scu_base ? scu_get_core_count(scu_base) : 1;
-+	else
-+		/*
-+		 * CPU Nodes are passed thru DT and set_cpu_possible
-+		 * is set by "arm_dt_init_cpu_maps".
-+		 */
-+		return;
- 
- 	/* sanity check */
- 	if (ncores > nr_cpu_ids) {
+-	if (chip_id == 0x5)
++	if ((chip_id & 0x0f) == 0x5 || (chip_id & 0xf0) == 0x50)
+ 		uart_base = (volatile u8 *)EXYNOS5_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
+ 	else
+ 		uart_base = (volatile u8 *)EXYNOS4_PA_UART + (S3C_UART_OFFSET * CONFIG_S3C_LOWLEVEL_UART_PORT);
 -- 
 1.7.9.5
