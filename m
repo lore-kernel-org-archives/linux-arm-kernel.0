@@ -1,115 +1,102 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 06 Jun 2013 12:49:52 -0400 (EDT)
-Subject: [PATCH v2] arm: mvebu: don't hardcode a physical address in
- headsmp.S
-In-Reply-To: <1370514268-9159-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370514268-9159-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <alpine.LFD.2.03.1306061249320.18597@syhkavp.arg>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 6 Jun 2013 17:50:40 +0100
+Subject: [PATCH 11/13] clocksource: exynos_mct: extend local timer
+ support for four cores
+In-Reply-To: <1370516488-25860-11-git-send-email-chander.kashyap@linaro.org>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <1370516488-25860-11-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <20130606165040.GB23311@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Jun 2013, Thomas Petazzoni wrote:
+Hi,
 
-> Now that the coherency_init() function is called a bit earlier, we can
-> actually read the physical address of the coherency unit registers
-> from the Device Tree, and communicate that to the headsmp.S code,
-> which avoids hardcoding a physical address.
+I have a few comments.
+
+On Thu, Jun 06, 2013 at 12:01:25PM +0100, Chander Kashyap wrote:
+> Extend the local timer interrupt support for handling four local timers.
+
+Is this the maximum number of CPUs the MCT could theoretically support?
+
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-
-Acked-by: Nicolas Pitre <nico@linaro.org>
-
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 > ---
-> Changes from v1 to v2:
+>  drivers/clocksource/exynos_mct.c |   33 ++++++++++++++++++++++++++++++---
+>  1 file changed, 30 insertions(+), 3 deletions(-)
 > 
->  * Simplified the code in headsmp.S to compute the physical address of
->    the coherency unit base address. Suggested by Nicolas Pitre.
-> 
->  * Added a sync_cache_w() call to ensure the physical address of the
->    coherency unit stored in the coherency_phys_base is visible by the
->    other CPUs. The other CPUs are reading this before they join the
->    coherency fabric, so we need to make some manual cache coherency
->    here. Noticed by Will Deacon.
-> 
->  arch/arm/mach-mvebu/coherency.c | 12 ++++++++++++
->  arch/arm/mach-mvebu/headsmp.S   | 16 ++++++++--------
->  2 files changed, 20 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-> index d74794a..32fcf69 100644
-> --- a/arch/arm/mach-mvebu/coherency.c
-> +++ b/arch/arm/mach-mvebu/coherency.c
-> @@ -25,8 +25,10 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/platform_device.h>
->  #include <asm/smp_plat.h>
-> +#include <asm/cacheflush.h>
->  #include "armada-370-xp.h"
+> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
+> index 662fcc0..6af17d4 100644
+> --- a/drivers/clocksource/exynos_mct.c
+> +++ b/drivers/clocksource/exynos_mct.c
+> @@ -412,6 +412,18 @@ static struct irqaction mct_tick1_event_irq = {
+>  	.handler	= exynos4_mct_tick_isr,
+>  };
 >  
-> +unsigned long __cpuinitdata coherency_phys_base;
->  static void __iomem *coherency_base;
->  static void __iomem *coherency_cpu_base;
->  
-> @@ -124,7 +126,17 @@ int __init coherency_init(void)
->  
->  	np = of_find_matching_node(NULL, of_coherency_table);
->  	if (np) {
-> +		struct resource res;
->  		pr_info("Initializing Coherency fabric\n");
-> +		of_address_to_resource(np, 0, &res);
-> +		coherency_phys_base = res.start;
-> +		/*
-> +		 * Ensure secondary CPUs will see the updated value,
-> +		 * which they read before they join the coherency
-> +		 * fabric, and therefore before they are coherent with
-> +		 * the boot CPU cache.
-> +		 */
-> +		sync_cache_w(&coherency_phys_base);
->  		coherency_base = of_iomap(np, 0);
->  		coherency_cpu_base = of_iomap(np, 1);
->  		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-> diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-> index a06e0ed..7147300 100644
-> --- a/arch/arm/mach-mvebu/headsmp.S
-> +++ b/arch/arm/mach-mvebu/headsmp.S
-> @@ -21,12 +21,6 @@
->  #include <linux/linkage.h>
->  #include <linux/init.h>
->  
-> -/*
-> - * At this stage the secondary CPUs don't have acces yet to the MMU, so
-> - * we have to provide physical addresses
-> - */
-> -#define ARMADA_XP_CFB_BASE	     0xD0020200
-> -
->  	__CPUINIT
->  
->  /*
-> @@ -35,15 +29,21 @@
->   * startup
->   */
->  ENTRY(armada_xp_secondary_startup)
-> +	/* Get coherency fabric base physical address */
-> +	adr	r0, 1f
-> +	ldr	r1, [r0]
-> +	ldr	r0, [r0, r1]
->  
->  	/* Read CPU id */
->  	mrc     p15, 0, r1, c0, c0, 5
->  	and     r1, r1, #0xF
->  
->  	/* Add CPU to coherency fabric */
-> -	ldr     r0, =ARMADA_XP_CFB_BASE
-> -
->  	bl	ll_set_cpu_coherent
->  	b	secondary_startup
->  
->  ENDPROC(armada_xp_secondary_startup)
+> +static struct irqaction mct_tick2_event_irq = {
+> +	.name		= "mct_tick2_irq",
+> +	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
+> +	.handler	= exynos4_mct_tick_isr,
+> +};
 > +
-> +	.align 2
-> +1:
-> +	.long	coherency_phys_base - .
-> -- 
-> 1.8.1.2
-> 
+> +static struct irqaction mct_tick3_event_irq = {
+> +	.name		= "mct_tick3_irq",
+> +	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
+> +	.handler	= exynos4_mct_tick_isr,
+> +};
+> +
+
+Is there any reason you can't use {request,free}_irq?
+
+>  static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+>  {
+>  	struct mct_clock_event_device *mevt;
+> @@ -439,11 +451,21 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
+>  			mct_tick0_event_irq.dev_id = mevt;
+>  			evt->irq = mct_irqs[MCT_L0_IRQ];
+>  			setup_irq(evt->irq, &mct_tick0_event_irq);
+> -		} else {
+> +		} else if (cpu == 1) {
+>  			mct_tick1_event_irq.dev_id = mevt;
+>  			evt->irq = mct_irqs[MCT_L1_IRQ];
+>  			setup_irq(evt->irq, &mct_tick1_event_irq);
+>  			irq_set_affinity(evt->irq, cpumask_of(1));
+> +		} else if (cpu == 2) {
+> +			mct_tick2_event_irq.dev_id = mevt;
+> +			evt->irq = mct_irqs[MCT_L2_IRQ];
+> +			setup_irq(evt->irq, &mct_tick2_event_irq);
+> +			irq_set_affinity(evt->irq, cpumask_of(2));
+> +		} else if (cpu == 3) {
+> +			mct_tick3_event_irq.dev_id = mevt;
+> +			evt->irq = mct_irqs[MCT_L3_IRQ];
+> +			setup_irq(evt->irq, &mct_tick3_event_irq);
+> +			irq_set_affinity(evt->irq, cpumask_of(3));
+
+This doesn't seem good to me. You're duplicating the logic for each CPU. Can
+you not figure out which values you need based on the smp_processor_id (or even
+better, the *evt) without requiring a separate branch for each CPU?
+
+>  		}
+>  	} else {
+>  		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
+> @@ -456,11 +478,16 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
+>  {
+>  	unsigned int cpu = smp_processor_id();
+>  	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
+> -	if (mct_int_type == MCT_INT_SPI)
+> +	if (mct_int_type == MCT_INT_SPI) {
+>  		if (cpu == 0)
+>  			remove_irq(evt->irq, &mct_tick0_event_irq);
+> -		else
+> +		else if (cpu == 1)
+>  			remove_irq(evt->irq, &mct_tick1_event_irq);
+> +		else if (cpu == 2)
+> +			remove_irq(evt->irq, &mct_tick2_event_irq);
+> +		else if (cpu == 3)
+> +			remove_irq(evt->irq, &mct_tick3_event_irq);
+> +	}
+
+Again, I don't think each CPU should be special-cased. If you used
+{request,free}_irq this would be simpler.
+
+Thanks,
+Mark.
