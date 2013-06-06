@@ -1,77 +1,27 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 6 Jun 2013 16:14:19 +0530
-Subject: [PATCH v2 1/5] ARM: davinci: uart: move to devid based clk_get
-In-Reply-To: <51B06547.8030709@ti.com>
-References: <1369729686-6595-1-git-send-email-prakash.pm@ti.com>
- <1369729686-6595-2-git-send-email-prakash.pm@ti.com>
- <51B06547.8030709@ti.com>
-Message-ID: <51B06803.2020008@ti.com>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Thu, 6 Jun 2013 13:47:27 +0300
+Subject: [PATCH v2 0/4] Override bits for PLLM
+Message-ID: <1370515677-6807-1-git-send-email-pdeschrijver@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+PLLM has override bits on Tegra30 and Tegra114. This patchset implements
+support for them for both Tegra30 and Tegra114.
 
+Changes since v1:
+ * Remove some stray lines from 'clk: tegra: override bits for Tegra114 PLLM'
 
-On 6/6/2013 4:02 PM, Sekhar Nori wrote:
-> Hi Prakash,
-> 
-> It appears that this patch was not tested thoroughly. See below:
-> 
-> On 5/28/2013 1:58 PM, Manjunathappa, Prakash wrote:
->> For modules having single clock, clk_get should be done with dev_id.
->> But current davinci implementation handles multiple instances
->> of the UART devices with single platform_device_register. Hence clk_get
->> is based on con_id rather than dev_id, this is not correct. Do
->> platform_device_register for each instance and clk_get on dev_id.
->>
->> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
->> ---
-> 
->> -static struct plat_serial8250_port da8xx_serial_pdata[] = {
->> +static struct plat_serial8250_port da8xx_serial0_pdata[] = {
->>  	{
->>  		.mapbase	= DA8XX_UART0_BASE,
->>  		.irq		= IRQ_DA8XX_UARTINT0,
->> @@ -75,7 +75,9 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
->>  					UPF_IOREMAP,
->>  		.iotype		= UPIO_MEM,
->>  		.regshift	= 2,
->> -	},
->> +	}
->> +};
->> +static struct plat_serial8250_port da8xx_serial1_pdata[] = {
->>  	{
->>  		.mapbase	= DA8XX_UART1_BASE,
->>  		.irq		= IRQ_DA8XX_UARTINT1,
->> @@ -83,7 +85,9 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
->>  					UPF_IOREMAP,
->>  		.iotype		= UPIO_MEM,
->>  		.regshift	= 2,
->> -	},
->> +	}
->> +};
->> +static struct plat_serial8250_port da8xx_serial2_pdata[] = {
->>  	{
->>  		.mapbase	= DA8XX_UART2_BASE,
->>  		.irq		= IRQ_DA8XX_UARTINT2,
->> @@ -91,18 +95,31 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
->>  					UPF_IOREMAP,
->>  		.iotype		= UPIO_MEM,
->>  		.regshift	= 2,
->> -	},
->> -	{
->> -		.flags	= 0,
->> -	},
->> +	}
-> 
-> 8250_core.c relies on sentinel value with p->flags = 0 to terminate
-> looking for more ports. You don't have sentinel values in any of pdata
-> the arrays you introduced so the code basically goes looking into areas
-> of memory not its own. This caused bunch of "cannot register port"
-> errors for me but I can easily imagine more serious errors.
+Peter De Schrijver (4):
+  clk: tegra: Add fields for override bits
+  clk: tegra: override bits for Tegra114 PLLM
+  clk: tegra: override bits for Tegra30 PLLM
+  clk: tegra: Use override bits when needed
 
-Similarly, you check for platform_data being NULL to go over the list of
-serial devices in the code in serial.c you introduced, but don't have a
-sentinel when you define the serial device array.
+ drivers/clk/tegra/clk-pll.c      |   82 ++++++++++++++++++++++---------------
+ drivers/clk/tegra/clk-tegra114.c |    9 ++++
+ drivers/clk/tegra/clk-tegra30.c  |   18 ++++++++
+ drivers/clk/tegra/clk.h          |    8 ++++
+ 4 files changed, 84 insertions(+), 33 deletions(-)
 
-Thanks,
-Sekhar
+-- 
+1.7.7.rc0.72.g4b5ea.dirty
