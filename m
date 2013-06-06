@@ -1,91 +1,86 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:20 +0900
-Subject: [PATCH 07/23] ARM: shmobile: r8a73a4: add div4 clocks
-In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503716-31155-8-git-send-email-horms+renesas@verge.net.au>
+Date: Thu,  6 Jun 2013 16:28:13 +0900
+Subject: [GIT PULL 00/23] Renesas ARM-based SoC updates for v3.11
+Message-ID: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-DIV4 clocks control each core clocks.
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a73a4.c | 45 ++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index 2be592f..147314a 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -32,6 +32,8 @@
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR5 0xe6150144
- 
-+#define FRQCRA		0xE6150000
-+#define FRQCRB		0xE6150004
- #define CKSCR		0xE61500C0
- #define PLLECR		0xE61500D0
- #define PLL1CR		0xE6150028
-@@ -175,6 +177,46 @@ static struct clk *main_clks[] = {
- 	&pll2h_clk,
- };
- 
-+/* DIV4 */
-+static void div4_kick(struct clk *clk)
-+{
-+	unsigned long value;
-+
-+	/* set KICK bit in FRQCRB to update hardware setting */
-+	value = ioread32(CPG_MAP(FRQCRB));
-+	value |= (1 << 31);
-+	iowrite32(value, CPG_MAP(FRQCRB));
-+}
-+
-+static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18, 24, 0, 36, 48, 10};
-+
-+static struct clk_div_mult_table div4_div_mult_table = {
-+	.divisors	= divisors,
-+	.nr_divisors	= ARRAY_SIZE(divisors),
-+};
-+
-+static struct clk_div4_table div4_table = {
-+	.div_mult_table	= &div4_div_mult_table,
-+	.kick		= div4_kick,
-+};
-+
-+enum {
-+	DIV4_I, DIV4_M3, DIV4_B, DIV4_M1, DIV4_M2,
-+	DIV4_ZX, DIV4_ZS, DIV4_HP,
-+	DIV4_NR };
-+
-+static struct clk div4_clks[DIV4_NR] = {
-+	[DIV4_I]	= SH_CLK_DIV4(&pll1_clk, FRQCRA, 20, 0x0dff, CLK_ENABLE_ON_INIT),
-+	[DIV4_M3]	= SH_CLK_DIV4(&pll1_clk, FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT),
-+	[DIV4_B]	= SH_CLK_DIV4(&pll1_clk, FRQCRA,  8, 0x0dff, CLK_ENABLE_ON_INIT),
-+	[DIV4_M1]	= SH_CLK_DIV4(&pll1_clk, FRQCRA,  4, 0x1dff, 0),
-+	[DIV4_M2]	= SH_CLK_DIV4(&pll1_clk, FRQCRA,  0, 0x1dff, 0),
-+	[DIV4_ZX]	= SH_CLK_DIV4(&pll1_clk, FRQCRB, 12, 0x0dff, 0),
-+	[DIV4_ZS]	= SH_CLK_DIV4(&pll1_clk, FRQCRB,  8, 0x0dff, 0),
-+	[DIV4_HP]	= SH_CLK_DIV4(&pll1_clk, FRQCRB,  4, 0x0dff, 0),
-+};
-+
-+/* MSTP */
- enum {
- 	MSTP217, MSTP216, MSTP207, MSTP206, MSTP204, MSTP203,
- 	MSTP522,
-@@ -258,6 +300,9 @@ void __init r8a73a4_clock_init(void)
- 		ret = clk_register(main_clks[k]);
- 
- 	if (!ret)
-+		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
-+
-+	if (!ret)
- 		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
- 
- 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.11
+
+for you to fetch changes up to 022a815a9119270a485c4b00ea3dce4314605c35:
+
+  ARM: shmobile: sh73a0: div4 clocks must check the kick bit before changing rate (2013-06-06 14:10:05 +0900)
+
+----------------------------------------------------------------
+Renesas ARM-based SoC updates for v3.11
+
+* Increased clock coverage for r8a7740, r8a73a4, r8a7778 and r8a7790
+* Use fixed clock ratio for r8a7778
+* Always use shmobile_setup_delay for sh73a0
+* Add add CPUFreq support for sh73a0
+* Check kick bit before changing rate on sh73a0
+* Do not overwrite all div4 clock operations on sh73a0
+
+A very small cleanup patch, "ARM: shmobile: remove ";" from
+SH_FIXED_RATIO_CLK*() macro", is included as it a dependency
+of r8a7790 clock changes.
+
+----------------------------------------------------------------
+Bastian Hecht (2):
+      ARM: shmobile: r8a7740: Add interim sh-eth device name to clocks list
+      ARM: shmobile: r8a7740: Add I2C DT clock names
+
+Guennadi Liakhovetski (4):
+      ARM: shmobile: sh73a0: add support for adjusting CPU frequency
+      ARM: shmobile: sh73a0: add CPUFreq support
+      ARM: shmobile: sh73a0: do not overwrite all div4 clock operations
+      ARM: shmobile: sh73a0: div4 clocks must check the kick bit before changing rate
+
+Kuninori Morimoto (12):
+      ARM: shmobile: r8a7778: fixup Ether setup code position
+      ARM: shmobile: r8a73a4: add main clock
+      ARM: shmobile: r8a73a4: add pll clocks
+      ARM: shmobile: r8a73a4: add div4 clocks
+      ARM: shmobile: r8a73a4: add div6 clocks
+      ARM: shmobile: r8a7778: use fixed ratio clock
+      ARM: shmobile: r8a7778: add SDHI clock support
+      ARM: shmobile: r8a7778: Register SDHI device
+      ARM: shmobile: remove ";" from SH_FIXED_RATIO_CLK*() macro
+      ARM: shmobile: r8a7790: add main clock
+      ARM: shmobile: r8a7790: add div4 clocks
+      ARM: shmobile: r8a7790: add div6 clocks
+
+Laurent Pinchart (3):
+      ARM: shmobile: r8a7740: add TPU PWM support
+      ARM: shmobile: r8a7790: Make private clock arrays static
+      ARM: shmobile: r8a7790: add TPU PWM support
+
+Magnus Damm (1):
+      ARM: shmobile: sh73a0: Always use shmobile_setup_delay()
+
+Phil Edworthy (1):
+      ARM: shmobile: r8a7779: Add PCIe clocks
+
+ arch/arm/mach-shmobile/Kconfig                |   2 +
+ arch/arm/mach-shmobile/clock-r8a73a4.c        | 375 ++++++++++++++++++++++++--
+ arch/arm/mach-shmobile/clock-r8a7740.c        |   7 +-
+ arch/arm/mach-shmobile/clock-r8a7778.c        | 156 ++++++++++-
+ arch/arm/mach-shmobile/clock-r8a7779.c        |   4 +-
+ arch/arm/mach-shmobile/clock-r8a7790.c        | 238 +++++++++++++++-
+ arch/arm/mach-shmobile/clock-sh73a0.c         | 111 +++++++-
+ arch/arm/mach-shmobile/include/mach/clock.h   |   4 +-
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |   2 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        |  52 +++-
+ arch/arm/mach-shmobile/setup-sh73a0.c         |  16 +-
+ 11 files changed, 906 insertions(+), 61 deletions(-)
+
 -- 
 1.8.2.1
