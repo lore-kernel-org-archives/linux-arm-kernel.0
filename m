@@ -1,34 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:23 +0900
-Subject: [PATCH 5/5] ARM: shmobile: marzen: keep local function as static
-In-Reply-To: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503703-31024-6-git-send-email-horms+renesas@verge.net.au>
+Date: Thu,  6 Jun 2013 16:28:15 +0900
+Subject: [PATCH 02/23] ARM: shmobile: r8a7740: Add interim sh-eth device name
+ to clocks list
+In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503716-31155-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Bastian Hecht <hechtb@gmail.com>
 
-marzen_init_late() should be static
+When we use the ethernet device via DT setup, we need to add it
+to a lookup list until this is properly handled later in a DT-only
+fashion.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7740.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index 9105285..d9c494e 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -349,7 +349,7 @@ static struct platform_device *marzen_late_devices[] __initdata = {
- 	&ohci1_device,
- };
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index c0d39aa..5bd8da0 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -592,6 +592,7 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_DEV_ID("sh_mmcif",		&mstp_clks[MSTP312]),
+ 	CLKDEV_DEV_ID("e6bd0000.mmcif",         &mstp_clks[MSTP312]),
+ 	CLKDEV_DEV_ID("sh-eth",			&mstp_clks[MSTP309]),
++	CLKDEV_DEV_ID("e9a00000.sh-eth",	&mstp_clks[MSTP309]),
  
--void __init marzen_init_late(void)
-+static void __init marzen_init_late(void)
- {
- 	/* get usb phy */
- 	phy = usb_get_phy(USB_PHY_TYPE_USB2);
+ 	CLKDEV_DEV_ID("sh_mobile_sdhi.2",	&mstp_clks[MSTP415]),
+ 	CLKDEV_DEV_ID("e6870000.sdhi",          &mstp_clks[MSTP415]),
 -- 
 1.8.2.1
