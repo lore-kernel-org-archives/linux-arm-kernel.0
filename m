@@ -1,60 +1,57 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 6 Jun 2013 12:17:39 -0400 (EDT)
-Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
-In-Reply-To: <20130606151705.GG16794@mudshark.cambridge.arm.com>
-References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
- <20130606151705.GG16794@mudshark.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1306061156330.18597@syhkavp.arg>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 6 Jun 2013 18:14:21 +0200
+Subject: [PATCH v3 0/7] pcmcia: at91_cf: clean up and add DT support
+In-Reply-To: <cover.1370506678.git.nicolas.ferre@atmel.com>
+References: <cover.1370506678.git.nicolas.ferre@atmel.com>
+Message-ID: <20130606161421.GM23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Jun 2013, Will Deacon wrote:
-
-> On Thu, Jun 06, 2013 at 04:03:00PM +0100, Ard Biesheuvel wrote:
-> > Hi all,
+On 10:24 Thu 06 Jun     , Nicolas Ferre wrote:
+> These patches clean up at91_cf a bit and add DT bindings.
+> They are based on a previous series from Joachim Eastwood and other cleanup
+> patches by Fabio and Laurent.
+> I have collected them together as they are lying around for some time.
 > 
-> Hi Ard,
+> Greg kindly told me that he can take them through his char/misc driver
+> tree, so I resend the series.
 > 
-> > This is a partial repost of the patches I proposed a couple of weeks ago to add
-> > support for VFP/NEON in kernel mode.
-> > 
-> > This time, I have included two use cases that I have been using, XOR and RAID-6
-> > checksumming. The former gets a 60% performance boost on the NEON, the latter
-> > over 400%.
+> Thanks for your help, best regards.
 > 
-> Whilst that sounds impressive, can you achieve similar results across all
-> NEON-capable CPUs? In particular, we need to make sure this doesn't cause
-> performance regressions on some cores.
+> v3: rebased on top of 3.10-rc4
+> 
+> v2: add 2 more cleanup patches:
+> 	- move to module_platform_driver_probe()
+> 	- little trivial indentation fix
+on all Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Note that the kernel performs runtime benchmarking of all the different 
-implementations it has available at boot time and selects the best one.  
-So if this would turn out to make things worse on some cores then the 
-Neon code would simply not be used.
-
-> Furthermore, do you have any power figures to complement your 
-> findings?
-
-This is going to be most useful in server type environments where a bit 
-more power is not such an issue but throughput is ... unless you start 
-using RAID6 arrays on your phone that is.  :-)  Otherwise this can be 
-left configured out for mobile targets.
-
-> The increased context-switch overhead
-> is also worth measuring if you can (i.e. run some userspace NEON-based
-> benchmarks in parallel with NEON and non-NEON implementations of the
-> checksumming).
-
-Do we know the context switch cost of normal task scheduling between 
-tasks using FP operations?  The in-kernel Neon usage should bring about 
-the same cost.  Measuring it would be interesting albeit probably 
-difficult.
-
-> We support building the kernel with older toolchains, so I don't see the
-> benefit of using intrinsics here.
-
-These days the compiler tends to do a better job than humans at properly 
-scheduling instructions for some code.  We shouldn't deprive ourselves 
-from it when a recent enough gcc is available.
-
-
-Nicolas
+Best Regards,
+J.
+> 
+> Fabio Porcedda (1):
+>   pcmcia: at91_cf: use module_platform_driver_probe()
+> 
+> Joachim Eastwood (5):
+>   pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
+>   pcmcia: at91_cf: convert to dev_ print functions
+>   pcmcia: at91_cf: use devm_ functions for allocations
+>   pcmcia: at91_cf: clean up header includes
+>   pcmcia: at91_cf: add support for DT
+> 
+> Laurent Navet (1):
+>   pcmcia/trivial: at91_cf: fix checkpatch error
+> 
+>  .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
+>  drivers/pcmcia/Kconfig                             |   2 +-
+>  drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
+>  3 files changed, 108 insertions(+), 89 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
+> 
+> -- 
+> 1.8.2.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
