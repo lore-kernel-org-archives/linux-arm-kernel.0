@@ -1,52 +1,70 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Thu,  6 Jun 2013 11:49:36 +0200
-Subject: [PATCH v2] ARM i.MX53: tqma53: add WP/CD pinctrl and vmmc to esdhc2
-Message-ID: <1370512176-19705-1-git-send-email-s.trumtrar@pengutronix.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 06 Jun 2013 11:58:03 +0200
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <20130606085039.GL23653@game.jcrosoft.org>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+ <20130605232647.55C8B3E10E4@localhost>
+ <20130606085039.GL23653@game.jcrosoft.org>
+Message-ID: <5214340.O7bxMVRM9L@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add WP/CD pinctrl for esdhc2.
-Also, add vmmc-supply for esdhc2.
+On Thursday 06 of June 2013 10:50:39 Jean-Christophe PLAGNIOL-VILLARD 
+wrote:
+> On 00:26 Thu 06 Jun     , Grant Likely wrote:
+> > On Tue, 09 Apr 2013 00:44:05 +0200, Javier Martinez Canillas 
+<javier.martinez@collabora.co.uk> wrote:
+> > > On 04/09/2013 12:05 AM, Rob Herring wrote:
+> > > > On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+> > > >> This means that drivers that need the IRQ type/level flags
+> > > >> defined in
+> > > >> the DT won't be able to get it.
+> > > > 
+> > > > But the interrupt controllers that need the information should be
+> > > > able
+> > > > to get to it via irqd_get_trigger_type. What problem exactly are
+> > > > you
+> > > > trying to fix? What driver would use this?
+> > > 
+> > > Yes but this is not about the interrupt controller wanting this
+> > > information but a device driver that is using the IORESOURCE_IRQ
+> > > struct resource that has the information about the virtual IRQ
+> > > associated with a GPIO-IRQ.
+> > > 
+> > > The driver doesn't know neither care if its IRQ line is connected to
+> > > a line of an real IRQ controller or to a GPIO controller that
+> > > allows a GPIO line to be used as an IRQ.
+> > > 
+> > > > My understanding of the IORESOURCE_IRQ_xxx (and DMA) bits are they
+> > > > are
+> > > > ISA specific and therefore should not be used on non-ISA buses.
+> > > 
+> > > Many TI OMAP2+ SoC based boards have an SMSC LAN911x/912x controller
+> > > (drivers/net/ethernet/smsc/smsc911x.c) that is connected to the OMAP
+> > > processor through its General-Purpose Memory Controller (GPMC) and
+> > > this LAN driver obtain its IRQ and I/O address space from a struct
+> > > resource IORESOURCE_IRQ and IORESOURCE_MEM respectively, that is
+> > > filled by the DeviceTree core.
+> > > 
+> > > It does this:
+> > > 
+> > > irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+> > > irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+> > > 
+> > > Since of_irq_to_resource() doesn't fill the trigger/level flags on
+> > > the
+> > > IORESOURCE_IRQ struct resource, irq_flags will always be 0 regarding
+> > > the value specified on the second cell of the "interrupts" DT
+> > > property.
+> 
+> why do you need to known this in you driver this need to be handle in
+> the irq chip
 
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
+There are devices that support multiple interrupt trigger types, like 
+Broadcom WLAN chips, and drivers must configure them properly for 
+requested trigger type, obtaining the information from flags field of the 
+IRQ resource.
 
-Changes since v1:
-	- move pinctrl to boardspecific namespace
-
- arch/arm/boot/dts/imx53-tqma53.dtsi | 13 ++++++++++++-
- 1 file changed, 12 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx53-tqma53.dtsi b/arch/arm/boot/dts/imx53-tqma53.dtsi
-index 38bed3e..dae03bb 100644
---- a/arch/arm/boot/dts/imx53-tqma53.dtsi
-+++ b/arch/arm/boot/dts/imx53-tqma53.dtsi
-@@ -35,7 +35,9 @@
- 
- &esdhc2 {
- 	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_esdhc2_1>;
-+	pinctrl-0 = <&pinctrl_esdhc2_1>,
-+		    <&pinctrl_tqma53_esdhc2_2>;
-+	vmmc-supply = <&reg_3p3v>;
- 	wp-gpios = <&gpio1 2 0>;
- 	cd-gpios = <&gpio1 4 0>;
- 	status = "disabled";
-@@ -69,6 +71,15 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hog>;
- 
-+	esdhc2_2 {
-+		pinctrl_tqma53_esdhc2_2: esdhc2-tqma53-grp2 {
-+			fsl,pins = <
-+				MX53_PAD_GPIO_4__GPIO1_4	0x80000000 /* SD2_CD */
-+				MX53_PAD_GPIO_2__GPIO1_2	0x80000000 /* SD2_WP */
-+			>;
-+		};
-+	};
-+
- 	i2s {
- 		pinctrl_i2s_1: i2s-grp1 {
- 			fsl,pins = <
--- 
-1.8.2.rc2
+Best regards,
+Tomasz
