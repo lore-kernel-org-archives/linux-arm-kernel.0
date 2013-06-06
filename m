@@ -1,40 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 06 Jun 2013 20:57:05 +0200
-Subject: [PATCH v4 1/6] drivers: bus: add a new driver for WEIM
-In-Reply-To: <20130606150935.GD28270@S2101-09.ap.freescale.net>
-References: <1369722012-6915-1-git-send-email-b32955@freescale.com>
- <1369722012-6915-2-git-send-email-b32955@freescale.com>
- <20130606150935.GD28270@S2101-09.ap.freescale.net>
-Message-ID: <3197659.HYKZIpp6NK@wuerfel>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Thu, 6 Jun 2013 15:03:21 -0400
+Subject: [PATCH] arm: mvebu: ensure PCIe range is propagated in the
+ .dts files
+In-Reply-To: <20130606181159.GN23859@titan.lakedaemon.net>
+References: <1370510483-32419-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370510483-32419-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130606181159.GN23859@titan.lakedaemon.net>
+Message-ID: <20130606190321.GQ23859@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 June 2013 23:09:37 Shawn Guo wrote:
-> 
-> On Tue, May 28, 2013 at 02:20:07PM +0800, Huang Shijie wrote:
-> > The WEIM(Wireless External Interface Module) works like a bus.
-> > You can attach many different devices on it, such as NOR, onenand.
+On Thu, Jun 06, 2013 at 02:11:59PM -0400, Jason Cooper wrote:
+> On Thu, Jun 06, 2013 at 11:21:23AM +0200, Thomas Petazzoni wrote:
+> > The ranges DT entry needed by the PCIe controller is defined at the
+> > SoC .dtsi level. However, some boards have a NOR flash, and to support
+> > it, they need to override the SoC-level ranges property to add an
+> > additional range. Since PCIe and NOR support came separately, some
+> > boards were not properly changed to include the PCIe range in their
+> > ranges property at the .dts level.
 > > 
-> > In the case of i.MX6q-sabreauto, the NOR is connected to WEIM.
+> > This commit fixes those platforms.
 > > 
-> > This patch also adds the devicetree binding document.
-> > The driver only works when the devicetree is enabled.
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > > ---
-> >  Documentation/devicetree/bindings/bus/imx-weim.txt |   49 +++++++
-> >  drivers/bus/Kconfig                                |    9 ++
-> >  drivers/bus/Makefile                               |    1 +
-> >  drivers/bus/imx-weim.c                             |  138 ++++++++++++++++++++
-> >  4 files changed, 197 insertions(+), 0 deletions(-)
-> >  create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
-> >  create mode 100644 drivers/bus/imx-weim.c
 > 
-> Since no one is collecting drivers/bus/ patches right now, I just
-> applied the whole series to have the patch go via imx -> arm-soc.
-> Please let me know if there is any problem.
+> Can you split this in to two patches, please:
+> 
+> >  arch/arm/boot/dts/armada-xp-db.dts               | 1 +
+> 
+> one for mvebu/dt
+> 
+> >  arch/arm/boot/dts/armada-xp-gp.dts               | 5 +++--
+> >  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 5 +++--
+> 
+> and one for mvebu/fixes?
 
-Sounds ok to me. If we see a lot of these, we can try to find a
-maintainer.
+Nevermind, I've got a few minutes and would like to get it in for the
+last -next this week.
 
-	Arnd
+thx,
+
+Jason.
