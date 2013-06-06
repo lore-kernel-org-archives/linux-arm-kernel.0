@@ -1,42 +1,37 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 6 Jun 2013 14:30:34 -0400
-Subject: [PATCH 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <alpine.DEB.2.02.1306061754560.5152@utopia.booyaka.com>
-References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
- <1369845494-30231-15-git-send-email-santosh.shilimkar@ti.com>
- <alpine.DEB.2.02.1306061754560.5152@utopia.booyaka.com>
-Message-ID: <51B0D54A.1090107@ti.com>
+From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
+Date: Thu, 06 Jun 2013 20:44:42 +0200
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDzrYL5c9v1T=nTcyv9RPrJ-TEnCyyjpHQnhXXJY-32=5g@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <CAKON4Oz79hUE_ReAqjeynwL6ZWntX2W1uw3YOg0G2AiY7Gjs=g@mail.gmail.com>
+ <CAPweEDyO+Sc1aQ64HBeh1OSzmPNsnwMwEo5kbHSan5vw_YEjXA@mail.gmail.com>
+ <1370477756.20454.65.camel@localhost>
+ <CAPweEDzrYL5c9v1T=nTcyv9RPrJ-TEnCyyjpHQnhXXJY-32=5g@mail.gmail.com>
+Message-ID: <1370544282.31564.5.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 June 2013 01:57 PM, Paul Walmsley wrote:
-> On Wed, 29 May 2013, Santosh Shilimkar wrote:
-> 
->> From: Sricharan R <r.sricharan@ti.com>
->>
->> - The IO resource information like dma request lines, irq number and
->>   ocp address space can be populated via dt blob. So such data is stripped
->>   from OMAP4 SOC hwmod data file.
->>
->> - The devices which are still missing the device tree bindings,
->>   address space entries are not removed yet. When such devices add
->>   the dt bindings, respective address space data can be deleted.
->>
->> - Also other unnessecary hwmods like firewalls are removed as a part of this.
->>
->> The above update, results in reduction of about ~1650 lines of code.
->>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> Signed-off-by: Sricharan R <r.sricharan@ti.com>
-> 
-> I assume that you're not autogenerating this data any more, based on
-> your change list above.  If that's correct, please also remove
-> the paragraph at the top of the file:
-> 
-The data is auto-generated. I let Sricharan comment if it is otherwise
-in the final version of the patch. 
+tor 2013-06-06 klockan 13:19 +0100 skrev luke.leighton:
 
-Sricharan ?
+>  mass-volume tablet, mass-volume IPTV box.  android OS, nothing else.
 
-Regards,
-Santosh
+Which still includes a number of possible configurations with different
+i2c, spi, usb etc devices connected on the board. Because Allwinner is
+not using mainline methods for configuration their customers are stuck
+in only selecting between a very limited set of "Allwinner compatible"
+auxillary chips (g-sensors, led controls, wifi modules, gps modules etc)
+in their designs.
+
+By using DT their customers are free to choose any device supported
+mainline.
+
+Regards
+Henrik
