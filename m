@@ -1,65 +1,54 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  6 Jun 2013 13:17:00 +0100
-Subject: [PATCH 12/33] ARM: ux500: Supply the MSP (Audio) clocks lookup to the
- DBX500 DT
+Date: Thu,  6 Jun 2013 13:17:06 +0100
+Subject: [PATCH 18/33] clk: ux500: Add a 2-cell Device Tree parser for
+ obtaining PRCC clocks
 In-Reply-To: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
 References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370521041-32318-13-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370521041-32318-19-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+PRCC (peripheral and kernel) clocks are specified using a property tuple
+<&phandle base bit>, where 'base' is the peripheral (1, 2, 3, 5 or 6),
+and bit is read-in value into that peripheral stipulated by the hardware
+specification.
+
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/clk/ux500/u8500_clk.c |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index 6b9c3a4..e4ce16b 100644
---- a/arch/arm/boot/dts/dbx5x0.dtsi
-+++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -781,6 +781,10 @@
- 			reg = <0x80123000 0x1000>;
- 			interrupts = <0 31 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
-+
-+			clocks = <&prcc_kclk 1 3>, <&prcc_pclk 1 3>;
-+			clock-names = "msp0", "apb_pclk";
-+
- 			status = "disabled";
- 		};
+diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+index ef948ff..3a7040b 100644
+--- a/drivers/clk/ux500/u8500_clk.c
++++ b/drivers/clk/ux500/u8500_clk.c
+@@ -15,6 +15,25 @@
+ #include <linux/platform_data/clk-ux500.h>
+ #include "clk.h"
  
-@@ -789,6 +793,10 @@
- 			reg = <0x80124000 0x1000>;
- 			interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
++struct clk *ux500_twocell_get(struct of_phandle_args *clkspec, void *data)
++{
++	struct clk **clk_data = data;
++	unsigned int base, bit;
 +
-+			clocks = <&prcc_kclk 1 4>, <&prcc_pclk 1 4>;
-+			clock-names = "msp1", "apb_pclk";
++	if (clkspec->args_count != 2)
++		return  ERR_PTR(-EINVAL);
 +
- 			status = "disabled";
- 		};
- 
-@@ -798,6 +806,10 @@
- 			reg = <0x80117000 0x1000>;
- 			interrupts = <0 98 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
++	base = clkspec->args[0];
++	bit = clkspec->args[1];
 +
-+			clocks = <&prcc_kclk 2 3>, <&prcc_pclk 2 5>;
-+			clock-names = "msp2", "apb_pclk";
++	if (base != 1 && base != 2 && base != 3 && base != 5 && base != 6) {
++		pr_err("%s: invalid PRCC base %d\n", __func__, base);
++		return ERR_PTR(-EINVAL);
++	}
 +
- 			status = "disabled";
- 		};
- 
-@@ -806,6 +818,10 @@
- 			reg = <0x80125000 0x1000>;
- 			interrupts = <0 62 IRQ_TYPE_LEVEL_HIGH>;
- 			v-ape-supply = <&db8500_vape_reg>;
++	return PRCC_SHOW(clk_data, base, bit);
++}
 +
-+			clocks = <&prcc_kclk 1 10>, <&prcc_pclk 1 11>;
-+			clock-names = "msp3", "apb_pclk";
-+
- 			status = "disabled";
- 		};
- 
+ const static struct of_device_id u8500_clk_of_match[] = {
+        { .compatible = "stericsson,u8500-clks", },
+        { },
 -- 
 1.7.10.4
