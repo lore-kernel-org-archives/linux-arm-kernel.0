@@ -1,99 +1,107 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Thu, 6 Jun 2013 19:23:35 +0900
-Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <20130606093524.GM18614@n2100.arm.linux.org.uk>
-References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
- <20130606093524.GM18614@n2100.arm.linux.org.uk>
-Message-ID: <51B06327.5030508@nvidia.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu,  6 Jun 2013 12:24:28 +0200
+Subject: [PATCH v2] arm: mvebu: don't hardcode a physical address in headsmp.S
+In-Reply-To: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370514268-9159-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2013 06:35 PM, Russell King - ARM Linux wrote:
-> On Thu, Jun 06, 2013 at 04:28:07PM +0900, Alexandre Courbot wrote:
->> +static int __attribute__((used)) __tegra_smc_stack[10];
->> +
->> +/*
->> + * With EABI, subtype and arg already end up in r0, r1 and r2 as they are
->> + * function arguments, but we prefer to play safe here and explicitly move
->> + * these values into the expected registers anyway. mov instructions without
->> + * any side-effect are turned into nops by the assembler, which limits
->> + * overhead.
->
-> No they aren't.  They will be preserved as:
-> 	mov r0, r0
-> 	mov r1, r1
-> 	mov r2, r2
+Now that the coherency_init() function is called a bit earlier, we can
+actually read the physical address of the coherency unit registers
+from the Device Tree, and communicate that to the headsmp.S code,
+which avoids hardcoding a physical address.
 
-I'm pretty sure I checked with objdump and saw these replaced by nops at 
-some point, but for some reason I cannot get that behavior again. So 
-simply put, my statement is wrong indeed.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+Changes from v1 to v2:
 
-> Moreover, things will go wrong if the compiler decides for whatever reason
-> to move 'arg' into r0 before calling your code sequence.  So really this
-> is quite fragile.
->
-> There's also no point in mentioning EABI in the above paragraph; all ARM
-> ABIs under Linux have always placed the arguments in r0..r3 and then on
-> the stack.  You can assert that this is always true by using the __asmeq()
-> macro.
+ * Simplified the code in headsmp.S to compute the physical address of
+   the coherency unit base address. Suggested by Nicolas Pitre.
 
-Good to know, thanks.
+ * Added a sync_cache_w() call to ensure the physical address of the
+   coherency unit stored in the coherency_phys_base is visible by the
+   other CPUs. The other CPUs are reading this before they join the
+   coherency fabric, so we need to make some manual cache coherency
+   here. Noticed by Will Deacon.
 
-> Also...
->
->> + */
->> +static void tegra_generic_smc(u32 type, u32 subtype, u32 arg)
->> +{
->> +	asm volatile(
->> +		".arch_extension	sec\n\t"
->> +		"ldr	r3, =__tegra_smc_stack\n\t"
->> +		"stmia	r3, {r4-r12, lr}\n\t"
->
-> using a statically allocated area to save the registers in this way is
-> probably a bad move; although the hotplug code guarantees that there
-> will be no concurrency between CPU hotplug operations, this sets a
-> precident for it being used in places where no such protection exists.
+ arch/arm/mach-mvebu/coherency.c | 12 ++++++++++++
+ arch/arm/mach-mvebu/headsmp.S   | 16 ++++++++--------
+ 2 files changed, 20 insertions(+), 8 deletions(-)
 
-Indeed. This function will be called from other places in the future, 
-and for these we cannot assume there will be no concurrency.
-
-> What is wrong with stacking r4-r12, lr onto the SVC stack?
-
-Nothing, actually. /o\
-
-> You don't
-> save the SVC stack pointer, so one can only assume that your SMC
-> implmentation preserves this (if it doesn't, that's yet another bug
-> with this assembly code.)
-
-SVC stack pointer is ok AFAICT.
-
-> Combining these two issues, you're probably far better off using an
-> __attribute__((naked)) function for this - which means you get to
-> write the entire function in assembly code without any compiler
-> interference:
- >
-> static void __attribute__((naked)) tegra_generic_smc(u32 type, u32 subtype, u32 arg)
-> {
-> 	asm volatile(
-> 		".arch_extension	sec\n\t"
-> 		"stmfd	sp!, {r4 - r12, lr}\n\t"
-> 		__asmeq("%0", "r0")
-> 		__asmeq("%1", "r1")
-> 		__asmeq("%2", "r2")
-> 		"mov	r3, #0\n\t"
-> 		"mov	r4, #0\n\t"
-> 		"dsb\n\t"
-> 		"smc	#0\n\t"
-> 		"ldmfd	sp!, {r4 - r12, pc}"
-> 		:
-> 		: "r" (type), "r" (subtype), "r" (arg)
-> 		: "memory");
-> }
-
-Well, that works beautifully indeed, and results in a much smaller 
-function that does nothing more beyond what's needed. On top of that, I 
-feel enlightened.
-
-Thanks, I will resubmit a fixed version soon.
-Alex.
+diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+index d74794a..32fcf69 100644
+--- a/arch/arm/mach-mvebu/coherency.c
++++ b/arch/arm/mach-mvebu/coherency.c
+@@ -25,8 +25,10 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/platform_device.h>
+ #include <asm/smp_plat.h>
++#include <asm/cacheflush.h>
+ #include "armada-370-xp.h"
+ 
++unsigned long __cpuinitdata coherency_phys_base;
+ static void __iomem *coherency_base;
+ static void __iomem *coherency_cpu_base;
+ 
+@@ -124,7 +126,17 @@ int __init coherency_init(void)
+ 
+ 	np = of_find_matching_node(NULL, of_coherency_table);
+ 	if (np) {
++		struct resource res;
+ 		pr_info("Initializing Coherency fabric\n");
++		of_address_to_resource(np, 0, &res);
++		coherency_phys_base = res.start;
++		/*
++		 * Ensure secondary CPUs will see the updated value,
++		 * which they read before they join the coherency
++		 * fabric, and therefore before they are coherent with
++		 * the boot CPU cache.
++		 */
++		sync_cache_w(&coherency_phys_base);
+ 		coherency_base = of_iomap(np, 0);
+ 		coherency_cpu_base = of_iomap(np, 1);
+ 		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+index a06e0ed..7147300 100644
+--- a/arch/arm/mach-mvebu/headsmp.S
++++ b/arch/arm/mach-mvebu/headsmp.S
+@@ -21,12 +21,6 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
+ 
+-/*
+- * At this stage the secondary CPUs don't have acces yet to the MMU, so
+- * we have to provide physical addresses
+- */
+-#define ARMADA_XP_CFB_BASE	     0xD0020200
+-
+ 	__CPUINIT
+ 
+ /*
+@@ -35,15 +29,21 @@
+  * startup
+  */
+ ENTRY(armada_xp_secondary_startup)
++	/* Get coherency fabric base physical address */
++	adr	r0, 1f
++	ldr	r1, [r0]
++	ldr	r0, [r0, r1]
+ 
+ 	/* Read CPU id */
+ 	mrc     p15, 0, r1, c0, c0, 5
+ 	and     r1, r1, #0xF
+ 
+ 	/* Add CPU to coherency fabric */
+-	ldr     r0, =ARMADA_XP_CFB_BASE
+-
+ 	bl	ll_set_cpu_coherent
+ 	b	secondary_startup
+ 
+ ENDPROC(armada_xp_secondary_startup)
++
++	.align 2
++1:
++	.long	coherency_phys_base - .
+-- 
+1.8.1.2
