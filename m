@@ -1,55 +1,52 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 6 Jun 2013 18:15:44 +0200
-Subject: [PATCH v3 1/7] pcmcia: at91_cf: fix gpio_get_value in
- at91_cf_get_status
-In-Reply-To: <cc6a02cb9d55ba52b48adca688fef362b8bea373.1370506678.git.nicolas.ferre@atmel.com>
-References: <cover.1370506678.git.nicolas.ferre@atmel.com>
- <cc6a02cb9d55ba52b48adca688fef362b8bea373.1370506678.git.nicolas.ferre@atmel.com>
-Message-ID: <20130606161544.GN23653@game.jcrosoft.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Jun 2013 18:19:58 +0200
+Subject: [PATCH 01/02] ARM: shmobile: Let romImage rely on default ATAGS
+In-Reply-To: <CANqRtoQZWmyMS6w2n9uW1-92-DOZcBst7gpCMrAC7GE9EwZUuQ@mail.gmail.com>
+References: <20130605075514.17653.77135.sendpatchset@w520>
+ <201306051351.14978.arnd@arndb.de>
+ <CANqRtoQZWmyMS6w2n9uW1-92-DOZcBst7gpCMrAC7GE9EwZUuQ@mail.gmail.com>
+Message-ID: <201306061819.58616.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:24 Thu 06 Jun     , Nicolas Ferre wrote:
-> From: Joachim Eastwood <manabian@gmail.com>
+On Thursday 06 June 2013, Magnus Damm wrote:
+> There are basically 4 types of zImages for mach-shmobile:
 > 
-> Commit 80af9e6d (pcmcia at91_cf: fix raw gpio number usage) forgot
-> to change the parameter in gpio_get_value after adding gpio
-> validation.
+> 1) Regular zImage/uImage - DTB and ATAGS are passed from boot loader -
+> head-shmobile.S is not used.
+> 
+> 2) Boot directly from MASK ROM from MMCIF/SDHI - head-shmobile.S loads
+> via MMC, sets up memory via mach/zboot.h, set ATAGS to NULL and passes
+> MACH_TYPE to kernel, ->fixup() sets up the actual memory bank
+> information.
+> 
+> 3) Boot directly from NOR Flash - head-shmobile.S includes memory
+> setup code from mach/zboot.h, passes MACH_TYPE to kernel running in
+> flash.
+> 
+> 4) Boot directly from MASK ROM via USB gadget - (r_usb_boot [1] runs
+> on your PC and loads to internal SRAM) - starts same image as 3)
+> above.
+> 
+> To answer your question about multiplatform images, I believe  the
+> majority case 1) above will run just fine.
 
-this is a fix so should for in stable tree too
+Ok, got it, thanks for the explanation!
 
-since #3.4
+> Regarding 2) -> 4), those are currently very specific to a certain
+> platform and they start directly from the reset vector which would
+> require them to either keep the board info hard-coded in the image or
+> somehow auto-detect board. From a hardware point of view I don' t
+> think there is any simple way to auto detect the boards in
+> mach-shmobile I'm afraid, so it looks to me that 2) -> 4) need to stay
+> board-specific.
 
-Best Regards,
-J.
-> 
-> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/pcmcia/at91_cf.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
-> index 01463c7..1b2c631 100644
-> --- a/drivers/pcmcia/at91_cf.c
-> +++ b/drivers/pcmcia/at91_cf.c
-> @@ -100,9 +100,9 @@ static int at91_cf_get_status(struct pcmcia_socket *s, u_int *sp)
->  		int vcc	= gpio_is_valid(cf->board->vcc_pin);
->  
->  		*sp = SS_DETECT | SS_3VCARD;
-> -		if (!rdy || gpio_get_value(rdy))
-> +		if (!rdy || gpio_get_value(cf->board->irq_pin))
->  			*sp |= SS_READY;
-> -		if (!vcc || gpio_get_value(vcc))
-> +		if (!vcc || gpio_get_value(cf->board->vcc_pin))
->  			*sp |= SS_POWERON;
->  	} else
->  		*sp = 0;
-> -- 
-> 1.8.2.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Yes, that makes sense.
+
+Just for completeness, am I guessing right that cases 2-4 are only for
+the previous "Renesas Technology" chips and their suggessors, while
+the previous NEC Emma EV2 only does the regular zImage boot?
+What about the current "Renesas Electronics" parts that include NEC
+technology, do they all support the head-shmobile.S direct boot?
+
+	Arnd
