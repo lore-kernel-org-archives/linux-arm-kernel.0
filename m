@@ -1,41 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Jun 2013 16:17:05 +0100
-Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
-In-Reply-To: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20130606151705.GG16794@mudshark.cambridge.arm.com>
+From: jonsmirl@gmail.com (jonsmirl at gmail.com)
+Date: Thu, 6 Jun 2013 11:13:55 -0400
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+Message-ID: <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 04:03:00PM +0100, Ard Biesheuvel wrote:
-> Hi all,
+On Wed, Jun 5, 2013 at 7:54 PM, luke.leighton <luke.leighton@gmail.com> wrote:
+>  augh.  ok.  solutions.  what are the solutions here?
 
-Hi Ard,
+Luke if you really want to fix this a good solution is to have
+Allwinner join Linaro and provide an engineer to the Linaro effort.
+That engineer will get educated on the right way to do kernel
+development and he can pass that knowledge back to Allwinner each day
+as he learns it.
 
-> This is a partial repost of the patches I proposed a couple of weeks ago to add
-> support for VFP/NEON in kernel mode.
-> 
-> This time, I have included two use cases that I have been using, XOR and RAID-6
-> checksumming. The former gets a 60% performance boost on the NEON, the latter
-> over 400%.
+Allwinner has expressed interest in the past in joining Linaro but the
+price was too high. I believe there are cheaper options now for
+joining. The benefits Allwinner receives from joining will far exceed
+the cost of joining. The net result will likely be a reduction in the
+amount they need to spend on in-house development since they will
+learn how to better leverage other developer's work.
 
-Whilst that sounds impressive, can you achieve similar results across all
-NEON-capable CPUs? In particular, we need to make sure this doesn't cause
-performance regressions on some cores. Furthermore, do you have any power
-figures to complement your findings? The increased context-switch overhead
-is also worth measuring if you can (i.e. run some userspace NEON-based
-benchmarks in parallel with NEON and non-NEON implementations of the
-checksumming).
-
-> lib/raid6: add ARM-NEON accelerated syndrome calculation
-> 
-> This is a port of the RAID-6 checksumming code in altivec.uc ported to use NEON
-> intrinsics. It is about 4x faster than the sequential code. As this code does
-> not live under arch/arm, I will send this patch separately to the appropriate 
-> list if/when the prerequisite patches from this series have been accepted.
-
-We support building the kernel with older toolchains, so I don't see the
-benefit of using intrinsics here. Have you tried writing an implementation
-with NEON instructions directly?
-
-Will
+--
+Jon Smirl
+jonsmirl at gmail.com
