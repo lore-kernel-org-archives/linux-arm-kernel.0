@@ -1,53 +1,57 @@
-From: aida.mynzhasova@skitlab.ru (Aida Mynzhasova)
-Date: Thu, 06 Jun 2013 10:03:42 +0400
-Subject: [PATCH 0/5] Broken DM816x support in Linux 3.10-rc4
-In-Reply-To: <alpine.DEB.2.02.1306060346390.15042@utopia.booyaka.com>
-References: <1370446156-11788-1-git-send-email-aida.mynzhasova@skitlab.ru>
- <alpine.DEB.2.02.1306060346390.15042@utopia.booyaka.com>
-Message-ID: <51B0263E.6000109@skitlab.ru>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Thu, 6 Jun 2013 14:55:26 +0800
+Subject: [PATCH 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
+Message-ID: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06.06.2013 07:54, Paul Walmsley wrote:
-> ????????????,
->
-> On Wed, 5 Jun 2013, Aida Mynzhasova wrote:
->
->> Not so long ago I tried to boot Linux 3.10-rc4 kernel on DM816x EVM
->> board. Unfortunately, my attempts were failed by reason of poor
->> support of DM81xx-based devices in new kernels.
->
-> Yeah, TI pretty much gave up on trying to get support for that chip
-> upstream a few years ago.  Same for DM814x.
->
->> So, I suggest you this patch series, which fixes that kernel crush and
->> adds new functions/structures, required for early initialization on
->> DM816x (power and clock domains, hwmods). After applying these patches
->> the kernel is able to successfully continue booting till clock
->> initialization (will be added later).
->
-> OK, it will be great to get my DM8168EVM booting on mainline.  But there
-> are a few preliminary issues with the patches:
->
-> 1. All new chip and board support needs to be DT-only.  So, no new board
-> files.  Also, all the hwmod data shouldn't have IRQ, DMA, etc. data - that
-> should come from DT.  See for example the recently posted patch "[PATCH
-> 13/14] ARM: AM33XX: hwmod data: irq, dma and addr info clean up"
->
-> 2. Looks like patch 2 is missing from the list.  If it's too big for the
-> list, please break it down into smaller patches.
->
-> 3. Did you write this code and data, hwmods, etc., or did it come from a
-> TI kernel?  Please note this clearly in the patch descriptions.
->
->
-> - Paul
->
+For tickless system, the jiffies may be updated long time (>20ms).
+At high loading system, the current waiting method will cause waiting
+timeout, and cause a kernel dump at below case.
+After timeout = jiffies + msecs_to_jiffies(10),
+the timer interrupt occurs, it updates jiffies (eg,  + 2 jiffies),
+then return back from interrupt, the time between above operations
+are tiny, the PLL is still not locked, but the timeout condition is satisfied.
 
-Hi!
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+ arch/arm/mach-imx/clk-pllv3.c |    9 ++++++---
+ 1 files changed, 6 insertions(+), 3 deletions(-)
 
-Thanks for reply!
-ok, I'll rewrite code by means of DT and add some additional notes to 
-patch description.
-
-Aida.
+diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+index 36aac94..eefc6c2 100644
+--- a/arch/arm/mach-imx/clk-pllv3.c
++++ b/arch/arm/mach-imx/clk-pllv3.c
+@@ -16,6 +16,7 @@
+ #include <linux/slab.h>
+ #include <linux/jiffies.h>
+ #include <linux/err.h>
++#include <linux/delay.h>
+ #include "clk.h"
+ 
+ #define PLL_NUM_OFFSET		0x10
+@@ -50,7 +51,7 @@ struct clk_pllv3 {
+ static int clk_pllv3_prepare(struct clk_hw *hw)
+ {
+ 	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+-	unsigned long timeout = jiffies + msecs_to_jiffies(10);
++	int count = 100;
+ 	u32 val;
+ 
+ 	val = readl_relaxed(pll->base);
+@@ -62,9 +63,11 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+ 	writel_relaxed(val, pll->base);
+ 
+ 	/* Wait for PLL to lock */
+-	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
+-		if (time_after(jiffies, timeout))
++	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK)) {
++		udelay(100);
++		if (--count == 0)
+ 			return -ETIMEDOUT;
++	}
+ 
+ 	return 0;
+ }
+-- 
+1.7.0.4
