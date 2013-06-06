@@ -1,40 +1,40 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Thu, 6 Jun 2013 14:55:15 -0400
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <20130606172810.GE14209@lukather>
-References: <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
- <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
- <20130606172810.GE14209@lukather>
-Message-ID: <20130606185515.GA11182@csclub.uwaterloo.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 06 Jun 2013 20:57:05 +0200
+Subject: [PATCH v4 1/6] drivers: bus: add a new driver for WEIM
+In-Reply-To: <20130606150935.GD28270@S2101-09.ap.freescale.net>
+References: <1369722012-6915-1-git-send-email-b32955@freescale.com>
+ <1369722012-6915-2-git-send-email-b32955@freescale.com>
+ <20130606150935.GD28270@S2101-09.ap.freescale.net>
+Message-ID: <3197659.HYKZIpp6NK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 07:28:10PM +0200, Maxime Ripard wrote:
-> I should also add that Allwinner not only talked to us already, but also
-> expressed interest in doing actual modern kernel development (like using
-> "recently" introduced kernel frameworks, like the clk framework).
+On Thursday 06 June 2013 23:09:37 Shawn Guo wrote:
 > 
-> I've received patches from them already for private reviews, they began
-> to show up on the kernel mailing lists, they asked to be CCed on the
-> patches I send upstream, they're even the one that reached out to me
-> when the early support for their chips was released. So, like Olof said,
-> they aren't in a vacuum, they are very aware of the mainline kernel and
-> speak a decent english.
+> On Tue, May 28, 2013 at 02:20:07PM +0800, Huang Shijie wrote:
+> > The WEIM(Wireless External Interface Module) works like a bus.
+> > You can attach many different devices on it, such as NOR, onenand.
+> > 
+> > In the case of i.MX6q-sabreauto, the NOR is connected to WEIM.
+> > 
+> > This patch also adds the devicetree binding document.
+> > The driver only works when the devicetree is enabled.
+> > 
+> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+> > ---
+> >  Documentation/devicetree/bindings/bus/imx-weim.txt |   49 +++++++
+> >  drivers/bus/Kconfig                                |    9 ++
+> >  drivers/bus/Makefile                               |    1 +
+> >  drivers/bus/imx-weim.c                             |  138 ++++++++++++++++++++
+> >  4 files changed, 197 insertions(+), 0 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/bus/imx-weim.txt
+> >  create mode 100644 drivers/bus/imx-weim.c
 > 
-> So yes, Allwinner has an evil vendor tree (c), with a solution similar yet
-> inferior (because not generic enough) to the device tree, but they show
-> interest on going down the mainline road.
+> Since no one is collecting drivers/bus/ patches right now, I just
+> applied the whole series to have the patch go via imx -> arm-soc.
+> Please let me know if there is any problem.
 
-Well I hope they get there soon, because they sure have some very nice
-chip designs at amazing prices.
+Sounds ok to me. If we see a lot of these, we can try to find a
+maintainer.
 
--- 
-Len Sorensen
+	Arnd
