@@ -1,32 +1,75 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 6 Jun 2013 23:21:17 +0530
-Subject: [PATCH 2/4] ARM: dts: omap5-uevm: Add USB Host support
-In-Reply-To: <20130605135739.GA11193@kahuna>
+Date: Thu, 6 Jun 2013 23:22:47 +0530
+Subject: [PATCH 3/4] ARM: dts: omap5-uevm: Add LED support for uEVM blue
+ LED
+In-Reply-To: <51AF6F8F.4000702@ti.com>
 References: <1370414770-1485-1-git-send-email-r.sricharan@ti.com>
- <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
- <20130605135739.GA11193@kahuna>
-Message-ID: <51B0CC15.6010809@ti.com>
+ <1370414770-1485-4-git-send-email-r.sricharan@ti.com>
+ <51AF6F8F.4000702@ti.com>
+Message-ID: <51B0CC6F.2060506@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
-On Wednesday 05 June 2013 07:27 PM, Nishanth Menon wrote:
-> On 12:16-20130605, Sricharan R wrote:
->> From: Roger Quadros <rogerq@ti.com>
-> [...]
+On Wednesday 05 June 2013 10:34 PM, Dan Murphy wrote:
+> Sricharan
+>
+> Thanks for sending this up in the series.
+>
+> On 06/05/2013 01:46 AM, Sricharan R wrote:
+>> From: Dan Murphy <dmurphy@ti.com>
+>>
+>> Add support for blue LED 1 off of GPIO 153.
+>> Make the LED a heartbeat LED
+>> Configure the MUX for GPIO output.
+>>
+>> Cc: Dan Murphy <dmurphy@ti.com>
+>> Signed-off-by: Dan Murphy <dmurphy@ti.com>
+>> [Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
+>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+>> ---
+>>  arch/arm/boot/dts/omap5-uevm.dts |   17 +++++++++++++++++
+>>  1 file changed, 17 insertions(+)
+>>
 >> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
->> index 843a001..cf862df 100644
+>> index cf862df..a2aed5b 100644
 >> --- a/arch/arm/boot/dts/omap5-uevm.dts
 >> +++ b/arch/arm/boot/dts/omap5-uevm.dts
-> <snip>
->> +	/* hsusb2_phy is clocked by FREF_CLK1 i.e. auxclk1 */
->> +	clock_alias {
->> +		clock-name = "auxclk1_ck";
->> +		clock-alias = "main_clk";
-> is'nt this better to use with clock node?
-Roger was suggesting to remove this for now. Posted
-V2 following that.
-Are you suggesting to go with your clock-binding patch ?
+>> @@ -66,6 +66,16 @@
+>>  		device = <&hsusb2_phy>;
+>>  		clock-frequency = <19200000>; /* 19.2 MHz */
+>>  	};
+>> +
+>> +	leds {
+>> +		compatible = "gpio-leds";
+>> +		led at 1 {
+>> +			label = "omap5:blue:usr1";
+>> +			gpios = <&gpio5 25 GPIO_ACTIVE_HIGH>; /* gpio5_153 D1 LED */
+>> +			linux,default-trigger = "heartbeat";
+>> +			default-state = "off";
+>> +		};
+>> +	};
+>>  };
+>>  
+>>  &omap5_pmx_core {
+>> @@ -77,6 +87,7 @@
+>>  			&mcbsp1_pins
+>>  			&mcbsp2_pins
+>>  			&usbhost_pins
+>> +			&led_gpio_pins
+>>  	>;
+>>  
+>>  	twl6040_pins: pinmux_twl6040_pins {
+>> @@ -175,6 +186,12 @@
+>>  			0x6e (PIN_OUTPUT | MUX_MODE6) /* gpio3_79 OUTPUT | MODE 6 ETH_NRESET */
+>>  		>;
+>>  	};
+>> +
+>> +	led_gpio_pins: pinmux_led_gpio_pins {
+>> +		pinctrl-single,pins = <
+>> +			0x196 (PIN_OUTPUT | MUX_MODE6) /* uart3_cts_rctx.gpio5_153 OUTPUT | MODE6 */
+> Same comment from Florian.  We can drop the OUTPUT | MODE6 in the comment.
+   Ok thanks, Corrected in V2.
 
 Regards,
  Sricharan
