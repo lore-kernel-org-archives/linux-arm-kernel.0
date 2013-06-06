@@ -1,37 +1,48 @@
-From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
-Date: Thu, 06 Jun 2013 20:44:42 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDzrYL5c9v1T=nTcyv9RPrJ-TEnCyyjpHQnhXXJY-32=5g@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <CAKON4Oz79hUE_ReAqjeynwL6ZWntX2W1uw3YOg0G2AiY7Gjs=g@mail.gmail.com>
- <CAPweEDyO+Sc1aQ64HBeh1OSzmPNsnwMwEo5kbHSan5vw_YEjXA@mail.gmail.com>
- <1370477756.20454.65.camel@localhost>
- <CAPweEDzrYL5c9v1T=nTcyv9RPrJ-TEnCyyjpHQnhXXJY-32=5g@mail.gmail.com>
-Message-ID: <1370544282.31564.5.camel@localhost>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 6 Jun 2013 13:46:17 -0500
+Subject: [PATCH 2/4] ARM: dts: omap5-uevm: Add USB Host support
+In-Reply-To: <51B0CC15.6010809@ti.com>
+References: <1370414770-1485-1-git-send-email-r.sricharan@ti.com>
+ <1370414770-1485-3-git-send-email-r.sricharan@ti.com>
+ <20130605135739.GA11193@kahuna> <51B0CC15.6010809@ti.com>
+Message-ID: <20130606184617.GA25579@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tor 2013-06-06 klockan 13:19 +0100 skrev luke.leighton:
+On 23:21-20130606, Sricharan R wrote:
+> Hi,
+> On Wednesday 05 June 2013 07:27 PM, Nishanth Menon wrote:
+> > On 12:16-20130605, Sricharan R wrote:
+> >> From: Roger Quadros <rogerq@ti.com>
+> > [...]
+> >> diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+> >> index 843a001..cf862df 100644
+> >> --- a/arch/arm/boot/dts/omap5-uevm.dts
+> >> +++ b/arch/arm/boot/dts/omap5-uevm.dts
+> > <snip>
+> >> +	/* hsusb2_phy is clocked by FREF_CLK1 i.e. auxclk1 */
+> >> +	clock_alias {
+> >> +		clock-name = "auxclk1_ck";
+> >> +		clock-alias = "main_clk";
+> > is'nt this better to use with clock node?
+> Roger was suggesting to remove this for now. Posted
+> V2 following that.
+> Are you suggesting to go with your clock-binding patch ?
+you cannot. Mike has already rejected that approach and I have dropped
+that series and wont be following up.
+See discussion https://patchwork.kernel.org/patch/2541331/
 
->  mass-volume tablet, mass-volume IPTV box.  android OS, nothing else.
+instead the new approach being discussed
+https://patchwork.kernel.org/patch/2657351/ and related discussions is
+the way to go.
 
-Which still includes a number of possible configurations with different
-i2c, spi, usb etc devices connected on the board. Because Allwinner is
-not using mainline methods for configuration their customers are stuck
-in only selecting between a very limited set of "Allwinner compatible"
-auxillary chips (g-sensors, led controls, wifi modules, gps modules etc)
-in their designs.
+That said, it practically blocks introduction of all code that depend on
+dts nodes :(, no matter how I dont like being blocked and my many series
+delayed, I believe Mike, Tero, Rajendra are doing the right architecture
+and we should wait for it's upstream introduction.
 
-By using DT their customers are free to choose any device supported
-mainline.
+That is just my 2 cents.
 
-Regards
-Henrik
+-- 
+Regards,
+Nishanth Menon
