@@ -1,28 +1,31 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 6 Jun 2013 10:20:20 -0300
-Subject: [PATCH v2] ARM: imx: Remove mxc specific ulpi access ops
-In-Reply-To: <1370522517-2873-1-git-send-email-mpa@pengutronix.de>
-References: <1370522517-2873-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <CAOMZO5AsLgWUX==n1pqn8jFu=krJx8L6q7GRNyP17aBQJsunuw@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Jun 2013 21:28:14 +0800
+Subject: [PATCH 0/8] update MBa53 support
+In-Reply-To: <1370344035-7417-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1370344035-7417-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20130606132811.GE11305@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+On Tue, Jun 04, 2013 at 01:07:07PM +0200, Steffen Trumtrar wrote:
+> Markus Niebel (4):
+>   ARM i.MX53: mba53: add sound support
+>   ARM i.MX53: mba53: add missing gpio stuff for pca9554
+>   ARM i.MX53: mba53: use reset gpio for FEC
+>   ARM i.MX53: mba53: add DI1_CLK to pinctrl for disp1
+> 
+> Michael Olbrich (1):
+>   ARM i.MX53: mba53: enable usbotg & usbh1
+> 
+> Philipp Zabel (1):
+>   ARM i.MX53: mba53: add Tevision Encoder
+> 
+> Sascha Hauer (1):
+>   ARM i.MX53: mba53: Add display support
+> 
+> Steffen Trumtrar (1):
+>   ARM i.MX53: mba53: fix lvds/disp pinctrl
 
-On Thu, Jun 6, 2013 at 9:41 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> There are ulpi access ops implemented in drivers/usb/phy/phy-ulpi.c.
-> mxc access ops implement the same access operations within mach-imx. This
-> patch removes the mxc ulpi file and uses phy-ulpi instead for
-> imx_otg_ulpi_create.
->
-> phy-ulpi successfully tested with i.MX27 Phytec phyCARD-S (pca100).
->
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
+All applied, thanks.
 
-Unrelated to this patch, but just out of curiosity: have you also try
-to use the chipidea driver with mx27?
-
-Regards,
-
-Fabio Estevam
+Shawn
