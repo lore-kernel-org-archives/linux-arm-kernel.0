@@ -1,48 +1,62 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:22 +0900
-Subject: [PATCH 09/23] ARM: shmobile: r8a7779: Add PCIe clocks
+Date: Thu,  6 Jun 2013 16:28:34 +0900
+Subject: [PATCH 21/23] ARM: shmobile: sh73a0: Always use shmobile_setup_delay()
 In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503716-31155-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503716-31155-22-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Phil Edworthy <Phil.Edworthy@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Phil Edworthy <phil.edworthy@renesas.com>
+Break out the function sh73a0_init_delay() that now
+gets called both for the C version of the code and
+the DT -reference boards. This way we handle both
+cases in the same way.
+
+Allows us to boot with TWD only in the kernel configuration
+for C board code. TWD is not yet enabled in the case of
+DT -reference - this due to a dependency on CCF.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7779.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-sh73a0.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7779.c b/arch/arm/mach-shmobile/clock-r8a7779.c
-index 31d5cd4..9daeb8c 100644
---- a/arch/arm/mach-shmobile/clock-r8a7779.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7779.c
-@@ -112,7 +112,7 @@ static struct clk *main_clks[] = {
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index ed93e01..bea298e 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -982,11 +982,17 @@ void __init sh73a0_add_standard_devices(void)
+ 			    ARRAY_SIZE(sh73a0_late_devices));
+ }
+ 
++void __init sh73a0_init_delay(void)
++{
++	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
++}
++
+ /* do nothing for !CONFIG_SMP or !CONFIG_HAVE_TWD */
+ void __init __weak sh73a0_register_twd(void) { }
+ 
+ void __init sh73a0_earlytimer_init(void)
+ {
++	sh73a0_init_delay();
+ 	sh73a0_clock_init();
+ 	shmobile_earlytimer_init();
+ 	sh73a0_register_twd();
+@@ -1005,11 +1011,6 @@ void __init sh73a0_add_early_devices(void)
+ 
+ #ifdef CONFIG_USE_OF
+ 
+-void __init sh73a0_init_delay(void)
+-{
+-	shmobile_setup_delay(1196, 44, 46); /* Cortex-A9 @ 1196MHz */
+-}
+-
+ static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
+ 	{},
  };
- 
- enum { MSTP323, MSTP322, MSTP321, MSTP320,
--	MSTP115, MSTP114,
-+	MSTP116, MSTP115, MSTP114,
- 	MSTP103, MSTP101, MSTP100,
- 	MSTP030,
- 	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-@@ -125,6 +125,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP322] = SH_CLK_MSTP32(&clkp_clk, MSTPCR3, 22, 0), /* SDHI1 */
- 	[MSTP321] = SH_CLK_MSTP32(&clkp_clk, MSTPCR3, 21, 0), /* SDHI2 */
- 	[MSTP320] = SH_CLK_MSTP32(&clkp_clk, MSTPCR3, 20, 0), /* SDHI3 */
-+	[MSTP116] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1, 16, 0), /* PCIe */
- 	[MSTP115] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1, 15, 0), /* SATA */
- 	[MSTP114] = SH_CLK_MSTP32(&clkp_clk, MSTPCR1, 14, 0), /* Ether */
- 	[MSTP103] = SH_CLK_MSTP32(&clks_clk, MSTPCR1,  3, 0), /* DU */
-@@ -161,6 +162,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("peripheral_clk",	&clkp_clk),
- 
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("rcar-pcie", &mstp_clks[MSTP116]), /* PCIe */
- 	CLKDEV_DEV_ID("sata_rcar", &mstp_clks[MSTP115]), /* SATA */
- 	CLKDEV_DEV_ID("fc600000.sata", &mstp_clks[MSTP115]), /* SATA w/DT */
- 	CLKDEV_DEV_ID("sh-eth", &mstp_clks[MSTP114]), /* Ether */
 -- 
 1.8.2.1
