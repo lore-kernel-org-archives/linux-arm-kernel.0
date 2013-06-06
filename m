@@ -1,70 +1,83 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  6 Jun 2013 13:16:57 +0100
-Subject: [PATCH 09/33] ARM: ux500: Supply the I2C clocks lookup to the DBX500
- DT
+Date: Thu,  6 Jun 2013 13:16:59 +0100
+Subject: [PATCH 11/33] ARM: ux500: Supply the SDI (MMC) clocks lookup to the
+ DBX500 DT
 In-Reply-To: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
 References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370521041-32318-10-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370521041-32318-12-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/boot/dts/dbx5x0.dtsi |   14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ arch/arm/boot/dts/dbx5x0.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dbx5x0.dtsi b/arch/arm/boot/dts/dbx5x0.dtsi
-index d682ea0..e49c679 100644
+index 8cfe5f1..6b9c3a4 100644
 --- a/arch/arm/boot/dts/dbx5x0.dtsi
 +++ b/arch/arm/boot/dts/dbx5x0.dtsi
-@@ -572,6 +572,8 @@
- 			v-i2c-supply = <&db8500_vape_reg>;
+@@ -703,6 +703,9 @@
+ 			       <&dma 29 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
  
- 			clock-frequency = <400000>;
-+			clocks = <&prcc_kclk 3 3>, <&prcc_pclk 3 3>;
-+			clock-names = "nmk-i2c.0", "apb_pclk";
- 		};
- 
- 		i2c at 80122000 {
-@@ -585,6 +587,9 @@
- 			v-i2c-supply = <&db8500_vape_reg>;
- 
- 			clock-frequency = <400000>;
++			clocks = <&prcc_kclk 1 5>, <&prcc_pclk 1 5>;
++			clock-names = "sdi0", "apb_pclk";
 +
-+			clocks = <&prcc_kclk 1 2>, <&prcc_pclk 1 2>;
-+			clock-names = "nmk-i2c.1", "apb_pclk";
+ 			status = "disabled";
  		};
  
- 		i2c at 80128000 {
-@@ -598,6 +603,9 @@
- 			v-i2c-supply = <&db8500_vape_reg>;
+@@ -715,6 +718,9 @@
+ 			       <&dma 32 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
  
- 			clock-frequency = <400000>;
++			clocks = <&prcc_kclk 2 4>, <&prcc_pclk 2 6>;
++			clock-names = "sdi1", "apb_pclk";
 +
-+			clocks = <&prcc_kclk 1 6>, <&prcc_pclk 1 6>;
-+			clock-names = "nmk-i2c.2", "apb_pclk";
+ 			status = "disabled";
  		};
  
- 		i2c at 80110000 {
-@@ -611,6 +619,9 @@
- 			v-i2c-supply = <&db8500_vape_reg>;
+@@ -727,6 +733,9 @@
+ 			       <&dma 28 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
  
- 			clock-frequency = <400000>;
++			clocks = <&prcc_kclk 3 4>, <&prcc_pclk 3 4>;
++			clock-names = "sdi2", "apb_pclk";
 +
-+			clocks = <&prcc_kclk 2 0>, <&prcc_pclk 2 0>;
-+			clock-names = "nmk-i2c.3", "apb_pclk";
+ 			status = "disabled";
  		};
  
- 		i2c at 8012a000 {
-@@ -624,6 +635,9 @@
- 			v-i2c-supply = <&db8500_vape_reg>;
- 
- 			clock-frequency = <400000>;
+@@ -734,6 +743,10 @@
+ 			compatible = "arm,pl18x", "arm,primecell";
+ 			reg = <0x80119000 0x1000>;
+ 			interrupts = <0 59 IRQ_TYPE_LEVEL_HIGH>;
 +
-+			clocks = <&prcc_kclk 1 9>, <&prcc_pclk 1 9>;
-+			clock-names = "nmk-i2c.4", "apb_pclk";
++			clocks = <&prcc_kclk 2 5>, <&prcc_pclk 2 7>;
++			clock-names = "sdi3", "apb_pclk";
++
+ 			status = "disabled";
  		};
  
- 		ssp at 80002000 {
+@@ -746,6 +759,9 @@
+ 			       <&dma 42 0 0x0>; /* Logical - MemToDev */
+ 			dma-names = "rx", "tx";
+ 
++			clocks = <&prcc_kclk 2 2>, <&prcc_pclk 2 4>;
++			clock-names = "sdi4", "apb_pclk";
++
+ 			status = "disabled";
+ 		};
+ 
+@@ -753,6 +769,10 @@
+ 			compatible = "arm,pl18x", "arm,primecell";
+ 			reg = <0x80008000 0x1000>;
+ 			interrupts = <0 100 IRQ_TYPE_LEVEL_HIGH>;
++
++			clocks = <&prcc_kclk 3 7>, <&prcc_pclk 3 7>;
++			clock-names = "sdi5", "apb_pclk";
++
+ 			status = "disabled";
+ 		};
+ 
 -- 
 1.7.10.4
