@@ -1,49 +1,45 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 6 Jun 2013 10:24:20 +0200
-Subject: [PATCH v3 7/7] pcmcia/trivial: at91_cf: fix checkpatch error
-In-Reply-To: <cover.1370506678.git.nicolas.ferre@atmel.com>
-References: <cover.1370506678.git.nicolas.ferre@atmel.com>
-Message-ID: <a132c622362cc90434f2a744a5cf2c3b22e86b58.1370506678.git.nicolas.ferre@atmel.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 6 Jun 2013 10:33:00 +0200
+Subject: [PATCH] mmc: atmel-mci: remove include <mach/cpu.h>
+In-Reply-To: <20130605094225.GC2805@ludovic.desroches@atmel.com>
+References: <1365511500-13778-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130605094225.GC2805@ludovic.desroches@atmel.com>
+Message-ID: <20130606083300.GJ23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Navet <laurent.navet@gmail.com>
+On 11:42 Wed 05 Jun     , Ludovic Desroches wrote:
+> On Tue, Apr 09, 2013 at 02:45:00PM +0200, Nicolas Ferre wrote:
+> > Header file not needed anymore as we have removed
+> > the calls to cpu_is_xxx() macro.
+> > 
+> > Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Late but of course:
+> 
+> Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-fix this checkpatch error:
-- ERROR: switch and case should be at the same indent
-
-Signed-off-by: Laurent Navet <laurent.navet@gmail.com>
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- drivers/pcmcia/at91_cf.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
-index 8ddc57c..b8f5acf 100644
---- a/drivers/pcmcia/at91_cf.c
-+++ b/drivers/pcmcia/at91_cf.c
-@@ -119,14 +119,14 @@ at91_cf_set_socket(struct pcmcia_socket *sock, struct socket_state_t *s)
- 	/* switch Vcc if needed and possible */
- 	if (gpio_is_valid(cf->board->vcc_pin)) {
- 		switch (s->Vcc) {
--			case 0:
--				gpio_set_value(cf->board->vcc_pin, 0);
--				break;
--			case 33:
--				gpio_set_value(cf->board->vcc_pin, 1);
--				break;
--			default:
--				return -EINVAL;
-+		case 0:
-+			gpio_set_value(cf->board->vcc_pin, 0);
-+			break;
-+		case 33:
-+			gpio_set_value(cf->board->vcc_pin, 1);
-+			break;
-+		default:
-+			return -EINVAL;
- 		}
- 	}
- 
--- 
-1.8.2.2
+Best Regards,
+J.
+> 
+> > ---
+> >  drivers/mmc/host/atmel-mci.c | 2 --
+> >  1 file changed, 2 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> > index e75774f..08e2b92 100644
+> > --- a/drivers/mmc/host/atmel-mci.c
+> > +++ b/drivers/mmc/host/atmel-mci.c
+> > @@ -40,8 +40,6 @@
+> >  #include <asm/io.h>
+> >  #include <asm/unaligned.h>
+> >  
+> > -#include <mach/cpu.h>
+> > -
+> >  #include "atmel-mci-regs.h"
+> >  
+> >  #define ATMCI_DATA_ERROR_FLAGS	(ATMCI_DCRCE | ATMCI_DTOE | ATMCI_OVRE | ATMCI_UNRE)
+> > -- 
+> > 1.8.0
+> > 
