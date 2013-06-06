@@ -1,36 +1,85 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:30 +0900
-Subject: [PATCH 17/23] ARM: shmobile: r8a7790: Make private clock arrays static
+Date: Thu,  6 Jun 2013 16:28:28 +0900
+Subject: [PATCH 15/23] ARM: shmobile: r8a7790: add div4 clocks
 In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503716-31155-18-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503716-31155-16-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Both clock-r8a7740.c and clock-r8a7790.c define a div4_clks array as
-non-static. Compiling support for both SoCs thus result in a symbol
-redefinition. Fix it by defining the arrays as static.
+DIV4 clocks control SD* core clocks.
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7790.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
 diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index a481003..bedd20c 100644
+index 850e47f..c85e643 100644
 --- a/arch/arm/mach-shmobile/clock-r8a7790.c
 +++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -154,7 +154,7 @@ enum {
- 	DIV4_SDH, DIV4_SD0, DIV4_SD1, DIV4_NR
+@@ -51,6 +51,7 @@
+ #define SMSTPCR7 0xe615014c
+ 
+ #define MODEMR		0xE6160060
++#define SDCKCR		0xE6150074
+ 
+ static struct clk_mapping cpg_mapping = {
+ 	.phys   = CPG_BASE,
+@@ -131,6 +132,29 @@ static struct clk *main_clks[] = {
+ 	&cp_clk,
  };
  
--struct clk div4_clks[DIV4_NR] = {
-+static struct clk div4_clks[DIV4_NR] = {
- 	[DIV4_SDH] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 8, 0x0dff, CLK_ENABLE_ON_INIT),
- 	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1de0, CLK_ENABLE_ON_INIT),
- 	[DIV4_SD1] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 0, 0x1de0, CLK_ENABLE_ON_INIT),
++/* SDHI (DIV4) clock */
++static int divisors[] = { 2, 3, 4, 6, 8, 12, 16, 18, 24, 0, 36, 48, 10 };
++
++static struct clk_div_mult_table div4_div_mult_table = {
++	.divisors = divisors,
++	.nr_divisors = ARRAY_SIZE(divisors),
++};
++
++static struct clk_div4_table div4_table = {
++	.div_mult_table = &div4_div_mult_table,
++};
++
++enum {
++	DIV4_SDH, DIV4_SD0, DIV4_SD1, DIV4_NR
++};
++
++struct clk div4_clks[DIV4_NR] = {
++	[DIV4_SDH] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 8, 0x0dff, CLK_ENABLE_ON_INIT),
++	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1de0, CLK_ENABLE_ON_INIT),
++	[DIV4_SD1] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 0, 0x1de0, CLK_ENABLE_ON_INIT),
++};
++
++/* MSTP */
+ enum { MSTP721, MSTP720,
+ 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
+ static struct clk mstp_clks[MSTP_NR] = {
+@@ -173,6 +197,11 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("qspi",		&qspi_clk),
+ 	CLKDEV_CON_ID("cp",		&cp_clk),
+ 
++	/* DIV4 */
++	CLKDEV_CON_ID("sdh",		&div4_clks[DIV4_SDH]),
++	CLKDEV_CON_ID("sd0",		&div4_clks[DIV4_SD0]),
++	CLKDEV_CON_ID("sd1",		&div4_clks[DIV4_SD1]),
++
+ 	/* MSTP */
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
+@@ -233,6 +262,9 @@ void __init r8a7790_clock_init(void)
+ 		ret = clk_register(main_clks[k]);
+ 
+ 	if (!ret)
++		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
++
++	if (!ret)
+ 		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
 -- 
 1.8.2.1
