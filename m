@@ -1,47 +1,37 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:19 +0900
-Subject: [PATCH 1/5] ARM: shmobile: r8a7740: Make private clock arrays static
+Date: Thu,  6 Jun 2013 16:28:20 +0900
+Subject: [PATCH 2/5] ARM: shmobile: use do{ }while() on SH_CLK_SET_RATIO()
 In-Reply-To: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503703-31024-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503703-31024-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Both clock-r8a7740.c and clock-r8a7790.c define a div4_clks array as
-non-static. Compiling support for both SoCs thus result in a symbol
-redefinition. Fix it by defining the arrays as static.
+SH_CLK_SET_RATIO() will be trouble without this patch
 
-To avoid further similar issues, also define the main_clks as static.
-
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7740.c | 4 ++--
+ arch/arm/mach-shmobile/include/mach/clock.h | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index c0d39aa..54afa04 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -266,7 +266,7 @@ static struct clk fsiack_clk = {
- static struct clk fsibck_clk = {
- };
+diff --git a/arch/arm/mach-shmobile/include/mach/clock.h b/arch/arm/mach-shmobile/include/mach/clock.h
+index 76ac612..ce29720 100644
+--- a/arch/arm/mach-shmobile/include/mach/clock.h
++++ b/arch/arm/mach-shmobile/include/mach/clock.h
+@@ -31,9 +31,9 @@ static SH_FIXED_RATIO_CLKg(name, p, r);
+ 	SH_FIXED_RATIO_CLK(name, p, name);
  
--struct clk *main_clks[] = {
-+static struct clk *main_clks[] = {
- 	&extalr_clk,
- 	&extal1_clk,
- 	&extal2_clk,
-@@ -317,7 +317,7 @@ enum {
- 	DIV4_NR
- };
+ #define SH_CLK_SET_RATIO(p, m, d)	\
+-{			\
++do {			\
+ 	(p)->mul = m;	\
+ 	(p)->div = d;	\
+-}
++} while (0)
  
--struct clk div4_clks[DIV4_NR] = {
-+static struct clk div4_clks[DIV4_NR] = {
- 	[DIV4_I]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 20, 0x6fff, CLK_ENABLE_ON_INIT),
- 	[DIV4_ZG]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 16, 0x6fff, CLK_ENABLE_ON_INIT),
- 	[DIV4_B]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  8, 0x6fff, CLK_ENABLE_ON_INIT),
+ #endif
 -- 
 1.8.2.1
