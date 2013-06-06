@@ -1,24 +1,33 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 06 Jun 2013 10:05:27 -0600
-Subject: [PATCH v2 0/4] Override bits for PLLM
-In-Reply-To: <1370515677-6807-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1370515677-6807-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <51B0B347.7010807@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Jun 2013 18:12:17 +0200
+Subject: [PATCH V2] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+In-Reply-To: <0a1201ce6268$d5a51610$80ef4230$%kim@samsung.com>
+References: <0a1201ce6268$d5a51610$80ef4230$%kim@samsung.com>
+Message-ID: <201306061812.18138.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2013 04:47 AM, Peter De Schrijver wrote:
-> PLLM has override bits on Tegra30 and Tegra114. This patchset implements
-> support for them for both Tegra30 and Tegra114.
+On Thursday 06 June 2013, Kukjin Kim wrote:
+> As we discussed in mailing list, non-DT for EXYNOS SoCs will not be
+> supported from v3.11. This patch removes regarding files for non-DT
+> including board files and defconfig.
 > 
-> Changes since v1:
->  * Remove some stray lines from 'clk: tegra: override bits for Tegra114 PLLM'
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Tomasz Figa <t.figa@samsung.com>
+> Cc: Thomas Abraham <thomas.ab@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Olof Johansson <olof@lixom.net>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+> 
+> It's time to remove non-DT stuff for EXYNOS SoCs.
+> If no objection on this, this will be sent to arm-soc in a couple of days.
 
-Recall that for V1, I said:
+Please do. I think there are no excuses left this time ;-)
 
-Tested-by: Stephen Warren <swarren@nvidia.com>
-Acked-by: Stephen Warren <swarren@nvidia.com>
+However, I wonder if more code in arch/arm/plat-samsung can be made to
+depend on the presence of ATAGS. I suspect there a lot of files that
+we no longer need to build for an Exynos kernel now.
 
-(assuming the one comment I already made is fixed)
-
-(and according to the changelog above, it has been)
+	Arnd
