@@ -1,41 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 6 Jun 2013 10:30:26 +0100
-Subject: Cache issues in vexpress cpu shutdown (regression in 3.10)
-In-Reply-To: <20130606092132.GB28479@arm.com>
-References: <1370430551.3387.11.camel@linaro1.home>
- <20130605113912.GE18614@n2100.arm.linux.org.uk>
- <20130605120539.GC32505@e102568-lin.cambridge.arm.com>
- <20130605190853.GF18614@n2100.arm.linux.org.uk>
- <20130606092132.GB28479@arm.com>
-Message-ID: <20130606093025.GC2650@e102568-lin.cambridge.arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  6 Jun 2013 11:30:42 +0200
+Subject: [PATCH v3 0/2] ARM: PJ4B: fixes for 3.10-rc
+Message-ID: <1370511044-31900-1-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 10:21:32AM +0100, Catalin Marinas wrote:
-> On Wed, Jun 05, 2013 at 08:08:53PM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Jun 05, 2013 at 01:05:39PM +0100, Lorenzo Pieralisi wrote:
-> > > There is an A9 errata (fixed in r1p0) whereby CLIDR[23:21] reads as 0
-> > > where it should read as 3'b001, so basically flush_cache_louis is not
-> > > flushing anything. If that's the problem, either we add a generic fix
-> > > in v7 cache assembly or we just fix it in platform code (by calling
-> > > flush_cache_all()), since there should not be many pre-r1p0 around.
-> > > 
-> > > Please let me know what you think.
-> > 
-> > If we're providing a flush_cache_louis() function, then it better do
-> > what it says or be removed.  So the right solution is to fix the
-> > function rather than working around it, because over time we'll only
-> > add more calls to flush_cache_louis() and it'll become a stumbling
-> > block.
-> 
-> I think at some point we should define this unification level in the DT,
-> maybe together with the CPU topology. We use LoUIS because it seems to
-> be the right thing on all the existing platforms but it's nothing in the
-> architecture that says LoUIS is the right level of flushing for the
-> CPU-local caches.
+Hello,
 
-I definitely agree. For the time being, I am willing to patch the code
-with an errata fix, waiting for the link between cache levels and
-topology (and power domains) to get in the kernel.
+This path set allows to fix some errata for PJ4B CPUs.
 
-Lorenzo
+Without the first one, the Armada 370 based board can't boot anymore
+since 3.10-rc1 . So this one really need to be applied on 3.10-rc.
+
+It should be a good thing to apply the other one on the 3.10-rc, even
+if we didn't observe get feedback from user who had a problem related
+to these errata, it may happen.
+
+Note that currently PJ4B is a symbol for 2 different CPUs:
+
+- the one used in Armada 370 is a PJ4B
+- the ones used in Armada XP are actually PJ4B-MP
+
+So I planed to introduce a new symbol PJ4B-MP but for 3.11 as it is
+not related to a critical fix. Awaiting these new symbols I made the
+errata depends on ARMADA_370 in the Kconfig.
+
+Changelog:
+V1 -> V2;
+ - Fixed various coding style and typo issues
+ - Replaced the "mcr p15, 0, r0, c7, c10, 4" by  "dsb"
+ - Removed the fix for errata 4611 in discard_old_kernel_data function,
+   as we don't use it
+
+V2 -> v3:
+ - As suggested by Russell, the first errata is now applied
+   dynamically accroding to the processor type
+ - The second patch use use save/restore IRQ macros following Will's
+   advices
+
+Gregory CLEMENT (1):
+  ARM PJ4B: Add support for errata 4742
+
+Lior Amsalem (1):
+  ARM PJ4B: Add support for errata 4611
+
+ arch/arm/Kconfig                 | 22 ++++++++++++++++++++++
+ arch/arm/include/asm/glue-proc.h |  9 +++++++++
+ arch/arm/include/asm/tlbflush.h  | 22 ++++++++++++++++++++++
+ arch/arm/mm/proc-macros.S        | 11 +++++++++++
+ arch/arm/mm/proc-v7.S            | 38 +++++++++++++++++++++++++++++++++-----
+ 5 files changed, 97 insertions(+), 5 deletions(-)
+
+-- 
+1.8.1.2
