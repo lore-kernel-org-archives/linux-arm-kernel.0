@@ -1,34 +1,44 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Thu, 6 Jun 2013 11:15:42 +0300
-Subject: [PATCH 2/4] clk: tegra: override bits for Tegra114 PLLM
-In-Reply-To: <51AF5FCE.6090501@wwwdotorg.org>
-References: <1370441329-8619-1-git-send-email-pdeschrijver@nvidia.com>
- <1370441329-8619-3-git-send-email-pdeschrijver@nvidia.com>
- <51AF5FCE.6090501@wwwdotorg.org>
-Message-ID: <20130606081542.GS3847@tbergstrom-lnx.Nvidia.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 6 Jun 2013 10:24:13 +0200
+Subject: [PATCH v3 0/7] pcmcia: at91_cf: clean up and add DT support
+Message-ID: <cover.1370506678.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 05:57:02PM +0200, Stephen Warren wrote:
-> On 06/05/2013 08:08 AM, Peter De Schrijver wrote:
-> 
-> Commit description?
-> 
-> > diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-> 
-> > +#ifdef CONFIG_PM_SLEEP
-> > +static struct cpu_clk_suspend_context {
-> > +	u32 clk_csite_src;
-> > +} tegra114_cpu_clk_sctx;
-> > +#endif
-> 
-> That generates:
-> 
-> drivers/clk/tegra/clk-tegra114.c:263:3: warning: ?tegra114_cpu_clk_sctx?
-> defined but not used [-Wunused-variable]
+These patches clean up at91_cf a bit and add DT bindings.
+They are based on a previous series from Joachim Eastwood and other cleanup
+patches by Fabio and Laurent.
+I have collected them together as they are lying around for some time.
 
-Ah. This should not be part of this patch indeed...
+Greg kindly told me that he can take them through his char/misc driver
+tree, so I resend the series.
 
-Cheers,
+Thanks for your help, best regards.
 
-Peter.
+v3: rebased on top of 3.10-rc4
+
+v2: add 2 more cleanup patches:
+	- move to module_platform_driver_probe()
+	- little trivial indentation fix
+
+Fabio Porcedda (1):
+  pcmcia: at91_cf: use module_platform_driver_probe()
+
+Joachim Eastwood (5):
+  pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
+  pcmcia: at91_cf: convert to dev_ print functions
+  pcmcia: at91_cf: use devm_ functions for allocations
+  pcmcia: at91_cf: clean up header includes
+  pcmcia: at91_cf: add support for DT
+
+Laurent Navet (1):
+  pcmcia/trivial: at91_cf: fix checkpatch error
+
+ .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
+ drivers/pcmcia/Kconfig                             |   2 +-
+ drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
+ 3 files changed, 108 insertions(+), 89 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
+
+-- 
+1.8.2.2
