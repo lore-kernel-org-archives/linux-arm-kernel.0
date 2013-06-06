@@ -1,34 +1,68 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 6 Jun 2013 13:41:05 -0400 (EDT)
-Subject: [PATCH v2] ARM: errata: LoUIS bit field in CLIDR register is
- incorrect
-In-Reply-To: <alpine.LFD.2.03.1306061338030.18597@syhkavp.arg>
-References: <1370538602.3695.71.camel@linaro1.home>
- <alpine.LFD.2.03.1306061338030.18597@syhkavp.arg>
-Message-ID: <alpine.LFD.2.03.1306061340150.18597@syhkavp.arg>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 6 Jun 2013 23:18:38 +0530
+Subject: [PATCH V2 3/4] ARM: dts: omap5-uevm: Add LED support for uEVM blue LED
+In-Reply-To: <1370540919-4339-1-git-send-email-r.sricharan@ti.com>
+References: <1370540919-4339-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1370540919-4339-4-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Jun 2013, Nicolas Pitre wrote:
+From: Dan Murphy <dmurphy@ti.com>
 
-> On Thu, 6 Jun 2013, Jon Medhurst (Tixy) wrote:
-> 
-> > On Cortex-A9 before version r1p0, the LoUIS bit field of the CLIDR
-> > register returns zero when it should return one. This leads to cache
-> > maintenance operations which rely on this value to not function as
-> > intended, causing data corruption.
-> > 
-> > The workaround for this errata is to detect affected CPUs and correct
-> > the LoUIS value read.
-> > 
-> > Acked-by: Will Deacon <will.deacon@arm.com>
-> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
-> 
-> This wouldn't hurt adding 'CC: stable at kernel.org' as well.
+Add support for blue LED 1 off of GPIO 153.
+Make the LED a heartbeat LED
+Configure the MUX for GPIO output.
 
-"stable at vger.kernel.org" that is.
+Cc: Dan Murphy <dmurphy@ti.com>
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+[Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+---
+ [V2] Removed the redundant comments
 
+ arch/arm/boot/dts/omap5-uevm.dts |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Nicolas
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index a31e42f..6e8bb86 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -59,6 +59,15 @@
+ 		reset-supply = <&hsusb3_reset>;
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++		led at 1 {
++			label = "omap5:blue:usr1";
++			gpios = <&gpio5 25 GPIO_ACTIVE_HIGH>; /* gpio5_153 D1 LED */
++			linux,default-trigger = "heartbeat";
++			default-state = "off";
++		};
++	};
+ };
+ 
+ &omap5_pmx_core {
+@@ -70,6 +79,7 @@
+ 			&mcbsp1_pins
+ 			&mcbsp2_pins
+ 			&usbhost_pins
++			&led_gpio_pins
+ 	>;
+ 
+ 	twl6040_pins: pinmux_twl6040_pins {
+@@ -168,6 +178,12 @@
+ 			0x6e (PIN_OUTPUT | MUX_MODE6) /* gpio3_79 ETH_NRESET */
+ 		>;
+ 	};
++
++	led_gpio_pins: pinmux_led_gpio_pins {
++		pinctrl-single,pins = <
++			0x196 (PIN_OUTPUT | MUX_MODE6) /* uart3_cts_rctx.gpio5_153 */
++		>;
++	};
+ };
+ 
+ &omap5_pmx_wkup {
+-- 
+1.7.9.5
