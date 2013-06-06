@@ -1,33 +1,37 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  6 Jun 2013 13:17:15 +0100
-Subject: [PATCH 27/33] ARM: ux500: Remove AUXDATA relating to I2C clock-name
+Date: Thu,  6 Jun 2013 13:17:12 +0100
+Subject: [PATCH 24/33] ARM: ux500: Remove AUXDATA relating to GPIO clock-name
  bindings
 In-Reply-To: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
 References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370521041-32318-28-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370521041-32318-25-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |    5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    9 ---------
+ 1 file changed, 9 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index aa325d8..b138d80 100644
+index 68a3918..8d72826 100644
 --- a/arch/arm/mach-ux500/cpu-db8500.c
 +++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -221,11 +221,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	/* Requires DMA bindings. */
- 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+@@ -228,15 +228,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
  	/* Requires clock name bindings. */
--	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80004000, "nmk-i2c.0", NULL),
--	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80122000, "nmk-i2c.1", NULL),
--	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
--	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80110000, "nmk-i2c.3", NULL),
--	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
- 	OF_DEV_AUXDATA("stericsson,db8500-musb", 0xa03e0000, "musb-ux500.0", NULL),
- 	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu",
- 			&db8500_prcmu_pdata),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e080, "gpio.1", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e000, "gpio.2", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e080, "gpio.3", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e100, "gpio.4", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e180, "gpio.5", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e000, "gpio.6", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e080, "gpio.7", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-gpio", 0xa03fe000, "gpio.8", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80004000, "nmk-i2c.0", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80122000, "nmk-i2c.1", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
 -- 
 1.7.10.4
