@@ -1,35 +1,36 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Fri, 7 Jun 2013 00:23:20 +0200
-Subject: [PATCH v7] arm: use built-in byte swap function
-In-Reply-To: <20130606221234.GQ18614@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.03.1302202327370.6419@syhkavp.arg>
- <20130221005221.15279b1372501af12c1e4f32@freescale.com>
- <alpine.LFD.2.03.1302211134160.6419@syhkavp.arg>
- <20130221203327.6558f89277468f7ffffa6506@freescale.com>
- <alpine.LFD.2.03.1302212219100.6419@syhkavp.arg>
- <20130222194032.f7b44aefa5e2723d16767a1b@freescale.com>
- <1361661654.18110.102.camel@shinybook.infradead.org>
- <20130523114654.1f273241725205c6703b2226@freescale.com>
- <20130523231336.GS18614@n2100.arm.linux.org.uk>
- <20130606221234.GQ18614@n2100.arm.linux.org.uk>
-Message-ID: <20130606222320.GT20972@pd.tnic>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 06 Jun 2013 15:27:21 -0700
+Subject: [PATCH 13/14] ARM: AM33XX: hwmod data: irq,
+ dma and addr info clean up
+In-Reply-To: <alpine.DEB.2.02.1306060355320.15042@utopia.booyaka.com> (Paul
+ Walmsley's message of "Thu, 6 Jun 2013 04:00:39 +0000 (UTC)")
+References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+ <1369845494-30231-14-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.02.1306060355320.15042@utopia.booyaka.com>
+Message-ID: <87zjv2ooxi.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 11:12:34PM +0100, Russell King - ARM Linux wrote:
-> That will ultimately then give sfr a conflict which should be trivial
-> to resolve - and hopefully we'll find out who's carrying the LZ4 patch
-> and putting it into linux-next.
+Paul Walmsley <paul@pwsan.com> writes:
 
-That should be akpm:
+> On Wed, 29 May 2013, Santosh Shilimkar wrote:
+>
+>> From: Vaibhav Hiremath <hvaibhav@ti.com>
+>> 
+>> AM33XX only supports DT boot mode and with addition of
+>> extracting module resources like, irq, dma and address space
+>> from DT block, so now we can remove duplicate information from
+>> hwmod data file.
+>
+> OK, guess I'll take your word for it that it all works.  The
+> BeagleBone-white with appended DTB hasn't booted here since v3.7.
+> And the BeagleBone-black with discrete DTB doesn't boot at all with
+> current mainline, only with the TI vendor kernel & DTB...
 
-http://ozlabs.org/~akpm/mmotm/broken-out/arm-add-support-for-lz4-compressed-kernel.patch
+Anyone care to shed light on what's missing for BeagleBone boot with
+mainline currently?  
 
-AFAICT.
+I've also not been able to boot a mainline kernel on the BeagleBone for
+some time.
 
--- 
-Regards/Gruss,
-    Boris.
-
-Sent from a fat crate under my desk. Formatting is fine.
---
+Kevin
