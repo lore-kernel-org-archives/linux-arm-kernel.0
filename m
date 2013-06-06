@@ -1,81 +1,52 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 6 Jun 2013 12:11:23 +0100
-Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <1740292.8Sz57ytBcM@flatron>
-References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
- <1740292.8Sz57ytBcM@flatron>
-Message-ID: <20130606111122.GB3320@localhost.localdomain>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Thu, 6 Jun 2013 16:44:46 +0530
+Subject: [PATCH 03/13] ARM: dts: fork out common Exynos5 nodes
+In-Reply-To: <1370516488-25860-3-git-send-email-chander.kashyap@linaro.org>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <1370516488-25860-3-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <CAK9yfHxv7EG_1rtgpOwo3HDN7TdfjnK3wH4bAG=RKQJDeW+hHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 12:17:02PM +0200, Tomasz Figa wrote:
-> Hi Alex,
-> 
-> On Thursday 06 of June 2013 16:28:07 Alexandre Courbot wrote:
-> > Boot loaders on some Tegra devices can be unlocked but do not let the
-> > system operate without SecureOS. SecureOS prevents access to some
-> > registers and requires the operating system to perform certain
-> > operations through Secure Monitor Calls instead of directly accessing
-> > the hardware.
-> > 
-> > This patch introduces basic SecureOS support for Tegra. SecureOS support
-> > can be enabled by adding a "nvidia,secure-os" property to the "chosen"
-> > node of the device tree.
-> > 
-> > Currently, only the bringup of secondary CPUs is performed by SMCs, but
-> > more operations will be added later.
-> > 
-> > Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> > ---
-> >  Documentation/devicetree/bindings/arm/tegra.txt |  8 +++
-> >  arch/arm/configs/tegra_defconfig                |  1 +
-> >  arch/arm/mach-tegra/Kconfig                     | 11 ++++
-> >  arch/arm/mach-tegra/Makefile                    |  2 +
-> >  arch/arm/mach-tegra/common.c                    |  2 +
-> >  arch/arm/mach-tegra/reset.c                     | 30 +++++++----
-> >  arch/arm/mach-tegra/secureos.c                  | 70
-> > +++++++++++++++++++++++++ arch/arm/mach-tegra/secureos.h               
-> >   | 31 +++++++++++ 8 files changed, 145 insertions(+), 10 deletions(-)
-> >  create mode 100644 arch/arm/mach-tegra/secureos.c
-> >  create mode 100644 arch/arm/mach-tegra/secureos.h
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/tegra.txt
-> > b/Documentation/devicetree/bindings/arm/tegra.txt index
-> > ed9c853..b543091 100644
-> > --- a/Documentation/devicetree/bindings/arm/tegra.txt
-> > +++ b/Documentation/devicetree/bindings/arm/tegra.txt
-> > @@ -32,3 +32,11 @@ board-specific compatible values:
-> >    nvidia,whistler
-> >    toradex,colibri_t20-512
-> >    toradex,iris
-> > +
-> > +Global properties
-> > +-------------------------------------------
-> > +
-> > +The following properties can be specified into the "chosen" root
-> > +node:
-> > +
-> > +  nvidia,secure-os: enable SecureOS.
-> 
-> Hmm, on Exynos we had something like
-> 
-> 	firmware at 0203F000 {
-> 		compatible = "samsung,secure-firmware";
-> 		reg = <0x0203F000 0x1000>;
-> 	};
-> 
-> but your solution might be actually the proper one, since firmware is not 
-> a hardware block. (The address in reg property is pointing to SYSRAM 
-> memory, which is an additional communication channel with the firmware.)
+On 6 June 2013 16:31, Chander Kashyap <chander.kashyap@linaro.org> wrote:
+> In preparation of adding support for Exynos5420, which has many peripherals
+> similar to Exynos5250, a new common Exynos5 device tree source file is
+> created out of the existing Exynos5250 device tree source file. Only the
+> common nodes required for basic boot up on Exynos5420 based boards are moved
+> into this new file and the rest of the common nodes would be moved subsequently.
+>
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos5.dtsi    |  121 +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250.dtsi |   74 +----------------------
+>  2 files changed, 122 insertions(+), 73 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos5.dtsi
+>
+> diff --git a/arch/arm/boot/dts/exynos5.dtsi b/arch/arm/boot/dts/exynos5.dtsi
+> new file mode 100644
+> index 0000000..ab56608
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos5.dtsi
+> @@ -0,0 +1,121 @@
+> +/*
+> + * Samsung's Exynos5 SoC series common device tree source
+> + *
+> + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+> + *             http://www.samsung.com
+> + *
+> + * Samsung's Exynos5 SoC series device nodes are listed in this file. Particular
+> + * SoCs from Exynos5 series can include this file and provide values for SoCs
+> + * specfic bindings.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/include/ "skeleton.dtsi"
 
-Calling to SecureOS doesn't sound like a "choice" to me.  It's part of the
-platform, and if it's present then you have to use it, otherwise major
-functionality (i.e., SMP) broken.
+Perhaps you could use #include here and rest of the places in this patch?
 
-Having a proper node still makes sense, because you can put a
-"compatible" property on it to track interface compatibility etc.  This
-was the view taken for PSCI (though in practice, we do have additional
-information to put in the DT for that anyway).
-
-Cheers
----Dave
+-- 
+With warm regards,
+Sachin
