@@ -1,102 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 6 Jun 2013 17:50:40 +0100
-Subject: [PATCH 11/13] clocksource: exynos_mct: extend local timer
- support for four cores
-In-Reply-To: <1370516488-25860-11-git-send-email-chander.kashyap@linaro.org>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-11-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <20130606165040.GB23311@e106331-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Thu, 6 Jun 2013 17:50:53 +0100
+Subject: [PATCH 4/4] ARM: ux500: Remove call to u8500_of_init_devices() -
+ again
+In-Reply-To: <201306061758.25106.arnd@arndb.de>
+References: <1370517676-10909-1-git-send-email-lee.jones@linaro.org>
+ <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
+ <201306061758.25106.arnd@arndb.de>
+Message-ID: <20130606165053.GU3370@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 06 Jun 2013, Arnd Bergmann wrote:
 
-I have a few comments.
-
-On Thu, Jun 06, 2013 at 12:01:25PM +0100, Chander Kashyap wrote:
-> Extend the local timer interrupt support for handling four local timers.
-
-Is this the maximum number of CPUs the MCT could theoretically support?
-
+> On Thursday 06 June 2013, Lee Jones wrote:
+> > Somehow, probably due to a merge error the call to u8500_of_init_devices()
+> > has re-appeared in next, causing this error:
+> > 
+> > arch/arm/mach-ux500/cpu-db8500.c: In function ?u8500_init_machine?:
+> > arch/arm/mach-ux500/cpu-db8500.c:268:2: error: implicit declaration of     \
+> >   function ?u8500_of_init_devices? [-Werror=implicit-function-declaration]
+> > arch/arm/mach-ux500/cpu-db8500.c:268:9: warning: assignment makes pointer  \
+> >   from integer without a cast [enabled by default]
+> > 
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> > ---
+> >  arch/arm/mach-ux500/cpu-db8500.c |    3 ---
+> >  1 file changed, 3 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+> > index d8ee616..f391d08 100644
+> > --- a/arch/arm/mach-ux500/cpu-db8500.c
+> > +++ b/arch/arm/mach-ux500/cpu-db8500.c
+> > @@ -264,9 +264,6 @@ static void __init u8500_init_machine(void)
+> >  	else if (of_machine_is_compatible("st-ericsson,ccu9540")) {}
+> >  		/* TODO: Add pinmaps for ccu9540 board. */
+> >  
+> > -	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
+> > -	parent = u8500_of_init_devices();
+> > -
+> >  	/* automatically probe child nodes of dbx5x0 devices */
+> >  	if (of_machine_is_compatible("st-ericsson,u8540"))
+> >  		of_platform_populate(NULL, u8500_local_bus_nodes,
 > 
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> ---
->  drivers/clocksource/exynos_mct.c |   33 ++++++++++++++++++++++++++++++---
->  1 file changed, 30 insertions(+), 3 deletions(-)
+> In the code I'm looking at, the definition for that function is
 > 
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 662fcc0..6af17d4 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -412,6 +412,18 @@ static struct irqaction mct_tick1_event_irq = {
->  	.handler	= exynos4_mct_tick_isr,
->  };
->  
-> +static struct irqaction mct_tick2_event_irq = {
-> +	.name		= "mct_tick2_irq",
-> +	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
-> +	.handler	= exynos4_mct_tick_isr,
-> +};
-> +
-> +static struct irqaction mct_tick3_event_irq = {
-> +	.name		= "mct_tick3_irq",
-> +	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
-> +	.handler	= exynos4_mct_tick_isr,
-> +};
-> +
+> /* TODO: Once all pieces are DT:ed, remove completely. */
+> static struct device * __init u8500_of_init_devices(void)
+> {
+>         struct device *parent = db8500_soc_device_init();
+>         db8500_add_usb(parent, usb_db8500_dma_cfg, usb_db8500_dma_cfg);
+>         return parent;
+> }
+> 
+> I'm not sure about the db8500_add_usb() call, but I think at least
+> db8500_soc_device_init() is required to get the root device for all
+> other devices.
 
-Is there any reason you can't use {request,free}_irq?
+Right:
 
->  static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->  {
->  	struct mct_clock_event_device *mevt;
-> @@ -439,11 +451,21 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->  			mct_tick0_event_irq.dev_id = mevt;
->  			evt->irq = mct_irqs[MCT_L0_IRQ];
->  			setup_irq(evt->irq, &mct_tick0_event_irq);
-> -		} else {
-> +		} else if (cpu == 1) {
->  			mct_tick1_event_irq.dev_id = mevt;
->  			evt->irq = mct_irqs[MCT_L1_IRQ];
->  			setup_irq(evt->irq, &mct_tick1_event_irq);
->  			irq_set_affinity(evt->irq, cpumask_of(1));
-> +		} else if (cpu == 2) {
-> +			mct_tick2_event_irq.dev_id = mevt;
-> +			evt->irq = mct_irqs[MCT_L2_IRQ];
-> +			setup_irq(evt->irq, &mct_tick2_event_irq);
-> +			irq_set_affinity(evt->irq, cpumask_of(2));
-> +		} else if (cpu == 3) {
-> +			mct_tick3_event_irq.dev_id = mevt;
-> +			evt->irq = mct_irqs[MCT_L3_IRQ];
-> +			setup_irq(evt->irq, &mct_tick3_event_irq);
-> +			irq_set_affinity(evt->irq, cpumask_of(3));
+https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-stericsson.git/commit/arch/arm/mach-ux500/cpu-db8500.c?h=next&id=1e74043a29cdec67279d6e4f494dd1674a1b2365
 
-This doesn't seem good to me. You're duplicating the logic for each CPU. Can
-you not figure out which values you need based on the smp_processor_id (or even
-better, the *evt) without requiring a separate branch for each CPU?
+For some reason (I suspect a merge error), u8500_of_init_devices
+reappeared.
 
->  		}
->  	} else {
->  		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
-> @@ -456,11 +478,16 @@ static void exynos4_local_timer_stop(struct clock_event_device *evt)
->  {
->  	unsigned int cpu = smp_processor_id();
->  	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
-> -	if (mct_int_type == MCT_INT_SPI)
-> +	if (mct_int_type == MCT_INT_SPI) {
->  		if (cpu == 0)
->  			remove_irq(evt->irq, &mct_tick0_event_irq);
-> -		else
-> +		else if (cpu == 1)
->  			remove_irq(evt->irq, &mct_tick1_event_irq);
-> +		else if (cpu == 2)
-> +			remove_irq(evt->irq, &mct_tick2_event_irq);
-> +		else if (cpu == 3)
-> +			remove_irq(evt->irq, &mct_tick3_event_irq);
-> +	}
-
-Again, I don't think each CPU should be special-cased. If you used
-{request,free}_irq this would be simpler.
-
-Thanks,
-Mark.
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
