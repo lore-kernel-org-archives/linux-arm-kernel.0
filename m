@@ -1,80 +1,80 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 06 Jun 2013 10:44:48 -0600
-Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
-References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <51B0BC80.9040007@wwwdotorg.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 6 Jun 2013 12:46:16 -0400 (EDT)
+Subject: [PATCH] ARM: errata: LoUIS bit field in CLIDR register is
+ incorrect
+In-Reply-To: <20130606154339.GH16794@mudshark.cambridge.arm.com>
+References: <1370527112.3695.47.camel@linaro1.home>
+ <20130606150156.GF16794@mudshark.cambridge.arm.com>
+ <1370532888.3500.11.camel@computer5.home>
+ <20130606154339.GH16794@mudshark.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1306061235530.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2013 01:28 AM, Alexandre Courbot wrote:
-> Boot loaders on some Tegra devices can be unlocked but do not let the
-> system operate without SecureOS. SecureOS prevents access to some
-> registers and requires the operating system to perform certain
-> operations through Secure Monitor Calls instead of directly accessing
-> the hardware.
+On Thu, 6 Jun 2013, Will Deacon wrote:
+
+> On Thu, Jun 06, 2013 at 04:34:48PM +0100, Jon Medhurst (Tixy) wrote:
+> > On Thu, 2013-06-06 at 16:01 +0100, Will Deacon wrote:
+> > > > diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> > > > index 5907e10..fe637e9 100644
+> > > > --- a/arch/arm/mach-vexpress/Kconfig
+> > > > +++ b/arch/arm/mach-vexpress/Kconfig
+> > > > @@ -56,5 +56,6 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
+> > > >  
+> > > >  config ARCH_VEXPRESS_CA9X4
+> > > >  	bool "Versatile Express Cortex-A9x4 tile"
+> > > > +	select ARM_ERRATA_643719
+> > > 
+> > > We don't do this for any other workarounds, so I'd suggest either dropping
+> > > this or having a separate patch adding all of those that are required.
+> > 
+> > Not quite sure by what you mean by 'all of those that are required'. All
+> > the errata required for vexpress? Or all platforms which require the
+> > errata workaround?
 > 
-> This patch introduces basic SecureOS support for Tegra. SecureOS support
-> can be enabled by adding a "nvidia,secure-os" property to the "chosen"
-> node of the device tree.
+> I mean, the A9 coretile on vexpress also has other errata, for which we have
+> workarounds in the kernel. They aren't automatically selected (for example,
+> ARM_ERRATA_720789) so if you want to do this, it's worth selecting all or
+> none, rather than make it look like you're selecting all those that apply
+> when you're not.
 
-I suspect "SecureOS" here is the name of a specific implementation of a
-secure monitor, right? It's certainly a very unfortunate name, since it
-sounds like a generic concept rather than a specific implementation:-(
+I think we _really_ should move towards selecting all the errata that 
+apply on a per platform basis.  We simply cannot expect everyone to be 
+aware of the actual errata list that apply for a given platform.  And as 
+we move towards reducing the amount of defconfig files we need a 
+reliable way to record which erratum applies to which platform.
 
-There certainly could be (and I believe are in practice?) multiple
-implementation of a secure monitor for Tegra. Presumably, each of those
-implementations has (or could have) a different definition for what SVC
-calls it supports, their parameters, etc.
+Many platforms appear to do it already:
 
-I think we need to separate the concept of support for *a* secure
-monitor, from support for a *particular* secure monitor.
+mach-bcm/Kconfig:       select ARM_ERRATA_754322
+mach-bcm/Kconfig:       select ARM_ERRATA_764369 if SMP
+mach-bcm2835/Kconfig:   select ARM_ERRATA_411920
+mach-imx/Kconfig:       select ARM_ERRATA_754322
+mach-imx/Kconfig:       select ARM_ERRATA_764369 if SMP
+mach-imx/Kconfig:       select ARM_ERRATA_775420
+mach-imx/Kconfig:       select PL310_ERRATA_588369 if CACHE_PL310
+mach-imx/Kconfig:       select PL310_ERRATA_727915 if CACHE_PL310
+mach-imx/Kconfig:       select PL310_ERRATA_769419 if CACHE_PL310
+mach-omap2/Kconfig:     select ARM_ERRATA_720789
+mach-omap2/Kconfig:     select PL310_ERRATA_588369
+mach-omap2/Kconfig:     select PL310_ERRATA_727915
+mach-omap2/Kconfig:     select ARM_ERRATA_754322
+mach-omap2/Kconfig:     select ARM_ERRATA_775420
+mach-tegra/Kconfig:     select ARM_ERRATA_720789
+mach-tegra/Kconfig:     select ARM_ERRATA_754327 if SMP
+mach-tegra/Kconfig:     select ARM_ERRATA_764369 if SMP
+mach-tegra/Kconfig:     select PL310_ERRATA_727915 if CACHE_L2X0
+mach-tegra/Kconfig:     select PL310_ERRATA_769419 if CACHE_L2X0
+mach-tegra/Kconfig:     select ARM_ERRATA_754322
+mach-tegra/Kconfig:     select ARM_ERRATA_764369 if SMP
+mach-tegra/Kconfig:     select PL310_ERRATA_769419 if CACHE_L2X0
+mach-ux500/Kconfig:     select ARM_ERRATA_754322
+mach-ux500/Kconfig:     select ARM_ERRATA_764369 if SMP
+mach-ux500/Kconfig:     select PL310_ERRATA_753970 if CACHE_PL310
 
-> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+So if someone knowledgeable about applicable errata for VExpress could 
+do the same that would be great.  I agree that this should be a separate 
+patch though.
 
-> +node:
-> +
-> +  nvidia,secure-os: enable SecureOS.
 
-... as such, I think some work is needed here to allow specification of
-which secure monitor is present and/or which secure monitor ABI it
-implements. The suggestion to use a specific DT node, and hence use
-compatible values for this, seems reasonable. Alternatively, perhaps:
-
-nvidia,secure-monitor = "name_of_vendor_or_SMC_ABI";
-
-might be reasonable, although using a node would allow ABI-specific
-additional properties to be defined should they be needed, so I guess I
-would lean towards that.
-
-Similar comments may apply to the CONFIG_ option and description,
-filenames, etc.
-
-> diff --git a/arch/arm/mach-tegra/secureos.c b/arch/arm/mach-tegra/secureos.c
-
-> +void __init tegra_init_secureos(void)
-> +{
-> +	struct device_node *node = of_find_node_by_path("/chosen");
-> +
-> +	if (node && of_property_read_bool(node, "nvidia,secure-os"))
-> +		register_firmware_ops(&tegra_firmware_ops);
-> +}
-
-I'm tempted to think that function should /always/ exist an be called
-(so no dummy inline in secureos.h).
-
-In particular, what happens when a kernel without CONFIG_SECUREOS
-enabled is booted under a secure monitor. Presumably we want the init
-code to explicitly check for this condition, and either BUG(), or do
-something to disable any features (like SMP) that require SVCs?
-
-So, the algorithm here might be more like:
-
-find node
-if node exists
-    if (!IS_ENABLED(SECURE_OS))
-        BUG/WARN/...
-    else
-        register_firmware_ops()
-
-?
+Nicolas
