@@ -1,57 +1,53 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 6 Jun 2013 18:14:21 +0200
-Subject: [PATCH v3 0/7] pcmcia: at91_cf: clean up and add DT support
-In-Reply-To: <cover.1370506678.git.nicolas.ferre@atmel.com>
-References: <cover.1370506678.git.nicolas.ferre@atmel.com>
-Message-ID: <20130606161421.GM23653@game.jcrosoft.org>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 6 Jun 2013 17:19:13 +0100
+Subject: [PATCH v3 5/6] arm64/xen: introduce CONFIG_XEN and hypercall.S
+ on ARM64
+In-Reply-To: <20130606144212.GK28479@arm.com>
+References: <alpine.DEB.2.02.1306041712100.4589@kaball.uk.xensource.com>
+ <1370434530-22428-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <1471793.18ZhhAHKN9@wuerfel> <20130606144212.GK28479@arm.com>
+Message-ID: <alpine.DEB.2.02.1306061703570.4589@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:24 Thu 06 Jun     , Nicolas Ferre wrote:
-> These patches clean up at91_cf a bit and add DT bindings.
-> They are based on a previous series from Joachim Eastwood and other cleanup
-> patches by Fabio and Laurent.
-> I have collected them together as they are lying around for some time.
+On Thu, 6 Jun 2013, Catalin Marinas wrote:
+> Hi Arnd,
 > 
-> Greg kindly told me that he can take them through his char/misc driver
-> tree, so I resend the series.
+> On Wed, Jun 05, 2013 at 01:44:55PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 05 June 2013 13:15:29 Stefano Stabellini wrote:
+> > > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> > > index c95c5cb..79dd13d 100644
+> > > --- a/arch/arm64/Makefile
+> > > +++ b/arch/arm64/Makefile
+> > > @@ -37,6 +37,7 @@ TEXT_OFFSET := 0x00080000
+> > >  export TEXT_OFFSET GZFLAGS
+> > >  
+> > >  core-y         += arch/arm64/kernel/ arch/arm64/mm/
+> > > +core-$(CONFIG_XEN)             += arch/arm64/xen/
+> > >  libs-y         := arch/arm64/lib/ $(libs-y)
+> > >  libs-y         += $(LIBGCC)
+> > >  
+> > > diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
+> > > new file mode 100644
+> > > index 0000000..be24040
+> > > --- /dev/null
+> > > +++ b/arch/arm64/xen/Makefile
+> > > @@ -0,0 +1,2 @@
+> > > +xen-arm-y      += $(addprefix ../../arm/xen/, enlighten.o grant-table.o)
+> > > +obj-y          := xen-arm.o hypercall.o
+> > 
+> > I think it would be nicer to redirect the entire directory, not just
+> > the enlighten.o and grant-table.o files. You could do in arch/arm64/Makefile:
+> > 
+> > core-(CONFIG_XEN) += arch/arm/xen/
+> > 
+> > That leaves a small difference in hypercall.o, which I think you can
+> > handle with an #ifdef.
 > 
-> Thanks for your help, best regards.
-> 
-> v3: rebased on top of 3.10-rc4
-> 
-> v2: add 2 more cleanup patches:
-> 	- move to module_platform_driver_probe()
-> 	- little trivial indentation fix
-on all Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Sorry, I missed this part. I want to keep the AArch64 assembly under
+> arm64, even if it is small.
 
-Best Regards,
-J.
-> 
-> Fabio Porcedda (1):
->   pcmcia: at91_cf: use module_platform_driver_probe()
-> 
-> Joachim Eastwood (5):
->   pcmcia: at91_cf: fix gpio_get_value in at91_cf_get_status
->   pcmcia: at91_cf: convert to dev_ print functions
->   pcmcia: at91_cf: use devm_ functions for allocations
->   pcmcia: at91_cf: clean up header includes
->   pcmcia: at91_cf: add support for DT
-> 
-> Laurent Navet (1):
->   pcmcia/trivial: at91_cf: fix checkpatch error
-> 
->  .../devicetree/bindings/ata/atmel-at91_cf.txt      |  19 +++
->  drivers/pcmcia/Kconfig                             |   2 +-
->  drivers/pcmcia/at91_cf.c                           | 176 ++++++++++-----------
->  3 files changed, 108 insertions(+), 89 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/ata/atmel-at91_cf.txt
-> 
-> -- 
-> 1.8.2.2
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+That's fine, I don't have a strong opinion on this, I am happy either way.
+
+In this case the v3 of the series is the one we want.
+I'll submit a pull request to you for it during the next couple of days.
