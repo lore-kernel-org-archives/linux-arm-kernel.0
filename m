@@ -1,42 +1,107 @@
-From: tytso@mit.edu (Theodore Ts'o)
-Date: Thu, 6 Jun 2013 10:02:50 -0400
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron>
- <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
-Message-ID: <20130606140250.GA4839@thunk.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 6 Jun 2013 15:25:31 +0100
+Subject: [PATCH v4 5/6] arm64/xen: introduce CONFIG_XEN on ARM64
+In-Reply-To: <1370451727-26826-5-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1306051605030.4589@kaball.uk.xensource.com>
+ <1370451727-26826-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <20130606142530.GJ28479@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 01:24:57PM +0100, luke.leighton wrote:
-> On Thu, Jun 6, 2013 at 1:01 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> 
-> > I don't see any other solution here than moving all the Allwinner code to
-> > DT (as it has been suggested in this thread several times already), as
-> > this is the only hardware description method supported by ARM Linux.
-> 
->  i repeat again: please state, explicitly and unequivocably that you -
-> linux kernel developers - are happy that the reach of linux and
-> gnu/linux OSes is dramatically reduced due to this intransigent
-> position.
+On Wed, Jun 05, 2013 at 06:02:06PM +0100, Stefano Stabellini wrote:
+> diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+> index 199cb2d..114b356 100644
+> --- a/arch/arm/xen/hypercall.S
+> +++ b/arch/arm/xen/hypercall.S
+> @@ -31,51 +31,93 @@
+>   */
+>  
+>  /*
+> - * The Xen hypercall calling convention is very similar to the ARM
+> - * procedure calling convention: the first paramter is passed in r0, the
+> - * second in r1, the third in r2 and the fourth in r3. Considering that
+> - * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
+> - * in r4, differently from the procedure calling convention of using the
+> - * stack for that case.
+> + * The Xen hypercall calling convention is very similar to the ARM/ARM64
+> + * procedure calling convention: the first paramter is passed in r0/x0,
+> + * the second in r1/x1, the third in r2/x2 and the fourth in r3/x3.
+> + * Considering that Xen hypercalls have 5 arguments at most, the fifth
+> + * paramter is always passed in r4/x4, differently from the ARM
+> + * procedure calling convention of using the stack for that case.
+>   *
+> - * The hypercall number is passed in r12.
+> + * The hypercall number is passed in r12/x16.
+>   *
+> - * The return value is in r0.
+> + * The return value is in r0/x0.
+>   *
+> - * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
+> - * hypercall tag.
+> + * The hvc ISS is required to be 0xEA1, that is the Xen specific
+> + * ARM/ARM64 hypercall tag.
+>   */
+>  
+>  #include <linux/linkage.h>
+>  #include <asm/assembler.h>
+> -#include <asm/opcodes-virt.h>
+>  #include <xen/interface/xen.h>
+>  
+>  
+>  #define XEN_IMM 0xEA1
+>  
+> +
+> +#ifdef CONFIG_ARM
+> +
+> +#include <asm/opcodes-virt.h>
+> +
+> +ENTRY(privcmd_call)
+> +	stmdb sp!, {r4}
+> +	mov r12, r0
+> +	mov r0, r1
+> +	mov r1, r2
+> +	mov r2, r3
+> +	ldr r3, [sp, #8]
+> +	ldr r4, [sp, #4]
+> +	__HVC(XEN_IMM)
+> +	ldm sp!, {r4}
+> +	mov pc, lr
+> +ENDPROC(privcmd_call);
+> +
+>  #define HYPERCALL_SIMPLE(hypercall)		\
+>  ENTRY(HYPERVISOR_##hypercall)			\
+>  	mov r12, #__HYPERVISOR_##hypercall;	\
+> -	__HVC(XEN_IMM);						\
+> -	mov pc, lr;							\
+> +	__HVC(XEN_IMM);				\
+> +	mov pc, lr;				\
+> +ENDPROC(HYPERVISOR_##hypercall)
+> +
+> +#define HYPERCALL5(hypercall)			\
+> +ENTRY(HYPERVISOR_##hypercall)			\
+> +	stmdb sp!, {r4}				\
+> +	ldr r4, [sp, #4]			\
+> +	mov r12, #__HYPERVISOR_##hypercall;	\
+> +	__HVC(XEN_IMM);				\
+> +	ldm sp!, {r4}				\
+> +	mov pc, lr				\
+>  ENDPROC(HYPERVISOR_##hypercall)
+>  
+> +#else /* ARM64 specific code below */
+> +
+> +ENTRY(privcmd_call)
+> +	mov x16, x0
+> +	mov x0, x1
+> +	mov x1, x2
+> +	mov x2, x3
+> +	mov x3, x4
+> +	mov x4, x5
+> +	hvc XEN_IMM
+> +	ret
+> +ENDPROC(privcmd_call);
 
-But that's not a true statement.  You've said that Allwinner is
-perfectly happy to carry code out of tree, by constantly porting their
-hacks from mainline kernels.
+Ah, thanks to Ian for pointing out, I missed the fact that you merged
+the hypercall.S files. Please don't. It's a different assembly syntax.
 
-For some of their customers, this will be acceptable to them.  In
-those cases, Linux will still be in use.  Great!  So claiming that the
-reach of Linux will be "dramatically reduced" just is not a
-supportable position.
-
-For other (potential) customers, for whom mainline kernel support is
-critically important, they will choose other hardware solutions that
-are in the mainline kernel.
-
-I don't see the problem here.
-
-						- Ted
+-- 
+Catalin
