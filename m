@@ -1,50 +1,57 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Jun 2013 15:42:12 +0100
-Subject: [PATCH v3 5/6] arm64/xen: introduce CONFIG_XEN and hypercall.S
- on ARM64
-In-Reply-To: <1471793.18ZhhAHKN9@wuerfel>
-References: <alpine.DEB.2.02.1306041712100.4589@kaball.uk.xensource.com>
- <1370434530-22428-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <1471793.18ZhhAHKN9@wuerfel>
-Message-ID: <20130606144212.GK28479@arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Jun 2013 22:56:01 +0800
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable PWW and backlight options
+In-Reply-To: <1370492664-30438-1-git-send-email-festevam@gmail.com>
+References: <1370492664-30438-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130606145600.GB28270@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Wed, Jun 05, 2013 at 01:44:55PM +0100, Arnd Bergmann wrote:
-> On Wednesday 05 June 2013 13:15:29 Stefano Stabellini wrote:
-> > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> > index c95c5cb..79dd13d 100644
-> > --- a/arch/arm64/Makefile
-> > +++ b/arch/arm64/Makefile
-> > @@ -37,6 +37,7 @@ TEXT_OFFSET := 0x00080000
-> >  export TEXT_OFFSET GZFLAGS
-> >  
-> >  core-y         += arch/arm64/kernel/ arch/arm64/mm/
-> > +core-$(CONFIG_XEN)             += arch/arm64/xen/
-> >  libs-y         := arch/arm64/lib/ $(libs-y)
-> >  libs-y         += $(LIBGCC)
-> >  
-> > diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
-> > new file mode 100644
-> > index 0000000..be24040
-> > --- /dev/null
-> > +++ b/arch/arm64/xen/Makefile
-> > @@ -0,0 +1,2 @@
-> > +xen-arm-y      += $(addprefix ../../arm/xen/, enlighten.o grant-table.o)
-> > +obj-y          := xen-arm.o hypercall.o
+On Thu, Jun 06, 2013 at 01:24:24AM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> I think it would be nicer to redirect the entire directory, not just
-> the enlighten.o and grant-table.o files. You could do in arch/arm64/Makefile:
-> 
-> core-(CONFIG_XEN) += arch/arm/xen/
-> 
-> That leaves a small difference in hypercall.o, which I think you can
-> handle with an #ifdef.
 
-Sorry, I missed this part. I want to keep the AArch64 assembly under
-arm64, even if it is small.
+s/PWW/PWM on subject
 
--- 
-Catalin
+> These options are useful for controlling backlight contrast via PWM.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/configs/imx_v6_v7_defconfig | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+> index ac3470c..f189887 100644
+> --- a/arch/arm/configs/imx_v6_v7_defconfig
+> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+> @@ -170,7 +170,10 @@ CONFIG_LCD_PLATFORM=y
+>  CONFIG_BACKLIGHT_LCD_SUPPORT=y
+>  CONFIG_LCD_CLASS_DEVICE=y
+>  CONFIG_LCD_L4F00242T03=y
+> +CONFIG_BACKLIGHT_LCD_SUPPORT=y
+> +CONFIG_LCD_CLASS_DEVICE=y
+
+make ARCH=arm imx_v6_v7_defconfig
+
+arch/arm/configs/imx_v6_v7_defconfig:173:warning: override: reassigning to symbol BACKLIGHT_LCD_SUPPORT
+arch/arm/configs/imx_v6_v7_defconfig:174:warning: override: reassigning to symbol LCD_CLASS_DEVICE
+
+Shawn
+
+>  CONFIG_BACKLIGHT_CLASS_DEVICE=y
+> +CONFIG_BACKLIGHT_PWM=y
+>  CONFIG_FRAMEBUFFER_CONSOLE=y
+>  CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+>  CONFIG_FONTS=y
+> @@ -216,6 +219,8 @@ CONFIG_DRM_IMX_IPUV3_CORE=y
+>  CONFIG_DRM_IMX_IPUV3=y
+>  CONFIG_COMMON_CLK_DEBUG=y
+>  # CONFIG_IOMMU_SUPPORT is not set
+> +CONFIG_PWM=y
+> +CONFIG_PWM_IMX=y
+>  CONFIG_EXT2_FS=y
+>  CONFIG_EXT2_FS_XATTR=y
+>  CONFIG_EXT2_FS_POSIX_ACL=y
+> -- 
+> 1.8.1.2
+> 
