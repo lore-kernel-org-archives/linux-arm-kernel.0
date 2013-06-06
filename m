@@ -1,27 +1,46 @@
 From: matt.porter@linaro.org (Matt Porter)
-Date: Thu,  6 Jun 2013 01:41:33 -0400
-Subject: [PATCH 0/2] ARM dts: bcm281xx: use preprocessor for device trees
-Message-ID: <1370497295-12682-1-git-send-email-matt.porter@linaro.org>
+Date: Thu,  6 Jun 2013 01:41:34 -0400
+Subject: [PATCH 1/2] ARM: dts: bcm281xx: use #include for device tree files
+In-Reply-To: <1370497295-12682-1-git-send-email-matt.porter@linaro.org>
+References: <1370497295-12682-1-git-send-email-matt.porter@linaro.org>
+Message-ID: <1370497295-12682-2-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series follows the same approach as taken on Tegra and
-OMAP DT files to use the C preprocessor in order to improve
-readability. Since bcm281xx does not yet have gpio and pinctrl
-support, this series just enables the C preprocessor and removes
-the magic constants from existing irq properties. Any new
-additions can come in using human readable definitions.
+Replace /include/ by #include for bcm281xx device tree
+files, enabling use of the C preprocessor.
 
-The resulting dtb was diff-tested to validate it versus the non
-preprocessed dts version.
-
-Matt Porter (2):
-  ARM: dts: bcm281xx: use #include for device tree files
-  ARM: dts: bcm281xx: use existing defines for irqs
-
+Signed-off-by: Matt Porter <matt.porter@linaro.org>
+---
  arch/arm/boot/dts/bcm11351-brt.dts |    2 +-
- arch/arm/boot/dts/bcm11351.dtsi    |    9 ++++++---
- 2 files changed, 7 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/bcm11351.dtsi    |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/bcm11351-brt.dts b/arch/arm/boot/dts/bcm11351-brt.dts
+index 248067c..3392f64 100644
+--- a/arch/arm/boot/dts/bcm11351-brt.dts
++++ b/arch/arm/boot/dts/bcm11351-brt.dts
+@@ -13,7 +13,7 @@
+ 
+ /dts-v1/;
+ 
+-/include/ "bcm11351.dtsi"
++#include "bcm11351.dtsi"
+ 
+ / {
+ 	model = "BCM11351 BRT board";
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 41b2c6c..c08810e 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -11,7 +11,7 @@
+  * GNU General Public License for more details.
+  */
+ 
+-/include/ "skeleton.dtsi"
++#include "skeleton.dtsi"
+ 
+ / {
+ 	model = "BCM11351 SoC";
 -- 
 1.7.9.5
