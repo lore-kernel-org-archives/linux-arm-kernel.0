@@ -1,58 +1,33 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  6 Jun 2013 13:17:10 +0100
-Subject: [PATCH 22/33] clk: ux500: Add Device Tree support for the RTC clock
+Date: Thu,  6 Jun 2013 13:17:15 +0100
+Subject: [PATCH 27/33] ARM: ux500: Remove AUXDATA relating to I2C clock-name
+ bindings
 In-Reply-To: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
 References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370521041-32318-23-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370521041-32318-28-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the RTC fixed frequency clock to be specified from
-Device Tree via phandles to the "rtc32k-clock" node.
-
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clk/ux500/u8500_clk.c |   11 +++++++----
- 1 file changed, 7 insertions(+), 4 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    5 -----
+ 1 file changed, 5 deletions(-)
 
-diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-index c3ed09c..ebd0381 100644
---- a/drivers/clk/ux500/u8500_clk.c
-+++ b/drivers/clk/ux500/u8500_clk.c
-@@ -60,7 +60,7 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 	struct device_node *np = NULL;
- 	struct device_node *child = NULL;
- 	const char *sgaclk_parent = NULL;
--	struct clk *clk;
-+	struct clk *clk, *rtc_clk;
- 
- 	/* Clock sources */
- 	clk = clk_reg_prcmu_gate("soc0_pll", NULL, PRCMU_PLLSOC0,
-@@ -80,11 +80,11 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 
- 	/* FIXME: Add sys, ulp and int clocks here. */
- 
--	clk = clk_register_fixed_rate(NULL, "rtc32k", "NULL",
-+	rtc_clk = clk_register_fixed_rate(NULL, "rtc32k", "NULL",
- 				CLK_IS_ROOT|CLK_IGNORE_UNUSED,
- 				32768);
--	clk_register_clkdev(clk, "clk32k", NULL);
--	clk_register_clkdev(clk, "apb_pclk", "rtc-pl031");
-+	clk_register_clkdev(rtc_clk, "clk32k", NULL);
-+	clk_register_clkdev(rtc_clk, "apb_pclk", "rtc-pl031");
- 
- 	/* PRCMU clocks */
- 	fw_version = prcmu_get_fw_version();
-@@ -690,5 +690,8 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 
- 		if (!of_node_cmp(child->name, "prcc-kernel-clock"))
- 			of_clk_add_provider(child, ux500_twocell_get, prcc_kclk);
-+
-+		if (!of_node_cmp(child->name, "rtc32k-clock"))
-+			of_clk_add_provider(child, of_clk_src_simple_get, rtc_clk);
- 	}
- }
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index aa325d8..b138d80 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -221,11 +221,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires DMA bindings. */
+ 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+ 	/* Requires clock name bindings. */
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80004000, "nmk-i2c.0", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80122000, "nmk-i2c.1", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80110000, "nmk-i2c.3", NULL),
+-	OF_DEV_AUXDATA("st,nomadik-i2c", 0x8012a000, "nmk-i2c.4", NULL),
+ 	OF_DEV_AUXDATA("stericsson,db8500-musb", 0xa03e0000, "musb-ux500.0", NULL),
+ 	OF_DEV_AUXDATA("stericsson,db8500-prcmu", 0x80157000, "db8500-prcmu",
+ 			&db8500_prcmu_pdata),
 -- 
 1.7.10.4
