@@ -1,63 +1,77 @@
-From: acourbot@nvidia.com (Alex Courbot)
-Date: Thu, 6 Jun 2013 19:37:49 +0900
-Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <1740292.8Sz57ytBcM@flatron>
-References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
- <1740292.8Sz57ytBcM@flatron>
-Message-ID: <51B0667D.30801@nvidia.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 6 Jun 2013 16:14:19 +0530
+Subject: [PATCH v2 1/5] ARM: davinci: uart: move to devid based clk_get
+In-Reply-To: <51B06547.8030709@ti.com>
+References: <1369729686-6595-1-git-send-email-prakash.pm@ti.com>
+ <1369729686-6595-2-git-send-email-prakash.pm@ti.com>
+ <51B06547.8030709@ti.com>
+Message-ID: <51B06803.2020008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomasz,
 
-On 06/06/2013 07:17 PM, Tomasz Figa wrote:
->> +Global properties
->> +-------------------------------------------
->> +
->> +The following properties can be specified into the "chosen" root
->> +node:
->> +
->> +  nvidia,secure-os: enable SecureOS.
->
-> Hmm, on Exynos we had something like
->
->          firmware at 0203F000 {
->                  compatible = "samsung,secure-firmware";
->                  reg = <0x0203F000 0x1000>;
->          };
->
-> but your solution might be actually the proper one, since firmware is not
-> a hardware block. (The address in reg property is pointing to SYSRAM
-> memory, which is an additional communication channel with the firmware.)
 
-Yes, I saw your implementation but decided to do it through the chosen 
-node anyway, since that's what it seems to be designed and we don't need 
-any reg parameter.
-
-> I think this patch could be split into several patches:
->   - add support for firmware
->   - split reset function
->   - add reset support using firmware.
-
-Mmm possibly yes, but I wonder if that would not be too much splitting. 
-Stephen?
-
-> Hmm, I wonder if you need all this complexity here. Have a look at our
-> exynos_smc function
->
-> https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/mach-exynos/exynos-smc.S?id=refs/tags/next-20130606
-
-Yes, I just embarrassed myself showing my ignorance of ARM assembler. ;) 
-The fix Russel proposed is pretty close to your version.
-
->> +static const struct firmware_ops tegra_firmware_ops = {
->> +     .set_cpu_boot_addr = tegra_set_cpu_boot_addr,
+On 6/6/2013 4:02 PM, Sekhar Nori wrote:
+> Hi Prakash,
+> 
+> It appears that this patch was not tested thoroughly. See below:
+> 
+> On 5/28/2013 1:58 PM, Manjunathappa, Prakash wrote:
+>> For modules having single clock, clk_get should be done with dev_id.
+>> But current davinci implementation handles multiple instances
+>> of the UART devices with single platform_device_register. Hence clk_get
+>> is based on con_id rather than dev_id, this is not correct. Do
+>> platform_device_register for each instance and clk_get on dev_id.
+>>
+>> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+>> ---
+> 
+>> -static struct plat_serial8250_port da8xx_serial_pdata[] = {
+>> +static struct plat_serial8250_port da8xx_serial0_pdata[] = {
+>>  	{
+>>  		.mapbase	= DA8XX_UART0_BASE,
+>>  		.irq		= IRQ_DA8XX_UARTINT0,
+>> @@ -75,7 +75,9 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
+>>  					UPF_IOREMAP,
+>>  		.iotype		= UPIO_MEM,
+>>  		.regshift	= 2,
+>> -	},
+>> +	}
 >> +};
->
-> It's good that this interface is finally getting some user besides Exynos.
+>> +static struct plat_serial8250_port da8xx_serial1_pdata[] = {
+>>  	{
+>>  		.mapbase	= DA8XX_UART1_BASE,
+>>  		.irq		= IRQ_DA8XX_UARTINT1,
+>> @@ -83,7 +85,9 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
+>>  					UPF_IOREMAP,
+>>  		.iotype		= UPIO_MEM,
+>>  		.regshift	= 2,
+>> -	},
+>> +	}
+>> +};
+>> +static struct plat_serial8250_port da8xx_serial2_pdata[] = {
+>>  	{
+>>  		.mapbase	= DA8XX_UART2_BASE,
+>>  		.irq		= IRQ_DA8XX_UARTINT2,
+>> @@ -91,18 +95,31 @@ static struct plat_serial8250_port da8xx_serial_pdata[] = {
+>>  					UPF_IOREMAP,
+>>  		.iotype		= UPIO_MEM,
+>>  		.regshift	= 2,
+>> -	},
+>> -	{
+>> -		.flags	= 0,
+>> -	},
+>> +	}
+> 
+> 8250_core.c relies on sentinel value with p->flags = 0 to terminate
+> looking for more ports. You don't have sentinel values in any of pdata
+> the arrays you introduced so the code basically goes looking into areas
+> of memory not its own. This caused bunch of "cannot register port"
+> errors for me but I can easily imagine more serious errors.
 
-I didn't know about it first but Joseph kindly pointed it out to me and 
-it indeed makes it easier to implement this.
+Similarly, you check for platform_data being NULL to go over the list of
+serial devices in the code in serial.c you introduced, but don't have a
+sentinel when you define the serial device array.
 
 Thanks,
-Alex.
+Sekhar
