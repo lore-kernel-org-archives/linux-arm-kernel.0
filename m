@@ -1,173 +1,80 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Thu, 6 Jun 2013 23:18:36 +0530
-Subject: [PATCH V2 1/4] ARM: dts: omap5: Rename omap5-evm to omap5-uevm
-In-Reply-To: <1370540919-4339-1-git-send-email-r.sricharan@ti.com>
-References: <1370540919-4339-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1370540919-4339-2-git-send-email-r.sricharan@ti.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 6 Jun 2013 17:49:09 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: hwmod/clock: more fixes for v3.10-rc
+Message-ID: <alpine.DEB.2.02.1306061746150.5152@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uevm is the official board supported for the OMAP5 soc
-in mainline. The uevm has an OMAP5432 with a DDR3 memory.
-Renaming the board dts file and adding the following cleanups.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
- * There are no devices connected on I2C 2,3,4 buses. So remove
-   the pinmux data for the same.
+Hi Tony
 
- * DDR3 memory is used in the uevm. Neither DVFS or temperature
-   polling is supported with DDR3. So remove the DDR3 device and
-   emif nodes.
+The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
 
- * Keypad is not supported on uevm. So remove the device node.
+  Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
 
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
----
- arch/arm/boot/dts/Makefile                         |    2 +-
- .../arm/boot/dts/{omap5-evm.dts => omap5-uevm.dts} |   83 +-------------------
- 2 files changed, 4 insertions(+), 81 deletions(-)
- rename arch/arm/boot/dts/{omap5-evm.dts => omap5-uevm.dts} (73%)
+are available in the git repository at:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index f0895c5..13b86bf 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -149,7 +149,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap4-panda-es.dtb \
- 	omap4-var-som.dtb \
- 	omap4-sdp.dtb \
--	omap5-evm.dtb \
-+	omap5-uevm.dtb \
- 	am335x-evm.dtb \
- 	am335x-evmsk.dtb \
- 	am335x-bone.dtb
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-similarity index 73%
-rename from arch/arm/boot/dts/omap5-evm.dts
-rename to arch/arm/boot/dts/omap5-uevm.dts
-index 22e9ee8..843a001 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
-+++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -8,11 +8,10 @@
- /dts-v1/;
- 
- #include "omap5.dtsi"
--#include "samsung_k3pe0e000b.dtsi"
- 
- / {
--	model = "TI OMAP5 EVM board";
--	compatible = "ti,omap5-evm", "ti,omap5";
-+	model = "TI OMAP5 uEVM board";
-+	compatible = "ti,omap5-uevm", "ti,omap5";
- 
- 	memory {
- 		device_type = "memory";
-@@ -88,27 +87,6 @@
- 		>;
- 	};
- 
--	i2c2_pins: pinmux_i2c2_pins {
--		pinctrl-single,pins = <
--			0x178 (PIN_INPUT | MUX_MODE0)		/* i2c2_scl */
--			0x17a (PIN_INPUT | MUX_MODE0)		/* i2c2_sda */
--		>;
--	};
--
--	i2c3_pins: pinmux_i2c3_pins {
--		pinctrl-single,pins = <
--			0x13a (PIN_INPUT | MUX_MODE0)		/* i2c3_scl */
--			0x13c (PIN_INPUT | MUX_MODE0)		/* i2c3_sda */
--		>;
--	};
--
--	i2c4_pins: pinmux_i2c4_pins {
--		pinctrl-single,pins = <
--			0xb8 (PIN_INPUT | MUX_MODE0)		/* i2c4_scl */
--			0xba (PIN_INPUT | MUX_MODE0)		/* i2c4_sda */
--		>;
--	};
--
- 	i2c5_pins: pinmux_i2c5_pins {
- 		pinctrl-single,pins = <
- 			0x184 (PIN_INPUT | MUX_MODE0)		/* i2c5_scl */
-@@ -175,39 +153,6 @@
- 	clock-frequency = <400000>;
- };
- 
--&i2c2 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&i2c2_pins>;
--
--	clock-frequency = <400000>;
--
--	/* Pressure Sensor */
--	bmp085 at 77 {
--		compatible = "bosch,bmp085";
--		reg = <0x77>;
--	};
--};
--
--&i2c3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&i2c3_pins>;
--
--	clock-frequency = <400000>;
--};
--
--&i2c4 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&i2c4_pins>;
--
--	clock-frequency = <400000>;
--
--	/* Temperature Sensor */
--	tmp102 at 48{
--		compatible = "ti,tmp102";
--		reg = <0x48>;
--	};
--};
--
- &i2c5 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c5_pins>;
-@@ -215,32 +160,10 @@
- 	clock-frequency = <400000>;
- };
- 
--&keypad {
--	keypad,num-rows = <8>;
--	keypad,num-columns = <8>;
--	linux,keymap = <0x02020073	/* VOLUP */
--			0x02030072	/* VOLDOWM */
--			0x020400e7	/* SEND */
--			0x02050066	/* HOME */
--			0x0206006b	/* END */
--			0x020700d9>;	/* SEARCH */
--	linux,input-no-autorepeat;
--};
--
- &mcbsp3 {
- 	status = "disabled";
- };
- 
--&emif1 {
--	cs1-used;
--	device-handle = <&samsung_K3PE0E000B>;
--};
--
--&emif2 {
--	cs1-used;
--	device-handle = <&samsung_K3PE0E000B>;
--};
--
- &mcspi1 {
- 
- };
--- 
-1.7.9.5
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-fixes-b-for-3.10-rc
+
+for you to fetch changes up to a93d8a1cea0899982993e9a93404c6f78b123697:
+
+  ARM: omap3: clock: fix wrong container_of in clock36xx.c (2013-06-06 08:48:07 -0600)
+
+- ----------------------------------------------------------------
+More OMAP hwmod and clock fixes for v3.10-rc.  Fixes the AM33xx UART2.
+Also fixes some CCF-related breakage on OMAP36xx/37xx, affecting DSS
+at the very least.
+
+Basic test logs for this branch are here:
+
+http://www.pwsan.com/omap/testlogs/fixes_b_v3.10-rc/20130606093449/
+
+- ----------------------------------------------------------------
+Jean-Philippe Francois (1):
+      ARM: omap3: clock: fix wrong container_of in clock36xx.c
+
+Thomas Petazzoni (1):
+      arm: omap2: fix AM33xx hwmod infos for UART2
+
+ arch/arm/mach-omap2/clock36xx.c            |   18 +++++++++---------
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    9 ++++++++-
+ 2 files changed, 17 insertions(+), 10 deletions(-)
+
+vmlinux object size
+(delta in bytes from test_v3.10-rc4 (d683b96b072dc4680fc74964eca77e6a23d1fa6e)):
+   text     data      bss    total  kernel
+      0      +64        0      +64  am33xx_only
+      0        0        0        0  n800_multi_omap2xxx
+      0        0        0        0  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+      0      +64        0      +64  omap2plus_defconfig
+      0        0        0        0  omap2plus_defconfig_2430sdp_only
+      0      +64        0      +64  omap2plus_defconfig_cpupm
+      0        0        0        0  omap2plus_defconfig_no_pm
+      0        0        0        0  omap2plus_defconfig_omap2_4_only
+    -64      +64        0        0  omap2plus_defconfig_omap3_4_only
+      0        0        0        0  rmk_omap3430_ldp_allnoconfig
+      0        0        0        0  rmk_omap3430_ldp_oldconfig
+      0        0        0        0  rmk_omap4430_sdp_allnoconfig
+      0      +64        0      +64  rmk_omap4430_sdp_oldconfig
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJRsMs0AAoJEMePsQ0LvSpLSkEQAJDav8PjK8w1P604lTMlxS9l
+CopkUktCtXKu+E/LRZ0H8Cd2h2hhPemqJPdTGLfd0QH2B5fF5HwBVDqJ7FYCyf6h
+6wg4HFJ2LkplzRHydlL7hylESRefZM5SmDH7fuwAD3BGa7LcYsX4q3GBpnRQJyH4
+0LXa1GuWNs5PqL1ZVKGjZE3ycMmB751yMsiTMkE2XocuXfyJnNFdf8mnfCGsjoPM
+BIzkOJCQc9cHxBPS1zhDU8iiiKILdaKtniL0iQ/22HKR+KFo/XvOaRQi1VbkmJM/
+amWbNnrgjyPoNUuGld54564vrmc7KvgXNRibX20R3dkJa2IsLTJNLUkJEKPIZKMi
+lALYNpm1raL1Wnq6xf/3xTAiK3IBqK+Gztsdf3Ya61uDrsNeCPrS+LJ9NRAtfVNQ
+G07FVoo2Il5CgJ94MLSS8DQVRAnG7Xofwfb7iN/J0tn0iFwPcrqV485F2TNitHKS
+H7vh5DhX/zXhTqt0gB94R1nIHY7c4hNuhqK368K42aPBAbhwWxrwWS0SS0mNZW79
+FEeoz/VwnxA+zviZbZOwSUbibpkp4XI6PdP6J7PYzsOdfdjsYyUbW7Nss1DCIyYz
+vcCvh8+8xEpRkujwOTOePOmhmj9vqIUJirA+1DOcfGF9MYzKSB0XIpcbieAp7pUp
+qG2KLm+gDfiJkxRH3IZX
+=qUET
+-----END PGP SIGNATURE-----
