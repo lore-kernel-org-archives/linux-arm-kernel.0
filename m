@@ -1,107 +1,36 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  6 Jun 2013 12:24:28 +0200
-Subject: [PATCH v2] arm: mvebu: don't hardcode a physical address in headsmp.S
-In-Reply-To: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1370514268-9159-1-git-send-email-thomas.petazzoni@free-electrons.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 6 Jun 2013 15:55:43 +0530
+Subject: [PATCH v2 5/5] ARM: davinci: serial: platform code cleanup
+In-Reply-To: <51AF2400.3020906@ti.com>
+References: <1369729686-6595-1-git-send-email-prakash.pm@ti.com>
+ <1369729686-6595-6-git-send-email-prakash.pm@ti.com>
+ <51AF2400.3020906@ti.com>
+Message-ID: <51B063A7.8020907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the coherency_init() function is called a bit earlier, we can
-actually read the physical address of the coherency unit registers
-from the Device Tree, and communicate that to the headsmp.S code,
-which avoids hardcoding a physical address.
+On 6/5/2013 5:11 PM, Sekhar Nori wrote:
+> 
+> On 5/28/2013 1:58 PM, Manjunathappa, Prakash wrote:
+>> 1) "struct davinci_uart_config" is introduced to specify
+>>    UART ports brought out or enabled on the board. But
+>>    none of the boards use them for that purpose, so clean
+>>    it up.
+>> 2) Have pointer to platform device as a argument for
+>>    davinci_serial_init(), no need of serial_dev in
+>>    struct soc_info now.
+>> 3) No need of davinci_serial_setup_clk(), not called from
+>>    multiple places, hence reduce function call overhead.
+>>
+>> Signed-off-by: Manjunathappa, Prakash <prakash.pm@ti.com>
+>> Suggested-by: Sekhar Nori <nsekhar@ti.com>
+> 
+> We generally clean up code before undertaking modifications. Is there a
+> reason why this cannot be done first-up?
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
-Changes from v1 to v2:
+Never mind this question. I figured it out myself. You need to have the
+serial clock setup removed from DT before you can do any reasonable
+clean-up and that happens only with 4/5.
 
- * Simplified the code in headsmp.S to compute the physical address of
-   the coherency unit base address. Suggested by Nicolas Pitre.
-
- * Added a sync_cache_w() call to ensure the physical address of the
-   coherency unit stored in the coherency_phys_base is visible by the
-   other CPUs. The other CPUs are reading this before they join the
-   coherency fabric, so we need to make some manual cache coherency
-   here. Noticed by Will Deacon.
-
- arch/arm/mach-mvebu/coherency.c | 12 ++++++++++++
- arch/arm/mach-mvebu/headsmp.S   | 16 ++++++++--------
- 2 files changed, 20 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-index d74794a..32fcf69 100644
---- a/arch/arm/mach-mvebu/coherency.c
-+++ b/arch/arm/mach-mvebu/coherency.c
-@@ -25,8 +25,10 @@
- #include <linux/dma-mapping.h>
- #include <linux/platform_device.h>
- #include <asm/smp_plat.h>
-+#include <asm/cacheflush.h>
- #include "armada-370-xp.h"
- 
-+unsigned long __cpuinitdata coherency_phys_base;
- static void __iomem *coherency_base;
- static void __iomem *coherency_cpu_base;
- 
-@@ -124,7 +126,17 @@ int __init coherency_init(void)
- 
- 	np = of_find_matching_node(NULL, of_coherency_table);
- 	if (np) {
-+		struct resource res;
- 		pr_info("Initializing Coherency fabric\n");
-+		of_address_to_resource(np, 0, &res);
-+		coherency_phys_base = res.start;
-+		/*
-+		 * Ensure secondary CPUs will see the updated value,
-+		 * which they read before they join the coherency
-+		 * fabric, and therefore before they are coherent with
-+		 * the boot CPU cache.
-+		 */
-+		sync_cache_w(&coherency_phys_base);
- 		coherency_base = of_iomap(np, 0);
- 		coherency_cpu_base = of_iomap(np, 1);
- 		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-index a06e0ed..7147300 100644
---- a/arch/arm/mach-mvebu/headsmp.S
-+++ b/arch/arm/mach-mvebu/headsmp.S
-@@ -21,12 +21,6 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
- 
--/*
-- * At this stage the secondary CPUs don't have acces yet to the MMU, so
-- * we have to provide physical addresses
-- */
--#define ARMADA_XP_CFB_BASE	     0xD0020200
--
- 	__CPUINIT
- 
- /*
-@@ -35,15 +29,21 @@
-  * startup
-  */
- ENTRY(armada_xp_secondary_startup)
-+	/* Get coherency fabric base physical address */
-+	adr	r0, 1f
-+	ldr	r1, [r0]
-+	ldr	r0, [r0, r1]
- 
- 	/* Read CPU id */
- 	mrc     p15, 0, r1, c0, c0, 5
- 	and     r1, r1, #0xF
- 
- 	/* Add CPU to coherency fabric */
--	ldr     r0, =ARMADA_XP_CFB_BASE
--
- 	bl	ll_set_cpu_coherent
- 	b	secondary_startup
- 
- ENDPROC(armada_xp_secondary_startup)
-+
-+	.align 2
-+1:
-+	.long	coherency_phys_base - .
--- 
-1.8.1.2
+Thanks,
+Sekhar
