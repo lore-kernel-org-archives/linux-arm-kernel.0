@@ -1,31 +1,47 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 6 Jun 2013 16:26:03 +0900
-Subject: [PATCH 01/15] ARM: shmobile: Per-board uImage load addresses
-In-Reply-To: <9933530.s16G7h846I@wuerfel>
-References: <20130605070616.13311.69049.sendpatchset@w520>
- <20130605070625.13311.17016.sendpatchset@w520>
- <9933530.s16G7h846I@wuerfel>
-Message-ID: <CANqRtoTHLvZ8mTGRFb88y8G3DS=d9Sw9Um6gg_66UiwSvmorZw@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  6 Jun 2013 16:28:19 +0900
+Subject: [PATCH 1/5] ARM: shmobile: r8a7740: Make private clock arrays static
+In-Reply-To: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503703-31024-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-On Wed, Jun 5, 2013 at 5:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 05 June 2013 16:06:25 Magnus Damm wrote:
->>
->> +__ZRELADDR     := $(shell /bin/bash -c \
->> +                    'echo $(loadaddr-y) | tr " " "\n" | sort | uniq')
->> +
->
-> It's not important, but I think this can be written much simpler using
-> makefile syntax as
->
-> __ZRELADDR      := $(sort $(loadaddr-y))
+Both clock-r8a7740.c and clock-r8a7790.c define a div4_clks array as
+non-static. Compiling support for both SoCs thus result in a symbol
+redefinition. Fix it by defining the arrays as static.
 
-Yes, correct. Just double checked by comparing the output. Your
-proposal is much cleaner, will follow that if/when I send a V2.
+To avoid further similar issues, also define the main_clks as static.
 
-Thanks,
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7740.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-/ magnus
+diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+index c0d39aa..54afa04 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7740.c
++++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+@@ -266,7 +266,7 @@ static struct clk fsiack_clk = {
+ static struct clk fsibck_clk = {
+ };
+ 
+-struct clk *main_clks[] = {
++static struct clk *main_clks[] = {
+ 	&extalr_clk,
+ 	&extal1_clk,
+ 	&extal2_clk,
+@@ -317,7 +317,7 @@ enum {
+ 	DIV4_NR
+ };
+ 
+-struct clk div4_clks[DIV4_NR] = {
++static struct clk div4_clks[DIV4_NR] = {
+ 	[DIV4_I]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 20, 0x6fff, CLK_ENABLE_ON_INIT),
+ 	[DIV4_ZG]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA, 16, 0x6fff, CLK_ENABLE_ON_INIT),
+ 	[DIV4_B]	= SH_CLK_DIV4(&pllc1_clk, FRQCRA,  8, 0x6fff, CLK_ENABLE_ON_INIT),
+-- 
+1.8.2.1
