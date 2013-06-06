@@ -1,51 +1,53 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Thu,  6 Jun 2013 01:41:35 -0400
-Subject: [PATCH 2/2] ARM: dts: bcm281xx: use existing defines for irqs
-In-Reply-To: <1370497295-12682-1-git-send-email-matt.porter@linaro.org>
-References: <1370497295-12682-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <1370497295-12682-3-git-send-email-matt.porter@linaro.org>
+From: aida.mynzhasova@skitlab.ru (Aida Mynzhasova)
+Date: Thu, 06 Jun 2013 10:03:42 +0400
+Subject: [PATCH 0/5] Broken DM816x support in Linux 3.10-rc4
+In-Reply-To: <alpine.DEB.2.02.1306060346390.15042@utopia.booyaka.com>
+References: <1370446156-11788-1-git-send-email-aida.mynzhasova@skitlab.ru>
+ <alpine.DEB.2.02.1306060346390.15042@utopia.booyaka.com>
+Message-ID: <51B0263E.6000109@skitlab.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the standard interrupt-controller and ARM GIC constants to
-improve the readability of bcm281xx DT irq properties.
+On 06.06.2013 07:54, Paul Walmsley wrote:
+> ????????????,
+>
+> On Wed, 5 Jun 2013, Aida Mynzhasova wrote:
+>
+>> Not so long ago I tried to boot Linux 3.10-rc4 kernel on DM816x EVM
+>> board. Unfortunately, my attempts were failed by reason of poor
+>> support of DM81xx-based devices in new kernels.
+>
+> Yeah, TI pretty much gave up on trying to get support for that chip
+> upstream a few years ago.  Same for DM814x.
+>
+>> So, I suggest you this patch series, which fixes that kernel crush and
+>> adds new functions/structures, required for early initialization on
+>> DM816x (power and clock domains, hwmods). After applying these patches
+>> the kernel is able to successfully continue booting till clock
+>> initialization (will be added later).
+>
+> OK, it will be great to get my DM8168EVM booting on mainline.  But there
+> are a few preliminary issues with the patches:
+>
+> 1. All new chip and board support needs to be DT-only.  So, no new board
+> files.  Also, all the hwmod data shouldn't have IRQ, DMA, etc. data - that
+> should come from DT.  See for example the recently posted patch "[PATCH
+> 13/14] ARM: AM33XX: hwmod data: irq, dma and addr info clean up"
+>
+> 2. Looks like patch 2 is missing from the list.  If it's too big for the
+> list, please break it down into smaller patches.
+>
+> 3. Did you write this code and data, hwmods, etc., or did it come from a
+> TI kernel?  Please note this clearly in the patch descriptions.
+>
+>
+> - Paul
+>
 
-Signed-off-by: Matt Porter <matt.porter@linaro.org>
----
- arch/arm/boot/dts/bcm11351.dtsi |    7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+Hi!
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index c08810e..824bebe 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -11,6 +11,9 @@
-  * GNU General Public License for more details.
-  */
- 
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
-+
- #include "skeleton.dtsi"
- 
- / {
-@@ -41,7 +44,7 @@
- 		status = "disabled";
- 		reg = <0x3e000000 0x1000>;
- 		clock-frequency = <13000000>;
--		interrupts = <0x0 67 0x4>;
-+		interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
- 		reg-shift = <2>;
- 		reg-io-width = <4>;
- 	};
-@@ -56,7 +59,7 @@
- 	timer at 35006000 {
- 		compatible = "bcm,kona-timer";
- 		reg = <0x35006000 0x1000>;
--		interrupts = <0x0 7 0x4>;
-+		interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
- 		clock-frequency = <32768>;
- 	};
- 
--- 
-1.7.9.5
+Thanks for reply!
+ok, I'll rewrite code by means of DT and add some additional notes to 
+patch description.
+
+Aida.
