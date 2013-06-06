@@ -1,55 +1,115 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  6 Jun 2013 11:30:42 +0200
-Subject: [PATCH v3 0/2] ARM: PJ4B: fixes for 3.10-rc
-Message-ID: <1370511044-31900-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Thu,  6 Jun 2013 11:30:44 +0200
+Subject: [PATCH v3 2/2] ARM PJ4B: Add support for errata 4611
+In-Reply-To: <1370511044-31900-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1370511044-31900-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1370511044-31900-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Lior Amsalem <alior@marvell.com>
 
-This path set allows to fix some errata for PJ4B CPUs.
+A CP15 clean operation can result in a dead lock state if it is hit by
+an incoming snoop event. The fix to this issue is the following:
+before any CP15 clean type operation in Cache Coherency mode, issue a
+Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
+instruction.
 
-Without the first one, the Armada 370 based board can't boot anymore
-since 3.10-rc1 . So this one really need to be applied on 3.10-rc.
+[gregory.clement at free-electrons.com:use save/restore IRQ macros]
+[gregory.clement at free-electrons.com:add errata description in changelog]
+[gregory.clement at free-electrons.com:make this errata depend on Armada 370]
+Signed-off-by: Lior Amsalem <alior@marvell.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/Kconfig                |  9 +++++++++
+ arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
+ arch/arm/mm/proc-macros.S       | 11 +++++++++++
+ 3 files changed, 42 insertions(+)
 
-It should be a good thing to apply the other one on the 3.10-rc, even
-if we didn't observe get feedback from user who had a problem related
-to these errata, it may happen.
-
-Note that currently PJ4B is a symbol for 2 different CPUs:
-
-- the one used in Armada 370 is a PJ4B
-- the ones used in Armada XP are actually PJ4B-MP
-
-So I planed to introduce a new symbol PJ4B-MP but for 3.11 as it is
-not related to a critical fix. Awaiting these new symbols I made the
-errata depends on ARMADA_370 in the Kconfig.
-
-Changelog:
-V1 -> V2;
- - Fixed various coding style and typo issues
- - Replaced the "mcr p15, 0, r0, c7, c10, 4" by  "dsb"
- - Removed the fix for errata 4611 in discard_old_kernel_data function,
-   as we don't use it
-
-V2 -> v3:
- - As suggested by Russell, the first errata is now applied
-   dynamically accroding to the processor type
- - The second patch use use save/restore IRQ macros following Will's
-   advices
-
-Gregory CLEMENT (1):
-  ARM PJ4B: Add support for errata 4742
-
-Lior Amsalem (1):
-  ARM PJ4B: Add support for errata 4611
-
- arch/arm/Kconfig                 | 22 ++++++++++++++++++++++
- arch/arm/include/asm/glue-proc.h |  9 +++++++++
- arch/arm/include/asm/tlbflush.h  | 22 ++++++++++++++++++++++
- arch/arm/mm/proc-macros.S        | 11 +++++++++++
- arch/arm/mm/proc-v7.S            | 38 +++++++++++++++++++++++++++++++++-----
- 5 files changed, 97 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 95cbe9d..3126557 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1087,6 +1087,15 @@ if !MMU
+ source "arch/arm/Kconfig-nommu"
+ endif
+ 
++config PJ4B_ERRATA_4611
++	bool "PJ4B Errata 4611: A Deadlock can Occur if a CP15 Clean/Clean and Invalidate Operation is Hit By a Snoop Event"
++	depends on CPU_PJ4B && MACH_ARMADA_370
++	help
++	  A CP15 clean operation can result in a dead lock state if it is hit
++	  by an incoming snoop event.  Workaround: Before any CP15 clean type
++	  operation in Cache Coherency mode, issue a Data Memory Barrier (DMB)
++	  or a Data Synchronization Barrier (DSB) instruction.
++
+ config PJ4B_ERRATA_4742
+ 	bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
+ 	depends on CPU_PJ4B && MACH_ARMADA_370
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index a3625d1..f9129e4 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -475,7 +475,18 @@ static inline void flush_pmd_entry(void *pmd)
+ {
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	unsigned long flags;
++	raw_local_irq_save(flags);
++	dmb();
++#endif
++
+ 	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
++
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	raw_local_irq_restore(flags);
++#endif
++
+ 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+ 
+ 	if (tlb_flag(TLB_WB))
+@@ -486,7 +497,18 @@ static inline void clean_pmd_entry(void *pmd)
+ {
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	unsigned long flags;
++	raw_local_irq_save(flags);
++	dmb();
++#endif
++
+ 	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
++
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	raw_local_irq_restore(flags);
++#endif
++
+ 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+ }
+ 
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index f9a0aa7..2eba2b7 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -178,7 +178,18 @@
+ #endif
+ 
+ 	str	r3, [r0]
++
++#ifdef CONFIG_PJ4B_ERRATA_4611
++        save_and_disable_irqs_notrace r2	@ Disable interrupts
++	dmb					@ ensure ordering with previous memory accesses
++#endif
++
+ 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
++
++#ifdef CONFIG_PJ4B_ERRATA_4611
++	restore_irqs_notrace r2			@ Restore interrupts
++	dsb					@ drain write buffer
++#endif
+ 	.endm
+ 
+ 
 -- 
 1.8.1.2
