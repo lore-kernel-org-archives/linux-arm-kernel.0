@@ -1,86 +1,125 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:13 +0900
-Subject: [GIT PULL 00/23] Renesas ARM-based SoC updates for v3.11
-Message-ID: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu,  6 Jun 2013 16:28:18 +0900
+Subject: [PATCH 05/23] ARM: shmobile: r8a73a4: add main clock
+In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503716-31155-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+Almost all clock needs main clock which is basis clock on r8a73a4.
+This patch adds it, and, set parent clock via CKSCR register.
 
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a73a4.c | 53 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 53 insertions(+)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.11
-
-for you to fetch changes up to 022a815a9119270a485c4b00ea3dce4314605c35:
-
-  ARM: shmobile: sh73a0: div4 clocks must check the kick bit before changing rate (2013-06-06 14:10:05 +0900)
-
-----------------------------------------------------------------
-Renesas ARM-based SoC updates for v3.11
-
-* Increased clock coverage for r8a7740, r8a73a4, r8a7778 and r8a7790
-* Use fixed clock ratio for r8a7778
-* Always use shmobile_setup_delay for sh73a0
-* Add add CPUFreq support for sh73a0
-* Check kick bit before changing rate on sh73a0
-* Do not overwrite all div4 clock operations on sh73a0
-
-A very small cleanup patch, "ARM: shmobile: remove ";" from
-SH_FIXED_RATIO_CLK*() macro", is included as it a dependency
-of r8a7790 clock changes.
-
-----------------------------------------------------------------
-Bastian Hecht (2):
-      ARM: shmobile: r8a7740: Add interim sh-eth device name to clocks list
-      ARM: shmobile: r8a7740: Add I2C DT clock names
-
-Guennadi Liakhovetski (4):
-      ARM: shmobile: sh73a0: add support for adjusting CPU frequency
-      ARM: shmobile: sh73a0: add CPUFreq support
-      ARM: shmobile: sh73a0: do not overwrite all div4 clock operations
-      ARM: shmobile: sh73a0: div4 clocks must check the kick bit before changing rate
-
-Kuninori Morimoto (12):
-      ARM: shmobile: r8a7778: fixup Ether setup code position
-      ARM: shmobile: r8a73a4: add main clock
-      ARM: shmobile: r8a73a4: add pll clocks
-      ARM: shmobile: r8a73a4: add div4 clocks
-      ARM: shmobile: r8a73a4: add div6 clocks
-      ARM: shmobile: r8a7778: use fixed ratio clock
-      ARM: shmobile: r8a7778: add SDHI clock support
-      ARM: shmobile: r8a7778: Register SDHI device
-      ARM: shmobile: remove ";" from SH_FIXED_RATIO_CLK*() macro
-      ARM: shmobile: r8a7790: add main clock
-      ARM: shmobile: r8a7790: add div4 clocks
-      ARM: shmobile: r8a7790: add div6 clocks
-
-Laurent Pinchart (3):
-      ARM: shmobile: r8a7740: add TPU PWM support
-      ARM: shmobile: r8a7790: Make private clock arrays static
-      ARM: shmobile: r8a7790: add TPU PWM support
-
-Magnus Damm (1):
-      ARM: shmobile: sh73a0: Always use shmobile_setup_delay()
-
-Phil Edworthy (1):
-      ARM: shmobile: r8a7779: Add PCIe clocks
-
- arch/arm/mach-shmobile/Kconfig                |   2 +
- arch/arm/mach-shmobile/clock-r8a73a4.c        | 375 ++++++++++++++++++++++++--
- arch/arm/mach-shmobile/clock-r8a7740.c        |   7 +-
- arch/arm/mach-shmobile/clock-r8a7778.c        | 156 ++++++++++-
- arch/arm/mach-shmobile/clock-r8a7779.c        |   4 +-
- arch/arm/mach-shmobile/clock-r8a7790.c        | 238 +++++++++++++++-
- arch/arm/mach-shmobile/clock-sh73a0.c         | 111 +++++++-
- arch/arm/mach-shmobile/include/mach/clock.h   |   4 +-
- arch/arm/mach-shmobile/include/mach/r8a7778.h |   2 +
- arch/arm/mach-shmobile/setup-r8a7778.c        |  52 +++-
- arch/arm/mach-shmobile/setup-sh73a0.c         |  16 +-
- 11 files changed, 906 insertions(+), 61 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
+index e710c00..42942b4 100644
+--- a/arch/arm/mach-shmobile/clock-r8a73a4.c
++++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
+@@ -22,6 +22,7 @@
+ #include <linux/kernel.h>
+ #include <linux/sh_clk.h>
+ #include <linux/clkdev.h>
++#include <mach/clock.h>
+ #include <mach/common.h>
+ 
+ #define CPG_BASE 0xe6150000
+@@ -31,6 +32,8 @@
+ #define SMSTPCR2 0xe6150138
+ #define SMSTPCR5 0xe6150144
+ 
++#define CKSCR		0xE61500C0
++
+ static struct clk_mapping cpg_mapping = {
+ 	.phys   = CPG_BASE,
+ 	.len    = CPG_LEN,
+@@ -51,10 +54,32 @@ static struct clk extal2_clk = {
+ 	.mapping	= &cpg_mapping,
+ };
+ 
++static struct sh_clk_ops followparent_clk_ops = {
++	.recalc	= followparent_recalc,
++};
++
++static struct clk main_clk = {
++	/* .parent will be set r8a73a4_clock_init */
++	.ops	= &followparent_clk_ops,
++};
++
++SH_CLK_RATIO(div2,	1, 2);
++SH_CLK_RATIO(div4,	1, 4);
++
++SH_FIXED_RATIO_CLK(main_div2_clk,	main_clk,		div2);
++SH_FIXED_RATIO_CLK(extal1_div2_clk,	extal1_clk,		div2);
++SH_FIXED_RATIO_CLK(extal2_div2_clk,	extal2_clk,		div2);
++SH_FIXED_RATIO_CLK(extal2_div4_clk,	extal2_clk,		div4);
++
+ static struct clk *main_clks[] = {
+ 	&extalr_clk,
+ 	&extal1_clk,
++	&extal1_div2_clk,
+ 	&extal2_clk,
++	&extal2_div2_clk,
++	&extal2_div4_clk,
++	&main_clk,
++	&main_div2_clk,
+ };
+ 
+ enum {
+@@ -74,6 +99,13 @@ static struct clk mstp_clks[MSTP_NR] = {
+ };
+ 
+ static struct clk_lookup lookups[] = {
++	/* main clock */
++	CLKDEV_CON_ID("extal1",			&extal1_clk),
++	CLKDEV_CON_ID("extal1_div2",		&extal1_div2_clk),
++	CLKDEV_CON_ID("extal2",			&extal2_clk),
++	CLKDEV_CON_ID("extal2_div2",		&extal2_div2_clk),
++	CLKDEV_CON_ID("extal2_div4",		&extal2_div4_clk),
++
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
+ 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
+@@ -90,6 +122,7 @@ void __init r8a73a4_clock_init(void)
+ {
+ 	void __iomem *cpg_base, *reg;
+ 	int k, ret = 0;
++	u32 ckscr;
+ 
+ 	/* fix MPCLK to EXTAL2 for now.
+ 	 * this is needed until more detailed clock topology is supported
+@@ -100,6 +133,26 @@ void __init r8a73a4_clock_init(void)
+ 	iowrite32(ioread32(reg) | 1 << 7 | 0x0c, reg); /* set CKSEL */
+ 	iounmap(cpg_base);
+ 
++	reg = ioremap_nocache(CKSCR, PAGE_SIZE);
++	BUG_ON(!reg);
++	ckscr = ioread32(reg);
++	iounmap(reg);
++
++	switch ((ckscr >> 28) & 0x3) {
++	case 0:
++		main_clk.parent = &extal1_clk;
++		break;
++	case 1:
++		main_clk.parent = &extal1_div2_clk;
++		break;
++	case 2:
++		main_clk.parent = &extal2_clk;
++		break;
++	case 3:
++		main_clk.parent = &extal2_div2_clk;
++		break;
++	}
++
+ 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
+ 		ret = clk_register(main_clks[k]);
+ 
 -- 
 1.8.2.1
