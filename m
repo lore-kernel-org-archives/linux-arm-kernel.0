@@ -1,46 +1,60 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 06 Jun 2013 09:58:14 -0600
-Subject: Tegra baseline test results for v3.10-rc1
-In-Reply-To: <alpine.DEB.2.02.1306060421250.15042@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306050558430.13098@utopia.booyaka.com>
- <51AF5698.5050106@wwwdotorg.org>
- <alpine.DEB.2.02.1306060421250.15042@utopia.booyaka.com>
-Message-ID: <51B0B196.3040400@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Jun 2013 17:58:24 +0200
+Subject: [PATCH 4/4] ARM: ux500: Remove call to u8500_of_init_devices() -
+ again
+In-Reply-To: <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
+References: <1370517676-10909-1-git-send-email-lee.jones@linaro.org>
+ <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <201306061758.25106.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 10:34 PM, Paul Walmsley wrote:
-> Hi Stephen,
+On Thursday 06 June 2013, Lee Jones wrote:
+> Somehow, probably due to a merge error the call to u8500_of_init_devices()
+> has re-appeared in next, causing this error:
 > 
-> thanks very much for the review -
+> arch/arm/mach-ux500/cpu-db8500.c: In function ?u8500_init_machine?:
+> arch/arm/mach-ux500/cpu-db8500.c:268:2: error: implicit declaration of     \
+>   function ?u8500_of_init_devices? [-Werror=implicit-function-declaration]
+> arch/arm/mach-ux500/cpu-db8500.c:268:9: warning: assignment makes pointer  \
+>   from integer without a cast [enabled by default]
 > 
-> On Wed, 5 Jun 2013, Stephen Warren wrote:
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+>  arch/arm/mach-ux500/cpu-db8500.c |    3 ---
+>  1 file changed, 3 deletions(-)
 > 
->> On 06/04/2013 11:59 PM, Paul Walmsley wrote:
->>>
->>> Here are some basic Tegra test results for Linux v3.10-rc1.
->>> Logs and other details at:
-...
->> I'm curious what the difference is between the "t33beaver" and
->> "tegra30-beaver" path entries is, in the following URL:
->>
->> http://www.pwsan.com/tegra/testlogs/test_v3.10-rc1/20130519152115/boot/t33beaver/tegra30-beaver/
->>
->> It might be better to call this board just "tegra30-beaver" for
->> consistency with other upstream tools like cbootimage-configs and the
->> DTB filename.
+> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+> index d8ee616..f391d08 100644
+> --- a/arch/arm/mach-ux500/cpu-db8500.c
+> +++ b/arch/arm/mach-ux500/cpu-db8500.c
+> @@ -264,9 +264,6 @@ static void __init u8500_init_machine(void)
+>  	else if (of_machine_is_compatible("st-ericsson,ccu9540")) {}
+>  		/* TODO: Add pinmaps for ccu9540 board. */
+>  
+> -	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
+> -	parent = u8500_of_init_devices();
+> -
+>  	/* automatically probe child nodes of dbx5x0 devices */
+>  	if (of_machine_is_compatible("st-ericsson,u8540"))
+>  		of_platform_populate(NULL, u8500_local_bus_nodes,
+> -- 
+> 1.7.10.4
 > 
-> In the boot test environment here, "t33beaver" uniquely identifies the 
-> board, while "tegra30-beaver" identifies the DTB used to boot it.  
-> So if an alternate DTB were used, the boot test path would be:
 > 
-> ../boot/t33beaver/tegra30-beaver-alternate/
-> 
-> If it's important to you, I'll change it.  Otherwise, I'd prefer not to 
-> call the board 'tegra30-beaver' -- mostly to avoid confusing myself 
-> between the board name and the DTB name :-)
 
-Could you name the directories
-.../boot/board-tegra30-beaver/tegra30-beaver.dtb/ or
-../boot/board-tegra30-beaver/tegra30-beaver-alternate.dtb/? I'd really
-love not to propagate a different set of names for the boards.
+In the code I'm looking at, the definition for that function is
+
+/* TODO: Once all pieces are DT:ed, remove completely. */
+static struct device * __init u8500_of_init_devices(void)
+{
+        struct device *parent = db8500_soc_device_init();
+        db8500_add_usb(parent, usb_db8500_dma_cfg, usb_db8500_dma_cfg);
+        return parent;
+}
+
+I'm not sure about the db8500_add_usb() call, but I think at least
+db8500_soc_device_init() is required to get the root device for all
+other devices.
+
+	Arnd
