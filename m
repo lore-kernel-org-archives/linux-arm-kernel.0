@@ -1,95 +1,85 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Jun 2013 16:01:56 +0100
-Subject: [PATCH] ARM: errata: LoUIS bit field in CLIDR register is
- incorrect
-In-Reply-To: <1370527112.3695.47.camel@linaro1.home>
-References: <1370527112.3695.47.camel@linaro1.home>
-Message-ID: <20130606150156.GF16794@mudshark.cambridge.arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu,  6 Jun 2013 17:03:00 +0200
+Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
+Message-ID: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 02:58:32PM +0100, Jon Medhurst (Tixy) wrote:
-> On Cortex-A9 before version r1p0, the LoUIS bit field of the CLIDR
-> register returns zero when it should return one. This leads to cache
-> maintenance operations which rely on this value to not function as
-> intended, causing data corruption.
-> 
-> The workaround for this errata is to detect affected CPUs and correct
-> the LoUIS value read.
-> 
-> We also selected this workaround in CONFIG_ARCH_VEXPRESS_CA9X4 as that
-> platform is affected by the errata and as a consequence was suffering
-> reboot and shutdown crashes since the cpu hotplug changes introduced in
-> Linux 3.10. (Commit bca7a5a04933 "ARM: cpu hotplug: remove majority of
-> cache flushing from platforms")
-> 
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
-> ---
->  arch/arm/Kconfig               |   10 ++++++++++
->  arch/arm/mach-vexpress/Kconfig |    1 +
->  arch/arm/mm/cache-v7.S         |    8 ++++++++
->  3 files changed, 19 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 49d993c..1cd577c 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1189,6 +1189,16 @@ config PL310_ERRATA_588369
->  	   is not correctly implemented in PL310 as clean lines are not
->  	   invalidated as a result of these operations.
->  
-> +config ARM_ERRATA_643719
-> +	bool "ARM errata: LoUIS bit field in CLIDR register is incorrect"
-> +	depends on CPU_V7
+Hi all,
 
-You could add an SMP dependency here too.
+This is a partial repost of the patches I proposed a couple of weeks ago to add
+support for VFP/NEON in kernel mode.
 
-> +	help
-> +	  This option enables the workaround for the 643719 Cortex-A9 (prior to
-> +	  r1p0) erratum. On affected cores the LoUIS bit field of the CLIDR
-> +	  register returns zero when it should return one. The workaround
-> +	  corrects this value, ensuring cache maintenance operations which use
-> +	  it behave as intended and avoiding data corruption.
-> +
->  config ARM_ERRATA_720789
->  	bool "ARM errata: TLBIASIDIS and TLBIMVAIS operations can broadcast a faulty ASID"
->  	depends on CPU_V7
-> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-> index 5907e10..fe637e9 100644
-> --- a/arch/arm/mach-vexpress/Kconfig
-> +++ b/arch/arm/mach-vexpress/Kconfig
-> @@ -56,5 +56,6 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
->  
->  config ARCH_VEXPRESS_CA9X4
->  	bool "Versatile Express Cortex-A9x4 tile"
-> +	select ARM_ERRATA_643719
+This time, I have included two use cases that I have been using, XOR and RAID-6
+checksumming. The former gets a 60% performance boost on the NEON, the latter
+over 400%.
 
-We don't do this for any other workarounds, so I'd suggest either dropping
-this or having a separate patch adding all of those that are required.
 
->  endmenu
-> diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-> index 15451ee..05993ba 100644
-> --- a/arch/arm/mm/cache-v7.S
-> +++ b/arch/arm/mm/cache-v7.S
-> @@ -92,6 +92,14 @@ ENTRY(v7_flush_dcache_louis)
->  	mrc	p15, 1, r0, c0, c0, 1		@ read clidr, r0 = clidr
->  	ALT_SMP(ands	r3, r0, #(7 << 21))	@ extract LoUIS from clidr
->  	ALT_UP(ands	r3, r0, #(7 << 27))	@ extract LoUU from clidr
-> +#ifdef CONFIG_ARM_ERRATA_643719
-> +	ALT_SMP(mrceq	p15, 0, r2, c0, c0, 0)	@ read main ID register
-> +	ALT_UP(moveq	pc, lr)			@ LoUU is zero, so nothing to do
-> +	biceq	r2, r2, #0x0000000f             @ clear minor revision number
-> +	ldreq	r1, =0x410fc090                 @ ID of ARM Cortex A9 r0p?
-> +	teqeq	r2, r1                          @ test for errata affected core and if so...
-> +	orreqs	r3, #(1 << 21)			@   fix LoUIS value (and set flags state to 'ne')
-> +#endif
->  	ALT_SMP(mov	r3, r3, lsr #20)	@ r3 = LoUIS * 2
->  	ALT_UP(mov	r3, r3, lsr #26)	@ r3 = LoUU * 2
->  	moveq	pc, lr				@ return if level == 0
+ARM: add support for kernel mode NEON
 
-This part looks good to me:
+Adds kernel_neon_begin/end (renamed from kernel_vfp_begin/end in the previous
+version to de-emphasize the VFP part as VFP code that needs software assistance
+is not supported currently)
+Introduces <asm/neon.h> and the Kconfig symbol KERNEL_MODE_NEON. This has been
+aligned with Catalin for arm64, so any NEON code that does not use assembly but
+intrinsics or the GCC vectorizer (such as my examples) can potentially be shared
+between arm and arm64 archs.
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Will
+ARM: move VFP init to an earlier boot stage
+
+This is needed so the NEON is enabled when the XOR and RAID-6 algo boot time
+benchmarks are run.
+
+
+ARM: be strict about FP exceptions in kernel mode
+
+This adds a check to vfp_support_entry() to flag unsupported uses of the
+NEON/VFP in kernel mode. FP exceptions (bounces) are flagged as a BUG(), this is
+because of their potentially intermittent nature. Exceptions caused by the fact
+that kernel_neon_begin has not been called are just routed through the undef
+handler.
+
+
+ARM: crypto: add NEON accelerated XOR implementation
+
+This is the xor_blocks() implementation built with -ftree-vectorize, 60% faster
+than optimized ARM code. It calls in_interrupt() to check whether the NEON
+flavor can be used: this should really not be necessary, but due to xor_blocks's
+quite generic nature, there is no telling how exactly people may be using it in
+the real world.
+
+
+lib/raid6: add ARM-NEON accelerated syndrome calculation
+
+This is a port of the RAID-6 checksumming code in altivec.uc ported to use NEON
+intrinsics. It is about 4x faster than the sequential code. As this code does
+not live under arch/arm, I will send this patch separately to the appropriate 
+list if/when the prerequisite patches from this series have been accepted.
+
+-- 
+Ard.
+
+
+ arch/arm/Kconfig            |  7 ++++
+ arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++
+ arch/arm/include/asm/xor.h  | 73 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm/lib/Makefile       |  6 ++++
+ arch/arm/lib/xor-neon.c     | 42 ++++++++++++++++++++++++
+ arch/arm/vfp/vfphw.S        |  5 +++
+ arch/arm/vfp/vfpmodule.c    | 56 ++++++++++++++++++++++++++++++-
+ include/linux/raid/pq.h     |  5 +++
+ lib/raid6/.gitignore        |  1 +
+ lib/raid6/Makefile          | 31 ++++++++++++++++++
+ lib/raid6/algos.c           |  6 ++++
+ lib/raid6/neon.c            | 58 ++++++++++++++++++++++++++++++++
+ lib/raid6/neon.uc           | 80 +++++++++++++++++++++++++++++++++++++++++++++
+ lib/raid6/test/Makefile     | 19 ++++++++++-
+ 14 files changed, 423 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/include/asm/neon.h
+ create mode 100644 arch/arm/lib/xor-neon.c
+ create mode 100644 lib/raid6/neon.c
+ create mode 100644 lib/raid6/neon.uc
+
+-- 
+1.8.1.2
