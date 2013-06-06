@@ -1,45 +1,87 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 06 Jun 2013 14:37:01 +0530
-Subject: [PATCH v2 1/3] ARM: EXYNOS: uncompress - print debug messages
- if DEBUG_LL is defined
-In-Reply-To: <1370319552-17694-2-git-send-email-tushar.behera@linaro.org>
-References: <1370319552-17694-1-git-send-email-tushar.behera@linaro.org>
- <1370319552-17694-2-git-send-email-tushar.behera@linaro.org>
-Message-ID: <51B05135.3020006@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Jun 2013 10:13:27 +0100
+Subject: [PATCH 5/8] arm: mvebu: don't hardcode a physical address in
+ headsmp.S
+In-Reply-To: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130606091327.GF15208@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2013 09:49 AM, Tushar Behera wrote:
-> Printing low-level debug messages make an assumption that the specified
-> UART port has been preconfigured by the bootloader. Incorrectly
-> specified UART port results in system getting stalled while printing the
-> message "Uncompressing Linux... done, booting the kernel"
-> This UART port number is specified through S3C_LOWLEVEL_UART_PORT. Since
-> the UART port might different for different board, it is not possible to
-> specify it correctly for every board that use a common defconfig file.
+Hi Thomas,
+
+On Wed, Jun 05, 2013 at 08:04:58AM +0100, Thomas Petazzoni wrote:
+> Now that the coherency_init() function is called a bit earlier, we can
+> actually read the physical address of the coherency unit registers
+> from the Device Tree, and communicate that to the headsmp.S code,
+> which avoids hardcoding a physical address.
 > 
-> Calling this print subroutine only when DEBUG_LL fixes the problem. By
-> disabling DEBUG_LL in default config file, we would be able to boot
-> multiple boards with different default UART ports.
-> 
-> With this current approach, we miss the print "Uncompressing Linux...
-> done, booting the kernel." when DEBUG_LL is not defined.
-> 
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
-> Change for v2:
-> * Instead of checking value of uart_base, now check if DEBUG_LL
-> is enabled. This removes the ifdef's from mach/uncompress.h
+>  arch/arm/mach-mvebu/coherency.c |  4 ++++
+>  arch/arm/mach-mvebu/headsmp.S   | 19 +++++++++++--------
+>  2 files changed, 15 insertions(+), 8 deletions(-)
 > 
-> 
->  arch/arm/plat-samsung/include/plat/uncompress.h |   10 +++++++++-
->  1 file changed, 9 insertions(+), 1 deletion(-)
-> 
+> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
+> index d74794a..3d8f40f 100644
+> --- a/arch/arm/mach-mvebu/coherency.c
+> +++ b/arch/arm/mach-mvebu/coherency.c
+> @@ -27,6 +27,7 @@
+>  #include <asm/smp_plat.h>
+>  #include "armada-370-xp.h"
+>  
+> +unsigned long __cpuinitdata coherency_phys_base;
+>  static void __iomem *coherency_base;
+>  static void __iomem *coherency_cpu_base;
+>  
+> @@ -124,7 +125,10 @@ int __init coherency_init(void)
+>  
+>  	np = of_find_matching_node(NULL, of_coherency_table);
+>  	if (np) {
+> +		struct resource res;
+>  		pr_info("Initializing Coherency fabric\n");
+> +		of_address_to_resource(np, 0, &res);
+> +		coherency_phys_base = res.start;
 
-If there are no concerns, would it be possible to queue this patch [1/3]
-for 3.10?
+So you have the primary CPU writing this address, before it is coherent...
 
-The other two patches can wait for 3.11.
+>  		coherency_base = of_iomap(np, 0);
+>  		coherency_cpu_base = of_iomap(np, 1);
+>  		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+> diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
+> index a06e0ed..f500e9c 100644
+> --- a/arch/arm/mach-mvebu/headsmp.S
+> +++ b/arch/arm/mach-mvebu/headsmp.S
+> @@ -21,12 +21,6 @@
+>  #include <linux/linkage.h>
+>  #include <linux/init.h>
+>  
+> -/*
+> - * At this stage the secondary CPUs don't have acces yet to the MMU, so
+> - * we have to provide physical addresses
+> - */
+> -#define ARMADA_XP_CFB_BASE	     0xD0020200
+> -
+>  	__CPUINIT
+>  
+>  /*
+> @@ -35,15 +29,24 @@
+>   * startup
+>   */
+>  ENTRY(armada_xp_secondary_startup)
+> +	/* Get coherency fabric base physical address */
+> +	adr	r0, 1f
+> +	ldmia	r0, {r1, r2}
+> +	sub	r0, r0, r1
+> +	add	r2, r2, r0
+> +	ldr	r0, [r2]
 
--- 
-Tushar Behera
+... and the secondaries reading it, before they are coherent.
+How do you ensure that the write is indeed visible?
+
+Furthermore, it's worth noting that of_find_matching_node takes the
+devtree_lock spinlock, so you need to be careful calling that if you're not
+coherent.
+
+Will
