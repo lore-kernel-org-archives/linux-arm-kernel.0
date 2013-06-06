@@ -1,53 +1,55 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 6 Jun 2013 17:19:13 +0100
-Subject: [PATCH v3 5/6] arm64/xen: introduce CONFIG_XEN and hypercall.S
- on ARM64
-In-Reply-To: <20130606144212.GK28479@arm.com>
-References: <alpine.DEB.2.02.1306041712100.4589@kaball.uk.xensource.com>
- <1370434530-22428-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <1471793.18ZhhAHKN9@wuerfel> <20130606144212.GK28479@arm.com>
-Message-ID: <alpine.DEB.2.02.1306061703570.4589@kaball.uk.xensource.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 6 Jun 2013 18:15:44 +0200
+Subject: [PATCH v3 1/7] pcmcia: at91_cf: fix gpio_get_value in
+ at91_cf_get_status
+In-Reply-To: <cc6a02cb9d55ba52b48adca688fef362b8bea373.1370506678.git.nicolas.ferre@atmel.com>
+References: <cover.1370506678.git.nicolas.ferre@atmel.com>
+ <cc6a02cb9d55ba52b48adca688fef362b8bea373.1370506678.git.nicolas.ferre@atmel.com>
+Message-ID: <20130606161544.GN23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Jun 2013, Catalin Marinas wrote:
-> Hi Arnd,
+On 10:24 Thu 06 Jun     , Nicolas Ferre wrote:
+> From: Joachim Eastwood <manabian@gmail.com>
 > 
-> On Wed, Jun 05, 2013 at 01:44:55PM +0100, Arnd Bergmann wrote:
-> > On Wednesday 05 June 2013 13:15:29 Stefano Stabellini wrote:
-> > > diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> > > index c95c5cb..79dd13d 100644
-> > > --- a/arch/arm64/Makefile
-> > > +++ b/arch/arm64/Makefile
-> > > @@ -37,6 +37,7 @@ TEXT_OFFSET := 0x00080000
-> > >  export TEXT_OFFSET GZFLAGS
-> > >  
-> > >  core-y         += arch/arm64/kernel/ arch/arm64/mm/
-> > > +core-$(CONFIG_XEN)             += arch/arm64/xen/
-> > >  libs-y         := arch/arm64/lib/ $(libs-y)
-> > >  libs-y         += $(LIBGCC)
-> > >  
-> > > diff --git a/arch/arm64/xen/Makefile b/arch/arm64/xen/Makefile
-> > > new file mode 100644
-> > > index 0000000..be24040
-> > > --- /dev/null
-> > > +++ b/arch/arm64/xen/Makefile
-> > > @@ -0,0 +1,2 @@
-> > > +xen-arm-y      += $(addprefix ../../arm/xen/, enlighten.o grant-table.o)
-> > > +obj-y          := xen-arm.o hypercall.o
-> > 
-> > I think it would be nicer to redirect the entire directory, not just
-> > the enlighten.o and grant-table.o files. You could do in arch/arm64/Makefile:
-> > 
-> > core-(CONFIG_XEN) += arch/arm/xen/
-> > 
-> > That leaves a small difference in hypercall.o, which I think you can
-> > handle with an #ifdef.
+> Commit 80af9e6d (pcmcia at91_cf: fix raw gpio number usage) forgot
+> to change the parameter in gpio_get_value after adding gpio
+> validation.
+
+this is a fix so should for in stable tree too
+
+since #3.4
+
+Best Regards,
+J.
 > 
-> Sorry, I missed this part. I want to keep the AArch64 assembly under
-> arm64, even if it is small.
-
-That's fine, I don't have a strong opinion on this, I am happy either way.
-
-In this case the v3 of the series is the one we want.
-I'll submit a pull request to you for it during the next couple of days.
+> Signed-off-by: Joachim Eastwood <manabian@gmail.com>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+>  drivers/pcmcia/at91_cf.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pcmcia/at91_cf.c b/drivers/pcmcia/at91_cf.c
+> index 01463c7..1b2c631 100644
+> --- a/drivers/pcmcia/at91_cf.c
+> +++ b/drivers/pcmcia/at91_cf.c
+> @@ -100,9 +100,9 @@ static int at91_cf_get_status(struct pcmcia_socket *s, u_int *sp)
+>  		int vcc	= gpio_is_valid(cf->board->vcc_pin);
+>  
+>  		*sp = SS_DETECT | SS_3VCARD;
+> -		if (!rdy || gpio_get_value(rdy))
+> +		if (!rdy || gpio_get_value(cf->board->irq_pin))
+>  			*sp |= SS_READY;
+> -		if (!vcc || gpio_get_value(vcc))
+> +		if (!vcc || gpio_get_value(cf->board->vcc_pin))
+>  			*sp |= SS_POWERON;
+>  	} else
+>  		*sp = 0;
+> -- 
+> 1.8.2.2
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
