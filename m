@@ -1,38 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:46 +0900
-Subject: [GIT PULL v2 0/2] Update for Renesas INTC External IRQ pin driver for
- v3.11
-Message-ID: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu,  6 Jun 2013 16:28:48 +0900
+Subject: [PATCH 2/2] irqchip: Add irqchip_init dummy function
+In-Reply-To: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503728-31373-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Bastian Hecht <hechtb@gmail.com>
 
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+We add an empty irqchip_init dummy function for cases in which
+CONFIG_IRQCHIP is not used. In these cases irqchip.c is not compiled,
+but a funtion call may still be present in architecture code, that in
+runtime doesn't get hit.
 
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+E.g. this is needed in the arch/arm/mach-shmobile/intc-r8a7740.c
+interrupt setup code where OF use and non OF us is both handled in one
+file.
 
-are available in the git repository at:
+Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+[horms+renesas at verge.net.au: Make non-CONFIG_IRQCHIP version static inline
+ and remove trailing ';'.]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ include/linux/irqchip.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq-for-v3.11
-
-for you to fetch changes up to 0d7c1210992ff05ee8de5d2c790defded3856f29:
-
-  irqchip: Add irqchip_init dummy function (2013-06-06 10:23:58 +0900)
-
-----------------------------------------------------------------
-Update for Renesas INTC External IRQ pin driver for v3.11
-
-Correct error handing in irqc_probe
-Add irqchip_init dummy function
-
-----------------------------------------------------------------
-Axel Lin (1):
-      irqchip: renesas-irqc: Fix irqc_probe error handling
-
-Bastian Hecht (1):
-      irqchip: Add irqchip_init dummy function
-
- drivers/irqchip/irq-renesas-irqc.c | 4 ++--
- include/linux/irqchip.h            | 4 ++++
- 2 files changed, 6 insertions(+), 2 deletions(-)
+diff --git a/include/linux/irqchip.h b/include/linux/irqchip.h
+index e0006f1..14d7913 100644
+--- a/include/linux/irqchip.h
++++ b/include/linux/irqchip.h
+@@ -11,6 +11,10 @@
+ #ifndef _LINUX_IRQCHIP_H
+ #define _LINUX_IRQCHIP_H
+ 
++#ifdef CONFIG_IRQCHIP
+ void irqchip_init(void);
++#else
++static inline void irqchip_init(void) {}
++#endif
+ 
+ #endif
+-- 
+1.8.2.1
