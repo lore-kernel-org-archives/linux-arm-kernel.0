@@ -1,56 +1,55 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jun 2013 14:10:42 +0100
+Date: Thu, 6 Jun 2013 14:15:07 +0100
 Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
  Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+In-Reply-To: <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
+References: <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
  <1370475609.20454.44.camel@localhost>
  <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron>
- <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
-Message-ID: <20130606131042.GN18614@n2100.arm.linux.org.uk>
+ <1370477958.20454.68.camel@localhost>
+ <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
+Message-ID: <20130606131506.GO18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 01:24:57PM +0100, luke.leighton wrote:
-> On Thu, Jun 6, 2013 at 1:01 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+On Thu, Jun 06, 2013 at 01:22:04PM +0100, luke.leighton wrote:
+> On Thu, Jun 6, 2013 at 1:19 AM, Henrik Nordstr?m
+> <henrik@henriknordstrom.net> wrote:
+> > tor 2013-06-06 klockan 00:54 +0100 skrev luke.leighton:
+> >
+> >> > Not really the case. Actually the opposite. DT have this as well, and
+> >> > integrated in device probing. Allwinner need to hack every driver used
+> >> > to add their gpio requests to have pinmuxing triggered.
+> >>
+> >>  augh.  ok.  solutions.  what are the solutions here?
+> >
+> > What I said before.
 > 
-> > I don't see any other solution here than moving all the Allwinner code to
-> > DT (as it has been suggested in this thread several times already), as
-> > this is the only hardware description method supported by ARM Linux.
+>  idea: hook into devicetree gpio functions to allow script-fex gpio
+> functions to gain access in a separate module?  that sort of thing.
 > 
->  i repeat again: please state, explicitly and unequivocably that you -
-> linux kernel developers - are happy that the reach of linux and
-> gnu/linux OSes is dramatically reduced due to this intransigent
-> position.
+> > Go with DT for the kernel. There is no need for two configuration
+> > mechanisms doing the same thing. Disguise it in fex form (and
+> > translator) if too hard for people with a DOS editior to configure.
+> 
+>  what methods for doing that.  i need proposals.  4 days on the clock.
 
-If companies are going to go off and invent the square wheel, and that
-makes *them* suffer the loss of being able to merge back into the
-mainline kernel, thereby making *their* job of moving forward with
-their kernel versions much harder, then yes, we *are* happy.
+No.
 
-Companies will always do idiotic things; it's *them* and their users
-who have to live with the results of that bad decision making process.
+If you want to set time scales, please put up money to find the work to
+come up with those proposals.
 
-Eventually, the pain of being outside the mainline kernel will become
-too great, especially if their users demand things like kernel upgrades
-from them.  Eventually, they will change.
+Virtually no one here is a charity; the charity days of open source are
+long gone.  Everyone needs money to put food in their mouths, and the
+way this works is that those who pay the most get the time.  That's the
+nature of a open and free market.
 
-And no, this isn't an intransigent position.  This is reality given
-that ARM already has way too much code in the Linux kernel and we're
-trying to reduce that through the use of technologies like DT.  The
-last thing we need right now is for another "DT" like implementation
-to come along which is only used on a minority of platforms - even if
-the platform it is used on is successful.
-
-The way this works is this:
-- you either go with the policies which are set, or
-- you change the policy as a whole because you have a technically
-  superior solution
-
-What that means in this case is either you adopt DT, or you convince
-everyone that DT isn't the solution, but your solution is, and we adopt
-your solution for *everything* instead.
-
-If neither of those are possible, then that's really not our problem,
-and it's not _us_ who are being "intransigent".
+What's more is that you have been given some good proposals already:
+converting the fex description to DT for the kernel.  Wow, that means you
+can use the work which has already been done in the mainline kernel for
+free!  How cool is that!
