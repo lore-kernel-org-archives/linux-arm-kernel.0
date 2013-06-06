@@ -1,71 +1,80 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  6 Jun 2013 18:41:28 +0200
-Subject: [PATCH v2 8/8] arm: mvebu: link PCIe controllers to the MSI controller
-In-Reply-To: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1370536888-8871-9-git-send-email-thomas.petazzoni@free-electrons.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 06 Jun 2013 10:44:48 -0600
+Subject: [PATCH] ARM: tegra: add basic SecureOS support
+In-Reply-To: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <51B0BC80.9040007@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adjusts the Armada 370 and Armada XP PCIe controllers
-Device Tree informations to reference their MSI controller. In the
-case of this platform, the MSI controller is implemented by the MPIC.
+On 06/06/2013 01:28 AM, Alexandre Courbot wrote:
+> Boot loaders on some Tegra devices can be unlocked but do not let the
+> system operate without SecureOS. SecureOS prevents access to some
+> registers and requires the operating system to perform certain
+> operations through Secure Monitor Calls instead of directly accessing
+> the hardware.
+> 
+> This patch introduces basic SecureOS support for Tegra. SecureOS support
+> can be enabled by adding a "nvidia,secure-os" property to the "chosen"
+> node of the device tree.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
----
- arch/arm/boot/dts/armada-370.dtsi        | 1 +
- arch/arm/boot/dts/armada-xp-mv78230.dtsi | 1 +
- arch/arm/boot/dts/armada-xp-mv78260.dtsi | 1 +
- arch/arm/boot/dts/armada-xp-mv78460.dtsi | 1 +
- 4 files changed, 4 insertions(+)
+I suspect "SecureOS" here is the name of a specific implementation of a
+secure monitor, right? It's certainly a very unfortunate name, since it
+sounds like a generic concept rather than a specific implementation:-(
 
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index aee2b18..3c4e6d7 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -178,6 +178,7 @@
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 
-+				msi-parent = <&mpic>;
- 				bus-range = <0x00 0xff>;
- 
- 				reg = <0x40000 0x2000>, <0x80000 0x2000>;
-diff --git a/arch/arm/boot/dts/armada-xp-mv78230.dtsi b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-index f8eaa38..4a9a305 100644
---- a/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78230.dtsi
-@@ -91,6 +91,7 @@
- #address-cells = <3>;
- #size-cells = <2>;
- 
-+				msi-parent = <&mpic>;
- 				bus-range = <0x00 0xff>;
- 
- 				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
-diff --git a/arch/arm/boot/dts/armada-xp-mv78260.dtsi b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-index f4029f0..bc63783 100644
---- a/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78260.dtsi
-@@ -111,6 +111,7 @@
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 
-+				msi-parent = <&mpic>;
- 				bus-range = <0x00 0xff>;
- 
- 				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
-diff --git a/arch/arm/boot/dts/armada-xp-mv78460.dtsi b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-index c7b1f4d..77db2bc 100644
---- a/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-+++ b/arch/arm/boot/dts/armada-xp-mv78460.dtsi
-@@ -127,6 +127,7 @@
- 				#address-cells = <3>;
- 				#size-cells = <2>;
- 
-+				msi-parent = <&mpic>;
- 				bus-range = <0x00 0xff>;
- 
- 				ranges = <0x82000000 0 0x40000 0x40000 0 0x00002000   /* Port 0.0 registers */
--- 
-1.8.1.2
+There certainly could be (and I believe are in practice?) multiple
+implementation of a secure monitor for Tegra. Presumably, each of those
+implementations has (or could have) a different definition for what SVC
+calls it supports, their parameters, etc.
+
+I think we need to separate the concept of support for *a* secure
+monitor, from support for a *particular* secure monitor.
+
+> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+
+> +node:
+> +
+> +  nvidia,secure-os: enable SecureOS.
+
+... as such, I think some work is needed here to allow specification of
+which secure monitor is present and/or which secure monitor ABI it
+implements. The suggestion to use a specific DT node, and hence use
+compatible values for this, seems reasonable. Alternatively, perhaps:
+
+nvidia,secure-monitor = "name_of_vendor_or_SMC_ABI";
+
+might be reasonable, although using a node would allow ABI-specific
+additional properties to be defined should they be needed, so I guess I
+would lean towards that.
+
+Similar comments may apply to the CONFIG_ option and description,
+filenames, etc.
+
+> diff --git a/arch/arm/mach-tegra/secureos.c b/arch/arm/mach-tegra/secureos.c
+
+> +void __init tegra_init_secureos(void)
+> +{
+> +	struct device_node *node = of_find_node_by_path("/chosen");
+> +
+> +	if (node && of_property_read_bool(node, "nvidia,secure-os"))
+> +		register_firmware_ops(&tegra_firmware_ops);
+> +}
+
+I'm tempted to think that function should /always/ exist an be called
+(so no dummy inline in secureos.h).
+
+In particular, what happens when a kernel without CONFIG_SECUREOS
+enabled is booted under a secure monitor. Presumably we want the init
+code to explicitly check for this condition, and either BUG(), or do
+something to disable any features (like SMP) that require SVCs?
+
+So, the algorithm here might be more like:
+
+find node
+if node exists
+    if (!IS_ENABLED(SECURE_OS))
+        BUG/WARN/...
+    else
+        register_firmware_ops()
+
+?
