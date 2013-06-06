@@ -1,173 +1,297 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:22 +0900
-Subject: [PATCH 4/5] ARM: shmobile: sh73a0: Use DEFINE_RES_MEM*() everywhere
-In-Reply-To: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503703-31024-5-git-send-email-horms+renesas@verge.net.au>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 6 Jun 2013 16:28:07 +0900
+Subject: [PATCH] ARM: tegra: add basic SecureOS support
+Message-ID: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert code to use DEFINE_RES_MEM*() macros.
-These macros were already used in this file,
-this change makes their usage consistent throughout the file.
+Boot loaders on some Tegra devices can be unlocked but do not let the
+system operate without SecureOS. SecureOS prevents access to some
+registers and requires the operating system to perform certain
+operations through Secure Monitor Calls instead of directly accessing
+the hardware.
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+This patch introduces basic SecureOS support for Tegra. SecureOS support
+can be enabled by adding a "nvidia,secure-os" property to the "chosen"
+node of the device tree.
+
+Currently, only the bringup of secondary CPUs is performed by SMCs, but
+more operations will be added later.
+
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- arch/arm/mach-shmobile/setup-sh73a0.c | 79 ++++++-----------------------------
- 1 file changed, 13 insertions(+), 66 deletions(-)
+ Documentation/devicetree/bindings/arm/tegra.txt |  8 +++
+ arch/arm/configs/tegra_defconfig                |  1 +
+ arch/arm/mach-tegra/Kconfig                     | 11 ++++
+ arch/arm/mach-tegra/Makefile                    |  2 +
+ arch/arm/mach-tegra/common.c                    |  2 +
+ arch/arm/mach-tegra/reset.c                     | 30 +++++++----
+ arch/arm/mach-tegra/secureos.c                  | 70 +++++++++++++++++++++++++
+ arch/arm/mach-tegra/secureos.h                  | 31 +++++++++++
+ 8 files changed, 145 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/secureos.c
+ create mode 100644 arch/arm/mach-tegra/secureos.h
 
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index fdf3894..3bc33a5 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -288,12 +288,7 @@ static struct sh_timer_config tmu00_platform_data = {
- };
+diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
+index ed9c853..b543091 100644
+--- a/Documentation/devicetree/bindings/arm/tegra.txt
++++ b/Documentation/devicetree/bindings/arm/tegra.txt
+@@ -32,3 +32,11 @@ board-specific compatible values:
+   nvidia,whistler
+   toradex,colibri_t20-512
+   toradex,iris
++
++Global properties
++-------------------------------------------
++
++The following properties can be specified into the "chosen" root
++node:
++
++  nvidia,secure-os: enable SecureOS.
+diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
+index f7ba3161..f6ed0f5 100644
+--- a/arch/arm/configs/tegra_defconfig
++++ b/arch/arm/configs/tegra_defconfig
+@@ -28,6 +28,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
+ CONFIG_ARCH_TEGRA_114_SOC=y
+ CONFIG_TEGRA_PCI=y
+ CONFIG_TEGRA_EMC_SCALING_ENABLE=y
++CONFIG_TEGRA_SECUREOS=y
+ CONFIG_SMP=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 84d72fc..acb5d0a 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -87,4 +87,15 @@ config TEGRA_AHB
+ config TEGRA_EMC_SCALING_ENABLE
+ 	bool "Enable scaling the memory frequency"
  
- static struct resource tmu00_resources[] = {
--	[0] = {
--		.name	= "TMU00",
--		.start	= 0xfff60008,
--		.end	= 0xfff60013,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xfff60008, 0xc, "TMU00"),
- 	[1] = {
- 		.start	= intcs_evt2irq(0x0e80), /* TMU0_TUNI00 */
- 		.flags	= IORESOURCE_IRQ,
-@@ -318,12 +313,7 @@ static struct sh_timer_config tmu01_platform_data = {
- };
++config TEGRA_SECUREOS
++	bool "Enable SecureOS support"
++	help
++	  Support for Tegra devices which bootloader sets up a
++	  SecureOS environment. This will use Secure Monitor Calls
++	  instead of directly accessing the hardware for some protected
++	  operations.
++
++	  SecureOS support is enabled by declaring a "nvidia,secure-os"
++	  property into the "chosen" node of the device tree.
++
+ endmenu
+diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
+index d011f0a..3adafe6 100644
+--- a/arch/arm/mach-tegra/Makefile
++++ b/arch/arm/mach-tegra/Makefile
+@@ -37,3 +37,5 @@ endif
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-harmony-pcie.o
  
- static struct resource tmu01_resources[] = {
--	[0] = {
--		.name	= "TMU01",
--		.start	= 0xfff60014,
--		.end	= 0xfff6001f,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xfff60014, 0xc, "TMU00"),
- 	[1] = {
- 		.start	= intcs_evt2irq(0x0ea0), /* TMU0_TUNI01 */
- 		.flags	= IORESOURCE_IRQ,
-@@ -341,12 +331,7 @@ static struct platform_device tmu01_device = {
- };
+ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-paz00.o
++
++obj-$(CONFIG_TEGRA_SECUREOS)		+= secureos.o
+diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
+index 9f852c6..b7eea02 100644
+--- a/arch/arm/mach-tegra/common.c
++++ b/arch/arm/mach-tegra/common.c
+@@ -37,6 +37,7 @@
+ #include "sleep.h"
+ #include "pm.h"
+ #include "reset.h"
++#include "secureos.h"
  
- static struct resource i2c0_resources[] = {
--	[0] = {
--		.name	= "IIC0",
--		.start	= 0xe6820000,
--		.end	= 0xe6820425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6820000, 0x426, "IIC0"),
- 	[1] = {
- 		.start	= gic_spi(167),
- 		.end	= gic_spi(170),
-@@ -355,12 +340,7 @@ static struct resource i2c0_resources[] = {
- };
+ /*
+  * Storage for debug-macro.S's state.
+@@ -97,6 +98,7 @@ static void __init tegra_init_cache(void)
  
- static struct resource i2c1_resources[] = {
--	[0] = {
--		.name	= "IIC1",
--		.start	= 0xe6822000,
--		.end	= 0xe6822425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6822000, 0x426, "IIC1"),
- 	[1] = {
- 		.start	= gic_spi(51),
- 		.end	= gic_spi(54),
-@@ -369,12 +349,7 @@ static struct resource i2c1_resources[] = {
- };
+ void __init tegra_init_early(void)
+ {
++	tegra_init_secureos();
+ 	tegra_cpu_reset_handler_init();
+ 	tegra_apb_io_init();
+ 	tegra_init_fuse();
+diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+index 1ac434e..4b9ebf9 100644
+--- a/arch/arm/mach-tegra/reset.c
++++ b/arch/arm/mach-tegra/reset.c
+@@ -21,38 +21,32 @@
  
- static struct resource i2c2_resources[] = {
--	[0] = {
--		.name	= "IIC2",
--		.start	= 0xe6824000,
--		.end	= 0xe6824425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6824000, 0x426, "IIC2"),
- 	[1] = {
- 		.start	= gic_spi(171),
- 		.end	= gic_spi(174),
-@@ -383,12 +358,7 @@ static struct resource i2c2_resources[] = {
- };
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
++#include <asm/firmware.h>
  
- static struct resource i2c3_resources[] = {
--	[0] = {
--		.name	= "IIC3",
--		.start	= 0xe6826000,
--		.end	= 0xe6826425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6826000, 0x426, "IIC3"),
- 	[1] = {
- 		.start	= gic_spi(183),
- 		.end	= gic_spi(186),
-@@ -397,12 +367,7 @@ static struct resource i2c3_resources[] = {
- };
+ #include "iomap.h"
+ #include "irammap.h"
+ #include "reset.h"
+ #include "sleep.h"
+ #include "fuse.h"
++#include "secureos.h"
  
- static struct resource i2c4_resources[] = {
--	[0] = {
--		.name	= "IIC4",
--		.start	= 0xe6828000,
--		.end	= 0xe6828425 - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	[0] = DEFINE_RES_MEM_NAMED(0xe6828000, 0x426, "IIC4"),
- 	[1] = {
- 		.start	= gic_spi(187),
- 		.end	= gic_spi(190),
-@@ -623,12 +588,7 @@ static struct sh_dmae_pdata sh73a0_dmae_platform_data = {
- };
+ #define TEGRA_IRAM_RESET_BASE (TEGRA_IRAM_BASE + \
+ 				TEGRA_IRAM_RESET_HANDLER_OFFSET)
  
- static struct resource sh73a0_dmae_resources[] = {
--	{
--		/* Registers including DMAOR and channels including DMARSx */
--		.start  = 0xfe000020,
--		.end    = 0xfe008a00 - 1,
--		.flags  = IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(0xfe000020, 0x89e0),
- 	{
- 		.name	= "error_irq",
- 		.start  = gic_spi(129),
-@@ -727,18 +687,10 @@ static struct sh_dmae_pdata sh73a0_mpdma_platform_data = {
+ static bool is_enabled;
  
- /* Resource order important! */
- static struct resource sh73a0_mpdma_resources[] = {
--	{
--		/* Channel registers and DMAOR */
--		.start	= 0xec618020,
--		.end	= 0xec61828f,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		/* DMARSx */
--		.start	= 0xec619000,
--		.end	= 0xec61900b,
--		.flags	= IORESOURCE_MEM,
--	},
-+	/* Channel registers and DMAOR */
-+	DEFINE_RES_MEM(0xec618020, 0x270),
-+	/* DMARSx */
-+	DEFINE_RES_MEM(0xec619000, 0xc),
- 	{
- 		.name	= "error_irq",
- 		.start	= gic_spi(181),
-@@ -785,12 +737,7 @@ static struct platform_device pmu_device = {
+-static void __init tegra_cpu_reset_handler_enable(void)
++static void __init tegra_cpu_reset_handler_set(const u32 reset_address)
+ {
+-	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
+ 	void __iomem *evp_cpu_reset =
+ 		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
+ 	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
+ 	u32 reg;
  
- /* an IPMMU module for ICB */
- static struct resource ipmmu_resources[] = {
--	[0] = {
--		.name	= "IPMMU",
--		.start	= 0xfe951000,
--		.end	= 0xfe9510ff,
--		.flags	= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM_NAMED(0xfe951000, 0x100, "IPMMU"),
- };
+-	BUG_ON(is_enabled);
+-	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
+-
+-	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
+-			tegra_cpu_reset_handler_size);
+-
+ 	/*
+ 	 * NOTE: This must be the one and only write to the EVP CPU reset
+ 	 *       vector in the entire system.
+ 	 */
+-	writel(TEGRA_IRAM_RESET_BASE + tegra_cpu_reset_handler_offset,
+-			evp_cpu_reset);
++	writel(reset_address, evp_cpu_reset);
+ 	wmb();
+ 	reg = readl(evp_cpu_reset);
  
- static const char * const ipmmu_dev_names[] = {
+@@ -66,6 +60,22 @@ static void __init tegra_cpu_reset_handler_enable(void)
+ 		writel(reg, sb_ctrl);
+ 		wmb();
+ 	}
++}
++
++static void __init tegra_cpu_reset_handler_enable(void)
++{
++	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
++	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
++						tegra_cpu_reset_handler_offset;
++
++	BUG_ON(is_enabled);
++	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
++
++	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
++			tegra_cpu_reset_handler_size);
++
++	if (call_firmware_op(set_cpu_boot_addr, 0, reset_address) == -ENOSYS)
++		tegra_cpu_reset_handler_set(reset_address);
+ 
+ 	is_enabled = true;
+ }
+diff --git a/arch/arm/mach-tegra/secureos.c b/arch/arm/mach-tegra/secureos.c
+new file mode 100644
+index 0000000..44c3514
+--- /dev/null
++++ b/arch/arm/mach-tegra/secureos.c
+@@ -0,0 +1,70 @@
++/*
++ * SecureOS support for Tegra CPUs
++ *
++ * Copyright (c) 2013, NVIDIA Corporation.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/of.h>
++#include <asm/firmware.h>
++
++static int __attribute__((used)) __tegra_smc_stack[10];
++
++/*
++ * With EABI, subtype and arg already end up in r0, r1 and r2 as they are
++ * function arguments, but we prefer to play safe here and explicitly move
++ * these values into the expected registers anyway. mov instructions without
++ * any side-effect are turned into nops by the assembler, which limits
++ * overhead.
++ */
++static void tegra_generic_smc(u32 type, u32 subtype, u32 arg)
++{
++	asm volatile(
++		".arch_extension	sec\n\t"
++		"ldr	r3, =__tegra_smc_stack\n\t"
++		"stmia	r3, {r4-r12, lr}\n\t"
++		"mov	r0, %[type]\n\t"
++		"mov	r1, %[subtype]\n\t"
++		"mov	r2, %[arg]\n\t"
++		"mov	r3, #0\n\t"
++		"mov	r4, #0\n\t"
++		"dsb\n\t"
++		"smc	#0\n\t"
++		"ldr	r3, =__tegra_smc_stack\n\t"
++		"ldmia	r3, {r4-r12, lr}"
++			:
++			: [type]    "r" (type),
++			  [subtype] "r" (subtype),
++			  [arg]     "r" (arg)
++			: "r0", "r1", "r2", "r3", "r4", "memory");
++}
++
++static int tegra_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
++{
++	tegra_generic_smc(0xfffff200, boot_addr, 0);
++
++	return 0;
++}
++
++static const struct firmware_ops tegra_firmware_ops = {
++	.set_cpu_boot_addr = tegra_set_cpu_boot_addr,
++};
++
++void __init tegra_init_secureos(void)
++{
++	struct device_node *node = of_find_node_by_path("/chosen");
++
++	if (node && of_property_read_bool(node, "nvidia,secure-os"))
++		register_firmware_ops(&tegra_firmware_ops);
++}
+diff --git a/arch/arm/mach-tegra/secureos.h b/arch/arm/mach-tegra/secureos.h
+new file mode 100644
+index 0000000..5388cc5
+--- /dev/null
++++ b/arch/arm/mach-tegra/secureos.h
+@@ -0,0 +1,31 @@
++/*
++ * Copyright (c) 2013, NVIDIA Corporation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ */
++
++#ifndef __TEGRA_SECUREOS_H
++#define __TEGRA_SECUREOS_H
++
++#ifdef CONFIG_TEGRA_SECUREOS
++
++#include <linux/types.h>
++
++void tegra_init_secureos(void);
++
++#else
++
++static inline void tegra_init_secureos(void)
++{
++}
++
++#endif
++
++#endif
 -- 
-1.8.2.1
+1.8.3
