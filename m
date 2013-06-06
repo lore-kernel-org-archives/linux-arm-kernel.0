@@ -1,16 +1,17 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu,  6 Jun 2013 18:27:10 +0200
-Subject: [PATCH v3 2/6] clocksource: add Marvell Orion SoC timer
+Date: Thu,  6 Jun 2013 18:27:14 +0200
+Subject: [PATCH v3 6/6] ARM: kirkwood: convert to DT irqchip and clocksource
 In-Reply-To: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1370536034-23956-3-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1370536034-23956-7-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add a DT enabled driver for timers found on Marvell Orion SoCs
-(Kirkwood, Dove, Orion5x, and Discovery Innovation). It installs a free-
-running clocksource on timer0 and a clockevent source on timer1.
-Corresponding device tree documentation is also added.
+With recent support for true irqchip and clocksource drivers for Orion
+SoCs, now make use of it on DT enabled Kirkwood boards.
+
+This also introduces a new Kconfig option for legacy (non-DT) Kirkwood
+where old code is moved out to and polishes DT board file a little bit.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -29,213 +30,248 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- .../bindings/timer/marvell,orion-timer.txt         |   17 +++
- drivers/clocksource/Kconfig                        |    5 +
- drivers/clocksource/Makefile                       |    1 +
- drivers/clocksource/time-orion.c                   |  143 ++++++++++++++++++++
- 4 files changed, 166 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/timer/marvell,orion-timer.txt
- create mode 100644 drivers/clocksource/time-orion.c
+ arch/arm/mach-kirkwood/Kconfig    |   24 ++++++++++++++++++++++++
+ arch/arm/mach-kirkwood/Makefile   |    4 ++--
+ arch/arm/mach-kirkwood/board-dt.c |   28 +++++++++++++++++-----------
+ 3 files changed, 43 insertions(+), 13 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/timer/marvell,orion-timer.txt b/Documentation/devicetree/bindings/timer/marvell,orion-timer.txt
-new file mode 100644
-index 0000000..62bb826
---- /dev/null
-+++ b/Documentation/devicetree/bindings/timer/marvell,orion-timer.txt
-@@ -0,0 +1,17 @@
-+Marvell Orion SoC timer
-+
-+Required properties:
-+- compatible: shall be "marvell,orion-timer"
-+- reg: base address of the timer register starting with TIMERS CONTROL register
-+- interrupt-parent: phandle of the bridge interrupt controller
-+- interrupts: should contain the interrupts for Timer0 and Timer1
-+- clocks: phandle of timer reference clock (tclk)
-+
-+Example:
-+	timer: timer {
-+		compatible = "marvell,orion-timer";
-+		reg = <0x20300 0x20>;
-+		interrupt-parent = <&bridge_intc>;
-+		interrupts = <1>, <2>;
-+		clocks = <&core_clk 0>;
-+	};
-diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-index f151c6c..2404869 100644
---- a/drivers/clocksource/Kconfig
-+++ b/drivers/clocksource/Kconfig
-@@ -25,6 +25,11 @@ config DW_APB_TIMER_OF
- config ARMADA_370_XP_TIMER
- 	bool
+diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+index 2c95623..f14914f 100644
+--- a/arch/arm/mach-kirkwood/Kconfig
++++ b/arch/arm/mach-kirkwood/Kconfig
+@@ -2,62 +2,75 @@ if ARCH_KIRKWOOD
  
-+config ORION_TIMER
-+	select CLKSRC_OF
-+	select CLKSRC_MMIO
+ menu "Marvell Kirkwood Implementations"
+ 
++config KIRKWOOD_LEGACY
 +	bool
 +
- config SUN4I_TIMER
- 	bool
+ config MACH_D2NET_V2
+ 	bool "LaCie d2 Network v2 NAS Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  LaCie d2 Network v2 NAS.
  
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 8d979c7..d1e8d68 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -15,6 +15,7 @@ obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
- obj-$(CONFIG_CLKSRC_NOMADIK_MTU)	+= nomadik-mtu.o
- obj-$(CONFIG_CLKSRC_DBX500_PRCMU)	+= clksrc-dbx500-prcmu.o
- obj-$(CONFIG_ARMADA_370_XP_TIMER)	+= time-armada-370-xp.o
-+obj-$(CONFIG_ORION_TIMER)	+= time-orion.o
- obj-$(CONFIG_ARCH_BCM2835)	+= bcm2835_timer.o
- obj-$(CONFIG_ARCH_MARCO)	+= timer-marco.o
- obj-$(CONFIG_ARCH_MXS)		+= mxs_timer.o
-diff --git a/drivers/clocksource/time-orion.c b/drivers/clocksource/time-orion.c
-new file mode 100644
-index 0000000..4ecb2f8
---- /dev/null
-+++ b/drivers/clocksource/time-orion.c
-@@ -0,0 +1,143 @@
-+/*
-+ * Marvell Orion SoC timer handling.
-+ *
-+ * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ *
-+ * Timer 0 is used as free-running clocksource, while timer 1 is
-+ * used as clock_event_device.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/bitops.h>
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <asm/sched_clock.h>
-+
-+#define TIMER_CTRL		0x00
-+#define  TIMER0_EN		BIT(0)
-+#define  TIMER0_RELOAD_EN	BIT(1)
-+#define  TIMER1_EN		BIT(2)
-+#define  TIMER1_RELOAD_EN	BIT(3)
-+#define TIMER0_RELOAD		0x10
-+#define TIMER0_VAL		0x14
-+#define TIMER1_RELOAD		0x18
-+#define TIMER1_VAL		0x1c
-+
-+#define ORION_ONESHOT_MIN	1
-+#define ORION_ONESHOT_MAX	0xfffffffe
-+
-+static void __iomem *timer_base;
-+
-+/*
-+ * Free-running clocksource handling.
-+ */
-+static u32 notrace orion_read_sched_clock(void)
-+{
-+	return ~readl(timer_base + TIMER0_VAL);
+ config MACH_DOCKSTAR
+ 	bool "Seagate FreeAgent DockStar"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Seagate FreeAgent DockStar.
+ 
+ config MACH_ESATA_SHEEVAPLUG
+ 	bool "Marvell eSATA SheevaPlug Reference Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell eSATA SheevaPlug Reference Board.
+ 
+ config MACH_GURUPLUG
+ 	bool "Marvell GuruPlug Reference Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell GuruPlug Reference Board.
+ 
+ config MACH_INETSPACE_V2
+ 	bool "LaCie Internet Space v2 NAS Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  LaCie Internet Space v2 NAS.
+ 
+ config MACH_MV88F6281GTW_GE
+ 	bool "Marvell 88F6281 GTW GE Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell 88F6281 GTW GE Board.
+ 
+ config MACH_NET2BIG_V2
+ 	bool "LaCie 2Big Network v2 NAS Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  LaCie 2Big Network v2 NAS.
+ 
+ config MACH_NET5BIG_V2
+ 	bool "LaCie 5Big Network v2 NAS Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  LaCie 5Big Network v2 NAS.
+ 
+ config MACH_NETSPACE_MAX_V2
+ 	bool "LaCie Network Space Max v2 NAS Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  LaCie Network Space Max v2 NAS.
+ 
+ config MACH_NETSPACE_V2
+ 	bool "LaCie Network Space v2 NAS Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  LaCie Network Space v2 NAS.
+@@ -67,6 +80,7 @@ config MACH_OPENRD
+ 
+ config MACH_OPENRD_BASE
+ 	bool "Marvell OpenRD Base Board"
++	select KIRKWOOD_LEGACY
+ 	select MACH_OPENRD
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+@@ -74,6 +88,7 @@ config MACH_OPENRD_BASE
+ 
+ config MACH_OPENRD_CLIENT
+ 	bool "Marvell OpenRD Client Board"
++	select KIRKWOOD_LEGACY
+ 	select MACH_OPENRD
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+@@ -81,6 +96,7 @@ config MACH_OPENRD_CLIENT
+ 
+ config MACH_OPENRD_ULTIMATE
+ 	bool "Marvell OpenRD Ultimate Board"
++	select KIRKWOOD_LEGACY
+ 	select MACH_OPENRD
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+@@ -88,30 +104,35 @@ config MACH_OPENRD_ULTIMATE
+ 
+ config MACH_RD88F6192_NAS
+ 	bool "Marvell RD-88F6192-NAS Reference Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell RD-88F6192-NAS Reference Board.
+ 
+ config MACH_RD88F6281
+ 	bool "Marvell RD-88F6281 Reference Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell RD-88F6281 Reference Board.
+ 
+ config MACH_SHEEVAPLUG
+ 	bool "Marvell SheevaPlug Reference Board"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  Marvell SheevaPlug Reference Board.
+ 
+ config MACH_T5325
+ 	bool "HP t5325 Thin Client"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  HP t5325 Thin Client.
+ 
+ config MACH_TS219
+ 	bool "QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and TS-219P+ Turbo NAS"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  QNAP TS-110, TS-119, TS-119P+, TS-210, TS-219, TS-219P and
+@@ -119,6 +140,7 @@ config MACH_TS219
+ 
+ config MACH_TS41X
+ 	bool "QNAP TS-410, TS-410U, TS-419P, TS-419P+ and TS-419U Turbo NAS"
++	select KIRKWOOD_LEGACY
+ 	help
+ 	  Say 'Y' here if you want your kernel to support the
+ 	  QNAP TS-410, TS-410U, TS-419P, TS-419P+ and TS-419U Turbo
+@@ -129,6 +151,8 @@ comment "Device tree entries"
+ config ARCH_KIRKWOOD_DT
+ 	bool "Marvell Kirkwood Flattened Device Tree"
+ 	select KIRKWOOD_CLK
++	select ORION_IRQCHIP
++	select ORION_TIMER
+ 	select POWER_SUPPLY
+ 	select POWER_RESET
+ 	select POWER_RESET_GPIO
+diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+index 53caf14..91be973 100644
+--- a/arch/arm/mach-kirkwood/Makefile
++++ b/arch/arm/mach-kirkwood/Makefile
+@@ -1,5 +1,5 @@
+-obj-y				+= common.o irq.o pcie.o mpp.o
+-
++obj-y				+= common.o pcie.o
++obj-$(CONFIG_KIRKWOOD_LEGACY)	+= irq.o mpp.o
+ obj-$(CONFIG_MACH_D2NET_V2)		+= d2net_v2-setup.o lacie_v2-common.o
+ obj-$(CONFIG_MACH_DOCKSTAR)		+= dockstar-setup.o
+ obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
+diff --git a/arch/arm/mach-kirkwood/board-dt.c b/arch/arm/mach-kirkwood/board-dt.c
+index 1e4eac3..cec736b 100644
+--- a/arch/arm/mach-kirkwood/board-dt.c
++++ b/arch/arm/mach-kirkwood/board-dt.c
+@@ -15,6 +15,9 @@
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/clk-provider.h>
++#include <linux/clocksource.h>
++#include <linux/dma-mapping.h>
++#include <linux/irqchip.h>
+ #include <linux/kexec.h>
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -49,10 +52,6 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	orion_clkdev_add("1", "pcie",
+ 			 of_clk_get_from_provider(&clkspec));
+ 
+-	clkspec.args[0] = CGC_BIT_SDIO;
+-	orion_clkdev_add(NULL, "mvsdio",
+-			 of_clk_get_from_provider(&clkspec));
+-
+ 	/*
+ 	 * The ethernet interfaces forget the MAC address assigned by
+ 	 * u-boot if the clocks are turned off. Until proper DT support
+@@ -67,10 +66,18 @@ static void __init kirkwood_legacy_clk_init(void)
+ 	clk_prepare_enable(clk);
+ }
+ 
+-static void __init kirkwood_of_clk_init(void)
++static void __init kirkwood_dt_time_init(void)
+ {
+ 	of_clk_init(NULL);
+-	kirkwood_legacy_clk_init();
++	clocksource_of_init();
 +}
 +
-+/*
-+ * Clockevent handling.
-+ */
-+static u32 ticks_per_jiffy;
-+
-+static int orion_clkevt_next_event(unsigned long delta,
-+				   struct clock_event_device *dev)
++static void __init kirkwood_dt_init_early(void)
 +{
-+	u32 u;
-+
-+	/* setup and enable one-shot timer */
-+	writel(delta, timer_base + TIMER1_VAL);
-+	u = readl(timer_base + TIMER_CTRL) & ~TIMER1_RELOAD_EN;
-+	writel(u | TIMER1_EN, timer_base + TIMER_CTRL);
-+
-+	return 0;
-+}
-+
-+static void orion_clkevt_mode(enum clock_event_mode mode,
-+			      struct clock_event_device *dev)
-+{
-+	u32 u;
-+
-+	if (mode == CLOCK_EVT_MODE_PERIODIC) {
-+		/* setup and enable periodic timer at 1/HZ intervals */
-+		writel(ticks_per_jiffy - 1, timer_base + TIMER1_RELOAD);
-+		writel(ticks_per_jiffy - 1, timer_base + TIMER1_VAL);
-+		u = readl(timer_base + TIMER_CTRL);
-+		writel(u | TIMER1_EN | TIMER1_RELOAD_EN,
-+		       timer_base + TIMER_CTRL);
-+	} else {
-+		/* disable timer */
-+		u = readl(timer_base + TIMER_CTRL) & ~TIMER1_EN;
-+		writel(u, timer_base + TIMER_CTRL);
-+	}
-+}
-+
-+static struct clock_event_device orion_clkevt = {
-+	.name		= "orion_event",
-+	.features	= CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC,
-+	.shift		= 32,
-+	.rating		= 300,
-+	.set_next_event	= orion_clkevt_next_event,
-+	.set_mode	= orion_clkevt_mode,
-+};
-+
-+static irqreturn_t orion_clkevt_irq_handler(int irq, void *dev_id)
-+{
-+	orion_clkevt.event_handler(&orion_clkevt);
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction orion_clkevt_irq = {
-+	.name		= "orion_event",
-+	.flags		= IRQF_DISABLED | IRQF_TIMER,
-+	.handler	= orion_clkevt_irq_handler,
-+};
-+
-+static void __init orion_timer_init(struct device_node *np)
-+{
-+	struct clk *clk;
-+	int irq;
-+
-+	/* timer registers are shared with watchdog timer */
-+	timer_base = of_iomap(np, 0);
-+	if (!timer_base)
-+		panic("%s: unable to map resource\n", np->name);
-+
-+	clk = of_clk_get(np, 0);
-+	if (IS_ERR(clk))
-+		panic("%s: unable to get clk\n", np->name);
-+	clk_prepare_enable(clk);
-+
-+	/* we are only interested in timer1 irq */
-+	irq = irq_of_parse_and_map(np, 1);
-+	if (irq <= 0)
-+		panic("%s: unable to parse timer1 irq\n", np->name);
-+
-+	/* setup timer0 as free-running clocksource */
-+	writel(~0, timer_base + TIMER0_VAL);
-+	writel(~0, timer_base + TIMER0_RELOAD);
-+	writel(readl(timer_base + TIMER_CTRL) | TIMER0_EN | TIMER0_RELOAD_EN,
-+	       timer_base + TIMER_CTRL);
-+	clocksource_mmio_init(timer_base + TIMER0_VAL, "orion_clocksource",
-+			      clk_get_rate(clk), 300, 32,
-+			      clocksource_mmio_readl_down);
-+	setup_sched_clock(orion_read_sched_clock, 32, clk_get_rate(clk));
-+
-+	/* setup timer1 as clockevent timer */
-+	if (setup_irq(irq, &orion_clkevt_irq))
-+		panic("%s: unable to setup irq\n", np->name);
-+
-+	ticks_per_jiffy = (clk_get_rate(clk) + HZ/2) / HZ;
-+	orion_clkevt.cpumask = cpumask_of(0);
-+	clockevents_config_and_register(&orion_clkevt, clk_get_rate(clk),
-+					ORION_ONESHOT_MIN, ORION_ONESHOT_MAX);
-+}
-+CLOCKSOURCE_OF_DECLARE(orion_timer, "marvell,orion-timer", orion_timer_init);
++	init_dma_coherent_pool_size(SZ_1M);
++	mvebu_mbus_init("marvell,kirkwood-mbus",
++			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
++			DDR_WINDOW_CPU_BASE, DDR_WINDOW_CPU_SZ);
+ }
+ 
+ static void __init kirkwood_dt_init(void)
+@@ -91,8 +98,8 @@ static void __init kirkwood_dt_init(void)
+ 
+ 	kirkwood_cpufreq_init();
+ 
+-	/* Setup root of clk tree */
+-	kirkwood_of_clk_init();
++	/* setup clocks for legacy devices */
++	kirkwood_legacy_clk_init();
+ 
+ 	kirkwood_cpuidle_init();
+ 
+@@ -117,9 +124,8 @@ static const char * const kirkwood_dt_board_compat[] = {
+ DT_MACHINE_START(KIRKWOOD_DT, "Marvell Kirkwood (Flattened Device Tree)")
+ 	/* Maintainer: Jason Cooper <jason@lakedaemon.net> */
+ 	.map_io		= kirkwood_map_io,
+-	.init_early	= kirkwood_init_early,
+-	.init_irq	= orion_dt_init_irq,
+-	.init_time	= kirkwood_timer_init,
++	.init_early	= kirkwood_dt_init_early,
++	.init_time	= kirkwood_dt_time_init,
+ 	.init_machine	= kirkwood_dt_init,
+ 	.restart	= kirkwood_restart,
+ 	.dt_compat	= kirkwood_dt_board_compat,
 -- 
 1.7.2.5
