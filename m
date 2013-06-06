@@ -1,44 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 6 Jun 2013 10:21:56 +0100
-Subject: [PATCH 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
-In-Reply-To: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
-References: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
-Message-ID: <20130606092156.GL18614@n2100.arm.linux.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 6 Jun 2013 11:27:23 +0200
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <1733666.lHUBcfUXq9@flatron>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1733666.lHUBcfUXq9@flatron>
+Message-ID: <20130606112723.71ddd70c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 02:55:26PM +0800, Peter Chen wrote:
-> @@ -62,9 +63,11 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
->  	writel_relaxed(val, pll->base);
->  
->  	/* Wait for PLL to lock */
-> -	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
-> -		if (time_after(jiffies, timeout))
-> +	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK)) {
-> +		udelay(100);
-> +		if (--count == 0)
->  			return -ETIMEDOUT;
-> +	}
+Dear Tomasz Figa,
 
-This is still buggy in the ways you describe above.
+On Thu, 06 Jun 2013 02:01:14 +0200, Tomasz Figa wrote:
 
-	do {
-		if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-			break;
-		udelay(100);
-	} while (--count);
+> I don't see any other solution here than moving all the Allwinner
+> code to DT (as it has been suggested in this thread several times
+> already), as this is the only hardware description method supported
+> by ARM Linux.
 
-	if (count == 0 && !(readl_relaxed(pll->base) & BM_PLL_LOCK))
-		return -ETIMEDOUT;
+Have you noticed that it is already the case in mainline? My colleague
+Maxime Ripard (Cc'ed) is the maintainer of the mainline Allwinner sunxi
+effort. It already supports a number of boards, has a pinctrl driver, a
+GPIO driver, serial port is working, network is working, I2C is
+working.
 
-Notice - we only return -ETIMEDOUT if the condition we're waiting for
-has not been satisfied _after_ the loop terminates, specifically, if
-this happens during the last 100us of our wait.
+All in mainline, completely Device Tree based.
 
-You can apply the same fix to your original; you don't need to move
-to using udelay() and a counter if you can tolerate some noise in
-the waiting time.
+So isn't this entire discussion completely moot? The mainline support
+for sunxi has already started since 6 months or so, and has been Device
+Tree based from day one.
 
-The lesson here is: if you're waiting for any kind of an event, then
-be very careful how you code the failure path so you don't miss a
-success coincident with the timeout condition becoming true.
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
