@@ -1,116 +1,35 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Jun 2013 14:51:10 -0400
-Subject: [PATCH v2 0/8] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130606185110.GP23859@titan.lakedaemon.net>
+From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
+Date: Thu, 06 Jun 2013 20:51:52 +0200
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1370477958.20454.68.camel@localhost>
+ <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
+Message-ID: <1370544712.31564.11.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+tor 2013-06-06 klockan 13:22 +0100 skrev luke.leighton:
 
-On Thu, Jun 06, 2013 at 06:41:20PM +0200, Thomas Petazzoni wrote:
-> Hello,
-> 
-> This set of patches introduces Message Signaled Interrupt support in
-> the Marvell EBU PCIe driver. It has been successfully tested on the
-> Armada XP GP platform with an Intel e1000e PCIe network card that
-> supports MSI.
-> 
-> This version 2 follows the RFC version sent on March, 26th 2013. This
-> is based on work done by Lior Amsalem <alior@marvell.com>.
-> 
-> The patches do the following:
-> 
->  * Patch 1 comes from Thierry Redding, and adds a minimal msi_chip
->    infrastructure.
-> 
->    This needs to be reviewed/acked by Bjorn Helgaas.
-> 
->  * Patch 2 extends the msi_chip infrastructure with a small registry,
->    so that one driver can register an msi_chip, and another driver can
->    find the msi_chip associated to a particular Device Tree node.
-> 
->    This needs to be reviewed/acked by Bjorn Helgaas.
-> 
->  * Patch 3 makes some not very interesting preparation in the Armada
->    370/XP IRQ controller driver.
-> 
->  * Patch 4 implements the MSI support in the Armada 370/XP IRQ
->    controller driver. It registers an msi_chip using the
->    msi_chip_add() function added in PATCH 2.
-> 
->  * Patch 5 adjust the Armada 370/XP Device Tree to indicate that the
->    MPIC is not only an interrupt-controller, but also an
->    msi-controller.
-> 
->  * Patch 6 adds MSI support in the Marvell PCIe host controller
->    driver. The work to do here is minimal: get a reference to the
->    msi-parent controller thanks to msi_chip_find_by_of_node(), and
->    link it to the pci_bus structure before the bus gets enumerated.
-> 
->    This needs to be reviewed/acked by Bjorn Helgaas.
-> 
->  * Patch 7 tunes Kconfig to indicate that Armada 370/XP supports MSI.
-> 
->  * Patch 8 adjusts the Armada 370/XP Device Tree to add the msi-parent
->    properties in the PCIe controller nodes.
-> 
-> This set of patches currently applies on top of the current "for-next"
-> branch of Jason Cooper's repository.
-> 
-> The Device Tree binding documentation updates will be added once the
-> general approach is agreed on.
-> 
-> Thanks,
-> 
-> Thomas
-> 
-> Thierry Reding (1):
->   PCI: Introduce new MSI chip infrastructure
-> 
-> Thomas Petazzoni (7):
->   PCI: Add registry of MSI chips
->   irqchip: armada-370-xp: properly request resources
->   irqchip: armada-370-xp: implement MSI support
->   arm: mvebu: the MPIC now provides MSI controller features
->   pci: mvebu: add support for MSI
->   arm: mvebu: indicate that this platform supports MSI
->   arm: mvebu: link PCIe controllers to the MSI controller
-> 
+>  idea: hook into devicetree gpio functions to allow script-fex gpio
+functions to gain access in a separate module?  that sort of thing.
 
-Is there a reason why the following breakdown wouldn't work?
+No. Drop FEX from the kernel, use DT. There is no reason why the kernel
+shold care about the FEX format.
 
->  arch/arm/boot/dts/armada-370-xp.dtsi     |   1 +
->  arch/arm/boot/dts/armada-370.dtsi        |   1 +
->  arch/arm/boot/dts/armada-xp-mv78230.dtsi |   1 +
->  arch/arm/boot/dts/armada-xp-mv78260.dtsi |   1 +
->  arch/arm/boot/dts/armada-xp-mv78460.dtsi |   1 +
+Translate from FEX to DT where needed in the "firmware" image build
+process to allow Allwinner to keep the FEX as hardware description to
+the ODMs.
 
-through mvebu/arm-soc
-
->  arch/arm/mach-mvebu/Kconfig              |   1 +
-
-through mvebu/arm-soc after the other three have landed (v3.11-rc1)
-
->  drivers/irqchip/irq-armada-370-xp.c      | 186 ++++++++++++++++++++++++++++++-
-
-through tglx
-
->  drivers/pci/host/pci-mvebu.c             |  21 ++++
->  drivers/pci/msi.c                        |  59 +++++++++-
->  drivers/pci/probe.c                      |   1 +
->  include/linux/msi.h                      |  22 ++++
->  include/linux/pci.h                      |   1 +
-
-through Bjorn
-
-I think we should view the manner in which we brought in the initial
-mvebu-pcie series (all through arm-soc) as the exception, not the rule.
-I have no problem, and in fact, prefer to have them reviewed as a
-series, but if at *all* possible, the series should be structured so
-relevant maintainers can pick up the relevant patches into their trees.
-
-thx,
-
-Jason.
+Regards
+Henrik
