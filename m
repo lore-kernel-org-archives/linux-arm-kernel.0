@@ -1,139 +1,120 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 06 Jun 2013 18:23:33 +0200
-Subject: [PATCHv7 02/11] clocksource: add generic dummy timer driver
-In-Reply-To: <1370291642-13259-3-git-send-email-sboyd@codeaurora.org>
-References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
- <1370291642-13259-3-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51B0B785.5080707@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Jun 2013 18:26:19 +0200
+Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
+In-Reply-To: <175CCF5F49938B4D99B2E3EF7F558EBE3B3BA09137@SC-VEXCH4.marvell.com>
+References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
+ <1726105.oKcjXShr89@wuerfel>
+ <175CCF5F49938B4D99B2E3EF7F558EBE3B3BA09137@SC-VEXCH4.marvell.com>
+Message-ID: <201306061826.19551.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/03/2013 10:33 PM, Stephen Boyd wrote:
-> From: Mark Rutland <mark.rutland@arm.com>
+On Thursday 06 June 2013, Neil Zhang wrote:
+> > > diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
+> > > index ebdda83..0955191 100644
+> > > --- a/arch/arm/mach-mmp/Kconfig
+> > > +++ b/arch/arm/mach-mmp/Kconfig
+> > > @@ -107,6 +107,16 @@ config MACH_MMP2_DT
+> > >  	  Include support for Marvell MMP2 based platforms using
+> > >  	  the device tree.
+> > >
+> > > +config MACH_MMPX_DT
+> > > +	bool "Support no-PJ/PJ4(ARMv7) platforms from device tree"
+> > > +	depends on !CPU_MOHAWK && !CPU_PJ4
+> > > +	select CPU_PXA988
+> > > +	select USE_OF
+> > > +	select PINCTRL
+> > > +	select PINCTRL_SINGLE
+> > 
+> > Why would this be mutually exclusive with PJ4? Cortex-A9 and PJ4 are both
+> > ARMv7 based, so we should be able to have them in the same kernel.
 > 
-> Several architectures have a dummy timer driver tightly coupled with
-> their broadcast code to support machines without cpu-local timers (or
-> where there is a lack of driver support).
+> The MACH_MMPX_DT here is for standard ARM core based SoC.
+> But PJ4 is modified by Marvell, which includes IWMMXT.
+
+That should not stop us from supporting them with the same kernel.
+We can already build a kernel that will work with IWMMXT on
+ArmadaXP (PJ4B) and Calxeda Highbank (Cortex-A9) for instance.
+
+> > __initdata = {
+> > >  		.virtual	= (unsigned long)AXI_VIRT_BASE,
+> > >  		.length		= AXI_PHYS_SIZE,
+> > >  		.type		= MT_DEVICE,
+> > > -	},
+> > > +	}, {
+> > > +		.pfn		= __phys_to_pfn(MMP_CORE_PERIPH_PHYS_BASE),
+> > > +		.virtual	= (unsigned long)MMP_CORE_PERIPH_VIRT_BASE,
+> > > +		.length		= MMP_CORE_PERIPH_PHYS_SIZE,
+> > > +		.type		= MT_DEVICE,
+> > > +	}
+> > >  };
+> > >
+> > >  void __init mmp_map_io(void)
+> > 
+> > What is this needed for?
 > 
-> Since 12ad100046: "clockevents: Add generic timer broadcast function"
-> it's been possible to write broadcast-capable timer drivers decoupled
-> from the broadcast mechanism. We can use this functionality to implement
-> a generic dummy timer driver that can be shared by all architectures
-> with generic tick broadcast (ARCH_HAS_TICK_BROADCAST).
+> This function is used to static map the device registers.
+
+I understand what map_io does. Why do you need a static mapping?
+
+> > > +/* PXA988 */
+> > > +static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst
+> > = {
+> > > +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0",
+> > NULL),
+> > > +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1",
+> > NULL),
+> > > +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000, "pxa2xx-uart.2",
+> > NULL),
+> > > +	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0",
+> > NULL),
+> > > +	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1",
+> > NULL),
+> > > +	OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
+> > > +	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
+> > > +	{}
+> > > +};
+> > 
+> > Why do you need auxdata?
 > 
-> This patch implements a generic dummy timer using this facility.
+> Two reasons:
+> 1. some of the device still need platform data at this time.
+
+None of the ones above do apparently.
+
+> 2. we use device name as clk name.
+> Will change it later, but need some time.
+
+If you have no platform_data, I think you should modify the clkdev
+lookup table to refer to the DT based names so you no longer have
+to pass auxdata.
+
+The long term solution of course is to describe the clocks in the
+device tree as well.
+
+> > > +void __init pxa988_dt_init_timer(void) {
+> > > +	extern void __init mmp_dt_init_timer(void);
+> > 
+> > You should never put 'extern' declarations into a .c file.
+> > 
+> > > +	/*
+> > > +	 * Is is a SOC timer, and will be used for broadcasting
+> > > +	 * when local timers are disabled.
+> > > +	 */
+> > > +	mmp_dt_init_timer();
+> > > +
+> > > +	clocksource_of_init();
+> > > +}
+> > 
+> > Please just change the mmp_dt_init_timer function to use
+> > CLOCKSOURCE_OF_DECLARE(), and if possible move the file to
+> > drivers/clocksource.
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>,
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> [sboyd: Make percpu data static, use __this_cpu_ptr(), move to
->         early_initcall to properly register on each CPU, only
-> 	register if more than one CPU possible]
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+> Yes, we will change to use CLOCKSOURCE_OF_DECLARE later.
+> But it need time, so let's keep it at this time.
 
-Except the missing first letter capitalization, in the patch description
-'add' => 'Add'.
+It should be a trivial change, I'm not asking you to put the clocks
+in the DT right away, just change the way that this function gets
+called.
 
-Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-
->  drivers/clocksource/Makefile      |  1 +
->  drivers/clocksource/dummy_timer.c | 69 +++++++++++++++++++++++++++++++++++++++
->  2 files changed, 70 insertions(+)
->  create mode 100644 drivers/clocksource/dummy_timer.c
-> 
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index 8d979c7..1a17d76 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -29,3 +29,4 @@ obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
->  
->  obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
->  obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
-> +obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
-> diff --git a/drivers/clocksource/dummy_timer.c b/drivers/clocksource/dummy_timer.c
-> new file mode 100644
-> index 0000000..1f55f96
-> --- /dev/null
-> +++ b/drivers/clocksource/dummy_timer.c
-> @@ -0,0 +1,69 @@
-> +/*
-> + *  linux/drivers/clocksource/dummy_timer.c
-> + *
-> + *  Copyright (C) 2013 ARM Ltd.
-> + *  All Rights Reserved
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +#include <linux/clockchips.h>
-> +#include <linux/cpu.h>
-> +#include <linux/init.h>
-> +#include <linux/percpu.h>
-> +#include <linux/cpumask.h>
-> +
-> +static DEFINE_PER_CPU(struct clock_event_device, dummy_timer_evt);
-> +
-> +static void dummy_timer_set_mode(enum clock_event_mode mode,
-> +			   struct clock_event_device *evt)
-> +{
-> +	/*
-> +	 * Core clockevents code will call this when exchanging timer devices.
-> +	 * We don't need to do anything here.
-> +	 */
-> +}
-> +
-> +static void __cpuinit dummy_timer_setup(void)
-> +{
-> +	int cpu = smp_processor_id();
-> +	struct clock_event_device *evt = __this_cpu_ptr(&dummy_timer_evt);
-> +
-> +	evt->name	= "dummy_timer";
-> +	evt->features	= CLOCK_EVT_FEAT_PERIODIC |
-> +			  CLOCK_EVT_FEAT_ONESHOT |
-> +			  CLOCK_EVT_FEAT_DUMMY;
-> +	evt->rating	= 100;
-> +	evt->set_mode	= dummy_timer_set_mode;
-> +	evt->cpumask	= cpumask_of(cpu);
-> +
-> +	clockevents_register_device(evt);
-> +}
-> +
-> +static int __cpuinit dummy_timer_cpu_notify(struct notifier_block *self,
-> +				      unsigned long action, void *hcpu)
-> +{
-> +	if ((action & ~CPU_TASKS_FROZEN) == CPU_STARTING)
-> +		dummy_timer_setup();
-> +
-> +	return NOTIFY_OK;
-> +}
-> +
-> +static struct notifier_block dummy_timer_cpu_nb __cpuinitdata = {
-> +	.notifier_call = dummy_timer_cpu_notify,
-> +};
-> +
-> +static int __init dummy_timer_register(void)
-> +{
-> +	int err = register_cpu_notifier(&dummy_timer_cpu_nb);
-> +	if (err)
-> +		return err;
-> +
-> +	/* We won't get a call on the boot CPU, so register immediately */
-> +	if (num_possible_cpus() > 1)
-> +		dummy_timer_setup();
-> +
-> +	return 0;
-> +}
-> +early_initcall(dummy_timer_register);
-> 
-
-
--- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	Arnd
