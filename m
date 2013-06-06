@@ -1,279 +1,66 @@
-From: zhangwm@marvell.com (Neil Zhang)
-Date: Wed, 5 Jun 2013 19:48:16 -0700
-Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
-In-Reply-To: <1726105.oKcjXShr89@wuerfel>
-References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
- <1369969115-4279-2-git-send-email-zhangwm@marvell.com>
- <1726105.oKcjXShr89@wuerfel>
-Message-ID: <175CCF5F49938B4D99B2E3EF7F558EBE3B3BA09137@SC-VEXCH4.marvell.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 6 Jun 2013 12:13:17 +0900
+Subject: [PATCH 01/02] ARM: shmobile: Let romImage rely on default ATAGS
+In-Reply-To: <201306051351.14978.arnd@arndb.de>
+References: <20130605075514.17653.77135.sendpatchset@w520>
+ <20130605075522.17653.20769.sendpatchset@w520>
+ <201306051351.14978.arnd@arndb.de>
+Message-ID: <CANqRtoQZWmyMS6w2n9uW1-92-DOZcBst7gpCMrAC7GE9EwZUuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: 2013?5?31? 19:25
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Neil Zhang; haojian.zhuang at gmail.com; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
-> 
-> On Friday 31 May 2013 10:58:35 Neil Zhang wrote:
-> > bring up pxa988 with device tree support.
-> >
-> > Change-Id: I6fc869b7d5ff8dc6e4eb0042a89429200f7a9fb1
-> 
-> Please don't post silly extra headers like that.
+On Wed, Jun 5, 2013 at 8:51 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 05 June 2013, Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> Remove the ATAGS data structure from head-shmobile.S
+>> since a default ATAGS is already provided by the code
+>> in arch/arm/kernel/atags_parser.c. Passing a NULL as
+>> ATAGS is valid. For actual hardware specific setup
+>> the fixup callback in the board code may be used.
+>>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>
+> Makes sense to me, but it's not really my area of expertise.
+> Maybe Russell has some input on this.
+>
+> What about the rest of head-shmobile.S? If we ignore the mmcif boot
+> code, can we boot an shmobile system using just the regular head.S
+> code once we get to a multiplatform image with shmobile?
 
-Sorry for the noise, will remove it.
+There are basically 4 types of zImages for mach-shmobile:
 
-> 
-> > Signed-off-by: Neil Zhang <zhangwm@marvell.com>
-> 
-> A couple of comments on the DT structure:
-> 
-> > +	gic: interrupt-controller at d1dfe100 {
-> > +		compatible = "arm,cortex-a9-gic";
-> > +		interrupt-controller;
-> > +		#interrupt-cells = <3>;
-> > +		reg = <0xd1dff000 0x1000>,
-> > +		      <0xd1dfe100 0x0100>;
-> > +	};
-> > +
-> > +	L2: l2-cache-controller at d1dfb000 {
-> > +		compatible = "arm,pl310-cache";
-> > +		reg = <0xd1dfb000 0x1000>;
-> > +		arm,data-latency = <2 1 1>;
-> > +		arm,tag-latency = <2 1 1>;
-> > +		arm,pwr-dynamic-clk-gating;
-> > +		arm,pwr-standby-mode;
-> > +		cache-unified;
-> > +		cache-level = <2>;
-> > +	};
-> > +
-> > +	local-timer at d1dfe600 {
-> > +		compatible = "arm,cortex-a9-twd-timer";
-> > +		reg = <0xd1dfe600 0x20>;
-> > +		interrupts = <1 13 0x304>;
-> > +	};
-> 
-> Why are these all top-level devices, rather than part of the 'soc' node?
+1) Regular zImage/uImage - DTB and ATAGS are passed from boot loader -
+head-shmobile.S is not used.
 
-Yes, we can move it as child of soc.
+2) Boot directly from MASK ROM from MMCIF/SDHI - head-shmobile.S loads
+via MMC, sets up memory via mach/zboot.h, set ATAGS to NULL and passes
+MACH_TYPE to kernel, ->fixup() sets up the actual memory bank
+information.
 
-> 
-> > +	soc {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		compatible = "simple-bus";
-> > +		interrupt-parent = <&gic>;
-> > +		ranges;
-> > +
-> > +		axi at d4200000 {	/* AXI */
-> > +			compatible = "mrvl,axi-bus", "simple-bus";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			reg = <0xd4200000 0x00200000>;
-> > +			ranges;
-> > +
-> > +			intc: wakeupgen at d4282000 {
-> > +				compatible = "mrvl,mmp-intc";
-> > +				reg = <0xd4282000 0x1000>;
-> > +				mrvl,intc-wakeup = <0x114 0x3
-> > +						    0x144 0x3>;
-> > +			};
-> > +
-> > +		};
-> 
-> What is a 'mrvl,axi-bus'? Is that different from ARM's AXI bus?
-> 
-> The documented vendor prefix for Marvell is 'marvell', not 'mrvl', please be
-> consistent with that.
-> 
-> What is the purpose of the 'reg' property in the axi bus? I notice that it
-> overlaps with its own children, wich seens very strange.
-> Maybe you meant this:
-> 
-> 	axi {
-> 		ranges = <0xd4200000 0xd4200000 0x00200000>;
-> 		...
-> 	};
-> 
-> > +		apb at d4000000 {	/* APB */
-> > +			compatible = "mrvl,apb-bus", "simple-bus";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			reg = <0xd4000000 0x00200000>;
-> > +			ranges;
-> 
-> Same comments apply here.
-> 
-Thanks for the comments here, will modify it later.
+3) Boot directly from NOR Flash - head-shmobile.S includes memory
+setup code from mach/zboot.h, passes MACH_TYPE to kernel running in
+flash.
 
-> > diff --git a/arch/arm/mach-mmp/Kconfig b/arch/arm/mach-mmp/Kconfig
-> > index ebdda83..0955191 100644
-> > --- a/arch/arm/mach-mmp/Kconfig
-> > +++ b/arch/arm/mach-mmp/Kconfig
-> > @@ -107,6 +107,16 @@ config MACH_MMP2_DT
-> >  	  Include support for Marvell MMP2 based platforms using
-> >  	  the device tree.
-> >
-> > +config MACH_MMPX_DT
-> > +	bool "Support no-PJ/PJ4(ARMv7) platforms from device tree"
-> > +	depends on !CPU_MOHAWK && !CPU_PJ4
-> > +	select CPU_PXA988
-> > +	select USE_OF
-> > +	select PINCTRL
-> > +	select PINCTRL_SINGLE
-> 
-> Why would this be mutually exclusive with PJ4? Cortex-A9 and PJ4 are both
-> ARMv7 based, so we should be able to have them in the same kernel.
+4) Boot directly from MASK ROM via USB gadget - (r_usb_boot [1] runs
+on your PC and loads to internal SRAM) - starts same image as 3)
+above.
 
-The MACH_MMPX_DT here is for standard ARM core based SoC.
-But PJ4 is modified by Marvell, which includes IWMMXT.
- 
-> 
-> > +	help
-> > +	  Include support for Marvell MMP2 based platforms using
-> > +	  the device tree.
-> >  endmenu
-> 
-> You should probably change the help texts to say different things here, e.g.
-> list the models supported under these.
+To answer your question about multiplatform images, I believe  the
+majority case 1) above will run just fine.
 
-Thanks for the remind, will modify it later.
+Regarding 2) -> 4), those are currently very specific to a certain
+platform and they start directly from the reset vector which would
+require them to either keep the board info hard-coded in the image or
+somehow auto-detect board. From a hardware point of view I don' t
+think there is any simple way to auto detect the boards in
+mach-shmobile I'm afraid, so it looks to me that 2) -> 4) need to stay
+board-specific.
 
-> 
-> > diff --git a/arch/arm/mach-mmp/common.c
-> b/arch/arm/mach-mmp/common.c
-> > index 9292b79..0c621bc 100644
-> > --- a/arch/arm/mach-mmp/common.c
-> > +++ b/arch/arm/mach-mmp/common.c
-> > @@ -11,6 +11,10 @@
-> >  #include <linux/init.h>
-> >  #include <linux/kernel.h>
-> >  #include <linux/module.h>
-> > +#include <linux/of.h>
-> > +#include <linux/io.h>
-> > +#include <linux/ioport.h>
-> > +#include <linux/of_address.h>
-> >
-> >  #include <asm/page.h>
-> >  #include <asm/mach/map.h>
-> > @@ -36,7 +40,12 @@ static struct map_desc standard_io_desc[]
-> __initdata = {
-> >  		.virtual	= (unsigned long)AXI_VIRT_BASE,
-> >  		.length		= AXI_PHYS_SIZE,
-> >  		.type		= MT_DEVICE,
-> > -	},
-> > +	}, {
-> > +		.pfn		= __phys_to_pfn(MMP_CORE_PERIPH_PHYS_BASE),
-> > +		.virtual	= (unsigned long)MMP_CORE_PERIPH_VIRT_BASE,
-> > +		.length		= MMP_CORE_PERIPH_PHYS_SIZE,
-> > +		.type		= MT_DEVICE,
-> > +	}
-> >  };
-> >
-> >  void __init mmp_map_io(void)
-> 
-> What is this needed for?
+Cheers,
 
-This function is used to static map the device registers.
+/ magnus
 
-> 
-> > +/* PXA988 */
-> > +static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst
-> = {
-> > +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0",
-> NULL),
-> > +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1",
-> NULL),
-> > +	OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000, "pxa2xx-uart.2",
-> NULL),
-> > +	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0",
-> NULL),
-> > +	OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1",
-> NULL),
-> > +	OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
-> > +	OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
-> > +	{}
-> > +};
-> 
-> Why do you need auxdata?
-
-Two reasons:
-1. some of the device still need platform data at this time.
-2. we use device name as clk name.
-Will change it later, but need some time.
-
-> 
-> > +void __init pxa988_dt_init_timer(void) {
-> > +	extern void __init mmp_dt_init_timer(void);
-> 
-> You should never put 'extern' declarations into a .c file.
-> 
-> > +	/*
-> > +	 * Is is a SOC timer, and will be used for broadcasting
-> > +	 * when local timers are disabled.
-> > +	 */
-> > +	mmp_dt_init_timer();
-> > +
-> > +	clocksource_of_init();
-> > +}
-> 
-> Please just change the mmp_dt_init_timer function to use
-> CLOCKSOURCE_OF_DECLARE(), and if possible move the file to
-> drivers/clocksource.
-
-Yes, we will change to use CLOCKSOURCE_OF_DECLARE later.
-But it need time, so let's keep it at this time.
-
-> 
-> > +static const char *pxa988_dt_board_compat[] __initdata = {
-> > +	"mrvl,pxa988-dkb",
-> > +	NULL,
-> > +};
-> > +
-> > +DT_MACHINE_START(PXA988_DT, "Marvell PXA988 (Device Tree
-> Support)")
-> > +	.smp		= smp_ops(mmp_smp_ops),
-> > +	.map_io		= mmp_map_io,
-> > +	.init_irq	= irqchip_init,
-> 
-> You can leave out the init_irq, it's implicit.
-> 
-> > +	.init_time	= pxa988_dt_init_timer,
-> > +	.init_machine	= pxa988_dt_init_machine,
-> > +	.dt_compat	= pxa988_dt_board_compat,
-> > +MACHINE_END
-> 
-> 
-> > +
-> > +static int __init mmp_entry_vector_init(void) {
-> > +	int cpu;
-> > +
-> > +	/* We will reset from DDR directly by default */
-> > +	writel(__pa(mmp_cpu_reset_entry), CIU_CA9_WARM_RESET_VECTOR);
-> > +
-> > +	for (cpu = 1; cpu < CONFIG_NR_CPUS; cpu++)
-> > +		mmp_set_entry_vector(cpu, __pa(mmp_secondary_startup)); }
-> > +
-> > +early_initcall(mmp_entry_vector_init);
-> 
-> You need to check which machine you are running on here. Best just move
-> the call into one of the init functions of the machine descriptor, e.g.
-> init_machine or init_late.
-
-Thanks for the remind, will use init_early for it.
-
-> 
-> CONFIG_NR_CPUS is probably the wrong constant to use here, it does not
-> have to match the physically present CPU cores.
-
-Thanks, will use nr_cpu_ids here.
-
-> 
-> 	Arnd
-
-Best Regards,
-Neil Zhang
+[1] http://marc.info/?l=linux-sh&m=131711553515485
