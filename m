@@ -1,115 +1,159 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  6 Jun 2013 11:30:44 +0200
-Subject: [PATCH v3 2/2] ARM PJ4B: Add support for errata 4611
+Date: Thu,  6 Jun 2013 11:30:43 +0200
+Subject: [PATCH v3 1/2] ARM PJ4B: Add support for errata 4742
 In-Reply-To: <1370511044-31900-1-git-send-email-gregory.clement@free-electrons.com>
 References: <1370511044-31900-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1370511044-31900-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1370511044-31900-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lior Amsalem <alior@marvell.com>
+This commit fixes the regression on Armada 370 (the kernal hang during
+boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
+TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
 
-A CP15 clean operation can result in a dead lock state if it is hit by
-an incoming snoop event. The fix to this issue is the following:
-before any CP15 clean type operation in Cache Coherency mode, issue a
-Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
+When coming out of either a Wait for Interrupt (WFI) or a Wait for
+Event (WFE) IDLE states, a specific timing sensitivity exists between
+the retiring WFI/WFE instructions and the newly issued subsequent
+instructions. This sensitivity can result in a CPU hang scenario.  The
+workaround is to insert either a Data Synchronization Barrier (DSB) or
+Data Memory Barrier (DMB) command immediately after the WFI/WFE
 instruction.
 
-[gregory.clement at free-electrons.com:use save/restore IRQ macros]
-[gregory.clement at free-electrons.com:add errata description in changelog]
-[gregory.clement at free-electrons.com:make this errata depend on Armada 370]
-Signed-off-by: Lior Amsalem <alior@marvell.com>
+This commit was based on the work of Lior Amsalem, but heavily
+modified to apply the errata fix dynamically according to the
+processor type thanks to the suggestions of Russell King and Nicolas
+Pitre.
+
+This commit fixes also the ID and mask for the PJ4B which was too
+restrictive and didn't match the CPU of the Armada 370 SoC.
+
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/Kconfig                |  9 +++++++++
- arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
- arch/arm/mm/proc-macros.S       | 11 +++++++++++
- 3 files changed, 42 insertions(+)
+ arch/arm/Kconfig                 | 13 +++++++++++++
+ arch/arm/include/asm/glue-proc.h |  9 +++++++++
+ arch/arm/mm/proc-v7.S            | 38 +++++++++++++++++++++++++++++++++-----
+ 3 files changed, 55 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 95cbe9d..3126557 100644
+index 49d993c..95cbe9d 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -1087,6 +1087,15 @@ if !MMU
+@@ -1087,6 +1087,19 @@ if !MMU
  source "arch/arm/Kconfig-nommu"
  endif
  
-+config PJ4B_ERRATA_4611
-+	bool "PJ4B Errata 4611: A Deadlock can Occur if a CP15 Clean/Clean and Invalidate Operation is Hit By a Snoop Event"
++config PJ4B_ERRATA_4742
++	bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
 +	depends on CPU_PJ4B && MACH_ARMADA_370
 +	help
-+	  A CP15 clean operation can result in a dead lock state if it is hit
-+	  by an incoming snoop event.  Workaround: Before any CP15 clean type
-+	  operation in Cache Coherency mode, issue a Data Memory Barrier (DMB)
-+	  or a Data Synchronization Barrier (DSB) instruction.
++	  When coming out of either a Wait for Interrupt (WFI) or a Wait for
++	  Event (WFE) IDLE states, a specific timing sensitivity exists between
++	  the retiring WFI/WFE instructions and the newly issued subsequent
++	  instructions.  This sensitivity can result in a CPU hang scenario.
++	  Workaround:
++	  The software must insert either a Data Synchronization Barrier (DSB)
++	  or Data Memory Barrier (DMB) command immediately after the WFI/WFE
++	  instruction
 +
- config PJ4B_ERRATA_4742
- 	bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
- 	depends on CPU_PJ4B && MACH_ARMADA_370
-diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
-index a3625d1..f9129e4 100644
---- a/arch/arm/include/asm/tlbflush.h
-+++ b/arch/arm/include/asm/tlbflush.h
-@@ -475,7 +475,18 @@ static inline void flush_pmd_entry(void *pmd)
- {
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	unsigned long flags;
-+	raw_local_irq_save(flags);
-+	dmb();
-+#endif
-+
- 	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	raw_local_irq_restore(flags);
-+#endif
-+
- 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
- 
- 	if (tlb_flag(TLB_WB))
-@@ -486,7 +497,18 @@ static inline void clean_pmd_entry(void *pmd)
- {
- 	const unsigned int __tlb_flag = __cpu_tlb_flags;
- 
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	unsigned long flags;
-+	raw_local_irq_save(flags);
-+	dmb();
-+#endif
-+
- 	tlb_op(TLB_DCLEAN, "c7, c10, 1	@ flush_pmd", pmd);
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	raw_local_irq_restore(flags);
-+#endif
-+
- 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
- }
- 
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index f9a0aa7..2eba2b7 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -178,7 +178,18 @@
+ config ARM_ERRATA_326103
+ 	bool "ARM errata: FSR write bit incorrect on a SWP to read-only memory"
+ 	depends on CPU_V6
+diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
+index ac1dd54..8017e94 100644
+--- a/arch/arm/include/asm/glue-proc.h
++++ b/arch/arm/include/asm/glue-proc.h
+@@ -230,6 +230,15 @@
+ # endif
  #endif
  
- 	str	r3, [r0]
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+        save_and_disable_irqs_notrace r2	@ Disable interrupts
-+	dmb					@ ensure ordering with previous memory accesses
++#ifdef CONFIG_CPU_PJ4B
++# ifdef CPU_NAME
++#  undef  MULTI_CPU
++#  define MULTI_CPU
++# else
++#  define CPU_NAME cpu_pj4b
++# endif
 +#endif
 +
- 	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
-+
-+#ifdef CONFIG_PJ4B_ERRATA_4611
-+	restore_irqs_notrace r2			@ Restore interrupts
-+	dsb					@ drain write buffer
+ #ifndef MULTI_CPU
+ #define cpu_proc_init			__glue(CPU_NAME,_proc_init)
+ #define cpu_proc_fin			__glue(CPU_NAME,_proc_fin)
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 2c73a73..4a4df33 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -342,6 +342,33 @@ __v7_setup:
+ 	mov	pc, lr				@ return to head.S:__ret
+ ENDPROC(__v7_setup)
+ 
++#ifdef CONFIG_CPU_PJ4B
++.macro globl_equ x, y
++	.globl	\x
++	.equ	\x, \y
++.endm
++	globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
++	globl_equ	cpu_pj4b_set_pte_ext,	cpu_v7_set_pte_ext
++	globl_equ	cpu_pj4b_proc_init,	cpu_v7_proc_init
++	globl_equ	cpu_pj4b_proc_fin, 	cpu_v7_proc_fin
++	globl_equ	cpu_pj4b_reset,	   	cpu_v7_reset
++#ifdef CONFIG_PJ4B_ERRATA_4742
++ENTRY(cpu_pj4b_do_idle)
++	dsb					@ WFI may enter a low-power mode
++	wfi
++	dsb					@barrier
++	mov	pc, lr
++ENDPROC(cpu_pj4b_do_idle)
++#else
++	globl_equ	cpu_pj4b_do_idle,  	cpu_v7_do_idle
 +#endif
- 	.endm
++	globl_equ	cpu_pj4b_dcache_clean_area,	cpu_v7_dcache_clean_area
++	globl_equ	cpu_pj4b_do_suspend,	cpu_v7_do_suspend
++	globl_equ	cpu_pj4b_do_resume,	cpu_v7_do_resume
++	globl_equ	cpu_pj4b_suspend_size,	cpu_v7_suspend_size
++
++#endif
++
+ 	.align	2
+ __v7_setup_stack:
+ 	.space	4 * 11				@ 11 registers
+@@ -350,6 +377,7 @@ __v7_setup_stack:
  
+ 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
+ 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
++	define_processor_functions pj4b, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
  
+ 	.section ".rodata"
+ 
+@@ -362,7 +390,7 @@ __v7_setup_stack:
+ 	/*
+ 	 * Standard v7 proc info content
+ 	 */
+-.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
++.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0, proc_fns = v7_processor_functions
+ 	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
+ 			PMD_SECT_AF | PMD_FLAGS_SMP | \mm_mmuflags)
+ 	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
+@@ -375,7 +403,7 @@ __v7_setup_stack:
+ 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \
+ 		HWCAP_EDSP | HWCAP_TLS | \hwcaps
+ 	.long	cpu_v7_name
+-	.long	v7_processor_functions
++	.long	\proc_fns
+ 	.long	v7wbi_tlb_fns
+ 	.long	v6_user_fns
+ 	.long	v7_cache_fns
+@@ -409,9 +437,9 @@ __v7_ca9mp_proc_info:
+ 	 */
+ 	.type   __v7_pj4b_proc_info, #object
+ __v7_pj4b_proc_info:
+-	.long	0x562f5840
+-	.long	0xfffffff0
+-	__v7_proc __v7_pj4b_setup
++	.long   0x560f5800
++	.long	0xff0fff00
++	__v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions
+ 	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+ 
+ 	/*
 -- 
 1.8.1.2
