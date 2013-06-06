@@ -1,37 +1,147 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 06 Jun 2013 16:23:58 -0700 (PDT)
-Subject: [PATCH 0/2 v4] net/macb: RX path enhancement
-In-Reply-To: <cover.1370418770.git.nicolas.ferre@atmel.com>
-References: <cover.1370418770.git.nicolas.ferre@atmel.com>
-Message-ID: <20130606.162358.506642916485125446.davem@davemloft.net>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu,  6 Jun 2013 16:27:33 -0700
+Subject: [PATCH v2 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ line
+In-Reply-To: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+Message-ID: <1370561253-15523-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nicolas Ferre <nicolas.ferre@atmel.com>
-Date: Wed, 5 Jun 2013 09:57:10 +0200
+On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+SYS_NIRQ line on OMAP.  Add another DTS include file
+(twl4030_omap3_mux.dtsi) for boards that hook up the twl4030 this way
+to include.
 
-> Here is the patch series for modifying the RX path in macb driver.
-> This change applies on GEM variant of the Cadence IP and introduces
-> function pointers to match the path to the proper adapter. The move
-> to RX buffers adapted to MTU and that can be DMAed directly in SKB
-> is done in two steps but can be merged in a single patch.
-> 
-> v4: - rebased on top of net-next
->     - removed the last patch of the series which needs rework
-> 
-> v3: - rebased on top of net-next (containing recently added
->       net/macb: fix ISR clear-on-write behavior only for some SoC)
->     - added the ___cacheline_aligned_in_smp qualifier to napi field
->       following Ben Hutchings' advice
-> 
-> v2: - gave up the idea of using non-coherent memory for
->       rx buffers
->     - addition of the struct macb layout optimization
+This allows RTC wake from off-mode to work again on OMAP3-based
+platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+3530/Overo, 3730/Overo-STORM.
 
-Applied to net-next but I had to fix the printf format strings
-used in macb_init_rx_buffer_size().
+Special thanks to Florian Vaussard for suggesting use of preprocessor
+feature.
 
-netdev->mtu is "unsigned int" so "%u"
-bp->rx_buffer_size is "size_t" so "%Zu"
+Cc: Florian Vaussard <florian.vaussard@epfl.ch>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+v2: Updated to change board files instead of twl4030 file.
 
-otherwise we get build warnings.
+ arch/arm/boot/dts/omap3-beagle-xm.dts    |  1 +
+ arch/arm/boot/dts/omap3-beagle.dts       |  1 +
+ arch/arm/boot/dts/omap3-devkit8000.dts   |  1 +
+ arch/arm/boot/dts/omap3-evm.dts          |  1 +
+ arch/arm/boot/dts/omap3-igep.dtsi        |  1 +
+ arch/arm/boot/dts/omap3-overo.dtsi       |  1 +
+ arch/arm/boot/dts/omap3430-sdp.dts       |  1 +
+ arch/arm/boot/dts/twl4030_omap3_mux.dtsi | 17 +++++++++++++++++
+ 8 files changed, 24 insertions(+)
+ create mode 100644 arch/arm/boot/dts/twl4030_omap3_mux.dtsi
+
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index ad17b6b..1afb563 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -96,6 +96,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3_mux.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index eb7e02a..d5810d7 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -135,6 +135,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3_mux.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+index 5be71b1..166b90c 100644
+--- a/arch/arm/boot/dts/omap3-devkit8000.dts
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -81,6 +81,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3_mux.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+index baa24bb..ad7ab86 100644
+--- a/arch/arm/boot/dts/omap3-evm.dts
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -45,6 +45,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3_mux.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index 5224c29..3107dc3 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -87,6 +87,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3_mux.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index 144a5a2..bb55907 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -50,6 +50,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3_mux.dtsi"
+ 
+ /* i2c2 pins are used for gpio */
+ &i2c2 {
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+index 2a725a0..df3b918 100644
+--- a/arch/arm/boot/dts/omap3430-sdp.dts
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -29,6 +29,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3_mux.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/twl4030_omap3_mux.dtsi b/arch/arm/boot/dts/twl4030_omap3_mux.dtsi
+new file mode 100644
+index 0000000..1bd0f9f
+--- /dev/null
++++ b/arch/arm/boot/dts/twl4030_omap3_mux.dtsi
+@@ -0,0 +1,17 @@
++&twl {
++	pinctrl-names = "default";
++	pinctrl-0 = <&twl4030_pins>;
++};
++
++&omap3_pmx_core {
++	/*
++	 * On most OMAP3 platforms, the twl4030 IRQ line is connected
++         * to the SYS_NIRQ line on OMAP.  Therefore, configure the
++         * defaults for the SYS_NIRQ pin here.
++	 */
++	twl4030_pins: pinmux_twl4030_pins {
++		pinctrl-single,pins = <
++			0x1b0 (PIN_INPUT_PULLUP | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* sys_nirq.sys_nirq */
++		>;
++	};
++};
+-- 
+1.8.3
