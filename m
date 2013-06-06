@@ -1,50 +1,43 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 6 Jun 2013 09:40:23 +0800
-Subject: [PATCH] spi/sirf: fix error propagation in spi_sirfsoc_probe()
-In-Reply-To: <CAGsJ_4w6o9aSRDrH-nZRk77bRMxLUHDY5auePz_NzPC0pH1cjw@mail.gmail.com>
-References: <1370467796-4641-1-git-send-email-khoroshilov@ispras.ru>
- <CAGsJ_4w6o9aSRDrH-nZRk77bRMxLUHDY5auePz_NzPC0pH1cjw@mail.gmail.com>
-Message-ID: <CAGsJ_4x4iv-36WQeQgueKZ3_QYOnyTYnJWFa7rewUoTyQCcPNg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 06 Jun 2013 10:41:29 +0900
+Subject: [PATCH V2 2/2] ARM: dts: add dts node for the ahci sata exynos5440
+References: <1366104611-14315-1-git-send-email-ks.giri@samsung.com>
+Message-ID: <09d301ce6256$f7771890$e66549b0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/6 Barry Song <21cnbao@gmail.com>:
-> 2013/6/6 Alexey Khoroshilov <khoroshilov@ispras.ru>:
->> If pinctrl_get_select_default() fails, spi_sirfsoc_probe()
->> returns IS_ERR(sspi->p) instead of PTR_ERR(sspi->p).
->>
->> Found by Linux Driver Verification project (linuxtesting.org).
->>
->> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
->
-> Acked-by: Barry Song <Baohua.Song@csr.com>
+Kukjin Kim wrote:
+> 
+> Girish K S wrote:
+> >
+> > This patch adds dts support for the sata controller
+> >
+> > Signed-off-by: Girish K S <ks.giri@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos5440.dtsi |    9 +++++++++
+> >  1 files changed, 9 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+> > index 7c5dc38..2dc4ffa 100644
+> > --- a/arch/arm/boot/dts/exynos5440.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> > @@ -220,4 +220,13 @@
+> >  		clock-names = "rtc";
+> >  		status = "disabled";
+> >  	};
+> > +
+> > +	sata at 210000 {
+> > +		compatible = "snps,exynos5440-ahci";
+> > +		reg = <0x210000 0x10000>;
+> > +		interrupts = <0 30 0>;
+> > +		clocks = <&clock 10>;
 
-sorry. nack, i think pinctrl_get_select_default(&pdev->dev) should
-have been dropped in another patch.
+Oops, this should be
 
->
->> ---
->>  drivers/spi/spi-sirf.c | 5 +++--
->>  1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/spi/spi-sirf.c b/drivers/spi/spi-sirf.c
->> index 0808cd5..94c3920 100644
->> --- a/drivers/spi/spi-sirf.c
->> +++ b/drivers/spi/spi-sirf.c
->> @@ -559,9 +559,10 @@ static int spi_sirfsoc_probe(struct platform_device *pdev)
->>         sspi->bitbang.master->dev.of_node = pdev->dev.of_node;
->>
->>         sspi->p = pinctrl_get_select_default(&pdev->dev);
->> -       ret = IS_ERR(sspi->p);
->> -       if (ret)
->> +       if (IS_ERR(sspi->p)) {
->> +               ret = PTR_ERR(sspi->p);
->>                 goto free_master;
->> +       }
->>
->>         sspi->clk = clk_get(&pdev->dev, NULL);
->>         if (IS_ERR(sspi->clk)) {
->> --
->> 1.8.1.2
++		clocks = <&clock 23>;
 
--barry
+Applied with fixing.
+
+Thanks.
+
+- Kukjin
