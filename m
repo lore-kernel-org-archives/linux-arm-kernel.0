@@ -1,124 +1,70 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  6 Jun 2013 18:41:21 +0200
-Subject: [PATCH v2 1/8] PCI: Introduce new MSI chip infrastructure
+Date: Thu,  6 Jun 2013 18:41:23 +0200
+Subject: [PATCH v2 3/8] irqchip: armada-370-xp: properly request resources
 In-Reply-To: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1370536888-8871-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370536888-8871-4-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
+Instead of using of_iomap(), we now use of_address_to_resource(),
+request_mem_region() and ioremap(). This allows the corresponding I/O
+regions to be properly requested and visible in /proc/iomem.
 
-The new struct msi_chip is used to associated an MSI controller with a
-PCI bus. It is automatically handed down from the root to its children
-during bus enumeration.
+The main motivation for this change is that the introduction of the
+MSI support requires us to get the physical address of the main
+interrupt controller registers, so we will need the corresponding
+'struct resource' anyway.
 
-This patch provides default (weak) implementations for the architecture-
-specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
-and arch_msi_check_device()) which check if a PCI device's bus has an
-attached MSI chip and forward the call appropriately.
+We also take this opportunity to change a panic() to BUG_ON(), in
+order to be consistent with the rest of the driver.
 
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/msi.c   | 34 +++++++++++++++++++++++++++++++---
- drivers/pci/probe.c |  1 +
- include/linux/msi.h | 11 +++++++++++
- include/linux/pci.h |  1 +
- 4 files changed, 44 insertions(+), 3 deletions(-)
+ drivers/irqchip/irq-armada-370-xp.c | 20 ++++++++++++++++----
+ 1 file changed, 16 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 2c10752..4dafac6 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -29,13 +29,41 @@ static int pci_msi_enable = 1;
- 
- 
- /* Arch hooks */
-+int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
-+{
-+	struct msi_chip *chip = dev->bus->msi;
-+
-+	if (chip && chip->setup_irq) {
-+		int err;
-+
-+		err = chip->setup_irq(chip, dev, desc);
-+		if (err < 0)
-+			return err;
-+
-+		irq_set_chip_data(desc->irq, chip);
-+		return err;
-+	}
-+
-+	return -EINVAL;
-+}
- 
--#ifndef arch_msi_check_device
--int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
-+void __weak arch_teardown_msi_irq(unsigned int irq)
+diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
+index bb328a3..26adc74 100644
+--- a/drivers/irqchip/irq-armada-370-xp.c
++++ b/drivers/irqchip/irq-armada-370-xp.c
+@@ -248,12 +248,25 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
+ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 					     struct device_node *parent)
  {
-+	struct msi_chip *chip = irq_get_chip_data(irq);
-+
-+	if (chip && chip->teardown_irq)
-+		chip->teardown_irq(chip, irq);
-+}
-+
-+int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
-+{
-+	struct msi_chip *chip = dev->bus->msi;
-+
-+	if (chip && chip->check_device)
-+		return chip->check_device(chip, dev, nvec, type);
-+
- 	return 0;
- }
--#endif
++	struct resource main_int_res, per_cpu_int_res;
+ 	u32 control;
  
- #ifndef arch_setup_msi_irqs
- # define arch_setup_msi_irqs default_setup_msi_irqs
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 70f10fa..c8591e4 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+-	main_int_base = of_iomap(node, 0);
+-	per_cpu_int_base = of_iomap(node, 1);
++	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
++	BUG_ON(of_address_to_resource(node, 1, &per_cpu_int_res));
  
- 	child->parent = parent;
- 	child->ops = parent->ops;
-+	child->msi = parent->msi;
- 	child->sysdata = parent->sysdata;
- 	child->bus_flags = parent->bus_flags;
- 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index 20c2d6d..4633529 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -58,4 +58,15 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
- void arch_teardown_msi_irqs(struct pci_dev *dev);
- int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
- 
-+struct msi_chip {
-+	struct module *owner;
-+	struct device *dev;
++	BUG_ON(!request_mem_region(main_int_res.start,
++				   resource_size(&main_int_res),
++				   node->full_name));
++	BUG_ON(!request_mem_region(per_cpu_int_res.start,
++				   resource_size(&per_cpu_int_res),
++				   node->full_name));
 +
-+	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
-+			 struct msi_desc *desc);
-+	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
-+	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
-+			    int nvec, int type);
-+};
++	main_int_base = ioremap(main_int_res.start,
++				resource_size(&main_int_res));
+ 	BUG_ON(!main_int_base);
 +
- #endif /* LINUX_MSI_H */
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 3a24e4f..7ffc012 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -432,6 +432,7 @@ struct pci_bus {
- 	struct resource busn_res;	/* bus numbers routed to this bus */
++	per_cpu_int_base = ioremap(per_cpu_int_res.start,
++				   resource_size(&per_cpu_int_res));
+ 	BUG_ON(!per_cpu_int_base);
  
- 	struct pci_ops	*ops;		/* configuration access functions */
-+	struct msi_chip	*msi;		/* MSI controller */
- 	void		*sysdata;	/* hook for sys-specific extension */
- 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
+ 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
+@@ -262,8 +275,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+ 		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
+ 				&armada_370_xp_mpic_irq_ops, NULL);
+ 
+-	if (!armada_370_xp_mpic_domain)
+-		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
++	BUG_ON(!armada_370_xp_mpic_domain);
+ 
+ 	irq_set_default_host(armada_370_xp_mpic_domain);
  
 -- 
 1.8.1.2
