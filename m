@@ -1,107 +1,62 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Jun 2013 15:25:31 +0100
-Subject: [PATCH v4 5/6] arm64/xen: introduce CONFIG_XEN on ARM64
-In-Reply-To: <1370451727-26826-5-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1306051605030.4589@kaball.uk.xensource.com>
- <1370451727-26826-5-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20130606142530.GJ28479@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu,  6 Jun 2013 15:28:33 +0100
+Subject: [PATCH 09/10] ARM: kvm: use inner-shareable barriers after TLB
+ flushing
+In-Reply-To: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
+References: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1370528914-17506-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 06:02:06PM +0100, Stefano Stabellini wrote:
-> diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-> index 199cb2d..114b356 100644
-> --- a/arch/arm/xen/hypercall.S
-> +++ b/arch/arm/xen/hypercall.S
-> @@ -31,51 +31,93 @@
->   */
->  
->  /*
-> - * The Xen hypercall calling convention is very similar to the ARM
-> - * procedure calling convention: the first paramter is passed in r0, the
-> - * second in r1, the third in r2 and the fourth in r3. Considering that
-> - * Xen hypercalls have 5 arguments at most, the fifth paramter is passed
-> - * in r4, differently from the procedure calling convention of using the
-> - * stack for that case.
-> + * The Xen hypercall calling convention is very similar to the ARM/ARM64
-> + * procedure calling convention: the first paramter is passed in r0/x0,
-> + * the second in r1/x1, the third in r2/x2 and the fourth in r3/x3.
-> + * Considering that Xen hypercalls have 5 arguments at most, the fifth
-> + * paramter is always passed in r4/x4, differently from the ARM
-> + * procedure calling convention of using the stack for that case.
->   *
-> - * The hypercall number is passed in r12.
-> + * The hypercall number is passed in r12/x16.
->   *
-> - * The return value is in r0.
-> + * The return value is in r0/x0.
->   *
-> - * The hvc ISS is required to be 0xEA1, that is the Xen specific ARM
-> - * hypercall tag.
-> + * The hvc ISS is required to be 0xEA1, that is the Xen specific
-> + * ARM/ARM64 hypercall tag.
->   */
->  
->  #include <linux/linkage.h>
->  #include <asm/assembler.h>
-> -#include <asm/opcodes-virt.h>
->  #include <xen/interface/xen.h>
->  
->  
->  #define XEN_IMM 0xEA1
->  
-> +
-> +#ifdef CONFIG_ARM
-> +
-> +#include <asm/opcodes-virt.h>
-> +
-> +ENTRY(privcmd_call)
-> +	stmdb sp!, {r4}
-> +	mov r12, r0
-> +	mov r0, r1
-> +	mov r1, r2
-> +	mov r2, r3
-> +	ldr r3, [sp, #8]
-> +	ldr r4, [sp, #4]
-> +	__HVC(XEN_IMM)
-> +	ldm sp!, {r4}
-> +	mov pc, lr
-> +ENDPROC(privcmd_call);
-> +
->  #define HYPERCALL_SIMPLE(hypercall)		\
->  ENTRY(HYPERVISOR_##hypercall)			\
->  	mov r12, #__HYPERVISOR_##hypercall;	\
-> -	__HVC(XEN_IMM);						\
-> -	mov pc, lr;							\
-> +	__HVC(XEN_IMM);				\
-> +	mov pc, lr;				\
-> +ENDPROC(HYPERVISOR_##hypercall)
-> +
-> +#define HYPERCALL5(hypercall)			\
-> +ENTRY(HYPERVISOR_##hypercall)			\
-> +	stmdb sp!, {r4}				\
-> +	ldr r4, [sp, #4]			\
-> +	mov r12, #__HYPERVISOR_##hypercall;	\
-> +	__HVC(XEN_IMM);				\
-> +	ldm sp!, {r4}				\
-> +	mov pc, lr				\
->  ENDPROC(HYPERVISOR_##hypercall)
->  
-> +#else /* ARM64 specific code below */
-> +
-> +ENTRY(privcmd_call)
-> +	mov x16, x0
-> +	mov x0, x1
-> +	mov x1, x2
-> +	mov x2, x3
-> +	mov x3, x4
-> +	mov x4, x5
-> +	hvc XEN_IMM
-> +	ret
-> +ENDPROC(privcmd_call);
+When flushing the TLB at PL2 in response to remapping at stage-2 or VMID
+rollover, we have a dsb instruction to ensure completion of the command
+before continuing.
 
-Ah, thanks to Ian for pointing out, I missed the fact that you merged
-the hypercall.S files. Please don't. It's a different assembly syntax.
+Since we only care about other processors for TLB invalidation, use the
+inner-shareable variant of the dsb instruction instead.
 
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kvm/init.S       | 2 +-
+ arch/arm/kvm/interrupts.S | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
+index f048338..1b9844d 100644
+--- a/arch/arm/kvm/init.S
++++ b/arch/arm/kvm/init.S
+@@ -142,7 +142,7 @@ target:	@ We're now in the trampoline code, switch page tables
+ 
+ 	@ Invalidate the old TLBs
+ 	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
+-	dsb
++	dsb	ish
+ 
+ 	eret
+ 
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index f7793df..dfb5dcc 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -54,7 +54,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
+ 	isb
+ 	mcr     p15, 0, r0, c8, c3, 0	@ TLBIALLIS (rt ignored)
+-	dsb
++	dsb	ish
+ 	isb
+ 	mov	r2, #0
+ 	mov	r3, #0
+@@ -78,7 +78,7 @@ ENTRY(__kvm_flush_vm_context)
+ 	mcr     p15, 4, r0, c8, c3, 4
+ 	/* Invalidate instruction caches Inner Shareable (ICIALLUIS) */
+ 	mcr     p15, 0, r0, c7, c1, 0
+-	dsb
++	dsb	ish
+ 	isb				@ Not necessary if followed by eret
+ 
+ 	bx	lr
 -- 
-Catalin
+1.8.2.2
