@@ -1,64 +1,57 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu, 6 Jun 2013 12:27:45 +0200
-Subject: [PATCH 5/8] arm: mvebu: don't hardcode a physical address in
- headsmp.S
-In-Reply-To: <20130606091327.GF15208@mudshark.cambridge.arm.com>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130606091327.GF15208@mudshark.cambridge.arm.com>
-Message-ID: <20130606122745.3c94d43e@skate>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Jun 2013 11:30:39 +0100
+Subject: [PATCH v3 2/2] ARM PJ4B: Add support for errata 4611
+In-Reply-To: <1370511044-31900-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1370511044-31900-1-git-send-email-gregory.clement@free-electrons.com>
+ <1370511044-31900-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130606103039.GN15208@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Will Deacon,
-
-On Thu, 6 Jun 2013 10:13:27 +0100, Will Deacon wrote:
-
-> > +		struct resource res;
-> >  		pr_info("Initializing Coherency fabric\n");
-> > +		of_address_to_resource(np, 0, &res);
-> > +		coherency_phys_base = res.start;
+On Thu, Jun 06, 2013 at 10:30:44AM +0100, Gregory CLEMENT wrote:
+> From: Lior Amsalem <alior@marvell.com>
 > 
-> So you have the primary CPU writing this address, before it is
-> coherent...
+> A CP15 clean operation can result in a dead lock state if it is hit by
+> an incoming snoop event. The fix to this issue is the following:
+> before any CP15 clean type operation in Cache Coherency mode, issue a
+> Data Memory Barrier (DMB) or a Data Synchronization Barrier (DSB)
+> instruction.
+> 
+> [gregory.clement at free-electrons.com:use save/restore IRQ macros]
+> [gregory.clement at free-electrons.com:add errata description in changelog]
+> [gregory.clement at free-electrons.com:make this errata depend on Armada 370]
+> Signed-off-by: Lior Amsalem <alior@marvell.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> ---
+>  arch/arm/Kconfig                |  9 +++++++++
+>  arch/arm/include/asm/tlbflush.h | 22 ++++++++++++++++++++++
+>  arch/arm/mm/proc-macros.S       | 11 +++++++++++
+>  3 files changed, 42 insertions(+)
 
 [...]
 
-> >  ENTRY(armada_xp_secondary_startup)
-> > +	/* Get coherency fabric base physical address */
-> > +	adr	r0, 1f
-> > +	ldmia	r0, {r1, r2}
-> > +	sub	r0, r0, r1
-> > +	add	r2, r2, r0
-> > +	ldr	r0, [r2]
-> 
-> ... and the secondaries reading it, before they are coherent.
-> How do you ensure that the write is indeed visible?
+> diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> index f9a0aa7..2eba2b7 100644
+> --- a/arch/arm/mm/proc-macros.S
+> +++ b/arch/arm/mm/proc-macros.S
+> @@ -178,7 +178,18 @@
+>  #endif
+>  
+>  	str	r3, [r0]
+> +
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +        save_and_disable_irqs_notrace r2	@ Disable interrupts
+> +	dmb					@ ensure ordering with previous memory accesses
+> +#endif
+> +
+>  	mcr	p15, 0, r0, c7, c10, 1		@ flush_pte
+> +
+> +#ifdef CONFIG_PJ4B_ERRATA_4611
+> +	restore_irqs_notrace r2			@ Restore interrupts
+> +	dsb					@ drain write buffer
+> +#endif
 
-Indeed. As discussed on IRC, I've fixed that by adding a sync_cache_w()
-on the coherency_phys_base variable after it has been updated by the
-boot CPU. By the time the secondary CPUs read their value, the MMU is
-not enabled, so the caches aren't enabled, so they are directly seeing
-the contents of the memory. So hopefully, this should solve your
-concern.
+Wait: isn't this in armv6_set_pte_ext? Shouldn't you be looking at
+proc-v7-{2,3}-level.S for the UP flushing?
 
-> Furthermore, it's worth noting that of_find_matching_node takes the
-> devtree_lock spinlock, so you need to be careful calling that if
-> you're not coherent.
-
-Also as discussed on IRC, we're not coherent with regard to the
-secondary CPUs, but those other CPUs have not started yet. And being
-part of the coherency unit is apparently not required for strex and al.
-to operate properly.
-
-I've just sent a v2 of this patch that adds the sync_cache_w(), and
-also adjust the assembly code as per the suggestions of Nicolas Pitre.
-
-Thanks for your comments!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Will
