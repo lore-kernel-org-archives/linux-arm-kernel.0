@@ -1,160 +1,85 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 6 Jun 2013 18:42:01 -0500
-Subject: [PATCH v2 3/3] ARM: DTS: TWL4030: fix mux and wakeup for
- SYS_NIRQ line
-In-Reply-To: <1370561253-15523-1-git-send-email-khilman@linaro.org>
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370561253-15523-1-git-send-email-khilman@linaro.org>
-Message-ID: <20130606234201.GA26919@kahuna>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 7 Jun 2013 07:58:49 +0800
+Subject: pxa27x and pinctrl-single
+In-Reply-To: <51B0C7E8.5090308@newsguy.com>
+References: <51AF7404.3090003@newsguy.com>
+ <CAD6h2NTu9-E=Xy8zz5cgDdk5W4ShM9-B+p+gQtiA_HASQ7AEuQ@mail.gmail.com>
+ <51B0C7E8.5090308@newsguy.com>
+Message-ID: <CAD6h2NSRCti57NZtw0wzE8Th65_3Y8Dkz5zGsbnA2SUPYS263Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16:27-20130606, Kevin Hilman wrote:
-> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
-> SYS_NIRQ line on OMAP.  Add another DTS include file
-> (twl4030_omap3_mux.dtsi) for boards that hook up the twl4030 this way
-> to include.
-> 
-> This allows RTC wake from off-mode to work again on OMAP3-based
-> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
-> 3530/Overo, 3730/Overo-STORM.
-> 
-> Special thanks to Florian Vaussard for suggesting use of preprocessor
-> feature.
-> 
-> Cc: Florian Vaussard <florian.vaussard@epfl.ch>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
-> ---
-> v2: Updated to change board files instead of twl4030 file.
-> 
->  arch/arm/boot/dts/omap3-beagle-xm.dts    |  1 +
->  arch/arm/boot/dts/omap3-beagle.dts       |  1 +
->  arch/arm/boot/dts/omap3-devkit8000.dts   |  1 +
->  arch/arm/boot/dts/omap3-evm.dts          |  1 +
->  arch/arm/boot/dts/omap3-igep.dtsi        |  1 +
->  arch/arm/boot/dts/omap3-overo.dtsi       |  1 +
->  arch/arm/boot/dts/omap3430-sdp.dts       |  1 +
->  arch/arm/boot/dts/twl4030_omap3_mux.dtsi | 17 +++++++++++++++++
-minor comment:
-can we do twl4030_omap3 instead? That way, I can add in twl4030 VP
-specific parameters which are OMAP3 specific?
-one additional minor comment below:
+On 7 June 2013 01:33, Mike Dunn <mikedunn@newsguy.com> wrote:
+> Thanks for the reply Haojian.
+>
+> On 06/05/2013 05:43 PM, Haojian Zhuang wrote:
+>> On 6 June 2013 01:23, Mike Dunn <mikedunn@newsguy.com> wrote:
+>>> Hi,
+>>>
+>>> I'd like to start converting to device tree usage some of the old pxa27x
+>>> platforms I'm fond of, starting with adding pinctrl support.  If I'm not
+>>> mistaken, this will clear the way for some ongoing updates to the pinctrl/gpio
+>>> code used by newer Marvell arches.
+>>>
+>>> I noticed that Haojian pulled the pinctrl-pxa driver from the kernel, in favor
+>>> of using pinctrl-single, so I turned my attention to that.  From what I can
+>>> tell, pinctrl-single is currently inadequate for pxa27x because:
+>>>
+>>> (1) On the pxa27x, setting the mux for a pin involves configuring both the alt
+>>> function register *and* the direction register, requiring the ability to specify
+>>> in the device tree multiple reg/value pairs for each pin.
+>> In PXA27x, GPIO controller control both GPIO & pin alternate function. The
+>> alternate function is covered by GAFRx registers.
+>>
+>> At first, we need to move GAFRx from gpio-pxa driver. Then we can support
+>
+>
+> Thanks... I wondered about division of labor between pinctrl and gpio.  Pinctrl
+> did seem to be the appropriate place.
+>
+>
+>> it by pinctrl-single driver since pinctrl-single driver could support mulitple
+>> pins in one pin registers. There's "bits-per-mux" property in pinctrl-single
+>> driver.
+>
+>
+> Yes, but currently pinctrl-single only supports writing one register for a given
+> pin (with multiple pins sharing a register if bit-per-mux==true).  On pxa27x, a
+> pin's alt function is determined by the values written to both the GAFRx and the
+> GPDRx registers, so I think that pinctrl-single may need to allow a device tree
+> to specify multiple reg/value/mask sets for any one pin.  I don't have a
+> pxa3xx/mmp developer's manual handy, but from the code it appears that on these
+> arches the direction register is irrelevant to the mux setting.
+>
 
->  8 files changed, 24 insertions(+)
->  create mode 100644 arch/arm/boot/dts/twl4030_omap3_mux.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> index ad17b6b..1afb563 100644
-> --- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-> @@ -96,6 +96,7 @@
->  };
->  
->  #include "twl4030.dtsi"
-> +#include "twl4030_omap3_mux.dtsi"
->  
->  &i2c2 {
->  	clock-frequency = <400000>;
-> diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-> index eb7e02a..d5810d7 100644
-> --- a/arch/arm/boot/dts/omap3-beagle.dts
-> +++ b/arch/arm/boot/dts/omap3-beagle.dts
-> @@ -135,6 +135,7 @@
->  };
->  
->  #include "twl4030.dtsi"
-> +#include "twl4030_omap3_mux.dtsi"
->  
->  &mmc1 {
->  	vmmc-supply = <&vmmc1>;
-> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-> index 5be71b1..166b90c 100644
-> --- a/arch/arm/boot/dts/omap3-devkit8000.dts
-> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-> @@ -81,6 +81,7 @@
->  };
->  
->  #include "twl4030.dtsi"
-> +#include "twl4030_omap3_mux.dtsi"
->  
->  &mmc1 {
->  	vmmc-supply = <&vmmc1>;
-> diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
-> index baa24bb..ad7ab86 100644
-> --- a/arch/arm/boot/dts/omap3-evm.dts
-> +++ b/arch/arm/boot/dts/omap3-evm.dts
-> @@ -45,6 +45,7 @@
->  };
->  
->  #include "twl4030.dtsi"
-> +#include "twl4030_omap3_mux.dtsi"
->  
->  &i2c2 {
->  	clock-frequency = <400000>;
-> diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-> index 5224c29..3107dc3 100644
-> --- a/arch/arm/boot/dts/omap3-igep.dtsi
-> +++ b/arch/arm/boot/dts/omap3-igep.dtsi
-> @@ -87,6 +87,7 @@
->  };
->  
->  #include "twl4030.dtsi"
-> +#include "twl4030_omap3_mux.dtsi"
->  
->  &i2c2 {
->  	clock-frequency = <400000>;
-> diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-> index 144a5a2..bb55907 100644
-> --- a/arch/arm/boot/dts/omap3-overo.dtsi
-> +++ b/arch/arm/boot/dts/omap3-overo.dtsi
-> @@ -50,6 +50,7 @@
->  };
->  
->  #include "twl4030.dtsi"
-> +#include "twl4030_omap3_mux.dtsi"
->  
->  /* i2c2 pins are used for gpio */
->  &i2c2 {
-> diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-> index 2a725a0..df3b918 100644
-> --- a/arch/arm/boot/dts/omap3430-sdp.dts
-> +++ b/arch/arm/boot/dts/omap3430-sdp.dts
-> @@ -29,6 +29,7 @@
->  };
->  
->  #include "twl4030.dtsi"
-> +#include "twl4030_omap3_mux.dtsi"
->  
->  &mmc1 {
->  	vmmc-supply = <&vmmc1>;
-> diff --git a/arch/arm/boot/dts/twl4030_omap3_mux.dtsi b/arch/arm/boot/dts/twl4030_omap3_mux.dtsi
-> new file mode 100644
-> index 0000000..1bd0f9f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/twl4030_omap3_mux.dtsi
-> @@ -0,0 +1,17 @@
-some license text?
-> +&twl {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&twl4030_pins>;
-> +};
-> +
-> +&omap3_pmx_core {
-> +	/*
-> +	 * On most OMAP3 platforms, the twl4030 IRQ line is connected
-> +         * to the SYS_NIRQ line on OMAP.  Therefore, configure the
-> +         * defaults for the SYS_NIRQ pin here.
-^^^ tab?
+No, it's not need to access both GAFRx & GPDRx. Let's focus on PXA27x first.
 
-> +	 */
-> +	twl4030_pins: pinmux_twl4030_pins {
-> +		pinctrl-single,pins = <
-> +			0x1b0 (PIN_INPUT_PULLUP | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* sys_nirq.sys_nirq */
-> +		>;
-> +	};
-> +};
+GPIO ?x? Alternate Function Select Bits (where x = 112 through 120)
+A bit-pair in this register determines the corresponding GPIO pin?s
+functionality as one of the alternate functions that is mapped to it or as a
+generic GPIO pin.
 
--- 
-Regards,
-Nishanth Menon
+0b00 = The corresponding GPIO pin (GPIO<x>) is used as a general-
+purpose I/O.
+0b01 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
+function 1.
+0b10 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
+function 2.
+0b11 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
+function 3.
+
+We can see that GAFRx configures the pinmux. That's all. We can use
+pinctrl-single
+driver to cover this.
+
+I know that you're also talking the implementation in gpio-pxa driver.
+__gpio_is_occupied() checks both GAFRx & GPDRx. Because this GPIO
+pin should be configured as GPIO input. Actually we could also discard the
+checking.
+
+So there's no relationship between GAFRx and GPDRx. And "inverted" GPIO
+pins only exists in PXA26x. This "inverted" means that GPDR bits should
+also be inverted.
+
+Regards
+Haojian
