@@ -1,36 +1,44 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 6 Jun 2013 10:21:32 +0100
-Subject: Cache issues in vexpress cpu shutdown (regression in 3.10)
-In-Reply-To: <20130605190853.GF18614@n2100.arm.linux.org.uk>
-References: <1370430551.3387.11.camel@linaro1.home>
- <20130605113912.GE18614@n2100.arm.linux.org.uk>
- <20130605120539.GC32505@e102568-lin.cambridge.arm.com>
- <20130605190853.GF18614@n2100.arm.linux.org.uk>
-Message-ID: <20130606092132.GB28479@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Jun 2013 10:21:56 +0100
+Subject: [PATCH 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
+In-Reply-To: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
+References: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
+Message-ID: <20130606092156.GL18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 08:08:53PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 05, 2013 at 01:05:39PM +0100, Lorenzo Pieralisi wrote:
-> > There is an A9 errata (fixed in r1p0) whereby CLIDR[23:21] reads as 0
-> > where it should read as 3'b001, so basically flush_cache_louis is not
-> > flushing anything. If that's the problem, either we add a generic fix
-> > in v7 cache assembly or we just fix it in platform code (by calling
-> > flush_cache_all()), since there should not be many pre-r1p0 around.
-> > 
-> > Please let me know what you think.
-> 
-> If we're providing a flush_cache_louis() function, then it better do
-> what it says or be removed.  So the right solution is to fix the
-> function rather than working around it, because over time we'll only
-> add more calls to flush_cache_louis() and it'll become a stumbling
-> block.
+On Thu, Jun 06, 2013 at 02:55:26PM +0800, Peter Chen wrote:
+> @@ -62,9 +63,11 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+>  	writel_relaxed(val, pll->base);
+>  
+>  	/* Wait for PLL to lock */
+> -	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
+> -		if (time_after(jiffies, timeout))
+> +	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK)) {
+> +		udelay(100);
+> +		if (--count == 0)
+>  			return -ETIMEDOUT;
+> +	}
 
-I think at some point we should define this unification level in the DT,
-maybe together with the CPU topology. We use LoUIS because it seems to
-be the right thing on all the existing platforms but it's nothing in the
-architecture that says LoUIS is the right level of flushing for the
-CPU-local caches.
+This is still buggy in the ways you describe above.
 
--- 
-Catalin
+	do {
+		if (readl_relaxed(pll->base) & BM_PLL_LOCK)
+			break;
+		udelay(100);
+	} while (--count);
+
+	if (count == 0 && !(readl_relaxed(pll->base) & BM_PLL_LOCK))
+		return -ETIMEDOUT;
+
+Notice - we only return -ETIMEDOUT if the condition we're waiting for
+has not been satisfied _after_ the loop terminates, specifically, if
+this happens during the last 100us of our wait.
+
+You can apply the same fix to your original; you don't need to move
+to using udelay() and a counter if you can tolerate some noise in
+the waiting time.
+
+The lesson here is: if you're waiting for any kind of an event, then
+be very careful how you code the failure path so you don't miss a
+success coincident with the timeout condition becoming true.
