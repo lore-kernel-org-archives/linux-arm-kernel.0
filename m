@@ -1,111 +1,191 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Jun 2013 15:28:29 +0100
-Subject: [PATCH 05/10] ARM: barrier: allow options to be passed to memory
- barrier instructions
+Date: Thu,  6 Jun 2013 15:28:32 +0100
+Subject: [PATCH 08/10] ARM: tlb: reduce scope of barrier domains for TLB
+ invalidation
 In-Reply-To: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
 References: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1370528914-17506-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1370528914-17506-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARMv7, the memory barrier instructions take an optional `option'
-field which can be used to constrain the effects of a memory barrier
-based on shareability and access type.
+Our TLB invalidation routines may require a barrier before the
+maintenance (in order to ensure pending page table writes are visible to
+the hardware walker) and barriers afterwards (in order to ensure
+completion of the maintenance and visibility in the instruction stream).
 
-This patch allows the caller to pass these options if required, and
-updates the smp_*() barriers to request inner-shareable barriers,
-affecting only stores for the _wmb variant. wmb() is also changed to
-use the -st version of dsb.
+Whilst this is expensive, the cost can be reduced somewhat by reducing
+the scope of the barrier instructions:
 
-Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
+  - The barrier before only needs to apply to stores (pte writes)
+  - Local ops are required only to affect the non-shareable domain
+  - Global ops are required only to affect the inner-shareable domain
+
+This patch makes these changes for the TLB flushing code.
+
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/assembler.h |  4 ++--
- arch/arm/include/asm/barrier.h   | 32 ++++++++++++++++----------------
- 2 files changed, 18 insertions(+), 18 deletions(-)
+ arch/arm/include/asm/tlbflush.h | 36 ++++++++++++++++++------------------
+ 1 file changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index 05ee9ee..863b280 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -212,9 +212,9 @@
- #ifdef CONFIG_SMP
- #if __LINUX_ARM_ARCH__ >= 7
- 	.ifeqs "\mode","arm"
--	ALT_SMP(dmb)
-+	ALT_SMP(dmb	ish)
- 	.else
--	ALT_SMP(W(dmb))
-+	ALT_SMP(W(dmb)	ish)
- 	.endif
- #elif __LINUX_ARM_ARCH__ == 6
- 	ALT_SMP(mcr	p15, 0, r0, c7, c10, 5)	@ dmb
-diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
-index 8dcd9c7..60f15e2 100644
---- a/arch/arm/include/asm/barrier.h
-+++ b/arch/arm/include/asm/barrier.h
-@@ -14,27 +14,27 @@
+diff --git a/arch/arm/include/asm/tlbflush.h b/arch/arm/include/asm/tlbflush.h
+index 0bdd5d2d..77350a2 100644
+--- a/arch/arm/include/asm/tlbflush.h
++++ b/arch/arm/include/asm/tlbflush.h
+@@ -327,14 +327,14 @@ static inline void local_flush_tlb_all(void)
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(nshst);
+ 
+ 	tlb_op(TLB_V4_U_FULL | TLB_V6_U_FULL, "c8, c7, 0", zero);
+ 	tlb_op(TLB_V4_D_FULL | TLB_V6_D_FULL, "c8, c6, 0", zero);
+ 	tlb_op(TLB_V4_I_FULL | TLB_V6_I_FULL, "c8, c5, 0", zero);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+-		dsb();
++		dsb(nsh);
+ 		isb();
+ 	}
+ }
+@@ -345,12 +345,12 @@ static inline void __flush_tlb_all(void)
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ 
+ 	tlb_op(TLB_V7_UIS_FULL, "c8, c3, 0", zero);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+-		dsb();
++		dsb(ish);
+ 		isb();
+ 	}
+ }
+@@ -362,7 +362,7 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(nshst);
+ 
+ 	if (possible_tlb_flags & (TLB_V4_U_FULL|TLB_V4_D_FULL|TLB_V4_I_FULL)) {
+ 		if (cpumask_test_cpu(smp_processor_id(), mm_cpumask(mm))) {
+@@ -377,7 +377,7 @@ static inline void local_flush_tlb_mm(struct mm_struct *mm)
+ 	tlb_op(TLB_V6_I_ASID, "c8, c5, 2", asid);
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+-		dsb();
++		dsb(nsh);
+ }
+ 
+ static inline void __flush_tlb_mm(struct mm_struct *mm)
+@@ -385,7 +385,7 @@ static inline void __flush_tlb_mm(struct mm_struct *mm)
+ 	const unsigned int __tlb_flag = __cpu_tlb_flags;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ 
+ #ifdef CONFIG_ARM_ERRATA_720789
+ 	tlb_op(TLB_V7_UIS_ASID, "c8, c3, 0", 0);
+@@ -394,7 +394,7 @@ static inline void __flush_tlb_mm(struct mm_struct *mm)
  #endif
  
- #if __LINUX_ARM_ARCH__ >= 7
--#define isb() __asm__ __volatile__ ("isb" : : : "memory")
--#define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
--#define dmb() __asm__ __volatile__ ("dmb" : : : "memory")
-+#define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
-+#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
-+#define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
- #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
--#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
-+#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
- 				    : : "r" (0) : "memory")
--#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
- 				    : : "r" (0) : "memory")
--#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
-+#define dmb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
- 				    : : "r" (0) : "memory")
- #elif defined(CONFIG_CPU_FA526)
--#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
-+#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
- 				    : : "r" (0) : "memory")
--#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
- 				    : : "r" (0) : "memory")
--#define dmb() __asm__ __volatile__ ("" : : : "memory")
-+#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
- #else
--#define isb() __asm__ __volatile__ ("" : : : "memory")
--#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
-+#define isb(x) __asm__ __volatile__ ("" : : : "memory")
-+#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
- 				    : : "r" (0) : "memory")
--#define dmb() __asm__ __volatile__ ("" : : : "memory")
-+#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+ 	if (tlb_flag(TLB_BARRIER))
+-		dsb();
++		dsb(ish);
+ }
+ 
+ static inline void
+@@ -406,7 +406,7 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ 	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(nshst);
+ 
+ 	if (possible_tlb_flags & (TLB_V4_U_PAGE|TLB_V4_D_PAGE|TLB_V4_I_PAGE|TLB_V4_I_FULL) &&
+ 	    cpumask_test_cpu(smp_processor_id(), mm_cpumask(vma->vm_mm))) {
+@@ -422,7 +422,7 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", uaddr);
+ 
+ 	if (tlb_flag(TLB_BARRIER))
+-		dsb();
++		dsb(nsh);
+ }
+ 
+ static inline void
+@@ -433,7 +433,7 @@ __flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
+ 	uaddr = (uaddr & PAGE_MASK) | ASID(vma->vm_mm);
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ 
+ #ifdef CONFIG_ARM_ERRATA_720789
+ 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 3", uaddr & PAGE_MASK);
+@@ -442,7 +442,7 @@ __flush_tlb_page(struct vm_area_struct *vma, unsigned long uaddr)
  #endif
  
- #ifdef CONFIG_ARCH_HAS_BARRIERS
-@@ -42,7 +42,7 @@
- #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
- #define mb()		do { dsb(); outer_sync(); } while (0)
- #define rmb()		dsb()
--#define wmb()		mb()
-+#define wmb()		do { dsb(st); outer_sync(); } while (0)
- #else
- #define mb()		barrier()
- #define rmb()		barrier()
-@@ -54,9 +54,9 @@
- #define smp_rmb()	barrier()
- #define smp_wmb()	barrier()
- #else
--#define smp_mb()	dmb()
--#define smp_rmb()	dmb()
--#define smp_wmb()	dmb()
-+#define smp_mb()	dmb(ish)
-+#define smp_rmb()	smp_mb()
-+#define smp_wmb()	dmb(ishst)
- #endif
+ 	if (tlb_flag(TLB_BARRIER))
+-		dsb();
++		dsb(ish);
+ }
  
- #define read_barrier_depends()		do { } while(0)
+ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+@@ -453,7 +453,7 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+ 	kaddr &= PAGE_MASK;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(nshst);
+ 
+ 	tlb_op(TLB_V4_U_PAGE, "c8, c7, 1", kaddr);
+ 	tlb_op(TLB_V4_D_PAGE, "c8, c6, 1", kaddr);
+@@ -466,7 +466,7 @@ static inline void local_flush_tlb_kernel_page(unsigned long kaddr)
+ 	tlb_op(TLB_V6_I_PAGE, "c8, c5, 1", kaddr);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+-		dsb();
++		dsb(nsh);
+ 		isb();
+ 	}
+ }
+@@ -478,12 +478,12 @@ static inline void __flush_tlb_kernel_page(unsigned long kaddr)
+ 	kaddr &= PAGE_MASK;
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ 
+ 	tlb_op(TLB_V7_UIS_PAGE, "c8, c3, 1", kaddr);
+ 
+ 	if (tlb_flag(TLB_BARRIER)) {
+-		dsb();
++		dsb(ish);
+ 		isb();
+ 	}
+ }
+@@ -517,7 +517,7 @@ static inline void dummy_flush_tlb_a15_erratum(void)
+ 	 * Dummy TLBIMVAIS. Using the unmapped address 0 and ASID 0.
+ 	 */
+ 	asm("mcr p15, 0, %0, c8, c3, 1" : : "r" (0));
+-	dsb();
++	dsb(ish);
+ }
+ #else
+ static inline void dummy_flush_tlb_a15_erratum(void)
+@@ -546,7 +546,7 @@ static inline void flush_pmd_entry(void *pmd)
+ 	tlb_l2_op(TLB_L2CLEAN_FR, "c15, c9, 1  @ L2 flush_pmd", pmd);
+ 
+ 	if (tlb_flag(TLB_WB))
+-		dsb();
++		dsb(ishst);
+ }
+ 
+ static inline void clean_pmd_entry(void *pmd)
 -- 
 1.8.2.2
