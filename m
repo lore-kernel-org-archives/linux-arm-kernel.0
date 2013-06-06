@@ -1,55 +1,32 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  6 Jun 2013 13:17:11 +0100
-Subject: [PATCH 23/33] clk: ux500: Add Device Tree support for the TWD clock
+Date: Thu,  6 Jun 2013 13:17:14 +0100
+Subject: [PATCH 26/33] ARM: ux500: Remove AUXDATA relating to SDI (MMC)
+ clock-name bindings
 In-Reply-To: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
 References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370521041-32318-24-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370521041-32318-27-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables the TWD fixed factor clock to be specified from
-Device Tree via phandles to the "smp-twd-clock" node.
-
-Cc: Mike Turquette <mturquette@linaro.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clk/ux500/u8500_clk.c |    9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-index ebd0381..b890067 100644
---- a/drivers/clk/ux500/u8500_clk.c
-+++ b/drivers/clk/ux500/u8500_clk.c
-@@ -60,7 +60,7 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 	struct device_node *np = NULL;
- 	struct device_node *child = NULL;
- 	const char *sgaclk_parent = NULL;
--	struct clk *clk, *rtc_clk;
-+	struct clk *clk, *rtc_clk, *twd_clk;
- 
- 	/* Clock sources */
- 	clk = clk_reg_prcmu_gate("soc0_pll", NULL, PRCMU_PLLSOC0,
-@@ -283,9 +283,9 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 				PRCMU_ARMSS, 0, CLK_IS_ROOT|CLK_IGNORE_UNUSED);
- 	clk_register_clkdev(clk, "armss", NULL);
- 
--	clk = clk_register_fixed_factor(NULL, "smp_twd", "armss",
-+	twd_clk = clk_register_fixed_factor(NULL, "smp_twd", "armss",
- 				CLK_IGNORE_UNUSED, 1, 2);
--	clk_register_clkdev(clk, NULL, "smp_twd");
-+	clk_register_clkdev(twd_clk, NULL, "smp_twd");
- 
- 	/*
- 	 * FIXME: Add special handled PRCMU clocks here:
-@@ -693,5 +693,8 @@ void u8500_clk_init(u32 clkrst1_base, u32 clkrst2_base, u32 clkrst3_base,
- 
- 		if (!of_node_cmp(child->name, "rtc32k-clock"))
- 			of_clk_add_provider(child, of_clk_src_simple_get, rtc_clk);
-+
-+		if (!of_node_cmp(child->name, "smp-twd-clock"))
-+			of_clk_add_provider(child, of_clk_src_simple_get, twd_clk);
- 	}
- }
+diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
+index 3efb326..aa325d8 100644
+--- a/arch/arm/mach-ux500/cpu-db8500.c
++++ b/arch/arm/mach-ux500/cpu-db8500.c
+@@ -220,10 +220,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+ 	/* Requires DMA bindings. */
+ 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
+-	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
+ 	/* Requires clock name bindings. */
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80004000, "nmk-i2c.0", NULL),
+ 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80122000, "nmk-i2c.1", NULL),
 -- 
 1.7.10.4
