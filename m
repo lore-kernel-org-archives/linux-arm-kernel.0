@@ -1,52 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 6 Jun 2013 18:53:43 +0200
-Subject: [PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
-In-Reply-To: <20130605192019.GG18614@n2100.arm.linux.org.uk>
-References: <20130605073410.15758.37563.sendpatchset@w520>
- <20130605073418.15758.93704.sendpatchset@w520>
- <20130605192019.GG18614@n2100.arm.linux.org.uk>
-Message-ID: <201306061853.44135.arnd@arndb.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 6 Jun 2013 17:54:39 +0100
+Subject: [PATCH 04/13] ARM: dts: list the CPU nodes for Exynos5250
+In-Reply-To: <1370516488-25860-4-git-send-email-chander.kashyap@linaro.org>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <1370516488-25860-4-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <20130606165439.GC23311@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 05 June 2013, Russell King - ARM Linux wrote:
-> On Wed, Jun 05, 2013 at 04:34:18PM +0900, Magnus Damm wrote:
-> > From: Magnus Damm <damm@opensource.se>
-> > 
-> > Introduce SHMOBILE_FIXUP() as a helper function to
-> > allow boards to specify their memory base and size.
+On Thu, Jun 06, 2013 at 12:01:18PM +0100, Chander Kashyap wrote:
+> Instead of having to specify the number for CPUs in Exynos5250 in platsmp.c
+> file, let the number of CPUs be determined by having this information listed
+> in Exynos5250 device tree file.
 > 
-> No.  I really don't like this idea (we've had people doing this in the
-> past and I went around removing all that crap, and adding command line
-> options into the defconfig files for those boards.)
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi |   14 ++++++++++++++
+>  arch/arm/mach-exynos/platsmp.c    |   10 +++++++---
+>  2 files changed, 21 insertions(+), 3 deletions(-)
 > 
-> I also fail to understand why in 2013, some 11 years after ATAG stuff
-> was created, people still can't get pass correct information into
-> the kernel.
-> 
-> It's exactly this kind of issue which makes me believe that stuff like
-> ACPI, UEFI and DT are doomed to fail on ARM because this kind of problem
-> constantly crops up time and time again.  People have seem to have this
-> total inability to get the pre-kernel environment right.
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+> index e571d3b..7f6b1c7 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -50,6 +50,20 @@
+>  		pinctrl3 = &pinctrl_3;
+>  	};
+>  
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			compatible = "arm,cortex-a15";
+> +			reg = <0>;
+> +		};
+> +		cpu at 1 {
+> +			compatible = "arm,cortex-a15";
+> +			reg = <1>;
+> +		};
+> +	};
+> +
 
-I think the problem in this case is that the pre-boot environment is
-essentially nothing but mask rom jumping into head-shmobile.S, which
-is something nobody else does.
+It would be nice to have device_type = "cpu" on each of the cpu nodes.
 
-My understanding is that you can also put a regular u-boot, kexec or
-some other boot loader into the same place and get a running system with
-correct ATAGS or DT information.
-
-It's debatable whether booting the kernel directly without an upgradable
-boot loader is a good idea, but since Renesas have come to depend on
-this and it's been supported by Linux for ages (both on ARM and SH),
-I would certainly not ask them to remove support for that.
-
-What I think we can do however is move all that configuration into
-one place of the kernel that is fairly separate from everything else.
-head-shmobile.S already contains most of the special case, so
-how about adding a configuration option that enables both the
-head-shmobile.S code and contains the configuration for that in
-a submenu?
-
-	Arnd
+Thanks,
+Mark.
