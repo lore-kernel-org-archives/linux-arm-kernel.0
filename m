@@ -1,23 +1,33 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Thu, 6 Jun 2013 13:05:19 -0700
-Subject: [PATCH v6] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <1370309270-21019-1-git-send-email-b35083@freescale.com>
-References: <1370309270-21019-1-git-send-email-b35083@freescale.com>
-Message-ID: <20130606200519.GA1644@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 6 Jun 2013 22:22:53 +0200
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <20130606172810.GE14209@lukather>
+References: <51AFA6DD.3000202@wwwdotorg.org>
+ <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
+ <20130606172810.GE14209@lukather>
+Message-ID: <201306062222.53780.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 09:27:50AM +0800, Jingchang Lu wrote:
-> Add Freescale lpuart driver support. The lpuart device
-> can be found on Vybrid VF610 and Layerscape LS-1 SoCs.
-> 
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
+On Thursday 06 June 2013, Maxime Ripard wrote:
+> So yes, Allwinner has an evil vendor tree (c), with a solution similar yet
+> inferior (because not generic enough) to the device tree, but they show
+> interest on going down the mainline road.
 
-This breaks the build on x86 systems with:
-  CC [M]  drivers/tty/serial/fsl_lpuart.o
-drivers/tty/serial/fsl_lpuart.c: In function ?lpuart_probe?:
-drivers/tty/serial/fsl_lpuart.c:751:2: error: implicit declaration of function ?of_alias_get_id? [-Werror=implicit-function-declaration]
+Right, and of course there is nothing special about that, everybody starts
+out with they own even vendor tree (c), and as hardware support gets merged
+upstream, the diff gets smaller, even though the code in the mainline
+kernel is normally very different from what they started out with.
 
-so I can't take this :(
+Chances are actually that the Allwinner (A10/A13/A20, not A31) platform may
+end up being the first modern one that is fully supported upstream including
+a GPU driver, since it is one of the obvious targets for the
+reverse-engineering efforts. Ironically (given NVIDIA's reputation), the
+Tegra platform is the strongest competitor I see in that race at the moment.
 
-greg k-h
+For all I can tell, things are progressing nicely, given that it's currently
+a volunteer effort. If anyone needs things to move faster, I'd recommend
+them to send money to free-electrons.com.
+
+	Arnd
