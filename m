@@ -1,79 +1,47 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  6 Jun 2013 16:22:04 +0100
-Subject: [RFC PATCH v2 1/2] ARM: kernel: build MPIDR hash function data
- structure
+Date: Thu,  6 Jun 2013 16:22:05 +0100
+Subject: [RFC PATCH v2 2/2] ARM: kernel: implement stack pointer save array
+ through MPIDR hashing
 In-Reply-To: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
 References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1370532125-14322-2-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1370532125-14322-3-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM SMP systems, cores are identified by their MPIDR register.
-The MPIDR guidelines in the ARM ARM do not provide strict enforcement of
-MPIDR layout, only recommendations that, if followed, split the MPIDR
-on ARM 32 bit platforms in three affinity levels. In multi-cluster
-systems like big.LITTLE, if the affinity guidelines are followed, the
-MPIDR can not be considered an index anymore. This means that the
-association between logical CPU in the kernel and the HW CPU identifier
-becomes somewhat more complicated requiring methods like hashing to
-associate a given MPIDR to a CPU logical index, in order for the look-up
-to be carried out in an efficient and scalable way.
+Current implementation of cpu_{suspend}/cpu_{resume} relies on the MPIDR
+to index the array of pointers where the context is saved and restored.
+The current approach works as long as the MPIDR can be considered a
+linear index, so that the pointers array can simply be dereferenced by
+using the MPIDR[7:0] value.
+On ARM multi-cluster systems, where the MPIDR may not be a linear index,
+to properly dereference the stack pointer array, a mapping function should
+be applied to it so that it can be used for arrays look-ups.
 
-This patch provides a function in the kernel that starting from the
-cpu_logical_map, implement collision-free hashing of MPIDR values by checking
-all significative bits of MPIDR affinity level bitfields. The hashing
-can then be carried out through bits shifting and ORing; the resulting
-hash algorithm is a collision-free though not minimal hash that can be
-executed with few assembly instructions. The mpidr is filtered through a
-mpidr mask that is built by checking all bits that toggle in the set of
-MPIDRs corresponding to possible CPUs. Bits that do not toggle do not carry
-information so they do not contribute to the resulting hash.
+This patch adds code in the cpu_{suspend}/cpu_{resume} implementation
+that relies on shifting and ORing hashing method to map a MPIDR value to a
+set of buckets precomputed at boot to have a collision free mapping from
+MPIDR to context pointers.
 
-Pseudo code:
+The hashing algorithm must be simple, fast, and implementable with few
+instructions since in the cpu_resume path the mapping is carried out with
+the MMU off and the I-cache off, hence code and data are fetched from DRAM
+with no-caching available. Simplicity is counterbalanced with a little
+increase of memory (allocated dynamically) for stack pointers buckets, that
+should be anyway fairly limited on most systems.
 
-/* check all bits that toggle, so they are required */
-for (i = 1, mpidr_mask = 0; i < num_possible_cpus(); i++)
-	mpidr_mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
-
-/*
- * Build shifts to be applied to aff0, aff1, aff2 values to hash the mpidr
- * fls() returns the last bit set in a word, 0 if none
- * ffs() returns the first bit set in a word, 0 if none
- */
-fs0 = mpidr_mask[7:0] ? ffs(mpidr_mask[7:0]) - 1 : 0;
-fs1 = mpidr_mask[15:8] ? ffs(mpidr_mask[15:8]) - 1 : 0;
-fs2 = mpidr_mask[23:16] ? ffs(mpidr_mask[23:16]) - 1 : 0;
-ls0 = fls(mpidr_mask[7:0]);
-ls1 = fls(mpidr_mask[15:8]);
-ls2 = fls(mpidr_mask[23:16]);
-bits0 = ls0 - fs0;
-bits1 = ls1 - fs1;
-bits2 = ls2 - fs2;
-aff0_shift = fs0;
-aff1_shift = 8 + fs1 - bits0;
-aff2_shift = 16 + fs2 - (bits0 + bits1);
-u32 hash(u32 mpidr) {
-	u32 l0, l1, l2;
-	u32 mpidr_masked = mpidr & mpidr_mask;
-	l0 = mpidr_masked & 0xff;
-	l1 = mpidr_masked & 0xff00;
-	l2 = mpidr_masked & 0xff0000;
-	return (l0 >> aff0_shift | l1 >> aff1_shift | l2 >> aff2_shift);
-}
-
-The hashing algorithm relies on the inherent properties set in the ARM ARM
-recommendations for the MPIDR. Exotic configurations, where for instance the
-MPIDR values at a given affinity level have large holes, can end up requiring
-big hash tables since the compression of values that can be achieved through
-shifting is somewhat crippled when holes are present. Kernel warns if
-the number of buckets of the resulting hash table exceeds the number of
-possible CPUs by a factor of 4, which is a symptom of a very sparse HW
-MPIDR configuration.
-
-The hash algorithm is quite simple and can easily be implemented in assembly
-code, to be used in code paths where the kernel virtual address space is
-not set-up (ie cpu_resume) and instruction and data fetches are strongly
-ordered so code must be compact and must carry out few data accesses.
+Memory for context pointers is allocated in a early_initcall with
+size precomputed and stashed previously in kernel data structures.
+Memory for context pointers is allocated through kmalloc; this
+guarantees contiguous physical addresses for the allocated memory which
+is fundamental to the correct functioning of the resume mechanism that
+relies on the context pointer array to be a chunk of contiguous physical
+memory. Virtual to physical address conversion for the context pointer
+array base is carried out at boot to avoid fiddling with virt_to_phys
+conversions in the cpu_resume path which is quite fragile and should be
+optimized to execute as few instructions as possible.
+Virtual and physical context pointer base array addresses are stashed in a
+struct that is accessible from assembly using values generated through the
+asm-offsets.c mechanism.
 
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
@@ -86,115 +54,239 @@ Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Dave Martin <Dave.Martin@arm.com>
 Reviewed-by: Nicolas Pitre <nico@linaro.org>
 ---
- arch/arm/include/asm/smp_plat.h | 12 ++++++++
- arch/arm/kernel/setup.c         | 67 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 79 insertions(+)
+ arch/arm/include/asm/smp_plat.h | 10 ++++-
+ arch/arm/include/asm/suspend.h  |  5 +++
+ arch/arm/kernel/asm-offsets.c   |  6 +++
+ arch/arm/kernel/sleep.S         | 97 +++++++++++++++++++++++++++++++++--------
+ arch/arm/kernel/suspend.c       | 20 +++++++++
+ 5 files changed, 118 insertions(+), 20 deletions(-)
 
 diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
-index aaa61b6..d933b03 100644
+index d933b03..f15eb6e 100644
 --- a/arch/arm/include/asm/smp_plat.h
 +++ b/arch/arm/include/asm/smp_plat.h
-@@ -66,4 +66,16 @@ static inline int get_logical_index(u32 mpidr)
+@@ -66,9 +66,15 @@ static inline int get_logical_index(u32 mpidr)
  	return -EINVAL;
  }
  
-+struct mpidr_hash {
-+	u32	mask;
-+	u32	shift_aff[3];
-+	u32	bits;
++/*
++ * NOTE ! Assembly code relies on the following
++ * structure memory layout in order to carry out load
++ * multiple from its base address. For more
++ * information check arch/arm/kernel/sleep.S
++ */
+ struct mpidr_hash {
+-	u32	mask;
+-	u32	shift_aff[3];
++	u32	mask; /* used by sleep.S */
++	u32	shift_aff[3]; /* used by sleep.S */
+ 	u32	bits;
+ };
+ 
+diff --git a/arch/arm/include/asm/suspend.h b/arch/arm/include/asm/suspend.h
+index 1c0a551..cd20029 100644
+--- a/arch/arm/include/asm/suspend.h
++++ b/arch/arm/include/asm/suspend.h
+@@ -1,6 +1,11 @@
+ #ifndef __ASM_ARM_SUSPEND_H
+ #define __ASM_ARM_SUSPEND_H
+ 
++struct sleep_save_sp {
++	u32 *save_ptr_stash;
++	u32 save_ptr_stash_phys;
 +};
 +
-+extern struct mpidr_hash mpidr_hash;
-+
-+static inline u32 mpidr_hash_size(void)
-+{
-+	return 1 << mpidr_hash.bits;
-+}
- #endif
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 6f5bdd6..74dce64 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -473,6 +473,72 @@ void __init smp_setup_processor_id(void)
- 	printk(KERN_INFO "Booting Linux on physical CPU 0x%x\n", mpidr);
- }
+ extern void cpu_resume(void);
+ extern int cpu_suspend(unsigned long, int (*)(unsigned long));
  
-+struct mpidr_hash mpidr_hash;
-+#ifdef CONFIG_SMP
-+/**
-+ * smp_build_mpidr_hash - Pre-compute shifts required at each affinity
-+ *			  level in order to build a linear index from an
-+ *			  MPIDR value. Resulting algorithm is a collision
-+ *			  free hash carried out through shifting and ORing
-+ */
-+static void __init smp_build_mpidr_hash(void)
-+{
-+	u32 i, affinity;
-+	u32 fs[3], bits[3], ls, mask = 0;
-+	/*
-+	 * Pre-scan the list of MPIDRS and filter out bits that do
-+	 * not contribute to affinity levels, ie they never toggle.
-+	 */
-+	for_each_possible_cpu(i)
-+		mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
-+	pr_debug("mask of set bits 0x%x\n", mask);
-+	/*
-+	 * Find and stash the last and first bit set at all affinity levels to
-+	 * check how many bits are required to represent them.
-+	 */
-+	for (i = 0; i < 3; i++) {
-+		affinity = MPIDR_AFFINITY_LEVEL(mask, i);
-+		/*
-+		 * Find the MSB bit and LSB bits position
-+		 * to determine how many bits are required
-+		 * to express the affinity level.
-+		 */
-+		ls = fls(affinity);
-+		fs[i] = affinity ? ffs(affinity) - 1 : 0;
-+		bits[i] = ls - fs[i];
-+	}
-+	/*
-+	 * An index can be created from the MPIDR by isolating the
-+	 * significant bits@each affinity level and by shifting
-+	 * them in order to compress the 24 bits values space to a
-+	 * compressed set of values. This is equivalent to hashing
-+	 * the MPIDR through shifting and ORing. It is a collision free
-+	 * hash though not minimal since some levels might contain a number
-+	 * of CPUs that is not an exact power of 2 and their bit
-+	 * representation might contain holes, eg MPIDR[7:0] = {0x2, 0x80}.
-+	 */
-+	mpidr_hash.shift_aff[0] = fs[0];
-+	mpidr_hash.shift_aff[1] = MPIDR_LEVEL_BITS + fs[1] - bits[0];
-+	mpidr_hash.shift_aff[2] = 2*MPIDR_LEVEL_BITS + fs[2] -
-+						(bits[1] + bits[0]);
-+	mpidr_hash.mask = mask;
-+	mpidr_hash.bits = bits[2] + bits[1] + bits[0];
-+	pr_debug("MPIDR hash: aff0[%u] aff1[%u] aff2[%u] mask[0x%x] bits[%u]\n",
-+				mpidr_hash.shift_aff[0],
-+				mpidr_hash.shift_aff[1],
-+				mpidr_hash.shift_aff[2],
-+				mpidr_hash.mask,
-+				mpidr_hash.bits);
-+	/*
-+	 * 4x is an arbitrary value used to warn on a hash table much bigger
-+	 * than expected on most systems.
-+	 */
-+	if (mpidr_hash_size() > 4 * num_possible_cpus())
-+		pr_warn("Large number of MPIDR hash buckets detected\n");
-+	sync_cache_w(&mpidr_hash);
-+}
+diff --git a/arch/arm/kernel/asm-offsets.c b/arch/arm/kernel/asm-offsets.c
+index ee68cce..ded0417 100644
+--- a/arch/arm/kernel/asm-offsets.c
++++ b/arch/arm/kernel/asm-offsets.c
+@@ -23,6 +23,7 @@
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/procinfo.h>
++#include <asm/suspend.h>
+ #include <asm/hardware/cache-l2x0.h>
+ #include <linux/kbuild.h>
+ 
+@@ -145,6 +146,11 @@ int main(void)
+ #ifdef MULTI_CACHE
+   DEFINE(CACHE_FLUSH_KERN_ALL,	offsetof(struct cpu_cache_fns, flush_kern_all));
+ #endif
++#ifdef CONFIG_ARM_CPU_SUSPEND
++  DEFINE(SLEEP_SAVE_SP_SZ,	sizeof(struct sleep_save_sp));
++  DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
++  DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
 +#endif
-+
- static void __init setup_processor(void)
- {
- 	struct proc_info_list *list;
-@@ -820,6 +886,7 @@ void __init setup_arch(char **cmdline_p)
- 				smp_set_ops(mdesc->smp);
- 		}
- 		smp_init_cpus();
-+		smp_build_mpidr_hash();
- 	}
- #endif
+   BLANK();
+   DEFINE(DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
+   DEFINE(DMA_TO_DEVICE,		DMA_TO_DEVICE);
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 987dcf3..db1536b 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -7,6 +7,49 @@
+ 	.text
  
+ /*
++ * Implementation of MPIDR hash algorithm through shifting
++ * and OR'ing.
++ *
++ * @dst: register containing hash result
++ * @rs0: register containing affinity level 0 bit shift
++ * @rs1: register containing affinity level 1 bit shift
++ * @rs2: register containing affinity level 2 bit shift
++ * @mpidr: register containing MPIDR value
++ * @mask: register containing MPIDR mask
++ *
++ * Pseudo C-code:
++ *
++ *u32 dst;
++ *
++ *compute_mpidr_hash(u32 rs0, u32 rs1, u32 rs2, u32 mpidr, u32 mask) {
++ *	u32 aff0, aff1, aff2;
++ *	u32 mpidr_masked = mpidr & mask;
++ *	aff0 = mpidr_masked & 0xff;
++ *	aff1 = mpidr_masked & 0xff00;
++ *	aff2 = mpidr_masked & 0xff0000;
++ *	dst = (aff0 >> rs0 | aff1 >> rs1 | aff2 >> rs2);
++ *}
++ * Input registers: rs0, rs1, rs2, mpidr, mask
++ * Output register: dst
++ * Note: input and output registers must be disjoint register sets
++         (eg: a macro instance with mpidr = r1 and dst = r1 is invalid)
++ */
++	.macro compute_mpidr_hash dst, rs0, rs1, rs2, mpidr, mask
++	and	\mpidr, \mpidr, \mask			@ mask out MPIDR bits
++	and	\dst, \mpidr, #0xff			@ mask=aff0
++ ARM(	mov	\dst, \dst, lsr \rs0		)	@ dst=aff0>>rs0
++ THUMB(	lsr	\dst, \dst, \rs0		)
++	and	\mask, \mpidr, #0xff00			@ mask = aff1
++ ARM(	orr	\dst, \dst, \mask, lsr \rs1	)	@ dst|=(aff1>>rs1)
++ THUMB(	lsr	\mask, \mask, \rs1		)
++ THUMB(	orr	\dst, \dst, \mask		)
++	and	\mask, \mpidr, #0xff0000		@ mask = aff2
++ ARM(	orr	\dst, \dst, \mask, lsr \rs2	)	@ dst|=(aff2>>rs2)
++ THUMB(	lsr	\mask, \mask, \rs2		)
++ THUMB(	orr	\dst, \dst, \mask		)
++	.endm
++
++/*
+  * Save CPU state for a suspend.  This saves the CPU general purpose
+  * registers, and allocates space on the kernel stack to save the CPU
+  * specific registers and some other data for resume.
+@@ -29,12 +72,18 @@ ENTRY(__cpu_suspend)
+ 	mov	r1, r4			@ size of save block
+ 	mov	r2, r5			@ virtual SP
+ 	ldr	r3, =sleep_save_sp
+-#ifdef CONFIG_SMP
+-	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
+-	ALT_UP(mov lr, #0)
+-	and	lr, lr, #15
++	ldr	r3, [r3, #SLEEP_SAVE_SP_VIRT]
++	ALT_SMP(mrc p15, 0, r9, c0, c0, 5)
++        ALT_UP_B(1f)
++	ldr	r8, =mpidr_hash
++	/*
++	 * This ldmia relies on the memory layout of the mpidr_hash
++	 * struct mpidr_hash.
++	 */
++	ldmia	r8, {r4-r7}	@ r4 = mpidr mask (r5,r6,r7) = l[0,1,2] shifts
++	compute_mpidr_hash	lr, r5, r6, r7, r9, r4
+ 	add	r3, r3, lr, lsl #2
+-#endif
++1:
+ 	bl	__cpu_suspend_save
+ 	adr	lr, BSYM(cpu_suspend_abort)
+ 	ldmfd	sp!, {r0, pc}		@ call suspend fn
+@@ -81,15 +130,23 @@ ENDPROC(cpu_resume_after_mmu)
+ 	.data
+ 	.align
+ ENTRY(cpu_resume)
+-#ifdef CONFIG_SMP
+-	adr	r0, sleep_save_sp
+-	ALT_SMP(mrc p15, 0, r1, c0, c0, 5)
+-	ALT_UP(mov r1, #0)
+-	and	r1, r1, #15
+-	ldr	r0, [r0, r1, lsl #2]	@ stack phys addr
+-#else
+-	ldr	r0, sleep_save_sp	@ stack phys addr
+-#endif
++	mov	r1, #0
++	ALT_SMP(mrc p15, 0, r0, c0, c0, 5)
++	ALT_UP_B(1f)
++	adr	r2, mpidr_hash_ptr
++	ldr	r3, [r2]
++	add	r2, r2, r3		@ r2 = struct mpidr_hash phys address
++	/*
++	 * This ldmia relies on the memory layout of the mpidr_hash
++	 * struct mpidr_hash.
++	 */
++	ldmia	r2, { r3-r6 }	@ r3 = mpidr mask (r4,r5,r6) = l[0,1,2] shifts
++	compute_mpidr_hash	r1, r4, r5, r6, r0, r3
++1:
++	adr	r0, _sleep_save_sp
++	ldr	r0, [r0, #SLEEP_SAVE_SP_PHYS]
++	ldr	r0, [r0, r1, lsl #2]
++
+ 	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
+ 	@ load phys pgd, stack, resume fn
+   ARM(	ldmia	r0!, {r1, sp, pc}	)
+@@ -98,7 +155,11 @@ THUMB(	mov	sp, r2			)
+ THUMB(	bx	r3			)
+ ENDPROC(cpu_resume)
+ 
+-sleep_save_sp:
+-	.rept	CONFIG_NR_CPUS
+-	.long	0				@ preserve stack phys ptr here
+-	.endr
++	.align 2
++mpidr_hash_ptr:
++	.long	mpidr_hash - .			@ mpidr_hash struct offset
++
++	.type	sleep_save_sp, #object
++ENTRY(sleep_save_sp)
++_sleep_save_sp:
++	.space	SLEEP_SAVE_SP_SZ		@ struct sleep_save_sp
+diff --git a/arch/arm/kernel/suspend.c b/arch/arm/kernel/suspend.c
+index c59c97e..17d02f6 100644
+--- a/arch/arm/kernel/suspend.c
++++ b/arch/arm/kernel/suspend.c
+@@ -1,9 +1,12 @@
+ #include <linux/init.h>
++#include <linux/slab.h>
+ 
++#include <asm/cacheflush.h>
+ #include <asm/idmap.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
+ #include <asm/memory.h>
++#include <asm/smp_plat.h>
+ #include <asm/suspend.h>
+ #include <asm/tlbflush.h>
+ 
+@@ -74,3 +77,20 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+ 
+ 	return ret;
+ }
++
++extern struct sleep_save_sp sleep_save_sp;
++
++static int cpu_suspend_alloc_sp(void)
++{
++	void *ctx_ptr;
++	/* ctx_ptr is an array of physical addresses */
++	ctx_ptr = kcalloc(mpidr_hash_size(), sizeof(u32), GFP_KERNEL);
++
++	if (WARN_ON(!ctx_ptr))
++		return -ENOMEM;
++	sleep_save_sp.save_ptr_stash = ctx_ptr;
++	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
++	sync_cache_w(&sleep_save_sp);
++	return 0;
++}
++early_initcall(cpu_suspend_alloc_sp);
 -- 
 1.8.2.2
