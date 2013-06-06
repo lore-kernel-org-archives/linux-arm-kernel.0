@@ -1,37 +1,83 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Jun 2013 14:02:01 -0400
-Subject: [PATCH 0/8] Support Marvell bootloaders remapping registers at
- different locations
-In-Reply-To: <20130605210104.GQ3803@titan.lakedaemon.net>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130605210104.GQ3803@titan.lakedaemon.net>
-Message-ID: <20130606180201.GM23859@titan.lakedaemon.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 6 Jun 2013 11:04:25 -0700
+Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over
+ global devices
+In-Reply-To: <51B0A6E8.20909@linaro.org>
+References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
+ <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
+ <51B0A6E8.20909@linaro.org>
+Message-ID: <20130606180425.GQ599@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 05:01:04PM -0400, Jason Cooper wrote:
-> On Wed, Jun 05, 2013 at 09:04:53AM +0200, Thomas Petazzoni wrote:
-> > This patch series is based on jcooper/mvebu/fixes-non-critical and
-> > jcooper/mvebu/cleanup, which contains 3 patches that are necessary to
-> > make this patch series work properly.
+On 06/06, Daniel Lezcano wrote:
+> On 06/03/2013 10:33 PM, Stephen Boyd wrote:
+> > On an SMP system with only one global clockevent and a dummy
+> > clockevent per CPU we run into problems. We want the dummy
+> > clockevents to be registered as the per CPU tick devices, but
+> > we can only achieve that if we register the dummy clockevents
+> > before the global clockevent or if we artificially inflate the
+> > rating of the dummy clockevents to be higher than the rating
+> > of the global clockevent. Failure to do so leads to boot
+> > hangs when the dummy timers are registered on all other CPUs
+> > besides the CPU that accepted the global clockevent as its tick
+> > device and there is no broadcast timer to poke the dummy
+> > devices.
+> > 
+> > If we're registering multiple clockevents and one clockevent is
+> > global and the other is local to a particular CPU we should
+> > choose to use the local clockevent regardless of the rating of
+> > the device. This way, if the clockevent is a dummy it will take
+> > the tick device duty as long as there isn't a higher rated tick
+> > device and any global clockevent will be bumped out into
+> > broadcast mode, fixing the problem described above.
 > 
-> Thomas,
+> It is not clear the connection between the changelog, the patch and the
+> comment. Could you clarify a bit ?
 > 
-> I've tentatively pulled your series into mvebu/regmap with appropriate
-> dependencies.
-> 
-> I was going to put this in for-next, but I got a build error after
-> merging it.  Could you do me a favor and try merging this with
-> mvebu/seb_clk?  Just shoot me the merge resolution that builds
-> mvebu_defconfig correctly, and I'll incorporate it into the merge.  No
-> need to rebase the series.
-> 
-> If you want to reproduce what I saw, just merge mvebu/regmap with
-> for-next (up shortly), and build mvebu_defconfig.
 
-This has now been resolved, whole series, with v2 of the one patch is in
-mvebu/regmap.
+There is one tick device per-cpu and one broadcast device. The
+broadcast device can only be a global clockevent, whereas the
+per-cpu tick device can be a global clockevent or a per-cpu
+clockevent. The code tries hard to keep per-cpu clockevents in
+the tick device slots but it has an ordering/rating requirement
+that doesn't work when there are only dummy per-cpu devices and
+one global device.
 
-thx,
+Perhaps an example will help. Let's say you only have one global
+clockevent such as the sp804, and you have SMP enabled. To
+support SMP we have to register dummy clockevents on each CPU so
+that the sp804 can go into broadcast mode. If we don't do this,
+only the CPU that registered the sp804 will get interrupts while
+the other CPUs will be left with no tick device and thus no
+scheduling. To fix this we register dummy clockevents on all the
+CPUs _before_ we register the sp804 to force the sp804 into the
+broadcast slot. Or we give the dummy clockevents a higher rating
+than the sp804 so that when we register them after the sp804 the
+sp804 is bumped out to broadcast duty.
 
-Jason.
+If the dummy devices are registered before the sp804 we can give
+the dummies a low rating and the sp804 will still go into the
+broadcast slot due to this code:
+
+	/*
+	 * If we have a cpu local device already, do not replace it
+	 * by a non cpu local device
+	 */
+	if (curdev && cpumask_equal(curdev->cpumask, cpumask_of(cpu)))
+		goto out_bc;
+
+If we register the sp804 before the dummies we're also fine as
+long as the rating of the dummy is more than the sp804.  Playing
+games with the dummy rating is not very nice so this patch fixes
+it by allowing the per-cpu device to replace the global device no
+matter what the rating of the global device is.
+
+This fixes the sp804 case when the dummy is rated lower than
+sp804 and it removes any ordering requirement from the
+registration of clockevents. It also completes the logic above
+where we prefer cpu local devices over non cpu local devices.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
