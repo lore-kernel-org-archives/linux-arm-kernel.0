@@ -1,48 +1,42 @@
-From: padma.kvr@gmail.com (Padma Venkat)
-Date: Thu, 6 Jun 2013 09:24:30 +0530
-Subject: [PATCH V5 4/5] ARM: dts: add clock provider information for i2s
- controllers in Exynos5250
-In-Reply-To: <CAD=FV=VHwTNQy5oNZ0cCaydJDDTst+yxFw4onKSDJR4DQV0gSw@mail.gmail.com>
-References: <1370348890-6645-1-git-send-email-padma.v@samsung.com>
- <1370348890-6645-5-git-send-email-padma.v@samsung.com>
- <CAD=FV=VHwTNQy5oNZ0cCaydJDDTst+yxFw4onKSDJR4DQV0gSw@mail.gmail.com>
-Message-ID: <CAAgF-Bcg3RQ-xJL0EGfwhRsBK477bCUcMu5Zr5x884HyzVbkcA@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 6 Jun 2013 03:54:55 +0000 (UTC)
+Subject: [PATCH 0/5] Broken DM816x support in Linux 3.10-rc4
+In-Reply-To: <1370446156-11788-1-git-send-email-aida.mynzhasova@skitlab.ru>
+References: <1370446156-11788-1-git-send-email-aida.mynzhasova@skitlab.ru>
+Message-ID: <alpine.DEB.2.02.1306060346390.15042@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+????????????,
 
-On Tue, Jun 4, 2013 at 10:49 PM, Doug Anderson <dianders@chromium.org> wrote:
-> Padmavathi,
->
-> On Tue, Jun 4, 2013 at 5:28 AM, Padmavathi Venna <padma.v@samsung.com> wrote:
->> @@ -471,6 +477,8 @@
->>                 dmas = <&pdma1 12
->>                         &pdma1 11>;
->>                 dma-names = "tx", "rx";
->> +               clocks = <&clock 307>;
->> +               clock-names = "iis";
->
-> ...actually, glancing at the driver I'm a little surprised that you
-> don't need to list "i2s_opclk0".  Did you test i2s1?
+On Wed, 5 Jun 2013, Aida Mynzhasova wrote:
 
-I didn't test i2s1 but i2s_opclk0 is also required. I will resubmit the patch.
+> Not so long ago I tried to boot Linux 3.10-rc4 kernel on DM816x EVM
+> board. Unfortunately, my attempts were failed by reason of poor
+> support of DM81xx-based devices in new kernels.
 
->
->>                 pinctrl-names = "default";
->>                 pinctrl-0 = <&i2s1_bus>;
->>         };
->> @@ -481,6 +489,8 @@
->>                 dmas = <&pdma0 12
->>                         &pdma0 11>;
->>                 dma-names = "tx", "rx";
->> +               clocks = <&clock 308>;
->> +               clock-names = "iis";
->
-> ...and here.
->
->
-> -Doug
+Yeah, TI pretty much gave up on trying to get support for that chip 
+upstream a few years ago.  Same for DM814x.
 
-Thanks
-Padma
+> So, I suggest you this patch series, which fixes that kernel crush and 
+> adds new functions/structures, required for early initialization on 
+> DM816x (power and clock domains, hwmods). After applying these patches 
+> the kernel is able to successfully continue booting till clock 
+> initialization (will be added later).
+
+OK, it will be great to get my DM8168EVM booting on mainline.  But there 
+are a few preliminary issues with the patches:
+
+1. All new chip and board support needs to be DT-only.  So, no new board 
+files.  Also, all the hwmod data shouldn't have IRQ, DMA, etc. data - that 
+should come from DT.  See for example the recently posted patch "[PATCH 
+13/14] ARM: AM33XX: hwmod data: irq, dma and addr info clean up"
+
+2. Looks like patch 2 is missing from the list.  If it's too big for the 
+list, please break it down into smaller patches.
+
+3. Did you write this code and data, hwmods, etc., or did it come from a 
+TI kernel?  Please note this clearly in the patch descriptions.
+
+
+- Paul
