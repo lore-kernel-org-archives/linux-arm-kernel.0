@@ -1,49 +1,75 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:17 +0900
-Subject: [PATCH 04/23] ARM: shmobile: r8a7740: add TPU PWM support
+Date: Thu,  6 Jun 2013 16:28:14 +0900
+Subject: [PATCH 01/23] ARM: shmobile: r8a7778: fixup Ether setup code position
 In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503716-31155-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503716-31155-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Tested-by: Simon Horman <horms@verge.net.au>
+Ether setup code position was scattering.
+This patch fixes it up
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7740.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/setup-r8a7778.c | 28 ++++++++++++++--------------
+ 1 file changed, 14 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index 633307d..cf65ef5 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -461,7 +461,7 @@ enum {
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 30b4a33..d6ee521 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -80,12 +80,6 @@ static struct sh_timer_config sh_tmu1_platform_data = {
+ 	.clocksource_rating	= 200,
+ };
  
- 	MSTP329, MSTP328, MSTP323, MSTP320,
- 	MSTP314, MSTP313, MSTP312,
--	MSTP309,
-+	MSTP309, MSTP304,
+-/* Ether */
+-static struct resource ether_resources[] = {
+-	DEFINE_RES_MEM(0xfde00000, 0x400),
+-	DEFINE_RES_IRQ(gic_iid(0x89)),
+-};
+-
+ #define r8a7778_register_tmu(idx)			\
+ 	platform_device_register_resndata(		\
+ 		&platform_bus, "sh_tmu", idx,		\
+@@ -94,6 +88,20 @@ static struct resource ether_resources[] = {
+ 		&sh_tmu##idx##_platform_data,		\
+ 		sizeof(sh_tmu##idx##_platform_data))
  
- 	MSTP416, MSTP415, MSTP407, MSTP406,
++/* Ether */
++static struct resource ether_resources[] = {
++	DEFINE_RES_MEM(0xfde00000, 0x400),
++	DEFINE_RES_IRQ(gic_iid(0x89)),
++};
++
++void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
++{
++	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
++					  ether_resources,
++					  ARRAY_SIZE(ether_resources),
++					  pdata, sizeof(*pdata));
++}
++
+ void __init r8a7778_add_standard_devices(void)
+ {
+ 	int i;
+@@ -118,14 +126,6 @@ void __init r8a7778_add_standard_devices(void)
+ 	r8a7778_register_tmu(1);
+ }
  
-@@ -499,6 +499,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP313] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 13, 0), /* SDHI1 */
- 	[MSTP312] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3, 12, 0), /* MMC */
- 	[MSTP309] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR3,  9, 0), /* GEther */
-+	[MSTP304] = SH_CLK_MSTP32(&div4_clks[DIV4_CP],	SMSTPCR3,  4, 0), /* TPU0 */
- 
- 	[MSTP416] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 16, 0), /* USBHOST */
- 	[MSTP415] = SH_CLK_MSTP32(&div4_clks[DIV4_HP],	SMSTPCR4, 15, 0), /* SDHI2 */
-@@ -595,6 +596,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("e6bd0000.mmcif",         &mstp_clks[MSTP312]),
- 	CLKDEV_DEV_ID("sh-eth",			&mstp_clks[MSTP309]),
- 	CLKDEV_DEV_ID("e9a00000.sh-eth",	&mstp_clks[MSTP309]),
-+	CLKDEV_DEV_ID("renesas_tpu_pwm",	&mstp_clks[MSTP304]),
- 
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2",	&mstp_clks[MSTP415]),
- 	CLKDEV_DEV_ID("e6870000.sdhi",          &mstp_clks[MSTP415]),
+-void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
+-{
+-	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
+-					  ether_resources,
+-					  ARRAY_SIZE(ether_resources),
+-					  pdata, sizeof(*pdata));
+-}
+-
+ static struct renesas_intc_irqpin_config irqpin_platform_data = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
+ 	.sense_bitfield_width = 2,
 -- 
 1.8.2.1
