@@ -1,62 +1,74 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Jun 2013 15:28:33 +0100
-Subject: [PATCH 09/10] ARM: kvm: use inner-shareable barriers after TLB
- flushing
+Date: Thu,  6 Jun 2013 15:28:30 +0100
+Subject: [PATCH 06/10] ARM: spinlock: use inner-shareable dsb variant prior to
+ sev instruction
 In-Reply-To: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
 References: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1370528914-17506-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1370528914-17506-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When flushing the TLB at PL2 in response to remapping at stage-2 or VMID
-rollover, we have a dsb instruction to ensure completion of the command
-before continuing.
+When unlocking a spinlock, we use the sev instruction to signal other
+CPUs waiting on the lock. Since sev is not a memory access instruction,
+we require a dsb in order to ensure that the sev is not issued ahead
+of the store placing the lock in an unlocked state.
 
-Since we only care about other processors for TLB invalidation, use the
-inner-shareable variant of the dsb instruction instead.
+However, as sev is only concerned with other processors in a
+multiprocessor system, we can restrict the scope of the preceding dsb
+to the inner-shareable domain. Furthermore, we can restrict the scope to
+consider only stores, since there are no independent loads on the unlock
+path.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+A side-effect of this change is that a spin_unlock operation no longer
+forces completion of pending TLB invalidation, something which we rely
+on when unlocking runqueues to ensure that CPU migration during TLB
+maintenance routines doesn't cause us to continue before the operation
+has completed.
+
+This patch adds the -ishst suffix to the ARMv7 definition of dsb_sev()
+and adds an inner-shareable dsb to the context-switch path when running
+a preemptible, SMP, v7 kernel.
+
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kvm/init.S       | 2 +-
- arch/arm/kvm/interrupts.S | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/spinlock.h  |  2 +-
+ arch/arm/include/asm/switch_to.h | 10 ++++++++++
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/kvm/init.S b/arch/arm/kvm/init.S
-index f048338..1b9844d 100644
---- a/arch/arm/kvm/init.S
-+++ b/arch/arm/kvm/init.S
-@@ -142,7 +142,7 @@ target:	@ We're now in the trampoline code, switch page tables
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index 6220e9f..5a0261e 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -46,7 +46,7 @@ static inline void dsb_sev(void)
+ {
+ #if __LINUX_ARM_ARCH__ >= 7
+ 	__asm__ __volatile__ (
+-		"dsb\n"
++		"dsb ishst\n"
+ 		SEV
+ 	);
+ #else
+diff --git a/arch/arm/include/asm/switch_to.h b/arch/arm/include/asm/switch_to.h
+index fa09e6b..c99e259 100644
+--- a/arch/arm/include/asm/switch_to.h
++++ b/arch/arm/include/asm/switch_to.h
+@@ -4,6 +4,16 @@
+ #include <linux/thread_info.h>
  
- 	@ Invalidate the old TLBs
- 	mcr	p15, 4, r0, c8, c7, 0	@ TLBIALLH
--	dsb
-+	dsb	ish
- 
- 	eret
- 
-diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
-index f7793df..dfb5dcc 100644
---- a/arch/arm/kvm/interrupts.S
-+++ b/arch/arm/kvm/interrupts.S
-@@ -54,7 +54,7 @@ ENTRY(__kvm_tlb_flush_vmid_ipa)
- 	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
- 	isb
- 	mcr     p15, 0, r0, c8, c3, 0	@ TLBIALLIS (rt ignored)
--	dsb
-+	dsb	ish
- 	isb
- 	mov	r2, #0
- 	mov	r3, #0
-@@ -78,7 +78,7 @@ ENTRY(__kvm_flush_vm_context)
- 	mcr     p15, 4, r0, c8, c3, 4
- 	/* Invalidate instruction caches Inner Shareable (ICIALLUIS) */
- 	mcr     p15, 0, r0, c7, c1, 0
--	dsb
-+	dsb	ish
- 	isb				@ Not necessary if followed by eret
- 
- 	bx	lr
+ /*
++ * For v7 SMP cores running a preemptible kernel we may be pre-empted
++ * during a TLB maintenance operation, so execute an inner-shareable dsb
++ * to ensure that the maintenance completes in case we migrate to another
++ * CPU.
++ */
++#if defined(CONFIG_PREEMPT) && defined(CONFIG_SMP) && defined(CONFIG_CPU_V7)
++#define finish_arch_switch(prev)	dsb(ish)
++#endif
++
++/*
+  * switch_to(prev, next) should switch from task `prev' to `next'
+  * `prev' will never be the same as `next'.  schedule() itself
+  * contains the memory barrier to tell GCC not to cache `current'.
 -- 
 1.8.2.2
