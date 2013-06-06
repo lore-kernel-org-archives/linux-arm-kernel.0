@@ -1,104 +1,28 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Thu, 6 Jun 2013 11:30:44 -0400
-Subject: getting allwinner SoC support upstream (was Re: Uploading
- linux (3.9.4-1))
-In-Reply-To: <CAPweEDzk0T+fZ1aW16D8K4XpvRR2GRrOFtfcjzstnmEJWxmREg@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <CAPweEDzDC87KmOQ=0hyPcjPtPsRuXHxNTs97vbEqVNNnix69rA@mail.gmail.com>
- <19865137.ey1FePPnmD@flatron>
- <CAPweEDzk0T+fZ1aW16D8K4XpvRR2GRrOFtfcjzstnmEJWxmREg@mail.gmail.com>
-Message-ID: <20130606153044.GZ11182@csclub.uwaterloo.ca>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Thu, 6 Jun 2013 15:31:56 +0000 (UTC)
+Subject: [PATCH v2 1/1] ARM : omap3 : fix wrong container_of in clock36xx.c
+In-Reply-To: <CAGGh5h1gBin0vWFf=SpB4eCQX69a2U+J6u2ccF_Oo_4R62+5fQ@mail.gmail.com>
+References: <1369903827-2025-1-git-send-email-jp.francois@cynove.com>
+ <alpine.DEB.2.02.1306051814520.10103@utopia.booyaka.com>
+ <CAGGh5h1gBin0vWFf=SpB4eCQX69a2U+J6u2ccF_Oo_4R62+5fQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.02.1306061517430.5152@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 11:38:52PM +0100, Luke Kenneth Casson Leighton wrote:
->  their sheer overwhelming success provides us with mass-volume
-> ultra-low cost hardware.  to not make an effort to accommodate them
-> would in this specific instance be a huge missed opportunity,
-> responsibility for which currently falls on the shoulders of the sunxi
-> community, where that small community is in no way considered
-> "authoritative" as an upstream source and thus every single GNU/Linux
-> Distro is left in a position of forcing people to follow insane
-> non-standard build procedures that are *way* outside of the capability
-> of the average person.
+On Thu, 6 Jun 2013, jean-philippe francois wrote:
 
-Who cares what their sales volume is.
-
-If they are that successful perhaps they could afford to spend some
-resources to fix the mess they have created.
-
->  so by the linux kernel developers intransigent position, the reach of
-> free software as a whole is greatly reduced.  simple logical
-> unavoidable conclusion.
-
-Long term having maintainable code is important.  Companies like the
-maker of the allwinner come and go.  Maybe in a yaer or two they will be
-irrelevant after some much better design from another company takes over
-the market.  Perhaps even one sensible enough to work with the community
-in the first place, rather than violate the GPL for a long time.
-
->  please feel free - linux kernel developers - to maintain this
-> intransigent position for as long as you find it useful to you to do
-> so.  btw, that is a sincere statement, devoid and completely free of
-> all and any implicit or explicit additional statements and
-> implications.
-
-I have not seen anything mentioned that the allwinner proprietary fex
-system does that devicetree does not already do.  So there is no benefit
-to anyone (except perhaps allwinner) to adding their system, and a lot
-of disadvantages in terms of changes to lots of drivers.  Life would
-become much easier for allwinner customers if they did change to
-devicetree.  Suddenly a much larger selection of hardware becomes trivial
-to include in designs.  Upgrades to new kernels become easier.  Life in
-general becomes easier.
-
->  yeahh, that's rather unfortunate.  i went to some lengths to avoid
-> mentioning eoma [*1] until there was a natural point at which it
-> became difficult *not* to bring it up, not least because i didn't hear
-> anyone else presenting any actual real workable solutions.
+> Does the first version [1] of the patch, that only touch the MSB of
+> the divider also trigger the
+> bug ?
 > 
-> but, you have to bear in mind a couple of things:
-> 
-> a) i'm a free software developer and advocate.  "business", "lobbying"
-> etc. do not come naturally to me.  my associates scream at me
-> regularly.
-> 
-> b) i've been thinking about this incredibly hard problem for at least
-> 4 years and almost *all* of my background in computing of the past 30
-> years leads me naturally towards actually coming up with a solution
-> 
-> c) i'm actually really, really really and truly going about *actively*
-> implementing that solution rather than just complaining about it *and*
-> i'm inviting free software developers to participate, why, because see
-> first sentence of a) above.
+> [1]  https://patchwork.kernel.org/patch/2609681/
 
-Well making a tool to convert the fex stuff to devicetree sure sounds
-like it could be helpful to allwinner customers.
+That one passes the PM test here.  Will take this one for v3.10-rc fixes 
+instead, since it fixes a known DSS problem and the original code wasn't 
+correct.
 
-And if there is anything you know if that can't be represented in
-devicetree, I am sure some people would like to know about it.  I doubt
-you can come up with anything though.
+Jean, could you work with Mike to come up with a better approach for 
+v3.11 or v3.12?
 
-Clearly adding fex to the upstream kernel isn't a good idea and isn't
-going to happen, so any "solution" has to involve getting allwinner to
-use devicetree and making doing that as easy as possible.
 
-> [*1] which is an open standard, not a proprietary locked one.
-
-It will be interesting to see if it ever turns into anything, or gets
-stuck as just an interesting idea that never took off.
-
-I just checked for my freescale i.mx53, and it has devicetree support
-as of 3.3 kernels.  The TI chips I have looked at recently all use
-devicetree, even the ones that have not yet been merged upstream.
-The marvell armada 370 and xp both appear to have devicetree support.
-Nvidia tegras appear to have devicetree support.  not sure if any of
-the qualcomm snapdragons have devicetree support yet.
-
-It seems to me almost everyone else is getting on with doing devicetree,
-and allwinner is the odd one out that just can't be bothered to get with
-the program.
-
--- 
-Len Sorensen
+- Paul
