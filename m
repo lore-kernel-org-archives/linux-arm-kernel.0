@@ -1,41 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:16 +0900
-Subject: [PATCH 03/23] ARM: shmobile: r8a7740: Add I2C DT clock names
-In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503716-31155-4-git-send-email-horms+renesas@verge.net.au>
+Date: Thu,  6 Jun 2013 16:28:23 +0900
+Subject: [PATCH 5/5] ARM: shmobile: marzen: keep local function as static
+In-Reply-To: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370503703-31024-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503703-31024-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@gmail.com>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Add clock association for i2c0 and i2c1 for the new DT names.
+marzen_init_late() should be static
 
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7740.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-shmobile/board-marzen.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
-index 5bd8da0..633307d 100644
---- a/arch/arm/mach-shmobile/clock-r8a7740.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7740.c
-@@ -551,6 +551,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_tmu.4",		&mstp_clks[MSTP111]),
- 	CLKDEV_DEV_ID("sh_tmu.5",		&mstp_clks[MSTP111]),
- 	CLKDEV_DEV_ID("i2c-sh_mobile.0",	&mstp_clks[MSTP116]),
-+	CLKDEV_DEV_ID("fff20000.i2c",		&mstp_clks[MSTP116]),
- 	CLKDEV_DEV_ID("sh_mobile_lcdc_fb.1",	&mstp_clks[MSTP117]),
- 	CLKDEV_DEV_ID("sh_tmu.0",		&mstp_clks[MSTP125]),
- 	CLKDEV_DEV_ID("sh_tmu.1",		&mstp_clks[MSTP125]),
-@@ -584,6 +585,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_cmt.10",		&mstp_clks[MSTP329]),
- 	CLKDEV_DEV_ID("sh_fsi2",		&mstp_clks[MSTP328]),
- 	CLKDEV_DEV_ID("i2c-sh_mobile.1",	&mstp_clks[MSTP323]),
-+	CLKDEV_DEV_ID("e6c20000.i2c",		&mstp_clks[MSTP323]),
- 	CLKDEV_DEV_ID("renesas_usbhs",		&mstp_clks[MSTP320]),
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0",	&mstp_clks[MSTP314]),
- 	CLKDEV_DEV_ID("e6850000.sdhi",          &mstp_clks[MSTP314]),
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index 9105285..d9c494e 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -349,7 +349,7 @@ static struct platform_device *marzen_late_devices[] __initdata = {
+ 	&ohci1_device,
+ };
+ 
+-void __init marzen_init_late(void)
++static void __init marzen_init_late(void)
+ {
+ 	/* get usb phy */
+ 	phy = usb_get_phy(USB_PHY_TYPE_USB2);
 -- 
 1.8.2.1
