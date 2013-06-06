@@ -1,60 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 6 Jun 2013 17:58:24 +0200
-Subject: [PATCH 4/4] ARM: ux500: Remove call to u8500_of_init_devices() -
- again
-In-Reply-To: <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
-References: <1370517676-10909-1-git-send-email-lee.jones@linaro.org>
- <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <201306061758.25106.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 6 Jun 2013 09:00:00 -0700
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
+Message-ID: <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 June 2013, Lee Jones wrote:
-> Somehow, probably due to a merge error the call to u8500_of_init_devices()
-> has re-appeared in next, causing this error:
-> 
-> arch/arm/mach-ux500/cpu-db8500.c: In function ?u8500_init_machine?:
-> arch/arm/mach-ux500/cpu-db8500.c:268:2: error: implicit declaration of     \
->   function ?u8500_of_init_devices? [-Werror=implicit-function-declaration]
-> arch/arm/mach-ux500/cpu-db8500.c:268:9: warning: assignment makes pointer  \
->   from integer without a cast [enabled by default]
-> 
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> ---
->  arch/arm/mach-ux500/cpu-db8500.c |    3 ---
->  1 file changed, 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-> index d8ee616..f391d08 100644
-> --- a/arch/arm/mach-ux500/cpu-db8500.c
-> +++ b/arch/arm/mach-ux500/cpu-db8500.c
-> @@ -264,9 +264,6 @@ static void __init u8500_init_machine(void)
->  	else if (of_machine_is_compatible("st-ericsson,ccu9540")) {}
->  		/* TODO: Add pinmaps for ccu9540 board. */
->  
-> -	/* TODO: Export SoC, USB, cpu-freq and DMA40 */
-> -	parent = u8500_of_init_devices();
-> -
->  	/* automatically probe child nodes of dbx5x0 devices */
->  	if (of_machine_is_compatible("st-ericsson,u8540"))
->  		of_platform_populate(NULL, u8500_local_bus_nodes,
-> -- 
-> 1.7.10.4
-> 
-> 
+On Thu, Jun 6, 2013 at 8:13 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> On Wed, Jun 5, 2013 at 7:54 PM, luke.leighton <luke.leighton@gmail.com> wrote:
+>>  augh.  ok.  solutions.  what are the solutions here?
+>
+> Luke if you really want to fix this a good solution is to have
+> Allwinner join Linaro and provide an engineer to the Linaro effort.
+> That engineer will get educated on the right way to do kernel
+> development and he can pass that knowledge back to Allwinner each day
+> as he learns it.
 
-In the code I'm looking at, the definition for that function is
+There's no need for anybody to join Linaro to contribute upstream.
+That's a crazy notion.
 
-/* TODO: Once all pieces are DT:ed, remove completely. */
-static struct device * __init u8500_of_init_devices(void)
-{
-        struct device *parent = db8500_soc_device_init();
-        db8500_add_usb(parent, usb_db8500_dma_cfg, usb_db8500_dma_cfg);
-        return parent;
-}
+Listen, Allwinner isn't working in a vacuum, believe it or not. I've
+talked to them, so has Arnd and other people working on ARM, including
+Maxime Ripard, who's been reimplementing upstream support for their
+platform. Everybody is interested in the right things happening, it's
+just a matter of figuring out how to do it. The right people are
+already talking.
 
-I'm not sure about the db8500_add_usb() call, but I think at least
-db8500_soc_device_init() is required to get the root device for all
-other devices.
+> Allwinner has expressed interest in the past in joining Linaro but the
+> price was too high. I believe there are cheaper options now for
+> joining. The benefits Allwinner receives from joining will far exceed
+> the cost of joining. The net result will likely be a reduction in the
+> amount they need to spend on in-house development since they will
+> learn how to better leverage other developer's work.
 
-	Arnd
+Uh, you're listing the benefits of doing upstream work, not of joining Linaro.
+
+
+-Olof
