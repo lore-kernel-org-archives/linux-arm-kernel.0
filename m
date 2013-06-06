@@ -1,45 +1,82 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  6 Jun 2013 16:28:48 +0900
-Subject: [PATCH 2/2] irqchip: Add irqchip_init dummy function
-In-Reply-To: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370503728-31373-3-git-send-email-horms+renesas@verge.net.au>
+Date: Thu,  6 Jun 2013 16:28:36 +0900
+Subject: [PATCH 23/23] ARM: shmobile: sh73a0: div4 clocks must check the kick
+ bit before changing rate
+In-Reply-To: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370503716-31155-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370503716-31155-24-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bastian Hecht <hechtb@gmail.com>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-We add an empty irqchip_init dummy function for cases in which
-CONFIG_IRQCHIP is not used. In these cases irqchip.c is not compiled,
-but a funtion call may still be present in architecture code, that in
-runtime doesn't get hit.
+According to the datasheet, it is not allowed to change div4 clock rates
+if an earlier rate change operation is still in progress, as indicated by
+a set kick bit.
 
-E.g. this is needed in the arch/arm/mach-shmobile/intc-r8a7740.c
-interrupt setup code where OF use and non OF us is both handled in one
-file.
-
-Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
-[horms+renesas at verge.net.au: Make non-CONFIG_IRQCHIP version static inline
- and remove trailing ';'.]
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/linux/irqchip.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-shmobile/clock-sh73a0.c | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/irqchip.h b/include/linux/irqchip.h
-index e0006f1..14d7913 100644
---- a/include/linux/irqchip.h
-+++ b/include/linux/irqchip.h
-@@ -11,6 +11,10 @@
- #ifndef _LINUX_IRQCHIP_H
- #define _LINUX_IRQCHIP_H
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index d05cf90..d9fd033 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -257,7 +257,7 @@ static struct clk twd_clk = {
+ 	.ops = &twd_clk_ops,
+ };
  
-+#ifdef CONFIG_IRQCHIP
- void irqchip_init(void);
-+#else
-+static inline void irqchip_init(void) {}
-+#endif
+-static struct sh_clk_ops zclk_ops;
++static struct sh_clk_ops zclk_ops, kicker_ops;
+ static const struct sh_clk_ops *div4_clk_ops;
  
- #endif
+ static int zclk_set_rate(struct clk *clk, unsigned long rate)
+@@ -324,18 +324,32 @@ static unsigned long zclk_recalc(struct clk *clk)
+ 	return clk_get_rate(clk->parent);
+ }
+ 
+-static void zclk_extend(void)
++static int kicker_set_rate(struct clk *clk, unsigned long rate)
+ {
+-	div4_clk_ops = div4_clks[DIV4_Z].ops;
++	if (__raw_readl(FRQCRB) & (1 << 31))
++		return -EBUSY;
++
++	return div4_clk_ops->set_rate(clk, rate);
++}
++
++static void div4_clk_extend(void)
++{
++	int i;
++
++	div4_clk_ops = div4_clks[0].ops;
+ 
++	/* Add a kicker-busy check before changing the rate */
++	kicker_ops = *div4_clk_ops;
+ 	/* We extend the DIV4 clock with a 1:1 pass-through case */
+ 	zclk_ops = *div4_clk_ops;
+ 
++	kicker_ops.set_rate = kicker_set_rate;
+ 	zclk_ops.set_rate = zclk_set_rate;
+ 	zclk_ops.round_rate = zclk_round_rate;
+ 	zclk_ops.recalc = zclk_recalc;
+ 
+-	div4_clks[DIV4_Z].ops = &zclk_ops;
++	for (i = 0; i < DIV4_NR; i++)
++		div4_clks[i].ops = i == DIV4_Z ? &zclk_ops : &kicker_ops;
+ }
+ 
+ enum { DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_ZB1,
+@@ -697,7 +711,7 @@ void __init sh73a0_clock_init(void)
+ 	if (!ret) {
+ 		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
+ 		if (!ret)
+-			zclk_extend();
++			div4_clk_extend();
+ 	}
+ 
+ 	if (!ret)
 -- 
 1.8.2.1
