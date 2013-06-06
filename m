@@ -1,47 +1,39 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 06 Jun 2013 14:43:37 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron>
- <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
-Message-ID: <1851164.HnXhGSdttW@flatron>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 6 Jun 2013 13:45:02 +0100
+Subject: [PATCH v2] arm: mvebu: don't hardcode a physical address in
+ headsmp.S
+In-Reply-To: <1370514268-9159-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370514268-9159-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130606124502.GE16794@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Luke,
-
-On Thursday 06 of June 2013 13:24:57 luke.leighton wrote:
-> On Thu, Jun 6, 2013 at 1:01 AM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > I don't see any other solution here than moving all the Allwinner code
-> > to DT (as it has been suggested in this thread several times
-> > already), as this is the only hardware description method supported
-> > by ARM Linux.
->  i repeat again: please state, explicitly and unequivocably that you -
-> linux kernel developers - are happy that the reach of linux and
-> gnu/linux OSes is dramatically reduced due to this intransigent
-> position.
+On Thu, Jun 06, 2013 at 11:24:28AM +0100, Thomas Petazzoni wrote:
+> Now that the coherency_init() function is called a bit earlier, we can
+> actually read the physical address of the coherency unit registers
+> from the Device Tree, and communicate that to the headsmp.S code,
+> which avoids hardcoding a physical address.
 > 
->  or, tomasz, please state that you, tomasz, represent each and every
-> one of the linux kernel developers so that i do not need to keep
-> asking.
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+> Changes from v1 to v2:
+> 
+>  * Simplified the code in headsmp.S to compute the physical address of
+>    the coherency unit base address. Suggested by Nicolas Pitre.
+> 
+>  * Added a sync_cache_w() call to ensure the physical address of the
+>    coherency unit stored in the coherency_phys_base is visible by the
+>    other CPUs. The other CPUs are reading this before they join the
+>    coherency fabric, so we need to make some manual cache coherency
+>    here. Noticed by Will Deacon.
+> 
+>  arch/arm/mach-mvebu/coherency.c | 12 ++++++++++++
+>  arch/arm/mach-mvebu/headsmp.S   | 16 ++++++++--------
+>  2 files changed, 20 insertions(+), 8 deletions(-)
 
-I do not represent all linux kernel developers by any means. I am just 
-stating current policy of SoC/board support maintained by ARM Linux, which 
-is common for all Linux kernel devlopers, or at least ARM Linux kernel 
-developers.
+This looks better to me, cheers.
 
-Personally I am happy with numerous companies backing this policy and not 
-making problems like this with Allwinner and I am really surprised that 
-you are supporting a troublesome company like this.
+  Reviewed-by: Will Deacon <will.deacon@arm.com>
 
-There are many other SoC vendors making low cost SoCs, like Rockchip, 
-Boxchip, Telechips. Maybe they would be better candidates for being 
-promoted as vendors of choice for hardware running free software? (Just 
-saying, as I do not know anything about their view on this. There is a lot 
-of cheap tablets built using their products as well.)
-
-Best regards,
-Tomasz
+Will
