@@ -1,52 +1,42 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 6 Jun 2013 00:21:43 -0400 (EDT)
-Subject: [PATCH] ARM: avoid mis-detecting some V7 cores in the decompressor
-In-Reply-To: <20130606012921.GO599@codeaurora.org>
-References: <51AD0703.6050408@codeaurora.org>
- <20130603222321.GP18614@n2100.arm.linux.org.uk>
- <51AD1AB3.9050908@codeaurora.org>
- <20130603224555.GR18614@n2100.arm.linux.org.uk>
- <51AD1FE9.80709@codeaurora.org>
- <alpine.LFD.2.03.1306040032510.1200@syhkavp.arg>
- <20130604194705.GK599@codeaurora.org>
- <alpine.LFD.2.03.1306041559440.1200@syhkavp.arg>
- <20130604214501.GL599@codeaurora.org>
- <alpine.LFD.2.03.1306041751470.1200@syhkavp.arg>
- <20130606012921.GO599@codeaurora.org>
-Message-ID: <alpine.LFD.2.03.1306060019280.18597@syhkavp.arg>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu,  6 Jun 2013 01:24:24 -0300
+Subject: [PATCH] ARM: imx_v6_v7_defconfig: Enable PWW and backlight options
+Message-ID: <1370492664-30438-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 5 Jun 2013, Stephen Boyd wrote:
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-> On 06/04, Nicolas Pitre wrote:
-> > 
-> > The LC0 area should be considered read-only as it may be located in 
-> > flash.
-> > 
-> > Here's what I came with instead:
-> > 
-> > From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Date: Tue, 4 Jun 2013 17:01:30 -0400
-> > Subject: [PATCH] ARM: zImage: don't overwrite ourself with a page table
-> > 
-> > When zImage is loaded into RAM at a low address but TEXT_OFFSET
-> > is set higher, we risk overwriting ourself with the page table
-> > needed to turn on the cache as it is located relative to the relocation
-> > address.  Let's defer the cache setup after relocation in that case.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> 
-> Reported-by: Stephen Boyd <sboyd@codeurora.org>
-> Tested-by: Stephen Boyd <sboyd@codeurora.org>
-> 
-> This one passes testing on my two platforms with and without the
-> 2Mb reservation at the beginning of ram. Seems like a good enough
-> compromise for me.
+These options are useful for controlling backlight contrast via PWM.
 
-Good!  Queued here:
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/imx_v6_v7_defconfig | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7751/1
-
-
-Nicolas
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index ac3470c..f189887 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -170,7 +170,10 @@ CONFIG_LCD_PLATFORM=y
+ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
++CONFIG_BACKLIGHT_LCD_SUPPORT=y
++CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_FONTS=y
+@@ -216,6 +219,8 @@ CONFIG_DRM_IMX_IPUV3_CORE=y
+ CONFIG_DRM_IMX_IPUV3=y
+ CONFIG_COMMON_CLK_DEBUG=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_PWM=y
++CONFIG_PWM_IMX=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+-- 
+1.8.1.2
