@@ -1,15 +1,14 @@
 From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Thu,  6 Jun 2013 18:27:12 +0200
-Subject: [PATCH v3 4/6] ARM: kirkwood: move device tree nodes to DT irqchip
- and clocksource
+Date: Thu,  6 Jun 2013 18:27:13 +0200
+Subject: [PATCH v3 5/6] ARM: dove: convert to DT irqchip and clocksource
 In-Reply-To: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
 References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <1370536034-23956-5-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <1370536034-23956-6-git-send-email-sebastian.hesselbarth@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 With recent support for true irqchip and clocksource drivers for Orion
-SoCs, now make use of it on DT enabled Kirkwood boards.
+SoCs, now make use of it on DT enabled Dove boards.
 
 Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
 ---
@@ -28,70 +27,96 @@ Cc: linux-doc at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/boot/dts/kirkwood.dtsi |   35 +++++++++++++++++++++++++++--------
- 1 files changed, 27 insertions(+), 8 deletions(-)
+ arch/arm/mach-dove/Kconfig    |    2 ++
+ arch/arm/mach-dove/Makefile   |    4 ++--
+ arch/arm/mach-dove/board-dt.c |   23 ++++++++++++++++-------
+ 3 files changed, 20 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index c0c4811..ca296c3 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -8,13 +8,6 @@
- 	       gpio0 = &gpio0;
- 	       gpio1 = &gpio1;
- 	};
--	intc: interrupt-controller {
--		compatible = "marvell,orion-intc", "marvell,intc";
--		interrupt-controller;
--		#interrupt-cells = <1>;
--		reg = <0xf1020204 0x04>,
--		      <0xf1020214 0x04>;
--	};
+diff --git a/arch/arm/mach-dove/Kconfig b/arch/arm/mach-dove/Kconfig
+index dff7b2f..0bc7cdf 100644
+--- a/arch/arm/mach-dove/Kconfig
++++ b/arch/arm/mach-dove/Kconfig
+@@ -23,6 +23,8 @@ config MACH_CM_A510
+ config MACH_DOVE_DT
+ 	bool "Marvell Dove Flattened Device Tree"
+ 	select DOVE_CLK
++	select ORION_IRQCHIP
++	select ORION_TIMER
+ 	select REGULATOR
+ 	select REGULATOR_FIXED_VOLTAGE
+ 	select USE_OF
+diff --git a/arch/arm/mach-dove/Makefile b/arch/arm/mach-dove/Makefile
+index 4d9d2ff..cbc5c06 100644
+--- a/arch/arm/mach-dove/Makefile
++++ b/arch/arm/mach-dove/Makefile
+@@ -1,5 +1,5 @@
+-obj-y				+= common.o irq.o
+-obj-$(CONFIG_DOVE_LEGACY)	+= mpp.o
++obj-y				+= common.o
++obj-$(CONFIG_DOVE_LEGACY)	+= irq.o mpp.o
+ obj-$(CONFIG_PCI)		+= pcie.o
+ obj-$(CONFIG_MACH_DOVE_DB)	+= dove-db-setup.o
+ obj-$(CONFIG_MACH_DOVE_DT)	+= board-dt.o
+diff --git a/arch/arm/mach-dove/board-dt.c b/arch/arm/mach-dove/board-dt.c
+index b3d65e8..b4ed3da 100644
+--- a/arch/arm/mach-dove/board-dt.c
++++ b/arch/arm/mach-dove/board-dt.c
+@@ -10,10 +10,13 @@
  
- 	ocp at f1000000 {
- 		compatible = "simple-bus";
-@@ -24,6 +17,30 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
+ #include <linux/init.h>
+ #include <linux/clk-provider.h>
++#include <linux/clocksource.h>
++#include <linux/irqchip.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <asm/hardware/cache-tauros2.h>
+ #include <asm/mach/arch.h>
++#include <mach/dove.h>
+ #include <mach/pm.h>
+ #include <plat/common.h>
+ #include <plat/irq.h>
+@@ -41,10 +44,17 @@ static void __init dove_legacy_clk_init(void)
+ 			 of_clk_get_from_provider(&clkspec));
+ }
  
-+		timer: timer at 20300 {
-+			compatible = "marvell,orion-timer";
-+			reg = <0x20300 0x20>;
-+			interrupt-parent = <&bridge_intc>;
-+			interrupts = <1>, <2>;
-+			clocks = <&core_clk 0>;
-+		};
+-static void __init dove_of_clk_init(void)
++static void __init dove_dt_time_init(void)
+ {
+ 	of_clk_init(NULL);
+-	dove_legacy_clk_init();
++	clocksource_of_init();
++}
 +
-+		intc: main-interrupt-ctrl at 20200 {
-+			compatible = "marvell,orion-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0x20200 0x10>, <0x20210 0x10>;
-+		};
-+
-+		bridge_intc: bridge-interrupt-ctrl at 20110 {
-+			compatible = "marvell,orion-bridge-intc";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0x20110 0x8>;
-+			interrupts = <1>;
-+			marvell,#interrupts = <6>;
-+		};
-+
- 		core_clk: core-clocks at 10030 {
- 			compatible = "marvell,kirkwood-core-clock";
- 			reg = <0x10030 0x4>;
-@@ -97,9 +114,11 @@
- 			#clock-cells = <1>;
- 		};
++static void __init dove_dt_init_early(void)
++{
++	mvebu_mbus_init("marvell,dove-mbus",
++			BRIDGE_WINS_BASE, BRIDGE_WINS_SZ,
++			DOVE_MC_WINS_BASE, DOVE_MC_WINS_SZ);
+ }
  
--		wdt at 20300 {
-+		wdt: watchdog-timer at 20300 {
- 			compatible = "marvell,orion-wdt";
- 			reg = <0x20300 0x28>;
-+			interrupt-parent = <&bridge_intc>;
-+			interrupts = <3>;
- 			clocks = <&gate_clk 7>;
- 			status = "okay";
- 		};
+ static void __init dove_dt_init(void)
+@@ -56,8 +66,8 @@ static void __init dove_dt_init(void)
+ #endif
+ 	dove_setup_cpu_wins();
+ 
+-	/* Setup root of clk tree */
+-	dove_of_clk_init();
++	/* setup clocks for legacy devices */
++	dove_legacy_clk_init();
+ 
+ 	/* Internal devices not ported to DT yet */
+ 	dove_pcie_init(1, 1);
+@@ -72,9 +82,8 @@ static const char * const dove_dt_board_compat[] = {
+ 
+ DT_MACHINE_START(DOVE_DT, "Marvell Dove (Flattened Device Tree)")
+ 	.map_io		= dove_map_io,
+-	.init_early	= dove_init_early,
+-	.init_irq	= orion_dt_init_irq,
+-	.init_time	= dove_timer_init,
++	.init_early	= dove_dt_init_early,
++	.init_time	= dove_dt_time_init,
+ 	.init_machine	= dove_dt_init,
+ 	.restart	= dove_restart,
+ 	.dt_compat	= dove_dt_board_compat,
 -- 
 1.7.2.5
