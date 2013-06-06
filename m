@@ -1,141 +1,290 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 6 Jun 2013 22:16:56 +0300
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <1370185130-15332-2-git-send-email-oliver+list@schinagl.nl>
-References: <1370185130-15332-1-git-send-email-oliver+list@schinagl.nl>
- <1370185130-15332-2-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <CAHp75Vdqc9xiPBvQUB3Hfb4EBFUsoVxyuH8MK=9spJ4+rieoDQ@mail.gmail.com>
+From: carlo.caione@gmail.com (Carlo Caione)
+Date: Thu,  6 Jun 2013 21:34:25 +0200
+Subject: [PATCH v5] ARM: sunxi: New watchdog driver for Allwinner A10/A13
+Message-ID: <1370547265-24854-1-git-send-email-carlo.caione@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 2, 2013 at 5:58 PM, Oliver Schinagl <oliver+list@schinagl.nl> wrote:
-> From: Oliver Schinagl <oliver@schinagl.nl>
->
-> Allwinner has electric fuses (efuse) on their line of chips. This driver
-> reads those fuses, seeds the kernel entropy and exports them as a sysfs node.
->
-> These fuses are most likly to be programmed at the factory, encoding
-> things like Chip ID, some sort of serial number etc and appear to be
-> reasonable unique.
-> While in theory, these should be writeable by the user, it will probably
-> be inconvinient to do so. Allwinner recommends that a certain input pin,
-> labeled 'efuse_vddq', be connected to GND. From the name however it is
-> highly likly that this name is the programming voltage, required to
-> write these fuses.
-> Even so, they can still be used to generate a board-unique mac from, board
-> unique RSA key and seed the kernel RNG.
->
-> Currently supported are the following known chips:
-> Allwinner sun4i (A10)
-> Allwinner sun5i (A13)
+This patch adds the driver for the watchdog found in the Allwinner A10 and
+A13 SoCs. It has DT-support and uses the new watchdog framework.
 
-Few commets below.
+Signed-off-by: Carlo Caione <carlo.caione@gmail.com>
+---
+ drivers/watchdog/Kconfig     |  10 ++
+ drivers/watchdog/Makefile    |   1 +
+ drivers/watchdog/sunxi_wdt.c | 231 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 242 insertions(+)
+ create mode 100644 drivers/watchdog/sunxi_wdt.c
 
-> +++ b/drivers/misc/eeprom/sunxi_sid.c
-> @@ -0,0 +1,172 @@
-
-> +#define DRV_NAME "sunxi-sid"
-> +#define DRV_VERSION "1.0"
-
-
-> +static void __iomem *p_sid_reg_base;
-So, why it's global?
-
-
-> +/* We read the entire key, but only return the requested byte. This is of
-> + * course slower then it could be and uses 4 times more reads as needed but
-> + * keeps code a simpler.
-> + */
-> +u8 sunxi_sid_read_byte(const int offset)
-> +{
-> +       u32 sid_key;
-> +       u8 ret;
-> +
-> +       ret = 0;
-
-ret is redundant variable in this function.
-
-> +       if (likely((SID_SIZE))) {
-
-Extra braces.
-Use antipattern here.
-
-> +               sid_key = ioread32be(p_sid_reg_base + round_down(offset, 4));
-> +               sid_key >>= (offset % 4) * 8;
-> +               ret = sid_key & 0xff;
-
-No need to do & 0xff, since return type is byte.
-
-> +static ssize_t sid_read(struct file *fd, struct kobject *kobj,
-> +                       struct bin_attribute *attr, char *buf,
-> +                       loff_t pos, size_t size)
-> +{
-> +       ssize_t ret;
-> +       int i;
-> +
-> +       ret = -EPERM;
-
-When will it happen?
-Moreover, ret is redundant.
-
-> +
-> +       if ((likely(size > 0)) && ((size + pos) <= SID_SIZE)) {
-
-Extra braces in second part of condition.
-Use antipattern.
-
-> +static int __init sunxi_sid_probe(struct platform_device *pdev)
-> +{
-> +       int entropy[SID_SIZE], i, ret;
-
-Usually ret variable is located at the end of definition block.
-Moreover, there is no relationship between those three. It means one
-line per variable.
-
-> +       struct device *dev;
-> +       struct resource *res;
-> +       void __iomem *sid_reg_base;
-> +
-> +       dev = &pdev->dev;
-
-Please, be consistent, somewhere you still use &pdev->dev.
-I recomend to use &pdev->dev everywhere in probe(), since we don't
-know if the device will be probed successfully.
-
-> +       if (unlikely(!pdev->dev.of_node)) {
-> +               dev_err(dev, "No devicetree data available\n");
-> +               ret = -EFAULT;
-> +               goto exit;
-
-Plain return here and in entire function where it applies.
-
-> +       }
-> +
-> +       res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +       sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
-> +       if (IS_ERR(sid_reg_base)) {
-> +               dev_err(dev, "Unable to obtain resource\n");
-
-Redundant message. You have not to duplicate this.
-
-> +               ret = PTR_ERR(sid_reg_base);
-> +               goto exit;
-> +       }
-> +       platform_set_drvdata(pdev, sid_reg_base);
-> +       p_sid_reg_base = sid_reg_base;
-> +
-> +       ret = device_create_bin_file(dev, &sid_bin_attr);
-> +       if (unlikely(ret)) {
-
-Any benifit of (un)likely in probe()?
-
-> +
-> +
-> +exit:
-> +       return ret;
-
-Remove those two and empty lines.
-
---
-With Best Regards,
-Andy Shevchenko
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index e89fc31..8ad2238 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -299,6 +299,16 @@ config ORION_WATCHDOG
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called orion_wdt.
+ 
++config SUNXI_WATCHDOG
++	tristate "Allwinner SoCs watchdog support"
++	depends on ARCH_SUNXI
++	select WATCHDOG_CORE
++	help
++	  Say Y here to include support for the watchdog timer
++	  in Allwinner SoCs.
++	  To compile this driver as a module, choose M here: the
++	  module will be called sunxi_wdt.
++
+ config COH901327_WATCHDOG
+ 	bool "ST-Ericsson COH 901 327 watchdog"
+ 	depends on ARCH_U300
+diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+index a300b94..5012d5f 100644
+--- a/drivers/watchdog/Makefile
++++ b/drivers/watchdog/Makefile
+@@ -47,6 +47,7 @@ obj-$(CONFIG_PNX4008_WATCHDOG) += pnx4008_wdt.o
+ obj-$(CONFIG_IOP_WATCHDOG) += iop_wdt.o
+ obj-$(CONFIG_DAVINCI_WATCHDOG) += davinci_wdt.o
+ obj-$(CONFIG_ORION_WATCHDOG) += orion_wdt.o
++obj-$(CONFIG_SUNXI_WATCHDOG) += sunxi_wdt.o
+ obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
+ obj-$(CONFIG_STMP3XXX_RTC_WATCHDOG) += stmp3xxx_rtc_wdt.o
+ obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
+diff --git a/drivers/watchdog/sunxi_wdt.c b/drivers/watchdog/sunxi_wdt.c
+new file mode 100644
+index 0000000..69d4d44
+--- /dev/null
++++ b/drivers/watchdog/sunxi_wdt.c
+@@ -0,0 +1,231 @@
++/*
++ *      sunxi Watchdog Driver
++ *
++ *      Copyright (c) 2013 Carlo Caione
++ *                    2012 Henrik Nordstrom
++ *
++ *      This program is free software; you can redistribute it and/or
++ *      modify it under the terms of the GNU General Public License
++ *      as published by the Free Software Foundation; either version
++ *      2 of the License, or (at your option) any later version.
++ *
++ *      Based on xen_wdt.c
++ *      (c) Copyright 2010 Novell, Inc.
++ */
++
++#include <linux/clk.h>
++#include <linux/err.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/moduleparam.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/platform_device.h>
++#include <linux/types.h>
++#include <linux/watchdog.h>
++
++#define WDT_MAX_TIMEOUT         16
++#define WDT_MIN_TIMEOUT         1
++#define WDT_MODE_TIMEOUT(n)     ((n) << 3)
++#define WDT_TIMEOUT_MASK        WDT_MODE_TIMEOUT(0x0F)
++
++#define WDT_CTRL                0x00
++#define WDT_CTRL_RELOAD         ((1 << 0) | (0x0a57 << 1))
++
++#define WDT_MODE                0x04
++#define WDT_MODE_EN             (1 << 0)
++#define WDT_MODE_RST_EN         (1 << 1)
++
++#define DRV_NAME		"sunxi-wdt"
++#define DRV_VERSION		"1.0"
++
++static bool nowayout = WATCHDOG_NOWAYOUT;
++static int heartbeat = WDT_MAX_TIMEOUT;
++
++struct sunxi_wdt_dev {
++	struct watchdog_device wdt_dev;
++	void __iomem *wdt_base;
++};
++
++/*
++ * wdt_timeout_map maps the watchdog timer interval value in seconds to
++ * the value of the register WDT_MODE bit 3:6
++ *
++ * [timeout seconds] = register value
++ *
++ */
++
++static const int wdt_timeout_map[] = {
++	[1] = 0b0001,  /* 1s  */
++	[2] = 0b0010,  /* 2s  */
++	[3] = 0b0011,  /* 3s  */
++	[4] = 0b0100,  /* 4s  */
++	[5] = 0b0101,  /* 5s  */
++	[6] = 0b0110,  /* 6s  */
++	[8] = 0b0111,  /* 8s  */
++	[10] = 0b1000, /* 10s */
++	[12] = 0b1001, /* 12s */
++	[14] = 0b1010, /* 14s */
++	[16] = 0b1011, /* 16s */
++};
++
++static int sunxi_wdt_ping(struct watchdog_device *wdt_dev)
++{
++	struct sunxi_wdt_dev *sunxi_wdt = watchdog_get_drvdata(wdt_dev);
++	void __iomem *wdt_base = sunxi_wdt->wdt_base;
++
++	iowrite32(WDT_CTRL_RELOAD, wdt_base + WDT_CTRL);
++
++	return 0;
++}
++
++static int sunxi_wdt_set_timeout(struct watchdog_device *wdt_dev,
++		unsigned int timeout)
++{
++	struct sunxi_wdt_dev *sunxi_wdt = watchdog_get_drvdata(wdt_dev);
++	void __iomem *wdt_base = sunxi_wdt->wdt_base;
++	u32 reg;
++
++	if (timeout > WDT_MAX_TIMEOUT)
++		return -EINVAL;
++
++	if (wdt_timeout_map[timeout] == 0)
++		timeout++;
++
++	sunxi_wdt->wdt_dev.timeout = timeout;
++
++	reg = ioread32(wdt_base + WDT_MODE);
++	reg &= ~WDT_TIMEOUT_MASK;
++	reg |= WDT_MODE_TIMEOUT(wdt_timeout_map[timeout]);
++	iowrite32(reg, wdt_base + WDT_MODE);
++
++	sunxi_wdt_ping(wdt_dev);
++
++	return 0;
++}
++
++static int sunxi_wdt_stop(struct watchdog_device *wdt_dev)
++{
++	struct sunxi_wdt_dev *sunxi_wdt = watchdog_get_drvdata(wdt_dev);
++	void __iomem *wdt_base = sunxi_wdt->wdt_base;
++
++	iowrite32(0, wdt_base + WDT_MODE);
++
++	return 0;
++}
++
++static int sunxi_wdt_start(struct watchdog_device *wdt_dev)
++{
++	u32 reg;
++	struct sunxi_wdt_dev *sunxi_wdt = watchdog_get_drvdata(wdt_dev);
++	void __iomem *wdt_base = sunxi_wdt->wdt_base;
++	int ret;
++
++	ret = sunxi_wdt_set_timeout(&sunxi_wdt->wdt_dev,
++			sunxi_wdt->wdt_dev.timeout);
++	if (ret < 0)
++		return ret;
++
++	reg = ioread32(wdt_base + WDT_MODE);
++	reg |= (WDT_MODE_RST_EN | WDT_MODE_EN);
++	iowrite32(reg, wdt_base + WDT_MODE);
++
++	return 0;
++}
++
++static const struct watchdog_info sunxi_wdt_info = {
++	.identity	= DRV_NAME,
++	.options	= WDIOF_SETTIMEOUT |
++			  WDIOF_KEEPALIVEPING |
++			  WDIOF_MAGICCLOSE,
++};
++
++static const struct watchdog_ops sunxi_wdt_ops = {
++	.owner		= THIS_MODULE,
++	.start		= sunxi_wdt_start,
++	.stop		= sunxi_wdt_stop,
++	.ping		= sunxi_wdt_ping,
++	.set_timeout	= sunxi_wdt_set_timeout,
++};
++
++static int __init sunxi_wdt_probe(struct platform_device *pdev)
++{
++	struct sunxi_wdt_dev *sunxi_wdt;
++	struct resource *res;
++	int err;
++
++	sunxi_wdt = devm_kzalloc(&pdev->dev, sizeof(*sunxi_wdt), GFP_KERNEL);
++	if (!sunxi_wdt)
++		return -EINVAL;
++
++	platform_set_drvdata(pdev, sunxi_wdt);
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	sunxi_wdt->wdt_base = devm_ioremap_resource(&pdev->dev, res);
++	if (IS_ERR(sunxi_wdt->wdt_base))
++		return PTR_ERR(sunxi_wdt->wdt_base);
++
++	sunxi_wdt->wdt_dev.info = &sunxi_wdt_info;
++	sunxi_wdt->wdt_dev.ops = &sunxi_wdt_ops;
++	sunxi_wdt->wdt_dev.timeout = WDT_MAX_TIMEOUT;
++	sunxi_wdt->wdt_dev.max_timeout = WDT_MAX_TIMEOUT;
++	sunxi_wdt->wdt_dev.min_timeout = WDT_MIN_TIMEOUT;
++	sunxi_wdt->wdt_dev.parent = &pdev->dev;
++
++	watchdog_init_timeout(&sunxi_wdt->wdt_dev, heartbeat, &pdev->dev);
++	watchdog_set_nowayout(&sunxi_wdt->wdt_dev, nowayout);
++
++	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, sunxi_wdt);
++
++	err = watchdog_register_device(&sunxi_wdt->wdt_dev);
++	if (unlikely(err))
++		return err;
++
++	dev_info(&pdev->dev, "Watchdog enabled (heartbeat=%d sec, nowayout=%d)",
++			sunxi_wdt->wdt_dev.timeout, nowayout);
++
++	return 0;
++}
++
++static int __exit sunxi_wdt_remove(struct platform_device *pdev)
++{
++	struct sunxi_wdt_dev *sunxi_wdt = platform_get_drvdata(pdev);
++
++	watchdog_unregister_device(&sunxi_wdt->wdt_dev);
++	watchdog_set_drvdata(&sunxi_wdt->wdt_dev, NULL);
++
++	return 0;
++}
++
++static const struct of_device_id sunxi_wdt_dt_ids[] = {
++	{ .compatible = "allwinner,sun4i-wdt" },
++	{ /* sentinel */ }
++};
++MODULE_DEVICE_TABLE(of, sunxi_wdt_dt_ids);
++
++static struct platform_driver sunxi_wdt_driver = {
++	.probe		= sunxi_wdt_probe,
++	.remove		= sunxi_wdt_remove,
++	.driver		= {
++		.owner		= THIS_MODULE,
++		.name		= DRV_NAME,
++		.of_match_table	= of_match_ptr(sunxi_wdt_dt_ids)
++	},
++};
++
++module_platform_driver(sunxi_wdt_driver);
++
++module_param(heartbeat, int, 0);
++MODULE_PARM_DESC(heartbeat, "Watchdog heartbeat in seconds");
++
++module_param(nowayout, bool, 0);
++MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started "
++		"(default=" __MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Carlo Caione <carlo.caione@gmail.com>");
++MODULE_AUTHOR("Henrik Nordstrom <henrik@henriknordstrom.net>");
++MODULE_DESCRIPTION("sunxi WatchDog Timer Driver");
++MODULE_VERSION(DRV_VERSION);
+-- 
+1.8.2.3
