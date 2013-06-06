@@ -1,70 +1,91 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  6 Jun 2013 18:41:23 +0200
-Subject: [PATCH v2 3/8] irqchip: armada-370-xp: properly request resources
+Date: Thu,  6 Jun 2013 18:41:22 +0200
+Subject: [PATCH v2 2/8] PCI: Add registry of MSI chips
 In-Reply-To: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1370536888-8871-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370536888-8871-3-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of using of_iomap(), we now use of_address_to_resource(),
-request_mem_region() and ioremap(). This allows the corresponding I/O
-regions to be properly requested and visible in /proc/iomem.
-
-The main motivation for this change is that the introduction of the
-MSI support requires us to get the physical address of the main
-interrupt controller registers, so we will need the corresponding
-'struct resource' anyway.
-
-We also take this opportunity to change a panic() to BUG_ON(), in
-order to be consistent with the rest of the driver.
+This commit adds a very basic registry of msi_chip structures, so that
+an IRQ controller driver can register an msi_chip, and a PCIe host
+controller can find it, based on a 'struct device_node'.
 
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/irqchip/irq-armada-370-xp.c | 20 ++++++++++++++++----
- 1 file changed, 16 insertions(+), 4 deletions(-)
+ drivers/pci/msi.c   | 25 +++++++++++++++++++++++++
+ include/linux/msi.h | 11 +++++++++++
+ 2 files changed, 36 insertions(+)
 
-diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-index bb328a3..26adc74 100644
---- a/drivers/irqchip/irq-armada-370-xp.c
-+++ b/drivers/irqchip/irq-armada-370-xp.c
-@@ -248,12 +248,25 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
- static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 					     struct device_node *parent)
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 4dafac6..0f177ee 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -20,6 +20,7 @@
+ #include <linux/errno.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/of.h>
+ 
+ #include "pci.h"
+ 
+@@ -70,6 +71,30 @@ int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+ # define HAVE_DEFAULT_MSI_SETUP_IRQS
+ #endif
+ 
++#ifdef CONFIG_OF
++static LIST_HEAD(msi_chip_list);
++static DEFINE_MUTEX(msi_chip_mutex);
++
++void msi_chip_add(struct msi_chip *chip)
++{
++	mutex_lock(&msi_chip_mutex);
++	list_add(&chip->link, &msi_chip_list);
++	mutex_unlock(&msi_chip_mutex);
++}
++
++struct msi_chip *msi_chip_find_by_of_node(struct device_node *of_node)
++{
++	struct msi_chip *c;
++	list_for_each_entry(c, &msi_chip_list, link) {
++		if (c->of_node == of_node &&
++		    of_property_read_bool(c->of_node, "msi-controller"))
++			return c;
++	}
++
++	return NULL;
++}
++#endif
++
+ #ifdef HAVE_DEFAULT_MSI_SETUP_IRQS
+ int default_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
  {
-+	struct resource main_int_res, per_cpu_int_res;
- 	u32 control;
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 4633529..a1a6084 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -61,6 +61,8 @@ int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
+ struct msi_chip {
+ 	struct module *owner;
+ 	struct device *dev;
++	struct device_node *of_node;
++	struct list_head link;
  
--	main_int_base = of_iomap(node, 0);
--	per_cpu_int_base = of_iomap(node, 1);
-+	BUG_ON(of_address_to_resource(node, 0, &main_int_res));
-+	BUG_ON(of_address_to_resource(node, 1, &per_cpu_int_res));
+ 	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+ 			 struct msi_desc *desc);
+@@ -69,4 +71,13 @@ struct msi_chip {
+ 			    int nvec, int type);
+ };
  
-+	BUG_ON(!request_mem_region(main_int_res.start,
-+				   resource_size(&main_int_res),
-+				   node->full_name));
-+	BUG_ON(!request_mem_region(per_cpu_int_res.start,
-+				   resource_size(&per_cpu_int_res),
-+				   node->full_name));
++#if defined(CONFIG_PCI_MSI) && defined(CONFIG_OF)
++void msi_chip_add(struct msi_chip *chip);
++struct msi_chip *msi_chip_find_by_of_node(struct device_node *of_node);
++#else
++static inline void msi_chip_add(struct msi_chip *chip) {}
++static inline struct msi_chip *
++msi_chip_find_by_of_node(struct device_node *of_node) { return NULL; }
++#endif
 +
-+	main_int_base = ioremap(main_int_res.start,
-+				resource_size(&main_int_res));
- 	BUG_ON(!main_int_base);
-+
-+	per_cpu_int_base = ioremap(per_cpu_int_res.start,
-+				   resource_size(&per_cpu_int_res));
- 	BUG_ON(!per_cpu_int_base);
- 
- 	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
-@@ -262,8 +275,7 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
- 		irq_domain_add_linear(node, (control >> 2) & 0x3ff,
- 				&armada_370_xp_mpic_irq_ops, NULL);
- 
--	if (!armada_370_xp_mpic_domain)
--		panic("Unable to add Armada_370_Xp MPIC irq domain (DT)\n");
-+	BUG_ON(!armada_370_xp_mpic_domain);
- 
- 	irq_set_default_host(armada_370_xp_mpic_domain);
- 
+ #endif /* LINUX_MSI_H */
 -- 
 1.8.1.2
