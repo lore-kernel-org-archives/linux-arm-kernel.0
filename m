@@ -1,37 +1,31 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Thu,  6 Jun 2013 13:17:12 +0100
-Subject: [PATCH 24/33] ARM: ux500: Remove AUXDATA relating to GPIO clock-name
+Date: Thu,  6 Jun 2013 13:17:13 +0100
+Subject: [PATCH 25/33] ARM: ux500: Remove AUXDATA relating to UART clock-name
  bindings
 In-Reply-To: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
 References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370521041-32318-25-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370521041-32318-26-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- arch/arm/mach-ux500/cpu-db8500.c |    9 ---------
- 1 file changed, 9 deletions(-)
+ arch/arm/mach-ux500/cpu-db8500.c |    3 ---
+ 1 file changed, 3 deletions(-)
 
 diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 68a3918..8d72826 100644
+index 8d72826..3efb326 100644
 --- a/arch/arm/mach-ux500/cpu-db8500.c
 +++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -228,15 +228,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("arm,pl18x", 0x80005000, "sdi2",  &mop500_sdi2_data),
- 	OF_DEV_AUXDATA("arm,pl18x", 0x80114000, "sdi4",  &mop500_sdi4_data),
- 	/* Requires clock name bindings. */
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e000, "gpio.0", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8012e080, "gpio.1", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e000, "gpio.2", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e080, "gpio.3", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e100, "gpio.4", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8000e180, "gpio.5", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e000, "gpio.6", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0x8011e080, "gpio.7", NULL),
--	OF_DEV_AUXDATA("st,nomadik-gpio", 0xa03fe000, "gpio.8", NULL),
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80004000, "nmk-i2c.0", NULL),
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80122000, "nmk-i2c.1", NULL),
- 	OF_DEV_AUXDATA("st,nomadik-i2c", 0x80128000, "nmk-i2c.2", NULL),
+@@ -219,9 +219,6 @@ static struct of_dev_auxdata u8500_auxdata_lookup[] __initdata = {
+ 	/* Requires call-back bindings. */
+ 	OF_DEV_AUXDATA("arm,cortex-a9-pmu", 0, "arm-pmu", &db8500_pmu_platdata),
+ 	/* Requires DMA bindings. */
+-	OF_DEV_AUXDATA("arm,pl011", 0x80120000, "uart0", NULL),
+-	OF_DEV_AUXDATA("arm,pl011", 0x80121000, "uart1", NULL),
+-	OF_DEV_AUXDATA("arm,pl011", 0x80007000, "uart2", NULL),
+ 	OF_DEV_AUXDATA("arm,pl022", 0x80002000, "ssp0",  &ssp0_plat),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80126000, "sdi0",  &mop500_sdi0_data),
+ 	OF_DEV_AUXDATA("arm,pl18x", 0x80118000, "sdi1",  &mop500_sdi1_data),
 -- 
 1.7.10.4
