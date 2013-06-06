@@ -1,45 +1,74 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 06 Jun 2013 02:01:14 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
-Message-ID: <1733666.lHUBcfUXq9@flatron>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 6 Jun 2013 02:09:43 +0200
+Subject: [PATCH RFC 3/3] clk: dt: binding for basic divider clock
+In-Reply-To: <20130604192243.10233.76496@quantum>
+References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
+ <CAHCPf3tZAbdVZPuKOjxJbCOAE76Pa6wMVHjnBRPhSpj0aMBMHg@mail.gmail.com>
+ <20130604192243.10233.76496@quantum>
+Message-ID: <201306060209.43486.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 06 of June 2013 00:54:02 luke.leighton wrote:
-> On Thu, Jun 6, 2013 at 12:40 AM, Henrik Nordstr?m
+Am Dienstag, 4. Juni 2013, 21:22:43 schrieb Mike Turquette:
+> Quoting Matt Sealey (2013-06-04 10:39:53)
 > 
-> <henrik@henriknordstrom.net> wrote:
-> > tor 2013-06-06 klockan 00:26 +0100 skrev luke.leighton:
-> >>  no john - they've only added it to the multiplexed sections of the
-> >> 
-> >> drivers which they themselves have written.  such as
-> >> drivers/usb/sun{N}i_usb/*.[ch], drivers/block/nand/sun{N}_i,
-> >> arch/arm/mach-sun{N}i and so on.
+> > On Tue, Jun 4, 2013 at 12:11 PM, Stephen Boyd <sboyd@codeaurora.org> 
+wrote:
+> > > On 06/03/13 10:53, Mike Turquette wrote:
+> > >> +Required properties:
+> > >> +- compatible : shall be "divider-clock".
+> > >> +- #clock-cells : from common clock binding; shall be set to 0.
+> > >> +- clocks : link to phandle of parent clock
+> > >> +- reg : base address for register controlling adjustable divider
+> > >> +- mask : arbitrary bitmask for programming the adjustable divider
+> > >> +
+> > >> +Optional properties:
+> > >> +- clock-output-names : From common clock binding.
+> > >> +- table : array of integer pairs defining divisors & bitfield values
+> > >> +- shift : number of bits to shift the mask, defaults to 0 if not
+> > >> present +- index_one : valid divisor programming starts at 1, not
+> > >> zero +- index_power_of_two : valid divisor programming must be a
+> > >> power of two +- allow_zero : implies index_one, and programming zero
+> > >> results in +  divide-by-one
+> > > 
+> > > It's preferred that property names have dashes instead of underscores.
 > > 
-> > And a number of SPI device drivers, USB device drivers, vendor
-> > provided
-> > device drivers, ......
+> > I think I have a suggestion or two here..
 > > 
-> >> the script.fex system deals with the pinmux issue in a very neat way 
-that:
-> >>   a) has very little impact on the rest of the kernel tree [citation
-> >> 
-> >> needed!  i'm saying that: could someone please confirm if it's true]
+> > I mailed one to Mike earlier, I have had some mailing list problems
+> > which I think are solved now..
 > > 
-> > Not really the case. Actually the opposite. DT have this as well, and
-> > integrated in device probing. Allwinner need to hack every driver used
-> > to add their gpio requests to have pinmuxing triggered.
+> > If you provide a mask for programming the divider, surely the "shift"
+> > property is therefore redundant. Unless some device has a completely
+> > strange way of doing things and uses two seperated bitfields for
+> > programming in the same register, the shift value is simply a function
+> > of ffs() on the mask, isn't it? It is nice to put the information
+> > specifically in the device tree, but where a shift is not specified
+> > it'd probably be a good idea to go about deriving that value that way
+> > anyway, right, and if we're doing that.. why specify it?
 > 
->  augh.  ok.  solutions.  what are the solutions here?
+> Shift is optional.  Also I think the integer values in a DTS are
+> 32-bits, so if some day someone had a clock driver that needed to write
+> to a 64-bit register then shift might be useful there, combined with a
+> 32-bit mask.  Or perhaps dtc will have a 64-bit value for that case?  I
+> don't know.
+> 
+> I certainly do see your point about only using the mask, and the
+> original clock basic types did this a while back before the shift+width
+> style came into vogue.
+> 
+> If other reviewers also want to use a pure 32-bit mask and no shift then
+> I'll drop it in the next round.
 
-I don't see any other solution here than moving all the Allwinner code to 
-DT (as it has been suggested in this thread several times already), as 
-this is the only hardware description method supported by ARM Linux.
+I would object to dropping the shift :-)
 
-Best regards,
-Tomasz
+If you look at the two clk extensions in my rockchip patches you can see that 
+they use a different regiment to set values.
+
+Using the lower 16 bits to set the value and the upper 16 bit to mark which 
+values are changed, i.e. (mask << shift + 16) | (val << shift).
+
+(I'm not sure, if the naming or solution could be improved though)
+
+
+Heiko
