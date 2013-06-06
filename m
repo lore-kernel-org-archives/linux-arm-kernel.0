@@ -1,31 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 6 Jun 2013 08:55:41 -0700
-Subject: [PATCH 0/5] Broken DM816x support in Linux 3.10-rc4
-In-Reply-To: <alpine.DEB.2.02.1306060414580.15042@utopia.booyaka.com>
-References: <1370446156-11788-1-git-send-email-aida.mynzhasova@skitlab.ru>
- <alpine.DEB.2.02.1306060414580.15042@utopia.booyaka.com>
-Message-ID: <20130606155541.GM3331@atomide.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 6 Jun 2013 12:56:30 -0300
+Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable PWM and backlight options
+Message-ID: <1370534190-10765-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130605 21:22]:
-> Hi,
-> 
-> also,
-> 
-> On Wed, 5 Jun 2013, Aida Mynzhasova wrote:
-> 
-> > Aida Mynzhasova (5):
-> >   ARM: OMAP: AM33xx: multiple renames for early initialization
-> 
-> If this patch is what's responsible for all the file renaming, please drop 
-> it.  Looks from the change summary that it's just useless churn (although 
-> I haven't seen the patch here since it never made it to the lists)
+These options are useful for controlling backlight contrast via PWM.
 
-Yes no reason for all the renaming, marketing names can be
-whatever. For example, we have am/dm37xx too which is really
-omap36xx.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v1:
+- Fix warnings
+- Fix typo in Subject
 
-Regards,
+ arch/arm/configs/imx_v6_v7_defconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Tony
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index ac3470c..c7eb5f6 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -171,6 +171,7 @@ CONFIG_BACKLIGHT_LCD_SUPPORT=y
+ CONFIG_LCD_CLASS_DEVICE=y
+ CONFIG_LCD_L4F00242T03=y
+ CONFIG_BACKLIGHT_CLASS_DEVICE=y
++CONFIG_BACKLIGHT_PWM=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+ CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
+ CONFIG_FONTS=y
+@@ -216,6 +217,8 @@ CONFIG_DRM_IMX_IPUV3_CORE=y
+ CONFIG_DRM_IMX_IPUV3=y
+ CONFIG_COMMON_CLK_DEBUG=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_PWM=y
++CONFIG_PWM_IMX=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+ CONFIG_EXT2_FS_POSIX_ACL=y
+-- 
+1.8.1.2
