@@ -1,24 +1,26 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 6 Jun 2013 23:35:07 +0300
-Subject: [PATCH v2 4/8] mmc: dw_mmc-pltfm: add Rockchip variant
-In-Reply-To: <201306062111.06694.heiko@sntech.de>
-References: <201306062107.58875.heiko@sntech.de>
- <201306062111.06694.heiko@sntech.de>
-Message-ID: <CAHp75VdTYuXBu0Xu_BKZiBW9afjYprMBtBhSnNYjws-7b6hYmw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 6 Jun 2013 21:38:58 +0100
+Subject: [PATCH v2] ARM: errata: LoUIS bit field in CLIDR register is
+ incorrect
+In-Reply-To: <1370538602.3695.71.camel@linaro1.home>
+References: <1370538602.3695.71.camel@linaro1.home>
+Message-ID: <20130606203858.GP18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 10:11 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Cortex-A9 SoCs from Rockchip use a slightly modified variant of dw_mmc
-> controllers that seems to require the SDMMC_CMD_USE_HOLD_REG bit to
-> always be set.
->
-> There also seem to be no other modifications (additional register etc)
-> present, so to keep the footprint low, add this small variant to the
-> pltfm driver.
+On Thu, Jun 06, 2013 at 06:10:02PM +0100, Jon Medhurst (Tixy) wrote:
+> +#ifdef CONFIG_ARM_ERRATA_643719
+> +	ALT_SMP(mrceq	p15, 0, r2, c0, c0, 0)	@ read main ID register
+> +	ALT_UP(moveq	pc, lr)			@ LoUU is zero, so nothing to do
+> +	biceq	r2, r2, #0x0000000f             @ clear minor revision number
+> +	ldreq	r1, =0x410fc090                 @ ID of ARM Cortex A9 r0p?
+> +	teqeq	r2, r1                          @ test for errata affected core and if so...
 
-My comments against v1 of this patch are still valid.
+I'm not sure if it makes much difference on Cortex A9, but we used to
+try to delay the use of a loaded value by one instruction where-ever
+possible.  This can be done trivially and cheaply on the above by just
+reversing the order of the ldreq and biceq.
 
---
-With Best Regards,
-Andy Shevchenko
+Of course, if branch prediction and speculative load gets it right, the
+theory is there shouldn't be any delay here at all.  So I'm not _that_
+bothered about it as this is ARMv7-only code.
