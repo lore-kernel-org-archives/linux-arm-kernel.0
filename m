@@ -1,91 +1,124 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Thu,  6 Jun 2013 18:41:20 +0200
-Subject: [PATCH v2 0/8] MSI support for Marvell EBU PCIe driver
-Message-ID: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Thu,  6 Jun 2013 18:41:21 +0200
+Subject: [PATCH v2 1/8] PCI: Introduce new MSI chip infrastructure
+In-Reply-To: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1370536888-8871-2-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Thierry Reding <thierry.reding@avionic-design.de>
 
-This set of patches introduces Message Signaled Interrupt support in
-the Marvell EBU PCIe driver. It has been successfully tested on the
-Armada XP GP platform with an Intel e1000e PCIe network card that
-supports MSI.
+The new struct msi_chip is used to associated an MSI controller with a
+PCI bus. It is automatically handed down from the root to its children
+during bus enumeration.
 
-This version 2 follows the RFC version sent on March, 26th 2013. This
-is based on work done by Lior Amsalem <alior@marvell.com>.
+This patch provides default (weak) implementations for the architecture-
+specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
+and arch_msi_check_device()) which check if a PCI device's bus has an
+attached MSI chip and forward the call appropriately.
 
-The patches do the following:
+Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+---
+ drivers/pci/msi.c   | 34 +++++++++++++++++++++++++++++++---
+ drivers/pci/probe.c |  1 +
+ include/linux/msi.h | 11 +++++++++++
+ include/linux/pci.h |  1 +
+ 4 files changed, 44 insertions(+), 3 deletions(-)
 
- * Patch 1 comes from Thierry Redding, and adds a minimal msi_chip
-   infrastructure.
-
-   This needs to be reviewed/acked by Bjorn Helgaas.
-
- * Patch 2 extends the msi_chip infrastructure with a small registry,
-   so that one driver can register an msi_chip, and another driver can
-   find the msi_chip associated to a particular Device Tree node.
-
-   This needs to be reviewed/acked by Bjorn Helgaas.
-
- * Patch 3 makes some not very interesting preparation in the Armada
-   370/XP IRQ controller driver.
-
- * Patch 4 implements the MSI support in the Armada 370/XP IRQ
-   controller driver. It registers an msi_chip using the
-   msi_chip_add() function added in PATCH 2.
-
- * Patch 5 adjust the Armada 370/XP Device Tree to indicate that the
-   MPIC is not only an interrupt-controller, but also an
-   msi-controller.
-
- * Patch 6 adds MSI support in the Marvell PCIe host controller
-   driver. The work to do here is minimal: get a reference to the
-   msi-parent controller thanks to msi_chip_find_by_of_node(), and
-   link it to the pci_bus structure before the bus gets enumerated.
-
-   This needs to be reviewed/acked by Bjorn Helgaas.
-
- * Patch 7 tunes Kconfig to indicate that Armada 370/XP supports MSI.
-
- * Patch 8 adjusts the Armada 370/XP Device Tree to add the msi-parent
-   properties in the PCIe controller nodes.
-
-This set of patches currently applies on top of the current "for-next"
-branch of Jason Cooper's repository.
-
-The Device Tree binding documentation updates will be added once the
-general approach is agreed on.
-
-Thanks,
-
-Thomas
-
-Thierry Reding (1):
-  PCI: Introduce new MSI chip infrastructure
-
-Thomas Petazzoni (7):
-  PCI: Add registry of MSI chips
-  irqchip: armada-370-xp: properly request resources
-  irqchip: armada-370-xp: implement MSI support
-  arm: mvebu: the MPIC now provides MSI controller features
-  pci: mvebu: add support for MSI
-  arm: mvebu: indicate that this platform supports MSI
-  arm: mvebu: link PCIe controllers to the MSI controller
-
- arch/arm/boot/dts/armada-370-xp.dtsi     |   1 +
- arch/arm/boot/dts/armada-370.dtsi        |   1 +
- arch/arm/boot/dts/armada-xp-mv78230.dtsi |   1 +
- arch/arm/boot/dts/armada-xp-mv78260.dtsi |   1 +
- arch/arm/boot/dts/armada-xp-mv78460.dtsi |   1 +
- arch/arm/mach-mvebu/Kconfig              |   1 +
- drivers/irqchip/irq-armada-370-xp.c      | 186 ++++++++++++++++++++++++++++++-
- drivers/pci/host/pci-mvebu.c             |  21 ++++
- drivers/pci/msi.c                        |  59 +++++++++-
- drivers/pci/probe.c                      |   1 +
- include/linux/msi.h                      |  22 ++++
- include/linux/pci.h                      |   1 +
- 12 files changed, 288 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+index 2c10752..4dafac6 100644
+--- a/drivers/pci/msi.c
++++ b/drivers/pci/msi.c
+@@ -29,13 +29,41 @@ static int pci_msi_enable = 1;
+ 
+ 
+ /* Arch hooks */
++int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
++{
++	struct msi_chip *chip = dev->bus->msi;
++
++	if (chip && chip->setup_irq) {
++		int err;
++
++		err = chip->setup_irq(chip, dev, desc);
++		if (err < 0)
++			return err;
++
++		irq_set_chip_data(desc->irq, chip);
++		return err;
++	}
++
++	return -EINVAL;
++}
+ 
+-#ifndef arch_msi_check_device
+-int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
++void __weak arch_teardown_msi_irq(unsigned int irq)
+ {
++	struct msi_chip *chip = irq_get_chip_data(irq);
++
++	if (chip && chip->teardown_irq)
++		chip->teardown_irq(chip, irq);
++}
++
++int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
++{
++	struct msi_chip *chip = dev->bus->msi;
++
++	if (chip && chip->check_device)
++		return chip->check_device(chip, dev, nvec, type);
++
+ 	return 0;
+ }
+-#endif
+ 
+ #ifndef arch_setup_msi_irqs
+ # define arch_setup_msi_irqs default_setup_msi_irqs
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 70f10fa..c8591e4 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+ 
+ 	child->parent = parent;
+ 	child->ops = parent->ops;
++	child->msi = parent->msi;
+ 	child->sysdata = parent->sysdata;
+ 	child->bus_flags = parent->bus_flags;
+ 
+diff --git a/include/linux/msi.h b/include/linux/msi.h
+index 20c2d6d..4633529 100644
+--- a/include/linux/msi.h
++++ b/include/linux/msi.h
+@@ -58,4 +58,15 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
+ void arch_teardown_msi_irqs(struct pci_dev *dev);
+ int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
+ 
++struct msi_chip {
++	struct module *owner;
++	struct device *dev;
++
++	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
++			 struct msi_desc *desc);
++	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
++	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
++			    int nvec, int type);
++};
++
+ #endif /* LINUX_MSI_H */
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 3a24e4f..7ffc012 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -432,6 +432,7 @@ struct pci_bus {
+ 	struct resource busn_res;	/* bus numbers routed to this bus */
+ 
+ 	struct pci_ops	*ops;		/* configuration access functions */
++	struct msi_chip	*msi;		/* MSI controller */
+ 	void		*sysdata;	/* hook for sys-specific extension */
+ 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
+ 
 -- 
 1.8.1.2
