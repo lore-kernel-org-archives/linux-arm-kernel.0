@@ -1,85 +1,156 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu,  6 Jun 2013 17:03:00 +0200
-Subject: [PATCH 0/5] Kernel mode NEON for XOR and RAID6
-Message-ID: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
+Date: Thu,  6 Jun 2013 17:03:01 +0200
+Subject: [PATCH 1/5] ARM: add support for kernel mode NEON
+In-Reply-To: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1370530985-20619-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1370530985-20619-2-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+In order to safely support the use of NEON instructions in
+kernel mode, some precautions need to be taken:
+- the userland context that may be present in the registers (even
+  if the NEON/VFP is currently disabled) must be stored under the
+  correct task (which may not be 'current' in the UP case),
+- to avoid having to keep track of additional vfpstates for the
+  kernel side, disallow the use of NEON in interrupt context
+  and run with preemption disabled,
+- after use, re-enable preemption and re-enable the lazy restore
+  machinery by disabling the NEON/VFP unit.
 
-This is a partial repost of the patches I proposed a couple of weeks ago to add
-support for VFP/NEON in kernel mode.
+This patch adds the functions kernel_neon_begin() and
+kernel_neon_end() which take care of the above. It also adds
+the Kconfig symbol KERNEL_MODE_NEON to enable it.
 
-This time, I have included two use cases that I have been using, XOR and RAID-6
-checksumming. The former gets a 60% performance boost on the NEON, the latter
-over 400%.
-
-
-ARM: add support for kernel mode NEON
-
-Adds kernel_neon_begin/end (renamed from kernel_vfp_begin/end in the previous
-version to de-emphasize the VFP part as VFP code that needs software assistance
-is not supported currently)
-Introduces <asm/neon.h> and the Kconfig symbol KERNEL_MODE_NEON. This has been
-aligned with Catalin for arm64, so any NEON code that does not use assembly but
-intrinsics or the GCC vectorizer (such as my examples) can potentially be shared
-between arm and arm64 archs.
-
-
-ARM: move VFP init to an earlier boot stage
-
-This is needed so the NEON is enabled when the XOR and RAID-6 algo boot time
-benchmarks are run.
-
-
-ARM: be strict about FP exceptions in kernel mode
-
-This adds a check to vfp_support_entry() to flag unsupported uses of the
-NEON/VFP in kernel mode. FP exceptions (bounces) are flagged as a BUG(), this is
-because of their potentially intermittent nature. Exceptions caused by the fact
-that kernel_neon_begin has not been called are just routed through the undef
-handler.
-
-
-ARM: crypto: add NEON accelerated XOR implementation
-
-This is the xor_blocks() implementation built with -ftree-vectorize, 60% faster
-than optimized ARM code. It calls in_interrupt() to check whether the NEON
-flavor can be used: this should really not be necessary, but due to xor_blocks's
-quite generic nature, there is no telling how exactly people may be using it in
-the real world.
-
-
-lib/raid6: add ARM-NEON accelerated syndrome calculation
-
-This is a port of the RAID-6 checksumming code in altivec.uc ported to use NEON
-intrinsics. It is about 4x faster than the sequential code. As this code does
-not live under arch/arm, I will send this patch separately to the appropriate 
-list if/when the prerequisite patches from this series have been accepted.
-
--- 
-Ard.
-
-
- arch/arm/Kconfig            |  7 ++++
- arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++
- arch/arm/include/asm/xor.h  | 73 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/lib/Makefile       |  6 ++++
- arch/arm/lib/xor-neon.c     | 42 ++++++++++++++++++++++++
- arch/arm/vfp/vfphw.S        |  5 +++
- arch/arm/vfp/vfpmodule.c    | 56 ++++++++++++++++++++++++++++++-
- include/linux/raid/pq.h     |  5 +++
- lib/raid6/.gitignore        |  1 +
- lib/raid6/Makefile          | 31 ++++++++++++++++++
- lib/raid6/algos.c           |  6 ++++
- lib/raid6/neon.c            | 58 ++++++++++++++++++++++++++++++++
- lib/raid6/neon.uc           | 80 +++++++++++++++++++++++++++++++++++++++++++++
- lib/raid6/test/Makefile     | 19 ++++++++++-
- 14 files changed, 423 insertions(+), 2 deletions(-)
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Acked-by: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/Kconfig            |  7 +++++++
+ arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++++++++++++++++++
+ arch/arm/vfp/vfpmodule.c    | 43 +++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 86 insertions(+)
  create mode 100644 arch/arm/include/asm/neon.h
- create mode 100644 arch/arm/lib/xor-neon.c
- create mode 100644 lib/raid6/neon.c
- create mode 100644 lib/raid6/neon.uc
 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ef30276..9e61402 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -2355,6 +2355,13 @@ config NEON
+ 	  Say Y to include support code for NEON, the ARMv7 Advanced SIMD
+ 	  Extension.
+ 
++config KERNEL_MODE_NEON
++	bool "Support for NEON in kernel mode"
++	default n
++	depends on NEON
++	help
++	  Say Y to include support for NEON in kernel mode.
++
+ endmenu
+ 
+ menu "Userspace binary formats"
+diff --git a/arch/arm/include/asm/neon.h b/arch/arm/include/asm/neon.h
+new file mode 100644
+index 0000000..8f730fe
+--- /dev/null
++++ b/arch/arm/include/asm/neon.h
+@@ -0,0 +1,36 @@
++/*
++ * linux/arch/arm/include/asm/neon.h
++ *
++ * Copyright (C) 2013 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <asm/hwcap.h>
++
++#define cpu_has_neon()		(!!(elf_hwcap & HWCAP_NEON))
++
++#ifdef __ARM_NEON__
++
++/*
++ * If you are affected by the BUILD_BUG below, it probably means that you are
++ * using NEON code /and/ calling the kernel_neon_begin() function from the same
++ * compilation unit. To prevent issues that may arise from GCC reordering or
++ * generating(1) NEON instructions outside of these begin/end functions, the
++ * only supported way of using NEON code in the kernel is by isolating it in a
++ * separate compilation unit, and calling it from another unit from inside a
++ * kernel_neon_begin/kernel_neon_end pair.
++ *
++ * (1) Current GCC (4.7) might generate NEON instructions at O3 level if
++ *     -mpfu=neon is set.
++ */
++
++#define kernel_neon_begin() \
++	BUILD_BUG_ON_MSG(1, "kernel_neon_begin() called from NEON code")
++
++#else
++void kernel_neon_begin(void);
++#endif
++void kernel_neon_end(void);
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index 5dfbb0b..1cdc13b 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -20,6 +20,7 @@
+ #include <linux/init.h>
+ #include <linux/uaccess.h>
+ #include <linux/user.h>
++#include <linux/export.h>
+ 
+ #include <asm/cp15.h>
+ #include <asm/cputype.h>
+@@ -648,6 +649,48 @@ static int vfp_hotplug(struct notifier_block *b, unsigned long action,
+ 	return NOTIFY_OK;
+ }
+ 
++#ifdef CONFIG_KERNEL_MODE_NEON
++
++/*
++ * Kernel-side NEON support functions
++ */
++void kernel_neon_begin(void)
++{
++	struct thread_info *thread = current_thread_info();
++	unsigned int cpu;
++	u32 fpexc;
++
++	/* Avoid using the NEON in interrupt context */
++	might_sleep();
++	cpu = get_cpu();
++
++	fpexc = fmrx(FPEXC) | FPEXC_EN;
++	fmxr(FPEXC, fpexc);
++
++	/*
++	 * Save the userland NEON/VFP state. Under UP,
++	 * the owner could be a task other than 'current'
++	 */
++	if (vfp_state_in_hw(cpu, thread))
++		vfp_save_state(&thread->vfpstate, fpexc);
++#ifndef CONFIG_SMP
++	else if (vfp_current_hw_state[cpu] != NULL)
++		vfp_save_state(vfp_current_hw_state[cpu], fpexc);
++#endif
++	vfp_current_hw_state[cpu] = NULL;
++}
++EXPORT_SYMBOL(kernel_neon_begin);
++
++void kernel_neon_end(void)
++{
++	/* Disable the NEON/VFP unit. */
++	fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
++	put_cpu();
++}
++EXPORT_SYMBOL(kernel_neon_end);
++
++#endif /* CONFIG_KERNEL_MODE_NEON */
++
+ /*
+  * VFP support code initialisation.
+  */
 -- 
 1.8.1.2
