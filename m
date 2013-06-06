@@ -1,61 +1,28 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Thu, 6 Jun 2013 23:45:15 +0530
-Subject: [PATCH 2/2] drivers: net: davinci_mdio: use pinctrl PM helpers
-In-Reply-To: <1370542515-22009-1-git-send-email-mugunthanvnm@ti.com>
-References: <1370542515-22009-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <1370542515-22009-3-git-send-email-mugunthanvnm@ti.com>
+Date: Thu, 6 Jun 2013 23:45:13 +0530
+Subject: [PATCH 0/2] Adding pinctrl PM support for CPSW and Davinci MDIO
+Message-ID: <1370542515-22009-1-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This utilize the new pinctrl core PM helpers to transition
-the driver to "default" and "sleep" states.
+* Adding pinctrl PM support for CPSW and MDIO for Power Optimization
+* Adopted to the new pinctrl core PM helpers added by Linus Walleij in 
+  http://marc.info/?l=linux-arm-kernel&m=137044113914184&w=2. This change
+  was suggested by Mark Brown in my another patch series posted for CPSW
+  and MDIO pinctrl.
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
+David Miller:
+  As this patch is based on the patch from Linus Walleij's patch
+  "drivers: pinctrl sleep and idle states in the core", can you ACK this
+  patch series so that Linus Walleij can take this patch via pinctrl tree.
+
+Mugunthan V N (2):
+  drivers: net: cpsw: use pinctrl PM helpers
+  drivers: net: davinci_mdio: use pinctrl PM helpers
+
+ drivers/net/ethernet/ti/cpsw.c         |   11 +++++++++++
  drivers/net/ethernet/ti/davinci_mdio.c |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ 2 files changed, 21 insertions(+)
 
-diff --git a/drivers/net/ethernet/ti/davinci_mdio.c b/drivers/net/ethernet/ti/davinci_mdio.c
-index 12aec17..5e361f4 100644
---- a/drivers/net/ethernet/ti/davinci_mdio.c
-+++ b/drivers/net/ethernet/ti/davinci_mdio.c
-@@ -38,6 +38,7 @@
- #include <linux/davinci_emac.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/pinctrl/consumer.h>
- 
- /*
-  * This timeout definition is a worst-case ultra defensive measure against
-@@ -347,6 +348,9 @@ static int davinci_mdio_probe(struct platform_device *pdev)
- 	data->bus->parent	= dev;
- 	data->bus->priv		= data;
- 
-+	/* Select default pin state */
-+	pinctrl_pm_select_default_state(&pdev->dev);
-+
- 	pm_runtime_enable(&pdev->dev);
- 	pm_runtime_get_sync(&pdev->dev);
- 	data->clk = clk_get(&pdev->dev, "fck");
-@@ -454,6 +458,9 @@ static int davinci_mdio_suspend(struct device *dev)
- 	data->suspended = true;
- 	spin_unlock(&data->lock);
- 
-+	/* Select sleep pin state */
-+	pinctrl_pm_select_sleep_state(dev);
-+
- 	return 0;
- }
- 
-@@ -462,6 +469,9 @@ static int davinci_mdio_resume(struct device *dev)
- 	struct davinci_mdio_data *data = dev_get_drvdata(dev);
- 	u32 ctrl;
- 
-+	/* Select default pin state */
-+	pinctrl_pm_select_default_state(dev);
-+
- 	spin_lock(&data->lock);
- 	pm_runtime_get_sync(data->dev);
- 
 -- 
 1.7.9.5
