@@ -1,66 +1,56 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 6 Jun 2013 13:27:38 -0400 (EDT)
-Subject: [PATCH 2/5] arm: preserve ATAGS in /chosen/atags in the Device
- Tree
-In-Reply-To: <20130606142851.6dd17cad@skate>
-References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370414409-29991-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130606142851.6dd17cad@skate>
-Message-ID: <alpine.LFD.2.03.1306061253430.18597@syhkavp.arg>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 6 Jun 2013 19:28:10 +0200
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
+References: <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
+ <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
+Message-ID: <20130606172810.GE14209@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 6 Jun 2013, Thomas Petazzoni wrote:
+Hi everyone,
 
-> Russell, Nicolas,
+On Thu, Jun 06, 2013 at 09:00:00AM -0700, Olof Johansson wrote:
+> On Thu, Jun 6, 2013 at 8:13 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+> > On Wed, Jun 5, 2013 at 7:54 PM, luke.leighton <luke.leighton@gmail.com> wrote:
+> >>  augh.  ok.  solutions.  what are the solutions here?
+> >
+> > Luke if you really want to fix this a good solution is to have
+> > Allwinner join Linaro and provide an engineer to the Linaro effort.
+> > That engineer will get educated on the right way to do kernel
+> > development and he can pass that knowledge back to Allwinner each day
+> > as he learns it.
 > 
-> I'd be interested to hear your opinion about the below proposal, that
-> allows platform-specific code to do its own parsing of ATAGS
-> information, without cluttering the generic code.
+> There's no need for anybody to join Linaro to contribute upstream.
+> That's a crazy notion.
+> 
+> Listen, Allwinner isn't working in a vacuum, believe it or not. I've
+> talked to them, so has Arnd and other people working on ARM, including
+> Maxime Ripard, who's been reimplementing upstream support for their
+> platform. Everybody is interested in the right things happening, it's
+> just a matter of figuring out how to do it. The right people are
+> already talking.
 
-Personally, I don't like it.
+I should also add that Allwinner not only talked to us already, but also
+expressed interest in doing actual modern kernel development (like using
+"recently" introduced kernel frameworks, like the clk framework).
 
-Not that the code itself is extremely ugly.  That is not the point.
+I've received patches from them already for private reviews, they began
+to show up on the kernel mailing lists, they asked to be CCed on the
+patches I send upstream, they're even the one that reached out to me
+when the early support for their chips was released. So, like Olof said,
+they aren't in a vacuum, they are very aware of the mainline kernel and
+speak a decent english.
 
-This opens the door to laziness on the part of bootloader authors and 
-system integrators which will simply (ab)use this mechanism as this 
-allows them to sit on what they already have instead of making the extra 
-mile to bring things into conformance.  And overtime this means 
-maintenance nightmare for us.
-
-I'm sorry but the only leverage we have to create some incentive for 
-people to do the right thing is exactly to say no to such kind of 
-accommodation.
-
-If Marvell has done things improperly in the past, it is for them to pay 
-the maintenance cost of their choices, not for mainline to carry them.
-
-If I were you I'd try to bring the bootloader into conformance instead.  
-That can be achieved in many ways:
-
-First, you should try to add support for older platforms into mainline 
-U-Boot.  That's always the preferable option.
-
-The next best option is to get the Marvell U-Boot source code (U-Boot is 
-GPL so the source must be available) and add minimal DT support to 
-it.
-
-Those two options imply a bootloader upgrade of course.  I know that 
-people are scared at the prospect of updating their bootloader, however 
-this can be made quite safe if the upgrade is implemented with care.
-
-Alternately you could use a second stage bootloader (or third stage in 
-some cases) that is executed from the existing U-Boot.  That second 
-stage bootloader can be as simple as a little executable blob that only 
-converts the legacy/proprietary ATAGs into a proper device tree and pass 
-it on to the already loaded kernel in memory.  That second stage 
-bootloader doesn't necessarily have to load files -- the original U-Boot 
-is well capable of loading more than just a kernel + initrd into memory 
-e.g. it can be scripted to load the kernel, the initrd, the desired DTB 
-and this shim binary, and execute the later.  The shim and the DTB don't 
-normally have to change, so a user could then enjoy upgrading the kernel 
-at will and use standard booting interfaces without even being aware of 
-the presence of that shim which only needs to be installed once.
-
-
-Nicolas
+So yes, Allwinner has an evil vendor tree (c), with a solution similar yet
+inferior (because not generic enough) to the device tree, but they show
+interest on going down the mainline road.
