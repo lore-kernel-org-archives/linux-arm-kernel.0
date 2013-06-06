@@ -1,38 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Jun 2013 11:54:46 +0100
-Subject: [PATCH 2/2] arm64: mm: don't bother invalidating the icache in
- switch_mm
-In-Reply-To: <1370516086-16653-1-git-send-email-will.deacon@arm.com>
-References: <1370516086-16653-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1370516086-16653-2-git-send-email-will.deacon@arm.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Thu,  6 Jun 2013 16:31:15 +0530
+Subject: [PATCH 01/13] ARM: Exynos: initialize l2x0 cache controller only for
+ cortex-a9 based SoCs
+Message-ID: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't support software broadcast of cache maintenance operations, so
-this flush is not required (__sync_icache_dcache will always affect all
-CPUs).
+Only cortex-a9 based Exynos SoCs have l2x0 cache controller. Hence instead of
+checking for every SoC with soc_is_xxx, just check for cpu part number and
+initialize the cache controller for cortex-a9 based SoCs.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 ---
- arch/arm64/include/asm/mmu_context.h | 6 ------
- 1 file changed, 6 deletions(-)
+ arch/arm/mach-exynos/common.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index e2bc385..a9eee33 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -151,12 +151,6 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
- {
- 	unsigned int cpu = smp_processor_id();
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 8ce2db4..bad000e 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -35,6 +35,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+ #include <asm/cacheflush.h>
++#include <asm/cputype.h>
  
--#ifdef CONFIG_SMP
--	/* check for possible thread migration */
--	if (!cpumask_empty(mm_cpumask(next)) &&
--	    !cpumask_test_cpu(cpu, mm_cpumask(next)))
--		__flush_icache_all();
--#endif
- 	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next)
- 		check_and_switch_context(next, tsk);
- }
+ #include <mach/regs-irq.h>
+ #include <mach/regs-pmu.h>
+@@ -520,7 +521,7 @@ static int __init exynos4_l2x0_cache_init(void)
+ {
+ 	int ret;
+ 
+-	if (soc_is_exynos5250() || soc_is_exynos5440())
++	if (read_cpuid_part_number() != ARM_CPU_PART_CORTEX_A9)
+ 		return 0;
+ 
+ 	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
 -- 
-1.8.2.2
+1.7.9.5
