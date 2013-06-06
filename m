@@ -1,72 +1,93 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Thu, 06 Jun 2013 10:33:28 -0700
-Subject: pxa27x and pinctrl-single
-In-Reply-To: <CAD6h2NTu9-E=Xy8zz5cgDdk5W4ShM9-B+p+gQtiA_HASQ7AEuQ@mail.gmail.com>
-References: <51AF7404.3090003@newsguy.com>
- <CAD6h2NTu9-E=Xy8zz5cgDdk5W4ShM9-B+p+gQtiA_HASQ7AEuQ@mail.gmail.com>
-Message-ID: <51B0C7E8.5090308@newsguy.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 6 Jun 2013 13:35:31 -0400 (EDT)
+Subject: [PATCH] arm/dt: Don't add disabled CPUs to system topology
+In-Reply-To: <1370538685-22386-1-git-send-email-james.king@linaro.org>
+References: <1370538685-22386-1-git-send-email-james.king@linaro.org>
+Message-ID: <alpine.LFD.2.03.1306061334250.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the reply Haojian.
+On Thu, 6 Jun 2013, James King wrote:
 
-On 06/05/2013 05:43 PM, Haojian Zhuang wrote:
-> On 6 June 2013 01:23, Mike Dunn <mikedunn@newsguy.com> wrote:
->> Hi,
->>
->> I'd like to start converting to device tree usage some of the old pxa27x
->> platforms I'm fond of, starting with adding pinctrl support.  If I'm not
->> mistaken, this will clear the way for some ongoing updates to the pinctrl/gpio
->> code used by newer Marvell arches.
->>
->> I noticed that Haojian pulled the pinctrl-pxa driver from the kernel, in favor
->> of using pinctrl-single, so I turned my attention to that.  From what I can
->> tell, pinctrl-single is currently inadequate for pxa27x because:
->>
->> (1) On the pxa27x, setting the mux for a pin involves configuring both the alt
->> function register *and* the direction register, requiring the ability to specify
->> in the device tree multiple reg/value pairs for each pin.
-> In PXA27x, GPIO controller control both GPIO & pin alternate function. The
-> alternate function is covered by GAFRx registers.
+> If CPUs are marked as disabled in the devicetree, make sure they do
+> not exist in the system CPU information and CPU topology information.
+> In this case these CPUs will not be able to be added to the system later
+> using hot-plug. This allows a single chip with many CPUs to be easily
+> used in a variety of hardware devices where they may have different
+> actual processing requirements (eg for thermal/cost reasons).
 > 
-> At first, we need to move GAFRx from gpio-pxa driver. Then we can support
+> - Change devicetree.c to ignore any cpu nodes marked as disabled,
+>   this effectively limits the number of active cpu cores so no need
+>   for the max_cpus=x in the chosen node.
+> - Change topology.c to ignore any cpu nodes marked as disabled, this
+>   is where the scheduler would learn about big/LITTLE cores so this
+>   effectively keeps the scheduler in sync.
+> 
+> Signed-off-by: James King <james.king@linaro.org>
+
+Acked-by: Nicolas Pitre <nico@linaro.org>
 
 
-Thanks... I wondered about division of labor between pinctrl and gpio.  Pinctrl
-did seem to be the appropriate place.
-
-
-> it by pinctrl-single driver since pinctrl-single driver could support mulitple
-> pins in one pin registers. There's "bits-per-mux" property in pinctrl-single
-> driver.
-
-
-Yes, but currently pinctrl-single only supports writing one register for a given
-pin (with multiple pins sharing a register if bit-per-mux==true).  On pxa27x, a
-pin's alt function is determined by the values written to both the GAFRx and the
-GPDRx registers, so I think that pinctrl-single may need to allow a device tree
-to specify multiple reg/value/mask sets for any one pin.  I don't have a
-pxa3xx/mmp developer's manual handy, but from the code it appears that on these
-arches the direction register is irrelevant to the mux setting.
-
-
->>
->> (2) Some of the pinctrl-single code still assumes one register-per-pin; see for
->> example the functions pcs_allocate_pin_table() and pcs_get_pin_by_offset().
->> Curiously, the recently added pcs_request_gpio() function also suffers from
->> this, unless I'm mistaken.
->>
-> Not exactly. pinctrl-single driver could support multiple pins in one register.
-> Now Manjunathappa also fixed some issue in pinctrl-single for supporting
-> multiple pins. (https://lkml.org/lkml/2013/5/21/226) I suggest you to develop
-> based on his patches.
-
-
-Thanks for the pointer.  I was away from the linux-arm-kernel ML until
-yesterday, so I didn't see the patch.  Yes, it looks like bits_per_pin corrects
-the problem.
-
-I guess I'll take a stab at this.  Any other comments greatly appreciated.
-
-Thanks again,
-Mike
+> ---
+>  Documentation/devicetree/bindings/arm/cpus.txt | 5 +++++
+>  arch/arm/kernel/devtree.c                      | 6 ++++++
+>  arch/arm/kernel/topology.c                     | 4 ++++
+>  3 files changed, 15 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+> index f32494d..9fbcbc5 100644
+> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+> @@ -45,6 +45,10 @@ For the ARM architecture every CPU node must contain the following properties:
+>  		"marvell,xsc3"
+>  		"marvell,xscale"
+>  
+> +And optionally set the following properties:
+> +
+> +- status:	can be set to "disabled" to remove that CPU from the system CPU topology
+> +
+>  Example:
+>  
+>  	cpus {
+> @@ -73,5 +77,6 @@ Example:
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a7";
+>  			reg = <0x101>;
+> +			status = "disabled";
+>  		};
+>  	};
+> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
+> index 5af04f6..f4ba8ee 100644
+> --- a/arch/arm/kernel/devtree.c
+> +++ b/arch/arm/kernel/devtree.c
+> @@ -112,6 +112,12 @@ void __init arm_dt_init_cpu_maps(void)
+>  			return;
+>  
+>  		/*
+> +		 * Check if the cpu is marked as "disabled", if so ignore.
+> +		 */
+> +		if (!of_device_is_available(cpu))
+> +			continue;
+> +
+> +		/*
+>  		 * Duplicate MPIDRs are a recipe for disaster.
+>  		 * Scan all initialized entries and check for
+>  		 * duplicates. If any is found just bail out.
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> index f10316b..90f8fb3 100644
+> --- a/arch/arm/kernel/topology.c
+> +++ b/arch/arm/kernel/topology.c
+> @@ -116,6 +116,10 @@ static void __init parse_dt_topology(void)
+>  		if (cpu_eff->compatible == NULL)
+>  			continue;
+>  
+> +		/* Check if the cpu is marked as "disabled", if so ignore. */
+> +		if (!of_device_is_available(cn))
+> +			continue;
+> +
+>  		rate = of_get_property(cn, "clock-frequency", &len);
+>  		if (!rate || len != 4) {
+>  			pr_err("%s missing clock-frequency property\n",
+> -- 
+> 1.8.1.2
+> 
