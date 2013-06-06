@@ -1,87 +1,82 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 6 Jun 2013 10:13:27 +0100
-Subject: [PATCH 5/8] arm: mvebu: don't hardcode a physical address in
- headsmp.S
-In-Reply-To: <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370415901-4721-6-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130606091327.GF15208@mudshark.cambridge.arm.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 6 Jun 2013 11:13:48 +0200
+Subject: [PATCH 1/1] of/irq: store IRQ trigger/level in struct resource
+ flags
+In-Reply-To: <20130606085039.GL23653@game.jcrosoft.org>
+References: <1365148088-11175-1-git-send-email-javier.martinez@collabora.co.uk>
+ <51633F26.7000400@gmail.com> <51634835.5010302@collabora.co.uk>
+ <20130605232647.55C8B3E10E4@localhost>
+ <20130606085039.GL23653@game.jcrosoft.org>
+Message-ID: <CABxcv==_37OxH1F=ELDMOL6Dni_x47emKHVnmMH8m2YWHgEZPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+On Thu, Jun 6, 2013 at 10:50 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 00:26 Thu 06 Jun     , Grant Likely wrote:
+>> On Tue, 09 Apr 2013 00:44:05 +0200, Javier Martinez Canillas <javier.martinez@collabora.co.uk> wrote:
+>> > On 04/09/2013 12:05 AM, Rob Herring wrote:
+>> > > On 04/05/2013 02:48 AM, Javier Martinez Canillas wrote:
+>> > >> This means that drivers that need the IRQ type/level flags defined in
+>> > >> the DT won't be able to get it.
+>> > >
+>> > > But the interrupt controllers that need the information should be able
+>> > > to get to it via irqd_get_trigger_type. What problem exactly are you
+>> > > trying to fix? What driver would use this?
+>> > >
+>> >
+>> > Yes but this is not about the interrupt controller wanting this information but
+>> > a device driver that is using the IORESOURCE_IRQ struct resource that has the
+>> > information about the virtual IRQ associated with a GPIO-IRQ.
+>> >
+>> > The driver doesn't know neither care if its IRQ line is connected to a line of
+>> > an real IRQ controller or to a GPIO controller that allows a GPIO line to be
+>> > used as an IRQ.
+>> >
+>> > > My understanding of the IORESOURCE_IRQ_xxx (and DMA) bits are they are
+>> > > ISA specific and therefore should not be used on non-ISA buses.
+>> > >
+>> >
+>> > Many TI OMAP2+ SoC based boards have an SMSC LAN911x/912x controller
+>> > (drivers/net/ethernet/smsc/smsc911x.c) that is connected to the OMAP processor
+>> > through its General-Purpose Memory Controller (GPMC) and this LAN driver obtain
+>> > its IRQ and I/O address space from a struct resource IORESOURCE_IRQ and
+>> > IORESOURCE_MEM respectively, that is filled by the DeviceTree core.
+>> >
+>> > It does this:
+>> >
+>> > irq_res = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
+>> > irq_flags = irq_res->flags & IRQF_TRIGGER_MASK;
+>> >
+>> > Since of_irq_to_resource() doesn't fill the trigger/level flags on the
+>> > IORESOURCE_IRQ struct resource, irq_flags will always be 0 regarding the value
+>> > specified on the second cell of the "interrupts" DT property.
+>
+> why do you need to known this in you driver this need to be handle in the irq
+> chip
+>
+> I does use irq gpio without at all
+>
+> Best Regards,
+> J.
+>
 
-On Wed, Jun 05, 2013 at 08:04:58AM +0100, Thomas Petazzoni wrote:
-> Now that the coherency_init() function is called a bit earlier, we can
-> actually read the physical address of the coherency unit registers
-> from the Device Tree, and communicate that to the headsmp.S code,
-> which avoids hardcoding a physical address.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  arch/arm/mach-mvebu/coherency.c |  4 ++++
->  arch/arm/mach-mvebu/headsmp.S   | 19 +++++++++++--------
->  2 files changed, 15 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mvebu/coherency.c b/arch/arm/mach-mvebu/coherency.c
-> index d74794a..3d8f40f 100644
-> --- a/arch/arm/mach-mvebu/coherency.c
-> +++ b/arch/arm/mach-mvebu/coherency.c
-> @@ -27,6 +27,7 @@
->  #include <asm/smp_plat.h>
->  #include "armada-370-xp.h"
->  
-> +unsigned long __cpuinitdata coherency_phys_base;
->  static void __iomem *coherency_base;
->  static void __iomem *coherency_cpu_base;
->  
-> @@ -124,7 +125,10 @@ int __init coherency_init(void)
->  
->  	np = of_find_matching_node(NULL, of_coherency_table);
->  	if (np) {
-> +		struct resource res;
->  		pr_info("Initializing Coherency fabric\n");
-> +		of_address_to_resource(np, 0, &res);
-> +		coherency_phys_base = res.start;
+Yes, in fact as I said on an earlier email on this thread if you don't
+pass a trigger type to the request_irq() call, it will use the trigger
+type set by the irq chip earlier with .xlate.
 
-So you have the primary CPU writing this address, before it is coherent...
+A few months ago when I was testing DT on my OMAP3 board, for some
+reasons it was not getting the right trigger type. That's why I sent
+this patch but it seems it was a bug on the GPIO omap irq_chip driver
+since now is working correctly without this. It is taking the trigger
+type that was set on the .xlate function handler.
 
->  		coherency_base = of_iomap(np, 0);
->  		coherency_cpu_base = of_iomap(np, 1);
->  		set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
-> diff --git a/arch/arm/mach-mvebu/headsmp.S b/arch/arm/mach-mvebu/headsmp.S
-> index a06e0ed..f500e9c 100644
-> --- a/arch/arm/mach-mvebu/headsmp.S
-> +++ b/arch/arm/mach-mvebu/headsmp.S
-> @@ -21,12 +21,6 @@
->  #include <linux/linkage.h>
->  #include <linux/init.h>
->  
-> -/*
-> - * At this stage the secondary CPUs don't have acces yet to the MMU, so
-> - * we have to provide physical addresses
-> - */
-> -#define ARMADA_XP_CFB_BASE	     0xD0020200
-> -
->  	__CPUINIT
->  
->  /*
-> @@ -35,15 +29,24 @@
->   * startup
->   */
->  ENTRY(armada_xp_secondary_startup)
-> +	/* Get coherency fabric base physical address */
-> +	adr	r0, 1f
-> +	ldmia	r0, {r1, r2}
-> +	sub	r0, r0, r1
-> +	add	r2, r2, r0
-> +	ldr	r0, [r2]
+So, I don't need this patch anymore to make the LAN chip work on my
+board and I don't know if the fact that an empty edge/level flags
+means that is going to be used whatever was set on the .xlate function
+handler is a reason enough to not return the IRQ flags on the struct
+resource or if someone else is still interested on this patch and
+filling this information on the struct resource.
 
-... and the secondaries reading it, before they are coherent.
-How do you ensure that the write is indeed visible?
-
-Furthermore, it's worth noting that of_find_matching_node takes the
-devtree_lock spinlock, so you need to be careful calling that if you're not
-coherent.
-
-Will
+Best regards,
+Javier
