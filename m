@@ -1,124 +1,200 @@
 From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  6 Jun 2013 16:22:03 +0100
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-Message-ID: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
+Date: Thu,  6 Jun 2013 16:22:04 +0100
+Subject: [RFC PATCH v2 1/2] ARM: kernel: build MPIDR hash function data
+ structure
+In-Reply-To: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <1370532125-14322-2-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset is v2 of a previous posting:
+On ARM SMP systems, cores are identified by their MPIDR register.
+The MPIDR guidelines in the ARM ARM do not provide strict enforcement of
+MPIDR layout, only recommendations that, if followed, split the MPIDR
+on ARM 32 bit platforms in three affinity levels. In multi-cluster
+systems like big.LITTLE, if the affinity guidelines are followed, the
+MPIDR can not be considered an index anymore. This means that the
+association between logical CPU in the kernel and the HW CPU identifier
+becomes somewhat more complicated requiring methods like hashing to
+associate a given MPIDR to a CPU logical index, in order for the look-up
+to be carried out in an efficient and scalable way.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/172873.html
+This patch provides a function in the kernel that starting from the
+cpu_logical_map, implement collision-free hashing of MPIDR values by checking
+all significative bits of MPIDR affinity level bitfields. The hashing
+can then be carried out through bits shifting and ORing; the resulting
+hash algorithm is a collision-free though not minimal hash that can be
+executed with few assembly instructions. The mpidr is filtered through a
+mpidr mask that is built by checking all bits that toggle in the set of
+MPIDRs corresponding to possible CPUs. Bits that do not toggle do not carry
+information so they do not contribute to the resulting hash.
 
-v2 changes:
+Pseudo code:
 
-- rescheduled registers usage in compute_mpidr_hash macro
+/* check all bits that toggle, so they are required */
+for (i = 1, mpidr_mask = 0; i < num_possible_cpus(); i++)
+	mpidr_mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
 
-Cores in ARM SMP systems are identified through coprocessor registers,
-so that every core, by executing a coprocessor read, can detect its own
-identifier. The CPU identifier evolved from a simple CPU ID on ARM 11 MPcore
-SMP, where the CPU ID was split in two subfields (CPU ID and CLUSTER ID)
-to the v7 MPIDR, where the MPIDR[23:0] bits define three affinity levels
-that can describe thread, core, cluster topology identifiers.
-According to the ARM 11 MPcore TRM and for architecture versions later
-than v7 (MPIDR), to the ARM ARM, the identifier registers format is as follows:
+/*
+ * Build shifts to be applied to aff0, aff1, aff2 values to hash the mpidr
+ * fls() returns the last bit set in a word, 0 if none
+ * ffs() returns the first bit set in a word, 0 if none
+ */
+fs0 = mpidr_mask[7:0] ? ffs(mpidr_mask[7:0]) - 1 : 0;
+fs1 = mpidr_mask[15:8] ? ffs(mpidr_mask[15:8]) - 1 : 0;
+fs2 = mpidr_mask[23:16] ? ffs(mpidr_mask[23:16]) - 1 : 0;
+ls0 = fls(mpidr_mask[7:0]);
+ls1 = fls(mpidr_mask[15:8]);
+ls2 = fls(mpidr_mask[23:16]);
+bits0 = ls0 - fs0;
+bits1 = ls1 - fs1;
+bits2 = ls2 - fs2;
+aff0_shift = fs0;
+aff1_shift = 8 + fs1 - bits0;
+aff2_shift = 16 + fs2 - (bits0 + bits1);
+u32 hash(u32 mpidr) {
+	u32 l0, l1, l2;
+	u32 mpidr_masked = mpidr & mpidr_mask;
+	l0 = mpidr_masked & 0xff;
+	l1 = mpidr_masked & 0xff00;
+	l2 = mpidr_masked & 0xff0000;
+	return (l0 >> aff0_shift | l1 >> aff1_shift | l2 >> aff2_shift);
+}
 
-NR: non-relevant for identification
+The hashing algorithm relies on the inherent properties set in the ARM ARM
+recommendations for the MPIDR. Exotic configurations, where for instance the
+MPIDR values at a given affinity level have large holes, can end up requiring
+big hash tables since the compression of values that can be achieved through
+shifting is somewhat crippled when holes are present. Kernel warns if
+the number of buckets of the resulting hash table exceeds the number of
+possible CPUs by a factor of 4, which is a symptom of a very sparse HW
+MPIDR configuration.
 
-ARM11 MPCORE: CPU ID register
+The hash algorithm is quite simple and can easily be implemented in assembly
+code, to be used in code paths where the kernel virtual address space is
+not set-up (ie cpu_resume) and instruction and data fetches are strongly
+ordered so code must be compact and must carry out few data accesses.
 
-31                                    12 11          8 7       4 3        0
----------------------------------------------------------------------------
-|                 NR                    |  CLUSTER ID |    NR   |  CPU ID |
---------------------------------------------------------------------------
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Colin Cross <ccross@android.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Amit Kucheria <amit.kucheria@linaro.org>
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/include/asm/smp_plat.h | 12 ++++++++
+ arch/arm/kernel/setup.c         | 67 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+)
 
-ARM v7: MPIDR
-
-31       24 23                 16 15                 8 7                  0
----------------------------------------------------------------------------
-|   NR     |      AFFINITY 2     |     AFFINITY 1     |    AFFINITY 0     |
----------------------------------------------------------------------------
-
-The split of CPU identifiers in multiple affinity levels implies that
-the CPU ID, and later the MPIDR, cannot be used as simple indexes, since
-the bit representation can contain holes:
-
-eg 4 CPUs, in two separate clusters with two CPUs each:
-
-CPU0: MPIDR = 0x0
-CPU1: MPIDR = 0x1
-CPU2: MPIDR = 0x100
-CPU3: MPIDR = 0x101
-
-In order to carry out operations that rely on the HW CPUID/MPIDR (CCI
-disabling, context save/restore) the association of the CPU ID, or MPIDR
-to an index is needed so that the CPU can be associated with a set of
-resources. Resources look-up through the HW CPU ID is carried out in
-code paths usually executed in power down procedures, that have to be
-fast and look-up should be performed with few instructions that may be
-executing in physical address space, with the MMU off.
-In order to provide a fast conversion from [CPU ID, MPIDR] values to indexes
-this set provides methods to build a simple collision-free hash function based
-on shifting and OR'ing of CPU ID values, with shifts precomputed at boot by
-scanning the cpu_logical_map entries (that contain the CPUID/MPIDR) of
-possible CPUs.
-
-By scanning the cpu_logical_map, the boot code detects how many bits are really
-required to represent HW identifiers in the system and map them to a set of
-buckets that actually represent the given index a HW id correspond to. The
-hashing algorithm inherently takes advantage of a-priori knowledge of the
-CPUIDs/MPIDRs allowed bits layout and it can be executed with few instructions
-even in code paths where caching and the MMU are turned off (e.g resuming from
-idle, S2R, hibernation).
-
-One drawback of the current hashing algorithm is that it may result in a big
-number of buckets if the recommendations on the CPUID/MPIDR layout are not
-respected in the CPUID/MPIDR configuration; code warns on hash table
-sizes bigger than 4 times the number of possible CPUs, which is a
-symptom of a weird CPUID/MPIDR HW configuration and should be the exception
-not the rule.
-
-The first patch in the series provides a function that precomputes all
-required hashing parameters by scanning the cpu_logical_map (that
-contains HW identifiers), computes and stashes the hash parameters in a
-structure exported to all kernel components for further usage.
-
-The second patch fixes the current cpu_{suspend}/{resume} functionality,
-so that all levels of CPUID/MPIDR are supported and cpu_{suspend}/{resume}
-can be used on systems where affinity levels 1 and 2 are actually populated.
-The fix carries out dynamic allocation of the array used to save the context
-pointers, with size equal to the number of precomputed CPUID/MPIDR hash
-buckets. To access the array, the CPUID/MPIDR values are hashed through the
-algorithm built in patch 1 so that a hash value is retrieved and the array can
-be indexed properly through it.
-
-Context pointer array is allocated through kmalloc, so that it is made
-up of a contiguous chunk of memory whose virtual address can be safely
-converted to physical address (used in the MMU off path) through a
-static mapping translation valid for all pages (if more than one) making
-up the context pointer array. Context pointer array base address is
-stashed in a structure easily retrieved in assembly through a pc relative
-load that provides both virtual and physical address so that address
-translation is not needed in the cpu_resume path, saving a few instructions.
-
-Code will be improved later through dynamic patching so that the mask
-and shifts in the hashing algorithm will be embedded in the assembly
-instructions as immediates, removing the need for multiple loads to
-memory to retrieve them at every given cpu_{suspend}/{resume} cycle.
-
-Tested on TC2 (dual cluster 2x3 A15/A7 system) through CPU idle deep C-states
-allowing A15 and A7 shutdown modes on both SMP and UP configurations.
-
-Lorenzo Pieralisi (2):
-  ARM: kernel: build MPIDR hash function data structure
-  ARM: kernel: implement stack pointer save array through MPIDR hashing
-
- arch/arm/include/asm/smp_plat.h | 18 ++++++++
- arch/arm/include/asm/suspend.h  |  5 +++
- arch/arm/kernel/asm-offsets.c   |  6 +++
- arch/arm/kernel/setup.c         | 67 ++++++++++++++++++++++++++++
- arch/arm/kernel/sleep.S         | 97 +++++++++++++++++++++++++++++++++--------
- arch/arm/kernel/suspend.c       | 20 +++++++++
- 6 files changed, 195 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/include/asm/smp_plat.h b/arch/arm/include/asm/smp_plat.h
+index aaa61b6..d933b03 100644
+--- a/arch/arm/include/asm/smp_plat.h
++++ b/arch/arm/include/asm/smp_plat.h
+@@ -66,4 +66,16 @@ static inline int get_logical_index(u32 mpidr)
+ 	return -EINVAL;
+ }
+ 
++struct mpidr_hash {
++	u32	mask;
++	u32	shift_aff[3];
++	u32	bits;
++};
++
++extern struct mpidr_hash mpidr_hash;
++
++static inline u32 mpidr_hash_size(void)
++{
++	return 1 << mpidr_hash.bits;
++}
+ #endif
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 6f5bdd6..74dce64 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -473,6 +473,72 @@ void __init smp_setup_processor_id(void)
+ 	printk(KERN_INFO "Booting Linux on physical CPU 0x%x\n", mpidr);
+ }
+ 
++struct mpidr_hash mpidr_hash;
++#ifdef CONFIG_SMP
++/**
++ * smp_build_mpidr_hash - Pre-compute shifts required at each affinity
++ *			  level in order to build a linear index from an
++ *			  MPIDR value. Resulting algorithm is a collision
++ *			  free hash carried out through shifting and ORing
++ */
++static void __init smp_build_mpidr_hash(void)
++{
++	u32 i, affinity;
++	u32 fs[3], bits[3], ls, mask = 0;
++	/*
++	 * Pre-scan the list of MPIDRS and filter out bits that do
++	 * not contribute to affinity levels, ie they never toggle.
++	 */
++	for_each_possible_cpu(i)
++		mask |= (cpu_logical_map(i) ^ cpu_logical_map(0));
++	pr_debug("mask of set bits 0x%x\n", mask);
++	/*
++	 * Find and stash the last and first bit set at all affinity levels to
++	 * check how many bits are required to represent them.
++	 */
++	for (i = 0; i < 3; i++) {
++		affinity = MPIDR_AFFINITY_LEVEL(mask, i);
++		/*
++		 * Find the MSB bit and LSB bits position
++		 * to determine how many bits are required
++		 * to express the affinity level.
++		 */
++		ls = fls(affinity);
++		fs[i] = affinity ? ffs(affinity) - 1 : 0;
++		bits[i] = ls - fs[i];
++	}
++	/*
++	 * An index can be created from the MPIDR by isolating the
++	 * significant bits@each affinity level and by shifting
++	 * them in order to compress the 24 bits values space to a
++	 * compressed set of values. This is equivalent to hashing
++	 * the MPIDR through shifting and ORing. It is a collision free
++	 * hash though not minimal since some levels might contain a number
++	 * of CPUs that is not an exact power of 2 and their bit
++	 * representation might contain holes, eg MPIDR[7:0] = {0x2, 0x80}.
++	 */
++	mpidr_hash.shift_aff[0] = fs[0];
++	mpidr_hash.shift_aff[1] = MPIDR_LEVEL_BITS + fs[1] - bits[0];
++	mpidr_hash.shift_aff[2] = 2*MPIDR_LEVEL_BITS + fs[2] -
++						(bits[1] + bits[0]);
++	mpidr_hash.mask = mask;
++	mpidr_hash.bits = bits[2] + bits[1] + bits[0];
++	pr_debug("MPIDR hash: aff0[%u] aff1[%u] aff2[%u] mask[0x%x] bits[%u]\n",
++				mpidr_hash.shift_aff[0],
++				mpidr_hash.shift_aff[1],
++				mpidr_hash.shift_aff[2],
++				mpidr_hash.mask,
++				mpidr_hash.bits);
++	/*
++	 * 4x is an arbitrary value used to warn on a hash table much bigger
++	 * than expected on most systems.
++	 */
++	if (mpidr_hash_size() > 4 * num_possible_cpus())
++		pr_warn("Large number of MPIDR hash buckets detected\n");
++	sync_cache_w(&mpidr_hash);
++}
++#endif
++
+ static void __init setup_processor(void)
+ {
+ 	struct proc_info_list *list;
+@@ -820,6 +886,7 @@ void __init setup_arch(char **cmdline_p)
+ 				smp_set_ops(mdesc->smp);
+ 		}
+ 		smp_init_cpus();
++		smp_build_mpidr_hash();
+ 	}
+ #endif
+ 
 -- 
 1.8.2.2
