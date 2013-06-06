@@ -1,62 +1,111 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Jun 2013 15:28:34 +0100
-Subject: [PATCH 10/10] ARM: mcpm: use -st dsb option prior to sev instructions
+Date: Thu,  6 Jun 2013 15:28:29 +0100
+Subject: [PATCH 05/10] ARM: barrier: allow options to be passed to memory
+ barrier instructions
 In-Reply-To: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
 References: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1370528914-17506-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1370528914-17506-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a similar manner to our spinlock implementation, mcpm uses sev to
-wake up cores waiting on a lock when the lock is unlocked. In order to
-ensure that the final write unlocking the lock is visible, a dsb
-instruction is executed immediately prior to the sev.
+On ARMv7, the memory barrier instructions take an optional `option'
+field which can be used to constrain the effects of a memory barrier
+based on shareability and access type.
 
-This patch changes these dsbs to use the -st option, since we only
-require that the store unlocking the lock is made visible.
+This patch allows the caller to pass these options if required, and
+updates the smp_*() barriers to request inner-shareable barriers,
+affecting only stores for the _wmb variant. wmb() is also changed to
+use the -st version of dsb.
 
-Reviewed-by: Dave Martin <dave.martin@arm.com>
+Reported-by: Albin Tonnerre <albin.tonnerre@arm.com>
 Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/common/mcpm_head.S | 2 +-
- arch/arm/common/vlock.S     | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/include/asm/assembler.h |  4 ++--
+ arch/arm/include/asm/barrier.h   | 32 ++++++++++++++++----------------
+ 2 files changed, 18 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/common/mcpm_head.S b/arch/arm/common/mcpm_head.S
-index 8178705..5cdf619 100644
---- a/arch/arm/common/mcpm_head.S
-+++ b/arch/arm/common/mcpm_head.S
-@@ -151,7 +151,7 @@ mcpm_setup_leave:
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index 05ee9ee..863b280 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -212,9 +212,9 @@
+ #ifdef CONFIG_SMP
+ #if __LINUX_ARM_ARCH__ >= 7
+ 	.ifeqs "\mode","arm"
+-	ALT_SMP(dmb)
++	ALT_SMP(dmb	ish)
+ 	.else
+-	ALT_SMP(W(dmb))
++	ALT_SMP(W(dmb)	ish)
+ 	.endif
+ #elif __LINUX_ARM_ARCH__ == 6
+ 	ALT_SMP(mcr	p15, 0, r0, c7, c10, 5)	@ dmb
+diff --git a/arch/arm/include/asm/barrier.h b/arch/arm/include/asm/barrier.h
+index 8dcd9c7..60f15e2 100644
+--- a/arch/arm/include/asm/barrier.h
++++ b/arch/arm/include/asm/barrier.h
+@@ -14,27 +14,27 @@
+ #endif
  
- 	mov	r0, #INBOUND_NOT_COMING_UP
- 	strb	r0, [r8, #MCPM_SYNC_CLUSTER_INBOUND]
--	dsb
-+	dsb	st
- 	sev
+ #if __LINUX_ARM_ARCH__ >= 7
+-#define isb() __asm__ __volatile__ ("isb" : : : "memory")
+-#define dsb() __asm__ __volatile__ ("dsb" : : : "memory")
+-#define dmb() __asm__ __volatile__ ("dmb" : : : "memory")
++#define isb(option) __asm__ __volatile__ ("isb " #option : : : "memory")
++#define dsb(option) __asm__ __volatile__ ("dsb " #option : : : "memory")
++#define dmb(option) __asm__ __volatile__ ("dmb " #option : : : "memory")
+ #elif defined(CONFIG_CPU_XSC3) || __LINUX_ARM_ARCH__ == 6
+-#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
++#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
++#define dmb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 5" \
+ 				    : : "r" (0) : "memory")
+ #elif defined(CONFIG_CPU_FA526)
+-#define isb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
++#define isb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c5, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("" : : : "memory")
++#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+ #else
+-#define isb() __asm__ __volatile__ ("" : : : "memory")
+-#define dsb() __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
++#define isb(x) __asm__ __volatile__ ("" : : : "memory")
++#define dsb(x) __asm__ __volatile__ ("mcr p15, 0, %0, c7, c10, 4" \
+ 				    : : "r" (0) : "memory")
+-#define dmb() __asm__ __volatile__ ("" : : : "memory")
++#define dmb(x) __asm__ __volatile__ ("" : : : "memory")
+ #endif
  
- 	mov	r0, r11
-diff --git a/arch/arm/common/vlock.S b/arch/arm/common/vlock.S
-index ff19858..8b7df28 100644
---- a/arch/arm/common/vlock.S
-+++ b/arch/arm/common/vlock.S
+ #ifdef CONFIG_ARCH_HAS_BARRIERS
 @@ -42,7 +42,7 @@
- 	dmb
- 	mov	\rscratch, #0
- 	strb	\rscratch, [\rbase, \rcpu]
--	dsb
-+	dsb	st
- 	sev
- .endm
+ #elif defined(CONFIG_ARM_DMA_MEM_BUFFERABLE) || defined(CONFIG_SMP)
+ #define mb()		do { dsb(); outer_sync(); } while (0)
+ #define rmb()		dsb()
+-#define wmb()		mb()
++#define wmb()		do { dsb(st); outer_sync(); } while (0)
+ #else
+ #define mb()		barrier()
+ #define rmb()		barrier()
+@@ -54,9 +54,9 @@
+ #define smp_rmb()	barrier()
+ #define smp_wmb()	barrier()
+ #else
+-#define smp_mb()	dmb()
+-#define smp_rmb()	dmb()
+-#define smp_wmb()	dmb()
++#define smp_mb()	dmb(ish)
++#define smp_rmb()	smp_mb()
++#define smp_wmb()	dmb(ishst)
+ #endif
  
-@@ -102,7 +102,7 @@ ENTRY(vlock_unlock)
- 	dmb
- 	mov	r1, #VLOCK_OWNER_NONE
- 	strb	r1, [r0, #VLOCK_OWNER_OFFSET]
--	dsb
-+	dsb	st
- 	sev
- 	bx	lr
- ENDPROC(vlock_unlock)
+ #define read_barrier_depends()		do { } while(0)
 -- 
 1.8.2.2
