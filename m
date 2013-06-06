@@ -1,67 +1,103 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  6 Jun 2013 15:28:24 +0100
-Subject: [PATCH 00/10] Make use of v7 barrier variants in Linux
-Message-ID: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
+Date: Thu,  6 Jun 2013 15:28:31 +0100
+Subject: [PATCH 07/10] ARM: mm: use inner-shareable barriers for TLB and user
+ cache operations
+In-Reply-To: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
+References: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1370528914-17506-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+System-wide barriers aren't required for situations where we only need
+to make visibility and ordering guarantees in the inner-shareable domain
+(i.e. we are not dealing with devices or potentially incoherent CPUs).
 
-This patch series updates our barrier macros to make use of the
-different variants introduced by the v7 architecture. This includes
-both access type (store vs load/store) and shareability domain. There
-is a dependency on my TLB patches, which I have included in the series
-and which were most recently posted here:
+This patch changes the v7 TLB operations, coherent_user_range and
+dcache_clean_area functions to user inner-shareable barriers. For cache
+maintenance, only the store access type is required to ensure completion.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/169124.html
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/cache-v7.S | 4 ++--
+ arch/arm/mm/proc-v7.S  | 2 +-
+ arch/arm/mm/tlb-v7.S   | 8 ++++----
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-With these patches applied, I see around 5% improvement on hackbench
-scores running on my TC2 with both clusters enabled.
-
-Since these changes have subtle memory-ordering implications, I've
-avoiding touching any cache-flushing operations or barrier code that is
-used during things like CPU suspend/resume, where the CPU coming up/down
-might have bits like actlr.smp clear. Maybe this is overkill, but it
-reaches the point of diminishing returns if we start having
-implementation-specific barrier options, so I've tried to keep it
-general.
-
-All feedback welcome,
-
-Will
-
-
-Will Deacon (10):
-  ARM: mm: remove redundant dsb() prior to range TLB invalidation
-  ARM: tlb: don't perform inner-shareable invalidation for local TLB ops
-  ARM: tlb: don't bother with barriers for branch predictor maintenance
-  ARM: tlb: don't perform inner-shareable invalidation for local BP ops
-  ARM: barrier: allow options to be passed to memory barrier
-    instructions
-  ARM: spinlock: use inner-shareable dsb variant prior to sev
-    instruction
-  ARM: mm: use inner-shareable barriers for TLB and user cache
-    operations
-  ARM: tlb: reduce scope of barrier domains for TLB invalidation
-  ARM: kvm: use inner-shareable barriers after TLB flushing
-  ARM: mcpm: use -st dsb option prior to sev instructions
-
- arch/arm/common/mcpm_head.S      |   2 +-
- arch/arm/common/vlock.S          |   4 +-
- arch/arm/include/asm/assembler.h |   4 +-
- arch/arm/include/asm/barrier.h   |  32 ++++++------
- arch/arm/include/asm/spinlock.h  |   2 +-
- arch/arm/include/asm/switch_to.h |  10 ++++
- arch/arm/include/asm/tlbflush.h  | 105 ++++++++++++++++++++++++++++++++-------
- arch/arm/kernel/smp_tlb.c        |  10 ++--
- arch/arm/kvm/init.S              |   2 +-
- arch/arm/kvm/interrupts.S        |   4 +-
- arch/arm/mm/cache-v7.S           |   4 +-
- arch/arm/mm/context.c            |   6 +--
- arch/arm/mm/dma-mapping.c        |   1 -
- arch/arm/mm/proc-v7.S            |   2 +-
- arch/arm/mm/tlb-v7.S             |   8 +--
- 15 files changed, 134 insertions(+), 62 deletions(-)
-
+diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
+index 15451ee..44f5a6a 100644
+--- a/arch/arm/mm/cache-v7.S
++++ b/arch/arm/mm/cache-v7.S
+@@ -274,7 +274,7 @@ ENTRY(v7_coherent_user_range)
+ 	add	r12, r12, r2
+ 	cmp	r12, r1
+ 	blo	1b
+-	dsb
++	dsb	ishst
+ 	icache_line_size r2, r3
+ 	sub	r3, r2, #1
+ 	bic	r12, r0, r3
+@@ -286,7 +286,7 @@ ENTRY(v7_coherent_user_range)
+ 	mov	r0, #0
+ 	ALT_SMP(mcr	p15, 0, r0, c7, c1, 6)	@ invalidate BTB Inner Shareable
+ 	ALT_UP(mcr	p15, 0, r0, c7, c5, 6)	@ invalidate BTB
+-	dsb
++	dsb	ishst
+ 	isb
+ 	mov	pc, lr
+ 
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 2c73a73..d19ddc0 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -82,7 +82,7 @@ ENTRY(cpu_v7_dcache_clean_area)
+ 	add	r0, r0, r2
+ 	subs	r1, r1, r2
+ 	bhi	1b
+-	dsb
++	dsb	ishst
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_dcache_clean_area)
+ 
+diff --git a/arch/arm/mm/tlb-v7.S b/arch/arm/mm/tlb-v7.S
+index ea94765..3553087 100644
+--- a/arch/arm/mm/tlb-v7.S
++++ b/arch/arm/mm/tlb-v7.S
+@@ -35,7 +35,7 @@
+ ENTRY(v7wbi_flush_user_tlb_range)
+ 	vma_vm_mm r3, r2			@ get vma->vm_mm
+ 	mmid	r3, r3				@ get vm_mm->context.id
+-	dsb
++	dsb	ish
+ 	mov	r0, r0, lsr #PAGE_SHIFT		@ align address
+ 	mov	r1, r1, lsr #PAGE_SHIFT
+ 	asid	r3, r3				@ mask ASID
+@@ -56,7 +56,7 @@ ENTRY(v7wbi_flush_user_tlb_range)
+ 	add	r0, r0, #PAGE_SZ
+ 	cmp	r0, r1
+ 	blo	1b
+-	dsb
++	dsb	ish
+ 	mov	pc, lr
+ ENDPROC(v7wbi_flush_user_tlb_range)
+ 
+@@ -69,7 +69,7 @@ ENDPROC(v7wbi_flush_user_tlb_range)
+  *	- end   - end address (exclusive, may not be aligned)
+  */
+ ENTRY(v7wbi_flush_kern_tlb_range)
+-	dsb
++	dsb	ish
+ 	mov	r0, r0, lsr #PAGE_SHIFT		@ align address
+ 	mov	r1, r1, lsr #PAGE_SHIFT
+ 	mov	r0, r0, lsl #PAGE_SHIFT
+@@ -84,7 +84,7 @@ ENTRY(v7wbi_flush_kern_tlb_range)
+ 	add	r0, r0, #PAGE_SZ
+ 	cmp	r0, r1
+ 	blo	1b
+-	dsb
++	dsb	ish
+ 	isb
+ 	mov	pc, lr
+ ENDPROC(v7wbi_flush_kern_tlb_range)
 -- 
 1.8.2.2
