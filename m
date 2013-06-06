@@ -1,68 +1,96 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 06 Jun 2013 17:14:49 +0530
-Subject: [PATCH 13/13] ARM: Exynos: extend soft-reset support for
- Exynos5420
-In-Reply-To: <1370516488-25860-13-git-send-email-chander.kashyap@linaro.org>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-13-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <51B07631.2010802@linaro.org>
+From: holt@sgi.com (Robin Holt)
+Date: Thu,  6 Jun 2013 06:47:13 -0500
+Subject: [PATCH -v11 resend 00/11] Shutdown from reboot_cpuid without stopping
+ other cpus.
+Message-ID: <1370519244-49918-1-git-send-email-holt@sgi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2013 04:31 PM, Chander Kashyap wrote:
-> Extend the soft reset support for Exynos5420 SoC.
-> 
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> ---
->  arch/arm/mach-exynos/common.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-> index fbe1aa7..dc7c134 100644
-> --- a/arch/arm/mach-exynos/common.c
-> +++ b/arch/arm/mach-exynos/common.c
-> @@ -321,7 +321,8 @@ void exynos5_restart(char mode, const char *cmd)
->  	u32 val;
->  	void __iomem *addr;
->  
-> -	if (of_machine_is_compatible("samsung,exynos5250")) {
-> +	if (of_machine_is_compatible("samsung,exynos5250") ||
-> +		(of_machine_is_compatible("samsung,exynos5420"))) {
->  		val = 0x1;
->  		addr = EXYNOS_SWRESET;
->  	} else if (of_machine_is_compatible("samsung,exynos5440")) {
-> 
+We recently noticed that reboot of a 1024 cpu machine takes approx 16
+minutes of just stopping the cpus.  The slowdown was tracked to commit
+f96972f.
 
-How about making 0x1 and EXYNOS_SWRESET as default values of val and
-addr. That way we can remove this check for exynos5250 and exynos5420.
-Also we can remove the trailing else statement as there are no non-DT
-boards for EXYNOS5.
+The current implementation does all the work of hot removing the cpus
+before halting the system.  We are switching to just migrating to the
+reboot_cpu and then continuing with shutdown/reboot.
 
- void exynos5_restart(char mode, const char *cmd)
- {
-        struct device_node *np;
--       u32 val;
--       void __iomem *addr;
-+       u32 val = 0x1;
-+       void __iomem *addr = EXYNOS_SWRESET;
+The patch set is broken into eleven parts.  The first two are planned for
+the stable release.  The others move the halt/shutdown/reboot related
+functions to their own kernel/reboot.c file and then move the handling
+of the kernel reboot= kernel parameter to generic kernel code.
 
--       if (of_machine_is_compatible("samsung,exynos5250")) {
--               val = 0x1;
--               addr = EXYNOS_SWRESET;
--       } else if (of_machine_is_compatible("samsung,exynos5440")) {
-+       if (of_machine_is_compatible("samsung,exynos5440")) {
-                u32 status;
-                np = of_find_compatible_node(NULL, NULL,
-"samsung,exynos5440-clock");
+Changes since -v10
+ - Added Russell's Acked-by for arm.
 
-@@ -336,9 +333,6 @@ void exynos5_restart(char mode, const char *cmd)
-                val = __raw_readl(addr);
+ - Fixed an accidentally commented out line in an arm header file.
 
-                val = (val & 0xffff0000) | (status & 0xffff);
--       } else {
--               pr_err("%s: cannot support non-DT\n", __func__);
--               return;
-        }
+Changes since -v9
+ - Added Ingo's Acked-by for x86.
 
--- 
-Tushar Behera
+ - Added Guan's Acked-by for unicore32.
+
+ - Replaced first patch with updated patch from Srivatsa S. Bhat.
+   This compiles for alpha allmodconfig, all arm defconfigs, and a few
+   test x86_64 defconfigs.  I have not tried more.
+
+Changes since -v8
+ - Changes reboot_cpu on stack to cpu to fix bug noticed by Russell King.
+
+ - Switched unicore32 and arm from using REBOOT_WARM/COLD to HARD/SOFT.
+
+ - Fixed case statement bug.
+
+ - Went to using simple_strtoul for parsing reboot_cpu=smp###.
+
+ - Made parsing of reboot= not use any #ifdef'd code.
+
+Changes since -v7.
+ - Fixed authorship for first patch.
+
+ - Rebased to Linus' current tree (51a26ae7a).
+
+Changes since -v6.
+ - Cross compiled all arm architectures (using v3.9 kernel.  Fails with
+   current).
+
+ - Added a #define for non-hotplug case.
+
+ - Add #define for PF_THREAD_BOUND as compatibility to make stable easier.
+
+ - Fixup s/reboot_cpu_id/reboot_cpu/
+
+ - Add include of linux/uaccess.h to allow building on arm.
+
+ - Removed last remaining checkpatch.pl line length warning on
+   kernel/reboot.c.
+
+ - Fixed the duplicate handling or the reboot= kernel parameter.
+
+Changes since -v5.
+ - Moved the arch/x86 reboot= up to the generic kernel code.
+
+Changes since -v4.
+ - Integrated Srivatsa S. Bhat creating cpu_hotplug_disable()
+   function
+
+ - Integrated comments by Srivatsa S. Bhat.
+
+ - Made one more comment consistent with others in function.
+
+Changes since -v3.
+ - Added a tested-by for the original reporter.
+
+ - Fix compile failure found by Joe Perches.
+
+ - Integrated comments by Joe Perches.
+
+
+To: Andrew Morton <akpm@linux-foundation.org>
+Cc: H. Peter Anvin <hpa@zytor.com>
+Cc: Russ Anderson <rja@sgi.com>
+Cc: Robin Holt <holt@sgi.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+Cc: the arch/x86 maintainers <x86@kernel.org>
+Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
