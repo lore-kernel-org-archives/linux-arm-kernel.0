@@ -1,81 +1,42 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Thu, 06 Jun 2013 14:58:32 +0100
-Subject: [PATCH] ARM: errata: LoUIS bit field in CLIDR register is incorrect
-Message-ID: <1370527112.3695.47.camel@linaro1.home>
+From: tytso@mit.edu (Theodore Ts'o)
+Date: Thu, 6 Jun 2013 10:02:50 -0400
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1733666.lHUBcfUXq9@flatron>
+ <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
+Message-ID: <20130606140250.GA4839@thunk.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Cortex-A9 before version r1p0, the LoUIS bit field of the CLIDR
-register returns zero when it should return one. This leads to cache
-maintenance operations which rely on this value to not function as
-intended, causing data corruption.
+On Thu, Jun 06, 2013 at 01:24:57PM +0100, luke.leighton wrote:
+> On Thu, Jun 6, 2013 at 1:01 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> 
+> > I don't see any other solution here than moving all the Allwinner code to
+> > DT (as it has been suggested in this thread several times already), as
+> > this is the only hardware description method supported by ARM Linux.
+> 
+>  i repeat again: please state, explicitly and unequivocably that you -
+> linux kernel developers - are happy that the reach of linux and
+> gnu/linux OSes is dramatically reduced due to this intransigent
+> position.
 
-The workaround for this errata is to detect affected CPUs and correct
-the LoUIS value read.
+But that's not a true statement.  You've said that Allwinner is
+perfectly happy to carry code out of tree, by constantly porting their
+hacks from mainline kernels.
 
-We also selected this workaround in CONFIG_ARCH_VEXPRESS_CA9X4 as that
-platform is affected by the errata and as a consequence was suffering
-reboot and shutdown crashes since the cpu hotplug changes introduced in
-Linux 3.10. (Commit bca7a5a04933 "ARM: cpu hotplug: remove majority of
-cache flushing from platforms")
+For some of their customers, this will be acceptable to them.  In
+those cases, Linux will still be in use.  Great!  So claiming that the
+reach of Linux will be "dramatically reduced" just is not a
+supportable position.
 
-Signed-off-by: Jon Medhurst <tixy@linaro.org>
----
- arch/arm/Kconfig               |   10 ++++++++++
- arch/arm/mach-vexpress/Kconfig |    1 +
- arch/arm/mm/cache-v7.S         |    8 ++++++++
- 3 files changed, 19 insertions(+)
+For other (potential) customers, for whom mainline kernel support is
+critically important, they will choose other hardware solutions that
+are in the mainline kernel.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..1cd577c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1189,6 +1189,16 @@ config PL310_ERRATA_588369
- 	   is not correctly implemented in PL310 as clean lines are not
- 	   invalidated as a result of these operations.
- 
-+config ARM_ERRATA_643719
-+	bool "ARM errata: LoUIS bit field in CLIDR register is incorrect"
-+	depends on CPU_V7
-+	help
-+	  This option enables the workaround for the 643719 Cortex-A9 (prior to
-+	  r1p0) erratum. On affected cores the LoUIS bit field of the CLIDR
-+	  register returns zero when it should return one. The workaround
-+	  corrects this value, ensuring cache maintenance operations which use
-+	  it behave as intended and avoiding data corruption.
-+
- config ARM_ERRATA_720789
- 	bool "ARM errata: TLBIASIDIS and TLBIMVAIS operations can broadcast a faulty ASID"
- 	depends on CPU_V7
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 5907e10..fe637e9 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -56,5 +56,6 @@ config ARCH_VEXPRESS_CORTEX_A5_A9_ERRATA
- 
- config ARCH_VEXPRESS_CA9X4
- 	bool "Versatile Express Cortex-A9x4 tile"
-+	select ARM_ERRATA_643719
- 
- endmenu
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index 15451ee..05993ba 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -92,6 +92,14 @@ ENTRY(v7_flush_dcache_louis)
- 	mrc	p15, 1, r0, c0, c0, 1		@ read clidr, r0 = clidr
- 	ALT_SMP(ands	r3, r0, #(7 << 21))	@ extract LoUIS from clidr
- 	ALT_UP(ands	r3, r0, #(7 << 27))	@ extract LoUU from clidr
-+#ifdef CONFIG_ARM_ERRATA_643719
-+	ALT_SMP(mrceq	p15, 0, r2, c0, c0, 0)	@ read main ID register
-+	ALT_UP(moveq	pc, lr)			@ LoUU is zero, so nothing to do
-+	biceq	r2, r2, #0x0000000f             @ clear minor revision number
-+	ldreq	r1, =0x410fc090                 @ ID of ARM Cortex A9 r0p?
-+	teqeq	r2, r1                          @ test for errata affected core and if so...
-+	orreqs	r3, #(1 << 21)			@   fix LoUIS value (and set flags state to 'ne')
-+#endif
- 	ALT_SMP(mov	r3, r3, lsr #20)	@ r3 = LoUIS * 2
- 	ALT_UP(mov	r3, r3, lsr #26)	@ r3 = LoUU * 2
- 	moveq	pc, lr				@ return if level == 0
--- 
-1.7.10.4
+I don't see the problem here.
+
+						- Ted
