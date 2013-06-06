@@ -1,23 +1,21 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 06 Jun 2013 16:38:57 +0800
-Subject: [PATCH v2] arch/*/asm/include/bitops.h: api issue, find_*_bit()
- defination are different with each other
-In-Reply-To: <20130605130222.GL23140@pengutronix.de>
-References: <51AE8FEF.1020809@asianux.com> <51AE903C.6010806@asianux.com>
- <51AE909D.9080006@asianux.com> <20130605071915.GK23140@pengutronix.de>
- <51AF225A.5020703@asianux.com> <20130605130222.GL23140@pengutronix.de>
-Message-ID: <51B04AA1.40403@asianux.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 6 Jun 2013 16:43:38 +0800
+Subject: [PATCH 1/4] ARM i.MX53: tqma53: Fix interrupt polarity for the
+ mc34708
+In-Reply-To: <1370337150-18487-2-git-send-email-s.trumtrar@pengutronix.de>
+References: <1370337150-18487-1-git-send-email-s.trumtrar@pengutronix.de>
+ <1370337150-18487-2-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20130606084336.GA11305@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 09:02 PM, Uwe ? wrote:
->> Thank you very much for your carefully checking (could you tell me how
->> > do you find it ?)  :-)
-> I have no tool for that, it just catched my eye
+On Tue, Jun 04, 2013 at 11:12:27AM +0200, Steffen Trumtrar wrote:
+> From: Sascha Hauer <s.hauer@pengutronix.de>
+> 
+> It's active high, not active low.
+> 
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-OK, thank again for your carefully checking.
+Applied 1 ~ 3.
 
--- 
-Chen Gang
-
-Asianux Corporation
+Shawn
