@@ -1,38 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Thu, 6 Jun 2013 14:11:59 -0400
-Subject: [PATCH] arm: mvebu: ensure PCIe range is propagated in the
- .dts files
-In-Reply-To: <1370510483-32419-2-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370510483-32419-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370510483-32419-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130606181159.GN23859@titan.lakedaemon.net>
+From: mugunthanvnm@ti.com (Mugunthan V N)
+Date: Thu, 6 Jun 2013 23:45:14 +0530
+Subject: [PATCH 1/2] drivers: net: cpsw: use pinctrl PM helpers
+In-Reply-To: <1370542515-22009-1-git-send-email-mugunthanvnm@ti.com>
+References: <1370542515-22009-1-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <1370542515-22009-2-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 11:21:23AM +0200, Thomas Petazzoni wrote:
-> The ranges DT entry needed by the PCIe controller is defined at the
-> SoC .dtsi level. However, some boards have a NOR flash, and to support
-> it, they need to override the SoC-level ranges property to add an
-> additional range. Since PCIe and NOR support came separately, some
-> boards were not properly changed to include the PCIe range in their
-> ranges property at the .dts level.
-> 
-> This commit fixes those platforms.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
+This utilize the new pinctrl core PM helpers to transition
+the driver to "default" and "sleep" states.
 
-Can you split this in to two patches, please:
+Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+---
+ drivers/net/ethernet/ti/cpsw.c |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
->  arch/arm/boot/dts/armada-xp-db.dts               | 1 +
-
-one for mvebu/dt
-
->  arch/arm/boot/dts/armada-xp-gp.dts               | 5 +++--
->  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 5 +++--
-
-and one for mvebu/fixes?
-
-thx,
-
-Jason.
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index a45f64e..5143552 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -35,6 +35,7 @@
+ #include <linux/if_vlan.h>
+ 
+ #include <linux/platform_data/cpsw.h>
++#include <linux/pinctrl/consumer.h>
+ 
+ #include "cpsw_ale.h"
+ #include "cpts.h"
+@@ -1691,6 +1692,9 @@ static int cpsw_probe(struct platform_device *pdev)
+ 	 */
+ 	pm_runtime_enable(&pdev->dev);
+ 
++	/* Select default pin state */
++	pinctrl_pm_select_default_state(&pdev->dev);
++
+ 	if (cpsw_probe_dt(&priv->data, pdev)) {
+ 		pr_err("cpsw: platform data missing\n");
+ 		ret = -ENODEV;
+@@ -1979,6 +1983,9 @@ static int cpsw_suspend(struct device *dev)
+ 		cpsw_ndo_stop(ndev);
+ 	pm_runtime_put_sync(&pdev->dev);
+ 
++	/* Select sleep pin state */
++	pinctrl_pm_select_sleep_state(&pdev->dev);
++
+ 	return 0;
+ }
+ 
+@@ -1988,6 +1995,10 @@ static int cpsw_resume(struct device *dev)
+ 	struct net_device	*ndev = platform_get_drvdata(pdev);
+ 
+ 	pm_runtime_get_sync(&pdev->dev);
++
++	/* Select default pin state */
++	pinctrl_pm_select_default_state(&pdev->dev);
++
+ 	if (netif_running(ndev))
+ 		cpsw_ndo_open(ndev);
+ 	return 0;
+-- 
+1.7.9.5
