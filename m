@@ -1,336 +1,99 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 06 Jun 2013 12:17:02 +0200
+From: acourbot@nvidia.com (Alex Courbot)
+Date: Thu, 6 Jun 2013 19:23:35 +0900
 Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+In-Reply-To: <20130606093524.GM18614@n2100.arm.linux.org.uk>
 References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1740292.8Sz57ytBcM@flatron>
+ <20130606093524.GM18614@n2100.arm.linux.org.uk>
+Message-ID: <51B06327.5030508@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+On 06/06/2013 06:35 PM, Russell King - ARM Linux wrote:
+> On Thu, Jun 06, 2013 at 04:28:07PM +0900, Alexandre Courbot wrote:
+>> +static int __attribute__((used)) __tegra_smc_stack[10];
+>> +
+>> +/*
+>> + * With EABI, subtype and arg already end up in r0, r1 and r2 as they are
+>> + * function arguments, but we prefer to play safe here and explicitly move
+>> + * these values into the expected registers anyway. mov instructions without
+>> + * any side-effect are turned into nops by the assembler, which limits
+>> + * overhead.
+>
+> No they aren't.  They will be preserved as:
+> 	mov r0, r0
+> 	mov r1, r1
+> 	mov r2, r2
 
-On Thursday 06 of June 2013 16:28:07 Alexandre Courbot wrote:
-> Boot loaders on some Tegra devices can be unlocked but do not let the
-> system operate without SecureOS. SecureOS prevents access to some
-> registers and requires the operating system to perform certain
-> operations through Secure Monitor Calls instead of directly accessing
-> the hardware.
-> 
-> This patch introduces basic SecureOS support for Tegra. SecureOS support
-> can be enabled by adding a "nvidia,secure-os" property to the "chosen"
-> node of the device tree.
-> 
-> Currently, only the bringup of secondary CPUs is performed by SMCs, but
-> more operations will be added later.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
->  Documentation/devicetree/bindings/arm/tegra.txt |  8 +++
->  arch/arm/configs/tegra_defconfig                |  1 +
->  arch/arm/mach-tegra/Kconfig                     | 11 ++++
->  arch/arm/mach-tegra/Makefile                    |  2 +
->  arch/arm/mach-tegra/common.c                    |  2 +
->  arch/arm/mach-tegra/reset.c                     | 30 +++++++----
->  arch/arm/mach-tegra/secureos.c                  | 70
-> +++++++++++++++++++++++++ arch/arm/mach-tegra/secureos.h               
->   | 31 +++++++++++ 8 files changed, 145 insertions(+), 10 deletions(-)
->  create mode 100644 arch/arm/mach-tegra/secureos.c
->  create mode 100644 arch/arm/mach-tegra/secureos.h
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt
-> b/Documentation/devicetree/bindings/arm/tegra.txt index
-> ed9c853..b543091 100644
-> --- a/Documentation/devicetree/bindings/arm/tegra.txt
-> +++ b/Documentation/devicetree/bindings/arm/tegra.txt
-> @@ -32,3 +32,11 @@ board-specific compatible values:
->    nvidia,whistler
->    toradex,colibri_t20-512
->    toradex,iris
-> +
-> +Global properties
-> +-------------------------------------------
-> +
-> +The following properties can be specified into the "chosen" root
-> +node:
-> +
-> +  nvidia,secure-os: enable SecureOS.
+I'm pretty sure I checked with objdump and saw these replaced by nops at 
+some point, but for some reason I cannot get that behavior again. So 
+simply put, my statement is wrong indeed.
 
-Hmm, on Exynos we had something like
+> Moreover, things will go wrong if the compiler decides for whatever reason
+> to move 'arg' into r0 before calling your code sequence.  So really this
+> is quite fragile.
+>
+> There's also no point in mentioning EABI in the above paragraph; all ARM
+> ABIs under Linux have always placed the arguments in r0..r3 and then on
+> the stack.  You can assert that this is always true by using the __asmeq()
+> macro.
 
-	firmware at 0203F000 {
-		compatible = "samsung,secure-firmware";
-		reg = <0x0203F000 0x1000>;
-	};
+Good to know, thanks.
 
-but your solution might be actually the proper one, since firmware is not 
-a hardware block. (The address in reg property is pointing to SYSRAM 
-memory, which is an additional communication channel with the firmware.)
+> Also...
+>
+>> + */
+>> +static void tegra_generic_smc(u32 type, u32 subtype, u32 arg)
+>> +{
+>> +	asm volatile(
+>> +		".arch_extension	sec\n\t"
+>> +		"ldr	r3, =__tegra_smc_stack\n\t"
+>> +		"stmia	r3, {r4-r12, lr}\n\t"
+>
+> using a statically allocated area to save the registers in this way is
+> probably a bad move; although the hotplug code guarantees that there
+> will be no concurrency between CPU hotplug operations, this sets a
+> precident for it being used in places where no such protection exists.
 
-> diff --git a/arch/arm/configs/tegra_defconfig
-> b/arch/arm/configs/tegra_defconfig index f7ba3161..f6ed0f5 100644
-> --- a/arch/arm/configs/tegra_defconfig
-> +++ b/arch/arm/configs/tegra_defconfig
-> @@ -28,6 +28,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
->  CONFIG_ARCH_TEGRA_114_SOC=y
->  CONFIG_TEGRA_PCI=y
->  CONFIG_TEGRA_EMC_SCALING_ENABLE=y
-> +CONFIG_TEGRA_SECUREOS=y
->  CONFIG_SMP=y
->  CONFIG_PREEMPT=y
->  CONFIG_AEABI=y
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> index 84d72fc..acb5d0a 100644
-> --- a/arch/arm/mach-tegra/Kconfig
-> +++ b/arch/arm/mach-tegra/Kconfig
-> @@ -87,4 +87,15 @@ config TEGRA_AHB
->  config TEGRA_EMC_SCALING_ENABLE
->  	bool "Enable scaling the memory frequency"
-> 
-> +config TEGRA_SECUREOS
-> +	bool "Enable SecureOS support"
-> +	help
-> +	  Support for Tegra devices which bootloader sets up a
-> +	  SecureOS environment. This will use Secure Monitor Calls
-> +	  instead of directly accessing the hardware for some protected
-> +	  operations.
-> +
-> +	  SecureOS support is enabled by declaring a "nvidia,secure-os"
-> +	  property into the "chosen" node of the device tree.
-> +
->  endmenu
-> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-> index d011f0a..3adafe6 100644
-> --- a/arch/arm/mach-tegra/Makefile
-> +++ b/arch/arm/mach-tegra/Makefile
-> @@ -37,3 +37,5 @@ endif
->  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-harmony-pcie.o
-> 
->  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-paz00.o
-> +
-> +obj-$(CONFIG_TEGRA_SECUREOS)		+= secureos.o
-> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-> index 9f852c6..b7eea02 100644
-> --- a/arch/arm/mach-tegra/common.c
-> +++ b/arch/arm/mach-tegra/common.c
-> @@ -37,6 +37,7 @@
->  #include "sleep.h"
->  #include "pm.h"
->  #include "reset.h"
-> +#include "secureos.h"
-> 
->  /*
->   * Storage for debug-macro.S's state.
-> @@ -97,6 +98,7 @@ static void __init tegra_init_cache(void)
-> 
->  void __init tegra_init_early(void)
->  {
-> +	tegra_init_secureos();
->  	tegra_cpu_reset_handler_init();
->  	tegra_apb_io_init();
->  	tegra_init_fuse();
-> diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-> index 1ac434e..4b9ebf9 100644
-> --- a/arch/arm/mach-tegra/reset.c
-> +++ b/arch/arm/mach-tegra/reset.c
-> @@ -21,38 +21,32 @@
-> 
->  #include <asm/cacheflush.h>
->  #include <asm/hardware/cache-l2x0.h>
-> +#include <asm/firmware.h>
-> 
->  #include "iomap.h"
->  #include "irammap.h"
->  #include "reset.h"
->  #include "sleep.h"
->  #include "fuse.h"
-> +#include "secureos.h"
-> 
->  #define TEGRA_IRAM_RESET_BASE (TEGRA_IRAM_BASE + \
->  				TEGRA_IRAM_RESET_HANDLER_OFFSET)
-> 
->  static bool is_enabled;
-> 
-> -static void __init tegra_cpu_reset_handler_enable(void)
-> +static void __init tegra_cpu_reset_handler_set(const u32 reset_address)
+Indeed. This function will be called from other places in the future, 
+and for these we cannot assume there will be no concurrency.
+
+> What is wrong with stacking r4-r12, lr onto the SVC stack?
+
+Nothing, actually. /o\
+
+> You don't
+> save the SVC stack pointer, so one can only assume that your SMC
+> implmentation preserves this (if it doesn't, that's yet another bug
+> with this assembly code.)
+
+SVC stack pointer is ok AFAICT.
+
+> Combining these two issues, you're probably far better off using an
+> __attribute__((naked)) function for this - which means you get to
+> write the entire function in assembly code without any compiler
+> interference:
+ >
+> static void __attribute__((naked)) tegra_generic_smc(u32 type, u32 subtype, u32 arg)
 > {
-> -	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
->  	void __iomem *evp_cpu_reset =
->  		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
->  	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
->  	u32 reg;
-> 
-> -	BUG_ON(is_enabled);
-> -	BUG_ON(tegra_cpu_reset_handler_size > 
-TEGRA_IRAM_RESET_HANDLER_SIZE);
-> -
-> -	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
-> -			tegra_cpu_reset_handler_size);
-> -
->  	/*
->  	 * NOTE: This must be the one and only write to the EVP CPU reset
->  	 *       vector in the entire system.
->  	 */
-> -	writel(TEGRA_IRAM_RESET_BASE + tegra_cpu_reset_handler_offset,
-> -			evp_cpu_reset);
-> +	writel(reset_address, evp_cpu_reset);
->  	wmb();
->  	reg = readl(evp_cpu_reset);
-> 
-> @@ -66,6 +60,22 @@ static void __init
-> tegra_cpu_reset_handler_enable(void) writel(reg, sb_ctrl);
->  		wmb();
->  	}
-> +}
-> +
-> +static void __init tegra_cpu_reset_handler_enable(void)
-> +{
-> +	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
-> +	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
-> +						
-tegra_cpu_reset_handler_offset;
-> +
-> +	BUG_ON(is_enabled);
-> +	BUG_ON(tegra_cpu_reset_handler_size > 
-TEGRA_IRAM_RESET_HANDLER_SIZE);
-> +
-> +	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
-> +			tegra_cpu_reset_handler_size);
-> +
-> +	if (call_firmware_op(set_cpu_boot_addr, 0, reset_address) == -
-ENOSYS)
-> +		tegra_cpu_reset_handler_set(reset_address);
-> 
->  	is_enabled = true;
->  }
+> 	asm volatile(
+> 		".arch_extension	sec\n\t"
+> 		"stmfd	sp!, {r4 - r12, lr}\n\t"
+> 		__asmeq("%0", "r0")
+> 		__asmeq("%1", "r1")
+> 		__asmeq("%2", "r2")
+> 		"mov	r3, #0\n\t"
+> 		"mov	r4, #0\n\t"
+> 		"dsb\n\t"
+> 		"smc	#0\n\t"
+> 		"ldmfd	sp!, {r4 - r12, pc}"
+> 		:
+> 		: "r" (type), "r" (subtype), "r" (arg)
+> 		: "memory");
+> }
 
-I think this patch could be split into several patches:
- - add support for firmware
- - split reset function
- - add reset support using firmware.
+Well, that works beautifully indeed, and results in a much smaller 
+function that does nothing more beyond what's needed. On top of that, I 
+feel enlightened.
 
-> diff --git a/arch/arm/mach-tegra/secureos.c
-> b/arch/arm/mach-tegra/secureos.c new file mode 100644
-> index 0000000..44c3514
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/secureos.c
-> @@ -0,0 +1,70 @@
-> +/*
-> + * SecureOS support for Tegra CPUs
-> + *
-> + * Copyright (c) 2013, NVIDIA Corporation.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published
-> by + * the Free Software Foundation; either version 2 of the License,
-> or + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful, but
-> WITHOUT + * ANY WARRANTY; without even the implied warranty of
-> MERCHANTABILITY or + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> General Public License for + * more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/of.h>
-> +#include <asm/firmware.h>
-> +
-> +static int __attribute__((used)) __tegra_smc_stack[10];
-> +
-> +/*
-> + * With EABI, subtype and arg already end up in r0, r1 and r2 as they
-> are + * function arguments, but we prefer to play safe here and
-> explicitly move + * these values into the expected registers anyway.
-> mov instructions without + * any side-effect are turned into nops by
-> the assembler, which limits + * overhead.
-> + */
-> +static void tegra_generic_smc(u32 type, u32 subtype, u32 arg)
-> +{
-> +	asm volatile(
-> +		".arch_extension	sec\n\t"
-> +		"ldr	r3, =__tegra_smc_stack\n\t"
-> +		"stmia	r3, {r4-r12, lr}\n\t"
-> +		"mov	r0, %[type]\n\t"
-> +		"mov	r1, %[subtype]\n\t"
-> +		"mov	r2, %[arg]\n\t"
-> +		"mov	r3, #0\n\t"
-> +		"mov	r4, #0\n\t"
-> +		"dsb\n\t"
-> +		"smc	#0\n\t"
-> +		"ldr	r3, =__tegra_smc_stack\n\t"
-> +		"ldmia	r3, {r4-r12, lr}"
-> +			:
-> +			: [type]    "r" (type),
-> +			  [subtype] "r" (subtype),
-> +			  [arg]     "r" (arg)
-> +			: "r0", "r1", "r2", "r3", "r4", "memory");
-> +}
-
-Hmm, I wonder if you need all this complexity here. Have a look at our 
-exynos_smc function
-
-https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/mach-exynos/exynos-smc.S?id=refs/tags/next-20130606
-
-and feel free to uncover any problems of it ;) .
-
-> +
-> +static int tegra_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
-> +{
-> +	tegra_generic_smc(0xfffff200, boot_addr, 0);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct firmware_ops tegra_firmware_ops = {
-> +	.set_cpu_boot_addr = tegra_set_cpu_boot_addr,
-> +};
-
-It's good that this interface is finally getting some user besides Exynos.
-
-Best regards,
-Tomasz
-
-> +void __init tegra_init_secureos(void)
-> +{
-> +	struct device_node *node = of_find_node_by_path("/chosen");
-> +
-> +	if (node && of_property_read_bool(node, "nvidia,secure-os"))
-> +		register_firmware_ops(&tegra_firmware_ops);
-> +}
-> diff --git a/arch/arm/mach-tegra/secureos.h
-> b/arch/arm/mach-tegra/secureos.h new file mode 100644
-> index 0000000..5388cc5
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/secureos.h
-> @@ -0,0 +1,31 @@
-> +/*
-> + * Copyright (c) 2013, NVIDIA Corporation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> it + * under the terms and conditions of the GNU General Public
-> License, + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but
-> WITHOUT + * ANY WARRANTY; without even the implied warranty of
-> MERCHANTABILITY or + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-> General Public License for + * more details.
-> + */
-> +
-> +#ifndef __TEGRA_SECUREOS_H
-> +#define __TEGRA_SECUREOS_H
-> +
-> +#ifdef CONFIG_TEGRA_SECUREOS
-> +
-> +#include <linux/types.h>
-> +
-> +void tegra_init_secureos(void);
-> +
-> +#else
-> +
-> +static inline void tegra_init_secureos(void)
-> +{
-> +}
-> +
-> +#endif
-> +
-> +#endif
+Thanks, I will resubmit a fixed version soon.
+Alex.
