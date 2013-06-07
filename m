@@ -1,59 +1,56 @@
-From: linux@prisktech.co.nz (Tony Prisk)
-Date: Fri, 07 Jun 2013 21:07:03 +1200
-Subject: NAND buffer allocation fails
-In-Reply-To: <51B1A1DE.3020603@prisktech.co.nz>
-References: <51B1A1DE.3020603@prisktech.co.nz>
-Message-ID: <51B1A2B7.6090602@prisktech.co.nz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Jun 2013 10:08:22 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <51B19C85.9090407@gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1851164.HnXhGSdttW@flatron>
+ <CAPweEDxWW4LUeBaHLb+wHuAMq=63p88zsx4tumVb2PdP_+ohAw@mail.gmail.com>
+ <1622862.fXQWv0YWGV@flatron>
+ <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
+ <51B19C85.9090407@gmail.com>
+Message-ID: <20130607090822.GS18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jun 07, 2013 at 10:40:37AM +0200, Vladimir Pantelic wrote:
+> luke.leighton wrote:>   so.
+> >
+> >   coming back to what you said earlier: i'm formulating what to say to
+> > allwinner [and need to pre-send something by monday so that they can
+> > consider it before the meeting].  so far, it consists of:
+> >
+> > * device-tree is what the linux kernel community has come up with, it
+> > is equivalent to FEX.
+> >
+> > * the linux kernel community would like to apologise for not
+> > consulting with you (allwinner) on the decision to only accept device
+> > tree
+>
+> apologize? WTF?
 
-On 07/06/13 21:03, Tony Prisk wrote:
-> Could someone explain why the following situation might occur:
->
-> In drivers/mtd/nand/nand_base.c, we have:
->
-> int nand_scan_tail(struct mtd_info *mtd)
-> {
->     int i;
->     struct nand_chip *chip = mtd->priv;
->
->     /* New bad blocks should be marked in OOB, flash-based BBT, or 
-> both */
->     BUG_ON((chip->bbt_options & NAND_BBT_NO_OOB_BBM) &&
->             !(chip->bbt_options & NAND_BBT_USE_FLASH));
->
->     if (!(chip->options & NAND_OWN_BUFFERS))
->         chip->buffers = kmalloc(sizeof(*chip->buffers), GFP_KERNEL);
->     if (!chip->buffers)
->         return -ENOMEM;
-> ...
->
-> For some reason, the kmalloc always fails on my configuration/hardware 
-> (arch-vt8500: WonderMedia/VIA APC8750).
->
-> The strange thing is that if I add the NAND_OWN_BUFFERS option, and 
-> allocate my own buffers in the driver probe everything is fine.
-> Driver probe code below:
->
->     priv->nand.buffers = devm_kzalloc(priv->dev, 
-> sizeof(*priv->nand.buffers), GFP_KERNEL);
->     if (!priv->nand.buffers) {
->         dev_err(priv->dev, "failed to allocate NAND buffers\n");
->         return -ENOMEM;
->     }
->
-> The devm_kzalloc does occur earlier than the nand_scan_tail alloc 
-> would have, but there doesn't appear to be a shortage of memory on the 
-> platform so I don't think it's failing for a memory shortage.
->
-> Is there any real difference between using kmalloc and devm_kzalloc to 
-> allocate the buffer (other than the obvious 0'ing of the buffer)?
-> Why would one call fail and the other succeed?
->
-> Regards
-> Tony Prisk
+(I don't seem to have the original mail).
 
-Resend to correct the linux-arm-kernel mailing list address.
+Definitely not.
 
-Tony P
+The way this generally works is that discussions happen in public on
+mailing lists, and people who have an interest get involved in the
+discussion.  If someone decides to avoid the mailing lists because they
+want to be secret about XYZ then they won't be part of the decision
+making process - but that's not _our_ problem.  That is _their_ problem.
+
+In the case of DT, there was quite a lengthy discussion about it and
+its adoption.
+
+So, either the discussion took place _before_ there was any interest in
+the ARM kernel developments from Allwinner, or they themselves _chose_
+not to be represented in the discussion by not being on the mailing list
+or participating in the discussion.
+
+There is nothing for us to apologise for here.
+
+(Occasionally, the kernel community *is* a dictatorship - for example,
+when Linus threatens to delete all the ARM defconfigs, or when Linus
+decides that we're running out of control when adding more than 10k
+lines of new code per kernel release, or - in the same way - when I see
+something I really don't like, but thankfully those are fairly rare.)
