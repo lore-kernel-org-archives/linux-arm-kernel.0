@@ -1,42 +1,41 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 07 Jun 2013 13:31:24 +0200
-Subject: [GIT PULL RESENT] CPUFreq: ARM Updates for v3.11
-In-Reply-To: <CAKohpokJt=8UpAKKEEFaojq-M_GPawrDRBdXL8erEDe2jh=Q4A@mail.gmail.com>
-References: <CAKohpokJt=8UpAKKEEFaojq-M_GPawrDRBdXL8erEDe2jh=Q4A@mail.gmail.com>
-Message-ID: <195814068.OMscJ0xp3P@vostro.rjw.lan>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 07 Jun 2013 15:30:04 +0400
+Subject: [PATCH 07/27] ARM: shmobile: r8a7740: Add interim sh-eth device
+ name to clocks list
+In-Reply-To: <1370591517-20239-8-git-send-email-horms+renesas@verge.net.au>
+References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+ <1370591517-20239-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <51B1C43C.9010805@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 07, 2013 04:39:49 PM Viresh Kumar wrote:
-> Hi Rafael,
-> 
-> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
-> 
->   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/vireshk/linux.git cpufreq-next
-> 
-> for you to fetch changes up to ea61623fe9badd5a195b3a0878e6d89a2f97ac0e:
-> 
->   cpufreq: kirkwood: Select CPU_FREQ_TABLE option (2013-06-07 16:33:36 +0530)
+Hello.
 
-Pulled, thanks Viresh!
+On 07-06-2013 11:51, Simon Horman wrote:
 
-Rafael
+> From: Bastian Hecht <hechtb@gmail.com>
 
+> When we use the ethernet device via DT setup, we need to add it
+> to a lookup list until this is properly handled later in a DT-only
+> fashion.
 
-> ----------------------------------------------------------------
-> Arnd Bergmann (2):
->       cpufreq: SPEAr needs cpufreq table
->       cpufreq: big.LITTLE needs cpufreq table
-> 
-> Ezequiel Garcia (1):
->       cpufreq: kirkwood: Select CPU_FREQ_TABLE option
-> 
->  drivers/cpufreq/Kconfig.arm | 3 +++
->  1 file changed, 3 insertions(+)
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+> Signed-off-by: Bastian Hecht <hechtb+renesas@gmail.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/clock-r8a7740.c | 1 +
+>   1 file changed, 1 insertion(+)
+
+> diff --git a/arch/arm/mach-shmobile/clock-r8a7740.c b/arch/arm/mach-shmobile/clock-r8a7740.c
+> index 54afa04..008b11c 100644
+> --- a/arch/arm/mach-shmobile/clock-r8a7740.c
+> +++ b/arch/arm/mach-shmobile/clock-r8a7740.c
+> @@ -592,6 +592,7 @@ static struct clk_lookup lookups[] = {
+>   	CLKDEV_DEV_ID("sh_mmcif",		&mstp_clks[MSTP312]),
+>   	CLKDEV_DEV_ID("e6bd0000.mmcif",         &mstp_clks[MSTP312]),
+>   	CLKDEV_DEV_ID("sh-eth",			&mstp_clks[MSTP309]),
+> +	CLKDEV_DEV_ID("e9a00000.sh-eth",	&mstp_clks[MSTP309]),
+
+     I don't quite understand why this is needed. There's no device tree 
+support for the 'sh_eth' driver yet. Oh well...
+
+WBR, Sergei
