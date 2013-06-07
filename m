@@ -1,43 +1,41 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  7 Jun 2013 18:51:43 +0100
-Subject: [PATCH] ARM: remove residual ARMv2 support from decompressor
-Message-ID: <1370627503-28786-1-git-send-email-marc.zyngier@arm.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Fri, 07 Jun 2013 10:52:54 -0700
+Subject: [PATCH RFC 0/3] clk: dt: bindings for mux & divider clocks
+In-Reply-To: <20130607055128.GA20780@S2101-09.ap.freescale.net>
+References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
+ <20130607055128.GA20780@S2101-09.ap.freescale.net>
+Message-ID: <20130607175254.10233.7661@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm26 support in Linux is long gone, yet it left an interresting,
-fossilized trace in the decompressor.
+Quoting Shawn Guo (2013-06-06 22:51:31)
+> Mike,
+> 
+> On Mon, Jun 03, 2013 at 10:53:07AM -0700, Mike Turquette wrote:
+> > I am using this code while converting the OMAP4 clock data over to DT
+> 
+> I see these basic clk bindings can be useful for platforms that have
+> a relatively simple clock tree, but I'm a little surprised that you plan
+> to move OMAP4 to it.  I'm wondering how many nodes you will have to add
+> to OMAP4 device tree.  For imx6q example, it means ~200 nodes addition
+> to device tree, which is obviously a bloating of device tree.
+> 
 
-Remove it so people won't get confused about what teqp is actually
-doing here...
+Yes, there was a time when I was firmly against doing such a thing.
+However I'm not sure it is so bad now.  More and more SoCs are going to
+keep getting merged into the kernel and that just means more and more
+clock data.  Perhaps DT is best suited to handle this bloat.  I broke
+the clock data out into a separate file so that it didn't overwhelm the
+existing omap4.dtsi.
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/boot/compressed/head.S | 5 -----
- 1 file changed, 5 deletions(-)
+Either way I marked this series as RFC precisely due to your point.  I
+want feedback on how the OMAP folks feel about this.  So far no has has
+NACKed it ;-)
 
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index fe4d9c3..05e812e 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -141,7 +141,6 @@ start:
- 		mov	r7, r1			@ save architecture ID
- 		mov	r8, r2			@ save atags pointer
- 
--#ifndef __ARM_ARCH_2__
- 		/*
- 		 * Booting from Angel - need to enter SVC mode and disable
- 		 * FIQs/IRQs (numeric definitions from angel arm.h source).
-@@ -157,10 +156,6 @@ not_angel:
- 		safe_svcmode_maskall r0
- 		msr	spsr_cxsf, r9		@ Save the CPU boot mode in
- 						@ SPSR
--#else
--		teqp	pc, #0x0c000003		@ turn off interrupts
--#endif
--
- 		/*
- 		 * Note that some cache flushing and other stuff may
- 		 * be needed here - is there an Angel SWI call for this?
--- 
-1.8.2.3
+Regards,
+Mike
+
+> Shawn
+> 
+> > and some common boilerplate code can be factored out of several clock
+> > drivers if this is merged.
