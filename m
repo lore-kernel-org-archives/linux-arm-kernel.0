@@ -1,28 +1,44 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 7 Jun 2013 14:31:04 +0530
-Subject: [PATCH 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <alpine.DEB.2.02.1306070751210.32163@utopia.booyaka.com>
-References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
- <1369845494-30231-15-git-send-email-santosh.shilimkar@ti.com>
- <alpine.DEB.2.02.1306061754560.5152@utopia.booyaka.com>
- <51B0D54A.1090107@ti.com> <51B175E4.1060909@ti.com>
- <alpine.DEB.2.02.1306070751210.32163@utopia.booyaka.com>
-Message-ID: <51B1A150.9020307@ti.com>
+From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
+Date: Fri, 7 Jun 2013 11:02:28 +0200
+Subject: [PATCH] video: mxsfb: fix color settings for 18bit data bus and
+ 32bpp
+In-Reply-To: <51B1957F.40104@digi.com>
+References: <519E03B0.1080006@digi.com> <519F4435.5010703@digi.com>
+ <201305241300.25461.jbe@pengutronix.de>
+ <201305241533.19941.jbe@pengutronix.de>
+ <20130607072103.GF14209@lukather> <51B18BA0.50506@digi.com>
+ <20130607074200.GG14209@lukather> <51B1957F.40104@digi.com>
+Message-ID: <20130607090228.GI14209@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013 01:22 PM, Paul Walmsley wrote:
-> cc Beno?t
->
-> On Fri, 7 Jun 2013, Sricharan R wrote:
->
->> I used autogen to remove the data, but some of the data were not in sync
->> with the mainline .(like abe, dss, aess, context register offsets etc..).
->> So i have to sync them manually.
-> OK.  Are you going to fix the differences up soon?
->
-> - Paul
-+ Ambresh and Tero for autogen.
+Hi Hector,
 
-Regards,
- Sricharan
+On Fri, Jun 07, 2013 at 10:10:39AM +0200, Hector Palacios wrote:
+> For a combination of 18bit LCD data bus width and a color
+> mode of 32bpp, the driver was setting the color mapping to
+> rgb666, which is wrong, as the color in memory realy has an
+> rgb888 layout.
+> 
+> This patch also removes the setting of flag CTRL_DF24 that
+> makes the driver dimiss the upper 2 bits when handling 32/24bpp
+> colors in a diplay with 18bit data bus width. This flag made
+> true color images display wrong in such configurations.
+> 
+> Finally, the color mapping rgb666 has also been removed as nobody
+> is using it and high level applications like Qt5 cannot work
+> with it either.
+> 
+> Reference: https://lkml.org/lkml/2013/5/23/220
+> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+> Acked-by: Juergen Beisert <jbe@pengutronix.de>
+
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Please also note that fbdev is now maintained by Jean Christophe
+Plagniol-Villard (plagnioj at jcrosoft.com, in CC), and that he is away
+until the 10th of June, so maybe it should be safe to resend it to him
+after this date.
+
+Thanks!
+Maxime
