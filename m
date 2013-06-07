@@ -1,49 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Jun 2013 19:18:46 +0100
-Subject: [PATCH] ARM: tegra: disable nonboot CPUs when reboot
-In-Reply-To: <51B20DF1.3030207@wwwdotorg.org>
-References: <1370597810-1153-1-git-send-email-josephl@nvidia.com>
- <51B20DF1.3030207@wwwdotorg.org>
-Message-ID: <20130607181846.GL8111@mudshark.cambridge.arm.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri, 07 Jun 2013 19:20:42 +0100
+Subject: [PATCH] ARM: mpu: Ensure that MPU depends on CPU_V7
+In-Reply-To: <20130607181126.GA11232@pengutronix.de>
+References: <1370625473-21628-1-git-send-email-jonathan.austin@arm.com>
+ <20130607181126.GA11232@pengutronix.de>
+Message-ID: <51B2247A.1040504@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 05:44:33PM +0100, Stephen Warren wrote:
-> On 06/07/2013 03:36 AM, Joseph Lo wrote:
-> > The normal CPU hotplug flow in kernel and the flow for Tegra we expected,
-> > is checking the CPU ID is OK for hotplug by "tegra_cpu_disable", the CPU
-> > that would be hotplugged runs into a power-gate state by "tegra_cpu_die",
-> > then the other CPU waits for the CPU that was hotplugged in reset and
-> > clock gate it by "tegra_cpu_kill". That means we don't support the CPU
-> > being stopped or put into offline by trigger "tegra_cpu_kill" directly.
-> > It may cause a busy loop for waiting CPU in reset.
-> > 
-> > After the commit "62e930e reboot: rigrate shutdown/reboot to boot cpu",
-> > we remove "disable_nonboot_cpus" when kernel_{restart,halt,power_off}.
-> > But the ARM kernel trigger "send_smp_stop" when machine_shutdown, that
-> > would cause the "tegra_cpu_kill" directly without "tegra_cpu_die" first.
-> > 
-> > We hook "disable_nonboot_cpus" in "reboot_notifier" to avoid that happens.
-> > And it can work for reboot, shutdown, halt and kexec.
-> 
-> I don't believe this is the correct solution.
-> 
-> If the semantics of cpu_kill/cpu_die are such that it's legal to call
-> only cpu_kill without having cause cpu_die to run on the killed CPU
-> first, then Tegra's implementation is buggy. We should simply fix that,
-> rather than avoiding this by forcing a different order for the calls to
-> cpu_kill/cpu_die.
-> 
-> If the semantics of cpu_kill/cpu_die are such that one /must/ cause
-> cpu_die to run on the killed CPU before cpu_kill can be used on it, then
-> there's a bug in the code that isn't doing that.
-> 
-> I'm CCing a few people in an attempt to find out exactly what the
-> expected semantics are for cpu_kill/cpu_die; is it legal to call
-> cpu_kill without having first caused cpu_die to execute?
+On 07/06/13 19:11, Uwe Kleine-K?nig wrote:
+> On Fri, Jun 07, 2013 at 06:17:53PM +0100, Jonathan Austin wrote:
+>> The support for the MPU is currently implemented only for R-class
+>> (PMSAv7/R). Since the merge of V7M support in to the kernel it is possible
+>> to select MPU support on V7M.
+>>
+>> This patch ensures that until MPU support for M-class processors is
+>> implemented, the MPU can only be selected with R-class CPUs
+>>
+>> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+>> Cc: Uwe Kleine-Konig <u.kleine-koenig@pengutronix.de>
+>> ---
+>>
+>> This patch is necessary now that Russell has merged the V7M work in to his
+>> devel-stable branch.
+>>
+>> I don't have any immediate plans to implement MPU support for M-class, so this
+>> patch is important to ensure we don't break building of V7M platforms.
+> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>
+> I didn't check, but that might affect other nommu configs for pre-v7
+> cpu's, too. (I think there is support for an at91 in the tree?!)
+>
 
-By cpu_kill, do you mean platform_cpu_kill called from __cpu_die? If so,
-__cpu_die and cpu_die are definitely supposed to be treated as a pair, since
-they synchronise via the cpu_died completion.
+Thanks Uwe,
 
-Will
+You're right - I just checked and without this patch we cause issues 
+with at91x40_defconfig. This patch *does* fix that too.
+
+I've added your acked-by and this time I've got the '?' :)
+
+Jonny
