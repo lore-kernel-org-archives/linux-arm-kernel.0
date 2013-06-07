@@ -1,64 +1,38 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 7 Jun 2013 16:25:07 +0900
-Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <20130606110240.GA3320@localhost.localdomain>
-References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
- <20130606110240.GA3320@localhost.localdomain>
-Message-ID: <CAAVeFu+o7oc4Rrn67xxzsgeZ9xrTBkaLd_E4amaVgcNBRsKC_g@mail.gmail.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Fri, 7 Jun 2013 09:28:32 +0200
+Subject: mxsfb: DATA_FORMAT_24_BIT flag outputs invalid colours
+In-Reply-To: <20130607072103.GF14209@lukather>
+References: <519E03B0.1080006@digi.com> <519F4435.5010703@digi.com>
+ <201305241300.25461.jbe@pengutronix.de>
+ <201305241533.19941.jbe@pengutronix.de> <20130607072103.GF14209@lukather>
+Message-ID: <51B18BA0.50506@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 8:02 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+Hi Maxime,
 
->> +static int __attribute__((used)) __tegra_smc_stack[10];
+On 06/07/2013 09:21 AM, maxime.ripard at free-electrons.com wrote:
+> Hi Hector,
 >
-> Use __used instead of using GCC attributes directly.
+> On Fri, May 24, 2013 at 03:33:19PM +0200, Juergen Beisert wrote:
+>> Someone told me, Qt5 cannot handle this special RGB666 mode (even not the
+>> def_rgb666_shift memory layout mentioned above). My test are based on Qt4.
+>> Qt5 needs a regular RGB888 mode, which should silently be converted
+>> internally to RGB666 in the hardware.
+>>
+>> So, your patch to always use the RGB888 memory layout seems to be the right
+>> way to go.
 >
->> +
->> +/*
->> + * With EABI, subtype and arg already end up in r0, r1 and r2 as they are
->> + * function arguments, but we prefer to play safe here and explicitly move
->> + * these values into the expected registers anyway. mov instructions without
->> + * any side-effect are turned into nops by the assembler, which limits
->> + * overhead.
->> + */
->> +static void tegra_generic_smc(u32 type, u32 subtype, u32 arg)
->> +{
->> +     asm volatile(
->> +             ".arch_extension        sec\n\t"
->> +             "ldr    r3, =__tegra_smc_stack\n\t"
->
-> ldr= should be avoided in inline asm, because GCC can't guess it's size,
-> and can't guarantee that the literal pool word is close enough to be
-> addressable (though for small compilation units it's unlikely to be a
-> problem).
+> Do you plan on submitting this patch? (Or did you already submit it and
+> I overlooked it?)
 
-With Russel's suggested changes this will go away, but that's good to
-know anyway.
+I wasn't sure that everybody involved agreed with the patch.
+@Juergen, would the patch break your platform?
+Additionally, the guys from Crystalfontz didn't comment on it, but their platform is 
+also using a 18bit data bus width and 32bpp.
 
->> +             "dsb\n\t"
->
-> Can you explain what this DSB is for?
+If no-one is against I'll be glad to submit it.
 
-Just a safety measure to make sure all memory operations are done
-before we enter the secure monitor. Is it unnecessary?
-
->> +             "smc    #0\n\t"
->> +             "ldr    r3, =__tegra_smc_stack\n\t"
->> +             "ldmia  r3, {r4-r12, lr}"
->> +                     :
->> +                     : [type]    "r" (type),
->> +                       [subtype] "r" (subtype),
->> +                       [arg]     "r" (arg)
->> +                     : "r0", "r1", "r2", "r3", "r4", "memory");
->
-> If r5-r12 are not clobbered, why do you save and restore them?
-
-The secure monitor might change them.
-
-> In the ARM ABI, r12 is a caller-save register, so you probably
-> don't need to save/restore that even if it is clobbered.
-
-Right, thanks. Didn't know r12 could be used as a scratch register.
-
-Alex.
+Best regards,
+--
+Hector Palacios
