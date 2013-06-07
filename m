@@ -1,49 +1,51 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri,  7 Jun 2013 19:40:56 +0200
-Subject: [PATCH] cpuidle: fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency warning
-Message-ID: <1370626856-2876-1-git-send-email-daniel.lezcano@linaro.org>
+From: mikedunn@newsguy.com (Mike Dunn)
+Date: Fri, 07 Jun 2013 10:41:15 -0700
+Subject: pxa27x and pinctrl-single
+In-Reply-To: <CAD6h2NStRcXm_X=0ib=RtKqVhmsfGo4z=_jzL1hUo_MLcfyBZw@mail.gmail.com>
+References: <51AF7404.3090003@newsguy.com>
+ <CAD6h2NTu9-E=Xy8zz5cgDdk5W4ShM9-B+p+gQtiA_HASQ7AEuQ@mail.gmail.com>
+ <51B0C7E8.5090308@newsguy.com>
+ <CAD6h2NSRCti57NZtw0wzE8Th65_3Y8Dkz5zGsbnA2SUPYS263Q@mail.gmail.com>
+ <51B12DE9.9040908@newsguy.com>
+ <CAN1soZyOzrRewwx0up2s+4igUf77h+UbFpCsm324O-nkBWcsTQ@mail.gmail.com>
+ <51B1F330.9080007@newsguy.com>
+ <CAD6h2NStRcXm_X=0ib=RtKqVhmsfGo4z=_jzL1hUo_MLcfyBZw@mail.gmail.com>
+Message-ID: <51B21B3B.8050604@newsguy.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before the commit d6f346f2d2bf511c2c59176121a6e42ce60173a0, the
-ARCH_NEEDS_CPU_IDLE_COUPLED option was wrongly not depending on the CPU_IDLE
-and the Kconfig for OMAP / TEGRA was not checking this dependency when setting
-the option.
+On 06/07/2013 08:16 AM, Haojian Zhuang wrote:
+> 
 
-With this patch, the ARCH_NEEDS_CPU_IDLE_COUPLED has been moved under the
-CPU_IDLE option. The dependency has been fixed in the relevant arch's Kconfig.
+[...]
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- arch/arm/mach-omap2/Kconfig |    2 +-
- arch/arm/mach-tegra/Kconfig |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index f49cd51..831e89e 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -83,7 +83,7 @@ config ARCH_OMAP4
- 	depends on ARCH_OMAP2PLUS
- 	depends on ARCH_MULTI_V7
- 	select ARCH_HAS_OPP
--	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
-+	select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
- 	select ARM_CPU_SUSPEND if PM
- 	select ARM_ERRATA_720789
- 	select ARM_GIC
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 84d72fc..04c6221 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -23,7 +23,7 @@ menu "NVIDIA Tegra options"
- 
- config ARCH_TEGRA_2x_SOC
- 	bool "Enable support for Tegra20 family"
--	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
-+	select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_754327 if SMP
- 	select ARM_ERRATA_764369 if SMP
--- 
-1.7.9.5
+> Since you need to configure both GPDRx and GAFRx. If we are talking
+> pinctrl-single
+> as reference, we can make it work by this way.
+> 
+> We need to define two pinmux controllers. One is for GPDRx, and the
+> other is for GAFRx.
+> Both of them need to support pinctrl-single,bits property. For any
+> alternate pins in DTS,
+> we could include these two pins from two pinmux controllers. What's
+> your opinion?
+
+
+Are you are suggesting that the dts file can be defined such that the desired
+values are written to GAFR and GPDR, without having to make any changes to the
+pinctrl-single driver code?  If I understand correctly, we would be defining two
+"pins" in the device tree for each actual pin.  That seems very ugly.
+
+I was thinking that pinctrl-single could be modified to support multiple
+reg/value/mask pairs for each pin listed in the pinctrl-single,bits property.
+There is a comment at the top of pcs_parse_one_pinctrl_entry() that seems to
+suggest the possibility...
+
+ * Note that this binding currently supports only sets of one register + value.
+
+I am still learning pinctrl and devicetree and studying the driver, so I am not
+adament about anything at this point.  Guidance appreciated!
+
+Thanks,
+Mike
