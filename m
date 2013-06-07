@@ -1,43 +1,52 @@
-From: vladoman@gmail.com (Vladimir Pantelic)
-Date: Fri, 07 Jun 2013 09:48:22 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1370477958.20454.68.camel@localhost>
- <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
- <51B085C6.3000605@gmail.com>
- <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
-Message-ID: <51B19046.5040401@gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 7 Jun 2013 09:49:41 +0200
+Subject: [PATCH 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
+In-Reply-To: <20130607033306.GC21641@nchen-desktop>
+References: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
+ <20130606121647.GR23140@pengutronix.de>
+ <20130607025320.GA21641@nchen-desktop>
+ <20130607033306.GC21641@nchen-desktop>
+Message-ID: <20130607074941.GD12361@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-luke.leighton wrote:
-> On Thu, Jun 6, 2013 at 1:51 PM, Vladimir Pantelic <vladoman@gmail.com> wrote:
->
->> 4 days? WTF? since when did setting an ultimatum to the kernel
->> community work?
->
->   i was only informed of the opportunity 2 days ago, vladimir.  this is
-> an important meeting.  of course the linux kernel community is
-> entirely free to:
->
-> * completely ignore this opportunity
-> * continue to complain that soc vendors do not follow their
-> unilaterally-decided rules
+On Fri, Jun 07, 2013 at 11:33:07AM +0800, Peter Chen wrote:
+> On Fri, Jun 07, 2013 at 10:53:20AM +0800, Peter Chen wrote:
+> > On Thu, Jun 06, 2013 at 02:16:47PM +0200, Uwe Kleine-K?nig wrote:
+> > > Hello
+> > > 
+> > > [added jstultz to Cc:]
+> > > 
+> > > On Thu, Jun 06, 2013 at 02:55:26PM +0800, Peter Chen wrote:
+> > > > For tickless system, the jiffies may be updated long time (>20ms).
+> > > ... may not be updated for a long time ... ?
+> > > 
+> > > > At high loading system, the current waiting method will cause waiting
+> > > > timeout, and cause a kernel dump at below case.
+> > > > After timeout = jiffies + msecs_to_jiffies(10),
+> > > > the timer interrupt occurs, it updates jiffies (eg,  + 2 jiffies),
+> > > > then return back from interrupt, the time between above operations
+> > > > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+> > > Hmm, I admit I didn't follow the tickless stuff, but still I wonder if
+> > > the analysis is right. I thought on tickless jiffies are updated as
+> > > before by the boot cpu that cannot run in tickless mode?
+> > > 
+> > > Anyhow, this only affects the commit log, not the problem.
+> > >  
+> > 
+> > I add jiffies print at irq_exit (kernel/softirq.c), and it
+> > is not updated every jiffies.
+> 
+> Oh, I have not considered cpu idle condition. I think this
+> problem may occur the condition that irq and softirq consume
+> too much time.
+That was my thought, too. With my patch this time at least only happens
+after the pll is programmed and the issue might be solved, too?! (Maybe
+apart from Russell's comment.)
 
-SoC vendors are free to join the discussion, and many SoC vendors are 
-part of the kernel community, so calling this unilateral is plain wrong.
+Best regards
+Uwe
 
->   3 days remaining on the clock.
-
-what catastrophic thing will happen when the time runs out?
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
