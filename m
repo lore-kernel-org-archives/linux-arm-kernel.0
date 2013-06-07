@@ -1,75 +1,23 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:36 +0900
-Subject: [PATCH 06/27] ARM: shmobile: r8a7778: fixup Ether setup code position
-In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370591517-20239-7-git-send-email-horms+renesas@verge.net.au>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 7 Jun 2013 07:52:36 +0000 (UTC)
+Subject: [PATCH 14/14] ARM: OMAP4: hwmod data: Clean up the data file
+In-Reply-To: <51B175E4.1060909@ti.com>
+References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+ <1369845494-30231-15-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.02.1306061754560.5152@utopia.booyaka.com>
+ <51B0D54A.1090107@ti.com> <51B175E4.1060909@ti.com>
+Message-ID: <alpine.DEB.2.02.1306070751210.32163@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+cc Beno?t
 
-Ether setup code position was scattering.
-This patch fixes it up
+On Fri, 7 Jun 2013, Sricharan R wrote:
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7778.c | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+> I used autogen to remove the data, but some of the data were not in sync
+> with the mainline .(like abe, dss, aess, context register offsets etc..).
+> So i have to sync them manually.
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 30b4a33..d6ee521 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -80,12 +80,6 @@ static struct sh_timer_config sh_tmu1_platform_data = {
- 	.clocksource_rating	= 200,
- };
- 
--/* Ether */
--static struct resource ether_resources[] = {
--	DEFINE_RES_MEM(0xfde00000, 0x400),
--	DEFINE_RES_IRQ(gic_iid(0x89)),
--};
--
- #define r8a7778_register_tmu(idx)			\
- 	platform_device_register_resndata(		\
- 		&platform_bus, "sh_tmu", idx,		\
-@@ -94,6 +88,20 @@ static struct resource ether_resources[] = {
- 		&sh_tmu##idx##_platform_data,		\
- 		sizeof(sh_tmu##idx##_platform_data))
- 
-+/* Ether */
-+static struct resource ether_resources[] = {
-+	DEFINE_RES_MEM(0xfde00000, 0x400),
-+	DEFINE_RES_IRQ(gic_iid(0x89)),
-+};
-+
-+void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
-+{
-+	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
-+					  ether_resources,
-+					  ARRAY_SIZE(ether_resources),
-+					  pdata, sizeof(*pdata));
-+}
-+
- void __init r8a7778_add_standard_devices(void)
- {
- 	int i;
-@@ -118,14 +126,6 @@ void __init r8a7778_add_standard_devices(void)
- 	r8a7778_register_tmu(1);
- }
- 
--void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
--{
--	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
--					  ether_resources,
--					  ARRAY_SIZE(ether_resources),
--					  pdata, sizeof(*pdata));
--}
--
- static struct renesas_intc_irqpin_config irqpin_platform_data = {
- 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
- 	.sense_bitfield_width = 2,
--- 
-1.8.2.1
+OK.  Are you going to fix the differences up soon?
+
+- Paul
