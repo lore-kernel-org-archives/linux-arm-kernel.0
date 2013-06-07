@@ -1,60 +1,40 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Jun 2013 09:10:11 +0200
-Subject: Active-low behavior in gpiolib
-In-Reply-To: <CAAVeFu+hQHScYYkvO1KOrUPLLaC0ju_O4SDZWyJE8KhLn_hibQ@mail.gmail.com>
-References: <CAAVeFu+hQHScYYkvO1KOrUPLLaC0ju_O4SDZWyJE8KhLn_hibQ@mail.gmail.com>
-Message-ID: <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Fri, 7 Jun 2013 16:13:58 +0900
+Subject: [PATCH] ARM: tegra: add basic SecureOS support
+In-Reply-To: <CABb+yY2SFfejMbbYOebMCUuMtAZF3u-yc+6z_MJTG2oOeSwL_g@mail.gmail.com>
+References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+ <CABb+yY2SFfejMbbYOebMCUuMtAZF3u-yc+6z_MJTG2oOeSwL_g@mail.gmail.com>
+Message-ID: <CAAVeFuKxRuLdhO+-+YHG=c-TNGUUJbDj5AHj+K5e8y1JDEDksg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 5, 2013 at 7:22 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
+On Thu, Jun 6, 2013 at 9:26 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Thu, Jun 6, 2013 at 12:58 PM, Alexandre Courbot <acourbot@nvidia.com> wrote:
+>> Boot loaders on some Tegra devices can be unlocked but do not let the
+>> system operate without SecureOS. SecureOS prevents access to some
+>> registers and requires the operating system to perform certain
+>> operations through Secure Monitor Calls instead of directly accessing
+>> the hardware.
+>>
+> IOW, some critical h/w controls on Tegra are accessible only from
+> Secure mode (not unusual). So if we(Linux) run in NS mode we need to
+> make calls to the SecureOS, over SMC, to do things for us?
 
-> FLAG_ACTIVE_LOW, on the other hand, is *only* set and used through
-> sysfs operations. Independently, the active low property can be
-> specified in gpio phandles and retrieved by
-> of_get_(named_)gpio_flags() - only it has to be kept in a separate
-> variable which must then be checked everytime one wants to change the
-> GPIO value to set the correct level.
+Exactly.
 
-Well it is designed as a sysfs-only thing according to the comment:
-drivers/gpio/gpiolib.c:#define FLAG_ACTIVE_LOW  6       /* sysfs value
-has active low */
+>> This patch introduces basic SecureOS support for Tegra. SecureOS support
+>> can be enabled by adding a "nvidia,secure-os" property to the "chosen"
+>> node of the device tree.
+>>
+> Probably just a nit, but shouldn't it be "nvidia,nonsecure-os"
+> instead, denoting the mode Linux is going to run?  (and then I wonder
+> if we could detect the mode (S or NS) at runtime and avoid this flag
+> at all).
 
-So I think your actual question is whether it should also be
-enabled for the kernel-internal interfaces.
+Detection of the secure mode at runtime would only solve half of the
+issue: we would know that we are running in non-secure mode, but we
+would still not know what monitor is operating. Detecting that part is
+impossible AFAIK, so I'm afraid we need to pass that information
+through the DT here.
 
-Currently we have things like this:
-
-/**
- * struct mmci_platform_data - platform configuration for the MMCI
- * (also known as PL180) block.
-(...)
- * @gpio_cd: read this GPIO pin to detect card insertion
- * @cd_invert: true if the gpio_cd pin value is active low
-(...)
-        int     gpio_cd;
-        bool    cd_invert;
-
-So the knowledge of whether a certain GPIO is active high or low
-is spread out through drivers, and the API only drives the line in a
-very explicit way.
-
-I am uncertain whether it is wise to move this into gpiolib for
-in-kernel consumers, it is mainly a convention of where the
-knowledge should sit. In the mentioned case, the flags will still
-be needed because we need to have the information there to
-set the flag toward the gpiolib API anyway.
-
-So the only thing gained is that gpiolib gets some knowledge
-of how the pin is used. But what is the gain of that?
-
-One could argue that this property should not have been
-added to the sysfs ABI for the same reason but that cannot
-be changed.
-
-The ABI addition of polarity was done when the GPIOlib was
-orphaned, by the way, so it wasn't really reviewed. :-(
-I wonder if the author's mail address is still working.
-
-Yours,
-Linus Walleij
+Alex.
