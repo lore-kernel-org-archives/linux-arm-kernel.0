@@ -1,162 +1,142 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  7 Jun 2013 12:04:20 +0200
-Subject: [PATCH v4 2/2] ARM PJ4B: Add support for errata 4742
-In-Reply-To: <1370599460-9947-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1370599460-9947-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1370599460-9947-3-git-send-email-gregory.clement@free-electrons.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 7 Jun 2013 13:05:44 +0300
+Subject: [PATCH 0/6] Drop legacy booting for omap4 for v3.11, boot with
+ device tree only
+In-Reply-To: <20130517191304.468.73487.stgit@localhost>
+References: <20130517191304.468.73487.stgit@localhost>
+Message-ID: <51B1B078.9000401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the regression on Armada 370 (the kernal hang during
-boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
-TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
+Hi,
 
-When coming out of either a Wait for Interrupt (WFI) or a Wait for
-Event (WFE) IDLE states, a specific timing sensitivity exists between
-the retiring WFI/WFE instructions and the newly issued subsequent
-instructions. This sensitivity can result in a CPU hang scenario.  The
-workaround is to insert either a Data Synchronization Barrier (DSB) or
-Data Memory Barrier (DMB) command immediately after the WFI/WFE
-instruction.
+On 17/05/13 22:17, Tony Lindgren wrote:
+> Hi all,
+> 
+> Here are patches against v3.10-rc1 to drop omap4 legacy booting as
+> things are now working well enough for booting omap4 with device
+> tree.
+> 
+> We already have am33xx and omap5 booting with device tree only,
+> and converting omap4 is relatively easy with just two board-*.c
+> files merged as we have not accepted any new board-*.c files for
+> quite some time now.
+> 
+> By working "well enough" I mean that I can use my omap4 panda-es
+> with device tree with a Motorola LapDock with HDMI, DVI, HID, USB
+> and WLAN using v3.10-rc1 and the patches in this series plus some
+> extra patches that are driver related.
+> 
+> Of course some things will need more work, like PM. But that
+> has not yet been fully working for omap4 anyways, and that
+> work can now be combined with omap5 PM work to some extent.
 
-This commit was based on the work of Lior Amsalem, but heavily
-modified to apply the errata fix dynamically according to the
-processor type thanks to the suggestions of Russell King and Nicolas
-Pitre.
+You can also add the one below to this series.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+ Tomi
+
+
+>From d22837262b59ad381feb215496fafe3fe399972f Mon Sep 17 00:00:00 2001
+From: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Date: Fri, 7 Jun 2013 13:01:05 +0300
+Subject: [PATCH] ARM: OMAP2+: Remove legacy DSS initialization for omap4
+
+This is no longer needed as omap4 is now booted using device tree.
+
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
- arch/arm/Kconfig                 | 13 +++++++++++++
- arch/arm/include/asm/glue-proc.h |  9 +++++++++
- arch/arm/mm/proc-macros.S        |  5 +++++
- arch/arm/mm/proc-v7.S            | 30 +++++++++++++++++++++++++++---
- 4 files changed, 54 insertions(+), 3 deletions(-)
+ arch/arm/mach-omap2/dss-common.c | 47 ----------------------------------------
+ arch/arm/mach-omap2/dss-common.h |  2 --
+ 2 files changed, 49 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..95cbe9d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1087,6 +1087,19 @@ if !MMU
- source "arch/arm/Kconfig-nommu"
- endif
+diff --git a/arch/arm/mach-omap2/dss-common.c b/arch/arm/mach-omap2/dss-common.c
+index 393aeef..43ec787 100644
+--- a/arch/arm/mach-omap2/dss-common.c
++++ b/arch/arm/mach-omap2/dss-common.c
+@@ -80,24 +80,6 @@ static struct omap_dss_board_info omap4_panda_dss_data = {
+ 	.default_device	= &omap4_panda_dvi_device,
+ };
  
-+config PJ4B_ERRATA_4742
-+	bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
-+	depends on CPU_PJ4B && MACH_ARMADA_370
-+	help
-+	  When coming out of either a Wait for Interrupt (WFI) or a Wait for
-+	  Event (WFE) IDLE states, a specific timing sensitivity exists between
-+	  the retiring WFI/WFE instructions and the newly issued subsequent
-+	  instructions.  This sensitivity can result in a CPU hang scenario.
-+	  Workaround:
-+	  The software must insert either a Data Synchronization Barrier (DSB)
-+	  or Data Memory Barrier (DMB) command immediately after the WFI/WFE
-+	  instruction
-+
- config ARM_ERRATA_326103
- 	bool "ARM errata: FSR write bit incorrect on a SWP to read-only memory"
- 	depends on CPU_V6
-diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
-index ac1dd54..8017e94 100644
---- a/arch/arm/include/asm/glue-proc.h
-+++ b/arch/arm/include/asm/glue-proc.h
-@@ -230,6 +230,15 @@
- # endif
+-void __init omap4_panda_display_init(void)
+-{
+-	omap_display_init(&omap4_panda_dss_data);
+-
+-	/*
+-	 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
+-	 * later have external pull up on the HDMI I2C lines
+-	 */
+-	if (cpu_is_omap446x() || omap_rev() > OMAP4430_REV_ES2_2)
+-		omap_hdmi_init(OMAP_HDMI_SDA_SCL_EXTERNAL_PULLUP);
+-	else
+-		omap_hdmi_init(0);
+-
+-	omap_mux_init_gpio(HDMI_GPIO_LS_OE, OMAP_PIN_OUTPUT);
+-	omap_mux_init_gpio(HDMI_GPIO_CT_CP_HPD, OMAP_PIN_OUTPUT);
+-	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
+-}
+-
+ void __init omap4_panda_display_init_of(void)
+ {
+ 	omap_display_init(&omap4_panda_dss_data);
+@@ -204,35 +186,6 @@ static struct omap_dss_board_info sdp4430_dss_data = {
+  * used by picodlp on the 4430sdp platform. Keep this gpio disabled as LCD2 is
+  * selected by default
+  */
+-void __init omap_4430sdp_display_init(void)
+-{
+-	int r;
+-
+-	r = gpio_request_one(DISPLAY_SEL_GPIO, GPIOF_OUT_INIT_HIGH,
+-			"display_sel");
+-	if (r)
+-		pr_err("%s: Could not get display_sel GPIO\n", __func__);
+-
+-	r = gpio_request_one(DLP_POWER_ON_GPIO, GPIOF_OUT_INIT_LOW,
+-		"DLP POWER ON");
+-	if (r)
+-		pr_err("%s: Could not get DLP POWER ON GPIO\n", __func__);
+-
+-	omap_display_init(&sdp4430_dss_data);
+-	/*
+-	 * OMAP4460SDP/Blaze and OMAP4430 ES2.3 SDP/Blaze boards and
+-	 * later have external pull up on the HDMI I2C lines
+-	 */
+-	if (cpu_is_omap446x() || omap_rev() > OMAP4430_REV_ES2_2)
+-		omap_hdmi_init(OMAP_HDMI_SDA_SCL_EXTERNAL_PULLUP);
+-	else
+-		omap_hdmi_init(0);
+-
+-	omap_mux_init_gpio(HDMI_GPIO_LS_OE, OMAP_PIN_OUTPUT);
+-	omap_mux_init_gpio(HDMI_GPIO_CT_CP_HPD, OMAP_PIN_OUTPUT);
+-	omap_mux_init_gpio(HDMI_GPIO_HPD, OMAP_PIN_INPUT_PULLDOWN);
+-}
+-
+ void __init omap_4430sdp_display_init_of(void)
+ {
+ 	int r;
+diff --git a/arch/arm/mach-omap2/dss-common.h b/arch/arm/mach-omap2/dss-common.h
+index 915f6ff..c28fe3c 100644
+--- a/arch/arm/mach-omap2/dss-common.h
++++ b/arch/arm/mach-omap2/dss-common.h
+@@ -6,9 +6,7 @@
+  * This file will be removed when DSS supports DT.
+  */
+ 
+-void __init omap4_panda_display_init(void);
+ void __init omap4_panda_display_init_of(void);
+-void __init omap_4430sdp_display_init(void);
+ void __init omap_4430sdp_display_init_of(void);
+ 
  #endif
- 
-+#ifdef CONFIG_CPU_PJ4B
-+# ifdef CPU_NAME
-+#  undef  MULTI_CPU
-+#  define MULTI_CPU
-+# else
-+#  define CPU_NAME cpu_pj4b
-+# endif
-+#endif
-+
- #ifndef MULTI_CPU
- #define cpu_proc_init			__glue(CPU_NAME,_proc_init)
- #define cpu_proc_fin			__glue(CPU_NAME,_proc_fin)
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index f9a0aa7..e3c48a3 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -333,3 +333,8 @@ ENTRY(\name\()_tlb_fns)
- 	.endif
- 	.size	\name\()_tlb_fns, . - \name\()_tlb_fns
- .endm
-+
-+.macro globl_equ x, y
-+	.globl	\x
-+	.equ	\x, \y
-+.endm
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index fe3a9d3..95d463e 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -342,6 +342,29 @@ __v7_setup:
- 	mov	pc, lr				@ return to head.S:__ret
- ENDPROC(__v7_setup)
- 
-+#ifdef CONFIG_CPU_PJ4B
-+	globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
-+	globl_equ	cpu_pj4b_set_pte_ext,	cpu_v7_set_pte_ext
-+	globl_equ	cpu_pj4b_proc_init,	cpu_v7_proc_init
-+	globl_equ	cpu_pj4b_proc_fin, 	cpu_v7_proc_fin
-+	globl_equ	cpu_pj4b_reset,	   	cpu_v7_reset
-+#ifdef CONFIG_PJ4B_ERRATA_4742
-+ENTRY(cpu_pj4b_do_idle)
-+	dsb					@ WFI may enter a low-power mode
-+	wfi
-+	dsb					@barrier
-+	mov	pc, lr
-+ENDPROC(cpu_pj4b_do_idle)
-+#else
-+	globl_equ	cpu_pj4b_do_idle,  	cpu_v7_do_idle
-+#endif
-+	globl_equ	cpu_pj4b_dcache_clean_area,	cpu_v7_dcache_clean_area
-+	globl_equ	cpu_pj4b_do_suspend,	cpu_v7_do_suspend
-+	globl_equ	cpu_pj4b_do_resume,	cpu_v7_do_resume
-+	globl_equ	cpu_pj4b_suspend_size,	cpu_v7_suspend_size
-+
-+#endif
-+
- 	.align	2
- __v7_setup_stack:
- 	.space	4 * 11				@ 11 registers
-@@ -350,6 +373,7 @@ __v7_setup_stack:
- 
- 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
- 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
-+	define_processor_functions pj4b, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
- 
- 	.section ".rodata"
- 
-@@ -362,7 +386,7 @@ __v7_setup_stack:
- 	/*
- 	 * Standard v7 proc info content
- 	 */
--.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
-+.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0, proc_fns = v7_processor_functions
- 	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
- 			PMD_SECT_AF | PMD_FLAGS_SMP | \mm_mmuflags)
- 	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
-@@ -375,7 +399,7 @@ __v7_setup_stack:
- 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \
- 		HWCAP_EDSP | HWCAP_TLS | \hwcaps
- 	.long	cpu_v7_name
--	.long	v7_processor_functions
-+	.long	\proc_fns
- 	.long	v7wbi_tlb_fns
- 	.long	v6_user_fns
- 	.long	v7_cache_fns
-@@ -411,7 +435,7 @@ __v7_ca9mp_proc_info:
- __v7_pj4b_proc_info:
- 	.long   0x560f5800
- 	.long	0xff0fff00
--	__v7_proc __v7_pj4b_setup
-+	__v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions
- 	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
- 
- 	/*
 -- 
 1.8.1.2
+
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130607/9210c379/attachment.sig>
