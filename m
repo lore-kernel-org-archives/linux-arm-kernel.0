@@ -1,65 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Jun 2013 10:21:46 -0600
-Subject: Active-low behavior in gpiolib
-In-Reply-To: <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
-References: <CAAVeFu+hQHScYYkvO1KOrUPLLaC0ju_O4SDZWyJE8KhLn_hibQ@mail.gmail.com>
- <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
-Message-ID: <51B2089A.1070404@wwwdotorg.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Jun 2013 18:21:57 +0200
+Subject: [PATCH 1/2] i2c-mv64xxx: Add I2C Transaction Generator support
+In-Reply-To: <1370619743-15245-2-git-send-email-gregory.clement@free-electrons.com>
+References: <1370619743-15245-1-git-send-email-gregory.clement@free-electrons.com>
+ <1370619743-15245-2-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130607182157.34188f72@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2013 01:10 AM, Linus Walleij wrote:
-> On Wed, Jun 5, 2013 at 7:22 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
-> 
->> FLAG_ACTIVE_LOW, on the other hand, is *only* set and used through
->> sysfs operations. Independently, the active low property can be
->> specified in gpio phandles and retrieved by
->> of_get_(named_)gpio_flags() - only it has to be kept in a separate
->> variable which must then be checked everytime one wants to change the
->> GPIO value to set the correct level.
-> 
-> Well it is designed as a sysfs-only thing according to the comment:
-> drivers/gpio/gpiolib.c:#define FLAG_ACTIVE_LOW  6       /* sysfs value
-> has active low */
-> 
-> So I think your actual question is whether it should also be
-> enabled for the kernel-internal interfaces.
-> 
-> Currently we have things like this:
-> 
-> /**
->  * struct mmci_platform_data - platform configuration for the MMCI
->  * (also known as PL180) block.
-> (...)
->  * @gpio_cd: read this GPIO pin to detect card insertion
->  * @cd_invert: true if the gpio_cd pin value is active low
-> (...)
->         int     gpio_cd;
->         bool    cd_invert;
-> 
-> So the knowledge of whether a certain GPIO is active high or low
-> is spread out through drivers, and the API only drives the line in a
-> very explicit way.
-...
-> So the only thing gained is that gpiolib gets some knowledge
-> of how the pin is used. But what is the gain of that?
+Dear Gregory CLEMENT,
 
-Well, the big gain I see is that every driver needs to somehow find out
-whether the GPIO is active-low or not, and store a separate flag for it,
-and XOR all data with that flag. That's not a massive amount of code,
-but it's really rather annoying. Why can't we just tell gpiolib what the
-polarity is, and let it deal with it. In the DT case, this "tell gpiolib
-what the polarity is" would be 100% hidden inside the DT parsing/mapping
-(of_xlate) code. For non-DT, presumably this could be a flag that the
-board file or platform code programs into gpiolib early on.
+On Fri,  7 Jun 2013 17:42:22 +0200, Gregory CLEMENT wrote:
 
-If you're worried about this hiding too much information, and that some
-code might want to know what's really going on rather than the logical
-values, perhaps:
+>  /* Driver states */
+>  enum {
+>  	MV64XXX_I2C_STATE_INVALID,
+> @@ -110,6 +133,7 @@ struct mv64xxx_i2c_data {
+>  	spinlock_t		lock;
+>  	struct i2c_msg		*msg;
+>  	struct i2c_adapter	adapter;
+> +	int			bridge_enabled;
 
-gpiod_[gs]et() - return/accept logical values
-gpiod_[gs]et_raw() - return the actual electrical level
+bool ?
 
-gpiod_[gs]et() might also hide details of
-open-drain/collector/source/... too, and do automatic tri-stating based
-on the level of output that was desired?
+> @@ -528,6 +652,7 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+>  {
+>  	u32 bus_freq, tclk;
+>  	int rc = 0;
+> +	const char *bridge_status;
+>  
+>  	/* CLK is mandatory when using DT to describe the i2c bus. We
+>  	 * need to know tclk in order to calculate bus clock
+> @@ -554,6 +679,15 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+>  	 * So hard code the value to 1 second.
+>  	 */
+>  	drv_data->adapter.timeout = HZ;
+> +
+> +	/*
+> +	 * Acquire information on Transaction Generator support.
+> +	 */
+> +	bridge_status = of_get_property(np, "", NULL);
+
+It is not clear to me what this new bridge_status local variable is
+doing.
+
+> +	if (of_property_read_bool(np, "i2c,i2c-bridge"))
+> +		drv_data->bridge_enabled = 1;
+> +	else
+> +		drv_data->bridge_enabled = 0;
+
+This could be written directly as:
+
+	drv_data->bridge_enabled = of_property_read_bool(np, "i2c,i2c-bridge");
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
