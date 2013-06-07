@@ -1,64 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Jun 2013 19:16:51 +0200
-Subject: [PATCH 2/5] arm: preserve ATAGS in /chosen/atags in the Device
- Tree
-In-Reply-To: <20130607143249.GR23859@titan.lakedaemon.net>
-References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370414409-29991-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130606142851.6dd17cad@skate>
- <alpine.LFD.2.03.1306061253430.18597@syhkavp.arg>
- <20130607112101.2cedbc5f@skate>
- <20130607143249.GR23859@titan.lakedaemon.net>
-Message-ID: <20130607191651.0baa1c7d@skate>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri,  7 Jun 2013 18:17:53 +0100
+Subject: [PATCH] ARM: mpu: Ensure that MPU depends on CPU_V7
+Message-ID: <1370625473-21628-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+The support for the MPU is currently implemented only for R-class
+(PMSAv7/R). Since the merge of V7M support in to the kernel it is possible
+to select MPU support on V7M.
 
-On Fri, 7 Jun 2013 10:32:49 -0400, Jason Cooper wrote:
+This patch ensures that until MPU support for M-class processors is
+implemented, the MPU can only be selected with R-class CPUs
 
-> > Well, I don't think what you say here is really fair. Before the DT was
-> > in place, unless I missed it, there was no standard way of letting the
-> > bootloader pass MAC addresses to the kernel. And Marvell's development
-> > on those Armada 370/XP platforms predates the introduction of the
-> > Device Tree in the Linux kernel (the code we have originally been give
-> > was a 2.6.3x), so it's really not their fault to not have a DT-capable
-> > bootloader at this point.
-> 
-> To be accurate, I think Nico is referring to the fact that Marvell
-> assigned their own ATAG without going through Russell.
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+Cc: Uwe Kleine-Konig <u.kleine-koenig@pengutronix.de>
+---
 
-Right, that's true.
+This patch is necessary now that Russell has merged the V7M work in to his
+devel-stable branch.
 
-> However, just like mach-types, are we assigning any new atags?  Can we
-> consider them deprecated?  If so, that changes the game.  Then what
-> Thomas is proposing is a "legacy compatibility" patch, as opposed to a
-> hole vendors can use to do their own thing.
-> 
-> We could add Arnd's suggestion of a time bomb on the common code in
-> atags_to_fdt.c to prevent mis-use.
-> 
-> I'm not 100% convinced of this, and I actually tend to agree with Nico
-> here, but I'd also like to find a workable solution.
+I don't have any immediate plans to implement MPU support for M-class, so this
+patch is important to ensure we don't break building of V7M platforms.
 
-I perfectly understand Nico and Russell concerns, for sure. But I'd
-also like to find a workable solution:
+ arch/arm/Kconfig-nommu |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/Kconfig-nommu b/arch/arm/Kconfig-nommu
+index db597e1..aed66d5 100644
+--- a/arch/arm/Kconfig-nommu
++++ b/arch/arm/Kconfig-nommu
+@@ -53,6 +53,7 @@ config REMAP_VECTORS_TO_RAM
  
- * Passing the MAC address on the kernel command line is not something
-   that the network maintainer likes. See
-   http://lists.openwall.net/netdev/2011/11/17/82 and Dave Miller's
-   answer http://lists.openwall.net/netdev/2011/11/17/83.
-
- * Parsing the U-Boot environment is really not easy. How does the
-   kernel know where this environment is located? What if another
-   bootloader than U-Boot is used? Reading the U-Boot environment from
-   the kernel sounds clunky.
-
-Best regards,
-
-Thomas
+ config ARM_MPU
+        bool 'Use the ARM v7 PMSA Compliant MPU'
++       depends on CPU_V7
+        default y
+        help
+          Some ARM systems without an MMU have instead a Memory Protection
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+1.7.9.5
