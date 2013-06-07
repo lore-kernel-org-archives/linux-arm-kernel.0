@@ -1,29 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Jun 2013 13:21:56 +0200
-Subject: [PATCH] pinctrl: exynos5440: fix issues reported by prevent tool
-In-Reply-To: <09d101ce6254$40813eb0$c183bc10$%kim@samsung.com>
-References: <09d101ce6254$40813eb0$c183bc10$%kim@samsung.com>
-Message-ID: <CACRpkdY=6YQK9BY=T_OoA3H6awyNUaqEMd0kx6paSJ-dr6WKzw@mail.gmail.com>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Fri, 07 Jun 2013 13:31:24 +0200
+Subject: [GIT PULL RESENT] CPUFreq: ARM Updates for v3.11
+In-Reply-To: <CAKohpokJt=8UpAKKEEFaojq-M_GPawrDRBdXL8erEDe2jh=Q4A@mail.gmail.com>
+References: <CAKohpokJt=8UpAKKEEFaojq-M_GPawrDRBdXL8erEDe2jh=Q4A@mail.gmail.com>
+Message-ID: <195814068.OMscJ0xp3P@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 3:22 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Friday, June 07, 2013 04:39:49 PM Viresh Kumar wrote:
+> Hi Rafael,
+> 
+> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
+> 
+>   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/vireshk/linux.git cpufreq-next
+> 
+> for you to fetch changes up to ea61623fe9badd5a195b3a0878e6d89a2f97ac0e:
+> 
+>   cpufreq: kirkwood: Select CPU_FREQ_TABLE option (2013-06-07 16:33:36 +0530)
 
-> From: Thomas Abraham <thomas.ab@samsung.com>
->
-> This patch fixes issues reported by prevent tool.
->
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+Pulled, thanks Viresh!
 
-Patch applied except for this hunk:
+Rafael
 
-> -       priv = devm_kzalloc(dev, sizeof(priv), GFP_KERNEL);
-> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
 
-That was already fixed by the patch
-"pinctrl: exynos5440: fix invalid use of sizeof in exynos5440_pinctrl_probe()"
-by Wei Yongjun.
-
-Yours,
-Linus Walleij
+> ----------------------------------------------------------------
+> Arnd Bergmann (2):
+>       cpufreq: SPEAr needs cpufreq table
+>       cpufreq: big.LITTLE needs cpufreq table
+> 
+> Ezequiel Garcia (1):
+>       cpufreq: kirkwood: Select CPU_FREQ_TABLE option
+> 
+>  drivers/cpufreq/Kconfig.arm | 3 +++
+>  1 file changed, 3 insertions(+)
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
