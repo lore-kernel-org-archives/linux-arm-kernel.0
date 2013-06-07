@@ -1,63 +1,113 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Jun 2013 10:33:10 -0600
-Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <CAAVeFu+by44HnOzv_85kwgeCx5b9TxiMhr27x69QcUj9GRbk8A@mail.gmail.com>
-References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
- <51B0BC80.9040007@wwwdotorg.org>
- <CAAVeFu+by44HnOzv_85kwgeCx5b9TxiMhr27x69QcUj9GRbk8A@mail.gmail.com>
-Message-ID: <51B20B46.4030501@wwwdotorg.org>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 7 Jun 2013 17:41:23 +0100
+Subject: [PATCH] arm/dt: Don't add disabled CPUs to system topology
+In-Reply-To: <CAFtq+0FuzNcoQpK7=7d_KetYYHoPC7rdkFWMrApey5dxiWZ9mg@mail.gmail.com>
+References: <1370538685-22386-1-git-send-email-james.king@linaro.org>
+ <20130607102326.GA3111@e102568-lin.cambridge.arm.com>
+ <CAFtq+0FuzNcoQpK7=7d_KetYYHoPC7rdkFWMrApey5dxiWZ9mg@mail.gmail.com>
+Message-ID: <20130607164123.GF3111@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2013 02:11 AM, Alexandre Courbot wrote:
-> On Fri, Jun 7, 2013 at 1:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 06/06/2013 01:28 AM, Alexandre Courbot wrote:
->>> Boot loaders on some Tegra devices can be unlocked but do not let the
->>> system operate without SecureOS. SecureOS prevents access to some
->>> registers and requires the operating system to perform certain
->>> operations through Secure Monitor Calls instead of directly accessing
->>> the hardware.
->>>
->>> This patch introduces basic SecureOS support for Tegra. SecureOS support
->>> can be enabled by adding a "nvidia,secure-os" property to the "chosen"
->>> node of the device tree.
->>
->> I suspect "SecureOS" here is the name of a specific implementation of a
->> secure monitor, right? It's certainly a very unfortunate name, since it
->> sounds like a generic concept rather than a specific implementation:-(
+On Fri, Jun 07, 2013 at 12:48:58PM +0100, James King wrote:
+> Hi Lorenzo,
 > 
-> Right. Using the actual name (Trusted Foundations) is probably better.
-> I don't think the SecureOS denomination is used by anyone else but
-> NVIDIA.
+> On 7 June 2013 11:23, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> > Hi James,
+> >
+> > On Thu, Jun 06, 2013 at 06:11:25PM +0100, James King wrote:
+> >> If CPUs are marked as disabled in the devicetree, make sure they do
+> >> not exist in the system CPU information and CPU topology information.
+> >> In this case these CPUs will not be able to be added to the system later
+> >> using hot-plug. This allows a single chip with many CPUs to be easily
+> >> used in a variety of hardware devices where they may have different
+> >> actual processing requirements (eg for thermal/cost reasons).
+> >>
+> >> - Change devicetree.c to ignore any cpu nodes marked as disabled,
+> >>   this effectively limits the number of active cpu cores so no need
+> >>   for the max_cpus=x in the chosen node.
+> >> - Change topology.c to ignore any cpu nodes marked as disabled, this
+> >>   is where the scheduler would learn about big/LITTLE cores so this
+> >>   effectively keeps the scheduler in sync.
+> >>
+> >
+> > I have two questions:
+> >
+> > 1) Since with this approach the DT should change anyway if on different
+> >    hardware devices based on the same chip you want to allow booting a
+> >    different number of CPUs, why do not we remove the cpu nodes instead of
+> >    disabling them ? Put it another way: cpu nodes define a cpu as
+> >    possible (currently), we can simply remove the node if we do not want
+> >    that cpu to be seen by the kernel.
 > 
->> There certainly could be (and I believe are in practice?) multiple
->> implementation of a secure monitor for Tegra. Presumably, each of those
->> implementations has (or could have) a different definition for what SVC
->> calls it supports, their parameters, etc.
->>
->> I think we need to separate the concept of support for *a* secure
->> monitor, from support for a *particular* secure monitor.
+> The reason we want disabled status rather than just remove the nodes
+> is to use a common soc.dtsi file which is included in many board.dts
+> files - eg:
 > 
-> Agreed. In this case, can we assume that support for a specific secure
-> monitor is not arch-specific, and that this patch should be moved
-> outside of arch-tegra and down to arch/arm? In other words, the ABI of
-> a particular secure monitor should be the same no matter the chip,
-> shouldn't it?
+> file soc.dtsi contains:
+> 
+>                 cpus {
+>                                 cpu0: cpu at 0 {
+>                                                 device_type = "cpu";
+>                                                 compatible = "arm,cortex-a7";
+>                                                 reg = <0>;
+>                                                 cluster = <&cluster0>;
+>                                                 core = <&core0>;
 
-I would like to believe that the Trusted Foundations monitor had the
-same ABI irrespective of which Soc it was running on. However, I have
-absolutely no idea at all if that's true. Even if there's some common
-subset of the ABI that is identical across all SoCs, I wouldn't be too
-surprised if there were custom extensions for each different SoC, or
-just perhaps even each product.
+Minor nit, "cluster" and "core" phandles are not part of cpu the bindings
+that will be merged this cycle, I know it is just an example.
 
-Can you research this and find out the answer?
+>                                 };
+> 
+>                                 cpu1: cpu at 1 {
+>                                                 device_type = "cpu";
+>                                                 compatible = "arm,cortex-a7";
+>                                                 reg = <1>;
+>                                                 cluster = <&cluster0>;
+>                                                 core = <&core1>;
+>                                 };
+> 
+>                                 cpu2: cpu at 2 {
+>                                                 device_type = "cpu";
+>                                                 compatible = "arm,cortex-a15";
+>                                                 reg = <2>;
+>                                                 cluster = <&cluster0>;
+>                                                 core = <&core2>;
+>                                 };
+>                 };
+> 
+> file board1.dts where we want the A15 disabled contains:
+> 
+> /include/ "soc.dtsi"
+> 
+>                 cpus {
+>                                 cpu2: cpu at 2 {
+>                                                 status = "disabled";
+>                                 };
+>                 };
 
-What we can always do is make a compatible property that lists
-everything[1], and have the driver match on the most specific value for
-now, but relax the driver's matching later if it turns out that the ABI
-is indeed common.
+Understood, see the other reply as far as the status property is concerned.
 
-[1] That'd need to be at least secure OS name, and secure OS version.
-Perhaps the SoC and board data can be deduced from the DT's top-level
-compatible properties; nvidia,tegra114-shield, nvidia,tegra114?
+> > 2) If we go for the "status" property, why do not we use it to set present
+> >    mask ? That way the cpu is possible but not present, you cannot
+> >    hotplug it in. It is a bit of a stretch, granted, the cpu _is_ present,
+> >    we just want to disable it, do not know how this is handled in x86
+> >    and other archs though.
+> 
+> I have been struggling to find any equivalent example for another
+> arch, so just tried to solve our problem. I guess in the x86 world it
+> is less likely to want to disable processors in a SoC for heat/battery
+> issues so this has just never arisen. In this case the cpu is
+> physically present but not possible, but I am not sure it should be in
+> a present mask (giving the impression it can be used). Perhaps you
+> could elaborate with an example what you are thinking about here?
+
+I was thinking about using status == "disabled" to mark a cpu as
+possible but not present; that is a bad idea for the reason you mentioned
+and also for the point Rob raised related to the ePAPR.
+
+I am not sure how we can solve this issue, as I mentioned the easiest
+solution consists in not defining cpu nodes in the DT or probably add
+an additional property != status with proper bindings attached to it.
+
+Lorenzo
