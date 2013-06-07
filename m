@@ -1,92 +1,79 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Jun 2013 11:21:01 +0200
-Subject: [PATCH 2/5] arm: preserve ATAGS in /chosen/atags in the Device
- Tree
-In-Reply-To: <alpine.LFD.2.03.1306061253430.18597@syhkavp.arg>
-References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370414409-29991-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130606142851.6dd17cad@skate>
- <alpine.LFD.2.03.1306061253430.18597@syhkavp.arg>
-Message-ID: <20130607112101.2cedbc5f@skate>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Fri, 07 Jun 2013 11:15:52 +0200
+Subject: [PATCH v3 4/6] ARM: kirkwood: move device tree nodes to DT irqchip
+ and clocksource
+In-Reply-To: <20130607103007.415575c8@skate>
+References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1370536034-23956-5-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130607103007.415575c8@skate>
+Message-ID: <51B1A4C8.9070404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Nicolas Pitre,
+On 06/07/13 10:30, Thomas Petazzoni wrote:
+> On Thu,  6 Jun 2013 18:27:12 +0200, Sebastian Hesselbarth wrote:
+>> -		wdt at 20300 {
+>> +		wdt: watchdog-timer at 20300 {
+>>   			compatible = "marvell,orion-wdt";
+>>   			reg = <0x20300 0x28>;
+>> +			interrupt-parent = <&bridge_intc>;
+>> +			interrupts = <3>;
+>>   			clocks = <&gate_clk 7>;
+>>   			status = "okay";
+>>   		};
+>
+> The watchdog driver is mapping the same registers as the timer driver
+> (0x20300) and is poking into the same TIMER_CTRL register that controls
+> both the timers and the watchdog.
 
-On Thu, 6 Jun 2013 13:27:38 -0400 (EDT), Nicolas Pitre wrote:
+Thomas,
 
-> > I'd be interested to hear your opinion about the below proposal, that
-> > allows platform-specific code to do its own parsing of ATAGS
-> > information, without cluttering the generic code.
-> 
-> Personally, I don't like it.
-> 
-> Not that the code itself is extremely ugly.  That is not the point.
-> 
-> This opens the door to laziness on the part of bootloader authors and 
-> system integrators which will simply (ab)use this mechanism as this 
-> allows them to sit on what they already have instead of making the extra 
-> mile to bring things into conformance.  And overtime this means 
-> maintenance nightmare for us.
-> 
-> I'm sorry but the only leverage we have to create some incentive for 
-> people to do the right thing is exactly to say no to such kind of 
-> accommodation.
-> 
-> If Marvell has done things improperly in the past, it is for them to pay 
-> the maintenance cost of their choices, not for mainline to carry them.
+you are right. I must admit that I forgot to take care of watchdog
+driver.
 
-Well, I don't think what you say here is really fair. Before the DT was
-in place, unless I missed it, there was no standard way of letting the
-bootloader pass MAC addresses to the kernel. And Marvell's development
-on those Armada 370/XP platforms predates the introduction of the
-Device Tree in the Linux kernel (the code we have originally been give
-was a 2.6.3x), so it's really not their fault to not have a DT-capable
-bootloader at this point.
+> In addition to this, the watchdog driver also pokes into some other
+> registers, such as BRIDGE_CAUSE and RSTOUTn_MASK.
 
-The ARM_APPENDED_DTB and ARM_ATAG_DTB_COMPAT thing were added precisely
-for this situation: the hardware platform was designed at a time where
-the DT was not yet used/widespread on ARM, so the bootloaders for those
-hardware platforms is not DT-capable. What I'm proposing here is a
-minimally intrusive extension of this idea, in the exact same scenario.
+As you can see above, watchdog should depend on chained interrupts but
+current implementation doesn't but clears itself in BRIDGE_CAUSE.
+Current non-DT timer also does (thread unsafe).
 
-Moving from the ATAG-based boot method to the DT-based method was a
-mainline decision, and pragmatically, we should give SoC vendors enough
-time to switch their entire boot infrastructure to this new boot
-protocol. This is why ARM_APPENDED_DTB was created in the first place.
-So please don't put the entire fault on Marvell on this one :)
+DT timer depends on the chained irq handler introduced with this patch
+set. So for the interrupt, watchdog should also depend on the chained
+irq handler to clear wdt irq.
 
-Marvell will release a DT-capable U-Boot in some time, that will
-properly adjust the MAC addresses in the DTB before handing it over to
-the kernel. We are currently working with Marvell to define which
-actions the bootloader should do on the DTB before handing it over to
-the kernel. I believe this is a sufficient proof that there is no
-laziness from Marvell's side and that things are progressing towards a
-full DT based boot protocol.
+Access to TIMER_CTRL should be made thread safe. I suggest to put that
+common code into orion clocksource as it will be always compiled in
+while wdt is optional.
 
-But in the mean time, just like we have this ARM_APPENDED_DTB and
-ARM_ATAG_DTB_COMPAT workarounds, I thought we could do the same to
-allow platform-specific code to parse some platform-specific ATAGs.
-That would be so much better for the current users of Armada 370 and
-Armada XP platforms.
+> As we want to bring watchdog support for Armada 370/XP, I'm wondering
+> if we should fix those problems, and if yes, how:
+>
+>   (1) The timer driver is also responsible for handling the watchdog
+>       (probably the easiest solution)
 
-> If I were you I'd try to bring the bootloader into conformance instead.  
-> That can be achieved in many ways:
-> 
-> First, you should try to add support for older platforms into mainline 
-> U-Boot.  That's always the preferable option.
-> 
-> The next best option is to get the Marvell U-Boot source code (U-Boot is 
-> GPL so the source must be available) and add minimal DT support to 
-> it.
+Well, there is drivers/watchdog where current (Orion) wdt is located.
+I guess it should stay there. For Armada 370/XP I guess it will need
+to clear the watchdog events in common timer registers as for the timer
+events? That is why I didn't merge Orion clocksource into Armada 370/XP
+clocksource because we would have to check for Orion/Armada 370/XP on
+every timer event.
 
-As I mentioned earlier, Marvell is going to release one relatively soon.
+>   (2) Have some sort of 'common code' between the timer driver and the
+>       watchdog driver to control the access to the shared TIMER_CTRL
+>       register.
 
-Thanks,
+Yes. Both should call a common thread-safe timer_en(num) at least.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+>   (3) Something else.
+>
+> And this still does not solve the access to BRIDGE_CAUSE and
+> RSTOUTn_MASK.
+
+BRIDGE_CAUSE is taken care of by making wdt depend on chained irq
+handler.. RSTOUTn_MASK is only used by current common code on reset,
+maybe there is an API for that I have missed yet. But both reset and
+watchdog will ultimately cause a reset - maybe we can accept that for
+now.
+
+Sebastian
