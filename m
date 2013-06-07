@@ -1,52 +1,74 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  7 Jun 2013 19:07:50 -0300
-Subject: [PATCH] ARM: mach-imx6q: Enable the codec clock earlier
-Message-ID: <1370642870-8051-1-git-send-email-festevam@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 8 Jun 2013 00:08:53 +0200
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1733666.lHUBcfUXq9@flatron> <20130606112723.71ddd70c@skate>
+ <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
+Message-ID: <20130607220853.GR14209@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@freescale.com>
+On Fri, Jun 07, 2013 at 07:26:49PM +0100, luke.leighton wrote:
+>  maxime: we need to talk :)
+> 
+>  please tell me in 4 or 5 sentences what you've managed to do so far,
+> expanding a little on what thomas says below, more specifically what
+> it achieves and/or allows rather than technically what it does
+> (suitable for managers and directors in other words), and what plans
+> you'd like to see happen.
 
-In order sgtl5000 driver to probe successfully, we need to read its ID via I2C 
-,which requires that MCLK is driven prior to the I2C access.
+You mean something like http://linux-sunxi.org/Linux_mainlining_effort ?
 
-Otherwise we get the following probe error:
+You should really do a bit of research before starting a thread like
+this one. This webpage has been around for like 9 monthes now on the wiki 
+of a community you pretend to represent (even though I fail to get how
+you can pretend such thing, but that's another topic).
 
-sgtl5000: probe of 0-000a failed with error -5
-imx-sgtl5000 sound.13: ASoC: CODEC (null) not registered
-imx-sgtl5000 sound.13: snd_soc_register_card failed (-517)
-platform sound.13: Driver imx-sgtl5000 requests probe deferral
+> > is the maintainer of the mainline Allwinner sunxi
+> > effort. It already supports a number of boards, has a pinctrl driver, a
+> > GPIO driver, serial port is working, network is working, I2C is
+> > working.
+> >
+> > All in mainline, completely Device Tree based.
+> 
+>  great.  which version did it first hit, i.e. what will the first
+> signs of this be when allwinner begin doing "git pulls"?
 
-Turn on MCLK sooner so that the probe can succeed.
+3.8, as shown in the wiki page
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-This issue is seen on linux-next tree
+>  and which boards.  bear in mind that one of those "boards" should
+> really be "the total range of products available across hundreds of
+> chinese tablet clone manufacturers".
+> 
+>  specific question: is one of the "boards" the one that tom cubie
+> submitted, which covers virtually every android tablet product
+> manufactured in the millions by chinese tablet clone manufacturers?
 
- arch/arm/mach-imx/mach-imx6q.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Again, wiki.
 
-diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
-index 045e5e3..034f4d2 100644
---- a/arch/arm/mach-imx/mach-imx6q.c
-+++ b/arch/arm/mach-imx/mach-imx6q.c
-@@ -118,6 +118,7 @@ static void __init imx6q_sabrelite_cko1_setup(void)
- {
- 	struct clk *cko1_sel, *ahb, *cko1;
- 	unsigned long rate;
-+	int ret;
- 
- 	cko1_sel = clk_get_sys(NULL, "cko1_sel");
- 	ahb = clk_get_sys(NULL, "ahb");
-@@ -129,6 +130,9 @@ static void __init imx6q_sabrelite_cko1_setup(void)
- 	clk_set_parent(cko1_sel, ahb);
- 	rate = clk_round_rate(cko1, 16000000);
- 	clk_set_rate(cko1, rate);
-+	ret = clk_prepare_enable(cko1);
-+	if (ret)
-+		pr_err("enabling clko1 failed: %d", ret);
- put_clk:
- 	if (!IS_ERR(cko1_sel))
- 		clk_put(cko1_sel);
--- 
-1.8.1.2
+> > So isn't this entire discussion completely moot?
+> 
+>  no because it's totally in isolation from allwinner.  i need to give
+> them a heads-up, and get them involved, giving them specific
+> incentives [which nobody's yet given!!] for following a particular
+> path [or paths] yet to be recommended.
+> 
+> > The mainline support
+> > for sunxi has already started since 6 months or so, and has been Device
+> > Tree based from day one.
+> 
+> to clarify: the *community-driven* mainline support for sunxi.  ok -
+> which chips?  sun3i (ARM9), sun4i (Cortex A8), sun5i, sun6i and sun7i
+> (Dual-Core Cortex A7)?  which ones are in?
+
+A10, A13 for the moment. I just received hardware with A10s, A20 and A31
+that I need to work on, but support should come quite soon. I already
+have some patches pending to be tested on an A31 board, but didn't have
+as much time as I wanted lately to actually set a proper environment to
+test them.
+
+Maxime
