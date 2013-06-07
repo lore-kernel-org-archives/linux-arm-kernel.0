@@ -1,28 +1,29 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 17:19:40 +0200
-Subject: [RFC PATCH 15/50] ARM: at91: move at91sam9261 SoC to new at91 clk
+Date: Fri,  7 Jun 2013 17:20:40 +0200
+Subject: [RFC PATCH 16/50] ARM: at91: move at91sam9263 SoC to new at91 clk
  implem
 In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
 References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370618380-18526-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370618440-18570-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes all references to the old at91 clks implementation and
-make use of the new at91 clk implem for at91sam9261 SoC.
 
-All dt specific lookups are removed (handled in clk device tree binding).
+This patch removes all references to the old at91 clks implementation and
+make use of the new at91 clk implem for at91sam9263 SoC.
+
+All dt specific lookups are removed (handled in clk device tree binding).  
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/mach-at91/at91sam9261.c |  579 +++++++++++++++++++++++++-------------
- 1 file changed, 383 insertions(+), 196 deletions(-)
+ arch/arm/mach-at91/at91sam9263.c |  597 +++++++++++++++++++++++---------------
+ 1 file changed, 368 insertions(+), 229 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
-index 8a63b81..ccc2bcc 100644
---- a/arch/arm/mach-at91/at91sam9261.c
-+++ b/arch/arm/mach-at91/at91sam9261.c
-@@ -25,7 +25,6 @@
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 77b3c24..b22ec26 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -24,7 +24,6 @@
  #include "at91_rstc.h"
  #include "soc.h"
  #include "generic.h"
@@ -30,163 +31,198 @@ index 8a63b81..ccc2bcc 100644
  #include "sam9_smc.h"
  
  /* --------------------------------------------------------------------
-@@ -35,216 +34,404 @@
+@@ -34,248 +33,388 @@
  /*
   * The peripheral clocks.
   */
 -static struct clk pioA_clk = {
 -	.name		= "pioA_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_PIOA,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_PIOA,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk pioB_clk = {
 -	.name		= "pioB_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_PIOB,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_PIOB,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--static struct clk pioC_clk = {
--	.name		= "pioC_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_PIOC,
+-static struct clk pioCDE_clk = {
+-	.name		= "pioCDE_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_PIOCDE,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk usart0_clk = {
 -	.name		= "usart0_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_US0,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_US0,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk usart1_clk = {
 -	.name		= "usart1_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_US1,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_US1,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk usart2_clk = {
 -	.name		= "usart2_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_US2,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_US2,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--static struct clk mmc_clk = {
--	.name		= "mci_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_MCI,
+-static struct clk mmc0_clk = {
+-	.name		= "mci0_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_MCI0,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--static struct clk udc_clk = {
--	.name		= "udc_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_UDP,
+-static struct clk mmc1_clk = {
+-	.name		= "mci1_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_MCI1,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk can_clk = {
+-	.name		= "can_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_CAN,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk twi_clk = {
 -	.name		= "twi_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_TWI,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_TWI,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk spi0_clk = {
 -	.name		= "spi0_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_SPI0,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_SPI0,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk spi1_clk = {
 -	.name		= "spi1_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_SPI1,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_SPI1,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk ssc0_clk = {
 -	.name		= "ssc0_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_SSC0,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_SSC0,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk ssc1_clk = {
 -	.name		= "ssc1_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_SSC1,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_SSC1,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--static struct clk ssc2_clk = {
--	.name		= "ssc2_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_SSC2,
+-static struct clk ac97_clk = {
+-	.name		= "ac97_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_AC97C,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--static struct clk tc0_clk = {
--	.name		= "tc0_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_TC0,
+-static struct clk tcb_clk = {
+-	.name		= "tcb_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_TCB,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--static struct clk tc1_clk = {
--	.name		= "tc1_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_TC1,
+-static struct clk pwm_clk = {
+-	.name		= "pwm_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_PWMC,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--static struct clk tc2_clk = {
--	.name		= "tc2_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_TC2,
+-static struct clk macb_clk = {
+-	.name		= "pclk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_EMAC,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--static struct clk ohci_clk = {
--	.name		= "ohci_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_UHP,
+-static struct clk dma_clk = {
+-	.name		= "dma_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_DMA,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk twodge_clk = {
+-	.name		= "2dge_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_2DGE,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk udc_clk = {
+-	.name		= "udc_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_UDP,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk isi_clk = {
+-	.name		= "isi_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_ISI,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -static struct clk lcdc_clk = {
 -	.name		= "lcdc_clk",
--	.pmc_mask	= 1 << AT91SAM9261_ID_LCDC,
+-	.pmc_mask	= 1 << AT91SAM9263_ID_LCDC,
 -	.type		= CLK_TYPE_PERIPHERAL,
 -};
--
--/* HClocks */
--static struct clk hck0 = {
--	.name		= "hck0",
--	.pmc_mask	= AT91_PMC_HCK0,
--	.type		= CLK_TYPE_SYSTEM,
--	.id		= 0,
--};
--static struct clk hck1 = {
--	.name		= "hck1",
--	.pmc_mask	= AT91_PMC_HCK1,
--	.type		= CLK_TYPE_SYSTEM,
--	.id		= 1,
+-static struct clk ohci_clk = {
+-	.name		= "ohci_clk",
+-	.pmc_mask	= 1 << AT91SAM9263_ID_UHP,
+-	.type		= CLK_TYPE_PERIPHERAL,
 -};
 -
 -static struct clk *periph_clocks[] __initdata = {
 -	&pioA_clk,
 -	&pioB_clk,
--	&pioC_clk,
+-	&pioCDE_clk,
 -	&usart0_clk,
 -	&usart1_clk,
 -	&usart2_clk,
--	&mmc_clk,
--	&udc_clk,
+-	&mmc0_clk,
+-	&mmc1_clk,
+-	&can_clk,
 -	&twi_clk,
 -	&spi0_clk,
 -	&spi1_clk,
 -	&ssc0_clk,
 -	&ssc1_clk,
--	&ssc2_clk,
--	&tc0_clk,
--	&tc1_clk,
--	&tc2_clk,
--	&ohci_clk,
+-	&ac97_clk,
+-	&tcb_clk,
+-	&pwm_clk,
+-	&macb_clk,
+-	&twodge_clk,
+-	&udc_clk,
+-	&isi_clk,
 -	&lcdc_clk,
--	// irq0 .. irq2
+-	&dma_clk,
+-	&ohci_clk,
+-	// irq0 .. irq1
 -};
 -
 -static struct clk_lookup periph_clocks_lookups[] = {
--	CLKDEV_CON_DEV_ID("hclk", "at91sam9261-lcdfb.0", &hck1),
--	CLKDEV_CON_DEV_ID("hclk", "at91sam9g10-lcdfb.0", &hck1),
--	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
--	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
--	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
+-	/* One additional fake clock for macb_hclk */
+-	CLKDEV_CON_ID("hclk", &macb_clk),
 -	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.0", &ssc0_clk),
 -	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.1", &ssc1_clk),
--	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.2", &ssc2_clk),
--	CLKDEV_CON_DEV_ID("pclk", "fffbc000.ssc", &ssc0_clk),
--	CLKDEV_CON_DEV_ID("pclk", "fffc0000.ssc", &ssc1_clk),
--	CLKDEV_CON_DEV_ID("pclk", "fffc4000.ssc", &ssc2_clk),
--	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &hck0),
--	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9261.0", &twi_clk),
--	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g10.0", &twi_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "fff98000.ssc", &ssc0_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "fff9c000.ssc", &ssc1_clk),
+-	CLKDEV_CON_DEV_ID("hclk", "at91sam9263-lcdfb.0", &lcdc_clk),
+-	CLKDEV_CON_DEV_ID("mci_clk", "atmel_mci.0", &mmc0_clk),
+-	CLKDEV_CON_DEV_ID("mci_clk", "atmel_mci.1", &mmc1_clk),
+-	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
+-	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
+-	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9260.0", &twi_clk),
+-	/* fake hclk clock */
+-	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &ohci_clk),
 -	CLKDEV_CON_ID("pioA", &pioA_clk),
 -	CLKDEV_CON_ID("pioB", &pioB_clk),
--	CLKDEV_CON_ID("pioC", &pioC_clk),
+-	CLKDEV_CON_ID("pioC", &pioCDE_clk),
+-	CLKDEV_CON_ID("pioD", &pioCDE_clk),
+-	CLKDEV_CON_ID("pioE", &pioCDE_clk),
+-	/* more usart lookup table for DT entries */
+-	CLKDEV_CON_DEV_ID("usart", "ffffee00.serial", &mck),
+-	CLKDEV_CON_DEV_ID("usart", "fff8c000.serial", &usart0_clk),
+-	CLKDEV_CON_DEV_ID("usart", "fff90000.serial", &usart1_clk),
+-	CLKDEV_CON_DEV_ID("usart", "fff94000.serial", &usart2_clk),
+-	/* more tc lookup table for DT entries */
+-	CLKDEV_CON_DEV_ID("t0_clk", "fff7c000.timer", &tcb_clk),
+-	CLKDEV_CON_DEV_ID("hclk", "a00000.ohci", &ohci_clk),
+-	CLKDEV_CON_DEV_ID("spi_clk", "fffa4000.spi", &spi0_clk),
+-	CLKDEV_CON_DEV_ID("spi_clk", "fffa8000.spi", &spi1_clk),
+-	CLKDEV_CON_DEV_ID("mci_clk", "fff80000.mmc", &mmc0_clk),
+-	CLKDEV_CON_DEV_ID("mci_clk", "fff84000.mmc", &mmc1_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fff88000.i2c", &twi_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffff200.gpio", &pioA_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioB_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioCDE_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCDE_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCDE_clk),
 -};
 -
 -static struct clk_lookup usart_clocks_lookups[] = {
@@ -204,9 +240,11 @@ index 8a63b81..ccc2bcc 100644
 +	CLKDEV_INIT(NULL, "pioB", NULL),
 +};
 +
-+static struct clk_lookup pioC_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "pioB_clk", NULL),
-+	CLKDEV_INIT(NULL, "pioB", NULL),
++static struct clk_lookup pioCDE_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pioCDE_clk", NULL),
++	CLKDEV_INIT(NULL, "pioC", NULL),
++	CLKDEV_INIT(NULL, "pioD", NULL),
++	CLKDEV_INIT(NULL, "pioE", NULL),
 +};
 +
 +static struct clk_lookup usart0_clk_lookup[] = {
@@ -224,18 +262,23 @@ index 8a63b81..ccc2bcc 100644
 +	CLKDEV_INIT("atmel_usart.3", "usart", NULL),
 +};
 +
-+static struct clk_lookup mci_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "mci_clk", NULL),
++static struct clk_lookup mci0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "mci0_clk", NULL),
++	CLKDEV_INIT("atmel_mci.0", "mci_clk", NULL),
 +};
 +
-+static struct clk_lookup udc_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "udc_clk", NULL),
++static struct clk_lookup mci1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "mci1_clk", NULL),
++	CLKDEV_INIT("atmel_mci.1", "mci_clk", NULL),
++};
++
++static struct clk_lookup can_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "can_clk", NULL),
 +};
 +
 +static struct clk_lookup twi_clk_lookup[] = {
 +	CLKDEV_INIT(NULL, "twi_clk", NULL),
-+	CLKDEV_INIT("i2c-at91sam9261.0", NULL, NULL),
-+	CLKDEV_INIT("i2c-at91sam9g10.0", NULL, NULL),
++	CLKDEV_INIT("i2c-at91sam9260.0", NULL, NULL),
 +};
 +
 +static struct clk_lookup spi0_clk_lookup[] = {
@@ -258,32 +301,48 @@ index 8a63b81..ccc2bcc 100644
 +	CLKDEV_INIT("at91rm9200_ssc.1", "pclk", NULL),
 +};
 +
-+static struct clk_lookup ssc2_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "ssc2_clk", NULL),
-+	CLKDEV_INIT("at91rm9200_ssc.2", "pclk", NULL),
++static struct clk_lookup ac97_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ac97_clk", NULL),
 +};
 +
-+static struct clk_lookup tc0_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "tc0_clk", NULL),
++static struct clk_lookup tcb_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tcb_clk", NULL),
 +	CLKDEV_INIT("atmel_tcb.0", "t0_clk", NULL),
 +};
 +
-+static struct clk_lookup tc1_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "tc1_clk", NULL),
-+	CLKDEV_INIT("atmel_tcb.0", "t1_clk", NULL),
++static struct clk_lookup pwm_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pwm_clk", NULL),
 +};
 +
-+static struct clk_lookup tc2_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "tc2_clk", NULL),
-+	CLKDEV_INIT("atmel_tcb.2", "t2_clk", NULL),
++static struct clk_lookup macb_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pclk", NULL),
++	CLKDEV_INIT(NULL, "hclk", NULL),
 +};
 +
-+static struct clk_lookup ohci_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "ohci_clk", NULL),
++static struct clk_lookup twodge_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "2dge_clk", NULL),
++};
++
++static struct clk_lookup udc_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "udc_clk", NULL),
++};
++
++static struct clk_lookup isi_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "isi_clk", NULL),
 +};
 +
 +static struct clk_lookup lcdc_clk_lookup[] = {
 +	CLKDEV_INIT(NULL, "lcdc_clk", NULL),
++	CLKDEV_INIT("at91sam9263-lcdfb.0", "hclk", NULL),
++};
++
++static struct clk_lookup dma_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "dma_clk", NULL),
++};
++
++static struct clk_lookup ohci_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ohci_clk", NULL),
++	CLKDEV_INIT("at91_ohci", "hclk", NULL),
 +};
 +
 +static size_t periph_clock_lookup_sizes[] __initdata = {
@@ -291,24 +350,32 @@ index 8a63b81..ccc2bcc 100644
 +	0,
 +	ARRAY_SIZE(pioA_clk_lookup),
 +	ARRAY_SIZE(pioB_clk_lookup),
-+	ARRAY_SIZE(pioC_clk_lookup),
++	ARRAY_SIZE(pioCDE_clk_lookup),
++	0,
 +	0,
 +	ARRAY_SIZE(usart0_clk_lookup),
 +	ARRAY_SIZE(usart1_clk_lookup),
 +	ARRAY_SIZE(usart2_clk_lookup),
-+	ARRAY_SIZE(mci_clk_lookup),
-+	ARRAY_SIZE(udc_clk_lookup),
++	ARRAY_SIZE(mci0_clk_lookup),
++	ARRAY_SIZE(mci1_clk_lookup),
++	ARRAY_SIZE(can_clk_lookup),
 +	ARRAY_SIZE(twi_clk_lookup),
 +	ARRAY_SIZE(spi0_clk_lookup),
 +	ARRAY_SIZE(spi1_clk_lookup),
 +	ARRAY_SIZE(ssc0_clk_lookup),
 +	ARRAY_SIZE(ssc1_clk_lookup),
-+	ARRAY_SIZE(ssc2_clk_lookup),
-+	ARRAY_SIZE(tc0_clk_lookup),
-+	ARRAY_SIZE(tc1_clk_lookup),
-+	ARRAY_SIZE(tc2_clk_lookup),
-+	ARRAY_SIZE(ohci_clk_lookup),
++	ARRAY_SIZE(ac97_clk_lookup),
++	ARRAY_SIZE(tcb_clk_lookup),
++	ARRAY_SIZE(pwm_clk_lookup),
++	ARRAY_SIZE(macb_clk_lookup),
++	0,
++	ARRAY_SIZE(twodge_clk_lookup),
++	ARRAY_SIZE(udc_clk_lookup),
++	ARRAY_SIZE(isi_clk_lookup),
 +	ARRAY_SIZE(lcdc_clk_lookup),
++	ARRAY_SIZE(dma_clk_lookup),
++	0,
++	ARRAY_SIZE(ohci_clk_lookup),
 +};
 +
 +static struct clk_lookup *periph_clock_lookups[] __initdata = {
@@ -316,24 +383,32 @@ index 8a63b81..ccc2bcc 100644
 +	NULL,
 +	pioA_clk_lookup,
 +	pioB_clk_lookup,
-+	pioC_clk_lookup,
++	pioCDE_clk_lookup,
++	NULL,
 +	NULL,
 +	usart0_clk_lookup,
 +	usart1_clk_lookup,
 +	usart2_clk_lookup,
-+	mci_clk_lookup,
-+	udc_clk_lookup,
++	mci0_clk_lookup,
++	mci1_clk_lookup,
++	can_clk_lookup,
 +	twi_clk_lookup,
 +	spi0_clk_lookup,
 +	spi1_clk_lookup,
 +	ssc0_clk_lookup,
 +	ssc1_clk_lookup,
-+	ssc2_clk_lookup,
-+	tc0_clk_lookup,
-+	tc1_clk_lookup,
-+	tc2_clk_lookup,
-+	ohci_clk_lookup,
++	ac97_clk_lookup,
++	tcb_clk_lookup,
++	pwm_clk_lookup,
++	macb_clk_lookup,
++	NULL,
++	twodge_clk_lookup,
++	udc_clk_lookup,
++	isi_clk_lookup,
 +	lcdc_clk_lookup,
++	dma_clk_lookup,
++	NULL,
++	ohci_clk_lookup,
 +};
 +
 +
@@ -364,17 +439,6 @@ index 8a63b81..ccc2bcc 100644
 +	CLKDEV_INIT(NULL, "pck3", NULL),
 +};
 +
-+static struct clk_lookup hck0_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "hck0", NULL),
-+	CLKDEV_INIT("at91_ohci", "hclk", NULL),
-+};
-+
-+static struct clk_lookup hck1_clk_lookup[] = {
-+	CLKDEV_INIT(NULL, "hck1", NULL),
-+	CLKDEV_INIT("at91sam9261-lcdfb.0", "hclk", NULL),
-+	CLKDEV_INIT("at91sam9g10-lcdfb.0", "hclk", NULL),
-+};
-+
 +static size_t system_clock_lookup_sizes[] __initdata = {
 +	0,
 +	0,
@@ -388,12 +452,6 @@ index 8a63b81..ccc2bcc 100644
 +	ARRAY_SIZE(pck1_clk_lookup),
 +	ARRAY_SIZE(pck2_clk_lookup),
 +	ARRAY_SIZE(pck3_clk_lookup),
-+	0,
-+	0,
-+	0,
-+	0,
-+	ARRAY_SIZE(hck0_clk_lookup),
-+	ARRAY_SIZE(hck1_clk_lookup),
 +};
 +
 +static struct clk_lookup *system_clock_lookups[] __initdata = {
@@ -409,12 +467,6 @@ index 8a63b81..ccc2bcc 100644
 +	pck1_clk_lookup,
 +	pck2_clk_lookup,
 +	pck3_clk_lookup,
-+	NULL,
-+	NULL,
-+	NULL,
-+	NULL,
-+	hck0_clk_lookup,
-+	hck1_clk_lookup,
 +};
 +
 +static const char *system_clock_parent_names[] __initdata = {
@@ -430,12 +482,6 @@ index 8a63b81..ccc2bcc 100644
 +	"prog1",
 +	"prog2",
 +	"prog3",
-+	NULL,
-+	NULL,
-+	NULL,
-+	NULL,
-+	"mck",
-+	"mck",
  };
  
  /*
@@ -472,6 +518,7 @@ index 8a63b81..ccc2bcc 100644
 +	"pllb",
 +};
 +
++
 +/*
 + * The pll clocks.
 + */
@@ -480,29 +527,23 @@ index 8a63b81..ccc2bcc 100644
 +	CLKDEV_INIT(NULL, "pllb", NULL),
 +};
 +
-+static struct clk_range at91sam9261_pll_output[] = {
++static struct clk_range at91sam9263_pll_output[] = {
 +	CLK_RANGE(80000000, 200000000),
 +	CLK_RANGE(190000000, 240000000),
 +};
-+static u8 at91sam9261_pll_out[] = {0, 2};
++static u8 at91sam9263_pll_out[] = {0, 2};
 +
-+struct clk_pll_characteristics at91sam9261_pll_characteristics = {
-+	.input = CLK_RANGE(1000000, 32000000),
-+	.num_output = ARRAY_SIZE(at91sam9261_pll_output),
-+	.output = at91sam9261_pll_output,
-+	.out = at91sam9261_pll_out,
++struct clk_pll_characteristics at91sam9263_pll_characteristics = {
++	.input = CLK_RANGE(2000000, 32000000),
++	.num_output = ARRAY_SIZE(at91sam9263_pll_output),
++	.output = at91sam9263_pll_output,
++	.out = at91sam9263_pll_out,
 +};
 +
-+static struct clk_range at91sam9g10_pll_output[] = {
-+	CLK_RANGE(80000000, 266000000),
-+};
-+static u8 at91sam9g10_pll_out[] = {0};
-+
-+struct clk_pll_characteristics at91sam9g10_pll_characteristics = {
-+	.input = CLK_RANGE(1000000, 32000000),
-+	.num_output = ARRAY_SIZE(at91sam9g10_pll_output),
-+	.output = at91sam9g10_pll_output,
-+	.out = at91sam9g10_pll_out,
++struct clk_master_characteristics at91sam9263_master_characteristics = {
++	.output = CLK_RANGE(0, 120000000),
++	.have_div3_pres = 0,
++	.divisors = {1, 2, 4, 0},
 +};
 +
 +
@@ -512,18 +553,6 @@ index 8a63b81..ccc2bcc 100644
 +static struct clk_lookup mck_clk_lookup[] = {
 +	CLKDEV_INIT(NULL, "mck", NULL),
 +	CLKDEV_INIT("atmel_usart.0", "usart", NULL),
-+};
-+
-+struct clk_master_characteristics at91sam9261_master_characteristics = {
-+	.output = CLK_RANGE(0, 94000000),
-+	.have_div3_pres = 0,
-+	.divisors = {1, 2, 4, 0},
-+};
-+
-+struct clk_master_characteristics at91sam9g10_master_characteristics = {
-+	.output = CLK_RANGE(0, 133000000),
-+	.have_div3_pres = 0,
-+	.divisors = {1, 2, 4, 0},
  };
  
 +static const char *master_clock_parent_names[] __initdata = {
@@ -533,12 +562,13 @@ index 8a63b81..ccc2bcc 100644
 +	"pllb",
 +};
 +
++
 +/*
 + * The USB clock.
 + */
 +static u32 usb_divisors[] = {1, 2, 4, 0};
 +
- static void __init at91sam9261_register_clocks(void)
+ static void __init at91sam9263_register_clocks(void)
  {
  	int i;
 +	int k;
@@ -546,24 +576,12 @@ index 8a63b81..ccc2bcc 100644
 +	struct clk *clk;
 +	const char *name;
 +	struct clk_lookup *lookup;
-+	struct clk_pll_characteristics *pll_characteristics;
-+	struct clk_master_characteristics *master_characteristics;
 +
-+	if (cpu_is_at91sam9g10()) {
-+		pll_characteristics = &at91sam9g10_pll_characteristics;
-+		master_characteristics = &at91sam9g10_master_characteristics;
-+	} else {
-+		pll_characteristics = &at91sam9261_pll_characteristics;
-+		master_characteristics = &at91sam9261_master_characteristics;
-+	}
- 
--	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
--		clk_register(periph_clocks[i]);
 +	for (i = 0; i < ARRAY_SIZE(pll_clk_lookup); i++) {
 +		name = pll_clk_lookup[i].con_id;
 +		clk = at91_clk_register_pll(name, "main", i,
 +					    &at91rm9200_pll_layout,
-+					    &pll_characteristics[i]);
++					    &at91sam9263_pll_characteristics);
 +		pll_clk_lookup[i].clk = clk;
 +	}
 +	clkdev_add_table(pll_clk_lookup, ARRAY_SIZE(pll_clk_lookup));
@@ -572,15 +590,13 @@ index 8a63b81..ccc2bcc 100644
 +				       ARRAY_SIZE(master_clock_parent_names),
 +				       master_clock_parent_names,
 +				       &at91rm9200_master_layout,
-+				       master_characteristics);
++				       &at91sam9263_master_characteristics);
 +	for (i = 0; i < ARRAY_SIZE(mck_clk_lookup); i++)
 +		mck_clk_lookup[i].clk = clk;
 +	clkdev_add_table(mck_clk_lookup, ARRAY_SIZE(mck_clk_lookup));
  
--	clkdev_add_table(periph_clocks_lookups,
--			 ARRAY_SIZE(periph_clocks_lookups));
--	clkdev_add_table(usart_clocks_lookups,
--			 ARRAY_SIZE(usart_clocks_lookups));
+-	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+-		clk_register(periph_clocks[i]);
 +	for (i = 0; i < ARRAY_SIZE(periph_clock_lookup_sizes); i++) {
 +		size = periph_clock_lookup_sizes[i];
 +		lookup = periph_clock_lookups[i];
@@ -591,17 +607,19 @@ index 8a63b81..ccc2bcc 100644
 +			continue;
 +		clk = at91_clk_register_peripheral(name, "mck", i);
  
--	clk_register(&pck0);
--	clk_register(&pck1);
--	clk_register(&pck2);
--	clk_register(&pck3);
+-	clkdev_add_table(periph_clocks_lookups,
+-			 ARRAY_SIZE(periph_clocks_lookups));
+-	clkdev_add_table(usart_clocks_lookups,
+-			 ARRAY_SIZE(usart_clocks_lookups));
 +		for (k = 0; k < size; k++)
 +			lookup[k].clk = clk;
 +		clkdev_add_table(lookup, size);
 +	}
  
--	clk_register(&hck0);
--	clk_register(&hck1);
+-	clk_register(&pck0);
+-	clk_register(&pck1);
+-	clk_register(&pck2);
+-	clk_register(&pck3);
 +	for (i = 0; i < 4; i++) {
 +		name = system_clock_parent_names[8 + i];
 +		clk = at91_clk_register_programmable(name,
