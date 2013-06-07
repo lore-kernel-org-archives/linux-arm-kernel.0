@@ -1,36 +1,22 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Jun 2013 21:21:58 +0200
+Date: Fri, 7 Jun 2013 21:22:12 +0200
 Subject: [PATCH] cpuidle: fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency
  warning
-In-Reply-To: <51B21D65.3040604@ti.com>
+In-Reply-To: <1370626856-2876-1-git-send-email-daniel.lezcano@linaro.org>
 References: <1370626856-2876-1-git-send-email-daniel.lezcano@linaro.org>
- <51B21D65.3040604@ti.com>
-Message-ID: <201306072121.58719.arnd@arndb.de>
+Message-ID: <201306072122.12369.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013, Santosh Shilimkar wrote:
-> > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> > index f49cd51..831e89e 100644
-> > --- a/arch/arm/mach-omap2/Kconfig
-> > +++ b/arch/arm/mach-omap2/Kconfig
-> > @@ -83,7 +83,7 @@ config ARCH_OMAP4
-> >       depends on ARCH_OMAP2PLUS
-> >       depends on ARCH_MULTI_V7
-> >       select ARCH_HAS_OPP
-> > -     select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
-> > +     select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
->
-> I remember Colin mentioning about above dependency is taken care
-> already in design [1]
+On Friday 07 June 2013, Daniel Lezcano wrote:
+> Before the commit d6f346f2d2bf511c2c59176121a6e42ce60173a0, the
+> ARCH_NEEDS_CPU_IDLE_COUPLED option was wrongly not depending on the CPU_IDLE
+> and the Kconfig for OMAP / TEGRA was not checking this dependency when setting
+> the option.
+> 
+> With this patch, the ARCH_NEEDS_CPU_IDLE_COUPLED has been moved under the
+> CPU_IDLE option. The dependency has been fixed in the relevant arch's Kconfig.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-It's a matter of how it gets represented in Kconfig. Right now 
-the ARCH_NEEDS_CPU_IDLE_COUPLED symbol has a dependency on CPU_IDLE,
-so we cannot select it if CPU_IDLE is not set (or get a build time
-warning).
-
-I originally suggested removing the dependency, but Daniel preferred
-to leave it there as an explicit dependency so it is required to
-do this change instead.
-
-	Arnd
+Acked-by: Arnd Bergmann <arnd@arndb.de>
