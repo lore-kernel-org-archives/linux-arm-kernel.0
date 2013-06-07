@@ -1,271 +1,72 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 16:24:19 +0200
-Subject: [RFC PATCH 11/50] ARM: at91: add PMC clk device tree binding doc.
-In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370615115-16979-12-git-send-email-b.brezillon@overkiz.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 7 Jun 2013 10:44:06 -0400
+Subject: [PATCH] arm: mvebu: ensure PCIe range is propagated in the
+ .dts files
+In-Reply-To: <20130607103241.3f82d71d@skate>
+References: <1370510483-32419-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370510483-32419-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130606181159.GN23859@titan.lakedaemon.net>
+ <20130606190321.GQ23859@titan.lakedaemon.net>
+ <20130607103241.3f82d71d@skate>
+Message-ID: <20130607144406.GS23859@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the documentation of the dt bindings used by at91 clks.
+On Fri, Jun 07, 2013 at 10:32:41AM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Thu, 6 Jun 2013 15:03:21 -0400, Jason Cooper wrote:
+> 
+> > > Can you split this in to two patches, please:
+> > > 
+> > > >  arch/arm/boot/dts/armada-xp-db.dts               | 1 +
+> > > 
+> > > one for mvebu/dt
+> > > 
+> > > >  arch/arm/boot/dts/armada-xp-gp.dts               | 5 +++--
+> > > >  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 5 +++--
+> > > 
+> > > and one for mvebu/fixes?
+> > 
+> > Nevermind, I've got a few minutes and would like to get it in for the
+> > last -next this week.
+> 
+> I must admit I don't quite get why the patch had to be split. The three
+> chunks do exactly the same thing for the three boards.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- .../devicetree/bindings/clock/at91-clock.txt       |  247 ++++++++++++++++++++
- 1 file changed, 247 insertions(+)
+The _only_ purpose of for-next is to do integration testing against what
+everyone else has going on for the merge window.  There will never be a
+pull request for it.  As such, no patches ever get directly applied on
+top of it.  They need to go against an appropriate branch.
 
-diff --git a/Documentation/devicetree/bindings/clock/at91-clock.txt b/Documentation/devicetree/bindings/clock/at91-clock.txt
-new file mode 100644
-index 0000000..63c5d16
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/at91-clock.txt
-@@ -0,0 +1,247 @@
-+Device Tree Clock bindings for arch-at91
-+
-+This binding uses the common clock binding[1].
-+
-+[1] Documentation/devicetree/bindings/clock/clock-bindings.txt
-+
-+Required properties:
-+- compatible : shall be one of the following:
-+	"atmel,at91rm9200-clk-main":
-+		at91 main oscillator
-+
-+	"atmel,at91rm9200-clk-master" or
-+	"atmel,at91sam9x5-clk-master":
-+		at91 master clock
-+
-+	"atmel,at91sam9x5-clk-peripheral" or
-+	"atmel,at91rm9200-clk-peripheral":
-+		at91 peripheral clocks
-+
-+	"atmel,at91rm9200-clk-pll" or
-+	"atmel,at91sam9g45-clk-pll" or
-+	"atmel,at91sam9g20-clk-pllb" or
-+	"atmel,sama5d3-clk-pll":
-+		at91 pll clocks
-+
-+	"atmel,at91sam9x5-clk-plldiv":
-+		at91 plla divisor
-+
-+	"atmel,at91rm9200-clk-programmable" or
-+	"atmel,at91sam9g45-clk-programmable" or
-+	"atmel,at91sam9x5-clk-programmable":
-+		at91 programmable clocks
-+
-+	"atmel,at91sam9x5-clk-smd":
-+		at91 SMD (Soft Modem) clock
-+
-+	"atmel,at91rm9200-clk-system":
-+		at91 system clocks
-+
-+	"atmel,at91rm9200-clk-usb" or
-+	"atmel,at91sam9x5-clk-usb":
-+		at91 usb clock
-+
-+	"atmel,at91sam9x5-clk-utmi":
-+		at91 utmi clock
-+
-+
-+Required properties for main clock:
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks (optional if clock-frequency is provided) : shall be the slow clock
-+	phandle. This clock is used to compute the main clock rate if
-+	"clock-frequency" is not provided.
-+- clock-frequency: the main oscillator frequency.Prefer the use of
-+	"clock-frequency" over automatic clock rate computation.
-+
-+For example:
-+	main: mainck {
-+		compatible = "atmel,at91rm9200-clk-main";
-+		#clock-cells = <0>;
-+		clocks = <&ck32k>;
-+		clock-frequency = <18432000>;
-+	};
-+
-+Required properties for master clock:
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : shall be the master clock sources (see atmel datasheet) phandles.
-+	e.g. "<&ck32k>, <&main>, <&plla>, <&pllb>".
-+- characteristics : device tree node describing master clock characteristics.
-+	You can find these characteristics in atmel's SoC datasheets.
-+	* output : minimum and maximum clock frequency (two u32 fields).
-+		e.g. output = <0 133000000>; <=> 0 to 133MHz.
-+	* divisors : master clock divisors table (four u32 fields).
-+		0 <=> reserved value.
-+		e.g. divisors = <1 2 4 6>;
-+	* have-div3-pres : some SoC use the reserved value 7 in the PRES field
-+		as CLOCK_DIV3 (e.g sam9x5).
-+
-+For example:
-+	mck: mck {
-+		compatible = "atmel,at91rm9200-clk-master";
-+		#clock-cells = <0>;
-+		characteristics = {
-+			output = <0 133000000>;
-+			divisors = <1 2 4 0>;
-+		};
-+	};
-+
-+Required properties for peripheral clocks:
-+- #clock-cells : from common clock binding; shall be set to 1. The second cell
-+	is used to encode the peripheral id. Peripheral ids are defined in
-+	atmel's SoC datasheets.
-+- clocks : shall be the master clock phandle.
-+	e.g. clocks = <&mck>;
-+- ids : peripheral ids (u32 array).
-+- clock-output-names : name of clocks. These are the name used during clock
-+	registration.
-+- "default-divisors" (optional, only available for
-+	"atmel,at91sam9x5-clk-peripheral") : sam9x5 and sama5d3 SoC provides
-+	configurable peripheral clock divisors. If you define this property
-+	(u32 array), the default divisor will be applied when enabling
-+	peripheral clock. If not provided the peripheral clock is not divided.
-+
-+For example:
-+	periph: periphck {
-+		compatible = "atmel,at91sam9x5-clk-peripheral";
-+		#clock-cells = <1>;
-+		clocks = <&mck>;
-+		ids = <2 6 7>;
-+		clock-output-names = "pioA_clk", "pioB_clk", "pioB_clk";
-+		default-divisors = <1 2 2>;
-+	};
-+
-+
-+Required properties for pll clocks:
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : shall be the main clock phandle.
-+- id : pll id
-+	* 0 <=> plla
-+	* 1 <=> pllb
-+- characteristics : device tree node describing pll clock characteristics.
-+	You can find these characteristics in atmel's SoC datasheets.
-+	* input : minimum and maximum source clock frequency (two u32 fields).
-+		e.g. input = <1 32000000>; <=> 1 to 32MHz.
-+	* output : output frequency ranges.
-+	* out: out field value for output frequency ranges.
-+	* icpll (not available on some SoC): icpll field value for output
-+		frequency ranges.
-+
-+For example:
-+	plla: pllack {
-+		compatible = "atmel,at91sam9g45-clk-pll";
-+		#clock-cells = <0>;
-+		clocks = <&main>;
-+		id = <0>;
-+		input = <2000000 32000000>;
-+		output = <74500000 800000000
-+			  69500000 750000000
-+			  64500000 700000000
-+			  59500000 650000000
-+			  54500000 600000000
-+			  49500000 550000000
-+			  44500000 500000000
-+			  40000000 450000000>;
-+		out = <0 1 2 3 0 1 2 3>;
-+		icpll = <0 0 0 0 1 1 1 1>;
-+	};
-+
-+Required properties for plldiv clocks:
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : shall be the plla clock phandle.
-+
-+For example:
-+	plladiv: plladivck {
-+		compatible = "atmel,at91sam9x5-clk-plldiv";
-+		#clock-cells = <0>;
-+		clocks = <&plla>;
-+	};
-+
-+Required properties for programmable clocks:
-+- #clock-cells : from common clock binding; shall be set to 1. The second cell
-+	is used to encode the programmable clock id.
-+	Peripheral ids are in atmel's SoC
-+	datasheets.
-+- clocks : shall be the programmable clock source phandles.
-+	e.g. clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
-+- ids : programmable clock ids (u32 array).
-+- clock-output-names : name of clocks. These names are used during clock
-+	registration.
-+
-+For example:
-+	prog: progck {
-+		compatible = "atmel,at91sam9g45-clk-programmable";
-+		#clock-cells = <1>;
-+		ids = <0 1>;
-+		clocks = <&clk32k>, <&main>, <&plladiv>, <&utmi>, <&mck>;
-+		clock-output-names = "prog0", "prog1";
-+	};
-+
-+
-+Required properties for smd clock:
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : shall be the smd clock source phandles.
-+	e.g. clocks = <&plladiv>, <&utmi>;
-+
-+For example:
-+	smd: smdck {
-+		compatible = "atmel,at91sam9x5-clk-smd";
-+		#clock-cells = <0>;
-+		clocks = <&plladiv>, <&utmi>;
-+	};
-+
-+Required properties for system clocks:
-+- #clock-cells : from common clock binding; shall be set to 1. The second cell
-+	is used to encode the system clock id (bit used in SCER/SCDR register).
-+- clocks : shall be the system clock source phandle.
-+	e.g. clocks = <&usb>;
-+- ids : peripheral ids (u32 array).
-+- clock-output-names : name of clocks. These names are used during clock
-+	registration.
-+
-+For example:
-+	system: systemck {
-+		compatible = "atmel,at91rm9200-clk-system";
-+		#clock-cells = <1>;
-+		ids = <2 4 6 7 8 9 10>;
-+		clocks = <&mck>, <&smd>, <&usb>, <&usb>,
-+			 <&prog 0>, <&prog 1>, <&prog 2>;
-+		clock-output-names = "ddrck", "smdck", "uhpck", "udpck",
-+				     "pck0", "pck1", "pck2";
-+	};
-+
-+
-+Required properties for usb clock:
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : shall be the smd clock source phandles.
-+	e.g. clocks = <&pllb>;
-+- divisors (only available for "atmel,at91rm9200-clk-usb"):
-+	usb clock divisor table.
-+	e.g. divisors = <1 2 4 0>;
-+- usbs0-unused (only available for "atmel,at91sam9x5-clk-usb"):
-+	Some SoC (sam9n12) use usb source 0 to disable the usb clock.
-+
-+For example:
-+	usb: usbck {
-+		compatible = "atmel,at91sam9x5-clk-usb";
-+		#clock-cells = <0>;
-+		clocks = <&plladiv>, <&utmi>;
-+	};
-+
-+	usb: usbck {
-+		compatible = "atmel,at91rm9200-clk-usb";
-+		#clock-cells = <0>;
-+		clocks = <&pllb>;
-+		divisors = <1 2 4 0>;
-+	};
-+
-+
-+Required properties for utmi clock:
-+- #clock-cells : from common clock binding; shall be set to 0.
-+- clocks : shall be the main clock source phandle.
-+
-+For example:
-+	utmi: utmick {
-+		compatible = "atmel,at91sam9x5-clk-utmi";
-+		#clock-cells = <0>;
-+		clocks = <&main>;
-+	};
--- 
-1.7.9.5
+> The only difference is that the part touching armada-xp-gp and
+> armada-xp-openblocks-ax3-4 was also adding some comments for each
+> range, while the one for armada-xp-db didn't had to do it because the
+> comments were already there.
+> 
+> So really, the armada-xp-db change is as much of a "fix" than the two
+> other changes.
+> 
+> To be honest, as long as they all go in 3.11, I'm fine, but I'm just
+> curious as to why it would have had to be split.
+
+the patches in mvebu/fixes:
+
+  8eed481 arm: mvebu: fix the 'ranges' property to handle PCIe
+  c6c003a ARM: mvebu: Fix ranges entry on XP GP board
+  00ed4a0 ARM: mvebu: Add a ranges entry to translate devbus childs
+
+added the ranges property for openblocks-ax3-4, and the gp, but nothing
+for the db.  The patch
+
+  b484ff4 ARM: mvebu: Add support for NOR flash device on Armada XP-DB board
+
+went into mvebu/dt because it was adding new capability.
+
+So the choices are to make mvebu/dt depend on mvebu/fixes because of
+your patch, or to split the patch because there is no real dependency
+between the two changes.
+
+hth,
+
+Jason.
