@@ -1,102 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Jun 2013 20:59:40 +0200
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Fri, 7 Jun 2013 20:02:03 +0100
 Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
  Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
+In-Reply-To: <4466665.6pIGCIdISn@flatron>
 References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron> <20130606112723.71ddd70c@skate>
- <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
-Message-ID: <20130607205940.4816fed5@skate>
+ <1622862.fXQWv0YWGV@flatron>
+ <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
+ <4466665.6pIGCIdISn@flatron>
+Message-ID: <CAPweEDwmgr2JbH+txDDjR_gDA2R2C1v=AuVCUVTs7RriMhZNiA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Jun 7, 2013 at 9:57 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-On Fri, 7 Jun 2013 19:26:49 +0100, luke.leighton wrote:
+>Seeing from your posts you don't have any knowledge on how Linux kernel
+> development works
 
-> > Have you noticed that it is already the case in mainline?
-> 
->  i knew there was a little bit, but not the extent of the commits.
+ check back to 2004.
 
-Then you could probably use a bit of your time to read the kernel
-commit logs rather than writing hundreds of e-mails, no?
+> and even on how Allwinner's cooperation with our
+> community looks (and seem to be completely closed to our effort of showing
+> you the reality),
 
-> > My colleague Maxime Ripard (Cc'ed)
-> 
->  maxime: we need to talk :)
-> 
->  please tell me in 4 or 5 sentences what you've managed to do so far,
-> expanding a little on what thomas says below, more specifically what
-> it achieves and/or allows rather than technically what it does
-> (suitable for managers and directors in other words), and what plans
-> you'd like to see happen.
+ no - just f*****g busy, tomasz
 
-Maxime will reply to this in more details, but I believe the status is:
+> so I'm not sure if you are the right person to take any
+> of those roles...
 
- * Interrupt controller is working.
- * Clock drivers are working.
- * Pinctrl is working.
- * GPIO is working.
- * Timer is working.
- * UART is working
- * Watchdog is on its way (patches posted)
- * Ethernet is on its way (patches posted)
- * I2C is on its way (patches posted)
+ well, tough.  get me up to speed, *fast*.  please stop wasting time
+like this: get me up to speed.  i may not be the best person but i am
+in the right place at the right time, and nobody else is going to be
+able to step into this role in time.
 
-Cubieboard (A10), Hackberry (A10), Mini XPlus (A10) And OLinuxino (A13)
-are supported.
+ so i may not be the best person that you *think* i am, but i'm the
+person you've got.  time's ticking.  can we get on please?
 
-See arch/arm/boot/dts/sun{4,5}i* for a good overview.
+> I'd suggest Maxime Ripard or someone else from Free Electrons to be
+> responsible for communication with Allwinner instead.
 
-> > All in mainline, completely Device Tree based.
-> 
->  great.  which version did it first hit, i.e. what will the first
-> signs of this be when allwinner begin doing "git pulls"?
+ you're welcome to suggest, however they do not have the contacts that
+i have (many of which are indirect anyway), and i am not going to
+introduce him to them either, in case they jeapordise the critical
+business relationships that took my associates 4 years to establish.
 
-The very first support landed in 3.8.
-
-> > So isn't this entire discussion completely moot?
-> 
->  no because it's totally in isolation from allwinner.  i need to give
-> them a heads-up, and get them involved, giving them specific
-> incentives [which nobody's yet given!!] for following a particular
-> path [or paths] yet to be recommended.
-
-You really believe you're more important than you really are, I'd say.
-
-My colleague Maxime is in contact with Allwinner, he has regular
-discussion with them, started reviewing some of the kernel code they're
-writing, has received datasheets from them, and evaluation boards.
-
-So this work is definitely not done in isolation from Allwinner, and
-they have received much more than an heads-up from Maxime.
-
-> > The mainline support
-> > for sunxi has already started since 6 months or so, and has been Device
-> > Tree based from day one.
-> 
-> to clarify: the *community-driven* mainline support for sunxi.  ok -
-> which chips?  sun3i (ARM9), sun4i (Cortex A8), sun5i, sun6i and sun7i
-> (Dual-Core Cortex A7)?  which ones are in?
-
-So far, A10 and A13. Maxime has received a A31 evaluation board from
-Allwinner very recently, and also A10S and A20 boards. I suppose he
-will be working on those fairly and posting the corresponding patches
-fairly soon.
-
-In other words, it looks like you've started an entire discussion about
-the mainline support for Allwinner SoCs without having a look at what
-"git log" tells you... Which by itself is a very good indicator that
-you're probably not the best interlocutor for Allwinner as far as
-mainline development is concerned.
-
-Best regards,
-
-Thomas Petazzoni
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+ l.
