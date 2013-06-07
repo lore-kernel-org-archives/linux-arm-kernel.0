@@ -1,56 +1,157 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Jun 2013 19:26:08 +0100
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <1370616567.2433.20.camel@jm-desktop>
-References: <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1370477958.20454.68.camel@localhost>
- <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
- <51B085C6.3000605@gmail.com>
- <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
- <51B19046.5040401@gmail.com>
- <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
- <1370616567.2433.20.camel@jm-desktop>
-Message-ID: <20130607182608.GV18614@n2100.arm.linux.org.uk>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri,  7 Jun 2013 11:31:26 -0700
+Subject: [PATCH v3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ line
+In-Reply-To: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+Message-ID: <1370629886-14170-1-git-send-email-khilman@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 02:49:28PM +0000, joem wrote:
-> > > SoC vendors are free to join the discussion, and many SoC vendors are part
-> > > of the kernel community, so calling this unilateral is plain wrong.
-> > 
-> >  you're free to believe that, vladimir.  i've explained why that
-> > hasn't happened, in prior messages.  can we move forward, please?
-> 
-> I prefer it if the "vladimir" troll (and fellow trolls)
-> make requests for one of us to make or do something instead of
-> constantly whining and wasting time.
-> 
-> After all we are attached to funds and resources ready to
-> deploy if something sounds a good idea and gets a vote.
-> 
-> To vladimir - please put your thoughts in a blog where it belongs.
-> If its important, I'm sure others would offer comment
-> and take you up on your thoughts.
+On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+SYS_NIRQ line on OMAP.  Add another DTS include file
+(twl4030_omap3.dtsi) for boards that hook up the twl4030 this way
+to include.
 
-I think your position is confused.  Everything that Vladimir (in his
-three posts) in this thread so far have been correct.  Vladimir is not
-the one doing any trolling in this thread.
+This allows RTC wake from off-mode to work again on OMAP3-based
+platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+3530/Overo, 3730/Overo-STORM.
 
-Vladimir has not requested anything.  He hasn't whined.  He hasn't
-wasted time.  He has stated the following in _three_ short succinct
-emails:
-(a) no one gets to impose stipulate timescales unless they're willing
-to financially sponsor the work.
-(b) the adopted position of the Linux kernel developers.
+Special thanks to Florian Vaussard for suggesting use of preprocessor
+feature.
 
-Luke Leighton on the other hand is demanding that we (Linux kernel
-developers) come up with proposals within three days so that Luke can
-act as a middle man between us and Allwinner, and is blaming the Linux
-kernel community for the situation with Allwinner.
+Cc: Florian Vaussard <florian.vaussard@epfl.ch>
+Cc: Benoit Cousson <b-cousson@ti.com>
+Cc: Nishanth Menon <nm@ti.com>
+Signed-off-by: Kevin Hilman <khilman@linaro.org>
+---
+v3: renamed to twl4030_omap3 (suggested by Nishanth), add GPL, fix whitespace
+v2: Updated to change board files instead of twl4030 file.
 
-As you seem to have your facts wrong, I can only conclude that you
-are also trolling... I hope I'm wrong about that and you've just made
-an innocent mistake.
+ arch/arm/boot/dts/omap3-beagle-xm.dts  |  1 +
+ arch/arm/boot/dts/omap3-beagle.dts     |  1 +
+ arch/arm/boot/dts/omap3-devkit8000.dts |  1 +
+ arch/arm/boot/dts/omap3-evm.dts        |  1 +
+ arch/arm/boot/dts/omap3-igep.dtsi      |  1 +
+ arch/arm/boot/dts/omap3-overo.dtsi     |  1 +
+ arch/arm/boot/dts/omap3430-sdp.dts     |  1 +
+ arch/arm/boot/dts/twl4030_omap3.dtsi   | 25 +++++++++++++++++++++++++
+ 8 files changed, 32 insertions(+)
+ create mode 100644 arch/arm/boot/dts/twl4030_omap3.dtsi
+
+diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
+index ad17b6b..afdb164 100644
+--- a/arch/arm/boot/dts/omap3-beagle-xm.dts
++++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
+@@ -96,6 +96,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
+index eb7e02a..dfd8310 100644
+--- a/arch/arm/boot/dts/omap3-beagle.dts
++++ b/arch/arm/boot/dts/omap3-beagle.dts
+@@ -135,6 +135,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
+index 5be71b1..af32eff 100644
+--- a/arch/arm/boot/dts/omap3-devkit8000.dts
++++ b/arch/arm/boot/dts/omap3-devkit8000.dts
+@@ -81,6 +81,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
+index baa24bb..7d4329d 100644
+--- a/arch/arm/boot/dts/omap3-evm.dts
++++ b/arch/arm/boot/dts/omap3-evm.dts
+@@ -45,6 +45,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
+index 5224c29..bc48b11 100644
+--- a/arch/arm/boot/dts/omap3-igep.dtsi
++++ b/arch/arm/boot/dts/omap3-igep.dtsi
+@@ -87,6 +87,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
+ 
+ &i2c2 {
+ 	clock-frequency = <400000>;
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index 144a5a2..4bc78896 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -50,6 +50,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
+ 
+ /* i2c2 pins are used for gpio */
+ &i2c2 {
+diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
+index 2a725a0..c4a1c0a 100644
+--- a/arch/arm/boot/dts/omap3430-sdp.dts
++++ b/arch/arm/boot/dts/omap3430-sdp.dts
+@@ -29,6 +29,7 @@
+ };
+ 
+ #include "twl4030.dtsi"
++#include "twl4030_omap3.dtsi"
+ 
+ &mmc1 {
+ 	vmmc-supply = <&vmmc1>;
+diff --git a/arch/arm/boot/dts/twl4030_omap3.dtsi b/arch/arm/boot/dts/twl4030_omap3.dtsi
+new file mode 100644
+index 0000000..c353ef0
+--- /dev/null
++++ b/arch/arm/boot/dts/twl4030_omap3.dtsi
+@@ -0,0 +1,25 @@
++/*
++ * Copyright (C) 2013 Linaro, Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++&twl {
++	pinctrl-names = "default";
++	pinctrl-0 = <&twl4030_pins>;
++};
++
++&omap3_pmx_core {
++	/*
++	 * On most OMAP3 platforms, the twl4030 IRQ line is connected
++	 * to the SYS_NIRQ line on OMAP.  Therefore, configure the
++	 * defaults for the SYS_NIRQ pin here.
++	 */
++	twl4030_pins: pinmux_twl4030_pins {
++		pinctrl-single,pins = <
++			0x1b0 (PIN_INPUT_PULLUP | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* sys_nirq.sys_nirq */
++		>;
++	};
++};
+-- 
+1.8.3
