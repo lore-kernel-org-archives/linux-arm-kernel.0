@@ -1,91 +1,130 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Jun 2013 16:00:22 -0700
-Subject: [PATCH] serial: omap: Fix device tree based PM runtime
-In-Reply-To: <87k3m5k07q.fsf@linaro.org>
-References: <20130607215835.GL3331@atomide.com>
- <87k3m5k07q.fsf@linaro.org>
-Message-ID: <20130607230022.GP3331@atomide.com>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Sat, 8 Jun 2013 00:07:28 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <20130607220853.GR14209@lukather>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1733666.lHUBcfUXq9@flatron> <20130606112723.71ddd70c@skate>
+ <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
+ <20130607220853.GR14209@lukather>
+Message-ID: <CAPweEDwFHY_AbBxjspm7BvfdFHsxL5H594cFN4ZVC6QFpu4QGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the runtime_suspend function pdata is not being used, and
-also blocks the function in device tree based booting. Fix it
-by removing the unused pdata from the runtime_suspend function.
+On Fri, Jun 7, 2013 at 11:08 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Fri, Jun 07, 2013 at 07:26:49PM +0100, luke.leighton wrote:
+>>  maxime: we need to talk :)
+>>
+>>  please tell me in 4 or 5 sentences what you've managed to do so far,
+>> expanding a little on what thomas says below, more specifically what
+>> it achieves and/or allows rather than technically what it does
+>> (suitable for managers and directors in other words), and what plans
+>> you'd like to see happen.
+>
+> You mean something like http://linux-sunxi.org/Linux_mainlining_effort ?
 
-Further, context loss count is not being passed in pdata, so
-let's just reinitialize the port every time for those case.
-This can be further optimized later on for the device tree
-case by adding detection for the hardware state and possibly
-by adding a driver specific autosuspend timeout.
+ ahh, fantastic.  with references too.  magic.  exactly what i need.
+thank you.  listed now at
+http://hands.com/~lkcl/allwinner_linux_proposal.txt
 
-And doing this, we can then make the related dev_err into a
-dev_dbg message instead of an error.
+> You should really do a bit of research before starting a thread like
+> this one.
 
-In order for the wake-up events to work, we also need to set
-autosuspend_timeout to -1 if 0, and also device_init_wakeup()
-as that's not being done by the platform init code for the
-device tree case.
+ then that gives you some idea of how busy i've been and still am, to
+not be aware even of things like this, to have kicked a project off
+some 18-24 months ago and not be able to keep up with one of the many
+branches and initiatives that it's spawned.
 
-Note that this does not affect legacy booting, and in fact
-might make it work for the cases where the context loss info
-is not being passed in pdata.
+ when i said i've been caught off-guard by this opportunity i meant
+exactly what i said.
 
-Thanks to Kevin Hilman <khilman@linaro.org> for debugging
-and suggesting fixes for the autosuspend_timeout and
-device_init_wakeup() related initializiation.
+> This webpage has been around for like 9 monthes now on the wiki
+> of a community you pretend to represent
 
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-Tested-by: Kevin Hilman <khilman@linaro.org>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
+ i pretend no such thing and apologise for giving any impression of such.
 
----
+> (even though I fail to get how
+> you can pretend such thing, but that's another topic).
 
-Here's an updated version with the white space fixed. Since
-you already acked it, I won't waste the opportunity to keep it
-in a single patch :)
+ i have a different focus: a meta-project of sorts, where allwinner
+happened to be the first.  look up rhombus-tech and EOMA68 and it'll
+become a bit clearer.
 
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -197,7 +197,7 @@ static int serial_omap_get_context_loss_count(struct uart_omap_port *up)
- 	struct omap_uart_port_info *pdata = up->dev->platform_data;
- 
- 	if (!pdata || !pdata->get_context_loss_count)
--		return 0;
-+		return -EINVAL;
- 
- 	return pdata->get_context_loss_count(up->dev);
- }
-@@ -1482,6 +1482,9 @@ static int serial_omap_probe(struct platform_device *pdev)
- 
- 	platform_set_drvdata(pdev, up);
- 	pm_runtime_enable(&pdev->dev);
-+	if (omap_up_info->autosuspend_timeout == 0)
-+		omap_up_info->autosuspend_timeout = -1;
-+	device_init_wakeup(up->dev, true);
- 	pm_runtime_use_autosuspend(&pdev->dev);
- 	pm_runtime_set_autosuspend_delay(&pdev->dev,
- 			omap_up_info->autosuspend_timeout);
-@@ -1591,14 +1594,10 @@ static void serial_omap_restore_context(struct uart_omap_port *up)
- static int serial_omap_runtime_suspend(struct device *dev)
- {
- 	struct uart_omap_port *up = dev_get_drvdata(dev);
--	struct omap_uart_port_info *pdata = dev->platform_data;
- 
- 	if (!up)
- 		return -EINVAL;
- 
--	if (!pdata)
--		return 0;
--
- 	up->context_loss_cnt = serial_omap_get_context_loss_count(up);
- 
- 	if (device_may_wakeup(dev)) {
-@@ -1626,7 +1625,7 @@ static int serial_omap_runtime_resume(struct device *dev)
- 	int loss_cnt = serial_omap_get_context_loss_count(up);
- 
- 	if (loss_cnt < 0) {
--		dev_err(dev, "serial_omap_get_context_loss_count failed : %d\n",
-+		dev_dbg(dev, "serial_omap_get_context_loss_count failed : %d\n",
- 			loss_cnt);
- 		serial_omap_restore_context(up);
- 	} else if (up->context_loss_cnt != loss_cnt) {
+>> > is the maintainer of the mainline Allwinner sunxi
+>> > effort. It already supports a number of boards, has a pinctrl driver, a
+>> > GPIO driver, serial port is working, network is working, I2C is
+>> > working.
+>> >
+>> > All in mainline, completely Device Tree based.
+>>
+>>  great.  which version did it first hit, i.e. what will the first
+>> signs of this be when allwinner begin doing "git pulls"?
+>
+> 3.8, as shown in the wiki page
+
+ got that.
+
+>>  and which boards.  bear in mind that one of those "boards" should
+>> really be "the total range of products available across hundreds of
+>> chinese tablet clone manufacturers".
+>>
+>>  specific question: is one of the "boards" the one that tom cubie
+>> submitted, which covers virtually every android tablet product
+>> manufactured in the millions by chinese tablet clone manufacturers?
+>
+> Again, wiki.
+
+ yep, am there now.
+
+>> > So isn't this entire discussion completely moot?
+>>
+>>  no because it's totally in isolation from allwinner.  i need to give
+>> them a heads-up, and get them involved, giving them specific
+>> incentives [which nobody's yet given!!] for following a particular
+>> path [or paths] yet to be recommended.
+>>
+>> > The mainline support
+>> > for sunxi has already started since 6 months or so, and has been Device
+>> > Tree based from day one.
+>>
+>> to clarify: the *community-driven* mainline support for sunxi.  ok -
+>> which chips?  sun3i (ARM9), sun4i (Cortex A8), sun5i, sun6i and sun7i
+>> (Dual-Core Cortex A7)?  which ones are in?
+>
+> A10, A13 for the moment. I just received hardware with A10s, A20 and A31
+> that I need to work on, but support should come quite soon.
+
+ superb.  question: what help or other resources could you do with?
+what additional information?
+
+
+> I already
+> have some patches pending to be tested on an A31 board, but didn't have
+> as much time as I wanted lately to actually set a proper environment to
+> test them.
+
+ ok - good to know.  btw when you get to it please note a bug found in
+the "vanilla" [allwinner-released] A20 3.3 tree where they reduced a
+128 byte buffer to 78 bytes for spurious reasons; the critical fix is
+at line 989, of the following patch:
+
+ http://git.rhombus-tech.net/?p=linux.git;a=commitdiff;h=refs/heads/lkcl-3.3-a20;hp=6c5753e5dc1fafff288d522c94b40a7dd2a81adc
+
+ i found this by running a diff -u of sun4i_usb from the 3.4 sunxi
+community tree against the sun7i_usb tree from the allwinner 3.3
+release.  amongst the desperate attempts to disable DMA (probably due
+to stack corruption of the above bug) and various renaming attempts of
+*SUN4I* to *SUN7I*, that one stuck out like a sore thumb.  the other
+bits - which may or may not be relevant - are the spinlock protection
+and the call to sw_udc_enable which is present in the sun4i_usb 3.4
+code but not the A20 3.3 code.
+
+mileage may vary, and the buffer overrun only happens if you enable
+the OTG interface as "dual" (auto-detect) because that's enough
+features in the bitfield to cause there to be enough strcpy's... oops
+:)
+
+l.
