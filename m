@@ -1,48 +1,49 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 7 Jun 2013 11:54:13 -0700
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDwU+RzTCGb20uh7jxAzjbrX_yHVa4sy_ATr7MWpBb4WcQ@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
- <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
- <CAPweEDwU+RzTCGb20uh7jxAzjbrX_yHVa4sy_ATr7MWpBb4WcQ@mail.gmail.com>
-Message-ID: <CAOesGMg+Xk5yy2W3n__QYEkrXb5FP6eruOWvZPNHkOVHf2+pDA@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 7 Jun 2013 14:54:27 -0400 (EDT)
+Subject: [RFC][PATCH 7/7] USB: OHCI: make ohci-s3c2410 a separate driver
+In-Reply-To: <1370585013-12809-8-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306071453310.1366-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Luke,
+On Fri, 7 Jun 2013, Manjunath Goudar wrote:
 
-I want only one thing from you at this time. See below.
+> Separate the Samsung OHCI S3CXXXX host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM.
 
+> @@ -371,10 +384,9 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
+>  		goto err_put;
+>  	}
+>  
+> +	ohci_setup(hcd);
 
-On Fri, Jun 7, 2013 at 11:45 AM, luke.leighton <luke.leighton@gmail.com> wrote:
->  .... but the Directors of Allwinner aren't been kept in the loop,
-> here: that's my job, to get them up-to-speed.
+Don't call ohci_setup().
 
-The one job I would love for you to do instead of all this trolling
-and time-wasting that's being done by _everybody_ involved, is to just
-extract yourself from the situation and let us go on with our work.
-You're causing nothing but confusion and extra work. Literally. You
-represent nobody that matters in this discussion.
+> @@ -532,4 +480,36 @@ static struct platform_driver ohci_hcd_s3c2410_driver = {
+>  	},
+>  };
+>  
+> +static int __init ohci_s3cxxxx_init(void)
+> +{
+> +	if (usb_disabled())
+> +		return -ENODEV;
+> +
+> +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
+> +	ohci_init_driver(&ohci_s3c2410_hc_driver, NULL);
+> +
+> +	/*
+> +	* The Samsung HW has some unusual quirks, which require Sumsung-specific
+> +	* workarounds. We override certain hc_driver functions here to
+> +	* achieve that. We explicitly do not enhance ohci_driver_overrides to
+> +	* allow this more easily, since this is an unusual case, and we don't
+> +	* want to encourage others to override these functions by making it
+> +	* too easy.
+> +	*/
+> +
+> +	ohci_s3c2410_hc_driver.hub_status_data	= ohci_s3c2410_hub_status_data;
+> +	ohci_s3c2410_hc_driver.hub_control	= ohci_s3c2410_hub_control;
 
-By demanding us to spend time and effort bringing you personally up to
-speed on a subject that both we (ARM kernel community) and them
-(Allwinner) are already having discussions about, it's nothing but a
-distraction and waste of energy.
+Like in ohci-at91, save the pointers before overwriting them.
 
-And yes, Allwinner knows about this public email thread.
-
-
-Thanks.
-
--Olof
+Alan Stern
