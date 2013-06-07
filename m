@@ -1,51 +1,35 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Fri, 07 Jun 2013 10:41:15 -0700
-Subject: pxa27x and pinctrl-single
-In-Reply-To: <CAD6h2NStRcXm_X=0ib=RtKqVhmsfGo4z=_jzL1hUo_MLcfyBZw@mail.gmail.com>
-References: <51AF7404.3090003@newsguy.com>
- <CAD6h2NTu9-E=Xy8zz5cgDdk5W4ShM9-B+p+gQtiA_HASQ7AEuQ@mail.gmail.com>
- <51B0C7E8.5090308@newsguy.com>
- <CAD6h2NSRCti57NZtw0wzE8Th65_3Y8Dkz5zGsbnA2SUPYS263Q@mail.gmail.com>
- <51B12DE9.9040908@newsguy.com>
- <CAN1soZyOzrRewwx0up2s+4igUf77h+UbFpCsm324O-nkBWcsTQ@mail.gmail.com>
- <51B1F330.9080007@newsguy.com>
- <CAD6h2NStRcXm_X=0ib=RtKqVhmsfGo4z=_jzL1hUo_MLcfyBZw@mail.gmail.com>
-Message-ID: <51B21B3B.8050604@newsguy.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Jun 2013 19:43:18 +0200
+Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <20130607162050.GA31895@obsidianresearch.com>
+References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
+ <1880458.2ksb8qtzHh@wuerfel> <20130607162050.GA31895@obsidianresearch.com>
+Message-ID: <201306071943.18407.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2013 08:16 AM, Haojian Zhuang wrote:
+On Friday 07 June 2013, Jason Gunthorpe wrote:
+> Sounds fair to me.
 > 
-
-[...]
-
-
-> Since you need to configure both GPDRx and GAFRx. If we are talking
-> pinctrl-single
-> as reference, we can make it work by this way.
+> But when we talk about multiple domains we don't mean a disjoint range
+> bus bus numbers, as your other email shows:
 > 
-> We need to define two pinmux controllers. One is for GPDRx, and the
-> other is for GAFRx.
-> Both of them need to support pinctrl-single,bits property. For any
-> alternate pins in DTS,
-> we could include these two pins from two pinmux controllers. What's
-> your opinion?
+> 00:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
+> 10:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
+> 
+> We mean multiple domains, it should look like this:
+> 
+> 0000:00:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
+> 0001:00:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
+> 
+> ie lspci -D.
+> 
+> Each domain gets a unique bus number range, config space, io range,
+> etc. This is much clearer to everyone than trying to pretend there is
+> only one domain when the HW is actually multi-domain.
 
+Yes, absolutely. This means we also don't need a bus-range property in DT, since each
+domain will allow all 255 buses.
 
-Are you are suggesting that the dts file can be defined such that the desired
-values are written to GAFR and GPDR, without having to make any changes to the
-pinctrl-single driver code?  If I understand correctly, we would be defining two
-"pins" in the device tree for each actual pin.  That seems very ugly.
-
-I was thinking that pinctrl-single could be modified to support multiple
-reg/value/mask pairs for each pin listed in the pinctrl-single,bits property.
-There is a comment at the top of pcs_parse_one_pinctrl_entry() that seems to
-suggest the possibility...
-
- * Note that this binding currently supports only sets of one register + value.
-
-I am still learning pinctrl and devicetree and studying the driver, so I am not
-adament about anything at this point.  Guidance appreciated!
-
-Thanks,
-Mike
+	Arnd
