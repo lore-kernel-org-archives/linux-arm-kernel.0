@@ -1,40 +1,45 @@
-From: vladoman@gmail.com (Vladimir Pantelic)
-Date: Fri, 07 Jun 2013 10:40:37 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1851164.HnXhGSdttW@flatron>
- <CAPweEDxWW4LUeBaHLb+wHuAMq=63p88zsx4tumVb2PdP_+ohAw@mail.gmail.com>
- <1622862.fXQWv0YWGV@flatron>
- <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
-Message-ID: <51B19C85.9090407@gmail.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 7 Jun 2013 16:43:55 +0800
+Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL
+ lock
+In-Reply-To: <20130607083528.GG12361@pengutronix.de>
+References: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
+ <20130607082457.GF12361@pengutronix.de>
+ <20130607083134.GE21641@nchen-desktop>
+ <20130607083528.GG12361@pengutronix.de>
+Message-ID: <20130607084354.GF21641@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-luke.leighton wrote:>   so.
- >
- >   coming back to what you said earlier: i'm formulating what to say to
- > allwinner [and need to pre-send something by monday so that they can
- > consider it before the meeting].  so far, it consists of:
- >
- > * device-tree is what the linux kernel community has come up with, it
- > is equivalent to FEX.
- >
- > * the linux kernel community would like to apologise for not
- > consulting with you (allwinner) on the decision to only accept device
- > tree
+On Fri, Jun 07, 2013 at 10:35:28AM +0200, Uwe Kleine-K?nig wrote:
+> On Fri, Jun 07, 2013 at 04:31:35PM +0800, Peter Chen wrote:
+> > On Fri, Jun 07, 2013 at 10:24:57AM +0200, Uwe Kleine-K?nig wrote:
+> > > On Fri, Jun 07, 2013 at 04:19:06PM +0800, Peter Chen wrote:
+> > > > For some unknown reasons, the jiffies will be updated more
+> > > > than one tick at every short time. Eg, at this code:
+> > > > After timeout = jiffies + msecs_to_jiffies(10),
+> > > > the interrupt occurs, and the softirq updates jiffies (eg,  + 2 jiffies),
+> > > > then return back from interrupt, the time between above operations
+> > > > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+> > > > 
+> > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > Does this mean my patch doesn't solve the issue for you?
+> > 
+> > Not try, but your patch just delay timeout assignment, if there
+> > is jiffies update after that but before timeout check, it still
+> > has problem.
+> But if that large update happens because there was a long preemption the
+> pll should be locked because I only start counting when the pll is
+> programmed.
+> 
+> IMHO you should try my patch as it is the better fix (assuming it fixes
+> it for you).
 
-apologize? WTF?
+I will try your fix, but still it just reduces the possibilities.
+The problem is not the preemption takes too long, it is the jiffies
+updates more than one tick at one short preemption.
 
- > * allwinner and the linux and sunxi community therefore need to work
- > closer together, we propose:
- >
- > * {insert proposals here}
+-- 
 
-1) switch to DT
-2) there is no 2)
-
- > 3 days left on the clock.
-
-tick tock
+Best Regards,
+Peter Chen
