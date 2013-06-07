@@ -1,67 +1,174 @@
-From: lsorense@csclub.uwaterloo.ca (Lennart Sorensen)
-Date: Fri, 7 Jun 2013 10:30:14 -0400
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1851164.HnXhGSdttW@flatron>
- <CAPweEDxWW4LUeBaHLb+wHuAMq=63p88zsx4tumVb2PdP_+ohAw@mail.gmail.com>
- <1622862.fXQWv0YWGV@flatron>
- <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
-Message-ID: <20130607143014.GB11182@csclub.uwaterloo.ca>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  7 Jun 2013 16:24:10 +0200
+Subject: [RFC PATCH 02/50] ARM: at91: add PMC main clock
+In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370615115-16979-3-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 08:52:43AM +0100, luke.leighton wrote:
->  coming back to what you said earlier: i'm formulating what to say to
-> allwinner [and need to pre-send something by monday so that they can
-> consider it before the meeting].  so far, it consists of:
-> 
-> * device-tree is what the linux kernel community has come up with, it
-> is equivalent to FEX.
+This is the at91 main oscillator clock implementation using common
+clk framework.
 
->From what I have seem looking at FEX, devicetree is vastly more powerful
-and scalable than FEX.  It is also a standard (IEEE1275) that has been
-around for many years (given devicetree is using part of openfirmware).
+If rate is not provided during clock registraction it is computed using
+the slow clock (main clk parent in this case) rate and the MCFR register.
 
-> * the linux kernel community would like to apologise for not
-> consulting with you (allwinner) on the decision to only accept device
-> tree
 
-I would consider that an enourmous lie.  Devicetree was around long
-before their company had ever started doing the allwinner.  It might
-not have been used in ARM yet, but it was used in a number of other
-architectures, making it the obvious choice for doing the same thing on
-more architectures.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/clk/at91/Makefile   |    5 ++
+ drivers/clk/at91/clk-main.c |  106 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/at91.h    |   10 ++++
+ 3 files changed, 121 insertions(+)
 
-> [bear in mind that if this kind of thing isn't said, they risk just
-> continuing to make the sunxi community's life absolute hell by
-> continuing to work in isolation and continuing to duplicate drivers
-> etc. etc. ]
-
-That is their problem (and their customers).
-
-> * work is being done by the free software community, they are
-> beginning to integrate allwinner's work into the upstream kernel, and
-> you (allwinner) will begin to see this when you get round to doing
-> linux kernel 3.9
-
-If something is popular enough, people will work on getting it supported,
-where supported means done properly.
-
-> * allwinner and the linux and sunxi community therefore need to work
-> closer together, we propose:
-> 
-> * {insert proposals here}
-
-How about allwinner simply tries to help with the activity already taking
-place for getting everything working with devicetree.  That probably
-means doing work to their tools to generate devicetree files from their
-FEX files, if they really like FEX (and think their customers like FEX).
-
-> 3 days left on the clock.
-
-Who cares what your deadline is.  That's not how good choices are made.
-
+diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
+new file mode 100644
+index 0000000..42c084e
+--- /dev/null
++++ b/drivers/clk/at91/Makefile
+@@ -0,0 +1,5 @@
++#
++# Makefile for at91 specific clk
++#
++
++obj-y += clk-main.o
+diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
+new file mode 100644
+index 0000000..738fa39
+--- /dev/null
++++ b/drivers/clk/at91/clk-main.c
+@@ -0,0 +1,106 @@
++/*
++ * drivers/clk/at91/clk-main.c
++ *
++ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
++ *
++ * This mainram is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/clkdev.h>
++#include <linux/clk/at91.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/io.h>
++
++#define to_clk_main(hw) container_of(hw, struct clk_main, hw)
++struct clk_main {
++	struct clk_hw hw;
++	unsigned long rate;
++};
++
++static unsigned long clk_main_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
++{
++	u32 tmp;
++	struct clk_main *clkmain = to_clk_main(hw);
++	if (clkmain->rate)
++		return clkmain->rate;
++	while ((tmp = at91_pmc_read(AT91_CKGR_MCFR)) & AT91_PMC_MAINRDY)
++		;
++	tmp &= AT91_PMC_MAINF;
++	clkmain->rate = (tmp * parent_rate) / 16;
++	return clkmain->rate;
++}
++
++static const struct clk_ops main_ops = {
++	.recalc_rate = clk_main_recalc_rate,
++};
++
++struct clk * __init
++at91_clk_register_main(const char *name,
++		       const char *parent_name,
++		       unsigned long rate)
++{
++	struct clk_main *clkmain;
++	struct clk *clk = NULL;
++	struct clk_init_data init;
++
++	if (!rate && !parent_name)
++		return ERR_PTR(-EINVAL);
++
++	clkmain = kzalloc(sizeof(*clkmain), GFP_KERNEL);
++	if (!clkmain)
++		return ERR_PTR(-ENOMEM);
++
++	init.name = name;
++	init.ops = &main_ops;
++	init.parent_names = parent_name ? &parent_name : NULL;
++	init.num_parents = parent_name ? 1 : 0;
++	init.flags = parent_name ? 0 : CLK_IS_ROOT;
++
++	clkmain->hw.init = &init;
++	clkmain->rate = rate;
++
++	clk = clk_register(NULL, &clkmain->hw);
++
++	if (IS_ERR(clk))
++		kfree(clkmain);
++
++	return clk;
++}
++
++
++
++#if defined(CONFIG_OF)
++static void __init
++of_at91_clk_main_setup(struct device_node *np)
++{
++	struct clk *clk;
++	const char *parent_name;
++	const char *name = np->name;
++	u32 rate = 0;
++
++	parent_name = of_clk_get_parent_name(np, 0);
++	of_property_read_string(np, "clock-output-names", &name);
++	of_property_read_u32(np, "clock-frequency", &rate);
++
++	clk = at91_clk_register_main(name, parent_name, rate);
++
++	if (!IS_ERR(clk))
++		return;
++
++	of_clk_add_provider(np, of_clk_src_simple_get, clk);
++}
++
++static void __init of_at91rm9200_clk_main_setup(struct device_node *np)
++{
++	of_at91_clk_main_setup(np);
++}
++CLK_OF_DECLARE(at91rm9200_clk_main, "atmel,at91rm9200-clk-main",
++	       of_at91rm9200_clk_main_setup);
++#endif
+diff --git a/include/linux/clk/at91.h b/include/linux/clk/at91.h
+index 58b1eba..c0801e7 100644
+--- a/include/linux/clk/at91.h
++++ b/include/linux/clk/at91.h
+@@ -16,6 +16,8 @@
+ #ifndef AT91_PMC_H
+ #define AT91_PMC_H
+ 
++#include <linux/clk-provider.h>
++
+ #ifndef __ASSEMBLY__
+ extern void __iomem *at91_pmc_base;
+ 
+@@ -184,4 +186,12 @@ extern void __iomem *at91_pmc_base;
+ #define			AT91_PMC_PCR_DIV8	0x8			/* Peripheral clock is MCK/8 */
+ #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
+ 
++
++
++
++struct clk * __init
++at91_clk_register_main(const char *name,
++		       const char *parent_name,
++		       unsigned long rate);
++
+ #endif
 -- 
-Len Sorensen
+1.7.9.5
