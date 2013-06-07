@@ -1,39 +1,364 @@
-From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
-Date: Fri, 07 Jun 2013 12:26:57 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDyYt+pN+UaFuqWL5RrHpyuq_4So-tArmx3dr=0wLS+hwQ@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron>
- <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
- <20130606131042.GN18614@n2100.arm.linux.org.uk>
- <CAPweEDyYt+pN+UaFuqWL5RrHpyuq_4So-tArmx3dr=0wLS+hwQ@mail.gmail.com>
-Message-ID: <1370600817.9983.7.camel@localhost>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 7 Jun 2013 16:00:08 +0530
+Subject: [RFC][PATCH 4/7] USB: OHCI: make ohci-spear a separate driver
+In-Reply-To: <1370585013-12809-5-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+ <1370585013-12809-5-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <CAKohpom6vcpePaM8x_MaZG8poNEsi-NB+thksGX0nj8dJu+ZPg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fre 2013-06-07 klockan 09:02 +0100 skrev luke.leighton:
+you need to cc spear-devel at list.st.com list for SPEAr patches.
 
->  ok.  so.  we come back to the question again: what shall i propose to
-> them that they consider doing, and what benefit would it be to them to
-> do so?
+On 7 June 2013 11:33, Manjunath Goudar <manjunath.goudar@linaro.org> wrote:
+> Separate the  TI OHCI SPEAr host controller driver from ohci-hcd
 
-Just tell them that the kernel is moving to a different configuration
-syntax called Device Tree, but apart from updating kernel drivers to the
-new way of configuring things it only have minor impact on their
-envionment. It is still possible to use the fex file for all board
-configuration details, only requires a small tool for translating fex to
-device tree.
+TI ??
 
-The change only impacts kernel, and a small change to their SDK build
-scripts to also build the device tree from the fex.
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM.
+>
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Cc: Viresh Kumar <viresh.linux@gmail.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Greg KH <greg@kroah.com>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: linux-usb at vger.kernel.org
+> ---
+>  drivers/usb/host/Kconfig      |    8 +++
+>  drivers/usb/host/Makefile     |    1 +
+>  drivers/usb/host/ohci-hcd.c   |   22 +-----
+>  drivers/usb/host/ohci-spear.c |  149 ++++++++++++++++++-----------------------
+>  4 files changed, 75 insertions(+), 105 deletions(-)
+>
+> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
+> index f42db93..c347cb3 100644
+> --- a/drivers/usb/host/Kconfig
+> +++ b/drivers/usb/host/Kconfig
+> @@ -403,6 +403,14 @@ config USB_OHCI_HCD_OMAP1
+>         ---help---
+>           Enables support for the OHCI controller on OMAP1/2 chips.
+>
+> +config USB_OHCI_HCD_SPEAR
+> +        tristate "Support for ST SPEAr on-chip OHCI USB controller"
+> +        depends on USB_OHCI_HCD && PLAT_SPEAR
+> +        default y
+> +        ---help---
+> +          Enables support for the on-chip OHCI controller on
+> +          ST SPEAr chips.
+> +
+>  config USB_OHCI_HCD_OMAP3
+>         tristate "OHCI support for OMAP3 and later chips"
+>         depends on (ARCH_OMAP3 || ARCH_OMAP4)
+> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
+> index ceb4e55..1e0d83e 100644
+> --- a/drivers/usb/host/Makefile
+> +++ b/drivers/usb/host/Makefile
+> @@ -49,6 +49,7 @@ obj-$(CONFIG_USB_OHCI_HCD_PLATFORM)   += ohci-platform.o
+>  obj-$(CONFIG_USB_OHCI_EXYNOS)  += ohci-exynos.o
+>  obj-$(CONFIG_USB_OHCI_HCD_OMAP1)       += ohci-omap.o
+>  obj-$(CONFIG_USB_OHCI_HCD_OMAP3)       += ohci-omap3.o
+> +obj-$(CONFIG_USB_OHCI_HCD_SPEAR)       += ohci-spear.o
+>
+>  obj-$(CONFIG_USB_UHCI_HCD)     += uhci-hcd.o
+>  obj-$(CONFIG_USB_FHCI_HCD)     += fhci.o
+> diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+> index 8002bbe..27f0abe 100644
+> --- a/drivers/usb/host/ohci-hcd.c
+> +++ b/drivers/usb/host/ohci-hcd.c
+> @@ -1208,11 +1208,6 @@ MODULE_LICENSE ("GPL");
+>  #define OF_PLATFORM_DRIVER     ohci_hcd_ppc_of_driver
+>  #endif
+>
+> -#ifdef CONFIG_PLAT_SPEAR
+> -#include "ohci-spear.c"
+> -#define SPEAR_PLATFORM_DRIVER  spear_ohci_hcd_driver
+> -#endif
+> -
+>  #ifdef CONFIG_PPC_PS3
+>  #include "ohci-ps3.c"
+>  #define PS3_SYSTEM_BUS_DRIVER  ps3_ohci_driver
+> @@ -1248,6 +1243,7 @@ MODULE_LICENSE ("GPL");
+>         !IS_ENABLED(CONFIG_USB_OHCI_EXYNOS) && \
+>         !IS_ENABLED(CONFIG_USB_OHCI_HCD_OMAP1) && \
+>         !IS_ENABLED(CONFIG_USB_OHCI_HCD_OMAP3) && \
+> +       !IS_ENABLED(CONFIG_USB_OHCI_HCD_SPEAR) && \
+>         !defined(PLATFORM_DRIVER) &&    \
+>         !defined(OF_PLATFORM_DRIVER) && \
+>         !defined(SA1111_DRIVER) &&      \
+> @@ -1258,8 +1254,7 @@ MODULE_LICENSE ("GPL");
+>         !defined(EP93XX_PLATFORM_DRIVER) && \
+>         !defined(AT91_PLATFORM_DRIVER) && \
+>         !defined(NXP_PLATFORM_DRIVER) && \
+> -       !defined(DAVINCI_PLATFORM_DRIVER) && \
+> -       !defined(SPEAR_PLATFORM_DRIVER)
+> +       !defined(DAVINCI_PLATFORM_DRIVER)
+>  #error "missing bus glue for ohci-hcd"
+>  #endif
+>
+> @@ -1349,19 +1344,9 @@ static int __init ohci_hcd_mod_init(void)
+>                 goto error_davinci;
+>  #endif
+>
+> -#ifdef SPEAR_PLATFORM_DRIVER
+> -       retval = platform_driver_register(&SPEAR_PLATFORM_DRIVER);
+> -       if (retval < 0)
+> -               goto error_spear;
+> -#endif
+> -
+>         return retval;
+>
+>         /* Error path */
+> -#ifdef SPEAR_PLATFORM_DRIVER
+> -       platform_driver_unregister(&SPEAR_PLATFORM_DRIVER);
+> - error_spear:
+> -#endif
+>  #ifdef DAVINCI_PLATFORM_DRIVER
+>         platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
+>   error_davinci:
+> @@ -1419,9 +1404,6 @@ module_init(ohci_hcd_mod_init);
+>
+>  static void __exit ohci_hcd_mod_exit(void)
+>  {
+> -#ifdef SPEAR_PLATFORM_DRIVER
+> -       platform_driver_unregister(&SPEAR_PLATFORM_DRIVER);
+> -#endif
+>  #ifdef DAVINCI_PLATFORM_DRIVER
+>         platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
+>  #endif
+> diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
+> index 6a7cb14..9e79d24 100644
+> --- a/drivers/usb/host/ohci-spear.c
+> +++ b/drivers/usb/host/ohci-spear.c
+> @@ -11,94 +11,41 @@
+>  * warranty of any kind, whether express or implied.
+>  */
+>
+> -#include <linux/signal.h>
+> -#include <linux/platform_device.h>
+> +#include <linux/dma-mapping.h>
+>  #include <linux/clk.h>
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+>  #include <linux/of.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/signal.h>
+> +#include <linux/usb.h>
+> +#include <linux/usb/hcd.h>
+> +#include <linux/debugfs.h>
+> +#include <linux/errno.h>
 
-It is no big deal really in structural terms. There is far bigger
-structural changes in the kernel which coincides with this and will
-require some developer time to adjust for. Had they upstreamed their
-changes earlier then...
+In alphabetical order please. And please which ones of these are must
+to have.
 
-Regards
-Henrik
+>
+> -struct spear_ohci {
+> -       struct ohci_hcd ohci;
+> -       struct clk *clk;
+> -};
+> -
+> -#define to_spear_ohci(hcd)     (struct spear_ohci *)hcd_to_ohci(hcd)
+> -
+> -static void spear_start_ohci(struct spear_ohci *ohci)
+> -{
+> -       clk_prepare_enable(ohci->clk);
+> -}
+> -
+> -static void spear_stop_ohci(struct spear_ohci *ohci)
+> -{
+> -       clk_disable_unprepare(ohci->clk);
+> -}
+> -
+> -static int ohci_spear_start(struct usb_hcd *hcd)
+> -{
+> -       struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+> -       int ret;
+> -
+> -       ret = ohci_init(ohci);
+> -       if (ret < 0)
+> -               return ret;
+> -       ohci->regs = hcd->regs;
+> -
+> -       ret = ohci_run(ohci);
+> -       if (ret < 0) {
+> -               dev_err(hcd->self.controller, "can't start\n");
+> -               ohci_stop(hcd);
+> -               return ret;
+> -       }
+> -
+> -       create_debug_files(ohci);
+> -
+> -#ifdef DEBUG
+> -       ohci_dump(ohci, 1);
+> -#endif
+> -       return 0;
+> -}
+> -
+> -static const struct hc_driver ohci_spear_hc_driver = {
+> -       .description            = hcd_name,
+> -       .product_desc           = "SPEAr OHCI",
+> -       .hcd_priv_size          = sizeof(struct spear_ohci),
+> -
+> -       /* generic hardware linkage */
+> -       .irq                    = ohci_irq,
+> -       .flags                  = HCD_USB11 | HCD_MEMORY,
+> -
+> -       /* basic lifecycle operations */
+> -       .start                  = ohci_spear_start,
+> -       .stop                   = ohci_stop,
+> -       .shutdown               = ohci_shutdown,
+> -#ifdef CONFIG_PM
+> -       .bus_suspend            = ohci_bus_suspend,
+> -       .bus_resume             = ohci_bus_resume,
+> -#endif
+> -
+> -       /* managing i/o requests and associated device resources */
+> -       .urb_enqueue            = ohci_urb_enqueue,
+> -       .urb_dequeue            = ohci_urb_dequeue,
+> -       .endpoint_disable       = ohci_endpoint_disable,
+>
+> -       /* scheduling support */
+> -       .get_frame_number       = ohci_get_frame,
+> +#include "ohci.h"
+>
+> -       /* root hub support */
+> -       .hub_status_data        = ohci_hub_status_data,
+> -       .hub_control            = ohci_hub_control,
+> +#define DRIVER_DESC "OHCI SPEAr driver"
+>
+> -       .start_port_reset       = ohci_start_port_reset,
+> +static const char hcd_name[] = "SPEAr-ohci";
+> +struct spear_ohci {
+> +       struct clk *clk;
+>  };
+>
+> +#define to_spear_ohci(hcd)     (struct spear_ohci *)(hcd_to_ohci(hcd)->priv)
+> +
+> +static struct hc_driver __read_mostly ohci_spear_hc_driver;
+>  static u64 spear_ohci_dma_mask = DMA_BIT_MASK(32);
+>
+>  static int spear_ohci_hcd_drv_probe(struct platform_device *pdev)
+>  {
+>         const struct hc_driver *driver = &ohci_spear_hc_driver;
+> +       struct ohci_hcd *ohci;
+>         struct usb_hcd *hcd = NULL;
+>         struct clk *usbh_clk;
+> -       struct spear_ohci *ohci_p;
+> +       struct spear_ohci *sohci_p;
+
+why rename this?
+
+>         struct resource *res;
+>         int retval, irq;
+>
+> @@ -151,16 +98,24 @@ static int spear_ohci_hcd_drv_probe(struct platform_device *pdev)
+>                 goto err_put_hcd;
+>         }
+>
+> -       ohci_p = (struct spear_ohci *)hcd_to_ohci(hcd);
+> -       ohci_p->clk = usbh_clk;
+> -       spear_start_ohci(ohci_p);
+> -       ohci_hcd_init(hcd_to_ohci(hcd));
+> +       sohci_p = to_spear_ohci(hcd);
+> +       sohci_p->clk = usbh_clk;
+> +       hcd_to_ohci(hcd)->regs = hcd->regs;
+> +
+> +       ohci_setup(hcd);
+> +       clk_prepare_enable(sohci_p->clk);
+> +
+> +       ohci = hcd_to_ohci(hcd);
+> +
+> +#ifdef DEBUG
+> +       ohci_dump(ohci, 1);
+> +#endif
+>
+>         retval = usb_add_hcd(hcd, platform_get_irq(pdev, 0), 0);
+>         if (retval == 0)
+>                 return retval;
+>
+> -       spear_stop_ohci(ohci_p);
+> +       clk_disable_unprepare(sohci_p->clk);
+>  err_put_hcd:
+>         usb_put_hcd(hcd);
+>  fail:
+> @@ -172,11 +127,11 @@ fail:
+>  static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
+>  {
+>         struct usb_hcd *hcd = platform_get_drvdata(pdev);
+> -       struct spear_ohci *ohci_p = to_spear_ohci(hcd);
+> +       struct spear_ohci *sohci_p = to_spear_ohci(hcd);
+>
+>         usb_remove_hcd(hcd);
+> -       if (ohci_p->clk)
+> -               spear_stop_ohci(ohci_p);
+> +       if (sohci_p->clk)
+> +               clk_disable_unprepare(sohci_p->clk);
+>
+>         usb_put_hcd(hcd);
+>         return 0;
+> @@ -188,13 +143,13 @@ static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
+>  {
+>         struct usb_hcd *hcd = platform_get_drvdata(dev);
+>         struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+> -       struct spear_ohci *ohci_p = to_spear_ohci(hcd);
+> +       struct spear_ohci *sohci_p = to_spear_ohci(hcd);
+>
+>         if (time_before(jiffies, ohci->next_statechange))
+>                 msleep(5);
+>         ohci->next_statechange = jiffies;
+>
+> -       spear_stop_ohci(ohci_p);
+> +       clk_disable_unprepare(sohci_p->clk);
+>         return 0;
+>  }
+>
+> @@ -202,13 +157,13 @@ static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
+>  {
+>         struct usb_hcd *hcd = platform_get_drvdata(dev);
+>         struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+> -       struct spear_ohci *ohci_p = to_spear_ohci(hcd);
+> +       struct spear_ohci *sohci_p = to_spear_ohci(hcd);
+>
+>         if (time_before(jiffies, ohci->next_statechange))
+>                 msleep(5);
+>         ohci->next_statechange = jiffies;
+>
+> -       spear_start_ohci(ohci_p);
+> +        clk_prepare_enable(sohci_p->clk);
+>         ohci_resume(hcd, false);
+>         return 0;
+>  }
+> @@ -234,4 +189,28 @@ static struct platform_driver spear_ohci_hcd_driver = {
+>         },
+>  };
+>
+> +static const struct ohci_driver_overrides spear_overrides __initconst = {
+> +       .extra_priv_size = sizeof(struct spear_ohci),
+> +};
+> +static int __init ohci_spear_init(void)
+> +{
+> +       if (usb_disabled())
+> +               return -ENODEV;
+> +
+> +       pr_info("%s: " DRIVER_DESC "\n", hcd_name);
+> +
+> +       ohci_init_driver(&ohci_spear_hc_driver, &spear_overrides);
+> +       return platform_driver_register(&spear_ohci_hcd_driver);
+> +}
+> +module_init(ohci_spear_init);
+> +
+> +static void __exit ohci_spear_cleanup(void)
+> +{
+> +       platform_driver_unregister(&spear_ohci_hcd_driver);
+> +}
+> +module_exit(ohci_spear_cleanup);
+> +
+> +MODULE_DESCRIPTION(DRIVER_DESC);
+> +MODULE_AUTHOR("Deepak Sikri");
+> +MODULE_LICENSE("GPL v2");
+>  MODULE_ALIAS("platform:spear-ohci");
+
+I can't really review it functionally.
+
+@Deepak: Can you?
