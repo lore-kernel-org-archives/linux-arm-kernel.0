@@ -1,53 +1,46 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 7 Jun 2013 16:51:53 +0200
-Subject: [PATCH V3 0/4] ARM: dts: omap5: Cleanup and updates for DT files
-In-Reply-To: <1370611370-14715-1-git-send-email-r.sricharan@ti.com>
-References: <1370611370-14715-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <51B1F389.30002@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 7 Jun 2013 16:53:21 +0200
+Subject: [PATCH 2/2] ARM: shmobile: sdhi: remove DMA hardware dependencies
+In-Reply-To: <Pine.LNX.4.64.1306071507060.11277@axis700.grange>
+References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
+ <2024464.67s93nOUnz@wuerfel>
+ <Pine.LNX.4.64.1306071507060.11277@axis700.grange>
+Message-ID: <201306071653.21668.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the quick update.
+On Friday 07 June 2013, Guennadi Liakhovetski wrote:
+> > I think that is a flaw in the dmaengine driver. I don't actually know how
+> > any dma-engine driver could use dmaengine_slave_config to pick the request
+> > line, since that is something the driver should not know at the time
+> > it calls dmaengine_slave_config().
+> > 
+> > It's probably best to change the shdma driver to just ignore the slave_id
+> > value in slave_config, like most other drivers to.
+> 
+> This is how shdma driver used to work. We used to pass the slave ID (DMA 
+> request line ID) to shdma from clients from the filter. This was 
+> considered bad and we were asked to switch to using 
+> dmaengine_slave_config(), which is the current preferred API, IIUC.
 
-I've just applied the series in my for_3.11/dts branch.
+I think you misunderstood the requirement. All other configuration,
+i.e. slave port address, burst size, bus width, really should be
+configured using dmaengine_slave_config, since this is data that
+is known by the /driver/, independent of the DMA engine in use and
+unknown to the platform. The request line number is something that
+the driver cannot know, since it is a property of the DMA engine.
 
-Regards,
-Benoit
+> > I don't see how that
+> > could possibly work when used from a portable slave driver.
+> 
+> A DMA slave ID (DMA request line) is considered to be a portable 
+> parameter. I.e. on every platform your DMA slave has to request a DMA 
+> request line to the DMAC and that line can be coded with an int. That's 
+> the current assumption, I think.
 
+In a lot of cases you actually need more than one number here, e.g.
+to configure which master port of the DMA engine is being used.
+That's why the dmaengine DT binding needs a variable #dma-cells
+property that is specific to the dma engine being used.
 
-On 06/07/2013 03:22 PM, Sricharan R wrote:
-> uevm is the only official board supported for OMAP5 soc in the mainline.
-> This series deprecates the support for existent sevm which will no more
-> be supported in mainline and renames the board dts file accordingly.
-> Also a few additional device DT entry updates are done.
-> 
-> This is on top of the below branch
->     git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
->     for_3.11/dts
-> 
-> Boot tested on omap5-uevm after pulling in the data from below place
->     git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git
->     HWMOD DATA: for_3.11/omap5_data_files
->     CLOCK DATA: out_of_tree/omap5_clk_data
-> 
-> Dan Murphy (1):
->   ARM: dts: omap5-uevm: Add LED support for uEVM blue LED
-> 
-> Roger Quadros (1):
->   ARM: dts: omap5-uevm: Add USB Host support
-> 
-> Sourav Poddar (1):
->   ARM: dts: omap5-uevm: Add uart pinctrl data
-> 
-> Sricharan R (1):
->   ARM: dts: omap5: Make uevm as the official board and deprecate sevm
->     support
-> 
->  arch/arm/boot/dts/Makefile       |    2 +-
->  arch/arm/boot/dts/omap5-evm.dts  |  261 --------------------------------
->  arch/arm/boot/dts/omap5-uevm.dts |  311 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap5.dtsi     |   30 ++++
->  4 files changed, 342 insertions(+), 262 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/omap5-evm.dts
->  create mode 100644 arch/arm/boot/dts/omap5-uevm.dts
-> 
+	Arnd
