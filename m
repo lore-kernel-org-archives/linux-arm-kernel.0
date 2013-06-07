@@ -1,57 +1,46 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 16:24:12 +0200
-Subject: [RFC PATCH 04/50] ARM: at91: add PMC master clock
+Date: Fri,  7 Jun 2013 16:24:13 +0200
+Subject: [RFC PATCH 05/50] ARM: at91: add PMC system clocks
 In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
 References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370615115-16979-5-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370615115-16979-6-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the at91 master clock implementation using common clk framework.
+This is the at91 system clock implementation using common clk framework.
 
-The pll clock layout describe the MCKR register layout.
-There's four pll clock layouts:
-- at91rm9200
-- at91sam9x5
-
-Master clocks are given characteristics:
-- min/max clock output rate
-
-These characteristics are checked during rate change to avoid
-over/underclocking.
-
-These characteristics are described in atmel's SoC datasheet in
-"Electrical Characteristics" paragraph.
+Some peripheral needs to enable a "system" clock in order to work properly.
+Each system clock is given an id which is the bit offset used in SCER/SCDR
+registers.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/clk/at91/Makefile     |    2 +-
- drivers/clk/at91/clk-master.c |  317 +++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/at91.h      |   23 +++
- 3 files changed, 341 insertions(+), 1 deletion(-)
+ drivers/clk/at91/Makefile     |    1 +
+ drivers/clk/at91/clk-system.c |  189 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/clk/at91.h      |    3 +
+ 3 files changed, 193 insertions(+)
 
 diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-index 564076f..d41f616 100644
+index d41f616..13e5714 100644
 --- a/drivers/clk/at91/Makefile
 +++ b/drivers/clk/at91/Makefile
-@@ -2,4 +2,4 @@
- # Makefile for at91 specific clk
+@@ -3,3 +3,4 @@
  #
  
--obj-y += clk-main.o clk-pll.o clk-plldiv.o
-+obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
-diff --git a/drivers/clk/at91/clk-master.c b/drivers/clk/at91/clk-master.c
+ obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
++obj-y += clk-system.o
+diff --git a/drivers/clk/at91/clk-system.c b/drivers/clk/at91/clk-system.c
 new file mode 100644
-index 0000000..71ade7d
+index 0000000..21af468
 --- /dev/null
-+++ b/drivers/clk/at91/clk-master.c
-@@ -0,0 +1,317 @@
++++ b/drivers/clk/at91/clk-system.c
+@@ -0,0 +1,189 @@
 +/*
-+ * drivers/clk/at91/clk-master.c
++ * drivers/clk/at91/clk-system.c
 + *
 + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
 + *
-+ * This masterram is free software; you can redistribute it and/or modify
++ * This program is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version.
@@ -65,341 +54,186 @@ index 0000000..71ade7d
 +#include <linux/of_address.h>
 +#include <linux/io.h>
 +
-+#define MASTER_SOURCE_MAX	4
++#define SYSTEM_MAX		32
 +
-+#define to_clk_master(hw) container_of(hw, struct clk_master, hw)
-+
-+struct clk_master {
++#define to_clk_system(hw) container_of(hw, struct clk_system, hw)
++struct clk_system {
 +	struct clk_hw hw;
-+	struct clk_master_layout *layout;
-+	struct clk_master_characteristics *characteristics;
++	u8 id;
 +};
 +
-+static unsigned long clk_master_recalc_rate(struct clk_hw *hw,
-+					    unsigned long parent_rate)
++static int clk_system_enable(struct clk_hw *hw)
 +{
-+	u8 pres;
-+	u8 div;
-+	unsigned long rate = parent_rate;
-+	struct clk_master *master = to_clk_master(hw);
-+	struct clk_master_layout *layout = master->layout;
-+	struct clk_master_characteristics *characteristics =
-+						master->characteristics;
-+	u32 tmp = at91_pmc_read(AT91_PMC_MCKR) & layout->mask;
-+
-+	pres = (tmp >> layout->pres_shift) & 0x7;
-+	div = (tmp >> 8) & 0x3;
-+
-+	if (characteristics->have_div3_pres && pres == 7)
-+		rate /= 3;
-+	else
-+		rate >>= pres;
-+
-+	rate /= characteristics->divisors[div];
-+
-+	/* print overclocking or underclocking error */
-+	/*
-+	if (rate < characteristics->output.min ||
-+	    rate > characteristics->output.max) {
-+	}
-+	*/
-+	return rate;
-+}
-+
-+static long clk_master_round_rate(struct clk_hw *hw, unsigned long rate,
-+				  unsigned long *parent_rate)
-+{
-+	int mdiv;
-+	int pres;
-+	u32 div;
-+	long best_rate = -EINVAL;
-+	unsigned long best_diff = 0;
-+	unsigned long cur_diff;
-+	unsigned long pres_rate;
-+	unsigned long cur_rate;
-+	struct clk_master *master = to_clk_master(hw);
-+	struct clk_master_characteristics *characteristics =
-+						master->characteristics;
-+
-+	if (rate < characteristics->output.min ||
-+	    rate > characteristics->output.max)
-+		return -EINVAL;
-+
-+	for (pres = 0; pres < 7; pres++) {
-+		if (pres < 7)
-+			pres_rate = *parent_rate >> pres;
-+		else {
-+			if (!characteristics->have_div3_pres)
-+				break;
-+			pres_rate = *parent_rate / 3;
-+		}
-+		for (mdiv = 0; mdiv < 4; mdiv++) {
-+			div = characteristics->divisors[mdiv];
-+			if (!div)
-+				continue;
-+			cur_rate = pres_rate / div;
-+			if (rate < cur_rate)
-+				cur_diff = cur_rate - rate;
-+			else
-+				cur_diff = rate - cur_rate;
-+
-+			if (best_rate < 0 || cur_diff < best_diff) {
-+				best_rate = cur_rate;
-+				best_diff = cur_diff;
-+				if (!best_diff)
-+					return best_rate;
-+			}
-+		}
-+	}
-+
-+	return best_rate;
-+}
-+
-+static int clk_master_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	u32 tmp;
-+	if (index > AT91_PMC_CSS)
-+		return -EINVAL;
-+	tmp = at91_pmc_read(AT91_PMC_MCKR) & ~AT91_PMC_CSS;
-+	tmp |= index;
-+
-+	at91_pmc_write(AT91_PMC_MCKR, tmp);
-+	while (!(at91_pmc_read(AT91_PMC_SR) & AT91_PMC_MCKRDY))
-+		;
++	struct clk_system *sys = to_clk_system(hw);
++	at91_pmc_write(AT91_PMC_SCER, sys->id);
 +	return 0;
 +}
 +
-+static u8 clk_master_get_parent(struct clk_hw *hw)
++static void clk_system_disable(struct clk_hw *hw)
 +{
-+	return at91_pmc_read(AT91_PMC_MCKR) & AT91_PMC_CSS;
++	struct clk_system *sys = to_clk_system(hw);
++	at91_pmc_write(AT91_PMC_SCDR, 1 << sys->id);
 +}
 +
-+static int clk_master_set_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long parent_rate)
++static int clk_system_is_enabled(struct clk_hw *hw)
 +{
-+	int mdiv;
-+	int pres;
-+	u32 div;
-+	u32 tmp;
-+	unsigned long cur_rate;
-+	unsigned long pres_rate;
-+	struct clk_master *master = to_clk_master(hw);
-+	struct clk_master_layout *layout = master->layout;
-+	struct clk_master_characteristics *characteristics =
-+						master->characteristics;
-+	for (pres = 0; pres < 7; pres++) {
-+		if (pres < 7)
-+			pres_rate = parent_rate >> pres;
-+		else {
-+			if (!characteristics->have_div3_pres)
-+				break;
-+			pres_rate = parent_rate / 3;
-+		}
-+		for (mdiv = 0; mdiv < 4; mdiv++) {
-+			div = characteristics->divisors[mdiv];
-+			if (!div)
-+				continue;
-+			cur_rate = pres_rate / div;
-+			if (cur_rate == rate) {
-+				tmp = at91_pmc_read(AT91_PMC_MCKR);
-+				tmp &= layout->mask;
-+				tmp &= ~AT91_PMC_CSS;
-+				tmp |= pres << layout->pres_shift | mdiv << 8;
-+
-+				at91_pmc_write(AT91_PMC_MCKR, tmp);
-+				while (!(at91_pmc_read(AT91_PMC_SR) &
-+					 AT91_PMC_MCKRDY))
-+					;
-+				return 0;
-+			}
-+		}
-+	}
-+
-+	return -EINVAL;
++	struct clk_system *sys = to_clk_system(hw);
++	return !!(at91_pmc_read(AT91_PMC_SCSR) & (sys->id));
 +}
 +
-+static const struct clk_ops master_ops = {
-+	.recalc_rate = clk_master_recalc_rate,
-+	.round_rate = clk_master_round_rate,
-+	.get_parent = clk_master_get_parent,
-+	.set_parent = clk_master_set_parent,
-+	.set_rate = clk_master_set_rate,
++static const struct clk_ops system_ops = {
++	.enable = clk_system_enable,
++	.disable = clk_system_disable,
++	.is_enabled = clk_system_is_enabled,
 +};
 +
 +struct clk * __init
-+at91_clk_register_master(const char *name,
-+			 int num_parents,
-+			 const char **parent_names,
-+			 struct clk_master_layout *layout,
-+			 struct clk_master_characteristics *characteristics)
++at91_clk_register_system(const char *name, const char *parent_name, u8 id)
 +{
-+	struct clk_master *master;
++	struct clk_system *sys;
 +	struct clk *clk = NULL;
 +	struct clk_init_data init;
 +
-+	master = kzalloc(sizeof(*master), GFP_KERNEL);
-+	if (!master)
++	id &= 31;
++
++	sys = kzalloc(sizeof(*sys), GFP_KERNEL);
++	if (!sys)
 +		return ERR_PTR(-ENOMEM);
 +
 +	init.name = name;
-+	init.ops = &master_ops;
-+	init.parent_names = parent_names;
-+	init.num_parents = num_parents;
-+	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
++	init.ops = &system_ops;
++	init.parent_names = (parent_name ? &parent_name : NULL);
++	init.num_parents = (parent_name ? 1 : 0);
++	init.flags = 0;
 +
-+	master->hw.init = &init;
-+	master->layout = layout;
-+	master->characteristics = characteristics;
++	sys->id = id;
++	sys->hw.init = &init;
 +
-+	clk = clk_register(NULL, &master->hw);
++	clk = clk_register(NULL, &sys->hw);
 +
 +	if (IS_ERR(clk))
-+		kfree(master);
++		kfree(sys);
 +
 +	return clk;
 +}
 +
-+
-+struct clk_master_layout at91rm9200_master_layout = {
-+	.mask = 0x31F,
-+	.pres_shift = 2,
-+};
-+
-+struct clk_master_layout at91sam9x5_master_layout = {
-+	.mask = 0x373,
-+	.pres_shift = 4,
-+};
-+
-+
 +#if defined(CONFIG_OF)
-+static struct clk_master_characteristics * __init
-+of_at91_clk_master_get_characteristics(struct device_node *np)
++struct clk_system_data {
++	struct clk **clks;
++	u8 *ids;
++	unsigned int clk_num;
++};
++
++static struct clk * __init
++of_clk_src_system_get(struct of_phandle_args *clkspec, void *data)
 +{
++	struct clk_system_data *clk_data = data;
++	unsigned int id = clkspec->args[0];
 +	int i;
-+	u32 tmp;
-+	struct clk_master_characteristics *characteristics = NULL;
 +
-+	characteristics = kzalloc(sizeof(*characteristics), GFP_KERNEL);
-+	if (!characteristics)
-+		return NULL;
++	if (id >= SYSTEM_MAX)
++		goto err;
 +
-+	if (of_property_read_u32_index(np, "output", 0, &tmp))
-+		goto out_free_characteristics;
-+
-+	characteristics->output.min = tmp;
-+
-+	if (of_property_read_u32_index(np, "output", 1, &tmp))
-+		goto out_free_characteristics;
-+
-+	characteristics->output.max = tmp;
-+
-+	for (i = 0; i < 4; i++) {
-+		tmp = 0;
-+		of_property_read_u32_index(np, "divisors", i, &tmp);
-+		characteristics->divisors[i] = tmp;
++	for (i = 0; i < clk_data->clk_num; i++) {
++		if (clk_data->ids[i] == id)
++			return clk_data->clks[i];
 +	}
 +
-+	characteristics->have_div3_pres =
-+		of_property_read_bool(np, "have-div3-pres");
-+
-+	return characteristics;
-+
-+out_free_characteristics:
-+	kfree(characteristics);
-+	return NULL;
++err:
++	pr_err("%s: invalid clock id %d\n", __func__, id);
++	return ERR_PTR(-EINVAL);
 +}
 +
 +static void __init
-+of_at91_clk_master_setup(struct device_node *np,
-+			 struct clk_master_layout *layout)
++of_at91_clk_sys_setup(struct device_node *np)
 +{
-+	struct clk *clk;
-+	int num_parents;
 +	int i;
-+	const char *parent_names[MASTER_SOURCE_MAX];
++	int num;
++	u32 id;
++	struct clk *clk;
++	u8 *ids;
++	struct clk **clks;
++	struct clk_system_data *clktab;
++	const char *parent_name;
 +	const char *name = np->name;
-+	struct clk_master_characteristics *characteristics;
 +
-+	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
-+	if (num_parents <= 0 || num_parents > MASTER_SOURCE_MAX)
++	parent_name = of_clk_get_parent_name(np, 0);
++	if (!parent_name)
 +		return;
 +
-+	for (i = 0; i < num_parents; ++i) {
-+		parent_names[i] = of_clk_get_parent_name(np, i);
-+		if (!parent_names[i])
-+			return;
++	if (!of_get_property(np, "ids", &num))
++		return;
++	num /= 4;
++	if (num > SYSTEM_MAX)
++		return;
++
++	if (of_count_phandle_with_args(np, "clocks", "#clock-cells") != num)
++		return;
++
++	if (of_property_count_strings(np, "clock-output-names") != num)
++		return;
++
++	clktab = kzalloc(sizeof(*clktab), GFP_KERNEL);
++	if (!clktab)
++		return;
++
++	ids = kzalloc(num * sizeof(*ids), GFP_KERNEL);
++	if (!ids)
++		goto out_free_clktab;
++
++	clks = kzalloc(num * sizeof(*clks), GFP_KERNEL);
++	if (!clks)
++		goto out_free_ids;
++
++	for (i = 0; i < num; i++) {
++		of_property_read_u32_index(np, "ids", i, &id);
++		if (id >= SYSTEM_MAX)
++			goto out_free_clks;
++		of_property_read_string_index(np, "clock-output-names",
++					      i, &name);
++		parent_name = of_clk_get_parent_name(np, i);
++		if (!parent_name)
++			goto out_free_clks;
++
++		clk = at91_clk_register_system(name, parent_name, id);
++		if (IS_ERR(clk))
++			goto out_free_clks;
++
++		clks[i] = clk;
++		ids[i] = id;
 +	}
 +
-+	of_property_read_string(np, "clock-output-names", &name);
-+
-+	characteristics = of_at91_clk_master_get_characteristics(np);
-+	if (!characteristics)
-+		return;
-+
-+	clk = at91_clk_register_master(name, num_parents, parent_names,
-+				       layout, characteristics);
-+
-+	if (IS_ERR(clk))
-+		goto out_free_characteristics;
-+
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
++	clktab->clk_num = num;
++	clktab->clks = clks;
++	clktab->ids = ids;
++	of_clk_add_provider(np, of_clk_src_system_get, clktab);
 +	return;
 +
-+out_free_characteristics:
-+	kfree(characteristics);
++out_free_clks:
++	kfree(clks);
++out_free_ids:
++	kfree(ids);
++out_free_clktab:
++	kfree(clktab);
 +}
 +
-+static void __init of_at91rm9200_clk_master_setup(struct device_node *np)
++static void __init of_at91rm9200_clk_sys_setup(struct device_node *np)
 +{
-+	of_at91_clk_master_setup(np, &at91rm9200_master_layout);
++	of_at91_clk_sys_setup(np);
 +}
-+CLK_OF_DECLARE(at91rm9200_clk_master, "atmel,at91rm9200-clk-master",
-+	       of_at91rm9200_clk_master_setup);
-+
-+static void __init of_at91sam9x5_clk_master_setup(struct device_node *np)
-+{
-+	of_at91_clk_master_setup(np, &at91sam9x5_master_layout);
-+}
-+CLK_OF_DECLARE(at91sam9x5_clk_master, "atmel,at91sam9x5-clk-master",
-+	       of_at91sam9x5_clk_master_setup);
++CLK_OF_DECLARE(at91rm9200_clk_sys, "atmel,at91rm9200-clk-system",
++	       of_at91rm9200_clk_sys_setup);
 +#endif
 diff --git a/include/linux/clk/at91.h b/include/linux/clk/at91.h
-index 7ba038f..a960e2f 100644
+index a960e2f..c886226 100644
 --- a/include/linux/clk/at91.h
 +++ b/include/linux/clk/at91.h
-@@ -210,6 +210,17 @@ struct clk_pll_layout {
- 	u8 mul_shift;
- };
+@@ -256,4 +256,7 @@ at91_clk_register_master(const char *name, int num_parents,
+ 			 struct clk_master_characteristics *characteristics);
  
-+struct clk_master_characteristics {
-+	struct clk_range output;
-+	u32 divisors[4];
-+	u8 have_div3_pres;
-+};
-+
-+struct clk_master_layout {
-+	u32 mask;
-+	u8 pres_shift;
-+};
-+
  
- struct clk * __init
- at91_clk_register_main(const char *name,
-@@ -233,4 +244,16 @@ at91_clk_register_pll(const char *name, const char *parent_name, u8 id,
- struct clk * __init
- at91_clk_register_plldiv(const char *name, const char *parent_name);
- 
-+
-+extern struct clk_master_layout at91rm9200_master_layout;
-+
-+extern struct clk_master_layout at91sam9x5_master_layout;
-+
 +struct clk * __init
-+at91_clk_register_master(const char *name, int num_parents,
-+			 const char **parent_names,
-+			 struct clk_master_layout *layout,
-+			 struct clk_master_characteristics *characteristics);
-+
++at91_clk_register_system(const char *name, const char *parent_name, u8 id);
 +
  #endif
 -- 
