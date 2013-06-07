@@ -1,41 +1,127 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Jun 2013 20:35:32 +0100
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDxXnRWYK4GhSkN-PzM1hLOZPiD1MUne1Q-4FT6PJRJUtw@mail.gmail.com>
-References: <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1370477958.20454.68.camel@localhost>
- <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
- <51B085C6.3000605@gmail.com>
- <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
- <51B19046.5040401@gmail.com>
- <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
- <1370616567.2433.20.camel@jm-desktop>
- <20130607182608.GV18614@n2100.arm.linux.org.uk>
- <CAPweEDxXnRWYK4GhSkN-PzM1hLOZPiD1MUne1Q-4FT6PJRJUtw@mail.gmail.com>
-Message-ID: <20130607193532.GY18614@n2100.arm.linux.org.uk>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  7 Jun 2013 21:41:14 +0200
+Subject: [RFC PATCH 46/50] ARM: at91/dt: move sam9263 boards to new at91 clk
+ implem
+In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370634074-4014-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 08:18:14PM +0100, Luke Kenneth Casson Leighton wrote:
-> On Fri, Jun 7, 2013 at 7:26 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Luke Leighton on the other hand is demanding that we
-> 
->  no demands have been made, russell: i've informed you of an immovable
-> deadline which will pass beyond which the opportunity being presented
-> is lost.
+Define the main clock frequency in every at91sam9263 boards.
+Remove the old main clock definition.
 
-" well, tough.  get me up to speed, *fast*.  please stop wasting time
-like this: get me up to speed."
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/boot/dts/at91sam9263ek.dts |   17 ++++++-----------
+ arch/arm/boot/dts/tny_a9263.dts     |   17 ++++++-----------
+ arch/arm/boot/dts/usb_a9263.dts     |   17 ++++++-----------
+ 3 files changed, 18 insertions(+), 33 deletions(-)
 
-That is a demand.  On the other hand this would not be:
-
-"Can someone please get me up to speed on this?"  That is a request.
-
-Sorry, you've just lost some more credibility.
-
-Please let those who are already working with Allwinner continue to
-work with them rather than spending time needlessly with someone who
-clearly doesn't have any idea about what they say even from one moment
-to the next.
+diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
+index 70f835b..b3aa143 100644
+--- a/arch/arm/boot/dts/at91sam9263ek.dts
++++ b/arch/arm/boot/dts/at91sam9263ek.dts
+@@ -20,17 +20,6 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <16367660>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at ffffee00 {
+@@ -93,6 +82,12 @@
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <16367660>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/tny_a9263.dts b/arch/arm/boot/dts/tny_a9263.dts
+index 0751a6a..067eefb 100644
+--- a/arch/arm/boot/dts/tny_a9263.dts
++++ b/arch/arm/boot/dts/tny_a9263.dts
+@@ -20,17 +20,6 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <12000000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at ffffee00 {
+@@ -41,6 +30,12 @@
+ 				atmel,vbus-gpio = <&pioB 11 GPIO_ACTIVE_HIGH>;
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <12000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/usb_a9263.dts b/arch/arm/boot/dts/usb_a9263.dts
+index 290e603..ae5b92d 100644
+--- a/arch/arm/boot/dts/usb_a9263.dts
++++ b/arch/arm/boot/dts/usb_a9263.dts
+@@ -20,17 +20,6 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <12000000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at ffffee00 {
+@@ -61,6 +50,12 @@
+ 				atmel,wakeup-counter = <10>;
+ 				atmel,wakeup-rtt-timer;
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <12000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+-- 
+1.7.9.5
