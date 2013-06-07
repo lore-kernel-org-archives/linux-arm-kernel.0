@@ -1,323 +1,152 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 20:13:02 +0200
-Subject: [RFC PATCH 40/50] ARM: at91/dt: move at91sam9n12 SoC to new at91 clk
- implem
-In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370628782-2925-1-git-send-email-b.brezillon@overkiz.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 7 Jun 2013 19:13:18 +0100
+Subject: [PATCH] ARM: tegra: add basic SecureOS support
+In-Reply-To: <CAAVeFuJkV3VVfeinLrjCCef9ZqJNvKurQwVWnJsW-bZqniTQ1w@mail.gmail.com>
+References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+ <51B0BC80.9040007@wwwdotorg.org>
+ <20130606180824.GC3320@localhost.localdomain>
+ <CAAVeFuJkV3VVfeinLrjCCef9ZqJNvKurQwVWnJsW-bZqniTQ1w@mail.gmail.com>
+Message-ID: <20130607181318.GC29344@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define at91sam9n12 clocks in at91sam9n12 device tree.
-Add references to the appropriate clocks in each peripheral.
+On Fri, Jun 07, 2013 at 06:03:54PM +0900, Alexandre Courbot wrote:
+> On Fri, Jun 7, 2013 at 3:08 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> >> I think we need to separate the concept of support for *a* secure
+> >> monitor, from support for a *particular* secure monitor.
+> >
+> > There is no fixed set of functionality implemented by these interfaces,
+> > so it might be better to think in terms of a generic "firmware" concept.
+> >
+> >
+> > Come to think of it...
+> >
+> > One option could be to have some standard baseline firmware calling
+> > conventions, so that we could have a few specific backends -- perhaps
+> > this could be built on the "method" notion used by PSCI
+> >
+> > (see Documentation/devicetree/bindings/arm/psci.tst; this is probably
+> > the most developed firmware interface binding we have today)
+> >
+> > There, method = "smc" means:
+> >
+> >         populate registers in a certain way
+> >         SMC #0
+> >         return results from register to caller in a certain way
+> >
+> > and method = "hvc" means:
+> >
+> >         populate registers in a certain way
+> >         HVC #0
+> >         return results from register to caller in a certain way
+> >
+> >
+> > The backend method arch/arm/kernel/psci.c:__invoke_psci_fn_smc()
+> > is probably close to what's needed for the tegra secureos case,
+> > so in theory it could be common, along with some of the DT binding
+> > conventions.
+> >
+> > The backends, and the convention for binding a firmware interface
+> > to the appropriate backend, could then theoretically be handled
+> > by a common framework.
+> 
+> I'm not sure whether we could use the same backend for many different
+> firmwares. If I understand you correctly, you propose to have a
+> backend to the "smc" call that would cover the needs of all firmwares
+> that rely on the smc instruction to invoke the firmware/secure
+> monitor.
+> 
+> I can understand the logic, but I'm not sure this is needed or even
+> possible. For instance, the implementation you have in
+> __invoke_psci_fn_smc assumes 4 arguments, while Tegra's only needs 3.
+> Also (and although I have to confess I am not very knowledgeable about
+> the "SecureOS" covered by this patch and need to double-check what
+> follows), in Tegra's case registers r3-r11 can be altered by the
+> secure monitor and need to be preserved - something you don't need to
+> do with PSCI.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/at91sam9n12.dtsi |  153 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 153 insertions(+)
+One way to make the backend generic would be to have something like
+one of the following (some syntax omitted due to laziness):
 
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 3166e1d..be947bb 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -70,6 +70,126 @@
- 			pmc: pmc at fffffc00 {
- 				compatible = "atmel,at91rm9200-pmc";
- 				reg = <0xfffffc00 0x100>;
-+
-+				clk32k: slck {
-+					compatible = "fixed-clock";
-+					#clock-cells = <0>;
-+					clock-frequency = <32768>;
-+				};
-+
-+				main: mainck {
-+					compatible = "atmel,at91rm9200-clk-main", "fixed-clock";
-+					#clock-cells = <0>;
-+					clocks = <&clk32k>;
-+				};
-+
-+				plla: pllack {
-+					compatible = "atmel,at91rm9200-clk-pll";
-+					#clock-cells = <0>;
-+					clocks = <&main>;
-+					id = <0>;
-+					input = <2000000 32000000>;
-+					output = <74500000 800000000
-+						  69500000 750000000
-+						  64500000 700000000
-+						  59500000 650000000
-+						  54500000 600000000
-+						  49500000 550000000
-+						  44500000 500000000
-+						  40000000 450000000>;
-+					out = <0 1 2 3 0 1 2 3>;
-+					icpll = <0 0 0 0 1 1 1 1>;
-+				};
-+
-+				pllb: pllbck {
-+					compatible = "atmel,at91rm9200-clk-pll";
-+					#clock-cells = <0>;
-+					clocks = <&main>;
-+					id = <1>;
-+					input = <2000000 32000000>;
-+					output = <74500000 800000000
-+						  69500000 750000000
-+						  64500000 700000000
-+						  59500000 650000000
-+						  54500000 600000000
-+						  49500000 550000000
-+						  44500000 500000000
-+						  40000000 450000000>;
-+					out = <0 1 2 3 0 1 2 3>;
-+					icpll = <0 0 0 0 1 1 1 1>;
-+				};
-+
-+				plladiv: plladivck {
-+					compatible = "atmel,at91sam9x5-clk-plldiv";
-+					#clock-cells = <0>;
-+					clocks = <&plla>;
-+				};
-+
-+				mck: masterck {
-+					compatible = "atmel,at91sam9x5-clk-master";
-+					#clock-cells = <0>;
-+					clocks = <&clk32k>, <&main>, <&plladiv>, <&pllb>;
-+					output = <0 133000000>;
-+					divisors = <1 2 4 3>;
-+				};
-+
-+				usb: usbck {
-+					compatible = "atmel,at91sam9x5-clk-usb";
-+					#clock-cells = <0>;
-+					clocks = <&pllb>;
-+					usbs0-unused;
-+				};
-+
-+				prog: progck {
-+					compatible = "atmel,at91rm9200-clk-programmable";
-+					#clock-cells = <1>;
-+					ids = <0 1>;
-+					clocks = <&clk32k>, <&main>, <&plladiv>, <&pllb>, <&mck>;
-+					clock-output-names = "prog0", "prog1";
-+				};
-+
-+				system: systemck {
-+					compatible = "atmel,at91rm9200-clk-system";
-+					#clock-cells = <1>;
-+					ids = <2 3 6 7 8 9>;
-+					clocks = <&mck>, <&mck>, <&usb>, <&usb>,
-+						 <&prog 0>, <&prog 1>;
-+					clock-output-names = "ddrck", "lcdck", "uhpck", "udpck",
-+							     "pck0", "pck1";
-+				};
-+
-+				periph: periphck {
-+					compatible = "atmel,at91rm9200-clk-peripheral";
-+					#clock-cells = <1>;
-+					clocks = <&mck>;
-+					ids = <2 3 4 5 6 7 8 9 10 12 13 14 15 16
-+					       17 18 19 20 22 23 25 27 28 29 30>;
-+					clock-output-names = "pioAB_clk",
-+							     "pioCD_clk",
-+							     "fuse_clk",
-+							     "usart0_clk",
-+							     "usart1_clk",
-+							     "usart2_clk",
-+							     "usart3_clk",
-+							     "twi0_ck",
-+							     "twi1_ck",
-+							     "hsmci_clk",
-+							     "spi0_clk",
-+							     "spi1_clk",
-+							     "uart0_clk",
-+							     "uart1_clk",
-+							     "tcb_clk",
-+							     "pwm_clk",
-+							     "adc_clk",
-+							     "dma_clk",
-+							     "uhp_clk",
-+							     "udc_clk",
-+							     "lcdc_clk",
-+							     "sha_clk",
-+							     "ssc_clk",
-+							     "aes_clk",
-+							     "trng_clk";
-+				};
- 			};
- 
- 			rstc at fffffe00 {
-@@ -81,6 +201,7 @@
- 				compatible = "atmel,at91sam9260-pit";
- 				reg = <0xfffffe30 0xf>;
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				clocks = <&mck>;
- 			};
- 
- 			shdwc at fffffe10 {
-@@ -96,6 +217,8 @@
- 				dma-names = "rxtx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				clocks = <&periph 12>;
-+				clock-names = "mci_clk";
- 				status = "disabled";
- 			};
- 
-@@ -103,12 +226,16 @@
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf8008000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&periph 17>;
-+				clock-names = "t0_clk";
- 			};
- 
- 			tcb1: timer at f800c000 {
- 				compatible = "atmel,at91sam9x5-tcb";
- 				reg = <0xf800c000 0x100>;
- 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0>;
-+				clocks = <&periph 17>;
-+				clock-names = "t0_clk";
- 			};
- 
- 			dma: dma-controller at ffffec00 {
-@@ -116,6 +243,8 @@
- 				reg = <0xffffec00 0x200>;
- 				interrupts = <20 IRQ_TYPE_LEVEL_HIGH 0>;
- 				#dma-cells = <2>;
-+				clocks = <&periph 20>;
-+				clock-names = "dma_clk";
- 			};
- 
- 			pinctrl at fffff400 {
-@@ -369,6 +498,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&periph 2>;
- 				};
- 
- 				pioB: gpio at fffff600 {
-@@ -379,6 +509,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&periph 2>;
- 				};
- 
- 				pioC: gpio at fffff800 {
-@@ -389,6 +520,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&periph 3>;
- 				};
- 
- 				pioD: gpio at fffffa00 {
-@@ -399,6 +531,7 @@
- 					gpio-controller;
- 					interrupt-controller;
- 					#interrupt-cells = <2>;
-+					clocks = <&periph 3>;
- 				};
- 			};
- 
-@@ -408,6 +541,8 @@
- 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_dbgu>;
-+				clocks = <&mck>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -417,6 +552,8 @@
- 				interrupts = <28 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
-+				clocks = <&periph 28>;
-+				clock-names = "pclk";
- 				status = "disabled";
- 			};
- 
-@@ -426,6 +563,8 @@
- 				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart0>;
-+				clocks = <&periph 5>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -435,6 +574,8 @@
- 				interrupts = <6 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart1>;
-+				clocks = <&periph 6>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -444,6 +585,8 @@
- 				interrupts = <7 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart2>;
-+				clocks = <&periph 7>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -453,6 +596,8 @@
- 				interrupts = <8 IRQ_TYPE_LEVEL_HIGH 5>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_usart3>;
-+				clocks = <&periph 8>;
-+				clock-names = "usart";
- 				status = "disabled";
- 			};
- 
-@@ -465,6 +610,7 @@
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				clocks = <&periph 10>;
- 				status = "disabled";
- 			};
- 
-@@ -477,6 +623,7 @@
- 				dma-names = "tx", "rx";
- 				#address-cells = <1>;
- 				#size-cells = <0>;
-+				clocks = <&periph 9>;
- 				status = "disabled";
- 			};
- 
-@@ -488,6 +635,8 @@
- 				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi0>;
-+				clocks = <&periph 13>;
-+				clock-names = "spi_clk";
- 				status = "disabled";
- 			};
- 
-@@ -499,6 +648,8 @@
- 				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 3>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&pinctrl_spi1>;
-+				clocks = <&periph 14>;
-+				clock-names = "spi_clk";
- 				status = "disabled";
- 			};
- 
-@@ -534,6 +685,8 @@
- 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
- 			reg = <0x00500000 0x00100000>;
- 			interrupts = <22 IRQ_TYPE_LEVEL_HIGH 2>;
-+			clocks = <&periph 22>, <&periph 22>, <&system 6>;
-+			clock-names = "ohci_clk", "hclk", "uhpck";
- 			status = "disabled";
- 		};
- 	};
--- 
-1.7.9.5
+	u32 __naked __call_smc(u32 r0, ...) 
+	{
+		asm volatile (
+			stmfd	sp!, {r4-r11,lr}
+			smc	#0
+			ldmfd	sp!, {r4-r11,pc}
+			::: "memory"
+		);
+	}
+
+	/* The above works for up to 4 u32 arguments */
+
+	u32 __naked __call_smc(u32 r0, ...) 
+	{
+		asm volatile (
+			mov	ip, sp
+			stmfd	sp!, {r4-r11,lr}
+			ldmia	ip, {r4-r11}
+			smc	#0
+			ldmfd	sp!, {r4-r11,pc}
+			::: "memory"
+		);
+	}
+
+	/*
+	 * Works for up to 13 u32 arguments, provided the stack is deep
+	 * enough to provide suitable garbage data to fill the registers
+	 * if the caller supplied fewer arguments (a bit of a hack)
+	 */
+
+	u32 __naked __call_smc(struct pt_regs *regs) {
+
+		asm(
+			stmfd	sp!, {r4-r11,lr}
+			/* load regs from <regs> */
+			smc #0
+			/* save regs back to <regs> */
+			ldmfd	sp!, {r4-r11,pc}
+		);
+	}
+
+	/*
+	 * Most generic,  least-efficient version.
+	 * Can return up to 13 u32 results instead of just one.
+	 * For convenience, the r0 value returned by the SMC could be
+	 * left in r0 so that it also determines the return value of the
+	 * function.
+	 *
+	 * Most of the time, SMC shouldn't be called on any hot path,
+	 * otherwise the performance battle is already lost -- so it may
+	 * not be crucial to reach the maximum possible efficiency for
+	 * these calls.
+	 */
+
+
+A particular firmware's Linux glue code might have to put extra stuff
+around calls to generic_smc, but at least generic_smc itself wouldn't
+need to be reinvented, and the firmware-specific glue code could usually
+avoid asm.
+
+> Another example is the function that Tomasz shown
+> (https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/mach-exynos/exynos-smc.S?id=refs/tags/next-20130606
+> ), which preserves r4-r11 but also assumes r3 is an argument - that's
+> again another slightly different convention.
+
+... for which the above implementations of __call_smc() should work too.
+
+> All in all the needs of the various firmwares might end up being just
+> different enough that we need to have a different backend for each of
+> them. The firmware_ops defined in arch/arm/include/asm/firmware.h
+> perform the abstraction at a higher level, which seems more fit here
+> IMHO.
+> 
+> Alex.
+
+Indeed.  If you think you could work with one of the above generics, we
+could try it and see what it looks like though.
+
+If it's an awkward fit, I might be being too optimistic.
+
+Cheers
+---Dave
