@@ -1,55 +1,41 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Jun 2013 10:30:07 +0200
-Subject: [PATCH v3 4/6] ARM: kirkwood: move device tree nodes to DT
- irqchip and clocksource
-In-Reply-To: <1370536034-23956-5-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1370536034-23956-5-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130607103007.415575c8@skate>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 7 Jun 2013 16:31:35 +0800
+Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL
+ lock
+In-Reply-To: <20130607082457.GF12361@pengutronix.de>
+References: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
+ <20130607082457.GF12361@pengutronix.de>
+Message-ID: <20130607083134.GE21641@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sebastian Hesselbarth,
+On Fri, Jun 07, 2013 at 10:24:57AM +0200, Uwe Kleine-K?nig wrote:
+> On Fri, Jun 07, 2013 at 04:19:06PM +0800, Peter Chen wrote:
+> > For some unknown reasons, the jiffies will be updated more
+> > than one tick at every short time. Eg, at this code:
+> > After timeout = jiffies + msecs_to_jiffies(10),
+> > the interrupt occurs, and the softirq updates jiffies (eg,  + 2 jiffies),
+> > then return back from interrupt, the time between above operations
+> > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> Does this mean my patch doesn't solve the issue for you?
 
-On Thu,  6 Jun 2013 18:27:12 +0200, Sebastian Hesselbarth wrote:
+Not try, but your patch just delay timeout assignment, if there
+is jiffies update after that but before timeout check, it still
+has problem.
 
-> -		wdt at 20300 {
-> +		wdt: watchdog-timer at 20300 {
->  			compatible = "marvell,orion-wdt";
->  			reg = <0x20300 0x28>;
-> +			interrupt-parent = <&bridge_intc>;
-> +			interrupts = <3>;
->  			clocks = <&gate_clk 7>;
->  			status = "okay";
->  		};
+> 
+> Best regards
+> Uwe
+> 
+> 
+> -- 
+> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> 
 
-The watchdog driver is mapping the same registers as the timer driver
-(0x20300) and is poking into the same TIMER_CTRL register that controls
-both the timers and the watchdog.
-
-In addition to this, the watchdog driver also pokes into some other
-registers, such as BRIDGE_CAUSE and RSTOUTn_MASK.
-
-As we want to bring watchdog support for Armada 370/XP, I'm wondering
-if we should fix those problems, and if yes, how:
-
- (1) The timer driver is also responsible for handling the watchdog
-     (probably the easiest solution)
-
- (2) Have some sort of 'common code' between the timer driver and the
-     watchdog driver to control the access to the shared TIMER_CTRL
-     register.
-
- (3) Something else.
-
-And this still does not solve the access to BRIDGE_CAUSE and
-RSTOUTn_MASK.
-
-Ideas?
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+Best Regards,
+Peter Chen
