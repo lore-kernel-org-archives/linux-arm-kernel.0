@@ -1,56 +1,212 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 7 Jun 2013 14:14:27 -0400
-Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <20130607175005.GB3331@atomide.com>
-References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
- <20130607162927.GA3331@atomide.com> <20130607175005.GB3331@atomide.com>
-Message-ID: <51B22303.2000002@ti.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  7 Jun 2013 20:14:25 +0200
+Subject: [RFC PATCH 44/50] ARM: at91/dt: move sam9260/sam9g20 to new at91 clk
+ implem
+In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370628866-3100-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013 01:50 PM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [130607 09:35]:
->> * Paul Walmsley <paul@pwsan.com> [130607 05:38]:
->>> On Fri, 7 Jun 2013, Sricharan R wrote:
->>>
->>>> - The IO resource information like dma request lines, irq number and
->>>>   ocp address space can be populated via dt blob. So such data is stripped
->>>>   from OMAP4 SOC hwmod data file.
->>>>
->>>> - The devices which are still missing the device tree bindings,
->>>>   address space entries are not removed yet. When such devices add
->>>>   the dt bindings, respective address space data can be deleted.
->>>>
->>>> - Also other unnecessary hwmods like firewalls are removed as a part of this.
->>>>   Since emif was getting registered only because of this firewalls links,
->>>>   the mpu->emif direct link is added now.
->>>>
->>>> The above update, results in reduction of about ~1650 lines of code.
->>>>
->>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->>>
->>> Acked-by: Paul Walmsley <paul@pwsan.com>
->>>
->>> Can't test this one since I don't have an OMAP4 DT config set up in the testbed
->>> yet.  Maybe will add that to the testbed after the v3.10 release.
->>
->> OK thanks, applying into omap-for-v3.11/cleanup.
-> 
-> I had to undo the following parts to avoid regressions on omap4sdp.
-> Can you please follow up on fixing the related issues so the fixup
-> won't be needed?
-> 
-> Seems to work now the same way as earlier for both omap4sdp and blaze
-> es, except for DSS, which seems to be a separate issue as posted by
-> Tomi. Pushed out now to omap-for-v3.11/cleanup.
-> 
-Thats strange. You shouldn't need those fixes since that data is
-expected to be coming from DT.
+Define the main clock frequency in every sam9260/sam9g20 boards.
+Remove the old main clock definition.
 
-Sricharan, Can you please try out the patch against Tony's
-V3.11/clean-up branch and see whats missing there.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/boot/dts/animeo_ip.dts             |   17 ++++++-----------
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |   17 ++++++-----------
+ arch/arm/boot/dts/ge863-pro3.dtsi           |   16 ++++++----------
+ arch/arm/boot/dts/kizbox.dts                |    5 +++++
+ arch/arm/boot/dts/tny_a9260_common.dtsi     |   17 ++++++-----------
+ arch/arm/boot/dts/usb_a9260_common.dtsi     |   17 ++++++-----------
+ 6 files changed, 35 insertions(+), 54 deletions(-)
 
-Regards,
-Santosh
+diff --git a/arch/arm/boot/dts/animeo_ip.dts b/arch/arm/boot/dts/animeo_ip.dts
+index 3a1de9e..1843f15 100644
+--- a/arch/arm/boot/dts/animeo_ip.dts
++++ b/arch/arm/boot/dts/animeo_ip.dts
+@@ -31,17 +31,6 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <18432000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			usart0: serial at fffb0000 {
+@@ -82,6 +71,12 @@
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <18432000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+index 1373546..b8c823d 100644
+--- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
++++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
+@@ -17,17 +17,6 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <18432000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			pinctrl at fffff400 {
+@@ -108,6 +97,12 @@
+ 			watchdog at fffffd40 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <18432000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/ge863-pro3.dtsi b/arch/arm/boot/dts/ge863-pro3.dtsi
+index 230099b..b0b6aae 100644
+--- a/arch/arm/boot/dts/ge863-pro3.dtsi
++++ b/arch/arm/boot/dts/ge863-pro3.dtsi
+@@ -10,22 +10,18 @@
+ #include "at91sam9260.dtsi"
+ 
+ / {
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <6000000>;
+-		};
+-	};
+ 
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at fffff200 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <6000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/kizbox.dts b/arch/arm/boot/dts/kizbox.dts
+index 02df191..091da2e 100644
+--- a/arch/arm/boot/dts/kizbox.dts
++++ b/arch/arm/boot/dts/kizbox.dts
+@@ -53,6 +53,11 @@
+ 				status = "okay";
+ 			};
+ 
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <18432000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/tny_a9260_common.dtsi b/arch/arm/boot/dts/tny_a9260_common.dtsi
+index 0e6d3de..1cecb7a 100644
+--- a/arch/arm/boot/dts/tny_a9260_common.dtsi
++++ b/arch/arm/boot/dts/tny_a9260_common.dtsi
+@@ -15,22 +15,17 @@
+ 		reg = <0x20000000 0x4000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <12000000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at fffff200 {
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <12000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+diff --git a/arch/arm/boot/dts/usb_a9260_common.dtsi b/arch/arm/boot/dts/usb_a9260_common.dtsi
+index 2859776..3ed4db8 100644
+--- a/arch/arm/boot/dts/usb_a9260_common.dtsi
++++ b/arch/arm/boot/dts/usb_a9260_common.dtsi
+@@ -7,17 +7,6 @@
+  */
+ 
+ / {
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <12000000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			dbgu: serial at fffff200 {
+@@ -33,6 +22,12 @@
+ 				atmel,vbus-gpio = <&pioC 5 GPIO_ACTIVE_HIGH>;
+ 				status = "okay";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <12000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
+-- 
+1.7.9.5
