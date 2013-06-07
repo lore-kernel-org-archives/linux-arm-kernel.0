@@ -1,41 +1,77 @@
 From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 07 Jun 2013 18:23:38 +0900
-Subject: [PATCH V3 2/3] ARM: EXYNOS: Enable PCIe support for Exynos5440
-Message-ID: <000e01ce6360$b1b20fd0$15162f70$@samsung.com>
+Date: Fri, 07 Jun 2013 18:24:07 +0900
+Subject: [PATCH V3 3/3] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+Message-ID: <000f01ce6360$c29c3370$47d49a50$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable PCIe support for Exynos5440 which has two PCIe controllers.
+Exynos5440 has two PCIe controllers which can be used as root complex
+for PCIe interface.
 
 Signed-off-by: Jingoo Han <jg1.han@samsung.com>
 ---
- arch/arm/Kconfig             |    1 +
- arch/arm/mach-exynos/Kconfig |    1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++++
+ arch/arm/boot/dts/exynos5440.dtsi         |   32 +++++++++++++++++++++++++++++
+ 2 files changed, 40 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 42d6ea2..53b3b2d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1395,6 +1395,7 @@ config PCI_HOST_ITE8152
- 	select DMABOUNCE
- 
- source "drivers/pci/Kconfig"
-+source "drivers/pci/pcie/Kconfig"
- 
- source "drivers/pcmcia/Kconfig"
- 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 6aa228d..ecd1a3d 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -81,6 +81,7 @@ config SOC_EXYNOS5440
- 	select PINCTRL
- 	select PINCTRL_EXYNOS5440
- 	select PM_OPP
-+	select MIGHT_HAVE_PCI
- 	help
- 	  Enable EXYNOS5440 SoC support
- 
+diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+index d55042b..efe7d39 100644
+--- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
++++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+@@ -30,4 +30,12 @@
+ 			clock-frequency = <50000000>;
+ 		};
+ 	};
++
++	pcie0 at 40000000 {
++		reset-gpio = <5>;
++	};
++
++	pcie1 at 60000000 {
++		reset-gpio = <22>;
++	};
+ };
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index f6b1c89..ea37e94 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -216,4 +216,36 @@
+ 		clock-names = "rtc";
+ 		status = "disabled";
+ 	};
++
++	pcie0 at 40000000 {
++		compatible = "samsung,exynos5440-pcie";
++		reg = <0x40000000 0x4000
++			0x290000 0x1000
++			0x270000 0x1000
++			0x271000 0x40>;
++		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		bus-range = <0x0 0xf>;
++		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
++			  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
++			  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
++	};
++
++	pcie1 at 60000000 {
++		compatible = "samsung,exynos5440-pcie";
++		reg = <0x60000000 0x4000
++			0x2a0000 0x1000
++			0x272000 0x1000
++			0x271040 0x40>;
++		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
++		#address-cells = <3>;
++		#size-cells = <2>;
++		device_type = "pci";
++		bus-range = <0x0 0xf>;
++		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00200000   /* configuration space */
++			  0x81000000 0 0	  0x60200000 0 0x00004000   /* downstream I/O */
++			  0x82000000 0 0	  0x60204000 0 0x10000000>; /* non-prefetchable memory */
++	};
+ };
 -- 
 1.7.10.4
