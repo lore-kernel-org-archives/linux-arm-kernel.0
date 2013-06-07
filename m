@@ -1,61 +1,48 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 07 Jun 2013 22:52:33 +0400
-Subject: [PATCH 2/2] ARM: shmobile: r8A7779: fix Ether device name
-In-Reply-To: <20130605233311.GA32023@verge.net.au>
-References: <1369645206-3682-1-git-send-email-horms+renesas@verge.net.au>
- <1369645206-3682-3-git-send-email-horms+renesas@verge.net.au>
- <20130528040043.GL13532@quad.lixom.net> <20130604051352.GW23054@verge.net.au>
- <51AFB3F1.40603@cogentembedded.com> <20130605233311.GA32023@verge.net.au>
-Message-ID: <51B22BF1.8030805@cogentembedded.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 7 Jun 2013 11:54:13 -0700
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDwU+RzTCGb20uh7jxAzjbrX_yHVa4sy_ATr7MWpBb4WcQ@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
+ <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
+ <CAPweEDwU+RzTCGb20uh7jxAzjbrX_yHVa4sy_ATr7MWpBb4WcQ@mail.gmail.com>
+Message-ID: <CAOesGMg+Xk5yy2W3n__QYEkrXb5FP6eruOWvZPNHkOVHf2+pDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Luke,
 
-On 06/06/2013 03:33 AM, Simon Horman wrote:
+I want only one thing from you at this time. See below.
 
->>>>> From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>>>>
->>>>> While recasting the commit "ARM: shmobile: R8A7779: add Ether support", I made a
->>>>> typo in the platform device's name: used underscore instead of hyphen.
->>>> Minor nit: if this has been merged, then including the SHA is useful too.
->>> Thanks, I have updated the changelog to:
->>>
->>> ARM: shmobile: r8A7779: fix Ether device name
->>>
->>> While recasting the commit dace48d04dee46a3409d5e13cd98031522e46377
->>> ("ARM: shmobile: R8A7779: add Ether support"), I made a
->>> typo in the platform device's name: used underscore instead of hyphen.
->>>
->>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>> [horms+renesas at verge.net.au Add SHA of referenced commit to changlog]
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>>
->>> diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
->>> index b0b3948..c14a69b 100644
->>> --- a/arch/arm/mach-shmobile/setup-r8a7779.c
->>> +++ b/arch/arm/mach-shmobile/setup-r8a7779.c
->>> @@ -443,7 +443,7 @@ void __init r8a7779_add_standard_devices(void)
->>>   void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
->>>   {
->>> -	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
->>> +	platform_device_register_resndata(&platform_bus, "sh-eth", -1,
->>>   					  ether_resources,
->>>   					  ARRAY_SIZE(ether_resources),
->>>   					  pdata, sizeof(*pdata));
->>      Actually, if these patches aren't going into 3.10, I think it
->> makes sense to drop them,
->> since I'll be renaming the device and pushing this change thru the
->> net-next tree RSN...
-> Sure, I will drop them.
 
-    OTOH, since Ether support currently isn't working anyway, it doesn't 
-make sense
-to push it as a consolidated patch with sh_eth.c change, and fix up the 
-names up separately
-thru the renesas.git anyway. So I'll probably just respin these two 
-patches later, when
-I'm done with getting rid of #ifdef's in the driver and it's merged by 
-Dave...
+On Fri, Jun 7, 2013 at 11:45 AM, luke.leighton <luke.leighton@gmail.com> wrote:
+>  .... but the Directors of Allwinner aren't been kept in the loop,
+> here: that's my job, to get them up-to-speed.
 
-WBR, Sergei
+The one job I would love for you to do instead of all this trolling
+and time-wasting that's being done by _everybody_ involved, is to just
+extract yourself from the situation and let us go on with our work.
+You're causing nothing but confusion and extra work. Literally. You
+represent nobody that matters in this discussion.
+
+By demanding us to spend time and effort bringing you personally up to
+speed on a subject that both we (ARM kernel community) and them
+(Allwinner) are already having discussions about, it's nothing but a
+distraction and waste of energy.
+
+And yes, Allwinner knows about this public email thread.
+
+
+Thanks.
+
+-Olof
