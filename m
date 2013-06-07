@@ -1,55 +1,26 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Jun 2013 14:09:41 -0400
-Subject: [PATCH 2/2] ARM: dts: mvebu: Add the i2c-bridge capability to
- the mv64xxx-i2c
-In-Reply-To: <1370619743-15245-3-git-send-email-gregory.clement@free-electrons.com>
-References: <1370619743-15245-1-git-send-email-gregory.clement@free-electrons.com>
- <1370619743-15245-3-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <20130607180941.GW23859@titan.lakedaemon.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 7 Jun 2013 18:10:14 +0000 (UTC)
+Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data
+ file
+In-Reply-To: <20130607175005.GB3331@atomide.com>
+References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
+ <20130607162927.GA3331@atomide.com> <20130607175005.GB3331@atomide.com>
+Message-ID: <alpine.DEB.2.02.1306071807510.7753@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 05:42:23PM +0200, Gregory CLEMENT wrote:
-> The mv64xxx-i2c embedded in the Armada XP have a new feature called
-> i2c-bridge. This commit split the i2c information into armada-370.dtsi
-> and armada-xp.dtsi. Most of the data remains the same and stay in the
-> common file Armada-370-xp.dtsi. With this new feature the size of the
-> registers are bigger for Armada XP and for this SoCs we add a new flag
-> for the i2c-bridge capability.
-> 
-> The Device Tree binding documentation is updated accordingly.
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt |  6 ++++++
->  arch/arm/boot/dts/armada-370-xp.dtsi                  |  2 --
->  arch/arm/boot/dts/armada-370.dtsi                     |  8 ++++++++
->  arch/arm/boot/dts/armada-xp.dtsi                      | 10 ++++++++++
->  4 files changed, 24 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> index f46d928..8ede3e7 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-mv64xxx.txt
-> @@ -8,6 +8,12 @@ Required properties :
->   - interrupts      : The interrupt number
->   - clock-frequency : Desired I2C bus clock frequency in Hz.
->  
-> +Optional  properties :
-> +
-> +- i2c,i2c-bridge : This flag indicate that the i2c controller have the
-> +  Transaction Generator support and we want to use it. Not all the
-> +  mv64xxx controller have this feature.
+On Fri, 7 Jun 2013, Tony Lindgren wrote:
 
-Do you have a list of which controllers definitely do, or definitely
-don't?  That would be helpful for folks adding new boards.
+> I had to undo the following parts to avoid regressions on omap4sdp.
+> Can you please follow up on fixing the related issues so the fixup
+> won't be needed?
+
+Well, I can't even test it at the moment.  So it's probably best for 
+Santosh and Sricharan to fix those issues - they're the ones who are 
+responsible for testing the patch before it's sent.  Unless there's
+some specific reason why I'd be the best person to do it?
 
 
-> +
->  Examples:
 
-nit. should the example be updated?
-
-thx,
-
-Jason.
+- Paul
