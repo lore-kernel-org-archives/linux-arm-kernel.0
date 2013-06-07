@@ -1,62 +1,40 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Fri,  7 Jun 2013 10:37:08 +0200
-Subject: [PATCH] staging: imx_drm: imx_ldb: fix 18 bit format
-Message-ID: <1370594228-2869-1-git-send-email-s.trumtrar@pengutronix.de>
+From: vladoman@gmail.com (Vladimir Pantelic)
+Date: Fri, 07 Jun 2013 10:40:37 +0200
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1851164.HnXhGSdttW@flatron>
+ <CAPweEDxWW4LUeBaHLb+wHuAMq=63p88zsx4tumVb2PdP_+ohAw@mail.gmail.com>
+ <1622862.fXQWv0YWGV@flatron>
+ <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
+Message-ID: <51B19C85.9090407@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Niebel <Markus.Niebel@tqs.de>
+luke.leighton wrote:>   so.
+ >
+ >   coming back to what you said earlier: i'm formulating what to say to
+ > allwinner [and need to pre-send something by monday so that they can
+ > consider it before the meeting].  so far, it consists of:
+ >
+ > * device-tree is what the linux kernel community has come up with, it
+ > is equivalent to FEX.
+ >
+ > * the linux kernel community would like to apologise for not
+ > consulting with you (allwinner) on the decision to only accept device
+ > tree
 
-Since 18 bit is supported as datawidth in device tree it should be
-supported in driver. Beside the LDB channel the IPU channel has also
-to be configured to use BGR666.
+apologize? WTF?
 
-Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
-Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
----
-This is based on the series: "staging: drm/imx: Add LDB support"
-by Philipp.
+ > * allwinner and the linux and sunxi community therefore need to work
+ > closer together, we propose:
+ >
+ > * {insert proposals here}
 
+1) switch to DT
+2) there is no 2)
 
- drivers/staging/imx-drm/imx-ldb.c | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ > 3 days left on the clock.
 
-diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-index d8fc93c..84bf7d3 100644
---- a/drivers/staging/imx-drm/imx-ldb.c
-+++ b/drivers/staging/imx-drm/imx-ldb.c
-@@ -179,6 +179,7 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
- 	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
- 	struct imx_ldb *ldb = imx_ldb_ch->ldb;
- 	struct drm_display_mode *mode = &encoder->crtc->mode;
-+	u32 pixel_fmt;
- 	unsigned long serial_clk;
- 	unsigned long di_clk = mode->clock * 1000;
- 	int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->imx_drm_encoder,
-@@ -194,8 +195,23 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
- 		imx_ldb_set_clock(ldb, mux, imx_ldb_ch->chno, serial_clk, di_clk);
- 	}
- 
-+	switch (imx_ldb_ch->chno) {
-+	case 0:
-+		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
-+			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
-+		break;
-+	case 1:
-+		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
-+			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
-+		break;
-+	default:
-+		dev_err(ldb->dev, "unable to config di%d panel format\n",
-+			imx_ldb_ch->chno);
-+		pixel_fmt = V4L2_PIX_FMT_RGB24;
-+	}
-+
- 	imx_drm_crtc_panel_format_pins(encoder->crtc, DRM_MODE_ENCODER_LVDS,
--			V4L2_PIX_FMT_RGB24, 2, 3);
-+			pixel_fmt, 2, 3);
- }
- 
- static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
--- 
-1.8.2.rc2
+tick tock
