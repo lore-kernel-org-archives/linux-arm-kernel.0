@@ -1,29 +1,55 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Jun 2013 18:56:52 +0200
-Subject: [PATCH 12/14] ARM: mvebu: Remove device tree unused properties
- on A370
-In-Reply-To: <1370623671-7748-13-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1370623671-7748-13-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130607185652.57b75ba3@skate>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Fri, 7 Jun 2013 17:06:29 +0000 (UTC)
+Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
+In-Reply-To: <51B21105.1080301@wwwdotorg.org>
+References: <20130607121505.21868.72360.stgit@dusk.lan>
+ <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
+Message-ID: <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Ezequiel Garcia,
+Hi Stephen,
 
-On Fri,  7 Jun 2013 13:47:49 -0300, Ezequiel Garcia wrote:
-> These properties are not needed so it's safe to remove them.
+On Fri, 7 Jun 2013, Stephen Warren wrote:
+
+> On 06/07/2013 06:19 AM, Paul Walmsley wrote:
+> > Add DFLL DVCO reset line control functions to the CAR IP block driver.
+> > 
+> > The DVCO present in the DFLL IP block has a separate reset line,
+> > exposed via the CAR IP block.  This reset line is asserted upon SoC
+> > reset.  Unless something (such as the DFLL driver) deasserts this
+> > line, the DVCO will not oscillate, although reads and writes to the
+> > DFLL IP block will complete.
+> > 
+> > Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
+> > saving hours of debugging time.
 > 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+> 
+> >  void tegra114_clock_tune_cpu_trimmers_high(void);
+> >  void tegra114_clock_tune_cpu_trimmers_low(void);
+> >  void tegra114_clock_tune_cpu_trimmers_init(void);
+> > +void tegra114_clock_assert_dfll_dvco_reset(void);
+> > +void tegra114_clock_deassert_dfll_dvco_reset(void);
+> 
+> Where/what is the code that will call these new APIs? If it's going to
+> be something in drivers/clk, that seems fine.
 
-Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+That's correct - they'll be used by the DFLL clocksource code, which will 
+live in drivers/clk/tegra.  You've seen the patches already ;-)
 
-I believe this one should be applied now, regardless of what happens to
-the rest of the patch series.
+> The reset assert/de-assert functions at least might be worth exposing
+> using the new generic module reset API. I believe Prashant Gaikwad is
+> working on converting the Tegra clock driver to be a module reset
+> provider, hence removing the existing custom
+> tegra_periph_reset_{de,}assert() APIs.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+OK, will take a look to see if this can be done without getting in the way 
+of Prashant's work.  I'd na?vely assume that it might be best to convert 
+these as part of his series - that way we won't duplicate effort.
+
+Prashant, what stage are you at in the conversion?  If you're close to 
+completion, maybe we can just add this functionality in with your patches?
+
+
+- Paul
