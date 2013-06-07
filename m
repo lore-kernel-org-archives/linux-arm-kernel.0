@@ -1,125 +1,634 @@
-From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Fri, 7 Jun 2013 23:16:03 +0800
-Subject: pxa27x and pinctrl-single
-In-Reply-To: <51B1F330.9080007@newsguy.com>
-References: <51AF7404.3090003@newsguy.com>
- <CAD6h2NTu9-E=Xy8zz5cgDdk5W4ShM9-B+p+gQtiA_HASQ7AEuQ@mail.gmail.com>
- <51B0C7E8.5090308@newsguy.com>
- <CAD6h2NSRCti57NZtw0wzE8Th65_3Y8Dkz5zGsbnA2SUPYS263Q@mail.gmail.com>
- <51B12DE9.9040908@newsguy.com>
- <CAN1soZyOzrRewwx0up2s+4igUf77h+UbFpCsm324O-nkBWcsTQ@mail.gmail.com>
- <51B1F330.9080007@newsguy.com>
-Message-ID: <CAD6h2NStRcXm_X=0ib=RtKqVhmsfGo4z=_jzL1hUo_MLcfyBZw@mail.gmail.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  7 Jun 2013 17:19:40 +0200
+Subject: [RFC PATCH 15/50] ARM: at91: move at91sam9261 SoC to new at91 clk
+ implem
+In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370618380-18526-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2013 22:50, Mike Dunn <mikedunn@newsguy.com> wrote:
-> On 06/06/2013 06:21 PM, Haojian Zhuang wrote:
->> On Fri, Jun 7, 2013 at 8:48 AM, Mike Dunn <mikedunn@newsguy.com> wrote:
->>> On 06/06/2013 04:58 PM, Haojian Zhuang wrote:
->>>> On 7 June 2013 01:33, Mike Dunn <mikedunn@newsguy.com> wrote:
->>>>>
->>>
->>>
->>> [...]
->>>
->>>
->>>>>
->>>>> Yes, but currently pinctrl-single only supports writing one register for a given
->>>>> pin (with multiple pins sharing a register if bit-per-mux==true).  On pxa27x, a
->>>>> pin's alt function is determined by the values written to both the GAFRx and the
->>>>> GPDRx registers, so I think that pinctrl-single may need to allow a device tree
->>>>> to specify multiple reg/value/mask sets for any one pin.  I don't have a
->>>>> pxa3xx/mmp developer's manual handy, but from the code it appears that on these
->>>>> arches the direction register is irrelevant to the mux setting.
->>>>>
->>>>
->>>> No, it's not need to access both GAFRx & GPDRx. Let's focus on PXA27x first.
->>>>
->>>> GPIO ?x? Alternate Function Select Bits (where x = 112 through 120)
->>>> A bit-pair in this register determines the corresponding GPIO pin?s
->>>> functionality as one of the alternate functions that is mapped to it or as a
->>>> generic GPIO pin.
->>>>
->>>> 0b00 = The corresponding GPIO pin (GPIO<x>) is used as a general-
->>>> purpose I/O.
->>>> 0b01 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
->>>> function 1.
->>>> 0b10 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
->>>> function 2.
->>>> 0b11 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
->>>> function 3.
->>>>
->>>> We can see that GAFRx configures the pinmux. That's all. We can use
->>>> pinctrl-single
->>>> driver to cover this.
->>>
->>>
->>> But on the pxa27x there are usually *two* meanings for any one of the 3 alt
->>> functions, depending on the direction.  As a random example... gpio28 alt fn
->>> 0b01 is AC97_BITCLK if the direction is input, but is I2S_BITCLK if the
->>> direction is output (from PXA27x Developer's Manual, Table 24-2).
->>>
->>
->> You didn't understand the alternate function. GPIO mode is only one mode
->> of alternate functions. Because GPIO means that user can program the
->> pin, you also need to configure the direction for GPIO usage.
->>
->> Most of pins are either input or output. If the alternate function is
->> AC97_BITCLK,
->> input mode is configured by hardware automatically. You shouldn't configure
->> it in GPDR register. Since it's working in AC97 mode, not GPIO mode. Configuring
->> in GPDR register can't work.
->
->
-> This is where you are wrong Haojian.  Now I am sure that this peculiarity is
-> unique to pxa2xx.  From pxa27x developer's manual (section 24.4.2)...
->
-> GPIO pins can have as many as three alternate input and three alternate output
-> functions.
->
-> And in the comments above the __gpio_is_occupied() function in gpio-pxa.c you
-> mentioned earlier...
->
-> /*
->  * On PXA25x and PXA27x, GAFRx and GPDRx together decide the alternate
->  * function of a GPIO, and GPDRx cannot be altered once configured. It
->
->
-> I'll try to state it another way... on the old Intel pxa arches, the direction
-> bit is effectively a third alt function bit, as "alt function" is defined by the
-> newer Marvell processors.
->
-> I'll be happy to send you the pxa27x developer's manual if you still have
-> doubts.  In the gpio chapter you will see a table with a row for each gpio pin,
-> each row containing 6 columns labeled
->
-> alt fn 1 (in)
-> alt fn 2 (in)
-> alt fn 3 (in)
-> alt fn 1 (out)
-> alt fn 2 (out)
-> alt fn 3 (out)
->
-> I hope that makes sense now.
->
-> Thanks again,
-> Mike
+This patch removes all references to the old at91 clks implementation and
+make use of the new at91 clk implem for at91sam9261 SoC.
 
-Thank you for pointing this to me. I didn't realize the GPDR needs to
-be configured
-in PXA2xx. It's totally different from PXA3xx.
+All dt specific lookups are removed (handled in clk device tree binding).
 
-Since you need to configure both GPDRx and GAFRx. If we are talking
-pinctrl-single
-as reference, we can make it work by this way.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/mach-at91/at91sam9261.c |  579 +++++++++++++++++++++++++-------------
+ 1 file changed, 383 insertions(+), 196 deletions(-)
 
-We need to define two pinmux controllers. One is for GPDRx, and the
-other is for GAFRx.
-Both of them need to support pinctrl-single,bits property. For any
-alternate pins in DTS,
-we could include these two pins from two pinmux controllers. What's
-your opinion?
-
-Regards
-Haojian
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 8a63b81..ccc2bcc 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -25,7 +25,6 @@
+ #include "at91_rstc.h"
+ #include "soc.h"
+ #include "generic.h"
+-#include "clock.h"
+ #include "sam9_smc.h"
+ 
+ /* --------------------------------------------------------------------
+@@ -35,216 +34,404 @@
+ /*
+  * The peripheral clocks.
+  */
+-static struct clk pioA_clk = {
+-	.name		= "pioA_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_PIOA,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk pioB_clk = {
+-	.name		= "pioB_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_PIOB,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk pioC_clk = {
+-	.name		= "pioC_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_PIOC,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk usart0_clk = {
+-	.name		= "usart0_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_US0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk usart1_clk = {
+-	.name		= "usart1_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_US1,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk usart2_clk = {
+-	.name		= "usart2_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_US2,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk mmc_clk = {
+-	.name		= "mci_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_MCI,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk udc_clk = {
+-	.name		= "udc_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_UDP,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk twi_clk = {
+-	.name		= "twi_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_TWI,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk spi0_clk = {
+-	.name		= "spi0_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_SPI0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk spi1_clk = {
+-	.name		= "spi1_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_SPI1,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ssc0_clk = {
+-	.name		= "ssc0_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_SSC0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ssc1_clk = {
+-	.name		= "ssc1_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_SSC1,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ssc2_clk = {
+-	.name		= "ssc2_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_SSC2,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc0_clk = {
+-	.name		= "tc0_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_TC0,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc1_clk = {
+-	.name		= "tc1_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_TC1,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk tc2_clk = {
+-	.name		= "tc2_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_TC2,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk ohci_clk = {
+-	.name		= "ohci_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_UHP,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-static struct clk lcdc_clk = {
+-	.name		= "lcdc_clk",
+-	.pmc_mask	= 1 << AT91SAM9261_ID_LCDC,
+-	.type		= CLK_TYPE_PERIPHERAL,
+-};
+-
+-/* HClocks */
+-static struct clk hck0 = {
+-	.name		= "hck0",
+-	.pmc_mask	= AT91_PMC_HCK0,
+-	.type		= CLK_TYPE_SYSTEM,
+-	.id		= 0,
+-};
+-static struct clk hck1 = {
+-	.name		= "hck1",
+-	.pmc_mask	= AT91_PMC_HCK1,
+-	.type		= CLK_TYPE_SYSTEM,
+-	.id		= 1,
+-};
+-
+-static struct clk *periph_clocks[] __initdata = {
+-	&pioA_clk,
+-	&pioB_clk,
+-	&pioC_clk,
+-	&usart0_clk,
+-	&usart1_clk,
+-	&usart2_clk,
+-	&mmc_clk,
+-	&udc_clk,
+-	&twi_clk,
+-	&spi0_clk,
+-	&spi1_clk,
+-	&ssc0_clk,
+-	&ssc1_clk,
+-	&ssc2_clk,
+-	&tc0_clk,
+-	&tc1_clk,
+-	&tc2_clk,
+-	&ohci_clk,
+-	&lcdc_clk,
+-	// irq0 .. irq2
+-};
+-
+-static struct clk_lookup periph_clocks_lookups[] = {
+-	CLKDEV_CON_DEV_ID("hclk", "at91sam9261-lcdfb.0", &hck1),
+-	CLKDEV_CON_DEV_ID("hclk", "at91sam9g10-lcdfb.0", &hck1),
+-	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
+-	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
+-	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tc0_clk),
+-	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.0", &tc1_clk),
+-	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.0", &tc2_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.0", &ssc0_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.1", &ssc1_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "at91rm9200_ssc.2", &ssc2_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "fffbc000.ssc", &ssc0_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "fffc0000.ssc", &ssc1_clk),
+-	CLKDEV_CON_DEV_ID("pclk", "fffc4000.ssc", &ssc2_clk),
+-	CLKDEV_CON_DEV_ID("hclk", "at91_ohci", &hck0),
+-	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9261.0", &twi_clk),
+-	CLKDEV_CON_DEV_ID(NULL, "i2c-at91sam9g10.0", &twi_clk),
+-	CLKDEV_CON_ID("pioA", &pioA_clk),
+-	CLKDEV_CON_ID("pioB", &pioB_clk),
+-	CLKDEV_CON_ID("pioC", &pioC_clk),
+-};
+-
+-static struct clk_lookup usart_clocks_lookups[] = {
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.0", &mck),
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.1", &usart0_clk),
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.2", &usart1_clk),
+-	CLKDEV_CON_DEV_ID("usart", "atmel_usart.3", &usart2_clk),
++static struct clk_lookup pioA_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pioA_clk", NULL),
++	CLKDEV_INIT(NULL, "pioA", NULL),
++};
++
++static struct clk_lookup pioB_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pioB_clk", NULL),
++	CLKDEV_INIT(NULL, "pioB", NULL),
++};
++
++static struct clk_lookup pioC_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pioB_clk", NULL),
++	CLKDEV_INIT(NULL, "pioB", NULL),
++};
++
++static struct clk_lookup usart0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "usart0_clk", NULL),
++	CLKDEV_INIT("atmel_usart.1", "usart", NULL),
++};
++
++static struct clk_lookup usart1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "usart1_clk", NULL),
++	CLKDEV_INIT("atmel_usart.2", "usart", NULL),
++};
++
++static struct clk_lookup usart2_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "usart2_clk", NULL),
++	CLKDEV_INIT("atmel_usart.3", "usart", NULL),
++};
++
++static struct clk_lookup mci_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "mci_clk", NULL),
++};
++
++static struct clk_lookup udc_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "udc_clk", NULL),
++};
++
++static struct clk_lookup twi_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "twi_clk", NULL),
++	CLKDEV_INIT("i2c-at91sam9261.0", NULL, NULL),
++	CLKDEV_INIT("i2c-at91sam9g10.0", NULL, NULL),
++};
++
++static struct clk_lookup spi0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "spi0_clk", NULL),
++	CLKDEV_INIT("atmel_spi.0", "spi_clk", NULL),
++};
++
++static struct clk_lookup spi1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "spi1_clk", NULL),
++	CLKDEV_INIT("atmel_spi.1", "spi_clk", NULL),
++};
++
++static struct clk_lookup ssc0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ssc0_clk", NULL),
++	CLKDEV_INIT("at91rm9200_ssc.0", "pclk", NULL),
++};
++
++static struct clk_lookup ssc1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ssc1_clk", NULL),
++	CLKDEV_INIT("at91rm9200_ssc.1", "pclk", NULL),
++};
++
++static struct clk_lookup ssc2_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ssc2_clk", NULL),
++	CLKDEV_INIT("at91rm9200_ssc.2", "pclk", NULL),
++};
++
++static struct clk_lookup tc0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc0_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.0", "t0_clk", NULL),
++};
++
++static struct clk_lookup tc1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc1_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.0", "t1_clk", NULL),
++};
++
++static struct clk_lookup tc2_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "tc2_clk", NULL),
++	CLKDEV_INIT("atmel_tcb.2", "t2_clk", NULL),
++};
++
++static struct clk_lookup ohci_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "ohci_clk", NULL),
++};
++
++static struct clk_lookup lcdc_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "lcdc_clk", NULL),
++};
++
++static size_t periph_clock_lookup_sizes[] __initdata = {
++	0,
++	0,
++	ARRAY_SIZE(pioA_clk_lookup),
++	ARRAY_SIZE(pioB_clk_lookup),
++	ARRAY_SIZE(pioC_clk_lookup),
++	0,
++	ARRAY_SIZE(usart0_clk_lookup),
++	ARRAY_SIZE(usart1_clk_lookup),
++	ARRAY_SIZE(usart2_clk_lookup),
++	ARRAY_SIZE(mci_clk_lookup),
++	ARRAY_SIZE(udc_clk_lookup),
++	ARRAY_SIZE(twi_clk_lookup),
++	ARRAY_SIZE(spi0_clk_lookup),
++	ARRAY_SIZE(spi1_clk_lookup),
++	ARRAY_SIZE(ssc0_clk_lookup),
++	ARRAY_SIZE(ssc1_clk_lookup),
++	ARRAY_SIZE(ssc2_clk_lookup),
++	ARRAY_SIZE(tc0_clk_lookup),
++	ARRAY_SIZE(tc1_clk_lookup),
++	ARRAY_SIZE(tc2_clk_lookup),
++	ARRAY_SIZE(ohci_clk_lookup),
++	ARRAY_SIZE(lcdc_clk_lookup),
++};
++
++static struct clk_lookup *periph_clock_lookups[] __initdata = {
++	NULL,
++	NULL,
++	pioA_clk_lookup,
++	pioB_clk_lookup,
++	pioC_clk_lookup,
++	NULL,
++	usart0_clk_lookup,
++	usart1_clk_lookup,
++	usart2_clk_lookup,
++	mci_clk_lookup,
++	udc_clk_lookup,
++	twi_clk_lookup,
++	spi0_clk_lookup,
++	spi1_clk_lookup,
++	ssc0_clk_lookup,
++	ssc1_clk_lookup,
++	ssc2_clk_lookup,
++	tc0_clk_lookup,
++	tc1_clk_lookup,
++	tc2_clk_lookup,
++	ohci_clk_lookup,
++	lcdc_clk_lookup,
++};
++
++
++/*
++ * The system clocks.
++ */
++static struct clk_lookup udp_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "udpck", NULL),
++};
++
++static struct clk_lookup uhp_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "uhpck", NULL),
++};
++
++static struct clk_lookup pck0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pck0", NULL),
++};
++
++static struct clk_lookup pck1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pck1", NULL),
++};
++
++static struct clk_lookup pck2_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pck2", NULL),
++};
++
++static struct clk_lookup pck3_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "pck3", NULL),
++};
++
++static struct clk_lookup hck0_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "hck0", NULL),
++	CLKDEV_INIT("at91_ohci", "hclk", NULL),
++};
++
++static struct clk_lookup hck1_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "hck1", NULL),
++	CLKDEV_INIT("at91sam9261-lcdfb.0", "hclk", NULL),
++	CLKDEV_INIT("at91sam9g10-lcdfb.0", "hclk", NULL),
++};
++
++static size_t system_clock_lookup_sizes[] __initdata = {
++	0,
++	0,
++	0,
++	0,
++	0,
++	0,
++	ARRAY_SIZE(uhp_clk_lookup),
++	ARRAY_SIZE(udp_clk_lookup),
++	ARRAY_SIZE(pck0_clk_lookup),
++	ARRAY_SIZE(pck1_clk_lookup),
++	ARRAY_SIZE(pck2_clk_lookup),
++	ARRAY_SIZE(pck3_clk_lookup),
++	0,
++	0,
++	0,
++	0,
++	ARRAY_SIZE(hck0_clk_lookup),
++	ARRAY_SIZE(hck1_clk_lookup),
++};
++
++static struct clk_lookup *system_clock_lookups[] __initdata = {
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	uhp_clk_lookup,
++	udp_clk_lookup,
++	pck0_clk_lookup,
++	pck1_clk_lookup,
++	pck2_clk_lookup,
++	pck3_clk_lookup,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	hck0_clk_lookup,
++	hck1_clk_lookup,
++};
++
++static const char *system_clock_parent_names[] __initdata = {
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	"usbck",
++	"usbck",
++	"prog0",
++	"prog1",
++	"prog2",
++	"prog3",
++	NULL,
++	NULL,
++	NULL,
++	NULL,
++	"mck",
++	"mck",
+ };
+ 
+ /*
+  * The four programmable clocks.
+  * You must configure pin multiplexing to bring these signals out.
+  */
+-static struct clk pck0 = {
+-	.name		= "pck0",
+-	.pmc_mask	= AT91_PMC_PCK0,
+-	.type		= CLK_TYPE_PROGRAMMABLE,
+-	.id		= 0,
+-};
+-static struct clk pck1 = {
+-	.name		= "pck1",
+-	.pmc_mask	= AT91_PMC_PCK1,
+-	.type		= CLK_TYPE_PROGRAMMABLE,
+-	.id		= 1,
+-};
+-static struct clk pck2 = {
+-	.name		= "pck2",
+-	.pmc_mask	= AT91_PMC_PCK2,
+-	.type		= CLK_TYPE_PROGRAMMABLE,
+-	.id		= 2,
+-};
+-static struct clk pck3 = {
+-	.name		= "pck3",
+-	.pmc_mask	= AT91_PMC_PCK3,
+-	.type		= CLK_TYPE_PROGRAMMABLE,
+-	.id		= 3,
++static const char *prog_clock_parent_names[] __initdata = {
++	"clk32k",
++	"main",
++	"plla",
++	"pllb",
++};
++
++/*
++ * The pll clocks.
++ */
++static struct clk_lookup pll_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "plla", NULL),
++	CLKDEV_INIT(NULL, "pllb", NULL),
++};
++
++static struct clk_range at91sam9261_pll_output[] = {
++	CLK_RANGE(80000000, 200000000),
++	CLK_RANGE(190000000, 240000000),
++};
++static u8 at91sam9261_pll_out[] = {0, 2};
++
++struct clk_pll_characteristics at91sam9261_pll_characteristics = {
++	.input = CLK_RANGE(1000000, 32000000),
++	.num_output = ARRAY_SIZE(at91sam9261_pll_output),
++	.output = at91sam9261_pll_output,
++	.out = at91sam9261_pll_out,
++};
++
++static struct clk_range at91sam9g10_pll_output[] = {
++	CLK_RANGE(80000000, 266000000),
++};
++static u8 at91sam9g10_pll_out[] = {0};
++
++struct clk_pll_characteristics at91sam9g10_pll_characteristics = {
++	.input = CLK_RANGE(1000000, 32000000),
++	.num_output = ARRAY_SIZE(at91sam9g10_pll_output),
++	.output = at91sam9g10_pll_output,
++	.out = at91sam9g10_pll_out,
++};
++
++
++/*
++ * The master clock.
++ */
++static struct clk_lookup mck_clk_lookup[] = {
++	CLKDEV_INIT(NULL, "mck", NULL),
++	CLKDEV_INIT("atmel_usart.0", "usart", NULL),
++};
++
++struct clk_master_characteristics at91sam9261_master_characteristics = {
++	.output = CLK_RANGE(0, 94000000),
++	.have_div3_pres = 0,
++	.divisors = {1, 2, 4, 0},
++};
++
++struct clk_master_characteristics at91sam9g10_master_characteristics = {
++	.output = CLK_RANGE(0, 133000000),
++	.have_div3_pres = 0,
++	.divisors = {1, 2, 4, 0},
+ };
+ 
++static const char *master_clock_parent_names[] __initdata = {
++	"clk32k",
++	"main",
++	"plla",
++	"pllb",
++};
++
++/*
++ * The USB clock.
++ */
++static u32 usb_divisors[] = {1, 2, 4, 0};
++
+ static void __init at91sam9261_register_clocks(void)
+ {
+ 	int i;
++	int k;
++	size_t size;
++	struct clk *clk;
++	const char *name;
++	struct clk_lookup *lookup;
++	struct clk_pll_characteristics *pll_characteristics;
++	struct clk_master_characteristics *master_characteristics;
++
++	if (cpu_is_at91sam9g10()) {
++		pll_characteristics = &at91sam9g10_pll_characteristics;
++		master_characteristics = &at91sam9g10_master_characteristics;
++	} else {
++		pll_characteristics = &at91sam9261_pll_characteristics;
++		master_characteristics = &at91sam9261_master_characteristics;
++	}
+ 
+-	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
+-		clk_register(periph_clocks[i]);
++	for (i = 0; i < ARRAY_SIZE(pll_clk_lookup); i++) {
++		name = pll_clk_lookup[i].con_id;
++		clk = at91_clk_register_pll(name, "main", i,
++					    &at91rm9200_pll_layout,
++					    &pll_characteristics[i]);
++		pll_clk_lookup[i].clk = clk;
++	}
++	clkdev_add_table(pll_clk_lookup, ARRAY_SIZE(pll_clk_lookup));
++
++	clk = at91_clk_register_master("mck",
++				       ARRAY_SIZE(master_clock_parent_names),
++				       master_clock_parent_names,
++				       &at91rm9200_master_layout,
++				       master_characteristics);
++	for (i = 0; i < ARRAY_SIZE(mck_clk_lookup); i++)
++		mck_clk_lookup[i].clk = clk;
++	clkdev_add_table(mck_clk_lookup, ARRAY_SIZE(mck_clk_lookup));
+ 
+-	clkdev_add_table(periph_clocks_lookups,
+-			 ARRAY_SIZE(periph_clocks_lookups));
+-	clkdev_add_table(usart_clocks_lookups,
+-			 ARRAY_SIZE(usart_clocks_lookups));
++	for (i = 0; i < ARRAY_SIZE(periph_clock_lookup_sizes); i++) {
++		size = periph_clock_lookup_sizes[i];
++		lookup = periph_clock_lookups[i];
++		if (!size || !lookup)
++			continue;
++		name = periph_clock_lookups[i][0].con_id;
++		if (!name)
++			continue;
++		clk = at91_clk_register_peripheral(name, "mck", i);
+ 
+-	clk_register(&pck0);
+-	clk_register(&pck1);
+-	clk_register(&pck2);
+-	clk_register(&pck3);
++		for (k = 0; k < size; k++)
++			lookup[k].clk = clk;
++		clkdev_add_table(lookup, size);
++	}
+ 
+-	clk_register(&hck0);
+-	clk_register(&hck1);
++	for (i = 0; i < 4; i++) {
++		name = system_clock_parent_names[8 + i];
++		clk = at91_clk_register_programmable(name,
++					prog_clock_parent_names,
++					ARRAY_SIZE(prog_clock_parent_names),
++					i, &at91rm9200_programmable_layout);
++	}
++
++	clk = at91rm9200_clk_register_usb("usbck", "pllb", usb_divisors);
++
++	for (i = 0; i < ARRAY_SIZE(system_clock_lookup_sizes); i++) {
++		size = system_clock_lookup_sizes[i];
++		lookup = system_clock_lookups[i];
++		if (!size || !lookup)
++			continue;
++		name = system_clock_lookups[i][0].con_id;
++		if (!name || !system_clock_parent_names[i])
++			continue;
++		clk = at91_clk_register_system(name,
++					       system_clock_parent_names[i],
++					       i);
++		for (k = 0; k < size; k++)
++			lookup[k].clk = clk;
++		clkdev_add_table(lookup, size);
++	}
+ }
+ 
+ /* --------------------------------------------------------------------
+-- 
+1.7.9.5
