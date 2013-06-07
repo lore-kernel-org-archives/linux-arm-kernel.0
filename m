@@ -1,40 +1,39 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 7 Jun 2013 19:21:35 -0400
-Subject: [PATCH] cpuidle: fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency
- warning
-In-Reply-To: <201306072121.58719.arnd@arndb.de>
-References: <1370626856-2876-1-git-send-email-daniel.lezcano@linaro.org>
- <51B21D65.3040604@ti.com> <201306072121.58719.arnd@arndb.de>
-Message-ID: <51B26AFF.9080908@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 7 Jun 2013 16:40:25 -0700
+Subject: [GIT PULL] ARM dts cpus/cpu nodes updates
+In-Reply-To: <20130523104858.GA2986@e102568-lin.cambridge.arm.com>
+References: <20130523104858.GA2986@e102568-lin.cambridge.arm.com>
+Message-ID: <20130607234025.GA24278@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013 03:21 PM, Arnd Bergmann wrote:
-> On Friday 07 June 2013, Santosh Shilimkar wrote:
->>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->>> index f49cd51..831e89e 100644
->>> --- a/arch/arm/mach-omap2/Kconfig
->>> +++ b/arch/arm/mach-omap2/Kconfig
->>> @@ -83,7 +83,7 @@ config ARCH_OMAP4
->>>       depends on ARCH_OMAP2PLUS
->>>       depends on ARCH_MULTI_V7
->>>       select ARCH_HAS_OPP
->>> -     select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
->>> +     select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
->>
->> I remember Colin mentioning about above dependency is taken care
->> already in design [1]
+On Thu, May 23, 2013 at 11:48:58AM +0100, Lorenzo Pieralisi wrote:
+> Hi Arnd, Olof,
 > 
-> It's a matter of how it gets represented in Kconfig. Right now 
-> the ARCH_NEEDS_CPU_IDLE_COUPLED symbol has a dependency on CPU_IDLE,
-> so we cannot select it if CPU_IDLE is not set (or get a build time
-> warning).
+> please pull dts cpus/cpu node updates for all non-compliant ARM
+> SoC/boards. Please notice I could not update all dts files since some of
+> them are missing the cpus node altogether and I simply can not know
+> the CPUs configuration for them, it is up to maintainers to patch the
+> respective dts to comply with the latest specification.
 > 
-> I originally suggested removing the dependency, but Daniel preferred
-> to leave it there as an explicit dependency so it is required to
-> do this change instead.
+> I have just sent a different pull request for related documentation:
 > 
-I see. Thanks for clarifying.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170234.html
+> 
+> dts updates comply with those Documentation updates.
+> 
+> Thank you very much indeed,
+> Lorenzo
+> 
+> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+> 
+>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://linux-arm.org/linux-2.6-lp.git dts-cpus-updates
 
-Regards,
-Santosh
+Thanks, pulled into next/dt.
+
+
+-Olof
