@@ -1,52 +1,39 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 7 Jun 2013 09:49:41 +0200
-Subject: [PATCH 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
-In-Reply-To: <20130607033306.GC21641@nchen-desktop>
-References: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
- <20130606121647.GR23140@pengutronix.de>
- <20130607025320.GA21641@nchen-desktop>
- <20130607033306.GC21641@nchen-desktop>
-Message-ID: <20130607074941.GD12361@pengutronix.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  7 Jun 2013 16:51:34 +0900
+Subject: [PATCH 04/27] ARM: shmobile: remove ";
+ " from SH_FIXED_RATIO_CLK*() macro
+In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 11:33:07AM +0800, Peter Chen wrote:
-> On Fri, Jun 07, 2013 at 10:53:20AM +0800, Peter Chen wrote:
-> > On Thu, Jun 06, 2013 at 02:16:47PM +0200, Uwe Kleine-K?nig wrote:
-> > > Hello
-> > > 
-> > > [added jstultz to Cc:]
-> > > 
-> > > On Thu, Jun 06, 2013 at 02:55:26PM +0800, Peter Chen wrote:
-> > > > For tickless system, the jiffies may be updated long time (>20ms).
-> > > ... may not be updated for a long time ... ?
-> > > 
-> > > > At high loading system, the current waiting method will cause waiting
-> > > > timeout, and cause a kernel dump at below case.
-> > > > After timeout = jiffies + msecs_to_jiffies(10),
-> > > > the timer interrupt occurs, it updates jiffies (eg,  + 2 jiffies),
-> > > > then return back from interrupt, the time between above operations
-> > > > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
-> > > Hmm, I admit I didn't follow the tickless stuff, but still I wonder if
-> > > the analysis is right. I thought on tickless jiffies are updated as
-> > > before by the boot cpu that cannot run in tickless mode?
-> > > 
-> > > Anyhow, this only affects the commit log, not the problem.
-> > >  
-> > 
-> > I add jiffies print at irq_exit (kernel/softirq.c), and it
-> > is not updated every jiffies.
-> 
-> Oh, I have not considered cpu idle condition. I think this
-> problem may occur the condition that irq and softirq consume
-> too much time.
-That was my thought, too. With my patch this time at least only happens
-after the pll is programmed and the issue might be solved, too?! (Maybe
-apart from Russell's comment.)
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Best regards
-Uwe
+Acked-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/include/mach/clock.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-shmobile/include/mach/clock.h b/arch/arm/mach-shmobile/include/mach/clock.h
+index 76ac612..8902044 100644
+--- a/arch/arm/mach-shmobile/include/mach/clock.h
++++ b/arch/arm/mach-shmobile/include/mach/clock.h
+@@ -24,11 +24,11 @@ struct clk name = {			\
+ }
+ 
+ #define SH_FIXED_RATIO_CLK(name, p, r)		\
+-static SH_FIXED_RATIO_CLKg(name, p, r);
++static SH_FIXED_RATIO_CLKg(name, p, r)
+ 
+ #define SH_FIXED_RATIO_CLK_SET(name, p, m, d)	\
+ 	SH_CLK_RATIO(name, m, d);		\
+-	SH_FIXED_RATIO_CLK(name, p, name);
++	SH_FIXED_RATIO_CLK(name, p, name)
+ 
+ #define SH_CLK_SET_RATIO(p, m, d)	\
+ {			\
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.8.2.1
