@@ -1,74 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 17:22:05 +0900
-Subject: [PATCH 07/11] ARM: shmobile: lager: Add GPIO LEDs
+Date: Fri,  7 Jun 2013 17:22:04 +0900
+Subject: [PATCH 06/11] ARM: shmobile: bockw: add dummy regulators for SMSC
 In-Reply-To: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370593329-27559-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370593329-27559-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
-support them.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
+SMSC driver will try to get regulator if .config had CONFIG_REGULATOR,
+and, shmobile_defconfig has it.
+SMSC driver on Bock-W board will be failed if it doens't have
+dummy regulator settings.
 
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-lager.c | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
+ arch/arm/mach-shmobile/board-bockw.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 6114edd..6a1ba38 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -21,13 +21,37 @@
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/kernel.h>
-+#include <linux/leds.h>
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index 3ce020a..4d65715 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -20,6 +20,8 @@
+ 
  #include <linux/pinctrl/machine.h>
-+#include <linux/platform_data/gpio-rcar.h>
  #include <linux/platform_device.h>
++#include <linux/regulator/fixed.h>
++#include <linux/regulator/machine.h>
+ #include <linux/smsc911x.h>
  #include <mach/common.h>
- #include <mach/r8a7790.h>
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
+ #include <mach/irqs.h>
+@@ -34,6 +36,12 @@
+  * SW41		SCIF	RCAN
+  */
  
-+/* LEDS */
-+static struct gpio_led lager_leds[] = {
-+	{
-+		.name		= "led8",
-+		.gpio		= RCAR_GP_PIN(5, 17),
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	}, {
-+		.name		= "led7",
-+		.gpio		= RCAR_GP_PIN(4, 23),
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	}, {
-+		.name		= "led6",
-+		.gpio		= RCAR_GP_PIN(4, 22),
-+		.default_state	= LEDS_GPIO_DEFSTATE_ON,
-+	},
++/* Dummy supplies, where voltage doesn't matter */
++static struct regulator_consumer_supply dummy_supplies[] = {
++	REGULATOR_SUPPLY("vddvario", "smsc911x"),
++	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
 +};
 +
-+static struct gpio_led_platform_data lager_leds_pdata = {
-+	.leds		= lager_leds,
-+	.num_leds	= ARRAY_SIZE(lager_leds),
-+};
+ static struct smsc911x_platform_config smsc911x_data = {
+ 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+ 	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
+@@ -82,6 +90,9 @@ static void __init bockw_init(void)
+ 		iowrite16(val, base + IRQ0MR);
+ 		iounmap(base);
+ 
++		regulator_register_fixed(0, dummy_supplies,
++					 ARRAY_SIZE(dummy_supplies));
 +
- static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-@@ -46,6 +70,9 @@ static void __init lager_add_standard_devices(void)
- 	r8a7790_pinmux_init();
- 
- 	r8a7790_add_standard_devices();
-+	platform_device_register_data(&platform_bus, "leds-gpio", -1,
-+				      &lager_leds_pdata,
-+				      sizeof(lager_leds_pdata));
- }
- 
- static const char *lager_boards_compat_dt[] __initdata = {
+ 		platform_device_register_resndata(
+ 			&platform_bus, "smsc911x", -1,
+ 			smsc911x_resources, ARRAY_SIZE(smsc911x_resources),
 -- 
 1.8.2.1
