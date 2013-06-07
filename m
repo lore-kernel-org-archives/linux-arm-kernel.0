@@ -1,103 +1,86 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 07 Jun 2013 09:54:18 +0200
-Subject: [PATCH v3 06/11] staging: drm/imx: Add LDB support
-In-Reply-To: <51B18E54.5030501@tqsc.de>
-References: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
- <1364484215-13935-7-git-send-email-p.zabel@pengutronix.de>
- <51B18E54.5030501@tqsc.de>
-Message-ID: <1370591658.4470.9.camel@pizza.hi.pengutronix.de>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Fri, 7 Jun 2013 09:02:43 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <20130606131042.GN18614@n2100.arm.linux.org.uk>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1733666.lHUBcfUXq9@flatron>
+ <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
+ <20130606131042.GN18614@n2100.arm.linux.org.uk>
+Message-ID: <CAPweEDyYt+pN+UaFuqWL5RrHpyuq_4So-tArmx3dr=0wLS+hwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 07.06.2013, 09:40 +0200 schrieb Markus Niebel:
-> Am 28.03.2013 16:23, wrote Philipp Zabel:
-> > From: Sascha Hauer <s.hauer@pengutronix.de>
-> > 
-> > This adds support for the LVDS Display Bridge contained
-> > in i.MX5 and i.MX6 SoCs.
-> > 
-> > Bit mapping, data width, and video timings are configurable
-> > via device tree. Dual-channel mode is supported for a single
-> > high-resolution source.
-> > 
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > ---
-> > Changes since v2:
-> >  - Removed commented out code
-> >  - Replaced magic constants
-> >  - Select OF_VIDEOMODE
-> > ---
-> >  .../devicetree/bindings/staging/imx-drm/ldb.txt    |  99 ++++
-> >  drivers/staging/imx-drm/Kconfig                    |   8 +
-> >  drivers/staging/imx-drm/Makefile                   |   1 +
-> >  drivers/staging/imx-drm/imx-ldb.c                  | 609 +++++++++++++++++++++
-> >  4 files changed, 717 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
-> >  create mode 100644 drivers/staging/imx-drm/imx-ldb.c
-> > 
-[...]
-> > diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
-> > new file mode 100644
-> > index 0000000..75607b3
-> > --- /dev/null
-> > +++ b/drivers/staging/imx-drm/imx-ldb.c
-> > @@ -0,0 +1,609 @@
-[...]
-> > +static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
-> > +		unsigned long serial_clk, unsigned long di_clk)
-> > +{
-> > +	int ret;
-> > +
-> > +	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
-> > +			clk_get_rate(ldb->clk_pll[chno]), serial_clk);
-> > +	clk_set_rate(ldb->clk_pll[chno], serial_clk);
-> > +
-> > +	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
-> > +			clk_get_rate(ldb->clk_pll[chno]));
-> > +
-> > +	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
-> > +			clk_get_rate(ldb->clk[chno]),
-> > +			(long int)di_clk);
-> > +	clk_set_rate(ldb->clk[chno], di_clk);
-> > +
-> > +	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
-> > +			clk_get_rate(ldb->clk[chno]));
-> > +
-> > +	/* set display clock mux to LDB input clock */
-> 
-> I think this will fail on i.MX53 with split mode enable in case of
-> mux != chno, since ipu_di<n> can only be muxed to ldb_di<n>_gate.
+On Thu, Jun 6, 2013 at 2:10 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+
+> If companies are going to go off and invent the square wheel, and that
+> makes *them* suffer the loss of being able to merge back into the
+> mainline kernel, thereby making *their* job of moving forward with
+> their kernel versions much harder, then yes, we *are* happy.
+
+ russell: they have more employees than sense :)  they also don't have
+any idea of what they *should* be doing, so this is an opportunity to
+educate them.
+
+ they're not feeling any pain: they just employ more chinese
+developers and substitute bodies for time and common-sense.
+
+ also, in this particular case, thanks to their script.fex system when
+i said they only need to develop one kernel and one u-boot i really
+wasn't kidding around: they really have got to the point which
+everyone else dreams of with device-tree [admittedly by limiting the
+product range that their clients can play with, but that product range
+has huge returns, so they're still happy].
+
+> Companies will always do idiotic things; it's *them* and their users
+> who have to live with the results of that bad decision making process.
+
+ russell: the decision process they've made is actually an extremely
+effective one.
+
+> Eventually, the pain of being outside the mainline kernel will become
+> too great, especially if their users demand things like kernel upgrades
+> from them.  Eventually, they will change.
 >
->> +     ret = clk_set_parent(ldb->clk_sel[mux], ldb->clk[chno]);
-
-That is true. We should use both ldb_di<n>_gates in split mode on
-i.MX53, with both ldb_di<n>_sel derived from the same parent.
-
->> +     if (ret) {
->> +             dev_err(ldb->dev, "unable to set di%d parent clock to ldb_di%d\n", mux, chno);
->> +     }
->> +}
->> +
->> +static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
->> +{
->> +     struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
->> +     struct imx_ldb *ldb = imx_ldb_ch->ldb;
->> +     struct drm_display_mode *mode = &encoder->crtc->mode;
->> +     unsigned long serial_clk;
->> +     unsigned long di_clk = mode->clock * 1000;
->> +     int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->imx_drm_encoder,
->> +                                          encoder->crtc);
->> +
->> +     if (ldb->ldb_ctrl & LDB_SPLIT_MODE_EN) {
->> +             /* dual channel LVDS mode */
->> +             serial_clk = 3500UL * mode->clock;
-> 
-> See comment in imx_ldb_set_clock
+> And no, this isn't an intransigent position.  This is reality given
+> that ARM already has way too much code in the Linux kernel and we're
+> trying to reduce that through the use of technologies like DT.  The
+> last thing we need right now is for another "DT" like implementation
+> to come along which is only used on a minority of platforms - even if
+> the platform it is used on is successful.
 >
->> +             imx_ldb_set_clock(ldb, mux, 0, serial_clk, di_clk);
->> +             imx_ldb_set_clock(ldb, mux, 1, serial_clk, di_clk);
-[...]
+> The way this works is this:
+> - you either go with the policies which are set, or
 
-regards
-Philipp
+ .... which they weren't consulted on, it has to be pointed out.
+
+> - you change the policy as a whole because you have a technically
+>   superior solution
+
+ i believe they have a technically more *successful* solution. whether
+it's more appropriate in a wider context is another matter.
+
+ here we have a key to the crux of the problem: the linux kernel
+maintainers have to cater for _everyone_.  with no funding or
+incentive from the major contributors to work with them.  hmmm....
+
+> What that means in this case is either you adopt DT, or you convince
+> everyone that DT isn't the solution, but your solution is, and we adopt
+> your solution for *everything* instead.
+>
+> If neither of those are possible, then that's really not our problem,
+> and it's not _us_ who are being "intransigent".
+
+ indeed.
+
+ ok.  so.  we come back to the question again: what shall i propose to
+them that they consider doing, and what benefit would it be to them to
+do so?
+
+ i cannot go to them and say "you have to do this [insert proposal
+here]" - it has to be more subtle than that.
+
+ l.
