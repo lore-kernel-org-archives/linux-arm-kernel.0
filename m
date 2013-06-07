@@ -1,41 +1,113 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Jun 2013 10:44:33 -0600
-Subject: [PATCH] ARM: tegra: disable nonboot CPUs when reboot
-In-Reply-To: <1370597810-1153-1-git-send-email-josephl@nvidia.com>
-References: <1370597810-1153-1-git-send-email-josephl@nvidia.com>
-Message-ID: <51B20DF1.3030207@wwwdotorg.org>
+From: john.stultz@linaro.org (John Stultz)
+Date: Fri, 07 Jun 2013 09:47:26 -0700
+Subject: [PATCH 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
+In-Reply-To: <20130606121647.GR23140@pengutronix.de>
+References: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
+ <20130606121647.GR23140@pengutronix.de>
+Message-ID: <51B20E9E.8070507@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2013 03:36 AM, Joseph Lo wrote:
-> The normal CPU hotplug flow in kernel and the flow for Tegra we expected,
-> is checking the CPU ID is OK for hotplug by "tegra_cpu_disable", the CPU
-> that would be hotplugged runs into a power-gate state by "tegra_cpu_die",
-> then the other CPU waits for the CPU that was hotplugged in reset and
-> clock gate it by "tegra_cpu_kill". That means we don't support the CPU
-> being stopped or put into offline by trigger "tegra_cpu_kill" directly.
-> It may cause a busy loop for waiting CPU in reset.
-> 
-> After the commit "62e930e reboot: rigrate shutdown/reboot to boot cpu",
-> we remove "disable_nonboot_cpus" when kernel_{restart,halt,power_off}.
-> But the ARM kernel trigger "send_smp_stop" when machine_shutdown, that
-> would cause the "tegra_cpu_kill" directly without "tegra_cpu_die" first.
-> 
-> We hook "disable_nonboot_cpus" in "reboot_notifier" to avoid that happens.
-> And it can work for reboot, shutdown, halt and kexec.
+On 06/06/2013 05:16 AM, Uwe Kleine-K?nig wrote:
+> Hello
+>
+> [added jstultz to Cc:]
+>
+> On Thu, Jun 06, 2013 at 02:55:26PM +0800, Peter Chen wrote:
+>> For tickless system, the jiffies may be updated long time (>20ms).
+> ... may not be updated for a long time ... ?
+>
+>> At high loading system, the current waiting method will cause waiting
+>> timeout, and cause a kernel dump at below case.
+>> After timeout = jiffies + msecs_to_jiffies(10),
+>> the timer interrupt occurs, it updates jiffies (eg,  + 2 jiffies),
+>> then return back from interrupt, the time between above operations
+>> are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+> Hmm, I admit I didn't follow the tickless stuff, but still I wonder if
+> the analysis is right. I thought on tickless jiffies are updated as
+> before by the boot cpu that cannot run in tickless mode?
+>
+> Anyhow, this only affects the commit log, not the problem.
+>   
+>> Signed-off-by: Peter Chen <peter.chen@freescale.com>
+>> ---
+>>   arch/arm/mach-imx/clk-pllv3.c |    9 ++++++---
+>>   1 files changed, 6 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+>> index 36aac94..eefc6c2 100644
+>> --- a/arch/arm/mach-imx/clk-pllv3.c
+>> +++ b/arch/arm/mach-imx/clk-pllv3.c
+>> @@ -16,6 +16,7 @@
+>>   #include <linux/slab.h>
+>>   #include <linux/jiffies.h>
+>>   #include <linux/err.h>
+>> +#include <linux/delay.h>
+>>   #include "clk.h"
+>>   
+>>   #define PLL_NUM_OFFSET		0x10
+>> @@ -50,7 +51,7 @@ struct clk_pllv3 {
+>>   static int clk_pllv3_prepare(struct clk_hw *hw)
+>>   {
+>>   	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+>> -	unsigned long timeout = jiffies + msecs_to_jiffies(10);
+>> +	int count = 100;
+>>   	u32 val;
+>>   
+>>   	val = readl_relaxed(pll->base);
+>> @@ -62,9 +63,11 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+>>   	writel_relaxed(val, pll->base);
+>>   
+>>   	/* Wait for PLL to lock */
+>> -	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
+>> -		if (time_after(jiffies, timeout))
+>> +	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK)) {
+>> +		udelay(100);
+>> +		if (--count == 0)
+>>   			return -ETIMEDOUT;
+>> +	}
+> Maybe it's enough to do timeout = jiffies + msecs_to_jiffies(10); just
+> after the pll is reprogrammed? i.e.
+>
+> diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+> index d09bc3d..37f734e 100644
+> --- a/arch/arm/mach-imx/clk-pllv3.c
+> +++ b/arch/arm/mach-imx/clk-pllv3.c
+> @@ -48,7 +48,7 @@ struct clk_pllv3 {
+>   static int clk_pllv3_prepare(struct clk_hw *hw)
+>   {
+>   	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+> -	unsigned long timeout = jiffies + msecs_to_jiffies(10);
+> +	unsigned long timeout;
+>   	u32 val;
+>   
+>   	val = readl_relaxed(pll->base);
+> @@ -59,6 +59,8 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+>   		val &= ~BM_PLL_POWER;
+>   	writel_relaxed(val, pll->base);
+>   
+> +	timeout = jiffies + msecs_to_jiffies(10);
+> +
+>   	/* Wait for PLL to lock */
+>   	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
+>   		if (time_after(jiffies, timeout))
+>
+> Then at least the pll tries to look while the process is interrupted.
+>
+> What is msecs_to_jiffies(10) for you? John, would you expect the problem
+> here that Peter describes?
 
-I don't believe this is the correct solution.
+No, I'm not sure I see how being tickless would cause such a problem 
+(Adding Frederic here in case he spots something).
 
-If the semantics of cpu_kill/cpu_die are such that it's legal to call
-only cpu_kill without having cause cpu_die to run on the killed CPU
-first, then Tegra's implementation is buggy. We should simply fix that,
-rather than avoiding this by forcing a different order for the calls to
-cpu_kill/cpu_die.
+The only issues that pop up for me right away is:
+1) The one Uwe noted, where jiffies may be incremented from the early 
+timeout assignment to before the wait loop begins.
 
-If the semantics of cpu_kill/cpu_die are such that one /must/ cause
-cpu_die to run on the killed CPU before cpu_kill can be used on it, then
-there's a bug in the code that isn't doing that.
+2) That at HZ=100, msecs_to_jiffies(10) is just 1, so if you were to 
+catch jiffies right before it was updated, you would end up waiting only 
+10ms before timing out. That's still seems like plenty of time, but I 
+don't know the hardware details here.
 
-I'm CCing a few people in an attempt to find out exactly what the
-expected semantics are for cpu_kill/cpu_die; is it legal to call
-cpu_kill without having first caused cpu_die to execute?
+thanks
+-john
