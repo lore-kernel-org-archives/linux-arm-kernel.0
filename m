@@ -1,65 +1,119 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 7 Jun 2013 14:44:45 -0400
-Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <20130607183748.GF3331@atomide.com>
-References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
- <20130607162927.GA3331@atomide.com> <20130607175005.GB3331@atomide.com>
- <51B22303.2000002@ti.com> <20130607183748.GF3331@atomide.com>
-Message-ID: <51B22A1D.6020603@ti.com>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Fri, 7 Jun 2013 19:45:07 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
+ <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
+Message-ID: <CAPweEDwU+RzTCGb20uh7jxAzjbrX_yHVa4sy_ATr7MWpBb4WcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013 02:37 PM, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [130607 11:20]:
->> On Friday 07 June 2013 01:50 PM, Tony Lindgren wrote:
->>> * Tony Lindgren <tony@atomide.com> [130607 09:35]:
->>>> * Paul Walmsley <paul@pwsan.com> [130607 05:38]:
->>>>> On Fri, 7 Jun 2013, Sricharan R wrote:
->>>>>
->>>>>> - The IO resource information like dma request lines, irq number and
->>>>>>   ocp address space can be populated via dt blob. So such data is stripped
->>>>>>   from OMAP4 SOC hwmod data file.
->>>>>>
->>>>>> - The devices which are still missing the device tree bindings,
->>>>>>   address space entries are not removed yet. When such devices add
->>>>>>   the dt bindings, respective address space data can be deleted.
->>>>>>
->>>>>> - Also other unnecessary hwmods like firewalls are removed as a part of this.
->>>>>>   Since emif was getting registered only because of this firewalls links,
->>>>>>   the mpu->emif direct link is added now.
->>>>>>
->>>>>> The above update, results in reduction of about ~1650 lines of code.
->>>>>>
->>>>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>>>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->>>>>
->>>>> Acked-by: Paul Walmsley <paul@pwsan.com>
->>>>>
->>>>> Can't test this one since I don't have an OMAP4 DT config set up in the testbed
->>>>> yet.  Maybe will add that to the testbed after the v3.10 release.
->>>>
->>>> OK thanks, applying into omap-for-v3.11/cleanup.
->>>
->>> I had to undo the following parts to avoid regressions on omap4sdp.
->>> Can you please follow up on fixing the related issues so the fixup
->>> won't be needed?
->>>
->>> Seems to work now the same way as earlier for both omap4sdp and blaze
->>> es, except for DSS, which seems to be a separate issue as posted by
->>> Tomi. Pushed out now to omap-for-v3.11/cleanup.
->>>
->> Thats strange. You shouldn't need those fixes since that data is
->> expected to be coming from DT.
+On Thu, Jun 6, 2013 at 5:00 PM, Olof Johansson <olof@lixom.net> wrote:
+> On Thu, Jun 6, 2013 at 8:13 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
+>> On Wed, Jun 5, 2013 at 7:54 PM, luke.leighton <luke.leighton@gmail.com> wrote:
+>>>  augh.  ok.  solutions.  what are the solutions here?
 >>
->> Sricharan, Can you please try out the patch against Tony's
->> V3.11/clean-up branch and see whats missing there.
-> 
-> Looking at the diff output with and without, it seems to be that the
-> DMA channels won't get configured.
-> 
-That should work since DMA engine changes are in mainline and the
-DMA channel information is already in DT.
+>> Luke if you really want to fix this a good solution is to have
+>> Allwinner join Linaro and provide an engineer to the Linaro effort.
+>> That engineer will get educated on the right way to do kernel
+>> development and he can pass that knowledge back to Allwinner each day
+>> as he learns it.
+>
+> There's no need for anybody to join Linaro to contribute upstream.
+> That's a crazy notion.
 
-regards,
-Santosh
+ indeed.  this is a company that produced a 70-page "datasheet" when
+freescale produced 4,500 for the iMX6.  i passed on that link and i
+believe it'll be an eye-opener to their engineers: education is what's
+key here, and you don't need to pay vast sums to do it.
+
+ although the quantities they're selling are just ennorrrmous,
+allowing them to undercut absolutely everybody because they can pay
+absolute best rates to the Fab Houses (TSMC etc.) their profit margins
+are going to be exceptionally slim.
+
+ so we cannot count on them having a spare $1m per year to give to
+linaro, so yes, i tend to agree with what you're implying, olof, that
+allwinner should be encouraged to participate more in upstream
+contribution.
+
+ so.
+
+ could someone please describe to me what they should do, here?  whom
+should they best contact, what lists, what's the procedures, where's
+the best-working-practices, where are the foundations with which they
+can participate that have the formal procedures for proposals [similar
+to python's PEP and debian's DEP].  that last was a not-very-subtle
+hint, btw.
+
+ and... please... i've yet to receive *any* answers to the question
+"and what are the benefits that they would get by doing so"!!
+
+> Listen, Allwinner isn't working in a vacuum, believe it or not. I've
+> talked to them, so has Arnd and other people working on ARM, including
+> Maxime Ripard, who's been reimplementing upstream support for their
+> platform.
+
+ great.
+
+> Everybody is interested in the right things happening, it's
+> just a matter of figuring out how to do it. The right people are
+> already talking.
+
+ .... but the Directors of Allwinner aren't been kept in the loop,
+here: that's my job, to get them up-to-speed.
+
+>> the cost of joining. The net result will likely be a reduction in the
+>> amount they need to spend on in-house development since they will
+>> learn how to better leverage other developer's work.
+
+ but you forget one thing: they only need *ever* produce *one*
+board/kernel.  they have a registered board type, it covers *all*
+products and i mean *all* products.  i don't mean that in the "usual"
+way where most companies re-use a single machine type for multiple
+devices and irritate the crap out of linux kernel developers when the
+GPL source finally "leaks", i mean "thanks to script.fex they
+LITERALLY only ever compile one binary and then customise script.fex
+on a per-customer basis".
+
+ so the usual lessons really do not apply, here.
+
+ the only one i spotted was that they rather foolishly made duplicates
+of sun5i_usb and renamed all the files (s/SUN5I/SUN7I/g) to make
+sun7i_usb, then started editing.  one of the developers created a
+buffer overflow, which corrupted internal memory, and there are signs
+that he then started experimenting switching off DMA trying to fix
+various problems.
+
+ if he'd done a proper job #ifdef CONFIG_SUN7I_USB #ifdef
+CONFIG_SUN5I_USB in the same source code etc etc. and tested on
+known-good [older] hardware he would have noticed that the
+modifications failed on previously-known-good hardware and would have
+spotted the buffer overflow error much sooner.
+
+ that _is_ something i will be bringing to the Director's attention,
+that the "strategy" of cut-paste-itis has detrimental effects.
+
+ok.  so.  apologies, bit of a digression there.
+
+ question for you olof [and others of course]: you've clearly listed
+some benefits, which i'm very very grateful for.  in light of what i
+describe above [the "we only need ever write one kernel" strategy
+which is serving Allwinner really really well apart from the
+code-duplication mistake], do the benefits you list *still* apply, and
+if so, could you please elaborate for me, assume i'm thick or
+something [or at least not a programmer, which i am unfortunately so
+might miss something]
+
+l.
