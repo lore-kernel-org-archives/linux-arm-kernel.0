@@ -1,82 +1,51 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:57 +0900
-Subject: [PATCH 27/27] ARM: shmobile: sh73a0: div4 clocks must check the kick
- bit before changing rate
+Date: Fri,  7 Jun 2013 16:51:52 +0900
+Subject: [PATCH 22/27] ARM: shmobile: r8a7790: add TPU PWM support
 In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370591517-20239-28-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-23-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-According to the datasheet, it is not allowed to change div4 clock rates
-if an earlier rate change operation is still in progress, as indicated by
-a set kick bit.
-
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-sh73a0.c | 24 +++++++++++++++++++-----
- 1 file changed, 19 insertions(+), 5 deletions(-)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index d05cf90..d9fd033 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -257,7 +257,7 @@ static struct clk twd_clk = {
- 	.ops = &twd_clk_ops,
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index bedd20c..b393592 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -48,6 +48,7 @@
+ #define CPG_LEN 0x1000
+ 
+ #define SMSTPCR2 0xe6150138
++#define SMSTPCR3 0xe615013c
+ #define SMSTPCR7 0xe615014c
+ 
+ #define MODEMR		0xE6160060
+@@ -178,11 +179,17 @@ static struct clk div6_clks[DIV6_NR] = {
  };
  
--static struct sh_clk_ops zclk_ops;
-+static struct sh_clk_ops zclk_ops, kicker_ops;
- static const struct sh_clk_ops *div4_clk_ops;
- 
- static int zclk_set_rate(struct clk *clk, unsigned long rate)
-@@ -324,18 +324,32 @@ static unsigned long zclk_recalc(struct clk *clk)
- 	return clk_get_rate(clk->parent);
- }
- 
--static void zclk_extend(void)
-+static int kicker_set_rate(struct clk *clk, unsigned long rate)
- {
--	div4_clk_ops = div4_clks[DIV4_Z].ops;
-+	if (__raw_readl(FRQCRB) & (1 << 31))
-+		return -EBUSY;
+ /* MSTP */
+-enum { MSTP721, MSTP720,
+-	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
++enum {
++	MSTP721, MSTP720,
++	MSTP304,
++	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202,
++	MSTP_NR
++};
 +
-+	return div4_clk_ops->set_rate(clk, rate);
-+}
-+
-+static void div4_clk_extend(void)
-+{
-+	int i;
-+
-+	div4_clk_ops = div4_clks[0].ops;
- 
-+	/* Add a kicker-busy check before changing the rate */
-+	kicker_ops = *div4_clk_ops;
- 	/* We extend the DIV4 clock with a 1:1 pass-through case */
- 	zclk_ops = *div4_clk_ops;
- 
-+	kicker_ops.set_rate = kicker_set_rate;
- 	zclk_ops.set_rate = zclk_set_rate;
- 	zclk_ops.round_rate = zclk_round_rate;
- 	zclk_ops.recalc = zclk_recalc;
- 
--	div4_clks[DIV4_Z].ops = &zclk_ops;
-+	for (i = 0; i < DIV4_NR; i++)
-+		div4_clks[i].ops = i == DIV4_Z ? &zclk_ops : &kicker_ops;
- }
- 
- enum { DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_ZB1,
-@@ -697,7 +711,7 @@ void __init sh73a0_clock_init(void)
- 	if (!ret) {
- 		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
- 		if (!ret)
--			zclk_extend();
-+			div4_clk_extend();
- 	}
- 
- 	if (!ret)
+ static struct clk mstp_clks[MSTP_NR] = {
+ 	[MSTP721] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 21, 0), /* SCIF0 */
+ 	[MSTP720] = SH_CLK_MSTP32(&p_clk, SMSTPCR7, 20, 0), /* SCIF1 */
++	[MSTP304] = SH_CLK_MSTP32(&cp_clk, SMSTPCR3, 4, 0), /* TPU0 */
+ 	[MSTP216] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 16, 0), /* SCIFB2 */
+ 	[MSTP207] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 7, 0), /* SCIFB1 */
+ 	[MSTP206] = SH_CLK_MSTP32(&mp_clk, SMSTPCR2, 6, 0), /* SCIFB0 */
 -- 
 1.8.2.1
