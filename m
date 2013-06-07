@@ -1,67 +1,55 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Fri, 07 Jun 2013 21:16:58 +0200
+From: lkcl@lkcl.net (Luke Kenneth Casson Leighton)
+Date: Fri, 7 Jun 2013 20:18:14 +0100
 Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
  Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDwmgr2JbH+txDDjR_gDA2R2C1v=AuVCUVTs7RriMhZNiA@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <4466665.6pIGCIdISn@flatron>
- <CAPweEDwmgr2JbH+txDDjR_gDA2R2C1v=AuVCUVTs7RriMhZNiA@mail.gmail.com>
-Message-ID: <1506423.MBs7Fu8QWI@flatron>
+In-Reply-To: <20130607182608.GV18614@n2100.arm.linux.org.uk>
+References: <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1370477958.20454.68.camel@localhost>
+ <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
+ <51B085C6.3000605@gmail.com>
+ <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
+ <51B19046.5040401@gmail.com>
+ <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
+ <1370616567.2433.20.camel@jm-desktop>
+ <20130607182608.GV18614@n2100.arm.linux.org.uk>
+Message-ID: <CAPweEDxXnRWYK4GhSkN-PzM1hLOZPiD1MUne1Q-4FT6PJRJUtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 of June 2013 20:02:03 luke.leighton wrote:
-> On Fri, Jun 7, 2013 at 9:57 AM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> >Seeing from your posts you don't have any knowledge on how Linux kernel
-> >
-> > development works
-> 
->  check back to 2004.
+On Fri, Jun 7, 2013 at 7:26 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> Luke Leighton on the other hand is demanding that we
 
-$ git log --oneline --author="Luke Kenneth Casson Leighton" | wc -l
-0
-$ git log --oneline --author="lkcl at lkcl.net" | wc -l
-0
-$ git log --oneline --author="Luke Leighton" | wc -l
-0
+ no demands have been made, russell: i've informed you of an immovable
+deadline which will pass beyond which the opportunity being presented
+is lost.
 
-That's an -ENOPATCH for me.
+> (Linux kernel
+> developers) come up with proposals within three days so that Luke can
+> act
 
-> > and even on how Allwinner's cooperation with our
-> > community looks (and seem to be completely closed to our effort of
-> > showing you the reality),
-> 
->  no - just f*****g busy, tomasz
+ .... is *going* to act, regardless of how well people deal with the
+time limitations and my own communication limitations....
 
-Just like many of us, I guess.
+> as a middle man between us and Allwinner, and is
 
-> > so I'm not sure if you are the right person to take any
-> > of those roles...
-> 
->  well, tough.  get me up to speed, *fast*.  please stop wasting time
-> like this: get me up to speed.  i may not be the best person but i am
-> in the right place at the right time, and nobody else is going to be
-> able to step into this role in time.
-> 
->  so i may not be the best person that you *think* i am, but i'm the
-> person you've got.  time's ticking.  can we get on please?
-> 
-> > I'd suggest Maxime Ripard or someone else from Free Electrons to be
-> > responsible for communication with Allwinner instead.
-> 
->  you're welcome to suggest, however they do not have the contacts that
-> i have (many of which are indirect anyway), and i am not going to
-> introduce him to them either, in case they jeapordise the critical
-> business relationships that took my associates 4 years to establish.
+ .... not ...
 
-Well, I'm quitting this discussion right now, as it doesn't seem to be of 
-any use or might be even counter-productive. I have already showed my view 
-on this matter (and even given you some proposals for them), got it 
-confirmed by several other people and got nothing from you that could make 
-me reconsider anything.
+>  blaming the Linux
+> kernel community for the situation with Allwinner.
+>
+> As you seem to have your facts wrong, I can only conclude that you
+> are also trolling... I hope I'm wrong about that and you've just made
+> an innocent mistake.
 
-Thank you for your time.
+ please continue to assume that i am making mistakes [under time
+pressure]: you'd be right.  i never understand this word "troll" and i
+haven't got time to discuss its meaning.
 
-Best regards,
-Tomasz
+ greatly appreciated efforts to correct my misunderstandings and
+mistakes so that i'm properly prepared - ready or not - for the
+meeting ahead.
+
+l.
