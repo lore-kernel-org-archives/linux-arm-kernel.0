@@ -1,95 +1,40 @@
-From: luke.leighton@gmail.com (luke.leighton)
-Date: Sat, 8 Jun 2013 00:17:54 +0100
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAF1ZMEets=ea+zpUTUn9Xr-+C+JaKxajK45vK+_mnDJJeoYQpA@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron> <20130606112723.71ddd70c@skate>
- <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
- <20130607220853.GR14209@lukather>
- <CAPweEDwFHY_AbBxjspm7BvfdFHsxL5H594cFN4ZVC6QFpu4QGA@mail.gmail.com>
- <CAF1ZMEets=ea+zpUTUn9Xr-+C+JaKxajK45vK+_mnDJJeoYQpA@mail.gmail.com>
-Message-ID: <CAPweEDyv=uN8_Ts4miXCGsCrNwYkovLpF_PYF7D1=n2_aZh_wA@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 7 Jun 2013 19:21:35 -0400
+Subject: [PATCH] cpuidle: fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency
+ warning
+In-Reply-To: <201306072121.58719.arnd@arndb.de>
+References: <1370626856-2876-1-git-send-email-daniel.lezcano@linaro.org>
+ <51B21D65.3040604@ti.com> <201306072121.58719.arnd@arndb.de>
+Message-ID: <51B26AFF.9080908@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 8, 2013 at 12:09 AM, Dennis Lan (dlan)
-<dennis.yxun@gmail.com> wrote:
->
->
-> On Saturday, June 8, 2013, luke.leighton wrote:
+On Friday 07 June 2013 03:21 PM, Arnd Bergmann wrote:
+> On Friday 07 June 2013, Santosh Shilimkar wrote:
+>>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>>> index f49cd51..831e89e 100644
+>>> --- a/arch/arm/mach-omap2/Kconfig
+>>> +++ b/arch/arm/mach-omap2/Kconfig
+>>> @@ -83,7 +83,7 @@ config ARCH_OMAP4
+>>>       depends on ARCH_OMAP2PLUS
+>>>       depends on ARCH_MULTI_V7
+>>>       select ARCH_HAS_OPP
+>>> -     select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+>>> +     select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
 >>
->> right - too many people contributed to this, input from jon smirl,
->> wookie, maxime, tomasz, henrik, i've made a start here and will
->> continue editing: this is notes for me to put forward an agenda for
->> discussion:
->>
->> http://hands.com/~lkcl/allwinner_linux_proposal.txt
->>
->> i'm setting a rule that each section *has* to have a list of clear
->> benefits, otherwise it'll have to be removed before it goes on to
->> their Directors.
->>
->> so - even if there are any allwinner engineers reading this who would
->> like something put forward please also speak up! :)
->>
->> l.
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
->
-> Hi luke
->      I'm not a allwinner employer :-)$. but pretty much in the same position
-> as they are.
+>> I remember Colin mentioning about above dependency is taken care
+>> already in design [1]
+> 
+> It's a matter of how it gets represented in Kconfig. Right now 
+> the ARCH_NEEDS_CPU_IDLE_COUPLED symbol has a dependency on CPU_IDLE,
+> so we cannot select it if CPU_IDLE is not set (or get a build time
+> warning).
+> 
+> I originally suggested removing the dependency, but Daniel preferred
+> to leave it there as an explicit dependency so it is required to
+> do this change instead.
+> 
+I see. Thanks for clarifying.
 
- thanks for chipping in.
-
->      I'd like to add a few comments about the risk of adopting the device
-> tree(from allwinner side)
-> 1) current using fdt in bootloader(uboot) is not mature, I'm not saying
-> about passing the fdt data to kernel.
-
- mmmm.... fdt.  could you provide some context here?  what is it?
-(apart from being a TLA)
-
->   But the bootloader itself need information from device tree, say boot0/1
-> phase (boot device type, DDR initialization...)
->   since fdt is not ready, and SRAM space is very limited ... I'm afraid
-> 'fex' may co-exist with device tree.
->   still, they receive benefits if they can adopt device tree, at least
-> minimal the kernel side migration effort
->   Generally this info already been pointed out by steppen warren in previous
-> email...
-
- ... which i have to admit i may have missed the significance of or
-possibly just missed it entirely.
-
- what's the main concern you have, here; what's the potential
-solution, and what's the benefit of that potential solution, to
-allwinner [direct or indirect]?
-
-> 2) device tree may not been understood by third vendors (who previus produce
-> shoes or ? :-$),
-
- :)
-
->   they are real old 'Fex' scheme user, they like edit the data in windows
-> with dos format
->   So, how to fill this gaps, make them happy? Creat another tool to handle
-> device tree modification?
->   Then it's another price they have to pay...
-
- yehh... that kinda looks unavoidable, although it would ultimately
-only inconvenience the developers of the proprietary firmware-flashing
-tools [livesuite, phoenix] and so would be transparent to the
-factories and so on.  i've mentioned the idea of having an in-kernel
-translation tool rather than an external (pre-runtime) one, i've yet
-to get some feedback on that.
-
- l.
+Regards,
+Santosh
