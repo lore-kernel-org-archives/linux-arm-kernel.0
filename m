@@ -1,41 +1,53 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 7 Jun 2013 16:31:35 +0800
-Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL
- lock
-In-Reply-To: <20130607082457.GF12361@pengutronix.de>
-References: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
- <20130607082457.GF12361@pengutronix.de>
-Message-ID: <20130607083134.GE21641@nchen-desktop>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Jun 2013 10:32:41 +0200
+Subject: [PATCH] arm: mvebu: ensure PCIe range is propagated in the .dts
+ files
+In-Reply-To: <20130606190321.GQ23859@titan.lakedaemon.net>
+References: <1370510483-32419-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370510483-32419-2-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130606181159.GN23859@titan.lakedaemon.net>
+ <20130606190321.GQ23859@titan.lakedaemon.net>
+Message-ID: <20130607103241.3f82d71d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 10:24:57AM +0200, Uwe Kleine-K?nig wrote:
-> On Fri, Jun 07, 2013 at 04:19:06PM +0800, Peter Chen wrote:
-> > For some unknown reasons, the jiffies will be updated more
-> > than one tick at every short time. Eg, at this code:
-> > After timeout = jiffies + msecs_to_jiffies(10),
-> > the interrupt occurs, and the softirq updates jiffies (eg,  + 2 jiffies),
-> > then return back from interrupt, the time between above operations
-> > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+Dear Jason Cooper,
+
+On Thu, 6 Jun 2013 15:03:21 -0400, Jason Cooper wrote:
+
+> > Can you split this in to two patches, please:
 > > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> Does this mean my patch doesn't solve the issue for you?
+> > >  arch/arm/boot/dts/armada-xp-db.dts               | 1 +
+> > 
+> > one for mvebu/dt
+> > 
+> > >  arch/arm/boot/dts/armada-xp-gp.dts               | 5 +++--
+> > >  arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 5 +++--
+> > 
+> > and one for mvebu/fixes?
+> 
+> Nevermind, I've got a few minutes and would like to get it in for the
+> last -next this week.
 
-Not try, but your patch just delay timeout assignment, if there
-is jiffies update after that but before timeout check, it still
-has problem.
+I must admit I don't quite get why the patch had to be split. The three
+chunks do exactly the same thing for the three boards.
 
-> 
-> Best regards
-> Uwe
-> 
-> 
-> -- 
-> Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-> Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-> 
+The only difference is that the part touching armada-xp-gp and
+armada-xp-openblocks-ax3-4 was also adding some comments for each
+range, while the one for armada-xp-db didn't had to do it because the
+comments were already there.
 
+So really, the armada-xp-db change is as much of a "fix" than the two
+other changes.
+
+To be honest, as long as they all go in 3.11, I'm fine, but I'm just
+curious as to why it would have had to be split.
+
+Thanks!
+
+Thomas
 -- 
-
-Best Regards,
-Peter Chen
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
