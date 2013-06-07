@@ -1,23 +1,44 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Fri, 7 Jun 2013 09:42:00 +0200
-Subject: mxsfb: DATA_FORMAT_24_BIT flag outputs invalid colours
-In-Reply-To: <51B18BA0.50506@digi.com>
-References: <519E03B0.1080006@digi.com> <519F4435.5010703@digi.com>
- <201305241300.25461.jbe@pengutronix.de>
- <201305241533.19941.jbe@pengutronix.de>
- <20130607072103.GF14209@lukather> <51B18BA0.50506@digi.com>
-Message-ID: <20130607074200.GG14209@lukather>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Jun 2013 09:45:48 +0200
+Subject: [PATCH 0/8] Support Marvell bootloaders remapping registers at
+ different locations
+In-Reply-To: <20130606180201.GM23859@titan.lakedaemon.net>
+References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130605210104.GQ3803@titan.lakedaemon.net>
+ <20130606180201.GM23859@titan.lakedaemon.net>
+Message-ID: <20130607094548.2695a4a7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 09:28:32AM +0200, Hector Palacios wrote:
-> I wasn't sure that everybody involved agreed with the patch.
-> @Juergen, would the patch break your platform?
-> Additionally, the guys from Crystalfontz didn't comment on it, but
-> their platform is also using a 18bit data bus width and 32bpp.
+Dear Jason Cooper,
 
-We (Free Electrons) are doing the bring up for the Crystalfontz boards,
-so it's fine :)
+On Thu, 6 Jun 2013 14:02:01 -0400, Jason Cooper wrote:
 
-Thanks!
-Maxime
+> > I've tentatively pulled your series into mvebu/regmap with
+> > appropriate dependencies.
+> > 
+> > I was going to put this in for-next, but I got a build error after
+> > merging it.  Could you do me a favor and try merging this with
+> > mvebu/seb_clk?  Just shoot me the merge resolution that builds
+> > mvebu_defconfig correctly, and I'll incorporate it into the merge.
+> > No need to rebase the series.
+> > 
+> > If you want to reproduce what I saw, just merge mvebu/regmap with
+> > for-next (up shortly), and build mvebu_defconfig.
+> 
+> This has now been resolved, whole series, with v2 of the one patch is
+> in mvebu/regmap.
+
+Ah, yes, sorry, I didn't reply to your e-mail, but we sorted it
+together on IRC right after you sent the mail.
+
+Thanks for integrating the v2 of the patch!
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
