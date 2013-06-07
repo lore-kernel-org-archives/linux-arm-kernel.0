@@ -1,45 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 17:22:07 +0900
-Subject: [PATCH 09/11] ARM: shmobile: marzen: Use INTC External IRQ pin driver
- for SMSC
+Date: Fri,  7 Jun 2013 17:22:03 +0900
+Subject: [PATCH 05/11] ARM: shmobile: bockw: add CN9 SCIF/RCAN selection
+ dipswitch explanation
 In-Reply-To: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370593329-27559-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370593329-27559-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the marzen board to use the INTC External IRQ pin driver for SMSC.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This code was originally posted by Magnus Damm as part of
-"ARM: shmobile: INTC External IRQ pin driver on r8a7779"
-but somehow omitted when I applied that patch.
+Debug serial (= SCIF0) is connected to CN9 upper side,
+and it is shared by RCAN.
+This patch adds SCIF/RCAN dipswitch explanation on
+comment area for developers.
 
-Cc: Magnus Damm <damm@opensource.se>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-marzen.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/board-bockw.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
-index fac9e0f..71f174e 100644
---- a/arch/arm/mach-shmobile/board-marzen.c
-+++ b/arch/arm/mach-shmobile/board-marzen.c
-@@ -69,7 +69,7 @@ static struct resource smsc911x_resources[] = {
- 		.flags		= IORESOURCE_MEM,
- 	},
- 	[1] = {
--		.start		= gic_iid(0x3c), /* IRQ 1 */
-+		.start		= irq_pin(1), /* IRQ 1 */
- 		.flags		= IORESOURCE_IRQ,
- 	},
- };
-@@ -405,6 +405,7 @@ static void __init marzen_init(void)
- 	pinctrl_register_mappings(marzen_pinctrl_map,
- 				  ARRAY_SIZE(marzen_pinctrl_map));
- 	r8a7779_pinmux_init();
-+	r8a7779_init_irq_extpin(1); /* IRQ1 as individual interrupt */
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index badde08..3ce020a 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -26,6 +26,14 @@
+ #include <mach/r8a7778.h>
+ #include <asm/mach/arch.h>
  
- 	r8a7779_add_standard_devices();
- 	platform_add_devices(marzen_devices, ARRAY_SIZE(marzen_devices));
++/*
++ *	CN9(Upper side) SCIF/RCAN selection
++ *
++ *		1,4	3,6
++ * SW40		SCIF	RCAN
++ * SW41		SCIF	RCAN
++ */
++
+ static struct smsc911x_platform_config smsc911x_data = {
+ 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+ 	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
 -- 
 1.8.2.1
