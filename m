@@ -1,31 +1,30 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Fri, 07 Jun 2013 17:36:01 +0200
-Subject: [RFC PATCH 02/50] ARM: at91: add PMC main clock
-In-Reply-To: <20130607173014.7186ddc0@skate>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  7 Jun 2013 17:36:43 +0200
+Subject: [RFC PATCH 21/50] ARM: at91: move at91sam9 SoCs to new at91 clk implem
+In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
 References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
- <1370615115-16979-3-git-send-email-b.brezillon@overkiz.com>
- <20130607173014.7186ddc0@skate>
-Message-ID: <51B1FDE1.8090109@overkiz.com>
+Message-ID: <1370619403-18976-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2013 17:30, Thomas Petazzoni wrote:
-> Dear Boris BREZILLON,
->
-> On Fri,  7 Jun 2013 16:24:10 +0200, Boris BREZILLON wrote:
->
->> + * This mainram is free software; you can redistribute it and/or modify
-> Looks like you did some funky 'sed' over your source files. In every
-> clk driver, instead of "program" you have "<name of clock>ram" :-)
-Oups.
+Make use of common clk framework for all at91sam9 SoCs
 
-I based all my implementations on programmable clocks and replaced every 
-instance
-of the "prog" pattern by the clock name.
-That's why "program" is replaced by "<name of clock>ram".
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/mach-at91/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-I'll fix it.
-
-Thanks
->
-> Thomas
+diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+index 7256b81..add1719 100644
+--- a/arch/arm/mach-at91/Kconfig
++++ b/arch/arm/mach-at91/Kconfig
+@@ -32,6 +32,7 @@ config HAVE_AT91_SMD
+ 
+ config SOC_AT91SAM9
+ 	bool
++	select COMMON_CLK
+ 	select AT91_SAM9_TIME
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
+-- 
+1.7.9.5
