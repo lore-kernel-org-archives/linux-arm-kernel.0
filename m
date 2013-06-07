@@ -1,47 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 7 Jun 2013 21:53:03 +0200
-Subject: [PATCH 03/14] bus: mvebu-mbus: Introduce device tree binding
-In-Reply-To: <20130607194430.GA7854@obsidianresearch.com>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306072110.35856.arnd@arndb.de>
- <20130607194430.GA7854@obsidianresearch.com>
-Message-ID: <201306072153.03855.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Jun 2013 20:52:34 +0100
+Subject: [PATCH 2/2] ARM: dts: mvebu: Add the i2c-bridge capability to
+ the mv64xxx-i2c
+In-Reply-To: <1370619743-15245-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1370619743-15245-1-git-send-email-gregory.clement@free-electrons.com>
+ <1370619743-15245-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130607195234.GZ18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013, Jason Gunthorpe wrote:
-> We have a minimum requirement that the bootloader setup internal regs,
-> so the minimum required DT bindings is going to be this:
-> 
-> mbus {
->   compatible = ...
->   ranges = <INTERNAL_REGS_MAP_ID 0xf1000000 0x100000>;
->   reg = <0xf1000xxx ...>; // MBUS regs block
->   #address/size-cells...
-> 
->   internal-regs  {
->       ranges = <0 INTERNAL_REGS_MAP_ID 0x100000>;
->   }
-> }
-> 
-> ie the ranges should never be empty.
+On Fri, Jun 07, 2013 at 05:42:23PM +0200, Gregory CLEMENT wrote:
+> The mv64xxx-i2c embedded in the Armada XP have a new feature called
+> i2c-bridge. This commit split the i2c information into armada-370.dtsi
+> and armada-xp.dtsi. Most of the data remains the same and stay in the
+> common file Armada-370-xp.dtsi. With this new feature the size of the
+> registers are bigger for Armada XP and for this SoCs we add a new flag
+> for the i2c-bridge capability.
 
-Right, that's what I thought.
+Personally, I don't like this "i2c-bridge" flag either, but for a different
+reason - i2c-bridge makes it sound like it's doing something it's not.
 
-> Discovery of the address of the mbus control registers is via the reg
-> property on its own node (which is untranslated), and all other
-> internal regs blocks will automatically translate as they are supposed
-> to (Thomas's work to make internal regs 0xd/0xf1 relies on this, AFAIK)
-> 
-> INTERNAL_REGS_MAP_ID is an invalid target ID value, defined to mean
-> the internal registers target. 0xFFFFFFFF is a better choice for this
-> than 0, because 0xFFFFFFFF is never going to be a valid target id, it
-> is too large.
+What it is doing is as you stated in the cover - it's an offload mechanism,
+just like if it were possible to use DMA to supply the data to the I2C
+interface.
 
-Can you explain to me why it is an invalid target ID value? Is it
-treated very differently by the mbus register setup than all the
-others? I guess we can define it as something else to make a valid
-target ID, by using one or more of the remaining bits in the first
-address cell.
-
-	Arnd
+I think Maxime is correct - this should be identified by a variation in
+the compatible string, not by a flag in DT.
