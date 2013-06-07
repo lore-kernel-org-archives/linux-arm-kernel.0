@@ -1,35 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Jun 2013 09:47:06 +0200
-Subject: [PATCH 4/4] ARM: ux500: Remove call to u8500_of_init_devices() -
- again
-In-Reply-To: <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
-References: <1370517676-10909-1-git-send-email-lee.jones@linaro.org>
- <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdYXD527jLzL3m6T6BBRMx+x0u6Wpsas=4se2-EzTb0uqw@mail.gmail.com>
+From: vladoman@gmail.com (Vladimir Pantelic)
+Date: Fri, 07 Jun 2013 09:48:22 +0200
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
+ <51AFA6DD.3000202@wwwdotorg.org>
+ <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
+ <1370469574.18839.33.camel@localhost>
+ <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
+ <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
+ <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1370477958.20454.68.camel@localhost>
+ <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
+ <51B085C6.3000605@gmail.com>
+ <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
+Message-ID: <51B19046.5040401@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 1:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> Somehow, probably due to a merge error the call to u8500_of_init_devices()
-> has re-appeared in next, causing this error:
+luke.leighton wrote:
+> On Thu, Jun 6, 2013 at 1:51 PM, Vladimir Pantelic <vladoman@gmail.com> wrote:
 >
-> arch/arm/mach-ux500/cpu-db8500.c: In function ?u8500_init_machine?:
-> arch/arm/mach-ux500/cpu-db8500.c:268:2: error: implicit declaration of     \
->   function ?u8500_of_init_devices? [-Werror=implicit-function-declaration]
-> arch/arm/mach-ux500/cpu-db8500.c:268:9: warning: assignment makes pointer  \
->   from integer without a cast [enabled by default]
+>> 4 days? WTF? since when did setting an ultimatum to the kernel
+>> community work?
 >
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+>   i was only informed of the opportunity 2 days ago, vladimir.  this is
+> an important meeting.  of course the linux kernel community is
+> entirely free to:
+>
+> * completely ignore this opportunity
+> * continue to complain that soc vendors do not follow their
+> unilaterally-decided rules
 
-Looking closer this seems like it's fixing a merge error that appeared in
-my linux-stericsson mixdown branch "next" at one point, and which was
-fixed three days ago.
+SoC vendors are free to join the discussion, and many SoC vendors are 
+part of the kernel community, so calling this unilateral is plain wrong.
 
-The ARM SoC maintainers may need to watch out for that merge error
-when pullin in my 5 pull requests sent recently though, that is
-essentially the basic merge conflict between the DMA40 and
-general devicetree work.
+>   3 days remaining on the clock.
 
-Yours,
-Linus Walleij
+what catastrophic thing will happen when the time runs out?
