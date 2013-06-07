@@ -1,23 +1,36 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 7 Jun 2013 07:52:36 +0000 (UTC)
-Subject: [PATCH 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <51B175E4.1060909@ti.com>
-References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
- <1369845494-30231-15-git-send-email-santosh.shilimkar@ti.com>
- <alpine.DEB.2.02.1306061754560.5152@utopia.booyaka.com>
- <51B0D54A.1090107@ti.com> <51B175E4.1060909@ti.com>
-Message-ID: <alpine.DEB.2.02.1306070751210.32163@utopia.booyaka.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  7 Jun 2013 16:51:51 +0900
+Subject: [PATCH 21/27] ARM: shmobile: r8a7790: Make private clock arrays static
+In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-22-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc Beno?t
+From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-On Fri, 7 Jun 2013, Sricharan R wrote:
+Both clock-r8a7740.c and clock-r8a7790.c define a div4_clks array as
+non-static. Compiling support for both SoCs thus result in a symbol
+redefinition. Fix it by defining the arrays as static.
 
-> I used autogen to remove the data, but some of the data were not in sync
-> with the mainline .(like abe, dss, aess, context register offsets etc..).
-> So i have to sync them manually.
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/clock-r8a7790.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-OK.  Are you going to fix the differences up soon?
-
-- Paul
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index a481003..bedd20c 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -154,7 +154,7 @@ enum {
+ 	DIV4_SDH, DIV4_SD0, DIV4_SD1, DIV4_NR
+ };
+ 
+-struct clk div4_clks[DIV4_NR] = {
++static struct clk div4_clks[DIV4_NR] = {
+ 	[DIV4_SDH] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 8, 0x0dff, CLK_ENABLE_ON_INIT),
+ 	[DIV4_SD0] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 4, 0x1de0, CLK_ENABLE_ON_INIT),
+ 	[DIV4_SD1] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 0, 0x1de0, CLK_ENABLE_ON_INIT),
+-- 
+1.8.2.1
