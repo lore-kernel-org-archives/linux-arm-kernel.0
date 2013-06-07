@@ -1,9 +1,9 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 18:26:09 +0200
-Subject: [RFC PATCH 28/50] ASoC: atmel-ssc: prepare clk before calling enable
+Date: Fri,  7 Jun 2013 18:26:31 +0200
+Subject: [RFC PATCH 29/50] mmc: atmel-mci: prepare clk before calling enable
 In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
 References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370622370-19614-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370622391-19654-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,43 +12,63 @@ avoid common clk framework warnings.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/misc/atmel-ssc.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/mmc/host/atmel-mci.c |   16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index c09c28f..e619197 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -58,7 +58,7 @@ struct ssc_device *ssc_request(unsigned int ssc_num)
- 	ssc->user++;
- 	spin_unlock(&user_lock);
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index e75774f..99c2fcc 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -380,6 +380,8 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ {
+ 	struct atmel_mci	*host = s->private;
+ 	u32			*buf;
++	int			ret;
++
  
--	clk_enable(ssc->clk);
-+	clk_prepare_enable(ssc->clk);
+ 	buf = kmalloc(ATMCI_REGS_SIZE, GFP_KERNEL);
+ 	if (!buf)
+@@ -391,7 +393,11 @@ static int atmci_regs_show(struct seq_file *s, void *v)
+ 	 * consistent.
+ 	 */
+ 	spin_lock_bh(&host->lock);
+-	clk_enable(host->mck);
++	ret = clk_enable(host->mck);
++	if (ret) {
++		kfree(buf);
++		return ret;
++	}
+ 	memcpy_fromio(buf, host->regs, ATMCI_REGS_SIZE);
+ 	clk_disable(host->mck);
+ 	spin_unlock_bh(&host->lock);
+@@ -2379,7 +2385,9 @@ static int __init atmci_probe(struct platform_device *pdev)
+ 	if (!host->regs)
+ 		goto err_ioremap;
  
- 	return ssc;
- }
-@@ -69,7 +69,7 @@ void ssc_free(struct ssc_device *ssc)
- 	spin_lock(&user_lock);
- 	if (ssc->user) {
- 		ssc->user--;
--		clk_disable(ssc->clk);
-+		clk_disable_unprepare(ssc->clk);
- 	} else {
- 		dev_dbg(&ssc->pdev->dev, "device already free\n");
- 	}
-@@ -172,10 +172,10 @@ static int ssc_probe(struct platform_device *pdev)
- 	}
+-	clk_enable(host->mck);
++	ret = clk_prepare_enable(host->mck);
++	if (ret)
++		goto err_clk_prepare_enable;
+ 	atmci_writel(host, ATMCI_CR, ATMCI_CR_SWRST);
+ 	host->bus_hz = clk_get_rate(host->mck);
+ 	clk_disable(host->mck);
+@@ -2463,6 +2471,8 @@ err_init_slot:
+ 		dma_release_channel(host->dma.chan);
+ 	free_irq(irq, host);
+ err_request_irq:
++	clk_unprepare(host->mck);
++err_clk_prepare_enable:
+ 	iounmap(host->regs);
+ err_ioremap:
+ 	clk_put(host->mck);
+@@ -2491,7 +2501,7 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 	atmci_writel(host, ATMCI_IDR, ~0UL);
+ 	atmci_writel(host, ATMCI_CR, ATMCI_CR_MCIDIS);
+ 	atmci_readl(host, ATMCI_SR);
+-	clk_disable(host->mck);
++	clk_disable_unprepare(host->mck);
  
- 	/* disable all interrupts */
--	clk_enable(ssc->clk);
-+	clk_prepare_enable(ssc->clk);
- 	ssc_writel(ssc->regs, IDR, -1);
- 	ssc_readl(ssc->regs, SR);
--	clk_disable(ssc->clk);
-+	clk_disable_unprepare(ssc->clk);
- 
- 	ssc->irq = platform_get_irq(pdev, 0);
- 	if (!ssc->irq) {
+ 	if (host->dma.chan)
+ 		dma_release_channel(host->dma.chan);
 -- 
 1.7.9.5
