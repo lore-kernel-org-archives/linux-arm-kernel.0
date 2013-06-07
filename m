@@ -1,49 +1,65 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Fri, 07 Jun 2013 10:18:49 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1370477958.20454.68.camel@localhost>
- <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
- <51B085C6.3000605@gmail.com>
- <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
- <51B19046.5040401@gmail.com>
- <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
-Message-ID: <51B19769.4060706@free-electrons.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 7 Jun 2013 16:19:06 +0800
+Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
+Message-ID: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/2013 10:06, luke.leighton wrote:
-> On Fri, Jun 7, 2013 at 8:48 AM, Vladimir Pantelic <vladoman@gmail.com> wrote:
->> luke.leighton wrote:
->>>   3 days remaining on the clock.
->>
->> what catastrophic thing will happen when the time runs out?
->  no catastrophe, vladimir: all that happens is that an opportunity is
-> lost, and the result of that is that the situation remains as it is,
-> with a major soc vendor being divorced from and isolated from the free
-> software community, who will continue to have to shoulder the
-> frustrating and isolated burden of responsibility of reworking
-> "over-the-fence" kernel patches as best they can with the limited
-> resources that they have.
+For some unknown reasons, the jiffies will be updated more
+than one tick at every short time. Eg, at this code:
+After timeout = jiffies + msecs_to_jiffies(10),
+the interrupt occurs, and the softirq updates jiffies (eg,  + 2 jiffies),
+then return back from interrupt, the time between above operations
+are tiny, the PLL is still not locked, but the timeout condition is satisfied.
 
-I think the question was: what will be done in 3 days that cannot be
-undone ? and you didn't answer that. I don't understand why your are
-still stating that Allwinner will never be able to get code in the
-mainline after Olof and Maxime told you that they are already working,
-at least discussing with them.
+Signed-off-by: Peter Chen <peter.chen@freescale.com>
+---
+Changes for v2:
+- According to Russell King's suggestion, change code for more reasonable
+for timeout condition.
+- Change commit log.
 
+ arch/arm/mach-imx/clk-pllv3.c |   14 ++++++++++----
+ 1 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
+index d09bc3d..52e54df 100644
+--- a/arch/arm/mach-imx/clk-pllv3.c
++++ b/arch/arm/mach-imx/clk-pllv3.c
+@@ -16,6 +16,7 @@
+ #include <linux/slab.h>
+ #include <linux/jiffies.h>
+ #include <linux/err.h>
++#include <linux/delay.h>
+ #include "clk.h"
+ 
+ #define PLL_NUM_OFFSET		0x10
+@@ -48,7 +49,7 @@ struct clk_pllv3 {
+ static int clk_pllv3_prepare(struct clk_hw *hw)
+ {
+ 	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+-	unsigned long timeout = jiffies + msecs_to_jiffies(10);
++	int count = 100;
+ 	u32 val;
+ 
+ 	val = readl_relaxed(pll->base);
+@@ -60,9 +61,14 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
+ 	writel_relaxed(val, pll->base);
+ 
+ 	/* Wait for PLL to lock */
+-	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
+-		if (time_after(jiffies, timeout))
+-			return -ETIMEDOUT;
++	do {
++		if (readl_relaxed(pll->base) & BM_PLL_LOCK)
++			break;
++		udelay(100);
++	} while (count--);
++
++	if (count == 0 && !(readl_relaxed(pll->base) & BM_PLL_LOCK))
++		return -ETIMEDOUT;
+ 
+ 	return 0;
+ }
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+1.7.0.4
