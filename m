@@ -1,45 +1,28 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 7 Jun 2013 16:37:32 +0530
-Subject: [PATCH 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <51B1B936.5030302@ti.com>
-References: <1370600827-21679-1-git-send-email-r.sricharan@ti.com>
- <51B1B936.5030302@ti.com>
-Message-ID: <51B1BEF4.6080606@ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 7 Jun 2013 19:07:43 +0800
+Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL
+ lock
+In-Reply-To: <20130607084937.GH12361@pengutronix.de>
+References: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
+ <20130607082457.GF12361@pengutronix.de>
+ <20130607083134.GE21641@nchen-desktop>
+ <20130607083528.GG12361@pengutronix.de>
+ <20130607084354.GF21641@nchen-desktop>
+ <20130607084937.GH12361@pengutronix.de>
+Message-ID: <20130607110741.GB20756@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Benoit,
+On Fri, Jun 07, 2013 at 10:49:38AM +0200, Uwe Kleine-K?nig wrote:
+> > I will try your fix, but still it just reduces the possibilities.
+> > The problem is not the preemption takes too long, it is the jiffies
+> > updates more than one tick at one short preemption.
+> If that is really the problem that many more instances that use the same
+> incarnation need the same fix. I would be surprised if that was the
+> case.
 
-On Friday 07 June 2013 04:13 PM, Benoit Cousson wrote:
-> Hi Sricharan,
->
-> On 06/07/2013 12:27 PM, Sricharan R wrote:
->> - The IO resource information like dma request lines, irq number and
->>   ocp address space can be populated via dt blob. So such data is stripped
->>   from OMAP4 SOC hwmod data file.
->>
->> - The devices which are still missing the device tree bindings,
->>   address space entries are not removed yet. When such devices add
->>   the dt bindings, respective address space data can be deleted.
->>
->> - Also other unnessecary hwmods like firewalls are removed as a part of this.
-> typo.
- Ok, will correct.
++1
 
-> That part is fine, but you should add that by doing that you have to
-> create new direct link from MPU to EMIFs that did no exist before.
- Yes, the mpu->emif link is already added in the patch
+We have plenty of timeout code written like that in the kernel.
 
->> The above update, results in reduction of about ~1650 lines of code.
->>
->> The comment about autogeneration is removed temporarily. Should be brought
->> back after syncing the scripts.
-> You'd better keep it and append a note stating that.
-> If you remove it, I fairly know nobody will ever add it again :-)
- Ok, will change this then :-)
-> Otherwise the patch looks fine.
->
-> Thanks,
-> Benoit
-Regards,
- Sricharan
+Shawn
