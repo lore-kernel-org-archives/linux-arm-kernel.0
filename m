@@ -1,44 +1,74 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 17:22:03 +0900
-Subject: [PATCH 05/11] ARM: shmobile: bockw: add CN9 SCIF/RCAN selection
- dipswitch explanation
+Date: Fri,  7 Jun 2013 17:22:05 +0900
+Subject: [PATCH 07/11] ARM: shmobile: lager: Add GPIO LEDs
 In-Reply-To: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370593329-27559-6-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370593329-27559-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
+support them.
 
-Debug serial (= SCIF0) is connected to CN9 upper side,
-and it is shared by RCAN.
-This patch adds SCIF/RCAN dipswitch explanation on
-comment area for developers.
+Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-shmobile/board-lager.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index badde08..3ce020a 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -26,6 +26,14 @@
- #include <mach/r8a7778.h>
+diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+index 6114edd..6a1ba38 100644
+--- a/arch/arm/mach-shmobile/board-lager.c
++++ b/arch/arm/mach-shmobile/board-lager.c
+@@ -21,13 +21,37 @@
+ #include <linux/interrupt.h>
+ #include <linux/irqchip.h>
+ #include <linux/kernel.h>
++#include <linux/leds.h>
+ #include <linux/pinctrl/machine.h>
++#include <linux/platform_data/gpio-rcar.h>
+ #include <linux/platform_device.h>
+ #include <mach/common.h>
+ #include <mach/r8a7790.h>
+ #include <asm/mach-types.h>
  #include <asm/mach/arch.h>
  
-+/*
-+ *	CN9(Upper side) SCIF/RCAN selection
-+ *
-+ *		1,4	3,6
-+ * SW40		SCIF	RCAN
-+ * SW41		SCIF	RCAN
-+ */
++/* LEDS */
++static struct gpio_led lager_leds[] = {
++	{
++		.name		= "led8",
++		.gpio		= RCAR_GP_PIN(5, 17),
++		.default_state	= LEDS_GPIO_DEFSTATE_ON,
++	}, {
++		.name		= "led7",
++		.gpio		= RCAR_GP_PIN(4, 23),
++		.default_state	= LEDS_GPIO_DEFSTATE_ON,
++	}, {
++		.name		= "led6",
++		.gpio		= RCAR_GP_PIN(4, 22),
++		.default_state	= LEDS_GPIO_DEFSTATE_ON,
++	},
++};
 +
- static struct smsc911x_platform_config smsc911x_data = {
- 	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
- 	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
++static struct gpio_led_platform_data lager_leds_pdata = {
++	.leds		= lager_leds,
++	.num_leds	= ARRAY_SIZE(lager_leds),
++};
++
+ static const struct pinctrl_map lager_pinctrl_map[] = {
+ 	/* SCIF0 (CN19: DEBUG SERIAL0) */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
+@@ -46,6 +70,9 @@ static void __init lager_add_standard_devices(void)
+ 	r8a7790_pinmux_init();
+ 
+ 	r8a7790_add_standard_devices();
++	platform_device_register_data(&platform_bus, "leds-gpio", -1,
++				      &lager_leds_pdata,
++				      sizeof(lager_leds_pdata));
+ }
+ 
+ static const char *lager_boards_compat_dt[] __initdata = {
 -- 
 1.8.2.1
