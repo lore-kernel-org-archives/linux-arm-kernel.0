@@ -1,65 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 17:22:00 +0900
-Subject: [PATCH 02/11] ARM: shmobile: bockw: define FPGA address and rename
- iomem variable
+Date: Fri,  7 Jun 2013 17:22:09 +0900
+Subject: [PATCH 11/11] ARM: shmobile: marzen: keep local function as static
 In-Reply-To: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370593329-27559-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370593329-27559-12-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-Bock-W board will needs more board specific ioremap() method.
-This patch tidyup current FPGA specific settings
+marzen_init_late() should be static
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-bockw.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/board-marzen.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
-index dac4365..badde08 100644
---- a/arch/arm/mach-shmobile/board-bockw.c
-+++ b/arch/arm/mach-shmobile/board-bockw.c
-@@ -46,10 +46,11 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
- 				  "scif0_ctrl", "scif0"),
+diff --git a/arch/arm/mach-shmobile/board-marzen.c b/arch/arm/mach-shmobile/board-marzen.c
+index 71f174e..9b5ed7e 100644
+--- a/arch/arm/mach-shmobile/board-marzen.c
++++ b/arch/arm/mach-shmobile/board-marzen.c
+@@ -350,7 +350,7 @@ static struct platform_device *marzen_late_devices[] __initdata = {
+ 	&ohci1_device,
  };
  
-+#define FPGA	0x18200000
- #define IRQ0MR	0x30
- static void __init bockw_init(void)
+-void __init marzen_init_late(void)
++static void __init marzen_init_late(void)
  {
--	void __iomem *fpga;
-+	void __iomem *base;
- 
- 	r8a7778_clock_init();
- 	r8a7778_init_irq_extpin(1);
-@@ -59,8 +60,8 @@ static void __init bockw_init(void)
- 				  ARRAY_SIZE(bockw_pinctrl_map));
- 	r8a7778_pinmux_init();
- 
--	fpga = ioremap_nocache(0x18200000, SZ_1M);
--	if (fpga) {
-+	base = ioremap_nocache(FPGA, SZ_1M);
-+	if (base) {
- 		/*
- 		 * CAUTION
- 		 *
-@@ -68,10 +69,10 @@ static void __init bockw_init(void)
- 		 * it should be cared in the future
- 		 * Now, it is assuming IRQ0 was used only from SMSC.
- 		 */
--		u16 val = ioread16(fpga + IRQ0MR);
-+		u16 val = ioread16(base + IRQ0MR);
- 		val &= ~(1 << 4); /* enable SMSC911x */
--		iowrite16(val, fpga + IRQ0MR);
--		iounmap(fpga);
-+		iowrite16(val, base + IRQ0MR);
-+		iounmap(base);
- 
- 		platform_device_register_resndata(
- 			&platform_bus, "smsc911x", -1,
+ 	/* get usb phy */
+ 	phy = usb_get_phy(USB_PHY_TYPE_USB2);
 -- 
 1.8.2.1
