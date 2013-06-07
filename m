@@ -1,54 +1,49 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 07 Jun 2013 15:39:41 +0400
-Subject: [PATCH 07/11] ARM: shmobile: lager: Add GPIO LEDs
-In-Reply-To: <1370593329-27559-8-git-send-email-horms+renesas@verge.net.au>
-References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
- <1370593329-27559-8-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <51B1C67D.7040900@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Jun 2013 13:46:32 +0200
+Subject: [PATCH v2 1/8] clk: flag to use upper half of the register as
+ change indicator
+In-Reply-To: <201306062108.38587.heiko@sntech.de>
+References: <201306062107.58875.heiko@sntech.de>
+ <201306062108.38587.heiko@sntech.de>
+Message-ID: <CACRpkda+QwnhCHBhQ3d-zUE9dD75Rv0_qt02h6prrzCBzNm5zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Jun 6, 2013 at 9:08 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
-On 07-06-2013 12:22, Simon Horman wrote:
-
-> The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
-> support them.
-
-> Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
-
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
->   arch/arm/mach-shmobile/board-lager.c | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
-
-> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-> index 6114edd..6a1ba38 100644
-> --- a/arch/arm/mach-shmobile/board-lager.c
-> +++ b/arch/arm/mach-shmobile/board-lager.c
-> @@ -21,13 +21,37 @@
-[...]
-> +static struct gpio_led_platform_data lager_leds_pdata = {
-
-     Misses __initdata. Too late now, need another patch...
-
-> +	.leds		= lager_leds,
-> +	.num_leds	= ARRAY_SIZE(lager_leds),
-> +};
-> +
->   static const struct pinctrl_map lager_pinctrl_map[] = {
->   	/* SCIF0 (CN19: DEBUG SERIAL0) */
->   	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-> @@ -46,6 +70,9 @@ static void __init lager_add_standard_devices(void)
->   	r8a7790_pinmux_init();
+> There exist platforms, namely at least all Rockchip Cortex-A9 based ones,
+> that don't use the paradigm of reading-changing-writing the register contents,
+> but instead only write the changes to the register with a mask that indicates
+> the changed bits.
 >
->   	r8a7790_add_standard_devices();
-> +	platform_device_register_data(&platform_bus, "leds-gpio", -1,
-> +				      &lager_leds_pdata,
-> +				      sizeof(lager_leds_pdata));
->   }
+> This patch adds flags and code to support the case where the lower 16 bit of
+> hold the information and the upper 16 bit are used as mask to indicate the
+> written changes.
 >
->   static const char *lager_boards_compat_dt[] __initdata = {
+> As hardware-specific flags should not be added to the common clk flags, the
+> flags are added to gate, mux and divider clocks individually.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+(...)
+> +       if ((clk_gate_flags & CLK_GATE_MASK_UPPER_HALF) && bit_idx > 15) {
+> +               pr_err("%s: bit_idx %d invalid\n", __func__, bit_idx);
+> +               return ERR_PTR(-EINVAL);
+> +       }
 
-WBR, Sergei
+Now this looks *EXTREMELY* familiar to a patch just sent by Haojian
+for HiSilicon.
+
+"[PATCH v2 3/6] clk: divider: add CLK_DIVIDER_HIWORD_MASK flag"
+http://marc.info/?l=linux-arm-kernel&m=137035873916777&w=2
+
+What kind of coincidence is this? Are Rockchip and HiSilicon using
+the same silicon IP or are they of a common origin? (It is a small
+world after all.)
+
+I think you two guys need to read each others patch sets closely
+here. I'd like Haojian to look at Heiko's patches and Heiko to look
+at Haojian's patches, just to make sure you're not actually writing
+two drivers for the same hardware in the end.
+
+Yours,
+Linus Walleij
