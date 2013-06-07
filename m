@@ -1,52 +1,49 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 7 Jun 2013 18:39:02 +0100
-Subject: [GIT PULL] arm: arch_timer cleanups and niceties for 3.11
-Message-ID: <20130607173902.GJ23311@e106331-lin.cambridge.arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri,  7 Jun 2013 19:40:56 +0200
+Subject: [PATCH] cpuidle: fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency warning
+Message-ID: <1370626856-2876-1-git-send-email-daniel.lezcano@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Before the commit d6f346f2d2bf511c2c59176121a6e42ce60173a0, the
+ARCH_NEEDS_CPU_IDLE_COUPLED option was wrongly not depending on the CPU_IDLE
+and the Kconfig for OMAP / TEGRA was not checking this dependency when setting
+the option.
 
-Please pull these arch_timer cleanups I've been holding onto for a while.
-They're the same as my last posting [1], but have been rebased to v3.10-rc3.
+With this patch, the ARCH_NEEDS_CPU_IDLE_COUPLED has been moved under the
+CPU_IDLE option. The dependency has been fixed in the relevant arch's Kconfig.
 
-Thanks,
-Mark.
+Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+---
+ arch/arm/mach-omap2/Kconfig |    2 +-
+ arch/arm/mach-tegra/Kconfig |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170602.html
-
----->8----
-
-The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
-
-  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-mr.git for-rmk/arch-timer-cleanups
-
-for you to fetch changes up to 3f71be237ce37e0131973ebfa33b326bc51d743e:
-
-  ARM: arch_timer: stop virtual timer when booted in HYP mode (2013-06-07 10:20:29 +0100)
-
-----------------------------------------------------------------
-Marc Zyngier (2):
-      ARM: hyp: initialize CNTVOFF to zero
-      ARM: arch_timer: stop virtual timer when booted in HYP mode
-
-Mark Rutland (3):
-      ARM: KVM: arch_timers: zero CNTVOFF upon return to host
-      clocksource: arch_timer: use virtual counters
-      arm: fix up ARM_ARCH_TIMER selects
-
- arch/arm/include/asm/arch_timer.h    |  9 ---------
- arch/arm/kernel/hyp-stub.S           |  7 +++++++
- arch/arm/kvm/interrupts_head.S       |  4 ++++
- arch/arm/mach-exynos/Kconfig         |  2 +-
- arch/arm/mach-shmobile/Kconfig       |  4 ++--
- arch/arm/mach-tegra/Kconfig          |  2 +-
- arch/arm/mach-virt/Kconfig           |  2 +-
- arch/arm64/include/asm/arch_timer.h  | 10 ----------
- drivers/clocksource/arm_arch_timer.c | 23 +++++------------------
- include/clocksource/arm_arch_timer.h |  2 +-
- 10 files changed, 22 insertions(+), 43 deletions(-)
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index f49cd51..831e89e 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -83,7 +83,7 @@ config ARCH_OMAP4
+ 	depends on ARCH_OMAP2PLUS
+ 	depends on ARCH_MULTI_V7
+ 	select ARCH_HAS_OPP
+-	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
++	select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
+ 	select ARM_CPU_SUSPEND if PM
+ 	select ARM_ERRATA_720789
+ 	select ARM_GIC
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 84d72fc..04c6221 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -23,7 +23,7 @@ menu "NVIDIA Tegra options"
+ 
+ config ARCH_TEGRA_2x_SOC
+ 	bool "Enable support for Tegra20 family"
+-	select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
++	select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_754327 if SMP
+ 	select ARM_ERRATA_764369 if SMP
+-- 
+1.7.9.5
