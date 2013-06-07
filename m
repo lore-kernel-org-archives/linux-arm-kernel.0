@@ -1,62 +1,76 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:54 +0900
-Subject: [PATCH 24/27] ARM: shmobile: sh73a0: add CPUFreq support
+Date: Fri,  7 Jun 2013 16:51:47 +0900
+Subject: [PATCH 17/27] ARM: shmobile: r8a7778: Register SDHI device
 In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370591517-20239-25-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-18-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch enables the use of the generic cpufreq-cpu0 driver on sh73a0.
-Providing a regulator, a list of OPPs in DT, combined with a virtual
-cpufreq-cpu0 platform device and a clock, attached to it is everything,
-the cpufreq-cpu0 driver needs. The first sh73a0 platform, implementing
-such CPUFreq support is kzm9g-reference.
+This patch adds SDHI register function which needs id number (= 0/1/2)
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig        | 2 ++
- arch/arm/mach-shmobile/setup-sh73a0.c | 5 +++++
- 2 files changed, 7 insertions(+)
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |  2 ++
+ arch/arm/mach-shmobile/setup-r8a7778.c        | 24 ++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 52e8c6e..f871f2a 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -169,6 +169,8 @@ config MACH_KZM9D
- config MACH_KZM9G
- 	bool "KZM-A9-GT board"
- 	depends on ARCH_SH73A0
-+	select ARCH_HAS_CPUFREQ
-+	select ARCH_HAS_OPP
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
- 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
-diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
-index 3bc33a5..3acb45a 100644
---- a/arch/arm/mach-shmobile/setup-sh73a0.c
-+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
-@@ -963,6 +963,8 @@ static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index 951149e..b5173b3 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -18,6 +18,7 @@
+ #ifndef __ASM_R8A7778_H__
+ #define __ASM_R8A7778_H__
  
- void __init sh73a0_add_standard_devices_dt(void)
- {
-+	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
-+
- 	/* clocks are setup late during boot in the case of DT */
- 	sh73a0_clock_init();
++#include <linux/mmc/sh_mobile_sdhi.h>
+ #include <linux/sh_eth.h>
  
-@@ -970,6 +972,9 @@ void __init sh73a0_add_standard_devices_dt(void)
- 			     ARRAY_SIZE(sh73a0_devices_dt));
- 	of_platform_populate(NULL, of_default_bus_match_table,
- 			     sh73a0_auxdata_lookup, NULL);
-+
-+	/* Instantiate cpufreq-cpu0 */
-+	platform_device_register_full(&devinfo);
+ extern void r8a7778_add_standard_devices(void);
+@@ -28,5 +29,6 @@ extern void r8a7778_init_irq(void);
+ extern void r8a7778_init_irq_dt(void);
+ extern void r8a7778_clock_init(void);
+ extern void r8a7778_init_irq_extpin(int irlm);
++extern void r8a7778_sdhi_init(int id, struct sh_mobile_sdhi_info *info);
+ 
+ #endif /* __ASM_R8A7778_H__ */
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index d6ee521..f5b2a57 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -102,6 +102,30 @@ void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
+ 					  pdata, sizeof(*pdata));
  }
  
- static const char *sh73a0_boards_compat_dt[] __initdata = {
++/* SDHI */
++static struct resource sdhi_resources[] = {
++	/* SDHI0 */
++	DEFINE_RES_MEM(0xFFE4C000, 0x100),
++	DEFINE_RES_IRQ(gic_iid(0x77)),
++	/* SDHI1 */
++	DEFINE_RES_MEM(0xFFE4D000, 0x100),
++	DEFINE_RES_IRQ(gic_iid(0x78)),
++	/* SDHI2 */
++	DEFINE_RES_MEM(0xFFE4F000, 0x100),
++	DEFINE_RES_IRQ(gic_iid(0x76)),
++};
++
++void __init r8a7778_sdhi_init(int id,
++			      struct sh_mobile_sdhi_info *info)
++{
++	BUG_ON(id < 0 || id > 2);
++
++	platform_device_register_resndata(
++		&platform_bus, "sh_mobile_sdhi", id,
++		sdhi_resources + (2 * id), 2,
++		info, sizeof(*info));
++}
++
+ void __init r8a7778_add_standard_devices(void)
+ {
+ 	int i;
 -- 
 1.8.2.1
