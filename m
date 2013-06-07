@@ -1,14 +1,14 @@
 From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Fri, 7 Jun 2013 17:02:53 +0530
-Subject: [PATCH 2/3] ARM: dts: AM33XX: Add pinmux configuration for CPSW to
- EVMsk
+Date: Fri, 7 Jun 2013 17:02:52 +0530
+Subject: [PATCH 1/3] ARM: dts: AM33XX: Add pinmux configuration for CPSW to
+ beaglebone
 In-Reply-To: <1370604775-21264-1-git-send-email-mugunthanvnm@ti.com>
 References: <1370604775-21264-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <1370604775-21264-3-git-send-email-mugunthanvnm@ti.com>
+Message-ID: <1370604775-21264-2-git-send-email-mugunthanvnm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux configurations for RGMII based CPSW ethernet to AM335x EVMsk.
+Add pinmux configurations for MII based CPSW ethernet to am335x-bone.
 
 Default mode is nothing but the values required for the module during
 active state. With this configurations module is functional as
@@ -20,53 +20,41 @@ energy usage for the pins for the suspend/resume cycle
 
 Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
 ---
- arch/arm/boot/dts/am335x-evmsk.dts |   92 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
+ arch/arm/boot/dts/am335x-bone.dts |   67 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 67 insertions(+)
 
-diff --git a/arch/arm/boot/dts/am335x-evmsk.dts b/arch/arm/boot/dts/am335x-evmsk.dts
-index 338b681..a0c201d 100644
---- a/arch/arm/boot/dts/am335x-evmsk.dts
-+++ b/arch/arm/boot/dts/am335x-evmsk.dts
-@@ -71,6 +71,86 @@
- 				0x1b4 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)		/* xdma_event_intr1.clkout2 */
+diff --git a/arch/arm/boot/dts/am335x-bone.dts b/arch/arm/boot/dts/am335x-bone.dts
+index fd48173..04feaf8 100644
+--- a/arch/arm/boot/dts/am335x-bone.dts
++++ b/arch/arm/boot/dts/am335x-bone.dts
+@@ -56,6 +56,60 @@
+ 				0x1b4 (PIN_OUTPUT_PULLDOWN | MUX_MODE3)	/* xdma_event_intr1.clkout2 */
  			>;
  		};
 +
 +		cpsw_default: cpsw_default {
 +			pinctrl-single,pins = <
 +				/* Slave 1 */
-+				0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txen.rgmii1_tctl */
-+				0x118 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxdv.rgmii1_rctl */
-+				0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd3.rgmii1_td3 */
-+				0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd2.rgmii1_td2 */
-+				0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_td1 */
-+				0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_td0 */
-+				0x12c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txclk.rgmii1_tclk */
-+				0x130 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxclk.rgmii1_rclk */
-+				0x134 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd3.rgmii1_rd3 */
-+				0x138 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd2.rgmii1_rd2 */
-+				0x13c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd1.rgmii1_rd1 */
-+				0x140 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd0.rgmii1_rd0 */
-+
-+				/* Slave 2 */
-+				0x40 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a0.rgmii2_tctl */
-+				0x44 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a1.rgmii2_rctl */
-+				0x48 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a2.rgmii2_td3 */
-+				0x4c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a3.rgmii2_td2 */
-+				0x50 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a4.rgmii2_td1 */
-+				0x54 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a5.rgmii2_td0 */
-+				0x58 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a6.rgmii2_tclk */
-+				0x5c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a7.rgmii2_rclk */
-+				0x60 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a8.rgmii2_rd3 */
-+				0x64 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a9.rgmii2_rd2 */
-+				0x68 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a10.rgmii2_rd1 */
-+				0x6c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* gpmc_a11.rgmii2_rd0 */
++				0x110 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxerr.mii1_rxerr */
++				0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txen.mii1_txen */
++				0x118 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxdv.mii1_rxdv */
++				0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd3.mii1_txd3 */
++				0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd2.mii1_txd2 */
++				0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd1.mii1_txd1 */
++				0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)	/* mii1_txd0.mii1_txd0 */
++				0x12c (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_txclk.mii1_txclk */
++				0x130 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxclk.mii1_rxclk */
++				0x134 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd3.mii1_rxd3 */
++				0x138 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd2.mii1_rxd2 */
++				0x13c (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd1.mii1_rxd1 */
++				0x140 (PIN_INPUT_PULLUP | MUX_MODE0)	/* mii1_rxd0.mii1_rxd0 */
 +			>;
 +		};
 +
 +		cpsw_sleep: cpsw_sleep {
 +			pinctrl-single,pins = <
 +				/* Slave 1 reset value */
++				0x110 (PIN_INPUT_PULLDOWN | MUX_MODE7)
 +				0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
 +				0x118 (PIN_INPUT_PULLDOWN | MUX_MODE7)
 +				0x11c (PIN_INPUT_PULLDOWN | MUX_MODE7)
@@ -79,20 +67,6 @@ index 338b681..a0c201d 100644
 +				0x138 (PIN_INPUT_PULLDOWN | MUX_MODE7)
 +				0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)
 +				0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+
-+				/* Slave 2 reset value*/
-+				0x40 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x44 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x48 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x4c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x50 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x54 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x58 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x5c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x60 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x64 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x68 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x6c (PIN_INPUT_PULLDOWN | MUX_MODE7)
 +			>;
 +		};
 +
@@ -114,15 +88,16 @@ index 338b681..a0c201d 100644
  	};
  
  	ocp {
-@@ -277,3 +357,15 @@
- 		};
- 	};
+@@ -165,3 +219,16 @@
+ &cpsw_emac1 {
+ 	phy_id = <&davinci_mdio>, <1>;
  };
 +
 +&mac {
 +	pinctrl-names = "default", "sleep";
 +	pinctrl-0 = <&cpsw_default>;
 +	pinctrl-1 = <&cpsw_sleep>;
++
 +};
 +
 +&davinci_mdio {
