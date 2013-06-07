@@ -1,46 +1,25 @@
-From: rjw@sisk.pl (Rafael J. Wysocki)
-Date: Fri, 07 Jun 2013 13:11:51 +0200
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 7 Jun 2013 16:35:24 +0530
 Subject: [GIT PULL] CPUFreq: ARM Updates for v3.11
-In-Reply-To: <CAKohpokdrw1KZuCx6Y5E1JyK-Yq0T1fh0qP+bEaqgZjoK8JEEQ@mail.gmail.com>
+In-Reply-To: <54837539.yBQlA0EhhC@vostro.rjw.lan>
 References: <CAKohpokdrw1KZuCx6Y5E1JyK-Yq0T1fh0qP+bEaqgZjoK8JEEQ@mail.gmail.com>
-Message-ID: <54837539.yBQlA0EhhC@vostro.rjw.lan>
+ <54837539.yBQlA0EhhC@vostro.rjw.lan>
+Message-ID: <CAKohponx-dSdRVX77Fa8ePKhppvvE=dS=ofJT0_+3014b38ZOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 07, 2013 04:26:36 PM Viresh Kumar wrote:
-> Hi Rafael,
-> 
-> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
-> 
->   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.linaro.org/people/vireshk/linux.git cpufreq-next
-> 
-> for you to fetch changes up to f13ad5d9829c060fffe5bf45b05cc3c689a2e719:
-> 
->   cpufreq: kirkwood: Select CPU_FREQ_TABLE option (2013-06-07 16:21:13 +0530)
-> 
-> ----------------------------------------------------------------
-> Arnd Bergmann (2):
->       cpufreq: SPEAr needs cpufreq table
->       cpufreq: bit.LITTLE needs cpufreq table
+On 7 June 2013 16:41, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Friday, June 07, 2013 04:26:36 PM Viresh Kumar wrote:
 
-That should be big.LITTLE I suppose?
+>>       cpufreq: bit.LITTLE needs cpufreq table
+>
+> That should be big.LITTLE I suppose?
 
-Rafael
+Yes. This is not the first time I face this issue where big is
+written as bit. Even I named one of my external repo like this
+earlier and after a long time some other careful viewer caught
+it :)
 
+Fixed my branch now with s/bit/big.
 
-> 
-> Ezequiel Garcia (1):
->       cpufreq: kirkwood: Select CPU_FREQ_TABLE option
-> 
->  drivers/cpufreq/Kconfig.arm | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> --
-> Viresh
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Thanks.
