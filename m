@@ -1,67 +1,119 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 7 Jun 2013 13:44:30 -0600
-Subject: [PATCH 03/14] bus: mvebu-mbus: Introduce device tree binding
-In-Reply-To: <201306072110.35856.arnd@arndb.de>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1370623671-7748-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306072110.35856.arnd@arndb.de>
-Message-ID: <20130607194430.GA7854@obsidianresearch.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  7 Jun 2013 21:45:09 +0200
+Subject: [RFC PATCH 50/50] ARM: at91/dt: move sama5d3 boards to new at91 clk
+ implem
+In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370634310-4185-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 09:10:35PM +0200, Arnd Bergmann wrote:
-> On Friday 07 June 2013, Ezequiel Garcia wrote:
-> > +       np = of_find_matching_node(NULL, of_mvebu_mbus_ids);
-> > +       if (!np) {
-> > +               pr_err("could not find a matching SoC family\n");
-> > +               return -ENODEV;
-> > +       }
-> > +
-> > +       of_id = of_match_node(of_mvebu_mbus_ids, np);
-> > +       mbus_state.soc = of_id->data;
-> > +
-> > +       if (of_address_to_resource(np, 0, &mbuswins_res)) {
-> > +               pr_err("cannot get MBUS register address\n");
-> > +               return -EINVAL;
-> > +       }
-> > +
-> > +       if (of_address_to_resource(np, 1, &sdramwins_res)) {
-> > +               pr_err("cannot get SDRAM register address\n");
-> > +               return -EINVAL;
-> > +       }
-> 
-> Just an idea to make this more regular: Since the internal-regs can no longer
-> be regarded as a fixed location, we might want to use the same "ranges" property
-> mechanism for resolving the internal regs as we use for everything else.
-> 
-> This would imply that the device node this driver binds to would actually
-> end up being a child of the bus itself, which then goes on to modify the
-> ranges property of its parent node. Does that make sense?
+Define the main clock frequency in every sama5d3 boards.
+Remove the old main clock definition.
+Include the appropriate peripheral options according to peripherals
+availability.
 
-We have a minimum requirement that the bootloader setup internal regs,
-so the minimum required DT bindings is going to be this:
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/boot/dts/sama5d31ek.dts  |    4 ++++
+ arch/arm/boot/dts/sama5d33ek.dts  |    2 ++
+ arch/arm/boot/dts/sama5d34ek.dts  |    4 ++++
+ arch/arm/boot/dts/sama5d35ek.dts  |    6 ++++++
+ arch/arm/boot/dts/sama5d3xcm.dtsi |   17 ++++++-----------
+ 5 files changed, 22 insertions(+), 11 deletions(-)
 
-mbus {
-  compatible = ...
-  ranges = <INTERNAL_REGS_MAP_ID 0xf1000000 0x100000>;
-  reg = <0xf1000xxx ...>; // MBUS regs block
-  #address/size-cells...
-
-  internal-regs  {
-      ranges = <0 INTERNAL_REGS_MAP_ID 0x100000>;
-  }
-}
-
-ie the ranges should never be empty.
-
-Discovery of the address of the mbus control registers is via the reg
-property on its own node (which is untranslated), and all other
-internal regs blocks will automatically translate as they are supposed
-to (Thomas's work to make internal regs 0xd/0xf1 relies on this, AFAIK)
-
-INTERNAL_REGS_MAP_ID is an invalid target ID value, defined to mean
-the internal registers target. 0xFFFFFFFF is a better choice for this
-than 0, because 0xFFFFFFFF is never going to be a valid target id, it
-is too large.
-
-Jason
+diff --git a/arch/arm/boot/dts/sama5d31ek.dts b/arch/arm/boot/dts/sama5d31ek.dts
+index 027bac7..3a6c391 100644
+--- a/arch/arm/boot/dts/sama5d31ek.dts
++++ b/arch/arm/boot/dts/sama5d31ek.dts
+@@ -7,6 +7,10 @@
+  * Licensed under GPLv2 or later.
+  */
+ /dts-v1/;
++#include "sama5d3_lcd.dtsi"
++#include "sama5d3_emac.dtsi"
++#include "sama5d3_mci2.dtsi"
++#include "sama5d3_uart.dtsi"
+ #include "sama5d3xmb.dtsi"
+ #include "sama5d3xdm.dtsi"
+ 
+diff --git a/arch/arm/boot/dts/sama5d33ek.dts b/arch/arm/boot/dts/sama5d33ek.dts
+index 99bd0c8..3e35854 100644
+--- a/arch/arm/boot/dts/sama5d33ek.dts
++++ b/arch/arm/boot/dts/sama5d33ek.dts
+@@ -7,6 +7,8 @@
+  * Licensed under GPLv2 or later.
+  */
+ /dts-v1/;
++#include "sama5d3_lcd.dtsi"
++#include "sama5d3_gmac.dtsi"
+ #include "sama5d3xmb.dtsi"
+ #include "sama5d3xdm.dtsi"
+ 
+diff --git a/arch/arm/boot/dts/sama5d34ek.dts b/arch/arm/boot/dts/sama5d34ek.dts
+index fb8ee11..d03db9f 100644
+--- a/arch/arm/boot/dts/sama5d34ek.dts
++++ b/arch/arm/boot/dts/sama5d34ek.dts
+@@ -7,6 +7,10 @@
+  * Licensed under GPLv2 or later.
+  */
+ /dts-v1/;
++#include "sama5d3_lcd.dtsi"
++#include "sama5d3_gmac.dtsi"
++#include "sama5d3_can.dtsi"
++#include "sama5d3_mci2.dtsi"
+ #include "sama5d3xmb.dtsi"
+ #include "sama5d3xdm.dtsi"
+ 
+diff --git a/arch/arm/boot/dts/sama5d35ek.dts b/arch/arm/boot/dts/sama5d35ek.dts
+index 509a53d..57e49b1 100644
+--- a/arch/arm/boot/dts/sama5d35ek.dts
++++ b/arch/arm/boot/dts/sama5d35ek.dts
+@@ -7,6 +7,12 @@
+  * Licensed under GPLv2 or later.
+  */
+ /dts-v1/;
++#include "sama5d3_gmac.dtsi"
++#include "sama5d3_emac.dtsi"
++#include "sama5d3_can.dtsi"
++#include "sama5d3_mci2.dtsi"
++#include "sama5d3_uart.dtsi"
++#include "sama5d3_tcb1.dtsi"
+ #include "sama5d3xmb.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/sama5d3xcm.dtsi b/arch/arm/boot/dts/sama5d3xcm.dtsi
+index 60637e4..a4ae732 100644
+--- a/arch/arm/boot/dts/sama5d3xcm.dtsi
++++ b/arch/arm/boot/dts/sama5d3xcm.dtsi
+@@ -19,22 +19,17 @@
+ 		reg = <0x20000000 0x20000000>;
+ 	};
+ 
+-	clocks {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		ranges;
+-
+-		main_clock: clock at 0 {
+-			compatible = "atmel,osc", "fixed-clock";
+-			clock-frequency = <12000000>;
+-		};
+-	};
+-
+ 	ahb {
+ 		apb {
+ 			macb0: ethernet at f0028000 {
+ 				phy-mode = "rgmii";
+ 			};
++
++			pmc: pmc at fffffc00 {
++				main: mainck {
++					clock-frequency = <12000000>;
++				};
++			};
+ 		};
+ 
+ 		nand0: nand at 60000000 {
+-- 
+1.7.9.5
