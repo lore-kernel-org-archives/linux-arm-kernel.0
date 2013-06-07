@@ -1,19 +1,86 @@
-From: B35083@freescale.com (Lu Jingchang-B35083)
-Date: Fri, 7 Jun 2013 01:29:27 +0000
-Subject: [PATCH v6] tty: serial: add Freescale lpuart driver support
-In-Reply-To: <20130606200519.GA1644@kroah.com>
-References: <1370309270-21019-1-git-send-email-b35083@freescale.com>
- <20130606200519.GA1644@kroah.com>
-Message-ID: <B56CDBE15CE27145A4B77D2D24263E851CFC11@039-SN1MPN1-003.039d.mgd.msft.net>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 06 Jun 2013 18:42:44 -0700
+Subject: [PATCH] clk: remove the clk_notifier from clk_notifier_list
+ before free it (was: Re: [BUG] zynq | CCF | SRCU)
+In-Reply-To: <51AC5F1B.4020409@cn.fujitsu.com>
+References: <42b8bfd5-3012-4c49-b9ef-7a9beb5956f1@VA3EHSMHS041.ehs.local>
+ <51AC5F1B.4020409@cn.fujitsu.com>
+Message-ID: <20130607014243.10233.79471@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->This breaks the build on x86 systems with:
->  CC [M]  drivers/tty/serial/fsl_lpuart.o
->drivers/tty/serial/fsl_lpuart.c: In function ?lpuart_probe?:
->drivers/tty/serial/fsl_lpuart.c:751:2: error: implicit declaration of
->function ?of_alias_get_id? [-Werror=implicit-function-declaration]
->
-[Lu Jingchang-B35083] 
-I will send the v7 patch with this error fixed. Thanks!
- 
+Quoting Lai Jiangshan (2013-06-03 02:17:15)
+> The @cn is stay in @clk_notifier_list after it is freed, it cause
+> memory corruption.
+> 
+> Example, if @clk is registered(first), unregistered(first),
+> registered(second), unregistered(second).
+> 
+> The freed @cn will be used when @clk is registered(second),
+> and the bug will be happened when @clk is unregistered(second):
+> 
+> [  517.040000] clk_notif_dbg clk_notif_dbg.1: clk_notifier_unregister()
+> [  517.040000] Unable to handle kernel paging request at virtual address 00df3008
+> [  517.050000] pgd = ed858000
+> [  517.050000] [00df3008] *pgd=00000000
+> [  517.060000] Internal error: Oops: 5 [#1] PREEMPT SMP ARM
+> [  517.060000] Modules linked in: clk_notif_dbg(O-) [last unloaded: clk_notif_dbg]
+> [  517.060000] CPU: 1 PID: 499 Comm: modprobe Tainted: G           O 3.10.0-rc3-00119-ga93cb29-dirty #85
+> [  517.060000] task: ee1e0180 ti: ee3e6000 task.ti: ee3e6000
+> [  517.060000] PC is at srcu_readers_seq_idx+0x48/0x84
+> [  517.060000] LR is at srcu_readers_seq_idx+0x60/0x84
+> [  517.060000] pc : [<c0052720>]    lr : [<c0052738>]    psr: 80070013
+> [  517.060000] sp : ee3e7d48  ip : 00000000  fp : ee3e7d6c
+> [  517.060000] r10: 00000000  r9 : ee3e6000  r8 : 00000000
+> [  517.060000] r7 : ed84fe4c  r6 : c068ec90  r5 : c068e430  r4 : 00000000
+> [  517.060000] r3 : 00df3000  r2 : 00000000  r1 : 00000002  r0 : 00000000
+> [  517.060000] Flags: Nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
+> [  517.060000] Control: 18c5387d  Table: 2d85804a  DAC: 00000015
+> [  517.060000] Process modprobe (pid: 499, stack limit = 0xee3e6238)
+> [  517.060000] Stack: (0xee3e7d48 to 0xee3e8000)
+> ....
+> [  517.060000] [<c0052720>] (srcu_readers_seq_idx+0x48/0x84) from [<c0052790>] (try_check_zero+0x34/0xfc)
+> [  517.060000] [<c0052790>] (try_check_zero+0x34/0xfc) from [<c00528b0>] (srcu_advance_batches+0x58/0x114)
+> [  517.060000] [<c00528b0>] (srcu_advance_batches+0x58/0x114) from [<c0052c30>] (__synchronize_srcu+0x114/0x1ac)
+> [  517.060000] [<c0052c30>] (__synchronize_srcu+0x114/0x1ac) from [<c0052d14>] (synchronize_srcu+0x2c/0x34)
+> [  517.060000] [<c0052d14>] (synchronize_srcu+0x2c/0x34) from [<c0053a08>] (srcu_notifier_chain_unregister+0x68/0x74)
+> [  517.060000] [<c0053a08>] (srcu_notifier_chain_unregister+0x68/0x74) from [<c0375a78>] (clk_notifier_unregister+0x7c/0xc0)
+> [  517.060000] [<c0375a78>] (clk_notifier_unregister+0x7c/0xc0) from [<bf008034>] (clk_notif_dbg_remove+0x34/0x9c [clk_notif_dbg])
+> [  517.060000] [<bf008034>] (clk_notif_dbg_remove+0x34/0x9c [clk_notif_dbg]) from [<c02bb974>] (platform_drv_remove+0x24/0x28)
+> [  517.060000] [<c02bb974>] (platform_drv_remove+0x24/0x28) from [<c02b9bf8>] (__device_release_driver+0x8c/0xd4)
+> [  517.060000] [<c02b9bf8>] (__device_release_driver+0x8c/0xd4) from [<c02ba680>] (driver_detach+0x9c/0xc4)
+> [  517.060000] [<c02ba680>] (driver_detach+0x9c/0xc4) from [<c02b99c4>] (bus_remove_driver+0xcc/0xfc)
+> [  517.060000] [<c02b99c4>] (bus_remove_driver+0xcc/0xfc) from [<c02bace4>] (driver_unregister+0x54/0x78)
+> [  517.060000] [<c02bace4>] (driver_unregister+0x54/0x78) from [<c02bbb44>] (platform_driver_unregister+0x1c/0x20)
+> [  517.060000] [<c02bbb44>] (platform_driver_unregister+0x1c/0x20) from [<bf0081f8>] (clk_notif_dbg_driver_exit+0x14/0x1c [clk_notif_dbg])
+> [  517.060000] [<bf0081f8>] (clk_notif_dbg_driver_exit+0x14/0x1c [clk_notif_dbg]) from [<c00835e4>] (SyS_delete_module+0x200/0x28c)
+> [  517.060000] [<c00835e4>] (SyS_delete_module+0x200/0x28c) from [<c000edc0>] (ret_fast_syscall+0x0/0x48)
+> [  517.060000] Code: e5973004 e7911102 e0833001 e2881002 (e7933101)
+> 
+> CC: stable at kernel.org
+> Reported-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Signed-off-by: Lai Jiangshan <laijs@cn.fujitsu.com>
+
+Thanks!  I picked this up for the next set of fixes.
+
+Regards,
+Mike
+
+> ---
+>  drivers/clk/clk.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 934cfd1..1144e8c 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1955,6 +1955,7 @@ int clk_notifier_unregister(struct clk *clk, struct notifier_block *nb)
+>                 /* XXX the notifier code should handle this better */
+>                 if (!cn->notifier_head.head) {
+>                         srcu_cleanup_notifier_head(&cn->notifier_head);
+> +                       list_del(&cn->node);
+>                         kfree(cn);
+>                 }
+>  
+> -- 
+> 1.7.4.4
