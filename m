@@ -1,33 +1,40 @@
-From: bjorn@mork.no (=?utf-8?Q?Bj=C3=B8rn_Mork?=)
-Date: Fri, 07 Jun 2013 12:32:04 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <4466665.6pIGCIdISn@flatron> (Tomasz Figa's message of "Fri, 07
- Jun 2013 10:57:57 +0200")
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1622862.fXQWv0YWGV@flatron>
- <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
- <4466665.6pIGCIdISn@flatron>
-Message-ID: <87li6mxlcr.fsf@nemi.mork.no>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 07 Jun 2013 14:45:45 +0400
+Subject: [PATCH v8 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <20130607080637.GC22598@verge.net.au>
+References: <201306020128.05914.sergei.shtylyov@cogentembedded.com>
+ <20130607080637.GC22598@verge.net.au>
+Message-ID: <51B1B9D9.5040906@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz Figa <tomasz.figa@gmail.com>
-writes:
+Hello.
 
-> Seeing from your posts you don't have any knowledge on how Linux kernel 
-> development works and even on how Allwinner's cooperation with our 
-> community looks (and seem to be completely closed to our effort of showing 
-> you the reality), so I'm not sure if you are the right person to take any 
-> of those roles...
+On 07-06-2013 12:06, Simon Horman wrote:
 
-Try googling for "Luke Leighton troll".  The pattern is some lengthy
-semi-technical post, followed by very long threads with no substance
-whatsoever.  It seems like some sick joke trying to waste as much time
-for as many people as possible.
+>>     Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+>> 'renesas-next-20130528' tag.  It was created to fix the shortcomings in the
+>> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+>> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+>> to touch both subtrees). The patches were conceived with the complete
+>> bisectability goal in mind.
 
-He's even become an -ENOPATCH example:
-http://linuxmafia.com/~rick/lexicon.html#enopatch
+>> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+>> [2/9] ehci-platform: add pre_setup() method to platform data
+>> [3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
+>> [4/9] phy-rcar-usb: remove EHCI internal buffer setup
+>> [5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
+>> [6/9] phy-rcar-usb: correct base address
+>> [7/9] phy-rcar-usb: add platform data
+>> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+>> [9/9] phy-rcar-usb: handle platform data
 
+>>     The patchset is completely ready to be merged now.
 
-Bj?rn
+> Can I confirm that the plan is for me to merge this code?
+
+    Yes, that was the plan.
+
+> If so, I should be able to do so next week.
+
+WBR, Sergei
