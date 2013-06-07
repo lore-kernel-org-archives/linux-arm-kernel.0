@@ -1,42 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Jun 2013 15:07:07 -0700
-Subject: [GIT PULL v2] ARM: dts: OMAP fixes for 3.10-rc5
-In-Reply-To: <51ACA9FA.9000308@ti.com>
-References: <51ACA9FA.9000308@ti.com>
-Message-ID: <20130607220706.GO3331@atomide.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  7 Jun 2013 19:07:50 -0300
+Subject: [PATCH] ARM: mach-imx6q: Enable the codec clock earlier
+Message-ID: <1370642870-8051-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Benoit Cousson <b-cousson@ti.com> [130603 07:42]:
-> Hi Tony,
-> 
-> Please pull three DTS fixes for the next -rc.
+From: Fabio Estevam <fabio.estevam@freescale.com>
 
-Thanks pulling into omap-for-v3.10/fixes.
+In order sgtl5000 driver to probe successfully, we need to read its ID via I2C 
+,which requires that MCLK is driven prior to the I2C access.
 
-Regards,
+Otherwise we get the following probe error:
 
-Tony
+sgtl5000: probe of 0-000a failed with error -5
+imx-sgtl5000 sound.13: ASoC: CODEC (null) not registered
+imx-sgtl5000 sound.13: snd_soc_register_card failed (-517)
+platform sound.13: Driver imx-sgtl5000 requests probe deferral
+
+Turn on MCLK sooner so that the probe can succeed.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+This issue is seen on linux-next tree
+
+ arch/arm/mach-imx/mach-imx6q.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/mach-imx/mach-imx6q.c b/arch/arm/mach-imx/mach-imx6q.c
+index 045e5e3..034f4d2 100644
+--- a/arch/arm/mach-imx/mach-imx6q.c
++++ b/arch/arm/mach-imx/mach-imx6q.c
+@@ -118,6 +118,7 @@ static void __init imx6q_sabrelite_cko1_setup(void)
+ {
+ 	struct clk *cko1_sel, *ahb, *cko1;
+ 	unsigned long rate;
++	int ret;
  
-> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
->   Linus Torvalds (1):
->         Linux 3.10-rc4
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git dts-fixes-for-3.10
-> 
-> Kevin Hilman (1):
->       ARM: dts: omap4-panda|sdp: Fix mux for twl6030 IRQ pin and msecure line
-> 
-> Lars Poeschel (1):
->       ARM: dts: AM33xx: Fix properties on gpmc node
-> 
-> Suman Anna (1):
->       ARM: dts: OMAP5: Fix missing PWM capability to timer nodes
-> 
->  arch/arm/boot/dts/am33xx.dtsi             |    4 ++--
->  arch/arm/boot/dts/omap4-panda-common.dtsi |   20 ++++++++++++++++++++
->  arch/arm/boot/dts/omap4-sdp.dts           |   20 ++++++++++++++++++++
->  arch/arm/boot/dts/omap5.dtsi              |    3 +++
->  4 files changed, 45 insertions(+), 2 deletions(-)
+ 	cko1_sel = clk_get_sys(NULL, "cko1_sel");
+ 	ahb = clk_get_sys(NULL, "ahb");
+@@ -129,6 +130,9 @@ static void __init imx6q_sabrelite_cko1_setup(void)
+ 	clk_set_parent(cko1_sel, ahb);
+ 	rate = clk_round_rate(cko1, 16000000);
+ 	clk_set_rate(cko1, rate);
++	ret = clk_prepare_enable(cko1);
++	if (ret)
++		pr_err("enabling clko1 failed: %d", ret);
+ put_clk:
+ 	if (!IS_ERR(cko1_sel))
+ 		clk_put(cko1_sel);
+-- 
+1.8.1.2
