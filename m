@@ -1,55 +1,64 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Fri, 7 Jun 2013 17:06:29 +0000 (UTC)
-Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
-In-Reply-To: <51B21105.1080301@wwwdotorg.org>
-References: <20130607121505.21868.72360.stgit@dusk.lan>
- <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
-Message-ID: <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Jun 2013 19:16:51 +0200
+Subject: [PATCH 2/5] arm: preserve ATAGS in /chosen/atags in the Device
+ Tree
+In-Reply-To: <20130607143249.GR23859@titan.lakedaemon.net>
+References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370414409-29991-3-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130606142851.6dd17cad@skate>
+ <alpine.LFD.2.03.1306061253430.18597@syhkavp.arg>
+ <20130607112101.2cedbc5f@skate>
+ <20130607143249.GR23859@titan.lakedaemon.net>
+Message-ID: <20130607191651.0baa1c7d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Dear Jason Cooper,
 
-On Fri, 7 Jun 2013, Stephen Warren wrote:
+On Fri, 7 Jun 2013 10:32:49 -0400, Jason Cooper wrote:
 
-> On 06/07/2013 06:19 AM, Paul Walmsley wrote:
-> > Add DFLL DVCO reset line control functions to the CAR IP block driver.
-> > 
-> > The DVCO present in the DFLL IP block has a separate reset line,
-> > exposed via the CAR IP block.  This reset line is asserted upon SoC
-> > reset.  Unless something (such as the DFLL driver) deasserts this
-> > line, the DVCO will not oscillate, although reads and writes to the
-> > DFLL IP block will complete.
-> > 
-> > Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
-> > saving hours of debugging time.
+> > Well, I don't think what you say here is really fair. Before the DT was
+> > in place, unless I missed it, there was no standard way of letting the
+> > bootloader pass MAC addresses to the kernel. And Marvell's development
+> > on those Armada 370/XP platforms predates the introduction of the
+> > Device Tree in the Linux kernel (the code we have originally been give
+> > was a 2.6.3x), so it's really not their fault to not have a DT-capable
+> > bootloader at this point.
 > 
-> > diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+> To be accurate, I think Nico is referring to the fact that Marvell
+> assigned their own ATAG without going through Russell.
+
+Right, that's true.
+
+> However, just like mach-types, are we assigning any new atags?  Can we
+> consider them deprecated?  If so, that changes the game.  Then what
+> Thomas is proposing is a "legacy compatibility" patch, as opposed to a
+> hole vendors can use to do their own thing.
 > 
-> >  void tegra114_clock_tune_cpu_trimmers_high(void);
-> >  void tegra114_clock_tune_cpu_trimmers_low(void);
-> >  void tegra114_clock_tune_cpu_trimmers_init(void);
-> > +void tegra114_clock_assert_dfll_dvco_reset(void);
-> > +void tegra114_clock_deassert_dfll_dvco_reset(void);
+> We could add Arnd's suggestion of a time bomb on the common code in
+> atags_to_fdt.c to prevent mis-use.
 > 
-> Where/what is the code that will call these new APIs? If it's going to
-> be something in drivers/clk, that seems fine.
+> I'm not 100% convinced of this, and I actually tend to agree with Nico
+> here, but I'd also like to find a workable solution.
 
-That's correct - they'll be used by the DFLL clocksource code, which will 
-live in drivers/clk/tegra.  You've seen the patches already ;-)
+I perfectly understand Nico and Russell concerns, for sure. But I'd
+also like to find a workable solution:
+ 
+ * Passing the MAC address on the kernel command line is not something
+   that the network maintainer likes. See
+   http://lists.openwall.net/netdev/2011/11/17/82 and Dave Miller's
+   answer http://lists.openwall.net/netdev/2011/11/17/83.
 
-> The reset assert/de-assert functions at least might be worth exposing
-> using the new generic module reset API. I believe Prashant Gaikwad is
-> working on converting the Tegra clock driver to be a module reset
-> provider, hence removing the existing custom
-> tegra_periph_reset_{de,}assert() APIs.
+ * Parsing the U-Boot environment is really not easy. How does the
+   kernel know where this environment is located? What if another
+   bootloader than U-Boot is used? Reading the U-Boot environment from
+   the kernel sounds clunky.
 
-OK, will take a look to see if this can be done without getting in the way 
-of Prashant's work.  I'd na?vely assume that it might be best to convert 
-these as part of his series - that way we won't duplicate effort.
+Best regards,
 
-Prashant, what stage are you at in the conversion?  If you're close to 
-completion, maybe we can just add this functionality in with your patches?
-
-
-- Paul
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
