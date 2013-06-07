@@ -1,38 +1,36 @@
 From: luke.leighton@gmail.com (luke.leighton)
-Date: Fri, 7 Jun 2013 22:29:34 +0100
+Date: Fri, 7 Jun 2013 22:34:25 +0100
 Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
  Uploading linux (3.9.4-1))
-In-Reply-To: <20130607205940.4816fed5@skate>
+In-Reply-To: <20130607193014.GW18614@n2100.arm.linux.org.uk>
 References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron> <20130606112723.71ddd70c@skate>
- <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
- <20130607205940.4816fed5@skate>
-Message-ID: <CAPweEDxtC+OamcpVEQ3BULbN88hSJzKoi0fkNLBAdZD04LQCNQ@mail.gmail.com>
+ <1622862.fXQWv0YWGV@flatron>
+ <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
+ <4466665.6pIGCIdISn@flatron>
+ <CAPweEDwmgr2JbH+txDDjR_gDA2R2C1v=AuVCUVTs7RriMhZNiA@mail.gmail.com>
+ <20130607193014.GW18614@n2100.arm.linux.org.uk>
+Message-ID: <CAPweEDxMTnpFBaPiACpig0g3ZHVMwLJpOpdz6TbD-fN5hkDL7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 7:59 PM, Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com> wrote:
-
-> Maxime will reply to this in more details, but I believe the status is:
+On Fri, Jun 7, 2013 at 8:30 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jun 07, 2013 at 08:02:03PM +0100, luke.leighton wrote:
+>>  well, tough.  get me up to speed, *fast*.
 >
->  * Interrupt controller is working.
->  * Clock drivers are working.
->  * Pinctrl is working.
->  * GPIO is working.
->  * Timer is working.
->  * UART is working
->  * Watchdog is on its way (patches posted)
->  * Ethernet is on its way (patches posted)
->  * I2C is on its way (patches posted)
+> No, not unless you're willing to *pay* someone to spend time teaching you,
 
- ok so i've got this now in
-http://hands.com/~lkcl/allwinner_linux_proposal.txt - that leaves...
-well there's quite a bit: usb, sd/mmc (both variants: they changed the
-data structures around sun5i), nand (probably both - the allwinner one
-and the mtd one being done, reminds me: we need full documentation on
-the NAND chip), scsi, g2d - cedarx and more.
+ there's not enough time.  2 days left.
 
- what else should be raised, and to what benefit?
+> because you are asking to be *taught* about the current situation, so
+> you're asking someone to do some _work_ _for_
+
+ ..... for the benefit of free software, russell.
+
+ for the benefit of free software.
+
+ for the BENEFIT of free software.
+
+ > _you_.
+
+ NO.
