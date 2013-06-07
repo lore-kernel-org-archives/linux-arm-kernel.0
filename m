@@ -1,113 +1,41 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 7 Jun 2013 17:41:23 +0100
-Subject: [PATCH] arm/dt: Don't add disabled CPUs to system topology
-In-Reply-To: <CAFtq+0FuzNcoQpK7=7d_KetYYHoPC7rdkFWMrApey5dxiWZ9mg@mail.gmail.com>
-References: <1370538685-22386-1-git-send-email-james.king@linaro.org>
- <20130607102326.GA3111@e102568-lin.cambridge.arm.com>
- <CAFtq+0FuzNcoQpK7=7d_KetYYHoPC7rdkFWMrApey5dxiWZ9mg@mail.gmail.com>
-Message-ID: <20130607164123.GF3111@e102568-lin.cambridge.arm.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 07 Jun 2013 10:44:33 -0600
+Subject: [PATCH] ARM: tegra: disable nonboot CPUs when reboot
+In-Reply-To: <1370597810-1153-1-git-send-email-josephl@nvidia.com>
+References: <1370597810-1153-1-git-send-email-josephl@nvidia.com>
+Message-ID: <51B20DF1.3030207@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 12:48:58PM +0100, James King wrote:
-> Hi Lorenzo,
+On 06/07/2013 03:36 AM, Joseph Lo wrote:
+> The normal CPU hotplug flow in kernel and the flow for Tegra we expected,
+> is checking the CPU ID is OK for hotplug by "tegra_cpu_disable", the CPU
+> that would be hotplugged runs into a power-gate state by "tegra_cpu_die",
+> then the other CPU waits for the CPU that was hotplugged in reset and
+> clock gate it by "tegra_cpu_kill". That means we don't support the CPU
+> being stopped or put into offline by trigger "tegra_cpu_kill" directly.
+> It may cause a busy loop for waiting CPU in reset.
 > 
-> On 7 June 2013 11:23, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > Hi James,
-> >
-> > On Thu, Jun 06, 2013 at 06:11:25PM +0100, James King wrote:
-> >> If CPUs are marked as disabled in the devicetree, make sure they do
-> >> not exist in the system CPU information and CPU topology information.
-> >> In this case these CPUs will not be able to be added to the system later
-> >> using hot-plug. This allows a single chip with many CPUs to be easily
-> >> used in a variety of hardware devices where they may have different
-> >> actual processing requirements (eg for thermal/cost reasons).
-> >>
-> >> - Change devicetree.c to ignore any cpu nodes marked as disabled,
-> >>   this effectively limits the number of active cpu cores so no need
-> >>   for the max_cpus=x in the chosen node.
-> >> - Change topology.c to ignore any cpu nodes marked as disabled, this
-> >>   is where the scheduler would learn about big/LITTLE cores so this
-> >>   effectively keeps the scheduler in sync.
-> >>
-> >
-> > I have two questions:
-> >
-> > 1) Since with this approach the DT should change anyway if on different
-> >    hardware devices based on the same chip you want to allow booting a
-> >    different number of CPUs, why do not we remove the cpu nodes instead of
-> >    disabling them ? Put it another way: cpu nodes define a cpu as
-> >    possible (currently), we can simply remove the node if we do not want
-> >    that cpu to be seen by the kernel.
+> After the commit "62e930e reboot: rigrate shutdown/reboot to boot cpu",
+> we remove "disable_nonboot_cpus" when kernel_{restart,halt,power_off}.
+> But the ARM kernel trigger "send_smp_stop" when machine_shutdown, that
+> would cause the "tegra_cpu_kill" directly without "tegra_cpu_die" first.
 > 
-> The reason we want disabled status rather than just remove the nodes
-> is to use a common soc.dtsi file which is included in many board.dts
-> files - eg:
-> 
-> file soc.dtsi contains:
-> 
->                 cpus {
->                                 cpu0: cpu at 0 {
->                                                 device_type = "cpu";
->                                                 compatible = "arm,cortex-a7";
->                                                 reg = <0>;
->                                                 cluster = <&cluster0>;
->                                                 core = <&core0>;
+> We hook "disable_nonboot_cpus" in "reboot_notifier" to avoid that happens.
+> And it can work for reboot, shutdown, halt and kexec.
 
-Minor nit, "cluster" and "core" phandles are not part of cpu the bindings
-that will be merged this cycle, I know it is just an example.
+I don't believe this is the correct solution.
 
->                                 };
-> 
->                                 cpu1: cpu at 1 {
->                                                 device_type = "cpu";
->                                                 compatible = "arm,cortex-a7";
->                                                 reg = <1>;
->                                                 cluster = <&cluster0>;
->                                                 core = <&core1>;
->                                 };
-> 
->                                 cpu2: cpu at 2 {
->                                                 device_type = "cpu";
->                                                 compatible = "arm,cortex-a15";
->                                                 reg = <2>;
->                                                 cluster = <&cluster0>;
->                                                 core = <&core2>;
->                                 };
->                 };
-> 
-> file board1.dts where we want the A15 disabled contains:
-> 
-> /include/ "soc.dtsi"
-> 
->                 cpus {
->                                 cpu2: cpu at 2 {
->                                                 status = "disabled";
->                                 };
->                 };
+If the semantics of cpu_kill/cpu_die are such that it's legal to call
+only cpu_kill without having cause cpu_die to run on the killed CPU
+first, then Tegra's implementation is buggy. We should simply fix that,
+rather than avoiding this by forcing a different order for the calls to
+cpu_kill/cpu_die.
 
-Understood, see the other reply as far as the status property is concerned.
+If the semantics of cpu_kill/cpu_die are such that one /must/ cause
+cpu_die to run on the killed CPU before cpu_kill can be used on it, then
+there's a bug in the code that isn't doing that.
 
-> > 2) If we go for the "status" property, why do not we use it to set present
-> >    mask ? That way the cpu is possible but not present, you cannot
-> >    hotplug it in. It is a bit of a stretch, granted, the cpu _is_ present,
-> >    we just want to disable it, do not know how this is handled in x86
-> >    and other archs though.
-> 
-> I have been struggling to find any equivalent example for another
-> arch, so just tried to solve our problem. I guess in the x86 world it
-> is less likely to want to disable processors in a SoC for heat/battery
-> issues so this has just never arisen. In this case the cpu is
-> physically present but not possible, but I am not sure it should be in
-> a present mask (giving the impression it can be used). Perhaps you
-> could elaborate with an example what you are thinking about here?
-
-I was thinking about using status == "disabled" to mark a cpu as
-possible but not present; that is a bad idea for the reason you mentioned
-and also for the point Rob raised related to the ePAPR.
-
-I am not sure how we can solve this issue, as I mentioned the easiest
-solution consists in not defining cpu nodes in the DT or probably add
-an additional property != status with proper bindings attached to it.
-
-Lorenzo
+I'm CCing a few people in an attempt to find out exactly what the
+expected semantics are for cpu_kill/cpu_die; is it legal to call
+cpu_kill without having first caused cpu_die to execute?
