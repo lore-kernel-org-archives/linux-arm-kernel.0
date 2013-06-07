@@ -1,20 +1,49 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Jun 2013 13:52:19 -0700
-Subject: [PATCH 4/4] ARM: OMAP: Move DT wake-up event handling over to
- use pinctrl-single-omap
-In-Reply-To: <20130607205046.16513.2802.stgit@localhost>
-References: <20130607203936.16513.57494.stgit@localhost>
- <20130607205046.16513.2802.stgit@localhost>
-Message-ID: <20130607205219.GG3331@atomide.com>
+Date: Fri, 7 Jun 2013 14:01:30 -0700
+Subject: [PATCH 09/11] mmc: omap_hsmmc: enhance pinctrl support
+In-Reply-To: <51B1E1C7.7050407@ti.com>
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
+ <20130604144632.GI3331@atomide.com> <51B1E1C7.7050407@ti.com>
+Message-ID: <20130607210129.GH3331@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130607 13:56]:
-> Now pinctrl-single-omap can handle the wake-up events for us now
-> as long as the events are configured in the .dts files.
+* Balaji T K <balajitk@ti.com> [130607 06:42]:
+> On Tuesday 04 June 2013 08:16 PM, Tony Lindgren wrote:
+> >* Hebbar Gururaja <gururaja.hebbar@ti.com> [130531 03:19]:
+> >>Amend the hsmmc controller to optionally take a pin control handle and
+> >>set the state of the pins to:
+> >>
+> >>- "default" on boot, resume and before performing a mmc transfer
+> >>- "idle" after initial default, after resume default, and after each
+> >>mmc/sd card access
+> >>- "sleep" on suspend()
+> >>
+> >>By optionally putting the pins into sleep state in the suspend callback
+> >>we can accomplish two things.
+> >>- One is to minimize current leakage from pins and thus save power,
+> >>- second, we can prevent the IP from driving pins output in an
+> >>uncontrolled manner, which may happen if the power domain drops the
+> >>domain regulator.
+> >>
+> >>If any of the above pin states are missing in dt, a warning message
+> >>about the missing state is displayed.
+> >>If certain pin-states are not available, to remove this warning message
+> >>pass respective state name with null phandler.
+> >
+> >There's a similar patch in the "[RESEND PATCH v2 1/3] mmc: omap_hsmmc:
+> >Enable SDIO IRQ using a GPIO in idle mode" thread. It also makes the
+> >SDIO interrupts to work, so we need to consider that too.
+> >
+> 
+> Hi Tony,
+> 
+> I will try to combine both of these and make use of
+> pinctrl_pm_select_[*]_state helper functions.
 
-This patch I should queue separately, the rest should go via
-the pinctrl tree.
+OK thanks, I'll separate out the pinctrl parts from Andreas' patch
+and repost.
 
 Regards,
 
