@@ -1,154 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:41 +0900
-Subject: [PATCH 11/27] ARM: shmobile: r8a73a4: add pll clocks
+Date: Fri,  7 Jun 2013 16:51:46 +0900
+Subject: [PATCH 16/27] ARM: shmobile: r8a7778: add SDHI clock support
 In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370591517-20239-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-17-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-PLL clocks are basis clock for other clock.
-
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c | 101 +++++++++++++++++++++++++++++++++
- 1 file changed, 101 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7778.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index 42942b4..2be592f 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -33,6 +33,14 @@
- #define SMSTPCR5 0xe6150144
- 
- #define CKSCR		0xE61500C0
-+#define PLLECR		0xE61500D0
-+#define PLL1CR		0xE6150028
-+#define PLL2CR		0xE615002C
-+#define PLL2SCR		0xE61501F4
-+#define PLL2HCR		0xE61501E4
-+
-+
-+#define CPG_MAP(o) ((o - CPG_BASE) + cpg_mapping.base)
- 
- static struct clk_mapping cpg_mapping = {
- 	.phys   = CPG_BASE,
-@@ -71,6 +79,86 @@ SH_FIXED_RATIO_CLK(extal1_div2_clk,	extal1_clk,		div2);
- SH_FIXED_RATIO_CLK(extal2_div2_clk,	extal2_clk,		div2);
- SH_FIXED_RATIO_CLK(extal2_div4_clk,	extal2_clk,		div4);
- 
-+/*
-+ *		PLL clocks
-+ */
-+static struct clk *pll_parent_main[] = {
-+	[0] = &main_clk,
-+	[1] = &main_div2_clk
-+};
-+
-+static struct clk *pll_parent_main_extal[8] = {
-+	[0] = &main_div2_clk,
-+	[1] = &extal2_div2_clk,
-+	[3] = &extal2_div4_clk,
-+	[4] = &main_clk,
-+	[5] = &extal2_clk,
-+};
-+
-+static unsigned long pll_recalc(struct clk *clk)
-+{
-+	unsigned long mult = 1;
-+
-+	if (ioread32(CPG_MAP(PLLECR)) & (1 << clk->enable_bit))
-+		mult = (((ioread32(clk->mapped_reg) >> 24) & 0x7f) + 1);
-+
-+	return clk->parent->rate * mult;
-+}
-+
-+static int pll_set_parent(struct clk *clk, struct clk *parent)
-+{
-+	u32 val;
-+	int i, ret;
-+
-+	if (!clk->parent_table || !clk->parent_num)
-+		return -EINVAL;
-+
-+	/* Search the parent */
-+	for (i = 0; i < clk->parent_num; i++)
-+		if (clk->parent_table[i] == parent)
-+			break;
-+
-+	if (i == clk->parent_num)
-+		return -ENODEV;
-+
-+	ret = clk_reparent(clk, parent);
-+	if (ret < 0)
-+		return ret;
-+
-+	val = ioread32(clk->mapped_reg) &
-+		~(((1 << clk->src_width) - 1) << clk->src_shift);
-+
-+	iowrite32(val | i << clk->src_shift, clk->mapped_reg);
-+
-+	return 0;
-+}
-+
-+static struct sh_clk_ops pll_clk_ops = {
-+	.recalc		= pll_recalc,
-+	.set_parent	= pll_set_parent,
-+};
-+
-+#define PLL_CLOCK(name, p, pt, w, s, reg, e)		\
-+	static struct clk name = {			\
-+		.ops		= &pll_clk_ops,		\
-+		.flags		= CLK_ENABLE_ON_INIT,	\
-+		.parent		= p,			\
-+		.parent_table	= pt,			\
-+		.parent_num	= ARRAY_SIZE(pt),	\
-+		.src_width	= w,			\
-+		.src_shift	= s,			\
-+		.enable_reg	= (void __iomem *)reg,	\
-+		.enable_bit	= e,			\
-+		.mapping	= &cpg_mapping,		\
-+	}
-+
-+PLL_CLOCK(pll1_clk,  &main_clk,      pll_parent_main,       1, 7, PLL1CR,  1);
-+PLL_CLOCK(pll2_clk,  &main_div2_clk, pll_parent_main_extal, 3, 5, PLL2CR,  2);
-+PLL_CLOCK(pll2s_clk, &main_div2_clk, pll_parent_main_extal, 3, 5, PLL2SCR, 4);
-+PLL_CLOCK(pll2h_clk, &main_div2_clk, pll_parent_main_extal, 3, 5, PLL2HCR, 5);
-+
-+SH_FIXED_RATIO_CLK(pll1_div2_clk,	pll1_clk,	div2);
-+
- static struct clk *main_clks[] = {
- 	&extalr_clk,
- 	&extal1_clk,
-@@ -80,6 +168,11 @@ static struct clk *main_clks[] = {
- 	&extal2_div4_clk,
- 	&main_clk,
- 	&main_div2_clk,
-+	&pll1_clk,
-+	&pll1_div2_clk,
-+	&pll2_clk,
-+	&pll2s_clk,
-+	&pll2h_clk,
+diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
+index 5cc271e..b251e4d 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7778.c
++++ b/arch/arm/mach-shmobile/clock-r8a7778.c
+@@ -103,12 +103,16 @@ static struct clk *main_clks[] = {
  };
  
  enum {
-@@ -106,6 +199,14 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("extal2_div2",		&extal2_div2_clk),
- 	CLKDEV_CON_ID("extal2_div4",		&extal2_div4_clk),
++	MSTP323, MSTP322, MSTP321,
+ 	MSTP114,
+ 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
+ 	MSTP016, MSTP015,
+ 	MSTP_NR };
  
-+	/* pll clock */
-+	CLKDEV_CON_ID("pll1",			&pll1_clk),
-+	CLKDEV_CON_ID("pll1_div2",		&pll1_div2_clk),
-+	CLKDEV_CON_ID("pll2",			&pll2_clk),
-+	CLKDEV_CON_ID("pll2s",			&pll2s_clk),
-+	CLKDEV_CON_ID("pll2h",			&pll2h_clk),
-+
-+	/* MSTP */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
+ static struct clk mstp_clks[MSTP_NR] = {
++	[MSTP323] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 23, 0), /* SDHI0 */
++	[MSTP322] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 22, 0), /* SDHI1 */
++	[MSTP321] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 21, 0), /* SDHI2 */
+ 	[MSTP114] = SH_CLK_MSTP32(&p_clk, MSTPCR1, 14, 0), /* Ether */
+ 	[MSTP026] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 26, 0), /* SCIF0 */
+ 	[MSTP025] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 25, 0), /* SCIF1 */
+@@ -122,6 +126,9 @@ static struct clk mstp_clks[MSTP_NR] = {
+ 
+ static struct clk_lookup lookups[] = {
+ 	/* MSTP32 clocks */
++	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
++	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
++	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
+ 	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
 -- 
 1.8.2.1
