@@ -1,13 +1,13 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Fri,  7 Jun 2013 11:33:32 +0530
-Subject: [RFC][PATCH 6/7] USB: OHCI: make ohci-at91 a separate driver
+Date: Fri,  7 Jun 2013 11:33:33 +0530
+Subject: [RFC][PATCH 7/7] USB: OHCI: make ohci-s3c2410 a separate driver
 In-Reply-To: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1370585013-12809-7-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1370585013-12809-8-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the  TI OHCI Atmel host controller driver from ohci-hcd
+Separate the Samsung OHCI S3CXXXX host controller driver from ohci-hcd
 host code so that it can be built as a separate driver module.
 This work is part of enabling multi-platform kernels on ARM.
 
@@ -17,153 +17,182 @@ Cc: Alan Stern <stern@rowland.harvard.edu>
 Cc: Greg KH <greg@kroah.com>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/Kconfig     |    8 +++
- drivers/usb/host/Makefile    |    1 +
- drivers/usb/host/ohci-at91.c |  135 ++++++++++++++++++------------------------
- drivers/usb/host/ohci-hcd.c  |   20 +------
- 4 files changed, 67 insertions(+), 97 deletions(-)
+ drivers/usb/host/Kconfig        |    8 +++
+ drivers/usb/host/Makefile       |    1 +
+ drivers/usb/host/ohci-hcd.c     |   20 +------
+ drivers/usb/host/ohci-s3c2410.c |  116 ++++++++++++++++-----------------------
+ 4 files changed, 58 insertions(+), 87 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index c347cb3..0aabd84 100644
+index 0aabd84..a863c60 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
 @@ -411,6 +411,14 @@ config USB_OHCI_HCD_SPEAR
            Enables support for the on-chip OHCI controller on
            ST SPEAr chips.
  
-+config USB_OHCI_HCD_AT91
-+        tristate  "Support for Atmel on-chip OHCI USB controller"
-+        depends on USB_OHCI_HCD && ARCH_AT91
++config USB_OHCI_HCD_S3CXXXX
++        tristate "Support for S3CXXXX on-chip OHCI USB controller"
++        depends on USB_OHCI_HCD && (ARCH_S3C24XX) || (ARCH_S3C64XX)
 +        default y
 +        ---help---
 +          Enables support for the on-chip OHCI controller on
-+          Atmel chips.
++          S3CXXXX chips.
 +
- config USB_OHCI_HCD_OMAP3
- 	tristate "OHCI support for OMAP3 and later chips"
- 	depends on (ARCH_OMAP3 || ARCH_OMAP4)
+ config USB_OHCI_HCD_AT91
+         tristate  "Support for Atmel on-chip OHCI USB controller"
+         depends on USB_OHCI_HCD && ARCH_AT91
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 1e0d83e..746ffc7 100644
+index 746ffc7..4290701 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -50,6 +50,7 @@ obj-$(CONFIG_USB_OHCI_EXYNOS)	+= ohci-exynos.o
- obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
+@@ -51,6 +51,7 @@ obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
  obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
  obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
-+obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
+ obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
++obj-$(CONFIG_USB_OHCI_HCD_S3CXXXX)	+= ohci-s3c2410.o
  
  obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
  obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index a0cb44f..b4a88a6 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -13,16 +13,25 @@
-  */
+diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
+index 00409b9..8e5d979 100644
+--- a/drivers/usb/host/ohci-hcd.c
++++ b/drivers/usb/host/ohci-hcd.c
+@@ -1173,11 +1173,6 @@ MODULE_LICENSE ("GPL");
+ #define SA1111_DRIVER		ohci_hcd_sa1111_driver
+ #endif
  
- #include <linux/clk.h>
+-#if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S3C64XX)
+-#include "ohci-s3c2410.c"
+-#define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
+-#endif
+-
+ #if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
+ #include "ohci-pxa27x.c"
+ #define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
+@@ -1240,13 +1235,13 @@ MODULE_LICENSE ("GPL");
+ 	!IS_ENABLED(CONFIG_USB_OHCI_HCD_OMAP3) && \
+ 	!IS_ENABLED(CONFIG_USB_OHCI_HCD_SPEAR) && \
+ 	!IS_ENABLED(CONFIG_USB_OHCI_HCD_AT91) && \
++	!IS_ENABLED(CONFIG_USB_OHCI_HCD_S3CXXXX) && \
+ 	!defined(PLATFORM_DRIVER) &&	\
+ 	!defined(OF_PLATFORM_DRIVER) &&	\
+ 	!defined(SA1111_DRIVER) &&	\
+ 	!defined(PS3_SYSTEM_BUS_DRIVER) && \
+ 	!defined(SM501_OHCI_DRIVER) && \
+ 	!defined(TMIO_OHCI_DRIVER) && \
+-	!defined(S3C2410_PLATFORM_DRIVER) && \
+ 	!defined(EP93XX_PLATFORM_DRIVER) && \
+ 	!defined(NXP_PLATFORM_DRIVER) && \
+ 	!defined(DAVINCI_PLATFORM_DRIVER)
+@@ -1309,12 +1304,6 @@ static int __init ohci_hcd_mod_init(void)
+ 		goto error_tmio;
+ #endif
+ 
+-#ifdef S3C2410_PLATFORM_DRIVER
+-	retval = platform_driver_register(&S3C2410_PLATFORM_DRIVER);
+-	if (retval < 0)
+-		goto error_s3c2410;
+-#endif
+-
+ #ifdef EP93XX_PLATFORM_DRIVER
+ 	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
+ 	if (retval < 0)
+@@ -1348,10 +1337,6 @@ static int __init ohci_hcd_mod_init(void)
+ 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+  error_ep93xx:
+ #endif
+-#ifdef S3C2410_PLATFORM_DRIVER
+-	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
+- error_s3c2410:
+-#endif
+ #ifdef TMIO_OHCI_DRIVER
+ 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
+  error_tmio:
+@@ -1398,9 +1383,6 @@ static void __exit ohci_hcd_mod_exit(void)
+ #ifdef EP93XX_PLATFORM_DRIVER
+ 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+ #endif
+-#ifdef S3C2410_PLATFORM_DRIVER
+-	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
+-#endif
+ #ifdef TMIO_OHCI_DRIVER
+ 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
+ #endif
+diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
+index e125770..14843d2 100644
+--- a/drivers/usb/host/ohci-s3c2410.c
++++ b/drivers/usb/host/ohci-s3c2410.c
+@@ -19,14 +19,27 @@
+  * This file is licenced under the GPL.
+ */
+ 
 -#include <linux/platform_device.h>
-+#include <linux/dma-mapping.h>
- #include <linux/of_platform.h>
- #include <linux/of_gpio.h>
-+#include <linux/platform_device.h>
- #include <linux/platform_data/atmel.h>
+ #include <linux/clk.h>
 +#include <linux/io.h>
 +#include <linux/kernel.h>
 +#include <linux/module.h>
++#include <linux/platform_device.h>
+ #include <linux/platform_data/usb-ohci-s3c2410.h>
 +#include <linux/usb.h>
 +#include <linux/usb/hcd.h>
- 
- #include <mach/hardware.h>
- #include <asm/gpio.h>
- 
- #include <mach/cpu.h>
- 
 +
 +#include "ohci.h"
 +
- #ifndef CONFIG_ARCH_AT91
- #error "CONFIG_ARCH_AT91 must be defined."
- #endif
-@@ -32,6 +41,12 @@
- 		for ((index) = 0; (index) < AT91_MAX_USBH_PORTS; (index)++)
  
- /* interface and function clocks; sometimes also an AHB clock */
-+
-+#define DRIVER_DESC "OHCI Atmel driver"
-+
-+static const char hcd_name[] = "ohci-atmel";
-+
-+static struct hc_driver __read_mostly ohci_at91_hc_driver;
- static struct clk *iclk, *fclk, *hclk;
- static int clocked;
+ #define valid_port(idx) ((idx) == 1 || (idx) == 2)
  
-@@ -111,6 +126,8 @@ static void usb_hcd_at91_remove (struct usb_hcd *, struct platform_device *);
- static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 			struct platform_device *pdev)
- {
-+	struct at91_usbh_data	*board;
-+	struct ohci_hcd	*ohci;
- 	int retval;
- 	struct usb_hcd *hcd = NULL;
+ /* clock device associated with the hcd */
  
-@@ -163,8 +180,11 @@ static int usb_hcd_at91_probe(const struct hc_driver *driver,
- 		goto err5;
++
++#define DRIVER_DESC "OHCI S3CXXXX driver"
++
++static const char hcd_name[] = "ohci-s3cxxxx";
++
+ static struct clk *clk;
+ static struct clk *usb_clk;
+ 
+@@ -371,10 +384,9 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
+ 		goto err_put;
  	}
  
-+	board = hcd->self.controller->platform_data;
-+	ohci = hcd_to_ohci(hcd);
-+	ohci->num_ports = board->ports;
- 	at91_start_hc(pdev);
--	ohci_hcd_init(hcd_to_ohci(hcd));
 +	ohci_setup(hcd);
+ 	s3c2410_start_hc(dev, hcd);
  
- 	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_SHARED);
- 	if (retval == 0)
-@@ -221,36 +241,6 @@ static void usb_hcd_at91_remove(struct usb_hcd *hcd,
- }
+-	ohci_hcd_init(hcd_to_ohci(hcd));
+-
+ 	retval = usb_add_hcd(hcd, dev->resource[1].start, 0);
+ 	if (retval != 0)
+ 		goto err_ioremap;
+@@ -391,71 +403,7 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
  
  /*-------------------------------------------------------------------------*/
--
+ 
 -static int
--ohci_at91_reset (struct usb_hcd *hcd)
+-ohci_s3c2410_start(struct usb_hcd *hcd)
 -{
--	struct at91_usbh_data	*board = hcd->self.controller->platform_data;
--	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
--	int			ret;
+-	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+-	int ret;
 -
--	if ((ret = ohci_init(ohci)) < 0)
+-	ret = ohci_init(ohci);
+-	if (ret < 0)
 -		return ret;
 -
--	ohci->num_ports = board->ports;
--	return 0;
--}
--
--static int
--ohci_at91_start (struct usb_hcd *hcd)
--{
--	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
--	int			ret;
--
--	if ((ret = ohci_run(ohci)) < 0) {
+-	ret = ohci_run(ohci);
+-	if (ret < 0) {
 -		dev_err(hcd->self.controller, "can't start %s\n",
 -			hcd->self.bus_name);
 -		ohci_stop(hcd);
 -		return ret;
 -	}
+-
 -	return 0;
 -}
 -
- static void ohci_at91_usb_set_power(struct at91_usbh_data *pdata, int port, int enable)
- {
- 	if (!valid_port(port))
-@@ -413,51 +403,6 @@ static int ohci_at91_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
- 
- /*-------------------------------------------------------------------------*/
- 
--static const struct hc_driver ohci_at91_hc_driver = {
+-
+-static const struct hc_driver ohci_s3c2410_hc_driver = {
 -	.description =		hcd_name,
--	.product_desc =		"AT91 OHCI",
+-	.product_desc =		"S3C24XX OHCI",
 -	.hcd_priv_size =	sizeof(struct ohci_hcd),
 -
 -	/*
@@ -175,8 +204,7 @@ index a0cb44f..b4a88a6 100644
 -	/*
 -	 * basic lifecycle operations
 -	 */
--	.reset =		ohci_at91_reset,
--	.start =		ohci_at91_start,
+-	.start =		ohci_s3c2410_start,
 -	.stop =			ohci_stop,
 -	.shutdown =		ohci_shutdown,
 -
@@ -195,44 +223,34 @@ index a0cb44f..b4a88a6 100644
 -	/*
 -	 * root hub support
 -	 */
--	.hub_status_data =	ohci_at91_hub_status_data,
--	.hub_control =		ohci_at91_hub_control,
--#ifdef CONFIG_PM
+-	.hub_status_data =	ohci_s3c2410_hub_status_data,
+-	.hub_control =		ohci_s3c2410_hub_control,
+-#ifdef	CONFIG_PM
 -	.bus_suspend =		ohci_bus_suspend,
 -	.bus_resume =		ohci_bus_resume,
 -#endif
 -	.start_port_reset =	ohci_start_port_reset,
 -};
 -
--/*-------------------------------------------------------------------------*/
--
- static irqreturn_t ohci_hcd_at91_overcurrent_irq(int irq, void *data)
+-/* device driver */
++static struct hc_driver __read_mostly ohci_s3c2410_hc_driver;
+ 
+ static int ohci_hcd_s3c2410_drv_probe(struct platform_device *pdev)
  {
- 	struct platform_device *pdev = data;
-@@ -686,7 +631,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
- 	 * REVISIT: some boards will be able to turn VBUS off...
- 	 */
- 	if (at91_suspend_entering_slow_clock()) {
--		ohci_usb_reset (ohci);
-+		ohci_restart(ohci);
- 		/* flush the writes */
- 		(void) ohci_readl (ohci, &ohci->regs->control);
- 		at91_stop_clock();
-@@ -727,3 +672,37 @@ static struct platform_driver ohci_hcd_at91_driver = {
- 		.of_match_table	= of_match_ptr(at91_ohci_dt_ids),
+@@ -532,4 +480,36 @@ static struct platform_driver ohci_hcd_s3c2410_driver = {
  	},
  };
-+
-+static int __init ohci_at91_init(void)
+ 
++static int __init ohci_s3cxxxx_init(void)
 +{
 +	if (usb_disabled())
 +		return -ENODEV;
 +
 +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+	ohci_init_driver(&ohci_at91_hc_driver, NULL);
++	ohci_init_driver(&ohci_s3c2410_hc_driver, NULL);
 +
 +	/*
-+	* The Atmel HW has some unusual quirks, which require Atmel-specific
++	* The Samsung HW has some unusual quirks, which require Sumsung-specific
 +	* workarounds. We override certain hc_driver functions here to
 +	* achieve that. We explicitly do not enhance ohci_driver_overrides to
 +	* allow this more easily, since this is an unusual case, and we don't
@@ -240,87 +258,21 @@ index a0cb44f..b4a88a6 100644
 +	* too easy.
 +	*/
 +
-+	ohci_at91_hc_driver.hub_status_data	= ohci_at91_hub_status_data;
-+	ohci_at91_hc_driver.hub_control		= ohci_at91_hub_control;
++	ohci_s3c2410_hc_driver.hub_status_data	= ohci_s3c2410_hub_status_data;
++	ohci_s3c2410_hc_driver.hub_control	= ohci_s3c2410_hub_control;
 +
-+	return platform_driver_register(&ohci_hcd_at91_driver);
++	return platform_driver_register(&ohci_hcd_s3c2410_driver);
 +}
-+module_init(ohci_at91_init);
++module_init(ohci_s3cxxxx_init);
 +
-+static void __exit ohci_at91_cleanup(void)
++static void __exit ohci_s3cxxxx_cleanup(void)
 +{
-+	platform_driver_unregister(&ohci_hcd_at91_driver);
++	platform_driver_unregister(&ohci_hcd_s3c2410_driver);
 +}
-+module_exit(ohci_at91_cleanup);
++module_exit(ohci_s3cxxxx_cleanup);
 +
 +MODULE_DESCRIPTION(DRIVER_DESC);
 +MODULE_LICENSE("GPL");
-+
-diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 27f0abe..00409b9 100644
---- a/drivers/usb/host/ohci-hcd.c
-+++ b/drivers/usb/host/ohci-hcd.c
-@@ -1188,11 +1188,6 @@ MODULE_LICENSE ("GPL");
- #define EP93XX_PLATFORM_DRIVER	ohci_hcd_ep93xx_driver
- #endif
- 
--#ifdef CONFIG_ARCH_AT91
--#include "ohci-at91.c"
--#define AT91_PLATFORM_DRIVER	ohci_hcd_at91_driver
--#endif
--
- #ifdef CONFIG_ARCH_LPC32XX
- #include "ohci-nxp.c"
- #define NXP_PLATFORM_DRIVER	usb_hcd_nxp_driver
-@@ -1244,6 +1239,7 @@ MODULE_LICENSE ("GPL");
- 	!IS_ENABLED(CONFIG_USB_OHCI_HCD_OMAP1) && \
- 	!IS_ENABLED(CONFIG_USB_OHCI_HCD_OMAP3) && \
- 	!IS_ENABLED(CONFIG_USB_OHCI_HCD_SPEAR) && \
-+	!IS_ENABLED(CONFIG_USB_OHCI_HCD_AT91) && \
- 	!defined(PLATFORM_DRIVER) &&	\
- 	!defined(OF_PLATFORM_DRIVER) &&	\
- 	!defined(SA1111_DRIVER) &&	\
-@@ -1252,7 +1248,6 @@ MODULE_LICENSE ("GPL");
- 	!defined(TMIO_OHCI_DRIVER) && \
- 	!defined(S3C2410_PLATFORM_DRIVER) && \
- 	!defined(EP93XX_PLATFORM_DRIVER) && \
--	!defined(AT91_PLATFORM_DRIVER) && \
- 	!defined(NXP_PLATFORM_DRIVER) && \
- 	!defined(DAVINCI_PLATFORM_DRIVER)
- #error "missing bus glue for ohci-hcd"
-@@ -1326,12 +1321,6 @@ static int __init ohci_hcd_mod_init(void)
- 		goto error_ep93xx;
- #endif
- 
--#ifdef AT91_PLATFORM_DRIVER
--	retval = platform_driver_register(&AT91_PLATFORM_DRIVER);
--	if (retval < 0)
--		goto error_at91;
--#endif
--
- #ifdef NXP_PLATFORM_DRIVER
- 	retval = platform_driver_register(&NXP_PLATFORM_DRIVER);
- 	if (retval < 0)
-@@ -1355,10 +1344,6 @@ static int __init ohci_hcd_mod_init(void)
- 	platform_driver_unregister(&NXP_PLATFORM_DRIVER);
-  error_nxp:
- #endif
--#ifdef AT91_PLATFORM_DRIVER
--	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
-- error_at91:
--#endif
- #ifdef EP93XX_PLATFORM_DRIVER
- 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
-  error_ep93xx:
-@@ -1410,9 +1395,6 @@ static void __exit ohci_hcd_mod_exit(void)
- #ifdef NXP_PLATFORM_DRIVER
- 	platform_driver_unregister(&NXP_PLATFORM_DRIVER);
- #endif
--#ifdef AT91_PLATFORM_DRIVER
--	platform_driver_unregister(&AT91_PLATFORM_DRIVER);
--#endif
- #ifdef EP93XX_PLATFORM_DRIVER
- 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
- #endif
+ MODULE_ALIAS("platform:s3c2410-ohci");
 -- 
 1.7.9.5
