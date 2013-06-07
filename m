@@ -1,174 +1,207 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 16:24:10 +0200
-Subject: [RFC PATCH 02/50] ARM: at91: add PMC main clock
-In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370615115-16979-3-git-send-email-b.brezillon@overkiz.com>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 07 Jun 2013 07:31:10 -0700
+Subject: [PATCH 3/3] i2c: nomadik: use pinctrl PM helpers
+In-Reply-To: <CACRpkdZCxCF_znnYJC=UR6ma8y4s0ev9iQSSy1hPvb5wxcnNFw@mail.gmail.com>
+ (Linus Walleij's message of "Fri, 7 Jun 2013 10:33:42 +0200")
+References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+ <1370439873-30053-3-git-send-email-linus.walleij@stericsson.com>
+ <87bo7kwm6q.fsf@linaro.org>
+ <CACRpkdZCxCF_znnYJC=UR6ma8y4s0ev9iQSSy1hPvb5wxcnNFw@mail.gmail.com>
+Message-ID: <87wqq6m1qp.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the at91 main oscillator clock implementation using common
-clk framework.
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-If rate is not provided during clock registraction it is computed using
-the slow clock (main clk parent in this case) rate and the MCFR register.
+> On Wed, Jun 5, 2013 at 6:34 PM, Kevin Hilman <khilman@linaro.org> wrote:
+>
+>>> From: Linus Walleij <linus.walleij@linaro.org>
+>>>
+>>> This utilize the new pinctrl core PM helpers to transition
+>>> the driver to "sleep" and "idle" states, cutting away some
+>>> boilerplate code.
+>>>
+>>> Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
+>>> Cc: Mark Brown <broonie@kernel.org>
+>>> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+>>> Cc: Kevin Hilman <khilman@linaro.org>
+>>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+>>> Cc: Wolfram Sang <wsa@the-dreams.de>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> I have some questions on the interaction with runtime PM here...
+>
+> OK, to get the basic infrastructure in place I have merged these
+> patches with the I2C maintainers ACK, since it is doing one thing,
+> i.e. moving the functionality out of the driver and into the pinctrl
+> core.
+>
+> I am considering semantic changes related to runtime PM in
+> addition to this as a separate patch, so let's start talking about
+> that here.
+>
+> It would be inappropriate to try to create a patch that is
+> changing these two things at once, but let's see where we end
+> up by the merge window.
+>
+>>> @@ -645,13 +636,7 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
+>>>       }
+>>>
+>>>       /* Optionaly enable pins to be muxed in and configured */
+>>> -     if (!IS_ERR(dev->pins_default)) {
+>>> -             status = pinctrl_select_state(dev->pinctrl,
+>>> -                             dev->pins_default);
+>>> -             if (status)
+>>> -                     dev_err(&dev->adev->dev,
+>>> -                             "could not set default pins\n");
+>>> -     }
+>>> +     pinctrl_pm_select_default_state(&dev->adev->dev);
+>>
+>> Shouldn't this be in the ->runtime_resume() callback of the driver (the
+>> original code should've as well.)
+>>
+>> IOW, the pinctrl changes only need to happen when the runtime PM
+>> usecount goes from zero to 1.  For any additional users, the device will
+>> already be active and pins already in default state.
+>>
+>> I'm not familiar with this HW, and maybe the driver already prevents
+>> multiple users, but for correctness sake (and because others will copy
+>> this), the (re)muxing should be in the runtime PM callback.
+>
+> I2C message are serialized/marshalled by nature so it's actually
+> not causing a concurrency problem: this xfer function will not be
+> called from two places for the same driver.
+>
+> What is true however is that we're hammering the pins from
+> active to idle for every transfer, instead of letting runtime PM
+> provide some nice hysteresis (autosuspend) around that.
+>
+> Notice though that:
+>
+> - This driver has no driver-local runtime PM callbacks, so the
+>   runtime PM calls are intended to inform the rest of the system,
+>   such as the bus, that the device is idle.
+>
+> - The bus used is the AMBA (PrimeCell) bus,
+>   drivers/amba/bus.c
+>
+>> Also, IMO, that's further evidence that the pinctrl stuff could (and
+>> probably should) be handled by the PM core.
+>
+> So I'm now thinking about how to achieve this.
+>
+> What happens for this driver when the usecount goes from
+> 1->0 is (the other way is very similar):
+>
+> drivers/base/power/runtime.c
+>
+>         if (dev->pm_domain)
+>                 callback = dev->pm_domain->ops.runtime_suspend;
+>         else if (dev->type && dev->type->pm)
+>                 callback = dev->type->pm->runtime_suspend;
+>         else if (dev->class && dev->class->pm)
+>                 callback = dev->class->pm->runtime_suspend;
+>         else if (dev->bus && dev->bus->pm)
+>                 callback = dev->bus->pm->runtime_suspend;
+>         else
+>                 callback = NULL;
+>
+>         if (!callback && dev->driver && dev->driver->pm)
+>                 callback = dev->driver->pm->runtime_suspend;
+>
+>         retval = rpm_callback(callback, dev);
+>
+> This platform will currently hit dev->bus->pm->runtime_suspend
+> to drivers/amba/bus.c:
+>
+> static int amba_pm_runtime_suspend(struct device *dev)
+> {
+>         struct amba_device *pcdev = to_amba_device(dev);
+>         int ret = pm_generic_runtime_suspend(dev);
+>
+>         if (ret == 0 && dev->driver)
+>                 clk_disable(pcdev->pclk);
+>
+>         return ret;
+> }
+>
+> The pm_generic_runtime_suspend will call the driver callbacks
+> (none in this case).
+>
+> Then the bus core proceeds to gate off the block clock and
+> we're done.
+>
+> I could make a patch adding runtime PM ops to the
+> driver itself to set the pinctrl state from there, which would
+> be a nice improvement in itself.
+>
+> But we're discussing handling it all in the PM core, so
+> let's think bigger.
+>
+> If we're making this all generic, were in this chain do you
+> suggest that I set the pins to idle?
+> drivers/base/power/runtime.c?
 
+Yes, that's where I was thinking.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/clk/at91/Makefile   |    5 ++
- drivers/clk/at91/clk-main.c |  106 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/at91.h    |   10 ++++
- 3 files changed, 121 insertions(+)
+> One thing in particular that worries me here is the ordering
+> of things, because that has been a severe issue for us.
 
-diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-new file mode 100644
-index 0000000..42c084e
---- /dev/null
-+++ b/drivers/clk/at91/Makefile
-@@ -0,0 +1,5 @@
-+#
-+# Makefile for at91 specific clk
-+#
-+
-+obj-y += clk-main.o
-diff --git a/drivers/clk/at91/clk-main.c b/drivers/clk/at91/clk-main.c
-new file mode 100644
-index 0000000..738fa39
---- /dev/null
-+++ b/drivers/clk/at91/clk-main.c
-@@ -0,0 +1,106 @@
-+/*
-+ * drivers/clk/at91/clk-main.c
-+ *
-+ *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
-+ *
-+ * This mainram is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ */
-+
-+#include <linux/clk-provider.h>
-+#include <linux/clkdev.h>
-+#include <linux/clk/at91.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/io.h>
-+
-+#define to_clk_main(hw) container_of(hw, struct clk_main, hw)
-+struct clk_main {
-+	struct clk_hw hw;
-+	unsigned long rate;
-+};
-+
-+static unsigned long clk_main_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	u32 tmp;
-+	struct clk_main *clkmain = to_clk_main(hw);
-+	if (clkmain->rate)
-+		return clkmain->rate;
-+	while ((tmp = at91_pmc_read(AT91_CKGR_MCFR)) & AT91_PMC_MAINRDY)
-+		;
-+	tmp &= AT91_PMC_MAINF;
-+	clkmain->rate = (tmp * parent_rate) / 16;
-+	return clkmain->rate;
-+}
-+
-+static const struct clk_ops main_ops = {
-+	.recalc_rate = clk_main_recalc_rate,
-+};
-+
-+struct clk * __init
-+at91_clk_register_main(const char *name,
-+		       const char *parent_name,
-+		       unsigned long rate)
-+{
-+	struct clk_main *clkmain;
-+	struct clk *clk = NULL;
-+	struct clk_init_data init;
-+
-+	if (!rate && !parent_name)
-+		return ERR_PTR(-EINVAL);
-+
-+	clkmain = kzalloc(sizeof(*clkmain), GFP_KERNEL);
-+	if (!clkmain)
-+		return ERR_PTR(-ENOMEM);
-+
-+	init.name = name;
-+	init.ops = &main_ops;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
-+	init.flags = parent_name ? 0 : CLK_IS_ROOT;
-+
-+	clkmain->hw.init = &init;
-+	clkmain->rate = rate;
-+
-+	clk = clk_register(NULL, &clkmain->hw);
-+
-+	if (IS_ERR(clk))
-+		kfree(clkmain);
-+
-+	return clk;
-+}
-+
-+
-+
-+#if defined(CONFIG_OF)
-+static void __init
-+of_at91_clk_main_setup(struct device_node *np)
-+{
-+	struct clk *clk;
-+	const char *parent_name;
-+	const char *name = np->name;
-+	u32 rate = 0;
-+
-+	parent_name = of_clk_get_parent_name(np, 0);
-+	of_property_read_string(np, "clock-output-names", &name);
-+	of_property_read_u32(np, "clock-frequency", &rate);
-+
-+	clk = at91_clk_register_main(name, parent_name, rate);
-+
-+	if (!IS_ERR(clk))
-+		return;
-+
-+	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+}
-+
-+static void __init of_at91rm9200_clk_main_setup(struct device_node *np)
-+{
-+	of_at91_clk_main_setup(np);
-+}
-+CLK_OF_DECLARE(at91rm9200_clk_main, "atmel,at91rm9200-clk-main",
-+	       of_at91rm9200_clk_main_setup);
-+#endif
-diff --git a/include/linux/clk/at91.h b/include/linux/clk/at91.h
-index 58b1eba..c0801e7 100644
---- a/include/linux/clk/at91.h
-+++ b/include/linux/clk/at91.h
-@@ -16,6 +16,8 @@
- #ifndef AT91_PMC_H
- #define AT91_PMC_H
- 
-+#include <linux/clk-provider.h>
-+
- #ifndef __ASSEMBLY__
- extern void __iomem *at91_pmc_base;
- 
-@@ -184,4 +186,12 @@ extern void __iomem *at91_pmc_base;
- #define			AT91_PMC_PCR_DIV8	0x8			/* Peripheral clock is MCK/8 */
- #define		AT91_PMC_PCR_EN		(0x1  <<  28)		/* Enable */
- 
-+
-+
-+
-+struct clk * __init
-+at91_clk_register_main(const char *name,
-+		       const char *parent_name,
-+		       unsigned long rate);
-+
- #endif
--- 
-1.7.9.5
+In the original series from Hebbar Gururaja, Grygorii Strashko pointed
+out that we may have some of the ordering issues on OMAP as well.  I
+hadn't thought about that (enough) yet.
+
+> For example: maybe on a certain platform pins need to
+> be idled/defaulted *before* calling the PM domain or
+> bus callbacks are executed, because of transient IRQs
+> and whatnot. So I put my pinctrl_pm_select_idle_state()
+> *before* the chain of calls.
+
+Right, that corresponds to the runtime PM core calling the drivers
+->runtime_suspend() callback before the subsystem/bus/domain has done
+its thing.
+
+> But sometimes you may want to execute the
+> pinctrl_pm_select_idle_state() *after* all other things have
+> been done, including the calls to the domain/bus/driver.
+
+Whether it's in the PM core or not, with runtime PM today, there is no
+easy way to do this from the driver ($SUBJECT patch assumes a single
+user, which is not true in general.)
+
+The only way a driver truly knows that the domain/bus/subsystem calls
+have been done is when its own callback is called, and for suspend this
+only happens *before* the device is actually idled.  This is effectively
+a pre-runtime_suspend callback.  We don't currently have a
+post-runtime_suspend callback (or a pre-runtime_resume callback.)  
+
+Might be we need something like that to do this in a generic way.
+
+> And this is only for the runtime suspend/resume path.
+>
+> For the common suspend/resume path things get more
+> complex still. Users may need to call
+> pinctrl_pm_select_sleep_state() in the middle of the
+> code sending the platform done, and will not survive it
+> being called by the PM core, and we'd need to add a flag
+> for this etc.
+>
+> To sum up I am afraid of a can of worms of corner cases
+> on something that looks simple here. Thus I cannot really
+> make a patch moving pinctrl state selection to the PM
+> core, I don't know the business there well enough, I just know
+> there are tigers in there :-/
+
+Yeah, the static PM case is definitely a can of worms, especially in the
+case where many devices are already runtime suspended.  That defnitely
+needs some serious thought and testing before handling in the PM core.
+
+So for now, it's probably not a good idea to move things to the PM core
+until we see a strong pattern emerging.
+
+That being said, maybe we could handle this in the
+subsystem/bus/pm_domain level though (in your case AMBA, in OMAP case
+the pm_domain) to still avoid sprinkling this across all the drivers?
+
+Kevin
