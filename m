@@ -1,66 +1,39 @@
-From: lkcl@lkcl.net (Luke Kenneth Casson Leighton)
-Date: Fri, 7 Jun 2013 22:41:12 +0100
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <20130607193532.GY18614@n2100.arm.linux.org.uk>
-References: <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1370477958.20454.68.camel@localhost>
- <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
- <51B085C6.3000605@gmail.com>
- <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
- <51B19046.5040401@gmail.com>
- <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
- <1370616567.2433.20.camel@jm-desktop>
- <20130607182608.GV18614@n2100.arm.linux.org.uk>
- <CAPweEDxXnRWYK4GhSkN-PzM1hLOZPiD1MUne1Q-4FT6PJRJUtw@mail.gmail.com>
- <20130607193532.GY18614@n2100.arm.linux.org.uk>
-Message-ID: <CAPweEDyOsJXEp9Wx0VAt3xdHGOT7KY-KUQ7C8-CxpUOCe+nDiA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 07 Jun 2013 14:49:44 -0700
+Subject: [PATCH 0/4] Updated omap_hsmmc SDIO and remuxing patches
+Message-ID: <20130607214557.18581.75288.stgit@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 8:35 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jun 07, 2013 at 08:18:14PM +0100, Luke Kenneth Casson Leighton wrote:
->> On Fri, Jun 7, 2013 at 7:26 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > Luke Leighton on the other hand is demanding that we
->>
->>  no demands have been made, russell: i've informed you of an immovable
->> deadline which will pass beyond which the opportunity being presented
->> is lost.
->
-> " well, tough.  get me up to speed, *fast*.  please stop wasting time
-> like this: get me up to speed."
->
-> That is a demand.  On the other hand this would not be:
->
-> "Can someone please get me up to speed on this?"  That is a request.
+Hi all,
 
- thank you for the correction.
+Here are the update SDIO remuxing patches that are based on Andreas'
+earlier patches. The remuxing part is still in discussion, but that
+can be merged later in case there's some way to do it automatically
+at the drivers/base/pinctrl.c level.
 
- can someone please get me up to speed on this?  i've collated peoples
-very gratefully received responses so far, here:
- http://hands.com/~lkcl/allwinner_linux_proposal.txt
+I've used these patches successfully with wl12xx and mwifiex_sdio
+on at least omap3 zoom, omap3 evm, omap4 sdp, and panda es.
+
+Regards,
+
+Tony
+
+---
+
+Andreas Fenkart (2):
+      mmc: omap_hsmmc: Enable SDIO IRQ using a GPIO in idle mode
+      mmc: omap_hsmmc: debugfs entries for GPIO and SDIO mode
+
+Tony Lindgren (2):
+      mmc: omap_hsmmc: Fix context save and restore for DT
+      mmc: omap_hsmmc: Remux pins to support SDIO interrupt and PM runtime
 
 
+ .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   42 ++
+ drivers/mmc/host/omap_hsmmc.c                      |  356 +++++++++++++++++---
+ include/linux/platform_data/mmc-omap.h             |    4 
+ 3 files changed, 351 insertions(+), 51 deletions(-)
 
-> Please let those who are already working with Allwinner continue to
-> work with them rather than spending time needlessly with someone who
-> clearly doesn't have any idea about what they say even from one moment
-> to the next.
-
- 1) correct: i don't.  i've been caught off-guard by this: it's very
-short notice, and i have limited time available.  i'm doing the best i
-can to correct mistakes as i go along, but i *don't have time* to
-observe the niceties, dot all the i's or cross all the t's.
-
- 2) that appears to be a request to a large audience.  i have to point
-out to that audience: end result of complying with the request above
-will be that the free software community suffers as a result of losing
-the opportunity to speak to - and therefore influence - the Directors
-of one of the world's most successful, fastest growing [and also very
-young and inexperienced] SoC fabless semiconductor company.
-
- please make your own choice.
-
- l.
+-- 
+Signature
