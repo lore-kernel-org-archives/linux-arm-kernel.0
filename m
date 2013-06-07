@@ -1,44 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Jun 2013 17:26:01 +0200
-Subject: [PATCH] arm: mvebu: ensure PCIe range is propagated in the .dts
- files
-In-Reply-To: <20130607144406.GS23859@titan.lakedaemon.net>
-References: <1370510483-32419-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370510483-32419-2-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130606181159.GN23859@titan.lakedaemon.net>
- <20130606190321.GQ23859@titan.lakedaemon.net>
- <20130607103241.3f82d71d@skate>
- <20130607144406.GS23859@titan.lakedaemon.net>
-Message-ID: <20130607172601.75b77122@skate>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 07 Jun 2013 16:27:33 +0100
+Subject: [PATCH 0/2] MCPM backend for Virtual Express TC2
+In-Reply-To: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1370618853.4852.28.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Fri, 2013-06-07 at 07:39 +0100, Nicolas Pitre wrote:
+> This is the MCPM backend enabling SMP secondary boot and CPU hotplug
+> on the VExpress TC2 big.LITTLE platform.  The method to allow CPU suspend
+> is also implemented.
 
-On Fri, 7 Jun 2013 10:44:06 -0400, Jason Cooper wrote:
+With my Naming Purist (TM) hat on, I must point out that there is no
+such thing as TC2... The platform you're referring to is V2P-CA15_A7.
+TC2 is just an internal name for the chip (as in: Test Chip 2, which
+followed 1 and was supposed to be followed by 3 ;-). And considering the
+fact that substantial part of the power management system lives outside
+of the main chip anyway, the naming is not really precise.
 
-> the patches in mvebu/fixes:
-> 
->   8eed481 arm: mvebu: fix the 'ranges' property to handle PCIe
->   c6c003a ARM: mvebu: Fix ranges entry on XP GP board
->   00ed4a0 ARM: mvebu: Add a ranges entry to translate devbus childs
-> 
-> added the ranges property for openblocks-ax3-4, and the gp, but nothing
-> for the db.  The patch
-> 
->   b484ff4 ARM: mvebu: Add support for NOR flash device on Armada XP-DB board
-> 
-> went into mvebu/dt because it was adding new capability.
-> 
-> So the choices are to make mvebu/dt depend on mvebu/fixes because of
-> your patch, or to split the patch because there is no real dependency
-> between the two changes.
+Now, I appreciate that "v2p_ca15_a7_" namespace is a bit cumbersome
+comparing to "tc2_" and no, I don't really have better ideas now...
 
-Ah, ok. That makes sense now. Thanks!
+Other than that:
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+
+Cheers!
+
+Pawe?
