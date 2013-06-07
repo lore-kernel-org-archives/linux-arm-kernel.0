@@ -1,62 +1,34 @@
-From: luke.leighton@gmail.com (luke.leighton)
-Date: Fri, 7 Jun 2013 09:06:24 +0100
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <51B19046.5040401@gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1370477958.20454.68.camel@localhost>
- <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
- <51B085C6.3000605@gmail.com>
- <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
- <51B19046.5040401@gmail.com>
-Message-ID: <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 7 Jun 2013 17:06:37 +0900
+Subject: [PATCH v8 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <201306020128.05914.sergei.shtylyov@cogentembedded.com>
+References: <201306020128.05914.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130607080637.GC22598@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 8:48 AM, Vladimir Pantelic <vladoman@gmail.com> wrote:
-> luke.leighton wrote:
->>
->> On Thu, Jun 6, 2013 at 1:51 PM, Vladimir Pantelic <vladoman@gmail.com>
->> wrote:
->>
->>> 4 days? WTF? since when did setting an ultimatum to the kernel
->>> community work?
->>
->>
->>   i was only informed of the opportunity 2 days ago, vladimir.  this is
->> an important meeting.  of course the linux kernel community is
->> entirely free to:
->>
->> * completely ignore this opportunity
->> * continue to complain that soc vendors do not follow their
->> unilaterally-decided rules
->
->
-> SoC vendors are free to join the discussion, and many SoC vendors are part
-> of the kernel community, so calling this unilateral is plain wrong.
+On Sun, Jun 02, 2013 at 01:28:05AM +0400, Sergei Shtylyov wrote:
+> Hello.
+> 
+>    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+> 'renesas-next-20130528' tag.  It was created to fix the shortcomings in the
+> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+> to touch both subtrees). The patches were conceived with the complete
+> bisectability goal in mind.
+> 
+> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+> [2/9] ehci-platform: add pre_setup() method to platform data
+> [3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
+> [4/9] phy-rcar-usb: remove EHCI internal buffer setup
+> [5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
+> [6/9] phy-rcar-usb: correct base address
+> [7/9] phy-rcar-usb: add platform data
+> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+> [9/9] phy-rcar-usb: handle platform data
+> 
+>    The patchset is completely ready to be merged now.
 
- you're free to believe that, vladimir.  i've explained why that
-hasn't happened, in prior messages.  can we move forward, please?
+Can I confirm that the plan is for me to merge this code?
 
->
->>   3 days remaining on the clock.
->
->
-> what catastrophic thing will happen when the time runs out?
-
- no catastrophe, vladimir: all that happens is that an opportunity is
-lost, and the result of that is that the situation remains as it is,
-with a major soc vendor being divorced from and isolated from the free
-software community, who will continue to have to shoulder the
-frustrating and isolated burden of responsibility of reworking
-"over-the-fence" kernel patches as best they can with the limited
-resources that they have.
+If so, I should be able to do so next week.
