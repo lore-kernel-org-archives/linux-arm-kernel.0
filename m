@@ -1,61 +1,108 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 7 Jun 2013 17:17:35 +0800
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <CAKON4OxDD5orX2w-_+d5kawTGXbE3KKj2QLERo9m7=NiUSXhgQ@mail.gmail.com>
- <51AFA6DD.3000202@wwwdotorg.org>
- <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
- <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
-Message-ID: <CAGsJ_4wKgJTwZnJm7UEUVcNYLrWfWu1Gi0=09JQq1uXcHj5VpA@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Fri, 07 Jun 2013 18:19:40 +0900
+Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <20130408165626.GA30824@obsidianresearch.com>
+References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
+ <00c501ce277c$30e49dc0$92add940$%han@samsung.com>
+ <000001ce3438$b136e1e0$13a4a5a0$%han@samsung.com>
+ <20130408165626.GA30824@obsidianresearch.com>
+Message-ID: <000c01ce6360$237a7040$6a6f50c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/7 Olof Johansson <olof@lixom.net>:
-> On Thu, Jun 6, 2013 at 8:13 AM, jonsmirl at gmail.com <jonsmirl@gmail.com> wrote:
->> On Wed, Jun 5, 2013 at 7:54 PM, luke.leighton <luke.leighton@gmail.com> wrote:
->>>  augh.  ok.  solutions.  what are the solutions here?
->>
->> Luke if you really want to fix this a good solution is to have
->> Allwinner join Linaro and provide an engineer to the Linaro effort.
->> That engineer will get educated on the right way to do kernel
->> development and he can pass that knowledge back to Allwinner each day
->> as he learns it.
->
-> There's no need for anybody to join Linaro to contribute upstream.
-> That's a crazy notion.
+On Tuesday, April 09, 2013 1:56 AM, Jason Gunthorpe wrote:
+> On Mon, Apr 08, 2013 at 06:08:53PM +0900, Jingoo Han wrote:
+> 
+> > I have a question.  Now, I am reviewing the Tegra PCIe, Marvell PCIe
+> > patchset.  However, in the case of Exynos PCIe, 'downstream I/O' and
+> > 'non-prefetchable memory' are different between PCIe0 and PCIe1.
+> > These regions are not shared.
+> >
+> > PCIe0:
+> > 	ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
+> > 		  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
+> > 		  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
+> >
+> > PCIe1:
+> > 	ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
+> > 		  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
+> > 		  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
+> >
+> > PCIe0 uses 0x40000000~0x5fffffff, PCI1 uses 0x60000000~0x7fffffff.
+> >
+> > How can I handle this? :)
+> 
+> You need to dig into where this range restriction comes from, and how
+> it interacts with the PCI-E root bridge's window registers. Is there
+> another set of registers that control this? Is it hardwired into the
+> silicon? Do the root port window registers control this?
+> 
+> I'm looking at functions like exynos_pcie_prog_viewport_mem_outbound
+> and wondering if the driver already controls this window.. But it
+> looks like there may be some restrictions.
+> 
+> Marvell also has unshared regions, but the driver arranges for those
+> ranges to be setup dynamically based on writes to the bridge's window
+> registers from the Linux PCI core, so the region is always in sync
+> with what the Linux PCI core is trying to do.
+> 
+> The desired perfect outcome is to have a single logical 'shared'
+> region for memory and I/O - give that region to the PCI core via
+> struct resources, then the PCI core tells the driver and HW what
+> portion of that region belongs to each root port via a write to the
+> root port bridge's window registers. The net result is still
+> non-overlapping regions, but the allocation of space between port 0
+> and port 1 is performed at run time.
+> 
+> I don't really know enough about your hardware to give you better
+> advice, sorry. The general guidance to try and follow the PCI-E spec
+> for a root complex is good, but if the HW can't do it, or it would
+> make the driver too complex, then one PCI domain per port will always
+> work (this is similar to your original driver, but with domains).
+> 
+> The main advantage to following the PCI-E specs and allowing for
+> dynamic allocation of address space is that it lets you reserve less
+> address space for PCI-E, and this in turn gives you more low mem
+> address space to use for DRAM.
 
-i do agree. i don't think there is any direct relationship between
-linaro and upstream.
-otherwise, we will be in pain as we are not linaro member too.
+Hi Jason Gunthorpe,
 
->
-> Listen, Allwinner isn't working in a vacuum, believe it or not. I've
-> talked to them, so has Arnd and other people working on ARM, including
-> Maxime Ripard, who's been reimplementing upstream support for their
-> platform. Everybody is interested in the right things happening, it's
-> just a matter of figuring out how to do it. The right people are
-> already talking.
->
->> Allwinner has expressed interest in the past in joining Linaro but the
->> price was too high. I believe there are cheaper options now for
->> joining. The benefits Allwinner receives from joining will far exceed
->> the cost of joining. The net result will likely be a reduction in the
->> amount they need to spend on in-house development since they will
->> learn how to better leverage other developer's work.
->
-> Uh, you're listing the benefits of doing upstream work, not of joining Linaro.
->
->
-> -Olof
+I implemented 'Single domain' with Exynos PCIe for last two months;
+however, it cannot work properly due to the hardware restriction.
+Each MEM region is hard-wired.
 
-thanks
-barry
+Thus, I will send Exynos PCIe V3 patch as 'Separate domains'.
+
+Best regards,
+Jingoo Han
+
+> 
+> > The following is right?
+> 
+> > +       pcie-controller {
+> > 		.....
+> > +               ranges = <0x82000000 0 0x40000000 0x40000000 0 0x00200000   /* port 0 registers */
+> > +                         0x82000000 0 0x60000000 0x60000000 0 0x00200000   /* port 1 registers */
+> > +                         0x81000000 0 0          0x40200000 0 0x00004000   /* port 0 downstream I/O */
+> > +                         0x81000000 0 0          0x60200000 0 0x00004000   /* port 1 downstream I/O */
+> > +                         0x82000000 0 0x40204000 0x40204000 0 0x10000000>; /* port 0 non-prefetchable
+> memory */
+> > +                         0x82000000 0 0x40204000 0x60204000 0 0x10000000>; /* port 1 non-prefetchable
+> memory */
+> 
+> 
+> > +
+> > +               pci at 1,0 {
+> > +                       device_type = "pci";
+> > +                       assigned-addresses = <0x82000800 0 0x40000000 0 0x00200000
+> > +                                                 0x81000800 0 0x40200000 0 0x00004000
+> > +                                                 0x81000800 0 0x40204000 0 0x10000000>;
+> 
+> Would be:
+> 
+>                        ranges = <0x81000800 0 0x40200000  0x81000800 0 0x40200000  0 0x00004000
+>                                  0x81000800 0 0x40204000  0x81000800 0 0x40204000  0 0x10000000>;
+>                        assigned-addresses = <0x82000800 0 0x40000000  0 0x00200000>;
+> 
+> Jason
