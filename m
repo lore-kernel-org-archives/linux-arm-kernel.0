@@ -1,40 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 7 Jun 2013 09:29:27 -0700
-Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
-References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
-Message-ID: <20130607162927.GA3331@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 07 Jun 2013 10:33:10 -0600
+Subject: [PATCH] ARM: tegra: add basic SecureOS support
+In-Reply-To: <CAAVeFu+by44HnOzv_85kwgeCx5b9TxiMhr27x69QcUj9GRbk8A@mail.gmail.com>
+References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+ <51B0BC80.9040007@wwwdotorg.org>
+ <CAAVeFu+by44HnOzv_85kwgeCx5b9TxiMhr27x69QcUj9GRbk8A@mail.gmail.com>
+Message-ID: <51B20B46.4030501@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130607 05:38]:
-> On Fri, 7 Jun 2013, Sricharan R wrote:
+On 06/07/2013 02:11 AM, Alexandre Courbot wrote:
+> On Fri, Jun 7, 2013 at 1:44 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 06/06/2013 01:28 AM, Alexandre Courbot wrote:
+>>> Boot loaders on some Tegra devices can be unlocked but do not let the
+>>> system operate without SecureOS. SecureOS prevents access to some
+>>> registers and requires the operating system to perform certain
+>>> operations through Secure Monitor Calls instead of directly accessing
+>>> the hardware.
+>>>
+>>> This patch introduces basic SecureOS support for Tegra. SecureOS support
+>>> can be enabled by adding a "nvidia,secure-os" property to the "chosen"
+>>> node of the device tree.
+>>
+>> I suspect "SecureOS" here is the name of a specific implementation of a
+>> secure monitor, right? It's certainly a very unfortunate name, since it
+>> sounds like a generic concept rather than a specific implementation:-(
 > 
-> > - The IO resource information like dma request lines, irq number and
-> >   ocp address space can be populated via dt blob. So such data is stripped
-> >   from OMAP4 SOC hwmod data file.
-> > 
-> > - The devices which are still missing the device tree bindings,
-> >   address space entries are not removed yet. When such devices add
-> >   the dt bindings, respective address space data can be deleted.
-> > 
-> > - Also other unnecessary hwmods like firewalls are removed as a part of this.
-> >   Since emif was getting registered only because of this firewalls links,
-> >   the mpu->emif direct link is added now.
-> > 
-> > The above update, results in reduction of about ~1650 lines of code.
-> > 
-> > Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> > Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> Right. Using the actual name (Trusted Foundations) is probably better.
+> I don't think the SecureOS denomination is used by anyone else but
+> NVIDIA.
 > 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
+>> There certainly could be (and I believe are in practice?) multiple
+>> implementation of a secure monitor for Tegra. Presumably, each of those
+>> implementations has (or could have) a different definition for what SVC
+>> calls it supports, their parameters, etc.
+>>
+>> I think we need to separate the concept of support for *a* secure
+>> monitor, from support for a *particular* secure monitor.
 > 
-> Can't test this one since I don't have an OMAP4 DT config set up in the testbed
-> yet.  Maybe will add that to the testbed after the v3.10 release.
+> Agreed. In this case, can we assume that support for a specific secure
+> monitor is not arch-specific, and that this patch should be moved
+> outside of arch-tegra and down to arch/arm? In other words, the ABI of
+> a particular secure monitor should be the same no matter the chip,
+> shouldn't it?
 
-OK thanks, applying into omap-for-v3.11/cleanup.
+I would like to believe that the Trusted Foundations monitor had the
+same ABI irrespective of which Soc it was running on. However, I have
+absolutely no idea at all if that's true. Even if there's some common
+subset of the ABI that is identical across all SoCs, I wouldn't be too
+surprised if there were custom extensions for each different SoC, or
+just perhaps even each product.
 
-Regards,
+Can you research this and find out the answer?
 
-Tony
+What we can always do is make a compatible property that lists
+everything[1], and have the driver match on the most specific value for
+now, but relax the driver's matching later if it turns out that the ABI
+is indeed common.
+
+[1] That'd need to be at least secure OS name, and secure OS version.
+Perhaps the SoC and board data can be deduced from the DT's top-level
+compatible properties; nvidia,tegra114-shield, nvidia,tegra114?
