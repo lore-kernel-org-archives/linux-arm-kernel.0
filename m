@@ -1,72 +1,63 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Fri, 7 Jun 2013 17:36:50 +0800
-Subject: [PATCH] ARM: tegra: disable nonboot CPUs when reboot
-Message-ID: <1370597810-1153-1-git-send-email-josephl@nvidia.com>
+From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
+Date: Fri, 7 Jun 2013 11:37:46 +0200
+Subject: Chipidea usb otg support for IMX/MXS (device functionality)
+In-Reply-To: <51A77BAB.4060101@digi.com>
+References: <51A5A808.2070803@digi.com>
+ <F281D0F91ED19E4D8E63A7504E8A649803E8A3F3@039-SN2MPN1-021.039d.mgd.msft.net>
+ <20130529075044.GC3293@lukather> <51A77BAB.4060101@digi.com>
+Message-ID: <20130607093746.GL14209@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The normal CPU hotplug flow in kernel and the flow for Tegra we expected,
-is checking the CPU ID is OK for hotplug by "tegra_cpu_disable", the CPU
-that would be hotplugged runs into a power-gate state by "tegra_cpu_die",
-then the other CPU waits for the CPU that was hotplugged in reset and
-clock gate it by "tegra_cpu_kill". That means we don't support the CPU
-being stopped or put into offline by trigger "tegra_cpu_kill" directly.
-It may cause a busy loop for waiting CPU in reset.
+Hi Hector,
 
-After the commit "62e930e reboot: rigrate shutdown/reboot to boot cpu",
-we remove "disable_nonboot_cpus" when kernel_{restart,halt,power_off}.
-But the ARM kernel trigger "send_smp_stop" when machine_shutdown, that
-would cause the "tegra_cpu_kill" directly without "tegra_cpu_die" first.
+On Thu, May 30, 2013 at 06:17:47PM +0200, Hector Palacios wrote:
+> Dear Maxime,
+> 
+> On 05/29/2013 09:50 AM, maxime.ripard at free-electrons.com wrote:
+> >Hi,
+> >
+> >On Wed, May 29, 2013 at 07:11:30AM +0000, Chen Peter-B29397 wrote:
+> >>
+> >>>Hello,
+> >>>
+> >>>Am I right in assuming that the MXS USB on-the-go port does not currently
+> >>>support the
+> >>>device (gadget) functionality?
+> >>>Anybody out there working on that?
+> >>>
+> >>
+> >>As far as I know, Maxime Ripard may already let the chipidea durl-role function
+> >>work ok at mx28. It may need my chipidea otg patch
+> >>
+> >>https://github.com/hzpeterchen/linux-usb.git
+> >
+> >Indeed, I've been using the patchset "Add tested id switch and vbus
+> >connect detect support for Chipidea" from Peter for quite some time on
+> >top of 3.9 and it works like a charm for the gadget mode on an MX28
+> >platform.
+> >
+> >BTW, Peter, I've seen that these patches are still not merged in 3.10,
+> >is there a reason for that? do you plan on sending a version rebased on
+> >top of 3.10 some time in the future? I tried to do the rebasing myself,
+> >but the chipidea driver seems to have changed quite heavily, which makes
+> >the process quite difficult when you don't know what you're doing :)
+> 
+> I guess you didn't get rid of the 'possible circular locking
+> dependency' you talked about at [1], right?
 
-We hook "disable_nonboot_cpus" in "reboot_notifier" to avoid that happens.
-And it can work for reboot, shutdown, halt and kexec.
+Indeed
 
-Signed-off-by: Joseph Lo <josephl@nvidia.com>
----
- arch/arm/mach-tegra/hotplug.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+> I experimented the same and also a BUG [2] after cable reconnection.
+> Despite those, I ran a simple test of serial, ethernet, and
+> mass_storage gadgets and they worked fine.
 
-diff --git a/arch/arm/mach-tegra/hotplug.c b/arch/arm/mach-tegra/hotplug.c
-index a52c10e..1676669 100644
---- a/arch/arm/mach-tegra/hotplug.c
-+++ b/arch/arm/mach-tegra/hotplug.c
-@@ -10,6 +10,8 @@
- #include <linux/kernel.h>
- #include <linux/smp.h>
- #include <linux/clk/tegra.h>
-+#include <linux/cpu.h>
-+#include <linux/reboot.h>
- 
- #include <asm/smp_plat.h>
- 
-@@ -57,6 +59,21 @@ int tegra_cpu_disable(unsigned int cpu)
- 	}
- }
- 
-+/*
-+ * reboot notifier for avoid busy loop when trigger tegra_cpu_kill
-+ * without tegra_cpu_die first
-+ */
-+static int tegra_cpu_kill_notify(struct notifier_block *nb,
-+				 unsigned long action, void *data)
-+{
-+	disable_nonboot_cpus();
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block tegra_cpu_kill_nb = {
-+	.notifier_call = tegra_cpu_kill_notify,
-+};
-+
- void __init tegra_hotplug_init(void)
- {
- 	if (!IS_ENABLED(CONFIG_HOTPLUG_CPU))
-@@ -68,4 +85,6 @@ void __init tegra_hotplug_init(void)
- 		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
- 	if (IS_ENABLED(CONFIG_ARCH_TEGRA_114_SOC) && tegra_chip_id == TEGRA114)
- 		tegra_hotplug_shutdown = tegra30_hotplug_shutdown;
-+
-+	register_reboot_notifier(&tegra_cpu_kill_nb);
- }
--- 
-1.8.3
+I never experienced the BUG you're mentionning, everything was working
+fine except the circular dependency.
+
+> I didn't use the new properties (phy_type, dr_mode...) in the DT of
+> my mx28 platform, did you?
+
+Neither did I.
+
+Maxime
