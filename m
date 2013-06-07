@@ -1,91 +1,106 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 7 Jun 2013 16:57:05 +0200
-Subject: [PATCH v2 2/2] at_hdmac: add FIFO configuration parameter to DMA DT
- binding
-In-Reply-To: <cover.1370615665.git.nicolas.ferre@atmel.com>
-References: <cover.1370615665.git.nicolas.ferre@atmel.com>
-Message-ID: <962983ea5510b1574466599fa1e8d857f33b1429.1370615665.git.nicolas.ferre@atmel.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 7 Jun 2013 11:08:14 -0400
+Subject: [PATCH v2 0/8] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <20130607102304.3c42773b@skate>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130606185110.GP23859@titan.lakedaemon.net>
+ <20130607102304.3c42773b@skate>
+Message-ID: <20130607150814.GU23859@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Fri, Jun 07, 2013 at 10:23:04AM +0200, Thomas Petazzoni wrote:
+> Dear Jason Cooper,
+> 
+> On Thu, 6 Jun 2013 14:51:10 -0400, Jason Cooper wrote:
+> > > Thierry Reding (1):
+> > >   PCI: Introduce new MSI chip infrastructure
+> > > 
+> > > Thomas Petazzoni (7):
+> > >   PCI: Add registry of MSI chips
+> > >   irqchip: armada-370-xp: properly request resources
+> > >   irqchip: armada-370-xp: implement MSI support
+> > >   arm: mvebu: the MPIC now provides MSI controller features
+> > >   pci: mvebu: add support for MSI
+> > >   arm: mvebu: indicate that this platform supports MSI
+> > >   arm: mvebu: link PCIe controllers to the MSI controller
+> > > 
+> > 
+> > Is there a reason why the following breakdown wouldn't work?
+> 
+> No, it should work. And it's actually possible with how the patches are
+> organized currently.
 
-For most devices the FIFO configuration is the same i.e. when half FIFO size is
-available/filled, a source/destination request is serviced. But USART devices
-have to do it when there is enough space/data available to perform a single
-AHB access so the ASAP configuration.
+Ok.  good.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
- .../devicetree/bindings/dma/atmel-dma.txt          |  7 ++++--
- drivers/dma/at_hdmac.c                             | 25 ++++++++++++++++++----
- 2 files changed, 26 insertions(+), 6 deletions(-)
+> > >  arch/arm/boot/dts/armada-370-xp.dtsi     |   1 +
+> > >  arch/arm/boot/dts/armada-370.dtsi        |   1 +
+> > >  arch/arm/boot/dts/armada-xp-mv78230.dtsi |   1 +
+> > >  arch/arm/boot/dts/armada-xp-mv78260.dtsi |   1 +
+> > >  arch/arm/boot/dts/armada-xp-mv78460.dtsi |   1 +
+> > 
+> > through mvebu/arm-soc
+> 
+> Patches 5 and 8.
+> 
+> > 
+> > >  arch/arm/mach-mvebu/Kconfig              |   1 +
+> > 
+> > through mvebu/arm-soc after the other three have landed (v3.11-rc1)
+> 
+> Patch 7.
+> 
+> > >  drivers/irqchip/irq-armada-370-xp.c      | 186 ++++++++++++++++++++++++++++++-
+> > 
+> > through tglx
+> 
+> Patches 3 and 4.
+> 
+> > 
+> > >  drivers/pci/host/pci-mvebu.c             |  21 ++++
+> > >  drivers/pci/msi.c                        |  59 +++++++++-
+> > >  drivers/pci/probe.c                      |   1 +
+> > >  include/linux/msi.h                      |  22 ++++
+> > >  include/linux/pci.h                      |   1 +
+> > 
+> > through Bjorn
+> 
+> Patches 1, 2 and 6.
+> 
+> So as you can see, the patches are already broken down in a way that
+> allows each maintainer to pick its part. But I admit I could probably
+> reorder them in the following way:
+> 
+>  1. PCI: Introduce new MSI chip infrastructure
+>  2. PCI: Add registry of MSI chips
+>  3. pci: mvebu: add support for MSI
+>  4. irqchip: armada-370-xp: properly request resources
+>  5. irqchip: armada-370-xp: implement MSI support
+>  6. arm: mvebu: the MPIC now provides MSI controller features
+>  7. arm: mvebu: link PCIe controllers to the MSI controller
+>  8. arm: mvebu: indicate that this platform supports MSI
+> 
+> 1-3 through Bjorn, 4-5 through tglx, 6-8 through you.
+> 
+> The only problem that I see is that 'irqchip: armada-370-xp: implement
+> MSI support' (which goes through tglx) has a build dependency on 'PCI:
+> Add registry of MSI chips' (which goes through Bjorn). This is due to
+> the IRQ controller using the msi_chip_add() function that is introduced
+> earlier in the PCI core.
 
-diff --git a/Documentation/devicetree/bindings/dma/atmel-dma.txt b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-index c80e8a3..c280a0e 100644
---- a/Documentation/devicetree/bindings/dma/atmel-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/atmel-dma.txt
-@@ -24,8 +24,11 @@ The three cells in order are:
- 1. A phandle pointing to the DMA controller.
- 2. The memory interface (16 most significant bits), the peripheral interface
- (16 less significant bits).
--3. The peripheral identifier for the hardware handshaking interface. The
--identifier can be different for tx and rx.
-+3. Parameters for the at91 DMA configuration register which are device
-+dependant:
-+  - bit 7-0: peripheral identifier for the hardware handshaking interface. The
-+  identifier can be different for tx and rx.
-+  - bit 11-8: FIFO configuration. 0 for half FIFO, 1 for ALAP, 1 for ASAP.
- 
- Example:
- 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 6db5228..4499dcf 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -14,6 +14,7 @@
-  * found on AT91SAM9263.
-  */
- 
-+#include <dt-bindings/dma/at91.h>
- #include <linux/clk.h>
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
-@@ -1320,15 +1321,31 @@ static struct dma_chan *at_dma_xlate(struct of_phandle_args *dma_spec,
- 	atslave = devm_kzalloc(&dmac_pdev->dev, sizeof(*atslave), GFP_KERNEL);
- 	if (!atslave)
- 		return NULL;
-+
-+	atslave->cfg = ATC_DST_H2SEL_HW | ATC_SRC_H2SEL_HW;
- 	/*
- 	 * We can fill both SRC_PER and DST_PER, one of these fields will be
- 	 * ignored depending on DMA transfer direction.
- 	 */
--	per_id = dma_spec->args[1];
--	atslave->cfg = ATC_FIFOCFG_HALFFIFO
--		     | ATC_DST_H2SEL_HW | ATC_SRC_H2SEL_HW
--		     | ATC_DST_PER_MSB(per_id) | ATC_DST_PER(per_id)
-+	per_id = dma_spec->args[1] & AT91_DMA_CFG_PER_ID_MASK;
-+	atslave->cfg |= ATC_DST_PER_MSB(per_id) | ATC_DST_PER(per_id)
- 		     | ATC_SRC_PER_MSB(per_id) | ATC_SRC_PER(per_id);
-+	/*
-+	 * We have to translate the value we get from the device tree since
-+	 * the half FIFO configuration value had to be 0 to keep backward
-+	 * compatibility.
-+	 */
-+	switch(dma_spec->args[1] & AT91_DMA_CFG_FIFOCFG_MASK) {
-+		case AT91_DMA_CFG_FIFOCFG_ALAP:
-+			atslave->cfg |= ATC_FIFOCFG_LARGESTBURST;
-+			break;
-+		case AT91_DMA_CFG_FIFOCFG_ASAP:
-+			atslave->cfg |= ATC_FIFOCFG_ENOUGHSPACE;
-+			break;
-+		case AT91_DMA_CFG_FIFOCFG_HALF:
-+		default:
-+			atslave->cfg |= ATC_FIFOCFG_HALFFIFO;
-+	}
- 	atslave->dma_dev = &dmac_pdev->dev;
- 
- 	chan = dma_request_channel(mask, at_dma_filter, atslave);
--- 
-1.8.2.2
+Yeah, that's what I was afraid of...
+
+> How would you solve that?
+
+Let me take a closer look at it later today or this weekend.  I just
+wanted to make sure that we always defer to the appropriate maintainers
+first, and merge all through arm-soc as a last resort.
+
+> In any case, at this point I'd like first to have the ACK from Bjorn
+> Helgaas and Arnd Bergmann on the general approach.
+
+Of course.
+
+thx,
+
+Jason.
