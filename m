@@ -1,82 +1,102 @@
-From: wookey@wookware.org (Wookey)
-Date: Fri, 7 Jun 2013 19:57:24 +0100
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Jun 2013 20:59:40 +0200
 Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
  Uploading linux (3.9.4-1))
-In-Reply-To: <20130606172810.GE14209@lukather>
-References: <CAPweEDz=hFxXW3XF9CSNZpEFSjayb5an1E8Xze1_uQcCZONVxg@mail.gmail.com>
- <1370469574.18839.33.camel@localhost>
- <CAPweEDxMpeJc-w=Yd7d2OT=UisRBp2rxf-MPMDUCOG3EyJz1GQ@mail.gmail.com>
- <CAKON4OxwyV2f_iTEb5RnP_azc7EsSxPdku_TY5WLWxN7USiY1Q@mail.gmail.com>
- <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
+In-Reply-To: <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
  <1370475609.20454.44.camel@localhost>
  <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <CAKON4OxPDpN3BTc9GWP44exDSkAZGJ5OeCpUP37vRnnvxwUnmw@mail.gmail.com>
- <CAOesGMgqxhG45NyCfpHc_0uHS+_Gn-hGZm-+CRvK2EEf1AGTow@mail.gmail.com>
- <20130606172810.GE14209@lukather>
-Message-ID: <20130607185724.GZ14125@stoneboat.aleph1.co.uk>
+ <1733666.lHUBcfUXq9@flatron> <20130606112723.71ddd70c@skate>
+ <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
+Message-ID: <20130607205940.4816fed5@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+++ Maxime Ripard [2013-06-06 19:28 +0200]:
-> Hi everyone,
+Hello,
+
+On Fri, 7 Jun 2013 19:26:49 +0100, luke.leighton wrote:
+
+> > Have you noticed that it is already the case in mainline?
 > 
-> On Thu, Jun 06, 2013 at 09:00:00AM -0700, Olof Johansson wrote:
+>  i knew there was a little bit, but not the extent of the commits.
 
-> > Listen, Allwinner isn't working in a vacuum, believe it or not. I've
-> > talked to them, so has Arnd and other people working on ARM, including
-> > Maxime Ripard, who's been reimplementing upstream support for their
-> > platform. Everybody is interested in the right things happening, it's
-> > just a matter of figuring out how to do it. The right people are
-> > already talking.
+Then you could probably use a bit of your time to read the kernel
+commit logs rather than writing hundreds of e-mails, no?
+
+> > My colleague Maxime Ripard (Cc'ed)
 > 
-> I should also add that Allwinner not only talked to us already, but also
-> expressed interest in doing actual modern kernel development (like using
-> "recently" introduced kernel frameworks, like the clk framework).
+>  maxime: we need to talk :)
 > 
-> I've received patches from them already for private reviews, they began
-> to show up on the kernel mailing lists, they asked to be CCed on the
-> patches I send upstream, they're even the one that reached out to me
-> when the early support for their chips was released. So, like Olof said,
-> they aren't in a vacuum, they are very aware of the mainline kernel and
-> speak a decent english.
+>  please tell me in 4 or 5 sentences what you've managed to do so far,
+> expanding a little on what thomas says below, more specifically what
+> it achieves and/or allows rather than technically what it does
+> (suitable for managers and directors in other words), and what plans
+> you'd like to see happen.
 
-OK, this sounds good. Could you say who the allwinner engineers are? I
-guess it's quite a large organisation, so if Crazy Luke can say 'the
-work of mainline integration using device-tree is already being done
-by $these $people, please talk to them to help move it along', that
-might help get everyone on the same page.
+Maxime will reply to this in more details, but I believe the status is:
 
-If it's like many large organisations, some bits of it will 'get it'
-and see why, in the long term, mainline integration is worthwhile, but
-other bits will look at what they have now and their android focus,
-and decide it's easier to keep doing what they are doing. 
+ * Interrupt controller is working.
+ * Clock drivers are working.
+ * Pinctrl is working.
+ * GPIO is working.
+ * Timer is working.
+ * UART is working
+ * Watchdog is on its way (patches posted)
+ * Ethernet is on its way (patches posted)
+ * I2C is on its way (patches posted)
 
-There is a lot of hardware using these socs, and I'd love to be able
-to use that with mainstream stuff, rather than random vendor piles,
-and specific android kernels, so anything we can do to help make that
-happen is good.
+Cubieboard (A10), Hackberry (A10), Mini XPlus (A10) And OLinuxino (A13)
+are supported.
 
-> So yes, Allwinner has an evil vendor tree (c), with a solution similar yet
-> inferior (because not generic enough) to the device tree, but they show
-> interest on going down the mainline road.
+See arch/arm/boot/dts/sun{4,5}i* for a good overview.
 
-So, luke: mainline is not going to support fex directly, whatever you
-or allwinner do. The advantages to allwinner of working with mainline
-are:
-1) Ability to use whatever (kernel supported) hardware they like with
-new designs, with no driver work
-2) Ability to use latest kernels and thus whatever shiny goodies those
-include
-3) No need to do fex-ready drivers for new hardware
-4) No need to keep backporting new kernels to add fex integration
-forevermore
+> > All in mainline, completely Device Tree based.
+> 
+>  great.  which version did it first hit, i.e. what will the first
+> signs of this be when allwinner begin doing "git pulls"?
 
-If they want to keep existing tools and fex workflow then a fex<->DT
-translation tool will be needed. (It's not clear to me to what degree
-DT can simply be used instead directly)
+The very first support landed in 3.8.
 
+> > So isn't this entire discussion completely moot?
+> 
+>  no because it's totally in isolation from allwinner.  i need to give
+> them a heads-up, and get them involved, giving them specific
+> incentives [which nobody's yet given!!] for following a particular
+> path [or paths] yet to be recommended.
 
-Wookey
+You really believe you're more important than you really are, I'd say.
+
+My colleague Maxime is in contact with Allwinner, he has regular
+discussion with them, started reviewing some of the kernel code they're
+writing, has received datasheets from them, and evaluation boards.
+
+So this work is definitely not done in isolation from Allwinner, and
+they have received much more than an heads-up from Maxime.
+
+> > The mainline support
+> > for sunxi has already started since 6 months or so, and has been Device
+> > Tree based from day one.
+> 
+> to clarify: the *community-driven* mainline support for sunxi.  ok -
+> which chips?  sun3i (ARM9), sun4i (Cortex A8), sun5i, sun6i and sun7i
+> (Dual-Core Cortex A7)?  which ones are in?
+
+So far, A10 and A13. Maxime has received a A31 evaluation board from
+Allwinner very recently, and also A10S and A20 boards. I suppose he
+will be working on those fairly and posting the corresponding patches
+fairly soon.
+
+In other words, it looks like you've started an entire discussion about
+the mainline support for Allwinner SoCs without having a look at what
+"git log" tells you... Which by itself is a very good indicator that
+you're probably not the best interlocutor for Allwinner as far as
+mainline development is concerned.
+
+Best regards,
+
+Thomas Petazzoni
 -- 
-Principal hats:  Linaro, Emdebian, Wookware, Balloonboard, ARM
-http://wookware.org/
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
