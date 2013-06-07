@@ -1,77 +1,47 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Fri, 07 Jun 2013 18:24:07 +0900
-Subject: [PATCH V3 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-Message-ID: <000f01ce6360$c29c3370$47d49a50$@samsung.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Fri, 7 Jun 2013 17:30:41 +0800
+Subject: [PATCH v2 3/6] clk: divider: add CLK_DIVIDER_HIWORD_MASK flag
+In-Reply-To: <CACRpkdZJmUQPiZrkzpNP2kc=3opDtwju5W1i4Z8wtYBbbmnidQ@mail.gmail.com>
+References: <1370358317-12768-1-git-send-email-haojian.zhuang@linaro.org>
+ <1370358317-12768-4-git-send-email-haojian.zhuang@linaro.org>
+ <CACRpkdZJmUQPiZrkzpNP2kc=3opDtwju5W1i4Z8wtYBbbmnidQ@mail.gmail.com>
+Message-ID: <CAD6h2NSSDy+d8U_ccHq4vmGhQ7Z-J5s+z=yNUgjZVYvwiYtkfg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5440 has two PCIe controllers which can be used as root complex
-for PCIe interface.
+On 7 June 2013 17:15, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Jun 4, 2013 at 5:05 PM, Haojian Zhuang
+> <haojian.zhuang@linaro.org> wrote:
+>
+>> In Hisilicon Hi3620 clock divider register, 16-bit HIWORD is mask field.
+>> Support the HIWORD mask to reuse clock divider driver.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>
+> I don't understand this...
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
- arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++++
- arch/arm/boot/dts/exynos5440.dtsi         |   32 +++++++++++++++++++++++++++++
- 2 files changed, 40 insertions(+)
+The mux or divider register in Hi3620 is 32-bit. The lower 16-bit is used to
+configure mux or divider, and the higher 16-bit is used to set mask of
+the mux or divier.
 
-diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-index d55042b..efe7d39 100644
---- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-@@ -30,4 +30,12 @@
- 			clock-frequency = <50000000>;
- 		};
- 	};
-+
-+	pcie0 at 40000000 {
-+		reset-gpio = <5>;
-+	};
-+
-+	pcie1 at 60000000 {
-+		reset-gpio = <22>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index f6b1c89..ea37e94 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -216,4 +216,36 @@
- 		clock-names = "rtc";
- 		status = "disabled";
- 	};
-+
-+	pcie0 at 40000000 {
-+		compatible = "samsung,exynos5440-pcie";
-+		reg = <0x40000000 0x4000
-+			0x290000 0x1000
-+			0x270000 0x1000
-+			0x271000 0x40>;
-+		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		bus-range = <0x0 0xf>;
-+		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-+			  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
-+			  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
-+	};
-+
-+	pcie1 at 60000000 {
-+		compatible = "samsung,exynos5440-pcie";
-+		reg = <0x60000000 0x4000
-+			0x2a0000 0x1000
-+			0x272000 0x1000
-+			0x271040 0x40>;
-+		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		bus-range = <0x0 0xf>;
-+		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00200000   /* configuration space */
-+			  0x81000000 0 0	  0x60200000 0 0x00004000   /* downstream I/O */
-+			  0x82000000 0 0	  0x60204000 0 0x10000000>; /* non-prefetchable memory */
-+	};
- };
--- 
-1.7.10.4
+If I need to set b01 in mux/divider register, I also need to set (b11 << 16) for
+HIWORD mask in the same register. The reason to set (b11 << 16) is two bits
+are changed in the mux/divider register.
+
+>
+>> + * CLK_DIVIDER_HIWORD_MASK - register contains high 16-bit as mask field
+>
+> Could you be a bit more verbose here on what this actually means,
+> so other users of this flag will realize if they need to set it?
+>
+I didn't find a better name for this flag. :(
+
+> In other cases in the clk subsystem where masks and shifts are
+> used, the position and number of bits are stated, rather than a
+> single flag indicating some 16 bits.
+>
+Those masks are different from mine because those're used to calculate
+which bits should be set or clear.
+
+Regards
+Haojian
