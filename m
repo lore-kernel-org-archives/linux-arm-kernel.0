@@ -1,50 +1,103 @@
-From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 7 Jun 2013 14:06:21 +0200
-Subject: [PATCH V2 0/4] ARM: dts: omap5: Cleanup and updates for DT files
-In-Reply-To: <1370540919-4339-1-git-send-email-r.sricharan@ti.com>
-References: <1370540919-4339-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <51B1CCBD.5080904@ti.com>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Fri, 07 Jun 2013 06:19:09 -0600
+Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
+In-Reply-To: <20130607121505.21868.72360.stgit@dusk.lan>
+References: <20130607121505.21868.72360.stgit@dusk.lan>
+Message-ID: <20130607121901.21868.65416.stgit@dusk.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2013 07:48 PM, Sricharan R wrote:
-> uevm is the official board supported for OMAP5 soc in the mainline.
-> This series renames the board dts file for OMAP5 accordingly and cleans
-> up the same. Also a few additional device DT entry updates are done.
-> 
-> This is on top of the below branch
->     git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
->     for_3.11/dts
+Add DFLL DVCO reset line control functions to the CAR IP block driver.
 
-Could you update your branch before reposting, I pulled a Makefile fix
-for AM5xx that prevents your patches to be applied properly.
+The DVCO present in the DFLL IP block has a separate reset line,
+exposed via the CAR IP block.  This reset line is asserted upon SoC
+reset.  Unless something (such as the DFLL driver) deasserts this
+line, the DVCO will not oscillate, although reads and writes to the
+DFLL IP block will complete.
 
-Thanks,
-Benoit
+Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
+saving hours of debugging time.
 
-> 
-> Boot tested on omap5-uevm after pulling in the data from below place
->     git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git
->     HWMOD DATA: for_3.11/omap5_data_files
->     CLOCK DATA: out_of_tree/omap5_clk_data
-> 
-> Dan Murphy (1):
->   ARM: dts: omap5-uevm: Add LED support for uEVM blue LED
-> 
-> Roger Quadros (1):
->   ARM: dts: omap5-uevm: Add USB Host support
-> 
-> Sourav Poddar (1):
->   ARM: dts: omap5-uevm: Add uart pinctrl data
-> 
-> Sricharan R (1):
->   ARM: dts: omap5: Rename omap5-evm to omap5-uevm
-> 
->  arch/arm/boot/dts/Makefile       |    2 +-
->  arch/arm/boot/dts/omap5-evm.dts  |  261 --------------------------------
->  arch/arm/boot/dts/omap5-uevm.dts |  311 ++++++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/omap5.dtsi     |   30 ++++
->  4 files changed, 342 insertions(+), 262 deletions(-)
->  delete mode 100644 arch/arm/boot/dts/omap5-evm.dts
->  create mode 100644 arch/arm/boot/dts/omap5-uevm.dts
-> 
+Signed-off-by: Paul Walmsley <pwalmsley@nvidia.com>
+Cc: Aleksandr Frid <afrid@nvidia.com>
+Cc: Peter De Schrijver <pdeschrijver@nvidia.com>
+---
+ drivers/clk/tegra/clk-tegra114.c |   37 +++++++++++++++++++++++++++++++++++++
+ drivers/clk/tegra/clk.h          |    2 ++
+ 2 files changed, 39 insertions(+)
+
+diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+index b35c78d..4ab15e3 100644
+--- a/drivers/clk/tegra/clk-tegra114.c
++++ b/drivers/clk/tegra/clk-tegra114.c
+@@ -29,6 +29,7 @@
+ #define RST_DEVICES_L			0x004
+ #define RST_DEVICES_H			0x008
+ #define RST_DEVICES_U			0x00C
++#define RST_DFLL_DVCO			0x2F4
+ #define RST_DEVICES_V			0x358
+ #define RST_DEVICES_W			0x35C
+ #define RST_DEVICES_X			0x28C
+@@ -47,6 +48,9 @@
+ #define CPU_FINETRIM_R			0x4e4	/* rise->rise prop dly inc A */
+ #define RST_DEVICES_NUM			5
+ 
++/* RST_DFLL_DVCO bitfields */
++#define DVFS_DFLL_RESET_SHIFT		0
++
+ /* CPU_FINETRIM_SELECT and CPU_FINETRIM_DR bitfields */
+ #define CPU_FINETRIM_1_FCPU_1		BIT(0)	/* fcpu0 */
+ #define CPU_FINETRIM_1_FCPU_2		BIT(1)	/* fcpu1 */
+@@ -2183,6 +2187,39 @@ void tegra114_clock_tune_cpu_trimmers_init(void)
+ }
+ EXPORT_SYMBOL(tegra114_clock_tune_cpu_trimmers_init);
+ 
++/**
++ * tegra114_clock_assert_dfll_dvco_reset - assert the DFLL's DVCO reset
++ *
++ * Assert the reset line of the DFLL's DVCO.  No return value.
++ */
++void tegra114_clock_assert_dfll_dvco_reset(void)
++{
++	u32 v;
++
++	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
++	v |= (1 << DVFS_DFLL_RESET_SHIFT);
++	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
++	tegra114_car_barrier();
++}
++EXPORT_SYMBOL(tegra114_clock_assert_dfll_dvco_reset);
++
++/**
++ * tegra114_clock_deassert_dfll_dvco_reset - deassert the DFLL's DVCO reset
++ *
++ * Deassert the reset line of the DFLL's DVCO, allowing the DVCO to
++ * operate.  No return value.
++ */
++void tegra114_clock_deassert_dfll_dvco_reset(void)
++{
++	u32 v;
++
++	v = readl_relaxed(clk_base + RST_DFLL_DVCO);
++	v &= ~(1 << DVFS_DFLL_RESET_SHIFT);
++	writel_relaxed(v, clk_base + RST_DFLL_DVCO);
++	tegra114_car_barrier();
++}
++EXPORT_SYMBOL(tegra114_clock_deassert_dfll_dvco_reset);
++
+ static void __init tegra114_clock_init(struct device_node *np)
+ {
+ 	struct device_node *node;
+diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+index c0b72fc..c2d84a1 100644
+--- a/drivers/clk/tegra/clk.h
++++ b/drivers/clk/tegra/clk.h
+@@ -574,6 +574,8 @@ void tegra_init_dup_clks(struct tegra_clk_duplicate *dup_list,
+ void tegra114_clock_tune_cpu_trimmers_high(void);
+ void tegra114_clock_tune_cpu_trimmers_low(void);
+ void tegra114_clock_tune_cpu_trimmers_init(void);
++void tegra114_clock_assert_dfll_dvco_reset(void);
++void tegra114_clock_deassert_dfll_dvco_reset(void);
+ 
+ typedef void (*tegra_clk_apply_init_table_func)(void);
+ extern tegra_clk_apply_init_table_func tegra_clk_apply_init_table;
