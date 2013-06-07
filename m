@@ -1,329 +1,63 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 17:30:18 +0200
-Subject: [RFC PATCH 20/50] ARM: at91: move at91sam9x5 SoCs to new at91 clk
- implem
-In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370619018-18756-1-git-send-email-b.brezillon@overkiz.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 7 Jun 2013 17:32:35 +0200 (CEST)
+Subject: [PATCH 2/2] ARM: shmobile: sdhi: remove DMA hardware dependencies
+In-Reply-To: <201306071653.21668.arnd@arndb.de>
+References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
+ <2024464.67s93nOUnz@wuerfel>
+ <Pine.LNX.4.64.1306071507060.11277@axis700.grange>
+ <201306071653.21668.arnd@arndb.de>
+Message-ID: <Pine.LNX.4.64.1306071659290.11277@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes all references to the old at91 clks for at91sam9x5 SoCs.
-These SoCs only supports dt boards: we can remove register_clocks
-(all clocks are defined in dt).
+On Fri, 7 Jun 2013, Arnd Bergmann wrote:
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> On Friday 07 June 2013, Guennadi Liakhovetski wrote:
+> > > I think that is a flaw in the dmaengine driver. I don't actually know how
+> > > any dma-engine driver could use dmaengine_slave_config to pick the request
+> > > line, since that is something the driver should not know at the time
+> > > it calls dmaengine_slave_config().
+> > > 
+> > > It's probably best to change the shdma driver to just ignore the slave_id
+> > > value in slave_config, like most other drivers to.
+> > 
+> > This is how shdma driver used to work. We used to pass the slave ID (DMA 
+> > request line ID) to shdma from clients from the filter. This was 
+> > considered bad and we were asked to switch to using 
+> > dmaengine_slave_config(), which is the current preferred API, IIUC.
+> 
+> I think you misunderstood the requirement. All other configuration,
+> i.e. slave port address, burst size, bus width, really should be
+> configured using dmaengine_slave_config, since this is data that
+> is known by the /driver/, independent of the DMA engine in use and
+> unknown to the platform. The request line number is something that
+> the driver cannot know, since it is a property of the DMA engine.
+
+Isn't it a board property? In case of external devices, or an SoC property 
+in case of integrated DMA slave and controller? Let me try to explain. The 
+DMAC has to configure the controller to "link" a specific DMA channel to a 
+slave request line. E.g. to link an internal channel #0 to SDHI0 tx. To do 
+this it has to write specific "magic" values in certain DMAC registers. 
+Those values aren't known to the DMAC driver, they are a property of the 
+SoC. Let's say, the SoC has 3 DMAC instances, each of them can serve any 
+of compatible DMA slaves, including SDHI0, on each of their 6 channels. To 
+configure a channel on a DMAC instance for SDHI0 tx you have to write to 
+that channel's config register a certain value, that cannot be calculated. 
+
+Those values are only known to the SoC code, so, they are passed as 
+platform parameters to the DMAC driver. Now, when SDHI0 asks DMAC to set 
+up a DMA channel for its tx, the DMAC driver has to find that value in its 
+platform data. In most cases you could use the client address (e.g. FIFO 
+register) and direction to find that value. But, I think, that might not 
+always be enough. So, we use unique enum values to find those values in 
+DMAC platform data. The SDHI driver gets that enum value in its platform 
+data, passes it to the DMAC driver as a slave ID, and the DMAC driver uses 
+it to find the value(s), it needs to set up its DMA channel. Do you see a 
+better way to do the same?
+
+Thanks
+Guennadi
 ---
- arch/arm/mach-at91/at91sam9x5.c |  289 ---------------------------------------
- 1 file changed, 289 deletions(-)
-
-diff --git a/arch/arm/mach-at91/at91sam9x5.c b/arch/arm/mach-at91/at91sam9x5.c
-index 83fc6b3..583a3d5 100644
---- a/arch/arm/mach-at91/at91sam9x5.c
-+++ b/arch/arm/mach-at91/at91sam9x5.c
-@@ -19,297 +19,9 @@
- #include "board.h"
- #include "soc.h"
- #include "generic.h"
--#include "clock.h"
- #include "sam9_smc.h"
- 
- /* --------------------------------------------------------------------
-- *  Clocks
-- * -------------------------------------------------------------------- */
--
--/*
-- * The peripheral clocks.
-- */
--static struct clk pioAB_clk = {
--	.name		= "pioAB_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_PIOAB,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pioCD_clk = {
--	.name		= "pioCD_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_PIOCD,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk smd_clk = {
--	.name		= "smd_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_SMD,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart0_clk = {
--	.name		= "usart0_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_USART0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart1_clk = {
--	.name		= "usart1_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_USART1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk usart2_clk = {
--	.name		= "usart2_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_USART2,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* USART3 clock - Only for sam9g25/sam9x25 */
--static struct clk usart3_clk = {
--	.name		= "usart3_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_USART3,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk twi0_clk = {
--	.name		= "twi0_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_TWI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk twi1_clk = {
--	.name		= "twi1_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_TWI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk twi2_clk = {
--	.name		= "twi2_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_TWI2,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk mmc0_clk = {
--	.name		= "mci0_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_MCI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk spi0_clk = {
--	.name		= "spi0_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_SPI0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk spi1_clk = {
--	.name		= "spi1_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_SPI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk uart0_clk = {
--	.name		= "uart0_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_UART0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk uart1_clk = {
--	.name		= "uart1_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_UART1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk tcb0_clk = {
--	.name		= "tcb0_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_TCB,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk pwm_clk = {
--	.name		= "pwm_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_PWM,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk adc_clk = {
--	.name		= "adc_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_ADC,
--	.type	= CLK_TYPE_PERIPHERAL,
--};
--static struct clk adc_op_clk = {
--	.name		= "adc_op_clk",
--	.type		= CLK_TYPE_PERIPHERAL,
--	.rate_hz	= 5000000,
--};
--static struct clk dma0_clk = {
--	.name		= "dma0_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_DMA0,
--	.type	= CLK_TYPE_PERIPHERAL,
--};
--static struct clk dma1_clk = {
--	.name		= "dma1_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_DMA1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk uhphs_clk = {
--	.name		= "uhphs",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_UHPHS,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk udphs_clk = {
--	.name		= "udphs_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_UDPHS,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* emac0 clock - Only for sam9g25/sam9x25/sam9g35/sam9x35 */
--static struct clk macb0_clk = {
--	.name		= "pclk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_EMAC0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* lcd clock - Only for sam9g15/sam9g35/sam9x35 */
--static struct clk lcdc_clk = {
--	.name		= "lcdc_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_LCDC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* isi clock - Only for sam9g25 */
--static struct clk isi_clk = {
--	.name		= "isi_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_ISI,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk mmc1_clk = {
--	.name		= "mci1_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_MCI1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* emac1 clock - Only for sam9x25 */
--static struct clk macb1_clk = {
--	.name		= "pclk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_EMAC1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--static struct clk ssc_clk = {
--	.name		= "ssc_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_SSC,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* can0 clock - Only for sam9x35 */
--static struct clk can0_clk = {
--	.name		= "can0_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_CAN0,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--/* can1 clock - Only for sam9x35 */
--static struct clk can1_clk = {
--	.name		= "can1_clk",
--	.pmc_mask	= 1 << AT91SAM9X5_ID_CAN1,
--	.type		= CLK_TYPE_PERIPHERAL,
--};
--
--static struct clk *periph_clocks[] __initdata = {
--	&pioAB_clk,
--	&pioCD_clk,
--	&smd_clk,
--	&usart0_clk,
--	&usart1_clk,
--	&usart2_clk,
--	&twi0_clk,
--	&twi1_clk,
--	&twi2_clk,
--	&mmc0_clk,
--	&spi0_clk,
--	&spi1_clk,
--	&uart0_clk,
--	&uart1_clk,
--	&tcb0_clk,
--	&pwm_clk,
--	&adc_clk,
--	&adc_op_clk,
--	&dma0_clk,
--	&dma1_clk,
--	&uhphs_clk,
--	&udphs_clk,
--	&mmc1_clk,
--	&ssc_clk,
--	// irq0
--};
--
--static struct clk_lookup periph_clocks_lookups[] = {
--	/* lookup table for DT entries */
--	CLKDEV_CON_DEV_ID("usart", "fffff200.serial", &mck),
--	CLKDEV_CON_DEV_ID("usart", "f801c000.serial", &usart0_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8020000.serial", &usart1_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8024000.serial", &usart2_clk),
--	CLKDEV_CON_DEV_ID("usart", "f8028000.serial", &usart3_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "f8008000.timer", &tcb0_clk),
--	CLKDEV_CON_DEV_ID("t0_clk", "f800c000.timer", &tcb0_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f0008000.mmc", &mmc0_clk),
--	CLKDEV_CON_DEV_ID("mci_clk", "f000c000.mmc", &mmc1_clk),
--	CLKDEV_CON_DEV_ID("dma_clk", "ffffec00.dma-controller", &dma0_clk),
--	CLKDEV_CON_DEV_ID("dma_clk", "ffffee00.dma-controller", &dma1_clk),
--	CLKDEV_CON_DEV_ID("pclk", "f0010000.ssc", &ssc_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f8010000.i2c", &twi0_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f8014000.i2c", &twi1_clk),
--	CLKDEV_CON_DEV_ID(NULL, "f8018000.i2c", &twi2_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "f0000000.spi", &spi0_clk),
--	CLKDEV_CON_DEV_ID("spi_clk", "f0004000.spi", &spi1_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff400.gpio", &pioAB_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff600.gpio", &pioAB_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffff800.gpio", &pioCD_clk),
--	CLKDEV_CON_DEV_ID(NULL, "fffffa00.gpio", &pioCD_clk),
--	/* additional fake clock for macb_hclk */
--	CLKDEV_CON_DEV_ID("hclk", "f802c000.ethernet", &macb0_clk),
--	CLKDEV_CON_DEV_ID("hclk", "f8030000.ethernet", &macb1_clk),
--	CLKDEV_CON_DEV_ID("hclk", "600000.ohci", &uhphs_clk),
--	CLKDEV_CON_DEV_ID("ohci_clk", "600000.ohci", &uhphs_clk),
--	CLKDEV_CON_DEV_ID("ehci_clk", "700000.ehci", &uhphs_clk),
--};
--
--/*
-- * The two programmable clocks.
-- * You must configure pin multiplexing to bring these signals out.
-- */
--static struct clk pck0 = {
--	.name		= "pck0",
--	.pmc_mask	= AT91_PMC_PCK0,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 0,
--};
--static struct clk pck1 = {
--	.name		= "pck1",
--	.pmc_mask	= AT91_PMC_PCK1,
--	.type		= CLK_TYPE_PROGRAMMABLE,
--	.id		= 1,
--};
--
--static void __init at91sam9x5_register_clocks(void)
--{
--	int i;
--
--	for (i = 0; i < ARRAY_SIZE(periph_clocks); i++)
--		clk_register(periph_clocks[i]);
--
--	clkdev_add_table(periph_clocks_lookups,
--			 ARRAY_SIZE(periph_clocks_lookups));
--
--	if (cpu_is_at91sam9g25()
--	|| cpu_is_at91sam9x25())
--		clk_register(&usart3_clk);
--
--	if (cpu_is_at91sam9g25()
--	|| cpu_is_at91sam9x25()
--	|| cpu_is_at91sam9g35()
--	|| cpu_is_at91sam9x35())
--		clk_register(&macb0_clk);
--
--	if (cpu_is_at91sam9g15()
--	|| cpu_is_at91sam9g35()
--	|| cpu_is_at91sam9x35())
--		clk_register(&lcdc_clk);
--
--	if (cpu_is_at91sam9g25())
--		clk_register(&isi_clk);
--
--	if (cpu_is_at91sam9x25())
--		clk_register(&macb1_clk);
--
--	if (cpu_is_at91sam9x25()
--	|| cpu_is_at91sam9x35()) {
--		clk_register(&can0_clk);
--		clk_register(&can1_clk);
--	}
--
--	clk_register(&pck0);
--	clk_register(&pck1);
--}
--
--/* --------------------------------------------------------------------
-  *  AT91SAM9x5 processor initialization
-  * -------------------------------------------------------------------- */
- 
-@@ -324,5 +36,4 @@ static void __init at91sam9x5_map_io(void)
- 
- AT91_SOC_START(at91sam9x5)
- 	.map_io = at91sam9x5_map_io,
--	.register_clocks = at91sam9x5_register_clocks,
- AT91_SOC_END
--- 
-1.7.9.5
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
