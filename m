@@ -1,26 +1,39 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 7 Jun 2013 23:20:51 +0100
-Subject: [PATCH] ARM: mach-imx6q: Enable the codec clock earlier
-In-Reply-To: <1370642870-8051-1-git-send-email-festevam@gmail.com>
-References: <1370642870-8051-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130607222051.GD18614@n2100.arm.linux.org.uk>
+Date: Fri, 7 Jun 2013 23:38:19 +0100
+Subject: [PATCH] ARM: KVM: perform save/restore of PAR
+In-Reply-To: <1370627593-28882-1-git-send-email-marc.zyngier@arm.com>
+References: <1370627593-28882-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20130607223819.GE18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 07:07:50PM -0300, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@freescale.com>
-> 
-> In order sgtl5000 driver to probe successfully, we need to read its ID via I2C 
-> ,which requires that MCLK is driven prior to the I2C access.
-> 
-> Otherwise we get the following probe error:
-> 
-> sgtl5000: probe of 0-000a failed with error -5
-> imx-sgtl5000 sound.13: ASoC: CODEC (null) not registered
-> imx-sgtl5000 sound.13: snd_soc_register_card failed (-517)
-> platform sound.13: Driver imx-sgtl5000 requests probe deferral
-> 
-> Turn on MCLK sooner so that the probe can succeed.
+On Fri, Jun 07, 2013 at 06:53:13PM +0100, Marc Zyngier wrote:
+> @@ -37,16 +37,18 @@
+>  #define c5_AIFSR	15	/* Auxilary Instrunction Fault Status R */
+>  #define c6_DFAR		16	/* Data Fault Address Register */
+>  #define c6_IFAR		17	/* Instruction Fault Address Register */
+> -#define c9_L2CTLR	18	/* Cortex A15 L2 Control Register */
+> -#define c10_PRRR	19	/* Primary Region Remap Register */
+> -#define c10_NMRR	20	/* Normal Memory Remap Register */
+> -#define c12_VBAR	21	/* Vector Base Address Register */
+> -#define c13_CID		22	/* Context ID Register */
+> -#define c13_TID_URW	23	/* Thread ID, User R/W */
+> -#define c13_TID_URO	24	/* Thread ID, User R/O */
+> -#define c13_TID_PRIV	25	/* Thread ID, Privileged */
+> -#define c14_CNTKCTL	26	/* Timer Control Register (PL1) */
+> -#define NR_CP15_REGS	27	/* Number of regs (incl. invalid) */
+> +#define c7_PAR		18	/* Physical Address Register */
+> +#define c7_PAR_high	19	/* PAR top 32 bits */
+> +#define c9_L2CTLR	20	/* Cortex A15 L2 Control Register */
+> +#define c10_PRRR	21	/* Primary Region Remap Register */
+> +#define c10_NMRR	22	/* Normal Memory Remap Register */
+> +#define c12_VBAR	23	/* Vector Base Address Register */
+> +#define c13_CID		24	/* Context ID Register */
+> +#define c13_TID_URW	25	/* Thread ID, User R/W */
+> +#define c13_TID_URO	26	/* Thread ID, User R/O */
+> +#define c13_TID_PRIV	27	/* Thread ID, Privileged */
+> +#define c14_CNTKCTL	28	/* Timer Control Register (PL1) */
+> +#define NR_CP15_REGS	29	/* Number of regs (incl. invalid) */
 
-Umm... doesn't that mean that imx-sgtl5000 should be getting this clock
-and turning it on itself, and disabling it on device removal?
+Umm, the fact that you've just had to renumber everything above 17
+suggests that maybe this should have been an enum?
