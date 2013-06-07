@@ -1,77 +1,58 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 07 Jun 2013 09:59:14 -0700
-Subject: [PATCH v2 3/3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ
- line
-In-Reply-To: <20130606234201.GA26919@kahuna> (Nishanth Menon's message of
- "Thu, 6 Jun 2013 18:42:01 -0500")
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370561253-15523-1-git-send-email-khilman@linaro.org>
- <20130606234201.GA26919@kahuna>
-Message-ID: <87fvwtn9gd.fsf@linaro.org>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Jun 2013 19:00:58 +0200
+Subject: [PATCH v2 0/8] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <20130607150814.GU23859@titan.lakedaemon.net>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130606185110.GP23859@titan.lakedaemon.net>
+ <20130607102304.3c42773b@skate>
+ <20130607150814.GU23859@titan.lakedaemon.net>
+Message-ID: <20130607190058.112d8d4a@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nishanth Menon <nm@ti.com> writes:
+Dear Jason Cooper,
 
-> On 16:27-20130606, Kevin Hilman wrote:
->> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
->> SYS_NIRQ line on OMAP.  Add another DTS include file
->> (twl4030_omap3_mux.dtsi) for boards that hook up the twl4030 this way
->> to include.
->> 
->> This allows RTC wake from off-mode to work again on OMAP3-based
->> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
->> 3530/Overo, 3730/Overo-STORM.
->> 
->> Special thanks to Florian Vaussard for suggesting use of preprocessor
->> feature.
->> 
->> Cc: Florian Vaussard <florian.vaussard@epfl.ch>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->> ---
->> v2: Updated to change board files instead of twl4030 file.
->> 
->>  arch/arm/boot/dts/omap3-beagle-xm.dts    |  1 +
->>  arch/arm/boot/dts/omap3-beagle.dts       |  1 +
->>  arch/arm/boot/dts/omap3-devkit8000.dts   |  1 +
->>  arch/arm/boot/dts/omap3-evm.dts          |  1 +
->>  arch/arm/boot/dts/omap3-igep.dtsi        |  1 +
->>  arch/arm/boot/dts/omap3-overo.dtsi       |  1 +
->>  arch/arm/boot/dts/omap3430-sdp.dts       |  1 +
->>  arch/arm/boot/dts/twl4030_omap3_mux.dtsi | 17 +++++++++++++++++
-> minor comment:
-> can we do twl4030_omap3 instead? That way, I can add in twl4030 VP
-> specific parameters which are OMAP3 specific?
+On Fri, 7 Jun 2013 11:08:14 -0400, Jason Cooper wrote:
 
-Good idea, I'll rename it to twl4030_omap3.dtsi
+> > 1-3 through Bjorn, 4-5 through tglx, 6-8 through you.
+> > 
+> > The only problem that I see is that 'irqchip: armada-370-xp: implement
+> > MSI support' (which goes through tglx) has a build dependency on 'PCI:
+> > Add registry of MSI chips' (which goes through Bjorn). This is due to
+> > the IRQ controller using the msi_chip_add() function that is introduced
+> > earlier in the PCI core.
+> 
+> Yeah, that's what I was afraid of...
+> 
+> > How would you solve that?
+> 
+> Let me take a closer look at it later today or this weekend.  I just
+> wanted to make sure that we always defer to the appropriate maintainers
+> first, and merge all through arm-soc as a last resort.
 
-[...]
+Now that I think of it, there is no problem in fact. Until you apply the
+patch 'arm: mvebu: indicate that this platform supports MSI', which
+modifies Kconfig to say that mvebu supports MSI, there is no way for
+the user to enable CONFIG_PCI_MSI.
 
->> diff --git a/arch/arm/boot/dts/twl4030_omap3_mux.dtsi b/arch/arm/boot/dts/twl4030_omap3_mux.dtsi
->> new file mode 100644
->> index 0000000..1bd0f9f
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/twl4030_omap3_mux.dtsi
->> @@ -0,0 +1,17 @@
-> some license text?
+And since in the IRQ controller driver the MSI code is inside a #ifdef
+CONFIG_PCI_MSI, this driver will build perfectly fine, as long as 'arm:
+mvebu: indicate that this platform supports MSI' is not merged before
+'PCI: Add registry of MSI chips'.
 
-oops
+So we can perfectly let Bjorn take the three PCI patches, tglx take the
+two IRQ controller patches, and you take the ARM stuff. The only thing
+is that the ARM stuff should not surface until both the PCI patches and
+the IRQ controller patches have landed in mainline.
 
->> +&twl {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&twl4030_pins>;
->> +};
->> +
->> +&omap3_pmx_core {
->> +	/*
->> +	 * On most OMAP3 platforms, the twl4030 IRQ line is connected
->> +         * to the SYS_NIRQ line on OMAP.  Therefore, configure the
->> +         * defaults for the SYS_NIRQ pin here.
-> ^^^ tab?
+But well, before even thinking of merging all this, I'd like to hear
+from Bjorn about what he thinks of those patches.
 
-good catch.
+Thanks!
 
-Thanks for the review, will make the changes and resubmit.
-
-Kevin
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
