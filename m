@@ -1,181 +1,66 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 7 Jun 2013 18:52:47 +0530
-Subject: [PATCH V3 1/4] ARM: dts: omap5: Make uevm as the official board and
- deprecate sevm support
+Date: Fri, 7 Jun 2013 18:52:49 +0530
+Subject: [PATCH V3 3/4] ARM: dts: omap5-uevm: Add LED support for uEVM blue LED
 In-Reply-To: <1370611370-14715-1-git-send-email-r.sricharan@ti.com>
 References: <1370611370-14715-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <1370611370-14715-2-git-send-email-r.sricharan@ti.com>
+Message-ID: <1370611370-14715-4-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The uevm is the only official board supported for the OMAP5 soc
-in mainline. The existent sevm platform will no more be supported.
-Hence cleaning up the board dts file to have only the data
-required for uevm.
+From: Dan Murphy <dmurphy@ti.com>
 
-Renaming the board dts file and adding the following cleanups.
+Add support for blue LED 1 off of GPIO 153.
+Make the LED a heartbeat LED
+Configure the MUX for GPIO output.
 
- * There are no devices connected on I2C 2,3,4 buses. So remove
-   the pinmux data for the same.
-
- * OMAP5432 and DDR3 memory is used in the uevm. Temperature polling
-   is not supported with DDR3 memories. Because of DDR3 phy limitation
-   the voltage change across DVFS and all shadow registers for DVFS on
-   DDR3 is not supported. Hence the emif kernel driver is not required,
-   so removing the DDR3 device file and emif nodes for uevm.
-
- * Keypad is not supported on uevm. So remove the device node.
-
+Cc: Dan Murphy <dmurphy@ti.com>
+Signed-off-by: Dan Murphy <dmurphy@ti.com>
+[Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
 Signed-off-by: Sricharan R <r.sricharan@ti.com>
 ---
- [V3] Rebased on top of Benoit's latest tip and improved the subject, changelog
+ arch/arm/boot/dts/omap5-uevm.dts |   16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
- arch/arm/boot/dts/Makefile                         |    2 +-
- .../arm/boot/dts/{omap5-evm.dts => omap5-uevm.dts} |   83 +-------------------
- 2 files changed, 4 insertions(+), 81 deletions(-)
- rename arch/arm/boot/dts/{omap5-evm.dts => omap5-uevm.dts} (73%)
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bd388b1..8e50761 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -150,7 +150,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	omap4-var-som.dtb \
- 	omap4-sdp.dtb \
- 	omap4-sdp-es23plus.dtb \
--	omap5-evm.dtb \
-+	omap5-uevm.dtb \
- 	am335x-evm.dtb \
- 	am335x-evmsk.dtb \
- 	am335x-bone.dtb \
-diff --git a/arch/arm/boot/dts/omap5-evm.dts b/arch/arm/boot/dts/omap5-uevm.dts
-similarity index 73%
-rename from arch/arm/boot/dts/omap5-evm.dts
-rename to arch/arm/boot/dts/omap5-uevm.dts
-index 22e9ee8..843a001 100644
---- a/arch/arm/boot/dts/omap5-evm.dts
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index a31e42f..6e8bb86 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
 +++ b/arch/arm/boot/dts/omap5-uevm.dts
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -8,11 +8,10 @@
- /dts-v1/;
- 
- #include "omap5.dtsi"
--#include "samsung_k3pe0e000b.dtsi"
- 
- / {
--	model = "TI OMAP5 EVM board";
--	compatible = "ti,omap5-evm", "ti,omap5";
-+	model = "TI OMAP5 uEVM board";
-+	compatible = "ti,omap5-uevm", "ti,omap5";
- 
- 	memory {
- 		device_type = "memory";
-@@ -88,27 +87,6 @@
- 		>;
+@@ -59,6 +59,15 @@
+ 		reset-supply = <&hsusb3_reset>;
  	};
  
--	i2c2_pins: pinmux_i2c2_pins {
--		pinctrl-single,pins = <
--			0x178 (PIN_INPUT | MUX_MODE0)		/* i2c2_scl */
--			0x17a (PIN_INPUT | MUX_MODE0)		/* i2c2_sda */
--		>;
--	};
--
--	i2c3_pins: pinmux_i2c3_pins {
--		pinctrl-single,pins = <
--			0x13a (PIN_INPUT | MUX_MODE0)		/* i2c3_scl */
--			0x13c (PIN_INPUT | MUX_MODE0)		/* i2c3_sda */
--		>;
--	};
--
--	i2c4_pins: pinmux_i2c4_pins {
--		pinctrl-single,pins = <
--			0xb8 (PIN_INPUT | MUX_MODE0)		/* i2c4_scl */
--			0xba (PIN_INPUT | MUX_MODE0)		/* i2c4_sda */
--		>;
--	};
--
- 	i2c5_pins: pinmux_i2c5_pins {
- 		pinctrl-single,pins = <
- 			0x184 (PIN_INPUT | MUX_MODE0)		/* i2c5_scl */
-@@ -175,39 +153,6 @@
- 	clock-frequency = <400000>;
++	leds {
++		compatible = "gpio-leds";
++		led at 1 {
++			label = "omap5:blue:usr1";
++			gpios = <&gpio5 25 GPIO_ACTIVE_HIGH>; /* gpio5_153 D1 LED */
++			linux,default-trigger = "heartbeat";
++			default-state = "off";
++		};
++	};
  };
  
--&i2c2 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&i2c2_pins>;
--
--	clock-frequency = <400000>;
--
--	/* Pressure Sensor */
--	bmp085 at 77 {
--		compatible = "bosch,bmp085";
--		reg = <0x77>;
--	};
--};
--
--&i2c3 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&i2c3_pins>;
--
--	clock-frequency = <400000>;
--};
--
--&i2c4 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&i2c4_pins>;
--
--	clock-frequency = <400000>;
--
--	/* Temperature Sensor */
--	tmp102 at 48{
--		compatible = "ti,tmp102";
--		reg = <0x48>;
--	};
--};
--
- &i2c5 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c5_pins>;
-@@ -215,32 +160,10 @@
- 	clock-frequency = <400000>;
+ &omap5_pmx_core {
+@@ -70,6 +79,7 @@
+ 			&mcbsp1_pins
+ 			&mcbsp2_pins
+ 			&usbhost_pins
++			&led_gpio_pins
+ 	>;
+ 
+ 	twl6040_pins: pinmux_twl6040_pins {
+@@ -168,6 +178,12 @@
+ 			0x6e (PIN_OUTPUT | MUX_MODE6) /* gpio3_79 ETH_NRESET */
+ 		>;
+ 	};
++
++	led_gpio_pins: pinmux_led_gpio_pins {
++		pinctrl-single,pins = <
++			0x196 (PIN_OUTPUT | MUX_MODE6) /* uart3_cts_rctx.gpio5_153 */
++		>;
++	};
  };
  
--&keypad {
--	keypad,num-rows = <8>;
--	keypad,num-columns = <8>;
--	linux,keymap = <0x02020073	/* VOLUP */
--			0x02030072	/* VOLDOWM */
--			0x020400e7	/* SEND */
--			0x02050066	/* HOME */
--			0x0206006b	/* END */
--			0x020700d9>;	/* SEARCH */
--	linux,input-no-autorepeat;
--};
--
- &mcbsp3 {
- 	status = "disabled";
- };
- 
--&emif1 {
--	cs1-used;
--	device-handle = <&samsung_K3PE0E000B>;
--};
--
--&emif2 {
--	cs1-used;
--	device-handle = <&samsung_K3PE0E000B>;
--};
--
- &mcspi1 {
- 
- };
+ &omap5_pmx_wkup {
 -- 
 1.7.9.5
