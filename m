@@ -1,52 +1,65 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Fri, 7 Jun 2013 10:20:50 -0600
-Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <1880458.2ksb8qtzHh@wuerfel>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
- <20130408165626.GA30824@obsidianresearch.com>
- <000c01ce6360$237a7040$6a6f50c0$@samsung.com>
- <1880458.2ksb8qtzHh@wuerfel>
-Message-ID: <20130607162050.GA31895@obsidianresearch.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 07 Jun 2013 10:21:46 -0600
+Subject: Active-low behavior in gpiolib
+In-Reply-To: <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
+References: <CAAVeFu+hQHScYYkvO1KOrUPLLaC0ju_O4SDZWyJE8KhLn_hibQ@mail.gmail.com>
+ <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
+Message-ID: <51B2089A.1070404@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 01:59:43PM +0200, Arnd Bergmann wrote:
-> On Friday 07 June 2013 18:19:40 Jingoo Han wrote:
-> > Hi Jason Gunthorpe,
-> > 
-> > I implemented 'Single domain' with Exynos PCIe for last two months;
-> > however, it cannot work properly due to the hardware restriction.
-> > Each MEM region is hard-wired.
-> > 
-> > Thus, I will send Exynos PCIe V3 patch as 'Separate domains'.
+On 06/07/2013 01:10 AM, Linus Walleij wrote:
+> On Wed, Jun 5, 2013 at 7:22 AM, Alexandre Courbot <gnurou@gmail.com> wrote:
 > 
-> Yes, I think that is best, if the hardware is clearly designed as
-> separate domains, this is what we should do by default in the
-> driver. For the Marvell case with its 10 separate ports, much
-> more address space would be wasted by having one domain per
-> port and that hardware let us work around it by remapping the
-> physical address space windows. For Exynos there is much less to
-> lose and I too cannot see how it would be done in the first
-> place.
+>> FLAG_ACTIVE_LOW, on the other hand, is *only* set and used through
+>> sysfs operations. Independently, the active low property can be
+>> specified in gpio phandles and retrieved by
+>> of_get_(named_)gpio_flags() - only it has to be kept in a separate
+>> variable which must then be checked everytime one wants to change the
+>> GPIO value to set the correct level.
+> 
+> Well it is designed as a sysfs-only thing according to the comment:
+> drivers/gpio/gpiolib.c:#define FLAG_ACTIVE_LOW  6       /* sysfs value
+> has active low */
+> 
+> So I think your actual question is whether it should also be
+> enabled for the kernel-internal interfaces.
+> 
+> Currently we have things like this:
+> 
+> /**
+>  * struct mmci_platform_data - platform configuration for the MMCI
+>  * (also known as PL180) block.
+> (...)
+>  * @gpio_cd: read this GPIO pin to detect card insertion
+>  * @cd_invert: true if the gpio_cd pin value is active low
+> (...)
+>         int     gpio_cd;
+>         bool    cd_invert;
+> 
+> So the knowledge of whether a certain GPIO is active high or low
+> is spread out through drivers, and the API only drives the line in a
+> very explicit way.
+...
+> So the only thing gained is that gpiolib gets some knowledge
+> of how the pin is used. But what is the gain of that?
 
-Sounds fair to me.
+Well, the big gain I see is that every driver needs to somehow find out
+whether the GPIO is active-low or not, and store a separate flag for it,
+and XOR all data with that flag. That's not a massive amount of code,
+but it's really rather annoying. Why can't we just tell gpiolib what the
+polarity is, and let it deal with it. In the DT case, this "tell gpiolib
+what the polarity is" would be 100% hidden inside the DT parsing/mapping
+(of_xlate) code. For non-DT, presumably this could be a flag that the
+board file or platform code programs into gpiolib early on.
 
-But when we talk about multiple domains we don't mean a disjoint range
-bus bus numbers, as your other email shows:
+If you're worried about this hiding too much information, and that some
+code might want to know what's really going on rather than the logical
+values, perhaps:
 
-00:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
-10:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
+gpiod_[gs]et() - return/accept logical values
+gpiod_[gs]et_raw() - return the actual electrical level
 
-We mean multiple domains, it should look like this:
-
-0000:00:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
-0001:00:00.0 PCI bridge: Samsung Electronics Co Ltd Device a549 (rev 01) (prog-if 00 [Normal decode])
-
-ie lspci -D.
-
-Each domain gets a unique bus number range, config space, io range,
-etc. This is much clearer to everyone than trying to pretend there is
-only one domain when the HW is actually multi-domain.
-
-Jason
+gpiod_[gs]et() might also hide details of
+open-drain/collector/source/... too, and do automatic tri-stating based
+on the level of output that was desired?
