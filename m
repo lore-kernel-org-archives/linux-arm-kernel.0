@@ -1,56 +1,336 @@
-From: joem@martindale-electric.co.uk (joem)
-Date: Fri, 7 Jun 2013 20:00:45 +0000
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <20130607182608.GV18614@n2100.arm.linux.org.uk>
-References: <CAPweEDw1BabE0cmT5fxZ3Z9p9EH508M3Nzcqk2VcO0oz-qYsvg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1370477958.20454.68.camel@localhost>
- <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
- <51B085C6.3000605@gmail.com>
- <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
- <51B19046.5040401@gmail.com>
- <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
- <1370616567.2433.20.camel@jm-desktop>,
- <20130607182608.GV18614@n2100.arm.linux.org.uk>
-Message-ID: <6DBBEE2DB8B23047A3F38C3520340CDFCCC116@fh-ex1>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  7 Jun 2013 22:03:43 +0200
+Subject: [RFC PATCH 37/50] ARM: at91/dt: move at91sam9260 SoC to new at91 clk
+ implem
+In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370635423-4325-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Confused yes - innocent mistake - 50% yes.
+Define at91sam9260 clocks in at91sam9260 device tree.
+Add references to the appropriate clocks in each peripheral.
 
-I see now the posts are cc'd from arm-netbook mailing lists to many
-other mailing lists with different standards for noise.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ arch/arm/boot/dts/at91sam9260.dtsi |  144 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 143 insertions(+), 1 deletion(-)
 
-Apologies for not seeing that.
-
-arm-netbook list 'belongs' to luke, but generally the noise level
-is very low here and its aim is to make EOMA 68 and other similar gadgets.
-
-So it is not fair on anybody here to be flooded like this with blog quality post.
-
-If anyone got open source things that need building, or things that need doing, by
-all means send a one or two line request.
-
-So stop squabbling, become more productive by sticking to one or two
-line responses. I'm sure everyone can do that.
-
-
-And if you have time, here are projects to take inspiration from
-when it comes making gadgets:
-
-http://rhombus-tech.net/
-
-Projects that have sprung up around Luke's project:
-
-http://www.iuac.res.in/~elab/phoenix/SBC/
-https://github.com/slapin/a13board
-http://www.gplsquared.com/SoM2/SoM2.html
-http://www.gplsquared.com/mk802/mk802.html
-
-________________________________________
-
-As you seem to have your facts wrong, I can only conclude that you
-are also trolling... I hope I'm wrong about that and you've just made
-an innocent mistake.
+diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
+index 899a7cf..eac42f9 100644
+--- a/arch/arm/boot/dts/at91sam9260.dtsi
++++ b/arch/arm/boot/dts/at91sam9260.dtsi
+@@ -72,6 +72,109 @@
+ 			pmc: pmc at fffffc00 {
+ 				compatible = "atmel,at91rm9200-pmc";
+ 				reg = <0xfffffc00 0x100>;
++
++				clk32k: slck {
++					compatible = "fixed-clock";
++					#clock-cells = <0>;
++					clock-frequency = <32768>;
++				};
++
++				main: mainck {
++					compatible = "atmel,at91rm9200-clk-main", "fixed-clock";
++					#clock-cells = <0>;
++					clocks = <&clk32k>;
++				};
++
++				plla: pllack {
++					compatible = "atmel,at91rm9200-clk-pll";
++					#clock-cells = <0>;
++					clocks = <&main>;
++					id = <0>;
++					input = <1000000 32000000>;
++					output = <80000000 160000000
++						  150000000 240000000>;
++					out = <0 2>;
++				};
++
++				pllb: pllbck {
++					compatible = "atmel,at91rm9200-clk-pll";
++					#clock-cells = <0>;
++					clocks = <&main>;
++					id = <1>;
++					input = <1000000 5000000>;
++					output = <70000000 130000000>;
++					out = <1>;
++				};
++
++				mck: masterck {
++					compatible = "atmel,at91rm9200-clk-master";
++					#clock-cells = <0>;
++					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
++					output = <0 105000000>;
++					divisors = <1 2 4 0>;
++				};
++
++				usb: usbck {
++					compatible = "atmel,at91rm9200-clk-usb";
++					#clock-cells = <0>;
++					clocks = <&pllb>;
++					divisors = <1 2 4 0>;
++				};
++
++				prog: progck {
++					compatible = "atmel,at91rm9200-clk-programmable";
++					#clock-cells = <1>;
++					ids = <0 1>;
++					clocks = <&clk32k>, <&main>, <&plla>, <&pllb>;
++					clock-output-names = "prog0", "prog1";
++				};
++
++				system: systemck {
++					compatible = "atmel,at91rm9200-clk-system";
++					#clock-cells = <1>;
++					ids = <6 7 8 9>;
++					clocks = <&usb>, <&usb>, <&prog 0>, <&prog 1>;
++					clock-output-names = "udpck", "uhpck", "pck0", "pck1";
++				};
++
++				periph: periphck {
++					compatible = "atmel,at91rm9200-clk-peripheral";
++					#clock-cells = <1>;
++					clocks = <&mck>;
++					ids = <2 3 4 5 6 7 8 9 10 11 12 13 14 17
++					       18 19 20 21 22 23 24 25 26 27 28>;
++					clock-output-names = "pioA_clk",
++							     "pioB_clk",
++							     "pioC_clk",
++							     "adc_clk",
++							     "usart0_clk",
++							     "usart1_clk",
++							     "usart2_clk",
++							     "mci_clk",
++							     "udc_clk",
++							     "twi_clk",
++							     "spi0_clk",
++							     "spi1_clk",
++							     "ssc_clk",
++							     "tc0_clk",
++							     "tc1_clk",
++							     "tc2_clk",
++							     "ohci_clk",
++							     "pclk",
++							     "isi_clk",
++							     "usart3_clk",
++							     "usart4_clk",
++							     "usart5_clk",
++							     "tc3_clk",
++							     "tc4_clk",
++							     "tc5_clk";
++
++					adc_op_clk: adc_op_clk{
++						compatible = "fixed-clock";
++						#clock-cells = <0>;
++						clock-frequency = <5000000>;
++					};
++				};
+ 			};
+ 
+ 			rstc at fffffd00 {
+@@ -88,6 +191,7 @@
+ 				compatible = "atmel,at91sam9260-pit";
+ 				reg = <0xfffffd30 0xf>;
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
++				clocks = <&mck>;
+ 			};
+ 
+ 			tcb0: timer at fffa0000 {
+@@ -96,6 +200,8 @@
+ 				interrupts = <17 IRQ_TYPE_LEVEL_HIGH 0
+ 					      18 IRQ_TYPE_LEVEL_HIGH 0
+ 					      19 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&periph 17>, <&periph 18>, <&periph 19>;
++				clock-names = "t0_clk", "t1_clk", "t2_clk";
+ 			};
+ 
+ 			tcb1: timer at fffdc000 {
+@@ -104,6 +210,8 @@
+ 				interrupts = <26 IRQ_TYPE_LEVEL_HIGH 0
+ 					      27 IRQ_TYPE_LEVEL_HIGH 0
+ 					      28 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&periph 26>, <&periph 27>, <&periph 28>;
++				clock-names = "t0_clk", "t1_clk", "t2_clk";
+ 			};
+ 
+ 			pinctrl at fffff400 {
+@@ -271,7 +379,7 @@
+ 						atmel,pins =
+ 							<AT91_PIOA 10 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA10 periph B */
+ 							 AT91_PIOA 11 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA11 periph B */
+-							 AT91_PIOA 24 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA24 periph B */
++							 AT91_PIOA 22 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA22 periph B */
+ 							 AT91_PIOA 25 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA25 periph B */
+ 							 AT91_PIOA 26 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA26 periph B */
+ 							 AT91_PIOA 27 AT91_PERIPH_B AT91_PINCTRL_NONE	/* PA27 periph B */
+@@ -439,6 +547,7 @@
+ 					gpio-controller;
+ 					interrupt-controller;
+ 					#interrupt-cells = <2>;
++					clocks = <&periph 2>;
+ 				};
+ 
+ 				pioB: gpio at fffff600 {
+@@ -449,6 +558,7 @@
+ 					gpio-controller;
+ 					interrupt-controller;
+ 					#interrupt-cells = <2>;
++					clocks = <&periph 3>;
+ 				};
+ 
+ 				pioC: gpio at fffff800 {
+@@ -459,6 +569,7 @@
+ 					gpio-controller;
+ 					interrupt-controller;
+ 					#interrupt-cells = <2>;
++					clocks = <&periph 4>;
+ 				};
+ 			};
+ 
+@@ -468,6 +579,8 @@
+ 				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_dbgu>;
++				clocks = <&mck>;
++				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -479,6 +592,8 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart0>;
++				clocks = <&periph 6>;
++				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -490,6 +605,8 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart1>;
++				clocks = <&periph 7>;
++				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -501,6 +618,8 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart2>;
++				clocks = <&periph 8>;
++				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -512,6 +631,8 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_usart3>;
++				clocks = <&periph 23>;
++				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -523,6 +644,8 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_uart0>;
++				clocks = <&periph 24>;
++				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -534,6 +657,8 @@
+ 				atmel,use-dma-tx;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_uart1>;
++				clocks = <&periph 25>;
++				clock-names = "usart";
+ 				status = "disabled";
+ 			};
+ 
+@@ -543,6 +668,8 @@
+ 				interrupts = <21 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_macb_rmii>;
++				clocks = <&periph 21>, <&periph 21>;
++				clock-names = "hclk", "pclk";
+ 				status = "disabled";
+ 			};
+ 
+@@ -550,6 +677,8 @@
+ 				compatible = "atmel,at91rm9200-udc";
+ 				reg = <0xfffa4000 0x4000>;
+ 				interrupts = <10 IRQ_TYPE_LEVEL_HIGH 2>;
++				clocks = <&periph 10>, <&system 6>;
++				clock-names = "udc_clk", "udpck";
+ 				status = "disabled";
+ 			};
+ 
+@@ -559,6 +688,7 @@
+ 				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 6>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
++				clocks = <&periph 11>;
+ 				status = "disabled";
+ 			};
+ 
+@@ -568,6 +698,8 @@
+ 				interrupts = <9 IRQ_TYPE_LEVEL_HIGH 0>;
+ 				#address-cells = <1>;
+ 				#size-cells = <0>;
++				clocks = <&periph 9>;
++				clock-names = "mci_clk";
+ 				status = "disabled";
+ 			};
+ 
+@@ -577,6 +709,8 @@
+ 				interrupts = <14 IRQ_TYPE_LEVEL_HIGH 5>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_ssc0_tx &pinctrl_ssc0_rx>;
++				clocks = <&periph 14>;
++				clock-names = "pclk";
+ 				status = "disabled";
+ 			};
+ 
+@@ -588,6 +722,8 @@
+ 				interrupts = <12 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi0>;
++				clocks = <&periph 12>;
++				clock-names = "spi_clk";
+ 				status = "disabled";
+ 			};
+ 
+@@ -599,6 +735,8 @@
+ 				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_spi1>;
++				clocks = <&periph 13>;
++				clock-names = "spi_clk";
+ 				status = "disabled";
+ 			};
+ 
+@@ -606,6 +744,8 @@
+ 				compatible = "atmel,at91sam9260-adc";
+ 				reg = <0xfffe0000 0x100>;
+ 				interrupts = <5 IRQ_TYPE_LEVEL_HIGH 0>;
++				clocks = <&periph 5>, <&adc_op_clk>;
++				clock-names = "adc_clk", "adc_op_clk";
+ 				atmel,adc-use-external-triggers;
+ 				atmel,adc-channels-used = <0xf>;
+ 				atmel,adc-vref = <3300>;
+@@ -669,6 +809,8 @@
+ 			compatible = "atmel,at91rm9200-ohci", "usb-ohci";
+ 			reg = <0x00500000 0x100000>;
+ 			interrupts = <20 IRQ_TYPE_LEVEL_HIGH 2>;
++			clocks = <&periph 20>, <&periph 20>, <&system 7>;
++			clock-names = "ohci_clk", "hclk", "uhpck";
+ 			status = "disabled";
+ 		};
+ 	};
+-- 
+1.7.9.5
