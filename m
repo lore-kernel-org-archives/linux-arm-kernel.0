@@ -1,63 +1,33 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Fri, 7 Jun 2013 11:37:46 +0200
-Subject: Chipidea usb otg support for IMX/MXS (device functionality)
-In-Reply-To: <51A77BAB.4060101@digi.com>
-References: <51A5A808.2070803@digi.com>
- <F281D0F91ED19E4D8E63A7504E8A649803E8A3F3@039-SN2MPN1-021.039d.mgd.msft.net>
- <20130529075044.GC3293@lukather> <51A77BAB.4060101@digi.com>
-Message-ID: <20130607093746.GL14209@lukather>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 7 Jun 2013 12:46:23 +0300
+Subject: [PATCH 14/14] ARM: OMAP4: hwmod data: Clean up the data file
+In-Reply-To: <51B1A150.9020307@ti.com>
+References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+ <1369845494-30231-15-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.02.1306061754560.5152@utopia.booyaka.com>
+ <51B0D54A.1090107@ti.com> <51B175E4.1060909@ti.com>
+ <alpine.DEB.2.02.1306070751210.32163@utopia.booyaka.com>
+ <51B1A150.9020307@ti.com>
+Message-ID: <1370598383.25965.73.camel@sokoban>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hector,
-
-On Thu, May 30, 2013 at 06:17:47PM +0200, Hector Palacios wrote:
-> Dear Maxime,
-> 
-> On 05/29/2013 09:50 AM, maxime.ripard at free-electrons.com wrote:
-> >Hi,
+On Fri, 2013-06-07 at 14:31 +0530, Sricharan R wrote:
+> On Friday 07 June 2013 01:22 PM, Paul Walmsley wrote:
+> > cc Beno?t
 > >
-> >On Wed, May 29, 2013 at 07:11:30AM +0000, Chen Peter-B29397 wrote:
-> >>
-> >>>Hello,
-> >>>
-> >>>Am I right in assuming that the MXS USB on-the-go port does not currently
-> >>>support the
-> >>>device (gadget) functionality?
-> >>>Anybody out there working on that?
-> >>>
-> >>
-> >>As far as I know, Maxime Ripard may already let the chipidea durl-role function
-> >>work ok at mx28. It may need my chipidea otg patch
-> >>
-> >>https://github.com/hzpeterchen/linux-usb.git
+> > On Fri, 7 Jun 2013, Sricharan R wrote:
 > >
-> >Indeed, I've been using the patchset "Add tested id switch and vbus
-> >connect detect support for Chipidea" from Peter for quite some time on
-> >top of 3.9 and it works like a charm for the gadget mode on an MX28
-> >platform.
+> >> I used autogen to remove the data, but some of the data were not in sync
+> >> with the mainline .(like abe, dss, aess, context register offsets etc..).
+> >> So i have to sync them manually.
+> > OK.  Are you going to fix the differences up soon?
 > >
-> >BTW, Peter, I've seen that these patches are still not merged in 3.10,
-> >is there a reason for that? do you plan on sending a version rebased on
-> >top of 3.10 some time in the future? I tried to do the rebasing myself,
-> >but the chipidea driver seems to have changed quite heavily, which makes
-> >the process quite difficult when you don't know what you're doing :)
-> 
-> I guess you didn't get rid of the 'possible circular locking
-> dependency' you talked about at [1], right?
+> > - Paul
+> + Ambresh and Tero for autogen.
 
-Indeed
+This is not going to happen soon, if ever. We might consider doing this
+if a complete overhaul for the hwmod data is going to be done at some
+point so that re-generating the new format is easier.
 
-> I experimented the same and also a BUG [2] after cable reconnection.
-> Despite those, I ran a simple test of serial, ethernet, and
-> mass_storage gadgets and they worked fine.
-
-I never experienced the BUG you're mentionning, everything was working
-fine except the circular dependency.
-
-> I didn't use the new properties (phy_type, dr_mode...) in the DT of
-> my mx28 platform, did you?
-
-Neither did I.
-
-Maxime
+-Tero
