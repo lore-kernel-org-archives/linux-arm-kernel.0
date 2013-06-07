@@ -1,73 +1,65 @@
-From: mikedunn@newsguy.com (Mike Dunn)
-Date: Thu, 06 Jun 2013 17:48:41 -0700
-Subject: pxa27x and pinctrl-single
-In-Reply-To: <CAD6h2NSRCti57NZtw0wzE8Th65_3Y8Dkz5zGsbnA2SUPYS263Q@mail.gmail.com>
-References: <51AF7404.3090003@newsguy.com>
- <CAD6h2NTu9-E=Xy8zz5cgDdk5W4ShM9-B+p+gQtiA_HASQ7AEuQ@mail.gmail.com>
- <51B0C7E8.5090308@newsguy.com>
- <CAD6h2NSRCti57NZtw0wzE8Th65_3Y8Dkz5zGsbnA2SUPYS263Q@mail.gmail.com>
-Message-ID: <51B12DE9.9040908@newsguy.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Thu, 06 Jun 2013 18:19:07 -0700
+Subject: [PATCH 0/4] clk, mfd: u8540 clock tree definition
+In-Reply-To: <20130603081504.GB3370@gmail.com>
+References: <1369658492-31358-1-git-send-email-philippe.begnic.st@gmail.com>
+ <20130531012509.21525.90187@quantum> <20130531065532.GA10355@gmail.com>
+ <20130531191437.21525.40759@quantum> <20130603081504.GB3370@gmail.com>
+Message-ID: <20130607011907.10233.314@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2013 04:58 PM, Haojian Zhuang wrote:
-> On 7 June 2013 01:33, Mike Dunn <mikedunn@newsguy.com> wrote:
->>
-
-
-[...]
-
-
->>
->> Yes, but currently pinctrl-single only supports writing one register for a given
->> pin (with multiple pins sharing a register if bit-per-mux==true).  On pxa27x, a
->> pin's alt function is determined by the values written to both the GAFRx and the
->> GPDRx registers, so I think that pinctrl-single may need to allow a device tree
->> to specify multiple reg/value/mask sets for any one pin.  I don't have a
->> pxa3xx/mmp developer's manual handy, but from the code it appears that on these
->> arches the direction register is irrelevant to the mux setting.
->>
+Quoting Lee Jones (2013-06-03 01:15:04)
+> On Fri, 31 May 2013, Mike Turquette wrote:
 > 
-> No, it's not need to access both GAFRx & GPDRx. Let's focus on PXA27x first.
+> > Quoting Lee Jones (2013-05-30 23:55:32)
+> > > On Thu, 30 May 2013, Mike Turquette wrote:
+> > > 
+> > > > Quoting Philippe Begnic (2013-05-27 05:41:28)
+> > > > > From: Philippe Begnic <philippe.begnic@st.com>
+> > > > > 
+> > > > > Create U8540 clock tree definitions for common clock framework
+> > > > > 
+> > > > 
+> > > > The clock changes look good to me.  How did you want to merge the
+> > > > patches?
+> > > 
+> > > You may as well take them through your tree Mike.
+> > > 
+> > 
+> > Sure I can take them but it would be best to wait for an Ack from Samuel
+> > for the MFD parts, if only so that we are coordinated.
 > 
-> GPIO ?x? Alternate Function Select Bits (where x = 112 through 120)
-> A bit-pair in this register determines the corresponding GPIO pin?s
-> functionality as one of the alternate functions that is mapped to it or as a
-> generic GPIO pin.
+> You don't need it. Apply with mine instead:
 > 
-> 0b00 = The corresponding GPIO pin (GPIO<x>) is used as a general-
-> purpose I/O.
-> 0b01 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
-> function 1.
-> 0b10 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
-> function 2.
-> 0b11 = The corresponding GPIO pin (GPIO<x>) is used for its alternate
-> function 3.
+> Acked-by: Lee Jones <lee.jones@linaro.org>
 > 
-> We can see that GAFRx configures the pinmux. That's all. We can use
-> pinctrl-single
-> driver to cover this.
 
-
-But on the pxa27x there are usually *two* meanings for any one of the 3 alt
-functions, depending on the direction.  As a random example... gpio28 alt fn
-0b01 is AC97_BITCLK if the direction is input, but is I2S_BITCLK if the
-direction is output (from PXA27x Developer's Manual, Table 24-2).
-
-
-> 
-> I know that you're also talking the implementation in gpio-pxa driver.
-> __gpio_is_occupied() checks both GAFRx & GPDRx. Because this GPIO
-> pin should be configured as GPIO input. Actually we could also discard the
-> checking.
-> 
-> So there's no relationship between GAFRx and GPDRx.
-
-
-But I am thinking on pxa27x there is... see my example above.  Perhaps this is
-not true for the later Marvell arches and you are missing this point?  Or else I
-am stating the obvious to you and I am missing your point.  In either case,
-thanks for your patience.
+Done.  Taken into clk-next.
 
 Thanks,
 Mike
+
+> > > > > Philippe Begnic (4):
+> > > > >   clk: ux500: Pass clock base adresses in initcall for u8540 and u9540
+> > > > >   mfd: db8500: Update register definition for u8540 clock
+> > > > >   mfd: db8500: Update BML clock register for db8580
+> > > > >   clk: ux500: Clocks definition for u8540
+> > > > > 
+> > > > >  arch/arm/mach-ux500/cpu.c                 |    6 +-
+> > > > >  drivers/clk/ux500/u8540_clk.c             |  564 ++++++++++++++++++++++++++++-
+> > > > >  drivers/clk/ux500/u9540_clk.c             |    4 +-
+> > > > >  drivers/mfd/db8500-prcmu.c                |    1 +
+> > > > >  drivers/mfd/dbx500-prcmu-regs.h           |    1 +
+> > > > >  include/linux/mfd/abx500/ab8500-sysctrl.h |    4 +-
+> > > > >  include/linux/mfd/dbx500-prcmu.h          |   12 +
+> > > > >  include/linux/platform_data/clk-ux500.h   |    6 +-
+> > > > >  8 files changed, 587 insertions(+), 11 deletions(-)
+> > > > > 
+> > > 
+> 
+> -- 
+> Lee Jones
+> Linaro ST-Ericsson Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
