@@ -1,252 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 17:22:02 +0900
-Subject: [PATCH 04/11] ARM: shmobile: kzm9g: add AS3711 PMIC platform data
+Date: Fri,  7 Jun 2013 17:22:00 +0900
+Subject: [PATCH 02/11] ARM: shmobile: bockw: define FPGA address and rename
+ iomem variable
 In-Reply-To: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370593329-27559-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370593329-27559-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-KZM9G uses an AS3711 PMIC to supply power to the CPU and the LCD backlight.
-The PMIC on the board is pre-programmed to supply correct voltages to the
-CPU, power supply to the backlight has to be turned on at run-time. The
-latter is currently performed by a hard-coded I2C command sequence in the
-board file. This patch removes the backlight hack and instead adds an I2C
-device to instantiate the AS3711 MFD driver, which will add a regulator
-device to dynamically adjust CPU voltages and a backlight device.
+Bock-W board will needs more board specific ioremap() method.
+This patch tidyup current FPGA specific settings
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/board-kzm9g.c | 193 +++++++++++++++++++++++++----------
- 1 file changed, 140 insertions(+), 53 deletions(-)
+ arch/arm/mach-shmobile/board-bockw.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/board-kzm9g.c b/arch/arm/mach-shmobile/board-kzm9g.c
-index 1fdf05c..165483c 100644
---- a/arch/arm/mach-shmobile/board-kzm9g.c
-+++ b/arch/arm/mach-shmobile/board-kzm9g.c
-@@ -29,6 +29,7 @@
- #include <linux/mmc/host.h>
- #include <linux/mmc/sh_mmcif.h>
- #include <linux/mmc/sh_mobile_sdhi.h>
-+#include <linux/mfd/as3711.h>
- #include <linux/mfd/tmio.h>
- #include <linux/pinctrl/machine.h>
- #include <linux/pinctrl/pinconf-generic.h>
-@@ -606,6 +607,140 @@ static struct platform_device fsi_ak4648_device = {
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index dac4365..badde08 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -46,10 +46,11 @@ static const struct pinctrl_map bockw_pinctrl_map[] = {
+ 				  "scif0_ctrl", "scif0"),
  };
  
- /* I2C */
-+
-+/* StepDown1 is used to supply 1.315V to the CPU */
-+static struct regulator_init_data as3711_sd1 = {
-+	.constraints = {
-+		.name = "1.315V CPU",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 1315000,
-+		.max_uV = 1335000,
-+	},
-+};
-+
-+/* StepDown2 is used to supply 1.8V to the CPU and to the board */
-+static struct regulator_init_data as3711_sd2 = {
-+	.constraints = {
-+		.name = "1.8V",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 1800000,
-+		.max_uV = 1800000,
-+	},
-+};
-+
-+/*
-+ * StepDown3 is switched in parallel with StepDown2, seems to be off,
-+ * according to read-back pre-set register values
-+ */
-+
-+/* StepDown4 is used to supply 1.215V to the CPU and to the board */
-+static struct regulator_init_data as3711_sd4 = {
-+	.constraints = {
-+		.name = "1.215V",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 1215000,
-+		.max_uV = 1235000,
-+	},
-+};
-+
-+/* LDO1 is unused and unconnected */
-+
-+/* LDO2 is used to supply 2.8V to the CPU */
-+static struct regulator_init_data as3711_ldo2 = {
-+	.constraints = {
-+		.name = "2.8V CPU",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 2800000,
-+		.max_uV = 2800000,
-+	},
-+};
-+
-+/* LDO3 is used to supply 3.0V to the CPU */
-+static struct regulator_init_data as3711_ldo3 = {
-+	.constraints = {
-+		.name = "3.0V CPU",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 3000000,
-+		.max_uV = 3000000,
-+	},
-+};
-+
-+/* LDO4 is used to supply 2.8V to the board */
-+static struct regulator_init_data as3711_ldo4 = {
-+	.constraints = {
-+		.name = "2.8V",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 2800000,
-+		.max_uV = 2800000,
-+	},
-+};
-+
-+/* LDO5 is switched parallel to LDO4, also set to 2.8V */
-+static struct regulator_init_data as3711_ldo5 = {
-+	.constraints = {
-+		.name = "2.8V #2",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 2800000,
-+		.max_uV = 2800000,
-+	},
-+};
-+
-+/* LDO6 is unused and unconnected */
-+
-+/* LDO7 is used to supply 1.15V to the CPU */
-+static struct regulator_init_data as3711_ldo7 = {
-+	.constraints = {
-+		.name = "1.15V CPU",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 1150000,
-+		.max_uV = 1150000,
-+	},
-+};
-+
-+/* LDO8 is switched parallel to LDO7, also set to 1.15V */
-+static struct regulator_init_data as3711_ldo8 = {
-+	.constraints = {
-+		.name = "1.15V CPU #2",
-+		.boot_on = 1,
-+		.always_on = 1,
-+		.min_uV = 1150000,
-+		.max_uV = 1150000,
-+	},
-+};
-+
-+static struct as3711_platform_data as3711_pdata = {
-+	.regulator	= {
-+		.init_data	= {
-+			[AS3711_REGULATOR_SD_1] = &as3711_sd1,
-+			[AS3711_REGULATOR_SD_2] = &as3711_sd2,
-+			[AS3711_REGULATOR_SD_4] = &as3711_sd4,
-+			[AS3711_REGULATOR_LDO_2] = &as3711_ldo2,
-+			[AS3711_REGULATOR_LDO_3] = &as3711_ldo3,
-+			[AS3711_REGULATOR_LDO_4] = &as3711_ldo4,
-+			[AS3711_REGULATOR_LDO_5] = &as3711_ldo5,
-+			[AS3711_REGULATOR_LDO_7] = &as3711_ldo7,
-+			[AS3711_REGULATOR_LDO_8] = &as3711_ldo8,
-+		},
-+	},
-+	.backlight	= {
-+		.su2_fb = "sh_mobile_lcdc_fb.0",
-+		.su2_max_uA = 36000,
-+		.su2_feedback = AS3711_SU2_CURR_AUTO,
-+		.su2_fbprot = AS3711_SU2_GPIO4,
-+		.su2_auto_curr1 = true,
-+		.su2_auto_curr2 = true,
-+		.su2_auto_curr3 = true,
-+	},
-+};
-+
- static struct pcf857x_platform_data pcf8575_pdata = {
- 	.gpio_base	= GPIO_PCF8575_BASE,
- };
-@@ -625,6 +760,11 @@ static struct i2c_board_info i2c0_devices[] = {
- 		I2C_BOARD_INFO("adxl34x", 0x1d),
- 		.irq = irq_pin(26), /* IRQ26 */
- 	},
-+	{
-+		I2C_BOARD_INFO("as3711", 0x40),
-+		.irq = intcs_evt2irq(0x3300), /* IRQ24 */
-+		.platform_data = &as3711_pdata,
-+	},
- };
- 
- static struct i2c_board_info i2c1_devices[] = {
-@@ -715,59 +855,6 @@ static const struct pinctrl_map kzm_pinctrl_map[] = {
- 				  "usb_vbus", "usb"),
- };
- 
--/*
-- * FIXME
-- *
-- * This is quick hack for enabling LCDC backlight
-- */
--static int __init as3711_enable_lcdc_backlight(void)
--{
--	struct i2c_adapter *a = i2c_get_adapter(0);
--	struct i2c_msg msg;
--	int i, ret;
--	__u8 magic[] = {
--		0x40, 0x2a,
--		0x43, 0x3c,
--		0x44, 0x3c,
--		0x45, 0x3c,
--		0x54, 0x03,
--		0x51, 0x00,
--		0x51, 0x01,
--		0xff, 0x00, /* wait */
--		0x43, 0xf0,
--		0x44, 0xf0,
--		0x45, 0xf0,
--	};
--
--	if (!of_machine_is_compatible("renesas,kzm9g"))
--		return 0;
--
--	if (!a)
--		return 0;
--
--	msg.addr	= 0x40;
--	msg.len		= 2;
--	msg.flags	= 0;
--
--	for (i = 0; i < ARRAY_SIZE(magic); i += 2) {
--		msg.buf = magic + i;
--
--		if (0xff == msg.buf[0]) {
--			udelay(500);
--			continue;
--		}
--
--		ret = i2c_transfer(a, &msg, 1);
--		if (ret < 0) {
--			pr_err("i2c transfer fail\n");
--			break;
--		}
--	}
--
--	return 0;
--}
--device_initcall(as3711_enable_lcdc_backlight);
--
- static void __init kzm_init(void)
++#define FPGA	0x18200000
+ #define IRQ0MR	0x30
+ static void __init bockw_init(void)
  {
- 	regulator_register_always_on(2, "fixed-1.8V", fixed1v8_power_consumers,
+-	void __iomem *fpga;
++	void __iomem *base;
+ 
+ 	r8a7778_clock_init();
+ 	r8a7778_init_irq_extpin(1);
+@@ -59,8 +60,8 @@ static void __init bockw_init(void)
+ 				  ARRAY_SIZE(bockw_pinctrl_map));
+ 	r8a7778_pinmux_init();
+ 
+-	fpga = ioremap_nocache(0x18200000, SZ_1M);
+-	if (fpga) {
++	base = ioremap_nocache(FPGA, SZ_1M);
++	if (base) {
+ 		/*
+ 		 * CAUTION
+ 		 *
+@@ -68,10 +69,10 @@ static void __init bockw_init(void)
+ 		 * it should be cared in the future
+ 		 * Now, it is assuming IRQ0 was used only from SMSC.
+ 		 */
+-		u16 val = ioread16(fpga + IRQ0MR);
++		u16 val = ioread16(base + IRQ0MR);
+ 		val &= ~(1 << 4); /* enable SMSC911x */
+-		iowrite16(val, fpga + IRQ0MR);
+-		iounmap(fpga);
++		iowrite16(val, base + IRQ0MR);
++		iounmap(base);
+ 
+ 		platform_device_register_resndata(
+ 			&platform_bus, "smsc911x", -1,
 -- 
 1.8.2.1
