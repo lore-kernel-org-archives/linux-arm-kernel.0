@@ -1,43 +1,37 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 7 Jun 2013 15:12:10 +0200 (CEST)
-Subject: [PATCH 2/2] ARM: shmobile: sdhi: remove DMA hardware dependencies
-In-Reply-To: <2024464.67s93nOUnz@wuerfel>
-References: <1370008605-3745603-1-git-send-email-arnd@arndb.de>
- <1370008605-3745603-2-git-send-email-arnd@arndb.de>
- <Pine.LNX.4.64.1306071214200.11277@axis700.grange>
- <2024464.67s93nOUnz@wuerfel>
-Message-ID: <Pine.LNX.4.64.1306071507060.11277@axis700.grange>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Jun 2013 15:13:19 +0200
+Subject: [PATCH 2/4] mfd: dbx500-prcmu: Correctly reorder PRCMU clock
+ identifiers
+In-Reply-To: <1370517676-10909-3-git-send-email-lee.jones@linaro.org>
+References: <1370517676-10909-1-git-send-email-lee.jones@linaro.org>
+ <1370517676-10909-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYLB-_JjEd69vVub_Z3L+avQRrFBt1fGuyR0D_owcLWvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Jun 2013, Arnd Bergmann wrote:
+On Thu, Jun 6, 2013 at 1:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-[snip]
+> ... as stipulated by the Hardware Specification document.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> I think that is a flaw in the dmaengine driver. I don't actually know how
-> any dma-engine driver could use dmaengine_slave_config to pick the request
-> line, since that is something the driver should not know at the time
-> it calls dmaengine_slave_config().
-> 
-> It's probably best to change the shdma driver to just ignore the slave_id
-> value in slave_config, like most other drivers to.
+I think you need Ulf (as ux500 clock author) and Loic (as PRCMU
+developer) to have a look at this.
 
-This is how shdma driver used to work. We used to pass the slave ID (DMA 
-request line ID) to shdma from clients from the filter. This was 
-considered bad and we were asked to switch to using 
-dmaengine_slave_config(), which is the current preferred API, IIUC.
+> -enum prcmu_clock {
+> -       PRCMU_SGACLK,
+(...)
+> +#define ARMCLK                 0
+> +#define PRCMU_ACLK             1
+(...)
 
-> I don't see how that
-> could possibly work when used from a portable slave driver.
+It seems the enum and the defines want to do two different things?
 
-A DMA slave ID (DMA request line) is considered to be a portable 
-parameter. I.e. on every platform your DMA slave has to request a DMA 
-request line to the DMAC and that line can be coded with an int. That's 
-the current assumption, I think.
+The first is a kernel-internal representation of the clocks, whereas
+the latter is a HW-centric representation for a certain PRCMU
+variant (I guess?)
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Does one actually exclude the other?
+
+Yours,
+Linus Walleij
