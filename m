@@ -1,44 +1,35 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Jun 2013 09:45:48 +0200
-Subject: [PATCH 0/8] Support Marvell bootloaders remapping registers at
- different locations
-In-Reply-To: <20130606180201.GM23859@titan.lakedaemon.net>
-References: <1370415901-4721-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130605210104.GQ3803@titan.lakedaemon.net>
- <20130606180201.GM23859@titan.lakedaemon.net>
-Message-ID: <20130607094548.2695a4a7@skate>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Jun 2013 09:47:06 +0200
+Subject: [PATCH 4/4] ARM: ux500: Remove call to u8500_of_init_devices() -
+ again
+In-Reply-To: <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
+References: <1370517676-10909-1-git-send-email-lee.jones@linaro.org>
+ <1370517676-10909-5-git-send-email-lee.jones@linaro.org>
+Message-ID: <CACRpkdYXD527jLzL3m6T6BBRMx+x0u6Wpsas=4se2-EzTb0uqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
+On Thu, Jun 6, 2013 at 1:21 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-On Thu, 6 Jun 2013 14:02:01 -0400, Jason Cooper wrote:
+> Somehow, probably due to a merge error the call to u8500_of_init_devices()
+> has re-appeared in next, causing this error:
+>
+> arch/arm/mach-ux500/cpu-db8500.c: In function ?u8500_init_machine?:
+> arch/arm/mach-ux500/cpu-db8500.c:268:2: error: implicit declaration of     \
+>   function ?u8500_of_init_devices? [-Werror=implicit-function-declaration]
+> arch/arm/mach-ux500/cpu-db8500.c:268:9: warning: assignment makes pointer  \
+>   from integer without a cast [enabled by default]
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-> > I've tentatively pulled your series into mvebu/regmap with
-> > appropriate dependencies.
-> > 
-> > I was going to put this in for-next, but I got a build error after
-> > merging it.  Could you do me a favor and try merging this with
-> > mvebu/seb_clk?  Just shoot me the merge resolution that builds
-> > mvebu_defconfig correctly, and I'll incorporate it into the merge.
-> > No need to rebase the series.
-> > 
-> > If you want to reproduce what I saw, just merge mvebu/regmap with
-> > for-next (up shortly), and build mvebu_defconfig.
-> 
-> This has now been resolved, whole series, with v2 of the one patch is
-> in mvebu/regmap.
+Looking closer this seems like it's fixing a merge error that appeared in
+my linux-stericsson mixdown branch "next" at one point, and which was
+fixed three days ago.
 
-Ah, yes, sorry, I didn't reply to your e-mail, but we sorted it
-together on IRC right after you sent the mail.
+The ARM SoC maintainers may need to watch out for that merge error
+when pullin in my 5 pull requests sent recently though, that is
+essentially the basic merge conflict between the DMA40 and
+general devicetree work.
 
-Thanks for integrating the v2 of the patch!
-
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Yours,
+Linus Walleij
