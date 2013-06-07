@@ -1,42 +1,77 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Fri, 07 Jun 2013 19:20:42 +0100
-Subject: [PATCH] ARM: mpu: Ensure that MPU depends on CPU_V7
-In-Reply-To: <20130607181126.GA11232@pengutronix.de>
-References: <1370625473-21628-1-git-send-email-jonathan.austin@arm.com>
- <20130607181126.GA11232@pengutronix.de>
-Message-ID: <51B2247A.1040504@arm.com>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Fri, 7 Jun 2013 19:26:49 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <20130606112723.71ddd70c@skate>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1733666.lHUBcfUXq9@flatron> <20130606112723.71ddd70c@skate>
+Message-ID: <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/06/13 19:11, Uwe Kleine-K?nig wrote:
-> On Fri, Jun 07, 2013 at 06:17:53PM +0100, Jonathan Austin wrote:
->> The support for the MPU is currently implemented only for R-class
->> (PMSAv7/R). Since the merge of V7M support in to the kernel it is possible
->> to select MPU support on V7M.
->>
->> This patch ensures that until MPU support for M-class processors is
->> implemented, the MPU can only be selected with R-class CPUs
->>
->> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
->> Cc: Uwe Kleine-Konig <u.kleine-koenig@pengutronix.de>
->> ---
->>
->> This patch is necessary now that Russell has merged the V7M work in to his
->> devel-stable branch.
->>
->> I don't have any immediate plans to implement MPU support for M-class, so this
->> patch is important to ensure we don't break building of V7M platforms.
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+thomas i _very_ briefly spotted this when i was extremely busy
+yesterday, and i'm grateful to the 2 or 3 people who've given me the
+keywords and/or links to catch up.
+
+On Thu, Jun 6, 2013 at 10:27 AM, Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com> wrote:
+> Dear Tomasz Figa,
 >
-> I didn't check, but that might affect other nommu configs for pre-v7
-> cpu's, too. (I think there is support for an at91 in the tree?!)
+> On Thu, 06 Jun 2013 02:01:14 +0200, Tomasz Figa wrote:
 >
+>> I don't see any other solution here than moving all the Allwinner
+>> code to DT (as it has been suggested in this thread several times
+>> already), as this is the only hardware description method supported
+>> by ARM Linux.
+>
+> Have you noticed that it is already the case in mainline?
 
-Thanks Uwe,
+ i knew there was a little bit, but not the extent of the commits.
 
-You're right - I just checked and without this patch we cause issues 
-with at91x40_defconfig. This patch *does* fix that too.
+> My colleague Maxime Ripard (Cc'ed)
 
-I've added your acked-by and this time I've got the '?' :)
+ maxime: we need to talk :)
 
-Jonny
+ please tell me in 4 or 5 sentences what you've managed to do so far,
+expanding a little on what thomas says below, more specifically what
+it achieves and/or allows rather than technically what it does
+(suitable for managers and directors in other words), and what plans
+you'd like to see happen.
+
+> is the maintainer of the mainline Allwinner sunxi
+> effort. It already supports a number of boards, has a pinctrl driver, a
+> GPIO driver, serial port is working, network is working, I2C is
+> working.
+>
+> All in mainline, completely Device Tree based.
+
+ great.  which version did it first hit, i.e. what will the first
+signs of this be when allwinner begin doing "git pulls"?
+
+ and which boards.  bear in mind that one of those "boards" should
+really be "the total range of products available across hundreds of
+chinese tablet clone manufacturers".
+
+ specific question: is one of the "boards" the one that tom cubie
+submitted, which covers virtually every android tablet product
+manufactured in the millions by chinese tablet clone manufacturers?
+
+
+> So isn't this entire discussion completely moot?
+
+ no because it's totally in isolation from allwinner.  i need to give
+them a heads-up, and get them involved, giving them specific
+incentives [which nobody's yet given!!] for following a particular
+path [or paths] yet to be recommended.
+
+> The mainline support
+> for sunxi has already started since 6 months or so, and has been Device
+> Tree based from day one.
+
+to clarify: the *community-driven* mainline support for sunxi.  ok -
+which chips?  sun3i (ARM9), sun4i (Cortex A8), sun5i, sun6i and sun7i
+(Dual-Core Cortex A7)?  which ones are in?
+
+l.
