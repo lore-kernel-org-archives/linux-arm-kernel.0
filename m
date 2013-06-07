@@ -1,84 +1,69 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 18:23:41 +0200
-Subject: [RFC PATCH 25/50] ARM: at91: move pit timer to common clk framework
+Date: Fri,  7 Jun 2013 18:24:52 +0200
+Subject: [RFC PATCH 26/50] ARM: at91/tc/clocksource: replace
+ clk_enable/disable with clk_prepare_enable/disable_unprepare.
 In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
 References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370622222-19489-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370622292-19531-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use device tree to get the source clock of the PIT (Periodic Interval Timer).
-If the clock is not found in device tree (or dt is not enabled) we'll try to
-get it using clk_lookup definitions.
+Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+avoid common clk framework warnings.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/mach-at91/at91sam926x_time.c |   21 +++++++++++++++++++--
- 1 file changed, 19 insertions(+), 2 deletions(-)
+ drivers/clocksource/tcb_clksrc.c |   10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam926x_time.c b/arch/arm/mach-at91/at91sam926x_time.c
-index 3a4bc2e..fba7bd6 100644
---- a/arch/arm/mach-at91/at91sam926x_time.c
-+++ b/arch/arm/mach-at91/at91sam926x_time.c
-@@ -39,6 +39,7 @@
- static u32 pit_cycle;		/* write-once */
- static u32 pit_cnt;		/* access only w/system irq blocked */
- static void __iomem *pit_base_addr __read_mostly;
-+static struct clk *mck;
- 
- static inline unsigned int pit_read(unsigned int reg_offset)
- {
-@@ -186,6 +187,7 @@ static int __init of_at91sam926x_pit_init(void)
- {
- 	struct device_node	*np;
- 	int			ret;
-+	int			err = -EINVAL;
- 
- 	np = of_find_matching_node(NULL, pit_timer_ids);
- 	if (!np)
-@@ -195,10 +197,19 @@ static int __init of_at91sam926x_pit_init(void)
- 	if (!pit_base_addr)
- 		goto node_err;
- 
-+	mck = of_clk_get(np, 0);
-+	if (IS_ERR(mck)) {
-+		err = PTR_RET(mck);
-+		mck = NULL;
-+		pr_crit("AT91: PIT: Unable to get mck clk from DT\n");
-+		goto ioremap_err;
-+	}
-+
- 	/* Get the interrupts property */
- 	ret = irq_of_parse_and_map(np, 0);
- 	if (!ret) {
- 		pr_crit("AT91: PIT: Unable to get IRQ from DT\n");
-+		clk_put(mck);
- 		goto ioremap_err;
+diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
+index 8a61872..229c019 100644
+--- a/drivers/clocksource/tcb_clksrc.c
++++ b/drivers/clocksource/tcb_clksrc.c
+@@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+ 			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
+ 		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
+ 		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
+-		clk_disable(tcd->clk);
++		clk_disable_unprepare(tcd->clk);
  	}
- 	at91sam926x_pit_irq.irq = ret;
-@@ -212,7 +223,7 @@ ioremap_err:
- node_err:
- 	of_node_put(np);
- err:
--	return -EINVAL;
-+	return err;
- }
- #else
- static int __init of_at91sam926x_pit_init(void)
-@@ -237,7 +248,13 @@ void __init at91sam926x_pit_init(void)
- 	 * Use our actual MCK to figure out how many MCK/16 ticks per
- 	 * 1/HZ period (instead of a compile-time constant LATCH).
- 	 */
--	pit_rate = clk_get_rate(clk_get(NULL, "mck")) / 16;
-+	if (!mck)
-+		mck = clk_get(NULL, "mck");
-+
-+	if (IS_ERR(mck))
-+		panic("AT91: PIT: Unable to get mck clk\n");
-+	pit_rate = clk_get_rate(mck) / 16;
-+	pr_notice("AT91: PIT: mck rate = %lu\n", pit_rate);
- 	pit_cycle = (pit_rate + HZ/2) / HZ;
- 	WARN_ON(((pit_cycle - 1) & ~AT91_PIT_PIV) != 0);
  
+ 	switch (m) {
+@@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+ 	 * of oneshot, we get lower overhead and improved accuracy.
+ 	 */
+ 	case CLOCK_EVT_MODE_PERIODIC:
+-		clk_enable(tcd->clk);
++		clk_prepare_enable(tcd->clk);
+ 
+ 		/* slow clock, count up to RC, then irq and restart */
+ 		__raw_writel(timer_clock
+@@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
+ 		break;
+ 
+ 	case CLOCK_EVT_MODE_ONESHOT:
+-		clk_enable(tcd->clk);
++		clk_prepare_enable(tcd->clk);
+ 
+ 		/* slow clock, count up to RC, then irq and stop */
+ 		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
+@@ -275,7 +275,7 @@ static int __init tcb_clksrc_init(void)
+ 	pdev = tc->pdev;
+ 
+ 	t0_clk = tc->clk[0];
+-	clk_enable(t0_clk);
++	clk_prepare_enable(t0_clk);
+ 
+ 	/* How fast will we be counting?  Pick something over 5 MHz.  */
+ 	rate = (u32) clk_get_rate(t0_clk);
+@@ -313,7 +313,7 @@ static int __init tcb_clksrc_init(void)
+ 		/* tclib will give us three clocks no matter what the
+ 		 * underlying platform supports.
+ 		 */
+-		clk_enable(tc->clk[1]);
++		clk_prepare_enable(tc->clk[1]);
+ 		/* setup both channel 0 & 1 */
+ 		tcb_setup_dual_chan(tc, best_divisor_idx);
+ 	}
 -- 
 1.7.9.5
