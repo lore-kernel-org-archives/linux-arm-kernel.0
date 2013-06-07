@@ -1,99 +1,173 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:30 +0900
-Subject: [GIT PULL v2 00/27] Renesas ARM-based SoC updates for v3.11
-Message-ID: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  7 Jun 2013 16:51:33 +0900
+Subject: [PATCH 03/27] ARM: shmobile: sh73a0: Use DEFINE_RES_MEM*() everywhere
+In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+Convert code to use DEFINE_RES_MEM*() macros.
+These macros were already used in this file,
+this change makes their usage consistent throughout the file.
 
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c | 79 ++++++-----------------------------
+ 1 file changed, 13 insertions(+), 66 deletions(-)
 
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.11
-
-for you to fetch changes up to 413bfd0e67894c930242482cd15ac09a800e2ab8:
-
-  ARM: shmobile: sh73a0: div4 clocks must check the kick bit before changing rate (2013-06-07 14:24:52 +0900)
-
-----------------------------------------------------------------
-Renesas ARM-based SoC updates for v3.11
-
-* Increased clock coverage for r8a7740, r8a73a4, r8a7778 and r8a7790
-* Use fixed clock ratio for r8a7778
-* Always use shmobile_setup_delay for sh73a0
-* Add add CPUFreq support for sh73a0
-* Check kick bit before changing rate on sh73a0
-* Do not overwrite all div4 clock operations on sh73a0
-
-* Cleanup SH_FIXED_RATIO_CLK and SH_FIXED_RATIO_CLK macros
-* sh73a0: Use DEFINE_RES_MEM*() everywhere
-* r8a7740: Make private clock arrays static
-* r8a7778: Correct model number
-
-The last four changes listed above are cleanups. I have included them
-in this series as all bar the last one are dependencies of non-cleanup
-patches.
-
-----------------------------------------------------------------
-Bastian Hecht (2):
-      ARM: shmobile: r8a7740: Add interim sh-eth device name to clocks list
-      ARM: shmobile: r8a7740: Add I2C DT clock names
-
-Guennadi Liakhovetski (4):
-      ARM: shmobile: sh73a0: add support for adjusting CPU frequency
-      ARM: shmobile: sh73a0: add CPUFreq support
-      ARM: shmobile: sh73a0: do not overwrite all div4 clock operations
-      ARM: shmobile: sh73a0: div4 clocks must check the kick bit before changing rate
-
-Kuninori Morimoto (13):
-      ARM: shmobile: remove ";" from SH_FIXED_RATIO_CLK*() macro
-      ARM: shmobile: use do{ }while() on SH_CLK_SET_RATIO()
-      ARM: shmobile: r8a7778: fixup Ether setup code position
-      ARM: shmobile: r8a73a4: add main clock
-      ARM: shmobile: r8a73a4: add pll clocks
-      ARM: shmobile: r8a73a4: add div4 clocks
-      ARM: shmobile: r8a73a4: add div6 clocks
-      ARM: shmobile: r8a7778: use fixed ratio clock
-      ARM: shmobile: r8a7778: add SDHI clock support
-      ARM: shmobile: r8a7778: Register SDHI device
-      ARM: shmobile: r8a7790: add main clock
-      ARM: shmobile: r8a7790: add div4 clocks
-      ARM: shmobile: r8a7790: add div6 clocks
-
-Laurent Pinchart (4):
-      ARM: shmobile: r8a7740: Make private clock arrays static
-      ARM: shmobile: r8a7740: add TPU PWM support
-      ARM: shmobile: r8a7790: Make private clock arrays static
-      ARM: shmobile: r8a7790: add TPU PWM support
-
-Magnus Damm (1):
-      ARM: shmobile: sh73a0: Always use shmobile_setup_delay()
-
-Phil Edworthy (1):
-      ARM: shmobile: r8a7779: Add PCIe clocks
-
-Sergei Shtylyov (1):
-      ARM: shmobile: r8a7778: correct model name in Kconfig
-
-Simon Horman (1):
-      ARM: shmobile: sh73a0: Use DEFINE_RES_MEM*() everywhere
-
- arch/arm/mach-shmobile/Kconfig                |   4 +-
- arch/arm/mach-shmobile/clock-r8a73a4.c        | 375 ++++++++++++++++++++++++--
- arch/arm/mach-shmobile/clock-r8a7740.c        |  11 +-
- arch/arm/mach-shmobile/clock-r8a7778.c        | 156 ++++++++++-
- arch/arm/mach-shmobile/clock-r8a7779.c        |   4 +-
- arch/arm/mach-shmobile/clock-r8a7790.c        | 238 +++++++++++++++-
- arch/arm/mach-shmobile/clock-sh73a0.c         | 111 +++++++-
- arch/arm/mach-shmobile/include/mach/clock.h   |   8 +-
- arch/arm/mach-shmobile/include/mach/r8a7778.h |   2 +
- arch/arm/mach-shmobile/setup-r8a7778.c        |  52 +++-
- arch/arm/mach-shmobile/setup-sh73a0.c         |  95 ++-----
- 11 files changed, 924 insertions(+), 132 deletions(-)
-
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index fdf3894..3bc33a5 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -288,12 +288,7 @@ static struct sh_timer_config tmu00_platform_data = {
+ };
+ 
+ static struct resource tmu00_resources[] = {
+-	[0] = {
+-		.name	= "TMU00",
+-		.start	= 0xfff60008,
+-		.end	= 0xfff60013,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM_NAMED(0xfff60008, 0xc, "TMU00"),
+ 	[1] = {
+ 		.start	= intcs_evt2irq(0x0e80), /* TMU0_TUNI00 */
+ 		.flags	= IORESOURCE_IRQ,
+@@ -318,12 +313,7 @@ static struct sh_timer_config tmu01_platform_data = {
+ };
+ 
+ static struct resource tmu01_resources[] = {
+-	[0] = {
+-		.name	= "TMU01",
+-		.start	= 0xfff60014,
+-		.end	= 0xfff6001f,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM_NAMED(0xfff60014, 0xc, "TMU00"),
+ 	[1] = {
+ 		.start	= intcs_evt2irq(0x0ea0), /* TMU0_TUNI01 */
+ 		.flags	= IORESOURCE_IRQ,
+@@ -341,12 +331,7 @@ static struct platform_device tmu01_device = {
+ };
+ 
+ static struct resource i2c0_resources[] = {
+-	[0] = {
+-		.name	= "IIC0",
+-		.start	= 0xe6820000,
+-		.end	= 0xe6820425 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM_NAMED(0xe6820000, 0x426, "IIC0"),
+ 	[1] = {
+ 		.start	= gic_spi(167),
+ 		.end	= gic_spi(170),
+@@ -355,12 +340,7 @@ static struct resource i2c0_resources[] = {
+ };
+ 
+ static struct resource i2c1_resources[] = {
+-	[0] = {
+-		.name	= "IIC1",
+-		.start	= 0xe6822000,
+-		.end	= 0xe6822425 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM_NAMED(0xe6822000, 0x426, "IIC1"),
+ 	[1] = {
+ 		.start	= gic_spi(51),
+ 		.end	= gic_spi(54),
+@@ -369,12 +349,7 @@ static struct resource i2c1_resources[] = {
+ };
+ 
+ static struct resource i2c2_resources[] = {
+-	[0] = {
+-		.name	= "IIC2",
+-		.start	= 0xe6824000,
+-		.end	= 0xe6824425 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM_NAMED(0xe6824000, 0x426, "IIC2"),
+ 	[1] = {
+ 		.start	= gic_spi(171),
+ 		.end	= gic_spi(174),
+@@ -383,12 +358,7 @@ static struct resource i2c2_resources[] = {
+ };
+ 
+ static struct resource i2c3_resources[] = {
+-	[0] = {
+-		.name	= "IIC3",
+-		.start	= 0xe6826000,
+-		.end	= 0xe6826425 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM_NAMED(0xe6826000, 0x426, "IIC3"),
+ 	[1] = {
+ 		.start	= gic_spi(183),
+ 		.end	= gic_spi(186),
+@@ -397,12 +367,7 @@ static struct resource i2c3_resources[] = {
+ };
+ 
+ static struct resource i2c4_resources[] = {
+-	[0] = {
+-		.name	= "IIC4",
+-		.start	= 0xe6828000,
+-		.end	= 0xe6828425 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	[0] = DEFINE_RES_MEM_NAMED(0xe6828000, 0x426, "IIC4"),
+ 	[1] = {
+ 		.start	= gic_spi(187),
+ 		.end	= gic_spi(190),
+@@ -623,12 +588,7 @@ static struct sh_dmae_pdata sh73a0_dmae_platform_data = {
+ };
+ 
+ static struct resource sh73a0_dmae_resources[] = {
+-	{
+-		/* Registers including DMAOR and channels including DMARSx */
+-		.start  = 0xfe000020,
+-		.end    = 0xfe008a00 - 1,
+-		.flags  = IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(0xfe000020, 0x89e0),
+ 	{
+ 		.name	= "error_irq",
+ 		.start  = gic_spi(129),
+@@ -727,18 +687,10 @@ static struct sh_dmae_pdata sh73a0_mpdma_platform_data = {
+ 
+ /* Resource order important! */
+ static struct resource sh73a0_mpdma_resources[] = {
+-	{
+-		/* Channel registers and DMAOR */
+-		.start	= 0xec618020,
+-		.end	= 0xec61828f,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		/* DMARSx */
+-		.start	= 0xec619000,
+-		.end	= 0xec61900b,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	/* Channel registers and DMAOR */
++	DEFINE_RES_MEM(0xec618020, 0x270),
++	/* DMARSx */
++	DEFINE_RES_MEM(0xec619000, 0xc),
+ 	{
+ 		.name	= "error_irq",
+ 		.start	= gic_spi(181),
+@@ -785,12 +737,7 @@ static struct platform_device pmu_device = {
+ 
+ /* an IPMMU module for ICB */
+ static struct resource ipmmu_resources[] = {
+-	[0] = {
+-		.name	= "IPMMU",
+-		.start	= 0xfe951000,
+-		.end	= 0xfe9510ff,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM_NAMED(0xfe951000, 0x100, "IPMMU"),
+ };
+ 
+ static const char * const ipmmu_dev_names[] = {
 -- 
 1.8.2.1
