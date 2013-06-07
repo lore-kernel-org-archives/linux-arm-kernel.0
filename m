@@ -1,44 +1,76 @@
-From: maxime.ripard@free-electrons.com (maxime.ripard at free-electrons.com)
-Date: Fri, 7 Jun 2013 11:02:28 +0200
-Subject: [PATCH] video: mxsfb: fix color settings for 18bit data bus and
- 32bpp
-In-Reply-To: <51B1957F.40104@digi.com>
-References: <519E03B0.1080006@digi.com> <519F4435.5010703@digi.com>
- <201305241300.25461.jbe@pengutronix.de>
- <201305241533.19941.jbe@pengutronix.de>
- <20130607072103.GF14209@lukather> <51B18BA0.50506@digi.com>
- <20130607074200.GG14209@lukather> <51B1957F.40104@digi.com>
-Message-ID: <20130607090228.GI14209@lukather>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Fri, 7 Jun 2013 18:03:54 +0900
+Subject: [PATCH] ARM: tegra: add basic SecureOS support
+In-Reply-To: <20130606180824.GC3320@localhost.localdomain>
+References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+ <51B0BC80.9040007@wwwdotorg.org> <20130606180824.GC3320@localhost.localdomain>
+Message-ID: <CAAVeFuJkV3VVfeinLrjCCef9ZqJNvKurQwVWnJsW-bZqniTQ1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hector,
+On Fri, Jun 7, 2013 at 3:08 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+>> I think we need to separate the concept of support for *a* secure
+>> monitor, from support for a *particular* secure monitor.
+>
+> There is no fixed set of functionality implemented by these interfaces,
+> so it might be better to think in terms of a generic "firmware" concept.
+>
+>
+> Come to think of it...
+>
+> One option could be to have some standard baseline firmware calling
+> conventions, so that we could have a few specific backends -- perhaps
+> this could be built on the "method" notion used by PSCI
+>
+> (see Documentation/devicetree/bindings/arm/psci.tst; this is probably
+> the most developed firmware interface binding we have today)
+>
+> There, method = "smc" means:
+>
+>         populate registers in a certain way
+>         SMC #0
+>         return results from register to caller in a certain way
+>
+> and method = "hvc" means:
+>
+>         populate registers in a certain way
+>         HVC #0
+>         return results from register to caller in a certain way
+>
+>
+> The backend method arch/arm/kernel/psci.c:__invoke_psci_fn_smc()
+> is probably close to what's needed for the tegra secureos case,
+> so in theory it could be common, along with some of the DT binding
+> conventions.
+>
+> The backends, and the convention for binding a firmware interface
+> to the appropriate backend, could then theoretically be handled
+> by a common framework.
 
-On Fri, Jun 07, 2013 at 10:10:39AM +0200, Hector Palacios wrote:
-> For a combination of 18bit LCD data bus width and a color
-> mode of 32bpp, the driver was setting the color mapping to
-> rgb666, which is wrong, as the color in memory realy has an
-> rgb888 layout.
-> 
-> This patch also removes the setting of flag CTRL_DF24 that
-> makes the driver dimiss the upper 2 bits when handling 32/24bpp
-> colors in a diplay with 18bit data bus width. This flag made
-> true color images display wrong in such configurations.
-> 
-> Finally, the color mapping rgb666 has also been removed as nobody
-> is using it and high level applications like Qt5 cannot work
-> with it either.
-> 
-> Reference: https://lkml.org/lkml/2013/5/23/220
-> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
-> Acked-by: Juergen Beisert <jbe@pengutronix.de>
+I'm not sure whether we could use the same backend for many different
+firmwares. If I understand you correctly, you propose to have a
+backend to the "smc" call that would cover the needs of all firmwares
+that rely on the smc instruction to invoke the firmware/secure
+monitor.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+I can understand the logic, but I'm not sure this is needed or even
+possible. For instance, the implementation you have in
+__invoke_psci_fn_smc assumes 4 arguments, while Tegra's only needs 3.
+Also (and although I have to confess I am not very knowledgeable about
+the "SecureOS" covered by this patch and need to double-check what
+follows), in Tegra's case registers r3-r11 can be altered by the
+secure monitor and need to be preserved - something you don't need to
+do with PSCI.
 
-Please also note that fbdev is now maintained by Jean Christophe
-Plagniol-Villard (plagnioj at jcrosoft.com, in CC), and that he is away
-until the 10th of June, so maybe it should be safe to resend it to him
-after this date.
+Another example is the function that Tomasz shown
+(https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/mach-exynos/exynos-smc.S?id=refs/tags/next-20130606
+), which preserves r4-r11 but also assumes r3 is an argument - that's
+again another slightly different convention.
 
-Thanks!
-Maxime
+All in all the needs of the various firmwares might end up being just
+different enough that we need to have a different backend for each of
+them. The firmware_ops defined in arch/arm/include/asm/firmware.h
+perform the abstraction at a higher level, which seems more fit here
+IMHO.
+
+Alex.
