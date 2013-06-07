@@ -1,40 +1,53 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 07 Jun 2013 14:45:45 +0400
-Subject: [PATCH v8 0/9] Reorganize R8A7779/Marzen USB code
-In-Reply-To: <20130607080637.GC22598@verge.net.au>
-References: <201306020128.05914.sergei.shtylyov@cogentembedded.com>
- <20130607080637.GC22598@verge.net.au>
-Message-ID: <51B1B9D9.5040906@cogentembedded.com>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Fri,  7 Jun 2013 11:48:28 +0100
+Subject: [PATCH v3 0/3] Separate generic header usage from ARCH_MULTIPLATFORM
+Message-ID: <1370602111-28737-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+The original aim of this series was to restore the ability to build a NOMMU
+kernel for Versatile Express, something that was lost when we converted
+ARCH_VEXPRESS for ARCH_MULTIPLATFORM.
 
-On 07-06-2013 12:06, Simon Horman wrote:
+In order to do this, it is necessary to abstract the use of generic headers
+from selection of ARCH_MULTIPLATFORM so that the two can be used separately.
+This is necessary becuase building a multiplatform kernel for processors
+without and MMU doesn't make sense (it is necessary to hardcode certain mem-map
+related data) and the versatile express can host NOMMU processors.
 
->>     Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
->> 'renesas-next-20130528' tag.  It was created to fix the shortcomings in the
->> R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
->> spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
->> to touch both subtrees). The patches were conceived with the complete
->> bisectability goal in mind.
+This series performs this separation, and then goes on to add a 'dummy'
+ARCH_VEXPRESS_NOMMU platform that can be selected as standalone platform.
 
->> [1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
->> [2/9] ehci-platform: add pre_setup() method to platform data
->> [3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
->> [4/9] phy-rcar-usb: remove EHCI internal buffer setup
->> [5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
->> [6/9] phy-rcar-usb: correct base address
->> [7/9] phy-rcar-usb: add platform data
->> [8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
->> [9/9] phy-rcar-usb: handle platform data
+Patch 2 was sent to the list as an RFC some time ago where it was ACKd, but
+alone is not sufficient to solve the problem, hence this follow-up series.
 
->>     The patchset is completely ready to be merged now.
+Changes since V1:
+ - Rebase on to 3.10-rc1: fixup conflict from CONFIG_UNCOMPRESS_INCLUDE-foo
 
-> Can I confirm that the plan is for me to merge this code?
+Changes since V2
+ - Rename ARM_GENERIC_HEADERS to NEED_NO_MACH_HEADERS as suggested/requested by
+   Rob Herring
 
-    Yes, that was the plan.
+Jonathan Austin (3):
+  ARM: allow platforms to use generic headers without
+    ARCH_MULTIPLATFORM
+  ARM: nommu: re-enable use of vexpress without ARCH_MULTIPLATFORM
+  ARM: vexpress-nommu: add a Makefile.boot to restore single-platform
+    build
 
-> If so, I should be able to do so next week.
+ arch/arm/Kconfig                     |   21 +++++++++++++++++++++
+ arch/arm/Kconfig.debug               |    4 ++--
+ arch/arm/Makefile                    |    2 +-
+ arch/arm/include/asm/timex.h         |    2 +-
+ arch/arm/mach-mvebu/Makefile         |    2 +-
+ arch/arm/mach-omap2/Makefile         |    2 +-
+ arch/arm/mach-vexpress/Makefile      |    2 +-
+ arch/arm/mach-vexpress/Makefile.boot |    4 ++++
+ arch/arm/plat-omap/Makefile          |    2 +-
+ arch/arm/plat-orion/Makefile         |    2 +-
+ arch/arm/plat-versatile/Makefile     |    2 +-
+ 11 files changed, 35 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/mach-vexpress/Makefile.boot
 
-WBR, Sergei
+-- 
+1.7.9.5
