@@ -1,25 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 7 Jun 2013 17:55:10 +0100
-Subject: [RFC PATCH 28/50] ASoC: atmel-ssc: prepare clk before calling
- enable
-In-Reply-To: <1370622370-19614-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
- <1370622370-19614-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20130607165510.GA31367@sirena.org.uk>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Jun 2013 18:56:20 +0200
+Subject: [PATCH 01/14] bus: mvebu-mbus: Use pr_fmt
+In-Reply-To: <1370623671-7748-2-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1370623671-7748-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130607185620.20780fd6@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 06:26:09PM +0200, Boris BREZILLON wrote:
-> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-> avoid common clk framework warnings.
+Dear Ezequiel Garcia,
 
-Applied since I happened to notice this on he list but you should
-*always* CC maintainers on patches otherwise they're likely to get
-missed.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130607/5e116406/attachment-0001.sig>
+On Fri,  7 Jun 2013 13:47:38 -0300, Ezequiel Garcia wrote:
+> In order to clean message printing, we replace pr_info with pr_fmt.
+> This is purely cosmetic change, with the sole purpose of making
+> the code a bit more readable.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+
+Acked-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+
+I believe this one could be applied regardless of what happens to the
+rest of the patch series.
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
