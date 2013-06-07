@@ -1,94 +1,42 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Fri, 7 Jun 2013 12:25:44 -0700
-Subject: [PATCH 3/3] leds: leds-mc13783: Rename unit to indicate various
- MC13xxx chips support
-In-Reply-To: <1370273916-29852-3-git-send-email-shc_work@mail.ru>
-References: <1370273916-29852-1-git-send-email-shc_work@mail.ru>
- <1370273916-29852-3-git-send-email-shc_work@mail.ru>
-Message-ID: <CAK5ve-JBQzfO=pmB7SRUi4tD1RqNcnXr7stxuCUdXVixWZS_tA@mail.gmail.com>
+From: ben@decadent.org.uk (Ben Hutchings)
+Date: Fri, 7 Jun 2013 20:31:04 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDxXnRWYK4GhSkN-PzM1hLOZPiD1MUne1Q-4FT6PJRJUtw@mail.gmail.com>
+References: <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1370477958.20454.68.camel@localhost>
+ <CAPweEDyPffcN9cNJ10ZHt+AZJHTRdU0LMfCGM_756uAbf+NEBQ@mail.gmail.com>
+ <51B085C6.3000605@gmail.com>
+ <CAPweEDwR_NWUSi-j53m8MuoaV1RxM4wNNXtRioa2CjNdYqEtzQ@mail.gmail.com>
+ <51B19046.5040401@gmail.com>
+ <CAPweEDxfWcv7HSDuO6Uc751iiPg9ngDQc5UB7mbxwBespwF_7Q@mail.gmail.com>
+ <1370616567.2433.20.camel@jm-desktop>
+ <20130607182608.GV18614@n2100.arm.linux.org.uk>
+ <CAPweEDxXnRWYK4GhSkN-PzM1hLOZPiD1MUne1Q-4FT6PJRJUtw@mail.gmail.com>
+Message-ID: <20130607193104.GE4752@decadent.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 3, 2013 at 8:38 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
->
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/configs/imx_v4_v5_defconfig            | 2 +-
+On Fri, Jun 07, 2013 at 08:18:14PM +0100, Luke Kenneth Casson Leighton wrote:
+> On Fri, Jun 7, 2013 at 7:26 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > Luke Leighton on the other hand is demanding that we
+> 
+>  no demands have been made, russell: i've informed you of an immovable
+> deadline which will pass beyond which the opportunity being presented
+> is lost.
+[...]
 
-Please split out this change into another patch, which can be merged
-into imx tree after those leds changes merged.
+Would that be the opportunity for you to pose as an intermediary
+between the Linux community and Allwinner, which you failed to realise
+was a completely redundant position?
 
--Bryan
+If not, please explain what you are actually hoping to do, and why
+anyone should care.
 
->  drivers/leds/Kconfig                            | 8 ++++----
->  drivers/leds/Makefile                           | 2 +-
->  drivers/leds/{leds-mc13783.c => leds-mc13xxx.c} | 2 +-
->  4 files changed, 7 insertions(+), 7 deletions(-)
->  rename drivers/leds/{leds-mc13783.c => leds-mc13xxx.c} (99%)
->
-> diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-> index f07a847..7fd9f9b 100644
-> --- a/arch/arm/configs/imx_v4_v5_defconfig
-> +++ b/arch/arm/configs/imx_v4_v5_defconfig
-> @@ -166,7 +166,7 @@ CONFIG_MMC_MXC=y
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
->  CONFIG_LEDS_GPIO=y
-> -CONFIG_LEDS_MC13783=y
-> +CONFIG_LEDS_MC13XXX=y
->  CONFIG_LEDS_TRIGGERS=y
->  CONFIG_LEDS_TRIGGER_TIMER=y
->  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-> diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> index ef99229..c9a4eb2 100644
-> --- a/drivers/leds/Kconfig
-> +++ b/drivers/leds/Kconfig
-> @@ -387,13 +387,13 @@ config LEDS_DELL_NETBOOKS
->           This adds support for the Latitude 2100 and similar
->           notebooks that have an external LED.
->
-> -config LEDS_MC13783
-> -       tristate "LED Support for MC13783 PMIC"
-> +config LEDS_MC13XXX
-> +       tristate "LED Support for MC13XXX PMIC"
->         depends on LEDS_CLASS
-> -       depends on MFD_MC13783
-> +       depends on MFD_MC13XXX
->         help
->           This option enable support for on-chip LED drivers found
-> -         on Freescale Semiconductor MC13783 PMIC.
-> +         on Freescale Semiconductor MC13783/MC13892 PMIC.
->
->  config LEDS_NS2
->         tristate "LED support for Network Space v2 GPIO LEDs"
-> diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-> index ac28977..70329f7 100644
-> --- a/drivers/leds/Makefile
-> +++ b/drivers/leds/Makefile
-> @@ -45,7 +45,7 @@ obj-$(CONFIG_LEDS_INTEL_SS4200)               += leds-ss4200.o
->  obj-$(CONFIG_LEDS_LT3593)              += leds-lt3593.o
->  obj-$(CONFIG_LEDS_ADP5520)             += leds-adp5520.o
->  obj-$(CONFIG_LEDS_DELL_NETBOOKS)       += dell-led.o
-> -obj-$(CONFIG_LEDS_MC13783)             += leds-mc13783.o
-> +obj-$(CONFIG_LEDS_MC13XXX)             += leds-mc13xxx.o
->  obj-$(CONFIG_LEDS_NS2)                 += leds-ns2.o
->  obj-$(CONFIG_LEDS_NETXBIG)             += leds-netxbig.o
->  obj-$(CONFIG_LEDS_ASIC3)               += leds-asic3.o
-> diff --git a/drivers/leds/leds-mc13783.c b/drivers/leds/leds-mc13xxx.c
-> similarity index 99%
-> rename from drivers/leds/leds-mc13783.c
-> rename to drivers/leds/leds-mc13xxx.c
-> index f4e50cc..b8a4c2f 100644
-> --- a/drivers/leds/leds-mc13783.c
-> +++ b/drivers/leds/leds-mc13xxx.c
-> @@ -541,6 +541,6 @@ static struct platform_driver mc13xxx_led_driver = {
->  };
->  module_platform_driver(mc13xxx_led_driver);
->
-> -MODULE_DESCRIPTION("LEDs driver for Freescale MC13783 PMIC");
-> +MODULE_DESCRIPTION("LEDs driver for Freescale MC13XXX PMIC");
->  MODULE_AUTHOR("Philippe Retornaz <philippe.retornaz@epfl.ch>");
->  MODULE_LICENSE("GPL");
-> --
-> 1.8.1.5
->
+Ben.
+
+-- 
+Ben Hutchings
+We get into the habit of living before acquiring the habit of thinking.
+                                                              - Albert Camus
