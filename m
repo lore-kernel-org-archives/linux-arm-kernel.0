@@ -1,125 +1,82 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:40 +0900
-Subject: [PATCH 10/27] ARM: shmobile: r8a73a4: add main clock
+Date: Fri,  7 Jun 2013 16:51:57 +0900
+Subject: [PATCH 27/27] ARM: shmobile: sh73a0: div4 clocks must check the kick
+ bit before changing rate
 In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370591517-20239-11-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-28-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
-Almost all clock needs main clock which is basis clock on r8a73a4.
-This patch adds it, and, set parent clock via CKSCR register.
+According to the datasheet, it is not allowed to change div4 clock rates
+if an earlier rate change operation is still in progress, as indicated by
+a set kick bit.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a73a4.c | 53 ++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+ arch/arm/mach-shmobile/clock-sh73a0.c | 24 +++++++++++++++++++-----
+ 1 file changed, 19 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a73a4.c b/arch/arm/mach-shmobile/clock-r8a73a4.c
-index e710c00..42942b4 100644
---- a/arch/arm/mach-shmobile/clock-r8a73a4.c
-+++ b/arch/arm/mach-shmobile/clock-r8a73a4.c
-@@ -22,6 +22,7 @@
- #include <linux/kernel.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
-+#include <mach/clock.h>
- #include <mach/common.h>
- 
- #define CPG_BASE 0xe6150000
-@@ -31,6 +32,8 @@
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR5 0xe6150144
- 
-+#define CKSCR		0xE61500C0
-+
- static struct clk_mapping cpg_mapping = {
- 	.phys   = CPG_BASE,
- 	.len    = CPG_LEN,
-@@ -51,10 +54,32 @@ static struct clk extal2_clk = {
- 	.mapping	= &cpg_mapping,
+diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
+index d05cf90..d9fd033 100644
+--- a/arch/arm/mach-shmobile/clock-sh73a0.c
++++ b/arch/arm/mach-shmobile/clock-sh73a0.c
+@@ -257,7 +257,7 @@ static struct clk twd_clk = {
+ 	.ops = &twd_clk_ops,
  };
  
-+static struct sh_clk_ops followparent_clk_ops = {
-+	.recalc	= followparent_recalc,
-+};
-+
-+static struct clk main_clk = {
-+	/* .parent will be set r8a73a4_clock_init */
-+	.ops	= &followparent_clk_ops,
-+};
-+
-+SH_CLK_RATIO(div2,	1, 2);
-+SH_CLK_RATIO(div4,	1, 4);
-+
-+SH_FIXED_RATIO_CLK(main_div2_clk,	main_clk,		div2);
-+SH_FIXED_RATIO_CLK(extal1_div2_clk,	extal1_clk,		div2);
-+SH_FIXED_RATIO_CLK(extal2_div2_clk,	extal2_clk,		div2);
-+SH_FIXED_RATIO_CLK(extal2_div4_clk,	extal2_clk,		div4);
-+
- static struct clk *main_clks[] = {
- 	&extalr_clk,
- 	&extal1_clk,
-+	&extal1_div2_clk,
- 	&extal2_clk,
-+	&extal2_div2_clk,
-+	&extal2_div4_clk,
-+	&main_clk,
-+	&main_div2_clk,
- };
+-static struct sh_clk_ops zclk_ops;
++static struct sh_clk_ops zclk_ops, kicker_ops;
+ static const struct sh_clk_ops *div4_clk_ops;
  
- enum {
-@@ -74,6 +99,13 @@ static struct clk mstp_clks[MSTP_NR] = {
- };
+ static int zclk_set_rate(struct clk *clk, unsigned long rate)
+@@ -324,18 +324,32 @@ static unsigned long zclk_recalc(struct clk *clk)
+ 	return clk_get_rate(clk->parent);
+ }
  
- static struct clk_lookup lookups[] = {
-+	/* main clock */
-+	CLKDEV_CON_ID("extal1",			&extal1_clk),
-+	CLKDEV_CON_ID("extal1_div2",		&extal1_div2_clk),
-+	CLKDEV_CON_ID("extal2",			&extal2_clk),
-+	CLKDEV_CON_ID("extal2_div2",		&extal2_div2_clk),
-+	CLKDEV_CON_ID("extal2_div4",		&extal2_div4_clk),
-+
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
-@@ -90,6 +122,7 @@ void __init r8a73a4_clock_init(void)
+-static void zclk_extend(void)
++static int kicker_set_rate(struct clk *clk, unsigned long rate)
  {
- 	void __iomem *cpg_base, *reg;
- 	int k, ret = 0;
-+	u32 ckscr;
- 
- 	/* fix MPCLK to EXTAL2 for now.
- 	 * this is needed until more detailed clock topology is supported
-@@ -100,6 +133,26 @@ void __init r8a73a4_clock_init(void)
- 	iowrite32(ioread32(reg) | 1 << 7 | 0x0c, reg); /* set CKSEL */
- 	iounmap(cpg_base);
- 
-+	reg = ioremap_nocache(CKSCR, PAGE_SIZE);
-+	BUG_ON(!reg);
-+	ckscr = ioread32(reg);
-+	iounmap(reg);
+-	div4_clk_ops = div4_clks[DIV4_Z].ops;
++	if (__raw_readl(FRQCRB) & (1 << 31))
++		return -EBUSY;
 +
-+	switch ((ckscr >> 28) & 0x3) {
-+	case 0:
-+		main_clk.parent = &extal1_clk;
-+		break;
-+	case 1:
-+		main_clk.parent = &extal1_div2_clk;
-+		break;
-+	case 2:
-+		main_clk.parent = &extal2_clk;
-+		break;
-+	case 3:
-+		main_clk.parent = &extal2_div2_clk;
-+		break;
-+	}
++	return div4_clk_ops->set_rate(clk, rate);
++}
 +
- 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
- 		ret = clk_register(main_clks[k]);
++static void div4_clk_extend(void)
++{
++	int i;
++
++	div4_clk_ops = div4_clks[0].ops;
  
++	/* Add a kicker-busy check before changing the rate */
++	kicker_ops = *div4_clk_ops;
+ 	/* We extend the DIV4 clock with a 1:1 pass-through case */
+ 	zclk_ops = *div4_clk_ops;
+ 
++	kicker_ops.set_rate = kicker_set_rate;
+ 	zclk_ops.set_rate = zclk_set_rate;
+ 	zclk_ops.round_rate = zclk_round_rate;
+ 	zclk_ops.recalc = zclk_recalc;
+ 
+-	div4_clks[DIV4_Z].ops = &zclk_ops;
++	for (i = 0; i < DIV4_NR; i++)
++		div4_clks[i].ops = i == DIV4_Z ? &zclk_ops : &kicker_ops;
+ }
+ 
+ enum { DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_ZB1,
+@@ -697,7 +711,7 @@ void __init sh73a0_clock_init(void)
+ 	if (!ret) {
+ 		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
+ 		if (!ret)
+-			zclk_extend();
++			div4_clk_extend();
+ 	}
+ 
+ 	if (!ret)
 -- 
 1.8.2.1
