@@ -1,58 +1,40 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Fri, 7 Jun 2013 19:00:58 +0200
-Subject: [PATCH v2 0/8] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <20130607150814.GU23859@titan.lakedaemon.net>
-References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130606185110.GP23859@titan.lakedaemon.net>
- <20130607102304.3c42773b@skate>
- <20130607150814.GU23859@titan.lakedaemon.net>
-Message-ID: <20130607190058.112d8d4a@skate>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 7 Jun 2013 13:01:05 -0400
+Subject: [PATCH 13/14] ARM: AM33XX: hwmod data: irq, dma and addr info
+ clean up
+In-Reply-To: <87zjv2ooxi.fsf@linaro.org>
+References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+ <1369845494-30231-14-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.02.1306060355320.15042@utopia.booyaka.com>
+ <87zjv2ooxi.fsf@linaro.org>
+Message-ID: <51B211D1.20100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jason Cooper,
-
-On Fri, 7 Jun 2013 11:08:14 -0400, Jason Cooper wrote:
-
-> > 1-3 through Bjorn, 4-5 through tglx, 6-8 through you.
-> > 
-> > The only problem that I see is that 'irqchip: armada-370-xp: implement
-> > MSI support' (which goes through tglx) has a build dependency on 'PCI:
-> > Add registry of MSI chips' (which goes through Bjorn). This is due to
-> > the IRQ controller using the msi_chip_add() function that is introduced
-> > earlier in the PCI core.
+On Thursday 06 June 2013 06:27 PM, Kevin Hilman wrote:
+> Paul Walmsley <paul@pwsan.com> writes:
 > 
-> Yeah, that's what I was afraid of...
+>> On Wed, 29 May 2013, Santosh Shilimkar wrote:
+>>
+>>> From: Vaibhav Hiremath <hvaibhav@ti.com>
+>>>
+>>> AM33XX only supports DT boot mode and with addition of
+>>> extracting module resources like, irq, dma and address space
+>>> from DT block, so now we can remove duplicate information from
+>>> hwmod data file.
+>>
+>> OK, guess I'll take your word for it that it all works.  The
+>> BeagleBone-white with appended DTB hasn't booted here since v3.7.
+>> And the BeagleBone-black with discrete DTB doesn't boot at all with
+>> current mainline, only with the TI vendor kernel & DTB...
 > 
-> > How would you solve that?
+> Anyone care to shed light on what's missing for BeagleBone boot with
+> mainline currently?  
 > 
-> Let me take a closer look at it later today or this weekend.  I just
-> wanted to make sure that we always defer to the appropriate maintainers
-> first, and merge all through arm-soc as a last resort.
+> I've also not been able to boot a mainline kernel on the BeagleBone for
+> some time.
+> 
+Looping Rajendra.
 
-Now that I think of it, there is no problem in fact. Until you apply the
-patch 'arm: mvebu: indicate that this platform supports MSI', which
-modifies Kconfig to say that mvebu supports MSI, there is no way for
-the user to enable CONFIG_PCI_MSI.
-
-And since in the IRQ controller driver the MSI code is inside a #ifdef
-CONFIG_PCI_MSI, this driver will build perfectly fine, as long as 'arm:
-mvebu: indicate that this platform supports MSI' is not merged before
-'PCI: Add registry of MSI chips'.
-
-So we can perfectly let Bjorn take the three PCI patches, tglx take the
-two IRQ controller patches, and you take the ARM stuff. The only thing
-is that the ARM stuff should not surface until both the PCI patches and
-the IRQ controller patches have landed in mainline.
-
-But well, before even thinking of merging all this, I'd like to hear
-from Bjorn about what he thinks of those patches.
-
-Thanks!
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Regards,
+Santosh
