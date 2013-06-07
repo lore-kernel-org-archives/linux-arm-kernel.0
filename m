@@ -1,50 +1,35 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  7 Jun 2013 17:11:28 +0100
-Subject: [PATCH 10/10] regulator: ab8500: Provide supply names for the AUX
- regulators
+Date: Fri,  7 Jun 2013 17:11:24 +0100
+Subject: [PATCH 06/10] regulator: ab8500: Ensure AB8500 external registers are
+ probed first
 In-Reply-To: <1370621488-18130-1-git-send-email-lee.jones@linaro.org>
 References: <1370621488-18130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370621488-18130-11-git-send-email-lee.jones@linaro.org>
+Message-ID: <1370621488-18130-7-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some platforms the AUX[1|2|3] regulators are supplied voltage by
-a separate regulator. For example on Snowball these are provided by
-the EXT3. If we list them here, we can supply voltage to them by
-simply listing them in as a consumer of EXT3 in the Snowball case.
+This patch changes the order in which the AB8500 regulator drivers are
+registered and subsequently probed. It saves a lot of -EPROBE_DEFEER
+nonsense and bootlog noise, as some AB8500 core regulators depend on
+the external ones for supply voltage.
 
 Signed-off-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/regulator/ab8500.c |    3 +++
- 1 file changed, 3 insertions(+)
+ drivers/regulator/Makefile |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/regulator/ab8500.c b/drivers/regulator/ab8500.c
-index aea9fdae..603f192 100644
---- a/drivers/regulator/ab8500.c
-+++ b/drivers/regulator/ab8500.c
-@@ -719,6 +719,7 @@ static struct ab8500_regulator_info
- 			.n_voltages	= ARRAY_SIZE(ldo_vauxn_voltages),
- 			.volt_table	= ldo_vauxn_voltages,
- 			.enable_time	= 200,
-+			.supply_name    = "vin",
- 		},
- 		.load_lp_uA		= 5000,
- 		.update_bank		= 0x04,
-@@ -741,6 +742,7 @@ static struct ab8500_regulator_info
- 			.n_voltages	= ARRAY_SIZE(ldo_vauxn_voltages),
- 			.volt_table	= ldo_vauxn_voltages,
- 			.enable_time	= 200,
-+			.supply_name    = "vin",
- 		},
- 		.load_lp_uA		= 5000,
- 		.update_bank		= 0x04,
-@@ -763,6 +765,7 @@ static struct ab8500_regulator_info
- 			.n_voltages	= ARRAY_SIZE(ldo_vaux3_voltages),
- 			.volt_table	= ldo_vaux3_voltages,
- 			.enable_time	= 450,
-+			.supply_name    = "vin",
- 		},
- 		.load_lp_uA		= 5000,
- 		.update_bank		= 0x04,
+diff --git a/drivers/regulator/Makefile b/drivers/regulator/Makefile
+index 47a34ff..0f4964e 100644
+--- a/drivers/regulator/Makefile
++++ b/drivers/regulator/Makefile
+@@ -12,7 +12,7 @@ obj-$(CONFIG_REGULATOR_USERSPACE_CONSUMER) += userspace-consumer.o
+ obj-$(CONFIG_REGULATOR_88PM8607) += 88pm8607.o
+ obj-$(CONFIG_REGULATOR_AAT2870) += aat2870-regulator.o
+ obj-$(CONFIG_REGULATOR_AB3100) += ab3100.o
+-obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500.o ab8500-ext.o
++obj-$(CONFIG_REGULATOR_AB8500)	+= ab8500-ext.o ab8500.o
+ obj-$(CONFIG_REGULATOR_AD5398) += ad5398.o
+ obj-$(CONFIG_REGULATOR_ANATOP) += anatop-regulator.o
+ obj-$(CONFIG_REGULATOR_ARIZONA) += arizona-micsupp.o arizona-ldo1.o
 -- 
 1.7.10.4
