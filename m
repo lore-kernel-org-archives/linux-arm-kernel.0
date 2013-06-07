@@ -1,65 +1,44 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Fri, 7 Jun 2013 16:19:06 +0800
-Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
-Message-ID: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  7 Jun 2013 17:22:01 +0900
+Subject: [PATCH 03/11] ARM: shmobile: kzm9d: resigser smsc911x platform device
+ with id -1
+In-Reply-To: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370593329-27559-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some unknown reasons, the jiffies will be updated more
-than one tick at every short time. Eg, at this code:
-After timeout = jiffies + msecs_to_jiffies(10),
-the interrupt occurs, and the softirq updates jiffies (eg,  + 2 jiffies),
-then return back from interrupt, the time between above operations
-are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+As the kzm9d only has one smsc911x device it
+may be registered as a platform device with id -1.
 
-Signed-off-by: Peter Chen <peter.chen@freescale.com>
+This allows the kzm9d board to access the smsc911x device
+when CONFIG_REGULATOR (and CONFIG_REGULATOR_FIXED_VOLTAGE)
+are set. The motivation for which is twofold: using regulators
+seems to be generally a good thing; it will move the kzm9d defconfig
+one step closer to being able to be consolidated with other
+shmobile defconfigs.
+
+An alternate but so far untested approach would be to
+update the definition of dummy_supplies in board-kzm9d.c
+to use "smsc911x.0" instead of "smsc911x".
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
-Changes for v2:
-- According to Russell King's suggestion, change code for more reasonable
-for timeout condition.
-- Change commit log.
+ arch/arm/mach-shmobile/board-kzm9d.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/mach-imx/clk-pllv3.c |   14 ++++++++++----
- 1 files changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mach-imx/clk-pllv3.c b/arch/arm/mach-imx/clk-pllv3.c
-index d09bc3d..52e54df 100644
---- a/arch/arm/mach-imx/clk-pllv3.c
-+++ b/arch/arm/mach-imx/clk-pllv3.c
-@@ -16,6 +16,7 @@
- #include <linux/slab.h>
- #include <linux/jiffies.h>
- #include <linux/err.h>
-+#include <linux/delay.h>
- #include "clk.h"
+diff --git a/arch/arm/mach-shmobile/board-kzm9d.c b/arch/arm/mach-shmobile/board-kzm9d.c
+index c016ccd..4368000 100644
+--- a/arch/arm/mach-shmobile/board-kzm9d.c
++++ b/arch/arm/mach-shmobile/board-kzm9d.c
+@@ -56,7 +56,7 @@ static struct smsc911x_platform_config smsc911x_platdata = {
  
- #define PLL_NUM_OFFSET		0x10
-@@ -48,7 +49,7 @@ struct clk_pllv3 {
- static int clk_pllv3_prepare(struct clk_hw *hw)
- {
- 	struct clk_pllv3 *pll = to_clk_pllv3(hw);
--	unsigned long timeout = jiffies + msecs_to_jiffies(10);
-+	int count = 100;
- 	u32 val;
- 
- 	val = readl_relaxed(pll->base);
-@@ -60,9 +61,14 @@ static int clk_pllv3_prepare(struct clk_hw *hw)
- 	writel_relaxed(val, pll->base);
- 
- 	/* Wait for PLL to lock */
--	while (!(readl_relaxed(pll->base) & BM_PLL_LOCK))
--		if (time_after(jiffies, timeout))
--			return -ETIMEDOUT;
-+	do {
-+		if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-+			break;
-+		udelay(100);
-+	} while (count--);
-+
-+	if (count == 0 && !(readl_relaxed(pll->base) & BM_PLL_LOCK))
-+		return -ETIMEDOUT;
- 
- 	return 0;
- }
+ static struct platform_device smsc91x_device = {
+ 	.name	= "smsc911x",
+-	.id	= 0,
++	.id	= -1,
+ 	.dev	= {
+ 		  .platform_data = &smsc911x_platdata,
+ 		},
 -- 
-1.7.0.4
+1.8.2.1
