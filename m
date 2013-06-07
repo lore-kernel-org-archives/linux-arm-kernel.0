@@ -1,85 +1,28 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 20:14:43 +0200
-Subject: [RFC PATCH 45/50] ARM: at91/dt: move rm9200 boards to new at91 clk
- implem
-In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370628883-3143-1-git-send-email-b.brezillon@overkiz.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 7 Jun 2013 14:14:51 -0400
+Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data file
+In-Reply-To: <alpine.DEB.2.02.1306071807510.7753@utopia.booyaka.com>
+References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
+ <20130607162927.GA3331@atomide.com> <20130607175005.GB3331@atomide.com>
+ <alpine.DEB.2.02.1306071807510.7753@utopia.booyaka.com>
+Message-ID: <51B2231B.6060806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define the main clock frequency in every at91rm9200 boards.
-Remove the old main clock definition.
+On Friday 07 June 2013 02:10 PM, Paul Walmsley wrote:
+> On Fri, 7 Jun 2013, Tony Lindgren wrote:
+> 
+>> I had to undo the following parts to avoid regressions on omap4sdp.
+>> Can you please follow up on fixing the related issues so the fixup
+>> won't be needed?
+> 
+> Well, I can't even test it at the moment.  So it's probably best for 
+> Santosh and Sricharan to fix those issues - they're the ones who are 
+> responsible for testing the patch before it's sent.  Unless there's
+> some specific reason why I'd be the best person to do it?
+> 
+Will take care of that Paul.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- arch/arm/boot/dts/at91rm9200ek.dts |   17 ++++++-----------
- arch/arm/boot/dts/mpa1600.dts      |   16 +++++-----------
- 2 files changed, 11 insertions(+), 22 deletions(-)
-
-diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-index 1405812..40772f3 100644
---- a/arch/arm/boot/dts/at91rm9200ek.dts
-+++ b/arch/arm/boot/dts/at91rm9200ek.dts
-@@ -16,19 +16,14 @@
- 		reg = <0x20000000 0x4000000>;
- 	};
- 
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <18432000>;
--		};
--	};
--
- 	ahb {
- 		apb {
-+			pmc: pmc at fffffc00 {
-+				main: mainck {
-+					clock-frequency = <18432000>;
-+				};
-+			};
-+
- 			dbgu: serial at fffff200 {
- 				status = "okay";
- 			};
-diff --git a/arch/arm/boot/dts/mpa1600.dts b/arch/arm/boot/dts/mpa1600.dts
-index ccf9ea2..317ee5a 100644
---- a/arch/arm/boot/dts/mpa1600.dts
-+++ b/arch/arm/boot/dts/mpa1600.dts
-@@ -16,17 +16,6 @@
- 		reg = <0x20000000 0x4000000>;
- 	};
- 
--	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <18432000>;
--		};
--	};
--
- 	ahb {
- 		apb {
- 			dbgu: serial at fffff200 {
-@@ -45,6 +34,11 @@
- 			ssc1: ssc at fffd4000 {
- 				status = "okay";
- 			};
-+			pmc: pmc at fffffc00 {
-+				main: mainck {
-+					clock-frequency = <18432000>;
-+				};
-+			};
- 		};
- 
- 		usb0: ohci at 00300000 {
--- 
-1.7.9.5
+Regards,
+Santosh
