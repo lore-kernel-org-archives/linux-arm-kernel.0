@@ -1,27 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 7 Jun 2013 10:35:08 +0800
-Subject: [PATCH v3] dma: imx-sdma: move to generic device tree bindings
-In-Reply-To: <1369923812-21767-1-git-send-email-shawn.guo@linaro.org>
-References: <1369923812-21767-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130607023506.GA20756@S2101-09.ap.freescale.net>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Fri, 7 Jun 2013 10:53:21 +0800
+Subject: [PATCH 1/1] ARM: imx: clk-pllv3: change wait method for PLL lock
+In-Reply-To: <20130606121647.GR23140@pengutronix.de>
+References: <1370501726-7421-1-git-send-email-peter.chen@freescale.com>
+ <20130606121647.GR23140@pengutronix.de>
+Message-ID: <20130607025320.GA21641@nchen-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 10:23:32PM +0800, Shawn Guo wrote:
-> Update imx-sdma driver to adopt generic DMA device tree bindings.  It
-> calls of_dma_controller_register() with imx-sdma specific of_dma_xlate
-> to get the generic DMA device tree helper support.  The #dma-cells for
-> imx-sdma must be 3, which includes request ID, peripheral type and
-> priority.
+On Thu, Jun 06, 2013 at 02:16:47PM +0200, Uwe Kleine-K?nig wrote:
+> Hello
 > 
-> The existing way of requesting channel, clients directly call
-> dma_request_channel(), still work there, and will be removed after
-> all imx-sdma clients get converted to generic DMA device tree helper.
+> [added jstultz to Cc:]
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> On Thu, Jun 06, 2013 at 02:55:26PM +0800, Peter Chen wrote:
+> > For tickless system, the jiffies may be updated long time (>20ms).
+> ... may not be updated for a long time ... ?
+> 
+> > At high loading system, the current waiting method will cause waiting
+> > timeout, and cause a kernel dump at below case.
+> > After timeout = jiffies + msecs_to_jiffies(10),
+> > the timer interrupt occurs, it updates jiffies (eg,  + 2 jiffies),
+> > then return back from interrupt, the time between above operations
+> > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+> Hmm, I admit I didn't follow the tickless stuff, but still I wonder if
+> the analysis is right. I thought on tickless jiffies are updated as
+> before by the boot cpu that cannot run in tickless mode?
+> 
+> Anyhow, this only affects the commit log, not the problem.
+>  
 
-Vinod,
+I add jiffies print at irq_exit (kernel/softirq.c), and it
+is not updated every jiffies.
 
-Can this patch be applied for 3.11?
+Meanwhile, I ran out this PLL Lock timeout issue with
+iperf test using usb ethernet gadget at current code (v3.5.7 kernel).
+After using udelay, this issue is disappeared.
 
-Shawn
+-- 
+
+Best Regards,
+Peter Chen
