@@ -1,59 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 17:21:59 +0900
-Subject: [PATCH 01/11] ARM: shmobile: ape6evm: MP clock parent become EXTAL2
-In-Reply-To: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370593329-27559-2-git-send-email-horms+renesas@verge.net.au>
+Date: Fri,  7 Jun 2013 17:21:58 +0900
+Subject: [GIT PULL 00/11] Renesas ARM-based SoC board updates for v3.11
+Message-ID: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-The orignal commit 3263e09d287fbaa8a9424b5e69396599a3bbd518
-(ARM: shmobile: Initial r8a73a4 SoC support V3)
-put MP clock parent as EXTAL2, but its code was removed
-on DIV6 clock support commit.
-This patch makes it consistent.
+Please note that this pull request is based on a merge of the
+renesas-pinmux-for-v3.11 and renesas-soc-for-v3.11 tags
+in the renesas tree in order to provide dependencies.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-ape6evm.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+I have sent pull requests for each of those tags as:
+[GIT PULL 000/130] Renesas ARM based SoC pinmux and GPIO update for
+[GIT PULL v2 00/27] Renesas ARM-based SoC updates for v3.11
 
-diff --git a/arch/arm/mach-shmobile/board-ape6evm.c b/arch/arm/mach-shmobile/board-ape6evm.c
-index 55b8c9f..5eb0caa 100644
---- a/arch/arm/mach-shmobile/board-ape6evm.c
-+++ b/arch/arm/mach-shmobile/board-ape6evm.c
-@@ -26,6 +26,7 @@
- #include <linux/platform_device.h>
- #include <linux/regulator/fixed.h>
- #include <linux/regulator/machine.h>
-+#include <linux/sh_clk.h>
- #include <linux/smsc911x.h>
- #include <mach/common.h>
- #include <mach/irqs.h>
-@@ -65,7 +66,21 @@ static const struct pinctrl_map ape6evm_pinctrl_map[] = {
- 
- static void __init ape6evm_add_standard_devices(void)
- {
-+
-+	struct clk *parent;
-+	struct clk *mp;
-+
- 	r8a73a4_clock_init();
-+
-+	/* MP clock parent = extal2 */
-+	parent      = clk_get(NULL, "extal2");
-+	mp          = clk_get(NULL, "mp");
-+	BUG_ON(IS_ERR(parent) || IS_ERR(mp));
-+
-+	clk_set_parent(mp, parent);
-+	clk_put(parent);
-+	clk_put(mp);
-+
- 	pinctrl_register_mappings(ape6evm_pinctrl_map,
- 				  ARRAY_SIZE(ape6evm_pinctrl_map));
- 	r8a73a4_pinmux_init();
+
+The following changes since commit a961ee1c95cb7309f619e9e68fe8c4fb73bedf6f:
+
+  Merge branches 'pinmux' and 'soc' into boards-base (2013-06-07 14:26:22 +0900)
+
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-boards-for-v3.11
+
+for you to fetch changes up to f3031ff3f2e14f0ced4d45150316df2607b70a27:
+
+  ARM: shmobile: marzen: keep local function as static (2013-06-07 14:26:35 +0900)
+
+----------------------------------------------------------------
+Renesas ARM-based SoC board updates for v3.11
+
+Highlights:
+bockw: add SDHI0 support
+bockw: add dummy regulators for SMSC
+bockw: Document CN9 SCIF/RCAN dipswitch selection
+lager: support GPIO switches and LEDs
+kzm9g: add AS3711 PMIC platform data
+marzen: Use INTC External IRQ pin driver for SMSC
+ape6evm: Update MP clock parent become EXTAL2 in line with changes
+         to r8a73a4 SoC code
+
+----------------------------------------------------------------
+Guennadi Liakhovetski (1):
+      ARM: shmobile: kzm9g: add AS3711 PMIC platform data
+
+Kuninori Morimoto (6):
+      ARM: shmobile: ape6evm: MP clock parent become EXTAL2
+      ARM: shmobile: bockw: define FPGA address and rename iomem variable
+      ARM: shmobile: bockw: add CN9 SCIF/RCAN selection dipswitch explanation
+      ARM: shmobile: bockw: add dummy regulators for SMSC
+      ARM: shmobile: bockw: add SDHI0 support
+      ARM: shmobile: marzen: keep local function as static
+
+Simon Horman (4):
+      ARM: shmobile: kzm9d: resigser smsc911x platform device with id -1
+      ARM: shmobile: lager: Add GPIO LEDs
+      ARM: shmobile: lager: support GPIO switches
+      ARM: shmobile: marzen: Use INTC External IRQ pin driver for SMSC
+
+ arch/arm/mach-shmobile/board-ape6evm.c |  15 +++
+ arch/arm/mach-shmobile/board-bockw.c   |  61 ++++++++++-
+ arch/arm/mach-shmobile/board-kzm9d.c   |   2 +-
+ arch/arm/mach-shmobile/board-kzm9g.c   | 193 ++++++++++++++++++++++++---------
+ arch/arm/mach-shmobile/board-lager.c   |  49 +++++++++
+ arch/arm/mach-shmobile/board-marzen.c  |   5 +-
+ 6 files changed, 263 insertions(+), 62 deletions(-)
+
 -- 
 1.8.2.1
