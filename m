@@ -1,64 +1,124 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 7 Jun 2013 13:59:13 -0400
-Subject: [PATCH 2/5] arm: preserve ATAGS in /chosen/atags in the Device
- Tree
-In-Reply-To: <20130607191651.0baa1c7d@skate>
-References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370414409-29991-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130606142851.6dd17cad@skate>
- <alpine.LFD.2.03.1306061253430.18597@syhkavp.arg>
- <20130607112101.2cedbc5f@skate>
- <20130607143249.GR23859@titan.lakedaemon.net>
- <20130607191651.0baa1c7d@skate>
-Message-ID: <20130607175913.GV23859@titan.lakedaemon.net>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Fri,  7 Jun 2013 20:07:55 +0200
+Subject: [RFC PATCH 31/50] tty: atmel_serial: prepare clk before calling enable
+In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370628479-2542-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 07:16:51PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
-> 
-> On Fri, 7 Jun 2013 10:32:49 -0400, Jason Cooper wrote:
-> 
-> > > Well, I don't think what you say here is really fair. Before the DT was
-> > > in place, unless I missed it, there was no standard way of letting the
-> > > bootloader pass MAC addresses to the kernel. And Marvell's development
-> > > on those Armada 370/XP platforms predates the introduction of the
-> > > Device Tree in the Linux kernel (the code we have originally been give
-> > > was a 2.6.3x), so it's really not their fault to not have a DT-capable
-> > > bootloader at this point.
-> > 
-> > To be accurate, I think Nico is referring to the fact that Marvell
-> > assigned their own ATAG without going through Russell.
-> 
-> Right, that's true.
-> 
-> > However, just like mach-types, are we assigning any new atags?  Can we
-> > consider them deprecated?  If so, that changes the game.  Then what
-> > Thomas is proposing is a "legacy compatibility" patch, as opposed to a
-> > hole vendors can use to do their own thing.
-> > 
-> > We could add Arnd's suggestion of a time bomb on the common code in
-> > atags_to_fdt.c to prevent mis-use.
-> > 
-> > I'm not 100% convinced of this, and I actually tend to agree with Nico
-> > here, but I'd also like to find a workable solution.
-> 
-> I perfectly understand Nico and Russell concerns, for sure. But I'd
-> also like to find a workable solution:
->  
->  * Passing the MAC address on the kernel command line is not something
->    that the network maintainer likes. See
->    http://lists.openwall.net/netdev/2011/11/17/82 and Dave Miller's
->    answer http://lists.openwall.net/netdev/2011/11/17/83.
-> 
->  * Parsing the U-Boot environment is really not easy. How does the
->    kernel know where this environment is located? What if another
->    bootloader than U-Boot is used? Reading the U-Boot environment from
->    the kernel sounds clunky.
+Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+avoid common clk framework warnings.
 
-I agree on both points.  Let's see what Nico and Russell think of using
-Arnd's suggestion of the time bomb, but used in atags_to_fdt.c.
+Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+---
+ drivers/tty/serial/atmel_serial.c |   35 ++++++++++++++++++++++++++++-------
+ 1 file changed, 28 insertions(+), 7 deletions(-)
 
-thx,
-
-Jason.
+diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
+index 3467462..b9b42cf 100644
+--- a/drivers/tty/serial/atmel_serial.c
++++ b/drivers/tty/serial/atmel_serial.c
+@@ -1458,9 +1458,10 @@ static void atmel_of_init_port(struct atmel_uart_port *atmel_port,
+ /*
+  * Configure the port from the platform device resource info.
+  */
+-static void atmel_init_port(struct atmel_uart_port *atmel_port,
++static int atmel_init_port(struct atmel_uart_port *atmel_port,
+ 				      struct platform_device *pdev)
+ {
++	int ret;
+ 	struct uart_port *port = &atmel_port->uart;
+ 	struct atmel_uart_data *pdata = pdev->dev.platform_data;
+ 
+@@ -1496,7 +1497,17 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
+ 	/* for console, the clock could already be configured */
+ 	if (!atmel_port->clk) {
+ 		atmel_port->clk = clk_get(&pdev->dev, "usart");
+-		clk_enable(atmel_port->clk);
++		if (IS_ERR(atmel_port->clk)) {
++			ret = PTR_ERR(atmel_port->clk);
++			atmel_port->clk = NULL;
++			return ret;
++		}
++		ret = clk_prepare_enable(atmel_port->clk);
++		if (ret) {
++			clk_put(atmel_port->clk);
++			atmel_port->clk = NULL;
++			return ret;
++		}
+ 		port->uartclk = clk_get_rate(atmel_port->clk);
+ 		clk_disable(atmel_port->clk);
+ 		/* only enable clock when USART is in use */
+@@ -1511,6 +1522,8 @@ static void atmel_init_port(struct atmel_uart_port *atmel_port,
+ 	} else {
+ 		atmel_port->tx_done_mask = ATMEL_US_TXRDY;
+ 	}
++
++	return 0;
+ }
+ 
+ struct platform_device *atmel_default_console_device;	/* the serial console device */
+@@ -1601,6 +1614,7 @@ static void __init atmel_console_get_options(struct uart_port *port, int *baud,
+ 
+ static int __init atmel_console_setup(struct console *co, char *options)
+ {
++	int ret;
+ 	struct uart_port *port = &atmel_ports[co->index].uart;
+ 	int baud = 115200;
+ 	int bits = 8;
+@@ -1612,7 +1626,9 @@ static int __init atmel_console_setup(struct console *co, char *options)
+ 		return -ENODEV;
+ 	}
+ 
+-	clk_enable(atmel_ports[co->index].clk);
++	ret = clk_enable(atmel_ports[co->index].clk);
++	if (ret)
++		return ret;
+ 
+ 	UART_PUT_IDR(port, -1);
+ 	UART_PUT_CR(port, ATMEL_US_RSTSTA | ATMEL_US_RSTRX);
+@@ -1645,6 +1661,7 @@ static struct console atmel_console = {
+  */
+ static int __init atmel_console_init(void)
+ {
++	int ret;
+ 	if (atmel_default_console_device) {
+ 		struct atmel_uart_data *pdata =
+ 			atmel_default_console_device->dev.platform_data;
+@@ -1655,7 +1672,9 @@ static int __init atmel_console_init(void)
+ 		port->uart.line = id;
+ 
+ 		add_preferred_console(ATMEL_DEVICENAME, id, NULL);
+-		atmel_init_port(port, atmel_default_console_device);
++		ret = atmel_init_port(port, atmel_default_console_device);
++		if (ret)
++			return ret;
+ 		register_console(&atmel_console);
+ 	}
+ 
+@@ -1786,7 +1805,9 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 	port->backup_imr = 0;
+ 	port->uart.line = ret;
+ 
+-	atmel_init_port(port, pdev);
++	ret = atmel_init_port(port, pdev);
++	if (ret)
++		goto err;
+ 
+ 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
+ 	if (IS_ERR(pinctrl)) {
+@@ -1812,9 +1833,9 @@ static int atmel_serial_probe(struct platform_device *pdev)
+ 			&& ATMEL_CONSOLE_DEVICE->flags & CON_ENABLED) {
+ 		/*
+ 		 * The serial core enabled the clock for us, so undo
+-		 * the clk_enable() in atmel_console_setup()
++		 * the clk_prepare_enable() in atmel_console_setup()
+ 		 */
+-		clk_disable(port->clk);
++		clk_disable_unprepare(port->clk);
+ 	}
+ #endif
+ 
+-- 
+1.7.9.5
