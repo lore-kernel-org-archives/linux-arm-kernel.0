@@ -1,46 +1,35 @@
-From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 7 Jun 2013 11:25:48 +0530
-Subject: [PATCH 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <51B0D54A.1090107@ti.com>
-References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
- <1369845494-30231-15-git-send-email-santosh.shilimkar@ti.com>
- <alpine.DEB.2.02.1306061754560.5152@utopia.booyaka.com>
- <51B0D54A.1090107@ti.com>
-Message-ID: <51B175E4.1060909@ti.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Fri,  7 Jun 2013 11:33:26 +0530
+Subject: [RFC][PATCH 0/7] USB: OHCI: more bus glues as separate modules
+Message-ID: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013 12:00 AM, Santosh Shilimkar wrote:
-> On Thursday 06 June 2013 01:57 PM, Paul Walmsley wrote:
->> On Wed, 29 May 2013, Santosh Shilimkar wrote:
->>
->>> From: Sricharan R <r.sricharan@ti.com>
->>>
->>> - The IO resource information like dma request lines, irq number and
->>>   ocp address space can be populated via dt blob. So such data is stripped
->>>   from OMAP4 SOC hwmod data file.
->>>
->>> - The devices which are still missing the device tree bindings,
->>>   address space entries are not removed yet. When such devices add
->>>   the dt bindings, respective address space data can be deleted.
->>>
->>> - Also other unnessecary hwmods like firewalls are removed as a part of this.
->>>
->>> The above update, results in reduction of about ~1650 lines of code.
->>>
->>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
->> I assume that you're not autogenerating this data any more, based on
->> your change list above.  If that's correct, please also remove
->> the paragraph at the top of the file:
->>
-> The data is auto-generated. I let Sricharan comment if it is otherwise
-> in the final version of the patch. 
->
-> Sricharan ?
-I used autogen to remove the data, but some of the data were not in sync
-with the mainline .(like abe, dss, aess, context register offsets etc..).
-So i have to sync them manually.
+These patches are for separating the SOC On-Chip ohci host controller 
+from ohci-hcd host code into its own driver module.
+This work is part of enabling multi-platform kernels on ARM.
 
-Regards,
- Sricharan
+Manjunath Goudar (7):
+  USB: OHCI: make ohci-exynos a separate driver
+  USB: OHCI: make ohci-omap a separate driver
+  USB: OHCI: make ohci-omap3 a separate driver
+  USB: OHCI: make ohci-spear a separate driver
+  USB: OHCI: export ohci_hub_control and ohci_hub_status_data
+  USB: OHCI: make ohci-at91 a separate driver
+  USB: OHCI: make ohci-s3c2410 a separate driver
+
+ drivers/usb/host/Kconfig        |   30 +++++++-
+ drivers/usb/host/Makefile       |    6 ++
+ drivers/usb/host/ohci-at91.c    |  135 +++++++++++++++-------------------
+ drivers/usb/host/ohci-exynos.c  |  154 +++++++++++++++++----------------------
+ drivers/usb/host/ohci-hcd.c     |  122 ++-----------------------------
+ drivers/usb/host/ohci-hub.c     |    8 +-
+ drivers/usb/host/ohci-omap.c    |  142 +++++++++++++-----------------------
+ drivers/usb/host/ohci-omap3.c   |  122 +++++++++++--------------------
+ drivers/usb/host/ohci-s3c2410.c |  116 ++++++++++++-----------------
+ drivers/usb/host/ohci-spear.c   |  149 ++++++++++++++++---------------------
+ drivers/usb/host/ohci.h         |    9 +++
+ 11 files changed, 383 insertions(+), 610 deletions(-)
+
+-- 
+1.7.9.5
