@@ -1,234 +1,134 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:48 +0900
-Subject: [PATCH 18/27] ARM: shmobile: r8a7790: add main clock
-In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370591517-20239-19-git-send-email-horms+renesas@verge.net.au>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Fri, 7 Jun 2013 08:52:43 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <1622862.fXQWv0YWGV@flatron>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1851164.HnXhGSdttW@flatron>
+ <CAPweEDxWW4LUeBaHLb+wHuAMq=63p88zsx4tumVb2PdP_+ohAw@mail.gmail.com>
+ <1622862.fXQWv0YWGV@flatron>
+Message-ID: <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Thu, Jun 6, 2013 at 2:02 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Thursday 06 of June 2013 13:49:38 luke.leighton wrote:
+>> On Thu, Jun 6, 2013 at 1:43 PM, Tomasz Figa <tomasz.figa@gmail.com>
+> wrote:
+>> > Luke,
+>> >
+>> > On Thursday 06 of June 2013 13:24:57 luke.leighton wrote:
+>> >> On Thu, Jun 6, 2013 at 1:01 AM, Tomasz Figa <tomasz.figa@gmail.com>
+>> >
+>> > wrote:
+>> >> > I don't see any other solution here than moving all the Allwinner
+>> >> > code
+>> >> > to DT (as it has been suggested in this thread several times
+>> >> > already), as this is the only hardware description method supported
+>> >> > by ARM Linux.
+>> >>
+>> >>  i repeat again: please state, explicitly and unequivocably that you
+>> >>  -
+>> >>
+>> >> linux kernel developers - are happy that the reach of linux and
+>> >> gnu/linux OSes is dramatically reduced due to this intransigent
+>> >> position.
+>> >>
+>> >>  or, tomasz, please state that you, tomasz, represent each and every
+>> >>
+>> >> one of the linux kernel developers so that i do not need to keep
+>> >> asking.
+>> >
+>> > I do not represent all linux kernel developers by any means. I am just
+>> > stating current policy of SoC/board support maintained by ARM Linux,
+>> > which is common for all Linux kernel devlopers, or at least ARM Linux
+>> > kernel developers.
+>> >
+>> > Personally I am happy with numerous companies backing this policy and
+>> > not making problems like this with Allwinner and I am really
+>> > surprised that you are supporting a troublesome company like this.
+>>
+>>  you've not read what i've written tomasz.
+>
+> I have.
+>
+>> > There are many other SoC vendors making low cost SoCs, like Rockchip,
+>> > Boxchip,
+>>
+>>  boxchip *is* allwinner.
+>
+> Right, sorry. I am not really into this low cost hardware.
 
-Almost all clock needs main clock which is basis clock on r8a7790.
-This patch adds it, and, set its parent/ratio via MD pin.
-It is based on v0.05 datasheet
+ i've been tracking it for several years.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7790.c | 161 ++++++++++++++++++++++++++++++++-
- 1 file changed, 156 insertions(+), 5 deletions(-)
+> There is also AMLogic, though.
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
-index bad9bf2..850e47f 100644
---- a/arch/arm/mach-shmobile/clock-r8a7790.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7790.c
-@@ -22,32 +22,113 @@
- #include <linux/kernel.h>
- #include <linux/sh_clk.h>
- #include <linux/clkdev.h>
-+#include <mach/clock.h>
- #include <mach/common.h>
- 
-+/*
-+ *   MD		EXTAL		PLL0	PLL1	PLL3
-+ * 14 13 19	(MHz)		*1	*1
-+ *---------------------------------------------------
-+ * 0  0  0	15 x 1		x172/2	x208/2	x106
-+ * 0  0  1	15 x 1		x172/2	x208/2	x88
-+ * 0  1  0	20 x 1		x130/2	x156/2	x80
-+ * 0  1  1	20 x 1		x130/2	x156/2	x66
-+ * 1  0  0	26 / 2		x200/2	x240/2	x122
-+ * 1  0  1	26 / 2		x200/2	x240/2	x102
-+ * 1  1  0	30 / 2		x172/2	x208/2	x106
-+ * 1  1  1	30 / 2		x172/2	x208/2	x88
-+ *
-+ * *1 :	Table 7.6 indicates VCO ouput (PLLx = VCO/2)
-+ *	see "p1 / 2" on R8A7790_CLOCK_ROOT() below
-+ */
-+
-+#define MD(nr)	(1 << nr)
-+
- #define CPG_BASE 0xe6150000
- #define CPG_LEN 0x1000
- 
- #define SMSTPCR2 0xe6150138
- #define SMSTPCR7 0xe615014c
- 
-+#define MODEMR		0xE6160060
-+
- static struct clk_mapping cpg_mapping = {
- 	.phys   = CPG_BASE,
- 	.len    = CPG_LEN,
- };
- 
--static struct clk p_clk = {
--	.rate	= 65000000, /* shortcut for now */
-+static struct clk extal_clk = {
-+	/* .rate will be updated on r8a7790_clock_init() */
- 	.mapping	= &cpg_mapping,
- };
- 
--static struct clk mp_clk = {
--	.rate	= 52000000,  /* shortcut for now */
--	.mapping	= &cpg_mapping,
-+static struct sh_clk_ops followparent_clk_ops = {
-+	.recalc	= followparent_recalc,
- };
- 
-+static struct clk main_clk = {
-+	/* .parent will be set r8a73a4_clock_init */
-+	.ops	= &followparent_clk_ops,
-+};
-+
-+/*
-+ * clock ratio of these clock will be updated
-+ * on r8a7790_clock_init()
-+ */
-+SH_FIXED_RATIO_CLK_SET(pll1_clk,		main_clk,	1, 1);
-+SH_FIXED_RATIO_CLK_SET(pll3_clk,		main_clk,	1, 1);
-+SH_FIXED_RATIO_CLK_SET(lb_clk,			pll1_clk,	1, 1);
-+SH_FIXED_RATIO_CLK_SET(qspi_clk,		pll1_clk,	1, 1);
-+
-+/* fixed ratio clock */
-+SH_FIXED_RATIO_CLK_SET(extal_div2_clk,		extal_clk,	1, 2);
-+SH_FIXED_RATIO_CLK_SET(cp_clk,			extal_clk,	1, 2);
-+
-+SH_FIXED_RATIO_CLK_SET(pll1_div2_clk,		pll1_clk,	1, 2);
-+SH_FIXED_RATIO_CLK_SET(zg_clk,			pll1_clk,	1, 3);
-+SH_FIXED_RATIO_CLK_SET(zx_clk,			pll1_clk,	1, 3);
-+SH_FIXED_RATIO_CLK_SET(zs_clk,			pll1_clk,	1, 6);
-+SH_FIXED_RATIO_CLK_SET(hp_clk,			pll1_clk,	1, 12);
-+SH_FIXED_RATIO_CLK_SET(i_clk,			pll1_clk,	1, 2);
-+SH_FIXED_RATIO_CLK_SET(b_clk,			pll1_clk,	1, 12);
-+SH_FIXED_RATIO_CLK_SET(p_clk,			pll1_clk,	1, 24);
-+SH_FIXED_RATIO_CLK_SET(cl_clk,			pll1_clk,	1, 48);
-+SH_FIXED_RATIO_CLK_SET(m2_clk,			pll1_clk,	1, 8);
-+SH_FIXED_RATIO_CLK_SET(imp_clk,			pll1_clk,	1, 4);
-+SH_FIXED_RATIO_CLK_SET(rclk_clk,		pll1_clk,	1, (48 * 1024));
-+SH_FIXED_RATIO_CLK_SET(oscclk_clk,		pll1_clk,	1, (12 * 1024));
-+
-+SH_FIXED_RATIO_CLK_SET(zb3_clk,			pll3_clk,	1, 4);
-+SH_FIXED_RATIO_CLK_SET(zb3d2_clk,		pll3_clk,	1, 8);
-+SH_FIXED_RATIO_CLK_SET(ddr_clk,			pll3_clk,	1, 8);
-+SH_FIXED_RATIO_CLK_SET(mp_clk,			pll1_div2_clk,	1, 15);
-+
- static struct clk *main_clks[] = {
-+	&extal_clk,
-+	&extal_div2_clk,
-+	&main_clk,
-+	&pll1_clk,
-+	&pll1_div2_clk,
-+	&pll3_clk,
-+	&lb_clk,
-+	&qspi_clk,
-+	&zg_clk,
-+	&zx_clk,
-+	&zs_clk,
-+	&hp_clk,
-+	&i_clk,
-+	&b_clk,
- 	&p_clk,
-+	&cl_clk,
-+	&m2_clk,
-+	&imp_clk,
-+	&rclk_clk,
-+	&oscclk_clk,
-+	&zb3_clk,
-+	&zb3d2_clk,
-+	&ddr_clk,
- 	&mp_clk,
-+	&cp_clk,
- };
- 
- enum { MSTP721, MSTP720,
-@@ -64,6 +145,35 @@ static struct clk mstp_clks[MSTP_NR] = {
- };
- 
- static struct clk_lookup lookups[] = {
-+
-+	/* main clocks */
-+	CLKDEV_CON_ID("extal",		&extal_clk),
-+	CLKDEV_CON_ID("extal_div2",	&extal_div2_clk),
-+	CLKDEV_CON_ID("main",		&main_clk),
-+	CLKDEV_CON_ID("pll1",		&pll1_clk),
-+	CLKDEV_CON_ID("pll1_div2",	&pll1_div2_clk),
-+	CLKDEV_CON_ID("pll3",		&pll3_clk),
-+	CLKDEV_CON_ID("zg",		&zg_clk),
-+	CLKDEV_CON_ID("zx",		&zx_clk),
-+	CLKDEV_CON_ID("zs",		&zs_clk),
-+	CLKDEV_CON_ID("hp",		&hp_clk),
-+	CLKDEV_CON_ID("i",		&i_clk),
-+	CLKDEV_CON_ID("b",		&b_clk),
-+	CLKDEV_CON_ID("lb",		&lb_clk),
-+	CLKDEV_CON_ID("p",		&p_clk),
-+	CLKDEV_CON_ID("cl",		&cl_clk),
-+	CLKDEV_CON_ID("m2",		&m2_clk),
-+	CLKDEV_CON_ID("imp",		&imp_clk),
-+	CLKDEV_CON_ID("rclk",		&rclk_clk),
-+	CLKDEV_CON_ID("oscclk",		&oscclk_clk),
-+	CLKDEV_CON_ID("zb3",		&zb3_clk),
-+	CLKDEV_CON_ID("zb3d2",		&zb3d2_clk),
-+	CLKDEV_CON_ID("ddr",		&ddr_clk),
-+	CLKDEV_CON_ID("mp",		&mp_clk),
-+	CLKDEV_CON_ID("qspi",		&qspi_clk),
-+	CLKDEV_CON_ID("cp",		&cp_clk),
-+
-+	/* MSTP */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP206]),
-@@ -74,10 +184,51 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh-sci.7", &mstp_clks[MSTP720]),
- };
- 
-+#define R8A7790_CLOCK_ROOT(e, m, p0, p1, p30, p31)		\
-+	extal_clk.rate	= e * 1000 * 1000;			\
-+	main_clk.parent	= m;					\
-+	SH_CLK_SET_RATIO(&pll1_clk_ratio, p1 / 2, 1);		\
-+	if (mode & MD(19))					\
-+		SH_CLK_SET_RATIO(&pll3_clk_ratio, p31, 1);	\
-+	else							\
-+		SH_CLK_SET_RATIO(&pll3_clk_ratio, p30, 1)
-+
-+
- void __init r8a7790_clock_init(void)
- {
-+	void __iomem *modemr = ioremap_nocache(MODEMR, PAGE_SIZE);
-+	u32 mode;
- 	int k, ret = 0;
- 
-+	BUG_ON(!modemr);
-+	mode = ioread32(modemr);
-+	iounmap(modemr);
-+
-+	switch (mode & (MD(14) | MD(13))) {
-+	case 0:
-+		R8A7790_CLOCK_ROOT(15, &extal_clk, 172, 208, 106, 88);
-+		break;
-+	case MD(13):
-+		R8A7790_CLOCK_ROOT(20, &extal_clk, 130, 156, 80, 66);
-+		break;
-+	case MD(14):
-+		R8A7790_CLOCK_ROOT(26, &extal_div2_clk, 200, 240, 122, 102);
-+		break;
-+	case MD(13) | MD(14):
-+		R8A7790_CLOCK_ROOT(30, &extal_div2_clk, 172, 208, 106, 88);
-+		break;
-+	}
-+
-+	if (mode & (MD(18)))
-+		SH_CLK_SET_RATIO(&lb_clk_ratio, 1, 36);
-+	else
-+		SH_CLK_SET_RATIO(&lb_clk_ratio, 1, 24);
-+
-+	if ((mode & (MD(3) | MD(2) | MD(1))) == MD(2))
-+		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 16);
-+	else
-+		SH_CLK_SET_RATIO(&qspi_clk_ratio, 1, 20);
-+
- 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
- 		ret = clk_register(main_clks[k]);
- 
--- 
-1.8.2.1
+ they're *definitely* GPL-violators.
+
+>> > Telechips. Maybe they would be better candidates for being
+>> > promoted as vendors of choice for hardware running free software?
+>>
+>>  no, because they're not selling at a low-enough price with
+>> high-enough integration.  telechips and rockchip don't have the market
+>> penetration.
+>
+> I do not have access to any numbers, so I am left to believe in what you
+> say.
+
+ well... none of us do :)  that report (was it from IDC? it was in
+earlier messages) is a good analysis.
+
+> (Although here in Poland the cheap tablet market is almost evenly
+> divided between all those companies, you can find almost same amount of
+> tablets based on SoCs from each vendor.)
+
+ most likely.
+
+ allwinner is the one that's actually expressed an interest, at
+Director (Board) Level, of being GPL-compliant.  the software
+engineers understand that; their immediate Manager does not [and is
+causing considerable disruption].
+
+ AMLogic stone-walled and cost us money and a large client due to
+their GPL violations. which they till have not resolved [in over 2
+years].  i will not work with them, ever again.
+
+ Telechips are korean-based: they haven't responded to communications.
+
+ Nufront got themselves in a muddle [late on silicon] so we ruled them
+out - we'll come back to them later.
+
+ there's a number of others, but allwinner's the only one that is
+actively communicating.
+
+ so.
+
+ coming back to what you said earlier: i'm formulating what to say to
+allwinner [and need to pre-send something by monday so that they can
+consider it before the meeting].  so far, it consists of:
+
+* device-tree is what the linux kernel community has come up with, it
+is equivalent to FEX.
+
+* the linux kernel community would like to apologise for not
+consulting with you (allwinner) on the decision to only accept device
+tree
+
+[bear in mind that if this kind of thing isn't said, they risk just
+continuing to make the sunxi community's life absolute hell by
+continuing to work in isolation and continuing to duplicate drivers
+etc. etc. ]
+
+* work is being done by the free software community, they are
+beginning to integrate allwinner's work into the upstream kernel, and
+you (allwinner) will begin to see this when you get round to doing
+linux kernel 3.9
+
+* allwinner and the linux and sunxi community therefore need to work
+closer together, we propose:
+
+* {insert proposals here}
+
+3 days left on the clock.
+
+l.
