@@ -1,48 +1,54 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 7 Jun 2013 09:44:58 +0100
-Subject: [PATCH] dmatest: do not allow to interrupt ongoing tests
-In-Reply-To: <20130607004525.GH23045@intel.com>
-References: <1369308593-3723-1-git-send-email-andriy.shevchenko@linux.intel.com>
- <Pine.LNX.4.64.1305242353210.7187@axis700.grange>
- <1369638667.29283.197.camel@smile>
- <20130605171001.GC26663@mudshark.cambridge.arm.com>
- <20130607004525.GH23045@intel.com>
-Message-ID: <20130607084458.GA3132@mudshark.cambridge.arm.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 7 Jun 2013 10:49:38 +0200
+Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL
+ lock
+In-Reply-To: <20130607084354.GF21641@nchen-desktop>
+References: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
+ <20130607082457.GF12361@pengutronix.de>
+ <20130607083134.GE21641@nchen-desktop>
+ <20130607083528.GG12361@pengutronix.de>
+ <20130607084354.GF21641@nchen-desktop>
+Message-ID: <20130607084937.GH12361@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 01:45:25AM +0100, Vinod Koul wrote:
-> On Wed, Jun 05, 2013 at 06:10:01PM +0100, Will Deacon wrote:
-> > On Mon, May 27, 2013 at 08:11:07AM +0100, Andy Shevchenko wrote:
-> > > On Fri, 2013-05-24 at 23:55 +0200, Guennadi Liakhovetski wrote: 
-> > > > On Thu, 23 May 2013, Andy Shevchenko wrote:
-> > > > 
-> > > > > When user interrupts ongoing transfers the dmatest may end up with console
-> > > > > lockup, oops, or data mismatch. This patch prevents user to abort any ongoing
-> > > > > test.
-> > > > 
-> > > > Personally I would be against such a change. What about interrupting the 
-> > > > test with rmmod?
-> > > >  Is it still possible after this your patch or not? If not 
-> > > > - this doesn't seem like a good idea to me. Why don't we just fix those 
-> > > > bugs, that you're describing?
+Hello Peter,
+
+On Fri, Jun 07, 2013 at 04:43:55PM +0800, Peter Chen wrote:
+> On Fri, Jun 07, 2013 at 10:35:28AM +0200, Uwe Kleine-K?nig wrote:
+> > On Fri, Jun 07, 2013 at 04:31:35PM +0800, Peter Chen wrote:
+> > > On Fri, Jun 07, 2013 at 10:24:57AM +0200, Uwe Kleine-K?nig wrote:
+> > > > On Fri, Jun 07, 2013 at 04:19:06PM +0800, Peter Chen wrote:
+> > > > > For some unknown reasons, the jiffies will be updated more
+> > > > > than one tick at every short time. Eg, at this code:
+> > > > > After timeout = jiffies + msecs_to_jiffies(10),
+> > > > > the interrupt occurs, and the softirq updates jiffies (eg,  + 2 jiffies),
+> > > > > then return back from interrupt, the time between above operations
+> > > > > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+> > > > > 
+> > > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > > > Does this mean my patch doesn't solve the issue for you?
 > > > 
-> > > The behaviour of the module is returned to the same page by this patch
-> > > as it was before (w/o debugfs).
-> > > 
-> > > The user can interrupt tests by rmmod, but it will take time up to
-> > > timeout.
-> > > 
-> > > I appreciate if you can do a deeper analysis of what happened in
-> > > case Will reported.
+> > > Not try, but your patch just delay timeout assignment, if there
+> > > is jiffies update after that but before timeout check, it still
+> > > has problem.
+> > But if that large update happens because there was a long preemption the
+> > pll should be locked because I only start counting when the pll is
+> > programmed.
 > > 
-> > Did this query hold up the application of this patch? I'd really like to see
-> > *something* in 3.10, otherwise dmatest will be broken.
-> I though we had some data corruption on subsequent tests, or was that different
-> one?
+> > IMHO you should try my patch as it is the better fix (assuming it fixes
+> > it for you).
+> 
+> I will try your fix, but still it just reduces the possibilities.
+> The problem is not the preemption takes too long, it is the jiffies
+> updates more than one tick at one short preemption.
+If that is really the problem that many more instances that use the same
+incarnation need the same fix. I would be surprised if that was the
+case.
 
-We ended up with something that worked in the end:
+Best regards
+Uwe
 
-  https://lkml.org/lkml/2013/5/23/196
-
-Will
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
