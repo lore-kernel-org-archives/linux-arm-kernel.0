@@ -1,429 +1,339 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Fri,  7 Jun 2013 11:33:27 +0530
-Subject: [RFC][PATCH 1/7] USB: OHCI: make ohci-exynos a separate driver
+Date: Fri,  7 Jun 2013 11:33:28 +0530
+Subject: [RFC][PATCH 2/7] USB: OHCI: make ohci-omap a separate driver
 In-Reply-To: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1370585013-12809-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1370585013-12809-3-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the  Samsung OHCI EXYNOS host controller driver from ohci-hcd
+Separate the  TI OHCI OMAP1/2 host controller driver from ohci-hcd
 host code so that it can be built as a separate driver module.
 This work is part of enabling multi-platform kernels on ARM.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Cc: Felipe Balbi <balbi@ti.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Jingoo Han <jg1.han@samsung.com>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
 Cc: Greg KH <greg@kroah.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/Kconfig       |    2 +-
- drivers/usb/host/Makefile      |    1 +
- drivers/usb/host/ohci-exynos.c |  154 +++++++++++++++++-----------------------
- drivers/usb/host/ohci-hcd.c    |   20 +-----
- 4 files changed, 70 insertions(+), 107 deletions(-)
+ drivers/usb/host/Kconfig     |    2 +-
+ drivers/usb/host/Makefile    |    1 +
+ drivers/usb/host/ohci-hcd.c  |   20 +-----
+ drivers/usb/host/ohci-omap.c |  142 ++++++++++++++++--------------------------
+ 4 files changed, 55 insertions(+), 110 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index 5391a38..f827386 100644
+index f827386..744673b 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -484,7 +484,7 @@ config USB_OHCI_SH
- 	  If you use the PCI OHCI controller, this option is not necessary.
+@@ -397,7 +397,7 @@ config USB_OHCI_HCD
+ if USB_OHCI_HCD
  
- config USB_OHCI_EXYNOS
--	boolean "OHCI support for Samsung EXYNOS SoC Series"
-+	tristate "OHCI support for Samsung EXYNOS SoC Series"
- 	depends on ARCH_EXYNOS
- 	help
- 	 Enable support for the Samsung Exynos SOC's on-chip OHCI controller.
+ config USB_OHCI_HCD_OMAP1
+-	bool "OHCI support for OMAP1/2 chips"
++	tristate "OHCI support for OMAP1/2 chips"
+ 	depends on ARCH_OMAP1
+ 	default y
+ 	---help---
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 8a89c3d..2a4f11f 100644
+index 2a4f11f..1326df2 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -46,6 +46,7 @@ obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
- obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
+@@ -47,6 +47,7 @@ obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
  obj-$(CONFIG_USB_OHCI_HCD_PCI)	+= ohci-pci.o
  obj-$(CONFIG_USB_OHCI_HCD_PLATFORM)	+= ohci-platform.o
-+obj-$(CONFIG_USB_OHCI_EXYNOS)	+= ohci-exynos.o
+ obj-$(CONFIG_USB_OHCI_EXYNOS)	+= ohci-exynos.o
++obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
  
  obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
  obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
-diff --git a/drivers/usb/host/ohci-exynos.c b/drivers/usb/host/ohci-exynos.c
-index 07592c0..a5f4c33 100644
---- a/drivers/usb/host/ohci-exynos.c
-+++ b/drivers/usb/host/ohci-exynos.c
-@@ -12,24 +12,38 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/dma-mapping.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/module.h>
- #include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/usb-ohci-exynos.h>
- #include <linux/usb/phy.h>
- #include <linux/usb/samsung_usb_phy.h>
-+#include <linux/usb.h>
-+#include <linux/usb/hcd.h>
-+#include <linux/usb/otg.h>
-+
-+#include "ohci.h"
-+
-+#define DRIVER_DESC "OHCI exynos driver"
-+
-+static const char hcd_name[] = "ohci-exynos";
-+static struct hc_driver __read_mostly exynos_ohci_hc_driver;
-+
-+#define to_exynos_ohci(hcd) (struct exynos_ohci_hcd *)(hcd_to_ohci(hcd)->priv)
- 
- struct exynos_ohci_hcd {
--	struct device *dev;
--	struct usb_hcd *hcd;
- 	struct clk *clk;
- 	struct usb_phy *phy;
- 	struct usb_otg *otg;
- 	struct exynos4_ohci_platdata *pdata;
- };
- 
--static void exynos_ohci_phy_enable(struct exynos_ohci_hcd *exynos_ohci)
-+static void exynos_ohci_phy_enable(struct platform_device *pdev)
- {
--	struct platform_device *pdev = to_platform_device(exynos_ohci->dev);
-+	struct exynos_ohci_hcd *exynos_ohci = platform_get_drvdata(pdev);
- 
- 	if (exynos_ohci->phy)
- 		usb_phy_init(exynos_ohci->phy);
-@@ -37,9 +51,9 @@ static void exynos_ohci_phy_enable(struct exynos_ohci_hcd *exynos_ohci)
- 		exynos_ohci->pdata->phy_init(pdev, USB_PHY_TYPE_HOST);
- }
- 
--static void exynos_ohci_phy_disable(struct exynos_ohci_hcd *exynos_ohci)
-+static void exynos_ohci_phy_disable(struct platform_device *pdev)
- {
--	struct platform_device *pdev = to_platform_device(exynos_ohci->dev);
-+	struct exynos_ohci_hcd *exynos_ohci = platform_get_drvdata(pdev);
- 
- 	if (exynos_ohci->phy)
- 		usb_phy_shutdown(exynos_ohci->phy);
-@@ -47,57 +61,6 @@ static void exynos_ohci_phy_disable(struct exynos_ohci_hcd *exynos_ohci)
- 		exynos_ohci->pdata->phy_exit(pdev, USB_PHY_TYPE_HOST);
- }
- 
--static int ohci_exynos_reset(struct usb_hcd *hcd)
--{
--	return ohci_init(hcd_to_ohci(hcd));
--}
--
--static int ohci_exynos_start(struct usb_hcd *hcd)
--{
--	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
--	int ret;
--
--	ohci_dbg(ohci, "ohci_exynos_start, ohci:%p", ohci);
--
--	ret = ohci_run(ohci);
--	if (ret < 0) {
--		dev_err(hcd->self.controller, "can't start %s\n",
--			hcd->self.bus_name);
--		ohci_stop(hcd);
--		return ret;
--	}
--
--	return 0;
--}
--
--static const struct hc_driver exynos_ohci_hc_driver = {
--	.description		= hcd_name,
--	.product_desc		= "EXYNOS OHCI Host Controller",
--	.hcd_priv_size		= sizeof(struct ohci_hcd),
--
--	.irq			= ohci_irq,
--	.flags			= HCD_MEMORY|HCD_USB11,
--
--	.reset			= ohci_exynos_reset,
--	.start			= ohci_exynos_start,
--	.stop			= ohci_stop,
--	.shutdown		= ohci_shutdown,
--
--	.get_frame_number	= ohci_get_frame,
--
--	.urb_enqueue		= ohci_urb_enqueue,
--	.urb_dequeue		= ohci_urb_dequeue,
--	.endpoint_disable	= ohci_endpoint_disable,
--
--	.hub_status_data	= ohci_hub_status_data,
--	.hub_control		= ohci_hub_control,
--#ifdef	CONFIG_PM
--	.bus_suspend		= ohci_bus_suspend,
--	.bus_resume		= ohci_bus_resume,
--#endif
--	.start_port_reset	= ohci_start_port_reset,
--};
--
- static u64 ohci_exynos_dma_mask = DMA_BIT_MASK(32);
- 
- static int exynos_ohci_probe(struct platform_device *pdev)
-@@ -105,7 +68,6 @@ static int exynos_ohci_probe(struct platform_device *pdev)
- 	struct exynos4_ohci_platdata *pdata = pdev->dev.platform_data;
- 	struct exynos_ohci_hcd *exynos_ohci;
- 	struct usb_hcd *hcd;
--	struct ohci_hcd *ohci;
- 	struct resource *res;
- 	struct usb_phy *phy;
- 	int irq;
-@@ -121,15 +83,18 @@ static int exynos_ohci_probe(struct platform_device *pdev)
- 	if (!pdev->dev.coherent_dma_mask)
- 		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
- 
--	exynos_ohci = devm_kzalloc(&pdev->dev, sizeof(struct exynos_ohci_hcd),
--					GFP_KERNEL);
--	if (!exynos_ohci)
-+	hcd = usb_create_hcd(&exynos_ohci_hc_driver,
-+				&pdev->dev, dev_name(&pdev->dev));
-+	if (!hcd) {
-+		dev_err(&pdev->dev, "Unable to create HCD\n");
- 		return -ENOMEM;
- 
- 	if (of_device_is_compatible(pdev->dev.of_node,
- 					"samsung,exynos5440-ohci"))
- 		goto skip_phy;
- 
-+	}
-+	exynos_ohci = to_exynos_ohci(hcd);
- 	phy = devm_usb_get_phy(&pdev->dev, USB_PHY_TYPE_USB2);
- 	if (IS_ERR(phy)) {
- 		/* Fallback to pdata */
-@@ -146,7 +111,6 @@ static int exynos_ohci_probe(struct platform_device *pdev)
- 
- skip_phy:
- 
--	exynos_ohci->dev = &pdev->dev;
- 
- 	hcd = usb_create_hcd(&exynos_ohci_hc_driver, &pdev->dev,
- 					dev_name(&pdev->dev));
-@@ -155,7 +119,6 @@ skip_phy:
- 		return -ENOMEM;
- 	}
- 
--	exynos_ohci->hcd = hcd;
- 	exynos_ohci->clk = devm_clk_get(&pdev->dev, "usbhost");
- 
- 	if (IS_ERR(exynos_ohci->clk)) {
-@@ -192,13 +155,11 @@ skip_phy:
- 	}
- 
- 	if (exynos_ohci->otg)
--		exynos_ohci->otg->set_host(exynos_ohci->otg,
--					&exynos_ohci->hcd->self);
-+		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
- 
--	exynos_ohci_phy_enable(exynos_ohci);
-+	exynos_ohci_phy_enable(pdev);
- 
--	ohci = hcd_to_ohci(hcd);
--	ohci_hcd_init(ohci);
-+	ohci_setup(hcd);
- 
- 	err = usb_add_hcd(hcd, irq, IRQF_SHARED);
- 	if (err) {
-@@ -206,12 +167,12 @@ skip_phy:
- 		goto fail_add_hcd;
- 	}
- 
--	platform_set_drvdata(pdev, exynos_ohci);
-+	platform_set_drvdata(pdev, hcd);
- 
- 	return 0;
- 
- fail_add_hcd:
--	exynos_ohci_phy_disable(exynos_ohci);
-+	exynos_ohci_phy_disable(pdev);
- fail_io:
- 	clk_disable_unprepare(exynos_ohci->clk);
- fail_clk:
-@@ -221,16 +182,15 @@ fail_clk:
- 
- static int exynos_ohci_remove(struct platform_device *pdev)
- {
--	struct exynos_ohci_hcd *exynos_ohci = platform_get_drvdata(pdev);
--	struct usb_hcd *hcd = exynos_ohci->hcd;
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
-+	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
- 
- 	usb_remove_hcd(hcd);
- 
- 	if (exynos_ohci->otg)
--		exynos_ohci->otg->set_host(exynos_ohci->otg,
--					&exynos_ohci->hcd->self);
-+		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
- 
--	exynos_ohci_phy_disable(exynos_ohci);
-+	exynos_ohci_phy_disable(pdev);
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
-@@ -241,8 +201,7 @@ static int exynos_ohci_remove(struct platform_device *pdev)
- 
- static void exynos_ohci_shutdown(struct platform_device *pdev)
- {
--	struct exynos_ohci_hcd *exynos_ohci = platform_get_drvdata(pdev);
--	struct usb_hcd *hcd = exynos_ohci->hcd;
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 
- 	if (hcd->driver->shutdown)
- 		hcd->driver->shutdown(hcd);
-@@ -251,9 +210,10 @@ static void exynos_ohci_shutdown(struct platform_device *pdev)
- #ifdef CONFIG_PM
- static int exynos_ohci_suspend(struct device *dev)
- {
--	struct exynos_ohci_hcd *exynos_ohci = dev_get_drvdata(dev);
--	struct usb_hcd *hcd = exynos_ohci->hcd;
-+	struct usb_hcd *hcd = dev_get_drvdata(dev);
-+	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
- 	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
-+	struct platform_device *pdev = to_platform_device(dev);
- 	unsigned long flags;
- 	int rc = 0;
- 
-@@ -273,10 +233,9 @@ static int exynos_ohci_suspend(struct device *dev)
- 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
- 
- 	if (exynos_ohci->otg)
--		exynos_ohci->otg->set_host(exynos_ohci->otg,
--					&exynos_ohci->hcd->self);
-+		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
- 
--	exynos_ohci_phy_disable(exynos_ohci);
-+	exynos_ohci_phy_disable(pdev);
- 
- 	clk_disable_unprepare(exynos_ohci->clk);
- 
-@@ -288,16 +247,16 @@ fail:
- 
- static int exynos_ohci_resume(struct device *dev)
- {
--	struct exynos_ohci_hcd *exynos_ohci = dev_get_drvdata(dev);
--	struct usb_hcd *hcd = exynos_ohci->hcd;
-+	struct usb_hcd *hcd			= dev_get_drvdata(dev);
-+	struct exynos_ohci_hcd *exynos_ohci	= to_exynos_ohci(hcd);
-+	struct platform_device *pdev		= to_platform_device(dev);
- 
- 	clk_prepare_enable(exynos_ohci->clk);
- 
- 	if (exynos_ohci->otg)
--		exynos_ohci->otg->set_host(exynos_ohci->otg,
--					&exynos_ohci->hcd->self);
-+		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
- 
--	exynos_ohci_phy_enable(exynos_ohci);
-+	exynos_ohci_phy_enable(pdev);
- 
- 	ohci_resume(hcd, false);
- 
-@@ -308,6 +267,10 @@ static int exynos_ohci_resume(struct device *dev)
- #define exynos_ohci_resume	NULL
- #endif
- 
-+static const struct ohci_driver_overrides exynos_overrides __initconst = {
-+	.extra_priv_size =	sizeof(struct exynos_ohci_hcd),
-+};
-+
- static const struct dev_pm_ops exynos_ohci_pm_ops = {
- 	.suspend	= exynos_ohci_suspend,
- 	.resume		= exynos_ohci_resume,
-@@ -333,6 +296,23 @@ static struct platform_driver exynos_ohci_driver = {
- 		.of_match_table	= of_match_ptr(exynos_ohci_match),
- 	}
- };
-+static int __init ohci_exynos_init(void)
-+{
-+	if (usb_disabled())
-+		return -ENODEV;
-+
-+	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-+	ohci_init_driver(&exynos_ohci_hc_driver, &exynos_overrides);
-+	return platform_driver_register(&exynos_ohci_driver);
-+}
-+module_init(ohci_exynos_init);
-+
-+static void __exit ohci_exynos_cleanup(void)
-+{
-+	platform_driver_unregister(&exynos_ohci_driver);
-+}
-+module_exit(ohci_exynos_cleanup);
- 
- MODULE_ALIAS("platform:exynos-ohci");
- MODULE_AUTHOR("Jingoo Han <jg1.han@samsung.com>");
-+MODULE_LICENSE("GPL v2");
 diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index 39c7624..14962f8 100644
+index 14962f8..4bfd890 100644
 --- a/drivers/usb/host/ohci-hcd.c
 +++ b/drivers/usb/host/ohci-hcd.c
 @@ -1178,11 +1178,6 @@ MODULE_LICENSE ("GPL");
  #define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
  #endif
  
--#ifdef CONFIG_USB_OHCI_EXYNOS
--#include "ohci-exynos.c"
--#define EXYNOS_PLATFORM_DRIVER	exynos_ohci_driver
+-#ifdef CONFIG_USB_OHCI_HCD_OMAP1
+-#include "ohci-omap.c"
+-#define OMAP1_PLATFORM_DRIVER	ohci_hcd_omap_driver
 -#endif
 -
- #ifdef CONFIG_USB_OHCI_HCD_OMAP1
- #include "ohci-omap.c"
- #define OMAP1_PLATFORM_DRIVER	ohci_hcd_omap_driver
-@@ -1260,6 +1255,7 @@ MODULE_LICENSE ("GPL");
- 
+ #ifdef CONFIG_USB_OHCI_HCD_OMAP3
+ #include "ohci-omap3.c"
+ #define OMAP3_PLATFORM_DRIVER	ohci_hcd_omap3_driver
+@@ -1256,8 +1251,8 @@ MODULE_LICENSE ("GPL");
  #if	!IS_ENABLED(CONFIG_USB_OHCI_HCD_PCI) &&	\
  	!IS_ENABLED(CONFIG_USB_OHCI_HCD_PLATFORM) && \
-+	!IS_ENABLED(CONFIG_USB_OHCI_EXYNOS) && \
+ 	!IS_ENABLED(CONFIG_USB_OHCI_EXYNOS) && \
++	!IS_ENABLED(CONFIG_USB_OHCI_HCD_OMAP1) && \
  	!defined(PLATFORM_DRIVER) &&	\
- 	!defined(OMAP1_PLATFORM_DRIVER) &&	\
+-	!defined(OMAP1_PLATFORM_DRIVER) &&	\
  	!defined(OMAP3_PLATFORM_DRIVER) &&	\
-@@ -1269,7 +1265,6 @@ MODULE_LICENSE ("GPL");
- 	!defined(SM501_OHCI_DRIVER) && \
- 	!defined(TMIO_OHCI_DRIVER) && \
- 	!defined(S3C2410_PLATFORM_DRIVER) && \
--	!defined(EXYNOS_PLATFORM_DRIVER) && \
- 	!defined(EP93XX_PLATFORM_DRIVER) && \
- 	!defined(AT91_PLATFORM_DRIVER) && \
- 	!defined(NXP_PLATFORM_DRIVER) && \
-@@ -1352,12 +1347,6 @@ static int __init ohci_hcd_mod_init(void)
- 		goto error_s3c2410;
+ 	!defined(OF_PLATFORM_DRIVER) &&	\
+ 	!defined(SA1111_DRIVER) &&	\
+@@ -1305,12 +1300,6 @@ static int __init ohci_hcd_mod_init(void)
+ 		goto error_platform;
  #endif
  
--#ifdef EXYNOS_PLATFORM_DRIVER
--	retval = platform_driver_register(&EXYNOS_PLATFORM_DRIVER);
+-#ifdef OMAP1_PLATFORM_DRIVER
+-	retval = platform_driver_register(&OMAP1_PLATFORM_DRIVER);
 -	if (retval < 0)
--		goto error_exynos;
+-		goto error_omap1_platform;
 -#endif
 -
- #ifdef EP93XX_PLATFORM_DRIVER
- 	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
+ #ifdef OMAP3_PLATFORM_DRIVER
+ 	retval = platform_driver_register(&OMAP3_PLATFORM_DRIVER);
  	if (retval < 0)
-@@ -1411,10 +1400,6 @@ static int __init ohci_hcd_mod_init(void)
- 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
-  error_ep93xx:
+@@ -1424,10 +1413,6 @@ static int __init ohci_hcd_mod_init(void)
+ 	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
+  error_omap3_platform:
  #endif
--#ifdef EXYNOS_PLATFORM_DRIVER
--	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
-- error_exynos:
+-#ifdef OMAP1_PLATFORM_DRIVER
+-	platform_driver_unregister(&OMAP1_PLATFORM_DRIVER);
+- error_omap1_platform:
 -#endif
- #ifdef S3C2410_PLATFORM_DRIVER
- 	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
-  error_s3c2410:
-@@ -1479,9 +1464,6 @@ static void __exit ohci_hcd_mod_exit(void)
- #ifdef EP93XX_PLATFORM_DRIVER
- 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+ #ifdef PLATFORM_DRIVER
+ 	platform_driver_unregister(&PLATFORM_DRIVER);
+  error_platform:
+@@ -1482,9 +1467,6 @@ static void __exit ohci_hcd_mod_exit(void)
+ #ifdef OMAP3_PLATFORM_DRIVER
+ 	platform_driver_unregister(&OMAP3_PLATFORM_DRIVER);
  #endif
--#ifdef EXYNOS_PLATFORM_DRIVER
--	platform_driver_unregister(&EXYNOS_PLATFORM_DRIVER);
+-#ifdef OMAP1_PLATFORM_DRIVER
+-	platform_driver_unregister(&OMAP1_PLATFORM_DRIVER);
 -#endif
- #ifdef S3C2410_PLATFORM_DRIVER
- 	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
+ #ifdef PLATFORM_DRIVER
+ 	platform_driver_unregister(&PLATFORM_DRIVER);
  #endif
+diff --git a/drivers/usb/host/ohci-omap.c b/drivers/usb/host/ohci-omap.c
+index 8747fa6..eee4b72 100644
+--- a/drivers/usb/host/ohci-omap.c
++++ b/drivers/usb/host/ohci-omap.c
+@@ -14,12 +14,21 @@
+  * This file is licenced under the GPL.
+  */
+ 
+-#include <linux/signal.h>
+-#include <linux/jiffies.h>
+-#include <linux/platform_device.h>
+ #include <linux/clk.h>
++#include <linux/dma-mapping.h>
+ #include <linux/err.h>
+ #include <linux/gpio.h>
++#include <linux/io.h>
++#include <linux/jiffies.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/usb/otg.h>
++#include <linux/platform_device.h>
++#include <linux/signal.h>
++#include <linux/usb.h>
++#include <linux/usb/hcd.h>
++
++#include "ohci.h"
+ 
+ #include <asm/io.h>
+ #include <asm/mach-types.h>
+@@ -42,10 +51,7 @@
+ #define OMAP1510_LB_MMU_RAM_H	0xfffec234
+ #define OMAP1510_LB_MMU_RAM_L	0xfffec238
+ 
+-
+-#ifndef CONFIG_ARCH_OMAP
+-#error "This file is OMAP bus glue.  CONFIG_OMAP must be defined."
+-#endif
++#define DRIVER_DESC "OHCI OMAP driver"
+ 
+ #ifdef CONFIG_TPS65010
+ #include <linux/i2c/tps65010.h>
+@@ -71,6 +77,10 @@ static struct clk *usb_dc_ck;
+ static int host_enabled;
+ static int host_initialized;
+ 
++static const char hcd_name[] = "ohci-omap";
++static struct hc_driver __read_mostly ohci_omap_hc_driver;
++
++
+ static void omap_ohci_clock_power(int on)
+ {
+ 	if (on) {
+@@ -188,7 +198,7 @@ static void start_hnp(struct ohci_hcd *ohci)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static int ohci_omap_init(struct usb_hcd *hcd)
++static int ohci_omap_reset(struct usb_hcd *hcd)
+ {
+ 	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
+ 	struct omap_usb_config	*config = hcd->self.controller->platform_data;
+@@ -201,8 +211,14 @@ static int ohci_omap_init(struct usb_hcd *hcd)
+ 		ohci_to_hcd(ohci)->self.otg_port = config->otg;
+ 		/* default/minimum OTG power budget:  8 mA */
+ 		ohci_to_hcd(ohci)->power_budget = 8;
++		ohci->hc_control = OHCI_CTRL_RWC;
++		writel(OHCI_CTRL_RWC, &ohci->regs->control);
+ 	}
+ 
++	if (config->rwc) {
++		ohci->hc_control = OHCI_CTRL_RWC;
++		writel(OHCI_CTRL_RWC, &ohci->regs->control);
++	}
+ 	/* boards can use OTG transceivers in non-OTG modes */
+ 	need_transceiver = need_transceiver
+ 			|| machine_is_omap_h2() || machine_is_omap_h3();
+@@ -238,7 +254,8 @@ static int ohci_omap_init(struct usb_hcd *hcd)
+ 		omap_1510_local_bus_init();
+ 	}
+ 
+-	if ((ret = ohci_init(ohci)) < 0)
++	ret = ohci_setup(hcd);
++	if (ret < 0)
+ 		return ret;
+ 
+ 	/* board-specific power switching and overcurrent support */
+@@ -281,14 +298,6 @@ static int ohci_omap_init(struct usb_hcd *hcd)
+ 	return 0;
+ }
+ 
+-static void ohci_omap_stop(struct usb_hcd *hcd)
+-{
+-	dev_dbg(hcd->self.controller, "stopping USB Controller\n");
+-	ohci_stop(hcd);
+-	omap_ohci_clock_power(0);
+-}
+-
+-
+ /*-------------------------------------------------------------------------*/
+ 
+ /**
+@@ -304,7 +313,6 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
+ {
+ 	int retval, irq;
+ 	struct usb_hcd *hcd = 0;
+-	struct ohci_hcd *ohci;
+ 
+ 	if (pdev->num_resources != 2) {
+ 		printk(KERN_ERR "hcd probe: invalid num_resources: %i\n",
+@@ -354,8 +362,7 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
+ 		goto err2;
+ 	}
+ 
+-	ohci = hcd_to_ohci(hcd);
+-	ohci_hcd_init(ohci);
++	ohci_setup(hcd);
+ 
+ 	host_initialized = 0;
+ 	host_enabled = 1;
+@@ -418,76 +425,6 @@ usb_hcd_omap_remove (struct usb_hcd *hcd, struct platform_device *pdev)
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static int
+-ohci_omap_start (struct usb_hcd *hcd)
+-{
+-	struct omap_usb_config *config;
+-	struct ohci_hcd	*ohci = hcd_to_ohci (hcd);
+-	int		ret;
+-
+-	if (!host_enabled)
+-		return 0;
+-	config = hcd->self.controller->platform_data;
+-	if (config->otg || config->rwc) {
+-		ohci->hc_control = OHCI_CTRL_RWC;
+-		writel(OHCI_CTRL_RWC, &ohci->regs->control);
+-	}
+-
+-	if ((ret = ohci_run (ohci)) < 0) {
+-		dev_err(hcd->self.controller, "can't start\n");
+-		ohci_stop (hcd);
+-		return ret;
+-	}
+-	return 0;
+-}
+-
+-/*-------------------------------------------------------------------------*/
+-
+-static const struct hc_driver ohci_omap_hc_driver = {
+-	.description =		hcd_name,
+-	.product_desc =		"OMAP OHCI",
+-	.hcd_priv_size =	sizeof(struct ohci_hcd),
+-
+-	/*
+-	 * generic hardware linkage
+-	 */
+-	.irq =			ohci_irq,
+-	.flags =		HCD_USB11 | HCD_MEMORY,
+-
+-	/*
+-	 * basic lifecycle operations
+-	 */
+-	.reset =		ohci_omap_init,
+-	.start =		ohci_omap_start,
+-	.stop =			ohci_omap_stop,
+-	.shutdown =		ohci_shutdown,
+-
+-	/*
+-	 * managing i/o requests and associated device resources
+-	 */
+-	.urb_enqueue =		ohci_urb_enqueue,
+-	.urb_dequeue =		ohci_urb_dequeue,
+-	.endpoint_disable =	ohci_endpoint_disable,
+-
+-	/*
+-	 * scheduling support
+-	 */
+-	.get_frame_number =	ohci_get_frame,
+-
+-	/*
+-	 * root hub support
+-	 */
+-	.hub_status_data =	ohci_hub_status_data,
+-	.hub_control =		ohci_hub_control,
+-#ifdef	CONFIG_PM
+-	.bus_suspend =		ohci_bus_suspend,
+-	.bus_resume =		ohci_bus_resume,
+-#endif
+-	.start_port_reset =	ohci_start_port_reset,
+-};
+-
+-/*-------------------------------------------------------------------------*/
+-
+ static int ohci_hcd_omap_drv_probe(struct platform_device *dev)
+ {
+ 	return usb_hcd_omap_probe(&ohci_omap_hc_driver, dev);
+@@ -553,4 +490,29 @@ static struct platform_driver ohci_hcd_omap_driver = {
+ 	},
+ };
+ 
++static const struct ohci_driver_overrides omap_overrides __initconst = {
++	.product_desc	= "OMAP OHCI",
++	.reset		= ohci_omap_reset
++};
++
++static int __init ohci_omap_init(void)
++{
++	if (usb_disabled())
++		return -ENODEV;
++
++	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
++
++	ohci_init_driver(&ohci_omap_hc_driver, &omap_overrides);
++	return platform_driver_register(&ohci_hcd_omap_driver);
++}
++module_init(ohci_omap_init);
++
++static void __exit ohci_omap_cleanup(void)
++{
++	platform_driver_unregister(&ohci_hcd_omap_driver);
++}
++module_exit(ohci_omap_cleanup);
++
++MODULE_DESCRIPTION(DRIVER_DESC);
+ MODULE_ALIAS("platform:ohci");
++MODULE_LICENSE("GPL");
 -- 
 1.7.9.5
