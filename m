@@ -1,32 +1,63 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 07 Jun 2013 11:30:39 -0600
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDyYt+pN+UaFuqWL5RrHpyuq_4So-tArmx3dr=0wLS+hwQ@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron>
- <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
- <20130606131042.GN18614@n2100.arm.linux.org.uk>
- <CAPweEDyYt+pN+UaFuqWL5RrHpyuq_4So-tArmx3dr=0wLS+hwQ@mail.gmail.com>
-Message-ID: <51B218BF.60002@wwwdotorg.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 07 Jun 2013 19:33:42 +0200
+Subject: [PATCH v3 0/3] Separate generic header usage from
+ ARCH_MULTIPLATFORM
+In-Reply-To: <51B20F7B.1080909@arm.com>
+References: <1370602111-28737-1-git-send-email-jonathan.austin@arm.com>
+ <29798869.9FjkuBXpzS@wuerfel> <51B20F7B.1080909@arm.com>
+Message-ID: <27974883.ZkGYubVYBp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2013 02:02 AM, luke.leighton wrote:
-> On Thu, Jun 6, 2013 at 2:10 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
+On Friday 07 June 2013 17:51:07 Jonathan Austin wrote:
 > 
->> If companies are going to go off and invent the square wheel, and that
->> makes *them* suffer the loss of being able to merge back into the
->> mainline kernel, thereby making *their* job of moving forward with
->> their kernel versions much harder, then yes, we *are* happy.
-> 
->  russell: they have more employees than sense :)  they also don't have
-> any idea of what they *should* be doing, so this is an opportunity to
-> educate them.
+> Thanks for the expansion. I like that as an aim :). We should remember 
+> it'll still only make sense for platforms where PHYS_OFFSET/DRAM_BASE is 
+> the same - not sure how many that will be.
 
-You know, they're probably reading this thread, and if not, they
-certainly can in the list archives. It's probably not a good idea to
-slag them off like that, and like other comments in this thread...
+Yes, this is much less about the practical value of actually running
+a kernel that is built for multiple NOMMU machines than it is about
+doing things in a consistent way throughout the kernel.
+
+> I've had a play with keeping !MMU and ARCH_MULTIPLATFORM selectable 
+> together, and of the fixes in your diff, only the following is required 
+> to get R7 booting on top of Vexpress:
+> 
+> -----8<-------
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index a7f066e..ead2b25 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -289,8 +289,7 @@ choice
+> 
+>   config ARCH_MULTIPLATFORM
+>          bool "Allow multiple platforms to be selected"
+> -       depends on MMU
+> -       select ARM_PATCH_PHYS_VIRT
+> +       select ARM_PATCH_PHYS_VIRT if MMU
+>          select AUTO_ZRELADDR
+>          select COMMON_CLK
+>          select MULTI_IRQ_HANDLER
+> ----->8--------
+> 
+> It's nice too, because we don't need to add back Makefile.boot for vexpress.
+
+Ok, excellent. We can probably mark that for -stable backports so we
+also get it in 3.8.x and 3.9.x.
+
+> The R7 support, nommu-fixes and MPU patches I sent before and which I 
+> hope to have merged for 3.11 (pull request for rmk coming shortly) can 
+> all work fine using this instead of the NEED_NO_MACH_HEADERS series (IE 
+> this series)....
+
+Ok.
+
+> It would be cool, then, to have the small patch above in for 3.11 too if 
+> we're not too late and if nobody is against going down this route?
+> 
+> Arnd: would you like to send it as a patch to the list for 
+> consideration, or shall I take this on?
+
+Please send a patch with a correct description.
+
+	Arnd
