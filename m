@@ -1,63 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 07 Jun 2013 19:33:42 +0200
-Subject: [PATCH v3 0/3] Separate generic header usage from
- ARCH_MULTIPLATFORM
-In-Reply-To: <51B20F7B.1080909@arm.com>
-References: <1370602111-28737-1-git-send-email-jonathan.austin@arm.com>
- <29798869.9FjkuBXpzS@wuerfel> <51B20F7B.1080909@arm.com>
-Message-ID: <27974883.ZkGYubVYBp@wuerfel>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 7 Jun 2013 13:37:57 -0400 (EDT)
+Subject: [RFC][PATCH 2/7] USB: OHCI: make ohci-omap a separate driver
+In-Reply-To: <1370585013-12809-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306071326000.1366-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013 17:51:07 Jonathan Austin wrote:
-> 
-> Thanks for the expansion. I like that as an aim :). We should remember 
-> it'll still only make sense for platforms where PHYS_OFFSET/DRAM_BASE is 
-> the same - not sure how many that will be.
+On Fri, 7 Jun 2013, Manjunath Goudar wrote:
 
-Yes, this is much less about the practical value of actually running
-a kernel that is built for multiple NOMMU machines than it is about
-doing things in a consistent way throughout the kernel.
+> Separate the  TI OHCI OMAP1/2 host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM.
 
-> I've had a play with keeping !MMU and ARCH_MULTIPLATFORM selectable 
-> together, and of the fixes in your diff, only the following is required 
-> to get R7 booting on top of Vexpress:
-> 
-> -----8<-------
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index a7f066e..ead2b25 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -289,8 +289,7 @@ choice
-> 
->   config ARCH_MULTIPLATFORM
->          bool "Allow multiple platforms to be selected"
-> -       depends on MMU
-> -       select ARM_PATCH_PHYS_VIRT
-> +       select ARM_PATCH_PHYS_VIRT if MMU
->          select AUTO_ZRELADDR
->          select COMMON_CLK
->          select MULTI_IRQ_HANDLER
-> ----->8--------
-> 
-> It's nice too, because we don't need to add back Makefile.boot for vexpress.
+> @@ -71,6 +77,10 @@ static struct clk *usb_dc_ck;
+>  static int host_enabled;
+>  static int host_initialized;
 
-Ok, excellent. We can probably mark that for -stable backports so we
-also get it in 3.8.x and 3.9.x.
+These two variables aren't used for anything.  You should get rid of 
+them.
 
-> The R7 support, nommu-fixes and MPU patches I sent before and which I 
-> hope to have merged for 3.11 (pull request for rmk coming shortly) can 
-> all work fine using this instead of the NEED_NO_MACH_HEADERS series (IE 
-> this series)....
+> @@ -201,8 +211,14 @@ static int ohci_omap_init(struct usb_hcd *hcd)
+>  		ohci_to_hcd(ohci)->self.otg_port = config->otg;
+>  		/* default/minimum OTG power budget:  8 mA */
+>  		ohci_to_hcd(ohci)->power_budget = 8;
+> +		ohci->hc_control = OHCI_CTRL_RWC;
+> +		writel(OHCI_CTRL_RWC, &ohci->regs->control);
+>  	}
+>  
+> +	if (config->rwc) {
+> +		ohci->hc_control = OHCI_CTRL_RWC;
+> +		writel(OHCI_CTRL_RWC, &ohci->regs->control);
+> +	}
 
-Ok.
+It's better to have two tests.  Remove the two lines added to the
+previous "if" block, and change this test to
 
-> It would be cool, then, to have the small patch above in for 3.11 too if 
-> we're not too late and if nobody is against going down this route?
-> 
-> Arnd: would you like to send it as a patch to the list for 
-> consideration, or shall I take this on?
+	if (config->otg || config->rwc) {
 
-Please send a patch with a correct description.
+> @@ -281,14 +298,6 @@ static int ohci_omap_init(struct usb_hcd *hcd)
+>  	return 0;
+>  }
+>  
+> -static void ohci_omap_stop(struct usb_hcd *hcd)
+> -{
+> -	dev_dbg(hcd->self.controller, "stopping USB Controller\n");
+> -	ohci_stop(hcd);
+> -	omap_ohci_clock_power(0);
 
-	Arnd
+This last line seems to have gotten lost.  You need to add it to 
+usb_hcd_omap_remove().
+
+> @@ -354,8 +362,7 @@ static int usb_hcd_omap_probe (const struct hc_driver *driver,
+>  		goto err2;
+>  	}
+>  
+> -	ohci = hcd_to_ohci(hcd);
+> -	ohci_hcd_init(ohci);
+> +	ohci_setup(hcd);
+
+Not needed, since you call ohci_setup() from within ohci_omap_reset().
+
+Alan Stern
