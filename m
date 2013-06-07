@@ -1,76 +1,87 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:47 +0900
-Subject: [PATCH 17/27] ARM: shmobile: r8a7778: Register SDHI device
+Date: Fri,  7 Jun 2013 16:51:50 +0900
+Subject: [PATCH 20/27] ARM: shmobile: r8a7790: add div6 clocks
 In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
 References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370591517-20239-18-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-21-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch adds SDHI register function which needs id number (= 0/1/2)
+DIV6 clocks control SD*/MMC* core clocks.
 
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/include/mach/r8a7778.h |  2 ++
- arch/arm/mach-shmobile/setup-r8a7778.c        | 24 ++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+ arch/arm/mach-shmobile/clock-r8a7790.c | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index 951149e..b5173b3 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -18,6 +18,7 @@
- #ifndef __ASM_R8A7778_H__
- #define __ASM_R8A7778_H__
+diff --git a/arch/arm/mach-shmobile/clock-r8a7790.c b/arch/arm/mach-shmobile/clock-r8a7790.c
+index c85e643..a481003 100644
+--- a/arch/arm/mach-shmobile/clock-r8a7790.c
++++ b/arch/arm/mach-shmobile/clock-r8a7790.c
+@@ -52,6 +52,12 @@
  
-+#include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/sh_eth.h>
+ #define MODEMR		0xE6160060
+ #define SDCKCR		0xE6150074
++#define SD2CKCR		0xE6150078
++#define SD3CKCR		0xE615007C
++#define MMC0CKCR	0xE6150240
++#define MMC1CKCR	0xE6150244
++#define SSPCKCR		0xE6150248
++#define SSPRSCKCR	0xE615024C
  
- extern void r8a7778_add_standard_devices(void);
-@@ -28,5 +29,6 @@ extern void r8a7778_init_irq(void);
- extern void r8a7778_init_irq_dt(void);
- extern void r8a7778_clock_init(void);
- extern void r8a7778_init_irq_extpin(int irlm);
-+extern void r8a7778_sdhi_init(int id, struct sh_mobile_sdhi_info *info);
+ static struct clk_mapping cpg_mapping = {
+ 	.phys   = CPG_BASE,
+@@ -154,6 +160,23 @@ struct clk div4_clks[DIV4_NR] = {
+ 	[DIV4_SD1] = SH_CLK_DIV4(&pll1_clk, SDCKCR, 0, 0x1de0, CLK_ENABLE_ON_INIT),
+ };
  
- #endif /* __ASM_R8A7778_H__ */
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index d6ee521..f5b2a57 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -102,6 +102,30 @@ void __init r8a7778_add_ether_device(struct sh_eth_plat_data *pdata)
- 					  pdata, sizeof(*pdata));
- }
- 
-+/* SDHI */
-+static struct resource sdhi_resources[] = {
-+	/* SDHI0 */
-+	DEFINE_RES_MEM(0xFFE4C000, 0x100),
-+	DEFINE_RES_IRQ(gic_iid(0x77)),
-+	/* SDHI1 */
-+	DEFINE_RES_MEM(0xFFE4D000, 0x100),
-+	DEFINE_RES_IRQ(gic_iid(0x78)),
-+	/* SDHI2 */
-+	DEFINE_RES_MEM(0xFFE4F000, 0x100),
-+	DEFINE_RES_IRQ(gic_iid(0x76)),
++/* DIV6 clocks */
++enum {
++	DIV6_SD2, DIV6_SD3,
++	DIV6_MMC0, DIV6_MMC1,
++	DIV6_SSP, DIV6_SSPRS,
++	DIV6_NR
 +};
 +
-+void __init r8a7778_sdhi_init(int id,
-+			      struct sh_mobile_sdhi_info *info)
-+{
-+	BUG_ON(id < 0 || id > 2);
++static struct clk div6_clks[DIV6_NR] = {
++	[DIV6_SD2]	= SH_CLK_DIV6(&pll1_div2_clk, SD2CKCR, 0),
++	[DIV6_SD3]	= SH_CLK_DIV6(&pll1_div2_clk, SD3CKCR, 0),
++	[DIV6_MMC0]	= SH_CLK_DIV6(&pll1_div2_clk, MMC0CKCR, 0),
++	[DIV6_MMC1]	= SH_CLK_DIV6(&pll1_div2_clk, MMC1CKCR, 0),
++	[DIV6_SSP]	= SH_CLK_DIV6(&pll1_div2_clk, SSPCKCR, 0),
++	[DIV6_SSPRS]	= SH_CLK_DIV6(&pll1_div2_clk, SSPRSCKCR, 0),
++};
 +
-+	platform_device_register_resndata(
-+		&platform_bus, "sh_mobile_sdhi", id,
-+		sdhi_resources + (2 * id), 2,
-+		info, sizeof(*info));
-+}
+ /* MSTP */
+ enum { MSTP721, MSTP720,
+ 	MSTP216, MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP_NR };
+@@ -202,6 +225,14 @@ static struct clk_lookup lookups[] = {
+ 	CLKDEV_CON_ID("sd0",		&div4_clks[DIV4_SD0]),
+ 	CLKDEV_CON_ID("sd1",		&div4_clks[DIV4_SD1]),
+ 
++	/* DIV6 */
++	CLKDEV_CON_ID("sd2",		&div6_clks[DIV6_SD2]),
++	CLKDEV_CON_ID("sd3",		&div6_clks[DIV6_SD3]),
++	CLKDEV_CON_ID("mmc0",		&div6_clks[DIV6_MMC0]),
++	CLKDEV_CON_ID("mmc1",		&div6_clks[DIV6_MMC1]),
++	CLKDEV_CON_ID("ssp",		&div6_clks[DIV6_SSP]),
++	CLKDEV_CON_ID("ssprs",		&div6_clks[DIV6_SSPRS]),
 +
- void __init r8a7778_add_standard_devices(void)
- {
- 	int i;
+ 	/* MSTP */
+ 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP204]),
+ 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP203]),
+@@ -265,6 +296,9 @@ void __init r8a7790_clock_init(void)
+ 		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
+ 
+ 	if (!ret)
++		ret = sh_clk_div6_register(div6_clks, DIV6_NR);
++
++	if (!ret)
+ 		ret = sh_clk_mstp_register(mstp_clks, MSTP_NR);
+ 
+ 	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
 -- 
 1.8.2.1
