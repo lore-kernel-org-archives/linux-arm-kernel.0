@@ -1,9 +1,10 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 20:08:33 +0200
-Subject: [RFC PATCH 33/50] ehci-atmel.c: prepare clk before calling enable
+Date: Fri,  7 Jun 2013 20:08:57 +0200
+Subject: [RFC PATCH 35/50] at91/avr32/atmel_lcdfb: prepare clk before calling
+ enable
 In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
 References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370628513-2628-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370628537-2712-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,32 +13,31 @@ avoid common clk framework warnings.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- drivers/usb/host/ehci-atmel.c |    8 ++++----
+ drivers/video/atmel_lcdfb.c |    8 ++++----
  1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-index 6642009..015ce6e 100644
---- a/drivers/usb/host/ehci-atmel.c
-+++ b/drivers/usb/host/ehci-atmel.c
-@@ -37,15 +37,15 @@ static int clocked;
+diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
+index 540909d..8525457 100644
+--- a/drivers/video/atmel_lcdfb.c
++++ b/drivers/video/atmel_lcdfb.c
+@@ -893,14 +893,14 @@ static int __init atmel_lcdfb_init_fbinfo(struct atmel_lcdfb_info *sinfo)
  
- static void atmel_start_clock(void)
+ static void atmel_lcdfb_start_clock(struct atmel_lcdfb_info *sinfo)
  {
--	clk_enable(iclk);
--	clk_enable(fclk);
-+	clk_prepare_enable(iclk);
-+	clk_prepare_enable(fclk);
- 	clocked = 1;
+-	clk_enable(sinfo->bus_clk);
+-	clk_enable(sinfo->lcdc_clk);
++	clk_prepare_enable(sinfo->bus_clk);
++	clk_prepare_enable(sinfo->lcdc_clk);
  }
  
- static void atmel_stop_clock(void)
+ static void atmel_lcdfb_stop_clock(struct atmel_lcdfb_info *sinfo)
  {
--	clk_disable(fclk);
--	clk_disable(iclk);
-+	clk_disable_unprepare(fclk);
-+	clk_disable_unprepare(iclk);
- 	clocked = 0;
+-	clk_disable(sinfo->bus_clk);
+-	clk_disable(sinfo->lcdc_clk);
++	clk_disable_unprepare(sinfo->bus_clk);
++	clk_disable_unprepare(sinfo->lcdc_clk);
  }
+ 
  
 -- 
 1.7.9.5
