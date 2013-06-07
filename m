@@ -1,73 +1,99 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 17:22:06 +0900
-Subject: [PATCH 08/11] ARM: shmobile: lager: support GPIO switches
-In-Reply-To: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370593329-27559-9-git-send-email-horms+renesas@verge.net.au>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Fri, 7 Jun 2013 10:23:04 +0200
+Subject: [PATCH v2 0/8] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <20130606185110.GP23859@titan.lakedaemon.net>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130606185110.GP23859@titan.lakedaemon.net>
+Message-ID: <20130607102304.3c42773b@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The lager board has pins 1 - 4 of SW2 wired up to GPIO pins.
-This patch allows access to those pins as KEYS 1 - 4 using
-gpio-keys.
+Dear Jason Cooper,
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/board-lager.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+On Thu, 6 Jun 2013 14:51:10 -0400, Jason Cooper wrote:
+> > Thierry Reding (1):
+> >   PCI: Introduce new MSI chip infrastructure
+> > 
+> > Thomas Petazzoni (7):
+> >   PCI: Add registry of MSI chips
+> >   irqchip: armada-370-xp: properly request resources
+> >   irqchip: armada-370-xp: implement MSI support
+> >   arm: mvebu: the MPIC now provides MSI controller features
+> >   pci: mvebu: add support for MSI
+> >   arm: mvebu: indicate that this platform supports MSI
+> >   arm: mvebu: link PCIe controllers to the MSI controller
+> > 
+> 
+> Is there a reason why the following breakdown wouldn't work?
 
-diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
-index 6a1ba38..d73e21d 100644
---- a/arch/arm/mach-shmobile/board-lager.c
-+++ b/arch/arm/mach-shmobile/board-lager.c
-@@ -18,6 +18,9 @@
-  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  */
- 
-+#include <linux/gpio.h>
-+#include <linux/gpio_keys.h>
-+#include <linux/input.h>
- #include <linux/interrupt.h>
- #include <linux/irqchip.h>
- #include <linux/kernel.h>
-@@ -47,11 +50,27 @@ static struct gpio_led lager_leds[] = {
- 	},
- };
- 
--static struct gpio_led_platform_data lager_leds_pdata = {
-+static __initdata struct gpio_led_platform_data lager_leds_pdata = {
- 	.leds		= lager_leds,
- 	.num_leds	= ARRAY_SIZE(lager_leds),
- };
- 
-+/* GPIO KEY */
-+#define GPIO_KEY(c, g, d, ...) \
-+	{ .code = c, .gpio = g, .desc = d, .active_low = 1 }
-+
-+static __initdata struct gpio_keys_button gpio_buttons[] = {
-+	GPIO_KEY(KEY_4,		RCAR_GP_PIN(1, 28),	"SW2-pin4"),
-+	GPIO_KEY(KEY_3,		RCAR_GP_PIN(1, 26),	"SW2-pin3"),
-+	GPIO_KEY(KEY_2,		RCAR_GP_PIN(1, 24),	"SW2-pin2"),
-+	GPIO_KEY(KEY_1,		RCAR_GP_PIN(1, 14),	"SW2-pin1"),
-+};
-+
-+static __initdata struct gpio_keys_platform_data lager_keys_pdata = {
-+	.buttons	= gpio_buttons,
-+	.nbuttons	= ARRAY_SIZE(gpio_buttons),
-+};
-+
- static const struct pinctrl_map lager_pinctrl_map[] = {
- 	/* SCIF0 (CN19: DEBUG SERIAL0) */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
-@@ -73,6 +92,9 @@ static void __init lager_add_standard_devices(void)
- 	platform_device_register_data(&platform_bus, "leds-gpio", -1,
- 				      &lager_leds_pdata,
- 				      sizeof(lager_leds_pdata));
-+	platform_device_register_data(&platform_bus, "gpio-keys", -1,
-+				      &lager_keys_pdata,
-+				      sizeof(lager_keys_pdata));
- }
- 
- static const char *lager_boards_compat_dt[] __initdata = {
+No, it should work. And it's actually possible with how the patches are
+organized currently.
+
+> >  arch/arm/boot/dts/armada-370-xp.dtsi     |   1 +
+> >  arch/arm/boot/dts/armada-370.dtsi        |   1 +
+> >  arch/arm/boot/dts/armada-xp-mv78230.dtsi |   1 +
+> >  arch/arm/boot/dts/armada-xp-mv78260.dtsi |   1 +
+> >  arch/arm/boot/dts/armada-xp-mv78460.dtsi |   1 +
+> 
+> through mvebu/arm-soc
+
+Patches 5 and 8.
+
+> 
+> >  arch/arm/mach-mvebu/Kconfig              |   1 +
+> 
+> through mvebu/arm-soc after the other three have landed (v3.11-rc1)
+
+Patch 7.
+
+> >  drivers/irqchip/irq-armada-370-xp.c      | 186 ++++++++++++++++++++++++++++++-
+> 
+> through tglx
+
+Patches 3 and 4.
+
+> 
+> >  drivers/pci/host/pci-mvebu.c             |  21 ++++
+> >  drivers/pci/msi.c                        |  59 +++++++++-
+> >  drivers/pci/probe.c                      |   1 +
+> >  include/linux/msi.h                      |  22 ++++
+> >  include/linux/pci.h                      |   1 +
+> 
+> through Bjorn
+
+Patches 1, 2 and 6.
+
+So as you can see, the patches are already broken down in a way that
+allows each maintainer to pick its part. But I admit I could probably
+reorder them in the following way:
+
+ 1. PCI: Introduce new MSI chip infrastructure
+ 2. PCI: Add registry of MSI chips
+ 3. pci: mvebu: add support for MSI
+ 4. irqchip: armada-370-xp: properly request resources
+ 5. irqchip: armada-370-xp: implement MSI support
+ 6. arm: mvebu: the MPIC now provides MSI controller features
+ 7. arm: mvebu: link PCIe controllers to the MSI controller
+ 8. arm: mvebu: indicate that this platform supports MSI
+
+1-3 through Bjorn, 4-5 through tglx, 6-8 through you.
+
+The only problem that I see is that 'irqchip: armada-370-xp: implement
+MSI support' (which goes through tglx) has a build dependency on 'PCI:
+Add registry of MSI chips' (which goes through Bjorn). This is due to
+the IRQ controller using the msi_chip_add() function that is introduced
+earlier in the PCI core.
+
+How would you solve that?
+
+In any case, at this point I'd like first to have the ACK from Bjorn
+Helgaas and Arnd Bergmann on the general approach.
+
+Best regards, 
+
+Thomas
 -- 
-1.8.2.1
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
