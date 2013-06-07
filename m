@@ -1,13 +1,14 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Fri, 7 Jun 2013 16:46:07 -0400
-Subject: [PATCHv3 5/6] arm: omap2plus_defconfig: enable TI bandgap driver
+Date: Fri, 7 Jun 2013 16:46:08 -0400
+Subject: [PATCHv3 6/6] arm: omap2plus_defconfig: enable DRA752 thermal support
+ by default
 In-Reply-To: <1370637968-23299-1-git-send-email-eduardo.valentin@ti.com>
 References: <1370637968-23299-1-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <1370637968-23299-6-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <1370637968-23299-7-git-send-email-eduardo.valentin@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the bandgap driver for TI SoCs thermal support.
+Make DRA752 thermal support enabled on omap2plus_defconfig
 
 Cc: Russell King <linux@arm.linux.org.uk>
 Cc: Tony Lindgren <tony@atomide.com>
@@ -19,35 +20,18 @@ Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
 ---
- arch/arm/configs/omap2plus_defconfig | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/configs/omap2plus_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm/configs/omap2plus_defconfig b/arch/arm/configs/omap2plus_defconfig
-index c1ef64b..6e6c494 100644
+index 6e6c494..07aab0b 100644
 --- a/arch/arm/configs/omap2plus_defconfig
 +++ b/arch/arm/configs/omap2plus_defconfig
-@@ -151,6 +151,13 @@ CONFIG_W1=y
- CONFIG_POWER_SUPPLY=y
- CONFIG_SENSORS_LM75=m
- CONFIG_WATCHDOG=y
-+CONFIG_THERMAL=y
-+CONFIG_THERMAL_HWMON=y
-+CONFIG_THERMAL_DEFAULT_GOV_STEP_WISE=y
-+CONFIG_THERMAL_GOV_FAIR_SHARE=y
-+CONFIG_THERMAL_GOV_STEP_WISE=y
-+CONFIG_THERMAL_GOV_USER_SPACE=y
-+CONFIG_CPU_THERMAL=y
- CONFIG_OMAP_WATCHDOG=y
- CONFIG_TWL4030_WATCHDOG=y
- CONFIG_MFD_TPS65217=y
-@@ -237,6 +244,10 @@ CONFIG_RTC_DRV_TWL4030=y
- CONFIG_RTC_DRV_OMAP=y
- CONFIG_DMADEVICES=y
- CONFIG_DMA_OMAP=y
-+CONFIG_TI_SOC_THERMAL=y
-+CONFIG_TI_THERMAL=y
-+CONFIG_OMAP4_THERMAL=y
-+CONFIG_OMAP5_THERMAL=y
+@@ -248,6 +248,7 @@ CONFIG_TI_SOC_THERMAL=y
+ CONFIG_TI_THERMAL=y
+ CONFIG_OMAP4_THERMAL=y
+ CONFIG_OMAP5_THERMAL=y
++CONFIG_DRA752_THERMAL=y
  CONFIG_EXT2_FS=y
  CONFIG_EXT3_FS=y
  # CONFIG_EXT3_FS_XATTR is not set
