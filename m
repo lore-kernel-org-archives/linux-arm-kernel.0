@@ -1,95 +1,109 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 7 Jun 2013 13:20:43 -0400 (EDT)
-Subject: [RFC][PATCH 1/7] USB: OHCI: make ohci-exynos a separate driver
-In-Reply-To: <1370585013-12809-2-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306071304420.1366-100000@iolanthe.rowland.org>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 7 Jun 2013 18:30:13 +0100
+Subject: [PATCH] ARM: tegra: add basic SecureOS support
+In-Reply-To: <CAAVeFu+o7oc4Rrn67xxzsgeZ9xrTBkaLd_E4amaVgcNBRsKC_g@mail.gmail.com>
+References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
+ <20130606110240.GA3320@localhost.localdomain>
+ <CAAVeFu+o7oc4Rrn67xxzsgeZ9xrTBkaLd_E4amaVgcNBRsKC_g@mail.gmail.com>
+Message-ID: <20130607173004.GA29344@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Jun 2013, Manjunath Goudar wrote:
+On Fri, Jun 07, 2013 at 04:25:07PM +0900, Alexandre Courbot wrote:
+> On Thu, Jun 6, 2013 at 8:02 PM, Dave Martin <Dave.Martin@arm.com> wrote:
+> 
+> >> +static int __attribute__((used)) __tegra_smc_stack[10];
+> >
+> > Use __used instead of using GCC attributes directly.
+> >
+> >> +
+> >> +/*
+> >> + * With EABI, subtype and arg already end up in r0, r1 and r2 as they are
+> >> + * function arguments, but we prefer to play safe here and explicitly move
+> >> + * these values into the expected registers anyway. mov instructions without
+> >> + * any side-effect are turned into nops by the assembler, which limits
+> >> + * overhead.
+> >> + */
+> >> +static void tegra_generic_smc(u32 type, u32 subtype, u32 arg)
+> >> +{
+> >> +     asm volatile(
+> >> +             ".arch_extension        sec\n\t"
+> >> +             "ldr    r3, =__tegra_smc_stack\n\t"
+> >
+> > ldr= should be avoided in inline asm, because GCC can't guess it's size,
+> > and can't guarantee that the literal pool word is close enough to be
+> > addressable (though for small compilation units it's unlikely to be a
+> > problem).
+> 
+> With Russel's suggested changes this will go away, but that's good to
+> know anyway.
+> 
+> >> +             "dsb\n\t"
+> >
+> > Can you explain what this DSB is for?
+> 
+> Just a safety measure to make sure all memory operations are done
+> before we enter the secure monitor. Is it unnecessary?
 
-> Separate the  Samsung OHCI EXYNOS host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM.
+Most likely it's either unnecessary, or insufficient.
 
-> -static void exynos_ohci_phy_enable(struct exynos_ohci_hcd *exynos_ohci)
-> +static void exynos_ohci_phy_enable(struct platform_device *pdev)
->  {
-> -	struct platform_device *pdev = to_platform_device(exynos_ohci->dev);
-> +	struct exynos_ohci_hcd *exynos_ohci = platform_get_drvdata(pdev);
+Just for entering call SMC properly, it's not needed.  If the Secure
+World has its MMU on and maps Normal World memory using the same memory
+types as Linux, then the Normal World and Secure World access the memory
+coherently with no extra barrier needed.
 
-This is wrong.  platform_get_drvdata() will return the hcd, not the 
-exynos_ohci_hcd structure.
+It the Secure World's MMU is off, or if it maps Normal World memory
+as Secure (pagetable NS bit = 0), or if it maps Normal World memory with
+memory types incompatible with the ones Linux is using then you will get
+coherency problems: the Secure and Normal Worlds won't necessarily see
+the same data.
 
-> @@ -37,9 +51,9 @@ static void exynos_ohci_phy_enable(struct exynos_ohci_hcd *exynos_ohci)
->  		exynos_ohci->pdata->phy_init(pdev, USB_PHY_TYPE_HOST);
->  }
->  
-> -static void exynos_ohci_phy_disable(struct exynos_ohci_hcd *exynos_ohci)
-> +static void exynos_ohci_phy_disable(struct platform_device *pdev)
->  {
-> -	struct platform_device *pdev = to_platform_device(exynos_ohci->dev);
-> +	struct exynos_ohci_hcd *exynos_ohci = platform_get_drvdata(pdev);
+In the latter case, you must do explicit cache maintenance around SMC
+for the data you want to exchange.  This might also be needed in the
+Secure World if caches are enabled over there.  DSB isn't enough by
+itself.
 
-Same problem here.
 
-> @@ -121,15 +83,18 @@ static int exynos_ohci_probe(struct platform_device *pdev)
->  	if (!pdev->dev.coherent_dma_mask)
->  		pdev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
->  
-> -	exynos_ohci = devm_kzalloc(&pdev->dev, sizeof(struct exynos_ohci_hcd),
-> -					GFP_KERNEL);
-> -	if (!exynos_ohci)
-> +	hcd = usb_create_hcd(&exynos_ohci_hc_driver,
-> +				&pdev->dev, dev_name(&pdev->dev));
-> +	if (!hcd) {
-> +		dev_err(&pdev->dev, "Unable to create HCD\n");
->  		return -ENOMEM;
->  
->  	if (of_device_is_compatible(pdev->dev.of_node,
->  					"samsung,exynos5440-ohci"))
->  		goto skip_phy;
->  
-> +	}
+If the Secure World doesn't access Normal World memory at all, you
+don't need to do anything special and can remove the DSB.
 
-This close brace belongs with the previous "if" statement.
+Otherwise, for performance reasons, it is definitely preferable to have
+the Secure World MMU on if possible, though it's a bit more complex to
+set up.
 
-> @@ -146,7 +111,6 @@ static int exynos_ohci_probe(struct platform_device *pdev)
->  
->  skip_phy:
->  
-> -	exynos_ohci->dev = &pdev->dev;
->  
->  	hcd = usb_create_hcd(&exynos_ohci_hc_driver, &pdev->dev,
->  					dev_name(&pdev->dev));
+> >> +             "smc    #0\n\t"
+> >> +             "ldr    r3, =__tegra_smc_stack\n\t"
+> >> +             "ldmia  r3, {r4-r12, lr}"
+> >> +                     :
+> >> +                     : [type]    "r" (type),
+> >> +                       [subtype] "r" (subtype),
+> >> +                       [arg]     "r" (arg)
+> >> +                     : "r0", "r1", "r2", "r3", "r4", "memory");
+> >
+> > If r5-r12 are not clobbered, why do you save and restore them?
+> 
+> The secure monitor might change them.
 
-This needs to be deleted, because it was done already.
+Sure, but you could just add all the registers to the clobber list,
+and then the compiler would save and restore them for you in the
+function entry/exit sequences, which may be a bit more efficient.
 
-Manjunath, I have already asked you to proof-read your patches before 
-posting them.  Please do so.  New patches should _not_ have this kind 
-of error.
+Since you are going to replace this code anyway, it's academic
+though.
 
-> @@ -192,13 +155,11 @@ skip_phy:
->  	}
->  
->  	if (exynos_ohci->otg)
-> -		exynos_ohci->otg->set_host(exynos_ohci->otg,
-> -					&exynos_ohci->hcd->self);
-> +		exynos_ohci->otg->set_host(exynos_ohci->otg, &hcd->self);
->  
-> -	exynos_ohci_phy_enable(exynos_ohci);
-> +	exynos_ohci_phy_enable(pdev);
+> 
+> > In the ARM ABI, r12 is a caller-save register, so you probably
+> > don't need to save/restore that even if it is clobbered.
+> 
+> Right, thanks. Didn't know r12 could be used as a scratch register.
 
-This call will not work, because you don't set pdev's platform_data
-until later.  The call to platform_set_drvdata() must be moved before
-this line.
+What I said is a bit wrong actually: for the naked version of the
+function you can go ahead and corrupt r12, because naked functions
+are not inlinable and follow the ABI.  Adding "r12" in the clobber
+list would be harmless in this case, but I don't think it's necessary.
 
->  
-> -	ohci = hcd_to_ohci(hcd);
-> -	ohci_hcd_init(ohci);
-> +	ohci_setup(hcd);
+asm() in any other context needs to declare all registers that it
+might clobber.
 
-There's no need to call ohci_setup(), because it will get called anyway
-as the .reset member of the ohci_hc_driver structure.
-
-Alan Stern
+Cheers
+---Dave
