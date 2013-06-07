@@ -1,74 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 8 Jun 2013 00:08:53 +0200
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1370475609.20454.44.camel@localhost>
- <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
- <1733666.lHUBcfUXq9@flatron> <20130606112723.71ddd70c@skate>
- <CAPweEDzW60poOYahm31aW3_A=NvZmyBPPPgM9PzdvuPJnju69A@mail.gmail.com>
-Message-ID: <20130607220853.GR14209@lukather>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Jun 2013 23:15:26 +0100
+Subject: [PATCH] ARM: tegra: disable nonboot CPUs when reboot
+In-Reply-To: <51B25086.6020209@wwwdotorg.org>
+References: <1370597810-1153-1-git-send-email-josephl@nvidia.com>
+ <51B20DF1.3030207@wwwdotorg.org>
+ <20130607181846.GL8111@mudshark.cambridge.arm.com>
+ <51B22CDC.4080200@wwwdotorg.org> <51B25086.6020209@wwwdotorg.org>
+Message-ID: <20130607221526.GC18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 07:26:49PM +0100, luke.leighton wrote:
->  maxime: we need to talk :)
+On Fri, Jun 07, 2013 at 03:28:38PM -0600, Stephen Warren wrote:
+> On 06/07/2013 12:56 PM, Stephen Warren wrote:
+> ...
+> > [1] Perhaps the issue is why ipi_send_stop() calls down into 
+> > tegra_cpu_kill() rather than tegra_cpu_die(), since die() is what
+> > should be run on the killed CPU, and kill() on the killing CPU?
 > 
->  please tell me in 4 or 5 sentences what you've managed to do so far,
-> expanding a little on what thomas says below, more specifically what
-> it achieves and/or allows rather than technically what it does
-> (suitable for managers and directors in other words), and what plans
-> you'd like to see happen.
+> Scratch that; I don't think it's calling down to /either/; I was
+> confused. It seems like it /should/ call cpu_die() though, at least if
+> hotplug is enabled, right?
 
-You mean something like http://linux-sunxi.org/Linux_mainlining_effort ?
+The problem is really complex.
 
-You should really do a bit of research before starting a thread like
-this one. This webpage has been around for like 9 monthes now on the wiki 
-of a community you pretend to represent (even though I fail to get how
-you can pretend such thing, but that's another topic).
+CPU hotplug is done in paths where we're relatively confident that the
+system is working correctly.  So all the features such as scheduling
+are available, the timer ticks work and so forth.
 
-> > is the maintainer of the mainline Allwinner sunxi
-> > effort. It already supports a number of boards, has a pinctrl driver, a
-> > GPIO driver, serial port is working, network is working, I2C is
-> > working.
-> >
-> > All in mainline, completely Device Tree based.
-> 
->  great.  which version did it first hit, i.e. what will the first
-> signs of this be when allwinner begin doing "git pulls"?
+However, reboot is a totally different environment.  This can happen
+from almost any context with the system in any state what so ever.  A
+CPU could be stuck.  A CPU could have oopsed.  The CPU which is in
+the reboot code could be the CPU which has oopsed.  It could be called
+from within an interrupt...
 
-3.8, as shown in the wiki page
+What that means is the usual CPU hotplug methods can't be used in the
+reboot path.  Well, they can, but it will be fragile.
 
->  and which boards.  bear in mind that one of those "boards" should
-> really be "the total range of products available across hundreds of
-> chinese tablet clone manufacturers".
-> 
->  specific question: is one of the "boards" the one that tom cubie
-> submitted, which covers virtually every android tablet product
-> manufactured in the millions by chinese tablet clone manufacturers?
-
-Again, wiki.
-
-> > So isn't this entire discussion completely moot?
-> 
->  no because it's totally in isolation from allwinner.  i need to give
-> them a heads-up, and get them involved, giving them specific
-> incentives [which nobody's yet given!!] for following a particular
-> path [or paths] yet to be recommended.
-> 
-> > The mainline support
-> > for sunxi has already started since 6 months or so, and has been Device
-> > Tree based from day one.
-> 
-> to clarify: the *community-driven* mainline support for sunxi.  ok -
-> which chips?  sun3i (ARM9), sun4i (Cortex A8), sun5i, sun6i and sun7i
-> (Dual-Core Cortex A7)?  which ones are in?
-
-A10, A13 for the moment. I just received hardware with A10s, A20 and A31
-that I need to work on, but support should come quite soon. I already
-have some patches pending to be tested on an A31 board, but didn't have
-as much time as I wanted lately to actually set a proper environment to
-test them.
-
-Maxime
+For reboot, the real solution there is not to use software-based
+reboot, but bring the other cores to a halt (which is what
+ipi_send_stop is doing) and then issue a hardware reset to the whole
+system, including the other CPUs.
