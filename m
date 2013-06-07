@@ -1,44 +1,83 @@
 From: r.sricharan@ti.com (Sricharan R)
-Date: Fri, 7 Jun 2013 18:52:46 +0530
-Subject: [PATCH V3 0/4] ARM: dts: omap5: Cleanup and updates for DT files
-Message-ID: <1370611370-14715-1-git-send-email-r.sricharan@ti.com>
+Date: Fri, 7 Jun 2013 18:52:50 +0530
+Subject: [PATCH V3 4/4] ARM: dts: omap5-uevm: Add uart pinctrl data
+In-Reply-To: <1370611370-14715-1-git-send-email-r.sricharan@ti.com>
+References: <1370611370-14715-1-git-send-email-r.sricharan@ti.com>
+Message-ID: <1370611370-14715-5-git-send-email-r.sricharan@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-uevm is the only official board supported for OMAP5 soc in the mainline.
-This series deprecates the support for existent sevm which will no more
-be supported in mainline and renames the board dts file accordingly.
-Also a few additional device DT entry updates are done.
+From: Sourav Poddar <sourav.poddar@ti.com>
 
-This is on top of the below branch
-    git://git.kernel.org/pub/scm/linux/kernel/git/bcousson/linux-omap-dt.git
-    for_3.11/dts
+Booting omap5 uevm results in the following error
+"did not get pins for uart error: -19"
 
-Boot tested on omap5-uevm after pulling in the data from below place
-    git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux.git
-    HWMOD DATA: for_3.11/omap5_data_files
-    CLOCK DATA: out_of_tree/omap5_clk_data
+This happens because omap5 uevm dts file is not adapted to use uart through pinctrl
+framework. Populating uart pinctrl data to get rid of the error.
 
-Dan Murphy (1):
-  ARM: dts: omap5-uevm: Add LED support for uEVM blue LED
+Cc: Sourav Poddar <sourav.poddar@ti.com>
+Signed-off-by: Sourav Poddar <sourav.poddar@ti.com>
+[Sricharan R <r.sricharan@ti.com>: Replaced constants with preprocessor macros]
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+---
+ arch/arm/boot/dts/omap5-uevm.dts |   41 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
 
-Roger Quadros (1):
-  ARM: dts: omap5-uevm: Add USB Host support
-
-Sourav Poddar (1):
-  ARM: dts: omap5-uevm: Add uart pinctrl data
-
-Sricharan R (1):
-  ARM: dts: omap5: Make uevm as the official board and deprecate sevm
-    support
-
- arch/arm/boot/dts/Makefile       |    2 +-
- arch/arm/boot/dts/omap5-evm.dts  |  261 --------------------------------
- arch/arm/boot/dts/omap5-uevm.dts |  311 ++++++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/omap5.dtsi     |   30 ++++
- 4 files changed, 342 insertions(+), 262 deletions(-)
- delete mode 100644 arch/arm/boot/dts/omap5-evm.dts
- create mode 100644 arch/arm/boot/dts/omap5-uevm.dts
-
+diff --git a/arch/arm/boot/dts/omap5-uevm.dts b/arch/arm/boot/dts/omap5-uevm.dts
+index 6e8bb86..927db1e 100644
+--- a/arch/arm/boot/dts/omap5-uevm.dts
++++ b/arch/arm/boot/dts/omap5-uevm.dts
+@@ -184,6 +184,32 @@
+ 			0x196 (PIN_OUTPUT | MUX_MODE6) /* uart3_cts_rctx.gpio5_153 */
+ 		>;
+ 	};
++
++	uart1_pins: pinmux_uart1_pins {
++		pinctrl-single,pins = <
++			0x60 (PIN_OUTPUT | MUX_MODE0) /* uart1_tx.uart1_cts */
++			0x62 (PIN_INPUT_PULLUP | MUX_MODE0) /* uart1_tx.uart1_cts */
++			0x64 (PIN_INPUT_PULLUP | MUX_MODE0) /* uart1_rx.uart1_rts */
++			0x66 (PIN_OUTPUT | MUX_MODE0) /* uart1_rx.uart1_rts */
++		>;
++	};
++
++	uart3_pins: pinmux_uart3_pins {
++		pinctrl-single,pins = <
++			0x19a (PIN_OUTPUT | MUX_MODE0) /* uart3_rts_irsd.uart3_tx_irtx */
++			0x19c (PIN_INPUT_PULLUP | MUX_MODE0) /* uart3_rx_irrx.uart3_usbb3_hsic */
++		>;
++	};
++
++	uart5_pins: pinmux_uart5_pins {
++		pinctrl-single,pins = <
++			0x170 (PIN_INPUT_PULLUP | MUX_MODE0) /* uart5_rx.uart5_rx */
++			0x172 (PIN_OUTPUT | MUX_MODE0) /* uart5_tx.uart5_tx */
++			0x174 (PIN_INPUT_PULLUP | MUX_MODE0) /* uart5_cts.uart5_rts */
++			0x176 (PIN_OUTPUT | MUX_MODE0) /* uart5_cts.uart5_rts */
++		>;
++	};
++
+ };
+ 
+ &omap5_pmx_wkup {
+@@ -268,3 +294,18 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mcspi4_pins>;
+ };
++
++&uart1 {
++        pinctrl-names = "default";
++        pinctrl-0 = <&uart1_pins>;
++};
++
++&uart3 {
++        pinctrl-names = "default";
++        pinctrl-0 = <&uart3_pins>;
++};
++
++&uart5 {
++        pinctrl-names = "default";
++        pinctrl-0 = <&uart5_pins>;
++};
 -- 
 1.7.9.5
