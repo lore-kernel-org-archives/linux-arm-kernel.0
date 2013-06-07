@@ -1,90 +1,75 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 16:24:16 +0200
-Subject: [RFC PATCH 08/50] ARM: at91: add PMC utmi clock
+Date: Fri,  7 Jun 2013 16:24:18 +0200
+Subject: [RFC PATCH 10/50] ARM: at91: add PMC smd clock
 In-Reply-To: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
 References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370615115-16979-9-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1370615115-16979-11-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the at91 utmi clock implementation using common clk framework.
+This is the at91 smd (Soft Modem) clock implementation using common clk
+framework.
 
-This clock is a pll with a fixed factor (x40).
-It is used as a source for usb clock.
+Not used by any driver right now.
 
 Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
 ---
- arch/arm/mach-at91/Kconfig  |    7 +++
- drivers/clk/at91/Makefile   |    1 +
- drivers/clk/at91/clk-utmi.c |  114 +++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk/at91.h    |    4 ++
- 4 files changed, 126 insertions(+)
+ arch/arm/mach-at91/Kconfig |    5 ++
+ drivers/clk/at91/Makefile  |    1 +
+ drivers/clk/at91/clk-smd.c |  157 ++++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 163 insertions(+)
 
 diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-index 0280238..a4d442d 100644
+index ce4851d..8032871 100644
 --- a/arch/arm/mach-at91/Kconfig
 +++ b/arch/arm/mach-at91/Kconfig
-@@ -1,5 +1,8 @@
- if ARCH_AT91
- 
-+config HAVE_AT91_UTMI
-+	bool
-+
- config HAVE_AT91_DBGU0
+@@ -27,6 +27,9 @@ config AT91_SAM9G45_RESET
+ config AT91_SAM9_TIME
  	bool
  
-@@ -65,6 +68,7 @@ config SOC_SAMA5D3
- 	select SOC_SAMA5
++config HAVE_AT91_SMD
++	bool
++
+ config SOC_AT91SAM9
+ 	bool
+ 	select AT91_SAM9_TIME
+@@ -72,6 +75,7 @@ config SOC_SAMA5D3
  	select HAVE_FB_ATMEL
  	select HAVE_AT91_DBGU1
-+	select HAVE_AT91_UTMI
+ 	select HAVE_AT91_UTMI
++	select HAVE_AT91_SMD
+ 	select HAVE_AT91_USB_CLK
  	help
  	  Select this if you are using one of Atmel's SAMA5D3 family SoC.
- 	  This support covers SAMA5D31, SAMA5D33, SAMA5D34, SAMA5D35.
-@@ -106,12 +110,14 @@ config SOC_AT91SAM9RL
- 	select HAVE_AT91_DBGU0
+@@ -137,6 +141,7 @@ config SOC_AT91SAM9X5
  	select HAVE_FB_ATMEL
  	select SOC_AT91SAM9
-+	select HAVE_AT91_UTMI
- 
- config SOC_AT91SAM9G45
- 	bool "AT91SAM9G45 or AT91SAM9M10 families"
- 	select HAVE_AT91_DBGU1
- 	select HAVE_FB_ATMEL
- 	select SOC_AT91SAM9
-+	select HAVE_AT91_UTMI
- 	help
- 	  Select this if you are using one of Atmel's AT91SAM9G45 family SoC.
- 	  This support covers AT91SAM9G45, AT91SAM9G46, AT91SAM9M10 and AT91SAM9M11.
-@@ -121,6 +127,7 @@ config SOC_AT91SAM9X5
- 	select HAVE_AT91_DBGU0
- 	select HAVE_FB_ATMEL
- 	select SOC_AT91SAM9
-+	select HAVE_AT91_UTMI
+ 	select HAVE_AT91_UTMI
++	select HAVE_AT91_SMD
+ 	select HAVE_AT91_USB_CLK
  	help
  	  Select this if you are using one of Atmel's AT91SAM9x5 family SoC.
- 	  This means that your SAM9 name finishes with a '5' (except if it is
 diff --git a/drivers/clk/at91/Makefile b/drivers/clk/at91/Makefile
-index 2d7c119..76d09f0 100644
+index bbfd245..7206f4c 100644
 --- a/drivers/clk/at91/Makefile
 +++ b/drivers/clk/at91/Makefile
-@@ -6,3 +6,4 @@ obj-y += clk-main.o clk-pll.o clk-plldiv.o clk-master.o
- obj-y += clk-system.o clk-peripheral.o
- 
+@@ -8,3 +8,4 @@ obj-y += clk-system.o clk-peripheral.o
  obj-$(CONFIG_AT91_PROGRAMMABLE_CLOCKS)	+= clk-programmable.o
-+obj-$(CONFIG_HAVE_AT91_UTMI)		+= clk-utmi.o
-diff --git a/drivers/clk/at91/clk-utmi.c b/drivers/clk/at91/clk-utmi.c
+ obj-$(CONFIG_HAVE_AT91_UTMI)		+= clk-utmi.o
+ obj-$(CONFIG_HAVE_AT91_USB_CLK)		+= clk-usb.o
++obj-$(CONFIG_HAVE_AT91_SMD)		+= clk-smd.o
+diff --git a/drivers/clk/at91/clk-smd.c b/drivers/clk/at91/clk-smd.c
 new file mode 100644
-index 0000000..c0dd596
+index 0000000..61bd8a5
 --- /dev/null
-+++ b/drivers/clk/at91/clk-utmi.c
-@@ -0,0 +1,114 @@
++++ b/drivers/clk/at91/clk-smd.c
+@@ -0,0 +1,157 @@
 +/*
-+ * drivers/clk/at91/clk-utmi.c
++ * drivers/clk/at91/clk-smd.c
 + *
 + *  Copyright (C) 2013 Boris BREZILLON <b.brezillon@overkiz.com>
 + *
-+ * This utmiram is free software; you can redistribute it and/or modify
++ * This smdram is free software; you can redistribute it and/or modify
 + * it under the terms of the GNU General Public License as published by
 + * the Free Software Foundation; either version 2 of the License, or
 + * (at your option) any later version.
@@ -98,113 +83,143 @@ index 0000000..c0dd596
 +#include <linux/of_address.h>
 +#include <linux/io.h>
 +
-+#define to_clk_utmi(hw) container_of(hw, struct clk_utmi, hw)
++#define SMD_SOURCE_MAX		2
 +
-+struct clk_utmi {
++#define to_at91sam9x5_clk_smd(hw) \
++	container_of(hw, struct at91sam9x5_clk_smd, hw)
++struct at91sam9x5_clk_smd {
 +	struct clk_hw hw;
 +};
 +
-+static int clk_utmi_prepare(struct clk_hw *hw)
++static unsigned long at91sam9x5_clk_smd_recalc_rate(struct clk_hw *hw,
++						    unsigned long parent_rate)
 +{
-+	u32 tmp = at91_pmc_read(AT91_CKGR_UCKR) | AT91_PMC_UPLLEN |
-+		  AT91_PMC_UPLLCOUNT;
-+	at91_pmc_write(AT91_CKGR_UCKR, tmp);
-+	while (!(at91_pmc_read(AT91_PMC_SR) & AT91_PMC_LOCKU))
-+		;
++	u32 tmp;
++	u8 smddiv;
++	tmp = at91_pmc_read(AT91_PMC_SMD);
++	smddiv = (tmp & AT91_PMC_SMD_DIV) >> 8;
++	return parent_rate / (smddiv + 1);
++}
++
++static long at91sam9x5_clk_smd_round_rate(struct clk_hw *hw, unsigned long rate,
++					  unsigned long *parent_rate)
++{
++	unsigned long div;
++	unsigned long bestrate;
++	unsigned long tmp;
++
++	if (rate >= *parent_rate)
++		return *parent_rate;
++
++	div = *parent_rate / rate;
++	if (div > 15)
++		return *parent_rate / 16;
++
++	bestrate = *parent_rate / div;
++	tmp = *parent_rate / (div + 1);
++	if (bestrate - rate > rate - tmp)
++		bestrate = tmp;
++
++	return bestrate;
++}
++
++static int at91sam9x5_clk_smd_set_parent(struct clk_hw *hw, u8 index)
++{
++	u32 tmp;
++	if (index > 1)
++		return -EINVAL;
++	tmp = at91_pmc_read(AT91_PMC_SMD) & ~AT91_PMC_SMDS;
++	if (index)
++		tmp |= AT91_PMC_SMDS;
++	at91_pmc_write(AT91_PMC_SMD, tmp);
 +	return 0;
 +}
 +
-+static int clk_utmi_is_prepared(struct clk_hw *hw)
++static u8 at91sam9x5_clk_smd_get_parent(struct clk_hw *hw)
 +{
-+	return !!(at91_pmc_read(AT91_PMC_SR) & AT91_PMC_LOCKU);
++	return at91_pmc_read(AT91_PMC_SMD) & AT91_PMC_SMDS;
 +}
 +
-+static void clk_utmi_disable(struct clk_hw *hw)
++static int at91sam9x5_clk_smd_set_rate(struct clk_hw *hw, unsigned long rate,
++				       unsigned long parent_rate)
 +{
-+	u32 tmp = at91_pmc_read(AT91_CKGR_UCKR) & ~AT91_PMC_UPLLEN;
-+	at91_pmc_write(AT91_CKGR_UCKR, tmp);
++	u32 tmp;
++	unsigned long div = parent_rate / rate;
++	if (parent_rate % rate || div < 1 || div > 16)
++		return -EINVAL;
++	tmp = at91_pmc_read(AT91_PMC_SMD) & ~AT91_PMC_SMD_DIV;
++	tmp |= (div - 1) << 8;
++	at91_pmc_write(AT91_PMC_SMD, tmp);
++
++	return 0;
 +}
 +
-+static unsigned long clk_utmi_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
-+{
-+	return parent_rate * 40;
-+}
-+
-+static const struct clk_ops utmi_ops = {
-+	.prepare = clk_utmi_prepare,
-+	.is_prepared = clk_utmi_is_prepared,
-+	.disable = clk_utmi_disable,
-+	.recalc_rate = clk_utmi_recalc_rate,
++static const struct clk_ops at91sam9x5_smd_ops = {
++	.recalc_rate = at91sam9x5_clk_smd_recalc_rate,
++	.round_rate = at91sam9x5_clk_smd_round_rate,
++	.get_parent = at91sam9x5_clk_smd_get_parent,
++	.set_parent = at91sam9x5_clk_smd_set_parent,
++	.set_rate = at91sam9x5_clk_smd_set_rate,
 +};
 +
 +struct clk * __init
-+at91_clk_register_utmi(const char *name, const char *parent_name)
++at91sam9x5_clk_register_smd(const char *name, const char **parent_names,
++			    u8 num_parents)
 +{
-+	struct clk_utmi *utmi;
++	struct at91sam9x5_clk_smd *smd;
 +	struct clk *clk = NULL;
 +	struct clk_init_data init;
 +
-+	utmi = kzalloc(sizeof(*utmi), GFP_KERNEL);
-+	if (!utmi)
++	smd = kzalloc(sizeof(*smd), GFP_KERNEL);
++	if (!smd)
 +		return ERR_PTR(-ENOMEM);
 +
 +	init.name = name;
-+	init.ops = &utmi_ops;
-+	init.parent_names = parent_name ? &parent_name : NULL;
-+	init.num_parents = parent_name ? 1 : 0;
-+	init.flags = CLK_SET_RATE_GATE;
++	init.ops = &at91sam9x5_smd_ops;
++	init.parent_names = parent_names;
++	init.num_parents = num_parents;
++	init.flags = CLK_SET_RATE_GATE | CLK_SET_PARENT_GATE;
 +
-+	utmi->hw.init = &init;
++	smd->hw.init = &init;
 +
-+	clk = clk_register(NULL, &utmi->hw);
++	clk = clk_register(NULL, &smd->hw);
 +
 +	if (IS_ERR(clk))
-+		kfree(utmi);
++		kfree(smd);
 +
 +	return clk;
 +}
 +
 +#if defined(CONFIG_OF)
-+static void __init
-+of_at91_clk_utmi_setup(struct device_node *np)
++static void __init of_at91sam9x5_clk_smd_setup(struct device_node *np)
 +{
 +	struct clk *clk;
-+	const char *parent_name;
++	int i;
++	int num_parents;
++	const char *parent_names[SMD_SOURCE_MAX];
 +	const char *name = np->name;
 +
-+	parent_name = of_clk_get_parent_name(np, 0);
++	num_parents = of_count_phandle_with_args(np, "clocks", "#clock-cells");
++	if (num_parents <= 0 || num_parents >= SMD_SOURCE_MAX)
++		return;
++
++	for (i = 0; i < num_parents; i++) {
++		parent_names[i] = of_clk_get_parent_name(np, i);
++		if (!parent_names[i])
++			return;
++	}
 +
 +	of_property_read_string(np, "clock-output-names", &name);
 +
-+	clk = at91_clk_register_utmi(name, parent_name);
++	clk = at91sam9x5_clk_register_smd(name, parent_names, num_parents);
 +
 +	if (IS_ERR(clk))
 +		return;
 +
 +	of_clk_add_provider(np, of_clk_src_simple_get, clk);
-+	return;
 +}
-+
-+static void __init of_at91sam9x5_clk_utmi_setup(struct device_node *np)
-+{
-+	of_at91_clk_utmi_setup(np);
-+}
-+CLK_OF_DECLARE(at91sam9x5_clk_utmi, "atmel,at91sam9x5-clk-utmi",
-+	       of_at91sam9x5_clk_utmi_setup);
++CLK_OF_DECLARE(at91sam9x5_clk_smd, "atmel,at91sam9x5-clk-smd",
++	       of_at91sam9x5_clk_smd_setup);
 +#endif
-diff --git a/include/linux/clk/at91.h b/include/linux/clk/at91.h
-index eccdf74..18c89c2 100644
---- a/include/linux/clk/at91.h
-+++ b/include/linux/clk/at91.h
-@@ -285,4 +285,8 @@ at91_clk_register_programmable(const char *name, const char **parent_names,
- 			       u8 num_parents, u8 id,
- 			       struct clk_programmable_layout *layout);
- 
-+
-+struct clk * __init
-+at91_clk_register_utmi(const char *name, const char *parent_name);
-+
- #endif
 -- 
 1.7.9.5
