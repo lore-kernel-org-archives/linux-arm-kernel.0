@@ -1,86 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri,  7 Jun 2013 17:11:27 +0100
-Subject: [PATCH 09/10] regulator: ab8500-ext: Enable for Device Tree
-In-Reply-To: <1370621488-18130-1-git-send-email-lee.jones@linaro.org>
-References: <1370621488-18130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1370621488-18130-10-git-send-email-lee.jones@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Jun 2013 09:13:09 -0700
+Subject: [PATCH 13/14] ARM: AM33XX: hwmod data: irq, dma and addr info
+ clean up
+In-Reply-To: <alpine.DEB.2.02.1306060355320.15042@utopia.booyaka.com>
+References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+ <1369845494-30231-14-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.02.1306060355320.15042@utopia.booyaka.com>
+Message-ID: <20130607161308.GZ3331@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here we use the OF regulator match facility to collect and populate
-initialisation data from Device Tree if we're booting with it enabled.
+* Paul Walmsley <paul@pwsan.com> [130605 21:06]:
+> On Wed, 29 May 2013, Santosh Shilimkar wrote:
+> 
+> > From: Vaibhav Hiremath <hvaibhav@ti.com>
+> > 
+> > AM33XX only supports DT boot mode and with addition of
+> > extracting module resources like, irq, dma and address space
+> > from DT block, so now we can remove duplicate information from
+> > hwmod data file.
+> 
+> OK, guess I'll take your word for it that it all works.  The
+> BeagleBone-white with appended DTB hasn't booted here since v3.7.
+> And the BeagleBone-black with discrete DTB doesn't boot at all with
+> current mainline, only with the TI vendor kernel & DTB...
+> 
+> Acked-by: Paul Walmsley <paul@pwsan.com>
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/regulator/ab8500-ext.c |   26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+Thanks applying into omap-for-v3.11/cleanup.
 
-diff --git a/drivers/regulator/ab8500-ext.c b/drivers/regulator/ab8500-ext.c
-index 95f495f..4137a2f 100644
---- a/drivers/regulator/ab8500-ext.c
-+++ b/drivers/regulator/ab8500-ext.c
-@@ -16,9 +16,11 @@
- #include <linux/kernel.h>
- #include <linux/err.h>
- #include <linux/module.h>
-+#include <linux/of.h>
- #include <linux/platform_device.h>
- #include <linux/regulator/driver.h>
- #include <linux/regulator/machine.h>
-+#include <linux/regulator/of_regulator.h>
- #include <linux/mfd/abx500.h>
- #include <linux/mfd/abx500/ab8500.h>
- #include <linux/regulator/ab8500.h>
-@@ -333,18 +335,37 @@ static struct ab8500_ext_regulator_info
- 	},
- };
- 
-+static struct of_regulator_match ab8500_ext_regulator_match[] = {
-+	{ .name = "ab8500_ext1", .driver_data = (void *) AB8500_EXT_SUPPLY1, },
-+	{ .name = "ab8500_ext2", .driver_data = (void *) AB8500_EXT_SUPPLY2, },
-+	{ .name = "ab8500_ext3", .driver_data = (void *) AB8500_EXT_SUPPLY3, },
-+};
-+
- int ab8500_ext_regulator_probe(struct platform_device *pdev)
- {
- 	struct ab8500 *ab8500 = dev_get_drvdata(pdev->dev.parent);
- 	struct ab8500_platform_data *ppdata;
- 	struct ab8500_regulator_platform_data *pdata;
-+	struct device_node *np = pdev->dev.of_node;
- 	struct regulator_config config = { };
- 	int i, err;
- 
-+	if (np) {
-+		err = of_regulator_match(&pdev->dev, np,
-+					 ab8500_ext_regulator_match,
-+					 ARRAY_SIZE(ab8500_ext_regulator_match));
-+		if (err < 0) {
-+			dev_err(&pdev->dev,
-+				"Error parsing regulator init data: %d\n", err);
-+			return err;
-+		}
-+	}
-+
- 	if (!ab8500) {
- 		dev_err(&pdev->dev, "null mfd parent\n");
- 		return -EINVAL;
- 	}
-+
- 	ppdata = dev_get_platdata(ab8500->dev);
- 	if (!ppdata) {
- 		dev_err(&pdev->dev, "null parent pdata\n");
-@@ -385,8 +406,11 @@ int ab8500_ext_regulator_probe(struct platform_device *pdev)
- 			pdata->ext_regulator[i].driver_data;
- 
- 		config.dev = &pdev->dev;
--		config.init_data = &pdata->ext_regulator[i];
- 		config.driver_data = info;
-+		config.of_node = ab8500_ext_regulator_match[i].of_node;
-+		config.init_data = (np) ?
-+			ab8500_ext_regulator_match[i].init_data :
-+			&pdata->ext_regulator[i];
- 
- 		/* register regulator with framework */
- 		info->rdev = regulator_register(&info->desc, &config);
--- 
-1.7.10.4
+Regards,
+
+Tony
