@@ -1,98 +1,35 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 7 Jun 2013 18:47:36 +0100
-Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <51B0D4FA.5070500@wwwdotorg.org>
-References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
- <51B0BC80.9040007@wwwdotorg.org>
- <20130606180824.GC3320@localhost.localdomain>
- <51B0D4FA.5070500@wwwdotorg.org>
-Message-ID: <20130607174736.GB29344@localhost.localdomain>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 7 Jun 2013 13:49:09 -0400 (EDT)
+Subject: [RFC][PATCH 3/7] USB: OHCI: make ohci-omap3 a separate driver
+In-Reply-To: <1370585013-12809-4-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306071348120.1366-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 12:29:14PM -0600, Stephen Warren wrote:
-> On 06/06/2013 12:08 PM, Dave Martin wrote:
-> > On Thu, Jun 06, 2013 at 10:44:48AM -0600, Stephen Warren wrote:
-> >> On 06/06/2013 01:28 AM, Alexandre Courbot wrote:
-> >>> Boot loaders on some Tegra devices can be unlocked but do not let the
-> >>> system operate without SecureOS. SecureOS prevents access to some
-> >>> registers and requires the operating system to perform certain
-> >>> operations through Secure Monitor Calls instead of directly accessing
-> >>> the hardware.
-> >>>
-> >>> This patch introduces basic SecureOS support for Tegra. SecureOS support
-> >>> can be enabled by adding a "nvidia,secure-os" property to the "chosen"
-> >>> node of the device tree.
-> ...
-> > So, something like
-> > 
-> > 	foo-firmware {
-> > 		compatible = "vendor1,foo-firmware-1.0", "vendor1,foo-firmware";
-> > 		method = "smc";
-> > 
-> > 		// ...
-> > 	};
-> > 
-> > 	bar-firmware {
-> > 		compatible = "vendor2,bar-firmware-1.6", "vendor2,bar-firmware";
-> > 		method = "smc";
-> > 
-> > 		// ...
-> > 	};
-> > 
-> > Could make sense.
-> 
-> I'm not sure if the method property is useful in most cases. For generic
+On Fri, 7 Jun 2013, Manjunath Goudar wrote:
 
-I was mostly illustrating.  It's not useful in most cases, unless we
-have standard code parsing these bindings (probably overkill).
+> Separate the  TI OHCI OMAP3 host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM.
 
-> ABIs such as PSCI that actually support multiple communication paths,
-> yes, it makes sense. However, it seems like for most custom ABIs, such
-> as is presumably implemented by whatever "SecureOS" is on Tegra, the
-> firmware type (or compatible value) directly implies that it operates
-> over SMC not HVC. After all, presumably if the kernel was virtualized,
-> it wouldn't have access to the raw secure monitor? I suppose you could
-> argue that the hypervisor might end up emulating the same ABI over HVC
-> instead? I'm not sure how likely that is. A compromise might be to
-> assume SMC if no property was present, which would allow it to be
-> optionally added later if it turned out to be useful.
+> @@ -185,7 +118,16 @@ static int ohci_hcd_omap3_probe(struct platform_device *pdev)
+>  	pm_runtime_enable(dev);
+>  	pm_runtime_get_sync(dev);
+>  
+> -	ohci_hcd_init(hcd_to_ohci(hcd));
+> +	ohci = hcd_to_ohci(hcd);
+> +	/*
+> +	* RemoteWakeupConnected has to be set explicitly before
+> +	* calling ohci_run. The reset value of RWC is 0.
+> +	*/
+> +	ohci->hc_control = OHCI_CTRL_RWC;
+> +	writel(OHCI_CTRL_RWC, &ohci->regs->control);
+> +	dev_dbg(hcd->self.controller, "starting OHCI controller\n");
+> +
+> +	ohci_setup(hcd);
 
-Sure.
+Don't call ohci_setup().
 
-For most firmware interface bindings, the backend could be implied.
-The binding could be extended later if an alternative backend were needed.
+Apart from that (and the comment format), this is okay.
 
-If an SMC-called firmware interface is visible to a guest running under
-a hypervisor at all, it is probably still callable using SMC, since
-hypervisors can trap and proxy/emulate it instead of the call bypassing
-the hypervisor and going straight to the Secure World.
-
-If the interface is not visible, the hypervisor shouldn't put the relevant
-node in the DT supplied to the guest (just as any physical hardware not
-accessible to the guest shouldn't be described in the DT).
-
-
-Firmware interfaces which don't specifically depend on the Security
-Extensions need multiple backends, because hypervisors can't trap SMC on
-ARMv8 platforms which don't implement the Security Extensions  -- this
-was an issue for PSCI, and it's why HVC is used instead by KVM etc.
-
-For "Secure OS" interfaces this won't be an issue since those interfaces
-don't make sense if the Security Extensions aren't there.
-
-> > ...where we would require all new firmware interface bindings to
-> > include the "-firmware" in their node names and compatible strings
-> > (with a version suffix encouraged for the compatible strings, where
-> > relevant).
-> 
-> That's probably a good convention, but I'm not sure it should be
-> required (or at least validated by code). Requiring this by code review
-> might be OK. Node names aren't meant to be interpreted semantically.
-
-Agreed: I don't think this makes sense as a formal binding, but rather
-it's a convention we can follow which avoids DTs being unnecessarily
-cryptic.
-
-Cheers
----Dave
+Alan Stern
