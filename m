@@ -1,32 +1,29 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Fri,  7 Jun 2013 16:37:15 +0530
-Subject: [PATCH 3/3] ARM: dts: Set BUCK7 as always on for Origen board
-In-Reply-To: <1370603235-11193-1-git-send-email-tushar.behera@linaro.org>
-References: <1370603235-11193-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1370603235-11193-4-git-send-email-tushar.behera@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 7 Jun 2013 13:21:56 +0200
+Subject: [PATCH] pinctrl: exynos5440: fix issues reported by prevent tool
+In-Reply-To: <09d101ce6254$40813eb0$c183bc10$%kim@samsung.com>
+References: <09d101ce6254$40813eb0$c183bc10$%kim@samsung.com>
+Message-ID: <CACRpkdY=6YQK9BY=T_OoA3H6awyNUaqEMd0kx6paSJ-dr6WKzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LDO for LCD driver is currently not handled by any of the drivers.
-This disables the LDO during booting time. To fix this, the LDO
-is forced to enabled always.
+On Thu, Jun 6, 2013 at 3:22 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
 
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
- arch/arm/boot/dts/exynos4210-origen.dts |    1 +
- 1 file changed, 1 insertion(+)
+> From: Thomas Abraham <thomas.ab@samsung.com>
+>
+> This patch fixes issues reported by prevent tool.
+>
+> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
-diff --git a/arch/arm/boot/dts/exynos4210-origen.dts b/arch/arm/boot/dts/exynos4210-origen.dts
-index 4c6c3cd..08609b8 100644
---- a/arch/arm/boot/dts/exynos4210-origen.dts
-+++ b/arch/arm/boot/dts/exynos4210-origen.dts
-@@ -225,6 +225,7 @@
- 					regulator-min-microvolt = <3300000>;
- 					regulator-max-microvolt = <3300000>;
- 					regulator-boot-on;
-+					regulator-always-on;
- 				};
- 			};
- 		};
--- 
-1.7.9.5
+Patch applied except for this hunk:
+
+> -       priv = devm_kzalloc(dev, sizeof(priv), GFP_KERNEL);
+> +       priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+
+That was already fixed by the patch
+"pinctrl: exynos5440: fix invalid use of sizeof in exynos5440_pinctrl_probe()"
+by Wei Yongjun.
+
+Yours,
+Linus Walleij
