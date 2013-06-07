@@ -1,90 +1,251 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Sat, 08 Jun 2013 00:51:35 +0100
-Subject: [GIT PULL] nommu-fixes, r7 and MPU support for 3.11
-In-Reply-To: <51B232CA.9060700@arm.com>
-References: <51B232CA.9060700@arm.com>
-Message-ID: <51B27207.8060208@arm.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sat, 8 Jun 2013 01:53:41 +0200
+Subject: [PATCH v2 5/8] pinctrl: add pinctrl driver for Rockchip SoCs
+In-Reply-To: <201306080113.49186.heiko@sntech.de>
+References: <201306062107.58875.heiko@sntech.de>
+ <CACRpkdZ97poa5HOP4baDnsdq5OjwO5S2=+pPH9ey84r=ZW43nA@mail.gmail.com>
+ <201306080113.49186.heiko@sntech.de>
+Message-ID: <201306080153.41924.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Resending as I had non-public git url in previous version, sorry)
-Hi Russell,
+Am Samstag, 8. Juni 2013, 01:13:48 schrieb Heiko St?bner:
+> Am Freitag, 7. Juni 2013, 14:53:51 schrieb Linus Walleij:
+> > On Thu, Jun 6, 2013 at 9:11 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > > +       for (i = 0, j = 0; i < size; i += 4, j++) {
+> > > +               unsigned long pinconf;
+> > > +
+> > > +               num = be32_to_cpu(*list++);
+> > > +               bank = bank_num_to_bank(info, num);
+> > > +               if (IS_ERR(bank))
+> > > +                       return PTR_ERR(bank);
+> > > +
+> > > +               pin = be32_to_cpu(*list++);
+> > > +               grp->pins[j] = bank->pin_base + pin;
+> > > +               grp->func[j] = be32_to_cpu(*list++);
+> > > +
+> > > +               pinconf = be32_to_cpu(*list++);
+> > > +               switch(pinconf) {
+> > > +               case RK_PINCTRL_NONE:
+> > > +                       bias = PIN_CONFIG_BIAS_DISABLE;
+> > > +                       break;
+> > > +               case RK_PINCTRL_PULL_PIN_DEFAULT:
+> > > +                       bias = PIN_CONFIG_BIAS_PULL_PIN_DEFAULT;
+> > > +                       break;
+> > > +               case RK_PINCTRL_PULL_UP:
+> > > +                       bias = PIN_CONFIG_BIAS_PULL_UP;
+> > > +                       break;
+> > > +               case RK_PINCTRL_PULL_DOWN:
+> > > +                       bias = PIN_CONFIG_BIAS_PULL_DOWN;
+> > > +                       break;
+> > > +               }
+> > > +
+> > > +               grp->configs[j] = pinconf_to_config_packed(bias, 0);
+> > > +       }
+> > 
+> > I would like this to be added to
+> > drivers/pinctrl/pinconf-generic.c
+> > as a utility function, with the header in
+> > drivers/pinctrl/pinconf.h
+> > 
+> > Also in a separate patch.
+> > 
+> > > +++ b/include/dt-bindings/pinctrl/rockchip.h
+> > 
+> > (...)
+> > 
+> > > +#define RK_PINCTRL_NONE                        0
+> > > +#define RK_PINCTRL_PULL_PIN_DEFAULT    (1 << 0)
+> > > +#define RK_PINCTRL_PULL_UP             (1 << 1)
+> > > +#define RK_PINCTRL_PULL_DOWN           (1 << 2)
+> > 
+> > So I'd like these moved to /include/dt-bindings/pinctrl/pinconfig.h
+> > and used as a separete include. Drop the RK_* prefix as it
+> > will be universal and use a PINCONFIG_* prefix instead
+> > of PINCTRL_*.
+> > 
+> > I think that is the route we need to take.
+> > 
+> > Bonus if you implement more config options from
+> > pinconf-generic.h but otherwise me and others will have
+> > to do it.
+> 
+> Gah, damn me for always wanting to get bonus points ;-),
+> 
+> I did play around a bit with the idea you described above and came up
+> with the stuff a bit below. This is in no way meant to be finished, I
+> also only was able to compile test it yet, but it looks like it might
+> work when I test it tomorrow.
+> 
+> So if possible I would just like to get a "looks halfway sane, continue"
+> or "completely wrong track" please :-) :
+> 
+> 
+> constants in dt-bindings/pinctrl/pinconfig.h:
+> -----------------------------
+> #define PINCONFIG_NONE			0
+> #define PINCONFIG_BIAS_DISABLE		(1 << 0)
+> #define PINCONFIG_BIAS_HIGH_IMPEDANCE	(1 << 1)
+> #define PINCONFIG_BIAS_BUS_HOLD		(1 << 2)
+> #define PINCONFIG_BIAS_PULL_PIN_DEFAULT	(1 << 3)
+> #define PINCONFIG_BIAS_PULL_UP		(1 << 4)
+> #define PINCONFIG_BIAS_PULL_DOWN	(1 << 5)
+> #define PINCONFIG_DRIVE_PUSH_PULL	(1 << 6)
+> #define PINCONFIG_DRIVE_OPEN_DRAIN	(1 << 7)
+> #define PINCONFIG_DRIVE_OPEN_SOURCE	(1 << 8)
+> #define PINCONFIG_INPUT_SCHMITT_ENABLE	(1 << 9)
+> #define PINCONFIG_INPUT_SCHMITT_DISABLE	(1 << 10)
+> #define PINCONFIG_LOW_POWER_MODE	(1 << 11)
+> #define PINCONFIG_OUTPUT_LOW		(1 << 12)
+> #define PINCONFIG_OUTPUT_HIGH		(1 << 13)
+> 
+> 
+> and code including how the rockchip driver could look like:
+> ---------
+> diff --git a/drivers/pinctrl/pinconf-generic.c
+> b/drivers/pinctrl/pinconf-generic.c index 9a6812b..35c40be 100644
+> --- a/drivers/pinctrl/pinconf-generic.c
+> +++ b/drivers/pinctrl/pinconf-generic.c
+> @@ -139,3 +139,61 @@ void pinconf_generic_dump_config(struct pinctrl_dev
+> *pctldev, }
+>  EXPORT_SYMBOL_GPL(pinconf_generic_dump_config);
+>  #endif
+> +
+> +/*
+> + * Maps the devicetree config bits to actual pinconf values.
+> + * The array indizes match the bits set in dt-bindings/pinctrl/pinconf.h
+> + * and the array should contain an entry for each bit defined there
+> + */
+> +static unsigned long conf_map[] = {
+> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_DISABLE, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_HIGH_IMPEDANCE, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_BUS_HOLD, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_PIN_DEFAULT, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_DRIVE_PUSH_PULL, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_DRIVE_OPEN_DRAIN, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_DRIVE_OPEN_SOURCE, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT_ENABLE, 1),
+> +	PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT_ENABLE, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_LOW_POWER_MODE, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0),
+> +	PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 1),
+> +};
+> +
+> +/*
+> + * Parse a pinconf bitmap from a devicetree entry into individual pin
+> configs. + * @pinconf: the bitmap containing config bits
+> + * @configs: after the function returns contains a pointer to an array of
+> + *	     pin configs
+> + * @nconfigs: number of entries of configs
+> + */
+> +int pinconf_generic_parse_dt_bitmap(unsigned long pinconf,
+> +				    unsigned long *configs,
+> +				    unsigned int *nconfigs)
+> +{
+> +	int bit;
+> +	int i;
+> +
+> +	*nconfigs = hweight_long(pinconf);
+> +	configs = kzalloc(*nconfigs * sizeof(unsigned long), GFP_KERNEL);
+> +
+> +	i = 0;
+> +	while (pinconf && i < *nconfigs) {
+> +		bit = __ffs(pinconf);
+> +		pinconf &= ~BIT(i);
+> +
+> +		if (bit > ARRAY_SIZE(conf_map)) {
+> +			pr_err("%s: unknown bit %d\n", __func__, bit);
+> +			kfree(configs);
+> +			return -EINVAL;
+> +		}
+> +
+> +		configs[i] = conf_map[bit];
+> +
+> +		i++;
+> +	}
+> +
+> +	return 0;
+> +}
+> diff --git a/drivers/pinctrl/pinconf.h b/drivers/pinctrl/pinconf.h
+> index 92c7267..0fab53a 100644
+> --- a/drivers/pinctrl/pinconf.h
+> +++ b/drivers/pinctrl/pinconf.h
+> @@ -123,3 +123,9 @@ static inline void pinconf_generic_dump_config(struct
+> pinctrl_dev *pctldev, return;
+>  }
+>  #endif
+> +
+> +#ifdef CONFIG_GENERIC_PINCONF
+> +int pinconf_generic_parse_dt_bitmap(unsigned long pinconf,
+> +				    unsigned long *configs,
+> +				    unsigned int *nconfigs);
+> +#endif
+> diff --git a/drivers/pinctrl/pinctrl-rockchip.c
+> b/drivers/pinctrl/pinctrl-rockchip.c index b77e241..88398df 100644
+> --- a/drivers/pinctrl/pinctrl-rockchip.c
+> +++ b/drivers/pinctrl/pinctrl-rockchip.c
+> @@ -40,6 +40,7 @@
+>  #include <dt-bindings/pinctrl/rockchip.h>
+> 
+>  #include "core.h"
+> +#include "pinconf.h"
+> 
+>  /* GPIO control registers */
+>  #define GPIO_SWPORT_DR		0x00
+> @@ -639,7 +640,8 @@ static int rockchip_pinctrl_parse_groups(struct
+> device_node *np, int num;
+>  	int i, j;
+>  	int pin;
+> -	int bias;
+> +	int ret;
+> +	int nconfigs;
+> 
+>  	dev_dbg(info->dev, "group(%d): %s\n", index, np->name);
+> 
+> @@ -683,22 +685,16 @@ static int rockchip_pinctrl_parse_groups(struct
+> device_node *np, grp->func[j] = be32_to_cpu(*list++);
+> 
+>  		pinconf = be32_to_cpu(*list++);
+> -		switch(pinconf) {
+> -		case RK_PINCTRL_NONE:
+> -			bias = PIN_CONFIG_BIAS_DISABLE;
+> -			break;
+> -		case RK_PINCTRL_PULL_PIN_DEFAULT:
+> -			bias = PIN_CONFIG_BIAS_PULL_PIN_DEFAULT;
+> -			break;
+> -		case RK_PINCTRL_PULL_UP:
+> -			bias = PIN_CONFIG_BIAS_PULL_UP;
+> -			break;
+> -		case RK_PINCTRL_PULL_DOWN:
+> -			bias = PIN_CONFIG_BIAS_PULL_DOWN;
+> -			break;
+> -		}
+> 
+> -		grp->configs[j] = pinconf_to_config_packed(bias, 0);
+> +		ret = pinconf_generic_parse_dt_bitmap(pinconf,
+> +				    &grp->configs[j], &nconfigs);
 
-Please could you pull the following changes for 3.11?
+of course this part is obviously wrong, which I just realized, because the 
+configs array only contains usigned longs
 
-This includes the following series sent earlier to the list:
- - nommu-fixes
- - R7 Support 
- - MPU support
+it must be more like 
+pinconf_generic_parse_dt_bitmap(pinconf, configs, &nconfigs)
+...
+grp->configs[j] = configs[0];
 
-I've left out the ARCH_MULTIPLATFORM/!MMU stuff that Arnd and I were
-discussing today until we've reached a conclusion/that's had some more
-review.
-
-This is rebased (and re-tested) on your devel-stable branch because
-otherwise there were going to be conflicts with Uwe's V7M work now that
-you've merged that. I've included the fix for limiting MPU to CPU_V7.
-
-Thanks,
-Jonny
------8<-----
-
-The following changes since commit 78ecad0183bd7e49131da2b5aa82bee017db1cf0:
-
-  Merge tag '3.10-rc2-psci-ops-11-tag' of git://git.kernel.org/pub/scm/linux/kernel/git/sstabellini/xen into devel-stable (2013-05-22 10:53:20 +0100)
-
-are available in the git repository at:
+or better yet simply carrying the created configs without copying entries or 
+limiting the number of configs
 
 
-  git://linux-arm.org/linux-ja.git ja-nommu-for-rmk
-
-for you to fetch changes up to 99ec449dfcd323266fa0f3d9bf1d671755d0d784:
-
-  ARM: mpu: Ensure that MPU depends on CPU_V7 (2013-06-07 19:13:33 +0100)
-
-----------------------------------------------------------------
-Jonathan Austin (14):
-      ARM: nommu: Don't build smp_tlb.c for !CONFIG_MMU
-      ARM: nommu: add stub local_flush_bp_all() for !CONFIG_MMUU
-      ARM: select CPU_CPU15_MMU/MPU appropriately
-      ARM: add Cortex-R7 Processor Info
-      ARM: vexpress: Add Cortex-R Series UART, selectable via DEBUG_LL
-      ARM: mpu: add PMSA related registers and bitfields to existing headers
-      ARM: mpu: add header for MPU register layouts and region data
-      ARM: mpu: add early bring-up code for the ARMv7 PMSA-compliant MPU
-      ARM: mpu: add MPU probe and initialisation functions in C
-      ARM: mpu: Complete initialisation of the MPU after reaching the C-world
-      ARM: mpu: add MPU initialisation for secondary cores
-      ARM: mpu: Allow enabling of the MPU via kconfig
-      ARM: mpu: protect the vectors page with an MPU region
-      ARM: mpu: Ensure that MPU depends on CPU_V7
-
-Will Deacon (5):
-      ARM: nommu: add entry point for secondary CPUs to head-nommu.S
-      ARM: nommu: define dummy TLB operations for nommu configurations
-      ARM: nommu: provide dummy cpu_switch_mm implementation
-      ARM: nommu: do not initialise page tables in secondary_data structure
-      ARM: suspend: fix CPU suspend code for !CONFIG_MMU configurations
-
- arch/arm/Kconfig                  |    5 +-
- arch/arm/Kconfig-nommu            |   12 ++
- arch/arm/Kconfig.debug            |   10 +-
- arch/arm/include/asm/cp15.h       |    5 +
- arch/arm/include/asm/cputype.h    |    1 +
- arch/arm/include/asm/mpu.h        |   76 +++++++++++
- arch/arm/include/asm/proc-fns.h   |    4 +
- arch/arm/include/asm/smp.h        |    5 +-
- arch/arm/include/asm/smp_plat.h   |    4 +
- arch/arm/include/asm/tlbflush.h   |   25 +++-
- arch/arm/include/debug/vexpress.S |   10 ++
- arch/arm/kernel/Makefile          |    5 +-
- arch/arm/kernel/head-nommu.S      |  160 ++++++++++++++++++++++-
- arch/arm/kernel/signal.c          |    9 +-
- arch/arm/kernel/smp.c             |   10 +-
- arch/arm/kernel/suspend.c         |   64 +++++----
- arch/arm/mm/Kconfig               |    3 +-
- arch/arm/mm/nommu.c               |  257 ++++++++++++++++++++++++++++++++++++-
- arch/arm/mm/proc-v6.S             |    6 +-
- arch/arm/mm/proc-v7.S             |   27 +++-
- 20 files changed, 647 insertions(+), 51 deletions(-)
- create mode 100644 arch/arm/include/asm/mpu.h
+> +		if (ret)
+> +			return ret;
+> +
+> +		if (nconfigs != 1) {
+> +			pr_err("unexpected number of config entries\n");
+> +			return -EINVAL;
+> +		}
+>  	}
+> 
+>  	return 0;
