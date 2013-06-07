@@ -1,166 +1,103 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri,  7 Jun 2013 16:51:53 +0900
-Subject: [PATCH 23/27] ARM: shmobile: sh73a0: add support for adjusting CPU
- frequency
-In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1370591517-20239-24-git-send-email-horms+renesas@verge.net.au>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 07 Jun 2013 09:54:18 +0200
+Subject: [PATCH v3 06/11] staging: drm/imx: Add LDB support
+In-Reply-To: <51B18E54.5030501@tqsc.de>
+References: <1364484215-13935-1-git-send-email-p.zabel@pengutronix.de>
+ <1364484215-13935-7-git-send-email-p.zabel@pengutronix.de>
+ <51B18E54.5030501@tqsc.de>
+Message-ID: <1370591658.4470.9.camel@pizza.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+Am Freitag, den 07.06.2013, 09:40 +0200 schrieb Markus Niebel:
+> Am 28.03.2013 16:23, wrote Philipp Zabel:
+> > From: Sascha Hauer <s.hauer@pengutronix.de>
+> > 
+> > This adds support for the LVDS Display Bridge contained
+> > in i.MX5 and i.MX6 SoCs.
+> > 
+> > Bit mapping, data width, and video timings are configurable
+> > via device tree. Dual-channel mode is supported for a single
+> > high-resolution source.
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > ---
+> > Changes since v2:
+> >  - Removed commented out code
+> >  - Replaced magic constants
+> >  - Select OF_VIDEOMODE
+> > ---
+> >  .../devicetree/bindings/staging/imx-drm/ldb.txt    |  99 ++++
+> >  drivers/staging/imx-drm/Kconfig                    |   8 +
+> >  drivers/staging/imx-drm/Makefile                   |   1 +
+> >  drivers/staging/imx-drm/imx-ldb.c                  | 609 +++++++++++++++++++++
+> >  4 files changed, 717 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/staging/imx-drm/ldb.txt
+> >  create mode 100644 drivers/staging/imx-drm/imx-ldb.c
+> > 
+[...]
+> > diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+> > new file mode 100644
+> > index 0000000..75607b3
+> > --- /dev/null
+> > +++ b/drivers/staging/imx-drm/imx-ldb.c
+> > @@ -0,0 +1,609 @@
+[...]
+> > +static void imx_ldb_set_clock(struct imx_ldb *ldb, int mux, int chno,
+> > +		unsigned long serial_clk, unsigned long di_clk)
+> > +{
+> > +	int ret;
+> > +
+> > +	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
+> > +			clk_get_rate(ldb->clk_pll[chno]), serial_clk);
+> > +	clk_set_rate(ldb->clk_pll[chno], serial_clk);
+> > +
+> > +	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
+> > +			clk_get_rate(ldb->clk_pll[chno]));
+> > +
+> > +	dev_dbg(ldb->dev, "%s: now: %ld want: %ld\n", __func__,
+> > +			clk_get_rate(ldb->clk[chno]),
+> > +			(long int)di_clk);
+> > +	clk_set_rate(ldb->clk[chno], di_clk);
+> > +
+> > +	dev_dbg(ldb->dev, "%s after: %ld\n", __func__,
+> > +			clk_get_rate(ldb->clk[chno]));
+> > +
+> > +	/* set display clock mux to LDB input clock */
+> 
+> I think this will fail on i.MX53 with split mode enable in case of
+> mux != chno, since ipu_di<n> can only be muxed to ldb_di<n>_gate.
+>
+>> +     ret = clk_set_parent(ldb->clk_sel[mux], ldb->clk[chno]);
 
-On SH73A0 the output of PLL0 is supplied to two dividers, feeding clock to
-the CPU core and SGX. Lower CPU frequencies allow the use of lower supply
-voltages and thus reduce power consumption.
+That is true. We should use both ldb_di<n>_gates in split mode on
+i.MX53, with both ldb_di<n>_sel derived from the same parent.
 
-Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-sh73a0.c | 95 ++++++++++++++++++++++++++++++++++-
- 1 file changed, 93 insertions(+), 2 deletions(-)
+>> +     if (ret) {
+>> +             dev_err(ldb->dev, "unable to set di%d parent clock to ldb_di%d\n", mux, chno);
+>> +     }
+>> +}
+>> +
+>> +static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+>> +{
+>> +     struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+>> +     struct imx_ldb *ldb = imx_ldb_ch->ldb;
+>> +     struct drm_display_mode *mode = &encoder->crtc->mode;
+>> +     unsigned long serial_clk;
+>> +     unsigned long di_clk = mode->clock * 1000;
+>> +     int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->imx_drm_encoder,
+>> +                                          encoder->crtc);
+>> +
+>> +     if (ldb->ldb_ctrl & LDB_SPLIT_MODE_EN) {
+>> +             /* dual channel LVDS mode */
+>> +             serial_clk = 3500UL * mode->clock;
+> 
+> See comment in imx_ldb_set_clock
+>
+>> +             imx_ldb_set_clock(ldb, mux, 0, serial_clk, di_clk);
+>> +             imx_ldb_set_clock(ldb, mux, 1, serial_clk, di_clk);
+[...]
 
-diff --git a/arch/arm/mach-shmobile/clock-sh73a0.c b/arch/arm/mach-shmobile/clock-sh73a0.c
-index 784fbaa..acb9e09 100644
---- a/arch/arm/mach-shmobile/clock-sh73a0.c
-+++ b/arch/arm/mach-shmobile/clock-sh73a0.c
-@@ -228,6 +228,11 @@ enum { DIV4_I, DIV4_ZG, DIV4_M3, DIV4_B, DIV4_M1, DIV4_M2,
- 
- static struct clk div4_clks[DIV4_NR] = {
- 	[DIV4_I] = DIV4(FRQCRA, 20, 0xdff, CLK_ENABLE_ON_INIT),
-+	/*
-+	 * ZG clock is dividing PLL0 frequency to supply SGX. Make sure not to
-+	 * exceed maximum frequencies of 201.5MHz for VDD_DVFS=1.175 and
-+	 * 239.2MHz for VDD_DVFS=1.315V.
-+	 */
- 	[DIV4_ZG] = SH_CLK_DIV4(&pll0_clk, FRQCRA, 16, 0xd7f, CLK_ENABLE_ON_INIT),
- 	[DIV4_M3] = DIV4(FRQCRA, 12, 0x1dff, CLK_ENABLE_ON_INIT),
- 	[DIV4_B] = DIV4(FRQCRA, 8, 0xdff, CLK_ENABLE_ON_INIT),
-@@ -252,6 +257,85 @@ static struct clk twd_clk = {
- 	.ops = &twd_clk_ops,
- };
- 
-+static int (*div4_set_rate)(struct clk *clk, unsigned long rate);
-+static unsigned long (*div4_recalc)(struct clk *clk);
-+static long (*div4_round_rate)(struct clk *clk, unsigned long rate);
-+
-+static int zclk_set_rate(struct clk *clk, unsigned long rate)
-+{
-+	int ret;
-+
-+	if (!clk->parent || !__clk_get(clk->parent))
-+		return -ENODEV;
-+
-+	if (readl(FRQCRB) & (1 << 31))
-+		return -EBUSY;
-+
-+	if (rate == clk_get_rate(clk->parent)) {
-+		/* 1:1 - switch off divider */
-+		__raw_writel(__raw_readl(FRQCRB) & ~(1 << 28), FRQCRB);
-+		/* nullify the divider to prepare for the next time */
-+		ret = div4_set_rate(clk, rate / 2);
-+		if (!ret)
-+			ret = frqcr_kick();
-+		if (ret > 0)
-+			ret = 0;
-+	} else {
-+		/* Enable the divider */
-+		__raw_writel(__raw_readl(FRQCRB) | (1 << 28), FRQCRB);
-+
-+		ret = frqcr_kick();
-+		if (ret >= 0)
-+			/*
-+			 * set the divider - call the DIV4 method, it will kick
-+			 * FRQCRB too
-+			 */
-+			ret = div4_set_rate(clk, rate);
-+		if (ret < 0)
-+			goto esetrate;
-+	}
-+
-+esetrate:
-+	__clk_put(clk->parent);
-+	return ret;
-+}
-+
-+static long zclk_round_rate(struct clk *clk, unsigned long rate)
-+{
-+	unsigned long div_freq = div4_round_rate(clk, rate),
-+		parent_freq = clk_get_rate(clk->parent);
-+
-+	if (rate > div_freq && abs(parent_freq - rate) < rate - div_freq)
-+		return parent_freq;
-+
-+	return div_freq;
-+}
-+
-+static unsigned long zclk_recalc(struct clk *clk)
-+{
-+	/*
-+	 * Must recalculate frequencies in case PLL0 has been changed, even if
-+	 * the divisor is unused ATM!
-+	 */
-+	unsigned long div_freq = div4_recalc(clk);
-+
-+	if (__raw_readl(FRQCRB) & (1 << 28))
-+		return div_freq;
-+
-+	return clk_get_rate(clk->parent);
-+}
-+
-+static void zclk_extend(void)
-+{
-+	/* We extend the DIV4 clock with a 1:1 pass-through case */
-+	div4_set_rate = div4_clks[DIV4_Z].ops->set_rate;
-+	div4_round_rate = div4_clks[DIV4_Z].ops->round_rate;
-+	div4_recalc = div4_clks[DIV4_Z].ops->recalc;
-+	div4_clks[DIV4_Z].ops->set_rate = zclk_set_rate;
-+	div4_clks[DIV4_Z].ops->round_rate = zclk_round_rate;
-+	div4_clks[DIV4_Z].ops->recalc = zclk_recalc;
-+}
-+
- enum { DIV6_VCK1, DIV6_VCK2, DIV6_VCK3, DIV6_ZB1,
- 	DIV6_FLCTL, DIV6_SDHI0, DIV6_SDHI1, DIV6_SDHI2,
- 	DIV6_FSIA, DIV6_FSIB, DIV6_SUB,
-@@ -450,7 +534,7 @@ static struct clk *late_main_clks[] = {
- };
- 
- enum { MSTP001,
--	MSTP129, MSTP128, MSTP127, MSTP126, MSTP125, MSTP118, MSTP116, MSTP100,
-+	MSTP129, MSTP128, MSTP127, MSTP126, MSTP125, MSTP118, MSTP116, MSTP112, MSTP100,
- 	MSTP219, MSTP218, MSTP217,
- 	MSTP207, MSTP206, MSTP204, MSTP203, MSTP202, MSTP201, MSTP200,
- 	MSTP331, MSTP329, MSTP328, MSTP325, MSTP323, MSTP322,
-@@ -471,6 +555,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP125] = MSTP(&div6_clks[DIV6_SUB], SMSTPCR1, 25, 0), /* TMU0 */
- 	[MSTP118] = MSTP(&div4_clks[DIV4_B], SMSTPCR1, 18, 0), /* DSITX0 */
- 	[MSTP116] = MSTP(&div4_clks[DIV4_HP], SMSTPCR1, 16, 0), /* IIC0 */
-+	[MSTP112] = MSTP(&div4_clks[DIV4_ZG], SMSTPCR1, 12, 0), /* SGX */
- 	[MSTP100] = MSTP(&div4_clks[DIV4_B], SMSTPCR1, 0, 0), /* LCDC0 */
- 	[MSTP219] = MSTP(&div6_clks[DIV6_SUB], SMSTPCR2, 19, 0), /* SCIFA7 */
- 	[MSTP218] = MSTP(&div4_clks[DIV4_HP], SMSTPCR2, 18, 0), /* SY-DMAC */
-@@ -513,6 +598,9 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("r_clk", &r_clk),
- 	CLKDEV_DEV_ID("smp_twd", &twd_clk), /* smp_twd */
- 
-+	/* DIV4 clocks */
-+	CLKDEV_DEV_ID("cpufreq-cpu0", &div4_clks[DIV4_Z]),
-+
- 	/* DIV6 clocks */
- 	CLKDEV_CON_ID("vck1_clk", &div6_clks[DIV6_VCK1]),
- 	CLKDEV_CON_ID("vck2_clk", &div6_clks[DIV6_VCK2]),
-@@ -604,8 +692,11 @@ void __init sh73a0_clock_init(void)
- 	for (k = 0; !ret && (k < ARRAY_SIZE(main_clks)); k++)
- 		ret = clk_register(main_clks[k]);
- 
--	if (!ret)
-+	if (!ret) {
- 		ret = sh_clk_div4_register(div4_clks, DIV4_NR, &div4_table);
-+		if (!ret)
-+			zclk_extend();
-+	}
- 
- 	if (!ret)
- 		ret = sh_clk_div6_reparent_register(div6_clks, DIV6_NR);
--- 
-1.8.2.1
+regards
+Philipp
