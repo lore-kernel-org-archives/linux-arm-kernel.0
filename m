@@ -1,171 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 7 Jun 2013 10:33:42 +0200
-Subject: [PATCH 3/3] i2c: nomadik: use pinctrl PM helpers
-In-Reply-To: <87bo7kwm6q.fsf@linaro.org>
-References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
- <1370439873-30053-3-git-send-email-linus.walleij@stericsson.com>
- <87bo7kwm6q.fsf@linaro.org>
-Message-ID: <CACRpkdZCxCF_znnYJC=UR6ma8y4s0ev9iQSSy1hPvb5wxcnNFw@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 7 Jun 2013 10:35:28 +0200
+Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL
+ lock
+In-Reply-To: <20130607083134.GE21641@nchen-desktop>
+References: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
+ <20130607082457.GF12361@pengutronix.de>
+ <20130607083134.GE21641@nchen-desktop>
+Message-ID: <20130607083528.GG12361@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 5, 2013 at 6:34 PM, Kevin Hilman <khilman@linaro.org> wrote:
+On Fri, Jun 07, 2013 at 04:31:35PM +0800, Peter Chen wrote:
+> On Fri, Jun 07, 2013 at 10:24:57AM +0200, Uwe Kleine-K?nig wrote:
+> > On Fri, Jun 07, 2013 at 04:19:06PM +0800, Peter Chen wrote:
+> > > For some unknown reasons, the jiffies will be updated more
+> > > than one tick at every short time. Eg, at this code:
+> > > After timeout = jiffies + msecs_to_jiffies(10),
+> > > the interrupt occurs, and the softirq updates jiffies (eg,  + 2 jiffies),
+> > > then return back from interrupt, the time between above operations
+> > > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
+> > > 
+> > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > Does this mean my patch doesn't solve the issue for you?
+> 
+> Not try, but your patch just delay timeout assignment, if there
+> is jiffies update after that but before timeout check, it still
+> has problem.
+But if that large update happens because there was a long preemption the
+pll should be locked because I only start counting when the pll is
+programmed.
 
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This utilize the new pinctrl core PM helpers to transition
->> the driver to "sleep" and "idle" states, cutting away some
->> boilerplate code.
->>
->> Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
->> Cc: Mark Brown <broonie@kernel.org>
->> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> Cc: Kevin Hilman <khilman@linaro.org>
->> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
->> Cc: Stephen Warren <swarren@wwwdotorg.org>
->> Cc: Wolfram Sang <wsa@the-dreams.de>
->> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->
-> I have some questions on the interaction with runtime PM here...
+IMHO you should try my patch as it is the better fix (assuming it fixes
+it for you).
 
-OK, to get the basic infrastructure in place I have merged these
-patches with the I2C maintainers ACK, since it is doing one thing,
-i.e. moving the functionality out of the driver and into the pinctrl
-core.
+Best regards
+Uwe
 
-I am considering semantic changes related to runtime PM in
-addition to this as a separate patch, so let's start talking about
-that here.
-
-It would be inappropriate to try to create a patch that is
-changing these two things at once, but let's see where we end
-up by the merge window.
-
->> @@ -645,13 +636,7 @@ static int nmk_i2c_xfer(struct i2c_adapter *i2c_adap,
->>       }
->>
->>       /* Optionaly enable pins to be muxed in and configured */
->> -     if (!IS_ERR(dev->pins_default)) {
->> -             status = pinctrl_select_state(dev->pinctrl,
->> -                             dev->pins_default);
->> -             if (status)
->> -                     dev_err(&dev->adev->dev,
->> -                             "could not set default pins\n");
->> -     }
->> +     pinctrl_pm_select_default_state(&dev->adev->dev);
->
-> Shouldn't this be in the ->runtime_resume() callback of the driver (the
-> original code should've as well.)
->
-> IOW, the pinctrl changes only need to happen when the runtime PM
-> usecount goes from zero to 1.  For any additional users, the device will
-> already be active and pins already in default state.
->
-> I'm not familiar with this HW, and maybe the driver already prevents
-> multiple users, but for correctness sake (and because others will copy
-> this), the (re)muxing should be in the runtime PM callback.
-
-I2C message are serialized/marshalled by nature so it's actually
-not causing a concurrency problem: this xfer function will not be
-called from two places for the same driver.
-
-What is true however is that we're hammering the pins from
-active to idle for every transfer, instead of letting runtime PM
-provide some nice hysteresis (autosuspend) around that.
-
-Notice though that:
-
-- This driver has no driver-local runtime PM callbacks, so the
-  runtime PM calls are intended to inform the rest of the system,
-  such as the bus, that the device is idle.
-
-- The bus used is the AMBA (PrimeCell) bus,
-  drivers/amba/bus.c
-
-> Also, IMO, that's further evidence that the pinctrl stuff could (and
-> probably should) be handled by the PM core.
-
-So I'm now thinking about how to achieve this.
-
-What happens for this driver when the usecount goes from
-1->0 is (the other way is very similar):
-
-drivers/base/power/runtime.c
-
-        if (dev->pm_domain)
-                callback = dev->pm_domain->ops.runtime_suspend;
-        else if (dev->type && dev->type->pm)
-                callback = dev->type->pm->runtime_suspend;
-        else if (dev->class && dev->class->pm)
-                callback = dev->class->pm->runtime_suspend;
-        else if (dev->bus && dev->bus->pm)
-                callback = dev->bus->pm->runtime_suspend;
-        else
-                callback = NULL;
-
-        if (!callback && dev->driver && dev->driver->pm)
-                callback = dev->driver->pm->runtime_suspend;
-
-        retval = rpm_callback(callback, dev);
-
-This platform will currently hit dev->bus->pm->runtime_suspend
-to drivers/amba/bus.c:
-
-static int amba_pm_runtime_suspend(struct device *dev)
-{
-        struct amba_device *pcdev = to_amba_device(dev);
-        int ret = pm_generic_runtime_suspend(dev);
-
-        if (ret == 0 && dev->driver)
-                clk_disable(pcdev->pclk);
-
-        return ret;
-}
-
-The pm_generic_runtime_suspend will call the driver callbacks
-(none in this case).
-
-Then the bus core proceeds to gate off the block clock and
-we're done.
-
-I could make a patch adding runtime PM ops to the
-driver itself to set the pinctrl state from there, which would
-be a nice improvement in itself.
-
-But we're discussing handling it all in the PM core, so
-let's think bigger.
-
-If we're making this all generic, were in this chain do you
-suggest that I set the pins to idle?
-drivers/base/power/runtime.c?
-
-One thing in particular that worries me here is the ordering
-of things, because that has been a severe issue for us.
-
-For example: maybe on a certain platform pins need to
-be idled/defaulted *before* calling the PM domain or
-bus callbacks are executed, because of transient IRQs
-and whatnot. So I put my pinctrl_pm_select_idle_state()
-*before* the chain of calls.
-
-But sometimes you may want to execute the
-pinctrl_pm_select_idle_state() *after* all other things have
-been done, including the calls to the domain/bus/driver.
-
-And this is only for the runtime suspend/resume path.
-
-For the common suspend/resume path things get more
-complex still. Users may need to call
-pinctrl_pm_select_sleep_state() in the middle of the
-code sending the platform done, and will not survive it
-being called by the PM core, and we'd need to add a flag
-for this etc.
-
-To sum up I am afraid of a can of worms of corner cases
-on something that looks simple here. Thus I cannot really
-make a patch moving pinctrl state selection to the PM
-core, I don't know the business there well enough, I just know
-there are tigers in there :-/
-
-Yours,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
