@@ -1,263 +1,319 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Fri,  7 Jun 2013 16:24:08 +0200
-Subject: [RESEND RFC PATCH 00/50] ARM: at91: move to common clk framework
-Message-ID: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 7 Jun 2013 15:26:45 +0100
+Subject: [PATCH 1/2] ARM: vexpress/TC2: basic PM support
+In-Reply-To: <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20130607142645.GD3111@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Fri, Jun 07, 2013 at 07:39:11AM +0100, Nicolas Pitre wrote:
+> This is the MCPM backend for the Virtual Express A15x2 A7x3 CoreTile
+> aka TC2.  This provides cluster management for SMP secondary boot and
+> CPU hotplug.
+> 
+> Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> ---
+>  arch/arm/mach-vexpress/Kconfig  |   9 ++
+>  arch/arm/mach-vexpress/Makefile |   1 +
+>  arch/arm/mach-vexpress/tc2_pm.c | 243 ++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 253 insertions(+)
+>  create mode 100644 arch/arm/mach-vexpress/tc2_pm.c
+> 
+> diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> index b8bbabec63..e7a825d7df 100644
+> --- a/arch/arm/mach-vexpress/Kconfig
+> +++ b/arch/arm/mach-vexpress/Kconfig
+> @@ -66,4 +66,13 @@ config ARCH_VEXPRESS_DCSCB
+>  	  This is needed to provide CPU and cluster power management
+>  	  on RTSM implementing big.LITTLE.
+>  
+> +config ARCH_VEXPRESS_TC2
+> +	bool "Versatile Express TC2 power management"
+> +	depends on MCPM
+> +	select VEXPRESS_SPC
+> +	select ARM_CCI
+> +	help
+> +	  Support for CPU and cluster power management on Versatile Express
+> +	  with a TC2 (A15x2 A7x3) big.LITTLE core tile.
+> +
+>  endmenu
+> diff --git a/arch/arm/mach-vexpress/Makefile b/arch/arm/mach-vexpress/Makefile
+> index 48ba89a814..b1cf227fa5 100644
+> --- a/arch/arm/mach-vexpress/Makefile
+> +++ b/arch/arm/mach-vexpress/Makefile
+> @@ -7,5 +7,6 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) := -I$(srctree)/$(src)/include \
+>  obj-y					:= v2m.o
+>  obj-$(CONFIG_ARCH_VEXPRESS_CA9X4)	+= ct-ca9x4.o
+>  obj-$(CONFIG_ARCH_VEXPRESS_DCSCB)	+= dcscb.o	dcscb_setup.o
+> +obj-$(CONFIG_ARCH_VEXPRESS_TC2)		+= tc2_pm.o
+>  obj-$(CONFIG_SMP)			+= platsmp.o
+>  obj-$(CONFIG_HOTPLUG_CPU)		+= hotplug.o
+> diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> new file mode 100644
+> index 0000000000..a3ea524372
+> --- /dev/null
+> +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> @@ -0,0 +1,243 @@
+> +/*
+> + * arch/arm/mach-vexpress/tc2_pm.c - TC2 power management support
+> + *
+> + * Created by:	Nicolas Pitre, October 2012
+> + * Copyright:	(C) 2012-2013  Linaro Limited
+> + *
+> + * Some portions of this file were originally written by Achin Gupta
+> + * Copyright:   (C) 2012  ARM Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/kernel.h>
+> +#include <linux/spinlock.h>
+> +#include <linux/errno.h>
+> +
+> +#include <asm/mcpm.h>
+> +#include <asm/proc-fns.h>
+> +#include <asm/cacheflush.h>
+> +#include <asm/cputype.h>
+> +#include <asm/cp15.h>
+> +
+> +#include <mach/motherboard.h>
 
-Sorry for the noise, the first submission has been filtered.
+Is the include above needed ?
 
-This patch series is a proposal to move at91 clock implementation
-to common clk framework.
+> +#include <linux/vexpress.h>
+> +#include <linux/arm-cci.h>
+> +
+> +/*
+> + * We can't use regular spinlocks. In the switcher case, it is possible
+> + * for an outbound CPU to call power_down() after its inbound counterpart
+> + * is already live using the same logical CPU number which trips lockdep
+> + * debugging.
+> + */
+> +static arch_spinlock_t tc2_pm_lock = __ARCH_SPIN_LOCK_UNLOCKED;
+> +
+> +static int tc2_pm_use_count[3][2];
+> +
+> +static int tc2_pm_power_up(unsigned int cpu, unsigned int cluster)
+> +{
+> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> +	if (cluster >= 2 || cpu >= vexpress_spc_get_nb_cpus(cluster))
+> +		return -EINVAL;
 
-Most of the clock provided by the PMC (Power Management Controller) are
-implemented :
-- main clock (main oscillator)
-- pll clocks
-- master clock
-- programmable clocks
-- utmi clock
-- peripheral clocks
-- system clocks
+We could stash (vexpress_spc_get_nb_cpus()), it never changes.
 
-This implementation is compatible with device tree: the goal is
-to define the whole clock tree in the device tree (all currently
-available dt SoCs and boards are patched to support dt clocks).
-Please feel free to comment the dt bindinds (I'm not sure about the
-name I choose or the position of clock nodes: children of pmc node).
+> +	/*
+> +	 * Since this is called with IRQs enabled, and no arch_spin_lock_irq
+> +	 * variant exists, we need to disable IRQs manually here.
+> +	 */
+> +	local_irq_disable();
+> +	arch_spin_lock(&tc2_pm_lock);
+> +
+> +	if (!tc2_pm_use_count[0][cluster] &&
+> +	    !tc2_pm_use_count[1][cluster] &&
+> +	    !tc2_pm_use_count[2][cluster])
+> +		vexpress_spc_powerdown_enable(cluster, 0);
+> +
+> +	tc2_pm_use_count[cpu][cluster]++;
+> +	if (tc2_pm_use_count[cpu][cluster] == 1) {
+> +		vexpress_spc_write_resume_reg(cluster, cpu,
+> +					      virt_to_phys(mcpm_entry_point));
+> +		vexpress_spc_set_cpu_wakeup_irq(cpu, cluster, 1);
+> +	} else if (tc2_pm_use_count[cpu][cluster] != 2) {
+> +		/*
+> +		 * The only possible values are:
+> +		 * 0 = CPU down
+> +		 * 1 = CPU (still) up
+> +		 * 2 = CPU requested to be up before it had a chance
+> +		 *     to actually make itself down.
+> +		 * Any other value is a bug.
+> +		 */
+> +		BUG();
+> +	}
+> +
+> +	arch_spin_unlock(&tc2_pm_lock);
+> +	local_irq_enable();
+> +
+> +	return 0;
+> +}
+> +
+> +static void tc2_pm_power_down(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +	bool last_man = false, skip_wfi = false;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> +	BUG_ON(cluster >= 2 || cpu >= vexpress_spc_get_nb_cpus(cluster));
 
-I removed the register_clocks function in SoC supporting dt boards only:
-- at91sam9x5 SoCs
-- at91sam9n12 SoC
-- sama5d3 SoCs
+Ditto, see above.
 
-This patch series also update at91 drivers calling clk_enable/disable
-instead of the preferred clk_prepare_enable/disable_unprepare functions.
+> +	__mcpm_cpu_going_down(cpu, cluster);
+> +
+> +	arch_spin_lock(&tc2_pm_lock);
+> +	BUG_ON(__mcpm_cluster_state(cluster) != CLUSTER_UP);
+> +	tc2_pm_use_count[cpu][cluster]--;
+> +	if (tc2_pm_use_count[cpu][cluster] == 0) {
+> +		vexpress_spc_set_cpu_wakeup_irq(cpu, cluster, 1);
+> +		if (!tc2_pm_use_count[0][cluster] &&
+> +		    !tc2_pm_use_count[1][cluster] &&
+> +		    !tc2_pm_use_count[2][cluster]) {
+> +			vexpress_spc_powerdown_enable(cluster, 1);
+> +			vexpress_spc_set_global_wakeup_intr(1);
+> +			last_man = true;
+> +		}
+> +	} else if (tc2_pm_use_count[cpu][cluster] == 1) {
+> +		/*
+> +		 * A power_up request went ahead of us.
+> +		 * Even if we do not want to shut this CPU down,
+> +		 * the caller expects a certain state as if the WFI
+> +		 * was aborted.  So let's continue with cache cleaning.
+> +		 */
+> +		skip_wfi = true;
+> +	} else
+> +		BUG();
+> +
+> +	if (last_man && __mcpm_outbound_enter_critical(cpu, cluster)) {
+> +		arch_spin_unlock(&tc2_pm_lock);
+> +
+> +		set_cr(get_cr() & ~CR_C);
 
+We must disable L2 prefetching on A15 before cleaning L2.
 
-I know there are a lot of cleanup in progress for at91 arch, so please tell
-me if you think this transition to common clk framework should wait.
+> +		flush_cache_all();
+> +		asm volatile ("clrex");
+> +		set_auxcr(get_auxcr() & ~(1 << 6));
 
-This patch series has been tested on Kizbox (sam9g20 SoC) board using device
-tree. It compiles for other SoCs and both with and without dt support, but it
-has not been tested.
+I think we should add comments here to avoid copy'n'paste mayhem. The
+code above is safe on cpus like A15/A7 (I know this back-end can just
+be run on those processors) that hit in the cache with C-bit in SCTLR
+cleared, it would explode on processors (eg A9) that do not hit in the
+cache with C-bit cleared. I am wondering if it is better to write inline
+asm and jump to v7 cache functions that do not need stack push/pop
+straight away.
 
-The clocks rate/parent change has not been tested.
+> +		cci_disable_port_by_cpu(mpidr);
+> +
+> +		/*
+> +		 * Ensure that both C & I bits are disabled in the SCTLR
+> +		 * before disabling ACE snoops. This ensures that no
+> +		 * coherency traffic will originate from this cpu after
+> +		 * ACE snoops are turned off.
+> +		 */
+> +		cpu_proc_fin();
 
-Best Regards,
-Boris
+Mmm, C bit is already cleared, why clear the I bit (and the A bit) ?
+I do not think cpu_proc_fin() is needed and I am really keen on getting
+the power down procedure right to avoid copy'n'paste induced error from
+the start.
 
-Boris BREZILLON (50):
-  ARM: at91: move at91_pmc.h to include/linux/clk/at91.h
-  ARM: at91: add PMC main clock
-  ARM: at91: add PMC pll clocks
-  ARM: at91: add PMC master clock
-  ARM: at91: add PMC system clocks
-  ARM: at91: add PMC peripheral clocks
-  ARM: at91: add PMC programmable clocks
-  ARM: at91: add PMC utmi clock support
-  ARM: at91: add PMC usb clock support
-  ARM: at91: add PMC smd clock support
-  ARM: at91: add PMC clk device tree binding doc
-  ARM: at91: move to common clk framework
-  ARM: at91: move at91rm9200 SoC to new at91 clk implem
-  ARM: at91: move at91sam9260 SoC to new at91 clk implem
-  ARM: at91: move at91sam9263 SoC to new at91 clk implem
-  ARM: at91: move at91sam9263 SoC to new at91 clk implem
-  ARM: at91: move at91sam9g45 SoC to new at91 clk implem
-  ARM: at91: move at91sam9n12 SoC to new at91 clk implem
-  ARM: at91: move at91sam9rl SoC to new at91 clk implem
-  ARM: at91: move at91sam9x5 SoCs to new at91 clk implem
-  ARM: at91: move at91sam9 SoCs to new at91 clk implem
-  ARM: at91: move sama5d3 SoCs to new at91 clk implem
-  ARM: at91: move at91rm9200 boards to new at91 clk implem
-  ARM: at91: move at91sam9 boards to new at91 clk implem
-  ARM: at91: move pit timer to common clk framework
-  ARM: at91/tc/clocksource: prepare clk before calling enable
-  at_hdmac: prepare clk before calling enable
-  ASoC: atmel-ssc: prepare clk before calling enable
-  mmc: atmel-mci: prepare clk before calling enable
-  pwm: atmel-tcb: prepare clk before calling enable
-  tty: atmel_serial: prepare clk before calling enable
-  usb: gadget: at91_udc: prepare clk before calling enable
-  ehci-atmel.c: prepare clk before calling enable
-  USB: ohci-at91: prepare clk before calling enable
-  at91/avr32/atmel_lcdfb: prepare clk before calling enable
-  ARM: at91/dt: move at91rm9200 SoC to new at91 clk implem
-  ARM: at91/dt: move at91sam9260 SoC to new at91 clk implem
-  ARM: at91/dt: move at91sam9263 SoC to new at91 clk implem
-  ARM: at91/dt: move at91sam9g45 SoC to new at91 clk implem
-  ARM: at91/dt: move at91sam9n12 SoC to new at91 clk implem
-  ARM: at91/dt: move at91sam9x5 SoCs to new at91 clk implem
-  ARM: at91/dt: move at91sam9g20 SoC to new at91 clk implem
-  ARM: at91/dt: move sama5d3 SoCs to to new at91 clk implem
-  ARM: at91/dt: move sam9260/sam9g20 boards to new at91 clk implem
-  ARM: at91/dt: move rm9200 boards to new at91 clk implem
-  ARM: at91/dt: move sam9263 boards to new at91 clk implem
-  ARM: at91/dt: move sam9g45 boards to new at91 clk implem
-  ARM: at91/dt: move sam9n12 boards to new at91 clk implem
-  ARM: at91/dt: move sam9x5 boards to new at91 clk implem
-  ARM: at91/dt: move sama5d3 boards to new at91 clk implem
+> +
+> +		__mcpm_outbound_leave_critical(cluster, CLUSTER_DOWN);
+> +	} else {
+> +		/*
+> +		 * If last man then undo any setup done previously.
+> +		 */
+> +		if (last_man) {
+> +			vexpress_spc_powerdown_enable(cluster, 0);
+> +			vexpress_spc_set_global_wakeup_intr(0);
+> +		}
+> +
+> +		arch_spin_unlock(&tc2_pm_lock);
+> +
+> +		set_cr(get_cr() & ~CR_C);
+> +		flush_cache_louis();
+> +		asm volatile ("clrex");
+> +		set_auxcr(get_auxcr() & ~(1 << 6));
+> +	}
+> +
+> +	__mcpm_cpu_down(cpu, cluster);
+> +
+> +	/* Now we are prepared for power-down, do it: */
+> +	if (!skip_wfi)
+> +		wfi();
+> +
+> +	/* Not dead at this point?  Let our caller cope. */
 
- .../devicetree/bindings/clock/at91-clock.txt       |  247 +++++
- arch/arm/boot/dts/animeo_ip.dts                    |   17 +-
- arch/arm/boot/dts/at91-ariag25.dts                 |   17 +-
- arch/arm/boot/dts/at91rm9200.dtsi                  |  133 +++
- arch/arm/boot/dts/at91rm9200ek.dts                 |   17 +-
- arch/arm/boot/dts/at91sam9260.dtsi                 |  144 ++-
- arch/arm/boot/dts/at91sam9263.dtsi                 |  135 +++
- arch/arm/boot/dts/at91sam9263ek.dts                |   17 +-
- arch/arm/boot/dts/at91sam9g15.dtsi                 |   11 +
- arch/arm/boot/dts/at91sam9g20.dtsi                 |   37 +
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi        |   17 +-
- arch/arm/boot/dts/at91sam9g25.dtsi                 |    3 +
- arch/arm/boot/dts/at91sam9g35.dtsi                 |   23 +
- arch/arm/boot/dts/at91sam9g45.dtsi                 |  157 ++++
- arch/arm/boot/dts/at91sam9m10g45ek.dts             |   17 +-
- arch/arm/boot/dts/at91sam9n12.dtsi                 |  153 ++++
- arch/arm/boot/dts/at91sam9n12ek.dts                |   17 +-
- arch/arm/boot/dts/at91sam9x25.dtsi                 |   25 +-
- arch/arm/boot/dts/at91sam9x35.dtsi                 |    3 +
- arch/arm/boot/dts/at91sam9x5.dtsi                  |  226 +++--
- arch/arm/boot/dts/at91sam9x5_can.dtsi              |   24 +
- arch/arm/boot/dts/at91sam9x5_isi.dtsi              |   24 +
- arch/arm/boot/dts/at91sam9x5_lcdc.dtsi             |   32 +
- arch/arm/boot/dts/at91sam9x5_macb0.dtsi            |   68 ++
- arch/arm/boot/dts/at91sam9x5_macb1.dtsi            |   56 ++
- arch/arm/boot/dts/at91sam9x5_usart3.dtsi           |   60 ++
- arch/arm/boot/dts/ge863-pro3.dtsi                  |   16 +-
- arch/arm/boot/dts/kizbox.dts                       |    5 +
- arch/arm/boot/dts/mpa1600.dts                      |   16 +-
- arch/arm/boot/dts/pm9g45.dts                       |   16 +-
- arch/arm/boot/dts/sama5d3.dtsi                     |  358 ++++----
- arch/arm/boot/dts/sama5d31ek.dts                   |    4 +
- arch/arm/boot/dts/sama5d33ek.dts                   |    2 +
- arch/arm/boot/dts/sama5d34ek.dts                   |    4 +
- arch/arm/boot/dts/sama5d35ek.dts                   |    6 +
- arch/arm/boot/dts/sama5d3_can.dtsi                 |   67 ++
- arch/arm/boot/dts/sama5d3_emac.dtsi                |   56 ++
- arch/arm/boot/dts/sama5d3_gmac.dtsi                |   89 ++
- arch/arm/boot/dts/sama5d3_lcd.dtsi                 |   73 ++
- arch/arm/boot/dts/sama5d3_mci2.dtsi                |   59 ++
- arch/arm/boot/dts/sama5d3_tcb1.dtsi                |   39 +
- arch/arm/boot/dts/sama5d3_uart.dtsi                |   42 +
- arch/arm/boot/dts/sama5d3xcm.dtsi                  |   17 +-
- arch/arm/boot/dts/tny_a9260_common.dtsi            |   17 +-
- arch/arm/boot/dts/tny_a9263.dts                    |   17 +-
- arch/arm/boot/dts/usb_a9260_common.dtsi            |   17 +-
- arch/arm/boot/dts/usb_a9263.dts                    |   17 +-
- arch/arm/mach-at91/Kconfig                         |   26 +
- arch/arm/mach-at91/Makefile                        |    2 +-
- arch/arm/mach-at91/at91rm9200.c                    |  578 +++++++-----
- arch/arm/mach-at91/at91sam9260.c                   |  694 +++++++++-----
- arch/arm/mach-at91/at91sam9261.c                   |  581 ++++++++----
- arch/arm/mach-at91/at91sam9263.c                   |  599 +++++++-----
- arch/arm/mach-at91/at91sam926x_time.c              |   21 +-
- arch/arm/mach-at91/at91sam9g45.c                   |  705 ++++++++------
- arch/arm/mach-at91/at91sam9g45_devices.c           |    1 -
- arch/arm/mach-at91/at91sam9n12.c                   |  196 +---
- arch/arm/mach-at91/at91sam9rl.c                    |  514 +++++++----
- arch/arm/mach-at91/at91sam9x5.c                    |  291 +-----
- arch/arm/mach-at91/board-1arm.c                    |   12 +-
- arch/arm/mach-at91/board-afeb-9260v1.c             |   11 +-
- arch/arm/mach-at91/board-cam60.c                   |   13 +-
- arch/arm/mach-at91/board-carmeva.c                 |   13 +-
- arch/arm/mach-at91/board-cpu9krea.c                |   12 +-
- arch/arm/mach-at91/board-cpuat91.c                 |   12 +-
- arch/arm/mach-at91/board-csb337.c                  |   11 +-
- arch/arm/mach-at91/board-csb637.c                  |   11 +-
- arch/arm/mach-at91/board-dt-rm9200.c               |    9 +-
- arch/arm/mach-at91/board-dt-sam9.c                 |    9 +-
- arch/arm/mach-at91/board-dt-sama5.c                |    9 +-
- arch/arm/mach-at91/board-eb9200.c                  |   11 +-
- arch/arm/mach-at91/board-ecbat91.c                 |   12 +-
- arch/arm/mach-at91/board-eco920.c                  |   13 +-
- arch/arm/mach-at91/board-flexibity.c               |   12 +-
- arch/arm/mach-at91/board-foxg20.c                  |   12 +-
- arch/arm/mach-at91/board-gsia18s.c                 |    8 +-
- arch/arm/mach-at91/board-kafa.c                    |   12 +-
- arch/arm/mach-at91/board-kb9202.c                  |   12 +-
- arch/arm/mach-at91/board-pcontrol-g20.c            |    9 +-
- arch/arm/mach-at91/board-picotux200.c              |   11 +-
- arch/arm/mach-at91/board-qil-a9260.c               |   11 +-
- arch/arm/mach-at91/board-rm9200dk.c                |   11 +-
- arch/arm/mach-at91/board-rm9200ek.c                |   11 +-
- arch/arm/mach-at91/board-rsi-ews.c                 |   12 +-
- arch/arm/mach-at91/board-sam9-l9260.c              |   11 +-
- arch/arm/mach-at91/board-sam9260ek.c               |   11 +-
- arch/arm/mach-at91/board-sam9261ek.c               |   15 +-
- arch/arm/mach-at91/board-sam9263ek.c               |   11 +-
- arch/arm/mach-at91/board-sam9g20ek.c               |   15 +-
- arch/arm/mach-at91/board-sam9m10g45ek.c            |   11 +-
- arch/arm/mach-at91/board-sam9rlek.c                |   11 +-
- arch/arm/mach-at91/board-snapper9260.c             |   12 +-
- arch/arm/mach-at91/board-stamp9g20.c               |   15 +-
- arch/arm/mach-at91/board-yl-9200.c                 |   12 +-
- arch/arm/mach-at91/clock.c                         |  961 --------------------
- arch/arm/mach-at91/clock.h                         |   49 -
- arch/arm/mach-at91/generic.h                       |   10 +-
- arch/arm/mach-at91/pm.c                            |    2 +-
- arch/arm/mach-at91/pm_slowclock.S                  |    2 +-
- arch/arm/mach-at91/pmc.c                           |   58 ++
- arch/arm/mach-at91/sama5d3.c                       |  344 +------
- arch/arm/mach-at91/setup.c                         |   38 +-
- arch/arm/mach-at91/stamp9g20.h                     |    2 +-
- drivers/clk/Makefile                               |    1 +
- drivers/clk/at91/Makefile                          |   11 +
- drivers/clk/at91/clk-main.c                        |  106 +++
- drivers/clk/at91/clk-master.c                      |  317 +++++++
- drivers/clk/at91/clk-peripheral.c                  |  376 ++++++++
- drivers/clk/at91/clk-pll.c                         |  438 +++++++++
- drivers/clk/at91/clk-plldiv.c                      |  125 +++
- drivers/clk/at91/clk-programmable.c                |  370 ++++++++
- drivers/clk/at91/clk-smd.c                         |  157 ++++
- drivers/clk/at91/clk-system.c                      |  189 ++++
- drivers/clk/at91/clk-usb.c                         |  303 ++++++
- drivers/clk/at91/clk-utmi.c                        |  114 +++
- drivers/clocksource/tcb_clksrc.c                   |   10 +-
- drivers/dma/at_hdmac.c                             |   12 +-
- drivers/misc/atmel-ssc.c                           |    8 +-
- drivers/mmc/host/atmel-mci.c                       |   16 +-
- drivers/pwm/pwm-atmel-tcb.c                        |    4 +-
- drivers/tty/serial/atmel_serial.c                  |   35 +-
- drivers/usb/gadget/at91_udc.c                      |   12 +-
- drivers/usb/gadget/atmel_usba_udc.c                |    2 +-
- drivers/usb/host/ehci-atmel.c                      |    8 +-
- drivers/usb/host/ohci-at91.c                       |   12 +-
- drivers/video/atmel_lcdfb.c                        |    8 +-
- .../mach/at91_pmc.h => include/linux/clk/at91.h    |  122 ++-
- 127 files changed, 7588 insertions(+), 3862 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/at91-clock.txt
- create mode 100644 arch/arm/boot/dts/at91sam9x5_can.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x5_isi.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x5_lcdc.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x5_macb0.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x5_macb1.dtsi
- create mode 100644 arch/arm/boot/dts/at91sam9x5_usart3.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_can.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_emac.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_gmac.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_lcd.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_mci2.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_tcb1.dtsi
- create mode 100644 arch/arm/boot/dts/sama5d3_uart.dtsi
- delete mode 100644 arch/arm/mach-at91/clock.c
- delete mode 100644 arch/arm/mach-at91/clock.h
- create mode 100644 arch/arm/mach-at91/pmc.c
- create mode 100644 drivers/clk/at91/Makefile
- create mode 100644 drivers/clk/at91/clk-main.c
- create mode 100644 drivers/clk/at91/clk-master.c
- create mode 100644 drivers/clk/at91/clk-peripheral.c
- create mode 100644 drivers/clk/at91/clk-pll.c
- create mode 100644 drivers/clk/at91/clk-plldiv.c
- create mode 100644 drivers/clk/at91/clk-programmable.c
- create mode 100644 drivers/clk/at91/clk-smd.c
- create mode 100644 drivers/clk/at91/clk-system.c
- create mode 100644 drivers/clk/at91/clk-usb.c
- create mode 100644 drivers/clk/at91/clk-utmi.c
- rename arch/arm/mach-at91/include/mach/at91_pmc.h => include/linux/clk/at91.h (76%)
+This function should disable the GIC CPU IF, but I guess you will add
+the code when CPUidle is merged.
 
--- 
-1.7.9.5
+> +static void tc2_pm_powered_up(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +	unsigned long flags;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> +	BUG_ON(cluster >= 2 || cpu >= vexpress_spc_get_nb_cpus(cluster));
+> +
+> +	local_irq_save(flags);
+> +	arch_spin_lock(&tc2_pm_lock);
+> +
+> +	if (!tc2_pm_use_count[0][cluster] &&
+> +	    !tc2_pm_use_count[1][cluster] &&
+> +	    !tc2_pm_use_count[2][cluster]) {
+> +		vexpress_spc_powerdown_enable(cluster, 0);
+> +		vexpress_spc_set_global_wakeup_intr(0);
+> +	}
+> +
+> +	if (!tc2_pm_use_count[cpu][cluster])
+> +		tc2_pm_use_count[cpu][cluster] = 1;
+> +
+> +	vexpress_spc_set_cpu_wakeup_irq(cpu, cluster, 0);
+> +	vexpress_spc_write_resume_reg(cluster, cpu, 0);
+> +
+> +	arch_spin_unlock(&tc2_pm_lock);
+> +	local_irq_restore(flags);
+> +}
+> +
+> +static const struct mcpm_platform_ops tc2_pm_power_ops = {
+> +	.power_up	= tc2_pm_power_up,
+> +	.power_down	= tc2_pm_power_down,
+> +	.powered_up	= tc2_pm_powered_up,
+> +};
+> +
+> +static void __init tc2_pm_usage_count_init(void)
+> +{
+> +	unsigned int mpidr, cpu, cluster;
+> +
+> +	mpidr = read_cpuid_mpidr();
+> +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> +
+> +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> +	BUG_ON(cpu >= 3 || cluster >= 2);
+> +	tc2_pm_use_count[cpu][cluster] = 1;
+> +}
+> +
+> +/*
+> + * Enable cluster-level coherency, in preparation for turning on the MMU.
+> + */
+> +static void __naked tc2_pm_power_up_setup(unsigned int affinity_level)
+> +{
+> +	asm volatile (" \n"
+> +"	cmp	r0, #1 \n"
+> +"	beq	cci_enable_port_for_self \n"
+> +"	bx	lr ");
+> +}
+
+We could write a function like the above (stackless and inline) for the
+sequence:
+
+1- clear C bit
+2- flush cache all/louis
+3- exit coherency
+
+Again, the current implementation is right on TC2 but we should not let
+people think that's correct for all v7 processors
+
+Lorenzo
