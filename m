@@ -1,51 +1,34 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Fri, 7 Jun 2013 19:06:07 +0530
-Subject: [PATCH 09/11] mmc: omap_hsmmc: enhance pinctrl support
-In-Reply-To: <20130604144632.GI3331@atomide.com>
-References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
- <1369995191-20855-10-git-send-email-gururaja.hebbar@ti.com>
- <20130604144632.GI3331@atomide.com>
-Message-ID: <51B1E1C7.7050407@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 07 Jun 2013 15:49:24 +0200
+Subject: [RFC][PATCH 1/7] USB: OHCI: make ohci-exynos a separate driver
+In-Reply-To: <1370585013-12809-2-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+ <1370585013-12809-2-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <6754704.rVr58LLFvc@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 04 June 2013 08:16 PM, Tony Lindgren wrote:
-> * Hebbar Gururaja <gururaja.hebbar@ti.com> [130531 03:19]:
->> Amend the hsmmc controller to optionally take a pin control handle and
->> set the state of the pins to:
->>
->> - "default" on boot, resume and before performing a mmc transfer
->> - "idle" after initial default, after resume default, and after each
->> mmc/sd card access
->> - "sleep" on suspend()
->>
->> By optionally putting the pins into sleep state in the suspend callback
->> we can accomplish two things.
->> - One is to minimize current leakage from pins and thus save power,
->> - second, we can prevent the IP from driving pins output in an
->> uncontrolled manner, which may happen if the power domain drops the
->> domain regulator.
->>
->> If any of the above pin states are missing in dt, a warning message
->> about the missing state is displayed.
->> If certain pin-states are not available, to remove this warning message
->> pass respective state name with null phandler.
->
-> There's a similar patch in the "[RESEND PATCH v2 1/3] mmc: omap_hsmmc:
-> Enable SDIO IRQ using a GPIO in idle mode" thread. It also makes the
-> SDIO interrupts to work, so we need to consider that too.
->
+On Friday 07 June 2013 11:33:27 Manjunath Goudar wrote:
+> 
+>  #if    !IS_ENABLED(CONFIG_USB_OHCI_HCD_PCI) && \
+>         !IS_ENABLED(CONFIG_USB_OHCI_HCD_PLATFORM) && \
+> +       !IS_ENABLED(CONFIG_USB_OHCI_EXYNOS) && \
+>         !defined(PLATFORM_DRIVER) &&    \
+>         !defined(OMAP1_PLATFORM_DRIVER) &&      \
+>         !defined(OMAP3_PLATFORM_DRIVER) &&      \
+> @@ -1269,7 +1265,6 @@ MODULE_LICENSE ("GPL");
+>         !defined(SM501_OHCI_DRIVER) && \
+>         !defined(TMIO_OHCI_DRIVER) && \
+>         !defined(S3C2410_PLATFORM_DRIVER) && \
+> -       !defined(EXYNOS_PLATFORM_DRIVER) && \
+>         !defined(EP93XX_PLATFORM_DRIVER) && \
+>         !defined(AT91_PLATFORM_DRIVER) && \
+>         !defined(NXP_PLATFORM_DRIVER) && \
 
-Hi Tony,
+Hi Manjunath,
 
-I will try to combine both of these and make use of
-pinctrl_pm_select_[*]_state helper functions.
+please note that Greg just merged my patch to remove this entire list and
+the #error statement. The next time you rebase your patch, you will have
+to remove this hunk in each of your patches.
 
-
-> We can merge the dynamic pinmuxing parts separately, but they should
-> be in a separate function like I posted later on in the thread above.
->
-> Regards,
->
-> Tony
->
+	Arnd
