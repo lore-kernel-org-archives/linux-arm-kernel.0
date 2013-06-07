@@ -1,107 +1,42 @@
-From: james.king@linaro.org (James King)
-Date: Fri, 7 Jun 2013 12:48:58 +0100
-Subject: [PATCH] arm/dt: Don't add disabled CPUs to system topology
-In-Reply-To: <20130607102326.GA3111@e102568-lin.cambridge.arm.com>
-References: <1370538685-22386-1-git-send-email-james.king@linaro.org>
- <20130607102326.GA3111@e102568-lin.cambridge.arm.com>
-Message-ID: <CAFtq+0FuzNcoQpK7=7d_KetYYHoPC7rdkFWMrApey5dxiWZ9mg@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 07 Jun 2013 13:50:11 +0200
+Subject: [PATCH v4 0/2] ARM: PJ4B: fix for 3.10-rc
+In-Reply-To: <20130607101234.GF3132@mudshark.cambridge.arm.com>
+References: <1370599460-9947-1-git-send-email-gregory.clement@free-electrons.com>
+ <20130607101234.GF3132@mudshark.cambridge.arm.com>
+Message-ID: <51B1C8F3.5090509@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On 7 June 2013 11:23, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> Hi James,
->
-> On Thu, Jun 06, 2013 at 06:11:25PM +0100, James King wrote:
->> If CPUs are marked as disabled in the devicetree, make sure they do
->> not exist in the system CPU information and CPU topology information.
->> In this case these CPUs will not be able to be added to the system later
->> using hot-plug. This allows a single chip with many CPUs to be easily
->> used in a variety of hardware devices where they may have different
->> actual processing requirements (eg for thermal/cost reasons).
+On 06/07/2013 12:12 PM, Will Deacon wrote:
+> On Fri, Jun 07, 2013 at 11:04:18AM +0100, Gregory CLEMENT wrote:
+>> Hello,
 >>
->> - Change devicetree.c to ignore any cpu nodes marked as disabled,
->>   this effectively limits the number of active cpu cores so no need
->>   for the max_cpus=x in the chosen node.
->> - Change topology.c to ignore any cpu nodes marked as disabled, this
->>   is where the scheduler would learn about big/LITTLE cores so this
->>   effectively keeps the scheduler in sync.
+>> This path set allows to fix one errata for PJ4B CPUs.
 >>
->
-> I have two questions:
->
-> 1) Since with this approach the DT should change anyway if on different
->    hardware devices based on the same chip you want to allow booting a
->    different number of CPUs, why do not we remove the cpu nodes instead of
->    disabling them ? Put it another way: cpu nodes define a cpu as
->    possible (currently), we can simply remove the node if we do not want
->    that cpu to be seen by the kernel.
+>> Without this the Armada 370 based board can't boot anymore since
+>> 3.10-rc1. So this one really need to be applied on 3.10-rc.
+>>
+>> As they were pending question for the second one, I preferred to keep
+>> it apart awaiting the answers from the Marvell engineer.
+>>
+>> Both of the patches of this series are needed to fix the issue. Indeed
+>> if the CPU is not recognized as a PJ4B then the fix is not applied.
+> 
+> Reviewed-by: Will Deacon <will.deacon@arm.com>
+> 
 
-The reason we want disabled status rather than just remove the nodes
-is to use a common soc.dtsi file which is included in many board.dts
-files - eg:
+Thanks for your review.
 
-file soc.dtsi contains:
+> Does this need a CC stable as well? I know that my TLB patch tickled it, but
+> that's not to say it couldn't occur with particular configurations of older
+> kernels.
 
-                cpus {
-                                cpu0: cpu at 0 {
-                                                device_type = "cpu";
-                                                compatible = "arm,cortex-a7";
-                                                reg = <0>;
-                                                cluster = <&cluster0>;
-                                                core = <&core0>;
-                                };
+Well according to stable_kernel_rules.txt " It must fix a real bug
+that bothers people (not a, "This could be a problem..." type thing)."
 
-                                cpu1: cpu at 1 {
-                                                device_type = "cpu";
-                                                compatible = "arm,cortex-a7";
-                                                reg = <1>;
-                                                cluster = <&cluster0>;
-                                                core = <&core1>;
-                                };
+So I am not sure that it should go to stable. But it is arguable.
+Then I will add the Cc: <stable@vger.kernel.org> flag to the patches
+when I will submit them to Russell pacth system.
 
-                                cpu2: cpu at 2 {
-                                                device_type = "cpu";
-                                                compatible = "arm,cortex-a15";
-                                                reg = <2>;
-                                                cluster = <&cluster0>;
-                                                core = <&core2>;
-                                };
-                };
-
-file board1.dts where we want the A15 disabled contains:
-
-/include/ "soc.dtsi"
-
-                cpus {
-                                cpu2: cpu at 2 {
-                                                status = "disabled";
-                                };
-                };
-
-> 2) If we go for the "status" property, why do not we use it to set present
->    mask ? That way the cpu is possible but not present, you cannot
->    hotplug it in. It is a bit of a stretch, granted, the cpu _is_ present,
->    we just want to disable it, do not know how this is handled in x86
->    and other archs though.
-
-I have been struggling to find any equivalent example for another
-arch, so just tried to solve our problem. I guess in the x86 world it
-is less likely to want to disable processors in a SoC for heat/battery
-issues so this has just never arisen. In this case the cpu is
-physically present but not possible, but I am not sure it should be in
-a present mask (giving the impression it can be used). Perhaps you
-could elaborate with an example what you are thinking about here?
-
-Thanks,
-James
->
-> I am just asking, since it is something I thought about while writing
-> code that parses the DT cpu map, basically we do not have a way to
-> "disable" a cpu in the DT and that's what you are doing, I just would like
-> to understand the best way to put it into DT bindings.
->
-> Thanks,
-> Lorenzo
->
+Gregory
