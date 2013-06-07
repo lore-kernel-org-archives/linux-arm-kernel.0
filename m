@@ -1,157 +1,84 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri,  7 Jun 2013 11:31:26 -0700
-Subject: [PATCH v3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ line
-In-Reply-To: <1370040357-25794-1-git-send-email-khilman@linaro.org>
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
-Message-ID: <1370629886-14170-1-git-send-email-khilman@linaro.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 7 Jun 2013 14:34:52 -0400 (EDT)
+Subject: [RFC][PATCH 4/7] USB: OHCI: make ohci-spear a separate driver
+In-Reply-To: <1370585013-12809-5-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306071355170.1366-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On most OMAP3 platforms, the twl4030 IRQ line is connected to the
-SYS_NIRQ line on OMAP.  Add another DTS include file
-(twl4030_omap3.dtsi) for boards that hook up the twl4030 this way
-to include.
+On Fri, 7 Jun 2013, Manjunath Goudar wrote:
 
-This allows RTC wake from off-mode to work again on OMAP3-based
-platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
-3530/Overo, 3730/Overo-STORM.
+> Separate the  TI OHCI SPEAr host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM.
 
-Special thanks to Florian Vaussard for suggesting use of preprocessor
-feature.
+> @@ -151,16 +98,24 @@ static int spear_ohci_hcd_drv_probe(struct platform_device *pdev)
+>  		goto err_put_hcd;
+>  	}
+>  
+> -	ohci_p = (struct spear_ohci *)hcd_to_ohci(hcd);
+> -	ohci_p->clk = usbh_clk;
+> -	spear_start_ohci(ohci_p);
+> -	ohci_hcd_init(hcd_to_ohci(hcd));
+> +	sohci_p = to_spear_ohci(hcd);
+> +	sohci_p->clk = usbh_clk;
+> +	hcd_to_ohci(hcd)->regs = hcd->regs;
 
-Cc: Florian Vaussard <florian.vaussard@epfl.ch>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Nishanth Menon <nm@ti.com>
-Signed-off-by: Kevin Hilman <khilman@linaro.org>
----
-v3: renamed to twl4030_omap3 (suggested by Nishanth), add GPL, fix whitespace
-v2: Updated to change board files instead of twl4030 file.
+This line isn't needed.  It is one of the first things that ohci_init() 
+does.
 
- arch/arm/boot/dts/omap3-beagle-xm.dts  |  1 +
- arch/arm/boot/dts/omap3-beagle.dts     |  1 +
- arch/arm/boot/dts/omap3-devkit8000.dts |  1 +
- arch/arm/boot/dts/omap3-evm.dts        |  1 +
- arch/arm/boot/dts/omap3-igep.dtsi      |  1 +
- arch/arm/boot/dts/omap3-overo.dtsi     |  1 +
- arch/arm/boot/dts/omap3430-sdp.dts     |  1 +
- arch/arm/boot/dts/twl4030_omap3.dtsi   | 25 +++++++++++++++++++++++++
- 8 files changed, 32 insertions(+)
- create mode 100644 arch/arm/boot/dts/twl4030_omap3.dtsi
+> +
+> +	ohci_setup(hcd);
 
-diff --git a/arch/arm/boot/dts/omap3-beagle-xm.dts b/arch/arm/boot/dts/omap3-beagle-xm.dts
-index ad17b6b..afdb164 100644
---- a/arch/arm/boot/dts/omap3-beagle-xm.dts
-+++ b/arch/arm/boot/dts/omap3-beagle-xm.dts
-@@ -96,6 +96,7 @@
- };
- 
- #include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
- 
- &i2c2 {
- 	clock-frequency = <400000>;
-diff --git a/arch/arm/boot/dts/omap3-beagle.dts b/arch/arm/boot/dts/omap3-beagle.dts
-index eb7e02a..dfd8310 100644
---- a/arch/arm/boot/dts/omap3-beagle.dts
-+++ b/arch/arm/boot/dts/omap3-beagle.dts
-@@ -135,6 +135,7 @@
- };
- 
- #include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
- 
- &mmc1 {
- 	vmmc-supply = <&vmmc1>;
-diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-index 5be71b1..af32eff 100644
---- a/arch/arm/boot/dts/omap3-devkit8000.dts
-+++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-@@ -81,6 +81,7 @@
- };
- 
- #include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
- 
- &mmc1 {
- 	vmmc-supply = <&vmmc1>;
-diff --git a/arch/arm/boot/dts/omap3-evm.dts b/arch/arm/boot/dts/omap3-evm.dts
-index baa24bb..7d4329d 100644
---- a/arch/arm/boot/dts/omap3-evm.dts
-+++ b/arch/arm/boot/dts/omap3-evm.dts
-@@ -45,6 +45,7 @@
- };
- 
- #include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
- 
- &i2c2 {
- 	clock-frequency = <400000>;
-diff --git a/arch/arm/boot/dts/omap3-igep.dtsi b/arch/arm/boot/dts/omap3-igep.dtsi
-index 5224c29..bc48b11 100644
---- a/arch/arm/boot/dts/omap3-igep.dtsi
-+++ b/arch/arm/boot/dts/omap3-igep.dtsi
-@@ -87,6 +87,7 @@
- };
- 
- #include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
- 
- &i2c2 {
- 	clock-frequency = <400000>;
-diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
-index 144a5a2..4bc78896 100644
---- a/arch/arm/boot/dts/omap3-overo.dtsi
-+++ b/arch/arm/boot/dts/omap3-overo.dtsi
-@@ -50,6 +50,7 @@
- };
- 
- #include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
- 
- /* i2c2 pins are used for gpio */
- &i2c2 {
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-index 2a725a0..c4a1c0a 100644
---- a/arch/arm/boot/dts/omap3430-sdp.dts
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -29,6 +29,7 @@
- };
- 
- #include "twl4030.dtsi"
-+#include "twl4030_omap3.dtsi"
- 
- &mmc1 {
- 	vmmc-supply = <&vmmc1>;
-diff --git a/arch/arm/boot/dts/twl4030_omap3.dtsi b/arch/arm/boot/dts/twl4030_omap3.dtsi
-new file mode 100644
-index 0000000..c353ef0
---- /dev/null
-+++ b/arch/arm/boot/dts/twl4030_omap3.dtsi
-@@ -0,0 +1,25 @@
-+/*
-+ * Copyright (C) 2013 Linaro, Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+&twl {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&twl4030_pins>;
-+};
-+
-+&omap3_pmx_core {
-+	/*
-+	 * On most OMAP3 platforms, the twl4030 IRQ line is connected
-+	 * to the SYS_NIRQ line on OMAP.  Therefore, configure the
-+	 * defaults for the SYS_NIRQ pin here.
-+	 */
-+	twl4030_pins: pinmux_twl4030_pins {
-+		pinctrl-single,pins = <
-+			0x1b0 (PIN_INPUT_PULLUP | PIN_OFF_WAKEUPENABLE | MUX_MODE0) /* sys_nirq.sys_nirq */
-+		>;
-+	};
-+};
--- 
-1.8.3
+Don't call ohci_setup().
+
+> +	clk_prepare_enable(sohci_p->clk);
+> +
+> +	ohci = hcd_to_ohci(hcd);
+> +
+> +#ifdef DEBUG
+> +	ohci_dump(ohci, 1);
+> +#endif
+
+I suspect this debugging stuff isn't needed any more.  You can get rid 
+of it.
+
+> @@ -188,13 +143,13 @@ static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
+>  {
+>  	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+> -	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
+> +	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
+>  
+>  	if (time_before(jiffies, ohci->next_statechange))
+>  		msleep(5);
+>  	ohci->next_statechange = jiffies;
+>  
+> -	spear_stop_ohci(ohci_p);
+> +	clk_disable_unprepare(sohci_p->clk);
+>  	return 0;
+>  }
+
+This routine needs to call ohci_suspend() just before the 
+clk_disable_unprepare().  I don't know how that got left out, but it 
+looks like the same problem exists in several of the ohci glue files.  
+I guess they should all be fixed at once, in a separate patch.
+
+>  
+> @@ -202,13 +157,13 @@ static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
+>  {
+>  	struct usb_hcd *hcd = platform_get_drvdata(dev);
+>  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+> -	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
+> +	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
+>  
+>  	if (time_before(jiffies, ohci->next_statechange))
+>  		msleep(5);
+>  	ohci->next_statechange = jiffies;
+>  
+> -	spear_start_ohci(ohci_p);
+> +	 clk_prepare_enable(sohci_p->clk);
+
+You got an extra space character after the tab.
+
+Alan Stern
