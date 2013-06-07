@@ -1,134 +1,62 @@
-From: luke.leighton@gmail.com (luke.leighton)
-Date: Fri, 7 Jun 2013 08:52:43 +0100
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <1622862.fXQWv0YWGV@flatron>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <1851164.HnXhGSdttW@flatron>
- <CAPweEDxWW4LUeBaHLb+wHuAMq=63p88zsx4tumVb2PdP_+ohAw@mail.gmail.com>
- <1622862.fXQWv0YWGV@flatron>
-Message-ID: <CAPweEDx_1fvAv9sROtPreoyyj_yDAuYb040fM2zPc+tf22d=YA@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri,  7 Jun 2013 16:51:54 +0900
+Subject: [PATCH 24/27] ARM: shmobile: sh73a0: add CPUFreq support
+In-Reply-To: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1370591517-20239-25-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 2:02 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Thursday 06 of June 2013 13:49:38 luke.leighton wrote:
->> On Thu, Jun 6, 2013 at 1:43 PM, Tomasz Figa <tomasz.figa@gmail.com>
-> wrote:
->> > Luke,
->> >
->> > On Thursday 06 of June 2013 13:24:57 luke.leighton wrote:
->> >> On Thu, Jun 6, 2013 at 1:01 AM, Tomasz Figa <tomasz.figa@gmail.com>
->> >
->> > wrote:
->> >> > I don't see any other solution here than moving all the Allwinner
->> >> > code
->> >> > to DT (as it has been suggested in this thread several times
->> >> > already), as this is the only hardware description method supported
->> >> > by ARM Linux.
->> >>
->> >>  i repeat again: please state, explicitly and unequivocably that you
->> >>  -
->> >>
->> >> linux kernel developers - are happy that the reach of linux and
->> >> gnu/linux OSes is dramatically reduced due to this intransigent
->> >> position.
->> >>
->> >>  or, tomasz, please state that you, tomasz, represent each and every
->> >>
->> >> one of the linux kernel developers so that i do not need to keep
->> >> asking.
->> >
->> > I do not represent all linux kernel developers by any means. I am just
->> > stating current policy of SoC/board support maintained by ARM Linux,
->> > which is common for all Linux kernel devlopers, or at least ARM Linux
->> > kernel developers.
->> >
->> > Personally I am happy with numerous companies backing this policy and
->> > not making problems like this with Allwinner and I am really
->> > surprised that you are supporting a troublesome company like this.
->>
->>  you've not read what i've written tomasz.
->
-> I have.
->
->> > There are many other SoC vendors making low cost SoCs, like Rockchip,
->> > Boxchip,
->>
->>  boxchip *is* allwinner.
->
-> Right, sorry. I am not really into this low cost hardware.
+From: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
 
- i've been tracking it for several years.
+This patch enables the use of the generic cpufreq-cpu0 driver on sh73a0.
+Providing a regulator, a list of OPPs in DT, combined with a virtual
+cpufreq-cpu0 platform device and a clock, attached to it is everything,
+the cpufreq-cpu0 driver needs. The first sh73a0 platform, implementing
+such CPUFreq support is kzm9g-reference.
 
-> There is also AMLogic, though.
+Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Kconfig        | 2 ++
+ arch/arm/mach-shmobile/setup-sh73a0.c | 5 +++++
+ 2 files changed, 7 insertions(+)
 
- they're *definitely* GPL-violators.
-
->> > Telechips. Maybe they would be better candidates for being
->> > promoted as vendors of choice for hardware running free software?
->>
->>  no, because they're not selling at a low-enough price with
->> high-enough integration.  telechips and rockchip don't have the market
->> penetration.
->
-> I do not have access to any numbers, so I am left to believe in what you
-> say.
-
- well... none of us do :)  that report (was it from IDC? it was in
-earlier messages) is a good analysis.
-
-> (Although here in Poland the cheap tablet market is almost evenly
-> divided between all those companies, you can find almost same amount of
-> tablets based on SoCs from each vendor.)
-
- most likely.
-
- allwinner is the one that's actually expressed an interest, at
-Director (Board) Level, of being GPL-compliant.  the software
-engineers understand that; their immediate Manager does not [and is
-causing considerable disruption].
-
- AMLogic stone-walled and cost us money and a large client due to
-their GPL violations. which they till have not resolved [in over 2
-years].  i will not work with them, ever again.
-
- Telechips are korean-based: they haven't responded to communications.
-
- Nufront got themselves in a muddle [late on silicon] so we ruled them
-out - we'll come back to them later.
-
- there's a number of others, but allwinner's the only one that is
-actively communicating.
-
- so.
-
- coming back to what you said earlier: i'm formulating what to say to
-allwinner [and need to pre-send something by monday so that they can
-consider it before the meeting].  so far, it consists of:
-
-* device-tree is what the linux kernel community has come up with, it
-is equivalent to FEX.
-
-* the linux kernel community would like to apologise for not
-consulting with you (allwinner) on the decision to only accept device
-tree
-
-[bear in mind that if this kind of thing isn't said, they risk just
-continuing to make the sunxi community's life absolute hell by
-continuing to work in isolation and continuing to duplicate drivers
-etc. etc. ]
-
-* work is being done by the free software community, they are
-beginning to integrate allwinner's work into the upstream kernel, and
-you (allwinner) will begin to see this when you get round to doing
-linux kernel 3.9
-
-* allwinner and the linux and sunxi community therefore need to work
-closer together, we propose:
-
-* {insert proposals here}
-
-3 days left on the clock.
-
-l.
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 52e8c6e..f871f2a 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -169,6 +169,8 @@ config MACH_KZM9D
+ config MACH_KZM9G
+ 	bool "KZM-A9-GT board"
+ 	depends on ARCH_SH73A0
++	select ARCH_HAS_CPUFREQ
++	select ARCH_HAS_OPP
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+ 	select SND_SOC_AK4642 if SND_SIMPLE_CARD
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index 3bc33a5..3acb45a 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -963,6 +963,8 @@ static const struct of_dev_auxdata sh73a0_auxdata_lookup[] __initconst = {
+ 
+ void __init sh73a0_add_standard_devices_dt(void)
+ {
++	struct platform_device_info devinfo = { .name = "cpufreq-cpu0", .id = -1, };
++
+ 	/* clocks are setup late during boot in the case of DT */
+ 	sh73a0_clock_init();
+ 
+@@ -970,6 +972,9 @@ void __init sh73a0_add_standard_devices_dt(void)
+ 			     ARRAY_SIZE(sh73a0_devices_dt));
+ 	of_platform_populate(NULL, of_default_bus_match_table,
+ 			     sh73a0_auxdata_lookup, NULL);
++
++	/* Instantiate cpufreq-cpu0 */
++	platform_device_register_full(&devinfo);
+ }
+ 
+ static const char *sh73a0_boards_compat_dt[] __initdata = {
+-- 
+1.8.2.1
