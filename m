@@ -1,84 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 7 Jun 2013 14:34:52 -0400 (EDT)
-Subject: [RFC][PATCH 4/7] USB: OHCI: make ohci-spear a separate driver
-In-Reply-To: <1370585013-12809-5-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306071355170.1366-100000@iolanthe.rowland.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 7 Jun 2013 11:37:09 -0700
+Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data file
+In-Reply-To: <51B2231B.6060806@ti.com>
+References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
+ <20130607162927.GA3331@atomide.com>
+ <20130607175005.GB3331@atomide.com>
+ <alpine.DEB.2.02.1306071807510.7753@utopia.booyaka.com>
+ <51B2231B.6060806@ti.com>
+Message-ID: <20130607183709.GE3331@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Jun 2013, Manjunath Goudar wrote:
+* Santosh Shilimkar <santosh.shilimkar@ti.com> [130607 11:20]:
+> On Friday 07 June 2013 02:10 PM, Paul Walmsley wrote:
+> > On Fri, 7 Jun 2013, Tony Lindgren wrote:
+> > 
+> >> I had to undo the following parts to avoid regressions on omap4sdp.
+> >> Can you please follow up on fixing the related issues so the fixup
+> >> won't be needed?
+> > 
+> > Well, I can't even test it at the moment.  So it's probably best for 
+> > Santosh and Sricharan to fix those issues - they're the ones who are 
+> > responsible for testing the patch before it's sent.  Unless there's
+> > some specific reason why I'd be the best person to do it?
+> > 
+> Will take care of that Paul.
 
-> Separate the  TI OHCI SPEAr host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM.
+Thanks, sorry I did not mean Paul, I meant the authors of the
+patches :)
 
-> @@ -151,16 +98,24 @@ static int spear_ohci_hcd_drv_probe(struct platform_device *pdev)
->  		goto err_put_hcd;
->  	}
->  
-> -	ohci_p = (struct spear_ohci *)hcd_to_ohci(hcd);
-> -	ohci_p->clk = usbh_clk;
-> -	spear_start_ohci(ohci_p);
-> -	ohci_hcd_init(hcd_to_ohci(hcd));
-> +	sohci_p = to_spear_ohci(hcd);
-> +	sohci_p->clk = usbh_clk;
-> +	hcd_to_ohci(hcd)->regs = hcd->regs;
+Regards,
 
-This line isn't needed.  It is one of the first things that ohci_init() 
-does.
-
-> +
-> +	ohci_setup(hcd);
-
-Don't call ohci_setup().
-
-> +	clk_prepare_enable(sohci_p->clk);
-> +
-> +	ohci = hcd_to_ohci(hcd);
-> +
-> +#ifdef DEBUG
-> +	ohci_dump(ohci, 1);
-> +#endif
-
-I suspect this debugging stuff isn't needed any more.  You can get rid 
-of it.
-
-> @@ -188,13 +143,13 @@ static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
->  {
->  	struct usb_hcd *hcd = platform_get_drvdata(dev);
->  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-> -	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
-> +	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
->  
->  	if (time_before(jiffies, ohci->next_statechange))
->  		msleep(5);
->  	ohci->next_statechange = jiffies;
->  
-> -	spear_stop_ohci(ohci_p);
-> +	clk_disable_unprepare(sohci_p->clk);
->  	return 0;
->  }
-
-This routine needs to call ohci_suspend() just before the 
-clk_disable_unprepare().  I don't know how that got left out, but it 
-looks like the same problem exists in several of the ohci glue files.  
-I guess they should all be fixed at once, in a separate patch.
-
->  
-> @@ -202,13 +157,13 @@ static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
->  {
->  	struct usb_hcd *hcd = platform_get_drvdata(dev);
->  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-> -	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
-> +	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
->  
->  	if (time_before(jiffies, ohci->next_statechange))
->  		msleep(5);
->  	ohci->next_statechange = jiffies;
->  
-> -	spear_start_ohci(ohci_p);
-> +	 clk_prepare_enable(sohci_p->clk);
-
-You got an extra space character after the tab.
-
-Alan Stern
+Tony
