@@ -1,37 +1,26 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Fri, 07 Jun 2013 15:20:55 -0700
-Subject: [PATCH] ARM: OMAP2+: Fix serial init for device tree based booting
-In-Reply-To: <20130607215503.GK3331@atomide.com> (Tony Lindgren's message of
- "Fri, 7 Jun 2013 14:55:04 -0700")
-References: <20130607215503.GK3331@atomide.com>
-Message-ID: <87fvwtlfzs.fsf@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Jun 2013 23:20:51 +0100
+Subject: [PATCH] ARM: mach-imx6q: Enable the codec clock earlier
+In-Reply-To: <1370642870-8051-1-git-send-email-festevam@gmail.com>
+References: <1370642870-8051-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130607222051.GD18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Fri, Jun 07, 2013 at 07:07:50PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
+> 
+> In order sgtl5000 driver to probe successfully, we need to read its ID via I2C 
+> ,which requires that MCLK is driven prior to the I2C access.
+> 
+> Otherwise we get the following probe error:
+> 
+> sgtl5000: probe of 0-000a failed with error -5
+> imx-sgtl5000 sound.13: ASoC: CODEC (null) not registered
+> imx-sgtl5000 sound.13: snd_soc_register_card failed (-517)
+> platform sound.13: Driver imx-sgtl5000 requests probe deferral
+> 
+> Turn on MCLK sooner so that the probe can succeed.
 
-> We don't want to call omap_serial_early_init() for device
-> tree based booting as the ports are initialized based on
-> the .dts entries.
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-
-Reviewed-by: Kevin Hilman <khilman@linaro.org>
-
-
-> --- a/arch/arm/mach-omap2/serial.c
-> +++ b/arch/arm/mach-omap2/serial.c
-> @@ -176,6 +176,9 @@ static char *cmdline_find_option(char *str)
->  
->  static int __init omap_serial_early_init(void)
->  {
-> +	if (of_have_populated_dt())
-> +		return -ENODEV;
-> +
->  	do {
->  		char oh_name[MAX_UART_HWMOD_NAME_LEN];
->  		struct omap_hwmod *oh;
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Umm... doesn't that mean that imx-sgtl5000 should be getting this clock
+and turning it on itself, and disabling it on device removal?
