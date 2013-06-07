@@ -1,109 +1,54 @@
-From: mugunthanvnm@ti.com (Mugunthan V N)
-Date: Fri, 7 Jun 2013 17:02:54 +0530
-Subject: [PATCH 3/3] ARM: dts: AM33XX: Add pinmux configuration for CPSW to
- am335x EVM
-In-Reply-To: <1370604775-21264-1-git-send-email-mugunthanvnm@ti.com>
-References: <1370604775-21264-1-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <1370604775-21264-4-git-send-email-mugunthanvnm@ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Fri, 07 Jun 2013 15:39:41 +0400
+Subject: [PATCH 07/11] ARM: shmobile: lager: Add GPIO LEDs
+In-Reply-To: <1370593329-27559-8-git-send-email-horms+renesas@verge.net.au>
+References: <1370593329-27559-1-git-send-email-horms+renesas@verge.net.au>
+ <1370593329-27559-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <51B1C67D.7040900@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux configurations for RGMII based CPSW ethernet to am335x-evm.
+Hello.
 
-Default mode is nothing but the values required for the module during
-active state. With this configurations module is functional as
-expected.
+On 07-06-2013 12:22, Simon Horman wrote:
 
-Sleep mode is nothing but the values required for the module during
-inactive state. The pins are configured to its reset state to optimize
-energy usage for the pins for the suspend/resume cycle
+> The board has 3 LEDs connected to GPIOs. Add a led-gpio device to
+> support them.
 
-Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
----
- arch/arm/boot/dts/am335x-evm.dts |   64 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+> Based on "ARM: shmobile: marzen: Add GPIO LEDs" by Laurent Pinchart.
 
-diff --git a/arch/arm/boot/dts/am335x-evm.dts b/arch/arm/boot/dts/am335x-evm.dts
-index 2c53247..a1a0880 100644
---- a/arch/arm/boot/dts/am335x-evm.dts
-+++ b/arch/arm/boot/dts/am335x-evm.dts
-@@ -91,6 +91,58 @@
- 				0x9c (PIN_OUTPUT | MUX_MODE0)		/* gpmc_be0n_cle.gpmc_be0n_cle */
- 			>;
- 		};
-+
-+		cpsw_default: cpsw_default {
-+			pinctrl-single,pins = <
-+				/* Slave 1 */
-+				0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txen.rgmii1_tctl */
-+				0x118 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxdv.rgmii1_rctl */
-+				0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd3.rgmii1_td3 */
-+				0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd2.rgmii1_td2 */
-+				0x124 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd1.rgmii1_td1 */
-+				0x128 (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txd0.rgmii1_td0 */
-+				0x12c (PIN_OUTPUT_PULLDOWN | MUX_MODE2)	/* mii1_txclk.rgmii1_tclk */
-+				0x130 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxclk.rgmii1_rclk */
-+				0x134 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd3.rgmii1_rd3 */
-+				0x138 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd2.rgmii1_rd2 */
-+				0x13c (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd1.rgmii1_rd1 */
-+				0x140 (PIN_INPUT_PULLDOWN | MUX_MODE2)	/* mii1_rxd0.rgmii1_rd0 */
-+			>;
-+		};
-+
-+		cpsw_sleep: cpsw_sleep {
-+			pinctrl-single,pins = <
-+				/* Slave 1 reset value */
-+				0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x118 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x11c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x120 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x124 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x128 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x12c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x130 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x134 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x138 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			>;
-+		};
-+
-+		davinci_mdio_default: davinci_mdio_default {
-+			pinctrl-single,pins = <
-+				/* MDIO */
-+				0x148 (PIN_INPUT_PULLUP | SLEWCTRL_FAST | MUX_MODE0)	/* mdio_data.mdio_data */
-+				0x14c (PIN_OUTPUT_PULLUP | MUX_MODE0)			/* mdio_clk.mdio_clk */
-+			>;
-+		};
-+
-+		davinci_mdio_sleep: davinci_mdio_sleep {
-+			pinctrl-single,pins = <
-+				/* MDIO reset value */
-+				0x148 (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+				0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
-+			>;
-+		};
- 	};
- 
- 	ocp {
-@@ -378,6 +430,18 @@
- 	};
- };
- 
-+&mac {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&cpsw_default>;
-+	pinctrl-1 = <&cpsw_sleep>;
-+};
-+
-+&davinci_mdio {
-+	pinctrl-names = "default", "sleep";
-+	pinctrl-0 = <&davinci_mdio_default>;
-+	pinctrl-1 = <&davinci_mdio_sleep>;
-+};
-+
- &cpsw_emac0 {
- 	phy_id = <&davinci_mdio>, <0>;
- };
--- 
-1.7.9.5
+> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+>   arch/arm/mach-shmobile/board-lager.c | 27 +++++++++++++++++++++++++++
+>   1 file changed, 27 insertions(+)
+
+> diff --git a/arch/arm/mach-shmobile/board-lager.c b/arch/arm/mach-shmobile/board-lager.c
+> index 6114edd..6a1ba38 100644
+> --- a/arch/arm/mach-shmobile/board-lager.c
+> +++ b/arch/arm/mach-shmobile/board-lager.c
+> @@ -21,13 +21,37 @@
+[...]
+> +static struct gpio_led_platform_data lager_leds_pdata = {
+
+     Misses __initdata. Too late now, need another patch...
+
+> +	.leds		= lager_leds,
+> +	.num_leds	= ARRAY_SIZE(lager_leds),
+> +};
+> +
+>   static const struct pinctrl_map lager_pinctrl_map[] = {
+>   	/* SCIF0 (CN19: DEBUG SERIAL0) */
+>   	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.6", "pfc-r8a7790",
+> @@ -46,6 +70,9 @@ static void __init lager_add_standard_devices(void)
+>   	r8a7790_pinmux_init();
+>
+>   	r8a7790_add_standard_devices();
+> +	platform_device_register_data(&platform_bus, "leds-gpio", -1,
+> +				      &lager_leds_pdata,
+> +				      sizeof(lager_leds_pdata));
+>   }
+>
+>   static const char *lager_boards_compat_dt[] __initdata = {
+
+WBR, Sergei
