@@ -1,33 +1,81 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 07 Jun 2013 02:39:10 -0400
-Subject: [PATCH 0/2] MCPM backend for Virtual Express TC2
-Message-ID: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+Date: Fri, 07 Jun 2013 02:39:12 -0400
+Subject: [PATCH 2/2] ARM: vexpress/TC2: implement PM suspend method
+In-Reply-To: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1370587152-4630-3-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the MCPM backend enabling SMP secondary boot and CPU hotplug
-on the VExpress TC2 big.LITTLE platform.  The method to allow CPU suspend
-is also implemented.
+From: Nicolas Pitre <nico@linaro.org>
 
-Those patches have the following prerequisites:
+This is simplistic for the moment as the expected residency is used to
+prevent the shutting down of L2 and the cluster if the residency for
+the last man is lower than 5 ms.  To make this right, the shutdown
+latency for each CPU would need to be recorded and taken into account.
 
-- the vexpress/dual-cluster branch currently in ARM-SOC
-  (commit 033a899c9b06)
+On a suspend, the firmware mailbox address has to be set prior entering
+low power mode.
 
-- the VExpress SPC patches from Lorenzo here:
-  http://news.gmane.org/group/gmane.linux.drivers.devicetree/thread=37483
+Signed-off-by: Nicolas Pitre <nico@linaro.org>
+---
+ arch/arm/mach-vexpress/tc2_pm.c | 23 +++++++++++++++++++++--
+ 1 file changed, 21 insertions(+), 2 deletions(-)
 
-For convenience I've pushed everything here:
-
-  git://git.linaro.org/people/nico/linux TC2
-
-Diffstat:
-
-
- arch/arm/mach-vexpress/Kconfig  |   9 ++
- arch/arm/mach-vexpress/Makefile |   1 +
- arch/arm/mach-vexpress/tc2_pm.c | 262 ++++++++++++++++++++++++++++++++++
- 3 files changed, 272 insertions(+)
-
-
-Nicolas
+diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+index a3ea524372..7901528566 100644
+--- a/arch/arm/mach-vexpress/tc2_pm.c
++++ b/arch/arm/mach-vexpress/tc2_pm.c
+@@ -79,7 +79,7 @@ static int tc2_pm_power_up(unsigned int cpu, unsigned int cluster)
+ 	return 0;
+ }
+ 
+-static void tc2_pm_power_down(void)
++static void tc2_pm_down(u64 residency)
+ {
+ 	unsigned int mpidr, cpu, cluster;
+ 	bool last_man = false, skip_wfi = false;
+@@ -100,7 +100,8 @@ static void tc2_pm_power_down(void)
+ 		vexpress_spc_set_cpu_wakeup_irq(cpu, cluster, 1);
+ 		if (!tc2_pm_use_count[0][cluster] &&
+ 		    !tc2_pm_use_count[1][cluster] &&
+-		    !tc2_pm_use_count[2][cluster]) {
++		    !tc2_pm_use_count[2][cluster] &&
++		    (!residency || residency > 5000)) {
+ 			vexpress_spc_powerdown_enable(cluster, 1);
+ 			vexpress_spc_set_global_wakeup_intr(1);
+ 			last_man = true;
+@@ -161,6 +162,23 @@ static void tc2_pm_power_down(void)
+ 	/* Not dead at this point?  Let our caller cope. */
+ }
+ 
++static void tc2_pm_power_down(void)
++{
++	tc2_pm_down(0);
++}
++
++static void tc2_pm_suspend(u64 residency)
++{
++	unsigned int mpidr, cpu, cluster;
++
++	mpidr = read_cpuid_mpidr();
++	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
++	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
++	vexpress_spc_write_resume_reg(cluster, cpu,
++				      virt_to_phys(mcpm_entry_point));
++	tc2_pm_down(residency);
++}
++
+ static void tc2_pm_powered_up(void)
+ {
+ 	unsigned int mpidr, cpu, cluster;
+@@ -196,6 +214,7 @@ static void tc2_pm_powered_up(void)
+ static const struct mcpm_platform_ops tc2_pm_power_ops = {
+ 	.power_up	= tc2_pm_power_up,
+ 	.power_down	= tc2_pm_power_down,
++	.suspend	= tc2_pm_suspend,
+ 	.powered_up	= tc2_pm_powered_up,
+ };
+ 
+-- 
+1.8.1.2
