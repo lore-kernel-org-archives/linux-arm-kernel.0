@@ -1,48 +1,35 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri,  7 Jun 2013 12:04:18 +0200
-Subject: [PATCH v4 0/2] ARM: PJ4B: fix for 3.10-rc
-Message-ID: <1370599460-9947-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Fri,  7 Jun 2013 12:04:19 +0200
+Subject: [PATCH v4 1/2] ARM: PJ4B: Fix the CPU ID and the mask associated to
+ the PJ4B
+In-Reply-To: <1370599460-9947-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1370599460-9947-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1370599460-9947-2-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+This commit fixes the ID and mask for the PJ4B which was too
+restrictive and didn't match the CPU of the Armada 370 SoC.
 
-This path set allows to fix one errata for PJ4B CPUs.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ arch/arm/mm/proc-v7.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Without this the Armada 370 based board can't boot anymore since
-3.10-rc1. So this one really need to be applied on 3.10-rc.
-
-As they were pending question for the second one, I preferred to keep
-it apart awaiting the answers from the Marvell engineer.
-
-Both of the patches of this series are needed to fix the issue. Indeed
-if the CPU is not recognized as a PJ4B then the fix is not applied.
-
-Thanks,
-
-Changelog:
-V1 -> V2;
- - Fixed various coding style and typo issues
- - Replaced the "mcr p15, 0, r0, c7, c10, 4" by  "dsb"
-
-V2 -> v3:
- - As suggested by Russell, the first errata is now applied
-   dynamically according to the processor type
-
-v3->4
- - Moved the glob_equ maco into proc-macro.S
- - Split the patch in 2 parts, one for fixing the ID and mask of the
-   PJ4B and the second for fixing the errata itself
-
-Gregory CLEMENT (2):
-  ARM: PJ4B: Fix the CPU ID and the mask associated to the PJ4B
-  ARM PJ4B: Add support for errata 4742
-
- arch/arm/Kconfig                 | 13 +++++++++++++
- arch/arm/include/asm/glue-proc.h |  9 +++++++++
- arch/arm/mm/proc-macros.S        |  5 +++++
- arch/arm/mm/proc-v7.S            | 34 +++++++++++++++++++++++++++++-----
- 4 files changed, 56 insertions(+), 5 deletions(-)
-
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 2c73a73..fe3a9d3 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -409,8 +409,8 @@ __v7_ca9mp_proc_info:
+ 	 */
+ 	.type   __v7_pj4b_proc_info, #object
+ __v7_pj4b_proc_info:
+-	.long	0x562f5840
+-	.long	0xfffffff0
++	.long   0x560f5800
++	.long	0xff0fff00
+ 	__v7_proc __v7_pj4b_setup
+ 	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
+ 
 -- 
 1.8.1.2
