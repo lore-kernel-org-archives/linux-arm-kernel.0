@@ -1,54 +1,29 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 7 Jun 2013 10:49:38 +0200
-Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL
- lock
-In-Reply-To: <20130607084354.GF21641@nchen-desktop>
-References: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
- <20130607082457.GF12361@pengutronix.de>
- <20130607083134.GE21641@nchen-desktop>
- <20130607083528.GG12361@pengutronix.de>
- <20130607084354.GF21641@nchen-desktop>
-Message-ID: <20130607084937.GH12361@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 7 Jun 2013 09:49:13 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <CAPweEDyYt+pN+UaFuqWL5RrHpyuq_4So-tArmx3dr=0wLS+hwQ@mail.gmail.com>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <1370475609.20454.44.camel@localhost>
+ <CAPweEDwS3tR=wh-bZJb3vqR8fVQra=3XxDitowGRdH9c7WRfmQ@mail.gmail.com>
+ <1733666.lHUBcfUXq9@flatron>
+ <CAPweEDzYLDzh_-OWU61dtVhajZ40QpQgZKHFYDsh3FgF=r9_ag@mail.gmail.com>
+ <20130606131042.GN18614@n2100.arm.linux.org.uk>
+ <CAPweEDyYt+pN+UaFuqWL5RrHpyuq_4So-tArmx3dr=0wLS+hwQ@mail.gmail.com>
+Message-ID: <20130607084913.GR18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Peter,
-
-On Fri, Jun 07, 2013 at 04:43:55PM +0800, Peter Chen wrote:
-> On Fri, Jun 07, 2013 at 10:35:28AM +0200, Uwe Kleine-K?nig wrote:
-> > On Fri, Jun 07, 2013 at 04:31:35PM +0800, Peter Chen wrote:
-> > > On Fri, Jun 07, 2013 at 10:24:57AM +0200, Uwe Kleine-K?nig wrote:
-> > > > On Fri, Jun 07, 2013 at 04:19:06PM +0800, Peter Chen wrote:
-> > > > > For some unknown reasons, the jiffies will be updated more
-> > > > > than one tick at every short time. Eg, at this code:
-> > > > > After timeout = jiffies + msecs_to_jiffies(10),
-> > > > > the interrupt occurs, and the softirq updates jiffies (eg,  + 2 jiffies),
-> > > > > then return back from interrupt, the time between above operations
-> > > > > are tiny, the PLL is still not locked, but the timeout condition is satisfied.
-> > > > > 
-> > > > > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > > > Does this mean my patch doesn't solve the issue for you?
-> > > 
-> > > Not try, but your patch just delay timeout assignment, if there
-> > > is jiffies update after that but before timeout check, it still
-> > > has problem.
-> > But if that large update happens because there was a long preemption the
-> > pll should be locked because I only start counting when the pll is
-> > programmed.
-> > 
-> > IMHO you should try my patch as it is the better fix (assuming it fixes
-> > it for you).
+On Fri, Jun 07, 2013 at 09:02:43AM +0100, luke.leighton wrote:
+>  ok.  so.  we come back to the question again: what shall i propose to
+> them that they consider doing, and what benefit would it be to them to
+> do so?
 > 
-> I will try your fix, but still it just reduces the possibilities.
-> The problem is not the preemption takes too long, it is the jiffies
-> updates more than one tick at one short preemption.
-If that is really the problem that many more instances that use the same
-incarnation need the same fix. I would be surprised if that was the
-case.
+>  i cannot go to them and say "you have to do this [insert proposal
+> here]" - it has to be more subtle than that.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+It seems that you don't have to do anything at all.  From what Arnd and
+others have said, they are _already_ talking to, and working with people
+in the kernel community to move their code base forward, move to DT, and
+they are already starting to send their own patches for the mainline
+kernel themselves.
