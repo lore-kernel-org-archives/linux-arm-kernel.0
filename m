@@ -1,58 +1,97 @@
 From: yadi.brar@samsung.com (Yadwinder Singh Brar)
-Date: Sat, 08 Jun 2013 23:04:21 +0530
-Subject: [PATCH v5 6/7] clk: samsung: Reorder MUX registration for mout_vpllsrc
+Date: Sat, 08 Jun 2013 23:04:22 +0530
+Subject: [PATCH v5 7/7] clk: samsung: Add EPLL and VPLL freq table for
+ exynos5250 SoC
 In-Reply-To: <1370712862-10501-1-git-send-email-yadi.brar@samsung.com>
 References: <1370712862-10501-1-git-send-email-yadi.brar@samsung.com>
-Message-ID: <1370712862-10501-7-git-send-email-yadi.brar@samsung.com>
+Message-ID: <1370712862-10501-8-git-send-email-yadi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vikas Sajjan <vikas.sajjan@linaro.org>
+Adds the EPLL and VPLL freq table for exynos5250 SoC.
 
-While trying to get rate of "mout_vpllsrc" MUX (parent) for registering the
-"fout_vpll" (child), we found get rate was failing.
-
-So this patch moves the mout_vpllsrc MUX out of the existing common list
-and registers the mout_vpllsrc MUX before the PLL registrations.
-
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
 Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
 ---
- drivers/clk/samsung/clk-exynos5250.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ drivers/clk/samsung/clk-exynos5250.c |   38 ++++++++++++++++++++++++++++++++++
+ drivers/clk/samsung/clk.h            |    2 +
+ 2 files changed, 40 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index a025269..09da356 100644
+index 09da356..d2743f9 100644
 --- a/drivers/clk/samsung/clk-exynos5250.c
 +++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -227,6 +227,10 @@ struct samsung_fixed_factor_clock exynos5250_fixed_factor_clks[] __initdata = {
- 	FFACTOR(none, "fout_bplldiv2", "fout_bpll", 1, 2, 0),
+@@ -492,6 +492,29 @@ static __initdata struct of_device_id ext_clk_match[] = {
+ 	{ },
  };
  
-+struct samsung_mux_clock exynos5250_pll_pmux_clks[] __initdata = {
-+	MUX(none, "mout_vpllsrc", mout_vpllsrc_p, SRC_TOP2, 0, 1),
++static __initdata struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
++	/* sorted in descending order */
++	/* PLL_36XX_RATE(rate, m, p, s, k) */
++	PLL_36XX_RATE(266000000, 266, 3, 3, 0),
++	/* Not in UM, but need for eDP on snow */
++	PLL_36XX_RATE(70500000, 94, 2, 4, 0),
++	{ },
 +};
 +
- struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
- 	MUX(none, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
- 	MUX(none, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
-@@ -234,7 +238,6 @@ struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
- 	MUX(none, "sclk_mpll", mout_mpll_p, SRC_CORE1, 8, 1),
- 	MUX(none, "mout_bpll_fout", mout_bpll_fout_p, PLL_DIV2_SEL, 0, 1),
- 	MUX(none, "sclk_bpll", mout_bpll_p, SRC_CDREX, 0, 1),
--	MUX(none, "mout_vpllsrc", mout_vpllsrc_p, SRC_TOP2, 0, 1),
- 	MUX(none, "sclk_vpll", mout_vpll_p, SRC_TOP2, 16, 1),
- 	MUX(none, "sclk_epll", mout_epll_p, SRC_TOP2, 12, 1),
- 	MUX(none, "sclk_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
-@@ -525,6 +528,8 @@ void __init exynos5250_clk_init(struct device_node *np)
- 	samsung_clk_of_register_fixed_ext(exynos5250_fixed_rate_ext_clks,
- 			ARRAY_SIZE(exynos5250_fixed_rate_ext_clks),
++static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
++	/* sorted in descending order */
++	/* PLL_36XX_RATE(rate, m, p, s, k) */
++	PLL_36XX_RATE(192000000, 48, 3, 1, 0),
++	PLL_36XX_RATE(180633600, 45, 3, 1, 10381),
++	PLL_36XX_RATE(180000000, 45, 3, 1, 0),
++	PLL_36XX_RATE(73728000, 73, 3, 3, 47710),
++	PLL_36XX_RATE(67737600, 90, 4, 3, 20762),
++	PLL_36XX_RATE(49152000, 49, 3, 3, 9962),
++	PLL_36XX_RATE(45158400, 45, 3, 3, 10381),
++	PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
++	{ },
++};
++
+ struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
+ 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
+ 		APLL_CON0, "fout_apll", NULL),
+@@ -513,6 +536,8 @@ struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
+ void __init exynos5250_clk_init(struct device_node *np)
+ {
+ 	void __iomem *reg_base;
++	struct clk *vpllsrc;
++	unsigned long fin_pll_rate, mout_vpllsrc_rate = 0;
+ 
+ 	if (np) {
+ 		reg_base = of_iomap(np, 0);
+@@ -530,6 +555,19 @@ void __init exynos5250_clk_init(struct device_node *np)
  			ext_clk_match);
-+	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
-+				ARRAY_SIZE(exynos5250_pll_pmux_clks));
+ 	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
+ 				ARRAY_SIZE(exynos5250_pll_pmux_clks));
++
++	fin_pll_rate = _get_rate("fin_pll");
++
++	if (fin_pll_rate == (24 * MHZ))
++		exynos5250_plls[epll].rate_table = epll_24mhz_tbl;
++
++	vpllsrc = __clk_lookup("mout_vpllsrc");
++	if (vpllsrc)
++		mout_vpllsrc_rate = clk_get_rate(vpllsrc);
++
++	if (mout_vpllsrc_rate == (24 * MHZ))
++		exynos5250_plls[vpll].rate_table =  vpll_24mhz_tbl;
++
  	samsung_clk_register_pll(exynos5250_plls, ARRAY_SIZE(exynos5250_plls),
  					reg_base);
  	samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
+diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
+index 3e6501c..378bf98 100644
+--- a/drivers/clk/samsung/clk.h
++++ b/drivers/clk/samsung/clk.h
+@@ -40,6 +40,8 @@ struct samsung_clock_alias {
+ 		.alias		= a,				\
+ 	}
+ 
++#define MHZ (1000*1000)
++
+ /**
+  * struct samsung_fixed_rate_clock: information about fixed-rate clock
+  * @id: platform specific id of the clock.
 -- 
 1.7.0.4
