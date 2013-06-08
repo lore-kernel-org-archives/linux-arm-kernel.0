@@ -1,40 +1,20 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Sat, 8 Jun 2013 19:08:40 +0200
-Subject: [PATCH 4/5] ARM: dts: imx27-phytec-phycore-rdk: Add spidev node
-In-Reply-To: <1370702380-25408-4-git-send-email-shc_work@mail.ru>
+Date: Sat, 8 Jun 2013 19:09:55 +0200
+Subject: [PATCH 1/5] ARM: dts: i.MX27: Add DMA devicetree node
+In-Reply-To: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
 References: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
- <1370702380-25408-4-git-send-email-shc_work@mail.ru>
-Message-ID: <20130608170840.GK32299@pengutronix.de>
+Message-ID: <20130608170955.GL32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 08, 2013 at 06:39:39PM +0400, Alexander Shiyan wrote:
-> This patch adds spidev device for spi0.1 which is used on ZigBee
-> PCM970 connector.  This change will help to use this connector in
-> userspace.
+On Sat, Jun 08, 2013 at 06:39:36PM +0400, Alexander Shiyan wrote:
+> This patch adds the missing DMA devicetree node for i.MX27 SoCs.
 > 
 > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> index e7ed978..b2dbcdd 100644
-> --- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-> @@ -17,6 +17,12 @@
->  &cspi1 {
->  	fsl,spi-num-chipselects = <2>;
->  	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
-> +
-> +	zigbee: spidev at 1 {
-> +		compatible = "rohm,dh2228fv";
-> +		reg = <1>;
-> +		spi-max-frequency = <0>;
 
-Why specify a speed of 0 here? Also, is there really a dh2228fv
-connected or is this just a hack to let the Linux spidev driver match?
+For patches 1-3 and 5:
 
+Acked-by: Sascha Hauer <s.hauer@pengutonix.de>
 
 Sascha
 
