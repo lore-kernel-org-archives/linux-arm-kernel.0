@@ -1,26 +1,47 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 7 Jun 2013 18:27:54 -0700
-Subject: [GIT PULL] ARM: imx: fixes for 3.10, take 2
-In-Reply-To: <20130608012632.GA22134@S2101-09.ap.freescale.net>
-References: <20130603150953.GA13853@S2101-09.ap.freescale.net>
- <20130608011913.GA27720@quad.lixom.net>
- <20130608012632.GA22134@S2101-09.ap.freescale.net>
-Message-ID: <CAOesGMh=9hka7T5VKcrR4+WzfAY6ZE8tpYNnEM1VZg9w05Z7UA@mail.gmail.com>
+From: dt.tangr@gmail.com (Daniel Tang)
+Date: Sat, 8 Jun 2013 11:42:54 +1000
+Subject: [PATCH] Add Initial TI-Nspire support
+In-Reply-To: <201306071955.26375.arnd@arndb.de>
+References: <E775DD08-5516-468E-9924-0D839218D7F9@gmail.com>
+ <D6B73C11-1EB8-472B-BA1E-E48CF205B43F@gmail.com>
+ <201306071955.26375.arnd@arndb.de>
+Message-ID: <9C5E608F-2DA8-469E-8C7C-B678B5EFC68B@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 6:26 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> On Fri, Jun 07, 2013 at 06:19:13PM -0700, Olof Johansson wrote:
->> > - Two imx6q clock fixes, which correct axi_sels and ldb_di_sels.
->>
->> Are these regressions, or fixes for things that have never worked?
->
-> I believe these are errors caught by the drivers that haven't hit
-> mainline.
+Hi,
 
-For this stage in the release cycle, they should wait for the next
-release. I've done the pull now but please be more diligent about
-fixing serious problems and regressions only after -rc3 or so.
+On 08/06/2013, at 3:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
+> On Friday 07 June 2013, Daniel Tang wrote:
+>> Hi,
+>> 
+>> I was wondering if this patch had gone through yet.
+> 
+> Sorry, not yet.
 
--Olof
+A few things have changed since I sent in this patch so I need to add some adjustments to the patch. There's a few Kconfig options that need adding and some device tree bindings that need to be changed.
+
+If it hasn't been merged yet, would it be possible for me to send version 2 of the patches? Or would you rather I wait until it is merged and send in a separate patch to fix them?
+
+> Olof and I are usually taking turns with merging things
+> into the arm-soc tree, but in the past few weeks he has done all of it,
+> and he was not on Cc the patch. Please make sure you always send submissions
+> for inclusion (as opposed to submissions for review purposes) to
+> arm at kernel.org so it reaches both of us.
+
+Ah my apologies. I will do that next time.
+
+> 
+> We are also sometimes missing requests for merging for patches (rather
+> than git pull requests), so if you don't see your code show up in
+> linux-next when it should, just send a friendly reminder like
+> this one. I don't currently have a good overview of what pull
+> requests are missing, so I think Olof should apply this one, or
+> we can do a handover next week so I do the merging again for some
+> time.
+> 
+> 	Arnd
+
+Cheers,
+Daniel Tang
