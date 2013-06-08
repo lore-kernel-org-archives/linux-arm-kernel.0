@@ -1,22 +1,85 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sat,  8 Jun 2013 22:47:16 +0800
-Subject: [PATCH v4 0/7] support Hisilicon SoC
-Message-ID: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
+Date: Sat,  8 Jun 2013 22:47:17 +0800
+Subject: [PATCH v4 1/7] clk: mux: add CLK_MUX_HIWORD_MASK
+In-Reply-To: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1370702843-27172-2-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changelog:
-v4:
-1. Add clk gate with HIWORD mask for Rockchip.
-2. Update comments and code of HIWORD flags for mux/divider.
-3. Append a mux without HIWORD mask in Hisilicon 3620.
-4. Fix the pinmux setting in Hi4511.
+In both Hisilicon & Rockchip Cortex-A9 based chips, they don't use the
+paradigm of reading-changing-writing the register contents.
+Instead they use a hiword mask to indicate the changed bits.
 
-v3:
-1. Use clk_register_mux_table().
+When b01 should be set as switching mux, it also needs to indicate
+the change by setting hiword mask (b11 << 16).
 
-v2:
-1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
-CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
-2. Fix system timer running too fast because wrong divider is choosen.
-3. Remove .init_irq in DT machine descriptor.
+The patch adds mux flag for this usage.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+---
+ drivers/clk/clk-mux.c        | 17 +++++++++++++++--
+ include/linux/clk-provider.h |  5 +++++
+ 2 files changed, 20 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
+index 25b1734..614444c 100644
+--- a/drivers/clk/clk-mux.c
++++ b/drivers/clk/clk-mux.c
+@@ -86,8 +86,12 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
+ 	if (mux->lock)
+ 		spin_lock_irqsave(mux->lock, flags);
+ 
+-	val = readl(mux->reg);
+-	val &= ~(mux->mask << mux->shift);
++	if (mux->flags & CLK_MUX_HIWORD_MASK) {
++		val = mux->mask << (mux->shift + 16);
++	} else {
++		val = readl(mux->reg);
++		val &= ~(mux->mask << mux->shift);
++	}
+ 	val |= index << mux->shift;
+ 	writel(val, mux->reg);
+ 
+@@ -111,6 +115,15 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
+ 	struct clk_mux *mux;
+ 	struct clk *clk;
+ 	struct clk_init_data init;
++	u8 width = 0;
++
++	if (clk_mux_flags & CLK_MUX_HIWORD_MASK) {
++		width = fls(mask) - ffs(mask) + 1;
++		if (width + shift > 16) {
++			pr_err("mux value exceeds LOWORD field\n");
++			return ERR_PTR(-EINVAL);
++		}
++	}
+ 
+ 	/* allocate the mux */
+ 	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 1186098..fecef88 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -299,6 +299,10 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
+  * Flags:
+  * CLK_MUX_INDEX_ONE - register index starts at 1, not 0
+  * CLK_MUX_INDEX_BIT - register index is a single bit (power of two)
++ * CLK_MUX_HIWORD_MASK - The mux settings are only in lower 16-bit of this
++ *   register, and mask of mux bits are in higher 16-bit of this register.
++ *   While setting the mux bits, higher 16-bit should also be updated to
++ *   indicate changing mux bits.
+  */
+ struct clk_mux {
+ 	struct clk_hw	hw;
+@@ -312,6 +316,7 @@ struct clk_mux {
+ 
+ #define CLK_MUX_INDEX_ONE		BIT(0)
+ #define CLK_MUX_INDEX_BIT		BIT(1)
++#define CLK_MUX_HIWORD_MASK		BIT(2)
+ 
+ extern const struct clk_ops clk_mux_ops;
+ 
+-- 
+1.8.1.2
