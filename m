@@ -1,41 +1,33 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sat, 8 Jun 2013 10:45:43 +0200
-Subject: [PATCH v2] ARM: imx: Remove mxc specific ulpi access ops
-In-Reply-To: <CAOMZO5AsLgWUX==n1pqn8jFu=krJx8L6q7GRNyP17aBQJsunuw@mail.gmail.com>
-References: <1370522517-2873-1-git-send-email-mpa@pengutronix.de>
- <CAOMZO5AsLgWUX==n1pqn8jFu=krJx8L6q7GRNyP17aBQJsunuw@mail.gmail.com>
-Message-ID: <20130608084543.GA7755@pengutronix.de>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 08 Jun 2013 09:57:17 +0100
+Subject: Arm sub architectures missing clk_round_rate()
+Message-ID: <51B2F1ED.2090801@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+At least one Arm subarch (pxa) does no provide an implementation of this
+function.  As far as I can see there is no way for a driver wishing to use
+it to detect it's absence.  This is marked in clk.h as being optional
+for 'Machine Class support'. Obvious solutions to this are:
 
-On Thu, Jun 06, 2013 at 10:20:20AM -0300, Fabio Estevam wrote:
-> Hi Markus,
-> 
-> On Thu, Jun 6, 2013 at 9:41 AM, Markus Pargmann <mpa@pengutronix.de> wrote:
-> > There are ulpi access ops implemented in drivers/usb/phy/phy-ulpi.c.
-> > mxc access ops implement the same access operations within mach-imx. This
-> > patch removes the mxc ulpi file and uses phy-ulpi instead for
-> > imx_otg_ulpi_create.
-> >
-> > phy-ulpi successfully tested with i.MX27 Phytec phyCARD-S (pca100).
-> >
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Unrelated to this patch, but just out of curiosity: have you also try
-> to use the chipidea driver with mx27?
+1) It is effectively only usable by platform specific drivers as no
+   more generic driver can know it is available.  Perhaps even a stub that
+   returns an appropriate error would be acceptable.
 
-Yes, I tried the chipidea driver with mx27 and created some patches for
-it. I didn't send the patches yet.
+2) It is not as optional as the header implies and should always be implemented
+   if the rest of the clk framework is.
 
-Regards,
+3) There should be some means of detecting its absense so that drivers can
+   be dependant on its presene.
 
-Markus
+Which is the correct one?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This issue came up as a result of the thread
+http://marc.info/?l=linux-iio&m=137026653516438&w=2
+[PATCH RESEND V2 3/4] iio: frequency: adf4350: Add support for clock consumer framework
+on linux-iio at vger.kernel.org
+
+
+Thanks,
+
+Jonathan
