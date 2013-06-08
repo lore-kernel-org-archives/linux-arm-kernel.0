@@ -1,53 +1,88 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 07 Jun 2013 23:39:15 -0700 (PDT)
-Subject: [PATCH 0/9] sh_eth: make driver build on any platform
-In-Reply-To: <51B277A7.4010709@cogentembedded.com>
-References: <201306080351.39018.sergei.shtylyov@cogentembedded.com>
- <51B2765D.7030604@cogentembedded.com>
- <51B277A7.4010709@cogentembedded.com>
-Message-ID: <20130607.233915.1771016084489204040.davem@davemloft.net>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Sat, 8 Jun 2013 09:25:56 +0200
+Subject: [PATCH] staging: imx_drm: imx_ldb: fix 18 bit format
+In-Reply-To: <20130608044945.GA22416@S2101-09.ap.freescale.net>
+References: <1370594228-2869-1-git-send-email-s.trumtrar@pengutronix.de>
+ <20130608044945.GA22416@S2101-09.ap.freescale.net>
+Message-ID: <20130608072556.GA27993@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Date: Sat, 08 Jun 2013 04:15:35 +0400
+Hi Shawn!
 
-> On 06/08/2013 04:10 AM, Sergei Shtylyov wrote:
->> Hello.
->>
->> On 06/08/2013 03:51 AM, Sergei Shtylyov wrote:
->>
->>>     This series of 9 patches are against Dave's 'net-next.git' repository.
->>>     The series deals with the #ifdef'fery around SoC support code/data in
->>>     the
->>> 'sh_eth' driver. It doesn't yet get rid of all the #ifdef's: 3 are
->>> left, 1 of
->>> them still hinders ARM multiplatform build -- I'll try to deal with it
->>> next
->>> week.
->>>
->>> [1/9] sh_eth: create initial ID table
->>> [2/9] sh_eth: get SH771x support out of #ifdef
->>> [3/9] sh_eth: get SH7619 support out of #ifdef
->>> [4/9] sh_eth: get R8A7740 support out of #ifdef
->>> [5/9] sh_eth: get SH77{34|63} support out of #ifdef
->>> [6/9] sh_eth: get SH7757 support out of #ifdef
->>> [7/9] sh_eth: get SH7724 support out of #ifdef
->>> [8/9] sh_eth: get R8A777x support out of #ifdef
->>> [9/9] sh_eth: remove dependencies from Kconfig
->>>
->>
->>    Sorry, Paul, forgot to include you into the CC list on most of the
->>    patches
->> and the cover letter. Please look for the patches on linux-sh and ACK
->> them
->> if you deem necessary.
+On Sat, Jun 08, 2013 at 12:49:47PM +0800, Shawn Guo wrote:
+> On Fri, Jun 07, 2013 at 10:37:08AM +0200, Steffen Trumtrar wrote:
+> > From: Markus Niebel <Markus.Niebel@tqs.de>
+> > 
+> > Since 18 bit is supported as datawidth in device tree it should be
+> > supported in driver. Beside the LDB channel the IPU channel has also
+> > to be configured to use BGR666.
+> > 
+> > Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
+> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> > ---
+> > This is based on the series: "staging: drm/imx: Add LDB support"
+> > by Philipp.
+> > 
+> > 
+> >  drivers/staging/imx-drm/imx-ldb.c | 18 +++++++++++++++++-
+> >  1 file changed, 17 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+> > index d8fc93c..84bf7d3 100644
+> > --- a/drivers/staging/imx-drm/imx-ldb.c
+> > +++ b/drivers/staging/imx-drm/imx-ldb.c
+> > @@ -179,6 +179,7 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+> >  	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+> >  	struct imx_ldb *ldb = imx_ldb_ch->ldb;
+> >  	struct drm_display_mode *mode = &encoder->crtc->mode;
+> > +	u32 pixel_fmt;
+> >  	unsigned long serial_clk;
+> >  	unsigned long di_clk = mode->clock * 1000;
+> >  	int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->imx_drm_encoder,
+> > @@ -194,8 +195,23 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+> >  		imx_ldb_set_clock(ldb, mux, imx_ldb_ch->chno, serial_clk, di_clk);
+> >  	}
+> >  
+> > +	switch (imx_ldb_ch->chno) {
+> > +	case 0:
+> > +		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
+> > +			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
+> > +		break;
+> > +	case 1:
+> > +		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
+> > +			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
+> > +		break;
+> > +	default:
+> > +		dev_err(ldb->dev, "unable to config di%d panel format\n",
+> > +			imx_ldb_ch->chno);
+> > +		pixel_fmt = V4L2_PIX_FMT_RGB24;
+> > +	}
+> > +
+> >  	imx_drm_crtc_panel_format_pins(encoder->crtc, DRM_MODE_ENCODER_LVDS,
+> > -			V4L2_PIX_FMT_RGB24, 2, 3);
+> > +			pixel_fmt, 2, 3);
 > 
->    Also, forgot to CC Simon, Magnus, Russell and LAKML on some patches.
-> Too much haste, forgot to run scripts/get_maintainer.pl before sending
-> out patches...
+> It seems the patch is based on an updated version of "staging: drm/imx:
+> Add LDB support"?  The last one from Philipp [1] calls function
+> imx_drm_crtc_panel_format() rather than imx_drm_crtc_panel_format_pins()
+> there.
+> 
 
-I'll apply this solely because it finally allows me to build test this
-driver on x86-64.
+Grmbl! Yes. The last call should be
 
-:-)
+imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_LVDS,
+			V4L2_PIX_FMT_RGB24);
+
+like it already is in Philipps series.
+This patch sits on a topic branch, that (I think) Philipp didn't yet sent out.
+I will resent.
+
+Thanks,
+Steffen
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
