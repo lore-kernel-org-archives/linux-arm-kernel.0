@@ -1,40 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 8 Jun 2013 19:59:59 +0100
-Subject: [PATCH 2/5] arm: preserve ATAGS in /chosen/atags in the Device
- Tree
-In-Reply-To: <CAL_Jsq+Ysc0xdLSv_QYwngvcYv80RrMxWbf_pZmJgBuDaSPWxQ@mail.gmail.com>
-References: <1370414409-29991-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370414409-29991-3-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130606142851.6dd17cad@skate>
- <alpine.LFD.2.03.1306061253430.18597@syhkavp.arg>
- <20130607112101.2cedbc5f@skate>
- <CAL_Jsq+Ysc0xdLSv_QYwngvcYv80RrMxWbf_pZmJgBuDaSPWxQ@mail.gmail.com>
-Message-ID: <20130608185958.GJ18614@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sat, 8 Jun 2013 12:08:57 -0700
+Subject: [GIT PULL] omap fixes against v3.10-rc4
+Message-ID: <20130608190857.GV3331@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 08, 2013 at 01:54:27PM -0500, Rob Herring wrote:
-> On Fri, Jun 7, 2013 at 4:21 AM, Thomas Petazzoni
-> <thomas.petazzoni@free-electrons.com> wrote:
-> > Dear Nicolas Pitre,
-> >
-> > On Thu, 6 Jun 2013 13:27:38 -0400 (EDT), Nicolas Pitre wrote:
-> >
-> > Marvell will release a DT-capable U-Boot in some time, that will
-> > properly adjust the MAC addresses in the DTB before handing it over to
-> > the kernel. We are currently working with Marvell to define which
-> > actions the bootloader should do on the DTB before handing it over to
-> > the kernel. I believe this is a sufficient proof that there is no
-> > laziness from Marvell's side and that things are progressing towards a
-> > full DT based boot protocol.
-> 
-> Hopefully the lesson on custom ATAGs has been learned and we don't
-> repeat it with something custom and undocumented in DT. I don't want
-> to hear "we're already using this binding in our bootloader and can't
-> change it". This example doesn't apply to MAC addresses since there
-> already is a defined way, but I'm sure there are other examples. That
-> is what I've gotten from the OLPC folks before.
+The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
 
-That is the standard argument given when people don't talk to us first
-and _try_ to present us with a fait accompli.  They hope that we'll back
-down.
+  Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.10/fixes-v3.10-rc4
+
+for you to fetch changes up to 03c0d27119296bb32ef4a075b9fb8bb0aeaa19c0:
+
+  Merge tag 'omap-fixes-b-for-3.10-rc' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v3.10/fixes (2013-06-07 15:06:18 -0700)
+
+----------------------------------------------------------------
+
+A set of small fixes for omaps for the -rc cycle:
+
+- am7303 iva2 reset PM regression fix
+- am33xx uart2 dma channel fix
+- am33xx gpmc properties fix
+- omap44xx rtc wake-up mux fix for nirq pins
+- omap36xx clock divider restore fix
+
+There's also one tiny non-critical .dts fix for omap5
+timer pwm properties.
+
+----------------------------------------------------------------
+Jean-Philippe Francois (1):
+      ARM: omap3: clock: fix wrong container_of in clock36xx.c
+
+Kevin Hilman (1):
+      ARM: dts: omap4-panda|sdp: Fix mux for twl6030 IRQ pin and msecure line
+
+Lars Poeschel (1):
+      ARM: dts: AM33xx: Fix properties on gpmc node
+
+Suman Anna (1):
+      ARM: dts: OMAP5: Fix missing PWM capability to timer nodes
+
+Thomas Petazzoni (1):
+      arm: omap2: fix AM33xx hwmod infos for UART2
+
+Tony Lindgren (3):
+      ARM: OMAP3: Fix iva2_pwrdm settings for 3703
+      Merge branch 'dts-fixes-for-3.10' of git://git.kernel.org/.../bcousson/linux-omap-dt into omap-for-v3.10/fixes
+      Merge tag 'omap-fixes-b-for-3.10-rc' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.10/fixes
+
+ arch/arm/boot/dts/am33xx.dtsi              |  4 ++--
+ arch/arm/boot/dts/omap4-panda-common.dtsi  | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/omap4-sdp.dts            | 20 ++++++++++++++++++++
+ arch/arm/boot/dts/omap5.dtsi               |  3 +++
+ arch/arm/mach-omap2/clock36xx.c            | 18 +++++++++---------
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |  9 ++++++++-
+ arch/arm/mach-omap2/pm34xx.c               |  6 ++++--
+ 7 files changed, 66 insertions(+), 14 deletions(-)
