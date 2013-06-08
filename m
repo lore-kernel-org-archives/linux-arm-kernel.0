@@ -1,49 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 7 Jun 2013 18:09:48 -0700
-Subject: [PATCH v2 1/3] ARM: EXYNOS: uncompress - print debug messages if
- DEBUG_LL is defined
-In-Reply-To: <51B05135.3020006@linaro.org>
-References: <1370319552-17694-1-git-send-email-tushar.behera@linaro.org>
- <1370319552-17694-2-git-send-email-tushar.behera@linaro.org>
- <51B05135.3020006@linaro.org>
-Message-ID: <20130608010948.GA27436@quad.lixom.net>
+Date: Fri, 7 Jun 2013 18:11:10 -0700
+Subject: [GIT PULL v3] Renesas ARM based SoC fixes for v3.10
+In-Reply-To: <1370332016-16017-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370332016-16017-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130608011110.GB27436@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 02:37:01PM +0530, Tushar Behera wrote:
-> On 06/04/2013 09:49 AM, Tushar Behera wrote:
-> > Printing low-level debug messages make an assumption that the specified
-> > UART port has been preconfigured by the bootloader. Incorrectly
-> > specified UART port results in system getting stalled while printing the
-> > message "Uncompressing Linux... done, booting the kernel"
-> > This UART port number is specified through S3C_LOWLEVEL_UART_PORT. Since
-> > the UART port might different for different board, it is not possible to
-> > specify it correctly for every board that use a common defconfig file.
-> > 
-> > Calling this print subroutine only when DEBUG_LL fixes the problem. By
-> > disabling DEBUG_LL in default config file, we would be able to boot
-> > multiple boards with different default UART ports.
-> > 
-> > With this current approach, we miss the print "Uncompressing Linux...
-> > done, booting the kernel." when DEBUG_LL is not defined.
-> > 
-> > Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> > ---
-> > Change for v2:
-> > * Instead of checking value of uart_base, now check if DEBUG_LL
-> > is enabled. This removes the ifdef's from mach/uncompress.h
-> > 
-> > 
-> >  arch/arm/plat-samsung/include/plat/uncompress.h |   10 +++++++++-
-> >  1 file changed, 9 insertions(+), 1 deletion(-)
-> > 
+On Tue, Jun 04, 2013 at 04:46:54PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> If there are no concerns, would it be possible to queue this patch [1/3]
-> for 3.10?
+> I have revised this series to include Linus Walleij's ack for
+> "sh-pfc: r8a7779: Don't group USB OVC and PENC pins" and double
+> checked that I actually pushed the tag this time.
 > 
-> The other two patches can wait for 3.11.
+> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+> 
+>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-fixes-for-v3.10
 
-Sure, I've applied it to fixes for 3.10.
-
+Thanks, pulled.
 
 -Olof
