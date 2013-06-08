@@ -1,83 +1,93 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sat,  8 Jun 2013 22:47:18 +0800
-Subject: [PATCH v4 2/7] clk: divider: add CLK_DIVIDER_HIWORD_MASK flag
+Date: Sat,  8 Jun 2013 22:47:19 +0800
+Subject: [PATCH v4 3/7] clk: gate: add CLK_GATE_HIWORD_MASK
 In-Reply-To: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1370702843-27172-3-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1370702843-27172-4-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In both Hisilicon & Rockchip Cortex-A9 based chips, they don't use the
-paradigm of reading-changing-writing the register contents.
-Instead they use a hiword mask to indicate the changed bits.
+In Rockchip Cortex-A9 based chips, they don't use paradigm of
+reading-changing-writing the register contents.  Instead they
+use a hiword mask to indicate the changed bits.
 
-When b01 should be set as setting divider, it also needs to indicate
-the change by setting hiword mask (b11 << 16).
+When b1 should be set as gate, it also needs to indicate the change
+by setting hiword mask (b1 << 16).
 
-The patch adds divider flag for this usage.
+The patch adds gate flag for this usage.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/clk/clk-divider.c    | 15 +++++++++++++--
+ drivers/clk/clk-gate.c       | 25 +++++++++++++++++++------
  include/linux/clk-provider.h |  5 +++++
- 2 files changed, 18 insertions(+), 2 deletions(-)
+ 2 files changed, 24 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-index 6d96741..ce5cfe9 100644
---- a/drivers/clk/clk-divider.c
-+++ b/drivers/clk/clk-divider.c
-@@ -217,8 +217,12 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
- 	if (divider->lock)
- 		spin_lock_irqsave(divider->lock, flags);
+diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
+index 15114fe..790306e 100644
+--- a/drivers/clk/clk-gate.c
++++ b/drivers/clk/clk-gate.c
+@@ -53,12 +53,18 @@ static void clk_gate_endisable(struct clk_hw *hw, int enable)
+ 	if (gate->lock)
+ 		spin_lock_irqsave(gate->lock, flags);
  
--	val = readl(divider->reg);
--	val &= ~(div_mask(divider) << divider->shift);
-+	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
-+		val = div_mask(divider) << (divider->shift + 16);
+-	reg = readl(gate->reg);
+-
+-	if (set)
+-		reg |= BIT(gate->bit_idx);
+-	else
+-		reg &= ~BIT(gate->bit_idx);
++	if (gate->flags & CLK_GATE_HIWORD_MASK) {
++		reg = BIT(gate->bit_idx + 16);
++		if (set)
++			reg |= BIT(gate->bit_idx);
 +	} else {
-+		val = readl(divider->reg);
-+		val &= ~(div_mask(divider) << divider->shift);
++		reg = readl(gate->reg);
++
++		if (set)
++			reg |= BIT(gate->bit_idx);
++		else
++			reg &= ~BIT(gate->bit_idx);
 +	}
- 	val |= value << divider->shift;
- 	writel(val, divider->reg);
  
-@@ -245,6 +249,13 @@ static struct clk *_register_divider(struct device *dev, const char *name,
+ 	writel(reg, gate->reg);
+ 
+@@ -121,6 +127,13 @@ struct clk *clk_register_gate(struct device *dev, const char *name,
  	struct clk *clk;
  	struct clk_init_data init;
  
-+	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
-+		if (width + shift > 16) {
-+			pr_warn("divider value exceeds LOWORD field\n");
++	if (clk_gate_flags & CLK_GATE_HIWORD_MASK) {
++		if (bit_idx > 16) {
++			pr_err("gate bit exceeds LOWORD field\n");
 +			return ERR_PTR(-EINVAL);
 +		}
 +	}
 +
- 	/* allocate the divider */
- 	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
- 	if (!div) {
+ 	/* allocate the gate */
+ 	gate = kzalloc(sizeof(struct clk_gate), GFP_KERNEL);
+ 	if (!gate) {
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index fecef88..8e45fd9 100644
+index 8e45fd9..8418b6f 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -257,6 +257,10 @@ struct clk_div_table {
-  *	Some hardware implementations gracefully handle this case and allow a
-  *	zero divisor by not modifying their input clock
-  *	(divide by one / bypass).
-+ * CLK_DIVIDER_HIWORD_MASK - The divider settings are only in lower 16-bit
-+ *   of this register, and mask of divider bits are in higher 16-bit of this
-+ *   register.  While setting the divider bits, higher 16-bit should also be
-+ *   updated to indicate changing divider bits.
+@@ -210,6 +210,10 @@ void of_fixed_clk_setup(struct device_node *np);
+  * CLK_GATE_SET_TO_DISABLE - by default this clock sets the bit at bit_idx to
+  * 	enable the clock.  Setting this flag does the opposite: setting the bit
+  * 	disable the clock and clearing it enables the clock
++ * CLK_GATE_HIWORD_MASK - The gate settings are only in lower 16-bit
++ *   of this register, and mask of gate bits are in higher 16-bit of this
++ *   register.  While setting the gate bits, higher 16-bit should also be
++ *   updated to indicate changing gate bits.
   */
- struct clk_divider {
- 	struct clk_hw	hw;
-@@ -271,6 +275,7 @@ struct clk_divider {
- #define CLK_DIVIDER_ONE_BASED		BIT(0)
- #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
- #define CLK_DIVIDER_ALLOW_ZERO		BIT(2)
-+#define CLK_DIVIDER_HIWORD_MASK		BIT(3)
+ struct clk_gate {
+ 	struct clk_hw hw;
+@@ -220,6 +224,7 @@ struct clk_gate {
+ };
  
- extern const struct clk_ops clk_divider_ops;
- struct clk *clk_register_divider(struct device *dev, const char *name,
+ #define CLK_GATE_SET_TO_DISABLE		BIT(0)
++#define CLK_GATE_HIWORD_MASK		BIT(1)
+ 
+ extern const struct clk_ops clk_gate_ops;
+ struct clk *clk_register_gate(struct device *dev, const char *name,
 -- 
 1.8.1.2
