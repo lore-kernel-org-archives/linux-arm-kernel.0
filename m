@@ -1,90 +1,64 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 8 Jun 2013 10:47:23 -0700
-Subject: [GIT PULL] ARM: SoC fixes for 3.10-rc
-Message-ID: <20130608174723.GA12346@quad.lixom.net>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sat, 8 Jun 2013 17:54:28 +0000 (UTC)
+Subject: [PATCH 04/14] ARM: OMAP5: CM: Add OMAP54XX register and bitfield
+ files
+In-Reply-To: <1369845494-30231-5-git-send-email-santosh.shilimkar@ti.com>
+References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+ <1369845494-30231-5-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <alpine.DEB.2.02.1306081749140.7001@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
+On Wed, 29 May 2013, Santosh Shilimkar wrote:
 
-  Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
+> From: Benoit Cousson <b-cousson@ti.com>
+> 
+> Add the new defines for OMAP54XX cm registers.
+> 
+> Cc: Paul Walmsley <paul@pwsan.com>
+> 
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Benoit Cousson <b-cousson@ti.com>
+> [santosh.shilimkar at ti.com: Generated es2.0 data]
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
 
-are available in the git repository at:
+...
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+> diff --git a/arch/arm/mach-omap2/cm1_54xx.h b/arch/arm/mach-omap2/cm1_54xx.h
+> new file mode 100644
+> index 0000000..7b1f3b6
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/cm1_54xx.h
 
-for you to fetch changes up to 090878aa951628143f40a1acc19ec074a5ae9200:
+...
 
-  Merge tag 'mxs-fixes-3.10' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes (2013-06-07 18:19:40 -0700)
+> +
+> +/* Function prototypes */
+> +extern u32 omap4_cm1_read_inst_reg(s16 inst, u16 idx);
+> +extern void omap4_cm1_write_inst_reg(u32 val, s16 inst, u16 idx);
+> +extern u32 omap4_cm1_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
 
-----------------------------------------------------------------
+No need for these since they're already prototyped in a common
+file in your earlier patch set.
 
-ARM: SoC fixes for 3.10-rc
+> diff --git a/arch/arm/mach-omap2/cm2_54xx.h b/arch/arm/mach-omap2/cm2_54xx.h
+> new file mode 100644
+> index 0000000..bab76bd
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/cm2_54xx.h
+> @@ -0,0 +1,394 @@
 
-Another week, another batch of fixes for arm-soc platforms.
+...
 
-Nothing controversial here, a handful of fixes for regressions and/or
-serious problems across several of the platforms. Things are slowing
-down nicely on fix rates for 3.10.
+> +/* Function prototypes */
+> +extern u32 omap4_cm2_read_inst_reg(s16 inst, u16 idx);
+> +extern void omap4_cm2_write_inst_reg(u32 val, s16 inst, u16 idx);
+> +extern u32 omap4_cm2_rmw_inst_reg_bits(u32 mask, u32 bits, s16 inst, s16 idx);
 
-----------------------------------------------------------------
-Andrew Lunn (1):
-      ARM: Kirkwood: TS219: Fix crash by double PCIe instantiation
+No need for these since they're already prototyped in a common
+file in your earlier patch set.
 
-Anson Huang (1):
-      ARM: imx: clk-imx6q: AXI clock select index is incorrect
+Fixed in the local copy here.
 
-Doug Anderson (1):
-      ARM: exynos: add debug_ll_io_init() call in exynos_init_io()
 
-Jiada Wang (1):
-      ARM i.MX6q: fix for ldb_di_sels
-
-Jonas Andersson (1):
-      ARM: dts: imx: fix clocks for cspi
-
-Jongsung Kim (1):
-      ARM: bcm2835: override the HW UART periphid
-
-Laurent Pinchart (1):
-      sh-pfc: r8a7779: Don't group USB OVC and PENC pins
-
-Lee Jones (2):
-      ARM: ux500: Only configure wake-up reasons on ux500 based platforms
-      ARM: ux500: Provide supplies for AUX1, AUX2 and AUX3
-
-Markus Pargmann (1):
-      ARM: mxs: icoll: Fix interrupts gpio bank 0
-
-Nadav Haklai (1):
-      ARM: mvebu: Fix bug in coherency fabric low level init function
-
-Olof Johansson (5):
-      Merge tag 'fixes-3.10-3' of git://git.infradead.org/users/jcooper/linux into fixes
-      Merge tag 'ux500-arm-soc-v3.10-fixes-2' of git://git.kernel.org/.../linusw/linux-stericsson into fixes
-      Merge tag 'renesas-fixes-for-v3.10' of git://git.kernel.org/.../horms/renesas into fixes
-      Merge tag 'imx-fixes-3.10-2' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-      Merge tag 'mxs-fixes-3.10' of git://git.linaro.org/people/shawnguo/linux-2.6 into fixes
-
-Simon Horman (1):
-      ARM: shmobile: sh73a0: Update CMT clockevent rating to 80
-
-Tushar Behera (1):
-      ARM: EXYNOS: uncompress - print debug messages if DEBUG_LL is defined
-
- arch/arm/boot/dts/bcm2835.dtsi                  |  1 +
- arch/arm/boot/dts/imx25.dtsi                    | 12 +++----
- arch/arm/boot/dts/imx27.dtsi                    |  6 ++--
- arch/arm/boot/dts/imx51.dtsi                    |  2 +-
- arch/arm/boot/dts/imx53.dtsi                    |  2 +-
- arch/arm/mach-exynos/common.c                   |  2 ++
- arch/arm/mach-imx/clk-imx6q.c                   |  4 +--
- arch/arm/mach-kirkwood/board-ts219.c            | 10 ------
- arch/arm/mach-mvebu/coherency_ll.S              | 16 ++++++---
- arch/arm/mach-shmobile/setup-sh73a0.c           |  2 +-
- arch/arm/mach-ux500/board-mop500-regulators.c   |  3 ++
- arch/arm/mach-ux500/cpuidle.c                   |  4 +++
- arch/arm/plat-samsung/include/plat/uncompress.h | 10 +++++-
- drivers/irqchip/irq-mxs.c                       | 14 +++-----
- drivers/pinctrl/sh-pfc/pfc-r8a7779.c            | 45 ++++++++++++++++++++-----
- 15 files changed, 84 insertions(+), 49 deletions(-)
+- Paul
