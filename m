@@ -1,47 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sat, 8 Jun 2013 09:57:20 -0700
-Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data file
-In-Reply-To: <51B35FCB.5010801@ti.com>
-References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
- <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
- <20130607162927.GA3331@atomide.com>
- <20130607175005.GB3331@atomide.com> <51B22303.2000002@ti.com>
- <20130607183748.GF3331@atomide.com> <51B22A1D.6020603@ti.com>
- <51B35FCB.5010801@ti.com>
-Message-ID: <20130608165719.GT3331@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Sat, 8 Jun 2013 19:08:40 +0200
+Subject: [PATCH 4/5] ARM: dts: imx27-phytec-phycore-rdk: Add spidev node
+In-Reply-To: <1370702380-25408-4-git-send-email-shc_work@mail.ru>
+References: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
+ <1370702380-25408-4-git-send-email-shc_work@mail.ru>
+Message-ID: <20130608170840.GK32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sricharan R <r.sricharan@ti.com> [130608 09:52]:
-> On Saturday 08 June 2013 12:14 AM, Santosh Shilimkar wrote:
-> > On Friday 07 June 2013 02:37 PM, Tony Lindgren wrote:
-> >>
-> >> Looking at the diff output with and without, it seems to be that the
-> >> DMA channels won't get configured.
-> >>
-> > That should work since DMA engine changes are in mainline and the
-> > DMA channel information is already in DT.
-> >
->  The issue is that mmc, spi drivers try to get the 'dma' request number from
->  get_platform_resource, which fails if hwmod has not populated the data.
+On Sat, Jun 08, 2013 at 06:39:39PM +0400, Alexander Shiyan wrote:
+> This patch adds spidev device for spi0.1 which is used on ZigBee
+> PCM970 connector.  This change will help to use this connector in
+> userspace.
 > 
->  There are patches  already from Balaji [1] for hsmmc, Matt Porter [2] mcspi
->  for adapting the drivers for Dma engine. Dma engine gets the data from DT.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
->       [1] http://comments.gmane.org/gmane.linux.kernel.mmc/20378
->       [2] http://www.spinics.net/lists/linux-omap/msg87634.html
-> 
->        [1] is already in  mmc-next for 3.10 branch.
-> 
->   Then one more patch for spi [3] is required for completing this. This is similar
->    to the patch done for mmc to skip the get_platform_resource call in case of DT.
-> 
->   [3] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg90112.html
+> diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+> index e7ed978..b2dbcdd 100644
+> --- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+> +++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+> @@ -17,6 +17,12 @@
+>  &cspi1 {
+>  	fsl,spi-num-chipselects = <2>;
+>  	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
+> +
+> +	zigbee: spidev at 1 {
+> +		compatible = "rohm,dh2228fv";
+> +		reg = <1>;
+> +		spi-max-frequency = <0>;
 
-OK thanks for looking into that. Once those driver changes hit
-mainline, please send a follow-up patch to remove the spi and
-mmc entries.
+Why specify a speed of 0 here? Also, is there really a dh2228fv
+connected or is this just a hack to let the Linux spidev driver match?
 
-Regards,
 
-Tony
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
