@@ -1,59 +1,29 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Sat, 8 Jun 2013 21:18:59 +0100
-Subject: [PATCH] irqchip: Return -EPERM for reserved IRQs
-In-Reply-To: <1370696686-1666-1-git-send-email-grant.likely@linaro.org>
-References: <1370696686-1666-1-git-send-email-grant.likely@linaro.org>
-Message-ID: <CACxGe6v7H35eA1Ry0VqQaxezaeT=TMQnxe+f_WQmroroombeZQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 09 Jun 2013 00:24:04 +0400
+Subject: [PATCH v9 0/3] Add USB support to R8A7778/BOCK-W
+In-Reply-To: <201306090013.00313.sergei.shtylyov@cogentembedded.com>
+References: <201306090013.00313.sergei.shtylyov@cogentembedded.com>
+Message-ID: <51B392E4.1040201@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 8, 2013 at 2:04 PM, Grant Likely <grant.likely@linaro.org> wrote:
-> The irqdomain core will report a log message for any attempted map call
-> that fails unless the error code is -EPERM. This patch changes the
-> Versatile irq controller drivers to use -EPERM because it is normal for
-> a subset of the IRQ inputs to be marked as reserved on the various
-> Versatile platforms.
->
-> Signed-off-by: Grant Likely <grant.likely@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
+On 06/09/2013 12:12 AM, Sergei Shtylyov wrote:
 
-I'm going to go ahead and take this one through the irqdomain tree
-since it is really an irqdomain bug fix. I'll be sending the pull
-request to Linus shortly.
+>     Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
+> 'renesas-next-20130607' tag, and the R8A7779/Marzen USB patchset I've posted.
+> It was created to add support of R8A7778/BOCK-W USB to the platform code and
+> the USB common PHY driver, and so spans both arch/arm/mach-shmobile/ and
+> drivers/usb/phy/ subtrees.
+>
+> [1/3] phy-rcar-usb: add R8A7778 support
+> [2/3] ARM: shmobile: r8a7778: add USB support
+> [3/3] ARM: shmobile: BOCK-W: add USB support
+>
+>     The patch #4 (ARM: shmobile: BOCK-W: enable USB in defconfig) that has been
+> already merged, is not reposted.
+>
+>     The patchset is completely ready for merging now.
 
-g.
+    Argh, scratch that -- I forgot to refresh the patches before sending...
 
-> ---
->  drivers/irqchip/irq-versatile-fpga.c | 2 +-
->  drivers/irqchip/irq-vic.c            | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
-> index 065b7a3..47a52ab 100644
-> --- a/drivers/irqchip/irq-versatile-fpga.c
-> +++ b/drivers/irqchip/irq-versatile-fpga.c
-> @@ -119,7 +119,7 @@ static int fpga_irqdomain_map(struct irq_domain *d, unsigned int irq,
->
->         /* Skip invalid IRQs, only register handlers for the real ones */
->         if (!(f->valid & BIT(hwirq)))
-> -               return -ENOTSUPP;
-> +               return -EPERM;
->         irq_set_chip_data(irq, f);
->         irq_set_chip_and_handler(irq, &f->chip,
->                                 handle_level_irq);
-> diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-> index 884d11c..2bbb004 100644
-> --- a/drivers/irqchip/irq-vic.c
-> +++ b/drivers/irqchip/irq-vic.c
-> @@ -197,7 +197,7 @@ static int vic_irqdomain_map(struct irq_domain *d, unsigned int irq,
->
->         /* Skip invalid IRQs, only register handlers for the real ones */
->         if (!(v->valid_sources & (1 << hwirq)))
-> -               return -ENOTSUPP;
-> +               return -EPERM;
->         irq_set_chip_and_handler(irq, &vic_chip, handle_level_irq);
->         irq_set_chip_data(irq, v->base);
->         set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
-> --
-> 1.8.1.2
->
+WBR, Sergei
