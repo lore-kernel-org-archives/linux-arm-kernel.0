@@ -1,27 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 8 Jun 2013 10:11:07 -0300
-Subject: [PATCH] serial: imx: enable the clocks for console
-In-Reply-To: <1370678667-3514-1-git-send-email-b32955@freescale.com>
-References: <20130608062307.GB22416@S2101-09.ap.freescale.net>
- <1370678667-3514-1-git-send-email-b32955@freescale.com>
-Message-ID: <CAOMZO5A4SPFv1NopdGrN9nX-XSpZy5Cw1CLp3E95mRP8O=rhLQ@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 08 Jun 2013 17:11:18 +0400
+Subject: [PATCH 0/9] sh_eth: make driver build on any platform
+In-Reply-To: <20130607.233915.1771016084489204040.davem@davemloft.net>
+References: <201306080351.39018.sergei.shtylyov@cogentembedded.com>
+ <51B2765D.7030604@cogentembedded.com> <51B277A7.4010709@cogentembedded.com>
+ <20130607.233915.1771016084489204040.davem@davemloft.net>
+Message-ID: <51B32D76.1030507@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Huang,
+Hello.
 
-On Sat, Jun 8, 2013 at 5:04 AM, Huang Shijie <b32955@freescale.com> wrote:
+On 08-06-2013 10:39, David Miller wrote:
 
-> +       if (!uart_console(port)) {
-> +               retval = clk_prepare_enable(sport->clk_per);
-> +               if (retval)
-> +                       goto error_out1;
-> +               retval = clk_prepare_enable(sport->clk_ipg);
-> +               if (retval)
-> +                       goto error_out1;
+>>>>      This series of 9 patches are against Dave's 'net-next.git' repository.
+>>>>      The series deals with the #ifdef'fery around SoC support code/data in
+>>>>      the
+>>>> 'sh_eth' driver. It doesn't yet get rid of all the #ifdef's: 3 are
+>>>> left, 1 of
+>>>> them still hinders ARM multiplatform build -- I'll try to deal with it
+>>>> next
+>>>> week.
 
-Here you should not jump to "error_out1".
+>>>> [1/9] sh_eth: create initial ID table
+>>>> [2/9] sh_eth: get SH771x support out of #ifdef
+>>>> [3/9] sh_eth: get SH7619 support out of #ifdef
+>>>> [4/9] sh_eth: get R8A7740 support out of #ifdef
+>>>> [5/9] sh_eth: get SH77{34|63} support out of #ifdef
+>>>> [6/9] sh_eth: get SH7757 support out of #ifdef
+>>>> [7/9] sh_eth: get SH7724 support out of #ifdef
+>>>> [8/9] sh_eth: get R8A777x support out of #ifdef
+>>>> [9/9] sh_eth: remove dependencies from Kconfig
 
-You should jump to a different label and disable the sport->clk_per clock.
+>>>     Sorry, Paul, forgot to include you into the CC list on most of the
+>>>     patches
+>>> and the cover letter. Please look for the patches on linux-sh and ACK
+>>> them
+>>> if you deem necessary.
 
-This was also wrong in your previous patch.
+>>     Also, forgot to CC Simon, Magnus, Russell and LAKML on some patches.
+>> Too much haste, forgot to run scripts/get_maintainer.pl before sending
+>> out patches...
+
+> I'll apply this solely because it finally allows me to build test this
+> driver on x86-64.
+
+    Hold on please. It just occured to me that the series won't be 
+bisectable on anything but R-Car CPUs (I checked it only on R8A7779) 
+since I forgot that 'sh_eth_my_cpu_data' variable should be always 
+available in any configuuration until the last patch (so the patch #1 is 
+somewhat incomplete). I'll respin the series today and resend.
+
+WBR, Sergei
