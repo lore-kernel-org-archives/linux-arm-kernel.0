@@ -1,32 +1,144 @@
-From: jic23@jic23.retrosnub.co.uk (Jonathan Cameron)
-Date: Sat, 08 Jun 2013 10:32:52 +0100
-Subject: Arm sub architectures missing clk_round_rate()
-In-Reply-To: <20130608092133.GI18614@n2100.arm.linux.org.uk>
-References: <51B2F1ED.2090801@kernel.org>
- <20130608092133.GI18614@n2100.arm.linux.org.uk>
-Message-ID: <51B2FA44.4020100@jic23.retrosnub.co.uk>
+From: haojian.zhuang@gmail.com (Haojian Zhuang)
+Date: Sat, 8 Jun 2013 17:37:36 +0800
+Subject: [PATCH 1/4] pinctrl: single: Prepare for supporting SoC specific
+ features
+In-Reply-To: <20130607205037.16513.84242.stgit@localhost>
+References: <20130607203936.16513.57494.stgit@localhost>
+ <20130607205037.16513.84242.stgit@localhost>
+Message-ID: <CAN1soZzLYpiakcgPR7mBOC7_mLFW=mZwOG98Dq6JpO+JHUW=cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc'd Eric and Haojian, sorry should have done that in the first place.
+On Sat, Jun 8, 2013 at 4:50 AM, Tony Lindgren <tony@atomide.com> wrote:
+> Let's replace is_pinconf with flags and add struct pcs_soc so we
+> can support also other features like pin wake-up events. Let's
+> export the probe so the SoC specific modules can pass their
+> SoC specific data to pinctrl-single if needed.
+>
+> Done in collaboration with Roger Quadros <rogerq@ti.com>.
+>
 
-On 06/08/2013 10:21 AM, Russell King - ARM Linux wrote:
-> On Sat, Jun 08, 2013 at 09:57:17AM +0100, Jonathan Cameron wrote:
->> At least one Arm subarch (pxa) does no provide an implementation of this
->> function.  As far as I can see there is no way for a driver wishing to use
->> it to detect it's absence.  This is marked in clk.h as being optional
->> for 'Machine Class support'. Obvious solutions to this are:
->>
->> 1) It is effectively only usable by platform specific drivers as no
->>    more generic driver can know it is available.  Perhaps even a stub that
->>    returns an appropriate error would be acceptable.
->>
->> 2) It is not as optional as the header implies and should always be implemented
->>    if the rest of the clk framework is.
->>
->> 3) There should be some means of detecting its absense so that drivers can
->>    be dependant on its presene.
->>
->> Which is the correct one?
-> The right answer is (2) now that we have things like the clk framework and
-> soo many users.
+Manjunathappa's pinctrl-single patch on enhancing bits is already merged.
+This patch conflicts with his patch.
+
+Could you rebase your patches?
+
+> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> ---
+>  drivers/pinctrl/pinctrl-single.c |   53 +++++++++++++++++++++++++++-----------
+>  drivers/pinctrl/pinctrl-single.h |   15 +++++++++++
+>  2 files changed, 52 insertions(+), 16 deletions(-)
+>  create mode 100644 drivers/pinctrl/pinctrl-single.h
+>
+> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+> index b9fa046..0f178d1 100644
+> --- a/drivers/pinctrl/pinctrl-single.c
+> +++ b/drivers/pinctrl/pinctrl-single.c
+> @@ -1368,7 +1367,8 @@ static int pcs_probe(struct platform_device *pdev)
+>         INIT_LIST_HEAD(&pcs->pingroups);
+>         INIT_LIST_HEAD(&pcs->functions);
+>         INIT_LIST_HEAD(&pcs->gpiofuncs);
+> -       pcs->is_pinconf = match->data;
+> +       pcs->flags = soc->flags;
+> +       pcs->soc = soc;
+>
+>         PCS_GET_PROP_U32("pinctrl-single,register-width", &pcs->width,
+>                          "register width not specified\n");
+> @@ -1437,7 +1437,7 @@ static int pcs_probe(struct platform_device *pdev)
+>         pcs->desc.name = DRIVER_NAME;
+>         pcs->desc.pctlops = &pcs_pinctrl_ops;
+>         pcs->desc.pmxops = &pcs_pinmux_ops;
+> -       if (pcs->is_pinconf)
+> +       if (pcs->flags & PCS_HAS_PINCONF)
+>                 pcs->desc.confops = &pcs_pinconf_ops;
+>         pcs->desc.owner = THIS_MODULE;
+>
+> @@ -1466,8 +1466,20 @@ free:
+>
+>         return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(pinctrl_single_probe);
+> +
+> +static int pcs_probe(struct platform_device *pdev)
+> +{
+> +       const struct of_device_id *match;
+> +
+> +       match = of_match_device(pcs_of_match, &pdev->dev);
+> +       if (!match)
+> +               return -EINVAL;
+> +
+> +       return pinctrl_single_probe(pdev, (struct pcs_soc *)match->data);
+> +}
+
+I think that you should declare pcs_probe() as EXPORT_SYMBOL_GPL.
+Is it right?
+
+>
+> -static int pcs_remove(struct platform_device *pdev)
+> +int pinctrl_single_remove(struct platform_device *pdev)
+>  {
+>         struct pcs_device *pcs = platform_get_drvdata(pdev);
+>
+> @@ -1478,17 +1490,26 @@ static int pcs_remove(struct platform_device *pdev)
+>
+>         return 0;
+>  }
+> +EXPORT_SYMBOL_GPL(pinctrl_single_remove);
+Since you redefined pcs_probe(), you needn't change pcs_remove to
+pinctrl_single_remove().
+
+> +
+> +static struct pcs_soc pinctrl_single = {
+> +       .flags = 0,
+> +};
+> +
+> +static struct pcs_soc pinconf_single = {
+> +       .flags = PCS_HAS_PINCONF,
+> +};
+>
+>  static struct of_device_id pcs_of_match[] = {
+> -       { .compatible = "pinctrl-single", .data = (void *)false },
+> -       { .compatible = "pinconf-single", .data = (void *)true },
+> +       { .compatible = "pinctrl-single", .data = &pinctrl_single },
+> +       { .compatible = "pinconf-single", .data = &pinconf_single },
+>         { },
+>  };
+>  MODULE_DEVICE_TABLE(of, pcs_of_match);
+>
+>  static struct platform_driver pcs_driver = {
+>         .probe          = pcs_probe,
+> -       .remove         = pcs_remove,
+> +       .remove         = pinctrl_single_remove,
+>         .driver = {
+>                 .owner          = THIS_MODULE,
+>                 .name           = DRIVER_NAME,
+> diff --git a/drivers/pinctrl/pinctrl-single.h b/drivers/pinctrl/pinctrl-single.h
+> new file mode 100644
+> index 0000000..18f3205
+> --- /dev/null
+> +++ b/drivers/pinctrl/pinctrl-single.h
+> @@ -0,0 +1,15 @@
+
+Do you need append "#ifndef __XX_H" to protect head file
+over loading?
+
+> +#define PCS_HAS_PINCONF         (1 << 0)
+> +
+> +/**
+> + * struct pcs_soc - SoC specific interface to pinctrl-single
+> + * @data:      SoC specific data pointer
+> + * @flags:     mask of PCS_HAS_xxx values
+> + */
+> +struct pcs_soc {
+> +       void *data;
+> +       unsigned flags;
+> +};
+> +
+> +extern int pinctrl_single_probe(struct platform_device *pdev,
+> +                               const struct pcs_soc *soc);
+> +extern int pinctrl_single_remove(struct platform_device *pdev);
+>
