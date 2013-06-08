@@ -1,48 +1,27 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Sat,  8 Jun 2013 14:04:46 +0100
-Subject: [PATCH] irqchip: Return -EPERM for reserved IRQs
-Message-ID: <1370696686-1666-1-git-send-email-grant.likely@linaro.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 8 Jun 2013 10:11:07 -0300
+Subject: [PATCH] serial: imx: enable the clocks for console
+In-Reply-To: <1370678667-3514-1-git-send-email-b32955@freescale.com>
+References: <20130608062307.GB22416@S2101-09.ap.freescale.net>
+ <1370678667-3514-1-git-send-email-b32955@freescale.com>
+Message-ID: <CAOMZO5A4SPFv1NopdGrN9nX-XSpZy5Cw1CLp3E95mRP8O=rhLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The irqdomain core will report a log message for any attempted map call
-that fails unless the error code is -EPERM. This patch changes the
-Versatile irq controller drivers to use -EPERM because it is normal for
-a subset of the IRQ inputs to be marked as reserved on the various
-Versatile platforms.
+Hi Huang,
 
-Signed-off-by: Grant Likely <grant.likely@linaro.org>
-Cc: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/irqchip/irq-versatile-fpga.c | 2 +-
- drivers/irqchip/irq-vic.c            | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+On Sat, Jun 8, 2013 at 5:04 AM, Huang Shijie <b32955@freescale.com> wrote:
 
-diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
-index 065b7a3..47a52ab 100644
---- a/drivers/irqchip/irq-versatile-fpga.c
-+++ b/drivers/irqchip/irq-versatile-fpga.c
-@@ -119,7 +119,7 @@ static int fpga_irqdomain_map(struct irq_domain *d, unsigned int irq,
- 
- 	/* Skip invalid IRQs, only register handlers for the real ones */
- 	if (!(f->valid & BIT(hwirq)))
--		return -ENOTSUPP;
-+		return -EPERM;
- 	irq_set_chip_data(irq, f);
- 	irq_set_chip_and_handler(irq, &f->chip,
- 				handle_level_irq);
-diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
-index 884d11c..2bbb004 100644
---- a/drivers/irqchip/irq-vic.c
-+++ b/drivers/irqchip/irq-vic.c
-@@ -197,7 +197,7 @@ static int vic_irqdomain_map(struct irq_domain *d, unsigned int irq,
- 
- 	/* Skip invalid IRQs, only register handlers for the real ones */
- 	if (!(v->valid_sources & (1 << hwirq)))
--		return -ENOTSUPP;
-+		return -EPERM;
- 	irq_set_chip_and_handler(irq, &vic_chip, handle_level_irq);
- 	irq_set_chip_data(irq, v->base);
- 	set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
--- 
-1.8.1.2
+> +       if (!uart_console(port)) {
+> +               retval = clk_prepare_enable(sport->clk_per);
+> +               if (retval)
+> +                       goto error_out1;
+> +               retval = clk_prepare_enable(sport->clk_ipg);
+> +               if (retval)
+> +                       goto error_out1;
+
+Here you should not jump to "error_out1".
+
+You should jump to a different label and disable the sport->clk_per clock.
+
+This was also wrong in your previous patch.
