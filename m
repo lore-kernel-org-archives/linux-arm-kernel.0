@@ -1,64 +1,59 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 08 Jun 2013 12:49:10 +0200
-Subject: [PATCH 2/3] ARM: dts: Add FIMD node to Origen4210 board
-In-Reply-To: <1370603235-11193-3-git-send-email-tushar.behera@linaro.org>
-References: <1370603235-11193-1-git-send-email-tushar.behera@linaro.org>
- <1370603235-11193-3-git-send-email-tushar.behera@linaro.org>
-Message-ID: <5527415.fcM1OgADxD@flatron>
+Date: Sat, 08 Jun 2013 12:57:41 +0200
+Subject: [PATCH 01/13] ARM: Exynos: initialize l2x0 cache controller only
+ for cortex-a9 based SoCs
+In-Reply-To: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <5595095.zmTGjttZIk@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 of June 2013 16:37:14 Tushar Behera wrote:
-> From: Sachin Kamat <sachin.kamat@linaro.org>
+Hi Chander,
+
+On Thursday 06 of June 2013 16:31:15 Chander Kashyap wrote:
+> Only cortex-a9 based Exynos SoCs have l2x0 cache controller. Hence
+> instead of checking for every SoC with soc_is_xxx, just check for cpu
+> part number and initialize the cache controller for cortex-a9 based
+> SoCs.
 > 
-> Added FIMD and display timing node to Origen4210 board.
-> 
-> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
 > ---
->  arch/arm/boot/dts/exynos4210-origen.dts |   21 +++++++++++++++++++++
->  1 file changed, 21 insertions(+)
+>  arch/arm/mach-exynos/common.c |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts
-> b/arch/arm/boot/dts/exynos4210-origen.dts index bcf8079..4c6c3cd 100644
-> --- a/arch/arm/boot/dts/exynos4210-origen.dts
-> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
-> @@ -290,4 +290,25 @@
->  			clock-frequency = <24000000>;
->  		};
->  	};
-> +
-> +	fimd at 11c00000 {
-> +		pinctrl-0 = <&lcd_en &lcd_clk &lcd_data24 &pwm0_out>;
+> diff --git a/arch/arm/mach-exynos/common.c
+> b/arch/arm/mach-exynos/common.c index 8ce2db4..bad000e 100644
+> --- a/arch/arm/mach-exynos/common.c
+> +++ b/arch/arm/mach-exynos/common.c
+> @@ -35,6 +35,7 @@
+>  #include <asm/mach/map.h>
+>  #include <asm/mach/irq.h>
+>  #include <asm/cacheflush.h>
+> +#include <asm/cputype.h>
+> 
+>  #include <mach/regs-irq.h>
+>  #include <mach/regs-pmu.h>
+> @@ -520,7 +521,7 @@ static int __init exynos4_l2x0_cache_init(void)
 
-Ahh, this would explain the two pwm pin groups from previous patch.
+I wonder if it shouldn't be done the other way around, i.e. this function 
+being called only when running on SoCs for which it's appropriate, instead 
+of checking for supported SoC in this function.
 
-This seems somehow incorrect, though. AFAIK PWM outputs are not managed by 
-FIMD in any way.
+Keep in mind that we are going towards multiplatform support, so you would 
+end up running this code on any non-Exynos SoC with Cortex A9 as well. 
+IMHO we should drop most (if not all) of the initcalls around mach-
+exynos/.
 
-> +		pinctrl-names = "default";
-> +		status = "okay";
-> +	};
-> +
-> +	display-timings {
-> +		native-mode = <&timing0>;
-> +		timing0: timing {
-> +			clock-frequency = <50000>;
-
-Hmm, 50 KHz for pixel clock? Isn't it a bit too low? Or am I missing 
-something?
+CCing people that might have some opinion on this topic as well.
 
 Best regards,
 Tomasz
 
-> +			hactive = <1024>;
-> +			vactive = <600>;
-> +			hfront-porch = <64>;
-> +			hback-porch = <16>;
-> +			hsync-len = <48>;
-> +			vback-porch = <64>;
-> +			vfront-porch = <16>;
-> +			vsync-len = <3>;
-> +		};
-> +	};
->  };
+>  {
+>  	int ret;
+> 
+> -	if (soc_is_exynos5250() || soc_is_exynos5440())
+> +	if (read_cpuid_part_number() != ARM_CPU_PART_CORTEX_A9)
+>  		return 0;
+> 
+>  	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
