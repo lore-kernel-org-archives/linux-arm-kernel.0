@@ -1,33 +1,44 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 08 Jun 2013 09:57:17 +0100
-Subject: Arm sub architectures missing clk_round_rate()
-Message-ID: <51B2F1ED.2090801@kernel.org>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Sat, 8 Jun 2013 10:08:50 +0100
+Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
+ Uploading linux (3.9.4-1))
+In-Reply-To: <4247099.i8S79t0Pua@flatron>
+References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
+ <20130607205940.4816fed5@skate>
+ <CAPweEDxtC+OamcpVEQ3BULbN88hSJzKoi0fkNLBAdZD04LQCNQ@mail.gmail.com>
+ <4247099.i8S79t0Pua@flatron>
+Message-ID: <CAPweEDwON7x-FrqUrvKDNXu3nCYOgrEzY9V5q8zxvoe6kWKCtA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At least one Arm subarch (pxa) does no provide an implementation of this
-function.  As far as I can see there is no way for a driver wishing to use
-it to detect it's absence.  This is marked in clk.h as being optional
-for 'Machine Class support'. Obvious solutions to this are:
+On Sat, Jun 8, 2013 at 9:28 AM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-1) It is effectively only usable by platform specific drivers as no
-   more generic driver can know it is available.  Perhaps even a stub that
-   returns an appropriate error would be acceptable.
+> Now that the discussion went off from "you stupid kernel developers
 
-2) It is not as optional as the header implies and should always be implemented
-   if the rest of the clk framework is.
+ *lol*.  i get that summary ["you said people were stupid!!!"] a lot.
+i don't quite understand where it comes from, otherwise i would stop
+doing it :)
 
-3) There should be some means of detecting its absense so that drivers can
-   be dependant on its presene.
+> adopted DeviceTree without even asking a closed company about their
+> proprietary solution, which does the same" to something a bit more
+> constructive, let me point some of the benefits.
 
-Which is the correct one?
+> [snip...]
 
-This issue came up as a result of the thread
-http://marc.info/?l=linux-iio&m=137026653516438&w=2
-[PATCH RESEND V2 3/4] iio: frequency: adf4350: Add support for clock consumer framework
-on linux-iio at vger.kernel.org
+ ahh, magic.  these have gone straight into that proposal.  i think
+the best ones - the gems - are the test-coverage and formally allowing
+public interaction.
 
+ the test coverage because it will reduce the risk of errors in the
+silicon [you never know when developing both hardware and software
+where the bug might be] as well as reduce the development time and
+development costs.
 
-Thanks,
+ the public interaction (which i was going to ask thomas and maxime
+about, this morning) because it means a much faster feedback loop.
 
-Jonathan
+ i've been trying to think of ways to link "if you do X it will result
+in more sales and reduce risk" to the discussion, and i think you
+finally hit it tomasz, so thank you.
+
+l.
