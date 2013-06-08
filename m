@@ -1,83 +1,59 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 9 Jun 2013 00:18:47 +0400
-Subject: [PATCH v9 3/3] ARM: shmobile: BOCK-W: add USB support
-In-Reply-To: <201306090013.00313.sergei.shtylyov@cogentembedded.com>
-References: <201306090013.00313.sergei.shtylyov@cogentembedded.com>
-Message-ID: <201306090018.47692.sergei.shtylyov@cogentembedded.com>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Sat, 8 Jun 2013 21:18:59 +0100
+Subject: [PATCH] irqchip: Return -EPERM for reserved IRQs
+In-Reply-To: <1370696686-1666-1-git-send-email-grant.likely@linaro.org>
+References: <1370696686-1666-1-git-send-email-grant.likely@linaro.org>
+Message-ID: <CACxGe6v7H35eA1Ry0VqQaxezaeT=TMQnxe+f_WQmroroombeZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the USB PHY device from bockw_init(), passing the platform  data to it.
-Set machine's init_late() method to r8a7778_init_late() in order for [EO]HCI to
-get registered too...
+On Sat, Jun 8, 2013 at 2:04 PM, Grant Likely <grant.likely@linaro.org> wrote:
+> The irqdomain core will report a log message for any attempted map call
+> that fails unless the error code is -EPERM. This patch changes the
+> Versatile irq controller drivers to use -EPERM because it is normal for
+> a subset of the IRQ inputs to be marked as reserved on the various
+> Versatile platforms.
+>
+> Signed-off-by: Grant Likely <grant.likely@linaro.org>
+> Cc: Linus Walleij <linus.walleij@linaro.org>
 
-Don't forget to add USB PENC0/1 pins to bockw_pinctrl_map[].
+I'm going to go ahead and take this one through the irqdomain tree
+since it is really an irqdomain bug fix. I'll be sending the pull
+request to Linus shortly.
 
-The patch has been tested on the BOCK-W board.
+g.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-
----
-Changes since version 8:
-- resolved reject, refreshed the patch.
-
-Changes since version 6:
-- added USB PENC0/1 pins to bockw_pinctrl_map[].
-
-Changes since version 4:
-- annotated 'usb_phy_platform_data' as '__initdata' since it's kmemdup()'ed
-  while registering the platform device anyway;
-- refreshed the patch.
-
-Changes since version 3:
-- removed initializer for 'usb_phy_platform_data' letting it be set to all 0s;
-- refreshed the patch.
-
-Changes since version 2:
-- refreshed the patch.
-
-Changes since the original posting:
-- removed initializer for no longer existing field in 'usb_phy_platform_data',
-  modified the comment to the 'ferrite_bead' field initializer.
-
- arch/arm/mach-shmobile/board-bockw.c |    8 ++++++++
- 1 file changed, 8 insertions(+)
-
-Index: renesas/arch/arm/mach-shmobile/board-bockw.c
-===================================================================
---- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
-+++ renesas/arch/arm/mach-shmobile/board-bockw.c
-@@ -63,6 +63,8 @@ static struct sh_mobile_sdhi_info sdhi0_
- 	.tmio_flags	= TMIO_MMC_HAS_IDLE_WAIT,
- };
- 
-+static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
-+
- static const struct pinctrl_map bockw_pinctrl_map[] = {
- 	/* SCIF0 */
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
-@@ -78,6 +80,10 @@ static const struct pinctrl_map bockw_pi
- 				  "sdhi0_data4", "sdhi0"),
- 	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-r8a7778",
- 				  "sdhi0_wp", "sdhi0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
-+				  "usb0", "usb0"),
-+	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
-+				  "usb1", "usb1"),
- };
- 
- #define FPGA	0x18200000
-@@ -91,6 +97,7 @@ static void __init bockw_init(void)
- 	r8a7778_clock_init();
- 	r8a7778_init_irq_extpin(1);
- 	r8a7778_add_standard_devices();
-+	r8a7778_add_usb_phy_device(&usb_phy_platform_data);
- 
- 	pinctrl_register_mappings(bockw_pinctrl_map,
- 				  ARRAY_SIZE(bockw_pinctrl_map));
-@@ -146,4 +153,5 @@ DT_MACHINE_START(BOCKW_DT, "bockw")
- 	.init_machine	= bockw_init,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= bockw_boards_compat_dt,
-+	.init_late      = r8a7778_init_late,
- MACHINE_END
+> ---
+>  drivers/irqchip/irq-versatile-fpga.c | 2 +-
+>  drivers/irqchip/irq-vic.c            | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/irqchip/irq-versatile-fpga.c b/drivers/irqchip/irq-versatile-fpga.c
+> index 065b7a3..47a52ab 100644
+> --- a/drivers/irqchip/irq-versatile-fpga.c
+> +++ b/drivers/irqchip/irq-versatile-fpga.c
+> @@ -119,7 +119,7 @@ static int fpga_irqdomain_map(struct irq_domain *d, unsigned int irq,
+>
+>         /* Skip invalid IRQs, only register handlers for the real ones */
+>         if (!(f->valid & BIT(hwirq)))
+> -               return -ENOTSUPP;
+> +               return -EPERM;
+>         irq_set_chip_data(irq, f);
+>         irq_set_chip_and_handler(irq, &f->chip,
+>                                 handle_level_irq);
+> diff --git a/drivers/irqchip/irq-vic.c b/drivers/irqchip/irq-vic.c
+> index 884d11c..2bbb004 100644
+> --- a/drivers/irqchip/irq-vic.c
+> +++ b/drivers/irqchip/irq-vic.c
+> @@ -197,7 +197,7 @@ static int vic_irqdomain_map(struct irq_domain *d, unsigned int irq,
+>
+>         /* Skip invalid IRQs, only register handlers for the real ones */
+>         if (!(v->valid_sources & (1 << hwirq)))
+> -               return -ENOTSUPP;
+> +               return -EPERM;
+>         irq_set_chip_and_handler(irq, &vic_chip, handle_level_irq);
+>         irq_set_chip_data(irq, v->base);
+>         set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
+> --
+> 1.8.1.2
+>
