@@ -1,95 +1,76 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Sat, 08 Jun 2013 12:37:30 +0800
-Subject: [PATCH v2] arm64: kernel: compiling issue,
- need delete read_current_timer().
-In-Reply-To: <51A32F40.1050309@asianux.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com>
- <20130521085325.GB10453@mudshark.cambridge.arm.com>
- <519B425D.4030806@asianux.com> <51A32F40.1050309@asianux.com>
-Message-ID: <51B2B50A.1050305@asianux.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 8 Jun 2013 12:49:47 +0800
+Subject: [PATCH] staging: imx_drm: imx_ldb: fix 18 bit format
+In-Reply-To: <1370594228-2869-1-git-send-email-s.trumtrar@pengutronix.de>
+References: <1370594228-2869-1-git-send-email-s.trumtrar@pengutronix.de>
+Message-ID: <20130608044945.GA22416@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maintainers:
-
-Please help check it, when you have time.
-
-Thanks.
-
-On 05/27/2013 06:02 PM, Chen Gang wrote:
-> Hello Maintainers:
+On Fri, Jun 07, 2013 at 10:37:08AM +0200, Steffen Trumtrar wrote:
+> From: Markus Niebel <Markus.Niebel@tqs.de>
 > 
-> Please help check this patch whether OK, when you have time.
+> Since 18 bit is supported as datawidth in device tree it should be
+> supported in driver. Beside the LDB channel the IPU channel has also
+> to be configured to use BGR666.
 > 
-> Thanks.
-> 
-> On 05/21/2013 05:46 PM, Chen Gang wrote:
->>
->> Under arm64, we will calibrate the delay loop statically using a known
->> timer frequency, so delete read_current_timer(), or it will cause
->> compiling issue with allmodconfig.
->>
->> The related error:
->>   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
->>   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
->>   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
->>   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
->>
->>
->> Signed-off-by: Chen Gang <gang.chen@asianux.com>
->> ---
->>  arch/arm64/include/asm/timex.h |    6 +++---
->>  arch/arm64/kernel/time.c       |    6 ------
->>  2 files changed, 3 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
->> index b24a31a..81a076e 100644
->> --- a/arch/arm64/include/asm/timex.h
->> +++ b/arch/arm64/include/asm/timex.h
->> @@ -16,14 +16,14 @@
->>  #ifndef __ASM_TIMEX_H
->>  #define __ASM_TIMEX_H
->>  
->> +#include <asm/arch_timer.h>
->> +
->>  /*
->>   * Use the current timer as a cycle counter since this is what we use for
->>   * the delay loop.
->>   */
->> -#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
->> +#define get_cycles()	arch_counter_get_cntvct()
->>  
->>  #include <asm-generic/timex.h>
->>  
->> -#define ARCH_HAS_READ_CURRENT_TIMER
->> -
->>  #endif
->> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
->> index a551f88..03dc371 100644
->> --- a/arch/arm64/kernel/time.c
->> +++ b/arch/arm64/kernel/time.c
->> @@ -68,12 +68,6 @@ unsigned long long notrace sched_clock(void)
->>  	return arch_timer_read_counter() * sched_clock_mult;
->>  }
->>  
->> -int read_current_timer(unsigned long *timer_value)
->> -{
->> -	*timer_value = arch_timer_read_counter();
->> -	return 0;
->> -}
->> -
->>  void __init time_init(void)
->>  {
->>  	u32 arch_timer_rate;
->>
+> Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
+> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+> ---
+> This is based on the series: "staging: drm/imx: Add LDB support"
+> by Philipp.
 > 
 > 
+>  drivers/staging/imx-drm/imx-ldb.c | 18 +++++++++++++++++-
+>  1 file changed, 17 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+> index d8fc93c..84bf7d3 100644
+> --- a/drivers/staging/imx-drm/imx-ldb.c
+> +++ b/drivers/staging/imx-drm/imx-ldb.c
+> @@ -179,6 +179,7 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+>  	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+>  	struct imx_ldb *ldb = imx_ldb_ch->ldb;
+>  	struct drm_display_mode *mode = &encoder->crtc->mode;
+> +	u32 pixel_fmt;
+>  	unsigned long serial_clk;
+>  	unsigned long di_clk = mode->clock * 1000;
+>  	int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->imx_drm_encoder,
+> @@ -194,8 +195,23 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+>  		imx_ldb_set_clock(ldb, mux, imx_ldb_ch->chno, serial_clk, di_clk);
+>  	}
+>  
+> +	switch (imx_ldb_ch->chno) {
+> +	case 0:
+> +		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
+> +			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
+> +		break;
+> +	case 1:
+> +		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
+> +			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
+> +		break;
+> +	default:
+> +		dev_err(ldb->dev, "unable to config di%d panel format\n",
+> +			imx_ldb_ch->chno);
+> +		pixel_fmt = V4L2_PIX_FMT_RGB24;
+> +	}
+> +
+>  	imx_drm_crtc_panel_format_pins(encoder->crtc, DRM_MODE_ENCODER_LVDS,
+> -			V4L2_PIX_FMT_RGB24, 2, 3);
+> +			pixel_fmt, 2, 3);
 
+It seems the patch is based on an updated version of "staging: drm/imx:
+Add LDB support"?  The last one from Philipp [1] calls function
+imx_drm_crtc_panel_format() rather than imx_drm_crtc_panel_format_pins()
+there.
 
--- 
-Chen Gang
+Shawn
 
-Asianux Corporation
+[1] http://thread.gmane.org/gmane.linux.drivers.driver-project.devel/36836/focus=36834
+
+>  }
+>  
+>  static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
+> -- 
+> 1.8.2.rc2
+> 
