@@ -1,34 +1,30 @@
-From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Sat, 8 Jun 2013 10:17:43 +0800
-Subject: [PATCH] Change the internal SRAM memory type MT_MEMORY_NONCACHED
-In-Reply-To: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
-References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
-Message-ID: <1370657863-8725-1-git-send-email-wenyou.yang@atmel.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 8 Jun 2013 11:02:41 +0800
+Subject: [PATCH RFC 0/3] clk: dt: bindings for mux & divider clocks
+In-Reply-To: <20130607175254.10233.7661@quantum>
+References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
+ <20130607055128.GA20780@S2101-09.ap.freescale.net>
+ <20130607175254.10233.7661@quantum>
+Message-ID: <20130608030240.GB22134@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Because MT_DEVICE is not executable in armv7, we change
-the internal SRAM memory type to MT_MEMORY_NONCACHED.
-As it seems that caching this internal SRAM memory is not necessary,
-we chose the this memory type.
+On Fri, Jun 07, 2013 at 10:52:54AM -0700, Mike Turquette wrote:
+> Yes, there was a time when I was firmly against doing such a thing.
+> However I'm not sure it is so bad now.  More and more SoCs are going to
+> keep getting merged into the kernel and that just means more and more
+> clock data.  Perhaps DT is best suited to handle this bloat.  I broke
+> the clock data out into a separate file so that it didn't overwhelm the
+> existing omap4.dtsi.
 
-Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
----
- arch/arm/mach-at91/setup.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I'm actually more concerned by run-time impact.  Any of_find_node_*()
+call will possibly have to scan all those hundreds of nodes to find the
+desired one.  Anyway, it's an OMAP folks decision, and the impact might
+not be that much on those fast CPUs.
 
-diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
-index a33d4b5..98d55ef 100644
---- a/arch/arm/mach-at91/setup.c
-+++ b/arch/arm/mach-at91/setup.c
-@@ -84,7 +84,7 @@ void __init at91_init_sram(int bank, unsigned long base, unsigned int length)
- 
- 	desc->pfn = __phys_to_pfn(base);
- 	desc->length = length;
--	desc->type = MT_DEVICE;
-+	desc->type = MT_MEMORY_NONCACHED;
- 
- 	pr_info("AT91: sram at 0x%lx of 0x%x mapped at 0x%lx\n",
- 		base, length, desc->virtual);
--- 
-1.7.9.5
+Shawn
+
+> 
+> Either way I marked this series as RFC precisely due to your point.  I
+> want feedback on how the OMAP folks feel about this.  So far no has has
+> NACKed it ;-)
