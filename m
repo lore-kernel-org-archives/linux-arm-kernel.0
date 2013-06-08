@@ -1,32 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 7 Jun 2013 17:03:26 -0700
-Subject: [GIT PULL v2] arm-soc: Xilinx zynq clock changes for v3.11
-In-Reply-To: <51B04FCA.1090905@monstr.eu>
-References: <51A31045.1060406@monstr.eu> <20130601051913.GC5189@quad.lixom.net>
- <20130601234708.21525.1684@quantum> <51B04FCA.1090905@monstr.eu>
-Message-ID: <20130608000326.GB24278@quad.lixom.net>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sat, 08 Jun 2013 04:15:35 +0400
+Subject: [PATCH 0/9] sh_eth: make driver build on any platform
+In-Reply-To: <51B2765D.7030604@cogentembedded.com>
+References: <201306080351.39018.sergei.shtylyov@cogentembedded.com>
+ <51B2765D.7030604@cogentembedded.com>
+Message-ID: <51B277A7.4010709@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 11:00:58AM +0200, Michal Simek wrote:
-> Hi Arnd and Olof,
-> 
-> please pull the following changes to your arm-soc tree.
-> This is the second pull request based on our discussion with Mike
-> I have added Mike's ACK to all patches.
-> 
-> Thanks,
-> Michal
-> 
-> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-> 
->   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.xilinx.com/linux-xlnx.git tags/zynq-clk-for-3.11
+On 06/08/2013 04:10 AM, Sergei Shtylyov wrote:
+> Hello.
+>
+> On 06/08/2013 03:51 AM, Sergei Shtylyov wrote:
+>
+>>     This series of 9 patches are against Dave's 'net-next.git' 
+>> repository.
+>>     The series deals with the #ifdef'fery around SoC support 
+>> code/data in the
+>> 'sh_eth' driver. It doesn't yet get rid of all the #ifdef's: 3 are 
+>> left, 1 of
+>> them still hinders ARM multiplatform build -- I'll try to deal with 
+>> it next
+>> week.
+>>
+>> [1/9] sh_eth: create initial ID table
+>> [2/9] sh_eth: get SH771x support out of #ifdef
+>> [3/9] sh_eth: get SH7619 support out of #ifdef
+>> [4/9] sh_eth: get R8A7740 support out of #ifdef
+>> [5/9] sh_eth: get SH77{34|63} support out of #ifdef
+>> [6/9] sh_eth: get SH7757 support out of #ifdef
+>> [7/9] sh_eth: get SH7724 support out of #ifdef
+>> [8/9] sh_eth: get R8A777x support out of #ifdef
+>> [9/9] sh_eth: remove dependencies from Kconfig
+>>
+>
+>    Sorry, Paul, forgot to include you into the CC list on most of the 
+> patches
+> and the cover letter. Please look for the patches on linux-sh and ACK 
+> them
+> if you deem necessary.
 
-Thanks, pulled into next/soc.
+    Also, forgot to CC Simon, Magnus, Russell and LAKML on some patches.
+Too much haste, forgot to run scripts/get_maintainer.pl before sending 
+out patches...
+
+WBR, Sergei
 
 
--Olof
+>
+> WBR, Serge
+>
