@@ -1,144 +1,35 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sat, 8 Jun 2013 17:37:36 +0800
-Subject: [PATCH 1/4] pinctrl: single: Prepare for supporting SoC specific
- features
-In-Reply-To: <20130607205037.16513.84242.stgit@localhost>
-References: <20130607203936.16513.57494.stgit@localhost>
- <20130607205037.16513.84242.stgit@localhost>
-Message-ID: <CAN1soZzLYpiakcgPR7mBOC7_mLFW=mZwOG98Dq6JpO+JHUW=cw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat,  8 Jun 2013 12:05:42 +0200
+Subject: [PATCH 0/4] Add external interrupt support for Allwinner SoCs
+Message-ID: <1370685946-3718-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 8, 2013 at 4:50 AM, Tony Lindgren <tony@atomide.com> wrote:
-> Let's replace is_pinconf with flags and add struct pcs_soc so we
-> can support also other features like pin wake-up events. Let's
-> export the probe so the SoC specific modules can pass their
-> SoC specific data to pinctrl-single if needed.
->
-> Done in collaboration with Roger Quadros <rogerq@ti.com>.
->
+Hi everyone,
 
-Manjunathappa's pinctrl-single patch on enhancing bits is already merged.
-This patch conflicts with his patch.
+This patch adds the support for the external interrupt sources found in
+the PIO IP of the Allwinner SoCs.
 
-Could you rebase your patches?
+This IP handles up to 32 external interrupt source, that are exposed
+through a particular pin function on some pins handled by the PIO.
 
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  drivers/pinctrl/pinctrl-single.c |   53 +++++++++++++++++++++++++++-----------
->  drivers/pinctrl/pinctrl-single.h |   15 +++++++++++
->  2 files changed, 52 insertions(+), 16 deletions(-)
->  create mode 100644 drivers/pinctrl/pinctrl-single.h
->
-> diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
-> index b9fa046..0f178d1 100644
-> --- a/drivers/pinctrl/pinctrl-single.c
-> +++ b/drivers/pinctrl/pinctrl-single.c
-> @@ -1368,7 +1367,8 @@ static int pcs_probe(struct platform_device *pdev)
->         INIT_LIST_HEAD(&pcs->pingroups);
->         INIT_LIST_HEAD(&pcs->functions);
->         INIT_LIST_HEAD(&pcs->gpiofuncs);
-> -       pcs->is_pinconf = match->data;
-> +       pcs->flags = soc->flags;
-> +       pcs->soc = soc;
->
->         PCS_GET_PROP_U32("pinctrl-single,register-width", &pcs->width,
->                          "register width not specified\n");
-> @@ -1437,7 +1437,7 @@ static int pcs_probe(struct platform_device *pdev)
->         pcs->desc.name = DRIVER_NAME;
->         pcs->desc.pctlops = &pcs_pinctrl_ops;
->         pcs->desc.pmxops = &pcs_pinmux_ops;
-> -       if (pcs->is_pinconf)
-> +       if (pcs->flags & PCS_HAS_PINCONF)
->                 pcs->desc.confops = &pcs_pinconf_ops;
->         pcs->desc.owner = THIS_MODULE;
->
-> @@ -1466,8 +1466,20 @@ free:
->
->         return ret;
->  }
-> +EXPORT_SYMBOL_GPL(pinctrl_single_probe);
-> +
-> +static int pcs_probe(struct platform_device *pdev)
-> +{
-> +       const struct of_device_id *match;
-> +
-> +       match = of_match_device(pcs_of_match, &pdev->dev);
-> +       if (!match)
-> +               return -EINVAL;
-> +
-> +       return pinctrl_single_probe(pdev, (struct pcs_soc *)match->data);
-> +}
+We thus need to change the muxing to enable these interrupts, which
+leads to some additional logic.
 
-I think that you should declare pcs_probe() as EXPORT_SYMBOL_GPL.
-Is it right?
+Thanks,
+Maxime
 
->
-> -static int pcs_remove(struct platform_device *pdev)
-> +int pinctrl_single_remove(struct platform_device *pdev)
->  {
->         struct pcs_device *pcs = platform_get_drvdata(pdev);
->
-> @@ -1478,17 +1490,26 @@ static int pcs_remove(struct platform_device *pdev)
->
->         return 0;
->  }
-> +EXPORT_SYMBOL_GPL(pinctrl_single_remove);
-Since you redefined pcs_probe(), you needn't change pcs_remove to
-pinctrl_single_remove().
+Maxime Ripard (4):
+  pinctrl: sunxi: Search the description array by pin id
+  pinctrl: sunxi: Add external interrupts support
+  pinctrl: sunxi: Add external interrupt functions
+  ARM: sunxi: dt: Register the pio node as interrupt controller
 
-> +
-> +static struct pcs_soc pinctrl_single = {
-> +       .flags = 0,
-> +};
-> +
-> +static struct pcs_soc pinconf_single = {
-> +       .flags = PCS_HAS_PINCONF,
-> +};
->
->  static struct of_device_id pcs_of_match[] = {
-> -       { .compatible = "pinctrl-single", .data = (void *)false },
-> -       { .compatible = "pinconf-single", .data = (void *)true },
-> +       { .compatible = "pinctrl-single", .data = &pinctrl_single },
-> +       { .compatible = "pinconf-single", .data = &pinconf_single },
->         { },
->  };
->  MODULE_DEVICE_TABLE(of, pcs_of_match);
->
->  static struct platform_driver pcs_driver = {
->         .probe          = pcs_probe,
-> -       .remove         = pcs_remove,
-> +       .remove         = pinctrl_single_remove,
->         .driver = {
->                 .owner          = THIS_MODULE,
->                 .name           = DRIVER_NAME,
-> diff --git a/drivers/pinctrl/pinctrl-single.h b/drivers/pinctrl/pinctrl-single.h
-> new file mode 100644
-> index 0000000..18f3205
-> --- /dev/null
-> +++ b/drivers/pinctrl/pinctrl-single.h
-> @@ -0,0 +1,15 @@
+ arch/arm/boot/dts/sun4i-a10.dtsi |   2 +
+ arch/arm/boot/dts/sun5i-a13.dtsi |   2 +
+ drivers/pinctrl/pinctrl-sunxi.c  | 307 +++++++++++++++++++++++++++++++++------
+ drivers/pinctrl/pinctrl-sunxi.h  |  68 +++++++++
+ 4 files changed, 331 insertions(+), 48 deletions(-)
 
-Do you need append "#ifndef __XX_H" to protect head file
-over loading?
-
-> +#define PCS_HAS_PINCONF         (1 << 0)
-> +
-> +/**
-> + * struct pcs_soc - SoC specific interface to pinctrl-single
-> + * @data:      SoC specific data pointer
-> + * @flags:     mask of PCS_HAS_xxx values
-> + */
-> +struct pcs_soc {
-> +       void *data;
-> +       unsigned flags;
-> +};
-> +
-> +extern int pinctrl_single_probe(struct platform_device *pdev,
-> +                               const struct pcs_soc *soc);
-> +extern int pinctrl_single_remove(struct platform_device *pdev);
->
+-- 
+1.8.3
