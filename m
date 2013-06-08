@@ -1,9 +1,9 @@
 From: haojian.zhuang@linaro.org (Haojian Zhuang)
-Date: Sat,  8 Jun 2013 22:47:17 +0800
-Subject: [PATCH v4 1/7] clk: mux: add CLK_MUX_HIWORD_MASK
+Date: Sat,  8 Jun 2013 22:47:18 +0800
+Subject: [PATCH v4 2/7] clk: divider: add CLK_DIVIDER_HIWORD_MASK flag
 In-Reply-To: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
 References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <1370702843-27172-2-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <1370702843-27172-3-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,75 +11,73 @@ In both Hisilicon & Rockchip Cortex-A9 based chips, they don't use the
 paradigm of reading-changing-writing the register contents.
 Instead they use a hiword mask to indicate the changed bits.
 
-When b01 should be set as switching mux, it also needs to indicate
+When b01 should be set as setting divider, it also needs to indicate
 the change by setting hiword mask (b11 << 16).
 
-The patch adds mux flag for this usage.
+The patch adds divider flag for this usage.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
 ---
- drivers/clk/clk-mux.c        | 17 +++++++++++++++--
+ drivers/clk/clk-divider.c    | 15 +++++++++++++--
  include/linux/clk-provider.h |  5 +++++
- 2 files changed, 20 insertions(+), 2 deletions(-)
+ 2 files changed, 18 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
-index 25b1734..614444c 100644
---- a/drivers/clk/clk-mux.c
-+++ b/drivers/clk/clk-mux.c
-@@ -86,8 +86,12 @@ static int clk_mux_set_parent(struct clk_hw *hw, u8 index)
- 	if (mux->lock)
- 		spin_lock_irqsave(mux->lock, flags);
+diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+index 6d96741..ce5cfe9 100644
+--- a/drivers/clk/clk-divider.c
++++ b/drivers/clk/clk-divider.c
+@@ -217,8 +217,12 @@ static int clk_divider_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	if (divider->lock)
+ 		spin_lock_irqsave(divider->lock, flags);
  
--	val = readl(mux->reg);
--	val &= ~(mux->mask << mux->shift);
-+	if (mux->flags & CLK_MUX_HIWORD_MASK) {
-+		val = mux->mask << (mux->shift + 16);
+-	val = readl(divider->reg);
+-	val &= ~(div_mask(divider) << divider->shift);
++	if (divider->flags & CLK_DIVIDER_HIWORD_MASK) {
++		val = div_mask(divider) << (divider->shift + 16);
 +	} else {
-+		val = readl(mux->reg);
-+		val &= ~(mux->mask << mux->shift);
++		val = readl(divider->reg);
++		val &= ~(div_mask(divider) << divider->shift);
 +	}
- 	val |= index << mux->shift;
- 	writel(val, mux->reg);
+ 	val |= value << divider->shift;
+ 	writel(val, divider->reg);
  
-@@ -111,6 +115,15 @@ struct clk *clk_register_mux_table(struct device *dev, const char *name,
- 	struct clk_mux *mux;
+@@ -245,6 +249,13 @@ static struct clk *_register_divider(struct device *dev, const char *name,
  	struct clk *clk;
  	struct clk_init_data init;
-+	u8 width = 0;
-+
-+	if (clk_mux_flags & CLK_MUX_HIWORD_MASK) {
-+		width = fls(mask) - ffs(mask) + 1;
+ 
++	if (clk_divider_flags & CLK_DIVIDER_HIWORD_MASK) {
 +		if (width + shift > 16) {
-+			pr_err("mux value exceeds LOWORD field\n");
++			pr_warn("divider value exceeds LOWORD field\n");
 +			return ERR_PTR(-EINVAL);
 +		}
 +	}
- 
- 	/* allocate the mux */
- 	mux = kzalloc(sizeof(struct clk_mux), GFP_KERNEL);
++
+ 	/* allocate the divider */
+ 	div = kzalloc(sizeof(struct clk_divider), GFP_KERNEL);
+ 	if (!div) {
 diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 1186098..fecef88 100644
+index fecef88..8e45fd9 100644
 --- a/include/linux/clk-provider.h
 +++ b/include/linux/clk-provider.h
-@@ -299,6 +299,10 @@ struct clk *clk_register_divider_table(struct device *dev, const char *name,
-  * Flags:
-  * CLK_MUX_INDEX_ONE - register index starts at 1, not 0
-  * CLK_MUX_INDEX_BIT - register index is a single bit (power of two)
-+ * CLK_MUX_HIWORD_MASK - The mux settings are only in lower 16-bit of this
-+ *   register, and mask of mux bits are in higher 16-bit of this register.
-+ *   While setting the mux bits, higher 16-bit should also be updated to
-+ *   indicate changing mux bits.
+@@ -257,6 +257,10 @@ struct clk_div_table {
+  *	Some hardware implementations gracefully handle this case and allow a
+  *	zero divisor by not modifying their input clock
+  *	(divide by one / bypass).
++ * CLK_DIVIDER_HIWORD_MASK - The divider settings are only in lower 16-bit
++ *   of this register, and mask of divider bits are in higher 16-bit of this
++ *   register.  While setting the divider bits, higher 16-bit should also be
++ *   updated to indicate changing divider bits.
   */
- struct clk_mux {
+ struct clk_divider {
  	struct clk_hw	hw;
-@@ -312,6 +316,7 @@ struct clk_mux {
+@@ -271,6 +275,7 @@ struct clk_divider {
+ #define CLK_DIVIDER_ONE_BASED		BIT(0)
+ #define CLK_DIVIDER_POWER_OF_TWO	BIT(1)
+ #define CLK_DIVIDER_ALLOW_ZERO		BIT(2)
++#define CLK_DIVIDER_HIWORD_MASK		BIT(3)
  
- #define CLK_MUX_INDEX_ONE		BIT(0)
- #define CLK_MUX_INDEX_BIT		BIT(1)
-+#define CLK_MUX_HIWORD_MASK		BIT(2)
- 
- extern const struct clk_ops clk_mux_ops;
- 
+ extern const struct clk_ops clk_divider_ops;
+ struct clk *clk_register_divider(struct device *dev, const char *name,
 -- 
 1.8.1.2
