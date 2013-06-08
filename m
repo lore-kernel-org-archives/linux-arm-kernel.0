@@ -1,37 +1,22 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  8 Jun 2013 18:39:39 +0400
-Subject: [PATCH 4/5] ARM: dts: imx27-phytec-phycore-rdk: Add spidev node
-In-Reply-To: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
-References: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1370702380-25408-4-git-send-email-shc_work@mail.ru>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Sat,  8 Jun 2013 22:47:16 +0800
+Subject: [PATCH v4 0/7] support Hisilicon SoC
+Message-ID: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds spidev device for spi0.1 which is used on ZigBee
-PCM970 connector.  This change will help to use this connector in
-userspace.
+Changelog:
+v4:
+1. Add clk gate with HIWORD mask for Rockchip.
+2. Update comments and code of HIWORD flags for mux/divider.
+3. Append a mux without HIWORD mask in Hisilicon 3620.
+4. Fix the pinmux setting in Hi4511.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
+v3:
+1. Use clk_register_mux_table().
 
-diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-index e7ed978..b2dbcdd 100644
---- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-+++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
-@@ -17,6 +17,12 @@
- &cspi1 {
- 	fsl,spi-num-chipselects = <2>;
- 	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
-+
-+	zigbee: spidev at 1 {
-+		compatible = "rohm,dh2228fv";
-+		reg = <1>;
-+		spi-max-frequency = <0>;
-+	};
- };
- 
- &sdhci2 {
--- 
-1.8.1.5
+v2:
+1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
+CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
+2. Fix system timer running too fast because wrong divider is choosen.
+3. Remove .init_irq in DT machine descriptor.
