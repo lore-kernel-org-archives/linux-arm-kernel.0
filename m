@@ -1,37 +1,37 @@
 From: shc_work@mail.ru (Alexander Shiyan)
-Date: Sat,  8 Jun 2013 18:39:36 +0400
-Subject: [PATCH 1/5] ARM: dts: i.MX27: Add DMA devicetree node
-Message-ID: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
+Date: Sat,  8 Jun 2013 18:39:38 +0400
+Subject: [PATCH 3/5] ARM: dts: imx27-phytec-phycore-rdk: Add SDHC support
+In-Reply-To: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
+References: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1370702380-25408-3-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing DMA devicetree node for i.MX27 SoCs.
+This patch adds the SHDC devicetree node for PCM970 board.
 
 Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 ---
- arch/arm/boot/dts/imx27.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
-index 7017bfe..9d65734 100644
---- a/arch/arm/boot/dts/imx27.dtsi
-+++ b/arch/arm/boot/dts/imx27.dtsi
-@@ -61,6 +61,16 @@
- 			reg = <0x10000000 0x20000>;
- 			ranges;
+diff --git a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+index f8a7a49..e7ed978 100644
+--- a/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
++++ b/arch/arm/boot/dts/imx27-phytec-phycore-rdk.dts
+@@ -19,6 +19,14 @@
+ 	cs-gpios = <&gpio4 28 0>, <&gpio4 27 0>;
+ };
  
-+			dma: dma at 10001000 {
-+				compatible = "fsl,imx27-dma";
-+				reg = <0x10001000 0x1000>;
-+				interrupts = <32>;
-+				clocks = <&clks 50>, <&clks 70>;
-+				clock-names = "ipg", "ahb";
-+				#dma-cells = <1>;
-+				#dma-channels = <16>;
-+			};
++&sdhci2 {
++	bus-width = <4>;
++	cd-gpios = <&gpio3 29 0>;
++	wp-gpios = <&gpio3 28 0>;
++	vmmc-supply = <&vmmc1_reg>;
++	status = "okay";
++};
 +
- 			wdog: wdog at 10002000 {
- 				compatible = "fsl,imx27-wdt", "fsl,imx21-wdt";
- 				reg = <0x10002000 0x1000>;
+ &uart1 {
+ 	fsl,uart-has-rtscts;
+ };
 -- 
 1.8.1.5
