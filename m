@@ -1,41 +1,49 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Sat, 8 Jun 2013 09:09:23 +0800
-Subject: [PATCH v2 1/1] ARM: imx: clk-pllv3: change wait method for PLL
- lock
-In-Reply-To: <20130607110741.GB20756@S2101-09.ap.freescale.net>
-References: <1370593146-14025-1-git-send-email-peter.chen@freescale.com>
- <20130607082457.GF12361@pengutronix.de>
- <20130607083134.GE21641@nchen-desktop>
- <20130607083528.GG12361@pengutronix.de>
- <20130607084354.GF21641@nchen-desktop>
- <20130607084937.GH12361@pengutronix.de>
- <20130607110741.GB20756@S2101-09.ap.freescale.net>
-Message-ID: <20130608010922.GA25105@nchen-desktop>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 7 Jun 2013 18:09:48 -0700
+Subject: [PATCH v2 1/3] ARM: EXYNOS: uncompress - print debug messages if
+ DEBUG_LL is defined
+In-Reply-To: <51B05135.3020006@linaro.org>
+References: <1370319552-17694-1-git-send-email-tushar.behera@linaro.org>
+ <1370319552-17694-2-git-send-email-tushar.behera@linaro.org>
+ <51B05135.3020006@linaro.org>
+Message-ID: <20130608010948.GA27436@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 07:07:43PM +0800, Shawn Guo wrote:
-> On Fri, Jun 07, 2013 at 10:49:38AM +0200, Uwe Kleine-K?nig wrote:
-> > > I will try your fix, but still it just reduces the possibilities.
-> > > The problem is not the preemption takes too long, it is the jiffies
-> > > updates more than one tick at one short preemption.
-> > If that is really the problem that many more instances that use the same
-> > incarnation need the same fix. I would be surprised if that was the
-> > case.
+On Thu, Jun 06, 2013 at 02:37:01PM +0530, Tushar Behera wrote:
+> On 06/04/2013 09:49 AM, Tushar Behera wrote:
+> > Printing low-level debug messages make an assumption that the specified
+> > UART port has been preconfigured by the bootloader. Incorrectly
+> > specified UART port results in system getting stalled while printing the
+> > message "Uncompressing Linux... done, booting the kernel"
+> > This UART port number is specified through S3C_LOWLEVEL_UART_PORT. Since
+> > the UART port might different for different board, it is not possible to
+> > specify it correctly for every board that use a common defconfig file.
+> > 
+> > Calling this print subroutine only when DEBUG_LL fixes the problem. By
+> > disabling DEBUG_LL in default config file, we would be able to boot
+> > multiple boards with different default UART ports.
+> > 
+> > With this current approach, we miss the print "Uncompressing Linux...
+> > done, booting the kernel." when DEBUG_LL is not defined.
+> > 
+> > Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> > ---
+> > Change for v2:
+> > * Instead of checking value of uart_base, now check if DEBUG_LL
+> > is enabled. This removes the ifdef's from mach/uncompress.h
+> > 
+> > 
+> >  arch/arm/plat-samsung/include/plat/uncompress.h |   10 +++++++++-
+> >  1 file changed, 9 insertions(+), 1 deletion(-)
+> > 
 > 
-> +1
+> If there are no concerns, would it be possible to queue this patch [1/3]
+> for 3.10?
 > 
+> The other two patches can wait for 3.11.
 
-Using uwe's patch, the pll lock timeout hasn't appeared during the
-overtime test, usually, it will occur 4 or 5 times during overnight
-test. The reason why I suspect jiffies update problem that is we
-meet the similiar issue at other drivers which timeout is 2 jiffies,
-but it is satisfied within 1ms.
+Sure, I've applied it to fixes for 3.10.
 
-I will do more test, if it is passed, I will send patch with uwe's suggestion.
-Thanks.
 
--- 
-
-Best Regards,
-Peter Chen
+-Olof
