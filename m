@@ -1,47 +1,32 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Fri, 7 Jun 2013 20:57:33 -0500
-Subject: [PATCH 1/7] omap: mailbox: check iomem resource before dereferencing
- it
-Message-ID: <1370656653-41212-1-git-send-email-s-anna@ti.com>
+Date: Fri, 7 Jun 2013 20:57:44 -0500
+Subject: [PATCH 2/7] omap: mailbox: check for NULL nb in mailbox_put
+Message-ID: <1370656664-41250-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a NULL check for iomem resource in mailbox probe functions.
+The mailbox_put function must check the notifier block for
+NULL before trying to unregister it.
 
 Signed-off-by: Fernando Guzman Lugo <lugo.fernando@gmail.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap1/mailbox.c | 3 +++
- arch/arm/mach-omap2/mailbox.c | 3 +++
- 2 files changed, 6 insertions(+)
+ arch/arm/plat-omap/mailbox.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index efc8f20..a343d5f 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -152,6 +152,9 @@ static int omap1_mbox_probe(struct platform_device *pdev)
- 	list[0]->irq = platform_get_irq_byname(pdev, "dsp");
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 42377ef..5fb4027 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -356,7 +356,8 @@ EXPORT_SYMBOL(omap_mbox_get);
  
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!mem)
-+		return -ENOENT;
-+
- 	mbox_base = ioremap(mem->start, resource_size(mem));
- 	if (!mbox_base)
- 		return -ENOMEM;
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 0b08026..9fe0bf2 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -382,6 +382,9 @@ static int omap2_mbox_probe(struct platform_device *pdev)
- 	}
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!mem)
-+		return -ENOENT;
-+
- 	mbox_base = ioremap(mem->start, resource_size(mem));
- 	if (!mbox_base)
- 		return -ENOMEM;
+ void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb)
+ {
+-	blocking_notifier_chain_unregister(&mbox->notifier, nb);
++	if (nb)
++		blocking_notifier_chain_unregister(&mbox->notifier, nb);
+ 	omap_mbox_fini(mbox);
+ }
+ EXPORT_SYMBOL(omap_mbox_put);
 -- 
 1.8.2
