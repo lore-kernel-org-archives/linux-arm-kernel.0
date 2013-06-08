@@ -1,83 +1,70 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Jun 2013 10:35:59 -0700
-Subject: [GIT PULL 3/3] msm clock for 3.11
-In-Reply-To: <51BF44F8.1030400@codeaurora.org>
-References: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
- <20130614195238.GA2381@codeaurora.org>
- <20130615013546.GV18124@quad.lixom.net>
- <51BF44F8.1030400@codeaurora.org>
-Message-ID: <CAOesGMhmZkqJZ8e-j-DXfw9UHfM5vVOFs2eH0r90aY8MRgdrAQ@mail.gmail.com>
+From: yadi.brar@samsung.com (Yadwinder Singh Brar)
+Date: Sat, 08 Jun 2013 23:04:15 +0530
+Subject: [PATCH v5 0/7] Add generic set_rate clk_ops for PLL35xx and PLL36xx
+ for samsung SoCs
+Message-ID: <1370712862-10501-1-git-send-email-yadi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 10:18 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 06/14/13 18:35, Olof Johansson wrote:
->> On Fri, Jun 14, 2013 at 12:52:55PM -0700, David Brown wrote:
->>> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
->>>
->>>  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
->>>
->>> are available in the git repository at:
->>>
->>>  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-clock-for-3.11
->>>
->>> for you to fetch changes up to f54c1c11053d8aaf318a096b8b332fd41a394a66:
->>>
->>>  ARM: msm: Migrate to common clock framework (2013-06-12 14:43:31 -0700)
->>>
->>> ----------------------------------------------------------------
->>> MSM clock updates for 3.11.
->>>
->>> Per Stephen Boyd's coverletter:
->>>
->>> This patchset moves the existing MSM clock code and affected drivers
->>> to the common clock framework. A prerequisite of moving to the common
->>> clock framework is to use clk_prepare() and clk_enable() so the first
->>> few patches migrate drivers to that call (clk_prepare() is a no-op on
->>> MSM right now). It also removes some custom clock APIs that MSM
->>> provides and finally moves the proc_comm clock code to the common
->>> struct clk.
->>>
->>> This patch series will be used as the foundation of the MSM 8660/8960
->>> clock code that I plan to send out after this series.
->>>
->>> ----------------------------------------------------------------
->>> Stephen Boyd (12):
->>>      msm_serial: Convert to clk_prepare/unprepare
->>>      msm_serial: Use devm_clk_get() and properly return errors
->>>      usb: otg: msm: Convert to clk_prepare/unprepare
->>>      msm_sdcc: Convert to clk_prepare/unprepare
->>>      msm: iommu: Convert to clk_prepare/unprepare
->>>      msm: iommu: Use clk_set_rate() instead of clk_set_min_rate()
->>>      ARM: msm: Remove custom clk_set_flags() API
->>>      ARM: msm: Remove custom clk_set_{max,min}_rate() API
->>>      ARM: msm: Remove clock-7x30.h include file
->>>      ARM: msm: Prepare clk_get() users in mach-msm for clock-pcom driver
->>>      ARM: msm: Make proc_comm clock control into a platform driver
->>>      ARM: msm: Migrate to common clock framework
->> I don't see a single ack from any of the driver subsystem maintainers for
->> serial, usb or iommu. Some of them have been acked though, for example Felipe
->> acked the USB one on the mailing list.
->>
->> I also didn't see Greg cc:d on the serial patches, which would explain why
->> there was no ack for them.
->>
->> Care to repost/collect/rebuild this branch, please? It's a great cleanup and
->> I'd be happy to take it even if it ends up coming in after -rc6.
->
-> MAINTAINERS shows the MSM maintainers for the serial and mmc drivers so
-> I sent them to David. The iommu driver didn't seem to have any
-> maintainers entry so I just sent it off to David as well.
->
-> It wasn't clear to me that we needed to Cc higher level maintainers at
-> all. Perhaps we should clarify this in SubmittingPatches?
+This patch series does the following:
 
-get_maintainer is pretty clear on it, pointing out all maintainers up the chain.
+ 1) Unifies the clk strutures  and registration function used for PLL35xx &
+    PLL36xx, to factor out possible common code.
 
-This is normally not a problem when the maintainer sends code on up
-the subsystem tree (i.e. to Greg in the case of serial patches). What
-made me want an ack in this case is because the serial patches came in
-for the arm-soc tree.
+ 2) Defines a common rate_table which will contain recommended p, m, s and k
+    values for supported rates that needs to be changed for changing
+    corresponding PLL's rate
 
+ 3) Adds set_rate() and round_rate() clk_ops for PLL35xx and PLL36xx
 
--Olof
+changes since v4:
+	- Defined common samsung samsung_clk_register_pll() to register a list
+	of PLL and used a struct samsung_pll_clock for passing intialisation
+	data instead of passing as arguments. Now passing LOCK as well as CON0
+	offset as intialisation data.
+	- Calculated length of rate table while registering PLL instead of
+	getting it as intialisation data.
+
+changes since v3:
+	- Used __clk_lookup() instead of adding alias for mout_vpllsrc
+	- Added check for changing only M value in samsung_pll36xx_set_rate()
+	- Modified samsung_pll35xx_mp_change() & samsung_pll35xx_set_rate()
+	to improve readabilty.
+	- Made the input rate_table as __init_data which is to be provided while
+	registering PLL and made a copy of that table while registering, so
+	that if multiple tables are their, they can be freed after getting the
+	P, M, S, K setting values from required one.
+
+changes since v2:
+	- Added new patch to reorder the MUX registration for mout_vpllsrc MUX
+	before the PLL registrations. And to add the alias for the mout_vpllsrc MUX.
+        - Added a check to confirm parent rate while registrating the PLL
+	rate tables.
+
+changes since v1:
+	- removed sorting and bsearch
+	- modified the definition of struct "samsung_pll_rate_table"
+	- added generic round_rate()
+	- rectified the ops assignment for "rate table passed as NULL"
+	  during PLL registration
+
+Is rebased on branch kgene's "for-next"
+https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=for-next
+
+Vikas Sajjan (2):
+  clk: samsung: Add set_rate() clk_ops for PLL36xx
+  clk: samsung: Reorder MUX registration for mout_vpllsrc
+
+Yadwinder Singh Brar (5):
+  clk: samsung: Introduce a common samsung_clk_pll struct.
+  clk: samsung: Define a common samsung_clk_register_pll().
+  clk: samsung: Add support to register rate_table for PLL3xxx
+  clk: samsung: Add set_rate() clk_ops for PLL35xx
+  clk: samsung: Add EPLL and VPLL freq table for exynos5250 SoC
+
+ drivers/clk/samsung/clk-exynos4.c    |   40 +++--
+ drivers/clk/samsung/clk-exynos5250.c |  101 +++++++++--
+ drivers/clk/samsung/clk-pll.c        |  330 ++++++++++++++++++++++++++--------
+ drivers/clk/samsung/clk-pll.h        |   36 ++++-
+ drivers/clk/samsung/clk.h            |   54 ++++++
+ 5 files changed, 449 insertions(+), 112 deletions(-)
