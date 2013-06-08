@@ -1,25 +1,23 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Sat, 8 Jun 2013 10:15:01 -0400
-Subject: [PATCH 01/14] bus: mvebu-mbus: Use pr_fmt
-In-Reply-To: <1370623671-7748-2-git-send-email-ezequiel.garcia@free-electrons.com>
+Date: Sat, 8 Jun 2013 10:18:51 -0400
+Subject: [PATCH 12/14] ARM: mvebu: Remove device tree unused properties
+ on A370
+In-Reply-To: <1370623671-7748-13-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1370623671-7748-2-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130608141501.GX23859@titan.lakedaemon.net>
+ <1370623671-7748-13-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130608141851.GY23859@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 01:47:38PM -0300, Ezequiel Garcia wrote:
-> In order to clean message printing, we replace pr_info with pr_fmt.
-> This is purely cosmetic change, with the sole purpose of making
-> the code a bit more readable.
+On Fri, Jun 07, 2013 at 01:47:49PM -0300, Ezequiel Garcia wrote:
+> These properties are not needed so it's safe to remove them.
 > 
 > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 > ---
->  drivers/bus/mvebu-mbus.c | 8 +++++---
->  1 file changed, 5 insertions(+), 3 deletions(-)
+>  arch/arm/boot/dts/armada-370.dtsi | 4 ----
+>  1 file changed, 4 deletions(-)
 
-As Thomas mentioned, this patch has been applied to mvebu/cleanup with
-his Ack.
+Also as mentioned by Thomas, applied to mvebu/dt with his Ack.
 
 thx,
 
