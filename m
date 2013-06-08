@@ -1,65 +1,95 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Sat, 8 Jun 2013 07:25:53 +0300
-Subject: [PATCH 1/4] mmc: omap_hsmmc: Fix context save and restore for DT
-In-Reply-To: <20130607214950.18581.56829.stgit@localhost>
-References: <20130607214557.18581.75288.stgit@localhost>
- <20130607214950.18581.56829.stgit@localhost>
-Message-ID: <20130608042553.GB20238@arwen.pp.htv.fi>
+From: gang.chen@asianux.com (Chen Gang)
+Date: Sat, 08 Jun 2013 12:37:30 +0800
+Subject: [PATCH v2] arm64: kernel: compiling issue,
+ need delete read_current_timer().
+In-Reply-To: <51A32F40.1050309@asianux.com>
+References: <5199C725.8050102@asianux.com>
+ <168084c28e8ba5124c05553e97463172@localhost>
+ <20130520095606.GH31359@mudshark.cambridge.arm.com>
+ <519AF2DC.2040200@asianux.com>
+ <20130521085325.GB10453@mudshark.cambridge.arm.com>
+ <519B425D.4030806@asianux.com> <51A32F40.1050309@asianux.com>
+Message-ID: <51B2B50A.1050305@asianux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello Maintainers:
 
-On Fri, Jun 07, 2013 at 02:49:50PM -0700, Tony Lindgren wrote:
-> We want to get rid of the omap specific platform init code
-> callbacks as they don't play nice with device tree.
+Please help check it, when you have time.
 
-right, any plans to have similar functionality generically ? Maybe
-something like:
+Thanks.
 
-probe()
-{
-	...
+On 05/27/2013 06:02 PM, Chen Gang wrote:
+> Hello Maintainers:
+> 
+> Please help check this patch whether OK, when you have time.
+> 
+> Thanks.
+> 
+> On 05/21/2013 05:46 PM, Chen Gang wrote:
+>>
+>> Under arm64, we will calibrate the delay loop statically using a known
+>> timer frequency, so delete read_current_timer(), or it will cause
+>> compiling issue with allmodconfig.
+>>
+>> The related error:
+>>   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
+>>   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
+>>   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
+>>   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
+>>
+>>
+>> Signed-off-by: Chen Gang <gang.chen@asianux.com>
+>> ---
+>>  arch/arm64/include/asm/timex.h |    6 +++---
+>>  arch/arm64/kernel/time.c       |    6 ------
+>>  2 files changed, 3 insertions(+), 9 deletions(-)
+>>
+>> diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
+>> index b24a31a..81a076e 100644
+>> --- a/arch/arm64/include/asm/timex.h
+>> +++ b/arch/arm64/include/asm/timex.h
+>> @@ -16,14 +16,14 @@
+>>  #ifndef __ASM_TIMEX_H
+>>  #define __ASM_TIMEX_H
+>>  
+>> +#include <asm/arch_timer.h>
+>> +
+>>  /*
+>>   * Use the current timer as a cycle counter since this is what we use for
+>>   * the delay loop.
+>>   */
+>> -#define get_cycles()	({ cycles_t c; read_current_timer(&c); c; })
+>> +#define get_cycles()	arch_counter_get_cntvct()
+>>  
+>>  #include <asm-generic/timex.h>
+>>  
+>> -#define ARCH_HAS_READ_CURRENT_TIMER
+>> -
+>>  #endif
+>> diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
+>> index a551f88..03dc371 100644
+>> --- a/arch/arm64/kernel/time.c
+>> +++ b/arch/arm64/kernel/time.c
+>> @@ -68,12 +68,6 @@ unsigned long long notrace sched_clock(void)
+>>  	return arch_timer_read_counter() * sched_clock_mult;
+>>  }
+>>  
+>> -int read_current_timer(unsigned long *timer_value)
+>> -{
+>> -	*timer_value = arch_timer_read_counter();
+>> -	return 0;
+>> -}
+>> -
+>>  void __init time_init(void)
+>>  {
+>>  	u32 arch_timer_rate;
+>>
+> 
+> 
 
-	/*
-	 * tell PM runtime layer that we can handle runtime
-	 * power gating of this device in certain conditions.
-	 *
-	 * Actual power gating will be triggered depending on
-	 * PM QoS wakeup requirements.
-	 */
-	pm_runtime_enable_power_gating(dev);
-
-	...
-}
-
-runtime_suspend()
-{
-	if (pm_runtime_will_power_gate(dev))
-		save_context();
-}
-
-runtime_resume()
-{
-	if (pm_runtime_has_lost_power(dev))
-		restore_context();
-}
-
-???
-
-> Let's convert the context loss check to be based on a
-> register state detection instead.
-
-that might not work always. Specially when you consider that default
-register values can change on every silicon release. I guess the above
-might be a bit nicer, although a lot more work :-p
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130608/8ae16bad/attachment.sig>
+Chen Gang
+
+Asianux Corporation
