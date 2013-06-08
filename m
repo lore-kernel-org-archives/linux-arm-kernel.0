@@ -1,34 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 7 Jun 2013 18:13:39 -0700
-Subject: [PATCH V2] ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-In-Reply-To: <201306061812.18138.arnd@arndb.de>
-References: <0a1201ce6268$d5a51610$80ef4230$%kim@samsung.com>
- <201306061812.18138.arnd@arndb.de>
-Message-ID: <20130608011339.GE27436@quad.lixom.net>
+Date: Fri, 7 Jun 2013 18:19:13 -0700
+Subject: [GIT PULL] ARM: imx: fixes for 3.10, take 2
+In-Reply-To: <20130603150953.GA13853@S2101-09.ap.freescale.net>
+References: <20130603150953.GA13853@S2101-09.ap.freescale.net>
+Message-ID: <20130608011913.GA27720@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 06:12:17PM +0200, Arnd Bergmann wrote:
-> On Thursday 06 June 2013, Kukjin Kim wrote:
-> > As we discussed in mailing list, non-DT for EXYNOS SoCs will not be
-> > supported from v3.11. This patch removes regarding files for non-DT
-> > including board files and defconfig.
-> > 
-> > Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> > Cc: Tomasz Figa <t.figa@samsung.com>
-> > Cc: Thomas Abraham <thomas.ab@samsung.com>
-> > Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> > Cc: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Olof Johansson <olof@lixom.net>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> > 
-> > It's time to remove non-DT stuff for EXYNOS SoCs.
-> > If no objection on this, this will be sent to arm-soc in a couple of days.
+On Mon, Jun 03, 2013 at 11:09:56PM +0800, Shawn Guo wrote:
+> The following changes since commit de78a23d73ba7f1d08f3e1aeaa0a03cb912c62a0:
 > 
-> Please do. I think there are no excuses left this time ;-)
+>   ARM: imx: fix typo in gpu3d_shader_sels (2013-05-12 21:39:51 +0800)
+> 
+> are available in the git repository at:
+> 
+>   git://git.linaro.org/people/shawnguo/linux-2.6.git tags/imx-fixes-3.10-2
 
-Agreed.
+Pulled, thanks.
+
+> ----------------------------------------------------------------
+> The imx fixes for 3.10, take 2:
+> 
+> - One device tree fix for all spi node to have per clock added.
+>   The clock is needed by spi driver to calculate bit rate divisor.
+>   The spi node in the current device trees either does not have the
+>   clock or is defined as dummy clock, in which case the driver probe
+>   will fail or spi will run at a wrong bit rate.
+> 
+> - Two imx6q clock fixes, which correct axi_sels and ldb_di_sels.
+
+Are these regressions, or fixes for things that have never worked?
 
 
 -Olof
