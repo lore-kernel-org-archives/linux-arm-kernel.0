@@ -1,27 +1,42 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Sun, 9 Jun 2013 16:43:10 +0800
-Subject: [V1 0/7] Enhanced mmp fb driver and bugfix 
-Message-ID: <1370767390-11026-1-git-send-email-jtzhou@marvell.com>
+From: zhangfei.gao@linaro.org (zhangfei)
+Date: Sun, 09 Jun 2013 16:47:28 +0800
+Subject: [PATCH 1/2] i2c-designware: support no DW_IC_COMP_TYPE platform
+In-Reply-To: <20130609030600.GA4312@tarshish>
+References: <1370745402-11844-1-git-send-email-zhangfei.gao@linaro.org>
+ <1370745402-11844-2-git-send-email-zhangfei.gao@linaro.org>
+ <20130609030600.GA4312@tarshish>
+Message-ID: <51B44120.5060304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1 Enhanced some api/register operation routine
-2 Fix some bugs like memcpy and graphics/video layer enable/mask swap;
-3 Add pitch info and video layer set win/addr operations support
-
-Guoqing Li (2):
-  video: mmp: rb swap setting update for new LCD driver
-  video: mmp: optimize some register setting code
-
-Jing Xiang (5):
-  video: mmp: fix graphics/video layer enable/mask swap issue
-  video: mmp: fix memcpy wrong size for mmp_addr issue
-  video: mmp: add pitch info in mmp_win structure
-  video: mmp: calculate pitch value when fb set win
-  video: mmp: add video layer set win/addr operations support
-
- drivers/video/mmp/fb/mmpfb.c    |   34 +++++++++++------
- drivers/video/mmp/hw/mmp_ctrl.c |   75 ++++++++++++++++++++++-----------------
- drivers/video/mmp/hw/mmp_ctrl.h |    4 ++
- include/video/mmp_disp.h        |    3 ++
- 4 files changed, 71 insertions(+), 45 deletions(-)
+On 13-06-09 11:06 AM, Baruch Siach wrote:
+> Hi Zhangfei Gao,
+>
+> On Sun, Jun 09, 2013 at 10:36:41AM +0800, Zhangfei Gao wrote:
+>> Check accessor_flags before reading DW_IC_COMP_TYPE
+>> Give chance to platform no such register
+>>
+>> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+>> ---
+>>   drivers/i2c/busses/i2c-designware-core.c |   24 +++++++++++++-----------
+>>   drivers/i2c/busses/i2c-designware-core.h |    1 +
+>>   2 files changed, 14 insertions(+), 11 deletions(-)
+>
+> [...]
+>
+>> diff --git a/drivers/i2c/busses/i2c-designware-core.h
+>> b/drivers/i2c/busses/i2c-designware-core.h
+>> index e761ad1..b38b54e 100644
+>> --- a/drivers/i2c/busses/i2c-designware-core.h
+>> +++ b/drivers/i2c/busses/i2c-designware-core.h
+>> @@ -94,6 +94,7 @@ struct dw_i2c_dev {
+>>
+>>   #define ACCESS_SWAP		0x00000001
+>>   #define ACCESS_16BIT		0x00000002
+>> +#define ACCESS_32BIT		0x00000004
+>
+> This belongs to the next patch, not to this one.
+>
+> baruch
+>
+Thanks baruch, make sense.
