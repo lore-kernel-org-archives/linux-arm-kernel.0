@@ -1,37 +1,52 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Sun, 9 Jun 2013 11:39:43 -0300
-Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <20130609014506.GB10027@obsidianresearch.com>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1370623671-7748-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306072101.44694.arnd@arndb.de>
- <20130607200054.GA9010@obsidianresearch.com>
- <20130608183851.GB2354@localhost>
- <20130609014506.GB10027@obsidianresearch.com>
-Message-ID: <20130609143941.GB2353@localhost>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Sun,  9 Jun 2013 23:18:27 +0800
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+Message-ID: <1370791112-18464-1-git-send-email-ming.lei@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 08, 2013 at 07:45:06PM -0600, Jason Gunthorpe wrote:
-> On Sat, Jun 08, 2013 at 03:38:52PM -0300, Ezequiel Garcia wrote:
-[...]
-> 
-> There are lots and lots of solutions using the pre-processor, please
-> take a look and find one that you feel works for you...
-> 
+Hi,
 
-Ok, I will.
+The patchset supports to run giveback of URB in tasklet context, so that
+DMA unmapping/mapping on transfer buffer and compelte() callback can be
+run with interrupt enabled, then time of HCD interrupt handler can be
+saved much. Also this approach may simplify HCD since HCD lock needn't
+be released any more before calling usb_hcd_giveback_urb().
 
-> 
-> We can always improve the dtc envorionment (as was done recently by
-> adding the preprocessor), we cannot change 'DT ABI' once it it set.
->
+The patchset enables the mechanism on EHCI HCD.
 
-Right. Let me rework this using the preprocessor and send a v2.
+Patch 3/4 improves interrupt qh unlink on EHCI HCD when the mechanism
+is introduced.
 
-Thanks for the feedback!
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+In the commit log of patch 4/4, detailed test result on three machines
+(ARM A9/A15 dual core, X86) are provided about transfer performance and
+ehci irq handling time. From the result, no transfer performance loss
+is found and ehci irq handling time can drop much with the patchset.
+
+ drivers/usb/core/hcd.c            |  170 +++++++++++++++++++++++++++++++------
+ drivers/usb/host/ehci-fsl.c       |    2 +-
+ drivers/usb/host/ehci-grlib.c     |    2 +-
+ drivers/usb/host/ehci-hcd.c       |   18 ++--
+ drivers/usb/host/ehci-hub.c       |    1 +
+ drivers/usb/host/ehci-mv.c        |    2 +-
+ drivers/usb/host/ehci-octeon.c    |    2 +-
+ drivers/usb/host/ehci-pmcmsp.c    |    2 +-
+ drivers/usb/host/ehci-ppc-of.c    |    2 +-
+ drivers/usb/host/ehci-ps3.c       |    2 +-
+ drivers/usb/host/ehci-q.c         |    6 +-
+ drivers/usb/host/ehci-sched.c     |   60 ++++++++++++-
+ drivers/usb/host/ehci-sead3.c     |    2 +-
+ drivers/usb/host/ehci-sh.c        |    2 +-
+ drivers/usb/host/ehci-tegra.c     |    2 +-
+ drivers/usb/host/ehci-tilegx.c    |    2 +-
+ drivers/usb/host/ehci-timer.c     |   43 ++++++++++
+ drivers/usb/host/ehci-w90x900.c   |    2 +-
+ drivers/usb/host/ehci-xilinx-of.c |    2 +-
+ drivers/usb/host/ehci.h           |    3 +
+ include/linux/usb/hcd.h           |   16 ++++
+ 21 files changed, 295 insertions(+), 48 deletions(-)
+
+
+Thanks,
+--
+Ming Lei
