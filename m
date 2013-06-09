@@ -1,46 +1,207 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 09 Jun 2013 16:03:11 +0400
-Subject: [V1 5/7] video: mmp: add pitch info in mmp_win structure
-In-Reply-To: <1370767486-11729-1-git-send-email-jtzhou@marvell.com>
-References: <1370767486-11729-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <51B46EFF.7020001@cogentembedded.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Sun, 9 Jun 2013 20:56:32 +0800
+Subject: [PATCH 1/3] usb: chipidea: add CSR SiRFSoC ci13xxx usb driver
+In-Reply-To: <11238795.iUF0RmU8ZP@wuerfel>
+References: <1370748338-13210-1-git-send-email-Baohua.Song@csr.com>
+ <1370748338-13210-2-git-send-email-Baohua.Song@csr.com>
+ <11238795.iUF0RmU8ZP@wuerfel>
+Message-ID: <CAGsJ_4zcLrSeOpb7ikOEvUJLf41ZheOKOzZ1zexO69VbBd2Z-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Arnd,
 
-On 09-06-2013 12:44, Jett.Zhou wrote:
+2013/6/9 Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 09 June 2013 11:25:36 Barry Song wrote:
+>> From: Rong Wang <Rong.Wang@csr.com>
+>>
+>> CSR SiRF SoCs licensed chipidea ci13xxx USB IP, this patch
+>> makes the chipidea drivers support CSR SiRF SoCS.
+>>
+>> It also changes the Kconfig, only compile MSM and IMX if related
+>> drivers are enabled. Otherwise, we always need to enable all
+>> clients of chipidea drivers.
+>
+> Can't you use the same driver as for imx and make it more generic?
+> I don't actually see anything in here that is really specific to SiRF
+> and most of the code is the same as for imx.
 
-> From: Jing Xiang <jxiang@marvell.com>
+it seems you means a common driver like drivers/mmc/host/sdhci-pltfm.c
+for mmc host.
+it is a good idea.
 
-> Add pitch length info of graphics/video layer for mmp_win, if it is
-> YUV format of video layer, u/v pitch will non-zero.
+>
+> If there are bits that are truly SiRF specific, at least that can
+> be a much smaller part I think.
+>
+>> +#define RSC_USB_UART_SHARE   0x0
+>> +#define USB1_MODE_SEL                BIT(2)
+>> +#define pdev_to_phy(pdev)    ((struct usb_phy *)platform_get_drvdata(pdev))
+>> +
+>> +static int sirfsoc_vbus_gpio;
+>
+> What do you need static data for? This seems like a bad idea because it
+> makes it impossible to support multiple such devices.
 
-> Signed-off-by: Jing Xiang <jxiang@marvell.com>
-> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-> ---
->   include/video/mmp_disp.h |    3 +++
->   1 files changed, 3 insertions(+), 0 deletions(-)
+this should be attached to the data struct. sorry for my carelessness.
+rong did a very good job at first glance, then i took easy and missed
+to read one line by one line before i sent and missed some issues.
 
-> diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
-> index b9dd1fb..5708d26 100644
-> --- a/include/video/mmp_disp.h
-> +++ b/include/video/mmp_disp.h
-> @@ -91,6 +91,9 @@ struct mmp_win {
->   	u16	up_crop;
->   	u16	bottom_crop;
->   	int	pix_fmt;
-> +	/* pitch[0]: graphics/video layer line length or y pitch
-> +	 * pitch[1]/pitch[2]: video u/v pitch if non-zero */
+>
+>> +struct ci13xxx_sirf_data {
+>> +     struct platform_device  *ci_pdev;
+>> +     struct clk              *clk;
+>> +};
+>> +
+>> +static inline int ci13xxx_sirf_drive_vbus(int value)
+>> +{
+>> +     return gpio_direction_output(sirfsoc_vbus_gpio, value ? 0 : 1);
+>> +}
+>> +
+>> +static void ci13xxx_sirf_notify_event(struct ci13xxx *ci, unsigned event)
+>> +{
+>> +     switch (event) {
+>> +     case CI13XXX_CONTROLLER_RESET_EVENT:
+>> +             ci13xxx_sirf_drive_vbus(1);
+>> +             break;
+>> +     case CI13XXX_CONTROLLER_STOPPED_EVENT:
+>> +             ci13xxx_sirf_drive_vbus(0);
+>> +             break;
+>> +     default:
+>> +             dev_info(ci->dev, "Unknown Event\n");
+>> +             break;
+>> +     }
+>> +}
+>> +
+>> +static struct ci13xxx_platform_data ci13xxx_sirf_platdata = {
+>> +     .name                   = "ci13xxx_sirf",
+>> +     .flags                  = CI13XXX_DISABLE_STREAMING,
+>> +     .capoffset              = DEF_CAPOFFSET,
+>> +     .notify_event           = ci13xxx_sirf_notify_event,
+>> +};
+>> +
+>> +static struct of_device_id rsc_ids[] = {
+>> +     { .compatible = "sirf,prima2-rsc", },
+>> +     { /* sentinel */ }
+>> +};
+>
+> This is the reset controller, right? You already use the reset API
+> below, why do you need to open-code the gpio
 
-    The preferred format for multi-line comments is this:
+it's not reset controller. this is a Resource Sharing Control Module
+involved with pinmux, we have sirf pinctrl driver, so we should move
+to that.
+here the problem is the driver is still hardcoding the pinmux between
+uart and usb.
 
-/*
-  * bla
-  * bla
-  */
+>
+>> +static int ci13xxx_sirf_probe(struct platform_device *pdev)
+>> +{
+>> +     struct platform_device *plat_ci, *phy_pdev;
+>> +     struct device_node *rsc_np, *phy_np;
+>> +     struct ci13xxx_sirf_data *data;
+>> +     struct usb_phy *phy;
+>> +     void __iomem *rsc_vbase;
+>> +     int ret;
+>> +
+>> +     data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
+>> +     if (!data) {
+>> +             dev_err(&pdev->dev, "Failed to allocate ci13xxx_sirf_data!\n");
+>> +             return -ENOMEM;
+>> +     }
+>> +
+>> +     /* 1. set usb controller clock */
+>> +     data->clk = devm_clk_get(&pdev->dev, NULL);
+>> +     if (IS_ERR(data->clk)) {
+>> +             dev_err(&pdev->dev,
+>> +                     "Failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+>> +             return PTR_ERR(data->clk);
+>> +     }
+>> +     ret = clk_prepare_enable(data->clk);
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev,
+>> +                     "Failed to prepare or enable clock, err=%d\n", ret);
+>> +             return ret;
+>> +     }
+>> +
+>> +     /* 2. software reset */
+>> +     ret = device_reset(&pdev->dev);
+>> +     if (ret)
+>> +             dev_info(&pdev->dev,
+>> +                     "Failed to reset device, err=%d\n", ret);
+>> +
+>> +     /* 3. vbus configuration */
+>> +     sirfsoc_vbus_gpio = of_get_named_gpio(pdev->dev.of_node,
+>> +                                                     "vbus-gpios", 0);
+>> +     if (sirfsoc_vbus_gpio < 0) {
+>> +             dev_err(&pdev->dev, "Can't get vbus gpio from DT\n");
+>> +             ret = -ENODEV;
+>> +             goto err;
+>> +     }
+>> +     ret = gpio_request(sirfsoc_vbus_gpio, "ci13xxx_sirf");
+>> +     if (ret) {
+>> +             dev_err(&pdev->dev, "Failed to get gpio control\n");
+>> +             goto err;
+>> +     }
+>> +
+>
+> This seems totally generic so far, better put it into a common file.
 
-> +	u32	pitch[3];
->   };
+not so generic, it seems. i think we might need some comments here to
+explain why.
 
-WBR, Sergei
+>
+>> +     /* 4. rsc control */
+>> +     rsc_np = of_find_matching_node(NULL, rsc_ids);
+>> +     if (!rsc_np) {
+>> +             dev_err(&pdev->dev, "Failed to get rsc device node\n");
+>> +             ret = -ENODEV;
+>> +             goto err;
+>> +     }
+>> +     rsc_vbase = of_iomap(rsc_np, 0);
+>> +     if (!rsc_vbase) {
+>> +             dev_err(&pdev->dev, "Failed to iomap rsc memory\n");
+>> +             ret = -ENOMEM;
+>> +             goto err;
+>> +     }
+>> +     writel(readl(rsc_vbase + RSC_USB_UART_SHARE) | USB1_MODE_SEL,
+>> +                                     rsc_vbase + RSC_USB_UART_SHARE);
+>
+> And this seems out of place.
+
+this issue came from the pinmux issue i mentioned.
+
+>
+>> +     /* 6. get phy for controller */
+>> +     phy_np = of_parse_phandle(pdev->dev.of_node, "sirf,ci13xxx-usbphy", 0);
+>> +     if (!phy_np) {
+>> +             dev_err(&pdev->dev, "Failed to get phy device node\n");
+>> +             ret = -ENODEV;
+>> +             goto err;
+>> +     }
+>
+> I think "sirf,ci13xxx-usbphy" is a particularly bad identifier for the
+> phy here. Please have a look at the generic phy binding that is being
+> proposed.
+>
+
+ok.
+
+>> +static const struct of_device_id ci13xxx_sirf_dt_ids[] = {
+>> +     { .compatible = "sirf,ci13xxx-usbcontroller", },
+>> +     { /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(of, ci13xxx_sirf_dt_ids);
+>
+> Please take the 'xxx' strings out of the 'compatible' string and use
+> the specific device you are doing this for. If there are multiple
+> ones, you can either list all of them or ensure they are all marked
+> as compatible with the original design.
+
+agree. i would think the old name "chipidea,ci13611a-prima2" in dts
+should be right.
+
+>
+>         Arnd
+
+-barry
