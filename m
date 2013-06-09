@@ -1,309 +1,67 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  9 Jun 2013 18:36:05 +0200
-Subject: [PATCH 4/6] ARM: sunxi: dt: Add Allwinner A10s DTSI
-In-Reply-To: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1370795767-9769-5-git-send-email-maxime.ripard@free-electrons.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 9 Jun 2013 18:47:45 +0200
+Subject: N900 device tree conversion: how to do first step
+In-Reply-To: <201306091124.41251@pali>
+References: <20130609015944.GA23559@amd.pavel.ucw.cz> <201306091124.41251@pali>
+Message-ID: <20130609164745.GB16066@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun5i-a10s.dtsi | 286 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 286 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun5i-a10s.dtsi
+On Sun 2013-06-09 11:24:40, Pali Roh?r wrote:
+> On Sunday 09 June 2013 03:59:44 Pavel Machek wrote:
+> > Hi!
+> > 
+> > I'd like to convert Nokia N900 to device tree.
+> > 
+> > Unfortunately, serial port is not easily available (very
+> > special cable would be needed, does someone know where to get
+> > one?) and I don't have BDI (and very special cable would be
+> > needed, too).
+> > 
+> 
+> Hello,
+> 
+> I used serial port only in qemu for debugging. Maybe you can try
+> to play with qemu first. Qemu has good n900 HW support.
 
-diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
-new file mode 100644
-index 0000000..2307ce8
---- /dev/null
-+++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
-@@ -0,0 +1,286 @@
-+/*
-+ * Copyright 2013 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		cpu at 0 {
-+			compatible = "arm,cortex-a8";
-+		};
-+	};
-+
-+	memory {
-+		reg = <0x40000000 0x20000000>;
-+	};
-+
-+	clocks {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		/*
-+		 * This is a dummy clock, to be used as placeholder on
-+		 * other mux clocks when a specific parent clock is not
-+		 * yet implemented. It should be dropped when the driver
-+		 * is complete.
-+		 */
-+		dummy: dummy {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <0>;
-+		};
-+
-+		osc24M: osc24M at 01c20050 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-osc-clk";
-+			reg = <0x01c20050 0x4>;
-+			clock-frequency = <24000000>;
-+		};
-+
-+		osc32k: osc32k {
-+			#clock-cells = <0>;
-+			compatible = "fixed-clock";
-+			clock-frequency = <32768>;
-+		};
-+
-+		pll1: pll1 at 01c20000 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-pll1-clk";
-+			reg = <0x01c20000 0x4>;
-+			clocks = <&osc24M>;
-+		};
-+
-+		/* dummy is 200M */
-+		cpu: cpu at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-cpu-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&osc32k>, <&osc24M>, <&pll1>, <&dummy>;
-+		};
-+
-+		axi: axi at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-axi-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&cpu>;
-+		};
-+
-+		axi_gates: axi_gates at 01c2005c {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-axi-gates-clk";
-+			reg = <0x01c2005c 0x4>;
-+			clocks = <&axi>;
-+			clock-output-names = "axi_dram";
-+		};
-+
-+		ahb: ahb at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-ahb-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&axi>;
-+		};
-+
-+		ahb_gates: ahb_gates at 01c20060 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-ahb-gates-clk";
-+			reg = <0x01c20060 0x8>;
-+			clocks = <&ahb>;
-+			clock-output-names = "ahb_usb0", "ahb_ehci0",
-+				"ahb_ohci0", "ahb_ehci1", "ahb_ohci1", "ahb_ss",
-+				"ahb_dma", "ahb_bist", "ahb_mmc0", "ahb_mmc1",
-+				"ahb_mmc2", "ahb_mmc3", "ahb_ms", "ahb_nand",
-+				"ahb_sdram", "ahb_ace",	"ahb_emac", "ahb_ts",
-+				"ahb_spi0", "ahb_spi1", "ahb_spi2", "ahb_spi3",
-+				"ahb_pata", "ahb_sata", "ahb_gps", "ahb_ve",
-+				"ahb_tvd", "ahb_tve0", "ahb_tve1", "ahb_lcd0",
-+				"ahb_lcd1", "ahb_csi0", "ahb_csi1", "ahb_hdmi",
-+				"ahb_de_be0", "ahb_de_be1", "ahb_de_fe0",
-+				"ahb_de_fe1", "ahb_mp", "ahb_mali400";
-+		};
-+
-+		apb0: apb0 at 01c20054 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-apb0-clk";
-+			reg = <0x01c20054 0x4>;
-+			clocks = <&ahb>;
-+		};
-+
-+		apb0_gates: apb0_gates at 01c20068 {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-apb0-gates-clk";
-+			reg = <0x01c20068 0x4>;
-+			clocks = <&apb0>;
-+			clock-output-names = "apb0_codec", "apb0_spdif",
-+				"apb0_ac97", "apb0_iis", "apb0_pio", "apb0_ir0",
-+				"apb0_ir1", "apb0_keypad";
-+		};
-+
-+		/* dummy is pll62 */
-+		apb1_mux: apb1_mux at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-apb1-mux-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&osc24M>, <&dummy>, <&osc32k>;
-+		};
-+
-+		apb1: apb1 at 01c20058 {
-+			#clock-cells = <0>;
-+			compatible = "allwinner,sun4i-apb1-clk";
-+			reg = <0x01c20058 0x4>;
-+			clocks = <&apb1_mux>;
-+		};
-+
-+		apb1_gates: apb1_gates at 01c2006c {
-+			#clock-cells = <1>;
-+			compatible = "allwinner,sun4i-apb1-gates-clk";
-+			reg = <0x01c2006c 0x4>;
-+			clocks = <&apb1>;
-+			clock-output-names = "apb1_i2c0", "apb1_i2c1",
-+				"apb1_i2c2", "apb1_can", "apb1_scr",
-+				"apb1_ps20", "apb1_ps21", "apb1_uart0",
-+				"apb1_uart1", "apb1_uart2", "apb1_uart3",
-+				"apb1_uart4", "apb1_uart5", "apb1_uart6",
-+				"apb1_uart7";
-+		};
-+	};
-+
-+	soc at 01c20000 {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x01c20000 0x300000>;
-+		ranges;
-+
-+		emac: ethernet at 01c0b000 {
-+			compatible = "allwinner,sun4i-emac";
-+			reg = <0x01c0b000 0x1000>;
-+			interrupts = <55>;
-+			clocks = <&ahb_gates 17>;
-+			status = "disabled";
-+		};
-+
-+		mdio at 01c0b080 {
-+			compatible = "allwinner,sun4i-mdio";
-+			reg = <0x01c0b080 0x14>;
-+			status = "disabled";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+		};
-+
-+		intc: interrupt-controller at 01c20400 {
-+			compatible = "allwinner,sun4i-ic";
-+			reg = <0x01c20400 0x400>;
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+		};
-+
-+		pio: pinctrl at 01c20800 {
-+			compatible = "allwinner,sun5i-a10s-pinctrl";
-+			reg = <0x01c20800 0x400>;
-+			interrupts = <28>;
-+			clocks = <&apb0_gates 5>;
-+			gpio-controller;
-+			interrupt-controller;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			#gpio-cells = <3>;
-+
-+			uart0_pins_a: uart0 at 0 {
-+				allwinner,pins = "PB19", "PB20";
-+				allwinner,function = "uart0";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			uart2_pins_a: uart2 at 0 {
-+				allwinner,pins = "PC18", "PC19";
-+				allwinner,function = "uart2";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			uart3_pins_a: uart3 at 0 {
-+				allwinner,pins = "PG9", "PG10";
-+				allwinner,function = "uart3";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			emac_pins_a: emac0 at 0 {
-+				allwinner,pins = "PA0", "PA1", "PA2",
-+						"PA3", "PA4", "PA5", "PA6",
-+						"PA7", "PA8", "PA9", "PA10",
-+						"PA11", "PA12", "PA13", "PA14",
-+						"PA15", "PA16";
-+				allwinner,function = "emac";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+		};
-+
-+		timer at 01c20c00 {
-+			compatible = "allwinner,sun4i-timer";
-+			reg = <0x01c20c00 0x90>;
-+			interrupts = <22>;
-+			clocks = <&osc24M>;
-+		};
-+
-+		wdt: watchdog at 01c20c90 {
-+			compatible = "allwinner,sun4i-wdt";
-+			reg = <0x01c20c90 0x10>;
-+		};
-+
-+		uart0: serial at 01c28000 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28000 0x400>;
-+			interrupts = <1>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&apb1_gates 16>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at 01c28400 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28400 0x400>;
-+			interrupts = <2>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&apb1_gates 17>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at 01c28800 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28800 0x400>;
-+			interrupts = <3>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&apb1_gates 18>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at 01c28c00 {
-+			compatible = "snps,dw-apb-uart";
-+			reg = <0x01c28c00 0x400>;
-+			interrupts = <4>;
-+			reg-shift = <2>;
-+			reg-io-width = <4>;
-+			clocks = <&apb1_gates 19>;
-+			status = "disabled";
-+		};
-+	};
-+};
+Yes, qemu is helpful.
+
+For the record: this is how you use it.
+
+KERNEL=/data/l/linux-n900/zImage_dtb
+./qflasher -m rx51 -x ./xloader-qemu.bin -s ./secondary-qemu.bin -k $KERNEL -o n900.img -p k=6072
+
+> sd-empty
+./qemu-system-arm -s -M n900 -mtdblock n900.img -sd sd-empty -serial
+stdio -clock unix -redir tcp:5555:10.0.2.15:22
+
+...and this patch is needed to make it past rx51_init.
+
+Author: Pavel <pavel@ucw.cz>
+Date:   Sun Jun 9 18:45:39 2013 +0200
+
+    Comment out errata workaround that breaks qemu.
+
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index 938e46f..0ffd7d3 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -108,11 +108,13 @@ static void __init rx51_init(void)
+ 	rx51_peripherals_init();
+ 	rx51_camera_init();
+ 
++#if 0
+ #ifdef CONFIG_ARM_ERRATA_430973
+ 	printk(KERN_INFO "RX-51: Enabling ARM errata 430973 workaround.\n");
+ 	/* set IBE to 1 */
+ 	rx51_secure_update_aux_cr(1 << 6, 0);
+ #endif
++#endif
+ 
+ 	/* Ensure SDRC pins are mux'd for self-refresh */
+ 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+
+
 -- 
-1.8.3
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
