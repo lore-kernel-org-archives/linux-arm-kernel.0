@@ -1,100 +1,61 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Sun, 9 Jun 2013 16:43:43 +0800
-Subject: [V1 1/7] video: mmp: rb swap setting update for new LCD driver
-Message-ID: <1370767423-11240-1-git-send-email-jtzhou@marvell.com>
+Date: Sun, 9 Jun 2013 16:43:54 +0800
+Subject: [V1 2/7] video: mmp: optimize some register setting code
+Message-ID: <1370767434-11343-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Guoqing Li <ligq@marvell.com>
 
-We could set rb swap in two modules: DMA controler and interface
-output after blending.
-This patch move the panel rbswap requirement setting in later module.
+There are dumplicate code of the smooth setting based on different
+path, optimized the routine and use readl_relaxed instead.
 
-Signed-off-by: Guoqing Li <ligq@marvell.com>
 Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+Signed-off-by: Jing Xiang <jxiang@marvell.com>
+Signed-off-by: Guoqing Li <ligq@marvell.com>
 ---
- drivers/video/mmp/hw/mmp_ctrl.c |   15 ++++++++-------
- drivers/video/mmp/hw/mmp_ctrl.h |    4 ++++
- 2 files changed, 12 insertions(+), 7 deletions(-)
+ drivers/video/mmp/hw/mmp_ctrl.c |   22 +++++++---------------
+ 1 files changed, 7 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-index 4bd31b2..a472c4d 100644
+index a472c4d..3a8c2a3 100644
 --- a/drivers/video/mmp/hw/mmp_ctrl.c
 +++ b/drivers/video/mmp/hw/mmp_ctrl.c
-@@ -60,8 +60,7 @@ static irqreturn_t ctrl_handle_irq(int irq, void *dev_id)
+@@ -53,7 +53,7 @@ static irqreturn_t ctrl_handle_irq(int irq, void *dev_id)
+ 		tmp = readl_relaxed(ctrl->reg_base + SPU_IRQ_ISR);
+ 		if (tmp & isr)
+ 			writel_relaxed(~isr, ctrl->reg_base + SPU_IRQ_ISR);
+-	} while ((isr = readl(ctrl->reg_base + SPU_IRQ_ISR)) & imask);
++	} while ((isr = readl_relaxed(ctrl->reg_base + SPU_IRQ_ISR)) & imask);
  
- static u32 fmt_to_reg(struct mmp_overlay *overlay, int pix_fmt)
- {
--	u32 link_config = path_to_path_plat(overlay->path)->link_config;
--	u32 rbswap, uvswap = 0, yuvswap = 0,
-+	u32 rbswap = 0, uvswap = 0, yuvswap = 0,
- 		csc_en = 0, val = 0,
- 		vid = overlay_is_vid(overlay);
+ 	return IRQ_HANDLED;
+ }
+@@ -371,20 +371,12 @@ static void path_set_default(struct mmp_path *path)
+ 	 * bus arbiter for faster read if not tv path;
+ 	 * 2.enable horizontal smooth filter;
+ 	 */
+-	if (PATH_PN == path->id) {
+-		mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK
+-			| CFG_ARBFAST_ENA(1);
+-		tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
+-		tmp |= mask;
+-		writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+-	} else if (PATH_TV == path->id) {
+-		mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK
+-			| CFG_ARBFAST_ENA(1);
+-		tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
+-		tmp &= ~mask;
+-		tmp |= CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK;
+-		writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+-	}
++	mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK | CFG_ARBFAST_ENA(1);
++	tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
++	tmp |= mask;
++	if (PATH_TV == path->id)
++		tmp &= ~CFG_ARBFAST_ENA(1);
++	writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+ }
  
-@@ -71,27 +70,23 @@ static u32 fmt_to_reg(struct mmp_overlay *overlay, int pix_fmt)
- 	case PIXFMT_RGB888PACK:
- 	case PIXFMT_RGB888UNPACK:
- 	case PIXFMT_RGBA888:
--		rbswap = !(link_config & 0x1);
-+		rbswap = 1;
- 		break;
- 	case PIXFMT_VYUY:
- 	case PIXFMT_YVU422P:
- 	case PIXFMT_YVU420P:
--		rbswap = link_config & 0x1;
- 		uvswap = 1;
- 		break;
- 	case PIXFMT_YUYV:
--		rbswap = link_config & 0x1;
- 		yuvswap = 1;
- 		break;
- 	default:
--		rbswap = link_config & 0x1;
- 		break;
- 	}
- 
- 	switch (pix_fmt) {
- 	case PIXFMT_RGB565:
- 	case PIXFMT_BGR565:
--		val = 0;
- 		break;
- 	case PIXFMT_RGB1555:
- 	case PIXFMT_BGR1555:
-@@ -263,6 +258,12 @@ static void path_set_mode(struct mmp_path *path, struct mmp_mode *mode)
- 	tmp |= CFG_DUMB_ENA(1);
- 	writel_relaxed(tmp, ctrl_regs(path) + intf_ctrl(path->id));
- 
-+	/* interface rb_swap setting */
-+	tmp = readl_relaxed(ctrl_regs(path) + intf_rbswap_ctrl(path->id)) &
-+		(~(CFG_INTFRBSWAP_MASK));
-+	tmp |= link_config & CFG_INTFRBSWAP_MASK;
-+	writel_relaxed(tmp, ctrl_regs(path) + intf_rbswap_ctrl(path->id));
-+
- 	writel_relaxed((mode->yres << 16) | mode->xres, &regs->screen_active);
- 	writel_relaxed((mode->left_margin << 16) | mode->right_margin,
- 		&regs->screen_h_porch);
-diff --git a/drivers/video/mmp/hw/mmp_ctrl.h b/drivers/video/mmp/hw/mmp_ctrl.h
-index edd2002..975d890 100644
---- a/drivers/video/mmp/hw/mmp_ctrl.h
-+++ b/drivers/video/mmp/hw/mmp_ctrl.h
-@@ -163,6 +163,8 @@ struct lcd_regs {
- 
- #define LCD_SCLK(path) ((PATH_PN == path->id) ? LCD_CFG_SCLK_DIV :\
- 	((PATH_TV == path->id) ? LCD_TCLK_DIV : LCD_PN2_SCLK_DIV))
-+#define intf_rbswap_ctrl(id)	((id) ? (((id) & 1) ? LCD_TVIF_CTRL : \
-+				PN2_IOPAD_CONTROL) : LCD_TOP_CTRL)
- 
- /* dither configure */
- #ifdef CONFIG_CPU_PXA988
-@@ -615,6 +617,8 @@ struct lcd_regs {
- #define LCD_SPU_DUMB_CTRL			0x01B8
- #define	 CFG_DUMBMODE(mode)			((mode)<<28)
- #define	 CFG_DUMBMODE_MASK			0xF0000000
-+#define	 CFG_INTFRBSWAP(mode)			((mode)<<24)
-+#define	 CFG_INTFRBSWAP_MASK			0x0F000000
- #define	 CFG_LCDGPIO_O(data)			((data)<<20)
- #define	 CFG_LCDGPIO_O_MASK			0x0FF00000
- #define	 CFG_LCDGPIO_ENA(gpio)			((gpio)<<12)
+ static int path_init(struct mmphw_path_plat *path_plat,
 -- 
 1.7.0.4
