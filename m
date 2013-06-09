@@ -1,53 +1,37 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sat, 8 Jun 2013 22:32:58 -0700
-Subject: [PATCH] serial: omap: Fix device tree based PM runtime
-In-Reply-To: <20130607230022.GP3331@atomide.com>
-References: <20130607215835.GL3331@atomide.com> <87k3m5k07q.fsf@linaro.org>
- <20130607230022.GP3331@atomide.com>
-Message-ID: <20130609053258.GA8104@kroah.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 8 Jun 2013 22:35:26 -0700
+Subject: [GIT PULL] SiRF fixes for the v3.10 series
+In-Reply-To: <CAGsJ_4xTVms1wZVgBDE-+qZMGxKT4s_u-A=wXiB2Xq0NztpOUw@mail.gmail.com>
+References: <CAGsJ_4xTVms1wZVgBDE-+qZMGxKT4s_u-A=wXiB2Xq0NztpOUw@mail.gmail.com>
+Message-ID: <CAOesGMhSSYPQ6fUVDy+4Nj3s48HC=4Mny7m_kRCP4Cviq9rCbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 04:00:22PM -0700, Tony Lindgren wrote:
-> In the runtime_suspend function pdata is not being used, and
-> also blocks the function in device tree based booting. Fix it
-> by removing the unused pdata from the runtime_suspend function.
-> 
-> Further, context loss count is not being passed in pdata, so
-> let's just reinitialize the port every time for those case.
-> This can be further optimized later on for the device tree
-> case by adding detection for the hardware state and possibly
-> by adding a driver specific autosuspend timeout.
-> 
-> And doing this, we can then make the related dev_err into a
-> dev_dbg message instead of an error.
-> 
-> In order for the wake-up events to work, we also need to set
-> autosuspend_timeout to -1 if 0, and also device_init_wakeup()
-> as that's not being done by the platform init code for the
-> device tree case.
-> 
-> Note that this does not affect legacy booting, and in fact
-> might make it work for the cases where the context loss info
-> is not being passed in pdata.
-> 
-> Thanks to Kevin Hilman <khilman@linaro.org> for debugging
-> and suggesting fixes for the autosuspend_timeout and
-> device_init_wakeup() related initializiation.
-> 
-> Reviewed-by: Kevin Hilman <khilman@linaro.org>
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> ---
-> 
-> Here's an updated version with the white space fixed. Since
-> you already acked it, I won't waste the opportunity to keep it
-> in a single patch :)
+On Sun, Jun 2, 2013 at 11:28 PM, Barry Song <21cnbao@gmail.com> wrote:
+> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
+>
+>   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
+>
+> are available in the git repository at:
+>
+>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
+> tags/sirf-arm-soc-v3.10-fixes
+>
+> for you to fetch changes up to 3cc3b617dc39dad1e566ccfc4500154cb7c51aa3:
+>
+>   arm: prima2: use of_platform_populate instead of
+> of_platform_bus_probe (2013-06-03 13:51:58 +0800)
 
-It doesn't apply to my tree, so you'll have to refresh it against my
-tty-next tree and resend it.
 
-thanks,
+Hi,
 
-greg k-h
+Sorry for the delay in responding to this.
+
+Looking at the patches, they don't seem to fix any regression or
+serious bug -- they are more of cleanups and code removals. So I've
+pulled them into next/fixes-non-critical for 3.11.
+
+
+Thanks!
+
+-Olof
