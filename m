@@ -1,25 +1,43 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Sun,  9 Jun 2013 10:36:40 +0800
-Subject: [PATCH 0/2] support i2c-designware-hs
-Message-ID: <1370745402-11844-1-git-send-email-zhangfei.gao@linaro.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 9 Jun 2013 06:06:01 +0300
+Subject: [PATCH 1/2] i2c-designware: support no DW_IC_COMP_TYPE platform
+In-Reply-To: <1370745402-11844-2-git-send-email-zhangfei.gao@linaro.org>
+References: <1370745402-11844-1-git-send-email-zhangfei.gao@linaro.org>
+ <1370745402-11844-2-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20130609030600.GA4312@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support i2c-designware-hs.c, based on designware i2c ip 
+Hi Zhangfei Gao,
 
-Zhangfei Gao (2):
-  i2c-designware: support no DW_IC_COMP_TYPE platform
-  i2c: designware: Add i2c-designware-hs
+On Sun, Jun 09, 2013 at 10:36:41AM +0800, Zhangfei Gao wrote:
+> Check accessor_flags before reading DW_IC_COMP_TYPE
+> Give chance to platform no such register
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> ---
+>  drivers/i2c/busses/i2c-designware-core.c |   24 +++++++++++++-----------
+>  drivers/i2c/busses/i2c-designware-core.h |    1 +
+>  2 files changed, 14 insertions(+), 11 deletions(-)
 
- .../devicetree/bindings/i2c/i2c-designware-hs.txt  |   30 +++
- drivers/i2c/busses/Kconfig                         |   10 +
- drivers/i2c/busses/Makefile                        |    1 +
- drivers/i2c/busses/i2c-designware-core.c           |   24 +--
- drivers/i2c/busses/i2c-designware-core.h           |    1 +
- drivers/i2c/busses/i2c-designware-hs.c             |  194 ++++++++++++++++++++
- 6 files changed, 249 insertions(+), 11 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-designware-hs.txt
- create mode 100644 drivers/i2c/busses/i2c-designware-hs.c
+[...]
+
+> diff --git a/drivers/i2c/busses/i2c-designware-core.h 
+> b/drivers/i2c/busses/i2c-designware-core.h
+> index e761ad1..b38b54e 100644
+> --- a/drivers/i2c/busses/i2c-designware-core.h
+> +++ b/drivers/i2c/busses/i2c-designware-core.h
+> @@ -94,6 +94,7 @@ struct dw_i2c_dev {
+>  
+>  #define ACCESS_SWAP		0x00000001
+>  #define ACCESS_16BIT		0x00000002
+> +#define ACCESS_32BIT		0x00000004
+
+This belongs to the next patch, not to this one.
+
+baruch
 
 -- 
-1.7.9.5
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
