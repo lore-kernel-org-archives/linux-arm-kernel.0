@@ -1,73 +1,86 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Sun, 9 Jun 2013 16:45:03 +0800
-Subject: [V1 7/7] video: mmp: add video layer set win/addr operations support
-Message-ID: <1370767503-11913-1-git-send-email-jtzhou@marvell.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Sun, 9 Jun 2013 16:59:48 +0800
+Subject: [PATCH 2/2] i2c: designware: Add i2c-designware-hs
+In-Reply-To: <20130609032300.GB4312@tarshish>
+References: <1370745402-11844-1-git-send-email-zhangfei.gao@linaro.org>
+ <1370745402-11844-3-git-send-email-zhangfei.gao@linaro.org>
+ <20130609032300.GB4312@tarshish>
+Message-ID: <CAMj5BkhPp_-b19WFM-XitJ5-qDd9-dETp7UdNRLkRbdcq_h-Vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jing Xiang <jxiang@marvell.com>
+>> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware-hs.txt
+>> @@ -0,0 +1,30 @@
+>> +* Hisilicon I2C Controller
+>> +
+>> +Required properties :
+>> +
+>> + - compatible : should be "hisilicon,designware-i2c"
+>> + - reg : Offset and length of the register set for the device
+>> + - interrupts : <IRQ> where IRQ is the interrupt number.
+>> +
+>> +Example :
+>> +
+>> +     i2c0: i2c at fcb08000 {
+>> +             compatible = "hs,designware-i2c";
+>
+> A few comments on this one:
+>
+> 1. You should Cc devicetree-discuss at lists.ozlabs.org on patches touching ftd
+>    bindings (added to Cc)
+>
+> 2. The convention is to use the IC block designer in the "compatible" property
+>    prefix, in this case Symopsys (snps)
+>
+> 3. This does not match the compatible property in hs_dw_i2c_of_match[] below
+>    where you use "hisilicon,designware-i2c"
+>
+> 4. Please update Documentation/devicetree/bindings/vendor-prefixes.txt when
+>    adding new vendor prefixes
 
-Since mmp display controller support graphic/video layer together, so
-add  win/addr setting operations support when set win parameters.
+Thanks Baruch for the kind education, really useful.
+How about using .compatible = "snps,hisilicon-i2c"
 
-Signed-off-by: Jing Xiang <jxiang@marvell.com>
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
----
- drivers/video/mmp/hw/mmp_ctrl.c |   30 +++++++++++++++++++++++-------
- 1 files changed, 23 insertions(+), 7 deletions(-)
+>> +     Client in i2c0 bus with add 0x58 could be added as example
+>> +     i2c0: i2c at fcb08000 {
+>> +             status = "ok";
+>
+> The convention is to use "okay".
+got it.
 
-diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-index 92a5f44..4da6268 100644
---- a/drivers/video/mmp/hw/mmp_ctrl.c
-+++ b/drivers/video/mmp/hw/mmp_ctrl.c
-@@ -142,17 +142,27 @@ static void dmafetch_set_fmt(struct mmp_overlay *overlay)
- static void overlay_set_win(struct mmp_overlay *overlay, struct mmp_win *win)
- {
- 	struct lcd_regs *regs = path_regs(overlay->path);
--	u32 pitch;
- 
- 	/* assert win supported */
- 	memcpy(&overlay->win, win, sizeof(struct mmp_win));
- 
- 	mutex_lock(&overlay->access_ok);
--	pitch = win->xsrc * pixfmt_to_stride(win->pix_fmt);
--	writel_relaxed(pitch, &regs->g_pitch);
--	writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->g_size);
--	writel_relaxed((win->ydst << 16) | win->xdst, &regs->g_size_z);
--	writel_relaxed(0, &regs->g_start);
-+
-+	if (overlay_is_vid(overlay)) {
-+		writel_relaxed(win->pitch[0], &regs->v_pitch_yc);
-+		writel_relaxed(win->pitch[2] << 16 |
-+				win->pitch[1], &regs->v_pitch_uv);
-+
-+		writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->v_size);
-+		writel_relaxed((win->ydst << 16) | win->xdst, &regs->v_size_z);
-+		writel_relaxed(win->ypos << 16 | win->xpos, &regs->v_start);
-+	} else {
-+		writel_relaxed(win->pitch[0], &regs->g_pitch);
-+
-+		writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->g_size);
-+		writel_relaxed((win->ydst << 16) | win->xdst, &regs->g_size_z);
-+		writel_relaxed(win->ypos << 16 | win->xpos, &regs->g_start);
-+	}
- 
- 	dmafetch_set_fmt(overlay);
- 	mutex_unlock(&overlay->access_ok);
-@@ -234,7 +244,13 @@ static int overlay_set_addr(struct mmp_overlay *overlay, struct mmp_addr *addr)
- 
- 	/* FIXME: assert addr supported */
- 	memcpy(&overlay->addr, addr, sizeof(struct mmp_addr));
--	writel(addr->phys[0], &regs->g_0);
-+
-+	if (overlay_is_vid(overlay)) {
-+		writel_relaxed(addr->phys[0], &regs->v_y0);
-+		writel_relaxed(addr->phys[1], &regs->v_u0);
-+		writel_relaxed(addr->phys[2], &regs->v_v0);
-+	} else
-+		writel_relaxed(addr->phys[0], &regs->g_0);
- 
- 	return overlay->addr.phys[0];
- }
--- 
-1.7.0.4
+>
+>> +             pinctrl-names = "default";
+>> +             pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
+>> +             i2c_client1: i2c_client at 58 {
+>> +                     compatible = "hisilicon,i2c_client_tpa2028";
+>> +                     reg = <0x58>;
+>> +             };
+>> +     };
+>
+> [...]
+>
+> The code below looks like a direct copy of i2c-designware-platdrv.c. Is there
+> any reason you can't use that code instead?
+
+Not understood i2c-designware-platdrv.c can be directly touched.
+Usually, there is register function, or external function call.
+
+It would be great if we could directly add hisilicon support in
+i2c-designware-platdrv.c.
+How about adding these code to distinguish.
+
+The concern is will platdrv.c become bigger and bigger?
+What in case private register have to be accessed?
+
+struct dw_i2c_data {
+        u32 accessor_flags;
+        unsigned int tx_fifo_depth;
+        unsigned int rx_fifo_depth;
+};
+
+static struct dw_i2c_data hisilicon_data = {
+        .accessor_flags = ACCESS_32BIT,
+        .tx_fifo_depth = 16,
+        .rx_fifo_depth = 16,
+};
+{ .compatible = "snps,hisilicon-i2c", .data = &hisilicon_data},
