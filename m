@@ -1,108 +1,141 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 9 Jun 2013 21:05:47 +0800
-Subject: [PATCH v2] serial: imx: enable the clocks for console
-In-Reply-To: <20130609083409.GA32485@S2101-09.ap.freescale.net>
-References: <CAOMZO5A4SPFv1NopdGrN9nX-XSpZy5Cw1CLp3E95mRP8O=rhLQ@mail.gmail.com>
- <1370743279-15941-1-git-send-email-b32955@freescale.com>
- <20130609083409.GA32485@S2101-09.ap.freescale.net>
-Message-ID: <20130609130544.GC20780@S2101-09.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 09 Jun 2013 15:42:24 +0200
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20130608183851.GB2354@localhost>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130607200054.GA9010@obsidianresearch.com>
+ <20130608183851.GB2354@localhost>
+Message-ID: <1695243.lt6nZouziV@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 09, 2013 at 04:34:11PM +0800, Shawn Guo wrote:
-> On Sun, Jun 09, 2013 at 10:01:19AM +0800, Huang Shijie wrote:
-> > The console's clocks are disabled after the uart driver is probed.
-> > It makes that we can see less log from the console now
-> > (though we still can get all the log by the `dmesg`).
-> > 
-> > So enable the clocks for console, and we can see all the log again.
-> > 
-> > This patch also disables the sport->clk_per when we fail to enable
-> > the sport->clk_ipg;
-> > 
-> > Signed-off-by: Huang Shijie <b32955@freescale.com>
+On Saturday 08 June 2013 15:38:52 Ezequiel Garcia wrote:
+> On Fri, Jun 07, 2013 at 02:00:54PM -0600, Jason Gunthorpe wrote:
+
+> Right. I think we have two options here for laying the DT ranges.
 > 
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> 1) This is the proposal implied in the patchset I sent:
+> 
+> mbus {
+> 	ranges = < we only put the internal-reg translation here>
+> 	devbus-bootcs {
+> 		ranges = <0 {target_id/attribute} {window_physical_base} {size}>
+> 	}
+> }
 
-Sorry.  I have to take that back.
+As Jason explained, you cannot have the window_physical_base in the child
+device, that just wouldn't work. I don't know if that's a typo or a thinko ;-)
 
-Though it works fine with BusyBox, I'm getting the following warnings
-when booting with an Ubuntu 13.04 rootfs, in which case imx_startup()
-and imx_shutdown() will be called for a number of iterations.  That
-causes unbalanced clk_prepare_enable vs. clk_disable_unprepare, since
-the clk_prepare_enable is under condition if (!uart_console(port)) in
-imx_startup(), while clk_disable_unprepare in imx_shutdown() is not.
+I also think {size} above there would just be 0xffffffff, right?
 
-Shawn
+> 2) This is what Jason is proposing in his mail:
+> 
+> mbus {
+> 	ranges = <{target_id/attribute} 0 {window_physical_base} {size}>
+> 	devbus-bootcs {
+> 		ranges = <0 {target_id/attribute} 0 {size}>
+> 	}
+> }
+> 
+> Of course this looks much cleaner, but it forces a lot of duplication
+> in the DT files. Now, if you see some of the recent patches we've been
+> sending, I think this duplication is very error-prone, and it'll be a
+> nightmare to maintain. Let me propose an example to show this
+> duplication:
 
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 70 at /home/r65073/repos/next/linux-next/drivers/clk/clk.c:780 __clk_disable+0x68/0x84()
-Modules linked in:
-CPU: 0 PID: 70 Comm: mountall Not tainted 3.10.0-rc4-next-20130607+ #435
-Backtrace: 
-[<800116a4>] (dump_backtrace+0x0/0x10c) from [<80011844>] (show_stack+0x18/0x1c)
- r6:8069f4e8 r5:0000030c r4:00000000 r3:00000000
-[<8001182c>] (show_stack+0x0/0x1c) from [<8053bce0>] (dump_stack+0x78/0x94)
-[<8053bc68>] (dump_stack+0x0/0x94) from [<80023df8>] (warn_slowpath_common+0x6c/0x8c)
- r4:00000000 r3:00000000
-[<80023d8c>] (warn_slowpath_common+0x0/0x8c) from [<80023e3c>] (warn_slowpath_null+0x24/0x2c)
- r8:bf2ed008 r7:bfaa9810 r6:000f0013 r5:bf824b80 r4:bf824b80
-[<80023e18>] (warn_slowpath_null+0x0/0x2c) from [<8041af84>] (__clk_disable+0x68/0x84)
-[<8041af1c>] (__clk_disable+0x0/0x84) from [<8041b098>] (clk_disable+0x20/0x2c)
- r4:600f0013 r3:00000001
-[<8041b078>] (clk_disable+0x0/0x2c) from [<802c93e8>] (imx_shutdown+0xbc/0xec)
- r5:bf824b80 r4:bfaa9810
-[<802c932c>] (imx_shutdown+0x0/0xec) from [<802c63a0>] (uart_port_shutdown+0x34/0x40)
- r5:bf86f860 r4:bfaa9810
-[<802c636c>] (uart_port_shutdown+0x0/0x40) from [<802c68c0>] (uart_shutdown+0x98/0xc4)
- r4:bf86f800 r3:00000000
-[<802c6828>] (uart_shutdown+0x0/0xc4) from [<802c7514>] (uart_close+0x5c/0x198)
- r7:bfaa9810 r6:bf274400 r5:bf86f86c r4:bf86f800
-[<802c74b8>] (uart_close+0x0/0x198) from [<802ac648>] (tty_release+0xf8/0x500)
-[<802ac550>] (tty_release+0x0/0x500) from [<800c5a30>] (__fput+0x9c/0x208)
-[<800c5994>] (__fput+0x0/0x208) from [<800c5bac>] (____fput+0x10/0x14)
-[<800c5b9c>] (____fput+0x0/0x14) from [<80040234>] (task_work_run+0xb4/0xec)
-[<80040180>] (task_work_run+0x0/0xec) from [<80029238>] (do_exit+0x2b0/0x920)
- r8:8000e144 r7:000000f8 r6:bf306300 r5:00000000 r4:bfac1180
-[<80028f88>] (do_exit+0x0/0x920) from [<80029a4c>] (do_group_exit+0x50/0xd4)
- r7:000000f8
-[<800299fc>] (do_group_exit+0x0/0xd4) from [<80029ae8>] (__wake_up_parent+0x0/0x28)
- r7:000000f8 r6:00000001 r5:0006f7ae r4:0006f79a
-[<80029ad0>] (SyS_exit_group+0x0/0x18) from [<8000dfc0>] (ret_fast_syscall+0x0/0x30)
----[ end trace 16d080eb7efea4e9 ]---
-------------[ cut here ]------------
-WARNING: CPU: 0 PID: 70 at /home/r65073/repos/next/linux-next/drivers/clk/clk.c:689 __clk_unprepare+0x6c/0x8c()
-Modules linked in:
-CPU: 0 PID: 70 Comm: mountall Tainted: G        W    3.10.0-rc4-next-20130607+ #435
-Backtrace: 
-[<800116a4>] (dump_backtrace+0x0/0x10c) from [<80011844>] (show_stack+0x18/0x1c)
- r6:8069f4e8 r5:000002b1 r4:00000000 r3:00000000
-[<8001182c>] (show_stack+0x0/0x1c) from [<8053bce0>] (dump_stack+0x78/0x94)
-[<8053bc68>] (dump_stack+0x0/0x94) from [<80023df8>] (warn_slowpath_common+0x6c/0x8c)
- r4:00000000 r3:00000000
-[<80023d8c>] (warn_slowpath_common+0x0/0x8c) from [<80023e3c>] (warn_slowpath_null+0x24/0x2c)
- r8:bf2ed008 r7:bfaa9810 r6:000f0013 r5:bf824b80 r4:bf824b80
-[<80023e18>] (warn_slowpath_null+0x0/0x2c) from [<8041b68c>] (__clk_unprepare+0x6c/0x8c)
-[<8041b620>] (__clk_unprepare+0x0/0x8c) from [<8041b6c8>] (clk_unprepare+0x1c/0x24)
- r4:bf824b80 r3:00000000
-[<8041b6ac>] (clk_unprepare+0x0/0x24) from [<802c93f0>] (imx_shutdown+0xc4/0xec)
- r4:bfaa9810 r3:00000000
-[<802c932c>] (imx_shutdown+0x0/0xec) from [<802c63a0>] (uart_port_shutdown+0x34/0x40)
- r5:bf86f860 r4:bfaa9810
-[<802c636c>] (uart_port_shutdown+0x0/0x40) from [<802c68c0>] (uart_shutdown+0x98/0xc4)
- r4:bf86f800 r3:00000000
-[<802c6828>] (uart_shutdown+0x0/0xc4) from [<802c7514>] (uart_close+0x5c/0x198)
- r7:bfaa9810 r6:bf274400 r5:bf86f86c r4:bf86f800
-[<802c74b8>] (uart_close+0x0/0x198) from [<802ac648>] (tty_release+0xf8/0x500)
-[<802ac550>] (tty_release+0x0/0x500) from [<800c5a30>] (__fput+0x9c/0x208)
-[<800c5994>] (__fput+0x0/0x208) from [<800c5bac>] (____fput+0x10/0x14)
-[<800c5b9c>] (____fput+0x0/0x14) from [<80040234>] (task_work_run+0xb4/0xec)
-[<80040180>] (task_work_run+0x0/0xec) from [<80029238>] (do_exit+0x2b0/0x920)
- r8:8000e144 r7:000000f8 r6:bf306300 r5:00000000 r4:bfac1180
-[<80028f88>] (do_exit+0x0/0x920) from [<80029a4c>] (do_group_exit+0x50/0xd4)
- r7:000000f8
-[<800299fc>] (do_group_exit+0x0/0xd4) from [<80029ae8>] (__wake_up_parent+0x0/0x28)
- r7:000000f8 r6:00000001 r5:0006f7ae r4:0006f79a
-[<80029ad0>] (SyS_exit_group+0x0/0x18) from [<8000dfc0>] (ret_fast_syscall+0x0/0x30)
----[ end trace 16d080eb7efea4ea ]---
-------------[ cut here ]------------
+I don't see where that duplication comes in. The ranges in the
+"devbus-bootcs" are just describing how the hardware maps the
+child address space into the global mbus space, and that never
+changes. For the cases that only have a single device underneath,
+you can actually put an empty ranges property in there and adapt
+the "regs" property of whatever sits underneath it. These two
+representations would do exactly the same for instance:
+
+a)
+
+mbus {
+	ranges = <...>;
+	devbus-bootcs {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0 MBUS_BOOTCS 0 0xffffffff>;
+
+		flash {
+			regs = <0 0x100000>;
+		};
+	};
+};
+
+mbus {
+	ranges = <...>;
+	devbus-bootcs {
+		#address-cells = <2>;
+		#size-cells = <1>;
+		ranges;
+
+		flash {
+			regs = <MBUS_BOOTCS 0 0x100000>;
+		};
+	};
+};
+
+> Let's suppose we have a board "A" with its armada-A.dts,
+> and a common one armada.dtsi.
+> 
+> The common dtsi file would have this ranges property:
+> 
+> /* armada.dtsi */
+> mbus {
+> 	ranges = < internal_regs_id 0 internal_regs_base internal_regs_size
+> 		         bootrom_id 0       bootrom_base       bootrom_size >
+> }
+> 
+> The A board has a NOR connected to some devbus, so we need to add it
+> to the ranges, but also need to duplicate the ones in the common dtsi:
+> 
+> /* armada-A.dts */
+> mbus {
+> 	ranges = < internal_regs_id 0 internal_regs_base internal_regs_size
+> 		         bootrom_id 0       bootrom_base       bootrom_size
+> 		         devbus0_id 0       devbus0_base       devbus0_size >
+> }
+
+I think the mbus ranges property is best left only in the
+board specific .dts file, since you don't know if all of the
+mappings are actually set up to the same value by all boot
+loaders. In order to avoid a situation where the mbus ranges
+describes a setting that is not actually programmed into the
+mbus controller by the boot loader, I would leave that empty
+by default and only fill it when the OS actually assigns
+a mapping.
+ 
+> Now, if we add something at the common level, and extend the ranges
+> property in the common armada.dtsi, we also have to go through *each* of
+> the per-board dts files (for *each* board) adding that entry, because
+> entries *need* to be duplicated. Otherwise you're effectively
+> "shadowing" the entries.
+
+We can't really do that anyway, as that would imply we also change
+all the boot loaders that have been deployed. I mentioned earlier that
+we could also have the mappings we /want/ described in the DT rather the
+ones that are set up, but after the discussion about the 0xd0/0xf1
+window for the internal registers I think it's better to keep them
+in sync all the time. We can leave out mappings here that are set
+up but I'd prefer not to put mappings in there that are actually
+incorrect.
+
+When assigning the mappings, it's best to just go through all devices
+sitting below the mbus and pick an appropriate address for each
+'reg' value that gets put into the mbus hardware and into the ranges
+property at the same time. The easiest algorithm would be to do
+a 'first fit' starting at the highest address that is not already
+occupied. If we need the physical address space to be more compact,
+we can also first sort all the resources by size. The simpler approach
+wastes at most the size difference between the smallest and the largest
+range, and that is probably good enough.
+
+I thought this was actually what you implemented already, but it seems
+I was wrong.
+
+	Arnd 
