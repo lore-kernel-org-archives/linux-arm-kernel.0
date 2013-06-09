@@ -1,41 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 09 Jun 2013 17:37:22 +0200
-Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <20130609143422.GA2353@localhost>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1695243.lt6nZouziV@wuerfel> <20130609143422.GA2353@localhost>
-Message-ID: <2027719.ak85gut3pg@wuerfel>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sun, 9 Jun 2013 11:48:09 -0400 (EDT)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <1370791112-18464-1-git-send-email-ming.lei@canonical.com>
+Message-ID: <Pine.LNX.4.44L0.1306091136450.13202-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 June 2013 11:34:24 Ezequiel Garcia wrote:
-> On Sun, Jun 09, 2013 at 03:42:24PM +0200, Arnd Bergmann wrote:
-> > On Saturday 08 June 2013 15:38:52 Ezequiel Garcia wrote:
-> > > On Fri, Jun 07, 2013 at 02:00:54PM -0600, Jason Gunthorpe wrote:
-> > 
-> > > Right. I think we have two options here for laying the DT ranges.
-> > > 
-> > > 1) This is the proposal implied in the patchset I sent:
-> > > 
-> > > mbus {
-> > >     ranges = < we only put the internal-reg translation here>
-> > >     devbus-bootcs {
-> > >             ranges = <0 {target_id/attribute} {window_physical_base} {size}>
-> > >     }
-> > > }
-> > 
-> > As Jason explained, you cannot have the window_physical_base in the child
-> > device, that just wouldn't work. I don't know if that's a typo or a thinko 
-> > 
+On Sun, 9 Jun 2013, Ming Lei wrote:
+
+> Hi,
 > 
-> I'm not sure what you mean by "that just wouldn't work". I understand it
-> may be a crappy DT layout, but it definitely works.
+> The patchset supports to run giveback of URB in tasklet context, so that
+> DMA unmapping/mapping on transfer buffer and compelte() callback can be
+> run with interrupt enabled, then time of HCD interrupt handler can be
+> saved much. Also this approach may simplify HCD since HCD lock needn't
+> be released any more before calling usb_hcd_giveback_urb().
 
-I didn't mean to imply that you hadn't tested it. I guess it works fine
-if you put the same window_physical_base address into both the source
-and destination side mbus ranges property, but then you have to pass
-it three times in total and it gets really messy when you reassign it
-to a different physical address.
+That's a lot of material.  However, you haven't specifically said
+_what_ you want to accomplish.  It sounds like you're trying to
+minimize the amount of time spent in hardirq context, but I can't be
+sure that is really what you want.
 
-	Arnd
+If it is, this is not a good way to do it.  A better way to minimize
+the time spent in hardirq context is to use a threaded interrupt
+handler.  But why do you want to minimize this time in the first place?  
+The CPU will be still have to use at least as much time as before; the
+only difference is that it will be in softirq or in a high-priority
+thread instead of in hardirq.
+
+Also, I don't see how you can avoid releasing the HCD's private lock
+before calling usb_hcd_giveback_urb().  When the completion handler
+tries to resubmit the URB, the HCD's enqueue routine will try to
+reacquire the private lock.  If it didn't release the lock earlier, it
+will hang.
+
+Alan Stern
