@@ -1,80 +1,119 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sun, 9 Jun 2013 01:59:54 +0200
-Subject: [PATCH 1/2] pinctrl: add devicetree constants for simple generic
- pnconfig options
+Date: Sun, 9 Jun 2013 02:00:29 +0200
+Subject: [PATCH 2/2] pinctrl: add function to separate combined pinconfig
+ values
 In-Reply-To: <201306090159.05383.heiko@sntech.de>
 References: <201306090159.05383.heiko@sntech.de>
-Message-ID: <201306090159.54323.heiko@sntech.de>
+Message-ID: <201306090200.30258.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Most pinconfig options either ignore the argument or only have two states
-for them. Therefore it's possible to combine them into one value in dt
-bindings as bits, resulting in smaller pin definitions.
+The previous patch introduced constants to combine pinconfig settings
+into one value for easier devicetree handling.
+
+Therefore also add a function, that can separate these bitmaps into
+regular generic pinconfig options for handling inside pinctrl drivers.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- .../bindings/pinctrl/pinctrl-bindings.txt          |    6 +++
- include/dt-bindings/pinctrl/pinconfig.h            |   37 ++++++++++++++++++++
- 2 files changed, 43 insertions(+), 0 deletions(-)
- create mode 100644 include/dt-bindings/pinctrl/pinconfig.h
+ .../bindings/pinctrl/pinctrl-bindings.txt          |    3 +
+ drivers/pinctrl/pinconf-generic.c                  |   61 ++++++++++++++++++++
+ drivers/pinctrl/pinconf.h                          |    6 ++
+ 3 files changed, 70 insertions(+), 0 deletions(-)
 
 diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-index c95ea82..d206da0 100644
+index d206da0..55141af 100644
 --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
 +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-@@ -126,3 +126,9 @@ device; they may be grandchildren, for example. Whether this is legal, and
- whether there is any interaction between the child and intermediate parent
- nodes, is again defined entirely by the binding for the individual pin
- controller device.
+@@ -132,3 +132,6 @@ controller device.
+ dt-bindings/pinctrl/pinconfig.h defines a set of constants to combine basic
+ generic pinconfig settings, like pulls, into one value, that can be used
+ in pinctrl bindings like <bank pin mux CONFIG>.
 +
-+== Generic pinctrl config settings ==
++This value can then be split into individual generic pinconfig values in the
++driver using pinconf_generic_parse_dt_bitmap.
+diff --git a/drivers/pinctrl/pinconf-generic.c b/drivers/pinctrl/pinconf-generic.c
+index 9a6812b..90896fe 100644
+--- a/drivers/pinctrl/pinconf-generic.c
++++ b/drivers/pinctrl/pinconf-generic.c
+@@ -139,3 +139,64 @@ void pinconf_generic_dump_config(struct pinctrl_dev *pctldev,
+ }
+ EXPORT_SYMBOL_GPL(pinconf_generic_dump_config);
+ #endif
 +
-+dt-bindings/pinctrl/pinconfig.h defines a set of constants to combine basic
-+generic pinconfig settings, like pulls, into one value, that can be used
-+in pinctrl bindings like <bank pin mux CONFIG>.
-diff --git a/include/dt-bindings/pinctrl/pinconfig.h b/include/dt-bindings/pinctrl/pinconfig.h
-new file mode 100644
-index 0000000..b6ad251
---- /dev/null
-+++ b/include/dt-bindings/pinctrl/pinconfig.h
-@@ -0,0 +1,37 @@
 +/*
-+ * Header providing constants for generic pinconf bindings.
-+ *
-+ * Copyright (c) 2013 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * Maps the devicetree config bits to actual pinconf values.
++ * The array indizes match the bits set in dt-bindings/pinctrl/pinconf.h
++ * and the array should contain an entry for each bit defined there
 + */
++static unsigned long conf_map[] = {
++	PIN_CONF_PACKED(PIN_CONFIG_BIAS_DISABLE, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_BIAS_HIGH_IMPEDANCE, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_BIAS_BUS_HOLD, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_PIN_DEFAULT, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_UP, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_BIAS_PULL_DOWN, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_DRIVE_PUSH_PULL, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_DRIVE_OPEN_DRAIN, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_DRIVE_OPEN_SOURCE, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT_ENABLE, 1),
++	PIN_CONF_PACKED(PIN_CONFIG_INPUT_SCHMITT_ENABLE, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_LOW_POWER_MODE, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 0),
++	PIN_CONF_PACKED(PIN_CONFIG_OUTPUT, 1),
++};
 +
-+#ifndef __DT_BINDINGS_PINCTRL_PINCONFIG_H__
-+#define __DT_BINDINGS_PINCTRL_PINCONFIG_H__
++/*
++ * Parse a pinconf bitmap from a devicetree entry into individual pin configs.
++ * @pinconf: the bitmap containing config bits
++ * @configs: after the function returns contains a pointer to an array of
++ *	     pin configs
++ * @nconfigs: number of entries of configs
++ */
++int pinconf_generic_parse_dt_bitmap(unsigned long pinconf,
++				    unsigned long **configs,
++				    unsigned int *nconfigs)
++{
++	int bit;
++	int i;
++	unsigned long *cnf;
++	unsigned int ncnf;
 +
-+#define PINCONFIG_NONE			0
-+#define PINCONFIG_BIAS_DISABLE		(1 << 0)
-+#define PINCONFIG_BIAS_HIGH_IMPEDANCE	(1 << 1)
-+#define PINCONFIG_BIAS_BUS_HOLD		(1 << 2)
-+#define PINCONFIG_BIAS_PULL_PIN_DEFAULT	(1 << 3)
-+#define PINCONFIG_BIAS_PULL_UP		(1 << 4)
-+#define PINCONFIG_BIAS_PULL_DOWN	(1 << 5)
-+#define PINCONFIG_DRIVE_PUSH_PULL	(1 << 6)
-+#define PINCONFIG_DRIVE_OPEN_DRAIN	(1 << 7)
-+#define PINCONFIG_DRIVE_OPEN_SOURCE	(1 << 8)
-+#define PINCONFIG_INPUT_SCHMITT_ENABLE	(1 << 9)
-+#define PINCONFIG_INPUT_SCHMITT_DISABLE	(1 << 10)
-+#define PINCONFIG_LOW_POWER_MODE	(1 << 11)
-+#define PINCONFIG_OUTPUT_LOW		(1 << 12)
-+#define PINCONFIG_OUTPUT_HIGH		(1 << 13)
++	ncnf = hweight_long(pinconf);
++	cnf = kzalloc(ncnf * sizeof(unsigned long), GFP_KERNEL);
 +
++	i = 0;
++	while (pinconf && i < ncnf) {
++		bit = __ffs(pinconf);
++		pinconf &= ~BIT(i);
++
++		if (bit > ARRAY_SIZE(conf_map)) {
++			pr_err("%s: unknown bit %d\n", __func__, bit);
++			kfree(cnf);
++			return -EINVAL;
++		}
++
++		cnf[i] = conf_map[bit];
++		i++;
++	}
++
++	*configs = cnf;
++	*nconfigs = ncnf;
++	return 0;
++}
+diff --git a/drivers/pinctrl/pinconf.h b/drivers/pinctrl/pinconf.h
+index 92c7267..ae7480c 100644
+--- a/drivers/pinctrl/pinconf.h
++++ b/drivers/pinctrl/pinconf.h
+@@ -123,3 +123,9 @@ static inline void pinconf_generic_dump_config(struct pinctrl_dev *pctldev,
+ 	return;
+ }
+ #endif
++
++#ifdef CONFIG_GENERIC_PINCONF
++int pinconf_generic_parse_dt_bitmap(unsigned long pinconf,
++				    unsigned long **configs,
++				    unsigned int *nconfigs);
 +#endif
 -- 
 1.7.2.3
