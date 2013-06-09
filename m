@@ -1,43 +1,23 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun, 9 Jun 2013 06:06:01 +0300
-Subject: [PATCH 1/2] i2c-designware: support no DW_IC_COMP_TYPE platform
-In-Reply-To: <1370745402-11844-2-git-send-email-zhangfei.gao@linaro.org>
-References: <1370745402-11844-1-git-send-email-zhangfei.gao@linaro.org>
- <1370745402-11844-2-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20130609030600.GA4312@tarshish>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 9 Jun 2013 11:07:52 +0800
+Subject: [PATCH 1/5] ARM: dts: i.MX27: Add DMA devicetree node
+In-Reply-To: <20130608170955.GL32299@pengutronix.de>
+References: <1370702380-25408-1-git-send-email-shc_work@mail.ru>
+ <20130608170955.GL32299@pengutronix.de>
+Message-ID: <20130609030751.GC28574@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhangfei Gao,
-
-On Sun, Jun 09, 2013 at 10:36:41AM +0800, Zhangfei Gao wrote:
-> Check accessor_flags before reading DW_IC_COMP_TYPE
-> Give chance to platform no such register
+On Sat, Jun 08, 2013 at 07:09:55PM +0200, Sascha Hauer wrote:
+> On Sat, Jun 08, 2013 at 06:39:36PM +0400, Alexander Shiyan wrote:
+> > This patch adds the missing DMA devicetree node for i.MX27 SoCs.
+> > 
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 > 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> ---
->  drivers/i2c/busses/i2c-designware-core.c |   24 +++++++++++++-----------
->  drivers/i2c/busses/i2c-designware-core.h |    1 +
->  2 files changed, 14 insertions(+), 11 deletions(-)
+> For patches 1-3 and 5:
+> 
+Applied these, thanks.
 
-[...]
+Shawn
 
-> diff --git a/drivers/i2c/busses/i2c-designware-core.h 
-> b/drivers/i2c/busses/i2c-designware-core.h
-> index e761ad1..b38b54e 100644
-> --- a/drivers/i2c/busses/i2c-designware-core.h
-> +++ b/drivers/i2c/busses/i2c-designware-core.h
-> @@ -94,6 +94,7 @@ struct dw_i2c_dev {
->  
->  #define ACCESS_SWAP		0x00000001
->  #define ACCESS_16BIT		0x00000002
-> +#define ACCESS_32BIT		0x00000004
-
-This belongs to the next patch, not to this one.
-
-baruch
-
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+> Acked-by: Sascha Hauer <s.hauer@pengutonix.de>
