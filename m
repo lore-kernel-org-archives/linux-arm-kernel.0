@@ -1,32 +1,128 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 9 Jun 2013 23:31:49 +0100
-Subject: [Arm-netbook] getting allwinner SoC support upstream (was Re:
- Uploading linux (3.9.4-1))
-In-Reply-To: <CAPweEDw0U-djVaVzWoNnvhWvwOP=LXc=Ac97ZzTYb6AKF+j8hg@mail.gmail.com>
-References: <CAPweEDx3mAy40BZrzrKPRbvg7vKMj7KevDQ3m_v4p6Yo50eSGg@mail.gmail.com>
- <20130607205940.4816fed5@skate>
- <CAPweEDxtC+OamcpVEQ3BULbN88hSJzKoi0fkNLBAdZD04LQCNQ@mail.gmail.com>
- <4247099.i8S79t0Pua@flatron>
- <CAPweEDwON7x-FrqUrvKDNXu3nCYOgrEzY9V5q8zxvoe6kWKCtA@mail.gmail.com>
- <CAPweEDw0U-djVaVzWoNnvhWvwOP=LXc=Ac97ZzTYb6AKF+j8hg@mail.gmail.com>
-Message-ID: <20130609223149.GO18614@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Jun 2013 00:34:30 +0200
+Subject: [PATCH] ARM: nomadik: switch to use the Nomadik I2C driver
+Message-ID: <1370817270-10116-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 09, 2013 at 11:09:59PM +0100, luke.leighton wrote:
-> this is all a rather round-about way to say that for those people who
-> heard and are thinking of heeding russell's call to "be silent and to
-> ignore me"
+Instead of using bit-banged I2C, let's use the actual I2C
+driver in the kernel. Since the I2C block may be communicating
+with things like the PMIC, we need to select it from the Kconfig
+just like the bit-banged adapter is selected today. The rest of
+the configuration for this driver can be done from the device
+tree.
 
-Okay, so you've just misrepresented me in the above comment.  I never
-said anything of the sort.  The closest that I've come to a comment like
-that is asking you to stop wasting people's time.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+This patch is based on the branch of Nomadik clocks making it
+possible to do all configuration of the I2C block from the
+device tree.
+---
+ arch/arm/boot/dts/ste-nomadik-stn8815.dtsi | 42 ++++++++++++++++++++++--------
+ arch/arm/mach-nomadik/Kconfig              |  1 +
+ 2 files changed, 32 insertions(+), 11 deletions(-)
 
-So, given your displayed inability to properly convey what people have
-said to you in a discussion in your own replies, is there *any* reason
-that anyone should trust you to communicate their position to any other
-third party?
-
-In some ways, I'm *glad* that you've passed everything on verbatum,
-because it means that it's (hopefully) free from any misrepresentations
-such as the above.
+diff --git a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+index 82970d7..0e543e0 100644
+--- a/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
++++ b/arch/arm/boot/dts/ste-nomadik-stn8815.dtsi
+@@ -140,18 +140,30 @@
+ 			};
+ 		};
+ 		i2c0 {
++			i2c0_default_mux: i2c0_mux {
++				i2c0_default_mux {
++					ste,function = "i2c0";
++					ste,pins = "i2c0_a_1";
++				};
++			};
+ 			i2c0_default_mode: i2c0_default {
+ 				i2c0_default_cfg {
+ 					ste,pins = "GPIO62_D3", "GPIO63_D2";
+-					ste,input = <1>;
++					ste,input = <0>;
+ 				};
+ 			};
+ 		};
+ 		i2c1 {
++			i2c1_default_mux: i2c1_mux {
++				i2c1_default_mux {
++					ste,function = "i2c1";
++					ste,pins = "i2c1_a_1";
++				};
++			};
+ 			i2c1_default_mode: i2c1_default {
+ 				i2c1_default_cfg {
+ 					ste,pins = "GPIO53_L4", "GPIO54_L3";
+-					ste,input = <1>;
++					ste,input = <0>;
+ 				};
+ 			};
+ 		};
+@@ -159,7 +171,7 @@
+ 			i2c2_default_mode: i2c2_default {
+ 				i2c2_default_cfg {
+ 					ste,pins = "GPIO73_C21", "GPIO74_C20";
+-					ste,input = <1>;
++					ste,input = <0>;
+ 				};
+ 			};
+ 		};
+@@ -682,13 +694,17 @@
+ 
+ 	/* I2C0 connected to the STw4811 power management chip */
+ 	i2c0 {
+-		compatible = "i2c-gpio";
+-		gpios = <&gpio1 31 0>, /* sda */
+-			<&gpio1 30 0>; /* scl */
++		compatible = "st,nomadik-i2c", "arm,primecell";
++		reg = <0x101f8000 0x1000>;
++		interrupt-parent = <&vica>;
++		interrupts = <20>;
++		clock-frequency = <100000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		clocks = <&i2c0clk>, <&pclki2c0>;
++		clock-names = "mclk", "apb_pclk";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&i2c0_default_mode>;
++		pinctrl-0 = <&i2c0_default_mux>, <&i2c0_default_mode>;
+ 
+ 		stw4811 at 2d {
+ 			compatible = "st,stw4811";
+@@ -704,13 +720,17 @@
+ 
+ 	/* I2C1 connected to various sensors */
+ 	i2c1 {
+-		compatible = "i2c-gpio";
+-		gpios = <&gpio1 22 0>, /* sda */
+-			<&gpio1 21 0>; /* scl */
++		compatible = "st,nomadik-i2c", "arm,primecell";
++		reg = <0x101f7000 0x1000>;
++		interrupt-parent = <&vica>;
++		interrupts = <21>;
++		clock-frequency = <100000>;
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		clocks = <&i2c1clk>, <&pclki2c1>;
++		clock-names = "mclk", "apb_pclk";
+ 		pinctrl-names = "default";
+-		pinctrl-0 = <&i2c1_default_mode>;
++		pinctrl-0 = <&i2c1_default_mux>, <&i2c1_default_mode>;
+ 
+ 		camera at 2d {
+ 			   compatible = "st,camera";
+diff --git a/arch/arm/mach-nomadik/Kconfig b/arch/arm/mach-nomadik/Kconfig
+index 5981c3d..4d42da4 100644
+--- a/arch/arm/mach-nomadik/Kconfig
++++ b/arch/arm/mach-nomadik/Kconfig
+@@ -27,6 +27,7 @@ config MACH_NOMADIK_8815NHK
+ 	select NOMADIK_8815
+ 	select I2C
+ 	select I2C_ALGOBIT
++	select I2C_NOMADIK
+ 
+ endmenu
+ endif
+-- 
+1.8.1.4
