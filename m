@@ -1,86 +1,93 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Sun, 9 Jun 2013 16:59:48 +0800
-Subject: [PATCH 2/2] i2c: designware: Add i2c-designware-hs
-In-Reply-To: <20130609032300.GB4312@tarshish>
-References: <1370745402-11844-1-git-send-email-zhangfei.gao@linaro.org>
- <1370745402-11844-3-git-send-email-zhangfei.gao@linaro.org>
- <20130609032300.GB4312@tarshish>
-Message-ID: <CAMj5BkhPp_-b19WFM-XitJ5-qDd9-dETp7UdNRLkRbdcq_h-Vg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Sun, 9 Jun 2013 09:11:13 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP: some clock & hwmod changes for v3.11
+Message-ID: <alpine.DEB.2.02.1306090909190.20050@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware-hs.txt
->> @@ -0,0 +1,30 @@
->> +* Hisilicon I2C Controller
->> +
->> +Required properties :
->> +
->> + - compatible : should be "hisilicon,designware-i2c"
->> + - reg : Offset and length of the register set for the device
->> + - interrupts : <IRQ> where IRQ is the interrupt number.
->> +
->> +Example :
->> +
->> +     i2c0: i2c at fcb08000 {
->> +             compatible = "hs,designware-i2c";
->
-> A few comments on this one:
->
-> 1. You should Cc devicetree-discuss at lists.ozlabs.org on patches touching ftd
->    bindings (added to Cc)
->
-> 2. The convention is to use the IC block designer in the "compatible" property
->    prefix, in this case Symopsys (snps)
->
-> 3. This does not match the compatible property in hs_dw_i2c_of_match[] below
->    where you use "hisilicon,designware-i2c"
->
-> 4. Please update Documentation/devicetree/bindings/vendor-prefixes.txt when
->    adding new vendor prefixes
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Thanks Baruch for the kind education, really useful.
-How about using .compatible = "snps,hisilicon-i2c"
+Hi Tony,
 
->> +     Client in i2c0 bus with add 0x58 could be added as example
->> +     i2c0: i2c at fcb08000 {
->> +             status = "ok";
->
-> The convention is to use "okay".
-got it.
+The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
 
->
->> +             pinctrl-names = "default";
->> +             pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
->> +             i2c_client1: i2c_client at 58 {
->> +                     compatible = "hisilicon,i2c_client_tpa2028";
->> +                     reg = <0x58>;
->> +             };
->> +     };
->
-> [...]
->
-> The code below looks like a direct copy of i2c-designware-platdrv.c. Is there
-> any reason you can't use that code instead?
+  Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
 
-Not understood i2c-designware-platdrv.c can be directly touched.
-Usually, there is register function, or external function call.
+are available in the git repository at:
 
-It would be great if we could directly add hisilicon support in
-i2c-designware-platdrv.c.
-How about adding these code to distinguish.
+  http://git.kernel.org/cgit/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-b-for-3.11
 
-The concern is will platdrv.c become bigger and bigger?
-What in case private register have to be accessed?
+for you to fetch changes up to 563ce4d51a555b45f5d43ff9cf127da8dac9f64d:
 
-struct dw_i2c_data {
-        u32 accessor_flags;
-        unsigned int tx_fifo_depth;
-        unsigned int rx_fifo_depth;
-};
+  ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK (2013-06-09 01:12:32 -0600)
 
-static struct dw_i2c_data hisilicon_data = {
-        .accessor_flags = ACCESS_32BIT,
-        .tx_fifo_depth = 16,
-        .rx_fifo_depth = 16,
-};
-{ .compatible = "snps,hisilicon-i2c", .data = &hisilicon_data},
+- ----------------------------------------------------------------
+A few OMAP clock & hwmod changes for v3.11.
+
+Basic test logs are here:
+
+http://www.pwsan.com/omap/testlogs/prcm_devel_v3.11/20130609020805/
+
+- ----------------------------------------------------------------
+Philip Avinash (1):
+      ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK
+
+Roger Quadros (1):
+      ARM: OMAP3: clock data: get rid of unused USB host clock aliases and dummies
+
+Vaibhav Hiremath (1):
+      ARM: OMAP2+: AM33xx: Add missing reset status info to GFX hwmod
+
+ arch/arm/mach-omap2/cclock33xx_data.c      |   30 ++++++++++++++++++++++++++++
+ arch/arm/mach-omap2/cclock3xxx_data.c      |   11 ----------
+ arch/arm/mach-omap2/control.h              |    8 ++++++++
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |    3 ++-
+ 4 files changed, 40 insertions(+), 12 deletions(-)
+
+vmlinux object size
+(delta in bytes from test_v3.10-rc4 (d683b96b072dc4680fc74964eca77e6a23d1fa6e)):
+   text     data      bss    total  kernel
+      0     +448        0     +448  am33xx_only
+      0        0        0        0  n800_multi_omap2xxx
+      0        0        0        0  n800_only_a
+      0        0        0        0  omap1_defconfig
+      0        0        0        0  omap1_defconfig_1510innovator_only
+      0        0        0        0  omap1_defconfig_5912osk_only
+  +4096     +192        0    +4288  omap2plus_defconfig
+      0        0        0        0  omap2plus_defconfig_2430sdp_only
+      0     +192        0     +192  omap2plus_defconfig_cpupm
+      0     +192        0     +192  omap2plus_defconfig_no_pm
+      0        0        0        0  omap2plus_defconfig_omap2_4_only
+      0     +192        0     +192  omap2plus_defconfig_omap3_4_only
+   +176     +128     -176     +128  rmk_omap3430_ldp_allnoconfig
+      0     +192        0     +192  rmk_omap3430_ldp_oldconfig
+   +176     +128     -176     +128  rmk_omap4430_sdp_allnoconfig
+      0     +448        0     +448  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v3.10-rc4 (d683b96b072dc4680fc74964eca77e6a23d1fa6e))
+  avail  rsrvd   high  freed  board          kconfig
+    -8k     8k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .      .  3517evm        omap2plus_defconfig
+    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
+    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.12 (GNU/Linux)
+
+iQIcBAEBAgAGBQJRtEYNAAoJEMePsQ0LvSpLgmMP/3Vq6DDNCTz6ZjsLG4AugQTc
+gdiQwk6RVYOUarJyNnQRPYNeHU3WiRL+v6K8bla577vseQEJ8qiomo0u/KMMDHAa
+AC++j7eGxcW7S4rakp6raU+ObRWMllqV3YhGVoGq69Sc/GYADPkOXuB1wdUTVk/6
+JXJKwE2/lh6/bDRHZzMr3oyXLEj+iNd3O1Yqc2HpBCYEPg+7U5HLCMBVGM2j8Trn
+2sNv6A8CfzKdmrOF+HBDurdESvbWfdm0dUO0hXAa4dc/L63SSiu4+Y9l+MWAmw02
++CDdaHKfhRZXdj4jbwleZpgjeF5HYWWSTBEt9pnhS/qzV2zhZHjwBvdoq2e5aJeM
+Nxg3gegQMeqsMjeDAG9NpAASDSVBrKYh+/fdhUBf87EdpQZHfvgK13LKjfeNrljN
+YTMLa9A9IdHGWLe9MWiZfFaNlCnazb2Zu5c+i1XYZNS8puucKLaGu87Y7QEptPb9
+a67Xqj8dyGWw/cgsxXRCyoXfmpUxigwoSQq3RuUQ/ukyu6JX5veusFW1FWMRtWXp
+PA0sjwnEgAiwEpMmnJ4oTC1TzCOhaa7Pl6X8DlYMBkjiIHSjE/MCvG/1PuoXYoJa
+6E0qv9dK302iIbWpA/msVFuhAJ9lrDQHP5PWZQALrbI9uF2aVrp8ursI80N3XoPz
+ZIsWRfwCRbjesLdEWJUX
+=uJ2F
+-----END PGP SIGNATURE-----
