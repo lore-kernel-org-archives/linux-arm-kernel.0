@@ -1,68 +1,115 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 9 Jun 2013 11:24:40 +0200
-Subject: N900 device tree conversion: how to do first step
-In-Reply-To: <20130609015944.GA23559@amd.pavel.ucw.cz>
-References: <20130609015944.GA23559@amd.pavel.ucw.cz>
-Message-ID: <201306091124.41251@pali>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 9 Jun 2013 12:50:26 +0300
+Subject: [PATCH 2/2] i2c: designware: Add i2c-designware-hs
+In-Reply-To: <CAMj5BkhPp_-b19WFM-XitJ5-qDd9-dETp7UdNRLkRbdcq_h-Vg@mail.gmail.com>
+References: <1370745402-11844-1-git-send-email-zhangfei.gao@linaro.org>
+ <1370745402-11844-3-git-send-email-zhangfei.gao@linaro.org>
+ <20130609032300.GB4312@tarshish>
+ <CAMj5BkhPp_-b19WFM-XitJ5-qDd9-dETp7UdNRLkRbdcq_h-Vg@mail.gmail.com>
+Message-ID: <20130609095026.GF4312@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 June 2013 03:59:44 Pavel Machek wrote:
-> Hi!
+Hi zhangfei gao,
+
+On Sun, Jun 09, 2013 at 04:59:48PM +0800, zhangfei gao wrote:
+> >> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware-hs.txt
+> >> @@ -0,0 +1,30 @@
+> >> +* Hisilicon I2C Controller
+> >> +
+> >> +Required properties :
+> >> +
+> >> + - compatible : should be "hisilicon,designware-i2c"
+> >> + - reg : Offset and length of the register set for the device
+> >> + - interrupts : <IRQ> where IRQ is the interrupt number.
+> >> +
+> >> +Example :
+> >> +
+> >> +     i2c0: i2c at fcb08000 {
+> >> +             compatible = "hs,designware-i2c";
+> >
+> > A few comments on this one:
+> >
+> > 1. You should Cc devicetree-discuss at lists.ozlabs.org on patches touching ftd
+> >    bindings (added to Cc)
+> >
+> > 2. The convention is to use the IC block designer in the "compatible" property
+> >    prefix, in this case Symopsys (snps)
+> >
+> > 3. This does not match the compatible property in hs_dw_i2c_of_match[] below
+> >    where you use "hisilicon,designware-i2c"
+> >
+> > 4. Please update Documentation/devicetree/bindings/vendor-prefixes.txt when
+> >    adding new vendor prefixes
 > 
-> I'd like to convert Nokia N900 to device tree.
+> Thanks Baruch for the kind education, really useful.
+> How about using .compatible = "snps,hisilicon-i2c"
+
+I don't think this is needed. See below.
+
+> >> +     Client in i2c0 bus with add 0x58 could be added as example
+> >> +     i2c0: i2c at fcb08000 {
+> >> +             status = "ok";
+> >
+> > The convention is to use "okay".
+> got it.
 > 
-> Unfortunately, serial port is not easily available (very
-> special cable would be needed, does someone know where to get
-> one?) and I don't have BDI (and very special cable would be
-> needed, too).
+> >
+> >> +             pinctrl-names = "default";
+> >> +             pinctrl-0 = <&i2c0_pmx_func &i2c0_cfg_func>;
+> >> +             i2c_client1: i2c_client at 58 {
+> >> +                     compatible = "hisilicon,i2c_client_tpa2028";
+> >> +                     reg = <0x58>;
+> >> +             };
+> >> +     };
+> >
+> > [...]
+> >
+> > The code below looks like a direct copy of i2c-designware-platdrv.c. Is there
+> > any reason you can't use that code instead?
 > 
+> Not understood i2c-designware-platdrv.c can be directly touched.
+> Usually, there is register function, or external function call.
+> 
+> It would be great if we could directly add hisilicon support in
+> i2c-designware-platdrv.c.
+> How about adding these code to distinguish.
+> 
+> The concern is will platdrv.c become bigger and bigger?
 
-Hello,
+The overall code size becomes much bigger when duplicating the code. It makes 
+code maintenance harder.
 
-I used serial port only in qemu for debugging. Maybe you can try
-to play with qemu first. Qemu has good n900 HW support.
+> What in case private register have to be accessed?
 
-But problematic is to create n900 mtd nand image bootable in
-qemu, because it needs closed source nokia bootloader and this
-needs to have CAL partition with some unknown data with is
-proprietary format.
+Good question. I don't know what is the common convention in this case. Do you 
+have such a need here?
 
-Nevertheless, there is prebuilded qemu image with maemo5 and with
-special version of nokia patches qemu, which was (and still is)
-very good for testing anything for n900. Special version of qemu
-plus qemu image is part of MADDE development tool, look here:
+> struct dw_i2c_data {
+>         u32 accessor_flags;
+>         unsigned int tx_fifo_depth;
+>         unsigned int rx_fifo_depth;
+> };
+> 
+> static struct dw_i2c_data hisilicon_data = {
+>         .accessor_flags = ACCESS_32BIT,
 
-Info: http://wiki.maemo.org/MADDE
-Download link: http://tablets-dev.nokia.com/MADDE.php
+This should be detected automatically in i2c_dw_init(). When ACCESS_16BIT is 
+not set, access is 32bit wide. Doesn't it work for you?
 
-Except skinning support and Opengl ES all other nokia patches were
-included into Linaro version of qemu, so you can use it without
-problems. But you still need proprietary bootloader and correct
-CAL partition.
+>         .tx_fifo_depth = 16,
+>         .rx_fifo_depth = 16,
 
-But, nokia released closed redistributable version of bootloader
-for qemu and (proprietary) tool which generating mtd nand
-partition. You can pass kernel, initfs, rootfs images and it
-create correct mtd layout and automatically creating CAL.
+These should be encoded in new device-tree properties named "tx-fifo-size", 
+and "rx-fifo-size". For example, see 
+Documentation/devicetree/bindings/powerpc/4xx/emac.txt.
 
-Proprietary n900 bootloader (two parts!) for qemu is here:
-http://download.meego.com/live/Trunk:/non-oss:/Testing/Trunk_Testing/i586/nolo-qemu-0.20100910-1.2.i586.rpm
+baruch
 
-Proprietary tool for creating mtd nand file is here:
-http://download.meego.com/live/Trunk:/non-oss:/Testing/Trunk_Testing/i586/qflasher-21-1.2.i586.rpm
-
-PS: Sorry for too many closed SW, but there is no FOSS equivalent
-and this is the only one option how to use qemu n900 hw support.
-U-Boot is ported to n900, but depends on Nokia bootloader...
+> };
+> { .compatible = "snps,hisilicon-i2c", .data = &hisilicon_data},
 
 -- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130609/e7737340/attachment-0001.sig>
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
