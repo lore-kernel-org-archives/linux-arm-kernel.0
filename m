@@ -1,48 +1,58 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 09 Jun 2013 20:31:46 +0100
-Subject: [PATCH RFC 4/8] drm/i2c: nxp-tda998x: ensure VIP output mux is
- properly set
+Date: Sun, 09 Jun 2013 20:34:24 +0100
+Subject: [PATCH RFC 6/8] drm/i2c: nxp-tda998x: prepare for video input
+ configuration
 In-Reply-To: <20130609190612.GM18614@n2100.arm.linux.org.uk>
 References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
-Message-ID: <E1UllL8-00058Y-H3@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1UllNg-00058k-AS@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When switching between various drivers for this device, it's possible
-that some critical registers are left containing values which affect
-the device operation.  One such case encountered is the VIP output
-mux register.  This defaults to 0x24 on powerup, but other drivers may
-set this to 0x12.  This results in incorrect colours.
-
-Fix this by ensuring that the register is always set to the power on
-default setting.
-
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c |   16 ++++++++++------
+ 1 files changed, 10 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index d71c408..dc0428d 100644
+index cd1526c..c0d17ae 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -110,6 +110,7 @@ struct tda998x_priv {
- #define REG_VIP_CNTRL_5           REG(0x00, 0x25)     /* write */
- # define VIP_CNTRL_5_CKCASE       (1 << 0)
- # define VIP_CNTRL_5_SP_CNT(x)    (((x) & 3) << 1)
-+#define REG_MUX_VP_VIP_OUT        REG(0x00, 0x27)     /* read/write */
- #define REG_MAT_CONTRL            REG(0x00, 0x80)     /* write */
- # define MAT_CONTRL_MAT_SC(x)     (((x) & 3) << 0)
- # define MAT_CONTRL_MAT_BP        (1 << 2)
-@@ -415,6 +416,9 @@ tda998x_reset(struct drm_encoder *encoder)
- 	reg_write(encoder, REG_PLL_SCGR1,    0x5b);
- 	reg_write(encoder, REG_PLL_SCGR2,    0x00);
- 	reg_write(encoder, REG_PLL_SCG2,     0x10);
-+
-+	/* Ensure VP output bus muxes result in no swapping */
-+	reg_write(encoder, REG_MUX_VP_VIP_OUT, 0x24);
- }
+@@ -32,6 +32,9 @@ struct tda998x_priv {
+ 	uint16_t rev;
+ 	uint8_t current_page;
+ 	int dpms;
++	u8 vip_cntrl_0;
++	u8 vip_cntrl_1;
++	u8 vip_cntrl_2;
+ };
  
- /* DRM encoder functions */
+ #define to_tda998x_priv(x)  ((struct tda998x_priv *)to_encoder_slave(x)->slave_priv)
+@@ -448,12 +451,9 @@ tda998x_encoder_dpms(struct drm_encoder *encoder, int mode)
+ 		reg_write(encoder, REG_ENA_VP_1, 0xff);
+ 		reg_write(encoder, REG_ENA_VP_2, 0xff);
+ 		/* set muxing after enabling ports: */
+-		reg_write(encoder, REG_VIP_CNTRL_0,
+-				VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3));
+-		reg_write(encoder, REG_VIP_CNTRL_1,
+-				VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1));
+-		reg_write(encoder, REG_VIP_CNTRL_2,
+-				VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5));
++		reg_write(encoder, REG_VIP_CNTRL_0, priv->vip_cntrl_0);
++		reg_write(encoder, REG_VIP_CNTRL_1, priv->vip_cntrl_1);
++		reg_write(encoder, REG_VIP_CNTRL_2, priv->vip_cntrl_2);
+ 		break;
+ 	case DRM_MODE_DPMS_OFF:
+ 		/* disable audio and video ports */
+@@ -823,6 +823,10 @@ tda998x_encoder_init(struct i2c_client *client,
+ 	if (!priv)
+ 		return -ENOMEM;
+ 
++	priv->vip_cntrl_0 = VIP_CNTRL_0_SWAP_A(2) | VIP_CNTRL_0_SWAP_B(3);
++	priv->vip_cntrl_1 = VIP_CNTRL_1_SWAP_C(0) | VIP_CNTRL_1_SWAP_D(1);
++	priv->vip_cntrl_2 = VIP_CNTRL_2_SWAP_E(4) | VIP_CNTRL_2_SWAP_F(5);
++
+ 	priv->current_page = 0;
+ 	priv->cec = i2c_new_dummy(client->adapter, 0x34);
+ 	priv->dpms = DRM_MODE_DPMS_OFF;
 -- 
 1.7.4.4
