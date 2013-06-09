@@ -1,84 +1,53 @@
-From: Baohua.Song@csr.com (Barry Song)
-Date: Sun, 9 Jun 2013 13:30:46 +0800
-Subject: [PATCH] reset: provide dummy API entries to avoid link errors
-Message-ID: <1370755846-27011-1-git-send-email-Baohua.Song@csr.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sat, 8 Jun 2013 22:32:58 -0700
+Subject: [PATCH] serial: omap: Fix device tree based PM runtime
+In-Reply-To: <20130607230022.GP3331@atomide.com>
+References: <20130607215835.GL3331@atomide.com> <87k3m5k07q.fsf@linaro.org>
+ <20130607230022.GP3331@atomide.com>
+Message-ID: <20130609053258.GA8104@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch provides dummy reset API entries like other subsystem e.g.
-gpiolib to avoid link errors when RESET_CONTROLLER is not enabled.
+On Fri, Jun 07, 2013 at 04:00:22PM -0700, Tony Lindgren wrote:
+> In the runtime_suspend function pdata is not being used, and
+> also blocks the function in device tree based booting. Fix it
+> by removing the unused pdata from the runtime_suspend function.
+> 
+> Further, context loss count is not being passed in pdata, so
+> let's just reinitialize the port every time for those case.
+> This can be further optimized later on for the device tree
+> case by adding detection for the hardware state and possibly
+> by adding a driver specific autosuspend timeout.
+> 
+> And doing this, we can then make the related dev_err into a
+> dev_dbg message instead of an error.
+> 
+> In order for the wake-up events to work, we also need to set
+> autosuspend_timeout to -1 if 0, and also device_init_wakeup()
+> as that's not being done by the platform init code for the
+> device tree case.
+> 
+> Note that this does not affect legacy booting, and in fact
+> might make it work for the cases where the context loss info
+> is not being passed in pdata.
+> 
+> Thanks to Kevin Hilman <khilman@linaro.org> for debugging
+> and suggesting fixes for the autosuspend_timeout and
+> device_init_wakeup() related initializiation.
+> 
+> Reviewed-by: Kevin Hilman <khilman@linaro.org>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
+> ---
+> 
+> Here's an updated version with the white space fixed. Since
+> you already acked it, I won't waste the opportunity to keep it
+> in a single patch :)
 
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
-Cc: Stephen Warren <swarren@nvidia.com>
-Signed-off-by: Barry Song <Baohua.Song@csr.com>
----
- include/linux/reset.h |   44 ++++++++++++++++++++++++++++++++++++++++++++
- 1 files changed, 44 insertions(+), 0 deletions(-)
+It doesn't apply to my tree, so you'll have to refresh it against my
+tty-next tree and resend it.
 
-diff --git a/include/linux/reset.h b/include/linux/reset.h
-index 6082247..92bd6fa 100644
---- a/include/linux/reset.h
-+++ b/include/linux/reset.h
-@@ -4,6 +4,7 @@
- struct device;
- struct reset_control;
- 
-+#ifdef CONFIG_RESET_CONTROLLER
- int reset_control_reset(struct reset_control *rstc);
- int reset_control_assert(struct reset_control *rstc);
- int reset_control_deassert(struct reset_control *rstc);
-@@ -14,4 +15,47 @@ struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
- 
- int device_reset(struct device *dev);
- 
-+#else /* ! CONFIG_RESET_CONTROLLER */
-+
-+static inline int reset_control_reset(struct reset_control *rstc)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int reset_control_assert(struct reset_control *rstc);
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int reset_control_deassert(struct reset_control *rstc)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline struct reset_control *reset_control_get(struct device *dev, const char *id)
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline void reset_control_put(struct reset_control *rstc)
-+{
-+	/* reset_control_get never succeed */
-+	WARN_ON(1);
-+}
-+
-+static inline struct reset_control *devm_reset_control_get(struct device *dev, const char *id);
-+{
-+	return -ENOSYS;
-+}
-+
-+static inline int device_reset(struct device *dev)
-+{
-+	/* device_reset will never really be done */
-+	WARN_ON(1);
-+
-+	return -ENOSYS;
-+}
-+
-+#endif
-+
- #endif
--- 
-1.7.5.4
+thanks,
 
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+greg k-h
