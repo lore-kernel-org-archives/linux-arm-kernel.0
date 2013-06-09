@@ -1,43 +1,48 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sun, 9 Jun 2013 10:26:28 -0700
-Subject: [PATCH v2] serial: imx: enable the clocks for console
-In-Reply-To: <20130609130544.GC20780@S2101-09.ap.freescale.net>
-References: <CAOMZO5A4SPFv1NopdGrN9nX-XSpZy5Cw1CLp3E95mRP8O=rhLQ@mail.gmail.com>
- <1370743279-15941-1-git-send-email-b32955@freescale.com>
- <20130609083409.GA32485@S2101-09.ap.freescale.net>
- <20130609130544.GC20780@S2101-09.ap.freescale.net>
-Message-ID: <20130609172628.GA17829@kroah.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 9 Jun 2013 19:30:06 +0200
+Subject: N900 device tree conversion: how to do first step
+In-Reply-To: <20130609015944.GA23559@amd.pavel.ucw.cz>
+References: <20130609015944.GA23559@amd.pavel.ucw.cz>
+Message-ID: <20130609173006.GC16066@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 09, 2013 at 09:05:47PM +0800, Shawn Guo wrote:
-> On Sun, Jun 09, 2013 at 04:34:11PM +0800, Shawn Guo wrote:
-> > On Sun, Jun 09, 2013 at 10:01:19AM +0800, Huang Shijie wrote:
-> > > The console's clocks are disabled after the uart driver is probed.
-> > > It makes that we can see less log from the console now
-> > > (though we still can get all the log by the `dmesg`).
-> > > 
-> > > So enable the clocks for console, and we can see all the log again.
-> > > 
-> > > This patch also disables the sport->clk_per when we fail to enable
-> > > the sport->clk_ipg;
-> > > 
-> > > Signed-off-by: Huang Shijie <b32955@freescale.com>
-> > 
-> > Tested-by: Shawn Guo <shawn.guo@linaro.org>
+On Sun 2013-06-09 03:59:44, Pavel Machek wrote:
+> Hi!
 > 
-> Sorry.  I have to take that back.
+> I'd like to convert Nokia N900 to device tree.
 > 
-> Though it works fine with BusyBox, I'm getting the following warnings
-> when booting with an Ubuntu 13.04 rootfs, in which case imx_startup()
-> and imx_shutdown() will be called for a number of iterations.  That
-> causes unbalanced clk_prepare_enable vs. clk_disable_unprepare, since
-> the clk_prepare_enable is under condition if (!uart_console(port)) in
-> imx_startup(), while clk_disable_unprepare in imx_shutdown() is not.
+> Unfortunately, serial port is not easily available (very special cable
+> would be needed, does someone know where to get one?) and I don't have
+> BDI (and very special cable would be needed, too).
+> 
+> So I tried doing very small first step, hoping that I get booting
+> system... obviously I did not.
+> 
+> I tried formally switching to device tree while still booting using
+> hardcoded functions. No luck. Does anyone see what I did wrong?
+> 
+> Is it possible that n900 has its main memory somewhere else than
+> 0x80000000?
 
-I had just applied this to my tree, should I revert it because of this
-problem?
+Interesting. It seems that memory setup from atags is indeed 
+	     0x8000 0000 size 0x0800 0000
+	     0x8800 0000 size 0x0800 0000
 
-thanks,
+. But hopefully that's just complicated way of saying 
+	     0x8000 0000 size 0x1000 0000
+	     
+.
 
-greg k-h
+Anyway, I now see problem with my reasoning: kernel is full of
+
+if (of_have_populated_dt())
+
+tests, so it is impossible to switch to device tree, and still expect
+old-style init to work :-(.
+
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
