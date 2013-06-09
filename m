@@ -1,38 +1,84 @@
-From: haojian.zhuang@gmail.com (Haojian Zhuang)
-Date: Sun, 9 Jun 2013 13:28:55 +0800
-Subject: [PATCH 3/4] pinctrl: single: omap: Add SoC specific module for
- wake-up events
-In-Reply-To: <20130607205044.16513.27675.stgit@localhost>
-References: <20130607203936.16513.57494.stgit@localhost>
- <20130607205044.16513.27675.stgit@localhost>
-Message-ID: <CAN1soZxC0QLGrhm=ZZpny0kDBnyv9ikZaw7gS+aLmbtPpd0pKw@mail.gmail.com>
+From: Baohua.Song@csr.com (Barry Song)
+Date: Sun, 9 Jun 2013 13:30:46 +0800
+Subject: [PATCH] reset: provide dummy API entries to avoid link errors
+Message-ID: <1370755846-27011-1-git-send-email-Baohua.Song@csr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 8, 2013 at 4:50 AM, Tony Lindgren <tony@atomide.com> wrote:
-> For wake-up events from deeper idle modes we need to check the
-> configured padconf registers for the wake-up bit and then call
-> the related interrupt handler.
->
-> Done in collaboration with Roger Quadros <rogerq@ti.com>.
->
-> Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-> Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Signed-off-by: Roger Quadros <rogerq@ti.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  drivers/pinctrl/Makefile                          |    3
->  drivers/pinctrl/pinctrl-single-omap.c             |  287 +++++++++++++++++++++
->  include/linux/platform_data/pinctrl-single-omap.h |    4
->  3 files changed, 293 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/pinctrl/pinctrl-single-omap.c
->  create mode 100644 include/linux/platform_data/pinctrl-single-omap.h
->
+this patch provides dummy reset API entries like other subsystem e.g.
+gpiolib to avoid link errors when RESET_CONTROLLER is not enabled.
 
-The hardware behavior likes PXA3xx.
+Cc: Philipp Zabel <p.zabel@pengutronix.de>
+Cc: Stephen Warren <swarren@nvidia.com>
+Signed-off-by: Barry Song <Baohua.Song@csr.com>
+---
+ include/linux/reset.h |   44 ++++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 44 insertions(+), 0 deletions(-)
 
-Acked-by: Haojian Zhuang <haojian.zhuang@gmail.com>
+diff --git a/include/linux/reset.h b/include/linux/reset.h
+index 6082247..92bd6fa 100644
+--- a/include/linux/reset.h
++++ b/include/linux/reset.h
+@@ -4,6 +4,7 @@
+ struct device;
+ struct reset_control;
+ 
++#ifdef CONFIG_RESET_CONTROLLER
+ int reset_control_reset(struct reset_control *rstc);
+ int reset_control_assert(struct reset_control *rstc);
+ int reset_control_deassert(struct reset_control *rstc);
+@@ -14,4 +15,47 @@ struct reset_control *devm_reset_control_get(struct device *dev, const char *id)
+ 
+ int device_reset(struct device *dev);
+ 
++#else /* ! CONFIG_RESET_CONTROLLER */
++
++static inline int reset_control_reset(struct reset_control *rstc)
++{
++	return -ENOSYS;
++}
++
++static inline int reset_control_assert(struct reset_control *rstc);
++{
++	return -ENOSYS;
++}
++
++static inline int reset_control_deassert(struct reset_control *rstc)
++{
++	return -ENOSYS;
++}
++
++static inline struct reset_control *reset_control_get(struct device *dev, const char *id)
++{
++	return -ENOSYS;
++}
++
++static inline void reset_control_put(struct reset_control *rstc)
++{
++	/* reset_control_get never succeed */
++	WARN_ON(1);
++}
++
++static inline struct reset_control *devm_reset_control_get(struct device *dev, const char *id);
++{
++	return -ENOSYS;
++}
++
++static inline int device_reset(struct device *dev)
++{
++	/* device_reset will never really be done */
++	WARN_ON(1);
++
++	return -ENOSYS;
++}
++
++#endif
++
+ #endif
+-- 
+1.7.5.4
 
-Regards
-Haojian
+
+
+Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
+More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
