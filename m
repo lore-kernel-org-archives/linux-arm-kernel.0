@@ -1,109 +1,170 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Sat, 8 Jun 2013 19:45:06 -0600
-Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <20130608183851.GB2354@localhost>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1370623671-7748-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306072101.44694.arnd@arndb.de>
- <20130607200054.GA9010@obsidianresearch.com>
- <20130608183851.GB2354@localhost>
-Message-ID: <20130609014506.GB10027@obsidianresearch.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 9 Jun 2013 03:59:44 +0200
+Subject: N900 device tree conversion: how to do first step
+Message-ID: <20130609015944.GA23559@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 08, 2013 at 03:38:52PM -0300, Ezequiel Garcia wrote:
+Hi!
 
-> > mbus {
-> >    ranges = <0x012f0000 0  0xe8000000  0x8000000>
-> >    devbus-bootcs {
-> >        ranges = <0  0x012f0000 0  0x8000000>
-> >    }
-> > }
-> > 
-> > We shouldn't mangle the DT format just to make it convenient for
-> > humans to write - if this is a major problem then I'd try to use the
-> > preprocessor first.. There are several reasonable solutions down that
-> > path, IMHO.
-> > 
-> 
-> Right. I think we have two options here for laying the DT ranges.
-> 
-> 1) This is the proposal implied in the patchset I sent:
-> 
-> mbus {
-> 	ranges = < we only put the internal-reg translation here>
-> 	devbus-bootcs {
-> 		ranges = <0 {target_id/attribute}
-> 	{window_physical_base} {size}>
-        ^^^^^^^^^^^^^^^^^^^^^^
+I'd like to convert Nokia N900 to device tree.
 
-This is the mangling I was referring to. It needs to be the offset
-into the target, it can't be something else.
+Unfortunately, serial port is not easily available (very special cable
+would be needed, does someone know where to get one?) and I don't have
+BDI (and very special cable would be needed, too).
 
-I understand your motivation, but this is not a good method of
-encoding this in DT.
+So I tried doing very small first step, hoping that I get booting
+system... obviously I did not.
 
-There is nothing especially wrong with updating the ranges at runtime,
-but don't use the 2nd cell in the 2dw address to encode the desired
-base address.
+I tried formally switching to device tree while still booting using
+hardcoded functions. No luck. Does anyone see what I did wrong?
 
-> Of course this looks much cleaner, but it forces a lot of duplication
-> in the DT files. Now, if you see some of the recent patches we've been
-> sending, I think this duplication is very error-prone, and it'll be a
-> nightmare to maintain. Let me propose an example to show this
-> duplication:
+Is it possible that n900 has its main memory somewhere else than
+0x80000000?
 
-IMHO, dtc was not designed to do the sorts of include things that we
-see in the boot/dt directory (eg a complex inheritance system) it is
-not surprising we hit limitations in dtc.
+Thanks,
+									Pavel
 
-It would be better to try and address them either by modding dtc (an
-append directive of some kind), or using the preprocessor...
-
-The preprocessor is already setup, here is a way to use it to solve
-this problem:
-
- /* armada.dtsi */
- mbus {
- 	ranges = < internal_regs_id 0 internal_regs_base internal_regs_size
- 		         bootrom_id 0       bootrom_base  bootrom_size 
-                   MBUS_BOARD_SPECIFIC_INFO>
-
+diff --git a/.config b/.config
+index a36bbe2..130a7a8 100644
+--- a/.config
++++ b/.config
+@@ -498,11 +498,11 @@ CONFIG_ATAGS=y
+ # CONFIG_DEPRECATED_PARAM_STRUCT is not set
+ CONFIG_ZBOOT_ROM_TEXT=0x0
+ CONFIG_ZBOOT_ROM_BSS=0x0
+-# CONFIG_ARM_APPENDED_DTB is not set
+-CONFIG_CMDLINE="init=/sbin/preinit ubi.mtd=rootfs root=ubi0:rootfs rootfstype=ubifs rootflags=bulk_read,no_chk_data_crc rw mtdoops.mtddev=log console=tty0 console=ttyO2"
+-CONFIG_CMDLINE_FROM_BOOTLOADER=y
+-# CONFIG_CMDLINE_EXTEND is not set
+-# CONFIG_CMDLINE_FORCE is not set
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++# CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_FROM_BOOTLOADER is not set
++CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
++CONFIG_CMDLINE=""
+ CONFIG_KEXEC=y
+ CONFIG_ATAGS_PROC=y
+ # CONFIG_CRASH_DUMP is not set
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 9c62558..7b1a075 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -119,6 +119,7 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	omap3-beagle-xm.dtb \
+ 	omap3-evm.dtb \
+ 	omap3-tobi.dtb \
++	omap3-n900.dtb \
+ 	omap4-panda.dtb \
+ 	omap4-panda-a4.dtb \
+ 	omap4-panda-es.dtb \
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+new file mode 100644
+index 0000000..e093543
+--- /dev/null
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -0,0 +1,35 @@
++/*
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++/dts-v1/;
++
++/include/ "skeleton.dtsi"
++/* FIXME: "omap3.dtsi" */
++
++/ {
++	model = "Nokia N900";
++	compatible = "nokia,omap3-n900", "ti,omap3";
++
++	memory {
++		device_type = "memory";
++		reg = <0x80000000 0x10000000>; /* 256 MB */
++	};
++};
++
++/*
++&mmc1 {
++	status = "disabled";
++};
++
++&mmc2 {
++	status = "disabled";
++};
++
++&mmc3 {
++	status = "disabled";
++};
++*/
+diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
+index 74f83a5..f857b5b 100644
+--- a/arch/arm/mach-omap2/board-rx51.c
++++ b/arch/arm/mach-omap2/board-rx51.c
+@@ -36,6 +36,8 @@
+ 
+ #define RX51_GPIO_SLEEP_IND 162
+ 
++/* This lights up left part of keyboard */
++
+ static struct gpio_led gpio_leds[] = {
+ 	{
+ 		.name	= "sleep_ind",
+@@ -119,21 +121,21 @@ static void __init rx51_init(void)
+ 	platform_device_register(&leds_gpio);
  }
  
- /* armada-A.dts */
- define MBUS_BOARD_SPECIFIC_INFO devbus0_id 0       devbus0_base devbus0_size
- #include "armada.dtsi"
+-static void __init rx51_reserve(void)
+-{
+-	omap_reserve();
+-}
++static const char *omap3_boards_compat[] __initdata = {
++	"nokia,omap3-n900",
++        NULL,
++};
+ 
+-MACHINE_START(NOKIA_RX51, "Nokia RX-51 board")
+-	/* Maintainer: Lauri Leukkunen <lauri.leukkunen@nokia.com> */
+-	.atag_offset	= 0x100,
+-	.reserve	= rx51_reserve,
++DT_MACHINE_START(N900_DT, "Nokia N900 (Flattened Device Tree)")
++	.atag_offset    = 0x100,
++	.reserve	= omap_reserve,
+ 	.map_io		= omap3_map_io,
+-	.init_early	= omap3430_init_early,
+-	.init_irq	= omap3_init_irq,
+-	.handle_irq	= omap3_intc_handle_irq,
+-	.init_machine	= rx51_init,
+-	.init_late	= omap3430_init_late,
+-	.init_time	= omap3_sync32k_timer_init,
+-	.restart	= omap3xxx_restart,
++	.init_early     = omap3430_init_early,
++	.init_irq       = omap3_init_irq, /* FIXME: omap_intc_of_init, */
++	.handle_irq     = omap3_intc_handle_irq,
++	.init_machine   = rx51_init, /* FIXME: omap_generic_init, */
++	.init_late      = omap3430_init_late, /* FIXME: omap3_init_late, */
++	.init_time      = omap3_sync32k_timer_init,
++	.dt_compat      = omap3_boards_compat,
++	.restart        = omap3xxx_restart,
+ MACHINE_END
+diff --git a/mkit b/mkit
+index 354610c..e9ffc02 100755
+--- a/mkit
++++ b/mkit
+@@ -1,3 +1,4 @@
+ #!/bin/bash
+ ARCH=arm time make -j 3 && \
+-    sudo ../maemo/0xffff/src/0xFFFF -m arch/arm/boot/zImage -l -b 'root=/dev/mmcblk0p6 rootwait'
+\ No newline at end of file
++    cat arch/arm/boot/zImage arch/arm/boot/dts/omap3-n900.dtb > zImage_dtb && \
++    sudo ../maemo/0xffff/src/0xFFFF -m zImage_dtb -l -b 'root=/dev/mmcblk0p6 rootwait'
+\ No newline at end of file
 
-There are lots and lots of solutions using the pre-processor, please
-take a look and find one that you feel works for you...
 
-> It is precisely for this reason that I've decided to adopt option #1
-> instead! Now, I'm not saying I like that option particularly.
-> In fact it has a couple issues as well:
-
-The main issue for me is that you can no longer refer to an offset in
-a target, and that badly breaks several desirable DT layouts, eg on
-Kirkwood the NAND case could be expressed like:
-
-devbus {
-  reg = <INTERNAL_REGS + 0x1234 0xABCD>;
-  ranges = <0 DEVBUS_TARGET 0x1000>;
-}
-
-The NAND driver needs both internal regs and a target id in one
-binding.
-
-Which is why the last DW in the address must be the offset into the
-target, not something else.
-
-> What do you think?
-
-IMHO, creating a correct FDT is of primary importance, the
-maintainability of the text DT is secondary.
-
-We can always improve the dtc envorionment (as was done recently by
-adding the preprocessor), we cannot change 'DT ABI' once it it set.
-
-Jason
+ 
+ 
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
