@@ -1,46 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun,  9 Jun 2013 18:36:01 +0200
-Subject: [PATCH 0/6] Add support for Allwinner A10s SoCs
-Message-ID: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
+Date: Sun,  9 Jun 2013 18:36:02 +0200
+Subject: [PATCH 1/6] ARM: sunxi: Add Allwinner A10s machine compatible
+In-Reply-To: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1370795767-9769-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The A10s is a SoC member of the Allwinner sun5i family. It is basically
+an A13 with an EMAC and an HDMI controller.
 
-This patch serie reworks a bit the pinctrl driver and adds the necessary
-bits needed to support the Allwinner A10s SoC.
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ Documentation/arm/sunxi/README | 4 ++++
+ arch/arm/mach-sunxi/sunxi.c    | 1 +
+ 2 files changed, 5 insertions(+)
 
-This SoC is a bit in between the A10 and A13. Notable differences with
-the A13 is the addition of an HDMI controller and of the EMAC.
-
-For the time being (ie until we find a proper datasheet for this SoCs),
-the clock definition is taken from the A10 one.
-
-This patches depends on the "Add external interrupt support for Allwinner SoCs"
-patch serie.
-
-Thanks,
-Maxime
-
-Maxime Ripard (6):
-  ARM: sunxi: Add Allwinner A10s machine compatible
-  pinctrl: sunxi: Move the pins definitions to a separate header
-  pinctrl: sunxi: Add Allwinner A10s pins
-  ARM: sunxi: dt: Add Allwinner A10s DTSI
-  ARM: sunxi: Add Olimex A10s-Olinuxino-micro device tree
-  ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig
-
- Documentation/arm/sunxi/README                   |    4 +
- arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |   75 +
- arch/arm/boot/dts/sun5i-a10s.dtsi                |  286 +++
- arch/arm/configs/multi_v7_defconfig              |    2 +
- arch/arm/mach-sunxi/sunxi.c                      |    1 +
- drivers/pinctrl/pinctrl-sunxi-pins.h             | 2023 ++++++++++++++++++++++
- drivers/pinctrl/pinctrl-sunxi.c                  | 1362 +--------------
- 7 files changed, 2393 insertions(+), 1360 deletions(-)
- create mode 100644 arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
- create mode 100644 arch/arm/boot/dts/sun5i-a10s.dtsi
- create mode 100644 drivers/pinctrl/pinctrl-sunxi-pins.h
-
+diff --git a/Documentation/arm/sunxi/README b/Documentation/arm/sunxi/README
+index d9a372d..e3f93fb 100644
+--- a/Documentation/arm/sunxi/README
++++ b/Documentation/arm/sunxi/README
+@@ -17,6 +17,10 @@ SunXi family
+ 	+ User Manual
+ 	  http://dl.linux-sunxi.org/A10/A10%20User%20Manual%20-%20v1.20%20%282012-04-09%2c%20DECRYPTED%29.pdf
+ 
++      - Allwinner A10s (sun5i)
++        + Datasheet
++          http://dl.linux-sunxi.org/A10s/A10s%20Datasheet%20-%20v1.20%20%282012-03-27%29.pdf
++
+       - Allwinner A13 (sun5i)
+         + Datasheet
+ 	  http://dl.linux-sunxi.org/A13/A13%20Datasheet%20-%20v1.12%20%282012-03-29%29.pdf
+diff --git a/arch/arm/mach-sunxi/sunxi.c b/arch/arm/mach-sunxi/sunxi.c
+index 08937a3..a42d874 100644
+--- a/arch/arm/mach-sunxi/sunxi.c
++++ b/arch/arm/mach-sunxi/sunxi.c
+@@ -109,6 +109,7 @@ static void __init sunxi_dt_init(void)
+ 
+ static const char * const sunxi_board_dt_compat[] = {
+ 	"allwinner,sun4i-a10",
++	"allwinner,sun5i-a10s",
+ 	"allwinner,sun5i-a13",
+ 	NULL,
+ };
 -- 
 1.8.3
