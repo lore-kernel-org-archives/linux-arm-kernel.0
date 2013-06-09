@@ -1,39 +1,92 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Sun, 09 Jun 2013 22:02:59 +0200
-Subject: [PATCH RFC 5/8] drm/i2c: nxp-tda998x: fix npix/nline programming
-In-Reply-To: <E1UllM6-00058d-LK@rmk-PC.arm.linux.org.uk>
-References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
- <E1UllM6-00058d-LK@rmk-PC.arm.linux.org.uk>
-Message-ID: <51B4DF73.3020605@gmail.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Sun, 9 Jun 2013 23:11:19 +0300
+Subject: N900 device tree conversion: how to do first step
+In-Reply-To: <20130609015944.GA23559@amd.pavel.ucw.cz>
+References: <20130609015944.GA23559@amd.pavel.ucw.cz>
+Message-ID: <20130609201119.GA3190@blackmetal.musicnaut.iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/09/2013 09:32 PM, Russell King wrote:
-> The npix/nline registers are supposed to be programmed with the total
-> number of pixels/lines, not the displayed pixels/lines, and not minus
-> one either.
->
-> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
-> ---
+Hi,
 
-Russell, Rob,
+On Sun, Jun 09, 2013 at 03:59:44AM +0200, Pavel Machek wrote:
+> I'd like to convert Nokia N900 to device tree.
+> 
+> Unfortunately, serial port is not easily available (very special cable
+> would be needed, does someone know where to get one?) and I don't have
+> BDI (and very special cable would be needed, too).
+> 
+> So I tried doing very small first step, hoping that I get booting
+> system... obviously I did not.
 
-I have patches fixing TDA998x sync generation for progressive video.
-They are based on TDA9983b datasheet [1]. TDA998x expects ITU-style
-sync with positive hblank/vblank (or VESA-style hsync/vsync plus
-refpix/refline). The patches make TDA998x behave as transparent as
-possible, i.e. invert input sync signals as required and revert for
-output sync as requested by EDID. I have measured a bunch of modes
-with an oszilloscope near-end (TDA998x input) and far-end (DVI receiver
-output) and they are pixel- and line-true.
+The following works for me, it's enough to boot and get the USB networking
+working. After that I can connect to the device with ssh. I don't use
+serial either, I just have initramfs with busybox+dropbear with hardcoded
+interface setup.
 
-Unfortunately, I have no receiver allowing me to also fix interlaced
-sync generation but with progressive working, that shouldn't be that
-hard to implement.
+---8<---
 
-Will clean-up patches next week and rebase on Russell's RFC.
+/dts-v1/;
 
-Sebastian
+/include/ "omap34xx.dtsi"
 
-[1]
-http://pdf1.alldatasheet.com/datasheet-pdf/view/347888/NXP/TDA9983B.html
+/ {
+	model = "Nokia N900";
+	compatible = "nokia,omap3-n900", "ti,omap3";
+
+	cpus {
+		cpu@0 {
+			cpu0-supply = <&vcc>;
+		};
+	};
+
+	memory {
+		device_type = "memory";
+		reg = <0x80000000 0x10000000>; /* 256 MB */
+	};
+
+};
+
+&i2c1 {
+	clock-frequency = <2200000>;
+
+	twl: twl at 48 {
+		reg = <0x48>;
+		interrupts = <7>; /* SYS_NIRQ cascaded to intc */
+		interrupt-parent = <&intc>;
+	};
+};
+
+/include/ "twl4030.dtsi"
+
+&twl_gpio {
+	ti,pullups	= <0x0>;
+	ti,pulldowns	= <0x03ff3f>; /* BIT(0..5) | BIT(8..17) */
+};
+
+&i2c2 {
+	clock-frequency = <400000>;
+};
+
+&i2c3 {
+	clock-frequency = <100000>;
+};
+
+&mmc1 {
+	status = "disabled";
+};
+
+&mmc2 {
+	status = "disabled";
+};
+
+&mmc3 {
+	status = "disabled";
+};
+
+&usb_otg_hs {
+	interface-type = <0>;
+	usb-phy = <&usb2_phy>;
+	mode = <2>;
+	power = <50>;
+};
