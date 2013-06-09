@@ -1,20 +1,21 @@
-From: shc_work@mail.ru (=?UTF-8?B?QWxleGFuZGVyIFNoaXlhbg==?=)
-Date: Mon, 10 Jun 2013 01:13:59 +0400
-Subject: =?UTF-8?B?UmU6IFtQQVRDSCB2MyAxLzJdIGxlZHM6IGxlZHMtbWMxMzc4MzogUHJlcGFy?=
- =?UTF-8?B?ZSBkcml2ZXIgdG8gc3VwcG9ydCBNQzEzODkyIExFRHM=?=
-In-Reply-To: <1370800285-18432-1-git-send-email-shc_work@mail.ru>
-References: <1370800285-18432-1-git-send-email-shc_work@mail.ru>
-Message-ID: <1370812439.3836337@f163.mail.ru>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 09 Jun 2013 23:36:24 +0200
+Subject: [PATCH 4/6] ARM: sunxi: dt: Add Allwinner A10s DTSI
+In-Reply-To: <1370795767-9769-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1370795767-9769-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <3346364.JR9UrJYqP8@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This patch rewrite driver code to be ready to add support for
-> MC13892 LEDs.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+On Sunday 09 June 2013 18:36:05 Maxime Ripard wrote:
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun5i-a10s.dtsi | 286 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 286 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun5i-a10s.dtsi
 
-Please do not apply these patches. This contain a problem and
-I will extend v4 for probe with devicetree.
-Thanks.
+Would it make sense to split out the parts that are common with A13 into
+a separate sun5i.dtsi file?
 
----
+	Arnd
