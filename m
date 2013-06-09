@@ -1,76 +1,48 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 09 Jun 2013 20:30:46 +0100
-Subject: [PATCH RFC 3/8] drm/i2c: nxp-tda998x: fix EDID reading on TDA19988
- devices
+Date: Sun, 09 Jun 2013 20:31:46 +0100
+Subject: [PATCH RFC 4/8] drm/i2c: nxp-tda998x: ensure VIP output mux is
+ properly set
 In-Reply-To: <20130609190612.GM18614@n2100.arm.linux.org.uk>
 References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
-Message-ID: <E1UllKA-00058T-D6@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1UllL8-00058Y-H3@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TDA19988 devices need their RAM enabled in order to read EDID
-information.  Add support for this.
+When switching between various drivers for this device, it's possible
+that some critical registers are left containing values which affect
+the device operation.  One such case encountered is the VIP output
+mux register.  This defaults to 0x24 on powerup, but other drivers may
+set this to 0x12.  This results in incorrect colours.
+
+Fix this by ensuring that the register is always set to the power on
+default setting.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/i2c/tda998x_drv.c |   14 +++++++++++++-
- 1 files changed, 13 insertions(+), 1 deletions(-)
+ drivers/gpu/drm/i2c/tda998x_drv.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
-index e68b58a..d71c408 100644
+index d71c408..dc0428d 100644
 --- a/drivers/gpu/drm/i2c/tda998x_drv.c
 +++ b/drivers/gpu/drm/i2c/tda998x_drv.c
-@@ -229,6 +229,8 @@ struct tda998x_priv {
- 
- /* Page 12h: HDCP and OTP */
- #define REG_TX3                   REG(0x12, 0x9a)     /* read/write */
-+#define REG_TX4                   REG(0x12, 0x9b)     /* read/write */
-+# define TX4_PD_RAM               (1 << 1)
- #define REG_TX33                  REG(0x12, 0xb8)     /* read/write */
- # define TX33_HDMI                (1 << 1)
- 
-@@ -673,6 +675,7 @@ read_edid_block(struct drm_encoder *encoder, uint8_t *buf, int blk)
- static uint8_t *
- do_get_edid(struct drm_encoder *encoder)
- {
-+	struct tda998x_priv *priv = to_tda998x_priv(encoder);
- 	int j = 0, valid_extensions = 0;
- 	uint8_t *block, *new;
- 	bool print_bad_edid = drm_debug & DRM_UT_KMS;
-@@ -680,6 +683,9 @@ do_get_edid(struct drm_encoder *encoder)
- 	if ((block = kmalloc(EDID_LENGTH, GFP_KERNEL)) == NULL)
- 		return NULL;
- 
-+	if (priv->rev == TDA19988)
-+		reg_clear(encoder, REG_TX4, TX4_PD_RAM);
+@@ -110,6 +110,7 @@ struct tda998x_priv {
+ #define REG_VIP_CNTRL_5           REG(0x00, 0x25)     /* write */
+ # define VIP_CNTRL_5_CKCASE       (1 << 0)
+ # define VIP_CNTRL_5_SP_CNT(x)    (((x) & 3) << 1)
++#define REG_MUX_VP_VIP_OUT        REG(0x00, 0x27)     /* read/write */
+ #define REG_MAT_CONTRL            REG(0x00, 0x80)     /* write */
+ # define MAT_CONTRL_MAT_SC(x)     (((x) & 3) << 0)
+ # define MAT_CONTRL_MAT_BP        (1 << 2)
+@@ -415,6 +416,9 @@ tda998x_reset(struct drm_encoder *encoder)
+ 	reg_write(encoder, REG_PLL_SCGR1,    0x5b);
+ 	reg_write(encoder, REG_PLL_SCGR2,    0x00);
+ 	reg_write(encoder, REG_PLL_SCG2,     0x10);
 +
- 	/* base block fetch */
- 	if (read_edid_block(encoder, block, 0))
- 		goto fail;
-@@ -689,7 +695,7 @@ do_get_edid(struct drm_encoder *encoder)
++	/* Ensure VP output bus muxes result in no swapping */
++	reg_write(encoder, REG_MUX_VP_VIP_OUT, 0x24);
+ }
  
- 	/* if there's no extensions, we're done */
- 	if (block[0x7e] == 0)
--		return block;
-+		goto done;
- 
- 	new = krealloc(block, (block[0x7e] + 1) * EDID_LENGTH, GFP_KERNEL);
- 	if (!new)
-@@ -716,9 +722,15 @@ do_get_edid(struct drm_encoder *encoder)
- 		block = new;
- 	}
- 
-+done:
-+	if (priv->rev == TDA19988)
-+		reg_set(encoder, REG_TX4, TX4_PD_RAM);
-+
- 	return block;
- 
- fail:
-+	if (priv->rev == TDA19988)
-+		reg_set(encoder, REG_TX4, TX4_PD_RAM);
- 	dev_warn(encoder->dev->dev, "failed to read EDID\n");
- 	kfree(block);
- 	return NULL;
+ /* DRM encoder functions */
 -- 
 1.7.4.4
