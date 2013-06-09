@@ -1,9 +1,9 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sun, 09 Jun 2013 16:01:35 +0400
-Subject: [V1 4/7] video: mmp: fix memcpy wrong size for mmp_addr issue
-In-Reply-To: <1370767470-11615-1-git-send-email-jtzhou@marvell.com>
-References: <1370767470-11615-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <51B46E9F.9020105@cogentembedded.com>
+Date: Sun, 09 Jun 2013 16:03:11 +0400
+Subject: [V1 5/7] video: mmp: add pitch info in mmp_win structure
+In-Reply-To: <1370767486-11729-1-git-send-email-jtzhou@marvell.com>
+References: <1370767486-11729-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <51B46EFF.7020001@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,28 +13,34 @@ On 09-06-2013 12:44, Jett.Zhou wrote:
 
 > From: Jing Xiang <jxiang@marvell.com>
 
-> Memcpy used wrong struct of mmp_addr, fix it.
-
-     From the patch it follows that 'struct mmp_addr' is the right one. :-)
+> Add pitch length info of graphics/video layer for mmp_win, if it is
+> YUV format of video layer, u/v pitch will non-zero.
 
 > Signed-off-by: Jing Xiang <jxiang@marvell.com>
 > Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 > ---
->   drivers/video/mmp/hw/mmp_ctrl.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
+>   include/video/mmp_disp.h |    3 +++
+>   1 files changed, 3 insertions(+), 0 deletions(-)
 
-> diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-> index 8836053..92a5f44 100644
-> --- a/drivers/video/mmp/hw/mmp_ctrl.c
-> +++ b/drivers/video/mmp/hw/mmp_ctrl.c
-> @@ -233,7 +233,7 @@ static int overlay_set_addr(struct mmp_overlay *overlay, struct mmp_addr *addr)
->   	struct lcd_regs *regs = path_regs(overlay->path);
->
->   	/* FIXME: assert addr supported */
-> -	memcpy(&overlay->addr, addr, sizeof(struct mmp_win));
-> +	memcpy(&overlay->addr, addr, sizeof(struct mmp_addr));
->   	writel(addr->phys[0], &regs->g_0);
->
->   	return overlay->addr.phys[0];
+> diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
+> index b9dd1fb..5708d26 100644
+> --- a/include/video/mmp_disp.h
+> +++ b/include/video/mmp_disp.h
+> @@ -91,6 +91,9 @@ struct mmp_win {
+>   	u16	up_crop;
+>   	u16	bottom_crop;
+>   	int	pix_fmt;
+> +	/* pitch[0]: graphics/video layer line length or y pitch
+> +	 * pitch[1]/pitch[2]: video u/v pitch if non-zero */
+
+    The preferred format for multi-line comments is this:
+
+/*
+  * bla
+  * bla
+  */
+
+> +	u32	pitch[3];
+>   };
 
 WBR, Sergei
