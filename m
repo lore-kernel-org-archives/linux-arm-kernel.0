@@ -1,31 +1,46 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Sun, 9 Jun 2013 12:06:24 -0400 (EDT)
-Subject: [RFC PATCH 2/4] USB: EHCI: don't release ehci->lock if URB
- giveback in tasklet context
-In-Reply-To: <1370791112-18464-3-git-send-email-ming.lei@canonical.com>
-Message-ID: <Pine.LNX.4.44L0.1306091158480.13202-100000@netrider.rowland.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun,  9 Jun 2013 18:36:01 +0200
+Subject: [PATCH 0/6] Add support for Allwinner A10s SoCs
+Message-ID: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 9 Jun 2013, Ming Lei wrote:
+Hi everyone,
 
-> If HCD_BH is set for HC driver's flags, URB giveback will be
-> done in tasklet context instead of interrupt context, so the
-> ehci->lock needn't to be released any more before calling
-> usb_hcd_giveback_urb().
+This patch serie reworks a bit the pinctrl driver and adds the necessary
+bits needed to support the Allwinner A10s SoC.
 
-Ah, this is the reason why you don't need to release the private lock.  
-I'm not sure that this will save much time overall.
+This SoC is a bit in between the A10 and A13. Notable differences with
+the A13 is the addition of an HDMI controller and of the EMAC.
 
-With the existing code, the main reason for lock contention would be if
-(for example) CPU 2 submitted or cancelled an URB while the giveback
-was occurring on CPU 1.  Then CPU 1 would be forced to wait while CPU 2 
-finished its submission or cancellation.
+For the time being (ie until we find a proper datasheet for this SoCs),
+the clock definition is taken from the A10 one.
 
-With this patch, it's the other way around.  CPU 2 would be forced to 
-wait while CPU 1 does all the rest of the work in its interrupt 
-handler.  The total time spent holding the lock will be the same; it 
-will just be distributed differently among the CPUs.  Hence it is not 
-at all clear that this change will save any time.
+This patches depends on the "Add external interrupt support for Allwinner SoCs"
+patch serie.
 
-Alan Stern
+Thanks,
+Maxime
+
+Maxime Ripard (6):
+  ARM: sunxi: Add Allwinner A10s machine compatible
+  pinctrl: sunxi: Move the pins definitions to a separate header
+  pinctrl: sunxi: Add Allwinner A10s pins
+  ARM: sunxi: dt: Add Allwinner A10s DTSI
+  ARM: sunxi: Add Olimex A10s-Olinuxino-micro device tree
+  ARM: multi_v7: Enable Allwinner EMAC in multi_v7_defconfig
+
+ Documentation/arm/sunxi/README                   |    4 +
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts |   75 +
+ arch/arm/boot/dts/sun5i-a10s.dtsi                |  286 +++
+ arch/arm/configs/multi_v7_defconfig              |    2 +
+ arch/arm/mach-sunxi/sunxi.c                      |    1 +
+ drivers/pinctrl/pinctrl-sunxi-pins.h             | 2023 ++++++++++++++++++++++
+ drivers/pinctrl/pinctrl-sunxi.c                  | 1362 +--------------
+ 7 files changed, 2393 insertions(+), 1360 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+ create mode 100644 arch/arm/boot/dts/sun5i-a10s.dtsi
+ create mode 100644 drivers/pinctrl/pinctrl-sunxi-pins.h
+
+-- 
+1.8.3
