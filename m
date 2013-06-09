@@ -1,88 +1,27 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Sun, 9 Jun 2013 16:44:54 +0800
-Subject: [V1 6/7] video: mmp: calculate pitch value when fb set win
-Message-ID: <1370767494-11821-1-git-send-email-jtzhou@marvell.com>
+Date: Sun, 9 Jun 2013 16:43:10 +0800
+Subject: [V1 0/7] Enhanced mmp fb driver and bugfix 
+Message-ID: <1370767390-11026-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jing Xiang <jxiang@marvell.com>
+1 Enhanced some api/register operation routine
+2 Fix some bugs like memcpy and graphics/video layer enable/mask swap;
+3 Add pitch info and video layer set win/addr operations support
 
-Add new func mmpfb_set_win to make code clean, it will calculate pitch
-value when fb set win in mmpfb_set_win.
+Guoqing Li (2):
+  video: mmp: rb swap setting update for new LCD driver
+  video: mmp: optimize some register setting code
 
-Signed-off-by: Jing Xiang <jxiang@marvell.com>
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
----
- drivers/video/mmp/fb/mmpfb.c |   34 ++++++++++++++++++++++------------
- 1 files changed, 22 insertions(+), 12 deletions(-)
+Jing Xiang (5):
+  video: mmp: fix graphics/video layer enable/mask swap issue
+  video: mmp: fix memcpy wrong size for mmp_addr issue
+  video: mmp: add pitch info in mmp_win structure
+  video: mmp: calculate pitch value when fb set win
+  video: mmp: add video layer set win/addr operations support
 
-diff --git a/drivers/video/mmp/fb/mmpfb.c b/drivers/video/mmp/fb/mmpfb.c
-index 6d1fa96..d9e7c94 100644
---- a/drivers/video/mmp/fb/mmpfb.c
-+++ b/drivers/video/mmp/fb/mmpfb.c
-@@ -392,12 +392,29 @@ static int var_update(struct fb_info *info)
- 	return 0;
- }
- 
-+static void mmpfb_set_win(struct fb_info *info)
-+{
-+	struct mmpfb_info *fbi = info->par;
-+	struct fb_var_screeninfo *var = &info->var;
-+	struct mmp_win win;
-+	u32 stride;
-+
-+	memset(&win, 0, sizeof(win));
-+	win.xsrc = win.xdst = fbi->mode.xres;
-+	win.ysrc = win.ydst = fbi->mode.yres;
-+	win.pix_fmt = fbi->pix_fmt;
-+	stride = pixfmt_to_stride(win.pix_fmt);
-+	win.pitch[0] = var->xres_virtual * stride;
-+	win.pitch[1] = win.pitch[2] =
-+		(stride == 1) ? (var->xres_virtual >> 1) : 0;
-+	mmp_overlay_set_win(fbi->overlay, &win);
-+}
-+
- static int mmpfb_set_par(struct fb_info *info)
- {
- 	struct mmpfb_info *fbi = info->par;
- 	struct fb_var_screeninfo *var = &info->var;
- 	struct mmp_addr addr;
--	struct mmp_win win;
- 	struct mmp_mode mode;
- 	int ret;
- 
-@@ -409,11 +426,8 @@ static int mmpfb_set_par(struct fb_info *info)
- 	fbmode_to_mmpmode(&mode, &fbi->mode, fbi->output_fmt);
- 	mmp_path_set_mode(fbi->path, &mode);
- 
--	memset(&win, 0, sizeof(win));
--	win.xsrc = win.xdst = fbi->mode.xres;
--	win.ysrc = win.ydst = fbi->mode.yres;
--	win.pix_fmt = fbi->pix_fmt;
--	mmp_overlay_set_win(fbi->overlay, &win);
-+	/* set window related info */
-+	mmpfb_set_win(info);
- 
- 	/* set address always */
- 	memset(&addr, 0, sizeof(addr));
-@@ -427,16 +441,12 @@ static int mmpfb_set_par(struct fb_info *info)
- static void mmpfb_power(struct mmpfb_info *fbi, int power)
- {
- 	struct mmp_addr addr;
--	struct mmp_win win;
- 	struct fb_var_screeninfo *var = &fbi->fb_info->var;
- 
- 	/* for power on, always set address/window again */
- 	if (power) {
--		memset(&win, 0, sizeof(win));
--		win.xsrc = win.xdst = fbi->mode.xres;
--		win.ysrc = win.ydst = fbi->mode.yres;
--		win.pix_fmt = fbi->pix_fmt;
--		mmp_overlay_set_win(fbi->overlay, &win);
-+		/* set window related info */
-+		mmpfb_set_win(fbi->fb_info);
- 
- 		/* set address always */
- 		memset(&addr, 0, sizeof(addr));
--- 
-1.7.0.4
+ drivers/video/mmp/fb/mmpfb.c    |   34 +++++++++++------
+ drivers/video/mmp/hw/mmp_ctrl.c |   75 ++++++++++++++++++++++-----------------
+ drivers/video/mmp/hw/mmp_ctrl.h |    4 ++
+ include/video/mmp_disp.h        |    3 ++
+ 4 files changed, 71 insertions(+), 45 deletions(-)
