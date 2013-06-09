@@ -1,42 +1,34 @@
-From: zhangfei.gao@linaro.org (zhangfei)
-Date: Sun, 09 Jun 2013 16:47:28 +0800
-Subject: [PATCH 1/2] i2c-designware: support no DW_IC_COMP_TYPE platform
-In-Reply-To: <20130609030600.GA4312@tarshish>
-References: <1370745402-11844-1-git-send-email-zhangfei.gao@linaro.org>
- <1370745402-11844-2-git-send-email-zhangfei.gao@linaro.org>
- <20130609030600.GA4312@tarshish>
-Message-ID: <51B44120.5060304@linaro.org>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Sun, 9 Jun 2013 16:44:46 +0800
+Subject: [V1 5/7] video: mmp: add pitch info in mmp_win structure
+Message-ID: <1370767486-11729-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-06-09 11:06 AM, Baruch Siach wrote:
-> Hi Zhangfei Gao,
->
-> On Sun, Jun 09, 2013 at 10:36:41AM +0800, Zhangfei Gao wrote:
->> Check accessor_flags before reading DW_IC_COMP_TYPE
->> Give chance to platform no such register
->>
->> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
->> ---
->>   drivers/i2c/busses/i2c-designware-core.c |   24 +++++++++++++-----------
->>   drivers/i2c/busses/i2c-designware-core.h |    1 +
->>   2 files changed, 14 insertions(+), 11 deletions(-)
->
-> [...]
->
->> diff --git a/drivers/i2c/busses/i2c-designware-core.h
->> b/drivers/i2c/busses/i2c-designware-core.h
->> index e761ad1..b38b54e 100644
->> --- a/drivers/i2c/busses/i2c-designware-core.h
->> +++ b/drivers/i2c/busses/i2c-designware-core.h
->> @@ -94,6 +94,7 @@ struct dw_i2c_dev {
->>
->>   #define ACCESS_SWAP		0x00000001
->>   #define ACCESS_16BIT		0x00000002
->> +#define ACCESS_32BIT		0x00000004
->
-> This belongs to the next patch, not to this one.
->
-> baruch
->
-Thanks baruch, make sense.
+From: Jing Xiang <jxiang@marvell.com>
+
+Add pitch length info of graphics/video layer for mmp_win, if it is
+YUV format of video layer, u/v pitch will non-zero.
+
+Signed-off-by: Jing Xiang <jxiang@marvell.com>
+Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+---
+ include/video/mmp_disp.h |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
+index b9dd1fb..5708d26 100644
+--- a/include/video/mmp_disp.h
++++ b/include/video/mmp_disp.h
+@@ -91,6 +91,9 @@ struct mmp_win {
+ 	u16	up_crop;
+ 	u16	bottom_crop;
+ 	int	pix_fmt;
++	/* pitch[0]: graphics/video layer line length or y pitch
++	 * pitch[1]/pitch[2]: video u/v pitch if non-zero */
++	u32	pitch[3];
+ };
+ 
+ struct mmp_addr {
+-- 
+1.7.0.4
