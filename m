@@ -1,55 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 9 Jun 2013 20:06:12 +0100
-Subject: [RFC v2 0/8] rmk's Dove DRM/TDA19988 Cubox driver
-Message-ID: <20130609190612.GM18614@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Sun, 09 Jun 2013 20:32:46 +0100
+Subject: [PATCH RFC 5/8] drm/i2c: nxp-tda998x: fix npix/nline programming
+In-Reply-To: <20130609190612.GM18614@n2100.arm.linux.org.uk>
+References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
+Message-ID: <E1UllM6-00058d-LK@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is version 2 of my DRM driver.  Changes since the previous version:
+The npix/nline registers are supposed to be programmed with the total
+number of pixels/lines, not the displayed pixels/lines, and not minus
+one either.
 
-1. It's now called Armada not Dove, because the "LCD controllers" aka CRTCs
-   are found in Armada 16x as well as Armada 510 Dove.  The Armada 16x is
-   preliminary work.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/gpu/drm/i2c/tda998x_drv.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-2. Cursor support is now a separate patch.  I've tried several formats,
-   and 64x32 ARGB is the one I've settled on for the time being, though
-   the driver will permit 32x64 as well.  This, however, is not available
-   with Armada 16x hardware.  This patch will be a separate follow-up to
-   this.  The reason for this is it's in a separate branch which conflicts
-   with this (and my NXP-TDA19988 output driver branch.)  The value of this
-   is still questionable due to the restrictions in the hardware meaning
-   the entire cursor has to be reloaded near the edge of the screen.
-
-   This also may interfere with the interlaced support; however the DRM
-   i2c TDA998x driver seems incapable of supporting interlace at present.
-   (It works with the CEA mode number programmed but not if you program
-   with mode timings.)
-
-3. A slave encoder output encoder which contains nothing specific to TDA19988
-   nor Cubox.  This data is now in the top level driver, and can be provided
-   using whatever method is desirable (eg, from DT.)
-
-   What *can't* be done without a rewrite of the DRM slave encoder backend
-   is to have the TDA998x I2C device provided by DT.  There are mumblings
-   about redoing the slave encoder API, hopefully this will be fixed there.
-
-4. Finished off the page flip support, which now gets used on mode changes
-   as well.  Page flip as a whole still isn't tested.
-
-5. Removal of default mode and reporting of unknown connector status.  The
-   kernel side will select 1024x768 if no connectors are connected - this
-   will cause problems if your display reports that it supports 1024x768
-   but it doesn't actually.  Xorg will do similar too.
-
-What is not in this patch set yet, but I have patches for:
-1. Pulled the clock stuff out of the armada_crtc.c file into the top level.
-   Armada 16x has different clocking options to Armada 510, and certain bits
-   in the clock configuration register are different.  This needs to be
-   dealt with like we do in AMBA devices with "variant" support.  So in a
-   DT environment, we'd have:
-	compatible = "marvell,armada510-lcd";
-   or
-	compatible = "marvell,armada16x-lcd";
-   and the driver adjusts according to that.
-
-2. Sebastian's additional patches
+diff --git a/drivers/gpu/drm/i2c/tda998x_drv.c b/drivers/gpu/drm/i2c/tda998x_drv.c
+index dc0428d..cd1526c 100644
+--- a/drivers/gpu/drm/i2c/tda998x_drv.c
++++ b/drivers/gpu/drm/i2c/tda998x_drv.c
+@@ -587,8 +587,8 @@ tda998x_encoder_mode_set(struct drm_encoder *encoder,
+ 		reg_set(encoder, REG_VIP_CNTRL_3, VIP_CNTRL_3_H_TGL);
+ 
+ 	reg_write(encoder, REG_VIDFORMAT, 0x00);
+-	reg_write16(encoder, REG_NPIX_MSB, mode->hdisplay - 1);
+-	reg_write16(encoder, REG_NLINE_MSB, mode->vdisplay - 1);
++	reg_write16(encoder, REG_NPIX_MSB, mode->htotal);
++	reg_write16(encoder, REG_NLINE_MSB, mode->vtotal);
+ 	reg_write16(encoder, REG_VS_LINE_STRT_1_MSB, line_start);
+ 	reg_write16(encoder, REG_VS_LINE_END_1_MSB, line_end);
+ 	reg_write16(encoder, REG_VS_PIX_STRT_1_MSB, hs_start);
+-- 
+1.7.4.4
