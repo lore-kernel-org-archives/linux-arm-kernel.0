@@ -1,86 +1,43 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?q?Roh=C3=A1r?=)
-Date: Sun, 9 Jun 2013 19:03:08 +0200
-Subject: N900 device tree conversion: how to do first step
-In-Reply-To: <20130609164745.GB16066@amd.pavel.ucw.cz>
-References: <20130609015944.GA23559@amd.pavel.ucw.cz>
- <201306091124.41251@pali> <20130609164745.GB16066@amd.pavel.ucw.cz>
-Message-ID: <201306091903.09766@pali>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sun, 9 Jun 2013 10:26:28 -0700
+Subject: [PATCH v2] serial: imx: enable the clocks for console
+In-Reply-To: <20130609130544.GC20780@S2101-09.ap.freescale.net>
+References: <CAOMZO5A4SPFv1NopdGrN9nX-XSpZy5Cw1CLp3E95mRP8O=rhLQ@mail.gmail.com>
+ <1370743279-15941-1-git-send-email-b32955@freescale.com>
+ <20130609083409.GA32485@S2101-09.ap.freescale.net>
+ <20130609130544.GC20780@S2101-09.ap.freescale.net>
+Message-ID: <20130609172628.GA17829@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 09 June 2013 18:47:45 Pavel Machek wrote:
-> On Sun 2013-06-09 11:24:40, Pali Roh?r wrote:
-> > On Sunday 09 June 2013 03:59:44 Pavel Machek wrote:
-> > > Hi!
+On Sun, Jun 09, 2013 at 09:05:47PM +0800, Shawn Guo wrote:
+> On Sun, Jun 09, 2013 at 04:34:11PM +0800, Shawn Guo wrote:
+> > On Sun, Jun 09, 2013 at 10:01:19AM +0800, Huang Shijie wrote:
+> > > The console's clocks are disabled after the uart driver is probed.
+> > > It makes that we can see less log from the console now
+> > > (though we still can get all the log by the `dmesg`).
 > > > 
-> > > I'd like to convert Nokia N900 to device tree.
+> > > So enable the clocks for console, and we can see all the log again.
 > > > 
-> > > Unfortunately, serial port is not easily available (very
-> > > special cable would be needed, does someone know where to
-> > > get one?) and I don't have BDI (and very special cable
-> > > would be needed, too).
+> > > This patch also disables the sport->clk_per when we fail to enable
+> > > the sport->clk_ipg;
+> > > 
+> > > Signed-off-by: Huang Shijie <b32955@freescale.com>
 > > 
-> > Hello,
-> > 
-> > I used serial port only in qemu for debugging. Maybe you can
-> > try to play with qemu first. Qemu has good n900 HW support.
+> > Tested-by: Shawn Guo <shawn.guo@linaro.org>
 > 
-> Yes, qemu is helpful.
+> Sorry.  I have to take that back.
 > 
-> For the record: this is how you use it.
-> 
-> KERNEL=/data/l/linux-n900/zImage_dtb
-> ./qflasher -m rx51 -x ./xloader-qemu.bin -s
-> ./secondary-qemu.bin -k $KERNEL -o n900.img -p k=6072
-> 
-> > sd-empty
-> 
-> ./qemu-system-arm -s -M n900 -mtdblock n900.img -sd sd-empty
-> -serial stdio -clock unix -redir tcp:5555:10.0.2.15:22
-> 
-> ...and this patch is needed to make it past rx51_init.
-> 
-> Author: Pavel <pavel@ucw.cz>
-> Date:   Sun Jun 9 18:45:39 2013 +0200
-> 
->     Comment out errata workaround that breaks qemu.
-> 
-> diff --git a/arch/arm/mach-omap2/board-rx51.c
-> b/arch/arm/mach-omap2/board-rx51.c index 938e46f..0ffd7d3
-> 100644
-> --- a/arch/arm/mach-omap2/board-rx51.c
-> +++ b/arch/arm/mach-omap2/board-rx51.c
-> @@ -108,11 +108,13 @@ static void __init rx51_init(void)
->  	rx51_peripherals_init();
->  	rx51_camera_init();
-> 
-> +#if 0
->  #ifdef CONFIG_ARM_ERRATA_430973
->  	printk(KERN_INFO "RX-51: Enabling ARM errata 430973
-> workaround.\n"); /* set IBE to 1 */
->  	rx51_secure_update_aux_cr(1 << 6, 0);
->  #endif
-> +#endif
-> 
->  	/* Ensure SDRC pins are mux'd for self-refresh */
->  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+> Though it works fine with BusyBox, I'm getting the following warnings
+> when booting with an Ubuntu 13.04 rootfs, in which case imx_startup()
+> and imx_shutdown() will be called for a number of iterations.  That
+> causes unbalanced clk_prepare_enable vs. clk_disable_unprepare, since
+> the clk_prepare_enable is under condition if (!uart_console(port)) in
+> imx_startup(), while clk_disable_unprepare in imx_shutdown() is not.
 
-Hm, right qemu not running in omap secure mode, so it can really 
-break booting. So before calling secure code it is needed to 
-check if we are really on secure device. I think this code help:
+I had just applied this to my tree, should I revert it because of this
+problem?
 
-if (omap_type() == OMAP2_DEVICE_TYPE_SEC)
+thanks,
 
-Can somebody confirm if above check is correct for OMAP3 HS 
-device? And also if it does not pass in qemu?
-
--- 
-Pali Roh?r
-pali.rohar at gmail.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130609/fcaf77e7/attachment.sig>
+greg k-h
