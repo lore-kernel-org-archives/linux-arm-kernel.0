@@ -1,58 +1,40 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 10 Jun 2013 18:26:54 +0800
-Subject: [PATCH 6/6] mtd: ofpart: add compatible check for child nodes
-In-Reply-To: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
-References: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <1370860014-1770-7-git-send-email-josh.wu@atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Jun 2013 12:34:35 +0200
+Subject: [PATCH 4/6] ARM: sunxi: dt: Add Allwinner A10s DTSI
+In-Reply-To: <3346364.JR9UrJYqP8@wuerfel>
+References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1370795767-9769-5-git-send-email-maxime.ripard@free-electrons.com>
+ <3346364.JR9UrJYqP8@wuerfel>
+Message-ID: <20130610103435.GJ2748@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the child node has compatible property then it is a driver not partition.
+Hi Arnd,
 
-Signed-off-by: Josh Wu <josh.wu@atmel.com>
----
- drivers/mtd/ofpart.c |   14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+On Sun, Jun 09, 2013 at 11:36:24PM +0200, Arnd Bergmann wrote:
+> On Sunday 09 June 2013 18:36:05 Maxime Ripard wrote:
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun5i-a10s.dtsi | 286 ++++++++++++++++++++++++++++++++++++++
+> >  1 file changed, 286 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/sun5i-a10s.dtsi
+> 
+> Would it make sense to split out the parts that are common with A13 into
+> a separate sun5i.dtsi file?
 
-diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
-index 553d6d6..61ce1f8 100644
---- a/drivers/mtd/ofpart.c
-+++ b/drivers/mtd/ofpart.c
-@@ -20,6 +20,10 @@
- #include <linux/slab.h>
- #include <linux/mtd/partitions.h>
- 
-+static bool node_has_compatible(struct device_node *pp, int *len)
-+{
-+	return of_get_property(pp, "compatible", len);
-+}
- static int parse_ofpart_partitions(struct mtd_info *master,
- 				   struct mtd_partition **pparts,
- 				   struct mtd_part_parser_data *data)
-@@ -40,8 +44,13 @@ static int parse_ofpart_partitions(struct mtd_info *master,
- 	/* First count the subnodes */
- 	pp = NULL;
- 	nr_parts = 0;
--	while ((pp = of_get_next_child(node, pp)))
-+	while ((pp = of_get_next_child(node, pp))) {
-+		int len;
-+		if (node_has_compatible(pp, &len))
-+			continue;
-+
- 		nr_parts++;
-+	}
- 
- 	if (nr_parts == 0)
- 		return 0;
-@@ -57,6 +66,9 @@ static int parse_ofpart_partitions(struct mtd_info *master,
- 		int len;
- 		int a_cells, s_cells;
- 
-+		if (node_has_compatible(pp, &len))
-+			continue;
-+
- 		reg = of_get_property(pp, "reg", &len);
- 		if (!reg) {
- 			nr_parts--;
+I don't have the documentation at the moment, so I'm not exactly sure at
+which extent it's similar to the A13. Yet for the moment, the two dtsi
+are very different (different clock definitions, different muxings,
+etc.), so , I'm not quite sure about wether it would make stuff smaller.
+
+Of course, if we find they actually share a lot, we can definitely make
+a common sun5i DTSI later.
+
+But if you prefer to have it right now, I can always send a v2 :)
+
+Maxime
+
 -- 
-1.7.9.5
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
