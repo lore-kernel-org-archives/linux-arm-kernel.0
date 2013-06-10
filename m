@@ -1,58 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Jun 2013 16:52:34 +0200
-Subject: [PATCH] ARM: dts: add missing cpu #address-cell values
-Message-ID: <2030747.zTCiG7VMcH@wuerfel>
+Date: Mon, 10 Jun 2013 16:58:28 +0200
+Subject: [PATCH 4/6] ARM: sunxi: dt: Add Allwinner A10s DTSI
+In-Reply-To: <20130610103435.GJ2748@lukather>
+References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
+ <3346364.JR9UrJYqP8@wuerfel> <20130610103435.GJ2748@lukather>
+Message-ID: <201306101658.28353.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A recent series has added CPU numbers to a lot of dts files,
-but unfortunately in a few cases the #address-cells
-and #size-cells values are missing, which causes build warnings.
-This adds the missing ones for sunxi and sama5 that I found
-through build testing.
+On Monday 10 June 2013, Maxime Ripard wrote:
+> I don't have the documentation at the moment, so I'm not exactly sure at
+> which extent it's similar to the A13. Yet for the moment, the two dtsi
+> are very different (different clock definitions, different muxings,
+> etc.), so , I'm not quite sure about wether it would make stuff smaller.
+> 
+> Of course, if we find they actually share a lot, we can definitely make
+> a common sun5i DTSI later.
+> 
+> But if you prefer to have it right now, I can always send a v2 :)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
-I've applied this on top of the next/dt branch that has the original
-patches.
+I thought it was actually the same silicon in a different package with
+fewer pins, but if the files look very different right now, just leave
+them separately.
 
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index abdf1c8..f57ffbc 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -38,6 +38,8 @@
- 		ssc1 = &ssc1;
- 	};
- 	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a5";
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 39a8f61..06ef8b6 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -16,6 +16,8 @@
- 	interrupt-parent = <&intc>;
- 
- 	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a8";
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 00a2637d..d285254 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -17,6 +17,8 @@
- 	interrupt-parent = <&intc>;
- 
- 	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
- 		cpu at 0 {
- 			device_type = "cpu";
- 			compatible = "arm,cortex-a8";
+	Arnd
