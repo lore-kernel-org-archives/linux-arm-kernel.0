@@ -1,58 +1,59 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Jun 2013 22:38:58 +0100
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
-References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
- <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
- <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
-Message-ID: <20130610213858.GA18614@n2100.arm.linux.org.uk>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Mon, 10 Jun 2013 23:43:19 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <CAHp75Vdqc9xiPBvQUB3Hfb4EBFUsoVxyuH8MK=9spJ4+rieoDQ@mail.gmail.com>
+References: <1370185130-15332-1-git-send-email-oliver+list@schinagl.nl>
+ <1370185130-15332-2-git-send-email-oliver+list@schinagl.nl>
+ <CAHp75Vdqc9xiPBvQUB3Hfb4EBFUsoVxyuH8MK=9spJ4+rieoDQ@mail.gmail.com>
+Message-ID: <51B64877.4040908@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 11:57:32AM -0400, Rob Clark wrote:
-> On Sun, Jun 9, 2013 at 3:29 PM, Russell King
-> <rmk+kernel@arm.linux.org.uk> wrote:
-> > +/* The mode_config.mutex will be held for this call */
-> > +static int armada_drm_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
-> > +       struct drm_framebuffer *old_fb)
-> > +{
-> > +       struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
-> > +       struct armada_regs regs[4];
-> > +       unsigned i;
-> > +
-> > +       i = armada_drm_crtc_calc_fb(crtc->fb, crtc->x, crtc->y, regs, dcrtc->interlaced);
-> > +       armada_reg_queue_end(regs, i);
-> > +
-> > +       /* Wait for pending flips to complete */
-> > +       wait_event(dcrtc->frame_wait, !dcrtc->frame_work);
-> > +
-> > +       /* Take a reference to the new fb as we're using it */
-> > +       drm_gem_object_reference(&drm_fb_obj(crtc->fb)->obj);
-> 
-> note that you probably want to ref/unref the fb (and let the fb hold a
-> ref to the gem bo).. that will make life easier for planar formats too
-> (as the fb should hold ref's to the bo for each plane)
+On 06/06/13 21:16, Andy Shevchenko wrote:
 
-Now changed - and it looks from my debug of gem_linear that it's working
-correctly (iow, not leaking).
+Thank you andy for your review, I do have a few questions/comments if 
+you don't mind.
+> On Sun, Jun 2, 2013 at 5:58 PM, Oliver Schinagl <oliver+list@schinagl.nl> wrote:
+>> From: Oliver Schinagl <oliver@schinagl.nl>
+<snip>
+>> +       if (likely((SID_SIZE))) {
+>
+> Extra braces.
+> Use antipattern here.
 
-> > +struct drm_armada_gem_create {
-> > +       uint32_t height;
-> > +       uint32_t width;
-> > +       uint32_t bpp;
-> 
-> just fwiw, typically height/width/bpp are properties of the fb but not
-> the bo.. (except in some cases where kernel needs to know this to
-> setup GTT correctly for tiled buffers)
+While I accidentally dropped the pointer here, sorry for the confusion, 
+what is antipattern? I have asked around and nobody really knew.
 
-Also fixed.
+Wikipedia mentions it as a software development thing, but you make it 
+sound like it is some sort of tool?
 
-> > +struct drm_armada_gem_pwrite {
-> > +       uint32_t handle;
-> > +       uint32_t offset;
-> > +       uint32_t size;
-> 
-> probably want a uint32_t padding here, or move the uint64_t up in the
-> struct to avoid 32 vs 64b alignment differences.
+<snip>
+>> +       if (unlikely(!pdev->dev.of_node)) {
+>> +               dev_err(dev, "No devicetree data available\n");
+>> +               ret = -EFAULT;
+>> +               goto exit;
+>
+> Plain return here and in entire function where it applies.
+Why? I know there's conflicting preferences here. The general consensus 
+seems, don't return mid function if you don't absolutely have to. Yet, 
+you make it sound, just return wherever. I take it that really is just a 
+preference? I think i see both constructs throughout the kernel. So one 
+review prefers the one method, the next the other?
+<snip>
+>> +
+>> +       ret = device_create_bin_file(dev, &sid_bin_attr);
+>> +       if (unlikely(ret)) {
+>
+> Any benifit of (un)likely in probe()?
+Does it hurt however in any way though? It's just a compiler 
+optimization isn't it.
 
-And also fixed.
+<snip>
+>
+> --
+> With Best Regards,
+> Andy Shevchenko
+>
+Thank you for your time, it is much appreciated :)
+
+Oliver
