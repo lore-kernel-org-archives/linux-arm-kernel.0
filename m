@@ -1,36 +1,82 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Jun 2013 08:21:10 -0700
-Subject: [PATCH 3/4] pinctrl: single: omap: Add SoC specific module for
- wake-up events
-In-Reply-To: <688FBEF7C8277944BE5AED9A41FB1EBC1AB12D0F@DNCE05.ent.ti.com>
-References: <20130607203936.16513.57494.stgit@localhost>
- <20130607205044.16513.27675.stgit@localhost>
- <688FBEF7C8277944BE5AED9A41FB1EBC1AB12D0F@DNCE05.ent.ti.com>
-Message-ID: <20130610152109.GI8164@atomide.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 10 Jun 2013 17:21:52 +0200
+Subject: [PATCH] ARM: dts: add missing cpu #address-cell values
+In-Reply-To: <2030747.zTCiG7VMcH@wuerfel>
+References: <2030747.zTCiG7VMcH@wuerfel>
+Message-ID: <51B5EF10.2060803@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Quadros, Roger <rogerq@ti.com> [130610 03:09]:
-> +
-> +static int __init pcs_omap_init(void)
-> +{
-> +       platform_driver_register(&pcs_omap_soc_driver);
-> +       platform_driver_register(&pcs_omap_driver);
-> +
-> +       return 0;
-> +}
-> +module_init(pcs_omap_init);
-> 
-> It seems this has to be moved to an earlier place (e.g. subsys_initcall)
-> else the pinctrl core fails to find the pinctrl device at the device creation
-> time and bails out with -EPROBE_DEFER. Also, that device is never
-> created again, so -EPROBE_DEFER doesn't seem to work there.
+On 10/06/2013 16:52, Arnd Bergmann :
+> A recent series has added CPU numbers to a lot of dts files,
+> but unfortunately in a few cases the #address-cells
+> and #size-cells values are missing, which causes build warnings.
+> This adds the missing ones for sunxi and sama5 that I found
+> through build testing.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 
-Ah here, found your other comment :)
+For SAMA5D3:
 
-That's not needed, the real fix is to make twl-core.c and friends to
-be regular module_init. There are already patches queued for that.
- 
-Regards,
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-Tony
+Thanks Arnd.
+
+Best regards,
+
+> ---
+> I've applied this on top of the next/dt branch that has the original
+> patches.
+>
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index abdf1c8..f57ffbc 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -38,6 +38,8 @@
+>   		ssc1 = &ssc1;
+>   	};
+>   	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+>   		cpu at 0 {
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a5";
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 39a8f61..06ef8b6 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -16,6 +16,8 @@
+>   	interrupt-parent = <&intc>;
+>
+>   	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+>   		cpu at 0 {
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a8";
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index 00a2637d..d285254 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -17,6 +17,8 @@
+>   	interrupt-parent = <&intc>;
+>
+>   	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+>   		cpu at 0 {
+>   			device_type = "cpu";
+>   			compatible = "arm,cortex-a8";
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
+
+
+-- 
+Nicolas Ferre
