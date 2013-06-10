@@ -1,27 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 10 Jun 2013 12:08:47 +0200
-Subject: [PATCHv3 1/6] i2c: sunxi: Add Allwinner A1X i2c driver
-In-Reply-To: <20130605213144.GB14209@lukather>
-References: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
- <1369648843-1640-2-git-send-email-maxime.ripard@free-electrons.com>
- <20130605133945.GA2934@katana> <20130605213144.GB14209@lukather>
-Message-ID: <20130610100847.GG2748@lukather>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Jun 2013 11:23:33 +0100
+Subject: [PATCH 7/7 v2] Documentation: Update binding for Nomadik and DBx5x
+ based platforms
+In-Reply-To: <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
+References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
+ <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130610102333.GJ20297@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram,
+Change compatible string to something more standard.
+   
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-On Wed, Jun 05, 2013 at 11:31:44PM +0200, Maxime Ripard wrote:
-> I guess it would make the code much more complicated for such simple
-> drivers, so I wouldn't push too much for merging, but I guess it's your
-> call.
-
-I'd like this to be in 3.11, would merging the driver separately for
-this release and merging it with mv64xxx for 3.12 be acceptable to you ?
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+index 9a2f3f4..6b33b9f 100644
+--- a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
++++ b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
+@@ -1,8 +1,8 @@
+ ST Ericsson Nomadik pinmux controller
+ 
+ Required properties:
+-- compatible: "stericsson,nmk-pinctrl", "stericsson,nmk-pinctrl-db8540",
+-              "stericsson,nmk-pinctrl-stn8815"
++- compatible: "stericsson,db8500-pinctrl", "stericsson,db8540-pinctrl",
++              "stericsson,stn8815-pinctrl"
+ - reg: Should contain the register physical address and length of the PRCMU.
+ 
+ Please refer to pinctrl-bindings.txt in this directory for details of the
+@@ -68,7 +68,7 @@ Optional subnode-properties:
+ Example board file extract:
+ 
+ 	pinctrl at 80157000 {
+-		compatible = "stericsson,nmk-pinctrl";
++		compatible = "stericsson,db8500-pinctrl";
+ 		reg = <0x80157000 0x2000>;
+ 
+ 		pinctrl-names = "default";
