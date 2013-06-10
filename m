@@ -1,38 +1,34 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Jun 2013 10:11:29 +0100
-Subject: [PATCH 3/9] clk: ux500: Provide device enumeration number suffix
- for SMSC911x
-In-Reply-To: <20130610090837.GC20297@gmail.com>
-References: <1368019749-19455-1-git-send-email-lee.jones@linaro.org>
- <1368019749-19455-4-git-send-email-lee.jones@linaro.org>
- <CACRpkdaWaEct1My5=gZ7Bbbizqsr3BBNSXiahMn3bS7L-SubLg@mail.gmail.com>
- <20130610090837.GC20297@gmail.com>
-Message-ID: <20130610091129.GD20297@gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 10 Jun 2013 18:19:25 +0900
+Subject: [PATCH 00/06] ARM: shmobile: SMP virt_to_phys() conversion
+Message-ID: <20130610091925.18944.68117.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jun 2013, Lee Jones wrote:
+ARM: shmobile: SMP virt_to_phys() conversion
 
-> Hi Mike,
-> 
-> > > First Ethernet device has a ".0" appended onto the device name. It
-> > > appears that we need this in order to obtain the correct clock.
-> > >
-> > > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > 
-> > Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
-> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> It appears this one slipped through the gaps.
+[PATCH 01/06] ARM: shmobile: Add SMP boot function and argument
+[PATCH 02/06] ARM: shmobile: Add SCU boot function using argument
+[PATCH 03/06] ARM: shmobile: r8a7779 SMP with SCU boot fn and args
+[PATCH 04/06] ARM: shmobile: sh73a0 SMP with SCU boot fn and args
+[PATCH 05/06] ARM: shmobile: EMEV2 SMP with SCU boot fn and args
+[PATCH 06/06] ARM: shmobile: Remove old SCU boot code
 
-Ah, I'm telling lies of course.
+This series replaces the inline virtual to physical address conversion code
+in the mach-shmobile assembly files with C code making use of virt_to_phys().
 
-It _is_ in -next. Thanks Mike.
+This is one of several series of code that rework code not to rely on
+CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
+
+ Written against renesas.git renesas-next-20130607
+
+ arch/arm/mach-shmobile/headsmp-scu.S         |   35 ++++++++++----------------
+ arch/arm/mach-shmobile/headsmp.S             |   13 +++++++--
+ arch/arm/mach-shmobile/include/mach/common.h |    6 ++--
+ arch/arm/mach-shmobile/smp-emev2.c           |    6 ++--
+ arch/arm/mach-shmobile/smp-r8a7779.c         |    6 ++--
+ arch/arm/mach-shmobile/smp-sh73a0.c          |    6 ++--
+ 6 files changed, 40 insertions(+), 32 deletions(-)
