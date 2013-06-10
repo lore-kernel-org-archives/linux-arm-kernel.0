@@ -1,31 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 10 Jun 2013 09:42:05 +0900
-Subject: [PATCH v9 0/3] Add USB support to R8A7778/BOCK-W
-In-Reply-To: <51B392E4.1040201@cogentembedded.com>
-References: <201306090013.00313.sergei.shtylyov@cogentembedded.com>
- <51B392E4.1040201@cogentembedded.com>
-Message-ID: <20130610004204.GC28555@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Jun 2013 08:53:45 +0800
+Subject: [PATCH] serial: imx: Fix serial clock unbalance
+In-Reply-To: <1370801838-3623-1-git-send-email-festevam@gmail.com>
+References: <1370801838-3623-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130610005343.GA6381@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 09, 2013 at 12:24:04AM +0400, Sergei Shtylyov wrote:
-> On 06/09/2013 12:12 AM, Sergei Shtylyov wrote:
+On Sun, Jun 09, 2013 at 03:17:18PM -0300, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@freescale.com>
 > 
-> >    Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
-> >'renesas-next-20130607' tag, and the R8A7779/Marzen USB patchset I've posted.
-> >It was created to add support of R8A7778/BOCK-W USB to the platform code and
-> >the USB common PHY driver, and so spans both arch/arm/mach-shmobile/ and
-> >drivers/usb/phy/ subtrees.
-> >
-> >[1/3] phy-rcar-usb: add R8A7778 support
-> >[2/3] ARM: shmobile: r8a7778: add USB support
-> >[3/3] ARM: shmobile: BOCK-W: add USB support
-> >
-> >    The patch #4 (ARM: shmobile: BOCK-W: enable USB in defconfig) that has been
-> >already merged, is not reposted.
-> >
-> >    The patchset is completely ready for merging now.
+> Since commit 0c375501 (serial: imx: enable the clocks for console), the 
+> imx_startup() function calls clk_prepare_enable conditionally, so we need to 
+> call clk_disable_unprepare inside imx_shutdown() under the same condition to
+> avoid unbalanced clock calls.
 > 
->    Argh, scratch that -- I forgot to refresh the patches before sending...
+> This avoids the following warning:
+> 
+> ------------[ cut here ]------------
+> WARNING: CPU: 0 PID: 70 at drivers/clk/clk.c:780 __clk_disable+0x68/0x84()
+> Modules linked in:
+> CPU: 0 PID: 70 Comm: mountall Not tainted 3.10.0-rc4-next-20130607+ #435
+> Backtrace: 
+> [<800116a4>] (dump_backtrace+0x0/0x10c) from [<80011844>] (show_stack+0x18/0x1c)
+>  r6:8069f4e8 r5:0000030c r4:00000000 r3:00000000
+> [<8001182c>] (show_stack+0x0/0x1c) from [<8053bce0>] (dump_stack+0x78/0x94)
+> [<8053bc68>] (dump_stack+0x0/0x94) from [<80023df8>] (warn_slowpath_common+0x6c/0x8c)
+>  r4:00000000 r3:00000000
+> [<80023d8c>] (warn_slowpath_common+0x0/0x8c) from [<80023e3c>] (warn_slowpath_null+0x24/0x2c)
+>  r8:bf2ed008 r7:bfaa9810 r6:000f0013 r5:bf824b80 r4:bf824b80
+> [<80023e18>] (warn_slowpath_null+0x0/0x2c) from [<8041af84>] (__clk_disable+0x68/0x84)
+> [<8041af1c>] (__clk_disable+0x0/0x84) from [<8041b098>] (clk_disable+0x20/0x2c)
+>  r4:600f0013 r3:00000001
+> [<8041b078>] (clk_disable+0x0/0x2c) from [<802c93e8>] (imx_shutdown+0xbc/0xec)
+>  r5:bf824b80 r4:bfaa9810
+> [<802c932c>] (imx_shutdown+0x0/0xec) from [<802c63a0>] (uart_port_shutdown+0x34/0x40)
+>  r5:bf86f860 r4:bfaa9810
+> [<802c636c>] (uart_port_shutdown+0x0/0x40) from [<802c68c0>] (uart_shutdown+0x98/0xc4)
+>  r4:bf86f800 r3:00000000
+> [<802c6828>] (uart_shutdown+0x0/0xc4) from [<802c7514>] (uart_close+0x5c/0x198)
+>  r7:bfaa9810 r6:bf274400 r5:bf86f86c r4:bf86f800
+> [<802c74b8>] (uart_close+0x0/0x198) from [<802ac648>] (tty_release+0xf8/0x500)
+> [<802ac550>] (tty_release+0x0/0x500) from [<800c5a30>] (__fput+0x9c/0x208)
+> [<800c5994>] (__fput+0x0/0x208) from [<800c5bac>] (____fput+0x10/0x14)
+> [<800c5b9c>] (____fput+0x0/0x14) from [<80040234>] (task_work_run+0xb4/0xec)
+> [<80040180>] (task_work_run+0x0/0xec) from [<80029238>] (do_exit+0x2b0/0x920)
+>  r8:8000e144 r7:000000f8 r6:bf306300 r5:00000000 r4:bfac1180
+> [<80028f88>] (do_exit+0x0/0x920) from [<80029a4c>] (do_group_exit+0x50/0xd4)
+>  r7:000000f8
+> [<800299fc>] (do_group_exit+0x0/0xd4) from [<80029ae8>] (__wake_up_parent+0x0/0x28)
+>  r7:000000f8 r6:00000001 r5:0006f7ae r4:0006f79a
+> [<80029ad0>] (SyS_exit_group+0x0/0x18) from [<8000dfc0>] (ret_fast_syscall+0x0/0x30)
+> ---[ end trace 16d080eb7efea4e9 ]---
+> 
+> Reported-by: Shawn Guo <shawn.guo@linaro.org>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-Scratched.
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
