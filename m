@@ -1,42 +1,90 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 10 Jun 2013 16:07:24 +0100
-Subject: [PATCH] arm: versatile: don't mark pen as __INIT
-Message-ID: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 10 Jun 2013 16:09:15 +0100
+Subject: [PATCH] mfd: vexpress: Make the driver optional for arm and arm64
+Message-ID: <1370876955-26050-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When booting fewer cores than are physically present on a versatile
-platform (e.g. when passing maxcpus=N on the command line), some
-secondary cores may remain in the holding pen, which is marked __INIT.
-Late in the boot process, the memory comprising the holding pen will be
-released to the kernel for more general use, and may be overwritten with
-arbitrary data, which can cause the held secondaries to start behaving
-unpredictably. This can lead to all manner of odd behaviour from the
-kernel.
+The driver can be used on either arm or arm64 platforms, but
+the latter doesn't have any platform-specific configuration
+options, so it must be possible to manually enable the driver.
 
-Instead don't mark the section as __INIT. This means we can't reuse the
-pen memory, but we won't get secondaries corrupting the rest of the
-kernel.
+As the gpiolib is optional for arm64 arch, the gpio/led code
+must be compiled conditionally.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Pawel Moll <pawel.moll@arm.com>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/plat-versatile/headsmp.S | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/mfd/Kconfig           |  3 ++-
+ drivers/mfd/vexpress-sysreg.c | 10 ++++++++--
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-index b178d44..2677bc3 100644
---- a/arch/arm/plat-versatile/headsmp.S
-+++ b/arch/arm/plat-versatile/headsmp.S
-@@ -11,8 +11,6 @@
- #include <linux/linkage.h>
- #include <linux/init.h>
+Hi Samuel,
+
+Could you please queue this small change for 3.11?
+
+Thanks!
+
+Pawel
+
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index d54e985..6959b8d 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1144,7 +1144,8 @@ config MCP_UCB1200_TS
+ endmenu
  
--	__INIT
+ config VEXPRESS_CONFIG
+-	bool
++	bool "ARM Versatile Express platform infrastructure"
++	depends on ARM || ARM64
+ 	help
+ 	  Platform configuration infrastructure for the ARM Ltd.
+ 	  Versatile Express.
+diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+index 96a020b..e2bbec5 100644
+--- a/drivers/mfd/vexpress-sysreg.c
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -351,6 +351,8 @@ void __init vexpress_sysreg_of_early_init(void)
+ }
+ 
+ 
++#if defined(CONFIG_GPIOLIB)
++
+ #define VEXPRESS_SYSREG_GPIO(_name, _reg, _value) \
+ 	[VEXPRESS_GPIO_##_name] = { \
+ 		.reg = _reg, \
+@@ -445,6 +447,8 @@ struct gpio_led_platform_data vexpress_sysreg_leds_pdata = {
+ 	.leds = vexpress_sysreg_leds,
+ };
+ 
++#endif
++
+ 
+ static ssize_t vexpress_sysreg_sys_id_show(struct device *dev,
+ 		struct device_attribute *attr, char *buf)
+@@ -480,6 +484,9 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+ 	setup_timer(&vexpress_sysreg_config_timer,
+ 			vexpress_sysreg_config_complete, 0);
+ 
++	vexpress_sysreg_dev = &pdev->dev;
++
++#if defined(CONFIG_GPIOLIB)
+ 	vexpress_sysreg_gpio_chip.dev = &pdev->dev;
+ 	err = gpiochip_add(&vexpress_sysreg_gpio_chip);
+ 	if (err) {
+@@ -490,11 +497,10 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	vexpress_sysreg_dev = &pdev->dev;
 -
- /*
-  * Realview/Versatile Express specific entry point for secondary CPUs.
-  * This provides a "holding pen" into which all secondary cores are held
+ 	platform_device_register_data(vexpress_sysreg_dev, "leds-gpio",
+ 			PLATFORM_DEVID_AUTO, &vexpress_sysreg_leds_pdata,
+ 			sizeof(vexpress_sysreg_leds_pdata));
++#endif
+ 
+ 	device_create_file(vexpress_sysreg_dev, &dev_attr_sys_id);
+ 
 -- 
-1.8.1.1
+1.8.1.2
