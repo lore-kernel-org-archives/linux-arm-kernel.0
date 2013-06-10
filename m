@@ -1,26 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Jun 2013 16:58:28 +0200
-Subject: [PATCH 4/6] ARM: sunxi: dt: Add Allwinner A10s DTSI
-In-Reply-To: <20130610103435.GJ2748@lukather>
-References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
- <3346364.JR9UrJYqP8@wuerfel> <20130610103435.GJ2748@lukather>
-Message-ID: <201306101658.28353.arnd@arndb.de>
+Date: Mon, 10 Jun 2013 17:00:22 +0200
+Subject: [PATCH 00/03] ARM: shmobile: Remove legacy memory bits
+In-Reply-To: <20130610094638.20803.18484.sendpatchset@w520>
+References: <20130610094638.20803.18484.sendpatchset@w520>
+Message-ID: <201306101700.22787.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 June 2013, Maxime Ripard wrote:
-> I don't have the documentation at the moment, so I'm not exactly sure at
-> which extent it's similar to the A13. Yet for the moment, the two dtsi
-> are very different (different clock definitions, different muxings,
-> etc.), so , I'm not quite sure about wether it would make stuff smaller.
+On Monday 10 June 2013, Magnus Damm wrote:
+> ARM: shmobile: Remove legacy memory bits
 > 
-> Of course, if we find they actually share a lot, we can definitely make
-> a common sun5i DTSI later.
+> [PATCH 01/03] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
+> [PATCH 02/03] ARM: shmobile: Remove MEMORY_START/SIZE
+> [PATCH 03/03] ARM: shmobile: Remove mach/memory.h
 > 
-> But if you prefer to have it right now, I can always send a v2 :)
+> Now when all users are gone this series removes the legacy memory code
+> and enables CONFIG_ARM_PATCH_PHYS_VIRT. Depends on the following code:
+> 
+> [PATCH v2] ARM: shmobile: uImage load address rework
+> [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
+> [PATCH 00/06] ARM: shmobile: SMP virt_to_phys() conversion
+> [PATCH 00/02] ARM: shmobile: romImage update
+> 
+> The romImage series above still needs to be updated.
+> 
+> This is the final bit of code not to rely on CONFIG_MEMORY_START/SIZE
+> which in turn is one component that we need for ARCH_MULTIPLATFORM.
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-I thought it was actually the same silicon in a different package with
-fewer pins, but if the files look very different right now, just leave
-them separately.
+Looks all good to me.
 
 	Arnd
