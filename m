@@ -1,39 +1,24 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Jun 2013 11:23:33 +0100
-Subject: [PATCH 7/7 v2] Documentation: Update binding for Nomadik and DBx5x
- based platforms
-In-Reply-To: <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
-References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
- <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
-Message-ID: <20130610102333.GJ20297@gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 10 Jun 2013 11:23:07 +0100
+Subject: [PATCH V5] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <1370462344-7128-1-git-send-email-gmbnomis@gmail.com>
+References: <1370462344-7128-1-git-send-email-gmbnomis@gmail.com>
+Message-ID: <20130610102307.GC1947@darko.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change compatible string to something more standard.
-   
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
+On Wed, Jun 05, 2013 at 08:59:04PM +0100, Simon Baatz wrote:
+> Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
+> it needs to handle are kernel mapped only.  However, for example when doing
+> direct I/O, pages with user space mappings may occur.
+> 
+> Thus, continue to do lazy flushing if there are no user space mappings.
+> Otherwise, flush the kernel cache lines directly.
+> 
+> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> Cc: <stable@vger.kernel.org> # 3.2+
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-index 9a2f3f4..6b33b9f 100644
---- a/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-+++ b/Documentation/devicetree/bindings/pinctrl/ste,nomadik.txt
-@@ -1,8 +1,8 @@
- ST Ericsson Nomadik pinmux controller
- 
- Required properties:
--- compatible: "stericsson,nmk-pinctrl", "stericsson,nmk-pinctrl-db8540",
--              "stericsson,nmk-pinctrl-stn8815"
-+- compatible: "stericsson,db8500-pinctrl", "stericsson,db8540-pinctrl",
-+              "stericsson,stn8815-pinctrl"
- - reg: Should contain the register physical address and length of the PRCMU.
- 
- Please refer to pinctrl-bindings.txt in this directory for details of the
-@@ -68,7 +68,7 @@ Optional subnode-properties:
- Example board file extract:
- 
- 	pinctrl at 80157000 {
--		compatible = "stericsson,nmk-pinctrl";
-+		compatible = "stericsson,db8500-pinctrl";
- 		reg = <0x80157000 0x2000>;
- 
- 		pinctrl-names = "default";
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
