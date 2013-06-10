@@ -1,38 +1,64 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 10 Jun 2013 18:46:47 +0900
-Subject: [PATCH 01/03] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
+Date: Mon, 10 Jun 2013 18:46:57 +0900
+Subject: [PATCH 02/03] ARM: shmobile: Remove MEMORY_START/SIZE
 In-Reply-To: <20130610094638.20803.18484.sendpatchset@w520>
 References: <20130610094638.20803.18484.sendpatchset@w520>
-Message-ID: <20130610094647.20803.93516.sendpatchset@w520>
+Message-ID: <20130610094657.20803.96780.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Adjust mach-shmobile to add a select for CONFIG_ARM_PATCH_PHYS_VIRT
-and at the same time remove NEED_MACH_MEMORY_H.
+Remove CONFIG_MEMORY_START and CONFIG_MEMORY_SIZE from mach-shmobile.
+
+Boards should use DT to specify their memory setup. Boards that still
+not support DT may pass ATAGS with memory information from the boot
+loader. If those ATAGS turn out to be incorrect then appended DTB with
+memory information should be used as a workaround.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- arch/arm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/Kconfig |   31 -------------------------------
+ 1 file changed, 31 deletions(-)
 
---- 0001/arch/arm/Kconfig
-+++ work/arch/arm/Kconfig	2013-06-05 12:01:18.000000000 +0900
-@@ -634,6 +634,7 @@ config ARCH_MSM
+--- 0007/arch/arm/mach-shmobile/Kconfig
++++ work/arch/arm/mach-shmobile/Kconfig	2013-06-05 12:06:25.000000000 +0900
+@@ -199,37 +199,6 @@ config CPU_HAS_INTEVT
+         bool
+ 	default y
  
- config ARCH_SHMOBILE
- 	bool "Renesas SH-Mobile / R-Mobile"
-+	select ARM_PATCH_PHYS_VIRT
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
-@@ -643,7 +644,6 @@ config ARCH_SHMOBILE
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select MULTI_IRQ_HANDLER
--	select NEED_MACH_MEMORY_H
- 	select NO_IOPORT
- 	select PINCTRL if ARCH_WANT_OPTIONAL_GPIOLIB
- 	select PM_GENERIC_DOMAINS if PM
+-menu "Memory configuration"
+-
+-config MEMORY_START
+-	hex "Physical memory start address"
+-	default "0x40000000" if MACH_AP4EVB || MACH_AG5EVM || \
+-				MACH_MACKEREL || MACH_BONITO || \
+-				MACH_ARMADILLO800EVA || MACH_APE6EVM || \
+-				MACH_LAGER
+-	default "0x41000000" if MACH_KOTA2
+-	default "0x00000000"
+-	---help---
+-	  Tweak this only when porting to a new machine which does not
+-	  already have a defconfig. Changing it from the known correct
+-	  value on any of the known systems will only lead to disaster.
+-
+-config MEMORY_SIZE
+-	hex "Physical memory size"
+-	default "0x80000000" if MACH_LAGER
+-	default "0x40000000" if MACH_APE6EVM
+-	default "0x20000000" if MACH_AG5EVM || MACH_BONITO || \
+-				MACH_ARMADILLO800EVA
+-	default "0x1e000000" if MACH_KOTA2
+-	default "0x10000000" if MACH_AP4EVB || MACH_MACKEREL
+-	default "0x04000000"
+-	help
+-	  This sets the default memory size assumed by your kernel. It can
+-	  be overridden as normal by the 'mem=' argument on the kernel command
+-	  line.
+-
+-endmenu
+-
+ menu "Timer and clock configuration"
+ 
+ config SHMOBILE_TIMER_HZ
