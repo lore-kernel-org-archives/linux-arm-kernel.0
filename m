@@ -1,59 +1,125 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 10 Jun 2013 19:25:41 +0200
-Subject: [PATCH v4 2/6] clocksource: add Marvell Orion SoC timer
-In-Reply-To: <1370856955-10514-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1370856955-10514-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130610172541.GA21290@lunn.ch>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 10 Jun 2013 13:36:11 -0400 (EDT)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVNdy_cffR7JYNVfs40QJ9eF4Y8UKL7ZsRPOTOegghFkaQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306101316020.1133-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 11:35:55AM +0200, Sebastian Hesselbarth wrote:
-> This patch add a DT enabled driver for timers found on Marvell Orion SoCs
-> (Kirkwood, Dove, Orion5x, and Discovery Innovation). It installs a free-
-> running clocksource on timer0 and a clockevent source on timer1.
-> Corresponding device tree documentation is also added.
+On Mon, 10 Jun 2013, Ming Lei wrote:
+
+> > That isn't clear.  It is documented that USB completion handlers are
+> > called with local interrupts disabled.  An IRQ arriving before the
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> ---
-> Changelog:
-> v3->v4:
-> - export thread-safe access to TIMER_CTRL register to use with watchdog
-> - remove IRQF_DISABLED and add .irq to clock event (Suggested by Daniel Lezcano)
+> Is there any good reason to do URB giveback with interrupt disabled?
+
+That's a good question.  Offhand I can't think of any drivers that rely
+on this -- although there certainly are places where callback routines
+use spin_lock() rather than spin_lock_irq() or spin_lock_irqsave(),
+because they know that interrupts are already disabled.
+
+However, changing a documented API is not something to be done lightly.  
+You would have to audit _every_ USB driver to make sure no trouble
+would arise.
+
+> IMO, disabling IRQs isn't necessary for completing URB since the
+> complete() of URBs for same endpoint is reentrant.
+
+Whether it is _necessary_ isn't the point.  It is _documented_, and 
+therefore it cannot be changed easily.
+
+> > tasklet starts up might therefore be serviced during the short interval
+> > before the tasklet disables local interrupts, but if that happens it
 > 
-> Notes:
-> - This is only an update to clocksource driver, the remaining patches are
->   not resent as they have not been changed.
-> - I will not rework orion watchdog driver for this patch set. It is written
->   Kirkwood/Orion5x specific although it will also work on Dove and it is messing
->   with shared registers. It has done it before, so I consider it broken anyway.
->   I (or somebody else) will take care of proper watchdog later.
-> - An updated branch can be found on
->   git://github.com/shesselba/linux-dove.git orion-irqchip-for-v3.11_v4
+> Tasklet doesn't disable local interrupts.
 
-Hi Sebastian
+It is documented that interrupts will be disabled while the completion 
+handler runs.  Therefore the tasklet _must_ disable local interrupts.
 
-You can add a
+> > would mean that the completion handler would be delayed.
+> 
+> Yes, the tasklet schedule delay is introduced to URB completion, but
+> the delay doesn't have much side effect about completing URB.
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
+What about delays that occur because a separate interrupt is serviced
+before the URB's completion handler is called?  With the current code
+that can't happen, but with your scheme it can.
 
-I tested on my kirkwood QNAP.
+> For async transfer, generally, it should have no effect since there should
+> have URBs queued on the qh queue before submitting URB.
 
-           CPU0
-  2:       6062  bridge-interrupt-ctrl  orion_event
-  9:          0  f1010140.gpio  Reset
- 15:          0  f1010140.gpio  USB Copy
- 24:        106  main-interrupt-ctrl  ehci_hcd:usb1
- 25:       2463  main-interrupt-ctrl  sata_mv
- 26:          0  main-interrupt-ctrl  f1030000.crypto
- 27:          2  main-interrupt-ctrl  f1060800.xor
- 28:          2  main-interrupt-ctrl  f1060800.xor
- 29:         71  main-interrupt-ctrl  mv64xxx_i2c
- 30:          2  main-interrupt-ctrl  f1060900.xor
- 31:          2  main-interrupt-ctrl  f1060900.xor
- 32:         41  main-interrupt-ctrl  eth0
- 33:       1317  main-interrupt-ctrl  serial
- 75:        745  main-interrupt-ctrl  f1072004.mdio-bus
-Err:          0                                              
+That's not how the Bulk-Only mass-storage protocol works.  There are
+times when the protocol _requires_ bulk packets not to be submitted
+until a particular URB has completed.
 
-      Andrew
+Since mass-storage is an important use case for USB, its requirements 
+should not be ignored.
+
+> > In effect, you are prioritizing other IRQs higher than USB completion
+> > handlers.
+> 
+> Both other IRQs and HCD's IRQ are prioritizing the URB completion.
+
+I don't understand that sentence.  "Prioritizing" means "assigning a 
+priority to".  IRQs and HCDs don't assign priorities to anything; 
+priorities are assigned by human programmers.
+
+> > Nevertheless, the total time spent with interrupts disabled
+> > will remain the same.
+> 
+> No, the total time spent with interrupts disabled does not remain same,
+> since no local IRQs are disabled during URB giveback anymore.
+
+That is a bug.  Local IRQs must be disabled during URB giveback.
+
+> > (There's one other side effect that perhaps you haven't considered.
+> > When multiple URBs are addressed to the same endpoint, their completion
+> > handlers are called in order of URB completion, which is the same as
+> > the order of URB submission unless an URB is cancelled.  By delegating
+> > the completion handlers to tasklets, and particularly by using per-CPU
+> > tasklets, you may violate this behavior.)
+> 
+> Even though URB giveback is handled by hard interrupt handler, it still can't
+> guarantee that 100%,  please see below:
+> 
+> - interrupt for URB A comes in CPU 0, and handled, then HCD private
+> lock is released, and usb_hcd_giveback_urb() is called to complete URB A
+> 
+> - interrupt for URB B comes in CPU 1 just before CPU0 releases HCD private
+> lock, so CPU1 holds the private lock when CPU 0 releases the lock and
+> handles the HCD interrupt.
+> 
+> So now just like two CPUs are racing, if CPU0 wins, URB A is completed
+> first, otherwise URB B is completed first.
+
+Although you didn't say so, I assume you mean that A and B are URBs for 
+the same endpoint.  This means they use the same host controller and 
+hence they use the same IRQ line.
+
+When an interrupt is handled, it is not possible for a second interrupt
+to arrive on the same IRQ line before the handler for the first 
+interrupt returns.  The kernel disables the IRQ line when the first 
+interrupt occurs, and keeps it disabled until all the handlers are 
+finished.  Therefore the scenario you described cannot occur.
+
+> With introducing completing URB in percpu tasklet, the situation is
+> just very similar.
+
+No, it isn't, for the reason given above.
+
+> On ehci hcd, it can make sure that by always letting CPU0 complete all URBs
+> (use ehci->scanning/ehci->need_rescan flag), but the patch can change percpu
+> tasklet to tasklet to meet the demand.
+
+Or perhaps you could assign each endpoint to a particular tasklet.
+
+> > As I understand it, the tradeoff between hardirq and softirq is
+> > generally unimportant.  It does matter a lot in realtime settings --
+> 
+> I don't think so, and obviously softirq allows IRQs to be served quickly,
+> otherwise why is softirq and tasklet introduced? and why so many drivers
+> are using tasklet/softirq?
+
+This is part of what I would like to hear Thomas and Steve comment on.
+
+Alan Stern
