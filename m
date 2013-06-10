@@ -1,89 +1,32 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 10 Jun 2013 14:24:14 +0900
-Subject: [PATCH] arm: Prevent memory aliasing on non-LPAE kernels
-In-Reply-To: <1369950320-22784-1-git-send-email-stepanm@codeaurora.org>
-References: <1369950320-22784-1-git-send-email-stepanm@codeaurora.org>
-Message-ID: <CANqRtoQERw46u7qyUPavd7XCj5P8TMVFFNy-xjEBMDEoR7U1Qw@mail.gmail.com>
+Date: Mon, 10 Jun 2013 15:03:25 +0900
+Subject: [PATCH] ARM: zImage/virt: remove hyp-stub.S during distclean
+Message-ID: <20130610060325.2335.65815.sendpatchset@w520>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Stepan,
+From: Magnus Damm <damm@opensource.se>
 
-On Fri, May 31, 2013 at 6:45 AM, Stepan Moskovchenko
-<stepanm@codeaurora.org> wrote:
-> Some LPAE-capable systems may use a Device Tree containing
-> memory nodes that describe memory extending beyond the 4GB
-> physical address boundary. Ignore or truncate these memory
-> nodes on kernels that have not been built with LPAE
-> support, to prevent the extended physical addresses from
-> being truncated and aliasing with physical addresses below
-> the 4GB boundary.
->
-> Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-> ---
->  arch/arm/kernel/devtree.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
+Make sure hyp-stub.S gets removed during make distclean,
+this left over file was introduced in commit:
 
-Thanks for your efforts on fixing this issue. Before I was aware of
-this patch I wrote a different implementation to solve most likely the
-same issue, please see the following patches for more information.
-Thanks to Arnd for pointing me in the right direction.
+424e599 ARM: zImage/virt: hyp mode entry support for the zImage loader
 
-[PATCH 00/03] ARM: 64-bit memory fixes, APE6EVM second memory bank
-[PATCH 01/03] ARM: Let arm_add_memory() always use 64-bit arguments
-[PATCH 02/03] ARM: Handle 64-bit memory in case of 32-bit phys_addr_t
-[PATCH 03/03] ARM: shmobile: Add second memory bank to DTS for APE6EVM
+Signed-off-by: Magnus Damm <damm@opensource.se>
+---
 
-Regarding this patch, I have now tested it on my APE6EVM board
-together with this patch:
+ arch/arm/boot/compressed/Makefile |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-[PATCH 03/03] ARM: shmobile: Add second memory bank to DTS for APE6EVM
-
-Without your patch the situation is as follows:
-
-HIGHMEM=n, LPAE=n - OK (busted, second bank ignored with message [1])
-HIGHMEM=y, LPAE=n - NG (busted, board hangs on boot)
-HIGHMEM=n, LPAE=y - OK
-HIGHMEM=y, LPAE=y - OK
-
-[1] Ignoring RAM at 00000000-3fffffff (vmalloc region overlap).
-
-With your patch applied I get the following:
-
-HIGHMEM=n, LPAE=n - OK (with message [2])
-HIGHMEM=y, LPAE=n - OK (with message [2])
-HIGHMEM=n, LPAE=y - OK
-HIGHMEM=y, LPAE=y - OK
-
-[2] Ignoring memory at 0x200000000 due to lack of LPAE support
-
-
-So your patch unbreaks the second memory on my board perfectly well, thank you!
-
-Regarding implementation details, I wonder if we only need to cover
-the DT memory banks by performing the check inside
-early_init_dt_add_memory_arch()?
-
-To me the root cause of this issue seems to be how phys_addr_t is
-configured when LPAE=n. It is understandable that the kernel cannot
-handle 64-bit addresses when phys_addr_t is 32-bit, but I believe we
-need some sane way to omit those memory banks. Your patch handles the
-non-LPAE case before phys_addr_t is involved which seems to work well.
-Your approach is much better compared to as-is today with potentially
-wrapping phys_addr_t parameters to arm_add_memory().
-
-The only question in my mind is about the location for this kind of
-test, shall it be done in early_init_dt_add_memory_arch() or
-arm_add_memory()?
-
-If we care about adding some bounds checking for the kernel command
-line mem=xxx option then arm_add_memory() seems to be the best
-location from my point of view.
-
-Any ideas?
-
-Please add me to CC if you respin your patch. I will give it a go on my board.
-
-Thanks,
-
-/ magnus
+--- 0001/arch/arm/boot/compressed/Makefile
++++ work/arch/arm/boot/compressed/Makefile	2013-06-05 17:21:20.000000000 +0900
+@@ -116,7 +116,8 @@ targets       := vmlinux vmlinux.lds \
+ 
+ # Make sure files are removed during clean
+ extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
+-		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
++		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs) \
++		 hyp-stub.S
+ 
+ ifeq ($(CONFIG_FUNCTION_TRACER),y)
+ ORIG_CFLAGS := $(KBUILD_CFLAGS)
