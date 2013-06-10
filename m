@@ -1,53 +1,60 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 10 Jun 2013 21:05:23 +0200
-Subject: [RESEND PATCH V3 0/8] mmc_of_parse() adaptations, switch mvsdio
- to mmc_of_parse()
-In-Reply-To: <1370808858-32241-1-git-send-email-gmbnomis@gmail.com>
-References: <1370808858-32241-1-git-send-email-gmbnomis@gmail.com>
-Message-ID: <20130610190523.GT2824@lunn.ch>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 10 Jun 2013 12:09:08 -0700
+Subject: [PATCH] arm: versatile: don't mark pen as __INIT
+In-Reply-To: <20130610185240.GC2513@e106331-lin.cambridge.arm.com>
+References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
+ <51B61D5F.1090906@codeaurora.org>
+ <20130610185240.GC2513@e106331-lin.cambridge.arm.com>
+Message-ID: <51B62454.204@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 09, 2013 at 10:14:10PM +0200, Simon Baatz wrote:
-> Hi,
-> 
-> 	RESEND V3:
-> 	- Dropped patches 9 and 10, they are part of linux-next already
-> 	NB: patch 7 as well, but I did not want to change the numbering
-> 
-> 	V3 changes:
-> 	- Patch 01/10: Added EPROBE_DEFER case to mmc_of_parse()
-> 	- Added Acked-By to (unmodified) patches 02 and 03.
-> 
-> 	V2 changes:
-> 	- Converted mvsdio to use mmc_of_parse()
-> 	- Adapted DTS files using mvsdio accordingly
-> 	- Changed mmc_of_parse() to return errors to the caller
-> 
-> While adding DT support for the Sheevaplugs by Globalscale Technologies
-> (Kirkwood), it turned out that the DT binding of mvsdio lacked features to
-> properly support the hardware (active high/low of CD and WP pins could not
-> be described in DT).
-> 
-> This is standard functionality provided by the mmc_of_parse() helper
-> function.  However, mmc_of_parse() may allocate GPIO lines.  If the
-> allocation fails, it outputs an error, but does not return an error to its
-> caller.  Therefore, a proposal to handle errors in mmc_of_parse() is made.
-> This also allows to handle the EPROBE_DEFER case when GPIO is not loaded
-> yet.
-> 
-> The patch set is structured as follows:
-> 
-> 1   Adapt mmc_of_parse() to return errors
-> 2-6 Handle errors in current drivers using mmc_of_parse() (compile tested
->     only)
-> 7-8 Convert mvsdio and respective dts files to mmc_of_parse() (tested on
->     kirkwood)
+On 06/10/13 11:52, Mark Rutland wrote:
+> On Mon, Jun 10, 2013 at 07:39:27PM +0100, Stephen Boyd wrote:
+>> On 06/10/13 08:07, Mark Rutland wrote:
+>>> When booting fewer cores than are physically present on a versatile
+>>> platform (e.g. when passing maxcpus=N on the command line), some
+>>> secondary cores may remain in the holding pen, which is marked __INIT.
+>>> Late in the boot process, the memory comprising the holding pen will be
+>>> released to the kernel for more general use, and may be overwritten with
+>>> arbitrary data, which can cause the held secondaries to start behaving
+>>> unpredictably. This can lead to all manner of odd behaviour from the
+>>> kernel.
+>>>
+>>> Instead don't mark the section as __INIT. This means we can't reuse the
+>>> pen memory, but we won't get secondaries corrupting the rest of the
+>>> kernel.
+>>>
+>>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+>>> Acked-by: Pawel Moll <pawel.moll@arm.com>
+>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>>> ---
+>>>  arch/arm/plat-versatile/headsmp.S | 2 --
+>>>  1 file changed, 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+>>> index b178d44..2677bc3 100644
+>>> --- a/arch/arm/plat-versatile/headsmp.S
+>>> +++ b/arch/arm/plat-versatile/headsmp.S
+>>> @@ -11,8 +11,6 @@
+>>>  #include <linux/linkage.h>
+>>>  #include <linux/init.h>
+>>>  
+>>> -	__INIT
+>>> -
+>>>  /*
+>>>   * Realview/Versatile Express specific entry point for secondary CPUs.
+>>>   * This provides a "holding pen" into which all secondary cores are held
+>> Why doesn't __CPUINIT work?
+> Won't we then encounter the same problem on builds without CPU_HOTPLUG? I
+> thought we'd throw away the .cpuinit.* section(s) in that case?
+>
 
-Hi Simon
+The generic linker macros look to set it up so that all __CPUINIT
+sections become __INIT in that scenario. Since we don't support hotplug
+booting with maxcpus < nr_present_cpus can't lead to any corruption
+because we can't bring online any of the offline and present CPUs.
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-I tested on kirkwood topkick with DT. SDIO wifi device is found.
-
-  Andrew
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
