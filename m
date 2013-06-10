@@ -1,71 +1,119 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Jun 2013 17:35:08 +0900
-Subject: [PATCH] ARM: dts: add pin state information for DP HPD support to
- Exynos5250
-In-Reply-To: <CAD=FV=V9oBR1ZAEsMs5-x7NaD1fiHJO=9dn1mPAMg0MX6tnxYA@mail.gmail.com>
-References: <000001ce4e1e$d1cc5de0$756519a0$@samsung.com>
- <CAD=FV=V9oBR1ZAEsMs5-x7NaD1fiHJO=9dn1mPAMg0MX6tnxYA@mail.gmail.com>
-Message-ID: <0ea201ce65b5$6a78ca30$3f6a5e90$%kim@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Jun 2013 10:35:20 +0200
+Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
+In-Reply-To: <CADApbeixEKi984QED07LxA8vzfHmLGCGT8KxEbB5cqXzpW823Q@mail.gmail.com>
+References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
+ <201306061826.19551.arnd@arndb.de>
+ <CADApbeixEKi984QED07LxA8vzfHmLGCGT8KxEbB5cqXzpW823Q@mail.gmail.com>
+Message-ID: <201306101035.20924.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Doug Anderson wrote:
+On Saturday 08 June 2013, Chao Xie wrote:
+> hi, Arnd
+> Thanks for your review.
 > 
-> Jingoo,
-> 
-> On Sat, May 11, 2013 at 1:09 AM, Jingoo Han <jg1.han@samsung.com> wrote:
-> > Add pin state information for DP HPD support that requires
-> > pin configuration support using pinctrl interface.
+> On Fri, Jun 7, 2013 at 12:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Thursday 06 June 2013, Neil Zhang wrote:
+> >>
+> >> The MACH_MMPX_DT here is for standard ARM core based SoC.
+> >> But PJ4 is modified by Marvell, which includes IWMMXT.
 > >
-> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
-> > ---
-> > Tested on Exynos5250
+> > That should not stop us from supporting them with the same kernel.
+> > We can already build a kernel that will work with IWMMXT on
+> > ArmadaXP (PJ4B) and Calxeda Highbank (Cortex-A9) for instance.
 > >
-> >  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    7 +++++++
-> >  arch/arm/boot/dts/exynos5250-smdk5250.dts |    3 +++
-> >  2 files changed, 10 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> > index d1650fb..e9cdee3 100644
-> > --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> > +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> > @@ -553,6 +553,13 @@
-> >                         samsung,pin-pud = <0>;
-> >                         samaung,pin-drv = <0>;
-> >                 };
-> > +
-> > +               dp_hpd: dp_hpd {
-> > +                       samsung,pins = "gpx0-7";
-> > +                       samsung,pin-function = <3>;
-> > +                       samsung,pin-pud = <0>;
-> > +                       samaung,pin-drv = <0>;
-> > +               };
-> >         };
-> >
-> >         pinctrl at 13400000 {
-> > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > index 3e0c792..d53ea34 100644
-> > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-> > @@ -224,6 +224,9 @@
-> >                 samsung,color-depth = <1>;
-> >                 samsung,link-rate = <0x0a>;
-> >                 samsung,lane-count = <4>;
-> > +
-> > +               pinctrl-names = "default";
-> > +               pinctrl-0 = <&dp_hpd>;
-> 
-> I was going to suggest moving this to exynos5250.dtsi but then
-> realized that I saw a board recently that used a non-standard HPD pin
-> recently!  ...so keeping it in the board file (like you've done) is
-> good.
-> 
-> ...so looks good to me.
-> 
-> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Yes. We can compile it, because will fail to boot up the core.
+> The correct way to adding device tree support for
+> iwmmx(arch/arm/kernel/pj4-cp0.c).
+> I think we can do it if you agree with us.
 
-Yeah, I agreed with Doug's comment :-)
+Ah, you mean the initcall in that file breaks when executed on a
+CPU that doesn't have iWMMXT?
 
-Applied, thanks.
+The easiest way for that is probably to call pj4_cp0_init()
+from the machine_descriptor init_late() callback. To do it properly,
+I think it should be hooked up with the CPU identification code
+in arch/arm/mm/proc-v7.S.
 
-- Kukjin
+> >> > __initdata = {
+> >> > >           .virtual        = (unsigned long)AXI_VIRT_BASE,
+> >> > >           .length         = AXI_PHYS_SIZE,
+> >> > >           .type           = MT_DEVICE,
+> >> > > - },
+> >> > > + }, {
+> >> > > +         .pfn            = __phys_to_pfn(MMP_CORE_PERIPH_PHYS_BASE),
+> >> > > +         .virtual        = (unsigned long)MMP_CORE_PERIPH_VIRT_BASE,
+> >> > > +         .length         = MMP_CORE_PERIPH_PHYS_SIZE,
+> >> > > +         .type           = MT_DEVICE,
+> >> > > + }
+> >> > >  };
+> >> > >
+> >> > >  void __init mmp_map_io(void)
+> >> >
+> >> > What is this needed for?
+> >>
+> >> This function is used to static map the device registers.
+> >
+> > I understand what map_io does. Why do you need a static mapping?
+> >
+> 
+> The AXI and APB bus register mapping, It does not need to be static mapping.
+> Because we define the registers for each peripharals in device tree.
+> The device driver can map it.
+
+Ok. Please try if it all keeps working without these mappings (aside
+from the SCU). You can leave them in as a performance optimization
+since the registers will get mapped as large pages this way, but it
+should really work without them.
+
+I would also suggest defining the virtual base addresses locally in this
+file rather than globally, just to ensure that no driver starts relying
+on the static mapping.
+
+> There is a exception. The address space used by core for example CPU
+> SCU registers for CA9.
+> We have to read/write the registers even device tree has not been
+> build up in kernel, for example ->smp_prepare_cpus.
+> At this point, how can we get the base address for SCU?
+
+I guess that is a problem we have on other platforms as well, we should
+find a generic solution for that. It would be nice to reserve a page
+in "fixmap" and have common code map the SCU page into that.
+ 
+> >> > > +/* PXA988 */
+> >> > > +static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst
+> >> > = {
+> >> > > + OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0",
+> >> > NULL),
+> >> > > + OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1",
+> >> > NULL),
+> >> > > + OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000, "pxa2xx-uart.2",
+> >> > NULL),
+> >> > > + OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0",
+> >> > NULL),
+> >> > > + OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1",
+> >> > NULL),
+> >> > > + OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
+> >> > > + OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
+> >> > > + {}
+> >> > > +};
+> >> >
+> >> > Why do you need auxdata?
+> >>
+> >> Two reasons:
+> >> 1. some of the device still need platform data at this time.
+> >
+> > None of the ones above do apparently.
+> >
+> Now, some devices are not added. For example, USB.
+> I am trying to modify the USB driver to make it support device tree.
+> For example, separate the phy and PMIC support from USB driver.
+> The patches have been reviewed in USB maillist for a long time.
+> Now it is hold because the maintainer think HCD and PHY need do some fix.
+> So as a temporaty solution before us pushing USB patches, we have to
+> use platform data for USB.
+
+Ok, I see.
+
+	Arnd
