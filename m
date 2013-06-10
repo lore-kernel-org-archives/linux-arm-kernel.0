@@ -1,39 +1,49 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Mon, 10 Jun 2013 23:56:16 +0200
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 11 Jun 2013 00:01:59 +0200
 Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20130610214842.GB18614@n2100.arm.linux.org.uk>
+In-Reply-To: <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
 References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
- <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk> <51B5B41A.7070306@gmail.com>
- <20130610214842.GB18614@n2100.arm.linux.org.uk>
-Message-ID: <51B64B80.5060709@gmail.com>
+ <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
+ <20130610170648.GX18614@n2100.arm.linux.org.uk>
+ <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
+Message-ID: <CAKMK7uHSCigrTvKENjZRgEsgtA0BeaORcj15n7JFW_uQoNp37Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2013 11:48 PM, Russell King - ARM Linux wrote:
-> On Mon, Jun 10, 2013 at 01:10:18PM +0200, Sebastian Hesselbarth wrote:
->> On 06/09/13 21:29, Russell King wrote:
->>> +static const struct armada_output_type armada_drm_conn_slave = {
->>> +	.connector_type	= DRM_MODE_CONNECTOR_HDMIA,
+On Mon, Jun 10, 2013 at 9:59 PM, Rob Clark <robdclark@gmail.com> wrote:
+> On Mon, Jun 10, 2013 at 1:06 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Mon, Jun 10, 2013 at 11:57:32AM -0400, Rob Clark wrote:
+>>> On Sun, Jun 9, 2013 at 3:29 PM, Russell King
+>>> <rmk+kernel@arm.linux.org.uk> wrote:
+>>> > This patch adds support for the pair of LCD controllers on the Marvell
+>>> > Armada 510 SoCs.  This driver supports:
+>>> > - multiple contiguous scanout buffers for video and graphics
+>>> > - shm backed cacheable buffer objects for X pixmaps for Vivante GPU
+>>> >   acceleration
+>>> > - dual lcd0 and lcd1 crt operation
+>>> > - video overlay on each LCD crt
+>>>
+>>> Any particular reason for not exposing the overlays as drm_plane's?
+>>> That is probably something that should change before merging the
+>>> driver.
 >>
->> For a rework of DRM slave encoder API, there should also be some way to
->> get .connector_type and .encoder_type above from that slave encoder.
->> IMHO it should be up to the slave encoder to determine connector and
->> encoder type.
->
-> Encoder type - yes, but connector type doesn't seem sensible.  It's
-> possible for the TDA998x to be connected to a DVI connector - how
-> would the slave encoder know that?
+>> Only through not understanding much of DRM when I started this.
+>> Provided DRM planes can do everything that I'm already doing with
+>> the overlay support, then yes.  Otherwise, I want to stick with this
+>> which is modelled after the i915 overlay interface.
 
-True. But how should Armada DRM driver know? Actually, it is not
-important where we put that information. IMHO it is more likely
-to be known by TDA998x as by the corresponding master encoder.
-With DT I'd suggest to have a property for TDA998x that sets either
-HDMI A/B/C or DVI.
+Oh i915 overlays aren't a good reason ;-) I've done those way back
+when drm didn't have any plane infrastructure and pretty much as my
+very contribution. So totally lacked any clue.
 
-Not related to CuBox setup, but with DisplayPort it can even get worse,
-e.g. consider a dumb LCDC connected to some DP++ (HDMI protocol over DP
-electrical) encoder connected to a TMDS level shifter. Where do you put
-the (final) connector type if not in the last encoder connected to that
-chain?
-
-Sebastian
+If I can scrap together a bit of time I want to port the legacy
+overlay code over to drm planes (and remap the current ioctl interface
+to the drm plane interface for backwards compat). But atm that's
+crushed under a giant pile of other todo items.
+-Daniel
+--
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
