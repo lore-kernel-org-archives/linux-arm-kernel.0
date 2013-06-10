@@ -1,18 +1,19 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 10 Jun 2013 10:06:08 -0600
-Subject: [PATCH] reset: provide dummy API entries to avoid link errors
-In-Reply-To: <1370755846-27011-1-git-send-email-Baohua.Song@csr.com>
-References: <1370755846-27011-1-git-send-email-Baohua.Song@csr.com>
-Message-ID: <51B5F970.1080505@wwwdotorg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 10 Jun 2013 13:07:18 -0300
+Subject: [PATCH 1/2] ASoC: sgtl5000: Let the codec acquire its clock
+In-Reply-To: <20130610154126.GF6381@S2101-09.ap.freescale.net>
+References: <1370826467-30399-1-git-send-email-festevam@gmail.com>
+ <20130610154126.GF6381@S2101-09.ap.freescale.net>
+Message-ID: <CAOMZO5B9fsC9UMsdbXMMSJzG_r=-U8o9nr=j9r_GxkeVMoa8og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2013 11:30 PM, Barry Song wrote:
-> this patch provides dummy reset API entries like other subsystem e.g.
-> gpiolib to avoid link errors when RESET_CONTROLLER is not enabled.
+On Mon, Jun 10, 2013 at 12:41 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
 
-I would tend to think that any driver that needs to use this API to
-reset its HW should depend on the reset API (or select it) to ensure
-that the API was present.
+>> -clk_fail:
+>> -     clk_put(data->codec_clk);
+>
+> Why can this clk_put() be removed now?
 
-That way, problems would be detected at compile-time, not run-time.
+Good point. Will send a patch to convert it to devm_clk_get, so that
+we do not need to call these clk_put.
