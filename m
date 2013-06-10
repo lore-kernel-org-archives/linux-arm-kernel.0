@@ -1,53 +1,57 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 10 Jun 2013 22:09:07 +0200
-Subject: [PATCH V4 2/4] ARM: tegra: pcie: Add tegra3 support
-In-Reply-To: <51AF68F1.8080307@wwwdotorg.org>
-References: <1370445221-17696-1-git-send-email-jagarwal@nvidia.com>
- <51AF68F1.8080307@wwwdotorg.org>
-Message-ID: <20130610200906.GD25859@mithrandir>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Jun 2013 21:08:39 +0100
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
+References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
+ <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
+ <20130610170648.GX18614@n2100.arm.linux.org.uk>
+ <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
+Message-ID: <20130610200839.GY18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 10:36:01AM -0600, Stephen Warren wrote:
-> On 06/05/2013 09:13 AM, Jay Agarwal wrote:
-> > - Make private data structure for each SoC
-> > - Add required Tegra30 clocks and regulators
-> > - Add Tegra30 specific code in enable controller
-> > - Added Tegra30 specific properties in pci binding document
+On Mon, Jun 10, 2013 at 03:59:34PM -0400, Rob Clark wrote:
+> On Mon, Jun 10, 2013 at 1:06 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > ARMADA_GEM_CREATE_PHYS is to deal with creating a gem buffer object for
+> > a chunk of physical memory allocated by other means (eg, the Vmeta stuff.)
+> > This allows my X server to remain compatible with the XF86 Dove driver,
+> > which permits the passing of the physical address of the video frame to
+> > the X server (otherwise we're into rewriting a whole load more code than
+> > is really desirable - and I really don't have time to rewrite bits of
+> > gstreamer and other stuff.)
 > 
-> It's a bit odd to send an updated version of just some of the patches;
-> reposting a whole series is much easier for the person applying the
-> patches. However, hopefully Thierry can handle it in this case.
+> ahh, gotcha.. and, ugg, that is even worse..
+> 
+> I'm not hugely a fan of giving userspace a way to dma into arbitrary
+> phys addresses (ie. create_phys + put_image).  But I don't need to
+> explain what you already know ;-)
+> 
+> Is there a pre-defined carveout pool that you can at least bounds
+> check against?  Otherwise put this ioctl inside a #if
+> CONFIG_CRAZY_SOC_VENDOR_HOLE_TO_DRIVE_A_TRUCK_THROUGH / #endif..
 
-Yes, I think I can handle it. It might be good to have Jay look at the
-final patches when I'm done, though, to make sure I haven't forgotten
-anything.
+This driver is _not_ about supporting the GPU natively as part of the DRM,
+but providing the foundations for:
 
-> > diff --git a/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt b/Documentation/devicetree/bindings/pci/nvidia,tegra20-pcie.txt
-> 
-> >  Required properties:
-> > -- compatible: "nvidia,tegra20-pcie"
-> > +- compatible: "nvidia,tegra20-pcie" "nvidia,tegra30-pcie"
-> 
-> perhaps add "or" between those two entries?
-> 
-> > +- avdd-supply: Power supply for controller (1.05V) (not required for tegra20)
-> ...
-> > +  "cml": The Tegra clock of that name (not required for tegra20)
-> 
-> Tegra20 should be capitalized in both those two lines.
-> 
-> I assume that Thierry can fix up these nits when he applies the patches,
-> so you don't need to repost. Thierry can correct me if I'm wrong.
+(a) a properly functional interface to HDMI TVs (fbdev doesn't hack that)
+    with hotplug
+(b) providing sufficient infrastructure to allow video playback to work.
 
-I've found a few other nits that I can take care of myself when
-applying.
+What this is not about is fixing the crappy userspace GPU libraries and
+video decoding so that it's "secure" - not only is that way beyond my
+abilities, it would also be a violation of the closed source license to
+reverse engineer them so that were possible.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/3a5f629d/attachment.sig>
+It is something that continues to be a problem and I'm making no claims
+that I'm fixing that.  So no, I will not put such a config option around
+it for the simple reason that by doing so, turning such an option off
+renders userspace utterly useless and the driver might as well not exist.
+
+If that means you want to NACK the patch, then fine; I'll just maintain
+it out of tree.  I did the driver mostly for my own personal benefit to
+get the Cubox to the point where I can boot it with or without the TV
+connected and have it work.  But it would be a shame if that meant
+that others could not benefit from about 8 solid months of my work on
+this and have to put up with crappy a fbdev driver.
