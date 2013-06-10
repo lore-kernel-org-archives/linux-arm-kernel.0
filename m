@@ -1,68 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 10 Jun 2013 09:23:56 -0700
-Subject: [PATCH 3/4] mmc: omap_hsmmc: Remux pins to support SDIO
- interrupt and PM runtime
-In-Reply-To: <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
-References: <20130607214557.18581.75288.stgit@localhost>
- <20130607214957.18581.90624.stgit@localhost>
- <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
-Message-ID: <20130610162356.GL8164@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Jun 2013 17:25:48 +0100
+Subject: [PATCH 00/10] regulator: ab8500-ext: Refactorings
+In-Reply-To: <20130610154633.GL20297@gmail.com>
+References: <20130610154633.GL20297@gmail.com>
+Message-ID: <20130610162548.GH1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130610 09:09]:
-> 
-> You can use the new infrastructure to make the core select:
-> 
-> pinctrl_pm_select_default_state(host->dev);
-> pinctrl_pm_select_idle_state(host->dev);
+On Mon, Jun 10, 2013 at 04:46:33PM +0100, Lee Jones wrote:
+> On Mon, 10 Jun 2013, Mark Brown wrote:
 
-OK great.
- 
-> What is the semantic difference between "default" and "active"?
+> > IIRC they were more involved and since you decided to pick a random
+> > e-mail address to send them to that goes nowhere near the mailboxes I
+> > use for upstream they're not going to bubble up particularly quickly.
 
-We only should remux the pins that need remuxing as that's done
-every time hitting idle. So I think we should have the following
-default groups:
+> Not as random as you might think.
 
-default		Static pins that don't change, no need to remux
-		configured in consumer driver probe like we already
-		do
+> I knew you'd left your old place, so I did:
 
-active		Optional dynamic pins remuxed for runtime, can be
-		configured and selected in consumer driver probe.
-		The consumer driver may also want to select this
-		state in PM runtime resume.
+>   `git log --author="Mark Brown" --format=%ae next/master | uniq -c | head`
 
-idle		Optional dynamic pins remuxed for idle. The consumer
-		driver may also want to select this state in PM
-		runtime suspend depending on device_can_wakeup()
-		and driver specific needs.
- 
-> If this is something very generic that a lot of platforms will want
-> to have, why not add it to include/linux/pinctrl/pinctrl-state.h
-> and augment the core to cache and handle this too?
+> ... to see what you were using most recently. I recieved:
 
-Yes we should do that assuming the above grouping makes sense
-to you.
- 
-> However in this case I *suspect* that what you really want
-> to do it to rename the state called "default" to "sleep"
-> (it appears the default state is sleepy) and then rename
-> the "active" state to "default" (as this is the defined semantic
-> meaning of "default" from <linux/pinctrl/pinctrl-state.h>.
+You should use the addresses people are actually advertising, falling
+back on git only if there's a problem with that for some reason.  In
+this case I updated my contact details in MAINTAINERS for exactly this
+reason.
 
-The idle state above could also be called sleep instead of idle
-if you prefer that.
+> I'll send it out again to your kernel.org one if it make you happy. :)
 
-> But maybe I'm not quite getting the subtle difference between
-> "default" and "active" here so enlighten me.
-
-I think the confusion is caused by the fact that we need three
-mux groups, not just two :) The toggling between active and idle
-is the hotpath as that can potentially happen for multiple drivers
-every time we enter and exit idle.
-
-Regards,
-
-Tony
+Well, I don't care that much - if there's not a patch
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/b700f065/attachment.sig>
