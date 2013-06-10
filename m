@@ -1,45 +1,40 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 10 Jun 2013 18:38:06 -0500
-Subject: [PATCHv7 0/6] ARM: socfpga: Add ethernet bindings, clk-gate,
- and SD/MMC
-Message-ID: <1370907493-17623-1-git-send-email-dinguyen@altera.com>
+Date: Mon, 10 Jun 2013 18:38:10 -0500
+Subject: [PATCHv7 4/6] ARM: socfpga: Add syscon to be part of socfpga
+In-Reply-To: <1370907493-17623-1-git-send-email-dinguyen@altera.com>
+References: <1370907493-17623-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1370907493-17623-5-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Hi Arnd/Olof,
+SOCFPGA has a system manager register block can be accessed by using
+the syscon driver.
 
-Can you please apply this patch series? Arnd has already reviewed patch[6/6] and
-patch [3/6] has gotten Mike Turquette's Ack-by.
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Reviewed-by: Pavel Machek <pavel@denx.de>
+Cc: Pavel Machek <pavel@denx.de>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: <linux@arm.linux.org.uk>
 
+v2:
+- Add Reviewed-by: Pavel Machel <pavel@denx.de>
+---
+ arch/arm/mach-socfpga/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Dinh
-
-Dinh Nguyen (6):
-  ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
-  ARM: socfpga: dts: Add gate-clock bindings
-  ARM: socfpga: Add support to gate peripheral clocks
-  ARM: socfpga: Add syscon to be part of socfpga
-  ARM: socfpga: dts: Add support for SD/MMC
-  mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-
- .../devicetree/bindings/clock/altr_socfpga.txt     |    7 +
- .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   60 +++++
- arch/arm/boot/dts/socfpga.dtsi                     |  230 +++++++++++++++++++-
- arch/arm/boot/dts/socfpga_cyclone5.dts             |   26 +++
- arch/arm/boot/dts/socfpga_vt.dts                   |   17 ++
- arch/arm/mach-socfpga/Kconfig                      |    1 +
- drivers/clk/socfpga/clk.c                          |  194 ++++++++++++++++-
- drivers/mmc/host/Kconfig                           |    8 +
- drivers/mmc/host/Makefile                          |    1 +
- drivers/mmc/host/dw_mmc-exynos.c                   |    2 -
- drivers/mmc/host/dw_mmc-socfpga.c                  |  138 ++++++++++++
- drivers/mmc/host/dw_mmc.h                          |    1 +
- 12 files changed, 671 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
- create mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
-
+diff --git a/arch/arm/mach-socfpga/Kconfig b/arch/arm/mach-socfpga/Kconfig
+index 566e804..07dff6f 100644
+--- a/arch/arm/mach-socfpga/Kconfig
++++ b/arch/arm/mach-socfpga/Kconfig
+@@ -13,5 +13,6 @@ config ARCH_SOCFPGA
+ 	select GPIO_PL061 if GPIOLIB
+ 	select HAVE_ARM_SCU
+ 	select HAVE_SMP
++	select MFD_SYSCON
+ 	select SPARSE_IRQ
+ 	select USE_OF
 -- 
 1.7.9.5
