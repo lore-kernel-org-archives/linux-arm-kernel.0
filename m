@@ -1,45 +1,84 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 09 Jun 2013 23:12:08 -0500
-Subject: [PATCHv2 4/6] sched_clock: Add support for >32 bit sched_clock
-In-Reply-To: <20130604102114.GU18614@n2100.arm.linux.org.uk>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <1370155183-31421-5-git-send-email-sboyd@codeaurora.org>
- <20130603093938.GG18614@n2100.arm.linux.org.uk>
- <51AD069F.1060308@codeaurora.org>
- <20130603221210.GO18614@n2100.arm.linux.org.uk>
- <51AD483F.2010206@codeaurora.org>
- <20130604102114.GU18614@n2100.arm.linux.org.uk>
-Message-ID: <51B55218.9040401@gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon, 10 Jun 2013 09:44:14 +0530
+Subject: [PATCH 2/3] ARM: dts: Add FIMD node to Origen4210 board
+In-Reply-To: <5527415.fcM1OgADxD@flatron>
+References: <1370603235-11193-1-git-send-email-tushar.behera@linaro.org>
+ <1370603235-11193-3-git-send-email-tushar.behera@linaro.org>
+ <5527415.fcM1OgADxD@flatron>
+Message-ID: <51B55296.5030006@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2013 05:21 AM, Russell King - ARM Linux wrote:
-> On Mon, Jun 03, 2013 at 06:51:59PM -0700, Stephen Boyd wrote:
->> On 06/03/13 15:12, Russell King - ARM Linux wrote:
->>> If you have a 56-bit clock which ticks at a period of 1ns, then
->>> cd.rate = 1, and your sched_clock() values will be truncated to 56-bits.
->>> The scheduler always _requires_ 64-bits from sched_clock.  That's why we
->>> have the complicated code to extend the 32-bits-or-less to a _full_
->>> 64-bit value.
->>>
->>> Let me make this clearer: sched_clock() return values _must_ without
->>> exception monotonically increment from zero to 2^64-1 and then wrap
->>> back to zero.  No other behaviour is acceptable for sched_clock().
+On 06/08/2013 04:19 PM, Tomasz Figa wrote:
+> On Friday 07 of June 2013 16:37:14 Tushar Behera wrote:
+>> From: Sachin Kamat <sachin.kamat@linaro.org>
 >>
->> Ok so you're saying if we have less than 64 bits of useable information
->> we _must_ do something to find where the wraparound will occur and
->> adjust for it so that epoch_ns is always incrementing until 2^64-1. Fair
->> enough. I was trying to avoid more work because on arm architected timer
->> platforms it takes many years for that to happen.
+>> Added FIMD and display timing node to Origen4210 board.
 >>
->> I'll see what I can do.
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/exynos4210-origen.dts |   21 +++++++++++++++++++++
+>>  1 file changed, 21 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts
+>> b/arch/arm/boot/dts/exynos4210-origen.dts index bcf8079..4c6c3cd 100644
+>> --- a/arch/arm/boot/dts/exynos4210-origen.dts
+>> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
+>> @@ -290,4 +290,25 @@
+>>  			clock-frequency = <24000000>;
+>>  		};
+>>  	};
+>> +
+>> +	fimd at 11c00000 {
+>> +		pinctrl-0 = <&lcd_en &lcd_clk &lcd_data24 &pwm0_out>;
 > 
-> Well, 56 bits at 1ns intervals is 833 days (2^56 / (1000000000*60*60*24)).
-> We used to say that 497 days was enough several years ago, and that got
-> fixed.  We used to say 640K was enough memory for anything, and that
-> got fixed.
+> Ahh, this would explain the two pwm pin groups from previous patch.
+> 
+> This seems somehow incorrect, though. AFAIK PWM outputs are not managed by 
+> FIMD in any way.
+> 
 
-The ARM ARM states a minimum resolution of 40 years AND at least 56-bits
-of resolution. So a 1Gz counter would have to have more that 56 bits.
+I couldn't find any better place to put the pwm0_out pin configurations.
+Without configuring pwm0_out pins, display doesn't come up on the LCD.
+Any suggestions?
 
-Rob
+>> +		pinctrl-names = "default";
+>> +		status = "okay";
+>> +	};
+>> +
+>> +	display-timings {
+>> +		native-mode = <&timing0>;
+>> +		timing0: timing {
+>> +			clock-frequency = <50000>;
+> 
+> Hmm, 50 KHz for pixel clock? Isn't it a bit too low? Or am I missing 
+> something?
+> 
+
+Actually clock-frequency value is not used by DRM-FIMD, but instead
+required by the framework.
+
+Still it would be better to provide the actual pixel clock value here.
+So I would update this with 40MHz which is actual pixel clock used on my
+board.
+
+> Best regards,
+> Tomasz
+> 
+>> +			hactive = <1024>;
+>> +			vactive = <600>;
+>> +			hfront-porch = <64>;
+>> +			hback-porch = <16>;
+>> +			hsync-len = <48>;
+>> +			vback-porch = <64>;
+>> +			vfront-porch = <16>;
+>> +			vsync-len = <3>;
+>> +		};
+>> +	};
+>>  };
+
+Thanks for your review.
+
+-- 
+Tushar Behera
