@@ -1,226 +1,50 @@
-From: rogerq@ti.com (Quadros, Roger)
-Date: Mon, 10 Jun 2013 12:31:54 +0000
-Subject: [PATCH 4/4] ARM: OMAP: Move DT wake-up event handling over to
- use pinctrl-single-omap
-In-Reply-To: <20130607205046.16513.2802.stgit@localhost>
-References: <20130607203936.16513.57494.stgit@localhost>,
- <20130607205046.16513.2802.stgit@localhost>
-Message-ID: <688FBEF7C8277944BE5AED9A41FB1EBC1AB12DA0@DNCE05.ent.ti.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 10 Jun 2013 16:35:25 +0400
+Subject: [PATCH 6/6] mtd: ofpart: add compatible check for child nodes
+In-Reply-To: <1370860014-1770-7-git-send-email-josh.wu@atmel.com>
+References: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
+ <1370860014-1770-7-git-send-email-josh.wu@atmel.com>
+Message-ID: <51B5C80D.2030303@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony, (sorry, on Outlook web)
+hello.
 
--                       compatible = "ti,omap4-padconf", "pinctrl-single";
-+                       compatible = "ti,omap4-padconf";
+On 10-06-2013 14:26, Josh Wu wrote:
 
-This change is not necessary if we make sure the pinctrl-single-omap driver
-gets registered early enough, before the pinctrl devices are probed.
- (e.g. subsys_initcall())
+> If the child node has compatible property then it is a driver not partition.
 
-I've commented about this in the other patch.
-
-cheers,
--roger
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+> ---
+>   drivers/mtd/ofpart.c |   14 +++++++++++++-
+>   1 file changed, 13 insertions(+), 1 deletion(-)
 
 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
+> index 553d6d6..61ce1f8 100644
+> --- a/drivers/mtd/ofpart.c
+> +++ b/drivers/mtd/ofpart.c
+[...]
+> @@ -40,8 +44,13 @@ static int parse_ofpart_partitions(struct mtd_info *master,
+>   	/* First count the subnodes */
+>   	pp = NULL;
+>   	nr_parts = 0;
+> -	while ((pp = of_get_next_child(node, pp)))
+> +	while ((pp = of_get_next_child(node, pp))) {
 
-________________________________________
-From: Tony Lindgren [tony at atomide.com]
-Sent: Friday, June 07, 2013 11:50 PM
-To: linus.walleij at linaro.org
-Cc: devicetree-discuss at lists.ozlabs.org; Haojian Zhuang; Ujfalusi, Peter; linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Quadros, Roger
-Subject: [PATCH 4/4] ARM: OMAP: Move DT wake-up event handling over to use pinctrl-single-omap
+    Assignment in *while*? Is scripts/checkpatch.pl happy about that?
 
-Now pinctrl-single-omap can handle the wake-up events for us now
-as long as the events are configured in the .dts files.
+> +		int len;
 
-Done in collaboration with Roger Quadros <rogerq@ti.com>.
+    Empty line wouldn't hurt here, after declaration.
 
-Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
-Cc: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Cc: devicetree-discuss at lists.ozlabs.org
-Signed-off-by: Roger Quadros <rogerq@ti.com>
-Signed-off-by: Tony Lindgren <tony@atomide.com>
----
- arch/arm/boot/dts/omap3.dtsi     |    4 ++--
- arch/arm/boot/dts/omap4.dtsi     |    4 ++--
- arch/arm/boot/dts/omap5.dtsi     |    4 ++--
- arch/arm/mach-omap2/mux.c        |    8 ++++++--
- arch/arm/mach-omap2/pm34xx.c     |    2 ++
- arch/arm/mach-omap2/prm_common.c |   26 ++++++++++++++++++++++++++
- 6 files changed, 40 insertions(+), 8 deletions(-)
+> +		if (node_has_compatible(pp, &len))
+> +			continue;
+> +
+>   		nr_parts++;
+> +	}
+>
+>   	if (nr_parts == 0)
+>   		return 0;
 
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 99ba6e1..847af56 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -94,7 +94,7 @@
-                };
-
-                omap3_pmx_core: pinmux at 48002030 {
--                       compatible = "ti,omap3-padconf", "pinctrl-single";
-+                       compatible = "ti,omap3-padconf";
-                        reg = <0x48002030 0x05cc>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-@@ -103,7 +103,7 @@
-                };
-
-                omap3_pmx_wkup: pinmux at 0x48002a00 {
--                       compatible = "ti,omap3-padconf", "pinctrl-single";
-+                       compatible = "ti,omap3-padconf";
-                        reg = <0x48002a00 0x5c>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 2a56428..2a4f099 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -107,7 +107,7 @@
-                };
-
-                omap4_pmx_core: pinmux at 4a100040 {
--                       compatible = "ti,omap4-padconf", "pinctrl-single";
-+                       compatible = "ti,omap4-padconf";
-                        reg = <0x4a100040 0x0196>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-@@ -115,7 +115,7 @@
-                        pinctrl-single,function-mask = <0x7fff>;
-                };
-                omap4_pmx_wkup: pinmux at 4a31e040 {
--                       compatible = "ti,omap4-padconf", "pinctrl-single";
-+                       compatible = "ti,omap4-padconf";
-                        reg = <0x4a31e040 0x0038>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-diff --git a/arch/arm/boot/dts/omap5.dtsi b/arch/arm/boot/dts/omap5.dtsi
-index 3dd7ff8..5515d58 100644
---- a/arch/arm/boot/dts/omap5.dtsi
-+++ b/arch/arm/boot/dts/omap5.dtsi
-@@ -100,7 +100,7 @@
-                };
-
-                omap5_pmx_core: pinmux at 4a002840 {
--                       compatible = "ti,omap4-padconf", "pinctrl-single";
-+                       compatible = "ti,omap4-padconf";
-                        reg = <0x4a002840 0x01b6>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-@@ -108,7 +108,7 @@
-                        pinctrl-single,function-mask = <0x7fff>;
-                };
-                omap5_pmx_wkup: pinmux at 4ae0c840 {
--                       compatible = "ti,omap4-padconf", "pinctrl-single";
-+                       compatible = "ti,omap4-padconf";
-                        reg = <0x4ae0c840 0x0038>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index f82cf87..48094b58 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -811,6 +811,12 @@ int __init omap_mux_late_init(void)
-                }
-        }
-
-+       omap_mux_dbg_init();
-+
-+       /* see pinctrl-single-omap for the wake-up interrupt handling */
-+       if (of_have_populated_dt())
-+               return 0;
-+
-        ret = request_irq(omap_prcm_event_to_irq("io"),
-                omap_hwmod_mux_handle_irq, IRQF_SHARED | IRQF_NO_SUSPEND,
-                        "hwmod_io", omap_mux_late_init);
-@@ -818,8 +824,6 @@ int __init omap_mux_late_init(void)
-        if (ret)
-                pr_warning("mux: Failed to setup hwmod io irq %d\n", ret);
-
--       omap_mux_dbg_init();
--
-        return 0;
- }
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index c018593..9b19b14 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -172,6 +172,8 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs, u32 ignore_bits)
-                        wkst = omap2_prm_read_mod_reg(module, wkst_off);
-                        wkst &= ~ignore_bits;
-                        c++;
-+                       if (c > 10)
-+                               break;
-                }
-                omap2_cm_write_mod_reg(iclk, module, iclk_off);
-                omap2_cm_write_mod_reg(fclk, module, fclk_off);
-diff --git a/arch/arm/mach-omap2/prm_common.c b/arch/arm/mach-omap2/prm_common.c
-index 228b850..b9af6a7 100644
---- a/arch/arm/mach-omap2/prm_common.c
-+++ b/arch/arm/mach-omap2/prm_common.c
-@@ -22,8 +22,10 @@
- #include <linux/io.h>
- #include <linux/irq.h>
- #include <linux/interrupt.h>
-+#include <linux/platform_data/pinctrl-single-omap.h>
- #include <linux/slab.h>
-
-+#include "soc.h"
- #include "prm2xxx_3xxx.h"
- #include "prm2xxx.h"
- #include "prm3xxx.h"
-@@ -95,6 +97,7 @@ static void omap_prcm_irq_handler(unsigned int irq, struct irq_desc *desc)
-        struct irq_chip *chip = irq_desc_get_chip(desc);
-        unsigned int virtirq;
-        int nr_irq = prcm_irq_setup->nr_regs * 32;
-+       int retries = 20;
-
-        /*
-         * If we are suspended, mask all interrupts from PRCM level,
-@@ -136,6 +139,9 @@ static void omap_prcm_irq_handler(unsigned int irq, struct irq_desc *desc)
-                /* Serve normal events next */
-                for_each_set_bit(virtirq, pending, nr_irq)
-                        generic_handle_irq(prcm_irq_setup->base_irq + virtirq);
-+
-+               if (retries-- < 1)
-+                       break;
-        }
-        if (chip->irq_ack)
-                chip->irq_ack(&desc->irq_data);
-@@ -234,6 +240,15 @@ void omap_prcm_irq_complete(void)
-        prcm_irq_setup->restore_irqen(prcm_irq_setup->saved_mask);
- }
-
-+static struct pcs_omap_pdata pcs_pdata;
-+
-+static struct platform_device pinctrl_single_omap = {
-+       .name   = "pinctrl-single-omap-soc",
-+       .dev    = {
-+               .platform_data = &pcs_pdata,
-+       },
-+};
-+
- /**
-  * omap_prcm_register_chain_handler - initializes the prcm chained interrupt
-  * handler based on provided parameters
-@@ -322,6 +337,17 @@ int omap_prcm_register_chain_handler(struct omap_prcm_irq_setup *irq_setup)
-                prcm_irq_chips[i] = gc;
-        }
-
-+       if (of_have_populated_dt()) {
-+               pcs_pdata.irq = omap_prcm_event_to_irq("io");
-+               if (cpu_is_omap34xx())
-+                       pcs_pdata.reconfigure_io_chain =
-+                               omap3xxx_prm_reconfigure_io_chain;
-+               else
-+                       pcs_pdata.reconfigure_io_chain =
-+                               omap44xx_prm_reconfigure_io_chain;
-+               platform_device_register(&pinctrl_single_omap);
-+       }
-+
-        return 0;
-
- err:
+WBR, Sergei
