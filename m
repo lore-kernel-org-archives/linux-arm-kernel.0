@@ -1,85 +1,50 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Mon, 10 Jun 2013 11:13:14 +0900
-Subject: Active-low behavior in gpiolib
-In-Reply-To: <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
-References: <CAAVeFu+hQHScYYkvO1KOrUPLLaC0ju_O4SDZWyJE8KhLn_hibQ@mail.gmail.com>
- <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
-Message-ID: <CAAVeFuJctmszhjyL7Z09pzYt9c_NhhYm5xbgm+Ns3gE5Y-xjJQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 9 Jun 2013 23:21:08 -0400 (EDT)
+Subject: [PATCH 0/2] MCPM backend for Virtual Express TC2
+In-Reply-To: <1370618853.4852.28.camel@hornet>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370618853.4852.28.camel@hornet>
+Message-ID: <alpine.LFD.2.03.1306092310570.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 4:10 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Well it is designed as a sysfs-only thing according to the comment:
-> drivers/gpio/gpiolib.c:#define FLAG_ACTIVE_LOW  6       /* sysfs value
-> has active low */
->
-> So I think your actual question is whether it should also be
-> enabled for the kernel-internal interfaces.
+On Fri, 7 Jun 2013, Pawel Moll wrote:
 
-Yes, that's my question.
+> On Fri, 2013-06-07 at 07:39 +0100, Nicolas Pitre wrote:
+> > This is the MCPM backend enabling SMP secondary boot and CPU hotplug
+> > on the VExpress TC2 big.LITTLE platform.  The method to allow CPU suspend
+> > is also implemented.
+> 
+> With my Naming Purist (TM) hat on, I must point out that there is no
+> such thing as TC2... The platform you're referring to is V2P-CA15_A7.
+> TC2 is just an internal name for the chip (as in: Test Chip 2, which
+> followed 1 and was supposed to be followed by 3 ;-). And considering the
+> fact that substantial part of the power management system lives outside
+> of the main chip anyway, the naming is not really precise.
 
-> Currently we have things like this:
->
-> /**
->  * struct mmci_platform_data - platform configuration for the MMCI
->  * (also known as PL180) block.
-> (...)
->  * @gpio_cd: read this GPIO pin to detect card insertion
->  * @cd_invert: true if the gpio_cd pin value is active low
-> (...)
->         int     gpio_cd;
->         bool    cd_invert;
->
-> So the knowledge of whether a certain GPIO is active high or low
-> is spread out through drivers, and the API only drives the line in a
-> very explicit way.
->
-> I am uncertain whether it is wise to move this into gpiolib for
-> in-kernel consumers, it is mainly a convention of where the
-> knowledge should sit. In the mentioned case, the flags will still
-> be needed because we need to have the information there to
-> set the flag toward the gpiolib API anyway.
->
-> So the only thing gained is that gpiolib gets some knowledge
-> of how the pin is used. But what is the gain of that?
+Well, in people's mind, TC2 refers to the whole system now, for better 
+or for worse.
 
-Well, my problem is clearly highlighted by the example you mention,
-which is a very common usage pattern especially for DT-obtained GPIOs
-which can have this OF_GPIO_ACTIVE_LOW flag. E.g. we have a lot of
-this:
+> Now, I appreciate that "v2p_ca15_a7_" namespace is a bit cumbersome
+> comparing to "tc2_" and no, I don't really have better ideas now...
 
-    gpio = of_get_named_gpio_flags(np, "foo-gpios", 0, &flags);
-    active_low = flags & OF_GPIO_ACTIVE_LOW ? 1 : 0;
-    ...
-    state = (gpio_get_value(gpio) ? 1 : 0) ^ active_low;
-    ...
-    gpio_set_value(gpio, (value ? 1 : 0) ^ active_low;
+Exactly.  If ARM wants names that stick, they'll have to be much more 
+practical.  Otherwise people will simply grab the first sensible 
+alternative name around.
 
-which could be simplified into this:
+All the ARM people I talk to always refer to v2p_ca15_a7 core tile as 
+simply TC2.  So using another name at this point would only *create* 
+confusion.  It is therefore probably best to keep it.
 
-    gpio = of_get_named_gpiod_flags(np, "foo-gpios", 0);
-    ...
-    state = gpiod_get_value(gpio);
-    ...
-    gpiod_set_value(gpio, value);
+You should do like some other companies does i.e. have an official name, 
+and an alias which is short and borrowed from an animal, or some 
+geographical region, etc.
 
-Board design makes it possible to turn any GPIO active low for any
-(good or bad) reason, thus the drivers, which interact with gpiolib,
-are more likely to want to set the GPIO logical value (taking the
-active low parameter into account) rather than its raw level.
+> Other than that:
+> 
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
 
-In the end, drivers that are not using an active_low flag are most
-likely doing so just because they never encountered such a situation.
-In practice, I suspect nearly all drivers want to be aware of the
-active-low property.
+Thanks.
 
-Since gpiolib is already half-aware of this property, through the
-sysfs active_low node and the OF_GPIO_ACTIVE_LOW DT property, why not
-complete the circle and ease the life of driver writers?
 
-As Stephen wrote, an alternative set of functions to get/set the
-actual raw value of the line could be provided, but my understanding
-is that an overwhelming majority of GPIO users would benefit from
-having the active low property being handled transparently.
-
-Alex.
+Nicolas
