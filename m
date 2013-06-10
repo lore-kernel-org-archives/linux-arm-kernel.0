@@ -1,39 +1,33 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Jun 2013 17:25:48 +0100
-Subject: [PATCH 00/10] regulator: ab8500-ext: Refactorings
-In-Reply-To: <20130610154633.GL20297@gmail.com>
-References: <20130610154633.GL20297@gmail.com>
-Message-ID: <20130610162548.GH1403@sirena.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Mon, 10 Jun 2013 18:31:13 +0200
+Subject: [PATCH v4 2/6] clocksource: add Marvell Orion SoC timer
+In-Reply-To: <51B5F8FE.5090508@linaro.org>
+References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1370856955-10514-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <51B5F8FE.5090508@linaro.org>
+Message-ID: <51B5FF51.6090708@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 04:46:33PM +0100, Lee Jones wrote:
-> On Mon, 10 Jun 2013, Mark Brown wrote:
+On 06/10/13 18:04, Daniel Lezcano wrote:
+> On 06/10/2013 11:35 AM, Sebastian Hesselbarth wrote:
+>> This patch add a DT enabled driver for timers found on Marvell Orion SoCs
+>> (Kirkwood, Dove, Orion5x, and Discovery Innovation). It installs a free-
+>> running clocksource on timer0 and a clockevent source on timer1.
+>> Corresponding device tree documentation is also added.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>
+> It looks good for me.
+>
+> Sebastian,
+>
+> shall I take it through my tree (it will go to Thomas's tree) ?
 
-> > IIRC they were more involved and since you decided to pick a random
-> > e-mail address to send them to that goes nowhere near the mailboxes I
-> > use for upstream they're not going to bubble up particularly quickly.
+Daniel,
 
-> Not as random as you might think.
+I checked MAINTAINERS and thought clocksource, i.e. patch 2/6, would go
+through Thomas' or John's tree? If you want to take it, I am fine with
+it but guess I am not the one to choose here ;)
 
-> I knew you'd left your old place, so I did:
-
->   `git log --author="Mark Brown" --format=%ae next/master | uniq -c | head`
-
-> ... to see what you were using most recently. I recieved:
-
-You should use the addresses people are actually advertising, falling
-back on git only if there's a problem with that for some reason.  In
-this case I updated my contact details in MAINTAINERS for exactly this
-reason.
-
-> I'll send it out again to your kernel.org one if it make you happy. :)
-
-Well, I don't care that much - if there's not a patch
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/b700f065/attachment.sig>
+Sebastian
