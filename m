@@ -1,41 +1,44 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 10 Jun 2013 11:44:51 +0200
-Subject: [PATCH 00/03] ARM: shmobile: Remove legacy memory bits
-In-Reply-To: <20130610094638.20803.18484.sendpatchset@w520>
-References: <20130610094638.20803.18484.sendpatchset@w520>
-Message-ID: <1652096.4LDaIIx18o@avalon>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 10 Jun 2013 17:51:14 +0800
+Subject: [RFC PATCH 1/4] USB: HCD: support giveback of URB in tasklet
+ context
+In-Reply-To: <10081846.6daPCXpZuS@linux-5eaq.site>
+References: <1370791112-18464-1-git-send-email-ming.lei@canonical.com>
+ <1399422.br9htUau7f@linux-5eaq.site>
+ <CACVXFVPs-MJy595OyqMs9rNmNAqcU7JDHXp+yp5bnEdq7_M-fg@mail.gmail.com>
+ <10081846.6daPCXpZuS@linux-5eaq.site>
+Message-ID: <CACVXFVMXE40yyckDmW0uDnLRMY0U1DztXVMPOAT12-YcRWVX+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On Mon, Jun 10, 2013 at 5:31 PM, Oliver Neukum <oliver@neukum.org> wrote:
+> On Monday 10 June 2013 17:23:46 Ming Lei wrote:
+>> On Mon, Jun 10, 2013 at 4:43 PM, Oliver Neukum <oliver@neukum.org> wrote:
+>> > On Sunday 09 June 2013 23:18:28 Ming Lei wrote:
+>> >> 2), the biggest change is the situation in which usb_submit_urb() is called
+>> >> in complete() callback, so the introduced tasklet schedule delay might be a
+>> >> con, but it shouldn't be a big deal:
+>> >>
+>> >>         - control/bulk asynchronous transfer isn't sensitive to schedule
+>> >>           delay
+>> >
+>> > That is debatable.Missing a frame boundary is expensive because the increased
+>> > latency then translates into lower throughput.
+>>
+>> Suppose so, considered that bulk transfer will do large data block transfer, and
+>> the extra frame or uFrame doesn't matter over the whole transfer time.
+>
+> That is not true for all use cases. Networking looks vulnerable.
 
-On Monday 10 June 2013 18:46:38 Magnus Damm wrote:
-> ARM: shmobile: Remove legacy memory bits
-> 
-> [PATCH 01/03] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
-> [PATCH 02/03] ARM: shmobile: Remove MEMORY_START/SIZE
-> [PATCH 03/03] ARM: shmobile: Remove mach/memory.h
-> 
-> Now when all users are gone this series removes the legacy memory code
-> and enables CONFIG_ARM_PATCH_PHYS_VIRT. Depends on the following code:
-> 
-> [PATCH v2] ARM: shmobile: uImage load address rework
-> [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
-> [PATCH 00/06] ARM: shmobile: SMP virt_to_phys() conversion
-> [PATCH 00/02] ARM: shmobile: romImage update
-> 
-> The romImage series above still needs to be updated.
-> 
-> This is the final bit of code not to rely on CONFIG_MEMORY_START/SIZE
-> which in turn is one component that we need for ARCH_MULTIPLATFORM.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+> That is debatable.Missing a frame boundary is expensive because the increased
+> latency then translates into lower throughput.
 
-I'm very happy to see CONFIG_MEMORY_START|SIZE go, thanks a lot for your work.
+Missing uframe/frame boundary doesn't cause lower throughput since network
+devices use bulk transfer, which is scheduled in hw aync queue and there should
+always have pending transfers in the queue when submitting bulk URB to the
+queue.
 
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
--- 
-Regards,
-
-Laurent Pinchart
+Thanks,
+--
+Ming Lei
