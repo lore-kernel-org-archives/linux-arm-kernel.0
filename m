@@ -1,41 +1,61 @@
-From: oliver@neukum.org (Oliver Neukum)
-Date: Mon, 10 Jun 2013 16:12:58 +0200
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306100946570.1133-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306100946570.1133-100000@iolanthe.rowland.org>
-Message-ID: <19045559.gYzJhRHBbp@linux-5eaq.site>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Jun 2013 07:14:51 -0700
+Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data file
+In-Reply-To: <51B5ACA6.2010101@iki.fi>
+References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
+ <20130607162927.GA3331@atomide.com>
+ <20130607175005.GB3331@atomide.com> <51B5ACA6.2010101@iki.fi>
+Message-ID: <20130610141451.GE8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 June 2013 10:03:00 Alan Stern wrote:
-> [Thomas and Steve, please see the question below.]
+* Tomi Valkeinen <tomi.valkeinen@iki.fi> [130610 03:44]:
+> On 07/06/13 20:50, Tony Lindgren wrote:
+> > * Tony Lindgren <tony@atomide.com> [130607 09:35]:
+> >> * Paul Walmsley <paul@pwsan.com> [130607 05:38]:
+> >>> On Fri, 7 Jun 2013, Sricharan R wrote:
+> >>>
+> >>>> - The IO resource information like dma request lines, irq number and
+> >>>>   ocp address space can be populated via dt blob. So such data is stripped
+> >>>>   from OMAP4 SOC hwmod data file.
+> >>>>
+> >>>> - The devices which are still missing the device tree bindings,
+> >>>>   address space entries are not removed yet. When such devices add
+> >>>>   the dt bindings, respective address space data can be deleted.
+> >>>>
+> >>>> - Also other unnecessary hwmods like firewalls are removed as a part of this.
+> >>>>   Since emif was getting registered only because of this firewalls links,
+> >>>>   the mpu->emif direct link is added now.
+> >>>>
+> >>>> The above update, results in reduction of about ~1650 lines of code.
+> >>>>
+> >>>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> >>>> Signed-off-by: Sricharan R <r.sricharan@ti.com>
+> >>>
+> >>> Acked-by: Paul Walmsley <paul@pwsan.com>
+> >>>
+> >>> Can't test this one since I don't have an OMAP4 DT config set up in the testbed
+> >>> yet.  Maybe will add that to the testbed after the v3.10 release.
+> >>
+> >> OK thanks, applying into omap-for-v3.11/cleanup.
+> > 
+> > I had to undo the following parts to avoid regressions on omap4sdp.
+> > Can you please follow up on fixing the related issues so the fixup
+> > won't be needed?
+> > 
+> > Seems to work now the same way as earlier for both omap4sdp and blaze
+> > es, except for DSS, which seems to be a separate issue as posted by
+> > Tomi. Pushed out now to omap-for-v3.11/cleanup.
 > 
-> On Mon, 10 Jun 2013, Ming Lei wrote:
+> What issue do you refer to?
 > 
+> DSS does not have DT bindings, and removing DSS from hwmod data will
+> break DSS for omap4.
 
-> That isn't clear.  It is documented that USB completion handlers are 
-> called with local interrupts disabled.  An IRQ arriving before the 
-> tasklet starts up might therefore be serviced during the short interval 
-> before the tasklet disables local interrupts, but if that happens it 
-> would mean that the completion handler would be delayed.
+Ah that's right. Care to post a patch reverting the minimal parts that
+you need for omap4 against omap-for-v3.11/cleanup?
 
-That is what tasklets do by definition, isn't it?
- 
-> In effect, you are prioritizing other IRQs higher than USB completion
-> handlers.  Nevertheless, the total time spent with interrupts disabled
-> will remain the same.
+Regards,
 
-It pobably slightly increases. You have colder caches twice.
-And potentially you swich CPUs.
- 
-> (There's one other side effect that perhaps you haven't considered.  
-> When multiple URBs are addressed to the same endpoint, their completion 
-> handlers are called in order of URB completion, which is the same as 
-> the order of URB submission unless an URB is cancelled.  By delegating 
-> the completion handlers to tasklets, and particularly by using per-CPU 
-> tasklets, you may violate this behavior.)
-
-This is quite serious. It mustn't happen.
-
-	Regards
-		Oliver
+Tony
