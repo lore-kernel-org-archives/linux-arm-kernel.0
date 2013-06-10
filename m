@@ -1,92 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Jun 2013 16:08:30 +0200
-Subject: [PATCH 0/2] pinctrl: common handling of generic pinconfig props
- in dt
-In-Reply-To: <201306101554.21671.heiko@sntech.de>
-References: <201306090159.05383.heiko@sntech.de>
- <201306101506.36098.heiko@sntech.de>
- <CACRpkdbnf2MJtnYrwGMVWyz4S=7tuDKv84p7eNgveSNCeLv15g@mail.gmail.com>
- <201306101554.21671.heiko@sntech.de>
-Message-ID: <CACRpkdbmHK-qhRH6wb1E-GK2wKADoyE=ccHN=_rW1y8GkiJ5Bg@mail.gmail.com>
+From: oliver@neukum.org (Oliver Neukum)
+Date: Mon, 10 Jun 2013 16:12:58 +0200
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306100946570.1133-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1306100946570.1133-100000@iolanthe.rowland.org>
+Message-ID: <19045559.gYzJhRHBbp@linux-5eaq.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 3:54 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Montag, 10. Juni 2013, 15:39:26 schrieb Linus Walleij:
->>
->> Does this design imply that we will never be able to support any
->> more than 32 bits (well, the number of bits in unsigned long)
->> i.e. 32 different generic pin configurations?
->>
->> In that case I suspect this might not be so wise. :-(
->
-> hmm, yes this would be the limit ... so back to the drawing board
+On Monday 10 June 2013 10:03:00 Alan Stern wrote:
+> [Thomas and Steve, please see the question below.]
+> 
+> On Mon, 10 Jun 2013, Ming Lei wrote:
+> 
 
-Well, I'm not hopeless, if this is what everyone wants we might
-need to have it like this, perhaps make it possible to extend
-the config word in the device tree from 32 to 64 to 96 bits
-like this, if:
+> That isn't clear.  It is documented that USB completion handlers are 
+> called with local interrupts disabled.  An IRQ arriving before the 
+> tasklet starts up might therefore be serviced during the short interval 
+> before the tasklet disables local interrupts, but if that happens it 
+> would mean that the completion handler would be delayed.
 
-= <0x00000001>;
+That is what tasklets do by definition, isn't it?
+ 
+> In effect, you are prioritizing other IRQs higher than USB completion
+> handlers.  Nevertheless, the total time spent with interrupts disabled
+> will remain the same.
 
-becomes:
+It pobably slightly increases. You have colder caches twice.
+And potentially you swich CPUs.
+ 
+> (There's one other side effect that perhaps you haven't considered.  
+> When multiple URBs are addressed to the same endpoint, their completion 
+> handlers are called in order of URB completion, which is the same as 
+> the order of URB submission unless an URB is cancelled.  By delegating 
+> the completion handlers to tasklets, and particularly by using per-CPU 
+> tasklets, you may violate this behavior.)
 
-= <PINCONFIG_BIAS_DISABLE>;
+This is quite serious. It mustn't happen.
 
-once we hit:
-
-= <0x80000000>;
-
-that is maybe
-
-= <PINCONFIG_FOO>;
-
-and then we need to ad PINCONFIG_BAR. What to do...
-Well enable the next 64 bits:
-
-= <0x00000000 0x00000001>;
-
-i.e.
-
-= <PINCONFIG_NONE PINCONFIG_EXT1_BAR>;
-
-Note necessary naming convention to remember to
-put that after the other...
-
-and then  we get to 96 bits:
-
-= <PINCONFIG_NONE PINCONFIG_EXT1_NONE PINCONFIG_EXT2_BAZ>;
-
-It's getting a bit ugly ...
-
->> my_config: my_config {
->>         bias-disable;
->>         drive-push-pull = <6>;
->>         output-high;
->> };
->>
->> It will make the device trees bigger for sure, but maybe more
->> readable as well?
->
-> There was a discussion about each of the merits of the two approaches
-> (bitstuffed vs. individual properties) between Tomasz Figa and Jean-Christophe
-> PLAGNIOL-VILLARD a bit back if I remember correctly.
-
-It's OK if it's bindings for a certain system where you know you
-will never have more than 32 config options. But for something
-generic we need to make some space.
-
-> And it still would be possible to write short pin statements as
->
->         pins = <bank pin mux &config_node>;
->
-> if I'm not mistaken.
-
-I thinkso....
-
-I'll take these patches out FTM so you can experiment, but I'm
-ready to make a late merge of this if you can come up with something
-that we agree upon to be future-safe.
-
-Yours,
-Linus Walleij
+	Regards
+		Oliver
