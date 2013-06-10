@@ -1,9 +1,9 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Sun, 09 Jun 2013 19:32:26 -0000
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+Date: Mon, 10 Jun 2013 22:51:28 -0000
+Subject: [PATCH RFC v3 1/4] DRM: Armada: Add Armada DRM driver
 In-Reply-To: <20130609190612.GM18614@n2100.arm.linux.org.uk>
 References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
-Message-ID: <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1UmAtQ-0006E9-Dq@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -26,17 +26,17 @@ Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
  drivers/gpu/drm/armada/Kconfig          |   15 +
  drivers/gpu/drm/armada/Makefile         |    6 +
  drivers/gpu/drm/armada/armada_crtc.c    |  766 +++++++++++++++++++++++++++++++
- drivers/gpu/drm/armada/armada_crtc.h    |   75 +++
+ drivers/gpu/drm/armada/armada_crtc.h    |   73 +++
  drivers/gpu/drm/armada/armada_debugfs.c |  186 ++++++++
- drivers/gpu/drm/armada/armada_drm.h     |   62 +++
- drivers/gpu/drm/armada/armada_drv.c     |  326 +++++++++++++
+ drivers/gpu/drm/armada/armada_drm.h     |   73 +++
+ drivers/gpu/drm/armada/armada_drv.c     |  389 ++++++++++++++++
  drivers/gpu/drm/armada/armada_fb.c      |  156 +++++++
  drivers/gpu/drm/armada/armada_fb.h      |   21 +
  drivers/gpu/drm/armada/armada_fbdev.c   |  210 +++++++++
- drivers/gpu/drm/armada/armada_gem.c     |  420 +++++++++++++++++
- drivers/gpu/drm/armada/armada_gem.h     |   41 ++
- drivers/gpu/drm/armada/armada_hw.h      |  295 ++++++++++++
- drivers/gpu/drm/armada/armada_ioctl.h   |  128 +++++
+ drivers/gpu/drm/armada/armada_gem.c     |  435 ++++++++++++++++++
+ drivers/gpu/drm/armada/armada_gem.h     |   43 ++
+ drivers/gpu/drm/armada/armada_hw.h      |  308 +++++++++++++
+ drivers/gpu/drm/armada/armada_ioctl.h   |  124 +++++
  drivers/gpu/drm/armada/armada_ioctlP.h  |   22 +
  drivers/gpu/drm/armada/armada_output.c  |  159 +++++++
  drivers/gpu/drm/armada/armada_output.h  |   38 ++
@@ -44,7 +44,7 @@ Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
  drivers/gpu/drm/armada/armada_slave.c   |  138 ++++++
  drivers/gpu/drm/armada/armada_slave.h   |   26 +
  drivers/gpu/drm/armada/drm_helper.h     |   31 ++
- 23 files changed, 3638 insertions(+), 0 deletions(-)
+ 23 files changed, 3736 insertions(+), 0 deletions(-)
  create mode 100644 drivers/gpu/drm/armada/Kconfig
  create mode 100644 drivers/gpu/drm/armada/Makefile
  create mode 100644 drivers/gpu/drm/armada/armada_crtc.c
@@ -127,7 +127,7 @@ index 0000000..430f025
 +obj-$(CONFIG_DRM_ARMADA) := armada.o
 diff --git a/drivers/gpu/drm/armada/armada_crtc.c b/drivers/gpu/drm/armada/armada_crtc.c
 new file mode 100644
-index 0000000..e5ab4cb
+index 0000000..dadaf63
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_crtc.c
 @@ -0,0 +1,766 @@
@@ -151,7 +151,7 @@ index 0000000..e5ab4cb
 +struct armada_frame_work {
 +	struct drm_pending_vblank_event *event;
 +	struct armada_regs regs[4];
-+	struct drm_gem_object *old_fb_obj;
++	struct drm_framebuffer *old_fb;
 +	struct work_struct work;
 +};
 +
@@ -258,8 +258,12 @@ index 0000000..e5ab4cb
 +	}
 +
 +	/*
-+	 * The spec is unclear about the polarities of the syncs.
-+	 * We assume their non-inverted state is active high.
++	 * The documentation doesn't indicate what the normal state
++	 * of the sync signals are.  Sebastian Hesselbart kindly probed
++	 * his hardware to determine their state.
++	 *
++	 * The non-inverted state of the sync signals is active high.
++	 * Setting these bits makes the appropriate signal active low.
 +	 */
 +	if (dcrtc->crtc.mode.flags & DRM_MODE_FLAG_NCSYNC)
 +		dumb_ctrl |= CFG_INV_CSYNC;
@@ -305,7 +309,7 @@ index 0000000..e5ab4cb
 +{
 +	struct armada_frame_work *work =
 +		container_of(_work, struct armada_frame_work, work);
-+	drm_gem_object_unreference_unlocked(work->old_fb_obj);
++	drm_framebuffer_unreference(work->old_fb);
 +	kfree(work);
 +}
 +
@@ -368,7 +372,7 @@ index 0000000..e5ab4cb
 +	obj = drm_fb_obj(fb);
 +	if (force) {
 +		/* Display is disabled, so just drop the old fb */
-+		drm_gem_object_unreference_unlocked(&obj->obj);
++		drm_framebuffer_unreference(fb);
 +		return;
 +	}
 +
@@ -376,7 +380,7 @@ index 0000000..e5ab4cb
 +	if (work) {
 +		int i = 0;
 +		work->event = NULL;
-+		work->old_fb_obj = &obj->obj;
++		work->old_fb = fb;
 +		armada_reg_queue_end(work->regs, i);
 +
 +		if (armada_drm_crtc_queue_frame_work(dcrtc, work) == 0)
@@ -390,7 +394,7 @@ index 0000000..e5ab4cb
 +	 * the best.  The worst that will happen is the buffer gets
 +	 * reused before it has finished being displayed.
 +	 */
-+	drm_gem_object_unreference_unlocked(&obj->obj);
++	drm_framebuffer_unreference(fb);
 +}
 +
 +static void armada_drm_vblank_off(struct armada_crtc *dcrtc)
@@ -539,14 +543,21 @@ index 0000000..e5ab4cb
 +	struct drm_display_mode *mode, struct drm_display_mode *adj,
 +	int x, int y, struct drm_framebuffer *old_fb)
 +{
++	struct armada_private *priv = crtc->dev->dev_private;
 +	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
 +	struct armada_regs regs[16];
-+	uint32_t lm, rm, tm, bm, val, rate, ref, div;
++	uint32_t lm, rm, tm, bm, val, sclk;
 +	unsigned long flags;
 +	unsigned i;
 +	bool interlaced;
++	int ret;
 +
-+	drm_gem_object_reference(&drm_fb_obj(crtc->fb)->obj);
++	/* First, check that this will succeed. */
++	ret = priv->ops->compute_crtc_clock(dcrtc, adj, NULL);
++	if (ret)
++		return ret;
++
++	drm_framebuffer_reference(crtc->fb);
 +
 +	interlaced = !!(adj->flags & DRM_MODE_FLAG_INTERLACE);
 +
@@ -581,13 +592,10 @@ index 0000000..e5ab4cb
 +		writel_relaxed(val, dcrtc->base + LCD_SPU_DUMB_CTRL);
 +	}
 +
-+	rate = adj->clock * 1000;
-+	clk_set_rate(dcrtc->clk, rate);
-+	ref = clk_get_rate(dcrtc->clk);
-+	div = DIV_ROUND_UP(ref, rate);
-+	if (div < 1)
-+		div = 1;
-+	armada_reg_queue_set(regs, i, div | dcrtc->cfg_sclk, LCD_CFG_SCLK_DIV);
++	/* Now compute the divider for real */
++	priv->ops->compute_crtc_clock(dcrtc, adj, &sclk);
++
++	armada_reg_queue_set(regs, i, sclk, LCD_CFG_SCLK_DIV);
 +
 +	if (interlaced ^ dcrtc->interlaced) {
 +		if (adj->flags & DRM_MODE_FLAG_INTERLACE)
@@ -712,7 +720,7 @@ index 0000000..e5ab4cb
 +	wait_event(dcrtc->frame_wait, !dcrtc->frame_work);
 +
 +	/* Take a reference to the new fb as we're using it */
-+	drm_gem_object_reference(&drm_fb_obj(crtc->fb)->obj);
++	drm_framebuffer_reference(crtc->fb);
 +
 +	/* Update the base in the CRTC */
 +	armada_drm_crtc_update_regs(dcrtc, regs);
@@ -758,8 +766,10 @@ index 0000000..e5ab4cb
 +
 +	priv->dcrtc[dcrtc->num] = NULL;
 +	drm_crtc_cleanup(&dcrtc->crtc);
-+	clk_disable_unprepare(dcrtc->clk);
-+	clk_put(dcrtc->clk);
++
++	if (!IS_ERR(dcrtc->clk))
++		clk_disable_unprepare(dcrtc->clk);
++
 +	kfree(dcrtc);
 +}
 +
@@ -786,7 +796,7 @@ index 0000000..e5ab4cb
 +		return -ENOMEM;
 +
 +	work->event = event;
-+	work->old_fb_obj = &drm_fb_obj(dcrtc->crtc.fb)->obj;
++	work->old_fb = dcrtc->crtc.fb;
 +
 +	i = armada_drm_crtc_calc_fb(fb, crtc->x, crtc->y, work->regs, dcrtc->interlaced);
 +	armada_reg_queue_end(work->regs, i);
@@ -795,7 +805,7 @@ index 0000000..e5ab4cb
 +	 * Hold the old framebuffer for the work - DRM appears to drop our
 +	 * reference to the old framebuffer in drm_mode_page_flip_ioctl().
 +	 */
-+	drm_gem_object_reference(work->old_fb_obj);
++	drm_framebuffer_reference(work->old_fb);
 +
 +	ret = armada_drm_crtc_queue_frame_work(dcrtc, work);
 +	if (ret) {
@@ -803,7 +813,7 @@ index 0000000..e5ab4cb
 +		 * Undo our reference above; DRM does not drop the reference
 +		 * to this object on error, so that's okay.
 +		 */
-+		drm_gem_object_unreference(work->old_fb_obj);
++		drm_framebuffer_unreference(work->old_fb);
 +		kfree(work);
 +		return ret;
 +	}
@@ -837,37 +847,27 @@ index 0000000..e5ab4cb
 +};
 +
 +int armada_drm_crtc_create(struct drm_device *dev, unsigned num,
-+	struct resource *res, struct clk *clk)
++	struct resource *res)
 +{
 +	struct armada_private *priv = dev->dev_private;
 +	struct armada_crtc *dcrtc;
 +	void __iomem *base;
-+	int ret;
-+
-+	ret = clk_prepare_enable(clk);
-+	if (ret) {
-+		DRM_ERROR("clk would not prepare and enable\n");
-+		return ret;
-+	}
 +
 +	base = devm_request_and_ioremap(dev->dev, res);
 +	if (!base) {
 +		DRM_ERROR("failed to ioremap register\n");
-+		clk_disable_unprepare(clk);
 +		return -ENOMEM;
 +	}
 +
 +	dcrtc = kzalloc(sizeof(*dcrtc), GFP_KERNEL);
 +	if (!dcrtc) {
 +		DRM_ERROR("failed to allocate Armada crtc\n");
-+		clk_disable_unprepare(clk);
 +		return -ENOMEM;
 +	}
 +
 +	dcrtc->base = base;
 +	dcrtc->num = num;
-+	dcrtc->clk = clk;
-+	dcrtc->cfg_sclk = 0xc0000000;
++	dcrtc->clk = ERR_PTR(-EINVAL);
 +	dcrtc->cfg_dma_ctrl0 = CFG_GRA_ENA | CFG_GRA_HSMOOTH;
 +	dcrtc->cfg_dumb_ctrl = DUMB24_RGB888_0;
 +	spin_lock_init(&dcrtc->irq_lock);
@@ -899,10 +899,10 @@ index 0000000..e5ab4cb
 +}
 diff --git a/drivers/gpu/drm/armada/armada_crtc.h b/drivers/gpu/drm/armada/armada_crtc.h
 new file mode 100644
-index 0000000..53d1efe
+index 0000000..e00dcf5
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_crtc.h
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,73 @@
 +/*
 + * Copyright (C) 2012 Russell King
 + *
@@ -954,7 +954,6 @@ index 0000000..53d1efe
 +	struct armada_overlay	*overlay;
 +
 +	int			dpms;
-+	uint32_t		cfg_sclk;
 +	uint32_t		cfg_dma_ctrl0;
 +	uint32_t		cfg_dumb_ctrl;
 +	uint32_t		dumb_ctrl;
@@ -968,8 +967,7 @@ index 0000000..53d1efe
 +};
 +#define drm_to_armada_crtc(c) container_of(c, struct armada_crtc, crtc)
 +
-+int armada_drm_crtc_create(struct drm_device *, unsigned, struct resource *,
-+	struct clk *);
++int armada_drm_crtc_create(struct drm_device *, unsigned, struct resource *);
 +void armada_drm_crtc_gamma_set(struct drm_crtc *, u16, u16, u16, int);
 +void armada_drm_crtc_gamma_get(struct drm_crtc *, u16 *, u16 *, u16 *, int);
 +void armada_drm_crtc_irq(struct armada_crtc *, u32);
@@ -1172,10 +1170,10 @@ index 0000000..ff5ada3
 +}
 diff --git a/drivers/gpu/drm/armada/armada_drm.h b/drivers/gpu/drm/armada/armada_drm.h
 new file mode 100644
-index 0000000..c73e29b
+index 0000000..c2dcde5
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_drm.h
-@@ -0,0 +1,62 @@
+@@ -0,0 +1,73 @@
 +/*
 + * Copyright (C) 2012 Russell King
 + *
@@ -1215,11 +1213,22 @@ index 0000000..c73e29b
 +} while (0)
 +
 +
++struct armada_private;
++
++struct armada_ops {
++	int (*init)(struct armada_private *, struct device *);
++	int (*compute_crtc_clock)(struct armada_crtc *,
++				  const struct drm_display_mode *,
++				  uint32_t *);
++};
++
 +struct armada_private {
++	const struct armada_ops	*ops;
 +	struct drm_fb_helper	*fbdev;
 +	struct armada_crtc	*dcrtc[2];
 +	struct armada_overlay	*overlay;
 +	struct drm_mm		linear;
++	struct clk		*extclk[2];
 +#ifdef CONFIG_DEBUG_FS
 +	struct dentry		*de;
 +#endif
@@ -1240,10 +1249,10 @@ index 0000000..c73e29b
 +#endif
 diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
 new file mode 100644
-index 0000000..bb70cf5
+index 0000000..807fd35
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_drv.c
-@@ -0,0 +1,326 @@
+@@ -0,0 +1,389 @@
 +/*
 + * Copyright (C) 2012 Russell King
 + *
@@ -1262,6 +1271,75 @@ index 0000000..bb70cf5
 +#include "armada_ioctl.h"
 +#include "armada_ioctlP.h"
 +
++/*
++ * Armada510 specific initialization.  There _may_ be two external
++ * clocks - look them up now but don't fail if they're not present.
++ * We may be able to use the internal clocks instead.
++ */
++static int armada510_init(struct armada_private *priv, struct device *dev)
++{
++	priv->extclk[0] = devm_clk_get(dev, "ext_ref_clk_1");
++
++	if (IS_ERR(priv->extclk[0])) {
++		int ret = PTR_ERR(priv->extclk[0]);
++		if (ret == -ENOENT)
++			ret = -EPROBE_DEFER;
++		return ret;
++	}
++
++	return 0;
++}
++
++/*
++ * Armada510 specific SCLK register selection: this gets called with
++ * sclk = NULL to test whether the mode is supportable, and again with
++ * sclk != NULL to set the clocks up for that.  The former can return
++ * an error, but the latter is expected not to.
++ *
++ * We currently are pretty rudimentary here, always selecting
++ * EXT_REF_CLK_1 for LCD0 and erroring LCD1.  This needs improvement!
++ */
++static int armada510_compute_crtc_clock(struct armada_crtc *dcrtc,
++	const struct drm_display_mode *mode, uint32_t *sclk)
++{
++	struct armada_private *priv = dcrtc->crtc.dev->dev_private;
++	struct clk *clk = priv->extclk[0];
++	int ret;
++
++	if (dcrtc->num == 1)
++		return -EINVAL;
++
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++
++	if (dcrtc->clk != clk) {
++		ret = clk_prepare_enable(clk);
++		if (ret)
++			return ret;
++		dcrtc->clk = clk;
++	}
++
++	if (sclk) {
++		uint32_t rate, ref, div;
++
++		rate = mode->clock * 1000;
++		ref = clk_round_rate(clk, rate);
++		div = DIV_ROUND_UP(ref, rate);
++		if (div < 1)
++			div = 1;
++
++		clk_set_rate(clk, ref);
++		*sclk = div | SCLK_510_EXTCLK1;
++	}
++
++	return 0;
++}
++
++static const struct armada_ops armada510_ops = {
++	.init = armada510_init,
++	.compute_crtc_clock = armada510_compute_crtc_clock,
++};
++
 +static int armada_drm_load(struct drm_device *dev, unsigned long flags)
 +{
 +	struct armada_private *priv;
@@ -1277,7 +1355,8 @@ index 0000000..bb70cf5
 +		if (!r)
 +			break;
 +
-+		if (resource_size(r) > SZ_4K)
++		/* Resources above 64K are graphics memory */
++		if (resource_size(r) > SZ_64K)
 +			mem = r;
 +		else if (i < ARRAY_SIZE(priv->dcrtc))
 +			res[i++] = r;
@@ -1301,6 +1380,12 @@ index 0000000..bb70cf5
 +
 +	dev->dev_private = priv;
 +
++	priv->ops = &armada510_ops;
++
++	ret = priv->ops->init(priv, dev->dev);
++	if (ret)
++		return ret;
++
 +	/* Mode setting support */
 +	drm_mode_config_init(dev);
 +	dev->mode_config.min_width = 0;
@@ -1313,25 +1398,12 @@ index 0000000..bb70cf5
 +
 +	/* Create all LCD controllers */
 +	for (n = 0; n < ARRAY_SIZE(priv->dcrtc); n++) {
-+		struct clk *clk;
-+
 +		if (!res[n])
 +			break;
 +
-+		clk = clk_get_sys("dovefb.0", "extclk");
-+		if (IS_ERR(clk)) {
-+			DRM_ERROR("failed to get clock\n");
-+			ret = PTR_ERR(clk);
-+			if (ret == -ENOENT)
-+				ret = -EPROBE_DEFER;
++		ret = armada_drm_crtc_create(dev, n, res[n]);
++		if (ret)
 +			goto err_kms;
-+		}
-+
-+		ret = armada_drm_crtc_create(dev, n, res[n], clk);
-+		if (ret) {
-+			clk_put(clk);
-+			goto err_kms;
-+		}
 +	}
 +
 +	ret = drm_vblank_init(dev, n);
@@ -1761,7 +1833,7 @@ index 0000000..0c78d2b
 +#endif
 diff --git a/drivers/gpu/drm/armada/armada_fbdev.c b/drivers/gpu/drm/armada/armada_fbdev.c
 new file mode 100644
-index 0000000..001d2ec
+index 0000000..bfacdd0
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_fbdev.c
 @@ -0,0 +1,210 @@
@@ -1808,6 +1880,7 @@ index 0000000..001d2ec
 +	struct armada_gem_object *obj;
 +	struct fb_info *info;
 +	int size, ret;
++	void *ptr;
 +
 +	memset(&mode, 0, sizeof(mode));
 +	mode.width = sizes->surface_width;
@@ -1827,6 +1900,12 @@ index 0000000..001d2ec
 +	if (ret) {
 +		drm_gem_object_unreference_unlocked(&obj->obj);
 +		return ret;
++	}
++
++	ptr = armada_gem_map_object(dev, obj);
++	if (!ptr) {
++		drm_gem_object_unreference_unlocked(&obj->obj);
++		return -ENOMEM;
 +	}
 +
 +	ret = armada_framebuffer_create(dev, &dfb, &mode, obj);
@@ -1854,12 +1933,7 @@ index 0000000..001d2ec
 +	info->fix.smem_start = obj->phys_addr;
 +	info->fix.smem_len = size;
 +	info->screen_size = size;
-+	info->screen_base = ioremap_wc(info->fix.smem_start, size);
-+	if (!info->screen_base) {
-+		ret = -ENOMEM;
-+		goto err_ioremap;
-+	}
-+
++	info->screen_base = ptr;
 +	fbh->fb = &dfb->fb;
 +	fbh->fbdev = info;
 +	drm_fb_helper_fill_fix(info, dfb->fb.pitches[0], dfb->fb.depth);
@@ -1869,13 +1943,12 @@ index 0000000..001d2ec
 +		dfb->fb.width, dfb->fb.height,
 +		dfb->fb.bits_per_pixel, obj->phys_addr);
 +
++	/* Reference is now held by the framebuffer object */
 +	drm_gem_object_unreference(&obj->obj);
 +	mutex_unlock(&dev->struct_mutex);
 +
 +	return 0;
 +
-+ err_ioremap:
-+	fb_dealloc_cmap(&info->cmap);
 + err_fbcmap:
 +	framebuffer_release(info);
 + err_fballoc:
@@ -1892,7 +1965,6 @@ index 0000000..001d2ec
 +
 +	if (info) {
 +		unregister_framebuffer(info);
-+		iounmap(info->screen_base);
 +		if (info->cmap.len)
 +			fb_dealloc_cmap(&info->cmap);
 +		framebuffer_release(info);
@@ -1977,10 +2049,10 @@ index 0000000..001d2ec
 +}
 diff --git a/drivers/gpu/drm/armada/armada_gem.c b/drivers/gpu/drm/armada/armada_gem.c
 new file mode 100644
-index 0000000..1d9c9cb
+index 0000000..c4e7d5f
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_gem.c
-@@ -0,0 +1,420 @@
+@@ -0,0 +1,435 @@
 +/*
 + * Copyright (C) 2012 Russell King
 + *
@@ -2046,14 +2118,20 @@ index 0000000..1d9c9cb
 +	if (dobj->page) {
 +		unsigned int order = get_order(dobj->obj.size);
 +		__free_pages(dobj->page, order);
++		/* avoid the iounmap below - these aren't ioremap'd */
++		dobj->addr = NULL;
 +	}
++
++	if (dobj->addr)
++		iounmap(dobj->addr);
 +
 +	drm_gem_object_release(&dobj->obj);
 +
 +	kfree(dobj);
 +}
 +
-+int armada_gem_linear_back(struct drm_device *dev, struct armada_gem_object *obj)
++int
++armada_gem_linear_back(struct drm_device *dev, struct armada_gem_object *obj)
 +{
 +	struct armada_private *priv = dev->dev_private;
 +	size_t size = obj->obj.size;
@@ -2061,7 +2139,10 @@ index 0000000..1d9c9cb
 +	if (obj->page || obj->linear)
 +		return 0;
 +
-+	/* If it is a small allocation, try to get it from the system */
++	/*
++	 * If it is a small allocation (typically cursor)
++	 * try to get it from the system
++	 */
 +	if (size < 1048576) {
 +		unsigned int order = get_order(size);
 +		struct page *p = alloc_pages(GFP_KERNEL, order);
@@ -2072,18 +2153,19 @@ index 0000000..1d9c9cb
 +
 +			obj->phys_addr = page_to_phys(p);
 +			obj->dev_addr = obj->phys_addr;
++			obj->page = p;
++			obj->addr = page_address(p);
++
++			memset(obj->addr, 0, PAGE_ALIGN(size));
 +
 +			/* FIXME: Hack around dirty cache */
-+			ptr = (uintptr_t)phys_to_virt(obj->phys_addr);
-+			memset((void *)ptr, 0, PAGE_ALIGN(size));
++			ptr = (uintptr_t)obj->addr;
 +			while (sz) {
 +				asm volatile("mcr p15, 0, %0, c7, c14, 1" : : "r" (ptr));
-+				ptr += 32;
-+				sz -= 32;
++				ptr += L1_CACHE_BYTES;
++				sz -= L1_CACHE_BYTES;
 +			}
 +			dsb();
-+
-+			obj->page = p;
 +		}
 +	}
 +
@@ -2120,8 +2202,16 @@ index 0000000..1d9c9cb
 +	return 0;
 +}
 +
-+struct armada_gem_object *armada_gem_alloc_private_object(struct drm_device *dev,
-+	size_t size)
++void *
++armada_gem_map_object(struct drm_device *dev, struct armada_gem_object *dobj)
++{
++	if (!dobj->addr)
++		dobj->addr = ioremap_wc(dobj->phys_addr, dobj->obj.size);
++	return dobj->addr;
++}
++
++struct armada_gem_object *
++armada_gem_alloc_private_object(struct drm_device *dev, size_t size)
 +{
 +	struct armada_gem_object *obj;
 +
@@ -2244,12 +2334,10 @@ index 0000000..1d9c9cb
 +	u32 handle;
 +	int ret;
 +
-+	if (args->size == 0) {
-+		args->pitch = armada_pitch(args->width, args->bpp);
-+		args->size = size = args->pitch * args->height;
-+	} else {
-+		size = args->size;
-+	}
++	if (args->size == 0)
++		return -ENOMEM;
++
++	size = args->size;
 +
 +	dobj = armada_gem_alloc_object(dev, size);
 +	if (dobj == NULL)
@@ -2378,8 +2466,8 @@ index 0000000..1d9c9cb
 +	if (dobj == NULL)
 +		return -ENOENT;
 +
-+	/* Don't allow pwrite to drm linear backed objects */
-+	if (dobj->linear)
++	/* Must be a kernel-mapped object */
++	if (!dobj->addr)
 +		return -EINVAL;
 +
 +	if (args->offset > dobj->obj.size ||
@@ -2389,12 +2477,11 @@ index 0000000..1d9c9cb
 +		goto unref;
 +	}
 +
-+	{
-+		void *data = phys_to_virt(dobj->phys_addr) + args->offset;
-+		ret = copy_from_user(data, ptr, args->size) ? -EFAULT : 0;
-+
-+		if (ret == 0 && dobj->update)
-+			dobj->update(dobj->update_data);
++	if (copy_from_user(dobj->addr + args->offset, ptr, args->size)) {
++		ret = -EFAULT;
++	} else if (dobj->update) {
++		dobj->update(dobj->update_data);
++		ret = 0;
 +	}
 +
 +  unref:
@@ -2403,10 +2490,10 @@ index 0000000..1d9c9cb
 +}
 diff --git a/drivers/gpu/drm/armada/armada_gem.h b/drivers/gpu/drm/armada/armada_gem.h
 new file mode 100644
-index 0000000..f500546
+index 0000000..87cd94b5
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_gem.h
-@@ -0,0 +1,41 @@
+@@ -0,0 +1,43 @@
 +/*
 + * Copyright (C) 2012 Russell King
 + *
@@ -2420,6 +2507,7 @@ index 0000000..f500546
 +/* GEM */
 +struct armada_gem_object {
 +	struct drm_gem_object	obj;
++	void			*addr;
 +	struct drm_mm_node	*linear;
 +	phys_addr_t		phys_addr;
 +	resource_size_t		dev_addr;
@@ -2432,6 +2520,7 @@ index 0000000..f500546
 +
 +void armada_gem_free_object(struct drm_gem_object *);
 +int armada_gem_linear_back(struct drm_device *, struct armada_gem_object *);
++void *armada_gem_map_object(struct drm_device *, struct armada_gem_object *);
 +struct armada_gem_object *armada_gem_alloc_private_object(struct drm_device *, size_t);
 +int armada_gem_dumb_create(struct drm_file *, struct drm_device *,
 +	struct drm_mode_create_dumb *);
@@ -2450,10 +2539,10 @@ index 0000000..f500546
 +#endif
 diff --git a/drivers/gpu/drm/armada/armada_hw.h b/drivers/gpu/drm/armada/armada_hw.h
 new file mode 100644
-index 0000000..f9e539b
+index 0000000..58d2a20
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_hw.h
-@@ -0,0 +1,295 @@
+@@ -0,0 +1,308 @@
 +/*
 + * Copyright (C) 2012 Russell King
 + *  Rewritten from the dovefb driver, and Armada510 manuals.
@@ -2648,6 +2737,19 @@ index 0000000..f9e539b
 +	CFG_PDWN64x66	= 1 << 0,
 +};
 +
++/* For LCD_CFG_SCLK_DIV */
++enum {
++	SCLK_510_AXI		= 0x0 << 30,	/* Armada 510 */
++	SCLK_510_EXTCLK0	= 0x1 << 30,	/* Armada 510 */
++	SCLK_510_PLL		= 0x2 << 30,	/* Armada 510 */
++	SCLK_510_EXTCLK1	= 0x3 << 30,	/* Armada 510 */
++	SCLK_DIV_CHANGE		= 1 << 29,
++	SCLK_16X_AHB		= 0x0 << 28,	/* Armada 16x */
++	SCLK_16X_PCLK		= 0x1 << 28,	/* Armada 16x */
++	SCLK_16X_AXI		= 0x4 << 28,	/* Armada 16x */
++	SCLK_16X_PLL		= 0x8 << 28,	/* Armada 16x */
++};
++
 +/* For LCD_SPU_DUMB_CTRL */
 +enum {
 +	DUMB16_RGB565_0	= 0x0 << 28,
@@ -2751,10 +2853,10 @@ index 0000000..f9e539b
 +#endif
 diff --git a/drivers/gpu/drm/armada/armada_ioctl.h b/drivers/gpu/drm/armada/armada_ioctl.h
 new file mode 100644
-index 0000000..619ec2c
+index 0000000..c99cc5a
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_ioctl.h
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,124 @@
 +/*
 + * Copyright (C) 2012 Russell King
 + *  With inspiration from the i915 driver
@@ -2778,11 +2880,7 @@ index 0000000..619ec2c
 +	DRM_##dir(DRM_COMMAND_BASE + DRM_ARMADA_##name, struct drm_armada_##str)
 +
 +struct drm_armada_gem_create {
-+	uint32_t height;
-+	uint32_t width;
-+	uint32_t bpp;
 +	uint32_t handle;
-+	uint32_t pitch;
 +	uint32_t size;
 +};
 +#define DRM_IOCTL_ARMADA_GEM_CREATE \
@@ -2807,10 +2905,10 @@ index 0000000..619ec2c
 +	ARMADA_IOCTL(IOWR, GEM_MMAP, gem_mmap)
 +
 +struct drm_armada_gem_pwrite {
++	uint64_t ptr;
 +	uint32_t handle;
 +	uint32_t offset;
 +	uint32_t size;
-+	uint64_t ptr;
 +};
 +#define DRM_IOCTL_ARMADA_GEM_PWRITE \
 +	ARMADA_IOCTL(IOW, GEM_PWRITE, gem_pwrite)
@@ -3786,7 +3884,7 @@ index 0000000..422a345
 +}
 diff --git a/drivers/gpu/drm/armada/armada_slave.h b/drivers/gpu/drm/armada/armada_slave.h
 new file mode 100644
-index 0000000..1b86696
+index 0000000..bf2374c
 --- /dev/null
 +++ b/drivers/gpu/drm/armada/armada_slave.h
 @@ -0,0 +1,26 @@
@@ -3797,8 +3895,8 @@ index 0000000..1b86696
 + * it under the terms of the GNU General Public License version 2 as
 + * published by the Free Software Foundation.
 + */
-+#ifndef ARMADA_TDA19988_H
-+#define ARMADA_TDA19988_H
++#ifndef ARMADA_SLAVE_H
++#define ARMADA_SLAVE_H
 +
 +#include <linux/i2c.h>
 +#include <drm/drmP.h>
