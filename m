@@ -1,77 +1,67 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Jun 2013 18:03:15 +0200
-Subject: [PATCH 3/4] mmc: omap_hsmmc: Remux pins to support SDIO interrupt
- and PM runtime
-In-Reply-To: <20130607214957.18581.90624.stgit@localhost>
-References: <20130607214557.18581.75288.stgit@localhost>
- <20130607214957.18581.90624.stgit@localhost>
-Message-ID: <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 10 Jun 2013 17:03:56 +0100
+Subject: [PATCH 2/2] ARM: vexpress/TC2: implement PM suspend method
+In-Reply-To: <alpine.LFD.2.03.1306092354080.18597@syhkavp.arg>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370587152-4630-3-git-send-email-nicolas.pitre@linaro.org>
+ <20130607105625.GB3111@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1306092354080.18597@syhkavp.arg>
+Message-ID: <20130610160355.GC1310@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 11:49 PM, Tony Lindgren <tony@atomide.com> wrote:
+On Mon, Jun 10, 2013 at 04:56:12AM +0100, Nicolas Pitre wrote:
+> On Fri, 7 Jun 2013, Lorenzo Pieralisi wrote:
+> 
+> > Hi Nico,
+> > 
+> > On Fri, Jun 07, 2013 at 07:39:12AM +0100, Nicolas Pitre wrote:
+> > > From: Nicolas Pitre <nico@linaro.org>
+> > > 
+> > > This is simplistic for the moment as the expected residency is used to
+> > > prevent the shutting down of L2 and the cluster if the residency for
+> > > the last man is lower than 5 ms.  To make this right, the shutdown
+> > > latency for each CPU would need to be recorded and taken into account.
+> > > 
+> > > On a suspend, the firmware mailbox address has to be set prior entering
+> > > low power mode.
+> > > 
+> > > Signed-off-by: Nicolas Pitre <nico@linaro.org>
+> > > ---
+> > >  arch/arm/mach-vexpress/tc2_pm.c | 23 +++++++++++++++++++++--
+> > >  1 file changed, 21 insertions(+), 2 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
+> > > index a3ea524372..7901528566 100644
+> > > --- a/arch/arm/mach-vexpress/tc2_pm.c
+> > > +++ b/arch/arm/mach-vexpress/tc2_pm.c
+> > > @@ -79,7 +79,7 @@ static int tc2_pm_power_up(unsigned int cpu, unsigned int cluster)
+> > >  	return 0;
+> > >  }
+> > >  
+> > > -static void tc2_pm_power_down(void)
+> > > +static void tc2_pm_down(u64 residency)
+> > >  {
+> > >  	unsigned int mpidr, cpu, cluster;
+> > >  	bool last_man = false, skip_wfi = false;
+> > > @@ -100,7 +100,8 @@ static void tc2_pm_power_down(void)
+> > >  		vexpress_spc_set_cpu_wakeup_irq(cpu, cluster, 1);
+> > >  		if (!tc2_pm_use_count[0][cluster] &&
+> > >  		    !tc2_pm_use_count[1][cluster] &&
+> > > -		    !tc2_pm_use_count[2][cluster]) {
+> > > +		    !tc2_pm_use_count[2][cluster] &&
+> > > +		    (!residency || residency > 5000)) {
+> > 
+> > I would remove the line above altogether. It is ok to have parameter (we
+> > should still define what that residency actually is), I do not think it
+> > makes sense to add policy at this stage, I have a patchset to queue for
+> > that.
+> 
+> OK, let's discuss that separately.  I'll simply let the whole cluster go 
+> down in all cases initially.  That's what we have right now anyway as 
+> the cpuidle driver is not passing anything interesting at the moment 
+> other than 0.
 
-> On some omaps we need to remux MMC pins for PM, and for some omaps
-> we need to remux the SDIO IRQ pin.
->
-> Based on an earlier patch by Andreas Fenkart <afenkart@gmail.com>.
-(...)
-> +       host->pinctrl = devm_pinctrl_get(host->dev);
-> +       if (IS_ERR(host->pinctrl)) {
-> +               dev_dbg(host->dev, "no pinctrl handle\n");
-> +               ret = 0;
-> +               goto out;
-> +       }
-> +
-> +       host->fixed = pinctrl_lookup_state(host->pinctrl,
-> +                                          PINCTRL_STATE_DEFAULT);
-> +       if (IS_ERR(host->fixed)) {
-> +               dev_dbg(host->dev,
-> +                        "pins are not configured from the driver\n");
-> +               host->fixed = NULL;
-> +               ret = 0;
-> +               goto out;
-> +       }
-> +
-> +       ret = pinctrl_select_state(host->pinctrl, host->fixed);
-> +       if (ret < 0)
-> +               goto err;
-> +
-> +       /* For most cases we don't have wake-ups, and exit after this */
-> +       host->active = pinctrl_lookup_state(host->pinctrl, "active");
-> +       if (IS_ERR(host->active)) {
-> +               ret = PTR_ERR(host->active);
-> +               host->active = NULL;
-> +               return 0;
-> +       }
-> +
-> +       host->idle = pinctrl_lookup_state(host->pinctrl,
-> +                                         PINCTRL_STATE_IDLE);
-> +       if (IS_ERR(host->idle)) {
-> +               ret = PTR_ERR(host->idle);
-> +               host->idle = NULL;
-> +               goto err;
-> +       }
+Agreed, thanks.
 
-You can use the new infrastructure to make the core select:
-
-pinctrl_pm_select_default_state(host->dev);
-pinctrl_pm_select_idle_state(host->dev);
-
-What is the semantic difference between "default" and "active"?
-
-If this is something very generic that a lot of platforms will want
-to have, why not add it to include/linux/pinctrl/pinctrl-state.h
-and augment the core to cache and handle this too?
-
-However in this case I *suspect* that what you really want
-to do it to rename the state called "default" to "sleep"
-(it appears the default state is sleepy) and then rename
-the "active" state to "default" (as this is the defined semantic
-meaning of "default" from <linux/pinctrl/pinctrl-state.h>.
-
-But maybe I'm not quite getting the subtle difference between
-"default" and "active" here so enlighten me.
-
-Yours,
-Linus Walleij
+Lorenzo
