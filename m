@@ -1,67 +1,71 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 10 Jun 2013 10:27:14 +0200
-Subject: [PATCHv4] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
-In-Reply-To: <1370425843-6802-1-git-send-email-alexandre.belloni@free-electrons.com>
-References: <1370425843-6802-1-git-send-email-alexandre.belloni@free-electrons.com>
-Message-ID: <51B58DE2.2020301@atmel.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 10 Jun 2013 17:35:08 +0900
+Subject: [PATCH] ARM: dts: add pin state information for DP HPD support to
+ Exynos5250
+In-Reply-To: <CAD=FV=V9oBR1ZAEsMs5-x7NaD1fiHJO=9dn1mPAMg0MX6tnxYA@mail.gmail.com>
+References: <000001ce4e1e$d1cc5de0$756519a0$@samsung.com>
+ <CAD=FV=V9oBR1ZAEsMs5-x7NaD1fiHJO=9dn1mPAMg0MX6tnxYA@mail.gmail.com>
+Message-ID: <0ea201ce65b5$6a78ca30$3f6a5e90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/2013 11:50, Alexandre Belloni :
-> Fixes:
-> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
-> :(.text+0x1174): undefined reference to `mdiobus_write'
-> :(.text+0x1188): undefined reference to `mdiobus_write'
-> :(.text+0x119c): undefined reference to `mdiobus_write'
-> :(.text+0x11b0): undefined reference to `mdiobus_write'
-> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
-> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
->
-> when CONFIG_PHYLIB is not selected.
->
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Doug Anderson wrote:
+> 
+> Jingoo,
+> 
+> On Sat, May 11, 2013 at 1:09 AM, Jingoo Han <jg1.han@samsung.com> wrote:
+> > Add pin state information for DP HPD support that requires
+> > pin configuration support using pinctrl interface.
+> >
+> > Signed-off-by: Jingoo Han <jg1.han@samsung.com>
+> > ---
+> > Tested on Exynos5250
+> >
+> >  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    7 +++++++
+> >  arch/arm/boot/dts/exynos5250-smdk5250.dts |    3 +++
+> >  2 files changed, 10 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> > index d1650fb..e9cdee3 100644
+> > --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> > @@ -553,6 +553,13 @@
+> >                         samsung,pin-pud = <0>;
+> >                         samaung,pin-drv = <0>;
+> >                 };
+> > +
+> > +               dp_hpd: dp_hpd {
+> > +                       samsung,pins = "gpx0-7";
+> > +                       samsung,pin-function = <3>;
+> > +                       samsung,pin-pud = <0>;
+> > +                       samaung,pin-drv = <0>;
+> > +               };
+> >         };
+> >
+> >         pinctrl at 13400000 {
+> > diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > index 3e0c792..d53ea34 100644
+> > --- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > +++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+> > @@ -224,6 +224,9 @@
+> >                 samsung,color-depth = <1>;
+> >                 samsung,link-rate = <0x0a>;
+> >                 samsung,lane-count = <4>;
+> > +
+> > +               pinctrl-names = "default";
+> > +               pinctrl-0 = <&dp_hpd>;
+> 
+> I was going to suggest moving this to exynos5250.dtsi but then
+> realized that I saw a board recently that used a non-standard HPD pin
+> recently!  ...so keeping it in the board file (like you've done) is
+> good.
+> 
+> ...so looks good to me.
+> 
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
 
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Yeah, I agreed with Doug's comment :-)
 
-As Arnd told it was not so urgent and that it seems that we have to be 
-strict for sending other 3.10-fixes, I stack this one on a at91-3.11-soc 
-branch.
+Applied, thanks.
 
-Thanks, best regards,
-
-> ---
->   arch/arm/mach-at91/Kconfig          | 1 +
->   arch/arm/mach-at91/board-dt-sama5.c | 3 ++-
->   2 files changed, 3 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
-> index 0280238..699b71e 100644
-> --- a/arch/arm/mach-at91/Kconfig
-> +++ b/arch/arm/mach-at91/Kconfig
-> @@ -163,6 +163,7 @@ config MACH_SAMA5_DT
->   	bool "Atmel SAMA5 Evaluation Kits with device-tree support"
->   	depends on SOC_SAMA5
->   	select USE_OF
-> +	select PHYLIB if NETDEVICES
->   	help
->   	  Select this if you want to experiment device-tree with
->   	  an Atmel Evaluation Kit.
-> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
-> index 705305e..ad95f6a 100644
-> --- a/arch/arm/mach-at91/board-dt-sama5.c
-> +++ b/arch/arm/mach-at91/board-dt-sama5.c
-> @@ -62,7 +62,8 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
->
->   static void __init sama5_dt_device_init(void)
->   {
-> -	if (of_machine_is_compatible("atmel,sama5d3xcm"))
-> +	if (of_machine_is_compatible("atmel,sama5d3xcm") &&
-> +	    IS_ENABLED(CONFIG_PHYLIB))
->   		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
->   			ksz9021rn_phy_fixup);
->
->
-
-
--- 
-Nicolas Ferre
+- Kukjin
