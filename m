@@ -1,33 +1,74 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Jun 2013 16:50:49 +0800
-Subject: [PATCH 2/4] ARM: imx: clk-imx6q: per1_bch's parent is wrong
-In-Reply-To: <51B57328.404@de.bosch.com>
-References: <1370034115-24006-1-git-send-email-b20788@freescale.com>
- <1370034115-24006-2-git-send-email-b20788@freescale.com>
- <20130603012939.GB13970@S2101-09.ap.freescale.net>
- <20130603054655.GA23090@S2101-09.ap.freescale.net>
- <51B57328.404@de.bosch.com>
-Message-ID: <20130610085047.GD6381@S2101-09.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 10 Jun 2013 17:54:59 +0900
+Subject: [PATCH 13/13] ARM: Exynos: extend soft-reset support for
+ Exynos5420
+In-Reply-To: <51B07631.2010802@linaro.org>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <1370516488-25860-13-git-send-email-chander.kashyap@linaro.org>
+ <51B07631.2010802@linaro.org>
+Message-ID: <0ea501ce65b8$3046d7a0$90d486e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 08:33:12AM +0200, Dirk Behme wrote:
-> On 03.06.2013 07:46, Shawn Guo wrote:
-> >On Mon, Jun 03, 2013 at 09:29:41AM +0800, Shawn Guo wrote:
-> >>On Fri, May 31, 2013 at 05:01:53PM -0400, Anson Huang wrote:
-> >>>per1_bch is sourced from ahb, previous parent
-> >>>info is incorrect.
-> >>>
-> >>>Signed-off-by: Anson Huang <b20788@freescale.com>
-> >>
-> >>Applied, thanks.
-> >>
-> >I just pulled it out.  As Reference Manual does not mention it, we need
-> >to confirm with designer about the correct parent of per1_bch.
+Tushar Behera wrote:
 > 
-> Any news on this?
+> On 06/06/2013 04:31 PM, Chander Kashyap wrote:
+> > Extend the soft reset support for Exynos5420 SoC.
+> >
+> > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> > ---
+> >  arch/arm/mach-exynos/common.c |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> > index fbe1aa7..dc7c134 100644
+> > --- a/arch/arm/mach-exynos/common.c
+> > +++ b/arch/arm/mach-exynos/common.c
+> > @@ -321,7 +321,8 @@ void exynos5_restart(char mode, const char *cmd)
+> >  	u32 val;
+> >  	void __iomem *addr;
+> >
+> > -	if (of_machine_is_compatible("samsung,exynos5250")) {
+> > +	if (of_machine_is_compatible("samsung,exynos5250") ||
+> > +		(of_machine_is_compatible("samsung,exynos5420"))) {
+> >  		val = 0x1;
+> >  		addr = EXYNOS_SWRESET;
+> >  	} else if (of_machine_is_compatible("samsung,exynos5440")) {
+> >
+> 
+> How about making 0x1 and EXYNOS_SWRESET as default values of val and
+> addr. That way we can remove this check for exynos5250 and exynos5420.
+> Also we can remove the trailing else statement as there are no non-DT
+> boards for EXYNOS5.
+> 
+>  void exynos5_restart(char mode, const char *cmd)
+>  {
+>         struct device_node *np;
+> -       u32 val;
+> -       void __iomem *addr;
+> +       u32 val = 0x1;
+> +       void __iomem *addr = EXYNOS_SWRESET;
+> 
+> -       if (of_machine_is_compatible("samsung,exynos5250")) {
+> -               val = 0x1;
+> -               addr = EXYNOS_SWRESET;
+> -       } else if (of_machine_is_compatible("samsung,exynos5440")) {
+> +       if (of_machine_is_compatible("samsung,exynos5440")) {
+>                 u32 status;
+>                 np = of_find_compatible_node(NULL, NULL,
+> "samsung,exynos5440-clock");
+> 
+> @@ -336,9 +333,6 @@ void exynos5_restart(char mode, const char *cmd)
+>                 val = __raw_readl(addr);
+> 
+>                 val = (val & 0xffff0000) | (status & 0xffff);
+> -       } else {
+> -               pr_err("%s: cannot support non-DT\n", __func__);
+> -               return;
+>         }
+> 
+> --
 
-It turns out that the existing code is correct.  So this patch should
-just be dropped.
+Yeah, looks better.
 
-Shawn
+- Kukjin
