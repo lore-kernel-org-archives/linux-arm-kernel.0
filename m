@@ -1,33 +1,79 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Mon, 10 Jun 2013 22:37:49 +0200
-Subject: [PATCH 2/2] memory: tegra30-mc: Fix IRQ handler bugs.
-In-Reply-To: <1370855624-30564-3-git-send-email-ttynkkynen@nvidia.com>
-References: <1370855624-30564-1-git-send-email-ttynkkynen@nvidia.com>
- <1370855624-30564-3-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <20130610203748.GB26036@mithrandir>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 10 Jun 2013 21:39:01 +0100
+Subject: [PATCH] arm: versatile: don't mark pen as __INIT
+In-Reply-To: <51B6277C.9020003@codeaurora.org>
+References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
+ <51B61D5F.1090906@codeaurora.org>
+ <20130610185240.GC2513@e106331-lin.cambridge.arm.com>
+ <51B62454.204@codeaurora.org> <51B6277C.9020003@codeaurora.org>
+Message-ID: <20130610203901.GA3775@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 12:13:44PM +0300, Tuomas Tynkkynen wrote:
-[...]
-> diff --git a/drivers/memory/tegra30-mc.c b/drivers/memory/tegra30-mc.c
-[...]
-> @@ -313,8 +313,11 @@ static irqreturn_t tegra30_mc_isr(int irq, void *data)
->  	mask &= stat;
->  	if (!mask)
->  		return IRQ_NONE;
-> -	while ((bit = ffs(mask)) != 0)
-> +	while ((bit = ffs(mask)) != 0) {
->  		tegra30_mc_decode(mc, bit - 1);
-> +		mask &= BIT(bit);
+On Mon, Jun 10, 2013 at 08:22:36PM +0100, Stephen Boyd wrote:
+> On 06/10/13 12:09, Stephen Boyd wrote:
+> > On 06/10/13 11:52, Mark Rutland wrote:
+> >> On Mon, Jun 10, 2013 at 07:39:27PM +0100, Stephen Boyd wrote:
+> >>> On 06/10/13 08:07, Mark Rutland wrote:
+> >>>> When booting fewer cores than are physically present on a versatile
+> >>>> platform (e.g. when passing maxcpus=N on the command line), some
+> >>>> secondary cores may remain in the holding pen, which is marked __INIT.
+> >>>> Late in the boot process, the memory comprising the holding pen will be
+> >>>> released to the kernel for more general use, and may be overwritten with
+> >>>> arbitrary data, which can cause the held secondaries to start behaving
+> >>>> unpredictably. This can lead to all manner of odd behaviour from the
+> >>>> kernel.
+> >>>>
+> >>>> Instead don't mark the section as __INIT. This means we can't reuse the
+> >>>> pen memory, but we won't get secondaries corrupting the rest of the
+> >>>> kernel.
+> >>>>
+> >>>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> >>>> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> >>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> >>>> ---
+> >>>>  arch/arm/plat-versatile/headsmp.S | 2 --
+> >>>>  1 file changed, 2 deletions(-)
+> >>>>
+> >>>> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+> >>>> index b178d44..2677bc3 100644
+> >>>> --- a/arch/arm/plat-versatile/headsmp.S
+> >>>> +++ b/arch/arm/plat-versatile/headsmp.S
+> >>>> @@ -11,8 +11,6 @@
+> >>>>  #include <linux/linkage.h>
+> >>>>  #include <linux/init.h>
+> >>>>  
+> >>>> -	__INIT
+> >>>> -
+> >>>>  /*
+> >>>>   * Realview/Versatile Express specific entry point for secondary CPUs.
+> >>>>   * This provides a "holding pen" into which all secondary cores are held
+> >>> Why doesn't __CPUINIT work?
+> >> Won't we then encounter the same problem on builds without CPU_HOTPLUG? I
+> >> thought we'd throw away the .cpuinit.* section(s) in that case?
+> >>
+> > The generic linker macros look to set it up so that all __CPUINIT
+> > sections become __INIT in that scenario. Since we don't support hotplug
+> > booting with maxcpus < nr_present_cpus can't lead to any corruption
+> > because we can't bring online any of the offline and present CPUs.
+> >
+> 
+> Sorry I should clarify further. We can't bring online any offline and
+> present CPUs after the init sections are freed.
 
-Same comment as for patch 1/2.
+Problem is, since now GIC broadcasts IPIs at boot to all CPUs connected
+to the GIC so that they are woken up for GIC CPU IF id discovery, on
+some platforms (ie versatile express, where CPUs are in wfi waiting for
+an IPI, with a common jump address), they are all thrown at the kernel
+waiting for the pen release value to be set to their MPIDR. Since we
+want to boot fewer CPUs than the number of present ones, if we free the pen
+assembly stub after boot, well, those CPUs end up executing undefined
+bytes. There is no way to put those CPUs back to sleep on old versatile
+platforms and probably no way to prevent them from entering the kernel upon
+wfi since the jump address is set using a single register common to all
+CPUs (if there was a register per-CPU, the bootloader could check its
+value and put the CPU back in wfi if jump address was, say, NULL; if
+there were per-CPU resets that would even be simpler).
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/b233b82b/attachment.sig>
+HTH,
+Lorenzo
