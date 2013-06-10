@@ -1,34 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Jun 2013 17:00:22 +0200
-Subject: [PATCH 00/03] ARM: shmobile: Remove legacy memory bits
-In-Reply-To: <20130610094638.20803.18484.sendpatchset@w520>
-References: <20130610094638.20803.18484.sendpatchset@w520>
-Message-ID: <201306101700.22787.arnd@arndb.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 10 Jun 2013 16:05:06 +0100
+Subject: [PATCH 1/2] clk: vexpress: Use full node name to identify individual
+ clocks
+In-Reply-To: <1370876707-25265-1-git-send-email-pawel.moll@arm.com>
+References: <1370876707-25265-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <1370876707-25265-2-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 June 2013, Magnus Damm wrote:
-> ARM: shmobile: Remove legacy memory bits
-> 
-> [PATCH 01/03] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
-> [PATCH 02/03] ARM: shmobile: Remove MEMORY_START/SIZE
-> [PATCH 03/03] ARM: shmobile: Remove mach/memory.h
-> 
-> Now when all users are gone this series removes the legacy memory code
-> and enables CONFIG_ARM_PATCH_PHYS_VIRT. Depends on the following code:
-> 
-> [PATCH v2] ARM: shmobile: uImage load address rework
-> [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
-> [PATCH 00/06] ARM: shmobile: SMP virt_to_phys() conversion
-> [PATCH 00/02] ARM: shmobile: romImage update
-> 
-> The romImage series above still needs to be updated.
-> 
-> This is the final bit of code not to rely on CONFIG_MEMORY_START/SIZE
-> which in turn is one component that we need for ARCH_MULTIPLATFORM.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
+Previously all the clocks were reported as "osc". Now it will be
+something like "/dcc/osc at 0".
 
-Looks all good to me.
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/clk/versatile/clk-vexpress-osc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-	Arnd
+diff --git a/drivers/clk/versatile/clk-vexpress-osc.c b/drivers/clk/versatile/clk-vexpress-osc.c
+index 256c8be..2dc8b41 100644
+--- a/drivers/clk/versatile/clk-vexpress-osc.c
++++ b/drivers/clk/versatile/clk-vexpress-osc.c
+@@ -107,7 +107,7 @@ void __init vexpress_osc_of_setup(struct device_node *node)
+ 	osc->func = vexpress_config_func_get_by_node(node);
+ 	if (!osc->func) {
+ 		pr_err("Failed to obtain config func for node '%s'!\n",
+-				node->name);
++				node->full_name);
+ 		goto error;
+ 	}
+ 
+@@ -119,7 +119,7 @@ void __init vexpress_osc_of_setup(struct device_node *node)
+ 
+ 	of_property_read_string(node, "clock-output-names", &init.name);
+ 	if (!init.name)
+-		init.name = node->name;
++		init.name = node->full_name;
+ 
+ 	init.ops = &vexpress_osc_ops;
+ 	init.flags = CLK_IS_ROOT;
+-- 
+1.8.1.2
