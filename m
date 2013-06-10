@@ -1,64 +1,56 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 9 Jun 2013 23:56:12 -0400 (EDT)
-Subject: [PATCH 2/2] ARM: vexpress/TC2: implement PM suspend method
-In-Reply-To: <20130607105625.GB3111@e102568-lin.cambridge.arm.com>
-References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
- <1370587152-4630-3-git-send-email-nicolas.pitre@linaro.org>
- <20130607105625.GB3111@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1306092354080.18597@syhkavp.arg>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Mon, 10 Jun 2013 09:40:43 +0530
+Subject: [PATCH 1/3] ARM: dts: exynos4210: Add LCD related pinctrl entries
+In-Reply-To: <4895761.sVtM2qZnU3@flatron>
+References: <1370603235-11193-1-git-send-email-tushar.behera@linaro.org>
+ <1370603235-11193-2-git-send-email-tushar.behera@linaro.org>
+ <4895761.sVtM2qZnU3@flatron>
+Message-ID: <51B551C3.8000003@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 7 Jun 2013, Lorenzo Pieralisi wrote:
-
-> Hi Nico,
+On 06/08/2013 04:16 PM, Tomasz Figa wrote:
+> Hi Tushar, Sachin,
 > 
-> On Fri, Jun 07, 2013 at 07:39:12AM +0100, Nicolas Pitre wrote:
-> > From: Nicolas Pitre <nico@linaro.org>
-> > 
-> > This is simplistic for the moment as the expected residency is used to
-> > prevent the shutting down of L2 and the cluster if the residency for
-> > the last man is lower than 5 ms.  To make this right, the shutdown
-> > latency for each CPU would need to be recorded and taken into account.
-> > 
-> > On a suspend, the firmware mailbox address has to be set prior entering
-> > low power mode.
-> > 
-> > Signed-off-by: Nicolas Pitre <nico@linaro.org>
-> > ---
-> >  arch/arm/mach-vexpress/tc2_pm.c | 23 +++++++++++++++++++++--
-> >  1 file changed, 21 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-vexpress/tc2_pm.c b/arch/arm/mach-vexpress/tc2_pm.c
-> > index a3ea524372..7901528566 100644
-> > --- a/arch/arm/mach-vexpress/tc2_pm.c
-> > +++ b/arch/arm/mach-vexpress/tc2_pm.c
-> > @@ -79,7 +79,7 @@ static int tc2_pm_power_up(unsigned int cpu, unsigned int cluster)
-> >  	return 0;
-> >  }
-> >  
-> > -static void tc2_pm_power_down(void)
-> > +static void tc2_pm_down(u64 residency)
-> >  {
-> >  	unsigned int mpidr, cpu, cluster;
-> >  	bool last_man = false, skip_wfi = false;
-> > @@ -100,7 +100,8 @@ static void tc2_pm_power_down(void)
-> >  		vexpress_spc_set_cpu_wakeup_irq(cpu, cluster, 1);
-> >  		if (!tc2_pm_use_count[0][cluster] &&
-> >  		    !tc2_pm_use_count[1][cluster] &&
-> > -		    !tc2_pm_use_count[2][cluster]) {
-> > +		    !tc2_pm_use_count[2][cluster] &&
-> > +		    (!residency || residency > 5000)) {
+> On Friday 07 of June 2013 16:37:13 Tushar Behera wrote:
+>> From: Sachin Kamat <sachin.kamat@linaro.org>
+>>
+>> Adds pinctrl entries required by FIMD.
+>>
+>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/exynos4210-pinctrl.dtsi |   75
+>> +++++++++++++++++++++++++++++ 1 file changed, 75 insertions(+)
+>>
+>> diff --git a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+>> b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi index 55a2efb..d241726
+>> 100644
+>> --- a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+>> +++ b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+>> @@ -330,6 +330,81 @@
+>>  			samsung,pin-pud = <3>;
+>>  			samsung,pin-drv = <0>;
+>>  		};
+>> +
+>> +		pwm0_out: pwm0-out {
+>> +			samsung,pins = "gpd0-0";
+>> +			samsung,pin-function = <2>;
+>> +			samsung,pin-pud = <0>;
+>> +			samsung,pin-drv = <0>;
+>> +		};
+>> +
+>> +		pwm1_out: pwm1-out {
+>> +			samsung,pins = "gpd0-1";
+>> +			samsung,pin-function = <2>;
+>> +			samsung,pin-pud = <0>;
+>> +			samsung,pin-drv = <0>;
+>> +		};
 > 
-> I would remove the line above altogether. It is ok to have parameter (we
-> should still define what that residency actually is), I do not think it
-> makes sense to add policy at this stage, I have a patchset to queue for
-> that.
+> Hmm, these two seem to be unrelated. Rebase error? :)
+> 
 
-OK, let's discuss that separately.  I'll simply let the whole cluster go 
-down in all cases initially.  That's what we have right now anyway as 
-the cpuidle driver is not passing anything interesting at the moment 
-other than 0.
+Not a rebase error. pwm0_out needs to configured to get display on LCD.
 
-
-Nicolas
+-- 
+Tushar Behera
