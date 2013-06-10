@@ -1,21 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Jun 2013 17:51:11 +0200
-Subject: [PATCH 1/2] drivers: net: cpsw: use pinctrl PM helpers
-In-Reply-To: <1370542515-22009-2-git-send-email-mugunthanvnm@ti.com>
-References: <1370542515-22009-1-git-send-email-mugunthanvnm@ti.com>
- <1370542515-22009-2-git-send-email-mugunthanvnm@ti.com>
-Message-ID: <CACRpkdbC0jRnJDSS-D04jw7QvOvSmwvnAb=NAAietMr3ZB86qQ@mail.gmail.com>
+From: jtzhou@marvell.com (Jett.Zhou)
+Date: Mon, 10 Jun 2013 23:52:23 +0800
+Subject: [V2 2/7] video: mmp: optimize some register setting code
+Message-ID: <1370879543-11152-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 6, 2013 at 8:15 PM, Mugunthan V N <mugunthanvnm@ti.com> wrote:
+From: Guoqing Li <ligq@marvell.com>
 
-> This utilize the new pinctrl core PM helpers to transition
-> the driver to "default" and "sleep" states.
->
-> Signed-off-by: Mugunthan V N <mugunthanvnm@ti.com>
+There are dumplicate code of the smooth setting based on different
+path, optimized the routine and use readl_relaxed instead.
 
-This version of the patch applied with DaveM:s ACK.
+Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+Signed-off-by: Jing Xiang <jxiang@marvell.com>
+Signed-off-by: Guoqing Li <ligq@marvell.com>
+---
+ drivers/video/mmp/hw/mmp_ctrl.c |   22 +++++++---------------
+ 1 files changed, 7 insertions(+), 15 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
+index a472c4d..3a8c2a3 100644
+--- a/drivers/video/mmp/hw/mmp_ctrl.c
++++ b/drivers/video/mmp/hw/mmp_ctrl.c
+@@ -53,7 +53,7 @@ static irqreturn_t ctrl_handle_irq(int irq, void *dev_id)
+ 		tmp = readl_relaxed(ctrl->reg_base + SPU_IRQ_ISR);
+ 		if (tmp & isr)
+ 			writel_relaxed(~isr, ctrl->reg_base + SPU_IRQ_ISR);
+-	} while ((isr = readl(ctrl->reg_base + SPU_IRQ_ISR)) & imask);
++	} while ((isr = readl_relaxed(ctrl->reg_base + SPU_IRQ_ISR)) & imask);
+ 
+ 	return IRQ_HANDLED;
+ }
+@@ -371,20 +371,12 @@ static void path_set_default(struct mmp_path *path)
+ 	 * bus arbiter for faster read if not tv path;
+ 	 * 2.enable horizontal smooth filter;
+ 	 */
+-	if (PATH_PN == path->id) {
+-		mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK
+-			| CFG_ARBFAST_ENA(1);
+-		tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
+-		tmp |= mask;
+-		writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+-	} else if (PATH_TV == path->id) {
+-		mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK
+-			| CFG_ARBFAST_ENA(1);
+-		tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
+-		tmp &= ~mask;
+-		tmp |= CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK;
+-		writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+-	}
++	mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK | CFG_ARBFAST_ENA(1);
++	tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
++	tmp |= mask;
++	if (PATH_TV == path->id)
++		tmp &= ~CFG_ARBFAST_ENA(1);
++	writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
+ }
+ 
+ static int path_init(struct mmphw_path_plat *path_plat,
+-- 
+1.7.0.4
