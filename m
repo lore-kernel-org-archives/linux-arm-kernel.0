@@ -1,43 +1,20 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 10 Jun 2013 16:59:52 +0800
-Subject: [PATCH] ARM: dts: imx51: Make SDMA firmware name same for DT and
- non-DT
-In-Reply-To: <1370850040-11177-1-git-send-email-shc_work@mail.ru>
-References: <1370850040-11177-1-git-send-email-shc_work@mail.ru>
-Message-ID: <20130610085950.GE6381@S2101-09.ap.freescale.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Mon, 10 Jun 2013 09:59:51 +0100
+Subject: [PATCH 0/2] MCPM backend for Virtual Express TC2
+In-Reply-To: <alpine.LFD.2.03.1306092310570.18597@syhkavp.arg>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370618853.4852.28.camel@hornet>
+ <alpine.LFD.2.03.1306092310570.18597@syhkavp.arg>
+Message-ID: <1370854791.3108.2.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 11:40:40AM +0400, Alexander Shiyan wrote:
-> This patch will help migrate i.MX51-targets to DT by make SDMA
-> firmware name same for DT and non-DT cases.
-> 
-> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> ---
->  arch/arm/boot/dts/imx51.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-> index f23636f..643f005 100644
-> --- a/arch/arm/boot/dts/imx51.dtsi
-> +++ b/arch/arm/boot/dts/imx51.dtsi
-> @@ -645,7 +645,7 @@
->  				interrupts = <6>;
->  				clocks = <&clks 56>, <&clks 56>;
->  				clock-names = "ipg", "ahb";
-> -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
-> +				fsl,sdma-ram-script-name = "sdma-imx51.bin";
+On Mon, 2013-06-10 at 04:21 +0100, Nicolas Pitre wrote:
+> You should do like some other companies does i.e. have an official name, 
+> and an alias which is short and borrowed from an animal, or some 
+> geographical region, etc.
 
-Though we haven't got SDMA firmware upstreamed anywhere yet, I think
-this name pattern has been established for some platforms, since it has
-been used on imx51, imx53 and imx6q for quite a while.  If you system
-expects a different one, you can overwrite it in your <board>.dts.
+Funny you mention this - this test chip _does_ have a code-name (and it
+is a bird indeed, just mythical ;-). Somehow it didn't stuck.
 
-Shawn
-
->  			};
->  
->  			cspi: cspi at 83fc0000 {
-> -- 
-> 1.8.1.5
-> 
+Pawe?
