@@ -1,54 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Jun 2013 00:38:09 +0100
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
-References: <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
- <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
- <20130610170648.GX18614@n2100.arm.linux.org.uk>
- <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
- <20130610200839.GY18614@n2100.arm.linux.org.uk>
- <CAF6AEGsfzvdiGXqAu56rc-G_ZhhE_vnNbC6kpBmRtd-8Sh_uOQ@mail.gmail.com>
- <20130610211516.GZ18614@n2100.arm.linux.org.uk>
- <CAF6AEGu-e+cZW-1F6L+epE11oonFucreEY_KH+awRx7j5pScpA@mail.gmail.com>
- <20130610225607.GE18614@n2100.arm.linux.org.uk>
- <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
-Message-ID: <20130610233809.GL18614@n2100.arm.linux.org.uk>
+From: dinguyen@altera.com (dinguyen at altera.com)
+Date: Mon, 10 Jun 2013 18:38:06 -0500
+Subject: [PATCHv7 0/6] ARM: socfpga: Add ethernet bindings, clk-gate,
+ and SD/MMC
+Message-ID: <1370907493-17623-1-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 07:17:22PM -0400, Rob Clark wrote:
-> On Mon, Jun 10, 2013 at 6:56 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Jun 10, 2013 at 06:49:06PM -0400, Rob Clark wrote:
-> >> I guess in the short term, the best I can think is keep those phys
-> >> ioctls as a small patch on top of the upstream driver.  It is ok to
-> >> leave place-holder ioctl #'s in the upstream driver so that the ioctl
-> >> #'s don't shift when you rebase.  And then try to get the vendor to
-> >> add support for dmabuf so that the patch on top of upstream can
-> >> eventually be dropped.  Maybe someone else has a better suggestion,
-> >> but I don't think we can merge those phys ioctls upstream, and I'd
-> >> really hate to 'throw the baby out with the bathwater' in this case
-> >> and not at least get the modesetting part of the driver merged.
-> >
-> > What you're saying is basically:
-> >
-> > 1. Throw out DRM_ARMADA_GEM_CREATE_PHYS, which cripples video playback
-> >    on existing gstreamer, xbmc and other implementations without someone
-> >    rewriting all that code.
-> >
-> > 2. Throw out DRM_ARMADA_GEM_PROP, which prevents any form of passing
-> >    the GEM objects to the GPU libraries in userspace, thereby preventing
-> >    any kind of GPU based acceleration.
-> >
-> > That makes the driver just be a dumb scanout only driver.  Sorry,
-> > that *really* does not interest me one bit, because the CPU doing
-> > framebuffer accesses is pig slow.
-> 
-> Well, yes that is basically what I am saying, unless we can find a
-> different way (dmabuf? if there is some way to pass it through the
-> blob bits you don't have src code for?)
-> 
-> The problem is that we really can't merge something upstream that lets
-> you dma to arbitrary physical address.  Maybe in staging, perhaps?  Or
+From: Dinh Nguyen <dinguyen@altera.com>
 
-Which bit of "THIS DRIVER DOESN'T DMA _TO_ ANY ADDRESS" did you not yet?
+Hi Arnd/Olof,
+
+Can you please apply this patch series? Arnd has already reviewed patch[6/6] and
+patch [3/6] has gotten Mike Turquette's Ack-by.
+
+
+Thanks,
+Dinh
+
+Dinh Nguyen (6):
+  ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+  ARM: socfpga: dts: Add gate-clock bindings
+  ARM: socfpga: Add support to gate peripheral clocks
+  ARM: socfpga: Add syscon to be part of socfpga
+  ARM: socfpga: dts: Add support for SD/MMC
+  mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+
+ .../devicetree/bindings/clock/altr_socfpga.txt     |    7 +
+ .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   60 +++++
+ arch/arm/boot/dts/socfpga.dtsi                     |  230 +++++++++++++++++++-
+ arch/arm/boot/dts/socfpga_cyclone5.dts             |   26 +++
+ arch/arm/boot/dts/socfpga_vt.dts                   |   17 ++
+ arch/arm/mach-socfpga/Kconfig                      |    1 +
+ drivers/clk/socfpga/clk.c                          |  194 ++++++++++++++++-
+ drivers/mmc/host/Kconfig                           |    8 +
+ drivers/mmc/host/Makefile                          |    1 +
+ drivers/mmc/host/dw_mmc-exynos.c                   |    2 -
+ drivers/mmc/host/dw_mmc-socfpga.c                  |  138 ++++++++++++
+ drivers/mmc/host/dw_mmc.h                          |    1 +
+ 12 files changed, 671 insertions(+), 14 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
+ create mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
+
+-- 
+1.7.9.5
