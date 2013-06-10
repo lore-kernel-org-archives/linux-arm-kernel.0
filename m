@@ -1,65 +1,39 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 10 Jun 2013 12:22:36 -0700
-Subject: [PATCH] arm: versatile: don't mark pen as __INIT
-In-Reply-To: <51B62454.204@codeaurora.org>
-References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
- <51B61D5F.1090906@codeaurora.org>
- <20130610185240.GC2513@e106331-lin.cambridge.arm.com>
- <51B62454.204@codeaurora.org>
-Message-ID: <51B6277C.9020003@codeaurora.org>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Mon, 10 Jun 2013 21:39:32 +0200
+Subject: [PATCH v2 0/2] pinctrl: common handling of generic pinconfig props in
+ dt
+Message-ID: <201306102139.32444.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/13 12:09, Stephen Boyd wrote:
-> On 06/10/13 11:52, Mark Rutland wrote:
->> On Mon, Jun 10, 2013 at 07:39:27PM +0100, Stephen Boyd wrote:
->>> On 06/10/13 08:07, Mark Rutland wrote:
->>>> When booting fewer cores than are physically present on a versatile
->>>> platform (e.g. when passing maxcpus=N on the command line), some
->>>> secondary cores may remain in the holding pen, which is marked __INIT.
->>>> Late in the boot process, the memory comprising the holding pen will be
->>>> released to the kernel for more general use, and may be overwritten with
->>>> arbitrary data, which can cause the held secondaries to start behaving
->>>> unpredictably. This can lead to all manner of odd behaviour from the
->>>> kernel.
->>>>
->>>> Instead don't mark the section as __INIT. This means we can't reuse the
->>>> pen memory, but we won't get secondaries corrupting the rest of the
->>>> kernel.
->>>>
->>>> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
->>>> Acked-by: Pawel Moll <pawel.moll@arm.com>
->>>> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
->>>> ---
->>>>  arch/arm/plat-versatile/headsmp.S | 2 --
->>>>  1 file changed, 2 deletions(-)
->>>>
->>>> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
->>>> index b178d44..2677bc3 100644
->>>> --- a/arch/arm/plat-versatile/headsmp.S
->>>> +++ b/arch/arm/plat-versatile/headsmp.S
->>>> @@ -11,8 +11,6 @@
->>>>  #include <linux/linkage.h>
->>>>  #include <linux/init.h>
->>>>  
->>>> -	__INIT
->>>> -
->>>>  /*
->>>>   * Realview/Versatile Express specific entry point for secondary CPUs.
->>>>   * This provides a "holding pen" into which all secondary cores are held
->>> Why doesn't __CPUINIT work?
->> Won't we then encounter the same problem on builds without CPU_HOTPLUG? I
->> thought we'd throw away the .cpuinit.* section(s) in that case?
->>
-> The generic linker macros look to set it up so that all __CPUINIT
-> sections become __INIT in that scenario. Since we don't support hotplug
-> booting with maxcpus < nr_present_cpus can't lead to any corruption
-> because we can't bring online any of the offline and present CPUs.
->
+Hi Linus,
 
-Sorry I should clarify further. We can't bring online any offline and
-present CPUs after the init sections are freed.
+here is my second try ... after our talk today, hopefully more future proof
+(and acceptable).
+
+I hadn't found a way to have the phandle as a simple argument in the pins
+property, so the example Rockchip driver now uses a second property
+rockchip,config = <&phandle>; to hold the link to the config node.
+
+Surprisingly everything still works ;-) .
+
+
+Heiko Stuebner (2):
+  pinctrl: add function to parse generic pinconfig properties from a dt node
+  pinctrl: add pinctrl driver for Rockchip SoCs
+
+ .../bindings/pinctrl/pinctrl-bindings.txt          |   38 +
+ .../bindings/pinctrl/rockchip,pinctrl.txt          |   98 ++
+ drivers/pinctrl/Kconfig                            |    6 +
+ drivers/pinctrl/Makefile                           |    1 +
+ drivers/pinctrl/pinconf-generic.c                  |   81 ++
+ drivers/pinctrl/pinconf.h                          |    6 +
+ drivers/pinctrl/pinctrl-rockchip.c                 | 1346 ++++++++++++++++++++
+ include/dt-bindings/pinctrl/rockchip.h             |   32 +
+ 8 files changed, 1608 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pinctrl/rockchip,pinctrl.txt
+ create mode 100644 drivers/pinctrl/pinctrl-rockchip.c
+ create mode 100644 include/dt-bindings/pinctrl/rockchip.h
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.2.3
