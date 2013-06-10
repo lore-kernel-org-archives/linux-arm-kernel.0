@@ -1,37 +1,29 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 10 Jun 2013 23:05:08 +0200
-Subject: [PATCH 00/21] ARM: ux500: Enable Clock look-up from Device Tree
-In-Reply-To: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
-References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CAPDyKFrJumd79hHWJkGWvRKzhoaprPHu=U6HOHXzVL8WyNS6jw@mail.gmail.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 10 Jun 2013 15:11:14 -0600
+Subject: [RESEND PATCH V3 6/8] mmc: tegra: handle mmc_of_parse() errors
+ during probe
+In-Reply-To: <1370808858-32241-7-git-send-email-gmbnomis@gmail.com>
+References: <1370808858-32241-1-git-send-email-gmbnomis@gmail.com>
+ <1370808858-32241-7-git-send-email-gmbnomis@gmail.com>
+Message-ID: <51B640F2.8030107@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 June 2013 15:42, Lee Jones <lee.jones@linaro.org> wrote:
-> Nice and simple implementation using standard Clk APIs.
-Hi Lee,
+On 06/09/2013 02:14 PM, Simon Baatz wrote:
+> Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
 
-I may be a bit tired, but I am having a bit hard to follow the steps
-taken in this patch set. :-)
+Tested-by: Stephen Warren <swarren@nvidia.com>
 
-I should of course tell you why:
-1. You start out by adding DT definitions in the DT files, should that
-not be done as the final step, after the DT support has been added in
-ux500 clk driver?
-2. Moreover, I think it would be enough to group the definitions
-patches into one patch or at least significant fewer. Same feeling
-about the patches were you remove the AUXDATA, this would simplify the
-review for me.
-3. The rest will be commented per patch.
+(On Seaboard/Springbank board, i.e. Tegra20)
 
-Kind regards
-Ulf Hansson
+> diff --git a/drivers/mmc/host/sdhci-tegra.c b/drivers/mmc/host/sdhci-tegra.c
 
->
->  arch/arm/boot/dts/dbx5x0.dtsi    |   94 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
->  arch/arm/boot/dts/snowball.dts   |    3 ++-
->  arch/arm/mach-ux500/cpu-db8500.c |   36 +--------------------------
->  drivers/clk/ux500/u8500_clk.c    |  154 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
->  4 files changed, 249 insertions(+), 38 deletions(-)
->
->
+> +err_parse_dt:
+>  err_power_req:
+>  err_alloc_tegra_host:
+
+Nit: It'd be nice if that new label got inserted into the middle of the
+list, so err_power_req, err_parse_dt, err_alloc_tegra_host. That way if
+we ever needed to add separate code there, they'd be in the right order
+already. Still, this isn't worth fixing unless you have to repost for
+some other reason I guess.
