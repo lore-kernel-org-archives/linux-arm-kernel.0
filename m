@@ -1,36 +1,42 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Mon, 10 Jun 2013 16:05:07 +0100
-Subject: [PATCH 2/2] clk: vexpress: Make the clock drivers directly available
- for arm64
-In-Reply-To: <1370876707-25265-1-git-send-email-pawel.moll@arm.com>
-References: <1370876707-25265-1-git-send-email-pawel.moll@arm.com>
-Message-ID: <1370876707-25265-3-git-send-email-pawel.moll@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Jun 2013 16:07:24 +0100
+Subject: [PATCH] arm: versatile: don't mark pen as __INIT
+Message-ID: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The new arm64 architecture has no idea of platform or machine, so
-it doesn't have to define ARCH_VEXPRESS configuration option at
-all. To allow user to select the drivers at all, make it depend
-on ARM64 as well.
+When booting fewer cores than are physically present on a versatile
+platform (e.g. when passing maxcpus=N on the command line), some
+secondary cores may remain in the holding pen, which is marked __INIT.
+Late in the boot process, the memory comprising the holding pen will be
+released to the kernel for more general use, and may be overwritten with
+arbitrary data, which can cause the held secondaries to start behaving
+unpredictably. This can lead to all manner of odd behaviour from the
+kernel.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Instead don't mark the section as __INIT. This means we can't reuse the
+pen memory, but we won't get secondaries corrupting the rest of the
+kernel.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Pawel Moll <pawel.moll@arm.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 ---
- drivers/clk/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/plat-versatile/headsmp.S | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 0357ac4..d0d9b21 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -42,7 +42,7 @@ config COMMON_CLK_WM831X
+diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+index b178d44..2677bc3 100644
+--- a/arch/arm/plat-versatile/headsmp.S
++++ b/arch/arm/plat-versatile/headsmp.S
+@@ -11,8 +11,6 @@
+ #include <linux/linkage.h>
+ #include <linux/init.h>
  
- config COMMON_CLK_VERSATILE
- 	bool "Clock driver for ARM Reference designs"
--	depends on ARCH_INTEGRATOR || ARCH_REALVIEW || ARCH_VEXPRESS
-+	depends on ARCH_INTEGRATOR || ARCH_REALVIEW || ARCH_VEXPRESS || ARM64
- 	---help---
-           Supports clocking on ARM Reference designs:
- 	  - Integrator/AP and Integrator/CP
+-	__INIT
+-
+ /*
+  * Realview/Versatile Express specific entry point for secondary CPUs.
+  * This provides a "holding pen" into which all secondary cores are held
 -- 
-1.8.1.2
+1.8.1.1
