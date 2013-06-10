@@ -1,31 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 10 Jun 2013 10:27:15 +0100
-Subject: [PATCH 1/2] ASoC: sgtl5000: Let the codec acquire its clock
-In-Reply-To: <1370826467-30399-1-git-send-email-festevam@gmail.com>
-References: <1370826467-30399-1-git-send-email-festevam@gmail.com>
-Message-ID: <20130610092715.GH31367@sirena.org.uk>
+From: b.brezillon@overkiz.com (boris brezillon)
+Date: Mon, 10 Jun 2013 11:28:35 +0200
+Subject: [RFC PATCH 28/50] ASoC: atmel-ssc: prepare clk before calling
+ enable
+In-Reply-To: <20130610090649.GC31367@sirena.org.uk>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+ <1370622370-19614-1-git-send-email-b.brezillon@overkiz.com>
+ <20130607165510.GA31367@sirena.org.uk> <51B23B04.20604@overkiz.com>
+ <20130610090649.GC31367@sirena.org.uk>
+Message-ID: <51B59C43.2020708@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 09, 2013 at 10:07:46PM -0300, Fabio Estevam wrote:
+On 10/06/2013 11:06, Mark Brown wrote:
+> On Fri, Jun 07, 2013 at 09:56:52PM +0200, Boris BREZILLON wrote:
+>> On 07/06/2013 18:55, Mark Brown wrote:
+>>> On Fri, Jun 07, 2013 at 06:26:09PM +0200, Boris BREZILLON wrote:
+>>>> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+>>>> avoid common clk framework warnings.
+>>> Applied since I happened to notice this on he list but you should
+>>> *always* CC maintainers on patches otherwise they're likely to get
+>>> missed.
+>> I used get_mainainer script and it returns:
+>> Arnd Bergmann <arnd@arndb.de> (supporter:CHAR and MISC DRI...)
+>> Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:CHAR and
+>> MISC DRI...)
+>> linux-kernel at vger.kernel.org (open list)
+>> Please tell me if misuse this script or if I should use something else.
+> I suspect you only ran this on some of the patches as that's missing
+> pretty much all of the subsystem maintainers, but in general you always
+> have to think about the output of get_maintainer.pl - it isn't terribly
+> reliable.
+I use a script to add "cc" and "to" fields to each patch:
 
-> -	if (IS_ERR(data->codec_clk)) {
-> -		/* assuming clock enabled by default */
-> -		data->codec_clk = NULL;
-> -		ret = of_property_read_u32(codec_np, "clock-frequency",
-> -					&data->clk_frequency);
-> -		if (ret) {
-> -			dev_err(&codec_dev->dev,
-> -				"clock-frequency missing or invalid\n");
-> -			goto fail;
-> -		}
+to.sh:
 
-Applied but this means that the binding document needs to be updated to
-remove the clock-frequency property.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/5a2535da/attachment.sig>
+#!/bin/bash
+
+opts="--nogit --nogit-fallback --norolestats --pattern-depth=1"
+
+if [[ $(basename $1) =~ ^0000- ]] ; then
+     ./scripts/get_maintainer.pl --nom $opts $(dirname $1)/*
+else
+     maint=$(./scripts/get_maintainer.pl --nol $opts $1)
+
+     if [ "$maint" == "" ] ; then
+         echo "[hidden email]"
+     else
+         echo "$maint"
+     fi
+fi
+
+cc.sh:
+
+#!/bin/bash
+
+opts="--nogit --nogit-fallback --norolestats"
+
+if [[ $(basename $1) =~ ^0000- ]] ; then
+     ./scripts/get_maintainer.pl --nom $opts $(dirname $1)/*
+else
+     ./scripts/get_maintainer.pl $opts $1
+fi
+
+But I guess it does not handle subsystem maintainers.
+
+I'll check it before sending patch series next time.
+
+BTW thanks for applying this patch.
+
+Best Regards,
+Boris
