@@ -1,48 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 11 Jun 2013 00:31:12 +0100
-Subject: [PATCH] i2c: vt8500: Add support for I2C bus on Wondermedia SoCs
-In-Reply-To: <20130610160328.GG2987@katana>
-References: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
- <20130610160328.GG2987@katana>
-Message-ID: <20130610233112.GJ18614@n2100.arm.linux.org.uk>
+From: robdclark@gmail.com (Rob Clark)
+Date: Mon, 10 Jun 2013 19:35:23 -0400
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <CAPM=9twJGgYiXxQyaXCnYd+bUPFv+P92qGdmJ39_4z29==4F2g@mail.gmail.com>
+References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
+ <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
+ <20130610170648.GX18614@n2100.arm.linux.org.uk>
+ <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
+ <20130610200839.GY18614@n2100.arm.linux.org.uk>
+ <CAF6AEGsfzvdiGXqAu56rc-G_ZhhE_vnNbC6kpBmRtd-8Sh_uOQ@mail.gmail.com>
+ <20130610211516.GZ18614@n2100.arm.linux.org.uk>
+ <CAF6AEGu-e+cZW-1F6L+epE11oonFucreEY_KH+awRx7j5pScpA@mail.gmail.com>
+ <20130610225607.GE18614@n2100.arm.linux.org.uk>
+ <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
+ <CAPM=9twJGgYiXxQyaXCnYd+bUPFv+P92qGdmJ39_4z29==4F2g@mail.gmail.com>
+Message-ID: <CAF6AEGsO-j-r0xCxZfbr7OrG=hpA5W0icA40NDfZi7oD75iF3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 06:03:29PM +0200, Wolfram Sang wrote:
-> Hi Tony,
-> 
-> > +static int wmt_i2c_wait_bus_not_busy(struct wmt_i2c_dev *i2c_dev)
-> > diff --git a/drivers/i2c/busses/i2c-wmt.c b/drivers/i2c/busses/i2c-wmt.c
-> > new file mode 100644
-> > index 0000000..5cebb29
-> > --- /dev/null
-> > +++ b/drivers/i2c/busses/i2c-wmt.c
-> 
-> ...
-> 
-> > +{
-> > +	u16 val;
-> > +	int i;
-> > +	int ret = 0;
-> > +
-> > +	for (i = 0; i < 100000; i++) {
-> > +		val = readw(i2c_dev->base + REG_CSR);
-> > +		if (val & CSR_READY_MASK)
-> > +			break;
-> > +
-> > +		udelay(1);
-> > +	}
-> > +	if (i >= 9999999)
-> > +		ret = -EBUSY;
-> 
-> What about using time_after and usleep_range?
+On Mon, Jun 10, 2013 at 7:24 PM, Dave Airlie <airlied@gmail.com> wrote:
+>>>
+>>> That makes the driver just be a dumb scanout only driver.  Sorry,
+>>> that *really* does not interest me one bit, because the CPU doing
+>>> framebuffer accesses is pig slow.
+>>
+>> Well, yes that is basically what I am saying, unless we can find a
+>> different way (dmabuf? if there is some way to pass it through the
+>> blob bits you don't have src code for?)
+>>
+>> The problem is that we really can't merge something upstream that lets
+>> you dma to arbitrary physical address.  Maybe in staging, perhaps?  Or
+>> otherwise if there is no other way, I hope someone will at least pick
+>> up the modesetting parts of it and get that merged upstream.  The rest
+>> of the driver is looking pretty good, and I think it would be useful
+>> to have upstream.
+>
+> Totally what he said.
+>
+> upstream shouldn't be restricted by the bad decisions of others, and
+> adding security bypasses is one of them.
+>
+> I'd like to see all the ARM based drivers based on CMA if it can meet
+> their requirements
 
-And in any case this is not the correct way to check for success or
-failure.
+afaiu CMA has issues w/ changing cache attributes of pages on older
+architectures like Russell is using.  Although perhaps on older arm
+CMA should just be a straight carveout pool and not try to recycle the
+unused pages.  At least then it would be the same API for the drivers.
 
-Failure is defined by readw(i2c_dev->base + REG_CSR) & CSR_READY_MASK
-being false.  The above does not check it after the final 1us delay.
-You might as well not wait for that final 1us because it's literally
-just wasting time the way you've coded it.
+BR,
+-R
 
-Or fix it to re-check for success after the loop completes.
+> and using close to standard GEM/dma-buf interfaces. Otherwise it'll be
+> come an unmaintainable
+> nightmare for everyone, but mostly for me.
+>
+> Merging the base dumb KMS driver, then working out acceptable ways to
+> provide the extra
+> features is definitely the nicest way to do things.
+>
+> Dave.
