@@ -1,35 +1,58 @@
-From: rklein@nvidia.com (Rhyland Klein)
-Date: Mon, 10 Jun 2013 17:26:40 -0400
-Subject: [PATCH 2/4] power: sbs-battery: Add dt to power_supply struct
-In-Reply-To: <1370899602-22123-1-git-send-email-rklein@nvidia.com>
-References: <1370899602-22123-1-git-send-email-rklein@nvidia.com>
-Message-ID: <1370899602-22123-3-git-send-email-rklein@nvidia.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Jun 2013 22:38:58 +0100
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
+References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
+ <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
+Message-ID: <20130610213858.GA18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By passing in the dt node of this device, we enable the logic for
-linking power_supplies together from dt. This is specified by adding
-a "power-supplies" property with a phandle to the charger for a
-given supply.
+On Mon, Jun 10, 2013 at 11:57:32AM -0400, Rob Clark wrote:
+> On Sun, Jun 9, 2013 at 3:29 PM, Russell King
+> <rmk+kernel@arm.linux.org.uk> wrote:
+> > +/* The mode_config.mutex will be held for this call */
+> > +static int armada_drm_crtc_mode_set_base(struct drm_crtc *crtc, int x, int y,
+> > +       struct drm_framebuffer *old_fb)
+> > +{
+> > +       struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
+> > +       struct armada_regs regs[4];
+> > +       unsigned i;
+> > +
+> > +       i = armada_drm_crtc_calc_fb(crtc->fb, crtc->x, crtc->y, regs, dcrtc->interlaced);
+> > +       armada_reg_queue_end(regs, i);
+> > +
+> > +       /* Wait for pending flips to complete */
+> > +       wait_event(dcrtc->frame_wait, !dcrtc->frame_work);
+> > +
+> > +       /* Take a reference to the new fb as we're using it */
+> > +       drm_gem_object_reference(&drm_fb_obj(crtc->fb)->obj);
+> 
+> note that you probably want to ref/unref the fb (and let the fb hold a
+> ref to the gem bo).. that will make life easier for planar formats too
+> (as the fb should hold ref's to the bo for each plane)
 
-Enable this logic now for the sbs-battery driver.
+Now changed - and it looks from my debug of gem_linear that it's working
+correctly (iow, not leaking).
 
-Signed-off-by: Rhyland Klein <rklein@nvidia.com>
----
- drivers/power/sbs-battery.c |    1 +
- 1 file changed, 1 insertion(+)
+> > +struct drm_armada_gem_create {
+> > +       uint32_t height;
+> > +       uint32_t width;
+> > +       uint32_t bpp;
+> 
+> just fwiw, typically height/width/bpp are properties of the fb but not
+> the bo.. (except in some cases where kernel needs to know this to
+> setup GTT correctly for tiled buffers)
 
-diff --git a/drivers/power/sbs-battery.c b/drivers/power/sbs-battery.c
-index c8c78a7..b5f2a76 100644
---- a/drivers/power/sbs-battery.c
-+++ b/drivers/power/sbs-battery.c
-@@ -704,6 +704,7 @@ static int sbs_probe(struct i2c_client *client,
- 	chip->power_supply.properties = sbs_properties;
- 	chip->power_supply.num_properties = ARRAY_SIZE(sbs_properties);
- 	chip->power_supply.get_property = sbs_get_property;
-+	chip->power_supply.of_node = client->dev.of_node;
- 	/* ignore first notification of external change, it is generated
- 	 * from the power_supply_register call back
- 	 */
--- 
-1.7.9.5
+Also fixed.
+
+> > +struct drm_armada_gem_pwrite {
+> > +       uint32_t handle;
+> > +       uint32_t offset;
+> > +       uint32_t size;
+> 
+> probably want a uint32_t padding here, or move the uint64_t up in the
+> struct to avoid 32 vs 64b alignment differences.
+
+And also fixed.
