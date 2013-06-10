@@ -1,143 +1,115 @@
 From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Mon, 10 Jun 2013 12:46:59 +0100
-Subject: [PATCH v2 06/11] ARM:stixxxx: Add STiH415 SOC support
-In-Reply-To: <CAHTX3d+dk3W_9b7SVUokWq4KYXnj=Z1=WPj5zJ-gUvJqqwE=+Q@mail.gmail.com>
+Date: Mon, 10 Jun 2013 12:53:55 +0100
+Subject: [PATCH v2 01/11] serial:st-asc: Add ST ASC driver.
+In-Reply-To: <20130610093511.GT18614@n2100.arm.linux.org.uk>
 References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
- <1370856381-6644-1-git-send-email-srinivas.kandagatla@st.com>
- <CAHTX3d+dk3W_9b7SVUokWq4KYXnj=Z1=WPj5zJ-gUvJqqwE=+Q@mail.gmail.com>
-Message-ID: <51B5BCB3.3060405@st.com>
+ <1370856060-6403-1-git-send-email-srinivas.kandagatla@st.com>
+ <20130610093511.GT18614@n2100.arm.linux.org.uk>
+Message-ID: <51B5BE53.2000105@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/13 12:15, Michal Simek wrote:
+Thankyou for your comment and suggestion,
+I will fix the POSIX compliant issue.
 
-Thankyou for your comments,
-> Hi,
+On 10/06/13 10:35, Russell King - ARM Linux wrote:
+> On Mon, Jun 10, 2013 at 10:21:00AM +0100, Srinivas KANDAGATLA wrote:
+>> This patch adds support to ASC (asynchronous serial controller)
+>> driver, which is basically a standard serial driver. This IP is common
+>> across all the ST parts for settop box platforms.
+>>
+>> ASC is embedded in ST COMMS IP block. It supports Rx & Tx functionality.
+>> It support all industry standard baud rates.
 > 
-> hmm - that's a nice bug that thunderbird is not able to send this email. :-(
-> Let's comment it again via gmail.
->     diff --git a/arch/arm/boot/dts/stih415.dtsi
->     b/arch/arm/boot/dts/stih415.dtsi
->     new file mode 100644
->     index 0000000..6dcf5b4
->     --- /dev/null
->     +++ b/arch/arm/boot/dts/stih415.dtsi
-...
->     +
->     +       soc {
->     +               #address-cells = <1>;
->     +               #size-cells = <1>;
->     +               interrupt-parent = <&intc>;
->     +               ranges;
->     +               compatible      = "simple-bus";
+> Your driver is not POSIX compliant.
 > 
+>> +		for (; count != 0; count--) {
+>> +			c = asc_in(port, ASC_RXBUF);
+>> +			flag = TTY_NORMAL;
+>> +			port->icount.rx++;
+>> +
+>> +			if (unlikely(c & ASC_RXBUF_FE)) {
+>> +				if (c == ASC_RXBUF_FE) {
+>> +					port->icount.brk++;
+>> +					if (uart_handle_break(port))
+>> +						continue;
+>> +					flag = TTY_BREAK;
+>> +				} else {
+>> +					port->icount.frame++;
+>> +					flag = TTY_FRAME;
+>> +				}
+>> +			} else if (ascport->check_parity &&
+>> +				   unlikely(c & ASC_RXBUF_PE)) {
+>> +				port->icount.parity++;
+>> +				flag = TTY_PARITY;
+>> +			}
+>> +
+>> +			if (uart_handle_sysrq_char(port, c))
+>> +				continue;
+>> +			tty_insert_flip_char(tport, c & 0xff, flag);
+>> +		}
+>> +		if (overrun) {
+>> +			port->icount.overrun++;
+>> +			tty_insert_flip_char(tport, 0, TTY_OVERRUN);
+>> +		}
 > 
+> No support for ignoring error conditions.  No support for ignoring all
+> input... and:
 > 
-> Rob and Grant: what's the purpose of SoC node.
-> It seems to me odd that SoC is compatible with simple-bus.
-
-All the drivers on this SOC are based on platform bus, so we use
-simple-bus, here.
-
->     diff --git a/arch/arm/boot/dts/stih41x.dtsi
->     b/arch/arm/boot/dts/stih41x.dtsi
->     new file mode 100644
->     index 0000000..7321403
->     --- /dev/null
->     +++ b/arch/arm/boot/dts/stih41x.dtsi
->     @@ -0,0 +1,38 @@
->     +/ {
->     +       #address-cells = <1>;
->     +       #size-cells = <1>;
->     +
->     +       cpus {
->     +               #address-cells = <1>;
->     +               #size-cells = <0>;
->     +               cpu at 0 {
->     +                       compatible = "arm,cortex-a9";
->     +                       reg = <0>;
->     +               };
->     +               cpu at 1 {
->     +                       compatible = "arm,cortex-a9";
->     +                       reg = <1>;
->     +               };
->     +       };
->     +
+>> +static void asc_set_termios(struct uart_port *port, struct ktermios *termios,
+>> +			    struct ktermios *old)
+>> +{
+>> +	struct asc_port *ascport = to_asc_port(port);
+>> +	unsigned int baud;
+>> +	u32 ctrl_val;
+>> +	tcflag_t cflag;
+>> +	unsigned long flags;
+>> +
+>> +	port->uartclk = clk_get_rate(ascport->clk);
+>> +
+>> +	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16);
+>> +	cflag = termios->c_cflag;
+>> +
+>> +	spin_lock_irqsave(&port->lock, flags);
+>> +
+>> +	/* read control register */
+>> +	ctrl_val = asc_in(port, ASC_CTL);
+>> +
+>> +	/* stop serial port and reset value */
+>> +	asc_out(port, ASC_CTL, (ctrl_val & ~ASC_CTL_RUN));
+>> +	ctrl_val = ASC_CTL_RXENABLE | ASC_CTL_FIFOENABLE;
+>> +
+>> +	/* reset fifo rx & tx */
+>> +	asc_out(port, ASC_TXRESET, 1);
+>> +	asc_out(port, ASC_RXRESET, 1);
+>> +
+>> +	/* set character length */
+>> +	if ((cflag & CSIZE) == CS7) {
+>> +		ctrl_val |= ASC_CTL_MODE_7BIT_PAR;
+>> +	} else {
+>> +		ctrl_val |= (cflag & PARENB) ?  ASC_CTL_MODE_8BIT_PAR :
+>> +						ASC_CTL_MODE_8BIT;
+>> +	}
+>> +
+>> +	ascport->check_parity = (cflag & PARENB) ? 1 : 0;
+>> +
+>> +	/* set stop bit */
+>> +	ctrl_val |= (cflag & CSTOPB) ? ASC_CTL_STOP_2BIT : ASC_CTL_STOP_1BIT;
+>> +
+>> +	/* odd parity */
+>> +	if (cflag & PARODD)
+>> +		ctrl_val |= ASC_CTL_PARITYODD;
+>> +
+>> +	/* hardware flow control */
+>> +	if ((cflag & CRTSCTS) && ascport->hw_flow_control)
+>> +		ctrl_val |= ASC_CTL_CTSENABLE;
 > 
+> This doesn't reflect those facts back into the termios structure to
+> indicate that they aren't supported.
 > 
-> I believe your SoC also has a bus here.
-
-It does but there is no active driver to manage it.
-
->     --- /dev/null
->     +++ b/arch/arm/mach-stixxxx/board-dt.c
->     @@ -0,0 +1,47 @@
-
->     +
->     +void __init stih41x_l2x0_init(void)
->     +{
->     +       u32 way_size = 0x4;
->     +       u32 aux_ctrl;
->     +
->     +       aux_ctrl = (0x1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
->     +               (0x1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
->     +               (0x1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
->     +               (way_size << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
-> 
-> 
-> 
-> #include <linux/bitops.h>
-> Linus Walleij would write use  BIT() here
-
-I will use BIT() macro.
-
->     diff --git a/arch/arm/mach-stixxxx/headsmp.S
->     b/arch/arm/mach-stixxxx/headsmp.S
->     new file mode 100644
->     index 0000000..3dd5c04
->     --- /dev/null
->     +++ b/arch/arm/mach-stixxxx/headsmp.S
->     @@ -0,0 +1,44 @@
->     +/*
->     + *  arch/arm/plat-stixxxx/headsmp.S
-> 
-
->     +       .long   pen_release
-> 
-> 
-> check that your SoC has no option to start/reset cpus separately.
-> If yes, then you shouldn't use pen_release.
-> We discussed this with Russel some days ago.
-No, stih41x series can't reset the cores separately.
->  
-> 
->     diff --git a/arch/arm/mach-stixxxx/platsmp.c
->     b/arch/arm/mach-stixxxx/platsmp.c
->     new file mode 100644
->     index 0000000..ffc40c0
->     --- /dev/null
->     +++ b/arch/arm/mach-stixxxx/platsmp.c
->     @@ -0,0 +1,117 @@
->     +/*
->     + *  arch/arm/plat-stixxxx/platsmp.c
+> Consider using uart_port's ignore and read status masks to implement
+> the break, framing, parity and overrun checking in your interrupt
+> handler using the same methodology as drivers like 8250, amba-pl011
+> etc.  That will help you get these code sequences correct.
 > 
 > 
-> wrong.
-
-Left over, will clean it up in next version.
-
->     + *  arch/arm/plat-stixxxx/platsmp.c
-> 
-> 
-> incorrect.
-Left over, will clean it up in next version.
->  
->     +extern struct smp_operations   stixxxx_smp_ops;
->     +extern void __iomem *stixxxx_scu_base_addr;
-> 
-> 
-> Unused variable in this patch.
-yes, I will remove stixxxx_scu_base_addr.
-
-thanks,
-srini
