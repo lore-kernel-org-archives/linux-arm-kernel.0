@@ -1,36 +1,92 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 10 Jun 2013 16:38:50 +0100
-Subject: [PATCHv2 4/6] sched_clock: Add support for >32 bit sched_clock
-In-Reply-To: <CAK7N6vrVvYPP8_y9F3uC=vZpdkb7_9gdzG96xSiyr0ASe6iMCQ@mail.gmail.com>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <1370155183-31421-5-git-send-email-sboyd@codeaurora.org>
- <20130603093938.GG18614@n2100.arm.linux.org.uk>
- <51AD069F.1060308@codeaurora.org>
- <20130603221210.GO18614@n2100.arm.linux.org.uk>
- <CAK7N6vrVvYPP8_y9F3uC=vZpdkb7_9gdzG96xSiyr0ASe6iMCQ@mail.gmail.com>
-Message-ID: <20130610153850.GU18614@n2100.arm.linux.org.uk>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Jun 2013 23:41:28 +0800
+Subject: [PATCH 1/2] ASoC: sgtl5000: Let the codec acquire its clock
+In-Reply-To: <1370826467-30399-1-git-send-email-festevam@gmail.com>
+References: <1370826467-30399-1-git-send-email-festevam@gmail.com>
+Message-ID: <20130610154126.GF6381@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 08:46:36PM +0530, anish singh wrote:
-> Probably a trivial question.I was wondering why this particular requirement
-> exists in the first place.I looked into this commit 112f38a4a3 but couldn't
-> gather the reason.
+On Sun, Jun 09, 2013 at 10:07:46PM -0300, Fabio Estevam wrote:
+> diff --git a/sound/soc/fsl/imx-sgtl5000.c b/sound/soc/fsl/imx-sgtl5000.c
+> index a60aaa0..823151b 100644
+> --- a/sound/soc/fsl/imx-sgtl5000.c
+> +++ b/sound/soc/fsl/imx-sgtl5000.c
+> @@ -129,20 +129,10 @@ static int imx_sgtl5000_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	data->codec_clk = clk_get(&codec_dev->dev, NULL);
+> -	if (IS_ERR(data->codec_clk)) {
+> -		/* assuming clock enabled by default */
+> -		data->codec_clk = NULL;
+> -		ret = of_property_read_u32(codec_np, "clock-frequency",
+> -					&data->clk_frequency);
+> -		if (ret) {
+> -			dev_err(&codec_dev->dev,
+> -				"clock-frequency missing or invalid\n");
+> -			goto fail;
+> -		}
+> -	} else {
+> -		data->clk_frequency = clk_get_rate(data->codec_clk);
+> -		clk_prepare_enable(data->codec_clk);
+> -	}
+> +	if (IS_ERR(data->codec_clk))
+> +		goto fail;
+> +
+> +	data->clk_frequency = clk_get_rate(data->codec_clk);
+>  
+>  	data->dai.name = "HiFi";
+>  	data->dai.stream_name = "HiFi";
+> @@ -157,10 +147,10 @@ static int imx_sgtl5000_probe(struct platform_device *pdev)
+>  	data->card.dev = &pdev->dev;
+>  	ret = snd_soc_of_parse_card_name(&data->card, "model");
+>  	if (ret)
+> -		goto clk_fail;
+> +		goto fail;
+>  	ret = snd_soc_of_parse_audio_routing(&data->card, "audio-routing");
+>  	if (ret)
+> -		goto clk_fail;
+> +		goto fail;
+>  	data->card.num_links = 1;
+>  	data->card.owner = THIS_MODULE;
+>  	data->card.dai_link = &data->dai;
+> @@ -170,7 +160,7 @@ static int imx_sgtl5000_probe(struct platform_device *pdev)
+>  	ret = snd_soc_register_card(&data->card);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
+> -		goto clk_fail;
+> +		goto fail;
+>  	}
+>  
+>  	platform_set_drvdata(pdev, data);
+> @@ -179,8 +169,6 @@ static int imx_sgtl5000_probe(struct platform_device *pdev)
+>  
+>  	return 0;
+>  
+> -clk_fail:
+> -	clk_put(data->codec_clk);
 
-You're looking at a commit introducing an implementation.  The requirement
-isn't driven by the implementation.  It's driven by the code and the maths
-in the core scheduler, and its been a requirement for years.
+Why can this clk_put() be removed now?
 
-sched_clock() needs to be monotonic, and needs to wrap at 64-bit, because
-calculations are done by comparing the difference of two 64-bit values
-returned from this function.
+>  fail:
+>  	if (ssi_np)
+>  		of_node_put(ssi_np);
+> @@ -194,10 +182,6 @@ static int imx_sgtl5000_remove(struct platform_device *pdev)
+>  {
+>  	struct imx_sgtl5000_data *data = platform_get_drvdata(pdev);
+>  
+> -	if (data->codec_clk) {
+> -		clk_disable_unprepare(data->codec_clk);
+> -		clk_put(data->codec_clk);
 
-Let's take a trivial example - if you have a 16 bit counter, and you have
-a value of 0xc000 ns, and next time you read it, it has value 0x0001 ns,
-then what value do you end up with when you calculate the time passed
-using 64-bit maths.
+Ditto
 
-That's 0x0000000000000001 - 0x000000000000c000.  The answer is a very big
-number which is not the correct 16385.  This means that things like process
-timeslice counting and scheduler fairness is compromised - I'd expect even
-more so if you're running RT and this is being used to provide guarantees.
+Shawn
+
+> -	}
+>  	snd_soc_unregister_card(&data->card);
+>  
+>  	return 0;
+> -- 
+> 1.8.1.2
+> 
