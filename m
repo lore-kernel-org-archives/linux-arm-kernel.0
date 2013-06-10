@@ -1,73 +1,297 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 10 Jun 2013 16:45:49 +0200
-Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
- platforms
-In-Reply-To: <1368807872-2601-4-git-send-email-t.figa@samsung.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <1368807872-2601-4-git-send-email-t.figa@samsung.com>
-Message-ID: <62314159.5vrvK4k2Mm@amdc1227>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 10 Jun 2013 16:42:25 +0200
+Subject: [RFC PATCH 1/1] ARM: at91: drop rm9200dk board support
+Message-ID: <1370875345-5687-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This board is impossible to found anymore
 
-On Friday 17 of May 2013 18:24:29 Tomasz Figa wrote:
-> This patch makes legacy code on suspend/resume path being executed
-> conditionally, on non-DT platforms only, to fix suspend/resume of
-> DT-enabled systems, for which the code is inappropriate.
-> 
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/plat-samsung/pm.c | 17 ++++++++++++-----
->  1 file changed, 12 insertions(+), 5 deletions(-)
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/configs/at91rm9200_defconfig |    1 -
+ arch/arm/mach-at91/Kconfig.non_dt     |    7 -
+ arch/arm/mach-at91/Makefile           |    1 -
+ arch/arm/mach-at91/board-rm9200dk.c   |  228 ---------------------------------
+ 4 files changed, 237 deletions(-)
+ delete mode 100644 arch/arm/mach-at91/board-rm9200dk.c
 
-It seems like this patch did not make it into 3.10-rc5, while rest of patches 
-did, which ended up with suspend/resume still being broken.
-
-What should we do in this case? 
-
-Best regards,
-Tomasz
-
-> diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
-> index 53210ec..8ac2b2d 100644
-> --- a/arch/arm/plat-samsung/pm.c
-> +++ b/arch/arm/plat-samsung/pm.c
-> @@ -261,7 +261,8 @@ static int s3c_pm_enter(suspend_state_t state)
->  	 * require a full power-cycle)
->  	*/
-> 
-> -	if (!any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
-> +	if (!of_have_populated_dt() &&
-> +	    !any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
->  	    !any_allowed(s3c_irqwake_eintmask, s3c_irqwake_eintallow)) {
->  		printk(KERN_ERR "%s: No wake-up sources!\n", __func__);
->  		printk(KERN_ERR "%s: Aborting sleep\n", __func__);
-> @@ -270,8 +271,11 @@ static int s3c_pm_enter(suspend_state_t state)
-> 
->  	/* save all necessary core registers not covered by the drivers */
-> 
-> -	samsung_pm_save_gpios();
-> -	samsung_pm_saved_gpios();
-> +	if (!of_have_populated_dt()) {
-> +		samsung_pm_save_gpios();
-> +		samsung_pm_saved_gpios();
-> +	}
-> +
->  	s3c_pm_save_uarts();
->  	s3c_pm_save_core();
-> 
-> @@ -310,8 +314,11 @@ static int s3c_pm_enter(suspend_state_t state)
-> 
->  	s3c_pm_restore_core();
->  	s3c_pm_restore_uarts();
-> -	samsung_pm_restore_gpios();
-> -	s3c_pm_restored_gpios();
-> +
-> +	if (!of_have_populated_dt()) {
-> +		samsung_pm_restore_gpios();
-> +		s3c_pm_restored_gpios();
-> +	}
-> 
->  	s3c_pm_debug_init();
+diff --git a/arch/arm/configs/at91rm9200_defconfig b/arch/arm/configs/at91rm9200_defconfig
+index 43834a7..3b76a63 100644
+--- a/arch/arm/configs/at91rm9200_defconfig
++++ b/arch/arm/configs/at91rm9200_defconfig
+@@ -17,7 +17,6 @@ CONFIG_MODULE_SRCVERSION_ALL=y
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_AT91=y
+ CONFIG_ARCH_AT91RM9200=y
+-CONFIG_ARCH_AT91RM9200DK=y
+ CONFIG_MACH_AT91RM9200EK=y
+ CONFIG_MACH_CSB337=y
+ CONFIG_MACH_CSB637=y
+diff --git a/arch/arm/mach-at91/Kconfig.non_dt b/arch/arm/mach-at91/Kconfig.non_dt
+index 8d84324..867c547 100644
+--- a/arch/arm/mach-at91/Kconfig.non_dt
++++ b/arch/arm/mach-at91/Kconfig.non_dt
+@@ -56,13 +56,6 @@ if ARCH_AT91RM9200
+ 
+ comment "AT91RM9200 Board Type"
+ 
+-config ARCH_AT91RM9200DK
+-	bool "Atmel AT91RM9200-DK Development board"
+-	select HAVE_AT91_DATAFLASH_CARD
+-	help
+-	  Select this if you are using Atmel's AT91RM9200-DK Development board.
+-	  (Discontinued)
+-
+ config MACH_AT91RM9200EK
+ 	bool "Atmel AT91RM9200-EK Evaluation Kit"
+ 	select HAVE_AT91_DATAFLASH_CARD
+diff --git a/arch/arm/mach-at91/Makefile b/arch/arm/mach-at91/Makefile
+index 1429985..dc2308b 100644
+--- a/arch/arm/mach-at91/Makefile
++++ b/arch/arm/mach-at91/Makefile
+@@ -33,7 +33,6 @@ obj-$(CONFIG_ARCH_AT91SAM9G45)	+= at91sam9g45_devices.o
+ obj-$(CONFIG_ARCH_AT91X40)	+= at91x40.o at91x40_time.o
+ 
+ # AT91RM9200 board-specific support
+-obj-$(CONFIG_ARCH_AT91RM9200DK)	+= board-rm9200dk.o
+ obj-$(CONFIG_MACH_AT91RM9200EK)	+= board-rm9200ek.o
+ obj-$(CONFIG_MACH_CSB337)	+= board-csb337.o
+ obj-$(CONFIG_MACH_CSB637)	+= board-csb637.o
+diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
+deleted file mode 100644
+index 690541b..0000000
+--- a/arch/arm/mach-at91/board-rm9200dk.c
++++ /dev/null
+@@ -1,228 +0,0 @@
+-/*
+- * linux/arch/arm/mach-at91/board-rm9200dk.c
+- *
+- *  Copyright (C) 2005 SAN People
+- *
+- *  Epson S1D framebuffer glue code is:
+- *     Copyright (C) 2005 Thibaut VARENE <varenet@parisc-linux.org>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+- */
+-
+-#include <linux/types.h>
+-#include <linux/gpio.h>
+-#include <linux/init.h>
+-#include <linux/mm.h>
+-#include <linux/module.h>
+-#include <linux/platform_device.h>
+-#include <linux/spi/spi.h>
+-#include <linux/mtd/physmap.h>
+-
+-#include <asm/setup.h>
+-#include <asm/mach-types.h>
+-#include <asm/irq.h>
+-
+-#include <asm/mach/arch.h>
+-#include <asm/mach/map.h>
+-#include <asm/mach/irq.h>
+-
+-#include <mach/hardware.h>
+-#include <mach/at91rm9200_mc.h>
+-#include <mach/at91_ramc.h>
+-
+-#include "at91_aic.h"
+-#include "board.h"
+-#include "generic.h"
+-
+-
+-static void __init dk_init_early(void)
+-{
+-	/* Initialize processor: 18.432 MHz crystal */
+-	at91_initialize(18432000);
+-}
+-
+-static struct macb_platform_data __initdata dk_eth_data = {
+-	.phy_irq_pin	= AT91_PIN_PC4,
+-	.is_rmii	= 1,
+-};
+-
+-static struct at91_usbh_data __initdata dk_usbh_data = {
+-	.ports		= 2,
+-	.vbus_pin	= {-EINVAL, -EINVAL},
+-	.overcurrent_pin= {-EINVAL, -EINVAL},
+-};
+-
+-static struct at91_udc_data __initdata dk_udc_data = {
+-	.vbus_pin	= AT91_PIN_PD4,
+-	.pullup_pin	= AT91_PIN_PD5,
+-};
+-
+-static struct at91_cf_data __initdata dk_cf_data = {
+-	.irq_pin	= -EINVAL,
+-	.det_pin	= AT91_PIN_PB0,
+-	.vcc_pin	= -EINVAL,
+-	.rst_pin	= AT91_PIN_PC5,
+-};
+-
+-#ifndef CONFIG_MTD_AT91_DATAFLASH_CARD
+-static struct mci_platform_data __initdata dk_mci0_data = {
+-	.slot[0] = {
+-		.bus_width	= 4,
+-		.detect_pin	= -EINVAL,
+-		.wp_pin		= -EINVAL,
+-	},
+-};
+-#endif
+-
+-static struct spi_board_info dk_spi_devices[] = {
+-	{	/* DataFlash chip */
+-		.modalias	= "mtd_dataflash",
+-		.chip_select	= 0,
+-		.max_speed_hz	= 15 * 1000 * 1000,
+-	},
+-	{	/* UR6HCPS2-SP40 PS2-to-SPI adapter */
+-		.modalias	= "ur6hcps2",
+-		.chip_select	= 1,
+-		.max_speed_hz	= 250 *  1000,
+-	},
+-	{	/* TLV1504 ADC, 4 channels, 10 bits; one is a temp sensor */
+-		.modalias	= "tlv1504",
+-		.chip_select	= 2,
+-		.max_speed_hz	= 20 * 1000 * 1000,
+-	},
+-#ifdef CONFIG_MTD_AT91_DATAFLASH_CARD
+-	{	/* DataFlash card */
+-		.modalias	= "mtd_dataflash",
+-		.chip_select	= 3,
+-		.max_speed_hz	= 15 * 1000 * 1000,
+-	}
+-#endif
+-};
+-
+-static struct i2c_board_info __initdata dk_i2c_devices[] = {
+-	{
+-		I2C_BOARD_INFO("ics1523", 0x26),
+-	},
+-	{
+-		I2C_BOARD_INFO("x9429", 0x28),
+-	},
+-	{
+-		I2C_BOARD_INFO("24c1024", 0x50),
+-	}
+-};
+-
+-static struct mtd_partition __initdata dk_nand_partition[] = {
+-	{
+-		.name	= "NAND Partition 1",
+-		.offset	= 0,
+-		.size	= MTDPART_SIZ_FULL,
+-	},
+-};
+-
+-static struct atmel_nand_data __initdata dk_nand_data = {
+-	.ale		= 22,
+-	.cle		= 21,
+-	.det_pin	= AT91_PIN_PB1,
+-	.rdy_pin	= AT91_PIN_PC2,
+-	.enable_pin	= -EINVAL,
+-	.ecc_mode	= NAND_ECC_SOFT,
+-	.on_flash_bbt	= 1,
+-	.parts		= dk_nand_partition,
+-	.num_parts	= ARRAY_SIZE(dk_nand_partition),
+-};
+-
+-#define DK_FLASH_BASE	AT91_CHIPSELECT_0
+-#define DK_FLASH_SIZE	SZ_2M
+-
+-static struct physmap_flash_data dk_flash_data = {
+-	.width		= 2,
+-};
+-
+-static struct resource dk_flash_resource = {
+-	.start		= DK_FLASH_BASE,
+-	.end		= DK_FLASH_BASE + DK_FLASH_SIZE - 1,
+-	.flags		= IORESOURCE_MEM,
+-};
+-
+-static struct platform_device dk_flash = {
+-	.name		= "physmap-flash",
+-	.id		= 0,
+-	.dev		= {
+-				.platform_data	= &dk_flash_data,
+-			},
+-	.resource	= &dk_flash_resource,
+-	.num_resources	= 1,
+-};
+-
+-static struct gpio_led dk_leds[] = {
+-	{
+-		.name			= "led0",
+-		.gpio			= AT91_PIN_PB2,
+-		.active_low		= 1,
+-		.default_trigger	= "heartbeat",
+-	}
+-};
+-
+-static void __init dk_board_init(void)
+-{
+-	/* Serial */
+-	/* DBGU on ttyS0. (Rx & Tx only) */
+-	at91_register_uart(0, 0, 0);
+-
+-	/* USART1 on ttyS1. (Rx, Tx, CTS, RTS, DTR, DSR, DCD, RI) */
+-	at91_register_uart(AT91RM9200_ID_US1, 1, ATMEL_UART_CTS | ATMEL_UART_RTS
+-			   | ATMEL_UART_DTR | ATMEL_UART_DSR | ATMEL_UART_DCD
+-			   | ATMEL_UART_RI);
+-	at91_add_device_serial();
+-	/* Ethernet */
+-	at91_add_device_eth(&dk_eth_data);
+-	/* USB Host */
+-	at91_add_device_usbh(&dk_usbh_data);
+-	/* USB Device */
+-	at91_add_device_udc(&dk_udc_data);
+-	at91_set_multi_drive(dk_udc_data.pullup_pin, 1);	/* pullup_pin is connected to reset */
+-	/* Compact Flash */
+-	at91_add_device_cf(&dk_cf_data);
+-	/* I2C */
+-	at91_add_device_i2c(dk_i2c_devices, ARRAY_SIZE(dk_i2c_devices));
+-	/* SPI */
+-	at91_add_device_spi(dk_spi_devices, ARRAY_SIZE(dk_spi_devices));
+-#ifdef CONFIG_MTD_AT91_DATAFLASH_CARD
+-	/* DataFlash card */
+-	at91_set_gpio_output(AT91_PIN_PB7, 0);
+-#else
+-	/* MMC */
+-	at91_set_gpio_output(AT91_PIN_PB7, 1);	/* this MMC card slot can optionally use SPI signaling (CS3). */
+-	at91_add_device_mci(0, &dk_mci0_data);
+-#endif
+-	/* NAND */
+-	at91_add_device_nand(&dk_nand_data);
+-	/* NOR Flash */
+-	platform_device_register(&dk_flash);
+-	/* LEDs */
+-	at91_gpio_leds(dk_leds, ARRAY_SIZE(dk_leds));
+-	/* VGA */
+-//	dk_add_device_video();
+-}
+-
+-MACHINE_START(AT91RM9200DK, "Atmel AT91RM9200-DK")
+-	/* Maintainer: SAN People/Atmel */
+-	.init_time	= at91rm9200_timer_init,
+-	.map_io		= at91_map_io,
+-	.handle_irq	= at91_aic_handle_irq,
+-	.init_early	= dk_init_early,
+-	.init_irq	= at91_init_irq_default,
+-	.init_machine	= dk_board_init,
+-MACHINE_END
+-- 
+1.7.10.4
