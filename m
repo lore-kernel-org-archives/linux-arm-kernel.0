@@ -1,78 +1,92 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 10 Jun 2013 10:03:00 -0400 (EDT)
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <CACVXFVOrniwAUaJN1dkUZD4HzfV6StajzL3Okw2dNBpkSPRjNA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306100946570.1133-100000@iolanthe.rowland.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Jun 2013 16:08:30 +0200
+Subject: [PATCH 0/2] pinctrl: common handling of generic pinconfig props
+ in dt
+In-Reply-To: <201306101554.21671.heiko@sntech.de>
+References: <201306090159.05383.heiko@sntech.de>
+ <201306101506.36098.heiko@sntech.de>
+ <CACRpkdbnf2MJtnYrwGMVWyz4S=7tuDKv84p7eNgveSNCeLv15g@mail.gmail.com>
+ <201306101554.21671.heiko@sntech.de>
+Message-ID: <CACRpkdbmHK-qhRH6wb1E-GK2wKADoyE=ccHN=_rW1y8GkiJ5Bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Thomas and Steve, please see the question below.]
+On Mon, Jun 10, 2013 at 3:54 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Montag, 10. Juni 2013, 15:39:26 schrieb Linus Walleij:
+>>
+>> Does this design imply that we will never be able to support any
+>> more than 32 bits (well, the number of bits in unsigned long)
+>> i.e. 32 different generic pin configurations?
+>>
+>> In that case I suspect this might not be so wise. :-(
+>
+> hmm, yes this would be the limit ... so back to the drawing board
 
-On Mon, 10 Jun 2013, Ming Lei wrote:
+Well, I'm not hopeless, if this is what everyone wants we might
+need to have it like this, perhaps make it possible to extend
+the config word in the device tree from 32 to 64 to 96 bits
+like this, if:
 
-> On Sun, Jun 9, 2013 at 11:48 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> > On Sun, 9 Jun 2013, Ming Lei wrote:
-> >
-> >> Hi,
-> >>
-> >> The patchset supports to run giveback of URB in tasklet context, so that
-> >> DMA unmapping/mapping on transfer buffer and compelte() callback can be
-> >> run with interrupt enabled, then time of HCD interrupt handler can be
-> >> saved much. Also this approach may simplify HCD since HCD lock needn't
-> >> be released any more before calling usb_hcd_giveback_urb().
-> >
-> > That's a lot of material.  However, you haven't specifically said
-> > _what_ you want to accomplish.  It sounds like you're trying to
-> 
-> All IRQs are disabled(locally) in hard interrupt context, but they are
-> enabled in softirq context, this patchset can decrease the time a lot.
+= <0x00000001>;
 
-That isn't clear.  It is documented that USB completion handlers are 
-called with local interrupts disabled.  An IRQ arriving before the 
-tasklet starts up might therefore be serviced during the short interval 
-before the tasklet disables local interrupts, but if that happens it 
-would mean that the completion handler would be delayed.
+becomes:
 
-In effect, you are prioritizing other IRQs higher than USB completion
-handlers.  Nevertheless, the total time spent with interrupts disabled
-will remain the same.
+= <PINCONFIG_BIAS_DISABLE>;
 
-(There's one other side effect that perhaps you haven't considered.  
-When multiple URBs are addressed to the same endpoint, their completion 
-handlers are called in order of URB completion, which is the same as 
-the order of URB submission unless an URB is cancelled.  By delegating 
-the completion handlers to tasklets, and particularly by using per-CPU 
-tasklets, you may violate this behavior.)
+once we hit:
 
-> > minimize the amount of time spent in hardirq context, but I can't be
-> > sure that is really what you want.
-> >
-> > If it is, this is not a good way to do it.  A better way to minimize
-> > the time spent in hardirq context is to use a threaded interrupt
-> > handler.  But why do you want to minimize this time in the first place?
-> 
-> Process context switch may have more cost than switching to softirq,
-> then USB performance may be effected, that is why I choose to use
-> tasklet.  Also now there is no any sleep in URB giveback, so it isn't
-> necessary to introduce process to handle the giveback or completion.
+= <0x80000000>;
 
-Thomas and Steve, can you comment on this?  I do not have a good 
-understanding of the relative benefits/drawbacks of tasklets vs. 
-threaded interrupt handlers.
+that is maybe
 
-> > The CPU will be still have to use at least as much time as before; the
-> > only difference is that it will be in softirq or in a high-priority
-> > thread instead of in hardirq.
-> 
-> Yes, as I said above, but we can allow other IRQs to be served in
-> handling URB giveback in softirq context, that is the value of softirq/tasklet.
-> Of course, system may have more important things to do during the time.
-> Generally speaking, for one driver, hard interrupt handler should always
-> consume less time as possible.
+= <PINCONFIG_FOO>;
 
-As I understand it, the tradeoff between hardirq and softirq is
-generally unimportant.  It does matter a lot in realtime settings --
-but the RT kernel effectively makes _every_ interrupt handler threaded,
-so it won't benefit from this change.
+and then we need to ad PINCONFIG_BAR. What to do...
+Well enable the next 64 bits:
 
-Alan Stern
+= <0x00000000 0x00000001>;
+
+i.e.
+
+= <PINCONFIG_NONE PINCONFIG_EXT1_BAR>;
+
+Note necessary naming convention to remember to
+put that after the other...
+
+and then  we get to 96 bits:
+
+= <PINCONFIG_NONE PINCONFIG_EXT1_NONE PINCONFIG_EXT2_BAZ>;
+
+It's getting a bit ugly ...
+
+>> my_config: my_config {
+>>         bias-disable;
+>>         drive-push-pull = <6>;
+>>         output-high;
+>> };
+>>
+>> It will make the device trees bigger for sure, but maybe more
+>> readable as well?
+>
+> There was a discussion about each of the merits of the two approaches
+> (bitstuffed vs. individual properties) between Tomasz Figa and Jean-Christophe
+> PLAGNIOL-VILLARD a bit back if I remember correctly.
+
+It's OK if it's bindings for a certain system where you know you
+will never have more than 32 config options. But for something
+generic we need to make some space.
+
+> And it still would be possible to write short pin statements as
+>
+>         pins = <bank pin mux &config_node>;
+>
+> if I'm not mistaken.
+
+I thinkso....
+
+I'll take these patches out FTM so you can experiment, but I'm
+ready to make a late merge of this if you can come up with something
+that we agree upon to be future-safe.
+
+Yours,
+Linus Walleij
