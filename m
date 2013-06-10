@@ -1,32 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Jun 2013 14:52:13 +0200
-Subject: [PATCH 0/2] pinctrl: common handling of generic pinconfig props
- in dt
-In-Reply-To: <201306090159.05383.heiko@sntech.de>
+Date: Mon, 10 Jun 2013 14:55:41 +0200
+Subject: [EXAMPLE PATCH] pinctrl: add pinctrl driver for Rockchip SoCs
+In-Reply-To: <201306090201.17739.heiko@sntech.de>
 References: <201306090159.05383.heiko@sntech.de>
-Message-ID: <CACRpkdaV0ipY4mYHt998D=NNKrpDaFhCA949V0-93NkOKcvHyA@mail.gmail.com>
+ <201306090201.17739.heiko@sntech.de>
+Message-ID: <CACRpkdbiHRrP7Xun1sPJ+o45Hofp3gCe89GY0fFiuF1F7TUaxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 9, 2013 at 1:59 AM, Heiko St?bner <heiko@sntech.de> wrote:
+On Sun, Jun 9, 2013 at 2:01 AM, Heiko St?bner <heiko@sntech.de> wrote:
 
-> following your suggestions for a common handling of things like pulls in dt,
-> I've come up with the following solution - hopefully I've gotten the correct
-> meaning of your explanaitions.
+> This driver adds support the Cortex-A9 based SoCs from Rockchip,
+> so at least the RK2928, RK3066 (a and b) and RK3188.
+> Earlier Rockchip SoCs seem to use similar mechanics for gpio
+> handling so should be supportable with relative small changes.
+> Pull handling on the rk3188 is currently a stub, due to it being
+> a bit different to the earlier SoCs.
 >
-> It handles all the pinconfigs that either ignore the argument, or have very
-> simple one, like PIN_CONFIG_OUTPUT does.
+> Pinmuxing as well as gpio (and interrupt-) handling tested on
+> a rk3066a based machine.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-OK patches applied. It needs some rough fixes like NULL check
-on kmalloc() but it'll do for a starter. Now I can tell everyone to
-use this and refer to it.
+Patch applied.
 
-> I've also attached my current rockchip pinctrl driver to show how it is using
-> this currently.
-
-OK I might just merge it. If you take the rest of the patches through
-ARM SoC they will need to pull in my tree anyway if it's intended to
-go in this merge window.
+You've been super-helpful, so of course I'm happy to merge this
+into the pinctrl tree.
 
 Yours,
 Linus Walleij
