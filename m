@@ -1,85 +1,27 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 10 Jun 2013 14:48:40 +0530
-Subject: [PATCH 04/13] ARM: dts: list the CPU nodes for Exynos5250
-In-Reply-To: <16514785.Efj3frXj0r@flatron>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-4-git-send-email-chander.kashyap@linaro.org>
- <16514785.Efj3frXj0r@flatron>
-Message-ID: <CANuQgHEZEuE_vh9z1sbwpcrEO91BADaqGzos-nEFzeqh_CkGZA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 10 Jun 2013 10:12:30 +0100
+Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
+ from Audio platform data
+In-Reply-To: <20130610090411.GB20297@gmail.com>
+References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
+ <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
+ <20130501144213.GG25256@gmail.com>
+ <20130502083849.GH25256@gmail.com>
+ <CACRpkdYbqU=bHrzf6Vpv-KFYN_+z6+y1ocNHtkLEO7ihHEd=dA@mail.gmail.com>
+ <20130610090411.GB20297@gmail.com>
+Message-ID: <20130610091230.GE20297@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2013 16:46, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Thursday 06 of June 2013 16:31:18 Chander Kashyap wrote:
->> Instead of having to specify the number for CPUs in Exynos5250 in
->> platsmp.c file, let the number of CPUs be determined by having this
->> information listed in Exynos5250 device tree file.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> ---
->>  arch/arm/boot/dts/exynos5250.dtsi |   14 ++++++++++++++
->>  arch/arm/mach-exynos/platsmp.c    |   10 +++++++---
->>  2 files changed, 21 insertions(+), 3 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
->> b/arch/arm/boot/dts/exynos5250.dtsi index e571d3b..7f6b1c7 100644
->> --- a/arch/arm/boot/dts/exynos5250.dtsi
->> +++ b/arch/arm/boot/dts/exynos5250.dtsi
->> @@ -50,6 +50,20 @@
->>               pinctrl3 = &pinctrl_3;
->>       };
->>
->> +     cpus {
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             cpu at 0 {
->> +                     compatible = "arm,cortex-a15";
->> +                     reg = <0>;
->> +             };
->> +             cpu at 1 {
->> +                     compatible = "arm,cortex-a15";
->> +                     reg = <1>;
->> +             };
->> +     };
->> +
->>       pd_gsc: gsc-power-domain at 0x10044000 {
->>               compatible = "samsung,exynos4210-pd";
->>               reg = <0x10044000 0x20>;
->> diff --git a/arch/arm/mach-exynos/platsmp.c
->> b/arch/arm/mach-exynos/platsmp.c index 1a4e4e5..85ea4ca 100644
->> --- a/arch/arm/mach-exynos/platsmp.c
->> +++ b/arch/arm/mach-exynos/platsmp.c
->> @@ -180,10 +180,14 @@ static void __init exynos_smp_init_cpus(void)
->>       void __iomem *scu_base = scu_base_addr();
->>       unsigned int i, ncores;
->>
->> -     if (soc_is_exynos5250())
->> -             ncores = 2;
->> -     else
->> +     if (read_cpuid_part_number() == ARM_CPU_PART_CORTEX_A9)
->>               ncores = scu_base ? scu_get_core_count(scu_base) : 1;
->> +     else
->> +             /*
->> +              * CPU Nodes are passed thru DT and set_cpu_possible
->> +              * is set by "arm_dt_init_cpu_maps".
->> +              */
->> +             return;
->>
->>       /* sanity check */
->>       if (ncores > nr_cpu_ids) {
->
-> Looks good. Same thing should be done for remaining Exynos SoCs as well.
-Thanks for reviewing.
->
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
->
-> Best regards,
-> Tomasz
->
+> Linus,
+> 
+> Would you mind taking this through your tree now that the DMA stuff
+> has gone in please?
 
+Again, just found this in -next. Sorry for the churn.
 
-
---
-with warm regards,
-Chander Kashyap
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
