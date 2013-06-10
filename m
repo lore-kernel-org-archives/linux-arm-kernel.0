@@ -1,229 +1,279 @@
 From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Mon, 10 Jun 2013 23:51:52 +0100
-Subject: [PATCH RFC v3 4/4] DRM: Armada: convert hardware cursor support to
- 64x32 or 32x64 ARGB
+Date: Mon, 10 Jun 2013 23:49:52 +0100
+Subject: [PATCH RFC v3 2/4] DRM: Armada: Add support for hardware cursors
 In-Reply-To: <20130609190612.GM18614@n2100.arm.linux.org.uk>
 References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
-Message-ID: <E1UmAwK-0006Em-TO@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1UmAuO-0006EQ-J4@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds hardware cursor support to the DRM driver for the
+Marvell Armada SoCs.
+
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/gpu/drm/armada/armada_crtc.c |  125 +++++++++++-----------------------
- drivers/gpu/drm/armada/armada_hw.h   |    6 +-
- 2 files changed, 43 insertions(+), 88 deletions(-)
+ drivers/gpu/drm/armada/Kconfig       |    7 +
+ drivers/gpu/drm/armada/armada_crtc.c |  201 ++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/armada/armada_crtc.h |    8 ++
+ 3 files changed, 216 insertions(+), 0 deletions(-)
 
+diff --git a/drivers/gpu/drm/armada/Kconfig b/drivers/gpu/drm/armada/Kconfig
+index c7a0a94..6f64642 100644
+--- a/drivers/gpu/drm/armada/Kconfig
++++ b/drivers/gpu/drm/armada/Kconfig
+@@ -13,3 +13,10 @@ config DRM_ARMADA
+ 	  This driver provides no built-in acceleration; acceleration is
+ 	  performed by other IP found on the SoC.  This driver provides
+ 	  kernel mode setting and buffer management to userspace.
++
++config DRM_ARMADA_CURSOR
++	bool "Enable hardware cursor support for Marvell Armada DRM"
++	depends on DRM_ARMADA != n
++	help
++	  Add support for hardware cursor support on the Marvell
++	  Armada devices.
 diff --git a/drivers/gpu/drm/armada/armada_crtc.c b/drivers/gpu/drm/armada/armada_crtc.c
-index b833014..3e2f9d3 100644
+index dadaf63..4a71ba0 100644
 --- a/drivers/gpu/drm/armada/armada_crtc.c
 +++ b/drivers/gpu/drm/armada/armada_crtc.c
-@@ -493,7 +493,8 @@ static int armada_drm_crtc_mode_set(struct drm_crtc *crtc,
- 	dcrtc->v[1].spu_adv_reg = val << 20 | val;
- 
- 	/* Always enable RGB hardware cursor mode */
--	dcrtc->v[1].spu_adv_reg |= ADV_HWC32ENABLE;
-+	dcrtc->v[1].spu_adv_reg |= ADV_HWC32ENABLE |
-+				   ADV_HWC32ARGB | ADV_HWC32BLEND;
- 
- 	if (interlaced) {
- 		/* Odd interlaced frame */
-@@ -641,100 +642,46 @@ static const struct drm_crtc_helper_funcs armada_crtc_helper_funcs = {
+@@ -626,11 +626,210 @@ static const struct drm_crtc_helper_funcs armada_crtc_helper_funcs = {
+ 	.disable	= armada_drm_crtc_disable,
  };
  
- #ifdef CONFIG_DRM_ARMADA_CURSOR
--static void armada_load_cursor_rgb(void __iomem *base, uint32_t *pix,
-+static void armada_load_cursor_argb(void __iomem *base, uint32_t *pix,
- 	unsigned stride, unsigned width, unsigned height)
++#ifdef CONFIG_DRM_ARMADA_CURSOR
++static int armada_drm_crtc_cursor_update(struct armada_crtc *dcrtc, bool reload)
++{
++	uint32_t xoff, xscr, w = dcrtc->cursor_w, s;
++	uint32_t yoff, yscr, h = dcrtc->cursor_h;
++
++	/*
++	 * Calculate the visible width and height of the cursor,
++	 * screen position, and the position in the cursor bitmap.
++	 */
++	if (dcrtc->cursor_x < 0) {
++		xoff = -dcrtc->cursor_x;
++		xscr = 0;
++		w -= min(xoff, w);
++	} else if (dcrtc->cursor_x + w > dcrtc->crtc.mode.hdisplay) {
++		xoff = 0;
++		xscr = dcrtc->cursor_x;
++		w = max_t(int, dcrtc->crtc.mode.hdisplay - dcrtc->cursor_x, 0);
++	} else {
++		xoff = 0;
++		xscr = dcrtc->cursor_x;
++	}
++
++	if (dcrtc->cursor_y < 0) {
++		yoff = -dcrtc->cursor_y;
++		yscr = 0;
++		h -= min(yoff, h);
++	} else if (dcrtc->cursor_y + h > dcrtc->crtc.mode.vdisplay) {
++		yoff = 0;
++		yscr = dcrtc->cursor_y;
++		h = max_t(int, dcrtc->crtc.mode.vdisplay - dcrtc->cursor_y, 0);
++	} else {
++		yoff = 0;
++		yscr = dcrtc->cursor_y;
++	}
++
++	/* On interlaced modes, the vertical cursor size must be halved */
++	s = dcrtc->cursor_w;
++	if (dcrtc->interlaced) {
++		s *= 2;
++		yscr /= 2;
++		h /= 2;
++	}
++
++	if (!dcrtc->cursor_obj || !h || !w) {
++		spin_lock_irq(&dcrtc->irq_lock);
++		armada_updatel(0, CFG_HWC_ENA, dcrtc->base + LCD_SPU_DMA_CTRL0);
++		spin_unlock_irq(&dcrtc->irq_lock);
++		return 0;
++	}
++
++	armada_updatel(CFG_CSB_256x32, CFG_PDWN256x32,
++		     dcrtc->base + LCD_SPU_SRAM_PARA1);
++
++	if (dcrtc->cursor_lw != w || dcrtc->cursor_lh != h || reload) {
++		struct armada_gem_object *obj = dcrtc->cursor_obj;
++		uint32_t *pix, *p, col2 = 0, col3 = 0;
++		unsigned x, y, d, n, a;
++
++		dcrtc->cursor_lw = w;
++		dcrtc->cursor_lh = h;
++
++		pix = obj->addr;
++
++		/* Set the top-left corner of the cursor image */
++		pix += yoff * s + xoff;
++
++		a = 2 << 14 | 15 << 8;
++		for (d = n = y = 0; y < h; y++) {
++			for (x = 0, p = &pix[y * s]; x < w; x++, p++) {
++				uint32_t v = *p;
++				unsigned b;
++
++				if ((v & 0xff000000) != 0xff000000) {
++					b = 0;	/* transparent */
++				} else if (col2 == v) {
++					b = 2;	/* color 2 */
++				} else if (col3 == v) {
++					b = 3;	/* color 3 */
++				} else if (col2 == 0) {
++					col2 = v;
++					b = 2;	/* alloc color 2 */
++				} else if (col3 == 0) {
++					col3 = v;
++					b = 3;	/* alloc color 3 */
++				} else {
++					/* fail */
++					b = 1;	/* inverse (!) */
++				}
++
++				d |= b << n;
++				n += 2;
++
++				if (n == 32) {
++					writel_relaxed(d, dcrtc->base + LCD_SPU_SRAM_WRDAT);
++					writel_relaxed(a, dcrtc->base + LCD_SPU_SRAM_CTRL);
++					a++;
++					d = n = 0;
++				}
++			}
++		}
++
++		if (n) {
++			writel_relaxed(d, dcrtc->base + LCD_SPU_SRAM_WRDAT);
++			writel_relaxed(a, dcrtc->base + LCD_SPU_SRAM_CTRL);
++		}
++
++		writel_relaxed(col2, dcrtc->base + LCD_SPU_ALPHA_COLOR1);
++		writel_relaxed(col3, dcrtc->base + LCD_SPU_ALPHA_COLOR2);
++		writel_relaxed(h << 16 | w, dcrtc->base + LCD_SPU_HWC_HPXL_VLN);
++	}
++
++	writel_relaxed(yscr << 16 | xscr, dcrtc->base + LCD_SPU_HWC_OVSA_HPXL_VLN);
++
++	spin_lock_irq(&dcrtc->irq_lock);
++	armada_updatel(CFG_HWC_ENA,
++		     CFG_HWC_ENA | CFG_HWC_1BITMOD | CFG_HWC_1BITENA,
++		     dcrtc->base + LCD_SPU_DMA_CTRL0);
++	spin_unlock_irq(&dcrtc->irq_lock);
++
++	return 0;
++}
++
++static void cursor_update(void *data)
++{
++	armada_drm_crtc_cursor_update(data, true);
++}
++
++static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
++	struct drm_file *file, uint32_t handle, uint32_t w, uint32_t h)
++{
++	struct drm_device *dev = crtc->dev;
++	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
++	struct armada_gem_object *obj = NULL;
++	int ret;
++
++	if (handle && w > 0 && h > 0) {
++		/* maximum size is 64x64 */
++		if (w > 64 || h > 64)
++			return -ENOMEM;
++
++		obj = armada_gem_object_lookup(dev, file, handle);
++		if (!obj)
++			return -ENOENT;
++
++		/* Must be a kernel-mapped object */
++		if (!obj->addr) {
++			drm_gem_object_unreference_unlocked(&obj->obj);
++			return -EINVAL;
++		}
++
++		if (obj->obj.size < w * h * 4) {
++			DRM_ERROR("buffer is too small\n");
++			drm_gem_object_unreference_unlocked(&obj->obj);
++			return -ENOMEM;
++		}
++	}
++
++	mutex_lock(&dev->struct_mutex);
++	if (dcrtc->cursor_obj) {
++		dcrtc->cursor_obj->update = NULL;
++		dcrtc->cursor_obj->update_data = NULL;
++		drm_gem_object_unreference(&dcrtc->cursor_obj->obj);
++	}
++	dcrtc->cursor_obj = obj;
++	dcrtc->cursor_w = w;
++	dcrtc->cursor_h = h;
++	ret = armada_drm_crtc_cursor_update(dcrtc, true);
++	if (obj) {
++		obj->update_data = dcrtc;
++		obj->update = cursor_update;
++	}
++	mutex_unlock(&dev->struct_mutex);
++
++	return ret;
++}
++
++static int armada_drm_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
++{
++	struct drm_device *dev = crtc->dev;
++	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
++	int ret;
++
++	mutex_lock(&dev->struct_mutex);
++	dcrtc->cursor_x = x;
++	dcrtc->cursor_y = y;
++	ret = armada_drm_crtc_cursor_update(dcrtc, false);
++	mutex_unlock(&dev->struct_mutex);
++
++	return ret;
++}
++#else
++#define armada_drm_crtc_cursor_set NULL
++#define armada_drm_crtc_cursor_move NULL
++#endif
++
+ static void armada_drm_crtc_destroy(struct drm_crtc *crtc)
  {
--	uint32_t r, g, b, addr;
--	unsigned y, n;
-+	uint32_t addr;
-+	unsigned y;
+ 	struct armada_crtc *dcrtc = drm_to_armada_crtc(crtc);
+ 	struct armada_private *priv = crtc->dev->dev_private;
  
--	for (r = g = b = addr = n = y = 0; y < height; y++) {
-+	addr = SRAM_HWC32_RAM1;
-+	for (y = 0; y < height; y++) {
- 		uint32_t *p = &pix[y * stride];
- 		unsigned x;
++	if (dcrtc->cursor_obj)
++		drm_gem_object_unreference(&dcrtc->cursor_obj->obj);
++
+ 	priv->dcrtc[dcrtc->num] = NULL;
+ 	drm_crtc_cleanup(&dcrtc->crtc);
  
- 		for (x = 0; x < width; x++, p++) {
--			r >>= 8;
--			r |= 0xff000000 & (*p << 8);
--			g >>= 8;
--			g |= 0xff000000 & (*p << 16);
--			b >>= 8;
--			b |= 0xff000000 & (*p << 24);
--			if (x == 0 || y == 0) {
--				b |= 0xff000000;
--				g |= 0xff000000;
--				r &= ~0xff000000;
--			}
--			if (++n == 4) {
--				writel_relaxed(r,
--					       base + LCD_SPU_SRAM_WRDAT);
--				writel_relaxed(addr |
--					       SRAM_WRITE | SRAM_HWC32_RAMR,
--					       base + LCD_SPU_SRAM_CTRL);
--				writel_relaxed(g,
--					       base + LCD_SPU_SRAM_WRDAT);
--				writel_relaxed(addr |
--					       SRAM_WRITE | SRAM_HWC32_RAMG,
--					       base + LCD_SPU_SRAM_CTRL);
--				writel_relaxed(b,
--					       base + LCD_SPU_SRAM_WRDAT);
--				writel_relaxed(addr |
--					       SRAM_WRITE | SRAM_HWC32_RAMB,
--					       base + LCD_SPU_SRAM_CTRL);
--				addr += 1;
--				if ((addr & 255) == 0)
--					addr += 0xf00;
--				n = 0;
--			}
-+			uint32_t val = *p;
-+
-+			val = (val & 0xff00ff00) |
-+			      (val & 0x000000ff) << 16 |
-+			      (val & 0x00ff0000) >> 16;
-+
-+			writel_relaxed(val,
-+				       base + LCD_SPU_SRAM_WRDAT);
-+			writel_relaxed(addr | SRAM_WRITE,
-+				       base + LCD_SPU_SRAM_CTRL);
-+			addr += 1;
-+			if ((addr & 0x00ff) == 0)
-+				addr += 0xf00;
-+			if ((addr & 0x30ff) == 0)
-+				addr = SRAM_HWC32_RAM2;
- 		}
- 	}
--	if (n) {
--		r >>= 8 * (4 - n);
--		g >>= 8 * (4 - n);
--		b >>= 8 * (4 - n);
--		writel_relaxed(r, base + LCD_SPU_SRAM_WRDAT);
--		writel_relaxed(addr | SRAM_WRITE | SRAM_HWC32_RAMR,
--			       base + LCD_SPU_SRAM_CTRL);
--		writel_relaxed(g, base + LCD_SPU_SRAM_WRDAT);
--		writel_relaxed(addr | SRAM_WRITE | SRAM_HWC32_RAMG,
--			       base + LCD_SPU_SRAM_CTRL);
--		writel_relaxed(b, base + LCD_SPU_SRAM_WRDAT);
--		writel_relaxed(addr | SRAM_WRITE | SRAM_HWC32_RAMB,
--			       base + LCD_SPU_SRAM_CTRL);
--	}
+@@ -708,6 +907,8 @@ static int armada_drm_crtc_page_flip(struct drm_crtc *crtc,
  }
  
--static void armada_load_cursor_alpha(void __iomem *base, uint32_t *pix,
--	unsigned stride, unsigned width, unsigned height)
-+static void armada_drm_crtc_cursor_tran(void __iomem *base)
- {
--	uint32_t data, addr, ram_cmd = SRAM_WRITE | SRAM_HWC32_TRAN;
--	unsigned y, n;
-+	unsigned addr;
+ static struct drm_crtc_funcs armada_crtc_funcs = {
++	.cursor_set	= armada_drm_crtc_cursor_set,
++	.cursor_move	= armada_drm_crtc_cursor_move,
+ 	.destroy	= armada_drm_crtc_destroy,
+ 	.page_flip	= armada_drm_crtc_page_flip,
+ 	.set_config	= drm_crtc_helper_set_config,
+diff --git a/drivers/gpu/drm/armada/armada_crtc.h b/drivers/gpu/drm/armada/armada_crtc.h
+index e00dcf5..16e9d93 100644
+--- a/drivers/gpu/drm/armada/armada_crtc.h
++++ b/drivers/gpu/drm/armada/armada_crtc.h
+@@ -48,6 +48,14 @@ struct armada_crtc {
  
--	for (data = addr = n = y = 0; y < height; y++) {
--		uint32_t *p = &pix[y * stride];
--		unsigned x;
--
--		for (x = 0; x < width; x++, p++) {
--			data >>= 2;
--			if (*p >= 0x80000000)
--				data |= 0x40000000;
--			if (x == 0 || y == 0)
--				data |= 0x40000000;
--			if (++n == 16) {
--				writel_relaxed(data,
--					       base + LCD_SPU_SRAM_WRDAT);
--				writel_relaxed(addr |
--					       SRAM_WRITE | SRAM_HWC32_TRAN,
--					       base + LCD_SPU_SRAM_CTRL);
--				addr += 1;
--				if ((addr & 255) == 0)
--					addr += 0xf00;
--				n = 0;
--			}
--		}
--	}
--	if (n) {
--		data >>= 2 * (16 - n);
--		writel_relaxed(data, base + LCD_SPU_SRAM_WRDAT);
--		writel_relaxed(addr | ram_cmd, base + LCD_SPU_SRAM_CTRL);
-+	for (addr = 0; addr < 256; addr++) {
-+		/* write the default value */
-+		writel_relaxed(0x55555555, base + LCD_SPU_SRAM_WRDAT);
-+		writel_relaxed(addr | SRAM_WRITE | SRAM_HWC32_TRAN,
-+			       base + LCD_SPU_SRAM_CTRL);
- 	}
- }
+ 	struct armada_overlay	*overlay;
  
-@@ -742,6 +689,7 @@ static int armada_drm_crtc_cursor_update(struct armada_crtc *dcrtc, bool reload)
- {
- 	uint32_t xoff, xscr, w = dcrtc->cursor_w, s;
- 	uint32_t yoff, yscr, h = dcrtc->cursor_h;
-+	uint32_t para1;
- 
- 	/*
- 	 * Calculate the visible width and height of the cursor,
-@@ -790,9 +738,14 @@ static int armada_drm_crtc_cursor_update(struct armada_crtc *dcrtc, bool reload)
- 		return 0;
- 	}
- 
-+	para1 = readl_relaxed(dcrtc->base + LCD_SPU_SRAM_PARA1);
- 	armada_updatel(CFG_CSB_256x32, CFG_PDWN256x32,
- 		     dcrtc->base + LCD_SPU_SRAM_PARA1);
- 
-+	/* Initialize the transparency if the SRAM was powered down */
-+	if (!(para1 & CFG_CSB_256x32))
-+		armada_drm_crtc_cursor_tran(dcrtc->base);
++	struct armada_gem_object	*cursor_obj;
++	int			cursor_x;
++	int			cursor_y;
++	uint32_t		cursor_w;
++	uint32_t		cursor_h;
++	uint32_t		cursor_lw;
++	uint32_t		cursor_lh;
 +
- 	if (dcrtc->cursor_hw_sz != (h << 16 | w) || reload) {
- 		struct armada_gem_object *obj = dcrtc->cursor_obj;
- 		uint32_t *pix;
-@@ -806,8 +759,7 @@ static int armada_drm_crtc_cursor_update(struct armada_crtc *dcrtc, bool reload)
- 		/* Set the top-left corner of the cursor image */
- 		pix = obj->addr;
- 		pix += yoff * s + xoff;
--		armada_load_cursor_rgb(dcrtc->base, pix, s, w, h);
--		armada_load_cursor_alpha(dcrtc->base, pix, s, w, h);
-+		armada_load_cursor_argb(dcrtc->base, pix, s, w, h);
- 	}
- 
- 	/* Reload the cursor position, size and enable in the IRQ handler */
-@@ -835,8 +787,8 @@ static int armada_drm_crtc_cursor_set(struct drm_crtc *crtc,
- 	int ret;
- 
- 	if (handle && w > 0 && h > 0) {
--		/* maximum size is 64x64 */
--		if (w > 64 || h > 64)
-+		/* maximum size is 64x32 or 32x64 */
-+		if (w > 64 || h > 64 || (w > 32 && h > 32))
- 			return -ENOMEM;
- 
- 		obj = armada_gem_object_lookup(dev, file, handle);
-@@ -1023,6 +975,7 @@ int armada_drm_crtc_create(struct drm_device *dev, unsigned num,
- 	writel_relaxed(0x0000e000, dcrtc->base + LCD_SPU_SRAM_PARA1);
- 	writel_relaxed(0x2032ff81, dcrtc->base + LCD_SPU_DMA_CTRL1);
- 	writel_relaxed(0x00000000, dcrtc->base + LCD_SPU_GRA_OVSA_HPXL_VLN);
-+	writel_relaxed(CFG_PDWN256x32, dcrtc->base + LCD_SPU_SRAM_PARA1);
- 
- 	/* Lower the watermark so to eliminate jitter at higher bandwidths */
- 	armada_updatel(0x20, (1 << 11) | 0xff, dcrtc->base + LCD_CFG_RDREG4F);
-diff --git a/drivers/gpu/drm/armada/armada_hw.h b/drivers/gpu/drm/armada/armada_hw.h
-index 58d2a20..0c2937b 100644
---- a/drivers/gpu/drm/armada/armada_hw.h
-+++ b/drivers/gpu/drm/armada/armada_hw.h
-@@ -171,8 +171,10 @@ enum {
- 	SRAM_READ	= 0 << 14,
- 	SRAM_WRITE	= 2 << 14,
- 	SRAM_INIT	= 3 << 14,
--	SRAM_HWC32_RAMR	= 0xc << 8,
--	SRAM_HWC32_RAMG	= 0xd << 8,
-+	SRAM_HWC32_RAM1	= 0xc << 8,
-+	SRAM_HWC32_RAM2	= 0xd << 8,
-+	SRAM_HWC32_RAMR	= SRAM_HWC32_RAM1,
-+	SRAM_HWC32_RAMG	= SRAM_HWC32_RAM2,
- 	SRAM_HWC32_RAMB	= 0xe << 8,
- 	SRAM_HWC32_TRAN	= 0xf << 8,
- 	SRAM_HWC	= 0xf << 8,
+ 	int			dpms;
+ 	uint32_t		cfg_dma_ctrl0;
+ 	uint32_t		cfg_dumb_ctrl;
 -- 
 1.7.4.4
