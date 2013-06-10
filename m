@@ -1,84 +1,64 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 10 Jun 2013 09:44:14 +0530
-Subject: [PATCH 2/3] ARM: dts: Add FIMD node to Origen4210 board
-In-Reply-To: <5527415.fcM1OgADxD@flatron>
-References: <1370603235-11193-1-git-send-email-tushar.behera@linaro.org>
- <1370603235-11193-3-git-send-email-tushar.behera@linaro.org>
- <5527415.fcM1OgADxD@flatron>
-Message-ID: <51B55296.5030006@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 9 Jun 2013 21:20:09 -0700
+Subject: [GIT PULL] ARM: OMAP: hwmod/PRCM: add OMAP5 data
+In-Reply-To: <alpine.DEB.2.02.1306082003200.7001@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306082003200.7001@utopia.booyaka.com>
+Message-ID: <20130610042008.GA8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/2013 04:19 PM, Tomasz Figa wrote:
-> On Friday 07 of June 2013 16:37:14 Tushar Behera wrote:
->> From: Sachin Kamat <sachin.kamat@linaro.org>
->>
->> Added FIMD and display timing node to Origen4210 board.
->>
->> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
->> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
->> ---
->>  arch/arm/boot/dts/exynos4210-origen.dts |   21 +++++++++++++++++++++
->>  1 file changed, 21 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/exynos4210-origen.dts
->> b/arch/arm/boot/dts/exynos4210-origen.dts index bcf8079..4c6c3cd 100644
->> --- a/arch/arm/boot/dts/exynos4210-origen.dts
->> +++ b/arch/arm/boot/dts/exynos4210-origen.dts
->> @@ -290,4 +290,25 @@
->>  			clock-frequency = <24000000>;
->>  		};
->>  	};
->> +
->> +	fimd at 11c00000 {
->> +		pinctrl-0 = <&lcd_en &lcd_clk &lcd_data24 &pwm0_out>;
+* Paul Walmsley <paul@pwsan.com> [130608 13:11]:
+> Hi Tony,
 > 
-> Ahh, this would explain the two pwm pin groups from previous patch.
+> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
 > 
-> This seems somehow incorrect, though. AFAIK PWM outputs are not managed by 
-> FIMD in any way.
+>   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
 > 
-
-I couldn't find any better place to put the pwm0_out pin configurations.
-Without configuring pwm0_out pins, display doesn't come up on the LCD.
-Any suggestions?
-
->> +		pinctrl-names = "default";
->> +		status = "okay";
->> +	};
->> +
->> +	display-timings {
->> +		native-mode = <&timing0>;
->> +		timing0: timing {
->> +			clock-frequency = <50000>;
+> are available in the git repository at:
 > 
-> Hmm, 50 KHz for pixel clock? Isn't it a bit too low? Or am I missing 
-> something?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-a-for-3.11
 > 
-
-Actually clock-frequency value is not used by DRM-FIMD, but instead
-required by the framework.
-
-Still it would be better to provide the actual pixel clock value here.
-So I would update this with 40MHz which is actual pixel clock used on my
-board.
-
-> Best regards,
-> Tomasz
+> for you to fetch changes up to e4020aa9a8f37d860024fe8a8c8441f003606d2b:
 > 
->> +			hactive = <1024>;
->> +			vactive = <600>;
->> +			hfront-porch = <64>;
->> +			hback-porch = <16>;
->> +			hsync-len = <48>;
->> +			vback-porch = <64>;
->> +			vfront-porch = <16>;
->> +			vsync-len = <3>;
->> +		};
->> +	};
->>  };
+>   ARM: OMAP5: Enable build and frameowrk initialisations (2013-06-08 12:00:05 -0600)
+> 
+> ----------------------------------------------------------------
+> Add support for the OMAP5 SoC family.
+> 
+> As part of the transition to DT, no board files will be used
+> for OMAP5.  The hwmod data is gradually being transitioned
+> away from arch/arm/mach-omap2: IRQ, DMA, and memory map data
+> has been moved to DT.  Hopefully the dev_attr and clock role
+> data will be the next step.
+> 
+> Basic test logs are available here, although not for OMAP5,
+> since I don't have an OMAP5 board:
+> http://www.pwsan.com/omap/testlogs/omap5_v3.10/20130608130949/
 
-Thanks for your review.
+Thanks pulled into omap-for-v3.11/omap5. I removed the ocp2scp include
+as that's unused and the header is removed with the omap4 clean-up.
 
--- 
-Tushar Behera
+Regards,
+
+Tony
+
+
+Author: Tony Lindgren <tony@atomide.com>
+Date:   Sun Jun 9 21:17:15 2013 -0700
+
+    ARM: OMAP5: Remove unused include for ocp2scp
+    
+    This header is not used, and is removed with the omap4 clean-up.
+    
+    Signed-off-by: Tony Lindgren <tony@atomide.com>
+
+--- a/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_54xx_data.c
+@@ -20,7 +20,6 @@
+ #include <linux/io.h>
+ #include <linux/platform_data/gpio-omap.h>
+ #include <linux/power/smartreflex.h>
+-#include <linux/platform_data/omap_ocp2scp.h>
+ #include <linux/i2c-omap.h>
+ 
+ #include <linux/omap-dma.h>
