@@ -1,59 +1,42 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 10 Jun 2013 14:35:22 +0530
-Subject: [PATCH 06/13] serial: samsung: add support for Exynos5420
-In-Reply-To: <CAKrE-Ke1J+Xr0XeaxO4Trf=AqRm_N1arjtpYwXwupsE7m56u8w@mail.gmail.com>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-6-git-send-email-chander.kashyap@linaro.org>
- <CAKrE-Ke1J+Xr0XeaxO4Trf=AqRm_N1arjtpYwXwupsE7m56u8w@mail.gmail.com>
-Message-ID: <CANuQgHE40JeV1+yqHNVpv+-OBh1Vzi1EZYew6KgauEj76xHH9A@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 10 Jun 2013 10:06:49 +0100
+Subject: [RFC PATCH 28/50] ASoC: atmel-ssc: prepare clk before calling
+ enable
+In-Reply-To: <51B23B04.20604@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+ <1370622370-19614-1-git-send-email-b.brezillon@overkiz.com>
+ <20130607165510.GA31367@sirena.org.uk> <51B23B04.20604@overkiz.com>
+Message-ID: <20130610090649.GC31367@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 07, 2013 at 09:56:52PM +0200, Boris BREZILLON wrote:
+> On 07/06/2013 18:55, Mark Brown wrote:
+> >On Fri, Jun 07, 2013 at 06:26:09PM +0200, Boris BREZILLON wrote:
+> >>Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+> >>avoid common clk framework warnings.
 
-On 6 June 2013 17:05, Girish KS <girishks2000@gmail.com> wrote:
-> On Thu, Jun 6, 2013 at 4:31 PM, Chander Kashyap
-> <chander.kashyap@linaro.org> wrote:
->> The serial port used in Exynos5420 is similar to the serial ports used
->> in the other Exynos SoC. Hence, extend the serial driver support for
->> Exynos5420.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> ---
->>  drivers/tty/serial/samsung.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
->> index 3cda4ed..841221c 100644
->> --- a/drivers/tty/serial/samsung.c
->> +++ b/drivers/tty/serial/samsung.c
->> @@ -1716,7 +1716,7 @@ static struct s3c24xx_serial_drv_data s5pv210_serial_drv_data = {
->>
->>  #if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) || \
->>         defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) || \
->> -       defined(CONFIG_SOC_EXYNOS5440)
->> +       defined(CONFIG_SOC_EXYNOS5420) || defined(CONFIG_SOC_EXYNOS5440)
->
-> Instead of comparing all CONFIGS of the SOC of exynos series, it can
-> be optimized with #if defined(CONFIG_ARCH_EXYNOS)
-> Make sure to test on all the boards for functionality.
+> >Applied since I happened to notice this on he list but you should
+> >*always* CC maintainers on patches otherwise they're likely to get
+> >missed.
 
-Yes all belongs to Exynos family. Will change that and test.
->
->>  static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
->>         .info = &(struct s3c24xx_uart_info) {
->>                 .name           = "Samsung Exynos4 UART",
->> --
->> 1.7.9.5
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> I used get_mainainer script and it returns:
 
+> Arnd Bergmann <arnd@arndb.de> (supporter:CHAR and MISC DRI...)
+> Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:CHAR and
+> MISC DRI...)
+> linux-kernel at vger.kernel.org (open list)
 
+> Please tell me if misuse this script or if I should use something else.
 
---
-with warm regards,
-Chander Kashyap
+I suspect you only ran this on some of the patches as that's missing
+pretty much all of the subsystem maintainers, but in general you always
+have to think about the output of get_maintainer.pl - it isn't terribly
+reliable.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/4298c9b7/attachment.sig>
