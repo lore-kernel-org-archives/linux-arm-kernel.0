@@ -1,50 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Jun 2013 17:27:29 +0200
-Subject: [PATCH 01/06] ARM: shmobile: Introduce SHMOBILE_FIXUP() helper
-In-Reply-To: <CANqRtoSKAm_9VXus=zzer2ELrS2NmZ=znZCSJH65imTXGk5ong@mail.gmail.com>
-References: <20130605073410.15758.37563.sendpatchset@w520>
- <201306061917.52550.arnd@arndb.de>
- <CANqRtoSKAm_9VXus=zzer2ELrS2NmZ=znZCSJH65imTXGk5ong@mail.gmail.com>
-Message-ID: <201306101727.29876.arnd@arndb.de>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 10 Jun 2013 11:33:55 -0400 (EDT)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <19045559.gYzJhRHBbp@linux-5eaq.site>
+Message-ID: <Pine.LNX.4.44L0.1306101130330.1133-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 June 2013, Magnus Damm wrote:
-> On Fri, Jun 7, 2013 at 2:17 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 06 June 2013, Magnus Damm wrote:
+On Mon, 10 Jun 2013, Oliver Neukum wrote:
+
+> On Monday 10 June 2013 10:03:00 Alan Stern wrote:
+> > [Thomas and Steve, please see the question below.]
+> > 
+> > On Mon, 10 Jun 2013, Ming Lei wrote:
+> > 
 > 
-> My approach with this series was more to make sure all boards keep on
-> working regardless what their boot loader pass. This since I too do
-> not trust the boot loader - especially on older boards. Perhaps the
-> more acceptable approach is to pretend to start trusting the
-> information by the boot loader and deal with the fallout if that
-> happens. Things may break when removing CONFIG_MEMORY_START/SIZE since
-> the MEM_SIZE and PHYS_OFFSET change in arch/arm/kernel/atags_parse.c
+> > That isn't clear.  It is documented that USB completion handlers are 
+> > called with local interrupts disabled.  An IRQ arriving before the 
+> > tasklet starts up might therefore be serviced during the short interval 
+> > before the tasklet disables local interrupts, but if that happens it 
+> > would mean that the completion handler would be delayed.
 > 
-> Anyway I can update my romImage series so it uses appended DTB with
-> both AP4EVB and Mackerel. Then this series can simply be thrown away.
+> That is what tasklets do by definition, isn't it?
 
-That sounds like a good idea, but it seems that AP4EVB does not
-yet use DT_MACHINE_START, so I suspect you will need more work.
+Yes.  Although tasklets in general have no reason to leave interrupts 
+disabled.
 
-> > The easiest way is probably to declare that multiplatform booting
-> > on shmobile is only supported for DT-enabled boards and that support
-> > for non-DT booting will be removed at the same time as
-> > non-multiplatform booting on shmobile. This is the same thing we are
-> > doing e.g. on Exynos and the various Marvell embedded (non-PXA/MMP)
-> > chips.  The time line for this not set yet, and I think that will
-> > be one of the hot topics at this year's ARM subarch maintainer summit
-> > that I hope we will have the chance to do during the kernel summit.
-> > FWIW, my take on this is that at some point we will require both DT
-> > and multiplatform for all ARMv6 and ARMv7 platforms anyway (not
-> > for the older ones, in particular StrongARM and XScale), but we have
-> > to come up with a timing that works for everyone.
+> > In effect, you are prioritizing other IRQs higher than USB completion
+> > handlers.  Nevertheless, the total time spent with interrupts disabled
+> > will remain the same.
 > 
-> Yeah, I agree with your idea but I wonder about the timing. Actually,
-> I was thinking that the prime candidate boards for multiplatform are
-> our DT -reference boards. Still blocked on common clock framework
-> though... I will try to sort out the memory bits first.
+> It pobably slightly increases. You have colder caches twice.
+> And potentially you swich CPUs.
 
-Ok.
+Actually, the situation is a little better in one respect, which was
+pointed out earlier but not emphasized.  The DMA unmapping can be
+deferred to the tasklet, and it can run with interrupts enabled before
+the completion hanlder is called.  Since the unmapping sometimes takes
+a while to run, this is an advantage.
 
-	Arnd
+Alan Stern
