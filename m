@@ -1,33 +1,32 @@
 From: rklein@nvidia.com (Rhyland Klein)
-Date: Mon, 10 Jun 2013 17:26:38 -0400
-Subject: [PATCH 0/4] Fix and start using supplied_from logic
-Message-ID: <1370899602-22123-1-git-send-email-rklein@nvidia.com>
+Date: Mon, 10 Jun 2013 17:26:41 -0400
+Subject: [PATCH 3/4] power: tps65090-charger: Add dt node to power_supply
+In-Reply-To: <1370899602-22123-1-git-send-email-rklein@nvidia.com>
+References: <1370899602-22123-1-git-send-email-rklein@nvidia.com>
+Message-ID: <1370899602-22123-4-git-send-email-rklein@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series first fixes a refcount issue with the dt nodes
-that was introduced with the supplied_from patch series. We add
-a call to of_node_put to decrement the refcount for each node we get
-from calling of_parse_phandle.
+Passing in the dt node for this charger enables the logic in the core
+to lookup this device, to see if it is supplying another power_supply,
+through dt.
 
-After that, this series enables using the supplied_from automatic
-population from dt by passing in the dt nodes for the sbs battery
-driver and the tps65090-charger driver.
+Signed-off-by: Rhyland Klein <rklein@nvidia.com>
+---
+ drivers/power/tps65090-charger.c |    1 +
+ 1 file changed, 1 insertion(+)
 
-Finally, the last patch creates this link for the tegra114-dalmore
-board.
-
-Rhyland Klein (4):
-  power_supply: Add of_node_put to fix refcount
-  power: sbs-battery: Add dt to power_supply struct
-  power: tps65090-charger: Add dt node to power_supply
-  arm: tegra: Add power-supplies link between battery and charger
-
- arch/arm/boot/dts/tegra114-dalmore.dts |    3 ++-
- drivers/power/power_supply_core.c      |    4 ++++
- drivers/power/sbs-battery.c            |    1 +
- drivers/power/tps65090-charger.c       |    1 +
- 4 files changed, 8 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/power/tps65090-charger.c b/drivers/power/tps65090-charger.c
+index 77ab856..3f4b9cc 100644
+--- a/drivers/power/tps65090-charger.c
++++ b/drivers/power/tps65090-charger.c
+@@ -230,6 +230,7 @@ static int tps65090_charger_probe(struct platform_device *pdev)
+ 	cdata->ac.num_properties	= ARRAY_SIZE(tps65090_ac_props);
+ 	cdata->ac.supplied_to		= pdata->supplied_to;
+ 	cdata->ac.num_supplicants	= pdata->num_supplicants;
++	cdata->ac.of_node		= pdev->dev.of_node;
+ 
+ 	ret = power_supply_register(&pdev->dev, &cdata->ac);
+ 	if (ret) {
 -- 
 1.7.9.5
