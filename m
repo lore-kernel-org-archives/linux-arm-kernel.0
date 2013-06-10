@@ -1,109 +1,53 @@
 From: gnurou@gmail.com (Alexandre Courbot)
-Date: Mon, 10 Jun 2013 17:05:04 +0900
+Date: Mon, 10 Jun 2013 17:11:15 +0900
 Subject: [PATCH] ARM: tegra: add basic SecureOS support
-In-Reply-To: <20130607181318.GC29344@localhost.localdomain>
+In-Reply-To: <51B20B46.4030501@wwwdotorg.org>
 References: <1370503687-17767-1-git-send-email-acourbot@nvidia.com>
- <51B0BC80.9040007@wwwdotorg.org> <20130606180824.GC3320@localhost.localdomain>
- <CAAVeFuJkV3VVfeinLrjCCef9ZqJNvKurQwVWnJsW-bZqniTQ1w@mail.gmail.com>
- <20130607181318.GC29344@localhost.localdomain>
-Message-ID: <CAAVeFuKsa=GsxexQOSOYPYvkAXaEZXfW1+zRmv25CtFEY=T_GQ@mail.gmail.com>
+ <51B0BC80.9040007@wwwdotorg.org>
+ <CAAVeFu+by44HnOzv_85kwgeCx5b9TxiMhr27x69QcUj9GRbk8A@mail.gmail.com>
+ <51B20B46.4030501@wwwdotorg.org>
+Message-ID: <CAAVeFu+UMZikdWO20c9chvBcieOAUgOhz-nTEUpevFWnPNC_ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 8, 2013 at 3:13 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> One way to make the backend generic would be to have something like
-> one of the following (some syntax omitted due to laziness):
->
->         u32 __naked __call_smc(u32 r0, ...)
->         {
->                 asm volatile (
->                         stmfd   sp!, {r4-r11,lr}
->                         smc     #0
->                         ldmfd   sp!, {r4-r11,pc}
->                         ::: "memory"
->                 );
->         }
->
->         /* The above works for up to 4 u32 arguments */
->
->         u32 __naked __call_smc(u32 r0, ...)
->         {
->                 asm volatile (
->                         mov     ip, sp
->                         stmfd   sp!, {r4-r11,lr}
->                         ldmia   ip, {r4-r11}
->                         smc     #0
->                         ldmfd   sp!, {r4-r11,pc}
->                         ::: "memory"
->                 );
->         }
->
->         /*
->          * Works for up to 13 u32 arguments, provided the stack is deep
->          * enough to provide suitable garbage data to fill the registers
->          * if the caller supplied fewer arguments (a bit of a hack)
->          */
->
->         u32 __naked __call_smc(struct pt_regs *regs) {
->
->                 asm(
->                         stmfd   sp!, {r4-r11,lr}
->                         /* load regs from <regs> */
->                         smc #0
->                         /* save regs back to <regs> */
->                         ldmfd   sp!, {r4-r11,pc}
->                 );
->         }
->
->         /*
->          * Most generic,  least-efficient version.
->          * Can return up to 13 u32 results instead of just one.
->          * For convenience, the r0 value returned by the SMC could be
->          * left in r0 so that it also determines the return value of the
->          * function.
->          *
->          * Most of the time, SMC shouldn't be called on any hot path,
->          * otherwise the performance battle is already lost -- so it may
->          * not be crucial to reach the maximum possible efficiency for
->          * these calls.
->          */
->
->
-> A particular firmware's Linux glue code might have to put extra stuff
-> around calls to generic_smc, but at least generic_smc itself wouldn't
-> need to be reinvented, and the firmware-specific glue code could usually
-> avoid asm.
->
->> Another example is the function that Tomasz shown
->> (https://git.kernel.org/cgit/linux/kernel/git/next/linux-next.git/tree/arch/arm/mach-exynos/exynos-smc.S?id=refs/tags/next-20130606
->> ), which preserves r4-r11 but also assumes r3 is an argument - that's
->> again another slightly different convention.
->
-> ... for which the above implementations of __call_smc() should work too.
->
->> All in all the needs of the various firmwares might end up being just
->> different enough that we need to have a different backend for each of
->> them. The firmware_ops defined in arch/arm/include/asm/firmware.h
->> perform the abstraction at a higher level, which seems more fit here
->> IMHO.
+On Sat, Jun 8, 2013 at 1:33 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> I think we need to separate the concept of support for *a* secure
+>>> monitor, from support for a *particular* secure monitor.
 >>
->> Alex.
+>> Agreed. In this case, can we assume that support for a specific secure
+>> monitor is not arch-specific, and that this patch should be moved
+>> outside of arch-tegra and down to arch/arm? In other words, the ABI of
+>> a particular secure monitor should be the same no matter the chip,
+>> shouldn't it?
 >
-> Indeed.  If you think you could work with one of the above generics, we
-> could try it and see what it looks like though.
+> I would like to believe that the Trusted Foundations monitor had the
+> same ABI irrespective of which Soc it was running on. However, I have
+> absolutely no idea at all if that's true. Even if there's some common
+> subset of the ABI that is identical across all SoCs, I wouldn't be too
+> surprised if there were custom extensions for each different SoC, or
+> just perhaps even each product.
 >
-> If it's an awkward fit, I might be being too optimistic.
+> Can you research this and find out the answer?
 
-I agree that your versions would most likely work in our (and probably
-many others) case. But I wonder if individual platforms will not
-prefer to sacrifice the ease of use of a generic version for the
-ability to write faster code that will just preserve what is needed
-(whether that performance gain is justified or not is of course
-subject to debate). I don't have enough hindsight to decide which
-approach is the best, but until we have more examples of firmwares
-that would justify such a factorization, I think I'd like to go with
-our own version first - for there is already more than enough to fix
-in this patch. :)
+Will do. Information about TF is scarce unfortunately.
+
+> What we can always do is make a compatible property that lists
+> everything[1], and have the driver match on the most specific value for
+> now, but relax the driver's matching later if it turns out that the ABI
+> is indeed common.
+>
+> [1] That'd need to be at least secure OS name, and secure OS version.
+> Perhaps the SoC and board data can be deduced from the DT's top-level
+> compatible properties; nvidia,tegra114-shield, nvidia,tegra114?
+
+They can probably, but in theory nothing prevents a board from coming
+with different secure monitors (or none at all). In this case, just
+having the board name might not be enough.
+
+Having a proper node for the firmware like David and Tomasz suggested
+seems to be the best way to make sure we cover all cases - I think I
+will try to do it this way for the next version, and hopefully come
+with a binding that is useful for everyone.
 
 Thanks,
 Alex.
