@@ -1,42 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Jun 2013 12:54:51 +0200
-Subject: [PATCH 2/4] mfd: dbx500-prcmu: Correctly reorder PRCMU clock
- identifiers
-In-Reply-To: <20130607142020.GB24958@gmail.com>
-References: <1370517676-10909-1-git-send-email-lee.jones@linaro.org>
- <1370517676-10909-3-git-send-email-lee.jones@linaro.org>
- <CACRpkdYLB-_JjEd69vVub_Z3L+avQRrFBt1fGuyR0D_owcLWvA@mail.gmail.com>
- <20130607142020.GB24958@gmail.com>
-Message-ID: <CACRpkdZiRZj05Wd3YKJO5hzXOMVJ0qESANEa=8LCGR=tn2AK7w@mail.gmail.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon, 10 Jun 2013 11:58:38 +0100
+Subject: [PATCH v2 09/11] ARM:stixxxx: Add stixxxx options to
+ multi_v7_defconfig
+In-Reply-To: <20130610104032.GA2513@e106331-lin.cambridge.arm.com>
+References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
+ <1370856477-7237-1-git-send-email-srinivas.kandagatla@st.com>
+ <20130610104032.GA2513@e106331-lin.cambridge.arm.com>
+Message-ID: <51B5B15E.50901@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 4:20 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Fri, 07 Jun 2013, Linus Walleij wrote:
->
->> > -enum prcmu_clock {
->> > -       PRCMU_SGACLK,
->> (...)
->> > +#define ARMCLK                 0
->> > +#define PRCMU_ACLK             1
->> (...)
->>
->> It seems the enum and the defines want to do two different things?
->>
->> The first is a kernel-internal representation of the clocks, whereas
->> the latter is a HW-centric representation for a certain PRCMU
->> variant (I guess?)
->>
->> Does one actually exclude the other?
->
-> From what I can tell, they're non-ordered values which are used as
-> read-ins to the clk_mgt array. So long as they are unique I'm not sure
-> the order matters. The current order seems 'made up', unless I'm
-> mistaken.
+Thanks for testing...
+On 10/06/13 11:40, Mark Rutland wrote:
+> On Mon, Jun 10, 2013 at 10:27:57AM +0100, Srinivas KANDAGATLA wrote:
+>> > This patch adds stih415 and stih416 support to multi_v7_defconfig.
+> This seems to drop a few options also:
+> 
+> CONFIG_ARM_ARCH_TIMER
 
-Hm, I suspect it might be something to do with the enumeration
-inside the PRCMU firmware, but I don't really know. In that case it
-could affect the message marshalling, but let's call out the experts...
+Same as last comment 2:
+> CONFIG_ARM_ERRATA_754322
+ARM_ERRATA_754322 gets selected by the mach level Kconfig of stixxxx, so
+it disappears, Should the mach level Kconfig select that?
 
-Yours,
-Linus Walleij
+> CONFIG_EXPERIMENTAL
+> CONFIG_GPIO_PL061
+> CONFIG_MMC_WMT
+
+Comment 2: Without any modifications to multi_v7_defconfig if I run
+savedefconfig CONFIG_ARM_ARCH_TIMER, CONFIG_EXPERIMENTAL,
+CONFIG_GPIO_PL061 and CONFIG_MMC_WMT disappears.
+Which suggests that these options seems to be selected by another
+kconfigs or mach level. And since then the multi_v7_defconfig was not
+run with savedefconfig.
+
+
+Thanks,
+srini
+> 
+> I just applied this to v3.10-rc5, and ran `make ARCH=arm multi_v7_defconfig`.
+> It seems MMC_WMT and GPIO_PL061 get selected elsewhere, but ARM_ARCH_TIMER and
+> ARM_ERRATA_754322 are left unselected.
+> 
+> Thanks,
+> Mark.
+> 
