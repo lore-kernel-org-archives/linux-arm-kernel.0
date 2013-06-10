@@ -1,97 +1,137 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Jun 2013 17:36:44 +0200
-Subject: [PATCH] ARM: sirf: use CONFIG_SIRF rather than CONFIG_PRIMA2 where
- necessary
-Message-ID: <201306101736.44652.arnd@arndb.de>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 10 Jun 2013 23:37:30 +0800
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306100946570.1133-100000@iolanthe.rowland.org>
+References: <CACVXFVOrniwAUaJN1dkUZD4HzfV6StajzL3Okw2dNBpkSPRjNA@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306100946570.1133-100000@iolanthe.rowland.org>
+Message-ID: <CACVXFVNdy_cffR7JYNVfs40QJ9eF4Y8UKL7ZsRPOTOegghFkaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I got a build error today that made me realize that it is not
-possible to build a kernel for a SiRF platform without enabling
-CONFIG_PRIMA2, since a lot of common code depends on CONFIG_PRIMA2.
+On Mon, Jun 10, 2013 at 10:03 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> [Thomas and Steve, please see the question below.]
+>
+> On Mon, 10 Jun 2013, Ming Lei wrote:
+>
+>> On Sun, Jun 9, 2013 at 11:48 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> > On Sun, 9 Jun 2013, Ming Lei wrote:
+>> >
+>> >> Hi,
+>> >>
+>> >> The patchset supports to run giveback of URB in tasklet context, so that
+>> >> DMA unmapping/mapping on transfer buffer and compelte() callback can be
+>> >> run with interrupt enabled, then time of HCD interrupt handler can be
+>> >> saved much. Also this approach may simplify HCD since HCD lock needn't
+>> >> be released any more before calling usb_hcd_giveback_urb().
+>> >
+>> > That's a lot of material.  However, you haven't specifically said
+>> > _what_ you want to accomplish.  It sounds like you're trying to
+>>
+>> All IRQs are disabled(locally) in hard interrupt context, but they are
+>> enabled in softirq context, this patchset can decrease the time a lot.
+>
+> That isn't clear.  It is documented that USB completion handlers are
+> called with local interrupts disabled.  An IRQ arriving before the
 
-This fixes all occurences that appear like common SiRF code.
+Is there any good reason to do URB giveback with interrupt disabled?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
+IMO, disabling IRQs isn't necessary for completing URB since the
+complete() of URBs for same endpoint is reentrant.
 
-Barry, can you see if this patch makes sense to you?
+> tasklet starts up might therefore be serviced during the short interval
+> before the tasklet disables local interrupts, but if that happens it
 
-Mark, Grant, Mike, Greg, Wolfram: would you like to get a split-out
-patch, or should I apply it in one piece to arm-soc?
+Tasklet doesn't disable local interrupts.
 
-There is no harm in changing just one file, they are all
-equally wrong and don't depend on one another.
+> would mean that the completion handler would be delayed.
 
- arch/arm/Makefile          | 2 +-
- drivers/clk/Makefile       | 2 +-
- drivers/i2c/busses/Kconfig | 2 +-
- drivers/spi/Kconfig        | 2 +-
- drivers/tty/serial/Kconfig | 2 +-
- 5 files changed, 5 insertions(+), 5 deletions(-)
+Yes, the tasklet schedule delay is introduced to URB completion, but
+the delay doesn't have much side effect about completing URB.
 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index 3380c4f..fcb4b48 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -169,7 +169,7 @@ machine-$(CONFIG_ARCH_OMAP1)		+= omap1
- machine-$(CONFIG_ARCH_OMAP2PLUS)	+= omap2
- machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
- machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
--machine-$(CONFIG_ARCH_PRIMA2)		+= prima2
-+machine-$(CONFIG_ARCH_SIRF)		+= prima2
- machine-$(CONFIG_ARCH_PXA)		+= pxa
- machine-$(CONFIG_ARCH_REALVIEW)		+= realview
- machine-$(CONFIG_ARCH_RPC)		+= rpc
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index f41e3e3..a9f616f 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -19,7 +19,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
- obj-$(CONFIG_PLAT_SPEAR)	+= spear/
- obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
- obj-$(CONFIG_COMMON_CLK_VERSATILE) += versatile/
--obj-$(CONFIG_ARCH_PRIMA2)	+= clk-prima2.o
-+obj-$(CONFIG_ARCH_SIRF)		+= clk-prima2.o
- obj-$(CONFIG_PLAT_ORION)	+= mvebu/
- ifeq ($(CONFIG_COMMON_CLK), y)
- obj-$(CONFIG_ARCH_MMP)		+= mmp/
-diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 2d030df..11c8eb8 100644
---- a/drivers/i2c/busses/Kconfig
-+++ b/drivers/i2c/busses/Kconfig
-@@ -676,7 +676,7 @@ config I2C_SIMTEC
- 
- config I2C_SIRF
- 	tristate "CSR SiRFprimaII I2C interface"
--	depends on ARCH_PRIMA2
-+	depends on ARCH_SIRF
- 	help
- 	  If you say yes to this option, support will be included for the
- 	  CSR SiRFprimaII I2C interface.
-diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-index 2015897..89cbbab 100644
---- a/drivers/spi/Kconfig
-+++ b/drivers/spi/Kconfig
-@@ -404,7 +404,7 @@ config SPI_SH_HSPI
- 
- config SPI_SIRF
- 	tristate "CSR SiRFprimaII SPI controller"
--	depends on ARCH_PRIMA2
-+	depends on ARCH_SIRF
- 	select SPI_BITBANG
- 	help
- 	  SPI driver for CSR SiRFprimaII SoCs
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 95e66ac..7b4aa69 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -251,7 +251,7 @@ config SERIAL_SAMSUNG_CONSOLE
- 
- config SERIAL_SIRFSOC
-         tristate "SiRF SoC Platform Serial port support"
--        depends on ARCH_PRIMA2
-+        depends on ARCH_SIRF
-         select SERIAL_CORE
-         help
-           Support for the on-chip UART on the CSR SiRFprimaII series,
+For async transfer, generally, it should have no effect since there should
+have URBs queued on the qh queue before submitting URB.
+
+For periodic transfer, the patch uses high priority tasklet to schedule it.
+
+>
+> In effect, you are prioritizing other IRQs higher than USB completion
+> handlers.
+
+Both other IRQs and HCD's IRQ are prioritizing the URB completion.
+
+> Nevertheless, the total time spent with interrupts disabled
+> will remain the same.
+
+No, the total time spent with interrupts disabled does not remain same,
+since no local IRQs are disabled during URB giveback anymore.
+
+>
+> (There's one other side effect that perhaps you haven't considered.
+> When multiple URBs are addressed to the same endpoint, their completion
+> handlers are called in order of URB completion, which is the same as
+> the order of URB submission unless an URB is cancelled.  By delegating
+> the completion handlers to tasklets, and particularly by using per-CPU
+> tasklets, you may violate this behavior.)
+
+Even though URB giveback is handled by hard interrupt handler, it still can't
+guarantee that 100%,  please see below:
+
+- interrupt for URB A comes in CPU 0, and handled, then HCD private
+lock is released, and usb_hcd_giveback_urb() is called to complete URB A
+
+- interrupt for URB B comes in CPU 1 just before CPU0 releases HCD private
+lock, so CPU1 holds the private lock when CPU 0 releases the lock and
+handles the HCD interrupt.
+
+So now just like two CPUs are racing, if CPU0 wins, URB A is completed
+first, otherwise URB B is completed first.
+
+With introducing completing URB in percpu tasklet, the situation is
+just very similar.
+
+On ehci hcd, it can make sure that by always letting CPU0 complete all URBs
+(use ehci->scanning/ehci->need_rescan flag), but the patch can change percpu
+tasklet to tasklet to meet the demand.
+
+>
+>> > minimize the amount of time spent in hardirq context, but I can't be
+>> > sure that is really what you want.
+>> >
+>> > If it is, this is not a good way to do it.  A better way to minimize
+>> > the time spent in hardirq context is to use a threaded interrupt
+>> > handler.  But why do you want to minimize this time in the first place?
+>>
+>> Process context switch may have more cost than switching to softirq,
+>> then USB performance may be effected, that is why I choose to use
+>> tasklet.  Also now there is no any sleep in URB giveback, so it isn't
+>> necessary to introduce process to handle the giveback or completion.
+>
+> Thomas and Steve, can you comment on this?  I do not have a good
+> understanding of the relative benefits/drawbacks of tasklets vs.
+> threaded interrupt handlers.
+>
+>> > The CPU will be still have to use at least as much time as before; the
+>> > only difference is that it will be in softirq or in a high-priority
+>> > thread instead of in hardirq.
+>>
+>> Yes, as I said above, but we can allow other IRQs to be served in
+>> handling URB giveback in softirq context, that is the value of softirq/tasklet.
+>> Of course, system may have more important things to do during the time.
+>> Generally speaking, for one driver, hard interrupt handler should always
+>> consume less time as possible.
+>
+> As I understand it, the tradeoff between hardirq and softirq is
+> generally unimportant.  It does matter a lot in realtime settings --
+
+I don't think so, and obviously softirq allows IRQs to be served quickly,
+otherwise why is softirq and tasklet introduced? and why so many drivers
+are using tasklet/softirq?
+
+> but the RT kernel effectively makes _every_ interrupt handler threaded,
+> so it won't benefit from this change.
+
+We still need mainline kernel to benefit the change, :-)
+
+Thanks,
+--
+Ming Lei
