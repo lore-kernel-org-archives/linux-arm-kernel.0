@@ -1,61 +1,29 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Mon, 10 Jun 2013 19:17:22 -0400
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20130610225607.GE18614@n2100.arm.linux.org.uk>
-References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
- <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
- <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
- <20130610170648.GX18614@n2100.arm.linux.org.uk>
- <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
- <20130610200839.GY18614@n2100.arm.linux.org.uk>
- <CAF6AEGsfzvdiGXqAu56rc-G_ZhhE_vnNbC6kpBmRtd-8Sh_uOQ@mail.gmail.com>
- <20130610211516.GZ18614@n2100.arm.linux.org.uk>
- <CAF6AEGu-e+cZW-1F6L+epE11oonFucreEY_KH+awRx7j5pScpA@mail.gmail.com>
- <20130610225607.GE18614@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 11 Jun 2013 00:19:34 +0100
+Subject: [PATCH v2 06/11] ARM:stixxxx: Add STiH415 SOC support
+In-Reply-To: <51B5BCB3.3060405@st.com>
+References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
+ <1370856381-6644-1-git-send-email-srinivas.kandagatla@st.com>
+ <CAHTX3d+dk3W_9b7SVUokWq4KYXnj=Z1=WPj5zJ-gUvJqqwE=+Q@mail.gmail.com>
+ <51B5BCB3.3060405@st.com>
+Message-ID: <20130610231934.GG18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 6:56 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 10, 2013 at 06:49:06PM -0400, Rob Clark wrote:
->> I guess in the short term, the best I can think is keep those phys
->> ioctls as a small patch on top of the upstream driver.  It is ok to
->> leave place-holder ioctl #'s in the upstream driver so that the ioctl
->> #'s don't shift when you rebase.  And then try to get the vendor to
->> add support for dmabuf so that the patch on top of upstream can
->> eventually be dropped.  Maybe someone else has a better suggestion,
->> but I don't think we can merge those phys ioctls upstream, and I'd
->> really hate to 'throw the baby out with the bathwater' in this case
->> and not at least get the modesetting part of the driver merged.
->
-> What you're saying is basically:
->
-> 1. Throw out DRM_ARMADA_GEM_CREATE_PHYS, which cripples video playback
->    on existing gstreamer, xbmc and other implementations without someone
->    rewriting all that code.
->
-> 2. Throw out DRM_ARMADA_GEM_PROP, which prevents any form of passing
->    the GEM objects to the GPU libraries in userspace, thereby preventing
->    any kind of GPU based acceleration.
->
-> That makes the driver just be a dumb scanout only driver.  Sorry,
-> that *really* does not interest me one bit, because the CPU doing
-> framebuffer accesses is pig slow.
+On Mon, Jun 10, 2013 at 12:46:59PM +0100, Srinivas KANDAGATLA wrote:
+> >     +       aux_ctrl = (0x1 << L2X0_AUX_CTRL_SHARE_OVERRIDE_SHIFT) |
+> >     +               (0x1 << L2X0_AUX_CTRL_DATA_PREFETCH_SHIFT) |
+> >     +               (0x1 << L2X0_AUX_CTRL_INSTR_PREFETCH_SHIFT) |
+> >     +               (way_size << L2X0_AUX_CTRL_WAY_SIZE_SHIFT);
+> > 
+> > 
+> > 
+> > #include <linux/bitops.h>
+> > Linus Walleij would write use  BIT() here
+> 
+> I will use BIT() macro.
 
-Well, yes that is basically what I am saying, unless we can find a
-different way (dmabuf? if there is some way to pass it through the
-blob bits you don't have src code for?)
-
-The problem is that we really can't merge something upstream that lets
-you dma to arbitrary physical address.  Maybe in staging, perhaps?  Or
-otherwise if there is no other way, I hope someone will at least pick
-up the modesetting parts of it and get that merged upstream.  The rest
-of the driver is looking pretty good, and I think it would be useful
-to have upstream.
-
-BR,
--R
-
-> There's really no point in such a driver; people might as well just
-> use the standard fbdev driver instead.
+Without checking those fields... BIT() is only appropriate if you're
+really talking about single bits.  If you have a field of more than a
+single bit which you happen to be setting to '1' then it's not
+appropriate to use BIT().
