@@ -1,32 +1,36 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Mon, 10 Jun 2013 23:52:42 +0800
-Subject: [V2 4/7] video: mmp: fix memcpy wrong size for mmp_addr issue
-Message-ID: <1370879562-11342-1-git-send-email-jtzhou@marvell.com>
+Date: Mon, 10 Jun 2013 23:52:54 +0800
+Subject: [V2 5/7] video: mmp: add pitch info in mmp_win structure
+Message-ID: <1370879574-11397-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jing Xiang <jxiang@marvell.com>
 
-Memcpy used wrong struct of mmp_win, fix it.
+Add pitch length info of graphics/video layer for mmp_win, if it is
+YUV format of video layer, u/v pitch will non-zero.
 
 Signed-off-by: Jing Xiang <jxiang@marvell.com>
 Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 ---
- drivers/video/mmp/hw/mmp_ctrl.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ include/video/mmp_disp.h |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-index 8836053..92a5f44 100644
---- a/drivers/video/mmp/hw/mmp_ctrl.c
-+++ b/drivers/video/mmp/hw/mmp_ctrl.c
-@@ -233,7 +233,7 @@ static int overlay_set_addr(struct mmp_overlay *overlay, struct mmp_addr *addr)
- 	struct lcd_regs *regs = path_regs(overlay->path);
+diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
+index b9dd1fb..462e3bd 100644
+--- a/include/video/mmp_disp.h
++++ b/include/video/mmp_disp.h
+@@ -91,6 +91,11 @@ struct mmp_win {
+ 	u16	up_crop;
+ 	u16	bottom_crop;
+ 	int	pix_fmt;
++	/*
++	 * pitch[0]: graphics/video layer line length or y pitch
++	 * pitch[1]/pitch[2]: video u/v pitch if non-zero
++	 */
++	u32	pitch[3];
+ };
  
- 	/* FIXME: assert addr supported */
--	memcpy(&overlay->addr, addr, sizeof(struct mmp_win));
-+	memcpy(&overlay->addr, addr, sizeof(struct mmp_addr));
- 	writel(addr->phys[0], &regs->g_0);
- 
- 	return overlay->addr.phys[0];
+ struct mmp_addr {
 -- 
 1.7.0.4
