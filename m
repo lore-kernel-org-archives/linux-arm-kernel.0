@@ -1,53 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 10 Jun 2013 08:15:34 +0000 (UTC)
-Subject: [PATCH v2 1/1] ARM : omap3 : fix wrong container_of in clock36xx.c
-In-Reply-To: <CAGGh5h0z3OPPL_jECb1NhENo2OaBqebdTC6r_ddhWKDuuB1Ykg@mail.gmail.com>
-References: <1369903827-2025-1-git-send-email-jp.francois@cynove.com>
- <alpine.DEB.2.02.1306051814520.10103@utopia.booyaka.com>
- <CAGGh5h1gBin0vWFf=SpB4eCQX69a2U+J6u2ccF_Oo_4R62+5fQ@mail.gmail.com>
- <alpine.DEB.2.02.1306061517430.5152@utopia.booyaka.com>
- <CAGGh5h0z3OPPL_jECb1NhENo2OaBqebdTC6r_ddhWKDuuB1Ykg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.02.1306100806530.4604@utopia.booyaka.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 10 Jun 2013 17:24:55 +0900
+Subject: [PATCH] ARM: dts: add vmmc regulator support for ODROID-X
+In-Reply-To: <1370454336-13003-1-git-send-email-tobetter@gmail.com>
+References: <1370454336-13003-1-git-send-email-tobetter@gmail.com>
+Message-ID: <0e9e01ce65b3$fcc3ba00$f64b2e00$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Jean-Philippe,
+Dongjin Kim wrote:
+> 
+> This patch is to add vmmc regulator node at MSHC and SDHCI for ODROID-X
+> board file.
+> 
+> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> ---
+>  arch/arm/boot/dts/exynos4412-odroidx.dts |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> index 1786225..3f3d7c8 100644
+> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
+> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
+> @@ -44,6 +44,7 @@
+>  		pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
+>  		pinctrl-names = "default";
+>  		status = "okay";
+> +		vmmc-supply = <&ldo20_reg &buck8_reg>;
+> 
+>  		num-slots = <1>;
+>  		supports-highspeed;
+> @@ -78,6 +79,7 @@
+>  		bus-width = <4>;
+>  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
+>  		pinctrl-names = "default";
+> +		vmmc-supply = <&ldo4_reg &ldo21_reg>;
+>  		status = "okay";
+>  	};
+> 
+> --
+> 1.7.9.5
 
-On Mon, 10 Jun 2013, jean-philippe francois wrote:
+Applied, thanks.
 
-> I am ok to work on it, however could you explain to me what is the
-> expected output of your PM tests, and how to reproduce them ?
-
-Here is the expected output for my ancient 3730 ES1.0 Beagle-XM:
-
-http://www.pwsan.com/omap/testlogs/test_v3.10-rc5/20130609031534/pm/3730beaglexm/3730beaglexm_log.txt
-
-When I ran that same test on the second version of your patch, the system 
-froze during the retention dynamic idle test:
-
-----------------
-
-%% Start retention dynamic idle UART wakeup test
-
-echo 3000 > /sys/devices/platform/omap_uart.0/power/autosuspend_delay_ms
-root at beagleboard:~# 
-root at beagleboard:~# echo 3000 > 
-/sys/devices/platform/omap_uart.1/power/autosuspend_delay_ms
-root at beagleboard:~# 
-root at beagleboard:~# echo 3000 > 
-/sys/devices/platform/omap_uart.2/power/autosuspend_delay_ms
-root at beagleboard:~# 
-root at beagleboard:~# echo 3000 > 
-/sys/devices/platform/omap_uart.3/power/autosuspend_delay_ms
-root at beagleboard:~# 
-root at beagleboard:~# 
-
--------------------
-
-That is where the log stopped.
-
-Sorry to hear about your board - I can certainly sympathize,
-
-regards,
-
-- Paul
+- Kukjin
