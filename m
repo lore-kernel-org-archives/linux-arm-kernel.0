@@ -1,23 +1,71 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Jun 2013 17:18:42 +0200
-Subject: [PATCH 02/10] ARM: ux500: Provide a supply name for the AB8500
- AUX regulators to use
-In-Reply-To: <1370621488-18130-3-git-send-email-lee.jones@linaro.org>
-References: <1370621488-18130-1-git-send-email-lee.jones@linaro.org>
- <1370621488-18130-3-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdZWc74MQqUdXbW=cEgzHbC7Og==Tq1iEbhQSeG891BWrA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 10 Jun 2013 16:19:47 +0100
+Subject: [PATCH] ARM: dts: add missing cpu #address-cell values
+In-Reply-To: <2030747.zTCiG7VMcH@wuerfel>
+References: <2030747.zTCiG7VMcH@wuerfel>
+Message-ID: <20130610151947.GA1310@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 6:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+On Mon, Jun 10, 2013 at 03:52:34PM +0100, Arnd Bergmann wrote:
+> A recent series has added CPU numbers to a lot of dts files,
+> but unfortunately in a few cases the #address-cells
+> and #size-cells values are missing, which causes build warnings.
+> This adds the missing ones for sunxi and sama5 that I found
+> through build testing.
 
-> AB8500 AUX regulators are supplied by EXT3 on some boards. This supply
-> phandle lookup will enable the regulator core to search for and locate
-> the EXT3 supply at registration time.
->
-> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+Gah, my bad, apologies, I missed the #address/#size cells updates to new
+dts that were merged the last merge window after rebasing, really sorry about
+that.
 
-Patch applied to my ux500-devicetree branch.
+Thanks !
+Lorenzo
 
-Yours,
-Linus Walleij
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> ---
+> I've applied this on top of the next/dt branch that has the original
+> patches.
+> 
+> diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
+> index abdf1c8..f57ffbc 100644
+> --- a/arch/arm/boot/dts/sama5d3.dtsi
+> +++ b/arch/arm/boot/dts/sama5d3.dtsi
+> @@ -38,6 +38,8 @@
+>  		ssc1 = &ssc1;
+>  	};
+>  	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+>  		cpu at 0 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a5";
+> diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+> index 39a8f61..06ef8b6 100644
+> --- a/arch/arm/boot/dts/sun4i-a10.dtsi
+> +++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+> @@ -16,6 +16,8 @@
+>  	interrupt-parent = <&intc>;
+>  
+>  	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+>  		cpu at 0 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a8";
+> diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+> index 00a2637d..d285254 100644
+> --- a/arch/arm/boot/dts/sun5i-a13.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+> @@ -17,6 +17,8 @@
+>  	interrupt-parent = <&intc>;
+>  
+>  	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+>  		cpu at 0 {
+>  			device_type = "cpu";
+>  			compatible = "arm,cortex-a8";
+> 
+> 
+> 
