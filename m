@@ -1,181 +1,85 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 10 Jun 2013 02:00:50 +0000 (UTC)
-Subject: OMAP baseline test results for v3.10-rc5
-Message-ID: <alpine.DEB.2.02.1306100158530.11164@utopia.booyaka.com>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Mon, 10 Jun 2013 11:13:14 +0900
+Subject: Active-low behavior in gpiolib
+In-Reply-To: <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
+References: <CAAVeFu+hQHScYYkvO1KOrUPLLaC0ju_O4SDZWyJE8KhLn_hibQ@mail.gmail.com>
+ <CACRpkdYmOHX2bPMKHwY=V2L+4EN-+5KzD-YCJhQtfkFeKV5p8g@mail.gmail.com>
+Message-ID: <CAAVeFuJctmszhjyL7Z09pzYt9c_NhhYm5xbgm+Ns3gE5Y-xjJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jun 7, 2013 at 4:10 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Well it is designed as a sysfs-only thing according to the comment:
+> drivers/gpio/gpiolib.c:#define FLAG_ACTIVE_LOW  6       /* sysfs value
+> has active low */
+>
+> So I think your actual question is whether it should also be
+> enabled for the kernel-internal interfaces.
 
-Here are some basic OMAP test results for Linux v3.10-rc5.
-Logs and other details at:
+Yes, that's my question.
 
-    http://www.pwsan.com/omap/testlogs/test_v3.10-rc5/20130609031534/
+> Currently we have things like this:
+>
+> /**
+>  * struct mmci_platform_data - platform configuration for the MMCI
+>  * (also known as PL180) block.
+> (...)
+>  * @gpio_cd: read this GPIO pin to detect card insertion
+>  * @cd_invert: true if the gpio_cd pin value is active low
+> (...)
+>         int     gpio_cd;
+>         bool    cd_invert;
+>
+> So the knowledge of whether a certain GPIO is active high or low
+> is spread out through drivers, and the API only drives the line in a
+> very explicit way.
+>
+> I am uncertain whether it is wise to move this into gpiolib for
+> in-kernel consumers, it is mainly a convention of where the
+> knowledge should sit. In the mentioned case, the flags will still
+> be needed because we need to have the information there to
+> set the flag toward the gpiolib API anyway.
+>
+> So the only thing gained is that gpiolib gets some knowledge
+> of how the pin is used. But what is the gain of that?
 
+Well, my problem is clearly highlighted by the example you mention,
+which is a very common usage pattern especially for DT-obtained GPIOs
+which can have this OF_GPIO_ACTIVE_LOW flag. E.g. we have a lot of
+this:
 
-Test summary
-------------
+    gpio = of_get_named_gpio_flags(np, "foo-gpios", 0, &flags);
+    active_low = flags & OF_GPIO_ACTIVE_LOW ? 1 : 0;
+    ...
+    state = (gpio_get_value(gpio) ? 1 : 0) ^ active_low;
+    ...
+    gpio_set_value(gpio, (value ? 1 : 0) ^ active_low;
 
-Build: uImage:
-    Pass (16/16): am33xx_only, n800_multi_omap2xxx, n800_only_a,
-                  omap1_defconfig, omap1_defconfig_1510innovator_only, 
-                  omap1_defconfig_5912osk_only, omap2plus_defconfig, 
-                  omap2plus_defconfig_2430sdp_only
-                  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm, 
-                  omap2plus_defconfig_omap2_4_only, 
-                  omap2plus_defconfig_omap3_4_only, 
-                  rmk_omap3430_ldp_allnoconfig, 
-                  rmk_omap3430_ldp_oldconfig, 
-                  rmk_omap4430_sdp_allnoconfig, 
-                  rmk_omap4430_sdp_oldconfig
+which could be simplified into this:
 
-Build: zImage:
-    Pass ( 1/ 1): omap2plus_defconfig
+    gpio = of_get_named_gpiod_flags(np, "foo-gpios", 0);
+    ...
+    state = gpiod_get_value(gpio);
+    ...
+    gpiod_set_value(gpio, value);
 
-Boot to userspace:
-    FAIL ( 3/12): 37xxevm, am335xbone, am335xbonelt
-    Pass ( 9/12): 2420n800, 2430sdp, 3517evm, 3530es3beagle,
-                  3730beaglexm, 4430es2panda, 4460pandaes, 5912osk,
-                  cmt3517
+Board design makes it possible to turn any GPIO active low for any
+(good or bad) reason, thus the drivers, which interact with gpiolib,
+are more likely to want to set the GPIO logical value (taking the
+active low parameter into account) rather than its raw level.
 
-PM: chip retention via suspend:
-    FAIL ( 3/ 6): 2430sdp, 37xxevm, 4430es2panda
-    Pass ( 3/ 6): 3530es3beagle, 3730beaglexm, 4460pandaes
+In the end, drivers that are not using an active_low flag are most
+likely doing so just because they never encountered such a situation.
+In practice, I suspect nearly all drivers want to be aware of the
+active-low property.
 
-PM: chip retention via dynamic idle:
-    FAIL ( 4/ 6): 2430sdp, 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 2/ 6): 3530es3beagle, 3730beaglexm
+Since gpiolib is already half-aware of this property, through the
+sysfs active_low node and the OF_GPIO_ACTIVE_LOW DT property, why not
+complete the circle and ease the life of driver writers?
 
-PM: chip off except CORE via suspend:
-    Pass ( 1/ 1): 3730beaglexm
+As Stephen wrote, an alternative set of functions to get/set the
+actual raw value of the line could be provided, but my understanding
+is that an overwhelming majority of GPIO users would benefit from
+having the active low property being handled transparently.
 
-PM: chip off except CORE via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
-
-PM: chip off via suspend:
-    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 1/ 4): 3530es3beagle
-
-PM: chip off via dynamic idle:
-    FAIL ( 3/ 4): 37xxevm, 4430es2panda, 4460pandaes
-    Pass ( 1/ 4): 3530es3beagle
-
-
-Failing tests: fixed by posted patches
---------------------------------------
-
-(none)
-
-
-Failing tests: needing investigation
-------------------------------------
-
-Boot tests:
-
-* 3517EVM & CM-T3517: boot hangs with NFS root
-  - Likely some Kconfig, board file, and PM issues with EMAC
-  - Longstanding bug
-  - Not currently part of the automated test suite
-
-* 37xx EVM: boot fails
-  - as of v3.10-rc1
-  - Cause unknown
-
-Boot warnings:
-
-* 2420N800, 2430sdp: failed to get counter_32k resource
-  - "omap2_sync32k_clocksource_init: failed to get counter_32k resource"
-  - Cause unknown
-
-* CM-T3517: L3 in-band error with IPSS during boot
-  - Cause unknown but see http://marc.info/?l=linux-omap&m=134833869730129&w=2
-  - Longstanding issue; does not occur on the 3517EVM
-
-* 2430SDP, 3730 Beagle XM, 3530 Beagle, 3517EVM, CM-T3517: {dmic,mcpdm} lookup failure
-  - Cause unknown
-  - These IP blocks don't exist on OMAP3xxx/AM35xx chips
-
-* 3730 Beagle XM, am335xbone, CM-T3517: uart4_rx.uart4_rx mux failure
-  - Cause unknown
-
-PM tests:
-
-* 2430sdp: power domains not entering retention
-  - Cause unknown
-
-* 3730 Beagle XM: does not serial wake from off-idle suspend when console
-  UART doesn't clock-gate ("debug ignore_loglevel")
-  - Cause unknown
-  - Not yet part of the automated test suite
-  - Re-tested at v3.7; still failing:
-    http://www.pwsan.com/omap/transcripts/20121211-3730beaglexm-3.7-pm-offmode-fail-debug.txt
-
-* 4430es2panda: pwrdm state mismatch on CAM, DSS
-
-* 4430es2panda: CORE, TESLA, IVAHD, L3INIT didn't enter target state
-  - Probably due to lack of reset code for M3, DSP, SL2IF, FSUSB
-    per discussion with Tero Kristo
-  - Likely dependent on the bootloader version
-    - fails with 2012.07-00136-g755de79
-  - http://marc.info/?l=linux-arm-kernel&m=136432340618226&w=2
-
-* 4430es2panda: MPU, ABE didn't enter target state
-  - New for v3.10-rc
-
-* 4460pandaes: pwrdm state mismatch on DSS, ABE, IVAHD, TESLA
-
-* 4460pandaes: chip not entering retention in dynamic idle
-  - Presumably 4430es2panda also fails this
-  - Suspend-to-RAM enters full chip retention
-
-Other:
-
-* 4430es2panda: omap_hwmod: l3_instr: _wait_target_disable failed
-  - Unknown cause; could be due to the lack of hierarchical enable/disable
-    in hwmod code
-  - Jon Hunter and Santosh Shilimkar report this does not appear with
-    the same X-loader/bootloader on his 4430ES2.3 Panda, so could be
-    ES-level dependent
-
-
-Failing tests: reported by others 
----------------------------------
-
-- RTC wakeup from suspend broken on 3730beaglexm
-  - as of v3.10-rc1
-  - discussion here: http://marc.info/?l=linux-omap&m=136915841625434&w=2
-
-
-
-vmlinux object size
-(delta in bytes from test_v3.10-rc4 
-(d683b96b072dc4680fc74964eca77e6a23d1fa6e)):
-   text     data      bss    total  kernel
-   +287       +8        0     +295  am33xx_only
-   +786       +8        0     +794  n800_multi_omap2xxx
-   +818       +8        0     +826  n800_only_a
-  +1207      +16        0    +1223  omap1_defconfig
-  +1207      +56        0    +1263  omap1_defconfig_1510innovator_only
-  +1239      -16        0    +1223  omap1_defconfig_5912osk_only
-  +4451       +8        0    +4459  omap2plus_defconfig
-  +1123       +8        0    +1131  omap2plus_defconfig_2430sdp_only
-   +355       +8        0     +363  omap2plus_defconfig_cpupm
-   +423      +72        0     +495  omap2plus_defconfig_no_pm
-   +355       +8        0     +363  omap2plus_defconfig_omap2_4_only
-   +355       +8        0     +363  omap2plus_defconfig_omap3_4_only
-   +192        0        0     +192  rmk_omap3430_ldp_allnoconfig
-   +443      -24        0     +419  rmk_omap3430_ldp_oldconfig
-   +192        0        0     +192  rmk_omap4430_sdp_allnoconfig
-   +722      +16        0     +738  rmk_omap4430_sdp_oldconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v3.10-rc4 
-(d683b96b072dc4680fc74964eca77e6a23d1fa6e))
-  avail  rsrvd   high  freed  board          kconfig
-     8k    -8k      .      .  2420n800       n800_only_a
-    -8k     8k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .      .  3517evm        omap2plus_defconfig
-    -8k     8k      .      .  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .      .  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .      .  4430es2panda   omap2plus_defconfig
-    -8k     8k      .      .  4460pandaes    omap2plus_defconfig
+Alex.
