@@ -1,56 +1,40 @@
-From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
-Date: Mon, 10 Jun 2013 11:25:17 +0000
-Subject: [PATCH 2/2] rtc: omap: add rtc wakeup support to alarm events
-In-Reply-To: <87a9nb2gjh.fsf@linaro.org>
-References: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
- <1369982005-8572-3-git-send-email-gururaja.hebbar@ti.com>
- <87a9nb2gjh.fsf@linaro.org>
-Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC2E907@DBDE04.ent.ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 10 Jun 2013 12:26:58 +0100
+Subject: [PATCH] ARM: zImage/virt: remove hyp-stub.S during distclean
+In-Reply-To: <20130610060325.2335.65815.sendpatchset@w520>
+References: <20130610060325.2335.65815.sendpatchset@w520>
+Message-ID: <20130610112658.GA2653@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 23:11:22, Kevin Hilman wrote:
-> Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
+On Mon, Jun 10, 2013 at 03:03:25PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
-> > On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
-> > is available to enable Wakeup feature for Alarm Events.
-> >
-> > Since new platforms/Boards are now added through DT only, this feature
-> > is supported via DT property only.
+> Make sure hyp-stub.S gets removed during make distclean,
+> this left over file was introduced in commit:
 > 
-> > Platforms using such IP should add the property "ti,has_irq_wake_enb"
-> > in rtc DT node.
+> 424e599 ARM: zImage/virt: hyp mode entry support for the zImage loader
 > 
-> This is a property of the IP, not the board.  Can't you detect this
-> based on the revision of the IP?
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-Here is what I found out till now.
+Thanks for spotting this.  Your fix looks sensible to me.
 
-1. rtc-omap driver is used by Davinci, OMAP-1/2 & AM33xx SoC.
+Acked-by: Dave Martin <dave.martin@linaro.org>
 
-2. Only AM33xx soc rtc ip has revision register (& populated). Older OMAP
-   Or davinci doesn't have this register.
-
-3. AFAIK, this was the reason why Afzal used platform_device_id & 
-   of_device_id->data method to detect new versions (commit
-   9e0344dcc225fe1a0e8b8af9ff7df44ec4613580)
-
-
-So now either 
-a. I can follow the same method and add new member to omap_rtc_devtype & add a new compatible in 
- omap_rtc_of_match in rtc-omap.c
-
-or
-
-b. use dt property to indicate existence of above property.
-
-
-Kindly let me know your opinion about the same.
-
+> ---
 > 
-> Kevin
+>  arch/arm/boot/compressed/Makefile |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-
-
-Regards, 
-Gururaja
+> --- 0001/arch/arm/boot/compressed/Makefile
+> +++ work/arch/arm/boot/compressed/Makefile	2013-06-05 17:21:20.000000000 +0900
+> @@ -116,7 +116,8 @@ targets       := vmlinux vmlinux.lds \
+>  
+>  # Make sure files are removed during clean
+>  extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
+> -		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
+> +		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs) \
+> +		 hyp-stub.S
+>  
+>  ifeq ($(CONFIG_FUNCTION_TRACER),y)
+>  ORIG_CFLAGS := $(KBUILD_CFLAGS)
