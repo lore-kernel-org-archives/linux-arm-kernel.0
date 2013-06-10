@@ -1,140 +1,73 @@
-From: james.king@linaro.org (James King)
-Date: Mon, 10 Jun 2013 11:48:44 +0100
-Subject: [PATCH] arm/dt: Don't add disabled CPUs to system topology
-In-Reply-To: <20130607164123.GF3111@e102568-lin.cambridge.arm.com>
-References: <1370538685-22386-1-git-send-email-james.king@linaro.org>
- <20130607102326.GA3111@e102568-lin.cambridge.arm.com>
- <CAFtq+0FuzNcoQpK7=7d_KetYYHoPC7rdkFWMrApey5dxiWZ9mg@mail.gmail.com>
- <20130607164123.GF3111@e102568-lin.cambridge.arm.com>
-Message-ID: <CAFtq+0HRk=Ccz0o5a-Or7Fz0+onEc1zNV4k5cN1+AnojPgTZ_w@mail.gmail.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Mon, 10 Jun 2013 11:50:15 +0100
+Subject: [PATCH v2] ARM: document the bigger pagetables needed for LPAE
+Message-ID: <1370861415-5587-1-git-send-email-javi.merino@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2013 17:41, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> On Fri, Jun 07, 2013 at 12:48:58PM +0100, James King wrote:
->> Hi Lorenzo,
->>
->> On 7 June 2013 11:23, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
->> > Hi James,
->> >
->> > On Thu, Jun 06, 2013 at 06:11:25PM +0100, James King wrote:
->> >> If CPUs are marked as disabled in the devicetree, make sure they do
->> >> not exist in the system CPU information and CPU topology information.
->> >> In this case these CPUs will not be able to be added to the system later
->> >> using hot-plug. This allows a single chip with many CPUs to be easily
->> >> used in a variety of hardware devices where they may have different
->> >> actual processing requirements (eg for thermal/cost reasons).
->> >>
->> >> - Change devicetree.c to ignore any cpu nodes marked as disabled,
->> >>   this effectively limits the number of active cpu cores so no need
->> >>   for the max_cpus=x in the chosen node.
->> >> - Change topology.c to ignore any cpu nodes marked as disabled, this
->> >>   is where the scheduler would learn about big/LITTLE cores so this
->> >>   effectively keeps the scheduler in sync.
->> >>
->> >
->> > I have two questions:
->> >
->> > 1) Since with this approach the DT should change anyway if on different
->> >    hardware devices based on the same chip you want to allow booting a
->> >    different number of CPUs, why do not we remove the cpu nodes instead of
->> >    disabling them ? Put it another way: cpu nodes define a cpu as
->> >    possible (currently), we can simply remove the node if we do not want
->> >    that cpu to be seen by the kernel.
->>
->> The reason we want disabled status rather than just remove the nodes
->> is to use a common soc.dtsi file which is included in many board.dts
->> files - eg:
->>
->> file soc.dtsi contains:
->>
->>                 cpus {
->>                                 cpu0: cpu at 0 {
->>                                                 device_type = "cpu";
->>                                                 compatible = "arm,cortex-a7";
->>                                                 reg = <0>;
->>                                                 cluster = <&cluster0>;
->>                                                 core = <&core0>;
->
-> Minor nit, "cluster" and "core" phandles are not part of cpu the bindings
-> that will be merged this cycle, I know it is just an example.
->
->>                                 };
->>
->>                                 cpu1: cpu at 1 {
->>                                                 device_type = "cpu";
->>                                                 compatible = "arm,cortex-a7";
->>                                                 reg = <1>;
->>                                                 cluster = <&cluster0>;
->>                                                 core = <&core1>;
->>                                 };
->>
->>                                 cpu2: cpu at 2 {
->>                                                 device_type = "cpu";
->>                                                 compatible = "arm,cortex-a15";
->>                                                 reg = <2>;
->>                                                 cluster = <&cluster0>;
->>                                                 core = <&core2>;
->>                                 };
->>                 };
->>
->> file board1.dts where we want the A15 disabled contains:
->>
->> /include/ "soc.dtsi"
->>
->>                 cpus {
->>                                 cpu2: cpu at 2 {
->>                                                 status = "disabled";
->>                                 };
->>                 };
->
-> Understood, see the other reply as far as the status property is concerned.
->
->> > 2) If we go for the "status" property, why do not we use it to set present
->> >    mask ? That way the cpu is possible but not present, you cannot
->> >    hotplug it in. It is a bit of a stretch, granted, the cpu _is_ present,
->> >    we just want to disable it, do not know how this is handled in x86
->> >    and other archs though.
->>
->> I have been struggling to find any equivalent example for another
->> arch, so just tried to solve our problem. I guess in the x86 world it
->> is less likely to want to disable processors in a SoC for heat/battery
->> issues so this has just never arisen. In this case the cpu is
->> physically present but not possible, but I am not sure it should be in
->> a present mask (giving the impression it can be used). Perhaps you
->> could elaborate with an example what you are thinking about here?
->
-> I was thinking about using status == "disabled" to mark a cpu as
-> possible but not present; that is a bad idea for the reason you mentioned
-> and also for the point Rob raised related to the ePAPR.
->
-> I am not sure how we can solve this issue, as I mentioned the easiest
-> solution consists in not defining cpu nodes in the DT or probably add
-> an additional property != status with proper bindings attached to it.
->
+The Booting documentation assumes that the initial pagetables are
+16KiB but since 1b6ba46 (ARM: LPAE: MMU setup for the 3-level page
+table format) they are 20KiB for LPAE kernels.  Thus, the
+recommendation to put atags or the dtb in the first 16KiB is wrong,
+there's only 12KiB of space there in LPAE kernels, so update the
+documentation accordingly.
 
-So what the ePAPR says is:
-"disabled" == Indicates that the device is not presently operational,
-but it might
-become operational in the future (for example, something is not
-plugged in, or switched off).
-Refer to the device binding for details on what disabled means for
-a given device.
+Signed-off-by: Javi Merino <javi.merino@arm.com>
+Acked-by: Rob Landley <rob@landley.net>
+---
+ Documentation/arm/Booting |   19 +++++++++++++++----
+ 1 file changed, 15 insertions(+), 4 deletions(-)
 
-So, would "disabled" be ok to use if those cores 'could' be re-added
-to the system using hot-plug?
-
-This would probably be fine for our usage as the user would have to
-have the right permissions to hot-plug in a cpu anyway (so is just as
-strong a protection as the DT anyway - if you root your device you can
-burn it). The main thing is the scheduler will not try and use it by
-default.
-
-If that sounds ok - I need to go back and look at the changes to see
-what will still allow a core to be hot-plugged in.
-
-Thanks,
-James
-
-> Lorenzo
->
+diff --git a/Documentation/arm/Booting b/Documentation/arm/Booting
+index 0c1f475..e3cab63 100644
+--- a/Documentation/arm/Booting
++++ b/Documentation/arm/Booting
+@@ -75,6 +75,16 @@ The boot loader must provide either a tagged list or a dtb image for
+ passing configuration data to the kernel.  The physical address of the
+ boot data is passed to the kernel in register r2.
+ 
++The low memory layout is as follows:
++
++   0k-12k   boot data (tagged list or device tree)
++  12k-32k   page tables
++  32k-xxx   kernel image
++
++The page tables go from 16k-32k in !CONFIG_ARM_LPAE kernels but in
++general it's safer to assume that you only have 12KiB for your boot
++data.
++
+ 4a. Setup the kernel tagged list
+ --------------------------------
+ 
+@@ -105,7 +115,7 @@ The tagged list should be stored in system RAM.
+ 
+ The tagged list must be placed in a region of memory where neither
+ the kernel decompressor nor initrd 'bootp' program will overwrite
+-it.  The recommended placement is in the first 16KiB of RAM.
++it.  The recommended placement is in the first 12KiB of RAM.
+ 
+ 4b. Setup the device tree
+ -------------------------
+@@ -120,7 +130,7 @@ tagged list.
+ The boot loader must pass at a minimum the size and location of the
+ system memory, and the root filesystem location.  The dtb must be
+ placed in a region of memory where the kernel decompressor will not
+-overwrite it.  The recommended placement is in the first 16KiB of RAM
++overwrite it.  The recommended placement is in the first 12KiB of RAM
+ with the caveat that it may not be located at physical address 0 since
+ the kernel interprets a value of 0 in r2 to mean neither a tagged list
+ nor a dtb were passed.
+@@ -137,8 +147,9 @@ then it is legal for the boot loader to call the zImage in flash
+ directly.
+ 
+ The zImage may also be placed in system RAM (at any location) and
+-called there.  Note that the kernel uses 16K of RAM below the image
+-to store page tables.  The recommended placement is 32KiB into RAM.
++called there.  Note that the kernel may use up to 20KiB of RAM below
++the image to store page tables.  The recommended placement is 32KiB
++into RAM.
+ 
+ In either case, the following conditions must be met:
+ 
+-- 
+1.7.9.5
