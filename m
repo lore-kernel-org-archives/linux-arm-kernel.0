@@ -1,61 +1,62 @@
-From: jtzhou@marvell.com (Jett.Zhou)
-Date: Mon, 10 Jun 2013 23:52:23 +0800
-Subject: [V2 2/7] video: mmp: optimize some register setting code
-Message-ID: <1370879543-11152-1-git-send-email-jtzhou@marvell.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Mon, 10 Jun 2013 16:51:41 +0100
+Subject: [PATCH v2 04/11] mfd:stixxxx-syscfg: Add ST System Configuration
+ support.
+In-Reply-To: <2757224.FBxg98dX57@wuerfel>
+References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
+ <CACRpkdaW2ALTWCB7Rd8m=aAGQwh3T_dJVncxJn_eXer4X3J6_g@mail.gmail.com>
+ <51B5DA26.6070707@st.com> <2757224.FBxg98dX57@wuerfel>
+Message-ID: <51B5F60D.6050205@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guoqing Li <ligq@marvell.com>
+Thanks for the comments.
+On 10/06/13 15:02, Arnd Bergmann wrote:
+> On Monday 10 June 2013 14:52:38 Srinivas KANDAGATLA wrote:
+>> On 10/06/13 14:16, Linus Walleij wrote:
+>>> On Mon, Jun 10, 2013 at 11:22 AM, Srinivas KANDAGATLA
+>>> <srinivas.kandagatla@st.com> wrote:
+>>>
+>>>> This mfd driver provides higher level inialization routines for various
+>>>> IPs like Ethernet, USB, PCIE, SATA and so on. Also it provides way to
+>>>> get to syscfg registers via standard regmap api which is usefull for
+>>>> drivers like pinctrl.
+>>>>
+>>>> This patch adds support to ST System Configuration registers, which can
+>>>> be configured by the drivers.
+>>>>
+>>>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
+>>>> CC: Stuart Menefy <stuart.menefy@st.com>
+>>>> CC: Stephen Gallimore <stephen.gallimore@st.com>
+>>>> CC: Linus Walleij <linus.walleij@linaro.org>
+>>>> CC: Mark Brown <broonie@kernel.org>
+>>>
+>>> What is this driver doing that drivers/mfd/syscon.c is not already
+>>> doing?
+>>
+>> As of now, the driver is very much similar to syscon + some additional
+>> functionality, but we are planning to use this file to add higher level
+>> functions to configure different IPs like ethernet, usb, power, reset
+>> and so on which are very much specific to ST System Configuration Registers.
+> 
+> I was expecting that you'd actually interface with the syscon code and
+> build on top, rather than copy it.
+> 
+I did not like the copying either, on the other hand I don't want to
+pollute the syscon code.
 
-There are dumplicate code of the smooth setting based on different
-path, optimized the routine and use readl_relaxed instead.
+As you said, I will make use of existing syscon and build "System
+configuration interface" on top of it and see how it look like. It will
+definitely get rid of lot of code duplication.
 
-Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-Signed-off-by: Jing Xiang <jxiang@marvell.com>
-Signed-off-by: Guoqing Li <ligq@marvell.com>
----
- drivers/video/mmp/hw/mmp_ctrl.c |   22 +++++++---------------
- 1 files changed, 7 insertions(+), 15 deletions(-)
+Thanks,
+srini
 
-diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-index a472c4d..3a8c2a3 100644
---- a/drivers/video/mmp/hw/mmp_ctrl.c
-+++ b/drivers/video/mmp/hw/mmp_ctrl.c
-@@ -53,7 +53,7 @@ static irqreturn_t ctrl_handle_irq(int irq, void *dev_id)
- 		tmp = readl_relaxed(ctrl->reg_base + SPU_IRQ_ISR);
- 		if (tmp & isr)
- 			writel_relaxed(~isr, ctrl->reg_base + SPU_IRQ_ISR);
--	} while ((isr = readl(ctrl->reg_base + SPU_IRQ_ISR)) & imask);
-+	} while ((isr = readl_relaxed(ctrl->reg_base + SPU_IRQ_ISR)) & imask);
- 
- 	return IRQ_HANDLED;
- }
-@@ -371,20 +371,12 @@ static void path_set_default(struct mmp_path *path)
- 	 * bus arbiter for faster read if not tv path;
- 	 * 2.enable horizontal smooth filter;
- 	 */
--	if (PATH_PN == path->id) {
--		mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK
--			| CFG_ARBFAST_ENA(1);
--		tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
--		tmp |= mask;
--		writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
--	} else if (PATH_TV == path->id) {
--		mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK
--			| CFG_ARBFAST_ENA(1);
--		tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
--		tmp &= ~mask;
--		tmp |= CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK;
--		writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
--	}
-+	mask = CFG_GRA_HSMOOTH_MASK | CFG_DMA_HSMOOTH_MASK | CFG_ARBFAST_ENA(1);
-+	tmp = readl_relaxed(ctrl_regs(path) + dma_ctrl(0, path->id));
-+	tmp |= mask;
-+	if (PATH_TV == path->id)
-+		tmp &= ~CFG_ARBFAST_ENA(1);
-+	writel_relaxed(tmp, ctrl_regs(path) + dma_ctrl(0, path->id));
- }
- 
- static int path_init(struct mmphw_path_plat *path_plat,
--- 
-1.7.0.4
+> There are multiple ways of doing that, e.g. you could export a function
+> from syscon.c that you call to register the device node and then import
+> the regmap from syscon into your high-level driver again.
+
+> 
+> 	Arnd
+> 
+> 
