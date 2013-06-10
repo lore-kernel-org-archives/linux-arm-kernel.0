@@ -1,47 +1,322 @@
-From: anish198519851985@gmail.com (anish singh)
-Date: Mon, 10 Jun 2013 21:31:21 +0530
-Subject: [PATCHv2 4/6] sched_clock: Add support for >32 bit sched_clock
-In-Reply-To: <20130610153850.GU18614@n2100.arm.linux.org.uk>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <1370155183-31421-5-git-send-email-sboyd@codeaurora.org>
- <20130603093938.GG18614@n2100.arm.linux.org.uk>
- <51AD069F.1060308@codeaurora.org>
- <20130603221210.GO18614@n2100.arm.linux.org.uk>
- <CAK7N6vrVvYPP8_y9F3uC=vZpdkb7_9gdzG96xSiyr0ASe6iMCQ@mail.gmail.com>
- <20130610153850.GU18614@n2100.arm.linux.org.uk>
-Message-ID: <CAK7N6vqao-O4hTLCNatu3LVC38OFR+L8MxZCc-gi1fikBSdYYA@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Mon, 10 Jun 2013 18:03:29 +0200
+Subject: [PATCH] i2c: vt8500: Add support for I2C bus on Wondermedia SoCs
+In-Reply-To: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
+References: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130610160328.GG2987@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 9:08 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Hi Tony,
 
-Least I can do is to say "Thanks".
-> On Mon, Jun 10, 2013 at 08:46:36PM +0530, anish singh wrote:
->> Probably a trivial question.I was wondering why this particular requirement
->> exists in the first place.I looked into this commit 112f38a4a3 but couldn't
->> gather the reason.
->
-> You're looking at a commit introducing an implementation.  The requirement
-> isn't driven by the implementation.  It's driven by the code and the maths
-> in the core scheduler, and its been a requirement for years.
->
-> sched_clock() needs to be monotonic, and needs to wrap at 64-bit, because
-> calculations are done by comparing the difference of two 64-bit values
-> returned from this function.
+> +static int wmt_i2c_wait_bus_not_busy(struct wmt_i2c_dev *i2c_dev)
+> diff --git a/drivers/i2c/busses/i2c-wmt.c b/drivers/i2c/busses/i2c-wmt.c
+> new file mode 100644
+> index 0000000..5cebb29
+> --- /dev/null
+> +++ b/drivers/i2c/busses/i2c-wmt.c
 
-Yes, and this is the question.If it is 32 bit then also it can overflow but
-it will happen relatively fast.So I guess that is the reason why we use 64 bit
-and this will avoid recalculations for recalibration.
->
-> Let's take a trivial example - if you have a 16 bit counter, and you have
-> a value of 0xc000 ns, and next time you read it, it has value 0x0001 ns,
-> then what value do you end up with when you calculate the time passed
-> using 64-bit maths.
->
-> That's 0x0000000000000001 - 0x000000000000c000.  The answer is a very big
-> number which is not the correct 16385.  This means that things like process
-> timeslice counting and scheduler fairness is compromised - I'd expect even
+...
 
-So you mean when counter overflows the scheduler doesn't handle it?
-> more so if you're running RT and this is being used to provide guarantees.
+> +{
+> +	u16 val;
+> +	int i;
+> +	int ret = 0;
+> +
+> +	for (i = 0; i < 100000; i++) {
+> +		val = readw(i2c_dev->base + REG_CSR);
+> +		if (val & CSR_READY_MASK)
+> +			break;
+> +
+> +		udelay(1);
+> +	}
+> +	if (i >= 9999999)
+> +		ret = -EBUSY;
+
+What about using time_after and usleep_range?
+
+> +
+> +	return ret;
+> +}
+> +static int wmt_i2c_write(struct i2c_adapter *adap, struct i2c_msg *pmsg,
+> +						   int restart, int last)
+> +{
+> +	struct wmt_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
+> +	u16 val, tcr_val;
+> +	int ret, wait_result;
+> +	int xfer_len = 0;
+> +
+> +	if (!restart) {
+> +		ret = wmt_i2c_wait_bus_not_busy(i2c_dev);
+> +		if (ret < 0)
+> +			return ret;
+> +	}
+> +
+> +	if (pmsg->len == 0) {
+> +		/*
+> +		 * We still need to run through the while (..) once, so
+> +		 * start at -1 and break out early from the loop
+> +		 */
+> +		xfer_len = -1;
+> +		writew(0, i2c_dev->base + REG_CDR);
+> +	} else {
+> +		writew(pmsg->buf[0] & 0xFF, i2c_dev->base + REG_CDR);
+> +	}
+> +
+> +	if (!restart) {
+> +		val = readw(i2c_dev->base + REG_CR);
+> +		val &= ~CR_TX_END;
+> +		writew(val, i2c_dev->base + REG_CR);
+> +
+> +		val = readw(i2c_dev->base + REG_CR);
+> +		val |= CR_CPU_RDY;
+> +		writew(val, i2c_dev->base + REG_CR);
+> +	}
+> +
+> +	init_completion(&i2c_dev->complete);
+
+INIT_COMPLETION (and init_completion in probe)
+
+> +static int wmt_i2c_read(struct i2c_adapter *adap, struct i2c_msg *pmsg,
+> +						  int restart, int last)
+> +{
+> +	struct wmt_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
+> +	u16 val, tcr_val;
+> +	int ret, wait_result;
+> +	u32 xfer_len = 0;
+> +
+> +	if (!restart) {
+> +		ret = wmt_i2c_wait_bus_not_busy(i2c_dev);
+> +		if (ret < 0)
+> +			return ret;
+> +	}
+> +
+> +	val = readw(i2c_dev->base + REG_CR);
+> +	val &= ~CR_TX_END;
+> +	writew(val, i2c_dev->base + REG_CR);
+> +
+> +	val = readw(i2c_dev->base + REG_CR);
+> +	val &= ~CR_TX_NEXT_NO_ACK;
+> +	writew(val, i2c_dev->base + REG_CR);
+> +
+> +	if (!restart) {
+> +		val = readw(i2c_dev->base + REG_CR);
+> +		val |= CR_CPU_RDY;
+> +		writew(val, i2c_dev->base + REG_CR);
+> +	}
+> +
+> +	if (pmsg->len == 1) {
+> +		val = readw(i2c_dev->base + REG_CR);
+> +		val |= CR_TX_NEXT_NO_ACK;
+> +		writew(val, i2c_dev->base + REG_CR);
+> +	}
+> +
+> +	init_completion(&i2c_dev->complete);
+
+ditto
+
+> +static int wmt_i2c_xfer(struct i2c_adapter *adap,
+> +			struct i2c_msg msgs[],
+> +			int num)
+> +{
+> +	struct i2c_msg *pmsg;
+> +	int i, is_last, restart;
+> +	int ret = 0;
+> +
+> +	for (i = 0; ret >= 0 && i < num; i++) {
+> +		is_last = ((i + 1) == num);
+> +		restart = (i != 0);
+> +
+> +		pmsg = &msgs[i];
+> +		if (pmsg->flags & I2C_M_NOSTART)
+> +			restart = 1;
+
+NOSTART is not restart!? Either your variable is misnamed or check
+Documentation/i2c/i2c-protocol what it is about.
+
+> +		if (pmsg->flags & I2C_M_RD)
+> +			ret = wmt_i2c_read(adap, pmsg, restart, is_last);
+> +		else
+> +			ret = wmt_i2c_write(adap, pmsg, restart, is_last);
+> +	}
+> +
+> +	return (ret < 0) ? ret : i;
+> +}
+> +
+> +static int wmt_i2c_reset_hardware(struct wmt_i2c_dev *i2c_dev)
+> +{
+> +	int err;
+> +
+> +	err = clk_prepare_enable(i2c_dev->clk);
+> +	if (err) {
+> +		dev_err(i2c_dev->dev, "failed to enable clock\n");
+> +		return err;
+> +	}
+> +
+> +	err = clk_set_rate(i2c_dev->clk, 20000000);
+> +	if (err) {
+> +		dev_err(i2c_dev->dev, "failed to set clock = 20Mhz\n");
+> +		return err;
+> +	}
+> +
+> +	writew(0, i2c_dev->base + REG_CR);
+> +	writew(12, i2c_dev->base + REG_MCR);
+
+What are those magic values?
+
+> +	writew(ISR_WRITE_ALL, i2c_dev->base + REG_ISR);
+> +	writew(IMR_ENABLE_ALL, i2c_dev->base + REG_IMR);
+> +	writew(CR_ENABLE, i2c_dev->base + REG_CR);
+> +	readw(i2c_dev->base + REG_CSR);		/* read clear */
+> +	writew(ISR_WRITE_ALL, i2c_dev->base + REG_ISR);
+> +
+> +	if (i2c_dev->mode == I2C_MODE_STANDARD)
+> +		writew(SCL_TIMEOUT(128) | TR_STD, i2c_dev->base + REG_TR);
+> +	else
+> +		writew(SCL_TIMEOUT(128) | TR_HS, i2c_dev->base + REG_TR);
+> +
+> +	return 0;
+> +}
+> +
+> +static int wmt_i2c_probe(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct wmt_i2c_dev *i2c_dev;
+> +	struct i2c_adapter *adap;
+> +	struct resource *res;
+> +	int err;
+> +	u32 clk_rate;
+> +
+> +	if (!np) {
+> +		dev_err(&pdev->dev, "device node not found\n");
+> +		return -ENODEV;
+> +	}
+
+This can't happen since we were matched by the driver core.
+
+> +
+> +	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
+> +	if (!i2c_dev) {
+> +		dev_err(&pdev->dev, "device memory allocation failed\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	i2c_dev->base = devm_ioremap_resource(&pdev->dev, res);
+> +	if (IS_ERR(i2c_dev->base))
+> +		return PTR_ERR(i2c_dev->base);
+> +
+> +	i2c_dev->irq = irq_of_parse_and_map(np, 0);
+> +	if (!i2c_dev->irq) {
+> +		dev_err(&pdev->dev, "irq missing or invalid\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	i2c_dev->clk = of_clk_get(np, 0);
+> +	if (IS_ERR(i2c_dev->clk)) {
+> +		dev_err(&pdev->dev, "unable to request clock\n");
+> +		return PTR_ERR(i2c_dev->clk);
+> +	}
+> +
+> +	i2c_dev->mode = I2C_MODE_STANDARD;
+> +	err = of_property_read_u32(np, "clock-frequency", &clk_rate);
+> +	if ((!err) && (clk_rate == 400000))
+> +		i2c_dev->mode = I2C_MODE_FAST;
+> +
+> +	i2c_dev->dev = &pdev->dev;
+> +
+> +	err = devm_request_irq(&pdev->dev, i2c_dev->irq, wmt_i2c_isr, 0,
+> +							"i2c", i2c_dev);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to request irq %i\n", i2c_dev->irq);
+> +		return err;
+> +	}
+> +
+> +	adap = &i2c_dev->adapter;
+> +	i2c_set_adapdata(adap, i2c_dev);
+> +	strlcpy(adap->name, "WMT I2C adapter", sizeof(adap->name));
+> +	adap->owner = THIS_MODULE;
+> +	adap->class = I2C_CLASS_HWMON;
+
+Don't use .class unless you have an explicit reason to do so. It may
+cost boot-time.
+
+> +	adap->algo = &wmt_i2c_algo;
+> +	adap->dev.parent = &pdev->dev;
+> +	adap->dev.of_node = pdev->dev.of_node;
+> +	adap->nr = of_alias_get_id(pdev->dev.of_node, "i2c");
+> +
+> +	err = wmt_i2c_reset_hardware(i2c_dev);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "error initializing hardware\n");
+> +		return err;
+> +	}
+> +
+> +	if (adap->nr < 0)
+> +		err = i2c_add_adapter(adap);
+> +	else
+> +		err = i2c_add_numbered_adapter(adap);
+
+add_numbered_adapter does handle this case internally.
+
+> +
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to add adapter\n");
+> +		return err;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, i2c_dev);
+> +
+> +	of_i2c_register_devices(adap);
+> +
+> +	return 0;
+> +}
+> +
+> +static int wmt_i2c_remove(struct platform_device *pdev)
+> +{
+> +	struct wmt_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
+> +
+> +	/* Disable interrupts, clock and delete adapter */
+> +	writew(0, i2c_dev->base + REG_IMR);
+> +	clk_disable_unprepare(i2c_dev->clk);
+> +	i2c_del_adapter(&i2c_dev->adapter);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct of_device_id wmt_i2c_dt_ids[] = {
+> +	{ .compatible = "wm,wm8505-i2c" },
+> +	{ /* Sentinel */ },
+> +};
+> +
+> +static struct platform_driver wmt_i2c_driver = {
+> +	.probe		= wmt_i2c_probe,
+> +	.remove		= wmt_i2c_remove,
+> +	.driver		= {
+> +		.name	= "wmt-i2c",
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = wmt_i2c_dt_ids,
+> +	},
+> +};
+> +
+> +module_platform_driver(wmt_i2c_driver);
+> +
+> +MODULE_DESCRIPTION("Wondermedia I2C master-mode bus adapter");
+> +MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
+> +MODULE_LICENSE("GPL v2");
+
+Header says GPLv2+
+
+> +MODULE_DEVICE_TABLE(of, wmt_i2c_dt_ids);
+
+Thanks,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/0cdac200/attachment.sig>
