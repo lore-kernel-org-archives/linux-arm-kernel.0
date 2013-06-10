@@ -1,59 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 9 Jun 2013 17:14:30 -0700
-Subject: [GIT PULL] SiRF fixes for the v3.10 series
-In-Reply-To: <CAGsJ_4x+1_mD3eoyWEOSUq1uZAWGqFNNSSja6YAkLu0=WwL9rg@mail.gmail.com>
-References: <CAGsJ_4xTVms1wZVgBDE-+qZMGxKT4s_u-A=wXiB2Xq0NztpOUw@mail.gmail.com>
- <CAOesGMhSSYPQ6fUVDy+4Nj3s48HC=4Mny7m_kRCP4Cviq9rCbg@mail.gmail.com>
- <CAGsJ_4x+1_mD3eoyWEOSUq1uZAWGqFNNSSja6YAkLu0=WwL9rg@mail.gmail.com>
-Message-ID: <20130610001430.GA22196@quad.lixom.net>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 9 Jun 2013 14:38:35 -1000
+Subject: [PATCH] cpuidle: fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency
+ warning
+In-Reply-To: <201306072121.58719.arnd@arndb.de>
+References: <1370626856-2876-1-git-send-email-daniel.lezcano@linaro.org>
+ <51B21D65.3040604@ti.com> <201306072121.58719.arnd@arndb.de>
+Message-ID: <CAMbhsRQkiz2Wtsfi6rFcw0vXZM5uFbeuJD+3f4+R+637LCAS5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 09, 2013 at 01:52:47PM +0800, Barry Song wrote:
-> 2013/6/9 Olof Johansson <olof@lixom.net>:
-> > On Sun, Jun 2, 2013 at 11:28 PM, Barry Song <21cnbao@gmail.com> wrote:
-> >> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
-> >>
-> >>   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
-> >> tags/sirf-arm-soc-v3.10-fixes
-> >>
-> >> for you to fetch changes up to 3cc3b617dc39dad1e566ccfc4500154cb7c51aa3:
-> >>
-> >>   arm: prima2: use of_platform_populate instead of
-> >> of_platform_bus_probe (2013-06-03 13:51:58 +0800)
+On Fri, Jun 7, 2013 at 9:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> On Friday 07 June 2013, Santosh Shilimkar wrote:
+> > > diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> > > index f49cd51..831e89e 100644
+> > > --- a/arch/arm/mach-omap2/Kconfig
+> > > +++ b/arch/arm/mach-omap2/Kconfig
+> > > @@ -83,7 +83,7 @@ config ARCH_OMAP4
+> > >       depends on ARCH_OMAP2PLUS
+> > >       depends on ARCH_MULTI_V7
+> > >       select ARCH_HAS_OPP
+> > > -     select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+> > > +     select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
 > >
-> >
-> > Hi,
-> >
-> > Sorry for the delay in responding to this.
-> >
-> > Looking at the patches, they don't seem to fix any regression or
-> > serious bug -- they are more of cleanups and code removals. So I've
-> > pulled them into next/fixes-non-critical for 3.11.
-> 
-> Hi Olof, i must have maken a mistake. i planned you pull this againest
-> 3.10-rc4, then this will be in 3.10-rc5.
-> 
-> so i rebased two critical fixes againest this patchset and planned
-> them be in rc6:
-> [PATCH 0/2] ARM: multiple-platforms: fix the kernel panic on non-SiRF platforms
-> [PATCH 1/2] ARM:prima2: move sirfsoc_of_rstc_init to .init_machine
-> [PATCH 2/2] ARM:prima2:drop postcore_initcalls in pm module
-> 
-> the above two patches are critical as it blocks non-CSR
-> multi-platforms, but they are depending on this patchset. so how can
-> we make this happen?
+> > I remember Colin mentioning about above dependency is taken care
+> > already in design [1]
+>
+> It's a matter of how it gets represented in Kconfig. Right now
+> the ARCH_NEEDS_CPU_IDLE_COUPLED symbol has a dependency on CPU_IDLE,
+> so we cannot select it if CPU_IDLE is not set (or get a build time
+> warning).
+>
+> I originally suggested removing the dependency, but Daniel preferred
+> to leave it there as an explicit dependency so it is required to
+> do this change instead.
 
-Hi,
-
-I repled on the 0/2 patch above -- for 3.10 it makes much more sense to make
-a more narrow fix that just gracefully fails the initcall if the device node
-isn't found, instead of panicking. That's a generally preferred behavior
-anyway.
-
-
--Olof
+ARCH_NEEDS_CPU_IDLE_COUPLED should never have been moved inside "if
+CPU_IDLE".  It was designed to be outside the CPU_IDLE dependency so
+archs could select it without having to know about its dependencies.
+Just move it back outside if CPU_IDLE in drivers/cpuidle/Kconfig and
+you won't have to mess with every arch that uses it.  If CPU_IDLE=n
+none if it will get compiled, so there is no need for the extra
+dependency.
