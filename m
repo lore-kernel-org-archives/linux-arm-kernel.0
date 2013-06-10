@@ -1,32 +1,43 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Mon, 10 Jun 2013 08:58:33 +0530
-Subject: [PATCH v1 0/3] Polling support for s3c64xx spi controller
-In-Reply-To: <1369032694-13183-1-git-send-email-ks.giri@samsung.com>
-References: <1369032694-13183-1-git-send-email-ks.giri@samsung.com>
-Message-ID: <CAKrE-Kd22BM=zS=KZN_a69yAN8zSSdq-Rh-x_dsNRZD4JffPwg@mail.gmail.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 10 Jun 2013 11:40:18 +0800
+Subject: [PATCH 0/2] ARM: multiple-platforms: fix the kernel panic on
+ non-SiRF platforms
+In-Reply-To: <20130610001331.GA21645@quad.lixom.net>
+References: <1370313255-20396-1-git-send-email-Baohua.Song@csr.com>
+ <20130610001331.GA21645@quad.lixom.net>
+Message-ID: <CAGsJ_4yZJ4Fs2fOyv1D1vBLTzRnhNu=6E8qTA_0m7gnkPEE63A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mark,
-
-pls let me know if there is any issue with this series
-
-
-
-On Mon, May 20, 2013 at 12:21 PM, Girish K S <girishks2000@gmail.com> wrote:
-> This patch series adds support for the polling mode only. Also 2nd patch
-> in the series adds support for dedicated cs pin. After Thomas's patch for
-> using default gpio is merged(commit id: 00ab539), one of the patch in this
-> series is dropped and new series is generated.
+2013/6/10 Olof Johansson <olof@lixom.net>:
+> On Tue, Jun 04, 2013 at 10:34:13AM +0800, Barry Song wrote:
+>> These two patches fix the kernel panic for multiple-platform kernel to run on non-SiRF
+>> platforms.
+>>
+>> It depends on patches I sent in the pull-request mail
+>> [GIT PULL] SiRF fixes for the v3.10 series
+>> at:
+>> http://www.spinics.net/lists/arm-kernel/msg247521.html
+>>
+>> And thanks for the original patchset from Srinivas Kandagatla <srinivas.kandagatla@st.com>
 >
-> Girish K S (3):
->   spi: s3c64xx: added support for polling mode
->   spi: s3c64xx: Added provision for dedicated cs pin
->   spi: s3c64xx: Added support for exynos5440 spi
+> Hi,
 >
->  drivers/spi/spi-s3c64xx.c |  197 ++++++++++++++++++++++++++++++++-------------
->  1 files changed, 140 insertions(+), 57 deletions(-)
+> A better and more narrow fix for 3.10 would be to gracefully abort the
+> initcalls if the device nodes are not found, which is what I had as original
+> feedback on these patches in the first place. Print an error but continue
+> booting.
+ok, for 3.10, let's do a quick fix, then i will ack haojian zhuang's:
+[PATCH v2] ARM: prima2: fix incorrect panic usage
+
+i had some discussion with Srinivas, and agreed with Srinivas about
+moving these functions to callback of prima2 mach_desc. that will
+avoid some redundant function calls for non-csr platforms. i'll make
+it as cleanup in 3.11 then.
+
 >
-> --
-> 1.7.5.4
 >
+> -Olof
+>
+
+-barry
