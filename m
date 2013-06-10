@@ -1,59 +1,53 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 10 Jun 2013 14:52:08 -0400
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306101316020.1133-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306101316020.1133-100000@iolanthe.rowland.org>
-Message-ID: <1370890328.9844.111.camel@gandalf.local.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 10 Jun 2013 19:52:40 +0100
+Subject: [PATCH] arm: versatile: don't mark pen as __INIT
+In-Reply-To: <51B61D5F.1090906@codeaurora.org>
+References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
+ <51B61D5F.1090906@codeaurora.org>
+Message-ID: <20130610185240.GC2513@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-06-10 at 13:36 -0400, Alan Stern wrote:
+On Mon, Jun 10, 2013 at 07:39:27PM +0100, Stephen Boyd wrote:
+> On 06/10/13 08:07, Mark Rutland wrote:
+> > When booting fewer cores than are physically present on a versatile
+> > platform (e.g. when passing maxcpus=N on the command line), some
+> > secondary cores may remain in the holding pen, which is marked __INIT.
+> > Late in the boot process, the memory comprising the holding pen will be
+> > released to the kernel for more general use, and may be overwritten with
+> > arbitrary data, which can cause the held secondaries to start behaving
+> > unpredictably. This can lead to all manner of odd behaviour from the
+> > kernel.
+> >
+> > Instead don't mark the section as __INIT. This means we can't reuse the
+> > pen memory, but we won't get secondaries corrupting the rest of the
+> > kernel.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> >  arch/arm/plat-versatile/headsmp.S | 2 --
+> >  1 file changed, 2 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
+> > index b178d44..2677bc3 100644
+> > --- a/arch/arm/plat-versatile/headsmp.S
+> > +++ b/arch/arm/plat-versatile/headsmp.S
+> > @@ -11,8 +11,6 @@
+> >  #include <linux/linkage.h>
+> >  #include <linux/init.h>
+> >  
+> > -	__INIT
+> > -
+> >  /*
+> >   * Realview/Versatile Express specific entry point for secondary CPUs.
+> >   * This provides a "holding pen" into which all secondary cores are held
+> 
+> Why doesn't __CPUINIT work?
 
-> > I don't think so, and obviously softirq allows IRQs to be served quickly,
-> > otherwise why is softirq and tasklet introduced?
+Won't we then encounter the same problem on builds without CPU_HOTPLUG? I
+thought we'd throw away the .cpuinit.* section(s) in that case?
 
-Because of history. In the old days there were top halves (hard irq) and
-bottom halves (like a softirq). The thing about a bottom half was, no
-two could run at the same time. That is, if one CPU was running a bottom
-half, another CPU would have to wait for that one to complete before it
-could run any bottom half. The killer here is that it didn't matter if
-it was the same bottom half or not! Microsoft/Mindcraft was kind enough
-to point out this inefficiency with some benchmarks showing how horrible
-Linux ran on a 4 way box. Thanks to them, softirqs and tasklets were
-born :-)
-
-A softirq does the rest of the interrupt work with interrupts enabled.
-
-A tasklet is run from softirq context, but the difference between a
-softirq and tasklet is that the same tasklet can not run on two
-different CPUs at the same time. It acts similar to a task, as a task
-can not run on two different CPUs at the same time either, hence the
-name "tasklet". But tasklets are better than bottom halves because it
-allows for different tasklets to run on different CPUs.
-
-
-
->  and why so many drivers
-> > are using tasklet/softirq?
-
-Because it's easy to set up and device driver authors don't know any
-better ;-). Note, a lot of drivers are now using work queues today,
-which run as a task.
-
-Yes, there's a little more overhead with a task than for a softirq, but
-the problem with softirqs and tasklets is that they can't be preempted,
-and they are more important than all tasks on the system. If you have a
-task that is critical, it must yield for your softirq. Almost!
-
-That is, even if you have a softirq, it may not run in irq context at
-all. If you get too many softirqs at a time (one comes while another one
-is running), it will defer the processing to the ksoftirq thread. This
-not only runs as a task, but also runs as SCHED_OTHER, and must yield to
-other tasks like everyone else too.
-
-Thus, adding it as a softirq does not guarantee that it will be
-processed quickly. It just means that most of the time it will prevent
-anything else from happening while your "most important handler in the
-world" is running.
-
--- Steve
+Thanks,
+Mark.
