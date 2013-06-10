@@ -1,72 +1,74 @@
-From: b.brezillon@overkiz.com (boris brezillon)
-Date: Mon, 10 Jun 2013 11:28:35 +0200
-Subject: [RFC PATCH 28/50] ASoC: atmel-ssc: prepare clk before calling
- enable
-In-Reply-To: <20130610090649.GC31367@sirena.org.uk>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
- <1370622370-19614-1-git-send-email-b.brezillon@overkiz.com>
- <20130607165510.GA31367@sirena.org.uk> <51B23B04.20604@overkiz.com>
- <20130610090649.GC31367@sirena.org.uk>
-Message-ID: <51B59C43.2020708@overkiz.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 10 Jun 2013 11:29:30 +0200
+Subject: [PATCH] cpuidle: fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency
+ warning
+In-Reply-To: <CAMbhsRQkiz2Wtsfi6rFcw0vXZM5uFbeuJD+3f4+R+637LCAS5A@mail.gmail.com>
+References: <1370626856-2876-1-git-send-email-daniel.lezcano@linaro.org>
+ <51B21D65.3040604@ti.com> <201306072121.58719.arnd@arndb.de>
+ <CAMbhsRQkiz2Wtsfi6rFcw0vXZM5uFbeuJD+3f4+R+637LCAS5A@mail.gmail.com>
+Message-ID: <51B59C7A.1050401@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/2013 11:06, Mark Brown wrote:
-> On Fri, Jun 07, 2013 at 09:56:52PM +0200, Boris BREZILLON wrote:
->> On 07/06/2013 18:55, Mark Brown wrote:
->>> On Fri, Jun 07, 2013 at 06:26:09PM +0200, Boris BREZILLON wrote:
->>>> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
->>>> avoid common clk framework warnings.
->>> Applied since I happened to notice this on he list but you should
->>> *always* CC maintainers on patches otherwise they're likely to get
->>> missed.
->> I used get_mainainer script and it returns:
->> Arnd Bergmann <arnd@arndb.de> (supporter:CHAR and MISC DRI...)
->> Greg Kroah-Hartman <gregkh@linuxfoundation.org> (supporter:CHAR and
->> MISC DRI...)
->> linux-kernel at vger.kernel.org (open list)
->> Please tell me if misuse this script or if I should use something else.
-> I suspect you only ran this on some of the patches as that's missing
-> pretty much all of the subsystem maintainers, but in general you always
-> have to think about the output of get_maintainer.pl - it isn't terribly
-> reliable.
-I use a script to add "cc" and "to" fields to each patch:
+On 06/10/2013 02:38 AM, Colin Cross wrote:
+> On Fri, Jun 7, 2013 at 9:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> On Friday 07 June 2013, Santosh Shilimkar wrote:
+>>>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>>>> index f49cd51..831e89e 100644
+>>>> --- a/arch/arm/mach-omap2/Kconfig
+>>>> +++ b/arch/arm/mach-omap2/Kconfig
+>>>> @@ -83,7 +83,7 @@ config ARCH_OMAP4
+>>>>       depends on ARCH_OMAP2PLUS
+>>>>       depends on ARCH_MULTI_V7
+>>>>       select ARCH_HAS_OPP
+>>>> -     select ARCH_NEEDS_CPU_IDLE_COUPLED if SMP
+>>>> +     select ARCH_NEEDS_CPU_IDLE_COUPLED if (SMP && CPU_IDLE)
+>>>
+>>> I remember Colin mentioning about above dependency is taken care
+>>> already in design [1]
+>>
+>> It's a matter of how it gets represented in Kconfig. Right now
+>> the ARCH_NEEDS_CPU_IDLE_COUPLED symbol has a dependency on CPU_IDLE,
+>> so we cannot select it if CPU_IDLE is not set (or get a build time
+>> warning).
+>>
+>> I originally suggested removing the dependency, but Daniel preferred
+>> to leave it there as an explicit dependency so it is required to
+>> do this change instead.
+> 
+> ARCH_NEEDS_CPU_IDLE_COUPLED should never have been moved inside "if
+> CPU_IDLE".  It was designed to be outside the CPU_IDLE dependency so
+> archs could select it without having to know about its dependencies.
+> Just move it back outside if CPU_IDLE in drivers/cpuidle/Kconfig and
+> you won't have to mess with every arch that uses it.  If CPU_IDLE=n
+> none if it will get compiled, so there is no need for the extra
+> dependency.
 
-to.sh:
+I don't really like implicit dependencies and IMO showing them in the
+Kconfig makes the life easier for someone who wants to understand what
+gets compiled or not when reading the code. Even if that means to modify
+a couple of Kconfig.
 
-#!/bin/bash
+It is a preference and thus I don't have a strong opinion on that, so if
+nobody is against I will resend a patch moving this option out of the
+CPU_IDLE dep.
 
-opts="--nogit --nogit-fallback --norolestats --pattern-depth=1"
+Thanks
+  -- Daniel
 
-if [[ $(basename $1) =~ ^0000- ]] ; then
-     ./scripts/get_maintainer.pl --nom $opts $(dirname $1)/*
-else
-     maint=$(./scripts/get_maintainer.pl --nol $opts $1)
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-     if [ "$maint" == "" ] ; then
-         echo "[hidden email]"
-     else
-         echo "$maint"
-     fi
-fi
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
 
-cc.sh:
+  * English - detected
+  * English
+  * French
 
-#!/bin/bash
+  * English
+  * French
 
-opts="--nogit --nogit-fallback --norolestats"
-
-if [[ $(basename $1) =~ ^0000- ]] ; then
-     ./scripts/get_maintainer.pl --nom $opts $(dirname $1)/*
-else
-     ./scripts/get_maintainer.pl $opts $1
-fi
-
-But I guess it does not handle subsystem maintainers.
-
-I'll check it before sending patch series next time.
-
-BTW thanks for applying this patch.
-
-Best Regards,
-Boris
+ <javascript:void(0);>
