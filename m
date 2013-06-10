@@ -1,100 +1,73 @@
 From: jtzhou@marvell.com (Jett.Zhou)
-Date: Mon, 10 Jun 2013 23:52:13 +0800
-Subject: [V2 1/7] video: mmp: rb swap setting update for new LCD driver
-Message-ID: <1370879533-11017-1-git-send-email-jtzhou@marvell.com>
+Date: Mon, 10 Jun 2013 23:53:13 +0800
+Subject: [V2 7/7] video: mmp: add video layer set win/addr operations support
+Message-ID: <1370879593-11557-1-git-send-email-jtzhou@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Guoqing Li <ligq@marvell.com>
+From: Jing Xiang <jxiang@marvell.com>
 
-We could set rb swap in two modules: DMA controler and interface
-output after blending.
-This patch move the panel rbswap requirement setting in later module.
+Since mmp display controller support graphic/video layer together, so
+add  win/addr setting operations support when set win parameters.
 
-Signed-off-by: Guoqing Li <ligq@marvell.com>
+Signed-off-by: Jing Xiang <jxiang@marvell.com>
 Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
 ---
- drivers/video/mmp/hw/mmp_ctrl.c |   15 ++++++++-------
- drivers/video/mmp/hw/mmp_ctrl.h |    4 ++++
- 2 files changed, 12 insertions(+), 7 deletions(-)
+ drivers/video/mmp/hw/mmp_ctrl.c |   30 +++++++++++++++++++++++-------
+ 1 files changed, 23 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-index 4bd31b2..a472c4d 100644
+index 92a5f44..4da6268 100644
 --- a/drivers/video/mmp/hw/mmp_ctrl.c
 +++ b/drivers/video/mmp/hw/mmp_ctrl.c
-@@ -60,8 +60,7 @@ static irqreturn_t ctrl_handle_irq(int irq, void *dev_id)
- 
- static u32 fmt_to_reg(struct mmp_overlay *overlay, int pix_fmt)
+@@ -142,17 +142,27 @@ static void dmafetch_set_fmt(struct mmp_overlay *overlay)
+ static void overlay_set_win(struct mmp_overlay *overlay, struct mmp_win *win)
  {
--	u32 link_config = path_to_path_plat(overlay->path)->link_config;
--	u32 rbswap, uvswap = 0, yuvswap = 0,
-+	u32 rbswap = 0, uvswap = 0, yuvswap = 0,
- 		csc_en = 0, val = 0,
- 		vid = overlay_is_vid(overlay);
+ 	struct lcd_regs *regs = path_regs(overlay->path);
+-	u32 pitch;
  
-@@ -71,27 +70,23 @@ static u32 fmt_to_reg(struct mmp_overlay *overlay, int pix_fmt)
- 	case PIXFMT_RGB888PACK:
- 	case PIXFMT_RGB888UNPACK:
- 	case PIXFMT_RGBA888:
--		rbswap = !(link_config & 0x1);
-+		rbswap = 1;
- 		break;
- 	case PIXFMT_VYUY:
- 	case PIXFMT_YVU422P:
- 	case PIXFMT_YVU420P:
--		rbswap = link_config & 0x1;
- 		uvswap = 1;
- 		break;
- 	case PIXFMT_YUYV:
--		rbswap = link_config & 0x1;
- 		yuvswap = 1;
- 		break;
- 	default:
--		rbswap = link_config & 0x1;
- 		break;
- 	}
+ 	/* assert win supported */
+ 	memcpy(&overlay->win, win, sizeof(struct mmp_win));
  
- 	switch (pix_fmt) {
- 	case PIXFMT_RGB565:
- 	case PIXFMT_BGR565:
--		val = 0;
- 		break;
- 	case PIXFMT_RGB1555:
- 	case PIXFMT_BGR1555:
-@@ -263,6 +258,12 @@ static void path_set_mode(struct mmp_path *path, struct mmp_mode *mode)
- 	tmp |= CFG_DUMB_ENA(1);
- 	writel_relaxed(tmp, ctrl_regs(path) + intf_ctrl(path->id));
- 
-+	/* interface rb_swap setting */
-+	tmp = readl_relaxed(ctrl_regs(path) + intf_rbswap_ctrl(path->id)) &
-+		(~(CFG_INTFRBSWAP_MASK));
-+	tmp |= link_config & CFG_INTFRBSWAP_MASK;
-+	writel_relaxed(tmp, ctrl_regs(path) + intf_rbswap_ctrl(path->id));
+ 	mutex_lock(&overlay->access_ok);
+-	pitch = win->xsrc * pixfmt_to_stride(win->pix_fmt);
+-	writel_relaxed(pitch, &regs->g_pitch);
+-	writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->g_size);
+-	writel_relaxed((win->ydst << 16) | win->xdst, &regs->g_size_z);
+-	writel_relaxed(0, &regs->g_start);
 +
- 	writel_relaxed((mode->yres << 16) | mode->xres, &regs->screen_active);
- 	writel_relaxed((mode->left_margin << 16) | mode->right_margin,
- 		&regs->screen_h_porch);
-diff --git a/drivers/video/mmp/hw/mmp_ctrl.h b/drivers/video/mmp/hw/mmp_ctrl.h
-index edd2002..975d890 100644
---- a/drivers/video/mmp/hw/mmp_ctrl.h
-+++ b/drivers/video/mmp/hw/mmp_ctrl.h
-@@ -163,6 +163,8 @@ struct lcd_regs {
++	if (overlay_is_vid(overlay)) {
++		writel_relaxed(win->pitch[0], &regs->v_pitch_yc);
++		writel_relaxed(win->pitch[2] << 16 |
++				win->pitch[1], &regs->v_pitch_uv);
++
++		writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->v_size);
++		writel_relaxed((win->ydst << 16) | win->xdst, &regs->v_size_z);
++		writel_relaxed(win->ypos << 16 | win->xpos, &regs->v_start);
++	} else {
++		writel_relaxed(win->pitch[0], &regs->g_pitch);
++
++		writel_relaxed((win->ysrc << 16) | win->xsrc, &regs->g_size);
++		writel_relaxed((win->ydst << 16) | win->xdst, &regs->g_size_z);
++		writel_relaxed(win->ypos << 16 | win->xpos, &regs->g_start);
++	}
  
- #define LCD_SCLK(path) ((PATH_PN == path->id) ? LCD_CFG_SCLK_DIV :\
- 	((PATH_TV == path->id) ? LCD_TCLK_DIV : LCD_PN2_SCLK_DIV))
-+#define intf_rbswap_ctrl(id)	((id) ? (((id) & 1) ? LCD_TVIF_CTRL : \
-+				PN2_IOPAD_CONTROL) : LCD_TOP_CTRL)
+ 	dmafetch_set_fmt(overlay);
+ 	mutex_unlock(&overlay->access_ok);
+@@ -234,7 +244,13 @@ static int overlay_set_addr(struct mmp_overlay *overlay, struct mmp_addr *addr)
  
- /* dither configure */
- #ifdef CONFIG_CPU_PXA988
-@@ -615,6 +617,8 @@ struct lcd_regs {
- #define LCD_SPU_DUMB_CTRL			0x01B8
- #define	 CFG_DUMBMODE(mode)			((mode)<<28)
- #define	 CFG_DUMBMODE_MASK			0xF0000000
-+#define	 CFG_INTFRBSWAP(mode)			((mode)<<24)
-+#define	 CFG_INTFRBSWAP_MASK			0x0F000000
- #define	 CFG_LCDGPIO_O(data)			((data)<<20)
- #define	 CFG_LCDGPIO_O_MASK			0x0FF00000
- #define	 CFG_LCDGPIO_ENA(gpio)			((gpio)<<12)
+ 	/* FIXME: assert addr supported */
+ 	memcpy(&overlay->addr, addr, sizeof(struct mmp_addr));
+-	writel(addr->phys[0], &regs->g_0);
++
++	if (overlay_is_vid(overlay)) {
++		writel_relaxed(addr->phys[0], &regs->v_y0);
++		writel_relaxed(addr->phys[1], &regs->v_u0);
++		writel_relaxed(addr->phys[2], &regs->v_v0);
++	} else
++		writel_relaxed(addr->phys[0], &regs->g_0);
+ 
+ 	return overlay->addr.phys[0];
+ }
 -- 
 1.7.0.4
