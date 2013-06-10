@@ -1,50 +1,67 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Mon, 10 Jun 2013 16:35:25 +0400
-Subject: [PATCH 6/6] mtd: ofpart: add compatible check for child nodes
-In-Reply-To: <1370860014-1770-7-git-send-email-josh.wu@atmel.com>
-References: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
- <1370860014-1770-7-git-send-email-josh.wu@atmel.com>
-Message-ID: <51B5C80D.2030303@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Jun 2013 14:43:03 +0200
+Subject: [PATCH v2 06/11] ARM:stixxxx: Add STiH415 SOC support
+In-Reply-To: <1370856381-6644-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
+ <1370856381-6644-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <CACRpkdZ-xnDO+bte4tyKDWwY4A_qWUhLru3dUmuY9MQwseP3uQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hello.
+On Mon, Jun 10, 2013 at 11:26 AM, Srinivas KANDAGATLA
+<srinivas.kandagatla@st.com> wrote:
 
-On 10-06-2013 14:26, Josh Wu wrote:
+> The STiH415 is the next generation of HD, AVC set-top box processors for
+> satellite, cable, terrestrial and IP-STB markets. It is an ARM Cortex-A9
+> 1.0 GHz, dual-core CPU.
+(...)
+> +       soc {
+> +               pin-controller-sbc {
+> +                       #address-cells  = <1>;
+> +                       #size-cells     = <1>;
+> +                       compatible      = "st,stih415-pinctrl", "simple-bus";
 
-> If the child node has compatible property then it is a driver not partition.
+Why is the pin controller be a simple bus?
 
-> Signed-off-by: Josh Wu <josh.wu@atmel.com>
-> ---
->   drivers/mtd/ofpart.c |   14 +++++++++++++-
->   1 file changed, 13 insertions(+), 1 deletion(-)
+Maybe obvious, I'm not 100% familiar with when we use this...
 
+> +               pin-controller-front {
+(...)
+> +               pin-controller-rear {
+(...)
+> +               pin-controller-left {
+(...)
+> +               pin-controller-right {
 
-> diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
-> index 553d6d6..61ce1f8 100644
-> --- a/drivers/mtd/ofpart.c
-> +++ b/drivers/mtd/ofpart.c
-[...]
-> @@ -40,8 +44,13 @@ static int parse_ofpart_partitions(struct mtd_info *master,
->   	/* First count the subnodes */
->   	pp = NULL;
->   	nr_parts = 0;
-> -	while ((pp = of_get_next_child(node, pp)))
-> +	while ((pp = of_get_next_child(node, pp))) {
+Please explain these orientations in some comment in the device
+tree, I'm half-guessing that it's about the edges around the chip so
+the PIO* names are actually pad names.
 
-    Assignment in *while*? Is scripts/checkpatch.pl happy about that?
+I would suggest you use the names north/south/west/east
+if this is the case since left and right etc are relative measures.
+(This terminology is used on e.g. dance mats for console games...)
 
-> +		int len;
+If these names are from the datasheets by all means keep them.
 
-    Empty line wouldn't hurt here, after declaration.
-
-> +		if (node_has_compatible(pp, &len))
-> +			continue;
+> +++ b/arch/arm/boot/dts/stixxxx-pincfg.h
+> @@ -0,0 +1,94 @@
+> +#ifndef _STIXXXX_PINCFG_H_
+> +#define _STIXXXX_PINCFG_H_
 > +
->   		nr_parts++;
-> +	}
->
->   	if (nr_parts == 0)
->   		return 0;
+> +/* Alternate functions */
+> +#define ALT1   1
+> +#define ALT2   2
+> +#define ALT3   3
+> +#define ALT4   4
+> +#define ALT5   5
+> +#define ALT6   6
+> +#define ALT7   7
 
-WBR, Sergei
+Why is this part of the DT definitions? In the pinctrl world this
+is an intrinsic detail on how groups and functions are associated,
+not something that you hard-code into the device tree. The
+device tree should state how to combine functions with groups
+and those will be strings, not numerals.
+
+Yours,
+Linus Walleij
