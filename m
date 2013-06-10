@@ -1,57 +1,63 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Mon, 10 Jun 2013 12:38:26 -0500
-Subject: [PATCH 2/7] omap: mailbox: check for NULL nb in mailbox_put
-In-Reply-To: <CA+Bv8XZW-Xv7D-TxqTiUF-t-QESMQqWGOq2fLshXVA-N7if_5w@mail.gmail.com>
-References: <1370656664-41250-1-git-send-email-s-anna@ti.com>
- <CA+Bv8XZW-Xv7D-TxqTiUF-t-QESMQqWGOq2fLshXVA-N7if_5w@mail.gmail.com>
-Message-ID: <51B60F12.30708@ti.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Mon, 10 Jun 2013 12:51:42 -0500
+Subject: [RFC PATCH 1/4] regulator: Introduce OMAP regulator to control
+ PMIC over VC/VP
+In-Reply-To: <20130610164905.GJ1403@sirena.org.uk>
+References: <1369246717-4167-1-git-send-email-nm@ti.com>
+ <1369246717-4167-2-git-send-email-nm@ti.com>
+ <20130610103131.GR31367@sirena.org.uk>
+ <CAGo_u6qTiPpd0DDe3jnPh_UxTwox22azhcMGy=fftL8H+DGeyw@mail.gmail.com>
+ <20130610164905.GJ1403@sirena.org.uk>
+Message-ID: <CAGo_u6ov=yaCwt8apbvW57ErAvhgUBHHw9gwADBC1fJUrfucUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russ,
+On Mon, Jun 10, 2013 at 11:49 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Mon, Jun 10, 2013 at 11:16:59AM -0500, Nishanth Menon wrote:
+>> On Mon, Jun 10, 2013 at 5:31 AM, Mark Brown <broonie@kernel.org> wrote:
+>> > On Wed, May 22, 2013 at 01:18:34PM -0500, Nishanth Menon wrote:
+>
+>> > So, the biggest problem here has been patch 4 (having to have a hack to
+>> > deploy this stuff is a bit worrying) plus the general not having a real
+>> > driver thing.
+>
+>> Patch #4 in this series was a hack as it was not properly split up and
+>> organized as a proper DTS series -it was meant as a proof of concept -
+>> not entirely meant to indicate the remaining 1-3 patches were hacks
+>> :).
+>
+> The way it reads is that you're building up to a hack - if what you've
+> done isn't enabling a sensible solution there might be a problem with
+> the earlier steps.
 
-On 06/08/2013 01:46 PM, Russ Dill wrote:
-> On Fri, Jun 7, 2013 at 6:57 PM, Suman Anna <s-anna@ti.com> wrote:
->> The mailbox_put function must check the notifier block for
->> NULL before trying to unregister it.
-> 
-> I'm going to nack this one. Why must it check for NULL? None of the
-> callers pass a NULL argument and blocking_notifier_chain_unregister
-> handles a NULL nb argument just fine.
+Understood, I should have taken extra steps to split up the patch into
+it's logical series, but wanted to get a quick feel from community
+about the approach before spending time on it. I apologize for the
+confusion caused.
 
-Thanks for the review. It should have been done differently, which is to
-print an error trace if the passed in arguments are NULL. Anyway, I will
-drop this since I expect this function to go away once this is adapted
-to the new framework.
+>
+>> I think you mean http://marc.info/?t=137059249100003&r=1&w=2 series. I
+>> will dig into it. if it is possible for Tegra and OMAP to use the same
+>> framework and strategy to deal with these kind of h/w blocks, all the
+>> more better.
+>
+> Not just better, if each system doing this sort of thing needs to
+> reinvent the wheel something is going wrong.
+Fair enough, I did spend a short while digging through the discussion
+in the series, I need to find Tegra TRM to see if there is commonolity
+between OMAP and what Tegra does at hardware level.
+a) Tegra seems to use Lookup Table for sending predefinied voltage
+values to PMIC. OMAP has no concept of lookup table.
+b) Tegra and OMAP h/w blocks seem to use I2C - that is good.
+c) How about the i2c slave and register addresses, slew rates, start,
+end voltages, max voltages that SoC can support etc, I am yet to
+understand those.
+d) OMAP has 3 modules - AVS (SmartReflex), Voltage Processor(VP),
+Voltage Controller(VC) - I am not yet sure about the Tegra hardware
+blocks involved.
 
-regards
-Suman
+maybe Paul could comment as well, I suppose if we could take a common
+approach between Tegra and OMAP.
 
-> 
->> Signed-off-by: Fernando Guzman Lugo <lugo.fernando@gmail.com>
->> Signed-off-by: Suman Anna <s-anna@ti.com>
->> ---
->>  arch/arm/plat-omap/mailbox.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
->> index 42377ef..5fb4027 100644
->> --- a/arch/arm/plat-omap/mailbox.c
->> +++ b/arch/arm/plat-omap/mailbox.c
->> @@ -356,7 +356,8 @@ EXPORT_SYMBOL(omap_mbox_get);
->>
->>  void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb)
->>  {
->> -       blocking_notifier_chain_unregister(&mbox->notifier, nb);
->> +       if (nb)
->> +               blocking_notifier_chain_unregister(&mbox->notifier, nb);
->>         omap_mbox_fini(mbox);
->>  }
->>  EXPORT_SYMBOL(omap_mbox_put);
->> --
->> 1.8.2
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+Nishanth Menon
