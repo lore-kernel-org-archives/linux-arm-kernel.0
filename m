@@ -1,256 +1,334 @@
 From: josh.wu@atmel.com (Josh Wu)
-Date: Mon, 10 Jun 2013 18:26:48 +0800
-Subject: [PATCH v3 0/6] mtd: atmel_nand: enable Nand Flash Controller (NFC)
- support
-Message-ID: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
+Date: Mon, 10 Jun 2013 18:26:49 +0800
+Subject: [PATCH 1/6] MTD: atmel_nand: use devm_xxx gpio kzalloc,
+ gpio and ioremap
+In-Reply-To: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
+References: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <1370860014-1770-2-git-send-email-josh.wu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series enable NFC support for SAMA5 soc. It can send command,
-address cycles automaticly. Also when enable NFC sram, NFC will transfer
-data to sram. Which can save lots of cpu time.
+From: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-The mtd speed test results (non-NFC vs NFC), run in sama5d3x-ek with DMA
-enable, is in the end of this patch.
+this will allow to simply the error and remove path
 
-v2 --> v3:
- 1) Change the dts usage for NFC. Now use a NFC child node of atmel nand
-    to enable NFC driver. In this way the atmel nand driver will include
-    a NFC driver, which will be probed if dts has NFC node.
- 2) can enable/disable NFC write by sram in dts.
- 3) merged J.C's patch(use devm_xxx to simple the code) in this series.
- 4) remove unused NFC register definitions. Change the definition names.
- 5) trival fix accroding to J.C's suggestion.
- 6) modify the ofpart.c for child node check. If the child node has compatible
-    property then this node is a device not a partition.
+Cc: linux-mtd at lists.infradead.org
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+[josh.wu at atmel.com: fix checkpatch warnings and rebase to latest mtd git tree]
+Signed-off-by: Josh Wu <josh.wu@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c |  148 ++++++++++++++---------------------------
+ 1 file changed, 51 insertions(+), 97 deletions(-)
 
-v1 --> v2:
- 1) rebase it with latest l2-mtd git tree: 
-    - remove useless nand commands (NAND_CMD_DEPLETE1, NAND_CMD_STATUS_ERRORx).
-    - adopt to the new nand write function's parameters. Add error message when
-      handle subpage write via nfc sram.
- 2) rewrite pmecc_enable function. Now I use exist NAND_ECC_READ/WRITE const
-    instead of using a new enum definition.
-
-Jean-Christophe PLAGNIOL-VILLARD (1):
-  MTD: atmel_nand: use devm_xxx gpio kzalloc, gpio and ioremap
-
-Josh Wu (5):
-  mtd: atmel_nand: replace pmecc enable code with one function.
-  mtd: atmel_nand: add Nand Flash Controller (NFC) support
-  mtd: atmel_nand: enable Nand Flash Controller (NFC) read data via
-    sram
-  mtd: atmel_nand: enable Nand Flash Controller (NFC) write via sram
-  mtd: ofpart: add compatible check for child nodes
-
- .../devicetree/bindings/mtd/atmel-nand.txt         |   28 +
- drivers/mtd/nand/atmel_nand.c                      |  840 ++++++++++++++++----
- drivers/mtd/nand/atmel_nand_nfc.h                  |   94 +++
- drivers/mtd/ofpart.c                               |   14 +-
- 4 files changed, 832 insertions(+), 144 deletions(-)
- create mode 100644 drivers/mtd/nand/atmel_nand_nfc.h
-
-mtd_speedtest is run in 60M partition with DMA enabled for two cases:
- 1. Using NFC and sram read/write with DMA enabled.
- 2. Using Non-NFC with DMA enabled.
-
-Summary of the two test results:
- 1. With NFC and sram read/write enabled, the write speed will become %10 slower
-    and the cpu load also is reduce a lot (50% -> 20%):
-                          Non-NFC                  NFC
-      Page write Speed:   5536KiB : 46% ~ 64% --> 4989KiB : 13% ~ 22%
-      2 Page write speed: 5567KiB : 52% ~ 69% --> 5043KiB : 10% ~ 20%
-
- 2. With NFC and sram read/write enabled, the read speed is almost same and the
-    cpu load is reduced (30% -> 15%):
-                          Non-NFC                  NFC
-      Page read Speed:    9361KiB : %24 ~ 46% --> 9340KiB : 13% ~ 19%
-      2 Page read Speed:  9361KiB : %21 ~ 57% --> 9426KiB :  8% ~ 15%
-
-Following is the detail test log:
-
-case 1: Non-NFC with DMA:
-=================================================
-mtd_speedtest: MTD device: 2
-mtd_speedtest: MTD device size 62914560, eraseblock size 131072, page size 2048, count of eraseblocks 480, pages per eraseblock 64, OOB size 64
-mtd_speedtest: scanning for bad eraseblocks
-mtd_speedtest: scanned 480 eraseblocks, 0 are bad
-mtd_speedtest: testing eraseblock write speed
-top -n 130 -d 1 | grep speedtest
-  513   504 root     R     1164   0%  62% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     D     1164   0%  53% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  58% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  53% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  60% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  59% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  62% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: eraseblock write speed is 5594 KiB/s
-mtd_speedtest: testing eraseblock read speed
-  513   504 root     R     1164   0%  27% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%   5% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%   1% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%   2% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%   1% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: eraseblock read speed is 9442 KiB/s
-mtd_speedtest: testing page write speed
-  513   504 root     R     1164   0%  46% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  64% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  64% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  56% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  59% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  59% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  56% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  59% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  62% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  60% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: page write speed is 5536 KiB/s
-mtd_speedtest: testing page read speed
-  513   504 root     R     1164   0%  46% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  24% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  30% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  30% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  26% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  25% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: page read speed is 9361 KiB/s
-  513   504 root     R     1164   0%  24% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: testing 2 page write speed
-  513   504 root     R     1164   0%  69% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  56% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  61% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  61% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  52% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  55% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  58% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 2 page write speed is 5567 KiB/s
-mtd_speedtest: testing 2 page read speed
-  513   504 root     D     1164   0%  57% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  26% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  21% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  23% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  24% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  25% insmod /root/mtd_test/mtd_speedtest.ko
-  513   504 root     R     1164   0%  23% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 2 page read speed is 9361 KiB/s
-mtd_speedtest: Testing erase speed
-mtd_speedtest: erase speed is 167411 KiB/s
-mtd_speedtest: Testing 2x multi-block erase speed
-mtd_speedtest: 2x multi-block erase speed is 326808 KiB/s
-mtd_speedtest: Testing 4x multi-block erase speed
-  513   504 root     R     1164   0%  74% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 4x multi-block erase speed is 301176 KiB/s
-mtd_speedtest: Testing 8x multi-block erase speed
-mtd_speedtest: 8x multi-block erase speed is 326808 KiB/s
-mtd_speedtest: Testing 16x multi-block erase speed
-mtd_speedtest: 16x multi-block erase speed is 328556 KiB/s
-mtd_speedtest: Testing 32x multi-block erase speed
-mtd_speedtest: 32x multi-block erase speed is 328556 KiB/s
-mtd_speedtest: Testing 64x multi-block erase speed
-mtd_speedtest: 64x multi-block erase speed is 325079 KiB/s
-mtd_speedtest: finished
-=================================================
-
-
-case 2: NFC with DMA:
-=================================================
-mtd_speedtest: MTD device: 2
-mtd_speedtest: MTD device size 62914560, eraseblock size 131072, page size 2048, count of eraseblocks 480, pages per eraseblock 64, OOB size 64
-mtd_speedtest: scanning for bad eraseblocks
-mtd_speedtest: scanned 480 eraseblocks, 0 are bad
-top -n 130 -d 1 | grep speedtest
-mtd_speedtest: testing eraseblock write speed
-  514   504 root     R     1164   0%   8% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  10% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  13% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     D     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     D     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  11% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%   9% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  11% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: eraseblock write speed is 5105 KiB/s
-mtd_speedtest: testing eraseblock read speed
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  20% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%   8% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%   6% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: eraseblock read speed is 9512 KiB/s
-  514   504 root     R     1164   0%   6% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: testing page write speed
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  20% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  13% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  11% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  22% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: page write speed is 4989 KiB/s
-mtd_speedtest: testing page read speed
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  13% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  18% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  19% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: page read speed is 9340 KiB/s
-mtd_speedtest: testing 2 page write speed
-  514   504 root     R     1164   0%  20% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  10% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  18% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  16% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  17% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  13% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 2 page write speed is 5043 KiB/s
-mtd_speedtest: testing 2 page read speed
-  514   504 root     R     1164   0%   8% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%   9% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  14% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-  514   504 root     R     1164   0%  15% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 2 page read speed is 9426 KiB/s
-mtd_speedtest: Testing erase speed
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: erase speed is 157943 KiB/s
-mtd_speedtest: Testing 2x multi-block erase speed
-mtd_speedtest: 2x multi-block erase speed is 308743 KiB/s
-mtd_speedtest: Testing 4x multi-block erase speed
-mtd_speedtest: 4x multi-block erase speed is 313469 KiB/s
-mtd_speedtest: Testing 8x multi-block erase speed
-mtd_speedtest: 8x multi-block erase speed is 313469 KiB/s
-mtd_speedtest: Testing 16x multi-block erase speed
-mtd_speedtest: 16x multi-block erase speed is 315076 KiB/s
-mtd_speedtest: Testing 32x multi-block erase speed
-  514   504 root     R     1164   0%  12% insmod /root/mtd_test/mtd_speedtest.ko
-mtd_speedtest: 32x multi-block erase speed is 298252 KiB/s
-mtd_speedtest: Testing 64x multi-block erase speed
-mtd_speedtest: 64x multi-block erase speed is 311878 KiB/s
-mtd_speedtest: finished
-=================================================
-
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index 2d23d29..c7a4016 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -366,43 +366,34 @@ static void __iomem *pmecc_get_alpha_to(struct atmel_nand_host *host)
+ 			table_size * sizeof(int16_t);
+ }
+ 
+-static void pmecc_data_free(struct atmel_nand_host *host)
+-{
+-	kfree(host->pmecc_partial_syn);
+-	kfree(host->pmecc_si);
+-	kfree(host->pmecc_lmu);
+-	kfree(host->pmecc_smu);
+-	kfree(host->pmecc_mu);
+-	kfree(host->pmecc_dmu);
+-	kfree(host->pmecc_delta);
+-}
+-
+ static int pmecc_data_alloc(struct atmel_nand_host *host)
+ {
+ 	const int cap = host->pmecc_corr_cap;
++	int size;
++
++	size = (2 * cap + 1) * sizeof(int16_t);
++	host->pmecc_partial_syn = devm_kzalloc(host->dev, size, GFP_KERNEL);
++	host->pmecc_si = devm_kzalloc(host->dev, size, GFP_KERNEL);
++	host->pmecc_lmu = devm_kzalloc(host->dev,
++			(cap + 1) * sizeof(int16_t), GFP_KERNEL);
++	host->pmecc_smu = devm_kzalloc(host->dev,
++			(cap + 2) * size, GFP_KERNEL);
++
++	size = (cap + 1) * sizeof(int);
++	host->pmecc_mu = devm_kzalloc(host->dev, size, GFP_KERNEL);
++	host->pmecc_dmu = devm_kzalloc(host->dev, size, GFP_KERNEL);
++	host->pmecc_delta = devm_kzalloc(host->dev, size, GFP_KERNEL);
++
++	if (!host->pmecc_partial_syn ||
++		!host->pmecc_si ||
++		!host->pmecc_lmu ||
++		!host->pmecc_smu ||
++		!host->pmecc_mu ||
++		!host->pmecc_dmu ||
++		!host->pmecc_delta)
++		return -ENOMEM;
+ 
+-	host->pmecc_partial_syn = kzalloc((2 * cap + 1) * sizeof(int16_t),
+-					GFP_KERNEL);
+-	host->pmecc_si = kzalloc((2 * cap + 1) * sizeof(int16_t), GFP_KERNEL);
+-	host->pmecc_lmu = kzalloc((cap + 1) * sizeof(int16_t), GFP_KERNEL);
+-	host->pmecc_smu = kzalloc((cap + 2) * (2 * cap + 1) * sizeof(int16_t),
+-					GFP_KERNEL);
+-	host->pmecc_mu = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
+-	host->pmecc_dmu = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
+-	host->pmecc_delta = kzalloc((cap + 1) * sizeof(int), GFP_KERNEL);
+-
+-	if (host->pmecc_partial_syn &&
+-			host->pmecc_si &&
+-			host->pmecc_lmu &&
+-			host->pmecc_smu &&
+-			host->pmecc_mu &&
+-			host->pmecc_dmu &&
+-			host->pmecc_delta)
+-		return 0;
+-
+-	/* error happened */
+-	pmecc_data_free(host);
+-	return -ENOMEM;
++	return 0;
+ }
+ 
+ static void pmecc_gen_syndrome(struct mtd_info *mtd, int sector)
+@@ -1023,27 +1014,27 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 		return 0;
+ 	}
+ 
+-	host->ecc = ioremap(regs->start, resource_size(regs));
++	host->ecc = devm_request_and_ioremap(&pdev->dev, regs);
+ 	if (host->ecc == NULL) {
+ 		dev_err(host->dev, "ioremap failed\n");
+ 		err_no = -EIO;
+-		goto err_pmecc_ioremap;
++		goto err;
+ 	}
+ 
+ 	regs_pmerr = platform_get_resource(pdev, IORESOURCE_MEM, 2);
+ 	regs_rom = platform_get_resource(pdev, IORESOURCE_MEM, 3);
+ 	if (regs_pmerr && regs_rom) {
+-		host->pmerrloc_base = ioremap(regs_pmerr->start,
+-			resource_size(regs_pmerr));
+-		host->pmecc_rom_base = ioremap(regs_rom->start,
+-			resource_size(regs_rom));
++		host->pmerrloc_base = devm_request_and_ioremap(&pdev->dev,
++				regs_pmerr);
++		host->pmecc_rom_base = devm_request_and_ioremap(&pdev->dev,
++				regs_rom);
+ 	}
+ 
+ 	if (!host->pmerrloc_base || !host->pmecc_rom_base) {
+ 		dev_err(host->dev,
+ 			"Can not get I/O resource for PMECC ERRLOC controller or ROM!\n");
+ 		err_no = -EIO;
+-		goto err_pmloc_ioremap;
++		goto err;
+ 	}
+ 
+ 	/* ECC is calculated for the whole page (1 step) */
+@@ -1068,7 +1059,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 		if (nand_chip->ecc.bytes > mtd->oobsize - 2) {
+ 			dev_err(host->dev, "No room for ECC bytes\n");
+ 			err_no = -EINVAL;
+-			goto err_no_ecc_room;
++			goto err;
+ 		}
+ 		pmecc_config_ecc_layout(&atmel_pmecc_oobinfo,
+ 					mtd->oobsize,
+@@ -1093,7 +1084,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 	if (err_no) {
+ 		dev_err(host->dev,
+ 				"Cannot allocate memory for PMECC computation!\n");
+-		goto err_pmecc_data_alloc;
++		goto err;
+ 	}
+ 
+ 	nand_chip->ecc.read_page = atmel_nand_pmecc_read_page;
+@@ -1103,15 +1094,7 @@ static int __init atmel_pmecc_nand_init_params(struct platform_device *pdev,
+ 
+ 	return 0;
+ 
+-err_pmecc_data_alloc:
+-err_no_ecc_room:
+-err_pmloc_ioremap:
+-	iounmap(host->ecc);
+-	if (host->pmerrloc_base)
+-		iounmap(host->pmerrloc_base);
+-	if (host->pmecc_rom_base)
+-		iounmap(host->pmecc_rom_base);
+-err_pmecc_ioremap:
++err:
+ 	return err_no;
+ }
+ 
+@@ -1414,7 +1397,7 @@ static int __init atmel_hw_nand_init_params(struct platform_device *pdev,
+ 		return 0;
+ 	}
+ 
+-	host->ecc = ioremap(regs->start, resource_size(regs));
++	host->ecc = devm_request_and_ioremap(&pdev->dev, regs);
+ 	if (host->ecc == NULL) {
+ 		dev_err(host->dev, "ioremap failed\n");
+ 		return -EIO;
+@@ -1479,20 +1462,19 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Allocate memory for the device structure (and zero it) */
+-	host = kzalloc(sizeof(struct atmel_nand_host), GFP_KERNEL);
++	host = devm_kzalloc(&pdev->dev, sizeof(*host), GFP_KERNEL);
+ 	if (!host) {
+ 		printk(KERN_ERR "atmel_nand: failed to allocate device structure.\n");
+ 		return -ENOMEM;
+ 	}
+ 
+-	host->io_phys = (dma_addr_t)mem->start;
+-
+-	host->io_base = ioremap(mem->start, resource_size(mem));
++	host->io_base = devm_request_and_ioremap(&pdev->dev, mem);
+ 	if (host->io_base == NULL) {
+ 		printk(KERN_ERR "atmel_nand: ioremap failed\n");
+ 		res = -EIO;
+ 		goto err_nand_ioremap;
+ 	}
++	host->io_phys = (dma_addr_t)mem->start;
+ 
+ 	mtd = &host->mtd;
+ 	nand_chip = &host->nand_chip;
+@@ -1500,7 +1482,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	if (pdev->dev.of_node) {
+ 		res = atmel_of_init_port(host, pdev->dev.of_node);
+ 		if (res)
+-			goto err_ecc_ioremap;
++			goto err_nand_ioremap;
+ 	} else {
+ 		memcpy(&host->board, pdev->dev.platform_data,
+ 		       sizeof(struct atmel_nand_data));
+@@ -1519,16 +1501,17 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pinctrl)) {
+ 		dev_err(host->dev, "Failed to request pinctrl\n");
+ 		res = PTR_ERR(pinctrl);
+-		goto err_ecc_ioremap;
++		goto err_nand_ioremap;
+ 	}
+ 
+ 	if (gpio_is_valid(host->board.rdy_pin)) {
+-		res = gpio_request(host->board.rdy_pin, "nand_rdy");
++		res = devm_gpio_request(&pdev->dev,
++				host->board.rdy_pin, "nand_rdy");
+ 		if (res < 0) {
+ 			dev_err(&pdev->dev,
+ 				"can't request rdy gpio %d\n",
+ 				host->board.rdy_pin);
+-			goto err_ecc_ioremap;
++			goto err_nand_ioremap;
+ 		}
+ 
+ 		res = gpio_direction_input(host->board.rdy_pin);
+@@ -1536,19 +1519,20 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 			dev_err(&pdev->dev,
+ 				"can't request input direction rdy gpio %d\n",
+ 				host->board.rdy_pin);
+-			goto err_ecc_ioremap;
++			goto err_nand_ioremap;
+ 		}
+ 
+ 		nand_chip->dev_ready = atmel_nand_device_ready;
+ 	}
+ 
+ 	if (gpio_is_valid(host->board.enable_pin)) {
+-		res = gpio_request(host->board.enable_pin, "nand_enable");
++		res = devm_gpio_request(&pdev->dev,
++				host->board.enable_pin, "nand_enable");
+ 		if (res < 0) {
+ 			dev_err(&pdev->dev,
+ 				"can't request enable gpio %d\n",
+ 				host->board.enable_pin);
+-			goto err_ecc_ioremap;
++			goto err_nand_ioremap;
+ 		}
+ 
+ 		res = gpio_direction_output(host->board.enable_pin, 1);
+@@ -1556,7 +1540,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 			dev_err(&pdev->dev,
+ 				"can't request output direction enable gpio %d\n",
+ 				host->board.enable_pin);
+-			goto err_ecc_ioremap;
++			goto err_nand_ioremap;
+ 		}
+ 	}
+ 
+@@ -1573,7 +1557,8 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 	atmel_nand_enable(host);
+ 
+ 	if (gpio_is_valid(host->board.det_pin)) {
+-		res = gpio_request(host->board.det_pin, "nand_det");
++		res = devm_gpio_request(&pdev->dev,
++				host->board.det_pin, "nand_det");
+ 		if (res < 0) {
+ 			dev_err(&pdev->dev,
+ 				"can't request det gpio %d\n",
+@@ -1651,16 +1636,8 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 		return res;
+ 
+ err_scan_tail:
+-	if (host->has_pmecc && host->nand_chip.ecc.mode == NAND_ECC_HW) {
++	if (host->has_pmecc && host->nand_chip.ecc.mode == NAND_ECC_HW)
+ 		pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+-		pmecc_data_free(host);
+-	}
+-	if (host->ecc)
+-		iounmap(host->ecc);
+-	if (host->pmerrloc_base)
+-		iounmap(host->pmerrloc_base);
+-	if (host->pmecc_rom_base)
+-		iounmap(host->pmecc_rom_base);
+ err_hw_ecc:
+ err_scan_ident:
+ err_no_card:
+@@ -1668,10 +1645,7 @@ err_no_card:
+ 	platform_set_drvdata(pdev, NULL);
+ 	if (host->dma_chan)
+ 		dma_release_channel(host->dma_chan);
+-err_ecc_ioremap:
+-	iounmap(host->io_base);
+ err_nand_ioremap:
+-	kfree(host);
+ 	return res;
+ }
+ 
+@@ -1691,31 +1665,11 @@ static int __exit atmel_nand_remove(struct platform_device *pdev)
+ 		pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+ 		pmerrloc_writel(host->pmerrloc_base, ELDIS,
+ 				PMERRLOC_DISABLE);
+-		pmecc_data_free(host);
+ 	}
+ 
+-	if (gpio_is_valid(host->board.det_pin))
+-		gpio_free(host->board.det_pin);
+-
+-	if (gpio_is_valid(host->board.enable_pin))
+-		gpio_free(host->board.enable_pin);
+-
+-	if (gpio_is_valid(host->board.rdy_pin))
+-		gpio_free(host->board.rdy_pin);
+-
+-	if (host->ecc)
+-		iounmap(host->ecc);
+-	if (host->pmecc_rom_base)
+-		iounmap(host->pmecc_rom_base);
+-	if (host->pmerrloc_base)
+-		iounmap(host->pmerrloc_base);
+-
+ 	if (host->dma_chan)
+ 		dma_release_channel(host->dma_chan);
+ 
+-	iounmap(host->io_base);
+-	kfree(host);
+-
+ 	return 0;
+ }
+ 
 -- 
 1.7.9.5
