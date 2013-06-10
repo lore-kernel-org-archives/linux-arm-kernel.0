@@ -1,43 +1,41 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 10 Jun 2013 11:40:18 +0800
-Subject: [PATCH 0/2] ARM: multiple-platforms: fix the kernel panic on
- non-SiRF platforms
-In-Reply-To: <20130610001331.GA21645@quad.lixom.net>
-References: <1370313255-20396-1-git-send-email-Baohua.Song@csr.com>
- <20130610001331.GA21645@quad.lixom.net>
-Message-ID: <CAGsJ_4yZJ4Fs2fOyv1D1vBLTzRnhNu=6E8qTA_0m7gnkPEE63A@mail.gmail.com>
+From: girishks2000@gmail.com (Girish KS)
+Date: Mon, 10 Jun 2013 09:10:45 +0530
+Subject: [PATCH V2] ahci: sata: add support for exynos5440 sata
+In-Reply-To: <1366104482-14240-1-git-send-email-ks.giri@samsung.com>
+References: <1366104482-14240-1-git-send-email-ks.giri@samsung.com>
+Message-ID: <CAKrE-Kc5aSdQcphVrq74xgHOxnEs3frZqjHzf_7bvvgwQWHY0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/10 Olof Johansson <olof@lixom.net>:
-> On Tue, Jun 04, 2013 at 10:34:13AM +0800, Barry Song wrote:
->> These two patches fix the kernel panic for multiple-platform kernel to run on non-SiRF
->> platforms.
->>
->> It depends on patches I sent in the pull-request mail
->> [GIT PULL] SiRF fixes for the v3.10 series
->> at:
->> http://www.spinics.net/lists/arm-kernel/msg247521.html
->>
->> And thanks for the original patchset from Srinivas Kandagatla <srinivas.kandagatla@st.com>
->
-> Hi,
->
-> A better and more narrow fix for 3.10 would be to gracefully abort the
-> initcalls if the device nodes are not found, which is what I had as original
-> feedback on these patches in the first place. Print an error but continue
-> booting.
-ok, for 3.10, let's do a quick fix, then i will ack haojian zhuang's:
-[PATCH v2] ARM: prima2: fix incorrect panic usage
+HI,
+can this patch be pulled in for 3.11
 
-i had some discussion with Srinivas, and agreed with Srinivas about
-moving these functions to callback of prima2 mach_desc. that will
-avoid some redundant function calls for non-csr platforms. i'll make
-it as cleanup in 3.11 then.
-
+On Tue, Apr 16, 2013 at 2:58 PM, Girish K S <girishks2000@gmail.com> wrote:
+> This patch adds the compatible string of the exynos5440 sata controller
+> compliant with the ahci 1.3 and sata 3.0 specification.
 >
+> Signed-off-by: Girish K S <ks.giri@samsung.com>
 >
-> -Olof
+> changes in v2:
+>                 changed the compatible string by adding the actual IP
+> owners name instead of the SoC vendor name.
 >
-
--barry
+> ---
+>  drivers/ata/ahci_platform.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+>
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index 7a8a284..c06f021 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -327,6 +327,7 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
+>
+>  static const struct of_device_id ahci_of_match[] = {
+>         { .compatible = "snps,spear-ahci", },
+> +       { .compatible = "snps,exynos5440-ahci", },
+>         {},
+>  };
+>  MODULE_DEVICE_TABLE(of, ahci_of_match);
+> --
+> 1.7.5.4
+>
