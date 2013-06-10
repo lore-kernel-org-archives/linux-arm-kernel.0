@@ -1,128 +1,140 @@
-From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
-Date: Mon, 10 Jun 2013 16:13:27 +0530
-Subject: [PATCH] arm64: Add support to pass earlyprintk argument via
- device tree
-In-Reply-To: <1370274671-23812-1-git-send-email-pranavkumar@linaro.org>
-References: <1370274671-23812-1-git-send-email-pranavkumar@linaro.org>
-Message-ID: <CAAHg+HiWNumV52BmiGmWyGTq7a=JH5O2ptQuHt7ywjnWzUYcvg@mail.gmail.com>
+From: james.king@linaro.org (James King)
+Date: Mon, 10 Jun 2013 11:48:44 +0100
+Subject: [PATCH] arm/dt: Don't add disabled CPUs to system topology
+In-Reply-To: <20130607164123.GF3111@e102568-lin.cambridge.arm.com>
+References: <1370538685-22386-1-git-send-email-james.king@linaro.org>
+ <20130607102326.GA3111@e102568-lin.cambridge.arm.com>
+ <CAFtq+0FuzNcoQpK7=7d_KetYYHoPC7rdkFWMrApey5dxiWZ9mg@mail.gmail.com>
+ <20130607164123.GF3111@e102568-lin.cambridge.arm.com>
+Message-ID: <CAFtq+0HRk=Ccz0o5a-Or7Fz0+onEc1zNV4k5cN1+AnojPgTZ_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 3 June 2013 21:21, Pranavkumar Sawargaonkar <pranavkumar@linaro.org> wrote:
-> This patch adds support for defining and passing earlyprintk
-> related information i.e. device and address information via
-> device tree by adding it inside "chosen" node.
+On 7 June 2013 17:41, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Jun 07, 2013 at 12:48:58PM +0100, James King wrote:
+>> Hi Lorenzo,
+>>
+>> On 7 June 2013 11:23, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> > Hi James,
+>> >
+>> > On Thu, Jun 06, 2013 at 06:11:25PM +0100, James King wrote:
+>> >> If CPUs are marked as disabled in the devicetree, make sure they do
+>> >> not exist in the system CPU information and CPU topology information.
+>> >> In this case these CPUs will not be able to be added to the system later
+>> >> using hot-plug. This allows a single chip with many CPUs to be easily
+>> >> used in a variety of hardware devices where they may have different
+>> >> actual processing requirements (eg for thermal/cost reasons).
+>> >>
+>> >> - Change devicetree.c to ignore any cpu nodes marked as disabled,
+>> >>   this effectively limits the number of active cpu cores so no need
+>> >>   for the max_cpus=x in the chosen node.
+>> >> - Change topology.c to ignore any cpu nodes marked as disabled, this
+>> >>   is where the scheduler would learn about big/LITTLE cores so this
+>> >>   effectively keeps the scheduler in sync.
+>> >>
+>> >
+>> > I have two questions:
+>> >
+>> > 1) Since with this approach the DT should change anyway if on different
+>> >    hardware devices based on the same chip you want to allow booting a
+>> >    different number of CPUs, why do not we remove the cpu nodes instead of
+>> >    disabling them ? Put it another way: cpu nodes define a cpu as
+>> >    possible (currently), we can simply remove the node if we do not want
+>> >    that cpu to be seen by the kernel.
+>>
+>> The reason we want disabled status rather than just remove the nodes
+>> is to use a common soc.dtsi file which is included in many board.dts
+>> files - eg:
+>>
+>> file soc.dtsi contains:
+>>
+>>                 cpus {
+>>                                 cpu0: cpu at 0 {
+>>                                                 device_type = "cpu";
+>>                                                 compatible = "arm,cortex-a7";
+>>                                                 reg = <0>;
+>>                                                 cluster = <&cluster0>;
+>>                                                 core = <&core0>;
 >
-> This will help user to just specify "earlyprintk" from bootargs
-> without actually knowing the address and device to enable
-> earlyprintk.
+> Minor nit, "cluster" and "core" phandles are not part of cpu the bindings
+> that will be merged this cycle, I know it is just an example.
 >
-> Mechanism:
+>>                                 };
+>>
+>>                                 cpu1: cpu at 1 {
+>>                                                 device_type = "cpu";
+>>                                                 compatible = "arm,cortex-a7";
+>>                                                 reg = <1>;
+>>                                                 cluster = <&cluster0>;
+>>                                                 core = <&core1>;
+>>                                 };
+>>
+>>                                 cpu2: cpu at 2 {
+>>                                                 device_type = "cpu";
+>>                                                 compatible = "arm,cortex-a15";
+>>                                                 reg = <2>;
+>>                                                 cluster = <&cluster0>;
+>>                                                 core = <&core2>;
+>>                                 };
+>>                 };
+>>
+>> file board1.dts where we want the A15 disabled contains:
+>>
+>> /include/ "soc.dtsi"
+>>
+>>                 cpus {
+>>                                 cpu2: cpu at 2 {
+>>                                                 status = "disabled";
+>>                                 };
+>>                 };
 >
-> One can just append earlyprintk=device-type,address (same as we pass
-> through command line) in "/chosen" node to notify kernel which is the
-> earlyprintk device and what is its address.
+> Understood, see the other reply as far as the status property is concerned.
 >
-> Backward Compatibility:
+>> > 2) If we go for the "status" property, why do not we use it to set present
+>> >    mask ? That way the cpu is possible but not present, you cannot
+>> >    hotplug it in. It is a bit of a stretch, granted, the cpu _is_ present,
+>> >    we just want to disable it, do not know how this is handled in x86
+>> >    and other archs though.
+>>
+>> I have been struggling to find any equivalent example for another
+>> arch, so just tried to solve our problem. I guess in the x86 world it
+>> is less likely to want to disable processors in a SoC for heat/battery
+>> issues so this has just never arisen. In this case the cpu is
+>> physically present but not possible, but I am not sure it should be in
+>> a present mask (giving the impression it can be used). Perhaps you
+>> could elaborate with an example what you are thinking about here?
 >
-> This patch also allows existing method of specifying earlyprintk
-> parameter via bootargs.
+> I was thinking about using status == "disabled" to mark a cpu as
+> possible but not present; that is a bad idea for the reason you mentioned
+> and also for the point Rob raised related to the ePAPR.
 >
-> Existing method i.e. passing via bootargs will still have precedence
-> over device tree i.e. if one specifies earlyprintk=device-type,address
-> in bootargs then kernel will use information from bootargs instead of
-> device tree.
->
-> If user just specifies earlyprintk (without =...) then kernel will
-> look for device tree earlyprintk parameter.
->
-> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
-> Signed-off-by: Anup Patel <anup.patel@linaro.org>
-> ---
->  arch/arm64/kernel/early_printk.c |    7 +++++++
->  arch/arm64/kernel/setup.c        |   21 ++++++++++++++++++++-
->  2 files changed, 27 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
-> index fbb6e18..4e6f845 100644
-> --- a/arch/arm64/kernel/early_printk.c
-> +++ b/arch/arm64/kernel/early_printk.c
-> @@ -29,6 +29,8 @@
->  static void __iomem *early_base;
->  static void (*printch)(char ch);
->
-> +extern char *earlyprintk_dt_args;
-> +
->  /*
->   * PL011 single character TX.
->   */
-> @@ -116,6 +118,11 @@ static int __init setup_early_printk(char *buf)
->         phys_addr_t paddr = 0;
->
->         if (!buf) {
-> +               /* Try to check if Device Tree has this argument or not ? */
-> +               buf = earlyprintk_dt_args;
-> +       }
-> +
-> +       if (!buf) {
->                 pr_warning("No earlyprintk arguments passed.\n");
->                 return 0;
->         }
-> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> index 6a9a532..fb2d56f 100644
-> --- a/arch/arm64/kernel/setup.c
-> +++ b/arch/arm64/kernel/setup.c
-> @@ -60,6 +60,8 @@ EXPORT_SYMBOL(processor_id);
->  unsigned int elf_hwcap __read_mostly;
->  EXPORT_SYMBOL_GPL(elf_hwcap);
->
-> +char *earlyprintk_dt_args;
-> +
->  static const char *cpu_name;
->  static const char *machine_name;
->  phys_addr_t __fdt_pointer __initdata;
-> @@ -122,6 +124,23 @@ static void __init setup_processor(void)
->         elf_hwcap = 0;
->  }
->
-> +int __init early_init_dt_scan_chosen_arm64(unsigned long node,
-> +                                          const char *uname,
-> +                                          int depth, void *data)
-> +{
-> +       char *prop;
-> +
-> +       /* Check if this is chosen node */
-> +       if (early_init_dt_scan_chosen(node, uname, depth, data) == 0)
-> +               return 0;
-> +
-> +       prop = of_get_flat_dt_prop(node, "earlyprintk", NULL);
-> +       if (prop)
-> +               earlyprintk_dt_args = prop;
-> +
-> +       return 1;
-> +}
-> +
->  static void __init setup_machine_fdt(phys_addr_t dt_phys)
->  {
->         struct boot_param_header *devtree;
-> @@ -165,7 +184,7 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
->         pr_info("Machine: %s\n", machine_name);
->
->         /* Retrieve various information from the /chosen node */
-> -       of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
-> +       of_scan_flat_dt(early_init_dt_scan_chosen_arm64, boot_command_line);
->         /* Initialize {size,address}-cells info */
->         of_scan_flat_dt(early_init_dt_scan_root, NULL);
->         /* Setup memory, calling early_init_dt_add_memory_arch */
-> --
-> 1.7.9.5
+> I am not sure how we can solve this issue, as I mentioned the easiest
+> solution consists in not defining cpu nodes in the DT or probably add
+> an additional property != status with proper bindings attached to it.
 >
 
-Ccing to devicetree-discuss at lists.ozlabs.org for comments.
-Original RFC posted for this patch is:
-https://patchwork.kernel.org/patch/2601411/
+So what the ePAPR says is:
+"disabled" == Indicates that the device is not presently operational,
+but it might
+become operational in the future (for example, something is not
+plugged in, or switched off).
+Refer to the device binding for details on what disabled means for
+a given device.
+
+So, would "disabled" be ok to use if those cores 'could' be re-added
+to the system using hot-plug?
+
+This would probably be fine for our usage as the user would have to
+have the right permissions to hot-plug in a cpu anyway (so is just as
+strong a protection as the DT anyway - if you root your device you can
+burn it). The main thing is the scheduler will not try and use it by
+default.
+
+If that sounds ok - I need to go back and look at the changes to see
+what will still allow a core to be hot-plugged in.
 
 Thanks,
-Pranav
+James
+
+> Lorenzo
+>
