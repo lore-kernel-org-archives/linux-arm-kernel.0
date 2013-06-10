@@ -1,89 +1,51 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Mon, 10 Jun 2013 14:41:58 +0100
-Subject: [PATCH v2 02/11] clocksource:global_timer: Add ARM global timer
- support.
-In-Reply-To: <CACRpkdbQCRKBzRF4HzNsXHwXCLJJcFZ9T36GPmmYsnX1OfgGRg@mail.gmail.com>
-References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
- <1370856087-6452-1-git-send-email-srinivas.kandagatla@st.com>
- <CACRpkdbQCRKBzRF4HzNsXHwXCLJJcFZ9T36GPmmYsnX1OfgGRg@mail.gmail.com>
-Message-ID: <51B5D7A6.1020101@st.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon, 10 Jun 2013 15:43:02 +0200
+Subject: [V2 5/7] video: mmp: add pitch info in mmp_win structure
+In-Reply-To: <1370780950-21746-1-git-send-email-jtzhou@marvell.com>
+References: <CACDDiy-Ri=iYNLWg6dd3BwayZx=4+Lb5WC=ZEgtNHpxiSca=nA@mail.gmail.com>
+ <1370780950-21746-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20130610134302.GZ19468@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/06/13 14:13, Linus Walleij wrote:
-> On Mon, Jun 10, 2013 at 11:21 AM, Srinivas KANDAGATLA
-> <srinivas.kandagatla@st.com> wrote:
+On 20:29 Sun 09 Jun     , Jett.Zhou wrote:
+> From: Jing Xiang <jxiang@marvell.com>
+> 
 
->>
->> Signed-off-by: Stuart Menefy <stuart.menefy@st.com>
->> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Rob Herring <robherring2@gmail.com>
->> CC: Linus Walleij <linus.walleij@linaro.org>
->> CC: Will Deacon <will.deacon@arm.com>
->> CC: Thomas Gleixner <tglx@linutronix.de>
-> 
-> This is starting to look very good!
-> 
-> (...)
-Thankyou.
->> +static int __cpuinit gt_clockevents_init(struct clock_event_device *clk)
->> +{
->> +       struct clock_event_device **this_cpu_clk;
->> +       int cpu = smp_processor_id();
->> +
->> +       clk->name = "ARM global timer clock event";
->> +       clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
->> +       clk->set_mode = gt_clockevent_set_mode;
->> +       clk->set_next_event = gt_clockevent_set_next_event;
->> +       this_cpu_clk = __this_cpu_ptr(gt_evt);
->> +       *this_cpu_clk = clk;
->> +       clk->cpumask = cpumask_of(cpu);
->> +       clk->irq = gt_ppi;
->> +       clockevents_config_and_register(clk, gt_clk_rate,
->> +                                       0, 0xffffffff);
-> 
-> What do you mean with being able to set event on
-> 0?
-Its a bit of over do from me.. I will change it to what you suggested...
+this is impossible to follow
 
-> 
-> This should most probably be:
-> 
-> 
-> clockevents_config_and_register(clk, gt_clk_rate,
->                                       1, 0xffffffff);
-> 
-> (...)
->> +static struct clk *gt_get_clock(void)
->> +{
->> +       struct clk *clk;
->> +       int err;
->> +
->> +       clk = clk_get_sys("gt", NULL);
->> +       if (IS_ERR(clk)) {
->> +               pr_err("global-timer: clock not found: %ld\n", PTR_ERR(clk));
->> +               return clk;
->> +       }
-> (...)
->> +       clk = of_clk_get(np, 0);
->> +       if (!IS_ERR(clk))
->> +               clk_register_clkdev(clk, NULL, "gt");
-> 
-> Well that was clever.
-> 
-> Isn't it better to pass a struct device_node *np around and have that as
-> NULL in the non-DT boot path?
-I will try it and see how it will look.
+resend the patch series fully with a PATCH 0
 
-Thanks,
-srini
-> 
-> (Maybe somebody in the community asked you to do this, then I
-> will live with it.)
+as I just go back from vacation I'll not read this series until then
 
+Best Regards,
+J.
+
+> Add pitch length info of graphics/video layer for mmp_win, if it is
+> YUV format of video layer, u/v pitch will non-zero.
 > 
-> Yours,
-> Linus Walleij
+> Signed-off-by: Jing Xiang <jxiang@marvell.com>
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+> ---
+>  include/video/mmp_disp.h |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
 > 
+> diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
+> index b9dd1fb..462e3bd 100644
+> --- a/include/video/mmp_disp.h
+> +++ b/include/video/mmp_disp.h
+> @@ -91,6 +91,11 @@ struct mmp_win {
+>  	u16	up_crop;
+>  	u16	bottom_crop;
+>  	int	pix_fmt;
+> +	/*
+> +	 * pitch[0]: graphics/video layer line length or y pitch
+> +	 * pitch[1]/pitch[2]: video u/v pitch if non-zero
+> +	 */
+> +	u32	pitch[3];
+>  };
+>  
+>  struct mmp_addr {
+> -- 
+> 1.7.0.4
 > 
