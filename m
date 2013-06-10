@@ -1,33 +1,103 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Mon, 10 Jun 2013 13:05:20 +0800
-Subject: [GIT PULL] SiRF V3.10 kernel Panic fix for multiplatforms using
- non-SiRF SoCs
-Message-ID: <CAGsJ_4ytD0L8gtcioDxJRyoOL6BGcEKQSxeyrJz6Ko5hXS4VnA@mail.gmail.com>
+From: bjorn@kryo.se (Bjorn Andersson)
+Date: Sun, 9 Jun 2013 22:12:11 -0700
+Subject: [PATCH 2/2] ARM: nomadik: add the new clocks to the device tree
+In-Reply-To: <CAJAp7OiYZx46aWRsXc+CmS+5F0STz5P+rdYnJEoaRRMUnkD1Cg@mail.gmail.com>
+References: <1370775348-7440-1-git-send-email-linus.walleij@linaro.org>
+ <1370775348-7440-2-git-send-email-linus.walleij@linaro.org>
+ <201306091621.02506.arnd@arndb.de>
+ <CAJAp7OiYZx46aWRsXc+CmS+5F0STz5P+rdYnJEoaRRMUnkD1Cg@mail.gmail.com>
+Message-ID: <CAJAp7Oji=+9PqwGkF84BRaxkFeeO_kWoY378Ur-A5z6G9Z5xSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+While hacking on clock support for msm8960 the other day I did the
+same thing; I figured that providing clocks with descriptive names
+would be of great benefit while reading the dts.
 
-  Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+I had my uart device setup with:
+clocks = <&gsbi8_uart_clk>, <&gsbi8_p_clk>;
 
-are available in the git repository at:
+However, all currently present clock bindings follow the pattern
+described by Arnd.
+Following this pattern my uart would be setup as:
+clocks = <&clks 42>, <&clks 44>;
 
-  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
-tags/sirf-fix-v3.10-mp-panic
+Needless to say there is no way to make sense of this without
+consulting the specific binding documentation. So, although your way
+of setting up the clock binding is not the standard way I do prefer
+it, but it comes with plenty extra nodes in the tree.
 
-for you to fetch changes up to b32b28406f830a526db1bacd539bee57692b0847:
+Regards,
+Bjorn
 
-  ARM: prima2: fix incorrect panic usage (2013-06-10 12:01:06 +0800)
-
-----------------------------------------------------------------
-SiRF fixes kernel panic on multi-platforms using non-sirf soc
-
-- ARM: prima2: fix incorrect panic usage
-
-----------------------------------------------------------------
-Haojian Zhuang (1):
-      ARM: prima2: fix incorrect panic usage
-
- arch/arm/mach-prima2/pm.c   | 6 ++++--
- arch/arm/mach-prima2/rstc.c | 6 ++++--
- 2 files changed, 8 insertions(+), 4 deletions(-)
+On Sun, Jun 9, 2013 at 10:10 PM, Bjorn Andersson <bjorn@kryo.se> wrote:
+> Linus,
+>
+> While hacking on clock support for msm8960 the other day I did the same
+> thing; I figured that providing clocks with descriptive names would be of
+> great benefit while reading the dts.
+>
+> I had my uart device setup with:
+> clocks = <&gsbi8_uart_clk>, <&gsbi8_p_clk>;
+>
+> However, all currently present clock bindings seem to follow the pattern
+> described by Arnd.
+> Following this pattern my uart would be setup as:
+> clocks = <&clks 42>, <&clks 44>;
+>
+> Needless to say there is no way to make sense of this without consulting the
+> specific binding documentation. So, although your way of setting up the
+> clock binding is not the standard way I do prefer it, but it comes with
+> plenty extra nodes in the tree.
+>
+> Regards,
+> Bjorn
+>
+>
+> On Sun, Jun 9, 2013 at 7:21 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>
+>> On Sunday 09 June 2013, Linus Walleij wrote:
+>> > +               /*
+>> > +                * IP AMBA bus clocks, driving the bus side of the
+>> > +                * peripheral clocking, clock gates.
+>> > +                */
+>> > +
+>> > +               hclkdma0: hclkdma0 at 48M {
+>> > +                       #clock-cells = <0>;
+>> > +                       compatible = "st,nomadik-src-clock";
+>> > +                       clock-id = <0>;
+>> > +                       clocks = <&hclk>;
+>> > +               };
+>> > +               hclksmc: hclksmc at 48M {
+>> > +                       #clock-cells = <0>;
+>> > +                       compatible = "st,nomadik-src-clock";
+>> > +                       clock-id = <1>;
+>> > +                       clocks = <&hclk>;
+>> > +               };
+>> > +               hclksdram: hclksdram at 48M {
+>> > +                       #clock-cells = <0>;
+>> > +                       compatible = "st,nomadik-src-clock";
+>> > +                       clock-id = <2>;
+>> > +                       clocks = <&hclk>;
+>> > +               };
+>> > +               hclkdma1: hclkdma1 at 48M {
+>> > +                       #clock-cells = <0>;
+>> > +                       compatible = "st,nomadik-src-clock";
+>> > +                       clock-id = <3>;
+>> > +                       clocks = <&hclk>;
+>> > +               };
+>>
+>> Sorry if I'm being slow to understand how the clock bindings work, but if
+>> you have 63 identical clocks that only differ in ther clock-id, can't you
+>> just have a single DT node for them instead with #clock-cells=1 to pass
+>> the
+>> number from the device using it?
+>>
+>>         Arnd
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+>
