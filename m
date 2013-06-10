@@ -1,51 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Jun 2013 14:29:17 +0200
-Subject: [PATCH 2/2] ARM: nomadik: add the new clocks to the device tree
-In-Reply-To: <CAJAp7Oji=+9PqwGkF84BRaxkFeeO_kWoY378Ur-A5z6G9Z5xSQ@mail.gmail.com>
-References: <1370775348-7440-1-git-send-email-linus.walleij@linaro.org>
- <1370775348-7440-2-git-send-email-linus.walleij@linaro.org>
- <201306091621.02506.arnd@arndb.de>
- <CAJAp7OiYZx46aWRsXc+CmS+5F0STz5P+rdYnJEoaRRMUnkD1Cg@mail.gmail.com>
- <CAJAp7Oji=+9PqwGkF84BRaxkFeeO_kWoY378Ur-A5z6G9Z5xSQ@mail.gmail.com>
-Message-ID: <CACRpkdYwRuvY5DLuG6aBbNsf8S7jDN4BqQfmeZsQk_aCa33ZbA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 10 Jun 2013 14:31:31 +0200
+Subject: [PATCH 1/8] ARM: shmobile: sh73a0 pinmux platform device cleanup
+In-Reply-To: <20130604132058.GE3068@verge.net.au>
+References: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
+ <20130604052043.GX23054@verge.net.au> <20130604132058.GE3068@verge.net.au>
+Message-ID: <1722811.MCTrRecTtK@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 7:12 AM, Bjorn Andersson <bjorn@kryo.se> wrote:
+Hi Simon,
 
-> While hacking on clock support for msm8960 the other day I did the
-> same thing; I figured that providing clocks with descriptive names
-> would be of great benefit while reading the dts.
->
-> I had my uart device setup with:
-> clocks = <&gsbi8_uart_clk>, <&gsbi8_p_clk>;
->
-> However, all currently present clock bindings follow the pattern
-> described by Arnd.
-> Following this pattern my uart would be setup as:
-> clocks = <&clks 42>, <&clks 44>;
->
-> Needless to say there is no way to make sense of this without
-> consulting the specific binding documentation. So, although your way
-> of setting up the clock binding is not the standard way I do prefer
-> it, but it comes with plenty extra nodes in the tree.
+On Tuesday 04 June 2013 22:20:59 Simon Horman wrote:
+> On Tue, Jun 04, 2013 at 02:20:43PM +0900, Simon Horman wrote:
+> > On Mon, May 27, 2013 at 09:02:43PM -0700, Olof Johansson wrote:
+> > > On Mon, May 27, 2013 at 06:13:22PM +0400, Sergei Shtylyov wrote:
+> > > > On 27-05-2013 13:00, Simon Horman wrote:
+> > > > >From: Magnus Damm <damm@opensource.se>
+> > > > >
+> > > > >Use DEFINE_RES_MEM() and platform_device_register_simple()
+> > > > >to save a couple of lines of code.
+> > > > >
+> > > > >Signed-off-by: Magnus Damm <damm@opensource.se>
+> > > > >Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > >---
+> > > > >
+> > > > >  arch/arm/mach-shmobile/setup-sh73a0.c |   25
+> > > > >  ++++++-------------------
+> > > > >  1 file changed, 6 insertions(+), 19 deletions(-)
+> > > > >
+> > > > >diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > > >b/arch/arm/mach-shmobile/setup-sh73a0.c index fdf3894..f8f4261
+> > > > >100644
+> > > > >--- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > > >+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > > >@@ -61,29 +61,16 @@ void __init sh73a0_map_io(void)
+> > > > 
+> > > > [...]
+> > > > 
+> > > > >+/* PFC */
+> > > > >+static const struct resource pfc_resources[] = {
+> > > > >
+> > > >    Should have been annotated as __initdata... too late, need
+> > > > 
+> > > > another patch.
+> > > 
+> > > See comments on other patches/pull requests, I think there's time to
+> > > revisit this. I.e. I'll hold off on pulling this based on the other
+> > > feedback.
+> >
+> > As I am respining I will fix this.
+> > 
+> > However, it had been reviewed and I think that ordinarily
+> > it would be reasonable to perform further clean-up
+> > work in a subsequent patch.
+> 
+> I decided to simply drop the patch and revisit it later.
 
-I agree. In my case this was just a side-effect of the different
-bits in the register having different parents, so the common pattern
-could not be used, but when looking at the end result it's strikingly
-more readable than the cryptic numbers.
+This patch (as well as the sh7372 equivalent) is pretty simple. What about 
+just adding __initdata and resubmitting them ? Otherwise they will get lost.
 
-However it is possible to mitigate the latter by using the new DTS
-preprocessor support like so:
+-- 
+Regards,
 
-#include <dt-bindings/clk/my-clocks.h>:
-
-/* Clock IDs */
-#define GSBI8_UART_CLK 42
-#define GSBI8_P_CLK 44
-
-(...)
-clocks = <&clks GSBI8_UART_CLK>, <&clks GSBI8_P_CLK>;
-
-Yours,
-Linus Walleij
+Laurent Pinchart
