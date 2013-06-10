@@ -1,32 +1,65 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 10 Jun 2013 15:03:25 +0900
-Subject: [PATCH] ARM: zImage/virt: remove hyp-stub.S during distclean
-Message-ID: <20130610060325.2335.65815.sendpatchset@w520>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 10 Jun 2013 14:05:43 +0800
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306091136450.13202-100000@netrider.rowland.org>
+References: <1370791112-18464-1-git-send-email-ming.lei@canonical.com>
+ <Pine.LNX.4.44L0.1306091136450.13202-100000@netrider.rowland.org>
+Message-ID: <CACVXFVOrniwAUaJN1dkUZD4HzfV6StajzL3Okw2dNBpkSPRjNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Sun, Jun 9, 2013 at 11:48 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Sun, 9 Jun 2013, Ming Lei wrote:
+>
+>> Hi,
+>>
+>> The patchset supports to run giveback of URB in tasklet context, so that
+>> DMA unmapping/mapping on transfer buffer and compelte() callback can be
+>> run with interrupt enabled, then time of HCD interrupt handler can be
+>> saved much. Also this approach may simplify HCD since HCD lock needn't
+>> be released any more before calling usb_hcd_giveback_urb().
+>
+> That's a lot of material.  However, you haven't specifically said
+> _what_ you want to accomplish.  It sounds like you're trying to
 
-Make sure hyp-stub.S gets removed during make distclean,
-this left over file was introduced in commit:
+All IRQs are disabled(locally) in hard interrupt context, but they are
+enabled in softirq context, this patchset can decrease the time a lot.
 
-424e599 ARM: zImage/virt: hyp mode entry support for the zImage loader
+> minimize the amount of time spent in hardirq context, but I can't be
+> sure that is really what you want.
+>
+> If it is, this is not a good way to do it.  A better way to minimize
+> the time spent in hardirq context is to use a threaded interrupt
+> handler.  But why do you want to minimize this time in the first place?
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Process context switch may have more cost than switching to softirq,
+then USB performance may be effected, that is why I choose to use
+tasklet.  Also now there is no any sleep in URB giveback, so it isn't
+necessary to introduce process to handle the giveback or completion.
 
- arch/arm/boot/compressed/Makefile |    3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> The CPU will be still have to use at least as much time as before; the
+> only difference is that it will be in softirq or in a high-priority
+> thread instead of in hardirq.
 
---- 0001/arch/arm/boot/compressed/Makefile
-+++ work/arch/arm/boot/compressed/Makefile	2013-06-05 17:21:20.000000000 +0900
-@@ -116,7 +116,8 @@ targets       := vmlinux vmlinux.lds \
- 
- # Make sure files are removed during clean
- extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
--		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
-+		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs) \
-+		 hyp-stub.S
- 
- ifeq ($(CONFIG_FUNCTION_TRACER),y)
- ORIG_CFLAGS := $(KBUILD_CFLAGS)
+Yes, as I said above, but we can allow other IRQs to be served in
+handling URB giveback in softirq context, that is the value of softirq/tasklet.
+Of course, system may have more important things to do during the time.
+Generally speaking, for one driver, hard interrupt handler should always
+consume less time as possible.
+
+>
+> Also, I don't see how you can avoid releasing the HCD's private lock
+> before calling usb_hcd_giveback_urb().  When the completion handler
+
+Please see patch 1/4, :-)
+
+> tries to resubmit the URB, the HCD's enqueue routine will try to
+> reacquire the private lock.  If it didn't release the lock earlier, it
+
+Yes, but with the patchset, resubmitting is called in taskelet context,
+instead of hardirq context, so there isn't any recursion any more.
+
+
+Thanks,
+--
+Ming Lei
