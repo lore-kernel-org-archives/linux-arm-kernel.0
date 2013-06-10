@@ -1,54 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Jun 2013 16:46:33 +0100
-Subject: [PATCH 00/10] regulator: ab8500-ext: Refactorings
-In-Reply-To: <20130610152507.GF1403@sirena.org.uk>
-References: <1370621488-18130-1-git-send-email-lee.jones@linaro.org>
- <CACRpkdbygDNdsO=EzigPiBSnMmF-NVnF95HeBBavkry93i+ubQ@mail.gmail.com>
- <20130610151208.GK20297@gmail.com>
- <20130610152507.GF1403@sirena.org.uk>
-Message-ID: <20130610154633.GL20297@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 10 Jun 2013 16:49:50 +0100
+Subject: Dove/Armada DRM driver naming
+In-Reply-To: <CAMLZHHRFMmLsckBVDrxEGx9XaqhNq_sOFvDKq=Cx7HH938tkng@mail.gmail.com>
+References: <CAMLZHHRFMmLsckBVDrxEGx9XaqhNq_sOFvDKq=Cx7HH938tkng@mail.gmail.com>
+Message-ID: <20130610154949.GV18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jun 2013, Mark Brown wrote:
+On Mon, Jun 10, 2013 at 09:36:51AM -0600, Daniel Drake wrote:
+> As the MMP3 does not fit under any form of "Armada" name, calling the
+> new DRM driver Armada may not be 100% accurate. Although, looking at
+> Documentation/arm/Marvell/README, finding a good name may not be
+> trivial.
 
-> On Mon, Jun 10, 2013 at 04:12:08PM +0100, Lee Jones wrote:
-> 
-> > The 'ux500: regulator_supply' patch, relies on the 'regulator:
-> > supply_name' one however. Mark has taken two of them, I don't know why
-> > the others were missed/intentionally left.
-> 
-> > Mark, was there a reason for this?
-> 
-> IIRC they were more involved and since you decided to pick a random
-> e-mail address to send them to that goes nowhere near the mailboxes I
-> use for upstream they're not going to bubble up particularly quickly.
+Armada seems to fit more SoCs with it than it doesn't, and is better
+than calling it Dove as I did in the initial version.
 
-Not as random as you might think.
+However, the name is not that important; we've had these arguments before
+and some maintainers outright reject name changes to existing drivers.
+If we cared that much about names, we'd have masses of patches going
+into the kernel constantly renaming functions and the like.
+It's fine to have the discussion early on in the development of a
+driver, but there comes a point when no other changes are acceptable.
 
-I knew you'd left your old place, so I did:
+> The MMP2 and MMP3 include graphics silicon developed by Vivante. Would
+> it be more accurate to call this drm-vivante?
 
-  `git log --author="Mark Brown" --format=%ae next/master | uniq -c | head`
+No, because Vivante is the GPU, which is a separate IP block from the
+LCD interfaces, which is a separate IP block from the Vmeta video
+decover.
 
-... to see what you were using most recently. I recieved:
+> I must admit I don't
+> have a complete understanding here: of is the whole graphics subsystem
+> driven by vivante silicon, or is the vivante part more of an isolated
+> add-on which can accelerate certain operations in graphics memory?
 
-     67 broonie at linaro.org
-      1 broonie at kernel.org
-      1 broonie at linaro.org
-     59 broonie at opensource.wolfsonmicro.com
-     28 broonie at sirena.org.uk
-    763 broonie at opensource.wolfsonmicro.com
-      1 broonie at sirena.org.uk
-    428 broonie at opensource.wolfsonmicro.com
-      1 broonie at sirena.org.uk
-     23 broonie at opensource.wolfsonmicro.com
+The LCD, GPU and video decoder are separate IP blocks.
 
-... hence why I used your linaro address.
+However, for a proper DRM driver, we would need to have the GPU fall
+under the DRM stuff as well, but my approach at the moment is to continue
+using the existing solution as I have no desire mess with that stuff,
+especially as doing so would be against the license terms that came
+with those libraries.  If others want to work on that, and integrate it
+into the driver, I'm more than happy to work with them on the integration.
 
-I'll send it out again to your kernel.org one if it make you happy. :)
+Call me pedantic, but I believe in respecting the licenses on the
+software I have, irrespective of whether they be open or closed source.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+(Of course, if Marvell/Vivante wish to grant me permission...)
+
+What I don't have an issue with is cleaning up the GPLv2 galcore kernel
+driver - the source is spread all round the Internet in various different
+versions - and there's quite an amount that can be cleaned up and the
+obfuscations unobfuscated relatively easily with perl (and I already
+have a hundred or so patches against that sucker.)
