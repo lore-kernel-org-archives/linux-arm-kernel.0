@@ -1,119 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Jun 2013 10:35:20 +0200
-Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
-In-Reply-To: <CADApbeixEKi984QED07LxA8vzfHmLGCGT8KxEbB5cqXzpW823Q@mail.gmail.com>
-References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
- <201306061826.19551.arnd@arndb.de>
- <CADApbeixEKi984QED07LxA8vzfHmLGCGT8KxEbB5cqXzpW823Q@mail.gmail.com>
-Message-ID: <201306101035.20924.arnd@arndb.de>
+From: lokeshvutla@ti.com (Lokesh Vutla)
+Date: Mon, 10 Jun 2013 14:05:53 +0530
+Subject: [PATCH 13/14] ARM: AM33XX: hwmod data: irq, dma and addr info
+ clean up
+In-Reply-To: <87zjv2ooxi.fsf@linaro.org>
+References: <1369845494-30231-1-git-send-email-santosh.shilimkar@ti.com>
+ <1369845494-30231-14-git-send-email-santosh.shilimkar@ti.com>
+ <alpine.DEB.2.02.1306060355320.15042@utopia.booyaka.com>
+ <87zjv2ooxi.fsf@linaro.org>
+Message-ID: <51B58FE9.5040309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 08 June 2013, Chao Xie wrote:
-> hi, Arnd
-> Thanks for your review.
-> 
-> On Fri, Jun 7, 2013 at 12:26 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Thursday 06 June 2013, Neil Zhang wrote:
-> >>
-> >> The MACH_MMPX_DT here is for standard ARM core based SoC.
-> >> But PJ4 is modified by Marvell, which includes IWMMXT.
-> >
-> > That should not stop us from supporting them with the same kernel.
-> > We can already build a kernel that will work with IWMMXT on
-> > ArmadaXP (PJ4B) and Calxeda Highbank (Cortex-A9) for instance.
-> >
-> Yes. We can compile it, because will fail to boot up the core.
-> The correct way to adding device tree support for
-> iwmmx(arch/arm/kernel/pj4-cp0.c).
-> I think we can do it if you agree with us.
+Hi Kevin,
 
-Ah, you mean the initcall in that file breaks when executed on a
-CPU that doesn't have iWMMXT?
+On Friday 07 June 2013 03:57 AM, Kevin Hilman wrote:
+> Paul Walmsley <paul@pwsan.com> writes:
+>
+>> On Wed, 29 May 2013, Santosh Shilimkar wrote:
+>>
+>>> From: Vaibhav Hiremath <hvaibhav@ti.com>
+>>>
+>>> AM33XX only supports DT boot mode and with addition of
+>>> extracting module resources like, irq, dma and address space
+>>> from DT block, so now we can remove duplicate information from
+>>> hwmod data file.
+>>
+>> OK, guess I'll take your word for it that it all works.  The
+>> BeagleBone-white with appended DTB hasn't booted here since v3.7.
+>> And the BeagleBone-black with discrete DTB doesn't boot at all with
+>> current mainline, only with the TI vendor kernel & DTB...
+>
+> Anyone care to shed light on what's missing for BeagleBone boot with
+> mainline currently?
+I have tested BeagleBone boot with today's mainline bootloader and
+kernel. It boots perfectly fine.
 
-The easiest way for that is probably to call pj4_cp0_init()
-from the machine_descriptor init_late() callback. To do it properly,
-I think it should be hooked up with the CPU identification code
-in arch/arm/mm/proc-v7.S.
-
-> >> > __initdata = {
-> >> > >           .virtual        = (unsigned long)AXI_VIRT_BASE,
-> >> > >           .length         = AXI_PHYS_SIZE,
-> >> > >           .type           = MT_DEVICE,
-> >> > > - },
-> >> > > + }, {
-> >> > > +         .pfn            = __phys_to_pfn(MMP_CORE_PERIPH_PHYS_BASE),
-> >> > > +         .virtual        = (unsigned long)MMP_CORE_PERIPH_VIRT_BASE,
-> >> > > +         .length         = MMP_CORE_PERIPH_PHYS_SIZE,
-> >> > > +         .type           = MT_DEVICE,
-> >> > > + }
-> >> > >  };
-> >> > >
-> >> > >  void __init mmp_map_io(void)
-> >> >
-> >> > What is this needed for?
-> >>
-> >> This function is used to static map the device registers.
-> >
-> > I understand what map_io does. Why do you need a static mapping?
-> >
-> 
-> The AXI and APB bus register mapping, It does not need to be static mapping.
-> Because we define the registers for each peripharals in device tree.
-> The device driver can map it.
-
-Ok. Please try if it all keeps working without these mappings (aside
-from the SCU). You can leave them in as a performance optimization
-since the registers will get mapped as large pages this way, but it
-should really work without them.
-
-I would also suggest defining the virtual base addresses locally in this
-file rather than globally, just to ensure that no driver starts relying
-on the static mapping.
-
-> There is a exception. The address space used by core for example CPU
-> SCU registers for CA9.
-> We have to read/write the registers even device tree has not been
-> build up in kernel, for example ->smp_prepare_cpus.
-> At this point, how can we get the base address for SCU?
-
-I guess that is a problem we have on other platforms as well, we should
-find a generic solution for that. It would be nice to reserve a page
-in "fixmap" and have common code map the SCU page into that.
- 
-> >> > > +/* PXA988 */
-> >> > > +static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst
-> >> > = {
-> >> > > + OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4017000, "pxa2xx-uart.0",
-> >> > NULL),
-> >> > > + OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4018000, "pxa2xx-uart.1",
-> >> > NULL),
-> >> > > + OF_DEV_AUXDATA("mrvl,mmp-uart", 0xd4036000, "pxa2xx-uart.2",
-> >> > NULL),
-> >> > > + OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4011000, "pxa2xx-i2c.0",
-> >> > NULL),
-> >> > > + OF_DEV_AUXDATA("mrvl,mmp-twsi", 0xd4037000, "pxa2xx-i2c.1",
-> >> > NULL),
-> >> > > + OF_DEV_AUXDATA("mrvl,mmp-gpio", 0xd4019000, "pxa-gpio", NULL),
-> >> > > + OF_DEV_AUXDATA("mrvl,mmp-rtc", 0xd4010000, "sa1100-rtc", NULL),
-> >> > > + {}
-> >> > > +};
-> >> >
-> >> > Why do you need auxdata?
-> >>
-> >> Two reasons:
-> >> 1. some of the device still need platform data at this time.
-> >
-> > None of the ones above do apparently.
-> >
-> Now, some devices are not added. For example, USB.
-> I am trying to modify the USB driver to make it support device tree.
-> For example, separate the phy and PMIC support from USB driver.
-> The patches have been reviewed in USB maillist for a long time.
-> Now it is hold because the maintainer think HCD and PHY need do some fix.
-> So as a temporaty solution before us pushing USB patches, we have to
-> use platform data for USB.
-
-Ok, I see.
-
-	Arnd
+Thanks and regards,
+Lokesh
+>
+> I've also not been able to boot a mainline kernel on the BeagleBone for
+> some time.
+>
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
