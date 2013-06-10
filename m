@@ -1,47 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 10 Jun 2013 16:02:04 +0200
-Subject: [PATCH v2 04/11] mfd:stixxxx-syscfg: Add ST System Configuration
- support.
-In-Reply-To: <51B5DA26.6070707@st.com>
-References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
- <CACRpkdaW2ALTWCB7Rd8m=aAGQwh3T_dJVncxJn_eXer4X3J6_g@mail.gmail.com>
- <51B5DA26.6070707@st.com>
-Message-ID: <2757224.FBxg98dX57@wuerfel>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 10 Jun 2013 10:03:00 -0400 (EDT)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVOrniwAUaJN1dkUZD4HzfV6StajzL3Okw2dNBpkSPRjNA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306100946570.1133-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 June 2013 14:52:38 Srinivas KANDAGATLA wrote:
-> On 10/06/13 14:16, Linus Walleij wrote:
-> > On Mon, Jun 10, 2013 at 11:22 AM, Srinivas KANDAGATLA
-> > <srinivas.kandagatla@st.com> wrote:
-> > 
-> >> This mfd driver provides higher level inialization routines for various
-> >> IPs like Ethernet, USB, PCIE, SATA and so on. Also it provides way to
-> >> get to syscfg registers via standard regmap api which is usefull for
-> >> drivers like pinctrl.
+[Thomas and Steve, please see the question below.]
+
+On Mon, 10 Jun 2013, Ming Lei wrote:
+
+> On Sun, Jun 9, 2013 at 11:48 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> > On Sun, 9 Jun 2013, Ming Lei wrote:
+> >
+> >> Hi,
 > >>
-> >> This patch adds support to ST System Configuration registers, which can
-> >> be configured by the drivers.
-> >>
-> >> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@st.com>
-> >> CC: Stuart Menefy <stuart.menefy@st.com>
-> >> CC: Stephen Gallimore <stephen.gallimore@st.com>
-> >> CC: Linus Walleij <linus.walleij@linaro.org>
-> >> CC: Mark Brown <broonie@kernel.org>
-> > 
-> > What is this driver doing that drivers/mfd/syscon.c is not already
-> > doing?
->
-> As of now, the driver is very much similar to syscon + some additional
-> functionality, but we are planning to use this file to add higher level
-> functions to configure different IPs like ethernet, usb, power, reset
-> and so on which are very much specific to ST System Configuration Registers.
+> >> The patchset supports to run giveback of URB in tasklet context, so that
+> >> DMA unmapping/mapping on transfer buffer and compelte() callback can be
+> >> run with interrupt enabled, then time of HCD interrupt handler can be
+> >> saved much. Also this approach may simplify HCD since HCD lock needn't
+> >> be released any more before calling usb_hcd_giveback_urb().
+> >
+> > That's a lot of material.  However, you haven't specifically said
+> > _what_ you want to accomplish.  It sounds like you're trying to
+> 
+> All IRQs are disabled(locally) in hard interrupt context, but they are
+> enabled in softirq context, this patchset can decrease the time a lot.
 
-I was expecting that you'd actually interface with the syscon code and
-build on top, rather than copy it.
+That isn't clear.  It is documented that USB completion handlers are 
+called with local interrupts disabled.  An IRQ arriving before the 
+tasklet starts up might therefore be serviced during the short interval 
+before the tasklet disables local interrupts, but if that happens it 
+would mean that the completion handler would be delayed.
 
-There are multiple ways of doing that, e.g. you could export a function
-from syscon.c that you call to register the device node and then import
-the regmap from syscon into your high-level driver again.
+In effect, you are prioritizing other IRQs higher than USB completion
+handlers.  Nevertheless, the total time spent with interrupts disabled
+will remain the same.
 
-	Arnd
+(There's one other side effect that perhaps you haven't considered.  
+When multiple URBs are addressed to the same endpoint, their completion 
+handlers are called in order of URB completion, which is the same as 
+the order of URB submission unless an URB is cancelled.  By delegating 
+the completion handlers to tasklets, and particularly by using per-CPU 
+tasklets, you may violate this behavior.)
+
+> > minimize the amount of time spent in hardirq context, but I can't be
+> > sure that is really what you want.
+> >
+> > If it is, this is not a good way to do it.  A better way to minimize
+> > the time spent in hardirq context is to use a threaded interrupt
+> > handler.  But why do you want to minimize this time in the first place?
+> 
+> Process context switch may have more cost than switching to softirq,
+> then USB performance may be effected, that is why I choose to use
+> tasklet.  Also now there is no any sleep in URB giveback, so it isn't
+> necessary to introduce process to handle the giveback or completion.
+
+Thomas and Steve, can you comment on this?  I do not have a good 
+understanding of the relative benefits/drawbacks of tasklets vs. 
+threaded interrupt handlers.
+
+> > The CPU will be still have to use at least as much time as before; the
+> > only difference is that it will be in softirq or in a high-priority
+> > thread instead of in hardirq.
+> 
+> Yes, as I said above, but we can allow other IRQs to be served in
+> handling URB giveback in softirq context, that is the value of softirq/tasklet.
+> Of course, system may have more important things to do during the time.
+> Generally speaking, for one driver, hard interrupt handler should always
+> consume less time as possible.
+
+As I understand it, the tradeoff between hardirq and softirq is
+generally unimportant.  It does matter a lot in realtime settings --
+but the RT kernel effectively makes _every_ interrupt handler threaded,
+so it won't benefit from this change.
+
+Alan Stern
