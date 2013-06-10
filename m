@@ -1,36 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 9 Jun 2013 21:20:32 -0700
-Subject: [GIT PULL] ARM: OMAP: some clock & hwmod changes for v3.11
-In-Reply-To: <alpine.DEB.2.02.1306090909190.20050@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306090909190.20050@utopia.booyaka.com>
-Message-ID: <20130610042032.GB8164@atomide.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Mon, 10 Jun 2013 13:02:53 +0800
+Subject: [PATCH v2 0/2] support hisilicon i2c 
+Message-ID: <1370840576-15651-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130609 02:17]:
-> Hi Tony,
-> 
-> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
-> 
->   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
-> 
-> are available in the git repository at:
-> 
->   http://git.kernel.org/cgit/linux/kernel/git/pjw/omap-pending.git tags/omap-devel-b-for-3.11
-> 
-> for you to fetch changes up to 563ce4d51a555b45f5d43ff9cf127da8dac9f64d:
-> 
->   ARM: AM33XX: clk: Add clock node for EHRPWM TBCLK (2013-06-09 01:12:32 -0600)
-> 
-> ----------------------------------------------------------------
-> A few OMAP clock & hwmod changes for v3.11.
-> 
-> Basic test logs are here:
-> 
-> http://www.pwsan.com/omap/testlogs/prcm_devel_v3.11/20130609020805/
+v2:
+Suggested by Baruch
+Support hisilicon i2c in i2c-designware-platdrv.c, and adding two optional properties
 
-Thanks pulled into omap-for-v3.11/soc.
+Zhangfei Gao (2):
+  i2c: designware: use module_platform_driver
+  i2c: designware: add two optional property tx/rx-fifo-size
 
-Regards,
+ .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
+ drivers/i2c/busses/i2c-designware-platdrv.c        |   17 +++++------------
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
-Tony
+-- 
+1.7.9.5
