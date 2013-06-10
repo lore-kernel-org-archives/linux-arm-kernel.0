@@ -1,27 +1,73 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 10 Jun 2013 16:35:56 +0200
-Subject: [PATCH 00/10] regulator: ab8500-ext: Refactorings
-In-Reply-To: <1370621488-18130-1-git-send-email-lee.jones@linaro.org>
-References: <1370621488-18130-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbygDNdsO=EzigPiBSnMmF-NVnF95HeBBavkry93i+ubQ@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Mon, 10 Jun 2013 16:45:49 +0200
+Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
+ platforms
+In-Reply-To: <1368807872-2601-4-git-send-email-t.figa@samsung.com>
+References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
+ <1368807872-2601-4-git-send-email-t.figa@samsung.com>
+Message-ID: <62314159.5vrvK4k2Mm@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 7, 2013 at 6:11 PM, Lee Jones <lee.jones@linaro.org> wrote:
+Hi,
 
-> This patch aims to do the following:
->
->  - Separate the AB8500 External Regulator out from the AB8500 core
->    one for added control and reduced complexity
->  - Enable the AB8500 External Regulator for Device Tree
->  - Ensure EXT3 supplies the AUX regulators with voltage
+On Friday 17 of May 2013 18:24:29 Tomasz Figa wrote:
+> This patch makes legacy code on suspend/resume path being executed
+> conditionally, on non-DT platforms only, to fix suspend/resume of
+> DT-enabled systems, for which the code is inappropriate.
+> 
+> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> ---
+>  arch/arm/plat-samsung/pm.c | 17 ++++++++++++-----
+>  1 file changed, 12 insertions(+), 5 deletions(-)
 
-The series:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+It seems like this patch did not make it into 3.10-rc5, while rest of patches 
+did, which ended up with suspend/resume still being broken.
 
-Once the changes to MFD+Regulator are in I'm happy to take the
-DT patches onto my ux500-devicetree branch. However I fear
-I'll break something if I do it right now?
+What should we do in this case? 
 
-Yours,
-Linus Walleij
+Best regards,
+Tomasz
+
+> diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+> index 53210ec..8ac2b2d 100644
+> --- a/arch/arm/plat-samsung/pm.c
+> +++ b/arch/arm/plat-samsung/pm.c
+> @@ -261,7 +261,8 @@ static int s3c_pm_enter(suspend_state_t state)
+>  	 * require a full power-cycle)
+>  	*/
+> 
+> -	if (!any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
+> +	if (!of_have_populated_dt() &&
+> +	    !any_allowed(s3c_irqwake_intmask, s3c_irqwake_intallow) &&
+>  	    !any_allowed(s3c_irqwake_eintmask, s3c_irqwake_eintallow)) {
+>  		printk(KERN_ERR "%s: No wake-up sources!\n", __func__);
+>  		printk(KERN_ERR "%s: Aborting sleep\n", __func__);
+> @@ -270,8 +271,11 @@ static int s3c_pm_enter(suspend_state_t state)
+> 
+>  	/* save all necessary core registers not covered by the drivers */
+> 
+> -	samsung_pm_save_gpios();
+> -	samsung_pm_saved_gpios();
+> +	if (!of_have_populated_dt()) {
+> +		samsung_pm_save_gpios();
+> +		samsung_pm_saved_gpios();
+> +	}
+> +
+>  	s3c_pm_save_uarts();
+>  	s3c_pm_save_core();
+> 
+> @@ -310,8 +314,11 @@ static int s3c_pm_enter(suspend_state_t state)
+> 
+>  	s3c_pm_restore_core();
+>  	s3c_pm_restore_uarts();
+> -	samsung_pm_restore_gpios();
+> -	s3c_pm_restored_gpios();
+> +
+> +	if (!of_have_populated_dt()) {
+> +		samsung_pm_restore_gpios();
+> +		s3c_pm_restored_gpios();
+> +	}
+> 
+>  	s3c_pm_debug_init();
