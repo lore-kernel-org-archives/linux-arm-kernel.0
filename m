@@ -1,66 +1,33 @@
-From: zhangfei.gao@linaro.org (Zhangfei Gao)
-Date: Mon, 10 Jun 2013 13:02:55 +0800
-Subject: [PATCH v2 2/2] i2c: designware: add two optional property
- tx/rx-fifo-size
-In-Reply-To: <1370840576-15651-1-git-send-email-zhangfei.gao@linaro.org>
-References: <1370840576-15651-1-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <1370840576-15651-3-git-send-email-zhangfei.gao@linaro.org>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Mon, 10 Jun 2013 13:05:20 +0800
+Subject: [GIT PULL] SiRF V3.10 kernel Panic fix for multiplatforms using
+ non-SiRF SoCs
+Message-ID: <CAGsJ_4ytD0L8gtcioDxJRyoOL6BGcEKQSxeyrJz6Ko5hXS4VnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rx-fifo-size and tx-fifo-size will be updated if provided from dts
+The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-CC: Baruch Siach <baruch@tkos.co.il>
----
- .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
- drivers/i2c/busses/i2c-designware-platdrv.c        |    3 +++
- 2 files changed, 10 insertions(+)
+  Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-index e42a2ee..61fdb44 100644
---- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-+++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-@@ -6,6 +6,11 @@ Required properties :
-  - reg : Offset and length of the register set for the device
-  - interrupts : <IRQ> where IRQ is the interrupt number.
- 
-+Optional properties:
-+
-+ - rx-fifo-size : 1 cell, Rx fifo threshold
-+ - tx-fifo-size : 1 cell, Tx fifo threshold
-+
- Recommended properties :
- 
-  - clock-frequency : desired I2C bus clock frequency in Hz.
-@@ -18,5 +23,7 @@ Example :
- 		compatible = "snps,designware-i2c";
- 		reg = <0xf0000 0x1000>;
- 		interrupts = <11>;
-+		rx-fifo-size = <16>;
-+		tx-fifo-size = <16>;
- 		clock-frequency = <400000>;
- 	};
-diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-index 41659c0..6760cea 100644
---- a/drivers/i2c/busses/i2c-designware-platdrv.c
-+++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-@@ -85,6 +85,7 @@ static int dw_i2c_probe(struct platform_device *pdev)
- 	struct dw_i2c_dev *dev;
- 	struct i2c_adapter *adap;
- 	struct resource *mem;
-+	struct device_node *np = pdev->dev.of_node;
- 	int irq, r;
- 
- 	/* NOTE: driver uses the static register mapping */
-@@ -140,6 +141,8 @@ static int dw_i2c_probe(struct platform_device *pdev)
- 		dev->rx_fifo_depth = ((param1 >> 8)  & 0xff) + 1;
- 		dev->adapter.nr = pdev->id;
- 	}
-+	of_property_read_u32(np, "rx-fifo-size", &dev->rx_fifo_depth);
-+	of_property_read_u32(np, "tx-fifo-size", &dev->tx_fifo_depth);
- 	r = i2c_dw_init(dev);
- 	if (r)
- 		return r;
--- 
-1.7.9.5
+are available in the git repository at:
+
+  git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
+tags/sirf-fix-v3.10-mp-panic
+
+for you to fetch changes up to b32b28406f830a526db1bacd539bee57692b0847:
+
+  ARM: prima2: fix incorrect panic usage (2013-06-10 12:01:06 +0800)
+
+----------------------------------------------------------------
+SiRF fixes kernel panic on multi-platforms using non-sirf soc
+
+- ARM: prima2: fix incorrect panic usage
+
+----------------------------------------------------------------
+Haojian Zhuang (1):
+      ARM: prima2: fix incorrect panic usage
+
+ arch/arm/mach-prima2/pm.c   | 6 ++++--
+ arch/arm/mach-prima2/rstc.c | 6 ++++--
+ 2 files changed, 8 insertions(+), 4 deletions(-)
