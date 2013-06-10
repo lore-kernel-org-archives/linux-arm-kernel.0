@@ -1,48 +1,75 @@
 From: dirk.behme@de.bosch.com (Dirk Behme)
-Date: Mon, 10 Jun 2013 08:33:12 +0200
-Subject: [PATCH 2/4] ARM: imx: clk-imx6q: per1_bch's parent is wrong
-In-Reply-To: <20130603054655.GA23090@S2101-09.ap.freescale.net>
-References: <1370034115-24006-1-git-send-email-b20788@freescale.com>
- <1370034115-24006-2-git-send-email-b20788@freescale.com>
- <20130603012939.GB13970@S2101-09.ap.freescale.net>
- <20130603054655.GA23090@S2101-09.ap.freescale.net>
-Message-ID: <51B57328.404@de.bosch.com>
+Date: Mon, 10 Jun 2013 08:44:55 +0200
+Subject: [PATCH] clk: divider: do not propagate rate change request when
+ unnecessary
+In-Reply-To: <1370182855-13427-1-git-send-email-shawn.guo@linaro.org>
+References: <1370182855-13427-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <51B575E7.7040708@de.bosch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.06.2013 07:46, Shawn Guo wrote:
-> On Mon, Jun 03, 2013 at 09:29:41AM +0800, Shawn Guo wrote:
->> On Fri, May 31, 2013 at 05:01:53PM -0400, Anson Huang wrote:
->>> per1_bch is sourced from ahb, previous parent
->>> info is incorrect.
->>>
->>> Signed-off-by: Anson Huang <b20788@freescale.com>
->>
->> Applied, thanks.
->>
-> I just pulled it out.  As Reference Manual does not mention it, we need
-> to confirm with designer about the correct parent of per1_bch.
+On 02.06.2013 16:20, Shawn Guo wrote:
+> If the current rate of parent clock is sufficient to provide child a
+> requested rate with a proper divider setting, the rate change request
+> should not be propagated.  Instead, changing the divider setting is good
+> enough to get child clock run at the requested rate.
+>
+> On an imx6q clock configuration illustrated below,
+>
+>    ahb --> ipg --> ipg_per
+>    132M    66M     66M
+>
+> calling clk_set_rate(ipg_per, 22M) with the current
+> clk_divider_bestdiv() implementation will result in the rate change up
+> to ahb level like the following, because of the unnecessary/incorrect
+> rate change propagation.
+>
+>    ahb --> ipg --> ipg_per
+>    66M     22M     22M
+>
+> Fix the problem by trying to see if the requested rate can be achieved
+> by simply changing the divider value, and in that case return the
+> divider immediately from function clk_divider_bestdiv() as the best
+> one, so that all those unnecessary rate change propagation can be saved.
+>
+> Reported-by: Anson Huang <b20788@freescale.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>   drivers/clk/clk-divider.c |   10 ++++++++++
+>   1 file changed, 10 insertions(+)
+>
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index 6d96741..6024e60 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -150,6 +150,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+>   	struct clk_divider *divider = to_clk_divider(hw);
+>   	int i, bestdiv = 0;
+>   	unsigned long parent_rate, best = 0, now, maxdiv;
+> +	unsigned long parent_rate_saved = *best_parent_rate;
+>
+>   	if (!rate)
+>   		rate = 1;
+> @@ -173,6 +174,15 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
+>   	for (i = 1; i <= maxdiv; i++) {
+>   		if (!_is_valid_div(divider, i))
+>   			continue;
+> +		if (rate * i == parent_rate_saved) {
+> +			/*
+> +			 * It's the most ideal case if the requested rate can be
+> +			 * divided from parent clock without needing to change
+> +			 * parent rate, so return the divider immediately.
+> +			 */
+> +			*best_parent_rate = parent_rate_saved;
+> +			return i;
+> +		}
+>   		parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
+>   				MULT_ROUND_UP(rate, i));
+>   		now = parent_rate / i;
+>
 
-Any news on this?
+Is this ready to be applied?
 
 Thanks
 
 Dirk
-
->>> ---
->>>   arch/arm/mach-imx/clk-imx6q.c |    2 +-
->>>   1 file changed, 1 insertion(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm/mach-imx/clk-imx6q.c b/arch/arm/mach-imx/clk-imx6q.c
->>> index dfb77c1..c501947 100644
->>> --- a/arch/arm/mach-imx/clk-imx6q.c
->>> +++ b/arch/arm/mach-imx/clk-imx6q.c
->>> @@ -518,7 +518,7 @@ int __init mx6q_clocks_init(void)
->>>   	clk[openvg_axi]   = imx_clk_gate2("openvg_axi",    "axi",               base + 0x74, 30);
->>>   	clk[pcie_axi]     = imx_clk_gate2("pcie_axi",      "pcie_axi_sel",      base + 0x78, 0);
->>>   	clk[mx6fast1]     = imx_clk_gate2("mx6fast1",      "ahb",               base + 0x78, 8);
->>> -	clk[per1_bch]     = imx_clk_gate2("per1_bch",      "usdhc3",            base + 0x78, 12);
->>> +	clk[per1_bch]     = imx_clk_gate2("per1_bch",      "ahb",               base + 0x78, 12);
->>>   	clk[per2_main]    = imx_clk_gate2("per2_main",     "ahb",               base + 0x78, 14);
->>>   	clk[pwm1]         = imx_clk_gate2("pwm1",          "ipg_per",           base + 0x78, 16);
->>>   	clk[pwm2]         = imx_clk_gate2("pwm2",          "ipg_per",           base + 0x78, 18);
