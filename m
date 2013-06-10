@@ -1,107 +1,68 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Mon, 10 Jun 2013 17:17:53 +0100
-Subject: [PATCH v2 07/11] ARM:stixxxx: Add STiH416 SOC support
-In-Reply-To: <3733079.FxbR14kFrs@wuerfel>
-References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
- <1370856425-7135-1-git-send-email-srinivas.kandagatla@st.com>
- <3733079.FxbR14kFrs@wuerfel>
-Message-ID: <51B5FC31.5050208@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 10 Jun 2013 09:23:56 -0700
+Subject: [PATCH 3/4] mmc: omap_hsmmc: Remux pins to support SDIO
+ interrupt and PM runtime
+In-Reply-To: <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
+References: <20130607214557.18581.75288.stgit@localhost>
+ <20130607214957.18581.90624.stgit@localhost>
+ <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
+Message-ID: <20130610162356.GL8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thankyou for your comments.
-On 10/06/13 14:52, Arnd Bergmann wrote:
-> On Monday 10 June 2013 10:27:05 Srinivas KANDAGATLA wrote:
+* Linus Walleij <linus.walleij@linaro.org> [130610 09:09]:
 > 
->> +	soc {
->> +		pin-controller-sbc {
->> +			#address-cells	= <1>;
->> +			#size-cells	= <1>;
->> +			compatible	= "st,stih416-pinctrl", "simple-bus";
+> You can use the new infrastructure to make the core select:
 > 
-> Why is this both its own device with a compatible string and a
-> "simple-bus" at the same time? Wouldn't it be simpler to just
-> scan the child device nodes from the "st,stih416-pinctrl"
-> driver instead of having a separate platform_driver for them?
-Am happy to get rid of gpio platform_driver, But looking at the existing
-pinctrl drivers like at91, they do it exactly like this.
+> pinctrl_pm_select_default_state(host->dev);
+> pinctrl_pm_select_idle_state(host->dev);
 
-Also having a gpio platform driver ties the resources to driver in a
-neat way.
+OK great.
+ 
+> What is the semantic difference between "default" and "active"?
 
-> 
->> +			st,retime-in-delay	= <0 300 500 750 1000 1250 1500 1750 2000 2250 2500 2750 3000 3250>;
->> +			st,retime-out-delay	= <0 300 500 750 1000 1250 1500 1750 2000 2250 2500 2750 3000 3250>;
->> +			st,syscfg		= <&syscfg_sbc>;
->> +			st,syscfg-offsets	= <0 40 50 60 100>;
->> +			ranges;
->> +			PIO0: pinctrl at fe610000 {
->> +				#gpio-cells = <1>;
->> +				compatible = "st,stixxxx-gpio";
->> +				gpio-controller;
->> +				reg = <0xfe610000 0x100>;
->> +				st,bank-name  = "PIO0";
->> +				st,retime-pin-mask = <0xff>;
->> +			};
->> +			PIO1: pinctrl at fe611000 {
->> +				#gpio-cells	= <1>;
->> +				compatible	= "st,stixxxx-gpio";
->> +				gpio-controller;
->> +				reg = <0xfe611000 0x100>;
->> +				st,bank-name  = "PIO1";
->> +				st,retime-pin-mask = <0xff>;
->> +			};
-> 
-> What is in the ranges between these registers? It seems you have
-> 256 bytes for each pinctrl node, with 4kb spacing. I wonder if
-> it would make sense to declare the entire range to belong to a single
-> pinctrl device. At least since all of the registers are in a single
-> range, you could add a property like
-> 
-> 	ranges = <0 0xfe610000 0x10000>;
-> 
-> and use relative addresses in the sub-nodes.
-> 
-OK, I will change to use ranges.
-> Please don't use identifiers with 'xxx' in them. Instead use numbers
-> of actual chips, ideally using the first one that this is compatible
-> with.
+We only should remux the pins that need remuxing as that's done
+every time hitting idle. So I think we should have the following
+default groups:
 
-Ok, I will change st,stixxxx-gpio to st,stih415-gpio.
+default		Static pins that don't change, no need to remux
+		configured in consumer driver probe like we already
+		do
 
-> 
->> +		syscfg_sbc:syscfg at fe600000{
->> +			compatible	= "st,stih416-syscfg";
->> +			reg		= <0xfe600000 0x1000>;
->> +			syscfg-range	= <0 999>;
->> +			syscfg-name	= "SYSCFG_SBC";
->> +		};
->> +		syscfg_front:syscfg at fee10000{
->> +			compatible	= "st,stih416-syscfg";
->> +			reg		= <0xfee10000 0x1000>;
->> +			syscfg-range	= <1000 999>;
->> +			syscfg-name	= "SYSCFG_FRONT";
->> +		};
-> 
-> Did you mean to declare ranges excluding 1000 and 2000 here?
-> Normally I would expect inclusive ranges like syscfg-range=<0 1000>;
-> 
-These numbers are from data sheet so I used it as it is.
+active		Optional dynamic pins remuxed for runtime, can be
+		configured and selected in consumer driver probe.
+		The consumer driver may also want to select this
+		state in PM runtime resume.
 
-> What is the idea of the 'syscfg-name'? If the nodes are all different,
-The idea of having syscfg-name is to lookup any sysconf bank(regmap)
-from code which do not have reference to phandle from device trees.
+idle		Optional dynamic pins remuxed for idle. The consumer
+		driver may also want to select this state in PM
+		runtime suspend depending on device_can_wakeup()
+		and driver specific needs.
+ 
+> If this is something very generic that a lot of platforms will want
+> to have, why not add it to include/linux/pinctrl/pinctrl-state.h
+> and augment the core to cache and handle this too?
 
-> I would expect them to have distinct "compatible" values and not
-> need them.
-Yes, If we have distinct compatible we would not need them, but there
-will be 5-10 compatibility list for each SOC.
-It looks like its going to be much neater Am going to try this change
-and see how it looks like.
-> 
-> 	Arnd
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-> 
+Yes we should do that assuming the above grouping makes sense
+to you.
+ 
+> However in this case I *suspect* that what you really want
+> to do it to rename the state called "default" to "sleep"
+> (it appears the default state is sleepy) and then rename
+> the "active" state to "default" (as this is the defined semantic
+> meaning of "default" from <linux/pinctrl/pinctrl-state.h>.
+
+The idle state above could also be called sleep instead of idle
+if you prefer that.
+
+> But maybe I'm not quite getting the subtle difference between
+> "default" and "active" here so enlighten me.
+
+I think the confusion is caused by the fact that we need three
+mux groups, not just two :) The toggling between active and idle
+is the hotpath as that can potentially happen for multiple drivers
+every time we enter and exit idle.
+
+Regards,
+
+Tony
