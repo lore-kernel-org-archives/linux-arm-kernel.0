@@ -1,44 +1,43 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 10 Jun 2013 09:57:16 +0100
-Subject: [PATCH v2] arm64: kernel: compiling issue, need delete
- read_current_timer().
-In-Reply-To: <51B2B50A.1050305@asianux.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com>
- <20130521085325.GB10453@mudshark.cambridge.arm.com>
- <519B425D.4030806@asianux.com> <51A32F40.1050309@asianux.com>
- <51B2B50A.1050305@asianux.com>
-Message-ID: <20130610085715.GA6580@mudshark.cambridge.arm.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 10 Jun 2013 16:59:52 +0800
+Subject: [PATCH] ARM: dts: imx51: Make SDMA firmware name same for DT and
+ non-DT
+In-Reply-To: <1370850040-11177-1-git-send-email-shc_work@mail.ru>
+References: <1370850040-11177-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130610085950.GE6381@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 08, 2013 at 05:37:30AM +0100, Chen Gang wrote:
-> Hello Maintainers:
+On Mon, Jun 10, 2013 at 11:40:40AM +0400, Alexander Shiyan wrote:
+> This patch will help migrate i.MX51-targets to DT by make SDMA
+> firmware name same for DT and non-DT cases.
 > 
-> Please help check it, when you have time.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> ---
+>  arch/arm/boot/dts/imx51.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
+> index f23636f..643f005 100644
+> --- a/arch/arm/boot/dts/imx51.dtsi
+> +++ b/arch/arm/boot/dts/imx51.dtsi
+> @@ -645,7 +645,7 @@
+>  				interrupts = <6>;
+>  				clocks = <&clks 56>, <&clks 56>;
+>  				clock-names = "ipg", "ahb";
+> -				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
+> +				fsl,sdma-ram-script-name = "sdma-imx51.bin";
 
-[...]
+Though we haven't got SDMA firmware upstreamed anywhere yet, I think
+this name pattern has been established for some platforms, since it has
+been used on imx51, imx53 and imx6q for quite a while.  If you system
+expects a different one, you can overwrite it in your <board>.dts.
 
-> >> Under arm64, we will calibrate the delay loop statically using a known
-> >> timer frequency, so delete read_current_timer(), or it will cause
-> >> compiling issue with allmodconfig.
-> >>
-> >> The related error:
-> >>   ERROR: "read_current_timer" [lib/rbtree_test.ko] undefined!
-> >>   ERROR: "read_current_timer" [lib/interval_tree_test.ko] undefined!
-> >>   ERROR: "read_current_timer" [fs/ext4/ext4.ko] undefined!
-> >>   ERROR: "read_current_timer" [crypto/tcrypt.ko] undefined!
-> >>
-> >>
-> >> Signed-off-by: Chen Gang <gang.chen@asianux.com>
-> >> ---
-> >>  arch/arm64/include/asm/timex.h |    6 +++---
-> >>  arch/arm64/kernel/time.c       |    6 ------
-> >>  2 files changed, 3 insertions(+), 9 deletions(-)
+Shawn
 
-Looks ok to me. We'll take it for a spin and apply it if it doesn't catch
-fire.
-
-Will
+>  			};
+>  
+>  			cspi: cspi at 83fc0000 {
+> -- 
+> 1.8.1.5
+> 
