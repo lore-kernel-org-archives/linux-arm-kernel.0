@@ -1,41 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 10 Jun 2013 11:33:55 -0400 (EDT)
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <19045559.gYzJhRHBbp@linux-5eaq.site>
-Message-ID: <Pine.LNX.4.44L0.1306101130330.1133-100000@iolanthe.rowland.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 10 Jun 2013 17:34:56 +0200
+Subject: [PATCH 4/4] ARM: sunxi: dt: Register the pio node as interrupt
+ controller
+In-Reply-To: <CACRpkdZfqspUA1BpzMpM727g-s6ckm=PfDkSo8ambUwdW4J8Sw@mail.gmail.com>
+References: <1370685946-3718-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1370685946-3718-5-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdZfqspUA1BpzMpM727g-s6ckm=PfDkSo8ambUwdW4J8Sw@mail.gmail.com>
+Message-ID: <20130610153456.GK2748@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jun 2013, Oliver Neukum wrote:
+Hi Linus,
 
-> On Monday 10 June 2013 10:03:00 Alan Stern wrote:
-> > [Thomas and Steve, please see the question below.]
-> > 
-> > On Mon, 10 Jun 2013, Ming Lei wrote:
-> > 
+On Mon, Jun 10, 2013 at 03:57:23PM +0200, Linus Walleij wrote:
+> On Sat, Jun 8, 2013 at 12:05 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
 > 
-> > That isn't clear.  It is documented that USB completion handlers are 
-> > called with local interrupts disabled.  An IRQ arriving before the 
-> > tasklet starts up might therefore be serviced during the short interval 
-> > before the tasklet disables local interrupts, but if that happens it 
-> > would mean that the completion handler would be delayed.
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
-> That is what tasklets do by definition, isn't it?
-
-Yes.  Although tasklets in general have no reason to leave interrupts 
-disabled.
-
-> > In effect, you are prioritizing other IRQs higher than USB completion
-> > handlers.  Nevertheless, the total time spent with interrupts disabled
-> > will remain the same.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> It pobably slightly increases. You have colder caches twice.
-> And potentially you swich CPUs.
+> I guess this patch needs to go through the ARM SoC tree.
+> 
+> Tell me if I can carry it in the pinctrl tree (read: there will be no
+> conflicts agains changes from elsewhere) and I'll apply it.
 
-Actually, the situation is a little better in one respect, which was
-pointed out earlier but not emphasized.  The DMA unmapping can be
-deferred to the tasklet, and it can run with interrupts enabled before
-the completion hanlder is called.  Since the unmapping sometimes takes
-a while to run, this is an advantage.
+I'll carry this patch through my tree.
 
-Alan Stern
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
