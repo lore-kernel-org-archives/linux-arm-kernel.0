@@ -1,322 +1,77 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 10 Jun 2013 18:03:29 +0200
-Subject: [PATCH] i2c: vt8500: Add support for I2C bus on Wondermedia SoCs
-In-Reply-To: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
-References: <1368350634-12654-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130610160328.GG2987@katana>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 10 Jun 2013 18:03:15 +0200
+Subject: [PATCH 3/4] mmc: omap_hsmmc: Remux pins to support SDIO interrupt
+ and PM runtime
+In-Reply-To: <20130607214957.18581.90624.stgit@localhost>
+References: <20130607214557.18581.75288.stgit@localhost>
+ <20130607214957.18581.90624.stgit@localhost>
+Message-ID: <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+On Fri, Jun 7, 2013 at 11:49 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-> +static int wmt_i2c_wait_bus_not_busy(struct wmt_i2c_dev *i2c_dev)
-> diff --git a/drivers/i2c/busses/i2c-wmt.c b/drivers/i2c/busses/i2c-wmt.c
-> new file mode 100644
-> index 0000000..5cebb29
-> --- /dev/null
-> +++ b/drivers/i2c/busses/i2c-wmt.c
+> On some omaps we need to remux MMC pins for PM, and for some omaps
+> we need to remux the SDIO IRQ pin.
+>
+> Based on an earlier patch by Andreas Fenkart <afenkart@gmail.com>.
+(...)
+> +       host->pinctrl = devm_pinctrl_get(host->dev);
+> +       if (IS_ERR(host->pinctrl)) {
+> +               dev_dbg(host->dev, "no pinctrl handle\n");
+> +               ret = 0;
+> +               goto out;
+> +       }
+> +
+> +       host->fixed = pinctrl_lookup_state(host->pinctrl,
+> +                                          PINCTRL_STATE_DEFAULT);
+> +       if (IS_ERR(host->fixed)) {
+> +               dev_dbg(host->dev,
+> +                        "pins are not configured from the driver\n");
+> +               host->fixed = NULL;
+> +               ret = 0;
+> +               goto out;
+> +       }
+> +
+> +       ret = pinctrl_select_state(host->pinctrl, host->fixed);
+> +       if (ret < 0)
+> +               goto err;
+> +
+> +       /* For most cases we don't have wake-ups, and exit after this */
+> +       host->active = pinctrl_lookup_state(host->pinctrl, "active");
+> +       if (IS_ERR(host->active)) {
+> +               ret = PTR_ERR(host->active);
+> +               host->active = NULL;
+> +               return 0;
+> +       }
+> +
+> +       host->idle = pinctrl_lookup_state(host->pinctrl,
+> +                                         PINCTRL_STATE_IDLE);
+> +       if (IS_ERR(host->idle)) {
+> +               ret = PTR_ERR(host->idle);
+> +               host->idle = NULL;
+> +               goto err;
+> +       }
 
-...
+You can use the new infrastructure to make the core select:
 
-> +{
-> +	u16 val;
-> +	int i;
-> +	int ret = 0;
-> +
-> +	for (i = 0; i < 100000; i++) {
-> +		val = readw(i2c_dev->base + REG_CSR);
-> +		if (val & CSR_READY_MASK)
-> +			break;
-> +
-> +		udelay(1);
-> +	}
-> +	if (i >= 9999999)
-> +		ret = -EBUSY;
+pinctrl_pm_select_default_state(host->dev);
+pinctrl_pm_select_idle_state(host->dev);
 
-What about using time_after and usleep_range?
+What is the semantic difference between "default" and "active"?
 
-> +
-> +	return ret;
-> +}
-> +static int wmt_i2c_write(struct i2c_adapter *adap, struct i2c_msg *pmsg,
-> +						   int restart, int last)
-> +{
-> +	struct wmt_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
-> +	u16 val, tcr_val;
-> +	int ret, wait_result;
-> +	int xfer_len = 0;
-> +
-> +	if (!restart) {
-> +		ret = wmt_i2c_wait_bus_not_busy(i2c_dev);
-> +		if (ret < 0)
-> +			return ret;
-> +	}
-> +
-> +	if (pmsg->len == 0) {
-> +		/*
-> +		 * We still need to run through the while (..) once, so
-> +		 * start at -1 and break out early from the loop
-> +		 */
-> +		xfer_len = -1;
-> +		writew(0, i2c_dev->base + REG_CDR);
-> +	} else {
-> +		writew(pmsg->buf[0] & 0xFF, i2c_dev->base + REG_CDR);
-> +	}
-> +
-> +	if (!restart) {
-> +		val = readw(i2c_dev->base + REG_CR);
-> +		val &= ~CR_TX_END;
-> +		writew(val, i2c_dev->base + REG_CR);
-> +
-> +		val = readw(i2c_dev->base + REG_CR);
-> +		val |= CR_CPU_RDY;
-> +		writew(val, i2c_dev->base + REG_CR);
-> +	}
-> +
-> +	init_completion(&i2c_dev->complete);
+If this is something very generic that a lot of platforms will want
+to have, why not add it to include/linux/pinctrl/pinctrl-state.h
+and augment the core to cache and handle this too?
 
-INIT_COMPLETION (and init_completion in probe)
+However in this case I *suspect* that what you really want
+to do it to rename the state called "default" to "sleep"
+(it appears the default state is sleepy) and then rename
+the "active" state to "default" (as this is the defined semantic
+meaning of "default" from <linux/pinctrl/pinctrl-state.h>.
 
-> +static int wmt_i2c_read(struct i2c_adapter *adap, struct i2c_msg *pmsg,
-> +						  int restart, int last)
-> +{
-> +	struct wmt_i2c_dev *i2c_dev = i2c_get_adapdata(adap);
-> +	u16 val, tcr_val;
-> +	int ret, wait_result;
-> +	u32 xfer_len = 0;
-> +
-> +	if (!restart) {
-> +		ret = wmt_i2c_wait_bus_not_busy(i2c_dev);
-> +		if (ret < 0)
-> +			return ret;
-> +	}
-> +
-> +	val = readw(i2c_dev->base + REG_CR);
-> +	val &= ~CR_TX_END;
-> +	writew(val, i2c_dev->base + REG_CR);
-> +
-> +	val = readw(i2c_dev->base + REG_CR);
-> +	val &= ~CR_TX_NEXT_NO_ACK;
-> +	writew(val, i2c_dev->base + REG_CR);
-> +
-> +	if (!restart) {
-> +		val = readw(i2c_dev->base + REG_CR);
-> +		val |= CR_CPU_RDY;
-> +		writew(val, i2c_dev->base + REG_CR);
-> +	}
-> +
-> +	if (pmsg->len == 1) {
-> +		val = readw(i2c_dev->base + REG_CR);
-> +		val |= CR_TX_NEXT_NO_ACK;
-> +		writew(val, i2c_dev->base + REG_CR);
-> +	}
-> +
-> +	init_completion(&i2c_dev->complete);
+But maybe I'm not quite getting the subtle difference between
+"default" and "active" here so enlighten me.
 
-ditto
-
-> +static int wmt_i2c_xfer(struct i2c_adapter *adap,
-> +			struct i2c_msg msgs[],
-> +			int num)
-> +{
-> +	struct i2c_msg *pmsg;
-> +	int i, is_last, restart;
-> +	int ret = 0;
-> +
-> +	for (i = 0; ret >= 0 && i < num; i++) {
-> +		is_last = ((i + 1) == num);
-> +		restart = (i != 0);
-> +
-> +		pmsg = &msgs[i];
-> +		if (pmsg->flags & I2C_M_NOSTART)
-> +			restart = 1;
-
-NOSTART is not restart!? Either your variable is misnamed or check
-Documentation/i2c/i2c-protocol what it is about.
-
-> +		if (pmsg->flags & I2C_M_RD)
-> +			ret = wmt_i2c_read(adap, pmsg, restart, is_last);
-> +		else
-> +			ret = wmt_i2c_write(adap, pmsg, restart, is_last);
-> +	}
-> +
-> +	return (ret < 0) ? ret : i;
-> +}
-> +
-> +static int wmt_i2c_reset_hardware(struct wmt_i2c_dev *i2c_dev)
-> +{
-> +	int err;
-> +
-> +	err = clk_prepare_enable(i2c_dev->clk);
-> +	if (err) {
-> +		dev_err(i2c_dev->dev, "failed to enable clock\n");
-> +		return err;
-> +	}
-> +
-> +	err = clk_set_rate(i2c_dev->clk, 20000000);
-> +	if (err) {
-> +		dev_err(i2c_dev->dev, "failed to set clock = 20Mhz\n");
-> +		return err;
-> +	}
-> +
-> +	writew(0, i2c_dev->base + REG_CR);
-> +	writew(12, i2c_dev->base + REG_MCR);
-
-What are those magic values?
-
-> +	writew(ISR_WRITE_ALL, i2c_dev->base + REG_ISR);
-> +	writew(IMR_ENABLE_ALL, i2c_dev->base + REG_IMR);
-> +	writew(CR_ENABLE, i2c_dev->base + REG_CR);
-> +	readw(i2c_dev->base + REG_CSR);		/* read clear */
-> +	writew(ISR_WRITE_ALL, i2c_dev->base + REG_ISR);
-> +
-> +	if (i2c_dev->mode == I2C_MODE_STANDARD)
-> +		writew(SCL_TIMEOUT(128) | TR_STD, i2c_dev->base + REG_TR);
-> +	else
-> +		writew(SCL_TIMEOUT(128) | TR_HS, i2c_dev->base + REG_TR);
-> +
-> +	return 0;
-> +}
-> +
-> +static int wmt_i2c_probe(struct platform_device *pdev)
-> +{
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct wmt_i2c_dev *i2c_dev;
-> +	struct i2c_adapter *adap;
-> +	struct resource *res;
-> +	int err;
-> +	u32 clk_rate;
-> +
-> +	if (!np) {
-> +		dev_err(&pdev->dev, "device node not found\n");
-> +		return -ENODEV;
-> +	}
-
-This can't happen since we were matched by the driver core.
-
-> +
-> +	i2c_dev = devm_kzalloc(&pdev->dev, sizeof(*i2c_dev), GFP_KERNEL);
-> +	if (!i2c_dev) {
-> +		dev_err(&pdev->dev, "device memory allocation failed\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	i2c_dev->base = devm_ioremap_resource(&pdev->dev, res);
-> +	if (IS_ERR(i2c_dev->base))
-> +		return PTR_ERR(i2c_dev->base);
-> +
-> +	i2c_dev->irq = irq_of_parse_and_map(np, 0);
-> +	if (!i2c_dev->irq) {
-> +		dev_err(&pdev->dev, "irq missing or invalid\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	i2c_dev->clk = of_clk_get(np, 0);
-> +	if (IS_ERR(i2c_dev->clk)) {
-> +		dev_err(&pdev->dev, "unable to request clock\n");
-> +		return PTR_ERR(i2c_dev->clk);
-> +	}
-> +
-> +	i2c_dev->mode = I2C_MODE_STANDARD;
-> +	err = of_property_read_u32(np, "clock-frequency", &clk_rate);
-> +	if ((!err) && (clk_rate == 400000))
-> +		i2c_dev->mode = I2C_MODE_FAST;
-> +
-> +	i2c_dev->dev = &pdev->dev;
-> +
-> +	err = devm_request_irq(&pdev->dev, i2c_dev->irq, wmt_i2c_isr, 0,
-> +							"i2c", i2c_dev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "failed to request irq %i\n", i2c_dev->irq);
-> +		return err;
-> +	}
-> +
-> +	adap = &i2c_dev->adapter;
-> +	i2c_set_adapdata(adap, i2c_dev);
-> +	strlcpy(adap->name, "WMT I2C adapter", sizeof(adap->name));
-> +	adap->owner = THIS_MODULE;
-> +	adap->class = I2C_CLASS_HWMON;
-
-Don't use .class unless you have an explicit reason to do so. It may
-cost boot-time.
-
-> +	adap->algo = &wmt_i2c_algo;
-> +	adap->dev.parent = &pdev->dev;
-> +	adap->dev.of_node = pdev->dev.of_node;
-> +	adap->nr = of_alias_get_id(pdev->dev.of_node, "i2c");
-> +
-> +	err = wmt_i2c_reset_hardware(i2c_dev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "error initializing hardware\n");
-> +		return err;
-> +	}
-> +
-> +	if (adap->nr < 0)
-> +		err = i2c_add_adapter(adap);
-> +	else
-> +		err = i2c_add_numbered_adapter(adap);
-
-add_numbered_adapter does handle this case internally.
-
-> +
-> +	if (err) {
-> +		dev_err(&pdev->dev, "failed to add adapter\n");
-> +		return err;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, i2c_dev);
-> +
-> +	of_i2c_register_devices(adap);
-> +
-> +	return 0;
-> +}
-> +
-> +static int wmt_i2c_remove(struct platform_device *pdev)
-> +{
-> +	struct wmt_i2c_dev *i2c_dev = platform_get_drvdata(pdev);
-> +
-> +	/* Disable interrupts, clock and delete adapter */
-> +	writew(0, i2c_dev->base + REG_IMR);
-> +	clk_disable_unprepare(i2c_dev->clk);
-> +	i2c_del_adapter(&i2c_dev->adapter);
-> +
-> +	return 0;
-> +}
-> +
-> +static struct of_device_id wmt_i2c_dt_ids[] = {
-> +	{ .compatible = "wm,wm8505-i2c" },
-> +	{ /* Sentinel */ },
-> +};
-> +
-> +static struct platform_driver wmt_i2c_driver = {
-> +	.probe		= wmt_i2c_probe,
-> +	.remove		= wmt_i2c_remove,
-> +	.driver		= {
-> +		.name	= "wmt-i2c",
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = wmt_i2c_dt_ids,
-> +	},
-> +};
-> +
-> +module_platform_driver(wmt_i2c_driver);
-> +
-> +MODULE_DESCRIPTION("Wondermedia I2C master-mode bus adapter");
-> +MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
-> +MODULE_LICENSE("GPL v2");
-
-Header says GPLv2+
-
-> +MODULE_DEVICE_TABLE(of, wmt_i2c_dt_ids);
-
-Thanks,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/0cdac200/attachment.sig>
+Yours,
+Linus Walleij
