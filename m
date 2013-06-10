@@ -1,59 +1,37 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 10 Jun 2013 18:28:57 +0900
-Subject: [PATCH v2] ARM: shmobile: uImage load address rework
-Message-ID: <20130610092857.19175.25629.sendpatchset@w520>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Mon, 10 Jun 2013 11:22:11 +0200
+Subject: [PATCH v3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ line
+In-Reply-To: <20130607193130.GA13205@kahuna>
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+ <1370629886-14170-1-git-send-email-khilman@linaro.org>
+ <20130607193130.GA13205@kahuna>
+Message-ID: <51B59AC3.2080900@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+Hi Kevin,
 
-This is V2 of the mach-shmobile uImage load address rework patch.
+On 06/07/2013 09:31 PM, Nishanth Menon wrote:
+> On 11:31-20130607, Kevin Hilman wrote:
+>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+>> SYS_NIRQ line on OMAP.  Add another DTS include file
+>> (twl4030_omap3.dtsi) for boards that hook up the twl4030 this way
+>> to include.
+>>
+>> This allows RTC wake from off-mode to work again on OMAP3-based
+>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+>> 3530/Overo, 3730/Overo-STORM.
+>>
+>> Special thanks to Florian Vaussard for suggesting use of preprocessor
+>> feature.
+>>
+>> Cc: Florian Vaussard <florian.vaussard@epfl.ch>
+>> Cc: Benoit Cousson <b-cousson@ti.com>
+>> Cc: Nishanth Menon <nm@ti.com>
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> Thanks,
+> Reviewed-by: Nishanth Menon <nm@ti.com>
 
-Rework the mach-shmobile uImage load address calculation by storing
-the per-board load addresses in Makefile.boot. This removes the
-CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
-it possible to create safe kernel images that boot on multiple boards.
+Thanks, I've just applied it in for_3.11/dts.
 
-This is one of several series of code that reworks code not to rely on
-CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
-
-Signed-off-by: Magnus Damm <damm@opensource.se>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
----
-
- Changes since V1:
- - On popular request, merged patch 5 and 14 and all other.
- - Updated the __ZRELADDR calculation, thanks Arnd!
- - Added Reviewed-by from Laurent and Morimoto-san, thanks!
-
- arch/arm/mach-shmobile/Makefile.boot |   20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/Makefile.boot
-+++ work/arch/arm/mach-shmobile/Makefile.boot	2013-06-10 16:15:22.000000000 +0900
-@@ -1,6 +1,22 @@
--__ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
--		     $$[$(CONFIG_MEMORY_START) + 0x8000]')
-+# per-board load address for uImage
-+loadaddr-y	:=
-+loadaddr-$(CONFIG_MACH_AG5EVM) += 0x40008000
-+loadaddr-$(CONFIG_MACH_AP4EVB) += 0x40008000
-+loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
-+loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
-+loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
-+loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
-+loadaddr-$(CONFIG_MACH_BONITO) += 0x40008000
-+loadaddr-$(CONFIG_MACH_KOTA2) += 0x41008000
-+loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
-+loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
-+loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
-+loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
-+loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
-+loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
-+loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
- 
-+__ZRELADDR	:= $(sort $(loadaddr-y))
-    zreladdr-y   += $(__ZRELADDR)
- 
- # Unsupported legacy stuff
+Benoit
