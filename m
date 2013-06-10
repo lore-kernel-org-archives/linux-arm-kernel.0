@@ -1,45 +1,67 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 10 Jun 2013 17:24:55 +0900
-Subject: [PATCH] ARM: dts: add vmmc regulator support for ODROID-X
-In-Reply-To: <1370454336-13003-1-git-send-email-tobetter@gmail.com>
-References: <1370454336-13003-1-git-send-email-tobetter@gmail.com>
-Message-ID: <0e9e01ce65b3$fcc3ba00$f64b2e00$%kim@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 10 Jun 2013 10:27:14 +0200
+Subject: [PATCHv4] ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+In-Reply-To: <1370425843-6802-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1370425843-6802-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <51B58DE2.2020301@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dongjin Kim wrote:
-> 
-> This patch is to add vmmc regulator node at MSHC and SDHCI for ODROID-X
-> board file.
-> 
-> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+On 05/06/2013 11:50, Alexandre Belloni :
+> Fixes:
+> arch/arm/mach-at91/built-in.o: In function `ksz9021rn_phy_fixup':
+> :(.text+0x1174): undefined reference to `mdiobus_write'
+> :(.text+0x1188): undefined reference to `mdiobus_write'
+> :(.text+0x119c): undefined reference to `mdiobus_write'
+> :(.text+0x11b0): undefined reference to `mdiobus_write'
+> arch/arm/mach-at91/built-in.o: In function `sama5_dt_device_init':
+> :(.init.text+0x1e34): undefined reference to `phy_register_fixup_for_uid'
+>
+> when CONFIG_PHYLIB is not selected.
+>
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+As Arnd told it was not so urgent and that it seems that we have to be 
+strict for sending other 3.10-fixes, I stack this one on a at91-3.11-soc 
+branch.
+
+Thanks, best regards,
+
 > ---
->  arch/arm/boot/dts/exynos4412-odroidx.dts |    2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos4412-odroidx.dts b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> index 1786225..3f3d7c8 100644
-> --- a/arch/arm/boot/dts/exynos4412-odroidx.dts
-> +++ b/arch/arm/boot/dts/exynos4412-odroidx.dts
-> @@ -44,6 +44,7 @@
->  		pinctrl-0 = <&sd4_clk &sd4_cmd &sd4_bus4 &sd4_bus8>;
->  		pinctrl-names = "default";
->  		status = "okay";
-> +		vmmc-supply = <&ldo20_reg &buck8_reg>;
-> 
->  		num-slots = <1>;
->  		supports-highspeed;
-> @@ -78,6 +79,7 @@
->  		bus-width = <4>;
->  		pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus4>;
->  		pinctrl-names = "default";
-> +		vmmc-supply = <&ldo4_reg &ldo21_reg>;
->  		status = "okay";
->  	};
-> 
-> --
-> 1.7.9.5
+>   arch/arm/mach-at91/Kconfig          | 1 +
+>   arch/arm/mach-at91/board-dt-sama5.c | 3 ++-
+>   2 files changed, 3 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/mach-at91/Kconfig b/arch/arm/mach-at91/Kconfig
+> index 0280238..699b71e 100644
+> --- a/arch/arm/mach-at91/Kconfig
+> +++ b/arch/arm/mach-at91/Kconfig
+> @@ -163,6 +163,7 @@ config MACH_SAMA5_DT
+>   	bool "Atmel SAMA5 Evaluation Kits with device-tree support"
+>   	depends on SOC_SAMA5
+>   	select USE_OF
+> +	select PHYLIB if NETDEVICES
+>   	help
+>   	  Select this if you want to experiment device-tree with
+>   	  an Atmel Evaluation Kit.
+> diff --git a/arch/arm/mach-at91/board-dt-sama5.c b/arch/arm/mach-at91/board-dt-sama5.c
+> index 705305e..ad95f6a 100644
+> --- a/arch/arm/mach-at91/board-dt-sama5.c
+> +++ b/arch/arm/mach-at91/board-dt-sama5.c
+> @@ -62,7 +62,8 @@ static int ksz9021rn_phy_fixup(struct phy_device *phy)
+>
+>   static void __init sama5_dt_device_init(void)
+>   {
+> -	if (of_machine_is_compatible("atmel,sama5d3xcm"))
+> +	if (of_machine_is_compatible("atmel,sama5d3xcm") &&
+> +	    IS_ENABLED(CONFIG_PHYLIB))
+>   		phy_register_fixup_for_uid(PHY_ID_KSZ9021, MICREL_PHY_ID_MASK,
+>   			ksz9021rn_phy_fixup);
+>
+>
 
-Applied, thanks.
 
-- Kukjin
+-- 
+Nicolas Ferre
