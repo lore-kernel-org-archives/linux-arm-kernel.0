@@ -1,31 +1,40 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Mon, 10 Jun 2013 11:40:40 +0400
-Subject: [PATCH] ARM: dts: imx51: Make SDMA firmware name same for DT and
- non-DT
-Message-ID: <1370850040-11177-1-git-send-email-shc_work@mail.ru>
+From: luke.leighton@gmail.com (luke.leighton)
+Date: Mon, 10 Jun 2013 08:41:02 +0100
+Subject: [#TCI-363-37182]: Re: [Arm-netbook] getting allwinner SoC support
+ upstream (was Re: Uploading linux (3.9.4-1))
+In-Reply-To: <1370838666.51b5568a8e82c@mobinnet.kayako.com>
+References: <1370838666.51b5568a8e82c@mobinnet.kayako.com>
+Message-ID: <CAPweEDyYoJgbSyZ4nuN2TbWxEVw4U9Q2awSskTmV1OFvW0OVBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch will help migrate i.MX51-targets to DT by make SDMA
-firmware name same for DT and non-DT cases.
+On Mon, Jun 10, 2013 at 5:31 AM, MobinNet <sasupport@mobinnet.net> wrote:
+> luke.leighton,
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- arch/arm/boot/dts/imx51.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ yes, automated service that i was subscribed to without my
+authorisation or permission: what can i do you for?
 
-diff --git a/arch/arm/boot/dts/imx51.dtsi b/arch/arm/boot/dts/imx51.dtsi
-index f23636f..643f005 100644
---- a/arch/arm/boot/dts/imx51.dtsi
-+++ b/arch/arm/boot/dts/imx51.dtsi
-@@ -645,7 +645,7 @@
- 				interrupts = <6>;
- 				clocks = <&clks 56>, <&clks 56>;
- 				clock-names = "ipg", "ahb";
--				fsl,sdma-ram-script-name = "imx/sdma/sdma-imx51.bin";
-+				fsl,sdma-ram-script-name = "sdma-imx51.bin";
- 			};
- 
- 			cspi: cspi at 83fc0000 {
--- 
-1.8.1.5
+> This email concerns your recent ticket: Re: [Arm-netbook] getting allwinner
+> SoC support upstream (was Re: Uploading linux (3.9.4-1)) (TCI-363-37182)
+>
+> As part of our commitment to improving your customer support experience, we
+> would like to know how you think we are doing.
+
+ sure. you're sending unsolicited messages to a number of technical
+lists, using an automated service.  generally this is considered to be
+Bad.  these technical lists are archived forever so the mistake that
+has been made is one which is irreversible, leaving a permanent and
+uneraseable public record.
+
+> You are invited to complete a short satisfaction survey consisting of just a
+> few multiple-choice questions.
+
+ i'm pleased to observe that it's an invitation not an order: i
+decline.  please don't ever send out such "invitations" ever again.
+
+ much obliged.
+
+l.
+
+[btw if someone subscribed my email address without my authorisation,
+the joke appears to have backfired]
