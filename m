@@ -1,38 +1,97 @@
-From: dsd@laptop.org (Daniel Drake)
-Date: Mon, 10 Jun 2013 09:36:51 -0600
-Subject: Dove/Armada DRM driver naming
-Message-ID: <CAMLZHHRFMmLsckBVDrxEGx9XaqhNq_sOFvDKq=Cx7HH938tkng@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Jun 2013 17:36:44 +0200
+Subject: [PATCH] ARM: sirf: use CONFIG_SIRF rather than CONFIG_PRIMA2 where
+ necessary
+Message-ID: <201306101736.44652.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I got a build error today that made me realize that it is not
+possible to build a kernel for a SiRF platform without enabling
+CONFIG_PRIMA2, since a lot of common code depends on CONFIG_PRIMA2.
 
-I realise this is not overly important in the grand scheme of things,
-but in case it is of interest:
+This fixes all occurences that appear like common SiRF code.
 
-At OLPC we work with Marvell MMP2 (a.k.a. Armada 610) and Marvell MMP3
-(a.k.a. PXA2128).
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
 
-Both have similar graphics hardware, they both are driven by
-drivers/video/pxa168fb.c and xf86-video-dove
-(http://dev.laptop.org/git/projects/xf86-video-dove/).
+Barry, can you see if this patch makes sense to you?
 
-The same xf86-video-dove source is also used by the cubox project
-(Dove), so I presume that cubox, MMP2 and MMP3 all have similar
-graphics hardware that would be driven by this new DRM driver.
+Mark, Grant, Mike, Greg, Wolfram: would you like to get a split-out
+patch, or should I apply it in one piece to arm-soc?
 
-As the MMP3 does not fit under any form of "Armada" name, calling the
-new DRM driver Armada may not be 100% accurate. Although, looking at
-Documentation/arm/Marvell/README, finding a good name may not be
-trivial.
+There is no harm in changing just one file, they are all
+equally wrong and don't depend on one another.
 
-The MMP2 and MMP3 include graphics silicon developed by Vivante. Would
-it be more accurate to call this drm-vivante? I must admit I don't
-have a complete understanding here: of is the whole graphics subsystem
-driven by vivante silicon, or is the vivante part more of an isolated
-add-on which can accelerate certain operations in graphics memory?
+ arch/arm/Makefile          | 2 +-
+ drivers/clk/Makefile       | 2 +-
+ drivers/i2c/busses/Kconfig | 2 +-
+ drivers/spi/Kconfig        | 2 +-
+ drivers/tty/serial/Kconfig | 2 +-
+ 5 files changed, 5 insertions(+), 5 deletions(-)
 
-I look forward to trying this driver on MMP2/MMP3 soon - thanks for
-your work here.
-
-Daniel
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index 3380c4f..fcb4b48 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -169,7 +169,7 @@ machine-$(CONFIG_ARCH_OMAP1)		+= omap1
+ machine-$(CONFIG_ARCH_OMAP2PLUS)	+= omap2
+ machine-$(CONFIG_ARCH_ORION5X)		+= orion5x
+ machine-$(CONFIG_ARCH_PICOXCELL)	+= picoxcell
+-machine-$(CONFIG_ARCH_PRIMA2)		+= prima2
++machine-$(CONFIG_ARCH_SIRF)		+= prima2
+ machine-$(CONFIG_ARCH_PXA)		+= pxa
+ machine-$(CONFIG_ARCH_REALVIEW)		+= realview
+ machine-$(CONFIG_ARCH_RPC)		+= rpc
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index f41e3e3..a9f616f 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -19,7 +19,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)	+= socfpga/
+ obj-$(CONFIG_PLAT_SPEAR)	+= spear/
+ obj-$(CONFIG_ARCH_U300)		+= clk-u300.o
+ obj-$(CONFIG_COMMON_CLK_VERSATILE) += versatile/
+-obj-$(CONFIG_ARCH_PRIMA2)	+= clk-prima2.o
++obj-$(CONFIG_ARCH_SIRF)		+= clk-prima2.o
+ obj-$(CONFIG_PLAT_ORION)	+= mvebu/
+ ifeq ($(CONFIG_COMMON_CLK), y)
+ obj-$(CONFIG_ARCH_MMP)		+= mmp/
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 2d030df..11c8eb8 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -676,7 +676,7 @@ config I2C_SIMTEC
+ 
+ config I2C_SIRF
+ 	tristate "CSR SiRFprimaII I2C interface"
+-	depends on ARCH_PRIMA2
++	depends on ARCH_SIRF
+ 	help
+ 	  If you say yes to this option, support will be included for the
+ 	  CSR SiRFprimaII I2C interface.
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index 2015897..89cbbab 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -404,7 +404,7 @@ config SPI_SH_HSPI
+ 
+ config SPI_SIRF
+ 	tristate "CSR SiRFprimaII SPI controller"
+-	depends on ARCH_PRIMA2
++	depends on ARCH_SIRF
+ 	select SPI_BITBANG
+ 	help
+ 	  SPI driver for CSR SiRFprimaII SoCs
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index 95e66ac..7b4aa69 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -251,7 +251,7 @@ config SERIAL_SAMSUNG_CONSOLE
+ 
+ config SERIAL_SIRFSOC
+         tristate "SiRF SoC Platform Serial port support"
+-        depends on ARCH_PRIMA2
++        depends on ARCH_SIRF
+         select SERIAL_CORE
+         help
+           Support for the on-chip UART on the CSR SiRFprimaII series,
