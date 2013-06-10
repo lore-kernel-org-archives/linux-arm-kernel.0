@@ -1,23 +1,30 @@
-From: jreiser@bitwagon.com (John Reiser)
-Date: Sun, 09 Jun 2013 17:05:24 -0700
-Subject: ARM cacheflush syscall with range that spans multiple vma
-Message-ID: <51B51844.9050108@bitwagon.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 9 Jun 2013 17:13:31 -0700
+Subject: [PATCH 0/2] ARM: multiple-platforms: fix the kernel panic on
+ non-SiRF platforms
+In-Reply-To: <1370313255-20396-1-git-send-email-Baohua.Song@csr.com>
+References: <1370313255-20396-1-git-send-email-Baohua.Song@csr.com>
+Message-ID: <20130610001331.GA21645@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Why does the ARM cacheflush syscall stop after the lowest vma
-which intersects the user-requested range?  The range could
-span more than one vma having contiguous addresses, such as
-two files MAP_SHARED into adjacent pages; or even a region
-that contains holes (pages not present.)
+On Tue, Jun 04, 2013 at 10:34:13AM +0800, Barry Song wrote:
+> These two patches fix the kernel panic for multiple-platform kernel to run on non-SiRF
+> platforms.
+> 
+> It depends on patches I sent in the pull-request mail
+> [GIT PULL] SiRF fixes for the v3.10 series
+> at:
+> http://www.spinics.net/lists/arm-kernel/msg247521.html
+> 
+> And thanks for the original patchset from Srinivas Kandagatla <srinivas.kandagatla@st.com>
 
-The code path in arch/arm/kernel/traps.c is:
+Hi,
 
-arm_syscall():
-        case NR(cacheflush):
-                return do_cache_op(regs->ARM_r0, regs->ARM_r1, regs->ARM_r2);
+A better and more narrow fix for 3.10 would be to gracefully abort the
+initcalls if the device nodes are not found, which is what I had as original
+feedback on these patches in the first place. Print an error but continue
+booting.
 
-do_cache_op() contains no loop for more than one vma:
-        vma = find_vma(mm, start);
 
--- 
+-Olof
