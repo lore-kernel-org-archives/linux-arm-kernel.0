@@ -1,67 +1,44 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Mon, 10 Jun 2013 16:30:33 -0400
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 4)
-Message-ID: <20130610203033.GP23859@titan.lakedaemon.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Mon, 10 Jun 2013 22:36:42 +0200
+Subject: [PATCH 1/2] memory: tegra20-mc: Fix hang in IRQ handler.
+In-Reply-To: <1370855624-30564-2-git-send-email-ttynkkynen@nvidia.com>
+References: <1370855624-30564-1-git-send-email-ttynkkynen@nvidia.com>
+ <1370855624-30564-2-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <20130610203641.GA26036@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof
+On Mon, Jun 10, 2013 at 12:13:43PM +0300, Tuomas Tynkkynen wrote:
+> In Tegra20 memory controller any MC interrupt would cause an
+> infinite loop in the IRQ handler.
+> 
+> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+> ---
+>  drivers/memory/tegra20-mc.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/memory/tegra20-mc.c b/drivers/memory/tegra20-mc.c
+> index 2ca5f28..bd5a553 100644
+> --- a/drivers/memory/tegra20-mc.c
+> +++ b/drivers/memory/tegra20-mc.c
+> @@ -193,8 +193,11 @@ static irqreturn_t tegra20_mc_isr(int irq, void *data)
+>  	mask &= stat;
+>  	if (!mask)
+>  		return IRQ_NONE;
+> -	while ((bit = ffs(mask)) != 0)
+> +	while ((bit = ffs(mask)) != 0) {
+>  		tegra20_mc_decode(mc, bit - 1);
+> +		mask &= BIT(bit);
 
-Here are two small fixes I've had in my tree for a few days.  I looked
-at moving one or both of them to fixes-non-critical, but it's not
-appropriate.
+Shouldn't this be "mask &= ~BIT(bit);"? The intent of the code is to
+clear the bit which was handled by the loop body, right? The above
+clears all other bits instead.
 
-  5f1f3d5 arm: mvebu: armada-xp-{gp,openblocks-ax3-4}: specify PCIe range
-
-builds on two patches already merged for v3.10 (through mvebu/fixes):
-
-  c6c003a ARM: mvebu: Fix ranges entry on XP GP board
-  8eed481 arm: mvebu: fix the 'ranges' property to handle PCIe
-
-
-And:
-
-  4089fe9 ARM: Kirkwood: handle mv88f6282 cpu in __kirkwood_variant().
-
-Is flagged for stable, which according to Linus, is appropriate for this
-stage of the -rc cycle.
-
-If I've made an error in judgement, please let me know.
-
-thx,
-
-Jason.
-
-
-The following changes since commit b60b61d41220c8d34e2c62a748bc78bc5d40585e:
-
-  ARM: mvebu: Fix bug in coherency fabric low level init function (2013-05-28 14:50:08 +0000)
-
-are available in the git repository at:
-
-  git://git.infradead.org/users/jcooper/linux.git tags/fixes-3.10-4
-
-for you to fetch changes up to 5f1f3d5088316f827591764aa6a5e7161eb514bd:
-
-  arm: mvebu: armada-xp-{gp,openblocks-ax3-4}: specify PCIe range (2013-06-06 19:09:00 +0000)
-
-----------------------------------------------------------------
-mvebu fixes for v3.10 round 4
-
- - mvebu
-    - fix PCIe ranges property so NOR flash is visible
-
- - kirkwood
-    - fix identification of 88f6282 so MPPs can be set correctly
-
-----------------------------------------------------------------
-Nicolas Schichan (1):
-      ARM: Kirkwood: handle mv88f6282 cpu in __kirkwood_variant().
-
-Thomas Petazzoni (1):
-      arm: mvebu: armada-xp-{gp,openblocks-ax3-4}: specify PCIe range
-
- arch/arm/boot/dts/armada-xp-gp.dts               | 5 +++--
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 5 +++--
- arch/arm/mach-kirkwood/mpp.c                     | 5 +++--
- 3 files changed, 9 insertions(+), 6 deletions(-)
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130610/04128b32/attachment.sig>
