@@ -1,49 +1,82 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 10 Jun 2013 11:39:27 -0700
-Subject: [PATCH] arm: versatile: don't mark pen as __INIT
-In-Reply-To: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
-References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <51B61D5F.1090906@codeaurora.org>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 10 Jun 2013 21:49:55 +0300
+Subject: [PATCH v2 2/2] i2c: designware: add two optional property
+ tx/rx-fifo-size
+In-Reply-To: <1370840576-15651-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1370840576-15651-1-git-send-email-zhangfei.gao@linaro.org>
+ <1370840576-15651-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20130610184954.GK4312@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/13 08:07, Mark Rutland wrote:
-> When booting fewer cores than are physically present on a versatile
-> platform (e.g. when passing maxcpus=N on the command line), some
-> secondary cores may remain in the holding pen, which is marked __INIT.
-> Late in the boot process, the memory comprising the holding pen will be
-> released to the kernel for more general use, and may be overwritten with
-> arbitrary data, which can cause the held secondaries to start behaving
-> unpredictably. This can lead to all manner of odd behaviour from the
-> kernel.
->
-> Instead don't mark the section as __INIT. This means we can't reuse the
-> pen memory, but we won't get secondaries corrupting the rest of the
-> kernel.
->
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Pawel Moll <pawel.moll@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> ---
->  arch/arm/plat-versatile/headsmp.S | 2 --
->  1 file changed, 2 deletions(-)
->
-> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-> index b178d44..2677bc3 100644
-> --- a/arch/arm/plat-versatile/headsmp.S
-> +++ b/arch/arm/plat-versatile/headsmp.S
-> @@ -11,8 +11,6 @@
->  #include <linux/linkage.h>
->  #include <linux/init.h>
->  
-> -	__INIT
-> -
->  /*
->   * Realview/Versatile Express specific entry point for secondary CPUs.
->   * This provides a "holding pen" into which all secondary cores are held
+Hi Zhangfei Gao,
 
-Why doesn't __CPUINIT work?
+On Mon, Jun 10, 2013 at 01:02:55PM +0800, Zhangfei Gao wrote:
+> rx-fifo-size and tx-fifo-size will be updated if provided from dts
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> CC: Baruch Siach <baruch@tkos.co.il>
+> ---
+>  .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
+>  drivers/i2c/busses/i2c-designware-platdrv.c        |    3 +++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> index e42a2ee..61fdb44 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> @@ -6,6 +6,11 @@ Required properties :
+>   - reg : Offset and length of the register set for the device
+>   - interrupts : <IRQ> where IRQ is the interrupt number.
+>  
+> +Optional properties:
+> +
+> + - rx-fifo-size : 1 cell, Rx fifo threshold
+
+I'd use the word 'size' instead of 'threshold' here. The term 'threshold' is 
+used for something else in the datasheet.
+
+baruch
+
+> + - tx-fifo-size : 1 cell, Tx fifo threshold
+> +
+>  Recommended properties :
+>  
+>   - clock-frequency : desired I2C bus clock frequency in Hz.
+> @@ -18,5 +23,7 @@ Example :
+>  		compatible = "snps,designware-i2c";
+>  		reg = <0xf0000 0x1000>;
+>  		interrupts = <11>;
+> +		rx-fifo-size = <16>;
+> +		tx-fifo-size = <16>;
+>  		clock-frequency = <400000>;
+>  	};
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index 41659c0..6760cea 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -85,6 +85,7 @@ static int dw_i2c_probe(struct platform_device *pdev)
+>  	struct dw_i2c_dev *dev;
+>  	struct i2c_adapter *adap;
+>  	struct resource *mem;
+> +	struct device_node *np = pdev->dev.of_node;
+>  	int irq, r;
+>  
+>  	/* NOTE: driver uses the static register mapping */
+> @@ -140,6 +141,8 @@ static int dw_i2c_probe(struct platform_device *pdev)
+>  		dev->rx_fifo_depth = ((param1 >> 8)  & 0xff) + 1;
+>  		dev->adapter.nr = pdev->id;
+>  	}
+> +	of_property_read_u32(np, "rx-fifo-size", &dev->rx_fifo_depth);
+> +	of_property_read_u32(np, "tx-fifo-size", &dev->tx_fifo_depth);
+>  	r = i2c_dw_init(dev);
+>  	if (r)
+>  		return r;
+> -- 
+> 1.7.9.5
+> 
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
