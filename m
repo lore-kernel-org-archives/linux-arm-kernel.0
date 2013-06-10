@@ -1,66 +1,59 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 10 Jun 2013 10:04:11 +0100
-Subject: [PATCH 12/32] ARM: ux500: Remove superfluous 'psize' attribute
- from Audio platform data
-In-Reply-To: <CACRpkdYbqU=bHrzf6Vpv-KFYN_+z6+y1ocNHtkLEO7ihHEd=dA@mail.gmail.com>
-References: <1366279934-30761-1-git-send-email-lee.jones@linaro.org>
- <1366279934-30761-13-git-send-email-lee.jones@linaro.org>
- <20130501144213.GG25256@gmail.com>
- <20130502083849.GH25256@gmail.com>
- <CACRpkdYbqU=bHrzf6Vpv-KFYN_+z6+y1ocNHtkLEO7ihHEd=dA@mail.gmail.com>
-Message-ID: <20130610090411.GB20297@gmail.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Mon, 10 Jun 2013 14:35:22 +0530
+Subject: [PATCH 06/13] serial: samsung: add support for Exynos5420
+In-Reply-To: <CAKrE-Ke1J+Xr0XeaxO4Trf=AqRm_N1arjtpYwXwupsE7m56u8w@mail.gmail.com>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <1370516488-25860-6-git-send-email-chander.kashyap@linaro.org>
+ <CAKrE-Ke1J+Xr0XeaxO4Trf=AqRm_N1arjtpYwXwupsE7m56u8w@mail.gmail.com>
+Message-ID: <CANuQgHE40JeV1+yqHNVpv+-OBh1Vzi1EZYew6KgauEj76xHH9A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 03 May 2013, Linus Walleij wrote:
+Hi,
 
-> On Thu, May 2, 2013 at 10:38 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> 
-> >> > 'psize' is used to calculate the maximum DMA burst size. However it
-> >> > is only taken into consideration when editing the DMA channel's
-> >> > configuration. The Audio DMA platform data is only used to allocate
-> >> > a channel, not configure it. That will be done at a later date within
-> >> > the MSP driver.
-> >> >
-> >> > We're also removing comments which are no longer required, as
-> >> > 'data_width' is no longer set in any device's platform data period.
-> >> >
-> >> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> 
-> >> Linus Walleij wrote:
-> >> So if I understand correctly this is now handled by dmaengine_pcm.c,
-> >> os that right?
-> >
-> > Unfortunately not. At the moment ux500 sound is very broken in
-> > Mainline. I looked at it recently and the driver is almost completely
-> > different to the one maintained internally.
-> 
-> I was more thinking that the dmaengine_pcm.c which appears
-> to have its functions called from the ux500 ASoC driver should
-> do the calls to slave config to set up proper DMA characteristics
-> for the channel.
-> 
-> Maybe that part is in the MSP driver as you say, is that so?
-> 
-> > There were DMA changes relating to this driver pending for v3.10,
-> > which I believe have just been taking into -next. I will straighten
-> > out the DMA issues shortly, but there are other ones remaining still -
-> > mostly surrounding widgets. Ideally this is something Ola should fix,
-> > as he has the expertise to do so, but he doesn't appear to have been
-> > very active upstream of late.
-> 
-> IIRC there are also patches from Fabio to this stuff so I'm
-> a bit confused, but if the intention is to merge this through
-> ASoC with some other stuff, by all means:
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+On 6 June 2013 17:05, Girish KS <girishks2000@gmail.com> wrote:
+> On Thu, Jun 6, 2013 at 4:31 PM, Chander Kashyap
+> <chander.kashyap@linaro.org> wrote:
+>> The serial port used in Exynos5420 is similar to the serial ports used
+>> in the other Exynos SoC. Hence, extend the serial driver support for
+>> Exynos5420.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> ---
+>>  drivers/tty/serial/samsung.c |    2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+>> index 3cda4ed..841221c 100644
+>> --- a/drivers/tty/serial/samsung.c
+>> +++ b/drivers/tty/serial/samsung.c
+>> @@ -1716,7 +1716,7 @@ static struct s3c24xx_serial_drv_data s5pv210_serial_drv_data = {
+>>
+>>  #if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) || \
+>>         defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) || \
+>> -       defined(CONFIG_SOC_EXYNOS5440)
+>> +       defined(CONFIG_SOC_EXYNOS5420) || defined(CONFIG_SOC_EXYNOS5440)
+>
+> Instead of comparing all CONFIGS of the SOC of exynos series, it can
+> be optimized with #if defined(CONFIG_ARCH_EXYNOS)
+> Make sure to test on all the boards for functionality.
 
-Linus,
+Yes all belongs to Exynos family. Will change that and test.
+>
+>>  static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
+>>         .info = &(struct s3c24xx_uart_info) {
+>>                 .name           = "Samsung Exynos4 UART",
+>> --
+>> 1.7.9.5
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-Would you mind taking this through your tree now that the DMA stuff
-has gone in please?
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+
+--
+with warm regards,
+Chander Kashyap
