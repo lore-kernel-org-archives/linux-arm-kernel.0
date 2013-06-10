@@ -1,51 +1,80 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 10 Jun 2013 15:43:02 +0200
-Subject: [V2 5/7] video: mmp: add pitch info in mmp_win structure
-In-Reply-To: <1370780950-21746-1-git-send-email-jtzhou@marvell.com>
-References: <CACDDiy-Ri=iYNLWg6dd3BwayZx=4+Lb5WC=ZEgtNHpxiSca=nA@mail.gmail.com>
- <1370780950-21746-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20130610134302.GZ19468@game.jcrosoft.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 10 Jun 2013 15:52:07 +0200
+Subject: [PATCH v2 07/11] ARM:stixxxx: Add STiH416 SOC support
+In-Reply-To: <1370856425-7135-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
+ <1370856425-7135-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <3733079.FxbR14kFrs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20:29 Sun 09 Jun     , Jett.Zhou wrote:
-> From: Jing Xiang <jxiang@marvell.com>
-> 
+On Monday 10 June 2013 10:27:05 Srinivas KANDAGATLA wrote:
 
-this is impossible to follow
+> +	soc {
+> +		pin-controller-sbc {
+> +			#address-cells	= <1>;
+> +			#size-cells	= <1>;
+> +			compatible	= "st,stih416-pinctrl", "simple-bus";
 
-resend the patch series fully with a PATCH 0
+Why is this both its own device with a compatible string and a
+"simple-bus" at the same time? Wouldn't it be simpler to just
+scan the child device nodes from the "st,stih416-pinctrl"
+driver instead of having a separate platform_driver for them?
 
-as I just go back from vacation I'll not read this series until then
+> +			st,retime-in-delay	= <0 300 500 750 1000 1250 1500 1750 2000 2250 2500 2750 3000 3250>;
+> +			st,retime-out-delay	= <0 300 500 750 1000 1250 1500 1750 2000 2250 2500 2750 3000 3250>;
+> +			st,syscfg		= <&syscfg_sbc>;
+> +			st,syscfg-offsets	= <0 40 50 60 100>;
+> +			ranges;
+> +			PIO0: pinctrl at fe610000 {
+> +				#gpio-cells = <1>;
+> +				compatible = "st,stixxxx-gpio";
+> +				gpio-controller;
+> +				reg = <0xfe610000 0x100>;
+> +				st,bank-name  = "PIO0";
+> +				st,retime-pin-mask = <0xff>;
+> +			};
+> +			PIO1: pinctrl at fe611000 {
+> +				#gpio-cells	= <1>;
+> +				compatible	= "st,stixxxx-gpio";
+> +				gpio-controller;
+> +				reg = <0xfe611000 0x100>;
+> +				st,bank-name  = "PIO1";
+> +				st,retime-pin-mask = <0xff>;
+> +			};
 
-Best Regards,
-J.
+What is in the ranges between these registers? It seems you have
+256 bytes for each pinctrl node, with 4kb spacing. I wonder if
+it would make sense to declare the entire range to belong to a single
+pinctrl device. At least since all of the registers are in a single
+range, you could add a property like
 
-> Add pitch length info of graphics/video layer for mmp_win, if it is
-> YUV format of video layer, u/v pitch will non-zero.
-> 
-> Signed-off-by: Jing Xiang <jxiang@marvell.com>
-> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-> ---
->  include/video/mmp_disp.h |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/include/video/mmp_disp.h b/include/video/mmp_disp.h
-> index b9dd1fb..462e3bd 100644
-> --- a/include/video/mmp_disp.h
-> +++ b/include/video/mmp_disp.h
-> @@ -91,6 +91,11 @@ struct mmp_win {
->  	u16	up_crop;
->  	u16	bottom_crop;
->  	int	pix_fmt;
-> +	/*
-> +	 * pitch[0]: graphics/video layer line length or y pitch
-> +	 * pitch[1]/pitch[2]: video u/v pitch if non-zero
-> +	 */
-> +	u32	pitch[3];
->  };
->  
->  struct mmp_addr {
-> -- 
-> 1.7.0.4
-> 
+	ranges = <0 0xfe610000 0x10000>;
+
+and use relative addresses in the sub-nodes.
+
+Please don't use identifiers with 'xxx' in them. Instead use numbers
+of actual chips, ideally using the first one that this is compatible
+with.
+
+> +		syscfg_sbc:syscfg at fe600000{
+> +			compatible	= "st,stih416-syscfg";
+> +			reg		= <0xfe600000 0x1000>;
+> +			syscfg-range	= <0 999>;
+> +			syscfg-name	= "SYSCFG_SBC";
+> +		};
+> +		syscfg_front:syscfg at fee10000{
+> +			compatible	= "st,stih416-syscfg";
+> +			reg		= <0xfee10000 0x1000>;
+> +			syscfg-range	= <1000 999>;
+> +			syscfg-name	= "SYSCFG_FRONT";
+> +		};
+
+Did you mean to declare ranges excluding 1000 and 2000 here?
+Normally I would expect inclusive ranges like syscfg-range=<0 1000>;
+
+What is the idea of the 'syscfg-name'? If the nodes are all different,
+I would expect them to have distinct "compatible" values and not
+need them.
+
+	Arnd
