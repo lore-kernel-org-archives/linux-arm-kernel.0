@@ -1,333 +1,371 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Tue, 11 Jun 2013 14:48:38 +0100
-Subject: [PATCH v3 1/6] irqchip: add support for Marvell Orion SoCs
-In-Reply-To: <1370536034-23956-2-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1370536034-23956-2-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130611134838.86B8D3E0A90@localhost>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 11 Jun 2013 19:19:04 +0530
+Subject: [PATCH 03/13] ARM: dts: fork out common Exynos5 nodes
+In-Reply-To: <3263993.4t2W5LRuVW@flatron>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <1370516488-25860-3-git-send-email-chander.kashyap@linaro.org>
+ <3263993.4t2W5LRuVW@flatron>
+Message-ID: <CANuQgHGQN2tmbbkuxp=S7712LX_=iYRwFXU_nYpJcbq54CJq+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  6 Jun 2013 18:27:09 +0200, Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> wrote:
-> This patch adds an irqchip driver for the main interrupt controller found
-> on Marvell Orion SoCs (Kirkwood, Dove, Orion5x, Discovery Innovation).
-> Corresponding device tree documentation is also added.
-> 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+On 8 June 2013 16:42, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> Hi Chander,
+>
+> On Thursday 06 of June 2013 16:31:17 Chander Kashyap wrote:
+>> In preparation of adding support for Exynos5420, which has many
+>> peripherals similar to Exynos5250, a new common Exynos5 device tree
+>> source file is created out of the existing Exynos5250 device tree
+>> source file. Only the common nodes required for basic boot up on
+>> Exynos5420 based boards are moved into this new file and the rest of
+>> the common nodes would be moved subsequently.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/exynos5.dtsi    |  121
+>> +++++++++++++++++++++++++++++++++++++ arch/arm/boot/dts/exynos5250.dtsi
+>> |   74 +---------------------- 2 files changed, 122 insertions(+), 73
+>> deletions(-)
+>>  create mode 100644 arch/arm/boot/dts/exynos5.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/exynos5.dtsi
+>> b/arch/arm/boot/dts/exynos5.dtsi new file mode 100644
+>> index 0000000..ab56608
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos5.dtsi
+>> @@ -0,0 +1,121 @@
+>> +/*
+>> + * Samsung's Exynos5 SoC series common device tree source
+>> + *
+>> + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+>> + *           http://www.samsung.com
+>> + *
+>> + * Samsung's Exynos5 SoC series device nodes are listed in this file.
+>> Particular + * SoCs from Exynos5 series can include this file and
+>> provide values for SoCs + * specfic bindings.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as +
+>> * published by the Free Software Foundation.
+>> + */
+>> +
+>> +/include/ "skeleton.dtsi"
+>> +
+>> +/ {
+>> +     interrupt-parent = <&gic>;
+>> +
+>> +     chipid at 10000000 {
+>> +             compatible = "samsung,exynos4210-chipid";
+>> +             reg = <0x10000000 0x100>;
+>> +     };
+>> +
+>> +     gic:interrupt-controller at 10481000 {
+>> +             compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>> +             #interrupt-cells = <3>;
+>> +             interrupt-controller;
+>> +             reg =   <0x10481000 0x1000>,
+>> +                     <0x10482000 0x1000>,
+>> +                     <0x10484000 0x2000>,
+>> +                     <0x10486000 0x2000>;
+>> +             interrupts = <1 9 0xf04>;
+>> +     };
+>> +
+>> +     combiner:interrupt-controller at 10440000 {
+>> +             compatible = "samsung,exynos4210-combiner";
+>> +             #interrupt-cells = <2>;
+>> +             interrupt-controller;
+>> +             samsung,combiner-nr = <32>;
+>> +             reg = <0x10440000 0x1000>;
+>> +             interrupts =    <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+>> +                             <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+>> +                             <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+>> +                             <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
+>> +                             <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
+>> +                             <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
+>> +                             <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
+>> +                             <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
+>> +     };
+>> +
+>> +     watchdog {
+>> +             compatible = "samsung,s3c2410-wdt";
+>> +             reg = <0x101D0000 0x100>;
+>> +             interrupts = <0 42 0>;
+>> +             clock-names = "watchdog";
+>> +             status = "disabled";
+>> +     };
+>> +
+>> +     rtc {
+>> +             compatible = "samsung,s3c6410-rtc";
+>> +             reg = <0x101E0000 0x100>;
+>> +             interrupts = <0 43 0>, <0 44 0>;
+>> +             clock-names = "rtc";
+>> +             status = "disabled";
+>> +     };
+>> +
+>> +     serial at 12C00000 {
+>> +             compatible = "samsung,exynos4210-uart";
+>> +             reg = <0x12C00000 0x100>;
+>> +             interrupts = <0 51 0>;
+>> +             clock-names = "uart", "clk_uart_baud0";
+>> +     };
+>> +
+>> +     serial at 12C10000 {
+>> +             compatible = "samsung,exynos4210-uart";
+>> +             reg = <0x12C10000 0x100>;
+>> +             interrupts = <0 52 0>;
+>> +             clock-names = "uart", "clk_uart_baud0";
+>> +     };
+>> +
+>> +     serial at 12C20000 {
+>> +             compatible = "samsung,exynos4210-uart";
+>> +             reg = <0x12C20000 0x100>;
+>> +             interrupts = <0 53 0>;
+>> +             clock-names = "uart", "clk_uart_baud0";
+>> +     };
+>> +
+>> +     serial at 12C30000 {
+>> +             compatible = "samsung,exynos4210-uart";
+>> +             reg = <0x12C30000 0x100>;
+>> +             interrupts = <0 54 0>;
+>> +             clock-names = "uart", "clk_uart_baud0";
+>> +     };
+>> +
+>> +     dwmmc_0: dwmmc0 at 12200000 {
+>> +             compatible = "samsung,exynos5250-dw-mshc";
+>> +             interrupts = <0 75 0>;
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             clock-names = "biu", "ciu";
+>> +     };
+>> +
+>> +     dwmmc_1: dwmmc1 at 12210000 {
+>> +             compatible = "samsung,exynos5250-dw-mshc";
+>> +             interrupts = <0 76 0>;
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             clock-names = "biu", "ciu";
+>> +     };
+>> +
+>> +     dwmmc_2: dwmmc2 at 12220000 {
+>> +             compatible = "samsung,exynos5250-dw-mshc";
+>> +             interrupts = <0 77 0>;
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +             clock-names = "biu", "ciu";
+>> +             status = "disabled";
+>> +     };
+>
+> If you are at adding new file, maybe it would be a good idea to sort the
+> nodes somehow, e.g. by @address or name. I'm not sure if there is some
+> rule, but it would improve maintainability of the file.
+I will place in sorted order and resend.
+>
+> CCing people that might know more than me on this matter and also
+> devicetree-discuss mailing list (which should be CCed for _every_ patch
+> which does something related to DeviceTree - please remember about this).
+>
+>> +};
+>> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+>> b/arch/arm/boot/dts/exynos5250.dtsi index 4bd9e9c..e571d3b 100644
+>> --- a/arch/arm/boot/dts/exynos5250.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+>> @@ -17,12 +17,11 @@
+>>   * published by the Free Software Foundation.
+>>  */
+>>
+>> -/include/ "skeleton.dtsi"
+>> +/include/ "exynos5.dtsi"
+>>  /include/ "exynos5250-pinctrl.dtsi"
+>>
+>>  / {
+>>       compatible = "samsung,exynos5250";
+>> -     interrupt-parent = <&gic>;
+>>
+>>       aliases {
+>>               spi0 = &spi_0;
+>> @@ -51,11 +50,6 @@
+>>               pinctrl3 = &pinctrl_3;
+>>       };
+>>
+>> -     chipid at 10000000 {
+>> -             compatible = "samsung,exynos4210-chipid";
+>> -             reg = <0x10000000 0x100>;
+>> -     };
+>> -
+>>       pd_gsc: gsc-power-domain at 0x10044000 {
+>>               compatible = "samsung,exynos4210-pd";
+>>               reg = <0x10044000 0x20>;
+>> @@ -72,17 +66,6 @@
+>>               #clock-cells = <1>;
+>>       };
+>>
+>> -     gic:interrupt-controller at 10481000 {
+>> -             compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+>> -             #interrupt-cells = <3>;
+>> -             interrupt-controller;
+>> -             reg = <0x10481000 0x1000>,
+>> -                   <0x10482000 0x1000>,
+>> -                   <0x10484000 0x2000>,
+>> -                   <0x10486000 0x2000>;
+>> -             interrupts = <1 9 0xf04>;
+>> -     };
+>> -
+>>       timer {
+>>               compatible = "arm,armv7-timer";
+>>               interrupts = <1 13 0xf08>,
+>> @@ -91,22 +74,6 @@
+>>                            <1 10 0xf08>;
+>>       };
+>>
+>> -     combiner:interrupt-controller at 10440000 {
+>> -             compatible = "samsung,exynos4210-combiner";
+>> -             #interrupt-cells = <2>;
+>> -             interrupt-controller;
+>> -             samsung,combiner-nr = <32>;
+>> -             reg = <0x10440000 0x1000>;
+>> -             interrupts = <0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+>> -                          <0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+>> -                          <0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+>> -                          <0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
+>> -                          <0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
+>> -                          <0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
+>> -                          <0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
+>> -                          <0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
+>> -     };
+>> -
+>>       mct at 101C0000 {
+>>               compatible = "samsung,exynos4210-mct";
+>>               reg = <0x101C0000 0x800>;
+>> @@ -168,11 +135,7 @@
+>>       };
+>>
+>>       watchdog {
+>> -             compatible = "samsung,s3c2410-wdt";
+>> -             reg = <0x101D0000 0x100>;
+>> -             interrupts = <0 42 0>;
+>>               clocks = <&clock 336>;
+>> -             clock-names = "watchdog";
+>
+> I would keep the clock-names property here, because it increases
+> readability and is complementary to the clocks property.
+Yes, thanks for pointing out. Will place clock names and number at same place.
+>
+>>       };
+>>
+>>       codec at 11000000 {
+>> @@ -183,12 +146,8 @@
+>>       };
+>>
+>>       rtc {
+>> -             compatible = "samsung,s3c6410-rtc";
+>> -             reg = <0x101E0000 0x100>;
+>> -             interrupts = <0 43 0>, <0 44 0>;
+>>               clocks = <&clock 337>;
+>>               clock-names = "rtc";
+>
+> Yes, just like here :) .
+>
+>> -             status = "disabled";
+>>       };
+>>
+>>       tmu at 10060000 {
+>> @@ -200,35 +159,19 @@
+>>       };
+>>
+>>       serial at 12C00000 {
+>> -             compatible = "samsung,exynos4210-uart";
+>> -             reg = <0x12C00000 0x100>;
+>> -             interrupts = <0 51 0>;
+>>               clocks = <&clock 289>, <&clock 146>;
+>> -             clock-names = "uart", "clk_uart_baud0";
+>
+> Ditto.
+>
+>>       };
+>>
+>>       serial at 12C10000 {
+>> -             compatible = "samsung,exynos4210-uart";
+>> -             reg = <0x12C10000 0x100>;
+>> -             interrupts = <0 52 0>;
+>>               clocks = <&clock 290>, <&clock 147>;
+>> -             clock-names = "uart", "clk_uart_baud0";
+>
+> Ditto.
+>
+>>       };
+>>
+>>       serial at 12C20000 {
+>> -             compatible = "samsung,exynos4210-uart";
+>> -             reg = <0x12C20000 0x100>;
+>> -             interrupts = <0 53 0>;
+>>               clocks = <&clock 291>, <&clock 148>;
+>> -             clock-names = "uart", "clk_uart_baud0";
+>
+> Ditto.
+>
+>>       };
+>>
+>>       serial at 12C30000 {
+>> -             compatible = "samsung,exynos4210-uart";
+>> -             reg = <0x12C30000 0x100>;
+>> -             interrupts = <0 54 0>;
+>>               clocks = <&clock 292>, <&clock 149>;
+>> -             clock-names = "uart", "clk_uart_baud0";
+>
+> Ditto.
+>
+>>       };
+>>
+>>       sata at 122F0000 {
+>> @@ -405,33 +348,18 @@
+>>       };
+>>
+>>       dwmmc_0: dwmmc0 at 12200000 {
+>> -             compatible = "samsung,exynos5250-dw-mshc";
+>>               reg = <0x12200000 0x1000>;
+>> -             interrupts = <0 75 0>;
+>> -             #address-cells = <1>;
+>> -             #size-cells = <0>;
+>>               clocks = <&clock 280>, <&clock 139>;
+>> -             clock-names = "biu", "ciu";
+>
+> Ditto.
+>
+>>       };
+>>
+>>       dwmmc_1: dwmmc1 at 12210000 {
+>> -             compatible = "samsung,exynos5250-dw-mshc";
+>>               reg = <0x12210000 0x1000>;
+>> -             interrupts = <0 76 0>;
+>> -             #address-cells = <1>;
+>> -             #size-cells = <0>;
+>>               clocks = <&clock 281>, <&clock 140>;
+>> -             clock-names = "biu", "ciu";
+>
+> Ditto.
+>
+>>       };
+>>
+>>       dwmmc_2: dwmmc2 at 12220000 {
+>> -             compatible = "samsung,exynos5250-dw-mshc";
+>>               reg = <0x12220000 0x1000>;
+>> -             interrupts = <0 77 0>;
+>> -             #address-cells = <1>;
+>> -             #size-cells = <0>;
+>>               clocks = <&clock 282>, <&clock 141>;
+>> -             clock-names = "biu", "ciu";
+>
+> Ditto.
+>
+> Best regards,
+> Tomasz
+>
+>>       };
+>>
+>>       dwmmc_3: dwmmc3 at 12230000 {
 
-Looks reasonable to me.
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-> ---
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Rob Landley <rob@landley.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Andrew Lunn <andrew@lunn.ch>
-> Cc: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Gregory Clement <gregory.clement@free-electrons.com>
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-doc at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  .../interrupt-controller/marvell,orion-intc.txt    |   48 +++++
->  drivers/irqchip/Kconfig                            |    5 +
->  drivers/irqchip/Makefile                           |    1 +
->  drivers/irqchip/irq-orion.c                        |  193 ++++++++++++++++++++
->  4 files changed, 247 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/marvell,orion-intc.txt
->  create mode 100644 drivers/irqchip/irq-orion.c
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/marvell,orion-intc.txt b/Documentation/devicetree/bindings/interrupt-controller/marvell,orion-intc.txt
-> new file mode 100644
-> index 0000000..2c11ac7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/marvell,orion-intc.txt
-> @@ -0,0 +1,48 @@
-> +Marvell Orion SoC interrupt controllers
-> +
-> +* Main interrupt controller
-> +
-> +Required properties:
-> +- compatible: shall be "marvell,orion-intc"
-> +- reg: base address(es) of interrupt registers starting with CAUSE register
-> +- interrupt-controller: identifies the node as an interrupt controller
-> +- #interrupt-cells: number of cells to encode an interrupt source, shall be 1
-> +
-> +The interrupt sources map to the corresponding bits in the interrupt
-> +registers, i.e.
-> +- 0 maps to bit 0 of first base address,
-> +- 1 maps to bit 1 of first base address,
-> +- 32 maps to bit 0 of second base address, and so on.
-> +
-> +Example:
-> +	intc: interrupt-controller {
-> +		compatible = "marvell,orion-intc";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		 /* Dove has 64 first level interrupts */
-> +		reg = <0x20200 0x10>, <0x20210 0x10>;
-> +	};
-> +
-> +* Bridge interrupt controller
-> +
-> +Required properties:
-> +- compatible: shall be "marvell,orion-bridge-intc"
-> +- reg: base address of bridge interrupt registers starting with CAUSE register
-> +- interrupts: bridge interrupt of the main interrupt controller
-> +- interrupt-controller: identifies the node as an interrupt controller
-> +- #interrupt-cells: number of cells to encode an interrupt source, shall be 1
-> +
-> +Optional properties:
-> +- marvell,#interrupts: number of interrupts provided by bridge interrupt
-> +      controller, defaults to 32 if not set
-> +
-> +Example:
-> +	bridge_intc: interrupt-controller {
-> +		compatible = "marvell,orion-bridge-intc";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		reg = <0x20110 0x8>;
-> +		interrupts = <0>;
-> +		/* Dove bridge provides 5 interrupts */
-> +		marvell,#interrupts = <5>;
-> +	};
-> diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
-> index 4a33351..68c3107 100644
-> --- a/drivers/irqchip/Kconfig
-> +++ b/drivers/irqchip/Kconfig
-> @@ -25,6 +25,11 @@ config ARM_VIC_NR
->  	  The maximum number of VICs available in the system, for
->  	  power management.
->  
-> +config ORION_IRQCHIP
-> +	bool
-> +	select IRQ_DOMAIN
-> +	select MULTI_IRQ_HANDLER
-> +
->  config RENESAS_INTC_IRQPIN
->  	bool
->  	select IRQ_DOMAIN
-> diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
-> index cda4cb5..55df3bd 100644
-> --- a/drivers/irqchip/Makefile
-> +++ b/drivers/irqchip/Makefile
-> @@ -7,6 +7,7 @@ obj-$(CONFIG_ARCH_MXS)			+= irq-mxs.o
->  obj-$(CONFIG_ARCH_S3C24XX)		+= irq-s3c24xx.o
->  obj-$(CONFIG_METAG)			+= irq-metag-ext.o
->  obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
-> +obj-$(CONFIG_ORION_IRQCHIP)		+= irq-orion.o
->  obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
->  obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
->  obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
-> diff --git a/drivers/irqchip/irq-orion.c b/drivers/irqchip/irq-orion.c
-> new file mode 100644
-> index 0000000..693ea20
-> --- /dev/null
-> +++ b/drivers/irqchip/irq-orion.c
-> @@ -0,0 +1,193 @@
-> +/*
-> + * Marvell Orion SoCs IRQ chip driver.
-> + *
-> + * Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2.  This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/irq.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_irq.h>
-> +#include <asm/exception.h>
-> +#include <asm/mach/irq.h>
-> +
-> +#include "irqchip.h"
-> +
-> +/*
-> + * Orion SoC main interrupt controller
-> + */
-> +
-> +#define ORION_IRQS_PER_CHIP		32
-> +
-> +#define ORION_IRQ_CAUSE			0x00
-> +#define ORION_IRQ_MASK			0x04
-> +#define ORION_IRQ_FIQ_MASK		0x08
-> +#define ORION_IRQ_ENDP_MASK		0x0c
-> +
-> +static struct irq_domain *orion_irq_domain;
-> +
-> +static asmlinkage void __exception_irq_entry orion_handle_irq(
-> +	struct pt_regs *regs)
-> +{
-> +	struct irq_domain_chip_generic *dgc = orion_irq_domain->gc;
-> +	int n, base = 0;
-> +
-> +	for (n = 0; n < dgc->num_chips; n++, base += ORION_IRQS_PER_CHIP) {
-> +		struct irq_chip_generic *gc =
-> +			irq_get_domain_generic_chip(orion_irq_domain, base);
-> +		u32 stat = readl_relaxed(gc->reg_base + ORION_IRQ_CAUSE) &
-> +			gc->mask_cache;
-> +		while (stat) {
-> +			u32 hwirq = ffs(stat) - 1;
-> +			u32 irq = irq_find_mapping(orion_irq_domain,
-> +						   gc->irq_base + hwirq);
-> +			handle_IRQ(irq, regs);
-> +			stat &= ~(1 << hwirq);
-> +		}
-> +	}
-> +}
-> +
-> +static int __init orion_irq_init(struct device_node *np,
-> +				 struct device_node *parent)
-> +{
-> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> +	struct resource r;
-> +	int n, ret, base, num_chips = 0;
-> +
-> +	/* count number of irq chips by valid reg addresses */
-> +	while (of_address_to_resource(np, num_chips, &r) == 0)
-> +		num_chips++;
-> +
-> +	orion_irq_domain = irq_domain_add_linear(np,
-> +				num_chips * ORION_IRQS_PER_CHIP,
-> +				&irq_generic_chip_ops, NULL);
-> +	if (!orion_irq_domain)
-> +		panic("%s: unable to add irq domain\n", np->name);
-> +
-> +	ret = irq_alloc_domain_generic_chips(orion_irq_domain,
-> +				ORION_IRQS_PER_CHIP, 1, np->name,
-> +				handle_level_irq, clr, 0,
-> +				IRQ_GC_INIT_MASK_CACHE);
-> +	if (ret)
-> +		panic("%s: unable to alloc irq domain gc\n", np->name);
-> +
-> +	for (n = 0, base = 0; n < num_chips; n++, base += ORION_IRQS_PER_CHIP) {
-> +		struct irq_chip_generic *gc =
-> +			irq_get_domain_generic_chip(orion_irq_domain, base);
-> +
-> +		of_address_to_resource(np, n, &r);
-> +
-> +		if (!request_mem_region(r.start, resource_size(&r), np->name))
-> +			panic("%s: unable to request mem region %d",
-> +			      np->name, n);
-> +
-> +		gc->reg_base = ioremap(r.start, resource_size(&r));
-> +		if (!gc->reg_base)
-> +			panic("%s: unable to map resource %d", np->name, n);
-> +
-> +		gc->chip_types[0].regs.mask = ORION_IRQ_MASK;
-> +		gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
-> +		gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
-> +
-> +		/* mask all interrupts */
-> +		writel(0, gc->reg_base + ORION_IRQ_MASK);
-> +	}
-> +
-> +	set_handle_irq(orion_handle_irq);
-> +
-> +	return 0;
-> +}
-> +IRQCHIP_DECLARE(orion_intc, "marvell,orion-intc", orion_irq_init);
-> +
-> +/*
-> + * Orion SoC bridge interrupt controller
-> + */
-> +
-> +#define ORION_BRIDGE_IRQ_CAUSE	0x00
-> +#define ORION_BRIDGE_IRQ_MASK	0x04
-> +
-> +static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
-> +{
-> +	struct irq_domain *d = irq_get_handler_data(irq);
-> +	struct irq_chip_generic *gc = irq_get_domain_generic_chip(d, irq);
-> +	u32 stat = readl_relaxed(gc->reg_base + ORION_BRIDGE_IRQ_CAUSE) &
-> +		gc->mask_cache;
-> +
-> +	while (stat) {
-> +		u32 hwirq = ffs(stat) - 1;
-> +		generic_handle_irq(irq_find_mapping(d, gc->irq_base + hwirq));
-> +		stat &= ~(1 << hwirq);
-> +	}
-> +}
-> +
-> +static int __init orion_bridge_irq_init(struct device_node *np,
-> +					struct device_node *parent)
-> +{
-> +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> +	struct resource r;
-> +	struct irq_domain *domain;
-> +	struct irq_chip_generic *gc;
-> +	int ret, irq, nrirqs = 32;
-> +
-> +	/* get optional number of interrupts provided */
-> +	of_property_read_u32(np, "marvell,#interrupts", &nrirqs);
-> +
-> +	domain = irq_domain_add_linear(np, nrirqs,
-> +				       &irq_generic_chip_ops, NULL);
-> +	if (!domain) {
-> +		pr_err("%s: unable to add irq domain\n", np->name);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	ret = irq_alloc_domain_generic_chips(domain, nrirqs, 1, np->name,
-> +			     handle_level_irq, clr, 0, IRQ_GC_INIT_MASK_CACHE);
-> +	if (ret) {
-> +		pr_err("%s: unable to alloc irq domain gc\n", np->name);
-> +		return ret;
-> +	}
-> +
-> +	ret = of_address_to_resource(np, 0, &r);
-> +	if (ret) {
-> +		pr_err("%s: unable to get resource\n", np->name);
-> +		return ret;
-> +	}
-> +
-> +	if (!request_mem_region(r.start, resource_size(&r), np->name)) {
-> +		pr_err("%s: unable to request mem region\n", np->name);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	irq = irq_of_parse_and_map(np, 0);
-> +	if (irq <= 0) {
-> +		pr_err("%s: unable to parse irq\n", np->name);
-> +		return -EINVAL;
-> +	}
-> +
-> +	gc = irq_get_domain_generic_chip(domain, 0);
-> +	gc->reg_base = ioremap(r.start, resource_size(&r));
-> +	if (!gc->reg_base) {
-> +		pr_err("%s: unable to map resource\n", np->name);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	gc->chip_types[0].regs.ack = ORION_BRIDGE_IRQ_CAUSE;
-> +	gc->chip_types[0].regs.mask = ORION_BRIDGE_IRQ_MASK;
-> +	gc->chip_types[0].chip.irq_ack = irq_gc_ack_clr_bit;
-> +	gc->chip_types[0].chip.irq_mask = irq_gc_mask_clr_bit;
-> +	gc->chip_types[0].chip.irq_unmask = irq_gc_mask_set_bit;
-> +
-> +	/* mask all interrupts */
-> +	writel(0, gc->reg_base + ORION_BRIDGE_IRQ_MASK);
-> +
-> +	irq_set_handler_data(irq, domain);
-> +	irq_set_chained_handler(irq, orion_bridge_irq_handler);
-> +
-> +	return 0;
-> +}
-> +IRQCHIP_DECLARE(orion_bridge_intc,
-> +		"marvell,orion-bridge-intc", orion_bridge_irq_init);
-> -- 
-> 1.7.2.5
-> 
-
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+Thanks for the review.
+--
+with warm regards,
+Chander Kashyap
