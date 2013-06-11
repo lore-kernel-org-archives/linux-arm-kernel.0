@@ -1,34 +1,57 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 11 Jun 2013 17:12:19 +0530
-Subject: [PATCH 02/11] gpio: davinci: coding style correction
-In-Reply-To: <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
- <1369206634-6778-3-git-send-email-avinashphilip@ti.com>
-Message-ID: <51B70D1B.1080208@ti.com>
+From: b-cousson@ti.com (Benoit Cousson)
+Date: Tue, 11 Jun 2013 13:43:19 +0200
+Subject: [PATCH v3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ line
+In-Reply-To: <51B70B08.9030208@ti.com>
+References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
+ <1370629886-14170-1-git-send-email-khilman@linaro.org>
+ <20130607193130.GA13205@kahuna> <51B59AC3.2080900@ti.com>
+ <87fvwpex6k.fsf@linaro.org> <51B70B08.9030208@ti.com>
+Message-ID: <51B70D57.4010208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/22/2013 12:40 PM, Philip Avinash wrote:
-> 1. Corrects coding and commenting styles
-> 2. Variables name change to meaningful name
-> 3. Remove unnecessary variable usage
-> 4. Add BINTEN macro definition
+On 06/11/2013 01:33 PM, Cousson, Benoit wrote:
+> On 6/10/2013 6:40 PM, Kevin Hilman wrote:
+>> Benoit Cousson <b-cousson@ti.com> writes:
+>>
+>>> Hi Kevin,
+>>>
+>>> On 06/07/2013 09:31 PM, Nishanth Menon wrote:
+>>>> On 11:31-20130607, Kevin Hilman wrote:
+>>>>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
+>>>>> SYS_NIRQ line on OMAP.  Add another DTS include file
+>>>>> (twl4030_omap3.dtsi) for boards that hook up the twl4030 this way
+>>>>> to include.
+>>>>>
+>>>>> This allows RTC wake from off-mode to work again on OMAP3-based
+>>>>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
+>>>>> 3530/Overo, 3730/Overo-STORM.
+>>>>>
+>>>>> Special thanks to Florian Vaussard for suggesting use of preprocessor
+>>>>> feature.
+>>>>>
+>>>>> Cc: Florian Vaussard <florian.vaussard@epfl.ch>
+>>>>> Cc: Benoit Cousson <b-cousson@ti.com>
+>>>>> Cc: Nishanth Menon <nm@ti.com>
+>>>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>>>> Thanks,
+>>>> Reviewed-by: Nishanth Menon <nm@ti.com>
+>>>
+>>> Thanks, I've just applied it in for_3.11/dts.
+>>
+>> Thanks,
+>>
+>> Will you apply the first 2 from the series too?
+>>
+>>    ARM: DTS: OMAP3: beagle/overo: mux console UART, enable wakeup
+>>    ARM: DTS: OMAP3: beagle: enable user button via gpio_keys, enable
+>> wakeup
 > 
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> Thanks for the reminder, I kind of forgot these ones :-)
 
-As Russell mentioned, the 80 char limit changes are churn. I looked at
-the variable name renaming and that's also churn with little benefit.
-The only changes that are probably worth doing are alphabetical ordering
-of include files, fixes for mult-line commenting style and usage of
-macro for register offset.
+BTW, do you have any v2 for these ones? This version does not use the
+macros.
+Moreover I cannot apply them on top of Florian's series :-(
 
-As I started reviewing these patches, I also started fixing some of the
-comments I had and I have pushed the resulting work here:
-
-https://git.kernel.org/cgit/linux/kernel/git/nsekhar/linux-davinci.git/log/?h=devel-gpio
-
-It is only compile tested, but I hope this will serve as good starting
-point for your next submission.
-
-Thanks,
-Sekhar
+Regards,
+Benoit
