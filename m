@@ -1,239 +1,153 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 11 Jun 2013 14:37:45 +0100
-Subject: [PATCH v2 4/8] irqchip: armada-370-xp: implement MSI support
-In-Reply-To: <1370536888-8871-5-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370536888-8871-5-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130611133745.514CA3E0A90@localhost>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 11 Jun 2013 09:40:28 -0400
+Subject: [PATCH 3/3] ARM: dts: keystone: Add minimal Keystone SOC device
+ tree data
+In-Reply-To: <20130611093818.GA22334@e106331-lin.cambridge.arm.com>
+References: <1370894123-26846-1-git-send-email-santosh.shilimkar@ti.com>
+ <1370894123-26846-4-git-send-email-santosh.shilimkar@ti.com>
+ <20130611093818.GA22334@e106331-lin.cambridge.arm.com>
+Message-ID: <51B728CC.40907@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  6 Jun 2013 18:41:24 +0200, Thomas Petazzoni <thomas.petazzoni@free-electrons.com> wrote:
-> This commit introduces the support for the MSI interrupts in the
-> armada-370-xp interrupt controller driver. It registers an MSI chip to
-> the MSI chip registry, which will be used by the Marvell PCIe host
-> controller driver.
+On Tuesday 11 June 2013 05:38 AM, Mark Rutland wrote:
+> On Mon, Jun 10, 2013 at 08:55:23PM +0100, Santosh Shilimkar wrote:
+>> Add minimal device tree data for Keystone2 based SOCs. Patch
+>> contains mainly ARM related SOC data and nothing about EVM specific
+>> yet.
+>>
+>> Cc: Grant Likely <grant.likely@linaro.org>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: arm at kernel.org
+>>
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+>> ---
+>> I have seen some ongoing #include cleanups from Stephen Warren and cpu_node
+>> updates from Lorenzo, but since am unaware of the dependencies, dts file is
+>> aligned with the v3.10rcx ARM dts files. The changes are very trivial so
+>> I can fix them quickly when they show up in linux-next. 
+>>
+>>  .../devicetree/bindings/arm/keystone/keystone.txt  |    9 ++
+>>  arch/arm/boot/dts/keystone.dts                     |   98 ++++++++++++++++++++
+>>  2 files changed, 107 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/keystone/keystone.txt
+>>  create mode 100644 arch/arm/boot/dts/keystone.dts
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+>> new file mode 100644
+>> index 0000000..b496d4c
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
+>> @@ -0,0 +1,9 @@
+>> +TI Kesytone Platforms Device Tree Bindings
+>> +-----------------------------------------------
+>> +
+>> +Boards with Keystone2 based devices (TCI66xxK2H) SOC shall have the
+>> +following properties.
+>> +
+>> +Required properties:
+>> + - compatible: Every devices present in Keystone SOC should be in
+>> +   the form "ti,keystone-*";
 > 
-> The MSI interrupts use the 16 high doorbells, and are therefore
-> notified using IRQ1 of the main interrupt controller.
+> I'm not sure that makes sense. The GIC for example isn't a "ti,keystone-gic",
+> and the uarts in the soc node don't start with "ti,keystone-" either.
+>
+I shouldn't have generalized it. UART are compatible with ns16550 UARTs.
+Will update the documentation line in next version.
+ 
+>> diff --git a/arch/arm/boot/dts/keystone.dts b/arch/arm/boot/dts/keystone.dts
+>> new file mode 100644
+>> index 0000000..9ca7d25
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/keystone.dts
+>> @@ -0,0 +1,98 @@
+>> +/*
+>> + * Copyright 2013 Texas Instruments, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +/include/ "skeleton.dtsi"
+>> +
+>> +/ {
+>> +	model = "Texas Instruments Keystone 2 SoC";
+>> +	compatible =  "ti,keystone-evm";
+>> +	#address-cells = <2>;
+>> +	#size-cells = <2>;
+>> +	interrupt-parent = <&gic>;
+>> +
+>> +	aliases {
+>> +		serial0	= &uart0;
+>> +	};
+>> +
+>> +	memory {
+>> +		reg = <0x00000000 0x80000000 0x00000000 0x40000000>;
+>> +	};
+>> +
+>> +	cpus {
+>> +		interrupt-parent = <&gic>;
+>> +
+>> +		cpu at 0 {
+>> +			compatible = "arm,cortex-a15";
+>> +		};
+>> +
+>> +		cpu at 1 {
+>> +			compatible = "arm,cortex-a15";
+>> +		};
+>> +
+>> +		cpu at 2 {
+>> +			compatible = "arm,cortex-a15";
+>> +		};
+>> +
+>> +		cpu at 3 {
+>> +			compatible = "arm,cortex-a15";
+>> +		};
+>> +	};
 > 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> ---
->  drivers/irqchip/irq-armada-370-xp.c | 166 +++++++++++++++++++++++++++++++++++-
->  1 file changed, 165 insertions(+), 1 deletion(-)
+> It would be nice if these matched up with what's *currently* specified in the
+> cpu bindings (each cpu has it's reg and device_type set, cpus have the
+> requisite #address-cells and #size cells as required by ePAPR).
 > 
-> diff --git a/drivers/irqchip/irq-armada-370-xp.c b/drivers/irqchip/irq-armada-370-xp.c
-> index 26adc74..c7c904d 100644
-> --- a/drivers/irqchip/irq-armada-370-xp.c
-> +++ b/drivers/irqchip/irq-armada-370-xp.c
-> @@ -22,6 +22,8 @@
->  #include <linux/of_address.h>
->  #include <linux/of_irq.h>
->  #include <linux/irqdomain.h>
-> +#include <linux/slab.h>
-> +#include <linux/msi.h>
->  #include <asm/mach/arch.h>
->  #include <asm/exception.h>
->  #include <asm/smp_plat.h>
-> @@ -51,12 +53,22 @@
->  #define IPI_DOORBELL_START                      (0)
->  #define IPI_DOORBELL_END                        (8)
->  #define IPI_DOORBELL_MASK                       0xFF
-> +#define PCI_MSI_DOORBELL_START                  (16)
-> +#define PCI_MSI_DOORBELL_NR                     (16)
-> +#define PCI_MSI_DOORBELL_END                    (32)
-> +#define PCI_MSI_DOORBELL_MASK                   0xFFFF0000
->  
->  static DEFINE_RAW_SPINLOCK(irq_controller_lock);
->  
->  static void __iomem *per_cpu_int_base;
->  static void __iomem *main_int_base;
->  static struct irq_domain *armada_370_xp_mpic_domain;
-> +#ifdef CONFIG_PCI_MSI
-> +static struct irq_domain *armada_370_xp_msi_domain;
-> +static DECLARE_BITMAP(msi_used, PCI_MSI_DOORBELL_NR);
-> +static DEFINE_MUTEX(msi_used_lock);
-> +static phys_addr_t msi_doorbell_addr;
-> +#endif
->  
->  /*
->   * In SMP mode:
-> @@ -87,6 +99,126 @@ static void armada_370_xp_irq_unmask(struct irq_data *d)
->  				ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
->  }
->  
-> +#ifdef CONFIG_PCI_MSI
-> +static int armada_370_xp_alloc_msi(void)
-> +{
-> +	int hwirq;
-> +
-> +	mutex_lock(&msi_used_lock);
-> +	hwirq = find_first_zero_bit(&msi_used, PCI_MSI_DOORBELL_NR);
-> +	if (hwirq >= PCI_MSI_DOORBELL_NR)
-> +		hwirq = -ENOSPC;
-> +	else
-> +		set_bit(hwirq, msi_used);
-> +	mutex_unlock(&msi_used_lock);
-> +
-> +	return hwirq;
-> +}
-> +
-> +static void armada_370_xp_free_msi(int hwirq)
-> +{
-> +	mutex_lock(&msi_used_lock);
-> +	if (!test_bit(hwirq, msi_used))
-> +		pr_err("trying to free unused MSI#%d\n", hwirq);
-> +	else
-> +		clear_bit(hwirq, msi_used);
-> +       mutex_unlock(&msi_used_lock);
-> +}
-> +
-> +static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
-> +				       struct pci_dev *pdev,
-> +				       struct msi_desc *desc)
-> +{
-> +	struct msi_msg msg;
-> +	int hwirq, irq;
-> +
-> +	hwirq = armada_370_xp_alloc_msi();
-> +	if (hwirq < 0)
-> +		return hwirq;
-> +
-> +	irq = irq_create_mapping(armada_370_xp_msi_domain, hwirq);
-> +	if (!irq) {
-> +		armada_370_xp_free_msi(hwirq);
-> +		return -EINVAL;
-> +	}
-
-This looks like something that the irq_domain should handle for you.
-It would be good to have a variant of irq_create_mapping() that keeps
-track of available hwirqs, allocates a free one, and maps it all with
-one function call. I can see that being useful by other MSI interrupt
-controllers and would eliminate needing to open-code it above.
-
-take a look at the irqdomain/test branch on git://git.secretlab.ca/git/linux
-
-I'm hoping to push that series into v3.11 and it simplifies the
-irq_domain code quite a bit. It would be easy to build an
-irq_create_mapping() variant on top of that. Take a look at
-irq_create_direct_mapping() for inspiration (although that function does
-it the other way around. It allocates a virq and uses that number for
-the hwirq number)
-
-> +static int armada_370_xp_msi_init(struct device_node *node)
-> +{
-> +	struct msi_chip *msi_chip;
-> +	u32 reg;
-> +
-> +	msi_chip = kzalloc(sizeof(*msi_chip), GFP_KERNEL);
-
-devm_kzalloc() so it gets freed on failure or unbind; although for this
-device you may not care.
-
-> +	if (!msi_chip)
-> +		return -ENOMEM;
-> +
-> +	armada_370_xp_msi_domain =
-> +		irq_domain_add_linear(NULL, PCI_MSI_DOORBELL_NR,
-> +				      &armada_370_xp_msi_irq_ops, NULL);
-> +	if (!armada_370_xp_msi_domain) {
-> +		kfree(msi_chip);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	msi_chip->of_node = node;
-> +	msi_chip->setup_irq = armada_370_xp_setup_msi_irq;
-> +	msi_chip->teardown_irq = armada_370_xp_teardown_msi_irq;
-> +
-> +	msi_chip_add(msi_chip);
-> +
-> +	reg = readl(per_cpu_int_base + ARMADA_370_XP_IN_DRBEL_MSK_OFFS)
-> +		| PCI_MSI_DOORBELL_MASK;
-> +
-> +	writel(reg, per_cpu_int_base +
-> +	       ARMADA_370_XP_IN_DRBEL_MSK_OFFS);
-> +
-> +	/* Unmask IPI interrupt */
-> +	writel(1, per_cpu_int_base + ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-> +
-> +	return 0;
-> +}
-> +#else
-> +static inline int armada_370_xp_msi_init(struct device_node *node) { return 0; }
-> +#endif
-> +
->  #ifdef CONFIG_SMP
->  static int armada_xp_set_affinity(struct irq_data *d,
->  				  const struct cpumask *mask_val, bool force)
-> @@ -214,12 +346,39 @@ armada_370_xp_handle_irq(struct pt_regs *regs)
->  		if (irqnr > 1022)
->  			break;
->  
-> -		if (irqnr > 0) {
-> +		if (irqnr > 1) {
->  			irqnr =	irq_find_mapping(armada_370_xp_mpic_domain,
->  					irqnr);
->  			handle_IRQ(irqnr, regs);
->  			continue;
->  		}
-> +
-> +#ifdef CONFIG_PCI_MSI
-> +		/* MSI handling */
-> +		if (irqnr == 1) {
-> +			u32 msimask, msinr;
-> +
-> +			msimask = readl_relaxed(per_cpu_int_base +
-> +						ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS)
-> +				& PCI_MSI_DOORBELL_MASK;
-> +
-> +			writel(~PCI_MSI_DOORBELL_MASK, per_cpu_int_base +
-> +			       ARMADA_370_XP_IN_DRBEL_CAUSE_OFFS);
-> +
-> +			for (msinr = PCI_MSI_DOORBELL_START;
-> +			     msinr < PCI_MSI_DOORBELL_END; msinr++) {
-> +				int irq;
-> +
-> +				if (!(msimask & BIT(msinr)))
-> +					continue;
-> +
-> +				irq = irq_find_mapping(armada_370_xp_msi_domain,
-> +						       msinr - 16);
-> +				handle_IRQ(irq, regs);
-> +			}
-> +		}
-> +#endif
-> +
->  #ifdef CONFIG_SMP
->  		/* IPI Handling */
->  		if (irqnr == 0) {
-> @@ -269,6 +428,9 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
->  				   resource_size(&per_cpu_int_res));
->  	BUG_ON(!per_cpu_int_base);
->  
-> +	msi_doorbell_addr = main_int_res.start +
-> +		ARMADA_370_XP_SW_TRIG_INT_OFFS;
-> +
->  	control = readl(main_int_base + ARMADA_370_XP_INT_CONTROL);
->  
->  	armada_370_xp_mpic_domain =
-> @@ -292,6 +454,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
->  
->  #endif
->  
-> +	armada_370_xp_msi_init(node);
-> +
->  	set_handle_irq(armada_370_xp_handle_irq);
->  
->  	return 0;
-> -- 
-> 1.8.1.2
+> All you should need is:
 > 
+> 	cpus {
+> 		#address-cells = <1>;
+> 		#size-cells = <0>;
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 		interrupt-parent = <&gic>;
+> 
+> 		cpu at 0 {
+> 			compatible = "arm,cortex-a15";
+> 			device_type = "cpu";
+> 			reg = <0>;
+> 		};
+> 
+> 		cpu at 1 {
+> 			compatible = "arm,cortex-a15";
+> 			device_type = "cpu";
+> 			reg = <1>;
+> 		};
+> 
+> 		cpu at 2 {
+> 			compatible = "arm,cortex-a15";
+> 			device_type = "cpu";
+> 			reg = <2>;
+> 		};
+> 
+> 		cpu at 3 {
+> 			compatible = "arm,cortex-a15";
+> 			device_type = "cpu";
+> 			reg = <3>;
+> 		};
+> 	};
+> 
+I did notice this as mentioned in the comments but was not sure
+about the dependency. Now since you confirmed there is none, consider
+above updates taken care in next version.
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+Regards,
+Santosh
