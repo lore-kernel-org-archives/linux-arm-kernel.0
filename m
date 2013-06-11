@@ -1,257 +1,137 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 11 Jun 2013 22:51:47 +0100
-Subject: [PATCH] of: Add missing node iteration stubs for disabled
- CONFIG_OF
-In-Reply-To: <51B74EDF.2090504@arm.com>
-References: <1362860154-3089-1-git-send-email-tomasz.figa@gmail.com>
- <5159F9E6.50508@gmail.com> <51B74EDF.2090504@arm.com>
-Message-ID: <20130611215147.199B13E0D8D@localhost>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 11 Jun 2013 15:07:44 -0700
+Subject: [Patch 3/3] clk: Avoid re-parenting orphan clk's having invalid
+ parent index.
+In-Reply-To: <51AD9450.5090107@ti.com>
+References: <1367475929-32166-1-git-send-email-ambresh@ti.com>
+ <1367475929-32166-4-git-send-email-ambresh@ti.com>
+ <20130529071809.6058.24017@quantum> <51AD9450.5090107@ti.com>
+Message-ID: <20130611220744.8816.8856@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013 17:22:55 +0100, Jonathan Austin <jonathan.austin@arm.com> wrote:
-> Hi Rob, Thomasz,
-> 
-> (dredging up an oldish thread as I just ran in to this issue)
-> 
-> On 01/04/13 22:19, Rob Herring wrote:
-> > On 03/09/2013 02:15 PM, Tomasz Figa wrote:
-> >> This patch moves several for_each macros out of the #ifdef CONFIG_OF
-> >> block and adds inline stubs for functions used by these macros, compiled
-> >> conditionally when CONFIG_OF is not enabled.
+Quoting Ambresh K (2013-06-04 00:16:32)
+> On Wednesday 29 May 2013 12:48 PM, Mike Turquette wrote:
+> > Quoting Ambresh K (2013-05-01 23:25:29)
+> >> From: Ambresh K <ambresh@ti.com>
 > >>
-> >> This eliminates the need to explicitly check for CONFIG_OF in driver
-> >> code using mentioned functions and macros.
-> > 
-> > Do you have some users of this?
-> 
-> I do!
-> 
-> Or at least I might.
-> 
-> I'm not certain as perhaps the fix to what I describe below is to add
-> dependencies on CONFIG_OF - it isn't clear to me either way:
-> 
-> With both psci and arch_timers (CONFIG_ARM_PSCI, CONFIG_ARM_ARCH_TIMER)
-> and without CONFIG_OF we get a build failure because we lack the definition
-> of of_find_matching_node():
-> 
-> eg:
-> arch/arm/kernel/psci.c:167:2: error: implicit declaration of function ???of_find_matching_node??? [-Werror=implicit-function-declaration]
-> 
-> The same happens with arm_arch_timer.c (well, there's a patch required to
-> include linux/of.h first, after which Thomasz's patch is relevant).
-
-That code path is completely broken if CONFIG_OF is not set. psci_init()
-is nothing but calls to CONFIG_OF infrastructure! I think that code
-needs to depend on CONFIG_OF, or at least be wrapped with
-"if (IS_ENABLED(CONFIG_OF))" if there are still usable parts when
-CONFIG_OF is disabled. Frankly I don't see that as being a real concern.
-
-That said, Arnd has posted a patch that moves at least some of the function
-prototypes out from under the #ifdef block so that GCC can do syntax
-checking on disabled code. That overlaps a bit with this patch.
-
-Regardless, I'm not going to apply it without a legitimate (as opposed
-to theoretical) user.
-
-g.
-
-> So, I guess the question is whether we should expect PSCI and ARM_ARCH_TIMER
-> to depend on CONFIG_OF, or whether we'd like them to fail gracefully in the
-> case that we *don't* have CONFIG_OF. I think the current situation is broken
-> either way...
-> 
-> Thoughts?
-> 
-> Jonny
-> 
-> > 
-> > Rob
-> > 
+> >> Add orhan clk nodes having invalid parent index to list and use
+> >> the list to skip re-parenting orphan clk having invalid parents.
 > >>
-> >> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> >> Signed-off-by: Ambresh K <ambresh@ti.com>
 > >> ---
-> >>   include/linux/of.h | 92 +++++++++++++++++++++++++++++++++++++-----------------
-> >>   1 file changed, 63 insertions(+), 29 deletions(-)
+> >>  drivers/clk/clk.c |   21 +++++++++++++++++++--
+> >>  1 files changed, 19 insertions(+), 2 deletions(-)
 > >>
-> >> diff --git a/include/linux/of.h b/include/linux/of.h
-> >> index a0f1292..7a736b8 100644
-> >> --- a/include/linux/of.h
-> >> +++ b/include/linux/of.h
-> >> @@ -86,6 +86,31 @@ static inline struct device_node *of_node_get(struct device_node *node)
-> >>   static inline void of_node_put(struct device_node *node) { }
-> >>   #endif /* !CONFIG_OF_DYNAMIC */
-> >>
-> >> +#define for_each_node_by_name(dn, name) \
-> >> +     for (dn = of_find_node_by_name(NULL, name); dn; \
-> >> +          dn = of_find_node_by_name(dn, name))
-> >> +#define for_each_node_by_type(dn, type) \
-> >> +     for (dn = of_find_node_by_type(NULL, type); dn; \
-> >> +          dn = of_find_node_by_type(dn, type))
-> >> +#define for_each_compatible_node(dn, type, compatible) \
-> >> +     for (dn = of_find_compatible_node(NULL, type, compatible); dn; \
-> >> +          dn = of_find_compatible_node(dn, type, compatible))
-> >> +#define for_each_matching_node(dn, matches) \
-> >> +     for (dn = of_find_matching_node(NULL, matches); dn; \
-> >> +          dn = of_find_matching_node(dn, matches))
-> >> +#define for_each_matching_node_and_match(dn, matches, match) \
-> >> +     for (dn = of_find_matching_node_and_match(NULL, matches, match); \
-> >> +          dn; dn = of_find_matching_node_and_match(dn, matches, match))
-> >> +#define for_each_child_of_node(parent, child) \
-> >> +     for (child = of_get_next_child(parent, NULL); child != NULL; \
-> >> +          child = of_get_next_child(parent, child))
-> >> +#define for_each_available_child_of_node(parent, child) \
-> >> +     for (child = of_get_next_available_child(parent, NULL); child != NULL; \
-> >> +          child = of_get_next_available_child(parent, child))
-> >> +#define for_each_node_with_property(dn, prop_name) \
-> >> +     for (dn = of_find_node_with_property(NULL, prop_name); dn; \
-> >> +          dn = of_find_node_with_property(dn, prop_name))
-> >> +
-> >>   #ifdef CONFIG_OF
-> >>
-> >>   /* Pointer for first entry in chain of all nodes. */
-> >> @@ -167,19 +192,10 @@ static inline const char *of_node_full_name(const struct device_node *np)
-> >>
-> >>   extern struct device_node *of_find_node_by_name(struct device_node *from,
-> >>        const char *name);
-> >> -#define for_each_node_by_name(dn, name) \
-> >> -     for (dn = of_find_node_by_name(NULL, name); dn; \
-> >> -          dn = of_find_node_by_name(dn, name))
-> >>   extern struct device_node *of_find_node_by_type(struct device_node *from,
-> >>        const char *type);
-> >> -#define for_each_node_by_type(dn, type) \
-> >> -     for (dn = of_find_node_by_type(NULL, type); dn; \
-> >> -          dn = of_find_node_by_type(dn, type))
-> >>   extern struct device_node *of_find_compatible_node(struct device_node *from,
-> >>        const char *type, const char *compat);
-> >> -#define for_each_compatible_node(dn, type, compatible) \
-> >> -     for (dn = of_find_compatible_node(NULL, type, compatible); dn; \
-> >> -          dn = of_find_compatible_node(dn, type, compatible))
-> >>   extern struct device_node *of_find_matching_node_and_match(
-> >>        struct device_node *from,
-> >>        const struct of_device_id *matches,
-> >> @@ -190,12 +206,6 @@ static inline struct device_node *of_find_matching_node(
-> >>   {
-> >>        return of_find_matching_node_and_match(from, matches, NULL);
-> >>   }
-> >> -#define for_each_matching_node(dn, matches) \
-> >> -     for (dn = of_find_matching_node(NULL, matches); dn; \
-> >> -          dn = of_find_matching_node(dn, matches))
-> >> -#define for_each_matching_node_and_match(dn, matches, match) \
-> >> -     for (dn = of_find_matching_node_and_match(NULL, matches, match); \
-> >> -          dn; dn = of_find_matching_node_and_match(dn, matches, match))
-> >>   extern struct device_node *of_find_node_by_path(const char *path);
-> >>   extern struct device_node *of_find_node_by_phandle(phandle handle);
-> >>   extern struct device_node *of_get_parent(const struct device_node *node);
-> >> @@ -207,14 +217,6 @@ extern struct device_node *of_get_next_available_child(
-> >>
-> >>   extern struct device_node *of_get_child_by_name(const struct device_node *node,
-> >>                                        const char *name);
-> >> -#define for_each_child_of_node(parent, child) \
-> >> -     for (child = of_get_next_child(parent, NULL); child != NULL; \
-> >> -          child = of_get_next_child(parent, child))
-> >> -
-> >> -#define for_each_available_child_of_node(parent, child) \
-> >> -     for (child = of_get_next_available_child(parent, NULL); child != NULL; \
-> >> -          child = of_get_next_available_child(parent, child))
-> >> -
-> >>   static inline int of_get_child_count(const struct device_node *np)
-> >>   {
-> >>        struct device_node *child;
-> >> @@ -228,10 +230,6 @@ static inline int of_get_child_count(const struct device_node *np)
-> >>
-> >>   extern struct device_node *of_find_node_with_property(
-> >>        struct device_node *from, const char *prop_name);
-> >> -#define for_each_node_with_property(dn, prop_name) \
-> >> -     for (dn = of_find_node_with_property(NULL, prop_name); dn; \
-> >> -          dn = of_find_node_with_property(dn, prop_name))
-> >> -
-> >>   extern struct property *of_find_property(const struct device_node *np,
-> >>                                         const char *name,
-> >>                                         int *lenp);
-> >> @@ -353,13 +351,28 @@ static inline struct device_node *of_find_node_by_name(struct device_node *from,
-> >>        return NULL;
-> >>   }
-> >>
-> >> +static inline struct device_node *of_find_node_by_type(struct device_node *from,
-> >> +     const char *type)
-> >> +{
-> >> +     return NULL;
-> >> +}
-> >> +
-> >>   static inline bool of_have_populated_dt(void)
-> >>   {
-> >>        return false;
-> >>   }
-> >>
-> >> -#define for_each_child_of_node(parent, child) \
-> >> -     while (0)
-> >> +static inline struct device_node *of_get_next_child(const struct device_node *node,
-> >> +                                          struct device_node *prev)
-> >> +{
-> >> +     return NULL;
-> >> +}
-> >> +
-> >> +static inline struct device_node *of_get_next_available_child(
-> >> +     const struct device_node *node, struct device_node *prev)
-> >> +{
-> >> +     return NULL;
-> >> +}
-> >>
-> >>   static inline struct device_node *of_get_child_by_name(
-> >>                                        const struct device_node *node,
-> >> @@ -373,6 +386,12 @@ static inline int of_get_child_count(const struct device_node *np)
-> >>        return 0;
-> >>   }
-> >>
-> >> +static inline struct device_node *of_find_node_with_property(
-> >> +     struct device_node *from, const char *prop_name)
-> >> +{
-> >> +     return NULL;
-> >> +}
-> >> +
-> >>   static inline int of_device_is_compatible(const struct device_node *device,
-> >>                                          const char *name)
-> >>   {
-> >> @@ -394,6 +413,21 @@ static inline struct device_node *of_find_compatible_node(
-> >>        return NULL;
-> >>   }
-> >>
-> >> +static inline struct device_node *of_find_matching_node_and_match(
-> >> +     struct device_node *from,
-> >> +     const struct of_device_id *matches,
-> >> +     const struct of_device_id **match)
-> >> +{
-> >> +     return NULL;
-> >> +}
-> >> +
-> >> +static inline struct device_node *of_find_matching_node(
-> >> +     struct device_node *from,
-> >> +     const struct of_device_id *matches)
-> >> +{
-> >> +     return NULL;
-> >> +}
-> >> +
-> >>   static inline int of_property_read_u8_array(const struct device_node *np,
-> >>                        const char *propname, u8 *out_values, size_t sz)
-> >>   {
-> >>
+> >> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> >> index f4d2c73..54d2aa3 100644
+> >> --- a/drivers/clk/clk.c
+> >> +++ b/drivers/clk/clk.c
+> >> @@ -32,6 +32,7 @@ static int enable_refcnt;
+> >>  
+> >>  static HLIST_HEAD(clk_root_list);
+> >>  static HLIST_HEAD(clk_orphan_list);
+> >> +static HLIST_HEAD(clk_orphan_invalid_parent);
 > > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> > 
+> > Why not re-use the clk_orphan_list?  Having an invalid value programmed
+> > into the hardware for selecting a parent essetially orphans a clock
+> > from a software point of view.  Is there a specific need for the new
+> > list?
 > 
+> Sorry for not being descriptive in commit message.  
 > 
+> a) Avoids unnecessary re-parenting cycle for orphan clock's with invalid parent for every clock
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
--- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+True, but this is a minor optimisation.  If this is a big optimization
+for you then you really need to fix your bootloader.  We shouldn't be
+optimizing slow error paths just because we refuse to fix the errors.
+
+> b) With patch [1/3], after a clk with invalid parent was encountered, for every clk registered thereafter seeing following logs. 
+> <Snippet>
+> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
+> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent  
+> 
+> Please advice, if can be handled better. 
+> 
+
+First off, I don't think we should create new structures to work around
+bugs that should be fixed.  pr_err_once() will let us know something is
+wrong and won't flood the log.  Even then I'm inclined to say that
+flooding the log is OK and will motivate you to fix up your bootloader.
+Error prints are there for a reason.
+
+Secondly, I spent like 10 minutes looking at this code and I'm still
+confused.  For a clock with invalid parent programming, are you adding
+it to BOTH the orphan list and the has_invalid_parent list?  Why?  Is
+this just avoid the spurious prints?  For everyone clock registered we
+walk the list of orphans to see if that orphan can be reparented.  This
+patch adds another nested list walk (likely a short list) for each of
+those orphans in the first list walk, so it starts to look like O(n^2).
+I don't like it.
+
+I think the first two patches in the series look good, but unless I am
+misunderstanding this patch I feel that it can be dropped entirely.
+
+Regards,
+Mike
+
+> Thanks, 
+> Ambresh
+> 
+> 
+> > 
+> > Regards,
+> > Mike
+> > 
+> >>  static LIST_HEAD(clk_notifier_list);
+> >>  
+> >>  /***           locking             ***/
+> >> @@ -1532,8 +1533,8 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
+> >>   */
+> >>  int __clk_init(struct device *dev, struct clk *clk)
+> >>  {
+> >> -       int i, ret = 0;
+> >> -       struct clk *orphan;
+> >> +       int i, ret = 0, skip = 0;
+> >> +       struct clk *orphan, *has_invalid_parent;
+> >>         struct hlist_node *tmp2;
+> >>  
+> >>         if (!clk)
+> >> @@ -1639,11 +1640,27 @@ int __clk_init(struct device *dev, struct clk *clk)
+> >>                 if (!strcmp(clk->name, orphan->name))
+> >>                         continue;
+> >>  
+> >> +               /* Skip iteration if orphan has invalid parent */
+> >> +               hlist_for_each_entry(has_invalid_parent,
+> >> +                               &clk_orphan_invalid_parent, child_node) {
+> >> +                       if (!strcmp(orphan->name, has_invalid_parent->name)) {
+> >> +                               skip = 1;
+> >> +                               break;
+> >> +                       }
+> >> +               }
+> >> +
+> >> +               if (skip) {
+> >> +                       skip = 0;
+> >> +                       continue;
+> >> +               }
+> >> +
+> >>                 if (orphan->ops->get_parent) {
+> >>                         i = orphan->ops->get_parent(orphan->hw);
+> >>                         if (i < 0) {
+> >>                                 pr_err("%s: orphan clk(%s) invalid parent\n",
+> >>                                                 __func__, orphan->name);
+> >> +                               hlist_add_head(&orphan->child_node,
+> >> +                                               &clk_orphan_invalid_parent);
+> >>                                 continue;
+> >>                         }
+> >>                         if (!strcmp(clk->name, orphan->parent_names[i]))
+> >> -- 
+> >> 1.7.4.1
+> >
