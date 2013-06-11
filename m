@@ -1,59 +1,28 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Tue, 11 Jun 2013 16:06:18 +0530
-Subject: [PATCH 01/11] ARM: davinci: GPIO: Add platform data structure
-In-Reply-To: <1369206634-6778-2-git-send-email-avinashphilip@ti.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
- <1369206634-6778-2-git-send-email-avinashphilip@ti.com>
-Message-ID: <51B6FDA2.8080003@ti.com>
+From: jagarwal@nvidia.com (Jay Agarwal)
+Date: Tue, 11 Jun 2013 16:10:43 +0530
+Subject: [PATCH V3 2/4] ARM: tegra: pcie: Add tegra3 support
+In-Reply-To: <20130611101610.GB932@manwe>
+References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
+ <1370372252-4332-2-git-send-email-jagarwal@nvidia.com>
+ <51AE3D3B.6080102@wwwdotorg.org> <20130610195028.GB25859@mithrandir>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEED@BGMAIL01.nvidia.com>
+ <20130611101610.GB932@manwe>
+Message-ID: <C79B248886DD134989C8FF6B096A91AB91B616BEF3@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/22/2013 12:40 PM, Philip Avinash wrote:
-> From: KV Sujith <sujithkv@ti.com>
+> > I have mentioned it in description as -> "Corrected logic in read/write
+> config space to display right device number on bus 0"
+> >
+> > > Device 0:00.0 is usually the root complex, and device 0:01.0, 0:02.0
+> > > etc are the root ports. The change proposed above makes 0:00.0 the
+> > > first root port, therefore breaking what systems usually expect.
+> > >
+> > I was seeing root port 2 in cardhu being enumerated as pci_bus 0000:03,
+> which I thought should be pci_bus 0000:02, so made this change.
 > 
-> Add struct davinci_gpio_platform_data davinci gpio module.
-> 
-> Signed-off-by: KV Sujith <sujithkv@ti.com>
-> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> Yes, that's done on purpose to mirror what a typical PCI tree looks like, as I
+> already explained. So unless this fixes a real bug I'll just drop it while
+> applying.
 
-As Linus commented before, this should be merged with 03/11.
-
-> ---
->  include/linux/platform_data/gpio-davinci.h |   27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 include/linux/platform_data/gpio-davinci.h
-> 
-> diff --git a/include/linux/platform_data/gpio-davinci.h b/include/linux/platform_data/gpio-davinci.h
-> new file mode 100644
-> index 0000000..f1c8277
-> --- /dev/null
-> +++ b/include/linux/platform_data/gpio-davinci.h
-> @@ -0,0 +1,27 @@
-> +/*
-> + * gpio-davinci.h
-
-I would drop this unnecessary filename mention as well.
-
-> + *
-> + * DaVinci GPIO Platform Related Defines
-> + *
-> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License as
-> + * published by the Free Software Foundation version 2.
-> + *
-> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-> + * kind, whether express or implied; without even the implied warranty
-> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __ASM_ARCH_DAVINCI_GPIO_H
-> +#define __ASM_ARCH_DAVINCI_GPIO_H
-
-This should now be __PLATFORM_DATA_DAVINCI_GPIO_H__ or some such since
-the file as been moved out of arch specific folder.
-
-Thanks,
-Sekhar
+Please apply V4 patch instead which does not contain this change along with taking care of other review comments.
