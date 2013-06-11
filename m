@@ -1,37 +1,38 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 00:11:26 -0700
-Subject: [PATCH v2] ARM: prima2: fix incorrect panic usage
-In-Reply-To: <1370575027-31671-1-git-send-email-haojian.zhuang@linaro.org>
-References: <1370575027-31671-1-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130611071126.GH6688@quad.lixom.net>
+From: oliver@neukum.org (Oliver Neukum)
+Date: Tue, 11 Jun 2013 09:18:42 +0200
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVMNzwD44mhKijURSWrqLKjy7_oOY8hrTtjbyOxGS2tv=g@mail.gmail.com>
+References: <CACVXFVNdy_cffR7JYNVfs40QJ9eF4Y8UKL7ZsRPOTOegghFkaQ@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306101316020.1133-100000@iolanthe.rowland.org>
+ <CACVXFVMNzwD44mhKijURSWrqLKjy7_oOY8hrTtjbyOxGS2tv=g@mail.gmail.com>
+Message-ID: <21763864.rYYOf1P6VP@linux-5eaq.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 11:17:07AM +0800, Haojian Zhuang wrote:
-> In prima2, some functions of checking DT is registered in initcall
-> level. If it doesn't match the compatible name of sirf, kernel
-> will panic. It blocks the usage of multiplatform on other verndor.
-> 
-> The error message is in below.
-> 
-> Signen-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> Knic - not syncing: unable to find compatible pwrc node in dtb          
->                                                                                 
-> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc3-00006-gd7f26ea-dirty #86   
-> [<c0013adc>] (unwind_backtrace+0x0/0xf8) from [<c0011430>] (show_stack+0x10/0x1)
-> [<c0011430>] (show_stack+0x10/0x14) from [<c026f724>] (panic+0x90/0x1e8)        
-> [<c026f724>] (panic+0x90/0x1e8) from [<c03267fc>] (sirfsoc_of_pwrc_init+0x24/0x)
-> [<c03267fc>] (sirfsoc_of_pwrc_init+0x24/0x58) from [<c0320864>] (do_one_initcal)
-> [<c0320864>] (do_one_initcall+0x90/0x150) from [<c0320a20>] (kernel_init_freeab)
-> [<c0320a20>] (kernel_init_freeable+0xfc/0x1c4) from [<c026b9e8>] (kernel_init+0)
-> [<c026b9e8>] (kernel_init+0x8/0xe4) from [<c000e158>] (ret_from_fork+0x14/0x3c) 
-> 
-> Changelog:
-> v2:
-> 1. Fix the wrong error message.
+On Tuesday 11 June 2013 13:40:20 Ming Lei wrote:
+> On Tue, Jun 11, 2013 at 1:36 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> > On Mon, 10 Jun 2013, Ming Lei wrote:
 
-Thanks, applied to fixes for 3.10, but I reworded the commit message a bit to
-move the S-o-b down.
+> If complete() callback runs in one tasklet context, spin_lock() inside
+> complete() is enough, just like hard irq, the tasklet itself is disabled
+> during complete(), if the percpu tasklet is converted to single tasklet.
+> So no problem when the lock is to protect shared resources between
+> complete().
 
+We also have exclusion between complete() and other contexts, i.e. timers.
 
--Olof
+> When the lock is to protect shared resources between complete() and
+> non-IRQ context, currently spin_lock_irqsave() is used in non-IRQ
+> context, which is enough to prevent tasklet from being run on the CPU,
+> so no problem for this situation too.
+> 
+> When all HCDs support to run URB giveback in tasklet context, we can
+> change all spin_lock_irq*() to spin_lock() in drivers URB->complete(), and
+> in other places, the spin_lock_irq*() can be changed to spin_lock_bh().
+
+Even now we cannot guarantee that all calls to complete() are in irq.
+There is the case of HCD hotunplug and other cases, like timeouts.
+They will have to be verified.
+
+	Regards
+		Oliver
