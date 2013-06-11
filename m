@@ -1,38 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 11 Jun 2013 19:18:38 +0900
-Subject: [PATCH] ARM: dts: Removing pdma for SSDK5440
-In-Reply-To: <51B6E49D.7000408@samsung.com>
-References: <109601ce6679$fef2e410$fcd8ac30$%kim@samsung.com>
- <51B6E49D.7000408@samsung.com>
-Message-ID: <10b101ce668d$0a341390$1e9c3ab0$%kim@samsung.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 11 Jun 2013 12:33:17 +0200
+Subject: [PATCH 0/2 v2] Bugfixes for Tegra memory controllers.
+In-Reply-To: <1370945479-2917-1-git-send-email-ttynkkynen@nvidia.com>
+References: <1370945479-2917-1-git-send-email-ttynkkynen@nvidia.com>
+Message-ID: <20130611103316.GC932@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
+On Tue, Jun 11, 2013 at 01:11:17PM +0300, Tuomas Tynkkynen wrote:
+> Hi,
 > 
-Hi Sylwester,
-
-> On 06/11/2013 10:02 AM, Kukjin Kim wrote:
-> > From: Giridhar Maruthy <giridhar.m@samsung.com>
-> >
-> > Since the pdma works only in secure mode, accessing the same
-> > in hypervisor mode gives an abort. As we are not using pdma
-> > anywhere (including spi), removing the same.
-> >
-> > Signed-off-by: Giridhar Maruthy <giridhar.m@samsung.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> Here's two simple bugfixes for the Tegra memory controllers.
 > 
-> I was wondering, wouldn't it be sufficient to add status = "disabled";
-> in those pdma nodes, to avoid re-adding them in future ?
-
-Yeah, could be. But the pdma will not be used on exynos5440 in future and if
-some guy use it in non-secure mode, it will cause problem, so I want to
-remove that.
-
-> As for the DMA properties in the spi device nodes, they should indeed
-> be removed, as generic DMA bindings would be used instead.
+> v2: Fix a dumb bug in the bit masking.
 > 
-Yes, agreed. So I'd prefer to remove that :-)
+> Tuomas Tynkkynen (2):
+>   memory: tegra20-mc: Fix hang in IRQ handler.
+>   memory: tegra30-mc: Fix IRQ handler.
+> 
+>  drivers/memory/tegra20-mc.c | 5 ++++-
+>  drivers/memory/tegra30-mc.c | 9 ++++++---
+>  2 files changed, 10 insertions(+), 4 deletions(-)
 
-Thanks,
-Kukjin
+Both patches:
+
+Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+
+On a side-note, the subject format looks a bit strange and my guess is
+you had to manually edit it to insert "v2". git can do it for you when
+you generate the patch series using:
+
+	git format-patch --subject-prefix='PATCH v2'
+
+That'll also automatically add the v2 to all individual patches instead
+of just the cover-letter.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/82711ac0/attachment.sig>
