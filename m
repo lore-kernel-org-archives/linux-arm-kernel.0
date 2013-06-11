@@ -1,36 +1,60 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Jun 2013 06:08:37 +0900
-Subject: [GIT PULL 1/6] s3c24xx arch
-Message-ID: <51B791D5.5050005@samsung.com>
+Date: Wed, 12 Jun 2013 06:08:48 +0900
+Subject: [GIT PULL 3/6] exynos arch
+Message-ID: <51B791E0.5040104@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
 
-   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/s3c24xx-arch-1
+tags/exynos-arch-1
 
-for you to fetch changes up to a496bda66201e855f6b5d5d701d8bd65b9178700:
+for you to fetch changes up to d75666024bbb7d1b4fa6f0b00ecd8d834033259a:
 
-   ARM: S3C24XX: remove obsolete s3c2412 specific dma settings 
-(2013-05-21 01:01:41 +0900)
-
-----------------------------------------------------------------
-update dma part for s3c24xx
+   ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor 
+(2013-06-10 18:28:04 +0900)
 
 ----------------------------------------------------------------
-Heiko Stuebner (3):
-       ARM: S3C24XX: split s3c2412 spi dma channels
-       ARM: S3C24XX: dma-s3c2443 - do not write into arbitary bits
-       ARM: S3C24XX: remove obsolete s3c2412 specific dma settings
+update exynos arch part
 
-  arch/arm/mach-s3c24xx/dma-s3c2412.c              | 56 
-+++++++-----------------
-  arch/arm/mach-s3c24xx/dma-s3c2443.c              |  3 +-
-  arch/arm/mach-s3c24xx/dma.c                      |  3 --
-  arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |  5 ---
-  4 files changed, 17 insertions(+), 50 deletions(-)
+----------------------------------------------------------------
+Doug Anderson (1):
+       ARM: EXYNOS: Select PINCTRL_EXYNOS for exynos4/5 at chip level
+
+Girish K S (1):
+       ARM: EXYNOS: force MAC ip to 32bit DMA
+
+Kukjin Kim (1):
+       ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+
+Leela Krishna Amudala (1):
+       ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor
+
+Thomas Abraham (1):
+       ARM: EXYNOS: Add a platform bus notifier to set dma masks for 
+Exynos5440
+
+Vivek Gautam (1):
+       ARM: EXYNOS: Enable XHCI support on exynos5
+
+  arch/arm/mach-exynos/Kconfig           | 330 
++--------------------------------
+  arch/arm/mach-exynos/Makefile          |  26 ---
+  arch/arm/mach-exynos/common.c          |  10 -
+  arch/arm/mach-exynos/dev-ahci.c        | 255 -------------------------
+  arch/arm/mach-exynos/dev-ohci.c        |  52 ------
+  arch/arm/mach-exynos/dma.c             | 322 
+--------------------------------
+  arch/arm/mach-exynos/mach-exynos5-dt.c |  28 +++
+  arch/arm/mach-exynos/platsmp.c         |   2 +-
+  arch/arm/mach-exynos/pm_domains.c      |   7 -
+  drivers/pinctrl/Kconfig                |   5 +-
+  10 files changed, 40 insertions(+), 997 deletions(-)
+  delete mode 100644 arch/arm/mach-exynos/dev-ahci.c
+  delete mode 100644 arch/arm/mach-exynos/dev-ohci.c
+  delete mode 100644 arch/arm/mach-exynos/dma.c
