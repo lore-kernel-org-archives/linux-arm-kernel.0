@@ -1,120 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Jun 2013 18:23:42 +0100
-Subject: [PATCH] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
-References: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <20130611172342.GJ3439@mudshark.cambridge.arm.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Tue, 11 Jun 2013 19:28:40 +0200
+Subject: [PATCH 1/3] ARM: dts: Add headers with constants for MTD
+ partitions
+In-Reply-To: <51B74F2D.2080804@wwwdotorg.org>
+References: <1370962138-9631-1-git-send-email-florian.vaussard@epfl.ch>
+ <1370962138-9631-2-git-send-email-florian.vaussard@epfl.ch>
+ <51B74F2D.2080804@wwwdotorg.org>
+Message-ID: <51B75E48.7060809@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+Hello Stephen,
 
-On Mon, Jun 10, 2013 at 07:12:41PM +0100, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
-> 
-> machine_shutdown() is a hook for kexec. Add a comment saying so, since
-> it isn't obvious from the function name.
+On 06/11/2013 06:24 PM, Stephen Warren wrote:
+> On 06/11/2013 08:48 AM, Florian Vaussard wrote:
+>> These constants can be used to easily declare MTD partitions inside
+>> DTS.
+>>
+>> The constants MTDPART_OFS_* are purposely not included. Indeed,
+>> parse_ofpart_partitions() is expecting u64, but a DT cell is u32.
+>> Negative constants, as defined by MTDPART_OFS_*, would be wrongly
+>> interpreted by parse_ofpart_partitions(). Two cells should be
+>> used to correctly encode the negative constants, but this breaks
+>> current usage.
+>
+> I think addition of common headers like this needs an ack from
+> Grant/Rob. I CC'd them here.
+>
 
-I'd go as far as saying that some of this commit log could be included in
-the comment too, since this comes up time and time again and it's never
-clear!
+Indeed. Thank you.
 
-Anyway, a few comments inline.
+>> diff --git a/include/dt-bindings/mtd/partitions.h b/include/dt-bindings/mtd/partitions.h
+>
+>> + * This header provides constants used with MTD partitions.
+> ...
+>> +/* Partition size */
+>> +#define MTDPART_SIZ_FULL	0
+>
+> Which binding document in Documentation/devicetree/bindings is this
+> definition associated with? The comment above should really mention
+> this. Documentation/devicetree/bindings/mtd/partition.txt doesn't seem
+> to mention this value.
+>
 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 42d6ea2..d7b3d2e 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -2028,7 +2028,7 @@ config XIP_PHYS_ADDR
->  
->  config KEXEC
->  	bool "Kexec system call (EXPERIMENTAL)"
-> -	depends on (!SMP || HOTPLUG_CPU)
-> +	depends on (!SMP || (HOTPLUG_CPU && PM_SLEEP_SMP))
+Mmmh I was not seeing this as a DT binding, strictly speaking. It was 
+already
+used with legacy board files. Otherwise we should also update the binding
+for constants related to GPIO, IRQ,... But I agree that a line inside the
+documentation never killed someone.
 
-PM_SLEEP_SMP selects HOTPLUG_CPU.
+>> diff --git a/include/dt-bindings/sizes.h b/include/dt-bindings/sizes.h
+>
+> ...
+>> +#define SZ_1G				0x40000000
+>> +#define SZ_2G				0x80000000
+>> +
+>> +#endif
+>
+> For MTD partitions specifically, SZ_4G and onwards would be useful in
+> theory, although that would end up putting two cell values into a single
+> macro. and then the values couldn't be added/or'd together. So, I'm not
+> really sure if we want to add those larger values, but food for thought...
+>
 
->  	help
->  	  kexec is a system call that implements the ability to shutdown your
->  	  current kernel, and to start another kernel.  It is like a reboot
-> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-> index 282de48..dbe1692 100644
-> --- a/arch/arm/kernel/process.c
-> +++ b/arch/arm/kernel/process.c
-> @@ -97,13 +97,14 @@ void soft_restart(unsigned long addr)
->  {
->  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
->  
-> +	BUG_ON(num_online_cpus() > 1);
+It is maybe feasible to define a macro splitting the u64 into two
+u32 cells? But this can be done afterwards when need arises.
 
-I think this is overkill, and we could actually scream and try to return an
-error here (we've not yet switched stack, and the upper layers of kexec look
-like they can do something with an error code).
+Best regards,
 
->  	/* Disable interrupts first */
->  	local_irq_disable();
->  	local_fiq_disable();
->  
-> -	/* Disable the L2 if we're the last man standing. */
-> -	if (num_online_cpus() == 1)
-> -		outer_disable();
-> +	/* Disable the L2 */
-> +	outer_disable();
->  
->  	/* Change to the new stack and continue with the reset. */
->  	call_with_stack(__soft_restart, (void *)addr, (void *)stack);
-> @@ -184,30 +185,41 @@ int __init reboot_setup(char *str)
->  
->  __setup("reboot=", reboot_setup);
->  
-> +/* For kexec */
->  void machine_shutdown(void)
->  {
-> -#ifdef CONFIG_SMP
-> -	smp_send_stop();
-> +#ifdef CONFIG_PM_SLEEP_SMP
-> +	disable_nonboot_cpus();
->  #endif
-
-You can lose the #ifdef here.
-
-> +
-> +	BUG_ON(num_online_cpus() > 1);
-
-Maybe redefine machine_shutdown if !kexec and lose this BUG?
-
->  void machine_halt(void)
->  {
-> -	machine_shutdown();
-> +#ifdef CONFIG_SMP
-> +	smp_send_stop();
-> +#endif
-
-Don't need the #ifdef.
-
-> +
->  	local_irq_disable();
->  	while (1);
->  }
->  
->  void machine_power_off(void)
->  {
-> -	machine_shutdown();
-> +#ifdef CONFIG_SMP
-> +	smp_send_stop();
-> +#endif
-> +
->  	if (pm_power_off)
->  		pm_power_off();
->  }
->  
->  void machine_restart(char *cmd)
->  {
-> -	machine_shutdown();
-> +#ifdef CONFIG_SMP
-> +	smp_send_stop();
-> +#endif
-
-Similarly for these two (power_off and restart).
-
-Will
+Florian
