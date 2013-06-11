@@ -1,51 +1,53 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 11 Jun 2013 16:14:25 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <21763864.rYYOf1P6VP@linux-5eaq.site>
-References: <CACVXFVNdy_cffR7JYNVfs40QJ9eF4Y8UKL7ZsRPOTOegghFkaQ@mail.gmail.com>
- <Pine.LNX.4.44L0.1306101316020.1133-100000@iolanthe.rowland.org>
- <CACVXFVMNzwD44mhKijURSWrqLKjy7_oOY8hrTtjbyOxGS2tv=g@mail.gmail.com>
- <21763864.rYYOf1P6VP@linux-5eaq.site>
-Message-ID: <CACVXFVNgzb=VVf9PY_sAHXPtXnqFVXbnB_L4i4xvK0dN1-8T2A@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 11 Jun 2013 17:14:57 +0900
+Subject: [PATCH] ARM: dts: update bootargs to support 8GiB for SSDK5440 and
+ SD5v1
+Message-ID: <109a01ce667b$c2d45930$487d0b90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 3:18 PM, Oliver Neukum <oliver@neukum.org> wrote:
-> On Tuesday 11 June 2013 13:40:20 Ming Lei wrote:
->> On Tue, Jun 11, 2013 at 1:36 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
->> > On Mon, 10 Jun 2013, Ming Lei wrote:
->
->> If complete() callback runs in one tasklet context, spin_lock() inside
->> complete() is enough, just like hard irq, the tasklet itself is disabled
->> during complete(), if the percpu tasklet is converted to single tasklet.
->> So no problem when the lock is to protect shared resources between
->> complete().
->
-> We also have exclusion between complete() and other contexts, i.e. timers.
+From: Subash Patel <subash.rp@samsung.com>
 
-The patch also converts the complete() called in timers to tasklet context too.
+Since ssdk5440 and sd5v1 have 8GiB memory, this patch
+updates bootargs for them.
 
-So could you let me know if that eases your concern? If not, could you explain
-your concern about other contexts in a bit detail?
+Signed-off-by: Subash Patel <subash.rp@samsung.com>
+Signed-off-by: Jungseok Lee <jays.lee@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/boot/dts/exynos5440-sd5v1.dts    |    2 +-
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
->
->> When the lock is to protect shared resources between complete() and
->> non-IRQ context, currently spin_lock_irqsave() is used in non-IRQ
->> context, which is enough to prevent tasklet from being run on the CPU,
->> so no problem for this situation too.
->>
->> When all HCDs support to run URB giveback in tasklet context, we can
->> change all spin_lock_irq*() to spin_lock() in drivers URB->complete(), and
->> in other places, the spin_lock_irq*() can be changed to spin_lock_bh().
->
-> Even now we cannot guarantee that all calls to complete() are in irq.
-> There is the case of HCD hotunplug and other cases, like timeouts.
-> They will have to be verified.
-
-All URBs are completed via usb_hcd_giveback_urb(), so there should
-be no differences between these cases and the common one about
-introducing the patchset.
-
-Thanks,
---
-Ming Lei
+diff --git a/arch/arm/boot/dts/exynos5440-sd5v1.dts b/arch/arm/boot/dts/exynos5440-sd5v1.dts
+index ef747b5..f722a02 100644
+--- a/arch/arm/boot/dts/exynos5440-sd5v1.dts
++++ b/arch/arm/boot/dts/exynos5440-sd5v1.dts
+@@ -17,7 +17,7 @@
+ 	compatible = "samsung,sd5v1", "samsung,exynos5440";
+ 
+ 	chosen {
+-		bootargs = "root=/dev/sda2 rw rootwait ignore_loglevel early_printk no_console_suspend mem=2048M at 0x80000000
+console=ttySAC0,115200";
++		bootargs = "root=/dev/sda2 rw rootwait ignore_loglevel early_printk no_console_suspend mem=2048M at 0x80000000
+mem=6144M at 0x100000000 console=ttySAC0,115200";
+ 	};
+ 
+ 	fixed-rate-clocks {
+diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+index d55042b..0e3adc8 100644
+--- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
++++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+@@ -17,7 +17,7 @@
+ 	compatible = "samsung,ssdk5440", "samsung,exynos5440";
+ 
+ 	chosen {
+-		bootargs = "root=/dev/sda2 rw rootwait ignore_loglevel early_printk no_console_suspend mem=2048M at 0x80000000
+console=ttySAC0,115200";
++		bootargs = "root=/dev/sda2 rw rootwait ignore_loglevel early_printk no_console_suspend mem=2048M at 0x80000000
+mem=6144M at 0x100000000 console=ttySAC0,115200";
+ 	};
+ 
+ 	spi {
+-- 
+1.7.10.4
