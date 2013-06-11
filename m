@@ -1,54 +1,55 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Jun 2013 14:41:08 +0100
-Subject: [PATCH 1/2] ARM: vexpress/TC2: basic PM support
-In-Reply-To: <alpine.LFD.2.03.1306101833450.18597@syhkavp.arg>
-References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
- <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
- <20130607142645.GD3111@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1306080118440.18597@syhkavp.arg>
- <20130610175357.GD1310@e102568-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1306101833450.18597@syhkavp.arg>
-Message-ID: <20130611134108.GB25664@e102568-lin.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 11 Jun 2013 15:45:25 +0200 (CEST)
+Subject: [PATCH v3 1/6] irqchip: add support for Marvell Orion SoCs
+In-Reply-To: <51B7280B.7080604@gmail.com>
+References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1370536034-23956-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <alpine.LFD.2.02.1306111045520.22970@ionos>
+ <alpine.LFD.2.02.1306111525180.22970@ionos>
+ <51B7280B.7080604@gmail.com>
+Message-ID: <alpine.LFD.2.02.1306111539310.22970@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 11:39:11PM +0100, Nicolas Pitre wrote:
-> On Mon, 10 Jun 2013, Lorenzo Pieralisi wrote:
-> 
-> > > +               /*
-> > > +                * We need to disable and flush the whole (L1 and L2) cache.
-> > > +                * Let's do it in the safest possible way i.e. with
-> > > +                * no memory access within the following sequence,
-> > > +                * including the stack.
-> > > +                */
-> > > +               asm volatile(
-> > > +               "mrc    p15, 0, r0, c1, c0, 0   @ get CR \n\t"
-> > > +               "bic    r0, r0, #"__stringify(CR_C)" \n\t"
-> > > +               "mcr    p15, 0, r0, c1, c0, 0   @ set CR \n\t"
-> > > +               "isb    \n\t"
-> > > +               "bl     v7_flush_dcache_all \n\t"
-> > > +               "clrex  \n\t"
-> > > +               "mrc    p15, 0, r0, c1, c0, 1   @ get AUXCR \n\t"
-> > > +               "bic    r0, r0, #(1 << 6)       @ disable local coherency \n\t"
-> > > +               "mcr    p15, 0, r0, c1, c0, 1   @ set AUXCR \n\t"
-> > > +               "isb    "
+On Tue, 11 Jun 2013, Sebastian Hesselbarth wrote:
+
+> On 06/11/13 15:30, Thomas Gleixner wrote:
+> > On Tue, 11 Jun 2013, Thomas Gleixner wrote:
 > > 
-> > We need a dsb here, I know there is one before returning from the flush
-> > routine though. Maybe add it as a comment please.
+> > > On Thu, 6 Jun 2013, Sebastian Hesselbarth wrote:
+> > > 
+> > > > This patch adds an irqchip driver for the main interrupt controller
+> > > > found
+> > > > on Marvell Orion SoCs (Kirkwood, Dove, Orion5x, Discovery Innovation).
+> > > > Corresponding device tree documentation is also added.
+> > > > 
+> > > > Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+> > > 
+> > > Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
+> > 
+> > Second thoughts:
+> > 
+> > > +static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc
+> > > *desc)
+> > > +{
+> > > +	struct irq_domain *d = irq_get_handler_data(irq);
+> > > +	struct irq_chip_generic *gc = irq_get_domain_generic_chip(d, irq);
+> > > +	u32 stat = readl_relaxed(gc->reg_base + ORION_BRIDGE_IRQ_CAUSE) &
+> > > +		gc->mask_cache;
+> > 
+> > In init you map the first irq of that chip and install the chain
+> > handler for it. Now if that first irq fires, isn't that set in the
+> > cause register as well? And what acks that first irq?
 > 
-> Is the dsb in v7_flush_dcache_all sufficient (hence a comment) or it 
-> needs to be located after a particular operation?
+> It is "acked" by acking all unmasked bridge irqs.
 
-Well I wanted to avoid too many dsb. But I think that a dsb after
-exiting coherency is mandatory to avoid issues (after isb), hence it should
-be added (I know as I said there is one just before returning from the
+Ok. A comment would be nice.
 
-v7_flush_dcache_all/louis
+But what about the bit in of that first irq in the cause register? If
+it's set on entry you call generic_handle_irq() for that as well. So
+if it's set you need to mask it in stat. If not, then it wants a
+comment.
 
-functions), but we should not be playing with fire either, it boils down
-to CPU microarchitectural details.
+Thanks,
 
-We cannot remove the dsb from the cache functions since they are meant
-to be self-contained.
-
-Lorenzo
+	tglx
