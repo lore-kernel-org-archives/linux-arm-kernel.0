@@ -1,277 +1,83 @@
-From: mario.smarduch@huawei.com (Mario Smarduch)
-Date: Tue, 11 Jun 2013 09:37:24 +0200
-Subject: [PATCH 1/2] add irq priodrop support
-Message-ID: <51B6D3B4.1020800@huawei.com>
+From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
+Date: Tue, 11 Jun 2013 16:41:56 +0900
+Subject: hrtimer: one more expiry time overflow check in hrtimer_interrupt
+Message-ID: <51B6D4C4.9080400@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the same Interrupt Priority Drop/Deactivation patch 
-emailed some time back (except for 3.10-rc4) used by the initial 
-device pass-through support. 
+When executing a date command to set the system date and time to a few
+seconds before the 2038 problem expiration time, we got a WARN_ON_ONCE()
+like this:
 
-When enabled all IRQs on host write to distributor EOIR and 
-DIR reg to dr-prioritize/de-activate an interrupt. For device 
-that's passed through only the EOIR is written
-to drop the priority, the Guest deactivates it when 
-it handles its EOI. This supports exitless EOI that's agnostic
-to bus type (i.e. PCI)
+  root at renesas:~# date -s "2038-1-19 3:14:00"
+  Tue Jan 19 03:14:00 GMT 2038
+  (then wait for 7-8 seconds)
+  root at renesas:~# [   27.662658] ------------[ cut here ]------------
+  [   27.667297] WARNING: at kernel/time/clockevents.c:209 clockevents_program_event+0x3c/0x138()
+  [   27.675720] Modules linked in:
+  [   27.678802] [<c00130ec>] (unwind_backtrace+0x0/0xe0) from [<c001f4d8>] (warn_slowpath_common+0x4c/0x64)
+  [   27.688201] [<c001f4d8>] (warn_slowpath_common+0x4c/0x64) from [<c001f508>] (warn_slowpath_null+0x18/0x1c)
+  [   27.697845] [<c001f508>] (warn_slowpath_null+0x18/0x1c) from [<c00549bc>] (clockevents_program_event+0x3c/0x138)
+  [   27.708007] [<c00549bc>] (clockevents_program_event+0x3c/0x138) from [<c005510c>] (tick_program_event+0x2c/0x34)
+  [   27.718170] [<c005510c>] (tick_program_event+0x2c/0x34) from [<c003fa98>] (hrtimer_interrupt+0x268/0x2a8)
+  [   27.727752] [<c003fa98>] (hrtimer_interrupt+0x268/0x2a8) from [<c00180c8>] (cmt_timer_interrupt+0x2c/0x34)
+  [   27.737396] [<c00180c8>] (cmt_timer_interrupt+0x2c/0x34) from [<c0066748>] (handle_irq_event_percpu+0xb0/0x2a8)
+  [   27.747467] [<c0066748>] (handle_irq_event_percpu+0xb0/0x2a8) from [<c0066998>] (handle_irq_event+0x58/0x74)
+  [   27.757293] [<c0066998>] (handle_irq_event+0x58/0x74) from [<c0068f24>] (handle_fasteoi_irq+0xc0/0x148)
+  [   27.766662] [<c0068f24>] (handle_fasteoi_irq+0xc0/0x148) from [<c0066014>] (generic_handle_irq+0x20/0x30)
+  [   27.776245] [<c0066014>] (generic_handle_irq+0x20/0x30) from [<c000ef54>] (handle_IRQ+0x60/0x84)
+  [   27.785003] [<c000ef54>] (handle_IRQ+0x60/0x84) from [<c0009334>] (gic_handle_irq+0x34/0x4c)
+  [   27.793426] [<c0009334>] (gic_handle_irq+0x34/0x4c) from [<c000e2c0>] (__irq_svc+0x40/0x70)
+  [   27.801788] Exception stack(0xc04aff68 to 0xc04affb0)
+  [   27.806823] ff60:                   00000000 f0100000 00000001 00000000 c04ae000 c04ec388
+  [   27.815002] ff80: c04b604c c0840d80 40004059 412fc093 00000000 00000000 c04ce140 c04affb0
+  [   27.823150] ffa0: c000f064 c000f068 60000013 ffffffff
+  [   27.828216] [<c000e2c0>] (__irq_svc+0x40/0x70) from [<c000f068>] (default_idle+0x24/0x2c)
+  [   27.836395] [<c000f068>] (default_idle+0x24/0x2c) from [<c000f338>] (cpu_idle+0x74/0xc8)
+  [   27.844451] [<c000f338>] (cpu_idle+0x74/0xc8) from [<c048c6d4>] (start_kernel+0x248/0x288)
+  [   27.852722] ---[ end trace 9d8ad385bde80fd3 ]---
+  [   27.857330] hrtimer: interrupt took 0 ns
 
-The patch has been tested for all configurations:
-Host: No Prio Drop  Guest: No Prio Drop
-Host: Prio DROP	    Guest: No Prio Drop
-Host: Prio Drop     Guest: Prio Drop 
+This is triggered with our v3.4-based custom ARM kernel, but we
+confirmed that v3.10-rc can still have the same problem.
 
-- Mario
+I found a similar issue fixed in v3.9 by Prarit Bhargava in commit
+8f294b5a13 (hrtimer: Add expiry time overflow check in hrtimer_interrupt,
+2013-04-08).  It tried to resolve a overflow issue detected around 1970
++ 100 seconds.
 
-Signed-off-by: Mario Smarduch <mario.smarduch@huawei.com>
+On the other hand, we have another call site of tick_program_event() at
+the bottom of hrtimer_interrupt().  The warning this time is triggered
+there, so we need to apply the same fix to it.
+
+Reported-by: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
+Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
 ---
- arch/arm/kvm/Kconfig            |    8 +++
- drivers/irqchip/irq-gic.c       |  145 ++++++++++++++++++++++++++++++++++++++-
- include/linux/irqchip/arm-gic.h |    6 ++
- 3 files changed, 156 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 370e1a8..c0c9f3c 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -59,6 +59,14 @@ config KVM_ARM_VGIC
- 	---help---
- 	  Adds support for a hardware assisted, in-kernel GIC emulation.
- 
-+config KVM_ARM_INT_PRIO_DROP
-+        bool "KVM support for Interrupt pass-through"
-+        depends on KVM_ARM_VGIC && OF
-+        default n
-+        ---help---
-+          Seperates interrupt priority drop and deactivation to enable device
-+          pass-through to Guests.
-+
- config KVM_ARM_TIMER
- 	bool "KVM support for Architected Timers"
- 	depends on KVM_ARM_VGIC && ARM_ARCH_TIMER
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 1760ceb..9fb4ef3 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -41,10 +41,13 @@
- #include <linux/slab.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <linux/irqflags.h>
-+#include <linux/bitops.h>
- 
- #include <asm/irq.h>
- #include <asm/exception.h>
- #include <asm/smp_plat.h>
-+#include <asm/virt.h>
- 
- #include "irqchip.h"
- 
-@@ -99,6 +102,20 @@ struct irq_chip gic_arch_extn = {
- 
- static struct gic_chip_data gic_data[MAX_GIC_NR] __read_mostly;
- 
-+#ifdef CONFIG_KVM_ARM_INT_PRIO_DROP
-+/*
-+ * Priority drop/deactivation bit map, 1st 16 bits used for SGIs, this bit map
-+ * is shared by several guests. If bit is set only execute EOI which drops
-+ * current priority but not deactivation.
-+ */
-+static u32  gic_irq_prio_drop[DIV_ROUND_UP(1020, 32)] __read_mostly;
-+static void gic_eoi_irq_priodrop(struct irq_data *);
-+#endif
-+
-+static void gic_enable_gicc(void __iomem *);
-+static void gic_eoi_sgi(u32, void __iomem *);
-+static void gic_priodrop_remap_eoi(struct irq_chip *);
-+
- #ifdef CONFIG_GIC_NON_BANKED
- static void __iomem *gic_get_percpu_base(union gic_base *base)
- {
-@@ -296,7 +313,7 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 			continue;
- 		}
- 		if (irqnr < 16) {
--			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
-+			gic_eoi_sgi(irqstat, cpu_base);
- #ifdef CONFIG_SMP
- 			handle_IPI(irqnr, regs);
- #endif
-@@ -450,7 +467,7 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
- 
- 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, base + GIC_CPU_CTRL);
-+	gic_enable_gicc(base);
- }
- 
- #ifdef CONFIG_CPU_PM
-@@ -585,7 +602,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
- 
- 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-+	gic_enable_gicc(cpu_base);
- }
- 
- static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-@@ -666,6 +683,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- static int gic_irq_domain_map(struct irq_domain *d, unsigned int irq,
- 				irq_hw_number_t hw)
- {
-+	gic_priodrop_remap_eoi(&gic_chip);
- 	if (hw < 32) {
- 		irq_set_percpu_devid(irq);
- 		irq_set_chip_and_handler(irq, &gic_chip,
-@@ -857,4 +875,125 @@ IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
- IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
- IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
- 
-+#ifdef CONFIG_KVM_ARM_INT_PRIO_DROP
-+/* If HYP mode enabled and PRIO DROP set EOIR function to handle PRIO DROP */
-+static inline void gic_priodrop_remap_eoi(struct irq_chip *chip)
-+{
-+	if (is_hyp_mode_available())
-+		chip->irq_eoi = gic_eoi_irq_priodrop;
-+}
-+
-+/* If HYP mode set enable interrupt priority drop/deactivation, and mark
-+ * SGIs to deactive through writes to GCICC_DIR. For Guest only enable normal
-+ * mode.
-+ */
-+static void gic_enable_gicc(void __iomem *gicc_base)
-+{
-+	if (is_hyp_mode_available()) {
-+		/* Allow Priority Drop in host, but not in Guest */
-+		gic_irq_prio_drop[0] = (u32) (1 << 16) - 1;
-+		writel_relaxed(0x201, gicc_base + GIC_CPU_CTRL);
-+	} else
-+		writel_relaxed(1, gicc_base + GIC_CPU_CTRL);
-+}
-+
-+/* If Host write to EOIR and DIR to drop priority and deactivate, Guest
-+ * only write to EOIR.
-+ */
-+static void gic_eoi_sgi(u32 irqstat, void __iomem *gicc_base)
-+{
-+	unsigned long flags;
-+	if (unlikely(gic_irq_prio_drop[0] & (1<<((irqstat & ~0x1c00) % 16)))) {
-+		raw_local_irq_save(flags);
-+		writel_relaxed(irqstat, gicc_base + GIC_CPU_EOI);
-+		writel_relaxed(irqstat, gicc_base + GIC_CPU_DIR);
-+		raw_local_irq_restore(flags);
-+		return;
-+	}
-+	writel_relaxed(irqstat, gicc_base + GIC_CPU_EOI);
-+}
-+
-+/* EOIR handler to manage PRIO DROP, if interrupt passed-through only write to
-+ * EOIR the Guest will deactivate it through its write to EOIR. Otherwise for
-+ * non pass-through write to EOIR and DIR. GICC_DIR _must_ be mapped.
-+ */
-+
-+static void gic_eoi_irq_priodrop(struct irq_data *d)
-+{
-+	if (gic_arch_extn.irq_eoi) {
-+		raw_spin_lock(&irq_controller_lock);
-+		gic_arch_extn.irq_eoi(d);
-+		raw_spin_unlock(&irq_controller_lock);
-+	}
-+
-+	/* Set from KVM device passthrough to determine which interrupts
-+	 * must be deactivated by the Guest.
-+	 */
-+	if (unlikely(gic_spi_get_priodrop(gic_irq(d)))) {
-+		/* IRQ marked for priority drop, deactivation is deferred
-+		 * in this case the Guest deactivates the interrupt, or regular
-+		 * path if GCTLR.EOImodeNS=0 or not suppored.
-+		 */
-+		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
-+	} else {
-+		/* De-prioritize/de-activate interrupt, disable interrupts
-+		 * so lower priority interrupt does not stall this one.
-+		 */
-+		unsigned long flags;
-+		raw_local_irq_save(flags);
-+		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
-+		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DIR);
-+		raw_local_irq_restore(flags);
-+	}
-+}
-+
-+/* Next 3 called from KVM Interrupt Device Passthrough code */
-+void gic_spi_set_priodrop(int irq)
-+{
-+	if (likely(irq >= 32 && irq <= 1019))
-+		set_bit(irq % 32, (void *) &gic_irq_prio_drop[irq/32]);
-+}
-+
-+void gic_spi_clr_priodrop(int irq)
-+{
-+	struct irq_data *d = irq_get_irq_data(irq);
-+	if (likely(irq >= 32 && irq < 1019)) {
-+		clear_bit(irq % 32, (void *) &gic_irq_prio_drop[irq/32]);
-+		writel_relaxed(irq, gic_cpu_base(d) + GIC_CPU_DIR);
-+	}
-+}
-+
-+int gic_spi_get_priodrop(int irq)
-+{
-+	if (likely(irq >= 32 && irq <= 1019))
-+		return gic_irq_prio_drop[irq/32] & (1 << (irq % 32));
-+	return 0;
-+}
-+
-+#else /* CONFIG_KVM_ARM_INT_PRIO_DROP */
-+static inline void gic_priodrop_remap_eoi(struct irq_chip *gic_chip)
-+{
-+}
-+static inline void gic_enable_gicc(void __iomem *gicc_base)
-+{
-+	writel_relaxed(1, gicc_base + GIC_CPU_CTRL);
-+}
-+static void gic_eoi_sgi(u32 irqstat, void __iomem *gicc_base)
-+{
-+	writel_relaxed(irqstat, gicc_base + GIC_CPU_EOI);
-+}
-+static inline void gic_deactivate_sgi(u32 irqstat, void __iomem *gicc_base)
-+{
-+}
-+void gic_spi_set_priodrop(int irq)
-+{
-+}
-+void gic_spi_clr_priodrop(int irq)
-+{
-+}
-+int gic_spi_get_priodrop(int irq)
-+{
-+	return 0;
-+}
-+#endif
- #endif
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 3e203eb..adb5d00 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -17,6 +17,7 @@
- #define GIC_CPU_EOI			0x10
- #define GIC_CPU_RUNNINGPRI		0x14
- #define GIC_CPU_HIGHPRI			0x18
-+#define GIC_CPU_DIR                     0x1000
- 
- #define GIC_DIST_CTRL			0x000
- #define GIC_DIST_CTR			0x004
-@@ -73,6 +74,11 @@ static inline void gic_init(unsigned int nr, int start,
- 	gic_init_bases(nr, start, dist, cpu, 0, NULL);
- }
- 
-+/* Functions to manage interrupt pass-through via priority drop/deactivation */
-+void gic_spi_set_priodrop(int);
-+void gic_spi_clr_priodrop(int);
-+int gic_spi_get_priodrop(int);
-+
- #endif /* __ASSEMBLY */
- 
- #endif
--- 
-1.7.9.5
+Hi Prarit-san and John-san,
+
+http://git.kernel.org/linus/8f294b5a139ee4b75e890ad5b443c93d1e558a8b
+hrtimer: Add expiry time overflow check in hrtimer_interrupt
+
+I tried to fix the other case of overflow issues in hrtimer_interrupt(),
+but not sure it should be worked around like this in the first place.
+
+Any comments are appreciated, thanks in advance.
+
+diff --git a/kernel/hrtimer.c b/kernel/hrtimer.c
+index cdd5607..a42d712 100644
+--- a/kernel/hrtimer.c
++++ b/kernel/hrtimer.c
+@@ -1368,6 +1370,8 @@ retry:
+ 		expires_next = ktime_add_ns(now, 100 * NSEC_PER_MSEC);
+ 	else
+ 		expires_next = ktime_add(now, delta);
++	if (expires_next.tv64 < 0)
++		expires_next.tv64 = KTIME_MAX;
+ 	tick_program_event(expires_next, 1);
+ 	printk_once(KERN_WARNING "hrtimer: interrupt took %llu ns\n",
+ 		    ktime_to_ns(delta));
+
+--
+Shinya Kuribayashi
+Renesas Electronics
