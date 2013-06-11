@@ -1,65 +1,66 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 11 Jun 2013 09:34:51 -0400
-Subject: [PATCH 2/3] ARM: keystone: Enable SMP support on Keystone machines
-In-Reply-To: <CANuQgHGKqnU1itAQBqjS2xY+JHz0SNPJ6rM2ZfMV8tO32f0Qnw@mail.gmail.com>
-References: <1370894123-26846-1-git-send-email-santosh.shilimkar@ti.com>
- <1370894123-26846-3-git-send-email-santosh.shilimkar@ti.com>
- <CANuQgHGKqnU1itAQBqjS2xY+JHz0SNPJ6rM2ZfMV8tO32f0Qnw@mail.gmail.com>
-Message-ID: <51B7277B.3080107@ti.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 11 Jun 2013 19:05:38 +0530
+Subject: [PATCH 10/13] ARM: dts: Add initial device tree support for
+ Exynos5420
+In-Reply-To: <20130606163411.GA23311@e106331-lin.cambridge.arm.com>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
+ <20130606163411.GA23311@e106331-lin.cambridge.arm.com>
+Message-ID: <CANuQgHFndqWH5KYskuiqxWuVXEp+_=R=Tnfo5y_syreBFcGPbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 June 2013 01:16 AM, Chander Kashyap wrote:
-> 2013/6/11 Santosh Shilimkar <santosh.shilimkar@ti.com>:
->> Add basic SMP support for Keystone machines. This does not
->> include support for CPU hotplug for now.
->>
->> Cc: Olof Johansson <olof@lixom.net>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: arm at kernel.org
->>
->> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->> ---
-
-[..]
-
->> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
+On 6 June 2013 22:04, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi,
+>
+>> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
 >> new file mode 100644
->> index 0000000..3071dda
+>> index 0000000..b14e775
 >> --- /dev/null
->> +++ b/arch/arm/mach-keystone/platsmp.c
->> @@ -0,0 +1,67 @@
+>> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> @@ -0,0 +1,40 @@
 >> +/*
->> + * Keystone SOC SMP platform code
+>> + * SAMSUNG SMDK5420 board device tree source
 >> + *
->> + * Copyright 2013 Texas Instruments, Inc.
->> + *     Cyril Chemparathy <cyril@ti.com>
->> + *     Santosh Shilimkar <santosh.shillimkar@ti.com>
+>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>> + *           http://www.samsung.com
 >> + *
->> + * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
->> + *
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms and conditions of the GNU General Public License,
->> + * version 2, as published by the Free Software Foundation.
->> + */
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
 >> +
->> +#include <linux/init.h>
->> +#include <linux/smp.h>
->> +#include <linux/io.h>
+>> +/dts-v1/;
+>> +/include/ "exynos5420.dtsi"
 >> +
->> +#include <asm/smp_plat.h>
+>> +/ {
+>> +     model = "Samsung SMDK5420 board based on EXYNOS5420";
+>> +     compatible = "samsung,smdk5420", "samsung,exynos5420";
 >> +
->> +#include "keystone.h"
->> +
->> +static void __init keystone_smp_init_cpus(void)
->> +{
->> +       unsigned int i, ncores;
->> +
->> +       ncores = 4;
-> This hardcoding can be done away, if cpu nodes are passed through DT.
-> Also set set_cpu_possible will be done by "arm_dt_init_cpu_maps" in  devtree.c
-> 
-Thanks. Will have a look at it.
+>> +     memory {
+>> +             reg =   <0x20000000 0x10000000
+>> +                      0x30000000 0x10000000
+>> +                      0x40000000 0x10000000
+>> +                      0x50000000 0x10000000
+>> +                      0x60000000 0x10000000
+>> +                      0x70000000 0x10000000
+>> +                      0x80000000 0x10000000
+>> +                      0x90000000 0x10000000>;
+>> +     };
+>
+As there are only 28 bits for memory bank size in memory.h.
+Hence each bank is split into 256MB.
+> This looks a little odd. As these are continguous, you can describe them as one
+> bank:
+>
+>         memory {
+>                 reg = <0x20000000 0x80000000>;
+>         };
+>
+> Mark.
 
-Regards,
-Santosh
+
+
+--
+with warm regards,
+Chander Kashyap
