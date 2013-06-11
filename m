@@ -1,67 +1,95 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 11 Jun 2013 11:47:51 -0700
-Subject: [PATCH] clocksource: kona: adapt to CLOCKSOURCE_OF_DECLARE change
-In-Reply-To: <3174210.ZivUajNGev@wuerfel>
-References: <3174210.ZivUajNGev@wuerfel>
-Message-ID: <51B770D7.6000000@broadcom.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 11 Jun 2013 11:57:50 -0700
+Subject: [PATCH v3 1/7] clk: divider: add flag to limit possible dividers
+ to even numbers
+In-Reply-To: <201306111329.32749.heiko@sntech.de>
+References: <201306111328.52679.heiko@sntech.de>
+ <201306111329.32749.heiko@sntech.de>
+Message-ID: <20130611185750.8816.82691@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-05-31 01:59 PM, Arnd Bergmann wrote:
-> The CLOCKSOURCE_OF_DECLARE functions now take a device_node pointer
-> as their argument, as of the clksrc/cleanup branch in arm-soc.
-> This patch adapts the bcm_kona_timer driver to the new interface.
->
-> This causes an annoying but harmless build-time warning, it would
-> be nice to have this fixed in 3.10.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Christian Daudt <csd@broadcom.com>
-> Cc: John Stultz <john.stultz@linaro.org>
+Quoting Heiko St?bner (2013-06-11 04:29:32)
+> SoCs like the Rockchip Cortex-A9 ones contain divider some clocks
+> that use the regular mechanisms for storage but allow only even
+> dividers and 1 to be used.
+> 
+> Therefore add a flag that lets _is_valid_div limit the valid dividers
+> to these values. _get_maxdiv is also adapted to return even values
+> for the CLK_DIVIDER_ONE_BASED case.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
-> diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
-> index 350f493..ba3d859 100644
-> --- a/drivers/clocksource/bcm_kona_timer.c
-> +++ b/drivers/clocksource/bcm_kona_timer.c
-> @@ -103,16 +103,10 @@ static const struct of_device_id bcm_timer_ids[] __initconst = {
->   	{},
->   };
->   
-> -static void __init kona_timers_init(void)
-> +static void __init kona_timers_init(struct device_node *node)
->   {
-> -	struct device_node *node;
->   	u32 freq;
->   
-> -	node = of_find_matching_node(NULL, bcm_timer_ids);
-> -
-> -	if (!node)
-> -		panic("No timer");
-> -
->   	if (!of_property_read_u32(node, "clock-frequency", &freq))
->   		arch_timer_rate = freq;
->   	else
-> @@ -199,13 +193,12 @@ static struct irqaction kona_timer_irq = {
->   	.handler = kona_timer_interrupt,
->   };
->   
-> -static void __init kona_timer_init(void)
-> +static void __init kona_timer_init(struct device_node *node)
->   {
-> -	kona_timers_init();
-> +	kona_timers_init(node);
->   	kona_timer_clockevents_init();
->   	setup_irq(timers.tmr_irq, &kona_timer_irq);
->   	kona_timer_set_next_event((arch_timer_rate / HZ), NULL);
->   }
->   
-> -CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer",
-> -	kona_timer_init);
-> +CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer", kona_timer_init);
->
->
-Acked-by: Christian Daudt <csd@broadcom.com>
+>  drivers/clk/clk-divider.c    |   14 ++++++++++++--
+>  include/linux/clk-provider.h |    2 ++
+>  2 files changed, 14 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
+> index ce5cfe9..bdee7cf 100644
+> --- a/drivers/clk/clk-divider.c
+> +++ b/drivers/clk/clk-divider.c
+> @@ -45,8 +45,16 @@ static unsigned int _get_table_maxdiv(const struct clk_div_table *table)
+>  
+>  static unsigned int _get_maxdiv(struct clk_divider *divider)
+>  {
+> -       if (divider->flags & CLK_DIVIDER_ONE_BASED)
+> -               return div_mask(divider);
+> +       if (divider->flags & CLK_DIVIDER_ONE_BASED) {
+> +               unsigned int div = div_mask(divider);
+> +
+> +               /* decrease to even number */
+> +               if (divider->flags & CLK_DIVIDER_EVEN)
+> +                       div--;
+> +
+> +               return div;
+> +       }
+> +
+>         if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
+>                 return 1 << div_mask(divider);
+>         if (divider->table)
+> @@ -141,6 +149,8 @@ static bool _is_valid_div(struct clk_divider *divider, unsigned int div)
+>                 return is_power_of_2(div);
+>         if (divider->table)
+>                 return _is_valid_table_div(divider->table, div);
+> +       if (divider->flags & CLK_DIVIDER_EVEN && div != 1 && (div % 2) != 0)
 
-Do you want this for 3.10 or should I add to my 3.11 tree ?
-  Thanks,
-    csd
+Is it correct to check for 'div != 1' here?  Wouldn't that check only be
+valid in the presence of CLK_DIVIDER_ONE_BASED?
+
+Maybe something like this would be more correct:
+
+	if (divider->flags & CLK_DIVIDER_EVEN && (div % 2) != 0) {
+		if (divider->flags & CLK_DIVIDER_ONE_BASED && div == 1)
+			return true;
+		return false;
+	}
+
+Regards,
+Mike
+
+> +               return false;
+>         return true;
+>  }
+>  
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 1ec14a7..bd52e52 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -266,6 +266,7 @@ struct clk_div_table {
+>   *   of this register, and mask of divider bits are in higher 16-bit of this
+>   *   register.  While setting the divider bits, higher 16-bit should also be
+>   *   updated to indicate changing divider bits.
+> + * CLK_DIVIDER_EVEN - only allow even divider values
+>   */
+>  struct clk_divider {
+>         struct clk_hw   hw;
+> @@ -281,6 +282,7 @@ struct clk_divider {
+>  #define CLK_DIVIDER_POWER_OF_TWO       BIT(1)
+>  #define CLK_DIVIDER_ALLOW_ZERO         BIT(2)
+>  #define CLK_DIVIDER_HIWORD_MASK                BIT(3)
+> +#define CLK_DIVIDER_EVEN               BIT(4)
+>  
+>  extern const struct clk_ops clk_divider_ops;
+>  struct clk *clk_register_divider(struct device *dev, const char *name,
+> -- 
+> 1.7.2.3
