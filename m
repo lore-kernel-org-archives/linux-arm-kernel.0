@@ -1,144 +1,29 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Jun 2013 10:38:18 +0100
-Subject: [PATCH 3/3] ARM: dts: keystone: Add minimal Keystone SOC
- device tree data
-In-Reply-To: <1370894123-26846-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1370894123-26846-1-git-send-email-santosh.shilimkar@ti.com>
- <1370894123-26846-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130611093818.GA22334@e106331-lin.cambridge.arm.com>
+From: hdoyu@nvidia.com (Hiroshi Doyu)
+Date: Tue, 11 Jun 2013 12:39:33 +0300
+Subject: [PATCH 4/9] ARM: dma-mapping: NULLify dev->archdata.mapping
+ pointer on detach
+In-Reply-To: <20130611085015.GC24729@mudshark.cambridge.arm.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-5-git-send-email-will.deacon@arm.com>
+ <20130611.083455.1500863288897785600.hdoyu@nvidia.com>
+ <20130611085015.GC24729@mudshark.cambridge.arm.com>
+Message-ID: <20130611123933.4d278ff4e056f395788ad060@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 08:55:23PM +0100, Santosh Shilimkar wrote:
-> Add minimal device tree data for Keystone2 based SOCs. Patch
-> contains mainly ARM related SOC data and nothing about EVM specific
-> yet.
+On Tue, 11 Jun 2013 10:50:15 +0200
+Will Deacon <will.deacon@arm.com> wrote:
+
+> On Tue, Jun 11, 2013 at 06:34:55AM +0100, Hiroshi Doyu wrote:
+> > Hi Will,
+> > 
+> > Will Deacon <will.deacon@arm.com> wrote @ Mon, 10 Jun 2013 20:34:40 +0200:
+> > 
+> > > The current code only clobbers a local variable, so the device is left
+> > > with a stale mapping pointer.
+> > 
+> > True. This's my bad. Thanks.
 > 
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: arm at kernel.org
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
-> I have seen some ongoing #include cleanups from Stephen Warren and cpu_node
-> updates from Lorenzo, but since am unaware of the dependencies, dts file is
-> aligned with the v3.10rcx ARM dts files. The changes are very trivial so
-> I can fix them quickly when they show up in linux-next. 
-> 
->  .../devicetree/bindings/arm/keystone/keystone.txt  |    9 ++
->  arch/arm/boot/dts/keystone.dts                     |   98 ++++++++++++++++++++
->  2 files changed, 107 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/keystone/keystone.txt
->  create mode 100644 arch/arm/boot/dts/keystone.dts
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/keystone/keystone.txt b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
-> new file mode 100644
-> index 0000000..b496d4c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/keystone/keystone.txt
-> @@ -0,0 +1,9 @@
-> +TI Kesytone Platforms Device Tree Bindings
-> +-----------------------------------------------
-> +
-> +Boards with Keystone2 based devices (TCI66xxK2H) SOC shall have the
-> +following properties.
-> +
-> +Required properties:
-> + - compatible: Every devices present in Keystone SOC should be in
-> +   the form "ti,keystone-*";
+> That's alright, it's easy to fix. Mind if I add your ack please?
 
-I'm not sure that makes sense. The GIC for example isn't a "ti,keystone-gic",
-and the uarts in the soc node don't start with "ti,keystone-" either.
-
-> diff --git a/arch/arm/boot/dts/keystone.dts b/arch/arm/boot/dts/keystone.dts
-> new file mode 100644
-> index 0000000..9ca7d25
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/keystone.dts
-> @@ -0,0 +1,98 @@
-> +/*
-> + * Copyright 2013 Texas Instruments, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +/dts-v1/;
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	model = "Texas Instruments Keystone 2 SoC";
-> +	compatible =  "ti,keystone-evm";
-> +	#address-cells = <2>;
-> +	#size-cells = <2>;
-> +	interrupt-parent = <&gic>;
-> +
-> +	aliases {
-> +		serial0	= &uart0;
-> +	};
-> +
-> +	memory {
-> +		reg = <0x00000000 0x80000000 0x00000000 0x40000000>;
-> +	};
-> +
-> +	cpus {
-> +		interrupt-parent = <&gic>;
-> +
-> +		cpu at 0 {
-> +			compatible = "arm,cortex-a15";
-> +		};
-> +
-> +		cpu at 1 {
-> +			compatible = "arm,cortex-a15";
-> +		};
-> +
-> +		cpu at 2 {
-> +			compatible = "arm,cortex-a15";
-> +		};
-> +
-> +		cpu at 3 {
-> +			compatible = "arm,cortex-a15";
-> +		};
-> +	};
-
-It would be nice if these matched up with what's *currently* specified in the
-cpu bindings (each cpu has it's reg and device_type set, cpus have the
-requisite #address-cells and #size cells as required by ePAPR).
-
-All you should need is:
-
-	cpus {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
-		interrupt-parent = <&gic>;
-
-		cpu at 0 {
-			compatible = "arm,cortex-a15";
-			device_type = "cpu";
-			reg = <0>;
-		};
-
-		cpu at 1 {
-			compatible = "arm,cortex-a15";
-			device_type = "cpu";
-			reg = <1>;
-		};
-
-		cpu at 2 {
-			compatible = "arm,cortex-a15";
-			device_type = "cpu";
-			reg = <2>;
-		};
-
-		cpu at 3 {
-			compatible = "arm,cortex-a15";
-			device_type = "cpu";
-			reg = <3>;
-		};
-	};
-
-Thanks,
-Mark.
+Feel free to add: Acked-by: Hiroshi Doyu <hdoyu@nvidia.com>
