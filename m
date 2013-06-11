@@ -1,44 +1,77 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Tue, 11 Jun 2013 14:19:33 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306101647290.1133-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306101316020.1133-100000@iolanthe.rowland.org>
- <Pine.LNX.4.44L0.1306101647290.1133-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVMh7a0UPDVhLiXKXbMkDtF7Ri+FJxWiE6OL3YCU9ok=1w@mail.gmail.com>
+From: tushar.behera@linaro.org (Tushar Behera)
+Date: Tue, 11 Jun 2013 12:02:53 +0530
+Subject: [PATCH 1/3] ARM: dts: exynos4210: Add LCD related pinctrl entries
+In-Reply-To: <3046864.Enssr3rlNj@flatron>
+References: <1370603235-11193-1-git-send-email-tushar.behera@linaro.org>
+ <4895761.sVtM2qZnU3@flatron> <51B551C3.8000003@linaro.org>
+ <3046864.Enssr3rlNj@flatron>
+Message-ID: <51B6C495.3040001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 4:51 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Mon, 10 Jun 2013, Alan Stern wrote:
->
->> > Tasklet doesn't disable local interrupts.
+On 06/11/2013 12:00 AM, Tomasz Figa wrote:
+> On Monday 10 of June 2013 09:40:43 Tushar Behera wrote:
+>> On 06/08/2013 04:16 PM, Tomasz Figa wrote:
+>>> Hi Tushar, Sachin,
+>>>
+>>> On Friday 07 of June 2013 16:37:13 Tushar Behera wrote:
+>>>> From: Sachin Kamat <sachin.kamat@linaro.org>
+>>>>
+>>>> Adds pinctrl entries required by FIMD.
+>>>>
+>>>> Signed-off-by: Sachin Kamat <sachin.kamat@linaro.org>
+>>>> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+>>>> ---
+>>>>
+>>>>  arch/arm/boot/dts/exynos4210-pinctrl.dtsi |   75
+>>>>
+>>>> +++++++++++++++++++++++++++++ 1 file changed, 75 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+>>>> b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi index 55a2efb..d241726
+>>>> 100644
+>>>> --- a/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+>>>> +++ b/arch/arm/boot/dts/exynos4210-pinctrl.dtsi
+>>>> @@ -330,6 +330,81 @@
+>>>>
+>>>>  			samsung,pin-pud = <3>;
+>>>>  			samsung,pin-drv = <0>;
+>>>>  		
+>>>>  		};
+>>>>
+>>>> +
+>>>> +		pwm0_out: pwm0-out {
+>>>> +			samsung,pins = "gpd0-0";
+>>>> +			samsung,pin-function = <2>;
+>>>> +			samsung,pin-pud = <0>;
+>>>> +			samsung,pin-drv = <0>;
+>>>> +		};
+>>>> +
+>>>> +		pwm1_out: pwm1-out {
+>>>> +			samsung,pins = "gpd0-1";
+>>>> +			samsung,pin-function = <2>;
+>>>> +			samsung,pin-pud = <0>;
+>>>> +			samsung,pin-drv = <0>;
+>>>> +		};
+>>>
+>>> Hmm, these two seem to be unrelated. Rebase error? :)
 >>
->> It is documented that interrupts will be disabled while the completion
->> handler runs.  Therefore the tasklet _must_ disable local interrupts.
->
-> You know, it may be that you can get most of the advantages you want by
-> enabling local interrupts around the call to unmap_urb_for_dma() in
-> usb_hcd_giveback_urb().
+>> Not a rebase error. pwm0_out needs to configured to get display on LCD.
+> 
+> Please split this into two separate patches than, one adding LCD pin 
+> configuration nodes and one adding PWM pin configuration nodes.
+> 
+> Also I think it would be better to just define all available PWM outputs 
+> not only first two. if you are already at adding PWM pin configurations.
+> 
 
-No, please don't enable IRQs inside interrupt handler, and you will
-get warning dump.
+Sure.
 
-Except for unmap_urb_for_dma() in usb_hcd_giveback_urb(),  I hope
-map_urb_for_dma() inside complete() can benefit from the change too,
-since map_urb_for_dma() is same time-consuming with unmap_urb_for_dma().
+> Thanks,
+> Tomasz
+> 
 
-Also I hope complete() can be run with interrupt enabled since
-driver's complete() may take long time on some ARCH, as I mentioned
-in my last mail. And it isn't good to disable interrupt only for one interface
-driver, looks I still don't get real good explanation about disabling
-IRQs here, :-)
+Thanks.
 
->
-> This may be a little dangerous, though, because it is possible for an
-> URB to be given back at the time it is submitted.  Drivers may not
-> expect interrupts to get enabled temporarily when they call
-> usb_submit_urb().
-
-Thanks,
---
-Ming Lei
+-- 
+Tushar Behera
