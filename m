@@ -1,136 +1,162 @@
 From: yadi.brar@samsung.com (Yadwinder Singh Brar)
-Date: Tue, 11 Jun 2013 15:01:08 +0530
-Subject: [PATCH v7 03/11] clk: samsung: Migrate exynos5250 to use common
- samsung_clk_register_pll()
+Date: Tue, 11 Jun 2013 15:01:13 +0530
+Subject: [PATCH v7 08/11] clk: samsung: Add set_rate() clk_ops for PLL35xx
 In-Reply-To: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
 References: <1370943076-13461-1-git-send-email-yadi.brar@samsung.com>
-Message-ID: <1370943076-13461-4-git-send-email-yadi.brar@samsung.com>
+Message-ID: <1370943076-13461-9-git-send-email-yadi.brar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch migrates exynos5250 pll registeration to use common
-samsung_clk_register_pll() by intialising table of PLLs and adding PLLs to
-unique id list of clocks.
+This patch add set_rate() and round_rate() for PLL35xx
 
+Reviewed-by: Doug Anderson <dianders@chromium.org>
+Reviewed-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
 ---
- drivers/clk/samsung/clk-exynos5250.c |   60 +++++++++++++++++++++++-----------
- 1 files changed, 41 insertions(+), 19 deletions(-)
+ drivers/clk/samsung/clk-pll.c |  105 ++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 104 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index f6e3031..4027c69 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -17,11 +17,22 @@
- #include <linux/of_address.h>
+diff --git a/drivers/clk/samsung/clk-pll.c b/drivers/clk/samsung/clk-pll.c
+index adc0659..b5c8b15 100644
+--- a/drivers/clk/samsung/clk-pll.c
++++ b/drivers/clk/samsung/clk-pll.c
+@@ -24,16 +24,51 @@ struct samsung_clk_pll {
  
- #include "clk.h"
--#include "clk-pll.h"
+ #define to_clk_pll(_hw) container_of(_hw, struct samsung_clk_pll, hw)
  
-+#define APLL_LOCK		0x0
-+#define APLL_CON0		0x100
- #define SRC_CPU			0x200
- #define DIV_CPU0		0x500
-+#define MPLL_LOCK		0x4000
-+#define MPLL_CON0		0x4100
- #define SRC_CORE1		0x4204
-+#define CPLL_LOCK		0x10020
-+#define EPLL_LOCK		0x10030
-+#define VPLL_LOCK		0x10040
-+#define GPLL_LOCK		0x10050
-+#define CPLL_CON0		0x10120
-+#define EPLL_CON0		0x10130
-+#define VPLL_CON0		0x10140
-+#define GPLL_CON0		0x10150
- #define SRC_TOP0		0x10210
- #define SRC_TOP1		0x10214
- #define SRC_TOP2		0x10218
-@@ -61,10 +72,18 @@
- #define GATE_IP_FSYS		0x10944
- #define GATE_IP_PERIC		0x10950
- #define GATE_IP_PERIS		0x10960
-+#define BPLL_LOCK		0x20010
-+#define BPLL_CON0		0x20110
- #define SRC_CDREX		0x20200
- #define PLL_DIV2_SEL		0x20a24
- #define GATE_IP_DISP1		0x10928
- 
-+/* list of PLLs to be registered */
-+enum exynos5250_plls {
-+	apll, mpll, cpll, epll, vpll, gpll, bpll,
-+	nr_plls			/* number of PLLs */
-+};
++static const struct samsung_pll_rate_table *samsung_get_pll_settings(
++				struct samsung_clk_pll *pll, unsigned long rate)
++{
++	const struct samsung_pll_rate_table  *rate_table = pll->rate_table;
++	int i;
++
++	for (i = 0; i < pll->rate_count; i++) {
++		if (rate == rate_table[i].rate)
++			return &rate_table[i];
++	}
++
++	return NULL;
++}
++
++static long samsung_pll_round_rate(struct clk_hw *hw,
++			unsigned long drate, unsigned long *prate)
++{
++	struct samsung_clk_pll *pll = to_clk_pll(hw);
++	const struct samsung_pll_rate_table *rate_table = pll->rate_table;
++	int i;
++
++	/* Assumming rate_table is in descending order */
++	for (i = 0; i < pll->rate_count; i++) {
++		if (drate >= rate_table[i].rate)
++			return rate_table[i].rate;
++	}
++
++	/* return minimum supported value */
++	return rate_table[i - 1].rate;
++}
 +
  /*
-  * Let each supported clock get a unique id. This id is used to lookup the clock
-  * for device tree based platforms. The clocks are categorized into three
-@@ -81,7 +100,8 @@ enum exynos5250_clks {
- 	none,
+  * PLL35xx Clock Type
+  */
++/* Maximum lock time can be 270 * PDIV cycles */
++#define PLL35XX_LOCK_FACTOR	(270)
  
- 	/* core clocks */
--	fin_pll,
-+	fin_pll, fout_apll, fout_mpll, fout_bpll, fout_gpll, fout_cpll,
-+	fout_epll, fout_vpll,
+ #define PLL35XX_MDIV_MASK       (0x3FF)
+ #define PLL35XX_PDIV_MASK       (0x3F)
+ #define PLL35XX_SDIV_MASK       (0x7)
++#define PLL35XX_LOCK_STAT_MASK	(0x1)
+ #define PLL35XX_MDIV_SHIFT      (16)
+ #define PLL35XX_PDIV_SHIFT      (8)
+ #define PLL35XX_SDIV_SHIFT      (0)
++#define PLL35XX_LOCK_STAT_SHIFT	(29)
  
- 	/* gate for special clocks (sclk) */
- 	sclk_cam_bayer = 128, sclk_cam0, sclk_cam1, sclk_gscl_wa, sclk_gscl_wb,
-@@ -475,6 +495,23 @@ static struct samsung_gate_clock exynos5250_gate_clks[] __initdata = {
- 	GATE(g3d, "g3d", "aclk_400_g3d", GATE_IP_G3D, 0, 0, 0),
- };
+ static unsigned long samsung_pll35xx_recalc_rate(struct clk_hw *hw,
+ 				unsigned long parent_rate)
+@@ -53,8 +88,73 @@ static unsigned long samsung_pll35xx_recalc_rate(struct clk_hw *hw,
+ 	return (unsigned long)fvco;
+ }
  
-+struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
-+	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
-+		APLL_CON0, "fout_apll"),
-+	[mpll] = PLL_A(pll_35xx, fout_mpll, "fout_mpll", "fin_pll", MPLL_LOCK,
-+		MPLL_CON0, "fout_mpll"),
-+	[bpll] = PLL(pll_35xx, fout_bpll, "fout_bpll", "fin_pll", BPLL_LOCK,
-+		BPLL_CON0),
-+	[gpll] = PLL(pll_35xx, fout_gpll, "fout_gpll", "fin_pll", GPLL_LOCK,
-+		GPLL_CON0),
-+	[cpll] = PLL(pll_35xx, fout_cpll, "fout_cpll", "fin_pll", CPLL_LOCK,
-+		CPLL_CON0),
-+	[epll] = PLL(pll_36xx, fout_epll, "fout_epll", "fin_pll", EPLL_LOCK,
-+		EPLL_CON0),
-+	[vpll] = PLL(pll_36xx, fout_vpll, "fout_vpll", "mout_vpllsrc",
-+		VPLL_LOCK, VPLL_CON0),
++static inline bool samsung_pll35xx_mp_change(
++		const struct samsung_pll_rate_table *rate, u32 pll_con)
++{
++	u32 old_mdiv, old_pdiv;
++
++	old_mdiv = (pll_con >> PLL35XX_MDIV_SHIFT) & PLL35XX_MDIV_MASK;
++	old_pdiv = (pll_con >> PLL35XX_PDIV_SHIFT) & PLL35XX_PDIV_MASK;
++
++	return (rate->mdiv != old_mdiv || rate->pdiv != old_pdiv);
++}
++
++static int samsung_pll35xx_set_rate(struct clk_hw *hw, unsigned long drate,
++					unsigned long prate)
++{
++	struct samsung_clk_pll *pll = to_clk_pll(hw);
++	const struct samsung_pll_rate_table *rate;
++	u32 tmp;
++
++	/* Get required rate settings from table */
++	rate = samsung_get_pll_settings(pll, drate);
++	if (!rate) {
++		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
++			drate, __clk_get_name(hw->clk));
++		return -EINVAL;
++	}
++
++	tmp = __raw_readl(pll->con_reg);
++
++	if (!(samsung_pll35xx_mp_change(rate, tmp))) {
++		/* If only s change, change just s value only*/
++		tmp &= ~(PLL35XX_SDIV_MASK << PLL35XX_SDIV_SHIFT);
++		tmp |= rate->sdiv << PLL35XX_SDIV_SHIFT;
++		__raw_writel(tmp, pll->con_reg);
++
++		return 0;
++	}
++
++	/* Set PLL lock time. */
++	__raw_writel(rate->pdiv * PLL35XX_LOCK_FACTOR,
++			pll->lock_reg);
++
++	/* Change PLL PMS values */
++	tmp &= ~((PLL35XX_MDIV_MASK << PLL35XX_MDIV_SHIFT) |
++			(PLL35XX_PDIV_MASK << PLL35XX_PDIV_SHIFT) |
++			(PLL35XX_SDIV_MASK << PLL35XX_SDIV_SHIFT));
++	tmp |= (rate->mdiv << PLL35XX_MDIV_SHIFT) |
++			(rate->pdiv << PLL35XX_PDIV_SHIFT) |
++			(rate->sdiv << PLL35XX_SDIV_SHIFT);
++	__raw_writel(tmp, pll->con_reg);
++
++	/* wait_lock_time */
++	do {
++		cpu_relax();
++		tmp = __raw_readl(pll->con_reg);
++	} while (!(tmp & (PLL35XX_LOCK_STAT_MASK
++				<< PLL35XX_LOCK_STAT_SHIFT)));
++	return 0;
++}
++
+ static const struct clk_ops samsung_pll35xx_clk_ops = {
+ 	.recalc_rate = samsung_pll35xx_recalc_rate,
++	.round_rate = samsung_pll_round_rate,
++	.set_rate = samsung_pll35xx_set_rate,
 +};
 +
- static __initdata struct of_device_id ext_clk_match[] = {
- 	{ .compatible = "samsung,clock-xxti", .data = (void *)0, },
- 	{ },
-@@ -484,7 +521,6 @@ static __initdata struct of_device_id ext_clk_match[] = {
- static void __init exynos5250_clk_init(struct device_node *np)
- {
- 	void __iomem *reg_base;
--	struct clk *apll, *mpll, *epll, *vpll, *bpll, *gpll, *cpll;
++static const struct clk_ops samsung_pll35xx_clk_min_ops = {
++	.recalc_rate = samsung_pll35xx_recalc_rate,
+ };
  
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -500,22 +536,8 @@ static void __init exynos5250_clk_init(struct device_node *np)
- 	samsung_clk_of_register_fixed_ext(exynos5250_fixed_rate_ext_clks,
- 			ARRAY_SIZE(exynos5250_fixed_rate_ext_clks),
- 			ext_clk_match);
--
--	apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
--			reg_base + 0x100);
--	mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
--			reg_base + 0x4100);
--	bpll = samsung_clk_register_pll35xx("fout_bpll", "fin_pll",
--			reg_base + 0x20110);
--	gpll = samsung_clk_register_pll35xx("fout_gpll", "fin_pll",
--			reg_base + 0x10150);
--	cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
--			reg_base + 0x10120);
--	epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
--			reg_base + 0x10130);
--	vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
--			reg_base + 0x10140);
--
-+	samsung_clk_register_pll(exynos5250_plls, ARRAY_SIZE(exynos5250_plls),
-+					reg_base);
- 	samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
- 			ARRAY_SIZE(exynos5250_fixed_rate_clks));
- 	samsung_clk_register_fixed_factor(exynos5250_fixed_factor_clks,
+ /*
+@@ -384,7 +484,10 @@ static void __init _samsung_clk_register_pll(struct samsung_pll_clock *pll_clk,
+ 	/* clk_ops for 35xx and 2550 are similar */
+ 	case pll_35xx:
+ 	case pll_2550:
+-		init.ops = &samsung_pll35xx_clk_ops;
++		if (!pll->rate_table)
++			init.ops = &samsung_pll35xx_clk_min_ops;
++		else
++			init.ops = &samsung_pll35xx_clk_ops;
+ 		break;
+ 	/* clk_ops for 36xx and 2650 are similar */
+ 	case pll_36xx:
 -- 
 1.7.0.4
