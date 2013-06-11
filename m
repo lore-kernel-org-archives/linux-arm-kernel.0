@@ -1,58 +1,40 @@
-From: pgaikwad@nvidia.com (Prashant Gaikwad)
-Date: Tue, 11 Jun 2013 13:01:05 +0530
-Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
-In-Reply-To: <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
-References: <20130607121505.21868.72360.stgit@dusk.lan>
- <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
- <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
-Message-ID: <51B6D239.5030905@nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Jun 2013 16:31:36 +0900
+Subject: [GIT PULL v2 00/27] Renesas ARM-based SoC updates for v3.11
+In-Reply-To: <20130611071925.GI6688@quad.lixom.net>
+References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+ <20130611071925.GI6688@quad.lixom.net>
+Message-ID: <20130611073134.GA18523@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 07 June 2013 10:36 PM, Paul Walmsley wrote:
-> Hi Stephen,
->
-> On Fri, 7 Jun 2013, Stephen Warren wrote:
->
->> On 06/07/2013 06:19 AM, Paul Walmsley wrote:
->>> Add DFLL DVCO reset line control functions to the CAR IP block driver.
->>>
->>> The DVCO present in the DFLL IP block has a separate reset line,
->>> exposed via the CAR IP block.  This reset line is asserted upon SoC
->>> reset.  Unless something (such as the DFLL driver) deasserts this
->>> line, the DVCO will not oscillate, although reads and writes to the
->>> DFLL IP block will complete.
->>>
->>> Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
->>> saving hours of debugging time.
->>> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
->>>   void tegra114_clock_tune_cpu_trimmers_high(void);
->>>   void tegra114_clock_tune_cpu_trimmers_low(void);
->>>   void tegra114_clock_tune_cpu_trimmers_init(void);
->>> +void tegra114_clock_assert_dfll_dvco_reset(void);
->>> +void tegra114_clock_deassert_dfll_dvco_reset(void);
->> Where/what is the code that will call these new APIs? If it's going to
->> be something in drivers/clk, that seems fine.
-> That's correct - they'll be used by the DFLL clocksource code, which will
-> live in drivers/clk/tegra.  You've seen the patches already ;-)
+On Tue, Jun 11, 2013 at 12:19:25AM -0700, Olof Johansson wrote:
+> Hi Simon,
+> 
+> On Fri, Jun 07, 2013 at 04:51:30PM +0900, Simon Horman wrote:
+> > Hi Olof, Hi Arnd,
+> > 
+> > The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+> > 
+> >   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.11
+> 
+> Thanks a lot for reshuffling the patches into the categories we use!
+> 
+> For future cases, if you want to split off the cleanups you can do that as
+> a separate branch, and use that branch as a base for feature branches. Either
+> way works, sometimes it's nice to see cleanups separated out but it all depends
+> on volumes, etc.
 
-Why not implement these APIs in DFLL clock driver itself and pass RST 
-address register to driver?
+Thanks. In this case I think it would have worked well
+to have soc depend on cleanups. I'll keep that in mind for next time.
 
->> The reset assert/de-assert functions at least might be worth exposing
->> using the new generic module reset API. I believe Prashant Gaikwad is
->> working on converting the Tegra clock driver to be a module reset
->> provider, hence removing the existing custom
->> tegra_periph_reset_{de,}assert() APIs.
-> OK, will take a look to see if this can be done without getting in the way
-> of Prashant's work.  I'd na?vely assume that it might be best to convert
-> these as part of his series - that way we won't duplicate effort.
->
-> Prashant, what stage are you at in the conversion?  If you're close to
-> completion, maybe we can just add this functionality in with your patches?
->
-
-You can continue with this patch. I do not see any need to add this 
-reset control to generic reset module.
-
-> - Paul
+> Pulled into next/soc.
+> 
+> 
+> 
+> -Olof
+> 
