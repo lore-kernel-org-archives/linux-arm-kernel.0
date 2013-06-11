@@ -1,27 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Jun 2013 09:45:14 +0100
-Subject: [PATCH 1/9] dma: pl330: rip out broken, redundant ID probing
-In-Reply-To: <CAJe_Zhc1UoTC4q4oaW=dzyi_10Q7EoezoT=G8_v+yCmBxV75+A@mail.gmail.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-2-git-send-email-will.deacon@arm.com>
- <CAJe_Zhc1UoTC4q4oaW=dzyi_10Q7EoezoT=G8_v+yCmBxV75+A@mail.gmail.com>
-Message-ID: <20130611084514.GA24729@mudshark.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 11 Jun 2013 10:45:40 +0200 (CEST)
+Subject: [PATCH 0/6] Marvell Orion SoC irqchip and clocksource
+In-Reply-To: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+Message-ID: <alpine.LFD.2.02.1306111043200.22970@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 05:40:36AM +0100, Jassi Brar wrote:
-> On 11 June 2013 00:04, Will Deacon <will.deacon@arm.com> wrote:
-> > The PL330 driver probes the peripheral and primecell IDs of the device to
-> > make sure that it is indeed an AMBA PL330. However, it does this by
-> > making byte accesses to a device mapping of the word-aligned ID
-> > registers, which is either UNPREDICTABLE or generates an alignment fault
-> > (depending on the presence of the virtualisation extensions).
-> >
-> > Rather than fix this code, we can actually rip most of it out and let
-> > the AMBA bus driver correctly do the probing for us.
-> >
-> Acked-by: Jassi Brar <jaswinder.singh@linaro.org>
+On Thu, 6 Jun 2013, Sebastian Hesselbarth wrote:
 
-Thanks for the acks Jassi!
+> This patch set introduces DT-aware irqchip and clocksource drivers for
+> Marvell Orion SoCs (Kirkwood, Dove, Orion5x, MV78x00) and corresponding
+> patches for Dove and Kirkwood to enable them for DT-boards.
+> 
+> The irqchip driver, of course, depends on Thomas Gleixner's work on
+> irqdomain support for generic chip (tip irq/core).
+> 
+> The ARM part of this patch set has a quite ridiculuous dependency havoc
+> of mv643xx_eth DT support (current net-next) that will add to both irqchip
+> and clocksource branches respectively. Therefore, I suggest that irq
+> and clocksource maintainers take in the mere drivers (Patches 1+2) and
+> Jason Cooper handles the remaining patches when all three drivers have
+> surfaced on mainline linux.
 
-Will
+I provided a tip branch irq/for-arm, which contains only these changes
+and can be pulled by SoC/subarch maintainers so we don't end up with a
+dependency nightmare. Just mention that you pulled it from me when
+sending the pull request to Linus.
+ 
+Thanks,
+
+	tglx
