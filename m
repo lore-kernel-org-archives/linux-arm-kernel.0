@@ -1,53 +1,46 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 11 Jun 2013 11:07:25 +0100
-Subject: [PATCH 4/8] ARM: vexpress: use generic cpu idle function for wfi
-In-Reply-To: <51B6B691.1040305@linaro.org>
-References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
- <1369665166-13049-5-git-send-email-sanjay.rawat@linaro.org>
- <1370617870.4852.23.camel@hornet> <51B6B691.1040305@linaro.org>
-Message-ID: <1370945245.3116.10.camel@hornet>
+From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
+Date: Tue, 11 Jun 2013 13:09:39 +0300
+Subject: [PATCH 1/2] memory: tegra20-mc: Fix hang in IRQ handler.
+In-Reply-To: <20130610203641.GA26036@mithrandir>
+References: <1370855624-30564-1-git-send-email-ttynkkynen@nvidia.com>
+ <1370855624-30564-2-git-send-email-ttynkkynen@nvidia.com>
+ <20130610203641.GA26036@mithrandir>
+Message-ID: <51B6F763.2080004@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-06-11 at 06:33 +0100, Sanjay Singh Rawat wrote:
-> >> use cpu_do_idle for entering the wfi mode.
-> >>
-> >> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
-> >> ---
-> >>   arch/arm/mach-vexpress/hotplug.c |    3 ++-
-> >>   1 file changed, 2 insertions(+), 1 deletion(-)
-> >>
-> >> diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
-> >> index f0ce6b8..b3dffc2 100644
-> >> --- a/arch/arm/mach-vexpress/hotplug.c
-> >> +++ b/arch/arm/mach-vexpress/hotplug.c
-> >> @@ -60,7 +60,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
-> >>   	 * code will have already disabled interrupts
-> >>   	 */
-> >>   	for (;;) {
-> >> -		wfi();
-> >> +		/* enter WFI mode */
-> >> +		cpu_do_idle();
-> >>
-> >>   		if (pen_release == cpu_logical_map(cpu)) {
-> >>   			/*
-> >
-> > I probably don't get the whole picture, but may I ask what is the
-> > rationale behind this change? As in: why cpu_do_idle() is better?
->
-> commit: 8553cb67d2318db327071018fc81084cbabccc46 explains that
+On 06/10/2013 11:36 PM, Thierry Reding wrote:
+> On Mon, Jun 10, 2013 at 12:13:43PM +0300, Tuomas Tynkkynen wrote:
+>> In Tegra20 memory controller any MC interrupt would cause an
+>> infinite loop in the IRQ handler.
+>>
+>> Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
+>> ---
+>>  drivers/memory/tegra20-mc.c | 5 ++++-
+>>  1 file changed, 4 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/memory/tegra20-mc.c b/drivers/memory/tegra20-mc.c
+>> index 2ca5f28..bd5a553 100644
+>> --- a/drivers/memory/tegra20-mc.c
+>> +++ b/drivers/memory/tegra20-mc.c
+>> @@ -193,8 +193,11 @@ static irqreturn_t tegra20_mc_isr(int irq, void *data)
+>>  	mask &= stat;
+>>  	if (!mask)
+>>  		return IRQ_NONE;
+>> -	while ((bit = ffs(mask)) != 0)
+>> +	while ((bit = ffs(mask)) != 0) {
+>>  		tegra20_mc_decode(mc, bit - 1);
+>> +		mask &= BIT(bit);
+> 
+> Shouldn't this be "mask &= ~BIT(bit);"? The intent of the code is to
+> clear the bit which was handled by the loop body, right? The above
+> clears all other bits instead.
+> 
+> Thierry
 
-Oh, I've noticed the dsb there, I'm just asking why is it necessary in
-the cpu_die() case? The core is going down anyway, it left the coherency
-domain and we could cut the power now (if only it was possible). All
-cache maintenance (which undoubtedly included dsb) has been long done.
+Whoops, yes it should be clearing just one bit. And since ffs() returned
+a one-based bit-index, it seemed to work in practice.
 
-Now, don't get me wrong - I'm not saying it's wrong to do the dsb. I
-simply would like to know if and why is required (I'm admitting my
-ignorance here ;-) But if you simply grep-ed for "wfi()" in the whole
-kernel and automatically replaced them with "cpu_do_idle()", it doesn't
-make sense.
+I'll fix those & resend.
 
-Regards
-
-Pawel
+- Tuomas
