@@ -1,31 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 11 Jun 2013 14:42:30 -0400 (EDT)
-Subject: [PATCH 0/2] MCPM backend for Virtual Express TC2
-In-Reply-To: <1370940110.3393.2.camel@linaro1.home>
-References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
- <1370940110.3393.2.camel@linaro1.home>
-Message-ID: <alpine.LFD.2.03.1306111407250.18597@syhkavp.arg>
+From: matt.porter@linaro.org (Matt Porter)
+Date: Tue, 11 Jun 2013 14:45:58 -0400
+Subject: [PATCH] ARM: dts: bcm281xx: change comment to C89 style
+Message-ID: <1370976358-18014-1-git-send-email-matt.porter@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013, Jon Medhurst (Tixy) wrote:
+CodingStyle does not allow C99 style comments. Since the
+dts files live in the kernel for now, make this compliant.
 
-> On Fri, 2013-06-07 at 02:39 -0400, Nicolas Pitre wrote:
-> > This is the MCPM backend enabling SMP secondary boot and CPU hotplug
-> > on the VExpress TC2 big.LITTLE platform.  The method to allow CPU suspend
-> > is also implemented.
-> 
-> Are we leaving out for now Lorenzo's patch "ARM: TC2: reset CPUs
-> spuriously woken up on cluster power up"?
+Signed-off-by: Matt Porter <matt.porter@linaro.org>
+Acked-by: Christian Daudt <csd@broadcom.com>
+---
+ arch/arm/boot/dts/bcm11351.dtsi |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I don't see spurious wake-ups with only hotplug operations.
-
-So we'll have to reconsider if that patch is still needed once we merge
-the cpuidle driver.  It certainly won't go into mainline in its current 
-form in any case.
-
-I do hope it is not required though -- that should be the job of the 
-firmware.
-
-
-Nicolas
+diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
+index 824bebe..0651a72 100644
+--- a/arch/arm/boot/dts/bcm11351.dtsi
++++ b/arch/arm/boot/dts/bcm11351.dtsi
+@@ -36,7 +36,7 @@
+ 
+ 	smc at 0x3404c000 {
+ 		compatible = "bcm,bcm11351-smc", "bcm,kona-smc";
+-		reg = <0x3404c000 0x400>; //1 KiB in SRAM
++		reg = <0x3404c000 0x400>; /* 1 KiB in SRAM */
+ 	};
+ 
+ 	uart at 3e000000 {
+-- 
+1.7.9.5
