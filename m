@@ -1,83 +1,34 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 11 Jun 2013 09:24:33 +0200
-Subject: [PATCH] drm: encoder_slave: respect of_node on i2c encoder init
-In-Reply-To: <1370899422-1281-1-git-send-email-sebastian.hesselbarth@gmail.com>
-References: <1370899422-1281-1-git-send-email-sebastian.hesselbarth@gmail.com>
-Message-ID: <20130611072433.GP22870@phenom.ffwll.local>
+From: pdeschrijver@nvidia.com (Peter De Schrijver)
+Date: Tue, 11 Jun 2013 10:30:48 +0300
+Subject: [PATCH V3 3/4] ARM: dts: tegra: Correct PCIe entry
+In-Reply-To: <20130610195511.GC25859@mithrandir>
+References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
+ <1370372252-4332-3-git-send-email-jagarwal@nvidia.com>
+ <20130610195511.GC25859@mithrandir>
+Message-ID: <20130611073048.GR3847@tbergstrom-lnx.Nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 11:23:42PM +0200, Sebastian Hesselbarth wrote:
-> Current DRM slave encoder API conflicts with auto-registration of i2c client
-> when using DT probed clients. To allow DRM slave encoders passed by DT, this
-> patch adds a check to drm_i2c_encoder_init for a non-NULL .of_node on
-> i2c_board_info and calls an of_i2c helper to get the i2c client device
-> instead of registering a new device.
+On Mon, Jun 10, 2013 at 09:55:12PM +0200, Thierry Reding wrote:
+> * PGP Signed by an unknown key
 > 
-> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-
-Hm, I don't have much clue about how dt/of really works, but since of has
-this nice probing/auto-instantiation thing I think we could simplify this
-some more:
-- Create a new drm_i2c_encoder_init_of which only takes a struct
-  device_node *of_node argument instead of adap and info.
-- I think we could also drop the call to ->set_config since presumably an
-  of-enabled driver grabbed any required info already from the dt.
-
-I think this way we could still share encoder slaves across tons of
-platforms, only the init sequence (and specifically how they get at their
-config data) would be different. That would also be extensible quite
-easily (*cough* intel platforms could setup encoder slaves from
-information out of the vbt *cough*).
-
-And ofc, a (totally broken) exemplary conversion patch for tilcdc would be
-neat ;-)
-
-Cheers, Daniel
-> ---
-> Cc: David Airlie <airlied@linux.ie>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Cc: Darren Etheridge <darren.etheridge@gmail.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: dri-devel at lists.freedesktop.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  drivers/gpu/drm/drm_encoder_slave.c |    6 +++++-
->  1 files changed, 5 insertions(+), 1 deletions(-)
+> On Wed, Jun 05, 2013 at 12:27:31AM +0530, Jay Agarwal wrote:
+> [...]
+> > @@ -29,7 +29,7 @@
+> >  		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000   /* port 0 configuration space */
+> >  			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
+> >  			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
+> > -			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
+> > +			  0x81000000 0 0          0x02000000 0 0x00100000   /* downstream I/O */
+> >  			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
+> >  			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
 > 
-> diff --git a/drivers/gpu/drm/drm_encoder_slave.c b/drivers/gpu/drm/drm_encoder_slave.c
-> index 0cfb60f..36c0aa7 100644
-> --- a/drivers/gpu/drm/drm_encoder_slave.c
-> +++ b/drivers/gpu/drm/drm_encoder_slave.c
-> @@ -25,6 +25,7 @@
->   */
->  
->  #include <linux/module.h>
-> +#include <linux/of_i2c.h>
->  
->  #include <drm/drm_encoder_slave.h>
->  
-> @@ -61,7 +62,10 @@ int drm_i2c_encoder_init(struct drm_device *dev,
->  
->  	request_module("%s%s", I2C_MODULE_PREFIX, info->type);
->  
-> -	client = i2c_new_device(adap, info);
-> +	if (info->of_node)
-> +		client = of_find_i2c_device_by_node(info->of_node);
-> +	else
-> +		client = i2c_new_device(adap, info);
->  	if (!client) {
->  		err = -ENOMEM;
->  		goto fail;
-> -- 
-> 1.7.2.5
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+> That increases the I/O region size from 64 KiB to 1 MiB. Why is that
+> necessary? I/O operations can only address 64 KiB, so I don't think
+> adding more makes any sense.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+At least PCI allows 32bit I/O addresses. No idea if anyone uses them though.
+
+Cheers,
+
+Peter.
