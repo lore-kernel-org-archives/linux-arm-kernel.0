@@ -1,38 +1,27 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Tue, 11 Jun 2013 18:33:15 +0900
-Subject: [PATCH v2] ARM: shmobile: uImage load address rework
-In-Reply-To: <20130611074713.GB10440@verge.net.au>
-References: <20130610092857.19175.25629.sendpatchset@w520>
- <20130611074713.GB10440@verge.net.au>
-Message-ID: <CANqRtoQGrOor4n9p4u=SR=RTLTM2LfJ_jxxviy3yh=LTrsQLYA@mail.gmail.com>
+Date: Tue, 11 Jun 2013 18:37:24 +0900
+Subject: [PATCH 1/2] ARM: shmobile: irqpin: add a DT property to enable
+ masking on parent
+In-Reply-To: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
+References: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
+Message-ID: <CANqRtoTqHiRixV571CrMkc=ijWcrfZFzaSrfjN1SKRNTgTTcZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 4:47 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Jun 10, 2013 at 06:28:57PM +0900, Magnus Damm wrote:
->> From: Magnus Damm <damm@opensource.se>
->>
->> This is V2 of the mach-shmobile uImage load address rework patch.
->>
->> Rework the mach-shmobile uImage load address calculation by storing
->> the per-board load addresses in Makefile.boot. This removes the
->> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
->> it possible to create safe kernel images that boot on multiple boards.
->>
->> This is one of several series of code that reworks code not to rely on
->> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
->>
->> Signed-off-by: Magnus Damm <damm@opensource.se>
->> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Fri, May 24, 2013 at 6:13 PM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> To disable spurious interrupts, that get triggered on certain hardware, the
+> irqpin driver masks them on the parent interrupt controller. To specify
+> such broken devices a .control_parent parameter can be provided in the
+> platform data. In the DT case we need a property, to do the same.
 >
-> Thanks, I have queued this up in the soc2 branch.
-> My current plan is to let that branch sit in next for a few
-> days and then send a pull-request for it to be included in v3.11.
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
+> ---
+>
+> These two patches simply split the earlier "ARM: shmobile: irqpin: fix
+> handling of spurious interrupts in DT case" patch into two parts.
+> Otherwise no change.
 
-Sounds good, thanks! I will try to sort out the remaining bits and see
-where that takes us.
+I'm fine with this portion of the patch series. Thanks for your help!
 
-Cheers,
-
-/ magnus
+Acked-by: Magnus Damm <damm@opensource.se>
