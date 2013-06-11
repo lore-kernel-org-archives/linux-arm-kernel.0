@@ -1,136 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Jun 2013 09:54:32 +0200
-Subject: [PATCH 3/4] mmc: omap_hsmmc: Remux pins to support SDIO interrupt
- and PM runtime
-In-Reply-To: <20130610162356.GL8164@atomide.com>
-References: <20130607214557.18581.75288.stgit@localhost>
- <20130607214957.18581.90624.stgit@localhost>
- <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
- <20130610162356.GL8164@atomide.com>
-Message-ID: <CACRpkdaEjLzXfA3HX5mra0Mjheia4e2O3kbvikeZQRsNczS7kg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Jun 2013 16:56:19 +0900
+Subject: [PATCH v8 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <20130611074943.GF10440@verge.net.au>
+References: <201306020128.05914.sergei.shtylyov@cogentembedded.com>
+ <20130607080637.GC22598@verge.net.au>
+ <51B1B9D9.5040906@cogentembedded.com>
+ <20130611074943.GF10440@verge.net.au>
+Message-ID: <20130611075619.GA5300@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 6:23 PM, Tony Lindgren <tony@atomide.com> wrote:
+On Tue, Jun 11, 2013 at 04:49:43PM +0900, Simon Horman wrote:
+> On Fri, Jun 07, 2013 at 02:45:45PM +0400, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 07-06-2013 12:06, Simon Horman wrote:
+> > 
+> > >>    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+> > >>'renesas-next-20130528' tag.  It was created to fix the shortcomings in the
+> > >>R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+> > >>spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+> > >>to touch both subtrees). The patches were conceived with the complete
+> > >>bisectability goal in mind.
+> > 
+> > >>[1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+> > >>[2/9] ehci-platform: add pre_setup() method to platform data
+> > >>[3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
+> > >>[4/9] phy-rcar-usb: remove EHCI internal buffer setup
+> > >>[5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
+> > >>[6/9] phy-rcar-usb: correct base address
+> > >>[7/9] phy-rcar-usb: add platform data
+> > >>[8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+> > >>[9/9] phy-rcar-usb: handle platform data
+> > 
+> > >>    The patchset is completely ready to be merged now.
+> > 
+> > >Can I confirm that the plan is for me to merge this code?
+> > 
+> >    Yes, that was the plan.
+> > 
+> > >If so, I should be able to do so next week.
+> 
+> Thanks, I have queued this up in the soc2 phy-rcar-usb.
 
-> We only should remux the pins that need remuxing as that's done
-> every time hitting idle. So I think we should have the following
-> default groups:
->
-> default         Static pins that don't change, no need to remux
->                 configured in consumer driver probe like we already
->                 do
->
-> active          Optional dynamic pins remuxed for runtime, can be
->                 configured and selected in consumer driver probe.
->                 The consumer driver may also want to select this
->                 state in PM runtime resume.
->
-> idle            Optional dynamic pins remuxed for idle. The consumer
->                 driver may also want to select this state in PM
->                 runtime suspend depending on device_can_wakeup()
->                 and driver specific needs.
+s/soc2 phy-rcar-usb/phy-rcar-usb branch/
 
-The one thing I don't understand is why a driver would select the
-active state in probe(), unless it's a driver that does not support
-runtime PM. (But maybe that's what you mean.)
-
-Compare this to <linus/pinctrl/pinctrl-state.h>:
-
-/**
- * @PINCTRL_STATE_DEFAULT: the state the pinctrl handle shall be put
- *      into as default, usually this means the pins are up and ready to
- *      be used by the device driver. This state is commonly used by
- *      hogs to configure muxing and pins at boot, and also as a state
- *      to go into when returning from sleep and idle in
- *      .pm_runtime_resume() or ordinary .resume() for example.
- * @PINCTRL_STATE_IDLE: the state the pinctrl handle shall be put into
- *      when the pins are idle. This is a state where the system is relaxed
- *      but not fully sleeping - some power may be on but clocks gated for
- *      example. Could typically be set from a pm_runtime_suspend() or
- *      pm_runtime_idle() operation.
- * @PINCTRL_STATE_SLEEP: the state the pinctrl handle shall be put into
- *      when the pins are sleeping. This is a state where the system is in
- *      its lowest sleep state. Could typically be set from an
- *      ordinary .suspend() function.
- */
-#define PINCTRL_STATE_DEFAULT "default"
-#define PINCTRL_STATE_IDLE "idle"
-#define PINCTRL_STATE_SLEEP "sleep"
-
-The way I currently use these in e.g.
-drivers/spi/spi-pl022 is:
-
-probe:
- -> default
-
-runtime_suspend:
- -> idle
-
-runtime_resume:
- -> default
-
-suspend:
- -> sleep
-
-resume:
-  -> default
-  -> idle
-
-Notice that we go to default then idle on probe and
-runtime resume. This is because the idle state is
-optional (as is the sleep state).
-
-So I guess if we should extend this terminology to match
-what you are using for the OMAP it would rather be like
-this:
-
-probe:
- -> default
-
-runtime_suspend:
- -> idle
-
-runtime_resume:
- -> default
- -> active
-
-suspend:
- -> sleep
-
-resume:
-  -> default
-  -> idle
-
-Just one more optional "active" state in runtime resume.
-Correct?
-
-If we can agree on this I will add the active state to the
-state table and add a container in the core for this as well
-as pinctrl_pm_select_active_state() so we can skip all the
-pointless boilerplate also in the OMAP drivers, plus increase
-the readability and portability quite a bit.
-
->> However in this case I *suspect* that what you really want
->> to do it to rename the state called "default" to "sleep"
->> (it appears the default state is sleepy) and then rename
->> the "active" state to "default" (as this is the defined semantic
->> meaning of "default" from <linux/pinctrl/pinctrl-state.h>.
->
-> The idle state above could also be called sleep instead of idle
-> if you prefer that.
-
-No I think we should reserve that name for the pin state
-associated with suspend(). Let's leave it like this.
-
-> I think the confusion is caused by the fact that we need three
-> mux groups, not just two :) The toggling between active and idle
-> is the hotpath as that can potentially happen for multiple drivers
-> every time we enter and exit idle.
-
-Actually we have the same thing, it's just that our "default"
-and "active" are the same thing. But it seems we need to
-add your granularity to this.
-
-Yours,
-Linus Walleij
+> My current plan is to let that branch sit in next for a few
+> days and then send a pull-request for it to be included in v3.11.
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
