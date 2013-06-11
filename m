@@ -1,103 +1,65 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 11 Jun 2013 08:44:49 +0800
-Subject: [PATCH] ARM: sirf: use CONFIG_SIRF rather than CONFIG_PRIMA2
- where necessary
-In-Reply-To: <201306101736.44652.arnd@arndb.de>
-References: <201306101736.44652.arnd@arndb.de>
-Message-ID: <CAGsJ_4yWc=a-JZu1C3VxdAWyht7ZDPh7o7ti0TW+e=zNjgGaUw@mail.gmail.com>
+Date: Tue, 11 Jun 2013 09:14:41 +0800
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <20130610134535.GB2987@katana>
+References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
+ <20130516093846.GA2927@katana>
+ <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
+ <20130525201032.GD32043@sirena.org.uk>
+ <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
+ <20130527121658.GA3660@sirena.org.uk>
+ <CAGsJ_4w867BhFvVze5BNaYheW75pMcOGhscz3wSZiia-neP59w@mail.gmail.com>
+ <20130610134535.GB2987@katana>
+Message-ID: <CAGsJ_4y4svi0TbUKK1aAW1McM5rFoo5Vb9rGPweq-sHJ2NN5cQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2013/6/10 Arnd Bergmann <arnd@arndb.de>:
-> I got a build error today that made me realize that it is not
-> possible to build a kernel for a SiRF platform without enabling
-> CONFIG_PRIMA2, since a lot of common code depends on CONFIG_PRIMA2.
+2013/6/10 Wolfram Sang <wsa@the-dreams.de>:
+> On Mon, May 27, 2013 at 11:36:14PM +0800, Barry Song wrote:
+>> 2013/5/27 Mark Brown <broonie@kernel.org>:
+>> > On Mon, May 27, 2013 at 09:54:56AM +0800, Barry Song wrote:
+>> >
+>> >> Mark, the case is not that deferred probing is slow or not. deferred
+>> >> probing is pretty good.
+>> >> the case is that we want to i2c and media connected with i2c probed
+>> >> earlier than other devices.
+>> >> in auto infotainment devices, we actually do some hacking in kernel
+>> >> that makes rear view work earlier than other device driver
+>> >> initialization with a kernel thread which take care of backing-car
+>> >> policy not only mechanism. that means, we make camera work to see
+>> >> backview image even earlier than other drivers' initialization.
+>> >> we don't want media deferred to wait for i2c. we want make some early
+>> >> jobs ready earlier.
+>> >
+>> > So this change makes no practical difference in mainline and exists to
+>> > support out of tree hacks for performance?  It doesn't seem like that
+>> > big a patch to carry along with the out of tree stuff...
+>>
+>> yes. but i don't think we are easy to make those out-of-mainline hacks
+>>  be in mainline. but this patch is both ok to mainline and local tree.
+>> making local tree and mainline same as many as possible decreases our
+>> maintaince efforts totally.
 >
-> This fixes all occurences that appear like common SiRF code.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
->
-> Barry, can you see if this patch makes sense to you?
+> I understand that, yet I agree with Mark. The mainline idea is to use
+> deferred probing to make sure all components come up correctly. In fact,
+> I wish for patches removing subsys_initcall with deferred probing.
+
+hi Wolfram,
+
+the mainline idea you mentioned is that you don't care about any early
+device, which means some devices want to start earlier than others in
+some real automative user scenerioes.
+but i think another important idea is that mainline codes come from
+branches of different vendors and serve final users of those drivers,
+but not only make source codes no difference to all environments. the
+auto users i2c-sirf serves, here, actually means some differences with
+PC/tablet/mobilephone. we don't make codes good-looking by losing
+functionality and not close to final users.
+
+anyway, it is up to you to decide. i can definitely maintain the
+difference locally.
+
 >
 
-Acked-by: Barry Song <Baohua.Song@csr.com>
-
-> Mark, Grant, Mike, Greg, Wolfram: would you like to get a split-out
-> patch, or should I apply it in one piece to arm-soc?
->
-> There is no harm in changing just one file, they are all
-> equally wrong and don't depend on one another.
->
->  arch/arm/Makefile          | 2 +-
->  drivers/clk/Makefile       | 2 +-
->  drivers/i2c/busses/Kconfig | 2 +-
->  drivers/spi/Kconfig        | 2 +-
->  drivers/tty/serial/Kconfig | 2 +-
->  5 files changed, 5 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 3380c4f..fcb4b48 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -169,7 +169,7 @@ machine-$(CONFIG_ARCH_OMAP1)                += omap1
->  machine-$(CONFIG_ARCH_OMAP2PLUS)       += omap2
->  machine-$(CONFIG_ARCH_ORION5X)         += orion5x
->  machine-$(CONFIG_ARCH_PICOXCELL)       += picoxcell
-> -machine-$(CONFIG_ARCH_PRIMA2)          += prima2
-> +machine-$(CONFIG_ARCH_SIRF)            += prima2
->  machine-$(CONFIG_ARCH_PXA)             += pxa
->  machine-$(CONFIG_ARCH_REALVIEW)                += realview
->  machine-$(CONFIG_ARCH_RPC)             += rpc
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index f41e3e3..a9f616f 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -19,7 +19,7 @@ obj-$(CONFIG_ARCH_SOCFPGA)    += socfpga/
->  obj-$(CONFIG_PLAT_SPEAR)       += spear/
->  obj-$(CONFIG_ARCH_U300)                += clk-u300.o
->  obj-$(CONFIG_COMMON_CLK_VERSATILE) += versatile/
-> -obj-$(CONFIG_ARCH_PRIMA2)      += clk-prima2.o
-> +obj-$(CONFIG_ARCH_SIRF)                += clk-prima2.o
->  obj-$(CONFIG_PLAT_ORION)       += mvebu/
->  ifeq ($(CONFIG_COMMON_CLK), y)
->  obj-$(CONFIG_ARCH_MMP)         += mmp/
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 2d030df..11c8eb8 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -676,7 +676,7 @@ config I2C_SIMTEC
->
->  config I2C_SIRF
->         tristate "CSR SiRFprimaII I2C interface"
-> -       depends on ARCH_PRIMA2
-> +       depends on ARCH_SIRF
->         help
->           If you say yes to this option, support will be included for the
->           CSR SiRFprimaII I2C interface.
-> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
-> index 2015897..89cbbab 100644
-> --- a/drivers/spi/Kconfig
-> +++ b/drivers/spi/Kconfig
-> @@ -404,7 +404,7 @@ config SPI_SH_HSPI
->
->  config SPI_SIRF
->         tristate "CSR SiRFprimaII SPI controller"
-> -       depends on ARCH_PRIMA2
-> +       depends on ARCH_SIRF
->         select SPI_BITBANG
->         help
->           SPI driver for CSR SiRFprimaII SoCs
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 95e66ac..7b4aa69 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -251,7 +251,7 @@ config SERIAL_SAMSUNG_CONSOLE
->
->  config SERIAL_SIRFSOC
->          tristate "SiRF SoC Platform Serial port support"
-> -        depends on ARCH_PRIMA2
-> +        depends on ARCH_SIRF
->          select SERIAL_CORE
->          help
->            Support for the on-chip UART on the CSR SiRFprimaII series,
+-barry
