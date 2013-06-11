@@ -1,95 +1,85 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Tue, 11 Jun 2013 14:28:41 -0700
-Subject: [PATCH] arm: dt: zynq: Add support for the zc706 platform
-In-Reply-To: <1370985888.7804.1.camel@linux-builds1>
-References: <1370884204-2297-1-git-send-email-soren.brinkmann@xilinx.com>
- <1370985888.7804.1.camel@linux-builds1>
-Message-ID: <785766f9-0d23-4a78-8638-fac05920049d@CO1EHSMHS013.ehs.local>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 11 Jun 2013 23:31:04 +0200
+Subject: [PATCH] drm: encoder_slave: respect of_node on i2c encoder init
+In-Reply-To: <8738soptt7.fsf@riseup.net>
+References: <1370899422-1281-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130611072433.GP22870@phenom.ffwll.local> <51B6D91D.3000906@gmail.com>
+ <8738soptt7.fsf@riseup.net>
+Message-ID: <51B79718.1030402@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 04:24:48PM -0500, Dinh Nguyen wrote:
-> Hi Soren,
-> 
-> On Mon, 2013-06-10 at 10:10 -0700, Soren Brinkmann wrote:
-> > Add a DT fragment for the zc706 Zynq platform. Also, adding a
-> > corresponding target to the Makefile and adding an appropriate
-> > compatibility string in the BSP.
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> >  arch/arm/boot/dts/Makefile       |  3 ++-
-> >  arch/arm/boot/dts/zynq-zc706.dts | 31 +++++++++++++++++++++++++++++++
-> >  arch/arm/mach-zynq/common.c      |  1 +
-> >  3 files changed, 34 insertions(+), 1 deletion(-)
-> >  create mode 100644 arch/arm/boot/dts/zynq-zc706.dts
-> > 
-> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> > index b9f7121..2aecf7e 100644
-> > --- a/arch/arm/boot/dts/Makefile
-> > +++ b/arch/arm/boot/dts/Makefile
-> > @@ -206,7 +206,8 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
-> >  	wm8505-ref.dtb \
-> >  	wm8650-mid.dtb \
-> >  	wm8850-w70v2.dtb
-> > -dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
-> > +dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
-> > +	zynq-zc706.dtb
-> >  
-> >  targets += dtbs
-> >  targets += $(dtb-y)
-> > diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-> > new file mode 100644
-> > index 0000000..a8a1d7d
-> > --- /dev/null
-> > +++ b/arch/arm/boot/dts/zynq-zc706.dts
-> > @@ -0,0 +1,31 @@
-> > +/*
-> > + *  Copyright (C) 2011 Xilinx
-> > + *  Copyright (C) 2012 National Instruments Corp.
-> > + *  Copyright (C) 2013 Xilinx
-> > + *
-> > + * This software is licensed under the terms of the GNU General Public
-> > + * License version 2, as published by the Free Software Foundation, and
-> > + * may be copied, distributed, and modified under those terms.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + */
-> > +/dts-v1/;
-> > +/include/ "zynq-7000.dtsi"
-> > +
-> > +/ {
-> > +	model = "Zynq ZC706 Development Board";
-> > +	compatible = "xlnx,zynq-zc706", "xlnx,zynq-7000";
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0x0 0x40000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttyPS1,115200 earlyprintk";
-> > +	};
-> > +
-> > +};
-> > diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> > index 5bfe703..221694b 100644
-> > --- a/arch/arm/mach-zynq/common.c
-> > +++ b/arch/arm/mach-zynq/common.c
-> > @@ -99,6 +99,7 @@ static void zynq_system_reset(char mode, const char *cmd)
-> >  
-> >  static const char * const zynq_dt_match[] = {
-> >  	"xlnx,zynq-zc702",
-> > +	"xlnx,zynq-zc706",
-> 
-> You really don't need to add zc706 here if it is already compatable with
-> zynq-7000.
-I actually thought about this and decided to add it, since there already
-was an entry for the zc702. What is the best methord for this cases?
-Rather remove the specific ones and migrate all to the zynq-7000
-compatibility string?
+On 06/11/2013 05:10 PM, Francisco Jerez wrote:
+> Sebastian Hesselbarth<sebastian.hesselbarth@gmail.com>  writes:
+>>> - I think we could also drop the call to ->set_config since presumably an
+>>>     of-enabled driver grabbed any required info already from the dt.
+>> [...]
+>>> I think this way we could still share encoder slaves across tons of
+>>> platforms, only the init sequence (and specifically how they get at their
+>
+> The "set_config" hook is just the way a DRM driver communicates those
+> board-specific differences in the init sequence to the slave encoder
+> driver.  I don't think it would make sense to remove it unless we make
+> sure it's being called elsewhere.
 
-	S?ren
+Francisco,
+
+for the non-DT case all probe related stuff could be passed with 
+board_info.platform_data. For the DT case, the i2c device driver
+will parse properties into .platform_data. IMHO in the end,
+.set_config can be safely removed. But for now and especially because
+I only have a DT-only platform to test, leave it there and rework
+existing drivers and drm master encoders to pass it that way.
+
+>> IMHO, the whole i2c encoder stuff is just wrong. Not any i2c slave
+>> driver is even really using its probe(). Everything is packed somewhere
+>> because it just worked.. this is at least a start.
+>>
+> Why is that?  What do you mean by the probe hooks not being used?
+> ch7006 and sil164 rely on it being called on initialization.
+
+You are right, I remembered wrong.
+
+>> I suggest this to get merged to at least allow to have DT slaves,
+>> then start with improving tda998x as an example, then maybe rethink
+>> drm_slave_encoder completely, e.g.
+>>
+>> - generalize the concept to SPI attached encoders, "internal" encoders..
+>
+> drm_encoder_slave is bus-agnostic.  drm_i2c_encoder_init() is just a
+> helper function taking care of bus-specific details like the creation of
+> the underlying I2C device object, which cannot be made bus-agnostic for
+> obvious reasons.  You're welcome to implement SPI and internal
+> counterparts of drm_i2c_encoder_init().
+
+Hehe, true again. I like to help and improve it wherever possible. But
+to be honest, DRM is not an easy starter for blindly touch commonly
+shared functions. If I break Dove, there is little people complaining.
+If I also break x86 complaining quickly becomes ranting ;)
+
+>> - find a way to setup .encoder_type and .connector_type correctly
+>
+> I guess encoder_type could be initialized correctly from the slave
+> encoder_init() hook -- that hasn't been necessary until now because the
+> DRM driver making use of the slave encoder has been expected to have
+> some other means to find out encoder types [e.g. device-specific BIOS
+> tables].  OTOH, I don't think that setting connector types is the slave
+> encoder's business.
+
+Well, I do not completely agree here. Actually, the connector type
+cannot be set from any encoder in the chain in a consitent way. But
+at least the slave encoder is closer to it.
+
+For Dove (and many other SoCs) the lcd controller is just a dumb rgb
+scan-out controller. It makes no difference if you directly connect an
+LCD panel or have a HDMI encoder finally connected to an DVI plug.
+The LCD controller shouldn't really care because it always sees a dumb
+rgb receiver, the HDMI encoder at least can say it is either HDMI or
+DVI plug.
+
+For DT, I tend to have a video-card node comprising lcd controllers,
+video memory range, external encoder phandle. Maybe put the board-
+specific connector here, and then it is up the the master encoder
+(or video card "driver") to set the correct connector.
+
+Sebastian
