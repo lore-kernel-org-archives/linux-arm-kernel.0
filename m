@@ -1,42 +1,31 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Jun 2013 12:41:06 -0600
-Subject: [PATCH] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <20130611172342.GJ3439@mudshark.cambridge.arm.com>
-References: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
- <20130611172342.GJ3439@mudshark.cambridge.arm.com>
-Message-ID: <51B76F42.2020704@wwwdotorg.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 11 Jun 2013 14:42:30 -0400 (EDT)
+Subject: [PATCH 0/2] MCPM backend for Virtual Express TC2
+In-Reply-To: <1370940110.3393.2.camel@linaro1.home>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370940110.3393.2.camel@linaro1.home>
+Message-ID: <alpine.LFD.2.03.1306111407250.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2013 11:23 AM, Will Deacon wrote:
-> Hi Stephen,
+On Tue, 11 Jun 2013, Jon Medhurst (Tixy) wrote:
+
+> On Fri, 2013-06-07 at 02:39 -0400, Nicolas Pitre wrote:
+> > This is the MCPM backend enabling SMP secondary boot and CPU hotplug
+> > on the VExpress TC2 big.LITTLE platform.  The method to allow CPU suspend
+> > is also implemented.
 > 
-> On Mon, Jun 10, 2013 at 07:12:41PM +0100, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> machine_shutdown() is a hook for kexec. Add a comment saying so, since
->> it isn't obvious from the function name.
+> Are we leaving out for now Lorenzo's patch "ARM: TC2: reset CPUs
+> spuriously woken up on cluster power up"?
 
->> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
->> index 282de48..dbe1692 100644
->> --- a/arch/arm/kernel/process.c
->> +++ b/arch/arm/kernel/process.c
->> @@ -97,13 +97,14 @@ void soft_restart(unsigned long addr)
->>  {
->>  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
->>  
->> +	BUG_ON(num_online_cpus() > 1);
-> 
-> I think this is overkill, and we could actually scream and try to return an
-> error here (we've not yet switched stack, and the upper layers of kexec look
-> like they can do something with an error code).
+I don't see spurious wake-ups with only hotplug operations.
 
-Oh, that's the BUG_ON I added to soft_restart() not the one I added into
-machine_shutdown().
+So we'll have to reconsider if that patch is still needed once we merge
+the cpuidle driver.  It certainly won't go into mainline in its current 
+form in any case.
 
-I added this one to make sure nobody was using soft_restart() on an SMP
-machine; Russell had asked to validate that all SMP systems provided a
-HW restart implementation.
+I do hope it is not required though -- that should be the job of the 
+firmware.
 
-I assume your comments re: aborting the kexec by returning an error code
-apply more to machine_shutdown() which happens a bunch earlier.
+
+Nicolas
