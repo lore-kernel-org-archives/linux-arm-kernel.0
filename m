@@ -1,152 +1,541 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 11 Jun 2013 21:59:09 +0200
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-Message-ID: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 11 Jun 2013 13:06:10 -0700
+Subject: [PATCH v3 5/7] clk: add basic Rockchip rk3066a clock support
+In-Reply-To: <201306111331.31517.heiko@sntech.de>
+References: <201306111328.52679.heiko@sntech.de>
+ <201306111331.31517.heiko@sntech.de>
+Message-ID: <20130611200610.8816.68285@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Quoting Heiko St?bner (2013-06-11 04:31:31)
+> This adds basic support for clocks on Rockchip rk3066 SoCs.
+> The clock handling thru small dt nodes is heavily inspired by the
+> sunxi clk code.
+> 
+> The plls are currently read-only, as their setting needs more
+> investigation. This also results in slow cpu speeds, as the apll starts
+> at a default of 600mhz.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>  arch/arm/boot/dts/rk3066a-clocks.dtsi   |  467 +++++++++++++++++++++++++++++++
 
-This document snippet tries to be helpful and define the pin
-PM states and helpers, and how they should be used to create
-some kind of common ontology around this.
+It's best to separate the DT data changes from the clock driver.  The
+new dtsi can be a separate patch.
 
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- Documentation/pinctrl.txt | 118 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 118 insertions(+)
+Also the rockchip clock bindings need to be documented in
+Documentation/devicetree/bindings/clock.
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index f6e664b..a34ea92 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -1196,6 +1196,124 @@ registered. Thus make sure that the error path in your driver gracefully
- cleans up and is ready to retry the probing later in the startup process.
- 
- 
-+Default and power management related states
-+===========================================
-+
-+As mentioned earlier the device core will automatically try to obtain a
-+pinctrl handle and activate the "default" state on all drivers.
-+
-+However, for power management and power saving, it is sometimes necessary
-+to switch pin states at runtime. Electrically speaking this involves
-+for example reconfigure some pins to be grounded or pulled-down when the
-+system as a whole goes to sleep, or a pull-up could be turned off when pins
-+are idle, reducing leak current.
-+
-+To help out with this, if CONFIG_PM is selected in the Kconfig, three
-+additional states will also be obtained by the driver core and cached
-+there:
-+
-+"active"   this is indended as an explicit active state, if the "default"
-+           state is not synonymous with the active one.
-+
-+"idle"     this is a state that is relaxing the pins when the system as a
-+           whole is up and running, but these particular pins are unused.
-+
-+"sleep"    this is a state that is used when the whole system goes to
-+           suspend, becomes uninteractive, unresponsive to anything but
-+           specific wake-up events.
-+
-+These correspond to the definitions found in <linux/pinctrl/pinctrl-state.h>
-+where the same strings are encoded.
-+
-+When CONFIG_PM is set, the following functions will simultaneously be made
-+available to switch between these power-related states:
-+
-+#include <linux/pinctrl/consumer.h>
-+
-+int pinctrl_pm_select_default_state(struct device *dev);
-+int pinctrl_pm_select_active_state(struct device *dev);
-+int pinctrl_pm_select_sleep_state(struct device *dev);
-+int pinctrl_pm_select_idle_state(struct device *dev);
-+
-+As the corresponding pinctrl handle and states are cached in the driver
-+core, nothing apart from these calls is needed to move the pins between
-+these states.
-+
-+For a typical runtime PM enabled (see Documentation/power/runtime_pm.txt)
-+driver the following outline could be followed:
-+
-+probe():
-+    pinctrl_pm_select_default_state()
-+
-+runtime_suspend():
-+    pinctrl_pm_select_idle_state()
-+
-+runtime_resume():
-+    pinctrl_pm_select_default_state()
-+
-+suspend:
-+    pinctrl_pm_select_sleep_state()
-+
-+resume:
-+    pinctrl_pm_select_idle_state()
-+
-+Some of the state selectors could be skipped if the driver is for a
-+certain system where e.g. the "active" state is not defined, instead
-+relying on the "default" state to make the pins active at all times.
-+For a driver only supporting suspend and resume, the "idle" state also
-+loose its meaning.
-+
-+A state-chart diagram would look like this:
-+
-+                +---------+                          +----------+
-+    probe() ->  | default |  -> runtime_suspend() -> | idle     |
-+                |         |  <- runtime_resume()  <- |          |
-+                +---------+                          +----------+
-+                                                        |     ^
-+                                                        |     |
-+                                                  suspend()  resume()
-+                                                        |     |
-+                                                        V     |
-+                                                      +---------+
-+                                                      |  sleep  |
-+                                                      +---------+
-+
-+This reflects the runtime PM concept that we are always runtime
-+suspended when we go to suspend.
-+
-+A more complex example is a driver written for many different
-+hardware configurations, some which have only the default state,
-+some which have the default state and the sleep state, some that
-+have no idle state but indeed a default state and so on. Since
-+all states are basically optional (the core will not complain if
-+they are not found) we can write our state transitions like
-+this:
-+
-+probe():
-+    pinctrl_pm_select_default_state()
-+
-+runtime_suspend():
-+    pinctrl_pm_select_idle_state()
-+
-+runtime_resume():
-+    pinctrl_pm_select_default_state()
-+    pinctrl_pm_select_active_state()
-+
-+suspend:
-+    pinctrl_pm_select_sleep_state()
-+
-+resume:
-+    pinctrl_pm_select_default_state()
-+    pinctrl_pm_select_idle_state()
-+
-+Here runtime_resume() and resume() passes through the "default"
-+state to the "active" and "idle" states respectively since everything
-+but "default" is optional. For example it is OK to only supply the
-+"default" and "sleep" state pair with this code, and it will
-+transition the pins from "default" to "sleep" and leaving the rest
-+as no-ops.
-+
-+
- Drivers needing both pin control and GPIOs
- ==========================================
- 
--- 
-1.7.11.3
+<snip>
+
+> diff --git a/drivers/clk/rockchip/clk-rockchip-pll.c b/drivers/clk/rockchip/clk-rockchip-pll.c
+> new file mode 100644
+> index 0000000..4456445
+> --- /dev/null
+> +++ b/drivers/clk/rockchip/clk-rockchip-pll.c
+> @@ -0,0 +1,131 @@
+> +/*
+> + * Copyright (c) 2013 MundoReader S.L.
+> + * Author: Heiko Stuebner <heiko@sntech.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <asm/div64.h>
+> +#include <linux/slab.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
+> +#include <linux/clk-private.h>
+
+NACK.  Please use clk-provider.h.  Do you really need something from
+clk-private.h?
+
+> +
+> +#define RK3X_PLL_MODE_MASK             0x3
+> +#define RK3X_PLL_MODE_SLOW             0x0
+> +#define RK3X_PLL_MODE_NORM             0x1
+> +#define RK3X_PLL_MODE_DEEP             0x2
+> +
+> +#define RK3X_PLLCON0_OD_MASK           0xf
+> +#define RK3X_PLLCON0_OD_SHIFT          0
+> +#define RK3X_PLLCON0_NR_MASK           0x3f
+> +#define RK3X_PLLCON0_NR_SHIFT          8
+> +
+> +#define RK3X_PLLCON1_NF_MASK           0x1fff
+> +#define RK3X_PLLCON1_NF_SHIFT          0
+> +
+> +#define RK3X_PLLCON3_REST              (1 << 5)
+> +#define RK3X_PLLCON3_BYPASS            (1 << 0)
+> +
+> +struct rockchip_clk_pll {
+> +       struct clk_hw           hw;
+> +       void __iomem            *reg_base;
+> +       void __iomem            *reg_mode;
+> +       unsigned int            shift_mode;
+> +       spinlock_t              *lock;
+> +};
+> +
+> +#define to_clk_pll(_hw) container_of(_hw, struct rockchip_clk_pll, hw)
+> +
+> +static unsigned long rk3x_generic_pll_recalc_rate(struct clk_hw *hw,
+> +                               unsigned long parent_rate)
+> +{
+> +       struct rockchip_clk_pll *pll = to_clk_pll(hw);
+> +       u32 pll_con0 = readl_relaxed(pll->reg_base);
+> +       u32 pll_con1 = readl_relaxed(pll->reg_base + 0x4);
+> +       u32 pll_con3 = readl_relaxed(pll->reg_base + 0xc);
+> +       u32 mode_con = readl_relaxed(pll->reg_mode) >> pll->shift_mode;
+> +       u64 pll_nf;
+> +       u64 pll_nr;
+> +       u64 pll_no;
+> +       u64 rate64;
+> +
+> +       if (pll_con3 & RK3X_PLLCON3_BYPASS) {
+> +               pr_debug("%s: pll %s is bypassed\n", __func__,
+> +                       __clk_get_name(hw->clk));
+> +               return parent_rate;
+> +       }
+> +
+> +       mode_con &= RK3X_PLL_MODE_MASK;
+> +       if (mode_con != RK3X_PLL_MODE_NORM) {
+> +               pr_debug("%s: pll %s not in normal mode: %d\n", __func__,
+> +                       __clk_get_name(hw->clk), mode_con);
+> +               return parent_rate;
+> +       }
+> +
+> +       pll_nf = (pll_con1 >> RK3X_PLLCON1_NF_SHIFT);
+> +       pll_nf &= RK3X_PLLCON1_NF_MASK;
+> +       pll_nf++;
+> +       rate64 = (u64)parent_rate * pll_nf;
+> +
+> +       pll_nr = (pll_con0 >> RK3X_PLLCON0_NR_SHIFT);
+> +       pll_nr &= RK3X_PLLCON0_NR_MASK;
+> +       pll_nr++;
+> +       do_div(rate64, pll_nr);
+> +
+> +       pll_no = (pll_con0 >> RK3X_PLLCON0_OD_SHIFT);
+> +       pll_no &= RK3X_PLLCON0_OD_MASK;
+> +       pll_no++;
+> +       do_div(rate64, pll_no);
+> +
+> +       return (unsigned long)rate64;
+> +}
+> +
+> +static const struct clk_ops rk3x_generic_pll_clk_ops = {
+> +       .recalc_rate = rk3x_generic_pll_recalc_rate,
+> +};
+> +
+> +struct clk * __init rockchip_clk_register_rk3x_pll(const char *name,
+> +                       const char *pname, void __iomem *reg_base,
+> +                       void __iomem *reg_mode, unsigned int shift_mode,
+> +                       spinlock_t *lock)
+> +{
+> +       struct rockchip_clk_pll *pll;
+> +       struct clk *clk;
+> +       struct clk_init_data init;
+> +
+> +       pll = kzalloc(sizeof(*pll), GFP_KERNEL);
+> +       if (!pll) {
+> +               pr_err("%s: could not allocate pll clk %s\n", __func__, name);
+> +               return NULL;
+> +       }
+> +
+> +       init.name = name;
+> +       init.ops = &rk3x_generic_pll_clk_ops;
+> +       init.flags = CLK_GET_RATE_NOCACHE;
+> +       init.parent_names = &pname;
+> +       init.num_parents = 1;
+> +
+> +       pll->hw.init = &init;
+> +       pll->reg_base = reg_base;
+> +       pll->reg_mode = reg_mode;
+> +       pll->shift_mode = shift_mode;
+> +       pll->lock = lock;
+> +
+> +       clk = clk_register(NULL, &pll->hw);
+> +       if (IS_ERR(clk)) {
+> +               pr_err("%s: failed to register pll clock %s\n", __func__,
+> +                               name);
+> +               kfree(pll);
+> +       }
+> +
+> +       return clk;
+> +}
+> diff --git a/drivers/clk/rockchip/clk-rockchip-pll.h b/drivers/clk/rockchip/clk-rockchip-pll.h
+> new file mode 100644
+> index 0000000..a63288a
+> --- /dev/null
+> +++ b/drivers/clk/rockchip/clk-rockchip-pll.h
+> @@ -0,0 +1,19 @@
+> +/*
+> + * Copyright (c) 2013 MundoReader S.L.
+> + * Author: Heiko Stuebner <heiko@sntech.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +extern struct clk * __init rockchip_clk_register_rk3x_pll(const char *name,
+> +                       const char *pname, const void __iomem *reg_base,
+> +                       const void __iomem *reg_mode, unsigned int shift_mode,
+> +                       spinlock_t *lock);
+> diff --git a/drivers/clk/rockchip/clk-rockchip.c b/drivers/clk/rockchip/clk-rockchip.c
+> new file mode 100644
+> index 0000000..660b00f
+> --- /dev/null
+> +++ b/drivers/clk/rockchip/clk-rockchip.c
+> @@ -0,0 +1,330 @@
+> +/*
+> + * Copyright (c) 2013 MundoReader S.L.
+> + * Author: Heiko Stuebner <heiko@sntech.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/clkdev.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +
+> +#include "clk-rockchip-pll.h"
+> +
+> +static DEFINE_SPINLOCK(clk_lock);
+> +
+> +struct rockchip_pll_data {
+> +       int mode_shift;
+> +};
+> +
+> +struct rockchip_pll_data rk3066a_apll_data = {
+> +       .mode_shift = 0,
+> +};
+> +
+> +struct rockchip_pll_data rk3066a_dpll_data = {
+> +       .mode_shift = 4,
+> +};
+> +
+> +struct rockchip_pll_data rk3066a_cpll_data = {
+> +       .mode_shift = 8,
+> +};
+> +
+> +struct rockchip_pll_data rk3066a_gpll_data = {
+> +       .mode_shift = 12,
+> +};
+> +
+> +/* Matches for plls */
+> +static const __initconst struct of_device_id clk_pll_match[] = {
+> +       { .compatible = "rockchip,rk3066a-apll", .data = &rk3066a_apll_data },
+> +       { .compatible = "rockchip,rk3066a-dpll", .data = &rk3066a_dpll_data },
+> +       { .compatible = "rockchip,rk3066a-cpll", .data = &rk3066a_cpll_data },
+> +       { .compatible = "rockchip,rk3066a-gpll", .data = &rk3066a_gpll_data },
+> +       {}
+> +};
+> +
+> +static void __init rockchip_pll_setup(struct device_node *node,
+> +                                     struct rockchip_pll_data *data)
+> +{
+> +       struct clk *clk;
+> +       const char *clk_name = node->name;
+> +       const char *clk_parent;
+> +       void __iomem *reg_base;
+> +       void __iomem *reg_mode;
+> +       u32 rate;
+> +
+> +       reg_base = of_iomap(node, 0);
+> +       reg_mode = of_iomap(node, 1);
+> +
+> +       clk_parent = of_clk_get_parent_name(node, 0);
+> +
+> +       pr_debug("%s: adding %s as child of %s\n",
+> +               __func__, clk_name, clk_parent);
+> +
+> +       clk = rockchip_clk_register_rk3x_pll(clk_name, clk_parent, reg_base,
+> +                                            reg_mode, data->mode_shift,
+> +                                            &clk_lock);
+> +       if (clk) {
+> +               of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +
+> +               /* optionally set a target frequency for the pll */
+> +               if (!of_property_read_u32(node, "clock-frequency", &rate))
+> +                       clk_set_rate(clk, rate);
+> +       }
+> +}
+> +
+> +/*
+> + * Mux clocks
+> + */
+> +
+> +struct rockchip_mux_data {
+> +       int shift;
+> +       int width;
+> +};
+> +
+> +#define RK_MUX(n, s, w)                                        \
+> +static const __initconst struct rockchip_mux_data n = {        \
+> +       .shift = s,                                     \
+> +       .width = w,                                     \
+> +}
+> +
+> +RK_MUX(gpll_cpll_15_mux_data, 15, 1);
+> +RK_MUX(uart_mux_data, 8, 2);
+> +RK_MUX(cpu_mux_data, 8, 1);
+> +
+> +static const __initconst struct of_device_id clk_mux_match[] = {
+> +       { .compatible = "rockchip,rk2928-gpll-cpll-bit15-mux",
+> +               .data = &gpll_cpll_15_mux_data },
+> +       { .compatible = "rockchip,rk2928-uart-mux",
+> +               .data = &uart_mux_data },
+> +       { .compatible = "rockchip,rk3066-cpu-mux",
+> +               .data = &cpu_mux_data },
+> +       {}
+> +};
+> +
+> +static void __init rockchip_mux_clk_setup(struct device_node *node,
+> +                                         struct rockchip_mux_data *data)
+> +{
+> +       struct clk *clk;
+> +       const char *clk_name = node->name;
+> +       void __iomem *reg;
+> +       int max_parents = (1 << data->width);
+> +       const char *parents[max_parents];
+> +       int flags;
+> +       int i = 0;
+> +
+> +       reg = of_iomap(node, 0);
+> +
+> +       while (i < max_parents &&
+> +              (parents[i] = of_clk_get_parent_name(node, i)) != NULL)
+> +               i++;
+> +
+> +       flags = CLK_MUX_HIWORD_MASK;
+> +
+> +       clk = clk_register_mux(NULL, clk_name, parents, i, 0,
+> +                              reg, data->shift, data->width,
+> +                              flags, &clk_lock);
+> +       if (clk)
+> +               of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +}
+> +
+> +/*
+> + * Divider clocks
+> + */
+> +
+> +struct rockchip_div_data {
+> +       int shift;
+> +       int width;
+> +       int flags;
+> +       struct clk_div_table *table;
+> +};
+> +
+> +#define RK_DIV(n, s, w, f, t)                          \
+> +static const __initconst struct rockchip_div_data n = {        \
+> +       .shift = s,                                     \
+> +       .width = w,                                     \
+> +       .flags = f,                                     \
+> +       .table = t,                                     \
+> +}
+> +
+> +RK_DIV(cpu_div_data, 0, 5, 0, NULL);
+> +RK_DIV(aclk_periph_div_data, 0, 5, 0, NULL);
+> +RK_DIV(aclk_cpu_div_data, 0, 3, 0, NULL);
+> +RK_DIV(hclk_div_data, 8, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
+> +RK_DIV(pclk_div_data, 12, 2, CLK_DIVIDER_POWER_OF_TWO, NULL);
+> +RK_DIV(mmc_div_data, 0, 6, CLK_DIVIDER_EVEN, NULL);
+> +RK_DIV(uart_div_data, 0, 7, 0, NULL);
+> +
+> +struct clk_div_table core_periph_table[] = {
+> +       { 0, 2 },
+> +       { 1, 4 },
+> +       { 2, 8 },
+> +       { 3, 16 },
+> +       { 0, 0 },
+> +};
+> +RK_DIV(core_periph_div_data, 6, 2, 0, core_periph_table);
+> +
+> +static const __initconst struct of_device_id clk_divider_match[] = {
+> +       { .compatible = "rockchip,rk3066a-cpu-divider",
+> +               .data = &cpu_div_data },
+> +       { .compatible = "rockchip,rk3066a-core-periph-divider",
+> +               .data = &core_periph_div_data },
+> +       { .compatible = "rockchip,rk2928-aclk-periph-divider",
+> +               .data = &aclk_periph_div_data },
+> +       { .compatible = "rockchip,rk3066a-aclk-cpu-divider",
+> +               .data = &aclk_cpu_div_data },
+> +       { .compatible = "rockchip,rk2928-hclk-divider",
+> +               .data = &hclk_div_data },
+> +       { .compatible = "rockchip,rk2928-pclk-divider",
+> +               .data = &pclk_div_data },
+> +       { .compatible = "rockchip,rk2928-mmc-divider",
+> +               .data = &mmc_div_data },
+> +       { .compatible = "rockchip,rk2928-uart-divider",
+> +               .data = &uart_div_data },
+> +       {}
+> +};
+> +
+> +static void __init rockchip_divider_clk_setup(struct device_node *node,
+> +                                             struct rockchip_div_data *data)
+> +{
+> +       struct clk *clk;
+> +       const char *clk_name = node->name;
+> +       const char *clk_parent;
+> +       void __iomem *reg;
+> +       int flags;
+> +
+> +       reg = of_iomap(node, 0);
+> +
+> +       clk_parent = of_clk_get_parent_name(node, 0);
+> +
+> +       flags = data->flags;
+> +       flags |= CLK_DIVIDER_HIWORD_MASK;
+> +
+> +       if (data->table)
+> +               clk = clk_register_divider_table(NULL, clk_name, clk_parent, 0,
+> +                                               reg, data->shift, data->width,
+> +                                               flags, data->table, &clk_lock);
+> +       else
+> +               clk = clk_register_divider(NULL, clk_name, clk_parent, 0,
+> +                                               reg, data->shift, data->width,
+> +                                               flags, &clk_lock);
+> +       if (clk)
+> +               of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +}
+> +
+> +/*
+> + * Gate clocks
+> + */
+> +
+> +static void __init rockchip_gate_clk_setup(struct device_node *node,
+> +                                           void *data)
+> +{
+> +       struct clk_onecell_data *clk_data;
+> +       const char *clk_parent;
+> +       const char *clk_name;
+> +       void __iomem *reg;
+> +       void __iomem *reg_idx;
+> +       int flags;
+> +       int qty;
+> +       int reg_bit;
+> +       int clkflags = CLK_SET_RATE_PARENT;
+> +       int i;
+> +
+> +       qty = of_property_count_strings(node, "clock-output-names");
+> +       if (qty < 0) {
+> +               pr_err("%s: error in clock-output-names %d\n", __func__, qty);
+> +               return;
+> +       }
+> +
+> +       if (qty == 0) {
+> +               pr_info("%s: nothing to do\n", __func__);
+> +               return;
+> +       }
+> +
+> +       reg = of_iomap(node, 0);
+> +
+> +       clk_data = kzalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
+> +       if (!clk_data)
+> +               return;
+> +
+> +       clk_data->clks = kzalloc(qty * sizeof(struct clk *), GFP_KERNEL);
+> +       if (!clk_data->clks) {
+> +               kfree(clk_data);
+> +               return;
+> +       }
+> +
+> +       flags = CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE;
+> +
+> +       for (i = 0; i < qty; i++) {
+> +               of_property_read_string_index(node, "clock-output-names",
+> +                                             i, &clk_name);
+> +
+> +               /* ignore empty slots */
+> +               if (!strcmp("reserved", clk_name))
+> +                       continue;
+> +
+> +               clk_parent = of_clk_get_parent_name(node, i);
+> +
+> +               /* keep all gates untouched for now */
+> +               clkflags |= CLK_IGNORE_UNUSED;
+> +
+> +               reg_idx = reg + (4 * (i / 16));
+> +               reg_bit = (i % 16);
+> +
+> +               clk_data->clks[i] = clk_register_gate(NULL, clk_name,
+> +                                                     clk_parent, clkflags,
+> +                                                     reg_idx, reg_bit,
+> +                                                     flags,
+> +                                                     &clk_lock);
+> +               WARN_ON(IS_ERR(clk_data->clks[i]));
+> +       }
+> +
+> +       clk_data->clk_num = qty;
+> +
+> +       of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
+> +}
+> +
+> +static const __initconst struct of_device_id clk_gate_match[] = {
+> +       { .compatible = "rockchip,rk2928-gate-clk" },
+> +       {}
+> +};
+> +
+> +void __init of_rockchip_clk_table_clock_setup(
+> +                                       const struct of_device_id *clk_match,
+> +                                       void *function)
+> +{
+> +       struct device_node *np;
+> +       const struct div_data *data;
+> +       const struct of_device_id *match;
+> +       void (*setup_function)(struct device_node *, const void *) = function;
+> +
+> +       for_each_matching_node(np, clk_match) {
+> +               match = of_match_node(clk_match, np);
+> +               data = match->data;
+> +               setup_function(np, data);
+> +       }
+> +}
+
+Can you use of_clk_init instead of the above function?
+
+Regards,
+Mike
+
+> +
+> +void __init rockchip_init_clocks(struct device_node *node)
+> +{
+> +       of_rockchip_clk_table_clock_setup(clk_pll_match,
+> +                                         rockchip_pll_setup);
+> +
+> +       of_rockchip_clk_table_clock_setup(clk_mux_match,
+> +                                         rockchip_mux_clk_setup);
+> +
+> +       of_rockchip_clk_table_clock_setup(clk_gate_match,
+> +                                         rockchip_gate_clk_setup);
+> +
+> +       of_rockchip_clk_table_clock_setup(clk_divider_match,
+> +                                         rockchip_divider_clk_setup);
+> +}
+> +CLK_OF_DECLARE(rockchip_clocks, "rockchip,clocks", rockchip_init_clocks);
+> -- 
+> 1.7.2.3
