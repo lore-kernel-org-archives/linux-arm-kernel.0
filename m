@@ -1,63 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 11 Jun 2013 17:02:19 +0900
-Subject: [PATCH] ARM: dts: Removing pdma for SSDK5440
-Message-ID: <109601ce6679$fef2e410$fcd8ac30$%kim@samsung.com>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Tue, 11 Jun 2013 11:08:04 +0300
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <CAKMK7uHSCigrTvKENjZRgEsgtA0BeaORcj15n7JFW_uQoNp37Q@mail.gmail.com>
+References: <20130609190612.GM18614@n2100.arm.linux.org.uk>
+ <E1UllJC-00058C-59@rmk-PC.arm.linux.org.uk>
+ <CAF6AEGs+=56nntyJfy6cMHsehmhzFGcfGUC53RgNW=HfFW=qRA@mail.gmail.com>
+ <20130610170648.GX18614@n2100.arm.linux.org.uk>
+ <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
+ <CAKMK7uHSCigrTvKENjZRgEsgtA0BeaORcj15n7JFW_uQoNp37Q@mail.gmail.com>
+Message-ID: <20130611080804.GI5004@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Giridhar Maruthy <giridhar.m@samsung.com>
+On Tue, Jun 11, 2013 at 12:01:59AM +0200, Daniel Vetter wrote:
+> On Mon, Jun 10, 2013 at 9:59 PM, Rob Clark <robdclark@gmail.com> wrote:
+> > On Mon, Jun 10, 2013 at 1:06 PM, Russell King - ARM Linux
+> > <linux@arm.linux.org.uk> wrote:
+> >> On Mon, Jun 10, 2013 at 11:57:32AM -0400, Rob Clark wrote:
+> >>> On Sun, Jun 9, 2013 at 3:29 PM, Russell King
+> >>> <rmk+kernel@arm.linux.org.uk> wrote:
+> >>> > This patch adds support for the pair of LCD controllers on the Marvell
+> >>> > Armada 510 SoCs.  This driver supports:
+> >>> > - multiple contiguous scanout buffers for video and graphics
+> >>> > - shm backed cacheable buffer objects for X pixmaps for Vivante GPU
+> >>> >   acceleration
+> >>> > - dual lcd0 and lcd1 crt operation
+> >>> > - video overlay on each LCD crt
+> >>>
+> >>> Any particular reason for not exposing the overlays as drm_plane's?
+> >>> That is probably something that should change before merging the
+> >>> driver.
+> >>
+> >> Only through not understanding much of DRM when I started this.
+> >> Provided DRM planes can do everything that I'm already doing with
+> >> the overlay support, then yes.  Otherwise, I want to stick with this
+> >> which is modelled after the i915 overlay interface.
+> 
+> Oh i915 overlays aren't a good reason ;-) I've done those way back
+> when drm didn't have any plane infrastructure and pretty much as my
+> very contribution. So totally lacked any clue.
+> 
+> If I can scrap together a bit of time I want to port the legacy
+> overlay code over to drm planes (and remap the current ioctl interface
+> to the drm plane interface for backwards compat). But atm that's
+> crushed under a giant pile of other todo items.
 
-Since the pdma works only in secure mode, accessing the same
-in hypervisor mode gives an abort. As we are not using pdma
-anywhere (including spi), removing the same.
+I hope you remember the mdfld overlay code I posted a long time ago:
+http://lists.freedesktop.org/archives/intel-gfx/2012-September/020479.html
 
-Signed-off-by: Giridhar Maruthy <giridhar.m@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/boot/dts/exynos5440.dtsi |   24 ------------------------
- 1 file changed, 24 deletions(-)
+I don't think it's too far from being operational on gen.
 
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index 871ebad..b08449e 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -105,8 +105,6 @@
- 		compatible = "samsung,exynos4210-spi";
- 		reg = <0xD0000 0x1000>;
- 		interrupts = <0 4 0>;
--		tx-dma-channel = <&pdma0 5>; /* preliminary */
--		rx-dma-channel = <&pdma0 4>; /* preliminary */
- 		#address-cells = <1>;
- 		#size-cells = <0>;
- 		clocks = <&clock 21>, <&clock 16>;
-@@ -184,28 +182,6 @@
- 		compatible = "arm,amba-bus";
- 		interrupt-parent = <&gic>;
- 		ranges;
--
--		pdma0: pdma at 00121000 {
--			compatible = "arm,pl330", "arm,primecell";
--			reg = <0x121000 0x1000>;
--			interrupts = <0 46 0>;
--			clocks = <&clock 8>;
--			clock-names = "apb_pclk";
--			#dma-cells = <1>;
--			#dma-channels = <8>;
--			#dma-requests = <32>;
--		};
--
--		pdma1: pdma at 00120000 {
--			compatible = "arm,pl330", "arm,primecell";
--			reg = <0x120000 0x1000>;
--			interrupts = <0 47 0>;
--			clocks = <&clock 8>;
--			clock-names = "apb_pclk";
--			#dma-cells = <1>;
--			#dma-channels = <8>;
--			#dma-requests = <32>;
--		};
- 	};
- 
- 	rtc {
 -- 
-1.7.10.4
+Ville Syrj?l?
+Intel OTC
