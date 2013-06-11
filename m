@@ -1,211 +1,94 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 11 Jun 2013 16:48:58 +0200
-Subject: [PATCH 3/3] ARM: dts: OMAP3: Use MTD constants for OMAP3 boards
+Date: Tue, 11 Jun 2013 16:48:57 +0200
+Subject: [PATCH 2/3] ARM: dts: Add omap3-overo NAND flash memory binding
 In-Reply-To: <1370962138-9631-1-git-send-email-florian.vaussard@epfl.ch>
 References: <1370962138-9631-1-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <1370962138-9631-4-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1370962138-9631-3-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the MTD constants for NAND and OneNAND nodes used in OMAP3
-DTS.
+Add device-tree node for the on-board NAND memory.
 
 Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 ---
- arch/arm/boot/dts/omap3-devkit8000.dts |   10 +++++-----
- arch/arm/boot/dts/omap3-igep0020.dts   |   10 +++++-----
- arch/arm/boot/dts/omap3-igep0030.dts   |   10 +++++-----
- arch/arm/boot/dts/omap3430-sdp.dts     |   28 ++++++++++++++--------------
- 4 files changed, 29 insertions(+), 29 deletions(-)
+ arch/arm/boot/dts/omap3-overo.dtsi |   50 ++++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3.dtsi       |    2 +
+ 2 files changed, 52 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-index 5be71b1..08699cb 100644
---- a/arch/arm/boot/dts/omap3-devkit8000.dts
-+++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-@@ -143,27 +143,27 @@
+diff --git a/arch/arm/boot/dts/omap3-overo.dtsi b/arch/arm/boot/dts/omap3-overo.dtsi
+index e112a42..811b74c 100644
+--- a/arch/arm/boot/dts/omap3-overo.dtsi
++++ b/arch/arm/boot/dts/omap3-overo.dtsi
+@@ -33,6 +33,56 @@
+ 	};
+ };
  
- 		x-loader at 0 {
- 			label = "X-Loader";
--			reg = <0 0x80000>;
++&gpmc {
++	ranges = <0 0 0x30000000 0x00000004>;       /* CS0: NAND */
++
++	nand at 0,0 {
++		reg = <0 0 0>; /* CS0, offset 0 */
++		nand-bus-width = <16>;
++
++		ti,nand-ecc-opt = "sw";
++
++		gpmc,device-nand;
++		gpmc,sync-clk-ps = <0>;
++		gpmc,cs-on-ns = <0>;
++		gpmc,cs-rd-off-ns = <36>;
++		gpmc,cs-wr-off-ns = <36>;
++		gpmc,adv-on-ns = <6>;
++		gpmc,adv-rd-off-ns = <24>;
++		gpmc,adv-wr-off-ns = <36>;
++		gpmc,we-off-ns = <30>;
++		gpmc,oe-off-ns = <48>;
++		gpmc,access-ns = <54>;
++		gpmc,rd-cycle-ns = <72>;
++		gpmc,wr-cycle-ns = <72>;
++		gpmc,wr-access-ns = <30>;
++		gpmc,wr-data-mux-bus-ns = <0>;
++
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		xloader at 0 {
 +			reg = <(0 * SZ_128K) (4 * SZ_128K)>;
- 		};
- 
- 		bootloaders at 80000 {
- 			label = "U-Boot";
--			reg = <0x80000 0x1e0000>;
-+			reg = <(4 * SZ_128K) (15 * SZ_128K)>;
- 		};
- 
- 		bootloaders_env at 260000 {
- 			label = "U-Boot Env";
--			reg = <0x260000 0x20000>;
-+			reg = <(19 * SZ_128K) (1 * SZ_128K)>;
- 		};
- 
- 		kernel at 280000 {
- 			label = "Kernel";
--			reg = <0x280000 0x400000>;
++		};
++
++		uboot at 80000 {
++			reg = <(4 * SZ_128K) (14 * SZ_128K)>;
++		};
++
++		ubootenv at 240000 {
++			reg = <(18 * SZ_128K) (2 * SZ_128K)>;
++		};
++
++		linux at 280000 {
 +			reg = <(20 * SZ_128K) (32 * SZ_128K)>;
- 		};
- 
- 		filesystem at 680000 {
- 			label = "File System";
--			reg = <0x680000 0xf980000>;
++		};
++
++		rootfs at 680000 {
 +			reg = <(52 * SZ_128K) MTDPART_SIZ_FULL>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-index e8c4828..3476b3c 100644
---- a/arch/arm/boot/dts/omap3-igep0020.dts
-+++ b/arch/arm/boot/dts/omap3-igep0020.dts
-@@ -97,23 +97,23 @@
++		};
++	};
++};
++
+ &i2c1 {
+ 	clock-frequency = <2600000>;
  
- 		partition at 0 {
- 			label = "SPL";
--			reg = <0 0x100000>;
-+			reg = <(0 * SZ_256K) (4 * SZ_256K)>;
- 		};
- 		partition at 0x80000 {
- 			label = "U-Boot";
--			reg = <0x100000 0x180000>;
-+			reg = <(4 * SZ_256K) (6 * SZ_256K)>;
- 		};
- 		partition at 0x1c0000 {
- 			label = "Environment";
--			reg = <0x280000 0x100000>;
-+			reg = <(10 * SZ_256K) (4 * SZ_256K)>;
- 		};
- 		partition at 0x280000 {
- 			label = "Kernel";
--			reg = <0x380000 0x300000>;
-+			reg = <(14 * SZ_256K) (12 * SZ_256K)>;
- 		};
- 		partition at 0x780000 {
- 			label = "Filesystem";
--			reg = <0x680000 0x1f980000>;
-+			reg = <(26 * SZ_256K) MTDPART_SIZ_FULL>;
- 		};
- 	};
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 6d05ee0..65a9390 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -9,7 +9,9 @@
+  */
  
-diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-index 644d053..e4f078c 100644
---- a/arch/arm/boot/dts/omap3-igep0030.dts
-+++ b/arch/arm/boot/dts/omap3-igep0030.dts
-@@ -72,23 +72,23 @@
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/mtd/partitions.h>
+ #include <dt-bindings/pinctrl/omap.h>
++#include <dt-bindings/sizes.h>
  
- 		partition at 0 {
- 			label = "SPL";
--			reg = <0 0x100000>;
-+			reg = <(0 * SZ_256K) (4 * SZ_256K)>;
- 		};
- 		partition at 0x80000 {
- 			label = "U-Boot";
--			reg = <0x100000 0x180000>;
-+			reg = <(4 * SZ_256K) (6 * SZ_256K)>;
- 		};
- 		partition at 0x1c0000 {
- 			label = "Environment";
--			reg = <0x280000 0x100000>;
-+			reg = <(10 * SZ_256K) (4 * SZ_256K)>;
- 		};
- 		partition at 0x280000 {
- 			label = "Kernel";
--			reg = <0x380000 0x300000>;
-+			reg = <(14 * SZ_256K) (12 * SZ_256K)>;
- 		};
- 		partition at 0x780000 {
- 			label = "Filesystem";
--			reg = <0x680000 0x1f980000>;
-+			reg = <(26 * SZ_256K) MTDPART_SIZ_FULL>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/omap3430-sdp.dts b/arch/arm/boot/dts/omap3430-sdp.dts
-index 2a725a0..dd69ee0 100644
---- a/arch/arm/boot/dts/omap3430-sdp.dts
-+++ b/arch/arm/boot/dts/omap3430-sdp.dts
-@@ -81,19 +81,19 @@
+ #include "skeleton.dtsi"
  
- 		partition at 0 {
- 			label = "bootloader-nor";
--			reg = <0 0x40000>;
-+			reg = <(0 * SZ_128K) (2 * SZ_128K)>;
- 		};
- 		partition at 0x40000 {
- 			label = "params-nor";
--			reg = <0x40000 0x40000>;
-+			reg = <(2 * SZ_128K) (2 * SZ_128K)>;
- 		};
- 		partition at 0x80000 {
- 			label = "kernel-nor";
--			reg = <0x80000 0x200000>;
-+			reg = <(4 * SZ_128K) (16 * SZ_128K)>;
- 		};
- 		partition at 0x280000 {
- 			label = "filesystem-nor";
--			reg = <0x240000 0x7d80000>;
-+			reg = <(18 * SZ_128K) (1004 * SZ_128K)>;
- 		};
- 	};
- 
-@@ -123,23 +123,23 @@
- 
- 		partition at 0 {
- 			label = "xloader-nand";
--			reg = <0 0x80000>;
-+			reg = <(0 * SZ_128K) (4 * SZ_128K)>;
- 		};
- 		partition at 0x80000 {
- 			label = "bootloader-nand";
--			reg = <0x80000 0x140000>;
-+			reg = <(4 * SZ_128K) (10 * SZ_128K)>;
- 		};
- 		partition at 0x1c0000 {
- 			label = "params-nand";
--			reg = <0x1c0000 0xc0000>;
-+			reg = <(14 * SZ_128K) (6 * SZ_128K)>;
- 		};
- 		partition at 0x280000 {
- 			label = "kernel-nand";
--			reg = <0x280000 0x500000>;
-+			reg = <(20 * SZ_128K) (40 * SZ_128K)>;
- 		};
- 		partition at 0x780000 {
- 			label = "filesystem-nand";
--			reg = <0x780000 0x7880000>;
-+			reg = <(60 * SZ_128K) (964 * SZ_128K)>;
- 		};
- 	};
- 
-@@ -168,23 +168,23 @@
- 
- 		partition at 0 {
- 			label = "xloader-onenand";
--			reg = <0 0x80000>;
-+			reg = <(0 * SZ_128K) (4 * SZ_128K)>;
- 		};
- 		partition at 0x80000 {
- 			label = "bootloader-onenand";
--			reg = <0x80000 0x40000>;
-+			reg = <(4 * SZ_128K) (2 * SZ_128K)>;
- 		};
- 		partition at 0xc0000 {
- 			label = "params-onenand";
--			reg = <0xc0000 0x20000>;
-+			reg = <(6 * SZ_128K) (1 * SZ_128K)>;
- 		};
- 		partition at 0xe0000 {
- 			label = "kernel-onenand";
--			reg = <0xe0000 0x200000>;
-+			reg = <(7 * SZ_128K) (16 * SZ_128K)>;
- 		};
- 		partition at 0x2e0000 {
- 			label = "filesystem-onenand";
--			reg = <0x2e0000 0xfd20000>;
-+			reg = <(23 * SZ_128K) (2025 * SZ_128K)>;
- 		};
- 	};
- };
 -- 
 1.7.5.4
