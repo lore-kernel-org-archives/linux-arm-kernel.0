@@ -1,28 +1,45 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 10 Jun 2013 22:27:35 -0700
-Subject: [PATCH 0/7] Renesas ARM-based SoC DT updates for v3.11
-In-Reply-To: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370406736-32272-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130611052735.GD6688@quad.lixom.net>
+From: sanjay.rawat@linaro.org (Sanjay Singh Rawat)
+Date: Tue, 11 Jun 2013 11:03:05 +0530
+Subject: [PATCH 4/8] ARM: vexpress: use generic cpu idle function for wfi
+In-Reply-To: <1370617870.4852.23.camel@hornet>
+References: <1369665166-13049-1-git-send-email-sanjay.rawat@linaro.org>
+ <1369665166-13049-5-git-send-email-sanjay.rawat@linaro.org>
+ <1370617870.4852.23.camel@hornet>
+Message-ID: <51B6B691.1040305@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 01:32:09PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-> 
->   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-for-v3.11
-> 
-> for you to fetch changes up to 24603f3caf07f5f65aa17ed7851ad4741595cf6a:
-> 
->   ARM: shmobile: marzen-reference: add irqpin support in DT (2013-06-04 18:05:59 +0900)
+commit: 8553cb67d2318db327071018fc81084cbabccc46 explains that
 
-Pulled, thanks.
+-sanjay
 
-
--Olof
+On Friday 07 June 2013 08:41 PM, Pawel Moll wrote:
+> On Mon, 2013-05-27 at 15:32 +0100, Sanjay Singh Rawat wrote:
+>> use cpu_do_idle for entering the wfi mode.
+>>
+>> Signed-off-by: Sanjay Singh Rawat <sanjay.rawat@linaro.org>
+>> ---
+>>   arch/arm/mach-vexpress/hotplug.c |    3 ++-
+>>   1 file changed, 2 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+>> index f0ce6b8..b3dffc2 100644
+>> --- a/arch/arm/mach-vexpress/hotplug.c
+>> +++ b/arch/arm/mach-vexpress/hotplug.c
+>> @@ -60,7 +60,8 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+>>   	 * code will have already disabled interrupts
+>>   	 */
+>>   	for (;;) {
+>> -		wfi();
+>> +		/* enter WFI mode */
+>> +		cpu_do_idle();
+>>
+>>   		if (pen_release == cpu_logical_map(cpu)) {
+>>   			/*
+>
+> I probably don't get the whole picture, but may I ask what is the
+> rationale behind this change? As in: why cpu_do_idle() is better?
+>
+> Pawe?
+>
+>
