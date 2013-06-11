@@ -1,38 +1,41 @@
-From: mario.smarduch@huawei.com (Mario Smarduch)
-Date: Tue, 11 Jun 2013 16:13:41 +0200
-Subject: [PATCH 2/2] add initial kvm dev passhtrough support
-In-Reply-To: <A501B176-B65B-4CEB-BB12-3EE7C165945C@suse.de>
-References: <51B6D52E.4030707@huawei.com>
- <A501B176-B65B-4CEB-BB12-3EE7C165945C@suse.de>
-Message-ID: <51B73095.3070408@huawei.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 11 Jun 2013 16:17:40 +0200
+Subject: [PATCH v3 1/6] irqchip: add support for Marvell Orion SoCs
+In-Reply-To: <alpine.LFD.2.02.1306111609110.22970@ionos>
+References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1370536034-23956-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <alpine.LFD.2.02.1306111045520.22970@ionos>
+ <alpine.LFD.2.02.1306111525180.22970@ionos> <51B7280B.7080604@gmail.com>
+ <alpine.LFD.2.02.1306111539310.22970@ionos> <51B72F5C.5020806@gmail.com>
+ <alpine.LFD.2.02.1306111609110.22970@ionos>
+Message-ID: <51B73184.10607@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 06/11/13 16:13, Thomas Gleixner wrote:
+> On Tue, 11 Jun 2013, Sebastian Hesselbarth wrote:
+>> On 06/11/13 15:45, Thomas Gleixner wrote:
+>>> But what about the bit in of that first irq in the cause register? If
+>>> it's set on entry you call generic_handle_irq() for that as well. So
+>>> if it's set you need to mask it in stat. If not, then it wants a
+>>> comment.
+>>
+>> I am not sure I can follow. orion_bridge_irq_init() maps the first
+>> parent irq, i.e. hwirq 0 of orion_irq. The parent irq controller
+>> clears that irq cause when all corresponding chained irqs are
+>> cleared. The chained (bridge) irqs are cleared by
+>> orion_bridge_irq_handler above.
+>
+> That makes sense. I got confused by:
+>
+>          irq = irq_of_parse_and_map(np, 0);
+>
+> but now I see that it's mapping irq 0 of the parent interrupt
+> controller. I'll add a comment before merging it.
 
-On 6/11/2013 10:28 AM, Alexander Graf wrote:
+Great! Just to be sure: Please make that comment refer to just
+"parent interrupt" but not specifically "parent interrupt 0".
+It is 0 only for Dove, and irq_of_parse_and_map(np, 0) maps the
+first passed irq.
 
-> 
-> Is there any particular reason you're not going down that path for your ARM implementation?
-
-We see this as a good starting point to build on, we need baseline numbers
-for performance, latency, interrupt throughput on real hardware
-ASAP to build competency for NFV, which has demanding Dev. Passthrough
-requirements. Over time we plan contributing to SMMU and VFIO as well
-(we're looking into this now).
-
-FYI NFV is an initiative wireless/fixed network operators are working 
-towards - to virtualize Core, likely Radia Access and even Home Network 
-equipment, this is a epic undertaking (i.e. Network Function Virtualization). 
-So far VMware has taken the lead (mostly x86).
- 
-> 
-> On the embedded PPC side we've been discussing vfio and how it fits into a device tree, non-PCI world for a while. If you like, we can dive into more detail on that, either via email or via phone.
-
-I'll email you offline, I'd like to know more what you've done on this
-and see where we can align/leverage the effort.
-
-- Mario
-> 
-> 
-> Alex
-> 
+Sebastian
