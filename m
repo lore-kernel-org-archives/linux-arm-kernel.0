@@ -1,32 +1,26 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 11 Jun 2013 17:10:10 +0900
-Subject: [PATCH] ARM: EXYNOS: Enable 64-bit DMA for EXYNOS5440 if LPAE is
- enabled
-Message-ID: <109701ce667b$179822e0$46c868a0$%kim@samsung.com>
+From: philippe.retornaz@epfl.ch (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
+Date: Tue, 11 Jun 2013 10:12:24 +0200
+Subject: [PATCH v4 1/3] leds: leds-mc13783: Prepare driver to support
+ MC13892 LEDs
+In-Reply-To: <1370883572-877-1-git-send-email-shc_work@mail.ru>
+References: <1370883572-877-1-git-send-email-shc_work@mail.ru>
+Message-ID: <51B6DBE8.5090505@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Abraham <thomas.ab@samsung.com>
+Le 10/06/2013 18:59, Alexander Shiyan a ?crit :
+> This patch rewrite driver code to be ready to add support for
+> MC13892 LEDs and probe from devicetree.
+>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Allow 64-bit DMA addresses if LPAE is enabled on EXYNOS5440.
 
-Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-exynos/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+The whole serie:
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index e101b14..0f7d308 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -81,6 +81,7 @@ config SOC_EXYNOS5440
- 	bool "SAMSUNG EXYNOS5440"
- 	default y
- 	depends on ARCH_EXYNOS5
-+	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
- 	select ARCH_HAS_OPP
- 	select ARM_ARCH_TIMER
- 	select AUTO_ZRELADDR
--- 
-1.7.10.4
+Tested-by: Philippe Retornaz <philippe.retornaz@epfl.ch>
+
+On mx31moboard with an mc13783.
+
+Thanks !
+
+Philippe
