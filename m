@@ -1,63 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 11 Jun 2013 15:11:21 +0100
-Subject: [PATCH 10/13] ARM: dts: Add initial device tree support for
- Exynos5420
-In-Reply-To: <CANuQgHFndqWH5KYskuiqxWuVXEp+_=R=Tnfo5y_syreBFcGPbQ@mail.gmail.com>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <20130606163411.GA23311@e106331-lin.cambridge.arm.com>
- <CANuQgHFndqWH5KYskuiqxWuVXEp+_=R=Tnfo5y_syreBFcGPbQ@mail.gmail.com>
-Message-ID: <20130611141121.GC22334@e106331-lin.cambridge.arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 11 Jun 2013 16:13:31 +0200 (CEST)
+Subject: [PATCH v3 1/6] irqchip: add support for Marvell Orion SoCs
+In-Reply-To: <51B72F5C.5020806@gmail.com>
+References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1370536034-23956-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <alpine.LFD.2.02.1306111045520.22970@ionos>
+ <alpine.LFD.2.02.1306111525180.22970@ionos> <51B7280B.7080604@gmail.com>
+ <alpine.LFD.2.02.1306111539310.22970@ionos> <51B72F5C.5020806@gmail.com>
+Message-ID: <alpine.LFD.2.02.1306111609110.22970@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 02:35:38PM +0100, Chander Kashyap wrote:
-> On 6 June 2013 22:04, Mark Rutland <mark.rutland@arm.com> wrote:
-> > Hi,
-> >
-> >> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> new file mode 100644
-> >> index 0000000..b14e775
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> @@ -0,0 +1,40 @@
-> >> +/*
-> >> + * SAMSUNG SMDK5420 board device tree source
-> >> + *
-> >> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> >> + *           http://www.samsung.com
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> +*/
-> >> +
-> >> +/dts-v1/;
-> >> +/include/ "exynos5420.dtsi"
-> >> +
-> >> +/ {
-> >> +     model = "Samsung SMDK5420 board based on EXYNOS5420";
-> >> +     compatible = "samsung,smdk5420", "samsung,exynos5420";
-> >> +
-> >> +     memory {
-> >> +             reg =   <0x20000000 0x10000000
-> >> +                      0x30000000 0x10000000
-> >> +                      0x40000000 0x10000000
-> >> +                      0x50000000 0x10000000
-> >> +                      0x60000000 0x10000000
-> >> +                      0x70000000 0x10000000
-> >> +                      0x80000000 0x10000000
-> >> +                      0x90000000 0x10000000>;
-> >> +     };
-> >
-> As there are only 28 bits for memory bank size in memory.h.
-> Hence each bank is split into 256MB.
+On Tue, 11 Jun 2013, Sebastian Hesselbarth wrote:
+> On 06/11/13 15:45, Thomas Gleixner wrote:
+> > But what about the bit in of that first irq in the cause register? If
+> > it's set on entry you call generic_handle_irq() for that as well. So
+> > if it's set you need to mask it in stat. If not, then it wants a
+> > comment.
+> 
+> I am not sure I can follow. orion_bridge_irq_init() maps the first
+> parent irq, i.e. hwirq 0 of orion_irq. The parent irq controller
+> clears that irq cause when all corresponding chained irqs are
+> cleared. The chained (bridge) irqs are cleared by
+> orion_bridge_irq_handler above.
 
-I don't think a kernel implementation choice should affect the dts.
+That makes sense. I got confused by:
 
-If the kernel needs to carve up the memory, it should do it itself - it knows
-what it needs. Splitting the banks manually as above is papering over the
-problem.
+        irq = irq_of_parse_and_map(np, 0);
+
+but now I see that it's mapping irq 0 of the parent interrupt
+controller. I'll add a comment before merging it.
 
 Thanks,
-Mark.
+
+	tglx
+
+
+
+ 
