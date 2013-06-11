@@ -1,51 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Jun 2013 11:31:45 +0200
-Subject: [PATCH 05/39] ARM: ux500: Stop passing MMC's platform data for
- Device Tree boots
-In-Reply-To: <20130610091503.GF20297@gmail.com>
-References: <1368611522-9984-1-git-send-email-lee.jones@linaro.org>
- <1368611522-9984-6-git-send-email-lee.jones@linaro.org>
- <CACRpkdbOxzhgR=ugXLrSBJ_Y1rw=0mcrvtuRi=-c5v039xsPWA@mail.gmail.com>
- <20130610091503.GF20297@gmail.com>
-Message-ID: <CACRpkdbkyMF4brGYr2c4=NuTLN20pHsBM=227-mFAPv7S+Ac7w@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 11 Jun 2013 18:33:15 +0900
+Subject: [PATCH v2] ARM: shmobile: uImage load address rework
+In-Reply-To: <20130611074713.GB10440@verge.net.au>
+References: <20130610092857.19175.25629.sendpatchset@w520>
+ <20130611074713.GB10440@verge.net.au>
+Message-ID: <CANqRtoQGrOor4n9p4u=SR=RTLTM2LfJ_jxxviy3yh=LTrsQLYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 11:15 AM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 15 May 2013, Linus Walleij wrote:
+On Tue, Jun 11, 2013 at 4:47 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Jun 10, 2013 at 06:28:57PM +0900, Magnus Damm wrote:
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> This is V2 of the mach-shmobile uImage load address rework patch.
+>>
+>> Rework the mach-shmobile uImage load address calculation by storing
+>> the per-board load addresses in Makefile.boot. This removes the
+>> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
+>> it possible to create safe kernel images that boot on multiple boards.
+>>
+>> This is one of several series of code that reworks code not to rely on
+>> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
+>>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 >
->> On Wed, May 15, 2013 at 11:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
->>
->> > It was required to pass DMA channel configuration information to the
->> > MMC driver before the new DMA API was in place. Now that it is, and
->> > is fully compatible with Device Tree we can stop doing that.
->> >
->> > Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
->> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
->>
->> So since the use of dma_request_slave_channel() is not upstream,
->> I guess this will break DMA use (i.e slow down transfers!) on all
->> device tree boots?
->>
->> I'd be happy to apply it once the MMCI patch is in linux-next
->> indicating there may just be a window in the merge period
->> where it falls back to IRQ mode, but I don't want to disable
->> DMA on DT boots for an entire kernel cycle just like that.
->>
->> Not applied as of yet.
->
-> I believe it's now okay to apply this.
+> Thanks, I have queued this up in the soc2 branch.
+> My current plan is to let that branch sit in next for a few
+> days and then send a pull-request for it to be included in v3.11.
 
-Yep, I've rebased and applied it to the ux500-devicetree
-branch.
+Sounds good, thanks! I will try to sort out the remaining bits and see
+where that takes us.
 
-I have some stuff on this branch which is queued up but may
-miss v3.11, because I need the 5 outstanding pull requests
-to land in ARM SoC so I get a merge base there before I
-can send any more stuff.
+Cheers,
 
-It's mainly because this stuff isn't any orthogonal, everything
-just conflicts in the AUXDATA all the time.
-
-Yours,
-Linus Walleij
+/ magnus
