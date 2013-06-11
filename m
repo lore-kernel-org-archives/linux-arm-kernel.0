@@ -1,29 +1,43 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 11 Jun 2013 09:47:36 +0200
-Subject: OMAP v3.10-rc regressions that no one's fixed
-In-Reply-To: <alpine.DEB.2.02.1306100716560.4604@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306100716560.4604@utopia.booyaka.com>
-Message-ID: <51B6D618.30809@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Jun 2013 16:48:11 +0900
+Subject: [PATCH] ARM: zImage/virt: remove hyp-stub.S during distclean
+In-Reply-To: <20130610060325.2335.65815.sendpatchset@w520>
+References: <20130610060325.2335.65815.sendpatchset@w520>
+Message-ID: <20130611074810.GC10440@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Paul,
-
-On 06/10/2013 09:22 AM, Paul Walmsley wrote:
+On Mon, Jun 10, 2013 at 03:03:25PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
 > 
-> Hi folks -- particularly TIers working on mainline,
+> Make sure hyp-stub.S gets removed during make distclean,
+> this left over file was introduced in commit:
 > 
-> There are several regressions that started with v3.10-rc that no one's 
-> fixed for over a month.  Some of them should be quite easy:
+> 424e599 ARM: zImage/virt: hyp mode entry support for the zImage loader
 > 
-> * 2430SDP, 3730 Beagle XM, 3530 Beagle, 3517EVM, CM-T3517: {dmic,mcpdm} lookup failure
->   - Cause unknown
->   - These IP blocks don't exist on OMAP3xxx/AM35xx chips
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-I will send a patch soon to fix these. Need to test the patch(es) first. I
-think they surfaced because I have enabled the audio support in
-omap2plus_defconfig for OMAP4 and 5 - which require McPDM and DMIC.
-Just couple of minutes, and I'll have the fix.
+Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
 
--- 
-P?ter
+> ---
+> 
+>  arch/arm/boot/compressed/Makefile |    3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> --- 0001/arch/arm/boot/compressed/Makefile
+> +++ work/arch/arm/boot/compressed/Makefile	2013-06-05 17:21:20.000000000 +0900
+> @@ -116,7 +116,8 @@ targets       := vmlinux vmlinux.lds \
+>  
+>  # Make sure files are removed during clean
+>  extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
+> -		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
+> +		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs) \
+> +		 hyp-stub.S
+>  
+>  ifeq ($(CONFIG_FUNCTION_TRACER),y)
+>  ORIG_CFLAGS := $(KBUILD_CFLAGS)
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
