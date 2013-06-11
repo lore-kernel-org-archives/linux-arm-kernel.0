@@ -1,37 +1,40 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 11 Jun 2013 11:58:45 -0400 (EDT)
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-In-Reply-To: <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
-References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1306111150270.18597@syhkavp.arg>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 11 Jun 2013 09:03:22 -0700
+Subject: [PATCH] drivers: pinctrl: add active state to core
+In-Reply-To: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
+References: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130611160322.GB20352@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013, Lorenzo Pieralisi wrote:
-
-> Hi Russell, all,
+On Tue, Jun 11, 2013 at 10:16:56AM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> even though I think this set is ready to get merged, it would be great
-> if we can test it on as many platforms as possible since it touches core
-> suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
-> and there are many.
+> In addition to the recently introduced pinctrl core
+> control, the PM runtime pin control for the OMAP platforms
+> require a fourth state in addtition to the default, idle and
+> sleep states already handled by the core: an explicit "active"
+> state. Let's introduce this to the core in addition to the
+> other states already defined.
 > 
-> I pushed out a branch:
-> 
-> git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
-> 
-> if anyone has time to test the set that would be really great, thank you
-> very much.
+> Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
+> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Wolfram Sang <wsa@the-dreams.de>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Mark Brown <broonie@kernel.org>
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Suggested-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> Greg: need your ACK on this to merge it through the pinctrl
+> tree.
+> ---
+>  drivers/base/pinctrl.c                |  8 +++++++-
+>  drivers/pinctrl/core.c                | 15 +++++++++++++++
 
-Since a lot of big.LITTLE related code, including proper TC2 support, is 
-being withheld by this, I would suggest we wait say a week for people to 
-test and report any issue they might have, after which it should simply 
-be merged.  Some people will test such code only after it is merged 
-anyway.
+For anything that just touches drivers/base/pinctrl.c, you don't need my
+ack, that's your code, you can do whatever you want with it :)
 
-@Lorenzo: Why not ask for this branch to be included in linux-next right 
-away? This way you'll get implicit testing.
-
-
-Nicolas
+But here you go anyway:
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
