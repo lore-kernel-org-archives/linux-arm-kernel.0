@@ -1,48 +1,36 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 00:45:52 -0700
-Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
- platforms
-In-Reply-To: <CACRpkdYA72YsASjPKPK6+N=okprRyQ5W6N-wUtgZ9c6uWq1a3Q@mail.gmail.com>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <1368807872-2601-4-git-send-email-t.figa@samsung.com>
- <62314159.5vrvK4k2Mm@amdc1227>
- <CACRpkdYA72YsASjPKPK6+N=okprRyQ5W6N-wUtgZ9c6uWq1a3Q@mail.gmail.com>
-Message-ID: <20130611074552.GK6688@quad.lixom.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Jun 2013 16:46:23 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Remove legacy memory bits
+In-Reply-To: <201306101700.22787.arnd@arndb.de>
+References: <20130610094638.20803.18484.sendpatchset@w520>
+ <201306101700.22787.arnd@arndb.de>
+Message-ID: <20130611074623.GA10440@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 06:13:10PM +0200, Linus Walleij wrote:
-> On Mon, Jun 10, 2013 at 4:45 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-> > On Friday 17 of May 2013 18:24:29 Tomasz Figa wrote:
-> >> This patch makes legacy code on suspend/resume path being executed
-> >> conditionally, on non-DT platforms only, to fix suspend/resume of
-> >> DT-enabled systems, for which the code is inappropriate.
-> >>
-> >> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> >> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >> ---
-> >>  arch/arm/plat-samsung/pm.c | 17 ++++++++++++-----
-> >>  1 file changed, 12 insertions(+), 5 deletions(-)
-> >
-> > It seems like this patch did not make it into 3.10-rc5, while rest of patches
-> > did, which ended up with suspend/resume still being broken.
-> >
-> > What should we do in this case?
+On Mon, Jun 10, 2013 at 05:00:22PM +0200, Arnd Bergmann wrote:
+> On Monday 10 June 2013, Magnus Damm wrote:
+> > ARM: shmobile: Remove legacy memory bits
+> > 
+> > [PATCH 01/03] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
+> > [PATCH 02/03] ARM: shmobile: Remove MEMORY_START/SIZE
+> > [PATCH 03/03] ARM: shmobile: Remove mach/memory.h
+> > 
+> > Now when all users are gone this series removes the legacy memory code
+> > and enables CONFIG_ARM_PATCH_PHYS_VIRT. Depends on the following code:
+> > 
+> > [PATCH v2] ARM: shmobile: uImage load address rework
+> > [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
+> > [PATCH 00/06] ARM: shmobile: SMP virt_to_phys() conversion
+> > [PATCH 00/02] ARM: shmobile: romImage update
+> > 
+> > The romImage series above still needs to be updated.
+> > 
+> > This is the final bit of code not to rely on CONFIG_MEMORY_START/SIZE
+> > which in turn is one component that we need for ARCH_MULTIPLATFORM.
+> > 
+> > Signed-off-by: Magnus Damm <damm@opensource.se>
 > 
-> I did not apply this patch to the pinctrl tree because it begins
-> with ARM: but it appears I promised to carry it anyway...
-> 
-> I need an ACK from the ARM SoC people to do that though,
-> or you can take it through ARM SoC fixes directly.
-> 
-> I would just ask Olof/Arnd to apply it directly as a separate
-> patch.
+> Looks all good to me.
 
-It makes sense to take this through arm-soc since it's no longer
-dependent on anything else.
-
-Applied to fixes. Please do follow through with the promised cleanups at some
-point, Tomasz. :-)
-
-
--Olof
+I will queue these up once all the dependencies are ready.
