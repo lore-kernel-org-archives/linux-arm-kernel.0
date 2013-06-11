@@ -1,31 +1,44 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Jun 2013 16:48:50 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: fix Ether device name
-In-Reply-To: <201306090123.24709.sergei.shtylyov@cogentembedded.com>
-References: <201306090123.24709.sergei.shtylyov@cogentembedded.com>
-Message-ID: <20130611074850.GE10440@verge.net.au>
+Date: Tue, 11 Jun 2013 16:49:43 +0900
+Subject: [PATCH v8 0/9] Reorganize R8A7779/Marzen USB code
+In-Reply-To: <51B1B9D9.5040906@cogentembedded.com>
+References: <201306020128.05914.sergei.shtylyov@cogentembedded.com>
+ <20130607080637.GC22598@verge.net.au>
+ <51B1B9D9.5040906@cogentembedded.com>
+Message-ID: <20130611074943.GF10440@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 09, 2013 at 01:23:24AM +0400, Sergei Shtylyov wrote:
-> While recasting commit 524219146a89aee5366326c225ccd71231419d89 (ARM: shmobile:
-> R8A7778: add Ether support), I made a typo in the platform device's name: used
-> underscore instead of hyphen.
+On Fri, Jun 07, 2013 at 02:45:45PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> However, there's now patch merged to net-next.git renaming the platform device
-> from "sh-eth" to "r8a777x-ehter", so it makes the most sense to change the name
-> straight to that one.
+> On 07-06-2013 12:06, Simon Horman wrote:
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> >>    Here's the set of 9 patches against the Simon Horman's 'renesas.git' repo,
+> >>'renesas-next-20130528' tag.  It was created to fix the shortcomings in the
+> >>R8A7779/Marzen USB platform code and R8A7779 USB common PHY driver, and so
+> >>spans both arch/arm/mach-shmobile/ and drivers/usb/ subtrees (some patches have
+> >>to touch both subtrees). The patches were conceived with the complete
+> >>bisectability goal in mind.
 > 
-> ---
-> The patch is atop of the 'renesas-next-20130607' tag of the 'renesas.git' tree
-> and the USB patches I have submitted earlier.
+> >>[1/9] ARM: shmobile: Marzen: move USB EHCI, OHCI, and PHY devices to R8A7779 code
+> >>[2/9] ehci-platform: add pre_setup() method to platform data
+> >>[3/9] ARM: shmobile: r8a7779: setup EHCI internal buffer
+> >>[4/9] phy-rcar-usb: remove EHCI internal buffer setup
+> >>[5/9] ARM: shmobile: r8a7779: remove USB PHY 2nd memory resource
+> >>[6/9] phy-rcar-usb: correct base address
+> >>[7/9] phy-rcar-usb: add platform data
+> >>[8/9] ARM: shmobile: Marzen: pass platform data to USB PHY device
+> >>[9/9] phy-rcar-usb: handle platform data
 > 
-> Changes in version 2:
-> - changed the platform device's name as in the patch merged to 'net-next.git';
-> - lowercased the SoC name in the subject.
+> >>    The patchset is completely ready to be merged now.
+> 
+> >Can I confirm that the plan is for me to merge this code?
+> 
+>    Yes, that was the plan.
+> 
+> >If so, I should be able to do so next week.
 
-Thanks, I have queued this up in the soc2 branch.
+Thanks, I have queued this up in the soc2 phy-rcar-usb.
 My current plan is to let that branch sit in next for a few
 days and then send a pull-request for it to be included in v3.11.
