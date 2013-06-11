@@ -1,81 +1,92 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Jun 2013 06:09:10 +0900
-Subject: [GIT PULL 6/6] s3c24xx driver
-Message-ID: <51B791F6.4000004@samsung.com>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 11 Jun 2013 16:24:48 -0500
+Subject: [PATCH] arm: dt: zynq: Add support for the zc706 platform
+In-Reply-To: <1370884204-2297-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1370884204-2297-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1370985888.7804.1.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+Hi Soren,
 
-   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+On Mon, 2013-06-10 at 10:10 -0700, Soren Brinkmann wrote:
+> Add a DT fragment for the zc706 Zynq platform. Also, adding a
+> corresponding target to the Makefile and adding an appropriate
+> compatibility string in the BSP.
+> 
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> ---
+>  arch/arm/boot/dts/Makefile       |  3 ++-
+>  arch/arm/boot/dts/zynq-zc706.dts | 31 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-zynq/common.c      |  1 +
+>  3 files changed, 34 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm/boot/dts/zynq-zc706.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index b9f7121..2aecf7e 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -206,7 +206,8 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+>  	wm8505-ref.dtb \
+>  	wm8650-mid.dtb \
+>  	wm8850-w70v2.dtb
+> -dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
+> +dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
+> +	zynq-zc706.dtb
+>  
+>  targets += dtbs
+>  targets += $(dtb-y)
+> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+> new file mode 100644
+> index 0000000..a8a1d7d
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/zynq-zc706.dts
+> @@ -0,0 +1,31 @@
+> +/*
+> + *  Copyright (C) 2011 Xilinx
+> + *  Copyright (C) 2012 National Instruments Corp.
+> + *  Copyright (C) 2013 Xilinx
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +/dts-v1/;
+> +/include/ "zynq-7000.dtsi"
+> +
+> +/ {
+> +	model = "Zynq ZC706 Development Board";
+> +	compatible = "xlnx,zynq-zc706", "xlnx,zynq-7000";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x0 0x40000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyPS1,115200 earlyprintk";
+> +	};
+> +
+> +};
+> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+> index 5bfe703..221694b 100644
+> --- a/arch/arm/mach-zynq/common.c
+> +++ b/arch/arm/mach-zynq/common.c
+> @@ -99,6 +99,7 @@ static void zynq_system_reset(char mode, const char *cmd)
+>  
+>  static const char * const zynq_dt_match[] = {
+>  	"xlnx,zynq-zc702",
+> +	"xlnx,zynq-zc706",
 
-are available in the git repository at:
+You really don't need to add zc706 here if it is already compatable with
+zynq-7000.
 
-   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/s3c24xx-driver-1
-
-for you to fetch changes up to ae7b6dccf6711e8d5815688f1572ab55bf5b3069:
-
-   Merge branch 'v3.11-next/driver-cpufreq' into 
-v3.11-next/s3c24xx-driver (2013-06-12 05:24:22 +0900)
-
-----------------------------------------------------------------
-
-update driver for s3c24xx
-- move cpufreq driver into drivers/
-- add pinctrl-s3c24xx driver
-- cleanup OF in gpio driver
-
-----------------------------------------------------------------
-Heiko Stuebner (1):
-       pinctrl: Add pinctrl-s3c24xx driver
-
-Kukjin Kim (3):
-       Merge branch 'v3.11-next/driver-gpio' into v3.11-next/s3c24xx-driver
-       Merge branch 'v3.11-next/driver-pinctrl' into 
-v3.11-next/s3c24xx-driver
-       Merge branch 'v3.11-next/driver-cpufreq' into 
-v3.11-next/s3c24xx-driver
-
-Sylwester Nawrocki (1):
-       gpio: samsung: Remove OF support for s3c24xx
-
-Viresh Kumar (1):
-       cpufreq: s3c24xx: move cpufreq driver to drivers/cpufreq
-
-  .../devicetree/bindings/gpio/gpio-samsung.txt      |  43 --
-  .../bindings/pinctrl/samsung-pinctrl.txt           |   8 +
-  arch/arm/Kconfig                                   |  47 --
-  arch/arm/mach-s3c24xx/Kconfig                      |  66 +--
-  arch/arm/mach-s3c24xx/Makefile                     |   6 -
-  arch/arm/mach-s3c24xx/{ => include/mach}/s3c2412.h |   0
-  arch/arm/mach-s3c24xx/iotiming-s3c2412.c           |   2 +-
-  arch/arm/plat-samsung/include/plat/cpu-freq-core.h |  10 +-
-  arch/arm/plat-samsung/include/plat/cpu-freq.h      |   6 +-
-  drivers/cpufreq/Kconfig.arm                        |  58 ++
-  drivers/cpufreq/Makefile                           |   5 +
-  .../cpufreq/s3c2410-cpufreq.c                      |   0
-  .../cpufreq/s3c2412-cpufreq.c                      |   3 +-
-  .../cpufreq/s3c2440-cpufreq.c                      |   0
-  .../cpufreq/s3c24xx-cpufreq-debugfs.c              |   0
-  .../cpufreq.c => drivers/cpufreq/s3c24xx-cpufreq.c |   0
-  drivers/gpio/gpio-samsung.c                        |  67 +--
-  drivers/pinctrl/Kconfig                            |   5 +
-  drivers/pinctrl/Makefile                           |   1 +
-  drivers/pinctrl/pinctrl-s3c24xx.c                  | 652 
-+++++++++++++++++++++
-  drivers/pinctrl/pinctrl-samsung.c                  |  10 +
-  drivers/pinctrl/pinctrl-samsung.h                  |   4 +
-  22 files changed, 784 insertions(+), 209 deletions(-)
-  rename arch/arm/mach-s3c24xx/{ => include/mach}/s3c2412.h (100%)
-  rename arch/arm/mach-s3c24xx/cpufreq-s3c2410.c => 
-drivers/cpufreq/s3c2410-cpufreq.c (100%)
-  rename arch/arm/mach-s3c24xx/cpufreq-s3c2412.c => 
-drivers/cpufreq/s3c2412-cpufreq.c (99%)
-  rename arch/arm/mach-s3c24xx/cpufreq-s3c2440.c => 
-drivers/cpufreq/s3c2440-cpufreq.c (100%)
-  rename arch/arm/mach-s3c24xx/cpufreq-debugfs.c => 
-drivers/cpufreq/s3c24xx-cpufreq-debugfs.c (100%)
-  rename arch/arm/mach-s3c24xx/cpufreq.c => 
-drivers/cpufreq/s3c24xx-cpufreq.c (100%)
-  create mode 100644 drivers/pinctrl/pinctrl-s3c24xx.c
+Dinh
+>  	"xlnx,zynq-7000",
+>  	NULL
+>  };
