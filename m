@@ -1,42 +1,36 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Jun 2013 09:48:27 +0100
-Subject: [PATCH] i2c: sirf: move driver init from module_init to
- subsys_initcall
-In-Reply-To: <CAGsJ_4y4svi0TbUKK1aAW1McM5rFoo5Vb9rGPweq-sHJ2NN5cQ@mail.gmail.com>
-References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
- <20130516093846.GA2927@katana>
- <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
- <20130525201032.GD32043@sirena.org.uk>
- <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
- <20130527121658.GA3660@sirena.org.uk>
- <CAGsJ_4w867BhFvVze5BNaYheW75pMcOGhscz3wSZiia-neP59w@mail.gmail.com>
- <20130610134535.GB2987@katana>
- <CAGsJ_4y4svi0TbUKK1aAW1McM5rFoo5Vb9rGPweq-sHJ2NN5cQ@mail.gmail.com>
-Message-ID: <20130611084827.GS1403@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Jun 2013 10:48:47 +0200
+Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
+ properties from a dt node
+In-Reply-To: <201306102140.29918.heiko@sntech.de>
+References: <201306102139.32444.heiko@sntech.de>
+ <201306102140.29918.heiko@sntech.de>
+Message-ID: <CACRpkdbEkP-UbwsMD7bDokDU_Swa4_mCQcxu+Z7AeUfdYZ8xaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 09:14:41AM +0800, Barry Song wrote:
+On Mon, Jun 10, 2013 at 9:40 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
-> the mainline idea you mentioned is that you don't care about any early
-> device, which means some devices want to start earlier than others in
-> some real automative user scenerioes.
-> but i think another important idea is that mainline codes come from
-> branches of different vendors and serve final users of those drivers,
-> but not only make source codes no difference to all environments. the
-> auto users i2c-sirf serves, here, actually means some differences with
-> PC/tablet/mobilephone. we don't make codes good-looking by losing
-> functionality and not close to final users.
+> pinconf_generic_parse_dt_config() takes a node as input and generates an
+> array of generic pinconfig values from the properties of this node.
+>
+> As I couldn't find a mechanism to count the number of properties of a node
+> the function uses internally an array to accept one of parameter and copies
+> the real present options to a smaller variable at its end.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-It's not that people don't care about these users, it's that people
-don't care too much about out of tree users.  Part of the goal here is
-to convince people working on such applications that they should make
-mainline better for everyone so that you don't need external code to
-make the kernel useful.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/858938c0/attachment.sig>
+Looks good, patch applied!
+
+> +Supported configuration parameters are:
+> +
+> +bias-disable           - disable any pin bias
+> +bias-high-impedance    - high impedance mode ("third-state", "floating")
+(...)
+
+We should probably document applicable arguments to these,
+and indicate which ones are boolean. But that can be fixed up
+later.
+
+Yours,
+Linus Walleij
