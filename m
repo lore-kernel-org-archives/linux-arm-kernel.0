@@ -1,61 +1,51 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 01:12:34 -0700
-Subject: [GIT PULL v2 00/27] Renesas ARM-based SoC updates for v3.11
-In-Reply-To: <20130611080119.GC5300@verge.net.au>
-References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
- <20130611071925.GI6688@quad.lixom.net>
- <CAOesGMjDGkWO9YEqocv1ZFtDaaUPfoRMJNPEty6E3UDcGTeKew@mail.gmail.com>
- <20130611080119.GC5300@verge.net.au>
-Message-ID: <CAOesGMjypvtgEcXNv-9oTfa8WG55rjy8HKXsqR_BE=7-hyqviw@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 11 Jun 2013 16:14:25 +0800
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <21763864.rYYOf1P6VP@linux-5eaq.site>
+References: <CACVXFVNdy_cffR7JYNVfs40QJ9eF4Y8UKL7ZsRPOTOegghFkaQ@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306101316020.1133-100000@iolanthe.rowland.org>
+ <CACVXFVMNzwD44mhKijURSWrqLKjy7_oOY8hrTtjbyOxGS2tv=g@mail.gmail.com>
+ <21763864.rYYOf1P6VP@linux-5eaq.site>
+Message-ID: <CACVXFVNgzb=VVf9PY_sAHXPtXnqFVXbnB_L4i4xvK0dN1-8T2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 1:01 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Jun 11, 2013 at 12:23:40AM -0700, Olof Johansson wrote:
->> On Tue, Jun 11, 2013 at 12:19 AM, Olof Johansson <olof@lixom.net> wrote:
->> > Hi Simon,
->> >
->> > On Fri, Jun 07, 2013 at 04:51:30PM +0900, Simon Horman wrote:
->> >> Hi Olof, Hi Arnd,
->> >>
->> >> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
->> >>
->> >>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
->> >>
->> >> are available in the git repository at:
->> >>
->> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.11
->> >
->> > Thanks a lot for reshuffling the patches into the categories we use!
->> >
->> > For future cases, if you want to split off the cleanups you can do that as
->> > a separate branch, and use that branch as a base for feature branches. Either
->> > way works, sometimes it's nice to see cleanups separated out but it all depends
->> > on volumes, etc.
->> >
->> >
->> > Pulled into next/soc.
+On Tue, Jun 11, 2013 at 3:18 PM, Oliver Neukum <oliver@neukum.org> wrote:
+> On Tuesday 11 June 2013 13:40:20 Ming Lei wrote:
+>> On Tue, Jun 11, 2013 at 1:36 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+>> > On Mon, 10 Jun 2013, Ming Lei wrote:
+>
+>> If complete() callback runs in one tasklet context, spin_lock() inside
+>> complete() is enough, just like hard irq, the tasklet itself is disabled
+>> during complete(), if the percpu tasklet is converted to single tasklet.
+>> So no problem when the lock is to protect shared resources between
+>> complete().
+>
+> We also have exclusion between complete() and other contexts, i.e. timers.
+
+The patch also converts the complete() called in timers to tasklet context too.
+
+So could you let me know if that eases your concern? If not, could you explain
+your concern about other contexts in a bit detail?
+
+>
+>> When the lock is to protect shared resources between complete() and
+>> non-IRQ context, currently spin_lock_irqsave() is used in non-IRQ
+>> context, which is enough to prevent tasklet from being run on the CPU,
+>> so no problem for this situation too.
 >>
->> Actually, I just noticed that this caused a few conflicts with the
->> pinmux-gpio branch you sent earlier. So I've moved said pinmux/gpio
->> branch into next/soc instead of next/drivers where it was earlier.
->> Please also check my conflict resolution once the branch has been
->> pushed out.
+>> When all HCDs support to run URB giveback in tasklet context, we can
+>> change all spin_lock_irq*() to spin_lock() in drivers URB->complete(), and
+>> in other places, the spin_lock_irq*() can be changed to spin_lock_bh().
 >
-> Thanks. I have checked and your conflict resolution is the same as mine.
->
-> This is an issue that I'm not entirely clear on the best practice for.
-> Is it sufficient for me to note any conflicts in the pull-request,
-> or in future should I re-arrange things somehow?
+> Even now we cannot guarantee that all calls to complete() are in irq.
+> There is the case of HCD hotunplug and other cases, like timeouts.
+> They will have to be verified.
 
-It's always good to get a heads up that there will be conflicts.
-Simple conflicts like these are perfectly fine to expose though.
+All URBs are completed via usb_hcd_giveback_urb(), so there should
+be no differences between these cases and the common one about
+introducing the patchset.
 
-It's sometimes good to get a reference resolution of them from you --
-for example in this case I had originally resolved the conflict
-differently from you in your version of the merge (that was part of
-the boards branch), so I had to go back and redo it to not cause extra
-conflicts there.
-
-
--Olof
+Thanks,
+--
+Ming Lei
