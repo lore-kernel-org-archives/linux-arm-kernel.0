@@ -1,120 +1,84 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Tue, 11 Jun 2013 12:51:28 +0200
-Subject: [RFC PATCH 3/4] ARM: at91/dt: add sam9 watchdog default options to
- SoCs
-In-Reply-To: <1370947890-954-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370947890-954-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1370947890-954-4-git-send-email-b.brezillon@overkiz.com>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Tue, 11 Jun 2013 11:56:02 +0100
+Subject: [PATCH v2] mfd: vexpress: Make the driver optional for arm and arm64
+In-Reply-To: <20130610232249.GH18614@n2100.arm.linux.org.uk>
+References: <20130610232249.GH18614@n2100.arm.linux.org.uk>
+Message-ID: <1370948162-18895-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set default watchdog options in every SoC compatible with the sam9 watchdog.
+The driver can be used on either arm or arm64 platforms, but
+the latter doesn't have any platform-specific configuration
+options, so it must be possible to manually enable the driver.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+As the gpiolib is optional for arm64 arch, the gpio/led code
+must be compiled conditionally.
+
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/boot/dts/at91sam9260.dtsi |    5 +++++
- arch/arm/boot/dts/at91sam9263.dtsi |    5 +++++
- arch/arm/boot/dts/at91sam9g45.dtsi |    5 +++++
- arch/arm/boot/dts/at91sam9n12.dtsi |    5 +++++
- arch/arm/boot/dts/at91sam9x5.dtsi  |    5 +++++
- arch/arm/boot/dts/sama5d3.dtsi     |    5 +++++
- 6 files changed, 30 insertions(+)
+ drivers/mfd/Kconfig           |  3 ++-
+ drivers/mfd/vexpress-sysreg.c | 10 ++++++++--
+ 2 files changed, 10 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/at91sam9260.dtsi b/arch/arm/boot/dts/at91sam9260.dtsi
-index 899a7cf..6c44c35 100644
---- a/arch/arm/boot/dts/at91sam9260.dtsi
-+++ b/arch/arm/boot/dts/at91sam9260.dtsi
-@@ -643,6 +643,11 @@
- 			watchdog at fffffd40 {
- 				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffd40 0x10>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				atmel,watchdog-type = "hardware";
-+				atmel,reset-type = "all";
-+				atmel,dbg-halt;
-+				atmel,idle-halt;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9263.dtsi b/arch/arm/boot/dts/at91sam9263.dtsi
-index ff63811..6b31ee0 100644
---- a/arch/arm/boot/dts/at91sam9263.dtsi
-+++ b/arch/arm/boot/dts/at91sam9263.dtsi
-@@ -519,6 +519,11 @@
- 			watchdog at fffffd40 {
- 				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffd40 0x10>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				atmel,watchdog-type = "hardware";
-+				atmel,reset-type = "all";
-+				atmel,dbg-halt;
-+				atmel,idle-halt;
- 				status = "disabled";
- 			};
+diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+index d54e985..6959b8d 100644
+--- a/drivers/mfd/Kconfig
++++ b/drivers/mfd/Kconfig
+@@ -1144,7 +1144,8 @@ config MCP_UCB1200_TS
+ endmenu
  
-diff --git a/arch/arm/boot/dts/at91sam9g45.dtsi b/arch/arm/boot/dts/at91sam9g45.dtsi
-index faec17d..ca1a643 100644
---- a/arch/arm/boot/dts/at91sam9g45.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g45.dtsi
-@@ -634,6 +634,11 @@
- 			watchdog at fffffd40 {
- 				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffd40 0x10>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				atmel,watchdog-type = "hardware";
-+				atmel,reset-type = "all";
-+				atmel,dbg-halt;
-+				atmel,idle-halt;
- 				status = "disabled";
- 			};
+ config VEXPRESS_CONFIG
+-	bool
++	bool "ARM Versatile Express platform infrastructure"
++	depends on ARM || ARM64
+ 	help
+ 	  Platform configuration infrastructure for the ARM Ltd.
+ 	  Versatile Express.
+diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
+index 96a020b..981bef4 100644
+--- a/drivers/mfd/vexpress-sysreg.c
++++ b/drivers/mfd/vexpress-sysreg.c
+@@ -351,6 +351,8 @@ void __init vexpress_sysreg_of_early_init(void)
+ }
  
-diff --git a/arch/arm/boot/dts/at91sam9n12.dtsi b/arch/arm/boot/dts/at91sam9n12.dtsi
-index 3166e1d..7c8a5ea 100644
---- a/arch/arm/boot/dts/at91sam9n12.dtsi
-+++ b/arch/arm/boot/dts/at91sam9n12.dtsi
-@@ -505,6 +505,11 @@
- 			watchdog at fffffe40 {
- 				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffe40 0x10>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				atmel,watchdog-type = "hardware";
-+				atmel,reset-type = "all";
-+				atmel,dbg-halt;
-+				atmel,idle-halt;
- 				status = "disabled";
- 			};
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9x5.dtsi b/arch/arm/boot/dts/at91sam9x5.dtsi
-index e77106e..48eb1cc 100644
---- a/arch/arm/boot/dts/at91sam9x5.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5.dtsi
-@@ -742,6 +742,11 @@
- 			watchdog at fffffe40 {
- 				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffe40 0x10>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				atmel,watchdog-type = "hardware";
-+				atmel,reset-type = "all";
-+				atmel,dbg-halt;
-+				atmel,idle-halt;
- 				status = "disabled";
- 			};
  
-diff --git a/arch/arm/boot/dts/sama5d3.dtsi b/arch/arm/boot/dts/sama5d3.dtsi
-index c00e158..7974723 100644
---- a/arch/arm/boot/dts/sama5d3.dtsi
-+++ b/arch/arm/boot/dts/sama5d3.dtsi
-@@ -885,6 +885,11 @@
- 			watchdog at fffffe40 {
- 				compatible = "atmel,at91sam9260-wdt";
- 				reg = <0xfffffe40 0x10>;
-+				interrupts = <1 IRQ_TYPE_LEVEL_HIGH 7>;
-+				atmel,watchdog-type = "hardware";
-+				atmel,reset-type = "all";
-+				atmel,dbg-halt;
-+				atmel,idle-halt;
- 				status = "disabled";
- 			};
++#ifdef CONFIG_GPIOLIB
++
+ #define VEXPRESS_SYSREG_GPIO(_name, _reg, _value) \
+ 	[VEXPRESS_GPIO_##_name] = { \
+ 		.reg = _reg, \
+@@ -445,6 +447,8 @@ struct gpio_led_platform_data vexpress_sysreg_leds_pdata = {
+ 	.leds = vexpress_sysreg_leds,
+ };
+ 
++#endif
++
+ 
+ static ssize_t vexpress_sysreg_sys_id_show(struct device *dev,
+ 		struct device_attribute *attr, char *buf)
+@@ -480,6 +484,9 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+ 	setup_timer(&vexpress_sysreg_config_timer,
+ 			vexpress_sysreg_config_complete, 0);
+ 
++	vexpress_sysreg_dev = &pdev->dev;
++
++#ifdef CONFIG_GPIOLIB
+ 	vexpress_sysreg_gpio_chip.dev = &pdev->dev;
+ 	err = gpiochip_add(&vexpress_sysreg_gpio_chip);
+ 	if (err) {
+@@ -490,11 +497,10 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
+-	vexpress_sysreg_dev = &pdev->dev;
+-
+ 	platform_device_register_data(vexpress_sysreg_dev, "leds-gpio",
+ 			PLATFORM_DEVID_AUTO, &vexpress_sysreg_leds_pdata,
+ 			sizeof(vexpress_sysreg_leds_pdata));
++#endif
+ 
+ 	device_create_file(vexpress_sysreg_dev, &dev_attr_sys_id);
  
 -- 
-1.7.9.5
+1.8.1.2
