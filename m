@@ -1,34 +1,58 @@
-From: pdeschrijver@nvidia.com (Peter De Schrijver)
-Date: Tue, 11 Jun 2013 10:30:48 +0300
-Subject: [PATCH V3 3/4] ARM: dts: tegra: Correct PCIe entry
-In-Reply-To: <20130610195511.GC25859@mithrandir>
-References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
- <1370372252-4332-3-git-send-email-jagarwal@nvidia.com>
- <20130610195511.GC25859@mithrandir>
-Message-ID: <20130611073048.GR3847@tbergstrom-lnx.Nvidia.com>
+From: pgaikwad@nvidia.com (Prashant Gaikwad)
+Date: Tue, 11 Jun 2013 13:01:05 +0530
+Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
+In-Reply-To: <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
+References: <20130607121505.21868.72360.stgit@dusk.lan>
+ <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
+ <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
+Message-ID: <51B6D239.5030905@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 09:55:12PM +0200, Thierry Reding wrote:
-> * PGP Signed by an unknown key
-> 
-> On Wed, Jun 05, 2013 at 12:27:31AM +0530, Jay Agarwal wrote:
-> [...]
-> > @@ -29,7 +29,7 @@
-> >  		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000   /* port 0 configuration space */
-> >  			  0x82000000 0 0x00001000 0x00001000 0 0x00001000   /* port 1 configuration space */
-> >  			  0x82000000 0 0x00004000 0x00004000 0 0x00001000   /* port 2 configuration space */
-> > -			  0x81000000 0 0          0x02000000 0 0x00010000   /* downstream I/O */
-> > +			  0x81000000 0 0          0x02000000 0 0x00100000   /* downstream I/O */
-> >  			  0x82000000 0 0x20000000 0x20000000 0 0x10000000   /* non-prefetchable memory */
-> >  			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>; /* prefetchable memory */
-> 
-> That increases the I/O region size from 64 KiB to 1 MiB. Why is that
-> necessary? I/O operations can only address 64 KiB, so I don't think
-> adding more makes any sense.
+On Friday 07 June 2013 10:36 PM, Paul Walmsley wrote:
+> Hi Stephen,
+>
+> On Fri, 7 Jun 2013, Stephen Warren wrote:
+>
+>> On 06/07/2013 06:19 AM, Paul Walmsley wrote:
+>>> Add DFLL DVCO reset line control functions to the CAR IP block driver.
+>>>
+>>> The DVCO present in the DFLL IP block has a separate reset line,
+>>> exposed via the CAR IP block.  This reset line is asserted upon SoC
+>>> reset.  Unless something (such as the DFLL driver) deasserts this
+>>> line, the DVCO will not oscillate, although reads and writes to the
+>>> DFLL IP block will complete.
+>>>
+>>> Thanks to Aleksandr Frid <afrid@nvidia.com> for identifying this and
+>>> saving hours of debugging time.
+>>> diff --git a/drivers/clk/tegra/clk.h b/drivers/clk/tegra/clk.h
+>>>   void tegra114_clock_tune_cpu_trimmers_high(void);
+>>>   void tegra114_clock_tune_cpu_trimmers_low(void);
+>>>   void tegra114_clock_tune_cpu_trimmers_init(void);
+>>> +void tegra114_clock_assert_dfll_dvco_reset(void);
+>>> +void tegra114_clock_deassert_dfll_dvco_reset(void);
+>> Where/what is the code that will call these new APIs? If it's going to
+>> be something in drivers/clk, that seems fine.
+> That's correct - they'll be used by the DFLL clocksource code, which will
+> live in drivers/clk/tegra.  You've seen the patches already ;-)
 
-At least PCI allows 32bit I/O addresses. No idea if anyone uses them though.
+Why not implement these APIs in DFLL clock driver itself and pass RST 
+address register to driver?
 
-Cheers,
+>> The reset assert/de-assert functions at least might be worth exposing
+>> using the new generic module reset API. I believe Prashant Gaikwad is
+>> working on converting the Tegra clock driver to be a module reset
+>> provider, hence removing the existing custom
+>> tegra_periph_reset_{de,}assert() APIs.
+> OK, will take a look to see if this can be done without getting in the way
+> of Prashant's work.  I'd na?vely assume that it might be best to convert
+> these as part of his series - that way we won't duplicate effort.
+>
+> Prashant, what stage are you at in the conversion?  If you're close to
+> completion, maybe we can just add this functionality in with your patches?
+>
 
-Peter.
+You can continue with this patch. I do not see any need to add this 
+reset control to generic reset module.
+
+> - Paul
