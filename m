@@ -1,137 +1,287 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 11 Jun 2013 15:07:44 -0700
-Subject: [Patch 3/3] clk: Avoid re-parenting orphan clk's having invalid
- parent index.
-In-Reply-To: <51AD9450.5090107@ti.com>
-References: <1367475929-32166-1-git-send-email-ambresh@ti.com>
- <1367475929-32166-4-git-send-email-ambresh@ti.com>
- <20130529071809.6058.24017@quantum> <51AD9450.5090107@ti.com>
-Message-ID: <20130611220744.8816.8856@quantum>
+Date: Tue, 11 Jun 2013 15:13:02 -0700
+Subject: [PATCH V5 2/5] clk: samsung: register audio subsystem clocks using
+ common clock framework
+In-Reply-To: <1370348890-6645-3-git-send-email-padma.v@samsung.com>
+References: <1370348890-6645-1-git-send-email-padma.v@samsung.com>
+ <1370348890-6645-3-git-send-email-padma.v@samsung.com>
+Message-ID: <20130611221302.8816.73360@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Ambresh K (2013-06-04 00:16:32)
-> On Wednesday 29 May 2013 12:48 PM, Mike Turquette wrote:
-> > Quoting Ambresh K (2013-05-01 23:25:29)
-> >> From: Ambresh K <ambresh@ti.com>
-> >>
-> >> Add orhan clk nodes having invalid parent index to list and use
-> >> the list to skip re-parenting orphan clk having invalid parents.
-> >>
-> >> Signed-off-by: Ambresh K <ambresh@ti.com>
-> >> ---
-> >>  drivers/clk/clk.c |   21 +++++++++++++++++++--
-> >>  1 files changed, 19 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-> >> index f4d2c73..54d2aa3 100644
-> >> --- a/drivers/clk/clk.c
-> >> +++ b/drivers/clk/clk.c
-> >> @@ -32,6 +32,7 @@ static int enable_refcnt;
-> >>  
-> >>  static HLIST_HEAD(clk_root_list);
-> >>  static HLIST_HEAD(clk_orphan_list);
-> >> +static HLIST_HEAD(clk_orphan_invalid_parent);
-> > 
-> > Why not re-use the clk_orphan_list?  Having an invalid value programmed
-> > into the hardware for selecting a parent essetially orphans a clock
-> > from a software point of view.  Is there a specific need for the new
-> > list?
+Quoting Padmavathi Venna (2013-06-04 05:28:07)
+> Audio subsystem is introduced in s5pv210 and exynos platforms.
+> This has seperate clock controller which can control i2s0 and
+> pcm0 clocks. This patch registers the audio subsystem clocks
+> with the common clock framework on Exynos family.
 > 
-> Sorry for not being descriptive in commit message.  
-> 
-> a) Avoids unnecessary re-parenting cycle for orphan clock's with invalid parent for every clock
-> 
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 
-True, but this is a minor optimisation.  If this is a big optimization
-for you then you really need to fix your bootloader.  We shouldn't be
-optimizing slow error paths just because we refuse to fix the errors.
-
-> b) With patch [1/3], after a clk with invalid parent was encountered, for every clk registered thereafter seeing following logs. 
-> <Snippet>
-> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent
-> [    0.000000] __clk_init: orphan clk(gpu_core_gclk_mux) invalid parent  
-> 
-> Please advice, if can be handled better. 
-> 
-
-First off, I don't think we should create new structures to work around
-bugs that should be fixed.  pr_err_once() will let us know something is
-wrong and won't flood the log.  Even then I'm inclined to say that
-flooding the log is OK and will motivate you to fix up your bootloader.
-Error prints are there for a reason.
-
-Secondly, I spent like 10 minutes looking at this code and I'm still
-confused.  For a clock with invalid parent programming, are you adding
-it to BOTH the orphan list and the has_invalid_parent list?  Why?  Is
-this just avoid the spurious prints?  For everyone clock registered we
-walk the list of orphans to see if that orphan can be reparented.  This
-patch adds another nested list walk (likely a short list) for each of
-those orphans in the first list walk, so it starts to look like O(n^2).
-I don't like it.
-
-I think the first two patches in the series look good, but unless I am
-misunderstanding this patch I feel that it can be dropped entirely.
+This looks good to me.  You have my Ack, or I can take this patch
+through clk-next.  Let me know what works for you.
 
 Regards,
 Mike
 
-> Thanks, 
-> Ambresh
+> ---
+>  .../devicetree/bindings/clock/clk-exynos-audss.txt |   64 ++++++++++
+>  drivers/clk/samsung/Makefile                       |    1 +
+>  drivers/clk/samsung/clk-exynos-audss.c             |  133 ++++++++++++++++++++
+>  include/dt-bindings/clk/exynos-audss-clk.h         |   25 ++++
+>  4 files changed, 223 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+>  create mode 100644 drivers/clk/samsung/clk-exynos-audss.c
+>  create mode 100644 include/dt-bindings/clk/exynos-audss-clk.h
 > 
-> 
-> > 
-> > Regards,
-> > Mike
-> > 
-> >>  static LIST_HEAD(clk_notifier_list);
-> >>  
-> >>  /***           locking             ***/
-> >> @@ -1532,8 +1533,8 @@ EXPORT_SYMBOL_GPL(clk_set_parent);
-> >>   */
-> >>  int __clk_init(struct device *dev, struct clk *clk)
-> >>  {
-> >> -       int i, ret = 0;
-> >> -       struct clk *orphan;
-> >> +       int i, ret = 0, skip = 0;
-> >> +       struct clk *orphan, *has_invalid_parent;
-> >>         struct hlist_node *tmp2;
-> >>  
-> >>         if (!clk)
-> >> @@ -1639,11 +1640,27 @@ int __clk_init(struct device *dev, struct clk *clk)
-> >>                 if (!strcmp(clk->name, orphan->name))
-> >>                         continue;
-> >>  
-> >> +               /* Skip iteration if orphan has invalid parent */
-> >> +               hlist_for_each_entry(has_invalid_parent,
-> >> +                               &clk_orphan_invalid_parent, child_node) {
-> >> +                       if (!strcmp(orphan->name, has_invalid_parent->name)) {
-> >> +                               skip = 1;
-> >> +                               break;
-> >> +                       }
-> >> +               }
-> >> +
-> >> +               if (skip) {
-> >> +                       skip = 0;
-> >> +                       continue;
-> >> +               }
-> >> +
-> >>                 if (orphan->ops->get_parent) {
-> >>                         i = orphan->ops->get_parent(orphan->hw);
-> >>                         if (i < 0) {
-> >>                                 pr_err("%s: orphan clk(%s) invalid parent\n",
-> >>                                                 __func__, orphan->name);
-> >> +                               hlist_add_head(&orphan->child_node,
-> >> +                                               &clk_orphan_invalid_parent);
-> >>                                 continue;
-> >>                         }
-> >>                         if (!strcmp(clk->name, orphan->parent_names[i]))
-> >> -- 
-> >> 1.7.4.1
-> >
+> diff --git a/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt b/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+> new file mode 100644
+> index 0000000..a120180
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/clk-exynos-audss.txt
+> @@ -0,0 +1,64 @@
+> +* Samsung Audio Subsystem Clock Controller
+> +
+> +The Samsung Audio Subsystem clock controller generates and supplies clocks
+> +to Audio Subsystem block available in the S5PV210 and Exynos SoCs. The clock
+> +binding described here is applicable to all SoC's in Exynos family.
+> +
+> +Required Properties:
+> +
+> +- compatible: should be one of the following:
+> +  - "samsung,exynos4210-audss-clock" - controller compatible with all Exynos4 SoCs.
+> +  - "samsung,exynos5250-audss-clock" - controller compatible with all Exynos5 SoCs.
+> +
+> +- reg: physical base address and length of the controller's register set.
+> +
+> +- #clock-cells: should be 1.
+> +
+> +The following is the list of clocks generated by the controller. Each clock is
+> +assigned an identifier and client nodes use this identifier to specify the
+> +clock which they consume. Some of the clocks are available only on a particular
+> +Exynos4 SoC and this is specified where applicable.
+> +
+> +Provided clocks:
+> +
+> +Clock           ID      SoC (if specific)
+> +-----------------------------------------------
+> +
+> +mout_audss      0
+> +mout_i2s        1
+> +dout_srp        2
+> +dout_aud_bus    3
+> +dout_i2s        4
+> +srp_clk         5
+> +i2s_bus         6
+> +sclk_i2s        7
+> +pcm_bus         8
+> +sclk_pcm        9
+> +
+> +Example 1: An example of a clock controller node is listed below.
+> +
+> +clock_audss: audss-clock-controller at 3810000 {
+> +       compatible = "samsung,exynos5250-audss-clock";
+> +       reg = <0x03810000 0x0C>;
+> +       #clock-cells = <1>;
+> +};
+> +
+> +Example 2: I2S controller node that consumes the clock generated by the clock
+> +           controller. Refer to the standard clock bindings for information
+> +           about 'clocks' and 'clock-names' property.
+> +
+> +i2s0: i2s at 03830000 {
+> +       compatible = "samsung,i2s-v5";
+> +       reg = <0x03830000 0x100>;
+> +       dmas = <&pdma0 10
+> +               &pdma0 9
+> +               &pdma0 8>;
+> +       dma-names = "tx", "rx", "tx-sec";
+> +       clocks = <&clock_audss EXYNOS_I2S_BUS>,
+> +               <&clock_audss EXYNOS_I2S_BUS>,
+> +               <&clock_audss EXYNOS_SCLK_I2S>,
+> +               <&clock_audss EXYNOS_MOUT_AUDSS>,
+> +               <&clock_audss EXYNOS_MOUT_I2S>;
+> +       clock-names = "iis", "i2s_opclk0", "i2s_opclk1",
+> +       "mout_audss", "mout_i2s";
+> +};
+> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+> index b7c232e..1876810 100644
+> --- a/drivers/clk/samsung/Makefile
+> +++ b/drivers/clk/samsung/Makefile
+> @@ -6,3 +6,4 @@ obj-$(CONFIG_COMMON_CLK)        += clk.o clk-pll.o
+>  obj-$(CONFIG_ARCH_EXYNOS4)     += clk-exynos4.o
+>  obj-$(CONFIG_SOC_EXYNOS5250)   += clk-exynos5250.o
+>  obj-$(CONFIG_SOC_EXYNOS5440)   += clk-exynos5440.o
+> +obj-$(CONFIG_ARCH_EXYNOS)      += clk-exynos-audss.o
+> diff --git a/drivers/clk/samsung/clk-exynos-audss.c b/drivers/clk/samsung/clk-exynos-audss.c
+> new file mode 100644
+> index 0000000..9b1bbd5
+> --- /dev/null
+> +++ b/drivers/clk/samsung/clk-exynos-audss.c
+> @@ -0,0 +1,133 @@
+> +/*
+> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+> + * Author: Padmavathi Venna <padma.v@samsung.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * Common Clock Framework support for Audio Subsystem Clock Controller.
+> +*/
+> +
+> +#include <linux/clkdev.h>
+> +#include <linux/io.h>
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> +#include <linux/syscore_ops.h>
+> +
+> +#include <dt-bindings/clk/exynos-audss-clk.h>
+> +
+> +static DEFINE_SPINLOCK(lock);
+> +static struct clk **clk_table;
+> +static void __iomem *reg_base;
+> +static struct clk_onecell_data clk_data;
+> +
+> +#define ASS_CLK_SRC 0x0
+> +#define ASS_CLK_DIV 0x4
+> +#define ASS_CLK_GATE 0x8
+> +
+> +static unsigned long reg_save[][2] = {
+> +       {ASS_CLK_SRC,  0},
+> +       {ASS_CLK_DIV,  0},
+> +       {ASS_CLK_GATE, 0},
+> +};
+> +
+> +/* list of all parent clock list */
+> +static const char *mout_audss_p[] = { "fin_pll", "fout_epll" };
+> +static const char *mout_i2s_p[] = { "mout_audss", "cdclk0", "sclk_audio0" };
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +static int exynos_audss_clk_suspend(void)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(reg_save); i++)
+> +               reg_save[i][1] = readl(reg_base + reg_save[i][0]);
+> +
+> +       return 0;
+> +}
+> +
+> +static void exynos_audss_clk_resume(void)
+> +{
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(reg_save); i++)
+> +               writel(reg_save[i][1], reg_base + reg_save[i][0]);
+> +}
+> +
+> +static struct syscore_ops exynos_audss_clk_syscore_ops = {
+> +       .suspend        = exynos_audss_clk_suspend,
+> +       .resume         = exynos_audss_clk_resume,
+> +};
+> +#endif /* CONFIG_PM_SLEEP */
+> +
+> +/* register exynos_audss clocks */
+> +void __init exynos_audss_clk_init(struct device_node *np)
+> +{
+> +       reg_base = of_iomap(np, 0);
+> +       if (!reg_base) {
+> +               pr_err("%s: failed to map audss registers\n", __func__);
+> +               return;
+> +       }
+> +
+> +       clk_table = kzalloc(sizeof(struct clk *) * EXYNOS_AUDSS_MAX_CLKS,
+> +                               GFP_KERNEL);
+> +       if (!clk_table) {
+> +               pr_err("%s: could not allocate clk lookup table\n", __func__);
+> +               return;
+> +       }
+> +
+> +       clk_data.clks = clk_table;
+> +       clk_data.clk_num = EXYNOS_AUDSS_MAX_CLKS;
+> +       of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data);
+> +
+> +       clk_table[EXYNOS_MOUT_AUDSS] = clk_register_mux(NULL, "mout_audss",
+> +                               mout_audss_p, ARRAY_SIZE(mout_audss_p), 0,
+> +                               reg_base + ASS_CLK_SRC, 0, 1, 0, &lock);
+> +
+> +       clk_table[EXYNOS_MOUT_I2S] = clk_register_mux(NULL, "mout_i2s",
+> +                               mout_i2s_p, ARRAY_SIZE(mout_i2s_p), 0,
+> +                               reg_base + ASS_CLK_SRC, 2, 2, 0, &lock);
+> +
+> +       clk_table[EXYNOS_DOUT_SRP] = clk_register_divider(NULL, "dout_srp",
+> +                               "mout_audss", 0, reg_base + ASS_CLK_DIV, 0, 4,
+> +                               0, &lock);
+> +
+> +       clk_table[EXYNOS_DOUT_AUD_BUS] = clk_register_divider(NULL,
+> +                               "dout_aud_bus", "dout_srp", 0,
+> +                               reg_base + ASS_CLK_DIV, 4, 4, 0, &lock);
+> +
+> +       clk_table[EXYNOS_DOUT_I2S] = clk_register_divider(NULL, "dout_i2s",
+> +                               "mout_i2s", 0, reg_base + ASS_CLK_DIV, 8, 4, 0,
+> +                               &lock);
+> +
+> +       clk_table[EXYNOS_SRP_CLK] = clk_register_gate(NULL, "srp_clk",
+> +                               "dout_srp", CLK_SET_RATE_PARENT,
+> +                               reg_base + ASS_CLK_GATE, 0, 0, &lock);
+> +
+> +       clk_table[EXYNOS_I2S_BUS] = clk_register_gate(NULL, "i2s_bus",
+> +                               "dout_aud_bus", CLK_SET_RATE_PARENT,
+> +                               reg_base + ASS_CLK_GATE, 2, 0, &lock);
+> +
+> +       clk_table[EXYNOS_SCLK_I2S] = clk_register_gate(NULL, "sclk_i2s",
+> +                               "dout_i2s", CLK_SET_RATE_PARENT,
+> +                               reg_base + ASS_CLK_GATE, 3, 0, &lock);
+> +
+> +       clk_table[EXYNOS_PCM_BUS] = clk_register_gate(NULL, "pcm_bus",
+> +                                "sclk_pcm", CLK_SET_RATE_PARENT,
+> +                               reg_base + ASS_CLK_GATE, 4, 0, &lock);
+> +
+> +       clk_table[EXYNOS_SCLK_PCM] = clk_register_gate(NULL, "sclk_pcm",
+> +                               "div_pcm0", CLK_SET_RATE_PARENT,
+> +                               reg_base + ASS_CLK_GATE, 5, 0, &lock);
+> +
+> +#ifdef CONFIG_PM_SLEEP
+> +       register_syscore_ops(&exynos_audss_clk_syscore_ops);
+> +#endif
+> +
+> +       pr_info("Exynos: Audss: clock setup completed\n");
+> +}
+> +CLK_OF_DECLARE(exynos4210_audss_clk, "samsung,exynos4210-audss-clock",
+> +               exynos_audss_clk_init);
+> +CLK_OF_DECLARE(exynos5250_audss_clk, "samsung,exynos5250-audss-clock",
+> +               exynos_audss_clk_init);
+> diff --git a/include/dt-bindings/clk/exynos-audss-clk.h b/include/dt-bindings/clk/exynos-audss-clk.h
+> new file mode 100644
+> index 0000000..8279f42
+> --- /dev/null
+> +++ b/include/dt-bindings/clk/exynos-audss-clk.h
+> @@ -0,0 +1,25 @@
+> +/*
+> + * This header provides constants for Samsung audio subsystem
+> + * clock controller.
+> + *
+> + * The constants defined in this header are being used in dts
+> + * and exynos audss driver.
+> + */
+> +
+> +#ifndef _DT_BINDINGS_CLK_EXYNOS_AUDSS_H
+> +#define _DT_BINDINGS_CLK_EXYNOS_AUDSS_H
+> +
+> +#define EXYNOS_MOUT_AUDSS      0
+> +#define EXYNOS_MOUT_I2S        1
+> +#define EXYNOS_DOUT_SRP        2
+> +#define EXYNOS_DOUT_AUD_BUS    3
+> +#define EXYNOS_DOUT_I2S        4
+> +#define EXYNOS_SRP_CLK         5
+> +#define EXYNOS_I2S_BUS         6
+> +#define EXYNOS_SCLK_I2S        7
+> +#define EXYNOS_PCM_BUS         8
+> +#define EXYNOS_SCLK_PCM        9
+> +
+> +#define EXYNOS_AUDSS_MAX_CLKS  10
+> +
+> +#endif
+> -- 
+> 1.7.4.4
