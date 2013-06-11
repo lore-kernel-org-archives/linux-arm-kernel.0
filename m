@@ -1,30 +1,30 @@
 From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 11 Jun 2013 16:49:45 +0200
-Subject: [PATCH 0/4] ARM: dts: OMAP3: Updates for Overo
-Message-ID: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
+Date: Tue, 11 Jun 2013 16:49:46 +0200
+Subject: [PATCH 1/4] ARM: dts: OMAP3: Include IRQ header
+In-Reply-To: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <1370962189-9689-2-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Some nodes in OMAP3 DTS now use edge or level sensitive interrupts.
 
-This series performs several updates to omap3-overo and omap3-tobi.
-Patch 1 is necessary to patch 2 for the IRQ constant. The SMSC911X is
-largely taken from omap3-igep.
+Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
+---
+ arch/arm/boot/dts/omap3.dtsi |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Regards,
-
-Florian
-
-Florian Vaussard (4):
-  ARM: dts: OMAP3: Include IRQ header
-  ARM: dts: omap3-tobi: Add SMSC911X node
-  ARM: dts: omap3-tobi: Correct polarity for GPIO LED
-  ARM: dts: omap3-overo: Add default trigger for TWL4030 LED
-
- arch/arm/boot/dts/omap3-overo.dtsi |    1 +
- arch/arm/boot/dts/omap3-tobi.dts   |   50 +++++++++++++++++++++++++++++++++++-
- arch/arm/boot/dts/omap3.dtsi       |    1 +
- 3 files changed, 51 insertions(+), 1 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
+index 6d05ee0..8e1a87f 100644
+--- a/arch/arm/boot/dts/omap3.dtsi
++++ b/arch/arm/boot/dts/omap3.dtsi
+@@ -9,6 +9,7 @@
+  */
+ 
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/pinctrl/omap.h>
+ 
+ #include "skeleton.dtsi"
 -- 
 1.7.5.4
