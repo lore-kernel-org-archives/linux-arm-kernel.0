@@ -1,30 +1,49 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 11 Jun 2013 12:12:38 -0400 (EDT)
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-In-Reply-To: <51B748BB.7070602@wwwdotorg.org>
-References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
- <51B748BB.7070602@wwwdotorg.org>
-Message-ID: <alpine.LFD.2.03.1306111209400.18597@syhkavp.arg>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 11 Jun 2013 18:10:27 +0200
+Subject: [GIT PULL] support for kernel mode NEON
+Message-ID: <CAKv+Gu_jf6xq+EPFucCPxLjNKY-O3bv2GtXb=PLd8TL9Rg5eBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013, Stephen Warren wrote:
+Hello Russell,
 
-> On 06/11/2013 03:58 AM, Lorenzo Pieralisi wrote:
-> > Hi Russell, all,
-> > 
-> > even though I think this set is ready to get merged, it would be great
-> > if we can test it on as many platforms as possible since it touches core
-> > suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
-> > and there are many.
-> 
-> FWIW, I booted a Tegra system with these patches applied and didn't see
-> any issue in very brief testing. I'm not sure what targeted testing
-> would be useful?
+If you feel the remaining issues with these patches have been
+addressed, please find my pull request below.
+Note that the RAID-6 syndrome calculation patch is not included here:
+the code lives under linux/lib/raid6/ so I will propose it on the LKML
+instead.
 
-Deep idle mode where the CPU is turned off and has to re-enter the 
-kernel via cpu_resume.
+Regards,
+Ard.
 
 
-Nicolas
+The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+
+  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+
+are available in the git repository at:
+
+  git://git.linaro.org/people/ardbiesheuvel/linux-arm.git for-rmk
+
+for you to fetch changes up to 35af08a00df3bd0261921e62bcfbdf9558fcbfc7:
+
+  ARM: crypto: add NEON accelerated XOR implementation (2013-06-11
+17:51:05 +0200)
+
+----------------------------------------------------------------
+Ard Biesheuvel (4):
+      ARM: add support for kernel mode NEON
+      ARM: move VFP init to an earlier boot stage
+      ARM: be strict about FP exceptions in kernel mode
+      ARM: crypto: add NEON accelerated XOR implementation
+
+ arch/arm/Kconfig            |  7 +++++
+ arch/arm/include/asm/neon.h | 36 ++++++++++++++++++++++
+ arch/arm/include/asm/xor.h  | 73 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/lib/Makefile       |  6 ++++
+ arch/arm/lib/xor-neon.c     | 42 ++++++++++++++++++++++++++
+ arch/arm/vfp/vfphw.S        |  5 ++++
+ arch/arm/vfp/vfpmodule.c    | 56 +++++++++++++++++++++++++++++++++-
+ 7 files changed, 224 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/include/asm/neon.h
+ create mode 100644 arch/arm/lib/xor-neon.c
