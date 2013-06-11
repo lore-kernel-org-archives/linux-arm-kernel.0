@@ -1,35 +1,43 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Jun 2013 10:48:53 -0600
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-In-Reply-To: <20130611162224.GA13741@e102568-lin.cambridge.arm.com>
-References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
- <51B748BB.7070602@wwwdotorg.org>
- <20130611162224.GA13741@e102568-lin.cambridge.arm.com>
-Message-ID: <51B754F5.4070109@wwwdotorg.org>
+From: jonathan.austin@arm.com (Jonathan Austin)
+Date: Tue, 11 Jun 2013 17:49:04 +0100
+Subject: [PATCH] ARM: arch_timer: add missing include for of_* functions
+Message-ID: <1370969344-25764-1-git-send-email-jonathan.austin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2013 10:22 AM, Lorenzo Pieralisi wrote:
-> Hi Stephen,
-> 
-> On Tue, Jun 11, 2013 at 04:56:43PM +0100, Stephen Warren wrote:
->> On 06/11/2013 03:58 AM, Lorenzo Pieralisi wrote:
->>> Hi Russell, all,
->>>
->>> even though I think this set is ready to get merged, it would be great
->>> if we can test it on as many platforms as possible since it touches core
->>> suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
->>> and there are many.
->>
->> FWIW, I booted a Tegra system with these patches applied and didn't see
->> any issue in very brief testing. I'm not sure what targeted testing
->> would be useful?
-> 
-> That's great thanks. CPUidle deep C-states (when CPUs resume from reset
-> through cpu_resume) are the main triggers of this code, so you should be
-> running with them enabled to test it.
+The arch timer code uses a bunch of of_* functions that are defined in
+linux/of.h. Currently this header is not included but with CONFIG_OF defined
+the functions are available anyway.
 
-OK, in that case I believe I tested that; I had our "LP2" CPU
-power-management mode enabled as always, and that powers off the CPUs
-and resumes them, and didn't see any issue.
+This was discovered because in the case that CONFIG_OF=n and ARM_ARCH_TIMER is
+selected, the kernel no longer builds due to the lack of this header.
+This patch fixes that (though without another patch
+- https://patchwork.kernel.org/patch/2242291/ - the build still fails due to
+a missing stub for of_find_matching_node())
+
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+---
+
+It seems to me that, no matter what your opinion on whether CONFIG_OF=n with
+CONFIG_ARM_ARCH_TIMER=y makes sense, we should fix this particular missing
+include.
+
+Jonny
+
+ drivers/clocksource/arm_arch_timer.c |    1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index d7ad425..c716ffa 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -15,6 +15,7 @@
+ #include <linux/cpu.h>
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
++#include <linux/of.h>
+ #include <linux/of_irq.h>
+ #include <linux/io.h>
+ 
+-- 
+1.7.9.5
