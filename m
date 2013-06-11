@@ -1,87 +1,59 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 11 Jun 2013 13:51:01 +0300
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <51B64877.4040908@schinagl.nl>
-References: <1370185130-15332-1-git-send-email-oliver+list@schinagl.nl>
- <1370185130-15332-2-git-send-email-oliver+list@schinagl.nl>
- <CAHp75Vdqc9xiPBvQUB3Hfb4EBFUsoVxyuH8MK=9spJ4+rieoDQ@mail.gmail.com>
- <51B64877.4040908@schinagl.nl>
-Message-ID: <CAHp75Vf8-JRjTHjoUDQPXA3LK3SQSeCzyroF=J4ZLmHMzy6jvw@mail.gmail.com>
+From: b.brezillon@overkiz.com (Boris BREZILLON)
+Date: Tue, 11 Jun 2013 12:51:25 +0200
+Subject: [RFC PATCH 0/4] watchdog: at91sam9_wdt: handle already configured wdt
+Message-ID: <1370947890-954-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 12:43 AM, Oliver Schinagl
-<oliver+list@schinagl.nl> wrote:
-> On 06/06/13 21:16, Andy Shevchenko wrote:
->> On Sun, Jun 2, 2013 at 5:58 PM, Oliver Schinagl <oliver+list@schinagl.nl>
->> wrote:
->>> From: Oliver Schinagl <oliver@schinagl.nl>
+Hello,
 
->>> +       if (likely((SID_SIZE))) {
->>
->> Extra braces.
->> Use antipattern here.
->
-> While I accidentally dropped the pointer here, sorry for the confusion, what
-> is antipattern? I have asked around and nobody really knew.
+This patch series is a porposal to enhance the sam9 watchdog timer support.
 
-In this case instead of doing...
+The at91sam9 watchdog timer cannot configured twice, and the current
+implementation only tries to configure in a static way:
+- 2 seconds timeout
+- wdt restart every 500ms
 
-if (likely(condition)) {
- do_smth();
-}
-do_very_few_ops();
-return;
+If the timer has already been configured with different values, it returns an
+error and do not create any watchdog device.
 
-...better to do
+This is not critical if the watchdog is disabled, but if it has been enabled with
+different timeout values it will lead to a SoC reset.
 
-if(unlikely(!condition)) {
- do_very_few_ops();
- return;
-}
+This patch series tries to address this issue by adapting the heartbeat value
+according the WDT timer config:
+- it first tries to configure the timer as requested.
+- if it fails it fallbacks to the current config, adapting its heartbeat timer
+to the needs
 
-do_smth();
-return;
+This patch series also move to a dynamically allocated at91wdt device instead
+of the static instance. I'm not sure this is the best solution, so please tell
+me if you prefer to keep static instance of watchdog.
 
-It takes more lines of code, but increases readability a lot.
+It adds a new at91 wdt type: software. This new type make use of the at91 wdt
+interrupt to trigger a software watchdog.
 
->>> +       if (unlikely(!pdev->dev.of_node)) {
->>> +               dev_err(dev, "No devicetree data available\n");
->>> +               ret = -EFAULT;
->>> +               goto exit;
->>
->>
->> Plain return here and in entire function where it applies.
->
-> Why? I know there's conflicting preferences here. The general consensus
-> seems, don't return mid function if you don't absolutely have to. Yet, you
-> make it sound, just return wherever. I take it that really is just a
-> preference? I think i see both constructs throughout the kernel. So one
-> review prefers the one method, the next the other?
+Finally it adds several properties to the device tree bindings.
 
-Usually it makes sense when you have to free resources or do something
-like that. You have plain return statement under exit label.
+Best Regards,
+Boris
 
->>> +       ret = device_create_bin_file(dev, &sid_bin_attr);
->>> +       if (unlikely(ret)) {
->>
->> Any benifit of (un)likely in probe()?
->
-> Does it hurt however in any way though? It's just a compiler optimization
-> isn't it.
+Boris BREZILLON (4):
+  watchdog: at91sam9_wdt: better watchdog support
+  watchdog: at91sam9_wdt: update device tree doc
+  ARM: at91/dt: add sam9 watchdog default options to SoCs
+  ARM: at91/dt: add watchdog properties to kizbox board
 
-It hurts readability. probe() function is usually doesn't require
-fastest execution. Moreover, [1] tells us "You should use it only in
-cases when the likeliest branch is very very very likely, or when the
-unlikeliest branch is very very very unlikely."
+ .../devicetree/bindings/watchdog/atmel-wdt.txt     |   30 +-
+ arch/arm/boot/dts/at91sam9260.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9263.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9g45.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9n12.dtsi                 |    5 +
+ arch/arm/boot/dts/at91sam9x5.dtsi                  |    5 +
+ arch/arm/boot/dts/kizbox.dts                       |    6 +
+ arch/arm/boot/dts/sama5d3.dtsi                     |    5 +
+ drivers/watchdog/at91sam9_wdt.c                    |  319 +++++++++++++++-----
+ 9 files changed, 300 insertions(+), 85 deletions(-)
 
-There also an article [2] about cache issues. Bad usage of the
-likely/unlikely macros might lead to performance degradation (cache
-misses). You have to think about those macros really carefully.
-
-[1] http://kernelnewbies.org/FAQ/LikelyUnlikely
-[2] http://dslab.lzu.edu.cn:8080/docs/publications/NicholasMcGuire.pdf
-
---
-With Best Regards,
-Andy Shevchenko
+-- 
+1.7.9.5
