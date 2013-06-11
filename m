@@ -1,43 +1,36 @@
-From: jonathan.austin@arm.com (Jonathan Austin)
-Date: Tue, 11 Jun 2013 17:49:04 +0100
-Subject: [PATCH] ARM: arch_timer: add missing include for of_* functions
-Message-ID: <1370969344-25764-1-git-send-email-jonathan.austin@arm.com>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 11 Jun 2013 09:56:45 -0700
+Subject: [PATCH 0/2] ARM dts: bcm281xx: use preprocessor for device trees
+In-Reply-To: <20130611070344.GF6688@quad.lixom.net>
+References: <1370497295-12682-1-git-send-email-matt.porter@linaro.org>
+ <20130611070344.GF6688@quad.lixom.net>
+Message-ID: <51B756CD.1070500@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arch timer code uses a bunch of of_* functions that are defined in
-linux/of.h. Currently this header is not included but with CONFIG_OF defined
-the functions are available anyway.
+On 13-06-11 12:03 AM, Olof Johansson wrote:
+> On Thu, Jun 06, 2013 at 01:41:33AM -0400, Matt Porter wrote:
+>> This series follows the same approach as taken on Tegra and
+>> OMAP DT files to use the C preprocessor in order to improve
+>> readability. Since bcm281xx does not yet have gpio and pinctrl
+>> support, this series just enables the C preprocessor and removes
+>> the magic constants from existing irq properties. Any new
+>> additions can come in using human readable definitions.
+>>
+>> The resulting dtb was diff-tested to validate it versus the non
+>> preprocessed dts version.
+>>
+>> Matt Porter (2):
+>>    ARM: dts: bcm281xx: use #include for device tree files
+>>    ARM: dts: bcm281xx: use existing defines for irqs
+> Acked-by: Olof Johansson <olof@lixom.net>
+Acked-by: Christian Daudt <csd@broadcom.com>
+>
+> Not sure what else you'll have for 3.11 devicetree-wise, Christian -- your
+> choice if you want to send a pull request or ack these and we'll apply them
+> directly.
+>
+I can add them to my tree. I already have a pending dt commit to push.
 
-This was discovered because in the case that CONFIG_OF=n and ARM_ARCH_TIMER is
-selected, the kernel no longer builds due to the lack of this header.
-This patch fixes that (though without another patch
-- https://patchwork.kernel.org/patch/2242291/ - the build still fails due to
-a missing stub for of_find_matching_node())
-
-Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
----
-
-It seems to me that, no matter what your opinion on whether CONFIG_OF=n with
-CONFIG_ARM_ARCH_TIMER=y makes sense, we should fix this particular missing
-include.
-
-Jonny
-
- drivers/clocksource/arm_arch_timer.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index d7ad425..c716ffa 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -15,6 +15,7 @@
- #include <linux/cpu.h>
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
-+#include <linux/of.h>
- #include <linux/of_irq.h>
- #include <linux/io.h>
- 
--- 
-1.7.9.5
+  thanks,
+    csd
