@@ -1,73 +1,46 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Jun 2013 10:05:45 +0100
-Subject: [RFC PATCH v3 0/2] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130611090545.GC8164@e102568-lin.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 11 Jun 2013 12:08:49 +0300
+Subject: [PATCH 4/4] ARM: OMAP: Move DT wake-up event handling over to
+ use pinctrl-single-omap
+In-Reply-To: <20130610142511.GF8164@atomide.com>
+References: <20130607203936.16513.57494.stgit@localhost>
+ <20130607205046.16513.2802.stgit@localhost>
+ <688FBEF7C8277944BE5AED9A41FB1EBC1AB12DA0@DNCE05.ent.ti.com>
+ <20130610142511.GF8164@atomide.com>
+Message-ID: <51B6E921.7050804@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+On 06/10/2013 05:25 PM, Tony Lindgren wrote:
+> * Quadros, Roger <rogerq@ti.com> [130610 05:37]:
+>> Hi Tony, (sorry, on Outlook web)
+>>
+>> -                       compatible = "ti,omap4-padconf", "pinctrl-single";
+>> +                       compatible = "ti,omap4-padconf";
+>>
+>> This change is not necessary if we make sure the pinctrl-single-omap driver
+>> gets registered early enough, before the pinctrl devices are probed.
+>>  (e.g. subsys_initcall())
+> 
+> I'd rather make everything just module_init, there should not be
+> any need to tinker with the init call ordering any longer with
+> deferred probe. And by making everything into regular device drivers
+> we actually see real error messages without DEBUG_LL and earlyprintk
+> if something goes wrong.
+> 
+> Note that there are patches queued to make twl-core.c just regular
+> module_init as well, so that should fix any issues you might be
+> related it probing before pinctrl.
+>  
 
-if nobody has objections I think this set is ready to get merged. As
-Nico mentioned in:
+OK.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173541.html
+>> I've commented about this in the other patch.
+> 
+> Sorry can you clarify, which other patch? The other message I saw
+> in this thread was empty. Or at least I have not seen it yet.
 
-since we would like to get it merged through the ARM SoC tree owing to
-dependencies between this code and ARM power management back-ends, your ack
-would be appreciated, if you think it is worth it of course.
+Sorry about that. Outlook web sucks. I see that you have found it :).
 
-Thank you very much indeed,
-Lorenzo
-
-On Thu, Jun 06, 2013 at 10:59:21AM +0100, Lorenzo Pieralisi wrote:
-> This patch is v3 of a previous posting:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/173464.html
-> 
-> v3 changes:
-> 
-> - added __refdata to spc_check_loaded pointer
-> - removed some exported symbols
-> - added node pointer check in vexpress_spc_init()
-> 
-> v2 changes:
-> 
-> - Dropped timeout interface patch
-> - Converted interfaces to non-timeout ones, integrated and retested
-> - Removed mutex used at init
-> - Refactored code to work around init sections warning
-> - Fixed two minor bugs
-> 
-> This patch series introduces support for the Versatile Express Serial
-> Power Controller (SPC) present in ARM Versatile Express TC2 core tiles.
-> SPC driver is a fundamental component of TC2 power management and allows
-> to carry out C-state management and DVFS for A15 and A7 clusters.
-> 
-> First patch provides changes required by SPC to comply with the
-> Versatile Express config API, second patch is the SPC driver implementation.
-> 
-> Code extensively exercised through CPUidle and CPUfreq power states and
-> operating point transitions.
-> 
-> Lorenzo Pieralisi (1):
->   drivers: mfd: vexpress: add Serial Power Controller (SPC) support
-> 
-> Pawel Moll (1):
->   drivers: mfd: refactor the vexpress config bridge API
-> 
->  Documentation/devicetree/bindings/mfd/vexpress-spc.txt |  35 +
->  drivers/mfd/Kconfig                                    |   7 +
->  drivers/mfd/Makefile                                   |   1 +
->  drivers/mfd/vexpress-config.c                          |  61 +-
->  drivers/mfd/vexpress-spc.c                             | 633 ++++++++++
->  drivers/mfd/vexpress-sysreg.c                          |   2 +-
->  include/linux/vexpress.h                               |  59 +-
->  7 files changed, 770 insertions(+), 28 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/mfd/vexpress-spc.txt
->  create mode 100644 drivers/mfd/vexpress-spc.c
-> 
-> -- 
-> 1.8.2.2
-> 
+cheers,
+-roger
