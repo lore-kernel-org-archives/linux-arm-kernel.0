@@ -1,84 +1,53 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Tue, 11 Jun 2013 11:56:02 +0100
-Subject: [PATCH v2] mfd: vexpress: Make the driver optional for arm and arm64
-In-Reply-To: <20130610232249.GH18614@n2100.arm.linux.org.uk>
-References: <20130610232249.GH18614@n2100.arm.linux.org.uk>
-Message-ID: <1370948162-18895-1-git-send-email-pawel.moll@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Jun 2013 12:07:46 +0100
+Subject: [PATCH 18/33 v2] clk: ux500: Add a 2-cell Device Tree parser for
+ obtaining PRCC clocks
+In-Reply-To: <1370521041-32318-19-git-send-email-lee.jones@linaro.org>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-19-git-send-email-lee.jones@linaro.org>
+Message-ID: <20130611110745.GA3330@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver can be used on either arm or arm64 platforms, but
-the latter doesn't have any platform-specific configuration
-options, so it must be possible to manually enable the driver.
+PRCC (peripheral and kernel) clocks are specified using a property tuple
+<&phandle base bit>, where 'base' is the peripheral (1, 2, 3, 5 or 6),
+and bit is read-in value into that peripheral stipulated by the hardware
+specification.
+    
+Cc: Mike Turquette <mturquette@linaro.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-As the gpiolib is optional for arm64 arch, the gpio/led code
-must be compiled conditionally.
-
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
----
- drivers/mfd/Kconfig           |  3 ++-
- drivers/mfd/vexpress-sysreg.c | 10 ++++++++--
- 2 files changed, 10 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-index d54e985..6959b8d 100644
---- a/drivers/mfd/Kconfig
-+++ b/drivers/mfd/Kconfig
-@@ -1144,7 +1144,8 @@ config MCP_UCB1200_TS
- endmenu
+diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
+index ef948ff..c2d9a1c 100644
+--- a/drivers/clk/ux500/u8500_clk.c
++++ b/drivers/clk/ux500/u8500_clk.c
+@@ -15,6 +15,28 @@
+ #include <linux/platform_data/clk-ux500.h>
+ #include "clk.h"
  
- config VEXPRESS_CONFIG
--	bool
-+	bool "ARM Versatile Express platform infrastructure"
-+	depends on ARM || ARM64
- 	help
- 	  Platform configuration infrastructure for the ARM Ltd.
- 	  Versatile Express.
-diff --git a/drivers/mfd/vexpress-sysreg.c b/drivers/mfd/vexpress-sysreg.c
-index 96a020b..981bef4 100644
---- a/drivers/mfd/vexpress-sysreg.c
-+++ b/drivers/mfd/vexpress-sysreg.c
-@@ -351,6 +351,8 @@ void __init vexpress_sysreg_of_early_init(void)
- }
- 
- 
-+#ifdef CONFIG_GPIOLIB
++#define PRCC_SHOW(clk, base, bit) \
++	clk[(base * PRCC_PERIPHS_PER_CLUSTER) + bit]
 +
- #define VEXPRESS_SYSREG_GPIO(_name, _reg, _value) \
- 	[VEXPRESS_GPIO_##_name] = { \
- 		.reg = _reg, \
-@@ -445,6 +447,8 @@ struct gpio_led_platform_data vexpress_sysreg_leds_pdata = {
- 	.leds = vexpress_sysreg_leds,
- };
- 
-+#endif
++struct clk *ux500_twocell_get(struct of_phandle_args *clkspec, void *data)
++{
++	struct clk **clk_data = data;
++	unsigned int base, bit;
 +
- 
- static ssize_t vexpress_sysreg_sys_id_show(struct device *dev,
- 		struct device_attribute *attr, char *buf)
-@@ -480,6 +484,9 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
- 	setup_timer(&vexpress_sysreg_config_timer,
- 			vexpress_sysreg_config_complete, 0);
- 
-+	vexpress_sysreg_dev = &pdev->dev;
++	if (clkspec->args_count != 2)
++		return  ERR_PTR(-EINVAL);
 +
-+#ifdef CONFIG_GPIOLIB
- 	vexpress_sysreg_gpio_chip.dev = &pdev->dev;
- 	err = gpiochip_add(&vexpress_sysreg_gpio_chip);
- 	if (err) {
-@@ -490,11 +497,10 @@ static int vexpress_sysreg_probe(struct platform_device *pdev)
- 		return err;
- 	}
- 
--	vexpress_sysreg_dev = &pdev->dev;
--
- 	platform_device_register_data(vexpress_sysreg_dev, "leds-gpio",
- 			PLATFORM_DEVID_AUTO, &vexpress_sysreg_leds_pdata,
- 			sizeof(vexpress_sysreg_leds_pdata));
-+#endif
- 
- 	device_create_file(vexpress_sysreg_dev, &dev_attr_sys_id);
- 
--- 
-1.8.1.2
++	base = clkspec->args[0];
++	bit = clkspec->args[1];
++
++	if (base != 1 && base != 2 && base != 3 && base != 5 && base != 6) {
++		pr_err("%s: invalid PRCC base %d\n", __func__, base);
++		return ERR_PTR(-EINVAL);
++	}
++
++	return PRCC_SHOW(clk_data, base, bit);
++}
++
+ const static struct of_device_id u8500_clk_of_match[] = {
+        { .compatible = "stericsson,u8500-clks", },
+        { },
