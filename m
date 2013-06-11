@@ -1,31 +1,67 @@
-From: matt.porter@linaro.org (Matt Porter)
-Date: Tue, 11 Jun 2013 14:45:58 -0400
-Subject: [PATCH] ARM: dts: bcm281xx: change comment to C89 style
-Message-ID: <1370976358-18014-1-git-send-email-matt.porter@linaro.org>
+From: csd@broadcom.com (Christian Daudt)
+Date: Tue, 11 Jun 2013 11:47:51 -0700
+Subject: [PATCH] clocksource: kona: adapt to CLOCKSOURCE_OF_DECLARE change
+In-Reply-To: <3174210.ZivUajNGev@wuerfel>
+References: <3174210.ZivUajNGev@wuerfel>
+Message-ID: <51B770D7.6000000@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CodingStyle does not allow C99 style comments. Since the
-dts files live in the kernel for now, make this compliant.
-
-Signed-off-by: Matt Porter <matt.porter@linaro.org>
+On 13-05-31 01:59 PM, Arnd Bergmann wrote:
+> The CLOCKSOURCE_OF_DECLARE functions now take a device_node pointer
+> as their argument, as of the clksrc/cleanup branch in arm-soc.
+> This patch adapts the bcm_kona_timer driver to the new interface.
+>
+> This causes an annoying but harmless build-time warning, it would
+> be nice to have this fixed in 3.10.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Christian Daudt <csd@broadcom.com>
+> Cc: John Stultz <john.stultz@linaro.org>
+> ---
+> diff --git a/drivers/clocksource/bcm_kona_timer.c b/drivers/clocksource/bcm_kona_timer.c
+> index 350f493..ba3d859 100644
+> --- a/drivers/clocksource/bcm_kona_timer.c
+> +++ b/drivers/clocksource/bcm_kona_timer.c
+> @@ -103,16 +103,10 @@ static const struct of_device_id bcm_timer_ids[] __initconst = {
+>   	{},
+>   };
+>   
+> -static void __init kona_timers_init(void)
+> +static void __init kona_timers_init(struct device_node *node)
+>   {
+> -	struct device_node *node;
+>   	u32 freq;
+>   
+> -	node = of_find_matching_node(NULL, bcm_timer_ids);
+> -
+> -	if (!node)
+> -		panic("No timer");
+> -
+>   	if (!of_property_read_u32(node, "clock-frequency", &freq))
+>   		arch_timer_rate = freq;
+>   	else
+> @@ -199,13 +193,12 @@ static struct irqaction kona_timer_irq = {
+>   	.handler = kona_timer_interrupt,
+>   };
+>   
+> -static void __init kona_timer_init(void)
+> +static void __init kona_timer_init(struct device_node *node)
+>   {
+> -	kona_timers_init();
+> +	kona_timers_init(node);
+>   	kona_timer_clockevents_init();
+>   	setup_irq(timers.tmr_irq, &kona_timer_irq);
+>   	kona_timer_set_next_event((arch_timer_rate / HZ), NULL);
+>   }
+>   
+> -CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer",
+> -	kona_timer_init);
+> +CLOCKSOURCE_OF_DECLARE(bcm_kona, "bcm,kona-timer", kona_timer_init);
+>
+>
 Acked-by: Christian Daudt <csd@broadcom.com>
----
- arch/arm/boot/dts/bcm11351.dtsi |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/bcm11351.dtsi b/arch/arm/boot/dts/bcm11351.dtsi
-index 824bebe..0651a72 100644
---- a/arch/arm/boot/dts/bcm11351.dtsi
-+++ b/arch/arm/boot/dts/bcm11351.dtsi
-@@ -36,7 +36,7 @@
- 
- 	smc at 0x3404c000 {
- 		compatible = "bcm,bcm11351-smc", "bcm,kona-smc";
--		reg = <0x3404c000 0x400>; //1 KiB in SRAM
-+		reg = <0x3404c000 0x400>; /* 1 KiB in SRAM */
- 	};
- 
- 	uart at 3e000000 {
--- 
-1.7.9.5
+Do you want this for 3.10 or should I add to my 3.11 tree ?
+  Thanks,
+    csd
