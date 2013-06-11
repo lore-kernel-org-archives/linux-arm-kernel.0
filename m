@@ -1,54 +1,43 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 11 Jun 2013 11:48:41 +0100
-Subject: [PATCH v2 03/11] regmap: Add regmap_field APIs
-In-Reply-To: <1370856118-6503-1-git-send-email-srinivas.kandagatla@st.com>
-References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
- <1370856118-6503-1-git-send-email-srinivas.kandagatla@st.com>
-Message-ID: <20130611104841.GX1403@sirena.org.uk>
+From: oliver@neukum.org (Oliver Neukum)
+Date: Tue, 11 Jun 2013 12:51:41 +0200
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVMxAddaHdjfi2rOOEW46-XA3KozULjFtLvEpo-MZC7+Aw@mail.gmail.com>
+References: <CACVXFVNdy_cffR7JYNVfs40QJ9eF4Y8UKL7ZsRPOTOegghFkaQ@mail.gmail.com>
+ <1888740.dKYctKO5at@linux-5eaq.site>
+ <CACVXFVMxAddaHdjfi2rOOEW46-XA3KozULjFtLvEpo-MZC7+Aw@mail.gmail.com>
+Message-ID: <4881808.FBe1KpJCmT@linux-5eaq.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 10:21:58AM +0100, Srinivas KANDAGATLA wrote:
-> It is common to access regmap registers at bit level, using
-> regmap_update_bits or regmap_read functions, however the end user has to
-> take care of a mask or shifting. This becomes overhead when such use
-> cases are high. Having a common function to do this is much convenient
-> and less error prone.
+On Tuesday 11 June 2013 17:27:28 Ming Lei wrote:
+> On Tue, Jun 11, 2013 at 4:49 PM, Oliver Neukum <oliver@neukum.org> wrote:
+> > On Tuesday 11 June 2013 16:14:25 Ming Lei wrote:
 
-So this looks basically good.  A couple of smallish nits below, if you
-could respin I'll apply this on a branch so it can be pulled in as
-dependency for the other things that use it.
+> > The driver itself may have submitted a timer and race against it.
+> > What locking do you need in complete() and a timer to lock against
+> > each other?
+> 
+> Good catch.
+> 
+> The problem will come if only spin_lock() is called inside complete(),
+> I will check main USB drivers in tree to see if there is such use case.
 
-> +	regmap_field_init(rm_field, regmap, reg_field);
-> +
-> +	return rm_field;
-> +
-> +}
-> +EXPORT_SYMBOL_GPL(devm_regmap_field_alloc);
-> +/**
-> + * regmap_field_alloc(): Allocate and initialise a register field
+All network drivers race against timeout. I think they just unlink the URB,
+but there's a lot of them.
 
-Needs a blank line between the two functions.
+> > But it makes no sense to go to a tasklet when you are already in task context.
+> > In those cases you need to do something, essentially blocking the tasklet.
+> 
+> At least now, always doing complete() in tasklet handler can simplify
+> implementation since these cases aren't in hot path.
 
-> +#include <linux/device.h>
-> +#include <linux/slab.h>
+Well, I am afraid this is not simply the case. These cases are partially
+synchronous. For example you need to make sure all calls to complete()
+are finished before you disconnect a HCD itself. The same applies to a device
+being disconnected.
 
-> +static inline void regmap_field_free(struct regmap_field *field)
-> +{
-> +	kfree(field);
-> +}
+It the same area, what happens if an URB is unlinked between the irq handler
+and the tasklet?
 
-> +static inline void devm_regmap_field_free(struct device *dev,
-> +	struct regmap_field *field)
-> +{
-> +	devm_kfree(dev, field);
-> +}
-
-Probably not worth inlining these, just put them in the code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/ebc65022/attachment.sig>
+	Regards
+		Oliver
