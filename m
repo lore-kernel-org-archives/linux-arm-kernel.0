@@ -1,100 +1,62 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Jun 2013 11:01:08 +0100
-Subject: [PATCH 00/21] ARM: ux500: Enable Clock look-up from Device Tree
-In-Reply-To: <CAPDyKFrJumd79hHWJkGWvRKzhoaprPHu=U6HOHXzVL8WyNS6jw@mail.gmail.com>
-References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
- <CAPDyKFrJumd79hHWJkGWvRKzhoaprPHu=U6HOHXzVL8WyNS6jw@mail.gmail.com>
-Message-ID: <20130611100108.GC9216@laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 11 Jun 2013 11:04:57 +0100
+Subject: [GIT PULL] arm: arch_timer cleanups and niceties for 3.11
+In-Reply-To: <20130607173902.GJ23311@e106331-lin.cambridge.arm.com>
+References: <20130607173902.GJ23311@e106331-lin.cambridge.arm.com>
+Message-ID: <20130611100457.GB22334@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > Nice and simple implementation using standard Clk APIs.
-> Hi Lee,
+On Fri, Jun 07, 2013 at 06:39:02PM +0100, Mark Rutland wrote:
+> Hi Russell,
 > 
-> I may be a bit tired, but I am having a bit hard to follow the steps
-> taken in this patch set. :-)
+> Please pull these arch_timer cleanups I've been holding onto for a while.
+> They're the same as my last posting [1], but have been rebased to v3.10-rc3.
 > 
-> I should of course tell you why:
-> 1. You start out by adding DT definitions in the DT files, should that
-> not be done as the final step, after the DT support has been added in
-> ux500 clk driver?
-
-No, let me tell you why. ;)
-
-a) The DT definitions will be going in via a separate tree, so it
-doesn't really matter where they are placed in _this_ patchset. and b)
-they will remain completely dormant until they are backed up with
-driver bindings, so there is no harm in putting them in first.
-
-> 2. Moreover, I think it would be enough to group the definitions
-> patches into one patch or at least significant fewer. Same feeling
-> about the patches were you remove the AUXDATA, this would simplify the
-> review for me.
-
-It's generally accepted that lots of lines of code split over a
-greater number of patches (so long as they are in consistent groups of
-functionality) are easier to review and thus have a greater chance of
-acceptance. It also makes things like reverting easier and bisecting
-more precise (rather than finding a big patch using bisect, then
-having to complete a manual mini-bisect to find the offending change.
-
-Arnd provides the maths for calculating the ease of upstreaming a
-patch, which he calls 'weight' (NB: this is from memory, it might be a
-little off):
-
-(patch_weight * patch_weight) * patch_count = delta_weight
-
-So if we had a 100 lines split over 2 patches, it would be:
-
-(50 * 50) * 2 = 5000
-
-Whereas if we split those lines over 4 patches we would see:
-
-(25 * 25) * 4 = 1000
-
-Thus, by this convention it would (generally) considered to be twice
-as difficult to upstream - at least that's the theory. There is a more
-extravagant formula for calculating how difficult it would be to
-upstream an entire tree of delta if a) all patches were contained on a
-single branch compared to b) if patches were split into topic branches.
-
-Something like:
-
-((patch_weight * patch_weight) * patch_count)  *
- (patch_weight * patch_weight) * patch_count)) *
-  branch_count = delta_weight
-
-So following on from the example above and placing 100 lines over 2
-patches on 1 branch you would get:
-
-(((25 * 25) * 4) * (25 * 25) * 4) * 1 = 6250000
-
-Whereas if you spread the patches over two branches you'd have:
-
-(((25 * 25) * 2) * (25 * 25) * 2) * 2 = 3125000
-
-Obviously the branch number comparison works better with the larger
-numbers you'd expect to find in a typical downstream BSP, but you get
-the idea.
-
-</tangent> ... whoops, sorry! :)
-
-> 3. The rest will be commented per patch.
+> Thanks,
+> Mark.
 > 
-> Kind regards
-> Ulf Hansson
-> 
-> >
-> >  arch/arm/boot/dts/dbx5x0.dtsi    |   94 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
-> >  arch/arm/boot/dts/snowball.dts   |    3 ++-
-> >  arch/arm/mach-ux500/cpu-db8500.c |   36 +--------------------------
-> >  drivers/clk/ux500/u8500_clk.c    |  154 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
-> >  4 files changed, 249 insertions(+), 38 deletions(-)
-> >
-> >
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170602.html
 
+It looks like there was a final ARM_ARCH_TIMER select in multi_v7_defconfig
+that's causing architected timer support to not get selected, which the patch
+below should fix if appended to the series. I've grepped for ARM_ARCH_TIMER,
+and it looks like it's the the last remaining occurence.
+
+Thanks,
+Mark.
+
+---->8----
+>From 6f09d5692133723c47629b89662bd01467aa526f Mon Sep 17 00:00:00 2001
+From: Mark Rutland <mark.rutland@arm.com>
+Date: Tue, 11 Jun 2013 10:51:35 +0100
+Subject: [PATCH] arm: multi_v7_defconfig: select HAVE_ARM_ARCH_TIMER
+
+In 8a4da6e: "arm: arch_timer: move core to drivers/clocksource", the
+selection of ARM_ARCH_TIMER was indirected via HAVE_ARM_ARCH_TIMER,
+though multi_v7_defconfig wasn't fixed up. This can lead to architected
+timer support being unexpectedly disabled when building
+multi_v7_defconfig.
+
+This patch fixes up multi_v7_defconfig to select HAVE_ARM_ARCH_TIMER.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2e67a27..c5bdbc9 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -17,7 +17,7 @@ CONFIG_ARCH_SPEAR13XX=y
+ CONFIG_MACH_SPEAR1310=y
+ CONFIG_MACH_SPEAR1340=y
+ CONFIG_SMP=y
+-CONFIG_ARM_ARCH_TIMER=y
++CONFIG_HAVE_ARM_ARCH_TIMER=y
+ CONFIG_AEABI=y
+ CONFIG_HIGHMEM=y
+ CONFIG_HIGHPTE=y
 -- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.8.1.1
