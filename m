@@ -1,79 +1,36 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Jun 2013 10:28:13 +0200
-Subject: [PATCH 1/3] drivers: pinctrl sleep and idle states in the core
-In-Reply-To: <51AF73E9.90506@wwwdotorg.org>
-References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
- <51AF73E9.90506@wwwdotorg.org>
-Message-ID: <CACRpkdY_s_RkErKLqVOWdE-A80CZOq7+VZSE8jcYSUbYkvsYYQ@mail.gmail.com>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 11 Jun 2013 10:28:49 +0200
+Subject: [PATCH 2/2] add initial kvm dev passhtrough support
+In-Reply-To: <51B6D52E.4030707@huawei.com>
+References: <51B6D52E.4030707@huawei.com>
+Message-ID: <A501B176-B65B-4CEB-BB12-3EE7C165945C@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 5, 2013 at 7:22 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
 
->> diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
->
->> +int pinctrl_pm_select_default_state(struct device *dev)
->
->> +int pinctrl_pm_select_sleep_state(struct device *dev)
->
->> +int pinctrl_pm_select_idle_state(struct device *dev)
->
-> The implementation of those 3 functions is basically identical. I'd be
-> inclined to move it to a helper function, and just pass (dev,
-> pins->xxx_state) to it.
+Am 11.06.2013 um 09:43 schrieb Mario Smarduch <mario.smarduch@huawei.com>:
 
-Just to follow up on this now that I'm adding one more state.
+> 
+> This is the initial device pass through support.
+> At this time host == guest only is supported.
+> Basic Operation:
+> 
+> - QEMU parameters: -device kvm-device-assign,host=<device name>
+>  for example - kvm-device-assign,host='arm-sp804'. Essentially
+>  any device that does PIO should be supported.
 
-I tried to create a refactoring patch for this but couldn't come
-up with anything apropriate along the lines above. For example
-this function:
+Yikes!
 
-int pinctrl_pm_select_default_state(struct device *dev)
-{
-        struct dev_pin_info *pins = dev->pins;
-        int ret;
+Over the last few years we've worked very hard to get rid of the unfortunate intertwining of device assignment and KVM. There are a number of reasons it's a bad idea:
 
-        if (!pins)
-                return 0;
-        if (IS_ERR(pins->default_state))
-                return 0; /* No default state */
-        ret = pinctrl_select_state(pins->p, pins->default_state);
-        if (ret)
-                dev_err(dev, "failed to activate default pinctrl state\n");
-        return ret;
-}
+  - kvm access is a potential priviledge escalation
+  - device assignment is limited to kvm
 
-Would be refactored into something like this:
+The solution to both of the above is VFIO. You get a completely separate interface for accessing your devices with a few connecting bits (irqfd, eventfd) to communicate quickly between vfio and kvm.
 
-static int pinctrl_pm_select_state(struct device *dev, struct pinctrl_state *s)
-{
-        struct dev_pin_info *pins = dev->pins;
+Is there any particular reason you're not going down that path for your ARM implementation?
 
-        if (IS_ERR(s))
-                return 0;
-        return pinctrl_select_state(pins->p, s);
-}
+On the embedded PPC side we've been discussing vfio and how it fits into a device tree, non-PCI world for a while. If you like, we can dive into more detail on that, either via email or via phone.
 
-int pinctrl_pm_select_default_state(struct device *dev)
-{
-        struct dev_pin_info *pins = dev->pins;
-        int ret;
 
-        if (!pins)
-                return 0;
-        if (IS_ERR(pins->default_state))
-                return 0; /* No default state */
-        ret = pinctrl_pm_select_state(dev, pins->default_state);
-        if (ret)
-                dev_err(dev, "failed to activate default pinctrl state\n");
-        return ret;
-}
-
-That is not any elegant, I can cut down the lines by removing
-debug messages but still we're dereferencing the pins twice and other
-ugliness like that. Also pinctrl_pm_select_state() becomes more and more
-a NULL wrapper around pinctrl_select_state() itself. If you have some other
-suggestion or a patch ... I just can't see any elegant refactoring here.
-
-Yours,
-Linus Walleij
+Alex
