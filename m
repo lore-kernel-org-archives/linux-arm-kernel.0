@@ -1,28 +1,54 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Tue, 11 Jun 2013 16:10:43 +0530
-Subject: [PATCH V3 2/4] ARM: tegra: pcie: Add tegra3 support
-In-Reply-To: <20130611101610.GB932@manwe>
-References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
- <1370372252-4332-2-git-send-email-jagarwal@nvidia.com>
- <51AE3D3B.6080102@wwwdotorg.org> <20130610195028.GB25859@mithrandir>
- <C79B248886DD134989C8FF6B096A91AB91B616BEED@BGMAIL01.nvidia.com>
- <20130611101610.GB932@manwe>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B616BEF3@BGMAIL01.nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Jun 2013 11:48:41 +0100
+Subject: [PATCH v2 03/11] regmap: Add regmap_field APIs
+In-Reply-To: <1370856118-6503-1-git-send-email-srinivas.kandagatla@st.com>
+References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
+ <1370856118-6503-1-git-send-email-srinivas.kandagatla@st.com>
+Message-ID: <20130611104841.GX1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I have mentioned it in description as -> "Corrected logic in read/write
-> config space to display right device number on bus 0"
-> >
-> > > Device 0:00.0 is usually the root complex, and device 0:01.0, 0:02.0
-> > > etc are the root ports. The change proposed above makes 0:00.0 the
-> > > first root port, therefore breaking what systems usually expect.
-> > >
-> > I was seeing root port 2 in cardhu being enumerated as pci_bus 0000:03,
-> which I thought should be pci_bus 0000:02, so made this change.
-> 
-> Yes, that's done on purpose to mirror what a typical PCI tree looks like, as I
-> already explained. So unless this fixes a real bug I'll just drop it while
-> applying.
+On Mon, Jun 10, 2013 at 10:21:58AM +0100, Srinivas KANDAGATLA wrote:
+> It is common to access regmap registers at bit level, using
+> regmap_update_bits or regmap_read functions, however the end user has to
+> take care of a mask or shifting. This becomes overhead when such use
+> cases are high. Having a common function to do this is much convenient
+> and less error prone.
 
-Please apply V4 patch instead which does not contain this change along with taking care of other review comments.
+So this looks basically good.  A couple of smallish nits below, if you
+could respin I'll apply this on a branch so it can be pulled in as
+dependency for the other things that use it.
+
+> +	regmap_field_init(rm_field, regmap, reg_field);
+> +
+> +	return rm_field;
+> +
+> +}
+> +EXPORT_SYMBOL_GPL(devm_regmap_field_alloc);
+> +/**
+> + * regmap_field_alloc(): Allocate and initialise a register field
+
+Needs a blank line between the two functions.
+
+> +#include <linux/device.h>
+> +#include <linux/slab.h>
+
+> +static inline void regmap_field_free(struct regmap_field *field)
+> +{
+> +	kfree(field);
+> +}
+
+> +static inline void devm_regmap_field_free(struct device *dev,
+> +	struct regmap_field *field)
+> +{
+> +	devm_kfree(dev, field);
+> +}
+
+Probably not worth inlining these, just put them in the code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/ebc65022/attachment.sig>
