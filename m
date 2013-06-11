@@ -1,78 +1,102 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 11 Jun 2013 23:50:28 +0200
-Subject: [PATCH v2] ARM: shmobile: uImage load address rework
-In-Reply-To: <20130610092857.19175.25629.sendpatchset@w520>
-References: <20130610092857.19175.25629.sendpatchset@w520>
-Message-ID: <2051721.a0060yLKKU@avalon>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 11 Jun 2013 15:50:23 -0600
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20835253.Agl4DfuI3k@wuerfel>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130609014506.GB10027@obsidianresearch.com>
+ <20130611135737.GC3996@localhost> <20835253.Agl4DfuI3k@wuerfel>
+Message-ID: <20130611215023.GA12649@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus,
+On Tue, Jun 11, 2013 at 05:26:47PM +0200, Arnd Bergmann wrote:
 
-Thanks for the patch.
+> That looks ok to me, yes. If you have just one device under some of the nodes
+> however, I think it's easier use an empty ranges property and do
+> 
+>  	devbus-bootcs {
+>  		ranges;
+>  		nor {
+>  			reg = <0x012f0000 0 0x1000000>;
+>  		};
+> 
+> The 'ranges' here is most useful if you have multiple devices
+> add different offsets. I would also predefine those ranges to
+> be as large as possible so you don't have to adapt them when
+> the child device grows beyond it.
 
-On Monday 10 June 2013 18:28:57 Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> This is V2 of the mach-shmobile uImage load address rework patch.
-> 
-> Rework the mach-shmobile uImage load address calculation by storing
-> the per-board load addresses in Makefile.boot. This removes the
-> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
-> it possible to create safe kernel images that boot on multiple boards.
-> 
-> This is one of several series of code that reworks code not to rely on
-> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+It isn't super critical, but the ranges does keep the 0x012f0000 value
+in the SOC .dtsi and the board level doesn't have to be exposed to the
+value, it just uses 0 to setup the NOR.
 
-I've noticed today that KZM9G doesn't boot v3.10-rc2 with 
-CONFIG_AUTO_ZRELADDR=y. While not caused by this patch, that's something that 
-will need to be fixed to support multi-arch kernels. I'm not too familiar with 
-early boot code, would you be able to have a look at this ?
+Also, it makes it much simpler for the mbus driver to detect which
+target id's are required so they can be allocated/setup - the rule
+would be every child stanza should have a ranges with the target(s) it
+needs.
 
-> ---
-> 
->  Changes since V1:
->  - On popular request, merged patch 5 and 14 and all other.
->  - Updated the __ZRELADDR calculation, thanks Arnd!
->  - Added Reviewed-by from Laurent and Morimoto-san, thanks!
-> 
->  arch/arm/mach-shmobile/Makefile.boot |   20 ++++++++++++++++++--
->  1 file changed, 18 insertions(+), 2 deletions(-)
-> 
-> --- 0001/arch/arm/mach-shmobile/Makefile.boot
-> +++ work/arch/arm/mach-shmobile/Makefile.boot	2013-06-10 
-16:15:22.000000000
-> +0900 @@ -1,6 +1,22 @@
-> -__ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
-> -		     $$[$(CONFIG_MEMORY_START) + 0x8000]')
-> +# per-board load address for uImage
-> +loadaddr-y	:=
-> +loadaddr-$(CONFIG_MACH_AG5EVM) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_AP4EVB) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
-> +loadaddr-$(CONFIG_MACH_BONITO) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_KOTA2) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
-> +loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
-> 
-> +__ZRELADDR	:= $(sort $(loadaddr-y))
->     zreladdr-y   += $(__ZRELADDR)
-> 
->  # Unsupported legacy stuff
+The full version probably looks like this:
 
--- 
-Regards,
+mbus {
+    ranges ....
 
-Laurent Pinchart
+                        devbus-bootcs at 10400 {
+                                compatible = "marvell,mvebu-devbus";
+                                reg = <INTERNAL_REGS + 0x10400 0x8>;
+                                ranges = <0 DEVBUS_BOOTCS 0x1000000>;
+                                #address-cells = <1>;
+                                #size-cells = <1>;
+                                clocks = <&coreclk 0>;
+
+				// In board .dts:
+                                nor at 0 {
+                                        compatible = "cfi-flash";
+                                        reg = <0 0x1000000>;
+                                        bank-width = <2>;
+                                };
+                        };
+};
+
+And notice here that we need to offset INTERNAL_REGS to make this
+work. To me, this is the primary reason why the 2nd cell of the mbus
+address format *must* be the address offset within the target, and not
+anything else.
+
+> > 2. There's no need to use an algorithm to 'find' a base address for decoding
+> >    windows (such as first-fit as Arnd suggested in another mail).
+> >    The base address is already there in the ranges property, so the mbus can
+> >    simply allocate the window on that base address.
+> > 
+> > So, am I right or completely lost?
+> 
+> Since you already need code to update the ranges property, I think
+> it's best to discard the ranges at boot time and create a new mapping
+> that just maps the devices you actually want to use. That would make
+> it much easier to cope with boot loaders that don't set up the
+> mappings in the same way that is listed in the device tree. Just
+> put the one entry for the internal-regs in the ranges, since that
+> is needed to map do the mbus setup.
+
+So, I think we can/have agree that the ranges in the FDT should
+reflect the bootloader's settings, and if the ranges is missing an
+element it means the bootloader didn't set it up.
+
+A compatible bootloader should dump the entire mbus register table
+into the ranges. The address encoding is such that we can represent
+every mbus window entry in ranges. If no bootloader support is present
+then the ranges value is forced into the mbus windows anyhow.
+
+If there isn't a ranges entry, but there is a child that requires it
+(how do we figure this out?) then dynamic assignment of that window
+makes sense to me. (however, this also looks a bit tricky, how do you
+avoid hitting the PCI-E window reservations, for instance?)
+
+Unconditional dynamic assignment is a bit more tricky, for instance
+the boot rom has to be located at a specific address since it is used
+as the SMP secondary startup trampoline. (Ezequiel: IMHO, you should
+check for this and bail secondary startup if it is not setup)
+
+I'm not sure there is a good reason to reject the address map in the
+DT?
+
+Jason
