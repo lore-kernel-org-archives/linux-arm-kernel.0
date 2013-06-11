@@ -1,152 +1,90 @@
-From: oliver+list@schinagl.nl (Oliver Schinagl)
-Date: Tue, 11 Jun 2013 19:44:36 +0200
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses;
- Unanswered comments
-In-Reply-To: <CAHp75Vf8-JRjTHjoUDQPXA3LK3SQSeCzyroF=J4ZLmHMzy6jvw@mail.gmail.com>
-References: <1370185130-15332-1-git-send-email-oliver+list@schinagl.nl>
- <1370185130-15332-2-git-send-email-oliver+list@schinagl.nl>
- <CAHp75Vdqc9xiPBvQUB3Hfb4EBFUsoVxyuH8MK=9spJ4+rieoDQ@mail.gmail.com>
- <51B64877.4040908@schinagl.nl>
- <CAHp75Vf8-JRjTHjoUDQPXA3LK3SQSeCzyroF=J4ZLmHMzy6jvw@mail.gmail.com>
-Message-ID: <51B76204.1000204@schinagl.nl>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Tue, 11 Jun 2013 12:08:40 -0600
+Subject: [PATCH] ARM: decouple CPU offlining from reboot/shutdown
+In-Reply-To: <20130611172342.GJ3439@mudshark.cambridge.arm.com>
+References: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
+ <20130611172342.GJ3439@mudshark.cambridge.arm.com>
+Message-ID: <51B767A8.7000506@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+On 06/11/2013 11:23 AM, Will Deacon wrote:
+> Hi Stephen,
+> 
+> On Mon, Jun 10, 2013 at 07:12:41PM +0100, Stephen Warren wrote:
+>> From: Stephen Warren <swarren@nvidia.com>
+>>
+>> machine_shutdown() is a hook for kexec. Add a comment saying so, since
+>> it isn't obvious from the function name.
+> 
+> I'd go as far as saying that some of this commit log could be included in
+> the comment too, since this comes up time and time again and it's never
+> clear!
 
-While waiting/working in comments I realized/was reminded that there 
-where a few things I hadn't addressed. I'll try to go over all the 
-missing bits to be sure to answer all questions before submitting the 
-hopefully final version. This because I wouldn't want anybody to think 
-I'm ungrateful, because I am very much so.
+OK, I'll add some expanded comments to each of the functions.
 
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 42d6ea2..d7b3d2e 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -2028,7 +2028,7 @@ config XIP_PHYS_ADDR
+>>  
+>>  config KEXEC
+>>  	bool "Kexec system call (EXPERIMENTAL)"
+>> -	depends on (!SMP || HOTPLUG_CPU)
+>> +	depends on (!SMP || (HOTPLUG_CPU && PM_SLEEP_SMP))
+> 
+> PM_SLEEP_SMP selects HOTPLUG_CPU.
 
- > On 05/17/13 23:18, Maxime Ripard wrote:
->> +
->> +struct sid_priv {
->> +	void __iomem *sid_base;
->> +};
->> +
->> +struct sid_priv *p;
->
-> What's the point of having a structure here? And why putting a global
-> value, !static, with a generic name, while you could have an
-> instance-specific one?
+Ah, that makes more sense; it explains how code under /just/ #ifdef
+PM_SLEEP_SMP can interact with hotplug-related code.
 
-and related (with the struct killed and the mem* renamed)
+I guess I just checked HOTPLUG for a select/depends and not the other
+way around.
 
- > On 02-06-13 17:09, Russell King - ARM Linux wrote:
-> So what happens if you have two of these devices?  Maybe you want to check
-> whether p_sid_reg_base is already set?
+>> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
 
-I had to think a while about it, as my first answer was 'i don't know'. 
-But yeah you can't without some smart trick that I don't yet know.
+>> @@ -97,13 +97,14 @@ void soft_restart(unsigned long addr)
+>>  {
+>>  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+>>  
+>> +	BUG_ON(num_online_cpus() > 1);
+> 
+> I think this is overkill, and we could actually scream and try to return an
+> error here (we've not yet switched stack, and the upper layers of kexec look
+> like they can do something with an error code).
 
- > On 06-06-13 21:16, Andy Shevchenko wrote:
- >> +static void __iomem *p_sid_reg_base;
- > So, why it's global?
- >
+Hmmm. The function returns void, although I suppose I could look into
+changing that too?
 
-The idea behind the global pointer is, to have sunxi_sid_read_byte() be 
-usable without anything other then a memory offset/address of what byte 
-you want to read. The idea behind that is that you can use it from 
-within the kernel directly. I'll admit it's a future-proofing thing, 
-it's not exported now as there is no user for it yet. I talked to Maxime 
-about it and we (he) decided it's best to remove it for now, as we can 
-always add it back later when we find a user for it.
+>> +/* For kexec */
+>>  void machine_shutdown(void)
+>>  {
+>> -#ifdef CONFIG_SMP
+>> -	smp_send_stop();
+>> +#ifdef CONFIG_PM_SLEEP_SMP
+>> +	disable_nonboot_cpus();
+>>  #endif
+> 
+> You can lose the #ifdef here.
 
-Having two SID's however is almost impossible too, since you get 1 per 
-SoC, and only 1 SoC per kernel? I added a guard in .probe() which only 
-loads the driver if the pointer is NULL.
+The implementation of disable_nonboot_cpus() is #ifdef
+CONFIG_PM_SLEEP_SMP, so I think I need that to avoid build errors.
 
- > On 02-06-13 17:09, Russell King - ARM Linux wrote:
->> +	if (likely((SID_SIZE))) {
->> +		sid_key = ioread32be(p_sid_reg_base + round_down(offset, 4));
->> +		sid_key >>= (offset % 4) * 8;
->> +		ret = sid_key & 0xff;
->> +	}
->
-> What happens if you unbind the device in sysfs and then try and use
-> this function?
->
-It goes kaboom. Again, i had no idea naturally. I think what you meant 
-was, if you unbind and p_sid_reg_base points to 'somewhere' and we just 
-randomly read bytes. I added p_sid_reg_base to the guard above to at 
-least check if it's not NULL.
+>> +	BUG_ON(num_online_cpus() > 1);
+> 
+> Maybe redefine machine_shutdown if !kexec and lose this BUG?
 
- > On 02-06-13 17:09, Russell King - ARM Linux wrote:
->> +static int sunxi_sid_remove(struct platform_device *pdev)
->> +{
->> +	device_remove_bin_file(&pdev->dev, &sid_bin_attr);
->> +	dev_info(&pdev->dev, "Sunxi SID driver unloaded successfully.\n");
->
-> Maybe you want to set p_sid_reg_base to NULL here?
->
-Yeah, that made even more sense to the above thing and added it. When we 
-unbind or unload the driver, we point to NULL and a) can check for it 
-above and don't have nasty things dangling around. I think it was save 
-to assume, that when the driver is unloaded/unbound, the devm_set_data() 
-private data gets cleaned and the pointer set to NULL? I think that's 
-what Maxime/Emilio said, by using the devm stuff, those should get 
-cleaned up properly.
+IIUC, machine_shutdown() is only used for kexec now, so I don't think an
+alternative implementation is required in the !kexec case?
 
- > On 02-06-13 17:09, Russell King - ARM Linux wrote:
->> +	platform_set_drvdata(pdev, sid_reg_base);
->> +	p_sid_reg_base = sid_reg_base;
->
-> So what happens if you have two of these devices?  Maybe you want to check
-> whether p_sid_reg_base is already set?
->
-Even that hint didn't trigger me as to why this could cause problems. 
-Userspace guy here, every driver has its own memory space right? So I've 
-added a guard that we only load this driver once and only if 
-p_sid_reg_base is NULL.
+>>  void machine_halt(void)
+>>  {
+>> -	machine_shutdown();
+>> +#ifdef CONFIG_SMP
+>> +	smp_send_stop();
+>> +#endif
+> 
+> Don't need the #ifdef.
 
- > On 02-06-13 17:09, Russell King - ARM Linux wrote:
->> +	dev_info(dev, "Sunxi SID driver loaded successfully.\n");
->
-> Do we really need to report that the driver "loaded successfully" ?
-> Do we need lots of lines in the kernel log telling us simply that
-> random driver X was built into the kernel or the module was loaded?
-Don't we do that already though? I made the string more informative by 
-adding version information, but yeah I see tons of 'all is ok' rolling 
-by, isn't that a good thing? Isn't that only printed if we actually have 
-a SID onboard, so the user knows 'sid is available'. I know I often 
-scroll through dmesg to see if things got brought up nicely.
-
-> On 06-06-13 21:16, Andy Shevchenko wrote:
->> +       if (likely((SID_SIZE))) {
-> Extra braces.
-> Use antipattern here.
-While this is a really small function, I guess if that's the normal 
-course of things; why not.
-
-
-> On 06-06-13 21:16, Andy Shevchenko wrote:
->> +               ret = sid_key & 0xff;
-> No need to do & 0xff, since return type is byte.
->
-With ret removed, I assume having return (u8)sid_key; is okay? Does that 
-typecast only return the last byte? Or do we still want & 0xff in the 
-return added for clarity?
-
- > On 06-06-13 21:16, Andy Shevchenko wrote
->> +static int __init sunxi_sid_probe(struct platform_device *pdev)
->> +{
->> +       int entropy[SID_SIZE], i, ret;
->
-> Usually ret variable is located at the end of definition block.
-> Moreover, there is no relationship between those three. It means one
-> line per variable.
->
-That's a good rule to group variables with, I should have known. Done.
-
-> On 06-06-13 21:16, Andy Shevchenko wrote:
->> +       dev = &pdev->dev;
-> Please, be consistent, somewhere you still use &pdev->dev.
-> I recomend to use &pdev->dev everywhere in probe(), since we don't
-> know if the device will be probed successfully.
->
-I would have thought that 'dev' would that it would be the same and valid,
-but yes, I should have been consistent throughout. What bothers me here,
-is that I actually managed to overlook it.
+Oh right; I hadn't noticed the inline in smp.h.
