@@ -1,70 +1,150 @@
-From: currojerez@riseup.net (Francisco Jerez)
-Date: Tue, 11 Jun 2013 17:10:12 +0200
-Subject: [PATCH] drm: encoder_slave: respect of_node on i2c encoder init
-In-Reply-To: <51B6D91D.3000906@gmail.com> (Sebastian Hesselbarth's message of
- "Tue, 11 Jun 2013 10:00:29 +0200")
-References: <1370899422-1281-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130611072433.GP22870@phenom.ffwll.local>
- <51B6D91D.3000906@gmail.com>
-Message-ID: <8738soptt7.fsf@riseup.net>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 11 Jun 2013 08:15:09 -0700
+Subject: [PATCHv2 1/3] Add support for GMT G762/G763 PWM fan controller
+In-Reply-To: <20130604212306.GL7626@kw.sim.vm.gnt>
+References: <cover.1369687670.git.arno@natisbad.org>
+ <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
+ <20130531221616.GG7626@kw.sim.vm.gnt> <87fvx1pwrl.fsf@natisbad.org>
+ <20130602215904.GH7626@kw.sim.vm.gnt> <87sj0yz7tv.fsf@natisbad.org>
+ <20130604212306.GL7626@kw.sim.vm.gnt>
+Message-ID: <20130611151509.GC10221@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Jun 04, 2013 at 11:23:07PM +0200, Simon Guinot wrote:
+> On Tue, Jun 04, 2013 at 08:52:12AM +0200, Arnaud Ebalard wrote:
+> > Hi Simon,
+> > 
+> > Simon Guinot <simon.guinot@sequanux.org> writes:
+> > 
+> > > On Sat, Jun 01, 2013 at 07:26:54PM +0200, Arnaud Ebalard wrote:
+> > >> Hi Simon and Guenter,
+> > >> 
+> > >> Simon Guinot <simon.guinot@sequanux.org> writes:
+> > >> 
+> > >> > On Tue, May 28, 2013 at 12:03:14AM +0200, Arnaud Ebalard wrote:
+> > >> >> 
+> > >> >> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> > >> >> ---
+> > >> >>  drivers/hwmon/Kconfig              |   10 +
+> > >> >>  drivers/hwmon/Makefile             |    1 +
+> > >> >>  drivers/hwmon/g762.c               | 1012 ++++++++++++++++++++++++++++++++++++
+> > >> >>  include/linux/platform_data/g762.h |   54 ++
+> > >> >>  4 files changed, 1077 insertions(+)
+> > >> >>  create mode 100644 drivers/hwmon/g762.c
+> > >> >>  create mode 100644 include/linux/platform_data/g762.h
+> > >> >
+> > >> > Hi Arnaud,
+> > >> >
+> > >> > After more tests on my 2Big Network v2 board, it appears that the fan
+> > >> > doesn't rotate when PWM mode (the preferred operating mode for this
+> > >> > board) is selected. Nevertheless, DC mode is usable (even if not ideal
+> > >> > given the hardware). After some investigations I noticed that an extra
+> > >> > initialization is needed to enable PWM mode on my board: the set_cnt
+> > >> > register must be set to 0 while the default value is 0xff. Is that
+> > >> > specific to my hardware ? Is PWM mode working on your ReadyNAS with
+> > >> > the default set_cnt value ?
+> > >> 
+> > >> First, thanks for testing this!
+> > >> 
+> > >> Regarding your problem, I first started by booting current version of my
+> > >> driver on the Duo v2 w/o touching chip registers (only clock reference
+> > >> value). This way, I inherit the values installed by (NETGEAR's) u-boot:
+> > >> 
+> > >> $ for k in fan* pwm* ; do echo -n "$k:" ; echo `cat $k `; done
+> > >> fan1_alarm:0
+> > >> fan1_div:2
+> > >> fan1_fault:0
+> > >> fan1_input:1807
+> > >> fan1_target:1807
+> > >> pwm1:221
+> > >> pwm1_enable:2        /* closed-loop, i.e. config is done via set_cnt */
+> > >> pwm1_mode:1          /* PWM mode */ 
+> > >
+> > > Sorry, I realize that I have not been very accurate in my description of
+> > > the problem: The fan doesn't rotate when PWM _and_ open-loop control are
+> > > selected. On the 2Big2 board, 2 wires are used to drive the fan.
+> > >
+> > > Then with pwm1_mode=1, pwm1_enable=1 and set_cnt=0xff (default value),
+> > > nothing happen whatever the value I write in pwm1.
+> > 
+> > After boot, with set_cnt and set_out untouched by me (set_cnt set to
+> > 0x5a by u-boot, i.e. 255-0x5a read on pwm1):
+> > 
+> > fan1_alarm:0
+> > fan1_div:1
+> > fan1_fault:0
+> > fan1_input:1365
+> > fan1_target:1365
+> > pwm1:0                  /* set_out is 0 (considering fan1_target,
+> >                            set_cnt is 0x5a)*/
+> > pwm1_enable:2           /* closed-loop */
+> > pwm1_mode:0             /* DC mode */
+> > 
+> > # echo 1 > pwm1_mode    /* PWM mode */       # fan rotates 
+> > # echo 1 > pwm1_enable  /* open-loop */      # fan stops rotating
+> > 
+> > At that point we have:
+> > 
+> > fan1_alarm:0
+> > fan1_div:1
+> > fan1_fault:0
+> > fan1_input:0
+> > fan1_target:1365
+> > pwm1:0                  /* set_out is 0, set_cnt is still 0x5a */
+> > pwm1_enable:1
+> > pwm1_mode:1
+> > 
+> > Then:
+> > 
+> > # echo 100 > pwm1                            # fan rotates
+> 
+> OK you are lucky. Your bootloader initialize set_cnt with 0x5a. Mine
+> don't and it is precisely the issue: set_cnt is still 0xff (the default
+> value) when the driver controls the fan.
+> 
+> Please, could you try open-loop mode with set_cnt set to 0xff ?  Maybe
+> you can enforce this value for the test purpose ?
+> 
+> If you observe the same behaviour than me, then could modify the driver
+> to ensure that set_cnt is not 0xff when open-loop mode is selected ?
+> Maybe by systematically setting a different value (as 0) ?
+> 
+I think it would make sense to set it to 0 when open-loop mode is selected, or
+at least to set it to a value != 0xff. Question would be if the value has any
+meaning in open loop mode, other than to enable/disable fan control entirely.
 
-Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com> writes:
+Thanks,
+Guenter
 
->> - I think we could also drop the call to ->set_config since presumably an
->>    of-enabled driver grabbed any required info already from the dt.
->[...]
->> I think this way we could still share encoder slaves across tons of
->> platforms, only the init sequence (and specifically how they get at their
-
-The "set_config" hook is just the way a DRM driver communicates those
-board-specific differences in the init sequence to the slave encoder
-driver.  I don't think it would make sense to remove it unless we make
-sure it's being called elsewhere.
-
->
-> IMHO, the whole i2c encoder stuff is just wrong. Not any i2c slave
-> driver is even really using its probe(). Everything is packed somewhere
-> because it just worked.. this is at least a start.
->
-Why is that?  What do you mean by the probe hooks not being used?
-ch7006 and sil164 rely on it being called on initialization.
-
-> I suggest this to get merged to at least allow to have DT slaves,
-> then start with improving tda998x as an example, then maybe rethink
-> drm_slave_encoder completely, e.g.
->
-> - generalize the concept to SPI attached encoders, "internal" encoders..
-
-drm_encoder_slave is bus-agnostic.  drm_i2c_encoder_init() is just a
-helper function taking care of bus-specific details like the creation of
-the underlying I2C device object, which cannot be made bus-agnostic for
-obvious reasons.  You're welcome to implement SPI and internal
-counterparts of drm_i2c_encoder_init().
-
-> - find a way to setup .encoder_type and .connector_type correctly
-
-I guess encoder_type could be initialized correctly from the slave
-encoder_init() hook -- that hasn't been necessary until now because the
-DRM driver making use of the slave encoder has been expected to have
-some other means to find out encoder types [e.g. device-specific BIOS
-tables].  OTOH, I don't think that setting connector types is the slave
-encoder's business.
-
-> - have more common of_drm_blabla helpers
->
->> config data) would be different. That would also be extensible quite
->> easily (*cough* intel platforms could setup encoder slaves from
->> information out of the vbt *cough*).
->>
->[...]
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 229 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/0870508c/attachment.sig>
+> > 
+> > 
+> > > By testing, I have discovered that writing 0 into set_cnt allows to work
+> > > around the issue. I can do this by using the closed-loop control:
+> > > pwm1_mode=1, pwm1_enable=2 and pwm=255. Now, set_cnt worths 0 and if I
+> > > switch back to open-loop control, all works as expected.
+> > >
+> > > Can you try open-loop control and PWM mode with your board ? I wonder if
+> > > this issue is specific to the 2Big2 hardware.
+> > 
+> > AFAICT, set_cnt has never been set to 0 in my test and PWM+open-loop
+> > works as expected, i.e. just by setting a non-zero value in set_out.
+> > Tell me if I missed something or if you want me to perform another
+> > test.
+> 
+> Actually, I have only problems when set_cnt worths 0xff. Please, could
+> you try the tests mentioned above ?
+> 
+> Thanks in advance,
+> 
+> Simon
+> 
+> > 
+> > Cheers,
+> > 
+> > a+
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
