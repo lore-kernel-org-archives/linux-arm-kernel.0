@@ -1,52 +1,85 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 11 Jun 2013 17:08:45 -0600
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Jun 2013 01:10:36 +0200
 Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
  the DT binding
-In-Reply-To: <51B7A325.8070108@gmail.com>
+In-Reply-To: <20130611225841.GA13892@obsidianresearch.com>
 References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130609014506.GB10027@obsidianresearch.com>
- <20130611135737.GC3996@localhost> <20835253.Agl4DfuI3k@wuerfel>
- <20130611215023.GA12649@obsidianresearch.com>
- <51B7A325.8070108@gmail.com>
-Message-ID: <20130611230845.GB13892@obsidianresearch.com>
+ <4160363.LWJuHATm2F@wuerfel> <20130611225841.GA13892@obsidianresearch.com>
+Message-ID: <2269352.fcCKFL4s2D@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 12:22:29AM +0200, Sebastian Hesselbarth wrote:
+On Tuesday 11 June 2013 16:58:41 Jason Gunthorpe wrote:
+> On Wed, Jun 12, 2013 at 12:34:14AM +0200, Arnd Bergmann wrote:
+> 
+> > a significant waste of physical address space, because the (per-soc)
+> > ranges property has to be set up for the largest possible external
+> > device connected to the bus, but the mbus window only needs to cover the
+> > device that is actually connected.
+> 
+> Yes, but perhaps that is a good argument to not put the ranges in the
+> dtsi?
 
-> sorry to kick into this thread that late but Ezequiel made me think of
-> address windows when asking on IRC. From what I can see from your and
-> Arnd's proposal the only real difference is that having it Arnd's way
-> allows you to have two or more windows mapped to e.g. devbus with
-> totally independent address ranges - while yours requires one large
-> window for all child devices?
+Fair enough. In that case not using ranges at all is probably easier
+so the board file only needs to update one place.
 
-Sorry, I'm having problems following the possessives in your paragraph
-- which things are you comparing?
+> > I think we have to walk the entire tree of devices underneath mbus,
+> > at least any device node that has a 'reg' property, following children
+> > of any device node with a 'ranges' property. We might need to
+> > add a variant of of_get_address() that does a partial translation
+> > up to a given node (the mbus) instead of all the way to the root.
+> 
+> Hum, how complex do you think this is? Run down the entire tree,
+> translate every regs and maintain a max offset for every target id.
 
-> Although, not thought to the bare end this could also work and maybe
-> reflects the actual hardware more accuate:
+It's the same thing we do for PCI.
 
-I actually posted something like this a time ago, but Arnd's
-suggestion to encode the target id in the address seems much clearer,
-and more accurate, though a bit more work to parse.
+> > > then dynamic assignment of that window
+> > > makes sense to me. (however, this also looks a bit tricky, how do you
+> > > avoid hitting the PCI-E window reservations, for instance?)
+> > 
+> > The PCI-E window would have 'ranges' but no 'regs', so we automatically
+> > skip it.
+> 
+> The trouble is not skipping PCI-E when parsing the dt. When the
+> kernel goes to make a dynamic window allocation it needs to exclude
+> the address space reserved for the PCI-E aperture.
+> 
+> The mbus driver starts before the PCI-E driver, so how can this be
+> resolved? Hardwire specialness about PCI-E into mbus?
+> Make the PCI-E aperture fully dynamic?
+>
+> Starting to be pretty complex - for what gain?
 
-It is 'better' in that the base addresses are in exactly one place -
-the ranges of the mbus node. With marvell,mbus-target the base
-addreses are strewn everywhere and now are difficult to change.
+I think this can be simplified a lot by making PCI a known special case:
 
-A main consideration here is that the bootloader needs to update the
-base addresses - to support the 0xd0 vs 0xf1 internal-regs base
-address issue. So I think that requirement alone is enough to make
-marvell,mbus-target undesirable.
+We assign all regular (non-PCI) windows from the top, and whatever is
+left by the time PCI comes up can be used for that, starting at the
+bottom of the avaliable space.
+ 
+> > > I'm not sure there is a good reason to reject the address map in the
+> > > DT?
+> > 
+> > You mean keep all windows that are listed by the boot loader but
+> > reassign the others? I guess it would be simpler but may result in
+> > a less optimal address map.
+> 
+> Sure, but what does a more optimal address map get you?
+> 
+>  1) More space to map SDRAM - however - the SDRAM map is controlled
+>     exclusively by the bootloader and the kernel doesn't have the
+>     information or the code to mess with it - so this isn't possible
+>  2) More space for the PCI-E aperture - this is entirely controlled by
+>     the kernel, but today we are using the pre-set allocation from the
+>     DT, so it doesn't matter how tightly the rest of the stuff is packed.
+> 
+> To me, it feels like alot of complex trouble to do actual dynamic
+> allocation, and I don't really see any gain.
 
-> When removing size from marvell,mbus-target above, mbus driver could
-> also probe for required max size from the reg properties of the child
-> nodes. Arnd already said that mbus isn't "simple-bus" anymore, why
-> can't it just walk through the nodes and collect required windows?
+We could of course decide to skip the dynamic part in the Linux
+implementation for the moment, but I would definitely want to
+see the binding written in a way that going fully dynamic can be
+done later without changing the binding if we decide we need to
+squeeze out more RAM or PCI space.
 
-With enough restrictions, I think it is pretty easy to parse
-marvell,mbus-target, but you can employ the same restrictions to
-simplify parsing the 2 cell address format too.
-
-Jason
+	Arnd
