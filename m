@@ -1,7 +1,7 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 12 Jun 2013 06:08:28 +0900
-Subject: [GIT PULL 2/6] s3c24xx DT
-Message-ID: <51B791CC.4000405@samsung.com>
+Date: Wed, 12 Jun 2013 06:08:37 +0900
+Subject: [GIT PULL 1/6] s3c24xx arch
+Message-ID: <51B791D5.5050005@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,32 +12,25 @@ The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/s3c24xx-dt-1
+tags/s3c24xx-arch-1
 
-for you to fetch changes up to 35aca36450e6c3fb3b3fe9ea60a7c4689a219a87:
+for you to fetch changes up to a496bda66201e855f6b5d5d701d8bd65b9178700:
 
-   ARM: dts: add devicetree support for s3c2416-smdk2416 (2013-05-21 
-01:06:12 +0900)
-
-----------------------------------------------------------------
-add DT support for s3c2416-smdk2416
+   ARM: S3C24XX: remove obsolete s3c2412 specific dma settings 
+(2013-05-21 01:01:41 +0900)
 
 ----------------------------------------------------------------
-Heiko Stuebner (1):
-       ARM: dts: add devicetree support for s3c2416-smdk2416
+update dma part for s3c24xx
 
-  arch/arm/boot/dts/Makefile              |   1 +
-  arch/arm/boot/dts/s3c2416-pinctrl.dtsi  | 173 
-++++++++++++++++++++++++++++++++
-  arch/arm/boot/dts/s3c2416-smdk2416.dts  |  72 +++++++++++++
-  arch/arm/boot/dts/s3c2416.dtsi          |  79 +++++++++++++++
-  arch/arm/boot/dts/s3c24xx.dtsi          |  92 +++++++++++++++++
-  arch/arm/mach-s3c24xx/Kconfig           |  12 +++
-  arch/arm/mach-s3c24xx/Makefile          |   1 +
-  arch/arm/mach-s3c24xx/mach-s3c2416-dt.c |  91 +++++++++++++++++
-  8 files changed, 521 insertions(+)
-  create mode 100644 arch/arm/boot/dts/s3c2416-pinctrl.dtsi
-  create mode 100644 arch/arm/boot/dts/s3c2416-smdk2416.dts
-  create mode 100644 arch/arm/boot/dts/s3c2416.dtsi
-  create mode 100644 arch/arm/boot/dts/s3c24xx.dtsi
-  create mode 100644 arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+----------------------------------------------------------------
+Heiko Stuebner (3):
+       ARM: S3C24XX: split s3c2412 spi dma channels
+       ARM: S3C24XX: dma-s3c2443 - do not write into arbitary bits
+       ARM: S3C24XX: remove obsolete s3c2412 specific dma settings
+
+  arch/arm/mach-s3c24xx/dma-s3c2412.c              | 56 
++++++++-----------------
+  arch/arm/mach-s3c24xx/dma-s3c2443.c              |  3 +-
+  arch/arm/mach-s3c24xx/dma.c                      |  3 --
+  arch/arm/plat-samsung/include/plat/dma-s3c24xx.h |  5 ---
+  4 files changed, 17 insertions(+), 50 deletions(-)
