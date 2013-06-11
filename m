@@ -1,45 +1,59 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 11 Jun 2013 12:33:17 +0200
-Subject: [PATCH 0/2 v2] Bugfixes for Tegra memory controllers.
-In-Reply-To: <1370945479-2917-1-git-send-email-ttynkkynen@nvidia.com>
-References: <1370945479-2917-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <20130611103316.GC932@manwe>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 11 Jun 2013 16:06:18 +0530
+Subject: [PATCH 01/11] ARM: davinci: GPIO: Add platform data structure
+In-Reply-To: <1369206634-6778-2-git-send-email-avinashphilip@ti.com>
+References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+ <1369206634-6778-2-git-send-email-avinashphilip@ti.com>
+Message-ID: <51B6FDA2.8080003@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 01:11:17PM +0300, Tuomas Tynkkynen wrote:
-> Hi,
+On 5/22/2013 12:40 PM, Philip Avinash wrote:
+> From: KV Sujith <sujithkv@ti.com>
 > 
-> Here's two simple bugfixes for the Tegra memory controllers.
+> Add struct davinci_gpio_platform_data davinci gpio module.
 > 
-> v2: Fix a dumb bug in the bit masking.
+> Signed-off-by: KV Sujith <sujithkv@ti.com>
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+
+As Linus commented before, this should be merged with 03/11.
+
+> ---
+>  include/linux/platform_data/gpio-davinci.h |   27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 include/linux/platform_data/gpio-davinci.h
 > 
-> Tuomas Tynkkynen (2):
->   memory: tegra20-mc: Fix hang in IRQ handler.
->   memory: tegra30-mc: Fix IRQ handler.
-> 
->  drivers/memory/tegra20-mc.c | 5 ++++-
->  drivers/memory/tegra30-mc.c | 9 ++++++---
->  2 files changed, 10 insertions(+), 4 deletions(-)
+> diff --git a/include/linux/platform_data/gpio-davinci.h b/include/linux/platform_data/gpio-davinci.h
+> new file mode 100644
+> index 0000000..f1c8277
+> --- /dev/null
+> +++ b/include/linux/platform_data/gpio-davinci.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * gpio-davinci.h
 
-Both patches:
+I would drop this unnecessary filename mention as well.
 
-Reviewed-by: Thierry Reding <thierry.reding@gmail.com>
+> + *
+> + * DaVinci GPIO Platform Related Defines
+> + *
+> + * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation version 2.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#ifndef __ASM_ARCH_DAVINCI_GPIO_H
+> +#define __ASM_ARCH_DAVINCI_GPIO_H
 
-On a side-note, the subject format looks a bit strange and my guess is
-you had to manually edit it to insert "v2". git can do it for you when
-you generate the patch series using:
+This should now be __PLATFORM_DATA_DAVINCI_GPIO_H__ or some such since
+the file as been moved out of arch specific folder.
 
-	git format-patch --subject-prefix='PATCH v2'
-
-That'll also automatically add the v2 to all individual patches instead
-of just the cover-letter.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/82711ac0/attachment.sig>
+Thanks,
+Sekhar
