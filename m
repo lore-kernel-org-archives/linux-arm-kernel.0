@@ -1,64 +1,59 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 16:48:51 -0700
-Subject: [GIT PULL v2] at91: USBA DT support / drivers update for 3.11 #1
-In-Reply-To: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
-References: <20130526083430.GP24476@game.jcrosoft.org>
- <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20130611234851.GH23774@quad.lixom.net>
+Date: Tue, 11 Jun 2013 16:58:06 -0700
+Subject: [PATCH 01/13] ARM: Exynos: initialize l2x0 cache controller only
+ for cortex-a9 based SoCs
+In-Reply-To: <5595095.zmTGjttZIk@flatron>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <5595095.zmTGjttZIk@flatron>
+Message-ID: <20130611235806.GI23774@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 07:05:39PM +0200, Nicolas Ferre wrote:
-> Arnd, Olof,
+On Sat, Jun 08, 2013 at 12:57:41PM +0200, Tomasz Figa wrote:
+> Hi Chander,
 > 
-> This is a rework of the previous pull-request done by Jean-Christophe
-> PLAGNIOL-VILLARD last week ([GIT PULL] at91: USBA DT support for 3.11).
-> You should see that this material is based on the cleanup branch that you
-> already have in arm-soc/at91/cleanup.
+> On Thursday 06 of June 2013 16:31:15 Chander Kashyap wrote:
+> > Only cortex-a9 based Exynos SoCs have l2x0 cache controller. Hence
+> > instead of checking for every SoC with soc_is_xxx, just check for cpu
+> > part number and initialize the cache controller for cortex-a9 based
+> > SoCs.
+> > 
+> > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> > ---
+> >  arch/arm/mach-exynos/common.c |    3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-exynos/common.c
+> > b/arch/arm/mach-exynos/common.c index 8ce2db4..bad000e 100644
+> > --- a/arch/arm/mach-exynos/common.c
+> > +++ b/arch/arm/mach-exynos/common.c
+> > @@ -35,6 +35,7 @@
+> >  #include <asm/mach/map.h>
+> >  #include <asm/mach/irq.h>
+> >  #include <asm/cacheflush.h>
+> > +#include <asm/cputype.h>
+> > 
+> >  #include <mach/regs-irq.h>
+> >  #include <mach/regs-pmu.h>
+> > @@ -520,7 +521,7 @@ static int __init exynos4_l2x0_cache_init(void)
 > 
-> This adds the DT support for USBA gadget driver present in the most recent
-> AT91 SoCs.
-> As agreed with Arnd and Felipe we send these drivers updates via arm-soc.
+> I wonder if it shouldn't be done the other way around, i.e. this function 
+> being called only when running on SoCs for which it's appropriate, instead 
+> of checking for supported SoC in this function.
 > 
-> Thanks, best regards,
+> Keep in mind that we are going towards multiplatform support, so you would 
+> end up running this code on any non-Exynos SoC with Cortex A9 as well. 
+> IMHO we should drop most (if not all) of the initcalls around mach-
+> exynos/.
 > 
-> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
-> 
->   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://github.com/at91linux/linux-at91.git tags/at91-drivers
-> 
-> for you to fetch changes up to a375f12dde25a7e89acd75d066d0225657d7dfc2:
-> 
->   ARM: at91: sam9m10g45ek add udc DT support (2013-05-24 07:15:20 +0800)
-> 
-> ----------------------------------------------------------------
-> Adding the DT support to UBB gadget High-Speed aka usba.
-> It updates the driver and all device tree files
-> 
-> ----------------------------------------------------------------
-> Jean-Christophe PLAGNIOL-VILLARD (7):
->       USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
->       USB: gadget: atmel_usba: allow multi instance
->       USB: gadget: atmel_usba: add DT support
->       ARM: at91: sam9x5 add udc DT support
->       ARM: at91: sam9x5ek add udc DT support
->       ARM: at91: sam9g45 add udc DT support
->       ARM: at91: sam9m10g45ek add udc DT support
+> CCing people that might have some opinion on this topic as well.
 
-Hi,
+Looks like all other platforms instantiate the pl310 device node in the
+device tree. Since Exynos is going DT-only, there's no need to support
+non-DT boot any more, and that would be a much cleaner way forward.
 
-So, now you have multiple branches updating the DT files on at91, and they all
-conflict due to add/add or add/change.
+That also moves the l2 init to be driven by device-tree data, this removing the
+need for the exynos-specific init alltogether. Code removal FTW!
 
-This branch is really two separate things already: three driver patches for
-next/drivers, and 4 devicetree updates that can go on top of the previous
-at91/dt branch. That should remove every DT conflict.
-
-Care to reshuffle?
-
-Thanks,
 
 -Olof
