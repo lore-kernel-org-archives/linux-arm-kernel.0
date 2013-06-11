@@ -1,64 +1,134 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 12 Jun 2013 00:42:55 +0200
-Subject: [PATCH] cpuidle: Fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency
- warning
-In-Reply-To: <1370938185-5019-1-git-send-email-daniel.lezcano@linaro.org>
-References: <1370938185-5019-1-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <1892912.B255hT0OHX@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Jun 2013 00:34:14 +0200
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20130611215023.GA12649@obsidianresearch.com>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20835253.Agl4DfuI3k@wuerfel> <20130611215023.GA12649@obsidianresearch.com>
+Message-ID: <4160363.LWJuHATm2F@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 11, 2013 10:09:45 AM Daniel Lezcano wrote:
-> Before the commit d6f346f2d2bf511c2c59176121a6e42ce60173a0, the
-> ARCH_NEEDS_CPU_IDLE_COUPLED option was not depending on the CPU_IDLE but now
-> it has been moved under the CPU_IDLE menuconfig option.
+On Tuesday 11 June 2013 15:50:23 Jason Gunthorpe wrote:
+> On Tue, Jun 11, 2013 at 05:26:47PM +0200, Arnd Bergmann wrote:
 > 
-> That raises the following warnings:
+> > That looks ok to me, yes. If you have just one device under some of the nodes
+> > however, I think it's easier use an empty ranges property and do
+> > 
+> >  	devbus-bootcs {
+> >  		ranges;
+> >  		nor {
+> >  			reg = <0x012f0000 0 0x1000000>;
+> >  		};
+> > 
+> > The 'ranges' here is most useful if you have multiple devices
+> > add different offsets. I would also predefine those ranges to
+> > be as large as possible so you don't have to adapt them when
+> > the child device grows beyond it.
 > 
-> warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects ARCH_NEEDS_CPU_IDLE_COUPLED
-> which has unmet direct dependencies (CPU_IDLE)
-> warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects ARCH_NEEDS_CPU_IDLE_COUPLED
-> which has unmet direct dependencies (CPU_IDLE)
-> 
-> The tegra2 and omap4 Kconfig files select this option but without checking
-> CPU_IDLE is set.
-> 
-> Fix that by moving the option out of the CPU_IDLE option.
-> 
-> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> It isn't super critical, but the ranges does keep the 0x012f0000 value
+> in the SOC .dtsi and the board level doesn't have to be exposed to the
+> value, it just uses 0 to setup the NOR.
 
-Queued up for 3.11.
+Yes, good point.
 
-Thanks,
-Rafael
+> Also, it makes it much simpler for the mbus driver to detect which
+> target id's are required so they can be allocated/setup - the rule
+> would be every child stanza should have a ranges with the target(s) it
+> needs.
 
+Not sure if this is a good rule: As you said, it makes sense to
+put the 'ranges' for the devbus-bootcs node into the per-soc .dtsi
+file so the board file doesn't have to care. However the mbus code
+needs both the 0x012f0000 and the start/length of the child. Mapping
+the entire window would work in theory but is likely going to cause
+a significant waste of physical address space, because the (per-soc)
+ranges property has to be set up for the largest possible external
+device connected to the bus, but the mbus window only needs to cover the
+device that is actually connected.
 
-> ---
->  drivers/cpuidle/Kconfig |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> The full version probably looks like this:
 > 
-> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-> index a7d2e83..81de5d9 100644
-> --- a/drivers/cpuidle/Kconfig
-> +++ b/drivers/cpuidle/Kconfig
-> @@ -29,9 +29,6 @@ config CPU_IDLE_GOV_MENU
->  	bool "Menu governor (for tickless system)"
->  	default y
->  
-> -config ARCH_NEEDS_CPU_IDLE_COUPLED
-> -	def_bool n
-> -
->  config CPU_IDLE_CALXEDA
->  	bool "CPU Idle Driver for Calxeda processors"
->  	depends on ARCH_HIGHBANK
-> @@ -45,3 +42,6 @@ config CPU_IDLE_ZYNQ
->  	  Select this to enable cpuidle on Xilinx Zynq processors.
->  
->  endif
-> +
-> +config ARCH_NEEDS_CPU_IDLE_COUPLED
-> +	def_bool n
+> mbus {
+>     ranges ....
 > 
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+>                         devbus-bootcs at 10400 {
+>                                 compatible = "marvell,mvebu-devbus";
+>                                 reg = <INTERNAL_REGS + 0x10400 0x8>;
+>                                 ranges = <0 DEVBUS_BOOTCS 0x1000000>;
+>                                 #address-cells = <1>;
+>                                 #size-cells = <1>;
+>                                 clocks = <&coreclk 0>;
+> 
+> 				// In board .dts:
+>                                 nor at 0 {
+>                                         compatible = "cfi-flash";
+>                                         reg = <0 0x1000000>;
+>                                         bank-width = <2>;
+>                                 };
+>                         };
+> };
+> 
+> And notice here that we need to offset INTERNAL_REGS to make this
+> work. To me, this is the primary reason why the 2nd cell of the mbus
+> address format *must* be the address offset within the target, and not
+> anything else.
+
+Right.
+
+> > > 2. There's no need to use an algorithm to 'find' a base address for decoding
+> > >    windows (such as first-fit as Arnd suggested in another mail).
+> > >    The base address is already there in the ranges property, so the mbus can
+> > >    simply allocate the window on that base address.
+> > > 
+> > > So, am I right or completely lost?
+> > 
+> > Since you already need code to update the ranges property, I think
+> > it's best to discard the ranges at boot time and create a new mapping
+> > that just maps the devices you actually want to use. That would make
+> > it much easier to cope with boot loaders that don't set up the
+> > mappings in the same way that is listed in the device tree. Just
+> > put the one entry for the internal-regs in the ranges, since that
+> > is needed to map do the mbus setup.
+> 
+> So, I think we can/have agree that the ranges in the FDT should
+> reflect the bootloader's settings, and if the ranges is missing an
+> element it means the bootloader didn't set it up.
+> 
+> A compatible bootloader should dump the entire mbus register table
+> into the ranges. The address encoding is such that we can represent
+> every mbus window entry in ranges. If no bootloader support is present
+> then the ranges value is forced into the mbus windows anyhow.
+> 
+> If there isn't a ranges entry, but there is a child that requires it
+> (how do we figure this out?)
+
+I think we have to walk the entire tree of devices underneath mbus,
+at least any device node that has a 'reg' property, following children
+of any device node with a 'ranges' property. We might need to
+add a variant of of_get_address() that does a partial translation
+up to a given node (the mbus) instead of all the way to the root.
+
+> then dynamic assignment of that window
+> makes sense to me. (however, this also looks a bit tricky, how do you
+> avoid hitting the PCI-E window reservations, for instance?)
+
+The PCI-E window would have 'ranges' but no 'regs', so we automatically
+skip it.
+
+> Unconditional dynamic assignment is a bit more tricky, for instance
+> the boot rom has to be located at a specific address since it is used
+> as the SMP secondary startup trampoline. (Ezequiel: IMHO, you should
+> check for this and bail secondary startup if it is not setup)
+
+I suppose we can identify the devices we don't want to reassign by
+their compatible values.
+
+> I'm not sure there is a good reason to reject the address map in the
+> DT?
+
+You mean keep all windows that are listed by the boot loader but
+reassign the others? I guess it would be simpler but may result in
+a less optimal address map.
+
+	Arnd
