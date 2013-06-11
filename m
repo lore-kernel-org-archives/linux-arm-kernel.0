@@ -1,57 +1,46 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 11 Jun 2013 12:12:54 +0100
-Subject: [PATCH 19/33] clk: ux500: Add Device Tree support for the PRCMU
- clock
-In-Reply-To: <20130611111050.GC3330@laptop>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <1370521041-32318-20-git-send-email-lee.jones@linaro.org>
- <CAPDyKFozMRxcpeEfaqKQrZ1_xxr=UMLw2EybdKiRM2zWcppikw@mail.gmail.com>
- <20130611111050.GC3330@laptop>
-Message-ID: <20130611111254.GD3330@laptop>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 11 Jun 2013 19:13:33 +0800
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <20130611084827.GS1403@sirena.org.uk>
+References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
+ <20130516093846.GA2927@katana>
+ <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
+ <20130525201032.GD32043@sirena.org.uk>
+ <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
+ <20130527121658.GA3660@sirena.org.uk>
+ <CAGsJ_4w867BhFvVze5BNaYheW75pMcOGhscz3wSZiia-neP59w@mail.gmail.com>
+ <20130610134535.GB2987@katana>
+ <CAGsJ_4y4svi0TbUKK1aAW1McM5rFoo5Vb9rGPweq-sHJ2NN5cQ@mail.gmail.com>
+ <20130611084827.GS1403@sirena.org.uk>
+Message-ID: <CAGsJ_4wH=mNxBTqizKjJR2YhmVQa=iprfUmVYy8oz7MZeLfkqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013, Lee Jones wrote:
+2013/6/11 Mark Brown <broonie@kernel.org>:
+> On Tue, Jun 11, 2013 at 09:14:41AM +0800, Barry Song wrote:
+>
+>> the mainline idea you mentioned is that you don't care about any early
+>> device, which means some devices want to start earlier than others in
+>> some real automative user scenerioes.
+>> but i think another important idea is that mainline codes come from
+>> branches of different vendors and serve final users of those drivers,
+>> but not only make source codes no difference to all environments. the
+>> auto users i2c-sirf serves, here, actually means some differences with
+>> PC/tablet/mobilephone. we don't make codes good-looking by losing
+>> functionality and not close to final users.
+>
+> It's not that people don't care about these users, it's that people
+> don't care too much about out of tree users.  Part of the goal here is
+> to convince people working on such applications that they should make
+> mainline better for everyone so that you don't need external code to
+> make the kernel useful.
 
-> On Mon, 10 Jun 2013, Ulf Hansson wrote:
-> 
-> > On 6 June 2013 14:17, Lee Jones <lee.jones@linaro.org> wrote:
-> > > This patch enables clocks to be specified from Device Tree via phandles
-> > > to the "prcmu-clock" node.
-> > >
-> > > Cc: Mike Turquette <mturquette@linaro.org>
-> > > Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> > > Signed-off-by: Lee Jones <lee.jones@linaro.org>
-> > > ---
-> > >  drivers/clk/ux500/u8500_clk.c |   50 +++++++++++++++++++++++++++++++++++++++--
-> > >  1 file changed, 48 insertions(+), 2 deletions(-)
-> > >
-> > > diff --git a/drivers/clk/ux500/u8500_clk.c b/drivers/clk/ux500/u8500_clk.c
-> > > index 3a7040b..4f5ad4c 100644
-> > > --- a/drivers/clk/ux500/u8500_clk.c
-> > > +++ b/drivers/clk/ux500/u8500_clk.c
-> > > @@ -15,6 +15,8 @@
-> > >  #include <linux/platform_data/clk-ux500.h>
-> > >  #include "clk.h"
-> > >
-> > > +static struct clk *prcmu_clk[PRCMU_NUM_CLKS];
-> > > +
-> > >  struct clk *ux500_twocell_get(struct of_phandle_args *clkspec, void *data)
-> > 
-> > Actually I thought ux500_twocell_get was going to be used in this
-> > patch, since the previous one was adding this helper function, but it
-> > isn't?
-> 
-> Yes it is:
+Mark, then this is really confusing me.
+for this reason, the target should be making this out-of-tree stuff be
+inside the tree. to make i2c-sirf "mainline better and not need
+external code", the target should be making this external code not
+external but become internal. otherwise, my mainline users will always
+need this external code.
 
-Whoops! No, it's using it in the next patch.
-
-There's no requirement for these things to be sequential. I thought it
-was better to put adding the clocks sequential, rather than have a
-random addition of a call-back function in the middle of them.
-
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-barry
