@@ -1,47 +1,42 @@
-From: oliver@neukum.org (Oliver Neukum)
-Date: Tue, 11 Jun 2013 10:49:23 +0200
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <CACVXFVNgzb=VVf9PY_sAHXPtXnqFVXbnB_L4i4xvK0dN1-8T2A@mail.gmail.com>
-References: <CACVXFVNdy_cffR7JYNVfs40QJ9eF4Y8UKL7ZsRPOTOegghFkaQ@mail.gmail.com>
- <21763864.rYYOf1P6VP@linux-5eaq.site>
- <CACVXFVNgzb=VVf9PY_sAHXPtXnqFVXbnB_L4i4xvK0dN1-8T2A@mail.gmail.com>
-Message-ID: <1888740.dKYctKO5at@linux-5eaq.site>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Jun 2013 09:48:27 +0100
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <CAGsJ_4y4svi0TbUKK1aAW1McM5rFoo5Vb9rGPweq-sHJ2NN5cQ@mail.gmail.com>
+References: <1368672607-5536-1-git-send-email-Baohua.Song@csr.com>
+ <20130516093846.GA2927@katana>
+ <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
+ <20130525201032.GD32043@sirena.org.uk>
+ <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
+ <20130527121658.GA3660@sirena.org.uk>
+ <CAGsJ_4w867BhFvVze5BNaYheW75pMcOGhscz3wSZiia-neP59w@mail.gmail.com>
+ <20130610134535.GB2987@katana>
+ <CAGsJ_4y4svi0TbUKK1aAW1McM5rFoo5Vb9rGPweq-sHJ2NN5cQ@mail.gmail.com>
+Message-ID: <20130611084827.GS1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 June 2013 16:14:25 Ming Lei wrote:
-> On Tue, Jun 11, 2013 at 3:18 PM, Oliver Neukum <oliver@neukum.org> wrote:
-> > On Tuesday 11 June 2013 13:40:20 Ming Lei wrote:
-> >> On Tue, Jun 11, 2013 at 1:36 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> >> > On Mon, 10 Jun 2013, Ming Lei wrote:
-> >
-> >> If complete() callback runs in one tasklet context, spin_lock() inside
-> >> complete() is enough, just like hard irq, the tasklet itself is disabled
-> >> during complete(), if the percpu tasklet is converted to single tasklet.
-> >> So no problem when the lock is to protect shared resources between
-> >> complete().
-> >
-> > We also have exclusion between complete() and other contexts, i.e. timers.
-> 
-> The patch also converts the complete() called in timers to tasklet context too.
-> 
-> So could you let me know if that eases your concern? If not, could you explain
-> your concern about other contexts in a bit detail?
+On Tue, Jun 11, 2013 at 09:14:41AM +0800, Barry Song wrote:
 
-The driver itself may have submitted a timer and race against it.
-What locking do you need in complete() and a timer to lock against
-each other?
+> the mainline idea you mentioned is that you don't care about any early
+> device, which means some devices want to start earlier than others in
+> some real automative user scenerioes.
+> but i think another important idea is that mainline codes come from
+> branches of different vendors and serve final users of those drivers,
+> but not only make source codes no difference to all environments. the
+> auto users i2c-sirf serves, here, actually means some differences with
+> PC/tablet/mobilephone. we don't make codes good-looking by losing
+> functionality and not close to final users.
 
-> > Even now we cannot guarantee that all calls to complete() are in irq.
-> > There is the case of HCD hotunplug and other cases, like timeouts.
-> > They will have to be verified.
-> 
-> All URBs are completed via usb_hcd_giveback_urb(), so there should
-> be no differences between these cases and the common one about
-> introducing the patchset.
-
-But it makes no sense to go to a tasklet when you are already in task context.
-In those cases you need to do something, essentially blocking the tasklet.
-
-	Regards
-		Oliver
+It's not that people don't care about these users, it's that people
+don't care too much about out of tree users.  Part of the goal here is
+to convince people working on such applications that they should make
+mainline better for everyone so that you don't need external code to
+make the kernel useful.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/858938c0/attachment.sig>
