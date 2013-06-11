@@ -1,42 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Jun 2013 10:53:43 +0200
-Subject: [PATCH 2/2 v3] pinctrl: add pinctrl driver for Rockchip SoCs
-In-Reply-To: <201306102216.23292.heiko@sntech.de>
-References: <201306102139.32444.heiko@sntech.de>
- <201306102142.52644.heiko@sntech.de>
- <201306102216.23292.heiko@sntech.de>
-Message-ID: <CACRpkdaLq_sDq1v=_K20fj7nJ42-PssBUv+t__DsnTcn3Py2uw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 11 Jun 2013 10:04:59 +0100
+Subject: [PATCH] arm: versatile: don't mark pen as __INIT
+In-Reply-To: <20130610232441.GI18614@n2100.arm.linux.org.uk>
+References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
+ <20130610232441.GI18614@n2100.arm.linux.org.uk>
+Message-ID: <20130611090459.GA9529@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 10:16 PM, Heiko St?bner <heiko@sntech.de> wrote:
+On Tue, Jun 11, 2013 at 12:24:41AM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 10, 2013 at 04:07:24PM +0100, Mark Rutland wrote:
+> > When booting fewer cores than are physically present on a versatile
+> > platform (e.g. when passing maxcpus=N on the command line), some
+> > secondary cores may remain in the holding pen, which is marked __INIT.
+> > Late in the boot process, the memory comprising the holding pen will be
+> > released to the kernel for more general use, and may be overwritten with
+> > arbitrary data, which can cause the held secondaries to start behaving
+> > unpredictably. This can lead to all manner of odd behaviour from the
+> > kernel.
+> > 
+> > Instead don't mark the section as __INIT. This means we can't reuse the
+> > pen memory, but we won't get secondaries corrupting the rest of the
+> > kernel.
+> 
+> __CPUINIT is appropriate here; __CPUINIT will be kept around if you have
+> hotplug CPU suport, but if you don't it will be discarded after all
+> secondary CPUs have booted.  And without hotplug CPU, you can't ask
+> for the offline CPUs to be onlined.
 
-> This driver adds support the Cortex-A9 based SoCs from Rockchip,
-> so at least the RK2928, RK3066 (a and b) and RK3188.
-> Earlier Rockchip SoCs seem to use similar mechanics for gpio
-> handling so should be supportable with relative small changes.
-> Pull handling on the rk3188 is currently a stub, due to it being
-> a bit different to the earlier SoCs.
->
-> Pinmuxing as well as gpio (and interrupt-) handling tested on
-> a rk3066a based machine.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> changes since v2:
-> Found out how to handle the phandle in the regular rockchip,pins property
-> 5 minutes after sending the v2 ... damn :-) .
-> I'm terribly sorry for all the noise.
->
->
-> After Stephen Warren's clarification, again with <dt-bindings/...> include.
-> and of course adapted to the new expected dt node-structure
+Since 384a290283: "ARM: gic: use a private mapping for CPU target interfaces",
+each CPU's gic_cpu_map entry is initialised to 0xff, so a call to
+gic_raise_softirq will target *all* CPUs attached to the GIC if one of the CPUs
+targetted has not been initialised.
 
-Thanks, this v3 version applied.
+Thus any call to versatile_boot_secondary will wake up *all* secondaries
+physically present, throwing them all into the pen. If we use a subset of these
+(e.g. from having "maxcpus=N" on the command line), some will be left in the
+pen, even though we didn't ask for them explicitly. This will happen with or
+without CPU_HOTPLUG.
 
-And don't worry about the noise, it is normal in situations like these
-where we're seeing rapid development of core stuff and building
-consensus.
+Another option would be to add an optional description of a CPU's gic id to the
+dt, which would allow us to avoid throwing these secondaries into the pen in
+the first place.
 
-Yours,
-Linus Walleij
+Thanks,
+Mark
