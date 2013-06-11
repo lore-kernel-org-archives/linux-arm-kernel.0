@@ -1,43 +1,34 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Jun 2013 16:48:11 +0900
-Subject: [PATCH] ARM: zImage/virt: remove hyp-stub.S during distclean
-In-Reply-To: <20130610060325.2335.65815.sendpatchset@w520>
-References: <20130610060325.2335.65815.sendpatchset@w520>
-Message-ID: <20130611074810.GC10440@verge.net.au>
+Date: Tue, 11 Jun 2013 16:48:39 +0900
+Subject: [PATCH v2 2/2] ARM: shmobile: r8a7779: fix Ether device name
+In-Reply-To: <201306090124.35464.sergei.shtylyov@cogentembedded.com>
+References: <201306090124.35464.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130611074839.GD10440@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 03:03:25PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
+On Sun, Jun 09, 2013 at 01:24:35AM +0400, Sergei Shtylyov wrote:
+> While recasting commit dace48d04dee46a3409d5e13cd98031522e46377 (ARM: shmobile:
+> R8A7779: add Ether support), I made a typo in the platform device's name: used
+> underscore instead of hyphen.
 > 
-> Make sure hyp-stub.S gets removed during make distclean,
-> this left over file was introduced in commit:
+> However, there's now patch merged to net-next.git renaming the platform device
+> from "sh-eth" to "r8a777x-ehter", so it makes the most sense to change the name
+> straight to that one.
 > 
-> 424e599 ARM: zImage/virt: hyp mode entry support for the zImage loader
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-
-Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
-
 > ---
+> The patch is atop of the 'renesas-next-20130607' tag of the 'renesas.git' tree
+> and the USB patches I have submitted earlier.
 > 
->  arch/arm/boot/compressed/Makefile |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
+> Changes in version 2:
+> - changed the platform device's name as in the patch merged to 'net-next.git';
+> - lowercased the SoC name in the subject.
 > 
-> --- 0001/arch/arm/boot/compressed/Makefile
-> +++ work/arch/arm/boot/compressed/Makefile	2013-06-05 17:21:20.000000000 +0900
-> @@ -116,7 +116,8 @@ targets       := vmlinux vmlinux.lds \
->  
->  # Make sure files are removed during clean
->  extra-y       += piggy.gzip piggy.lzo piggy.lzma piggy.xzkern \
-> -		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs)
-> +		 lib1funcs.S ashldi3.S $(libfdt) $(libfdt_hdrs) \
-> +		 hyp-stub.S
->  
->  ifeq ($(CONFIG_FUNCTION_TRACER),y)
->  ORIG_CFLAGS := $(KBUILD_CFLAGS)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+>  arch/arm/mach-shmobile/setup-r8a7779.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+
+Thanks, I have queued this up in the soc2 branch.
+My current plan is to let that branch sit in next for a few
+days and then send a pull-request for it to be included in v3.11.
