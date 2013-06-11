@@ -1,37 +1,136 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 00:52:26 -0700
-Subject: [PATCH] Add Initial TI-Nspire support
-In-Reply-To: <1464231.JBtC8Grrsg@wuerfel>
-References: <E775DD08-5516-468E-9924-0D839218D7F9@gmail.com>
- <201306071955.26375.arnd@arndb.de>
- <9C5E608F-2DA8-469E-8C7C-B678B5EFC68B@gmail.com>
- <1464231.JBtC8Grrsg@wuerfel>
-Message-ID: <20130611075226.GA15718@quad.lixom.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Jun 2013 09:54:32 +0200
+Subject: [PATCH 3/4] mmc: omap_hsmmc: Remux pins to support SDIO interrupt
+ and PM runtime
+In-Reply-To: <20130610162356.GL8164@atomide.com>
+References: <20130607214557.18581.75288.stgit@localhost>
+ <20130607214957.18581.90624.stgit@localhost>
+ <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
+ <20130610162356.GL8164@atomide.com>
+Message-ID: <CACRpkdaEjLzXfA3HX5mra0Mjheia4e2O3kbvikeZQRsNczS7kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 08, 2013 at 07:46:28PM +0200, Arnd Bergmann wrote:
-> On Saturday 08 June 2013 11:42:54 Daniel Tang wrote:
-> > 
-> > On 08/06/2013, at 3:55 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> > If it hasn't been merged yet, would it be possible for me to
-> > send version 2 of the patches? Or would you rather I wait
-> > until it is merged and send in a separate patch to fix them?
-> 
-> Either way works fine, only after it has been merged into arm-soc
-> you should send add-on patches rather than replacements.
+On Mon, Jun 10, 2013 at 6:23 PM, Tony Lindgren <tony@atomide.com> wrote:
 
-Please feel free to repost a new version, I'll hold off applying until then.
+> We only should remux the pins that need remuxing as that's done
+> every time hitting idle. So I think we should have the following
+> default groups:
+>
+> default         Static pins that don't change, no need to remux
+>                 configured in consumer driver probe like we already
+>                 do
+>
+> active          Optional dynamic pins remuxed for runtime, can be
+>                 configured and selected in consumer driver probe.
+>                 The consumer driver may also want to select this
+>                 state in PM runtime resume.
+>
+> idle            Optional dynamic pins remuxed for idle. The consumer
+>                 driver may also want to select this state in PM
+>                 runtime suspend depending on device_can_wakeup()
+>                 and driver specific needs.
 
-Most pending pull request should have been made, please remind me if it looks
-like something is missing. What I need to go back and spend a bit more time on
-is review of some of the new platforms, as well as making sure that some of the
-"smaller" platforms where maintainers don't have their own git repos don't have
-any outstanding patch series that need to be applied -- I think there are
-a couple.
+The one thing I don't understand is why a driver would select the
+active state in probe(), unless it's a driver that does not support
+runtime PM. (But maybe that's what you mean.)
 
-I'll look at those tomorrow and we should be all caught up.
+Compare this to <linus/pinctrl/pinctrl-state.h>:
 
+/**
+ * @PINCTRL_STATE_DEFAULT: the state the pinctrl handle shall be put
+ *      into as default, usually this means the pins are up and ready to
+ *      be used by the device driver. This state is commonly used by
+ *      hogs to configure muxing and pins at boot, and also as a state
+ *      to go into when returning from sleep and idle in
+ *      .pm_runtime_resume() or ordinary .resume() for example.
+ * @PINCTRL_STATE_IDLE: the state the pinctrl handle shall be put into
+ *      when the pins are idle. This is a state where the system is relaxed
+ *      but not fully sleeping - some power may be on but clocks gated for
+ *      example. Could typically be set from a pm_runtime_suspend() or
+ *      pm_runtime_idle() operation.
+ * @PINCTRL_STATE_SLEEP: the state the pinctrl handle shall be put into
+ *      when the pins are sleeping. This is a state where the system is in
+ *      its lowest sleep state. Could typically be set from an
+ *      ordinary .suspend() function.
+ */
+#define PINCTRL_STATE_DEFAULT "default"
+#define PINCTRL_STATE_IDLE "idle"
+#define PINCTRL_STATE_SLEEP "sleep"
 
--Olof
+The way I currently use these in e.g.
+drivers/spi/spi-pl022 is:
+
+probe:
+ -> default
+
+runtime_suspend:
+ -> idle
+
+runtime_resume:
+ -> default
+
+suspend:
+ -> sleep
+
+resume:
+  -> default
+  -> idle
+
+Notice that we go to default then idle on probe and
+runtime resume. This is because the idle state is
+optional (as is the sleep state).
+
+So I guess if we should extend this terminology to match
+what you are using for the OMAP it would rather be like
+this:
+
+probe:
+ -> default
+
+runtime_suspend:
+ -> idle
+
+runtime_resume:
+ -> default
+ -> active
+
+suspend:
+ -> sleep
+
+resume:
+  -> default
+  -> idle
+
+Just one more optional "active" state in runtime resume.
+Correct?
+
+If we can agree on this I will add the active state to the
+state table and add a container in the core for this as well
+as pinctrl_pm_select_active_state() so we can skip all the
+pointless boilerplate also in the OMAP drivers, plus increase
+the readability and portability quite a bit.
+
+>> However in this case I *suspect* that what you really want
+>> to do it to rename the state called "default" to "sleep"
+>> (it appears the default state is sleepy) and then rename
+>> the "active" state to "default" (as this is the defined semantic
+>> meaning of "default" from <linux/pinctrl/pinctrl-state.h>.
+>
+> The idle state above could also be called sleep instead of idle
+> if you prefer that.
+
+No I think we should reserve that name for the pin state
+associated with suspend(). Let's leave it like this.
+
+> I think the confusion is caused by the fact that we need three
+> mux groups, not just two :) The toggling between active and idle
+> is the hotpath as that can potentially happen for multiple drivers
+> every time we enter and exit idle.
+
+Actually we have the same thing, it's just that our "default"
+and "active" are the same thing. But it seems we need to
+add your granularity to this.
+
+Yours,
+Linus Walleij
