@@ -1,147 +1,100 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 11 Jun 2013 10:58:48 +0100
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-In-Reply-To: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 11 Jun 2013 11:01:08 +0100
+Subject: [PATCH 00/21] ARM: ux500: Enable Clock look-up from Device Tree
+In-Reply-To: <CAPDyKFrJumd79hHWJkGWvRKzhoaprPHu=U6HOHXzVL8WyNS6jw@mail.gmail.com>
+References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
+ <CAPDyKFrJumd79hHWJkGWvRKzhoaprPHu=U6HOHXzVL8WyNS6jw@mail.gmail.com>
+Message-ID: <20130611100108.GC9216@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, all,
+> > Nice and simple implementation using standard Clk APIs.
+> Hi Lee,
+> 
+> I may be a bit tired, but I am having a bit hard to follow the steps
+> taken in this patch set. :-)
+> 
+> I should of course tell you why:
+> 1. You start out by adding DT definitions in the DT files, should that
+> not be done as the final step, after the DT support has been added in
+> ux500 clk driver?
 
-even though I think this set is ready to get merged, it would be great
-if we can test it on as many platforms as possible since it touches core
-suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
-and there are many.
+No, let me tell you why. ;)
 
-I pushed out a branch:
+a) The DT definitions will be going in via a separate tree, so it
+doesn't really matter where they are placed in _this_ patchset. and b)
+they will remain completely dormant until they are backed up with
+driver bindings, so there is no harm in putting them in first.
 
-git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
+> 2. Moreover, I think it would be enough to group the definitions
+> patches into one patch or at least significant fewer. Same feeling
+> about the patches were you remove the AUXDATA, this would simplify the
+> review for me.
 
-if anyone has time to test the set that would be really great, thank you
-very much.
+It's generally accepted that lots of lines of code split over a
+greater number of patches (so long as they are in consistent groups of
+functionality) are easier to review and thus have a greater chance of
+acceptance. It also makes things like reverting easier and bisecting
+more precise (rather than finding a big patch using bisect, then
+having to complete a manual mini-bisect to find the offending change.
 
-Comments and further review appreciated.
+Arnd provides the maths for calculating the ease of upstreaming a
+patch, which he calls 'weight' (NB: this is from memory, it might be a
+little off):
 
-Thanks a lot,
-Lorenzo
+(patch_weight * patch_weight) * patch_count = delta_weight
 
-On Thu, Jun 06, 2013 at 04:22:03PM +0100, Lorenzo Pieralisi wrote:
-> This patchset is v2 of a previous posting:
+So if we had a 100 lines split over 2 patches, it would be:
+
+(50 * 50) * 2 = 5000
+
+Whereas if we split those lines over 4 patches we would see:
+
+(25 * 25) * 4 = 1000
+
+Thus, by this convention it would (generally) considered to be twice
+as difficult to upstream - at least that's the theory. There is a more
+extravagant formula for calculating how difficult it would be to
+upstream an entire tree of delta if a) all patches were contained on a
+single branch compared to b) if patches were split into topic branches.
+
+Something like:
+
+((patch_weight * patch_weight) * patch_count)  *
+ (patch_weight * patch_weight) * patch_count)) *
+  branch_count = delta_weight
+
+So following on from the example above and placing 100 lines over 2
+patches on 1 branch you would get:
+
+(((25 * 25) * 4) * (25 * 25) * 4) * 1 = 6250000
+
+Whereas if you spread the patches over two branches you'd have:
+
+(((25 * 25) * 2) * (25 * 25) * 2) * 2 = 3125000
+
+Obviously the branch number comparison works better with the larger
+numbers you'd expect to find in a typical downstream BSP, but you get
+the idea.
+
+</tangent> ... whoops, sorry! :)
+
+> 3. The rest will be commented per patch.
 > 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2013-June/172873.html
+> Kind regards
+> Ulf Hansson
 > 
-> v2 changes:
-> 
-> - rescheduled registers usage in compute_mpidr_hash macro
-> 
-> Cores in ARM SMP systems are identified through coprocessor registers,
-> so that every core, by executing a coprocessor read, can detect its own
-> identifier. The CPU identifier evolved from a simple CPU ID on ARM 11 MPcore
-> SMP, where the CPU ID was split in two subfields (CPU ID and CLUSTER ID)
-> to the v7 MPIDR, where the MPIDR[23:0] bits define three affinity levels
-> that can describe thread, core, cluster topology identifiers.
-> According to the ARM 11 MPcore TRM and for architecture versions later
-> than v7 (MPIDR), to the ARM ARM, the identifier registers format is as follows:
-> 
-> NR: non-relevant for identification
-> 
-> ARM11 MPCORE: CPU ID register
-> 
-> 31                                    12 11          8 7       4 3        0
-> ---------------------------------------------------------------------------
-> |                 NR                    |  CLUSTER ID |    NR   |  CPU ID |
-> --------------------------------------------------------------------------
-> 
-> ARM v7: MPIDR
-> 
-> 31       24 23                 16 15                 8 7                  0
-> ---------------------------------------------------------------------------
-> |   NR     |      AFFINITY 2     |     AFFINITY 1     |    AFFINITY 0     |
-> ---------------------------------------------------------------------------
-> 
-> The split of CPU identifiers in multiple affinity levels implies that
-> the CPU ID, and later the MPIDR, cannot be used as simple indexes, since
-> the bit representation can contain holes:
-> 
-> eg 4 CPUs, in two separate clusters with two CPUs each:
-> 
-> CPU0: MPIDR = 0x0
-> CPU1: MPIDR = 0x1
-> CPU2: MPIDR = 0x100
-> CPU3: MPIDR = 0x101
-> 
-> In order to carry out operations that rely on the HW CPUID/MPIDR (CCI
-> disabling, context save/restore) the association of the CPU ID, or MPIDR
-> to an index is needed so that the CPU can be associated with a set of
-> resources. Resources look-up through the HW CPU ID is carried out in
-> code paths usually executed in power down procedures, that have to be
-> fast and look-up should be performed with few instructions that may be
-> executing in physical address space, with the MMU off.
-> In order to provide a fast conversion from [CPU ID, MPIDR] values to indexes
-> this set provides methods to build a simple collision-free hash function based
-> on shifting and OR'ing of CPU ID values, with shifts precomputed at boot by
-> scanning the cpu_logical_map entries (that contain the CPUID/MPIDR) of
-> possible CPUs.
-> 
-> By scanning the cpu_logical_map, the boot code detects how many bits are really
-> required to represent HW identifiers in the system and map them to a set of
-> buckets that actually represent the given index a HW id correspond to. The
-> hashing algorithm inherently takes advantage of a-priori knowledge of the
-> CPUIDs/MPIDRs allowed bits layout and it can be executed with few instructions
-> even in code paths where caching and the MMU are turned off (e.g resuming from
-> idle, S2R, hibernation).
-> 
-> One drawback of the current hashing algorithm is that it may result in a big
-> number of buckets if the recommendations on the CPUID/MPIDR layout are not
-> respected in the CPUID/MPIDR configuration; code warns on hash table
-> sizes bigger than 4 times the number of possible CPUs, which is a
-> symptom of a weird CPUID/MPIDR HW configuration and should be the exception
-> not the rule.
-> 
-> The first patch in the series provides a function that precomputes all
-> required hashing parameters by scanning the cpu_logical_map (that
-> contains HW identifiers), computes and stashes the hash parameters in a
-> structure exported to all kernel components for further usage.
-> 
-> The second patch fixes the current cpu_{suspend}/{resume} functionality,
-> so that all levels of CPUID/MPIDR are supported and cpu_{suspend}/{resume}
-> can be used on systems where affinity levels 1 and 2 are actually populated.
-> The fix carries out dynamic allocation of the array used to save the context
-> pointers, with size equal to the number of precomputed CPUID/MPIDR hash
-> buckets. To access the array, the CPUID/MPIDR values are hashed through the
-> algorithm built in patch 1 so that a hash value is retrieved and the array can
-> be indexed properly through it.
-> 
-> Context pointer array is allocated through kmalloc, so that it is made
-> up of a contiguous chunk of memory whose virtual address can be safely
-> converted to physical address (used in the MMU off path) through a
-> static mapping translation valid for all pages (if more than one) making
-> up the context pointer array. Context pointer array base address is
-> stashed in a structure easily retrieved in assembly through a pc relative
-> load that provides both virtual and physical address so that address
-> translation is not needed in the cpu_resume path, saving a few instructions.
-> 
-> Code will be improved later through dynamic patching so that the mask
-> and shifts in the hashing algorithm will be embedded in the assembly
-> instructions as immediates, removing the need for multiple loads to
-> memory to retrieve them at every given cpu_{suspend}/{resume} cycle.
-> 
-> Tested on TC2 (dual cluster 2x3 A15/A7 system) through CPU idle deep C-states
-> allowing A15 and A7 shutdown modes on both SMP and UP configurations.
-> 
-> Lorenzo Pieralisi (2):
->   ARM: kernel: build MPIDR hash function data structure
->   ARM: kernel: implement stack pointer save array through MPIDR hashing
-> 
->  arch/arm/include/asm/smp_plat.h | 18 ++++++++
->  arch/arm/include/asm/suspend.h  |  5 +++
->  arch/arm/kernel/asm-offsets.c   |  6 +++
->  arch/arm/kernel/setup.c         | 67 ++++++++++++++++++++++++++++
->  arch/arm/kernel/sleep.S         | 97 +++++++++++++++++++++++++++++++++--------
->  arch/arm/kernel/suspend.c       | 20 +++++++++
->  6 files changed, 195 insertions(+), 18 deletions(-)
-> 
-> -- 
-> 1.8.2.2
-> 
+> >
+> >  arch/arm/boot/dts/dbx5x0.dtsi    |   94 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+> >  arch/arm/boot/dts/snowball.dts   |    3 ++-
+> >  arch/arm/mach-ux500/cpu-db8500.c |   36 +--------------------------
+> >  drivers/clk/ux500/u8500_clk.c    |  154 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
+> >  4 files changed, 249 insertions(+), 38 deletions(-)
+> >
+> >
+
+-- 
+Lee Jones
+Linaro ST-Ericsson Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
