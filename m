@@ -1,157 +1,152 @@
-From: c.hemp@phytec.de (Christian Hemp)
-Date: Tue, 11 Jun 2013 19:48:22 +0200
-Subject: [PATCH v2 2/2] ARM: dts: Phytec imx6q pfla02 and pbab01 support
-In-Reply-To: <1370972902-23934-1-git-send-email-c.hemp@phytec.de>
-References: <1370972902-23934-1-git-send-email-c.hemp@phytec.de>
-Message-ID: <1370972902-23934-3-git-send-email-c.hemp@phytec.de>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Tue, 11 Jun 2013 19:44:36 +0200
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses;
+ Unanswered comments
+In-Reply-To: <CAHp75Vf8-JRjTHjoUDQPXA3LK3SQSeCzyroF=J4ZLmHMzy6jvw@mail.gmail.com>
+References: <1370185130-15332-1-git-send-email-oliver+list@schinagl.nl>
+ <1370185130-15332-2-git-send-email-oliver+list@schinagl.nl>
+ <CAHp75Vdqc9xiPBvQUB3Hfb4EBFUsoVxyuH8MK=9spJ4+rieoDQ@mail.gmail.com>
+ <51B64877.4040908@schinagl.nl>
+ <CAHp75Vf8-JRjTHjoUDQPXA3LK3SQSeCzyroF=J4ZLmHMzy6jvw@mail.gmail.com>
+Message-ID: <51B76204.1000204@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for imx6q Phytec phyFLEX-i.MX6 Quad (aka pfla02 and pbab01).
- - Module pfla02
- - Carrier-Board pbab01
+Hello all,
 
-Signed-off-by: Christian Hemp <c.hemp@phytec.de>
----
- arch/arm/boot/dts/Makefile                 |    1 +
- arch/arm/boot/dts/imx6q-phytec-pbab01.dts  |   34 +++++++++++++
- arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi |   75 ++++++++++++++++++++++++++++
- 3 files changed, 110 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-phytec-pbab01.dts
- create mode 100644 arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
+While waiting/working in comments I realized/was reminded that there 
+where a few things I hadn't addressed. I'll try to go over all the 
+missing bits to be sure to answer all questions before submitting the 
+hopefully final version. This because I wouldn't want anybody to think 
+I'm ungrateful, because I am very much so.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 314fb9d..e0dd08b 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -119,6 +119,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
- 	imx6dl-sabresd.dtb \
- 	imx6dl-wandboard.dtb \
- 	imx6q-arm2.dtb \
-+	imx6q-phytec-pbab01.dtb \
- 	imx6q-sabreauto.dtb \
- 	imx6q-sabrelite.dtb \
- 	imx6q-sabresd.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-phytec-pbab01.dts b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-new file mode 100644
-index 0000000..7d37ec6
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-phytec-pbab01.dts
-@@ -0,0 +1,34 @@
-+/*
-+ * Copyright 2013 Christian Hemp, Phytec Messtechnik GmbH
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+#include "imx6q-phytec-pfla02.dtsi"
-+
-+/ {
-+	model = "Phytec phyFLEX-i.MX6 Quad Carrier-Board";
-+	compatible = "phytec,imx6q-pbab01", "phytec,imx6q-pfla02", "fsl,imx6q";
-+};
-+
-+&fec {
-+	status = "okay";
-+};
-+
-+&uart4 {
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	status = "okay";
-+};
-+
-+&usdhc3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-new file mode 100644
-index 0000000..0ea1af4
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-phytec-pfla02.dtsi
-@@ -0,0 +1,75 @@
-+/*
-+ * Copyright 2013 Christian Hemp, Phytec Messtechnik GmbH
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include "imx6q.dtsi"
-+
-+/ {
-+	model = "Phytec phyFLEX-i.MX6 Ouad";
-+	compatible = "phytec,imx6q-pfla02", "fsl,imx6q";
-+
-+	memory {
-+		reg = <0x10000000 0x80000000>;
-+	};
-+};
-+
-+&iomuxc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hog>;
-+
-+	hog {
-+		pinctrl_hog: hoggrp {
-+			fsl,pins = <
-+				MX6Q_PAD_EIM_D23__GPIO3_IO23    0x80000000
-+			>;
-+		};
-+	};
-+
-+	pfla02 {
-+		pinctrl_usdhc3_pfla02: usdhc3grp-pfla02 {
-+			fsl,pins = <
-+				MX6Q_PAD_ENET_RXD0__GPIO1_IO27  0x80000000
-+				MX6Q_PAD_ENET_TXD1__GPIO1_IO29  0x80000000
-+			>;
-+		};
-+	};
-+};
-+
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet_3>;
-+	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio3 23 0>;
-+	status = "disabled";
-+};
-+
-+&uart4 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart4_1>;
-+	status = "disabled";
-+};
-+
-+&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2_2>;
-+	cd-gpios = <&gpio1 4 0>;
-+	wp-gpios = <&gpio1 2 0>;
-+	status = "disabled";
-+};
-+
-+&usdhc3 {
-+        pinctrl-names = "default";
-+        pinctrl-0 = <&pinctrl_usdhc3_2
-+		     &pinctrl_usdhc3_pfla02>;
-+        cd-gpios = <&gpio1 27 0>;
-+        wp-gpios = <&gpio1 29 0>;
-+        status = "disabled";
-+};
-+
--- 
-1.7.9.5
+
+ > On 05/17/13 23:18, Maxime Ripard wrote:
+>> +
+>> +struct sid_priv {
+>> +	void __iomem *sid_base;
+>> +};
+>> +
+>> +struct sid_priv *p;
+>
+> What's the point of having a structure here? And why putting a global
+> value, !static, with a generic name, while you could have an
+> instance-specific one?
+
+and related (with the struct killed and the mem* renamed)
+
+ > On 02-06-13 17:09, Russell King - ARM Linux wrote:
+> So what happens if you have two of these devices?  Maybe you want to check
+> whether p_sid_reg_base is already set?
+
+I had to think a while about it, as my first answer was 'i don't know'. 
+But yeah you can't without some smart trick that I don't yet know.
+
+ > On 06-06-13 21:16, Andy Shevchenko wrote:
+ >> +static void __iomem *p_sid_reg_base;
+ > So, why it's global?
+ >
+
+The idea behind the global pointer is, to have sunxi_sid_read_byte() be 
+usable without anything other then a memory offset/address of what byte 
+you want to read. The idea behind that is that you can use it from 
+within the kernel directly. I'll admit it's a future-proofing thing, 
+it's not exported now as there is no user for it yet. I talked to Maxime 
+about it and we (he) decided it's best to remove it for now, as we can 
+always add it back later when we find a user for it.
+
+Having two SID's however is almost impossible too, since you get 1 per 
+SoC, and only 1 SoC per kernel? I added a guard in .probe() which only 
+loads the driver if the pointer is NULL.
+
+ > On 02-06-13 17:09, Russell King - ARM Linux wrote:
+>> +	if (likely((SID_SIZE))) {
+>> +		sid_key = ioread32be(p_sid_reg_base + round_down(offset, 4));
+>> +		sid_key >>= (offset % 4) * 8;
+>> +		ret = sid_key & 0xff;
+>> +	}
+>
+> What happens if you unbind the device in sysfs and then try and use
+> this function?
+>
+It goes kaboom. Again, i had no idea naturally. I think what you meant 
+was, if you unbind and p_sid_reg_base points to 'somewhere' and we just 
+randomly read bytes. I added p_sid_reg_base to the guard above to at 
+least check if it's not NULL.
+
+ > On 02-06-13 17:09, Russell King - ARM Linux wrote:
+>> +static int sunxi_sid_remove(struct platform_device *pdev)
+>> +{
+>> +	device_remove_bin_file(&pdev->dev, &sid_bin_attr);
+>> +	dev_info(&pdev->dev, "Sunxi SID driver unloaded successfully.\n");
+>
+> Maybe you want to set p_sid_reg_base to NULL here?
+>
+Yeah, that made even more sense to the above thing and added it. When we 
+unbind or unload the driver, we point to NULL and a) can check for it 
+above and don't have nasty things dangling around. I think it was save 
+to assume, that when the driver is unloaded/unbound, the devm_set_data() 
+private data gets cleaned and the pointer set to NULL? I think that's 
+what Maxime/Emilio said, by using the devm stuff, those should get 
+cleaned up properly.
+
+ > On 02-06-13 17:09, Russell King - ARM Linux wrote:
+>> +	platform_set_drvdata(pdev, sid_reg_base);
+>> +	p_sid_reg_base = sid_reg_base;
+>
+> So what happens if you have two of these devices?  Maybe you want to check
+> whether p_sid_reg_base is already set?
+>
+Even that hint didn't trigger me as to why this could cause problems. 
+Userspace guy here, every driver has its own memory space right? So I've 
+added a guard that we only load this driver once and only if 
+p_sid_reg_base is NULL.
+
+ > On 02-06-13 17:09, Russell King - ARM Linux wrote:
+>> +	dev_info(dev, "Sunxi SID driver loaded successfully.\n");
+>
+> Do we really need to report that the driver "loaded successfully" ?
+> Do we need lots of lines in the kernel log telling us simply that
+> random driver X was built into the kernel or the module was loaded?
+Don't we do that already though? I made the string more informative by 
+adding version information, but yeah I see tons of 'all is ok' rolling 
+by, isn't that a good thing? Isn't that only printed if we actually have 
+a SID onboard, so the user knows 'sid is available'. I know I often 
+scroll through dmesg to see if things got brought up nicely.
+
+> On 06-06-13 21:16, Andy Shevchenko wrote:
+>> +       if (likely((SID_SIZE))) {
+> Extra braces.
+> Use antipattern here.
+While this is a really small function, I guess if that's the normal 
+course of things; why not.
+
+
+> On 06-06-13 21:16, Andy Shevchenko wrote:
+>> +               ret = sid_key & 0xff;
+> No need to do & 0xff, since return type is byte.
+>
+With ret removed, I assume having return (u8)sid_key; is okay? Does that 
+typecast only return the last byte? Or do we still want & 0xff in the 
+return added for clarity?
+
+ > On 06-06-13 21:16, Andy Shevchenko wrote
+>> +static int __init sunxi_sid_probe(struct platform_device *pdev)
+>> +{
+>> +       int entropy[SID_SIZE], i, ret;
+>
+> Usually ret variable is located at the end of definition block.
+> Moreover, there is no relationship between those three. It means one
+> line per variable.
+>
+That's a good rule to group variables with, I should have known. Done.
+
+> On 06-06-13 21:16, Andy Shevchenko wrote:
+>> +       dev = &pdev->dev;
+> Please, be consistent, somewhere you still use &pdev->dev.
+> I recomend to use &pdev->dev everywhere in probe(), since we don't
+> know if the device will be probed successfully.
+>
+I would have thought that 'dev' would that it would be the same and valid,
+but yes, I should have been consistent throughout. What bothers me here,
+is that I actually managed to overlook it.
