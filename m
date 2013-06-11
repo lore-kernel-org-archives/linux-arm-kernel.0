@@ -1,52 +1,64 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 11 Jun 2013 23:32:02 +0100
-Subject: [PATCH 2/9] dma: pl330: use dma_addr_t for describing bus
- addresses
-In-Reply-To: <1370889285-22799-3-git-send-email-will.deacon@arm.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20130611223202.CDCEB3E0D8D@localhost>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 12 Jun 2013 00:42:55 +0200
+Subject: [PATCH] cpuidle: Fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency
+ warning
+In-Reply-To: <1370938185-5019-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1370938185-5019-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <1892912.B255hT0OHX@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 10 Jun 2013 19:34:38 +0100, Will Deacon <will.deacon@arm.com> wrote:
-> The microcode bus address (pl330_dmac.mcode_bus) is currently a u32,
-> which fails to compile when building on a system with 64-bit bus
-> addresses.
+On Tuesday, June 11, 2013 10:09:45 AM Daniel Lezcano wrote:
+> Before the commit d6f346f2d2bf511c2c59176121a6e42ce60173a0, the
+> ARCH_NEEDS_CPU_IDLE_COUPLED option was not depending on the CPU_IDLE but now
+> it has been moved under the CPU_IDLE menuconfig option.
 > 
-> This patch uses dma_addr_t to represent the address instead.
+> That raises the following warnings:
 > 
-> Cc: Jassi Brar <jaswinder.singh@linaro.org>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects ARCH_NEEDS_CPU_IDLE_COUPLED
+> which has unmet direct dependencies (CPU_IDLE)
+> warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects ARCH_NEEDS_CPU_IDLE_COUPLED
+> which has unmet direct dependencies (CPU_IDLE)
+> 
+> The tegra2 and omap4 Kconfig files select this option but without checking
+> CPU_IDLE is set.
+> 
+> Fix that by moving the option out of the CPU_IDLE option.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 
-Acked-by: Grant Likely <grant.likely@linaro.org>
+Queued up for 3.11.
+
+Thanks,
+Rafael
+
 
 > ---
->  drivers/dma/pl330.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/cpuidle/Kconfig |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> index 22e2a8f..f1bc593 100644
-> --- a/drivers/dma/pl330.c
-> +++ b/drivers/dma/pl330.c
-> @@ -501,7 +501,7 @@ struct pl330_dmac {
->  	/* Maximum possible events/irqs */
->  	int			events[32];
->  	/* BUS address of MicroCode buffer */
-> -	u32			mcode_bus;
-> +	dma_addr_t		mcode_bus;
->  	/* CPU address of MicroCode buffer */
->  	void			*mcode_cpu;
->  	/* List of all Channel threads */
-> -- 
-> 1.8.2.2
+> diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
+> index a7d2e83..81de5d9 100644
+> --- a/drivers/cpuidle/Kconfig
+> +++ b/drivers/cpuidle/Kconfig
+> @@ -29,9 +29,6 @@ config CPU_IDLE_GOV_MENU
+>  	bool "Menu governor (for tickless system)"
+>  	default y
+>  
+> -config ARCH_NEEDS_CPU_IDLE_COUPLED
+> -	def_bool n
+> -
+>  config CPU_IDLE_CALXEDA
+>  	bool "CPU Idle Driver for Calxeda processors"
+>  	depends on ARCH_HIGHBANK
+> @@ -45,3 +42,6 @@ config CPU_IDLE_ZYNQ
+>  	  Select this to enable cpuidle on Xilinx Zynq processors.
+>  
+>  endif
+> +
+> +config ARCH_NEEDS_CPU_IDLE_COUPLED
+> +	def_bool n
 > 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
-
 -- 
-Grant Likely, B.Sc, P.Eng.
-Secret Lab Technologies, Ltd.
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
