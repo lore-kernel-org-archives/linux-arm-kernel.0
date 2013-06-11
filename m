@@ -1,23 +1,27 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Tue, 11 Jun 2013 09:47:13 +0000 (UTC)
-Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
-In-Reply-To: <51B6D239.5030905@nvidia.com>
-References: <20130607121505.21868.72360.stgit@dusk.lan>
- <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
- <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
- <51B6D239.5030905@nvidia.com>
-Message-ID: <alpine.DEB.2.02.1306110944130.22645@utopia.booyaka.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Jun 2013 11:53:36 +0200
+Subject: About LPAE supporting on EXYNOS5440
+In-Reply-To: <109e01ce667e$5becc880$13c65980$%kim@samsung.com>
+References: <109e01ce667e$5becc880$13c65980$%kim@samsung.com>
+Message-ID: <6690814.Wx0lSuVAQ5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013, Prashant Gaikwad wrote:
+On Tuesday 11 June 2013 17:33:33 Kukjin Kim wrote:
+> Hi all,
+> 
+> The exynos5440 can support LPAE and referece boards, SSDK5440 and SD5v1 have
+> over 8GiB memory.
+> 
+> Current exynos_defconfig selects every EXYNOS SoCs including exynos5440 it
+> means supporting LPAE will be selected for other EXYNOS SoCs.
+> 
+> I'm wondering if seleting LPAE causes some problem for multiplatform. Can we
+> support LPAE enabled and disabled platform together with single zImage?
 
-> Why not implement these APIs in DFLL clock driver itself and pass RST address
-> register to driver?
+No, that isn't possible. I think we should enable all exynos support in the
+regular multi_v7_defconfig and leave LPAE turned off for that, but create
+another multi_lpae_defconfig that has all LPAE capable machines turned on.
+This is also what I expect the distros to do.
 
-The DFLL DVCO reset registers are CAR registers, not DFLL registers.  
-Functions that operate on registers in one IP block shouldn't be located 
-in another IP block's driver.
-
-
-- Paul
+	Arnd
