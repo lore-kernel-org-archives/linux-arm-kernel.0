@@ -1,50 +1,40 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 11 Jun 2013 13:33:28 +0200
-Subject: [PATCH v3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ line
-In-Reply-To: <87fvwpex6k.fsf@linaro.org>
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370629886-14170-1-git-send-email-khilman@linaro.org>
- <20130607193130.GA13205@kahuna> <51B59AC3.2080900@ti.com>
- <87fvwpex6k.fsf@linaro.org>
-Message-ID: <51B70B08.9030208@ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Tue, 11 Jun 2013 19:35:11 +0800
+Subject: [GIT PULL] SiRF V3.10 kernel Panic fix for multiplatforms using
+ non-SiRF SoCs
+In-Reply-To: <20130611073552.GJ6688@quad.lixom.net>
+References: <CAGsJ_4ytD0L8gtcioDxJRyoOL6BGcEKQSxeyrJz6Ko5hXS4VnA@mail.gmail.com>
+ <20130611073552.GJ6688@quad.lixom.net>
+Message-ID: <CAGsJ_4w0e0pawfRhN4Y7Jp635-hozAeB8vqggeLOV_8o3U9=ew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/10/2013 6:40 PM, Kevin Hilman wrote:
-> Benoit Cousson <b-cousson@ti.com> writes:
->
->> Hi Kevin,
+2013/6/11 Olof Johansson <olof@lixom.net>:
+> On Mon, Jun 10, 2013 at 01:05:20PM +0800, Barry Song wrote:
+>> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
 >>
->> On 06/07/2013 09:31 PM, Nishanth Menon wrote:
->>> On 11:31-20130607, Kevin Hilman wrote:
->>>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
->>>> SYS_NIRQ line on OMAP.  Add another DTS include file
->>>> (twl4030_omap3.dtsi) for boards that hook up the twl4030 this way
->>>> to include.
->>>>
->>>> This allows RTC wake from off-mode to work again on OMAP3-based
->>>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
->>>> 3530/Overo, 3730/Overo-STORM.
->>>>
->>>> Special thanks to Florian Vaussard for suggesting use of preprocessor
->>>> feature.
->>>>
->>>> Cc: Florian Vaussard <florian.vaussard@epfl.ch>
->>>> Cc: Benoit Cousson <b-cousson@ti.com>
->>>> Cc: Nishanth Menon <nm@ti.com>
->>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->>> Thanks,
->>> Reviewed-by: Nishanth Menon <nm@ti.com>
+>>   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 >>
->> Thanks, I've just applied it in for_3.11/dts.
+>> are available in the git repository at:
+>>
+>>   git://gitorious.org/sirfprima2-kernel/sirfprima2-kernel.git
+>> tags/sirf-fix-v3.10-mp-panic
+>>
+>> for you to fetch changes up to b32b28406f830a526db1bacd539bee57692b0847:
+>>
+>>   ARM: prima2: fix incorrect panic usage (2013-06-10 12:01:06 +0800)
 >
-> Thanks,
+> Hi,
 >
-> Will you apply the first 2 from the series too?
->
->    ARM: DTS: OMAP3: beagle/overo: mux console UART, enable wakeup
->    ARM: DTS: OMAP3: beagle: enable user button via gpio_keys, enable wakeup
+> I've applied the patch as it was posted earlier instead of pulling this, but
+> the same code is in our fixes branch now.
 
-Thanks for the reminder, I kind of forgot these ones :-)
+ok. Thanks. i saw this in fix branch of arm-soc.
 
-Benoit
+>
+>
+> Regards,
+>
+> -Olof
+
+-barry
