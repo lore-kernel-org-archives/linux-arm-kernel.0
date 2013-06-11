@@ -1,25 +1,37 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 00:09:26 -0700
-Subject: [GIT PULL v2 0/2] Update for Renesas INTC External IRQ pin
- driver for v3.11
-In-Reply-To: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
-References: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130611070926.GG6688@quad.lixom.net>
+Date: Tue, 11 Jun 2013 00:11:26 -0700
+Subject: [PATCH v2] ARM: prima2: fix incorrect panic usage
+In-Reply-To: <1370575027-31671-1-git-send-email-haojian.zhuang@linaro.org>
+References: <1370575027-31671-1-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <20130611071126.GH6688@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 04:28:46PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
+On Fri, Jun 07, 2013 at 11:17:07AM +0800, Haojian Zhuang wrote:
+> In prima2, some functions of checking DT is registered in initcall
+> level. If it doesn't match the compatible name of sirf, kernel
+> will panic. It blocks the usage of multiplatform on other verndor.
 > 
-> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+> The error message is in below.
 > 
->   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+> Signen-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+> Knic - not syncing: unable to find compatible pwrc node in dtb          
+>                                                                                 
+> CPU: 0 PID: 1 Comm: swapper/0 Not tainted 3.10.0-rc3-00006-gd7f26ea-dirty #86   
+> [<c0013adc>] (unwind_backtrace+0x0/0xf8) from [<c0011430>] (show_stack+0x10/0x1)
+> [<c0011430>] (show_stack+0x10/0x14) from [<c026f724>] (panic+0x90/0x1e8)        
+> [<c026f724>] (panic+0x90/0x1e8) from [<c03267fc>] (sirfsoc_of_pwrc_init+0x24/0x)
+> [<c03267fc>] (sirfsoc_of_pwrc_init+0x24/0x58) from [<c0320864>] (do_one_initcal)
+> [<c0320864>] (do_one_initcall+0x90/0x150) from [<c0320a20>] (kernel_init_freeab)
+> [<c0320a20>] (kernel_init_freeable+0xfc/0x1c4) from [<c026b9e8>] (kernel_init+0)
+> [<c026b9e8>] (kernel_init+0x8/0xe4) from [<c000e158>] (ret_from_fork+0x14/0x3c) 
 > 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq-for-v3.11
+> Changelog:
+> v2:
+> 1. Fix the wrong error message.
 
-Thanks, I've merged this into next/fixes-non-critical.
+Thanks, applied to fixes for 3.10, but I reworded the commit message a bit to
+move the S-o-b down.
 
 
 -Olof
