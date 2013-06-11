@@ -1,66 +1,48 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Tue, 11 Jun 2013 07:30:35 -0700
-Subject: [PATCH v3] ARM: DTS: TWL4030: fix mux and wakeup for SYS_NIRQ line
-In-Reply-To: <51B70D57.4010208@ti.com> (Benoit Cousson's message of "Tue, 11
- Jun 2013 13:43:19 +0200")
-References: <1370040357-25794-1-git-send-email-khilman@linaro.org>
- <1370629886-14170-1-git-send-email-khilman@linaro.org>
- <20130607193130.GA13205@kahuna> <51B59AC3.2080900@ti.com>
- <87fvwpex6k.fsf@linaro.org> <51B70B08.9030208@ti.com>
- <51B70D57.4010208@ti.com>
-Message-ID: <874nd4d8j8.fsf@linaro.org>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Tue, 11 Jun 2013 16:48:55 +0200
+Subject: [PATCH 0/3] ARM: dts: OMAP3: Use constants with MTD devices
+Message-ID: <1370962138-9631-1-git-send-email-florian.vaussard@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit Cousson <b-cousson@ti.com> writes:
+Hello,
 
-> On 06/11/2013 01:33 PM, Cousson, Benoit wrote:
->> On 6/10/2013 6:40 PM, Kevin Hilman wrote:
->>> Benoit Cousson <b-cousson@ti.com> writes:
->>>
->>>> Hi Kevin,
->>>>
->>>> On 06/07/2013 09:31 PM, Nishanth Menon wrote:
->>>>> On 11:31-20130607, Kevin Hilman wrote:
->>>>>> On most OMAP3 platforms, the twl4030 IRQ line is connected to the
->>>>>> SYS_NIRQ line on OMAP.  Add another DTS include file
->>>>>> (twl4030_omap3.dtsi) for boards that hook up the twl4030 this way
->>>>>> to include.
->>>>>>
->>>>>> This allows RTC wake from off-mode to work again on OMAP3-based
->>>>>> platforms with twl4030.  Tested on 3530/Beagle, 3730/Beagle-xM,
->>>>>> 3530/Overo, 3730/Overo-STORM.
->>>>>>
->>>>>> Special thanks to Florian Vaussard for suggesting use of preprocessor
->>>>>> feature.
->>>>>>
->>>>>> Cc: Florian Vaussard <florian.vaussard@epfl.ch>
->>>>>> Cc: Benoit Cousson <b-cousson@ti.com>
->>>>>> Cc: Nishanth Menon <nm@ti.com>
->>>>>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
->>>>> Thanks,
->>>>> Reviewed-by: Nishanth Menon <nm@ti.com>
->>>>
->>>> Thanks, I've just applied it in for_3.11/dts.
->>>
->>> Thanks,
->>>
->>> Will you apply the first 2 from the series too?
->>>
->>>    ARM: DTS: OMAP3: beagle/overo: mux console UART, enable wakeup
->>>    ARM: DTS: OMAP3: beagle: enable user button via gpio_keys, enable
->>> wakeup
->> 
->> Thanks for the reminder, I kind of forgot these ones :-)
->
-> BTW, do you have any v2 for these ones? This version does not use the
-> macros.
-> Moreover I cannot apply them on top of Florian's series :-(
+Legacy board files use constants from sizes.h and mtd/partitions.h
+to declare MTD partitions. This series performs the same with DT.
 
-Oops,  I thought I reposted those too.   All three are here:
+Necessary headers are added (patch 1), a NAND node is added to
+omap3-overo (patch 2), and remaining DTS are converted (patch 3).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git  for_3.11/dt
+Patch 2 was tested on the real hardware. For patch 3, the resulting
+DTB were diff'ed. The MTDPART_SIZ_FULL constant was used in DTS, when
+it was the case in legacy board files. The size cell is thus changed
+inside the binary output, so testing on the hardware is welcome, even
+if it should work transparently.
 
-which is based on top of your for_3.11/dts branch.
+Note that inside omap3430-sdp.dts (nor at 0,0), it appears with
+this series that partitions 'kernel-nor' and 'filesystem-nor' overlaps
+by (2*SZ_128K), which is probably not desired.
 
-Kevin
+Regards,
+
+Florian
+
+Florian Vaussard (3):
+  ARM: dts: Add headers with constants for MTD partitions
+  ARM: dts: Add omap3-overo NAND flash memory binding
+  ARM: dts: OMAP3: Use MTD constants for OMAP3 boards
+
+ arch/arm/boot/dts/omap3-devkit8000.dts |   10 +++---
+ arch/arm/boot/dts/omap3-igep0020.dts   |   10 +++---
+ arch/arm/boot/dts/omap3-igep0030.dts   |   10 +++---
+ arch/arm/boot/dts/omap3-overo.dtsi     |   50 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap3.dtsi           |    2 +
+ arch/arm/boot/dts/omap3430-sdp.dts     |   28 ++++++++--------
+ include/dt-bindings/mtd/partitions.h   |   12 +++++++
+ include/dt-bindings/sizes.h            |   52 ++++++++++++++++++++++++++++++++
+ 8 files changed, 145 insertions(+), 29 deletions(-)
+ create mode 100644 include/dt-bindings/mtd/partitions.h
+ create mode 100644 include/dt-bindings/sizes.h
+
+-- 
+1.7.5.4
