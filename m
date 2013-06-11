@@ -1,38 +1,35 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Jun 2013 10:33:12 -0600
-Subject: [PATCH] drivers: pinctrl: add active state to core
-In-Reply-To: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
-References: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <51B75148.5080701@wwwdotorg.org>
+Date: Tue, 11 Jun 2013 10:48:53 -0600
+Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
+In-Reply-To: <20130611162224.GA13741@e102568-lin.cambridge.arm.com>
+References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
+ <51B748BB.7070602@wwwdotorg.org>
+ <20130611162224.GA13741@e102568-lin.cambridge.arm.com>
+Message-ID: <51B754F5.4070109@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2013 02:16 AM, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On 06/11/2013 10:22 AM, Lorenzo Pieralisi wrote:
+> Hi Stephen,
 > 
-> In addition to the recently introduced pinctrl core
-> control, the PM runtime pin control for the OMAP platforms
-> require a fourth state in addtition to the default, idle and
-> sleep states already handled by the core: an explicit "active"
-> state. Let's introduce this to the core in addition to the
-> other states already defined.
+> On Tue, Jun 11, 2013 at 04:56:43PM +0100, Stephen Warren wrote:
+>> On 06/11/2013 03:58 AM, Lorenzo Pieralisi wrote:
+>>> Hi Russell, all,
+>>>
+>>> even though I think this set is ready to get merged, it would be great
+>>> if we can test it on as many platforms as possible since it touches core
+>>> suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
+>>> and there are many.
+>>
+>> FWIW, I booted a Tegra system with these patches applied and didn't see
+>> any issue in very brief testing. I'm not sure what targeted testing
+>> would be useful?
+> 
+> That's great thanks. CPUidle deep C-states (when CPUs resume from reset
+> through cpu_resume) are the main triggers of this code, so you should be
+> running with them enabled to test it.
 
-Surely "default" /is/ "active"? That's what it's meant so far.
-
-Since the pinctrl states are represented in DT, the DT bindings of all
-devices potentially get affected by changes like this. They'd need to be
-documented in a DT binding document, and the exact semantics of the
-different states clearly explained.
-
-It may be better for struct device, struct platform_driver, or similar,
-to contain a list of the states that are required by the driver or its
-binding. That way, the list of states (or states beyond the basic
-default) is driver-/DT-binding- specific, and custom stuff like this for
-OMAP wouldn't require explicit code in drivers/base/pinctrl.c, but
-rather simply iterating over a custom list.
-
-Related to that, I'm not sure we should be deriving what we put into DT
-based on the runtime PM requirements of drivers; DT is supposed to be
-driven by HW definitions, although I suppose you could argue that the
-drivers implement what they do because they're implementing the HW
-requirements.
+OK, in that case I believe I tested that; I had our "LP2" CPU
+power-management mode enabled as always, and that powers off the CPUs
+and resumes them, and didn't see any issue.
