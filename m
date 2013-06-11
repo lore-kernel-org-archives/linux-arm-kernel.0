@@ -1,68 +1,29 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Jun 2013 16:47:14 +0900
-Subject: [PATCH v2] ARM: shmobile: uImage load address rework
-In-Reply-To: <20130610092857.19175.25629.sendpatchset@w520>
-References: <20130610092857.19175.25629.sendpatchset@w520>
-Message-ID: <20130611074713.GB10440@verge.net.au>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 11 Jun 2013 09:47:36 +0200
+Subject: OMAP v3.10-rc regressions that no one's fixed
+In-Reply-To: <alpine.DEB.2.02.1306100716560.4604@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1306100716560.4604@utopia.booyaka.com>
+Message-ID: <51B6D618.30809@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 06:28:57PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm@opensource.se>
-> 
-> This is V2 of the mach-shmobile uImage load address rework patch.
-> 
-> Rework the mach-shmobile uImage load address calculation by storing
-> the per-board load addresses in Makefile.boot. This removes the
-> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
-> it possible to create safe kernel images that boot on multiple boards.
-> 
-> This is one of several series of code that reworks code not to rely on
-> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Paul,
 
-Thanks, I have queued this up in the soc2 branch.
-My current plan is to let that branch sit in next for a few
-days and then send a pull-request for it to be included in v3.11.
+On 06/10/2013 09:22 AM, Paul Walmsley wrote:
+> 
+> Hi folks -- particularly TIers working on mainline,
+> 
+> There are several regressions that started with v3.10-rc that no one's 
+> fixed for over a month.  Some of them should be quite easy:
+> 
+> * 2430SDP, 3730 Beagle XM, 3530 Beagle, 3517EVM, CM-T3517: {dmic,mcpdm} lookup failure
+>   - Cause unknown
+>   - These IP blocks don't exist on OMAP3xxx/AM35xx chips
 
-> ---
-> 
->  Changes since V1:
->  - On popular request, merged patch 5 and 14 and all other.
->  - Updated the __ZRELADDR calculation, thanks Arnd!
->  - Added Reviewed-by from Laurent and Morimoto-san, thanks!
-> 
->  arch/arm/mach-shmobile/Makefile.boot |   20 ++++++++++++++++++--
->  1 file changed, 18 insertions(+), 2 deletions(-)
-> 
-> --- 0001/arch/arm/mach-shmobile/Makefile.boot
-> +++ work/arch/arm/mach-shmobile/Makefile.boot	2013-06-10 16:15:22.000000000 +0900
-> @@ -1,6 +1,22 @@
-> -__ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
-> -		     $$[$(CONFIG_MEMORY_START) + 0x8000]')
-> +# per-board load address for uImage
-> +loadaddr-y	:=
-> +loadaddr-$(CONFIG_MACH_AG5EVM) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_AP4EVB) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
-> +loadaddr-$(CONFIG_MACH_BONITO) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_KOTA2) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
-> +loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
->  
-> +__ZRELADDR	:= $(sort $(loadaddr-y))
->     zreladdr-y   += $(__ZRELADDR)
->  
->  # Unsupported legacy stuff
-> 
+I will send a patch soon to fix these. Need to test the patch(es) first. I
+think they surfaced because I have enabled the audio support in
+omap2plus_defconfig for OMAP4 and 5 - which require McPDM and DMIC.
+Just couple of minutes, and I'll have the fix.
+
+-- 
+P?ter
