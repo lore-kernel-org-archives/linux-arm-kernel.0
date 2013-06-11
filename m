@@ -1,47 +1,65 @@
 From: s-anna@ti.com (Suman Anna)
-Date: Tue, 11 Jun 2013 12:03:30 -0500
-Subject: [PATCH v2 1/6] omap: mailbox: check iomem resource before
- dereferencing it
-Message-ID: <1370970210-6669-1-git-send-email-s-anna@ti.com>
+Date: Tue, 11 Jun 2013 12:03:40 -0500
+Subject: [PATCH v2 2/6] omap: mailbox: call request_irq after mbox queues are
+ allocated
+Message-ID: <1370970220-6704-1-git-send-email-s-anna@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a NULL check for iomem resource in mailbox probe functions.
+The OMAP mailbox startup code is enabling the interrupt before any
+of the associated mailbox queues are allocated. Move this code so
+that the interrupt configuration for a mailbox is together.
 
 Signed-off-by: Fernando Guzman Lugo <lugo.fernando@gmail.com>
 Signed-off-by: Suman Anna <s-anna@ti.com>
 ---
- arch/arm/mach-omap1/mailbox.c | 3 +++
- arch/arm/mach-omap2/mailbox.c | 3 +++
- 2 files changed, 6 insertions(+)
+ arch/arm/plat-omap/mailbox.c | 18 +++++++++---------
+ 1 file changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index efc8f20..a343d5f 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -152,6 +152,9 @@ static int omap1_mbox_probe(struct platform_device *pdev)
- 	list[0]->irq = platform_get_irq_byname(pdev, "dsp");
- 
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!mem)
-+		return -ENOENT;
-+
- 	mbox_base = ioremap(mem->start, resource_size(mem));
- 	if (!mbox_base)
- 		return -ENOMEM;
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 0b08026..9fe0bf2 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -382,6 +382,9 @@ static int omap2_mbox_probe(struct platform_device *pdev)
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 42377ef..f65eaf0 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -261,13 +261,6 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
  	}
  
- 	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!mem)
-+		return -ENOENT;
-+
- 	mbox_base = ioremap(mem->start, resource_size(mem));
- 	if (!mbox_base)
- 		return -ENOMEM;
+ 	if (!mbox->use_count++) {
+-		ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
+-							mbox->name, mbox);
+-		if (unlikely(ret)) {
+-			pr_err("failed to register mailbox interrupt:%d\n",
+-									ret);
+-			goto fail_request_irq;
+-		}
+ 		mq = mbox_queue_alloc(mbox, NULL, mbox_tx_tasklet);
+ 		if (!mq) {
+ 			ret = -ENOMEM;
+@@ -282,17 +275,24 @@ static int omap_mbox_startup(struct omap_mbox *mbox)
+ 		}
+ 		mbox->rxq = mq;
+ 		mq->mbox = mbox;
++		ret = request_irq(mbox->irq, mbox_interrupt, IRQF_SHARED,
++							mbox->name, mbox);
++		if (unlikely(ret)) {
++			pr_err("failed to register mailbox interrupt:%d\n",
++									ret);
++			goto fail_request_irq;
++		}
+ 
+ 		omap_mbox_enable_irq(mbox, IRQ_RX);
+ 	}
+ 	mutex_unlock(&mbox_configured_lock);
+ 	return 0;
+ 
++fail_request_irq:
++	mbox_queue_free(mbox->rxq);
+ fail_alloc_rxq:
+ 	mbox_queue_free(mbox->txq);
+ fail_alloc_txq:
+-	free_irq(mbox->irq, mbox);
+-fail_request_irq:
+ 	if (mbox->ops->shutdown)
+ 		mbox->ops->shutdown(mbox);
+ 	mbox->use_count--;
 -- 
 1.8.2
