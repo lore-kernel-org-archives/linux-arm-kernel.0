@@ -1,143 +1,26 @@
-From: csd@broadcom.com (Christian Daudt)
-Date: Tue, 11 Jun 2013 15:39:16 -0700
-Subject: [PATCH] mmc: sirf: fix sdhci_pltfm_init sequence
-In-Reply-To: <24753444.e6CjWoyOih@wuerfel>
-References: <24753444.e6CjWoyOih@wuerfel>
-Message-ID: <51B7A714.7040804@broadcom.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Jun 2013 15:45:17 -0700
+Subject: [PATCH v2 1/3] GPIO: clps711x: Rewrite driver for using generic
+ GPIO code
+In-Reply-To: <CACRpkdZHYmcD7CS42Gmh=QtSEG4zdpEp+x-Nac3oFcnLdTk-hw@mail.gmail.com>
+References: <1366991250-17130-1-git-send-email-shc_work@mail.ru>
+ <CACRpkdZHYmcD7CS42Gmh=QtSEG4zdpEp+x-Nac3oFcnLdTk-hw@mail.gmail.com>
+Message-ID: <20130611224517.GA23774@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-06-03 03:02 PM, Arnd Bergmann wrote:
-> Patch "mmc: sdhci: Add size for caller in init+register" changed the
-> interface for sdhci_pltfm_init, while patch "mmc: sdhci-sirf: add mmc
-> host sdhci-pltfm based driver for SiRF SoCs" added a new driver
-> with the old interface.
->
-> This changes the sirf driver to use the new interface, avoiding
-> one warning, and simplifying the init sequence. Since we're here
-> already, this also adds an error path for failed clk_prepare_enable.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Christian Daudt <csd@broadcom.com>
-> Cc: Barry Song <Baohua.Song@csr.com>
-> Cc: Chris Ball <cjb@laptop.org>
-> ----
-> This needs an Ack from Barry before it can get applied.
->
-> diff --git a/drivers/mmc/host/sdhci-sirf.c b/drivers/mmc/host/sdhci-sirf.c
-> index 09805af..cc80f26 100644
-> --- a/drivers/mmc/host/sdhci-sirf.c
-> +++ b/drivers/mmc/host/sdhci-sirf.c
-> @@ -24,7 +24,7 @@ struct sdhci_sirf_priv {
->   static unsigned int sdhci_sirf_get_max_clk(struct sdhci_host *host)
->   {
->   	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	struct sdhci_sirf_priv *priv = pltfm_host->priv;
-> +	struct sdhci_sirf_priv *priv = sdhci_pltfm_priv(pltfm_host);
->   	return clk_get_rate(priv->clk);
->   }
->   
-> @@ -47,6 +47,8 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
->   	struct sdhci_pltfm_host *pltfm_host;
->   	struct sdhci_sirf_priv *priv;
->   	struct pinctrl *pinctrl;
-> +	struct clk *clk;
-> +	int gpio_cd;
->   	int ret;
->   
->   	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> @@ -55,38 +57,31 @@ static int sdhci_sirf_probe(struct platform_device *pdev)
->   		return PTR_ERR(pinctrl);
->   	}
->   
-> -	priv = devm_kzalloc(&pdev->dev, sizeof(struct sdhci_sirf_priv),
-> -		GFP_KERNEL);
-> -	if (!priv) {
-> -		dev_err(&pdev->dev, "unable to allocate private data");
-> -		return -ENOMEM;
-> -	}
-> -
-> -	priv->clk = devm_clk_get(&pdev->dev, NULL);
-> -	if (IS_ERR(priv->clk)) {
-> +	clk = devm_clk_get(&pdev->dev, NULL);
-> +	if (IS_ERR(clk)) {
->   		dev_err(&pdev->dev, "unable to get clock");
-> -		return PTR_ERR(priv->clk);
-> +		return PTR_ERR(clk);
->   	}
->   
-> -	if (pdev->dev.of_node) {
-> -		priv->gpio_cd = of_get_named_gpio(pdev->dev.of_node,
-> -			"cd-gpios", 0);
-> -	} else {
-> -		priv->gpio_cd = -EINVAL;
-> -	}
-> +	if (pdev->dev.of_node)
-> +		gpio_cd = of_get_named_gpio(pdev->dev.of_node, "cd-gpios", 0);
-> +	else
-> +		gpio_cd = -EINVAL;
->   
-> -	host = sdhci_pltfm_init(pdev, &sdhci_sirf_pdata);
-> -	if (IS_ERR(host)) {
-> -		ret = PTR_ERR(host);
-> -		goto err_sdhci_pltfm_init;
-> -	}
-> +	host = sdhci_pltfm_init(pdev, &sdhci_sirf_pdata, sizeof(struct sdhci_sirf_priv));
-> +	if (IS_ERR(host))
-> +		return PTR_ERR(host);
->   
->   	pltfm_host = sdhci_priv(host);
-> -	pltfm_host->priv = priv;
-> +	priv = sdhci_pltfm_priv(pltfm_host);
-> +	priv->clk = clk;
-> +	priv->gpio_cd = gpio_cd;
->   
->   	sdhci_get_of_property(pdev);
->   
-> -	clk_prepare_enable(priv->clk);
-> +	ret = clk_prepare_enable(priv->clk);
-> +	if (ret)
-> +		goto err_clk_prepare;
->   
->   	ret = sdhci_add_host(host);
->   	if (ret)
-> @@ -111,8 +106,8 @@ err_request_cd:
->   	sdhci_remove_host(host, 0);
->   err_sdhci_add:
->   	clk_disable_unprepare(priv->clk);
-> +err_clk_prepare:
->   	sdhci_pltfm_free(pdev);
-> -err_sdhci_pltfm_init:
->   	return ret;
->   }
->   
-> @@ -120,7 +115,7 @@ static int sdhci_sirf_remove(struct platform_device *pdev)
->   {
->   	struct sdhci_host *host = platform_get_drvdata(pdev);
->   	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	struct sdhci_sirf_priv *priv = pltfm_host->priv;
-> +	struct sdhci_sirf_priv *priv = sdhci_pltfm_priv(pltfm_host);
->   
->   	sdhci_pltfm_unregister(pdev);
->   
-> @@ -136,7 +131,7 @@ static int sdhci_sirf_suspend(struct device *dev)
->   {
->   	struct sdhci_host *host = dev_get_drvdata(dev);
->   	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	struct sdhci_sirf_priv *priv = pltfm_host->priv;
-> +	struct sdhci_sirf_priv *priv = sdhci_pltfm_priv(pltfm_host);
->   	int ret;
->   
->   	ret = sdhci_suspend_host(host);
-> @@ -152,7 +147,7 @@ static int sdhci_sirf_resume(struct device *dev)
->   {
->   	struct sdhci_host *host = dev_get_drvdata(dev);
->   	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> -	struct sdhci_sirf_priv *priv = pltfm_host->priv;
-> +	struct sdhci_sirf_priv *priv = sdhci_pltfm_priv(pltfm_host);
->   	int ret;
->   
->   	ret = clk_enable(priv->clk);
->
->
-Acked-by: Christian Daudt <csd@broadcom.com>
+On Sun, May 05, 2013 at 10:04:58PM +0200, Linus Walleij wrote:
+> On Fri, Apr 26, 2013 at 5:47 PM, Alexander Shiyan <shc_work@mail.ru> wrote:
+> 
+> > This patch provides rewritten driver for CLPS711X GPIO which uses
+> > generic GPIO code.
+> >
+> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+> 
+> The series:
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Applied.
+
+
+-Olof
