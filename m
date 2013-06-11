@@ -1,137 +1,58 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 11 Jun 2013 17:29:43 +0200
-Subject: [PATCH 3/3] ARM: dts: OMAP3: Use MTD constants for OMAP3 boards
-In-Reply-To: <1370962138-9631-4-git-send-email-florian.vaussard@epfl.ch>
-References: <1370962138-9631-1-git-send-email-florian.vaussard@epfl.ch>
- <1370962138-9631-4-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <51B74267.1000700@collabora.co.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 11 Jun 2013 11:43:59 -0400 (EDT)
+Subject: [PATCH] arm: versatile: don't mark pen as __INIT
+In-Reply-To: <20130611090459.GA9529@e106331-lin.cambridge.arm.com>
+References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
+ <20130610232441.GI18614@n2100.arm.linux.org.uk>
+ <20130611090459.GA9529@e106331-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1306111136060.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2013 04:48 PM, Florian Vaussard wrote:
-> Use the MTD constants for NAND and OneNAND nodes used in OMAP3
-> DTS.
+On Tue, 11 Jun 2013, Mark Rutland wrote:
+
+> On Tue, Jun 11, 2013 at 12:24:41AM +0100, Russell King - ARM Linux wrote:
+> > On Mon, Jun 10, 2013 at 04:07:24PM +0100, Mark Rutland wrote:
+> > > When booting fewer cores than are physically present on a versatile
+> > > platform (e.g. when passing maxcpus=N on the command line), some
+> > > secondary cores may remain in the holding pen, which is marked __INIT.
+> > > Late in the boot process, the memory comprising the holding pen will be
+> > > released to the kernel for more general use, and may be overwritten with
+> > > arbitrary data, which can cause the held secondaries to start behaving
+> > > unpredictably. This can lead to all manner of odd behaviour from the
+> > > kernel.
+> > > 
+> > > Instead don't mark the section as __INIT. This means we can't reuse the
+> > > pen memory, but we won't get secondaries corrupting the rest of the
+> > > kernel.
+> > 
+> > __CPUINIT is appropriate here; __CPUINIT will be kept around if you have
+> > hotplug CPU suport, but if you don't it will be discarded after all
+> > secondary CPUs have booted.  And without hotplug CPU, you can't ask
+> > for the offline CPUs to be onlined.
 > 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  arch/arm/boot/dts/omap3-devkit8000.dts |   10 +++++-----
->  arch/arm/boot/dts/omap3-igep0020.dts   |   10 +++++-----
->  arch/arm/boot/dts/omap3-igep0030.dts   |   10 +++++-----
->  arch/arm/boot/dts/omap3430-sdp.dts     |   28 ++++++++++++++--------------
->  4 files changed, 29 insertions(+), 29 deletions(-)
+> Since 384a290283: "ARM: gic: use a private mapping for CPU target interfaces",
+> each CPU's gic_cpu_map entry is initialised to 0xff, so a call to
+> gic_raise_softirq will target *all* CPUs attached to the GIC if one of the CPUs
+> targetted has not been initialised.
 > 
-> diff --git a/arch/arm/boot/dts/omap3-devkit8000.dts b/arch/arm/boot/dts/omap3-devkit8000.dts
-> index 5be71b1..08699cb 100644
-> --- a/arch/arm/boot/dts/omap3-devkit8000.dts
-> +++ b/arch/arm/boot/dts/omap3-devkit8000.dts
-> @@ -143,27 +143,27 @@
->  
->  		x-loader at 0 {
->  			label = "X-Loader";
-> -			reg = <0 0x80000>;
-> +			reg = <(0 * SZ_128K) (4 * SZ_128K)>;
->  		};
->  
->  		bootloaders at 80000 {
->  			label = "U-Boot";
-> -			reg = <0x80000 0x1e0000>;
-> +			reg = <(4 * SZ_128K) (15 * SZ_128K)>;
->  		};
->  
->  		bootloaders_env at 260000 {
->  			label = "U-Boot Env";
-> -			reg = <0x260000 0x20000>;
-> +			reg = <(19 * SZ_128K) (1 * SZ_128K)>;
->  		};
->  
->  		kernel at 280000 {
->  			label = "Kernel";
-> -			reg = <0x280000 0x400000>;
-> +			reg = <(20 * SZ_128K) (32 * SZ_128K)>;
->  		};
->  
->  		filesystem at 680000 {
->  			label = "File System";
-> -			reg = <0x680000 0xf980000>;
-> +			reg = <(52 * SZ_128K) MTDPART_SIZ_FULL>;
->  		};
->  	};
->  };
-> diff --git a/arch/arm/boot/dts/omap3-igep0020.dts b/arch/arm/boot/dts/omap3-igep0020.dts
-> index e8c4828..3476b3c 100644
-> --- a/arch/arm/boot/dts/omap3-igep0020.dts
-> +++ b/arch/arm/boot/dts/omap3-igep0020.dts
-> @@ -97,23 +97,23 @@
->  
->  		partition at 0 {
->  			label = "SPL";
-> -			reg = <0 0x100000>;
-> +			reg = <(0 * SZ_256K) (4 * SZ_256K)>;
->  		};
->  		partition at 0x80000 {
->  			label = "U-Boot";
-> -			reg = <0x100000 0x180000>;
-> +			reg = <(4 * SZ_256K) (6 * SZ_256K)>;
->  		};
->  		partition at 0x1c0000 {
->  			label = "Environment";
-> -			reg = <0x280000 0x100000>;
-> +			reg = <(10 * SZ_256K) (4 * SZ_256K)>;
->  		};
->  		partition at 0x280000 {
->  			label = "Kernel";
-> -			reg = <0x380000 0x300000>;
-> +			reg = <(14 * SZ_256K) (12 * SZ_256K)>;
->  		};
->  		partition at 0x780000 {
->  			label = "Filesystem";
-> -			reg = <0x680000 0x1f980000>;
-> +			reg = <(26 * SZ_256K) MTDPART_SIZ_FULL>;
->  		};
->  	};
->  
-> diff --git a/arch/arm/boot/dts/omap3-igep0030.dts b/arch/arm/boot/dts/omap3-igep0030.dts
-> index 644d053..e4f078c 100644
-> --- a/arch/arm/boot/dts/omap3-igep0030.dts
-> +++ b/arch/arm/boot/dts/omap3-igep0030.dts
-> @@ -72,23 +72,23 @@
->  
->  		partition at 0 {
->  			label = "SPL";
-> -			reg = <0 0x100000>;
-> +			reg = <(0 * SZ_256K) (4 * SZ_256K)>;
->  		};
->  		partition at 0x80000 {
->  			label = "U-Boot";
-> -			reg = <0x100000 0x180000>;
-> +			reg = <(4 * SZ_256K) (6 * SZ_256K)>;
->  		};
->  		partition at 0x1c0000 {
->  			label = "Environment";
-> -			reg = <0x280000 0x100000>;
-> +			reg = <(10 * SZ_256K) (4 * SZ_256K)>;
->  		};
->  		partition at 0x280000 {
->  			label = "Kernel";
-> -			reg = <0x380000 0x300000>;
-> +			reg = <(14 * SZ_256K) (12 * SZ_256K)>;
->  		};
->  		partition at 0x780000 {
->  			label = "Filesystem";
-> -			reg = <0x680000 0x1f980000>;
-> +			reg = <(26 * SZ_256K) MTDPART_SIZ_FULL>;
->  		};
->  	};
->  };
+> Thus any call to versatile_boot_secondary will wake up *all* secondaries
+> physically present, throwing them all into the pen. If we use a subset of these
+> (e.g. from having "maxcpus=N" on the command line), some will be left in the
+> pen, even though we didn't ask for them explicitly. This will happen with or
+> without CPU_HOTPLUG.
+> 
+> Another option would be to add an optional description of a CPU's gic id to the
+> dt, which would allow us to avoid throwing these secondaries into the pen in
+> the first place.
 
-Hi Florian,
+You mean adding extra description in DT for hardware information that is 
+already perfectly self-discoverable, plus the code to parse it, just for 
+those rare cases where someone might want to use maxcpus=N on the kernel 
+cmdline while CONFIG_CPU_HOTPLUG=n ?
 
-I don't have access to my IGEP board so I can test it right now but the patch
-looks good to me.
+IMHO removing __CPUINIT from the holding pen is probably the preferable 
+alternative.
 
-In fact I wanted to use MTDPART_SIZ_FULL when added the NAND nodes since not all
-IGEP boards have 512MB flash but I didn't know that a value of 0 meant that.
 
-So thanks a lot for doing this!
-
-Acked-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+Nicolas
