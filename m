@@ -1,78 +1,120 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 11 Jun 2013 10:17:19 -0700
-Subject: [PATCH] clk: divider: do not propagate rate change request when
- unnecessary
-In-Reply-To: <1370182855-13427-1-git-send-email-shawn.guo@linaro.org>
-References: <1370182855-13427-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20130611171719.8816.55038@quantum>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Jun 2013 18:23:42 +0100
+Subject: [PATCH] ARM: decouple CPU offlining from reboot/shutdown
+In-Reply-To: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
+References: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130611172342.GJ3439@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Shawn Guo (2013-06-02 07:20:55)
-> If the current rate of parent clock is sufficient to provide child a
-> requested rate with a proper divider setting, the rate change request
-> should not be propagated.  Instead, changing the divider setting is good
-> enough to get child clock run at the requested rate.
-> 
-> On an imx6q clock configuration illustrated below,
-> 
->   ahb --> ipg --> ipg_per
->   132M    66M     66M
-> 
-> calling clk_set_rate(ipg_per, 22M) with the current
-> clk_divider_bestdiv() implementation will result in the rate change up
-> to ahb level like the following, because of the unnecessary/incorrect
-> rate change propagation.
-> 
->   ahb --> ipg --> ipg_per
->   66M     22M     22M
-> 
-> Fix the problem by trying to see if the requested rate can be achieved
-> by simply changing the divider value, and in that case return the
-> divider immediately from function clk_divider_bestdiv() as the best
-> one, so that all those unnecessary rate change propagation can be saved.
-> 
-> Reported-by: Anson Huang <b20788@freescale.com>
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Hi Stephen,
 
-I've taken this into clk-next.  I'm keeping an eye out for any
-regressions this change might cause.  Any help testing it would be
-appreciated.
-
-Regards,
-Mike
-
-> ---
->  drivers/clk/clk-divider.c |   10 ++++++++++
->  1 file changed, 10 insertions(+)
+On Mon, Jun 10, 2013 at 07:12:41PM +0100, Stephen Warren wrote:
+> From: Stephen Warren <swarren@nvidia.com>
 > 
-> diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> index 6d96741..6024e60 100644
-> --- a/drivers/clk/clk-divider.c
-> +++ b/drivers/clk/clk-divider.c
-> @@ -150,6 +150,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->         struct clk_divider *divider = to_clk_divider(hw);
->         int i, bestdiv = 0;
->         unsigned long parent_rate, best = 0, now, maxdiv;
-> +       unsigned long parent_rate_saved = *best_parent_rate;
+> machine_shutdown() is a hook for kexec. Add a comment saying so, since
+> it isn't obvious from the function name.
+
+I'd go as far as saying that some of this commit log could be included in
+the comment too, since this comes up time and time again and it's never
+clear!
+
+Anyway, a few comments inline.
+
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 42d6ea2..d7b3d2e 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2028,7 +2028,7 @@ config XIP_PHYS_ADDR
 >  
->         if (!rate)
->                 rate = 1;
-> @@ -173,6 +174,15 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
->         for (i = 1; i <= maxdiv; i++) {
->                 if (!_is_valid_div(divider, i))
->                         continue;
-> +               if (rate * i == parent_rate_saved) {
-> +                       /*
-> +                        * It's the most ideal case if the requested rate can be
-> +                        * divided from parent clock without needing to change
-> +                        * parent rate, so return the divider immediately.
-> +                        */
-> +                       *best_parent_rate = parent_rate_saved;
-> +                       return i;
-> +               }
->                 parent_rate = __clk_round_rate(__clk_get_parent(hw->clk),
->                                 MULT_ROUND_UP(rate, i));
->                 now = parent_rate / i;
-> -- 
-> 1.7.9.5
+>  config KEXEC
+>  	bool "Kexec system call (EXPERIMENTAL)"
+> -	depends on (!SMP || HOTPLUG_CPU)
+> +	depends on (!SMP || (HOTPLUG_CPU && PM_SLEEP_SMP))
+
+PM_SLEEP_SMP selects HOTPLUG_CPU.
+
+>  	help
+>  	  kexec is a system call that implements the ability to shutdown your
+>  	  current kernel, and to start another kernel.  It is like a reboot
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 282de48..dbe1692 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -97,13 +97,14 @@ void soft_restart(unsigned long addr)
+>  {
+>  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+>  
+> +	BUG_ON(num_online_cpus() > 1);
+
+I think this is overkill, and we could actually scream and try to return an
+error here (we've not yet switched stack, and the upper layers of kexec look
+like they can do something with an error code).
+
+>  	/* Disable interrupts first */
+>  	local_irq_disable();
+>  	local_fiq_disable();
+>  
+> -	/* Disable the L2 if we're the last man standing. */
+> -	if (num_online_cpus() == 1)
+> -		outer_disable();
+> +	/* Disable the L2 */
+> +	outer_disable();
+>  
+>  	/* Change to the new stack and continue with the reset. */
+>  	call_with_stack(__soft_restart, (void *)addr, (void *)stack);
+> @@ -184,30 +185,41 @@ int __init reboot_setup(char *str)
+>  
+>  __setup("reboot=", reboot_setup);
+>  
+> +/* For kexec */
+>  void machine_shutdown(void)
+>  {
+> -#ifdef CONFIG_SMP
+> -	smp_send_stop();
+> +#ifdef CONFIG_PM_SLEEP_SMP
+> +	disable_nonboot_cpus();
+>  #endif
+
+You can lose the #ifdef here.
+
+> +
+> +	BUG_ON(num_online_cpus() > 1);
+
+Maybe redefine machine_shutdown if !kexec and lose this BUG?
+
+>  void machine_halt(void)
+>  {
+> -	machine_shutdown();
+> +#ifdef CONFIG_SMP
+> +	smp_send_stop();
+> +#endif
+
+Don't need the #ifdef.
+
+> +
+>  	local_irq_disable();
+>  	while (1);
+>  }
+>  
+>  void machine_power_off(void)
+>  {
+> -	machine_shutdown();
+> +#ifdef CONFIG_SMP
+> +	smp_send_stop();
+> +#endif
+> +
+>  	if (pm_power_off)
+>  		pm_power_off();
+>  }
+>  
+>  void machine_restart(char *cmd)
+>  {
+> -	machine_shutdown();
+> +#ifdef CONFIG_SMP
+> +	smp_send_stop();
+> +#endif
+
+Similarly for these two (power_off and restart).
+
+Will
