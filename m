@@ -1,62 +1,47 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 11 Jun 2013 10:00:29 +0200
-Subject: [PATCH] drm: encoder_slave: respect of_node on i2c encoder init
-In-Reply-To: <20130611072433.GP22870@phenom.ffwll.local>
-References: <1370899422-1281-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130611072433.GP22870@phenom.ffwll.local>
-Message-ID: <51B6D91D.3000906@gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Jun 2013 17:01:19 +0900
+Subject: [GIT PULL v2 00/27] Renesas ARM-based SoC updates for v3.11
+In-Reply-To: <CAOesGMjDGkWO9YEqocv1ZFtDaaUPfoRMJNPEty6E3UDcGTeKew@mail.gmail.com>
+References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
+ <20130611071925.GI6688@quad.lixom.net>
+ <CAOesGMjDGkWO9YEqocv1ZFtDaaUPfoRMJNPEty6E3UDcGTeKew@mail.gmail.com>
+Message-ID: <20130611080119.GC5300@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/13 09:24, Daniel Vetter wrote:
-> On Mon, Jun 10, 2013 at 11:23:42PM +0200, Sebastian Hesselbarth wrote:
->> Current DRM slave encoder API conflicts with auto-registration of i2c client
->> when using DT probed clients. To allow DRM slave encoders passed by DT, this
->> patch adds a check to drm_i2c_encoder_init for a non-NULL .of_node on
->> i2c_board_info and calls an of_i2c helper to get the i2c client device
->> instead of registering a new device.
->>
->> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->
-> Hm, I don't have much clue about how dt/of really works, but since of has
-> this nice probing/auto-instantiation thing I think we could simplify this
-> some more:
-> - Create a new drm_i2c_encoder_init_of which only takes a struct
->    device_node *of_node argument instead of adap and info.
-> - I think we could also drop the call to ->set_config since presumably an
->    of-enabled driver grabbed any required info already from the dt.
+On Tue, Jun 11, 2013 at 12:23:40AM -0700, Olof Johansson wrote:
+> On Tue, Jun 11, 2013 at 12:19 AM, Olof Johansson <olof@lixom.net> wrote:
+> > Hi Simon,
+> >
+> > On Fri, Jun 07, 2013 at 04:51:30PM +0900, Simon Horman wrote:
+> >> Hi Olof, Hi Arnd,
+> >>
+> >> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+> >>
+> >>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.11
+> >
+> > Thanks a lot for reshuffling the patches into the categories we use!
+> >
+> > For future cases, if you want to split off the cleanups you can do that as
+> > a separate branch, and use that branch as a base for feature branches. Either
+> > way works, sometimes it's nice to see cleanups separated out but it all depends
+> > on volumes, etc.
+> >
+> >
+> > Pulled into next/soc.
+> 
+> Actually, I just noticed that this caused a few conflicts with the
+> pinmux-gpio branch you sent earlier. So I've moved said pinmux/gpio
+> branch into next/soc instead of next/drivers where it was earlier.
+> Please also check my conflict resolution once the branch has been
+> pushed out.
 
-Daniel,
+Thanks. I have checked and your conflict resolution is the same as mine.
 
-this patch is not about making DRM API DT aware but make it not _break_
-on DT aware platforms. I am way out of league to rework DRM slave
-encoder stuff for DT. This is the smallest non-intrusive modification
-I can think of to allow i2c encoders to be passed by DT.
-
-> I think this way we could still share encoder slaves across tons of
-> platforms, only the init sequence (and specifically how they get at their
-
-IMHO, the whole i2c encoder stuff is just wrong. Not any i2c slave
-driver is even really using its probe(). Everything is packed somewhere
-because it just worked.. this is at least a start.
-
-I suggest this to get merged to at least allow to have DT slaves,
-then start with improving tda998x as an example, then maybe rethink
-drm_slave_encoder completely, e.g.
-
-- generalize the concept to SPI attached encoders, "internal" encoders..
-- find a way to setup .encoder_type and .connector_type correctly
-- have more common of_drm_blabla helpers
-
-> config data) would be different. That would also be extensible quite
-> easily (*cough* intel platforms could setup encoder slaves from
-> information out of the vbt *cough*).
->
-> And ofc, a (totally broken) exemplary conversion patch for tilcdc would be
-> neat ;-)
-
-I don't have tilcdc to test so - no, I am not giving an example how to
-use of_parse_phandle and assign the returned pointer to board_info's
-.of_node. But it is no more than that, a single line of code.
-
-Sebastian
+This is an issue that I'm not entirely clear on the best practice for.
+Is it sufficient for me to note any conflicts in the pull-request,
+or in future should I re-arrange things somehow?
