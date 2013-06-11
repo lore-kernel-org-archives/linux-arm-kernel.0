@@ -1,89 +1,137 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 11 Jun 2013 21:23:50 +0200
-Subject: [PATCH v3 1/7] clk: divider: add flag to limit possible dividers
- to even numbers
-In-Reply-To: <20130611185750.8816.82691@quantum>
-References: <201306111328.52679.heiko@sntech.de>
- <201306111329.32749.heiko@sntech.de> <20130611185750.8816.82691@quantum>
-Message-ID: <201306112123.51843.heiko@sntech.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 11 Jun 2013 21:27:30 +0200
+Subject: [PATCH 1/3] ARM: keystone: Add minimal TI Keystone platform
+ support
+In-Reply-To: <1370894123-26846-2-git-send-email-santosh.shilimkar@ti.com>
+References: <1370894123-26846-1-git-send-email-santosh.shilimkar@ti.com>
+ <1370894123-26846-2-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <3148358.YM4iO29jiR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 11. Juni 2013, 20:57:50 schrieb Mike Turquette:
-> Quoting Heiko St?bner (2013-06-11 04:29:32)
-> 
-> > SoCs like the Rockchip Cortex-A9 ones contain divider some clocks
-> > that use the regular mechanisms for storage but allow only even
-> > dividers and 1 to be used.
-> > 
-> > Therefore add a flag that lets _is_valid_div limit the valid dividers
-> > to these values. _get_maxdiv is also adapted to return even values
-> > for the CLK_DIVIDER_ONE_BASED case.
-> > 
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> > 
-> >  drivers/clk/clk-divider.c    |   14 ++++++++++++--
-> >  include/linux/clk-provider.h |    2 ++
-> >  2 files changed, 14 insertions(+), 2 deletions(-)
-> > 
-> > diff --git a/drivers/clk/clk-divider.c b/drivers/clk/clk-divider.c
-> > index ce5cfe9..bdee7cf 100644
-> > --- a/drivers/clk/clk-divider.c
-> > +++ b/drivers/clk/clk-divider.c
-> > @@ -45,8 +45,16 @@ static unsigned int _get_table_maxdiv(const struct
-> > clk_div_table *table)
-> > 
-> >  static unsigned int _get_maxdiv(struct clk_divider *divider)
-> >  {
-> > 
-> > -       if (divider->flags & CLK_DIVIDER_ONE_BASED)
-> > -               return div_mask(divider);
-> > +       if (divider->flags & CLK_DIVIDER_ONE_BASED) {
-> > +               unsigned int div = div_mask(divider);
-> > +
-> > +               /* decrease to even number */
-> > +               if (divider->flags & CLK_DIVIDER_EVEN)
-> > +                       div--;
-> > +
-> > +               return div;
-> > +       }
-> > +
-> > 
-> >         if (divider->flags & CLK_DIVIDER_POWER_OF_TWO)
-> >         
-> >                 return 1 << div_mask(divider);
-> >         
-> >         if (divider->table)
-> > 
-> > @@ -141,6 +149,8 @@ static bool _is_valid_div(struct clk_divider
-> > *divider, unsigned int div)
-> > 
-> >                 return is_power_of_2(div);
-> >         
-> >         if (divider->table)
-> >         
-> >                 return _is_valid_table_div(divider->table, div);
-> > 
-> > +       if (divider->flags & CLK_DIVIDER_EVEN && div != 1 && (div % 2) !=
-> > 0)
-> 
-> Is it correct to check for 'div != 1' here?  Wouldn't that check only be
-> valid in the presence of CLK_DIVIDER_ONE_BASED?
-> 
-> Maybe something like this would be more correct:
-> 
-> 	if (divider->flags & CLK_DIVIDER_EVEN && (div % 2) != 0) {
-> 		if (divider->flags & CLK_DIVIDER_ONE_BASED && div == 1)
-> 			return true;
-> 		return false;
-> 	}
+On Monday 10 June 2013 15:55:21 Santosh Shilimkar wrote:
+>
+> diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
+> new file mode 100644
+> index 0000000..62e968c
+> --- /dev/null
+> +++ b/arch/arm/configs/keystone_defconfig
+> @@ -0,0 +1,157 @@
+> +# CONFIG_SWAP is not set
+> +CONFIG_POSIX_MQUEUE=y
+> +CONFIG_HIGH_RES_TIMERS=y
+> +CONFIG_IKCONFIG=y
 
-hmm, not necessarily. As I understand the doc DIVIDER_ONE_BASED describes how 
-the divider is stored in the register, i.e. if the register value is div-1 or 
-div.
+How about adding the things you need to multi_v7_defconfig instead?
+We try not to have too many defconfigs.
 
-When div is 1, it of course means don't divide [rate/1], and CLK_DIVIDER_EVEN 
-needs to just make sure that bigger dividers that really divide the rate are 
-even values (so limiting the possible dividers to 1 2 4 ...), independent on 
-how the divider value is stored in the register.
+> diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
+> new file mode 100644
+> index 0000000..39fab74
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/Kconfig
+> @@ -0,0 +1,16 @@
+> +config ARCH_KEYSTONE
+> +	bool "Texas Instruments Keystone Devices"
+> +	select CPU_V7
+> +	select ARM_GIC
+> +	select HAVE_ARM_ARCH_TIMER
+> +	select USE_OF
+> +	select MULTI_IRQ_HANDLER
+> +	select CLKSRC_MMIO
+> +	select GENERIC_CLOCKEVENTS
+> +	select SPARSE_IRQ
+> +	select HAVE_SCHED_CLOCK
+> +	select ARCH_WANT_OPTIONAL_GPIOLIB
+> +	select ARM_ERRATA_798181
+
+You don't need to select any of the options that are already selected
+by CONFIG_ARCH_MULTIPLATFORM.
+
+Please add a 'depends on ARCH_MULTI_V7' statement in there to prevent
+this option from showing up for incompatible platforms.
+
+> diff --git a/arch/arm/mach-keystone/include/mach/timex.h b/arch/arm/mach-keystone/include/mach/timex.h
+> new file mode 100644
+> index 0000000..e4c595a
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/include/mach/timex.h
+> @@ -0,0 +1,15 @@
+> +/*
+> + * Copyright 2013 Texas Instruments, Inc.
+> + *	Cyril Chemparathy <cyril@ti.com>
+> + *	Santosh Shilimkar <santosh.shillimkar@ti.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + */
+> +#ifndef __MACH_TIMEX_H
+> +#define __MACH_TIMEX_H
+> +
+> +#define CLOCK_TICK_RATE		1000000
+> +
+> +#endif
+
+Not needed any more
+
+> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
+> new file mode 100644
+> index 0000000..6c6fc42
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/keystone.c
+
+> +static void __iomem *keystone_rstctrl;
+> +
+> +static void __init keystone_init(void)
+> +{
+> +	struct device_node *node;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "ti,keystone-reset");
+> +	if (WARN_ON(!node)) {
+> +		pr_warn("ti, keystone-reset node undefined\n");
+> +		return;
+> +	}
+> +
+> +	keystone_rstctrl = of_iomap(node, 0);
+> +	if (WARN_ON(!keystone_rstctrl)) {
+> +		pr_warn("ti, keystone-reset iomap error\n");
+> +		return;
+> +	}
+> +
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
+> +
+> +static const char *keystone_match[] __initconst = {
+> +	"ti,keystone-evm",
+> +	NULL,
+> +};
+> +
+> +void keystone_restart(char mode, const char *cmd)
+> +{
+> +	u32 val;
+> +
+> +	/* Enable write access to RSTCTRL */
+> +	val = __raw_readl(keystone_rstctrl);
+> +	val &= PLL_RESET_WRITE_KEY_MASK;
+> +	val |= PLL_RESET_WRITE_KEY;
+> +	__raw_writel(val, keystone_rstctrl);
+> +
+> +	/* Reset the SOC */
+> +	val = __raw_readl(keystone_rstctrl);
+> +	val &= ~PLL_RESET;
+> +	__raw_writel(val, keystone_rstctrl);
+> +}
+
+Please use 'readl', not '__raw_readl' unless you are accessing memory.
+
+> +DT_MACHINE_START(KEYSTONE, "Keystone")
+> +	.map_io		= debug_ll_io_init,
+> +	.init_machine	= keystone_init,
+> +	.dt_compat	= keystone_match,
+> +	.restart	= keystone_restart,
+> +MACHINE_END
+
+You can leave out the  map_io line now.
+
+	Arnd
