@@ -1,137 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 11 Jun 2013 21:27:30 +0200
-Subject: [PATCH 1/3] ARM: keystone: Add minimal TI Keystone platform
- support
-In-Reply-To: <1370894123-26846-2-git-send-email-santosh.shilimkar@ti.com>
-References: <1370894123-26846-1-git-send-email-santosh.shilimkar@ti.com>
- <1370894123-26846-2-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <3148358.YM4iO29jiR@wuerfel>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 11 Jun 2013 23:49:40 +0400
+Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: fix Ether device name
+In-Reply-To: <20130611074850.GE10440@verge.net.au>
+References: <201306090123.24709.sergei.shtylyov@cogentembedded.com>
+ <20130611074850.GE10440@verge.net.au>
+Message-ID: <51B77F54.8030001@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 10 June 2013 15:55:21 Santosh Shilimkar wrote:
->
-> diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-> new file mode 100644
-> index 0000000..62e968c
-> --- /dev/null
-> +++ b/arch/arm/configs/keystone_defconfig
-> @@ -0,0 +1,157 @@
-> +# CONFIG_SWAP is not set
-> +CONFIG_POSIX_MQUEUE=y
-> +CONFIG_HIGH_RES_TIMERS=y
-> +CONFIG_IKCONFIG=y
+Hello.
 
-How about adding the things you need to multi_v7_defconfig instead?
-We try not to have too many defconfigs.
+On 06/11/2013 11:48 AM, Simon Horman wrote:
 
-> diff --git a/arch/arm/mach-keystone/Kconfig b/arch/arm/mach-keystone/Kconfig
-> new file mode 100644
-> index 0000000..39fab74
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/Kconfig
-> @@ -0,0 +1,16 @@
-> +config ARCH_KEYSTONE
-> +	bool "Texas Instruments Keystone Devices"
-> +	select CPU_V7
-> +	select ARM_GIC
-> +	select HAVE_ARM_ARCH_TIMER
-> +	select USE_OF
-> +	select MULTI_IRQ_HANDLER
-> +	select CLKSRC_MMIO
-> +	select GENERIC_CLOCKEVENTS
-> +	select SPARSE_IRQ
-> +	select HAVE_SCHED_CLOCK
-> +	select ARCH_WANT_OPTIONAL_GPIOLIB
-> +	select ARM_ERRATA_798181
+>> While recasting commit 524219146a89aee5366326c225ccd71231419d89 (ARM: shmobile:
+>> R8A7778: add Ether support), I made a typo in the platform device's name: used
+>> underscore instead of hyphen.
 
-You don't need to select any of the options that are already selected
-by CONFIG_ARCH_MULTIPLATFORM.
+>> However, there's now patch merged to net-next.git renaming the platform device
+>> from "sh-eth" to "r8a777x-ehter", so it makes the most sense to change the name
+>> straight to that one.
 
-Please add a 'depends on ARCH_MULTI_V7' statement in there to prevent
-this option from showing up for incompatible platforms.
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-> diff --git a/arch/arm/mach-keystone/include/mach/timex.h b/arch/arm/mach-keystone/include/mach/timex.h
-> new file mode 100644
-> index 0000000..e4c595a
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/include/mach/timex.h
-> @@ -0,0 +1,15 @@
-> +/*
-> + * Copyright 2013 Texas Instruments, Inc.
-> + *	Cyril Chemparathy <cyril@ti.com>
-> + *	Santosh Shilimkar <santosh.shillimkar@ti.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + */
-> +#ifndef __MACH_TIMEX_H
-> +#define __MACH_TIMEX_H
-> +
-> +#define CLOCK_TICK_RATE		1000000
-> +
-> +#endif
+>> ---
+>> The patch is atop of the 'renesas-next-20130607' tag of the 'renesas.git' tree
+>> and the USB patches I have submitted earlier.
 
-Not needed any more
+>> Changes in version 2:
+>> - changed the platform device's name as in the patch merged to 'net-next.git';
+>> - lowercased the SoC name in the subject.
 
-> diff --git a/arch/arm/mach-keystone/keystone.c b/arch/arm/mach-keystone/keystone.c
-> new file mode 100644
-> index 0000000..6c6fc42
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/keystone.c
+> Thanks, I have queued this up in the soc2 branch.
+> My current plan is to let that branch sit in next for a few
+> days and then send a pull-request for it to be included in v3.11.
 
-> +static void __iomem *keystone_rstctrl;
-> +
-> +static void __init keystone_init(void)
-> +{
-> +	struct device_node *node;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "ti,keystone-reset");
-> +	if (WARN_ON(!node)) {
-> +		pr_warn("ti, keystone-reset node undefined\n");
-> +		return;
-> +	}
-> +
-> +	keystone_rstctrl = of_iomap(node, 0);
-> +	if (WARN_ON(!keystone_rstctrl)) {
-> +		pr_warn("ti, keystone-reset iomap error\n");
-> +		return;
-> +	}
-> +
-> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
-> +}
-> +
-> +static const char *keystone_match[] __initconst = {
-> +	"ti,keystone-evm",
-> +	NULL,
-> +};
-> +
-> +void keystone_restart(char mode, const char *cmd)
-> +{
-> +	u32 val;
-> +
-> +	/* Enable write access to RSTCTRL */
-> +	val = __raw_readl(keystone_rstctrl);
-> +	val &= PLL_RESET_WRITE_KEY_MASK;
-> +	val |= PLL_RESET_WRITE_KEY;
-> +	__raw_writel(val, keystone_rstctrl);
-> +
-> +	/* Reset the SOC */
-> +	val = __raw_readl(keystone_rstctrl);
-> +	val &= ~PLL_RESET;
-> +	__raw_writel(val, keystone_rstctrl);
-> +}
+     Could you then merge the BOCK-W Ether support too? The patch 
+currently has some offsets applying to 'renesas-next-20130611v2', should 
+I respin it?
 
-Please use 'readl', not '__raw_readl' unless you are accessing memory.
-
-> +DT_MACHINE_START(KEYSTONE, "Keystone")
-> +	.map_io		= debug_ll_io_init,
-> +	.init_machine	= keystone_init,
-> +	.dt_compat	= keystone_match,
-> +	.restart	= keystone_restart,
-> +MACHINE_END
-
-You can leave out the  map_io line now.
-
-	Arnd
+WBR, Sergei
