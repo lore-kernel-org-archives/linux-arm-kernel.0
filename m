@@ -1,109 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 11 Jun 2013 14:07:41 +0200
-Subject: [PATCH 00/21] ARM: ux500: Enable Clock look-up from Device Tree
-In-Reply-To: <20130611100108.GC9216@laptop>
-References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
- <CAPDyKFrJumd79hHWJkGWvRKzhoaprPHu=U6HOHXzVL8WyNS6jw@mail.gmail.com>
- <20130611100108.GC9216@laptop>
-Message-ID: <CAPDyKFoopE9CSnZB3m0rv+YiEesqck_Jmws+Q7T=n9FrK-mYRQ@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 11 Jun 2013 13:10:03 +0100
+Subject: [PATCH] i2c: sirf: move driver init from module_init to
+ subsys_initcall
+In-Reply-To: <CAGsJ_4wH=mNxBTqizKjJR2YhmVQa=iprfUmVYy8oz7MZeLfkqg@mail.gmail.com>
+References: <20130516093846.GA2927@katana>
+ <CAGsJ_4zVOF8-g=emEGgP3atxkWdxMaQQiVZrZkht_WueTriSnw@mail.gmail.com>
+ <20130525201032.GD32043@sirena.org.uk>
+ <CAGsJ_4y6SY6nNkbW+Yh8jx0WB4Pi9MO1W3xVZcrQcedGeD5ogQ@mail.gmail.com>
+ <20130527121658.GA3660@sirena.org.uk>
+ <CAGsJ_4w867BhFvVze5BNaYheW75pMcOGhscz3wSZiia-neP59w@mail.gmail.com>
+ <20130610134535.GB2987@katana>
+ <CAGsJ_4y4svi0TbUKK1aAW1McM5rFoo5Vb9rGPweq-sHJ2NN5cQ@mail.gmail.com>
+ <20130611084827.GS1403@sirena.org.uk>
+ <CAGsJ_4wH=mNxBTqizKjJR2YhmVQa=iprfUmVYy8oz7MZeLfkqg@mail.gmail.com>
+Message-ID: <20130611121003.GC1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 June 2013 12:01, Lee Jones <lee.jones@linaro.org> wrote:
->> > Nice and simple implementation using standard Clk APIs.
->> Hi Lee,
->>
->> I may be a bit tired, but I am having a bit hard to follow the steps
->> taken in this patch set. :-)
->>
->> I should of course tell you why:
->> 1. You start out by adding DT definitions in the DT files, should that
->> not be done as the final step, after the DT support has been added in
->> ux500 clk driver?
->
-> No, let me tell you why. ;)
->
-> a) The DT definitions will be going in via a separate tree, so it
-> doesn't really matter where they are placed in _this_ patchset. and b)
-> they will remain completely dormant until they are backed up with
-> driver bindings, so there is no harm in putting them in first.
+On Tue, Jun 11, 2013 at 07:13:33PM +0800, Barry Song wrote:
+> 2013/6/11 Mark Brown <broonie@kernel.org>:
 
-Okay, was not aware of that those were to be merged on it's own.
+> > It's not that people don't care about these users, it's that people
+> > don't care too much about out of tree users.  Part of the goal here is
+> > to convince people working on such applications that they should make
+> > mainline better for everyone so that you don't need external code to
+> > make the kernel useful.
 
->
->> 2. Moreover, I think it would be enough to group the definitions
->> patches into one patch or at least significant fewer. Same feeling
->> about the patches were you remove the AUXDATA, this would simplify the
->> review for me.
->
-> It's generally accepted that lots of lines of code split over a
-> greater number of patches (so long as they are in consistent groups of
-> functionality) are easier to review and thus have a greater chance of
-> acceptance. It also makes things like reverting easier and bisecting
-> more precise (rather than finding a big patch using bisect, then
-> having to complete a manual mini-bisect to find the offending change.
->
-> Arnd provides the maths for calculating the ease of upstreaming a
-> patch, which he calls 'weight' (NB: this is from memory, it might be a
-> little off):
->
-> (patch_weight * patch_weight) * patch_count = delta_weight
->
-> So if we had a 100 lines split over 2 patches, it would be:
->
-> (50 * 50) * 2 = 5000
->
-> Whereas if we split those lines over 4 patches we would see:
->
-> (25 * 25) * 4 = 1000
->
-> Thus, by this convention it would (generally) considered to be twice
-> as difficult to upstream - at least that's the theory. There is a more
-> extravagant formula for calculating how difficult it would be to
-> upstream an entire tree of delta if a) all patches were contained on a
-> single branch compared to b) if patches were split into topic branches.
->
-> Something like:
->
-> ((patch_weight * patch_weight) * patch_count)  *
->  (patch_weight * patch_weight) * patch_count)) *
->   branch_count = delta_weight
->
-> So following on from the example above and placing 100 lines over 2
-> patches on 1 branch you would get:
->
-> (((25 * 25) * 4) * (25 * 25) * 4) * 1 = 6250000
->
-> Whereas if you spread the patches over two branches you'd have:
->
-> (((25 * 25) * 2) * (25 * 25) * 2) * 2 = 3125000
->
-> Obviously the branch number comparison works better with the larger
-> numbers you'd expect to find in a typical downstream BSP, but you get
-> the idea.
->
-> </tangent> ... whoops, sorry! :)
+> Mark, then this is really confusing me.
+> for this reason, the target should be making this out-of-tree stuff be
+> inside the tree. to make i2c-sirf "mainline better and not need
+> external code", the target should be making this external code not
+> external but become internal. otherwise, my mainline users will always
+> need this external code.
 
-Hehe, I stopped reading long before this line. Go ahead, keep them as
-is then! :-)
-
->
->> 3. The rest will be commented per patch.
->>
->> Kind regards
->> Ulf Hansson
->>
->> >
->> >  arch/arm/boot/dts/dbx5x0.dtsi    |   94 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
->> >  arch/arm/boot/dts/snowball.dts   |    3 ++-
->> >  arch/arm/mach-ux500/cpu-db8500.c |   36 +--------------------------
->> >  drivers/clk/ux500/u8500_clk.c    |  154 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++-
->> >  4 files changed, 249 insertions(+), 38 deletions(-)
->> >
->> >
->
-> --
-> Lee Jones
-> Linaro ST-Ericsson Landing Team Lead
-> Linaro.org ? Open source software for ARM SoCs
-> Follow Linaro: Facebook | Twitter | Blog
+It's not just this one bit of code that they're relying on, this also
+gets built on with other things that are also out of tree.  The thing
+we need to do is figure out what problem the solution as a whole is
+fixing and then make sure that mainline can deal with that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/b4eb3389/attachment.sig>
