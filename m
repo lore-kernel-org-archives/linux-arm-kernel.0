@@ -1,44 +1,118 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 10 Jun 2013 21:47:28 -0500
-Subject: [PATCHv8 0/6] ARM: socfpga: Add ethernet bindings, clk-gate,
- and SD/MMC
-Message-ID: <1370918854-1765-1-git-send-email-dinguyen@altera.com>
+Date: Mon, 10 Jun 2013 21:47:29 -0500
+Subject: [PATCHv8 1/6] ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
+In-Reply-To: <1370918854-1765-1-git-send-email-dinguyen@altera.com>
+References: <1370918854-1765-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1370918854-1765-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Hi Arnd/Olof,
+Add entry for 2nd GMAC controller. Add the correct clocks for the GMAC.
 
-Can you please apply this patch series? For patch[6/6], Arnd has reviewed and
-Acked-by Jaehoon Chung. For patch [3/6], it has gotten Mike Turquette's Acked-by.
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+Reviewed-by: Pavel Machek <pavel@denx.de>
+CC: Arnd Bergmann <arnd@arndb.de>
+CC: Olof Johansson <olof@lixom.net>
+Cc: Pavel Machek <pavel@denx.de>
+CC: <linux@arm.linux.org.uk>
 
-Thanks,
-Dinh
+v2:
+- Moved "disabled" status to dtsi file
+---
+ arch/arm/boot/dts/socfpga.dtsi         |   18 ++++++++++++++++--
+ arch/arm/boot/dts/socfpga_cyclone5.dts |   13 +++++++++++++
+ arch/arm/boot/dts/socfpga_vt.dts       |    5 +++++
+ 3 files changed, 34 insertions(+), 2 deletions(-)
 
-Dinh Nguyen (6):
-  ARM: socfpga: dts: Add ethernet bindings for SOCFPGA
-  ARM: socfpga: dts: Add gate-clock bindings
-  ARM: socfpga: Add support to gate peripheral clocks
-  ARM: socfpga: Add syscon to be part of socfpga
-  ARM: socfpga: dts: Add support for SD/MMC
-  mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-
- .../devicetree/bindings/clock/altr_socfpga.txt     |    7 +
- .../devicetree/bindings/mmc/socfpga-dw-mshc.txt    |   60 +++++
- arch/arm/boot/dts/socfpga.dtsi                     |  230 +++++++++++++++++++-
- arch/arm/boot/dts/socfpga_cyclone5.dts             |   26 +++
- arch/arm/boot/dts/socfpga_vt.dts                   |   17 ++
- arch/arm/mach-socfpga/Kconfig                      |    1 +
- drivers/clk/socfpga/clk.c                          |  194 ++++++++++++++++-
- drivers/mmc/host/Kconfig                           |    8 +
- drivers/mmc/host/Makefile                          |    1 +
- drivers/mmc/host/dw_mmc-exynos.c                   |    2 -
- drivers/mmc/host/dw_mmc-socfpga.c                  |  140 ++++++++++++
- drivers/mmc/host/dw_mmc.h                          |    1 +
- 12 files changed, 673 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/socfpga-dw-mshc.txt
- create mode 100644 drivers/mmc/host/dw_mmc-socfpga.c
-
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index 16a6e13..02bb425 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -23,6 +23,7 @@
+ 
+ 	aliases {
+ 		ethernet0 = &gmac0;
++		ethernet1 = &gmac1;
+ 		serial0 = &uart0;
+ 		serial1 = &uart1;
+ 		timer0 = &timer0;
+@@ -238,13 +239,26 @@
+ 				};
+ 			};
+ 
+-		gmac0: stmmac at ff700000 {
++		gmac0: ethernet at ff700000 {
+ 			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
+ 			reg = <0xff700000 0x2000>;
+ 			interrupts = <0 115 4>;
+ 			interrupt-names = "macirq";
+ 			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
+-			phy-mode = "gmii";
++			clocks = <&emac0_clk>;
++			clock-names = "stmmaceth";
++			status = "disabled";
++		};
++
++		gmac1: ethernet at ff702000 {
++			compatible = "altr,socfpga-stmmac", "snps,dwmac-3.70a", "snps,dwmac";
++			reg = <0xff702000 0x2000>;
++			interrupts = <0 120 4>;
++			interrupt-names = "macirq";
++			mac-address = [00 00 00 00 00 00];/* Filled in by U-Boot */
++			clocks = <&emac1_clk>;
++			clock-names = "stmmaceth";
++			status = "disabled";
+ 		};
+ 
+ 		L2: l2-cache at fffef000 {
+diff --git a/arch/arm/boot/dts/socfpga_cyclone5.dts b/arch/arm/boot/dts/socfpga_cyclone5.dts
+index 2495958..973999d 100644
+--- a/arch/arm/boot/dts/socfpga_cyclone5.dts
++++ b/arch/arm/boot/dts/socfpga_cyclone5.dts
+@@ -32,6 +32,13 @@
+ 		reg = <0x0 0x40000000>; /* 1GB */
+ 	};
+ 
++	aliases {
++		/* this allow the ethaddr uboot environmnet variable contents
++		 * to be added to the gmac1 device tree blob.
++		 */
++		ethernet0 = &gmac1;
++	};
++
+ 	soc {
+ 		clkmgr at ffd04000 {
+ 			clocks {
+@@ -41,6 +48,12 @@
+ 			};
+ 		};
+ 
++		ethernet at ff702000 {
++			phy-mode = "rgmii";
++			phy-addr = <0xffffffff>; /* probe for phy addr */
++			status = "okay";
++		};
++
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <100000000>;
+ 		};
+diff --git a/arch/arm/boot/dts/socfpga_vt.dts b/arch/arm/boot/dts/socfpga_vt.dts
+index 0bf035d..d1ec0ca 100644
+--- a/arch/arm/boot/dts/socfpga_vt.dts
++++ b/arch/arm/boot/dts/socfpga_vt.dts
+@@ -41,6 +41,11 @@
+ 			};
+ 		};
+ 
++		ethernet at ff700000 {
++			phy-mode = "gmii";
++			status = "okay";
++		};
++
+ 		timer0 at ffc08000 {
+ 			clock-frequency = <7000000>;
+ 		};
 -- 
 1.7.9.5
