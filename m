@@ -1,93 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Jun 2013 21:53:17 +0200
-Subject: [PATCH] drivers: pinctrl: add active state to core
-In-Reply-To: <51B75148.5080701@wwwdotorg.org>
-References: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
- <51B75148.5080701@wwwdotorg.org>
-Message-ID: <CACRpkdYQSO0+9tQkS=df-kpL=XL+DpnY1ijp6_Zeg0MvmFujyw@mail.gmail.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 11 Jun 2013 21:59:09 +0200
+Subject: [PATCH] pinctrl: document the pinctrl PM states
+Message-ID: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 6:33 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/11/2013 02:16 AM, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> In addition to the recently introduced pinctrl core
->> control, the PM runtime pin control for the OMAP platforms
->> require a fourth state in addtition to the default, idle and
->> sleep states already handled by the core: an explicit "active"
->> state. Let's introduce this to the core in addition to the
->> other states already defined.
->
-> Surely "default" /is/ "active"? That's what it's meant so far.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-I thought so too, until Tony informed us that in the OMAP world
-this state is not always the active one.
+This document snippet tries to be helpful and define the pin
+PM states and helpers, and how they should be used to create
+some kind of common ontology around this.
 
-But I don't know the exact reasons for.
-
-I guess that some "default" states on the OMAP may mean these
-are configured as decoupled, inactive, until explicitly activated
-or something like that.
-
-> Since the pinctrl states are represented in DT, the DT bindings of all
-> devices potentially get affected by changes like this. They'd need to be
-> documented in a DT binding document, and the exact semantics of the
-> different states clearly explained.
-
-Incidentally pinctrl-bindings.txt refers to the states
-"active" and "idle" in the examples, but not "default".
-(git blame tells me you wrote this ;-)
-
-We should probably patch that document a bit to reflect
-the semantics we agree upon here.
-
-> It may be better for struct device, struct platform_driver, or similar,
-> to contain a list of the states that are required by the driver or its
-> binding. That way, the list of states (or states beyond the basic
-> default) is driver-/DT-binding- specific, and custom stuff like this for
-> OMAP wouldn't require explicit code in drivers/base/pinctrl.c, but
-> rather simply iterating over a custom list.
-
-Hm, I was more out to nail down some common semantics
-here, especially with these helper functions:
-
-extern int pinctrl_pm_select_default_state(struct device *dev);
-extern int pinctrl_pm_select_active_state(struct device *dev);
-extern int pinctrl_pm_select_sleep_state(struct device *dev);
-extern int pinctrl_pm_select_idle_state(struct device *dev);
-
-I am intending this to be *all* for the PM consensual states.
-Any other states will be up to the special cases and drivers to
-handle still, I have no intention of retrieveing and caching all
-possible states in the core.
-
-> Related to that, I'm not sure we should be deriving what we put into DT
-> based on the runtime PM requirements of drivers; DT is supposed to be
-> driven by HW definitions, although I suppose you could argue that the
-> drivers implement what they do because they're implementing the HW
-> requirements.
-
-Yes that's a circular proof that we do it this way becuse this is the
-way we have to do it :-)
-
-But there is some truth to that.
-
-The idea with these PM states is to correspond to such states
-often found in electronic specifications, i.e. derived from a larger
-set of hardware, not from runtime PM or Linux.
-
-I conjured the following doc patch as a starter:
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Kevin Hilman <khilman@linaro.org>
+Cc: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ Documentation/pinctrl.txt | 118 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 118 insertions(+)
 
 diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
 index f6e664b..a34ea92 100644
 --- a/Documentation/pinctrl.txt
 +++ b/Documentation/pinctrl.txt
-@@ -1196,6 +1196,124 @@ registered. Thus make sure that the error path
-in your driver gracefully
+@@ -1196,6 +1196,124 @@ registered. Thus make sure that the error path in your driver gracefully
  cleans up and is ready to retry the probing later in the startup process.
-
-
+ 
+ 
 +Default and power management related states
 +===========================================
 +
@@ -208,7 +147,6 @@ in your driver gracefully
 +
  Drivers needing both pin control and GPIOs
  ==========================================
-
-
-Yours,
-Linus Walleij
+ 
+-- 
+1.7.11.3
