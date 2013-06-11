@@ -1,83 +1,183 @@
-From: shinya.kuribayashi.px@renesas.com (Shinya Kuribayashi)
-Date: Tue, 11 Jun 2013 16:41:56 +0900
-Subject: hrtimer: one more expiry time overflow check in hrtimer_interrupt
-Message-ID: <51B6D4C4.9080400@renesas.com>
+From: tomi.valkeinen@iki.fi (Tomi Valkeinen)
+Date: Tue, 11 Jun 2013 10:42:58 +0300
+Subject: [PATCH V2 14/14] ARM: OMAP4: hwmod data: Clean up the data file
+In-Reply-To: <20130610141451.GE8164@atomide.com>
+References: <1370606175-22599-1-git-send-email-r.sricharan@ti.com>
+ <alpine.DEB.2.02.1306071230500.5589@utopia.booyaka.com>
+ <20130607162927.GA3331@atomide.com> <20130607175005.GB3331@atomide.com>
+ <51B5ACA6.2010101@iki.fi> <20130610141451.GE8164@atomide.com>
+Message-ID: <51B6D502.5010208@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When executing a date command to set the system date and time to a few
-seconds before the 2038 problem expiration time, we got a WARN_ON_ONCE()
-like this:
+On 10/06/13 17:14, Tony Lindgren wrote:
+> * Tomi Valkeinen <tomi.valkeinen@iki.fi> [130610 03:44]:
 
-  root at renesas:~# date -s "2038-1-19 3:14:00"
-  Tue Jan 19 03:14:00 GMT 2038
-  (then wait for 7-8 seconds)
-  root at renesas:~# [   27.662658] ------------[ cut here ]------------
-  [   27.667297] WARNING: at kernel/time/clockevents.c:209 clockevents_program_event+0x3c/0x138()
-  [   27.675720] Modules linked in:
-  [   27.678802] [<c00130ec>] (unwind_backtrace+0x0/0xe0) from [<c001f4d8>] (warn_slowpath_common+0x4c/0x64)
-  [   27.688201] [<c001f4d8>] (warn_slowpath_common+0x4c/0x64) from [<c001f508>] (warn_slowpath_null+0x18/0x1c)
-  [   27.697845] [<c001f508>] (warn_slowpath_null+0x18/0x1c) from [<c00549bc>] (clockevents_program_event+0x3c/0x138)
-  [   27.708007] [<c00549bc>] (clockevents_program_event+0x3c/0x138) from [<c005510c>] (tick_program_event+0x2c/0x34)
-  [   27.718170] [<c005510c>] (tick_program_event+0x2c/0x34) from [<c003fa98>] (hrtimer_interrupt+0x268/0x2a8)
-  [   27.727752] [<c003fa98>] (hrtimer_interrupt+0x268/0x2a8) from [<c00180c8>] (cmt_timer_interrupt+0x2c/0x34)
-  [   27.737396] [<c00180c8>] (cmt_timer_interrupt+0x2c/0x34) from [<c0066748>] (handle_irq_event_percpu+0xb0/0x2a8)
-  [   27.747467] [<c0066748>] (handle_irq_event_percpu+0xb0/0x2a8) from [<c0066998>] (handle_irq_event+0x58/0x74)
-  [   27.757293] [<c0066998>] (handle_irq_event+0x58/0x74) from [<c0068f24>] (handle_fasteoi_irq+0xc0/0x148)
-  [   27.766662] [<c0068f24>] (handle_fasteoi_irq+0xc0/0x148) from [<c0066014>] (generic_handle_irq+0x20/0x30)
-  [   27.776245] [<c0066014>] (generic_handle_irq+0x20/0x30) from [<c000ef54>] (handle_IRQ+0x60/0x84)
-  [   27.785003] [<c000ef54>] (handle_IRQ+0x60/0x84) from [<c0009334>] (gic_handle_irq+0x34/0x4c)
-  [   27.793426] [<c0009334>] (gic_handle_irq+0x34/0x4c) from [<c000e2c0>] (__irq_svc+0x40/0x70)
-  [   27.801788] Exception stack(0xc04aff68 to 0xc04affb0)
-  [   27.806823] ff60:                   00000000 f0100000 00000001 00000000 c04ae000 c04ec388
-  [   27.815002] ff80: c04b604c c0840d80 40004059 412fc093 00000000 00000000 c04ce140 c04affb0
-  [   27.823150] ffa0: c000f064 c000f068 60000013 ffffffff
-  [   27.828216] [<c000e2c0>] (__irq_svc+0x40/0x70) from [<c000f068>] (default_idle+0x24/0x2c)
-  [   27.836395] [<c000f068>] (default_idle+0x24/0x2c) from [<c000f338>] (cpu_idle+0x74/0xc8)
-  [   27.844451] [<c000f338>] (cpu_idle+0x74/0xc8) from [<c048c6d4>] (start_kernel+0x248/0x288)
-  [   27.852722] ---[ end trace 9d8ad385bde80fd3 ]---
-  [   27.857330] hrtimer: interrupt took 0 ns
+>> DSS does not have DT bindings, and removing DSS from hwmod data will
+>> break DSS for omap4.
+> 
+> Ah that's right. Care to post a patch reverting the minimal parts that
+> you need for omap4 against omap-for-v3.11/cleanup?
 
-This is triggered with our v3.4-based custom ARM kernel, but we
-confirmed that v3.10-rc can still have the same problem.
+This one adds back the DSS data.
 
-I found a similar issue fixed in v3.9 by Prarit Bhargava in commit
-8f294b5a13 (hrtimer: Add expiry time overflow check in hrtimer_interrupt,
-2013-04-08).  It tried to resolve a overflow issue detected around 1970
-+ 100 seconds.
+ Tomi
 
-On the other hand, we have another call site of tick_program_event() at
-the bottom of hrtimer_interrupt().  The warning this time is triggered
-there, so we need to apply the same fix to it.
 
-Reported-by: Hiroyuki Yokoyama <hiroyuki.yokoyama.vx@renesas.com>
-Signed-off-by: Shinya Kuribayashi <shinya.kuribayashi.px@renesas.com>
+>From e23a18fe14cbfebf9b08e3004aec92e05a86a117 Mon Sep 17 00:00:00 2001
+From: Tomi Valkeinen <tomi.valkeinen@ti.com>
+Date: Tue, 11 Jun 2013 10:37:19 +0300
+Subject: [PATCH] ARM: OMAP4: hwmod data: add DSS data back
+
+Commit 3b9b10151c6838af52244cec4af41a938bb5b7ec (ARM: OMAP4: hwmod data:
+Clean up the data file) removes hwmod data for omap4, including DSS
+data. DSS has not yet been converted to DT, so the hwmod data is still
+needed.
+
+This patch adds back the DSS parts of the hwmod data.
+
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 54 ++++++++++++++++++++++++++++++
+ 1 file changed, 54 insertions(+)
 
-Hi Prarit-san and John-san,
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 5f5d631..c8d4957 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -619,6 +619,16 @@ static struct omap_hwmod_class omap44xx_dispc_hwmod_class = {
+ };
+ 
+ /* dss_dispc */
++static struct omap_hwmod_irq_info omap44xx_dss_dispc_irqs[] = {
++	{ .irq = 25 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_dma_info omap44xx_dss_dispc_sdma_reqs[] = {
++	{ .dma_req = 5 + OMAP44XX_DMA_REQ_START },
++	{ .dma_req = -1 }
++};
++
+ static struct omap_dss_dispc_dev_attr omap44xx_dss_dispc_dev_attr = {
+ 	.manager_count		= 3,
+ 	.has_framedonetv_irq	= 1
+@@ -628,6 +638,8 @@ static struct omap_hwmod omap44xx_dss_dispc_hwmod = {
+ 	.name		= "dss_dispc",
+ 	.class		= &omap44xx_dispc_hwmod_class,
+ 	.clkdm_name	= "l3_dss_clkdm",
++	.mpu_irqs	= omap44xx_dss_dispc_irqs,
++	.sdma_reqs	= omap44xx_dss_dispc_sdma_reqs,
+ 	.main_clk	= "dss_dss_clk",
+ 	.prcm = {
+ 		.omap4 = {
+@@ -660,6 +672,16 @@ static struct omap_hwmod_class omap44xx_dsi_hwmod_class = {
+ };
+ 
+ /* dss_dsi1 */
++static struct omap_hwmod_irq_info omap44xx_dss_dsi1_irqs[] = {
++	{ .irq = 53 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_dma_info omap44xx_dss_dsi1_sdma_reqs[] = {
++	{ .dma_req = 74 + OMAP44XX_DMA_REQ_START },
++	{ .dma_req = -1 }
++};
++
+ static struct omap_hwmod_opt_clk dss_dsi1_opt_clks[] = {
+ 	{ .role = "sys_clk", .clk = "dss_sys_clk" },
+ };
+@@ -668,6 +690,8 @@ static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
+ 	.name		= "dss_dsi1",
+ 	.class		= &omap44xx_dsi_hwmod_class,
+ 	.clkdm_name	= "l3_dss_clkdm",
++	.mpu_irqs	= omap44xx_dss_dsi1_irqs,
++	.sdma_reqs	= omap44xx_dss_dsi1_sdma_reqs,
+ 	.main_clk	= "dss_dss_clk",
+ 	.prcm = {
+ 		.omap4 = {
+@@ -680,6 +704,16 @@ static struct omap_hwmod omap44xx_dss_dsi1_hwmod = {
+ };
+ 
+ /* dss_dsi2 */
++static struct omap_hwmod_irq_info omap44xx_dss_dsi2_irqs[] = {
++	{ .irq = 84 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_dma_info omap44xx_dss_dsi2_sdma_reqs[] = {
++	{ .dma_req = 83 + OMAP44XX_DMA_REQ_START },
++	{ .dma_req = -1 }
++};
++
+ static struct omap_hwmod_opt_clk dss_dsi2_opt_clks[] = {
+ 	{ .role = "sys_clk", .clk = "dss_sys_clk" },
+ };
+@@ -688,6 +722,8 @@ static struct omap_hwmod omap44xx_dss_dsi2_hwmod = {
+ 	.name		= "dss_dsi2",
+ 	.class		= &omap44xx_dsi_hwmod_class,
+ 	.clkdm_name	= "l3_dss_clkdm",
++	.mpu_irqs	= omap44xx_dss_dsi2_irqs,
++	.sdma_reqs	= omap44xx_dss_dsi2_sdma_reqs,
+ 	.main_clk	= "dss_dss_clk",
+ 	.prcm = {
+ 		.omap4 = {
+@@ -720,6 +756,16 @@ static struct omap_hwmod_class omap44xx_hdmi_hwmod_class = {
+ };
+ 
+ /* dss_hdmi */
++static struct omap_hwmod_irq_info omap44xx_dss_hdmi_irqs[] = {
++	{ .irq = 101 + OMAP44XX_IRQ_GIC_START },
++	{ .irq = -1 }
++};
++
++static struct omap_hwmod_dma_info omap44xx_dss_hdmi_sdma_reqs[] = {
++	{ .dma_req = 75 + OMAP44XX_DMA_REQ_START },
++	{ .dma_req = -1 }
++};
++
+ static struct omap_hwmod_opt_clk dss_hdmi_opt_clks[] = {
+ 	{ .role = "sys_clk", .clk = "dss_sys_clk" },
+ };
+@@ -733,6 +779,8 @@ static struct omap_hwmod omap44xx_dss_hdmi_hwmod = {
+ 	 * set idle mode by software.
+ 	 */
+ 	.flags		= HWMOD_SWSUP_SIDLE,
++	.mpu_irqs	= omap44xx_dss_hdmi_irqs,
++	.sdma_reqs	= omap44xx_dss_hdmi_sdma_reqs,
+ 	.main_clk	= "dss_48mhz_clk",
+ 	.prcm = {
+ 		.omap4 = {
+@@ -765,6 +813,11 @@ static struct omap_hwmod_class omap44xx_rfbi_hwmod_class = {
+ };
+ 
+ /* dss_rfbi */
++static struct omap_hwmod_dma_info omap44xx_dss_rfbi_sdma_reqs[] = {
++	{ .dma_req = 13 + OMAP44XX_DMA_REQ_START },
++	{ .dma_req = -1 }
++};
++
+ static struct omap_hwmod_opt_clk dss_rfbi_opt_clks[] = {
+ 	{ .role = "ick", .clk = "dss_fck" },
+ };
+@@ -773,6 +826,7 @@ static struct omap_hwmod omap44xx_dss_rfbi_hwmod = {
+ 	.name		= "dss_rfbi",
+ 	.class		= &omap44xx_rfbi_hwmod_class,
+ 	.clkdm_name	= "l3_dss_clkdm",
++	.sdma_reqs	= omap44xx_dss_rfbi_sdma_reqs,
+ 	.main_clk	= "dss_dss_clk",
+ 	.prcm = {
+ 		.omap4 = {
+-- 
+1.8.1.2
 
-http://git.kernel.org/linus/8f294b5a139ee4b75e890ad5b443c93d1e558a8b
-hrtimer: Add expiry time overflow check in hrtimer_interrupt
 
-I tried to fix the other case of overflow issues in hrtimer_interrupt(),
-but not sure it should be worked around like this in the first place.
 
-Any comments are appreciated, thanks in advance.
-
-diff --git a/kernel/hrtimer.c b/kernel/hrtimer.c
-index cdd5607..a42d712 100644
---- a/kernel/hrtimer.c
-+++ b/kernel/hrtimer.c
-@@ -1368,6 +1370,8 @@ retry:
- 		expires_next = ktime_add_ns(now, 100 * NSEC_PER_MSEC);
- 	else
- 		expires_next = ktime_add(now, delta);
-+	if (expires_next.tv64 < 0)
-+		expires_next.tv64 = KTIME_MAX;
- 	tick_program_event(expires_next, 1);
- 	printk_once(KERN_WARNING "hrtimer: interrupt took %llu ns\n",
- 		    ktime_to_ns(delta));
-
---
-Shinya Kuribayashi
-Renesas Electronics
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/7eafc727/attachment-0001.sig>
