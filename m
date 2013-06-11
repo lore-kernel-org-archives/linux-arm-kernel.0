@@ -1,90 +1,98 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Tue, 11 Jun 2013 12:08:40 -0600
-Subject: [PATCH] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <20130611172342.GJ3439@mudshark.cambridge.arm.com>
-References: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
- <20130611172342.GJ3439@mudshark.cambridge.arm.com>
-Message-ID: <51B767A8.7000506@wwwdotorg.org>
+From: dirk.behme@gmail.com (Dirk Behme)
+Date: Tue, 11 Jun 2013 20:16:18 +0200
+Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
+In-Reply-To: <51AED468.9040109@de.bosch.com>
+References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
+ <51AED468.9040109@de.bosch.com>
+Message-ID: <51B76972.3040002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2013 11:23 AM, Will Deacon wrote:
-> Hi Stephen,
-> 
-> On Mon, Jun 10, 2013 at 07:12:41PM +0100, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
+On 05.06.2013 08:02, Dirk Behme wrote:
+> On 28.09.2012 00:02, Russell King wrote:
+>> If we are building for a LE platform, and we haven't overriden the
+>> MMIO ops, then we can optimize the mem*io operations using the
+>> standard string functions.
 >>
->> machine_shutdown() is a hook for kexec. Add a comment saying so, since
->> it isn't obvious from the function name.
-> 
-> I'd go as far as saying that some of this commit log could be included in
-> the comment too, since this comes up time and time again and it's never
-> clear!
-
-OK, I'll add some expanded comments to each of the functions.
-
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 42d6ea2..d7b3d2e 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -2028,7 +2028,7 @@ config XIP_PHYS_ADDR
->>  
->>  config KEXEC
->>  	bool "Kexec system call (EXPERIMENTAL)"
->> -	depends on (!SMP || HOTPLUG_CPU)
->> +	depends on (!SMP || (HOTPLUG_CPU && PM_SLEEP_SMP))
-> 
-> PM_SLEEP_SMP selects HOTPLUG_CPU.
-
-Ah, that makes more sense; it explains how code under /just/ #ifdef
-PM_SLEEP_SMP can interact with hotplug-related code.
-
-I guess I just checked HOTPLUG for a select/depends and not the other
-way around.
-
->> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-
->> @@ -97,13 +97,14 @@ void soft_restart(unsigned long addr)
->>  {
->>  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
->>  
->> +	BUG_ON(num_online_cpus() > 1);
-> 
-> I think this is overkill, and we could actually scream and try to return an
-> error here (we've not yet switched stack, and the upper layers of kexec look
-> like they can do something with an error code).
-
-Hmmm. The function returns void, although I suppose I could look into
-changing that too?
-
->> +/* For kexec */
->>  void machine_shutdown(void)
->>  {
->> -#ifdef CONFIG_SMP
->> -	smp_send_stop();
->> +#ifdef CONFIG_PM_SLEEP_SMP
->> +	disable_nonboot_cpus();
->>  #endif
-> 
-> You can lose the #ifdef here.
-
-The implementation of disable_nonboot_cpus() is #ifdef
-CONFIG_PM_SLEEP_SMP, so I think I need that to avoid build errors.
-
->> +	BUG_ON(num_online_cpus() > 1);
-> 
-> Maybe redefine machine_shutdown if !kexec and lose this BUG?
-
-IIUC, machine_shutdown() is only used for kexec now, so I don't think an
-alternative implementation is required in the !kexec case?
-
->>  void machine_halt(void)
->>  {
->> -	machine_shutdown();
->> +#ifdef CONFIG_SMP
->> +	smp_send_stop();
+>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> ---
+>>   arch/arm/include/asm/io.h |   25 +++++++++++++++++++++++++
+>>   1 files changed, 25 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+>> index 815c669..ed0577e 100644
+>> --- a/arch/arm/include/asm/io.h
+>> +++ b/arch/arm/include/asm/io.h
+>> @@ -23,6 +23,7 @@
+>>
+>>   #ifdef __KERNEL__
+>>
+>> +#include <linux/string.h>
+>>   #include <linux/types.h>
+>>   #include <asm/byteorder.h>
+>>   #include <asm/memory.h>
+>> @@ -249,9 +250,33 @@ extern void _memset_io(volatile void __iomem *,
+>> int, size_t);
+>>   #define writesw(p,d,l)        __raw_writesw(p,d,l)
+>>   #define writesl(p,d,l)        __raw_writesl(p,d,l)
+>>
+>> +#ifndef __ARMBE__
+>> +static inline void memset_io(volatile void __iomem *dst, unsigned c,
+>> +    size_t count)
+>> +{
+>> +    memset((void __force *)dst, c, count);
+>> +}
+>> +#define memset_io(dst,c,count) memset_io(dst,c,count)
+>> +
+>> +static inline void memcpy_fromio(void *to, const volatile void
+>> __iomem *from,
+>> +    size_t count)
+>> +{
+>> +    memcpy(to, (const void __force *)from, count);
+>> +}
+>> +#define memcpy_fromio(to,from,count) memcpy_fromio(to,from,count)
+>> +
+>> +static inline void memcpy_toio(volatile void __iomem *to, const
+>> void *from,
+>> +    size_t count)
+>> +{
+>> +    memcpy((void __force *)to, from, count);
+>> +}
+>> +#define memcpy_toio(to,from,count) memcpy_toio(to,from,count)
+>> +
+>> +#else
+>>   #define memset_io(c,v,l)    _memset_io(c,(v),(l))
+>>   #define memcpy_fromio(a,c,l)    _memcpy_fromio((a),c,(l))
+>>   #define memcpy_toio(c,a,l)    _memcpy_toio(c,(a),(l))
 >> +#endif
-> 
-> Don't need the #ifdef.
+>>
+>>   #endif    /* readl */
+>
+> I'd like to ask if there is any chance to get anything like this or
+> the even older proposal
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004077.html
+>
+>
+> merged? Maybe an updated version incorporating the discussion
+> conclusions?
+>
+>
+> In the discussion of
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004077.html
+>
+>
+> there have been some doubts if it's a good idea to enable it for all
+> SoCs. Therefore that patch introduced a
+>
+> config OPTIMIZED_IOMEM_MEMCPY
+>
+> which would allow us to enable it for only known to be compatible
+> SoCs. Just in case this helps to get it applied ;)
 
-Oh right; I hadn't noticed the inline in smp.h.
+Any opinion on this?
+
+Best regards
+
+Dirk
