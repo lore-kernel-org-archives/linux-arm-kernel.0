@@ -1,55 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Jun 2013 11:11:49 +0100
-Subject: ARM cacheflush syscall with range that spans multiple vma
-In-Reply-To: <20130610085948.GP18614@n2100.arm.linux.org.uk>
-References: <51B51844.9050108@bitwagon.com>
- <20130610085948.GP18614@n2100.arm.linux.org.uk>
-Message-ID: <20130611101149.GF24729@mudshark.cambridge.arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 11 Jun 2013 12:16:11 +0200
+Subject: [PATCH V3 2/4] ARM: tegra: pcie: Add tegra3 support
+In-Reply-To: <C79B248886DD134989C8FF6B096A91AB91B616BEED@BGMAIL01.nvidia.com>
+References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
+ <1370372252-4332-2-git-send-email-jagarwal@nvidia.com>
+ <51AE3D3B.6080102@wwwdotorg.org>
+ <20130610195028.GB25859@mithrandir>
+ <C79B248886DD134989C8FF6B096A91AB91B616BEED@BGMAIL01.nvidia.com>
+Message-ID: <20130611101610.GB932@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 09:59:48AM +0100, Russell King - ARM Linux wrote:
-> On Sun, Jun 09, 2013 at 05:05:24PM -0700, John Reiser wrote:
-> > Why does the ARM cacheflush syscall stop after the lowest vma
-> > which intersects the user-requested range?  The range could
-> > span more than one vma having contiguous addresses, such as
-> > two files MAP_SHARED into adjacent pages; or even a region
-> > that contains holes (pages not present.)
+On Tue, Jun 11, 2013 at 10:13:38AM +0530, Jay Agarwal wrote:
+> > * PGP Signed by an unknown key
+> > 
+> > On Tue, Jun 04, 2013 at 01:17:15PM -0600, Stephen Warren wrote:
+> > > On 06/04/2013 12:57 PM, Jay Agarwal wrote:
+> > [...]
+> > > >  struct tegra_pcie_port {
+> > > > @@ -384,7 +408,7 @@ static int tegra_pcie_read_conf(struct pci_bus
+> > *bus, unsigned int devfn,
+> > > >  		struct tegra_pcie_port *port;
+> > > >
+> > > >  		list_for_each_entry(port, &pcie->ports, list) {
+> > > > -			if (port->index + 1 == slot) {
+> > > > +			if (port->index == slot) {
+> > >
+> > > This and the equivalent change in tegra_pcie_write_conf() seem like a
+> > > bug-fix unrelated to the addition of Tegra30 support. Hence, they
+> > > should be a separate patch.
+> > 
+> > What exactly is this change supposed to fix? The description doesn't provide
+> > any details about why this is required. Furthermore this was done on
+> > purpose to model the Tegra PCIe controller according to what typical Linux
+> > systems provide.
 > 
-> Because you're not supposed to use it on large ranges because it's
-> an expensive operation.
+> I have mentioned it in description as -> "Corrected logic in read/write config space to display right device number on bus 0"
+> 
+> > Device 0:00.0 is usually the root complex, and device 0:01.0, 0:02.0 etc are
+> > the root ports. The change proposed above makes 0:00.0 the first root port,
+> > therefore breaking what systems usually expect.
+> > 
+> I was seeing root port 2 in cardhu being enumerated as pci_bus 0000:03, which I thought should be pci_bus 0000:02, so made this change.
 
-FWIW: here's a simple test case which can really affect responsiveness on my
-TC2 (2GB of memory). It just creates a single VMA, doesn't bother faulting it
-in, then tries to cacheflush the whole range. On a kernel with
-CONFIG_PREEMPT_NONE=y, this effectively stalls the system (interrupts are
-still taken) until the flush has completed.
+Yes, that's done on purpose to mirror what a typical PCI tree looks
+like, as I already explained. So unless this fixes a real bug I'll just
+drop it while applying.
 
-Will
-
---->8
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-
-#define BUFSIZE		0x70000000
-#define NR_cacheflush	0xf0002
-
-int main(void)
-{
-	int ret;
-	char *region = malloc(BUFSIZE);
-
-	if (!region) {
-		fprintf(stderr, "Failed to allocate %u-byte buffer\n", BUFSIZE);
-		return -1;
-	}
-
-	ret = syscall(NR_cacheflush, region, region + BUFSIZE, 0);
-	if (ret)
-		printf("syscall returned %d\n", ret);
-
-	return ret;
-}
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/e28e7f75/attachment-0001.sig>
