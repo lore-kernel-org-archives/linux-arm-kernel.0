@@ -1,33 +1,77 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 11 Jun 2013 20:22:51 +0200
-Subject: [PATCHv3 1/6] i2c: sunxi: Add Allwinner A1X i2c driver
-In-Reply-To: <20130610100847.GG2748@lukather>
-References: <1369648843-1640-1-git-send-email-maxime.ripard@free-electrons.com>
- <1369648843-1640-2-git-send-email-maxime.ripard@free-electrons.com>
- <20130605133945.GA2934@katana> <20130605213144.GB14209@lukather>
- <20130610100847.GG2748@lukather>
-Message-ID: <20130611182250.GB3376@katana>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Jun 2013 19:29:27 +0100
+Subject: [PATCH] ARM: decouple CPU offlining from reboot/shutdown
+In-Reply-To: <51B767A8.7000506@wwwdotorg.org>
+References: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
+ <20130611172342.GJ3439@mudshark.cambridge.arm.com>
+ <51B767A8.7000506@wwwdotorg.org>
+Message-ID: <20130611182927.GP3439@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 12:08:47PM +0200, Maxime Ripard wrote:
-> Hi Wolfram,
+On Tue, Jun 11, 2013 at 07:08:40PM +0100, Stephen Warren wrote:
+> On 06/11/2013 11:23 AM, Will Deacon wrote:
+> > On Mon, Jun 10, 2013 at 07:12:41PM +0100, Stephen Warren wrote:
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> machine_shutdown() is a hook for kexec. Add a comment saying so, since
+> >> it isn't obvious from the function name.
+> > 
+> > I'd go as far as saying that some of this commit log could be included in
+> > the comment too, since this comes up time and time again and it's never
+> > clear!
 > 
-> On Wed, Jun 05, 2013 at 11:31:44PM +0200, Maxime Ripard wrote:
-> > I guess it would make the code much more complicated for such simple
-> > drivers, so I wouldn't push too much for merging, but I guess it's your
-> > call.
+> OK, I'll add some expanded comments to each of the functions.
+
+Great, cheers.
+
+> >> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
 > 
-> I'd like this to be in 3.11, would merging the driver separately for
-> this release and merging it with mv64xxx for 3.12 be acceptable to you ?
+> >> @@ -97,13 +97,14 @@ void soft_restart(unsigned long addr)
+> >>  {
+> >>  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+> >>  
+> >> +	BUG_ON(num_online_cpus() > 1);
+> > 
+> > I think this is overkill, and we could actually scream and try to return an
+> > error here (we've not yet switched stack, and the upper layers of kexec look
+> > like they can do something with an error code).
+> 
+> Hmmm. The function returns void, although I suppose I could look into
+> changing that too?
 
-Thanks for the offer, but the chance of a regression is too high when
-switching drivers. Also, configs would need updates then, etc...
+Yes. Usually this is a path of no return, but if we detect an error before
+we've changed stack then I think we should at least try to propogate the
+error.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130611/e476ea31/attachment-0001.sig>
+> >> +/* For kexec */
+> >>  void machine_shutdown(void)
+> >>  {
+> >> -#ifdef CONFIG_SMP
+> >> -	smp_send_stop();
+> >> +#ifdef CONFIG_PM_SLEEP_SMP
+> >> +	disable_nonboot_cpus();
+> >>  #endif
+> > 
+> > You can lose the #ifdef here.
+> 
+> The implementation of disable_nonboot_cpus() is #ifdef
+> CONFIG_PM_SLEEP_SMP, so I think I need that to avoid build errors.
+
+Hmm, my include/linux/cpu.h has a dummy definition in an #else block, which
+simply returns 0. What kernel are you using?
+
+> >> +	BUG_ON(num_online_cpus() > 1);
+> > 
+> > Maybe redefine machine_shutdown if !kexec and lose this BUG?
+> 
+> IIUC, machine_shutdown() is only used for kexec now, so I don't think an
+> alternative implementation is required in the !kexec case?
+
+Yes, you're right. In fact, since we don't support KEXEC_JUMP on ARM, we
+could dispense with machine_shutdown altogether (just make it do nothing)
+and move the code into machine_kexec, which has a much better name.
+
+What do you think?
+
+Will
