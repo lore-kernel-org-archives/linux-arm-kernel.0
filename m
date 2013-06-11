@@ -1,22 +1,22 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 11 Jun 2013 09:41:50 +0100
-Subject: [PATCH 0/2] MCPM backend for Virtual Express TC2
-In-Reply-To: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1370940110.3393.2.camel@linaro1.home>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Jun 2013 10:43:53 +0200
+Subject: [PATCH 7/7 v2] Documentation: Update binding for Nomadik and
+ DBx5x based platforms
+In-Reply-To: <20130610102333.GJ20297@gmail.com>
+References: <1369232581-18923-1-git-send-email-lee.jones@linaro.org>
+ <1369232581-18923-8-git-send-email-lee.jones@linaro.org>
+ <20130610102333.GJ20297@gmail.com>
+Message-ID: <CACRpkdYt7m+wabPwbG2k16WYmV5wrk+R1aQQexvRv3cSk9gE+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2013-06-07 at 02:39 -0400, Nicolas Pitre wrote:
-> This is the MCPM backend enabling SMP secondary boot and CPU hotplug
-> on the VExpress TC2 big.LITTLE platform.  The method to allow CPU suspend
-> is also implemented.
+On Mon, Jun 10, 2013 at 12:23 PM, Lee Jones <lee.jones@linaro.org> wrote:
 
-Are we leaving out for now Lorenzo's patch "ARM: TC2: reset CPUs
-spuriously woken up on cluster power up"?
+> Change compatible string to something more standard.
+>
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
 
-I got reminded of this after reading the comments on Mark Rutland's
-"[PATCH] arm: versatile: don't mark pen as __INIT"
+Thanks, applied to ux500-devicetree.
 
--- 
-Tixy
+Yours,
+Linus Walleij
