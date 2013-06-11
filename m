@@ -1,82 +1,60 @@
-From: javier.martinez@collabora.co.uk (Javier Martinez Canillas)
-Date: Tue, 11 Jun 2013 17:35:21 +0200
-Subject: [PATCH 2/4] ARM: dts: omap3-tobi: Add SMSC911X node
-In-Reply-To: <1370962189-9689-3-git-send-email-florian.vaussard@epfl.ch>
-References: <1370962189-9689-1-git-send-email-florian.vaussard@epfl.ch>
- <1370962189-9689-3-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <51B743B9.3070809@collabora.co.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 11 Jun 2013 11:35:42 -0400 (EDT)
+Subject: [PATCH 1/2] ARM: vexpress/TC2: basic PM support
+In-Reply-To: <20130611134108.GB25664@e102568-lin.cambridge.arm.com>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130607142645.GD3111@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1306080118440.18597@syhkavp.arg>
+ <20130610175357.GD1310@e102568-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1306101833450.18597@syhkavp.arg>
+ <20130611134108.GB25664@e102568-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.03.1306111135150.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/2013 04:49 PM, Florian Vaussard wrote:
-> The Tobi expansion boards embeds a SMSC LAN8700 PHY. Add the
-> corresponding node into the DT. The regulators are not designed
-> to be turned off.
-> 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  arch/arm/boot/dts/omap3-tobi.dts |   48 ++++++++++++++++++++++++++++++++++++++
->  1 files changed, 48 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-tobi.dts b/arch/arm/boot/dts/omap3-tobi.dts
-> index c7eebbf..dea726f 100644
-> --- a/arch/arm/boot/dts/omap3-tobi.dts
-> +++ b/arch/arm/boot/dts/omap3-tobi.dts
-> @@ -24,6 +24,54 @@
->  			linux,default-trigger = "heartbeat";
->  		};
->  	};
-> +
-> +	vddvario: regulator-vddvario {
-> +		  compatible = "regulator-fixed";
-> +		  regulator-name = "vddvario";
-> +		  regulator-always-on;
-> +	};
-> +
-> +	vdd33a: regulator-vdd33a {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "vdd33a";
-> +		regulator-always-on;
-> +	};
-> +};
-> +
-> +&gpmc {
-> +	ranges = <5 0 0x2c000000 0x1000000>;	/* CS5 */
-> +
-> +	ethernet at 5,0 {
-> +		compatible = "smsc,lan9221", "smsc,lan9115";
-> +		reg = <5 0 0xff>;
-> +		bank-width = <2>;
-> +
-> +		gpmc,mux-add-data;
-> +		gpmc,cs-on-ns = <0>;
-> +		gpmc,cs-rd-off-ns = <42>;
-> +		gpmc,cs-wr-off-ns = <36>;
-> +		gpmc,adv-on-ns = <6>;
-> +		gpmc,adv-rd-off-ns = <12>;
-> +		gpmc,adv-wr-off-ns = <12>;
-> +		gpmc,oe-on-ns = <0>;
-> +		gpmc,oe-off-ns = <42>;
-> +		gpmc,we-on-ns = <0>;
-> +		gpmc,we-off-ns = <36>;
-> +		gpmc,rd-cycle-ns = <60>;
-> +		gpmc,wr-cycle-ns = <54>;
-> +		gpmc,access-ns = <36>;
-> +		gpmc,page-burst-access-ns = <0>;
-> +		gpmc,bus-turnaround-ns = <0>;
-> +		gpmc,cycle2cycle-delay-ns = <0>;
-> +		gpmc,wr-data-mux-bus-ns = <18>;
-> +		gpmc,wr-access-ns = <42>;
-> +		gpmc,cycle2cycle-samecsen;
-> +		gpmc,cycle2cycle-diffcsen;
-> +
-> +		interrupt-parent = <&gpio6>;
-> +		interrupts = <16 IRQ_TYPE_LEVEL_LOW>;	/* GPIO 176*/
-> +		reg-io-width = <4>;
-> +	};
->  };
->  
->  &i2c3 {
-> 
+On Tue, 11 Jun 2013, Lorenzo Pieralisi wrote:
 
-Reviewed-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+> On Mon, Jun 10, 2013 at 11:39:11PM +0100, Nicolas Pitre wrote:
+> > On Mon, 10 Jun 2013, Lorenzo Pieralisi wrote:
+> > 
+> > > > +               /*
+> > > > +                * We need to disable and flush the whole (L1 and L2) cache.
+> > > > +                * Let's do it in the safest possible way i.e. with
+> > > > +                * no memory access within the following sequence,
+> > > > +                * including the stack.
+> > > > +                */
+> > > > +               asm volatile(
+> > > > +               "mrc    p15, 0, r0, c1, c0, 0   @ get CR \n\t"
+> > > > +               "bic    r0, r0, #"__stringify(CR_C)" \n\t"
+> > > > +               "mcr    p15, 0, r0, c1, c0, 0   @ set CR \n\t"
+> > > > +               "isb    \n\t"
+> > > > +               "bl     v7_flush_dcache_all \n\t"
+> > > > +               "clrex  \n\t"
+> > > > +               "mrc    p15, 0, r0, c1, c0, 1   @ get AUXCR \n\t"
+> > > > +               "bic    r0, r0, #(1 << 6)       @ disable local coherency \n\t"
+> > > > +               "mcr    p15, 0, r0, c1, c0, 1   @ set AUXCR \n\t"
+> > > > +               "isb    "
+> > > 
+> > > We need a dsb here, I know there is one before returning from the flush
+> > > routine though. Maybe add it as a comment please.
+> > 
+> > Is the dsb in v7_flush_dcache_all sufficient (hence a comment) or it 
+> > needs to be located after a particular operation?
+> 
+> Well I wanted to avoid too many dsb. But I think that a dsb after
+> exiting coherency is mandatory to avoid issues (after isb), hence it should
+> be added (I know as I said there is one just before returning from the
+> 
+> v7_flush_dcache_all/louis
+> 
+> functions), but we should not be playing with fire either, it boils down
+> to CPU microarchitectural details.
+> 
+> We cannot remove the dsb from the cache functions since they are meant
+> to be self-contained.
+
+OK, consider it added.
+
+
+Nicolas
