@@ -1,56 +1,55 @@
-From: ttynkkynen@nvidia.com (Tuomas Tynkkynen)
-Date: Tue, 11 Jun 2013 13:11:19 +0300
-Subject: [PATCH 2/2] memory: tegra30-mc: Fix IRQ handler.
-In-Reply-To: <1370945479-2917-1-git-send-email-ttynkkynen@nvidia.com>
-References: <1370945479-2917-1-git-send-email-ttynkkynen@nvidia.com>
-Message-ID: <1370945479-2917-3-git-send-email-ttynkkynen@nvidia.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Jun 2013 11:11:49 +0100
+Subject: ARM cacheflush syscall with range that spans multiple vma
+In-Reply-To: <20130610085948.GP18614@n2100.arm.linux.org.uk>
+References: <51B51844.9050108@bitwagon.com>
+ <20130610085948.GP18614@n2100.arm.linux.org.uk>
+Message-ID: <20130611101149.GF24729@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In Tegra30 any memory controller interrupt would cause an infinite loop in the
-IRQ handler. Additionally, a garbage pointer was used to read the MC
-status registers, which causes wrong values to be printed if a MC error
-occurred.
+On Mon, Jun 10, 2013 at 09:59:48AM +0100, Russell King - ARM Linux wrote:
+> On Sun, Jun 09, 2013 at 05:05:24PM -0700, John Reiser wrote:
+> > Why does the ARM cacheflush syscall stop after the lowest vma
+> > which intersects the user-requested range?  The range could
+> > span more than one vma having contiguous addresses, such as
+> > two files MAP_SHARED into adjacent pages; or even a region
+> > that contains holes (pages not present.)
+> 
+> Because you're not supposed to use it on large ranges because it's
+> an expensive operation.
 
-Signed-off-by: Tuomas Tynkkynen <ttynkkynen@nvidia.com>
----
- drivers/memory/tegra30-mc.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+FWIW: here's a simple test case which can really affect responsiveness on my
+TC2 (2GB of memory). It just creates a single VMA, doesn't bother faulting it
+in, then tries to cacheflush the whole range. On a kernel with
+CONFIG_PREEMPT_NONE=y, this effectively stalls the system (interrupts are
+still taken) until the flush has completed.
 
-diff --git a/drivers/memory/tegra30-mc.c b/drivers/memory/tegra30-mc.c
-index f4ae074..58d2979 100644
---- a/drivers/memory/tegra30-mc.c
-+++ b/drivers/memory/tegra30-mc.c
-@@ -218,7 +218,7 @@ static void tegra30_mc_decode(struct tegra30_mc *mc, int n)
- 		return;
- 	}
- 
--	err = readl(mc + MC_ERR_STATUS);
-+	err = mc_readl(mc, MC_ERR_STATUS);
- 
- 	type = (err & MC_ERR_TYPE_MASK) >> MC_ERR_TYPE_SHIFT;
- 	perm = (err & MC_ERR_INVALID_SMMU_PAGE_MASK) >>
-@@ -235,7 +235,7 @@ static void tegra30_mc_decode(struct tegra30_mc *mc, int n)
- 	if (cid < ARRAY_SIZE(tegra30_mc_client))
- 		client = tegra30_mc_client[cid];
- 
--	addr = readl(mc + MC_ERR_ADR);
-+	addr = mc_readl(mc, MC_ERR_ADR);
- 
- 	dev_err_ratelimited(mc->dev, "%s (0x%08x): 0x%08x %s (%s %s %s %s)\n",
- 			   mc_int_err[idx], err, addr, client,
-@@ -313,8 +313,11 @@ static irqreturn_t tegra30_mc_isr(int irq, void *data)
- 	mask &= stat;
- 	if (!mask)
- 		return IRQ_NONE;
--	while ((bit = ffs(mask)) != 0)
-+	while ((bit = ffs(mask)) != 0) {
- 		tegra30_mc_decode(mc, bit - 1);
-+		mask &= ~BIT(bit - 1);
-+	}
-+
- 	mc_writel(mc, stat, MC_INTSTATUS);
- 	return IRQ_HANDLED;
- }
--- 
-1.8.1.5
+Will
+
+--->8
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define BUFSIZE		0x70000000
+#define NR_cacheflush	0xf0002
+
+int main(void)
+{
+	int ret;
+	char *region = malloc(BUFSIZE);
+
+	if (!region) {
+		fprintf(stderr, "Failed to allocate %u-byte buffer\n", BUFSIZE);
+		return -1;
+	}
+
+	ret = syscall(NR_cacheflush, region, region + BUFSIZE, 0);
+	if (ret)
+		printf("syscall returned %d\n", ret);
+
+	return ret;
+}
