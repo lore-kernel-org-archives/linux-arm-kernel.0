@@ -1,68 +1,44 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 11 Jun 2013 15:00:25 +0900
-Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <201306101722.10146.arnd@arndb.de>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
- <201306071943.18407.arnd@arndb.de>
- <000001ce65b5$e45477f0$acfd67d0$@samsung.com>
- <201306101722.10146.arnd@arndb.de>
-Message-ID: <002e01ce6668$f785dc20$e6919460$@samsung.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Tue, 11 Jun 2013 14:19:33 +0800
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306101647290.1133-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1306101316020.1133-100000@iolanthe.rowland.org>
+ <Pine.LNX.4.44L0.1306101647290.1133-100000@iolanthe.rowland.org>
+Message-ID: <CACVXFVMh7a0UPDVhLiXKXbMkDtF7Ri+FJxWiE6OL3YCU9ok=1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, June 11, 2013 12:22 AM, Arnd Bergmann wrote:
-> On Monday 10 June 2013, Jingoo Han wrote:
-> > On Saturday, June 08, 2013 2:43 AM, Arnd Bergmann wrote:
-> > For multiple domains, how can I fix the DT properties?
-> 
-> Domains are a Linux concept, you have to pick a new domain number for each
-> struct hw_pci you register.
+On Tue, Jun 11, 2013 at 4:51 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Mon, 10 Jun 2013, Alan Stern wrote:
+>
+>> > Tasklet doesn't disable local interrupts.
+>>
+>> It is documented that interrupts will be disabled while the completion
+>> handler runs.  Therefore the tasklet _must_ disable local interrupts.
+>
+> You know, it may be that you can get most of the advantages you want by
+> enabling local interrupts around the call to unmap_urb_for_dma() in
+> usb_hcd_giveback_urb().
 
-Hi Arnd,
+No, please don't enable IRQs inside interrupt handler, and you will
+get warning dump.
 
-Thank you for your reply.
-It is very helpful. :)
+Except for unmap_urb_for_dma() in usb_hcd_giveback_urb(),  I hope
+map_urb_for_dma() inside complete() can benefit from the change too,
+since map_urb_for_dma() is same time-consuming with unmap_urb_for_dma().
 
-I will set domain numbers for each struct hw_pci.
+Also I hope complete() can be run with interrupt enabled since
+driver's complete() may take long time on some ARCH, as I mentioned
+in my last mail. And it isn't good to disable interrupt only for one interface
+driver, looks I still don't get real good explanation about disabling
+IRQs here, :-)
 
-> 
-> > Current DT properties are as below:
-> >
-> > +	pcie0 at 40000000 {
-> > +		compatible = "samsung,exynos5440-pcie";
-> > +		reg = <0x40000000 0x4000
-> > +			0x290000 0x1000
-> > +			0x270000 0x1000
-> > +			0x271000 0x40>;
-> > +		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> > +		#address-cells = <3>;
-> > +		#size-cells = <2>;
-> > +		device_type = "pci";
-> > +		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-> > +			  0x81000000 0 0	  0x40200000 0 0x00004000   /* downstream I/O */
-> > +			  0x82000000 0 0	  0x40204000 0 0x10000000>; /* non-prefetchable memory */
-> > +	};
-> 
-> An unrelated comment: your first "reg" field seems to overlap with part
-> of your configuration space. Is that intentional?
+>
+> This may be a little dangerous, though, because it is possible for an
+> URB to be given back at the time it is submitted.  Drivers may not
+> expect interrupts to get enabled temporarily when they call
+> usb_submit_urb().
 
-Yes, intentional.
-But, I will try to remove it.
-
-> 
-> Also, shouldn't your memory space end on a 256MB boundary, rather than
-> extend up to 0x50203fff?
-
-According to the manual of Exynos PCIe, each memory space for Exynos PCIe
-can support 512MB, including I/O, CFG regions.
-
-Is there any problem when over 256MB boundary is used?
-Please let me know. :)
-
-
-Best regards,
-Jingoo Han
-
-> 
-> 	Arnd
+Thanks,
+--
+Ming Lei
