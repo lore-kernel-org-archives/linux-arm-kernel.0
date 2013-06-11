@@ -1,37 +1,62 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Jun 2013 16:56:27 +0900
-Subject: [PATCH v9 resend 0/3] Add USB support to R8A7778/BOCK-W
-In-Reply-To: <20130611074959.GG10440@verge.net.au>
-References: <201306090032.35128.sergei.shtylyov@cogentembedded.com>
- <20130611074959.GG10440@verge.net.au>
-Message-ID: <20130611075627.GB5300@verge.net.au>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 11 Jun 2013 10:00:29 +0200
+Subject: [PATCH] drm: encoder_slave: respect of_node on i2c encoder init
+In-Reply-To: <20130611072433.GP22870@phenom.ffwll.local>
+References: <1370899422-1281-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130611072433.GP22870@phenom.ffwll.local>
+Message-ID: <51B6D91D.3000906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 04:49:59PM +0900, Simon Horman wrote:
-> On Sun, Jun 09, 2013 at 12:32:34AM +0400, Sergei Shtylyov wrote:
-> > Hello.
-> > 
-> >    Here's the set of 3 patches against the Simon Horman's 'renesas.git' repo,
-> > 'renesas-next-20130607' tag, and the R8A7779/Marzen USB patchset I've posted.
-> > It was created to add support of R8A7778/BOCK-W USB to the platform code and
-> > the USB common PHY driver, and so spans both arch/arm/mach-shmobile/ and
-> > drivers/usb/phy/ subtrees.
-> > 
-> > [1/3] phy-rcar-usb: add R8A7778 support
-> > [2/3] ARM: shmobile: r8a7778: add USB support
-> > [3/3] ARM: shmobile: BOCK-W: add USB support
-> > 
-> >    The patchset is completely ready for merging now.
-> 
-> Thanks, I have queued this up in the soc2 phy-rcar-usb.
+On 06/11/13 09:24, Daniel Vetter wrote:
+> On Mon, Jun 10, 2013 at 11:23:42PM +0200, Sebastian Hesselbarth wrote:
+>> Current DRM slave encoder API conflicts with auto-registration of i2c client
+>> when using DT probed clients. To allow DRM slave encoders passed by DT, this
+>> patch adds a check to drm_i2c_encoder_init for a non-NULL .of_node on
+>> i2c_board_info and calls an of_i2c helper to get the i2c client device
+>> instead of registering a new device.
+>>
+>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>
+> Hm, I don't have much clue about how dt/of really works, but since of has
+> this nice probing/auto-instantiation thing I think we could simplify this
+> some more:
+> - Create a new drm_i2c_encoder_init_of which only takes a struct
+>    device_node *of_node argument instead of adap and info.
+> - I think we could also drop the call to ->set_config since presumably an
+>    of-enabled driver grabbed any required info already from the dt.
 
-s/soc2 phy-rcar-usb/phy-rcar-usb branch/
+Daniel,
 
-> My current plan is to let that branch sit in next for a few
-> days and then send a pull-request for it to be included in v3.11.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+this patch is not about making DRM API DT aware but make it not _break_
+on DT aware platforms. I am way out of league to rework DRM slave
+encoder stuff for DT. This is the smallest non-intrusive modification
+I can think of to allow i2c encoders to be passed by DT.
+
+> I think this way we could still share encoder slaves across tons of
+> platforms, only the init sequence (and specifically how they get at their
+
+IMHO, the whole i2c encoder stuff is just wrong. Not any i2c slave
+driver is even really using its probe(). Everything is packed somewhere
+because it just worked.. this is at least a start.
+
+I suggest this to get merged to at least allow to have DT slaves,
+then start with improving tda998x as an example, then maybe rethink
+drm_slave_encoder completely, e.g.
+
+- generalize the concept to SPI attached encoders, "internal" encoders..
+- find a way to setup .encoder_type and .connector_type correctly
+- have more common of_drm_blabla helpers
+
+> config data) would be different. That would also be extensible quite
+> easily (*cough* intel platforms could setup encoder slaves from
+> information out of the vbt *cough*).
+>
+> And ofc, a (totally broken) exemplary conversion patch for tilcdc would be
+> neat ;-)
+
+I don't have tilcdc to test so - no, I am not giving an example how to
+use of_parse_phandle and assign the returned pointer to board_info's
+.of_node. But it is no more than that, a single line of code.
+
+Sebastian
