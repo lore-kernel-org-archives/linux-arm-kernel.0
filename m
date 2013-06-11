@@ -1,51 +1,32 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 11 Jun 2013 10:09:45 +0200
-Subject: [PATCH] cpuidle: Fix ARCH_NEEDS_CPU_IDLE_COUPLED dependency warning
-Message-ID: <1370938185-5019-1-git-send-email-daniel.lezcano@linaro.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 11 Jun 2013 17:10:10 +0900
+Subject: [PATCH] ARM: EXYNOS: Enable 64-bit DMA for EXYNOS5440 if LPAE is
+ enabled
+Message-ID: <109701ce667b$179822e0$46c868a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before the commit d6f346f2d2bf511c2c59176121a6e42ce60173a0, the
-ARCH_NEEDS_CPU_IDLE_COUPLED option was not depending on the CPU_IDLE but now
-it has been moved under the CPU_IDLE menuconfig option.
+From: Thomas Abraham <thomas.ab@samsung.com>
 
-That raises the following warnings:
+Allow 64-bit DMA addresses if LPAE is enabled on EXYNOS5440.
 
-warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects ARCH_NEEDS_CPU_IDLE_COUPLED
-which has unmet direct dependencies (CPU_IDLE)
-warning: (ARCH_OMAP4 && ARCH_TEGRA_2x_SOC) selects ARCH_NEEDS_CPU_IDLE_COUPLED
-which has unmet direct dependencies (CPU_IDLE)
-
-The tegra2 and omap4 Kconfig files select this option but without checking
-CPU_IDLE is set.
-
-Fix that by moving the option out of the CPU_IDLE option.
-
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/cpuidle/Kconfig |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/mach-exynos/Kconfig |    1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/cpuidle/Kconfig b/drivers/cpuidle/Kconfig
-index a7d2e83..81de5d9 100644
---- a/drivers/cpuidle/Kconfig
-+++ b/drivers/cpuidle/Kconfig
-@@ -29,9 +29,6 @@ config CPU_IDLE_GOV_MENU
- 	bool "Menu governor (for tickless system)"
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index e101b14..0f7d308 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -81,6 +81,7 @@ config SOC_EXYNOS5440
+ 	bool "SAMSUNG EXYNOS5440"
  	default y
- 
--config ARCH_NEEDS_CPU_IDLE_COUPLED
--	def_bool n
--
- config CPU_IDLE_CALXEDA
- 	bool "CPU Idle Driver for Calxeda processors"
- 	depends on ARCH_HIGHBANK
-@@ -45,3 +42,6 @@ config CPU_IDLE_ZYNQ
- 	  Select this to enable cpuidle on Xilinx Zynq processors.
- 
- endif
-+
-+config ARCH_NEEDS_CPU_IDLE_COUPLED
-+	def_bool n
+ 	depends on ARCH_EXYNOS5
++	select ARCH_DMA_ADDR_T_64BIT if ARM_LPAE
+ 	select ARCH_HAS_OPP
+ 	select ARM_ARCH_TIMER
+ 	select AUTO_ZRELADDR
 -- 
-1.7.9.5
+1.7.10.4
