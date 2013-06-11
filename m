@@ -1,28 +1,131 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Tue, 11 Jun 2013 10:17:52 +0530
-Subject: [PATCH V4 2/4] ARM: tegra: pcie: Add tegra3 support
-In-Reply-To: <20130610200906.GD25859@mithrandir>
-References: <1370445221-17696-1-git-send-email-jagarwal@nvidia.com>
- <51AF68F1.8080307@wwwdotorg.org> <20130610200906.GD25859@mithrandir>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B616BEEE@BGMAIL01.nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 11 Jun 2013 13:48:47 +0900
+Subject: [PATCH 1/8] ARM: shmobile: sh73a0 pinmux platform device cleanup
+In-Reply-To: <1722811.MCTrRecTtK@avalon>
+References: <1369645252-3847-1-git-send-email-horms+renesas@verge.net.au>
+ <20130604052043.GX23054@verge.net.au>
+ <20130604132058.GE3068@verge.net.au> <1722811.MCTrRecTtK@avalon>
+Message-ID: <20130611044847.GH15593@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 10, 2013 at 02:31:31PM +0200, Laurent Pinchart wrote:
+> Hi Simon,
+> 
+> On Tuesday 04 June 2013 22:20:59 Simon Horman wrote:
+> > On Tue, Jun 04, 2013 at 02:20:43PM +0900, Simon Horman wrote:
+> > > On Mon, May 27, 2013 at 09:02:43PM -0700, Olof Johansson wrote:
+> > > > On Mon, May 27, 2013 at 06:13:22PM +0400, Sergei Shtylyov wrote:
+> > > > > On 27-05-2013 13:00, Simon Horman wrote:
+> > > > > >From: Magnus Damm <damm@opensource.se>
+> > > > > >
+> > > > > >Use DEFINE_RES_MEM() and platform_device_register_simple()
+> > > > > >to save a couple of lines of code.
+> > > > > >
+> > > > > >Signed-off-by: Magnus Damm <damm@opensource.se>
+> > > > > >Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> > > > > >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> > > > > >---
+> > > > > >
+> > > > > >  arch/arm/mach-shmobile/setup-sh73a0.c |   25
+> > > > > >  ++++++-------------------
+> > > > > >  1 file changed, 6 insertions(+), 19 deletions(-)
+> > > > > >
+> > > > > >diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > > > >b/arch/arm/mach-shmobile/setup-sh73a0.c index fdf3894..f8f4261
+> > > > > >100644
+> > > > > >--- a/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > > > >+++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+> > > > > >@@ -61,29 +61,16 @@ void __init sh73a0_map_io(void)
+> > > > > 
+> > > > > [...]
+> > > > > 
+> > > > > >+/* PFC */
+> > > > > >+static const struct resource pfc_resources[] = {
+> > > > > >
+> > > > >    Should have been annotated as __initdata... too late, need
+> > > > > 
+> > > > > another patch.
+> > > > 
+> > > > See comments on other patches/pull requests, I think there's time to
+> > > > revisit this. I.e. I'll hold off on pulling this based on the other
+> > > > feedback.
+> > >
+> > > As I am respining I will fix this.
+> > > 
+> > > However, it had been reviewed and I think that ordinarily
+> > > it would be reasonable to perform further clean-up
+> > > work in a subsequent patch.
+> > 
+> > I decided to simply drop the patch and revisit it later.
+> 
+> This patch (as well as the sh7372 equivalent) is pretty simple. What about 
+> just adding __initdata and resubmitting them ? Otherwise they will get lost.
 
-> * PGP Signed by an unknown key
-> 
-> On Wed, Jun 05, 2013 at 10:36:01AM -0600, Stephen Warren wrote:
-> > On 06/05/2013 09:13 AM, Jay Agarwal wrote:
-> > > - Make private data structure for each SoC
-> > > - Add required Tegra30 clocks and regulators
-> > > - Add Tegra30 specific code in enable controller
-> > > - Added Tegra30 specific properties in pci binding document
-> >
-> > It's a bit odd to send an updated version of just some of the patches;
-> > reposting a whole series is much easier for the person applying the
-> > patches. However, hopefully Thierry can handle it in this case.
-> 
-> Yes, I think I can handle it. It might be good to have Jay look at the final
-> patches when I'm done, though, to make sure I haven't forgotten anything.
-> 
-Yes, please let me know whenever you have integrated my patches to your repo, so that I can sync, review & verify again.
+Sure. I took a look at doing this but with the patch below applied I see:
+
+# make kzm9g_defconfig
+# make
+In file included from arch/arm/mach-shmobile/setup-sh73a0.c:27:
+include/linux/platform_device.h: In function ?sh73a0_pinmux_init?:
+arch/arm/mach-shmobile/setup-sh73a0.c:65: error: pfc_resources causes a section type conflict
+
+
+>From 23ea305bcb4513e33ad636b1c735439993fcff74 Mon Sep 17 00:00:00 2001
+From: Magnus Damm <damm@opensource.se>
+Date: Mon, 27 May 2013 09:00:45 +0000
+Subject: [PATCH] ARM: shmobile: sh73a0 pinmux platform device cleanup
+
+Use DEFINE_RES_MEM() and platform_device_register_simple()
+to save a couple of lines of code.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+[ Annotate pfc_resources with __initdata: causes section missmatch! ]
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-sh73a0.c | 25 ++++++-------------------
+ 1 file changed, 6 insertions(+), 19 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-sh73a0.c b/arch/arm/mach-shmobile/setup-sh73a0.c
+index c5028f1f..7d90eed 100644
+--- a/arch/arm/mach-shmobile/setup-sh73a0.c
++++ b/arch/arm/mach-shmobile/setup-sh73a0.c
+@@ -61,29 +61,16 @@ void __init sh73a0_map_io(void)
+ 	iotable_init(sh73a0_io_desc, ARRAY_SIZE(sh73a0_io_desc));
+ }
+ 
+-static struct resource sh73a0_pfc_resources[] = {
+-	[0] = {
+-		.start	= 0xe6050000,
+-		.end	= 0xe6057fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= 0xe605801c,
+-		.end	= 0xe6058027,
+-		.flags	= IORESOURCE_MEM,
+-	}
+-};
+-
+-static struct platform_device sh73a0_pfc_device = {
+-	.name		= "pfc-sh73a0",
+-	.id		= -1,
+-	.resource	= sh73a0_pfc_resources,
+-	.num_resources	= ARRAY_SIZE(sh73a0_pfc_resources),
++/* PFC */
++static const struct resource pfc_resources[] __initdata = {
++	DEFINE_RES_MEM(0xe6050000, 0x8000),
++	DEFINE_RES_MEM(0xe605801c, 0x000c),
+ };
+ 
+ void __init sh73a0_pinmux_init(void)
+ {
+-	platform_device_register(&sh73a0_pfc_device);
++	platform_device_register_simple("pfc-sh73a0", -1, pfc_resources,
++					ARRAY_SIZE(pfc_resources));
+ }
+ 
+ static struct plat_sci_port scif0_platform_data = {
+-- 
+1.8.2.1
