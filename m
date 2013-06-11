@@ -1,92 +1,63 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Tue, 11 Jun 2013 16:24:48 -0500
-Subject: [PATCH] arm: dt: zynq: Add support for the zc706 platform
-In-Reply-To: <1370884204-2297-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1370884204-2297-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1370985888.7804.1.camel@linux-builds1>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 11 Jun 2013 22:25:49 +0100
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <517AF22C.9090901@ti.com>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <515319D5.20105@wwwdotorg.org>
+ <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
+ <5155C902.7080207@wwwdotorg.org>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
+ <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
+ <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
+ <516DDB4D.9020500@ti.com>
+ <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
+ <CACRpkdaA_7Feuui-S65m--2FfvpoUkfn6b9SoWavAstZUS23ag@mail.gmail.com> <517AF22
+ C.9090901@ti.com>
+Message-ID: <20130611212550.03A823E0D8D@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Soren,
-
-On Mon, 2013-06-10 at 10:10 -0700, Soren Brinkmann wrote:
-> Add a DT fragment for the zc706 Zynq platform. Also, adding a
-> corresponding target to the Makefile and adding an appropriate
-> compatibility string in the BSP.
+On Fri, 26 Apr 2013 16:31:24 -0500, Jon Hunter <jon-hunter@ti.com> wrote:
 > 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
->  arch/arm/boot/dts/Makefile       |  3 ++-
->  arch/arm/boot/dts/zynq-zc706.dts | 31 +++++++++++++++++++++++++++++++
->  arch/arm/mach-zynq/common.c      |  1 +
->  3 files changed, 34 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm/boot/dts/zynq-zc706.dts
+> On 04/26/2013 02:31 AM, Linus Walleij wrote:
+> > On Wed, Apr 17, 2013 at 2:41 AM, Javier Martinez Canillas
+> > <martinez.javier@gmail.com> wrote:
+> > 
+> > So:
+> > 
+> >> +static int omap_gpio_irq_domain_xlate(struct irq_domain *d,
+> >> +                                     struct device_node *ctrlr,
+> >> +                                     const u32 *intspec, unsigned int intsize,
+> >> +                                     irq_hw_number_t *out_hwirq,
+> >> +                                     unsigned int *out_type)
+> >> +{
+> >> +       int ret;
+> >> +       struct gpio_bank *bank = d->host_data;
+> >> +       int gpio = bank->chip.base + intspec[0];
+> >> +
+> >> +       if (WARN_ON(intsize < 2))
+> >> +               return -EINVAL;
+> >> +
+> >> +       ret = gpio_request_one(gpio, GPIOF_IN, ctrlr->full_name);
+> >> +       if (ret)
+> >> +               return ret;
+> > 
+> > So how to figure out if a device is already requesting this GPIO
+> > on some orthogonal axis?
 > 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index b9f7121..2aecf7e 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -206,7 +206,8 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
->  	wm8505-ref.dtb \
->  	wm8650-mid.dtb \
->  	wm8850-w70v2.dtb
-> -dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
-> +dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
-> +	zynq-zc706.dtb
->  
->  targets += dtbs
->  targets += $(dtb-y)
-> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
-> new file mode 100644
-> index 0000000..a8a1d7d
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/zynq-zc706.dts
-> @@ -0,0 +1,31 @@
-> +/*
-> + *  Copyright (C) 2011 Xilinx
-> + *  Copyright (C) 2012 National Instruments Corp.
-> + *  Copyright (C) 2013 Xilinx
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +/dts-v1/;
-> +/include/ "zynq-7000.dtsi"
-> +
-> +/ {
-> +	model = "Zynq ZC706 Development Board";
-> +	compatible = "xlnx,zynq-zc706", "xlnx,zynq-7000";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0x0 0x40000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyPS1,115200 earlyprintk";
-> +	};
-> +
-> +};
-> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
-> index 5bfe703..221694b 100644
-> --- a/arch/arm/mach-zynq/common.c
-> +++ b/arch/arm/mach-zynq/common.c
-> @@ -99,6 +99,7 @@ static void zynq_system_reset(char mode, const char *cmd)
->  
->  static const char * const zynq_dt_match[] = {
->  	"xlnx,zynq-zc702",
-> +	"xlnx,zynq-zc706",
+> I really don't think that is necessary. Hopefully, my other email [1]
+> elaborates on why. Let me know if this makes sense.
 
-You really don't need to add zc706 here if it is already compatable with
-zynq-7000.
+I would agree here. If the irq specified happens to be a GPIO; then the
+onus is on the GPIO/IRQ controller driver to make sure that GPIO is
+actually set up to work as an IRQ.
 
-Dinh
->  	"xlnx,zynq-7000",
->  	NULL
->  };
+g.
