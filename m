@@ -1,25 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 11 Jun 2013 09:50:15 +0100
-Subject: [PATCH 4/9] ARM: dma-mapping: NULLify dev->archdata.mapping
- pointer on detach
-In-Reply-To: <20130611.083455.1500863288897785600.hdoyu@nvidia.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-5-git-send-email-will.deacon@arm.com>
- <20130611.083455.1500863288897785600.hdoyu@nvidia.com>
-Message-ID: <20130611085015.GC24729@mudshark.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Jun 2013 10:53:43 +0200
+Subject: [PATCH 2/2 v3] pinctrl: add pinctrl driver for Rockchip SoCs
+In-Reply-To: <201306102216.23292.heiko@sntech.de>
+References: <201306102139.32444.heiko@sntech.de>
+ <201306102142.52644.heiko@sntech.de>
+ <201306102216.23292.heiko@sntech.de>
+Message-ID: <CACRpkdaLq_sDq1v=_K20fj7nJ42-PssBUv+t__DsnTcn3Py2uw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 06:34:55AM +0100, Hiroshi Doyu wrote:
-> Hi Will,
-> 
-> Will Deacon <will.deacon@arm.com> wrote @ Mon, 10 Jun 2013 20:34:40 +0200:
-> 
-> > The current code only clobbers a local variable, so the device is left
-> > with a stale mapping pointer.
-> 
-> True. This's my bad. Thanks.
+On Mon, Jun 10, 2013 at 10:16 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
-That's alright, it's easy to fix. Mind if I add your ack please?
+> This driver adds support the Cortex-A9 based SoCs from Rockchip,
+> so at least the RK2928, RK3066 (a and b) and RK3188.
+> Earlier Rockchip SoCs seem to use similar mechanics for gpio
+> handling so should be supportable with relative small changes.
+> Pull handling on the rk3188 is currently a stub, due to it being
+> a bit different to the earlier SoCs.
+>
+> Pinmuxing as well as gpio (and interrupt-) handling tested on
+> a rk3066a based machine.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> changes since v2:
+> Found out how to handle the phandle in the regular rockchip,pins property
+> 5 minutes after sending the v2 ... damn :-) .
+> I'm terribly sorry for all the noise.
+>
+>
+> After Stephen Warren's clarification, again with <dt-bindings/...> include.
+> and of course adapted to the new expected dt node-structure
 
-Will
+Thanks, this v3 version applied.
+
+And don't worry about the noise, it is normal in situations like these
+where we're seeing rapid development of core stuff and building
+consensus.
+
+Yours,
+Linus Walleij
