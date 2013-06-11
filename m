@@ -1,83 +1,79 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Tue, 11 Jun 2013 15:54:33 +0200 (CEST)
-Subject: [PATCH v2] ARM: shmobile: uImage load address rework
-In-Reply-To: <20130610092857.19175.25629.sendpatchset@w520>
-References: <20130610092857.19175.25629.sendpatchset@w520>
-Message-ID: <Pine.LNX.4.64.1306111552480.9621@axis700.grange>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 11 Jun 2013 10:57:38 -0300
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20130609014506.GB10027@obsidianresearch.com>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1370623671-7748-5-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306072101.44694.arnd@arndb.de>
+ <20130607200054.GA9010@obsidianresearch.com>
+ <20130608183851.GB2354@localhost>
+ <20130609014506.GB10027@obsidianresearch.com>
+Message-ID: <20130611135737.GC3996@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Magnus
+Jason, Arnd:
 
-On Mon, 10 Jun 2013, Magnus Damm wrote:
-
-> From: Magnus Damm <damm@opensource.se>
+On Sat, Jun 08, 2013 at 07:45:06PM -0600, Jason Gunthorpe wrote:
+[...]
 > 
-> This is V2 of the mach-shmobile uImage load address rework patch.
-> 
-> Rework the mach-shmobile uImage load address calculation by storing
-> the per-board load addresses in Makefile.boot. This removes the
-> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
-> it possible to create safe kernel images that boot on multiple boards.
-> 
-> This is one of several series of code that reworks code not to rely on
-> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
-> 
-> Signed-off-by: Magnus Damm <damm@opensource.se>
-> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> ---
-
-This patch seems to break compilation when none of CONFIG_MACH_* is set, 
-e.g. when trying to build a generic SoC kernel with only DT-based board 
-support, or am I missing something?
-
-Thanks
-Guennadi
-
-> 
->  Changes since V1:
->  - On popular request, merged patch 5 and 14 and all other.
->  - Updated the __ZRELADDR calculation, thanks Arnd!
->  - Added Reviewed-by from Laurent and Morimoto-san, thanks!
-> 
->  arch/arm/mach-shmobile/Makefile.boot |   20 ++++++++++++++++++--
->  1 file changed, 18 insertions(+), 2 deletions(-)
-> 
-> --- 0001/arch/arm/mach-shmobile/Makefile.boot
-> +++ work/arch/arm/mach-shmobile/Makefile.boot	2013-06-10 16:15:22.000000000 +0900
-> @@ -1,6 +1,22 @@
-> -__ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
-> -		     $$[$(CONFIG_MEMORY_START) + 0x8000]')
-> +# per-board load address for uImage
-> +loadaddr-y	:=
-> +loadaddr-$(CONFIG_MACH_AG5EVM) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_AP4EVB) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
-> +loadaddr-$(CONFIG_MACH_BONITO) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_KOTA2) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
-> +loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
-> +loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
-> +loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
->  
-> +__ZRELADDR	:= $(sort $(loadaddr-y))
->     zreladdr-y   += $(__ZRELADDR)
->  
->  # Unsupported legacy stuff
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> This is the mangling I was referring to. It needs to be the offset
+> into the target, it can't be something else.
 > 
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+I see both of you have explained this already, but I can't seem
+to catch it yet.
+
+Mind explaining me exaclty *why* "it can't be something else"?
+IOW, why the window base address cannot be in the 2nd cell,
+and/or what use cases would this encoding brake?
+
+> I understand your motivation, but this is not a good method of
+> encoding this in DT.
+> 
+> There is nothing especially wrong with updating the ranges at runtime,
+> but don't use the 2nd cell in the 2dw address to encode the desired
+> base address.
+> 
+
+Regarding this, let me confirm your proposed layout using an example.
+(later on, i'll try the preprocessor on this to make it look better).
+
+mbus {
+	compatible = "foo-mbus";
+	ranges = < 0xffff0001 0 0xf1000000 0x1000000 /* Internal register entry */
+		   0x011d0000 0 0xfff00000 0x0100000 /* BootROM entry with base address */
+		   0x012f0000 0 0xe8000000 0x1000000 /* DevBus,NOR entry with base address */
+	>;
+
+	bootrom {
+		ranges = <0 0x011d0000 0 0x100000>;
+	};
+
+	devbus-bootcs {
+		ranges = <0 0x012f0000 0 0x1000000>;
+		nor {
+			reg = <0 0x1000000>;
+		};
+	};
+};
+
+Is the above correct?
+
+Now, if the above is OK, then the DT looks complete to me. Meaning:
+
+1. There's no need to update any ranges property at runtime.
+
+2. There's no need to use an algorithm to 'find' a base address for decoding
+   windows (such as first-fit as Arnd suggested in another mail).
+   The base address is already there in the ranges property, so the mbus can
+   simply allocate the window on that base address.
+
+So, am I right or completely lost?
+
+Thanks a lot for the help,
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
