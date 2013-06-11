@@ -1,66 +1,41 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 11 Jun 2013 19:05:38 +0530
-Subject: [PATCH 10/13] ARM: dts: Add initial device tree support for
- Exynos5420
-In-Reply-To: <20130606163411.GA23311@e106331-lin.cambridge.arm.com>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <20130606163411.GA23311@e106331-lin.cambridge.arm.com>
-Message-ID: <CANuQgHFndqWH5KYskuiqxWuVXEp+_=R=Tnfo5y_syreBFcGPbQ@mail.gmail.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 11 Jun 2013 15:37:15 +0200
+Subject: [PATCH v3 1/6] irqchip: add support for Marvell Orion SoCs
+In-Reply-To: <alpine.LFD.2.02.1306111525180.22970@ionos>
+References: <1370536034-23956-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1370536034-23956-2-git-send-email-sebastian.hesselbarth@gmail.com>
+ <alpine.LFD.2.02.1306111045520.22970@ionos>
+ <alpine.LFD.2.02.1306111525180.22970@ionos>
+Message-ID: <51B7280B.7080604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 June 2013 22:04, Mark Rutland <mark.rutland@arm.com> wrote:
-> Hi,
+On 06/11/13 15:30, Thomas Gleixner wrote:
+> On Tue, 11 Jun 2013, Thomas Gleixner wrote:
 >
->> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> new file mode 100644
->> index 0000000..b14e775
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> @@ -0,0 +1,40 @@
->> +/*
->> + * SAMSUNG SMDK5420 board device tree source
->> + *
->> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
->> + *           http://www.samsung.com
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> +*/
->> +
->> +/dts-v1/;
->> +/include/ "exynos5420.dtsi"
->> +
->> +/ {
->> +     model = "Samsung SMDK5420 board based on EXYNOS5420";
->> +     compatible = "samsung,smdk5420", "samsung,exynos5420";
->> +
->> +     memory {
->> +             reg =   <0x20000000 0x10000000
->> +                      0x30000000 0x10000000
->> +                      0x40000000 0x10000000
->> +                      0x50000000 0x10000000
->> +                      0x60000000 0x10000000
->> +                      0x70000000 0x10000000
->> +                      0x80000000 0x10000000
->> +                      0x90000000 0x10000000>;
->> +     };
+>> On Thu, 6 Jun 2013, Sebastian Hesselbarth wrote:
+>>
+>>> This patch adds an irqchip driver for the main interrupt controller found
+>>> on Marvell Orion SoCs (Kirkwood, Dove, Orion5x, Discovery Innovation).
+>>> Corresponding device tree documentation is also added.
+>>>
+>>> Signed-off-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+>>
+>> Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 >
-As there are only 28 bits for memory bank size in memory.h.
-Hence each bank is split into 256MB.
-> This looks a little odd. As these are continguous, you can describe them as one
-> bank:
+> Second thoughts:
 >
->         memory {
->                 reg = <0x20000000 0x80000000>;
->         };
+>> +static void orion_bridge_irq_handler(unsigned int irq, struct irq_desc *desc)
+>> +{
+>> +	struct irq_domain *d = irq_get_handler_data(irq);
+>> +	struct irq_chip_generic *gc = irq_get_domain_generic_chip(d, irq);
+>> +	u32 stat = readl_relaxed(gc->reg_base + ORION_BRIDGE_IRQ_CAUSE) &
+>> +		gc->mask_cache;
 >
-> Mark.
+> In init you map the first irq of that chip and install the chain
+> handler for it. Now if that first irq fires, isn't that set in the
+> cause register as well? And what acks that first irq?
 
+It is "acked" by acking all unmasked bridge irqs.
 
-
---
-with warm regards,
-Chander Kashyap
+Sebastian
