@@ -1,41 +1,214 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 11 Jun 2013 23:49:40 +0400
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: fix Ether device name
-In-Reply-To: <20130611074850.GE10440@verge.net.au>
-References: <201306090123.24709.sergei.shtylyov@cogentembedded.com>
- <20130611074850.GE10440@verge.net.au>
-Message-ID: <51B77F54.8030001@cogentembedded.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 11 Jun 2013 21:53:17 +0200
+Subject: [PATCH] drivers: pinctrl: add active state to core
+In-Reply-To: <51B75148.5080701@wwwdotorg.org>
+References: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
+ <51B75148.5080701@wwwdotorg.org>
+Message-ID: <CACRpkdYQSO0+9tQkS=df-kpL=XL+DpnY1ijp6_Zeg0MvmFujyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jun 11, 2013 at 6:33 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/11/2013 02:16 AM, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> In addition to the recently introduced pinctrl core
+>> control, the PM runtime pin control for the OMAP platforms
+>> require a fourth state in addtition to the default, idle and
+>> sleep states already handled by the core: an explicit "active"
+>> state. Let's introduce this to the core in addition to the
+>> other states already defined.
+>
+> Surely "default" /is/ "active"? That's what it's meant so far.
 
-On 06/11/2013 11:48 AM, Simon Horman wrote:
+I thought so too, until Tony informed us that in the OMAP world
+this state is not always the active one.
 
->> While recasting commit 524219146a89aee5366326c225ccd71231419d89 (ARM: shmobile:
->> R8A7778: add Ether support), I made a typo in the platform device's name: used
->> underscore instead of hyphen.
+But I don't know the exact reasons for.
 
->> However, there's now patch merged to net-next.git renaming the platform device
->> from "sh-eth" to "r8a777x-ehter", so it makes the most sense to change the name
->> straight to that one.
+I guess that some "default" states on the OMAP may mean these
+are configured as decoupled, inactive, until explicitly activated
+or something like that.
 
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> Since the pinctrl states are represented in DT, the DT bindings of all
+> devices potentially get affected by changes like this. They'd need to be
+> documented in a DT binding document, and the exact semantics of the
+> different states clearly explained.
 
->> ---
->> The patch is atop of the 'renesas-next-20130607' tag of the 'renesas.git' tree
->> and the USB patches I have submitted earlier.
+Incidentally pinctrl-bindings.txt refers to the states
+"active" and "idle" in the examples, but not "default".
+(git blame tells me you wrote this ;-)
 
->> Changes in version 2:
->> - changed the platform device's name as in the patch merged to 'net-next.git';
->> - lowercased the SoC name in the subject.
+We should probably patch that document a bit to reflect
+the semantics we agree upon here.
 
-> Thanks, I have queued this up in the soc2 branch.
-> My current plan is to let that branch sit in next for a few
-> days and then send a pull-request for it to be included in v3.11.
+> It may be better for struct device, struct platform_driver, or similar,
+> to contain a list of the states that are required by the driver or its
+> binding. That way, the list of states (or states beyond the basic
+> default) is driver-/DT-binding- specific, and custom stuff like this for
+> OMAP wouldn't require explicit code in drivers/base/pinctrl.c, but
+> rather simply iterating over a custom list.
 
-     Could you then merge the BOCK-W Ether support too? The patch 
-currently has some offsets applying to 'renesas-next-20130611v2', should 
-I respin it?
+Hm, I was more out to nail down some common semantics
+here, especially with these helper functions:
 
-WBR, Sergei
+extern int pinctrl_pm_select_default_state(struct device *dev);
+extern int pinctrl_pm_select_active_state(struct device *dev);
+extern int pinctrl_pm_select_sleep_state(struct device *dev);
+extern int pinctrl_pm_select_idle_state(struct device *dev);
+
+I am intending this to be *all* for the PM consensual states.
+Any other states will be up to the special cases and drivers to
+handle still, I have no intention of retrieveing and caching all
+possible states in the core.
+
+> Related to that, I'm not sure we should be deriving what we put into DT
+> based on the runtime PM requirements of drivers; DT is supposed to be
+> driven by HW definitions, although I suppose you could argue that the
+> drivers implement what they do because they're implementing the HW
+> requirements.
+
+Yes that's a circular proof that we do it this way becuse this is the
+way we have to do it :-)
+
+But there is some truth to that.
+
+The idea with these PM states is to correspond to such states
+often found in electronic specifications, i.e. derived from a larger
+set of hardware, not from runtime PM or Linux.
+
+I conjured the following doc patch as a starter:
+
+diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+index f6e664b..a34ea92 100644
+--- a/Documentation/pinctrl.txt
++++ b/Documentation/pinctrl.txt
+@@ -1196,6 +1196,124 @@ registered. Thus make sure that the error path
+in your driver gracefully
+ cleans up and is ready to retry the probing later in the startup process.
+
+
++Default and power management related states
++===========================================
++
++As mentioned earlier the device core will automatically try to obtain a
++pinctrl handle and activate the "default" state on all drivers.
++
++However, for power management and power saving, it is sometimes necessary
++to switch pin states at runtime. Electrically speaking this involves
++for example reconfigure some pins to be grounded or pulled-down when the
++system as a whole goes to sleep, or a pull-up could be turned off when pins
++are idle, reducing leak current.
++
++To help out with this, if CONFIG_PM is selected in the Kconfig, three
++additional states will also be obtained by the driver core and cached
++there:
++
++"active"   this is indended as an explicit active state, if the "default"
++           state is not synonymous with the active one.
++
++"idle"     this is a state that is relaxing the pins when the system as a
++           whole is up and running, but these particular pins are unused.
++
++"sleep"    this is a state that is used when the whole system goes to
++           suspend, becomes uninteractive, unresponsive to anything but
++           specific wake-up events.
++
++These correspond to the definitions found in <linux/pinctrl/pinctrl-state.h>
++where the same strings are encoded.
++
++When CONFIG_PM is set, the following functions will simultaneously be made
++available to switch between these power-related states:
++
++#include <linux/pinctrl/consumer.h>
++
++int pinctrl_pm_select_default_state(struct device *dev);
++int pinctrl_pm_select_active_state(struct device *dev);
++int pinctrl_pm_select_sleep_state(struct device *dev);
++int pinctrl_pm_select_idle_state(struct device *dev);
++
++As the corresponding pinctrl handle and states are cached in the driver
++core, nothing apart from these calls is needed to move the pins between
++these states.
++
++For a typical runtime PM enabled (see Documentation/power/runtime_pm.txt)
++driver the following outline could be followed:
++
++probe():
++    pinctrl_pm_select_default_state()
++
++runtime_suspend():
++    pinctrl_pm_select_idle_state()
++
++runtime_resume():
++    pinctrl_pm_select_default_state()
++
++suspend:
++    pinctrl_pm_select_sleep_state()
++
++resume:
++    pinctrl_pm_select_idle_state()
++
++Some of the state selectors could be skipped if the driver is for a
++certain system where e.g. the "active" state is not defined, instead
++relying on the "default" state to make the pins active at all times.
++For a driver only supporting suspend and resume, the "idle" state also
++loose its meaning.
++
++A state-chart diagram would look like this:
++
++                +---------+                          +----------+
++    probe() ->  | default |  -> runtime_suspend() -> | idle     |
++                |         |  <- runtime_resume()  <- |          |
++                +---------+                          +----------+
++                                                        |     ^
++                                                        |     |
++                                                  suspend()  resume()
++                                                        |     |
++                                                        V     |
++                                                      +---------+
++                                                      |  sleep  |
++                                                      +---------+
++
++This reflects the runtime PM concept that we are always runtime
++suspended when we go to suspend.
++
++A more complex example is a driver written for many different
++hardware configurations, some which have only the default state,
++some which have the default state and the sleep state, some that
++have no idle state but indeed a default state and so on. Since
++all states are basically optional (the core will not complain if
++they are not found) we can write our state transitions like
++this:
++
++probe():
++    pinctrl_pm_select_default_state()
++
++runtime_suspend():
++    pinctrl_pm_select_idle_state()
++
++runtime_resume():
++    pinctrl_pm_select_default_state()
++    pinctrl_pm_select_active_state()
++
++suspend:
++    pinctrl_pm_select_sleep_state()
++
++resume:
++    pinctrl_pm_select_default_state()
++    pinctrl_pm_select_idle_state()
++
++Here runtime_resume() and resume() passes through the "default"
++state to the "active" and "idle" states respectively since everything
++but "default" is optional. For example it is OK to only supply the
++"default" and "sleep" state pair with this code, and it will
++transition the pins from "default" to "sleep" and leaving the rest
++as no-ops.
++
++
+ Drivers needing both pin control and GPIOs
+ ==========================================
+
+
+Yours,
+Linus Walleij
