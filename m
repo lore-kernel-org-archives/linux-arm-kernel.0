@@ -1,223 +1,122 @@
-From: andre.przywara@linaro.org (Andre Przywara)
-Date: Tue, 11 Jun 2013 17:16:59 +0200
-Subject: [PATCH v2] ARM/KVM: save and restore generic timer registers
-Message-ID: <1370963819-26165-1-git-send-email-andre.przywara@linaro.org>
+From: mario.smarduch@huawei.com (Mario Smarduch)
+Date: Tue, 11 Jun 2013 17:22:49 +0200
+Subject: [PATCH 1/2] add irq priodrop support
+In-Reply-To: <20130611122122.478603E0A90@localhost>
+References: <51B6D3B4.1020800@huawei.com>
+ <20130611122122.478603E0A90@localhost>
+Message-ID: <51B740C9.4030101@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For migration to work we need to save (and later restore) the state of
-each core's virtual generic timer.
-Since this is per VCPU, we can use the [gs]et_one_reg ioctl and export
-the three needed registers (control, counter, compare value).
-Though they live in cp15 space, we don't use the existing list, since
-they need special accessor functions and also the arch timer is
-optional.
+Hi Grant,    
+	appreciate the strong feedback, I agree with all
+	the coding observations will make the changes. 
+	I have few inline responses.
 
-Changes from v1:
-- move code out of coproc.c and into guest.c and arch_timer.c
-- present the registers with their native CP15 addresses, but without
-  using space in the VCPU's cp15 array
-- do the user space copying in the accessor functions
 
-Signed-off-by: Andre Przywara <andre.przywara@linaro.org>
----
- arch/arm/include/asm/kvm_host.h |  5 ++++
- arch/arm/include/uapi/asm/kvm.h | 16 ++++++++++
- arch/arm/kvm/arch_timer.c       | 65 +++++++++++++++++++++++++++++++++++++++++
- arch/arm/kvm/guest.c            | 26 ++++++++++++++++-
- 4 files changed, 111 insertions(+), 1 deletion(-)
+>> +static u32  gic_irq_prio_drop[DIV_ROUND_UP(1020, 32)] __read_mostly;
+> 
+> I believe it is possible to have more than one GIC in a system. This map
+> assumes only one. The prio_drop map should probably be part of
+> gic_chip_data so that it is per-instance.
+> 
+> Also, as discussed below, the code should be using DECLARE_BITMAP()
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 57cb786..1096e33 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -224,4 +224,9 @@ static inline int kvm_arch_dev_ioctl_check_extension(long ext)
- int kvm_perf_init(void);
- int kvm_perf_teardown(void);
- 
-+int kvm_arm_num_timer_regs(void);
-+int kvm_arm_copy_timer_indices(struct kvm_vcpu *, u64 __user *);
-+int kvm_arm_timer_get_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
-+int kvm_arm_timer_set_reg(struct kvm_vcpu *, const struct kvm_one_reg *);
-+
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm/include/uapi/asm/kvm.h b/arch/arm/include/uapi/asm/kvm.h
-index c1ee007..e3b0115 100644
---- a/arch/arm/include/uapi/asm/kvm.h
-+++ b/arch/arm/include/uapi/asm/kvm.h
-@@ -118,6 +118,22 @@ struct kvm_arch_memory_slot {
- #define KVM_REG_ARM_32_CRN_MASK		0x0000000000007800
- #define KVM_REG_ARM_32_CRN_SHIFT	11
- 
-+#define KVM_REG_ARM_32_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U32      | \
-+					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
-+#define KVM_REG_ARM_64_CP15		(KVM_REG_ARM | KVM_REG_SIZE_U64      | \
-+					(15ULL << KVM_REG_ARM_COPROC_SHIFT))
-+#define KVM_REG_ARM_TIMER_CTL		(KVM_REG_ARM_32_CP15                 | \
-+					( 3ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-+					(14ULL << KVM_REG_ARM_32_CRN_SHIFT)  | \
-+					( 0ULL << KVM_REG_ARM_OPC1_SHIFT)    | \
-+					( 1ULL << KVM_REG_ARM_32_OPC2_SHIFT))
-+#define KVM_REG_ARM_TIMER_CNT		(KVM_REG_ARM_64_CP15 | \
-+					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-+					( 1ULL << KVM_REG_ARM_OPC1_SHIFT))
-+#define KVM_REG_ARM_TIMER_CVAL		(KVM_REG_ARM_64_CP15 | \
-+					(14ULL << KVM_REG_ARM_CRM_SHIFT)     | \
-+					( 3ULL << KVM_REG_ARM_OPC1_SHIFT))
-+
- /* Normal registers are mapped as coprocessor 16. */
- #define KVM_REG_ARM_CORE		(0x0010 << KVM_REG_ARM_COPROC_SHIFT)
- #define KVM_REG_ARM_CORE_REG(name)	(offsetof(struct kvm_regs, name) / 4)
-diff --git a/arch/arm/kvm/arch_timer.c b/arch/arm/kvm/arch_timer.c
-index c55b608..8d709eb 100644
---- a/arch/arm/kvm/arch_timer.c
-+++ b/arch/arm/kvm/arch_timer.c
-@@ -18,6 +18,7 @@
- 
- #include <linux/cpu.h>
- #include <linux/of_irq.h>
-+#include <linux/uaccess.h>
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <linux/interrupt.h>
-@@ -171,6 +172,70 @@ static void kvm_timer_init_interrupt(void *info)
- 	enable_percpu_irq(timer_irq.irq, 0);
- }
- 
-+int kvm_arm_num_timer_regs(void)
-+{
-+	return 3;
-+}
-+
-+int kvm_arm_copy_timer_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
-+{
-+	if (put_user(KVM_REG_ARM_TIMER_CTL, uindices))
-+		return -EFAULT;
-+	uindices++;
-+	if (put_user(KVM_REG_ARM_TIMER_CNT, uindices))
-+		return -EFAULT;
-+	uindices++;
-+	if (put_user(KVM_REG_ARM_TIMER_CVAL, uindices))
-+		return -EFAULT;
-+
-+	return 0;
-+}
-+
-+int kvm_arm_timer_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+	void __user *uaddr = (void __user *)(long)reg->addr;
-+	u64 val;
-+	int ret;
-+
-+	ret = copy_from_user(&val, uaddr, KVM_REG_SIZE(reg->id));
-+	if (ret != 0)
-+		return ret;
-+
-+	switch (reg->id) {
-+	case KVM_REG_ARM_TIMER_CTL:
-+		timer->cntv_ctl = val;
-+		break;
-+	case KVM_REG_ARM_TIMER_CNT:
-+		vcpu->kvm->arch.timer.cntvoff = kvm_phys_timer_read() - val;
-+		break;
-+	case KVM_REG_ARM_TIMER_CVAL:
-+		timer->cntv_cval = val;
-+		break;
-+	}
-+
-+	return 0;
-+}
-+
-+int kvm_arm_timer_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
-+{
-+	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+	void __user *uaddr = (void __user *)(long)reg->addr;
-+	u64 val;
-+
-+	switch (reg->id) {
-+	case KVM_REG_ARM_TIMER_CTL:
-+		val = timer->cntv_ctl;
-+		break;
-+	case KVM_REG_ARM_TIMER_CNT:
-+		val = kvm_phys_timer_read() - vcpu->kvm->arch.timer.cntvoff;
-+		break;
-+	case KVM_REG_ARM_TIMER_CVAL:
-+		val = timer->cntv_cval;
-+		break;
-+	}
-+	return copy_to_user(uaddr, &val, KVM_REG_SIZE(reg->id));
-+}
- 
- static int kvm_timer_cpu_notify(struct notifier_block *self,
- 				unsigned long action, void *cpu)
-diff --git a/arch/arm/kvm/guest.c b/arch/arm/kvm/guest.c
-index 152d036..a50ffb6 100644
---- a/arch/arm/kvm/guest.c
-+++ b/arch/arm/kvm/guest.c
-@@ -121,7 +121,8 @@ static unsigned long num_core_regs(void)
-  */
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu)
- {
--	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu);
-+	return num_core_regs() + kvm_arm_num_coproc_regs(vcpu)
-+		+ kvm_arm_num_timer_regs();
- }
- 
- /**
-@@ -133,6 +134,7 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- {
- 	unsigned int i;
- 	const u64 core_reg = KVM_REG_ARM | KVM_REG_SIZE_U32 | KVM_REG_ARM_CORE;
-+	int ret;
- 
- 	for (i = 0; i < sizeof(struct kvm_regs)/sizeof(u32); i++) {
- 		if (put_user(core_reg | i, uindices))
-@@ -140,9 +142,25 @@ int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *uindices)
- 		uindices++;
- 	}
- 
-+	ret = kvm_arm_copy_timer_indices(vcpu, uindices);
-+	if (ret)
-+		return ret;
-+	uindices += kvm_arm_num_timer_regs();
-+
- 	return kvm_arm_copy_coproc_indices(vcpu, uindices);
- }
- 
-+static bool is_timer_reg(u64 index)
-+{
-+	switch (index) {
-+	case KVM_REG_ARM_TIMER_CTL:
-+	case KVM_REG_ARM_TIMER_CNT:
-+	case KVM_REG_ARM_TIMER_CVAL:
-+		return true;
-+	}
-+	return false;
-+}
-+
- int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- {
- 	/* We currently use nothing arch-specific in upper 32 bits */
-@@ -153,6 +171,9 @@ int kvm_arm_get_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return get_core_reg(vcpu, reg);
- 
-+	if (is_timer_reg(reg->id))
-+		return kvm_arm_timer_get_reg(vcpu, reg);
-+
- 	return kvm_arm_coproc_get_reg(vcpu, reg);
- }
- 
-@@ -166,6 +187,9 @@ int kvm_arm_set_reg(struct kvm_vcpu *vcpu, const struct kvm_one_reg *reg)
- 	if ((reg->id & KVM_REG_ARM_COPROC_MASK) == KVM_REG_ARM_CORE)
- 		return set_core_reg(vcpu, reg);
- 
-+	if (is_timer_reg(reg->id))
-+		return kvm_arm_timer_set_reg(vcpu, reg);
-+
- 	return kvm_arm_coproc_set_reg(vcpu, reg);
- }
- 
--- 
-1.7.12.1
+Agree.
+
+> 
+> gic_priodrop_remap_eoi() is used exactly once. You should instead put
+> the body of it inline like so:
+> 
+> 	if (IS_ENABLED(CONFIG_KVM_ARM_INT_PRIO_DROP) && is_hyp_mode_available())
+> 		chip->irq_eoi = gic_eoi_irq_priodrop;
+
+Yes much cleaner.
+
+> 
+> However, this block is problematic. For each map call it modifies the
+> /global/ gic_chip. It's not a per-interrupt thing, but rather changes
+> the callback for all gic interrupts, on *any* gic in the system. Is this
+> really what you want?
+> 
+> If it is, then I would expect the callback to be modified once sometime
+> around gic_init_bases() time.
+
+Yes need to move it up, now its being set for each IRQ domain mapping call.
+
+> 
+> If it is not, and what you really want is per-irq behaviour, then what
+> you need to do is have a separate gic_priodrop_chip that can be used on
+> a per-irq basis instead of the gic_chip.
+
+Prio drop/deactivate is per CPU and all IRQs are affected including SGIs.
+It's possible to run mixed CPU modes, but this patch enables all CPUs for
+device passthrough, similar to hyp mode enable.
+
+Another way would be the reverse - set all non-passthrough irqs to gic_priodrop_chip
+and the passed through IRQ to gic_chip.  I think keeping it in one function
+and just setting a bit to enable/disable is cleaner.
+
+
+> 
+>>  	if (hw < 32) {
+>>  		irq_set_percpu_devid(irq);
+>>  		irq_set_chip_and_handler(irq, &gic_chip,
+>> @@ -857,4 +875,125 @@ IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
+>>  IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
+>>  IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
+>>  
+>> +#ifdef CONFIG_KVM_ARM_INT_PRIO_DROP
+>> +/* If HYP mode enabled and PRIO DROP set EOIR function to handle PRIO DROP */
+>> +static inline void gic_priodrop_remap_eoi(struct irq_chip *chip)
+>> +{
+>> +	if (is_hyp_mode_available())
+>> +		chip->irq_eoi = gic_eoi_irq_priodrop;
+>> +}
+>> +
+>> +/* If HYP mode set enable interrupt priority drop/deactivation, and mark
+>> + * SGIs to deactive through writes to GCICC_DIR. For Guest only enable normal
+>> + * mode.
+>> + */
+> 
+> Nit: Read Documentation/kernel-doc-nano-HOWTO.txt. It's a good idea to
+> stick to that format when writing function documenation. Also,
+> convention is for multiline comments to have an empty /* line before the
+> first line of text.
+
+Will do.
+
+> 
+
+
+>> +}
+>> +
+>> +void gic_spi_clr_priodrop(int irq)
+>> +{
+>> +	struct irq_data *d = irq_get_irq_data(irq);
+>> +	if (likely(irq >= 32 && irq < 1019)) {
+> 
+> "< 1019" ...
+> 
+>> +		clear_bit(irq % 32, (void *) &gic_irq_prio_drop[irq/32]);
+>> +		writel_relaxed(irq, gic_cpu_base(d) + GIC_CPU_DIR);
+>> +	}
+>> +}
+>> +
+>> +int gic_spi_get_priodrop(int irq)
+>> +{
+>> +	if (likely(irq >= 32 && irq <= 1019))
+> 
+> ... "<= 1019"
+> 
+> Looks like some off-by-one errors going on here. Also, the rest of the
+> gic code uses 1020, not 1019 as the upper limit. What is the reason for
+> being difference in this code block?
+
+Hmmm a mistake.
+
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
