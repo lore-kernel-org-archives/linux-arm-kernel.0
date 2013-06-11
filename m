@@ -1,163 +1,37 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 10 Jun 2013 21:51:18 -0700
-Subject: [PATCH 6/7] KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR
- handlers
-In-Reply-To: <1370926279-32532-1-git-send-email-christoffer.dall@linaro.org>
-References: <1370926279-32532-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1370926279-32532-7-git-send-email-christoffer.dall@linaro.org>
+From: jagarwal@nvidia.com (Jay Agarwal)
+Date: Tue, 11 Jun 2013 10:22:59 +0530
+Subject: [PATCH V3 3/4] ARM: dts: tegra: Correct PCIe entry
+In-Reply-To: <20130610195511.GC25859@mithrandir>
+References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
+ <1370372252-4332-3-git-send-email-jagarwal@nvidia.com>
+ <20130610195511.GC25859@mithrandir>
+Message-ID: <C79B248886DD134989C8FF6B096A91AB91B616BEEF@BGMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle MMIO accesses to the two registers which should support both the
-case where the VMs want to read/write either of these registers and the
-case where user space reads/writes these registers to do save/restore of
-the VGIC state.
 
-Note that the added complexity compared to simple set/clear enable
-registers stems from the bookkeping of source cpu ids.  It may be
-possible to change the underlying data structure to simplify the
-complexity, but since this is not in the critical path, at all, this is
-left as an interesting excercise to the reader.
-
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic.c |  114 ++++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 112 insertions(+), 2 deletions(-)
-
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 4821ce9..62d0fec 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -591,18 +591,128 @@ static bool handle_mmio_sgi_reg(struct kvm_vcpu *vcpu,
- 	return false;
- }
- 
-+static void read_sgi_set_clear(struct kvm_vcpu *vcpu,
-+			       struct kvm_exit_mmio *mmio,
-+			       phys_addr_t offset)
-+{
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	int i, sgi, cpu;
-+	int min_sgi = (offset & ~0x3) * 4;
-+	int max_sgi = min_sgi + 3;
-+	int vcpu_id = vcpu->vcpu_id;
-+	u32 lr, reg = 0;
-+
-+	/* Copy source SGIs from distributor side */
-+	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-+		int shift = 8 * (sgi - min_sgi);
-+		reg |= (u32)dist->irq_sgi_sources[vcpu_id][sgi] << shift;
-+	}
-+
-+	/* Copy source SGIs already on LRs */
-+	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-+		lr = vgic_cpu->vgic_lr[i];
-+		sgi = lr & GICH_LR_VIRTUALID;
-+		cpu = (lr & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
-+		if (sgi >= min_sgi && sgi <= max_sgi) {
-+			if (lr & GICH_LR_STATE)
-+				reg |= (1 << cpu) << (8 * (sgi - min_sgi));
-+		}
-+	}
-+
-+	memcpy(mmio->data, &reg, sizeof(reg));
-+}
-+
- static bool handle_mmio_sgi_clear(struct kvm_vcpu *vcpu,
- 				  struct kvm_exit_mmio *mmio,
- 				  phys_addr_t offset)
- {
--	return false;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	int i, sgi, cpu;
-+	int min_sgi = (offset & ~0x3) * 4;
-+	int max_sgi = min_sgi + 3;
-+	int vcpu_id = vcpu->vcpu_id;
-+	u32 *lr, reg;
-+	bool updated = false;
-+
-+	if (!mmio->is_write) {
-+		read_sgi_set_clear(vcpu, mmio, offset);
-+		return false;
-+	}
-+
-+	memcpy(&reg, mmio->data, sizeof(reg));
-+
-+	/* Clear pending SGIs on distributor side */
-+	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-+		u8 mask = reg >> (8 * (sgi - min_sgi));
-+		if (dist->irq_sgi_sources[vcpu_id][sgi] & mask)
-+			updated = true;
-+		dist->irq_sgi_sources[vcpu_id][sgi] &= ~mask;
-+	}
-+
-+	/* Clear SGIs already on LRs */
-+	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-+		lr = &vgic_cpu->vgic_lr[i];
-+		sgi = *lr & GICH_LR_VIRTUALID;
-+		cpu = (*lr & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
-+
-+		if (sgi >= min_sgi && sgi <= max_sgi) {
-+			if (reg & ((1 << cpu) << (8 * (sgi - min_sgi)))) {
-+				if (*lr & GICH_LR_PENDING_BIT)
-+					updated = true;
-+				*lr &= GICH_LR_PENDING_BIT;
-+			}
-+		}
-+	}
-+
-+	return updated;
- }
- 
- static bool handle_mmio_sgi_set(struct kvm_vcpu *vcpu,
- 				struct kvm_exit_mmio *mmio,
- 				phys_addr_t offset)
- {
--	return false;
-+	struct vgic_dist *dist = &vcpu->kvm->arch.vgic;
-+	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
-+	int i, sgi, cpu;
-+	int min_sgi = (offset & ~0x3) * 4;
-+	int max_sgi = min_sgi + 3;
-+	int vcpu_id = vcpu->vcpu_id;
-+	u32 *lr, reg;
-+	bool updated = false;
-+
-+	if (!mmio->is_write) {
-+		read_sgi_set_clear(vcpu, mmio, offset);
-+		return false;
-+	}
-+
-+	memcpy(&reg, mmio->data, sizeof(reg));
-+
-+	/* Set pending SGIs on distributor side */
-+	for (sgi = min_sgi; sgi <= max_sgi; sgi++) {
-+		u8 mask = reg >> (8 * (sgi - min_sgi));
-+		if ((dist->irq_sgi_sources[vcpu_id][sgi] & mask) != mask)
-+			updated = true;
-+		dist->irq_sgi_sources[vcpu_id][sgi] |= mask;
-+	}
-+
-+	/* Set active SGIs already on LRs to pending and active */
-+	for_each_set_bit(i, vgic_cpu->lr_used, vgic_cpu->nr_lr) {
-+		lr = &vgic_cpu->vgic_lr[i];
-+		sgi = *lr & GICH_LR_VIRTUALID;
-+		cpu = (*lr & GICH_LR_PHYSID_CPUID) >> GICH_LR_PHYSID_CPUID_SHIFT;
-+
-+		if (sgi >= min_sgi && sgi <= max_sgi) {
-+			if (reg & ((1 << cpu) << (8 * (sgi - min_sgi)))) {
-+				if (!(*lr & GICH_LR_PENDING_BIT))
-+					updated = true;
-+				*lr |= GICH_LR_PENDING_BIT;
-+			}
-+		}
-+	}
-+
-+	return updated;
- }
- 
- /*
--- 
-1.7.9.5
+> On Wed, Jun 05, 2013 at 12:27:31AM +0530, Jay Agarwal wrote:
+> [...]
+> > @@ -29,7 +29,7 @@
+> >  		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000
+> /* port 0 configuration space */
+> >  			  0x82000000 0 0x00001000 0x00001000 0 0x00001000
+> /* port 1 configuration space */
+> >  			  0x82000000 0 0x00004000 0x00004000 0 0x00001000
+> /* port 2 configuration space */
+> > -			  0x81000000 0 0          0x02000000 0 0x00010000   /*
+> downstream I/O */
+> > +			  0x81000000 0 0          0x02000000 0 0x00100000   /*
+> downstream I/O */
+> >  			  0x82000000 0 0x20000000 0x20000000 0 0x10000000
+> /* non-prefetchable memory */
+> >  			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>;
+> /*
+> > prefetchable memory */
+> 
+> That increases the I/O region size from 64 KiB to 1 MiB. Why is that
+> necessary? I/O operations can only address 64 KiB, so I don't think adding
+> more makes any sense.
+> 
+Okay, you can keep it 64KiB then, I did it to match with downstream. 
+Please let me know if you want me to upload new patch for this or you will take care while integrating.
