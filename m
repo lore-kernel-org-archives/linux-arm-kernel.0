@@ -1,37 +1,66 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Tue, 11 Jun 2013 10:22:59 +0530
-Subject: [PATCH V3 3/4] ARM: dts: tegra: Correct PCIe entry
-In-Reply-To: <20130610195511.GC25859@mithrandir>
-References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
- <1370372252-4332-3-git-send-email-jagarwal@nvidia.com>
- <20130610195511.GC25859@mithrandir>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91B616BEEF@BGMAIL01.nvidia.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 10 Jun 2013 21:51:12 -0700
+Subject: [PATCH 0/7] KVM: arm-vgic: Implement save/restore of VGIC state
+Message-ID: <1370926279-32532-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series adds support for user space save/restore of the VGIC
+state.  Instead of expanding the ONE_REG interface, which works on
+VCPUs, we first introduce support for the new KVM device control API and
+the VGIC.  Now, instead of calling KVM_CREATE_IRQCHIP, user space can
+call KVM_CREATE_DEVICE and perform operations on the device fd, such as
+KVM_SET_DEVICE_ATTR to set a device attribute.
 
-> On Wed, Jun 05, 2013 at 12:27:31AM +0530, Jay Agarwal wrote:
-> [...]
-> > @@ -29,7 +29,7 @@
-> >  		ranges = <0x82000000 0 0x00000000 0x00000000 0 0x00001000
-> /* port 0 configuration space */
-> >  			  0x82000000 0 0x00001000 0x00001000 0 0x00001000
-> /* port 1 configuration space */
-> >  			  0x82000000 0 0x00004000 0x00004000 0 0x00001000
-> /* port 2 configuration space */
-> > -			  0x81000000 0 0          0x02000000 0 0x00010000   /*
-> downstream I/O */
-> > +			  0x81000000 0 0          0x02000000 0 0x00100000   /*
-> downstream I/O */
-> >  			  0x82000000 0 0x20000000 0x20000000 0 0x10000000
-> /* non-prefetchable memory */
-> >  			  0xc2000000 0 0x30000000 0x30000000 0 0x10000000>;
-> /*
-> > prefetchable memory */
-> 
-> That increases the I/O region size from 64 KiB to 1 MiB. Why is that
-> necessary? I/O operations can only address 64 KiB, so I don't think adding
-> more makes any sense.
-> 
-Okay, you can keep it 64KiB then, I did it to match with downstream. 
-Please let me know if you want me to upload new patch for this or you will take care while integrating.
+We leverage the KVM_{SET/GET}_DEVICE_ATTR API to export the state of the
+VGIC to user space.  Instead of coming up with our own custom format for
+exporting the VGIC state, we simply export all the state visible to an
+emulated guest, which must contain the full GIC state to provide
+save/restore of the GIC state for power management purposes.  This
+further provides the benefit of being able to re-use the MMIO emulation
+code for the distributor for save/restore.
+
+However, the need to save/restore cpu-specific state demands that user
+space can save/restore state accessible through the CPU interface, and
+we therefore add an emulation interface for the CPU-specific interface.
+
+This is considered a first attempt, and I am not married to the device
+control API.  If there are good technical arguments to take another
+approach, I am of course willing to discuss this.  However, my attempts
+with the ONE_REG interface did not look very nice.
+
+  [ WARINING: The patch set core functionality is completely untested;
+  the basic KVM system has been briefly tested on TC2 and it doesn't
+  seem like I've broken existing functionality. ]
+
+I wanted to get this out early to get feedback on the overall API and
+idea, and I'm writing some user QEMU for the user space side to test
+the new functionality meanwhile.
+
+Patches are against kvm-arm-next and also available here:
+git://git.linaro.org/people/cdall/linux-kvm-arm.git vgic-migrate
+
+Christoffer Dall (7):
+  KVM: arm-vgic: Support KVM_CREATE_DEVICE for VGIC
+  KVM: arm-vgic: Set base addr through device API
+  irqchip: arm-gic: Define additional MMIO offsets and masks
+  KVM: arm-vgic: Make vgic mmio functions more generic
+  KVM: arm-vgic: Add vgic reg access from dev attr
+  KVM: arm-vgic: Add GICD_SPENDSGIR and GICD_CPENDSGIR handlers
+  KVM: arm-vgic: Support CPU interface reg access
+
+ Documentation/virtual/kvm/api.txt              |    5 +-
+ Documentation/virtual/kvm/devices/arm-vgic.txt |   52 +++
+ arch/arm/include/uapi/asm/kvm.h                |    8 +
+ arch/arm/kvm/arm.c                             |    3 +-
+ include/kvm/arm_vgic.h                         |    2 +-
+ include/linux/irqchip/arm-gic.h                |   14 +
+ include/linux/kvm_host.h                       |    1 +
+ include/uapi/linux/kvm.h                       |    1 +
+ virt/kvm/arm/vgic.c                            |  452 +++++++++++++++++++++++-
+ virt/kvm/kvm_main.c                            |    4 +
+ 10 files changed, 522 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/virtual/kvm/devices/arm-vgic.txt
+
+-- 
+1.7.9.5
