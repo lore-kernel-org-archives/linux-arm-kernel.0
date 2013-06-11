@@ -1,36 +1,36 @@
-From: agraf@suse.de (Alexander Graf)
-Date: Tue, 11 Jun 2013 10:28:49 +0200
-Subject: [PATCH 2/2] add initial kvm dev passhtrough support
-In-Reply-To: <51B6D52E.4030707@huawei.com>
-References: <51B6D52E.4030707@huawei.com>
-Message-ID: <A501B176-B65B-4CEB-BB12-3EE7C165945C@suse.de>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 11 Jun 2013 10:31:59 +0200
+Subject: [PATCH 2/3] ARM: OMAP2+: devices: Do not print error when DMIC hwmod
+ lookup fails
+In-Reply-To: <1370939520-16132-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1370939520-16132-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1370939520-16132-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+It means that the SoC does not have DMIC IP
+.
+Reported-by: Paul Walmsley <paul@pwsan.com>
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ arch/arm/mach-omap2/devices.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-Am 11.06.2013 um 09:43 schrieb Mario Smarduch <mario.smarduch@huawei.com>:
-
-> 
-> This is the initial device pass through support.
-> At this time host == guest only is supported.
-> Basic Operation:
-> 
-> - QEMU parameters: -device kvm-device-assign,host=<device name>
->  for example - kvm-device-assign,host='arm-sp804'. Essentially
->  any device that does PIO should be supported.
-
-Yikes!
-
-Over the last few years we've worked very hard to get rid of the unfortunate intertwining of device assignment and KVM. There are a number of reasons it's a bad idea:
-
-  - kvm access is a potential priviledge escalation
-  - device assignment is limited to kvm
-
-The solution to both of the above is VFIO. You get a completely separate interface for accessing your devices with a few connecting bits (irqfd, eventfd) to communicate quickly between vfio and kvm.
-
-Is there any particular reason you're not going down that path for your ARM implementation?
-
-On the embedded PPC side we've been discussing vfio and how it fits into a device tree, non-PCI world for a while. If you like, we can dive into more detail on that, either via email or via phone.
-
-
-Alex
+diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+index b82538d..8f268b4 100644
+--- a/arch/arm/mach-omap2/devices.c
++++ b/arch/arm/mach-omap2/devices.c
+@@ -393,10 +393,8 @@ static void __init omap_init_dmic(void)
+ 	struct platform_device *pdev;
+ 
+ 	oh = omap_hwmod_lookup("dmic");
+-	if (!oh) {
+-		pr_err("Could not look up dmic hw_mod\n");
++	if (!oh)
+ 		return;
+-	}
+ 
+ 	pdev = omap_device_build("omap-dmic", -1, oh, NULL, 0);
+ 	WARN(IS_ERR(pdev), "Can't build omap_device for omap-dmic.\n");
+-- 
+1.8.2.1
