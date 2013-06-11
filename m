@@ -1,58 +1,48 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 11 Jun 2013 11:43:59 -0400 (EDT)
-Subject: [PATCH] arm: versatile: don't mark pen as __INIT
-In-Reply-To: <20130611090459.GA9529@e106331-lin.cambridge.arm.com>
-References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
- <20130610232441.GI18614@n2100.arm.linux.org.uk>
- <20130611090459.GA9529@e106331-lin.cambridge.arm.com>
-Message-ID: <alpine.LFD.2.03.1306111136060.18597@syhkavp.arg>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 11 Jun 2013 17:46:26 +0200
+Subject: [PATCH] ARM: dts: imx35: Add kernel oftree support
+In-Reply-To: <1370948894-757-1-git-send-email-kunadt@schleissheimer.de>
+References: <1370948894-757-1-git-send-email-kunadt@schleissheimer.de>
+Message-ID: <20130611154626.GS32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013, Mark Rutland wrote:
+Hi Ivo,
 
-> On Tue, Jun 11, 2013 at 12:24:41AM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Jun 10, 2013 at 04:07:24PM +0100, Mark Rutland wrote:
-> > > When booting fewer cores than are physically present on a versatile
-> > > platform (e.g. when passing maxcpus=N on the command line), some
-> > > secondary cores may remain in the holding pen, which is marked __INIT.
-> > > Late in the boot process, the memory comprising the holding pen will be
-> > > released to the kernel for more general use, and may be overwritten with
-> > > arbitrary data, which can cause the held secondaries to start behaving
-> > > unpredictably. This can lead to all manner of odd behaviour from the
-> > > kernel.
-> > > 
-> > > Instead don't mark the section as __INIT. This means we can't reuse the
-> > > pen memory, but we won't get secondaries corrupting the rest of the
-> > > kernel.
-> > 
-> > __CPUINIT is appropriate here; __CPUINIT will be kept around if you have
-> > hotplug CPU suport, but if you don't it will be discarded after all
-> > secondary CPUs have booted.  And without hotplug CPU, you can't ask
-> > for the offline CPUs to be onlined.
-> 
-> Since 384a290283: "ARM: gic: use a private mapping for CPU target interfaces",
-> each CPU's gic_cpu_map entry is initialised to 0xff, so a call to
-> gic_raise_softirq will target *all* CPUs attached to the GIC if one of the CPUs
-> targetted has not been initialised.
-> 
-> Thus any call to versatile_boot_secondary will wake up *all* secondaries
-> physically present, throwing them all into the pen. If we use a subset of these
-> (e.g. from having "maxcpus=N" on the command line), some will be left in the
-> pen, even though we didn't ask for them explicitly. This will happen with or
-> without CPU_HOTPLUG.
-> 
-> Another option would be to add an optional description of a CPU's gic id to the
-> dt, which would allow us to avoid throwing these secondaries into the pen in
-> the first place.
+Generally I wonder how this patch works. You do not add a single clock,
+so how do the drivers get their clocks?
 
-You mean adding extra description in DT for hardware information that is 
-already perfectly self-discoverable, plus the code to parse it, just for 
-those rare cases where someone might want to use maxcpus=N on the kernel 
-cmdline while CONFIG_CPU_HOTPLUG=n ?
+On Tue, Jun 11, 2013 at 01:08:14PM +0200, Ivo Kunadt wrote:
+> diff --git a/arch/arm/boot/dts/imx35.dtsi b/arch/arm/boot/dts/imx35.dtsi
+> new file mode 100644
+> index 0000000..1f0a58f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx35.dtsi
+> @@ -0,0 +1,350 @@
+> +			i2c1: i2c at 43f80000 {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				compatible = "fsl,imx35-i2c", "fsl,imx1-i2c";
 
-IMHO removing __CPUINIT from the holding pen is probably the preferable 
-alternative.
+Use imx21-i2c instead of imx1-i2c, there has been an incompatible change
+between them.
 
+> +			iomuxc at 43fac000 {
+> +				compatible = "fsl,imx35-iomuxc";
+> +				reg = <0x43fac000 0x4000>;
+> +
+> +				i2c3 {
+> +					pinctrl_i2c3_1: i2c3grp-1 {
+> +						fsl,pins = <773 0x1c0 /* MX35_PAD_ATA_DATA12__I2C3_SCL */
+> +							777 0x1c0>; /* MX35_PAD_ATA_DATA13__I2C3_SDA */
 
-Nicolas
+This doesn't match the current pinctrl driver. We now use defines
+instead of these numbers. See the other i.MXs how this is done now.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
