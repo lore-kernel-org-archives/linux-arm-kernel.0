@@ -1,47 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 11 Jun 2013 17:01:19 +0900
-Subject: [GIT PULL v2 00/27] Renesas ARM-based SoC updates for v3.11
-In-Reply-To: <CAOesGMjDGkWO9YEqocv1ZFtDaaUPfoRMJNPEty6E3UDcGTeKew@mail.gmail.com>
-References: <1370591517-20239-1-git-send-email-horms+renesas@verge.net.au>
- <20130611071925.GI6688@quad.lixom.net>
- <CAOesGMjDGkWO9YEqocv1ZFtDaaUPfoRMJNPEty6E3UDcGTeKew@mail.gmail.com>
-Message-ID: <20130611080119.GC5300@verge.net.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 11 Jun 2013 17:02:19 +0900
+Subject: [PATCH] ARM: dts: Removing pdma for SSDK5440
+Message-ID: <109601ce6679$fef2e410$fcd8ac30$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 12:23:40AM -0700, Olof Johansson wrote:
-> On Tue, Jun 11, 2013 at 12:19 AM, Olof Johansson <olof@lixom.net> wrote:
-> > Hi Simon,
-> >
-> > On Fri, Jun 07, 2013 at 04:51:30PM +0900, Simon Horman wrote:
-> >> Hi Olof, Hi Arnd,
-> >>
-> >> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-> >>
-> >>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-> >>
-> >> are available in the git repository at:
-> >>
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v3.11
-> >
-> > Thanks a lot for reshuffling the patches into the categories we use!
-> >
-> > For future cases, if you want to split off the cleanups you can do that as
-> > a separate branch, and use that branch as a base for feature branches. Either
-> > way works, sometimes it's nice to see cleanups separated out but it all depends
-> > on volumes, etc.
-> >
-> >
-> > Pulled into next/soc.
-> 
-> Actually, I just noticed that this caused a few conflicts with the
-> pinmux-gpio branch you sent earlier. So I've moved said pinmux/gpio
-> branch into next/soc instead of next/drivers where it was earlier.
-> Please also check my conflict resolution once the branch has been
-> pushed out.
+From: Giridhar Maruthy <giridhar.m@samsung.com>
 
-Thanks. I have checked and your conflict resolution is the same as mine.
+Since the pdma works only in secure mode, accessing the same
+in hypervisor mode gives an abort. As we are not using pdma
+anywhere (including spi), removing the same.
 
-This is an issue that I'm not entirely clear on the best practice for.
-Is it sufficient for me to note any conflicts in the pull-request,
-or in future should I re-arrange things somehow?
+Signed-off-by: Giridhar Maruthy <giridhar.m@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/boot/dts/exynos5440.dtsi |   24 ------------------------
+ 1 file changed, 24 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index 871ebad..b08449e 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -105,8 +105,6 @@
+ 		compatible = "samsung,exynos4210-spi";
+ 		reg = <0xD0000 0x1000>;
+ 		interrupts = <0 4 0>;
+-		tx-dma-channel = <&pdma0 5>; /* preliminary */
+-		rx-dma-channel = <&pdma0 4>; /* preliminary */
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 		clocks = <&clock 21>, <&clock 16>;
+@@ -184,28 +182,6 @@
+ 		compatible = "arm,amba-bus";
+ 		interrupt-parent = <&gic>;
+ 		ranges;
+-
+-		pdma0: pdma at 00121000 {
+-			compatible = "arm,pl330", "arm,primecell";
+-			reg = <0x121000 0x1000>;
+-			interrupts = <0 46 0>;
+-			clocks = <&clock 8>;
+-			clock-names = "apb_pclk";
+-			#dma-cells = <1>;
+-			#dma-channels = <8>;
+-			#dma-requests = <32>;
+-		};
+-
+-		pdma1: pdma at 00120000 {
+-			compatible = "arm,pl330", "arm,primecell";
+-			reg = <0x120000 0x1000>;
+-			interrupts = <0 47 0>;
+-			clocks = <&clock 8>;
+-			clock-names = "apb_pclk";
+-			#dma-cells = <1>;
+-			#dma-channels = <8>;
+-			#dma-requests = <32>;
+-		};
+ 	};
+ 
+ 	rtc {
+-- 
+1.7.10.4
