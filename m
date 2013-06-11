@@ -1,26 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 11 Jun 2013 10:50:04 +0200
-Subject: [EXAMPLE PATCH] pinctrl: add pinctrl driver for Rockchip SoCs
-In-Reply-To: <51B619B9.8040204@wwwdotorg.org>
-References: <201306090159.05383.heiko@sntech.de>
- <201306090201.17739.heiko@sntech.de>
- <CACRpkdaEcZZ3NZzwKOhUPjvFg+bSZ=UbpyPT2EBcAfVv1-EsKA@mail.gmail.com>
- <51B619B9.8040204@wwwdotorg.org>
-Message-ID: <CACRpkdYT08w-3KuMD9YLcjebcpbqyOpWdqH5NU+fjAeP6VpkWQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 11 Jun 2013 09:50:15 +0100
+Subject: [PATCH 4/9] ARM: dma-mapping: NULLify dev->archdata.mapping
+ pointer on detach
+In-Reply-To: <20130611.083455.1500863288897785600.hdoyu@nvidia.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-5-git-send-email-will.deacon@arm.com>
+ <20130611.083455.1500863288897785600.hdoyu@nvidia.com>
+Message-ID: <20130611085015.GC24729@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 8:23 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+On Tue, Jun 11, 2013 at 06:34:55AM +0100, Hiroshi Doyu wrote:
+> Hi Will,
+> 
+> Will Deacon <will.deacon@arm.com> wrote @ Mon, 10 Jun 2013 20:34:40 +0200:
+> 
+> > The current code only clobbers a local variable, so the device is left
+> > with a stale mapping pointer.
+> 
+> True. This's my bad. Thanks.
 
-> The entire reason I created the <dt-bindings/> directory (rather than
-> just putting *.h into e.g. arch/arm/boot/dts) was to provide a place to
-> share binding-defined constants between the DT files and drivers that
-> implement that binding. It's certainly my opinion that if/when *.dts
-> move out of the kernel, the <dt-bindings/> directory should continue to
-> be present in the kernel, and take updates mirrored from the upstream
-> binding repo.
+That's alright, it's easy to fix. Mind if I add your ack please?
 
-OK thanks Stephen, makes perfect sense.
-
-Yours,
-Linus Walleij
+Will
