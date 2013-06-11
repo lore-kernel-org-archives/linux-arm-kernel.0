@@ -1,32 +1,25 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 00:03:44 -0700
-Subject: [PATCH 0/2] ARM dts: bcm281xx: use preprocessor for device trees
-In-Reply-To: <1370497295-12682-1-git-send-email-matt.porter@linaro.org>
-References: <1370497295-12682-1-git-send-email-matt.porter@linaro.org>
-Message-ID: <20130611070344.GF6688@quad.lixom.net>
+Date: Tue, 11 Jun 2013 00:09:26 -0700
+Subject: [GIT PULL v2 0/2] Update for Renesas INTC External IRQ pin
+ driver for v3.11
+In-Reply-To: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
+References: <1370503728-31373-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130611070926.GG6688@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 01:41:33AM -0400, Matt Porter wrote:
-> This series follows the same approach as taken on Tegra and
-> OMAP DT files to use the C preprocessor in order to improve
-> readability. Since bcm281xx does not yet have gpio and pinctrl
-> support, this series just enables the C preprocessor and removes
-> the magic constants from existing irq properties. Any new
-> additions can come in using human readable definitions.
+On Thu, Jun 06, 2013 at 04:28:46PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> The resulting dtb was diff-tested to validate it versus the non
-> preprocessed dts version.
+> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 > 
-> Matt Porter (2):
->   ARM: dts: bcm281xx: use #include for device tree files
->   ARM: dts: bcm281xx: use existing defines for irqs
+>   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-intc-external-irq-for-v3.11
 
-Acked-by: Olof Johansson <olof@lixom.net>
-
-Not sure what else you'll have for 3.11 devicetree-wise, Christian -- your
-choice if you want to send a pull request or ack these and we'll apply them
-directly.
+Thanks, I've merged this into next/fixes-non-critical.
 
 
 -Olof
