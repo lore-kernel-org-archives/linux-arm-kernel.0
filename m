@@ -1,34 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 10 Jun 2013 22:02:27 -0700
-Subject: [GIT PULL 2/2] ARM: mvebu: pcie kirkwood for v3.11 (round 2)
-In-Reply-To: <20130604135433.GD3803@titan.lakedaemon.net>
-References: <20130604135433.GD3803@titan.lakedaemon.net>
-Message-ID: <20130611050227.GB6688@quad.lixom.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 10 Jun 2013 23:12:06 -0600
+Subject: [PATCH] reset: provide dummy API entries to avoid link errors
+In-Reply-To: <CAGsJ_4xY4anEme-S1AvE5aDf_R5zPmx7wzHM=rmRRxgqFiqR3Q@mail.gmail.com>
+References: <1370755846-27011-1-git-send-email-Baohua.Song@csr.com>
+ <51B5F970.1080505@wwwdotorg.org>
+ <CAGsJ_4xY4anEme-S1AvE5aDf_R5zPmx7wzHM=rmRRxgqFiqR3Q@mail.gmail.com>
+Message-ID: <51B6B1A6.6020505@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 09:54:33AM -0400, Jason Cooper wrote:
-> Olof,
+On 06/10/2013 07:39 PM, Barry Song wrote:
+> 2013/6/11 Stephen Warren <swarren@wwwdotorg.org>:
+>> On 06/08/2013 11:30 PM, Barry Song wrote:
+>>> this patch provides dummy reset API entries like other subsystem e.g.
+>>> gpiolib to avoid link errors when RESET_CONTROLLER is not enabled.
+>>
+>> I would tend to think that any driver that needs to use this API to
+>> reset its HW should depend on the reset API (or select it) to ensure
+>> that the API was present.
+>>
+>> That way, problems would be detected at compile-time, not run-time.
 > 
-> Here's a patch catching up a missed board in the DT conversion of
-> kirkwood pcie.  There shouldn't be any more like this, so I'm just
-> sending the single patch.
-> 
-> This has also been in -next for five days or so.
-> 
-> 
-> The following changes since commit 0d0632f523fa040b307688ae421a1debf79af2d7:
-> 
->   arm: kirkwood: convert db-88f6281/db-88f6282 to the Device Tree (2013-05-27 16:02:13 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/pcie_kw-3.11-2
+> Hi Stephen,
+> your point is right if the hardware IP always need a real reset to
+> work. but the current situation is that many common IP can be used in
+> many chips. in some chips, the designer might provide a reset
+> controller with a bit set to reset this IP module, but in some other
+> chips, there can be no.
 
-Thanks, pulled.
+I would tend to think that if a HW module needs a reset input, it would
+always need one, so an SoC that didn't hook one up would be a bit
+broken. Still, I suppose perhaps they could hook it up to a global
+system reset rather than to a per-module SW-controlled reset, so you may
+have a point.
 
-I just realized the kirkwood branches fit better in the next/boards
-category but the previous one is in next/soc so there goes this one too.
+There is still an issue to resolve:
 
+Just because /a/ particular IP block doesn't have a SW-controlled reset
+input, that doesn't imply that the reset API won't/can't be enabled in
+Kconfig. Think multi-platform zImage, or multiple IP blocks, some of
+which do have a reset input.
 
--Olof
+What about drivers that attempt to reset their IP block to ensure a
+known-good HW state before programming it?
+
+So, I think that drivers that use the reset API should still select or
+depend on it. However, the reset API and/or DT bindings for it need some
+way of providing a dummy do-nothing reset provider.
+
+Actually, this is just like dummy (fixed) regulators in that framework;
+in the regulator case, if the board/... doesn't actually have a
+regulator, the board is still supposed to provide a fixed/dummy
+regulator so that the drivers can't tell. I'd suggest the same approach
+here.
+
+> so a common driver for this IP should be able
+> to work with calling device_reset even while lacking of
+> RESET_CONTROLLER. here we are considering a case for chipidea,
+> ci13xxx, there is a reset bit for it on sirf, but it seems these is no
+> code showing a reset bit exists for imx.
