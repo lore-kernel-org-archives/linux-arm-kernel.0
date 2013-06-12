@@ -1,40 +1,197 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 12 Jun 2013 14:50:29 -0700
-Subject: [PATCH v4 1/6] clk: samsung: Use clk->base instead of directly
- using clk->con0 for PLL3xxx
-In-Reply-To: <1501124.EVQA8KO0ic@flatron>
-References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
- <1370272196-4346-2-git-send-email-yadi.brar@samsung.com>
- <CAD=FV=VTLkH9oDqr263Kyv=wCEbuQ40VL7mtC73SCMt20NPwgQ@mail.gmail.com>
- <1501124.EVQA8KO0ic@flatron>
-Message-ID: <CAD=FV=XKjYBzgBwY+CnUZyzyBzgGN88Y39n=tABgAH5aU3gSkQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Wed, 12 Jun 2013 23:50:35 +0200
+Subject: [PATCH v4] irqchip: Add support for ARMv7-M's NVIC
+Message-ID: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
 
-On Wed, Jun 12, 2013 at 2:19 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hmm, if done properly, it could simplify PLL registration in SoC clock
-> initialization code a lot.
->
-> I'm not sure if this is really the best solution (feel free to suggest
-> anything better), but we could put PLLs in an array, like other clocks,
-> e.g.
->
->         ... exynos4210_pll_clks[] = {
->                 CLK_PLL45XX(...),
->                 CLK_PLL45XX(...),
->                 CLK_PLL46XX(...),
->                 CLK_PLL46XX(...),
->         };
->
-> and then just call a helper like
->
->         samsung_clk_register_pll(exynos4210_pll_clks,
->                         ARRAY_SIZE(exynos4210_pll_clks));
+Support for this controller appeared in Catalin's Cortex tree based on
+2.6.33 but was nearly completely rewritten.
 
-Something like that looks like what I was thinking.  I'd have to see
-it actually coded up to see if there's something I'm missing that
-would prevent us from doing that, but I don't see anything.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
 
--Doug
+Notes:
+    Changes since v3, sent with
+    Message-Id: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>:
+    
+     - use generic chip
+     - rename nvic_do_IRQ to nvic_handle_irq
+    
+    This depends on the stuff currently in tip/irq/for-arm
+
+ arch/arm/kernel/entry-v7m.S |   2 +-
+ drivers/irqchip/Kconfig     |   5 ++
+ drivers/irqchip/Makefile    |   1 +
+ drivers/irqchip/irq-nvic.c  | 116 ++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 123 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/irqchip/irq-nvic.c
+
+diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
+index e00621f..52b2643 100644
+--- a/arch/arm/kernel/entry-v7m.S
++++ b/arch/arm/kernel/entry-v7m.S
+@@ -49,7 +49,7 @@ __irq_entry:
+ 	mov	r1, sp
+ 	stmdb	sp!, {lr}
+ 	@ routine called with r0 = irq number, r1 = struct pt_regs *
+-	bl	nvic_do_IRQ
++	bl	nvic_handle_irq
+ 
+ 	pop	{lr}
+ 	@
+diff --git a/drivers/irqchip/Kconfig b/drivers/irqchip/Kconfig
+index 4a33351..8317a7e 100644
+--- a/drivers/irqchip/Kconfig
++++ b/drivers/irqchip/Kconfig
+@@ -10,6 +10,11 @@ config ARM_GIC
+ config GIC_NON_BANKED
+ 	bool
+ 
++config ARM_NVIC
++	bool
++	select IRQ_DOMAIN
++	select GENERIC_IRQ_CHIP
++
+ config ARM_VIC
+ 	bool
+ 	select IRQ_DOMAIN
+diff --git a/drivers/irqchip/Makefile b/drivers/irqchip/Makefile
+index cda4cb5..4bb277c 100644
+--- a/drivers/irqchip/Makefile
++++ b/drivers/irqchip/Makefile
+@@ -10,6 +10,7 @@ obj-$(CONFIG_METAG_PERFCOUNTER_IRQS)	+= irq-metag.o
+ obj-$(CONFIG_ARCH_SUNXI)		+= irq-sun4i.o
+ obj-$(CONFIG_ARCH_SPEAR3XX)		+= spear-shirq.o
+ obj-$(CONFIG_ARM_GIC)			+= irq-gic.o
++obj-$(CONFIG_ARM_NVIC)			+= irq-nvic.o
+ obj-$(CONFIG_ARM_VIC)			+= irq-vic.o
+ obj-$(CONFIG_SIRF_IRQ)			+= irq-sirfsoc.o
+ obj-$(CONFIG_RENESAS_INTC_IRQPIN)	+= irq-renesas-intc-irqpin.o
+diff --git a/drivers/irqchip/irq-nvic.c b/drivers/irqchip/irq-nvic.c
+new file mode 100644
+index 0000000..2f1d305
+--- /dev/null
++++ b/drivers/irqchip/irq-nvic.c
+@@ -0,0 +1,116 @@
++/*
++ * drivers/irq/irq-nvic.c
++ *
++ * Copyright (C) 2008 ARM Limited, All Rights Reserved.
++ * Copyright (C) 2013 Pengutronix
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * Support for the Nested Vectored Interrupt Controller found on the
++ * ARMv7-M CPUs (Cortex-M3/M4)
++ */
++#define pr_fmt(fmt)	KBUILD_MODNAME ": " fmt
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/slab.h>
++#include <linux/err.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/irq.h>
++#include <linux/irqdomain.h>
++
++#include <asm/v7m.h>
++#include <asm/exception.h>
++
++#include "irqchip.h"
++
++#define NVIC_ISER			0x000
++#define NVIC_ICER			0x080
++#define NVIC_IPR			0x300
++
++#define NVIC_MAX_BANKS		16
++/*
++ * Each bank handles 32 irqs. Only the 16th (= last) bank handles only
++ * 16 irqs.
++ */
++#define NVIC_MAX_IRQ		((NVIC_MAX_BANKS - 1) * 32 + 16)
++
++static struct irq_domain *nvic_irq_domain;
++
++asmlinkage void __exception_irq_entry
++nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
++{
++	unsigned int irq = irq_linear_revmap(nvic_irq_domain, hwirq);
++
++	handle_IRQ(irq, regs);
++}
++
++static void nvic_eoi(struct irq_data *d)
++{
++	/*
++	 * This is a no-op as end of interrupt is signaled by the exception
++	 * return sequence.
++	 */
++}
++
++static int __init nvic_of_init(struct device_node *node,
++			       struct device_node *parent)
++{
++	void __iomem *nvic_base;
++	unsigned int irqs, i, ret;
++	unsigned numbanks = (readl_relaxed(V7M_SCS_ICTR) &
++			     V7M_SCS_ICTR_INTLINESNUM_MASK) + 1;
++	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
++
++	nvic_base = of_iomap(node, 0);
++	if (!nvic_base) {
++		pr_warn("unable to map nvic registers\n");
++		return -ENOMEM;
++	}
++
++	irqs = numbanks * 32;
++	if (irqs > NVIC_MAX_IRQ)
++		irqs = NVIC_MAX_IRQ;
++
++	nvic_irq_domain =
++		irq_domain_add_linear(node, irqs, &irq_generic_chip_ops, NULL);
++	if (!nvic_irq_domain) {
++		pr_warn("Failed to allocate irq domain\n");
++		return -ENOMEM;
++	}
++
++	ret = irq_alloc_domain_generic_chips(nvic_irq_domain, 32, numbanks,
++					     "nvic_irq", handle_fasteoi_irq,
++					     clr, 0, IRQ_GC_INIT_MASK_CACHE);
++	if (ret) {
++		pr_warn("Failed to allocate irq chips\n");
++		irq_domain_remove(nvic_irq_domain);
++		return ret;
++	}
++
++	for (i = 0; i < numbanks; ++i) {
++		struct irq_chip_generic *gc =
++			irq_get_domain_generic_chip(nvic_irq_domain, 32 * i);
++		gc->reg_base = nvic_base + 4 * i;
++		gc->chip_types[0].regs.enable = NVIC_ISER;
++		gc->chip_types[0].regs.disable = NVIC_ICER;
++		gc->chip_types[0].chip.irq_mask = irq_gc_mask_disable_reg;
++		gc->chip_types[0].chip.irq_unmask = irq_gc_unmask_enable_reg;
++		gc->chip_types[0].chip.irq_eoi = nvic_eoi;
++	}
++
++	/* Disable all interrupts */
++	for (i = 0; i < irqs; i += 32)
++		writel_relaxed(~0, nvic_base + NVIC_ICER + i * 4 / 32);
++
++	/* Set priority on all interrupts */
++	for (i = 0; i < irqs; i += 4)
++		writel_relaxed(0, nvic_base + NVIC_IPR + i);
++
++	return 0;
++}
++IRQCHIP_DECLARE(armv7m_nvic, "arm,armv7m-nvic", nvic_of_init);
+-- 
+1.8.3
