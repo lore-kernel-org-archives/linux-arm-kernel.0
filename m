@@ -1,52 +1,65 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Jun 2013 13:31:18 +0200
-Subject: [PATCHv4 4/9] i2c: mv64xxx: Add Allwinner sun4i compatible
-In-Reply-To: <20130612105613.GT16502@lunn.ch>
-References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
- <1371024438-16631-5-git-send-email-maxime.ripard@free-electrons.com>
- <20130612105613.GT16502@lunn.ch>
-Message-ID: <20130612113118.GF16699@lukather>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 12 Jun 2013 19:33:03 +0800
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <3473222.45jKxS1jDK@linux-5eaq.site>
+References: <Pine.LNX.4.44L0.1306111431170.1392-100000@iolanthe.rowland.org>
+ <2722548.PBMM2Yn19A@linux-5eaq.site>
+ <CACVXFVMQGqGNcKntLbpQSJN+mkVZoRTRNYZ+TMVSmnGwK7BiBQ@mail.gmail.com>
+ <3473222.45jKxS1jDK@linux-5eaq.site>
+Message-ID: <CACVXFVPSTLm9E55YLTJ51f-d0a6tkUnncPn2cfU2BtjNx8+f=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 12:56:13PM +0200, Andrew Lunn wrote:
-> On Wed, Jun 12, 2013 at 10:07:13AM +0200, Maxime Ripard wrote:
-> > Add the compatible string for the Allwinner A10 i2c controller and the
-> > associated register layout.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/i2c/busses/Kconfig       |  3 ++-
-> >  drivers/i2c/busses/i2c-mv64xxx.c |  1 +
-> >  include/linux/mv643xx_i2c.h      | 10 ++++++++++
-> >  3 files changed, 13 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> > index 631736e..5dc4148 100644
-> > --- a/drivers/i2c/busses/Kconfig
-> > +++ b/drivers/i2c/busses/Kconfig
-> > @@ -507,10 +507,11 @@ config I2C_MPC
-> >  
-> >  config I2C_MV64XXX
-> >  	tristate "Marvell mv64xxx I2C Controller"
-> > -	depends on (MV64X60 || PLAT_ORION)
-> > +	depends on (MV64X60 || PLAT_ORION || ARCH_SUNXI)
-> 
-> Hi Maxime.
-> 
-> What about MV64X60? It also needs to pass the registers in its
-> platform data.
+On Wed, Jun 12, 2013 at 6:19 PM, Oliver Neukum <oliver@neukum.org> wrote:
+> On Wednesday 12 June 2013 18:11:34 Ming Lei wrote:
+>> On Wed, Jun 12, 2013 at 5:11 PM, Oliver Neukum <oliver@neukum.org> wrote:
+>> > On Tuesday 11 June 2013 15:10:03 Alan Stern wrote:
+>> >> In order to prevent this from happening, you would have to change the
+>> >> spin_lock() call in the completion handler to spin_lock_irqsave().
+>> >> Furthermore, you will have to audit every USB driver to make sure that
+>> >> all the completion handlers get fixed.
+>> >
+>> > Yes. However, it can be done mechanically. And we know only
+>> > the handlers for complete need to be fixed.
+>>
+>> I am wondering if the change is needed since timer function is still
+>> run in softirq context instead of hard irq.
+>>
+>> Looks Alan concerned that one USB interface driver may have another
+>> hard interrupt handler involved. Is there such kind of USB driver/device
+>> in tree?
+>
+> No. Suppose a USB network driver.
+> The complete() handler is written on the assumption that interrupts are off.
+> So it takes a spinlock from the network subsystem. It does so with spin_lock()
 
-I grep'ed for the users mv64xxx_i2c_pdata in arch/arm, and the
-plat-orion/common.c was the only user. Obviously, I forgot to think
-about the PPC architecture.
+Looks I misses the case, but IMO, it might not be very common, generally
+subsystem provides API for drivers to do something(handle rx/report tx) inside
+complete(), and seldom exports subsystem-wide lock directly to drivers.
+API has no context info, and should have called spin_lock_irqrestore().
 
-Anyway, this patch will be dropped.
+>
+> Other network drivers also take the lock. And they may take it from an IRQ handler.
+> If such an IRQ interrupts the tasklet complete() is running in, the CPU will deadlock.
 
-Thanks!
-Maxime
+Looks no usbnet drivers hold subsystem(network) locks in its complete().
+Both the locks held are per device/per skb list. In usbnet_bh(), there
+is one, eg.
+netif_rx(), which is a API and disables local IRQ.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+>
+> The danger is not interrupt handlers in the same driver but IRQ handlers of _other_
+> drivers (PCI, ...) a lock is shared with.
+
+Right, so generally drivers which spin_lock(subsystem lock) in complete()
+might be affected.
+
+>
+> You need to go through all USB drivers and change every spin_lock() that goes
+> for a lock that is exported to a spin_lock_irqsave()
+
+Yes, that is the safest way.
+
+Thanks,
+--
+Ming Lei
