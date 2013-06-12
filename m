@@ -1,30 +1,117 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 12 Jun 2013 09:45:13 +0200 (CEST)
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
-References: <CACVXFVMNzwD44mhKijURSWrqLKjy7_oOY8hrTtjbyOxGS2tv=g@mail.gmail.com>
- <Pine.LNX.4.44L0.1306111431170.1392-100000@iolanthe.rowland.org>
- <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1306120935320.22970@ionos>
+From: monstr@monstr.eu (Michal Simek)
+Date: Wed, 12 Jun 2013 09:46:29 +0200
+Subject: [PATCH] arm: dt: zynq: Add support for the zc706 platform
+In-Reply-To: <785766f9-0d23-4a78-8638-fac05920049d@CO1EHSMHS013.ehs.local>
+References: <1370884204-2297-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1370985888.7804.1.camel@linux-builds1>
+ <785766f9-0d23-4a78-8638-fac05920049d@CO1EHSMHS013.ehs.local>
+Message-ID: <51B82755.4080701@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Ming Lei wrote:
-> On Wed, Jun 12, 2013 at 3:10 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> >> Also the tasklet running in CPU0 can handle the work which should
-> >> have been done by the same tasket scheduled in CPU1,  so we can
-> >> avoid busy-waitting in CPU1 which may be introduced by tasklet_schedule()
-> >> in CPU1.
-> >
-> > Or you could have a separate tasklet for each host controller.
-> 
-> Yes, but I will compare tasklet with interrupt threaded handler first.
+On 06/11/2013 11:28 PM, S?ren Brinkmann wrote:
+> On Tue, Jun 11, 2013 at 04:24:48PM -0500, Dinh Nguyen wrote:
+>> Hi Soren,
+>>
+>> On Mon, 2013-06-10 at 10:10 -0700, Soren Brinkmann wrote:
+>>> Add a DT fragment for the zc706 Zynq platform. Also, adding a
+>>> corresponding target to the Makefile and adding an appropriate
+>>> compatibility string in the BSP.
+>>>
+>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>> ---
+>>>  arch/arm/boot/dts/Makefile       |  3 ++-
+>>>  arch/arm/boot/dts/zynq-zc706.dts | 31 +++++++++++++++++++++++++++++++
+>>>  arch/arm/mach-zynq/common.c      |  1 +
+>>>  3 files changed, 34 insertions(+), 1 deletion(-)
+>>>  create mode 100644 arch/arm/boot/dts/zynq-zc706.dts
+>>>
+>>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>>> index b9f7121..2aecf7e 100644
+>>> --- a/arch/arm/boot/dts/Makefile
+>>> +++ b/arch/arm/boot/dts/Makefile
+>>> @@ -206,7 +206,8 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
+>>>  	wm8505-ref.dtb \
+>>>  	wm8650-mid.dtb \
+>>>  	wm8850-w70v2.dtb
+>>> -dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb
+>>> +dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
+>>> +	zynq-zc706.dtb
+>>>  
+>>>  targets += dtbs
+>>>  targets += $(dtb-y)
+>>> diff --git a/arch/arm/boot/dts/zynq-zc706.dts b/arch/arm/boot/dts/zynq-zc706.dts
+>>> new file mode 100644
+>>> index 0000000..a8a1d7d
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/zynq-zc706.dts
+>>> @@ -0,0 +1,31 @@
+>>> +/*
+>>> + *  Copyright (C) 2011 Xilinx
+>>> + *  Copyright (C) 2012 National Instruments Corp.
+>>> + *  Copyright (C) 2013 Xilinx
+>>> + *
+>>> + * This software is licensed under the terms of the GNU General Public
+>>> + * License version 2, as published by the Free Software Foundation, and
+>>> + * may be copied, distributed, and modified under those terms.
+>>> + *
+>>> + * This program is distributed in the hope that it will be useful,
+>>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>>> + * GNU General Public License for more details.
+>>> + */
+>>> +/dts-v1/;
+>>> +/include/ "zynq-7000.dtsi"
+>>> +
+>>> +/ {
+>>> +	model = "Zynq ZC706 Development Board";
+>>> +	compatible = "xlnx,zynq-zc706", "xlnx,zynq-7000";
+>>> +
+>>> +	memory {
+>>> +		device_type = "memory";
+>>> +		reg = <0x0 0x40000000>;
+>>> +	};
+>>> +
+>>> +	chosen {
+>>> +		bootargs = "console=ttyPS1,115200 earlyprintk";
+>>> +	};
+>>> +
+>>> +};
+>>> diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+>>> index 5bfe703..221694b 100644
+>>> --- a/arch/arm/mach-zynq/common.c
+>>> +++ b/arch/arm/mach-zynq/common.c
+>>> @@ -99,6 +99,7 @@ static void zynq_system_reset(char mode, const char *cmd)
+>>>  
+>>>  static const char * const zynq_dt_match[] = {
+>>>  	"xlnx,zynq-zc702",
+>>> +	"xlnx,zynq-zc706",
+>>
+>> You really don't need to add zc706 here if it is already compatable with
+>> zynq-7000.
+> I actually thought about this and decided to add it, since there already
+> was an entry for the zc702. What is the best methord for this cases?
+> Rather remove the specific ones and migrate all to the zynq-7000
+> compatibility string?
 
-Yes, please. I read through the thread and I really recommend that you
-get rid of the tasklet. tasklets are a complete disaster by design and
-we really should make efforts to get rid of the last users instead of
-trying to work around their semantical shortcomings.
+Please remove zc702 compatibility string from common.c and
+don't add zc706.
 
 Thanks,
+Michal
 
-	tglx
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/c5698226/attachment.sig>
