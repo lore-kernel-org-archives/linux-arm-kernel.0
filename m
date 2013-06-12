@@ -1,215 +1,173 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 12 Jun 2013 11:59:21 +0900
-Subject: [PATCH V3 1/3] Add PCIe driver for Samsung Exynos
-In-Reply-To: <36071399.7aY6jgGn2d@wuerfel>
-References: <000d01ce6360$9504e7e0$bf0eb7a0$@samsung.com>
- <36071399.7aY6jgGn2d@wuerfel>
-Message-ID: <002401ce6718$d6bbc8f0$84335ad0$@samsung.com>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Wed, 12 Jun 2013 08:48:08 +0530
+Subject: [RESEND PATCH 1/3] ARM: EXYNOS: Move arm core power down clock to
+ exynos5250 common clock
+In-Reply-To: <1370501833-9196-1-git-send-email-amit.daniel@samsung.com>
+References: <1363240979-1939-2-git-send-email-amit.daniel@samsung.com>
+ <1370501833-9196-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <CADGdYn5owUyCMzJSJQgzR6N0inLpm5Te09BvX0rvBZ1bx=bv=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, June 07, 2013 7:53 PM, Arnd Bergmann wrote:
-> On Friday 07 June 2013 18:22:50 Jingoo Han wrote:
-> 
-> > diff --git a/Documentation/devicetree/bindings/pci/exynos-pcie.txt
-> b/Documentation/devicetree/bindings/pci/exynos-pcie.txt
-> > new file mode 100644
-> > index 0000000..3eb4a2d
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/pci/exynos-pcie.txt
-> > @@ -0,0 +1,56 @@
-> > +* Samsung Exynos PCIe interface
-> > +
-> > +Required properties:
-> > +-compatible: should be "samsung,exynos5440-pcie"
-> > +-reg: base addresses and lengths of the pcie conteroller,
-> > +	additional register for the pcie controller,
-> > +	the phy controller,
-> > +	additional register for the phy controller.
-> > +- interrupts: interrupt values for level interrupt,
-> > +	pulse interrupt, special interrupt.
-> > +- device_type, set to "pci"
-> > +- bus-range: PCI bus numbers covered
-> 
-> Why is it that only a subset of bus numbers are used? Can't you address
-> the entire range?
+Hi Mike,
 
-I will remove 'bus-range' property from DT.
+If possible please ack this patch or merge this via your tree.
 
-> 
-> > +- ranges: ranges for the PCI memory and I/O regions
-> > +- reset-gpio: gpio pin number of power good signal
-> 
-> The 'reset-gpio' property seems incorrect. I think this should either
-> use the gpio binding or the reset-controller binding. Specifying
-> bare numbers to use as gpio pins does not work, since the number
-> space for Linux internal gpio numbers is not necessarily the same
-> as used by the hardware.
+Thanks,
+Amit Daniel
 
-As you mentioned, other Exynos SoCs such as Exynos5250 set
-GPIO properties in DT, as below:
-(./arch/arm/boot/dts/exynos5250-smdk5250.dts)
-	hdmi {
-		hpd-gpio = <&gpx3 7 0>;
-	};
-	usb at 12110000 {
-		samsung,vbus-gpio = <&gpx2 6 0>;
-	};
-
-However, the situation of Exynos5440 GPIO is different.
-The following bare numbers of GPIO work properly on Exynos5440.
-(./arch/arm/boot/dts/exynos5440-ssdk5440.dts)
-	pcie0 at 40000000 {
-		reset-gpio = <5>;
-	}
-	pcie0 at 40000000 {
-		reset-gpio = <22>;
-	}
-
-Thomas Abraham is the author of pinctrl driver for EXYNOS5440.
-(./drivers/pinctrl/pinctrl-exynos5440.c)
-
-Thomas Abraham or Kukjin Kim, can you confirm this?
-If I am wrong, please let me know kindly. :)
-
-
-> 
-> I think you also need an interrupt-map property as mandated by
-> the PCI binding, in order to use legacy interrupts, as well as
-> #address-cells and #size-cells.
-> 
-> > +       pcie0 at 40000000 {
-> > +               compatible = "samsung,exynos5440-pcie";
-> > +               reg = <0x40000000 0x4000
-> > +                       0x290000 0x1000
-> > +                       0x270000 0x1000
-> > +                       0x271000 0x40>;
-> > +               interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> > +               device_type = "pci";
-> > +               bus-range = <0x0 0xf>;
-> > +               ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-> > +                         0x81000000 0 0          0x40200000 0 0x00004000   /* downstream I/O */
-> > +                         0x82000000 0 0          0x40204000 0 0x10000000>; /* non-prefetchable memory */
-> > +       };
-> > +
-> > +       pcie1 at 60000000 {
-> > +               compatible = "samsung,exynos5440-pcie";
-> > +               reg = <0x60000000 0x4000
-> > +                       0x2a0000 0x1000
-> > +                       0x272000 0x1000
-> > +                       0x271040 0x40>;
-> > +               interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-> > +               device_type = "pci";
-> > +               bus-range = <0x0 0xf>;
-> > +               ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00200000   /* configuration space */
-> > +                         0x81000000 0 0          0x60200000 0 0x00004000   /* downstream I/O */
-> > +                         0x82000000 0 0          0x60204000 0 0x10000000>; /* non-prefetchable memory */
-> > +       };
-> 
-> Is it intentional that in this example you set up both buses to
-> have both memory and I/O space start at address 0 in bus space?
-
-No, it is not intentional.
-I will fix it.
-
-> 
-> I think it would be more logical to have non-overlapping addresses.
-> You can also choose to have an identity mapping for memory
-> space where a PCI bus address maps directly to the physical address
-> used to access it, although that will prevent you from using legacy
-> VGA cards that require the use of the low 16 MB.
-> 
-> Using a 16kb I/O space rather than a 64KB I/O space per port will
-> lead to pci_ioremap_io() map the start of your memory space into
-> PCI_IO_VIRT_BASE, which you probably didn't intend.
-> 
-> If your hardware cannot handle a full 64KB window, I would recommend
-> to at least leave a hole before the start of the memory window.
-
-OK, I see.
-I will fix both MEM space and I/O space.
-
-> 
-> > +struct pcie_port {
-> > +	struct device		*dev;
-> > +	u8			controller;
-> > +	u8			root_bus_nr;
-> > +	void __iomem		*dbi_base;
-> > +	void __iomem		*va_dbi_base;
-> > +	void __iomem		*elbi_base;
-> > +	void __iomem		*va_elbi_base;
-> > +	void __iomem		*base;
-> > +	void __iomem		*phy_base;
-> > +	void __iomem		*va_phy_base;
-> > +	void __iomem		*purple_base;
-> > +	void __iomem		*va_purple_base;
-> > +	void __iomem		*cfg0_base;
-> > +	void __iomem		*va_cfg0_base;
-> > +	void __iomem		*cfg1_base;
-> > +	void __iomem		*va_cfg1_base;
-> > +	void __iomem		*io_base;
-> > +	void __iomem		*mem_base;
-> > +	spinlock_t		conf_lock;
-> > +	struct resource		io;
-> > +	struct resource		mem;
-> > +	struct resource		busn;
-> 
-> A lot of the fields above appear to be duplicated. If you
-> pass a physical address, that needs to be a phys_addr_t,
-> not void __iomem*. I think most of the physical addresses
-> can be removed there, and you just keep the virtual addresses
-> but drop the va_ prefix.
-
-OK, I see.
-I will use the 'phys_addr_t' and remove redundant physical
-addresses.
-
-> 
-> > +static int add_pcie_port(struct pcie_port *pp, struct platform_device *pdev)
-> > +{
-> > +	struct resource *dbi_base;
-> > +	struct resource *elbi_base;
-> > +	struct resource *phy_base;
-> > +	struct resource *purple_base;
-> > +	int ret;
-> > +
-> > +	dbi_base = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	if (!dbi_base) {
-> > +		dev_err(&pdev->dev, "couldn't get dbi base resource\n");
-> > +		return -EINVAL;
-> > +	}
-> > +	if (!devm_request_mem_region(&pdev->dev, dbi_base->start,
-> > +				resource_size(dbi_base), pdev->name)) {
-> > +		dev_err(&pdev->dev, "dbi base resource is busy\n");
-> > +		return -EBUSY;
-> > +	}
-> > +	pp->dbi_base = (void __iomem *) (unsigned long)dbi_base->start;
-> 
-> That will also let you get rid of the casts here.
-
-Yes, I will remove unnecessary casts.
-
-> 
-> 
-> > +static int __exit exynos_pcie_remove(struct platform_device *pdev)
-> > +{
-> > +	return 0;
-> > +}
-> > +
-> 
-> an empty 'remove' function seems incorrect. I don't know what a
-> removable PCI should be doing here, but at least you need to undo
-> everything you set up in the probe function.
-
-I will remove the empty 'remove' function.
-
-Thank you for your comments. :)
-I will fix it and send v4 patch, soon.
-
-
-Best regards,
-Jingoo Han
-
-> 
-> 
-> 	Arnd
+On Thu, Jun 6, 2013 at 12:27 PM, Amit Daniel Kachhap
+<amit.daniel@samsung.com> wrote:
+> Now with common clock support added for exynos5250 it is necessary to move
+> this code to exynos5250 common clock driver as clock registers should be
+> handled there. This change is tested in exynos5250 based arndale platform.
+>
+> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+> ---
+> Re-based against linux for-next branch.
+>
+>  arch/arm/mach-exynos/cpuidle.c       |   35 ----------------------------
+>  drivers/clk/samsung/clk-exynos5250.c |   42 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 42 insertions(+), 35 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
+> index 17a18ff..4667907 100644
+> --- a/arch/arm/mach-exynos/cpuidle.c
+> +++ b/arch/arm/mach-exynos/cpuidle.c
+> @@ -159,46 +159,11 @@ static int exynos4_enter_lowpower(struct cpuidle_device *dev,
+>                 return exynos4_enter_core0_aftr(dev, drv, new_index);
+>  }
+>
+> -static void __init exynos5_core_down_clk(void)
+> -{
+> -       unsigned int tmp;
+> -
+> -       /*
+> -        * Enable arm clock down (in idle) and set arm divider
+> -        * ratios in WFI/WFE state.
+> -        */
+> -       tmp = PWR_CTRL1_CORE2_DOWN_RATIO | \
+> -             PWR_CTRL1_CORE1_DOWN_RATIO | \
+> -             PWR_CTRL1_DIV2_DOWN_EN     | \
+> -             PWR_CTRL1_DIV1_DOWN_EN     | \
+> -             PWR_CTRL1_USE_CORE1_WFE    | \
+> -             PWR_CTRL1_USE_CORE0_WFE    | \
+> -             PWR_CTRL1_USE_CORE1_WFI    | \
+> -             PWR_CTRL1_USE_CORE0_WFI;
+> -       __raw_writel(tmp, EXYNOS5_PWR_CTRL1);
+> -
+> -       /*
+> -        * Enable arm clock up (on exiting idle). Set arm divider
+> -        * ratios when not in idle along with the standby duration
+> -        * ratios.
+> -        */
+> -       tmp = PWR_CTRL2_DIV2_UP_EN       | \
+> -             PWR_CTRL2_DIV1_UP_EN       | \
+> -             PWR_CTRL2_DUR_STANDBY2_VAL | \
+> -             PWR_CTRL2_DUR_STANDBY1_VAL | \
+> -             PWR_CTRL2_CORE2_UP_RATIO   | \
+> -             PWR_CTRL2_CORE1_UP_RATIO;
+> -       __raw_writel(tmp, EXYNOS5_PWR_CTRL2);
+> -}
+> -
+>  static int __init exynos4_init_cpuidle(void)
+>  {
+>         int cpu_id, ret;
+>         struct cpuidle_device *device;
+>
+> -       if (soc_is_exynos5250())
+> -               exynos5_core_down_clk();
+> -
+>         ret = cpuidle_register_driver(&exynos4_idle_driver);
+>         if (ret) {
+>                 printk(KERN_ERR "CPUidle failed to register driver\n");
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+> index 5c97e75..89f51e9 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -21,6 +21,8 @@
+>
+>  #define SRC_CPU                        0x200
+>  #define DIV_CPU0               0x500
+> +#define PWR_CTRL1              0x1020
+> +#define PWR_CTRL2              0x1024
+>  #define SRC_CORE1              0x4204
+>  #define SRC_TOP0               0x10210
+>  #define SRC_TOP2               0x10218
+> @@ -63,6 +65,23 @@
+>  #define PLL_DIV2_SEL           0x20a24
+>  #define GATE_IP_DISP1          0x10928
+>
+> +/*Below definitions are used for PWR_CTRL settings*/
+> +#define PWR_CTRL1_CORE2_DOWN_RATIO             (7 << 28)
+> +#define PWR_CTRL1_CORE1_DOWN_RATIO             (7 << 16)
+> +#define PWR_CTRL1_DIV2_DOWN_EN                 (1 << 9)
+> +#define PWR_CTRL1_DIV1_DOWN_EN                 (1 << 8)
+> +#define PWR_CTRL1_USE_CORE1_WFE                        (1 << 5)
+> +#define PWR_CTRL1_USE_CORE0_WFE                        (1 << 4)
+> +#define PWR_CTRL1_USE_CORE1_WFI                        (1 << 1)
+> +#define PWR_CTRL1_USE_CORE0_WFI                        (1 << 0)
+> +
+> +#define PWR_CTRL2_DIV2_UP_EN                   (1 << 25)
+> +#define PWR_CTRL2_DIV1_UP_EN                   (1 << 24)
+> +#define PWR_CTRL2_DUR_STANDBY2_VAL             (1 << 16)
+> +#define PWR_CTRL2_DUR_STANDBY1_VAL             (1 << 8)
+> +#define PWR_CTRL2_CORE2_UP_RATIO               (1 << 4)
+> +#define PWR_CTRL2_CORE1_UP_RATIO               (1 << 0)
+> +
+>  /*
+>   * Let each supported clock get a unique id. This id is used to lookup the clock
+>   * for device tree based platforms. The clocks are categorized into three
+> @@ -110,6 +129,8 @@ enum exynos5250_clks {
+>  static __initdata unsigned long exynos5250_clk_regs[] = {
+>         SRC_CPU,
+>         DIV_CPU0,
+> +       PWR_CTRL1,
+> +       PWR_CTRL2,
+>         SRC_CORE1,
+>         SRC_TOP0,
+>         SRC_TOP2,
+> @@ -474,6 +495,7 @@ void __init exynos5250_clk_init(struct device_node *np)
+>  {
+>         void __iomem *reg_base;
+>         struct clk *apll, *mpll, *epll, *vpll, *bpll, *gpll, *cpll;
+> +       unsigned int tmp;
+>
+>         if (np) {
+>                 reg_base = of_iomap(np, 0);
+> @@ -516,6 +538,26 @@ void __init exynos5250_clk_init(struct device_node *np)
+>         samsung_clk_register_gate(exynos5250_gate_clks,
+>                         ARRAY_SIZE(exynos5250_gate_clks));
+>
+> +       /*
+> +        * Enable arm clock down (in idle) and set arm divider
+> +        * ratios in WFI/WFE state.
+> +        */
+> +       tmp = (PWR_CTRL1_CORE2_DOWN_RATIO | PWR_CTRL1_CORE1_DOWN_RATIO |
+> +               PWR_CTRL1_DIV2_DOWN_EN | PWR_CTRL1_DIV1_DOWN_EN |
+> +               PWR_CTRL1_USE_CORE1_WFE | PWR_CTRL1_USE_CORE0_WFE |
+> +               PWR_CTRL1_USE_CORE1_WFI | PWR_CTRL1_USE_CORE0_WFI);
+> +       __raw_writel(tmp, reg_base + PWR_CTRL1);
+> +
+> +       /*
+> +        * Enable arm clock up (on exiting idle). Set arm divider
+> +        * ratios when not in idle along with the standby duration
+> +        * ratios.
+> +        */
+> +       tmp = (PWR_CTRL2_DIV2_UP_EN | PWR_CTRL2_DIV1_UP_EN |
+> +               PWR_CTRL2_DUR_STANDBY2_VAL | PWR_CTRL2_DUR_STANDBY1_VAL |
+> +               PWR_CTRL2_CORE2_UP_RATIO | PWR_CTRL2_CORE1_UP_RATIO);
+> +       __raw_writel(tmp, reg_base + PWR_CTRL2);
+> +
+>         pr_info("Exynos5250: clock setup completed, armclk=%ld\n",
+>                         _get_rate("armclk"));
+>  }
+> --
+> 1.7.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
