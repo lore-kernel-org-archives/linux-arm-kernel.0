@@ -1,85 +1,49 @@
-From: tgih.jun@samsung.com (Seungwon Jeon)
-Date: Wed, 12 Jun 2013 10:22:00 +0900
-Subject: [PATCH v3 4/7] mmc: dw_mmc-pltfm: add Rockchip variant
-In-Reply-To: <201306111330.56901.heiko@sntech.de>
-References: <201306111328.52679.heiko@sntech.de>
- <201306111330.56901.heiko@sntech.de>
-Message-ID: <000a01ce670b$3cf651c0$b6e2f540$%jun@samsung.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Jun 2013 18:22:42 -0700
+Subject: [PATCHv6 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+In-Reply-To: <1370995696.7804.17.camel@linux-builds1>
+References: <1370444578-25721-1-git-send-email-dinguyen@altera.com>
+ <1370444578-25721-7-git-send-email-dinguyen@altera.com>
+ <20130611232756.GD23774@quad.lixom.net>
+ <1370995696.7804.17.camel@linux-builds1>
+Message-ID: <20130612012242.GL23774@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks good to me.
-But this patch has a dependency on '[PATCH 2/2] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA'
-After that, it can be applied.(SDMMC_CMD_USE_HOLD_REG should be moved in dw_mmc.h)
+On Tue, Jun 11, 2013 at 07:08:16PM -0500, Dinh Nguyen wrote:
+> Hi Olof,
+> 
+> On Tue, 2013-06-11 at 16:27 -0700, Olof Johansson wrote:
+> > Hi,
+> > 
+> > On Wed, Jun 05, 2013 at 10:02:58AM -0500, dinguyen at altera.com wrote:
+> > > From: Dinh Nguyen <dinguyen@altera.com>
+> > > 
+> > > Add platform specific functionality for the DW SD/MMC driver for
+> > > SoCFPGA. Move SDMMC_CMD_USE_HOLD_REG to dw_mmc.h so other platforms
+> > > can use this define.
+> > > 
+> > > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > > CC: Seungwon Jeon <tgih.jun@samsung.com>
+> > > CC: Jaehoon Chung <jh80.chung@samsung.com>
+> > > CC: Arnd Bergmann <arnd@arndb.de>
+> > > CC: Olof Johansson <olof@lixom.net>
+> > > CC: Pavel Machek <pavel@denx.de>
+> > > CC: linux-mmc at vger.kernel.org
+> > 
+> > Acked-by: Olof Johansson <olof@lixom.net>
+> > 
+> > This one should be sent to (and applied by) Chris Ball, the MMC maintainer. The
+> > driver is standalone and can go in independently on the platform code that will
+> > configure it, so he can merge it without dependencies.
+> 
+> Thanks Olof. I will send to Chris Ball. I kinda thought that since
+> Jaehoon and Seungwon were maintainers of the dw_mmc driver that I didn't
+> need to send to Chris.
 
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+Ah, no, it should probably go up through his tree in this case. It's
+still good to have their Acked-by though, since they know the details
+of the DW side.
 
-Thanks,
-Seungwon Jeon
 
-On 06/11/13 2013 8:31 PM Heiko St?bner wrote:
-> Cortex-A9 SoCs from Rockchip use a slightly modified variant of dw_mmc
-> controllers that seems to require the SDMMC_CMD_USE_HOLD_REG bit to
-> always be set.
-> 
-> There also seem to be no other modifications (additional register etc)
-> present, so to keep the footprint low, add this small variant to the
-> pltfm driver.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  drivers/mmc/host/dw_mmc-pltfm.c |   21 ++++++++++++++++++++-
->  1 files changed, 20 insertions(+), 1 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-> index 9b05381..cbbbcf3 100644
-> --- a/drivers/mmc/host/dw_mmc-pltfm.c
-> +++ b/drivers/mmc/host/dw_mmc-pltfm.c
-> @@ -24,6 +24,15 @@
-> 
->  #include "dw_mmc.h"
-> 
-> +static void dw_mci_rockchip_prepare_command(struct dw_mci *host, u32 *cmdr)
-> +{
-> +	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-> +}
-> +
-> +static const struct dw_mci_drv_data rockchip_drv_data = {
-> +	.prepare_command	= dw_mci_rockchip_prepare_command,
-> +};
-> +
->  int dw_mci_pltfm_register(struct platform_device *pdev,
->  				const struct dw_mci_drv_data *drv_data)
->  {
-> @@ -100,13 +109,23 @@ EXPORT_SYMBOL_GPL(dw_mci_pltfm_pmops);
-> 
->  static const struct of_device_id dw_mci_pltfm_match[] = {
->  	{ .compatible = "snps,dw-mshc", },
-> +	{ .compatible = "rockchip,cortex-a9-dw-mshc",
-> +		.data = &rockchip_drv_data },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
-> 
->  static int dw_mci_pltfm_probe(struct platform_device *pdev)
->  {
-> -	return dw_mci_pltfm_register(pdev, NULL);
-> +	const struct dw_mci_drv_data *drv_data = NULL;
-> +	const struct of_device_id *match;
-> +
-> +	if (pdev->dev.of_node) {
-> +		match = of_match_node(dw_mci_pltfm_match, pdev->dev.of_node);
-> +		drv_data = match->data;
-> +	}
-> +
-> +	return dw_mci_pltfm_register(pdev, drv_data);
->  }
-> 
->  int dw_mci_pltfm_remove(struct platform_device *pdev)
-> --
-> 1.7.2.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-Olof
