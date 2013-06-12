@@ -1,47 +1,51 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 12 Jun 2013 14:08:00 +0200
-Subject: [V2 3/7] video: mmp: fix graphics/video layer enable/mask swap
- issue
-In-Reply-To: <1370879552-11290-1-git-send-email-jtzhou@marvell.com>
-References: <1370879521-10962-1-git-send-email-jtzhou@marvell.com>
- <1370879552-11290-1-git-send-email-jtzhou@marvell.com>
-Message-ID: <20130612120800.GC305@game.jcrosoft.org>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Wed, 12 Jun 2013 14:16:38 +0200
+Subject: [GIT PULL] dw_apb_timer enhancements for 3.11
+Message-ID: <201306121416.39237.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:52 Mon 10 Jun     , Jett.Zhou wrote:
-> From: Jing Xiang <jxiang@marvell.com>
-> 
-> There is bug when switch dma of graphic layer and video layer, it
-> configured opposite bit, fix it.
-> 
-> Signed-off-by: Jing Xiang <jxiang@marvell.com>
-> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
-do you need those 2 fixes for 3.10 or it can wait for 3.11?
+Hi Arnd, Olof,
 
-Best Regards,
-J.
-> ---
->  drivers/video/mmp/hw/mmp_ctrl.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
-> index 3a8c2a3..8836053 100644
-> --- a/drivers/video/mmp/hw/mmp_ctrl.c
-> +++ b/drivers/video/mmp/hw/mmp_ctrl.c
-> @@ -160,9 +160,9 @@ static void overlay_set_win(struct mmp_overlay *overlay, struct mmp_win *win)
->  
->  static void dmafetch_onoff(struct mmp_overlay *overlay, int on)
->  {
-> -	u32 mask = overlay_is_vid(overlay) ? CFG_GRA_ENA_MASK :
-> -		   CFG_DMA_ENA_MASK;
-> -	u32 enable = overlay_is_vid(overlay) ? CFG_GRA_ENA(1) : CFG_DMA_ENA(1);
-> +	u32 mask = overlay_is_vid(overlay) ? CFG_DMA_ENA_MASK :
-> +		   CFG_GRA_ENA_MASK;
-> +	u32 enable = overlay_is_vid(overlay) ? CFG_DMA_ENA(1) : CFG_GRA_ENA(1);
->  	u32 tmp;
->  	struct mmp_path *path = overlay->path;
->  
-> -- 
-> 1.7.0.4
-> 
+following the suggestion of Linus Walleij, a pull request for the
+dw_apb_timer changes from last week with all ACKs applied.
+Warning, this is my first pull request ever :-) .
+
+The tag is signed and the key has among others a signature of Greg K-H, so
+hopefully this will work.
+
+
+The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+
+  Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+
+are available in the git repository at:
+
+  git at github.com:mmind/linux-rockchip.git tags/dw_apb_timer_of
+
+for you to fetch changes up to 10021488997317d1121505a7ac659124c058efed:
+
+  clocksource: dw_apb_timer_of: use clocksource_of_init (2013-06-12 13:47:38 +0200)
+
+----------------------------------------------------------------
+Enhancements for dw_apb_timer:
+- use DECLARE_CLOCKSOURCE_OF and convert its users
+- handle the sptimer not being present as sched_clock
+- add optional handling of timer clocks
+
+----------------------------------------------------------------
+Heiko Stuebner (4):
+      clocksource: dw_apb_timer_of: enable the use the clocksource as sched clock
+      clocksource: dw_apb_timer_of: add clock-handling
+      clocksource: dw_apb_timer_of: select DW_APB_TIMER
+      clocksource: dw_apb_timer_of: use clocksource_of_init
+
+ Documentation/devicetree/bindings/rtc/dw-apb.txt |   19 +++++++++++++++++++
+ arch/arm/mach-picoxcell/Kconfig                  |    1 -
+ arch/arm/mach-picoxcell/common.c                 |    2 --
+ arch/arm/mach-socfpga/Kconfig                    |    1 -
+ arch/arm/mach-socfpga/socfpga.c                  |    2 --
+ drivers/clocksource/Kconfig                      |    2 ++
+ drivers/clocksource/dw_apb_timer_of.c            |   95 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++--------------------------------
+ include/linux/dw_apb_timer.h                     |    1 -
+ 8 files changed, 84 insertions(+), 39 deletions(-)
