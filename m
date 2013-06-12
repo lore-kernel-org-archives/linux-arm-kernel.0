@@ -1,45 +1,38 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Jun 2013 13:38:49 +0200
-Subject: [PATCHv4 0/9] Add I2C support for Allwinner SoCs
-In-Reply-To: <3315236.ZNXhyxmCRd@wuerfel>
-References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
- <3315236.ZNXhyxmCRd@wuerfel>
-Message-ID: <20130612113849.GG16699@lukather>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Jun 2013 13:43:55 +0200
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20130612110746.5D6943E0A56@localhost>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20835253.Agl4DfuI3k@wuerfel> <20130612110746.5D6943E0A56@localhost>
+Message-ID: <2456741.M6ZcdeZsEr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-On Wed, Jun 12, 2013 at 01:26:56PM +0200, Arnd Bergmann wrote:
-> On Wednesday 12 June 2013 10:07:09 Maxime Ripard wrote:
-> > 
-> > This patchset adds support for the I2C controller found on most of the
-> > Allwinner SoCs, especially the already supported A10 and A13, and the
-> > yet to come A31.
-> > 
-> > This driver leverages the Marvel mv64xxx i2c controller driver, that has
-> > an almost identical logic, with a slightly different register layout.
-> > 
-> > It has been tested on a A13-Olinuxino and an A10s-Olinuxino.
+On Wednesday 12 June 2013 12:07:46 Grant Likely wrote:
 > 
-> It doesn't really matter, but can someone clarify why this driver can
-> be reused? Did marvell and allwinner license the same hardware block
-> or is just a really simple driver that does things in an obvious way?
+> It actually seems a bit silly to put the internal regs into the ranges
+> property at all. It's not like they need to be translated or provided to
+> any child nodes. Just give the root node a reg property with the correct
+> base for the internal regs.
 
-The Marvell and Allwinner controllers share the exact same logic (which
-is definitely not trivial), based on a finite state machine that
-triggers interrupts at each change of state, each state being a state in
-the I2C protocol (like address sent, data received with an ACK, etc.).
+I think you are missing some background about the internal-regs:
 
-The weird thing is that the only difference between the two controllers
-is the register offsets, and that's it. The state numbers, bit index,
-etc, are exactly the same.
+* These are SoC-wide registers including the UART and other things, not
+  just the mbus setup
+* There are at least two different values used for the internal-regs
+  mapping address depending on the SoC and boot loader version
+* We have to get the address from the DT since it is impossible to
+  probe or change without knowing the current setting: The internal-regs
+  also contains the registers in mbus used to relocate the internal-regs.
 
-So yes, I think they both licensed the same IP.
+> As for regenerating the ranges; I have no problem with the kernel
+> allocating ranges at runtime, but that code should not be creating a new
+> ranges property and adding it to the tree. The knowledge should be kept
+> internal to the driver and it should use an of_bus translator
+> (drivers/of/address.c) to tap into the ranges parsings code.
 
-Maxime
+Ok, makes sense. I didn't know about the of_bus code. Thanks for the
+pointer!
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+	Arnd
