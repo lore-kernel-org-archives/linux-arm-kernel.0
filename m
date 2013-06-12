@@ -1,65 +1,69 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 12 Jun 2013 23:06:53 +0200
-Subject: [PATCH v4 5/6] clk: samsung: Reorder MUX registration for
- mout_vpllsrc
-In-Reply-To: <1370272196-4346-6-git-send-email-yadi.brar@samsung.com>
-References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
- <1370272196-4346-6-git-send-email-yadi.brar@samsung.com>
-Message-ID: <6043487.0U6pzGhZid@flatron>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 12 Jun 2013 17:08:02 -0400
+Subject: [PATCH] ARM: multi_v7: Add OMAP with ramdisk config bits
+Message-ID: <1371071282-14750-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 03 of June 2013 20:39:55 Yadwinder Singh Brar wrote:
-> From: Vikas Sajjan <vikas.sajjan@linaro.org>
-> 
-> While trying to get rate of "mout_vpllsrc" MUX (parent) for registering
-> the "fout_vpll" (child), we found get rate was failing.
-> 
-> So this patch moves the mout_vpllsrc MUX out of the existing common list
-> and registers the mout_vpllsrc MUX before the PLL registrations.
-> 
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
-> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> ---
->  drivers/clk/samsung/clk-exynos5250.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
+Add ramdisk fileystem related options which lets OMAP5 and Keystone
+SOCs to boot till shell with multi_v7_config.
 
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Arnd Bergmann <arnd@arndb.de>
 
-Best regards,
-Tomasz
+Signed-off-by: Sricharan R <r.sricharan@ti.com>
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+---
+The ARCH_SIRF related fix is already in arm-soc as pointed by Olof on
+IRC. So just sending the defconfig bits only. I didn't sync the
+multi_v7_config with usual method since it was adding some unnecessary
+delta to the $subject patch.
 
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c
-> b/drivers/clk/samsung/clk-exynos5250.c index ddf10ca..70cc6cf 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -207,6 +207,10 @@ struct samsung_fixed_factor_clock
-> exynos5250_fixed_factor_clks[] __initdata = { FFACTOR(none,
-> "fout_bplldiv2", "fout_bpll", 1, 2, 0),
->  };
-> 
-> +struct samsung_mux_clock exynos5250_pll_pmux_clks[] __initdata = {
-> +	MUX(none, "mout_vpllsrc", mout_vpllsrc_p, SRC_TOP2, 0, 1),
-> +};
-> +
->  struct samsung_mux_clock exynos5250_mux_clks[] __initdata = {
->  	MUX(none, "mout_apll", mout_apll_p, SRC_CPU, 0, 1),
->  	MUX(none, "mout_cpu", mout_cpu_p, SRC_CPU, 16, 1),
-> @@ -214,7 +218,6 @@ struct samsung_mux_clock exynos5250_mux_clks[]
-> __initdata = { MUX(none, "sclk_mpll", mout_mpll_p, SRC_CORE1, 8, 1),
->  	MUX(none, "mout_bpll_fout", mout_bpll_fout_p, PLL_DIV2_SEL, 0, 1),
->  	MUX(none, "sclk_bpll", mout_bpll_p, SRC_CDREX, 0, 1),
-> -	MUX(none, "mout_vpllsrc", mout_vpllsrc_p, SRC_TOP2, 0, 1),
->  	MUX(none, "sclk_vpll", mout_vpll_p, SRC_TOP2, 16, 1),
->  	MUX(none, "sclk_epll", mout_epll_p, SRC_TOP2, 12, 1),
->  	MUX(none, "sclk_cpll", mout_cpll_p, SRC_TOP2, 8, 1),
-> @@ -490,6 +493,9 @@ void __init exynos5250_clk_init(struct device_node
-> *np) ARRAY_SIZE(exynos5250_fixed_rate_ext_clks),
->  			ext_clk_match);
-> 
-> +	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
-> +			ARRAY_SIZE(exynos5250_pll_pmux_clks));
-> +
->  	apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
->  			reg_base, NULL, 0);
->  	mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
+ arch/arm/configs/multi_v7_defconfig |    9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 2e67a27..efd12f4 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -1,11 +1,14 @@
+ CONFIG_EXPERIMENTAL=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
++CONFIG_BLK_DEV_INITRD=y
+ CONFIG_ARCH_MVEBU=y
+ CONFIG_MACH_ARMADA_370=y
+ CONFIG_ARCH_SIRF=y
+ CONFIG_MACH_ARMADA_XP=y
+ CONFIG_ARCH_HIGHBANK=y
++CONFIG_ARCH_OMAP2PLUS=y
++CONFIG_SOC_OMAP5=y
+ CONFIG_ARCH_SOCFPGA=y
+ CONFIG_ARCH_SUNXI=y
+ CONFIG_ARCH_WM8850=y
+@@ -25,6 +28,9 @@ CONFIG_ARM_APPENDED_DTB=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_NET=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_BLK_DEV_RAM=y
+ CONFIG_BLK_DEV_SD=y
+ CONFIG_ATA=y
+ CONFIG_SATA_HIGHBANK=y
+@@ -38,6 +44,8 @@ CONFIG_SERIO_AMBAKMI=y
+ CONFIG_SERIAL_8250=y
+ CONFIG_SERIAL_8250_CONSOLE=y
+ CONFIG_SERIAL_8250_DW=y
++CONFIG_SERIAL_OMAP=y
++CONFIG_SERIAL_OMAP_CONSOLE=y
+ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+@@ -81,3 +89,4 @@ CONFIG_DMADEVICES=y
+ CONFIG_PL330_DMA=y
+ CONFIG_SIRF_DMA=y
+ CONFIG_DW_DMAC=y
++CONFIG_EXT2_FS=y
+-- 
+1.7.9.5
