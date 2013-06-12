@@ -1,40 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Jun 2013 17:10:58 +0200
-Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <002e01ce6668$f785dc20$e6919460$@samsung.com>
-References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
- <201306101722.10146.arnd@arndb.de>
- <002e01ce6668$f785dc20$e6919460$@samsung.com>
-Message-ID: <201306121710.58601.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 12 Jun 2013 18:13:26 +0300
+Subject: [PATCH 2/3] USB: OMAP: add omap-otg
+In-Reply-To: <1370817606-1008-3-git-send-email-aaro.koskinen@iki.fi>
+References: <1370817606-1008-1-git-send-email-aaro.koskinen@iki.fi>
+ <1370817606-1008-3-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20130612151326.GE15056@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 June 2013, Jingoo Han wrote:
-> > > +           ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-> > > +                     0x81000000 0 0          0x40200000 0 0x00004000   /* downstream I/O */
-> > > +                     0x82000000 0 0          0x40204000 0 0x10000000>; /* non-prefetchable memory */
-> > > +   };
-> > 
-> ...
-> > Also, shouldn't your memory space end on a 256MB boundary, rather than
-> > extend up to 0x50203fff?
-> 
-> According to the manual of Exynos PCIe, each memory space for Exynos PCIe
-> can support 512MB, including I/O, CFG regions.
-> 
-> Is there any problem when over 256MB boundary is used?
-> Please let me know. :)
+Hi,
 
-No, that's not a problem, but I think you should have the window span
-the entire space that is provided in hardware. If there are 512 MB total, why
-not use them?
+On Mon, Jun 10, 2013 at 01:40:05AM +0300, Aaro Koskinen wrote:
+> +void omap_otg_set_mode(enum omap_otg_mode mode)
+> +{
+> +	if (!otg_dev) {
+> +		WARN(1, "%s: controller not present\n", __func__);
+> +		return;
+> +	}
+> +	mutex_lock(&otg_dev->serialize);
+> +	switch (mode) {
+> +	case OMAP_OTG_MODE_DEVICE:
+> +		/*
+> +		 * Set B-session valid.
+> +		 */
+> +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSVLD);
+> +		break;
+> +	case OMAP_OTG_MODE_HOST:
+> +		/*
+> +		 * Set A-session valid.
+> +		 */
+> +		omap_otg_ctrl(OMAP_OTG_ASESSVLD);
+> +		break;
+> +	case OMAP_OTG_MODE_DISCONNECT:
+> +		/*
+> +		 * Set B-session end to indicate no VBUS.
+> +		 */
+> +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSEND);
+> +		break;
+> +	default:
+> +		WARN(1, "%s: unknown mode: %d\n", __func__, mode);
+> +	}
+> +	mutex_unlock(&otg_dev->serialize);
+> +}
+> +EXPORT_SYMBOL_GPL(omap_otg_set_mode);
 
-You could use 
+looks like this should provide a extcon interface for its users.
 
-	ranges = <0x82000000 0 0          0x40204000 0 0x1fdfc000>;
-
-to pass a range for the memory space that extends all the way until
-0x5fffffff.
-
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/0e3e9e91/attachment.sig>
