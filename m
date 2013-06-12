@@ -1,40 +1,31 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 11 Jun 2013 17:26:23 -0700
-Subject: [PATCH] clk: tegra: pllp_out2 divider is int only
-In-Reply-To: <1370439442-30852-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1370439442-30852-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20130612002623.8816.29653@quantum>
+Date: Tue, 11 Jun 2013 17:39:51 -0700
+Subject: [PATCH 0/2] PLL m,n,p init from SoC files
+In-Reply-To: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20130612003951.8816.41684@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter De Schrijver (2013-06-05 06:37:17)
-> The pllp_out2 should be integer only, the fractional bit should always be 0.
+Quoting Peter De Schrijver (2013-06-05 06:51:24)
+> The m,n,p fields don't have the same bit offset and width across all PLLs.
+> This patchset allows SoC specific files to indicate the offset and width.
+> It also provides the data for Tegra114.
 > 
-> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
 Taken into clk-next.
 
 Thanks,
 Mike
 
-> ---
->  drivers/clk/tegra/clk-tegra114.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
+> Peter De Schrijver (2):
+>   clk: tegra: allow PLL m,n,p init from SoC files
+>   clk: tegra: PLL m,n,p init for Tegra114
 > 
-> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
-> index eb27764..5e029fe 100644
-> --- a/drivers/clk/tegra/clk-tegra114.c
-> +++ b/drivers/clk/tegra/clk-tegra114.c
-> @@ -1203,8 +1203,8 @@ static void __init tegra114_pll_init(void __iomem *clk_base,
->         /* PLLP_OUT2 */
->         clk = tegra_clk_register_divider("pll_p_out2_div", "pll_p",
->                                 clk_base + PLLP_OUTA, 0, TEGRA_DIVIDER_FIXED |
-> -                               TEGRA_DIVIDER_ROUND_UP, 24, 8, 1,
-> -                               &pll_div_lock);
-> +                               TEGRA_DIVIDER_ROUND_UP | TEGRA_DIVIDER_INT, 24,
-> +                               8, 1, &pll_div_lock);
->         clk = tegra_clk_register_pll_out("pll_p_out2", "pll_p_out2_div",
->                                 clk_base + PLLP_OUTA, 17, 16,
->                                 CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0,
+>  drivers/clk/tegra/clk-pll.c      |   60 ++++++++++++++++-------------
+>  drivers/clk/tegra/clk-tegra114.c |   77 ++++++++++++++++++++++++++++++++++++++
+>  drivers/clk/tegra/clk.h          |   32 ++++++++++------
+>  3 files changed, 130 insertions(+), 39 deletions(-)
+> 
 > -- 
 > 1.7.7.rc0.72.g4b5ea.dirty
