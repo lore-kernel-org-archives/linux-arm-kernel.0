@@ -1,92 +1,36 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Wed, 12 Jun 2013 19:20:00 +0900
-Subject: [PATCH V4 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-Message-ID: <003801ce6756$6578ff80$306afe80$@samsung.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Jun 2013 11:25:48 +0100
+Subject: [PATCH 05/14] bus: mvebu-mbus: Update the mbus-compatible node's
+ ranges property
+In-Reply-To: <1370623671-7748-6-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1370623671-7748-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130612102548.A08003E0A56@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos5440 has two PCIe controllers which can be used as root complex
-for PCIe interface.
+On Fri,  7 Jun 2013 13:47:42 -0300, Ezequiel Garcia <ezequiel.garcia@free-electrons.com> wrote:
+> Ideally 'ranges' entry should be added in device tree source files.
+> However, since those properties do not inherit the entries from included
+> files it would be a duplication hell, which means a nightmare to
+> maintain.
+> 
+> So, instead of hardcoding the required translation entries, we update
+> them programatically, whenever a decoding window is allocated.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 
-Signed-off-by: Jingoo Han <jg1.han@samsung.com>
----
-Tested on Exynos5440.
+I'm in the middle of reading through this thread, and I'll have some
+better comments for you then, but in the mean time I wanted to reply to
+this patch.
 
-Changes since v3:
-- Removed 'bus-range' property from DT
-- Added 'interrupt-map-mask', 'interrupt-map' properties to DT
-- Fixed the start address of MEM space in DT
-- Increased the size of I/O space to 64kB in DT
-- Added 'clocks', 'clock-names' properties to DT
+As far as the kernel is concerned, the DT is *not* a live structure. It
+is a static description of the system.  There are cases where we do
+runtime updates to the tree, but those are restricted to either fixups
+for broken trees, or because firmware told us to at runtime. Modifying
+the data in the tree out of convenience has all kinds of problems.
+Rather, the data in the tree should make it clear that there is a gap in
+the translation from one node to another and defer to the bus driver to
+provide a custom translation when requested without modifying the tree.
 
- arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++
- arch/arm/boot/dts/exynos5440.dtsi         |   38 +++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-index d55042b..efe7d39 100644
---- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-+++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-@@ -30,4 +30,12 @@
- 			clock-frequency = <50000000>;
- 		};
- 	};
-+
-+	pcie0 at 40000000 {
-+		reset-gpio = <5>;
-+	};
-+
-+	pcie1 at 60000000 {
-+		reset-gpio = <22>;
-+	};
- };
-diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-index f6b1c89..2c15f9d 100644
---- a/arch/arm/boot/dts/exynos5440.dtsi
-+++ b/arch/arm/boot/dts/exynos5440.dtsi
-@@ -216,4 +216,42 @@
- 		clock-names = "rtc";
- 		status = "disabled";
- 	};
-+
-+	pcie0 at 0x290000 {
-+		compatible = "samsung,exynos5440-pcie";
-+		reg = <0x290000 0x1000
-+			0x270000 0x1000
-+			0x271000 0x40>;
-+		interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-+		clocks = <&clock 28>, <&clock 27>;
-+		clock-names = "pcie", "pcie_bus";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-+			  0x81000000 0 0	  0x40200000 0 0x00010000   /* downstream I/O */
-+			  0x82000000 0 0x40210000 0x40210000 0 0x10000000>; /* non-prefetchable memory */
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0x0 0 &gic 53>;
-+	};
-+
-+	pcie1 at 2a0000 {
-+		compatible = "samsung,exynos5440-pcie";
-+		reg = <0x2a0000 0x1000
-+			0x272000 0x1000
-+			0x271040 0x40>;
-+		interrupts = <0 23 0>, <0 24 0>, <0 25 0>;
-+		clocks = <&clock 29>, <&clock 27>;
-+		clock-names = "pcie", "pcie_bus";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		device_type = "pci";
-+		ranges = <0x00000800 0 0x60000000 0x60000000 0 0x00200000   /* configuration space */
-+			  0x81000000 0 0	  0x60200000 0 0x00010000   /* downstream I/O */
-+			  0x82000000 0 0x60210000 0x60210000 0 0x10000000>; /* non-prefetchable memory */
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 0>;
-+		interrupt-map = <0x0 0 &gic 56>;
-+	};
- };
--- 
-1.7.10.4
+g.
