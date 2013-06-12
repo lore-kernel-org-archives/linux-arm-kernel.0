@@ -1,59 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 16:58:06 -0700
-Subject: [PATCH 01/13] ARM: Exynos: initialize l2x0 cache controller only
- for cortex-a9 based SoCs
-In-Reply-To: <5595095.zmTGjttZIk@flatron>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <5595095.zmTGjttZIk@flatron>
-Message-ID: <20130611235806.GI23774@quad.lixom.net>
+Date: Tue, 11 Jun 2013 17:05:49 -0700
+Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 4)
+In-Reply-To: <20130610203033.GP23859@titan.lakedaemon.net>
+References: <20130610203033.GP23859@titan.lakedaemon.net>
+Message-ID: <20130612000549.GJ23774@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 08, 2013 at 12:57:41PM +0200, Tomasz Figa wrote:
-> Hi Chander,
+On Mon, Jun 10, 2013 at 04:30:33PM -0400, Jason Cooper wrote:
+> Arnd, Olof
 > 
-> On Thursday 06 of June 2013 16:31:15 Chander Kashyap wrote:
-> > Only cortex-a9 based Exynos SoCs have l2x0 cache controller. Hence
-> > instead of checking for every SoC with soc_is_xxx, just check for cpu
-> > part number and initialize the cache controller for cortex-a9 based
-> > SoCs.
-> > 
-> > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> > ---
-> >  arch/arm/mach-exynos/common.c |    3 ++-
-> >  1 file changed, 2 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/mach-exynos/common.c
-> > b/arch/arm/mach-exynos/common.c index 8ce2db4..bad000e 100644
-> > --- a/arch/arm/mach-exynos/common.c
-> > +++ b/arch/arm/mach-exynos/common.c
-> > @@ -35,6 +35,7 @@
-> >  #include <asm/mach/map.h>
-> >  #include <asm/mach/irq.h>
-> >  #include <asm/cacheflush.h>
-> > +#include <asm/cputype.h>
-> > 
-> >  #include <mach/regs-irq.h>
-> >  #include <mach/regs-pmu.h>
-> > @@ -520,7 +521,7 @@ static int __init exynos4_l2x0_cache_init(void)
+> Here are two small fixes I've had in my tree for a few days.  I looked
+> at moving one or both of them to fixes-non-critical, but it's not
+> appropriate.
 > 
-> I wonder if it shouldn't be done the other way around, i.e. this function 
-> being called only when running on SoCs for which it's appropriate, instead 
-> of checking for supported SoC in this function.
+>   5f1f3d5 arm: mvebu: armada-xp-{gp,openblocks-ax3-4}: specify PCIe range
 > 
-> Keep in mind that we are going towards multiplatform support, so you would 
-> end up running this code on any non-Exynos SoC with Cortex A9 as well. 
-> IMHO we should drop most (if not all) of the initcalls around mach-
-> exynos/.
+> builds on two patches already merged for v3.10 (through mvebu/fixes):
 > 
-> CCing people that might have some opinion on this topic as well.
+>   c6c003a ARM: mvebu: Fix ranges entry on XP GP board
+>   8eed481 arm: mvebu: fix the 'ranges' property to handle PCIe
+> 
+> 
+> And:
+> 
+>   4089fe9 ARM: Kirkwood: handle mv88f6282 cpu in __kirkwood_variant().
+> 
+> Is flagged for stable, which according to Linus, is appropriate for this
+> stage of the -rc cycle.
+> 
+> If I've made an error in judgement, please let me know.
 
-Looks like all other platforms instantiate the pl310 device node in the
-device tree. Since Exynos is going DT-only, there's no need to support
-non-DT boot any more, and that would be a much cleaner way forward.
 
-That also moves the l2 init to be driven by device-tree data, this removing the
-need for the exynos-specific init alltogether. Code removal FTW!
+Unfortunate that they weren't found sooner, but looks like relevant fixes.
 
+Pulled, thanks.
 
 -Olof
