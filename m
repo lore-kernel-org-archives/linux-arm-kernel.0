@@ -1,60 +1,65 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 12 Jun 2013 11:01:54 +0530
-Subject: [PATCH 2/9] dma: pl330: use dma_addr_t for describing bus
- addresses
-In-Reply-To: <CAJe_ZheKMVQgq42Vx5N1TXXdgFJ2sp50ixU30A7beXhmSVHnZQ@mail.gmail.com>
-References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
- <1370889285-22799-3-git-send-email-will.deacon@arm.com>
- <CAJe_ZheKMVQgq42Vx5N1TXXdgFJ2sp50ixU30A7beXhmSVHnZQ@mail.gmail.com>
-Message-ID: <20130612053154.GE4107@intel.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 12 Jun 2013 08:22:18 +0200 (CEST)
+Subject: [PATCH v2] ARM: shmobile: uImage load address rework
+In-Reply-To: <CANqRtoQJMtRsJp43cEYF7GvS_DiJUwu3nDppKCqObYPsQHY-EA@mail.gmail.com>
+References: <20130610092857.19175.25629.sendpatchset@w520>
+ <Pine.LNX.4.64.1306111552480.9621@axis700.grange>
+ <CANqRtoQJMtRsJp43cEYF7GvS_DiJUwu3nDppKCqObYPsQHY-EA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1306120820280.23454@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 10:07:12AM +0530, Jassi Brar wrote:
-> On 11 June 2013 00:04, Will Deacon <will.deacon@arm.com> wrote:
-> 
-> > The microcode bus address (pl330_dmac.mcode_bus) is currently a u32,
-> > which fails to compile when building on a system with 64-bit bus
-> > addresses.
-> >
-> > This patch uses dma_addr_t to represent the address instead.
-> >
-> > Acked-by: Jassi Brar <jaswinder.singh@linaro.org>
-> 
-> 
-> > Cc: Jassi Brar <jaswinder.singh@linaro.org>
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-Applied, thanks
+On Wed, 12 Jun 2013, Magnus Damm wrote:
 
---
-~Vinod
-> > ---
-> >  drivers/dma/pl330.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/dma/pl330.c b/drivers/dma/pl330.c
-> > index 22e2a8f..f1bc593 100644
-> > --- a/drivers/dma/pl330.c
-> > +++ b/drivers/dma/pl330.c
-> > @@ -501,7 +501,7 @@ struct pl330_dmac {
-> >         /* Maximum possible events/irqs */
-> >         int                     events[32];
-> >         /* BUS address of MicroCode buffer */
-> > -       u32                     mcode_bus;
-> > +       dma_addr_t              mcode_bus;
-> >         /* CPU address of MicroCode buffer */
-> >         void                    *mcode_cpu;
-> >         /* List of all Channel threads */
-> > --
-> > 1.8.2.2
-> >
-> >
+> Hi Guennadi,
 > 
+> On Tue, Jun 11, 2013 at 10:54 PM, Guennadi Liakhovetski
+> <g.liakhovetski@gmx.de> wrote:
+> > Hi Magnus
+> >
+> > On Mon, 10 Jun 2013, Magnus Damm wrote:
+> >
+> >> From: Magnus Damm <damm@opensource.se>
+> >>
+> >> This is V2 of the mach-shmobile uImage load address rework patch.
+> >>
+> >> Rework the mach-shmobile uImage load address calculation by storing
+> >> the per-board load addresses in Makefile.boot. This removes the
+> >> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
+> >> it possible to create safe kernel images that boot on multiple boards.
+> >>
+> >> This is one of several series of code that reworks code not to rely on
+> >> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
+> >>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> >> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> >> ---
+> >
+> > This patch seems to break compilation when none of CONFIG_MACH_* is set,
+> > e.g. when trying to build a generic SoC kernel with only DT-based board
+> > support, or am I missing something?
 > 
-> -- 
-> Linaro.org ? Open source software for ARM SoCs | Follow Linaro
-> http://facebook.com/pages/Linaro/155974581091106  -
-> http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
+> Thanks for your feedback. I believe the current code already covers
+> the in-tree REFERENCE DT boards. Perhaps there is some board missing?
+> 
+> If you want to build an uImage for a certain DT board then perhaps you
+> can add it to the list with an incremental patch?
+> 
+> Or even better, use zImage instead of uImage, then we can have a
+> single binary for all boards.
+> 
+> So if you build the kernel for no board at all, either set the
+> LOADADDR variable as the help text says, or simply do not build for
+> uImage.
+> 
+> Makes sense?
 
--- 
+Ok, understand, thanks.
+
+Regards
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
