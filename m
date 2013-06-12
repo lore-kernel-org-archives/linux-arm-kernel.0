@@ -1,99 +1,56 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Jun 2013 16:32:33 -0700
-Subject: [PATCH] ARM: msm: Move msm_timer to CLOCKSOURCE_OF_DECLARE
-Message-ID: <1371079953-28457-1-git-send-email-sboyd@codeaurora.org>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 13 Jun 2013 01:38:05 +0200
+Subject: [PATCH 00/15] Final Samsung PWM support cleanup
+In-Reply-To: <1604160.oAKkaEhla1@flatron>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <20130612230023.GA9016@quad.lixom.net> <1604160.oAKkaEhla1@flatron>
+Message-ID: <201306130138.05692.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows us to remove the init_time callback in the DT machine
-descriptors, shrinking the code.
+Am Donnerstag, 13. Juni 2013, 01:13:47 schrieb Tomasz Figa:
+> Hi Olof,
+> 
+> On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
+> > On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
+> > > > Needs testing on other platforms as I could only compile test for
+> > > > them.
+> > 
+> > How/who can help here? WHo has and still cares for other affected
+> > platforms?
+> > 
+> > > > 66 files changed, 627 insertions(+), 1580 deletions(-)
+> 
+> I will try to test this on Exynos 4 at work, if I somehow manage to find
+> any way to use PWM on our boards (other than already-tested PWM
+> clocksource).
+> 
+> Unfortunately, except S3C6410, I don't have access to other platforms, or
+> at least I won't in any reasonable time.
+> 
+> If I remember correctly, in case of my watchdog support cleanup, Kukjin
+> has been able to test it on S5P64x0.
+> 
+> Heiko and Sylwester used to have some s3c24xx-based boards, not sure if
+> they still do and are interested in their support in mainline.
+> 
+> So all left is S5PC100 (for which I couldn't find anyone who cares) and
+> Exynos5.
+> 
+> > Nice cleanup.
+> 
+> Thanks.
+> 
+> > > Any comments for this series?
+> > 
+> > Yes, above. :) In general looks good -- testing coverage is a bit of a
+> > concern.
+> 
+> Yeah. Unfortunately all I could do was testing on Tiny6410 and compile
+> testing on others. I hope we find some really helpful people over here who
+> could waste a bit of their precious time for this museum. ;)
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/mach-msm/board-dt-8660.c |  1 -
- arch/arm/mach-msm/board-dt-8960.c |  1 -
- arch/arm/mach-msm/common.h        |  1 -
- arch/arm/mach-msm/timer.c         | 17 +++--------------
- 4 files changed, 3 insertions(+), 17 deletions(-)
+I'll try to give it a testrun tomorrow. And my s3c2416 will always be the 
+first-love-architecture for me ;-)
 
-diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
-index 7dcfc53..4bd22ca 100644
---- a/arch/arm/mach-msm/board-dt-8660.c
-+++ b/arch/arm/mach-msm/board-dt-8660.c
-@@ -47,6 +47,5 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
- 	.init_irq = irqchip_init,
- 	.init_machine = msm8x60_dt_init,
- 	.init_late = msm8x60_init_late,
--	.init_time	= msm_dt_timer_init,
- 	.dt_compat = msm8x60_fluid_match,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
-index 7301936..9a2b525 100644
---- a/arch/arm/mach-msm/board-dt-8960.c
-+++ b/arch/arm/mach-msm/board-dt-8960.c
-@@ -32,7 +32,6 @@ DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
- 	.smp = smp_ops(msm_smp_ops),
- 	.map_io = msm_map_msm8960_io,
- 	.init_irq = irqchip_init,
--	.init_time	= msm_dt_timer_init,
- 	.init_machine = msm_dt_init,
- 	.dt_compat = msm8960_dt_match,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
-index ce8215a..e32429e 100644
---- a/arch/arm/mach-msm/common.h
-+++ b/arch/arm/mach-msm/common.h
-@@ -14,7 +14,6 @@
- 
- extern void msm7x01_timer_init(void);
- extern void msm7x30_timer_init(void);
--extern void msm_dt_timer_init(void);
- extern void qsd8x50_timer_init(void);
- 
- extern void msm_map_common_io(void);
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 284313f..1167cf6 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -219,15 +219,8 @@ err:
- }
- 
- #ifdef CONFIG_OF
--static const struct of_device_id msm_timer_match[] __initconst = {
--	{ .compatible = "qcom,kpss-timer" },
--	{ .compatible = "qcom,scss-timer" },
--	{ },
--};
--
--void __init msm_dt_timer_init(void)
-+static void __init msm_dt_timer_init(struct device_node *np)
- {
--	struct device_node *np;
- 	u32 freq;
- 	int irq;
- 	struct resource res;
-@@ -235,12 +228,6 @@ void __init msm_dt_timer_init(void)
- 	void __iomem *base;
- 	void __iomem *cpu0_base;
- 
--	np = of_find_matching_node(NULL, msm_timer_match);
--	if (!np) {
--		pr_err("Can't find msm timer DT node\n");
--		return;
--	}
--
- 	base = of_iomap(np, 0);
- 	if (!base) {
- 		pr_err("Failed to map event base\n");
-@@ -283,6 +270,8 @@ void __init msm_dt_timer_init(void)
- 
- 	msm_timer_init(freq, 32, irq, !!percpu_offset);
- }
-+CLOCKSOURCE_OF_DECLARE(kpss_timer, "qcom,kpss-timer", msm_dt_timer_init);
-+CLOCKSOURCE_OF_DECLARE(scss_timer, "qcom,scss-timer", msm_dt_timer_init);
- #endif
- 
- static int __init msm_timer_map(phys_addr_t addr, u32 event, u32 source,
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+Heiko
