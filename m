@@ -1,56 +1,57 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Jun 2013 10:51:15 +0900
-Subject: [RFC/PATCH v2 0/2] R-Car GPIO DT bindings
-In-Reply-To: <3619797.0aKKBP4JP5@avalon>
-References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <20130525012434.GA24005@verge.net.au> <3619797.0aKKBP4JP5@avalon>
-Message-ID: <20130612015115.GD32725@verge.net.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 12 Jun 2013 11:20:38 +0900
+Subject: [PATCH v2] ARM: shmobile: uImage load address rework
+In-Reply-To: <Pine.LNX.4.64.1306111552480.9621@axis700.grange>
+References: <20130610092857.19175.25629.sendpatchset@w520>
+ <Pine.LNX.4.64.1306111552480.9621@axis700.grange>
+Message-ID: <CANqRtoQJMtRsJp43cEYF7GvS_DiJUwu3nDppKCqObYPsQHY-EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 12:14:49AM +0200, Laurent Pinchart wrote:
-> Hi Simon,
-> 
-> On Saturday 25 May 2013 10:24:34 Simon Horman wrote:
-> > On Tue, May 21, 2013 at 01:40:04PM +0200, Laurent Pinchart wrote:
-> > > Hello,
-> > > 
-> > > Here's the second version of the gpio-rcar driver DT bindings. I've tested
-> > > the patches on the Marzen board (r8a7779).
-> > > 
-> > > Once again I'd appreciate feedback on the DT bindings. I'm particularly
-> > > wondering whether getting the number of lines through the gpio-ranges
-> > > property instead of using a dedicated #gpio-lines property as in v1 is a
-> > > good idea.
-> > > 
-> > > Changes since v1:
-> > > 
-> > > - Initialize the gpiochip dev field at probe time.
-> > > - Add the gpio-ranges property.
-> > > - Remove the #gpio-lines property. The number of lines is now passed
-> > > through> 
-> > >   the gpio-ranges property.
-> > > 
-> > > Laurent Pinchart (2):
-> > >   gpio-rcar: Make the platform data gpio_base field signed
-> > >   gpio-rcar: Add DT support
-> > >  
-> > >  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt | 52 +++++++++++++++++
-> > >  drivers/gpio/gpio-rcar.c                           | 66 +++++++++++++----
-> > >  include/linux/platform_data/gpio-rcar.h            |  2 +-
-> > >  3 files changed, 109 insertions(+), 11 deletions(-)
-> > >  create mode 100644
-> > >  Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
-> >
-> > Hi Magnus,
-> > 
-> > could you please review these changes?
-> 
-> I've received Magnus' ack face-to-face last week. I'm not sure whether that's 
-> a proper procedure, but I'm sure he will confirm that if needed.
+Hi Guennadi,
 
-Its sufficient for my needs.
+On Tue, Jun 11, 2013 at 10:54 PM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Hi Magnus
+>
+> On Mon, 10 Jun 2013, Magnus Damm wrote:
+>
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> This is V2 of the mach-shmobile uImage load address rework patch.
+>>
+>> Rework the mach-shmobile uImage load address calculation by storing
+>> the per-board load addresses in Makefile.boot. This removes the
+>> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
+>> it possible to create safe kernel images that boot on multiple boards.
+>>
+>> This is one of several series of code that reworks code not to rely on
+>> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
+>>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+>> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+>> ---
+>
+> This patch seems to break compilation when none of CONFIG_MACH_* is set,
+> e.g. when trying to build a generic SoC kernel with only DT-based board
+> support, or am I missing something?
 
-> Could you please take the patch in your tree for v3.11 ?
+Thanks for your feedback. I believe the current code already covers
+the in-tree REFERENCE DT boards. Perhaps there is some board missing?
 
-Sure, I'll see what I can do.
+If you want to build an uImage for a certain DT board then perhaps you
+can add it to the list with an incremental patch?
+
+Or even better, use zImage instead of uImage, then we can have a
+single binary for all boards.
+
+So if you build the kernel for no board at all, either set the
+LOADADDR variable as the help text says, or simply do not build for
+uImage.
+
+Makes sense?
+
+Cheers,
+
+/ magnus
