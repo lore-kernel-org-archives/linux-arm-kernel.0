@@ -1,26 +1,40 @@
-From: oliver@neukum.org (Oliver Neukum)
-Date: Wed, 12 Jun 2013 17:10:37 +0200
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
-Message-ID: <1757819.Rmlin4PoBK@linux-5eaq.site>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Jun 2013 17:10:58 +0200
+Subject: [PATCH 6/6] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <002e01ce6668$f785dc20$e6919460$@samsung.com>
+References: <00c001ce277b$92b26ab0$b8174010$%han@samsung.com>
+ <201306101722.10146.arnd@arndb.de>
+ <002e01ce6668$f785dc20$e6919460$@samsung.com>
+Message-ID: <201306121710.58601.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 June 2013 10:35:44 Alan Stern wrote:
-> On Wed, 12 Jun 2013, Ming Lei wrote:
+On Tuesday 11 June 2013, Jingoo Han wrote:
+> > > +           ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
+> > > +                     0x81000000 0 0          0x40200000 0 0x00004000   /* downstream I/O */
+> > > +                     0x82000000 0 0          0x40204000 0 0x10000000>; /* non-prefetchable memory */
+> > > +   };
+> > 
+> ...
+> > Also, shouldn't your memory space end on a 256MB boundary, rather than
+> > extend up to 0x50203fff?
 > 
-> > If not, I am wondering why one USB driver need register another hard
-> > interrupt handler? Could you share such examples? I understand the
-> > case only exists with timer handler as discussed with Oliver, don't I?
+> According to the manual of Exynos PCIe, each memory space for Exynos PCIe
+> can support 512MB, including I/O, CFG regions.
 > 
-> Here's another possibility.  A USB driver has a private lock, and it
-> acquires this lock in its completion handler.  But it also acquires
-> this lock in other routines, and those other routines may be called by
-> other drivers or subsystems in interrupt context.
+> Is there any problem when over 256MB boundary is used?
+> Please let me know. :)
 
-That is fatal. But again mechanically using _irqsave in complete()
-does the job. No other place can be affected.
+No, that's not a problem, but I think you should have the window span
+the entire space that is provided in hardware. If there are 512 MB total, why
+not use them?
 
-	Regards
-		Oliver
+You could use 
+
+	ranges = <0x82000000 0 0          0x40204000 0 0x1fdfc000>;
+
+to pass a range for the memory space that extends all the way until
+0x5fffffff.
+
+	Arnd
