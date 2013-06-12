@@ -1,73 +1,91 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 12 Jun 2013 23:23:10 +0200
-Subject: [PATCH v3 07/12] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <51B89D26.9070605@wwwdotorg.org>
-References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
- <1365000318-28256-8-git-send-email-thierry.reding@avionic-design.de>
- <516C46BC.2040707@wwwdotorg.org> <20130612122959.GA32444@manwe>
- <51B89D26.9070605@wwwdotorg.org>
-Message-ID: <20130612212308.GA27681@manwe>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 12 Jun 2013 17:25:14 -0400
+Subject: [PATCH v2 0/3] ARM: Add minimal support for TI Keystone SOCs
+Message-ID: <1371072317-15030-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 10:09:10AM -0600, Stephen Warren wrote:
-> On 06/12/2013 06:30 AM, Thierry Reding wrote:
-> > On Mon, Apr 15, 2013 at 12:28:12PM -0600, Stephen Warren wrote:
-> >> On 04/03/2013 08:45 AM, Thierry Reding wrote:
-> >>> Move the PCIe driver from arch/arm/mach-tegra into the
-> >>> drivers/pci/host directory. The motivation is to collect
-> >>> various host controller drivers in the same location in order
-> >>> to facilitate refactoring.
-> >>> 
-> >>> The Tegra PCIe driver has been largely rewritten, both in order
-> >>> to turn it into a proper platform driver and to add MSI (based
-> >>> on code by Krishna Kishore <kthota@nvidia.com>) as well as
-> >>> device tree support.
-> ...
-> >>> +static irqreturn_t tegra_pcie_msi_irq(int irq, void *data)
-> >> ...
-> >>> +	return IRQ_HANDLED;
-> >> 
-> >> Shouldn't this function return IRQ_NONE if no MSI status bits
-> >> were found set?
-> > 
-> > The IRQ isn't marked IRQF_SHARED, so I don't think this is needed.
-> 
-> Isn't it still useful to detect unexpected/stuck interrupts?
+Olof, Arnd,
 
-Yes, you're right. I can't think of a nicer way to do it, though, so
-I'll go with a processed IRQ counter or a flag.
+Here is the refreshed v2 version of the Keystone SOC support series
+after fixing all the discussed comments. I also posted multi_v7_defconfig
+bits in a seperate patch which lets Keystone boot with it. Its a very
+small and indepedent series, so if you are happy with this version, I
+would like to get it queued for upcoming 3.11 merge window.
 
-> >>> +static int tegra_pcie_probe(struct platform_device *pdev)
-> >> ...
-> >>> +	pcibios_min_mem = 0;
-> >> 
-> >> What does that mean/do? I wonder if that should be set to
-> >> 0x80000000 by the Tegra30 patches?
-> > 
-> > ARM defines PCIBIOS_MIN_MEM to that variable. That macro in turn is
-> > only used by pci_bus_alloc_resource() AFAICT, which uses it to
-> > override the start of a resource when allocating if res->start ==
-> > 0. As such it designates a lower-bound of valid PCI memory
-> > addresses, so 0 on Tegra20 and 0x80000000 on Tegra30 don't seem
-> > like good values. Maybe we need to set them to the lowest of the
-> > prefetchable and non-prefetchable memory areas as defined in the
-> > DT?
-> > 
-> > It doesn't currently seem to matter at all, though, since we never
-> > pass in a range that's 0, so the start address of resources can
-> > never be 0 and therefore PCIBIOS_MIN_MEM is never used.
-> 
-> Hmmm. I guess ignore it then. If the value won't ever be used, 0 is as
-> good a value as any?
+Series adds minimal support to Texas Instruments Keystone 2 based
+SOCs. Basic SOC code and simple dt file describing SOC which is enough
+to get the device booting till shell against mainline v3.10-rcx release.
 
-Alright, I'll do that then.
+Texas Instruments Keystone family of multi-core devices are
+based on ARM Cortex A15. The TCI66xxK2H Communications Infrastructure
+Keystone SoCs are member of the C66x family based on TI's new
+KeyStone 2 multi-core SoC Architecture designed specifically for
+high performance wireless and networking infrastructure applications.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/328c88ca/attachment.sig>
+The SOCs contains many subsystems like Cortex A15 ARM CorePacs,
+C66XX DSP CorePacs, MSMC memory controller, Tera Net bus,
+IP Network, Navigator, Hyperlink, 1G/10G Ethernet, Radio layers
+and queue based communication systems.
+
+The patchset is available on my git tree and details are end of the
+email [1]
+
+The Keystone Linux port has been used internal and externally for quite some
+time and its based on slightly older kernels. I need to specially mention
+about Cyril Chemparathy who was integral part of many of the development
+for Keystone linux port along with Murali, Vitaly and rest of the team.
+We would like to take all the internal linux keystone work to mainline
+and this is the first step to get that process started.
+
+There is public documentation available for these SOCs. Here is one of
+the link [2]
+
+Santosh Shilimkar (3):
+  ARM: dts: keystone: Add minimal Keystone SOC device tree data
+  ARM: keystone: Add minimal TI Keystone platform support
+  ARM: keystone: Enable SMP support on Keystone machines
+
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: arm at kernel.org
+
+ .../devicetree/bindings/arm/keystone/keystone.txt  |   10 ++
+ arch/arm/Kconfig                                   |    3 +
+ arch/arm/Kconfig.debug                             |   16 ++
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/keystone.dts                     |  109 ++++++++++++++
+ arch/arm/configs/keystone_defconfig                |  157 ++++++++++++++++++++
+ arch/arm/include/debug/keystone.S                  |   43 ++++++
+ arch/arm/mach-keystone/Kconfig                     |   15 ++
+ arch/arm/mach-keystone/Makefile                    |    2 +
+ arch/arm/mach-keystone/Makefile.boot               |    1 +
+ arch/arm/mach-keystone/keystone.c                  |   77 ++++++++++
+ arch/arm/mach-keystone/keystone.h                  |   17 +++
+ arch/arm/mach-keystone/platsmp.c                   |   52 +++++++
+ 13 files changed, 503 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/keystone/keystone.txt
+ create mode 100644 arch/arm/boot/dts/keystone.dts
+ create mode 100644 arch/arm/configs/keystone_defconfig
+ create mode 100644 arch/arm/include/debug/keystone.S
+ create mode 100644 arch/arm/mach-keystone/Kconfig
+ create mode 100644 arch/arm/mach-keystone/Makefile
+ create mode 100644 arch/arm/mach-keystone/Makefile.boot
+ create mode 100644 arch/arm/mach-keystone/keystone.c
+ create mode 100644 arch/arm/mach-keystone/keystone.h
+ create mode 100644 arch/arm/mach-keystone/platsmp.c
+
+Regards,
+Santosh
+
+[1] Git tree details
+ git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+ keystone/dt
+ keystone/soc
+ keystone/master --> 'soc + dt'
+
+[2] Device specs
+ http://www.ti.com/product/tci6636k2h
+-- 
+1.7.9.5
