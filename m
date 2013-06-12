@@ -1,23 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 13 Jun 2013 00:24:14 +0200
-Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <201306130020.30437.arnd@arndb.de>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130612220250.GA14852@obsidianresearch.com>
- <201306130020.30437.arnd@arndb.de>
-Message-ID: <201306130024.14368.arnd@arndb.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Jun 2013 15:30:08 -0700
+Subject: [PATCHv2 3/3] ARM: msm: Don't compile __msm_ioremap_caller() unless
+ used
+In-Reply-To: <1371076208-30921-1-git-send-email-sboyd@codeaurora.org>
+References: <1371076208-30921-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371076208-30921-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 June 2013, Arnd Bergmann wrote:
+This function is only used on MSM7x00A so only compile the
+function if the build includes support for that platform.
 
-> Yes, I realize that, which is why I said it depends on the actual sizes.
-> If you have a lot of windows that are all the same size and nothing larger,
-> the worst case isn't too bad.
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/io.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Also, if the available space is a naturally aligned address range with a
-power-of-two size itself, the order does not matter at all and any order
-is as good as any other.
-
-	Arnd
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index b99c3bc..985f4aa 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -144,6 +144,7 @@ void __init msm_map_msm7x30_io(void)
+ }
+ #endif /* CONFIG_ARCH_MSM7X30 */
+ 
++#ifdef CONFIG_ARCH_MSM7X00A
+ void __iomem *__msm_ioremap_caller(unsigned long phys_addr, size_t size,
+ 				   unsigned int mtype, void *caller)
+ {
+@@ -158,3 +159,4 @@ void __iomem *__msm_ioremap_caller(unsigned long phys_addr, size_t size,
+ 
+ 	return __arm_ioremap_caller(phys_addr, size, mtype, caller);
+ }
++#endif
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
