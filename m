@@ -1,177 +1,72 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Jun 2013 06:21:44 -0700
-Subject: [PATCH 3/4] mmc: omap_hsmmc: Remux pins to support SDIO
- interrupt and PM runtime
-In-Reply-To: <CACRpkdaEjLzXfA3HX5mra0Mjheia4e2O3kbvikeZQRsNczS7kg@mail.gmail.com>
-References: <20130607214557.18581.75288.stgit@localhost>
- <20130607214957.18581.90624.stgit@localhost>
- <CACRpkdZ5CUvULBFpdHZ_AMotqfUdBcAQ63+8cT+r6TZ77bUWOA@mail.gmail.com>
- <20130610162356.GL8164@atomide.com>
- <CACRpkdaEjLzXfA3HX5mra0Mjheia4e2O3kbvikeZQRsNczS7kg@mail.gmail.com>
-Message-ID: <20130612132144.GP8164@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Jun 2013 14:24:41 +0100
+Subject: [PATCH 2/2] ARM: nomadik: add the new clocks to the device tree
+In-Reply-To: <CACRpkdZNZ4_FzjEsstUm0bn8hE7FPTN1y_QnXtWUvGUzCNynBg@mail.gmail.com>
+References: <1370775348-7440-1-git-send-email-linus.walleij@linaro.org>
+ <1370775348-7440-2-git-send-email-linus.walleij@linaro.org>
+ <201306091621.02506.arnd@arndb.de>
+ <CACRpkdZNZ4_FzjEsstUm0bn8hE7FPTN1y_QnXtWUvGUzCNynBg@mail.gmail.com>
+Message-ID: <20130612132441.637B23E0A56@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [130611 01:00]:
-> On Mon, Jun 10, 2013 at 6:23 PM, Tony Lindgren <tony@atomide.com> wrote:
-> 
-> > We only should remux the pins that need remuxing as that's done
-> > every time hitting idle. So I think we should have the following
-> > default groups:
+On Mon, 10 Jun 2013 09:43:30 +0200, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Sun, Jun 9, 2013 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Sunday 09 June 2013, Linus Walleij wrote:
+> >> +               /*
+> >> +                * IP AMBA bus clocks, driving the bus side of the
+> >> +                * peripheral clocking, clock gates.
+> >> +                */
+> >> +
+> >> +               hclkdma0: hclkdma0 at 48M {
+> >> +                       #clock-cells = <0>;
+> >> +                       compatible = "st,nomadik-src-clock";
+> >> +                       clock-id = <0>;
+> >> +                       clocks = <&hclk>;
+> >> +               };
+> >> +               hclksmc: hclksmc at 48M {
+> >> +                       #clock-cells = <0>;
+> >> +                       compatible = "st,nomadik-src-clock";
+> >> +                       clock-id = <1>;
+> >> +                       clocks = <&hclk>;
+> >> +               };
+> >> +               hclksdram: hclksdram at 48M {
+> >> +                       #clock-cells = <0>;
+> >> +                       compatible = "st,nomadik-src-clock";
+> >> +                       clock-id = <2>;
+> >> +                       clocks = <&hclk>;
+> >> +               };
+> >> +               hclkdma1: hclkdma1 at 48M {
+> >> +                       #clock-cells = <0>;
+> >> +                       compatible = "st,nomadik-src-clock";
+> >> +                       clock-id = <3>;
+> >> +                       clocks = <&hclk>;
+> >> +               };
 > >
-> > default         Static pins that don't change, no need to remux
-> >                 configured in consumer driver probe like we already
-> >                 do
-> >
-> > active          Optional dynamic pins remuxed for runtime, can be
-> >                 configured and selected in consumer driver probe.
-> >                 The consumer driver may also want to select this
-> >                 state in PM runtime resume.
-> >
-> > idle            Optional dynamic pins remuxed for idle. The consumer
-> >                 driver may also want to select this state in PM
-> >                 runtime suspend depending on device_can_wakeup()
-> >                 and driver specific needs.
+> > Sorry if I'm being slow to understand how the clock bindings work, but if
+> > you have 63 identical clocks that only differ in ther clock-id, can't you
+> > just have a single DT node for them instead with #clock-cells=1 to pass the
+> > number from the device using it?
 > 
-> The one thing I don't understand is why a driver would select the
-> active state in probe(), unless it's a driver that does not support
-> runtime PM. (But maybe that's what you mean.)
+> I first had exactly that implementation but it didn't work. This is explained
+> in the commit message on patch 1/1:
+> 
+>   The gated clocks are implemented with zero cells and
+>   given the clock ID as a property of each node, so every
+>   gate need to have its own node in the device tree.
+>   This is because the gate registers contain both HCLK
+>   gates and PCLK gates, where the latter has HCLK as
+>   parent. As can be seen from the register layout, this
+>   is a complete mixup, which means all these gates need
+>   their own node to properly model parent/child relations
+>   for PCLKs apart from the HCLKs.
+> 
+> Basically the "shortcoming" in device tree is that modelling this with
+> clock-cells = 1 requires them all to have one and the same parent,
+> but they don't.
 
-Yes you're right, there should not be any need to select active state
-in probe, that should be selected by PM runtime.
- 
-> Compare this to <linus/pinctrl/pinctrl-state.h>:
-> 
-> /**
->  * @PINCTRL_STATE_DEFAULT: the state the pinctrl handle shall be put
->  *      into as default, usually this means the pins are up and ready to
->  *      be used by the device driver. This state is commonly used by
->  *      hogs to configure muxing and pins at boot, and also as a state
->  *      to go into when returning from sleep and idle in
->  *      .pm_runtime_resume() or ordinary .resume() for example.
->  * @PINCTRL_STATE_IDLE: the state the pinctrl handle shall be put into
->  *      when the pins are idle. This is a state where the system is relaxed
->  *      but not fully sleeping - some power may be on but clocks gated for
->  *      example. Could typically be set from a pm_runtime_suspend() or
->  *      pm_runtime_idle() operation.
->  * @PINCTRL_STATE_SLEEP: the state the pinctrl handle shall be put into
->  *      when the pins are sleeping. This is a state where the system is in
->  *      its lowest sleep state. Could typically be set from an
->  *      ordinary .suspend() function.
->  */
-> #define PINCTRL_STATE_DEFAULT "default"
-> #define PINCTRL_STATE_IDLE "idle"
-> #define PINCTRL_STATE_SLEEP "sleep"
-> 
-> The way I currently use these in e.g.
-> drivers/spi/spi-pl022 is:
-> 
-> probe:
->  -> default
-> 
-> runtime_suspend:
->  -> idle
-> 
-> runtime_resume:
->  -> default
-> 
-> suspend:
->  -> sleep
-> 
-> resume:
->   -> default
->   -> idle
-> 
-> Notice that we go to default then idle on probe and
-> runtime resume. This is because the idle state is
-> optional (as is the sleep state).
-> 
-> So I guess if we should extend this terminology to match
-> what you are using for the OMAP it would rather be like
-> this:
-> 
-> probe:
->  -> default
-> 
-> runtime_suspend:
->  -> idle
-> 
-> runtime_resume:
->  -> default
->  -> active
+Are you prevented from increasing the number of clock-cells used here?
 
-At least for omaps, there's no need to select default in
-runtime_resume as the default pins stay that way.
- 
-> suspend:
->  -> sleep
+It is a lot of identical data being added.
 
-For omaps, we would just select idle pins again in the
-suspend case.
- 
-> resume:
->   -> default
->   -> idle
-
-And for omaps, there's no need to select default in resume
-either. Just selecting active would do the trick for resume.
-
-So for omaps, the sequence would be:
-
-probe:
- -> default (typically all device pins except rx pin)
-
-runtime_suspend:
-suspend:
- -> idle (remux rx pin from device to gpio input for wake)
- 
-runtime_resume:
-resume:
- -> active (remux rx pin from gpio input to device)
- 
-> Just one more optional "active" state in runtime resume.
-> Correct?
-
-Yes the "active" is needed, but "sleep" would be unused for
-omaps.
- 
-> If we can agree on this I will add the active state to the
-> state table and add a container in the core for this as well
-> as pinctrl_pm_select_active_state() so we can skip all the
-> pointless boilerplate also in the OMAP drivers, plus increase
-> the readability and portability quite a bit.
-
-Sounds good to me as long as we don't always need to select
-the default pins over and over in PM runtime_resume.
- 
-> >> However in this case I *suspect* that what you really want
-> >> to do it to rename the state called "default" to "sleep"
-> >> (it appears the default state is sleepy) and then rename
-> >> the "active" state to "default" (as this is the defined semantic
-> >> meaning of "default" from <linux/pinctrl/pinctrl-state.h>.
-> >
-> > The idle state above could also be called sleep instead of idle
-> > if you prefer that.
-> 
-> No I think we should reserve that name for the pin state
-> associated with suspend(). Let's leave it like this.
-
-OK
- 
-> > I think the confusion is caused by the fact that we need three
-> > mux groups, not just two :) The toggling between active and idle
-> > is the hotpath as that can potentially happen for multiple drivers
-> > every time we enter and exit idle.
-> 
-> Actually we have the same thing, it's just that our "default"
-> and "active" are the same thing. But it seems we need to
-> add your granularity to this.
-
-Well the difference seems to be that you need to remux all the
-device pins for runtime_suspend and resume while in most of the
-cases I know of only one device pins needs to be toggled and the
-rest can be selected in driver probe.
-
-Regards,
-
-Tony
+g.
