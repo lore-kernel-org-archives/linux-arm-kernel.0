@@ -1,98 +1,138 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Jun 2013 14:44:35 -0700
-Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over
- global devices
-In-Reply-To: <20130606223848.GR599@codeaurora.org>
-References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
- <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
- <51B0A6E8.20909@linaro.org> <20130606180425.GQ599@codeaurora.org>
- <51B10D85.1060507@linaro.org> <20130606223848.GR599@codeaurora.org>
-Message-ID: <20130612214435.GE10823@codeaurora.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 12 Jun 2013 23:48:56 +0200
+Subject: [PATCH 00/15] Final Samsung PWM support cleanup
+In-Reply-To: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1444953.LmSrOvSyJG@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06, Stephen Boyd wrote:
-> On 06/07, Daniel Lezcano wrote:
-> > On 06/06/2013 08:04 PM, Stephen Boyd wrote:
-> > > On 06/06, Daniel Lezcano wrote:
-> > >> On 06/03/2013 10:33 PM, Stephen Boyd wrote:
-> > >>> On an SMP system with only one global clockevent and a dummy
-> > >>> clockevent per CPU we run into problems. We want the dummy
-> > >>> clockevents to be registered as the per CPU tick devices, but
-> > >>> we can only achieve that if we register the dummy clockevents
-> > >>> before the global clockevent or if we artificially inflate the
-> > >>> rating of the dummy clockevents to be higher than the rating
-> > >>> of the global clockevent. Failure to do so leads to boot
-> > >>> hangs when the dummy timers are registered on all other CPUs
-> > >>> besides the CPU that accepted the global clockevent as its tick
-> > >>> device and there is no broadcast timer to poke the dummy
-> > >>> devices.
-> > >>>
-> > >>> If we're registering multiple clockevents and one clockevent is
-> > >>> global and the other is local to a particular CPU we should
-> > >>> choose to use the local clockevent regardless of the rating of
-> > >>> the device. This way, if the clockevent is a dummy it will take
-> > >>> the tick device duty as long as there isn't a higher rated tick
-> > >>> device and any global clockevent will be bumped out into
-> > >>> broadcast mode, fixing the problem described above.
-> > >>
-> > >> It is not clear the connection between the changelog, the patch and the
-> > >> comment. Could you clarify a bit ?
-> > >>
-> > > 
-> > > There is one tick device per-cpu and one broadcast device. The
-> > > broadcast device can only be a global clockevent, whereas the
-> > > per-cpu tick device can be a global clockevent or a per-cpu
-> > > clockevent. The code tries hard to keep per-cpu clockevents in
-> > > the tick device slots but it has an ordering/rating requirement
-> > > that doesn't work when there are only dummy per-cpu devices and
-> > > one global device.
-> > > 
-> > > Perhaps an example will help. Let's say you only have one global
-> > > clockevent such as the sp804, and you have SMP enabled. To
-> > > support SMP we have to register dummy clockevents on each CPU so
-> > > that the sp804 can go into broadcast mode. If we don't do this,
-> > > only the CPU that registered the sp804 will get interrupts while
-> > > the other CPUs will be left with no tick device and thus no
-> > > scheduling. To fix this we register dummy clockevents on all the
-> > > CPUs _before_ we register the sp804 to force the sp804 into the
-> > > broadcast slot. Or we give the dummy clockevents a higher rating
-> > > than the sp804 so that when we register them after the sp804 the
-> > > sp804 is bumped out to broadcast duty.
-> > > 
-> > > If the dummy devices are registered before the sp804 we can give
-> > > the dummies a low rating and the sp804 will still go into the
-> > > broadcast slot due to this code:
-> > > 
-> > > 	/*
-> > > 	 * If we have a cpu local device already, do not replace it
-> > > 	 * by a non cpu local device
-> > > 	 */
-> > > 	if (curdev && cpumask_equal(curdev->cpumask, cpumask_of(cpu)))
-> > > 		goto out_bc;
-> > > 
-> > > If we register the sp804 before the dummies we're also fine as
-> > > long as the rating of the dummy is more than the sp804.  Playing
-> > > games with the dummy rating is not very nice so this patch fixes
-> > > it by allowing the per-cpu device to replace the global device no
-> > > matter what the rating of the global device is.
-> > > 
-> > > This fixes the sp804 case when the dummy is rated lower than
-> > > sp804 and it removes any ordering requirement from the
-> > > registration of clockevents. It also completes the logic above
-> > > where we prefer cpu local devices over non cpu local devices.
-> > 
-> > Thanks for the detailed explanation.
-> > 
-> > Did Thomas reacted to this patch ?
-> > 
-> 
-> So far there has been no response from Thomas.
-> 
+Hi,
 
-Will you ack this patch anyway? Or do we need Thomas to review
-this patch? It seems that this patch series has stalled again.
+On Wednesday 05 of June 2013 23:18:05 Tomasz Figa wrote:
+> Since we now have a proper Samsung PWM clocksource driver in place,
+> we can proceed with further cleanup of PWM timers support on Samsung
+> SoCs.
+> 
+> This series attempts to achieve this goal by:
+>  1) moving remaining Samsung platforms to the new clocksource driver
+>  2) removing old clocksource driver
+>  3) adding new multiplatform- and DT-aware PWM driver
+>  4) moving all Samsung platforms to use the new PWM driver
+>  5) removing old PWM driver
+>  6) removing all PWM-related code that is not used anymore
+> 
+> Cleaning up the PWM driver is a bit tricky, because the design of
+> current driver makes it completely unsuitable for DT and multiplatform
+> and would require a heavy rework to make it usable, breaking any
+> existing Samsung PWM users by the way. To avoid any breakage I decided
+> to keep the old driver, add new one, move all platforms to it and then
+> remove the old one.
+> 
+> See particular patches for more detailed descriptions.
+> 
+> On S3C6410-based Tiny6410 (Mini6410-compatible), after enabling
+> pwm-beeper:
+> 
+> Tested-by: Tomasz Figa <tomasz.figa@gmail.com>
+> 
+> Needs testing on other platforms as I could only compile test for them.
+> 
+> Tomasz Figa (15):
+>   ARM: SAMSUNG: Unify base address definitions of timer block
+>   ARM: SAMSUNG: Add new PWM platform device
+>   ARM: SAMSUNG: Set PWM platform data
+>   ARM: SAMSUNG: Move all platforms to new clocksource driver
+>   ARM: SAMSUNG: Remove old samsung-time driver
+>   ARM: SAMSUNG: Remove unused PWM timer IRQ chip code
+>   pwm: samsung: Rename to pwm-samsung-legacy
+>   pwm: Add new pwm-samsung driver
+>   ARM: SAMSUNG: Rework private data handling in dev-backlight
+>   ARM: SAMSUNG: Modify board files to use new PWM platform device
+>   pwm: Remove superseded pwm-samsung-legacy driver
+>   ARM: SAMSUNG: Remove old PWM timer platform devices
+>   ARM: SAMSUNG: Remove pwm-clock infrastructure
+>   ARM: SAMSUNG: Remove remaining uses of plat/regs-timer.h header
+>   ARM: SAMSUNG: Remove plat/regs-timer.h header
+> 
+>  arch/arm/Kconfig                                   |   1 -
+>  arch/arm/mach-exynos/common.c                      |   3 +
+>  arch/arm/mach-exynos/include/mach/irqs.h           |   3 +-
+>  arch/arm/mach-exynos/include/mach/map.h            |   1 +
+>  arch/arm/mach-exynos/mach-nuri.c                   |   4 +-
+>  arch/arm/mach-exynos/mach-origen.c                 |   3 +-
+>  arch/arm/mach-exynos/mach-smdk4x12.c               |   3 +-
+>  arch/arm/mach-exynos/mach-smdkv310.c               |   3 +-
+>  arch/arm/mach-s3c24xx/Kconfig                      |  12 +-
+>  arch/arm/mach-s3c24xx/clock-s3c2410.c              |   1 -
+>  arch/arm/mach-s3c24xx/clock-s3c2412.c              |   1 -
+>  arch/arm/mach-s3c24xx/clock-s3c2416.c              |   2 -
+>  arch/arm/mach-s3c24xx/clock-s3c2443.c              |   2 -
+>  arch/arm/mach-s3c24xx/common.c                     |  27 +
+>  arch/arm/mach-s3c24xx/include/mach/map.h           |   2 +
+>  arch/arm/mach-s3c24xx/mach-h1940.c                 |   4 +-
+>  arch/arm/mach-s3c24xx/mach-rx1950.c                |   5 +-
+>  arch/arm/mach-s3c64xx/Kconfig                      |   4 +-
+>  arch/arm/mach-s3c64xx/clock.c                      |   2 -
+>  arch/arm/mach-s3c64xx/common.c                     |  32 +-
+>  arch/arm/mach-s3c64xx/include/mach/irqs.h          |   8 -
+>  arch/arm/mach-s3c64xx/include/mach/map.h           |   1 +
+>  arch/arm/mach-s3c64xx/irq-pm.c                     |   2 -
+>  arch/arm/mach-s3c64xx/mach-crag6410.c              |   4 +-
+>  arch/arm/mach-s3c64xx/mach-hmt.c                   |   4 +-
+>  arch/arm/mach-s3c64xx/mach-smartq.c                |   4 +-
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c              |   1 +
+>  arch/arm/mach-s5p64x0/Kconfig                      |   4 +-
+>  arch/arm/mach-s5p64x0/clock-s5p6440.c              |   2 -
+>  arch/arm/mach-s5p64x0/clock-s5p6450.c              |   2 -
+>  arch/arm/mach-s5p64x0/common.c                     |  27 +
+>  arch/arm/mach-s5p64x0/include/mach/irqs.h          |   2 -
+>  arch/arm/mach-s5p64x0/include/mach/map.h           |   1 +
+>  arch/arm/mach-s5p64x0/mach-smdk6440.c              |   1 +
+>  arch/arm/mach-s5p64x0/mach-smdk6450.c              |   1 +
+>  arch/arm/mach-s5p64x0/pm.c                         |   3 -
+>  arch/arm/mach-s5pc100/Kconfig                      |   2 +-
+>  arch/arm/mach-s5pc100/clock.c                      |   2 -
+>  arch/arm/mach-s5pc100/common.c                     |  28 +
+>  arch/arm/mach-s5pc100/include/mach/irqs.h          |   2 -
+>  arch/arm/mach-s5pc100/include/mach/map.h           |   1 +
+>  arch/arm/mach-s5pc100/mach-smdkc100.c              |   1 +
+>  arch/arm/mach-s5pv210/Kconfig                      |   2 +-
+>  arch/arm/mach-s5pv210/clock.c                      |   1 -
+>  arch/arm/mach-s5pv210/common.c                     |  28 +
+>  arch/arm/mach-s5pv210/include/mach/irqs.h          |   2 -
+>  arch/arm/mach-s5pv210/include/mach/map.h           |   1 +
+>  arch/arm/mach-s5pv210/mach-smdkv210.c              |   1 +
+>  arch/arm/mach-s5pv210/pm.c                         |  10 -
+>  arch/arm/plat-samsung/Kconfig                      |  14 -
+>  arch/arm/plat-samsung/Makefile                     |   3 -
+>  arch/arm/plat-samsung/dev-backlight.c              |  61 ++-
+>  arch/arm/plat-samsung/devs.c                       |  42 +-
+>  arch/arm/plat-samsung/include/plat/clock.h         |   4 -
+>  arch/arm/plat-samsung/include/plat/devs.h          |   1 +
+>  arch/arm/plat-samsung/include/plat/irq-vic-timer.h |  13 -
+>  arch/arm/plat-samsung/include/plat/irqs.h          |   9 -
+>  arch/arm/plat-samsung/include/plat/pwm-clock.h     |  81 ---
+>  arch/arm/plat-samsung/include/plat/pwm-core.h      |  24 +
+>  arch/arm/plat-samsung/include/plat/regs-timer.h    | 124 -----
+>  arch/arm/plat-samsung/include/plat/samsung-time.h  |  23 -
+>  arch/arm/plat-samsung/irq-vic-timer.c              |  98 ----
+>  arch/arm/plat-samsung/pwm-clock.c                  | 474
+> ----------------- arch/arm/plat-samsung/s5p-irq.c                    | 
+>  4 -
+>  arch/arm/plat-samsung/samsung-time.c               | 394 --------------
+> drivers/pwm/pwm-samsung.c                          | 575
+> ++++++++++++++------- 66 files changed, 627 insertions(+), 1580
+> deletions(-)
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/irq-vic-timer.h
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/pwm-clock.h
+>  create mode 100644 arch/arm/plat-samsung/include/plat/pwm-core.h
+>  delete mode 100644 arch/arm/plat-samsung/include/plat/regs-timer.h
+>  delete mode 100644 arch/arm/plat-samsung/irq-vic-timer.c
+>  delete mode 100644 arch/arm/plat-samsung/pwm-clock.c
+>  delete mode 100644 arch/arm/plat-samsung/samsung-time.c
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Any comments for this series?
+
+Best regards,
+Tomasz
