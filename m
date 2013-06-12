@@ -1,61 +1,46 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 12 Jun 2013 15:35:42 +0530
-Subject: MUSB multiplatform work?
-In-Reply-To: <CACRpkdaUegc7B8awUiQTvFRJHPMWv6hEEsE-2AHtZCDXVEMN9g@mail.gmail.com>
-References: <201305271702.09203.arnd@arndb.de>
- <20130528163548.GC28253@arwen.pp.htv.fi>
- <20130530201854.GB6467@atomide.com>
- <CACRpkdZHupVFS+pNADpaJjunPa3fEtyCqLwbL-etHs3gt8EW0Q@mail.gmail.com>
- <20130530203132.GC6467@atomide.com>
- <CACRpkdaUegc7B8awUiQTvFRJHPMWv6hEEsE-2AHtZCDXVEMN9g@mail.gmail.com>
-Message-ID: <20130612100542.GV4107@intel.com>
+From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
+Date: Wed, 12 Jun 2013 11:45:37 +0100
+Subject: [PATCH v2 02/11] clocksource:global_timer: Add ARM global timer
+ support.
+In-Reply-To: <CACRpkdbppRqnMYknbBy8JpAVtujMOEQvyczXTmpvkQuxgikFog@mail.gmail.com>
+References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
+ <1370856087-6452-1-git-send-email-srinivas.kandagatla@st.com>
+ <CACRpkdbQCRKBzRF4HzNsXHwXCLJJcFZ9T36GPmmYsnX1OfgGRg@mail.gmail.com>
+ <51B5D7A6.1020101@st.com> <51B72E9A.6070006@st.com>
+ <CACRpkdbppRqnMYknbBy8JpAVtujMOEQvyczXTmpvkQuxgikFog@mail.gmail.com>
+Message-ID: <51B85151.2060409@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 30, 2013 at 11:19:33PM +0200, Linus Walleij wrote:
-> On Thu, May 30, 2013 at 10:31 PM, Tony Lindgren <tony@atomide.com> wrote:
+On 11/06/13 21:13, Linus Walleij wrote:
+> On Tue, Jun 11, 2013 at 4:05 PM, Srinivas KANDAGATLA
+> <srinivas.kandagatla@st.com> wrote:
 > 
-> > There are many devices where the device FIFO is memory mapped to the
-> > GPMC bus on omaps, like TUSB, OneNAND, smc911x etc. I believe the
-> > only reason why these have not been converted to the dmaengine is
-> > the fact that dmaengine cannot configure the DMA hardware to do
-> > autoincrement and loop over the device FIFO.
+>> Doing this is not adding any value to the driver, because
+>>  1. Currently the driver only support DT boot paths, in my previous RFC
+>> patches, Arnd suggested to get rid of the header as all platforms are DT
+>> now.
 > 
-> OK that seems like something pretty generic that we could just add
-> to the struct dma_slave_config actually, something like:
+> In that case why do you have the separate global_timer_init()
+> at all? Just move that code into global_timer_of_register() and
+> also remove the #ifdef around CONFIG_OF and make the driver
+> depend on CONFIG_OF in Kconfig.
 > 
-> u32 src_fifoloop;
-> u32 dst_fifoloop;
-Yes for genric but not for loop. For most of our cases we are considering the
-FIFO address as a constant. Typically DMA controllers have this ability to
-perform incremental/decremental/constant FIFO address.
+> After this you realize that all that business with
+> clk_register_clkdev() / clk_get_sys() is just pure surplus
+> baggade, you just use of_clk_get() and that's it.
 
-What would make sense to have is:
+It makes sense to move all the code into global_timer_of_register().
+This will also get rid of un-used code. I will do this in the next spin.
 
-enum dmaengine_slave_addr_mode {
-	DMAENGINE_SLAVE_ADDR_CONSTANT = 0,
-	DMAENGINE_SLAVE_ADDR_INCREMANT,
-	DMAENGINE_SLAVE_ADDR_DECREMENT,
-};
+Thanks,
+srini
 
-and add these to struct dma_slave_config:
-	enum dmaengine_slave_addr_mode src_mode;
-	enum dmaengine_slave_addr_mode dstn_mode;
-
-For loopover we can have:
-	u32 loop_counter;
-
-on 0 means no loop, and valid value tells when to loopover (offset).
-
-will this help for all of the above controllers and their conversion?
- 
-> Given in # of words on the src/dst address simply, left as zero
-> for hitting a constant address over and over again.
 > 
-> We'd need both to make space for device->device transfers.
+> Yours,
+> Linus Walleij
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
 > 
-> If this is all that is needed to convert them do DMAengine
-> I'd surely ACK it (FWIW).
-
---
-~Vinod
