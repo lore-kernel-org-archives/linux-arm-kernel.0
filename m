@@ -1,20 +1,38 @@
-From: oliver@neukum.org (Oliver Neukum)
-Date: Wed, 12 Jun 2013 11:11:06 +0200
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306111431170.1392-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306111431170.1392-100000@iolanthe.rowland.org>
-Message-ID: <2722548.PBMM2Yn19A@linux-5eaq.site>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 12 Jun 2013 10:13:55 +0100
+Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
+In-Reply-To: <20130612083619.GA13274@S2101-09.ap.freescale.net>
+References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
+ <20130612083619.GA13274@S2101-09.ap.freescale.net>
+Message-ID: <20130612091355.GB20236@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 11 June 2013 15:10:03 Alan Stern wrote:
-> In order to prevent this from happening, you would have to change the
-> spin_lock() call in the completion handler to spin_lock_irqsave().  
-> Furthermore, you will have to audit every USB driver to make sure that
-> all the completion handlers get fixed.
+Hi Shawn,
 
-Yes. However, it can be done mechanically. And we know only
-the handlers for complete need to be fixed.
+On Wed, Jun 12, 2013 at 09:36:20AM +0100, Shawn Guo wrote:
+> On Tue, Jun 11, 2013 at 10:58:48AM +0100, Lorenzo Pieralisi wrote:
+> > Hi Russell, all,
+> > 
+> > even though I think this set is ready to get merged, it would be great
+> > if we can test it on as many platforms as possible since it touches core
+> > suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
+> > and there are many.
+> > 
+> > I pushed out a branch:
+> > 
+> > git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
+> > 
+> > if anyone has time to test the set that would be really great, thank you
+> > very much.
+> 
+> I tested the branch on imx6q, and system suspend/resume works fine with
+> it.
 
-	Regards
-		Oliver
+Thanks a lot. If you can enable idle deep C-states that would be grand,
+S2R exercises that code path just on one CPU whilst idle clobbers it on
+all CPUs at once and ensures the hash is working properly on your platform.
+
+Anyway, thank you very much !
+Lorenzo
