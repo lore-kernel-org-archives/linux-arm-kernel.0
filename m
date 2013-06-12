@@ -1,68 +1,37 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Jun 2013 10:07:34 -0700
-Subject: [PATCHv3 2/6] arm: introduce config HAS_BANDGAP
-In-Reply-To: <1370637968-23299-3-git-send-email-eduardo.valentin@ti.com>
-References: <1370637968-23299-1-git-send-email-eduardo.valentin@ti.com>
- <1370637968-23299-3-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <20130612170733.GK8164@atomide.com>
+Date: Wed, 12 Jun 2013 10:12:00 -0700
+Subject: [PATCH v2 02/14] ARM: OMAP2+: AM43x: Kconfig
+In-Reply-To: <7642e0c701680ea94a8cc84059ff19e500813bf1.1369658705.git.afzal@ti.com>
+References: <cover.1369658705.git.afzal@ti.com>
+ <7642e0c701680ea94a8cc84059ff19e500813bf1.1369658705.git.afzal@ti.com>
+Message-ID: <20130612171200.GL8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Eduardo Valentin <eduardo.valentin@ti.com> [130607 13:53]:
-> Bandgap is a device used to measure temperature on
-> electronic equipments. It is widely used in digital
-> integrated circuits. It is based on the dependency
-> between silicon voltage and temperature.
-> 
-> This patch introduce HAS_BANDGAP config entry.
-> This config is a boolean value so that arch
-> code can flag if they feature a bandgap device.
-> 
-> This config entry follows the same idea behind
-> ARCH_HAS_CPUFREQ.
-
-I suggest you add this to Russell's patch system:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-omap at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
-> Cc: Fabio Stevam <festevam@gmail.com>
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> ---
->  arch/arm/Kconfig            | 3 +++
->  arch/arm/mach-omap2/Kconfig | 1 +
->  2 files changed, 4 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index d423d58..bcbdec9 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -174,6 +174,9 @@ config ARCH_HAS_CPUFREQ
->  	  and that the relevant menu configurations are displayed for
->  	  it.
->  
-> +config ARCH_HAS_BANDGAP
-> +	bool
-> +
->  config GENERIC_HWEIGHT
->  	bool
->  	default y
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index f49cd51..8620ab5 100644
+* Afzal Mohammed <afzal@ti.com> [130527 07:41]:
 > --- a/arch/arm/mach-omap2/Kconfig
 > +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -4,6 +4,7 @@ config ARCH_OMAP
->  config ARCH_OMAP2PLUS
->  	bool "TI OMAP2/3/4/5 SoCs with device tree support" if (ARCH_MULTI_V6 || ARCH_MULTI_V7)
->  	select ARCH_HAS_CPUFREQ
-> +	select ARCH_HAS_BANDGAP
->  	select ARCH_HAS_HOLES_MEMORYMODEL
->  	select ARCH_OMAP
->  	select ARCH_REQUIRE_GPIOLIB
-> -- 
-> 1.8.2.1.342.gfa7285d
-> 
+> @@ -149,6 +149,16 @@ config SOC_AM33XX
+>  	select MULTI_IRQ_HANDLER
+>  	select COMMON_CLK
+>  
+> +config SOC_AM43XX
+> +	bool "TI AM43x"
+> +	depends on ARCH_OMAP2PLUS
+> +	default y
+> +	select CPU_V7
+> +	select MULTI_IRQ_HANDLER
+> +	select ARM_GIC
+> +	select COMMON_CLK
+> +	select MACH_OMAP_GENERIC
+> +
+>  config OMAP_PACKAGE_ZAF
+>         bool
+
+I've updated this patch to remove the "default y" and
+"depends on ARCH_OMAP2PLUS" entries for the usual reasons
+and applied the first ten patches into omap-for-v3.11/soc.
+
+Regards,
+
+Tony
