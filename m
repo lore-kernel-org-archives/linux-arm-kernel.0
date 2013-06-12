@@ -1,73 +1,86 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Jun 2013 10:09:10 -0600
-Subject: [PATCH v3 07/12] PCI: tegra: Move PCIe driver to drivers/pci/host
-In-Reply-To: <20130612122959.GA32444@manwe>
-References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
- <1365000318-28256-8-git-send-email-thierry.reding@avionic-design.de>
- <516C46BC.2040707@wwwdotorg.org> <20130612122959.GA32444@manwe>
-Message-ID: <51B89D26.9070605@wwwdotorg.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 12 Jun 2013 12:25:56 -0400 (EDT)
+Subject: [PATCH 01/10] USB: OHCI: Properly handle ohci-at91 suspend
+In-Reply-To: <Pine.LNX.4.44L0.1306121203180.1431-100000@iolanthe.rowland.org>
+Message-ID: <Pine.LNX.4.44L0.1306121223470.1431-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2013 06:30 AM, Thierry Reding wrote:
-> On Mon, Apr 15, 2013 at 12:28:12PM -0600, Stephen Warren wrote:
->> On 04/03/2013 08:45 AM, Thierry Reding wrote:
->>> Move the PCIe driver from arch/arm/mach-tegra into the
->>> drivers/pci/host directory. The motivation is to collect
->>> various host controller drivers in the same location in order
->>> to facilitate refactoring.
->>> 
->>> The Tegra PCIe driver has been largely rewritten, both in order
->>> to turn it into a proper platform driver and to add MSI (based
->>> on code by Krishna Kishore <kthota@nvidia.com>) as well as
->>> device tree support.
-...
->>> +static irqreturn_t tegra_pcie_msi_irq(int irq, void *data)
->> ...
->>> +	return IRQ_HANDLED;
->> 
->> Shouldn't this function return IRQ_NONE if no MSI status bits
->> were found set?
+On Wed, 12 Jun 2013, Alan Stern wrote:
+
+> On Wed, 12 Jun 2013, Manjunath Goudar wrote:
 > 
-> The IRQ isn't marked IRQF_SHARED, so I don't think this is needed.
-
-Isn't it still useful to detect unexpected/stuck interrupts?
-
->>> +static int tegra_pcie_enable(struct tegra_pcie *pcie)
-...
->> 
->> Why is that needed; when would a port get enabled if it was
->> already enabled, and if it was already enabled, wouldn't you want
->> this function to be a no-op rather than destroying everything and
->> starting again?
+> > Suspend scenario in case of ohci-at91 glue was not properly
+> > handled as it was not suspending generic part of ohci controller.
+> > Calling explicitly the ohci_suspend()routine in ohci_hcd_at91_drv_suspend()
+> > will ensure proper handling of suspend scenario.
 > 
-> I'm not sure I understand what you're saying. The intent of this 
-> function is to enable a port, check that there's a link and disable
-> the port otherwise. That way we don't keep ports around where
-> nothing is connected.
-
-Hmm. I have no idea either now:-( The body of tegra_pcie_enable()
-looks fine.
-
->>> +static int tegra_pcie_probe(struct platform_device *pdev)
->> ...
->>> +	pcibios_min_mem = 0;
->> 
->> What does that mean/do? I wonder if that should be set to
->> 0x80000000 by the Tegra30 patches?
+> > diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+> > index fb2f127..28400a7 100644
+> > --- a/drivers/usb/host/ohci-at91.c
+> > +++ b/drivers/usb/host/ohci-at91.c
+> > @@ -619,8 +619,12 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+> >  {
+> >  	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
+> >  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
+> > +	bool do_wakeup = device_may_wakeup(&pdev->dev);
+> > +	int ret;
+> >  
+> > -	if (device_may_wakeup(&pdev->dev))
+> > +	ret = ohci_suspend(hcd, do_wakeup);
+> > +
+> > +	if (do_wakeup)
+> >  		enable_irq_wake(hcd->irq);
+> >  
+> >  	/*
+> > @@ -637,7 +641,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+> >  		at91_stop_clock();
+> >  	}
+> >  
+> > -	return 0;
+> > +	return ret;
 > 
-> ARM defines PCIBIOS_MIN_MEM to that variable. That macro in turn is
-> only used by pci_bus_alloc_resource() AFAICT, which uses it to
-> override the start of a resource when allocating if res->start ==
-> 0. As such it designates a lower-bound of valid PCI memory
-> addresses, so 0 on Tegra20 and 0x80000000 on Tegra30 don't seem
-> like good values. Maybe we need to set them to the lowest of the
-> prefetchable and non-prefetchable memory areas as defined in the
-> DT?
-> 
-> It doesn't currently seem to matter at all, though, since we never
-> pass in a range that's 0, so the start address of resources can
-> never be 0 and therefore PCIBIOS_MIN_MEM is never used.
+> If ohci_suspend() fails, we should return right away.  Don't execute 
+> the enable_irq_wake() and all the other stuff.
 
-Hmmm. I guess ignore it then. If the value won't ever be used, 0 is as
-good a value as any?
+Actually, the situation is more complicated.  In order to handle races
+with remote wakeup, the logic we need is more like this:
+
+
+Index: usb-3.10/drivers/usb/host/ohci-at91.c
+===================================================================
+--- usb-3.10.orig/drivers/usb/host/ohci-at91.c
++++ usb-3.10/drivers/usb/host/ohci-at91.c
+@@ -674,8 +674,18 @@ ohci_hcd_at91_drv_suspend(struct platfor
+ {
+ 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
+ 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	bool		do_wakeup = device_may_wakeup(&pdev->dev);
++	int		ret;
+ 
+-	if (device_may_wakeup(&pdev->dev))
++	ret = ohci_suspend(hcd, do_wakeup);
++	if (ret == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
++		ohci_resume(hcd, false);
++		ret = -EBUSY;
++	}
++	if (ret)
++		return ret;
++
++	if (do_wakeup)
+ 		enable_irq_wake(hcd->irq);
+ 
+ 	/*
+@@ -692,7 +702,7 @@ ohci_hcd_at91_drv_suspend(struct platfor
+ 		at91_stop_clock();
+ 	}
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
+
+The same is true for all the other drivers.
+
+Alan Stern
