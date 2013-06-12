@@ -1,24 +1,19 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Jun 2013 10:31:20 -0700
-Subject: [PATCH] ARM: OMAP4: hwmod data: Remove irq entries from mcspi,
- mmc hwmods
-In-Reply-To: <1370846720-6709-1-git-send-email-r.sricharan@ti.com>
-References: <1370846720-6709-1-git-send-email-r.sricharan@ti.com>
-Message-ID: <20130612173120.GO8164@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Jun 2013 18:32:38 +0100
+Subject: [RFC 2/3] arm: mm: Define set_memory_* functions for ARM
+In-Reply-To: <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
+References: <1371057810-3189-1-git-send-email-lauraa@codeaurora.org>
+ <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20130612173238.GV18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sricharan R <r.sricharan@ti.com> [130609 23:51]:
-> Commit '3b9b10151c6838af52244cec4af41a938bb5b7ec' cleaned up the
-> data file to remove all irq and dma entries for all hwmods, which
-> are now populated by DT. But mcspi and mmc irq, dma entries were
-> retained since MMC, NFS boot was not working. Since it is root caused
-> to be an issue with only DMA entries [1], irq can be safely removed.
-> 
-> [1] http://www.mail-archive.com/linux-omap at vger.kernel.org/msg90115.html
+On Wed, Jun 12, 2013 at 10:23:29AM -0700, Laura Abbott wrote:
+> Other architectures define various set_memory functions to allow
+> attributes to be changed (e.g. set_memory_x, set_memory_rw, etc.)
+> Currently, these functions are missing on ARM. Define these in an
+> appropriate manner for ARM.
 
-Thanks applying into omap-for-v3.11/cleanup.
-
-Regards,
-
-Tony
+Please ensure that these functions only accept arguments for the module
+range; they will fail probably very noisily and destructively if they
+encounter the section mappings which we use for the direct RAM mapping.
