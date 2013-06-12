@@ -1,85 +1,27 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Jun 2013 00:00:57 +0100
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20130612194021.GX18614@n2100.arm.linux.org.uk>
-References: <20130610225607.GE18614@n2100.arm.linux.org.uk>
- <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
- <CAPM=9twJGgYiXxQyaXCnYd+bUPFv+P92qGdmJ39_4z29==4F2g@mail.gmail.com>
- <20130610233611.GK18614@n2100.arm.linux.org.uk>
- <CAPM=9tz6p2rhjNUg7ednT09A+dztbYskF32QkZeaCi_qrH8ipw@mail.gmail.com>
- <20130612134845.GQ18614@n2100.arm.linux.org.uk>
- <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
- <20130612164914.GT18614@n2100.arm.linux.org.uk>
- <20130612170512.GU18614@n2100.arm.linux.org.uk>
- <20130612194021.GX18614@n2100.arm.linux.org.uk>
-Message-ID: <20130612230057.GY18614@n2100.arm.linux.org.uk>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Jun 2013 16:02:34 -0700
+Subject: [PATCH v3 5/7] clk: add basic Rockchip rk3066a clock support
+In-Reply-To: <201306130045.41723.heiko@sntech.de>
+References: <201306111328.52679.heiko@sntech.de>
+ <201306111331.31517.heiko@sntech.de>
+ <20130611200610.8816.68285@quantum>
+ <201306130045.41723.heiko@sntech.de>
+Message-ID: <20130612230234.GB9016@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And here's another one - look carefully at this path:
+On Thu, Jun 13, 2013 at 12:45:41AM +0200, Heiko St?bner wrote:
+> Part of me simply wants to wait for this - but rockchip stuff might be to late 
+> for 3.11 anyway, as we're near rc6.
 
-                buf = dev->driver->gem_prime_export(dev, obj, flags);
-                if (IS_ERR(buf)) {
-                        /* normally the created dma-buf takes ownership of the ref,
-                         * but if that fails then drop the ref
-                         */
-                        drm_gem_object_unreference_unlocked(obj);
-                        mutex_unlock(&file_priv->prime.lock);
-                        return PTR_ERR(buf);
-                }
-                obj->export_dma_buf = buf;
-                *prime_fd = dma_buf_fd(buf, flags);
-        }
-        /* if we've exported this buffer the cheat and add it to the import list
-         * so we get the correct handle back
-         */
-        ret = drm_prime_add_imported_buf_handle(&file_priv->prime,
-                        obj->export_dma_buf, handle);
-        if (ret) {
-                drm_gem_object_unreference_unlocked(obj);
-                mutex_unlock(&file_priv->prime.lock);
-                return ret;
-        }
+For a new platform like this, it's useful to get some of the drivers to land
+even if the main platform code isn't. Where things tend to get messy is when we
+have to add a lot of code late in the cycle that has a lot of external
+dependencies, since everybody then has to scramble about getting things sorted
+out.
 
-So in the event of drm_prime_add_imported_buf_handle() returning an error,
-we return that error to our caller (which will eventually be userspace)
-saying that we failed.
+It's not too late for 3.11 yet, and in particular it'd be nice to see things
+like clock and pinctrl stuff go in even if some other stuff misses the train.
 
-However, we've already setup the export and obtained an fd for it, which
-we resultingly now leak in that situation.
 
-Now, second problem here - consider what happens if you ask for the same
-object to be exported a second (or more) times.  Note that
-obj->export_dma_buf will now be set, so we take a different path through
-this code:
-
-        if (obj->export_dma_buf) {
-                get_dma_buf(obj->export_dma_buf);
-                *prime_fd = dma_buf_fd(obj->export_dma_buf, flags);
-                drm_gem_object_unreference_unlocked(obj);
-	} else {
-	}
-        /* if we've exported this buffer the cheat and add it to the import list
-         * so we get the correct handle back
-         */
-        ret = drm_prime_add_imported_buf_handle(&file_priv->prime,
-                        obj->export_dma_buf, handle);
-        if (ret) {
-                drm_gem_object_unreference_unlocked(obj);
-                mutex_unlock(&file_priv->prime.lock);
-                return ret;
-        }
-
-Now, if I in a loop in userspace doing this:
-
-	do {
-		drmPrimeHandleToFD(..., &fd);
-		close(fd);
-	} while (1);
-
-How long do you think it might take to exhaust the kmalloc() inside
-drm_prime_add_imported_buf_handle() ?
-
-It's not even trivially fixable, because drm_gem_dmabuf_release() doesn't
-call drm_prime_remove_imported_buf_handle() because it has no knowledge
-of the drm_prime_file_private structure to search for these things...
+-Olof
