@@ -1,73 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 12 Jun 2013 12:55:36 +0200
-Subject: [PATCH V4 3/3] ARM: dts: Add pcie controller node for Samsung
- EXYNOS5440 SoC
-In-Reply-To: <003801ce6756$6578ff80$306afe80$@samsung.com>
-References: <003801ce6756$6578ff80$306afe80$@samsung.com>
-Message-ID: <3532163.SqzZzxO4BR@wuerfel>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 12 Jun 2013 12:56:13 +0200
+Subject: [PATCHv4 4/9] i2c: mv64xxx: Add Allwinner sun4i compatible
+In-Reply-To: <1371024438-16631-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371024438-16631-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130612105613.GT16502@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks for the update! A few comments again:
-
-On Wednesday 12 June 2013 19:20:00 Jingoo Han wrote:
+On Wed, Jun 12, 2013 at 10:07:13AM +0200, Maxime Ripard wrote:
+> Add the compatible string for the Allwinner A10 i2c controller and the
+> associated register layout.
 > 
-> diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> index d55042b..efe7d39 100644
-> --- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> +++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
-> @@ -30,4 +30,12 @@
->                         clock-frequency = <50000000>;
->                 };
->         };
-> +
-> +       pcie0 at 40000000 {
-> +               reset-gpio = <5>;
-> +       };
-> +
-> +       pcie1 at 60000000 {
-> +               reset-gpio = <22>;
-> +       };
->  };
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/i2c/busses/Kconfig       |  3 ++-
+>  drivers/i2c/busses/i2c-mv64xxx.c |  1 +
+>  include/linux/mv643xx_i2c.h      | 10 ++++++++++
+>  3 files changed, 13 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+> index 631736e..5dc4148 100644
+> --- a/drivers/i2c/busses/Kconfig
+> +++ b/drivers/i2c/busses/Kconfig
+> @@ -507,10 +507,11 @@ config I2C_MPC
+>  
+>  config I2C_MV64XXX
+>  	tristate "Marvell mv64xxx I2C Controller"
+> -	depends on (MV64X60 || PLAT_ORION)
+> +	depends on (MV64X60 || PLAT_ORION || ARCH_SUNXI)
 
-As mentioned before, please use the gpio binding to pass gpio numbers.
+Hi Maxime.
 
-> diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
-> index f6b1c89..2c15f9d 100644
-> --- a/arch/arm/boot/dts/exynos5440.dtsi
-> +++ b/arch/arm/boot/dts/exynos5440.dtsi
-> @@ -216,4 +216,42 @@
->                 clock-names = "rtc";
->                 status = "disabled";
->         };
-> +
-> +       pcie0 at 0x290000 {
-> +               compatible = "samsung,exynos5440-pcie";
-> +               reg = <0x290000 0x1000
-> +                       0x270000 0x1000
-> +                       0x271000 0x40>;
-> +               interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
-> +               clocks = <&clock 28>, <&clock 27>;
-> +               clock-names = "pcie", "pcie_bus";
-> +               #address-cells = >;
-> +               #size-cells = <2>;
-> +               device_type = "pci";
-> +               ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
-> +                         0x81000000 0 0          0x40200000 0 0x00010000   /* downstream I/O */
-> +                         0x82000000 0 0x40210000 0x40210000 0 0x10000000>; /* non-prefetchable memory */
+What about MV64X60? It also needs to pass the registers in its
+platform data.
 
-I think you did not reply to my question regarding the size of the
-memory space. Does it extend from 0x40210000 to 0x50210000,
-or from 0x40210000 to 0x50000000. You probably meant the latter
-but wrote the former. If not, please add a comment for clarification.
-
-> +               #interrupt-cells = <1>;
-> +               interrupt-map-mask = <0 0 0 0>;
-> +               interrupt-map = <0x0 0 &gic 53>;
-> +       };
-
-So all PCI IntA interrupts are mapped to a single gic interrupt? That
-sounds like a bottleneck when you have a lot of devices on the bus.
-Do you have MSI support?
-
-	Arnd
+	 Andrew
