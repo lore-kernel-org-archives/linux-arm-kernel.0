@@ -1,52 +1,39 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Wed, 12 Jun 2013 20:58:29 +0530
-Subject: [PATCH 01/10] USB: OHCI: Properly handle ohci-at91 suspend
-In-Reply-To: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1371050918-29472-2-git-send-email-manjunath.goudar@linaro.org>
+Date: Wed, 12 Jun 2013 20:58:28 +0530
+Subject: [PATCH 00/10] USB: OHCI:Properly handle ohci_suspend()routine in bus
+ glue
+Message-ID: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-at91 glue was not properly
-handled as it was not suspending generic part of ohci controller.
-Calling explicitly the ohci_suspend()routine in ohci_hcd_at91_drv_suspend()
-will ensure proper handling of suspend scenario.
+Suspend scenario in case of ohci bus glue was not properly handled as 
+it was not suspending generic part of ohci controller. Calling 
+explicitly the ohci_suspend()routine will ensure proper handling 
+of suspend scenario.
+ 
+Manjunath Goudar (10):
+  USB: OHCI: Properly handle ohci-at91 suspend
+  USB: OHCI: Properly handle ohci-s3c2410 suspend
+  USB: OHCI: Properly handle ohci-da8xx suspend
+  USB: OHCI: Properly handle ohci-ep93xx suspend
+  USB: OHCI: Properly handle ohci-exynos suspend
+  USB: OHCI: Properly handle ohci-omap suspend
+  USB: OHCI: Properly handle ohci-platform suspend
+  USB: OHCI: Properly handle ohci-pxa27x suspend
+  USB: OHCI: Properly handle ohci-sm501 suspend
+  USB: OHCI: Properly handle ohci-spear suspend
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
----
- drivers/usb/host/ohci-at91.c |    8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ drivers/usb/host/ohci-at91.c     |    8 ++++++--
+ drivers/usb/host/ohci-da8xx.c    |   13 +++++++++----
+ drivers/usb/host/ohci-ep93xx.c   |    6 +++++-
+ drivers/usb/host/ohci-exynos.c   |    3 +++
+ drivers/usb/host/ohci-omap.c     |   11 ++++++++---
+ drivers/usb/host/ohci-platform.c |    6 +++++-
+ drivers/usb/host/ohci-pxa27x.c   |    6 +++++-
+ drivers/usb/host/ohci-s3c2410.c  |    3 +++
+ drivers/usb/host/ohci-sm501.c    |    9 +++++++--
+ drivers/usb/host/ohci-spear.c    |   10 +++++++---
+ 10 files changed, 58 insertions(+), 17 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-index fb2f127..28400a7 100644
---- a/drivers/usb/host/ohci-at91.c
-+++ b/drivers/usb/host/ohci-at91.c
-@@ -619,8 +619,12 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
- {
- 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-+	bool do_wakeup = device_may_wakeup(&pdev->dev);
-+	int ret;
- 
--	if (device_may_wakeup(&pdev->dev))
-+	ret = ohci_suspend(hcd, do_wakeup);
-+
-+	if (do_wakeup)
- 		enable_irq_wake(hcd->irq);
- 
- 	/*
-@@ -637,7 +641,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
- 		at91_stop_clock();
- 	}
- 
--	return 0;
-+	return ret;
- }
- 
- static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
 -- 
 1.7.9.5
