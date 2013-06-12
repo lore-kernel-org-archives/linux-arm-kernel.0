@@ -1,33 +1,40 @@
-From: gmbnomis@gmail.com (Simon Baatz)
-Date: Wed, 12 Jun 2013 20:59:09 +0200
-Subject: [PATCH V5] ARM: handle user space mapped pages in
- flush_kernel_dcache_page
-In-Reply-To: <20130610102307.GC1947@darko.cambridge.arm.com>
-References: <1370462344-7128-1-git-send-email-gmbnomis@gmail.com>
- <20130610102307.GC1947@darko.cambridge.arm.com>
-Message-ID: <20130612185909.GA6945@schnuecks.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Wed, 12 Jun 2013 15:30:46 -0400
+Subject: [PATCH 1/3] ARM: keystone: Add minimal TI Keystone platform
+ support
+In-Reply-To: <51B78EF0.3040803@ti.com>
+References: <1370894123-26846-1-git-send-email-santosh.shilimkar@ti.com>
+ <3148358.YM4iO29jiR@wuerfel> <51B78438.6090604@ti.com>
+ <1884655.zPfOkDCsbu@wuerfel> <51B78EF0.3040803@ti.com>
+Message-ID: <51B8CC66.4010302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Catalin,
+Arnd,
 
-On Mon, Jun 10, 2013 at 11:23:07AM +0100, Catalin Marinas wrote:
-> On Wed, Jun 05, 2013 at 08:59:04PM +0100, Simon Baatz wrote:
-> > Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
-> > it needs to handle are kernel mapped only.  However, for example when doing
-> > direct I/O, pages with user space mappings may occur.
-> > 
-> > Thus, continue to do lazy flushing if there are no user space mappings.
-> > Otherwise, flush the kernel cache lines directly.
-> > 
-> > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
-> > Cc: <stable@vger.kernel.org> # 3.2+
-> > CC: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
+On Tuesday 11 June 2013 04:56 PM, Santosh Shilimkar wrote:
+> On Tuesday 11 June 2013 04:24 PM, Arnd Bergmann wrote:
+>> On Tuesday 11 June 2013 16:10:32 Santosh Shilimkar wrote:
+
+[..]
+
+>> Ok, fair enough. Could you enable keystone in multi_v7_defconfig anyway
+>> and ensure that it is able to boot?
+>>
+> Thanks. Will make sure it boots with multi_v7_defconfig.
 > 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+I spent some time to get "multi_v7_defconfig" on OMAP and Keystone
+working. ARCH_SIRF machine code needs a fix and the multi_v7_defconfig
+needs few generic updates like enabling ramdisk and ext2 related
+support. With those two updates, OMAP5 and Keystone boots with
+multi_v7_defconfig. Will post those couple of patches for
+multi_v7_defconfig and also refresh the Keystone series.
 
-Thanks for the review. This is submitted now as patch #7755/1 in
-Russell's patch system.
+Thanks for the feedback.
 
-- Simon
+Regards,
+Santosh
+P.S: On Keystone I noticed a weired issue with local_flush_tlb_all() while
+booting with multi_v7_defconfig which I will debug it further. Its
+mostly looks like keystone specific issue since I don't see that issue
+on OMAP5.
