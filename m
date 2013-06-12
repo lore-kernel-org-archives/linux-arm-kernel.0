@@ -1,74 +1,80 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Jun 2013 11:43:23 +0200
-Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
-In-Reply-To: <20130611212550.03A823E0D8D@localhost>
-References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
- <515319D5.20105@wwwdotorg.org>
- <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
- <5155C902.7080207@wwwdotorg.org>
- <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
- <5165CB9D.1090202@wwwdotorg.org>
- <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
- <51671D7B.5060303@wwwdotorg.org>
- <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
- <51673D70.3010503@wwwdotorg.org>
- <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
- <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
- <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
- <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
- <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
- <516DDB4D.9020500@ti.com>
- <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
- <CACRpkdaA_7Feuui-S65m--2FfvpoUkfn6b9SoWavAstZUS23ag@mail.gmail.com>
- <517AF22C.9090901@ti.com> <20130611212550.03A823E0D8D@localhost>
-Message-ID: <CACRpkdYq9d1Sv8uk3ZyKnd3ZYG3d+_YKk6yNu6H9TtNyAFkpFw@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 12 Jun 2013 14:35:20 +0530
+Subject: [RFC PATCH 27/50] at_hdmac: prepare clk before calling enable
+In-Reply-To: <1370622358-19575-1-git-send-email-b.brezillon@overkiz.com>
+References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
+ <1370622358-19575-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <20130612090520.GN4107@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 11:25 PM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> On Fri, 26 Apr 2013 16:31:24 -0500, Jon Hunter <jon-hunter@ti.com> wrote:
->>
->> On 04/26/2013 02:31 AM, Linus Walleij wrote:
->> > On Wed, Apr 17, 2013 at 2:41 AM, Javier Martinez Canillas
->> > <martinez.javier@gmail.com> wrote:
->> >
->> > So:
->> >
->> >> +static int omap_gpio_irq_domain_xlate(struct irq_domain *d,
->> >> +                                     struct device_node *ctrlr,
->> >> +                                     const u32 *intspec, unsigned int intsize,
->> >> +                                     irq_hw_number_t *out_hwirq,
->> >> +                                     unsigned int *out_type)
->> >> +{
->> >> +       int ret;
->> >> +       struct gpio_bank *bank = d->host_data;
->> >> +       int gpio = bank->chip.base + intspec[0];
->> >> +
->> >> +       if (WARN_ON(intsize < 2))
->> >> +               return -EINVAL;
->> >> +
->> >> +       ret = gpio_request_one(gpio, GPIOF_IN, ctrlr->full_name);
->> >> +       if (ret)
->> >> +               return ret;
->> >
->> > So how to figure out if a device is already requesting this GPIO
->> > on some orthogonal axis?
->>
->> I really don't think that is necessary. Hopefully, my other email [1]
->> elaborates on why. Let me know if this makes sense.
->
-> I would agree here. If the irq specified happens to be a GPIO; then the
-> onus is on the GPIO/IRQ controller driver to make sure that GPIO is
-> actually set up to work as an IRQ.
-
-Hm, re-reading this I guess the gpio_request_one() will block
-others from using the pin for anything else.
-
-Isn't that the answer to my actual question...?
-
-It seems more like I was asking a pretty stupid question
-actually.
-
-Yours,
-Linus Walleij
+On Fri, Jun 07, 2013 at 06:25:57PM +0200, Boris BREZILLON wrote:
+> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
+> avoid common clk framework warnings.
+> 
+> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> ---
+>  drivers/dma/at_hdmac.c |   12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index e923cda..4772036 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -1374,7 +1374,7 @@ static int __init at_dma_probe(struct platform_device *pdev)
+>  		err = PTR_ERR(atdma->clk);
+>  		goto err_clk;
+>  	}
+> -	clk_enable(atdma->clk);
+> +	clk_prepare_enable(atdma->clk);
+Can you add checks for return value in the driver as well
+>  
+>  	/* force dma off, just in case */
+>  	at_dma_off(atdma);
+> @@ -1475,7 +1475,7 @@ err_pool_create:
+>  	platform_set_drvdata(pdev, NULL);
+>  	free_irq(platform_get_irq(pdev, 0), atdma);
+>  err_irq:
+> -	clk_disable(atdma->clk);
+> +	clk_disable_unprepare(atdma->clk);
+>  	clk_put(atdma->clk);
+>  err_clk:
+>  	iounmap(atdma->regs);
+> @@ -1512,7 +1512,7 @@ static int at_dma_remove(struct platform_device *pdev)
+>  		list_del(&chan->device_node);
+>  	}
+>  
+> -	clk_disable(atdma->clk);
+> +	clk_disable_unprepare(atdma->clk);
+>  	clk_put(atdma->clk);
+>  
+>  	iounmap(atdma->regs);
+> @@ -1531,7 +1531,7 @@ static void at_dma_shutdown(struct platform_device *pdev)
+>  	struct at_dma	*atdma = platform_get_drvdata(pdev);
+>  
+>  	at_dma_off(platform_get_drvdata(pdev));
+> -	clk_disable(atdma->clk);
+> +	clk_disable_unprepare(atdma->clk);
+>  }
+>  
+>  static int at_dma_prepare(struct device *dev)
+> @@ -1588,7 +1588,7 @@ static int at_dma_suspend_noirq(struct device *dev)
+>  
+>  	/* disable DMA controller */
+>  	at_dma_off(atdma);
+> -	clk_disable(atdma->clk);
+> +	clk_disable_unprepare(atdma->clk);
+>  	return 0;
+>  }
+>  
+> @@ -1618,7 +1618,7 @@ static int at_dma_resume_noirq(struct device *dev)
+>  	struct dma_chan *chan, *_chan;
+>  
+>  	/* bring back DMA controller */
+> -	clk_enable(atdma->clk);
+> +	clk_prepare_enable(atdma->clk);
+>  	dma_writel(atdma, EN, AT_DMA_ENABLE);
+>  
+>  	/* clear any pending interrupt */
+--
+~Vinod
