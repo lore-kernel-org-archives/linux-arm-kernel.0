@@ -1,38 +1,49 @@
-From: jagarwal@nvidia.com (Jay Agarwal)
-Date: Wed, 12 Jun 2013 12:41:38 +0530
-Subject: [PATCH V3 1/4] ARM: tegra30: clocks: Fix pciex clock registration
-In-Reply-To: <20130611221709.8816.15602@quantum>
-References: <1370372252-4332-1-git-send-email-jagarwal@nvidia.com>
- <51AE3B18.9010604@wwwdotorg.org> <20130611221709.8816.15602@quantum>
-Message-ID: <C79B248886DD134989C8FF6B096A91AB91CF1615C6@BGMAIL01.nvidia.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Jun 2013 16:20:13 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Remove legacy memory bits
+In-Reply-To: <CANqRtoSm81_Ncxa0R4ZYHjwGq7=jNymY9q1qvfphtOe20PuJFg@mail.gmail.com>
+References: <20130610094638.20803.18484.sendpatchset@w520>
+ <201306101700.22787.arnd@arndb.de>
+ <20130611074623.GA10440@verge.net.au>
+ <CANqRtoSm81_Ncxa0R4ZYHjwGq7=jNymY9q1qvfphtOe20PuJFg@mail.gmail.com>
+Message-ID: <20130612072013.GA6006@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Quoting Stephen Warren (2013-06-04 12:08:08)
-> > On 06/04/2013 12:57 PM, Jay Agarwal wrote:
-> > > Registering pciex as peripheral clock instead of fixed clock as
-> > > tegra_perih_reset_assert(deassert) api of this clock api gives
-> > > warning and ultimately does not succeed to assert(deassert).
-> > >
-> > > Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
-> > > ---
-> > > Patch is based on remotes/gitorious_thierryreding_linux/tegra/next and
-> should be applied on top of this.
-> >
-> > For this change, Mike may as well apply it directly to the clock tree.
-> > Thierry can then pick it up when he rebases his tegra/next tree.
-> >
-> > That said, I don't think you should need any of the
-> > TEGRA_CLK_DUPLICATE() entries; the PCIe driver should get its clocks
-> > from device tree now, and hence the driver name in the clock
-> > registration shouldn't be necessary. All of these
-> > TEGRA_CLK_DUPLICATE() entries should be removed en mass sometime
-> soon
-> > with luck. So, can you simply leave the two TEGRA_CLK_DUPLICATE()
-> > entries untouched, rather than changing them?
+On Wed, Jun 12, 2013 at 03:26:01PM +0900, Magnus Damm wrote:
+> Hi Simon,
 > 
-> Ping on this patch.  I can take it through my tree, but is there going to be
-> rework based on Stephen's comments?
+> On Tue, Jun 11, 2013 at 4:46 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Jun 10, 2013 at 05:00:22PM +0200, Arnd Bergmann wrote:
+> >> On Monday 10 June 2013, Magnus Damm wrote:
+> >> > ARM: shmobile: Remove legacy memory bits
+> >> >
+> >> > [PATCH 01/03] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
+> >> > [PATCH 02/03] ARM: shmobile: Remove MEMORY_START/SIZE
+> >> > [PATCH 03/03] ARM: shmobile: Remove mach/memory.h
+> >> >
+> >> > Now when all users are gone this series removes the legacy memory code
+> >> > and enables CONFIG_ARM_PATCH_PHYS_VIRT. Depends on the following code:
+> >> >
+> >> > [PATCH v2] ARM: shmobile: uImage load address rework
+> >> > [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
+> >> > [PATCH 00/06] ARM: shmobile: SMP virt_to_phys() conversion
+> >> > [PATCH 00/02] ARM: shmobile: romImage update
+> >> >
+> >> > The romImage series above still needs to be updated.
+> >> >
+> >> > This is the final bit of code not to rely on CONFIG_MEMORY_START/SIZE
+> >> > which in turn is one component that we need for ARCH_MULTIPLATFORM.
+> >> >
+> >> > Signed-off-by: Magnus Damm <damm@opensource.se>
+> >>
+> >> Looks all good to me.
+> >
+> > I will queue these up once all the dependencies are ready.
+> 
+> Thanks, I believe they are now.
+> 
+> I will update the Mackerel romImage support as an incremental patch.
 
-Hi Mike,
-I have uploaded next version V4 of this patch after taking care of this comment.
+Thanks, I have this and the dependencies queued up locally.
+I will push them after doing some build and boot tests.
