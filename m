@@ -1,22 +1,28 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Jun 2013 11:44:41 -0600
-Subject: [PATCH 4/4] arm: tegra: Add power-supplies link between battery
- and charger
-In-Reply-To: <1370899602-22123-5-git-send-email-rklein@nvidia.com>
-References: <1370899602-22123-1-git-send-email-rklein@nvidia.com>
- <1370899602-22123-5-git-send-email-rklein@nvidia.com>
-Message-ID: <51B8B389.8010105@wwwdotorg.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Jun 2013 10:51:42 -0700
+Subject: [PATCH v2 0/4] dw_apb_timer: osc as sched_clock, clocks and
+ clocksource_of support
+In-Reply-To: <CACRpkdZmDWTy=U_rhU9uVXy9N5jEOk6qQingiO5kb+Kc2WkL3w@mail.gmail.com>
+References: <201306041136.09566.heiko@sntech.de>
+ <201306121055.53685.heiko@sntech.de>
+ <CACRpkdZmDWTy=U_rhU9uVXy9N5jEOk6qQingiO5kb+Kc2WkL3w@mail.gmail.com>
+Message-ID: <20130612175142.GB2760@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2013 03:26 PM, Rhyland Klein wrote:
-> The power supply core now supports detecting linkages between batteries
-> and chargers through the use of the power-supplies property. Adding
-> this to the battery, the core will use the phandle list to find
-> the associated charger and pair them up. This facilitates notifications
-> from the charger to the battery when ac power is dissconnected
-> or connected for instance.
+On Wed, Jun 12, 2013 at 11:46:37AM +0200, Linus Walleij wrote:
+> On Wed, Jun 12, 2013 at 10:55 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> 
+> > with clocksource_of conversion of picoxcell and socfpga, this series stands on
+> > its own. Is anybody going to pick it up?
+> 
+> I would suggest you send a pull request to the ARM SoC maintainers.
+> This is where most clocksource code and refactorings related to
+> ARM things come in.
 
-Rhyland, if I apply this patch without patches 1-3 being in the same
-branch, will it cause any bugs? If so, I guess 1-3 should go through the
-drivers/power maintainer for 3.11, and I should defer this patch to 3.12?
+Yeah, or we can pick them up and apply from the list too. Have you collected
+all Acked-bys and reposted a final version? If not, cc arm at kenrel.org on the
+final posting.
+
+
+-Olof
