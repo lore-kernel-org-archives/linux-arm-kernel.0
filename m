@@ -1,74 +1,95 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 12 Jun 2013 10:35:44 -0400 (EDT)
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Jun 2013 16:44:47 +0200
+Subject: [PATCHv4 2/9] i2c: mv64xxx: make the registers offset configurable
+In-Reply-To: <20130612135735.GR18614@n2100.arm.linux.org.uk>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371024438-16631-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20130612135735.GR18614@n2100.arm.linux.org.uk>
+Message-ID: <20130612144447.GI16699@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Ming Lei wrote:
+Hi Russel,
 
-> If not, I am wondering why one USB driver need register another hard
-> interrupt handler? Could you share such examples? I understand the
-> case only exists with timer handler as discussed with Oliver, don't I?
-
-Here's another possibility.  A USB driver has a private lock, and it
-acquires this lock in its completion handler.  But it also acquires
-this lock in other routines, and those other routines may be called by
-other drivers or subsystems in interrupt context.
-
-> > The drivers _do_ need to be changed, as explained above.  And that
-> > explanation was only one failure scenario.  There may be others.
+On Wed, Jun 12, 2013 at 02:57:35PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 12, 2013 at 10:07:11AM +0200, Maxime Ripard wrote:
+> > The Allwinner i2c controller uses the same logic as the Marvell one, but
+> > with slightly different register offsets.
+> > 
+> > Introduce a structure that will be passed by either the pdata or
+> > associated to the compatible strings, and that holds the various
+> > registers that might be needed.
 > 
-> OK, I'd like to know what the others are? :-)
+> I don't like this change.  It introduces further indirection where it's
+> not really necessary, and it's also using platform data to specify this
+> which is in the opposite direction to what's required for moving towards
+> DT.
 
-Me too.  :-)
+Well, some users of this aren't converted to DT, hence why I made the
+changes to the platform_data.
 
-> >> And finally, USB HCDs themselves will benefit from the change, won't they?
-> >
-> > How will they benefit?  Merely from not releasing their private locks?
+> > @@ -154,13 +147,13 @@ mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
+> >  static void
+> >  mv64xxx_i2c_hw_init(struct mv64xxx_i2c_data *drv_data)
+> >  {
+> > -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SOFT_RESET);
+> > +	writel(0, drv_data->reg_base + drv_data->regs->soft_reset);
 > 
-> The interrupt of one HCD will be responded lately since another HCD's
-> interrupt handler takes very long time. With the change, the problem can
-> be avoided.
+> It'd be much better to copy the offsets themselves in drv_data.  You're
+> only talking about 7 bytes here, so there's no worry about bloating the
+> drv_data structure.
 
-For reasonably sophisticated host controllers like EHCI, the delay in
-responding to an interrupt doesn't matter much.  But for simpler host
-controllers (for example, those using PIO instead of DMA) it matters
-more, so those other HCDs will benefit more from the conversion.
+It was more about keeping things separated. Moreover, the probe
+function gets smaller, since you have only a pointer to pass on, instead
+of assigning those 7 bytes.
 
-> >> Compared with "usb-storage" task's schedule latency, the tasklet
-> >> schedule delay should be lower at most of situations since the tasklet
-> >> is scheduled inside irq handler.
-> >
-> > True.  But the two latencies add.
+And since Gregory Clement is working on adding more registers, I believe
+it makes more sense to have things separate.
+
 > 
-> I think it should be one tasklet latency added, but what is the other one?
-
-I meant that the latency in tasklet scheduling has to be added to the 
-latency in scheduling the usb-storage thread.
-
-> > Or you could have a separate tasklet for each host controller.
+> > @@ -611,8 +619,9 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+> >  		drv_data->freq_n = pdata->freq_n;
+> >  		drv_data->irq = platform_get_irq(pd, 0);
+> >  		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
+> > +		drv_data->regs = pdata->regs;
+> >  	} else if (pd->dev.of_node) {
+> > -		rc = mv64xxx_of_config(drv_data, pd->dev.of_node);
+> > +		rc = mv64xxx_of_config(drv_data, &pd->dev);
 > 
-> Yes, but I will compare tasklet with interrupt threaded handler first.
+> I'd suggest making the default register offsets be the drivers existing
+> offsets, and allowing it to be overriden.  That nicely sorts out the
+> next comment below, and also gets rid of it in platform data.  Moreover,
+> if you're going to re-use this driver, you should do it via a different
+> "compatible" name in DT, which the driver can then use to identify the
+> different register set layout.
 
-Switching to a threaded interrupt handler offers more possibilities.  
-Instead of moving just the givebacks to the thread, we could put almost 
-all the processing there.  (At least, we can for ehci-hcd.  Other HCDs 
-may not be able to do this.)
+The logic here will change quite a bit in the next iteration thanks to
+the comments I received.
 
-At this point we are talking about multiple changes:
+I'm now using a platform_device_id structure to match the name of the
+driver just like what was done with the DT in that patchset. This also
+removes the need to add the regs field to the platform data and ...
 
-	Moving the givebacks to a tasklet or threaded handler.
+> 
+> > +struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
+> > +	.addr		= 0x00,
+> > +	.ext_addr	= 0x10,
+> > +	.data		= 0x04,
+> > +	.control	= 0x08,
+> > +	.status		= 0x0c,
+> > +	.clock		= 0x0c,
+> > +	.soft_reset	= 0x1c,
+> > +};
+> 
+> No, this means every file which includes this header ends up defining
+> this structure, which is globally visiable, and therefore its a recipe
+> for link failures.
 
-	Changing the USB completion handlers so that they can be called 
-	with interrupts enabled.	
+solves this as well.
 
-	Allowing the tasklet/thread to run with interrupts enabled.
+Maxime
 
-	Moving more of the HCD processing into the tasklet/thread.
-
-Maybe other things too.  In principle, the first and second items can 
-be done simultaneously.
-
-Alan Stern
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
