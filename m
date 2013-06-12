@@ -1,44 +1,74 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 12 Jun 2013 11:24:38 +0200
-Subject: [PATCH v5 01/22] pinctrl: generic: Add DT bindings
-In-Reply-To: <1370989371-30846-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1370989371-30846-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1370989371-30846-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <CACRpkdYev+hapkM075Sw7Yi0u+XpRvL74SwT39DV1aV1RtHC+Q@mail.gmail.com>
+Date: Wed, 12 Jun 2013 11:43:23 +0200
+Subject: [PATCH 3/5] gpio/omap: Add DT support to GPIO driver
+In-Reply-To: <20130611212550.03A823E0D8D@localhost>
+References: <1329321854-24490-1-git-send-email-b-cousson@ti.com>
+ <515319D5.20105@wwwdotorg.org>
+ <CACRpkdYXVLgCz1Tyu-Ls2V2OTc4R3cGNJhfQJB6Hiz_K9dkZYQ@mail.gmail.com>
+ <5155C902.7080207@wwwdotorg.org>
+ <CACRpkdYbs4-uudpRUY8e+7icYYkZrfM0kReP3pLL5DMiURJ4dg@mail.gmail.com>
+ <5165CB9D.1090202@wwwdotorg.org>
+ <CACRpkdYirFNqmGhA4K9CL4ve4NYhs8Rd3SFt1iwW9vHBkrcz8g@mail.gmail.com>
+ <51671D7B.5060303@wwwdotorg.org>
+ <CACRpkdbf32Ef77GmXk9id9+RRjcDRTr7S+F4nznoeZU8y=BT_Q@mail.gmail.com>
+ <51673D70.3010503@wwwdotorg.org>
+ <CAAwP0s0e2x33jZQhFRY+Hoo61SFqYKRgWk=1mL2+DNxSDJHz+A@mail.gmail.com>
+ <CACRpkda4h+qXTvsirPAS7E7sjXhMLE62q=VDy53W8UchsYjbNg@mail.gmail.com>
+ <516C31C3.9040505@wwwdotorg.org> <516C7C43.3040105@wwwdotorg.org>
+ <516C8760.2050500@ti.com> <516D9B05.1000501@wwwdotorg.org>
+ <516DA60A.5070000@ti.com> <516DCCA8.3070108@wwwdotorg.org>
+ <516DDB4D.9020500@ti.com>
+ <CAAwP0s0-VNUoeSKaGbvoDeD7m7kZRdp5rCJ7iVpFoFAaQtXcmQ@mail.gmail.com>
+ <CACRpkdaA_7Feuui-S65m--2FfvpoUkfn6b9SoWavAstZUS23ag@mail.gmail.com>
+ <517AF22C.9090901@ti.com> <20130611212550.03A823E0D8D@localhost>
+Message-ID: <CACRpkdYq9d1Sv8uk3ZyKnd3ZYG3d+_YKk6yNu6H9TtNyAFkpFw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 12:22 AM, Laurent Pinchart
-<laurent.pinchart+renesas@ideasonboard.com> wrote:
-
-> Document DT properties for the generic pinctrl parameters and add a
-> parser function.
+On Tue, Jun 11, 2013 at 11:25 PM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Fri, 26 Apr 2013 16:31:24 -0500, Jon Hunter <jon-hunter@ti.com> wrote:
+>>
+>> On 04/26/2013 02:31 AM, Linus Walleij wrote:
+>> > On Wed, Apr 17, 2013 at 2:41 AM, Javier Martinez Canillas
+>> > <martinez.javier@gmail.com> wrote:
+>> >
+>> > So:
+>> >
+>> >> +static int omap_gpio_irq_domain_xlate(struct irq_domain *d,
+>> >> +                                     struct device_node *ctrlr,
+>> >> +                                     const u32 *intspec, unsigned int intsize,
+>> >> +                                     irq_hw_number_t *out_hwirq,
+>> >> +                                     unsigned int *out_type)
+>> >> +{
+>> >> +       int ret;
+>> >> +       struct gpio_bank *bank = d->host_data;
+>> >> +       int gpio = bank->chip.base + intspec[0];
+>> >> +
+>> >> +       if (WARN_ON(intsize < 2))
+>> >> +               return -EINVAL;
+>> >> +
+>> >> +       ret = gpio_request_one(gpio, GPIOF_IN, ctrlr->full_name);
+>> >> +       if (ret)
+>> >> +               return ret;
+>> >
+>> > So how to figure out if a device is already requesting this GPIO
+>> > on some orthogonal axis?
+>>
+>> I really don't think that is necessary. Hopefully, my other email [1]
+>> elaborates on why. Let me know if this makes sense.
 >
-> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> I would agree here. If the irq specified happens to be a GPIO; then the
+> onus is on the GPIO/IRQ controller driver to make sure that GPIO is
+> actually set up to work as an IRQ.
 
-It appears we have a race here, as something like three people,
-or four, happened to do generic pinconf bindings at the same time.
+Hm, re-reading this I guess the gpio_request_one() will block
+others from using the pin for anything else.
 
-Yesterday I applied Heiko St?bners patch
-"pinctrl: add function to parse generic pinconfig properties from a dt node"
-doing basically the same thing. With subtle differences...
-but it already supports schmittrigging and some more.
+Isn't that the answer to my actual question...?
 
-It appears to be close to your idea though!
-
-Would it be possible for you to look at what I have on my "devel" branch
-now (same as submitted for -next), rebase on that and patch any problems?
-
-> +               if (param->flag) {
-> +                       ret = of_property_read_bool(np, param->property)
-> +                           ? 0 : -EINVAL;
-> +                       val = 1;
-> +               } else {
-> +                       ret = of_property_read_u32(np, param->property, &val);
-> +               }
-
-This construct is done differently in Heiko's code, please
-review it so we know we have a nice, efficient parser.
+It seems more like I was asking a pretty stupid question
+actually.
 
 Yours,
 Linus Walleij
