@@ -1,41 +1,41 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 12 Jun 2013 14:41:16 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
-References: <CACVXFVMNzwD44mhKijURSWrqLKjy7_oOY8hrTtjbyOxGS2tv=g@mail.gmail.com>
- <Pine.LNX.4.44L0.1306111431170.1392-100000@iolanthe.rowland.org>
- <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
-Message-ID: <CACVXFVO_eGeiyjzyoFJWEa8WMhQdvO+vD43b5g6Tf2eTjAp0gA@mail.gmail.com>
+From: philippe.retornaz@epfl.ch (=?ISO-8859-1?Q?Philippe_R=E9tornaz?=)
+Date: Wed, 12 Jun 2013 08:41:37 +0200
+Subject: [PATCH v4 1/3] leds: leds-mc13783: Prepare driver to support
+ MC13892 LEDs
+In-Reply-To: <CAK5ve-+aQNrVbbOkyHXaB6paDe96wMcZ-7yG=J0Wp9mtH0HGyw@mail.gmail.com>
+References: <1370883572-877-1-git-send-email-shc_work@mail.ru>
+ <51B6DBE8.5090505@epfl.ch>
+ <CAK5ve-+aQNrVbbOkyHXaB6paDe96wMcZ-7yG=J0Wp9mtH0HGyw@mail.gmail.com>
+Message-ID: <51B81821.7020507@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 10:43 AM, Ming Lei <ming.lei@canonical.com> wrote:
-> On Wed, Jun 12, 2013 at 3:10 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+Le 11/06/2013 20:29, Bryan Wu a ?crit :
+> On Tue, Jun 11, 2013 at 1:12 AM, Philippe R?tornaz
+> <philippe.retornaz@epfl.ch> wrote:
+>> Le 10/06/2013 18:59, Alexander Shiyan a ?crit :
 >>
->> I don't follow your reasoning.  Consider the following situation, where
->> the same spinlock is used in both a URB completion handler and an
->> interrupt handler:
+>>> This patch rewrite driver code to be ready to add support for
+>>> MC13892 LEDs and probe from devicetree.
+>>>
+>>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 >>
->>         URB completes
->>         A tasklet calls the completion handler, with interrupts enabled
->>         The completion handler does
->>                 spin_lock(&lock);
->>         An interrupt occurs
->>         The interrupt handler does
->>                 spin_lock(&lock);       // Deadlock!
+>>
+>>
+>> The whole serie:
+>>
+>> Tested-by: Philippe Retornaz <philippe.retornaz@epfl.ch>
+>>
+>> On mx31moboard with an mc13783.
+>>
 >
-> If you mean the interrupt handler is HCD irq handler of the device, no
-> such problem since all complete() will run in tasklet context.
+> Thanks for testing, did you test device tree as well? I failed to see
+> any DTS file adding/change in this patchset.
 >
-> If not, I am wondering why one USB driver need register another hard
-> interrupt handler? Could you share such examples? I understand the
-> case only exists with timer handler as discussed with Oliver, don't I?
 
-In fact, timer funtion is still run in softirq context, so the deadlock won't
-be caused with acquiring same lock(spin_lock) in both timer function
-and complete() from tasklet.
+No, I tested on a mx31moboard: mc13783 with an imx31, so no device tree.
+But AFAIK this board was the only in-tree user of this driver.
 
+Regards,
 
-Thanks,
---
-Ming Lei
+Philippe
