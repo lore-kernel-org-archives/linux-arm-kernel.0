@@ -1,59 +1,296 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Jun 2013 11:52:26 +0100
-Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <20130609014506.GB10027@obsidianresearch.com>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1370623671-7748-5-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306072101.44694.arnd@arndb.de>
- <20130607200054.GA9010@obsidianresearch.com>
- <20130608183851.GB2354@localhost>
- <20130609014506.GB10027@obsidianresearch.com>
-Message-ID: <20130612105226.3F2723E0A56@localhost>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 12 Jun 2013 12:54:31 +0200
+Subject: [PATCHv4 2/9] i2c: mv64xxx: make the registers offset configurable
+In-Reply-To: <1371024438-16631-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371024438-16631-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130612105431.GS16502@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 8 Jun 2013 19:45:06 -0600, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
-> On Sat, Jun 08, 2013 at 03:38:52PM -0300, Ezequiel Garcia wrote:
+On Wed, Jun 12, 2013 at 10:07:11AM +0200, Maxime Ripard wrote:
+> The Allwinner i2c controller uses the same logic as the Marvell one, but
+> with slightly different register offsets.
 > 
-> > > mbus {
-> > >    ranges = <0x012f0000 0  0xe8000000  0x8000000>
-> > >    devbus-bootcs {
-> > >        ranges = <0  0x012f0000 0  0x8000000>
-> > >    }
-> > > }
-> > > 
-> > > We shouldn't mangle the DT format just to make it convenient for
-> > > humans to write - if this is a major problem then I'd try to use the
-> > > preprocessor first.. There are several reasonable solutions down that
-> > > path, IMHO.
-> > > 
-> > 
-> > Right. I think we have two options here for laying the DT ranges.
-> > 
-> > 1) This is the proposal implied in the patchset I sent:
-> > 
-> > mbus {
-> > 	ranges = < we only put the internal-reg translation here>
-> > 	devbus-bootcs {
-> > 		ranges = <0 {target_id/attribute}
-> > 	{window_physical_base} {size}>
->         ^^^^^^^^^^^^^^^^^^^^^^
-> 
-> This is the mangling I was referring to. It needs to be the offset
-> into the target, it can't be something else.
-> 
-> I understand your motivation, but this is not a good method of
-> encoding this in DT.
-> 
-> There is nothing especially wrong with updating the ranges at runtime,
-> but don't use the 2nd cell in the 2dw address to encode the desired
-> base address.
+> Introduce a structure that will be passed by either the pdata or
+> associated to the compatible strings, and that holds the various
+> registers that might be needed.
 
-+1 The design intent of the ranges property is it isolates the parent
-address space from the child address space. Encoding the physical
-address into the second cell breaks that isolation. Sure, you can do it
-and it will work, but then it forces a change to the parent ranges to
-propagate down to all the child reg and ranges properties.
+Hi Maxime
 
-g.
+I don't think this change is bisectable. It assumes the platform data
+passes the registers, which is not true until the next patch.
+
+Please can you re-arrange the order. Add the extra information to the
+platform data, and then make use of it, not the other way around.
+
+Thanks
+	 Andrew
+
+
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/i2c/busses/i2c-mv64xxx.c | 81 +++++++++++++++++++++-------------------
+>  include/linux/mv643xx_i2c.h      | 27 ++++++++++++--
+>  2 files changed, 66 insertions(+), 42 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> index d70a2fda..f9e076e 100644
+> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> @@ -19,20 +19,12 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_i2c.h>
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+>  
+> -/* Register defines */
+> -#define	MV64XXX_I2C_REG_SLAVE_ADDR			0x00
+> -#define	MV64XXX_I2C_REG_DATA				0x04
+> -#define	MV64XXX_I2C_REG_CONTROL				0x08
+> -#define	MV64XXX_I2C_REG_STATUS				0x0c
+> -#define	MV64XXX_I2C_REG_BAUD				0x0c
+> -#define	MV64XXX_I2C_REG_EXT_SLAVE_ADDR			0x10
+> -#define	MV64XXX_I2C_REG_SOFT_RESET			0x1c
+> -
+>  #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
+>  #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
+>  #define MV64XXX_I2C_BAUD_DIV_M(val)			((val & 0xf) << 3)
+> @@ -98,6 +90,7 @@ struct mv64xxx_i2c_data {
+>  	u32			aborting;
+>  	u32			cntl_bits;
+>  	void __iomem		*reg_base;
+> +	struct mv64xxx_i2c_regs	*regs;
+>  	u32			addr1;
+>  	u32			addr2;
+>  	u32			bytes_left;
+> @@ -154,13 +147,13 @@ mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
+>  static void
+>  mv64xxx_i2c_hw_init(struct mv64xxx_i2c_data *drv_data)
+>  {
+> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SOFT_RESET);
+> +	writel(0, drv_data->reg_base + drv_data->regs->soft_reset);
+>  	writel(MV64XXX_I2C_BAUD_DIV_M(drv_data->freq_m) | MV64XXX_I2C_BAUD_DIV_N(drv_data->freq_n),
+> -		drv_data->reg_base + MV64XXX_I2C_REG_BAUD);
+> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SLAVE_ADDR);
+> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_EXT_SLAVE_ADDR);
+> +		drv_data->reg_base + drv_data->regs->clock);
+> +	writel(0, drv_data->reg_base + drv_data->regs->addr);
+> +	writel(0, drv_data->reg_base + drv_data->regs->ext_addr);
+>  	writel(MV64XXX_I2C_REG_CONTROL_TWSIEN | MV64XXX_I2C_REG_CONTROL_STOP,
+> -		drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +		drv_data->reg_base + drv_data->regs->control);
+>  	drv_data->state = MV64XXX_I2C_STATE_IDLE;
+>  }
+>  
+> @@ -282,7 +275,7 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+>  
+>  		drv_data->cntl_bits |= MV64XXX_I2C_REG_CONTROL_START;
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  
+>  		drv_data->msgs++;
+>  		drv_data->num_msgs--;
+> @@ -300,48 +293,48 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+>  
+>  	case MV64XXX_I2C_ACTION_CONTINUE:
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_SEND_START:
+>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_SEND_ADDR_1:
+>  		writel(drv_data->addr1,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			drv_data->reg_base + drv_data->regs->data);
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_SEND_ADDR_2:
+>  		writel(drv_data->addr2,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			drv_data->reg_base + drv_data->regs->data);
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_SEND_DATA:
+>  		writel(drv_data->msg->buf[drv_data->byte_posn++],
+> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			drv_data->reg_base + drv_data->regs->data);
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_RCV_DATA:
+>  		drv_data->msg->buf[drv_data->byte_posn++] =
+> -			readl(drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			readl(drv_data->reg_base + drv_data->regs->data);
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_RCV_DATA_STOP:
+>  		drv_data->msg->buf[drv_data->byte_posn++] =
+> -			readl(drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			readl(drv_data->reg_base + drv_data->regs->data);
+>  		drv_data->cntl_bits &= ~MV64XXX_I2C_REG_CONTROL_INTEN;
+>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  		drv_data->block = 0;
+>  		wake_up(&drv_data->waitq);
+>  		break;
+> @@ -356,7 +349,7 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+>  	case MV64XXX_I2C_ACTION_SEND_STOP:
+>  		drv_data->cntl_bits &= ~MV64XXX_I2C_REG_CONTROL_INTEN;
+>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->regs->control);
+>  		drv_data->block = 0;
+>  		wake_up(&drv_data->waitq);
+>  		break;
+> @@ -372,9 +365,9 @@ mv64xxx_i2c_intr(int irq, void *dev_id)
+>  	irqreturn_t	rc = IRQ_NONE;
+>  
+>  	spin_lock_irqsave(&drv_data->lock, flags);
+> -	while (readl(drv_data->reg_base + MV64XXX_I2C_REG_CONTROL) &
+> +	while (readl(drv_data->reg_base + drv_data->regs->control) &
+>  						MV64XXX_I2C_REG_CONTROL_IFLG) {
+> -		status = readl(drv_data->reg_base + MV64XXX_I2C_REG_STATUS);
+> +		status = readl(drv_data->reg_base + drv_data->regs->status);
+>  		mv64xxx_i2c_fsm(drv_data, status);
+>  		mv64xxx_i2c_do_action(drv_data);
+>  		rc = IRQ_HANDLED;
+> @@ -496,6 +489,12 @@ static const struct i2c_algorithm mv64xxx_i2c_algo = {
+>   *****************************************************************************
+>   */
+>  #ifdef CONFIG_OF
+> +static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
+> +	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
+> +
+>  static int
+>  mv64xxx_calc_freq(const int tclk, const int n, const int m)
+>  {
+> @@ -528,8 +527,10 @@ mv64xxx_find_baud_factors(const u32 req_freq, const u32 tclk, u32 *best_n,
+>  
+>  static int
+>  mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+> -		  struct device_node *np)
+> +		  struct device *dev)
+>  {
+> +	const struct of_device_id *device;
+> +	struct device_node *np = dev->of_node;
+>  	u32 bus_freq, tclk;
+>  	int rc = 0;
+>  
+> @@ -558,6 +559,13 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+>  	 * So hard code the value to 1 second.
+>  	 */
+>  	drv_data->adapter.timeout = HZ;
+> +
+> +	device = of_match_device(mv64xxx_i2c_of_match_table, dev);
+> +	if (!device)
+> +		return -ENODEV;
+> +
+> +	drv_data->regs = (struct mv64xxx_i2c_regs *)device->data;
+> +
+>  out:
+>  	return rc;
+>  #endif
+> @@ -565,7 +573,7 @@ out:
+>  #else /* CONFIG_OF */
+>  static int
+>  mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+> -		  struct device_node *np)
+> +		  struct device *dev)
+>  {
+>  	return -ENODEV;
+>  }
+> @@ -611,8 +619,9 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+>  		drv_data->freq_n = pdata->freq_n;
+>  		drv_data->irq = platform_get_irq(pd, 0);
+>  		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
+> +		drv_data->regs = pdata->regs;
+>  	} else if (pd->dev.of_node) {
+> -		rc = mv64xxx_of_config(drv_data, pd->dev.of_node);
+> +		rc = mv64xxx_of_config(drv_data, &pd->dev);
+>  		if (rc)
+>  			goto exit_clk;
+>  	}
+> @@ -680,12 +689,6 @@ mv64xxx_i2c_remove(struct platform_device *dev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
+> -	{ .compatible = "marvell,mv64xxx-i2c", },
+> -	{}
+> -};
+> -MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
+> -
+>  static struct platform_driver mv64xxx_i2c_driver = {
+>  	.probe	= mv64xxx_i2c_probe,
+>  	.remove	= mv64xxx_i2c_remove,
+> diff --git a/include/linux/mv643xx_i2c.h b/include/linux/mv643xx_i2c.h
+> index 5db5152..9304c94 100644
+> --- a/include/linux/mv643xx_i2c.h
+> +++ b/include/linux/mv643xx_i2c.h
+> @@ -12,11 +12,32 @@
+>  
+>  #define MV64XXX_I2C_CTLR_NAME	"mv64xxx_i2c"
+>  
+> +struct mv64xxx_i2c_regs {
+> +	u8	addr;
+> +	u8	ext_addr;
+> +	u8	data;
+> +	u8	control;
+> +	u8	status;
+> +	u8	clock;
+> +	u8	soft_reset;
+> +};
+> +
+> +struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
+> +	.addr		= 0x00,
+> +	.ext_addr	= 0x10,
+> +	.data		= 0x04,
+> +	.control	= 0x08,
+> +	.status		= 0x0c,
+> +	.clock		= 0x0c,
+> +	.soft_reset	= 0x1c,
+> +};
+> +
+>  /* i2c Platform Device, Driver Data */
+>  struct mv64xxx_i2c_pdata {
+> -	u32	freq_m;
+> -	u32	freq_n;
+> -	u32	timeout;	/* In milliseconds */
+> +	u32			freq_m;
+> +	u32			freq_n;
+> +	struct mv64xxx_i2c_regs *regs;
+> +	u32			timeout;	/* In milliseconds */
+>  };
+>  
+>  #endif /*_MV64XXX_I2C_H_*/
+> -- 
+> 1.8.3
+> 
