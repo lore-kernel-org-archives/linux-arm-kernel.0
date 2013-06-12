@@ -1,69 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 12 Jun 2013 17:08:02 -0400
-Subject: [PATCH] ARM: multi_v7: Add OMAP with ramdisk config bits
-Message-ID: <1371071282-14750-1-git-send-email-santosh.shilimkar@ti.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 12 Jun 2013 18:12:22 -0300
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <201306122245.55960.arnd@arndb.de>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <4160363.LWJuHATm2F@wuerfel> <20130612111441.E6D603E0A56@localhost>
+ <201306122245.55960.arnd@arndb.de>
+Message-ID: <20130612211221.GB23012@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ramdisk fileystem related options which lets OMAP5 and Keystone
-SOCs to boot till shell with multi_v7_config.
+On Wed, Jun 12, 2013 at 10:45:55PM +0200, Arnd Bergmann wrote:
+> On Wednesday 12 June 2013, Grant Likely wrote:
+> > I think we should have almost everything needed already to do this.
+> > of_bus allows arbitrary mapping code to be used at any stage in the
+> > translation. We might need to add some glue so that of_busses[] can
+> > be assembled by the linker to allow an mbus of_bus stanza to live
+> > outside of drivers/of/address.c
+> > 
+> 
+> Actually, the best thing about this solution is that we don't even
+> have to bother setting up the mappings when loading the mbus driver:
+> We don't need any ranges (other than internal-regs) in DT, and we
+> don't need complex logic to search through the child devices to
+> figure out what the mappings should be. The only thing one needs
+> to do here is check if a mapping already exists when we get into the
+> of_bus handler and create one for the device being translated if
+> there isn't one!
+> 
 
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Arnd Bergmann <arnd@arndb.de>
+This departs considerably from what I'm aiming right now.
 
-Signed-off-by: Sricharan R <r.sricharan@ti.com>
-Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
----
-The ARCH_SIRF related fix is already in arm-soc as pointed by Olof on
-IRC. So just sending the defconfig bits only. I didn't sync the
-multi_v7_config with usual method since it was adding some unnecessary
-delta to the $subject patch.
+Are you suggesting to not put *any* mapping in the mbus 'ranges' node in
+the DT (other than internal-regs)?
 
- arch/arm/configs/multi_v7_defconfig |    9 +++++++++
- 1 file changed, 9 insertions(+)
+In that case, can you explain a bit further how the mbus would
+decide a base address for each window? I guess you're thinking
+in a first-fit algorithm, right?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 2e67a27..efd12f4 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -1,11 +1,14 @@
- CONFIG_EXPERIMENTAL=y
- CONFIG_NO_HZ=y
- CONFIG_HIGH_RES_TIMERS=y
-+CONFIG_BLK_DEV_INITRD=y
- CONFIG_ARCH_MVEBU=y
- CONFIG_MACH_ARMADA_370=y
- CONFIG_ARCH_SIRF=y
- CONFIG_MACH_ARMADA_XP=y
- CONFIG_ARCH_HIGHBANK=y
-+CONFIG_ARCH_OMAP2PLUS=y
-+CONFIG_SOC_OMAP5=y
- CONFIG_ARCH_SOCFPGA=y
- CONFIG_ARCH_SUNXI=y
- CONFIG_ARCH_WM8850=y
-@@ -25,6 +28,9 @@ CONFIG_ARM_APPENDED_DTB=y
- CONFIG_VFP=y
- CONFIG_NEON=y
- CONFIG_NET=y
-+CONFIG_DEVTMPFS=y
-+CONFIG_DEVTMPFS_MOUNT=y
-+CONFIG_BLK_DEV_RAM=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_ATA=y
- CONFIG_SATA_HIGHBANK=y
-@@ -38,6 +44,8 @@ CONFIG_SERIO_AMBAKMI=y
- CONFIG_SERIAL_8250=y
- CONFIG_SERIAL_8250_CONSOLE=y
- CONFIG_SERIAL_8250_DW=y
-+CONFIG_SERIAL_OMAP=y
-+CONFIG_SERIAL_OMAP_CONSOLE=y
- CONFIG_KEYBOARD_SPEAR=y
- CONFIG_SERIAL_AMBA_PL011=y
- CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
-@@ -81,3 +89,4 @@ CONFIG_DMADEVICES=y
- CONFIG_PL330_DMA=y
- CONFIG_SIRF_DMA=y
- CONFIG_DW_DMAC=y
-+CONFIG_EXT2_FS=y
 -- 
-1.7.9.5
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
