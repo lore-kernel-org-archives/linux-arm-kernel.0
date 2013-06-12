@@ -1,117 +1,52 @@
-From: yadi.brar@samsung.com (Yadwinder Singh Brar)
-Date: Mon, 03 Jun 2013 20:39:56 +0530
-Subject: [PATCH v4 6/6] clk: samsung: Add EPLL and VPLL freq table for
- exynos5250 SoC
-In-Reply-To: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
-References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
-Message-ID: <1370272196-4346-7-git-send-email-yadi.brar@samsung.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Wed, 12 Jun 2013 20:58:29 +0530
+Subject: [PATCH 01/10] USB: OHCI: Properly handle ohci-at91 suspend
+In-Reply-To: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371050918-29472-2-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds the EPLL and VPLL freq table for exynos5250 SoC.
+Suspend scenario in case of ohci-at91 glue was not properly
+handled as it was not suspending generic part of ohci controller.
+Calling explicitly the ohci_suspend()routine in ohci_hcd_at91_drv_suspend()
+will ensure proper handling of suspend scenario.
 
-Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
+Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg KH <greg@kroah.com>
+Cc: linux-usb at vger.kernel.org
 ---
- drivers/clk/samsung/clk-exynos5250.c |   53 ++++++++++++++++++++++++++++++++--
- drivers/clk/samsung/clk.h            |    2 +
- 2 files changed, 52 insertions(+), 3 deletions(-)
+ drivers/usb/host/ohci-at91.c |    8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 70cc6cf..f98c19d 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -472,11 +472,34 @@ static __initdata struct of_device_id ext_clk_match[] = {
- 	{ },
- };
- 
-+static __initdata struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_36XX_RATE(rate, m, p, s, k) */
-+	PLL_36XX_RATE(266000000, 266, 3, 3, 0),
-+	/* Not in UM, but need for eDP on snow */
-+	PLL_36XX_RATE(70500000, 94, 2, 4, 0),
-+};
-+
-+static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_36XX_RATE(rate, m, p, s, k) */
-+	PLL_36XX_RATE(192000000, 48, 3, 1, 0),
-+	PLL_36XX_RATE(180633600, 45, 3, 1, 10381),
-+	PLL_36XX_RATE(180000000, 45, 3, 1, 0),
-+	PLL_36XX_RATE(73728000, 73, 3, 3, 47710),
-+	PLL_36XX_RATE(67737600, 90, 4, 3, 20762),
-+	PLL_36XX_RATE(49152000, 49, 3, 3, 9962),
-+	PLL_36XX_RATE(45158400, 45, 3, 3, 10381),
-+	PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
-+};
-+
- /* register exynox5250 clocks */
- void __init exynos5250_clk_init(struct device_node *np)
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index fb2f127..28400a7 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -619,8 +619,12 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
  {
- 	void __iomem *reg_base;
- 	struct clk *apll, *mpll, *epll, *vpll, *bpll, *gpll, *cpll;
-+	struct clk *vpllsrc;
-+	unsigned long fin_pll_rate, mout_vpllsrc_rate = 0;
+ 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
+ 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	bool do_wakeup = device_may_wakeup(&pdev->dev);
++	int ret;
  
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -496,6 +519,11 @@ void __init exynos5250_clk_init(struct device_node *np)
- 	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
- 			ARRAY_SIZE(exynos5250_pll_pmux_clks));
+-	if (device_may_wakeup(&pdev->dev))
++	ret = ohci_suspend(hcd, do_wakeup);
++
++	if (do_wakeup)
+ 		enable_irq_wake(hcd->irq);
  
-+	fin_pll_rate = _get_rate("fin_pll");
-+	vpllsrc = __clk_lookup("mout_vpllsrc");
-+	if (vpllsrc)
-+		mout_vpllsrc_rate = clk_get_rate(vpllsrc);
-+
- 	apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
- 			reg_base, NULL, 0);
- 	mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
-@@ -506,10 +534,29 @@ void __init exynos5250_clk_init(struct device_node *np)
- 			reg_base + 0x10050, NULL, 0);
- 	cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
- 			reg_base + 0x10020, NULL, 0);
--	epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
--			reg_base + 0x10030, NULL, 0);
--	vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
-+
-+	if (fin_pll_rate == (24 * MHZ)) {
-+		epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-+				reg_base + 0x10030, epll_24mhz_tbl,
-+				ARRAY_SIZE(epll_24mhz_tbl));
-+	} else {
-+		pr_warn("%s: valid epll rate_table missing for\n"
-+			"parent fin_pll:%lu hz\n", __func__, fin_pll_rate);
-+		epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-+				reg_base + 0x10030, NULL, 0);
-+	}
-+
-+	if (mout_vpllsrc_rate == (24 * MHZ)) {
-+		vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc"
-+			, reg_base + 0x10040, vpll_24mhz_tbl,
-+			ARRAY_SIZE(vpll_24mhz_tbl));
-+	} else {
-+		pr_warn("%s: valid vpll rate_table missing for\n"
-+			"parent mout_vpllsrc_rate:%lu hz\n", __func__,
-+			mout_vpllsrc_rate);
-+		samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
- 			reg_base + 0x10040, NULL, 0);
-+	}
+ 	/*
+@@ -637,7 +641,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 		at91_stop_clock();
+ 	}
  
- 	samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
- 			ARRAY_SIZE(exynos5250_fixed_rate_clks));
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index e4ad6ea..c997649 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -20,6 +20,8 @@
- #include <linux/of.h>
- #include <linux/of_address.h>
+-	return 0;
++	return ret;
+ }
  
-+#define MHZ (1000*1000)
-+
- /**
-  * struct samsung_clock_alias: information about mux clock
-  * @id: platform specific id of the clock.
+ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
 -- 
-1.7.0.4
+1.7.9.5
