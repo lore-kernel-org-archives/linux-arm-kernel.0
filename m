@@ -1,65 +1,48 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Wed, 12 Jun 2013 08:22:18 +0200 (CEST)
-Subject: [PATCH v2] ARM: shmobile: uImage load address rework
-In-Reply-To: <CANqRtoQJMtRsJp43cEYF7GvS_DiJUwu3nDppKCqObYPsQHY-EA@mail.gmail.com>
-References: <20130610092857.19175.25629.sendpatchset@w520>
- <Pine.LNX.4.64.1306111552480.9621@axis700.grange>
- <CANqRtoQJMtRsJp43cEYF7GvS_DiJUwu3nDppKCqObYPsQHY-EA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1306120820280.23454@axis700.grange>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 12 Jun 2013 15:26:01 +0900
+Subject: [PATCH 00/03] ARM: shmobile: Remove legacy memory bits
+In-Reply-To: <20130611074623.GA10440@verge.net.au>
+References: <20130610094638.20803.18484.sendpatchset@w520>
+ <201306101700.22787.arnd@arndb.de>
+ <20130611074623.GA10440@verge.net.au>
+Message-ID: <CANqRtoSm81_Ncxa0R4ZYHjwGq7=jNymY9q1qvfphtOe20PuJFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Magnus Damm wrote:
+Hi Simon,
 
-> Hi Guennadi,
-> 
-> On Tue, Jun 11, 2013 at 10:54 PM, Guennadi Liakhovetski
-> <g.liakhovetski@gmx.de> wrote:
-> > Hi Magnus
-> >
-> > On Mon, 10 Jun 2013, Magnus Damm wrote:
-> >
-> >> From: Magnus Damm <damm@opensource.se>
-> >>
-> >> This is V2 of the mach-shmobile uImage load address rework patch.
-> >>
-> >> Rework the mach-shmobile uImage load address calculation by storing
-> >> the per-board load addresses in Makefile.boot. This removes the
-> >> CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
-> >> it possible to create safe kernel images that boot on multiple boards.
-> >>
-> >> This is one of several series of code that reworks code not to rely on
-> >> CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
-> >>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> >> Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> >> ---
-> >
-> > This patch seems to break compilation when none of CONFIG_MACH_* is set,
-> > e.g. when trying to build a generic SoC kernel with only DT-based board
-> > support, or am I missing something?
-> 
-> Thanks for your feedback. I believe the current code already covers
-> the in-tree REFERENCE DT boards. Perhaps there is some board missing?
-> 
-> If you want to build an uImage for a certain DT board then perhaps you
-> can add it to the list with an incremental patch?
-> 
-> Or even better, use zImage instead of uImage, then we can have a
-> single binary for all boards.
-> 
-> So if you build the kernel for no board at all, either set the
-> LOADADDR variable as the help text says, or simply do not build for
-> uImage.
-> 
-> Makes sense?
+On Tue, Jun 11, 2013 at 4:46 PM, Simon Horman <horms@verge.net.au> wrote:
+> On Mon, Jun 10, 2013 at 05:00:22PM +0200, Arnd Bergmann wrote:
+>> On Monday 10 June 2013, Magnus Damm wrote:
+>> > ARM: shmobile: Remove legacy memory bits
+>> >
+>> > [PATCH 01/03] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
+>> > [PATCH 02/03] ARM: shmobile: Remove MEMORY_START/SIZE
+>> > [PATCH 03/03] ARM: shmobile: Remove mach/memory.h
+>> >
+>> > Now when all users are gone this series removes the legacy memory code
+>> > and enables CONFIG_ARM_PATCH_PHYS_VIRT. Depends on the following code:
+>> >
+>> > [PATCH v2] ARM: shmobile: uImage load address rework
+>> > [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
+>> > [PATCH 00/06] ARM: shmobile: SMP virt_to_phys() conversion
+>> > [PATCH 00/02] ARM: shmobile: romImage update
+>> >
+>> > The romImage series above still needs to be updated.
+>> >
+>> > This is the final bit of code not to rely on CONFIG_MEMORY_START/SIZE
+>> > which in turn is one component that we need for ARCH_MULTIPLATFORM.
+>> >
+>> > Signed-off-by: Magnus Damm <damm@opensource.se>
+>>
+>> Looks all good to me.
+>
+> I will queue these up once all the dependencies are ready.
 
-Ok, understand, thanks.
+Thanks, I believe they are now.
 
-Regards
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+I will update the Mackerel romImage support as an incremental patch.
+
+Cheers,
+
+/ magnus
