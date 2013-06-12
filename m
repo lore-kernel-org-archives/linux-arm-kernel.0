@@ -1,96 +1,50 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Jun 2013 11:24:35 -0700
-Subject: [GIT PULL 6/6] omap5 data for v3.11 merge window
-In-Reply-To: <pull-1371061475-206272>
-Message-ID: <mailman.4.1371061558.1060.linux-arm-kernel@lists.infradead.org>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Wed, 12 Jun 2013 11:26:34 -0700
+Subject: [PATCH v2 3/3] arm: dt: zynq: Add support for the zed platform
+In-Reply-To: <20130612182345.GA1656@pengutronix.de>
+References: <1371055268-32337-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1371055268-32337-4-git-send-email-soren.brinkmann@xilinx.com>
+ <20130612182345.GA1656@pengutronix.de>
+Message-ID: <2433e1d1-7d2e-4b23-a76e-2085e3aef1a6@DB9EHSMHS010.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+On Wed, Jun 12, 2013 at 08:23:45PM +0200, Steffen Trumtrar wrote:
+> On Wed, Jun 12, 2013 at 09:41:08AM -0700, Soren Brinkmann wrote:
+> > Add a DT fragment for the Zed Zynq platform and a corresponding
+> > target to the Makefile
+> > 
+> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> > ---
+> > I used the 'xlnx,...' compat strings since it seems this is what is
+> > used in the Xilinx and Digilent vendor trees.
+> > 
+> > +/include/ "zynq-7000.dtsi"
+> > +
+> > +/ {
+> > +	model = "Zynq Zed Development Board";
+> > +	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
+> > +
+> > +	memory {
+> > +		device_type = "memory";
+> > +		reg = <0 0x20000000>;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "console=ttyPS1,115200 earlyprintk";
+> > +	};
+> > +
+> > +};
+> 
+> Hi!
+> 
+> This looks a little bit to basic. No?! Not even an UART?
+The UART is imported from the common zynq-7000.dtsi.
 
-  Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+> The compatible should include digilent or avnet. Digilent only sells to academic
+> customers, Avnet doesn't.
+I don't care at all. So, who makes the decision which one is the correct
+one? Actually we could even drop the zed specific one completely and go
+with 'xlnx,zynq-7000' only.
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/omap5-signed
-
-for you to fetch changes up to 6503a8e109a639760408f874c1251060d563942e:
-
-  ARM: OMAP5: Remove unused include for ocp2scp (2013-06-09 21:17:15 -0700)
-
-----------------------------------------------------------------
-Omap5 SoC data via Paul Walmsley <paul@pwsan.com:
-
-Add support for the OMAP5 SoC family.
-
-As part of the transition to DT, no board files will be used
-for OMAP5.  The hwmod data is gradually being transitioned
-away from arch/arm/mach-omap2: IRQ, DMA, and memory map data
-has been moved to DT.  Hopefully the dev_attr and clock role
-data will be the next step.
-
-Basic test logs are available here, although not for OMAP5,
-since I don't have an OMAP5 board:
-http://www.pwsan.com/omap/testlogs/omap5_v3.10/20130608130949/
-
-----------------------------------------------------------------
-Benoit Cousson (7):
-      ARM: OMAP5: PRM: Add OMAP54XX register and bitfield files
-      ARM: OMAP5: CM: Add OMAP54XX register and bitfield files
-      ARM: OMAP5: PRCM: Add OMAP54XX local MPU PRCM registers
-      ARM: OMAP5: SCRM: Add OMAP54XX header file.
-      ARM: OMAP5: clockdomain data: Add OMAP54XX data and update the header
-      ARM: OMAP5: powerdomain data: Add OMAP54XX data and update the header
-      ARM: OMAP5: hwmod data: Create initial OMAP5 SOC hwmod data
-
-Santosh Shilimkar (5):
-      ARM: OMAP4+: PRM: Move function prototypes to common header for re-use
-      ARM: OMAP4+: CM: Move function prototypes to common header for re-use
-      ARM: OMAP4+: PRCM MPU: Move function prototypes to common header for re-use
-      ARM: OMAP5: voltagedomain data: Add OMAP5 voltage domain data
-      ARM: OMAP5: Enable build and frameowrk initialisations
-
-Tony Lindgren (2):
-      Merge tag 'omap-devel-a-for-3.11' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v3.11/omap5
-      ARM: OMAP5: Remove unused include for ocp2scp
-
- arch/arm/mach-omap2/Makefile                  |    4 +
- arch/arm/mach-omap2/clockdomain.h             |    1 +
- arch/arm/mach-omap2/clockdomains54xx_data.c   |  464 +++++
- arch/arm/mach-omap2/cm-regbits-54xx.h         | 1737 ++++++++++++++++
- arch/arm/mach-omap2/cm1_44xx.h                |    7 +-
- arch/arm/mach-omap2/cm1_54xx.h                |  213 ++
- arch/arm/mach-omap2/cm2_44xx.h                |    7 +-
- arch/arm/mach-omap2/cm2_54xx.h                |  389 ++++
- arch/arm/mach-omap2/cm_44xx_54xx.h            |   36 +
- arch/arm/mach-omap2/io.c                      |    6 +
- arch/arm/mach-omap2/omap_hwmod.h              |    1 +
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c    | 2150 ++++++++++++++++++++
- arch/arm/mach-omap2/powerdomain.h             |    1 +
- arch/arm/mach-omap2/powerdomains54xx_data.c   |  331 +++
- arch/arm/mach-omap2/prcm44xx.h                |    6 +
- arch/arm/mach-omap2/prcm_mpu44xx.h            |   14 +-
- arch/arm/mach-omap2/prcm_mpu54xx.h            |   87 +
- arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h      |   36 +
- arch/arm/mach-omap2/prm-regbits-54xx.h        | 2701 +++++++++++++++++++++++++
- arch/arm/mach-omap2/prm44xx.h                 |   33 +-
- arch/arm/mach-omap2/prm44xx_54xx.h            |   58 +
- arch/arm/mach-omap2/prm54xx.h                 |  421 ++++
- arch/arm/mach-omap2/scrm54xx.h                |  231 +++
- arch/arm/mach-omap2/voltage.h                 |    1 +
- arch/arm/mach-omap2/voltagedomains54xx_data.c |  102 +
- 25 files changed, 8982 insertions(+), 55 deletions(-)
- create mode 100644 arch/arm/mach-omap2/clockdomains54xx_data.c
- create mode 100644 arch/arm/mach-omap2/cm-regbits-54xx.h
- create mode 100644 arch/arm/mach-omap2/cm1_54xx.h
- create mode 100644 arch/arm/mach-omap2/cm2_54xx.h
- create mode 100644 arch/arm/mach-omap2/cm_44xx_54xx.h
- create mode 100644 arch/arm/mach-omap2/omap_hwmod_54xx_data.c
- create mode 100644 arch/arm/mach-omap2/powerdomains54xx_data.c
- create mode 100644 arch/arm/mach-omap2/prcm_mpu54xx.h
- create mode 100644 arch/arm/mach-omap2/prcm_mpu_44xx_54xx.h
- create mode 100644 arch/arm/mach-omap2/prm-regbits-54xx.h
- create mode 100644 arch/arm/mach-omap2/prm44xx_54xx.h
- create mode 100644 arch/arm/mach-omap2/prm54xx.h
- create mode 100644 arch/arm/mach-omap2/scrm54xx.h
- create mode 100644 arch/arm/mach-omap2/voltagedomains54xx_data.c
+	S?ren
