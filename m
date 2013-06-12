@@ -1,327 +1,310 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Wed, 12 Jun 2013 21:24:00 +0530
-Subject: [PATCH V2 4/6] USB: OHCI: make ohci-spear a separate driver
+Date: Wed, 12 Jun 2013 21:24:02 +0530
+Subject: [PATCH V2 6/6] USB: OHCI: make ohci-s3c2410 a separate driver
 In-Reply-To: <1371052442-14541-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
  <1371052442-14541-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1371052442-14541-5-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371052442-14541-7-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Separate the ST OHCI SPEAr host controller driver from ohci-hcd
+Separate the Samsung OHCI S3CXXXX host controller driver from ohci-hcd
 host code so that it can be built as a separate driver module.
 This work is part of enabling multi-platform kernels on ARM;
 it would be nice to have in 3.11.
 
 V2:
- -ohci_setup() removed because it is called in .reset member
+ -Set non-standard fields in ohci_s3c2410_hc_driver manually, rather than
+  relying on an expanded struct ohci_driver_overrides.
+ -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
+  relying on ohci_hub_control and hub_status_data being exported.
+ -ohci_setup() has been removed because it is called in .reset member
   of the ohci_hc_driver structure.
- -debugging stuff isn't needed any more that's what removed.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Viresh Kumar <viresh.linux@gmail.com>
 Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Greg KH <greg@kroah.com>
 Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg KH <greg@kroah.com>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/Kconfig      |    8 +++
- drivers/usb/host/Makefile     |    1 +
- drivers/usb/host/ohci-hcd.c   |   18 ------
- drivers/usb/host/ohci-spear.c |  140 +++++++++++++++++------------------------
- 4 files changed, 65 insertions(+), 102 deletions(-)
+ drivers/usb/host/Kconfig        |    8 +++
+ drivers/usb/host/Makefile       |    1 +
+ drivers/usb/host/ohci-hcd.c     |   18 ------
+ drivers/usb/host/ohci-s3c2410.c |  129 ++++++++++++++++++---------------------
+ 4 files changed, 67 insertions(+), 89 deletions(-)
 
 diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-index db20e43..46c2f42 100644
+index e4dc9ab..0b7b0f7 100644
 --- a/drivers/usb/host/Kconfig
 +++ b/drivers/usb/host/Kconfig
-@@ -382,6 +382,14 @@ config USB_OHCI_HCD_OMAP1
- 	---help---
- 	  Enables support for the OHCI controller on OMAP1/2 chips.
+@@ -390,6 +390,14 @@ config USB_OHCI_HCD_SPEAR
+           Enables support for the on-chip OHCI controller on
+           ST SPEAr chips.
  
-+config USB_OHCI_HCD_SPEAR
-+        tristate "Support for ST SPEAr on-chip OHCI USB controller"
-+        depends on USB_OHCI_HCD && PLAT_SPEAR
++config USB_OHCI_HCD_S3CXXXX
++        tristate "Support for S3CXXXX on-chip OHCI USB controller"
++        depends on USB_OHCI_HCD && (ARCH_S3C24XX) || (ARCH_S3C64XX)
 +        default y
 +        ---help---
 +          Enables support for the on-chip OHCI controller on
-+          ST SPEAr chips.
++          S3CXXXX chips.
 +
- config USB_OHCI_HCD_OMAP3
- 	tristate "OHCI support for OMAP3 and later chips"
- 	depends on (ARCH_OMAP3 || ARCH_OMAP4)
+ config USB_OHCI_HCD_AT91
+         tristate  "Support for Atmel on-chip OHCI USB controller"
+         depends on USB_OHCI_HCD && ARCH_AT91
 diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-index 9f2f5f3..26cb6b3 100644
+index f3e02c0..9fa4b3e 100644
 --- a/drivers/usb/host/Makefile
 +++ b/drivers/usb/host/Makefile
-@@ -48,6 +48,7 @@ obj-$(CONFIG_USB_OHCI_HCD_PLATFORM)	+= ohci-platform.o
- obj-$(CONFIG_USB_OHCI_EXYNOS)	+= ohci-exynos.o
- obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
+@@ -50,6 +50,7 @@ obj-$(CONFIG_USB_OHCI_HCD_OMAP1)	+= ohci-omap.o
  obj-$(CONFIG_USB_OHCI_HCD_OMAP3)	+= ohci-omap3.o
-+obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
+ obj-$(CONFIG_USB_OHCI_HCD_SPEAR)	+= ohci-spear.o
+ obj-$(CONFIG_USB_OHCI_HCD_AT91)	+= ohci-at91.o
++obj-$(CONFIG_USB_OHCI_HCD_S3CXXXX)	+= ohci-s3c2410.o
  
  obj-$(CONFIG_USB_UHCI_HCD)	+= uhci-hcd.o
  obj-$(CONFIG_USB_FHCI_HCD)	+= fhci.o
 diff --git a/drivers/usb/host/ohci-hcd.c b/drivers/usb/host/ohci-hcd.c
-index cad51d2..34ec156 100644
+index b48c892..b69a49e 100644
 --- a/drivers/usb/host/ohci-hcd.c
 +++ b/drivers/usb/host/ohci-hcd.c
-@@ -1212,11 +1212,6 @@ MODULE_LICENSE ("GPL");
- #define OF_PLATFORM_DRIVER	ohci_hcd_ppc_of_driver
+@@ -1177,11 +1177,6 @@ MODULE_LICENSE ("GPL");
+ #define SA1111_DRIVER		ohci_hcd_sa1111_driver
  #endif
  
--#ifdef CONFIG_PLAT_SPEAR
--#include "ohci-spear.c"
--#define SPEAR_PLATFORM_DRIVER	spear_ohci_hcd_driver
+-#if defined(CONFIG_ARCH_S3C24XX) || defined(CONFIG_ARCH_S3C64XX)
+-#include "ohci-s3c2410.c"
+-#define S3C2410_PLATFORM_DRIVER	ohci_hcd_s3c2410_driver
 -#endif
 -
- #ifdef CONFIG_PPC_PS3
- #include "ohci-ps3.c"
- #define PS3_SYSTEM_BUS_DRIVER	ps3_ohci_driver
-@@ -1333,19 +1328,9 @@ static int __init ohci_hcd_mod_init(void)
- 		goto error_davinci;
+ #if defined(CONFIG_PXA27x) || defined(CONFIG_PXA3xx)
+ #include "ohci-pxa27x.c"
+ #define PLATFORM_DRIVER		ohci_hcd_pxa27x_driver
+@@ -1293,12 +1288,6 @@ static int __init ohci_hcd_mod_init(void)
+ 		goto error_tmio;
  #endif
  
--#ifdef SPEAR_PLATFORM_DRIVER
--	retval = platform_driver_register(&SPEAR_PLATFORM_DRIVER);
+-#ifdef S3C2410_PLATFORM_DRIVER
+-	retval = platform_driver_register(&S3C2410_PLATFORM_DRIVER);
 -	if (retval < 0)
--		goto error_spear;
+-		goto error_s3c2410;
 -#endif
 -
- 	return retval;
- 
- 	/* Error path */
--#ifdef SPEAR_PLATFORM_DRIVER
--	platform_driver_unregister(&SPEAR_PLATFORM_DRIVER);
-- error_spear:
--#endif
- #ifdef DAVINCI_PLATFORM_DRIVER
- 	platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
-  error_davinci:
-@@ -1403,9 +1388,6 @@ module_init(ohci_hcd_mod_init);
- 
- static void __exit ohci_hcd_mod_exit(void)
- {
--#ifdef SPEAR_PLATFORM_DRIVER
--	platform_driver_unregister(&SPEAR_PLATFORM_DRIVER);
--#endif
- #ifdef DAVINCI_PLATFORM_DRIVER
- 	platform_driver_unregister(&DAVINCI_PLATFORM_DRIVER);
+ #ifdef EP93XX_PLATFORM_DRIVER
+ 	retval = platform_driver_register(&EP93XX_PLATFORM_DRIVER);
+ 	if (retval < 0)
+@@ -1332,10 +1321,6 @@ static int __init ohci_hcd_mod_init(void)
+ 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+  error_ep93xx:
  #endif
-diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
-index cc9dd9e..31ff3fc 100644
---- a/drivers/usb/host/ohci-spear.c
-+++ b/drivers/usb/host/ohci-spear.c
-@@ -11,92 +11,37 @@
- * warranty of any kind, whether express or implied.
+-#ifdef S3C2410_PLATFORM_DRIVER
+-	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
+- error_s3c2410:
+-#endif
+ #ifdef TMIO_OHCI_DRIVER
+ 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
+  error_tmio:
+@@ -1382,9 +1367,6 @@ static void __exit ohci_hcd_mod_exit(void)
+ #ifdef EP93XX_PLATFORM_DRIVER
+ 	platform_driver_unregister(&EP93XX_PLATFORM_DRIVER);
+ #endif
+-#ifdef S3C2410_PLATFORM_DRIVER
+-	platform_driver_unregister(&S3C2410_PLATFORM_DRIVER);
+-#endif
+ #ifdef TMIO_OHCI_DRIVER
+ 	platform_driver_unregister(&TMIO_OHCI_DRIVER);
+ #endif
+diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
+index e125770..8018bb1 100644
+--- a/drivers/usb/host/ohci-s3c2410.c
++++ b/drivers/usb/host/ohci-s3c2410.c
+@@ -19,17 +19,34 @@
+  * This file is licenced under the GPL.
  */
  
--#include <linux/signal.h>
 -#include <linux/platform_device.h>
  #include <linux/clk.h>
-+#include <linux/dma-mapping.h>
 +#include <linux/io.h>
 +#include <linux/kernel.h>
 +#include <linux/module.h>
- #include <linux/of.h>
 +#include <linux/platform_device.h>
-+#include <linux/signal.h>
+ #include <linux/platform_data/usb-ohci-s3c2410.h>
 +#include <linux/usb.h>
 +#include <linux/usb/hcd.h>
 +
 +#include "ohci.h"
- 
-+#define DRIVER_DESC "OHCI SPEAr driver"
 +
-+static const char hcd_name[] = "SPEAr-ohci";
- struct spear_ohci {
--	struct ohci_hcd ohci;
- 	struct clk *clk;
- };
  
--#define to_spear_ohci(hcd)	(struct spear_ohci *)hcd_to_ohci(hcd)
+ #define valid_port(idx) ((idx) == 1 || (idx) == 2)
+ 
+ /* clock device associated with the hcd */
+ 
++
++#define DRIVER_DESC "OHCI S3CXXXX driver"
++
++static const char hcd_name[] = "ohci-s3cxxxx";
++
+ static struct clk *clk;
+ static struct clk *usb_clk;
+ 
++static int (*orig_ohci_hub_control)(struct usb_hcd  *hcd, u16 typeReq, u16 wValue,
++                        u16 wIndex, char *buf, u16 wLength);
++static int (*orig_ohci_hub_status_data)(struct usb_hcd *hcd, char *buf);
++
+ /* forward definitions */
+ 
+ static void s3c2410_hcd_oc(struct s3c2410_hcd_info *info, int port_oc);
+@@ -93,7 +110,7 @@ ohci_s3c2410_hub_status_data(struct usb_hcd *hcd, char *buf)
+ 	int orig;
+ 	int portno;
+ 
+-	orig  = ohci_hub_status_data(hcd, buf);
++	orig  = orig_ohci_hub_status_data(hcd, buf);
+ 
+ 	if (info == NULL)
+ 		return orig;
+@@ -164,7 +181,7 @@ static int ohci_s3c2410_hub_control(
+ 	 * process the request straight away and exit */
+ 
+ 	if (info == NULL) {
+-		ret = ohci_hub_control(hcd, typeReq, wValue,
++		ret = orig_ohci_hub_control(hcd, typeReq, wValue,
+ 				       wIndex, buf, wLength);
+ 		goto out;
+ 	}
+@@ -214,7 +231,7 @@ static int ohci_s3c2410_hub_control(
+ 		break;
+ 	}
+ 
+-	ret = ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
++	ret = orig_ohci_hub_control(hcd, typeReq, wValue, wIndex, buf, wLength);
+ 	if (ret)
+ 		goto out;
+ 
+@@ -371,10 +388,9 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
+ 		goto err_put;
+ 	}
+ 
++	ohci_setup(hcd);
+ 	s3c2410_start_hc(dev, hcd);
+ 
+-	ohci_hcd_init(hcd_to_ohci(hcd));
 -
--static void spear_start_ohci(struct spear_ohci *ohci)
+ 	retval = usb_add_hcd(hcd, dev->resource[1].start, 0);
+ 	if (retval != 0)
+ 		goto err_ioremap;
+@@ -391,71 +407,7 @@ static int usb_hcd_s3c2410_probe(const struct hc_driver *driver,
+ 
+ /*-------------------------------------------------------------------------*/
+ 
+-static int
+-ohci_s3c2410_start(struct usb_hcd *hcd)
 -{
--	clk_prepare_enable(ohci->clk);
--}
--
--static void spear_stop_ohci(struct spear_ohci *ohci)
--{
--	clk_disable_unprepare(ohci->clk);
--}
--
--static int ohci_spear_start(struct usb_hcd *hcd)
--{
--	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
+-	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
 -	int ret;
 -
 -	ret = ohci_init(ohci);
 -	if (ret < 0)
 -		return ret;
--	ohci->regs = hcd->regs;
 -
 -	ret = ohci_run(ohci);
 -	if (ret < 0) {
--		dev_err(hcd->self.controller, "can't start\n");
+-		dev_err(hcd->self.controller, "can't start %s\n",
+-			hcd->self.bus_name);
 -		ohci_stop(hcd);
 -		return ret;
 -	}
 -
--	create_debug_files(ohci);
--
--#ifdef DEBUG
--	ohci_dump(ohci, 1);
--#endif
 -	return 0;
 -}
 -
--static const struct hc_driver ohci_spear_hc_driver = {
--	.description		= hcd_name,
--	.product_desc		= "SPEAr OHCI",
--	.hcd_priv_size		= sizeof(struct spear_ohci),
 -
--	/* generic hardware linkage */
--	.irq			= ohci_irq,
--	.flags			= HCD_USB11 | HCD_MEMORY,
+-static const struct hc_driver ohci_s3c2410_hc_driver = {
+-	.description =		hcd_name,
+-	.product_desc =		"S3C24XX OHCI",
+-	.hcd_priv_size =	sizeof(struct ohci_hcd),
 -
--	/* basic lifecycle operations */
--	.start			= ohci_spear_start,
--	.stop			= ohci_stop,
--	.shutdown		= ohci_shutdown,
+-	/*
+-	 * generic hardware linkage
+-	 */
+-	.irq =			ohci_irq,
+-	.flags =		HCD_USB11 | HCD_MEMORY,
+-
+-	/*
+-	 * basic lifecycle operations
+-	 */
+-	.start =		ohci_s3c2410_start,
+-	.stop =			ohci_stop,
+-	.shutdown =		ohci_shutdown,
+-
+-	/*
+-	 * managing i/o requests and associated device resources
+-	 */
+-	.urb_enqueue =		ohci_urb_enqueue,
+-	.urb_dequeue =		ohci_urb_dequeue,
+-	.endpoint_disable =	ohci_endpoint_disable,
+-
+-	/*
+-	 * scheduling support
+-	 */
+-	.get_frame_number =	ohci_get_frame,
+-
+-	/*
+-	 * root hub support
+-	 */
+-	.hub_status_data =	ohci_s3c2410_hub_status_data,
+-	.hub_control =		ohci_s3c2410_hub_control,
 -#ifdef	CONFIG_PM
--	.bus_suspend		= ohci_bus_suspend,
--	.bus_resume		= ohci_bus_resume,
+-	.bus_suspend =		ohci_bus_suspend,
+-	.bus_resume =		ohci_bus_resume,
 -#endif
--
--	/* managing i/o requests and associated device resources */
--	.urb_enqueue		= ohci_urb_enqueue,
--	.urb_dequeue		= ohci_urb_dequeue,
--	.endpoint_disable	= ohci_endpoint_disable,
--
--	/* scheduling support */
--	.get_frame_number	= ohci_get_frame,
-+#define to_spear_ohci(hcd)     (struct spear_ohci *)(hcd_to_ohci(hcd)->priv)
- 
--	/* root hub support */
--	.hub_status_data	= ohci_hub_status_data,
--	.hub_control		= ohci_hub_control,
--
--	.start_port_reset	= ohci_start_port_reset,
+-	.start_port_reset =	ohci_start_port_reset,
 -};
-+static struct hc_driver __read_mostly ohci_spear_hc_driver;
+-
+-/* device driver */
++static struct hc_driver __read_mostly ohci_s3c2410_hc_driver;
  
- static int spear_ohci_hcd_drv_probe(struct platform_device *pdev)
+ static int ohci_hcd_s3c2410_drv_probe(struct platform_device *pdev)
  {
- 	const struct hc_driver *driver = &ohci_spear_hc_driver;
-+	struct ohci_hcd *ohci;
- 	struct usb_hcd *hcd = NULL;
- 	struct clk *usbh_clk;
--	struct spear_ohci *ohci_p;
-+	struct spear_ohci *sohci_p;
- 	struct resource *res;
- 	int retval, irq;
- 
-@@ -151,16 +96,18 @@ static int spear_ohci_hcd_drv_probe(struct platform_device *pdev)
- 		goto err_put_hcd;
- 	}
- 
--	ohci_p = (struct spear_ohci *)hcd_to_ohci(hcd);
--	ohci_p->clk = usbh_clk;
--	spear_start_ohci(ohci_p);
--	ohci_hcd_init(hcd_to_ohci(hcd));
-+	sohci_p = to_spear_ohci(hcd);
-+	sohci_p->clk = usbh_clk;
-+
-+	clk_prepare_enable(sohci_p->clk);
-+
-+	ohci = hcd_to_ohci(hcd);
- 
- 	retval = usb_add_hcd(hcd, platform_get_irq(pdev, 0), 0);
- 	if (retval == 0)
- 		return retval;
- 
--	spear_stop_ohci(ohci_p);
-+	clk_disable_unprepare(sohci_p->clk);
- err_put_hcd:
- 	usb_put_hcd(hcd);
- fail:
-@@ -172,11 +119,11 @@ fail:
- static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(pdev);
--	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
-+	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
- 
- 	usb_remove_hcd(hcd);
--	if (ohci_p->clk)
--		spear_stop_ohci(ohci_p);
-+	if (sohci_p->clk)
-+		clk_disable_unprepare(sohci_p->clk);
- 
- 	usb_put_hcd(hcd);
- 	return 0;
-@@ -188,13 +135,14 @@ static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
--	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
-+	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
- 
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
- 	ohci->next_statechange = jiffies;
- 
--	spear_stop_ohci(ohci_p);
-+	clk_disable_unprepare(sohci_p->clk);
-+
- 	return 0;
- }
- 
-@@ -202,13 +150,13 @@ static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
- {
- 	struct usb_hcd *hcd = platform_get_drvdata(dev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
--	struct spear_ohci *ohci_p = to_spear_ohci(hcd);
-+	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
- 
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
- 	ohci->next_statechange = jiffies;
- 
--	spear_start_ohci(ohci_p);
-+	clk_prepare_enable(sohci_p->clk);
- 	ohci_resume(hcd, false);
- 	return 0;
- }
-@@ -234,4 +182,28 @@ static struct platform_driver spear_ohci_hcd_driver = {
+@@ -532,4 +484,39 @@ static struct platform_driver ohci_hcd_s3c2410_driver = {
  	},
  };
  
-+static const struct ohci_driver_overrides spear_overrides __initconst = {
-+	.extra_priv_size = sizeof(struct spear_ohci),
-+};
-+static int __init ohci_spear_init(void)
++static int __init ohci_s3cxxxx_init(void)
 +{
 +	if (usb_disabled())
 +		return -ENODEV;
 +
 +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
++	ohci_init_driver(&ohci_s3c2410_hc_driver, NULL);
 +
-+	ohci_init_driver(&ohci_spear_hc_driver, &spear_overrides);
-+	return platform_driver_register(&spear_ohci_hcd_driver);
++	/*
++	 * The Samsung HW has some unusual quirks, which require Sumsung-specific
++	 * workarounds. We override certain hc_driver functions here to
++	 * achieve that. We explicitly do not enhance ohci_driver_overrides to
++	 * allow this more easily, since this is an unusual case, and we don't
++	 * want to encourage others to override these functions by making it
++	 * too easy.
++	 */
++
++	orig_ohci_hub_control = ohci_s3c2410_hc_driver.hub_control;
++	orig_ohci_hub_status_data = ohci_s3c2410_hc_driver.hub_status_data;
++
++	ohci_s3c2410_hc_driver.hub_status_data	= ohci_s3c2410_hub_status_data;
++	ohci_s3c2410_hc_driver.hub_control	= ohci_s3c2410_hub_control;
++
++	return platform_driver_register(&ohci_hcd_s3c2410_driver);
 +}
-+module_init(ohci_spear_init);
++module_init(ohci_s3cxxxx_init);
 +
-+static void __exit ohci_spear_cleanup(void)
++static void __exit ohci_s3cxxxx_cleanup(void)
 +{
-+	platform_driver_unregister(&spear_ohci_hcd_driver);
++	platform_driver_unregister(&ohci_hcd_s3c2410_driver);
 +}
-+module_exit(ohci_spear_cleanup);
++module_exit(ohci_s3cxxxx_cleanup);
 +
 +MODULE_DESCRIPTION(DRIVER_DESC);
-+MODULE_AUTHOR("Deepak Sikri");
-+MODULE_LICENSE("GPL v2");
- MODULE_ALIAS("platform:spear-ohci");
++MODULE_LICENSE("GPL");
+ MODULE_ALIAS("platform:s3c2410-ohci");
 -- 
 1.7.9.5
