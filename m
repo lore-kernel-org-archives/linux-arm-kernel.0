@@ -1,33 +1,24 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Jun 2013 07:05:21 -0700
-Subject: [PATCH 0/3] ARM: OMAP: add corrected DSS regulator supplies
-In-Reply-To: <51B84FA5.80409@ti.com>
-References: <1369985874-8571-1-git-send-email-tomi.valkeinen@ti.com>
- <51B84FA5.80409@ti.com>
-Message-ID: <20130612140520.GT8164@atomide.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 12 Jun 2013 23:09:05 +0900
+Subject: [PATCH v3] ARM: shmobile: BOCK-W: add Ether support
+In-Reply-To: <201306020240.55702.sergei.shtylyov@cogentembedded.com>
+References: <201306020240.55702.sergei.shtylyov@cogentembedded.com>
+Message-ID: <20130612140905.GM32751@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [130612 03:44]:
-> On 31/05/13 10:37, Tomi Valkeinen wrote:
-> > Hi Tony,
-> > 
-> > Here are a few patches adding corrected DSS regulator supplies. The current
-> > ones in the board files are not really correct, although the dss driver works
-> > ok with them.
-> > 
-> > So these patches add new regulator supply entries. When these are merged, I'll
-> > change omapdss driver to use the new ones, instead of the old ones. After that,
-> > we can remove the old ones from the board files.
-> > 
-> > Note that these patches were also present in the big DSS series I sent
-> > yesterday. There's no reason for these patches to be there, so I'm sending them
-> > separately, and will drop these from my DSS series.
+On Sun, Jun 02, 2013 at 02:40:55AM +0400, Sergei Shtylyov wrote:
+> Register Ether device from bockw_init(), passing the platform data to it, adding
+> only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
+> on the board, it's connected to the link/activity LED  output of the PHY, thus
+> the link disappears and reappears after each packet. We'd be better off ignoring
+> such signal and getting the link state from the PHY indirectly.
 > 
-> Ping.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> ---
+> The patch is atop of Simon's 'renesas.git' repo, 'renesas-next-20130528' tag
+> and the USB patches just reposted. I decided to move it ahead of the VIN patches
+> as it can be merged right now since all dependecies have been already met.
 
-Thanks, applying into omap-for-v.311/fixes-non-critical.
-
-Regards,
-
-Tony
+Thanks, queued up in the boards branch.
