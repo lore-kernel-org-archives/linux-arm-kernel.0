@@ -1,27 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Jun 2013 16:02:34 -0700
-Subject: [PATCH v3 5/7] clk: add basic Rockchip rk3066a clock support
-In-Reply-To: <201306130045.41723.heiko@sntech.de>
-References: <201306111328.52679.heiko@sntech.de>
- <201306111331.31517.heiko@sntech.de>
- <20130611200610.8816.68285@quantum>
- <201306130045.41723.heiko@sntech.de>
-Message-ID: <20130612230234.GB9016@quad.lixom.net>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 13 Jun 2013 01:13:47 +0200
+Subject: [PATCH 00/15] Final Samsung PWM support cleanup
+In-Reply-To: <20130612230023.GA9016@quad.lixom.net>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1444953.LmSrOvSyJG@flatron> <20130612230023.GA9016@quad.lixom.net>
+Message-ID: <1604160.oAKkaEhla1@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 12:45:41AM +0200, Heiko St?bner wrote:
-> Part of me simply wants to wait for this - but rockchip stuff might be to late 
-> for 3.11 anyway, as we're near rc6.
+Hi Olof,
 
-For a new platform like this, it's useful to get some of the drivers to land
-even if the main platform code isn't. Where things tend to get messy is when we
-have to add a lot of code late in the cycle that has a lot of external
-dependencies, since everybody then has to scramble about getting things sorted
-out.
+On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
+> On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
+> > > Needs testing on other platforms as I could only compile test for
+> > > them.
+> 
+> How/who can help here? WHo has and still cares for other affected
+> platforms?
+> > > 66 files changed, 627 insertions(+), 1580 deletions(-)
 
-It's not too late for 3.11 yet, and in particular it'd be nice to see things
-like clock and pinctrl stuff go in even if some other stuff misses the train.
+I will try to test this on Exynos 4 at work, if I somehow manage to find 
+any way to use PWM on our boards (other than already-tested PWM 
+clocksource).
 
+Unfortunately, except S3C6410, I don't have access to other platforms, or 
+at least I won't in any reasonable time.
 
--Olof
+If I remember correctly, in case of my watchdog support cleanup, Kukjin 
+has been able to test it on S5P64x0.
+
+Heiko and Sylwester used to have some s3c24xx-based boards, not sure if 
+they still do and are interested in their support in mainline.
+
+So all left is S5PC100 (for which I couldn't find anyone who cares) and 
+Exynos5.
+
+> Nice cleanup.
+
+Thanks.
+
+> > Any comments for this series?
+> 
+> Yes, above. :) In general looks good -- testing coverage is a bit of a
+> concern.
+
+Yeah. Unfortunately all I could do was testing on Tiny6410 and compile 
+testing on others. I hope we find some really helpful people over here who 
+could waste a bit of their precious time for this museum. ;)
+
+Best regards,
+Tomasz
