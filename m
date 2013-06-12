@@ -1,50 +1,45 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 12 Jun 2013 11:26:34 -0700
-Subject: [PATCH v2 3/3] arm: dt: zynq: Add support for the zed platform
-In-Reply-To: <20130612182345.GA1656@pengutronix.de>
-References: <1371055268-32337-1-git-send-email-soren.brinkmann@xilinx.com>
- <1371055268-32337-4-git-send-email-soren.brinkmann@xilinx.com>
- <20130612182345.GA1656@pengutronix.de>
-Message-ID: <2433e1d1-7d2e-4b23-a76e-2085e3aef1a6@DB9EHSMHS010.ehs.local>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Jun 2013 11:33:45 -0700
+Subject: [PATCH] drivers: pinctrl: add active state to core
+In-Reply-To: <CACRpkdYQSO0+9tQkS=df-kpL=XL+DpnY1ijp6_Zeg0MvmFujyw@mail.gmail.com>
+References: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
+ <51B75148.5080701@wwwdotorg.org>
+ <CACRpkdYQSO0+9tQkS=df-kpL=XL+DpnY1ijp6_Zeg0MvmFujyw@mail.gmail.com>
+Message-ID: <20130612183345.GU8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 08:23:45PM +0200, Steffen Trumtrar wrote:
-> On Wed, Jun 12, 2013 at 09:41:08AM -0700, Soren Brinkmann wrote:
-> > Add a DT fragment for the Zed Zynq platform and a corresponding
-> > target to the Makefile
-> > 
-> > Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> > ---
-> > I used the 'xlnx,...' compat strings since it seems this is what is
-> > used in the Xilinx and Digilent vendor trees.
-> > 
-> > +/include/ "zynq-7000.dtsi"
-> > +
-> > +/ {
-> > +	model = "Zynq Zed Development Board";
-> > +	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
-> > +
-> > +	memory {
-> > +		device_type = "memory";
-> > +		reg = <0 0x20000000>;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "console=ttyPS1,115200 earlyprintk";
-> > +	};
-> > +
-> > +};
+* Linus Walleij <linus.walleij@linaro.org> [130611 12:59]:
+> On Tue, Jun 11, 2013 at 6:33 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> > On 06/11/2013 02:16 AM, Linus Walleij wrote:
+> >> From: Linus Walleij <linus.walleij@linaro.org>
+> >>
+> >> In addition to the recently introduced pinctrl core
+> >> control, the PM runtime pin control for the OMAP platforms
+> >> require a fourth state in addtition to the default, idle and
+> >> sleep states already handled by the core: an explicit "active"
+> >> state. Let's introduce this to the core in addition to the
+> >> other states already defined.
+> >
+> > Surely "default" /is/ "active"? That's what it's meant so far.
 > 
-> Hi!
+> I thought so too, until Tony informed us that in the OMAP world
+> this state is not always the active one.
 > 
-> This looks a little bit to basic. No?! Not even an UART?
-The UART is imported from the common zynq-7000.dtsi.
+> But I don't know the exact reasons for.
+> 
+> I guess that some "default" states on the OMAP may mean these
+> are configured as decoupled, inactive, until explicitly activated
+> or something like that.
 
-> The compatible should include digilent or avnet. Digilent only sells to academic
-> customers, Avnet doesn't.
-I don't care at all. So, who makes the decision which one is the correct
-one? Actually we could even drop the zed specific one completely and go
-with 'xlnx,zynq-7000' only.
+The main reason is that remuxing all the pins for a device for
+PM runtime suspend and resume is not necessary. Most pins are
+static and configured once during the consumer driver probe.
+And in most cases, remuxing only one pin for the rx line is
+needed. This is performance critical as it may need to be done
+constantly while entering and exiting idle, and remuxing all the
+pins is just a waste of cycles.
 
-	S?ren
+Regards,
+
+Tony 
