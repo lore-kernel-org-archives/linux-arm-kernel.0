@@ -1,46 +1,46 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 13 Jun 2013 00:00:08 +0200
-Subject: [PATCH v4] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20130612220008.GG11232@pengutronix.de>
+From: abrestic@chromium.org (Andrew Bresticker)
+Date: Wed, 12 Jun 2013 15:02:04 -0700
+Subject: [PATCH v4 1/6] clk: samsung: Use clk->base instead of directly
+ using clk->con0 for PLL3xxx
+In-Reply-To: <CAD=FV=XKjYBzgBwY+CnUZyzyBzgGN88Y39n=tABgAH5aU3gSkQ@mail.gmail.com>
+References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
+ <1370272196-4346-2-git-send-email-yadi.brar@samsung.com>
+ <CAD=FV=VTLkH9oDqr263Kyv=wCEbuQ40VL7mtC73SCMt20NPwgQ@mail.gmail.com>
+ <1501124.EVQA8KO0ic@flatron>
+ <CAD=FV=XKjYBzgBwY+CnUZyzyBzgGN88Y39n=tABgAH5aU3gSkQ@mail.gmail.com>
+Message-ID: <CAL1qeaF-tsY727eLBdWRW3iBsTtygFLbjm6nFRCu+xV6XzpFSA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Doug,
 
-On Wed, Jun 12, 2013 at 11:50:35PM +0200, Uwe Kleine-K?nig wrote:
-> This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
-> 
-> Support for this controller appeared in Catalin's Cortex tree based on
-> 2.6.33 but was nearly completely rewritten.
-> 
-> Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> 
-> Notes:
->     Changes since v3, sent with
->     Message-Id: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>:
->     
->      - use generic chip
->      - rename nvic_do_IRQ to nvic_handle_irq
->     
->     This depends on the stuff currently in tip/irq/for-arm
-It also depends on Russell King's devel-stable branch. So the options to
-apply it in case you are otherwise happy with it:
+>> Hmm, if done properly, it could simplify PLL registration in SoC clock
+>> initialization code a lot.
+>>
+>> I'm not sure if this is really the best solution (feel free to suggest
+>> anything better), but we could put PLLs in an array, like other clocks,
+>> e.g.
+>>
+>>         ... exynos4210_pll_clks[] = {
+>>                 CLK_PLL45XX(...),
+>>                 CLK_PLL45XX(...),
+>>                 CLK_PLL46XX(...),
+>>                 CLK_PLL46XX(...),
+>>         };
+>>
+>> and then just call a helper like
+>>
+>>         samsung_clk_register_pll(exynos4210_pll_clks,
+>>                         ARRAY_SIZE(exynos4210_pll_clks));
+>
+> Something like that looks like what I was thinking.  I'd have to see
+> it actually coded up to see if there's something I'm missing that
+> would prevent us from doing that, but I don't see anything.
 
- - apply on top of tip/irq/for-arm dropping the change to
-   arch/arm/kernel/entry-v7m.S and let me add that change seperately; or
- - let it go through Russell's tree (the dependency on tip/irq/for-arm
-   doesn't stop the patch to be applied on that one, it just won't
-   compile); or
- - wait until there is a tree that contains both branches; or
- - merge the two trees and apply it on top of the merge.
+The only issue I see with this is that we may only want to register a
+rate table with a PLL only if fin_pll is running at a certain rate.
+On 5250 and 5420, for example, we have EPLL and VPLL rate tables that
+should only be registered if fin_pll is 24Mhz.  We may have to
+register those separately, but this approach seems fine otherwise.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-Andrew
