@@ -1,44 +1,45 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Wed, 12 Jun 2013 10:55:52 +0200
-Subject: [PATCH v2 0/4] dw_apb_timer: osc as sched_clock,
- clocks and clocksource_of support
-In-Reply-To: <201306041136.09566.heiko@sntech.de>
-References: <201306041136.09566.heiko@sntech.de>
-Message-ID: <201306121055.53685.heiko@sntech.de>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Wed, 12 Jun 2013 10:07:30 +0100
+Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
+In-Reply-To: <51B754F5.4070109@wwwdotorg.org>
+References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
+ <51B748BB.7070602@wwwdotorg.org>
+ <20130611162224.GA13741@e102568-lin.cambridge.arm.com>
+ <51B754F5.4070109@wwwdotorg.org>
+Message-ID: <20130612090729.GA20236@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 4. Juni 2013, 11:36:09 schrieb Heiko St?bner:
-> This is split off of my Rockchip support series from yesterday. It's now
-> a patch more than before, as the third patch enables the timer to be used
-> thru clocksource_of_init and moves picoxcell and socfpga to it.
+On Tue, Jun 11, 2013 at 05:48:53PM +0100, Stephen Warren wrote:
+> On 06/11/2013 10:22 AM, Lorenzo Pieralisi wrote:
+> > Hi Stephen,
+> > 
+> > On Tue, Jun 11, 2013 at 04:56:43PM +0100, Stephen Warren wrote:
+> >> On 06/11/2013 03:58 AM, Lorenzo Pieralisi wrote:
+> >>> Hi Russell, all,
+> >>>
+> >>> even though I think this set is ready to get merged, it would be great
+> >>> if we can test it on as many platforms as possible since it touches core
+> >>> suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
+> >>> and there are many.
+> >>
+> >> FWIW, I booted a Tegra system with these patches applied and didn't see
+> >> any issue in very brief testing. I'm not sure what targeted testing
+> >> would be useful?
+> > 
+> > That's great thanks. CPUidle deep C-states (when CPUs resume from reset
+> > through cpu_resume) are the main triggers of this code, so you should be
+> > running with them enabled to test it.
 > 
-> changes since v1:
-> - hopefully improve the patch description of patch 1
->   after a suggestion by Linus Walleij
-> - move the selection of DW_APB_TIMER and CLKSRC_OF into DW_APB_TIMER_OF
->   after a suggestion by Baruch Siach
-> 
-> Heiko Stuebner (4):
->   clocksource: dw_apb_timer_of: enable the use the clocksource as sched
-> clock clocksource: dw_apb_timer_of: add clock-handling
->   clocksource: dw_apb_timer_of: select DW_APB_TIMER
->   clocksource: dw_apb_timer_of: use clocksource_of_init
-> 
->  Documentation/devicetree/bindings/rtc/dw-apb.txt |   19 +++++
->  arch/arm/mach-picoxcell/Kconfig                  |    1 -
->  arch/arm/mach-picoxcell/common.c                 |    2 -
->  arch/arm/mach-socfpga/Kconfig                    |    1 -
->  arch/arm/mach-socfpga/socfpga.c                  |    2 -
->  drivers/clocksource/Kconfig                      |    2 +
->  drivers/clocksource/dw_apb_timer_of.c            |   95
-> ++++++++++++++------- include/linux/dw_apb_timer.h                     |  
->  1 -
->  8 files changed, 84 insertions(+), 39 deletions(-)
+> OK, in that case I believe I tested that; I had our "LP2" CPU
+> power-management mode enabled as always, and that powers off the CPUs
+> and resumes them, and didn't see any issue.
 
-with clocksource_of conversion of picoxcell and socfpga, this series stands on 
-its own. Is anybody going to pick it up?
+Great, thanks, I guess this also means you did not notice any suspicious
+warnings at boot (ie "Large number of MPIDR hash buckets detected").
 
+Can I add your tested-by please ?
 
-Thanks
-Heiko
+Thanks a lot,
+Lorenzo
