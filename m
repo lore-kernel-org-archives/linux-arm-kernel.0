@@ -1,37 +1,68 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Jun 2013 10:12:00 -0700
-Subject: [PATCH v2 02/14] ARM: OMAP2+: AM43x: Kconfig
-In-Reply-To: <7642e0c701680ea94a8cc84059ff19e500813bf1.1369658705.git.afzal@ti.com>
-References: <cover.1369658705.git.afzal@ti.com>
- <7642e0c701680ea94a8cc84059ff19e500813bf1.1369658705.git.afzal@ti.com>
-Message-ID: <20130612171200.GL8164@atomide.com>
+Date: Wed, 12 Jun 2013 10:14:08 -0700
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <20130612163124.GD8164@atomide.com>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191753.468.1734.stgit@localhost>
+ <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+ <20130612163124.GD8164@atomide.com>
+Message-ID: <20130612171407.GM8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Afzal Mohammed <afzal@ti.com> [130527 07:41]:
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -149,6 +149,16 @@ config SOC_AM33XX
->  	select MULTI_IRQ_HANDLER
->  	select COMMON_CLK
->  
-> +config SOC_AM43XX
-> +	bool "TI AM43x"
-> +	depends on ARCH_OMAP2PLUS
-> +	default y
-> +	select CPU_V7
-> +	select MULTI_IRQ_HANDLER
-> +	select ARM_GIC
-> +	select COMMON_CLK
-> +	select MACH_OMAP_GENERIC
-> +
->  config OMAP_PACKAGE_ZAF
->         bool
+* Tony Lindgren <tony@atomide.com> [130612 09:37]:
+> * Ming Lei <tom.leiming@gmail.com> [130603 08:34]:
+> > Hi,
+> > 
+> > On Sat, May 18, 2013 at 3:17 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > > We can now boot with device tree. If you don't want to update u-boot,
+> > > you can boot with appended DTB with the following instructions:
+> > >
+> > > 1. Make sure you have the appended DTB support in .config
+> > >
+> > >    CONFIG_ARM_APPENDED_DTB=y
+> > >    CONFIG_ARM_ATAG_DTB_COMPAT=y
+> > >    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+> > >
+> > > 2. Build the zImage
+> > >
+> > >    $ ARCH=arm CROSS_COMPILE=... make zImage
+> > >
+> > > 3. Build the device tree blobs
+> > >
+> > >    $ ARCH=arm CROSS_COMPILE=... make dtbs
+> > >
+> > > 4. Append the correct panda dtb to zImage
+> > >
+> > >    Depending on your hardware it's omap4-panda.dtb, omap4-panda-a4.dtb
+> > >    or omap4-panda-es.dtb.
+> > >
+> > >    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-panda-es.dtb > /tmp/appended
+> > >
+> > > 5. Use mkimage to produce the appended device tree uImage
+> > >
+> > >    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
+> > >      -n "Linux" -d /tmp/appended /tmp/uImage
+> > 
+> > I followed the above steps and tried devicetree on Pandaboard against
+> > 3.10.0-rc3-next-20130528, and the board will hang during boot, but works
+> > well with legacy mode.
+> > 
+> >          Hardware: Pandaboard A1
+> >          dtb: omap4-panda.dtb
+> > 
+> > See 'dmesg' on below link:
+> > 
+> >          http://kernel.ubuntu.com/~ming/up/panda-dts.dmesg
+> > 
+> 
+> Hmm looks like it boots to init. Maybe add initcall_debug to the cmdline in
+> case there's some late_initcall that causes the issue. It's probably some
+> trivial issue causing it.
 
-I've updated this patch to remove the "default y" and
-"depends on ARCH_OMAP2PLUS" entries for the usual reasons
-and applied the first ten patches into omap-for-v3.11/soc.
+Sricharan, maybe give this a quick try if you have the original pandaboard?
+I only have pandaboard es.
 
 Regards,
 
-Tony
+Tony 
