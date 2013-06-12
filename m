@@ -1,49 +1,36 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 12 Jun 2013 15:24:43 +0530
-Subject: [PATCH -next v2] dmaengine: ste_dma40: fix error return code
- in d40_probe()
-In-Reply-To: <CACRpkdZhK6TUAC132vzcaLKqdMTwPma+ZhKG5Y+AUvekNpz6EQ@mail.gmail.com>
-References: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
- <CACRpkdYBfvr0kA7bd-6Ns78UH7JtBCFDzFxyHLgtReB32O4D+w@mail.gmail.com>
- <20130530173326.GD3767@intel.com>
- <CACRpkdZhK6TUAC132vzcaLKqdMTwPma+ZhKG5Y+AUvekNpz6EQ@mail.gmail.com>
-Message-ID: <20130612095443.GU4107@intel.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Wed, 12 Jun 2013 13:38:29 +0300
+Subject: [PATCH 0/3] ARM: OMAP: add corrected DSS regulator supplies
+In-Reply-To: <1369985874-8571-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1369985874-8571-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <51B84FA5.80409@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 11:14:16AM +0200, Linus Walleij wrote:
-> On Thu, May 30, 2013 at 7:33 PM, Vinod Koul <vinod.koul@intel.com> wrote:
-> > On Thu, May 30, 2013 at 09:41:38AM +0200, Linus Walleij wrote:
-> >> On Thu, May 30, 2013 at 6:32 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
-> >>
-> >> > From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> >> >
-> >> > In many of the error handling case, the return value 'ret' not set
-> >> > and 0 will be return from d40_probe() even if error, but we should
-> >> > return a negative error code instead in those error handling case.
-> >> > This patch fixed them, and also removed useless variable 'err'.
-> >> >
-> >> > Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
-> >> > ---
-> >> > v1 -> v2: rebased on linux-next.git
-> >>
-> >> I've tentatively applied this to my dma40 branch, waiting for Vinod
-> >> to ACK it.
-> > I though you wanted me to apply this :)
-> >
-> > Nevertheless, Acked-by: Vinod Koul <vinod.koul@intel.com>
-> >
-> > Can you CC stable too, pls.
+On 31/05/13 10:37, Tomi Valkeinen wrote:
+> Hi Tony,
 > 
-> Hm I'm not sending any DMA40 stuff for stable, sorry ...
-> if you want it to go into stable you'd better pick this
-> (the v3 version) into the DMA tree.
-okay
+> Here are a few patches adding corrected DSS regulator supplies. The current
+> ones in the board files are not really correct, although the dss driver works
+> ok with them.
 > 
-> Let me know how you want it, I've removed it from my
-> dma40 branch for the time being.
-Have you removed, Also I see a v3 of this, do you want to ack that before I
-apply
+> So these patches add new regulator supply entries. When these are merged, I'll
+> change omapdss driver to use the new ones, instead of the old ones. After that,
+> we can remove the old ones from the board files.
+> 
+> Note that these patches were also present in the big DSS series I sent
+> yesterday. There's no reason for these patches to be there, so I'm sending them
+> separately, and will drop these from my DSS series.
 
---
-~Vinod
+Ping.
+
+ Tomi
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 901 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/9d11bedf/attachment.sig>
