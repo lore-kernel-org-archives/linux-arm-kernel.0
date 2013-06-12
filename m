@@ -1,29 +1,40 @@
-From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Wed, 12 Jun 2013 16:58:44 +0530
-Subject: [PATCH V2 0/2] ARM: EXYNOS: cpuidle: fixes in exynos cpuidle/PM
-Message-ID: <1371036526-16589-1-git-send-email-amit.daniel@samsung.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Jun 2013 13:29:07 +0200
+Subject: [PATCHv4 2/9] i2c: mv64xxx: make the registers offset configurable
+In-Reply-To: <20130612105431.GS16502@lunn.ch>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371024438-16631-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20130612105431.GS16502@lunn.ch>
+Message-ID: <20130612112907.GE16699@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series contains a couple of fixes in cpuidle/PM due to
-1) exynos5440 platform which does not support cpuidle C1 state.
-2) Compilations error when generic PM options are enabled.
+Hi Andrew,
 
-This patch series depends on earlier posted patch
-http://www.spinics.net/lists/arm-kernel/msg248831.html
+On Wed, Jun 12, 2013 at 12:54:31PM +0200, Andrew Lunn wrote:
+> On Wed, Jun 12, 2013 at 10:07:11AM +0200, Maxime Ripard wrote:
+> > The Allwinner i2c controller uses the same logic as the Marvell one, but
+> > with slightly different register offsets.
+> > 
+> > Introduce a structure that will be passed by either the pdata or
+> > associated to the compatible strings, and that holds the various
+> > registers that might be needed.
+> 
+> Hi Maxime
+> 
+> I don't think this change is bisectable. It assumes the platform data
+> passes the registers, which is not true until the next patch.
+> 
+> Please can you re-arrange the order. Add the extra information to the
+> platform data, and then make use of it, not the other way around.
 
-Changes in V2:
-* Rebase against samsung maintainer's for next tree.
+Thanks to Tomasz comments, the next patch will be removed, and the whole
+regs passing in the pdata as well, so it will become bisectable.
 
-Amit Daniel Kachhap (2):
-  ARM: SAMSUNG: Add SAMSUNG_PM config option to select pm
-  ARM: EXYNOS: cpuidle: Allow C1 state only in supported SOC's.
+Thanks,
+Maxime
 
- arch/arm/mach-exynos/Makefile           |    2 +-
- arch/arm/mach-exynos/common.c           |    2 +-
- arch/arm/mach-exynos/common.h           |    1 -
- arch/arm/mach-exynos/cpuidle.c          |    5 ++++-
- arch/arm/plat-samsung/Kconfig           |    7 +++++++
- arch/arm/plat-samsung/Makefile          |    3 +--
- arch/arm/plat-samsung/include/plat/pm.h |    8 ++++----
- 7 files changed, 18 insertions(+), 10 deletions(-)
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
