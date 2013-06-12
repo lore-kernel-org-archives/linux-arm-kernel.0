@@ -1,39 +1,46 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 17:05:49 -0700
-Subject: [GIT PULL] ARM: mvebu: fixes for v3.10 (round 4)
-In-Reply-To: <20130610203033.GP23859@titan.lakedaemon.net>
-References: <20130610203033.GP23859@titan.lakedaemon.net>
-Message-ID: <20130612000549.GJ23774@quad.lixom.net>
+From: dinguyen@altera.com (Dinh Nguyen)
+Date: Tue, 11 Jun 2013 19:08:16 -0500
+Subject: [PATCHv6 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
+In-Reply-To: <20130611232756.GD23774@quad.lixom.net>
+References: <1370444578-25721-1-git-send-email-dinguyen@altera.com>
+ <1370444578-25721-7-git-send-email-dinguyen@altera.com>
+ <20130611232756.GD23774@quad.lixom.net>
+Message-ID: <1370995696.7804.17.camel@linux-builds1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 04:30:33PM -0400, Jason Cooper wrote:
-> Arnd, Olof
-> 
-> Here are two small fixes I've had in my tree for a few days.  I looked
-> at moving one or both of them to fixes-non-critical, but it's not
-> appropriate.
-> 
->   5f1f3d5 arm: mvebu: armada-xp-{gp,openblocks-ax3-4}: specify PCIe range
-> 
-> builds on two patches already merged for v3.10 (through mvebu/fixes):
-> 
->   c6c003a ARM: mvebu: Fix ranges entry on XP GP board
->   8eed481 arm: mvebu: fix the 'ranges' property to handle PCIe
-> 
-> 
-> And:
-> 
->   4089fe9 ARM: Kirkwood: handle mv88f6282 cpu in __kirkwood_variant().
-> 
-> Is flagged for stable, which according to Linus, is appropriate for this
-> stage of the -rc cycle.
-> 
-> If I've made an error in judgement, please let me know.
+Hi Olof,
 
+On Tue, 2013-06-11 at 16:27 -0700, Olof Johansson wrote:
+> Hi,
+> 
+> On Wed, Jun 05, 2013 at 10:02:58AM -0500, dinguyen at altera.com wrote:
+> > From: Dinh Nguyen <dinguyen@altera.com>
+> > 
+> > Add platform specific functionality for the DW SD/MMC driver for
+> > SoCFPGA. Move SDMMC_CMD_USE_HOLD_REG to dw_mmc.h so other platforms
+> > can use this define.
+> > 
+> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+> > CC: Seungwon Jeon <tgih.jun@samsung.com>
+> > CC: Jaehoon Chung <jh80.chung@samsung.com>
+> > CC: Arnd Bergmann <arnd@arndb.de>
+> > CC: Olof Johansson <olof@lixom.net>
+> > CC: Pavel Machek <pavel@denx.de>
+> > CC: linux-mmc at vger.kernel.org
+> 
+> Acked-by: Olof Johansson <olof@lixom.net>
+> 
+> This one should be sent to (and applied by) Chris Ball, the MMC maintainer. The
+> driver is standalone and can go in independently on the platform code that will
+> configure it, so he can merge it without dependencies.
 
-Unfortunate that they weren't found sooner, but looks like relevant fixes.
+Thanks Olof. I will send to Chris Ball. I kinda thought that since
+Jaehoon and Seungwon were maintainers of the dw_mmc driver that I didn't
+need to send to Chris.
 
-Pulled, thanks.
-
--Olof
+Dinh
+> 
+> 
+> -Olof
+> 
