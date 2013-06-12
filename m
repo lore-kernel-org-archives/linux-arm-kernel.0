@@ -1,48 +1,90 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 11 Jun 2013 22:37:23 -0500
-Subject: [PATCH] ARM: mmu: Add debug_ll_io_init() mappings to early
- mappings
-In-Reply-To: <1371000607-1787-1-git-send-email-sboyd@codeaurora.org>
-References: <1371000607-1787-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <CAL_JsqLJ7ZD9-VR+vgOZZ_q-RD6FCDvKPSNSCjAADxy94SU1Xg@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 12 Jun 2013 08:33:22 +0530
+Subject: [PATCH] ARM: dma: imx: Fix deadlock bug
+In-Reply-To: <20130608211557.GK18614@n2100.arm.linux.org.uk>
+References: <1370724988-16426-1-git-send-email-shc_work@mail.ru>
+ <20130608211557.GK18614@n2100.arm.linux.org.uk>
+Message-ID: <20130612030321.GA4107@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 8:30 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+On Sat, Jun 08, 2013 at 10:15:57PM +0100, Russell King - ARM Linux wrote:
+> On Sun, Jun 09, 2013 at 12:56:28AM +0400, Alexander Shiyan wrote:
+> > @@ -625,8 +613,9 @@ static void imxdma_tasklet(unsigned long data)
+> >  	struct imxdma_channel *imxdmac = (void *)data;
+> >  	struct imxdma_engine *imxdma = imxdmac->imxdma;
+> >  	struct imxdma_desc *desc;
+> > +	unsigned long flags;
+> >  
+> > -	spin_lock(&imxdma->lock);
+> > +	spin_lock_irqsave(&imxdma->lock, flags);
+> >  
+> >  	if (list_empty(&imxdmac->ld_active)) {
+> >  		/* Someone might have called terminate all */
+> > @@ -663,7 +652,7 @@ static void imxdma_tasklet(unsigned long data)
+> >  				 __func__, imxdmac->channel);
+> >  	}
+> >  out:
+> > -	spin_unlock(&imxdma->lock);
+> > +	spin_unlock_irqrestore(&imxdma->lock, flags);
+> 
+> So, I just peeked at this driver.  Who is reviewing DMA engine drivers
+> and why aren't they reviewing stuff properly.
+mea culpa, yes its documeneted well. Let me fix it up...
 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index e0d8565..04fe160 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -938,8 +938,12 @@ static void __init pci_reserve_io(void)
->  #ifdef CONFIG_DEBUG_LL
->  void __init debug_ll_io_init(void)
->  {
-> +       struct vm_struct *vm;
-> +       struct static_vm *svm;
->         struct map_desc map;
->
-> +       svm = early_alloc_aligned(sizeof(*svm), __alignof__(*svm));
-> +
->         debug_ll_addr(&map.pfn, &map.virtual);
->         if (!map.pfn || !map.virtual)
->                 return;
-> @@ -948,6 +952,15 @@ void __init debug_ll_io_init(void)
->         map.length = PAGE_SIZE;
->         map.type = MT_DEVICE;
->         create_mapping(&map);
-> +
-> +       vm = &svm->vm;
-> +       vm->addr = (void *)map.virtual;
-> +       vm->size = map.length;
-> +       vm->phys_addr = __pfn_to_phys(map.pfn);
-> +       vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
-> +       vm->flags |= VM_ARM_MTYPE(map.type);
-> +       vm->caller = debug_ll_io_init;
-> +       add_static_vm_early(svm);
+> 
+> static void imxdma_tasklet(unsigned long data)
+> {
+> ...
+>         spin_lock(&imxdma->lock);
+> ...
+>         if (desc->desc.callback)
+>                 desc->desc.callback(desc->desc.callback_param);
+> ...
+> out:
+>         spin_unlock(&imxdma->lock);
+> }
+> 
+> This stuff is well known and even documented:
+> 
+>         For slave DMA, the subsequent transaction may not be available
+>         for submission prior to callback function being invoked, so
+>         slave DMA callbacks are permitted to prepare and submit a new
+>         transaction.
+> 
+>         For cyclic DMA, a callback function may wish to terminate the
+>         DMA via dmaengine_terminate_all().
+> 
+>         Therefore, it is important that DMA engine drivers drop any
+>         locks before calling the callback function which may cause a
+>         deadlock.
+> 
+>         Note that callbacks will always be invoked from the DMA
+>         engines tasklet, never from interrupt context.
+> 
+> Note the 3rd paragraph - and note that the IMX driver violates this
+> by holding that spinlock.  Changing that spinlock to be an irq-saving
+> type just makes the problem worse.
+> 
+> What's more is it takes this same lock in the submit and issue_pending
+> functions - so this is potential deadlock territory by the mere fact
+> that a callback function _can_ invoke these two functions.
+> 
+> It also makes use of __memzero.  Don't.  Use memset().
+> 
+> Doesn't check the return value of clk_prepare_enable().
+> 
+> Mixes up accessors and direct accesses:
+>                 imxdmac->sg_list[i].dma_address = dma_addr;
+>                 sg_dma_len(&imxdmac->sg_list[i]) = period_len;
+> The first should be accessed via sg_dma_address().
+> 
+> Reimplements much of virt-dma.c/.h - maybe it should use this support
+> instead?  As an added benefit you'll be able to start the next queued
+> request without the tasklet and get better throughput as a result -
+> and process all completed transfers upon tasklet invocation.
 
-Can you use vm_reserve_area_early here or perhaps just call
-iotable_init instead of create_mapping directly? I don't recall if
-there was some reason I didn't do that.
+--
+~Vinod
 
-Rob
+-- 
