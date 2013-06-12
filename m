@@ -1,31 +1,46 @@
 From: mturquette@linaro.org (Mike Turquette)
-Date: Tue, 11 Jun 2013 17:39:51 -0700
-Subject: [PATCH 0/2] PLL m,n,p init from SoC files
-In-Reply-To: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
-References: <1370440301-3562-1-git-send-email-pdeschrijver@nvidia.com>
-Message-ID: <20130612003951.8816.41684@quantum>
+Date: Tue, 11 Jun 2013 17:45:37 -0700
+Subject: [PATCH] clk: tegra: fix pllre initilization
+In-Reply-To: <1370442111-13215-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1370442111-13215-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20130612004537.8816.13976@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Peter De Schrijver (2013-06-05 06:51:24)
-> The m,n,p fields don't have the same bit offset and width across all PLLs.
-> This patchset allows SoC specific files to indicate the offset and width.
-> It also provides the data for Tegra114.
+Quoting Peter De Schrijver (2013-06-05 07:21:46)
+> The PLLRE flags weren't set correctly. Fixed in this patch.
 > 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
 Taken into clk-next.
 
 Thanks,
 Mike
 
-> Peter De Schrijver (2):
->   clk: tegra: allow PLL m,n,p init from SoC files
->   clk: tegra: PLL m,n,p init for Tegra114
+> ---
+>  drivers/clk/tegra/clk-pll.c |    3 +--
+>  1 files changed, 1 insertions(+), 2 deletions(-)
 > 
->  drivers/clk/tegra/clk-pll.c      |   60 ++++++++++++++++-------------
->  drivers/clk/tegra/clk-tegra114.c |   77 ++++++++++++++++++++++++++++++++++++++
->  drivers/clk/tegra/clk.h          |   32 ++++++++++------
->  3 files changed, 130 insertions(+), 39 deletions(-)
-> 
+> diff --git a/drivers/clk/tegra/clk-pll.c b/drivers/clk/tegra/clk-pll.c
+> index 4293643..197074a 100644
+> --- a/drivers/clk/tegra/clk-pll.c
+> +++ b/drivers/clk/tegra/clk-pll.c
+> @@ -1424,7 +1424,7 @@ struct clk *tegra_clk_register_pllre(const char *name, const char *parent_name,
+>         struct tegra_clk_pll *pll;
+>         struct clk *clk;
+>  
+> -       pll_flags |= TEGRA_PLL_HAS_LOCK_ENABLE;
+> +       pll_flags |= TEGRA_PLL_HAS_LOCK_ENABLE | TEGRA_PLL_LOCK_MISC;
+>         pll = _tegra_init_pll(clk_base, pmc, fixed_rate, pll_params, pll_flags,
+>                               freq_table, lock);
+>         if (IS_ERR(pll))
+> @@ -1451,7 +1451,6 @@ struct clk *tegra_clk_register_pllre(const char *name, const char *parent_name,
+>         val &= ~BIT(29);
+>         pll_writel_misc(val, pll);
+>  
+> -       pll_flags |= TEGRA_PLL_LOCK_MISC;
+>         clk = _tegra_clk_register_pll(pll, name, parent_name, flags,
+>                                       &tegra_clk_pllre_ops);
+>         if (IS_ERR(clk))
 > -- 
 > 1.7.7.rc0.72.g4b5ea.dirty
