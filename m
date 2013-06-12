@@ -1,35 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Jun 2013 07:10:50 -0700
-Subject: [PATCH 0/3] ARM: OMAP2+: devices: Silence hwmod lookup
- failures (dmic/mcpdm)
-In-Reply-To: <1370939520-16132-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1370939520-16132-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20130612141050.GU8164@atomide.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 12 Jun 2013 15:25:32 +0100
+Subject: [PATCH] ARM: arch_timer: add missing include for of_* functions
+In-Reply-To: <1370969344-25764-1-git-send-email-jonathan.austin@arm.com>
+References: <1370969344-25764-1-git-send-email-jonathan.austin@arm.com>
+Message-ID: <20130612142532.GA27414@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [130611 01:37]:
-> Hi,
+On Tue, Jun 11, 2013 at 05:49:04PM +0100, Jonathan Austin wrote:
+> The arch timer code uses a bunch of of_* functions that are defined in
+> linux/of.h. Currently this header is not included but with CONFIG_OF defined
+> the functions are available anyway.
 > 
-> Small patches to silence the hwmod lookup failures in case when we boot the
-> kernel on boards where the IPs are not present (OMAP2/3 vs McPDM, DMIC,
-> HDMI audio).
-
-Thanks applying into omap-for-v3.11/fixes-non-critical.
-
-Regards,
-
-Tony
-
-> Peter Ujfalusi (3):
->   ARM: OMAP2+: devices: Do not print error when McPDM hwmod lookup fails
->   ARM: OMAP2+: devices: Do not print error when DMIC hwmod lookup fails
->   ARM: OMAP2+: devices: Do not print error when dss_hdmi hwmod lookup
->     fails
+> This was discovered because in the case that CONFIG_OF=n and ARM_ARCH_TIMER is
+> selected, the kernel no longer builds due to the lack of this header.
+> This patch fixes that (though without another patch
+> - https://patchwork.kernel.org/patch/2242291/ - the build still fails due to
+> a missing stub for of_find_matching_node())
 > 
->  arch/arm/mach-omap2/devices.c | 12 +++---------
->  1 file changed, 3 insertions(+), 9 deletions(-)
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+
+Makes sense to me.
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+> ---
 > 
+> It seems to me that, no matter what your opinion on whether CONFIG_OF=n with
+> CONFIG_ARM_ARCH_TIMER=y makes sense, we should fix this particular missing
+> include.
+> 
+> Jonny
+> 
+>  drivers/clocksource/arm_arch_timer.c |    1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index d7ad425..c716ffa 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/cpu.h>
+>  #include <linux/clockchips.h>
+>  #include <linux/interrupt.h>
+> +#include <linux/of.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/io.h>
+>  
 > -- 
-> 1.8.2.1
+> 1.7.9.5
 > 
