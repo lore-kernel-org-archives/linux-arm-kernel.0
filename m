@@ -1,57 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 12 Jun 2013 18:13:26 +0300
-Subject: [PATCH 2/3] USB: OMAP: add omap-otg
-In-Reply-To: <1370817606-1008-3-git-send-email-aaro.koskinen@iki.fi>
-References: <1370817606-1008-1-git-send-email-aaro.koskinen@iki.fi>
- <1370817606-1008-3-git-send-email-aaro.koskinen@iki.fi>
-Message-ID: <20130612151326.GE15056@arwen.pp.htv.fi>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Jun 2013 17:17:18 +0200
+Subject: [PATCHv4 2/9] i2c: mv64xxx: make the registers offset configurable
+In-Reply-To: <20130612145139.GS18614@n2100.arm.linux.org.uk>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371024438-16631-3-git-send-email-maxime.ripard@free-electrons.com>
+ <20130612135735.GR18614@n2100.arm.linux.org.uk>
+ <20130612144447.GI16699@lukather>
+ <20130612145139.GS18614@n2100.arm.linux.org.uk>
+Message-ID: <20130612151718.GK16699@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 12, 2013 at 03:51:39PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 12, 2013 at 04:44:47PM +0200, Maxime Ripard wrote:
+> > Hi Russel,
+> > 
+> > On Wed, Jun 12, 2013 at 02:57:35PM +0100, Russell King - ARM Linux wrote:
+> > > It'd be much better to copy the offsets themselves in drv_data.  You're
+> > > only talking about 7 bytes here, so there's no worry about bloating the
+> > > drv_data structure.
+> > 
+> > It was more about keeping things separated. Moreover, the probe
+> > function gets smaller, since you have only a pointer to pass on, instead
+> > of assigning those 7 bytes.
+> 
+> 	struct driver_data {
+> 		struct mv64xxx_i2c_regs reg_offsets;
+> 	};
+> 
+> 	struct driver_data *drv_data;
+> 
+> 	memcpy(drv_data->reg_offsets, reg_offsets, sizeof(drv_data->reg_offsets));
+> 
+> No need to write it each member as a separate assignment.
 
-On Mon, Jun 10, 2013 at 01:40:05AM +0300, Aaro Koskinen wrote:
-> +void omap_otg_set_mode(enum omap_otg_mode mode)
-> +{
-> +	if (!otg_dev) {
-> +		WARN(1, "%s: controller not present\n", __func__);
-> +		return;
-> +	}
-> +	mutex_lock(&otg_dev->serialize);
-> +	switch (mode) {
-> +	case OMAP_OTG_MODE_DEVICE:
-> +		/*
-> +		 * Set B-session valid.
-> +		 */
-> +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSVLD);
-> +		break;
-> +	case OMAP_OTG_MODE_HOST:
-> +		/*
-> +		 * Set A-session valid.
-> +		 */
-> +		omap_otg_ctrl(OMAP_OTG_ASESSVLD);
-> +		break;
-> +	case OMAP_OTG_MODE_DISCONNECT:
-> +		/*
-> +		 * Set B-session end to indicate no VBUS.
-> +		 */
-> +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSEND);
-> +		break;
-> +	default:
-> +		WARN(1, "%s: unknown mode: %d\n", __func__, mode);
-> +	}
-> +	mutex_unlock(&otg_dev->serialize);
-> +}
-> +EXPORT_SYMBOL_GPL(omap_otg_set_mode);
+Ah right. I previously understood that you wanted a single variable for
+each register in the driver data structure.
 
-looks like this should provide a extcon interface for its users.
+I'll do like you suggested.
+
+Maxime
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/0e3e9e91/attachment.sig>
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
