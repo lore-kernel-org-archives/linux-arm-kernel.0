@@ -1,45 +1,56 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Jun 2013 10:49:20 +0900
-Subject: [PATCH v2 1/2] ARM: shmobile: r8a7778: fix Ether device name
-In-Reply-To: <51B77F54.8030001@cogentembedded.com>
-References: <201306090123.24709.sergei.shtylyov@cogentembedded.com>
- <20130611074850.GE10440@verge.net.au>
- <51B77F54.8030001@cogentembedded.com>
-Message-ID: <20130612014920.GC32725@verge.net.au>
+Date: Wed, 12 Jun 2013 10:51:15 +0900
+Subject: [RFC/PATCH v2 0/2] R-Car GPIO DT bindings
+In-Reply-To: <3619797.0aKKBP4JP5@avalon>
+References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20130525012434.GA24005@verge.net.au> <3619797.0aKKBP4JP5@avalon>
+Message-ID: <20130612015115.GD32725@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 11:49:40PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Wed, Jun 12, 2013 at 12:14:49AM +0200, Laurent Pinchart wrote:
+> Hi Simon,
 > 
-> On 06/11/2013 11:48 AM, Simon Horman wrote:
+> On Saturday 25 May 2013 10:24:34 Simon Horman wrote:
+> > On Tue, May 21, 2013 at 01:40:04PM +0200, Laurent Pinchart wrote:
+> > > Hello,
+> > > 
+> > > Here's the second version of the gpio-rcar driver DT bindings. I've tested
+> > > the patches on the Marzen board (r8a7779).
+> > > 
+> > > Once again I'd appreciate feedback on the DT bindings. I'm particularly
+> > > wondering whether getting the number of lines through the gpio-ranges
+> > > property instead of using a dedicated #gpio-lines property as in v1 is a
+> > > good idea.
+> > > 
+> > > Changes since v1:
+> > > 
+> > > - Initialize the gpiochip dev field at probe time.
+> > > - Add the gpio-ranges property.
+> > > - Remove the #gpio-lines property. The number of lines is now passed
+> > > through> 
+> > >   the gpio-ranges property.
+> > > 
+> > > Laurent Pinchart (2):
+> > >   gpio-rcar: Make the platform data gpio_base field signed
+> > >   gpio-rcar: Add DT support
+> > >  
+> > >  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt | 52 +++++++++++++++++
+> > >  drivers/gpio/gpio-rcar.c                           | 66 +++++++++++++----
+> > >  include/linux/platform_data/gpio-rcar.h            |  2 +-
+> > >  3 files changed, 109 insertions(+), 11 deletions(-)
+> > >  create mode 100644
+> > >  Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+> >
+> > Hi Magnus,
+> > 
+> > could you please review these changes?
 > 
-> >>While recasting commit 524219146a89aee5366326c225ccd71231419d89 (ARM: shmobile:
-> >>R8A7778: add Ether support), I made a typo in the platform device's name: used
-> >>underscore instead of hyphen.
-> 
-> >>However, there's now patch merged to net-next.git renaming the platform device
-> >>from "sh-eth" to "r8a777x-ehter", so it makes the most sense to change the name
-> >>straight to that one.
-> 
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >>---
-> >>The patch is atop of the 'renesas-next-20130607' tag of the 'renesas.git' tree
-> >>and the USB patches I have submitted earlier.
-> 
-> >>Changes in version 2:
-> >>- changed the platform device's name as in the patch merged to 'net-next.git';
-> >>- lowercased the SoC name in the subject.
-> 
-> >Thanks, I have queued this up in the soc2 branch.
-> >My current plan is to let that branch sit in next for a few
-> >days and then send a pull-request for it to be included in v3.11.
-> 
->     Could you then merge the BOCK-W Ether support too? The patch
-> currently has some offsets applying to 'renesas-next-20130611v2',
-> should I respin it?
+> I've received Magnus' ack face-to-face last week. I'm not sure whether that's 
+> a proper procedure, but I'm sure he will confirm that if needed.
 
-I think I should be able to take it as-is.
-And I should be able to do so today or tomorrow.
-I'll let you know if I need a re-spin after all.
+Its sufficient for my needs.
+
+> Could you please take the patch in your tree for v3.11 ?
+
+Sure, I'll see what I can do.
