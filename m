@@ -1,32 +1,47 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 12 Jun 2013 16:30:02 -0400
-Subject: [GIT PULL 6/6] omap5 data for v3.11 merge window
-In-Reply-To: <E1Umpk8-0005eT-9e@merlin.infradead.org>
-References: <E1Umpk8-0005eT-9e@merlin.infradead.org>
-Message-ID: <51B8DA4A.3020106@ti.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 12 Jun 2013 13:33:50 -0700
+Subject: [PATCH v4 1/6] clk: samsung: Use clk->base instead of directly
+ using clk->con0 for PLL3xxx
+In-Reply-To: <1370272196-4346-2-git-send-email-yadi.brar@samsung.com>
+References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
+ <1370272196-4346-2-git-send-email-yadi.brar@samsung.com>
+Message-ID: <CAD=FV=VTLkH9oDqr263Kyv=wCEbuQ40VL7mtC73SCMt20NPwgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 12 June 2013 02:24 PM, Tony Lindgren wrote:
-> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
-> 
->   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/omap5-signed
-> 
-> for you to fetch changes up to 6503a8e109a639760408f874c1251060d563942e:
-> 
->   ARM: OMAP5: Remove unused include for ocp2scp (2013-06-09 21:17:15 -0700)
-> 
-> ----------------------------------------------------------------
+Yadwinder,
 
-[..]
+On Mon, Jun 3, 2013 at 8:09 AM, Yadwinder Singh Brar
+<yadi.brar@samsung.com> wrote:
+> This patch unifies clk strutures used for PLL35xx & PLL36xx and uses clk->base
+> instead of directly using clk->con0, so that possible common code can be
+> factored out.
+> It also introdues common pll_[readl/writel] macros for the users of common
+> samsung_clk_pll struct.
+>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> Reviewed-by: Doug Anderson <dianders@chromium.org>
+> Tested-by: Doug Anderson <dianders@chromium.org>
+> Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+> ---
+>  drivers/clk/samsung/clk-exynos4.c    |   10 ++++--
+>  drivers/clk/samsung/clk-exynos5250.c |   14 ++++----
+>  drivers/clk/samsung/clk-pll.c        |   54 ++++++++++++++++++---------------
+>  drivers/clk/samsung/clk-pll.h        |    4 +-
+>  4 files changed, 44 insertions(+), 38 deletions(-)
 
-> Basic test logs are available here, although not for OMAP5,
-> since I don't have an OMAP5 board:
-You happen to mention that you got one OMAP5 board form David A ?
+So.  We just found that this type of solution doesn't work on
+exynos5420, since the LOCK and CON registers aren't always 0x100 away
+from each other.  Perhaps you can adjust to use a solution like Andrew
+proposed in <https://gerrit.chromium.org/gerrit/#/c/58411/>?  That way
+we can avoid some churn of changing this code twice.
 
-Regards,
-Santosh
+The number of parameters to the register PLL function is starting to
+get unwieldy.  At some point we'll probably want to pass in a
+structure.  I wonder if now would be the time?  Certainly it would be
+easier to handle changes to the code without touching all of the
+exynos variants...
+
+Thanks!
+
+-Doug
