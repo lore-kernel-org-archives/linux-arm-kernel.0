@@ -1,52 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Jun 2013 18:53:35 +0200
-Subject: [PATCHv5 6/8] ARM: sun5i: dt: Add i2c muxing options
-In-Reply-To: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1371056017-8166-7-git-send-email-maxime.ripard@free-electrons.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Jun 2013 09:54:57 -0700
+Subject: [PATCH 12/12] ARM: msm: Migrate to common clock framework
+In-Reply-To: <20130611222832.8816.77120@quantum>
+References: <1370373938-32417-1-git-send-email-sboyd@codeaurora.org>
+ <1370373938-32417-13-git-send-email-sboyd@codeaurora.org>
+ <20130611222832.8816.77120@quantum>
+Message-ID: <51B8A7E1.1020708@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c controller found on the Allwinner A13 has only one muxing option
-available for each controller. Add them to the dtsi
+On 06/11/13 15:28, Mike Turquette wrote:
+> Quoting Stephen Boyd (2013-06-04 12:25:38)
+>> Move the existing clock code in mach-msm to the common clock
+>> framework. We lose our capability to set the rate of and enable a
+>> clock through debugfs. This is ok though because the debugfs
+>> features are mainly used for testing and development of new clock
+>> code.
+>>
+>> To maintain compatibility with the original MSM clock code we
+>> make a wrapper for clk_reset() that calls the struct msm_clk
+>> specific reset function. This is necessary for the usb and sdcc
+>> devices on MSM until a better suited API is made available.
+>>
+>> Cc: Saravana Kannan <skannan@codeaurora.org>
+>> Cc: Mike Turquette <mturquette@linaro.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> I just went through this quickly and nothing popped out at me.  Nice
+> diffstat btw!  Do you have any plans to move this to drivers/clk/msm ?
+>
+> Acked-by: Mike Turquette <mturquette@linaro.org>
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- arch/arm/boot/dts/sun5i-a13.dtsi | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+Thanks Mike.
 
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 31ebfd7..df96c54 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -184,6 +184,27 @@
- 				allwinner,drive = <0>;
- 				allwinner,pull = <0>;
- 			};
-+
-+			i2c0_pins_a: i2c0 at 0 {
-+				allwinner,pins = "PB0", "PB1";
-+				allwinner,function = "i2c0";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			i2c1_pins_a: i2c1 at 0 {
-+				allwinner,pins = "PB15", "PB16";
-+				allwinner,function = "i2c1";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
-+
-+			i2c2_pins_a: i2c2 at 0 {
-+				allwinner,pins = "PB17", "PB18";
-+				allwinner,function = "i2c2";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <0>;
-+			};
- 		};
- 
- 		timer at 01c20c00 {
+I plan to add mmio support under drivers/clk/msm. Moving this proc_comm
+based code to drivers/clk/msm is possible but it would need to depend on
+the 3 architectures that use it so that it isn't available or compiled
+on our DT based platforms. We can do that later I suppose.
+
 -- 
-1.8.3
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
