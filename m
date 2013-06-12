@@ -1,42 +1,33 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 12 Jun 2013 18:52:18 +0900
-Subject: [PATCH] ARM: zImage/virt: remove hyp-stub.S during distclean
-In-Reply-To: <20130611100648.GA2844@linaro.org>
-References: <20130610060325.2335.65815.sendpatchset@w520>
- <20130611074810.GC10440@verge.net.au>
- <CANqRtoSx_dN3as5ObwFCeRkAQ3NF1O7CYkfVmUXLxBq4hMj2dQ@mail.gmail.com>
- <20130611100648.GA2844@linaro.org>
-Message-ID: <CANqRtoRFrmz3_UM7SgEeeR0cEe_GtxEzN34HbrTFMYWnSjomVg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Jun 2013 11:58:20 +0200
+Subject: About LPAE supporting on EXYNOS5440
+In-Reply-To: <51B7FD2E.9030306@gmail.com>
+References: <109e01ce667e$5becc880$13c65980$%kim@samsung.com>
+ <15605927.1Yi6Xe5hWs@wuerfel> <51B7FD2E.9030306@gmail.com>
+Message-ID: <201306121158.20676.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 7:06 PM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Tue, Jun 11, 2013 at 06:31:37PM +0900, Magnus Damm wrote:
->> Hi Simon, Dave, everyone,
->>
->> On Tue, Jun 11, 2013 at 4:48 PM, Simon Horman <horms@verge.net.au> wrote:
->> > On Mon, Jun 10, 2013 at 03:03:25PM +0900, Magnus Damm wrote:
->> >> From: Magnus Damm <damm@opensource.se>
->> >>
->> >> Make sure hyp-stub.S gets removed during make distclean,
->> >> this left over file was introduced in commit:
->> >>
->> >> 424e599 ARM: zImage/virt: hyp mode entry support for the zImage loader
->> >>
->> >> Signed-off-by: Magnus Damm <damm@opensource.se>
->>
->> Acked-by: Dave Martin <dave.martin@linaro.org>
->>
->> > Reviewed-by: Simon Horman <horms+renesas@verge.net.au>
->>
->> Thanks guys, who can pick this up?
->
-> I suggest you send this to Russell's patch system.
+On Wednesday 12 June 2013, Subash Patel wrote:
+> > I would definitely leave on exynos5440 support in defconfig. It's not a
+> > lot of extra code, and if you have a system with less than 4GB memory,
+> > you really don't want to enable LPAE because of the overhead.
+> 
+> Even if we have <= 4GB memory, and the system designers have placed the 
+> memory banks in addresses > 2^32 bytes, then we need LPAE support. I 
+> think we may have such systems in future. So memory capacity is not the 
+> only parameter to judge if we need to enable LPAE or not.
 
-Done!
+Yes, but that wasn't the point. You can always build systems with
+exynos5440 that don't need LPAE, so we should not assume that it is
+not a reasonable configuration.
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=7756/1
+I would certainly advise system designers to put all the RAM and I/O
+into normally addressable locations if possible to avoid the need
+for LPAE, but of course that isn't always possible.
 
-Thanks for your help!
+We should probably have someone measure the performance impact
+of LPAE as well. If it's less than a few percent, we might not
+care all that much.
 
-/ magnus
+	Arnd
