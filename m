@@ -1,50 +1,78 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 12 Jun 2013 13:53:44 +0530
-Subject: [PATCH RESEND V2] ARM: dts: Correct the base address of pinctrl_3 on
- Exynos5250
-Message-ID: <1371025425-480-1-git-send-email-padma.v@samsung.com>
+Date: Wed, 12 Jun 2013 13:53:45 +0530
+Subject: [PATCH RESEND V2] ARM: dts: wm8994: Add wm8994 regulator support on
+ smdk5250.
+In-Reply-To: <1371025425-480-1-git-send-email-padma.v@samsung.com>
+References: <1371025425-480-1-git-send-email-padma.v@samsung.com>
+Message-ID: <1371025425-480-2-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch corrects the base address of pinctrl_3 on Exynos5250
-platform.
+This patch adds the required regulator supplies and properties
+for wm8994 codec on smdk5250 board.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
+
 Changes since V1:
-	- Added platform name in the subject line.
+	- Clubbed the same supply regulators as suggested by Mark.
 
- arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    2 +-
- arch/arm/boot/dts/exynos5250.dtsi         |    4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/exynos5250-smdk5250.dts |   37 +++++++++++++++++++++++++++-
+ 1 files changed, 35 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-index d1650fb..ded558b 100644
---- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-+++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-@@ -763,7 +763,7 @@
+diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+index f2a025e..dc2ec25 100644
+--- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
++++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
+@@ -37,6 +37,30 @@
  		};
  	};
  
--	pinctrl at 03680000 {
-+	pinctrl at 03860000 {
- 		gpz: gpz {
- 			gpio-controller;
- 			#gpio-cells = <2>;
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index 7154e3d..e9bfd13 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -169,9 +169,9 @@
- 		interrupts = <0 50 0>;
- 	};
++	vdd:fixed-regulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd-supply";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-always-on;
++	};
++
++	dbvdd:fixed-regulator at 1 {
++		compatible = "regulator-fixed";
++		regulator-name = "dbvdd-supply";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	spkvdd:fixed-regulator at 2 {
++		compatible = "regulator-fixed";
++		regulator-name = "spkvdd-supply";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-always-on;
++	};
++
+ 	i2c at 12C70000 {
+ 		samsung,i2c-sda-delay = <100>;
+ 		samsung,i2c-max-bus-freq = <20000>;
+@@ -47,8 +71,17 @@
+ 		};
  
--	pinctrl_3: pinctrl at 03680000 {
-+	pinctrl_3: pinctrl at 03860000 {
- 		compatible = "samsung,exynos5250-pinctrl";
--		reg = <0x0368000 0x1000>;
-+		reg = <0x03860000 0x1000>;
- 		interrupts = <0 47 0>;
+ 		wm8994: wm8994 at 1a {
+-			 compatible = "wlf,wm8994";
+-			 reg = <0x1a>;
++			compatible = "wlf,wm8994";
++			reg = <0x1a>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			AVDD2-supply = <&vdd>;
++			CPVDD-supply = <&vdd>;
++			DBVDD-supply = <&dbvdd>;
++			SPKVDD1-supply = <&spkvdd>;
++			SPKVDD2-supply = <&spkvdd>;
+ 		};
  	};
  
 -- 
