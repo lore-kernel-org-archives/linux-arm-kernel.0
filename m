@@ -1,36 +1,75 @@
-From: amit.daniel@samsung.com (Amit Daniel Kachhap)
-Date: Wed, 12 Jun 2013 16:58:46 +0530
-Subject: [PATCH V2 2/2] ARM: EXYNOS: cpuidle: Allow C1 state only in supported
- SOC's.
-In-Reply-To: <1371036526-16589-1-git-send-email-amit.daniel@samsung.com>
-References: <1371036526-16589-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <1371036526-16589-3-git-send-email-amit.daniel@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 12 Jun 2013 19:30:27 +0800
+Subject: [PATCH] irqchip: gic: call gic_cpu_init() as well in
+ CPU_STARTING_FROZEN case
+Message-ID: <1371036627-13529-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch registers the basic C0 state for all exynos SOC's but
-limits the C1(AFTR -Arm off top running) state in only the supported
-SOC's(ie. EXYNOS 4210, 4212, 4412 and 5250).
+Commit c011470 (irqchip: gic: Perform the gic_secondary_init() call via
+CPU notifier) moves gic_secondary_init() that used to be called in
+.smp_secondary_init hook into a notifier call.  But it changes the
+system behavior a little bit.  Before the commit, gic_cpu_init()
+is called not only when kernel brings up the secondary cores but also
+when system resuming procedure hot-plugs the cores back to kernel.
+While after the commit, the function will not be called in the latter
+case, where the 'action' will not be CPU_STARTING but
+CPU_STARTING_FROZEN.  This behavior difference at least causes the
+following suspend/resume regression on imx6q.
 
-Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+$ echo mem > /sys/power/state
+PM: Syncing filesystems ... done.
+PM: Preparing system for mem sleep
+mmc1: card e624 removed
+Freezing user space processes ... (elapsed 0.01 seconds) done.
+Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
+PM: Entering mem sleep
+PM: suspend of devices complete after 5.930 msecs
+PM: suspend devices took 0.010 seconds
+PM: late suspend of devices complete after 0.343 msecs
+PM: noirq suspend of devices complete after 0.828 msecs
+Disabling non-boot CPUs ...
+CPU1: shutdown
+CPU2: shutdown
+CPU3: shutdown
+Enabling non-boot CPUs ...
+CPU1: Booted secondary processor
+INFO: rcu_sched detected stalls on CPUs/tasks: { 1 2 3} (detected by 0, t=2102 jiffies, g=4294967169, c=4294967168, q=17)
+Task dump for CPU 1:
+swapper/1       R running      0     0      1 0x00000000
+Backtrace:
+[<bf895ff4>] (0xbf895ff4) from [<00000000>] (  (null))
+Backtrace aborted due to bad frame pointer <8007ccdc>
+Task dump for CPU 2:
+swapper/2       R running      0     0      1 0x00000000
+Backtrace:
+[<8075dbdc>] (0x8075dbdc) from [<00000000>] (  (null))
+Backtrace aborted due to bad frame pointer <00000002>
+Task dump for CPU 3:
+swapper/3       R running      0     0      1 0x00000000
+Backtrace:
+[<8075dbdc>] (0x8075dbdc) from [<00000000>] (  (null))
+
+Fix the regression by checking 'action' being CPU_STARTING_FROZEN to
+have gic_cpu_init() called for secondary cores when system resumes.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/mach-exynos/cpuidle.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ drivers/irqchip/irq-gic.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/cpuidle.c b/arch/arm/mach-exynos/cpuidle.c
-index 2d071c6..ccb2b48 100644
---- a/arch/arm/mach-exynos/cpuidle.c
-+++ b/arch/arm/mach-exynos/cpuidle.c
-@@ -176,7 +176,9 @@ static int __init exynos4_init_cpuidle(void)
- 		device->cpu = cpu_id;
- 
- 		/* Support IDLE only */
--		if (cpu_id != 0)
-+		if (!(soc_is_exynos4210() || soc_is_exynos4212() ||
-+			soc_is_exynos4412() || soc_is_exynos5250()) ||
-+			cpu_id != 0)
- 			device->state_count = 1;
- 
- 		ret = cpuidle_register_device(device);
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 1760ceb..19ceaa6 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -705,7 +705,7 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
+ static int __cpuinit gic_secondary_init(struct notifier_block *nfb,
+ 					unsigned long action, void *hcpu)
+ {
+-	if (action == CPU_STARTING)
++	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
+ 		gic_cpu_init(&gic_data[0]);
+ 	return NOTIFY_OK;
+ }
 -- 
-1.7.1
+1.7.9.5
