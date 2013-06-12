@@ -1,36 +1,36 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Wed, 12 Jun 2013 13:38:29 +0300
-Subject: [PATCH 0/3] ARM: OMAP: add corrected DSS regulator supplies
-In-Reply-To: <1369985874-8571-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1369985874-8571-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <51B84FA5.80409@ti.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 12 Jun 2013 12:42:40 +0200
+Subject: [PATCH v2 4/8] irqchip: armada-370-xp: implement MSI support
+In-Reply-To: <1370536888-8871-5-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370536888-8871-5-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130612104207.GE30841@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31/05/13 10:37, Tomi Valkeinen wrote:
-> Hi Tony,
-> 
-> Here are a few patches adding corrected DSS regulator supplies. The current
-> ones in the board files are not really correct, although the dss driver works
-> ok with them.
-> 
-> So these patches add new regulator supply entries. When these are merged, I'll
-> change omapdss driver to use the new ones, instead of the old ones. After that,
-> we can remove the old ones from the board files.
-> 
-> Note that these patches were also present in the big DSS series I sent
-> yesterday. There's no reason for these patches to be there, so I'm sending them
-> separately, and will drop these from my DSS series.
+On Thu, Jun 06, 2013 at 06:41:24PM +0200, Thomas Petazzoni wrote:
+[...]
+> @@ -292,6 +454,8 @@ static int __init armada_370_xp_mpic_of_init(struct device_node *node,
+>  
+>  #endif
+>  
+> +	armada_370_xp_msi_init(node);
+> +
 
-Ping.
+So I see that you don't have access to the original platform device
+here, but you could use of_find_device_by_node() to obtain it and pass
+that into armada_370_xp_msi_init() in order to set the msi_chip.dev
+field. Or you could do the lookup in armada_370_xp_msi_init() if you
+don't need it for anything else in armada_370_xp_mpic_of_init().
 
- Tomi
+Doing the above will also allow you to use devm_kzalloc() as Grant
+suggested in his reply.
 
-
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
+Name: not available
 Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/9d11bedf/attachment.sig>
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/6af6e30d/attachment.sig>
