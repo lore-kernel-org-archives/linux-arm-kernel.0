@@ -1,77 +1,52 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 12 Jun 2013 09:41:08 -0700
-Subject: [PATCH v2 3/3] arm: dt: zynq: Add support for the zed platform
-In-Reply-To: <1371055268-32337-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1371055268-32337-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1371055268-32337-4-git-send-email-soren.brinkmann@xilinx.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Wed, 12 Jun 2013 09:45:53 -0700
+Subject: [PATCH V6 6/6] clk: exynos5250: Add enum entries for divider
+ clock of i2s1 and i2s2
+In-Reply-To: <1371024463-303-7-git-send-email-padma.v@samsung.com>
+References: <1371024463-303-1-git-send-email-padma.v@samsung.com>
+ <1371024463-303-7-git-send-email-padma.v@samsung.com>
+Message-ID: <20130612164553.26381.41398@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a DT fragment for the Zed Zynq platform and a corresponding
-target to the Makefile
+Quoting Padmavathi Venna (2013-06-12 01:07:43)
+> This patch adds enum entries for div_i2s1 and div_i2s2 which are
+> required for i2s1 and i2s2 controllers.
+> 
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-I used the 'xlnx,...' compat strings since it seems this is what is
-used in the Xilinx and Digilent vendor trees.
+Looks good.  Did you want me to take the clk patches or just gathering
+Acks?
 
-	S?ren
+Regards,
+Mike
 
- arch/arm/boot/dts/Makefile     |  3 ++-
- arch/arm/boot/dts/zynq-zed.dts | 31 +++++++++++++++++++++++++++++++
- 2 files changed, 33 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/zynq-zed.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 2aecf7e..d34af4c 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -207,7 +207,8 @@ dtb-$(CONFIG_ARCH_VT8500) += vt8500-bv07.dtb \
- 	wm8650-mid.dtb \
- 	wm8850-w70v2.dtb
- dtb-$(CONFIG_ARCH_ZYNQ) += zynq-zc702.dtb \
--	zynq-zc706.dtb
-+	zynq-zc706.dtb \
-+	zynq-zed.dtb
- 
- targets += dtbs
- targets += $(dtb-y)
-diff --git a/arch/arm/boot/dts/zynq-zed.dts b/arch/arm/boot/dts/zynq-zed.dts
-new file mode 100644
-index 0000000..72bb348
---- /dev/null
-+++ b/arch/arm/boot/dts/zynq-zed.dts
-@@ -0,0 +1,31 @@
-+/*
-+ *  Copyright (C) 2011 Xilinx
-+ *  Copyright (C) 2012 National Instruments Corp.
-+ *  Copyright (C) 2013 Xilinx
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+/dts-v1/;
-+/include/ "zynq-7000.dtsi"
-+
-+/ {
-+	model = "Zynq Zed Development Board";
-+	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0 0x20000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyPS1,115200 earlyprintk";
-+	};
-+
-+};
--- 
-1.8.3
+> ---
+>  drivers/clk/samsung/clk-exynos5250.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+> index 5c97e75..7c68850 100644
+> --- a/drivers/clk/samsung/clk-exynos5250.c
+> +++ b/drivers/clk/samsung/clk-exynos5250.c
+> @@ -87,6 +87,7 @@ enum exynos5250_clks {
+>         sclk_mmc0, sclk_mmc1, sclk_mmc2, sclk_mmc3, sclk_sata, sclk_usb3,
+>         sclk_jpeg, sclk_uart0, sclk_uart1, sclk_uart2, sclk_uart3, sclk_pwm,
+>         sclk_audio1, sclk_audio2, sclk_spdif, sclk_spi0, sclk_spi1, sclk_spi2,
+> +       div_i2s1, div_i2s2,
+>  
+>         /* gate clocks */
+>         gscl0 = 256, gscl1, gscl2, gscl3, gscl_wa, gscl_wb, smmu_gscl0,
+> @@ -291,8 +292,8 @@ struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+>         DIV(none, "div_pcm1", "sclk_audio1", DIV_PERIC4, 4, 8),
+>         DIV(none, "div_audio2", "mout_audio2", DIV_PERIC4, 16, 4),
+>         DIV(none, "div_pcm2", "sclk_audio2", DIV_PERIC4, 20, 8),
+> -       DIV(none, "div_i2s1", "sclk_audio1", DIV_PERIC5, 0, 6),
+> -       DIV(none, "div_i2s2", "sclk_audio2", DIV_PERIC5, 8, 6),
+> +       DIV(div_i2s1, "div_i2s1", "sclk_audio1", DIV_PERIC5, 0, 6),
+> +       DIV(div_i2s2, "div_i2s2", "sclk_audio2", DIV_PERIC5, 8, 6),
+>         DIV(sclk_pixel, "div_hdmi_pixel", "sclk_vpll", DIV_DISP1_0, 28, 4),
+>         DIV_A(none, "armclk", "div_arm", DIV_CPU0, 28, 3, "armclk"),
+>         DIV_F(none, "div_mipi1_pre", "div_mipi1",
+> -- 
+> 1.7.4.4
