@@ -1,46 +1,55 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 12 Jun 2013 19:15:58 -0400 (EDT)
-Subject: [GIT PULL] MCPM backend for VExpress TC2
-In-Reply-To: <20130612212901.GA7012@quad.lixom.net>
-References: <alpine.LFD.2.03.1306121612150.18597@syhkavp.arg>
- <20130612212901.GA7012@quad.lixom.net>
-Message-ID: <alpine.LFD.2.03.1306121908030.18597@syhkavp.arg>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Jun 2013 16:25:26 -0700
+Subject: [GIT PULL 3/6] exynos arch
+In-Reply-To: <51B791E0.5040104@samsung.com>
+References: <51B791E0.5040104@samsung.com>
+Message-ID: <20130612232526.GA9067@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Olof Johansson wrote:
-
-> Hi,
+On Wed, Jun 12, 2013 at 06:08:48AM +0900, Kukjin Kim wrote:
+> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
 > 
+>   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 > 
-> On Wed, Jun 12, 2013 at 04:52:38PM -0400, Nicolas Pitre wrote:
-> > ARnd, Olof, please pull the following:
-> > 
-> >         git://git.linaro.org/people/nico/linux TC2
-> > 
-> > This is the MCPM backend submission for VExpress with a TC2 core tile.
-> > This enables SMP secondary boot, CPU hotplug, and paves the way for 
-> > cpuidle and cpufreq on this platform.
-> > 
-> > A big prerequisite for this support is the serial power controller 
-> > driver posted by Lorenzo and extensively reviewed on the list.  Because 
-> > of the strict dependency, we asked Samuel Ortiz twice for his ACK to 
-> > merge it via ARM-SOC:
-> > 
-> > 	http://article.gmane.org/gmane.linux.kernel/1506121
-> > 
-> > But no reply came back so far.  If Samuel had any issues with this 
-> > driver I'm trusting he would have had ample time to express them at this 
-> > point.  I'm therefore including it by default.
+> are available in the git repository at:
 > 
-> I just pinged Sam on IRC and he said he'll look at them shortly, so we'll wait
-> for his review. They were, after all, only posted 2.5 weeks ago for the first
-> time.
 
-Public records show that Samuel is normally very responsive i.e. replies 
-from him are sent in a matter of hours.  I concluded that he might just 
-not be interested in highly vexpress specific code if 2.5 weeks have 
-passed without a word.
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/exynos-arch-1
+> 
+> for you to fetch changes up to d75666024bbb7d1b4fa6f0b00ecd8d834033259a:
+> 
+>   ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor
+> (2013-06-10 18:28:04 +0900)
+> 
+> ----------------------------------------------------------------
+> update exynos arch part
+
+Kukjin, please, write proper tag messages. This adds no value. Give a brief
+overview of what's in the branch instead.
+
+> ----------------------------------------------------------------
+> Doug Anderson (1):
+>       ARM: EXYNOS: Select PINCTRL_EXYNOS for exynos4/5 at chip level
+> 
+> Girish K S (1):
+>       ARM: EXYNOS: force MAC ip to 32bit DMA
+> 
+> Kukjin Kim (1):
+>       ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
+> 
+> Leela Krishna Amudala (1):
+>       ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor
+> 
+> Thomas Abraham (1):
+>       ARM: EXYNOS: Add a platform bus notifier to set dma masks for
+> Exynos5440
+
+This one has outstanding comments from Russell that were not addressed?
 
 
-Nicolas
+Not pulled.
+
+
+-Olof
