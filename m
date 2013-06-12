@@ -1,52 +1,65 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Jun 2013 18:53:30 +0200
-Subject: [PATCHv5 1/8] i2c: mv64xxx: Add macros to access parts of registers
-In-Reply-To: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1371056017-8166-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Wed, 12 Jun 2013 18:53:29 +0200
+Subject: [PATCHv5 0/8] Add I2C support for Allwinner SoCs
+Message-ID: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These macros make it more comprehensive to access to useful masked and
-shifted area of the various registers used.
+Hi,
 
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- drivers/i2c/busses/i2c-mv64xxx.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+This patchset adds support for the I2C controller found on most of the
+Allwinner SoCs, especially the already supported A10 and A13, and the
+yet to come A31.
 
-diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-index 6356439..d70a2fda 100644
---- a/drivers/i2c/busses/i2c-mv64xxx.c
-+++ b/drivers/i2c/busses/i2c-mv64xxx.c
-@@ -33,6 +33,10 @@
- #define	MV64XXX_I2C_REG_EXT_SLAVE_ADDR			0x10
- #define	MV64XXX_I2C_REG_SOFT_RESET			0x1c
- 
-+#define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
-+#define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
-+#define MV64XXX_I2C_BAUD_DIV_M(val)			((val & 0xf) << 3)
-+
- #define	MV64XXX_I2C_REG_CONTROL_ACK			0x00000004
- #define	MV64XXX_I2C_REG_CONTROL_IFLG			0x00000008
- #define	MV64XXX_I2C_REG_CONTROL_STOP			0x00000010
-@@ -133,7 +137,7 @@ mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
- 		drv_data->addr1 = 0xf0 | (((u32)msg->addr & 0x300) >> 7) | dir;
- 		drv_data->addr2 = (u32)msg->addr & 0xff;
- 	} else {
--		drv_data->addr1 = ((u32)msg->addr & 0x7f) << 1 | dir;
-+		drv_data->addr1 = MV64XXX_I2C_ADDR_ADDR((u32)msg->addr) | dir;
- 		drv_data->addr2 = 0;
- 	}
- }
-@@ -151,7 +155,7 @@ static void
- mv64xxx_i2c_hw_init(struct mv64xxx_i2c_data *drv_data)
- {
- 	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SOFT_RESET);
--	writel((((drv_data->freq_m & 0xf) << 3) | (drv_data->freq_n & 0x7)),
-+	writel(MV64XXX_I2C_BAUD_DIV_M(drv_data->freq_m) | MV64XXX_I2C_BAUD_DIV_N(drv_data->freq_n),
- 		drv_data->reg_base + MV64XXX_I2C_REG_BAUD);
- 	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SLAVE_ADDR);
- 	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_EXT_SLAVE_ADDR);
+This driver leverages the Marvel mv64xxx i2c controller driver, that has
+an almost identical logic, with a slightly different register layout.
+
+It has been tested on a A13-Olinuxino and an A10s-Olinuxino.
+
+Thanks,
+Maxime
+
+Changes from v4:
+  * Don't expose the reg offset structure through the platform data
+  * Move the register offset structures to the driver and declare them static
+  * Default at marvell's register layout when using platform data, and switch
+    between the Allwinner and the Marvell ones only when using DT.
+  * Remove the pull-ups in the device tree muxings
+
+Changes from v3:
+  * Merged the driver in the Marvell mv64xxx i2c controller
+
+Changes from v2:
+  * Slightly modified the switch comments again
+  * Removed the of_* calls in favor of platform_get_* functions
+
+Changes from v1:
+  * Added comments to the switch statements to clarify when the fall through to
+    the next case is made on purpose
+  * Use devm_ioremap_resource instead of of_iomap
+  * Moved the reset after enabling the clocks
+  * Added Emilio Lopez' patch to add the available i2c controllers to the
+    cubieboard
+
+Emilio L?pez (1):
+  ARM: sun4i: cubieboard: Enable the i2c controllers
+
+Maxime Ripard (7):
+  i2c: mv64xxx: Add macros to access parts of registers
+  i2c: mv64xxx: make the registers offset configurable
+  i2c: mv64xxx: Add Allwinner sun4i compatible
+  ARM: sunxi: dt: Add i2c controller nodes to the DTSI
+  ARM: sun4i: dt: Add i2c muxing options
+  ARM: sun5i: dt: Add i2c muxing options
+  ARM: sun5i: olinuxino: Enable the i2c controllers
+
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts |  12 +++
+ arch/arm/boot/dts/sun4i-a10.dtsi           |  48 ++++++++++++
+ arch/arm/boot/dts/sun5i-a13-olinuxino.dts  |  18 +++++
+ arch/arm/boot/dts/sun5i-a13.dtsi           |  48 ++++++++++++
+ drivers/i2c/busses/Kconfig                 |   3 +-
+ drivers/i2c/busses/i2c-mv64xxx.c           | 118 +++++++++++++++++++----------
+ 6 files changed, 206 insertions(+), 41 deletions(-)
+
 -- 
 1.8.3
