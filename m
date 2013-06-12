@@ -1,39 +1,49 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 12 Jun 2013 12:33:45 +0200
-Subject: [PATCH v2 2/8] PCI: Add registry of MSI chips
-In-Reply-To: <1370536888-8871-3-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370536888-8871-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130612103344.GD30841@mithrandir>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 12 Jun 2013 15:24:43 +0530
+Subject: [PATCH -next v2] dmaengine: ste_dma40: fix error return code
+ in d40_probe()
+In-Reply-To: <CACRpkdZhK6TUAC132vzcaLKqdMTwPma+ZhKG5Y+AUvekNpz6EQ@mail.gmail.com>
+References: <CAPgLHd-gjJ6ju3HyhiQi98YFGojvU3aYSTn7SOe4NhQPY1r++w@mail.gmail.com>
+ <CACRpkdYBfvr0kA7bd-6Ns78UH7JtBCFDzFxyHLgtReB32O4D+w@mail.gmail.com>
+ <20130530173326.GD3767@intel.com>
+ <CACRpkdZhK6TUAC132vzcaLKqdMTwPma+ZhKG5Y+AUvekNpz6EQ@mail.gmail.com>
+Message-ID: <20130612095443.GU4107@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 06:41:22PM +0200, Thomas Petazzoni wrote:
-[...]
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 4633529..a1a6084 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -61,6 +61,8 @@ int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
->  struct msi_chip {
->  	struct module *owner;
->  	struct device *dev;
-> +	struct device_node *of_node;
+On Tue, Jun 04, 2013 at 11:14:16AM +0200, Linus Walleij wrote:
+> On Thu, May 30, 2013 at 7:33 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> > On Thu, May 30, 2013 at 09:41:38AM +0200, Linus Walleij wrote:
+> >> On Thu, May 30, 2013 at 6:32 AM, Wei Yongjun <weiyj.lk@gmail.com> wrote:
+> >>
+> >> > From: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> >> >
+> >> > In many of the error handling case, the return value 'ret' not set
+> >> > and 0 will be return from d40_probe() even if error, but we should
+> >> > return a negative error code instead in those error handling case.
+> >> > This patch fixed them, and also removed useless variable 'err'.
+> >> >
+> >> > Signed-off-by: Wei Yongjun <yongjun_wei@trendmicro.com.cn>
+> >> > ---
+> >> > v1 -> v2: rebased on linux-next.git
+> >>
+> >> I've tentatively applied this to my dma40 branch, waiting for Vinod
+> >> to ACK it.
+> > I though you wanted me to apply this :)
+> >
+> > Nevertheless, Acked-by: Vinod Koul <vinod.koul@intel.com>
+> >
+> > Can you CC stable too, pls.
+> 
+> Hm I'm not sending any DMA40 stuff for stable, sorry ...
+> if you want it to go into stable you'd better pick this
+> (the v3 version) into the DMA tree.
+okay
+> 
+> Let me know how you want it, I've removed it from my
+> dma40 branch for the time being.
+Have you removed, Also I see a v3 of this, do you want to ack that before I
+apply
 
-Shouldn't we be reusing the dev.of_node field to look this information
-up? On Tegra we do register the MSI chip and set the dev member to the
-PCIe host bridge device. Can't the same thing be done for the Armada?
-
-I assume that the MSI controller provider will be instantiated from the
-device tree and hence there will already be a struct platform_device and
-therefore also a struct device associated with it which should have the
-of_node field set to the correct value automatically.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/674c4214/attachment.sig>
+--
+~Vinod
