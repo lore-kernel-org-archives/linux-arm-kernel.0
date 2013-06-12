@@ -1,28 +1,33 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 12 Jun 2013 14:51:34 -0400
-Subject: [PATCHv3 3/3] arm64: Move to generic sched_clock infrastructure
-In-Reply-To: <1370476485-468-4-git-send-email-sboyd@codeaurora.org>
-References: <1370476485-468-1-git-send-email-sboyd@codeaurora.org>
- <1370476485-468-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <51B8C336.4050700@codeaurora.org>
+From: gmbnomis@gmail.com (Simon Baatz)
+Date: Wed, 12 Jun 2013 20:59:09 +0200
+Subject: [PATCH V5] ARM: handle user space mapped pages in
+ flush_kernel_dcache_page
+In-Reply-To: <20130610102307.GC1947@darko.cambridge.arm.com>
+References: <1370462344-7128-1-git-send-email-gmbnomis@gmail.com>
+ <20130610102307.GC1947@darko.cambridge.arm.com>
+Message-ID: <20130612185909.GA6945@schnuecks.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/05/2013 07:54 PM, Stephen Boyd wrote:
-> Use the generic sched_clock infrastructure instead of rolling our
-> own. This has the added benefit of fixing suspend/resume as
-> outlined in 6a4dae5 (ARM: 7565/1: sched: stop sched_clock()
-> during suspend, 2012-10-23) and correcting the timestamps when
-> the hardware returns a value instead of 0 upon the first read.
+Hi Catalin,
 
-Builds and runs for me on software models.
+On Mon, Jun 10, 2013 at 11:23:07AM +0100, Catalin Marinas wrote:
+> On Wed, Jun 05, 2013 at 08:59:04PM +0100, Simon Baatz wrote:
+> > Commit f8b63c1 made flush_kernel_dcache_page a no-op assuming that the pages
+> > it needs to handle are kernel mapped only.  However, for example when doing
+> > direct I/O, pages with user space mappings may occur.
+> > 
+> > Thus, continue to do lazy flushing if there are no user space mappings.
+> > Otherwise, flush the kernel cache lines directly.
+> > 
+> > Signed-off-by: Simon Baatz <gmbnomis@gmail.com>
+> > Cc: <stable@vger.kernel.org> # 3.2+
+> > CC: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Russell King <linux@arm.linux.org.uk>
+> 
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Tested-by: Christopher Covington <cov@codeaurora.org>
+Thanks for the review. This is submitted now as patch #7755/1 in
+Russell's patch system.
 
-Cheers,
-Christopher
-
--- 
-Employee of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by the Linux Foundation.
+- Simon
