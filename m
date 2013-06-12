@@ -1,49 +1,30 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Jun 2013 16:20:13 +0900
-Subject: [PATCH 00/03] ARM: shmobile: Remove legacy memory bits
-In-Reply-To: <CANqRtoSm81_Ncxa0R4ZYHjwGq7=jNymY9q1qvfphtOe20PuJFg@mail.gmail.com>
-References: <20130610094638.20803.18484.sendpatchset@w520>
- <201306101700.22787.arnd@arndb.de>
- <20130611074623.GA10440@verge.net.au>
- <CANqRtoSm81_Ncxa0R4ZYHjwGq7=jNymY9q1qvfphtOe20PuJFg@mail.gmail.com>
-Message-ID: <20130612072013.GA6006@verge.net.au>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Wed, 12 Jun 2013 09:37:06 +0200
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20130611230845.GB13892@obsidianresearch.com>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130609014506.GB10027@obsidianresearch.com>
+ <20130611135737.GC3996@localhost> <20835253.Agl4DfuI3k@wuerfel>
+ <20130611215023.GA12649@obsidianresearch.com> <51B7A325.8070108@gmail.com>
+ <20130611230845.GB13892@obsidianresearch.com>
+Message-ID: <51B82522.5010903@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 03:26:01PM +0900, Magnus Damm wrote:
-> Hi Simon,
-> 
-> On Tue, Jun 11, 2013 at 4:46 PM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Jun 10, 2013 at 05:00:22PM +0200, Arnd Bergmann wrote:
-> >> On Monday 10 June 2013, Magnus Damm wrote:
-> >> > ARM: shmobile: Remove legacy memory bits
-> >> >
-> >> > [PATCH 01/03] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
-> >> > [PATCH 02/03] ARM: shmobile: Remove MEMORY_START/SIZE
-> >> > [PATCH 03/03] ARM: shmobile: Remove mach/memory.h
-> >> >
-> >> > Now when all users are gone this series removes the legacy memory code
-> >> > and enables CONFIG_ARM_PATCH_PHYS_VIRT. Depends on the following code:
-> >> >
-> >> > [PATCH v2] ARM: shmobile: uImage load address rework
-> >> > [PATCH] ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
-> >> > [PATCH 00/06] ARM: shmobile: SMP virt_to_phys() conversion
-> >> > [PATCH 00/02] ARM: shmobile: romImage update
-> >> >
-> >> > The romImage series above still needs to be updated.
-> >> >
-> >> > This is the final bit of code not to rely on CONFIG_MEMORY_START/SIZE
-> >> > which in turn is one component that we need for ARCH_MULTIPLATFORM.
-> >> >
-> >> > Signed-off-by: Magnus Damm <damm@opensource.se>
-> >>
-> >> Looks all good to me.
-> >
-> > I will queue these up once all the dependencies are ready.
-> 
-> Thanks, I believe they are now.
-> 
-> I will update the Mackerel romImage support as an incremental patch.
+On 06/12/2013 01:08 AM, Jason Gunthorpe wrote:
+> On Wed, Jun 12, 2013 at 12:22:29AM +0200, Sebastian Hesselbarth wrote:
+>> sorry to kick into this thread that late but Ezequiel made me think of
+>> address windows when asking on IRC. From what I can see from your and
+>> Arnd's proposal the only real difference is that having it Arnd's way
+>> allows you to have two or more windows mapped to e.g. devbus with
+>> totally independent address ranges - while yours requires one large
+>> window for all child devices?
+>
+> Sorry, I'm having problems following the possessives in your paragraph
+> - which things are you comparing?
 
-Thanks, I have this and the dependencies queued up locally.
-I will push them after doing some build and boot tests.
+Ahh, just forget what I said. I see you two wrapped you mind a dozen
+times more around it. I am starting to get the idea and its "beauty" ;)
+
+Sebastian
