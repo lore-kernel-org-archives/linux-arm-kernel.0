@@ -1,38 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 12 Jun 2013 12:56:13 +0200
-Subject: [PATCHv4 4/9] i2c: mv64xxx: Add Allwinner sun4i compatible
-In-Reply-To: <1371024438-16631-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
- <1371024438-16631-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130612105613.GT16502@lunn.ch>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Wed, 12 Jun 2013 19:57:16 +0900
+Subject: [PATCH 00/03] ARM: 64-bit memory fixes, APE6EVM second memory bank
+In-Reply-To: <201306051317.02284.arnd@arndb.de>
+References: <20130605104427.1720.68752.sendpatchset@w520>
+ <201306051317.02284.arnd@arndb.de>
+Message-ID: <CANqRtoSZXz5-z4pMTM_gpTf11qQCc870Vf35qLQ4jpoCPnq4KQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 10:07:13AM +0200, Maxime Ripard wrote:
-> Add the compatible string for the Allwinner A10 i2c controller and the
-> associated register layout.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/i2c/busses/Kconfig       |  3 ++-
->  drivers/i2c/busses/i2c-mv64xxx.c |  1 +
->  include/linux/mv643xx_i2c.h      | 10 ++++++++++
->  3 files changed, 13 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 631736e..5dc4148 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -507,10 +507,11 @@ config I2C_MPC
->  
->  config I2C_MV64XXX
->  	tristate "Marvell mv64xxx I2C Controller"
-> -	depends on (MV64X60 || PLAT_ORION)
-> +	depends on (MV64X60 || PLAT_ORION || ARCH_SUNXI)
+Hi Arnd,
 
-Hi Maxime.
+On Wed, Jun 5, 2013 at 8:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 05 June 2013, Magnus Damm wrote:
+>> ARM: 64-bit memory fixes, APE6EVM second memory bank
+>>
+>> [PATCH 01/03] ARM: Let arm_add_memory() always use 64-bit arguments
+>> [PATCH 02/03] ARM: Handle 64-bit memory in case of 32-bit phys_addr_t
+>> [PATCH 03/03] ARM: shmobile: Add second memory bank to DTS for APE6EVM
+>>
+>> This patch set contains two fixes and one mach-shmobile specific patch
+>> to add a second memory bank. The fixes attempt to improve the memory bank
+>> handling in the ARM kernel in case of 64-bit addresses.
+>
+> Please have a look at this patch that Stepan Moskovchenko posted:
+>
+> https://patchwork.kernel.org/patch/2639171/
+>
+> I think we are going to need only one of the two approaches.
 
-What about MV64X60? It also needs to pass the registers in its
-platform data.
+Thanks for pointing out this implementation. Is there anything I can
+do to move this forward?
 
-	 Andrew
+Cheers,
+
+/ magnus
