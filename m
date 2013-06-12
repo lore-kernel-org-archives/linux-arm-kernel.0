@@ -1,94 +1,43 @@
 From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 12 Jun 2013 13:37:42 +0530
-Subject: [PATCH V6 5/6] ARM: dts: Update Samsung I2S documentation
+Date: Wed, 12 Jun 2013 13:37:43 +0530
+Subject: [PATCH V6 6/6] clk: exynos5250: Add enum entries for divider clock of
+ i2s1 and i2s2
 In-Reply-To: <1371024463-303-1-git-send-email-padma.v@samsung.com>
 References: <1371024463-303-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1371024463-303-6-git-send-email-padma.v@samsung.com>
+Message-ID: <1371024463-303-7-git-send-email-padma.v@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the samsung i2s documentation for pinmux and
-clock entries.
+This patch adds enum entries for div_i2s1 and div_i2s2 which are
+required for i2s1 and i2s2 controllers.
 
 Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 ---
- .../devicetree/bindings/sound/samsung-i2s.txt      |   46 ++++++++-----------
- 1 files changed, 19 insertions(+), 27 deletions(-)
+ drivers/clk/samsung/clk-exynos5250.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/samsung-i2s.txt b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-index 3070046..025e66b 100644
---- a/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/samsung-i2s.txt
-@@ -8,6 +8,16 @@ Required SoC Specific Properties:
- - dmas: list of DMA controller phandle and DMA request line ordered pairs.
- - dma-names: identifier string for each DMA request line in the dmas property.
-   These strings correspond 1:1 with the ordered pairs in dmas.
-+- clocks: Handle to iis clock and RCLK source clk.
-+- clock-names:
-+  i2s0 uses some base clks from CMU and some are from audio subsystem internal
-+  clock controller. The clock names for i2s0 should be "iis", "i2s_opclk0" and
-+  "i2s_opclk1" as shown in the example below.
-+  i2s1 and i2s2 uses clocks from CMU. The clock names for i2s1 and i2s2 should
-+  be "iis" and "i2s_opclk0".
-+  "iis" is the i2s bus clock and i2s_opclk0, i2s_opclk1 are sources of the root
-+  clk. i2s0 has internal mux to select the source of root clk and i2s1 and i2s2
-+  doesn't have any such mux.
+diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+index 5c97e75..7c68850 100644
+--- a/drivers/clk/samsung/clk-exynos5250.c
++++ b/drivers/clk/samsung/clk-exynos5250.c
+@@ -87,6 +87,7 @@ enum exynos5250_clks {
+ 	sclk_mmc0, sclk_mmc1, sclk_mmc2, sclk_mmc3, sclk_sata, sclk_usb3,
+ 	sclk_jpeg, sclk_uart0, sclk_uart1, sclk_uart2, sclk_uart3, sclk_pwm,
+ 	sclk_audio1, sclk_audio2, sclk_spdif, sclk_spi0, sclk_spi1, sclk_spi2,
++	div_i2s1, div_i2s2,
  
- Optional SoC Specific Properties:
- 
-@@ -20,44 +30,26 @@ Optional SoC Specific Properties:
-   then this flag is enabled.
- - samsung,idma-addr: Internal DMA register base address of the audio
-   sub system(used in secondary sound source).
--
--Required Board Specific Properties:
--
--- gpios: The gpio specifier for data out,data in, LRCLK, CDCLK and SCLK
--  interface lines. The format of the gpio specifier depends on the gpio
--  controller.
--  The syntax of samsung gpio specifier is
--	<[phandle of the gpio controller node]
--	 [pin number within the gpio controller]
--	 [mux function]
--	 [flags and pull up/down]
--	 [drive strength]>
-+- pinctrl-0: Should specify pin control groups used for this controller.
-+- pinctrl-names: Should contain only one value - "default".
- 
- Example:
- 
--- SoC Specific Portion:
--
--i2s at 03830000 {
-+i2s0: i2s at 03830000 {
- 	compatible = "samsung,i2s-v5";
- 	reg = <0x03830000 0x100>;
- 	dmas = <&pdma0 10
- 		&pdma0 9
- 		&pdma0 8>;
- 	dma-names = "tx", "rx", "tx-sec";
-+	clocks = <&clock_audss EXYNOS_I2S_BUS>,
-+		<&clock_audss EXYNOS_I2S_BUS>,
-+		<&clock_audss EXYNOS_SCLK_I2S>;
-+	clock-names = "iis", "i2s_opclk0", "i2s_opclk1";
- 	samsung,supports-6ch;
- 	samsung,supports-rstclr;
- 	samsung,supports-secdai;
- 	samsung,idma-addr = <0x03000000>;
--};
--
--- Board Specific Portion:
--
--i2s at 03830000 {
--	gpios = <&gpz 0 2 0 0>, /* I2S_0_SCLK */
--		<&gpz 1 2 0 0>, /* I2S_0_CDCLK */
--		<&gpz 2 2 0 0>, /* I2S_0_LRCK */
--		<&gpz 3 2 0 0>, /* I2S_0_SDI */
--		<&gpz 4 2 0 0>, /* I2S_0_SDO[1] */
--		<&gpz 5 2 0 0>, /* I2S_0_SDO[2] */
--		<&gpz 6 2 0 0>; /* I2S_0_SDO[3] */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2s0_bus>;
- };
+ 	/* gate clocks */
+ 	gscl0 = 256, gscl1, gscl2, gscl3, gscl_wa, gscl_wb, smmu_gscl0,
+@@ -291,8 +292,8 @@ struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+ 	DIV(none, "div_pcm1", "sclk_audio1", DIV_PERIC4, 4, 8),
+ 	DIV(none, "div_audio2", "mout_audio2", DIV_PERIC4, 16, 4),
+ 	DIV(none, "div_pcm2", "sclk_audio2", DIV_PERIC4, 20, 8),
+-	DIV(none, "div_i2s1", "sclk_audio1", DIV_PERIC5, 0, 6),
+-	DIV(none, "div_i2s2", "sclk_audio2", DIV_PERIC5, 8, 6),
++	DIV(div_i2s1, "div_i2s1", "sclk_audio1", DIV_PERIC5, 0, 6),
++	DIV(div_i2s2, "div_i2s2", "sclk_audio2", DIV_PERIC5, 8, 6),
+ 	DIV(sclk_pixel, "div_hdmi_pixel", "sclk_vpll", DIV_DISP1_0, 28, 4),
+ 	DIV_A(none, "armclk", "div_arm", DIV_CPU0, 28, 3, "armclk"),
+ 	DIV_F(none, "div_mipi1_pre", "div_mipi1",
 -- 
 1.7.4.4
