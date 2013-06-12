@@ -1,38 +1,40 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 11 Jun 2013 17:20:05 -0700
-Subject: [PATCH 3/6] ARM: SAMSUNG: pm: Adjust for pinctrl- and DT-enabled
- platforms
-In-Reply-To: <1904605.joOAnPJ6dR@flatron>
-References: <1368807872-2601-1-git-send-email-t.figa@samsung.com>
- <20130611074552.GK6688@quad.lixom.net>
- <CAOesGMgjnt+T1OEFy15J0-zkHwHyeo3XLyzTGqmozq-t0nm=GQ@mail.gmail.com>
- <1904605.joOAnPJ6dR@flatron>
-Message-ID: <CAOesGMh1aeiQfiEAd7xx_PmyZq1fC8y2pxjAVABHLmE7ECkEtQ@mail.gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 11 Jun 2013 17:26:23 -0700
+Subject: [PATCH] clk: tegra: pllp_out2 divider is int only
+In-Reply-To: <1370439442-30852-1-git-send-email-pdeschrijver@nvidia.com>
+References: <1370439442-30852-1-git-send-email-pdeschrijver@nvidia.com>
+Message-ID: <20130612002623.8816.29653@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 5:15 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+Quoting Peter De Schrijver (2013-06-05 06:37:17)
+> The pllp_out2 should be integer only, the fractional bit should always be 0.
+> 
+> Signed-off-by: Peter De Schrijver <pdeschrijver@nvidia.com>
 
->> > Please do follow through with the promised cleanups
->> > at some point, Tomasz. :-)
->
-> Yeah, just managed to reserve some time for it, so stay tuned ;) .
+Taken into clk-next.
 
-Cool.
+Thanks,
+Mike
 
->> Btw, I had to add an include of <linux/of.h> or else all non-DT builds
->> broke...
->
-> Sorry, I must have missed it.
->
-> I guess it's the right time to set up some autobuild framework to check
-> all patches with several most interesting configs. I guess some git hooks
-> would be enough...
-
-No worries. I tend to build all defconfigs after doing a batch of
-pulls, and that's when we find these issues. I also boot on the few
-boards that I have to make sure nothing catastrophic is broken, but
-there's obviously much less coverage on that side.
-
-
--Olof
+> ---
+>  drivers/clk/tegra/clk-tegra114.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/tegra/clk-tegra114.c b/drivers/clk/tegra/clk-tegra114.c
+> index eb27764..5e029fe 100644
+> --- a/drivers/clk/tegra/clk-tegra114.c
+> +++ b/drivers/clk/tegra/clk-tegra114.c
+> @@ -1203,8 +1203,8 @@ static void __init tegra114_pll_init(void __iomem *clk_base,
+>         /* PLLP_OUT2 */
+>         clk = tegra_clk_register_divider("pll_p_out2_div", "pll_p",
+>                                 clk_base + PLLP_OUTA, 0, TEGRA_DIVIDER_FIXED |
+> -                               TEGRA_DIVIDER_ROUND_UP, 24, 8, 1,
+> -                               &pll_div_lock);
+> +                               TEGRA_DIVIDER_ROUND_UP | TEGRA_DIVIDER_INT, 24,
+> +                               8, 1, &pll_div_lock);
+>         clk = tegra_clk_register_pll_out("pll_p_out2", "pll_p_out2_div",
+>                                 clk_base + PLLP_OUTA, 17, 16,
+>                                 CLK_IGNORE_UNUSED | CLK_SET_RATE_PARENT, 0,
+> -- 
+> 1.7.7.rc0.72.g4b5ea.dirty
