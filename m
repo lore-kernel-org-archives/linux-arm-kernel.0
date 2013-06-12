@@ -1,109 +1,49 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 12 Jun 2013 13:52:13 -0700
-Subject: [PATCH v4 6/6] clk: samsung: Add EPLL and VPLL freq table for
- exynos5250 SoC
-In-Reply-To: <1370272196-4346-7-git-send-email-yadi.brar@samsung.com>
-References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
- <1370272196-4346-7-git-send-email-yadi.brar@samsung.com>
-Message-ID: <CAD=FV=WN21XTu5vjj=SRiUjS08HuV3jPr=WO=v9-_f1+G1dJaA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 12 Jun 2013 16:52:38 -0400 (EDT)
+Subject: [GIT PULL] MCPM backend for VExpress TC2
+Message-ID: <alpine.LFD.2.03.1306121612150.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yadwinder,
+ARnd, Olof, please pull the following:
 
-On Mon, Jun 3, 2013 at 8:09 AM, Yadwinder Singh Brar
-<yadi.brar@samsung.com> wrote:
-> Adds the EPLL and VPLL freq table for exynos5250 SoC.
->
-> Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
-> ---
->  drivers/clk/samsung/clk-exynos5250.c |   53 ++++++++++++++++++++++++++++++++--
->  drivers/clk/samsung/clk.h            |    2 +
->  2 files changed, 52 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-> index 70cc6cf..f98c19d 100644
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -472,11 +472,34 @@ static __initdata struct of_device_id ext_clk_match[] = {
->         { },
->  };
->
-> +static __initdata struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
-> +       /* sorted in descending order */
-> +       /* PLL_36XX_RATE(rate, m, p, s, k) */
-> +       PLL_36XX_RATE(266000000, 266, 3, 3, 0),
-> +       /* Not in UM, but need for eDP on snow */
-> +       PLL_36XX_RATE(70500000, 94, 2, 4, 0),
-> +};
-> +
-> +static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
-> +       /* sorted in descending order */
-> +       /* PLL_36XX_RATE(rate, m, p, s, k) */
-> +       PLL_36XX_RATE(192000000, 48, 3, 1, 0),
-> +       PLL_36XX_RATE(180633600, 45, 3, 1, 10381),
-> +       PLL_36XX_RATE(180000000, 45, 3, 1, 0),
-> +       PLL_36XX_RATE(73728000, 73, 3, 3, 47710),
-> +       PLL_36XX_RATE(67737600, 90, 4, 3, 20762),
-> +       PLL_36XX_RATE(49152000, 49, 3, 3, 9962),
-> +       PLL_36XX_RATE(45158400, 45, 3, 3, 10381),
-> +       PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
-> +};
-> +
->  /* register exynox5250 clocks */
->  void __init exynos5250_clk_init(struct device_node *np)
->  {
->         void __iomem *reg_base;
->         struct clk *apll, *mpll, *epll, *vpll, *bpll, *gpll, *cpll;
-> +       struct clk *vpllsrc;
-> +       unsigned long fin_pll_rate, mout_vpllsrc_rate = 0;
->
->         if (np) {
->                 reg_base = of_iomap(np, 0);
-> @@ -496,6 +519,11 @@ void __init exynos5250_clk_init(struct device_node *np)
->         samsung_clk_register_mux(exynos5250_pll_pmux_clks,
->                         ARRAY_SIZE(exynos5250_pll_pmux_clks));
->
-> +       fin_pll_rate = _get_rate("fin_pll");
-> +       vpllsrc = __clk_lookup("mout_vpllsrc");
-> +       if (vpllsrc)
-> +               mout_vpllsrc_rate = clk_get_rate(vpllsrc);
-> +
->         apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
->                         reg_base, NULL, 0);
->         mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
-> @@ -506,10 +534,29 @@ void __init exynos5250_clk_init(struct device_node *np)
->                         reg_base + 0x10050, NULL, 0);
->         cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
->                         reg_base + 0x10020, NULL, 0);
-> -       epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-> -                       reg_base + 0x10030, NULL, 0);
-> -       vpll = samsung_clk_register_pll36xx("fout_vpll", "mout_vpllsrc",
-> +
-> +       if (fin_pll_rate == (24 * MHZ)) {
-> +               epll = samsung_clk_register_pll36xx("fout_epll", "fin_pll",
-> +                               reg_base + 0x10030, epll_24mhz_tbl,
-> +                               ARRAY_SIZE(epll_24mhz_tbl));
-> +       } else {
-> +               pr_warn("%s: valid epll rate_table missing for\n"
-> +                       "parent fin_pll:%lu hz\n", __func__, fin_pll_rate);
+        git://git.linaro.org/people/nico/linux TC2
 
-It seems like we could just have a warning once at the top of this
-file.  ...and since we think nobody has designed a 5250 with a 26MHz
-input clock we could even just consider it an error at the moment to
-avoid adding a bunch of code.
+This is the MCPM backend submission for VExpress with a TC2 core tile.
+This enables SMP secondary boot, CPU hotplug, and paves the way for 
+cpuidle and cpufreq on this platform.
 
-You could also avoid all of these "if" statements with a level of indirection.
+A big prerequisite for this support is the serial power controller 
+driver posted by Lorenzo and extensively reviewed on the list.  Because 
+of the strict dependency, we asked Samuel Ortiz twice for his ACK to 
+merge it via ARM-SOC:
 
-enum {
-  EPLL, VPLL
-};
+	http://article.gmane.org/gmane.linux.kernel/1506121
 
-samsung_pll_rate_table *plls_24mhz[] = { epll_24mhz_tbl, vpll_24mhz_tbl };
-samsung_pll_rate_table *plls_default[] = { };
+But no reply came back so far.  If Samuel had any issues with this 
+driver I'm trusting he would have had ample time to express them at this 
+point.  I'm therefore including it by default.
 
-...of course you'd need a parallel table for sizes.  That does suggest
-that Tomasz's thought of terminating the list with a sentinal would be
-cleaner.
+This is based on ARM-SOC's vexpress/dual-cluster branch as this also 
+needs the CCI driver and commit 033a899c9b already in that branch to 
+work properly, as well as the existing prerequisite from RMK's tree for 
+that branch.
 
--Doug
+Diffstat for 033a899c9b..dbe5a98089
+
+ .../devicetree/bindings/mfd/vexpress-spc.txt    |  35 +
+ arch/arm/mach-vexpress/Kconfig                  |   9 +
+ arch/arm/mach-vexpress/Makefile                 |   1 +
+ arch/arm/mach-vexpress/tc2_pm.c                 | 295 ++++++++
+ drivers/mfd/Kconfig                             |   7 +
+ drivers/mfd/Makefile                            |   1 +
+ drivers/mfd/vexpress-config.c                   |  61 +-
+ drivers/mfd/vexpress-spc.c                      | 633 ++++++++++++++++++
+ drivers/mfd/vexpress-sysreg.c                   |   2 +-
+ include/linux/vexpress.h                        |  59 +-
+ 10 files changed, 1075 insertions(+), 28 deletions(-)
+
+Thanks
+
+
+Nicolas
