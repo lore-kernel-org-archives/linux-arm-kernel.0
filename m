@@ -1,34 +1,22 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 12 Jun 2013 10:48:42 -0700
-Subject: OMAP v3.10-rc regressions that no one's fixed
-In-Reply-To: <alpine.DEB.2.02.1306100716560.4604@utopia.booyaka.com>
-References: <alpine.DEB.2.02.1306100716560.4604@utopia.booyaka.com>
-Message-ID: <20130612174842.GQ8164@atomide.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Jun 2013 11:44:41 -0600
+Subject: [PATCH 4/4] arm: tegra: Add power-supplies link between battery
+ and charger
+In-Reply-To: <1370899602-22123-5-git-send-email-rklein@nvidia.com>
+References: <1370899602-22123-1-git-send-email-rklein@nvidia.com>
+ <1370899602-22123-5-git-send-email-rklein@nvidia.com>
+Message-ID: <51B8B389.8010105@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [130610 00:27]:
-> 
-> Hi folks -- particularly TIers working on mainline,
-> 
-> There are several regressions that started with v3.10-rc that no one's 
-> fixed for over a month.  Some of them should be quite easy:
-> 
-> * 37xx EVM: boot fails
->   - as of v3.10-rc1
->   - Cause unknown
+On 06/10/2013 03:26 PM, Rhyland Klein wrote:
+> The power supply core now supports detecting linkages between batteries
+> and chargers through the use of the power-supplies property. Adding
+> this to the battery, the core will use the phandle list to find
+> the associated charger and pair them up. This facilitates notifications
+> from the charger to the battery when ac power is dissconnected
+> or connected for instance.
 
-This one is probably because of broken GPIO numbering in
-the board file that uses hardcoded GPIOs for what are probably
-twl GPIOs.
-
-Does commenting out omap3_evm_display_init() in the board file
-fix the booting for you?
-
-If so, we should probably mark omap3_evm_display_init() with
-CONFIG_BROKEN for now rather than add more late init callback
-functions for the twl code.
-
-Regards,
-
-Tony
+Rhyland, if I apply this patch without patches 1-3 being in the same
+branch, will it cause any bugs? If so, I guess 1-3 should go through the
+drivers/power maintainer for 3.11, and I should defer this patch to 3.12?
