@@ -1,52 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Wed, 12 Jun 2013 13:13:59 +0530
-Subject: [PATCH 03/11] gpio: davinci: Modify to platform driver
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EAD9D75@DBDE04.ent.ti.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
- <1369206634-6778-4-git-send-email-avinashphilip@ti.com>
- <51B71056.9010103@ti.com>
- <518397C60809E147AF5323E0420B992E3EAD9D75@DBDE04.ent.ti.com>
-Message-ID: <51B826BF.7050009@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 12 Jun 2013 09:45:13 +0200 (CEST)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
+References: <CACVXFVMNzwD44mhKijURSWrqLKjy7_oOY8hrTtjbyOxGS2tv=g@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306111431170.1392-100000@iolanthe.rowland.org>
+ <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1306120935320.22970@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/11/2013 6:25 PM, Philip, Avinash wrote:
-
-> On Tue, Jun 11, 2013 at 17:26:06, Nori, Sekhar wrote:
-
->> On 5/22/2013 12:40 PM, Philip Avinash wrote:
-
->>> @@ -179,13 +204,10 @@ static int __init davinci_gpio_setup(void)
->>>  		gpiochip_add(&ctlrs[i].chip);
->>>  	}
->>>  
->>> -	soc_info->gpio_ctlrs = ctlrs;
->>
->>> -	soc_info->gpio_ctlrs_num = DIV_ROUND_UP(ngpio, 32);
->>
->> You drop setting gpio_ctlrs_num here and don't introduce it anywhere
->> else in the patchset so in effect you render the inline gpio get/set API
->> useless. Looks like this initialization should be moved to platform code?
+On Wed, 12 Jun 2013, Ming Lei wrote:
+> On Wed, Jun 12, 2013 at 3:10 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> >> Also the tasklet running in CPU0 can handle the work which should
+> >> have been done by the same tasket scheduled in CPU1,  so we can
+> >> avoid busy-waitting in CPU1 which may be introduced by tasklet_schedule()
+> >> in CPU1.
+> >
+> > Or you could have a separate tasklet for each host controller.
 > 
-> With [PATCH 08/11] ARM: davinci: start using gpiolib support gpio get/set API
-> Has no more dependency on soc_info->gpio_ctlrs_num.
+> Yes, but I will compare tasklet with interrupt threaded handler first.
 
-With this series, you have removed support for inline gpio get/set API.
-I see that the inline functions are still available for use on
-tnetv107x. I wonder why it is important to keep these for tnetv107x when
-not necessary for other DaVinci devices?
-
-When you are removing this feature, please note it prominently in your
-cover letter and patch description. Also, please provide some data on
-how the latency now compares to that of inline access earlier. This is
-important especially for the read. For the writes, gpio clock will
-mostly determine how soon the value changes on the pin.
-
-I am okay with removing the inline access feature. It helps simplify
-code and most arm machines don't use them. I would just like to see some
-data for justification as this can be seen as feature regression. Also,
-if we are removing it, its better to also remove it completely and get
-the LOC savings instead of just stopping its usage.
+Yes, please. I read through the thread and I really recommend that you
+get rid of the tasklet. tasklets are a complete disaster by design and
+we really should make efforts to get rid of the last users instead of
+trying to work around their semantical shortcomings.
 
 Thanks,
-Sekhar
+
+	tglx
