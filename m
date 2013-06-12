@@ -1,42 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Jun 2013 14:44:32 +0200
-Subject: [PATCHv4 0/9] Add I2C support for Allwinner SoCs
-In-Reply-To: <201306121438.12549.arnd@arndb.de>
-References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
- <3315236.ZNXhyxmCRd@wuerfel> <20130612113849.GG16699@lukather>
- <201306121438.12549.arnd@arndb.de>
-Message-ID: <20130612124432.GH16699@lukather>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Jun 2013 13:56:07 +0100
+Subject: [PATCH 21/21] clk: ux500: Supply provider look-up functionality
+ to support Device Tree
+In-Reply-To: <CACRpkdaNMR=6JT+pi+9aqOJXW3gK9Yb4hztx3rOiY3c+f3UTRA@mail.gmail.com>
+References: <1370266965-7901-1-git-send-email-lee.jones@linaro.org>
+ <1370266965-7901-22-git-send-email-lee.jones@linaro.org>
+ <CACRpkdaNMR=6JT+pi+9aqOJXW3gK9Yb4hztx3rOiY3c+f3UTRA@mail.gmail.com>
+Message-ID: <20130612125607.5C13E3E0A56@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 02:38:12PM +0200, Arnd Bergmann wrote:
-> On Wednesday 12 June 2013, Maxime Ripard wrote:
-> > The Marvell and Allwinner controllers share the exact same logic (which
-> > is definitely not trivial), based on a finite state machine that
-> > triggers interrupts at each change of state, each state being a state in
-> > the I2C protocol (like address sent, data received with an ACK, etc.).
-> > 
-> > The weird thing is that the only difference between the two controllers
-> > is the register offsets, and that's it. The state numbers, bit index,
-> > etc, are exactly the same.
+On Tue, 4 Jun 2013 12:57:06 +0200, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Mon, Jun 3, 2013 at 3:42 PM, Lee Jones <lee.jones@linaro.org> wrote:
 > 
-> Ok, cool. Great someone noticed!
-
-Kudos to Wolfram :)
-
-> > So yes, I think they both licensed the same IP.
+> > In this patch we're populating a clk_data array, one clock per element to
+> > act as a clk look-up using indexes supplied from Device Tree.
+> >
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > 
-> I wonder if it's the Mentor Graphics Inventra mi2c block, which
-> would make sense given that Allwinner also uses musb.
+> This needs to be patch 1/21 because otherwise the rest of the
+> stuff is non-bisectable right? It's being broken the first time
+> you remove auxdata and not fixed until this patch.
+> 
+> The whole thing is very different from other DT clock things
+> I've seen, usually you add a compatible node for each
+> clock type, and a node for each physical gate. But there
+> may be several ways to skin this cat...
 
-The only datasheet or manual I have been able to find is
-http://www.mentor.com/products/ip/peripheral/ip_interface/upload/mi2c_pd.pdf
-which doesn't give a lot of details. Yet, from what is shown and
-explained in the second page, it looks like it could be this IP.
+The design choice made here is perfectly fine by me. There has never
+been a requirement to expose every clock as a separate node, and for
+SoCs with complex clock control blocks I can certainly appreciate not
+wanting to expose how the internal clocks interact out to the device
+tree, especially if only the leaf clocks ever get reverenced by device
+drivers. As long as there is a driver there that understands the binding
+and hands out the correct clock when asked, then this design is great.
 
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+g.
