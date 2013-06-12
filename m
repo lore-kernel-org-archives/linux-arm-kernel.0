@@ -1,40 +1,40 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Wed, 12 Jun 2013 15:30:46 -0400
-Subject: [PATCH 1/3] ARM: keystone: Add minimal TI Keystone platform
- support
-In-Reply-To: <51B78EF0.3040803@ti.com>
-References: <1370894123-26846-1-git-send-email-santosh.shilimkar@ti.com>
- <3148358.YM4iO29jiR@wuerfel> <51B78438.6090604@ti.com>
- <1884655.zPfOkDCsbu@wuerfel> <51B78EF0.3040803@ti.com>
-Message-ID: <51B8CC66.4010302@ti.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Jun 2013 12:32:51 -0700
+Subject: [GIT PULL] dw_apb_timer enhancements for 3.11
+In-Reply-To: <201306121416.39237.heiko@sntech.de>
+References: <201306121416.39237.heiko@sntech.de>
+Message-ID: <20130612193251.GA5162@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
-
-On Tuesday 11 June 2013 04:56 PM, Santosh Shilimkar wrote:
-> On Tuesday 11 June 2013 04:24 PM, Arnd Bergmann wrote:
->> On Tuesday 11 June 2013 16:10:32 Santosh Shilimkar wrote:
-
-[..]
-
->> Ok, fair enough. Could you enable keystone in multi_v7_defconfig anyway
->> and ensure that it is able to boot?
->>
-> Thanks. Will make sure it boots with multi_v7_defconfig.
+On Wed, Jun 12, 2013 at 02:16:38PM +0200, Heiko St?bner wrote:
+> Hi Arnd, Olof,
 > 
-I spent some time to get "multi_v7_defconfig" on OMAP and Keystone
-working. ARCH_SIRF machine code needs a fix and the multi_v7_defconfig
-needs few generic updates like enabling ramdisk and ext2 related
-support. With those two updates, OMAP5 and Keystone boots with
-multi_v7_defconfig. Will post those couple of patches for
-multi_v7_defconfig and also refresh the Keystone series.
+> following the suggestion of Linus Walleij, a pull request for the
+> dw_apb_timer changes from last week with all ACKs applied.
+> Warning, this is my first pull request ever :-) .
+> 
+> The tag is signed and the key has among others a signature of Greg K-H, so
+> hopefully this will work.
+> 
+> 
+> The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+> 
+>   Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git at github.com:mmind/linux-rockchip.git tags/dw_apb_timer_of
+> 
 
-Thanks for the feedback.
+Please use a publicly-available url, which in this case should be:
 
-Regards,
-Santosh
-P.S: On Keystone I noticed a weired issue with local_flush_tlb_all() while
-booting with multi_v7_defconfig which I will debug it further. Its
-mostly looks like keystone specific issue since I don't see that issue
-on OMAP5.
+git://github.com/mmind/linux-rockchip.git
+
+Also, please see if you can get your PGP keys signed such that you can get
+a kernel.org account instead for this.
+
+Merged above URL into next/drivers. Thanks!
+
+
+-Olof
