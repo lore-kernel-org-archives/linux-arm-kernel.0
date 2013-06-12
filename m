@@ -1,197 +1,89 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 12 Jun 2013 13:53:41 +0200
-Subject: [PATCH 05/10] USB: EHCI: make ehci-atmel a separate driver
-In-Reply-To: <5113e60e.c84e420a.08c3.ffffbeda@mx.google.com>
-References: <yes> <1360258447-27247-1-git-send-email-yes>
- <5113e60e.c84e420a.08c3.ffffbeda@mx.google.com>
-Message-ID: <20130612115341.GP23653@game.jcrosoft.org>
+Date: Wed, 12 Jun 2013 13:57:48 +0200
+Subject: [PATCH 2/6] mtd: atmel_nand: replace pmecc enable code with
+ one function.
+In-Reply-To: <1370860014-1770-3-git-send-email-josh.wu@atmel.com>
+References: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
+ <1370860014-1770-3-git-send-email-josh.wu@atmel.com>
+Message-ID: <20130612115748.GQ23653@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23:04 Thu 07 Feb     , manjunath.goudar at linaro.org wrote:
-> From: Manjunath Goudar <manjunath.goudar@linaro.org>
-> 
-> Separate the Atmel host controller driver from ehci-hcd host code
-> into its own driver module.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: Andrew Victor <linux@maxim.org.za>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Jean-Christophe Plagniol-Villard <plagnioj@jcrosoft.com>
-> Cc: linux-usb at vger.kernel.org
-> Cc: linux-kernel at vger.kernel.org
+On 18:26 Mon 10 Jun     , Josh Wu wrote:
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
 Best Regards,
 J.
 > ---
->  drivers/usb/host/Kconfig      |    7 ++++
->  drivers/usb/host/Makefile     |    1 +
->  drivers/usb/host/ehci-atmel.c |   78 ++++++++++++++++++++++-------------------
->  drivers/usb/host/ehci-hcd.c   |    6 +---
->  4 files changed, 51 insertions(+), 41 deletions(-)
+>  drivers/mtd/nand/atmel_nand.c |   40 +++++++++++++++++++++++++---------------
+>  1 file changed, 25 insertions(+), 15 deletions(-)
 > 
-> diff --git a/drivers/usb/host/Kconfig b/drivers/usb/host/Kconfig
-> index 3689b7b..5a13f9d 100644
-> --- a/drivers/usb/host/Kconfig
-> +++ b/drivers/usb/host/Kconfig
-> @@ -176,6 +176,13 @@ config USB_EHCI_HCD_ORION
->          ---help---
->            Enables support for the on-chip EHCI controller on
->            Morvell Orion chips.
-> +config USB_EHCI_HCD_AT91
-> +        tristate  "Support for Atmel on-chip EHCI USB controller"
-> +        depends on USB_EHCI_HCD && ARCH_AT91
-> +        default y
-> +        ---help---
-> +          Enables support for the on-chip EHCI controller on
-> +          Atmel chips.
->  
->  config USB_EHCI_MSM
->  	bool "Support for MSM on-chip EHCI USB controller"
-> diff --git a/drivers/usb/host/Makefile b/drivers/usb/host/Makefile
-> index 23b07dd..96b4839 100644
-> --- a/drivers/usb/host/Makefile
-> +++ b/drivers/usb/host/Makefile
-> @@ -31,6 +31,7 @@ obj-$(CONFIG_USB_EHCI_HCD_OMAP) += ehci-omap.o
->  obj-$(CONFIG_USB_EHCI_HCD_SPEAR)+= ehci-spear.o
->  obj-$(CONFIG_USB_EHCI_HCD_ORION)+= ehci-orion.o
->  obj-$(CONFIG_USB_OXU210HP_HCD)	+= oxu210hp-hcd.o
-> +obj-$(CONFIG_USB_EHCI_HCD_AT91) += ehci-atmel.o
->  obj-$(CONFIG_USB_ISP116X_HCD)	+= isp116x-hcd.o
->  obj-$(CONFIG_USB_ISP1362_HCD)	+= isp1362-hcd.o
->  obj-$(CONFIG_USB_OHCI_HCD)	+= ohci-hcd.o
-> diff --git a/drivers/usb/host/ehci-atmel.c b/drivers/usb/host/ehci-atmel.c
-> index 27639487..2f06711 100644
-> --- a/drivers/usb/host/ehci-atmel.c
-> +++ b/drivers/usb/host/ehci-atmel.c
-> @@ -15,6 +15,19 @@
->  #include <linux/platform_device.h>
->  #include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +#include <linux/io.h>
-> +#include <linux/dma-mapping.h>
-> +
-> +#include "ehci.h"
-> +
-> +#define DRIVER_DESC "EHCI atmel driver"
-> +
-> +static const char hcd_name[] = "ehci-atmel";
-> +static struct hc_driver __read_mostly ehci_atmel_hc_driver;
->  
->  /* interface and function clocks */
->  static struct clk *iclk, *fclk;
-> @@ -60,41 +73,6 @@ static int ehci_atmel_setup(struct usb_hcd *hcd)
->  	return ehci_setup(hcd);
+> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+> index c7a4016..7236415 100644
+> --- a/drivers/mtd/nand/atmel_nand.c
+> +++ b/drivers/mtd/nand/atmel_nand.c
+> @@ -754,6 +754,29 @@ normal_check:
+>  	return total_err;
 >  }
 >  
-> -static const struct hc_driver ehci_atmel_hc_driver = {
-> -	.description		= hcd_name,
-> -	.product_desc		= "Atmel EHCI UHP HS",
-> -	.hcd_priv_size		= sizeof(struct ehci_hcd),
-> -
-> -	/* generic hardware linkage */
-> -	.irq			= ehci_irq,
-> -	.flags			= HCD_MEMORY | HCD_USB2,
-> -
-> -	/* basic lifecycle operations */
-> -	.reset			= ehci_atmel_setup,
-> -	.start			= ehci_run,
-> -	.stop			= ehci_stop,
-> -	.shutdown		= ehci_shutdown,
-> -
-> -	/* managing i/o requests and associated device resources */
-> -	.urb_enqueue		= ehci_urb_enqueue,
-> -	.urb_dequeue		= ehci_urb_dequeue,
-> -	.endpoint_disable	= ehci_endpoint_disable,
-> -	.endpoint_reset		= ehci_endpoint_reset,
-> -
-> -	/* scheduling support */
-> -	.get_frame_number	= ehci_get_frame,
-> -
-> -	/* root hub support */
-> -	.hub_status_data	= ehci_hub_status_data,
-> -	.hub_control		= ehci_hub_control,
-> -	.bus_suspend		= ehci_bus_suspend,
-> -	.bus_resume		= ehci_bus_resume,
-> -	.relinquish_port	= ehci_relinquish_port,
-> -	.port_handed_over	= ehci_port_handed_over,
-> -
-> -	.clear_tt_buffer_complete	= ehci_clear_tt_buffer_complete,
-> -};
-> -
->  static u64 at91_ehci_dma_mask = DMA_BIT_MASK(32);
->  
->  static int ehci_atmel_drv_probe(struct platform_device *pdev)
-> @@ -210,7 +188,35 @@ static struct platform_driver ehci_atmel_driver = {
->  	.remove		= ehci_atmel_drv_remove,
->  	.shutdown	= usb_hcd_platform_shutdown,
->  	.driver		= {
-> -		.name	= "atmel-ehci",
-> +		.name	= hcd_name,
->  		.of_match_table	= of_match_ptr(atmel_ehci_dt_ids),
->  	},
->  };
-> +
-> +static const struct ehci_driver_overrides atmel_overrides __initdata = {
-> +	.reset = ehci_atmel_setup,
-> +};
-> +
-> +static int __init ehci_atmel_init(void)
+> +static void pmecc_enable(struct atmel_nand_host *host, int ecc_op)
 > +{
-> +	if (usb_disabled())
-> +		return -ENODEV;
+> +	u32 val;
+> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
+> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+> +	val = pmecc_readl_relaxed(host->ecc, CFG);
 > +
-> +	pr_info("%s: " DRIVER_DESC "\n", hcd_name);
-> +	ehci_init_driver(&ehci_atmel_hc_driver, &atmel_overrides);
-> +	return platform_driver_register(&ehci_atmel_driver);
+> +	if (ecc_op != NAND_ECC_READ && ecc_op != NAND_ECC_WRITE) {
+> +		dev_err(host->dev, "atmel_nand: wrong pmecc operation type!");
+> +		return;
+> +	}
+> +
+> +	if (ecc_op == NAND_ECC_READ)
+> +		pmecc_writel(host->ecc, CFG, (val & ~PMECC_CFG_WRITE_OP)
+> +			| PMECC_CFG_AUTO_ENABLE);
+> +	else
+> +		pmecc_writel(host->ecc, CFG, (val | PMECC_CFG_WRITE_OP)
+> +			& ~PMECC_CFG_AUTO_ENABLE);
+> +
+> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
+> +	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
 > +}
-> +module_init(ehci_atmel_init);
 > +
-> +static void __exit ehci_atmel_cleanup(void)
-> +{
-> +	platform_driver_unregister(&ehci_atmel_driver);
-> +}
-> +module_exit(ehci_atmel_cleanup);
-> +
-> +MODULE_DESCRIPTION(DRIVER_DESC);
-> +
-> +MODULE_ALIAS("platform:ehci-atmel");
-> +MODULE_AUTHOR("Nicolas Ferre");
-> +MODULE_LICENSE("GPL");
-> +
-> diff --git a/drivers/usb/host/ehci-hcd.c b/drivers/usb/host/ehci-hcd.c
-> index 5a19a57..628ed139 100644
-> --- a/drivers/usb/host/ehci-hcd.c
-> +++ b/drivers/usb/host/ehci-hcd.c
-> @@ -1272,11 +1272,6 @@ MODULE_LICENSE ("GPL");
->  #define	PLATFORM_DRIVER		ehci_hcd_w90x900_driver
->  #endif
+>  static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
+>  	struct nand_chip *chip, uint8_t *buf, int oob_required, int page)
+>  {
+> @@ -765,13 +788,7 @@ static int atmel_nand_pmecc_read_page(struct mtd_info *mtd,
+>  	unsigned long end_time;
+>  	int bitflips = 0;
 >  
-> -#ifdef CONFIG_ARCH_AT91
-> -#include "ehci-atmel.c"
-> -#define	PLATFORM_DRIVER		ehci_atmel_driver
-> -#endif
+> -	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
+> -	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+> -	pmecc_writel(host->ecc, CFG, (pmecc_readl_relaxed(host->ecc, CFG)
+> -		& ~PMECC_CFG_WRITE_OP) | PMECC_CFG_AUTO_ENABLE);
 > -
->  #ifdef CONFIG_USB_OCTEON_EHCI
->  #include "ehci-octeon.c"
->  #define PLATFORM_DRIVER		ehci_octeon_driver
-> @@ -1334,6 +1329,7 @@ MODULE_LICENSE ("GPL");
->  	!defined(PLATFORM_DRIVER) && \
->  	!IS_ENABLED(CONFIG_USB_EHCI_HCD_OMAP) && \
->  	!IS_ENABLED(CONFIG_PLAT_SPEAR) && \
-> +	!IS_ENABLED(CONFIG_ARCH_AT91) && \
->  	!defined(PS3_SYSTEM_BUS_DRIVER) && \
->  	!defined(OF_PLATFORM_DRIVER) && \
->  	!defined(XILINX_OF_PLATFORM_DRIVER)
+> -	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
+> -	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
+> +	pmecc_enable(host, NAND_ECC_READ);
+>  
+>  	chip->read_buf(mtd, buf, eccsize);
+>  	chip->read_buf(mtd, oob, mtd->oobsize);
+> @@ -804,14 +821,7 @@ static int atmel_nand_pmecc_write_page(struct mtd_info *mtd,
+>  	int i, j;
+>  	unsigned long end_time;
+>  
+> -	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_RST);
+> -	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DISABLE);
+> -
+> -	pmecc_writel(host->ecc, CFG, (pmecc_readl_relaxed(host->ecc, CFG) |
+> -		PMECC_CFG_WRITE_OP) & ~PMECC_CFG_AUTO_ENABLE);
+> -
+> -	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_ENABLE);
+> -	pmecc_writel(host->ecc, CTRL, PMECC_CTRL_DATA);
+> +	pmecc_enable(host, NAND_ECC_WRITE);
+>  
+>  	chip->write_buf(mtd, (u8 *)buf, mtd->writesize);
+>  
 > -- 
 > 1.7.9.5
 > 
