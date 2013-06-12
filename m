@@ -1,47 +1,59 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Jun 2013 12:54:59 +0100
-Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <2456741.M6ZcdeZsEr@wuerfel>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20835253.Agl4DfuI3k@wuerfel> <20130612110746.5D6943E0A56@localhost>
- <2456741.M6ZcdeZsEr@wuerfel>
-Message-ID: <CACxGe6v5wDK8nvuEZJ3o=pL7tvz-xdVwfnZFQjywL=JNZaHitQ@mail.gmail.com>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Wed, 12 Jun 2013 17:27:53 +0530
+Subject: MUSB multiplatform work?
+In-Reply-To: <20130612100542.GV4107@intel.com>
+References: <201305271702.09203.arnd@arndb.de>
+ <20130528163548.GC28253@arwen.pp.htv.fi>
+ <20130530201854.GB6467@atomide.com>
+ <CACRpkdZHupVFS+pNADpaJjunPa3fEtyCqLwbL-etHs3gt8EW0Q@mail.gmail.com>
+ <20130530203132.GC6467@atomide.com>
+ <CACRpkdaUegc7B8awUiQTvFRJHPMWv6hEEsE-2AHtZCDXVEMN9g@mail.gmail.com>
+ <20130612100542.GV4107@intel.com>
+Message-ID: <CAJe_ZheT6q6YnWU=1_bdwGE4-n9WNJyADFQ_TpQckuVfYai7zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 12:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 12 June 2013 12:07:46 Grant Likely wrote:
+On 12 June 2013 15:35, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Thu, May 30, 2013 at 11:19:33PM +0200, Linus Walleij wrote:
+>> On Thu, May 30, 2013 at 10:31 PM, Tony Lindgren <tony@atomide.com> wrote:
 >>
->> It actually seems a bit silly to put the internal regs into the ranges
->> property at all. It's not like they need to be translated or provided to
->> any child nodes. Just give the root node a reg property with the correct
->> base for the internal regs.
+>> > There are many devices where the device FIFO is memory mapped to the
+>> > GPMC bus on omaps, like TUSB, OneNAND, smc911x etc. I believe the
+>> > only reason why these have not been converted to the dmaengine is
+>> > the fact that dmaengine cannot configure the DMA hardware to do
+>> > autoincrement and loop over the device FIFO.
+>>
+>> OK that seems like something pretty generic that we could just add
+>> to the struct dma_slave_config actually, something like:
+>>
+>> u32 src_fifoloop;
+>> u32 dst_fifoloop;
+> Yes for genric but not for loop. For most of our cases we are considering the
+> FIFO address as a constant. Typically DMA controllers have this ability to
+> perform incremental/decremental/constant FIFO address.
 >
-> I think you are missing some background about the internal-regs:
-
-True, I came into this conversation late.
-
-> * These are SoC-wide registers including the UART and other things, not
->   just the mbus setup
-> * There are at least two different values used for the internal-regs
->   mapping address depending on the SoC and boot loader version
-> * We have to get the address from the DT since it is impossible to
->   probe or change without knowing the current setting: The internal-regs
->   also contains the registers in mbus used to relocate the internal-regs.
-
-I wasn't actually suggesting to not get the address from DT, but your
-point is taken; there is a lot more to internal regs than I had
-assumed.
-
+> What would make sense to have is:
 >
->> As for regenerating the ranges; I have no problem with the kernel
->> allocating ranges at runtime, but that code should not be creating a new
->> ranges property and adding it to the tree. The knowledge should be kept
->> internal to the driver and it should use an of_bus translator
->> (drivers/of/address.c) to tap into the ranges parsings code.
+> enum dmaengine_slave_addr_mode {
+>         DMAENGINE_SLAVE_ADDR_CONSTANT = 0,
+>         DMAENGINE_SLAVE_ADDR_INCREMANT,
+>         DMAENGINE_SLAVE_ADDR_DECREMENT,
+> };
 >
-> Ok, makes sense. I didn't know about the of_bus code. Thanks for the
-> pointer!
+> and add these to struct dma_slave_config:
+>         enum dmaengine_slave_addr_mode src_mode;
+>         enum dmaengine_slave_addr_mode dstn_mode;
 >
->         Arnd
+> For loopover we can have:
+>         u32 loop_counter;
+>
+> on 0 means no loop, and valid value tells when to loopover (offset).
+>
+> will this help for all of the above controllers and their conversion?
+>
+IIRC,  TI's Sundaram Raju proposed a TI specific api to DMAEngine for
+this very purpose, which was generalized into
+device_prep_interleaved_dma().  Which I think should already be enough
+to serve the purpose. Is it not?
+
+-jassi
