@@ -1,44 +1,47 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Wed, 12 Jun 2013 14:32:52 -0700
-Subject: [PATCH 09/13] clk: exynos5420: register clocks using common clock
- framework
-In-Reply-To: <1479353.W3tSzhFHaA@flatron>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-9-git-send-email-chander.kashyap@linaro.org>
- <1479353.W3tSzhFHaA@flatron>
-Message-ID: <CAL1qeaE91S-sTLXBb7d3tbDP9M68py4PsLdHxxp2JqisGsP=ww@mail.gmail.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 12 Jun 2013 18:36:21 -0300
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20130612212641.GB8625@obsidianresearch.com>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <4160363.LWJuHATm2F@wuerfel> <20130612111441.E6D603E0A56@localhost>
+ <201306122245.55960.arnd@arndb.de>
+ <20130612211221.GB23012@localhost>
+ <20130612212641.GB8625@obsidianresearch.com>
+Message-ID: <20130612213620.GC23012@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomasz,
+On Wed, Jun 12, 2013 at 03:26:42PM -0600, Jason Gunthorpe wrote:
+> On Wed, Jun 12, 2013 at 06:12:22PM -0300, Ezequiel Garcia wrote:
+> 
+[...]
+> > 
+> > This departs considerably from what I'm aiming right now.
+> > 
+> > Are you suggesting to not put *any* mapping in the mbus 'ranges' node in
+> > the DT (other than internal-regs)?
+> 
+> My view is that the ranges should be respected. If an address is
+> present, it should be used, unless there is a conflict.
+> 
+> If no address is present (unclear why anyone would do this, but OK)
+> then demand allocate via the linux resource allocator through the
+> of_bus stuff seems reasonable to me..
+> 
+> Just to re-iterate Arnd's earlier comment: The DT representation
+> must handle dynamic allocation, but we can defer implementing the
+> kernel side until there is a need.
+> 
+> It isn't clear to me there is a need.....
+> 
 
->> +     apll = samsung_clk_register_pll35xx("fout_apll", "oscclk",
->> +                     reg_base + 0x100);
->> +     bpll = samsung_clk_register_pll35xx("fout_bpll", "oscclk",
->> +                     reg_base + 0x20110);
->> +     cpll = samsung_clk_register_pll35xx("fout_cpll", "oscclk",
->> +                     reg_base + 0x10120);
->> +     dpll = samsung_clk_register_pll35xx("fout_dpll", "oscclk",
->> +                     reg_base + 0x10128);
->> +     epll = samsung_clk_register_pll35xx("fout_epll", "oscclk",
->> +                     reg_base + 0x10130);
->> +     ipll = samsung_clk_register_pll35xx("fout_ipll", "oscclk",
->> +                     reg_base + 0x10150);
->> +     kpll = samsung_clk_register_pll35xx("fout_kpll", "oscclk",
->> +                     reg_base + 0x28100);
->> +     mpll = samsung_clk_register_pll35xx("fout_mpll", "oscclk",
->> +                     reg_base + 0x10180);
->> +     rpll = samsung_clk_register_pll35xx("fout_rpll", "oscclk",
->> +                     reg_base + 0x10140);
->> +     spll = samsung_clk_register_pll35xx("fout_spll", "oscclk",
->> +                     reg_base + 0x10160);
->> +     vpll = samsung_clk_register_pll35xx("fout_vpll", "oscclk",
->> +                     reg_base + 0x10170);
->
-> Are all those PLLs really PLL35xx? At least for VPLL and EPLL a PLL
-> without the K factor looks a bit awkward.
+Right. And just to confirm: this kernel side dynamic implementation
+will be completely independent of the MBus DT layout proposal.
+So I think it's best to agree on this binding first.
 
-No they are not...  EPLL and RPLL should be pll36xx, but the rest are pll35xx.
-
-Thanks,
-Andrew
+I'll post a v2 with the progress I've made using the preprocessor.
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
