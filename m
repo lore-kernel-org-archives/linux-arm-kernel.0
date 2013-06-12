@@ -1,52 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Jun 2013 16:51:58 -0700
-Subject: [GIT PULL 6/6] s3c24xx driver
-In-Reply-To: <51B791F6.4000004@samsung.com>
-References: <51B791F6.4000004@samsung.com>
-Message-ID: <20130612235158.GC9067@quad.lixom.net>
+From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
+Date: Thu, 13 Jun 2013 01:52:05 +0200
+Subject: [PATCH 00/15] Final Samsung PWM support cleanup
+In-Reply-To: <201306130138.05692.heiko@sntech.de>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <20130612230023.GA9016@quad.lixom.net> <1604160.oAKkaEhla1@flatron>
+ <201306130138.05692.heiko@sntech.de>
+Message-ID: <51B909A5.2020409@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 06:09:10AM +0900, Kukjin Kim wrote:
-> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
-> 
->   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
+On 06/13/2013 01:38 AM, Heiko St?bner wrote:
+> Am Donnerstag, 13. Juni 2013, 01:13:47 schrieb Tomasz Figa:
+>> Hi Olof,
+>>
+>> On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
+>>> On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
+>>>>> Needs testing on other platforms as I could only compile test for
+>>>>> them.
+>>>
+>>> How/who can help here? WHo has and still cares for other affected
+>>> platforms?
+>>>
+>>>>> 66 files changed, 627 insertions(+), 1580 deletions(-)
+>>
+>> I will try to test this on Exynos 4 at work, if I somehow manage to find
+>> any way to use PWM on our boards (other than already-tested PWM
+>> clocksource).
+>>
+>> Unfortunately, except S3C6410, I don't have access to other platforms, or
+>> at least I won't in any reasonable time.
+>>
+>> If I remember correctly, in case of my watchdog support cleanup, Kukjin
+>> has been able to test it on S5P64x0.
+>>
+>> Heiko and Sylwester used to have some s3c24xx-based boards, not sure if
+>> they still do and are interested in their support in mainline.
+>>
+>> So all left is S5PC100 (for which I couldn't find anyone who cares) and
+>> Exynos5.
+>>
+>>> Nice cleanup.
+>>
+>> Thanks.
+>>
+>>>> Any comments for this series?
+>>>
+>>> Yes, above. :) In general looks good -- testing coverage is a bit of a
+>>> concern.
+>>
+>> Yeah. Unfortunately all I could do was testing on Tiny6410 and compile
+>> testing on others. I hope we find some really helpful people over here who
+>> could waste a bit of their precious time for this museum. ;)
+>
+> I'll try to give it a testrun tomorrow. And my s3c2416 will always be the
+> first-love-architecture for me ;-)
 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/s3c24xx-driver-1
-> 
-> for you to fetch changes up to ae7b6dccf6711e8d5815688f1572ab55bf5b3069:
-> 
->   Merge branch 'v3.11-next/driver-cpufreq' into
-> v3.11-next/s3c24xx-driver (2013-06-12 05:24:22 +0900)
-> 
-> ----------------------------------------------------------------
-> 
-> update driver for s3c24xx
-> - move cpufreq driver into drivers/
-> - add pinctrl-s3c24xx driver
-> - cleanup OF in gpio driver
-> 
-> ----------------------------------------------------------------
-> Heiko Stuebner (1):
->       pinctrl: Add pinctrl-s3c24xx driver
-> 
-> Kukjin Kim (3):
->       Merge branch 'v3.11-next/driver-gpio' into v3.11-next/s3c24xx-driver
->       Merge branch 'v3.11-next/driver-pinctrl' into
-> v3.11-next/s3c24xx-driver
->       Merge branch 'v3.11-next/driver-cpufreq' into
-> v3.11-next/s3c24xx-driver
+I'll likely test it tomorrow on a Mini2440 board, I was going to do it 
+earlier
+but got distracted by plenty other things that needed attention too. At 
+least
+that's one of the reasons I got the board - testing the cross-platform 
+cleanups
+and ensuring they are not breaking the older platforms.
 
-Hi,
-
-No need to do a merge commit per patch, just do them on a single branch in the
-future, please.
-
-Pulled.
-
-
--Olof
+Regards,
+Sylwester
