@@ -1,37 +1,46 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 12 Jun 2013 12:14:41 +0100
-Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <4160363.LWJuHATm2F@wuerfel>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20835253.Agl4DfuI3k@wuerfel> <20130611215023.GA12649@obsidianresearch.com>
- <4160363.LWJuHATm2F@wuerfel>
-Message-ID: <20130612111441.E6D603E0A56@localhost>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 12 Jun 2013 13:20:21 +0200
+Subject: [linux-sunxi] [PATCHv4 7/9] ARM: sun5i: dt: Add i2c muxing options
+In-Reply-To: <1371025788.4659.20.camel@localhost>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371024438-16631-8-git-send-email-maxime.ripard@free-electrons.com>
+ <1371025788.4659.20.camel@localhost>
+Message-ID: <20130612112021.GC16699@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013 00:34:14 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 11 June 2013 15:50:23 Jason Gunthorpe wrote:
-> > So, I think we can/have agree that the ranges in the FDT should
-> > reflect the bootloader's settings, and if the ranges is missing an
-> > element it means the bootloader didn't set it up.
-> > 
-> > A compatible bootloader should dump the entire mbus register table
-> > into the ranges. The address encoding is such that we can represent
-> > every mbus window entry in ranges. If no bootloader support is present
-> > then the ranges value is forced into the mbus windows anyhow.
-> > 
-> > If there isn't a ranges entry, but there is a child that requires it
-> > (how do we figure this out?)
-> 
-> I think we have to walk the entire tree of devices underneath mbus,
-> at least any device node that has a 'reg' property, following children
-> of any device node with a 'ranges' property. We might need to
-> add a variant of of_get_address() that does a partial translation
-> up to a given node (the mbus) instead of all the way to the root.
+Hi Henrik,
 
-I think we should have almost everything needed already to do this.
-of_bus allows arbitrary mapping code to be used at any stage in the
-translation. We might need to add some glue so that of_busses[] can
-be assembled by the linker to allow an mbus of_bus stanza to live
-outside of drivers/of/address.c
+On Wed, Jun 12, 2013 at 10:29:48AM +0200, Henrik Nordstr?m wrote:
+> ons 2013-06-12 klockan 10:07 +0200 skrev Maxime Ripard:
+> 
+> > +			i2c0_pins_a: i2c0 at 0 {
+> > +				allwinner,pins = "PB0", "PB1";
+> > +				allwinner,function = "i2c0";
+> > +				allwinner,drive = <0>;
+> > +				allwinner,pull = <0>;
+> 
+> Is this right? All other use pull = 1.
+
+Ah, true.
+
+> I guess it's board dependent depending on if there is external pullups
+> or not on the i2c bus. I have seen Allwinner designs both with and
+> without external pullups.
+> 
+> It will not work well if there is neither internal or external pullup.
+> And may stress the i2c components a bit if there is both..
+
+Yes, but it's a default, so by definition, it won't suit everyone. Yet,
+it has to be there. And every board is free to override that default in
+its own DT anyway, so it's not really a big issue. But like you pointed
+at, we have to be consistent.
+
+I'll disable the pull-ups in the next iteration for every node.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
