@@ -1,17 +1,17 @@
 From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Wed, 12 Jun 2013 20:58:30 +0530
-Subject: [PATCH 02/10] USB: OHCI: Properly handle ohci-s3c2410 suspend
+Date: Wed, 12 Jun 2013 20:58:31 +0530
+Subject: [PATCH 03/10] USB: OHCI: Properly handle ohci-da8xx suspend
 In-Reply-To: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
 References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1371050918-29472-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371050918-29472-4-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-s3c2410 glue was not
+Suspend scenario in case of ohci-da8xx glue was not
 properly handled as it was not suspending generic part
 of ohci controller.Calling explicitly the ohci_suspend()
-routine in ohci_hcd_s3c2410_drv_suspend() will ensure
-proper handling of suspend scenario.
+routine in ohci_da8xx_suspend() will ensure proper
+handling of suspend scenario.
 
 Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
 Cc: Arnd Bergmann <arnd@arndb.de>
@@ -19,29 +19,41 @@ Cc: Alan Stern <stern@rowland.harvard.edu>
 Cc: Greg KH <greg@kroah.com>
 Cc: linux-usb at vger.kernel.org
 ---
- drivers/usb/host/ohci-s3c2410.c |    3 +++
- 1 file changed, 3 insertions(+)
+ drivers/usb/host/ohci-da8xx.c |   13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
-index 8018bb1..2ffa693 100644
---- a/drivers/usb/host/ohci-s3c2410.c
-+++ b/drivers/usb/host/ohci-s3c2410.c
-@@ -430,6 +430,7 @@ static int ohci_hcd_s3c2410_drv_suspend(struct device *dev)
- 	struct platform_device *pdev = to_platform_device(dev);
- 	unsigned long flags;
- 	int rc = 0;
-+	bool do_wakeup = device_may_wakeup(dev);
+diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
+index 6aaa9c9..3b1d9bd 100644
+--- a/drivers/usb/host/ohci-da8xx.c
++++ b/drivers/usb/host/ohci-da8xx.c
+@@ -406,19 +406,24 @@ static int ohci_hcd_da8xx_drv_remove(struct platform_device *dev)
+ }
  
- 	/*
- 	 * Root hub was already suspended. Disable irq emission and
-@@ -445,6 +446,8 @@ static int ohci_hcd_s3c2410_drv_suspend(struct device *dev)
+ #ifdef CONFIG_PM
+-static int ohci_da8xx_suspend(struct platform_device *dev, pm_message_t message)
++static int ohci_da8xx_suspend(struct platform_device *pdev,
++		pm_message_t message)
+ {
+-	struct usb_hcd	*hcd	= platform_get_drvdata(dev);
++	struct usb_hcd	*hcd	= platform_get_drvdata(pdev);
+ 	struct ohci_hcd	*ohci	= hcd_to_ohci(hcd);
++	bool do_wakeup = device_may_wakeup(&pdev->dev);
++	int ret;
  
- 	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+ 	if (time_before(jiffies, ohci->next_statechange))
+ 		msleep(5);
+ 	ohci->next_statechange = jiffies;
  
-+	rc = ohci_suspend(hcd, do_wakeup);
++	ret = ohci_suspend(hcd, do_wakeup);
 +
- 	s3c2410_stop_hc(pdev);
- bail:
- 	spin_unlock_irqrestore(&ohci->lock, flags);
+ 	ohci_da8xx_clock(0);
+ 	hcd->state = HC_STATE_SUSPENDED;
+-	dev->dev.power.power_state = PMSG_SUSPEND;
+-	return 0;
++	pdev->dev.power.power_state = PMSG_SUSPEND;
++	return ret;
+ }
+ 
+ static int ohci_da8xx_resume(struct platform_device *dev)
 -- 
 1.7.9.5
