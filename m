@@ -1,38 +1,44 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 12 Jun 2013 10:13:55 +0100
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-In-Reply-To: <20130612083619.GA13274@S2101-09.ap.freescale.net>
-References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
- <20130612083619.GA13274@S2101-09.ap.freescale.net>
-Message-ID: <20130612091355.GB20236@e102568-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 12 Jun 2013 11:24:38 +0200
+Subject: [PATCH v5 01/22] pinctrl: generic: Add DT bindings
+In-Reply-To: <1370989371-30846-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1370989371-30846-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1370989371-30846-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <CACRpkdYev+hapkM075Sw7Yi0u+XpRvL74SwT39DV1aV1RtHC+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Wed, Jun 12, 2013 at 12:22 AM, Laurent Pinchart
+<laurent.pinchart+renesas@ideasonboard.com> wrote:
 
-On Wed, Jun 12, 2013 at 09:36:20AM +0100, Shawn Guo wrote:
-> On Tue, Jun 11, 2013 at 10:58:48AM +0100, Lorenzo Pieralisi wrote:
-> > Hi Russell, all,
-> > 
-> > even though I think this set is ready to get merged, it would be great
-> > if we can test it on as many platforms as possible since it touches core
-> > suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
-> > and there are many.
-> > 
-> > I pushed out a branch:
-> > 
-> > git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
-> > 
-> > if anyone has time to test the set that would be really great, thank you
-> > very much.
-> 
-> I tested the branch on imx6q, and system suspend/resume works fine with
-> it.
+> Document DT properties for the generic pinctrl parameters and add a
+> parser function.
+>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Thanks a lot. If you can enable idle deep C-states that would be grand,
-S2R exercises that code path just on one CPU whilst idle clobbers it on
-all CPUs at once and ensures the hash is working properly on your platform.
+It appears we have a race here, as something like three people,
+or four, happened to do generic pinconf bindings at the same time.
 
-Anyway, thank you very much !
-Lorenzo
+Yesterday I applied Heiko St?bners patch
+"pinctrl: add function to parse generic pinconfig properties from a dt node"
+doing basically the same thing. With subtle differences...
+but it already supports schmittrigging and some more.
+
+It appears to be close to your idea though!
+
+Would it be possible for you to look at what I have on my "devel" branch
+now (same as submitted for -next), rebase on that and patch any problems?
+
+> +               if (param->flag) {
+> +                       ret = of_property_read_bool(np, param->property)
+> +                           ? 0 : -EINVAL;
+> +                       val = 1;
+> +               } else {
+> +                       ret = of_property_read_u32(np, param->property, &val);
+> +               }
+
+This construct is done differently in Heiko's code, please
+review it so we know we have a nice, efficient parser.
+
+Yours,
+Linus Walleij
