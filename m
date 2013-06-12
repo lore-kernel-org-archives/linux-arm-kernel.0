@@ -1,28 +1,26 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 12 Jun 2013 18:06:41 +0300
-Subject: [RFC PATCH 32/50] usb: gadget: at91_udc: prepare clk before
- calling enable
-In-Reply-To: <1370628498-2584-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
- <1370628498-2584-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20130612150641.GC15056@arwen.pp.htv.fi>
+From: oliver@neukum.org (Oliver Neukum)
+Date: Wed, 12 Jun 2013 17:10:37 +0200
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
+Message-ID: <1757819.Rmlin4PoBK@linux-5eaq.site>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 08:08:18PM +0200, Boris BREZILLON wrote:
-> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-> avoid common clk framework warnings.
+On Wednesday 12 June 2013 10:35:44 Alan Stern wrote:
+> On Wed, 12 Jun 2013, Ming Lei wrote:
 > 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
+> > If not, I am wondering why one USB driver need register another hard
+> > interrupt handler? Could you share such examples? I understand the
+> > case only exists with timer handler as discussed with Oliver, don't I?
+> 
+> Here's another possibility.  A USB driver has a private lock, and it
+> acquires this lock in its completion handler.  But it also acquires
+> this lock in other routines, and those other routines may be called by
+> other drivers or subsystems in interrupt context.
 
-Acked-by: Felipe Balbi <balbi@ti.com>
+That is fatal. But again mechanically using _irqsave in complete()
+does the job. No other place can be affected.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/cdc9a63f/attachment.sig>
+	Regards
+		Oliver
