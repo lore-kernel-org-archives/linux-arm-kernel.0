@@ -1,51 +1,58 @@
-From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
-Date: Wed, 12 Jun 2013 20:23:45 +0200
-Subject: [PATCH v2 3/3] arm: dt: zynq: Add support for the zed platform
-In-Reply-To: <1371055268-32337-4-git-send-email-soren.brinkmann@xilinx.com>
-References: <1371055268-32337-1-git-send-email-soren.brinkmann@xilinx.com>
- <1371055268-32337-4-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <20130612182345.GA1656@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Jun 2013 11:24:33 -0700
+Subject: [GIT PULL 1/6] non-critical omap fixes for v3.11 merge window
+Message-ID: <pull-1371061475-206272>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 09:41:08AM -0700, Soren Brinkmann wrote:
-> Add a DT fragment for the Zed Zynq platform and a corresponding
-> target to the Makefile
-> 
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> ---
-> I used the 'xlnx,...' compat strings since it seems this is what is
-> used in the Xilinx and Digilent vendor trees.
-> 
-> +/include/ "zynq-7000.dtsi"
-> +
-> +/ {
-> +	model = "Zynq Zed Development Board";
-> +	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
-> +
-> +	memory {
-> +		device_type = "memory";
-> +		reg = <0 0x20000000>;
-> +	};
-> +
-> +	chosen {
-> +		bootargs = "console=ttyPS1,115200 earlyprintk";
-> +	};
-> +
-> +};
+The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
 
-Hi!
+  Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 
-This looks a little bit to basic. No?! Not even an UART?
-The compatible should include digilent or avnet. Digilent only sells to academic
-customers, Avnet doesn't.
-I personally don't care what they do out of tree.
+are available in the git repository at:
 
-Regards,
-Steffen
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/fixes-non-critical-signed
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+for you to fetch changes up to e41a5f88b374f7b1d87a72740d186be20cae4aa8:
+
+  ARM: OMAP2+: omap-usb-host: Fix memory leaks (2013-06-12 10:04:10 -0700)
+
+----------------------------------------------------------------
+Non-critical fixes for omaps for v3.11 merge window.
+
+----------------------------------------------------------------
+Peter Ujfalusi (3):
+      ARM: OMAP2+: devices: Do not print error when McPDM hwmod lookup fails
+      ARM: OMAP2+: devices: Do not print error when DMIC hwmod lookup fails
+      ARM: OMAP2+: devices: Do not print error when dss_hdmi hwmod lookup fails
+
+Roger Quadros (1):
+      ARM: OMAP2+: omap-usb-host: Fix memory leaks
+
+Sebastian Andrzej Siewior (1):
+      arm/omap: use const char properly
+
+Suman Anna (1):
+      ARM: OMAP2+: control: add OMAP5 support for dsp boot programming
+
+Tomi Valkeinen (3):
+      ARM: OMAP: fix dsi regulator names
+      ARM: OMAP: add vdds_dsi supply for omapdss_dpi.0
+      ARM: OMAP: add vdds_sdi supply for omapdss_sdi.0
+
+Tony Lindgren (2):
+      Merge branch 'dss-regulator' into omap-for-v3.11/fixes-non-critical
+      ARM: OMAP2+: Fix serial init for device tree based booting
+
+ arch/arm/mach-omap2/board-cm-t35.c           |   3 +-
+ arch/arm/mach-omap2/board-devkit8000.c       |   1 +
+ arch/arm/mach-omap2/board-ldp.c              |   3 +-
+ arch/arm/mach-omap2/board-omap3pandora.c     |   1 +
+ arch/arm/mach-omap2/board-rx51-peripherals.c |   1 +
+ arch/arm/mach-omap2/control.c                |   1 +
+ arch/arm/mach-omap2/devices.c                |  12 +--
+ arch/arm/mach-omap2/id.c                     |   2 +-
+ arch/arm/mach-omap2/serial.c                 |   3 +
+ arch/arm/mach-omap2/twl-common.c             |   1 +
+ arch/arm/mach-omap2/usb-host.c               | 106 ++++++++++++++-------------
+ 11 files changed, 72 insertions(+), 62 deletions(-)
