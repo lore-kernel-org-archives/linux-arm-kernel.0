@@ -1,30 +1,59 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Wed, 12 Jun 2013 12:52:23 +0200
-Subject: [RFC PATCH 30/50] pwm: atmel-tcb: prepare clk before calling
- enable
-In-Reply-To: <1370622402-19693-1-git-send-email-b.brezillon@overkiz.com>
-References: <1370615115-16979-1-git-send-email-b.brezillon@overkiz.com>
- <1370622402-19693-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <20130612105222.GB1940@manwe>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Jun 2013 11:52:26 +0100
+Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <20130609014506.GB10027@obsidianresearch.com>
+References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1370623671-7748-5-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306072101.44694.arnd@arndb.de>
+ <20130607200054.GA9010@obsidianresearch.com>
+ <20130608183851.GB2354@localhost>
+ <20130609014506.GB10027@obsidianresearch.com>
+Message-ID: <20130612105226.3F2723E0A56@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 06:26:42PM +0200, Boris BREZILLON wrote:
-> Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-> avoid common clk framework warnings.
+On Sat, 8 Jun 2013 19:45:06 -0600, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
+> On Sat, Jun 08, 2013 at 03:38:52PM -0300, Ezequiel Garcia wrote:
 > 
-> Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
-> ---
->  drivers/pwm/pwm-atmel-tcb.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> > > mbus {
+> > >    ranges = <0x012f0000 0  0xe8000000  0x8000000>
+> > >    devbus-bootcs {
+> > >        ranges = <0  0x012f0000 0  0x8000000>
+> > >    }
+> > > }
+> > > 
+> > > We shouldn't mangle the DT format just to make it convenient for
+> > > humans to write - if this is a major problem then I'd try to use the
+> > > preprocessor first.. There are several reasonable solutions down that
+> > > path, IMHO.
+> > > 
+> > 
+> > Right. I think we have two options here for laying the DT ranges.
+> > 
+> > 1) This is the proposal implied in the patchset I sent:
+> > 
+> > mbus {
+> > 	ranges = < we only put the internal-reg translation here>
+> > 	devbus-bootcs {
+> > 		ranges = <0 {target_id/attribute}
+> > 	{window_physical_base} {size}>
+>         ^^^^^^^^^^^^^^^^^^^^^^
+> 
+> This is the mangling I was referring to. It needs to be the offset
+> into the target, it can't be something else.
+> 
+> I understand your motivation, but this is not a good method of
+> encoding this in DT.
+> 
+> There is nothing especially wrong with updating the ranges at runtime,
+> but don't use the 2nd cell in the 2dw address to encode the desired
+> base address.
 
-Applied, thanks.
++1 The design intent of the ranges property is it isolates the parent
+address space from the child address space. Encoding the physical
+address into the second cell breaks that isolation. Sure, you can do it
+and it will work, but then it forces a change to the parent ranges to
+propagate down to all the child reg and ranges properties.
 
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/ec99b2b3/attachment.sig>
+g.
