@@ -1,86 +1,63 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Wed, 12 Jun 2013 12:25:56 -0400 (EDT)
-Subject: [PATCH 01/10] USB: OHCI: Properly handle ohci-at91 suspend
-In-Reply-To: <Pine.LNX.4.44L0.1306121203180.1431-100000@iolanthe.rowland.org>
-Message-ID: <Pine.LNX.4.44L0.1306121223470.1431-100000@iolanthe.rowland.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 12 Jun 2013 09:31:24 -0700
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191753.468.1734.stgit@localhost>
+ <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+Message-ID: <20130612163124.GD8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Alan Stern wrote:
-
-> On Wed, 12 Jun 2013, Manjunath Goudar wrote:
+* Ming Lei <tom.leiming@gmail.com> [130603 08:34]:
+> Hi,
 > 
-> > Suspend scenario in case of ohci-at91 glue was not properly
-> > handled as it was not suspending generic part of ohci controller.
-> > Calling explicitly the ohci_suspend()routine in ohci_hcd_at91_drv_suspend()
-> > will ensure proper handling of suspend scenario.
+> On Sat, May 18, 2013 at 3:17 AM, Tony Lindgren <tony@atomide.com> wrote:
+> > We can now boot with device tree. If you don't want to update u-boot,
+> > you can boot with appended DTB with the following instructions:
+> >
+> > 1. Make sure you have the appended DTB support in .config
+> >
+> >    CONFIG_ARM_APPENDED_DTB=y
+> >    CONFIG_ARM_ATAG_DTB_COMPAT=y
+> >    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+> >
+> > 2. Build the zImage
+> >
+> >    $ ARCH=arm CROSS_COMPILE=... make zImage
+> >
+> > 3. Build the device tree blobs
+> >
+> >    $ ARCH=arm CROSS_COMPILE=... make dtbs
+> >
+> > 4. Append the correct panda dtb to zImage
+> >
+> >    Depending on your hardware it's omap4-panda.dtb, omap4-panda-a4.dtb
+> >    or omap4-panda-es.dtb.
+> >
+> >    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-panda-es.dtb > /tmp/appended
+> >
+> > 5. Use mkimage to produce the appended device tree uImage
+> >
+> >    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
+> >      -n "Linux" -d /tmp/appended /tmp/uImage
 > 
-> > diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> > index fb2f127..28400a7 100644
-> > --- a/drivers/usb/host/ohci-at91.c
-> > +++ b/drivers/usb/host/ohci-at91.c
-> > @@ -619,8 +619,12 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
-> >  {
-> >  	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
-> >  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-> > +	bool do_wakeup = device_may_wakeup(&pdev->dev);
-> > +	int ret;
-> >  
-> > -	if (device_may_wakeup(&pdev->dev))
-> > +	ret = ohci_suspend(hcd, do_wakeup);
-> > +
-> > +	if (do_wakeup)
-> >  		enable_irq_wake(hcd->irq);
-> >  
-> >  	/*
-> > @@ -637,7 +641,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
-> >  		at91_stop_clock();
-> >  	}
-> >  
-> > -	return 0;
-> > +	return ret;
+> I followed the above steps and tried devicetree on Pandaboard against
+> 3.10.0-rc3-next-20130528, and the board will hang during boot, but works
+> well with legacy mode.
 > 
-> If ohci_suspend() fails, we should return right away.  Don't execute 
-> the enable_irq_wake() and all the other stuff.
+>          Hardware: Pandaboard A1
+>          dtb: omap4-panda.dtb
+> 
+> See 'dmesg' on below link:
+> 
+>          http://kernel.ubuntu.com/~ming/up/panda-dts.dmesg
+> 
 
-Actually, the situation is more complicated.  In order to handle races
-with remote wakeup, the logic we need is more like this:
+Hmm looks like it boots to init. Maybe add initcall_debug to the cmdline in
+case there's some late_initcall that causes the issue. It's probably some
+trivial issue causing it.
 
+Regards,
 
-Index: usb-3.10/drivers/usb/host/ohci-at91.c
-===================================================================
---- usb-3.10.orig/drivers/usb/host/ohci-at91.c
-+++ usb-3.10/drivers/usb/host/ohci-at91.c
-@@ -674,8 +674,18 @@ ohci_hcd_at91_drv_suspend(struct platfor
- {
- 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-+	bool		do_wakeup = device_may_wakeup(&pdev->dev);
-+	int		ret;
- 
--	if (device_may_wakeup(&pdev->dev))
-+	ret = ohci_suspend(hcd, do_wakeup);
-+	if (ret == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
-+		ohci_resume(hcd, false);
-+		ret = -EBUSY;
-+	}
-+	if (ret)
-+		return ret;
-+
-+	if (do_wakeup)
- 		enable_irq_wake(hcd->irq);
- 
- 	/*
-@@ -692,7 +702,7 @@ ohci_hcd_at91_drv_suspend(struct platfor
- 		at91_stop_clock();
- 	}
- 
--	return 0;
-+	return ret;
- }
- 
- static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
-
-The same is true for all the other drivers.
-
-Alan Stern
+Tony
