@@ -1,86 +1,73 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 12 Jun 2013 23:19:42 +0200
-Subject: [PATCH v4 1/6] clk: samsung: Use clk->base instead of directly
- using clk->con0 for PLL3xxx
-In-Reply-To: <CAD=FV=VTLkH9oDqr263Kyv=wCEbuQ40VL7mtC73SCMt20NPwgQ@mail.gmail.com>
-References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
- <1370272196-4346-2-git-send-email-yadi.brar@samsung.com>
- <CAD=FV=VTLkH9oDqr263Kyv=wCEbuQ40VL7mtC73SCMt20NPwgQ@mail.gmail.com>
-Message-ID: <1501124.EVQA8KO0ic@flatron>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Wed, 12 Jun 2013 23:23:10 +0200
+Subject: [PATCH v3 07/12] PCI: tegra: Move PCIe driver to drivers/pci/host
+In-Reply-To: <51B89D26.9070605@wwwdotorg.org>
+References: <1365000318-28256-1-git-send-email-thierry.reding@avionic-design.de>
+ <1365000318-28256-8-git-send-email-thierry.reding@avionic-design.de>
+ <516C46BC.2040707@wwwdotorg.org> <20130612122959.GA32444@manwe>
+ <51B89D26.9070605@wwwdotorg.org>
+Message-ID: <20130612212308.GA27681@manwe>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wednesday 12 of June 2013 13:33:50 Doug Anderson wrote:
-> Yadwinder,
-> 
-> On Mon, Jun 3, 2013 at 8:09 AM, Yadwinder Singh Brar
-> 
-> <yadi.brar@samsung.com> wrote:
-> > This patch unifies clk strutures used for PLL35xx & PLL36xx and uses
-> > clk->base instead of directly using clk->con0, so that possible
-> > common code can be factored out.
-> > It also introdues common pll_[readl/writel] macros for the users of
-> > common samsung_clk_pll struct.
+On Wed, Jun 12, 2013 at 10:09:10AM -0600, Stephen Warren wrote:
+> On 06/12/2013 06:30 AM, Thierry Reding wrote:
+> > On Mon, Apr 15, 2013 at 12:28:12PM -0600, Stephen Warren wrote:
+> >> On 04/03/2013 08:45 AM, Thierry Reding wrote:
+> >>> Move the PCIe driver from arch/arm/mach-tegra into the
+> >>> drivers/pci/host directory. The motivation is to collect
+> >>> various host controller drivers in the same location in order
+> >>> to facilitate refactoring.
+> >>> 
+> >>> The Tegra PCIe driver has been largely rewritten, both in order
+> >>> to turn it into a proper platform driver and to add MSI (based
+> >>> on code by Krishna Kishore <kthota@nvidia.com>) as well as
+> >>> device tree support.
+> ...
+> >>> +static irqreturn_t tegra_pcie_msi_irq(int irq, void *data)
+> >> ...
+> >>> +	return IRQ_HANDLED;
+> >> 
+> >> Shouldn't this function return IRQ_NONE if no MSI status bits
+> >> were found set?
 > > 
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > Reviewed-by: Doug Anderson <dianders@chromium.org>
-> > Tested-by: Doug Anderson <dianders@chromium.org>
-> > Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
-> > ---
+> > The IRQ isn't marked IRQF_SHARED, so I don't think this is needed.
+> 
+> Isn't it still useful to detect unexpected/stuck interrupts?
+
+Yes, you're right. I can't think of a nicer way to do it, though, so
+I'll go with a processed IRQ counter or a flag.
+
+> >>> +static int tegra_pcie_probe(struct platform_device *pdev)
+> >> ...
+> >>> +	pcibios_min_mem = 0;
+> >> 
+> >> What does that mean/do? I wonder if that should be set to
+> >> 0x80000000 by the Tegra30 patches?
 > > 
-> >  drivers/clk/samsung/clk-exynos4.c    |   10 ++++--
-> >  drivers/clk/samsung/clk-exynos5250.c |   14 ++++----
-> >  drivers/clk/samsung/clk-pll.c        |   54
-> >  ++++++++++++++++++--------------- drivers/clk/samsung/clk-pll.h     
-> >    |    4 +-
-> >  4 files changed, 44 insertions(+), 38 deletions(-)
+> > ARM defines PCIBIOS_MIN_MEM to that variable. That macro in turn is
+> > only used by pci_bus_alloc_resource() AFAICT, which uses it to
+> > override the start of a resource when allocating if res->start ==
+> > 0. As such it designates a lower-bound of valid PCI memory
+> > addresses, so 0 on Tegra20 and 0x80000000 on Tegra30 don't seem
+> > like good values. Maybe we need to set them to the lowest of the
+> > prefetchable and non-prefetchable memory areas as defined in the
+> > DT?
+> > 
+> > It doesn't currently seem to matter at all, though, since we never
+> > pass in a range that's 0, so the start address of resources can
+> > never be 0 and therefore PCIBIOS_MIN_MEM is never used.
 > 
-> So.  We just found that this type of solution doesn't work on
-> exynos5420, since the LOCK and CON registers aren't always 0x100 away
-> from each other.
+> Hmmm. I guess ignore it then. If the value won't ever be used, 0 is as
+> good a value as any?
 
-Oops, this is what I've been afraid of, ever since we assumed this first 
-time in our internal patches.
+Alright, I'll do that then.
 
-> Perhaps you can adjust to use a solution like Andrew
-> proposed in <https://gerrit.chromium.org/gerrit/#/c/58411/>?  That way
-> we can avoid some churn of changing this code twice.
-> 
-> The number of parameters to the register PLL function is starting to
-> get unwieldy.  At some point we'll probably want to pass in a
-> structure.  I wonder if now would be the time?  Certainly it would be
-> easier to handle changes to the code without touching all of the
-> exynos variants...
-
-Hmm, if done properly, it could simplify PLL registration in SoC clock 
-initialization code a lot.
-
-I'm not sure if this is really the best solution (feel free to suggest 
-anything better), but we could put PLLs in an array, like other clocks, 
-e.g.
-
-	... exynos4210_pll_clks[] = {
-		CLK_PLL45XX(...),
-		CLK_PLL45XX(...),
-		CLK_PLL46XX(...),
-		CLK_PLL46XX(...),
-	};
-
-and then just call a helper like
-
-	samsung_clk_register_pll(exynos4210_pll_clks,
-			ARRAY_SIZE(exynos4210_pll_clks));
-
-Best regards,
-Tomasz
-
-> Thanks!
-> 
-> -Doug
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in the body of a message to
-> majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130612/328c88ca/attachment.sig>
