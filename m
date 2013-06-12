@@ -1,51 +1,48 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Jun 2013 10:07:15 +0200
-Subject: [PATCHv4 6/9] ARM: sun4i: dt: Add i2c muxing options
+Date: Wed, 12 Jun 2013 10:07:18 +0200
+Subject: [PATCHv4 9/9] ARM: sun4i: cubieboard: Enable the i2c controllers
 In-Reply-To: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1371024438-16631-7-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1371024438-16631-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The i2c controller found on the Allwinner A10 has only one muxing option
-available for each controller. Add them to the dtsi
+From: Emilio L?pez <emilio@elopez.com.ar>
 
+The Cubieboard makes use of the first two i2c controllers found on the
+Allwinner A10; i2c-0 is used internally for the PMIC, while i2c-1
+is exposed on the board headers. This patch enables them in the device
+tree.
+
+Signed-off-by: Emilio L?pez <emilio@elopez.com.ar>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index f7e4a96..c2adc74 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -227,6 +227,26 @@
- 				allwinner,function = "emac";
- 				allwinner,drive = <0>;
- 				allwinner,pull = <0>;
-+
-+			i2c0_pins_a: i2c0 at 0 {
-+				allwinner,pins = "PB0", "PB1";
-+				allwinner,function = "i2c0";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+
-+			i2c1_pins_a: i2c1 at 0 {
-+				allwinner,pins = "PB18", "PB19";
-+				allwinner,function = "i2c1";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
-+			};
-+
-+			i2c2_pins_a: i2c2 at 0 {
-+				allwinner,pins = "PB20", "PB21";
-+				allwinner,function = "i2c2";
-+				allwinner,drive = <0>;
-+				allwinner,pull = <1>;
- 			};
+diff --git a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+index e752b57..757c4cd 100644
+--- a/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
++++ b/arch/arm/boot/dts/sun4i-a10-cubieboard.dts
+@@ -56,6 +56,18 @@
+ 			pinctrl-0 = <&uart0_pins_a>;
+ 			status = "okay";
  		};
++
++		i2c0: i2c at 01c2ac00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c0_pins_a>;
++			status = "okay";
++		};
++
++		i2c1: i2c at 01c2b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&i2c1_pins_a>;
++			status = "okay";
++		};
+ 	};
  
+ 	leds {
 -- 
 1.8.3
