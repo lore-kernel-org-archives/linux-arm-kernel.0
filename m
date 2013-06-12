@@ -1,27 +1,53 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Wed, 12 Jun 2013 19:56:54 +0400
-Subject: [PATCH 01/15] ARM: clps711x: Remove NEED_MACH_MEMORY_H dependency
-In-Reply-To: <20130611225708.GC23774@quad.lixom.net>
-References: <1368464857-5038-1-git-send-email-shc_work@mail.ru>
- <20130611225708.GC23774@quad.lixom.net>
-Message-ID: <20130612195654.ea0d899c60a4cb1d0c0f0104@mail.ru>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 12 Jun 2013 19:58:31 +0400
+Subject: [PATCH 02/10] USB: OHCI: Properly handle ohci-s3c2410 suspend
+In-Reply-To: <1371050918-29472-3-git-send-email-manjunath.goudar@linaro.org>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371050918-29472-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <51B89AA7.4000906@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 11 Jun 2013 15:57:08 -0700
-Olof Johansson <olof@lixom.net> wrote:
+Hello.
 
-> On Mon, May 13, 2013 at 09:07:20PM +0400, Alexander Shiyan wrote:
-> > This patch removes dependency of NEED_MACH_MEMORY_H for CLPS711X-target.
-> > Since some board may have memory holes, define ARCH_HAS_HOLES_MEMORYMODEL
-> > for these boards.
-> > 
-> > Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
-> 
-> Applied both series (3 gpio patches and the 15 other patches).
+On 12-06-2013 19:28, Manjunath Goudar wrote:
 
-Thank you very mach Olof, long awaited changes for me,
-next series will be step to make clps711x multiplatfom.
+> Suspend scenario in case of ohci-s3c2410 glue was not
+> properly handled as it was not suspending generic part
+> of ohci controller.Calling explicitly the ohci_suspend()
+> routine in ohci_hcd_s3c2410_drv_suspend() will ensure
+> proper handling of suspend scenario.
 
--- 
-Alexander Shiyan <shc_work@mail.ru>
+> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Alan Stern <stern@rowland.harvard.edu>
+> Cc: Greg KH <greg@kroah.com>
+> Cc: linux-usb at vger.kernel.org
+> ---
+>   drivers/usb/host/ohci-s3c2410.c |    3 +++
+>   1 file changed, 3 insertions(+)
+
+> diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
+> index 8018bb1..2ffa693 100644
+> --- a/drivers/usb/host/ohci-s3c2410.c
+> +++ b/drivers/usb/host/ohci-s3c2410.c
+> @@ -430,6 +430,7 @@ static int ohci_hcd_s3c2410_drv_suspend(struct device *dev)
+>   	struct platform_device *pdev = to_platform_device(dev);
+>   	unsigned long flags;
+>   	int rc = 0;
+> +	bool do_wakeup = device_may_wakeup(dev);
+>
+>   	/*
+>   	 * Root hub was already suspended. Disable irq emission and
+> @@ -445,6 +446,8 @@ static int ohci_hcd_s3c2410_drv_suspend(struct device *dev)
+>
+>   	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
+>
+> +	rc = ohci_suspend(hcd, do_wakeup);
+> +
+
+    Why not call ohci_suspend with device_may_wakeup(&pdev->dev) result 
+directly, saving on a local variable only used once? Same comment about 
+the following patches...
+
+WBR, Sergei
