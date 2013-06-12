@@ -1,41 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 12 Jun 2013 17:58:49 +0100
+Date: Wed, 12 Jun 2013 18:01:43 +0100
 Subject: [PATCH] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <51B76E99.3090001@wwwdotorg.org>
+In-Reply-To: <51B76F42.2020704@wwwdotorg.org>
 References: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
  <20130611172342.GJ3439@mudshark.cambridge.arm.com>
- <51B767A8.7000506@wwwdotorg.org>
- <20130611182927.GP3439@mudshark.cambridge.arm.com>
- <51B76E99.3090001@wwwdotorg.org>
-Message-ID: <20130612165849.GJ2563@mudshark.cambridge.arm.com>
+ <51B76F42.2020704@wwwdotorg.org>
+Message-ID: <20130612170143.GK2563@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
-
-On Tue, Jun 11, 2013 at 07:38:17PM +0100, Stephen Warren wrote:
-> On 06/11/2013 12:29 PM, Will Deacon wrote:
-> > Yes, you're right. In fact, since we don't support KEXEC_JUMP on ARM, we
-> > could dispense with machine_shutdown altogether (just make it do nothing)
-> > and move the code into machine_kexec, which has a much better name.
+On Tue, Jun 11, 2013 at 07:41:06PM +0100, Stephen Warren wrote:
+> On 06/11/2013 11:23 AM, Will Deacon wrote:
+> > Hi Stephen,
 > > 
-> > What do you think?
+> > On Mon, Jun 10, 2013 at 07:12:41PM +0100, Stephen Warren wrote:
+> >> From: Stephen Warren <swarren@nvidia.com>
+> >>
+> >> machine_shutdown() is a hook for kexec. Add a comment saying so, since
+> >> it isn't obvious from the function name.
 > 
-> That seems fine to me. Or, if I'm changing the prototype of
-> machine_shutdown(), I could just rename it to e.g.
-> machine_kexec_shutdown() while I'm at it?
+> >> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> >> index 282de48..dbe1692 100644
+> >> --- a/arch/arm/kernel/process.c
+> >> +++ b/arch/arm/kernel/process.c
+> >> @@ -97,13 +97,14 @@ void soft_restart(unsigned long addr)
+> >>  {
+> >>  	u64 *stack = soft_restart_stack + ARRAY_SIZE(soft_restart_stack);
+> >>  
+> >> +	BUG_ON(num_online_cpus() > 1);
+> > 
+> > I think this is overkill, and we could actually scream and try to return an
+> > error here (we've not yet switched stack, and the upper layers of kexec look
+> > like they can do something with an error code).
+> 
+> Oh, that's the BUG_ON I added to soft_restart() not the one I added into
+> machine_shutdown().
+> 
+> I added this one to make sure nobody was using soft_restart() on an SMP
+> machine; Russell had asked to validate that all SMP systems provided a
+> HW restart implementation.
+> 
+> I assume your comments re: aborting the kexec by returning an error code
+> apply more to machine_shutdown() which happens a bunch earlier.
 
-Probably best to leave it alone as it has a declaration in linux/reboot.h
-and is referenced directly by the core kexec code. Moving all this into
-machine_kexec is a better move.
-
-> Actually, I was wondering if ARM's implementation wasn't already
-> KEXEC_JUMP; after all, it uses soft_restart(), which simply jumps to the
-> new kernel rather than doing any kind of HW reset, right? I must admit
-> though, the Kconfig for KEXEC_JUMP doesn't really help me understand
-> what the difference is supposed to be.
-
-I think KEXEC_JUMP keeps both of the kernels `alive' at the same time, so
-you can `jump' between them -- that's certainly not what we do on ARM.
+No, I did mean soft_restart! For kexec, this hangs off machine_kexec, which
+seems to propogate errors correctly. For invocations via the machine
+descriptor (i.e. arm_pm_restart), we'll print out `reboot failed' and go
+into a while(1) loop.
 
 Will
