@@ -1,67 +1,27 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Jun 2013 11:37:15 -0600
-Subject: [PATCH 2/3] ARM: tegra: enable audio on Beaver
-In-Reply-To: <1371058636-25244-1-git-send-email-swarren@wwwdotorg.org>
-References: <1371058636-25244-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1371058636-25244-2-git-send-email-swarren@wwwdotorg.org>
+Date: Wed, 12 Jun 2013 11:41:28 -0600
+Subject: [PATCH V2 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <51AE5EE3.3010607@linaro.org>
+References: <1370342880-422-1-git-send-email-josephl@nvidia.com>
+ <1370342880-422-4-git-send-email-josephl@nvidia.com>
+ <51AE5EE3.3010607@linaro.org>
+Message-ID: <51B8B2C8.1090006@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stephen Warren <swarren@nvidia.com>
+On 06/04/2013 03:40 PM, Daniel Lezcano wrote:
+> On 06/04/2013 12:48 PM, Joseph Lo wrote:
+>> This supports CPU core power down on each CPU when CPU idle. When CPU go
+>> into this state, it saves it's context and needs a proper configuration
+>> in flow controller to power gate the CPU when CPU runs into WFI
+>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
+>> wake up event in flow controller.
+>>
+>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+> 
+> I would like to understand why there is a WARN with the
+> CPUIDLE_FLAG_TIMER_STOP flag set before queuing this patch and ensure it
+> is not the tree hiding the forest.
 
-Beaver uses the RT5640 audio CODEC. Instantiate this on the I2C bus, and
-add the top-level "sound" node to hook everything together and provide a
-"sound card" device.
-
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
- arch/arm/boot/dts/tegra30-beaver.dts | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
-
-diff --git a/arch/arm/boot/dts/tegra30-beaver.dts b/arch/arm/boot/dts/tegra30-beaver.dts
-index a7a34b9..87c5f7b 100644
---- a/arch/arm/boot/dts/tegra30-beaver.dts
-+++ b/arch/arm/boot/dts/tegra30-beaver.dts
-@@ -116,6 +116,15 @@
- 		status = "okay";
- 		clock-frequency = <100000>;
- 
-+		rt5640: rt5640 {
-+			compatible = "realtek,rt5640";
-+			reg = <0x1c>;
-+			interrupt-parent = <&gpio>;
-+			interrupts = <TEGRA_GPIO(X, 3) GPIO_ACTIVE_HIGH>;
-+			realtek,ldo1-en-gpios =
-+				<&gpio TEGRA_GPIO(X, 2) GPIO_ACTIVE_HIGH>;
-+		};
-+
- 		tps62361 {
- 			compatible = "ti,tps62361";
- 			reg = <0x60>;
-@@ -404,4 +413,24 @@
- 			gpios = <&gpio TEGRA_GPIO(L, 0) GPIO_ACTIVE_HIGH>;
- 		};
- 	};
-+
-+	sound {
-+		compatible = "nvidia,tegra-audio-rt5640-beaver",
-+			     "nvidia,tegra-audio-rt5640";
-+		nvidia,model = "NVIDIA Tegra Beaver";
-+
-+		nvidia,audio-routing =
-+			"Headphones", "HPOR",
-+			"Headphones", "HPOL";
-+
-+		nvidia,i2s-controller = <&tegra_i2s1>;
-+		nvidia,audio-codec = <&rt5640>;
-+
-+		nvidia,hp-det-gpios = <&gpio TEGRA_GPIO(W, 2) GPIO_ACTIVE_HIGH>;
-+
-+		clocks = <&tegra_car TEGRA30_CLK_PLL_A>,
-+			 <&tegra_car TEGRA30_CLK_PLL_A_OUT0>,
-+			 <&tegra_car TEGRA30_CLK_EXTERN1>;
-+		clock-names = "pll_a", "pll_a_out0", "mclk";
-+	};
- };
--- 
-1.8.1.5
+Joseph, are you planning to post an updated series or respond to resolve
+Daniel's question?
