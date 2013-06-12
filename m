@@ -1,42 +1,52 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 13 Jun 2013 01:40:05 +0200
-Subject: [PATCH v3 5/7] clk: add basic Rockchip rk3066a clock support
-In-Reply-To: <20130612230234.GB9016@quad.lixom.net>
-References: <201306111328.52679.heiko@sntech.de>
- <201306130045.41723.heiko@sntech.de> <20130612230234.GB9016@quad.lixom.net>
-Message-ID: <201306130140.05981.heiko@sntech.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 12 Jun 2013 16:51:58 -0700
+Subject: [GIT PULL 6/6] s3c24xx driver
+In-Reply-To: <51B791F6.4000004@samsung.com>
+References: <51B791F6.4000004@samsung.com>
+Message-ID: <20130612235158.GC9067@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 13. Juni 2013, 01:02:34 schrieb Olof Johansson:
-> On Thu, Jun 13, 2013 at 12:45:41AM +0200, Heiko St?bner wrote:
-> > Part of me simply wants to wait for this - but rockchip stuff might be to
-> > late for 3.11 anyway, as we're near rc6.
+On Wed, Jun 12, 2013 at 06:09:10AM +0900, Kukjin Kim wrote:
+> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
 > 
-> For a new platform like this, it's useful to get some of the drivers to
-> land even if the main platform code isn't. Where things tend to get messy
-> is when we have to add a lot of code late in the cycle that has a lot of
-> external dependencies, since everybody then has to scramble about getting
-> things sorted out.
+>   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 > 
-> It's not too late for 3.11 yet, and in particular it'd be nice to see
-> things like clock and pinctrl stuff go in even if some other stuff misses
-> the train.
+> are available in the git repository at:
+> 
 
-pinctrl is already in Linus Walleijs tree :-)
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/s3c24xx-driver-1
+> 
+> for you to fetch changes up to ae7b6dccf6711e8d5815688f1572ab55bf5b3069:
+> 
+>   Merge branch 'v3.11-next/driver-cpufreq' into
+> v3.11-next/s3c24xx-driver (2013-06-12 05:24:22 +0900)
+> 
+> ----------------------------------------------------------------
+> 
+> update driver for s3c24xx
+> - move cpufreq driver into drivers/
+> - add pinctrl-s3c24xx driver
+> - cleanup OF in gpio driver
+> 
+> ----------------------------------------------------------------
+> Heiko Stuebner (1):
+>       pinctrl: Add pinctrl-s3c24xx driver
+> 
+> Kukjin Kim (3):
+>       Merge branch 'v3.11-next/driver-gpio' into v3.11-next/s3c24xx-driver
+>       Merge branch 'v3.11-next/driver-pinctrl' into
+> v3.11-next/s3c24xx-driver
+>       Merge branch 'v3.11-next/driver-cpufreq' into
+> v3.11-next/s3c24xx-driver
 
-Tomorrow I'll try to send the mmc stuff to the mmc lists, as my dw-mmc 
-dependency from Dinh Nguyen also seems to go this way.
+Hi,
 
-The clocks are the really hard part, simply because Mike's upcoming dt support 
-for the divider and mux clocks will let me get rid of the small clocks that 
-simply hold. And of course I also need the HIWORD_MASK flag for the clocks from 
-the hisilicon series.
+No need to do a merge commit per patch, just do them on a single branch in the
+future, please.
 
-Is there some sane intermediate step for the clocks? One possibility that 
-comes to mind, would be to only declare the gates and provide fixed rate 
-parents to the timer and mmc and add the divs and muxes when Mikes dt patches 
-are ready.
+Pulled.
 
-I.e. I would keep the gate clocks grouped like now to not have to declare 160 
-individual gates later :-)
+
+-Olof
