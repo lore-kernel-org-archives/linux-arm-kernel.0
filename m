@@ -1,46 +1,36 @@
-From: dinguyen@altera.com (Dinh Nguyen)
-Date: Tue, 11 Jun 2013 19:08:16 -0500
-Subject: [PATCHv6 6/6] mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA
-In-Reply-To: <20130611232756.GD23774@quad.lixom.net>
-References: <1370444578-25721-1-git-send-email-dinguyen@altera.com>
- <1370444578-25721-7-git-send-email-dinguyen@altera.com>
- <20130611232756.GD23774@quad.lixom.net>
-Message-ID: <1370995696.7804.17.camel@linux-builds1>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 11 Jun 2013 17:11:12 -0700
+Subject: About LPAE supporting on EXYNOS5440
+In-Reply-To: <6690814.Wx0lSuVAQ5@wuerfel>
+References: <109e01ce667e$5becc880$13c65980$%kim@samsung.com>
+ <6690814.Wx0lSuVAQ5@wuerfel>
+Message-ID: <20130612001112.GK23774@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-On Tue, 2013-06-11 at 16:27 -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Wed, Jun 05, 2013 at 10:02:58AM -0500, dinguyen at altera.com wrote:
-> > From: Dinh Nguyen <dinguyen@altera.com>
+On Tue, Jun 11, 2013 at 11:53:36AM +0200, Arnd Bergmann wrote:
+> On Tuesday 11 June 2013 17:33:33 Kukjin Kim wrote:
+> > Hi all,
 > > 
-> > Add platform specific functionality for the DW SD/MMC driver for
-> > SoCFPGA. Move SDMMC_CMD_USE_HOLD_REG to dw_mmc.h so other platforms
-> > can use this define.
+> > The exynos5440 can support LPAE and referece boards, SSDK5440 and SD5v1 have
+> > over 8GiB memory.
 > > 
-> > Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-> > CC: Seungwon Jeon <tgih.jun@samsung.com>
-> > CC: Jaehoon Chung <jh80.chung@samsung.com>
-> > CC: Arnd Bergmann <arnd@arndb.de>
-> > CC: Olof Johansson <olof@lixom.net>
-> > CC: Pavel Machek <pavel@denx.de>
-> > CC: linux-mmc at vger.kernel.org
+> > Current exynos_defconfig selects every EXYNOS SoCs including exynos5440 it
+> > means supporting LPAE will be selected for other EXYNOS SoCs.
+> > 
+> > I'm wondering if seleting LPAE causes some problem for multiplatform. Can we
+> > support LPAE enabled and disabled platform together with single zImage?
 > 
-> Acked-by: Olof Johansson <olof@lixom.net>
-> 
-> This one should be sent to (and applied by) Chris Ball, the MMC maintainer. The
-> driver is standalone and can go in independently on the platform code that will
-> configure it, so he can merge it without dependencies.
+> No, that isn't possible. I think we should enable all exynos support in the
+> regular multi_v7_defconfig and leave LPAE turned off for that, but create
+> another multi_lpae_defconfig that has all LPAE capable machines turned on.
+> This is also what I expect the distros to do.
 
-Thanks Olof. I will send to Chris Ball. I kinda thought that since
-Jaehoon and Seungwon were maintainers of the dw_mmc driver that I didn't
-need to send to Chris.
+I think it would be unfortunate to split the defconfig just for LPAE,
+since all the other parts should be identical (drivers, etc).
 
-Dinh
-> 
-> 
-> -Olof
-> 
+I wonder if it makes more sense to just include a config fragment to
+turn on LPAE together with the existing multi_v7_defconfig.
+
+
+-Olof
