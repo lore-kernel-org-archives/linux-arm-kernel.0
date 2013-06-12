@@ -1,56 +1,42 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 13 Jun 2013 01:38:05 +0200
-Subject: [PATCH 00/15] Final Samsung PWM support cleanup
-In-Reply-To: <1604160.oAKkaEhla1@flatron>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <20130612230023.GA9016@quad.lixom.net> <1604160.oAKkaEhla1@flatron>
-Message-ID: <201306130138.05692.heiko@sntech.de>
+Date: Thu, 13 Jun 2013 01:40:05 +0200
+Subject: [PATCH v3 5/7] clk: add basic Rockchip rk3066a clock support
+In-Reply-To: <20130612230234.GB9016@quad.lixom.net>
+References: <201306111328.52679.heiko@sntech.de>
+ <201306130045.41723.heiko@sntech.de> <20130612230234.GB9016@quad.lixom.net>
+Message-ID: <201306130140.05981.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 13. Juni 2013, 01:13:47 schrieb Tomasz Figa:
-> Hi Olof,
+Am Donnerstag, 13. Juni 2013, 01:02:34 schrieb Olof Johansson:
+> On Thu, Jun 13, 2013 at 12:45:41AM +0200, Heiko St?bner wrote:
+> > Part of me simply wants to wait for this - but rockchip stuff might be to
+> > late for 3.11 anyway, as we're near rc6.
 > 
-> On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
-> > On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
-> > > > Needs testing on other platforms as I could only compile test for
-> > > > them.
-> > 
-> > How/who can help here? WHo has and still cares for other affected
-> > platforms?
-> > 
-> > > > 66 files changed, 627 insertions(+), 1580 deletions(-)
+> For a new platform like this, it's useful to get some of the drivers to
+> land even if the main platform code isn't. Where things tend to get messy
+> is when we have to add a lot of code late in the cycle that has a lot of
+> external dependencies, since everybody then has to scramble about getting
+> things sorted out.
 > 
-> I will try to test this on Exynos 4 at work, if I somehow manage to find
-> any way to use PWM on our boards (other than already-tested PWM
-> clocksource).
-> 
-> Unfortunately, except S3C6410, I don't have access to other platforms, or
-> at least I won't in any reasonable time.
-> 
-> If I remember correctly, in case of my watchdog support cleanup, Kukjin
-> has been able to test it on S5P64x0.
-> 
-> Heiko and Sylwester used to have some s3c24xx-based boards, not sure if
-> they still do and are interested in their support in mainline.
-> 
-> So all left is S5PC100 (for which I couldn't find anyone who cares) and
-> Exynos5.
-> 
-> > Nice cleanup.
-> 
-> Thanks.
-> 
-> > > Any comments for this series?
-> > 
-> > Yes, above. :) In general looks good -- testing coverage is a bit of a
-> > concern.
-> 
-> Yeah. Unfortunately all I could do was testing on Tiny6410 and compile
-> testing on others. I hope we find some really helpful people over here who
-> could waste a bit of their precious time for this museum. ;)
+> It's not too late for 3.11 yet, and in particular it'd be nice to see
+> things like clock and pinctrl stuff go in even if some other stuff misses
+> the train.
 
-I'll try to give it a testrun tomorrow. And my s3c2416 will always be the 
-first-love-architecture for me ;-)
+pinctrl is already in Linus Walleijs tree :-)
 
-Heiko
+Tomorrow I'll try to send the mmc stuff to the mmc lists, as my dw-mmc 
+dependency from Dinh Nguyen also seems to go this way.
+
+The clocks are the really hard part, simply because Mike's upcoming dt support 
+for the divider and mux clocks will let me get rid of the small clocks that 
+simply hold. And of course I also need the HIWORD_MASK flag for the clocks from 
+the hisilicon series.
+
+Is there some sane intermediate step for the clocks? One possibility that 
+comes to mind, would be to only declare the gates and provide fixed rate 
+parents to the timer and mmc and add the divs and muxes when Mikes dt patches 
+are ready.
+
+I.e. I would keep the gate clocks grouped like now to not have to declare 160 
+individual gates later :-)
