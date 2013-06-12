@@ -1,103 +1,47 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Wed, 12 Jun 2013 12:10:22 +0000
-Subject: [PATCH 03/11] gpio: davinci: Modify to platform driver
-In-Reply-To: <51B826BF.7050009@ti.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
- <1369206634-6778-4-git-send-email-avinashphilip@ti.com>
- <51B71056.9010103@ti.com>
- <518397C60809E147AF5323E0420B992E3EAD9D75@DBDE04.ent.ti.com>
- <51B826BF.7050009@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EADA252@DBDE04.ent.ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 12 Jun 2013 14:08:00 +0200
+Subject: [V2 3/7] video: mmp: fix graphics/video layer enable/mask swap
+ issue
+In-Reply-To: <1370879552-11290-1-git-send-email-jtzhou@marvell.com>
+References: <1370879521-10962-1-git-send-email-jtzhou@marvell.com>
+ <1370879552-11290-1-git-send-email-jtzhou@marvell.com>
+Message-ID: <20130612120800.GC305@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 13:13:59, Nori, Sekhar wrote:
-> On 6/11/2013 6:25 PM, Philip, Avinash wrote:
+On 23:52 Mon 10 Jun     , Jett.Zhou wrote:
+> From: Jing Xiang <jxiang@marvell.com>
 > 
-> > On Tue, Jun 11, 2013 at 17:26:06, Nori, Sekhar wrote:
+> There is bug when switch dma of graphic layer and video layer, it
+> configured opposite bit, fix it.
 > 
-> >> On 5/22/2013 12:40 PM, Philip Avinash wrote:
+> Signed-off-by: Jing Xiang <jxiang@marvell.com>
+> Signed-off-by: Jett.Zhou <jtzhou@marvell.com>
+do you need those 2 fixes for 3.10 or it can wait for 3.11?
+
+Best Regards,
+J.
+> ---
+>  drivers/video/mmp/hw/mmp_ctrl.c |    6 +++---
+>  1 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> >>> @@ -179,13 +204,10 @@ static int __init davinci_gpio_setup(void)
-> >>>  		gpiochip_add(&ctlrs[i].chip);
-> >>>  	}
-> >>>  
-> >>> -	soc_info->gpio_ctlrs = ctlrs;
-> >>
-> >>> -	soc_info->gpio_ctlrs_num = DIV_ROUND_UP(ngpio, 32);
-> >>
-> >> You drop setting gpio_ctlrs_num here and don't introduce it anywhere
-> >> else in the patchset so in effect you render the inline gpio get/set API
-> >> useless. Looks like this initialization should be moved to platform code?
-> > 
-> > With [PATCH 08/11] ARM: davinci: start using gpiolib support gpio get/set API
-> > Has no more dependency on soc_info->gpio_ctlrs_num.
-> 
-> With this series, you have removed support for inline gpio get/set API.
-> I see that the inline functions are still available for use on
-> tnetv107x. I wonder why it is important to keep these for tnetv107x when
-> not necessary for other DaVinci devices?
-
-To support DT boot in da850, gpio davinci has to be converted to a driver and
-remove references to davinci_soc_info from driver. But tnetv107x has 
-separate GPIO driver and reference to davinci_soc_info can also be removed.
-But I didn't found defconfig support for tnetv107x platforms and left untouched.
-As I will not be able to build and test on tnetv107x, I prefer to not touch it.
-
-> 
-> When you are removing this feature, please note it prominently in your
-> cover letter and patch description.
-
-Ok
-
-> Also, please provide some data on 
-> how the latency now compares to that of inline access earlier. This is
-> important especially for the read.
-
-I am not sure whether I understood correctly or not? Meanwhile I had done
-an experiment by reading printk timing before and after gpio_get_value from
-a test module. I think this will help in software latency for inline access over
-gpiolib specific access.
-
-gpio_get_value latency testing code
-
-+
-+       local_irq_disable();
-+       pr_emerg("%d %x\n", __LINE__, jiffies);
-+       gpio_get_value(gpio_num);
-+       pr_emerg("%d %x\n", __LINE__, jiffies);
-+       local_irq_enable();
-
-inline gpio functions with interrupt disabled
-[   29.734337] 81 ffff966c
-[   29.736847] 83 ffff966c
-
-Time diff = 	0.00251
-
-gpio library with interrupt disabled
-
-[  272.876763] 81 fffff567
-[  272.879291] 83 fffff567
-
-Time diff =	0.002528
-
-Inline function takes less time as expected.
-
-> For the writes, gpio clock will
-> mostly determine how soon the value changes on the pin.
-> 
-> I am okay with removing the inline access feature. It helps simplify
-> code and most arm machines don't use them. I would just like to see some
-> data for justification as this can be seen as feature regression. Also,
-> if we are removing it, its better to also remove it completely and get
-> the LOC savings instead of just stopping its usage.
-
-I see build failure with below patch for tnetv107x
-[v6,6/6] Davinci: tnetv107x default configuration 
-
-So I prefer to leave tnetv107x platform for now.
-
-Thanks
-Avinash
-
+> diff --git a/drivers/video/mmp/hw/mmp_ctrl.c b/drivers/video/mmp/hw/mmp_ctrl.c
+> index 3a8c2a3..8836053 100644
+> --- a/drivers/video/mmp/hw/mmp_ctrl.c
+> +++ b/drivers/video/mmp/hw/mmp_ctrl.c
+> @@ -160,9 +160,9 @@ static void overlay_set_win(struct mmp_overlay *overlay, struct mmp_win *win)
+>  
+>  static void dmafetch_onoff(struct mmp_overlay *overlay, int on)
+>  {
+> -	u32 mask = overlay_is_vid(overlay) ? CFG_GRA_ENA_MASK :
+> -		   CFG_DMA_ENA_MASK;
+> -	u32 enable = overlay_is_vid(overlay) ? CFG_GRA_ENA(1) : CFG_DMA_ENA(1);
+> +	u32 mask = overlay_is_vid(overlay) ? CFG_DMA_ENA_MASK :
+> +		   CFG_GRA_ENA_MASK;
+> +	u32 enable = overlay_is_vid(overlay) ? CFG_DMA_ENA(1) : CFG_GRA_ENA(1);
+>  	u32 tmp;
+>  	struct mmp_path *path = overlay->path;
+>  
+> -- 
+> 1.7.0.4
 > 
