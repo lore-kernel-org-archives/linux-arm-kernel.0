@@ -1,52 +1,46 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 13 Jun 2013 01:13:47 +0200
-Subject: [PATCH 00/15] Final Samsung PWM support cleanup
-In-Reply-To: <20130612230023.GA9016@quad.lixom.net>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <1444953.LmSrOvSyJG@flatron> <20130612230023.GA9016@quad.lixom.net>
-Message-ID: <1604160.oAKkaEhla1@flatron>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 12 Jun 2013 19:15:58 -0400 (EDT)
+Subject: [GIT PULL] MCPM backend for VExpress TC2
+In-Reply-To: <20130612212901.GA7012@quad.lixom.net>
+References: <alpine.LFD.2.03.1306121612150.18597@syhkavp.arg>
+ <20130612212901.GA7012@quad.lixom.net>
+Message-ID: <alpine.LFD.2.03.1306121908030.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Wed, 12 Jun 2013, Olof Johansson wrote:
 
-On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
-> On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
-> > > Needs testing on other platforms as I could only compile test for
-> > > them.
+> Hi,
 > 
-> How/who can help here? WHo has and still cares for other affected
-> platforms?
-> > > 66 files changed, 627 insertions(+), 1580 deletions(-)
-
-I will try to test this on Exynos 4 at work, if I somehow manage to find 
-any way to use PWM on our boards (other than already-tested PWM 
-clocksource).
-
-Unfortunately, except S3C6410, I don't have access to other platforms, or 
-at least I won't in any reasonable time.
-
-If I remember correctly, in case of my watchdog support cleanup, Kukjin 
-has been able to test it on S5P64x0.
-
-Heiko and Sylwester used to have some s3c24xx-based boards, not sure if 
-they still do and are interested in their support in mainline.
-
-So all left is S5PC100 (for which I couldn't find anyone who cares) and 
-Exynos5.
-
-> Nice cleanup.
-
-Thanks.
-
-> > Any comments for this series?
 > 
-> Yes, above. :) In general looks good -- testing coverage is a bit of a
-> concern.
+> On Wed, Jun 12, 2013 at 04:52:38PM -0400, Nicolas Pitre wrote:
+> > ARnd, Olof, please pull the following:
+> > 
+> >         git://git.linaro.org/people/nico/linux TC2
+> > 
+> > This is the MCPM backend submission for VExpress with a TC2 core tile.
+> > This enables SMP secondary boot, CPU hotplug, and paves the way for 
+> > cpuidle and cpufreq on this platform.
+> > 
+> > A big prerequisite for this support is the serial power controller 
+> > driver posted by Lorenzo and extensively reviewed on the list.  Because 
+> > of the strict dependency, we asked Samuel Ortiz twice for his ACK to 
+> > merge it via ARM-SOC:
+> > 
+> > 	http://article.gmane.org/gmane.linux.kernel/1506121
+> > 
+> > But no reply came back so far.  If Samuel had any issues with this 
+> > driver I'm trusting he would have had ample time to express them at this 
+> > point.  I'm therefore including it by default.
+> 
+> I just pinged Sam on IRC and he said he'll look at them shortly, so we'll wait
+> for his review. They were, after all, only posted 2.5 weeks ago for the first
+> time.
 
-Yeah. Unfortunately all I could do was testing on Tiny6410 and compile 
-testing on others. I hope we find some really helpful people over here who 
-could waste a bit of their precious time for this museum. ;)
+Public records show that Samuel is normally very responsive i.e. replies 
+from him are sent in a matter of hours.  I concluded that he might just 
+not be interested in highly vexpress specific code if 2.5 weeks have 
+passed without a word.
 
-Best regards,
-Tomasz
+
+Nicolas
