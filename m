@@ -1,73 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Jun 2013 15:56:30 -0700
-Subject: [PATCH 3/3] ARM: mach-moxart: add MOXA ART UART debug files
-In-Reply-To: <1371040448-28742-4-git-send-email-jonas.jensen@gmail.com>
-References: <1371040448-28742-1-git-send-email-jonas.jensen@gmail.com>
- <1371040448-28742-4-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <20130612225630.GC8146@quad.lixom.net>
+Date: Wed, 12 Jun 2013 16:00:23 -0700
+Subject: [PATCH 00/15] Final Samsung PWM support cleanup
+In-Reply-To: <1444953.LmSrOvSyJG@flatron>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1444953.LmSrOvSyJG@flatron>
+Message-ID: <20130612230023.GA9016@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
 
-On Wed, Jun 12, 2013 at 02:34:08PM +0200, Jonas Jensen wrote:
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-> ---
->  arch/arm/Kconfig.debug          |   10 ++++++++++
->  arch/arm/include/debug/moxart.S |   14 ++++++++++++++
->  2 files changed, 24 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/include/debug/moxart.S
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index 1d41908..a0e4a32 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -422,6 +422,15 @@ choice
->  		  Say Y here if you want kernel low-level debugging support
->  		  on Allwinner A1X based platforms on the UART1.
->  
-> +    config DEBUG_MOXART_UART0
-> +        bool "Kernel low-level debugging messages via MOXART UART0"
-> +        depends on ARCH_MOXART
-> +        help
-> +          Say Y here if you want kernel low-level debugging support
-> +          on MOXART based platforms on the UART0.
-> +          select this to make sure "putc" in arch/arm/boot/compressed/debug.S
-> +          uses arch/arm/include/debug/moxart.S:s "addruart" macro
+> > Needs testing on other platforms as I could only compile test for them.
 
-Looks like the last two lines above are leftovers? It's not super-helpful for
-someone trying to figure out if they want this option or not; the first two
-lines covers that quite nicely.
+How/who can help here? WHo has and still cares for other affected platforms?
 
-> +
->  	config DEBUG_TEGRA_UART
->  		depends on ARCH_TEGRA
->  		bool "Use Tegra UART for low-level debug"
-> @@ -642,6 +651,7 @@ config DEBUG_LL_INCLUDE
->  	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
->  	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
->  	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
-> +	default "debug/moxart.S" if DEBUG_MOXART_UART0
->  	default "debug/tegra.S" if DEBUG_TEGRA_UART
->  	default "debug/ux500.S" if DEBUG_UX500_UART
->  	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
-> diff --git a/arch/arm/include/debug/moxart.S b/arch/arm/include/debug/moxart.S
-> new file mode 100644
-> index 0000000..01e2aee
-> --- /dev/null
-> +++ b/arch/arm/include/debug/moxart.S
-> @@ -0,0 +1,14 @@
-> +/* Copyright (C) 2013 Jonas Jensen <jonas.jensen@gmail.com>
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License as published by the
-> + * Free Software Foundation; either version 2 of the License,
-> + * or (at your option) any later version. */
-> +
-> +#define MOXART_UART_DEBUG_PHYS_BASE		0x98200000
-> +
-> +.macro	addruart, rp, rv, tmp
-> +	ldr	\rp, =MOXART_UART_DEBUG_PHYS_BASE	@ physical
+> > 66 files changed, 627 insertions(+), 1580 deletions(-)
 
-You need to set rv here too.
+Nice cleanup.
+
+> Any comments for this series?
+
+Yes, above. :) In general looks good -- testing coverage is a bit of a concern.
+
 
 -Olof
