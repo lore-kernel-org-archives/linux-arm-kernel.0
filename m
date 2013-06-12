@@ -1,66 +1,55 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Wed, 12 Jun 2013 15:55:12 +0100
-Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
- properties from a dt node
-In-Reply-To: <201306102140.29918.heiko@sntech.de>
-References: <201306102139.32444.heiko@sntech.de>
- <201306102140.29918.heiko@sntech.de>
-Message-ID: <51B88BD0.805@imgtec.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 12 Jun 2013 16:57:26 +0200
+Subject: [PATCH V3 1/3] Add PCIe driver for Samsung Exynos
+In-Reply-To: <002401ce6718$d6bbc8f0$84335ad0$@samsung.com>
+References: <000d01ce6360$9504e7e0$bf0eb7a0$@samsung.com>
+ <36071399.7aY6jgGn2d@wuerfel> <002401ce6718$d6bbc8f0$84335ad0$@samsung.com>
+Message-ID: <201306121657.26441.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-On 10/06/13 20:40, Heiko St?bner wrote:
-> pinconf_generic_parse_dt_config() takes a node as input and generates an
-> array of generic pinconfig values from the properties of this node.
+On Wednesday 12 June 2013, Jingoo Han wrote:
+> On Friday, June 07, 2013 7:53 PM, Arnd Bergmann wrote:
+> > On Friday 07 June 2013 18:22:50 Jingoo Han wrote:
+> > 
+> > > +- ranges: ranges for the PCI memory and I/O regions
+> > > +- reset-gpio: gpio pin number of power good signal
+> > 
+> > The 'reset-gpio' property seems incorrect. I think this should either
+> > use the gpio binding or the reset-controller binding. Specifying
+> > bare numbers to use as gpio pins does not work, since the number
+> > space for Linux internal gpio numbers is not necessarily the same
+> > as used by the hardware.
 > 
-> As I couldn't find a mechanism to count the number of properties of a node
-> the function uses internally an array to accept one of parameter and copies
-> the real present options to a smaller variable at its end.
+> As you mentioned, other Exynos SoCs such as Exynos5250 set
+> GPIO properties in DT, as below:
+> (./arch/arm/boot/dts/exynos5250-smdk5250.dts)
+> 	hdmi {
+> 		hpd-gpio = <&gpx3 7 0>;
+> 	};
+> 	usb at 12110000 {
+> 		samsung,vbus-gpio = <&gpx2 6 0>;
+> 	};
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> However, the situation of Exynos5440 GPIO is different.
+> The following bare numbers of GPIO work properly on Exynos5440.
+> (./arch/arm/boot/dts/exynos5440-ssdk5440.dts)
+> 	pcie0 at 40000000 {
+> 		reset-gpio = <5>;
+> 	}
+> 	pcie0 at 40000000 {
+> 		reset-gpio = <22>;
+> 	}
+> 
+> Thomas Abraham is the author of pinctrl driver for EXYNOS5440.
+> (./drivers/pinctrl/pinctrl-exynos5440.c)
+> 
+> Thomas Abraham or Kukjin Kim, can you confirm this?
+> If I am wrong, please let me know kindly. :)
 
-<snip>
+This is not about the code working at the moment, it is about
+it being correct. The current method you are using would stop
+working if something changes in the pinctrl code, and would
+not be portable to other SoCs.
 
-> @@ -139,3 +140,83 @@ void pinconf_generic_dump_config(struct pinctrl_dev *pctldev,
->  }
->  EXPORT_SYMBOL_GPL(pinconf_generic_dump_config);
->  #endif
-> +
-> +#ifdef CONFIG_OF
-> +struct pinconf_generic_dt_params {
-> +	const char * const property;
-> +	enum pin_config_param param;
-> +	u32 default_value;
-> +};
-> +
-> +static struct pinconf_generic_dt_params dt_params[] = {
-> +	{ "bias-disable", PIN_CONFIG_BIAS_DISABLE, 0 },
-> +	{ "bias-high-impedance", PIN_CONFIG_BIAS_HIGH_IMPEDANCE, 0 },
-> +	{ "bias-bus-hold", PIN_CONFIG_BIAS_BUS_HOLD, 0 },
-> +	{ "bias-pull-up", PIN_CONFIG_BIAS_PULL_UP, 0 },
-> +	{ "bias-pull-down", PIN_CONFIG_BIAS_PULL_DOWN, 0 },
-> +	{ "bias-pull-pin-default", PIN_CONFIG_BIAS_PULL_PIN_DEFAULT, 0 },
-> +	{ "drive-push-pull", PIN_CONFIG_DRIVE_PUSH_PULL, 0 },
-> +	{ "drive-open-drain", PIN_CONFIG_DRIVE_OPEN_DRAIN, 0 },
-> +	{ "drive-open-source", PIN_CONFIG_DRIVE_OPEN_SOURCE, 0 },
-> +	{ "drive-strength", PIN_CONFIG_DRIVE_STRENGTH, 0 },
-> +	{ "input-schmitt-enable", PIN_CONFIG_INPUT_SCHMITT_ENABLE, 1 },
-> +	{ "input-schmitt-disable", PIN_CONFIG_INPUT_SCHMITT_ENABLE, 0 },
-> +	{ "input-schmitt", PIN_CONFIG_INPUT_SCHMITT, 0 },
-> +	{ "input-debounce", PIN_CONFIG_INPUT_DEBOUNCE, 0 },
-> +	{ "power-source", PIN_CONFIG_POWER_SOURCE, 0 },
-> +	{ "slew-rate", PIN_CONFIG_SLEW_RATE, 0 },
-> +	{ "low-power-mode", PIN_CONFIG_LOW_POWER_MODE, 0 },
-> +	{ "output-low", PIN_CONFIG_OUTPUT, 0, },
-> +	{ "output-high", PIN_CONFIG_OUTPUT, 1, },
-
-shouldn't half of these default to 1 instead of 0? i.e. it's much nicer
-for the lone flag "bias-pull-up" to enable pull up rather than disable
-it (you even do this in the DT example in the bindings doc).
-
-Otherwise the patch looks good to me (though I haven't tried it yet).
-
-Cheers
-James
+	Arnd
