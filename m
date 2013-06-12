@@ -1,79 +1,29 @@
-From: padma.v@samsung.com (Padmavathi Venna)
-Date: Wed, 12 Jun 2013 13:53:45 +0530
-Subject: [PATCH RESEND V2] ARM: dts: wm8994: Add wm8994 regulator support on
- smdk5250.
-In-Reply-To: <1371025425-480-1-git-send-email-padma.v@samsung.com>
-References: <1371025425-480-1-git-send-email-padma.v@samsung.com>
-Message-ID: <1371025425-480-2-git-send-email-padma.v@samsung.com>
+From: henrik@henriknordstrom.net (Henrik =?ISO-8859-1?Q?Nordstr=F6m?=)
+Date: Wed, 12 Jun 2013 10:29:48 +0200
+Subject: [linux-sunxi] [PATCHv4 7/9] ARM: sun5i: dt: Add i2c muxing options
+In-Reply-To: <1371024438-16631-8-git-send-email-maxime.ripard@free-electrons.com>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371024438-16631-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1371025788.4659.20.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the required regulator supplies and properties
-for wm8994 codec on smdk5250 board.
+ons 2013-06-12 klockan 10:07 +0200 skrev Maxime Ripard:
 
-Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
----
+> +			i2c0_pins_a: i2c0 at 0 {
+> +				allwinner,pins = "PB0", "PB1";
+> +				allwinner,function = "i2c0";
+> +				allwinner,drive = <0>;
+> +				allwinner,pull = <0>;
 
-Changes since V1:
-	- Clubbed the same supply regulators as suggested by Mark.
+Is this right? All other use pull = 1.
 
- arch/arm/boot/dts/exynos5250-smdk5250.dts |   37 +++++++++++++++++++++++++++-
- 1 files changed, 35 insertions(+), 2 deletions(-)
+I guess it's board dependent depending on if there is external pullups
+or not on the i2c bus. I have seen Allwinner designs both with and
+without external pullups.
 
-diff --git a/arch/arm/boot/dts/exynos5250-smdk5250.dts b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-index f2a025e..dc2ec25 100644
---- a/arch/arm/boot/dts/exynos5250-smdk5250.dts
-+++ b/arch/arm/boot/dts/exynos5250-smdk5250.dts
-@@ -37,6 +37,30 @@
- 		};
- 	};
- 
-+	vdd:fixed-regulator at 0 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vdd-supply";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		regulator-always-on;
-+	};
-+
-+	dbvdd:fixed-regulator at 1 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "dbvdd-supply";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
-+
-+	spkvdd:fixed-regulator at 2 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "spkvdd-supply";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-always-on;
-+	};
-+
- 	i2c at 12C70000 {
- 		samsung,i2c-sda-delay = <100>;
- 		samsung,i2c-max-bus-freq = <20000>;
-@@ -47,8 +71,17 @@
- 		};
- 
- 		wm8994: wm8994 at 1a {
--			 compatible = "wlf,wm8994";
--			 reg = <0x1a>;
-+			compatible = "wlf,wm8994";
-+			reg = <0x1a>;
-+
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+
-+			AVDD2-supply = <&vdd>;
-+			CPVDD-supply = <&vdd>;
-+			DBVDD-supply = <&dbvdd>;
-+			SPKVDD1-supply = <&spkvdd>;
-+			SPKVDD2-supply = <&spkvdd>;
- 		};
- 	};
- 
--- 
-1.7.4.4
+It will not work well if there is neither internal or external pullup.
+And may stress the i2c components a bit if there is both..
+
+Regards
+Henrik
