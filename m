@@ -1,31 +1,26 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Wed, 12 Jun 2013 23:09:33 +0900
-Subject: [PATCH] ARM: shmobile: Rework sh7372 sleep code to use
- virt_to_phys()
-In-Reply-To: <20130605074553.16962.7736.sendpatchset@w520>
-References: <20130605074553.16962.7736.sendpatchset@w520>
-Message-ID: <20130612140932.GQ32751@verge.net.au>
+Date: Wed, 12 Jun 2013 23:09:37 +0900
+Subject: [PATCH 01/06] ARM: shmobile: Add SMP boot function and argument
+In-Reply-To: <20130610091936.18944.66463.sendpatchset@w520>
+References: <20130610091925.18944.68117.sendpatchset@w520>
+ <20130610091936.18944.66463.sendpatchset@w520>
+Message-ID: <20130612140936.GR32751@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 05, 2013 at 04:45:53PM +0900, Magnus Damm wrote:
+On Mon, Jun 10, 2013 at 06:19:36PM +0900, Magnus Damm wrote:
 > From: Magnus Damm <damm@opensource.se>
 > 
-> Instead of having a hard coded virt-to-phys address
-> conversion code in sleep-sh7372.S, rework the code
-> to do the conversion in C using virt_to_phys().
-> 
-> This removes the need for PLAT_PHYS_OFFSET which
-> in turn is needed for ARCH_MULTIPLATFORM.
+> Add code for mach-shmobile to allow specifying boot function
+> and argument. Will initially be used for SMP together with SCU
+> but may in the future also be used for deep sleep resume. This
+> patch removes one inline virtual to physical address conversion.
 > 
 > Signed-off-by: Magnus Damm <damm@opensource.se>
 > ---
 > 
->  Tested with A3SM Suspend-to-RAM on Mackerel.
-> 
->  arch/arm/mach-shmobile/include/mach/sh7372.h |    2 ++
->  arch/arm/mach-shmobile/pm-sh7372.c           |    3 +++
->  arch/arm/mach-shmobile/sleep-sh7372.S        |    5 ++++-
->  3 files changed, 9 insertions(+), 1 deletion(-)
+>  arch/arm/mach-shmobile/headsmp.S             |   13 ++++++++++---
+>  arch/arm/mach-shmobile/include/mach/common.h |    4 +++-
+>  2 files changed, 13 insertions(+), 4 deletions(-)
 
 Thanks, I have queued this up for v3.11 in the (new) cleanup-boot branch.
