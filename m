@@ -1,86 +1,63 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 12 Jun 2013 09:56:22 -0400
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20130612134845.GQ18614@n2100.arm.linux.org.uk>
-References: <CAF6AEGuGuCtYQo_W3RVJ_69iDxq17s3y_y7eNmWRCw41YUvZmg@mail.gmail.com>
- <20130610200839.GY18614@n2100.arm.linux.org.uk>
- <CAF6AEGsfzvdiGXqAu56rc-G_ZhhE_vnNbC6kpBmRtd-8Sh_uOQ@mail.gmail.com>
- <20130610211516.GZ18614@n2100.arm.linux.org.uk>
- <CAF6AEGu-e+cZW-1F6L+epE11oonFucreEY_KH+awRx7j5pScpA@mail.gmail.com>
- <20130610225607.GE18614@n2100.arm.linux.org.uk>
- <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
- <CAPM=9twJGgYiXxQyaXCnYd+bUPFv+P92qGdmJ39_4z29==4F2g@mail.gmail.com>
- <20130610233611.GK18614@n2100.arm.linux.org.uk>
- <CAPM=9tz6p2rhjNUg7ednT09A+dztbYskF32QkZeaCi_qrH8ipw@mail.gmail.com>
- <20130612134845.GQ18614@n2100.arm.linux.org.uk>
-Message-ID: <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 12 Jun 2013 14:57:35 +0100
+Subject: [PATCHv4 2/9] i2c: mv64xxx: make the registers offset configurable
+In-Reply-To: <1371024438-16631-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371024438-16631-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130612135735.GR18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 9:48 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 11, 2013 at 09:48:57AM +1000, Dave Airlie wrote:
->> On Tue, Jun 11, 2013 at 9:36 AM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Jun 11, 2013 at 09:24:16AM +1000, Dave Airlie wrote:
->> >> I'd like to see all the ARM based drivers based on CMA if it can meet
->> >> their requirements
->> >> and using close to standard GEM/dma-buf interfaces. Otherwise it'll be
->> >> come an unmaintainable
->> >> nightmare for everyone, but mostly for me.
->> >
->> > I am *not* using the CMA layer - that layer is just plain broken in
->> > DRM.  It forces every single gem object to be a CMA allocated object,
->> > which means I can't have cacheable pixmaps in X.  And that makes X
->> > suck.
->> >
->> > Okay, I'm pulling this and I'm going to keep it in my private cubox
->> > tree; I'm not persuing pushing this driver or any other Armada 510
->> > driver into mainline anymore.  It's just too much fscking hastle
->> > dealing with people who don't like various stuff.
->> >
->> > I've done my best to clean a lot of the crap up, and the problem is
->> > that no matter how much I clean up, it remains unacceptable.  Only
->> > the 100% perfect solution seems to be acceptable.  That is
->> > unacceptable given that this stuff has already consumed something
->> > like 8 months solid of my time.
->>
->> Russell, aren't you a kernel maintainer, because for fuck sake get real.
->>
->> I'm not merging bullshit into my tree that has a completely broken API that
->> has to be maintained for ever. You of all people should understand we
->> don't break Linux
->> userspace APIs, and adding a phys addr one is wrong, wrong, wrong, its not
->> cleanups, its just broken, and I'll never merge it.
->
-> And having thought about this driver, DRM some more, I'm now of the
-> opinion that DRM is not suitable for driving hardware where the GPU is
-> an entirely separate IP block from the display side.
->
-> DRM is modelled after the PC setup where your "graphics card" does
-> everything - it has the GPU, display and connectors all integrated
-> together.  This is not the case on embedded SoCs, which can be a
-> collection of different IPs all integrated together.
+On Wed, Jun 12, 2013 at 10:07:11AM +0200, Maxime Ripard wrote:
+> The Allwinner i2c controller uses the same logic as the Marvell one, but
+> with slightly different register offsets.
+> 
+> Introduce a structure that will be passed by either the pdata or
+> associated to the compatible strings, and that holds the various
+> registers that might be needed.
 
-actually it isn't even the case on desktop/laptop anymore, where you
-can have one gpu with scanout and a second one without (or just with
-display controller not hooked up to anything, etc, etc)
+I don't like this change.  It introduces further indirection where it's
+not really necessary, and it's also using platform data to specify this
+which is in the opposite direction to what's required for moving towards
+DT.
 
-That is the point of dmabuf and the upcoming fence/reservation stuff.
+> @@ -154,13 +147,13 @@ mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
+>  static void
+>  mv64xxx_i2c_hw_init(struct mv64xxx_i2c_data *drv_data)
+>  {
+> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SOFT_RESET);
+> +	writel(0, drv_data->reg_base + drv_data->regs->soft_reset);
 
-BR,
--R
+It'd be much better to copy the offsets themselves in drv_data.  You're
+only talking about 7 bytes here, so there's no worry about bloating the
+drv_data structure.
 
-> DRM is based on the assumption that you have a single card and everything
-> is known about that card.  Again, this is not the case with embedded SoCs,
-> which is why Sebastian is having a hard time with the DRM slave encoder
-> stuff.
->
-> If DRM is going to be usable on SoCs, it needs to become more modular in
-> nature, allowing the same scanout stuff to be used with different GPUs
-> and providing _kernel_ side interfaces to allow different GPUs to be
-> plugged in to a scanout implementation, or vice versa (the reverse is
-> probably easier because the scanout interface is nicely abstracted).
->
-> Or we go off and write an entirely new subsystem which *does* suit the
-> needs of modular SoC implementations.
+> @@ -611,8 +619,9 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+>  		drv_data->freq_n = pdata->freq_n;
+>  		drv_data->irq = platform_get_irq(pd, 0);
+>  		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
+> +		drv_data->regs = pdata->regs;
+>  	} else if (pd->dev.of_node) {
+> -		rc = mv64xxx_of_config(drv_data, pd->dev.of_node);
+> +		rc = mv64xxx_of_config(drv_data, &pd->dev);
+
+I'd suggest making the default register offsets be the drivers existing
+offsets, and allowing it to be overriden.  That nicely sorts out the
+next comment below, and also gets rid of it in platform data.  Moreover,
+if you're going to re-use this driver, you should do it via a different
+"compatible" name in DT, which the driver can then use to identify the
+different register set layout.
+
+> +struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
+> +	.addr		= 0x00,
+> +	.ext_addr	= 0x10,
+> +	.data		= 0x04,
+> +	.control	= 0x08,
+> +	.status		= 0x0c,
+> +	.clock		= 0x0c,
+> +	.soft_reset	= 0x1c,
+> +};
+
+No, this means every file which includes this header ends up defining
+this structure, which is globally visiable, and therefore its a recipe
+for link failures.
