@@ -1,42 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Jun 2013 09:54:57 -0700
-Subject: [PATCH 12/12] ARM: msm: Migrate to common clock framework
-In-Reply-To: <20130611222832.8816.77120@quantum>
-References: <1370373938-32417-1-git-send-email-sboyd@codeaurora.org>
- <1370373938-32417-13-git-send-email-sboyd@codeaurora.org>
- <20130611222832.8816.77120@quantum>
-Message-ID: <51B8A7E1.1020708@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 12 Jun 2013 17:58:49 +0100
+Subject: [PATCH] ARM: decouple CPU offlining from reboot/shutdown
+In-Reply-To: <51B76E99.3090001@wwwdotorg.org>
+References: <1370887961-31569-1-git-send-email-swarren@wwwdotorg.org>
+ <20130611172342.GJ3439@mudshark.cambridge.arm.com>
+ <51B767A8.7000506@wwwdotorg.org>
+ <20130611182927.GP3439@mudshark.cambridge.arm.com>
+ <51B76E99.3090001@wwwdotorg.org>
+Message-ID: <20130612165849.GJ2563@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/13 15:28, Mike Turquette wrote:
-> Quoting Stephen Boyd (2013-06-04 12:25:38)
->> Move the existing clock code in mach-msm to the common clock
->> framework. We lose our capability to set the rate of and enable a
->> clock through debugfs. This is ok though because the debugfs
->> features are mainly used for testing and development of new clock
->> code.
->>
->> To maintain compatibility with the original MSM clock code we
->> make a wrapper for clk_reset() that calls the struct msm_clk
->> specific reset function. This is necessary for the usb and sdcc
->> devices on MSM until a better suited API is made available.
->>
->> Cc: Saravana Kannan <skannan@codeaurora.org>
->> Cc: Mike Turquette <mturquette@linaro.org>
->> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> I just went through this quickly and nothing popped out at me.  Nice
-> diffstat btw!  Do you have any plans to move this to drivers/clk/msm ?
->
-> Acked-by: Mike Turquette <mturquette@linaro.org>
+Hi Stephen,
 
-Thanks Mike.
+On Tue, Jun 11, 2013 at 07:38:17PM +0100, Stephen Warren wrote:
+> On 06/11/2013 12:29 PM, Will Deacon wrote:
+> > Yes, you're right. In fact, since we don't support KEXEC_JUMP on ARM, we
+> > could dispense with machine_shutdown altogether (just make it do nothing)
+> > and move the code into machine_kexec, which has a much better name.
+> > 
+> > What do you think?
+> 
+> That seems fine to me. Or, if I'm changing the prototype of
+> machine_shutdown(), I could just rename it to e.g.
+> machine_kexec_shutdown() while I'm at it?
 
-I plan to add mmio support under drivers/clk/msm. Moving this proc_comm
-based code to drivers/clk/msm is possible but it would need to depend on
-the 3 architectures that use it so that it isn't available or compiled
-on our DT based platforms. We can do that later I suppose.
+Probably best to leave it alone as it has a declaration in linux/reboot.h
+and is referenced directly by the core kexec code. Moving all this into
+machine_kexec is a better move.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> Actually, I was wondering if ARM's implementation wasn't already
+> KEXEC_JUMP; after all, it uses soft_restart(), which simply jumps to the
+> new kernel rather than doing any kind of HW reset, right? I must admit
+> though, the Kconfig for KEXEC_JUMP doesn't really help me understand
+> what the difference is supposed to be.
+
+I think KEXEC_JUMP keeps both of the kernels `alive' at the same time, so
+you can `jump' between them -- that's certainly not what we do on ARM.
+
+Will
