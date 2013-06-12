@@ -1,95 +1,66 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 12 Jun 2013 18:53:33 +0200
-Subject: [PATCHv5 4/8] ARM: sunxi: dt: Add i2c controller nodes to the DTSI
+Date: Wed, 12 Jun 2013 18:53:32 +0200
+Subject: [PATCHv5 3/8] i2c: mv64xxx: Add Allwinner sun4i compatible
 In-Reply-To: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1371056017-8166-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1371056017-8166-4-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Allwinner A10 and A13 both have 3 i2c controller embedded.
-Add those to the common sunxi dtsi.
+Add the compatible string for the Allwinner A10 i2c controller and the
+associated register layout.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Reviewed-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- arch/arm/boot/dts/sun4i-a10.dtsi | 27 +++++++++++++++++++++++++++
- arch/arm/boot/dts/sun5i-a13.dtsi | 27 +++++++++++++++++++++++++++
- 2 files changed, 54 insertions(+)
+ drivers/i2c/busses/Kconfig       |  3 ++-
+ drivers/i2c/busses/i2c-mv64xxx.c | 11 +++++++++++
+ 2 files changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index 04ff62a..f7e4a96 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -321,5 +321,32 @@
- 			clocks = <&apb1_gates 23>;
- 			status = "disabled";
- 		};
-+
-+		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <7>;
-+			clocks = <&apb1_gates 0>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <8>;
-+			clocks = <&apb1_gates 1>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <9>;
-+			clocks = <&apb1_gates 2>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
- 	};
+diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
+index 631736e..5dc4148 100644
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -507,10 +507,11 @@ config I2C_MPC
+ 
+ config I2C_MV64XXX
+ 	tristate "Marvell mv64xxx I2C Controller"
+-	depends on (MV64X60 || PLAT_ORION)
++	depends on (MV64X60 || PLAT_ORION || ARCH_SUNXI)
+ 	help
+ 	  If you say yes to this option, support will be included for the
+ 	  built-in I2C interface on the Marvell 64xxx line of host bridges.
++	  This driver is also used for Allwinner SoCs I2C controllers.
+ 
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called i2c-mv64xxx.
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 7ba9bac..7a0e39b 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -129,6 +129,16 @@ static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
+ 	.soft_reset	= 0x1c,
  };
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index f34db19..31ebfd7 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -217,5 +217,32 @@
- 			clocks = <&apb1_gates 19>;
- 			status = "disabled";
- 		};
+ 
++static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_sun4i = {
++	.addr		= 0x00,
++	.ext_addr	= 0x04,
++	.data		= 0x08,
++	.control	= 0x0c,
++	.status		= 0x10,
++	.clock		= 0x14,
++	.soft_reset	= 0x18,
++};
 +
-+		i2c0: i2c at 01c2ac00 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2ac00 0x400>;
-+			interrupts = <7>;
-+			clocks = <&apb1_gates 0>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
-+		i2c1: i2c at 01c2b000 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b000 0x400>;
-+			interrupts = <8>;
-+			clocks = <&apb1_gates 1>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
-+
-+		i2c2: i2c at 01c2b400 {
-+			compatible = "allwinner,sun4i-i2c";
-+			reg = <0x01c2b400 0x400>;
-+			interrupts = <9>;
-+			clocks = <&apb1_gates 2>;
-+			clock-frequency = <100000>;
-+			status = "disabled";
-+		};
- 	};
+ static void
+ mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
+ 	struct i2c_msg *msg)
+@@ -509,6 +519,7 @@ static const struct i2c_algorithm mv64xxx_i2c_algo = {
+  *****************************************************************************
+  */
+ static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
++	{ .compatible = "allwinner,sun4i-i2c", .data = &mv64xxx_i2c_regs_sun4i},
+ 	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+ 	{}
  };
 -- 
 1.8.3
