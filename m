@@ -1,52 +1,47 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 12 Jun 2013 19:54:04 +0400
-Subject: [PATCH 03/10] USB: OHCI: Properly handle ohci-da8xx suspend
-In-Reply-To: <1371050918-29472-4-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1371050918-29472-4-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <51B8999C.30506@cogentembedded.com>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Wed, 12 Jun 2013 21:23:56 +0530
+Subject: [PATCH V2 0/6] USB: OHCI: more bus glues as separate modules
+In-Reply-To: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1370585013-12809-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371052442-14541-1-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+These patches are for separating the SOC On-Chip ohci host controller
+from ohci-hcd host code into its own driver module.
+This work is part of enabling multi-platform kernels on ARM.
 
-On 12-06-2013 19:28, Manjunath Goudar wrote:
+V2:
+  In patch 5/6 and 6/6:
+  -Set non-standard fields in hc_driver manually, rather than
+   relying on an expanded struct ohci_driver_overrides.
+  -Save orig_ohci_hub_control and orig_ohci_hub_status_data rather than
+   relying on ohci_hub_control and hub_status_data being exported.
+  -ohci_setup() has been removed because it is called in .reset member
+   of the ohci_hc_driver structure.
+ 
+  In patch 1/6 to 4/6
+  -ohci_setup() has been removed because it is called in .reset member
+   of the ohci_hc_driver structure.
 
-> Suspend scenario in case of ohci-da8xx glue was not
-> properly handled as it was not suspending generic part
-> of ohci controller.Calling explicitly the ohci_suspend()
-> routine in ohci_da8xx_suspend() will ensure proper
-> handling of suspend scenario.
+Manjunath Goudar (6):
+  USB: OHCI: make ohci-exynos a separate driver
+  USB: OHCI: make ohci-omap a separate driver
+  USB: OHCI: make ohci-omap3 a separate driver
+  USB: OHCI: make ohci-spear a separate driver
+  USB: OHCI: make ohci-at91 a separate driver
+  USB: OHCI: make ohci-s3c2410 a separate driver
 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
-> ---
->   drivers/usb/host/ohci-da8xx.c |   13 +++++++++----
->   1 file changed, 9 insertions(+), 4 deletions(-)
+ drivers/usb/host/Kconfig        |   30 ++++++-
+ drivers/usb/host/Makefile       |    6 ++
+ drivers/usb/host/ohci-at91.c    |  148 +++++++++++++++-------------------
+ drivers/usb/host/ohci-exynos.c  |  167 ++++++++++++++++-----------------------
+ drivers/usb/host/ohci-hcd.c     |  108 -------------------------
+ drivers/usb/host/ohci-omap.c    |  156 ++++++++++++------------------------
+ drivers/usb/host/ohci-omap3.c   |  120 ++++++++++------------------
+ drivers/usb/host/ohci-s3c2410.c |  129 ++++++++++++++----------------
+ drivers/usb/host/ohci-spear.c   |  140 +++++++++++++-------------------
+ 9 files changed, 370 insertions(+), 634 deletions(-)
 
-> diff --git a/drivers/usb/host/ohci-da8xx.c b/drivers/usb/host/ohci-da8xx.c
-> index 6aaa9c9..3b1d9bd 100644
-> --- a/drivers/usb/host/ohci-da8xx.c
-> +++ b/drivers/usb/host/ohci-da8xx.c
-> @@ -406,19 +406,24 @@ static int ohci_hcd_da8xx_drv_remove(struct platform_device *dev)
->   }
->
->   #ifdef CONFIG_PM
-> -static int ohci_da8xx_suspend(struct platform_device *dev, pm_message_t message)
-> +static int ohci_da8xx_suspend(struct platform_device *pdev,
-> +		pm_message_t message)
->   {
-> -	struct usb_hcd	*hcd	= platform_get_drvdata(dev);
-> +	struct usb_hcd	*hcd	= platform_get_drvdata(pdev);
->   	struct ohci_hcd	*ohci	= hcd_to_ohci(hcd);
-> +	bool do_wakeup = device_may_wakeup(&pdev->dev);
-
-     Could you align = with other intializers above?
-
-> +	int ret;
->
-
-WBR, Sergei
+-- 
+1.7.9.5
