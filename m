@@ -1,64 +1,99 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Wed, 12 Jun 2013 16:31:36 -0700
-Subject: [GIT PULL 5/6] remove non-DT for exynos
-In-Reply-To: <51B791EF.9070904@samsung.com>
-References: <51B791EF.9070904@samsung.com>
-Message-ID: <20130612233136.GB9067@quad.lixom.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Jun 2013 16:32:33 -0700
+Subject: [PATCH] ARM: msm: Move msm_timer to CLOCKSOURCE_OF_DECLARE
+Message-ID: <1371079953-28457-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 06:09:03AM +0900, Kukjin Kim wrote:
-> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
-> 
->   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
-> 
-> are available in the git repository at:
-> 
+This allows us to remove the init_time callback in the DT machine
+descriptors, shrinking the code.
 
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/remove-nondt-exynos
-> 
-> for you to fetch changes up to 8661bc149b95b5d4298b4ffd55c298972c4820d1:
-> 
->   ARM: exynos4_defconfig: remove non-DT configuration (2013-06-10
-> 18:37:01 +0900)
-> 
-> ----------------------------------------------------------------
-> remove non DT support for exynos
-> 
-> ----------------------------------------------------------------
-> Kukjin Kim (2):
->       ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
->       ARM: exynos4_defconfig: remove non-DT configuration
-> 
->  arch/arm/configs/exynos4_defconfig |  68 --------
->  arch/arm/mach-exynos/Kconfig       | 320
-> +-----------------------------------
->  arch/arm/mach-exynos/Makefile      |  26 ---
->  arch/arm/mach-exynos/common.c      |  10 --
->  arch/arm/mach-exynos/dev-ahci.c    | 255 -----------------------------
->  arch/arm/mach-exynos/dev-ohci.c    |  52 ------
->  arch/arm/mach-exynos/dma.c         | 322
-> -------------------------------------
->  arch/arm/mach-exynos/pm_domains.c  |   7 -
->  8 files changed, 1 insertion(+), 1059 deletions(-)
->  delete mode 100644 arch/arm/configs/exynos4_defconfig
->  delete mode 100644 arch/arm/mach-exynos/dev-ahci.c
->  delete mode 100644 arch/arm/mach-exynos/dev-ohci.c
->  delete mode 100644 arch/arm/mach-exynos/dma.c
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/mach-msm/board-dt-8660.c |  1 -
+ arch/arm/mach-msm/board-dt-8960.c |  1 -
+ arch/arm/mach-msm/common.h        |  1 -
+ arch/arm/mach-msm/timer.c         | 17 +++--------------
+ 4 files changed, 3 insertions(+), 17 deletions(-)
 
-Kukjin,
-
-What about the legacy board files? I don't see them removed (nor converted to
-DT) here, so this is not a full removal.
-
-Also, the argument to keep exynos4_defconfig was that it needed to enable
-non-DT boards. I think we might as well just remove the defconfig and make sure
-all the needed options are enabled in exynos_defconfig -- they should coexist
-just fine.
-
-I'll hold off pulling until the defconfig situation has been resolved, but
-please follow up on the board file piece too.
-
-
--Olof
+diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
+index 7dcfc53..4bd22ca 100644
+--- a/arch/arm/mach-msm/board-dt-8660.c
++++ b/arch/arm/mach-msm/board-dt-8660.c
+@@ -47,6 +47,5 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.init_irq = irqchip_init,
+ 	.init_machine = msm8x60_dt_init,
+ 	.init_late = msm8x60_init_late,
+-	.init_time	= msm_dt_timer_init,
+ 	.dt_compat = msm8x60_fluid_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
+index 7301936..9a2b525 100644
+--- a/arch/arm/mach-msm/board-dt-8960.c
++++ b/arch/arm/mach-msm/board-dt-8960.c
+@@ -32,7 +32,6 @@ DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+ 	.map_io = msm_map_msm8960_io,
+ 	.init_irq = irqchip_init,
+-	.init_time	= msm_dt_timer_init,
+ 	.init_machine = msm_dt_init,
+ 	.dt_compat = msm8960_dt_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+index ce8215a..e32429e 100644
+--- a/arch/arm/mach-msm/common.h
++++ b/arch/arm/mach-msm/common.h
+@@ -14,7 +14,6 @@
+ 
+ extern void msm7x01_timer_init(void);
+ extern void msm7x30_timer_init(void);
+-extern void msm_dt_timer_init(void);
+ extern void qsd8x50_timer_init(void);
+ 
+ extern void msm_map_common_io(void);
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 284313f..1167cf6 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -219,15 +219,8 @@ err:
+ }
+ 
+ #ifdef CONFIG_OF
+-static const struct of_device_id msm_timer_match[] __initconst = {
+-	{ .compatible = "qcom,kpss-timer" },
+-	{ .compatible = "qcom,scss-timer" },
+-	{ },
+-};
+-
+-void __init msm_dt_timer_init(void)
++static void __init msm_dt_timer_init(struct device_node *np)
+ {
+-	struct device_node *np;
+ 	u32 freq;
+ 	int irq;
+ 	struct resource res;
+@@ -235,12 +228,6 @@ void __init msm_dt_timer_init(void)
+ 	void __iomem *base;
+ 	void __iomem *cpu0_base;
+ 
+-	np = of_find_matching_node(NULL, msm_timer_match);
+-	if (!np) {
+-		pr_err("Can't find msm timer DT node\n");
+-		return;
+-	}
+-
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+ 		pr_err("Failed to map event base\n");
+@@ -283,6 +270,8 @@ void __init msm_dt_timer_init(void)
+ 
+ 	msm_timer_init(freq, 32, irq, !!percpu_offset);
+ }
++CLOCKSOURCE_OF_DECLARE(kpss_timer, "qcom,kpss-timer", msm_dt_timer_init);
++CLOCKSOURCE_OF_DECLARE(scss_timer, "qcom,scss-timer", msm_dt_timer_init);
+ #endif
+ 
+ static int __init msm_timer_map(phys_addr_t addr, u32 event, u32 source,
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
