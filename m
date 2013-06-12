@@ -1,86 +1,114 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 12 Jun 2013 10:42:31 +0200
-Subject: [PATCHv4 4/9] i2c: mv64xxx: Add Allwinner sun4i compatible
-In-Reply-To: <1371024438-16631-5-git-send-email-maxime.ripard@free-electrons.com>
-References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
- <1371024438-16631-5-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <24053541.0lokJN1hNA@flatron>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 12 Jun 2013 09:44:15 +0100
+Subject: [PATCH 7/9] documentation: iommu: add description of ARM System
+ MMU binding
+In-Reply-To: <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+References: <1370889285-22799-1-git-send-email-will.deacon@arm.com>
+ <1370889285-22799-8-git-send-email-will.deacon@arm.com>
+Message-ID: <20130612084415.834ED3E0A56@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
-
-On Wednesday 12 of June 2013 10:07:13 Maxime Ripard wrote:
-> Add the compatible string for the Allwinner A10 i2c controller and the
-> associated register layout.
+On Mon, 10 Jun 2013 19:34:43 +0100, Will Deacon <will.deacon@arm.com> wrote:
+> This patch adds a description of the device tree binding for the ARM
+> System MMU architecture.
 > 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Cc: Rob Herring <robherring2@gmail.com>
+> Cc: Andreas Herrmann <andreas.herrmann@calxeda.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Acked-by: Grant Likely <grant.likely@linaro.org>
+
 > ---
->  drivers/i2c/busses/Kconfig       |  3 ++-
->  drivers/i2c/busses/i2c-mv64xxx.c |  1 +
->  include/linux/mv643xx_i2c.h      | 10 ++++++++++
->  3 files changed, 13 insertions(+), 1 deletion(-)
+>  .../devicetree/bindings/iommu/arm,smmu.txt         | 70 ++++++++++++++++++++++
+>  1 file changed, 70 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/iommu/arm,smmu.txt
 > 
-> diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-> index 631736e..5dc4148 100644
-> --- a/drivers/i2c/busses/Kconfig
-> +++ b/drivers/i2c/busses/Kconfig
-> @@ -507,10 +507,11 @@ config I2C_MPC
-> 
->  config I2C_MV64XXX
->  	tristate "Marvell mv64xxx I2C Controller"
-> -	depends on (MV64X60 || PLAT_ORION)
-> +	depends on (MV64X60 || PLAT_ORION || ARCH_SUNXI)
->  	help
->  	  If you say yes to this option, support will be included for the
->  	  built-in I2C interface on the Marvell 64xxx line of host 
-bridges.
-> +	  This driver is also used for Allwinner SoCs I2C controllers.
-> 
->  	  This driver can also be built as a module.  If so, the module
->  	  will be called i2c-mv64xxx.
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c
-> b/drivers/i2c/busses/i2c-mv64xxx.c index f9e076e..febf5ba 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -490,6 +490,7 @@ static const struct i2c_algorithm mv64xxx_i2c_algo =
-> { */
->  #ifdef CONFIG_OF
->  static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
-> +	{ .compatible = "allwinner,sun4i-i2c", .data =
-> &mv64xxx_i2c_regs_sun4i}, { .compatible = "marvell,mv64xxx-i2c", .data
-> = &mv64xxx_i2c_regs_mv64xxx}, {}
-
-Ah, OK, here you use compatible matching to get variant-specific data, 
-fine. Still I think the same method (based on platform device name) should 
-be used for non-DT variant.
-
->  };
-> diff --git a/include/linux/mv643xx_i2c.h b/include/linux/mv643xx_i2c.h
-> index 9304c94..737108e 100644
-> --- a/include/linux/mv643xx_i2c.h
-> +++ b/include/linux/mv643xx_i2c.h
-> @@ -32,6 +32,16 @@ struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
->  	.soft_reset	= 0x1c,
->  };
-> 
-> +struct mv64xxx_i2c_regs mv64xxx_i2c_regs_sun4i = {
-> +	.addr		= 0x00,
-> +	.ext_addr	= 0x04,
-> +	.data		= 0x08,
-> +	.control	= 0x0c,
-> +	.status		= 0x10,
-> +	.clock		= 0x14,
-> +	.soft_reset	= 0x18,
-> +};
+> diff --git a/Documentation/devicetree/bindings/iommu/arm,smmu.txt b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> new file mode 100644
+> index 0000000..e34c6cd
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/iommu/arm,smmu.txt
+> @@ -0,0 +1,70 @@
+> +* ARM System MMU Architecture Implementation
 > +
+> +ARM SoCs may contain an implementation of the ARM System Memory
+> +Management Unit Architecture, which can be used to provide 1 or 2 stages
+> +of address translation to bus masters external to the CPU.
+> +
+> +The SMMU may also raise interrupts in response to various fault
+> +conditions.
+> +
+> +** System MMU required properties:
+> +
+> +- compatible    : Should be one of:
+> +
+> +                        "arm,smmu-v1"
+> +                        "arm,smmu-v2"
+> +                        "arm,mmu-400"
+> +                        "arm,mmu-500"
+> +
+> +                  depending on the particular implementation and/or the
+> +                  version of the architecture implemented.
+> +
+> +- reg           : Base address and size of the SMMU.
+> +
+> +- #global-interrupts : The number of global interrupts exposed by the
+> +                       device.
+> +
+> +- interrupts    : Interrupt list, with the first #global-irqs entries
+> +                  corresponding to the global interrupts and any
+> +                  following entries corresponding to context interrupts,
+> +                  specified in order of their indexing by the SMMU.
+> +
+> +                  For SMMUv2 implementations, there must be exactly one
+> +                  interrupt per context bank. In the case of a single,
+> +                  combined interrupt, it must be listed multiple times.
+> +
+> +- mmu-masters   : A list of phandles to device nodes representing bus
+> +                  masters for which the SMMU can provide a translation
+> +                  and their corresponding StreamIDs (see example below).
+> +                  Each device node linked from this list must have a
+> +                  "#stream-id-cells" property, indicating the number of
+> +                  StreamIDs associated with it.
+> +
+> +** System MMU optional properties:
+> +
+> +- smmu-parent   : When multiple SMMUs are chained together, this
+> +                  property can be used to provide a phandle to the
+> +                  parent SMMU (that is the next SMMU on the path going
+> +                  from the mmu-masters towards memory) node for this
+> +                  SMMU.
+> +
+> +Example:
+> +
+> +        smmu {
+> +                compatible = "arm,smmu-v1";
+> +                reg = <0xba5e0000 0x10000>;
+> +                #global-interrupts = <2>;
+> +                interrupts = <0 32 4>,
+> +                             <0 33 4>,
+> +                             <0 34 4>, /* This is the first context interrupt */
+> +                             <0 35 4>,
+> +                             <0 36 4>,
+> +                             <0 37 4>;
+> +
+> +                /*
+> +                 * Two DMA controllers, the first with two StreamIDs (0xd01d
+> +                 * and 0xd01e) and the second with only one (0xd11c).
+> +                 */
+> +                mmu-masters = <&dma0 0xd01d 0xd01e>,
+> +                              <&dma1 0xd11c>;
+> +        };
+> -- 
+> 1.8.2.2
+> 
+> _______________________________________________
+> devicetree-discuss mailing list
+> devicetree-discuss at lists.ozlabs.org
+> https://lists.ozlabs.org/listinfo/devicetree-discuss
 
-Hmm, header doesn't look like a correct place for a structure definition, 
-especially when the structure isn't even static.
-
-Best regards,
-Tomasz
-
->  /* i2c Platform Device, Driver Data */
->  struct mv64xxx_i2c_pdata {
->  	u32			freq_m;
+-- 
+Grant Likely, B.Sc, P.Eng.
+Secret Lab Technologies, Ltd.
