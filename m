@@ -1,30 +1,59 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 12 Jun 2013 18:11:34 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <2722548.PBMM2Yn19A@linux-5eaq.site>
-References: <Pine.LNX.4.44L0.1306111431170.1392-100000@iolanthe.rowland.org>
- <2722548.PBMM2Yn19A@linux-5eaq.site>
-Message-ID: <CACVXFVMQGqGNcKntLbpQSJN+mkVZoRTRNYZ+TMVSmnGwK7BiBQ@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Wed, 12 Jun 2013 19:18:02 +0900
+Subject: [PATCH V4 0/3] PCIe support for Samsung Exynos5440 SoC
+Message-ID: <003001ce6756$1ef00d60$5cd02820$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 5:11 PM, Oliver Neukum <oliver@neukum.org> wrote:
-> On Tuesday 11 June 2013 15:10:03 Alan Stern wrote:
->> In order to prevent this from happening, you would have to change the
->> spin_lock() call in the completion handler to spin_lock_irqsave().
->> Furthermore, you will have to audit every USB driver to make sure that
->> all the completion handlers get fixed.
->
-> Yes. However, it can be done mechanically. And we know only
-> the handlers for complete need to be fixed.
+Hi,
 
-I am wondering if the change is needed since timer function is still
-run in softirq context instead of hard irq.
+This series of patches introduces PCIe support for Samsung Exynos5440,
+and is based on the latest 'linux-next' tree (20130607).
+These patches was tested with Intel e1000e LAN card on Exynos5440.
 
-Looks Alan concerned that one USB interface driver may have another
-hard interrupt handler involved. Is there such kind of USB driver/device
-in tree?
+This PATCH v4 follows:
+ * PATCH v3, sent on June, 6th 2013
+ * PATCH v2, sent on March, 23rd 2013
+ * PATCH v1, sent on March, 4th 2013
+ 
+Changes between v3 and v4:
+  * Added support for multi domains as reviewed by Jason Gunthorpe,
+    and Arnd Bergmann.
+  * Fixed both MEM space and I/O space in DT.
+  * Removed redundant physical addresses from struct pcie_port,
+    added devm_ioremap_resource() to make add_pcie_port() simpler.
+  * Added clock names and clock enable/disable.
+	
+Changes between v2 and v3:
+  * Rebased on the top of 3.10-rc4
+  * Updated names of PCIe PHY registers
+ 
+Changes between v1 and v2:
+  * Moved Exynos PCIe driver from arch/arm to drivers/pci/host.
+  * Added DT properties of PCI DT standard.
 
-Thanks,
---
-Ming
+Thank you.
+
+Best regards,
+Jingoo Han
+
+
+Jingoo Han (3):
+  pci: Add PCIe driver for Samsung Exynos
+  ARM: EXYNOS: Enable PCIe support for Exynos5440
+  ARM: dts: Add pcie controller node for Samsung EXYNOS5440 SoC
+
+ arch/arm/boot/dts/exynos5440-ssdk5440.dts |    8 ++++++
+ arch/arm/boot/dts/exynos5440.dtsi         |   38 +++++++++++++++++++++++++++++
+ arch/arm/Kconfig             |    1 +
+ arch/arm/mach-exynos/Kconfig |    2 ++
+ .../devicetree/bindings/pci/exynos-pcie.txt        |   71 ++
+ drivers/pci/host/Kconfig                           |    5 +
+ drivers/pci/host/Makefile                          |    1 +
+ drivers/pci/host/pci-exynos.c                      | 1074 ++++++++++++++++++++
+ 8 files changed, 1200 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/exynos-pcie.txt
+ create mode 100644 drivers/pci/host/pci-exynos.c
+
+-- 
+1.7.10.4
