@@ -1,52 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 12 Jun 2013 15:25:32 +0100
-Subject: [PATCH] ARM: arch_timer: add missing include for of_* functions
-In-Reply-To: <1370969344-25764-1-git-send-email-jonathan.austin@arm.com>
-References: <1370969344-25764-1-git-send-email-jonathan.austin@arm.com>
-Message-ID: <20130612142532.GA27414@e106331-lin.cambridge.arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 12 Jun 2013 10:35:44 -0400 (EDT)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 05:49:04PM +0100, Jonathan Austin wrote:
-> The arch timer code uses a bunch of of_* functions that are defined in
-> linux/of.h. Currently this header is not included but with CONFIG_OF defined
-> the functions are available anyway.
-> 
-> This was discovered because in the case that CONFIG_OF=n and ARM_ARCH_TIMER is
-> selected, the kernel no longer builds due to the lack of this header.
-> This patch fixes that (though without another patch
-> - https://patchwork.kernel.org/patch/2242291/ - the build still fails due to
-> a missing stub for of_find_matching_node())
-> 
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com>
+On Wed, 12 Jun 2013, Ming Lei wrote:
 
-Makes sense to me.
+> If not, I am wondering why one USB driver need register another hard
+> interrupt handler? Could you share such examples? I understand the
+> case only exists with timer handler as discussed with Oliver, don't I?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Here's another possibility.  A USB driver has a private lock, and it
+acquires this lock in its completion handler.  But it also acquires
+this lock in other routines, and those other routines may be called by
+other drivers or subsystems in interrupt context.
 
-> ---
+> > The drivers _do_ need to be changed, as explained above.  And that
+> > explanation was only one failure scenario.  There may be others.
 > 
-> It seems to me that, no matter what your opinion on whether CONFIG_OF=n with
-> CONFIG_ARM_ARCH_TIMER=y makes sense, we should fix this particular missing
-> include.
+> OK, I'd like to know what the others are? :-)
+
+Me too.  :-)
+
+> >> And finally, USB HCDs themselves will benefit from the change, won't they?
+> >
+> > How will they benefit?  Merely from not releasing their private locks?
 > 
-> Jonny
+> The interrupt of one HCD will be responded lately since another HCD's
+> interrupt handler takes very long time. With the change, the problem can
+> be avoided.
+
+For reasonably sophisticated host controllers like EHCI, the delay in
+responding to an interrupt doesn't matter much.  But for simpler host
+controllers (for example, those using PIO instead of DMA) it matters
+more, so those other HCDs will benefit more from the conversion.
+
+> >> Compared with "usb-storage" task's schedule latency, the tasklet
+> >> schedule delay should be lower at most of situations since the tasklet
+> >> is scheduled inside irq handler.
+> >
+> > True.  But the two latencies add.
 > 
->  drivers/clocksource/arm_arch_timer.c |    1 +
->  1 file changed, 1 insertion(+)
+> I think it should be one tasklet latency added, but what is the other one?
+
+I meant that the latency in tasklet scheduling has to be added to the 
+latency in scheduling the usb-storage thread.
+
+> > Or you could have a separate tasklet for each host controller.
 > 
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index d7ad425..c716ffa 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -15,6 +15,7 @@
->  #include <linux/cpu.h>
->  #include <linux/clockchips.h>
->  #include <linux/interrupt.h>
-> +#include <linux/of.h>
->  #include <linux/of_irq.h>
->  #include <linux/io.h>
->  
-> -- 
-> 1.7.9.5
-> 
+> Yes, but I will compare tasklet with interrupt threaded handler first.
+
+Switching to a threaded interrupt handler offers more possibilities.  
+Instead of moving just the givebacks to the thread, we could put almost 
+all the processing there.  (At least, we can for ehci-hcd.  Other HCDs 
+may not be able to do this.)
+
+At this point we are talking about multiple changes:
+
+	Moving the givebacks to a tasklet or threaded handler.
+
+	Changing the USB completion handlers so that they can be called 
+	with interrupts enabled.	
+
+	Allowing the tasklet/thread to run with interrupts enabled.
+
+	Moving more of the HCD processing into the tasklet/thread.
+
+Maybe other things too.  In principle, the first and second items can 
+be done simultaneously.
+
+Alan Stern
