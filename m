@@ -1,64 +1,53 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Thu, 13 Jun 2013 15:21:43 -0700
-Subject: [PATCH 2/2] rtc: omap: add rtc wakeup support to alarm events
-In-Reply-To: <1BAFE6F6C881BF42822005164F1491C33EC34679@DBDE04.ent.ti.com>
- (Gururaja Hebbar's message of "Thu, 13 Jun 2013 09:39:54 +0000")
-References: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
- <1369982005-8572-3-git-send-email-gururaja.hebbar@ti.com>
- <87a9nb2gjh.fsf@linaro.org>
- <1BAFE6F6C881BF42822005164F1491C33EC34679@DBDE04.ent.ti.com>
-Message-ID: <87k3lxabyg.fsf@linaro.org>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 14 Jun 2013 00:23:26 +0200
+Subject: [PATCH v5 01/22] pinctrl: generic: Add DT bindings
+In-Reply-To: <CACRpkdYev+hapkM075Sw7Yi0u+XpRvL74SwT39DV1aV1RtHC+Q@mail.gmail.com>
+References: <1370989371-30846-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1370989371-30846-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <CACRpkdYev+hapkM075Sw7Yi0u+XpRvL74SwT39DV1aV1RtHC+Q@mail.gmail.com>
+Message-ID: <1961223.akELqavQP8@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Hebbar, Gururaja" <gururaja.hebbar@ti.com> writes:
+Hi Linus,
 
-> Hi Kevin,
->
-> On Mon, Jun 10, 2013 at 16:55:17, Hebbar, Gururaja wrote:
->> On Fri, May 31, 2013 at 23:11:22, Kevin Hilman wrote:
->> > Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
->> > 
->> > > On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
->> > > is available to enable Wakeup feature for Alarm Events.
->> > >
->> > > Since new platforms/Boards are now added through DT only, this feature
->> > > is supported via DT property only.
->> > 
->> > > Platforms using such IP should add the property "ti,has_irq_wake_enb"
->> > > in rtc DT node.
->> > 
->> > This is a property of the IP, not the board.  Can't you detect this
->> > based on the revision of the IP?
->> 
->> Here is what I found out till now.
->> 
->> 1. rtc-omap driver is used by Davinci, OMAP-1/2 & AM33xx SoC.
->> 
->> 2. Only AM33xx soc rtc ip has revision register (& populated). Older OMAP
->>    Or davinci doesn't have this register.
->> 
->> 3. AFAIK, this was the reason why Afzal used platform_device_id & 
->>    of_device_id->data method to detect new versions (commit
->>    9e0344dcc225fe1a0e8b8af9ff7df44ec4613580)
->> 
->> 
->> So now either 
->> a. I can follow the same method and add new member to omap_rtc_devtype & add a new compatible in 
->>  omap_rtc_of_match in rtc-omap.c
->> 
->> or
->> 
->> b. use dt property to indicate existence of above property.
->> 
->> 
->> Kindly let me know your opinion about the same.
->
-> Any update on this. I have patch ready for both the choices. Waiting for your ok to send
+On Wednesday 12 June 2013 11:24:38 Linus Walleij wrote:
+> On Wed, Jun 12, 2013 at 12:22 AM, Laurent Pinchart wrote:
+> > Document DT properties for the generic pinctrl parameters and add a
+> > parser function.
+> > 
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> 
+> It appears we have a race here, as something like three people,
+> or four, happened to do generic pinconf bindings at the same time.
+> 
+> Yesterday I applied Heiko St?bners patch
+> "pinctrl: add function to parse generic pinconfig properties from a dt node"
+> doing basically the same thing. With subtle differences...
+> but it already supports schmittrigging and some more.
+> 
+> It appears to be close to your idea though!
+> 
+> Would it be possible for you to look at what I have on my "devel" branch
+> now (same as submitted for -next), rebase on that and patch any problems?
 
-I think (a) is better.
+OK, I will do so. In the meantime I'll resubmit this patch series without the 
+pinconf DT bindings for inclusion in v3.11, and will then post follow-up 
+patches to add pinconf DT support, for v3.11 or v3.12 depending on the timing.
 
-The driver should always do a device_init_wakeup(dev, true), *except*
-for devtypes that don't have this feature.
+> > +               if (param->flag) {
+> > +                       ret = of_property_read_bool(np, param->property)
+> > +                           ? 0 : -EINVAL;
+> > +                       val = 1;
+> > +               } else {
+> > +                       ret = of_property_read_u32(np, param->property,
+> > &val); +               }
+> 
+> This construct is done differently in Heiko's code, please review it so we
+> know we have a nice, efficient parser.
 
-Kevin
+-- 
+Regards,
+
+Laurent Pinchart
