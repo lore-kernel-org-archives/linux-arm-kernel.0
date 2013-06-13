@@ -1,201 +1,103 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Jun 2013 18:49:00 -0700
-Subject: [RFC/PATCH 04/13] clk: Add set_rate_and_parent() op
+Date: Wed, 12 Jun 2013 18:49:07 -0700
+Subject: [RFC/PATCH 11/13] ARM: dts: msm: Add MSM8960 GCC DT nodes
 In-Reply-To: <1371088149-22562-1-git-send-email-sboyd@codeaurora.org>
 References: <1371088149-22562-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1371088149-22562-5-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371088149-22562-12-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some of Qualcomm's clocks can change their parent and rate at the
-same time with a single register write. Add support for this
-hardware to the common clock framework by adding a new
-set_rate_and_parent() op. When the clock framework determines
-that both the parent and the rate are going to change during
-clk_set_rate() it will call the .set_rate_and_parent() op if
-available and fall back to calling .set_parent() followed by
-.set_rate() otherwise.
+Add the necessary DT data to probe the global clock controller
+on MSM8960 devices.
 
-Cc: James Hogan <james.hogan@imgtec.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- Documentation/clk.txt        |  3 ++
- drivers/clk/clk.c            | 78 +++++++++++++++++++++++++++++++++-----------
- include/linux/clk-provider.h | 15 +++++++++
- 3 files changed, 77 insertions(+), 19 deletions(-)
+ arch/arm/boot/dts/msm8960-cdp.dts | 72 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 72 insertions(+)
 
-diff --git a/Documentation/clk.txt b/Documentation/clk.txt
-index 3110ba4..e7badc3 100644
---- a/Documentation/clk.txt
-+++ b/Documentation/clk.txt
-@@ -77,6 +77,9 @@ the operations defined in clk.h:
- 		int		(*set_parent)(struct clk_hw *hw, u8 index);
- 		u8		(*get_parent)(struct clk_hw *hw);
- 		int		(*set_rate)(struct clk_hw *hw, unsigned long);
-+		int		(*set_rate_and_parent)(struct clk_hw *hw,
-+					    unsigned long rate,
-+					    unsigned long parent_rate, u8 index);
- 		void		(*init)(struct clk_hw *hw);
+diff --git a/arch/arm/boot/dts/msm8960-cdp.dts b/arch/arm/boot/dts/msm8960-cdp.dts
+index fd2f3ec..01d03f1 100644
+--- a/arch/arm/boot/dts/msm8960-cdp.dts
++++ b/arch/arm/boot/dts/msm8960-cdp.dts
+@@ -42,6 +42,78 @@
+ 		cpu-offset = <0x80000>;
  	};
  
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index f40ce9b..294901f 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1121,10 +1121,9 @@ static void clk_reparent(struct clk *clk, struct clk *new_parent)
- 	clk->parent = new_parent;
- }
- 
--static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
-+static struct clk *__clk_set_parent_before(struct clk *clk, struct clk *parent)
- {
- 	unsigned long flags;
--	int ret = 0;
- 	struct clk *old_parent = clk->parent;
- 
- 	/*
-@@ -1153,6 +1152,34 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
- 	clk_reparent(clk, parent);
- 	clk_enable_unlock(flags);
- 
-+	return old_parent;
-+}
++	clock-controller at 900000 {
++		compatible = "qcom,gcc-8960", "qcom,gcc";
++		reg = <0x900000 0x4000>;
 +
-+static void __clk_set_parent_after(struct clk *clk, struct clk *parent,
-+		struct clk *old_parent)
-+{
-+	/*
-+	 * Finish the migration of prepare state and undo the changes done
-+	 * for preventing a race with clk_enable().
-+	 */
-+	if (clk->prepare_count) {
-+		clk_disable(clk);
-+		clk_disable(old_parent);
-+		__clk_unprepare(old_parent);
-+	}
++		clocks {
++			cxo: cxo {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++				clock-frequency = <19200000>;
++			};
 +
-+	/* update debugfs with new clk tree topology */
-+	clk_debug_reparent(clk, parent);
-+}
++			pxo: pxo {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++				clock-frequency = <27000000>;
++			};
 +
-+static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
-+{
-+	unsigned long flags;
-+	int ret = 0;
-+	struct clk *old_parent;
++			pll8: pll8 {
++				#clock-cells = <0>;
++				compatible = "qcom,pll";
++				clocks = <&pxo>;
++			};
 +
-+	old_parent = __clk_set_parent_before(clk, parent);
++			vpll8: vpll8 {
++				#clock-cells = <0>;
++				compatible = "qcom,pll-vote";
++				clocks = <&pll8>;
++			};
 +
- 	/* change clock input source */
- 	if (parent && clk->ops->set_parent)
- 		ret = clk->ops->set_parent(clk->hw, p_index);
-@@ -1170,18 +1197,8 @@ static int __clk_set_parent(struct clk *clk, struct clk *parent, u8 p_index)
- 		return ret;
- 	}
- 
--	/*
--	 * Finish the migration of prepare state and undo the changes done
--	 * for preventing a race with clk_enable().
--	 */
--	if (clk->prepare_count) {
--		clk_disable(clk);
--		clk_disable(old_parent);
--		__clk_unprepare(old_parent);
--	}
-+	__clk_set_parent_after(clk, parent, old_parent);
- 
--	/* update debugfs with new clk tree topology */
--	clk_debug_reparent(clk, parent);
- 	return 0;
- }
- 
-@@ -1366,17 +1383,32 @@ static void clk_change_rate(struct clk *clk)
- 	struct clk *child;
- 	unsigned long old_rate;
- 	unsigned long best_parent_rate = 0;
-+	bool skip_set_rate = false;
-+	struct clk *old_parent;
- 
- 	old_rate = clk->rate;
- 
--	/* set parent */
--	if (clk->new_parent && clk->new_parent != clk->parent)
--		__clk_set_parent(clk, clk->new_parent, clk->new_parent_index);
--
--	if (clk->parent)
-+	if (clk->new_parent)
-+		best_parent_rate = clk->new_parent->rate;
-+	else if (clk->parent)
- 		best_parent_rate = clk->parent->rate;
- 
--	if (clk->ops->set_rate)
-+	if (clk->new_parent && clk->new_parent != clk->parent) {
-+		old_parent = __clk_set_parent_before(clk, clk->new_parent);
++			gsbi5_uart_rcg: gsbi5_uart_rcg {
++				#clock-cells = <0>;
++				compatible = "qcom,p2-mn16-clock";
++				clocks = <&pxo>, <&vpll8>;
++			};
 +
-+		if (clk->ops->set_rate_and_parent) {
-+			skip_set_rate = true;
-+			clk->ops->set_rate_and_parent(clk->hw, clk->new_rate,
-+					best_parent_rate,
-+					clk->new_parent_index);
-+		} else if (clk->ops->set_parent) {
-+			clk->ops->set_parent(clk->hw, clk->new_parent_index);
-+		}
++			gsbi5_uart_clk: gsbi5_uart_cxc {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-clock";
++				clocks = <&gsbi5_uart_rcg>;
++			};
 +
-+		__clk_set_parent_after(clk, clk->new_parent, old_parent);
-+	}
++			gsbi6_uart_rcg: gsbi6_uart_rcg {
++				#clock-cells = <0>;
++				compatible = "qcom,p2-mn16-clock";
++				clocks = <&pxo>, <&vpll8>;
++			};
 +
-+	if (!skip_set_rate && clk->ops->set_rate)
- 		clk->ops->set_rate(clk->hw, clk->new_rate, best_parent_rate);
- 
- 	if (clk->ops->recalc_rate)
-@@ -1658,6 +1690,14 @@ int __clk_init(struct device *dev, struct clk *clk)
- 		goto out;
- 	}
- 
-+	if (clk->ops->set_rate_and_parent &&
-+			!(clk->ops->set_parent && clk->ops->set_rate)) {
-+		pr_warning("%s: %s must implement .set_parent & .set_rate\n",
-+				__func__, clk->name);
-+		ret = -EINVAL;
-+		goto out;
-+	}
++			gsbi6_uart_clk: gsbi6_uart_cxc {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-clock";
++				clocks = <&gsbi6_uart_rcg>;
++			};
 +
- 	/* throw a WARN if any entries in parent_names are NULL */
- 	for (i = 0; i < clk->num_parents; i++)
- 		WARN(!clk->parent_names[i],
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index 3668a76..cce891d 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -108,6 +108,18 @@ struct clk_hw;
-  *		which is likely helpful for most .set_rate implementation.
-  *		Returns 0 on success, -EERROR otherwise.
-  *
-+ * @set_rate_and_parent: Change the rate and the parent of this clock. The
-+ *		requested rate is specified by the second argument, which
-+ *		should typically be the return of .round_rate call.  The
-+ *		third argument gives the parent rate which is likely helpful
-+ *		for most .set_rate_and_parent implementation. The fourth
-+ *		argument gives the parent index. It is optional (and
-+ *		unnecessary) for clocks with 0 or 1 parents as well as
-+ *		for clocks that can tolerate switching the rate and the parent
-+ *		separately via calls to .set_parent and .set_rate.
-+ *		Returns 0 on success, -EERROR otherwise.
-+ *
-+ *
-  * The clk_enable/clk_disable and clk_prepare/clk_unprepare pairs allow
-  * implementations to split any work between atomic (enable) and sleepable
-  * (prepare) contexts.  If enabling a clock requires code that might sleep,
-@@ -139,6 +151,9 @@ struct clk_ops {
- 	u8		(*get_parent)(struct clk_hw *hw);
- 	int		(*set_rate)(struct clk_hw *hw, unsigned long,
- 				    unsigned long);
-+	int		(*set_rate_and_parent)(struct clk_hw *hw,
-+				    unsigned long rate,
-+				    unsigned long parent_rate, u8 index);
- 	void		(*init)(struct clk_hw *hw);
- };
- 
++			gsbi5_uart_ahb: gsbi5_uart_ahb {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-hg-clock";
++			};
++
++			gsbi5_qup_rcg: gsbi5_qup_rcg {
++				#clock-cells = <0>;
++				compatible = "qcom,p2-mn8-clock";
++				clocks = <&pxo>, <&vpll8>;
++			};
++
++			gsbi5_qup_clk: gsbi5_qup_cxc {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-clock";
++				clocks = <&gsbi5_qup_rcg>;
++			};
++		};
++	};
++
+ 	kpss at 2088000 {
+ 		compatible = "qcom,kpss";
+ 		reg = <0x02088000 0x1000
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
