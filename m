@@ -1,105 +1,44 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Wed, 12 Jun 2013 19:41:38 -0700
-Subject: [PATCH RFC 3/3] clk: dt: binding for basic divider clock
-In-Reply-To: <201306040018.33236.heiko@sntech.de>
-References: <1370281990-15090-1-git-send-email-mturquette@linaro.org>
- <1370281990-15090-4-git-send-email-mturquette@linaro.org>
- <201306040018.33236.heiko@sntech.de>
-Message-ID: <20130613024138.26381.96286@quantum>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Thu, 13 Jun 2013 10:45:24 +0800
+Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
+In-Reply-To: <Pine.LNX.4.44L0.1305301020230.1321-100000@iolanthe.rowland.org>
+References: <51A73BD8.8000007@ti.com>
+ <Pine.LNX.4.44L0.1305301020230.1321-100000@iolanthe.rowland.org>
+Message-ID: <CADApbegr5RBODJD=4UZ5Skn_N91oxwDFDxnS7Qqh5dot0EnU-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Heiko St?bner (2013-06-03 15:18:32)
-> Am Montag, 3. Juni 2013, 19:53:10 schrieb Mike Turquette:
-> > Devicetree binding for the basic clock divider, plus the setup function
-> > to register the clock.  Based on the existing fixed-clock binding.
-> > 
-> > Signed-off-by: Mike Turquette <mturquette@linaro.org>
-> > ---
-> 
-> [...]
-> 
-> > +/**
-> > + * of_div_clk_setup() - Setup function for simple div rate clock
-> > + */
-> > +void of_divider_clk_setup(struct device_node *node)
-> > +{
-> > +     struct clk *clk;
-> > +     const char *clk_name = node->name;
-> > +     void __iomem *reg;
-> > +     const char *parent_name;
-> > +     u8 clk_divider_flags = 0;
-> > +     u8 mask = 0;
-> > +     u8 shift = 0;
-> 
-> in the mux-clock these 3 are unsigned long and u32 types ... what is correct?
-> 
+On Thu, May 30, 2013 at 10:23 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 30 May 2013, Roger Quadros wrote:
+>
+>> >> So what are your idea about making the PHY layer more generic? How
+>> >> ehci-hcd will make use of PHY layer?
+>> >
+>> >
+>> > on probe grab the phy and initialize it. On suspend/resume,
+>> > suspend/resume the PHY and so on. Whatever you were going to do on your
+>> > ehci glue, do it on generic ehci-hcd.
+>> >
+>>
+>> These operations sound generic enough to be done at HCD layer, no? So no need to
+>> replicate the same stuff in ohci, ehci, xhci, etc.
+>
+> The HCD layer handles suspend and resume only for PCI host controllers.
+> Not for other types.
+>
+> I don't know if the acquire/start and stop/release parts can be moved
+> into the USB core.  Maybe they can.
+>
+> Alan Stern
+>
+hi
+The following is my understanding.
+I think for PHY initialization and shutdown part, it is generic for
+other parts.
+PHY initialization need to be called before hc_driver->reset is called.
+I think it can be added at usb_add_hcd.
+For PHY shutdown, it can be added at usb_remove_hcd.
 
-Good catch.  Shifts should be u8, masks should be u32.  I've left the
-flags as u8.  The binding doesn't dictate this and if we end up having
-more flags (hopefully not!) then this value can be embiggened.
-
-> 
-> > +     struct clk_div_table *table;
-> > +
-> > +     of_property_read_string(node, "clock-output-names", &clk_name);
-> > +
-> > +     parent_name = of_clk_get_parent_name(node, 0);
-> > +
-> > +     reg = of_iomap(node, 0);
-> > +
-> > +     if (of_property_read_u8(node, "mask", &mask)) {
-> > +             pr_err("%s: missing mask property for %s\n", __func__, node->name);
-> > +             return;
-> > +     }
-> > +
-> > +     if (of_property_read_u8(node, "shift", &shift))
-> > +             pr_debug("%s: missing shift property defaults to zero for %s\n",
-> > +                             __func__, node->name);
-> 
-> same here ... mux reads u32
-> 
-> > +     if (of_property_read_bool(node, "index_one"))
-> > +             clk_divider_flags |= CLK_DIVIDER_ONE_BASED;
-> > +
-> > +     if (of_property_read_bool(node, "index_power_of_two"))
-> > +             clk_divider_flags |= CLK_DIVIDER_POWER_OF_TWO;
-> > +
-> > +     if (of_property_read_bool(node, "index_allow_zero"))
-> > +             clk_divider_flags |= CLK_DIVIDER_ALLOW_ZERO;
-> > +
-> > +     table = of_clk_get_div_table(node);
-> > +     if (IS_ERR(table))
-> > +             return;
-> > +
-> > +     clk = clk_register_divider_table(NULL, clk_name,
-> > +                     parent_name, 0,
-> > +                     reg, shift, mask,
-> > +                     clk_divider_flags, table,
-> > +                     NULL);
-> 
-> this causes trouble, as the divider clock code above still requires a width 
-> instead of a mask. I remember talk about this going to change separately, but 
-> couldn't find anything of the sort in linux-next.
-
-Right.  I viewed creation of the DT bindings a bit separately from the
-CCF code, which I think is the right approach.  A mask is definitely a
-more useful structure than a width value, and the DT bindings need to be
-at least a little future-proof, so I chose a mask.
-
-I'll update the divider code to use a mask and post that as part of the
-v2 series.
-
-Regards,
-Mike
-
-> 
-> 
-> 
-> > +
-> > +     if (!IS_ERR(clk))
-> > +             of_clk_add_provider(node, of_clk_src_simple_get, clk);
-> > +}
-> > +EXPORT_SYMBOL_GPL(of_divider_clk_setup);
-> > +CLK_OF_DECLARE(divider_clk, "divider-clock", of_divider_clk_setup);
-> > +#endif
+For suspend/resume, i do not know how to add it. For our EHCI driver,
+when system goes to deep idle states, we just directly shutdown the
+hcd and initialize it again when the system goes back.
