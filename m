@@ -1,108 +1,65 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Thu, 13 Jun 2013 22:14:19 +0200
-Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
-In-Reply-To: <1370467100-10820-9-git-send-email-tomasz.figa@gmail.com>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <1370467100-10820-9-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <201306132214.20017.heiko@sntech.de>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 13 Jun 2013 13:16:35 -0700
+Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over
+ global devices
+In-Reply-To: <20130613183950.GA32061@codeaurora.org>
+References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
+ <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
+ <51B0A6E8.20909@linaro.org> <20130606180425.GQ599@codeaurora.org>
+ <51B10D85.1060507@linaro.org> <20130606223848.GR599@codeaurora.org>
+ <20130612214435.GE10823@codeaurora.org> <51B991EF.70800@linaro.org>
+ <alpine.LFD.2.02.1306131331430.22970@ionos>
+ <20130613183950.GA32061@codeaurora.org>
+Message-ID: <999cad28-cd11-489c-91d1-012ffa03b21c@CO9EHSMHS019.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 5. Juni 2013, 23:18:13 schrieb Tomasz Figa:
-> This patch introduces new Samsung PWM driver, which uses Samsung
-> PWM/timer master driver to control shared parts of the hardware.
+On Thu, Jun 13, 2013 at 11:39:50AM -0700, Stephen Boyd wrote:
+> On 06/13, Thomas Gleixner wrote:
+> > On Thu, 13 Jun 2013, Daniel Lezcano wrote:
+> > > I prefer Thomas to have a look at it and ack it. I changed Cc to To for
+> > > Thomas.
+> > 
+> > The patch does not apply on tip timers/core. The code has been
+> > reworked a month ago. Please work against tip timers/core. That's
+> > where this stuff ends up.
+> > 
 > 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  drivers/pwm/Makefile      |   1 +
->  drivers/pwm/pwm-samsung.c | 528
-> ++++++++++++++++++++++++++++++++++++++++++++++ 2 files changed, 529
-> insertions(+)
->  create mode 100644 drivers/pwm/pwm-samsung.c
+> Ah, I thought your patch series had stalled. Here is a refreshed
+> patch. Every other patch in this series applies cleanly to tip
+> timers/core so I don't want to resend them again unless
+> absolutely necessary.
 > 
-> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
+> -----8<-----
+> Subject: [PATCH v8] clockevents: Prefer CPU local devices over global devices
+> 
+> On an SMP system with only one global clockevent and a dummy
+> clockevent per CPU we run into problems. We want the dummy
+> clockevents to be registered as the per CPU tick devices, but
+> we can only achieve that if we register the dummy clockevents
+> before the global clockevent or if we artificially inflate the
+> rating of the dummy clockevents to be higher than the rating
+> of the global clockevent. Failure to do so leads to boot
+> hangs when the dummy timers are registered on all other CPUs
+> besides the CPU that accepted the global clockevent as its tick
+> device and there is no broadcast timer to poke the dummy
+> devices.
+> 
+> If we're registering multiple clockevents and one clockevent is
+> global and the other is local to a particular CPU we should
+> choose to use the local clockevent regardless of the rating of
+> the device. This way, if the clockevent is a dummy it will take
+> the tick device duty as long as there isn't a higher rated tick
+> device and any global clockevent will be bumped out into
+> broadcast mode, fixing the problem described above.
+> 
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-[...]
+I retested my case on tip/timers/core with the same results.
 
-> +static int pwm_samsung_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct samsung_pwm_chip *chip;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
-> +	if (chip == NULL) {
-> +		dev_err(dev, "failed to allocate driver data\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	chip->chip.dev = &pdev->dev;
-> +	chip->chip.ops = &pwm_samsung_ops;
-> +	chip->chip.base = -1;
-> +	chip->chip.npwm = SAMSUNG_PWM_NUM;
-> +
-> +	if (pdev->dev.of_node) {
-> +		ret = pwm_samsung_parse_dt(chip);
-> +		if (ret)
-> +			return ret;
-> +
-> +		chip->chip.of_xlate = of_pwm_xlate_with_flags;
-> +		chip->chip.of_pwm_n_cells = 3;
-> +	} else {
-> +		if (!pdev->dev.platform_data) {
-> +			dev_err(&pdev->dev, "no platform data specified\n");
-> +			return -EINVAL;
-> +		}
-> +
-> +		memcpy(&chip->variant, pdev->dev.platform_data,
-> +							sizeof(chip->variant));
-> +	}
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!res) {
-> +		dev_err(&pdev->dev, "failed to get mem resource\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	chip->base = devm_request_and_ioremap(&pdev->dev, res);
-> +	if (!chip->base) {
-> +		dev_err(&pdev->dev, "failed to request and map registers\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +	chip->base_clk = devm_clk_get(&pdev->dev, "timers");
-> +	if (IS_ERR(chip->base_clk)) {
-> +		dev_err(dev, "failed to get timer base clk\n");
-> +		return PTR_ERR(chip->base_clk);
-> +	}
-> +	clk_prepare_enable(chip->base_clk);
-> +
-> +	chip->tclk0 = devm_clk_get(&pdev->dev, "pwm-tclk0");
-> +	chip->tclk1 = devm_clk_get(&pdev->dev, "pwm-tclk1");
-> +
-> +	ret = pwmchip_add(&chip->chip);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to register pwm\n");
-> +		goto err_clk_disable;
-> +	}
-> +
-> +	dev_info(dev, "base_clk at %lu, tclk0 at %lu, tclk1 at %lu\n",
-> +		clk_get_rate(chip->base_clk),
-> +		!IS_ERR(chip->tclk0) ? clk_get_rate(chip->tclk0) : 0,
-> +		!IS_ERR(chip->tclk1) ? clk_get_rate(chip->tclk1) : 0);
-
-hmm, these values simply tell some internal state of the pwm, so wouldn't a 
-dev_dbg be more appropriate?
-
-
-> +
-> +	platform_set_drvdata(pdev, chip);
-> +
-> +	return 0;
-> +
-> +err_clk_disable:
-> +	clk_disable_unprepare(chip->base_clk);
-> +
-> +	return ret;
-> +}
+	S?ren
