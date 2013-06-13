@@ -1,31 +1,38 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Thu, 13 Jun 2013 10:02:18 +0000
-Subject: [PATCH v2 02/14] ARM: OMAP2+: AM43x: Kconfig
-In-Reply-To: <20130613095454.GY8164@atomide.com>
-References: <cover.1369658705.git.afzal@ti.com>
- <7642e0c701680ea94a8cc84059ff19e500813bf1.1369658705.git.afzal@ti.com>
- <20130612171200.GL8164@atomide.com>
- <C8443D0743D26F4388EA172BF4E2A7A93EB1DEB2@DBDE04.ent.ti.com>
- <20130613095454.GY8164@atomide.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB1E196@DBDE04.ent.ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 13 Jun 2013 15:38:42 +0530
+Subject: [PATCH 0/2] Remove unused voltagedomain data for AM33xx
+Message-ID: <1371118124-15910-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
-On Thu, Jun 13, 2013 at 15:24:54, Tony Lindgren wrote:
-> * Mohammed, Afzal <afzal@ti.com> [130613 00:04]:
+The powerdomain framework today expects to always have a voltagedomain
+associated with a given powerdomain. We already have AM33xx which
+has no Voltage Controller/Voltage Processor as part of PRCM.
+There are more SoCs' to follow starting with AM437x and DRA7xx
+which do not have VC/VP.
 
-> > Patch 10 "ARM: OMAP2+: AM43x: basic dt support" is missing in
-> > omap-for-v3.11/soc branch and omap soc pull request, can you
-> > please help patch 10 also to go upstream.
-> 
-> Hmm if that's .dts changes, Benoit needs to queue that.
+Instead of adding dummy voltage domain data files, make the powerdomain
+framework aware of the fact that some SoCs' might not really have
+scalable voltage domains.
 
-It is not dts change.
+Patches are based of 3.10-rc5 and are boot tested on am335x bone.
 
-Patch 10 patches board-generic.c for DT boot (Benoit has already
-picked up dts, that is patch 14).
+Rajendra Nayak (2):
+  ARM: OMAP2+: Powerdomain: Remove the need to always have a
+    voltdm associated to a pwrdm
+  ARM: AM33xx: Remove the unused voltagedomain data
 
-Regards
-Afzal
+ arch/arm/mach-omap2/Makefile                  |    1 -
+ arch/arm/mach-omap2/io.c                      |    1 -
+ arch/arm/mach-omap2/powerdomain.c             |    5 +++
+ arch/arm/mach-omap2/powerdomain.h             |    2 ++
+ arch/arm/mach-omap2/prm33xx.c                 |    7 ++++
+ arch/arm/mach-omap2/voltage.h                 |    1 -
+ arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 -------------------------
+ 7 files changed, 14 insertions(+), 46 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
+
+-- 
+1.7.9.5
