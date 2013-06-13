@@ -1,64 +1,91 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:50 +0900
-Subject: [PATCH 00/11] Renesas ARM-based SoC updates for v3.11 #2
-Message-ID: <1371106861-25626-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 16:00:30 +0900
+Subject: [PATCH 06/12] phy-rcar-usb: correct base address
+In-Reply-To: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106836-25388-7-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-this pull-request is based on renesas-soc-for-v3.11 which you have
-previously pulled.
+The memory region that is used by the driver overlaps EHCI and OHCI  register
+regions for absolutely no reason now  -- fix it  by adding offset of 0x800 to
+the base address, changing the register #define's accordingly. This has extra
+positive effect that we now can use devm_ioremap_resource()...
 
-This pull may cause various conflicts though I believe all of them are not
-difficult to resolve. The renesas-next-20130613 tag in my tree illustrates
-how I have handled the conflicts with both changes already in arm-soc and
-changes I intend to send pull requests for in the near future.
+Note that the driver and the SoC code have to be in one patch to keep the code
+bisectable...
 
-The following changes since commit 413bfd0e67894c930242482cd15ac09a800e2ab8:
+The patch has been tested on the Marzen board.
 
-  ARM: shmobile: sh73a0: div4 clocks must check the kick bit before changing rate (2013-06-07 14:24:52 +0900)
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7779.c |  2 +-
+ drivers/usb/phy/phy-rcar-usb.c         | 28 ++++++++++------------------
+ 2 files changed, 11 insertions(+), 19 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc2-for-v3.11
-
-for you to fetch changes up to 018222f5d32bc5ca9fd830aebfeed10f1be96c93:
-
-  ARM: shmobile: r8a7790: add clock definitions and aliases for MMCIF and SDHI (2013-06-12 21:07:38 +0900)
-
-----------------------------------------------------------------
-Second Round of Renesas ARM-based SoC updates for v3.11
-
-* Ether device name updates for r8a7778 and r8a7779 Sergei Shtylyov
-* Extended clock and driver coverage for r8a7778 by Goda-san and Morimoto-san
-* Extended clock and coverage for r8a73a4 and r8a7790 by  Guennadi Liakhovetski
-* HSCIF support for r8a7790 by Ulrich Hecht
-
-----------------------------------------------------------------
-Guennadi Liakhovetski (2):
-      ARM: shmobile: r8a73a4: add clock definitions and aliases for MMCIF and SDHI
-      ARM: shmobile: r8a7790: add clock definitions and aliases for MMCIF and SDHI
-
-Kuninori Morimoto (6):
-      ARM: shmobile: r8a7778: add support I2C clock
-      ARM: shmobile: r8a7778: add support HSPI clock
-      ARM: shmobile: r8a7778: add support MMC clock
-      ARM: shmobile: r8a7778: add support I2C driver
-      ARM: shmobile: r8a7778: add support HSPI driver
-      ARM: shmobile: r8a7778: add support MMC driver
-
-Sergei Shtylyov (2):
-      ARM: shmobile: r8a7779: fix Ether device name
-      ARM: shmobile: r8a7778: fix Ether device name
-
-Ulrich Hecht (1):
-      ARM: shmobile: r8a7790: HSCIF support
-
- arch/arm/mach-shmobile/clock-r8a73a4.c        | 22 +++++++---
- arch/arm/mach-shmobile/clock-r8a7778.c        | 23 +++++++++-
- arch/arm/mach-shmobile/clock-r8a7790.c        | 31 ++++++++++---
- arch/arm/mach-shmobile/include/mach/r8a7778.h |  5 +++
- arch/arm/mach-shmobile/setup-r8a7778.c        | 63 ++++++++++++++++++++++++++-
- arch/arm/mach-shmobile/setup-r8a7779.c        |  2 +-
- 6 files changed, 131 insertions(+), 15 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index a6406cd..a00283f 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -391,7 +391,7 @@ static struct platform_device sata_device = {
+ /* USB PHY */
+ static struct resource usb_phy_resources[] = {
+ 	[0] = {
+-		.start		= 0xffe70000,
++		.start		= 0xffe70800,
+ 		.end		= 0xffe70900 - 1,
+ 		.flags		= IORESOURCE_MEM,
+ 	},
+diff --git a/drivers/usb/phy/phy-rcar-usb.c b/drivers/usb/phy/phy-rcar-usb.c
+index 4893dbd..d636cc7 100644
+--- a/drivers/usb/phy/phy-rcar-usb.c
++++ b/drivers/usb/phy/phy-rcar-usb.c
+@@ -16,13 +16,13 @@
+ #include <linux/spinlock.h>
+ #include <linux/module.h>
+ 
+-/* USBH common register */
+-#define USBPCTRL0	0x0800
+-#define USBPCTRL1	0x0804
+-#define USBST		0x0808
+-#define USBEH0		0x080C
+-#define USBOH0		0x081C
+-#define USBCTL0		0x0858
++/* REGS block */
++#define USBPCTRL0	0x00
++#define USBPCTRL1	0x04
++#define USBST		0x08
++#define USBEH0		0x0C
++#define USBOH0		0x1C
++#define USBCTL0		0x58
+ 
+ /* USBPCTRL1 */
+ #define PHY_RST		(1 << 2)
+@@ -139,17 +139,9 @@ static int rcar_usb_phy_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	/*
+-	 * CAUTION
+-	 *
+-	 * Because this phy address is also mapped under OHCI/EHCI address area,
+-	 * this driver can't use devm_request_and_ioremap(dev, res) here
+-	 */
+-	reg0 = devm_ioremap_nocache(dev, res0->start, resource_size(res0));
+-	if (!reg0) {
+-		dev_err(dev, "ioremap error\n");
+-		return -ENOMEM;
+-	}
++	reg0 = devm_ioremap_resource(dev, res0);
++	if (IS_ERR(reg0))
++		return PTR_ERR(reg0);
+ 
+ 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
+ 	if (!priv) {
+-- 
+1.8.2.1
