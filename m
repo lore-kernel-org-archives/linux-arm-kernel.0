@@ -1,33 +1,48 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 13 Jun 2013 15:52:16 -0400 (EDT)
-Subject: [PATCH V2 05/10] USB: OHCI: Properly handle ohci-exynos suspend
-In-Reply-To: <9340690.Y20fM6tyU7@flatron>
-Message-ID: <Pine.LNX.4.44L0.1306131542080.1561-100000@iolanthe.rowland.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 13 Jun 2013 12:58:01 -0700
+Subject: [PATCH v4 0/7] support Hisilicon SoC
+In-Reply-To: <201306131829.47348.heiko@sntech.de>
+References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
+ <20130612200142.GD5162@quad.lixom.net>
+ <201306131829.47348.heiko@sntech.de>
+Message-ID: <20130613195801.GA21765@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jun 2013, Tomasz Figa wrote:
-
-> > +	rc = ohci_suspend(hcd, do_wakeup);
-> > +	if (rc == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
-> > +		ohci_resume(hcd, false);
-> > +		rc = -EBUSY;
-> > +	}
+On Thu, Jun 13, 2013 at 06:29:47PM +0200, Heiko St?bner wrote:
+> Am Mittwoch, 12. Juni 2013, 22:01:42 schrieb Olof Johansson:
+> > On Sat, Jun 08, 2013 at 10:47:16PM +0800, Haojian Zhuang wrote:
+> > > Changelog:
+> > > v4:
+> > > 1. Add clk gate with HIWORD mask for Rockchip.
+> > > 2. Update comments and code of HIWORD flags for mux/divider.
+> > > 3. Append a mux without HIWORD mask in Hisilicon 3620.
+> > > 4. Fix the pinmux setting in Hi4511.
+> > > 
+> > > v3:
+> > > 1. Use clk_register_mux_table().
+> > > 
+> > > v2:
+> > > 1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
+> > > CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
+> > > 2. Fix system timer running too fast because wrong divider is choosen.
+> > > 3. Remove .init_irq in DT machine descriptor.
+> > 
+> > Hi,
+> > 
+> > I had some comments on the last two patches. I also haven't seen any acks
+> > from Mike on any of the clock changes, which would be needed before we can
+> > pick them up. He might want to merge them into his tree as well, if so
+> > we'll have to setup a shared branch.
 > 
-> I'm not into USB host subsystem, so I might just ask a stupid question.
-> 
-> Can't we make ohci_suspend check this for us, so the drivers would just 
-> check for error code? It seems like in all your patches this part of code 
-> is duplicated, looking as a good candidate to be generic.
+> Also, if anything unexpected happens to the main hisilicon support, could you 
+> or Mike pick up the HIWORD_MASK patches anyway (if they are acceptable), 
+> because they're needed for the Rockchip stuff too.
 
-Argh!  You're right, of course.
+Ok, that definitely means a topic branch would be a good idea. Mike, can you
+collect these branches on a topic that we can just pull in as a dependency
+then, please? Assuming you're happy with them, of course.
 
-I didn't see it, because the only existing place where this check is 
-made is in the PCI glue layer.  Pushing it into the HCDs themselves is 
-obviously the right thing to do.
+Thanks!
 
-Manjanuth, let's do this.  You can write a preliminary patch that puts 
-this check at the end of the ohci_suspend() routine, and then resubmit 
-your series.
-
-Alan Stern
+-Olof
