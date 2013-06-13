@@ -1,82 +1,89 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 13 Jun 2013 16:49:49 +0100
-Subject: [PATCH v2 3/3] ARM: keystone: Enable SMP support on Keystone
- machines
-In-Reply-To: <1371072317-15030-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1371072317-15030-1-git-send-email-santosh.shilimkar@ti.com>
- <1371072317-15030-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130613154949.GD27414@e106331-lin.cambridge.arm.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 13 Jun 2013 17:52:40 +0200
+Subject: N900 device tree conversion: how to do first step
+In-Reply-To: <20130613145724.GH8164@atomide.com>
+References: <20130609015944.GA23559@amd.pavel.ucw.cz>
+ <20130609201119.GA3190@blackmetal.musicnaut.iki.fi>
+ <20130613132624.GA3464@amd.pavel.ucw.cz>
+ <20130613141001.GF8164@atomide.com>
+ <20130613142809.GA3775@amd.pavel.ucw.cz>
+ <20130613145724.GH8164@atomide.com>
+Message-ID: <20130613155240.GB3775@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 10:25:17PM +0100, Santosh Shilimkar wrote:
-> Add basic SMP support for Keystone machines. This does not
-> include support for CPU hotplug for now.
-> 
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: arm at kernel.org
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> ---
->  arch/arm/mach-keystone/Kconfig    |    1 +
->  arch/arm/mach-keystone/Makefile   |    1 +
->  arch/arm/mach-keystone/keystone.c |    4 +++
->  arch/arm/mach-keystone/keystone.h |   17 ++++++++++++
->  arch/arm/mach-keystone/platsmp.c  |   52 +++++++++++++++++++++++++++++++++++++
->  5 files changed, 75 insertions(+)
->  create mode 100644 arch/arm/mach-keystone/keystone.h
->  create mode 100644 arch/arm/mach-keystone/platsmp.c
-> 
+Hi!
 
-[...]
+> * Pavel Machek <pavel@ucw.cz> [130613 07:34]:
+> > On Thu 2013-06-13 07:10:01, Tony Lindgren wrote:
+> > > * Pavel Machek <pavel@ucw.cz> [130613 06:32]:
+> > >  
+> > > > If I init spi manually (and some more hacks), it works in the
+> > > > qemu. But I have not tested on real hw for a while.
+> > > 
+> > > You should be able to initialize spi by adding the .dts entry,
+> > > or is there something missing in drivers/spi/spi-omap2-mcspi.c?
+> > 
+> > Not sure, I guess I'll find out soon. Do you have example dts that
+> > uses drivers/spi/spi-omap2-mcspi.c? Grepping spi in dts/ was not too
+> > successful.
+> 
+> Hmm I think all we have is what's written in
+> Documentation/devicetree/bindings/spi/omap-spi.txt and
+> omap4-sdp.dts.
 
-> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
-> new file mode 100644
-> index 0000000..630ab3b
-> --- /dev/null
-> +++ b/arch/arm/mach-keystone/platsmp.c
-> @@ -0,0 +1,52 @@
-> +/*
-> + * Keystone SOC SMP platform code
-> + *
-> + * Copyright 2013 Texas Instruments, Inc.
-> + *	Cyril Chemparathy <cyril@ti.com>
-> + *	Santosh Shilimkar <santosh.shillimkar@ti.com>
-> + *
-> + * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/init.h>
-> +#include <linux/smp.h>
-> +#include <linux/io.h>
-> +
-> +#include <asm/smp_plat.h>
-> +#include <asm/prom.h>
-> +
-> +#include "keystone.h"
-> +
-> +static int __cpuinit keystone_smp_boot_secondary(unsigned int cpu,
-> +						struct task_struct *idle)
-> +{
-> +	unsigned long start = virt_to_phys(&secondary_startup);
-> +	int error;
-> +
-> +	pr_debug("keystone-smp: booting cpu %d, vector %08lx\n",
-> +		 cpu, start);
-> +
-> +	asm volatile (
-> +		"mov    r0, #0\n"	/* power on cmd	*/
-> +		"mov    r1, %1\n"	/* cpu		*/
-> +		"mov    r2, %2\n"	/* start	*/
-> +		".inst  0xe1600070\n"	/* smc #0	*/
+Ok, this was easier than expected.
 
-In arch/arm/asm/opcodes-sec.h we have an __SMC() macro you could use here
-that'll use the correct opcode for arm or thumb kernels.
+Now, by chance, any idea what is DT equivalent of 
+
+omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+
+?
+
+(Plus I'll still have to figure out why it works on emulator but not
+on hw).
 
 Thanks,
-Mark.
+									Pavel
+
+
+diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+index 10a880f..3918ae1 100644
+--- a/arch/arm/boot/dts/omap3-n900.dts
++++ b/arch/arm/boot/dts/omap3-n900.dts
+@@ -65,6 +65,14 @@
+ 	status = "disabled";
+ };
+ 
++&mcspi1 {
++	mipid at 2 {
++		compatible = "acx565akm";
++		spi-max-frequency = <6000000>;
++		reg = <2>;
++	};
++};
++
+ /*
+ &usb_otg_hs {
+ 	interface-type = <0>;
+diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+index 996ffc3..597ade9 100644
+--- a/arch/arm/mach-omap2/board-generic.c
++++ b/arch/arm/mach-omap2/board-generic.c
+@@ -130,9 +130,10 @@ void __init omap_generic_init(void)
+ 		regulator_use_dummy_regulator();
+ 
+ 		omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+-
++#if 0
+ 		spi_register_board_info(rx51_peripherals_spi_board_info,
+ 				ARRAY_SIZE(rx51_peripherals_spi_board_info));
++#endif
+ #else
+ 		rx51_video_init();
+ #endif
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
