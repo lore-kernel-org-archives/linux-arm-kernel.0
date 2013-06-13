@@ -1,45 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:10 +0900
-Subject: [PATCH 2/3] ARM: shmobile: bockw defconfig: add M25P80 support
-In-Reply-To: <1371106811-25223-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371106811-25223-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106811-25223-3-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 16:00:51 +0900
+Subject: [PATCH 01/11] ARM: shmobile: r8a7779: fix Ether device name
+In-Reply-To: <1371106861-25626-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371106861-25626-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106861-25626-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+While recasting commit dace48d04dee46a3409d5e13cd98031522e46377 (ARM: shmobile:
+R8A7779: add Ether support), I made a typo in the platform device's name: used
+underscore instead of hyphen.
+
+However, there's now patch merged to net-next.git renaming the platform device
+from "sh-eth" to "r8a777x-ehter", so it makes the most sense to change the name
+straight to that one.
+
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/bockw_defconfig | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/mach-shmobile/setup-r8a7779.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index cb7638d..55e00ff 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -49,6 +49,12 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- # CONFIG_PREVENT_FIRMWARE_BUILD is not set
- # CONFIG_FW_LOADER is not set
-+CONFIG_MTD=y
-+CONFIG_MTD_CHAR=y
-+CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_CFI=y
-+CONFIG_MTD_CFI_AMDSTD=y
-+CONFIG_MTD_M25P80=y
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
-@@ -76,6 +82,8 @@ CONFIG_SERIAL_SH_SCI_CONSOLE=y
- # CONFIG_HWMON is not set
- CONFIG_I2C=y
- CONFIG_I2C_RCAR=y
-+CONFIG_SPI=y
-+CONFIG_SPI_SH_HSPI=y
- CONFIG_USB=y
- CONFIG_USB_ANNOUNCE_NEW_DEVICES=y
- CONFIG_USB_EHCI_HCD=y
+diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
+index b0b3948..d8a70dc 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7779.c
++++ b/arch/arm/mach-shmobile/setup-r8a7779.c
+@@ -443,7 +443,7 @@ void __init r8a7779_add_standard_devices(void)
+ 
+ void __init r8a7779_add_ether_device(struct sh_eth_plat_data *pdata)
+ {
+-	platform_device_register_resndata(&platform_bus, "sh_eth", -1,
++	platform_device_register_resndata(&platform_bus, "r8a777x-ether", -1,
+ 					  ether_resources,
+ 					  ARRAY_SIZE(ether_resources),
+ 					  pdata, sizeof(*pdata));
 -- 
 1.8.2.1
