@@ -1,63 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:27 +0900
-Subject: [PATCH 03/12] ARM: shmobile: r8a7779: setup EHCI internal buffer
-In-Reply-To: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106836-25388-4-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 16:00:52 +0900
+Subject: [GIT PULL 0/2] Renesas sh-sci updates for v3.11
+Message-ID: <1371106854-25560-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi Olof, Hi Arnd,
 
-Setup the EHCI internal buffer (before EHCI driver has a chance to touch the
-registers) using the pre_setup() method in 'struct usb_ehci_pdata'.
+I have included the r8a7790 change in this patch as it
+depends on the first change in the pull-request but nothing else.
 
-The patch has been tested on the Marzen board.
+This pull request will cause some conflicts though I believe all
+of them are not difficult to resolve. The renesas-next-20130613 tag in
+my tree illustrates how I have handled the conflicts with
+both changes already in arm-soc and changes I intend to send
+pull requests for in the near future.
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/setup-r8a7779.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index 533d7fd..a3d0e55 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -33,6 +33,7 @@
- #include <linux/sh_timer.h>
- #include <linux/dma-mapping.h>
- #include <linux/usb/otg.h>
-+#include <linux/usb/hcd.h>
- #include <linux/usb/ehci_pdriver.h>
- #include <linux/usb/ohci_pdriver.h>
- #include <linux/pm_runtime.h>
-@@ -435,10 +436,25 @@ static void usb_power_off(struct platform_device *pdev)
- 	pm_runtime_disable(&pdev->dev);
- }
- 
-+static int ehci_init_internal_buffer(struct usb_hcd *hcd)
-+{
-+	/*
-+	 * Below are recommended values from the datasheet;
-+	 * see [USB :: Setting of EHCI Internal Buffer].
-+	 */
-+	/* EHCI IP internal buffer setting */
-+	iowrite32(0x00ff0040, hcd->regs + 0x0094);
-+	/* EHCI IP internal buffer enable */
-+	iowrite32(0x00000001, hcd->regs + 0x009C);
-+
-+	return 0;
-+}
-+
- static struct usb_ehci_pdata ehcix_pdata = {
- 	.power_on	= usb_power_on,
- 	.power_off	= usb_power_off,
- 	.power_suspend	= usb_power_off,
-+	.pre_setup	= ehci_init_internal_buffer,
- };
- 
- static struct resource ehci0_resources[] = {
--- 
-1.8.2.1
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git sh-sci
+
+for you to fetch changes up to d1b6515e2eeaac48eff47bf4987f106a982e14f3:
+
+  ARM: shmobile: r8a7790: don't use external clock for SCIFs (2013-06-11 17:24:08 +0900)
+
+----------------------------------------------------------------
+Renesas sh-sci updates for v3.11
+
+HSCIF support by Ulrich Hecht.
+
+----------------------------------------------------------------
+Ulrich Hecht (2):
+      serial: sh-sci: HSCIF support
+      ARM: shmobile: r8a7790: don't use external clock for SCIFs
+
+ arch/arm/mach-shmobile/setup-r8a7790.c |  16 +++++-
+ drivers/tty/serial/sh-sci.c            | 102 ++++++++++++++++++++++++++++++---
+ include/linux/serial_sci.h             |  12 +++-
+ include/uapi/linux/serial_core.h       |   3 +
+ 4 files changed, 120 insertions(+), 13 deletions(-)
