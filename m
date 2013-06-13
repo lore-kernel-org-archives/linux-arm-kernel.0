@@ -1,130 +1,140 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 13 Jun 2013 14:13:50 +0530
-Subject: [PATCH v7 0/9] Generic PHY Framework
-Message-ID: <1371113039-5784-1-git-send-email-kishon@ti.com>
+Date: Thu, 13 Jun 2013 14:13:57 +0530
+Subject: [PATCH v7 7/9] usb: musb: omap2430: use the new generic PHY framework
+In-Reply-To: <1371113039-5784-1-git-send-email-kishon@ti.com>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+Message-ID: <1371113039-5784-8-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added a generic PHY framework that provides a set of APIs for the PHY drivers
-to create/destroy a PHY and APIs for the PHY users to obtain a reference to
-the PHY with or without using phandle.
+Use the generic PHY framework API to get the PHY. The usb_phy_set_resume
+and usb_phy_set_suspend is replaced with power_on/get_sync and
+power_off/put_sync to align with the new PHY framework.
 
-This framework will be of use only to devices that uses external PHY (PHY
-functionality is not embedded within the controller).
+musb->xceiv can't be removed as of now because musb core uses xceiv.state and
+xceiv.otg. Once there is a separate state machine to handle otg, these can be
+moved out of xceiv and then we can start using the generic PHY framework.
 
-The intention of creating this framework is to bring the phy drivers spread
-all over the Linux kernel to drivers/phy to increase code re-use and to
-increase code maintainability.
+Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+---
+ drivers/usb/musb/musb_core.c |    1 +
+ drivers/usb/musb/musb_core.h |    3 +++
+ drivers/usb/musb/omap2430.c  |   29 +++++++++++++++++++++--------
+ 3 files changed, 25 insertions(+), 8 deletions(-)
 
-Comments to make PHY as bus wasn't done because PHY devices can be part of
-other bus and making a same device attached to multiple bus leads to bad
-design.
-
-If the PHY driver has to send notification on connect/disconnect, the PHY
-driver should make use of the extcon framework. Using this susbsystem 
-to use extcon framwork will have to be analysed.
-
-Making omap-usb2 and twl4030 to use this framework is provided as a sample.
-
-This patch series is developed on linux mainline tree.
-
-Changes from v6
-* corrected few typos in Documentation
-* Changed PHY Subsystem to *bool* in Kconfig (to avoid compilation errors when
-  PHY Subsystem is kept as module and the dependent modules are built-in)
-* Added if pm_runtime_enabled check before runtime pm calls.
-
-Changes from v5:
-* removed the new sysfs entries as it dint have any new information other than
-  what is already there in /sys/devices/...
-* removed a bunch of APIs added to get the PHY and now only phy_get and
-  devm_phy_get are used.
-* Added new APIs to register/unregister the PHY provider. This is needed for
-  dt boot case.
-* Enabled pm runtime and incorporated the comments given by Alan Stern in a
-  different patch series by Gautam.
-* Removed the *phy_bind* API. Now the phy binding information should be passed
-  using the platform data to the controller devices.
-* Fixed a few typos.
-
-Changes from v4:
-* removed of_phy_get_with_args/devm_of_phy_get_with_args. Now the *phy providers*
-  should use their custom implementation of of_xlate or use of_phy_xlate to get
-  *phy instance* from *phy providers*.
-* Added of_phy_xlate to be used by *phy providers* if it provides only one PHY.
-* changed phy_core from having subsys_initcall to module_init.
-* other minor fixes.
-
-Changes from v3:
-* Changed the return value of PHY APIs to ENOSYS
-* Added APIs of_phy_get_with_args/devm_of_phy_get_with_args to support getting
-  PHYs if the same IP implements multiple PHYs.
-* modified phy_bind API so that the binding information can now be _updated_.
-  In effect of this removed the binding information added in board files and
-  added only in usb-musb.c. If a particular board uses a different phy binding,
-  it can update it in board file after usb_musb_init().
-* Added Documentation/devicetree/bindings/phy/phy-bindings.txt for dt binding
-  information.
-
-Changes from v2:
-* removed phy_descriptor structure completely so changed the APIs which were
-  taking phy_descriptor as parameters
-* Added 2 more APIs *of_phy_get_byname* and *devm_of_phy_get_byname* to be used
-  by PHY user drivers which has *phy* and *phy-names* binding in the dt data
-* Fixed a few typos
-* Removed phy_list and we now use class_dev_iter_init, class_dev_iter_next and
-  class_dev_iter_exit for traversing through the phy list. (Note we still need
-  phy_bind list and phy_bind_mutex).
-* Changed the sysfs entry name from *bind* to *phy_bind*.
-
-Changes from v1:
-* Added Documentation for the PHY framework
-* Added few more APIs mostly w.r.t devres
-* Modified omap-usb2 and twl4030 to make use of the new framework
-
-Did USB enumeration testing in panda and beagle.
-
-Kishon Vijay Abraham I (9):
-  drivers: phy: add generic PHY framework
-  usb: phy: omap-usb2: use the new generic PHY framework
-  usb: phy: twl4030: use the new generic PHY framework
-  usb: phy: twl4030: twl4030 shouldn't be subsys_initcall
-  ARM: OMAP: USB: Add phy binding information
-  ARM: dts: omap: update usb_otg_hs data
-  usb: musb: omap2430: use the new generic PHY framework
-  usb: phy: omap-usb2: remove *set_suspend* callback from omap-usb2
-  usb: phy: twl4030-usb: remove *set_suspend* and *phy_init* ops
-
- .../devicetree/bindings/phy/phy-bindings.txt       |   66 +++
- Documentation/devicetree/bindings/usb/omap-usb.txt |    5 +
- Documentation/devicetree/bindings/usb/usb-phy.txt  |    6 +
- Documentation/phy.txt                              |  124 +++++
- MAINTAINERS                                        |    7 +
- arch/arm/boot/dts/omap3-beagle-xm.dts              |    2 +
- arch/arm/boot/dts/omap3-evm.dts                    |    2 +
- arch/arm/boot/dts/omap3-overo.dtsi                 |    2 +
- arch/arm/boot/dts/omap4.dtsi                       |    3 +
- arch/arm/boot/dts/twl4030.dtsi                     |    1 +
- arch/arm/mach-omap2/usb-musb.c                     |    6 +-
- drivers/Kconfig                                    |    2 +
- drivers/Makefile                                   |    2 +
- drivers/phy/Kconfig                                |   13 +
- drivers/phy/Makefile                               |    5 +
- drivers/phy/phy-core.c                             |  543 ++++++++++++++++++++
- drivers/usb/musb/musb_core.c                       |    1 +
- drivers/usb/musb/musb_core.h                       |    3 +
- drivers/usb/musb/omap2430.c                        |   29 +-
- drivers/usb/phy/phy-omap-usb2.c                    |   54 +-
- drivers/usb/phy/phy-twl4030-usb.c                  |   73 +--
- include/linux/phy/phy.h                            |  284 ++++++++++
- include/linux/usb/musb.h                           |    3 +
- 23 files changed, 1172 insertions(+), 64 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/phy/phy-bindings.txt
- create mode 100644 Documentation/phy.txt
- create mode 100644 drivers/phy/Kconfig
- create mode 100644 drivers/phy/Makefile
- create mode 100644 drivers/phy/phy-core.c
- create mode 100644 include/linux/phy/phy.h
-
+diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
+index 37a261a..f732bcc 100644
+--- a/drivers/usb/musb/musb_core.c
++++ b/drivers/usb/musb/musb_core.c
+@@ -1864,6 +1864,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
+ 	musb->board_set_power = plat->set_power;
+ 	musb->min_power = plat->min_power;
+ 	musb->ops = plat->platform_ops;
++	musb->phy_label = plat->phy_label;
+ 
+ 	/* The musb_platform_init() call:
+ 	 *   - adjusts musb->mregs
+diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
+index 7fb4819..498ae21 100644
+--- a/drivers/usb/musb/musb_core.h
++++ b/drivers/usb/musb/musb_core.h
+@@ -46,6 +46,7 @@
+ #include <linux/usb.h>
+ #include <linux/usb/otg.h>
+ #include <linux/usb/musb.h>
++#include <linux/phy/phy.h>
+ 
+ struct musb;
+ struct musb_hw_ep;
+@@ -357,6 +358,7 @@ struct musb {
+ 	u16			int_tx;
+ 
+ 	struct usb_phy		*xceiv;
++	struct phy		*phy;
+ 
+ 	int nIrq;
+ 	unsigned		irq_wake:1;
+@@ -434,6 +436,7 @@ struct musb {
+ 	unsigned                double_buffer_not_ok:1;
+ 
+ 	struct musb_hdrc_config	*config;
++	const char		*phy_label;
+ 
+ #ifdef MUSB_CONFIG_PROC_FS
+ 	struct proc_dir_entry *proc_entry;
+diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
+index 628b93f..c62a004 100644
+--- a/drivers/usb/musb/omap2430.c
++++ b/drivers/usb/musb/omap2430.c
+@@ -348,14 +348,24 @@ static int omap2430_musb_init(struct musb *musb)
+ 	 * up through ULPI.  TWL4030-family PMICs include one,
+ 	 * which needs a driver, drivers aren't always needed.
+ 	 */
+-	if (dev->parent->of_node)
++	if (dev->parent->of_node) {
++		musb->phy = devm_phy_get(dev->parent, "usb2-phy");
++
++		/* We can't totally remove musb->xceiv as of now because
++		 * musb core uses xceiv.state and xceiv.otg. Once we have
++		 * a separate state machine to handle otg, these can be moved
++		 * out of xceiv and then we can start using the generic PHY
++		 * framework
++		 */
+ 		musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
+ 		    "usb-phy", 0);
+-	else
++	} else {
+ 		musb->xceiv = devm_usb_get_phy_dev(dev, 0);
++		musb->phy = devm_phy_get(dev, musb->phy_label);
++	}
+ 
+-	if (IS_ERR(musb->xceiv)) {
+-		status = PTR_ERR(musb->xceiv);
++	if (IS_ERR(musb->xceiv) || IS_ERR(musb->phy)) {
++		status = PTR_ERR(musb->xceiv) | PTR_ERR(musb->phy);
+ 
+ 		if (status == -ENXIO)
+ 			return status;
+@@ -397,9 +407,10 @@ static int omap2430_musb_init(struct musb *musb)
+ 	if (glue->status != OMAP_MUSB_UNKNOWN)
+ 		omap_musb_set_mailbox(glue);
+ 
+-	usb_phy_init(musb->xceiv);
++	phy_init(musb->phy);
+ 
+ 	pm_runtime_put_noidle(musb->controller);
++	phy_pm_runtime_put(musb->phy);
+ 	return 0;
+ 
+ err1:
+@@ -460,6 +471,7 @@ static int omap2430_musb_exit(struct musb *musb)
+ 	del_timer_sync(&musb_idle_timer);
+ 
+ 	omap2430_low_level_exit(musb);
++	phy_exit(musb->phy);
+ 
+ 	return 0;
+ }
+@@ -619,7 +631,8 @@ static int omap2430_runtime_suspend(struct device *dev)
+ 				OTG_INTERFSEL);
+ 
+ 		omap2430_low_level_exit(musb);
+-		usb_phy_set_suspend(musb->xceiv, 1);
++		phy_power_off(musb->phy);
++		phy_pm_runtime_put(musb->phy);
+ 	}
+ 
+ 	return 0;
+@@ -634,8 +647,8 @@ static int omap2430_runtime_resume(struct device *dev)
+ 		omap2430_low_level_init(musb);
+ 		musb_writel(musb->mregs, OTG_INTERFSEL,
+ 				musb->context.otg_interfsel);
+-
+-		usb_phy_set_suspend(musb->xceiv, 0);
++		phy_pm_runtime_get_sync(musb->phy);
++		phy_power_on(musb->phy);
+ 	}
+ 
+ 	return 0;
 -- 
 1.7.10.4
