@@ -1,70 +1,87 @@
-From: jgchunter@gmail.com (Jon Hunter)
-Date: Thu, 13 Jun 2013 17:41:26 +0100
-Subject: [RFC PATCH] ARM: SOCFPGA: Enable PMU through the CTI
-In-Reply-To: <20130515091205.GB12907@mudshark.cambridge.arm.com>
-References: <1368586682-19848-1-git-send-email-dinguyen@altera.com>
- <20130515091205.GB12907@mudshark.cambridge.arm.com>
-Message-ID: <51B9F636.5010708@gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Thu, 13 Jun 2013 19:08:42 +0200
+Subject: [RFC/PATCH v2 2/2] gpio-rcar: Add DT support
+In-Reply-To: <20130612114911.638683E0A56@localhost>
+References: <1369136406-23800-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1369136406-23800-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <20130612114911.638683E0A56@localhost>
+Message-ID: <2687390.IKNGX5KlWy@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Grant,
 
-On 15/05/13 10:12, Will Deacon wrote:
-> Hello,
-> 
-> [adding Jon Hunter]
-> 
-> On Wed, May 15, 2013 at 03:58:02AM +0100, dinguyen at altera.com wrote:
->> From: Dinh Nguyen <dinguyen@altera.com>
->>
->> SOCFPGA has a PMU(Performance Measurement Unit) that has its
->> IRQs routed through Coresight using the CTI(Cross-Trigger Interface).
->>
->> This patch enables the PMU and initializes the CTI for usage by
->> oprofile/perfmon.
->>
->> A lot of the code/idea was taken from this:
->> https://patchwork.kernel.org/patch/1432541/
->>
->> Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
->> CC: Ming Lei <ming.lei@canonical.com>
->> CC: Will Deacon <will.deacon@arm.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> CC: Arnd Bergmann <arnd@arndb.de>
->> CC: Olof Johansson <olof@lixom.net>
->> Cc: Pavel Machek <pavel@denx.de>
->> ---
->>  arch/arm/boot/dts/socfpga.dtsi      |   18 +++++
->>  arch/arm/include/asm/pmu.h          |    3 +
->>  arch/arm/kernel/perf_event.c        |   16 +++++
->>  arch/arm/mach-socfpga/Makefile      |    1 +
->>  arch/arm/mach-socfpga/socfpga.c     |   21 +++++-
->>  arch/arm/mach-socfpga/socfpga_cti.c |  125 +++++++++++++++++++++++++++++++++++
->>  arch/arm/mach-socfpga/socfpga_cti.h |   16 +++++
->>  7 files changed, 199 insertions(+), 1 deletion(-)
->>  create mode 100644 arch/arm/mach-socfpga/socfpga_cti.c
->>  create mode 100644 arch/arm/mach-socfpga/socfpga_cti.h
-> 
-> Whilst it's great to see somebody else making use of CTI, I think this would
-> benefit from Jon's separate CTI driver that he posted once:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2012-December/137156.html
-> 
-> Jon -- would you be interested in reviving that work so the socfpga guys can
-> make use of it?
+Thanks for the review.
 
-Sorry the delay I have been moving house!
+On Wednesday 12 June 2013 12:49:11 Grant Likely wrote:
+> On Tue, 21 May 2013 13:40:06 +0200, Laurent Pinchart wrote:
+> > Add DT bindings for the gpio-rcar driver and read the device
+> > configuration from the DT node at probe time if available.
+> > 
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> > 
+> >  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt | 52 +++++++++++++++++
+> >  drivers/gpio/gpio-rcar.c                           | 66 ++++++++++++++---
+> >  2 files changed, 108 insertions(+), 10 deletions(-)
+> >  create mode 100644
+> >  Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
 
-Anyway, although I would be interesting in reviving and completing the
-work on cti, realistically, I am not sure when I would get to it now. I
-do have the latest code on my github account [1]. However, probably
-still needs more work before it is ready for the mainline in sorting out
-the DT bindings, etc. I was also thinking about making the cti look like
-a interrupt controller in DT as that is the way it is currently being
-used. However, I am not implemented that but should not be much work.
+[snip]
 
-Cheers
-Jon
+> > diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
+> > index 0f3d647..c153837 100644
+> > --- a/drivers/gpio/gpio-rcar.c
+> > +++ b/drivers/gpio/gpio-rcar.c
 
-[1] https://github.com/jonhunter/linux/commits/dev-cti
+[snip]
+
+> > +static void gpio_rcar_parse_pdata(struct gpio_rcar_priv *p)
+> > +{
+> > +	struct gpio_rcar_config *pdata = p->pdev->dev.platform_data;
+> > +#ifdef CONFIG_OF
+> > +	struct device_node *np = p->pdev->dev.of_node;
+> > +	struct of_phandle_args args;
+> > +	int ret;
+> > +#endif
+> > +
+> > +	if (pdata)
+> > +		p->config = *pdata;
+> > +#ifdef CONFIG_OF
+> > +	else if (np) {
+> 
+> Try this:
+> 	else if ((IS_ENABLED(CONFIG_OF)) && np) {
+> 
+> It's much better than adding #ifdef blocks to .c files. In v3.11 a bunch
+> of the OF forward declarations get pulled out from under the #ifdef
+> block so that you can use the above construct.
+
+As a pull request has already been sent to the ARM SoC maintainers, and given 
+that this isn't a critical issue, I'll address it as a follow-up patch if 
+that's fine with you.
+
+> > +		ret = of_parse_phandle_with_args(np, "gpio-ranges",
+> > +				"#gpio-range-cells", 0, &args);
+> > +		p->config.number_of_pins = ret == 0 && args.args_count == 3
+> > +					 ? args.args[2]
+> > +					 : RCAR_MAX_GPIO_PER_BANK;
+> > +		p->config.gpio_base = -1;
+> > +	}
+> > +#endif
+> > +
+> > +	if (p->config.number_of_pins == 0 ||
+> > +	    p->config.number_of_pins > RCAR_MAX_GPIO_PER_BANK) {
+> > +		dev_warn(&p->pdev->dev,
+> > +			 "Invalid number of gpio lines %u, using %u\n",
+> > +			 p->config.number_of_pins, RCAR_MAX_GPIO_PER_BANK);
+> > +		p->config.number_of_pins = RCAR_MAX_GPIO_PER_BANK;
+> > +	}
+> > +}
+
+-- 
+Regards,
+
+Laurent Pinchart
