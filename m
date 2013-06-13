@@ -1,116 +1,74 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Thu, 13 Jun 2013 16:18:57 +0100
-Subject: [PATCH v4 5/5] clk: clk-mux: implement remuxing on set_rate
-In-Reply-To: <CAD=FV=VFqTzqLc3+UOHD21NiTqtu84DzwYD1Qag-RxiD0qcFDA@mail.gmail.com>
-References: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
- <1369056507-32521-6-git-send-email-james.hogan@imgtec.com>
- <519AFBB6.90700@codeaurora.org>
- <CAD=FV=VFqTzqLc3+UOHD21NiTqtu84DzwYD1Qag-RxiD0qcFDA@mail.gmail.com>
-Message-ID: <51B9E2E1.9020203@imgtec.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 13 Jun 2013 17:23:04 +0200
+Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
+ properties from a dt node
+In-Reply-To: <201306131635.21446.heiko@sntech.de>
+References: <201306102139.32444.heiko@sntech.de>
+ <CACRpkdb-vbdQJOeZvCEsKLatK-0BhEfUTJqmGURJGf1NWx__Ew@mail.gmail.com>
+ <201306131635.21446.heiko@sntech.de>
+Message-ID: <201306131723.04721.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/13 02:01, Doug Anderson wrote:
-> Hi,
+Am Donnerstag, 13. Juni 2013, 16:35:20 schrieb Heiko St?bner:
+> Am Donnerstag, 13. Juni 2013, 10:11:28 schrieb Linus Walleij:
+> > Tisdagen den 13:e Juni 2013 klock 12:22 AM, skrev Heiko St?bner
+> > 
+> > <heiko@sntech.de>:
+> > > Am Mittwoch, 12. Juni 2013, 16:55:12 schrieb James Hogan:
+> > >> > +static struct pinconf_generic_dt_params dt_params[] = {
+> > >> > +   { "bias-disable", PIN_CONFIG_BIAS_DISABLE, 0 },
+> > >> > +   { "bias-high-impedance", PIN_CONFIG_BIAS_HIGH_IMPEDANCE, 0 },
+> > >> > +   { "bias-bus-hold", PIN_CONFIG_BIAS_BUS_HOLD, 0 },
+> > >> > +   { "bias-pull-up", PIN_CONFIG_BIAS_PULL_UP, 0 },
+> > >> > +   { "bias-pull-down", PIN_CONFIG_BIAS_PULL_DOWN, 0 },
+> > >> > +   { "bias-pull-pin-default", PIN_CONFIG_BIAS_PULL_PIN_DEFAULT, 0
+> > >> > }, +   { "drive-push-pull", PIN_CONFIG_DRIVE_PUSH_PULL, 0 },
+> > >> > +   { "drive-open-drain", PIN_CONFIG_DRIVE_OPEN_DRAIN, 0 },
+> > >> > +   { "drive-open-source", PIN_CONFIG_DRIVE_OPEN_SOURCE, 0 },
+> > >> > +   { "drive-strength", PIN_CONFIG_DRIVE_STRENGTH, 0 },
+> > >> > +   { "input-schmitt-enable", PIN_CONFIG_INPUT_SCHMITT_ENABLE, 1 },
+> > >> > +   { "input-schmitt-disable", PIN_CONFIG_INPUT_SCHMITT_ENABLE, 0 },
+> > >> > +   { "input-schmitt", PIN_CONFIG_INPUT_SCHMITT, 0 },
+> > >> > +   { "input-debounce", PIN_CONFIG_INPUT_DEBOUNCE, 0 },
+> > >> > +   { "power-source", PIN_CONFIG_POWER_SOURCE, 0 },
+> > >> > +   { "slew-rate", PIN_CONFIG_SLEW_RATE, 0 },
+> > >> > +   { "low-power-mode", PIN_CONFIG_LOW_POWER_MODE, 0 },
+> > >> > +   { "output-low", PIN_CONFIG_OUTPUT, 0, },
+> > >> > +   { "output-high", PIN_CONFIG_OUTPUT, 1, },
+> > >> 
+> > >> shouldn't half of these default to 1 instead of 0? i.e. it's much
+> > >> nicer for the lone flag "bias-pull-up" to enable pull up rather than
+> > >> disable it (you even do this in the DT example in the bindings doc).
+> > > 
+> > > on closer inspection it seems that you may be right.
+> > 
+> > Heiko can you write a patch for this? You can hit both this code and
+> > the Rockchip driver at the same time for sure. Please check that
+> > the bindings are consistent.
+> > 
+> > > The documentation to the
+> > > options in the pinconf-generic header even tells that for example the
+> > > pull options do have a 0 or 1 argument.
+> > 
+> > Yeah. Well.
+> > 
+> > Actually there has been plans to have the argument represent the
+> > number of Ohms on the pull-up, but we haven't seen any hardware
+> > that can actually select that.
+> > 
+> > Maybe we should add that now? It will still be that != 0 implies
+> > enablement on platforms that does not support specifying the
+> > pull up/down resistance.
 > 
-> Mike pointed me at this series since I'm running into parenting
-> problems at the moment as well...
-> 
-> On Mon, May 20, 2013 at 9:44 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
->> While writing a similar code for our internal tree, I quickly came to the
->> realization that, "all parents are equal, but some are more equal than
->> others". The simplest example is a clock tree like this:
->>
->> Source -> Divider -> Mux
->> Source -> Mux
->>
->> A rate of Y can be achieved for Mux by either running Source at Y and
->> picking that input or running Source at Y * 2 and Divider set to div-2 and
->> picking the Divider input.
->>
->> The solution seems to be a priority list of parents. I'm sure there would be
->> other reason (jitter, clock quality, etc) for a mux to pick one parent vs.
->> another when both of them can provide the required rate.
->>
->> I think this loop should loop over parents based on their priority order.
->> So, parents should become a struct of { clk, index } and have the parents
->> listed in the order of priority. Well, at least in that long run that would
->> be better to avoid messing up parent/index values. But for now, you could
->> just have a priority array of index or parents.
->>
->> It might not fit 100% of the cases where two parents can provide the same
->> rate, but it should fit most use cases.
-> 
-> I'm slightly worried about similar problems, but I don't have a really
-> great solution.
-> 
-> In my case I'm working on exynos5 hardware which has a bunch of PLLs
-> and a crazy number of muxing options.  Many of the muxing options are
-> not really meant to be used but seem to have been added to the SoC as
-> a "backup plan" of some sort.  :-/  Most of the PLLs are intended to
-> be used for one purpose and one purpose only though muxing options
-> allow them to be used all over the place.
-> 
-> For instance if I look at my current bootup of exynos5250-snow, I see:
-> 
-> fout_apll/clk_rate:1700000000
-> fout_bpll/clk_rate:800000000
-> fout_cpll/clk_rate:333000000
-> fout_epll/clk_rate:45158401
-> fout_gpll/clk_rate:533000000
-> fout_mpll/clk_rate:1600000000
-> 
-> * APLL is intended to be the parent of the 2 ARM cores and changes due
-> to cpu load
-> * EPLL is intended to be the parent for audio and changes dpending on
-> audio playback rates.
-> * GPLL is intended to be the parent of the GPU and changes due to gpu load
-> * VPLL is intended to be the parent for video related things and could
-> change depending on the LCD.
-> * MPLL doesn't change a lot and is intended to be the parent for most things.
-> * In some systems BPLL can be used for memory or GPU
-> 
-> My main concern here is the CCF will end up deciding at some point
-> that it should reparent some clock onto a PLL that is going to change
-> a whole lot.  Maybe the user will plug in an SD card that requests a
-> frequency of 52MHz and at the moment we'll be running EPLL at 104 MHz
-> so it will be a perfect match!  ...but then the user wants to play
-> audio at a different rate.  The audio code assumes that it can mess
-> with its clock and we've got code setup to call CLK_SET_RATE_PARENT
-> all the way up to EPLL.  That will really mess with the SD card.
-> Really we'd rather just have the SD card clock always parented on the
-> stable MPLL and it's OK if 52MHz gets rounded down to 50MHz.
+> Ok, I'll see that I get this fixed :-)
 
-One possible approach to handling this is by making drivers register
-clock rate change notifications, which can reject a clock rate change,
-however I believe at the moment this would simply make the clock rate
-change fail rather than finding an alternative change which isn't
-rejected, so it may have limited use at the moment.
+Hmm ... what is the meaning of the argument of bias-disable and bias-high-
+impedance, as the kernel-doc in pinconf-generic.h does not tell?
 
-> Of course, on another board maybe they don't have an audio codec and
-> aren't using epll for audio and have realized that EPLL would be a
-> perfect way to get their SD card to run 4% faster.  It ought to work.
-> 
-> 
-> I guess to summarize the above:
-> 
-> * It seems like much of the muxing on exynos5250 is just too
-> complicated to leave it to an simple automated algorithm.
-> * It seems like we can't make muxing decisions on the SoC level.
-> * Your automatic muxing patches don't hurt me and could be useful for
-> _some_ of the muxing options, just not the top PLL ones.
-> 
-> ...but the only place that leaves me for my muxing needs is the device
-> tree.  ...and as Mike pointed out on IRC the device tree should
-> describe hardware, not policy.  Ick.
+bias-bus-hold ignores its argument and we already clarified that the pull-* do 
+have != 0 or 0 argument.
 
-Yes, we have a similar situation with the TZ1090, except it may be worse
-as some of the clocks/devices may be driven by different non-Linux cores
-or hardware threads (e.g. the WiFi/DAB firmware drives the I2C/SPI bus
-the tuner chip is connected to, and related clocks), in which case Linux
-literally has no knowledge of whether the hardware is already in use
-aside from some form of application-specific configuration (currently
-munged into device tree due to the lack of an alternative).
 
-Cheers
-James
+Thanks
+Heiko
