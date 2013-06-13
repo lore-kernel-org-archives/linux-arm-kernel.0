@@ -1,30 +1,109 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Jun 2013 22:24:25 +0200
-Subject: [PATCH 31/39] ARM: u300: add syscon node
-In-Reply-To: <14733989.vf3LkZC316@wuerfel>
-References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
- <1369991954-17406-32-git-send-email-linus.walleij@stericsson.com>
- <14733989.vf3LkZC316@wuerfel>
-Message-ID: <CACRpkdYWU2g0iK=kJO2E-Lj_0MRszUOVbfgFZN6s33KE8v02oA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Thu, 13 Jun 2013 22:24:33 +0200
+Subject: [PATCH 14/15] ARM: SAMSUNG: Remove remaining uses of
+ plat/regs-timer.h header
+In-Reply-To: <1370467100-10820-15-git-send-email-tomasz.figa@gmail.com>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1370467100-10820-15-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <201306132224.33866.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 31, 2013 at 12:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Am Mittwoch, 5. Juni 2013, 23:18:19 schrieb Tomasz Figa:
+> This patch removes remaining inclusions of plat/regs-timer.h as a
+> preparation to remove the header.
 
->>  compatible="stericsson,u300";
->>
->> +Required node: syscon
->> +This contains the system controller.
->> +- compatible: must be "stericsson,u300-syscon".
->> +- reg: the base address and size of the system controller.
->> +
->
-> Any reason why you are not making it compatible with "syscon", to use
-> the drivers/mfd/syscon.c driver?
+hmm, the patch does a bit more than that, as it also removes the saving of the 
+registers from the suspend calls, which is most likely handled by the driver 
+now. But the description should possibly reflect that.
 
-I've proposed a patch for this and also altered the board
-power code to make use of it (it's the only instance that can
-use the syscon regmap do do its work so far).
 
-Yours,
-Linus Walleij
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  arch/arm/mach-s3c64xx/irq-pm.c  |  2 --
+>  arch/arm/mach-s5p64x0/pm.c      |  3 ---
+>  arch/arm/mach-s5pv210/pm.c      | 10 ----------
+>  arch/arm/plat-samsung/s5p-irq.c |  1 -
+>  4 files changed, 16 deletions(-)
+> 
+> diff --git a/arch/arm/mach-s3c64xx/irq-pm.c
+> b/arch/arm/mach-s3c64xx/irq-pm.c index 0c7e1d9..c3da1b6 100644
+> --- a/arch/arm/mach-s3c64xx/irq-pm.c
+> +++ b/arch/arm/mach-s3c64xx/irq-pm.c
+> @@ -22,7 +22,6 @@
+>  #include <mach/map.h>
+> 
+>  #include <plat/regs-serial.h>
+> -#include <plat/regs-timer.h>
+>  #include <mach/regs-gpio.h>
+>  #include <plat/cpu.h>
+>  #include <plat/pm.h>
+> @@ -43,7 +42,6 @@ static struct sleep_save irq_save[] = {
+>  	SAVE_ITEM(S3C64XX_EINT0FLTCON2),
+>  	SAVE_ITEM(S3C64XX_EINT0FLTCON3),
+>  	SAVE_ITEM(S3C64XX_EINT0MASK),
+> -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+>  };
+> 
+>  static struct irq_grp_save {
+> diff --git a/arch/arm/mach-s5p64x0/pm.c b/arch/arm/mach-s5p64x0/pm.c
+> index 97c2a08a..861e15c 100644
+> --- a/arch/arm/mach-s5p64x0/pm.c
+> +++ b/arch/arm/mach-s5p64x0/pm.c
+> @@ -18,7 +18,6 @@
+> 
+>  #include <plat/cpu.h>
+>  #include <plat/pm.h>
+> -#include <plat/regs-timer.h>
+>  #include <plat/wakeup-mask.h>
+> 
+>  #include <mach/regs-clock.h>
+> @@ -48,8 +47,6 @@ static struct sleep_save s5p64x0_misc_save[] = {
+>  	SAVE_ITEM(S5P64X0_MEM0CONSLP1),
+>  	SAVE_ITEM(S5P64X0_MEM0DRVCON),
+>  	SAVE_ITEM(S5P64X0_MEM1DRVCON),
+> -
+> -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+>  };
+> 
+>  /* DPLL is present only in S5P6450 */
+> diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
+> index 2b68a67..3cf3f9c 100644
+> --- a/arch/arm/mach-s5pv210/pm.c
+> +++ b/arch/arm/mach-s5pv210/pm.c
+> @@ -21,7 +21,6 @@
+> 
+>  #include <plat/cpu.h>
+>  #include <plat/pm.h>
+> -#include <plat/regs-timer.h>
+> 
+>  #include <mach/regs-irq.h>
+>  #include <mach/regs-clock.h>
+> @@ -77,15 +76,6 @@ static struct sleep_save s5pv210_core_save[] = {
+>  	/* Clock ETC */
+>  	SAVE_ITEM(S5P_CLK_OUT),
+>  	SAVE_ITEM(S5P_MDNIE_SEL),
+> -
+> -	/* PWM Register */
+> -	SAVE_ITEM(S3C2410_TCFG0),
+> -	SAVE_ITEM(S3C2410_TCFG1),
+> -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+> -	SAVE_ITEM(S3C2410_TCON),
+> -	SAVE_ITEM(S3C2410_TCNTB(0)),
+> -	SAVE_ITEM(S3C2410_TCMPB(0)),
+> -	SAVE_ITEM(S3C2410_TCNTO(0)),
+>  };
+> 
+>  static int s5pv210_cpu_suspend(unsigned long arg)
+> diff --git a/arch/arm/plat-samsung/s5p-irq.c
+> b/arch/arm/plat-samsung/s5p-irq.c index 6729cb2..ddfaca9 100644
+> --- a/arch/arm/plat-samsung/s5p-irq.c
+> +++ b/arch/arm/plat-samsung/s5p-irq.c
+> @@ -17,7 +17,6 @@
+> 
+>  #include <mach/irqs.h>
+>  #include <mach/map.h>
+> -#include <plat/regs-timer.h>
+>  #include <plat/cpu.h>
+> 
+>  void __init s5p_init_irq(u32 *vic, u32 num_vic)
