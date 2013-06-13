@@ -1,94 +1,70 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Thu, 13 Jun 2013 07:02:51 +0200
-Subject: [PATCH v2 3/3] arm: dt: zynq: Add support for the zed platform
-In-Reply-To: <d7057a7e-fc92-4e24-bf7b-137e873f871b@VA3EHSMHS011.ehs.local>
-References: <1371055268-32337-1-git-send-email-soren.brinkmann@xilinx.com>
- <1371055268-32337-4-git-send-email-soren.brinkmann@xilinx.com>
- <20130612182345.GA1656@pengutronix.de>
- <2433e1d1-7d2e-4b23-a76e-2085e3aef1a6@DB9EHSMHS010.ehs.local>
- <20130612193358.GA21585@pengutronix.de>
- <d7057a7e-fc92-4e24-bf7b-137e873f871b@VA3EHSMHS011.ehs.local>
-Message-ID: <51B9527B.904@monstr.eu>
+From: rui.zhang@intel.com (Zhang Rui)
+Date: Thu, 13 Jun 2013 13:14:44 +0800
+Subject: [PATCH] thermal: add imx thermal driver support
+In-Reply-To: <20130613041207.GA14259@S2101-09.ap.freescale.net>
+References: <1370330008-5982-1-git-send-email-shawn.guo@linaro.org>
+ <1371093177.2135.24.camel@rzhang1-mobl4>
+ <20130613041207.GA14259@S2101-09.ap.freescale.net>
+Message-ID: <1371100484.2135.55.camel@rzhang1-mobl4>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2013 10:16 PM, S?ren Brinkmann wrote:
-> On Wed, Jun 12, 2013 at 09:33:58PM +0200, Steffen Trumtrar wrote:
->> On Wed, Jun 12, 2013 at 11:26:34AM -0700, S?ren Brinkmann wrote:
->>> On Wed, Jun 12, 2013 at 08:23:45PM +0200, Steffen Trumtrar wrote:
->>>> On Wed, Jun 12, 2013 at 09:41:08AM -0700, Soren Brinkmann wrote:
->>>>> Add a DT fragment for the Zed Zynq platform and a corresponding
->>>>> target to the Makefile
->>>>>
->>>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->>>>> ---
->>>>> I used the 'xlnx,...' compat strings since it seems this is what is
->>>>> used in the Xilinx and Digilent vendor trees.
->>>>>
->>>>> +/include/ "zynq-7000.dtsi"
->>>>> +
->>>>> +/ {
->>>>> +	model = "Zynq Zed Development Board";
->>>>> +	compatible = "xlnx,zynq-zed", "xlnx,zynq-7000";
->>>>> +
->>>>> +	memory {
->>>>> +		device_type = "memory";
->>>>> +		reg = <0 0x20000000>;
->>>>> +	};
->>>>> +
->>>>> +	chosen {
->>>>> +		bootargs = "console=ttyPS1,115200 earlyprintk";
->>>>> +	};
->>>>> +
->>>>> +};
->>>>
->>>> Hi!
->>>>
->>>> This looks a little bit to basic. No?! Not even an UART?
->>> The UART is imported from the common zynq-7000.dtsi.
->>
->> Hm, you are actually right, although I think that you shouldn't be.
->> It is possible to NOT use the UARTs, isn't it? So, default on for both UARTs is wrong.
-> Well, in that case the dtsi has to be fixed to add the 'status = "disabled"
-> property to the UARTs which then can be overridden in the board dts files
-> as needed. I guess I'll prepare another patch for a v3 for adding status
-> properties to the UART nodes.
+On Thu, 2013-06-13 at 12:12 +0800, Shawn Guo wrote:
+> On Thu, Jun 13, 2013 at 11:12:57AM +0800, Zhang Rui wrote:
+> > On Tue, 2013-06-04 at 15:13 +0800, Shawn Guo wrote:
+> > > This is based on the initial imx thermal work done by
+> > > Rob Lee <rob.lee@linaro.org> (Not sure if the email address is still
+> > > valid).  Since he is no longer interested in the work and I have
+> > > rewritten a significant amount of the code, I just took the authorship
+> > > over from him.
+> > > 
+> > > It adds the imx thermal support using Temperature Monitor (TEMPMON)
+> > > block found on some Freescale i.MX SoCs.  The driver uses syscon regmap
+> > > interface to access TEMPMON control registers and calibration data, and
+> > > supports cpufreq as the cooling device.
+> > > 
+> > you're using the cpufrq_cooling to throttle cpus at 85C, right?
+> 
+> Yes.
+> 
+> > then you should register it as THERMAL_TRIP_PASSIVE instead of
+> > THERMAL_TRIP_ACTIVE.
+> 
+> Yes, literally it should be a passive trip point rather than active
+> one.  But I'm not sure if there is any real functional differences
+> between them in my thermal case,
 
-I am ok with this. Just to be sure that we will probably need to start
-to use port-number to reflect which port is first, second.
+well, no, the code for handling passive and active trip point is the
+same.
+But "passive" and "active" are meaningful for thermal strategy, which
+has not been supported so far.
+Say, when running on battery, "passive" cooling should be preferred
+because it consumes less power, while "active" cooling should be
+preferred when running on AC because it provides better performance.
 
+>  except I have to give both
+> passive_delay and polling_delay in thermal_zone_device_register()
+> call for passive type while it only needs polling_delay for active type
+> to work properly.
+> 
+polling_delay is for systems w/o thermal interrupt.
+but passive_delay is used for the condition that the processors are
+being throttled.
+they have different meanings. Say, you may want to check the temperature
+every 30 seconds (polling_delay) in normal condition, but when the
+system is overheating, you may need to check the temperature and put the
+processors to a lower/higher cooling state every 5 seconds to avoid
+1. the fast temperature increment shuts down the system when you just
+started to throttle.
+2. the rapid temperature decrement leaves the system idle but processors
+throttled, for a long time.
 
->>>> The compatible should include digilent or avnet. Digilent only sells to academic
->>>> customers, Avnet doesn't.
->>> I don't care at all. So, who makes the decision which one is the correct
->>> one? Actually we could even drop the zed specific one completely and go
->>> with 'xlnx,zynq-7000' only.
->>
->> I'm okay with that.
-> Okay, let's wait a little and see if there are other opinions and then I
-> can prepare a v3.
+> Besides, both exynos and db8500 thermal drivers register active trip
+> point while they are using cpufreq as the cooling device.
 
-AFAIK Digilent is producer, Avnet is reseller. I think it is enough to write
-in description ZedBoard and don't mentioned manufacturer.
+oh, I did not notice that.
+Then that is something needs fixing. you can cook up twp patch for
+that. :)
 
-By my previous comment I thought to have there just zynq-7000 compatible string
-without any additional zc702/zc706 or zed board properties.
-
-Thanks,
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
-Maintainer of Linux kernel - Xilinx Zynq ARM architecture
-Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
-
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 263 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130613/6da2722c/attachment.sig>
+thanks,
+rui
