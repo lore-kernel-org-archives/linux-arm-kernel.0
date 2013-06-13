@@ -1,104 +1,68 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 13 Jun 2013 11:41:58 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
-References: <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
- <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVOB1e6cptrXqbXyt_JxU7YnRp++HABvR90cG8rUMa2xog@mail.gmail.com>
+From: josh.wu@atmel.com (Josh Wu)
+Date: Thu, 13 Jun 2013 11:42:26 +0800
+Subject: [PATCH 6/6] mtd: ofpart: add compatible check for child nodes
+In-Reply-To: <51B5C80D.2030303@cogentembedded.com>
+References: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
+ <1370860014-1770-7-git-send-email-josh.wu@atmel.com>
+ <51B5C80D.2030303@cogentembedded.com>
+Message-ID: <51B93FA2.7040206@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 10:35 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Wed, 12 Jun 2013, Ming Lei wrote:
->
->> If not, I am wondering why one USB driver need register another hard
->> interrupt handler? Could you share such examples? I understand the
->> case only exists with timer handler as discussed with Oliver, don't I?
->
-> Here's another possibility.  A USB driver has a private lock, and it
-> acquires this lock in its completion handler.  But it also acquires
-> this lock in other routines, and those other routines may be called by
-> other drivers or subsystems in interrupt context.
+Hi, Sergei
 
-OK, so the problem is more complicated than I imaged at start, :-(
+On 6/10/2013 8:35 PM, Sergei Shtylyov wrote:
+> hello.
+>
+> On 10-06-2013 14:26, Josh Wu wrote:
+>
+>> If the child node has compatible property then it is a driver not 
+>> partition.
+>
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
+>> ---
+>>   drivers/mtd/ofpart.c |   14 +++++++++++++-
+>>   1 file changed, 13 insertions(+), 1 deletion(-)
+>
+>
+>> diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
+>> index 553d6d6..61ce1f8 100644
+>> --- a/drivers/mtd/ofpart.c
+>> +++ b/drivers/mtd/ofpart.c
+> [...]
+>> @@ -40,8 +44,13 @@ static int parse_ofpart_partitions(struct mtd_info 
+>> *master,
+>>       /* First count the subnodes */
+>>       pp = NULL;
+>>       nr_parts = 0;
+>> -    while ((pp = of_get_next_child(node, pp)))
+>> +    while ((pp = of_get_next_child(node, pp))) {
+>
+>    Assignment in *while*? Is scripts/checkpatch.pl happy about that?
+
+yes, checkpatch.pl has no complain  ;-)
 
 >
->> > The drivers _do_ need to be changed, as explained above.  And that
->> > explanation was only one failure scenario.  There may be others.
+>> +        int len;
+>
+>    Empty line wouldn't hurt here, after declaration.
+
+Ok, as Brian said, I will no need to use a 'int len' here. So I will 
+remove those declaration.
+
+>
+>> +        if (node_has_compatible(pp, &len))
+>> +            continue;
+>> +
+>>           nr_parts++;
+>> +    }
 >>
->> OK, I'd like to know what the others are? :-)
+>>       if (nr_parts == 0)
+>>           return 0;
 >
-> Me too.  :-)
+> WBR, Sergei
 >
->> >> And finally, USB HCDs themselves will benefit from the change, won't they?
->> >
->> > How will they benefit?  Merely from not releasing their private locks?
->>
->> The interrupt of one HCD will be responded lately since another HCD's
->> interrupt handler takes very long time. With the change, the problem can
->> be avoided.
->
-> For reasonably sophisticated host controllers like EHCI, the delay in
-> responding to an interrupt doesn't matter much.  But for simpler host
 
-EHCI might still benefit from the change: suppose uvc video is playing on
-one EHCI bus, and mass storage's performance over another EHCI may
-decrease because of the IRQ latency introduced.
-
-> controllers (for example, those using PIO instead of DMA) it matters
-> more, so those other HCDs will benefit more from the conversion.
-
-Indeed, musb and ehci/ohci are coexisted on OMAP3/4/5.
-
->> >> Compared with "usb-storage" task's schedule latency, the tasklet
->> >> schedule delay should be lower at most of situations since the tasklet
->> >> is scheduled inside irq handler.
->> >
->> > True.  But the two latencies add.
->>
->> I think it should be one tasklet latency added, but what is the other one?
->
-> I meant that the latency in tasklet scheduling has to be added to the
-> latency in scheduling the usb-storage thread.
->
->> > Or you could have a separate tasklet for each host controller.
->>
->> Yes, but I will compare tasklet with interrupt threaded handler first.
->
-> Switching to a threaded interrupt handler offers more possibilities.
-> Instead of moving just the givebacks to the thread, we could put almost
-> all the processing there.  (At least, we can for ehci-hcd.  Other HCDs
-> may not be able to do this.)
->
-> At this point we are talking about multiple changes:
->
->         Moving the givebacks to a tasklet or threaded handler.
->
->         Changing the USB completion handlers so that they can be called
->         with interrupts enabled.
->
->         Allowing the tasklet/thread to run with interrupts enabled.
->
->         Moving more of the HCD processing into the tasklet/thread.
->
-> Maybe other things too.  In principle, the first and second items can
-> be done simultaneously.
-
-Very good summery, we can push the 1st change with disabling local IRQ
-when calling complete(), so that at least DMA unmapping can be done
-with IRQ enabled, and at the same time do the API change, which
-should be a bit slow but the mechanical way proposed by Oliver may
-be OK.
-
-The 3rd item is easy once the 1st two items are completed.
-
-For the 4th one, it might be a long term thing, since refactoring
-HCD interrupt handler is a bit complicated. Also, when the 1st
-three items are completed, hard interrupt handler takes less time,
-often less than 20us at average about EHCI, so I am wondering
-if the 4th is worthy.
-
-
-Thanks,
---
-Ming Lei
+Thanks.
+Best Regards,
+Josh Wu
