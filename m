@@ -1,41 +1,35 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Thu, 13 Jun 2013 10:55:48 +0200
-Subject: [PATCH v4 0/3] mmc: dw_mmc: Add support for Rockchip variant
-Message-ID: <201306131055.49595.heiko@sntech.de>
+Date: Thu, 13 Jun 2013 10:56:23 +0200
+Subject: [PATCH v4 1/3] mmc: dw_mmc-pltfm: remove static from
+ dw_mci_pltfm_remove
+In-Reply-To: <201306131055.49595.heiko@sntech.de>
+References: <201306131055.49595.heiko@sntech.de>
+Message-ID: <201306131056.23969.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver support for the mmc host is not needed for the core SoC support
-and in the same way the mmc support does not need the SoC code to function.
-Therefore it can be submitted (and hopefully merged) on its own.
+dw_mci_pltfm_remove gets exported and used by dw_mmc-exynos, so should
+not be static.
 
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Jaehoon Chung <jh80.chung@samsung.com>
+Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
+---
+ drivers/mmc/host/dw_mmc-pltfm.c |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes since v3:
-- submit mmc driver standalone
-- add dt binding documentation
-
-Changes since v2:
-- split "mmc: dw_mmc-pltfm: add Rockchip variant" into move and feature parts
-  as suggested by Andy Shevchenko
-
-Changes since v1:
-none
-
-Dependencies:
-- "mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA" from Dinh Nguyen that
-  moves the SDMMC_CMD_USE_HOLD_REG constant into the common header, which is
-  required on these Rockchip SoCs 
-
-
-Heiko Stuebner (3):
-  mmc: dw_mmc-pltfm: remove static from dw_mci_pltfm_remove
-  mmc: dw_mmc-pltfm: move probe and remove below dt match table
-  mmc: dw_mmc-pltfm: add Rockchip variant
-
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   23 ++++++++++
- drivers/mmc/host/dw_mmc-pltfm.c                    |   47 ++++++++++++++------
- 2 files changed, 56 insertions(+), 14 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-
+diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
+index 37873f1..0048da8 100644
+--- a/drivers/mmc/host/dw_mmc-pltfm.c
++++ b/drivers/mmc/host/dw_mmc-pltfm.c
+@@ -68,7 +68,7 @@ static int dw_mci_pltfm_probe(struct platform_device *pdev)
+ 	return dw_mci_pltfm_register(pdev, NULL);
+ }
+ 
+-static int dw_mci_pltfm_remove(struct platform_device *pdev)
++int dw_mci_pltfm_remove(struct platform_device *pdev)
+ {
+ 	struct dw_mci *host = platform_get_drvdata(pdev);
+ 
 -- 
 1.7.10.4
