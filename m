@@ -1,41 +1,67 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 13 Jun 2013 10:34:10 +0100
-Subject: [PATCH 00/32] ARM: ux500: Enable clocks for Device Tree
-In-Reply-To: <CACRpkdYtocMN-qvhOX_uHw=zoJysjJhGjQv5gL_ijkR56QL4Bg@mail.gmail.com>
-References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
- <20130612132713.GE4320@laptop>
- <CACRpkdYtocMN-qvhOX_uHw=zoJysjJhGjQv5gL_ijkR56QL4Bg@mail.gmail.com>
-Message-ID: <20130613093410.GB16677@laptop>
+From: gururaja.hebbar@ti.com (Hebbar, Gururaja)
+Date: Thu, 13 Jun 2013 09:39:54 +0000
+Subject: [PATCH 2/2] rtc: omap: add rtc wakeup support to alarm events
+References: <1369982005-8572-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369982005-8572-3-git-send-email-gururaja.hebbar@ti.com>
+ <87a9nb2gjh.fsf@linaro.org>
+Message-ID: <1BAFE6F6C881BF42822005164F1491C33EC34679@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jun 2013, Linus Walleij wrote:
+Hi Kevin,
 
-> On Wed, Jun 12, 2013 at 3:27 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> After this patchset has been applied, we can request clocks directly
-> >> from Device Tree without using any AUXDATA device-name hacks. We also
-> >> take care to remove all of thos at the end of the set.
-> >
-> > So it looks like Mike and Grant have okayed the actual design of this
-> > patch-set, which is great. Is there any chance on some proper Acks from
-> > Linus and Mike please?
+On Mon, Jun 10, 2013 at 16:55:17, Hebbar, Gururaja wrote:
+> On Fri, May 31, 2013 at 23:11:22, Kevin Hilman wrote:
+> > Hebbar Gururaja <gururaja.hebbar@ti.com> writes:
+> > 
+> > > On some platforms (like AM33xx), a special register (RTC_IRQWAKEEN)
+> > > is available to enable Wakeup feature for Alarm Events.
+> > >
+> > > Since new platforms/Boards are now added through DT only, this feature
+> > > is supported via DT property only.
+> > 
+> > > Platforms using such IP should add the property "ti,has_irq_wake_enb"
+> > > in rtc DT node.
+> > 
+> > This is a property of the IP, not the board.  Can't you detect this
+> > based on the revision of the IP?
 > 
-> I will get to it. Basically I don't see there is a hurry as this has
-> no chance to hit the v3.11 merge window anyway so we'll have
-> lots of time to discuss it.
+> Here is what I found out till now.
 > 
-> Why 3.12: my five pull request for ux500 stuff to ARM SoC is still
-> outstanding, and this stuff will clash with that unless we get
-> a common merge base. So we have to wait for ARM SoC
-> to settle at this point.
+> 1. rtc-omap driver is used by Davinci, OMAP-1/2 & AM33xx SoC.
+> 
+> 2. Only AM33xx soc rtc ip has revision register (& populated). Older OMAP
+>    Or davinci doesn't have this register.
+> 
+> 3. AFAIK, this was the reason why Afzal used platform_device_id & 
+>    of_device_id->data method to detect new versions (commit
+>    9e0344dcc225fe1a0e8b8af9ff7df44ec4613580)
+> 
+> 
+> So now either 
+> a. I can follow the same method and add new member to omap_rtc_devtype & add a new compatible in 
+>  omap_rtc_of_match in rtc-omap.c
+> 
+> or
+> 
+> b. use dt property to indicate existence of above property.
+> 
+> 
+> Kindly let me know your opinion about the same.
 
-I understand, thanks for the clarification.
+Any update on this. I have patch ready for both the choices. Waiting for your ok to send
 
-I'm fairly sure the semantics are sound, so I'll duplicate them for
-the u8540 - working on that now.
 
--- 
-Lee Jones
-Linaro ST-Ericsson Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> 
+> > 
+> > Kevin
+> > 
+> 
+> 
+> Regards, 
+> Gururaja
+> 
+
+
+Regards, 
+Gururaja
