@@ -1,48 +1,58 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Thu, 13 Jun 2013 12:58:01 -0700
-Subject: [PATCH v4 0/7] support Hisilicon SoC
-In-Reply-To: <201306131829.47348.heiko@sntech.de>
-References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
- <20130612200142.GD5162@quad.lixom.net>
- <201306131829.47348.heiko@sntech.de>
-Message-ID: <20130613195801.GA21765@quad.lixom.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 13 Jun 2013 16:08:32 -0400
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
+Message-ID: <1371154112.9844.306.camel@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 06:29:47PM +0200, Heiko St?bner wrote:
-> Am Mittwoch, 12. Juni 2013, 22:01:42 schrieb Olof Johansson:
-> > On Sat, Jun 08, 2013 at 10:47:16PM +0800, Haojian Zhuang wrote:
-> > > Changelog:
-> > > v4:
-> > > 1. Add clk gate with HIWORD mask for Rockchip.
-> > > 2. Update comments and code of HIWORD flags for mux/divider.
-> > > 3. Append a mux without HIWORD mask in Hisilicon 3620.
-> > > 4. Fix the pinmux setting in Hi4511.
-> > > 
-> > > v3:
-> > > 1. Use clk_register_mux_table().
-> > > 
-> > > v2:
-> > > 1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
-> > > CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
-> > > 2. Fix system timer running too fast because wrong divider is choosen.
-> > > 3. Remove .init_irq in DT machine descriptor.
-> > 
-> > Hi,
-> > 
-> > I had some comments on the last two patches. I also haven't seen any acks
-> > from Mike on any of the clock changes, which would be needed before we can
-> > pick them up. He might want to merge them into his tree as well, if so
-> > we'll have to setup a shared branch.
-> 
-> Also, if anything unexpected happens to the main hisilicon support, could you 
-> or Mike pick up the HIWORD_MASK patches anyway (if they are acceptable), 
-> because they're needed for the Rockchip stuff too.
+On Thu, 2013-06-13 at 15:41 -0400, Alan Stern wrote:
 
-Ok, that definitely means a topic branch would be a good idea. Mike, can you
-collect these branches on a topic that we can just pull in as a dependency
-then, please? Assuming you're happy with them, of course.
+> The test results above show a 2.4% degradation for threaded interrupts 
+> as compared to tasklets.  That's in addition to the bottlenecks caused 
+> by the device; no doubt it would be worse for a faster device.  This 
+> result calls into question the benefits of threaded interrupts.
 
-Thanks!
+That's because it was written like a top half and not a full blown
+interrupt. I just looked at the patch, and saw this:
 
--Olof
++#ifndef USB_HCD_THREADED_IRQ
+        if (sched) {
+                if (async)
+                        tasklet_schedule(&bh->bh);
+                else
+                        tasklet_hi_schedule(&bh->bh);
+        }
++#else
++       if (sched)
++               schedule_work(&hcd->periodic_bh->work);
++#endif
+
+What is this? The work isn't done by an interrupt thread, but by work queues!
+
+The point of the interrupt thread is that you do *all* the work that
+needs to be done when an interrupt comes in. You don't need to delay the
+work.
+
+If you just treat a threaded interrupt like a real interrupt and push
+off work to something else, then yes, it will degrade performance.
+
+If you go the threaded interrupt route, you need to rethink the
+paradigm. There's no reason that the interrupt handler needs to be fast
+like it needs to be in true interrupt context. The handler can now use
+mutexes, and other full features that currently only threads benefit
+from. It should improve locking issues, and can serialize things if
+needed.
+
+All this patch did was to switch the main irq to a thread and make a
+bottom half into a work queue.
+
+Why couldn't you just do:
+
+	if (sched)
+		usb_giveback_urb_bh(bh);
+
+?
+
+-- Steve
