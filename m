@@ -1,56 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 15:59:41 +0900
-Subject: [PATCH 03/15] ARM: shmobile: Remove romImage CONFIG_MEMORY_START
+Date: Thu, 13 Jun 2013 15:59:42 +0900
+Subject: [PATCH 04/15] ARM: shmobile: Rework sh7372 sleep code to use
+ virt_to_phys()
 In-Reply-To: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106793-25071-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106793-25071-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Instead of relying on CONFIG_MEMORY_START for memory
-base address, let each romImage board header file
-specify this information.
+Instead of having a hard coded virt-to-phys address
+conversion code in sleep-sh7372.S, rework the code
+to do the conversion in C using virt_to_phys().
 
-This is reworks code not to rely on CONFIG_MEMORY_START
-which in turn is needed for ARCH_MULTIPLATFORM.
+This removes the need for PLAT_PHYS_OFFSET which
+in turn is needed for ARCH_MULTIPLATFORM.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/compressed/head-shmobile.S    | 2 +-
- arch/arm/mach-shmobile/include/mach/zboot.h | 2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/sh7372.h | 2 ++
+ arch/arm/mach-shmobile/pm-sh7372.c           | 3 +++
+ arch/arm/mach-shmobile/sleep-sh7372.S        | 5 ++++-
+ 3 files changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/compressed/head-shmobile.S b/arch/arm/boot/compressed/head-shmobile.S
-index 19b2304..e2d6363 100644
---- a/arch/arm/boot/compressed/head-shmobile.S
-+++ b/arch/arm/boot/compressed/head-shmobile.S
-@@ -46,7 +46,7 @@ __image_start:
- __image_end:
- 	.long	_got_end
- __load_base:
--	.long	CONFIG_MEMORY_START + 0x02000000 @ Load at 32Mb into SDRAM
-+	.long	MEMORY_START + 0x02000000 @ Load at 32Mb into SDRAM
- __loaded:
- 	.long	__continue
- 	.align
-diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
-index 9320aff..308b5cf 100644
---- a/arch/arm/mach-shmobile/include/mach/zboot.h
-+++ b/arch/arm/mach-shmobile/include/mach/zboot.h
-@@ -12,9 +12,11 @@
+diff --git a/arch/arm/mach-shmobile/include/mach/sh7372.h b/arch/arm/mach-shmobile/include/mach/sh7372.h
+index e882717..854a9f0 100644
+--- a/arch/arm/mach-shmobile/include/mach/sh7372.h
++++ b/arch/arm/mach-shmobile/include/mach/sh7372.h
+@@ -75,6 +75,8 @@ extern void sh7372_intcs_resume(void);
+ extern void sh7372_intca_suspend(void);
+ extern void sh7372_intca_resume(void);
  
- #ifdef CONFIG_MACH_AP4EVB
- #define MACH_TYPE	MACH_TYPE_AP4EVB
-+#define MEMORY_START	0x40000000
- #include "mach/head-ap4evb.txt"
- #elif defined(CONFIG_MACH_MACKEREL)
- #define MACH_TYPE	MACH_TYPE_MACKEREL
-+#define MEMORY_START	0x40000000
- #include "mach/head-mackerel.txt"
++extern unsigned long sh7372_cpu_resume;
++
+ #ifdef CONFIG_PM
+ extern void __init sh7372_init_pm_domains(void);
  #else
- #error "unsupported board."
+diff --git a/arch/arm/mach-shmobile/pm-sh7372.c b/arch/arm/mach-shmobile/pm-sh7372.c
+index dec9293..4f15ed5 100644
+--- a/arch/arm/mach-shmobile/pm-sh7372.c
++++ b/arch/arm/mach-shmobile/pm-sh7372.c
+@@ -524,6 +524,9 @@ void __init sh7372_pm_init(void)
+ 	/* do not convert A3SM, A3SP, A3SG, A4R power down into A4S */
+ 	__raw_writel(0, PDNSEL);
+ 
++	/* pass physical address of cpu_resume() to assembly resume code */
++	sh7372_cpu_resume = virt_to_phys(cpu_resume);
++
+ 	sh7372_pm_setup_smfram();
+ 
+ 	sh7372_suspend_init();
+diff --git a/arch/arm/mach-shmobile/sleep-sh7372.S b/arch/arm/mach-shmobile/sleep-sh7372.S
+index a9df53b..53f4840 100644
+--- a/arch/arm/mach-shmobile/sleep-sh7372.S
++++ b/arch/arm/mach-shmobile/sleep-sh7372.S
+@@ -40,7 +40,10 @@
+ 	.global sh7372_resume_core_standby_sysc
+ sh7372_resume_core_standby_sysc:
+ 	ldr     pc, 1f
+-1:	.long   cpu_resume - PAGE_OFFSET + PLAT_PHYS_OFFSET
++
++	.globl	sh7372_cpu_resume
++sh7372_cpu_resume:
++1:	.space	4
+ 
+ #define SPDCR 0xe6180008
+ 
 -- 
 1.8.2.1
