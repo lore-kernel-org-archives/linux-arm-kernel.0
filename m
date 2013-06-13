@@ -1,100 +1,97 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 13 Jun 2013 13:59:53 +0530
-Subject: [PATCH 03/11] gpio: davinci: Modify to platform driver
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EADA883@DBDE04.ent.ti.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
- <1369206634-6778-4-git-send-email-avinashphilip@ti.com>
- <51B71056.9010103@ti.com>
- <518397C60809E147AF5323E0420B992E3EAD9D75@DBDE04.ent.ti.com>
- <51B826BF.7050009@ti.com>
- <518397C60809E147AF5323E0420B992E3EADA252@DBDE04.ent.ti.com>
- <51B96410.7000807@ti.com>
- <518397C60809E147AF5323E0420B992E3EADA883@DBDE04.ent.ti.com>
-Message-ID: <51B98301.9090404@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 13 Jun 2013 10:37:48 +0200
+Subject: [PATCH 2/2] ARM: nomadik: add the new clocks to the device tree
+In-Reply-To: <20130612132441.637B23E0A56@localhost>
+References: <1370775348-7440-1-git-send-email-linus.walleij@linaro.org>
+ <1370775348-7440-2-git-send-email-linus.walleij@linaro.org>
+ <201306091621.02506.arnd@arndb.de>
+ <CACRpkdZNZ4_FzjEsstUm0bn8hE7FPTN1y_QnXtWUvGUzCNynBg@mail.gmail.com>
+ <20130612132441.637B23E0A56@localhost>
+Message-ID: <CACRpkdbqzA3ydsg6O4korKrRZSRc+p1Kea3wzrTCjXiFaHr1bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/13/2013 1:02 PM, Philip, Avinash wrote:
-
-> With tnetv107x_defconfig build is failing
-> 
-> arch/arm/mach-davinci/board-tnetv107x-evm.c:282:15: error:
->  'davinci_timer_init' undeclared here (not in a function)
-> arch/arm/mach-davinci/board-tnetv107x-evm.c:284:15: error:
->  'davinci_init_late' undeclared here (not in a function)
-> make[1]: *** [arch/arm/mach-davinci/board-tnetv107x-evm.o] Error 1
-> 
-> Following patch fixes the build above breakage
-
-The error you are seeing and the patch you provided below have no
-correlation.
-
-> 
-> diff --git a/arch/arm/mach-davinci/board-tnetv107x-evm.c b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-> index ba79837..4a9c320 100644
-> --- a/arch/arm/mach-davinci/board-tnetv107x-evm.c
-> +++ b/arch/arm/mach-davinci/board-tnetv107x-evm.c
-> @@ -30,6 +30,7 @@
->  #include <asm/mach/arch.h>
->  #include <asm/mach-types.h>
-> 
-> +#include <mach/common.h>
->  #include <mach/irqs.h>
->  #include <mach/edma.h>
->  #include <mach/mux.h>
-> @@ -147,7 +148,7 @@ static struct davinci_nand_pdata nand_config = {
->         .ecc_bits       = 1,
->  };
-> 
-> -static struct davinci_uart_config serial_config __initconst = {
-> +static struct davinci_uart_config serial_config = {
->         .enabled_uarts  = BIT(1),
->  };
-
-You can make this __initdata instead - assuming its okay to have this
-memory discarded at init.
-
-> 
-> @@ -245,7 +246,7 @@ static struct ti_ssp_data ssp_config = {
->         },
->  };
-> 
-> -static struct tnetv107x_device_info evm_device_info __initconst = {
-> +static struct tnetv107x_device_info evm_device_info = {
-
-Same here. You can make this __initdata.
-
-Please send a formal patch for the errors you have seen.
-
->         .serial_config          = &serial_config,
->         .mmc_config[1]          = &mmc_config,  /* controller 1 */
->         .nand_config[0]         = &nand_config, /* chip select 0 */
-> 
-> 
-> 
+On Wed, Jun 12, 2013 at 3:24 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon, 10 Jun 2013 09:43:30 +0200, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Sun, Jun 9, 2013 at 4:21 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > On Sunday 09 June 2013, Linus Walleij wrote:
+>> >> +               /*
+>> >> +                * IP AMBA bus clocks, driving the bus side of the
+>> >> +                * peripheral clocking, clock gates.
+>> >> +                */
+>> >> +
+>> >> +               hclkdma0: hclkdma0 at 48M {
+>> >> +                       #clock-cells = <0>;
+>> >> +                       compatible = "st,nomadik-src-clock";
+>> >> +                       clock-id = <0>;
+>> >> +                       clocks = <&hclk>;
+>> >> +               };
+>> >> +               hclksmc: hclksmc at 48M {
+>> >> +                       #clock-cells = <0>;
+>> >> +                       compatible = "st,nomadik-src-clock";
+>> >> +                       clock-id = <1>;
+>> >> +                       clocks = <&hclk>;
+>> >> +               };
+>> >> +               hclksdram: hclksdram at 48M {
+>> >> +                       #clock-cells = <0>;
+>> >> +                       compatible = "st,nomadik-src-clock";
+>> >> +                       clock-id = <2>;
+>> >> +                       clocks = <&hclk>;
+>> >> +               };
+>> >> +               hclkdma1: hclkdma1 at 48M {
+>> >> +                       #clock-cells = <0>;
+>> >> +                       compatible = "st,nomadik-src-clock";
+>> >> +                       clock-id = <3>;
+>> >> +                       clocks = <&hclk>;
+>> >> +               };
+>> >
+>> > Sorry if I'm being slow to understand how the clock bindings work, but if
+>> > you have 63 identical clocks that only differ in ther clock-id, can't you
+>> > just have a single DT node for them instead with #clock-cells=1 to pass the
+>> > number from the device using it?
 >>
->>>
->>> So I prefer to leave tnetv107x platform for now.
+>> I first had exactly that implementation but it didn't work. This is explained
+>> in the commit message on patch 1/1:
 >>
->> I don't think that's acceptable. At least by me.
-> 
-> I think 2 options are available
-> 1. Convert gpio-tnetv107x.c to platform driver. This will help in
-> 	removing gpio references in davinci_soc_info structure.
-> 2. Remove inline gpio api support and start use gpiolib support.
-> 
-> I prefer first option. It will help in removing
-> <arch/arm/mach-davinci/include/mach/gpio-davinci.h>.
+>>   The gated clocks are implemented with zero cells and
+>>   given the clock ID as a property of each node, so every
+>>   gate need to have its own node in the device tree.
+>>   This is because the gate registers contain both HCLK
+>>   gates and PCLK gates, where the latter has HCLK as
+>>   parent. As can be seen from the register layout, this
+>>   is a complete mixup, which means all these gates need
+>>   their own node to properly model parent/child relations
+>>   for PCLKs apart from the HCLKs.
+>>
+>> Basically the "shortcoming" in device tree is that modelling this with
+>> clock-cells = 1 requires them all to have one and the same parent,
+>> but they don't.
+>
+> Are you prevented from increasing the number of clock-cells used here?
 
-Okay. Can you take this up in this series? I understand you may not have
-an tnetv107x board, but at least you can get to a series that builds.
+No, I can do this, but it involves loosing HW information from the
+device tree and the debugfs representation of the clocks will
+not correspond to the actual clock hierarchy.
 
-Even if you choose to do just option #2, I am OK. What I really want to
-see is inline API gone completely (not just remain largely unused). This
-will also help you avoid exposing internal data structures like
-davinci_gpio_controller exposed to the whole kernel. The worse part
-right now is you have two copies of the same structure exposed globally
-from two different include folders.
+In short it creates a mess for the understanding of the system
+for some poor engineer with a datasheet and a device tree.
 
-Thanks,
-Sekhar
+And AFAIK one of the goals of the device tree is to make
+things easier to understand, not harder.
+
+Doing this with additional cells would sacrifice readability
+and HW representation for fewer lines of DTS, basically.
+
+What I wonder is which one is more important for the
+DT community. We cannot let the kernel community's
+will to keep down the number of lines in the files (as I'm
+starting to suspect is behind some of the reasoning here,
+correct me if wrong) influence everyone else, if we want
+to keep things reusable for other OS:es.
+
+That said I've recently had the feeling that the majority
+of the civilized world has started to think of DT as a
+Linux thing only ... so maybe I'm fighting windmills?
+
+Yours,
+Linus Walleij
