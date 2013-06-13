@@ -1,25 +1,42 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 13 Jun 2013 17:25:59 +0100
-Subject: [RFC 2/3] arm: mm: Define set_memory_* functions for ARM
-In-Reply-To: <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
-References: <1371057810-3189-1-git-send-email-lauraa@codeaurora.org>
- <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20130613162559.GC9609@arm.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 13 Jun 2013 18:29:47 +0200
+Subject: [PATCH v4 0/7] support Hisilicon SoC
+In-Reply-To: <20130612200142.GD5162@quad.lixom.net>
+References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
+ <20130612200142.GD5162@quad.lixom.net>
+Message-ID: <201306131829.47348.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 06:23:29PM +0100, Laura Abbott wrote:
-> +int set_memory_ro(unsigned long addr, int numpages)
-> +{
-> +	unsigned long start = addr;
-> +	unsigned long size = PAGE_SIZE*numpages;
-> +	unsigned end = start + size;
-> +
-> +	apply_to_page_range(&init_mm, start, size, pte_set_ro, NULL);
-> +	dsb();
-> +	flush_tlb_kernel_range(start, end);
+Am Mittwoch, 12. Juni 2013, 22:01:42 schrieb Olof Johansson:
+> On Sat, Jun 08, 2013 at 10:47:16PM +0800, Haojian Zhuang wrote:
+> > Changelog:
+> > v4:
+> > 1. Add clk gate with HIWORD mask for Rockchip.
+> > 2. Update comments and code of HIWORD flags for mux/divider.
+> > 3. Append a mux without HIWORD mask in Hisilicon 3620.
+> > 4. Fix the pinmux setting in Hi4511.
+> > 
+> > v3:
+> > 1. Use clk_register_mux_table().
+> > 
+> > v2:
+> > 1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
+> > CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
+> > 2. Fix system timer running too fast because wrong divider is choosen.
+> > 3. Remove .init_irq in DT machine descriptor.
+> 
+> Hi,
+> 
+> I had some comments on the last two patches. I also haven't seen any acks
+> from Mike on any of the clock changes, which would be needed before we can
+> pick them up. He might want to merge them into his tree as well, if so
+> we'll have to setup a shared branch.
 
-I think flush_tlb_kernel_range() already has a DSB.
+Also, if anything unexpected happens to the main hisilicon support, could you 
+or Mike pick up the HIWORD_MASK patches anyway (if they are acceptable), 
+because they're needed for the Rockchip stuff too.
 
--- 
-Catalin
+
+Thanks
+Heiko
