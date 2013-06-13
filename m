@@ -1,32 +1,74 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:09 +0900
-Subject: [PATCH 1/3] ARM: shmobile: bockw defconfig: add RTC RX8581 support
-In-Reply-To: <1371106811-25223-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371106811-25223-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106811-25223-2-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 15:59:48 +0900
+Subject: [PATCH 10/15] ARM: shmobile: Remove old SCU boot code
+In-Reply-To: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106793-25071-11-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Remove shmobile_secondary_vector_scu now when all SCU enabled
+SMP platforms instead make use of shmobile_boot_scu. This
+removes two inline virtual to physical address conversions.
+
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/bockw_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/mach-shmobile/headsmp-scu.S         | 22 +---------------------
+ arch/arm/mach-shmobile/include/mach/common.h |  1 -
+ 2 files changed, 1 insertion(+), 22 deletions(-)
 
-diff --git a/arch/arm/configs/bockw_defconfig b/arch/arm/configs/bockw_defconfig
-index d662608..cb7638d 100644
---- a/arch/arm/configs/bockw_defconfig
-+++ b/arch/arm/configs/bockw_defconfig
-@@ -86,6 +86,8 @@ CONFIG_USB_STORAGE=y
- CONFIG_USB_RCAR_PHY=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHI=y
-+CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_RX8581=y
- CONFIG_UIO=y
- CONFIG_UIO_PDRV_GENIRQ=y
- # CONFIG_IOMMU_SUPPORT is not set
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index c5c9106..6f98654 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -25,32 +25,12 @@
+ 
+ 	__CPUINIT
+ /*
+- * Reset vector for secondary CPUs.
++ * Boot code for secondary CPUs.
+  *
+  * First we turn on L1 cache coherency for our CPU. Then we jump to
+  * shmobile_invalidate_start that invalidates the cache and hands over control
+  * to the common ARM startup code.
+- * This function will be mapped to address 0 by the SBAR register.
+- * A normal branch is out of range here so we need a long jump. We jump to
+- * the physical address as the MMU is still turned off.
+  */
+-	.align	12
+-ENTRY(shmobile_secondary_vector_scu)
+-	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
+-	and	r0, r0, #3		@ mask out cpu ID
+-	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
+-	ldr	r1, 2f
+-	ldr	r1, [r1]		@ SCU base address
+-	ldr	r2, [r1, #8]		@ SCU Power Status Register
+-	mov	r3, #3
+-	bic	r2, r2, r3, lsl r0	@ Clear bits of our CPU (Run Mode)
+-	str	r2, [r1, #8]		@ write back
+-
+-	ldr	pc, 1f
+-1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
+-2:	.long shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
+-ENDPROC(shmobile_secondary_vector_scu)
+-
+ ENTRY(shmobile_boot_scu)
+ 					@ r0 = SCU base address
+ 	mrc     p15, 0, r1, c0, c0, 5	@ read MIPDR
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 8ef1c3c..e818f02 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -10,7 +10,6 @@ extern void shmobile_setup_console(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_arg;
+-extern void shmobile_secondary_vector_scu(void);
+ extern void shmobile_boot_scu(void);
+ struct clk;
+ extern int shmobile_clk_init(void);
 -- 
 1.8.2.1
