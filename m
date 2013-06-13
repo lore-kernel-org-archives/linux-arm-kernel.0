@@ -1,245 +1,108 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 13 Jun 2013 11:30:23 +0200
-Subject: [PATCH v4 1/6] clk: samsung: Use clk->base instead of directly
- using clk->con0 for PLL3xxx
-In-Reply-To: <CAKew6eVUGzLweLsQkYx-VGxbzWjUbROk0_63djSsYyH17tbGvg@mail.gmail.com>
-References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
- <CAL1qeaF-tsY727eLBdWRW3iBsTtygFLbjm6nFRCu+xV6XzpFSA@mail.gmail.com>
- <CAKew6eVUGzLweLsQkYx-VGxbzWjUbROk0_63djSsYyH17tbGvg@mail.gmail.com>
-Message-ID: <4909432.mh6TOzaEGM@flatron>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 13 Jun 2013 11:30:57 +0200
+Subject: [PATCH V2 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <1371089619.1681.21.camel@jlo-ubuntu-64.nvidia.com>
+References: <1370342880-422-1-git-send-email-josephl@nvidia.com>
+ <1370342880-422-4-git-send-email-josephl@nvidia.com>
+ <51AE5EE3.3010607@linaro.org> <51B8B2C8.1090006@wwwdotorg.org>
+ <1371089619.1681.21.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <51B99151.5010107@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 of June 2013 12:32:05 Yadwinder Singh Brar wrote:
-> On Thu, Jun 13, 2013 at 3:32 AM, Andrew Bresticker
+On 06/13/2013 04:13 AM, Joseph Lo wrote:
+> On Thu, 2013-06-13 at 01:41 +0800, Stephen Warren wrote:
+>> On 06/04/2013 03:40 PM, Daniel Lezcano wrote:
+>>> On 06/04/2013 12:48 PM, Joseph Lo wrote:
+>>>> This supports CPU core power down on each CPU when CPU idle. When CPU go
+>>>> into this state, it saves it's context and needs a proper configuration
+>>>> in flow controller to power gate the CPU when CPU runs into WFI
+>>>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
+>>>> wake up event in flow controller.
+>>>>
+>>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>>>
+>>> I would like to understand why there is a WARN with the
+>>> CPUIDLE_FLAG_TIMER_STOP flag set before queuing this patch and ensure it
+>>> is not the tree hiding the forest.
+>>
+>> Joseph, are you planning to post an updated series or respond to resolve
+>> Daniel's question?
 > 
-> <abrestic@chromium.org> wrote:
-> > Doug,
-> > 
-> >>> Hmm, if done properly, it could simplify PLL registration in SoC
-> >>> clock
-> >>> initialization code a lot.
-> >>> 
-> >>> I'm not sure if this is really the best solution (feel free to
-> >>> suggest
-> >>> anything better), but we could put PLLs in an array, like other
-> >>> clocks,
-> >>> e.g.
-> >>> 
-> >>>         ... exynos4210_pll_clks[] = {
-> >>>         
-> >>>                 CLK_PLL45XX(...),
-> >>>                 CLK_PLL45XX(...),
-> >>>                 CLK_PLL46XX(...),
-> >>>                 CLK_PLL46XX(...),
-> >>>         
-> >>>         };
-> >>> 
-> >>> and then just call a helper like
-> >>> 
-> >>>         samsung_clk_register_pll(exynos4210_pll_clks,
-> >>>         
-> >>>                         ARRAY_SIZE(exynos4210_pll_clks));
-> >> 
-> >> Something like that looks like what I was thinking.  I'd have to see
-> >> it actually coded up to see if there's something I'm missing that
-> >> would prevent us from doing that, but I don't see anything.
-> > 
-> > The only issue I see with this is that we may only want to register a
-> > rate table with a PLL only if fin_pll is running at a certain rate.
-> > On 5250 and 5420, for example, we have EPLL and VPLL rate tables that
-> > should only be registered if fin_pll is 24Mhz.  We may have to
-> > register those separately, but this approach seems fine otherwise.
+> I need more time to investigate the detail about what caused the WARN
+> when apply the flag. And what's the difference if we didn't enable
+> CONFIG_CPU_IDLE_MULTIPLE_DRIVERS, then it only applies
+> CLOCK_EVT_NOTIFY_BROADCAST_ON on CPU0.
+
+I think I got it for this one. It is a bug in the cpuidle driver's code.
+
+cpuidle_register_driver does get_cpu => CPU0
+
+Then __cpuidle_register_driver(drv, <CPU0>)
+
+ => __cpuidle_driver_init(drv, <CPU0>)
+
+Hence, the timer broadcast is initialized only for cpu0.
+
+That should have been fixed with:
+
+commit 82467a5a885ddd9f80309682159da8db510e7832
+Author: Daniel Lezcano <daniel.lezcano@linaro.org>
+Date:   Fri Jun 7 21:53:09 2013 +0000
+
+    cpuidle: simplify multiple driver support
+
+    Commit bf4d1b5 (cpuidle: support multiple drivers) introduced support
+    for using multiple cpuidle drivers at the same time.  It added a
+    couple of new APIs to register the driver per CPU, but that led to
+    some unnecessary code complexity related to the kernel config options
+    deciding whether or not the multiple driver support is enabled.  The
+    code has to work as it did before when the multiple driver support is
+    not enabled and the multiple driver support has to be compatible with
+    the previously existing API.
+
+    Remove the new API, not used by any driver in the tree yet (but
+    needed for the HMP cpuidle drivers that will be submitted soon), and
+    add a new cpumask pointer to the cpuidle driver structure that will
+    point to the mask of CPUs handled by the given driver.  That will
+    allow the cpuidle_[un]register_driver() API to be used for the
+    multiple driver support along with the cpuidle_[un]register()
+    functions added recently.
+
+    [rjw: Changelog]
+    Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+    Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+
+> Why if I am moving the
+> clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT before
+> "local_irq_enable" in the
+> "cpuidle_enter_state" (drivers/cpuidle/cpuidle.c), then the warning
+> message gone?
+
+Is the warning coming immediately, at the first time
+CLOCK_EVT_NOTIFY_BROADCAST_EXIT is invoked or can it occur at different
+moment ?
+
+> Daniel,
 > 
-> As Andrew Bresticker said, we will face problem with different table,
-> and it will give some pain while handling such cases but I think
-> overall code may look better.
+> Because I need more time to figure it out, are you OK if I can post
+> another patch to apply CPUIDLE_FLAG_TIMER_STOP flag for all Tegra CPU
+> Idle drivers later? (Once we know what's the problem behind this)
 > 
-> Similar thoughts were their in my mind also, but i didn't want to
-> disturb this series :).
-
-Yes, I was thinking the same as well, but now that Exynos5420 doesn't 
-follow the 0x100 register spacing, we have a problem :) .
-
-> Anyways, I think we can do it now only rather going for incremental
-> patches after this series.
-> I was thinking to make samsung_clk_register_pllxxxx itself  little
-> generic instead
-> of using helper, as we are almost duplicating code for most PLLs.
+> Stephen,
 > 
-> A rough picture in my mind was,
-> After implementing  generic samung_clk_register_pll(), code may look
-> like below. Its just an idea, please feel free to correct it.
-> Later we can factor out other common clk.ops for PLLs also.
+> I don't have an update of this series, if Daniel is OK if I can post
+> another patch to apply TIMER_STOP flag for all Tegra idle drivers.
 > 
-> this diff is over this series.
-> Assuming a generic samung_clk_register_pll() is their(which i think is
-> not impossible)
-> 8<----------------------------------------------------------------------
-> ----
+> Thanks,
+> Joseph
 > 
-> --- a/drivers/clk/samsung/clk-exynos5250.c
-> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> @@ -493,6 +493,20 @@ static __initdata struct samsung_pll_rate_table
-> epll_24mhz_tbl[] = {
->         PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
->  };
-> 
-> +struct __initdata samsung_pll_init_data samsung_plls[] = {
-> +       PLL(pll_3500, "fout_apll", "fin_pll", APLL_LOCK, APLL_CON0,
-> NULL), +       PLL(pll_3500, "fout_mpll", "fin_pll", MPLL_LOCK,
-> MPLL_CON0, NULL), +       PLL(pll_3500, "fout_bpll",
-> "fin_pll",BPLL_LOCK, BPLL_CON0, NULL), +       PLL(pll_3500,
-> "fout_gpll", "fin_pll",GPLL_LOCK, GPLL_CON0, NULL), +      
-> PLL(pll_3500, "fout_cpll", "fin_pll",BPLL_LOCK, CPLL_CON0, NULL), +};
-> +
-> +struct __initdata samsung_pll_init_data epll_init_data =
-> +       PLL(pll_3600, "fout_epll", "fin_pll", EPLL_LOCK, EPLL_CON0,
-> NULL); +
-> +struct __initdata samsung_pll_init_data vpll_init_data =
-> +       PLL(pll_3600, "fout_epll", "fin_pll", VPLL_LOCK, VPLL_CON0,
-> NULL); +
 
-This is mostly what I had in my mind. In addition I think I might have a 
-solution for rate tables:
 
-If we create another array
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-	struct samsung_pll_rate_table *rate_tables_24mhz[] = {
-		apll_rate_table_24mhz,
-		mpll_rate_table_24mhz, /* can be NULL as well, if no 
-support for rate change */
-		epll_rate_table_24mhz,
-		vpll_rate_table_24mhz,
-		/* ... */
-	};
-
-which lists rate tables for given input frequency. This relies on making 
-rate tables end with a sentinel, to remove the need of passing array 
-sizes.
-
->  /* register exynox5250 clocks */
->  void __init exynos5250_clk_init(struct device_node *np)
->  {
-> @@ -519,44 +533,22 @@ void __init exynos5250_clk_init(struct device_node
-> *np) samsung_clk_register_mux(exynos5250_pll_pmux_clks,
->                         ARRAY_SIZE(exynos5250_pll_pmux_clks));
-> 
-> -       fin_pll_rate = _get_rate("fin_pll");
-> +       samsung_clk_register_pll(samsung_plls,
-> ARRAY_SIZE(samsung_plls)); +
-
-...and then pass it here like:
-
-	if (fin_pll_rate == 24 * MHZ) {
-		samsung_clk_register_pll(samsung_plls, 
-ARRAY_SIZE(samsung_plls), rate_tables_24mhz);
-	} else {
-		/* warning or whatever */
-		samsung_clk_register_pll(samsung_plls, 
-ARRAY_SIZE(samsung_plls), NULL);
-	}
-
-This way we could specify different rate tables depending on input 
-frequency for a whole group of PLLs.
-
-The only thing I don't like here is having two separate arrays that need 
-to have the same sizes. Feel free to improve (or discard) this idea, 
-though.
-
-Best regards,
-Tomasz
-
->         vpllsrc = __clk_lookup("mout_vpllsrc");
->         if (vpllsrc)
->                 mout_vpllsrc_rate = clk_get_rate(vpllsrc);
-> 
-> -       apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
-> -                       reg_base, NULL, 0);
-> -       mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
-> -                       reg_base + 0x4000, NULL, 0);
-> -       bpll = samsung_clk_register_pll35xx("fout_bpll", "fin_pll",
-> -                       reg_base + 0x20010, NULL, 0);
-> -       gpll = samsung_clk_register_pll35xx("fout_gpll", "fin_pll",
-> -                       reg_base + 0x10050, NULL, 0);
-> -       cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
-> -                       reg_base + 0x10020, NULL, 0);
-> -
-> +       fin_pll_rate = _get_rate("fin_pll");
->         if (fin_pll_rate == (24 * MHZ)) {
-> -               epll = samsung_clk_register_pll36xx("fout_epll",
-> "fin_pll", -                               reg_base + 0x10030,
-> epll_24mhz_tbl, -                              
-> ARRAY_SIZE(epll_24mhz_tbl));
-> -       } else {
-> -               pr_warn("%s: valid epll rate_table missing for\n"
-> -                       "parent fin_pll:%lu hz\n", __func__,
-> fin_pll_rate); -               epll =
-> samsung_clk_register_pll36xx("fout_epll", "fin_pll", -                 
->              reg_base + 0x10030, NULL, 0);
-> +               epll_init_data.rate_table =  epll_24mhz_tb;
->         }
-> +       samsung_clk_register_pll(&fout_epll_data, 1);
-> 
->         if (mout_vpllsrc_rate == (24 * MHZ)) {
-> -               vpll = samsung_clk_register_pll36xx("fout_vpll",
-> "mout_vpllsrc" -                       , reg_base + 0x10040,
-> vpll_24mhz_tbl,
-> -                       ARRAY_SIZE(vpll_24mhz_tbl));
-> -       } else {
-> -               pr_warn("%s: valid vpll rate_table missing for\n"
-> -                       "parent mout_vpllsrc_rate:%lu hz\n", __func__,
-> -                       mout_vpllsrc_rate);
-> -               samsung_clk_register_pll36xx("fout_vpll",
-> "mout_vpllsrc", -                       reg_base + 0x10040, NULL, 0);
-> +               vpll_init_data.rate_table =  epll_24mhz_tb;
->         }
-> +       samsung_clk_register_pll(&fout_epll_data, 1);
->         samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
->                         ARRAY_SIZE(exynos5250_fixed_rate_clks));
-> diff --git a/drivers/clk/samsung/clk-pll.h
-> b/drivers/clk/samsung/clk-pll.h index 4780e6c..3b02dc5 100644
-> --- a/drivers/clk/samsung/clk-pll.h
-> +++ b/drivers/clk/samsung/clk-pll.h
-> @@ -39,6 +39,39 @@ struct samsung_pll_rate_table {
->         unsigned int kdiv;
->  };
-> 
-> +#define PLL(_type, _name, _pname, _lock_reg, _con_reg, _rate_table)   
-> \ +       {                                                            
->   \ +               .type   =       _type,                             
->     \ +               .name   =       _name,                           
->       \ +               .parent_name =  _pname,                        
->         \ +               .flags  =       CLK_GET_RATE_NOCACHE,        
->           \ +               .rate_table =   _rate_table,               
->             \ +               .con_reg =      _con_reg,                
->               \ +               .lock_reg =     _lock_reg,             
->                 \ +       }
-> +
-> +enum samsung_pll_type {
-> +       pll_3500,
-> +       pll_45xx,
-> +       pll_2550,
-> +       pll_3600,
-> +       pll_46xx,
-> +       pll_2660,
-> +};
-> +
-> +
-> +struct samsung_pll_init_data {
-> +       enum            samsung_pll_type type;
-> +       struct          samsung_pll_rate_table *rate_table;
-> +       const char      *name;
-> +       const char      *parent_name;
-> +       unsigned long   flags;
-> +       const void __iomem *con_reg;
-> +       const void __iomem *lock_reg;
-> +};
-> +
-> +extern int  __init samsung_clk_register_pll(struct
-> samsung_pll_init_data *data, +                               unsigned
-> int nr_pll);
-> +
-> 
-> Regards,
-> Yadwinder
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
