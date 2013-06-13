@@ -1,51 +1,93 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 13 Jun 2013 10:13:39 +0800
-Subject: [PATCH V2 3/3] ARM: tegra114: cpuidle: add powered-down state
-In-Reply-To: <51B8B2C8.1090006@wwwdotorg.org>
-References: <1370342880-422-1-git-send-email-josephl@nvidia.com>
- <1370342880-422-4-git-send-email-josephl@nvidia.com>
- <51AE5EE3.3010607@linaro.org>  <51B8B2C8.1090006@wwwdotorg.org>
-Message-ID: <1371089619.1681.21.camel@jlo-ubuntu-64.nvidia.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Thu, 13 Jun 2013 10:25:10 +0800
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <alpine.LFD.2.02.1306120935320.22970@ionos>
+References: <CACVXFVMNzwD44mhKijURSWrqLKjy7_oOY8hrTtjbyOxGS2tv=g@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306111431170.1392-100000@iolanthe.rowland.org>
+ <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
+ <alpine.LFD.2.02.1306120935320.22970@ionos>
+Message-ID: <CACVXFVP__N9o3xRMd5+sk5T0zeGcrSk41rxY6Tzi1AM-mHL81Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-13 at 01:41 +0800, Stephen Warren wrote:
-> On 06/04/2013 03:40 PM, Daniel Lezcano wrote:
-> > On 06/04/2013 12:48 PM, Joseph Lo wrote:
-> >> This supports CPU core power down on each CPU when CPU idle. When CPU go
-> >> into this state, it saves it's context and needs a proper configuration
-> >> in flow controller to power gate the CPU when CPU runs into WFI
-> >> instruction. And the CPU also needs to set the IRQ as CPU power down idle
-> >> wake up event in flow controller.
-> >>
-> >> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> > 
-> > I would like to understand why there is a WARN with the
-> > CPUIDLE_FLAG_TIMER_STOP flag set before queuing this patch and ensure it
-> > is not the tree hiding the forest.
-> 
-> Joseph, are you planning to post an updated series or respond to resolve
-> Daniel's question?
+On Wed, Jun 12, 2013 at 3:45 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Wed, 12 Jun 2013, Ming Lei wrote:
+>
+> Yes, please. I read through the thread and I really recommend that you
+> get rid of the tasklet. tasklets are a complete disaster by design and
+> we really should make efforts to get rid of the last users instead of
+> trying to work around their semantical shortcomings.
 
-I need more time to investigate the detail about what caused the WARN
-when apply the flag. And what's the difference if we didn't enable
-CONFIG_CPU_IDLE_MULTIPLE_DRIVERS, then it only applies
-CLOCK_EVT_NOTIFY_BROADCAST_ON on CPU0. Why if I am moving the
-clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT before
-"local_irq_enable" in the
-"cpuidle_enter_state" (drivers/cpuidle/cpuidle.c), then the warning
-message gone?
+The attached patch001 supports tasklet in HCD and patch002 implements
+interrupt threaded handler, then if USB_HCD_THREADED_IRQ
+is set, interrupt threaded handler is used to do URB giveback, otherwise
+tasklet is used to do that.
 
-Daniel,
+The other 3 patches(2/4, 3/4, 4/4) aren't changed now, if anyone want to try it.
+(the patch 2 is only for comparing performance difference, and welcome to
+review/comment it so that we can get accurate test result to make decision)
 
-Because I need more time to figure it out, are you OK if I can post
-another patch to apply CPUIDLE_FLAG_TIMER_STOP flag for all Tegra CPU
-Idle drivers later? (Once we know what's the problem behind this)
+Follows the mass storage test result(average over 10 times test) with
+tasklet /interrupt threaded handler/hard interrupt handler under  same
+environment of lenovo T410(x86), which means the test is switched by
+reinserting module of usbcore or ehci-hcd without changing other things
+in the machine.
 
-Stephen,
+- do below tests 10 times and figure out the average speed
 
-I don't have an update of this series, if Daniel is OK if I can post
-another patch to apply TIMER_STOP flag for all Tegra idle drivers.
+          dd if=/dev/sdN of=/dev/null iflag=direct bs=200M 1
+
+          device: sandisk extreme USB 3.0 16G, host: Lenovo T410 EHCI
+
+- using interrupt threaded handler(default)
+        33.440 MB/sec
+
+- using tasklet(#undef USB_HCD_THREADED_IRQ)
+        34.29 MB/sec
+
+- using hard interrupt handler(by removing HCD_BH in ehci-hcd.c )
+        34.260 MB/s
+
+
+So looks usb mass storage performance loss can be observed with
+interrupt threaded handler because one mass storage read/write sectors
+requires at least 3 interrupts which wake up usb-storage thread 3 times
+(each interrupt wakeup the usb-storage each time), introducing irq threaded
+handler will make 2 threads to be waken up about 6 times for one read/write.
+
+I think usb mass storage transfer handler need to be rewritten, otherwise
+it may become worsen after using irq threaded handler in USB 3.0.(the
+above device can reach >120MB/sec with hardware handler or tasklet handler,
+which means about ~3K interrupts/sec, so ~6K contexts switch in case of
+using irq threaded handler)
+
+So how about supporting tasklet first, then convert to interrupt
+threaded handler
+after usb mass storage transfer is rewritten without performance loss?
+(rewriting
+usb mass storage transfer handler may need some time and work since storage
+stability/correctness is extremely important, :-)
+
+Also another problem with irq threaded handler is that there is no sort of
+tasklet_schedule() interface to wakeup the thread handler manually, so
+I have to use work to schedule some URB giveback from drivers(root hub
+transfer, unlink),  even though that isn't a big deal but will cause code a bit
+much/complicated, :-)
 
 Thanks,
-Joseph
+--
+Ming Lei
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0002-USB-support-interrupt-threaded-handler.patch
+Type: application/octet-stream
+Size: 5752 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130613/50f04eb1/attachment-0002.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-USB-HCD-support-giveback-of-URB-in-tasklet-context.patch
+Type: application/octet-stream
+Size: 12423 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130613/50f04eb1/attachment-0003.obj>
