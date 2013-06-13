@@ -1,28 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Jun 2013 14:43:43 +0100
-Subject: [PATCH] Change the internal SRAM memory type MT_MEMORY_NONCACHED
-In-Reply-To: <51B9C6FE.7000302@atmel.com>
-References: <1369011911-21282-1-git-send-email-wenyou.yang@atmel.com>
- <1370657863-8725-1-git-send-email-wenyou.yang@atmel.com>
- <51B9C6FE.7000302@atmel.com>
-Message-ID: <20130613134342.GE18614@n2100.arm.linux.org.uk>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 13 Jun 2013 19:18:58 +0530
+Subject: [PATCH 3/3] ARM: OMAP: dma: Fix the kfree ordering
+In-Reply-To: <20130613131647.GS21614@n2100.arm.linux.org.uk>
+References: <1371128960-24822-1-git-send-email-rnayak@ti.com>
+ <1371128960-24822-4-git-send-email-rnayak@ti.com>
+ <20130613131647.GS21614@n2100.arm.linux.org.uk>
+Message-ID: <51B9CDCA.9010901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 03:19:58PM +0200, Nicolas Ferre wrote:
-> On 08/06/2013 04:17, Wenyou Yang :
->> Because MT_DEVICE is not executable in armv7, we change
->> the internal SRAM memory type to MT_MEMORY_NONCACHED.
->> As it seems that caching this internal SRAM memory is not necessary,
->> we chose the this memory type.
->>
->> Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
->
-> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->
-> But Russell, can we have your advice on this as you made us re-think  
-> about that during previous patch discussion?
+On Thursday 13 June 2013 06:46 PM, Russell King - ARM Linux wrote:
+> On Thu, Jun 13, 2013 at 06:39:20PM +0530, Rajendra Nayak wrote:
+>> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+>> index 8a71f75..8e16503 100644
+>> --- a/arch/arm/plat-omap/dma.c
+>> +++ b/arch/arm/plat-omap/dma.c
+>> @@ -2111,8 +2111,8 @@ exit_dma_irq_fail:
+>>  	}
+>>  
+>>  exit_dma_lch_fail:
+>> -	kfree(p);
+>>  	kfree(d);
+>> +	kfree(p);
+> 
+> Err.
+> 
+>         p = pdev->dev.platform_data;
+>         d                       = p->dma_attr;
+> 
+> Why is it kfree'ing platform data in the first place?  This means that
+> a failed bind can't be reattempted later.  It also means that an unbind
+> plus rebind in userspace will free the platform data leaving stale
+> pointers behind.
 
-I think this is fine - using MT_MEMORY_NONCACHED gets you a memory-like
-mapping instead of a strongly ordered or device mapping, but without
-caching issues, which is what you want here.
+Right, I just seemed to have overlooked the fact that p was pointing to
+platform data. Will remove all the kfree(p) and kfree(d) across the
+driver (I just realized this is also the case in .remove)
+
+> 
+> This is totally nonsense.  Don't kfree() data in your driver which you
+> haven't allocated yourself!
+> 
