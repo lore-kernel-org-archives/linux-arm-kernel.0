@@ -1,35 +1,25 @@
-From: srinivas.kandagatla@st.com (Srinivas KANDAGATLA)
-Date: Thu, 13 Jun 2013 13:41:33 +0100
-Subject: [PATCH v2 06/11] ARM:stixxxx: Add STiH415 SOC support
-In-Reply-To: <20130613115640.GC18614@n2100.arm.linux.org.uk>
-References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
- <1370856381-6644-1-git-send-email-srinivas.kandagatla@st.com>
- <CAHTX3d+dk3W_9b7SVUokWq4KYXnj=Z1=WPj5zJ-gUvJqqwE=+Q@mail.gmail.com>
- <51B5BCB3.3060405@st.com> <20130610231934.GG18614@n2100.arm.linux.org.uk>
- <51B6C8B7.50807@st.com> <20130613115640.GC18614@n2100.arm.linux.org.uk>
-Message-ID: <51B9BDFD.1040408@st.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 13 Jun 2013 14:47:35 +0200
+Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
+In-Reply-To: <20130613110501.GZ18614@n2100.arm.linux.org.uk>
+References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
+ <51B76972.3040002@gmail.com> <20130613110501.GZ18614@n2100.arm.linux.org.uk>
+Message-ID: <2184363.o70cB30E6f@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/13 12:56, Russell King - ARM Linux wrote:
-> On Tue, Jun 11, 2013 at 07:50:31AM +0100, Srinivas KANDAGATLA wrote:
->> You are right, It does not make sense to use BIT() macro for field which
->> has more than 1 bit. I think using mix of both BIT() and the old style
->> will make code look bit confusing to reader, Also no other mach code in
->> the kernel use BIT while configuring L2 controller. So am going to drop
->> the idea of using BIT here and leave the code as it is.
+On Thursday 13 June 2013 12:05:02 Russell King - ARM Linux wrote:
+> Yes, unfortunately it should be selectable by platform, though it needs
+> to be done carefully.  Some ARM platforms can't cope with full 32-bit
+> accesses to MMIO.
 > 
-> I'd suggest putting a comment in the code to that effect.  With the way
-> "cleanups" get done, I wouldn't be surprised if this attracts a lot of
-> people wanting to do a trivial "1 << bit" -> "BIT(bit)" conversions.
-Hmm... I can add a comment for them.
+> I don't think any of those intersect with the single zImage project, so
+> those should be fine to have it always enabled - it's only the older
+> platforms that might have issues.
 
-> 
-> One of the problems of open source is that you can say "no" to a patch
-> like that until you're blue in the face, but it will eventually make
-> its way in via some path.
-> 
-> Just one of the reasons I consider BIT() to be evil and an inappropriate
-> macro.
-> 
-> 
+Are those all StrongARM and XScale based platforms? If so, I definitely
+don't expect them to go multiplatform.
+
+Can we combine this with the existing CONFIG_NEED_MACH_IO_H?
+
+	Arnd
