@@ -1,65 +1,82 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 13 Jun 2013 13:16:35 -0700
-Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over
- global devices
-In-Reply-To: <20130613183950.GA32061@codeaurora.org>
-References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
- <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
- <51B0A6E8.20909@linaro.org> <20130606180425.GQ599@codeaurora.org>
- <51B10D85.1060507@linaro.org> <20130606223848.GR599@codeaurora.org>
- <20130612214435.GE10823@codeaurora.org> <51B991EF.70800@linaro.org>
- <alpine.LFD.2.02.1306131331430.22970@ionos>
- <20130613183950.GA32061@codeaurora.org>
-Message-ID: <999cad28-cd11-489c-91d1-012ffa03b21c@CO9EHSMHS019.ehs.local>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 13 Jun 2013 22:17:43 +0200
+Subject: [PATCH 00/15] Final Samsung PWM support cleanup
+In-Reply-To: <1808375.nuQYa2FdfG@flatron>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <51B909A5.2020409@gmail.com> <1808375.nuQYa2FdfG@flatron>
+Message-ID: <201306132217.44265.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 11:39:50AM -0700, Stephen Boyd wrote:
-> On 06/13, Thomas Gleixner wrote:
-> > On Thu, 13 Jun 2013, Daniel Lezcano wrote:
-> > > I prefer Thomas to have a look at it and ack it. I changed Cc to To for
-> > > Thomas.
+Am Donnerstag, 13. Juni 2013, 11:07:38 schrieb Tomasz Figa:
+> Hi Heiko, Sylwester,
+> 
+> On Thursday 13 of June 2013 01:52:05 Sylwester Nawrocki wrote:
+> > On 06/13/2013 01:38 AM, Heiko St?bner wrote:
+> > > Am Donnerstag, 13. Juni 2013, 01:13:47 schrieb Tomasz Figa:
+> > >> Hi Olof,
+> > >> 
+> > >> On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
+> > >>> On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
+> > >>>>> Needs testing on other platforms as I could only compile test for
+> > >>>>> them.
+> > >>> 
+> > >>> How/who can help here? WHo has and still cares for other affected
+> > >>> platforms?
+> > >>> 
+> > >>>>> 66 files changed, 627 insertions(+), 1580 deletions(-)
+> > >> 
+> > >> I will try to test this on Exynos 4 at work, if I somehow manage to
+> > >> find any way to use PWM on our boards (other than already-tested PWM
+> > >> clocksource).
+> > >> 
+> > >> Unfortunately, except S3C6410, I don't have access to other
+> > >> platforms, or at least I won't in any reasonable time.
+> > >> 
+> > >> If I remember correctly, in case of my watchdog support cleanup,
+> > >> Kukjin
+> > >> has been able to test it on S5P64x0.
+> > >> 
+> > >> Heiko and Sylwester used to have some s3c24xx-based boards, not sure
+> > >> if
+> > >> they still do and are interested in their support in mainline.
+> > >> 
+> > >> So all left is S5PC100 (for which I couldn't find anyone who cares)
+> > >> and
+> > >> Exynos5.
+> > >> 
+> > >>> Nice cleanup.
+> > >> 
+> > >> Thanks.
+> > >> 
+> > >>>> Any comments for this series?
+> > >>> 
+> > >>> Yes, above. :) In general looks good -- testing coverage is a bit of
+> > >>> a
+> > >>> concern.
+> > >> 
+> > >> Yeah. Unfortunately all I could do was testing on Tiny6410 and
+> > >> compile
+> > >> testing on others. I hope we find some really helpful people over
+> > >> here who could waste a bit of their precious time for this museum.
+> > >> ;)
+> > > 
+> > > I'll try to give it a testrun tomorrow. And my s3c2416 will always be
+> > > the first-love-architecture for me ;-)
 > > 
-> > The patch does not apply on tip timers/core. The code has been
-> > reworked a month ago. Please work against tip timers/core. That's
-> > where this stuff ends up.
-> > 
+> > I'll likely test it tomorrow on a Mini2440 board, I was going to do it
+> > earlier
+> > but got distracted by plenty other things that needed attention too. At
+> > least
+> > that's one of the reasons I got the board - testing the cross-platform
+> > cleanups
+> > and ensuring they are not breaking the older platforms.
 > 
-> Ah, I thought your patch series had stalled. Here is a refreshed
-> patch. Every other patch in this series applies cleanly to tip
-> timers/core so I don't want to resend them again unless
-> absolutely necessary.
-> 
-> -----8<-----
-> Subject: [PATCH v8] clockevents: Prefer CPU local devices over global devices
-> 
-> On an SMP system with only one global clockevent and a dummy
-> clockevent per CPU we run into problems. We want the dummy
-> clockevents to be registered as the per CPU tick devices, but
-> we can only achieve that if we register the dummy clockevents
-> before the global clockevent or if we artificially inflate the
-> rating of the dummy clockevents to be higher than the rating
-> of the global clockevent. Failure to do so leads to boot
-> hangs when the dummy timers are registered on all other CPUs
-> besides the CPU that accepted the global clockevent as its tick
-> device and there is no broadcast timer to poke the dummy
-> devices.
-> 
-> If we're registering multiple clockevents and one clockevent is
-> global and the other is local to a particular CPU we should
-> choose to use the local clockevent regardless of the rating of
-> the device. This way, if the clockevent is a dummy it will take
-> the tick device duty as long as there isn't a higher rated tick
-> device and any global clockevent will be bumped out into
-> broadcast mode, fixing the problem described above.
-> 
-> Reported-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: John Stultz <john.stultz@linaro.org>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+> Thank you both for your support. Looking forward for testing results :)
 
-I retested my case on tip/timers/core with the same results.
 
-	S?ren
+on a s3c2416-based machine for dt and non-dt case
+[with the limit that my machine does not has anything connected to the pwm 
+outputs, so I only get to test the base-pwm and timer part]
+
+Tested-by: Heiko Stuebner <heiko@sntech.de>
