@@ -1,29 +1,156 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Jun 2013 22:34:10 +0200
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <51BA1FE7.4000900@wwwdotorg.org>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
-Message-ID: <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 13 Jun 2013 22:38:57 +0200
+Subject: [PATCH 14/15] ARM: SAMSUNG: Remove remaining uses of
+ plat/regs-timer.h header
+In-Reply-To: <201306132224.33866.heiko@sntech.de>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1370467100-10820-15-git-send-email-tomasz.figa@gmail.com>
+ <201306132224.33866.heiko@sntech.de>
+Message-ID: <2199978.JEbm7Iqajq@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 9:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/11/2013 01:59 PM, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This document snippet tries to be helpful and define the pin
->> PM states and helpers, and how they should be used to create
->> some kind of common ontology around this.
->
-> Oops. I haven't been keeping up well. I propose we hold off on this
-> patch for a short while until the other thread on this topic is finalized.
+On Thursday 13 of June 2013 22:24:33 Heiko St?bner wrote:
+> Am Mittwoch, 5. Juni 2013, 23:18:19 schrieb Tomasz Figa:
+> > This patch removes remaining inclusions of plat/regs-timer.h as a
+> > preparation to remove the header.
+> 
+> hmm, the patch does a bit more than that, as it also removes the saving
+> of the registers from the suspend calls, which is most likely handled
+> by the driver now. But the description should possibly reflect that.
 
-Isn't it better if I split it?
+True, although I couldn't test suspend/resume with these patches, because 
+it was already broken before, at least on s3c64xx and/or mini6410.
 
-Most of this doc is about the default/sleep/idle states and
-how that relates to runtime PM, and that seems to be
-uncontroversial.
+As an interesting side note, in case of s3c64xx and s5p64x0, existing code 
+was not enough to make suspend/resume of the timer work, as it can be seen 
+in case of s5pv210, which has it done almost correctly.
 
-Yours,
-Linus Walleij
+Almost, because as far as I know (and I can see in the manual) the TCNTO 
+register is read only and there is a separate procedure for loading timer 
+value manually.
+
+Thanks for review.
+
+Best regards,
+Tomasz
+
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> > ---
+> > 
+> >  arch/arm/mach-s3c64xx/irq-pm.c  |  2 --
+> >  arch/arm/mach-s5p64x0/pm.c      |  3 ---
+> >  arch/arm/mach-s5pv210/pm.c      | 10 ----------
+> >  arch/arm/plat-samsung/s5p-irq.c |  1 -
+> >  4 files changed, 16 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-s3c64xx/irq-pm.c
+> > b/arch/arm/mach-s3c64xx/irq-pm.c index 0c7e1d9..c3da1b6 100644
+> > --- a/arch/arm/mach-s3c64xx/irq-pm.c
+> > +++ b/arch/arm/mach-s3c64xx/irq-pm.c
+> > @@ -22,7 +22,6 @@
+> > 
+> >  #include <mach/map.h>
+> >  
+> >  #include <plat/regs-serial.h>
+> > 
+> > -#include <plat/regs-timer.h>
+> > 
+> >  #include <mach/regs-gpio.h>
+> >  #include <plat/cpu.h>
+> >  #include <plat/pm.h>
+> > 
+> > @@ -43,7 +42,6 @@ static struct sleep_save irq_save[] = {
+> > 
+> >  	SAVE_ITEM(S3C64XX_EINT0FLTCON2),
+> >  	SAVE_ITEM(S3C64XX_EINT0FLTCON3),
+> >  	SAVE_ITEM(S3C64XX_EINT0MASK),
+> > 
+> > -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+> > 
+> >  };
+> >  
+> >  static struct irq_grp_save {
+> > 
+> > diff --git a/arch/arm/mach-s5p64x0/pm.c b/arch/arm/mach-s5p64x0/pm.c
+> > index 97c2a08a..861e15c 100644
+> > --- a/arch/arm/mach-s5p64x0/pm.c
+> > +++ b/arch/arm/mach-s5p64x0/pm.c
+> > @@ -18,7 +18,6 @@
+> > 
+> >  #include <plat/cpu.h>
+> >  #include <plat/pm.h>
+> > 
+> > -#include <plat/regs-timer.h>
+> > 
+> >  #include <plat/wakeup-mask.h>
+> >  
+> >  #include <mach/regs-clock.h>
+> > 
+> > @@ -48,8 +47,6 @@ static struct sleep_save s5p64x0_misc_save[] = {
+> > 
+> >  	SAVE_ITEM(S5P64X0_MEM0CONSLP1),
+> >  	SAVE_ITEM(S5P64X0_MEM0DRVCON),
+> >  	SAVE_ITEM(S5P64X0_MEM1DRVCON),
+> > 
+> > -
+> > -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+> > 
+> >  };
+> >  
+> >  /* DPLL is present only in S5P6450 */
+> > 
+> > diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
+> > index 2b68a67..3cf3f9c 100644
+> > --- a/arch/arm/mach-s5pv210/pm.c
+> > +++ b/arch/arm/mach-s5pv210/pm.c
+> > @@ -21,7 +21,6 @@
+> > 
+> >  #include <plat/cpu.h>
+> >  #include <plat/pm.h>
+> > 
+> > -#include <plat/regs-timer.h>
+> > 
+> >  #include <mach/regs-irq.h>
+> >  #include <mach/regs-clock.h>
+> > 
+> > @@ -77,15 +76,6 @@ static struct sleep_save s5pv210_core_save[] = {
+> > 
+> >  	/* Clock ETC */
+> >  	SAVE_ITEM(S5P_CLK_OUT),
+> >  	SAVE_ITEM(S5P_MDNIE_SEL),
+> > 
+> > -
+> > -	/* PWM Register */
+> > -	SAVE_ITEM(S3C2410_TCFG0),
+> > -	SAVE_ITEM(S3C2410_TCFG1),
+> > -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
+> > -	SAVE_ITEM(S3C2410_TCON),
+> > -	SAVE_ITEM(S3C2410_TCNTB(0)),
+> > -	SAVE_ITEM(S3C2410_TCMPB(0)),
+> > -	SAVE_ITEM(S3C2410_TCNTO(0)),
+> > 
+> >  };
+> >  
+> >  static int s5pv210_cpu_suspend(unsigned long arg)
+> > 
+> > diff --git a/arch/arm/plat-samsung/s5p-irq.c
+> > b/arch/arm/plat-samsung/s5p-irq.c index 6729cb2..ddfaca9 100644
+> > --- a/arch/arm/plat-samsung/s5p-irq.c
+> > +++ b/arch/arm/plat-samsung/s5p-irq.c
+> > @@ -17,7 +17,6 @@
+> > 
+> >  #include <mach/irqs.h>
+> >  #include <mach/map.h>
+> > 
+> > -#include <plat/regs-timer.h>
+> > 
+> >  #include <plat/cpu.h>
+> >  
+> >  void __init s5p_init_irq(u32 *vic, u32 num_vic)
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe
+> linux-samsung-soc" in the body of a message to
+> majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
