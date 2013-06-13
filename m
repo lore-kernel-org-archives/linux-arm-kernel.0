@@ -1,38 +1,73 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 13 Jun 2013 15:38:42 +0530
-Subject: [PATCH 0/2] Remove unused voltagedomain data for AM33xx
-Message-ID: <1371118124-15910-1-git-send-email-rnayak@ti.com>
+Date: Thu, 13 Jun 2013 15:38:43 +0530
+Subject: [PATCH 1/2] ARM: OMAP2+: Powerdomain: Remove the need to always have
+ a voltdm associated to a pwrdm
+In-Reply-To: <1371118124-15910-1-git-send-email-rnayak@ti.com>
+References: <1371118124-15910-1-git-send-email-rnayak@ti.com>
+Message-ID: <1371118124-15910-2-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The powerdomain framework expects all powerdomains to be associated with
+a corresponding voltagedomain. For some SoCs' (like the already existing AM33xx
+family, or for the upcoming AM437x and DRA7 SoCs') which
+do not have a Voltage controller/Voltage Processor (neither the SR I2C
+bus to communicate with the PMIC) there is no need for a Powerdomain to have
+a voltage domain association (since they are really non scaleable, even
+though the voltage domains exist in place).
 
-The powerdomain framework today expects to always have a voltagedomain
-associated with a given powerdomain. We already have AM33xx which
-has no Voltage Controller/Voltage Processor as part of PRCM.
-There are more SoCs' to follow starting with AM437x and DRA7xx
-which do not have VC/VP.
+Extend the arch operations to add an api which the powerdomain core can
+then use to identify if a voltdm lookup and association for a powerdomain
+is really needed.
 
-Instead of adding dummy voltage domain data files, make the powerdomain
-framework aware of the fact that some SoCs' might not really have
-scalable voltage domains.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/powerdomain.c |    5 +++++
+ arch/arm/mach-omap2/powerdomain.h |    2 ++
+ 2 files changed, 7 insertions(+)
 
-Patches are based of 3.10-rc5 and are boot tested on am335x bone.
-
-Rajendra Nayak (2):
-  ARM: OMAP2+: Powerdomain: Remove the need to always have a
-    voltdm associated to a pwrdm
-  ARM: AM33xx: Remove the unused voltagedomain data
-
- arch/arm/mach-omap2/Makefile                  |    1 -
- arch/arm/mach-omap2/io.c                      |    1 -
- arch/arm/mach-omap2/powerdomain.c             |    5 +++
- arch/arm/mach-omap2/powerdomain.h             |    2 ++
- arch/arm/mach-omap2/prm33xx.c                 |    7 ++++
- arch/arm/mach-omap2/voltage.h                 |    1 -
- arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 -------------------------
- 7 files changed, 14 insertions(+), 46 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
-
+diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
+index 86babd7..e233dfc 100644
+--- a/arch/arm/mach-omap2/powerdomain.c
++++ b/arch/arm/mach-omap2/powerdomain.c
+@@ -102,6 +102,10 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 	if (_pwrdm_lookup(pwrdm->name))
+ 		return -EEXIST;
+ 
++	if (arch_pwrdm && arch_pwrdm->pwrdm_has_voltdm)
++		if (!arch_pwrdm->pwrdm_has_voltdm())
++			goto skip_voltdm;
++
+ 	voltdm = voltdm_lookup(pwrdm->voltdm.name);
+ 	if (!voltdm) {
+ 		pr_err("powerdomain: %s: voltagedomain %s does not exist\n",
+@@ -111,6 +115,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
+ 	pwrdm->voltdm.ptr = voltdm;
+ 	INIT_LIST_HEAD(&pwrdm->voltdm_node);
+ 	voltdm_add_pwrdm(voltdm, pwrdm);
++skip_voltdm:
+ 	spin_lock_init(&pwrdm->_lock);
+ 
+ 	list_add(&pwrdm->node, &pwrdm_list);
+diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+index 140c360..8ed89de 100644
+--- a/arch/arm/mach-omap2/powerdomain.h
++++ b/arch/arm/mach-omap2/powerdomain.h
+@@ -166,6 +166,7 @@ struct powerdomain {
+  * @pwrdm_disable_hdwr_sar: Disable Hardware Save-Restore feature for a pd
+  * @pwrdm_set_lowpwrstchange: Enable pd transitions from a shallow to deep sleep
+  * @pwrdm_wait_transition: Wait for a pd state transition to complete
++ * @pwrdm_has_voltdmi: Check if a voltdm association is needed
+  *
+  * Regarding @pwrdm_set_lowpwrstchange: On the OMAP2 and 3-family
+  * chips, a powerdomain's power state is not allowed to directly
+@@ -196,6 +197,7 @@ struct pwrdm_ops {
+ 	int	(*pwrdm_disable_hdwr_sar)(struct powerdomain *pwrdm);
+ 	int	(*pwrdm_set_lowpwrstchange)(struct powerdomain *pwrdm);
+ 	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
++	int	(*pwrdm_has_voltdm)(void);
+ };
+ 
+ int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
 -- 
 1.7.9.5
