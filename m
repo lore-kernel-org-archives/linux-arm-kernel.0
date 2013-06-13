@@ -1,54 +1,56 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 13 Jun 2013 15:47:26 +0100
-Subject: [RFC PATCH 1/4] regulator: Introduce OMAP regulator to control
- PMIC over VC/VP
-In-Reply-To: <20130613133950.GA32174@kahuna>
-References: <1369246717-4167-1-git-send-email-nm@ti.com>
- <1369246717-4167-2-git-send-email-nm@ti.com>
- <20130610103131.GR31367@sirena.org.uk>
- <CAGo_u6qTiPpd0DDe3jnPh_UxTwox22azhcMGy=fftL8H+DGeyw@mail.gmail.com>
- <20130610164905.GJ1403@sirena.org.uk>
- <CAGo_u6ov=yaCwt8apbvW57ErAvhgUBHHw9gwADBC1fJUrfucUQ@mail.gmail.com>
- <20130610180150.GQ1403@sirena.org.uk>
- <20130613133950.GA32174@kahuna>
-Message-ID: <20130613144726.GY1403@sirena.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 13 Jun 2013 10:54:13 -0400 (EDT)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVP__N9o3xRMd5+sk5T0zeGcrSk41rxY6Tzi1AM-mHL81Q@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306131035080.1561-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 08:39:50AM -0500, Nishanth Menon wrote:
+On Thu, 13 Jun 2013, Ming Lei wrote:
 
-> I am having a bit of a difficulty trying to understand your concern
-> here.
+> - using interrupt threaded handler(default)
+>         33.440 MB/sec
+> 
+> - using tasklet(#undef USB_HCD_THREADED_IRQ)
+>         34.29 MB/sec
+> 
+> - using hard interrupt handler(by removing HCD_BH in ehci-hcd.c )
+>         34.260 MB/s
+> 
+> 
+> So looks usb mass storage performance loss can be observed with
+> interrupt threaded handler because one mass storage read/write sectors
+> requires at least 3 interrupts which wake up usb-storage thread 3 times
+> (each interrupt wakeup the usb-storage each time), introducing irq threaded
+> handler will make 2 threads to be waken up about 6 times for one read/write.
+> 
+> I think usb mass storage transfer handler need to be rewritten, otherwise
+> it may become worsen after using irq threaded handler in USB 3.0.(the
+> above device can reach >120MB/sec with hardware handler or tasklet handler,
+> which means about ~3K interrupts/sec, so ~6K contexts switch in case of
+> using irq threaded handler)
+> 
+> So how about supporting tasklet first, then convert to interrupt
+> threaded handler
+> after usb mass storage transfer is rewritten without performance loss?
+> (rewriting
+> usb mass storage transfer handler may need some time and work since storage
+> stability/correctness is extremely important, :-)
 
-Your device tree for this stuff appears to mostly consist of repeating
-the description of the PMIC that we already have - this really doesn't
-seem like a great result.
+Maybe we should simply copy what the networking people do.  They are 
+very concerned about performance and latency; whatever technique they 
+use should be good for USB too.
 
-> Problem statement:
+> Also another problem with irq threaded handler is that there is no sort of
+> tasklet_schedule() interface to wakeup the thread handler manually, so
+> I have to use work to schedule some URB giveback from drivers(root hub
+> transfer, unlink),  even though that isn't a big deal but will cause code a bit
+> much/complicated, :-)
 
-> OMAP has this weird custom h/w where one programs the voltage and that
-> voltage is send over i2c - this is not same as Tegra's lookup table
-> array which automatically sends out entries, in OMAP, software has to trigger
-> the voltage transition
+Yes, I was going to bring that up.
 
-The basic idea that's important here is that you need to figure out how
-to tell the hardware what to write - how those writes get triggered is a
-separate problem.
+Thomas, sometimes we need the IRQ handler thread to do some work even
+though an interrupt hasn't occurred.  Is there an API for this, or can 
+one be added?
 
-> If your concern was describing PMIC parameters in dts, I can easily move
-> them inside the omap_pmic driver and provide required compatible flags.
-> If, on the other hand, the entire approach followed is flawed, I'd like to
-> understand the rationale for the same.
-
-That's the biggest problem I saw so far but to be honest I've not
-drilled down too much into the specifics.  From my point of view the
-main thing is how this fits into the frameworks and so on, having the
-register information in the DT was an alarm flag that suggested the
-overall approach was a concern.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130613/09ae5905/attachment.sig>
+Alan Stern
