@@ -1,58 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Jun 2013 12:19:03 +0100
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20130612230057.GY18614@n2100.arm.linux.org.uk>
-References: <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
- <CAPM=9twJGgYiXxQyaXCnYd+bUPFv+P92qGdmJ39_4z29==4F2g@mail.gmail.com>
- <20130610233611.GK18614@n2100.arm.linux.org.uk>
- <CAPM=9tz6p2rhjNUg7ednT09A+dztbYskF32QkZeaCi_qrH8ipw@mail.gmail.com>
- <20130612134845.GQ18614@n2100.arm.linux.org.uk>
- <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
- <20130612164914.GT18614@n2100.arm.linux.org.uk>
- <20130612170512.GU18614@n2100.arm.linux.org.uk>
- <20130612194021.GX18614@n2100.arm.linux.org.uk>
- <20130612230057.GY18614@n2100.arm.linux.org.uk>
-Message-ID: <20130613111903.GA18614@n2100.arm.linux.org.uk>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Thu, 13 Jun 2013 20:25:08 +0900
+Subject: [RFC PATCH] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+Message-ID: <02c201ce6828$a97bda90$fc738fb0$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-And another issue...
 
-What is drm_crtc_helper_set_mode() passed as the fb argument?  Is it
-the old fb, or the new fb?
+> +static void dmabuf_sync_timeout_worker(struct work_struct *work)
+> +{
+> +	struct dmabuf_sync *sync = container_of(work, struct dmabuf_sync,
+> work);
+> +	struct dmabuf_sync_object *sobj;
+> +
+> +	mutex_lock(&sync->lock);
+> +
+> +	list_for_each_entry(sobj, &sync->syncs, head) {
+> +		if (WARN_ON(!sobj->robj))
+> +			continue;
+> +
+> +		printk(KERN_WARNING "%s: timeout = 0x%x [type = %d, " \
+> +					"refcnt = %d, locked = %d]\n",
+> +					sync->name, (u32)sobj->dmabuf,
+> +					sobj->access_type,
+> +
+atomic_read(&sobj->robj->shared_cnt),
+> +					sobj->robj->locked);
+> +
+> +		/* unlock only valid sync object. */
+> +		if (!sobj->robj->locked)
+> +			continue;
+> +
+> +		if (sobj->robj->shared &&
+> +				atomic_read(&sobj->robj->shared_cnt) > 1) {
+> +			atomic_dec(&sobj->robj->shared_cnt);
+> +			continue;
+> +		}
+> +
+> +		ww_mutex_unlock(&sobj->robj->lock);
+> +
+> +		if (sobj->access_type & DMA_BUF_ACCESS_READ)
+> +			printk(KERN_WARNING "%s: r-unlocked = 0x%x\n",
+> +					sync->name, (u32)sobj->dmabuf);
+> +		else
+> +			printk(KERN_WARNING "%s: w-unlocked = 0x%x\n",
+> +					sync->name, (u32)sobj->dmabuf);
+> +
+> +#if defined(CONFIG_DEBUG_FS)
+> +		sync_debugfs_timeout_cnt++;
+> +#endif
 
-bool drm_crtc_helper_set_mode(struct drm_crtc *crtc,
-                              struct drm_display_mode *mode,
-                              int x, int y,
-                              struct drm_framebuffer *old_fb)
-...
-int drm_crtc_helper_set_config(struct drm_mode_set *set)
-{
-...
-        save_set.fb = set->crtc->fb;
-...
-                        old_fb = set->crtc->fb;
-                        set->crtc->fb = set->fb;
-                        if (!drm_crtc_helper_set_mode(set->crtc, set->mode,
-                                                      set->x, set->y,
-                                                      old_fb)) {
-...
-        /* Try to restore the config */
-        if (mode_changed &&
-            !drm_crtc_helper_set_mode(save_set.crtc, save_set.mode, save_set.x,
-                                      save_set.y, save_set.fb))
-}
-...
-int drm_helper_resume_force_mode(struct drm_device *dev)
-{
-...
-                ret = drm_crtc_helper_set_mode(crtc, &crtc->mode,
-                                               crtc->x, crtc->y, crtc->fb);
-
-The function prototype implies it's the old fb, as does the first use.
-The second and third uses of it clearly show it being the fb which we
-wish to be displayed.
-
-The deeper I look, the more bugs there seem to be in this DRM stuff,
-and I'm continuing to look because I'm chasing a framebuffer refcount
-bug.
+Oops, unnecessary codes. will remove them.
