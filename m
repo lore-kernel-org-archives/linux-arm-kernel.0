@@ -1,50 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:56 +0900
-Subject: [PATCH 06/11] ARM: shmobile: r8a7778: add support MMC clock
-In-Reply-To: <1371106861-25626-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371106861-25626-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106861-25626-7-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 16:00:08 +0900
+Subject: [GIT PULL 0/3] Renesas ARM based SoC defconfig updates for v3.11 #2
+Message-ID: <1371106811-25223-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Hi Olof, Hi Arnd,
 
-This patch adds r8a7778 MMC clock support.
+This series is based on renesas-defconfig-for-v3.11 which you
+have previously pulled.
 
-Signed-off-by: Yusuke Goda <yusuke.goda.sx@renesas.com>
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/mach-shmobile/clock-r8a7778.c | 3 +++
- 1 file changed, 3 insertions(+)
+The following changes since commit 76d415dfa7d53a2f92550484d766ae475a427daf:
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
-index c2c1895..18d44f5 100644
---- a/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -103,6 +103,7 @@ static struct clk *main_clks[] = {
- };
- 
- enum {
-+	MSTP331,
- 	MSTP323, MSTP322, MSTP321,
- 	MSTP114,
- 	MSTP030,
-@@ -112,6 +113,7 @@ enum {
- 	MSTP_NR };
- 
- static struct clk mstp_clks[MSTP_NR] = {
-+	[MSTP331] = SH_CLK_MSTP32(&s4_clk, MSTPCR3, 31, 0), /* MMC */
- 	[MSTP323] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 23, 0), /* SDHI0 */
- 	[MSTP322] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 22, 0), /* SDHI1 */
- 	[MSTP321] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 21, 0), /* SDHI2 */
-@@ -137,6 +139,7 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_CON_ID("peripheral_clk",	&p_clk),
- 
- 	/* MSTP32 clocks */
-+	CLKDEV_DEV_ID("sh_mmcif", &mstp_clks[MSTP331]), /* MMC */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
--- 
-1.8.2.1
+  ARM: shmobile: kzm9g: enable AS3711 PMIC in defconfig (2013-06-04 21:47:10 +0900)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-defconfig2-for-v3.11
+
+for you to fetch changes up to d69626d8913ceeacaa2cd369a2487c85f818fef1:
+
+  ARM: shmobile: bockw defconfig: add MMCIF support (2013-06-12 17:25:57 +0900)
+
+----------------------------------------------------------------
+Second Round of Renesas ARM based SoC defconfig updates for v3.11
+
+* Changes by Morimoto-san to enable MMCIF, M25P80 and RTC RX8581 for the
+  bockw board
+
+----------------------------------------------------------------
+Kuninori Morimoto (3):
+      ARM: shmobile: bockw defconfig: add RTC RX8581 support
+      ARM: shmobile: bockw defconfig: add M25P80 support
+      ARM: shmobile: bockw defconfig: add MMCIF support
+
+ arch/arm/configs/bockw_defconfig | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
