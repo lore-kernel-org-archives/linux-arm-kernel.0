@@ -1,42 +1,37 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 13 Jun 2013 18:29:47 +0200
-Subject: [PATCH v4 0/7] support Hisilicon SoC
-In-Reply-To: <20130612200142.GD5162@quad.lixom.net>
-References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
- <20130612200142.GD5162@quad.lixom.net>
-Message-ID: <201306131829.47348.heiko@sntech.de>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Thu, 13 Jun 2013 09:37:14 -0700
+Subject: [PATCH v3 0/4] Zynq: Support more boards
+Message-ID: <1371141438-16553-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 12. Juni 2013, 22:01:42 schrieb Olof Johansson:
-> On Sat, Jun 08, 2013 at 10:47:16PM +0800, Haojian Zhuang wrote:
-> > Changelog:
-> > v4:
-> > 1. Add clk gate with HIWORD mask for Rockchip.
-> > 2. Update comments and code of HIWORD flags for mux/divider.
-> > 3. Append a mux without HIWORD mask in Hisilicon 3620.
-> > 4. Fix the pinmux setting in Hi4511.
-> > 
-> > v3:
-> > 1. Use clk_register_mux_table().
-> > 
-> > v2:
-> > 1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
-> > CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
-> > 2. Fix system timer running too fast because wrong divider is choosen.
-> > 3. Remove .init_irq in DT machine descriptor.
-> 
-> Hi,
-> 
-> I had some comments on the last two patches. I also haven't seen any acks
-> from Mike on any of the clock changes, which would be needed before we can
-> pick them up. He might want to merge them into his tree as well, if so
-> we'll have to setup a shared branch.
+Just another respin. Still depending on armsoc/zynq/clk
 
-Also, if anything unexpected happens to the main hisilicon support, could you 
-or Mike pick up the HIWORD_MASK patches anyway (if they are acceptable), 
-because they're needed for the Rockchip stuff too.
+	S?ren
 
+v3:
+ - adding patch to use 'status' property for UART nodes
+ - dropping board specific compat string in the Zed dts
 
-Thanks
-Heiko
+v2:
+ - adding patch to remove board specific compat strings from the BSP
+ - adding patch adding Zed support
+
+Soren Brinkmann (4):
+  arm: zynq: Remove board specific compatibility string
+  arm: dt: zynq: Use 'status' property for UART nodes
+  arm: dt: zynq: Add support for the zc706 platform
+  arm: dt: zynq: Add support for the zed platform
+
+ arch/arm/boot/dts/Makefile       |  4 +++-
+ arch/arm/boot/dts/zynq-7000.dtsi |  2 ++
+ arch/arm/boot/dts/zynq-zc702.dts |  6 +++++-
+ arch/arm/boot/dts/zynq-zc706.dts | 35 +++++++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/zynq-zed.dts   | 35 +++++++++++++++++++++++++++++++++++
+ arch/arm/mach-zynq/common.c      |  1 -
+ 6 files changed, 80 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/zynq-zc706.dts
+ create mode 100644 arch/arm/boot/dts/zynq-zed.dts
+
+-- 
+1.8.3
