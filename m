@@ -1,74 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 15:59:48 +0900
-Subject: [PATCH 10/15] ARM: shmobile: Remove old SCU boot code
-In-Reply-To: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106793-25071-11-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 16:00:26 +0900
+Subject: [PATCH 02/12] ehci-platform: add pre_setup() method to platform data
+In-Reply-To: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106836-25388-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Remove shmobile_secondary_vector_scu now when all SCU enabled
-SMP platforms instead make use of shmobile_boot_scu. This
-removes two inline virtual to physical address conversions.
+Sometimes there is a need  to initialize some non-standard registers mapped to
+the EHCI region before accessing the standard EHCI registers.  Add pre_setup()
+method with 'struct usb_hcd *' parameter to be called just before ehci_setup()
+to the 'ehci-platform'  driver's platform data for this purpose...
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
+While at it, add the missing incomplete declaration of 'struct platform_device'
+to <linux/usb/ehci_pdriver.h>...
+
+The patch has been tested on the Marzen and BOCK-W boards.
+
+Suggested-by: Alan Stern <stern@rowland.harvard.edu>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Alan Stern <stern@rowland.harvard.edu>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/headsmp-scu.S         | 22 +---------------------
- arch/arm/mach-shmobile/include/mach/common.h |  1 -
- 2 files changed, 1 insertion(+), 22 deletions(-)
+ drivers/usb/host/ehci-platform.c | 6 ++++++
+ include/linux/usb/ehci_pdriver.h | 4 ++++
+ 2 files changed, 10 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
-index c5c9106..6f98654 100644
---- a/arch/arm/mach-shmobile/headsmp-scu.S
-+++ b/arch/arm/mach-shmobile/headsmp-scu.S
-@@ -25,32 +25,12 @@
+diff --git a/drivers/usb/host/ehci-platform.c b/drivers/usb/host/ehci-platform.c
+index f47f259..d1f5cea 100644
+--- a/drivers/usb/host/ehci-platform.c
++++ b/drivers/usb/host/ehci-platform.c
+@@ -48,6 +48,12 @@ static int ehci_platform_reset(struct usb_hcd *hcd)
+ 	ehci->big_endian_desc = pdata->big_endian_desc;
+ 	ehci->big_endian_mmio = pdata->big_endian_mmio;
  
- 	__CPUINIT
- /*
-- * Reset vector for secondary CPUs.
-+ * Boot code for secondary CPUs.
++	if (pdata->pre_setup) {
++		retval = pdata->pre_setup(hcd);
++		if (retval < 0)
++			return retval;
++	}
++
+ 	ehci->caps = hcd->regs + pdata->caps_offset;
+ 	retval = ehci_setup(hcd);
+ 	if (retval)
+diff --git a/include/linux/usb/ehci_pdriver.h b/include/linux/usb/ehci_pdriver.h
+index 99238b0..7eb4dcd 100644
+--- a/include/linux/usb/ehci_pdriver.h
++++ b/include/linux/usb/ehci_pdriver.h
+@@ -19,6 +19,9 @@
+ #ifndef __USB_CORE_EHCI_PDRIVER_H
+ #define __USB_CORE_EHCI_PDRIVER_H
+ 
++struct platform_device;
++struct usb_hcd;
++
+ /**
+  * struct usb_ehci_pdata - platform_data for generic ehci driver
   *
-  * First we turn on L1 cache coherency for our CPU. Then we jump to
-  * shmobile_invalidate_start that invalidates the cache and hands over control
-  * to the common ARM startup code.
-- * This function will be mapped to address 0 by the SBAR register.
-- * A normal branch is out of range here so we need a long jump. We jump to
-- * the physical address as the MMU is still turned off.
-  */
--	.align	12
--ENTRY(shmobile_secondary_vector_scu)
--	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
--	and	r0, r0, #3		@ mask out cpu ID
--	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
--	ldr	r1, 2f
--	ldr	r1, [r1]		@ SCU base address
--	ldr	r2, [r1, #8]		@ SCU Power Status Register
--	mov	r3, #3
--	bic	r2, r2, r3, lsl r0	@ Clear bits of our CPU (Run Mode)
--	str	r2, [r1, #8]		@ write back
--
--	ldr	pc, 1f
--1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
--2:	.long shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
--ENDPROC(shmobile_secondary_vector_scu)
--
- ENTRY(shmobile_boot_scu)
- 					@ r0 = SCU base address
- 	mrc     p15, 0, r1, c0, c0, 5	@ read MIPDR
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 8ef1c3c..e818f02 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -10,7 +10,6 @@ extern void shmobile_setup_console(void);
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_arg;
--extern void shmobile_secondary_vector_scu(void);
- extern void shmobile_boot_scu(void);
- struct clk;
- extern int shmobile_clk_init(void);
+@@ -50,6 +53,7 @@ struct usb_ehci_pdata {
+ 	/* Turn on only VBUS suspend power and hotplug detection,
+ 	 * turn off everything else */
+ 	void (*power_suspend)(struct platform_device *pdev);
++	int (*pre_setup)(struct usb_hcd *hcd);
+ };
+ 
+ #endif /* __USB_CORE_EHCI_PDRIVER_H */
 -- 
 1.8.2.1
