@@ -1,25 +1,35 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 13 Jun 2013 15:15:34 +0200 (CEST)
-Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over global
- devices
-In-Reply-To: <51B991EF.70800@linaro.org>
-References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
- <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
- <51B0A6E8.20909@linaro.org> <20130606180425.GQ599@codeaurora.org>
- <51B10D85.1060507@linaro.org> <20130606223848.GR599@codeaurora.org>
- <20130612214435.GE10823@codeaurora.org> <51B991EF.70800@linaro.org>
-Message-ID: <alpine.LFD.2.02.1306131331430.22970@ionos>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jun 2013 14:16:47 +0100
+Subject: [PATCH 3/3] ARM: OMAP: dma: Fix the kfree ordering
+In-Reply-To: <1371128960-24822-4-git-send-email-rnayak@ti.com>
+References: <1371128960-24822-1-git-send-email-rnayak@ti.com>
+ <1371128960-24822-4-git-send-email-rnayak@ti.com>
+Message-ID: <20130613131647.GS21614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jun 2013, Daniel Lezcano wrote:
-> I prefer Thomas to have a look at it and ack it. I changed Cc to To for
-> Thomas.
+On Thu, Jun 13, 2013 at 06:39:20PM +0530, Rajendra Nayak wrote:
+> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
+> index 8a71f75..8e16503 100644
+> --- a/arch/arm/plat-omap/dma.c
+> +++ b/arch/arm/plat-omap/dma.c
+> @@ -2111,8 +2111,8 @@ exit_dma_irq_fail:
+>  	}
+>  
+>  exit_dma_lch_fail:
+> -	kfree(p);
+>  	kfree(d);
+> +	kfree(p);
 
-The patch does not apply on tip timers/core. The code has been
-reworked a month ago. Please work against tip timers/core. That's
-where this stuff ends up.
+Err.
 
-Thanks,
+        p = pdev->dev.platform_data;
+        d                       = p->dma_attr;
 
-	tglx
+Why is it kfree'ing platform data in the first place?  This means that
+a failed bind can't be reattempted later.  It also means that an unbind
+plus rebind in userspace will free the platform data leaving stale
+pointers behind.
+
+This is totally nonsense.  Don't kfree() data in your driver which you
+haven't allocated yourself!
