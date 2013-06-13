@@ -1,34 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Jun 2013 07:57:24 -0700
-Subject: N900 device tree conversion: how to do first step
-In-Reply-To: <20130613142809.GA3775@amd.pavel.ucw.cz>
-References: <20130609015944.GA23559@amd.pavel.ucw.cz>
- <20130609201119.GA3190@blackmetal.musicnaut.iki.fi>
- <20130613132624.GA3464@amd.pavel.ucw.cz>
- <20130613141001.GF8164@atomide.com>
- <20130613142809.GA3775@amd.pavel.ucw.cz>
-Message-ID: <20130613145724.GH8164@atomide.com>
+From: nm@ti.com (Nishanth Menon)
+Date: Thu, 13 Jun 2013 09:58:03 -0500
+Subject: [RFC PATCH 1/4] regulator: Introduce OMAP regulator to control
+ PMIC over VC/VP
+In-Reply-To: <20130613144726.GY1403@sirena.org.uk>
+References: <1369246717-4167-1-git-send-email-nm@ti.com>
+ <1369246717-4167-2-git-send-email-nm@ti.com>
+ <20130610103131.GR31367@sirena.org.uk>
+ <CAGo_u6qTiPpd0DDe3jnPh_UxTwox22azhcMGy=fftL8H+DGeyw@mail.gmail.com>
+ <20130610164905.GJ1403@sirena.org.uk>
+ <CAGo_u6ov=yaCwt8apbvW57ErAvhgUBHHw9gwADBC1fJUrfucUQ@mail.gmail.com>
+ <20130610180150.GQ1403@sirena.org.uk>
+ <20130613133950.GA32174@kahuna>
+ <20130613144726.GY1403@sirena.org.uk>
+Message-ID: <20130613145803.GA32324@kahuna>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [130613 07:34]:
-> On Thu 2013-06-13 07:10:01, Tony Lindgren wrote:
-> > * Pavel Machek <pavel@ucw.cz> [130613 06:32]:
-> >  
-> > > If I init spi manually (and some more hacks), it works in the
-> > > qemu. But I have not tested on real hw for a while.
-> > 
-> > You should be able to initialize spi by adding the .dts entry,
-> > or is there something missing in drivers/spi/spi-omap2-mcspi.c?
+On 15:47-20130613, Mark Brown wrote:
+> On Thu, Jun 13, 2013 at 08:39:50AM -0500, Nishanth Menon wrote:
 > 
-> Not sure, I guess I'll find out soon. Do you have example dts that
-> uses drivers/spi/spi-omap2-mcspi.c? Grepping spi in dts/ was not too
-> successful.
+> > I am having a bit of a difficulty trying to understand your concern
+> > here.
+> 
+> Your device tree for this stuff appears to mostly consist of repeating
+> the description of the PMIC that we already have - this really doesn't
+> seem like a great result.
+> 
+> > Problem statement:
+> 
+> > OMAP has this weird custom h/w where one programs the voltage and that
+> > voltage is send over i2c - this is not same as Tegra's lookup table
+> > array which automatically sends out entries, in OMAP, software has to trigger
+> > the voltage transition
+> 
+> The basic idea that's important here is that you need to figure out how
+> to tell the hardware what to write - how those writes get triggered is a
+> separate problem.
+> 
+> > If your concern was describing PMIC parameters in dts, I can easily move
+> > them inside the omap_pmic driver and provide required compatible flags.
+> > If, on the other hand, the entire approach followed is flawed, I'd like to
+> > understand the rationale for the same.
+> 
+> That's the biggest problem I saw so far but to be honest I've not
+> drilled down too much into the specifics.  From my point of view the
+> main thing is how this fits into the frameworks and so on, having the
+> register information in the DT was an alarm flag that suggested the
+> overall approach was a concern.
+OK. would you be ok with an generic omap_pmic driver if the PMIC
+specific data set is moved into OF compatible data?
+I am proposing moving the following into OF match data.
+ti,i2c-slave-address
+ti,i2c-voltage-register
+ti,i2c-command-register
+ti,slew-rate-microvolt
+ti,step-size-micro-volts
+ti,voltage-selector-set-bits
+ti,voltage-selector-mask
+ti,voltage-selector-offset
+ti,non-zero-voltage-selector
 
-Hmm I think all we have is what's written in
-Documentation/devicetree/bindings/spi/omap-spi.txt and
-omap4-sdp.dts.
+The only thing I propose to retain is board specific variations - e.g.
+gpios, boot voltage and standard regulator min,max overrides if any.
 
+I can also do voltage selector based operations while at it.
+
+-- 
 Regards,
-
-Tony
+Nishanth Menon
