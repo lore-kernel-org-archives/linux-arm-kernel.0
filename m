@@ -1,56 +1,34 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 13 Jun 2013 10:54:13 -0400 (EDT)
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <CACVXFVP__N9o3xRMd5+sk5T0zeGcrSk41rxY6Tzi1AM-mHL81Q@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306131035080.1561-100000@iolanthe.rowland.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Jun 2013 07:57:24 -0700
+Subject: N900 device tree conversion: how to do first step
+In-Reply-To: <20130613142809.GA3775@amd.pavel.ucw.cz>
+References: <20130609015944.GA23559@amd.pavel.ucw.cz>
+ <20130609201119.GA3190@blackmetal.musicnaut.iki.fi>
+ <20130613132624.GA3464@amd.pavel.ucw.cz>
+ <20130613141001.GF8164@atomide.com>
+ <20130613142809.GA3775@amd.pavel.ucw.cz>
+Message-ID: <20130613145724.GH8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jun 2013, Ming Lei wrote:
-
-> - using interrupt threaded handler(default)
->         33.440 MB/sec
+* Pavel Machek <pavel@ucw.cz> [130613 07:34]:
+> On Thu 2013-06-13 07:10:01, Tony Lindgren wrote:
+> > * Pavel Machek <pavel@ucw.cz> [130613 06:32]:
+> >  
+> > > If I init spi manually (and some more hacks), it works in the
+> > > qemu. But I have not tested on real hw for a while.
+> > 
+> > You should be able to initialize spi by adding the .dts entry,
+> > or is there something missing in drivers/spi/spi-omap2-mcspi.c?
 > 
-> - using tasklet(#undef USB_HCD_THREADED_IRQ)
->         34.29 MB/sec
-> 
-> - using hard interrupt handler(by removing HCD_BH in ehci-hcd.c )
->         34.260 MB/s
-> 
-> 
-> So looks usb mass storage performance loss can be observed with
-> interrupt threaded handler because one mass storage read/write sectors
-> requires at least 3 interrupts which wake up usb-storage thread 3 times
-> (each interrupt wakeup the usb-storage each time), introducing irq threaded
-> handler will make 2 threads to be waken up about 6 times for one read/write.
-> 
-> I think usb mass storage transfer handler need to be rewritten, otherwise
-> it may become worsen after using irq threaded handler in USB 3.0.(the
-> above device can reach >120MB/sec with hardware handler or tasklet handler,
-> which means about ~3K interrupts/sec, so ~6K contexts switch in case of
-> using irq threaded handler)
-> 
-> So how about supporting tasklet first, then convert to interrupt
-> threaded handler
-> after usb mass storage transfer is rewritten without performance loss?
-> (rewriting
-> usb mass storage transfer handler may need some time and work since storage
-> stability/correctness is extremely important, :-)
+> Not sure, I guess I'll find out soon. Do you have example dts that
+> uses drivers/spi/spi-omap2-mcspi.c? Grepping spi in dts/ was not too
+> successful.
 
-Maybe we should simply copy what the networking people do.  They are 
-very concerned about performance and latency; whatever technique they 
-use should be good for USB too.
+Hmm I think all we have is what's written in
+Documentation/devicetree/bindings/spi/omap-spi.txt and
+omap4-sdp.dts.
 
-> Also another problem with irq threaded handler is that there is no sort of
-> tasklet_schedule() interface to wakeup the thread handler manually, so
-> I have to use work to schedule some URB giveback from drivers(root hub
-> transfer, unlink),  even though that isn't a big deal but will cause code a bit
-> much/complicated, :-)
+Regards,
 
-Yes, I was going to bring that up.
-
-Thomas, sometimes we need the IRQ handler thread to do some work even
-though an interrupt hasn't occurred.  Is there an API for this, or can 
-one be added?
-
-Alan Stern
+Tony
