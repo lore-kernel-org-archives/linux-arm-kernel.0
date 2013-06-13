@@ -1,33 +1,47 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 13 Jun 2013 15:14:48 -0400 (EDT)
-Subject: [PATCH V2 01/10] USB: OHCI: Properly handle ohci-at91 suspend
-In-Reply-To: <1371114989-2342-2-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306131513140.1561-100000@iolanthe.rowland.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Jun 2013 13:19:29 -0600
+Subject: [PATCH v2 1/3] ARM: tegra: basic support for Trusted Foundations
+In-Reply-To: <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
+References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
+ <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
+Message-ID: <51BA1B41.6030002@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jun 2013, Manjunath Goudar wrote:
-
-> Suspend scenario in case of ohci-at91 glue was not properly
-> handled as it was not suspending generic part of ohci controller.
-> Calling explicitly the ohci_suspend() routine in ohci_hcd_at91_drv_suspend()
-> will ensure proper handling of suspend scenario.
+On 06/13/2013 03:12 AM, Alexandre Courbot wrote:
+> Add basic support for booting secondary processors on Tegra devices
+> using the Trusted Foundations secure monitor.
 > 
-> V2:
->   -Incase ohci_suspend() fails, return right away without executing further.
+> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
+> ---
+>  Documentation/devicetree/bindings/arm/tegra.txt    | 11 +++++
+>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>  arch/arm/configs/tegra_defconfig                   |  1 +
 
-> diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
-> index fb2f127..6620e3a 100644
-> --- a/drivers/usb/host/ohci-at91.c
-> +++ b/drivers/usb/host/ohci-at91.c
-> @@ -619,8 +619,18 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
->  {
->  	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
->  	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
-> +	bool do_wakeup = device_may_wakeup(&pdev->dev);
-> +	int ret;
+The defconfig change should be a separate patch, so that I can squash it
+into any other defconfig updates separately from all the code changes.
 
-Please use tab characters so that "do_wakeup" and "ret" are lined up 
-directly beneath "*hcd" and "*ohci".  The rest of this patch is okay.
+> diff --git a/arch/arm/mach-tegra/firmware.c b/arch/arm/mach-tegra/firmware.c
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+> +void __init tegra_init_firmware(void)
+> +{
+> +	struct device_node *node;
+> +
+> +	if (!of_have_populated_dt())
+> +		return;
+> +
+> +	node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
+> +	if (node && !IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS))
+> +		pr_warn("Trusted Foundations detected but support missing!\n");
+> +#if IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS)
+> +	else if (node)
+> +		register_firmware_ops(&tegra_trusted_foundations_ops);
+> +#endif
+> +}
+
+Is it worth continuing on in the node && !IS_ENABLED case here? After
+all, we can be pretty certain that the write to the CPU reset vector is
+immediately going to trap...
+
+I suppose that perhaps without SMP, cpuidle, suspend, ... we could keep
+running, but that seems a little niche.
