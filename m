@@ -1,40 +1,43 @@
 From: b42378@freescale.com (Nicolin Chen)
-Date: Thu, 13 Jun 2013 19:50:59 +0800
-Subject: [PATCH 4/9] ARM: dtsi: imx6dl: Add a pinctrl for AUDMUX
+Date: Thu, 13 Jun 2013 19:50:57 +0800
+Subject: [PATCH 2/9] ARM: dts: imx6qdl-sabresd: add clko1 iomux configuration
 In-Reply-To: <cover.1371123426.git.b42378@freescale.com>
 References: <cover.1371123426.git.b42378@freescale.com>
-Message-ID: <61023162fb7819ac181d57ab071a82b22bd7e2b2.1371123426.git.b42378@freescale.com>
+Message-ID: <d2c5065c6cb9d7ed5f760e74190d0cad24cc933e.1371123426.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a pinctrl for AUDMUX used on imx6dl-sabresd.
+Setting GPIO_0 pad as clko1 clock output to provide MCLK for WM8962.
 
 Signed-off-by: Nicolin Chen <b42378@freescale.com>
 ---
- arch/arm/boot/dts/imx6dl.dtsi |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/imx6dl-sabresd.dts |    1 +
+ arch/arm/boot/dts/imx6q-sabresd.dts  |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index 06bd544..023ac83 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -35,6 +35,17 @@
- 				compatible = "fsl,imx6dl-iomuxc";
- 				reg = <0x020e0000 0x4000>;
- 
-+				audmux {
-+					pinctrl_audmux_2: audmux-2 {
-+						fsl,pins = <
-+							MX6DL_PAD_CSI0_DAT7__AUD3_RXD  0x80000000
-+							MX6DL_PAD_CSI0_DAT4__AUD3_TXC  0x80000000
-+							MX6DL_PAD_CSI0_DAT5__AUD3_TXD  0x80000000
-+							MX6DL_PAD_CSI0_DAT6__AUD3_TXFS 0x80000000
-+						>;
-+					};
-+				};
-+
- 				ecspi1 {
- 					pinctrl_ecspi1_1: ecspi1grp-1 {
- 						fsl,pins = <
+diff --git a/arch/arm/boot/dts/imx6dl-sabresd.dts b/arch/arm/boot/dts/imx6dl-sabresd.dts
+index 7efb05d..8989df2 100644
+--- a/arch/arm/boot/dts/imx6dl-sabresd.dts
++++ b/arch/arm/boot/dts/imx6dl-sabresd.dts
+@@ -29,6 +29,7 @@
+ 				MX6DL_PAD_NANDF_D1__GPIO2_IO01 0x80000000
+ 				MX6DL_PAD_NANDF_D2__GPIO2_IO02 0x80000000
+ 				MX6DL_PAD_NANDF_D3__GPIO2_IO03 0x80000000
++				MX6DL_PAD_GPIO_0__CCM_CLKO1    0x130b0
+ 			>;
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
+index 4420513..0038228 100644
+--- a/arch/arm/boot/dts/imx6q-sabresd.dts
++++ b/arch/arm/boot/dts/imx6q-sabresd.dts
+@@ -33,6 +33,7 @@
+ 				MX6Q_PAD_NANDF_D1__GPIO2_IO01 0x80000000
+ 				MX6Q_PAD_NANDF_D2__GPIO2_IO02 0x80000000
+ 				MX6Q_PAD_NANDF_D3__GPIO2_IO03 0x80000000
++				MX6Q_PAD_GPIO_0__CCM_CLKO1    0x130b0
+ 			>;
+ 		};
+ 	};
 -- 
 1.7.1
