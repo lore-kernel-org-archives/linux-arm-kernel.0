@@ -1,77 +1,62 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 13 Jun 2013 11:07:38 +0200
-Subject: [PATCH 00/15] Final Samsung PWM support cleanup
-In-Reply-To: <51B909A5.2020409@gmail.com>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <201306130138.05692.heiko@sntech.de> <51B909A5.2020409@gmail.com>
-Message-ID: <1808375.nuQYa2FdfG@flatron>
+From: manjunath.goudar@linaro.org (Manjunath Goudar)
+Date: Thu, 13 Jun 2013 14:40:52 +0530
+Subject: [PATCH 01/10] USB: OHCI: Properly handle ohci-at91 suspend
+In-Reply-To: <1371114661-2207-1-git-send-email-manjunath.goudar@linaro.org>
+References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
+ <1371114661-2207-1-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <1371114661-2207-2-git-send-email-manjunath.goudar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko, Sylwester,
+Suspend scenario in case of ohci-at91 glue was not properly
+handled as it was not suspending generic part of ohci controller.
+Calling explicitly the ohci_suspend() routine in ohci_hcd_at91_drv_suspend()
+will ensure proper handling of suspend scenario.
 
-On Thursday 13 of June 2013 01:52:05 Sylwester Nawrocki wrote:
-> On 06/13/2013 01:38 AM, Heiko St?bner wrote:
-> > Am Donnerstag, 13. Juni 2013, 01:13:47 schrieb Tomasz Figa:
-> >> Hi Olof,
-> >> 
-> >> On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
-> >>> On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
-> >>>>> Needs testing on other platforms as I could only compile test for
-> >>>>> them.
-> >>> 
-> >>> How/who can help here? WHo has and still cares for other affected
-> >>> platforms?
-> >>> 
-> >>>>> 66 files changed, 627 insertions(+), 1580 deletions(-)
-> >> 
-> >> I will try to test this on Exynos 4 at work, if I somehow manage to
-> >> find any way to use PWM on our boards (other than already-tested PWM
-> >> clocksource).
-> >> 
-> >> Unfortunately, except S3C6410, I don't have access to other
-> >> platforms, or at least I won't in any reasonable time.
-> >> 
-> >> If I remember correctly, in case of my watchdog support cleanup,
-> >> Kukjin
-> >> has been able to test it on S5P64x0.
-> >> 
-> >> Heiko and Sylwester used to have some s3c24xx-based boards, not sure
-> >> if
-> >> they still do and are interested in their support in mainline.
-> >> 
-> >> So all left is S5PC100 (for which I couldn't find anyone who cares)
-> >> and
-> >> Exynos5.
-> >> 
-> >>> Nice cleanup.
-> >> 
-> >> Thanks.
-> >> 
-> >>>> Any comments for this series?
-> >>> 
-> >>> Yes, above. :) In general looks good -- testing coverage is a bit of
-> >>> a
-> >>> concern.
-> >> 
-> >> Yeah. Unfortunately all I could do was testing on Tiny6410 and
-> >> compile
-> >> testing on others. I hope we find some really helpful people over
-> >> here who could waste a bit of their precious time for this museum.
-> >> ;)
-> > 
-> > I'll try to give it a testrun tomorrow. And my s3c2416 will always be
-> > the first-love-architecture for me ;-)
-> 
-> I'll likely test it tomorrow on a Mini2440 board, I was going to do it
-> earlier
-> but got distracted by plenty other things that needed attention too. At
-> least
-> that's one of the reasons I got the board - testing the cross-platform
-> cleanups
-> and ensuring they are not breaking the older platforms.
+V2:
+  -Incase ohci_suspend() fails, return right away without executing further.
 
-Thank you both for your support. Looking forward for testing results :)
+Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Alan Stern <stern@rowland.harvard.edu>
+Cc: Greg KH <greg@kroah.com>
+Cc: linux-usb at vger.kernel.org
+---
+ drivers/usb/host/ohci-at91.c |   14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-Best regards,
-Tomasz
+diff --git a/drivers/usb/host/ohci-at91.c b/drivers/usb/host/ohci-at91.c
+index fb2f127..6620e3a 100644
+--- a/drivers/usb/host/ohci-at91.c
++++ b/drivers/usb/host/ohci-at91.c
+@@ -619,8 +619,18 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+ {
+ 	struct usb_hcd	*hcd = platform_get_drvdata(pdev);
+ 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
++	bool do_wakeup = device_may_wakeup(&pdev->dev);
++	int ret;
+ 
+-	if (device_may_wakeup(&pdev->dev))
++	ret = ohci_suspend(hcd, do_wakeup);
++	if (ret == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
++		ohci_resume(hcd, false);
++		ret = -EBUSY;
++	}
++	if (ret)
++		return ret;
++
++	if (do_wakeup)
+ 		enable_irq_wake(hcd->irq);
+ 
+ 	/*
+@@ -637,7 +647,7 @@ ohci_hcd_at91_drv_suspend(struct platform_device *pdev, pm_message_t mesg)
+ 		at91_stop_clock();
+ 	}
+ 
+-	return 0;
++	return ret;
+ }
+ 
+ static int ohci_hcd_at91_drv_resume(struct platform_device *pdev)
+-- 
+1.7.9.5
