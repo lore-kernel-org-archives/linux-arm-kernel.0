@@ -1,31 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Jun 2013 21:26:45 +0900
-Subject: [RESEND PATCH 1/3] ARM: EXYNOS: Move arm core power down clock to
- exynos5250 common clock
-In-Reply-To: <1370501833-9196-1-git-send-email-amit.daniel@samsung.com>
-References: <1363240979-1939-2-git-send-email-amit.daniel@samsung.com>
- <1370501833-9196-1-git-send-email-amit.daniel@samsung.com>
-Message-ID: <150e01ce6831$44d94920$ce8bdb60$%kim@samsung.com>
+Date: Thu, 13 Jun 2013 21:32:45 +0900
+Subject: [PATCH] ARM: dts: Add more opp levels in exynos5440
+Message-ID: <150f01ce6832$1b7db600$52792200$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Amit Daniel Kachhap wrote:
-> 
-> Now with common clock support added for exynos5250 it is necessary to move
-> this code to exynos5250 common clock driver as clock registers should be
-> handled there. This change is tested in exynos5250 based arndale platform.
-> 
-> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
-> Cc: Thomas Abraham <thomas.abraham@linaro.org>
-> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+From: Amit Daniel Kachhap <amit.daniel@samsung.com>
 
-Hmm...I'm not sure it's better to handle the ARM core power down clock in
-common clock but the clock registers should be handled in one part, clock.
+This patch updates cpu frequency level from 1500 to 800MHZ in steps
+of 100MHZ. The corresponding voltage(in uV) is also added.
 
-Acked-by: Kukjin Kim <kgene.kim@samsugn.com>
+Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/boot/dts/exynos5440.dtsi |    5 +++++
+ 1 file changed, 5 insertions(+)
 
-Mike, the mach-exynos/cpuidle.c is not touched in samsung tree at this
-moment, so this patch will not create any conflict between samsung and clk.
-
-Thanks,
-- Kukjin
+diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+index e8f5745..80ed5d9 100644
+--- a/arch/arm/boot/dts/exynos5440.dtsi
++++ b/arch/arm/boot/dts/exynos5440.dtsi
+@@ -79,8 +79,13 @@
+ 		interrupts = <0 57 0>;
+ 		operating-points = <
+ 				/* KHz	  uV */
++				1500000 1100000
++				1400000 1075000
++				1300000 1050000
+ 				1200000 1025000
++				1100000 1000000
+ 				1000000 975000
++				900000  950000
+ 				800000  925000
+ 		>;
+ 	};
+-- 
+1.7.10.4
