@@ -1,46 +1,60 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Jun 2013 21:53:29 +0900
-Subject: About LPAE supporting on EXYNOS5440
-In-Reply-To: <201306121158.20676.arnd@arndb.de>
-References: <109e01ce667e$5becc880$13c65980$%kim@samsung.com>
- <15605927.1Yi6Xe5hWs@wuerfel> <51B7FD2E.9030306@gmail.com>
- <201306121158.20676.arnd@arndb.de>
-Message-ID: <151501ce6835$0109d4e0$031d7ea0$%kim@samsung.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 13 Jun 2013 14:58:27 +0200
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <CAF6AEGs_Jf+R4qytC3odGa5yXX=Q5UWidjokHSh9S-a2GoFVnw@mail.gmail.com>
+References: <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
+ <CAPM=9twJGgYiXxQyaXCnYd+bUPFv+P92qGdmJ39_4z29==4F2g@mail.gmail.com>
+ <20130610233611.GK18614@n2100.arm.linux.org.uk>
+ <CAPM=9tz6p2rhjNUg7ednT09A+dztbYskF32QkZeaCi_qrH8ipw@mail.gmail.com>
+ <20130612134845.GQ18614@n2100.arm.linux.org.uk>
+ <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
+ <20130612164914.GT18614@n2100.arm.linux.org.uk>
+ <20130612170512.GU18614@n2100.arm.linux.org.uk>
+ <20130612194021.GX18614@n2100.arm.linux.org.uk>
+ <20130612230057.GY18614@n2100.arm.linux.org.uk>
+ <20130613111903.GA18614@n2100.arm.linux.org.uk>
+ <CAF6AEGs_Jf+R4qytC3odGa5yXX=Q5UWidjokHSh9S-a2GoFVnw@mail.gmail.com>
+Message-ID: <CAKMK7uHXkSEBpxmYULUSGZDxLS0W5zDjS5EKYhB6D6fm4ZQ9LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann wrote:
-> 
-> On Wednesday 12 June 2013, Subash Patel wrote:
-> > > I would definitely leave on exynos5440 support in defconfig. It's not
-> a
-> > > lot of extra code, and if you have a system with less than 4GB memory,
-> > > you really don't want to enable LPAE because of the overhead.
-> >
-> > Even if we have <= 4GB memory, and the system designers have placed the
-> > memory banks in addresses > 2^32 bytes, then we need LPAE support. I
-> > think we may have such systems in future. So memory capacity is not the
-> > only parameter to judge if we need to enable LPAE or not.
-> 
-> Yes, but that wasn't the point. You can always build systems with
-> exynos5440 that don't need LPAE, so we should not assume that it is
-> not a reasonable configuration.
-> 
-Agreed.
+On Thu, Jun 13, 2013 at 2:52 PM, Rob Clark <robdclark@gmail.com> wrote:
+> most of the embedded drivers should ignore the old_fb.. the API is a
+> bit odd but the purpose is to help drivers that need to pin/unpin the
+> gem objects backing the fb.  The ones that do, do something like:
+>
+>   foo_pin(new_fb);
+>   foo_unpin(old_fb);
+>
+> if the two are the same, it works out.
+>
+> Note that even for the non error paths, new_fb and old_fb could be the same.
+>
+> Possibly something worth clarifying in the docs.
 
-> I would certainly advise system designers to put all the RAM and I/O
-> into normally addressable locations if possible to avoid the need
-> for LPAE, but of course that isn't always possible.
-> 
-Yes, same here. Actually, some IPs sometimes can request to alloc/use
-something like dma buffer over 32 bit area after LPAE enabling, but will not
-be happened without LPAE.
+One implication this has is that the crtc helper assumes that the
+driver modeset callbacks only fail before the driver internally has
+done the pin/unpin dance. If the new fb is already the one which
+should be unpinned and the modeset fails after that point, then we'll
+leak stuff.
 
-> We should probably have someone measure the performance impact
-> of LPAE as well. If it's less than a few percent, we might not
-> care all that much.
-> 
-Yes, after testing on exynos5440 board, LPAE doesn't cause any performance
-degradation with lmbench tool.
+So drivers need to ensure that they undo any pin/unpins (and other fb
+refcounted resource handling) if they're ->modeset callback fails.
 
-- Kukjin
+In the new shiny drm/i915 modeset helper code we've flipped around
+those semantics, but imo for the crtc helper it does fit into the
+larger assumptions of the crtc helper code:
+- crtc helper code assumes that all ->disable callbacks are stateless
+- hence it can put the _new_ requested state into the sw tracking
+structures before the modeset starts so that ->mode_fixup callbacks
+could e.g. check the pixel format of the new fb.
+
+Flipping that around would remove one of the cornerstones of the crtc
+helpers, so imo doesn't make much sense. But as i915.ko demonstrates
+with a bit of effort it's no problem to have a completely different
+modeset sequence driver infrastructure.
+-Daniel
+--
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
