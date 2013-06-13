@@ -1,65 +1,38 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Jun 2013 09:37:05 +0900
-Subject: [GIT PULL 3/6] exynos arch
-In-Reply-To: <20130612232526.GA9067@quad.lixom.net>
-References: <51B791E0.5040104@samsung.com>
- <20130612232526.GA9067@quad.lixom.net>
-Message-ID: <143b01ce67ce$20d5f5e0$6281e1a0$%kim@samsung.com>
+Date: Thu, 13 Jun 2013 09:48:05 +0900
+Subject: [GIT PULL 0/6] Samsung stuff for v3.11
+In-Reply-To: <20130612235455.GD9067@quad.lixom.net>
+References: <51B791C3.7050702@samsung.com>
+ <20130612235455.GD9067@quad.lixom.net>
+Message-ID: <143e01ce67cf$aa7d1b60$ff775220$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Olof Johansson wrote:
 > 
-> On Wed, Jun 12, 2013 at 06:08:48AM +0900, Kukjin Kim wrote:
-> > The following changes since commit
-> 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+> On Wed, Jun 12, 2013 at 06:08:19AM +0900, Kukjin Kim wrote:
+> > Hi Arnd, Olof
 > >
-> >   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+> > Please pull Samsung stuff for v3.11.
 > >
-> > are available in the git repository at:
-> >
+> > If any problems, please kindly let me know.
 > 
-> > git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> > tags/exynos-arch-1
-> >
-> > for you to fetch changes up to d75666024bbb7d1b4fa6f0b00ecd8d834033259a:
-> >
-> >   ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor
-> > (2013-06-10 18:28:04 +0900)
-> >
-> > ----------------------------------------------------------------
-> > update exynos arch part
+> Hi,
 > 
-> Kukjin, please, write proper tag messages. This adds no value. Give a
-> brief
-> overview of what's in the branch instead.
+> I've pulled 1, 2, 4 and 6. Please fix the comments on 3 and 5 and send
+> fresh
+> requests.
 > 
-YES, I will.
+Thanks. OK, I will.
 
-> > ----------------------------------------------------------------
-> > Doug Anderson (1):
-> >       ARM: EXYNOS: Select PINCTRL_EXYNOS for exynos4/5 at chip level
-> >
-> > Girish K S (1):
-> >       ARM: EXYNOS: force MAC ip to 32bit DMA
-> >
-> > Kukjin Kim (1):
-> >       ARM: EXYNOS: no more support non-DT for EXYNOS SoCs
-> >
-> > Leela Krishna Amudala (1):
-> >       ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor
-> >
-> > Thomas Abraham (1):
-> >       ARM: EXYNOS: Add a platform bus notifier to set dma masks for
-> > Exynos5440
+> Also, I see you've based a bunch of branches on -rc5. While this is
+> fine, it is more convenient for us to review your branch submission if it
+> doesn't also pull in a newer upstream -rc.
 > 
-> This one has outstanding comments from Russell that were not addressed?
+> Main reason to use the most-recent -rc would be if new code conflicts
+> with fixes in the previous -rc version, but if they don't then feel free
+> to start your branches on an older version instead.
 > 
-Oops, I missed the comment from Russell and looked at just now. Thanks.
-
-> 
-> Not pulled.
-> 
-OK.
+Agreed.
 
 - Kukjin
