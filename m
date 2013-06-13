@@ -1,37 +1,23 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 13 Jun 2013 16:05:58 +0300
-Subject: [RFC PATCH 1/4] arm: omap: Add phy binding info for musb in plat
- data
-In-Reply-To: <51A43E0A.8090201@ti.com>
-References: <1368796954-3499-1-git-send-email-kishon@ti.com>
- <51A43E0A.8090201@ti.com>
-Message-ID: <51B9C3B6.1080707@ti.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 13 Jun 2013 18:39:17 +0530
+Subject: [PATCH 0/3] minor omap dma fixes
+Message-ID: <1371128960-24822-1-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 28/05/13 08:18, Kishon Vijay Abraham I wrote:
-> Hi Tony,
-> 
-> On Friday 17 May 2013 06:52 PM, Kishon Vijay Abraham I wrote:
->> In order for controllers to get PHY in case of non dt boot, the phy
->> binding information (phy label) should be added in the platform
->> data of the controller.
-> 
-> This series would be needed to get MUSB working in OMAP3 boards for
-> non-dt boot case. Do you think this is good enough to go in this rc cycle?
+Here are some minor omap dma fixes.
 
-Did this or some other solution go forward? I'm still unable to boot
-with usb-gadget-ethernet with v3.10-rc5.
+R Sricharan (2):
+  ARM: OMAP: dma: Remove the wrong dev_id check
+  ARM: OMAP: dma: Fix the dma_chan_link_map init order
 
- Tomi
+Rajendra Nayak (1):
+  ARM: OMAP: dma: Fix the kfree ordering
 
+ arch/arm/plat-omap/dma.c |    9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 901 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130613/f41255a4/attachment.sig>
+-- 
+1.7.9.5
