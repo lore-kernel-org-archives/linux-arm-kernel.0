@@ -1,104 +1,77 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Thu, 13 Jun 2013 10:58:22 +0200
-Subject: [PATCH v4 3/3] mmc: dw_mmc-pltfm: add Rockchip variant
-In-Reply-To: <201306131055.49595.heiko@sntech.de>
-References: <201306131055.49595.heiko@sntech.de>
-Message-ID: <201306131058.23150.heiko@sntech.de>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 13 Jun 2013 11:07:38 +0200
+Subject: [PATCH 00/15] Final Samsung PWM support cleanup
+In-Reply-To: <51B909A5.2020409@gmail.com>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <201306130138.05692.heiko@sntech.de> <51B909A5.2020409@gmail.com>
+Message-ID: <1808375.nuQYa2FdfG@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cortex-A9 SoCs from Rockchip use a slightly modified variant of dw_mmc
-controllers that seems to require the SDMMC_CMD_USE_HOLD_REG bit to
-always be set.
+Hi Heiko, Sylwester,
 
-There also seem to be no other modifications (additional register etc)
-present, so to keep the footprint low, add this small variant to the
-pltfm driver.
+On Thursday 13 of June 2013 01:52:05 Sylwester Nawrocki wrote:
+> On 06/13/2013 01:38 AM, Heiko St?bner wrote:
+> > Am Donnerstag, 13. Juni 2013, 01:13:47 schrieb Tomasz Figa:
+> >> Hi Olof,
+> >> 
+> >> On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
+> >>> On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
+> >>>>> Needs testing on other platforms as I could only compile test for
+> >>>>> them.
+> >>> 
+> >>> How/who can help here? WHo has and still cares for other affected
+> >>> platforms?
+> >>> 
+> >>>>> 66 files changed, 627 insertions(+), 1580 deletions(-)
+> >> 
+> >> I will try to test this on Exynos 4 at work, if I somehow manage to
+> >> find any way to use PWM on our boards (other than already-tested PWM
+> >> clocksource).
+> >> 
+> >> Unfortunately, except S3C6410, I don't have access to other
+> >> platforms, or at least I won't in any reasonable time.
+> >> 
+> >> If I remember correctly, in case of my watchdog support cleanup,
+> >> Kukjin
+> >> has been able to test it on S5P64x0.
+> >> 
+> >> Heiko and Sylwester used to have some s3c24xx-based boards, not sure
+> >> if
+> >> they still do and are interested in their support in mainline.
+> >> 
+> >> So all left is S5PC100 (for which I couldn't find anyone who cares)
+> >> and
+> >> Exynos5.
+> >> 
+> >>> Nice cleanup.
+> >> 
+> >> Thanks.
+> >> 
+> >>>> Any comments for this series?
+> >>> 
+> >>> Yes, above. :) In general looks good -- testing coverage is a bit of
+> >>> a
+> >>> concern.
+> >> 
+> >> Yeah. Unfortunately all I could do was testing on Tiny6410 and
+> >> compile
+> >> testing on others. I hope we find some really helpful people over
+> >> here who could waste a bit of their precious time for this museum.
+> >> ;)
+> > 
+> > I'll try to give it a testrun tomorrow. And my s3c2416 will always be
+> > the first-love-architecture for me ;-)
+> 
+> I'll likely test it tomorrow on a Mini2440 board, I was going to do it
+> earlier
+> but got distracted by plenty other things that needed attention too. At
+> least
+> that's one of the reasons I got the board - testing the cross-platform
+> cleanups
+> and ensuring they are not breaking the older platforms.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
----
-depends on "mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA"
- from Dinh Nguyen
+Thank you both for your support. Looking forward for testing results :)
 
- .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   23 ++++++++++++++++++++
- drivers/mmc/host/dw_mmc-pltfm.c                    |   21 +++++++++++++++++-
- 2 files changed, 43 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-
-diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-new file mode 100644
-index 0000000..8a3d91d
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
-@@ -0,0 +1,23 @@
-+* Rockchip specific extensions to the Synopsis Designware Mobile
-+  Storage Host Controller
-+
-+The Synopsis designware mobile storage host controller is used to interface
-+a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
-+differences between the core Synopsis dw mshc controller properties described
-+by synopsis-dw-mshc.txt and the properties used by the Rockchip specific
-+extensions to the Synopsis Designware Mobile Storage Host Controller.
-+
-+Required Properties:
-+
-+* compatible: should be
-+	- "rockchip,rk2928-dw-mshc": for Rockchip RK2928 and following
-+
-+Example:
-+
-+	rkdwmmc0 at 12200000 {
-+		compatible = "rockchip,rk2928-dw-mshc";
-+		reg = <0x12200000 0x1000>;
-+		interrupts = <0 75 0>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+	};
-diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-index 9b05381..3923ffd 100644
---- a/drivers/mmc/host/dw_mmc-pltfm.c
-+++ b/drivers/mmc/host/dw_mmc-pltfm.c
-@@ -24,6 +24,15 @@
- 
- #include "dw_mmc.h"
- 
-+static void dw_mci_rockchip_prepare_command(struct dw_mci *host, u32 *cmdr)
-+{
-+	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
-+}
-+
-+static const struct dw_mci_drv_data rockchip_drv_data = {
-+	.prepare_command	= dw_mci_rockchip_prepare_command,
-+};
-+
- int dw_mci_pltfm_register(struct platform_device *pdev,
- 				const struct dw_mci_drv_data *drv_data)
- {
-@@ -100,13 +109,23 @@ EXPORT_SYMBOL_GPL(dw_mci_pltfm_pmops);
- 
- static const struct of_device_id dw_mci_pltfm_match[] = {
- 	{ .compatible = "snps,dw-mshc", },
-+	{ .compatible = "rockchip,rk2928-dw-mshc",
-+		.data = &rockchip_drv_data },
- 	{},
- };
- MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
- 
- static int dw_mci_pltfm_probe(struct platform_device *pdev)
- {
--	return dw_mci_pltfm_register(pdev, NULL);
-+	const struct dw_mci_drv_data *drv_data = NULL;
-+	const struct of_device_id *match;
-+
-+	if (pdev->dev.of_node) {
-+		match = of_match_node(dw_mci_pltfm_match, pdev->dev.of_node);
-+		drv_data = match->data;
-+	}
-+
-+	return dw_mci_pltfm_register(pdev, drv_data);
- }
- 
- int dw_mci_pltfm_remove(struct platform_device *pdev)
--- 
-1.7.10.4
+Best regards,
+Tomasz
