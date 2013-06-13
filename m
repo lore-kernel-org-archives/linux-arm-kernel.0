@@ -1,326 +1,60 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 13 Jun 2013 20:43:26 +0200
-Subject: [PATCH v4 1/6] clk: samsung: Use clk->base instead of directly
- using clk->con0 for PLL3xxx
-In-Reply-To: <CAKew6eXxdanR-4aoWGAw3j2co+Kke4joWcXQ6xjZ3UTC1j-ycw@mail.gmail.com>
-References: <1370272196-4346-1-git-send-email-yadi.brar@samsung.com>
- <4909432.mh6TOzaEGM@flatron>
- <CAKew6eXxdanR-4aoWGAw3j2co+Kke4joWcXQ6xjZ3UTC1j-ycw@mail.gmail.com>
-Message-ID: <7229700.rehruK5g0S@flatron>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 13 Jun 2013 11:47:03 -0700
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306131035080.1561-100000@iolanthe.rowland.org>
+References: <CACVXFVP__N9o3xRMd5+sk5T0zeGcrSk41rxY6Tzi1AM-mHL81Q@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306131035080.1561-100000@iolanthe.rowland.org>
+Message-ID: <20130613184703.GA5701@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 of June 2013 00:05:31 Yadwinder Singh Brar wrote:
-> On Thu, Jun 13, 2013 at 3:00 PM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > On Thursday 13 of June 2013 12:32:05 Yadwinder Singh Brar wrote:
-> >> On Thu, Jun 13, 2013 at 3:32 AM, Andrew Bresticker
-> >> 
-> >> <abrestic@chromium.org> wrote:
-> >> > Doug,
-> >> > 
-> >> >>> Hmm, if done properly, it could simplify PLL registration in SoC
-> >> >>> clock
-> >> >>> initialization code a lot.
-> >> >>> 
-> >> >>> I'm not sure if this is really the best solution (feel free to
-> >> >>> suggest
-> >> >>> anything better), but we could put PLLs in an array, like other
-> >> >>> clocks,
-> >> >>> e.g.
-> >> >>> 
-> >> >>>         ... exynos4210_pll_clks[] = {
-> >> >>>         
-> >> >>>                 CLK_PLL45XX(...),
-> >> >>>                 CLK_PLL45XX(...),
-> >> >>>                 CLK_PLL46XX(...),
-> >> >>>                 CLK_PLL46XX(...),
-> >> >>>         
-> >> >>>         };
-> >> >>> 
-> >> >>> and then just call a helper like
-> >> >>> 
-> >> >>>         samsung_clk_register_pll(exynos4210_pll_clks,
-> >> >>>         
-> >> >>>                         ARRAY_SIZE(exynos4210_pll_clks));
-> >> >> 
-> >> >> Something like that looks like what I was thinking.  I'd have to
-> >> >> see
-> >> >> it actually coded up to see if there's something I'm missing that
-> >> >> would prevent us from doing that, but I don't see anything.
-> >> > 
-> >> > The only issue I see with this is that we may only want to register
-> >> > a
-> >> > rate table with a PLL only if fin_pll is running at a certain rate.
-> >> > On 5250 and 5420, for example, we have EPLL and VPLL rate tables
-> >> > that
-> >> > should only be registered if fin_pll is 24Mhz.  We may have to
-> >> > register those separately, but this approach seems fine otherwise.
-> >> 
-> >> As Andrew Bresticker said, we will face problem with different table,
-> >> and it will give some pain while handling such cases but I think
-> >> overall code may look better.
-> >> 
-> >> Similar thoughts were their in my mind also, but i didn't want to
-> >> disturb this series :).
-> > 
-> > Yes, I was thinking the same as well, but now that Exynos5420 doesn't
-> > follow the 0x100 register spacing, we have a problem :) .
-> > 
-> >> Anyways, I think we can do it now only rather going for incremental
-> >> patches after this series.
-> >> I was thinking to make samsung_clk_register_pllxxxx itself  little
-> >> generic instead
-> >> of using helper, as we are almost duplicating code for most PLLs.
-> >> 
-> >> A rough picture in my mind was,
-> >> After implementing  generic samung_clk_register_pll(), code may look
-> >> like below. Its just an idea, please feel free to correct it.
-> >> Later we can factor out other common clk.ops for PLLs also.
-> >> 
-> >> this diff is over this series.
-> >> Assuming a generic samung_clk_register_pll() is their(which i think
-> >> is
-> >> not impossible)
-> >> 8<-------------------------------------------------------------------
-> >> --- ----
-> >> 
-> >> --- a/drivers/clk/samsung/clk-exynos5250.c
-> >> +++ b/drivers/clk/samsung/clk-exynos5250.c
-> >> @@ -493,6 +493,20 @@ static __initdata struct samsung_pll_rate_table
-> >> epll_24mhz_tbl[] = {
-> >> 
-> >>         PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
-> >>  
-> >>  };
-> >> 
-> >> +struct __initdata samsung_pll_init_data samsung_plls[] = {
-> >> +       PLL(pll_3500, "fout_apll", "fin_pll", APLL_LOCK, APLL_CON0,
-> >> NULL), +       PLL(pll_3500, "fout_mpll", "fin_pll", MPLL_LOCK,
-> >> MPLL_CON0, NULL), +       PLL(pll_3500, "fout_bpll",
-> >> "fin_pll",BPLL_LOCK, BPLL_CON0, NULL), +       PLL(pll_3500,
-> >> "fout_gpll", "fin_pll",GPLL_LOCK, GPLL_CON0, NULL), +
-> >> PLL(pll_3500, "fout_cpll", "fin_pll",BPLL_LOCK, CPLL_CON0, NULL), +};
-> >> +
-> >> +struct __initdata samsung_pll_init_data epll_init_data =
-> >> +       PLL(pll_3600, "fout_epll", "fin_pll", EPLL_LOCK, EPLL_CON0,
-> >> NULL); +
-> >> +struct __initdata samsung_pll_init_data vpll_init_data =
-> >> +       PLL(pll_3600, "fout_epll", "fin_pll", VPLL_LOCK, VPLL_CON0,
-> >> NULL); +
-> > 
-> > This is mostly what I had in my mind. In addition I think I might have
-> > a solution for rate tables:
-> > 
-> > If we create another array
-> > 
-> >         struct samsung_pll_rate_table *rate_tables_24mhz[] = {
-> >         
-> >                 apll_rate_table_24mhz,
-> >                 mpll_rate_table_24mhz, /* can be NULL as well, if no
-> > 
-> > support for rate change */
-> > 
-> >                 epll_rate_table_24mhz,
-> >                 vpll_rate_table_24mhz,
-> >                 /* ... */
-> >         
-> >         };
-> > 
-> > which lists rate tables for given input frequency. This relies on
-> > making rate tables end with a sentinel, to remove the need of passing
-> > array sizes.
+On Thu, Jun 13, 2013 at 10:54:13AM -0400, Alan Stern wrote:
+> On Thu, 13 Jun 2013, Ming Lei wrote:
 > 
-> I think we may also have to make assumption that entries in the arrays
-> rate_tables_24mhz[] and samsung_plls[] should be in same order in
-> both arrays, and which may not be fair assumption, otherwise we
-> have to use some mechanism to identify which rate_table is for which
-> PLL, which will increase code and complexity.
-> Am I missed something or you are thinking something else?
-
-Yes, this is exactly what I thought. The order and size of 
-rate_tables_24mhz[] would have to be the same as of samsung_plls[], which 
-shouldn't be a problem technically, but adds another responsibility to the 
-person who defines them.
-
-> Any thoughts from Doug or others ?
+> > - using interrupt threaded handler(default)
+> >         33.440 MB/sec
+> > 
+> > - using tasklet(#undef USB_HCD_THREADED_IRQ)
+> >         34.29 MB/sec
+> > 
+> > - using hard interrupt handler(by removing HCD_BH in ehci-hcd.c )
+> >         34.260 MB/s
+> > 
+> > 
+> > So looks usb mass storage performance loss can be observed with
+> > interrupt threaded handler because one mass storage read/write sectors
+> > requires at least 3 interrupts which wake up usb-storage thread 3 times
+> > (each interrupt wakeup the usb-storage each time), introducing irq threaded
+> > handler will make 2 threads to be waken up about 6 times for one read/write.
+> > 
+> > I think usb mass storage transfer handler need to be rewritten, otherwise
+> > it may become worsen after using irq threaded handler in USB 3.0.(the
+> > above device can reach >120MB/sec with hardware handler or tasklet handler,
+> > which means about ~3K interrupts/sec, so ~6K contexts switch in case of
+> > using irq threaded handler)
+> > 
+> > So how about supporting tasklet first, then convert to interrupt
+> > threaded handler
+> > after usb mass storage transfer is rewritten without performance loss?
+> > (rewriting
+> > usb mass storage transfer handler may need some time and work since storage
+> > stability/correctness is extremely important, :-)
 > 
-> >>  /* register exynox5250 clocks */
-> >>  void __init exynos5250_clk_init(struct device_node *np)
-> >>  {
-> >> 
-> >> @@ -519,44 +533,22 @@ void __init exynos5250_clk_init(struct
-> >> device_node *np) samsung_clk_register_mux(exynos5250_pll_pmux_clks,
-> >> 
-> >>                         ARRAY_SIZE(exynos5250_pll_pmux_clks));
-> >> 
-> >> -       fin_pll_rate = _get_rate("fin_pll");
-> >> +       samsung_clk_register_pll(samsung_plls,
-> >> ARRAY_SIZE(samsung_plls)); +
-> > 
-> > ...and then pass it here like:
-> >         if (fin_pll_rate == 24 * MHZ) {
-> >         
-> >                 samsung_clk_register_pll(samsung_plls,
-> > 
-> > ARRAY_SIZE(samsung_plls), rate_tables_24mhz);
-> > 
-> >         } else {
-> >         
-> >                 /* warning or whatever */
-> >                 samsung_clk_register_pll(samsung_plls,
-> > 
-> > ARRAY_SIZE(samsung_plls), NULL);
-> > 
-> >         }
-> > 
-> > This way we could specify different rate tables depending on input
-> > frequency for a whole group of PLLs.
-> 
-> I think code lines or complexity will be same.
-> Also all PLLs may not have same parent.
+> Maybe we should simply copy what the networking people do.  They are 
+> very concerned about performance and latency; whatever technique they 
+> use should be good for USB too.
 
-Most of them usually do. Anyway, they can be grouped by the parent, e.g. 
-all that have fin_pll as input can use one set of arrays and other can 
-have their own set.
+Yes, but for "old-style" usb-storage, is this really a big deal?  We are
+still easily hitting the "line-speed" of USB for usb-storage with simple
+machines, the bottlenecks that I'm seeing are in the devices themselves,
+and then in the USB wire speed.
 
-> > The only thing I don't like here is having two separate arrays that
-> > need to have the same sizes. Feel free to improve (or discard) this
-> > idea, though.
-> 
-> Sorry, I didn't get your point. You are talking about which two arrays?
+Once hardware comes out that uses USB streams, and we get device support
+for the UAS protocol, then we might have a need to change things, but at
+this point in time, for the "old" driver, I think we are fine.
 
-I mean that the code would need to assume that
+Unless someone has a workload / benchmark that shows otherwise?
 
-samsung_plls[] and rate_tables_24mhz[]
+thanks,
 
-have the same sizes (and orders), which is not a perfect solution, but I 
-can't think of anything better at the moment.
-
-Best regards,
-Tomasz
-
-> Regards,
-> Yadwinder
-> 
-> > Best regards,
-> > Tomasz
-> > 
-> >>         vpllsrc = __clk_lookup("mout_vpllsrc");
-> >>         if (vpllsrc)
-> >>         
-> >>                 mout_vpllsrc_rate = clk_get_rate(vpllsrc);
-> >> 
-> >> -       apll = samsung_clk_register_pll35xx("fout_apll", "fin_pll",
-> >> -                       reg_base, NULL, 0);
-> >> -       mpll = samsung_clk_register_pll35xx("fout_mpll", "fin_pll",
-> >> -                       reg_base + 0x4000, NULL, 0);
-> >> -       bpll = samsung_clk_register_pll35xx("fout_bpll", "fin_pll",
-> >> -                       reg_base + 0x20010, NULL, 0);
-> >> -       gpll = samsung_clk_register_pll35xx("fout_gpll", "fin_pll",
-> >> -                       reg_base + 0x10050, NULL, 0);
-> >> -       cpll = samsung_clk_register_pll35xx("fout_cpll", "fin_pll",
-> >> -                       reg_base + 0x10020, NULL, 0);
-> >> -
-> >> +       fin_pll_rate = _get_rate("fin_pll");
-> >> 
-> >>         if (fin_pll_rate == (24 * MHZ)) {
-> >> 
-> >> -               epll = samsung_clk_register_pll36xx("fout_epll",
-> >> "fin_pll", -                               reg_base + 0x10030,
-> >> epll_24mhz_tbl, -
-> >> ARRAY_SIZE(epll_24mhz_tbl));
-> >> -       } else {
-> >> -               pr_warn("%s: valid epll rate_table missing for\n"
-> >> -                       "parent fin_pll:%lu hz\n", __func__,
-> >> fin_pll_rate); -               epll =
-> >> samsung_clk_register_pll36xx("fout_epll", "fin_pll", -
-> >> 
-> >>              reg_base + 0x10030, NULL, 0);
-> >> 
-> >> +               epll_init_data.rate_table =  epll_24mhz_tb;
-> >> 
-> >>         }
-> >> 
-> >> +       samsung_clk_register_pll(&fout_epll_data, 1);
-> >> 
-> >>         if (mout_vpllsrc_rate == (24 * MHZ)) {
-> >> 
-> >> -               vpll = samsung_clk_register_pll36xx("fout_vpll",
-> >> "mout_vpllsrc" -                       , reg_base + 0x10040,
-> >> vpll_24mhz_tbl,
-> >> -                       ARRAY_SIZE(vpll_24mhz_tbl));
-> >> -       } else {
-> >> -               pr_warn("%s: valid vpll rate_table missing for\n"
-> >> -                       "parent mout_vpllsrc_rate:%lu hz\n",
-> >> __func__,
-> >> -                       mout_vpllsrc_rate);
-> >> -               samsung_clk_register_pll36xx("fout_vpll",
-> >> "mout_vpllsrc", -                       reg_base + 0x10040, NULL, 0);
-> >> +               vpll_init_data.rate_table =  epll_24mhz_tb;
-> >> 
-> >>         }
-> >> 
-> >> +       samsung_clk_register_pll(&fout_epll_data, 1);
-> >> 
-> >>         samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
-> >>         
-> >>                         ARRAY_SIZE(exynos5250_fixed_rate_clks));
-> >> 
-> >> diff --git a/drivers/clk/samsung/clk-pll.h
-> >> b/drivers/clk/samsung/clk-pll.h index 4780e6c..3b02dc5 100644
-> >> --- a/drivers/clk/samsung/clk-pll.h
-> >> +++ b/drivers/clk/samsung/clk-pll.h
-> >> @@ -39,6 +39,39 @@ struct samsung_pll_rate_table {
-> >> 
-> >>         unsigned int kdiv;
-> >>  
-> >>  };
-> >> 
-> >> +#define PLL(_type, _name, _pname, _lock_reg, _con_reg, _rate_table)
-> >> \ +       {
-> >> 
-> >>   \ +               .type   =       _type,
-> >>   
-> >>     \ +               .name   =       _name,
-> >>     
-> >>       \ +               .parent_name =  _pname,
-> >>       
-> >>         \ +               .flags  =       CLK_GET_RATE_NOCACHE,
-> >>         
-> >>           \ +               .rate_table =   _rate_table,
-> >>           
-> >>             \ +               .con_reg =      _con_reg,
-> >>             
-> >>               \ +               .lock_reg =     _lock_reg,
-> >>               
-> >>                 \ +       }
-> >> 
-> >> +
-> >> +enum samsung_pll_type {
-> >> +       pll_3500,
-> >> +       pll_45xx,
-> >> +       pll_2550,
-> >> +       pll_3600,
-> >> +       pll_46xx,
-> >> +       pll_2660,
-> >> +};
-> >> +
-> >> +
-> >> +struct samsung_pll_init_data {
-> >> +       enum            samsung_pll_type type;
-> >> +       struct          samsung_pll_rate_table *rate_table;
-> >> +       const char      *name;
-> >> +       const char      *parent_name;
-> >> +       unsigned long   flags;
-> >> +       const void __iomem *con_reg;
-> >> +       const void __iomem *lock_reg;
-> >> +};
-> >> +
-> >> +extern int  __init samsung_clk_register_pll(struct
-> >> samsung_pll_init_data *data, +                               unsigned
-> >> int nr_pll);
-> >> +
-> >> 
-> >> Regards,
-> >> Yadwinder
+greg k-h
