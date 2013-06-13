@@ -1,69 +1,78 @@
-From: manjunath.goudar@linaro.org (Manjunath Goudar)
-Date: Thu, 13 Jun 2013 14:41:01 +0530
-Subject: [PATCH 10/10] USB: OHCI: Properly handle ohci-spear suspend
-In-Reply-To: <1371114661-2207-1-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1371114661-2207-1-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <1371114661-2207-11-git-send-email-manjunath.goudar@linaro.org>
+From: acourbot@nvidia.com (Alexandre Courbot)
+Date: Thu, 13 Jun 2013 18:12:24 +0900
+Subject: [PATCH v2 2/3] ARM: tegra: split setting of CPU reset handler
+In-Reply-To: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
+References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
+Message-ID: <1371114745-24710-3-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Suspend scenario in case of ohci-spear glue was not
-properly handled as it was not suspending generic part
-of ohci controller.Calling explicitly the ohci_suspend()
-routine in spear_ohci_hcd_drv_suspend() will ensure proper
-handling of suspend scenario.
+Not all Tegra devices need to set the CPU reset handler in the same way.
+In particular, devices using a TrustZone secure monitor cannot set the
+reset handler directly and need to do it through a firmware operation.
 
-V2:
- -Incase ohci_suspend() fails, return right away without
-  executing further.
+This patch separates the act of setting the reset handler from its
+preparation, so the former can be implemented in a different way.
 
-Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Alan Stern <stern@rowland.harvard.edu>
-Cc: Greg KH <greg@kroah.com>
-Cc: linux-usb at vger.kernel.org
+Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
 ---
- drivers/usb/host/ohci-spear.c |   16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/mach-tegra/reset.c | 27 +++++++++++++++++----------
+ 1 file changed, 17 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/usb/host/ohci-spear.c b/drivers/usb/host/ohci-spear.c
-index 31ff3fc..2ff867b 100644
---- a/drivers/usb/host/ohci-spear.c
-+++ b/drivers/usb/host/ohci-spear.c
-@@ -130,12 +130,22 @@ static int spear_ohci_hcd_drv_remove(struct platform_device *pdev)
- }
+diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
+index 1ac434e..6964117 100644
+--- a/arch/arm/mach-tegra/reset.c
++++ b/arch/arm/mach-tegra/reset.c
+@@ -33,26 +33,18 @@
  
- #if defined(CONFIG_PM)
--static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
-+static int spear_ohci_hcd_drv_suspend(struct platform_device *pdev,
- 		pm_message_t message)
+ static bool is_enabled;
+ 
+-static void __init tegra_cpu_reset_handler_enable(void)
++static void __init tegra_cpu_reset_handler_set(const u32 reset_address)
  {
--	struct usb_hcd *hcd = platform_get_drvdata(dev);
-+	struct usb_hcd *hcd = platform_get_drvdata(pdev);
- 	struct ohci_hcd	*ohci = hcd_to_ohci(hcd);
- 	struct spear_ohci *sohci_p = to_spear_ohci(hcd);
-+	bool do_wakeup = device_may_wakeup(&pdev->dev);
-+	int ret;
+-	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
+ 	void __iomem *evp_cpu_reset =
+ 		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
+ 	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
+ 	u32 reg;
+ 
+-	BUG_ON(is_enabled);
+-	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
+-
+-	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
+-			tegra_cpu_reset_handler_size);
+-
+ 	/*
+ 	 * NOTE: This must be the one and only write to the EVP CPU reset
+ 	 *       vector in the entire system.
+ 	 */
+-	writel(TEGRA_IRAM_RESET_BASE + tegra_cpu_reset_handler_offset,
+-			evp_cpu_reset);
++	writel(reset_address, evp_cpu_reset);
+ 	wmb();
+ 	reg = readl(evp_cpu_reset);
+ 
+@@ -66,6 +58,21 @@ static void __init tegra_cpu_reset_handler_enable(void)
+ 		writel(reg, sb_ctrl);
+ 		wmb();
+ 	}
++}
 +
-+	ret = ohci_suspend(hcd, do_wakeup);
-+	if (ret == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
-+		ohci_resume(hcd, false);
-+		ret = -EBUSY;
-+	}
-+	if (ret)
-+		return ret;
++static void __init tegra_cpu_reset_handler_enable(void)
++{
++	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
++	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
++						tegra_cpu_reset_handler_offset;
++
++	BUG_ON(is_enabled);
++	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
++
++	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
++			tegra_cpu_reset_handler_size);
++
++	tegra_cpu_reset_handler_set(reset_address);
  
- 	if (time_before(jiffies, ohci->next_statechange))
- 		msleep(5);
-@@ -143,7 +153,7 @@ static int spear_ohci_hcd_drv_suspend(struct platform_device *dev,
- 
- 	clk_disable_unprepare(sohci_p->clk);
- 
--	return 0;
-+	return ret;
+ 	is_enabled = true;
  }
- 
- static int spear_ohci_hcd_drv_resume(struct platform_device *dev)
 -- 
-1.7.9.5
+1.8.3
