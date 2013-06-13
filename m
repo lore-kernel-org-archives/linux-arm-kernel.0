@@ -1,29 +1,40 @@
 From: b42378@freescale.com (Nicolin Chen)
-Date: Thu, 13 Jun 2013 19:50:55 +0800
-Subject: [PATCH 0/9] Update imx6qdl dts/dtsi to support WM8962
-Message-ID: <cover.1371123426.git.b42378@freescale.com>
+Date: Thu, 13 Jun 2013 19:50:59 +0800
+Subject: [PATCH 4/9] ARM: dtsi: imx6dl: Add a pinctrl for AUDMUX
+In-Reply-To: <cover.1371123426.git.b42378@freescale.com>
+References: <cover.1371123426.git.b42378@freescale.com>
+Message-ID: <61023162fb7819ac181d57ab071a82b22bd7e2b2.1371123426.git.b42378@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-*** This branch of patches add WM8962 support in imx6q/dl-sabresd dts.
+Add a pinctrl for AUDMUX used on imx6dl-sabresd.
 
-Nicolin Chen (9):
-  ARM: clk-imx6qdl: Add clko1 configuration for imx6qdl-sabresd
-  ARM: dts: imx6qdl-sabresd: add clko1 iomux configuration
-  ARM: dtsi: imx6q/imx6dl: Add a pinctrl for I2C1
-  ARM: dtsi: imx6dl: Add a pinctrl for AUDMUX
-  ARM: dtsi: imx6qdl-sabresd: add a fixed regulator for WM8962
-  ARM: dtsi: imx6qdl-sabresd: Add WM8962 CODEC support
-  ARM: dtsi: imx6qdl-sabresd: Enable SSI2 and AUDMUX
-  ARM: dtsi: imx6qdl-sabresd: Enable WM8962 audio support
-  ARM: imx_v6_v7_defconfig: Enable imx-wm8962 by default
+Signed-off-by: Nicolin Chen <b42378@freescale.com>
+---
+ arch/arm/boot/dts/imx6dl.dtsi |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
- arch/arm/boot/dts/imx6dl-sabresd.dts   |    1 +
- arch/arm/boot/dts/imx6dl.dtsi          |   20 ++++++++++
- arch/arm/boot/dts/imx6q-sabresd.dts    |    1 +
- arch/arm/boot/dts/imx6q.dtsi           |    7 +++
- arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   66 ++++++++++++++++++++++++++++++++
- arch/arm/configs/imx_v6_v7_defconfig   |    2 +
- arch/arm/mach-imx/clk-imx6q.c          |    2 +
- arch/arm/mach-imx/mach-imx6q.c         |   42 ++++++++++++++++++++
- 8 files changed, 141 insertions(+), 0 deletions(-)
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 06bd544..023ac83 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -35,6 +35,17 @@
+ 				compatible = "fsl,imx6dl-iomuxc";
+ 				reg = <0x020e0000 0x4000>;
+ 
++				audmux {
++					pinctrl_audmux_2: audmux-2 {
++						fsl,pins = <
++							MX6DL_PAD_CSI0_DAT7__AUD3_RXD  0x80000000
++							MX6DL_PAD_CSI0_DAT4__AUD3_TXC  0x80000000
++							MX6DL_PAD_CSI0_DAT5__AUD3_TXD  0x80000000
++							MX6DL_PAD_CSI0_DAT6__AUD3_TXFS 0x80000000
++						>;
++					};
++				};
++
+ 				ecspi1 {
+ 					pinctrl_ecspi1_1: ecspi1grp-1 {
+ 						fsl,pins = <
+-- 
+1.7.1
