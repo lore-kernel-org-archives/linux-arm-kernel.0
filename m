@@ -1,48 +1,65 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 13 Jun 2013 21:22:44 +0200
-Subject: [PATCH] clocksource: samsung_pwm_timer: Do not request PWM mem region
-Message-ID: <1371151364-8121-1-git-send-email-tomasz.figa@gmail.com>
+From: tg@mirbsd.org (Thorsten Glaser)
+Date: Thu, 13 Jun 2013 19:16:26 +0000 (UTC)
+Subject: [PATCH 0/3] Use POSIX "$((..))" instead of bashism "$[...]"
+In-Reply-To: <1371129052-31506-1-git-send-email-geert@linux-m68k.org>
+References: <1371129052-31506-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <Pine.BSM.4.64L.1306131908240.22801@herc.mirbsd.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PWM registers are shared between clocksource and PWM drivers and so can
-not be claimed for exclusive use.
+Geert Uytterhoeven dixit:
 
-Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
----
- drivers/clocksource/samsung_pwm_timer.c | 11 +----------
- 1 file changed, 1 insertion(+), 10 deletions(-)
+>Should these be truncated to 32-bit explicitly, or is this a bug in mksh?
 
-diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
-index 0234c8d..553115b 100644
---- a/drivers/clocksource/samsung_pwm_timer.c
-+++ b/drivers/clocksource/samsung_pwm_timer.c
-@@ -404,7 +404,6 @@ void __init samsung_pwm_clocksource_init(void __iomem *base,
- static void __init samsung_pwm_alloc(struct device_node *np,
- 				     const struct samsung_pwm_variant *variant)
- {
--	struct resource res;
- 	struct property *prop;
- 	const __be32 *cur;
- 	u32 val;
-@@ -423,17 +422,9 @@ static void __init samsung_pwm_alloc(struct device_node *np,
- 		pwm.variant.output_mask |= 1 << val;
- 	}
- 
--	of_address_to_resource(np, 0, &res);
--	if (!request_mem_region(res.start,
--				resource_size(&res), "samsung-pwm")) {
--		pr_err("%s: failed to request IO mem region\n", __func__);
--		return;
--	}
--
--	pwm.base = ioremap(res.start, resource_size(&res));
-+	pwm.base = of_iomap(np, 0);
- 	if (!pwm.base) {
- 		pr_err("%s: failed to map PWM registers\n", __func__);
--		release_mem_region(res.start, resource_size(&res));
- 		return;
- 	}
- 
+mksh in ?mksh mode? operates specifically on 32-bit integer data
+types with defined wraparound and other guarantees beyond what
+POSIX does. There is an ?lksh? binary in the mksh binary package
+in Debian and derivates now, which is the ?legacy mode? that uses
+the host system?s ?long? data type, as POSIX demands, and is now
+(mksh_46-2) used for /bin/sh.
+
+However, on mixed 32/64-bit systems, /bin/sh can have either bit
+size. Additionally, it is not possible, in POSIX, without invoking
+ISO C ?Undefined Behaviour?, to find out the bitsize of the shell
+arithmetics.
+
+Furthermore, Linux can be cross-compiled, so when building kernels
+for 64-bit platforms on 32-bit systems, the arithmetics used MUST
+NOT overflow beyond a signed 32-bit ?long?.
+
+>  [1/3] h8300/boot: Use POSIX "$((..))" instead of bashism "$[...]"
+>  [2/3] ARM: shmobile: Use POSIX "$((..))" instead of bashism "$[...]"
+>  [3/3] sh/boot: Use POSIX "$((..))" instead of bashism "$[...]"
+
+Independent of the above, I?ve verified all three and can state
+that they
+? are no regression relative to existing behaviour
+? do not invoke any features not in POSIX $((?)) arithmetics
+? do not invoke any features not in mksh $((?)) arithmetics
+
+This means you can add my
+Signed-off: Thorsten Glaser <tg@mirbsd.org>
+
+However, I urge you to check whether any of these arithmetics
+can go beyond 32 bit. If they have even the slightest chance
+to do that, you MUST replace them by something different. One
+method could be to use bc(1):
+
+$(shell printf 'obase=16\nibase=16\n%s+%s\n' $(FOO) $(BAR) | bc)
+
+Another method could be to operate on the upper half and the
+lower half of the 64-bit quantities separately, assuming that
+calculations do not overflow (in POSIX sh, overflow is, like
+in ISO C, Undefined Behaviour; a C compiler is permitted to
+compile the source code in the shell that invokes it to run
+?rm -rf ~ /? instead) or carry over (e.g. if it?s known that
+the first half is always 0x7FFFFFFF or the last half always
+00000000 you can just add that as ?string?).
+
+bye,
+//mirabilos
 -- 
-1.8.2.1
+FWIW, I'm quite impressed with mksh interactively. I thought it was much
+*much* more bare bones. But it turns out it beats the living hell out of
+ksh93 in that respect. I'd even consider it for my daily use if I hadn't
+wasted half my life on my zsh setup. :-) -- Frank Terbeck in #!/bin/mksh
