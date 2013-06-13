@@ -1,55 +1,24 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Fri, 14 Jun 2013 01:37:11 +0300
-Subject: [PATCH 2/3] USB: OMAP: add omap-otg
-In-Reply-To: <20130612151326.GE15056@arwen.pp.htv.fi>
-References: <1370817606-1008-1-git-send-email-aaro.koskinen@iki.fi>
- <1370817606-1008-3-git-send-email-aaro.koskinen@iki.fi>
- <20130612151326.GE15056@arwen.pp.htv.fi>
-Message-ID: <20130613223711.GD18360@blackmetal.musicnaut.iki.fi>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Fri, 14 Jun 2013 00:44:15 +0200
+Subject: [PATCH 0/3] ARM: S3C24XX: s3c2416 build fixes
+Message-ID: <201306140044.15568.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+While testing Tomasz' timer series I came accross some small build problems
+in the new code for pinctrl and dt support on s3c24xx.
 
-On Wed, Jun 12, 2013 at 06:13:26PM +0300, Felipe Balbi wrote:
-> On Mon, Jun 10, 2013 at 01:40:05AM +0300, Aaro Koskinen wrote:
-> > +void omap_otg_set_mode(enum omap_otg_mode mode)
-> > +{
-> > +	if (!otg_dev) {
-> > +		WARN(1, "%s: controller not present\n", __func__);
-> > +		return;
-> > +	}
-> > +	mutex_lock(&otg_dev->serialize);
-> > +	switch (mode) {
-> > +	case OMAP_OTG_MODE_DEVICE:
-> > +		/*
-> > +		 * Set B-session valid.
-> > +		 */
-> > +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSVLD);
-> > +		break;
-> > +	case OMAP_OTG_MODE_HOST:
-> > +		/*
-> > +		 * Set A-session valid.
-> > +		 */
-> > +		omap_otg_ctrl(OMAP_OTG_ASESSVLD);
-> > +		break;
-> > +	case OMAP_OTG_MODE_DISCONNECT:
-> > +		/*
-> > +		 * Set B-session end to indicate no VBUS.
-> > +		 */
-> > +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSEND);
-> > +		break;
-> > +	default:
-> > +		WARN(1, "%s: unknown mode: %d\n", __func__, mode);
-> > +	}
-> > +	mutex_unlock(&otg_dev->serialize);
-> > +}
-> > +EXPORT_SYMBOL_GPL(omap_otg_set_mode);
-> 
-> looks like this should provide a extcon interface for its users.
+All 3 patches fix problems in the samsung tree, so should also go thru there.
 
-Is there any examples available? Anyway, I'll look into this.
+Heiko Stuebner (3):
+  gpio: samsung: add PINCTRL_S3C24XX to exclude options
+  pinctrl: s3c24xx: use correct header for chained_irq functions
+  ARM: S3C24XX: update uart addresses in s3c2416-dt auxdata
 
-Thanks,
+ arch/arm/mach-s3c24xx/mach-s3c2416-dt.c |    8 ++++----
+ drivers/gpio/gpio-samsung.c             |    3 ++-
+ drivers/pinctrl/pinctrl-s3c24xx.c       |    3 +--
+ 3 files changed, 7 insertions(+), 7 deletions(-)
 
-A.
+-- 
+1.7.10.4
