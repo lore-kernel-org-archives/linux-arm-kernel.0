@@ -1,31 +1,30 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Jun 2013 22:23:05 +0200
-Subject: [PATCH 12/39] ARM: u300: set up board power from device tree
-In-Reply-To: <20130601190203.GK16790@sirena.org.uk>
-References: <CACRpkdb=Z8oFpvxni6jyaWHoQOjhFkWQ_71ku=h5UFk9pzJZ2A@mail.gmail.com>
- <20130601190203.GK16790@sirena.org.uk>
-Message-ID: <CACRpkdbNQS-Rf1PSDKza1RRJyer2PoZidrpW5sQwG23=H0m5eQ@mail.gmail.com>
+Date: Thu, 13 Jun 2013 22:24:25 +0200
+Subject: [PATCH 31/39] ARM: u300: add syscon node
+In-Reply-To: <14733989.vf3LkZC316@wuerfel>
+References: <1369991954-17406-1-git-send-email-linus.walleij@stericsson.com>
+ <1369991954-17406-32-git-send-email-linus.walleij@stericsson.com>
+ <14733989.vf3LkZC316@wuerfel>
+Message-ID: <CACRpkdYWU2g0iK=kJO2E-Lj_0MRszUOVbfgFZN6s33KE8v02oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 1, 2013 at 9:02 PM, Mark Brown <broonie@kernel.org> wrote:
-> On Fri, May 31, 2013 at 04:02:34PM +0200, Linus Walleij wrote:
+On Fri, May 31, 2013 at 12:47 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+
+>>  compatible="stericsson,u300";
+>>
+>> +Required node: syscon
+>> +This contains the system controller.
+>> +- compatible: must be "stericsson,u300-syscon".
+>> +- reg: the base address and size of the system controller.
+>> +
 >
->> Mark: would you be OK with the ab3100 driver hogging one of its
->> own regulators?
->
-> I'm not sure what that means, sorry.  Could someone send a patch please?
+> Any reason why you are not making it compatible with "syscon", to use
+> the drivers/mfd/syscon.c driver?
 
-I've sent a patch so you can see what I mean by this.
-(Subject [PATCH 2/2] regulators: ab3100: bootstrap board power)
-
-It is changing the stuff proposed so far over to this way of
-doing things.
-
-If this approach is fine I'd prefer if we keep this on top of
-the stack instead of me going back to amend everything
-since it creates a messy rebase-hell for me. The end result
-is textually identical.
+I've proposed a patch for this and also altered the board
+power code to make use of it (it's the only instance that can
+use the syscon regmap do do its work so far).
 
 Yours,
 Linus Walleij
