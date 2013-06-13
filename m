@@ -1,68 +1,32 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 13 Jun 2013 11:42:26 +0800
-Subject: [PATCH 6/6] mtd: ofpart: add compatible check for child nodes
-In-Reply-To: <51B5C80D.2030303@cogentembedded.com>
-References: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
- <1370860014-1770-7-git-send-email-josh.wu@atmel.com>
- <51B5C80D.2030303@cogentembedded.com>
-Message-ID: <51B93FA2.7040206@atmel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Wed, 12 Jun 2013 21:45:27 -0600
+Subject: [GIT PULL 2/2] ARM: bcm2835: defconfig updates
+In-Reply-To: <1371095127-23847-1-git-send-email-swarren@wwwdotorg.org>
+References: <1371095127-23847-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1371095127-23847-2-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Sergei
+This enables gpio-leds and simplefb.
 
-On 6/10/2013 8:35 PM, Sergei Shtylyov wrote:
-> hello.
->
-> On 10-06-2013 14:26, Josh Wu wrote:
->
->> If the child node has compatible property then it is a driver not 
->> partition.
->
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>   drivers/mtd/ofpart.c |   14 +++++++++++++-
->>   1 file changed, 13 insertions(+), 1 deletion(-)
->
->
->> diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
->> index 553d6d6..61ce1f8 100644
->> --- a/drivers/mtd/ofpart.c
->> +++ b/drivers/mtd/ofpart.c
-> [...]
->> @@ -40,8 +44,13 @@ static int parse_ofpart_partitions(struct mtd_info 
->> *master,
->>       /* First count the subnodes */
->>       pp = NULL;
->>       nr_parts = 0;
->> -    while ((pp = of_get_next_child(node, pp)))
->> +    while ((pp = of_get_next_child(node, pp))) {
->
->    Assignment in *while*? Is scripts/checkpatch.pl happy about that?
+----------------------------------------------------------------
 
-yes, checkpatch.pl has no complain  ;-)
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
->
->> +        int len;
->
->    Empty line wouldn't hurt here, after declaration.
+  Linux 3.10-rc1
 
-Ok, as Brian said, I will no need to use a 'int len' here. So I will 
-remove those declaration.
+are available in the git repository at:
 
->
->> +        if (node_has_compatible(pp, &len))
->> +            continue;
->> +
->>           nr_parts++;
->> +    }
->>
->>       if (nr_parts == 0)
->>           return 0;
->
-> WBR, Sergei
->
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.11-defconfig
 
-Thanks.
-Best Regards,
-Josh Wu
+for you to fetch changes up to c321e7164493ac3684bfbb382d66a4a2416291fb:
+
+  ARM: bcm2835: defconfig updates
+
+----------------------------------------------------------------
+
+Stephen Warren (1):
+      ARM: bcm2835: defconfig updates
+
+ arch/arm/configs/bcm2835_defconfig |   19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
