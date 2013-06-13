@@ -1,38 +1,55 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Jun 2013 09:05:05 -0600
-Subject: [PATCH V2 2/2] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <CAMj5BkiV29fWkk6k_Q=5ThSS-4hitvNZv0MFi86f5O=1Ma3Dhg@mail.gmail.com>
-References: <1371067281-655-1-git-send-email-swarren@wwwdotorg.org>
- <1371067281-655-2-git-send-email-swarren@wwwdotorg.org>
- <CAMj5BkiV29fWkk6k_Q=5ThSS-4hitvNZv0MFi86f5O=1Ma3Dhg@mail.gmail.com>
-Message-ID: <51B9DFA1.7030001@wwwdotorg.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 13 Jun 2013 11:05:25 -0400 (EDT)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVOB1e6cptrXqbXyt_JxU7YnRp++HABvR90cG8rUMa2xog@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306131054420.1561-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2013 07:58 PM, zhangfei gao wrote:
-> On Thu, Jun 13, 2013 at 4:01 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-...
-> Hi, Setphen
-> 
-> We also met the issue: fail to reboot system from panic.
-> Solve it by the following change.
-> 
-> cpu_die is function kill cpu itself
-> cpu_kill is functoin to check whethe the cpu is dead or not
-> 
-> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+On Thu, 13 Jun 2013, Ming Lei wrote:
 
-> @@ -554,6 +554,9 @@ static void ipi_cpu_stop(unsigned int cpu)
-
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +       cpu_die();
-> +#endif
->         while (1)
->                 cpu_relax();
->  }
+> > For reasonably sophisticated host controllers like EHCI, the delay in
+> > responding to an interrupt doesn't matter much.  But for simpler host
 > 
-> What do you think?
+> EHCI might still benefit from the change: suppose uvc video is playing on
+> one EHCI bus, and mass storage's performance over another EHCI may
+> decrease because of the IRQ latency introduced.
 
-That probably works too, since it pairs cpu_die/cpu_kill, although the
-patch I sent ends up running less code during the halt/power_off/restart
-path, which seems like a good idea; less stuff to potentially break.
+If multiple CPUs are involved, then we could see an improvement in the 
+case where the two EHCI controllers share the same IRQ line.  With 
+different IRQs, though, everything would run in parallel on different 
+CPUs, so there is no advantage.
+
+> > At this point we are talking about multiple changes:
+> >
+> >         Moving the givebacks to a tasklet or threaded handler.
+> >
+> >         Changing the USB completion handlers so that they can be called
+> >         with interrupts enabled.
+> >
+> >         Allowing the tasklet/thread to run with interrupts enabled.
+> >
+> >         Moving more of the HCD processing into the tasklet/thread.
+> >
+> > Maybe other things too.  In principle, the first and second items can
+> > be done simultaneously.
+> 
+> Very good summery, we can push the 1st change with disabling local IRQ
+> when calling complete(), so that at least DMA unmapping can be done
+> with IRQ enabled, and at the same time do the API change, which
+> should be a bit slow but the mechanical way proposed by Oliver may
+> be OK.
+> 
+> The 3rd item is easy once the 1st two items are completed.
+> 
+> For the 4th one, it might be a long term thing, since refactoring
+> HCD interrupt handler is a bit complicated. Also, when the 1st
+> three items are completed, hard interrupt handler takes less time,
+> often less than 20us at average about EHCI, so I am wondering
+> if the 4th is worthy.
+
+Yes, I don't know about that.  If the time spent in the hardirq
+processing is reasonably short then moving it to the threaded handler
+won't help very much.
+
+Alan Stern
