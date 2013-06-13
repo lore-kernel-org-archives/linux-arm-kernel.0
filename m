@@ -1,46 +1,57 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 13 Jun 2013 15:43:43 +0200
-Subject: [PATCH 2/4] ARM: cfa10049: Switch the chip select pin of the LCD
- controller
+Date: Thu, 13 Jun 2013 15:43:42 +0200
+Subject: [PATCH 1/4] ARM: cfa10036: Add USB0 OTG port
 In-Reply-To: <1371131025-12200-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1371131025-12200-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1371131025-12200-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1371131025-12200-2-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brian Lilly <brian@crystalfontz.com>
-
-The early prototypes had the chip select pin for the LCD controller
-wired on the GPIO 3-23, while the production run of the CFA-10049 have
-this chip select on the GPIO 3-5.
-
-Signed-off-by: Brian Lilly <brian@crystalfontz.com>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/imx28-cfa10049.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx28-cfa10036.dts | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx28-cfa10049.dts b/arch/arm/boot/dts/imx28-cfa10049.dts
-index 063e620..fa91af5 100644
---- a/arch/arm/boot/dts/imx28-cfa10049.dts
-+++ b/arch/arm/boot/dts/imx28-cfa10049.dts
-@@ -33,7 +33,7 @@
- 						0x1163 /* MX28_PAD_LCD_D22__GPIO_1_22 */
- 						0x1173 /* MX28_PAD_LCD_D22__GPIO_1_23 */
- 						0x2153 /* MX28_PAD_SSP2_D5__GPIO_2_21 */
--						0x3173 /* MX28_PAD_LCD_RESET__GPIO_3_23 */
-+						0x3053 /* MX28_PAD_AUART1_TX__GPIO_3_5 */
- 					>;
- 					fsl,drive-strength = <0>;
+diff --git a/arch/arm/boot/dts/imx28-cfa10036.dts b/arch/arm/boot/dts/imx28-cfa10036.dts
+index 1594694..eae9c97 100644
+--- a/arch/arm/boot/dts/imx28-cfa10036.dts
++++ b/arch/arm/boot/dts/imx28-cfa10036.dts
+@@ -45,6 +45,17 @@
  					fsl,voltage = <1>;
-@@ -265,7 +265,7 @@
- 		gpio-sck = <&gpio2 16 0>;
- 		gpio-mosi = <&gpio2 17 0>;
- 		gpio-miso = <&gpio2 18 0>;
--		cs-gpios = <&gpio3 23 0>;
-+		cs-gpios = <&gpio3 5 0>;
- 		num-chipselects = <1>;
- 		#address-cells = <1>;
- 		#size-cells = <0>;
+ 					fsl,pull-up = <0>;
+ 				};
++
++				usb0_otg_cfa10036: otg-10036 at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						0x0142 /* MX28_PAD_GPMI_READY0__USB0_ID */
++					>;
++					fsl,drive-strength = <0>;
++					fsl,voltage = <1>;
++					fsl,pull-up = <0>;
++				};
++
+ 			};
+ 
+ 			ssp0: ssp at 80010000 {
+@@ -82,6 +93,18 @@
+ 					reset-gpios = <&gpio2 7 0>;
+ 				};
+ 			};
++
++			usbphy0: usbphy at 8007c000 {
++				status = "okay";
++			};
++		};
++	};
++
++	ahb at 80080000 {
++		usb0: usb at 80080000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&usb0_otg_cfa10036>;
++			status = "okay";
+ 		};
+ 	};
+ 
 -- 
 1.8.3
