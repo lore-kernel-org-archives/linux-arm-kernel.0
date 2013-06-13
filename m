@@ -1,20 +1,48 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Jun 2013 13:21:35 -0600
-Subject: [PATCH v2 2/3] ARM: tegra: split setting of CPU reset handler
-In-Reply-To: <1371114745-24710-3-git-send-email-acourbot@nvidia.com>
-References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
- <1371114745-24710-3-git-send-email-acourbot@nvidia.com>
-Message-ID: <51BA1BBF.6050106@wwwdotorg.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Thu, 13 Jun 2013 21:22:44 +0200
+Subject: [PATCH] clocksource: samsung_pwm_timer: Do not request PWM mem region
+Message-ID: <1371151364-8121-1-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2013 03:12 AM, Alexandre Courbot wrote:
-> Not all Tegra devices need to set the CPU reset handler in the same way.
+PWM registers are shared between clocksource and PWM drivers and so can
+not be claimed for exclusive use.
 
-s/need/can/ ?
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/clocksource/samsung_pwm_timer.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
 
-> In particular, devices using a TrustZone secure monitor cannot set the
-> reset handler directly and need to do it through a firmware operation.
-> 
-> This patch separates the act of setting the reset handler from its
-> preparation, so the former can be implemented in a different way.
+diff --git a/drivers/clocksource/samsung_pwm_timer.c b/drivers/clocksource/samsung_pwm_timer.c
+index 0234c8d..553115b 100644
+--- a/drivers/clocksource/samsung_pwm_timer.c
++++ b/drivers/clocksource/samsung_pwm_timer.c
+@@ -404,7 +404,6 @@ void __init samsung_pwm_clocksource_init(void __iomem *base,
+ static void __init samsung_pwm_alloc(struct device_node *np,
+ 				     const struct samsung_pwm_variant *variant)
+ {
+-	struct resource res;
+ 	struct property *prop;
+ 	const __be32 *cur;
+ 	u32 val;
+@@ -423,17 +422,9 @@ static void __init samsung_pwm_alloc(struct device_node *np,
+ 		pwm.variant.output_mask |= 1 << val;
+ 	}
+ 
+-	of_address_to_resource(np, 0, &res);
+-	if (!request_mem_region(res.start,
+-				resource_size(&res), "samsung-pwm")) {
+-		pr_err("%s: failed to request IO mem region\n", __func__);
+-		return;
+-	}
+-
+-	pwm.base = ioremap(res.start, resource_size(&res));
++	pwm.base = of_iomap(np, 0);
+ 	if (!pwm.base) {
+ 		pr_err("%s: failed to map PWM registers\n", __func__);
+-		release_mem_region(res.start, resource_size(&res));
+ 		return;
+ 	}
+ 
+-- 
+1.8.2.1
