@@ -1,89 +1,333 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Jun 2013 08:59:40 -0600
-Subject: [PATCH V2 2/2] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <20130613074551.GA7769@mudshark.cambridge.arm.com>
-References: <1371067281-655-1-git-send-email-swarren@wwwdotorg.org>
- <1371067281-655-2-git-send-email-swarren@wwwdotorg.org>
- <20130613074551.GA7769@mudshark.cambridge.arm.com>
-Message-ID: <51B9DE5C.9030904@wwwdotorg.org>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Thu, 13 Jun 2013 17:00:23 +0200
+Subject: [PATCH v4 2/4] arm: Add basic clocks for Rockchip rk3066a SoCs
+In-Reply-To: <201306131658.36584.heiko@sntech.de>
+References: <201306131658.36584.heiko@sntech.de>
+Message-ID: <201306131700.23376.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2013 01:45 AM, Will Deacon wrote:
-> Hi Stephen,
-> 
-> On Wed, Jun 12, 2013 at 09:01:21PM +0100, Stephen Warren wrote:
->> From: Stephen Warren <swarren@nvidia.com>
->>
->> Add comments to machine_shutdown()/halt()/power_off()/restart() that
->> describe their purpose and/or requirements re: CPUs being active/not.
->>
->> In machine_shutdown(), replace the call to smp_send_stop() with a call to
->> disable_nonboot_cpus(). This completely disables all but one CPU, thus
->> satisfying the requirement that only a single CPU be active for kexec.
->> Adjust Kconfig dependencies for this change.
->>
->> In machine_halt()/power_off()/restart(), call smp_send_stop() directly,
->> rather than via machine_shutdown(); these functions don't need to
->> completely de-activate all CPUs using hotplug, but rather just quiesce
->> them.
->>
->> Remove smp_kill_cpus(), and its call from smp_send_stop().
->> smp_kill_cpus() was indirectly calling smp_ops.cpu_kill() without calling
->> smp_ops.cpu_die() on the target CPUs first. At least some implementations
->> of smp_ops had issues with this; it caused cpu_kill() to hang on Tegra,
->> for example. Since smp_send_stop() is only used for shutdown, halt, and
->> power-off, there is no need to attempt any kind of CPU hotplug here.
->>
->> Adjust Kconfig to reflect that machine_shutdown() (and hence kexec)
->> relies upon disable_nonboot_cpus(). However, this alone doesn't guarantee
->> that hotplug will work, or even that hotplug is implemented for a
->> particular piece of HW that a multi-platform zImage runs on. Hence, add
->> error-checking to machine_kexec() to determine whether it did work.
+This adds a basic clock setup for rk3066a SoCs. Only the gates are
+set up currently, as the mux and dividers should use the upcoming
+generic devicetree bindings.
 
->> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+Clocks whose rates need to be known are supplied by fixed-rate
+"dummy"-clocks that provide the correct rate. This is uncritical insofar
+that the only bootloader currently in existence for Rockchip devices
+is the propietary Rockchip one that always setups the clocks in the
+necessary way.
 
->> +/*
->> + * Called by kexec, immediately prior to machine_kexec().
->> + *
->> + * This must completely disable all secondary CPUs; simply causing those CPUs
->> + * to execute e.g. a RAM-based pin loop is not sufficient. This allows the
->> + * kexec'd kernel to use any and all RAM as it sees fit, without having to
->> + * avoid any code or data used by any SW CPU pin loop. The CPU hotplug
->> + * functionality embodied in disable_nonboot_cpus() to achieve this.
->> + */
->>  void machine_shutdown(void)
->>  {
->> -#ifdef CONFIG_SMP
->> -	smp_send_stop();
->> -#endif
->> +	disable_nonboot_cpus();
->>  }
-> 
-> Any reason not to move this into machine_kexec and leave machine_shutdown
-> as a nop?
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3066a-clocks.dtsi |  300 +++++++++++++++++++++++++++++++++
+ 1 file changed, 300 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3066a-clocks.dtsi
 
-Well, the function needs to exist to link the kernel, so I figured it
-may as well do something:-)
-
-Judging by the function names, it seems like machine_shutdown() should
-put the machine into a state where kexec can work, and machine_kexec()
-should do the final "jump". That matches doing disable_nonboot_cpus() in
-here. I don't know much about KEXEC_JUMP, but if it were ever
-implemented for ARM, I'm not sure we'd want to do the
-disable_nonboot_cpus() in that case(?), and machine_shutdown() is called
-if !KEXEC_JUMP, but machine_kexec() is called for both.
-
-It also means I get to put that comment right there, which is next to
-the equivalent commands for machine_halt/power_off/restart, rather than
-in some completely different place in machine_kexec.c.
-
-> Anyway, I'm on holiday without internet until Tuesday, so for these two
-> patches:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
-
-Thanks!
-
-Russell, does this look good to you? I assume I should put this into the
-ARM patch tracker.
+diff --git a/arch/arm/boot/dts/rk3066a-clocks.dtsi b/arch/arm/boot/dts/rk3066a-clocks.dtsi
+new file mode 100644
+index 0000000..bdbe18a
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3066a-clocks.dtsi
+@@ -0,0 +1,300 @@
++/*
++ * Copyright (c) 2013 MundoReader S.L.
++ * Author: Heiko Stuebner <heiko@sntech.de>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/ {
++	clocks {
++		compatible = "rockchip,clocks";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/*
++		 * This is a dummy clock, to be used as placeholder on
++		 * other mux clocks when a specific parent clock is not
++		 * yet implemented. It should be dropped when the driver
++		 * is complete.
++		 */
++		dummy: dummy {
++			compatible = "fixed-clock";
++			clock-frequency = <0>;
++			#clock-cells = <0>;
++		};
++
++		xin24m: xin24m {
++			compatible = "fixed-clock";
++			clock-frequency = <24000000>;
++			#clock-cells = <0>;
++		};
++
++		dummy48m: dummy48m {
++			compatible = "fixed-clock";
++			clock-frequency = <48000000>;
++			#clock-cells = <0>;
++		};
++
++		dummy150m: dummy150m {
++			compatible = "fixed-clock";
++			clock-frequency = <150000000>;
++			#clock-cells = <0>;
++		};
++
++		clk_gates0: gate-clk at 200000d0 {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000d0 0x4>;
++			clocks = <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>;
++
++			clock-output-names =
++				"gate_core_periph", "gate_cpu_gpll",
++				"gate_ddrphy", "gate_aclk_cpu",
++				"gate_hclk_cpu", "gate_pclk_cpu",
++				"gate_atclk_cpu", "gate_i2s0",
++				"gate_i2s0_frac", "gate_i2s1",
++				"gate_i2s1_frac", "gate_i2s2",
++				"gate_i2s2_frac", "gate_spdif",
++				"gate_spdif_frac", "gate_testclk";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates1: gate-clk at 200000d4 {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000d4 0x4>;
++			clocks = <&xin24m>, <&xin24m>,
++				 <&xin24m>, <&dummy>,
++				 <&dummy>, <&xin24m>,
++				 <&xin24m>, <&dummy>,
++				 <&xin24m>, <&dummy>,
++				 <&xin24m>, <&dummy>,
++				 <&xin24m>, <&dummy>,
++				 <&xin24m>, <&dummy>;
++
++			clock-output-names =
++				"gate_timer0", "gate_timer1",
++				"gate_timer2", "gate_jtag",
++				"gate_aclk_lcdc1_src", "gate_otgphy0",
++				"gate_otgphy1", "gate_ddr_gpll",
++				"gate_uart0", "gate_frac_uart0",
++				"gate_uart1", "gate_frac_uart1",
++				"gate_uart2", "gate_frac_uart2",
++				"gate_uart3", "gate_frac_uart3";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates2: gate-clk at 200000d8 {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000d8 0x4>;
++			clocks = <&clk_gates2 1>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&clk_gates2 3>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy48m>,
++				 <&dummy>, <&dummy48m>,
++				 <&dummy>, <&dummy>;
++
++			clock-output-names =
++				"gate_periph_src", "gate_aclk_periph",
++				"gate_hclk_periph", "gate_pclk_periph",
++				"gate_smc", "gate_mac",
++				"gate_hsadc", "gate_hsadc_frac",
++				"gate_saradc", "gate_spi0",
++				"gate_spi1", "gate_mmc0",
++				"gate_mac_lbtest", "gate_mmc1",
++				"gate_emmc", "gate_tsadc";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates3: gate-clk at 200000dc {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000dc 0x4>;
++			clocks = <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&dummy>;
++
++			clock-output-names =
++				"gate_aclk_lcdc0_src", "gate_dclk_lcdc0",
++				"gate_dclk_lcdc1", "gate_pclkin_cif0",
++				"gate_pclkin_cif1", "reserved",
++				"reserved", "gate_cif0_out",
++				"gate_cif1_out", "gate_aclk_vepu",
++				"gate_hclk_vepu", "gate_aclk_vdpu",
++				"gate_hclk_vdpu", "gate_gpu_src",
++				"reserved", "gate_xin27m";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates4: gate-clk at 200000e0 {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000e0 0x4>;
++			clocks = <&clk_gates2 2>, <&clk_gates2 3>,
++				 <&clk_gates2 1>, <&clk_gates2 1>,
++				 <&clk_gates2 1>, <&clk_gates2 2>,
++				 <&clk_gates2 2>, <&clk_gates2 2>,
++				 <&clk_gates0 4>, <&clk_gates0 4>,
++				 <&clk_gates0 3>, <&clk_gates0 3>,
++				 <&clk_gates0 3>, <&clk_gates2 3>,
++				 <&clk_gates0 4>;
++
++			clock-output-names =
++				"gate_hclk_peri_axi_matrix", "gate_pclk_peri_axi_matrix",
++				"gate_aclk_cpu_peri", "gate_aclk_peri_axi_matrix",
++				"gate_aclk_pei_niu", "gate_hclk_usb_peri",
++				"gate_hclk_peri_ahb_arbi", "gate_hclk_emem_peri",
++				"gate_hclk_cpubus", "gate_hclk_ahb2apb",
++				"gate_aclk_strc_sys", "gate_aclk_l2mem_con",
++				"gate_aclk_intmem", "gate_pclk_tsadc",
++				"gate_hclk_hdmi";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates5: gate-clk at 200000e4 {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000e4 0x4>;
++			clocks = <&clk_gates0 3>, <&clk_gates2 1>,
++				 <&clk_gates0 5>, <&clk_gates0 5>,
++				 <&clk_gates0 5>, <&clk_gates0 5>,
++				 <&clk_gates0 4>, <&clk_gates0 5>,
++				 <&clk_gates2 1>, <&clk_gates2 2>,
++				 <&clk_gates2 2>, <&clk_gates2 2>,
++				 <&clk_gates2 2>, <&clk_gates4 5>,
++				 <&clk_gates4 5>, <&dummy>;
++
++			clock-output-names =
++				"gate_aclk_dmac1", "gate_aclk_dmac2",
++				"gate_pclk_efuse", "gate_pclk_tzpc",
++				"gate_pclk_grf", "gate_pclk_pmu",
++				"gate_hclk_rom", "gate_pclk_ddrupctl",
++				"gate_aclk_smc", "gate_hclk_nandc",
++				"gate_hclk_mmc0", "gate_hclk_mmc1",
++				"gate_hclk_emmc", "gate_hclk_otg0",
++				"gate_hclk_otg1", "gate_aclk_gpu";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates6: gate-clk at 200000e8 {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000e8 0x4>;
++			clocks = <&clk_gates3 0>, <&clk_gates0 4>,
++				 <&clk_gates0 4>, <&clk_gates1 4>,
++				 <&clk_gates0 4>, <&clk_gates3 0>,
++				 <&clk_gates0 4>, <&clk_gates1 4>,
++				 <&clk_gates3 0>, <&clk_gates0 4>,
++				 <&clk_gates0 4>, <&clk_gates1 4>,
++				 <&clk_gates0 4>, <&clk_gates3 0>,
++				 <&dummy>, <&dummy>;
++
++			clock-output-names =
++				"gate_aclk_lcdc0", "gate_hclk_lcdc0",
++				"gate_hclk_lcdc1", "gate_aclk_lcdc1",
++				"gate_hclk_cif0", "gate_aclk_cif0",
++				"gate_hclk_cif1", "gate_aclk_cif1",
++				"gate_aclk_ipp", "gate_hclk_ipp",
++				"gate_hclk_rga", "gate_aclk_rga",
++				"gate_hclk_vio_bus", "gate_aclk_vio0",
++				"gate_aclk_vcodec", "gate_shclk_vio_h2h";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates7: gate-clk at 200000ec {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000ec 0x4>;
++			clocks = <&clk_gates2 2>, <&clk_gates0 4>,
++				 <&clk_gates0 4>, <&clk_gates0 4>,
++				 <&clk_gates0 4>, <&clk_gates2 2>,
++				 <&clk_gates2 2>, <&clk_gates0 5>,
++				 <&clk_gates0 5>, <&clk_gates0 5>,
++				 <&clk_gates0 5>, <&clk_gates2 3>,
++				 <&clk_gates2 3>, <&clk_gates2 3>,
++				 <&clk_gates2 3>, <&clk_gates2 3>;
++
++			clock-output-names =
++				"gate_hclk_emac", "gate_hclk_spdif",
++				"gate_hclk_i2s0_2ch", "gate_hclk_i2s1_2ch",
++				"gate_hclk_i2s_8ch", "gate_hclk_hsadc",
++				"gate_hclk_pidf", "gate_pclk_timer0",
++				"gate_pclk_timer1", "gate_pclk_timer2",
++				"gate_pclk_pwm01", "gate_pclk_pwm23",
++				"gate_pclk_spi0", "gate_pclk_spi1",
++				"gate_pclk_saradc", "gate_pclk_wdt";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates8: gate-clk at 200000f0 {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000f0 0x4>;
++			clocks = <&clk_gates0 5>, <&clk_gates0 5>,
++				 <&clk_gates2 3>, <&clk_gates2 3>,
++				 <&clk_gates0 5>, <&clk_gates0 5>,
++				 <&clk_gates2 3>, <&clk_gates2 3>,
++				 <&clk_gates2 3>, <&clk_gates0 5>,
++				 <&clk_gates0 5>, <&clk_gates0 5>,
++				 <&clk_gates2 3>, <&clk_gates2 3>,
++				 <&dummy>, <&clk_gates0 5>;
++
++			clock-output-names =
++				"gate_pclk_uart0", "gate_pclk_uart1",
++				"gate_pclk_uart2", "gate_pclk_uart3",
++				"gate_pclk_i2c0", "gate_pclk_i2c1",
++				"gate_pclk_i2c2", "gate_pclk_i2c3",
++				"gate_pclk_i2c4", "gate_pclk_gpio0",
++				"gate_pclk_gpio1", "gate_pclk_gpio2",
++				"gate_pclk_gpio3", "gate_pclk_gpio4",
++				"reserved", "gate_pclk_gpio6";
++
++			#clock-cells = <1>;
++		};
++
++		clk_gates9: gate-clk at 200000f4 {
++			compatible = "rockchip,rk2928-gate-clk";
++			reg = <0x200000f4 0x4>;
++			clocks = <&dummy>, <&clk_gates0 5>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>, <&clk_gates1 4>,
++				 <&clk_gates0 5>, <&dummy>,
++				 <&dummy>, <&dummy>,
++				 <&dummy>;
++
++			clock-output-names =
++				"gate_clk_core_dbg", "gate_pclk_dbg",
++				"gate_clk_trace", "gate_atclk",
++				"gate_clk_l2c", "gate_aclk_vio1",
++				"gate_pclk_publ", "gate_aclk_intmem0",
++				"gate_aclk_intmem1", "gate_aclk_intmem2",
++				"gate_aclk_intmem3";
++
++			#clock-cells = <1>;
++		};
++	};
++
++};
+-- 
+1.7.10.4
