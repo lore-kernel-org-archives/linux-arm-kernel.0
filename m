@@ -1,68 +1,69 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:54 +0900
-Subject: [PATCH 04/11] ARM: shmobile: r8a7778: add support I2C clock
+Date: Thu, 13 Jun 2013 16:00:58 +0900
+Subject: [PATCH 08/11] ARM: shmobile: r8a7778: add support HSPI driver
 In-Reply-To: <1371106861-25626-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371106861-25626-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106861-25626-5-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106861-25626-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This patch adds r8a7778 I2C clock support.
-It also adds peripheral_clk which is requiested
-from i2c-rcar driver
+Add a platform device for the r8a7778 HSPI.
 
 Signed-off-by: Yusuke Goda <yusuke.goda.sx@renesas.com>
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/clock-r8a7778.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ arch/arm/mach-shmobile/include/mach/r8a7778.h |  1 +
+ arch/arm/mach-shmobile/setup-r8a7778.c        | 23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
-index b251e4d..1386c59 100644
---- a/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -105,7 +105,8 @@ static struct clk *main_clks[] = {
- enum {
- 	MSTP323, MSTP322, MSTP321,
- 	MSTP114,
--	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
-+	MSTP030,
-+	MSTP029, MSTP028, MSTP027, MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
+diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+index 9e5835b..af668c4 100644
+--- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
++++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
+@@ -25,6 +25,7 @@ extern void r8a7778_add_standard_devices(void);
+ extern void r8a7778_add_standard_devices_dt(void);
+ extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
+ extern void r8a7778_add_i2c_device(int id);
++extern void r8a7778_add_hspi_device(int id);
  
-@@ -114,6 +115,10 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP322] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 22, 0), /* SDHI1 */
- 	[MSTP321] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 21, 0), /* SDHI2 */
- 	[MSTP114] = SH_CLK_MSTP32(&p_clk, MSTPCR1, 14, 0), /* Ether */
-+	[MSTP030] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 30, 0), /* I2C0 */
-+	[MSTP029] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 29, 0), /* I2C1 */
-+	[MSTP028] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 28, 0), /* I2C2 */
-+	[MSTP027] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 27, 0), /* I2C3 */
- 	[MSTP026] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 24, 0), /* SCIF2 */
-@@ -125,11 +130,18 @@ static struct clk mstp_clks[MSTP_NR] = {
- };
+ extern void r8a7778_init_delay(void);
+ extern void r8a7778_init_irq(void);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
+index 6625a38..a1e6930 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7778.c
++++ b/arch/arm/mach-shmobile/setup-r8a7778.c
+@@ -151,6 +151,29 @@ void __init r8a7778_add_i2c_device(int id)
+ 		i2c_resources + (2 * id), 2);
+ }
  
- static struct clk_lookup lookups[] = {
-+	/* main */
-+	CLKDEV_CON_ID("peripheral_clk",	&p_clk),
++/* HSPI */
++static struct resource hspi_resources[] __initdata = {
++	/* HSPI0 */
++	DEFINE_RES_MEM(0xfffc7000, 0x18),
++	DEFINE_RES_IRQ(gic_iid(0x5f)),
++	/* HSPI1 */
++	DEFINE_RES_MEM(0xfffc8000, 0x18),
++	DEFINE_RES_IRQ(gic_iid(0x74)),
++	/* HSPI2 */
++	DEFINE_RES_MEM(0xfffc6000, 0x18),
++	DEFINE_RES_IRQ(gic_iid(0x75)),
++};
 +
- 	/* MSTP32 clocks */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.0", &mstp_clks[MSTP323]), /* SDHI0 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
- 	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
-+	CLKDEV_DEV_ID("i2c-rcar.0", &mstp_clks[MSTP030]), /* I2C0 */
-+	CLKDEV_DEV_ID("i2c-rcar.1", &mstp_clks[MSTP029]), /* I2C1 */
-+	CLKDEV_DEV_ID("i2c-rcar.2", &mstp_clks[MSTP028]), /* I2C2 */
-+	CLKDEV_DEV_ID("i2c-rcar.3", &mstp_clks[MSTP027]), /* I2C3 */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
++void __init r8a7778_add_hspi_device(int id)
++{
++	BUG_ON(id < 0 || id > 2);
++
++	platform_device_register_simple(
++		"sh-hspi", id,
++		hspi_resources + (2 * id), 2);
++}
++
++
+ void __init r8a7778_add_standard_devices(void)
+ {
+ 	int i;
 -- 
 1.8.2.1
