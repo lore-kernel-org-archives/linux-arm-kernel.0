@@ -1,37 +1,58 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Jun 2013 04:15:39 -0700
-Subject: [GIT PULL 6/6] omap5 data for v3.11 merge window
-In-Reply-To: <51B8DA4A.3020106@ti.com>
-References: <E1Umpk8-0005eT-9e@merlin.infradead.org> <51B8DA4A.3020106@ti.com>
-Message-ID: <20130613111538.GE8164@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 13 Jun 2013 12:19:03 +0100
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <20130612230057.GY18614@n2100.arm.linux.org.uk>
+References: <CAF6AEGvAqF=SbxW=D_ymbW+w9SEqfouxPsVZEsctdk-iM79L5w@mail.gmail.com>
+ <CAPM=9twJGgYiXxQyaXCnYd+bUPFv+P92qGdmJ39_4z29==4F2g@mail.gmail.com>
+ <20130610233611.GK18614@n2100.arm.linux.org.uk>
+ <CAPM=9tz6p2rhjNUg7ednT09A+dztbYskF32QkZeaCi_qrH8ipw@mail.gmail.com>
+ <20130612134845.GQ18614@n2100.arm.linux.org.uk>
+ <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
+ <20130612164914.GT18614@n2100.arm.linux.org.uk>
+ <20130612170512.GU18614@n2100.arm.linux.org.uk>
+ <20130612194021.GX18614@n2100.arm.linux.org.uk>
+ <20130612230057.GY18614@n2100.arm.linux.org.uk>
+Message-ID: <20130613111903.GA18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [130612 13:36]:
-> On Wednesday 12 June 2013 02:24 PM, Tony Lindgren wrote:
-> > The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
-> > 
-> >   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/omap5-signed
-> > 
-> > for you to fetch changes up to 6503a8e109a639760408f874c1251060d563942e:
-> > 
-> >   ARM: OMAP5: Remove unused include for ocp2scp (2013-06-09 21:17:15 -0700)
-> > 
-> > ----------------------------------------------------------------
-> 
-> [..]
-> 
-> > Basic test logs are available here, although not for OMAP5,
-> > since I don't have an OMAP5 board:
-> You happen to mention that you got one OMAP5 board form David A ?
+And another issue...
 
-Oh yes I got one from David thanks, but these are the comments from
-Paul's signed tag though, not my comments.
+What is drm_crtc_helper_set_mode() passed as the fb argument?  Is it
+the old fb, or the new fb?
 
-Regards,
+bool drm_crtc_helper_set_mode(struct drm_crtc *crtc,
+                              struct drm_display_mode *mode,
+                              int x, int y,
+                              struct drm_framebuffer *old_fb)
+...
+int drm_crtc_helper_set_config(struct drm_mode_set *set)
+{
+...
+        save_set.fb = set->crtc->fb;
+...
+                        old_fb = set->crtc->fb;
+                        set->crtc->fb = set->fb;
+                        if (!drm_crtc_helper_set_mode(set->crtc, set->mode,
+                                                      set->x, set->y,
+                                                      old_fb)) {
+...
+        /* Try to restore the config */
+        if (mode_changed &&
+            !drm_crtc_helper_set_mode(save_set.crtc, save_set.mode, save_set.x,
+                                      save_set.y, save_set.fb))
+}
+...
+int drm_helper_resume_force_mode(struct drm_device *dev)
+{
+...
+                ret = drm_crtc_helper_set_mode(crtc, &crtc->mode,
+                                               crtc->x, crtc->y, crtc->fb);
 
-Tony
+The function prototype implies it's the old fb, as does the first use.
+The second and third uses of it clearly show it being the fb which we
+wish to be displayed.
+
+The deeper I look, the more bugs there seem to be in this DRM stuff,
+and I'm continuing to look because I'm chasing a framebuffer refcount
+bug.
