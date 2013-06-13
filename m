@@ -1,102 +1,85 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Thu, 13 Jun 2013 02:01:43 +0200
-Subject: [RFC PATCH v3 2/2] drivers: mfd: vexpress: add Serial Power
- Controller (SPC) support
-In-Reply-To: <1370512763-32200-3-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1370512763-32200-3-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20130613000143.GB4567@zurbaran>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Jun 2013 17:10:14 -0700
+Subject: [PATCH] ARM: sched_clock: Load cycle count after epoch stabilizes
+Message-ID: <1371082214-1119-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+There is a small race between when the cycle count is read from
+the hardware and when the epoch stabilizes. Consider this
+scenario:
 
-I don't particularily like this code, but I guess most of my dislike
-comes from the whole bridge interface API and how that forces you into
-implementing pretty much static code.
-A few nitpicks:
+ CPU0                           CPU1
+ ----                           ----
+ cyc = read_sched_clock()
+ cyc_to_sched_clock()
+                                 update_sched_clock()
+                                  ...
+                                  cd.epoch_cyc = cyc;
+  epoch_cyc = cd.epoch_cyc;
+  ...
+  epoch_ns + cyc_to_ns((cyc - epoch_cyc)
 
-On Thu, Jun 06, 2013 at 10:59:23AM +0100, Lorenzo Pieralisi wrote:
-> diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
-> index d54e985..391eda1 100644
-> --- a/drivers/mfd/Kconfig
-> +++ b/drivers/mfd/Kconfig
-> @@ -1148,3 +1148,10 @@ config VEXPRESS_CONFIG
->  	help
->  	  Platform configuration infrastructure for the ARM Ltd.
->  	  Versatile Express.
-> +
-> +config VEXPRESS_SPC
-> +	bool "Versatile Express SPC driver support"
-> +	depends on ARM
-> +	depends on VEXPRESS_CONFIG
-> +	help
-Please provide a detailed help entry here. 
+The cyc on cpu0 was read before the epoch changed. But we
+calculate the nanoseconds based on the new epoch by subtracting
+the new epoch from the old cycle count. Since epoch is most likely
+larger than the old cycle count we calculate a large number that
+will be converted to nanoseconds and added to epoch_ns, causing
+time to jump forward too much.
 
+Fix this problem by reading the hardware after the epoch has
+stabilized.
 
-> +	  Serial Power Controller driver for ARM Ltd. test chips.
-> diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
-> index 718e94a..3a01203 100644
-> --- a/drivers/mfd/Makefile
-> +++ b/drivers/mfd/Makefile
-> @@ -153,5 +153,6 @@ obj-$(CONFIG_MFD_SEC_CORE)	+= sec-core.o sec-irq.o
->  obj-$(CONFIG_MFD_SYSCON)	+= syscon.o
->  obj-$(CONFIG_MFD_LM3533)	+= lm3533-core.o lm3533-ctrlbank.o
->  obj-$(CONFIG_VEXPRESS_CONFIG)	+= vexpress-config.o vexpress-sysreg.o
-> +obj-$(CONFIG_VEXPRESS_SPC)	+= vexpress-spc.o
-So you have Versatile Express platforms that will not need SPC ? i.e.
-why isn't all that stuff under a generic CONFIG_VEXPRESS symbol ?
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
+Found this while reading through the code. I haven't actually
+seen it in practice but I think it's real.
 
+ arch/arm/kernel/sched_clock.c | 13 +++++--------
+ 1 file changed, 5 insertions(+), 8 deletions(-)
 
-> +static struct vexpress_spc_drvdata *info;
-> +static u32 *vexpress_spc_config_data;
-> +static struct vexpress_config_bridge *vexpress_spc_config_bridge;
-> +static struct vexpress_config_func *opp_func, *perf_func;
-> +
-> +static int vexpress_spc_load_result = -EAGAIN;
-As I said, quite static...
-
-> +irqreturn_t vexpress_spc_irq_handler(int irq, void *data)
-missing a static here ?
-
-
-> +static bool __init __vexpress_spc_check_loaded(void);
-> +/*
-> + * Pointer spc_check_loaded is swapped after init hence it is safe
-> + * to initialize it to a function in the __init section
-> + */
-> +static bool (*spc_check_loaded)(void) __refdata = &__vexpress_spc_check_loaded;
-> +
-> +static bool __init __vexpress_spc_check_loaded(void)
-> +{
-> +	if (vexpress_spc_load_result == -EAGAIN)
-> +		vexpress_spc_load_result = vexpress_spc_init();
-> +	spc_check_loaded = &vexpress_spc_initialized;
-> +	return vexpress_spc_initialized();
-> +}
-> +
-> +/*
-> + * Function exported to manage early_initcall ordering.
-> + * SPC code is needed very early in the boot process
-> + * to bring CPUs out of reset and initialize power
-> + * management back-end. After boot swap pointers to
-> + * make the functionality check available to loadable
-> + * modules, when early boot init functions have been
-> + * already freed from kernel address space.
-> + */
-> +bool vexpress_spc_check_loaded(void)
-> +{
-> +	return spc_check_loaded();
-> +}
-> +EXPORT_SYMBOL_GPL(vexpress_spc_check_loaded);
-That one and the previous function look really nasty to me.
-The simple fact that you need a static variable in your code to check if
-your module is loaded sounds really fishy.
-
-Cheers,
-Samuel.
-
+diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+index e8edcaa..a57cc5d 100644
+--- a/arch/arm/kernel/sched_clock.c
++++ b/arch/arm/kernel/sched_clock.c
+@@ -51,10 +51,11 @@ static inline u64 notrace cyc_to_ns(u64 cyc, u32 mult, u32 shift)
+ 	return (cyc * mult) >> shift;
+ }
+ 
+-static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
++static unsigned long long notrace sched_clock_32(void)
+ {
+ 	u64 epoch_ns;
+ 	u32 epoch_cyc;
++	u32 cyc;
+ 
+ 	if (cd.suspended)
+ 		return cd.epoch_ns;
+@@ -73,7 +74,9 @@ static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
+ 		smp_rmb();
+ 	} while (epoch_cyc != cd.epoch_cyc_copy);
+ 
+-	return epoch_ns + cyc_to_ns((cyc - epoch_cyc) & mask, cd.mult, cd.shift);
++	cyc = read_sched_clock();
++	cyc = (cyc - epoch_cyc) & sched_clock_mask;
++	return epoch_ns + cyc_to_ns(cyc, cd.mult, cd.shift);
+ }
+ 
+ /*
+@@ -165,12 +168,6 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+ 	pr_debug("Registered %pF as sched_clock source\n", read);
+ }
+ 
+-static unsigned long long notrace sched_clock_32(void)
+-{
+-	u32 cyc = read_sched_clock();
+-	return cyc_to_sched_clock(cyc, sched_clock_mask);
+-}
+-
+ unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
+ 
+ unsigned long long notrace sched_clock(void)
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
