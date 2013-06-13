@@ -1,89 +1,109 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 13 Jun 2013 17:52:40 +0200
-Subject: N900 device tree conversion: how to do first step
-In-Reply-To: <20130613145724.GH8164@atomide.com>
-References: <20130609015944.GA23559@amd.pavel.ucw.cz>
- <20130609201119.GA3190@blackmetal.musicnaut.iki.fi>
- <20130613132624.GA3464@amd.pavel.ucw.cz>
- <20130613141001.GF8164@atomide.com>
- <20130613142809.GA3775@amd.pavel.ucw.cz>
- <20130613145724.GH8164@atomide.com>
-Message-ID: <20130613155240.GB3775@amd.pavel.ucw.cz>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Thu, 13 Jun 2013 17:05:57 +0100
+Subject: [PATCH v5 0/5] clk: implement remuxing during set_rate
+Message-ID: <1371139562-305-1-git-send-email-james.hogan@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+This patchset adds support for automatic selection of the best parent
+for a clock mux, i.e. the one which can provide the closest clock rate
+to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
+flag (which is set for all uses of clk_register_mux().
 
-> * Pavel Machek <pavel@ucw.cz> [130613 07:34]:
-> > On Thu 2013-06-13 07:10:01, Tony Lindgren wrote:
-> > > * Pavel Machek <pavel@ucw.cz> [130613 06:32]:
-> > >  
-> > > > If I init spi manually (and some more hacks), it works in the
-> > > > qemu. But I have not tested on real hw for a while.
-> > > 
-> > > You should be able to initialize spi by adding the .dts entry,
-> > > or is there something missing in drivers/spi/spi-omap2-mcspi.c?
-> > 
-> > Not sure, I guess I'll find out soon. Do you have example dts that
-> > uses drivers/spi/spi-omap2-mcspi.c? Grepping spi in dts/ was not too
-> > successful.
-> 
-> Hmm I think all we have is what's written in
-> Documentation/devicetree/bindings/spi/omap-spi.txt and
-> omap4-sdp.dts.
+This works by way of adding a new op, determine_rate, similar to
+round_rate but with an extra parameter to allow the clock driver to
+optionally select a different parent clock. This is used in
+clk_calc_new_rates to decide whether to initiate a set_parent operation.
 
-Ok, this was easier than expected.
+Changes in v5:
 
-Now, by chance, any idea what is DT equivalent of 
+* Rebased on latest clk-next ("clk: tegra: Use common of_clk_init
+  function")
+* Updated clock hardware characteristics table in documentation.
 
-omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+Changes in v4:
 
-?
+* rebased on clk-next ("clk: sun5i: Add compatibles for Allwinner A13").
+* replace __clk_set_parent_no_recalc with __clk_set_parent.
+* never pass NULL to determine_rate's best_parent_clk parameter, and
+  slight refactor of __clk_round_rate to use local copy of clk->parent.
+* a few new comments around use of clk::new_child.
+* new patch (patch 2) split out of patch 3 to avoid having to declare
+  static __clk_set_parent() at the top of clk.c, and to ease readability
+  of patch 3.
 
-(Plus I'll still have to figure out why it works on emulator but not
-on hw).
+Changes in v3:
 
-Thanks,
-									Pavel
+* rebased on v3.10-rc1.
+* remove double underscore prefix from clk_get_parent_by_index()
+* store new_parent_index in struct clk too (calculated from
+  clk_fetch_parent_index, and passed through __clk_set_parent_no_recalc
+  to __clk_set_parent).
+* allow determine_rate to satisfy recalc_rate check in __clk_init.
+* rename/invert CLK_SET_RATE_REMUX to CLK_SET_RATE_NO_REPARENT and move
+  to patch 3.
+* patch 3: add CLK_SET_RATE_NO_REPARENT flag to all callers of
+  clk_register_mux. If you don't mind your clocks being reparented in
+  response to set_rate please let me know and I'll drop the relevant
+  portion of the patch.
 
+Changes in v2:
 
-diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-index 10a880f..3918ae1 100644
---- a/arch/arm/boot/dts/omap3-n900.dts
-+++ b/arch/arm/boot/dts/omap3-n900.dts
-@@ -65,6 +65,14 @@
- 	status = "disabled";
- };
- 
-+&mcspi1 {
-+	mipid at 2 {
-+		compatible = "acx565akm";
-+		spi-max-frequency = <6000000>;
-+		reg = <2>;
-+	};
-+};
-+
- /*
- &usb_otg_hs {
- 	interface-type = <0>;
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 996ffc3..597ade9 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -130,9 +130,10 @@ void __init omap_generic_init(void)
- 		regulator_use_dummy_regulator();
- 
- 		omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
--
-+#if 0
- 		spi_register_board_info(rx51_peripherals_spi_board_info,
- 				ARRAY_SIZE(rx51_peripherals_spi_board_info));
-+#endif
- #else
- 		rx51_video_init();
- #endif
+I've moved the mux determine_rate implementation into a core helper, but
+I haven't pushed it fully into the core, as I think it just wouldn't
+work correctly for more complex clocks, e.g. if you (theoretically) had
+a combined mux and divide, you'd want to intercept the determine_rate
+and ask for a larger rate from the parent clocks, then return the
+divided rate. This should be possible by wrapping the mux determine_rate
+helper.
 
+Patch 1 still exports the __clk_get_parent_by_index as it seems like it
+might be a useful thing for clock implementations to have access to if
+they ever wanted to do something more fancy with changing clock parents.
+
+I haven't made any attempt to implement the atomic set_parent+set_rate
+as I don't have hardware that could take proper advantage of it, but it
+shouldn't be too difficult for others to implement if they wanted since
+they're fairly close to one another (in clk_change_rate()).
+
+* switched to using new determine_rate op rather than adding an argument
+  to round_rate.
+* moved mux implementation into a single helper which should be usable
+  from more complex clocks which can mux.
+* rewrite main implementation so that no changes are made until after
+  the PRE notifications have been sent, and in a way that should ensure
+  correct notifications without duplicates, and I think should be safe
+  in the event of a notification failing.
+* various tidy ups and fixes.
+
+James Hogan (5):
+  clk: abstract parent cache
+  clk: move some parent related functions upwards
+  clk: add support for clock reparent on set_rate
+  clk: add CLK_SET_RATE_NO_REPARENT flag
+  clk: clk-mux: implement remuxing on set_rate
+
+ Documentation/clk.txt                |  46 ++--
+ arch/arm/mach-imx/clk.h              |   5 +-
+ drivers/clk/clk-mux.c                |   1 +
+ drivers/clk/clk.c                    | 420 ++++++++++++++++++++++-------------
+ drivers/clk/mmp/clk-mmp2.c           |  39 ++--
+ drivers/clk/mmp/clk-pxa168.c         |  40 ++--
+ drivers/clk/mmp/clk-pxa910.c         |  31 ++-
+ drivers/clk/mxs/clk.h                |   4 +-
+ drivers/clk/samsung/clk.h            |   2 +-
+ drivers/clk/spear/spear1310_clock.c  | 179 ++++++++-------
+ drivers/clk/spear/spear1340_clock.c  |  97 ++++----
+ drivers/clk/spear/spear3xx_clock.c   |  57 +++--
+ drivers/clk/spear/spear6xx_clock.c   |  35 +--
+ drivers/clk/sunxi/clk-sunxi.c        |   3 +-
+ drivers/clk/tegra/clk-tegra114.c     |  36 ++-
+ drivers/clk/tegra/clk-tegra20.c      |   6 +-
+ drivers/clk/tegra/clk-tegra30.c      |  33 ++-
+ drivers/clk/versatile/clk-vexpress.c |   4 +-
+ include/linux/clk-private.h          |   3 +
+ include/linux/clk-provider.h         |  12 +
+ 20 files changed, 638 insertions(+), 415 deletions(-)
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+1.8.1.2
