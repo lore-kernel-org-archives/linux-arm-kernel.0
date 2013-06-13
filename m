@@ -1,47 +1,58 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Jun 2013 13:19:29 -0600
-Subject: [PATCH v2 1/3] ARM: tegra: basic support for Trusted Foundations
-In-Reply-To: <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
-References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
- <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <51BA1B41.6030002@wwwdotorg.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 13 Jun 2013 15:20:42 -0400 (EDT)
+Subject: [PATCH V2 02/10] USB: OHCI: Properly handle ohci-s3c2410 suspend
+In-Reply-To: <1371114989-2342-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306131515020.1561-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2013 03:12 AM, Alexandre Courbot wrote:
-> Add basic support for booting secondary processors on Tegra devices
-> using the Trusted Foundations secure monitor.
+On Thu, 13 Jun 2013, Manjunath Goudar wrote:
+
+> Suspend scenario in case of ohci-s3c2410 glue was not
+> properly handled as it was not suspending generic part
+> of ohci controller.Calling explicitly the ohci_suspend()
+> routine in ohci_hcd_s3c2410_drv_suspend() will ensure
+> proper handling of suspend scenario.
 > 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
->  Documentation/devicetree/bindings/arm/tegra.txt    | 11 +++++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm/configs/tegra_defconfig                   |  1 +
+> V2:
+>  -Incase ohci_suspend() fails, return right away
+>   without executing further.
 
-The defconfig change should be a separate patch, so that I can squash it
-into any other defconfig updates separately from all the code changes.
+> diff --git a/drivers/usb/host/ohci-s3c2410.c b/drivers/usb/host/ohci-s3c2410.c
+> index 8018bb1..01430f2 100644
+> --- a/drivers/usb/host/ohci-s3c2410.c
+> +++ b/drivers/usb/host/ohci-s3c2410.c
+> @@ -430,7 +430,15 @@ static int ohci_hcd_s3c2410_drv_suspend(struct device *dev)
+>  	struct platform_device *pdev = to_platform_device(dev);
+>  	unsigned long flags;
+>  	int rc = 0;
+> +	bool do_wakeup = device_may_wakeup(dev);
+>  
+> +	rc = ohci_suspend(hcd, do_wakeup);
+> +	if (rc == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
+> +		ohci_resume(hcd, false);
+> +		rc = -EBUSY;
+> +	}
+> +	if (rc)
+> +		return rc;
+>  	/*
+>  	 * Root hub was already suspended. Disable irq emission and
+>  	 * mark HW unaccessible, bail out if RH has been resumed. Use
 
-> diff --git a/arch/arm/mach-tegra/firmware.c b/arch/arm/mach-tegra/firmware.c
+The part that follows this patch doesn't make sense any more.  I think
+we can afford to get rid of the test for ohci->rh_state !=
+OHCI_RH_SUSPENDED; the PM core has been quite stable for years and it
+won't try to suspend the controller if the root hub is active.
 
-> +void __init tegra_init_firmware(void)
-> +{
-> +	struct device_node *node;
-> +
-> +	if (!of_have_populated_dt())
-> +		return;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
-> +	if (node && !IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS))
-> +		pr_warn("Trusted Foundations detected but support missing!\n");
-> +#if IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS)
-> +	else if (node)
-> +		register_firmware_ops(&tegra_trusted_foundations_ops);
-> +#endif
-> +}
+Also, the
 
-Is it worth continuing on in the node && !IS_ENABLED case here? After
-all, we can be pretty certain that the write to the CPU reset vector is
-immediately going to trap...
+	clear_bit(HCD_FLAG_HW_ACCESSIBLE, &hcd->flags);
 
-I suppose that perhaps without SMP, cpuidle, suspend, ... we could keep
-running, but that seems a little niche.
+line isn't needed, because ohci_suspend() does it.
+
+Putting this all together, all that's left is the spin_lock/unlock and 
+the call to s3c2410_stop_hc().  The comment isn't needed, nor is the 
+statement label.  (In fact, I'm not even sure if the spin_lock/unlock 
+lines are needed.  It depends on the hardware details.)
+
+Alan Stern
