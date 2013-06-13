@@ -1,102 +1,104 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 13 Jun 2013 11:38:39 +0800
-Subject: [PATCH 6/6] mtd: ofpart: add compatible check for child nodes
-In-Reply-To: <CAN8TOE-JuVAAKBR84cbs9Hge+bQ6hQpFyoSDywKvCMe7h+Lc4g@mail.gmail.com>
-References: <1370860014-1770-1-git-send-email-josh.wu@atmel.com>
- <1370860014-1770-7-git-send-email-josh.wu@atmel.com>
- <CAN8TOE-JuVAAKBR84cbs9Hge+bQ6hQpFyoSDywKvCMe7h+Lc4g@mail.gmail.com>
-Message-ID: <51B93EBF.5050207@atmel.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Thu, 13 Jun 2013 11:41:58 +0800
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
+References: <CACVXFVPRWxjXqyv-L6yU1OLXHFYCbe7cQxGnaFxqbEXwBK=hfQ@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306121008420.1431-100000@iolanthe.rowland.org>
+Message-ID: <CACVXFVOB1e6cptrXqbXyt_JxU7YnRp++HABvR90cG8rUMa2xog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Brian
-
-On 6/12/2013 7:34 AM, Brian Norris wrote:
-> Hi Josh,
+On Wed, Jun 12, 2013 at 10:35 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Wed, 12 Jun 2013, Ming Lei wrote:
 >
-> On Mon, Jun 10, 2013 at 3:26 AM, Josh Wu <josh.wu@atmel.com> wrote:
->> If the child node has compatible property then it is a driver not partition.
+>> If not, I am wondering why one USB driver need register another hard
+>> interrupt handler? Could you share such examples? I understand the
+>> case only exists with timer handler as discussed with Oliver, don't I?
+>
+> Here's another possibility.  A USB driver has a private lock, and it
+> acquires this lock in its completion handler.  But it also acquires
+> this lock in other routines, and those other routines may be called by
+> other drivers or subsystems in interrupt context.
+
+OK, so the problem is more complicated than I imaged at start, :-(
+
+>
+>> > The drivers _do_ need to be changed, as explained above.  And that
+>> > explanation was only one failure scenario.  There may be others.
 >>
->> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->> ---
->>   drivers/mtd/ofpart.c |   14 +++++++++++++-
->>   1 file changed, 13 insertions(+), 1 deletion(-)
+>> OK, I'd like to know what the others are? :-)
+>
+> Me too.  :-)
+>
+>> >> And finally, USB HCDs themselves will benefit from the change, won't they?
+>> >
+>> > How will they benefit?  Merely from not releasing their private locks?
 >>
->> diff --git a/drivers/mtd/ofpart.c b/drivers/mtd/ofpart.c
->> index 553d6d6..61ce1f8 100644
->> --- a/drivers/mtd/ofpart.c
->> +++ b/drivers/mtd/ofpart.c
->> @@ -20,6 +20,10 @@
->>   #include <linux/slab.h>
->>   #include <linux/mtd/partitions.h>
+>> The interrupt of one HCD will be responded lately since another HCD's
+>> interrupt handler takes very long time. With the change, the problem can
+>> be avoided.
+>
+> For reasonably sophisticated host controllers like EHCI, the delay in
+> responding to an interrupt doesn't matter much.  But for simpler host
+
+EHCI might still benefit from the change: suppose uvc video is playing on
+one EHCI bus, and mass storage's performance over another EHCI may
+decrease because of the IRQ latency introduced.
+
+> controllers (for example, those using PIO instead of DMA) it matters
+> more, so those other HCDs will benefit more from the conversion.
+
+Indeed, musb and ehci/ohci are coexisted on OMAP3/4/5.
+
+>> >> Compared with "usb-storage" task's schedule latency, the tasklet
+>> >> schedule delay should be lower at most of situations since the tasklet
+>> >> is scheduled inside irq handler.
+>> >
+>> > True.  But the two latencies add.
 >>
->> +static bool node_has_compatible(struct device_node *pp, int *len)
->> +{
->> +       return of_get_property(pp, "compatible", len);
->> +}
-> The way the interface is named, it seems like a user only would ever
-> need the bool return value, not the implicit 'len' return value. So I
-> would write it like this:
+>> I think it should be one tasklet latency added, but what is the other one?
 >
-> static bool node_has_compatible(struct device_node *pp)
-> {
->         return of_get_property(pp, "compatible", NULL);
-> }
-
-yes, this is exactly is what I want. I didn't check the *len can be NULL 
-or not. thanks.
-
+> I meant that the latency in tasklet scheduling has to be added to the
+> latency in scheduling the usb-storage thread.
 >
->>   static int parse_ofpart_partitions(struct mtd_info *master,
->>                                     struct mtd_partition **pparts,
->>                                     struct mtd_part_parser_data *data)
->> @@ -40,8 +44,13 @@ static int parse_ofpart_partitions(struct mtd_info *master,
->>          /* First count the subnodes */
->>          pp = NULL;
->>          nr_parts = 0;
->> -       while ((pp = of_get_next_child(node, pp)))
->> +       while ((pp = of_get_next_child(node, pp))) {
->> +               int len;
->> +               if (node_has_compatible(pp, &len))
-> Then this would just be:
+>> > Or you could have a separate tasklet for each host controller.
+>>
+>> Yes, but I will compare tasklet with interrupt threaded handler first.
 >
-> if (node_has_compatible(pp))
-> ...
-> etc. (rest snipped)
+> Switching to a threaded interrupt handler offers more possibilities.
+> Instead of moving just the givebacks to the thread, we could put almost
+> all the processing there.  (At least, we can for ehci-hcd.  Other HCDs
+> may not be able to do this.)
 >
-> On a more important question, why does a NAND device node have
-> sub-nodes that are not partitions? And if such devices exist, wouldn't
-> it be more foolproof to establish a "compatible" property for ofpart
-> partitions?
-
-In my case, we have a Atmel NAND flash driver/device which is work for 
-all series of SAM9/SAMA5D3 chip.
-And since in the new chip SAMA5D3 which has a NAND Flash Controller support.
-
-So to enable NAND flash controller, I should either write a compatible 
-driver like atmel,sama5-nand, which is
-just old device property plus NFC regs and NFC properties, that became 
-too big. Or add a NFC sub-node for the NFC support.
-
-IMHO, to make the NFC device as a sub-node is the simplest way to make 
-nand driver is back-compatible and easy to enable/disable NFC feature.
-Since all NFC related property are grouped it is more readable.
-
-But to implement this, I need to add this patch, otherwise this NFC sub 
-node will be recognized as a partition.
-
-> Of course, we'd still have to retain
-> backward-compatibility and allow partitions without a "compatible"
-> prop. But this question probably should be addressed in the commit log
-> and documented in Documentation/devicetree/bindings/mtd/partition.txt
-> ; either specifying that all sub-nodes without a compatible property
-> must be partitions, or else some other explanation.
-
-yes, sure. I will add an explanation in commit log and 
-Documentation/devicetree/bindings/mtd/partition.txt in next version.
-
+> At this point we are talking about multiple changes:
 >
-> Brian
+>         Moving the givebacks to a tasklet or threaded handler.
+>
+>         Changing the USB completion handlers so that they can be called
+>         with interrupts enabled.
+>
+>         Allowing the tasklet/thread to run with interrupts enabled.
+>
+>         Moving more of the HCD processing into the tasklet/thread.
+>
+> Maybe other things too.  In principle, the first and second items can
+> be done simultaneously.
 
-Best Regards,
-Josh Wu
+Very good summery, we can push the 1st change with disabling local IRQ
+when calling complete(), so that at least DMA unmapping can be done
+with IRQ enabled, and at the same time do the API change, which
+should be a bit slow but the mechanical way proposed by Oliver may
+be OK.
+
+The 3rd item is easy once the 1st two items are completed.
+
+For the 4th one, it might be a long term thing, since refactoring
+HCD interrupt handler is a bit complicated. Also, when the 1st
+three items are completed, hard interrupt handler takes less time,
+often less than 20us at average about EHCI, so I am wondering
+if the 4th is worthy.
+
+
+Thanks,
+--
+Ming Lei
