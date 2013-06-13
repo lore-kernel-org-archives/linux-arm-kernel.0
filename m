@@ -1,58 +1,108 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 13 Jun 2013 16:08:32 -0400
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
-Message-ID: <1371154112.9844.306.camel@gandalf.local.home>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Thu, 13 Jun 2013 22:14:19 +0200
+Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
+In-Reply-To: <1370467100-10820-9-git-send-email-tomasz.figa@gmail.com>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1370467100-10820-9-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <201306132214.20017.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-13 at 15:41 -0400, Alan Stern wrote:
+Am Mittwoch, 5. Juni 2013, 23:18:13 schrieb Tomasz Figa:
+> This patch introduces new Samsung PWM driver, which uses Samsung
+> PWM/timer master driver to control shared parts of the hardware.
+> 
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> ---
+>  drivers/pwm/Makefile      |   1 +
+>  drivers/pwm/pwm-samsung.c | 528
+> ++++++++++++++++++++++++++++++++++++++++++++++ 2 files changed, 529
+> insertions(+)
+>  create mode 100644 drivers/pwm/pwm-samsung.c
+> 
+> diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
 
-> The test results above show a 2.4% degradation for threaded interrupts 
-> as compared to tasklets.  That's in addition to the bottlenecks caused 
-> by the device; no doubt it would be worse for a faster device.  This 
-> result calls into question the benefits of threaded interrupts.
+[...]
 
-That's because it was written like a top half and not a full blown
-interrupt. I just looked at the patch, and saw this:
+> +static int pwm_samsung_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct samsung_pwm_chip *chip;
+> +	struct resource *res;
+> +	int ret;
+> +
+> +	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
+> +	if (chip == NULL) {
+> +		dev_err(dev, "failed to allocate driver data\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	chip->chip.dev = &pdev->dev;
+> +	chip->chip.ops = &pwm_samsung_ops;
+> +	chip->chip.base = -1;
+> +	chip->chip.npwm = SAMSUNG_PWM_NUM;
+> +
+> +	if (pdev->dev.of_node) {
+> +		ret = pwm_samsung_parse_dt(chip);
+> +		if (ret)
+> +			return ret;
+> +
+> +		chip->chip.of_xlate = of_pwm_xlate_with_flags;
+> +		chip->chip.of_pwm_n_cells = 3;
+> +	} else {
+> +		if (!pdev->dev.platform_data) {
+> +			dev_err(&pdev->dev, "no platform data specified\n");
+> +			return -EINVAL;
+> +		}
+> +
+> +		memcpy(&chip->variant, pdev->dev.platform_data,
+> +							sizeof(chip->variant));
+> +	}
+> +
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		dev_err(&pdev->dev, "failed to get mem resource\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	chip->base = devm_request_and_ioremap(&pdev->dev, res);
+> +	if (!chip->base) {
+> +		dev_err(&pdev->dev, "failed to request and map registers\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	chip->base_clk = devm_clk_get(&pdev->dev, "timers");
+> +	if (IS_ERR(chip->base_clk)) {
+> +		dev_err(dev, "failed to get timer base clk\n");
+> +		return PTR_ERR(chip->base_clk);
+> +	}
+> +	clk_prepare_enable(chip->base_clk);
+> +
+> +	chip->tclk0 = devm_clk_get(&pdev->dev, "pwm-tclk0");
+> +	chip->tclk1 = devm_clk_get(&pdev->dev, "pwm-tclk1");
+> +
+> +	ret = pwmchip_add(&chip->chip);
+> +	if (ret < 0) {
+> +		dev_err(dev, "failed to register pwm\n");
+> +		goto err_clk_disable;
+> +	}
+> +
+> +	dev_info(dev, "base_clk at %lu, tclk0 at %lu, tclk1 at %lu\n",
+> +		clk_get_rate(chip->base_clk),
+> +		!IS_ERR(chip->tclk0) ? clk_get_rate(chip->tclk0) : 0,
+> +		!IS_ERR(chip->tclk1) ? clk_get_rate(chip->tclk1) : 0);
 
-+#ifndef USB_HCD_THREADED_IRQ
-        if (sched) {
-                if (async)
-                        tasklet_schedule(&bh->bh);
-                else
-                        tasklet_hi_schedule(&bh->bh);
-        }
-+#else
-+       if (sched)
-+               schedule_work(&hcd->periodic_bh->work);
-+#endif
+hmm, these values simply tell some internal state of the pwm, so wouldn't a 
+dev_dbg be more appropriate?
 
-What is this? The work isn't done by an interrupt thread, but by work queues!
 
-The point of the interrupt thread is that you do *all* the work that
-needs to be done when an interrupt comes in. You don't need to delay the
-work.
-
-If you just treat a threaded interrupt like a real interrupt and push
-off work to something else, then yes, it will degrade performance.
-
-If you go the threaded interrupt route, you need to rethink the
-paradigm. There's no reason that the interrupt handler needs to be fast
-like it needs to be in true interrupt context. The handler can now use
-mutexes, and other full features that currently only threads benefit
-from. It should improve locking issues, and can serialize things if
-needed.
-
-All this patch did was to switch the main irq to a thread and make a
-bottom half into a work queue.
-
-Why couldn't you just do:
-
-	if (sched)
-		usb_giveback_urb_bh(bh);
-
-?
-
--- Steve
+> +
+> +	platform_set_drvdata(pdev, chip);
+> +
+> +	return 0;
+> +
+> +err_clk_disable:
+> +	clk_disable_unprepare(chip->base_clk);
+> +
+> +	return ret;
+> +}
