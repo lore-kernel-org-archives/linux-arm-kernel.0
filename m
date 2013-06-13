@@ -1,124 +1,141 @@
-From: james.hogan@imgtec.com (James Hogan)
-Date: Thu, 13 Jun 2013 16:02:26 +0100
-Subject: [PATCH v4 5/5] clk: clk-mux: implement remuxing on set_rate
-In-Reply-To: <519AFBB6.90700@codeaurora.org>
-References: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
- <1369056507-32521-6-git-send-email-james.hogan@imgtec.com>
- <519AFBB6.90700@codeaurora.org>
-Message-ID: <51B9DF02.6040609@imgtec.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 13 Jun 2013 17:02:34 +0200
+Subject: [PATCH V2 3/3] ARM: tegra114: cpuidle: add powered-down state
+In-Reply-To: <1371133960.1631.13.camel@jlo-ubuntu-64.nvidia.com>
+References: <1370342880-422-1-git-send-email-josephl@nvidia.com>
+ <1370342880-422-4-git-send-email-josephl@nvidia.com>
+ <51AE5EE3.3010607@linaro.org> <51B8B2C8.1090006@wwwdotorg.org>
+ <1371089619.1681.21.camel@jlo-ubuntu-64.nvidia.com>
+ <51B99151.5010107@linaro.org>
+ <1371133960.1631.13.camel@jlo-ubuntu-64.nvidia.com>
+Message-ID: <51B9DF0A.3020001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/05/13 05:44, Saravana Kannan wrote:
-> On 05/20/2013 06:28 AM, James Hogan wrote:
->> Implement clk-mux remuxing if the CLK_SET_RATE_NO_REPARENT flag isn't
->> set. This implements determine_rate for clk-mux to propagate to each
->> parent and to choose the best one (like clk-divider this chooses the
->> parent which provides the fastest rate <= the requested rate).
+On 06/13/2013 04:32 PM, Joseph Lo wrote:
+> On Thu, 2013-06-13 at 17:30 +0800, Daniel Lezcano wrote:
+>> On 06/13/2013 04:13 AM, Joseph Lo wrote:
+>>> On Thu, 2013-06-13 at 01:41 +0800, Stephen Warren wrote:
+>>>> On 06/04/2013 03:40 PM, Daniel Lezcano wrote:
+>>>>> On 06/04/2013 12:48 PM, Joseph Lo wrote:
+>>>>>> This supports CPU core power down on each CPU when CPU idle. When CPU go
+>>>>>> into this state, it saves it's context and needs a proper configuration
+>>>>>> in flow controller to power gate the CPU when CPU runs into WFI
+>>>>>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
+>>>>>> wake up event in flow controller.
+>>>>>>
+>>>>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
+>>>>>
+>>>>> I would like to understand why there is a WARN with the
+>>>>> CPUIDLE_FLAG_TIMER_STOP flag set before queuing this patch and ensure it
+>>>>> is not the tree hiding the forest.
+>>>>
+>>>> Joseph, are you planning to post an updated series or respond to resolve
+>>>> Daniel's question?
+>>>
+>>> I need more time to investigate the detail about what caused the WARN
+>>> when apply the flag. And what's the difference if we didn't enable
+>>> CONFIG_CPU_IDLE_MULTIPLE_DRIVERS, then it only applies
+>>> CLOCK_EVT_NOTIFY_BROADCAST_ON on CPU0.
 >>
->> The determine_rate op is implemented as a core helper function so that
->> it can be easily used by more complex clocks which incorporate muxes.
+>> I think I got it for this one. It is a bug in the cpuidle driver's code.
 >>
->> Signed-off-by: James Hogan <james.hogan@imgtec.com>
->> Cc: Mike Turquette <mturquette@linaro.org>
->> Cc: linux-arm-kernel at lists.infradead.org
->> ---
->> Changes in v4:
+>> cpuidle_register_driver does get_cpu => CPU0
 >>
->> * never pass NULL to determine_rate's best_parent_clk parameter.
+>> Then __cpuidle_register_driver(drv, <CPU0>)
 >>
->> Changes in v3:
+>>  => __cpuidle_driver_init(drv, <CPU0>)
 >>
->> * rename/invert CLK_SET_RATE_REMUX to CLK_SET_RATE_NO_REPARENT and move
->>    to patch 3.
+>> Hence, the timer broadcast is initialized only for cpu0.
 >>
->>   drivers/clk/clk-mux.c        |  1 +
->>   drivers/clk/clk.c            | 49
->> ++++++++++++++++++++++++++++++++++++++++++++
->>   include/linux/clk-provider.h |  3 +++
->>   3 files changed, 53 insertions(+)
+>> That should have been fixed with:
 >>
->> diff --git a/drivers/clk/clk-mux.c b/drivers/clk/clk-mux.c
->> index 25b1734..cecfa01 100644
->> --- a/drivers/clk/clk-mux.c
->> +++ b/drivers/clk/clk-mux.c
->> @@ -100,6 +100,7 @@ static int clk_mux_set_parent(struct clk_hw *hw,
->> u8 index)
->>   const struct clk_ops clk_mux_ops = {
->>       .get_parent = clk_mux_get_parent,
->>       .set_parent = clk_mux_set_parent,
->> +    .determine_rate = __clk_mux_determine_rate,
->>   };
->>   EXPORT_SYMBOL_GPL(clk_mux_ops);
->>
->> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
->> index 3ce4810..85b661d 100644
->> --- a/drivers/clk/clk.c
->> +++ b/drivers/clk/clk.c
->> @@ -692,6 +692,55 @@ struct clk *__clk_lookup(const char *name)
->>       return NULL;
->>   }
->>
->> +/*
->> + * Helper for finding best parent to provide a given frequency. This
->> can be used
->> + * directly as a determine_rate callback (e.g. for a mux), or from a
->> more
->> + * complex clock that may combine a mux with other operations.
->> + */
->> +long __clk_mux_determine_rate(struct clk_hw *hw, unsigned long rate,
->> +                  unsigned long *best_parent_rate,
->> +                  struct clk **best_parent_p)
->> +{
->> +    struct clk *clk = hw->clk, *parent, *best_parent = NULL;
->> +    int i, num_parents;
->> +    unsigned long parent_rate, best = 0;
->> +
->> +    /* if NO_REPARENT flag set, pass through to current parent */
->> +    if (clk->flags & CLK_SET_RATE_NO_REPARENT) {
->> +        parent = clk->parent;
->> +        if (clk->flags & CLK_SET_RATE_PARENT)
->> +            best = __clk_round_rate(parent, rate);
->> +        else if (parent)
->> +            best = __clk_get_rate(parent);
->> +        else
->> +            best = __clk_get_rate(clk);
->> +        goto out;
->> +    }
->> +
->> +    /* find the parent that can provide the fastest rate <= rate */
->> +    num_parents = clk->num_parents;
->> +    for (i = 0; i < num_parents; i++) {
+> OK, thanks.
 > 
-> While writing a similar code for our internal tree, I quickly came to
-> the realization that, "all parents are equal, but some are more equal
-> than others". The simplest example is a clock tree like this:
-> 
-> Source -> Divider -> Mux
-> Source -> Mux
-> 
-> A rate of Y can be achieved for Mux by either running Source at Y and
-> picking that input or running Source at Y * 2 and Divider set to div-2
-> and picking the Divider input.
-> 
-> The solution seems to be a priority list of parents. I'm sure there
-> would be other reason (jitter, clock quality, etc) for a mux to pick one
-> parent vs. another when both of them can provide the required rate.
-> 
-> I think this loop should loop over parents based on their priority
-> order. So, parents should become a struct of { clk, index } and have the
-> parents listed in the order of priority. Well, at least in that long run
-> that would be better to avoid messing up parent/index values. But for
-> now, you could just have a priority array of index or parents.
-> 
-> It might not fit 100% of the cases where two parents can provide the
-> same rate, but it should fit most use cases.
+>> commit 82467a5a885ddd9f80309682159da8db510e7832
+>> Author: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> Date:   Fri Jun 7 21:53:09 2013 +0000
+>>
+>>     cpuidle: simplify multiple driver support
+>>
+>>     Commit bf4d1b5 (cpuidle: support multiple drivers) introduced support
+>>     for using multiple cpuidle drivers at the same time.  It added a
+>>     couple of new APIs to register the driver per CPU, but that led to
+>>     some unnecessary code complexity related to the kernel config options
+>>     deciding whether or not the multiple driver support is enabled.  The
+>>     code has to work as it did before when the multiple driver support is
+>>     not enabled and the multiple driver support has to be compatible with
+>>     the previously existing API.
+>>
+>>     Remove the new API, not used by any driver in the tree yet (but
+>>     needed for the HMP cpuidle drivers that will be submitted soon), and
+>>     add a new cpumask pointer to the cpuidle driver structure that will
+>>     point to the mask of CPUs handled by the given driver.  That will
+>>     allow the cpuidle_[un]register_driver() API to be used for the
+>>     multiple driver support along with the cpuidle_[un]register()
+>>     functions added recently.
+>>
+>>     [rjw: Changelog]
+>>     Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+>>
+>>
+>>> Why if I am moving the
+>>> clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT before
+>>> "local_irq_enable" in the
+>>> "cpuidle_enter_state" (drivers/cpuidle/cpuidle.c), then the warning
+>>> message gone?
+>>
+>> Is the warning coming immediately, at the first time
+>> CLOCK_EVT_NOTIFY_BROADCAST_EXIT is invoked or can it occur at different
+>> moment ?
+>>
+> Not exactly at the 1st time, it may happen in the 3rd to 10th time. But
+> it only happens once. I mean I did check the
+> tick_broadcast_pending_mask, it only happens once the CPU didn't clear
+> the tick_broadcast_pending_mask after CLOCK_EVT_NOTIFY_BROADCAST_EXIT.
+> And cause the warning message. Then I didn't see it happen anymore.
 
-Sorry for the delay replying.
+I suspect when the CLOCK_EVENT_NOTIFY_EXIT is after the
+local_irq_enable, we have the timer handler executed before where it
+sets the tick_broadcast_pending_mask.
 
-What you say sounds reasonable. As Stephen Boyd suggested though, I'd
-like to omit this from this patchset as its something that can be
-tackled later.
+Hence in the tick_broadcast_oneshot_control function when we fall into
+the condition:
 
-Cheers
-James
+ if (dev->next_event.tv64 == KTIME_MAX)
+	goto out;
+
+The tick_broadcast_pending_mask is not cleared and when re-entering with
+CLOCK_EVENT_NOTIFY_ENTER, this mask is set and that raises the warning.
+
+So, if I am not wrong, the condition to raise this warning would be:
+
+ 1. use the flag (of course), because the
+CLOCK_EVT_NOTIFY_BROADCAST_EXIT is called after the local_irq_enabled
+
+ 2. there is no timer planned after the expired one.
+
+ 3. a new timer is created and the cpu enters the low power state again
+
+The first step would be to create a simple program to reproduce easily
+the warning.
+
+First boot the kernel with init=/bin/bash (or whatever, the init process
+is replaced by a shell), thus reducing considerably the number of timers.
+
+Then try to raise the warning with cpu2:
+
+	taskset 4 /bin/sleep 0.5
+
+... several times until the warning appears.
+
+As I don't have the hardware, this is based on assumptions, so may be I
+am wrong.
+
+-- 
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
