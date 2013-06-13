@@ -1,43 +1,48 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 13 Jun 2013 19:18:58 +0530
-Subject: [PATCH 3/3] ARM: OMAP: dma: Fix the kfree ordering
-In-Reply-To: <20130613131647.GS21614@n2100.arm.linux.org.uk>
-References: <1371128960-24822-1-git-send-email-rnayak@ti.com>
- <1371128960-24822-4-git-send-email-rnayak@ti.com>
- <20130613131647.GS21614@n2100.arm.linux.org.uk>
-Message-ID: <51B9CDCA.9010901@ti.com>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Thu, 13 Jun 2013 15:56:03 +0200
+Subject: [PATCH] ARM: ux500: set coherent_dma_mask for dma40
+Message-ID: <1371131763-6288-1-git-send-email-fabio.baltieri@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 June 2013 06:46 PM, Russell King - ARM Linux wrote:
-> On Thu, Jun 13, 2013 at 06:39:20PM +0530, Rajendra Nayak wrote:
->> diff --git a/arch/arm/plat-omap/dma.c b/arch/arm/plat-omap/dma.c
->> index 8a71f75..8e16503 100644
->> --- a/arch/arm/plat-omap/dma.c
->> +++ b/arch/arm/plat-omap/dma.c
->> @@ -2111,8 +2111,8 @@ exit_dma_irq_fail:
->>  	}
->>  
->>  exit_dma_lch_fail:
->> -	kfree(p);
->>  	kfree(d);
->> +	kfree(p);
-> 
-> Err.
-> 
->         p = pdev->dev.platform_data;
->         d                       = p->dma_attr;
-> 
-> Why is it kfree'ing platform data in the first place?  This means that
-> a failed bind can't be reattempted later.  It also means that an unbind
-> plus rebind in userspace will free the platform data leaving stale
-> pointers behind.
+Set coherent_dma_mask to DMA_BIT_MASK(32) for dma40 platform_device, as
+without this DMA allocations were failing with the error:
 
-Right, I just seemed to have overlooked the fact that p was pointing to
-platform data. Will remove all the kfree(p) and kfree(d) across the
-driver (I just realized this is also the case in .remove)
+dma40 dma40.0: coherent DMA mask is unset
 
-> 
-> This is totally nonsense.  Don't kfree() data in your driver which you
-> haven't allocated yourself!
-> 
+when booting without device-tree.
+
+Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+---
+
+Hi Linus, Lee,
+
+I found this while removing the last hack I was keeping in my ASoC tree.
+I originally thought that I had to set this on the driver's pdata, but
+it turns out it's needed on the DMA controller one instead.
+
+When booting with device-tree enabled the mask seems to be set
+automatically.
+
+Would you consider applying this with the other dma40 patches?
+
+Thanks,
+Fabio
+
+ arch/arm/mach-ux500/devices-db8500.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
+index e21ffd8..fa8f7a5 100644
+--- a/arch/arm/mach-ux500/devices-db8500.c
++++ b/arch/arm/mach-ux500/devices-db8500.c
+@@ -49,6 +49,7 @@ struct stedma40_platform_data dma40_plat_data = {
+ struct platform_device u8500_dma40_device = {
+ 	.dev = {
+ 		.platform_data = &dma40_plat_data,
++		.coherent_dma_mask = DMA_BIT_MASK(32),
+ 	},
+ 	.name = "dma40",
+ 	.id = 0,
+-- 
+1.8.2
