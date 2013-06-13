@@ -1,92 +1,74 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 14 Jun 2013 00:27:33 +0200
-Subject: [PATCH 00/15] Final Samsung PWM support cleanup
-In-Reply-To: <201306132217.44265.heiko@sntech.de>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <1808375.nuQYa2FdfG@flatron> <201306132217.44265.heiko@sntech.de>
-Message-ID: <201306140027.34181.heiko@sntech.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 13 Jun 2013 18:31:32 -0400 (EDT)
+Subject: [PATCH 1/2] ARM: vexpress/TC2: basic PM support
+In-Reply-To: <20130613203218.GA22310@quad.lixom.net>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130613203218.GA22310@quad.lixom.net>
+Message-ID: <alpine.LFD.2.03.1306131817310.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 13. Juni 2013, 22:17:43 schrieb Heiko St?bner:
-> Am Donnerstag, 13. Juni 2013, 11:07:38 schrieb Tomasz Figa:
-> > Hi Heiko, Sylwester,
-> > 
-> > On Thursday 13 of June 2013 01:52:05 Sylwester Nawrocki wrote:
-> > > On 06/13/2013 01:38 AM, Heiko St?bner wrote:
-> > > > Am Donnerstag, 13. Juni 2013, 01:13:47 schrieb Tomasz Figa:
-> > > >> Hi Olof,
-> > > >> 
-> > > >> On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
-> > > >>> On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
-> > > >>>>> Needs testing on other platforms as I could only compile test for
-> > > >>>>> them.
-> > > >>> 
-> > > >>> How/who can help here? WHo has and still cares for other affected
-> > > >>> platforms?
-> > > >>> 
-> > > >>>>> 66 files changed, 627 insertions(+), 1580 deletions(-)
-> > > >> 
-> > > >> I will try to test this on Exynos 4 at work, if I somehow manage to
-> > > >> find any way to use PWM on our boards (other than already-tested PWM
-> > > >> clocksource).
-> > > >> 
-> > > >> Unfortunately, except S3C6410, I don't have access to other
-> > > >> platforms, or at least I won't in any reasonable time.
-> > > >> 
-> > > >> If I remember correctly, in case of my watchdog support cleanup,
-> > > >> Kukjin
-> > > >> has been able to test it on S5P64x0.
-> > > >> 
-> > > >> Heiko and Sylwester used to have some s3c24xx-based boards, not sure
-> > > >> if
-> > > >> they still do and are interested in their support in mainline.
-> > > >> 
-> > > >> So all left is S5PC100 (for which I couldn't find anyone who cares)
-> > > >> and
-> > > >> Exynos5.
-> > > >> 
-> > > >>> Nice cleanup.
-> > > >> 
-> > > >> Thanks.
-> > > >> 
-> > > >>>> Any comments for this series?
-> > > >>> 
-> > > >>> Yes, above. :) In general looks good -- testing coverage is a bit
-> > > >>> of a
-> > > >>> concern.
-> > > >> 
-> > > >> Yeah. Unfortunately all I could do was testing on Tiny6410 and
-> > > >> compile
-> > > >> testing on others. I hope we find some really helpful people over
-> > > >> here who could waste a bit of their precious time for this museum.
-> > > >> ;)
-> > > > 
-> > > > I'll try to give it a testrun tomorrow. And my s3c2416 will always be
-> > > > the first-love-architecture for me ;-)
-> > > 
-> > > I'll likely test it tomorrow on a Mini2440 board, I was going to do it
-> > > earlier
-> > > but got distracted by plenty other things that needed attention too. At
-> > > least
-> > > that's one of the reasons I got the board - testing the cross-platform
-> > > cleanups
-> > > and ensuring they are not breaking the older platforms.
-> > 
-> > Thank you both for your support. Looking forward for testing results :)
+On Thu, 13 Jun 2013, Olof Johansson wrote:
+
+> > +config ARCH_VEXPRESS_TC2
+> > +	bool "Versatile Express TC2 power management"
 > 
-> on a s3c2416-based machine for dt and non-dt case
-> [with the limit that my machine does not has anything connected to the pwm
-> outputs, so I only get to test the base-pwm and timer part]
+> Should there be a _PM in the config option, perhaps? Or maybe take out the
+> power management one-line info if it's really just base support for the
+> platform.
+
+CONFIG_ARCH_VEXPRESS_TC2_PM it now is.
+
+> > +static int tc2_pm_use_count[3][2];
 > 
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> A comment describing the purpose of this array would be much beneficial for
+> someone reading the driver.
 
-And of course forgot the other thing:
+You are right.  It now looks like this:
 
-Acked-by: Heiko Stuebner <heiko@sntech.de>
+#define TC2_CLUSTERS                    2
+#define TC2_MAX_CPUS_PER_CLUSTER        3
 
-Thanks for doing this, as with this series I can now also resurrect my s3c2416 
-ccf patch :-)
+/* Keep per-cpu usage count to cope with unordered up/down requests */
+static int tc2_pm_use_count[TC2_MAX_CPUS_PER_CLUSTER][TC2_CLUSTERS];
+
+#define tc2_cluster_unused(cluster) \
+        (!tc2_pm_use_count[0][cluster] && \
+         !tc2_pm_use_count[1][cluster] && \
+         !tc2_pm_use_count[2][cluster])
+
+> > +	if (!tc2_pm_use_count[0][cluster] &&
+> > +	    !tc2_pm_use_count[1][cluster] &&
+> > +	    !tc2_pm_use_count[2][cluster])
+> 
+> I see this construct used three times open-coded like this in the file. Adding
+> a smaller helper with a descriptive name would be a good idea.
+
+Good observation.  Being too close to this code makes those issues 
+invisible.  Hence the tc2_cluster_unused() above.
+
+> Same goes for other direct accesses to the array -- maybe a tiny helper to
+> set/get state? It might end up overabstracted that way though.
+
+I would think so.
+
+> > +static void __init tc2_pm_usage_count_init(void)
+> > +{
+> > +	unsigned int mpidr, cpu, cluster;
+> > +
+> > +	mpidr = read_cpuid_mpidr();
+> > +	cpu = MPIDR_AFFINITY_LEVEL(mpidr, 0);
+> > +	cluster = MPIDR_AFFINITY_LEVEL(mpidr, 1);
+> > +
+> > +	pr_debug("%s: cpu %u cluster %u\n", __func__, cpu, cluster);
+> > +	BUG_ON(cpu >= 3 || cluster >= 2);
+> 
+> A warning saying that this hardware configuration is not supported would maybe
+> be more informal for an user trying to boot some mythical future hardware with
+> a too-old kernel.
+
+Hmmm... OK.
 
 
-Heiko
+Nicolas
