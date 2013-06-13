@@ -1,42 +1,120 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Thu, 13 Jun 2013 11:34:58 +0530
-Subject: [PATCH v2 3/3] ARM: s5p64x0: Use common uncompress.h part for
- plat-samsung
-In-Reply-To: <1370319552-17694-4-git-send-email-tushar.behera@linaro.org>
-References: <1370319552-17694-1-git-send-email-tushar.behera@linaro.org>
- <1370319552-17694-4-git-send-email-tushar.behera@linaro.org>
-Message-ID: <51B9610A.20202@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 13 Jun 2013 11:47:52 +0530
+Subject: [PATCH 03/11] gpio: davinci: Modify to platform driver
+In-Reply-To: <518397C60809E147AF5323E0420B992E3EADA252@DBDE04.ent.ti.com>
+References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
+ <1369206634-6778-4-git-send-email-avinashphilip@ti.com>
+ <51B71056.9010103@ti.com>
+ <518397C60809E147AF5323E0420B992E3EAD9D75@DBDE04.ent.ti.com>
+ <51B826BF.7050009@ti.com>
+ <518397C60809E147AF5323E0420B992E3EADA252@DBDE04.ent.ti.com>
+Message-ID: <51B96410.7000807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/04/2013 09:49 AM, Tushar Behera wrote:
-> From: Tomasz Figa <tomasz.figa@gmail.com>
+On 6/12/2013 5:40 PM, Philip, Avinash wrote:
+> On Wed, Jun 12, 2013 at 13:13:59, Nori, Sekhar wrote:
+>> On 6/11/2013 6:25 PM, Philip, Avinash wrote:
+>>
+>>> On Tue, Jun 11, 2013 at 17:26:06, Nori, Sekhar wrote:
+>>
+>>>> On 5/22/2013 12:40 PM, Philip Avinash wrote:
+>>
+>>>>> @@ -179,13 +204,10 @@ static int __init davinci_gpio_setup(void)
+>>>>>  		gpiochip_add(&ctlrs[i].chip);
+>>>>>  	}
+>>>>>  
+>>>>> -	soc_info->gpio_ctlrs = ctlrs;
+>>>>
+>>>>> -	soc_info->gpio_ctlrs_num = DIV_ROUND_UP(ngpio, 32);
+>>>>
+>>>> You drop setting gpio_ctlrs_num here and don't introduce it anywhere
+>>>> else in the patchset so in effect you render the inline gpio get/set API
+>>>> useless. Looks like this initialization should be moved to platform code?
+>>>
+>>> With [PATCH 08/11] ARM: davinci: start using gpiolib support gpio get/set API
+>>> Has no more dependency on soc_info->gpio_ctlrs_num.
+>>
+>> With this series, you have removed support for inline gpio get/set API.
+>> I see that the inline functions are still available for use on
+>> tnetv107x. I wonder why it is important to keep these for tnetv107x when
+>> not necessary for other DaVinci devices?
 > 
-> Since uart_base can be set dynamically in arch_detect_cpu(), there is no
-> need to have a copy of all code locally, just to override UART base
-> address.
-> 
-> This patch removes any duplicate code in uncompress.h variant of s5p64x0
-> and implements proper arch_detect_cpu() function to initialize UART with
-> SoC-specific parameters.
-> 
-> While at it, replace hard-coded register address with macro.
-> 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
-> ---
-> (This patch replaces the original patch in this patchset as it was an
-> earlier-posted near-identical patch.)
-> 
-> Changes for v2:
-> * Remove the declaration of uart_base (taken care in plat/uncompress.h)
-> 
+> To support DT boot in da850, gpio davinci has to be converted to a driver and
+> remove references to davinci_soc_info from driver. But tnetv107x has 
+> separate GPIO driver and reference to davinci_soc_info can also be removed.
+> But I didn't found defconfig support for tnetv107x platforms and left untouched.
+> As I will not be able to build and test on tnetv107x, I prefer to not touch it.
 
-Kukjin,
+You can always build it by enabling it in menuconfig. Its an ARMv6
+platform so you will have to disable other ARMv5 based platforms from
+while enabling it. ARMv5 and ARMv6 cannot co-exist in the same image.
 
-Would you please queue this up for 3.11?
+> 
+>>
+>> When you are removing this feature, please note it prominently in your
+>> cover letter and patch description.
+> 
+> Ok
+> 
+>> Also, please provide some data on 
+>> how the latency now compares to that of inline access earlier. This is
+>> important especially for the read.
+> 
+> I am not sure whether I understood correctly or not? Meanwhile I had done
+> an experiment by reading printk timing before and after gpio_get_value from
+> a test module. I think this will help in software latency for inline access over
+> gpiolib specific access.
+> 
+> gpio_get_value latency testing code
+> 
+> +
+> +       local_irq_disable();
+> +       pr_emerg("%d %x\n", __LINE__, jiffies);
+> +       gpio_get_value(gpio_num);
+> +       pr_emerg("%d %x\n", __LINE__, jiffies);
+> +       local_irq_enable();
+> 
+> inline gpio functions with interrupt disabled
+> [   29.734337] 81 ffff966c
+> [   29.736847] 83 ffff966c
+> 
+> Time diff = 	0.00251
+> 
+> gpio library with interrupt disabled
+> 
+> [  272.876763] 81 fffff567
+> [  272.879291] 83 fffff567
+> 
+> Time diff =	0.002528
+> 
+> Inline function takes less time as expected.
 
-Thanks.
+Okay, please note these experiments in your cover letter. Its an 18usec
+difference. I have no reference to say if that will affect any
+application, but it will at least serve as information for someone who
+may get affected by it.
 
--- 
-Tushar Behera
+> 
+>> For the writes, gpio clock will
+>> mostly determine how soon the value changes on the pin.
+>>
+>> I am okay with removing the inline access feature. It helps simplify
+>> code and most arm machines don't use them. I would just like to see some
+>> data for justification as this can be seen as feature regression. Also,
+>> if we are removing it, its better to also remove it completely and get
+>> the LOC savings instead of just stopping its usage.
+> 
+> I see build failure with below patch for tnetv107x
+> [v6,6/6] Davinci: tnetv107x default configuration 
+
+Where is this patch? What is the commit-id if it is in mainline? Where
+is the failure log?
+
+> 
+> So I prefer to leave tnetv107x platform for now.
+
+I don't think that's acceptable. At least by me.
+
+Thanks,
+Sekhar
