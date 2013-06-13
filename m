@@ -1,133 +1,90 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 13 Jun 2013 15:38:44 +0530
-Subject: [PATCH 2/2] ARM: AM33xx: Remove the unused voltagedomain data
-In-Reply-To: <1371118124-15910-1-git-send-email-rnayak@ti.com>
-References: <1371118124-15910-1-git-send-email-rnayak@ti.com>
-Message-ID: <1371118124-15910-3-git-send-email-rnayak@ti.com>
+From: r.sricharan@ti.com (Sricharan R)
+Date: Thu, 13 Jun 2013 15:42:23 +0530
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <51B98F1E.1000006@ti.com>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191753.468.1734.stgit@localhost>
+ <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+ <20130612163124.GD8164@atomide.com> <20130612171407.GM8164@atomide.com>
+ <51B98F1E.1000006@ti.com>
+Message-ID: <51B99B07.1050806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that there is a way to tell the powerdomain core about
-missing voltage domain control in SoCs', get rid of the dummy
-voltage domain data populated for AM33xx devices.
+On Thursday 13 June 2013 02:51 PM, Sricharan R wrote:
+> Hi Tony,
+> On Wednesday 12 June 2013 10:44 PM, Tony Lindgren wrote:
+>> * Tony Lindgren <tony@atomide.com> [130612 09:37]:
+>>> * Ming Lei <tom.leiming@gmail.com> [130603 08:34]:
+>>>> Hi,
+>>>>
+>>>> On Sat, May 18, 2013 at 3:17 AM, Tony Lindgren <tony@atomide.com> wrote:
+>>>>> We can now boot with device tree. If you don't want to update u-boot,
+>>>>> you can boot with appended DTB with the following instructions:
+>>>>>
+>>>>> 1. Make sure you have the appended DTB support in .config
+>>>>>
+>>>>>    CONFIG_ARM_APPENDED_DTB=y
+>>>>>    CONFIG_ARM_ATAG_DTB_COMPAT=y
+>>>>>    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+>>>>>
+>>>>> 2. Build the zImage
+>>>>>
+>>>>>    $ ARCH=arm CROSS_COMPILE=... make zImage
+>>>>>
+>>>>> 3. Build the device tree blobs
+>>>>>
+>>>>>    $ ARCH=arm CROSS_COMPILE=... make dtbs
+>>>>>
+>>>>> 4. Append the correct panda dtb to zImage
+>>>>>
+>>>>>    Depending on your hardware it's omap4-panda.dtb, omap4-panda-a4.dtb
+>>>>>    or omap4-panda-es.dtb.
+>>>>>
+>>>>>    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-panda-es.dtb > /tmp/appended
+>>>>>
+>>>>> 5. Use mkimage to produce the appended device tree uImage
+>>>>>
+>>>>>    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
+>>>>>      -n "Linux" -d /tmp/appended /tmp/uImage
+>>>> I followed the above steps and tried devicetree on Pandaboard against
+>>>> 3.10.0-rc3-next-20130528, and the board will hang during boot, but works
+>>>> well with legacy mode.
+>>>>
+>>>>          Hardware: Pandaboard A1
+>>>>          dtb: omap4-panda.dtb
+>>>>
+>>>> See 'dmesg' on below link:
+>>>>
+>>>>          http://kernel.ubuntu.com/~ming/up/panda-dts.dmesg
+>>>>
+>>> Hmm looks like it boots to init. Maybe add initcall_debug to the cmdline in
+>>> case there's some late_initcall that causes the issue. It's probably some
+>>> trivial issue causing it.
+>> Sricharan, maybe give this a quick try if you have the original pandaboard?
+>> I only have pandaboard es.
+>>
+>> Regards,
+>>
+>> Tony 
+>  
+> I tried your cleanup branch omap-for-v3.11/cleanup on panda board and it booted
+>  to prompt fine.
+>             Hardware: Pandaboard A1   dtb: omap4-panda.dtb
+>
+>   git pull on linux-next branch was not working though.
+>
+    Ok, tested in linux-next as well and it booted fine with DTB.
+     HW: OMAP4430ES2.1 PANDA A1 version DTB: OMAP4-PANDA.DTB
+  
+    Booted with ramdisk and mmc FS
 
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/Makefile                  |    1 -
- arch/arm/mach-omap2/io.c                      |    1 -
- arch/arm/mach-omap2/prm33xx.c                 |    7 ++++
- arch/arm/mach-omap2/voltage.h                 |    1 -
- arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 -------------------------
- 5 files changed, 7 insertions(+), 46 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
+commit c04efed734409f5a44715b54a6ca1b54b0ccf215
+Author: Stephen Rothwell <sfr@canb.auug.org.au>
+Date:   Fri Jun 7 16:40:02 2013 +1000
 
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index 55a9d67..a4f1d2a 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -125,7 +125,6 @@ obj-$(CONFIG_ARCH_OMAP3)		+= voltagedomains3xxx_data.o
- obj-$(CONFIG_ARCH_OMAP4)		+= $(voltagedomain-common)
- obj-$(CONFIG_ARCH_OMAP4)		+= voltagedomains44xx_data.o
- obj-$(CONFIG_SOC_AM33XX)		+= $(voltagedomain-common)
--obj-$(CONFIG_SOC_AM33XX)                += voltagedomains33xx_data.o
- obj-$(CONFIG_SOC_OMAP5)			+= $(voltagedomain-common)
- 
- # OMAP powerdomain framework
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 09abf99..50b93df 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -577,7 +577,6 @@ void __init am33xx_init_early(void)
- 	omap2_set_globals_cm(AM33XX_L4_WK_IO_ADDRESS(AM33XX_PRCM_BASE), NULL);
- 	omap3xxx_check_revision();
- 	ti81xx_check_features();
--	am33xx_voltagedomains_init();
- 	am33xx_powerdomains_init();
- 	am33xx_clockdomains_init();
- 	am33xx_hwmod_init();
-diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-index 44c0d72..7204407 100644
---- a/arch/arm/mach-omap2/prm33xx.c
-+++ b/arch/arm/mach-omap2/prm33xx.c
-@@ -320,6 +320,12 @@ static int am33xx_pwrdm_wait_transition(struct powerdomain *pwrdm)
- 	return 0;
- }
- 
-+static int am33xx_check_vcvp(void)
-+{
-+	/* No VC/VP on am33xx devices */
-+	return 0;
-+}
-+
- struct pwrdm_ops am33xx_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst		= am33xx_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst		= am33xx_pwrdm_read_next_pwrst,
-@@ -335,4 +341,5 @@ struct pwrdm_ops am33xx_pwrdm_operations = {
- 	.pwrdm_set_mem_onst		= am33xx_pwrdm_set_mem_onst,
- 	.pwrdm_set_mem_retst		= am33xx_pwrdm_set_mem_retst,
- 	.pwrdm_wait_transition		= am33xx_pwrdm_wait_transition,
-+	.pwrdm_has_voltdm		= am33xx_check_vcvp,
- };
-diff --git a/arch/arm/mach-omap2/voltage.h b/arch/arm/mach-omap2/voltage.h
-index a0ce4f1..9bf796d 100644
---- a/arch/arm/mach-omap2/voltage.h
-+++ b/arch/arm/mach-omap2/voltage.h
-@@ -169,7 +169,6 @@ int omap_voltage_late_init(void);
- 
- extern void omap2xxx_voltagedomains_init(void);
- extern void omap3xxx_voltagedomains_init(void);
--extern void am33xx_voltagedomains_init(void);
- extern void omap44xx_voltagedomains_init(void);
- 
- struct voltagedomain *voltdm_lookup(const char *name);
-diff --git a/arch/arm/mach-omap2/voltagedomains33xx_data.c b/arch/arm/mach-omap2/voltagedomains33xx_data.c
-deleted file mode 100644
-index 965458d..0000000
---- a/arch/arm/mach-omap2/voltagedomains33xx_data.c
-+++ /dev/null
-@@ -1,43 +0,0 @@
--/*
-- * AM33XX voltage domain data
-- *
-- * Copyright (C) 2011 Texas Instruments Incorporated - http://www.ti.com/
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License as
-- * published by the Free Software Foundation version 2.
-- *
-- * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-- * kind, whether express or implied; without even the implied warranty
-- * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
--
--#include <linux/kernel.h>
--#include <linux/init.h>
--
--#include "voltage.h"
--
--static struct voltagedomain am33xx_voltdm_mpu = {
--	.name		= "mpu",
--};
--
--static struct voltagedomain am33xx_voltdm_core = {
--	.name		= "core",
--};
--
--static struct voltagedomain am33xx_voltdm_rtc = {
--	.name		= "rtc",
--};
--
--static struct voltagedomain *voltagedomains_am33xx[] __initdata = {
--	&am33xx_voltdm_mpu,
--	&am33xx_voltdm_core,
--	&am33xx_voltdm_rtc,
--	NULL,
--};
--
--void __init am33xx_voltagedomains_init(void)
--{
--	voltdm_init(voltagedomains_am33xx);
--}
--- 
-1.7.9.5
+    Add linux-next specific files for 20130607
+   
+
+Regards,
+ Sricharan
