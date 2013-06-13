@@ -1,60 +1,113 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:31 +0900
-Subject: [PATCH 07/12] phy-rcar-usb: add platform data
+Date: Thu, 13 Jun 2013 16:00:28 +0900
+Subject: [PATCH 04/12] phy-rcar-usb: remove EHCI internal buffer setup
 In-Reply-To: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106836-25388-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106836-25388-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Currently the driver hard-codes  USBPCTRL0 register to 0. It is wrong since this
-register contains board-specific USB ports configuration and so its value should
-be somehow passed via the platform data.  Add the global header file containing
-'struct rcar_phy_platform_data' consisting of the various bit fields describing
-USB ports' pin configuration.
+Now that the EHCI internal  buffer setup is done by the platform code,  we  can
+remove  such code from this driver as it  never  really belonged here.  We also
+no longer need the 2nd memory region now (2nd EHCI controller is simply missing
+in e.g. R8A7778 SoC).
+
+The patch has been tested on the Marzen and BOCK-W boards.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Acked-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- include/linux/platform_data/usb-rcar-phy.h | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
- create mode 100644 include/linux/platform_data/usb-rcar-phy.h
+ drivers/usb/phy/phy-rcar-usb.c | 28 ++++------------------------
+ 1 file changed, 4 insertions(+), 24 deletions(-)
 
-diff --git a/include/linux/platform_data/usb-rcar-phy.h b/include/linux/platform_data/usb-rcar-phy.h
-new file mode 100644
-index 0000000..c49f35a
---- /dev/null
-+++ b/include/linux/platform_data/usb-rcar-phy.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright (C) 2013 Renesas Solutions Corp.
-+ * Copyright (C) 2013 Cogent Embedded, Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __USB_RCAR_PHY_H
-+#define __USB_RCAR_PHY_H
-+
-+#include <linux/types.h>
-+
-+struct rcar_phy_platform_data {
-+	bool port1_func:1;	/* true: port 1 used by function, false: host */
-+	unsigned penc1:1;	/* Output of the PENC1 pin in function mode */
-+	struct {		/* Overcurrent pin control for ports 0..2 */
-+		bool select_3_3v:1; /* true: USB_OVCn pin, false: OVCn pin */
-+				/* Set to false on port 1 in function mode */
-+		bool active_high:1; /* true: active  high, false: active low */
-+				/* Set to true  on port 1 in function mode */
-+	} ovc_pin[3];
-+};
-+
-+#endif /* __USB_RCAR_PHY_H */
+diff --git a/drivers/usb/phy/phy-rcar-usb.c b/drivers/usb/phy/phy-rcar-usb.c
+index a35681b..4893dbd 100644
+--- a/drivers/usb/phy/phy-rcar-usb.c
++++ b/drivers/usb/phy/phy-rcar-usb.c
+@@ -23,8 +23,6 @@
+ #define USBEH0		0x080C
+ #define USBOH0		0x081C
+ #define USBCTL0		0x0858
+-#define EIIBC1		0x0094
+-#define EIIBC2		0x009C
+ 
+ /* USBPCTRL1 */
+ #define PHY_RST		(1 << 2)
+@@ -40,7 +38,6 @@ struct rcar_usb_phy_priv {
+ 	spinlock_t lock;
+ 
+ 	void __iomem *reg0;
+-	void __iomem *reg1;
+ 	int counter;
+ };
+ 
+@@ -59,7 +56,6 @@ static int rcar_usb_phy_init(struct usb_phy *phy)
+ 	struct rcar_usb_phy_priv *priv = usb_phy_to_priv(phy);
+ 	struct device *dev = phy->dev;
+ 	void __iomem *reg0 = priv->reg0;
+-	void __iomem *reg1 = priv->reg1;
+ 	int i;
+ 	u32 val;
+ 	unsigned long flags;
+@@ -97,19 +93,6 @@ static int rcar_usb_phy_init(struct usb_phy *phy)
+ 		iowrite32(0x00000000, (reg0 + USBPCTRL0));
+ 
+ 		/*
+-		 * EHCI IP internal buffer setting
+-		 * EHCI IP internal buffer enable
+-		 *
+-		 * These are recommended value of a datasheet
+-		 * see [USB :: EHCI internal buffer setting]
+-		 */
+-		iowrite32(0x00ff0040, (reg0 + EIIBC1));
+-		iowrite32(0x00ff0040, (reg1 + EIIBC1));
+-
+-		iowrite32(0x00000001, (reg0 + EIIBC2));
+-		iowrite32(0x00000001, (reg1 + EIIBC2));
+-
+-		/*
+ 		 * Bus alignment settings
+ 		 */
+ 
+@@ -145,14 +128,13 @@ static void rcar_usb_phy_shutdown(struct usb_phy *phy)
+ static int rcar_usb_phy_probe(struct platform_device *pdev)
+ {
+ 	struct rcar_usb_phy_priv *priv;
+-	struct resource *res0, *res1;
++	struct resource *res0;
+ 	struct device *dev = &pdev->dev;
+-	void __iomem *reg0, *reg1;
++	void __iomem *reg0;
+ 	int ret;
+ 
+ 	res0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	res1 = platform_get_resource(pdev, IORESOURCE_MEM, 1);
+-	if (!res0 || !res1) {
++	if (!res0) {
+ 		dev_err(dev, "Not enough platform resources\n");
+ 		return -EINVAL;
+ 	}
+@@ -164,8 +146,7 @@ static int rcar_usb_phy_probe(struct platform_device *pdev)
+ 	 * this driver can't use devm_request_and_ioremap(dev, res) here
+ 	 */
+ 	reg0 = devm_ioremap_nocache(dev, res0->start, resource_size(res0));
+-	reg1 = devm_ioremap_nocache(dev, res1->start, resource_size(res1));
+-	if (!reg0 || !reg1) {
++	if (!reg0) {
+ 		dev_err(dev, "ioremap error\n");
+ 		return -ENOMEM;
+ 	}
+@@ -177,7 +158,6 @@ static int rcar_usb_phy_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	priv->reg0		= reg0;
+-	priv->reg1		= reg1;
+ 	priv->counter		= 0;
+ 	priv->phy.dev		= dev;
+ 	priv->phy.label		= dev_name(dev);
 -- 
 1.8.2.1
