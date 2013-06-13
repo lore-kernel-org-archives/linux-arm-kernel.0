@@ -1,338 +1,116 @@
-From: mario.smarduch@huawei.com (Mario Smarduch)
-Date: Thu, 13 Jun 2013 17:16:13 +0200
-Subject: [PATCH 1/2] support for IRQ priority drop deactivation
-Message-ID: <51B9E23D.5040901@huawei.com>
+From: james.hogan@imgtec.com (James Hogan)
+Date: Thu, 13 Jun 2013 16:18:57 +0100
+Subject: [PATCH v4 5/5] clk: clk-mux: implement remuxing on set_rate
+In-Reply-To: <CAD=FV=VFqTzqLc3+UOHD21NiTqtu84DzwYD1Qag-RxiD0qcFDA@mail.gmail.com>
+References: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
+ <1369056507-32521-6-git-send-email-james.hogan@imgtec.com>
+ <519AFBB6.90700@codeaurora.org>
+ <CAD=FV=VFqTzqLc3+UOHD21NiTqtu84DzwYD1Qag-RxiD0qcFDA@mail.gmail.com>
+Message-ID: <51B9E2E1.9020203@imgtec.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Updated Priority Drop/Deactivation patch -
-- moved bitmap to per gic data
-- moved initialization of gic irqchip eoi handler to gic_init_bases
-- cleaned up the code per suggestions.
-- added documentation
+On 12/06/13 02:01, Doug Anderson wrote:
+> Hi,
+> 
+> Mike pointed me at this series since I'm running into parenting
+> problems at the moment as well...
+> 
+> On Mon, May 20, 2013 at 9:44 PM, Saravana Kannan <skannan@codeaurora.org> wrote:
+>> While writing a similar code for our internal tree, I quickly came to the
+>> realization that, "all parents are equal, but some are more equal than
+>> others". The simplest example is a clock tree like this:
+>>
+>> Source -> Divider -> Mux
+>> Source -> Mux
+>>
+>> A rate of Y can be achieved for Mux by either running Source at Y and
+>> picking that input or running Source at Y * 2 and Divider set to div-2 and
+>> picking the Divider input.
+>>
+>> The solution seems to be a priority list of parents. I'm sure there would be
+>> other reason (jitter, clock quality, etc) for a mux to pick one parent vs.
+>> another when both of them can provide the required rate.
+>>
+>> I think this loop should loop over parents based on their priority order.
+>> So, parents should become a struct of { clk, index } and have the parents
+>> listed in the order of priority. Well, at least in that long run that would
+>> be better to avoid messing up parent/index values. But for now, you could
+>> just have a priority array of index or parents.
+>>
+>> It might not fit 100% of the cases where two parents can provide the same
+>> rate, but it should fit most use cases.
+> 
+> I'm slightly worried about similar problems, but I don't have a really
+> great solution.
+> 
+> In my case I'm working on exynos5 hardware which has a bunch of PLLs
+> and a crazy number of muxing options.  Many of the muxing options are
+> not really meant to be used but seem to have been added to the SoC as
+> a "backup plan" of some sort.  :-/  Most of the PLLs are intended to
+> be used for one purpose and one purpose only though muxing options
+> allow them to be used all over the place.
+> 
+> For instance if I look at my current bootup of exynos5250-snow, I see:
+> 
+> fout_apll/clk_rate:1700000000
+> fout_bpll/clk_rate:800000000
+> fout_cpll/clk_rate:333000000
+> fout_epll/clk_rate:45158401
+> fout_gpll/clk_rate:533000000
+> fout_mpll/clk_rate:1600000000
+> 
+> * APLL is intended to be the parent of the 2 ARM cores and changes due
+> to cpu load
+> * EPLL is intended to be the parent for audio and changes dpending on
+> audio playback rates.
+> * GPLL is intended to be the parent of the GPU and changes due to gpu load
+> * VPLL is intended to be the parent for video related things and could
+> change depending on the LCD.
+> * MPLL doesn't change a lot and is intended to be the parent for most things.
+> * In some systems BPLL can be used for memory or GPU
+> 
+> My main concern here is the CCF will end up deciding at some point
+> that it should reparent some clock onto a PLL that is going to change
+> a whole lot.  Maybe the user will plug in an SD card that requests a
+> frequency of 52MHz and at the moment we'll be running EPLL at 104 MHz
+> so it will be a perfect match!  ...but then the user wants to play
+> audio at a different rate.  The audio code assumes that it can mess
+> with its clock and we've got code setup to call CLK_SET_RATE_PARENT
+> all the way up to EPLL.  That will really mess with the SD card.
+> Really we'd rather just have the SD card clock always parented on the
+> stable MPLL and it's OK if 52MHz gets rounded down to 50MHz.
 
-Signed-off-by: Mario Smarduch <mario.smarduch@huawei.com>
----
- arch/arm/kvm/Kconfig            |    8 ++
- drivers/irqchip/irq-gic.c       |  204 ++++++++++++++++++++++++++++++++++++++-
- include/linux/irqchip/arm-gic.h |    6 ++
- 3 files changed, 213 insertions(+), 5 deletions(-)
+One possible approach to handling this is by making drivers register
+clock rate change notifications, which can reject a clock rate change,
+however I believe at the moment this would simply make the clock rate
+change fail rather than finding an alternative change which isn't
+rejected, so it may have limited use at the moment.
 
-diff --git a/arch/arm/kvm/Kconfig b/arch/arm/kvm/Kconfig
-index 370e1a8..ae69e9a 100644
---- a/arch/arm/kvm/Kconfig
-+++ b/arch/arm/kvm/Kconfig
-@@ -59,6 +59,14 @@ config KVM_ARM_VGIC
- 	---help---
- 	  Adds support for a hardware assisted, in-kernel GIC emulation.
- 
-+config KVM_ARM_INT_PRIO_DROP
-+        bool "KVM support for Interrupt pass-through"
-+        depends on KVM_ARM_VGIC && OF
-+        default n
-+        ---help---
-+	  Seperates interrupt priority drop and deactivation to enable device
-+	  pass-through to Guests.
-+
- config KVM_ARM_TIMER
- 	bool "KVM support for Architected Timers"
- 	depends on KVM_ARM_VGIC && ARM_ARCH_TIMER
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 1760ceb..ac345ec 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -41,10 +41,13 @@
- #include <linux/slab.h>
- #include <linux/irqchip/chained_irq.h>
- #include <linux/irqchip/arm-gic.h>
-+#include <linux/irqflags.h>
-+#include <linux/bitops.h>
- 
- #include <asm/irq.h>
- #include <asm/exception.h>
- #include <asm/smp_plat.h>
-+#include <asm/virt.h>
- 
- #include "irqchip.h"
- 
-@@ -68,6 +71,9 @@ struct gic_chip_data {
- #ifdef CONFIG_GIC_NON_BANKED
- 	void __iomem *(*get_base)(union gic_base *);
- #endif
-+#ifdef CONFIG_KVM_ARM_INT_PRIO_DROP
-+	DECLARE_BITMAP(gic_irq_prio_drop, 1020);
-+#endif
- };
- 
- static DEFINE_RAW_SPINLOCK(irq_controller_lock);
-@@ -148,6 +154,189 @@ static inline unsigned int gic_irq(struct irq_data *d)
- 	return d->hwirq;
- }
- 
-+#ifdef CONFIG_KVM_ARM_INT_PRIO_DROP
-+static inline unsigned long *get_priodrop_map(int irq)
-+{
-+	struct irq_data *d = irq_get_irq_data(irq);
-+	return ((struct gic_chip_data *) (d->chip_data))->gic_irq_prio_drop;
-+}
-+
-+/**
-+ * void gic_eoi_irq_priodrop() - process end of interrupt handling for
-+ *			         passthrough IRQs
-+ * @struct irq_data *d:	irq_data associed irq_desc
-+ *
-+ * When Priority Drop/Deactivation is set this handler replaces the standard
-+ * EOI (irq_eoi) handler. The use of this handler will applyt to IRQa on all
-+ * CPU for end of interrupt operation. This mode of operations is for
-+ * passing IRQs through to guest, and eliminate guest exit for EOI execution.
-+ * IRQs not marked for passthrough will write to CPU EOIR and DIR registers,
-+ * IRQs makred for passhtrough will only write to EOIR register and guests
-+ * write to EOIR register will reactivate the IRQ being passed through.
-+ *
-+ * IMPORTANT - when enabling this feature the host GICC interface must map
-+ * additional page, the device tree should be updated to map 0x2000 instead
-+ * of 0x1000.
-+ *
-+ * Return: void
-+ */
-+static void gic_eoi_irq_priodrop(struct irq_data *d)
-+{
-+	if (gic_arch_extn.irq_eoi) {
-+		raw_spin_lock(&irq_controller_lock);
-+		gic_arch_extn.irq_eoi(d);
-+		raw_spin_unlock(&irq_controller_lock);
-+	}
-+
-+	/* Set from KVM device passthrough to determine which interrupts
-+	 * must be deactivated by the Guest.
-+	 */
-+	if (unlikely(gic_spi_get_priodrop(gic_irq(d)))) {
-+		/*
-+		 * IRQ marked for priority drop, deactivation is deferred
-+		 * in this case the Guest deactivates the interrupt, or regular
-+		 * path if GCTLR.EOImodeNS=0 or not suppored.
-+		 */
-+		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
-+	} else {
-+		/*
-+		 * De-prioritize/de-activate interrupt, disable interrupts
-+		 * so lower priority interrupt does not stall this one.
-+		 */
-+		unsigned long flags;
-+		raw_local_irq_save(flags);
-+		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
-+		writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_DIR);
-+		raw_local_irq_restore(flags);
-+	}
-+}
-+/**
-+ * gic_enable_gicc() - enable CPU GIC interface
-+ * @struct gic_chip_data *gic - gic chip data for GIC interface
-+ *
-+ * If HYP mode is enabled puts CPU GIC interface int priodrop mode. SGI bits
-+ * are set in per-gic prio drop map to proces EOI for SGI correctly.
-+ * It may happen that boot CPU will set HYP mode to true but subsequent CPUs
-+ * may turn HYP mode off and system may come up in mixed mode. Writes to CPU
-+ * DIR register with priodrop disabled results in upredictable access.
-+ * In this case the host will panic. The Guest never runs in priodrop
-+ * mode.
-+ *
-+ * Return: void
-+ */
-+static void gic_enable_gicc(struct gic_chip_data *gic)
-+{
-+	static bool priodrop_set;
-+	if (is_hyp_mode_available()) {
-+		/*
-+		 * Allow Priority Drop in host, but not in Guest
-+		 */
-+		gic->gic_irq_prio_drop[0] = (u32) (1 << 16) - 1;
-+		writel_relaxed(0x201, gic_data_cpu_base(gic)  + GIC_CPU_CTRL);
-+		priodrop_set = true;
-+	} else {
-+		if (priodrop_set  == true)
-+			panic("OS misconfigured running in mixed interrupt modes");
-+		writel_relaxed(1, gic_data_cpu_base(gic) + GIC_CPU_CTRL);
-+	}
-+}
-+/**
-+ * gic_eoi_sgi() - end of interrupt for SGIs in priodrop mode
-+ *
-+ * @u32 irqstat - EOI word
-+ * @struct gic_chip_data *gic - per GIC interface chip data
-+ *
-+ * Handles SGI EOI handling, for host writes to EOIR and DIR registers. For
-+ * Guest to EOIR only.
-+ *
-+ * Return: void
-+ */
-+static void gic_eoi_sgi(u32 irqstat, struct gic_chip_data *gic)
-+{
-+	unsigned long flags;
-+	if (unlikely(gic->gic_irq_prio_drop[0] & (1<<((irqstat & ~0x1c00) % 16)))) {
-+		raw_local_irq_save(flags);
-+		writel_relaxed(irqstat, gic_data_cpu_base(gic) + GIC_CPU_EOI);
-+		writel_relaxed(irqstat, gic_data_cpu_base(gic) + GIC_CPU_DIR);
-+		raw_local_irq_restore(flags);
-+		return;
-+	}
-+	writel_relaxed(irqstat, gic_data_cpu_base(gic) + GIC_CPU_EOI);
-+}
-+
-+/**
-+ * gic_spi_set_priodrop() - set IRQ to priodrop mode
-+ *
-+ * @int irq - the IRQ for passthrough
-+ *
-+ * Hypervisor code sets this bit for interrupt passthrough.
-+ *
-+ * Return: void
-+ */
-+void gic_spi_set_priodrop(int irq)
-+{
-+	if (likely(irq >= 32 && irq <= 1020))
-+		set_bit(irq, get_priodrop_map(irq));
-+}
-+
-+/**
-+ * gic_spi_clr_priodrop() - clears priodrop for IRQ
-+ *
-+ * @int irq - the IRQ to clear passthrough
-+ *
-+ * Hypervisor code sets this to interrupt passthrough for the IRQ
-+ *
-+ * Return: void
-+ */
-+void gic_spi_clr_priodrop(int irq)
-+{
-+	struct irq_data *d = irq_get_irq_data(irq);
-+	if (likely(irq >= 32 && irq < 1020)) {
-+		clear_bit(irq, get_priodrop_map(irq));
-+		writel_relaxed(irq, gic_cpu_base(d) + GIC_CPU_DIR);
-+	}
-+}
-+
-+/**
-+ * gic_spi_get_priodrop() - determine if interrupt is set for passthrough
-+ *
-+ * @int irq - irq to check passhtrough status
-+ *
-+ * Used by priodrop eoi code and Hypervisor to check IRQ priority drop status.
-+ *
-+ * Return: bool - true if irq set for passthrough.
-+ */
-+bool gic_spi_get_priodrop(int irq)
-+{
-+	if (likely(irq >= 32 && irq <= 1020))
-+		return test_bit(irq, get_priodrop_map(irq));
-+	return false;
-+}
-+#else
-+static void gic_eoi_irq_priodrop(struct irq_data *d)
-+{
-+}
-+static void gic_enable_gicc(struct gic_chip_data *gic)
-+{
-+	writel_relaxed(1, gic_data_cpu_base(gic) + GIC_CPU_CTRL);
-+}
-+static void gic_eoi_sgi(u32 irqstat, struct gic_chip_data *gic)
-+{
-+	writel_relaxed(irqstat, gic_data_cpu_base(gic) + GIC_CPU_EOI);
-+}
-+void gic_spi_set_priodrop(int irq)
-+{
-+}
-+void gic_spi_clr_priodrop(int irq)
-+{
-+}
-+bool gic_spi_get_priodrop(int irq)
-+{
-+	return false;
-+}
-+#endif
-+
-+
- /*
-  * Routines to acknowledge, disable and enable interrupts
-  */
-@@ -180,7 +369,6 @@ static void gic_eoi_irq(struct irq_data *d)
- 		gic_arch_extn.irq_eoi(d);
- 		raw_spin_unlock(&irq_controller_lock);
- 	}
--
- 	writel_relaxed(gic_irq(d), gic_cpu_base(d) + GIC_CPU_EOI);
- }
- 
-@@ -296,7 +484,7 @@ static asmlinkage void __exception_irq_entry gic_handle_irq(struct pt_regs *regs
- 			continue;
- 		}
- 		if (irqnr < 16) {
--			writel_relaxed(irqstat, cpu_base + GIC_CPU_EOI);
-+			gic_eoi_sgi(irqstat, gic);
- #ifdef CONFIG_SMP
- 			handle_IPI(irqnr, regs);
- #endif
-@@ -450,7 +638,7 @@ static void __cpuinit gic_cpu_init(struct gic_chip_data *gic)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4 / 4);
- 
- 	writel_relaxed(0xf0, base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, base + GIC_CPU_CTRL);
-+	gic_enable_gicc(gic);
- }
- 
- #ifdef CONFIG_CPU_PM
-@@ -585,7 +773,7 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 		writel_relaxed(0xa0a0a0a0, dist_base + GIC_DIST_PRI + i * 4);
- 
- 	writel_relaxed(0xf0, cpu_base + GIC_CPU_PRIMASK);
--	writel_relaxed(1, cpu_base + GIC_CPU_CTRL);
-+	gic_enable_gicc(&gic_data[gic_nr]);
- }
- 
- static int gic_notifier(struct notifier_block *self, unsigned long cmd,	void *v)
-@@ -735,6 +923,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
- 
- 	BUG_ON(gic_nr >= MAX_GIC_NR);
- 
-+	/*
-+	 * If HYP mode enabled and PRIO DROP set EOIR function to handle PRIO
-+	 * DROP
-+	 */
-+	if (IS_ENABLED(CONFIG_KVM_ARM_INT_PRIO_DROP) && is_hyp_mode_available())
-+		gic_chip.irq_eoi = gic_eoi_irq_priodrop;
-+
- 	gic = &gic_data[gic_nr];
- #ifdef CONFIG_GIC_NON_BANKED
- 	if (percpu_offset) { /* Frankein-GIC without banked registers... */
-@@ -856,5 +1051,4 @@ IRQCHIP_DECLARE(cortex_a15_gic, "arm,cortex-a15-gic", gic_of_init);
- IRQCHIP_DECLARE(cortex_a9_gic, "arm,cortex-a9-gic", gic_of_init);
- IRQCHIP_DECLARE(msm_8660_qgic, "qcom,msm-8660-qgic", gic_of_init);
- IRQCHIP_DECLARE(msm_qgic2, "qcom,msm-qgic2", gic_of_init);
--
- #endif
-diff --git a/include/linux/irqchip/arm-gic.h b/include/linux/irqchip/arm-gic.h
-index 3e203eb..5a906c9 100644
---- a/include/linux/irqchip/arm-gic.h
-+++ b/include/linux/irqchip/arm-gic.h
-@@ -17,6 +17,7 @@
- #define GIC_CPU_EOI			0x10
- #define GIC_CPU_RUNNINGPRI		0x14
- #define GIC_CPU_HIGHPRI			0x18
-+#define GIC_CPU_DIR                     0x1000
- 
- #define GIC_DIST_CTRL			0x000
- #define GIC_DIST_CTR			0x004
-@@ -73,6 +74,11 @@ static inline void gic_init(unsigned int nr, int start,
- 	gic_init_bases(nr, start, dist, cpu, 0, NULL);
- }
- 
-+/* Functions to manage interrupt pass-through via priority drop/deactivation */
-+void gic_spi_set_priodrop(int);
-+void gic_spi_clr_priodrop(int);
-+bool gic_spi_get_priodrop(int);
-+
- #endif /* __ASSEMBLY */
- 
- #endif
--- 
-1.7.9.5
+> Of course, on another board maybe they don't have an audio codec and
+> aren't using epll for audio and have realized that EPLL would be a
+> perfect way to get their SD card to run 4% faster.  It ought to work.
+> 
+> 
+> I guess to summarize the above:
+> 
+> * It seems like much of the muxing on exynos5250 is just too
+> complicated to leave it to an simple automated algorithm.
+> * It seems like we can't make muxing decisions on the SoC level.
+> * Your automatic muxing patches don't hurt me and could be useful for
+> _some_ of the muxing options, just not the top PLL ones.
+> 
+> ...but the only place that leaves me for my muxing needs is the device
+> tree.  ...and as Mike pointed out on IRC the device tree should
+> describe hardware, not policy.  Ick.
+
+Yes, we have a similar situation with the TZ1090, except it may be worse
+as some of the clocks/devices may be driven by different non-Linux cores
+or hardware threads (e.g. the WiFi/DAB firmware drives the I2C/SPI bus
+the tuner chip is connected to, and related clocks), in which case Linux
+literally has no knowledge of whether the hardware is already in use
+aside from some form of application-specific configuration (currently
+munged into device tree due to the lack of an alternative).
+
+Cheers
+James
