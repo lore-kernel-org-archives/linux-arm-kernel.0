@@ -1,231 +1,352 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:35 +0900
-Subject: [PATCH 11/12] ARM: shmobile: r8a7778: add USB support
-In-Reply-To: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106836-25388-12-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 16:00:53 +0900
+Subject: [PATCH 1/2] serial: sh-sci: HSCIF support
+In-Reply-To: <1371106854-25560-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371106854-25560-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106854-25560-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Ulrich Hecht <ulrich.hecht@gmail.com>
 
-Add USB clock and EHCI, OHCI, and USB PHY platform devices for R8A7778 SoC;  add
-a function to register PHY device with board-specific platform data and register
-EHCI and OHCI platfrom devices from the init_late() board method.
+Adds support for "High Speed Serial Communications Interface with FIFO",
+essentially a SCIF with 128-byte FIFOs and more accurate baud rate
+generator.
 
-Also,  don't forget to enable CONFIG_ARCH_HAS_[EO]HCI options for R8A7778 SoC in
-Kconfig...
-
-The patch has been tested on the BOCK-W board.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+Acked-by: Paul Mundt <lethal@linux-sh.org>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig                |   2 +
- arch/arm/mach-shmobile/clock-r8a7778.c        |   4 +
- arch/arm/mach-shmobile/include/mach/r8a7778.h |   3 +
- arch/arm/mach-shmobile/setup-r8a7778.c        | 108 ++++++++++++++++++++++++++
- 4 files changed, 117 insertions(+)
+ drivers/tty/serial/sh-sci.c      | 102 ++++++++++++++++++++++++++++++++++++---
+ include/linux/serial_sci.h       |  12 +++--
+ include/uapi/linux/serial_core.h |   3 ++
+ 3 files changed, 106 insertions(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 5414402..757c4e9 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -41,6 +41,8 @@ config ARCH_R8A7778
- 	select CPU_V7
- 	select SH_CLK_CPG
- 	select ARM_GIC
-+	select USB_ARCH_HAS_EHCI
-+	select USB_ARCH_HAS_OHCI
+diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
+index 1564186..931d6c3 100644
+--- a/drivers/tty/serial/sh-sci.c
++++ b/drivers/tty/serial/sh-sci.c
+@@ -146,6 +146,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= sci_reg_invalid,
+ 		[SCSPTR]	= sci_reg_invalid,
+ 		[SCLSR]		= sci_reg_invalid,
++		[HSSRR]		= sci_reg_invalid,
+ 	},
  
- config ARCH_R8A7779
- 	bool "R-Car H1 (R8A77790)"
-diff --git a/arch/arm/mach-shmobile/clock-r8a7778.c b/arch/arm/mach-shmobile/clock-r8a7778.c
-index b251e4d..696d206 100644
---- a/arch/arm/mach-shmobile/clock-r8a7778.c
-+++ b/arch/arm/mach-shmobile/clock-r8a7778.c
-@@ -105,6 +105,7 @@ static struct clk *main_clks[] = {
- enum {
- 	MSTP323, MSTP322, MSTP321,
- 	MSTP114,
-+	MSTP100,
- 	MSTP026, MSTP025, MSTP024, MSTP023, MSTP022, MSTP021,
- 	MSTP016, MSTP015,
- 	MSTP_NR };
-@@ -114,6 +115,7 @@ static struct clk mstp_clks[MSTP_NR] = {
- 	[MSTP322] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 22, 0), /* SDHI1 */
- 	[MSTP321] = SH_CLK_MSTP32(&p_clk, MSTPCR3, 21, 0), /* SDHI2 */
- 	[MSTP114] = SH_CLK_MSTP32(&p_clk, MSTPCR1, 14, 0), /* Ether */
-+	[MSTP100] = SH_CLK_MSTP32(&p_clk, MSTPCR1,  0, 0), /* USB0/1 */
- 	[MSTP026] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 26, 0), /* SCIF0 */
- 	[MSTP025] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 25, 0), /* SCIF1 */
- 	[MSTP024] = SH_CLK_MSTP32(&p_clk, MSTPCR0, 24, 0), /* SCIF2 */
-@@ -130,6 +132,8 @@ static struct clk_lookup lookups[] = {
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.1", &mstp_clks[MSTP322]), /* SDHI1 */
- 	CLKDEV_DEV_ID("sh_mobile_sdhi.2", &mstp_clks[MSTP321]), /* SDHI2 */
- 	CLKDEV_DEV_ID("sh-eth",	&mstp_clks[MSTP114]), /* Ether */
-+	CLKDEV_DEV_ID("ehci-platform", &mstp_clks[MSTP100]), /* USB EHCI port0/1 */
-+	CLKDEV_DEV_ID("ohci-platform", &mstp_clks[MSTP100]), /* USB OHCI port0/1 */
- 	CLKDEV_DEV_ID("sh-sci.0", &mstp_clks[MSTP026]), /* SCIF0 */
- 	CLKDEV_DEV_ID("sh-sci.1", &mstp_clks[MSTP025]), /* SCIF1 */
- 	CLKDEV_DEV_ID("sh-sci.2", &mstp_clks[MSTP024]), /* SCIF2 */
-diff --git a/arch/arm/mach-shmobile/include/mach/r8a7778.h b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-index ae65b45..1d4207c 100644
---- a/arch/arm/mach-shmobile/include/mach/r8a7778.h
-+++ b/arch/arm/mach-shmobile/include/mach/r8a7778.h
-@@ -20,10 +20,13 @@
+ 	/*
+@@ -165,6 +166,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= sci_reg_invalid,
+ 		[SCSPTR]	= sci_reg_invalid,
+ 		[SCLSR]		= sci_reg_invalid,
++		[HSSRR]		= sci_reg_invalid,
+ 	},
  
- #include <linux/mmc/sh_mobile_sdhi.h>
- #include <linux/sh_eth.h>
-+#include <linux/platform_data/usb-rcar-phy.h>
+ 	/*
+@@ -183,6 +185,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= sci_reg_invalid,
+ 		[SCSPTR]	= sci_reg_invalid,
+ 		[SCLSR]		= sci_reg_invalid,
++		[HSSRR]		= sci_reg_invalid,
+ 	},
  
- extern void r8a7778_add_standard_devices(void);
- extern void r8a7778_add_standard_devices_dt(void);
- extern void r8a7778_add_ether_device(struct sh_eth_plat_data *pdata);
-+extern void r8a7778_add_usb_phy_device(struct rcar_phy_platform_data *pdata);
-+extern void r8a7778_init_late(void);
- extern void r8a7778_init_delay(void);
- extern void r8a7778_init_irq(void);
- extern void r8a7778_init_irq_dt(void);
-diff --git a/arch/arm/mach-shmobile/setup-r8a7778.c b/arch/arm/mach-shmobile/setup-r8a7778.c
-index 1b9b7f2..f84885a 100644
---- a/arch/arm/mach-shmobile/setup-r8a7778.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7778.c
-@@ -30,6 +30,12 @@
- #include <linux/irqchip.h>
- #include <linux/serial_sci.h>
- #include <linux/sh_timer.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/usb/phy.h>
-+#include <linux/usb/hcd.h>
-+#include <linux/usb/ehci_pdriver.h>
-+#include <linux/usb/ohci_pdriver.h>
-+#include <linux/dma-mapping.h>
- #include <mach/irqs.h>
- #include <mach/r8a7778.h>
- #include <mach/common.h>
-@@ -89,6 +95,99 @@ static struct sh_timer_config sh_tmu1_platform_data = {
- 		&sh_tmu##idx##_platform_data,		\
- 		sizeof(sh_tmu##idx##_platform_data))
+ 	/*
+@@ -201,6 +204,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= { 0x3c, 16 },
+ 		[SCSPTR]	= sci_reg_invalid,
+ 		[SCLSR]		= sci_reg_invalid,
++		[HSSRR]		= sci_reg_invalid,
+ 	},
  
-+/* USB PHY */
-+static struct resource usb_phy_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xffe70800, 0x100),
-+	DEFINE_RES_MEM(0xffe76000, 0x100),
-+};
+ 	/*
+@@ -220,6 +224,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= sci_reg_invalid,
+ 		[SCSPTR]	= { 0x20, 16 },
+ 		[SCLSR]		= { 0x24, 16 },
++		[HSSRR]		= sci_reg_invalid,
+ 	},
+ 
+ 	/*
+@@ -238,6 +243,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= sci_reg_invalid,
+ 		[SCSPTR]	= sci_reg_invalid,
+ 		[SCLSR]		= sci_reg_invalid,
++		[HSSRR]		= sci_reg_invalid,
+ 	},
+ 
+ 	/*
+@@ -256,6 +262,26 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= sci_reg_invalid,
+ 		[SCSPTR]	= { 0x20, 16 },
+ 		[SCLSR]		= { 0x24, 16 },
++		[HSSRR]		= sci_reg_invalid,
++	},
 +
-+void __init r8a7778_add_usb_phy_device(struct rcar_phy_platform_data *pdata)
-+{
-+	platform_device_register_resndata(&platform_bus, "rcar_usb_phy", -1,
-+					  usb_phy_resources,
-+					  ARRAY_SIZE(usb_phy_resources),
-+					  pdata, sizeof(*pdata));
-+}
-+
-+/* USB */
-+static struct usb_phy *phy;
-+
-+static int usb_power_on(struct platform_device *pdev)
-+{
-+	if (IS_ERR(phy))
-+		return PTR_ERR(phy);
-+
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_get_sync(&pdev->dev);
-+
-+	usb_phy_init(phy);
-+
-+	return 0;
-+}
-+
-+static void usb_power_off(struct platform_device *pdev)
-+{
-+	if (IS_ERR(phy))
-+		return;
-+
-+	usb_phy_shutdown(phy);
-+
-+	pm_runtime_put_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+}
-+
-+static int ehci_init_internal_buffer(struct usb_hcd *hcd)
-+{
 +	/*
-+	 * Below are recommended values from the datasheet;
-+	 * see [USB :: Setting of EHCI Internal Buffer].
++	 * Common HSCIF definitions.
 +	 */
-+	/* EHCI IP internal buffer setting */
-+	iowrite32(0x00ff0040, hcd->regs + 0x0094);
-+	/* EHCI IP internal buffer enable */
-+	iowrite32(0x00000001, hcd->regs + 0x009C);
-+
-+	return 0;
-+}
-+
-+static struct usb_ehci_pdata ehci_pdata __initdata = {
-+	.power_on	= usb_power_on,
-+	.power_off	= usb_power_off,
-+	.power_suspend	= usb_power_off,
-+	.pre_setup	= ehci_init_internal_buffer,
-+};
-+
-+static struct resource ehci_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xffe70000, 0x400),
-+	DEFINE_RES_IRQ(gic_iid(0x4c)),
-+};
-+
-+static struct usb_ohci_pdata ohci_pdata __initdata = {
-+	.power_on	= usb_power_on,
-+	.power_off	= usb_power_off,
-+	.power_suspend	= usb_power_off,
-+};
-+
-+static struct resource ohci_resources[] __initdata = {
-+	DEFINE_RES_MEM(0xffe70400, 0x400),
-+	DEFINE_RES_IRQ(gic_iid(0x4c)),
-+};
-+
-+#define USB_PLATFORM_INFO(hci)					\
-+static struct platform_device_info hci##_info __initdata = {	\
-+	.parent		= &platform_bus,			\
-+	.name		= #hci "-platform",			\
-+	.id		= -1,					\
-+	.res		= hci##_resources,			\
-+	.num_res	= ARRAY_SIZE(hci##_resources),		\
-+	.data		= &hci##_pdata,				\
-+	.size_data	= sizeof(hci##_pdata),			\
-+	.dma_mask	= DMA_BIT_MASK(32),			\
-+}
-+
-+USB_PLATFORM_INFO(ehci);
-+USB_PLATFORM_INFO(ohci);
-+
- /* Ether */
- static struct resource ether_resources[] = {
- 	DEFINE_RES_MEM(0xfde00000, 0x400),
-@@ -197,6 +296,14 @@ void __init r8a7778_add_standard_devices(void)
- 	r8a7778_register_tmu(1);
++	[SCIx_HSCIF_REGTYPE] = {
++		[SCSMR]		= { 0x00, 16 },
++		[SCBRR]		= { 0x04,  8 },
++		[SCSCR]		= { 0x08, 16 },
++		[SCxTDR]	= { 0x0c,  8 },
++		[SCxSR]		= { 0x10, 16 },
++		[SCxRDR]	= { 0x14,  8 },
++		[SCFCR]		= { 0x18, 16 },
++		[SCFDR]		= { 0x1c, 16 },
++		[SCTFDR]	= sci_reg_invalid,
++		[SCRFDR]	= sci_reg_invalid,
++		[SCSPTR]	= { 0x20, 16 },
++		[SCLSR]		= { 0x24, 16 },
++		[HSSRR]		= { 0x40, 16 },
+ 	},
+ 
+ 	/*
+@@ -275,6 +301,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= sci_reg_invalid,
+ 		[SCSPTR]	= sci_reg_invalid,
+ 		[SCLSR]		= { 0x24, 16 },
++		[HSSRR]		= sci_reg_invalid,
+ 	},
+ 
+ 	/*
+@@ -294,6 +321,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= { 0x20, 16 },
+ 		[SCSPTR]	= { 0x24, 16 },
+ 		[SCLSR]		= { 0x28, 16 },
++		[HSSRR]		= sci_reg_invalid,
+ 	},
+ 
+ 	/*
+@@ -313,6 +341,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
+ 		[SCRFDR]	= sci_reg_invalid,
+ 		[SCSPTR]	= sci_reg_invalid,
+ 		[SCLSR]		= sci_reg_invalid,
++		[HSSRR]		= sci_reg_invalid,
+ 	},
+ };
+ 
+@@ -374,6 +403,9 @@ static int sci_probe_regmap(struct plat_sci_port *cfg)
+ 		 */
+ 		cfg->regtype = SCIx_SH4_SCIF_REGTYPE;
+ 		break;
++	case PORT_HSCIF:
++		cfg->regtype = SCIx_HSCIF_REGTYPE;
++		break;
+ 	default:
+ 		printk(KERN_ERR "Can't probe register map for given port\n");
+ 		return -EINVAL;
+@@ -1798,6 +1830,42 @@ static unsigned int sci_scbrr_calc(unsigned int algo_id, unsigned int bps,
+ 	return ((freq + 16 * bps) / (32 * bps) - 1);
  }
  
-+void __init r8a7778_init_late(void)
++/* calculate sample rate, BRR, and clock select for HSCIF */
++static void sci_baud_calc_hscif(unsigned int bps, unsigned long freq,
++				int *brr, unsigned int *srr,
++				unsigned int *cks)
 +{
-+	phy = usb_get_phy(USB_PHY_TYPE_USB2);
++	int sr, c, br, err;
++	int min_err = 1000; /* 100% */
 +
-+	platform_device_register_full(&ehci_info);
-+	platform_device_register_full(&ohci_info);
++	/* Find the combination of sample rate and clock select with the
++	   smallest deviation from the desired baud rate. */
++	for (sr = 8; sr <= 32; sr++) {
++		for (c = 0; c <= 3; c++) {
++			/* integerized formulas from HSCIF documentation */
++			br = freq / (sr * (1 << (2 * c + 1)) * bps) - 1;
++			if (br < 0 || br > 255)
++				continue;
++			err = freq / ((br + 1) * bps * sr *
++			      (1 << (2 * c + 1)) / 1000) - 1000;
++			if (min_err > err) {
++				min_err = err;
++				*brr = br;
++				*srr = sr - 1;
++				*cks = c;
++			}
++		}
++	}
++
++	if (min_err == 1000) {
++		WARN_ON(1);
++		/* use defaults */
++		*brr = 255;
++		*srr = 15;
++		*cks = 0;
++	}
 +}
 +
- static struct renesas_intc_irqpin_config irqpin_platform_data = {
- 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
- 	.sense_bitfield_width = 2,
-@@ -310,6 +417,7 @@ DT_MACHINE_START(R8A7778_DT, "Generic R8A7778 (Flattened Device Tree)")
- 	.init_machine	= r8a7778_add_standard_devices_dt,
- 	.init_time	= shmobile_timer_init,
- 	.dt_compat	= r8a7778_compat_dt,
-+	.init_late      = r8a7778_init_late,
- MACHINE_END
+ static void sci_reset(struct uart_port *port)
+ {
+ 	struct plat_sci_reg *reg;
+@@ -1821,6 +1889,7 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	struct plat_sci_reg *reg;
+ 	unsigned int baud, smr_val, max_baud, cks;
+ 	int t = -1;
++	unsigned int srr;
  
- #endif /* CONFIG_USE_OF */
+ 	/*
+ 	 * earlyprintk comes here early on with port->uartclk set to zero.
+@@ -1833,8 +1902,17 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	max_baud = port->uartclk ? port->uartclk / 16 : 115200;
+ 
+ 	baud = uart_get_baud_rate(port, termios, old, 0, max_baud);
+-	if (likely(baud && port->uartclk))
+-		t = sci_scbrr_calc(s->cfg->scbrr_algo_id, baud, port->uartclk);
++	if (likely(baud && port->uartclk)) {
++		if (s->cfg->scbrr_algo_id == SCBRR_ALGO_6) {
++			sci_baud_calc_hscif(baud, port->uartclk, &t, &srr,
++					    &cks);
++		} else {
++			t = sci_scbrr_calc(s->cfg->scbrr_algo_id, baud,
++					   port->uartclk);
++			for (cks = 0; t >= 256 && cks <= 3; cks++)
++				t >>= 2;
++		}
++	}
+ 
+ 	sci_port_enable(s);
+ 
+@@ -1853,15 +1931,15 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
+ 
+ 	uart_update_timeout(port, termios->c_cflag, baud);
+ 
+-	for (cks = 0; t >= 256 && cks <= 3; cks++)
+-		t >>= 2;
+-
+ 	dev_dbg(port->dev, "%s: SMR %x, cks %x, t %x, SCSCR %x\n",
+ 		__func__, smr_val, cks, t, s->cfg->scscr);
+ 
+ 	if (t >= 0) {
+ 		serial_port_out(port, SCSMR, (smr_val & ~3) | cks);
+ 		serial_port_out(port, SCBRR, t);
++		reg = sci_getreg(port, HSSRR);
++		if (reg->size)
++			serial_port_out(port, HSSRR, srr | HSCIF_SRE);
+ 		udelay((1000000+(baud-1)) / baud); /* Wait one bit interval */
+ 	} else
+ 		serial_port_out(port, SCSMR, smr_val);
+@@ -1947,6 +2025,8 @@ static const char *sci_type(struct uart_port *port)
+ 		return "scifa";
+ 	case PORT_SCIFB:
+ 		return "scifb";
++	case PORT_HSCIF:
++		return "hscif";
+ 	}
+ 
+ 	return NULL;
+@@ -1960,7 +2040,10 @@ static inline unsigned long sci_port_size(struct uart_port *port)
+ 	 * from platform resource data at such a time that ports begin to
+ 	 * behave more erratically.
+ 	 */
+-	return 64;
++	if (port->type == PORT_HSCIF)
++		return 96;
++	else
++		return 64;
+ }
+ 
+ static int sci_remap_port(struct uart_port *port)
+@@ -2085,6 +2168,9 @@ static int sci_init_single(struct platform_device *dev,
+ 	case PORT_SCIFB:
+ 		port->fifosize = 256;
+ 		break;
++	case PORT_HSCIF:
++		port->fifosize = 128;
++		break;
+ 	case PORT_SCIFA:
+ 		port->fifosize = 64;
+ 		break;
+@@ -2325,7 +2411,7 @@ static inline int sci_probe_earlyprintk(struct platform_device *pdev)
+ #endif /* CONFIG_SERIAL_SH_SCI_CONSOLE */
+ 
+ static char banner[] __initdata =
+-	KERN_INFO "SuperH SCI(F) driver initialized\n";
++	KERN_INFO "SuperH (H)SCI(F) driver initialized\n";
+ 
+ static struct uart_driver sci_uart_driver = {
+ 	.owner		= THIS_MODULE,
+@@ -2484,4 +2570,4 @@ module_exit(sci_exit);
+ MODULE_LICENSE("GPL");
+ MODULE_ALIAS("platform:sh-sci");
+ MODULE_AUTHOR("Paul Mundt");
+-MODULE_DESCRIPTION("SuperH SCI(F) serial driver");
++MODULE_DESCRIPTION("SuperH (H)SCI(F) serial driver");
+diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
+index eb763ad..d340497 100644
+--- a/include/linux/serial_sci.h
++++ b/include/linux/serial_sci.h
+@@ -5,7 +5,7 @@
+ #include <linux/sh_dma.h>
+ 
+ /*
+- * Generic header for SuperH SCI(F) (used by sh/sh64/h8300 and related parts)
++ * Generic header for SuperH (H)SCI(F) (used by sh/sh64/h8300 and related parts)
+  */
+ 
+ #define SCIx_NOT_SUPPORTED	(-1)
+@@ -16,6 +16,7 @@ enum {
+ 	SCBRR_ALGO_3,		/* (((clk * 2) + 16 * bps) / (16 * bps) - 1) */
+ 	SCBRR_ALGO_4,		/* (((clk * 2) + 16 * bps) / (32 * bps) - 1) */
+ 	SCBRR_ALGO_5,		/* (((clk * 1000 / 32) / bps) - 1) */
++	SCBRR_ALGO_6,		/* HSCIF variable sample rate algorithm */
+ };
+ 
+ #define SCSCR_TIE	(1 << 7)
+@@ -37,7 +38,7 @@ enum {
+ 
+ #define SCI_DEFAULT_ERROR_MASK (SCI_PER | SCI_FER)
+ 
+-/* SCxSR SCIF */
++/* SCxSR SCIF, HSCIF */
+ #define SCIF_ER    0x0080
+ #define SCIF_TEND  0x0040
+ #define SCIF_TDFE  0x0020
+@@ -55,6 +56,9 @@ enum {
+ #define SCSPTR_SPB2IO	(1 << 1)
+ #define SCSPTR_SPB2DT	(1 << 0)
+ 
++/* HSSRR HSCIF */
++#define HSCIF_SRE	0x8000
++
+ /* Offsets into the sci_port->irqs array */
+ enum {
+ 	SCIx_ERI_IRQ,
+@@ -90,6 +94,7 @@ enum {
+ 	SCIx_SH4_SCIF_NO_SCSPTR_REGTYPE,
+ 	SCIx_SH4_SCIF_FIFODATA_REGTYPE,
+ 	SCIx_SH7705_SCIF_REGTYPE,
++	SCIx_HSCIF_REGTYPE,
+ 
+ 	SCIx_NR_REGTYPES,
+ };
+@@ -115,6 +120,7 @@ enum {
+ 	SCSMR, SCBRR, SCSCR, SCxSR,
+ 	SCFCR, SCFDR, SCxTDR, SCxRDR,
+ 	SCLSR, SCTFDR, SCRFDR, SCSPTR,
++	HSSRR,
+ 
+ 	SCIx_NR_REGS,
+ };
+@@ -137,7 +143,7 @@ struct plat_sci_port {
+ 	unsigned long	mapbase;		/* resource base */
+ 	unsigned int	irqs[SCIx_NR_IRQS];	/* ERI, RXI, TXI, BRI */
+ 	unsigned int	gpios[SCIx_NR_FNS];	/* SCK, RXD, TXD, CTS, RTS */
+-	unsigned int	type;			/* SCI / SCIF / IRDA */
++	unsigned int	type;			/* SCI / SCIF / IRDA / HSCIF */
+ 	upf_t		flags;			/* UPF_* flags */
+ 	unsigned long	capabilities;		/* Port features/capabilities */
+ 
+diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
+index 74c2bf7..26eee07 100644
+--- a/include/uapi/linux/serial_core.h
++++ b/include/uapi/linux/serial_core.h
+@@ -226,4 +226,7 @@
+ /* Rocketport EXPRESS/INFINITY */
+ #define PORT_RP2	102
+ 
++/* SH-SCI */
++#define PORT_HSCIF	103
++
+ #endif /* _UAPILINUX_SERIAL_CORE_H */
 -- 
 1.8.2.1
