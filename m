@@ -1,72 +1,33 @@
 From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 13 Jun 2013 15:41:17 -0400 (EDT)
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <20130613184703.GA5701@kroah.com>
-Message-ID: <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
+Date: Thu, 13 Jun 2013 15:52:16 -0400 (EDT)
+Subject: [PATCH V2 05/10] USB: OHCI: Properly handle ohci-exynos suspend
+In-Reply-To: <9340690.Y20fM6tyU7@flatron>
+Message-ID: <Pine.LNX.4.44L0.1306131542080.1561-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jun 2013, Greg Kroah-Hartman wrote:
+On Thu, 13 Jun 2013, Tomasz Figa wrote:
 
-> On Thu, Jun 13, 2013 at 10:54:13AM -0400, Alan Stern wrote:
-> > On Thu, 13 Jun 2013, Ming Lei wrote:
-> > 
-> > > - using interrupt threaded handler(default)
-> > >         33.440 MB/sec
-> > > 
-> > > - using tasklet(#undef USB_HCD_THREADED_IRQ)
-> > >         34.29 MB/sec
-> > > 
-> > > - using hard interrupt handler(by removing HCD_BH in ehci-hcd.c )
-> > >         34.260 MB/s
-> > > 
-> > > 
-> > > So looks usb mass storage performance loss can be observed with
-> > > interrupt threaded handler because one mass storage read/write sectors
-> > > requires at least 3 interrupts which wake up usb-storage thread 3 times
-> > > (each interrupt wakeup the usb-storage each time), introducing irq threaded
-> > > handler will make 2 threads to be waken up about 6 times for one read/write.
-> > > 
-> > > I think usb mass storage transfer handler need to be rewritten, otherwise
-> > > it may become worsen after using irq threaded handler in USB 3.0.(the
-> > > above device can reach >120MB/sec with hardware handler or tasklet handler,
-> > > which means about ~3K interrupts/sec, so ~6K contexts switch in case of
-> > > using irq threaded handler)
-> > > 
-> > > So how about supporting tasklet first, then convert to interrupt
-> > > threaded handler
-> > > after usb mass storage transfer is rewritten without performance loss?
-> > > (rewriting
-> > > usb mass storage transfer handler may need some time and work since storage
-> > > stability/correctness is extremely important, :-)
-> > 
-> > Maybe we should simply copy what the networking people do.  They are 
-> > very concerned about performance and latency; whatever technique they 
-> > use should be good for USB too.
+> > +	rc = ohci_suspend(hcd, do_wakeup);
+> > +	if (rc == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
+> > +		ohci_resume(hcd, false);
+> > +		rc = -EBUSY;
+> > +	}
 > 
-> Yes, but for "old-style" usb-storage, is this really a big deal?  We are
-> still easily hitting the "line-speed" of USB for usb-storage with simple
-> machines, the bottlenecks that I'm seeing are in the devices themselves,
-> and then in the USB wire speed.
-
-What about with USB-3 storage devices?  Many of them still use the
-bulk-only transport instead of UAS.  They may push the limits up.
-
-> Once hardware comes out that uses USB streams, and we get device support
-> for the UAS protocol, then we might have a need to change things, but at
-> this point in time, for the "old" driver, I think we are fine.
+> I'm not into USB host subsystem, so I might just ask a stupid question.
 > 
-> Unless someone has a workload / benchmark that shows otherwise?
+> Can't we make ohci_suspend check this for us, so the drivers would just 
+> check for error code? It seems like in all your patches this part of code 
+> is duplicated, looking as a good candidate to be generic.
 
-The test results above show a 2.4% degradation for threaded interrupts 
-as compared to tasklets.  That's in addition to the bottlenecks caused 
-by the device; no doubt it would be worse for a faster device.  This 
-result calls into question the benefits of threaded interrupts.
+Argh!  You're right, of course.
 
-The main reason for moving away from the current scheme is to reduce
-latency for other interrupt handlers.  Ming gave two examples of slow
-USB code that runs in hardirq context now; with his change they would
-run in softirq context and therefore wouldn't delay other interrupts so
-much.  (Interrupt latency is hard to measure, however.)
+I didn't see it, because the only existing place where this check is 
+made is in the PCI glue layer.  Pushing it into the HCDs themselves is 
+obviously the right thing to do.
+
+Manjanuth, let's do this.  You can write a preliminary patch that puts 
+this check at the end of the ohci_suspend() routine, and then resubmit 
+your series.
 
 Alan Stern
