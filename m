@@ -1,120 +1,166 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 13 Jun 2013 11:47:52 +0530
-Subject: [PATCH 03/11] gpio: davinci: Modify to platform driver
-In-Reply-To: <518397C60809E147AF5323E0420B992E3EADA252@DBDE04.ent.ti.com>
-References: <1369206634-6778-1-git-send-email-avinashphilip@ti.com>
- <1369206634-6778-4-git-send-email-avinashphilip@ti.com>
- <51B71056.9010103@ti.com>
- <518397C60809E147AF5323E0420B992E3EAD9D75@DBDE04.ent.ti.com>
- <51B826BF.7050009@ti.com>
- <518397C60809E147AF5323E0420B992E3EADA252@DBDE04.ent.ti.com>
-Message-ID: <51B96410.7000807@ti.com>
+From: pranavkumar@linaro.org (Pranavkumar Sawargaonkar)
+Date: Thu, 13 Jun 2013 11:55:20 +0530
+Subject: [PATCH] arm64: Add support to pass earlyprintk argument via
+ device tree
+In-Reply-To: <20130612132820.992E73E0A56@localhost>
+References: <1370274671-23812-1-git-send-email-pranavkumar@linaro.org>
+ <20130612132820.992E73E0A56@localhost>
+Message-ID: <CAAHg+HhhVOLn1DXizWAKOqZXczq9YR8dOXM+u=ywbEakw6A6ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/12/2013 5:40 PM, Philip, Avinash wrote:
-> On Wed, Jun 12, 2013 at 13:13:59, Nori, Sekhar wrote:
->> On 6/11/2013 6:25 PM, Philip, Avinash wrote:
+Hi Grant,
+
+On 12 June 2013 18:58, Grant Likely <grant.likely@secretlab.ca> wrote:
+> On Mon,  3 Jun 2013 21:21:11 +0530, Pranavkumar Sawargaonkar <pranavkumar@linaro.org> wrote:
+>> This patch adds support for defining and passing earlyprintk
+>> related information i.e. device and address information via
+>> device tree by adding it inside "chosen" node.
 >>
->>> On Tue, Jun 11, 2013 at 17:26:06, Nori, Sekhar wrote:
+>> This will help user to just specify "earlyprintk" from bootargs
+>> without actually knowing the address and device to enable
+>> earlyprintk.
 >>
->>>> On 5/22/2013 12:40 PM, Philip Avinash wrote:
+>> Mechanism:
 >>
->>>>> @@ -179,13 +204,10 @@ static int __init davinci_gpio_setup(void)
->>>>>  		gpiochip_add(&ctlrs[i].chip);
->>>>>  	}
->>>>>  
->>>>> -	soc_info->gpio_ctlrs = ctlrs;
->>>>
->>>>> -	soc_info->gpio_ctlrs_num = DIV_ROUND_UP(ngpio, 32);
->>>>
->>>> You drop setting gpio_ctlrs_num here and don't introduce it anywhere
->>>> else in the patchset so in effect you render the inline gpio get/set API
->>>> useless. Looks like this initialization should be moved to platform code?
->>>
->>> With [PATCH 08/11] ARM: davinci: start using gpiolib support gpio get/set API
->>> Has no more dependency on soc_info->gpio_ctlrs_num.
+>> One can just append earlyprintk=device-type,address (same as we pass
+>> through command line) in "/chosen" node to notify kernel which is the
+>> earlyprintk device and what is its address.
 >>
->> With this series, you have removed support for inline gpio get/set API.
->> I see that the inline functions are still available for use on
->> tnetv107x. I wonder why it is important to keep these for tnetv107x when
->> not necessary for other DaVinci devices?
-> 
-> To support DT boot in da850, gpio davinci has to be converted to a driver and
-> remove references to davinci_soc_info from driver. But tnetv107x has 
-> separate GPIO driver and reference to davinci_soc_info can also be removed.
-> But I didn't found defconfig support for tnetv107x platforms and left untouched.
-> As I will not be able to build and test on tnetv107x, I prefer to not touch it.
-
-You can always build it by enabling it in menuconfig. Its an ARMv6
-platform so you will have to disable other ARMv5 based platforms from
-while enabling it. ARMv5 and ARMv6 cannot co-exist in the same image.
-
-> 
+>> Backward Compatibility:
 >>
->> When you are removing this feature, please note it prominently in your
->> cover letter and patch description.
-> 
-> Ok
-> 
->> Also, please provide some data on 
->> how the latency now compares to that of inline access earlier. This is
->> important especially for the read.
-> 
-> I am not sure whether I understood correctly or not? Meanwhile I had done
-> an experiment by reading printk timing before and after gpio_get_value from
-> a test module. I think this will help in software latency for inline access over
-> gpiolib specific access.
-> 
-> gpio_get_value latency testing code
-> 
-> +
-> +       local_irq_disable();
-> +       pr_emerg("%d %x\n", __LINE__, jiffies);
-> +       gpio_get_value(gpio_num);
-> +       pr_emerg("%d %x\n", __LINE__, jiffies);
-> +       local_irq_enable();
-> 
-> inline gpio functions with interrupt disabled
-> [   29.734337] 81 ffff966c
-> [   29.736847] 83 ffff966c
-> 
-> Time diff = 	0.00251
-> 
-> gpio library with interrupt disabled
-> 
-> [  272.876763] 81 fffff567
-> [  272.879291] 83 fffff567
-> 
-> Time diff =	0.002528
-> 
-> Inline function takes less time as expected.
-
-Okay, please note these experiments in your cover letter. Its an 18usec
-difference. I have no reference to say if that will affect any
-application, but it will at least serve as information for someone who
-may get affected by it.
-
-> 
->> For the writes, gpio clock will
->> mostly determine how soon the value changes on the pin.
+>> This patch also allows existing method of specifying earlyprintk
+>> parameter via bootargs.
 >>
->> I am okay with removing the inline access feature. It helps simplify
->> code and most arm machines don't use them. I would just like to see some
->> data for justification as this can be seen as feature regression. Also,
->> if we are removing it, its better to also remove it completely and get
->> the LOC savings instead of just stopping its usage.
-> 
-> I see build failure with below patch for tnetv107x
-> [v6,6/6] Davinci: tnetv107x default configuration 
+>> Existing method i.e. passing via bootargs will still have precedence
+>> over device tree i.e. if one specifies earlyprintk=device-type,address
+>> in bootargs then kernel will use information from bootargs instead of
+>> device tree.
+>>
+>> If user just specifies earlyprintk (without =...) then kernel will
+>> look for device tree earlyprintk parameter.
+>>
+>> Signed-off-by: Pranavkumar Sawargaonkar <pranavkumar@linaro.org>
+>> Signed-off-by: Anup Patel <anup.patel@linaro.org>
+>
+> I'm not a big fan of this. It seems to be short-circuiting around
+> existing properties.
 
-Where is this patch? What is the commit-id if it is in mainline? Where
-is the failure log?
+Agreed, but intention was to have a simple solution since it is just
+to be used for early printing/debugging.
+and also keep that in sync with existing method of specifying
+earlyprintk from command line.
 
-> 
-> So I prefer to leave tnetv107x platform for now.
+The kernel /should/ be able to use the
+> linux,stdout-path property to determine what the earlyprintk device to
+> use is.
 
-I don't think that's acceptable. At least by me.
+For this there are two problems:
+
+1. Early printk code gets initialized before un-flattening of a device tree.
+Hence trying to find out node from stdout-path is tricky as we do not have
+of_find_node_by_path available.
+
+2. Current compatible strings in arm64 early printk code are not in
+synced (or different)
+from actual compatible strings used in drivers -
+e.g. for PL011
+In earlyprintk code match name is just pl011 but in dts it is
+specified as "arm,pl011"
+Hence we will need multiple changes to implement it.
+
+>
+> g.
 
 Thanks,
-Sekhar
+Pranav
+
+>
+>> ---
+>>  arch/arm64/kernel/early_printk.c |    7 +++++++
+>>  arch/arm64/kernel/setup.c        |   21 ++++++++++++++++++++-
+>>  2 files changed, 27 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/arch/arm64/kernel/early_printk.c b/arch/arm64/kernel/early_printk.c
+>> index fbb6e18..4e6f845 100644
+>> --- a/arch/arm64/kernel/early_printk.c
+>> +++ b/arch/arm64/kernel/early_printk.c
+>> @@ -29,6 +29,8 @@
+>>  static void __iomem *early_base;
+>>  static void (*printch)(char ch);
+>>
+>> +extern char *earlyprintk_dt_args;
+>> +
+>>  /*
+>>   * PL011 single character TX.
+>>   */
+>> @@ -116,6 +118,11 @@ static int __init setup_early_printk(char *buf)
+>>       phys_addr_t paddr = 0;
+>>
+>>       if (!buf) {
+>> +             /* Try to check if Device Tree has this argument or not ? */
+>> +             buf = earlyprintk_dt_args;
+>> +     }
+>> +
+>> +     if (!buf) {
+>>               pr_warning("No earlyprintk arguments passed.\n");
+>>               return 0;
+>>       }
+>> diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+>> index 6a9a532..fb2d56f 100644
+>> --- a/arch/arm64/kernel/setup.c
+>> +++ b/arch/arm64/kernel/setup.c
+>> @@ -60,6 +60,8 @@ EXPORT_SYMBOL(processor_id);
+>>  unsigned int elf_hwcap __read_mostly;
+>>  EXPORT_SYMBOL_GPL(elf_hwcap);
+>>
+>> +char *earlyprintk_dt_args;
+>> +
+>>  static const char *cpu_name;
+>>  static const char *machine_name;
+>>  phys_addr_t __fdt_pointer __initdata;
+>> @@ -122,6 +124,23 @@ static void __init setup_processor(void)
+>>       elf_hwcap = 0;
+>>  }
+>>
+>> +int __init early_init_dt_scan_chosen_arm64(unsigned long node,
+>> +                                        const char *uname,
+>> +                                        int depth, void *data)
+>> +{
+>> +     char *prop;
+>> +
+>> +     /* Check if this is chosen node */
+>> +     if (early_init_dt_scan_chosen(node, uname, depth, data) == 0)
+>> +             return 0;
+>> +
+>> +     prop = of_get_flat_dt_prop(node, "earlyprintk", NULL);
+>> +     if (prop)
+>> +             earlyprintk_dt_args = prop;
+>> +
+>> +     return 1;
+>> +}
+>> +
+>>  static void __init setup_machine_fdt(phys_addr_t dt_phys)
+>>  {
+>>       struct boot_param_header *devtree;
+>> @@ -165,7 +184,7 @@ static void __init setup_machine_fdt(phys_addr_t dt_phys)
+>>       pr_info("Machine: %s\n", machine_name);
+>>
+>>       /* Retrieve various information from the /chosen node */
+>> -     of_scan_flat_dt(early_init_dt_scan_chosen, boot_command_line);
+>> +     of_scan_flat_dt(early_init_dt_scan_chosen_arm64, boot_command_line);
+>>       /* Initialize {size,address}-cells info */
+>>       of_scan_flat_dt(early_init_dt_scan_root, NULL);
+>>       /* Setup memory, calling early_init_dt_add_memory_arch */
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
+>
+> --
+> Grant Likely, B.Sc, P.Eng.
+> Secret Lab Technologies, Ltd.
