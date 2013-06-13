@@ -1,53 +1,42 @@
 From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Thu, 13 Jun 2013 14:13:55 +0530
-Subject: [PATCH v7 5/9] ARM: OMAP: USB: Add phy binding information
+Date: Thu, 13 Jun 2013 14:13:54 +0530
+Subject: [PATCH v7 4/9] usb: phy: twl4030: twl4030 shouldn't be subsys_initcall
 In-Reply-To: <1371113039-5784-1-git-send-email-kishon@ti.com>
 References: <1371113039-5784-1-git-send-email-kishon@ti.com>
-Message-ID: <1371113039-5784-6-git-send-email-kishon@ti.com>
+Message-ID: <1371113039-5784-5-git-send-email-kishon@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for controllers to get PHY in case of non dt boot, the phy
-binding information (phy device name) should be added in the platform
-data of the controller.
+Changed the inticall from subsys_initcall to module_init for
+twl4030-usb.
 
 Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
 ---
- arch/arm/mach-omap2/usb-musb.c |    6 +++++-
- include/linux/usb/musb.h       |    3 +++
- 2 files changed, 8 insertions(+), 1 deletion(-)
+ drivers/usb/phy/phy-twl4030-usb.c |   12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/usb-musb.c b/arch/arm/mach-omap2/usb-musb.c
-index 3242a55..284ba51 100644
---- a/arch/arm/mach-omap2/usb-musb.c
-+++ b/arch/arm/mach-omap2/usb-musb.c
-@@ -85,8 +85,12 @@ void __init usb_musb_init(struct omap_musb_board_data *musb_board_data)
- 	musb_plat.mode = board_data->mode;
- 	musb_plat.extvbus = board_data->extvbus;
+diff --git a/drivers/usb/phy/phy-twl4030-usb.c b/drivers/usb/phy/phy-twl4030-usb.c
+index 65a5e43..fba9697 100644
+--- a/drivers/usb/phy/phy-twl4030-usb.c
++++ b/drivers/usb/phy/phy-twl4030-usb.c
+@@ -822,17 +822,7 @@ static struct platform_driver twl4030_usb_driver = {
+ 	},
+ };
  
--	if (cpu_is_omap44xx())
-+	if (cpu_is_omap44xx()) {
- 		musb_plat.has_mailbox = true;
-+		musb_plat.phy_label = "omap-usb2";
-+	} else if (cpu_is_omap34xx()) {
-+		musb_plat.phy_label = "twl4030";
-+	}
+-static int __init twl4030_usb_init(void)
+-{
+-	return platform_driver_register(&twl4030_usb_driver);
+-}
+-subsys_initcall(twl4030_usb_init);
+-
+-static void __exit twl4030_usb_exit(void)
+-{
+-	platform_driver_unregister(&twl4030_usb_driver);
+-}
+-module_exit(twl4030_usb_exit);
++module_platform_driver(twl4030_usb_driver);
  
- 	if (soc_is_am35xx()) {
- 		oh_name = "am35x_otg_hs";
-diff --git a/include/linux/usb/musb.h b/include/linux/usb/musb.h
-index 053c268..596f8c8 100644
---- a/include/linux/usb/musb.h
-+++ b/include/linux/usb/musb.h
-@@ -104,6 +104,9 @@ struct musb_hdrc_platform_data {
- 	/* for clk_get() */
- 	const char	*clock;
- 
-+	/* phy label */
-+	const char	*phy_label;
-+
- 	/* (HOST or OTG) switch VBUS on/off */
- 	int		(*set_vbus)(struct device *dev, int is_on);
- 
+ MODULE_ALIAS("platform:twl4030_usb");
+ MODULE_AUTHOR("Texas Instruments, Inc, Nokia Corporation");
 -- 
 1.7.10.4
