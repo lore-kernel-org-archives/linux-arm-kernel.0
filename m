@@ -1,118 +1,90 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Jun 2013 18:48:59 -0700
-Subject: [RFC/PATCH 03/13] clk: Add of_clk_match() for device drivers
-In-Reply-To: <1371088149-22562-1-git-send-email-sboyd@codeaurora.org>
-References: <1371088149-22562-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1371088149-22562-4-git-send-email-sboyd@codeaurora.org>
+Date: Wed, 12 Jun 2013 18:48:56 -0700
+Subject: [RFC/PATCH 00/13] Add support for MSM's mmio clocks
+Message-ID: <1371088149-22562-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In similar fashion as of_regulator_match() add an of_clk_match()
-function that finds an initializes clock init_data structs from
-devicetree. Drivers should use this API to find clocks that their
-device is providing and then iterate over their match table
-registering the clocks with the init data parsed.
+Posting as an RFC because I haven't gone through and generated all 
+the data needed yet. This is just a few clocks for now to give a general
+idea of where things are headed.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- drivers/clk/clk.c            | 64 ++++++++++++++++++++++++++++++++++++++++++++
- include/linux/clk-provider.h | 10 +++++++
- 2 files changed, 74 insertions(+)
+The first 4 patches are generic clock framework patches. They add support
+for finding clocks in DT and parsing them generically. They also add support
+for setting the rate and the parent at the same time based on patches from
+James Hogan's remuxing set_rate series [1].
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 282b10e..f40ce9b 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2282,4 +2282,68 @@ err:
- 	return -ENOMEM;
- }
- EXPORT_SYMBOL_GPL(of_init_clk_data);
-+
-+/**
-+ * of_clk_match() - Scan and match clock providers from the DT node of a device
-+ * @dev: device initializing clock providers
-+ * @matches: match table of clocks
-+ * @num_matches: number of entries in @matches
-+ *
-+ * This function uses a match table specified by the clock driver to parse
-+ * clock init data from the device tree. @dev is expected to be a device with
-+ * a 'clocks' child node containing a set of child nodes, each providing the
-+ * init data for one clock. The data parsed from a child node will be matched
-+ * to a clock based on the child node's name. Note that the match table is
-+ * modified in place.
-+ *
-+ * Returns the number of matches found or a negative error code on failure.
-+ */
-+int of_clk_match(struct device *dev, struct of_clk_match *matches,
-+		 int num_matches)
-+{
-+	int count = 0;
-+	int err, i;
-+	struct device_node *np, *clocks;
-+	struct clk_init_data *init;
-+
-+	clocks = of_find_node_by_name(dev->of_node, "clocks");
-+	if (!clocks)
-+		return -EINVAL;
-+
-+	for (i = 0; i < num_matches; i++) {
-+		struct of_clk_match *match = &matches[i];
-+		match->init_data = NULL;
-+		match->of_node = NULL;
-+	}
-+
-+	for_each_available_child_of_node(clocks, np) {
-+		for (i = 0; i < num_matches; i++) {
-+			struct of_clk_match *match = &matches[i];
-+			if (match->of_node)
-+				continue;
-+
-+			if (strcmp(match->name, np->name))
-+				continue;
-+
-+			init = devm_kzalloc(dev, sizeof(*init), GFP_KERNEL);
-+			if (!init)
-+				return -ENOMEM;
-+
-+			err = of_init_clk_data(np, init);
-+			if (err) {
-+				dev_err(dev,
-+					"failed to parse DT for clock %s\n",
-+					np->name);
-+				return err;
-+			}
-+			match->of_node = np;
-+			match->init_data = init;
-+			count++;
-+			break;
-+		}
-+	}
-+
-+	return count;
-+}
-+EXPORT_SYMBOL_GPL(of_clk_match);
- #endif
-diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
-index bdcc655..3668a76 100644
---- a/include/linux/clk-provider.h
-+++ b/include/linux/clk-provider.h
-@@ -454,6 +454,16 @@ void of_clk_init(const struct of_device_id *matches);
- 
- int of_init_clk_data(struct device_node *np, struct clk_init_data *init);
- 
-+struct of_clk_match {
-+	const char *name;
-+	void *driver_data;
-+	struct clk_init_data *init_data;
-+	struct device_node *of_node;
-+};
-+
-+int of_clk_match(struct device *dev, struct of_clk_match *matches,
-+		 int num_matches);
-+
- #define CLK_OF_DECLARE(name, compat, fn)			\
- 	static const struct of_device_id __clk_of_table_##name	\
- 		__used __section(__clk_of_table)		\
+After that we add MSM clock hardware support and then fill in the DT and
+data to actually register clocks. This is sufficient enough to get the UART
+going on my msm8960 device.
+
+I'm currently waffling between the DT bindings being more descriptive
+versus just using the clocks as numbers method. From what I can tell
+nobody is complaining either way so it seems I could put all of
+the information I encode in C structs into DT. It would be great
+if more experienced DT persons could weigh in here.
+
+Please note this patchset relies on my previous patch series that moves
+existing MSM clock code to the common clock framework [2].
+
+Stephen Boyd (13):
+  clk: fixed-rate: Export clk_fixed_rate_register()
+  clk: Add of_init_clk_data() to parse common clock bindings
+  clk: Add of_clk_match() for device drivers
+  clk: Add set_rate_and_parent() op
+  clk: msm: Add support for phase locked loops (PLLs)
+  clk: msm: Add support for root clock generators (RCGs)
+  clk: msm: Add support for branches/gate clocks
+  clk: msm: Add MSM clock driver
+  clk: msm: Add support for MSM8960's global clock controller (GCC)
+  clk: msm: Add support for MSM8960's multimedia clock controller (MMCC)
+  ARM: dts: msm: Add MSM8960 GCC DT nodes
+  ARM: dts: msm: Add MSM8960 MMCC DT nodes
+  ARM: dts: msm: Add clock entries for MSM8960 uart device
+
+ Documentation/clk.txt                              |   3 +
+ Documentation/devicetree/bindings/clock/msm.txt    |  99 +++
+ .../devicetree/bindings/clock/qcom,gcc.txt         |  55 ++
+ .../devicetree/bindings/clock/qcom,mmcc.txt        |  38 ++
+ arch/arm/boot/dts/msm8960-cdp.dts                  | 111 +++
+ drivers/clk/Kconfig                                |   2 +
+ drivers/clk/Makefile                               |   1 +
+ drivers/clk/clk-fixed-rate.c                       |   1 +
+ drivers/clk/clk.c                                  | 201 +++++-
+ drivers/clk/msm/Kconfig                            |  22 +
+ drivers/clk/msm/Makefile                           |  11 +
+ drivers/clk/msm/clk-branch.c                       | 190 ++++++
+ drivers/clk/msm/clk-branch.h                       |  48 ++
+ drivers/clk/msm/clk-pll.c                          | 233 +++++++
+ drivers/clk/msm/clk-pll.h                          |  43 ++
+ drivers/clk/msm/clk-rcg.c                          | 754 +++++++++++++++++++++
+ drivers/clk/msm/clk-rcg.h                          | 114 ++++
+ drivers/clk/msm/clk-rcg2.c                         | 320 +++++++++
+ drivers/clk/msm/core.c                             | 271 ++++++++
+ drivers/clk/msm/gcc-8960.c                         | 174 +++++
+ drivers/clk/msm/internal.h                         |  27 +
+ drivers/clk/msm/mmcc-8960.c                        | 142 ++++
+ include/linux/clk-provider.h                       |  28 +
+ 23 files changed, 2868 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/clock/msm.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,gcc.txt
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,mmcc.txt
+ create mode 100644 drivers/clk/msm/Kconfig
+ create mode 100644 drivers/clk/msm/Makefile
+ create mode 100644 drivers/clk/msm/clk-branch.c
+ create mode 100644 drivers/clk/msm/clk-branch.h
+ create mode 100644 drivers/clk/msm/clk-pll.c
+ create mode 100644 drivers/clk/msm/clk-pll.h
+ create mode 100644 drivers/clk/msm/clk-rcg.c
+ create mode 100644 drivers/clk/msm/clk-rcg.h
+ create mode 100644 drivers/clk/msm/clk-rcg2.c
+ create mode 100644 drivers/clk/msm/core.c
+ create mode 100644 drivers/clk/msm/gcc-8960.c
+ create mode 100644 drivers/clk/msm/internal.h
+ create mode 100644 drivers/clk/msm/mmcc-8960.c
+
+[1] <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
+[2] 
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
