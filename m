@@ -1,116 +1,92 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 13 Jun 2013 18:24:20 -0400
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306131656560.1561-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306131656560.1561-100000@iolanthe.rowland.org>
-Message-ID: <1371162260.9844.315.camel@gandalf.local.home>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Fri, 14 Jun 2013 00:27:33 +0200
+Subject: [PATCH 00/15] Final Samsung PWM support cleanup
+In-Reply-To: <201306132217.44265.heiko@sntech.de>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1808375.nuQYa2FdfG@flatron> <201306132217.44265.heiko@sntech.de>
+Message-ID: <201306140027.34181.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-13 at 17:09 -0400, Alan Stern wrote:
-> On Thu, 13 Jun 2013, Steven Rostedt wrote:
-> 
-> > On Thu, 2013-06-13 at 15:41 -0400, Alan Stern wrote:
+Am Donnerstag, 13. Juni 2013, 22:17:43 schrieb Heiko St?bner:
+> Am Donnerstag, 13. Juni 2013, 11:07:38 schrieb Tomasz Figa:
+> > Hi Heiko, Sylwester,
 > > 
-> > > The test results above show a 2.4% degradation for threaded interrupts 
-> > > as compared to tasklets.  That's in addition to the bottlenecks caused 
-> > > by the device; no doubt it would be worse for a faster device.  This 
-> > > result calls into question the benefits of threaded interrupts.
+> > On Thursday 13 of June 2013 01:52:05 Sylwester Nawrocki wrote:
+> > > On 06/13/2013 01:38 AM, Heiko St?bner wrote:
+> > > > Am Donnerstag, 13. Juni 2013, 01:13:47 schrieb Tomasz Figa:
+> > > >> Hi Olof,
+> > > >> 
+> > > >> On Wednesday 12 of June 2013 16:00:23 Olof Johansson wrote:
+> > > >>> On Wed, Jun 12, 2013 at 11:48:56PM +0200, Tomasz Figa wrote:
+> > > >>>>> Needs testing on other platforms as I could only compile test for
+> > > >>>>> them.
+> > > >>> 
+> > > >>> How/who can help here? WHo has and still cares for other affected
+> > > >>> platforms?
+> > > >>> 
+> > > >>>>> 66 files changed, 627 insertions(+), 1580 deletions(-)
+> > > >> 
+> > > >> I will try to test this on Exynos 4 at work, if I somehow manage to
+> > > >> find any way to use PWM on our boards (other than already-tested PWM
+> > > >> clocksource).
+> > > >> 
+> > > >> Unfortunately, except S3C6410, I don't have access to other
+> > > >> platforms, or at least I won't in any reasonable time.
+> > > >> 
+> > > >> If I remember correctly, in case of my watchdog support cleanup,
+> > > >> Kukjin
+> > > >> has been able to test it on S5P64x0.
+> > > >> 
+> > > >> Heiko and Sylwester used to have some s3c24xx-based boards, not sure
+> > > >> if
+> > > >> they still do and are interested in their support in mainline.
+> > > >> 
+> > > >> So all left is S5PC100 (for which I couldn't find anyone who cares)
+> > > >> and
+> > > >> Exynos5.
+> > > >> 
+> > > >>> Nice cleanup.
+> > > >> 
+> > > >> Thanks.
+> > > >> 
+> > > >>>> Any comments for this series?
+> > > >>> 
+> > > >>> Yes, above. :) In general looks good -- testing coverage is a bit
+> > > >>> of a
+> > > >>> concern.
+> > > >> 
+> > > >> Yeah. Unfortunately all I could do was testing on Tiny6410 and
+> > > >> compile
+> > > >> testing on others. I hope we find some really helpful people over
+> > > >> here who could waste a bit of their precious time for this museum.
+> > > >> ;)
+> > > > 
+> > > > I'll try to give it a testrun tomorrow. And my s3c2416 will always be
+> > > > the first-love-architecture for me ;-)
+> > > 
+> > > I'll likely test it tomorrow on a Mini2440 board, I was going to do it
+> > > earlier
+> > > but got distracted by plenty other things that needed attention too. At
+> > > least
+> > > that's one of the reasons I got the board - testing the cross-platform
+> > > cleanups
+> > > and ensuring they are not breaking the older platforms.
 > > 
-> > That's because it was written like a top half and not a full blown
-> > interrupt. I just looked at the patch, and saw this:
-> > 
-> > +#ifndef USB_HCD_THREADED_IRQ
-> >         if (sched) {
-> >                 if (async)
-> >                         tasklet_schedule(&bh->bh);
-> >                 else
-> >                         tasklet_hi_schedule(&bh->bh);
-> >         }
-> > +#else
-> > +       if (sched)
-> > +               schedule_work(&hcd->periodic_bh->work);
-> > +#endif
-> > 
-> > What is this? The work isn't done by an interrupt thread, but by work queues!
+> > Thank you both for your support. Looking forward for testing results :)
 > 
-> You don't understand the patch.
-
-Hey, I'll admit that I don't understand how USB works ;-)
-
-I also only looked at the second patch without applying it. Thus, a lot
-of the changes were out of context for me.
-
-
->   Most of the time, sched will be 0 
-> here and hence the work queue won't be involved.
-
-OK, I only compared that current tasklets were being commented out, and
-that's pretty much all I had to go on.
-
+> on a s3c2416-based machine for dt and non-dt case
+> [with the limit that my machine does not has anything connected to the pwm
+> outputs, so I only get to test the base-pwm and timer part]
 > 
-> Yes, part of the work is done by a work queue rather than the interrupt 
-> thread.  But it is an unimportant part, the part that involves 
-> transfers to root hubs or transfers that were cancelled.  These things 
-> can complete without any interrupt occurring, so they can't be handled 
-> by the interrupt thread.  However, they are the abnormal case; the 
-> transfers we care about are not to root hubs and they do complete 
-> normally.
-> 
-> > The point of the interrupt thread is that you do *all* the work that
-> > needs to be done when an interrupt comes in. You don't need to delay the
-> > work.
-> 
-> You've got it backward.  The patch doesn't leave part of the work 
-> undone when an interrupt occurs.  Rather it's the other way around -- 
-> sometimes work needs to be done when there isn't any interrupt.  This 
-> could happen in a timer callback, or it could happen as a direct result 
-> of a function call.
-> 
-> Since there doesn't seem to be any way to invoke the interrupt thread 
-> in the absence of an interrupt, Ming pushed the job off to a work 
-> queue.
-> 
-> > If you just treat a threaded interrupt like a real interrupt and push
-> > off work to something else, then yes, it will degrade performance.
-> > 
-> > If you go the threaded interrupt route, you need to rethink the
-> > paradigm. There's no reason that the interrupt handler needs to be fast
-> > like it needs to be in true interrupt context. The handler can now use
-> > mutexes, and other full features that currently only threads benefit
-> > from. It should improve locking issues, and can serialize things if
-> > needed.
-> > 
-> > All this patch did was to switch the main irq to a thread and make a
-> > bottom half into a work queue.
-> 
-> In case it's not clear, the code you quoted above is part of the 
-> interrupt handler, not part of the thread.
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-Got it.
+And of course forgot the other thing:
 
-> 
-> > Why couldn't you just do:
-> > 
-> > 	if (sched)
-> > 		usb_giveback_urb_bh(bh);
-> > 
-> > ?
-> 
-> Because usb_giveback_urb_bh() is supposed to run in the context of the
-> tasklet or interrupt thread or work queue, not in the context of the
-> interrupt handler.
+Acked-by: Heiko Stuebner <heiko@sntech.de>
 
-I only took a quick look at the second patch. I'm now looking at both
-patches applied to the code. I didn't realize this was called from the
-top half.
+Thanks for doing this, as with this series I can now also resurrect my s3c2416 
+ccf patch :-)
 
-Usually the top half for threaded interrupts is used just to quite the
-interrupt line. Either by acknowledging the interrupt or by disabling
-the device from sending more interrupts till the bottom half (thread)
-can run. This looks to be doing a bit more than that.
 
-I'll look a bit deeper at the patch, but this still doesn't look like a
-typical threaded interrupt usage.
-
--- Steve
+Heiko
