@@ -1,91 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:30 +0900
-Subject: [PATCH 06/12] phy-rcar-usb: correct base address
+Date: Thu, 13 Jun 2013 16:00:36 +0900
+Subject: [PATCH 12/12] ARM: shmobile: BOCK-W: add USB support
 In-Reply-To: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106836-25388-7-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106836-25388-13-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-The memory region that is used by the driver overlaps EHCI and OHCI  register
-regions for absolutely no reason now  -- fix it  by adding offset of 0x800 to
-the base address, changing the register #define's accordingly. This has extra
-positive effect that we now can use devm_ioremap_resource()...
+Register the USB PHY device from bockw_init(), passing the platform  data to it.
+Set machine's init_late() method to r8a7778_init_late() in order for [EO]HCI to
+get registered too...
 
-Note that the driver and the SoC code have to be in one patch to keep the code
-bisectable...
+Don't forget to add USB PENC0/1 pins to bockw_pinctrl_map[].
 
-The patch has been tested on the Marzen board.
+The patch has been tested on the BOCK-W board.
 
 Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/setup-r8a7779.c |  2 +-
- drivers/usb/phy/phy-rcar-usb.c         | 28 ++++++++++------------------
- 2 files changed, 11 insertions(+), 19 deletions(-)
+ arch/arm/mach-shmobile/board-bockw.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm/mach-shmobile/setup-r8a7779.c b/arch/arm/mach-shmobile/setup-r8a7779.c
-index a6406cd..a00283f 100644
---- a/arch/arm/mach-shmobile/setup-r8a7779.c
-+++ b/arch/arm/mach-shmobile/setup-r8a7779.c
-@@ -391,7 +391,7 @@ static struct platform_device sata_device = {
- /* USB PHY */
- static struct resource usb_phy_resources[] = {
- 	[0] = {
--		.start		= 0xffe70000,
-+		.start		= 0xffe70800,
- 		.end		= 0xffe70900 - 1,
- 		.flags		= IORESOURCE_MEM,
- 	},
-diff --git a/drivers/usb/phy/phy-rcar-usb.c b/drivers/usb/phy/phy-rcar-usb.c
-index 4893dbd..d636cc7 100644
---- a/drivers/usb/phy/phy-rcar-usb.c
-+++ b/drivers/usb/phy/phy-rcar-usb.c
-@@ -16,13 +16,13 @@
- #include <linux/spinlock.h>
- #include <linux/module.h>
+diff --git a/arch/arm/mach-shmobile/board-bockw.c b/arch/arm/mach-shmobile/board-bockw.c
+index dac4365..7ed2401 100644
+--- a/arch/arm/mach-shmobile/board-bockw.c
++++ b/arch/arm/mach-shmobile/board-bockw.c
+@@ -38,12 +38,18 @@ static struct resource smsc911x_resources[] = {
+ 	DEFINE_RES_IRQ(irq_pin(0)), /* IRQ 0 */
+ };
  
--/* USBH common register */
--#define USBPCTRL0	0x0800
--#define USBPCTRL1	0x0804
--#define USBST		0x0808
--#define USBEH0		0x080C
--#define USBOH0		0x081C
--#define USBCTL0		0x0858
-+/* REGS block */
-+#define USBPCTRL0	0x00
-+#define USBPCTRL1	0x04
-+#define USBST		0x08
-+#define USBEH0		0x0C
-+#define USBOH0		0x1C
-+#define USBCTL0		0x58
++static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
++
+ static const struct pinctrl_map bockw_pinctrl_map[] = {
+ 	/* SCIF0 */
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
+ 				  "scif0_data_a", "scif0"),
+ 	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-r8a7778",
+ 				  "scif0_ctrl", "scif0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
++				  "usb0", "usb0"),
++	PIN_MAP_MUX_GROUP_DEFAULT("ehci-platform", "pfc-r8a7778",
++				  "usb1", "usb1"),
+ };
  
- /* USBPCTRL1 */
- #define PHY_RST		(1 << 2)
-@@ -139,17 +139,9 @@ static int rcar_usb_phy_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
+ #define IRQ0MR	0x30
+@@ -54,6 +60,7 @@ static void __init bockw_init(void)
+ 	r8a7778_clock_init();
+ 	r8a7778_init_irq_extpin(1);
+ 	r8a7778_add_standard_devices();
++	r8a7778_add_usb_phy_device(&usb_phy_platform_data);
  
--	/*
--	 * CAUTION
--	 *
--	 * Because this phy address is also mapped under OHCI/EHCI address area,
--	 * this driver can't use devm_request_and_ioremap(dev, res) here
--	 */
--	reg0 = devm_ioremap_nocache(dev, res0->start, resource_size(res0));
--	if (!reg0) {
--		dev_err(dev, "ioremap error\n");
--		return -ENOMEM;
--	}
-+	reg0 = devm_ioremap_resource(dev, res0);
-+	if (IS_ERR(reg0))
-+		return PTR_ERR(reg0);
- 
- 	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
- 	if (!priv) {
+ 	pinctrl_register_mappings(bockw_pinctrl_map,
+ 				  ARRAY_SIZE(bockw_pinctrl_map));
+@@ -91,4 +98,5 @@ DT_MACHINE_START(BOCKW_DT, "bockw")
+ 	.init_machine	= bockw_init,
+ 	.init_time	= shmobile_timer_init,
+ 	.dt_compat	= bockw_boards_compat_dt,
++	.init_late      = r8a7778_init_late,
+ MACHINE_END
 -- 
 1.8.2.1
