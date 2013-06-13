@@ -1,43 +1,66 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Jun 2013 01:45:59 +0200
-Subject: [PATCH v6 14/18] ARM: shmobile: armadillo-reference: Add st1232 pin
- mappings
+Date: Fri, 14 Jun 2013 01:46:00 +0200
+Subject: [PATCH v6 15/18] ARM: shmobile: armadillo-reference: Move st1232
+ reset GPIO to DT
 In-Reply-To: <1371167163-10507-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1371167163-10507-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1371167163-10507-15-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1371167163-10507-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pin mappings for the st1232 device to the device tree and reference
-them as the default state for the device.
+Reference the st1232 reset GPIO from the device tree and remove it from
+board code.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts  | 2 ++
+ arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 7 -------
+ 2 files changed, 2 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index 4a7ae32..a6c6606 100644
+index a6c6606..8ec4cd1 100644
 --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
 +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -41,6 +41,8 @@
- 		reg = <0x55>;
- 		interrupt-parent = <&irqpin1>;
+@@ -10,6 +10,7 @@
+ 
+ /dts-v1/;
+ /include/ "r8a7740.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "armadillo 800 eva reference";
+@@ -43,6 +44,7 @@
  		interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
-+		pinctrl-0 = <&st1232_pins>;
-+		pinctrl-names = "default";
+ 		pinctrl-0 = <&st1232_pins>;
+ 		pinctrl-names = "default";
++		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
  	};
  };
  
-@@ -52,4 +54,9 @@
- 		renesas,groups = "scifa1_data";
- 		renesas,function = "scifa1";
- 	};
-+
-+	st1232_pins: st1232 {
-+		renesas,groups = "intc_irq10";
-+		renesas,function = "intc";
-+	};
- };
+diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+index 4ddd299..002d8d3 100644
+--- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
++++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
+@@ -158,7 +158,6 @@ clock_error:
+  */
+ static void __init eva_init(void)
+ {
+-
+ 	r8a7740_clock_init(MD_CK0 | MD_CK2);
+ 	eva_clock_init();
+ 
+@@ -171,12 +170,6 @@ static void __init eva_init(void)
+ 
+ 	r8a7740_add_standard_devices_dt();
+ 
+-	/*
+-	 * Touchscreen
+-	 * TODO: Move reset GPIO over to .dts when we can reference it
+-	 */
+-	gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
+-
+ 	r8a7740_pm_init();
+ }
+ 
 -- 
 1.8.1.5
