@@ -1,103 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 13 Jun 2013 12:05:02 +0100
-Subject: [PATCH] ARM: optimize memset_io()/memcpy_fromio()/memcpy_toio()
-In-Reply-To: <51B76972.3040002@gmail.com>
-References: <E1THMAC-0004nL-8B@rmk-PC.arm.linux.org.uk>
- <51AED468.9040109@de.bosch.com> <51B76972.3040002@gmail.com>
-Message-ID: <20130613110501.GZ18614@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Jun 2013 04:05:37 -0700
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <51B99B07.1050806@ti.com>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191753.468.1734.stgit@localhost>
+ <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+ <20130612163124.GD8164@atomide.com>
+ <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
+ <51B99B07.1050806@ti.com>
+Message-ID: <20130613110537.GC8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 08:16:18PM +0200, Dirk Behme wrote:
-> On 05.06.2013 08:02, Dirk Behme wrote:
->> On 28.09.2012 00:02, Russell King wrote:
->>> If we are building for a LE platform, and we haven't overriden the
->>> MMIO ops, then we can optimize the mem*io operations using the
->>> standard string functions.
->>>
->>> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>> ---
->>>   arch/arm/include/asm/io.h |   25 +++++++++++++++++++++++++
->>>   1 files changed, 25 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
->>> index 815c669..ed0577e 100644
->>> --- a/arch/arm/include/asm/io.h
->>> +++ b/arch/arm/include/asm/io.h
->>> @@ -23,6 +23,7 @@
->>>
->>>   #ifdef __KERNEL__
->>>
->>> +#include <linux/string.h>
->>>   #include <linux/types.h>
->>>   #include <asm/byteorder.h>
->>>   #include <asm/memory.h>
->>> @@ -249,9 +250,33 @@ extern void _memset_io(volatile void __iomem *,
->>> int, size_t);
->>>   #define writesw(p,d,l)        __raw_writesw(p,d,l)
->>>   #define writesl(p,d,l)        __raw_writesl(p,d,l)
->>>
->>> +#ifndef __ARMBE__
->>> +static inline void memset_io(volatile void __iomem *dst, unsigned c,
->>> +    size_t count)
->>> +{
->>> +    memset((void __force *)dst, c, count);
->>> +}
->>> +#define memset_io(dst,c,count) memset_io(dst,c,count)
->>> +
->>> +static inline void memcpy_fromio(void *to, const volatile void
->>> __iomem *from,
->>> +    size_t count)
->>> +{
->>> +    memcpy(to, (const void __force *)from, count);
->>> +}
->>> +#define memcpy_fromio(to,from,count) memcpy_fromio(to,from,count)
->>> +
->>> +static inline void memcpy_toio(volatile void __iomem *to, const
->>> void *from,
->>> +    size_t count)
->>> +{
->>> +    memcpy((void __force *)to, from, count);
->>> +}
->>> +#define memcpy_toio(to,from,count) memcpy_toio(to,from,count)
->>> +
->>> +#else
->>>   #define memset_io(c,v,l)    _memset_io(c,(v),(l))
->>>   #define memcpy_fromio(a,c,l)    _memcpy_fromio((a),c,(l))
->>>   #define memcpy_toio(c,a,l)    _memcpy_toio(c,(a),(l))
->>> +#endif
->>>
->>>   #endif    /* readl */
->>
->> I'd like to ask if there is any chance to get anything like this or
->> the even older proposal
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004077.html
->>
->>
->> merged? Maybe an updated version incorporating the discussion
->> conclusions?
->>
->>
->> In the discussion of
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2009-November/004077.html
->>
->>
->> there have been some doubts if it's a good idea to enable it for all
->> SoCs. Therefore that patch introduced a
->>
->> config OPTIMIZED_IOMEM_MEMCPY
->>
->> which would allow us to enable it for only known to be compatible
->> SoCs. Just in case this helps to get it applied ;)
->
-> Any opinion on this?
+* Sricharan R <r.sricharan@ti.com> [130613 03:18]:
+> >  
+> > I tried your cleanup branch omap-for-v3.11/cleanup on panda board and it booted
+> >  to prompt fine.
+> >             Hardware: Pandaboard A1   dtb: omap4-panda.dtb
 
-Yes, unfortunately it should be selectable by platform, though it needs
-to be done carefully.  Some ARM platforms can't cope with full 32-bit
-accesses to MMIO.
+OK thanks for testing.
 
-I don't think any of those intersect with the single zImage project, so
-those should be fine to have it always enabled - it's only the older
-platforms that might have issues.
+> >   git pull on linux-next branch was not working though.
+> >
+>     Ok, tested in linux-next as well and it booted fine with DTB.
+>      HW: OMAP4430ES2.1 PANDA A1 version DTB: OMAP4-PANDA.DTB
+>   
+>     Booted with ramdisk and mmc FS
+> 
+> commit c04efed734409f5a44715b54a6ca1b54b0ccf215
+> Author: Stephen Rothwell <sfr@canb.auug.org.au>
+> Date:   Fri Jun 7 16:40:02 2013 +1000
+> 
+>     Add linux-next specific files for 20130607
+
+OK thanks for testing that too. I don't think these patches are
+in linux-next yet. But still good to hear it works.
+
+Ming Lei, any further info on your board?
+
+Regards,
+
+Tony
