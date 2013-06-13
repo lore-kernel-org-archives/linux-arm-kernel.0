@@ -1,42 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 13 Jun 2013 17:36:00 +0200
-Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
- properties from a dt node
-In-Reply-To: <201306131723.04721.heiko@sntech.de>
-References: <201306102139.32444.heiko@sntech.de>
- <CACRpkdb-vbdQJOeZvCEsKLatK-0BhEfUTJqmGURJGf1NWx__Ew@mail.gmail.com>
- <201306131635.21446.heiko@sntech.de>
- <201306131723.04721.heiko@sntech.de>
-Message-ID: <CACRpkdZavNX3jk4K5unEJCED4vTuZEUF=NC1naGOMyr54hXQKw@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 13 Jun 2013 16:49:49 +0100
+Subject: [PATCH v2 3/3] ARM: keystone: Enable SMP support on Keystone
+ machines
+In-Reply-To: <1371072317-15030-4-git-send-email-santosh.shilimkar@ti.com>
+References: <1371072317-15030-1-git-send-email-santosh.shilimkar@ti.com>
+ <1371072317-15030-4-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <20130613154949.GD27414@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 5:23 PM, Heiko St?bner <heiko@sntech.de> wrote:
+On Wed, Jun 12, 2013 at 10:25:17PM +0100, Santosh Shilimkar wrote:
+> Add basic SMP support for Keystone machines. This does not
+> include support for CPU hotplug for now.
+> 
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: arm at kernel.org
+> 
+> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> ---
+>  arch/arm/mach-keystone/Kconfig    |    1 +
+>  arch/arm/mach-keystone/Makefile   |    1 +
+>  arch/arm/mach-keystone/keystone.c |    4 +++
+>  arch/arm/mach-keystone/keystone.h |   17 ++++++++++++
+>  arch/arm/mach-keystone/platsmp.c  |   52 +++++++++++++++++++++++++++++++++++++
+>  5 files changed, 75 insertions(+)
+>  create mode 100644 arch/arm/mach-keystone/keystone.h
+>  create mode 100644 arch/arm/mach-keystone/platsmp.c
+> 
 
->> Ok, I'll see that I get this fixed :-)
->
-> Hmm ... what is the meaning of the argument of bias-disable and bias-high-
-> impedance, as the kernel-doc in pinconf-generic.h does not tell?
+[...]
 
-I think those arguments are N/A, ignored, doesn't matter.
-If these options were typed, they would be bool.
+> diff --git a/arch/arm/mach-keystone/platsmp.c b/arch/arm/mach-keystone/platsmp.c
+> new file mode 100644
+> index 0000000..630ab3b
+> --- /dev/null
+> +++ b/arch/arm/mach-keystone/platsmp.c
+> @@ -0,0 +1,52 @@
+> +/*
+> + * Keystone SOC SMP platform code
+> + *
+> + * Copyright 2013 Texas Instruments, Inc.
+> + *	Cyril Chemparathy <cyril@ti.com>
+> + *	Santosh Shilimkar <santosh.shillimkar@ti.com>
+> + *
+> + * Based on platsmp.c, Copyright (C) 2002 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it
+> + * under the terms and conditions of the GNU General Public License,
+> + * version 2, as published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/init.h>
+> +#include <linux/smp.h>
+> +#include <linux/io.h>
+> +
+> +#include <asm/smp_plat.h>
+> +#include <asm/prom.h>
+> +
+> +#include "keystone.h"
+> +
+> +static int __cpuinit keystone_smp_boot_secondary(unsigned int cpu,
+> +						struct task_struct *idle)
+> +{
+> +	unsigned long start = virt_to_phys(&secondary_startup);
+> +	int error;
+> +
+> +	pr_debug("keystone-smp: booting cpu %d, vector %08lx\n",
+> +		 cpu, start);
+> +
+> +	asm volatile (
+> +		"mov    r0, #0\n"	/* power on cmd	*/
+> +		"mov    r1, %1\n"	/* cpu		*/
+> +		"mov    r2, %2\n"	/* start	*/
+> +		".inst  0xe1600070\n"	/* smc #0	*/
 
-Please improve documentation if you can... sorry for all the
-rough edges.
+In arch/arm/asm/opcodes-sec.h we have an __SMC() macro you could use here
+that'll use the correct opcode for arm or thumb kernels.
 
-> bias-bus-hold ignores its argument and we already clarified that the pull-* do
-> have != 0 or 0 argument.
-
-I think in the DT binding, both these forms:
-
-bias-pull-up;
-bias-pull-up = <150000>;
-
-Should be allowed.
-
-So when parsing, you first check if it exists, then if there
-is an argument, if there is no value supplied, just set it
-to 1, as that is clearly != 0...
-
-Yours,
-Linus Walleij
+Thanks,
+Mark.
