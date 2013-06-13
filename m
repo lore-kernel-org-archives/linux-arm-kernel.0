@@ -1,65 +1,30 @@
-From: tg@mirbsd.org (Thorsten Glaser)
-Date: Thu, 13 Jun 2013 19:16:26 +0000 (UTC)
-Subject: [PATCH 0/3] Use POSIX "$((..))" instead of bashism "$[...]"
-In-Reply-To: <1371129052-31506-1-git-send-email-geert@linux-m68k.org>
-References: <1371129052-31506-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <Pine.BSM.4.64L.1306131908240.22801@herc.mirbsd.org>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Jun 2013 13:23:41 -0600
+Subject: [PATCH v2 3/3] ARM: tegra: set CPU reset handler with firmware op
+In-Reply-To: <1371114745-24710-4-git-send-email-acourbot@nvidia.com>
+References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
+ <1371114745-24710-4-git-send-email-acourbot@nvidia.com>
+Message-ID: <51BA1C3D.1010608@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Geert Uytterhoeven dixit:
+On 06/13/2013 03:12 AM, Alexandre Courbot wrote:
+> Use a firmware operation to set the CPU reset handler and only resort to
+> doing it ourselves if there is none defined.
+> 
+> This supports the booting of secondary CPUs on devices using a TrustZone
+> secure monitor.
 
->Should these be truncated to 32-bit explicitly, or is this a bug in mksh?
+> diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
 
-mksh in ?mksh mode? operates specifically on 32-bit integer data
-types with defined wraparound and other guarantees beyond what
-POSIX does. There is an ?lksh? binary in the mksh binary package
-in Debian and derivates now, which is the ?legacy mode? that uses
-the host system?s ?long? data type, as POSIX demands, and is now
-(mksh_46-2) used for /bin/sh.
+> +	err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
+> +	switch (err) {
+> +	case -ENOSYS:
+> +		tegra_cpu_reset_handler_set(reset_address);
+> +		/* pass-through */
 
-However, on mixed 32/64-bit systems, /bin/sh can have either bit
-size. Additionally, it is not possible, in POSIX, without invoking
-ISO C ?Undefined Behaviour?, to find out the bitsize of the shell
-arithmetics.
-
-Furthermore, Linux can be cross-compiled, so when building kernels
-for 64-bit platforms on 32-bit systems, the arithmetics used MUST
-NOT overflow beyond a signed 32-bit ?long?.
-
->  [1/3] h8300/boot: Use POSIX "$((..))" instead of bashism "$[...]"
->  [2/3] ARM: shmobile: Use POSIX "$((..))" instead of bashism "$[...]"
->  [3/3] sh/boot: Use POSIX "$((..))" instead of bashism "$[...]"
-
-Independent of the above, I?ve verified all three and can state
-that they
-? are no regression relative to existing behaviour
-? do not invoke any features not in POSIX $((?)) arithmetics
-? do not invoke any features not in mksh $((?)) arithmetics
-
-This means you can add my
-Signed-off: Thorsten Glaser <tg@mirbsd.org>
-
-However, I urge you to check whether any of these arithmetics
-can go beyond 32 bit. If they have even the slightest chance
-to do that, you MUST replace them by something different. One
-method could be to use bc(1):
-
-$(shell printf 'obase=16\nibase=16\n%s+%s\n' $(FOO) $(BAR) | bc)
-
-Another method could be to operate on the upper half and the
-lower half of the 64-bit quantities separately, assuming that
-calculations do not overflow (in POSIX sh, overflow is, like
-in ISO C, Undefined Behaviour; a C compiler is permitted to
-compile the source code in the shell that invokes it to run
-?rm -rf ~ /? instead) or carry over (e.g. if it?s known that
-the first half is always 0x7FFFFFFF or the last half always
-00000000 you can just add that as ?string?).
-
-bye,
-//mirabilos
--- 
-FWIW, I'm quite impressed with mksh interactively. I thought it was much
-*much* more bare bones. But it turns out it beats the living hell out of
-ksh93 in that respect. I'd even consider it for my daily use if I hadn't
-wasted half my life on my zsh setup. :-) -- Frank Terbeck in #!/bin/mksh
+Rather than detecting -ENOSYS and falling back to the custom
+tegra_cpu_reset_handler_set(), does it make sense to plug in
+tegra_cpu_reset_handler_set as the firmware op when there is no secure
+firmware detected? That way, this code wouldn't need the special case;
+that would be isolated to firmware.c.
