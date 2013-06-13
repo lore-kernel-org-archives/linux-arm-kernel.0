@@ -1,131 +1,139 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Jun 2013 18:49:06 -0700
-Subject: [RFC/PATCH 10/13] clk: msm: Add support for MSM8960's multimedia
- clock controller (MMCC)
+Date: Wed, 12 Jun 2013 18:49:05 -0700
+Subject: [RFC/PATCH 09/13] clk: msm: Add support for MSM8960's global clock
+ controller (GCC)
 In-Reply-To: <1371088149-22562-1-git-send-email-sboyd@codeaurora.org>
 References: <1371088149-22562-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1371088149-22562-11-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371088149-22562-10-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fill in the data and wire up the multimedia clock controller to
-the MSM clock driver. This should allow multimedia device drivers
-to control their clocks on 8960 based platforms.
+Fill in the data and wire up the global clock controller to the
+MSM clock driver. This should allow most non-multimedia device
+drivers to control their clocks on 8960 based platforms.
 
 Cc: devicetree-discuss at lists.ozlabs.org
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- .../devicetree/bindings/clock/qcom,mmcc.txt        |  38 ++++++
- drivers/clk/msm/Kconfig                            |   8 ++
- drivers/clk/msm/Makefile                           |   1 +
+ .../devicetree/bindings/clock/qcom,gcc.txt         |  55 +++++++
+ drivers/clk/msm/Kconfig                            |  10 ++
+ drivers/clk/msm/Makefile                           |   2 +
  drivers/clk/msm/core.c                             |   3 +
- drivers/clk/msm/internal.h                         |   1 +
- drivers/clk/msm/mmcc-8960.c                        | 142 +++++++++++++++++++++
- 6 files changed, 193 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/qcom,mmcc.txt
- create mode 100644 drivers/clk/msm/mmcc-8960.c
+ drivers/clk/msm/gcc-8960.c                         | 174 +++++++++++++++++++++
+ drivers/clk/msm/internal.h                         |   2 +
+ 6 files changed, 246 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/qcom,gcc.txt
+ create mode 100644 drivers/clk/msm/gcc-8960.c
 
-diff --git a/Documentation/devicetree/bindings/clock/qcom,mmcc.txt b/Documentation/devicetree/bindings/clock/qcom,mmcc.txt
+diff --git a/Documentation/devicetree/bindings/clock/qcom,gcc.txt b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
 new file mode 100644
-index 0000000..e06577e
+index 0000000..2311e1a
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/qcom,mmcc.txt
-@@ -0,0 +1,38 @@
-+MSM Multimedia Clock Controller Binding
-+-----------------------------------------
++++ b/Documentation/devicetree/bindings/clock/qcom,gcc.txt
+@@ -0,0 +1,55 @@
++MSM Global Clock Controller Binding
++-----------------------------------
 +
 +Required properties :
-+- compatible : shall contain at least "qcom,mmcc" and only one of the
++- compatible : shall contain at least "qcom,gcc" and only one of the
 +	       following:
 +
-+			"qcom,mmcc-8660"
-+			"qcom,mmcc-8960"
++			"qcom,gcc-8660"
++			"qcom,gcc-8960"
 +
 +- reg : shall contain base register location and length
 +- clocks : shall contain clocks supplied by the clock controller
 +
 +Example:
-+	clock-controller at 4000000 {
-+		compatible = "qcom,mmcc-8960", "qcom,mmcc";
-+		reg = <0x4000000 0x1000>;
++	clock-controller at 900000 {
++		compatible = "qcom,gcc-8960", "qcom,gcc";
++		reg = <0x900000 0x4000>;
 +
 +		clocks {
-+			pll2: pll2 {
++			pxo: pxo {
++				#clock-cells = <0>;
++				compatible = "fixed-clock";
++				clock-frequency = <27000000>;
++			};
++
++			pll8: pll8 {
 +				#clock-cells = <0>;
 +				compatible = "qcom,pll";
 +				clocks = <&pxo>;
 +			};
 +
-+			mdp_rcg: mdp_rcg {
++			vpll8: vpll8 {
 +				#clock-cells = <0>;
-+				compatible = "qcom,mn8-dyn-clock";
-+				clocks = <&pxo>, <&pll2>, <&vpll8>;
++				compatible = "qcom,pll-vote";
++				clocks = <&pll8>;
 +			};
 +
-+			mdp_cxc: mdp_cxc {
++			gsbi5_uart_rcg: gsbi5_uart_rcg {
++				#clock-cells = <0>;
++				compatible = "qcom,p2-mn16-clock";
++				clocks = <&pxo>, <&vpll8>;
++			};
++
++			gsbi5_uart_clk: gsbi5_uart_cxc {
 +				#clock-cells = <0>;
 +				compatible = "qcom,cxc-clock";
-+				clocks = <&mdp_rcg>;
++				clocks = <&gsbi5_uart_rcg>;
++			};
++
++			gsbi5_uart_ahb: gsbi5_uart_ahb {
++				#clock-cells = <0>;
++				compatible = "qcom,cxc-hg-clock";
 +			};
 +		};
 +	};
 diff --git a/drivers/clk/msm/Kconfig b/drivers/clk/msm/Kconfig
-index 3eaffb6..6147380 100644
+index bf7e3d2..3eaffb6 100644
 --- a/drivers/clk/msm/Kconfig
 +++ b/drivers/clk/msm/Kconfig
-@@ -11,4 +11,12 @@ config MSM_GCC_8960
- 	  Say Y if you want to use peripheral devices such as UART, SPI,
- 	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
+@@ -2,3 +2,13 @@ menuconfig COMMON_CLK_MSM
+ 	tristate "Support for Qualcomm's MSM designs"
+ 	depends on OF
  
-+config MSM_MMCC_8960
-+	bool "MSM8960 Multimedia Clock Controller"
-+	select MSM_GCC_8960
-+	help
-+	  Support for the multimedia clock controller on msm8960 devices.
-+	  Say Y if you want to support multimedia devices such as display,
-+	  graphics, video encode/decode, camera, etc.
++if COMMON_CLK_MSM
 +
- endif
++config MSM_GCC_8960
++	bool "MSM8960 Global Clock Controller"
++	help
++	  Support for the global clock controller on msm8960 devices.
++	  Say Y if you want to use peripheral devices such as UART, SPI,
++	  i2c, USB, SD/eMMC, SATA, PCIe, etc.
++
++endif
 diff --git a/drivers/clk/msm/Makefile b/drivers/clk/msm/Makefile
-index c785943..ae199f5 100644
+index 9cfd0d7..c785943 100644
 --- a/drivers/clk/msm/Makefile
 +++ b/drivers/clk/msm/Makefile
-@@ -8,3 +8,4 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
- clk-msm-$(CONFIG_COMMON_CLK_MSM) += core.o
+@@ -6,3 +6,5 @@ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-rcg2.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += clk-branch.o
  
- clk-msm-$(CONFIG_MSM_GCC_8960) += gcc-8960.o
-+clk-msm-$(CONFIG_MSM_MMCC_8960) += mmcc-8960.o
+ clk-msm-$(CONFIG_COMMON_CLK_MSM) += core.o
++
++clk-msm-$(CONFIG_MSM_GCC_8960) += gcc-8960.o
 diff --git a/drivers/clk/msm/core.c b/drivers/clk/msm/core.c
-index b1ac8c1..f30aee5 100644
+index b1904c0..b1ac8c1 100644
 --- a/drivers/clk/msm/core.c
 +++ b/drivers/clk/msm/core.c
-@@ -176,6 +176,9 @@ static const struct of_device_id msm_cc_match_table[] = {
- #ifdef CONFIG_MSM_GCC_8960
- 	{ .compatible = "qcom,gcc-8960", .data = &msm_gcc_clk_matches },
- #endif
-+#ifdef CONFIG_MSM_MMCC_8960
-+	{ .compatible = "qcom,mmcc-8960", .data = &msm_mmcc_clk_matches },
+@@ -173,6 +173,9 @@ typedef struct clk *
+ 		struct cc_data *cc);
+ 
+ static const struct of_device_id msm_cc_match_table[] = {
++#ifdef CONFIG_MSM_GCC_8960
++	{ .compatible = "qcom,gcc-8960", .data = &msm_gcc_clk_matches },
 +#endif
  	{ }
  };
  MODULE_DEVICE_TABLE(of, msm_cc_match_table);
-diff --git a/drivers/clk/msm/internal.h b/drivers/clk/msm/internal.h
-index 0b6b9fe..77ffc45 100644
---- a/drivers/clk/msm/internal.h
-+++ b/drivers/clk/msm/internal.h
-@@ -22,5 +22,6 @@ struct msm_clk_match {
- };
- 
- extern const struct msm_clk_match msm_gcc_clk_matches;
-+extern const struct msm_clk_match msm_mmcc_clk_matches;
- 
- #endif
-diff --git a/drivers/clk/msm/mmcc-8960.c b/drivers/clk/msm/mmcc-8960.c
+diff --git a/drivers/clk/msm/gcc-8960.c b/drivers/clk/msm/gcc-8960.c
 new file mode 100644
-index 0000000..c57e9cc
+index 0000000..11f47d8
 --- /dev/null
-+++ b/drivers/clk/msm/mmcc-8960.c
-@@ -0,0 +1,142 @@
++++ b/drivers/clk/msm/gcc-8960.c
+@@ -0,0 +1,174 @@
 +/*
 + * Copyright (c) 2013, The Linux Foundation. All rights reserved.
 + *
@@ -146,128 +154,171 @@ index 0000000..c57e9cc
 +#include "clk-rcg.h"
 +#include "clk-branch.h"
 +
-+static struct pll_desc pll2_desc = {
-+	.l_reg = 0x320,
-+	.m_reg = 0x324,
-+	.n_reg = 0x328,
-+	.config_reg = 0x32c,
-+	.mode_reg = 0x31c,
-+	.status_reg = 0x334,
++static struct pll_desc pll8_desc = {
++	.l_reg = 0x3144,
++	.m_reg = 0x3148,
++	.n_reg = 0x314c,
++	.config_reg = 0x3154,
++	.mode_reg = 0x3140,
++	.status_reg = 0x3158,
 +	.status_bit = 16,
 +};
 +
++static struct pll_vote_desc pll8_vote_desc = {
++	.vote_reg = 0x34c0,
++	.vote_bit = 8,
++};
++
 +#define PXO	0
-+#define PLL2	1
-+#define PLL8	2
++#define PLL8	1
 +
-+static u8 mmcc_pxo_pll2_pll8_map[] = {
++static u8 gcc_pxo_pll8_map[] = {
 +	[PXO]	= 0,
-+	[PLL2]	= 1,
-+	[PLL8]	= 2,
++	[PLL8]	= 3,
 +};
 +
-+static struct freq_tbl clk_tbl_mdp[] = {
-+	{   9600000, PLL8, 0, 1, 40 },
-+	{  13710000, PLL8, 0, 1, 28 },
-+	{  27000000, PXO,  0, 0,  0 },
-+	{  29540000, PLL8, 0, 1, 13 },
-+	{  34910000, PLL8, 0, 1, 11 },
-+	{  38400000, PLL8, 0, 1, 10 },
-+	{  59080000, PLL8, 0, 2, 13 },
-+	{  76800000, PLL8, 0, 1,  5 },
-+	{  85330000, PLL8, 0, 2,  9 },
-+	{  96000000, PLL8, 0, 1,  4 },
-+	{ 128000000, PLL8, 0, 1,  3 },
-+	{ 160000000, PLL2, 0, 1,  5 },
-+	{ 177780000, PLL2, 0, 2,  9 },
-+	{ 200000000, PLL2, 0, 1,  4 },
-+	{ 228571000, PLL2, 0, 2,  7 },
-+	{ 266667000, PLL2, 0, 1,  3 },
++static struct freq_tbl clk_tbl_gsbi_uart[] = {
++	{  1843200, PLL8, 2,  6, 625 },
++	{  3686400, PLL8, 2, 12, 625 },
++	{  7372800, PLL8, 2, 24, 625 },
++	{ 14745600, PLL8, 2, 48, 625 },
++	{ 16000000, PLL8, 4,  1,   6 },
++	{ 24000000, PLL8, 4,  1,   4 },
++	{ 32000000, PLL8, 4,  1,   3 },
++	{ 40000000, PLL8, 1,  5,  48 },
++	{ 46400000, PLL8, 1, 29, 240 },
++	{ 48000000, PLL8, 4,  1,   2 },
++	{ 51200000, PLL8, 1,  2,  15 },
++	{ 56000000, PLL8, 1,  7,  48 },
++	{ 58982400, PLL8, 1, 96, 625 },
++	{ 64000000, PLL8, 2,  1,   3 },
 +	{ }
 +};
 +
-+static struct rcg_dyn_desc mdp_rcg = {
-+	.ctl_reg = 0xc0,
-+	.ns_reg = 0xd0,
-+	.md0_reg = 0xc4,
-+	.md1_reg = 0xc8,
-+	.ctl_bit = 2,
-+	.mnctr0_en_bit = 8,
-+	.mnctr1_en_bit = 5,
-+	.mnctr0_reset_bit = 31,
-+	.mnctr1_reset_bit = 30,
-+	.mnctr0_mode_shift = 9,
-+	.mnctr1_mode_shift = 6,
-+	.src0_sel_shift = 3,
-+	.src1_sel_shift = 0,
-+	.n0_val_shift = 22,
-+	.n1_val_shift = 14,
-+	.m0_val_shift = 8,
-+	.m1_val_shift = 8,
-+	.mux_sel_bit = 11,
-+	.parent_map = mmcc_pxo_pll2_pll8_map,
-+	.freq_tbl = clk_tbl_mdp,
++static struct rcg_desc gsbi5_uart_rcg = {
++	.ctl_reg = 0x2a54,
++	.ns_reg = 0x2a54,
++	.md_reg = 0x2a50,
++	.ctl_bit = 11,
++	.mnctr_en_bit = 8,
++	.mnctr_reset_bit = 7,
++	.mnctr_mode_shift = 5,
++	.pre_div_shift = 3,
++	.src_sel_shift = 0,
++	.n_val_shift = 16,
++	.m_val_shift = 16,
++	.parent_map = gcc_pxo_pll8_map,
++	.freq_tbl = clk_tbl_gsbi_uart,
 +};
 +
-+static struct branch_desc mdp_cxc = {
-+	.ctl_reg = 0xc0,
-+	.halt_reg = 0x1d0,
-+	.ctl_bit = 0,
-+	.halt_bit = 10,
++static struct branch_desc gsbi5_uart_cxc = {
++	.ctl_reg = 0x2a54,
++	.halt_reg = 0x2fd0,
++	.ctl_bit = 9,
++	.halt_bit = 22,
 +	.halt_check = BRANCH_HALT,
 +};
 +
-+static struct freq_tbl clk_tbl_rot[] = {
-+	{  27000000, PXO,   1 },
-+	{  29540000, PLL8, 13 },
-+	{  32000000, PLL8, 12 },
-+	{  38400000, PLL8, 10 },
-+	{  48000000, PLL8,  8 },
-+	{  54860000, PLL8,  7 },
-+	{  64000000, PLL8,  6 },
-+	{  76800000, PLL8,  5 },
-+	{  96000000, PLL8,  4 },
-+	{ 100000000, PLL2,  8 },
-+	{ 114290000, PLL2,  7 },
-+	{ 133330000, PLL2,  6 },
-+	{ 160000000, PLL2,  5 },
-+	{ 200000000, PLL2,  4 },
++static struct rcg_desc gsbi6_uart_rcg = {
++	.ctl_reg = 0x2a74,
++	.ns_reg = 0x2a74,
++	.md_reg = 0x2a70,
++	.ctl_bit = 11,
++	.mnctr_en_bit = 8,
++	.mnctr_reset_bit = 7,
++	.mnctr_mode_shift = 5,
++	.pre_div_shift = 3,
++	.src_sel_shift = 0,
++	.n_val_shift = 16,
++	.m_val_shift = 16,
++	.parent_map = gcc_pxo_pll8_map,
++	.freq_tbl = clk_tbl_gsbi_uart,
++};
++
++static struct branch_desc gsbi6_uart_cxc = {
++	.ctl_reg = 0x2a74,
++	.halt_reg = 0x2fd0,
++	.ctl_bit = 9,
++	.halt_bit = 18,
++	.halt_check = BRANCH_HALT,
++};
++
++static struct branch_desc gsbi5_uart_ahb = {
++	.ctl_reg = 0x2a40,
++	.halt_reg = 0x2fd0,
++	.hwcg_reg = 0x2a40,
++	.ctl_bit = 4,
++	.hwcg_bit = 6,
++	.halt_bit = 23,
++	.halt_check = BRANCH_HALT,
++};
++
++static struct freq_tbl clk_tbl_gsbi_qup[] = {
++	{  1100000, PXO,  1, 2, 49 },
++	{  5400000, PXO,  1, 1,  5 },
++	{ 10800000, PXO,  1, 2,  5 },
++	{ 15060000, PLL8, 1, 2, 51 },
++	{ 24000000, PLL8, 4, 1,  4 },
++	{ 25600000, PLL8, 1, 1, 15 },
++	{ 27000000, PXO,  1, 0,  0 },
++	{ 48000000, PLL8, 4, 1,  2 },
++	{ 51200000, PLL8, 1, 2, 15 },
 +	{ }
 +};
 +
-+static struct rcg_dyn_desc rot_rcg = {
-+	.ctl_reg = 0xe0,
-+	.ns_reg = 0xe8,
-+	.ctl_bit = 2,
-+	.pre_div0_shift = 22,
-+	.pre_div1_shift = 26,
-+	.src0_sel_shift = 16,
-+	.src1_sel_shift = 19,
-+	.mux_sel_bit = 30,
-+	.parent_map = mmcc_pxo_pll2_pll8_map,
-+	.freq_tbl = clk_tbl_rot,
++static struct rcg_desc gsbi5_qup_rcg = {
++	.ctl_reg = 0x2a4c,
++	.ns_reg = 0x2a4c,
++	.md_reg = 0x2a48,
++	.ctl_bit = 11,
++	.mnctr_en_bit = 8,
++	.mnctr_reset_bit = 7,
++	.mnctr_mode_shift = 5,
++	.pre_div_shift = 3,
++	.src_sel_shift = 0,
++	.n_val_shift = 16,
++	.m_val_shift = 16,
++	.parent_map = gcc_pxo_pll8_map,
++	.freq_tbl = clk_tbl_gsbi_qup,
 +};
 +
-+static struct branch_desc rot_cxc = {
-+	.ctl_reg = 0xe0,
-+	.halt_reg = 0x1d0,
-+	.ctl_bit = 0,
-+	.halt_bit = 15,
++static struct branch_desc gsbi5_qup_cxc = {
++	.ctl_reg = 0x2a4c,
++	.halt_reg = 0x2fd0,
++	.ctl_bit = 9,
++	.halt_bit = 20,
 +	.halt_check = BRANCH_HALT,
 +};
 +
-+static struct of_clk_match msm_mmcc_clk_match[] = {
-+	{ .name = "pll2", .driver_data = &pll2_desc },
-+	{ .name = "mdp_rcg", .driver_data = &mdp_rcg },
-+	{ .name = "mdp_cxc", .driver_data = &mdp_cxc },
-+	{ .name = "rot_rcg", .driver_data = &rot_rcg },
-+	{ .name = "rot_cxc", .driver_data = &rot_cxc },
++static struct of_clk_match msm_gcc_clk_match[] = {
++	{ .name = "cxo" },
++	{ .name = "pxo" },
++	{ .name = "pll8", .driver_data = &pll8_desc },
++	{ .name = "vpll8", .driver_data = &pll8_vote_desc },
++	{ .name = "gsbi5_uart_rcg", .driver_data = &gsbi5_uart_rcg },
++	{ .name = "gsbi5_uart_cxc", .driver_data = &gsbi5_uart_cxc },
++	{ .name = "gsbi6_uart_rcg", .driver_data = &gsbi6_uart_rcg },
++	{ .name = "gsbi6_uart_cxc", .driver_data = &gsbi6_uart_cxc },
++	{ .name = "gsbi5_uart_ahb", .driver_data = &gsbi5_uart_ahb },
++	{ .name = "gsbi5_qup_rcg", .driver_data = &gsbi5_qup_rcg },
++	{ .name = "gsbi5_qup_cxc", .driver_data = &gsbi5_qup_cxc },
 +};
 +
-+const struct msm_clk_match msm_mmcc_clk_matches = {
-+	.matches = msm_mmcc_clk_match,
-+	.size = ARRAY_SIZE(msm_mmcc_clk_match)
++const struct msm_clk_match msm_gcc_clk_matches = {
++	.matches = msm_gcc_clk_match,
++	.size = ARRAY_SIZE(msm_gcc_clk_match)
 +};
+diff --git a/drivers/clk/msm/internal.h b/drivers/clk/msm/internal.h
+index 177bd3b..0b6b9fe 100644
+--- a/drivers/clk/msm/internal.h
++++ b/drivers/clk/msm/internal.h
+@@ -21,4 +21,6 @@ struct msm_clk_match {
+ 	size_t size;
+ };
+ 
++extern const struct msm_clk_match msm_gcc_clk_matches;
++
+ #endif
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
