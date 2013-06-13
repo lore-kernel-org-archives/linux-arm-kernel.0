@@ -1,65 +1,67 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 13 Jun 2013 21:29:45 +0200
-Subject: [PATCH V2 05/10] USB: OHCI: Properly handle ohci-exynos suspend
-In-Reply-To: <1371114989-2342-6-git-send-email-manjunath.goudar@linaro.org>
-References: <1371050918-29472-1-git-send-email-manjunath.goudar@linaro.org>
- <1371114989-2342-1-git-send-email-manjunath.goudar@linaro.org>
- <1371114989-2342-6-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <9340690.Y20fM6tyU7@flatron>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Jun 2013 13:31:18 -0600
+Subject: [PATCH] drivers: pinctrl: add active state to core
+In-Reply-To: <20130612183345.GU8164@atomide.com>
+References: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
+ <51B75148.5080701@wwwdotorg.org>
+ <CACRpkdYQSO0+9tQkS=df-kpL=XL+DpnY1ijp6_Zeg0MvmFujyw@mail.gmail.com>
+ <20130612183345.GU8164@atomide.com>
+Message-ID: <51BA1E06.6020705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Manjunath,
-
-On Thursday 13 of June 2013 14:46:24 Manjunath Goudar wrote:
-> Suspend scenario in case of ohci-exynos glue was not
-> properly handled as it was not suspending generic part
-> of ohci controller.Calling explicitly the ohci_suspend()
-> routine in exynos_ohci_suspend() will ensure proper
-> handling of suspend scenario.
+On 06/12/2013 12:33 PM, Tony Lindgren wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [130611 12:59]:
+>> On Tue, Jun 11, 2013 at 6:33 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 06/11/2013 02:16 AM, Linus Walleij wrote:
+>>>> From: Linus Walleij <linus.walleij@linaro.org>
+>>>>
+>>>> In addition to the recently introduced pinctrl core
+>>>> control, the PM runtime pin control for the OMAP platforms
+>>>> require a fourth state in addtition to the default, idle and
+>>>> sleep states already handled by the core: an explicit "active"
+>>>> state. Let's introduce this to the core in addition to the
+>>>> other states already defined.
+>>>
+>>> Surely "default" /is/ "active"? That's what it's meant so far.
+>>
+>> I thought so too, until Tony informed us that in the OMAP world
+>> this state is not always the active one.
+>>
+>> But I don't know the exact reasons for.
+>>
+>> I guess that some "default" states on the OMAP may mean these
+>> are configured as decoupled, inactive, until explicitly activated
+>> or something like that.
 > 
-> V2:
->  -Incase ohci_suspend() fails, return right away without
->   executing further.
-> 
-> Signed-off-by: Manjunath Goudar <manjunath.goudar@linaro.org>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Cc: Greg KH <greg@kroah.com>
-> Cc: linux-usb at vger.kernel.org
-> ---
->  drivers/usb/host/ohci-exynos.c |    8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/drivers/usb/host/ohci-exynos.c
-> b/drivers/usb/host/ohci-exynos.c index 6ff830c..8fecb6a 100644
-> --- a/drivers/usb/host/ohci-exynos.c
-> +++ b/drivers/usb/host/ohci-exynos.c
-> @@ -203,9 +203,17 @@ static int exynos_ohci_suspend(struct device *dev)
->  	struct exynos_ohci_hcd *exynos_ohci = to_exynos_ohci(hcd);
->  	struct ohci_hcd *ohci = hcd_to_ohci(hcd);
->  	struct platform_device *pdev = to_platform_device(dev);
-> +	bool do_wakeup = device_may_wakeup(dev);
->  	unsigned long flags;
->  	int rc = 0;
-> 
-> +	rc = ohci_suspend(hcd, do_wakeup);
-> +	if (rc == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
-> +		ohci_resume(hcd, false);
-> +		rc = -EBUSY;
-> +	}
+> The main reason is that remuxing all the pins for a device for
+> PM runtime suspend and resume is not necessary. Most pins are
+> static and configured once during the consumer driver probe.
+> And in most cases, remuxing only one pin for the rx line is
+> needed. This is performance critical as it may need to be done
+> constantly while entering and exiting idle, and remuxing all the
+> pins is just a waste of cycles.
 
-I'm not into USB host subsystem, so I might just ask a stupid question.
+Then isn't the correct solution to optimize the code that switches
+between states, so that it only reprograms the pins/groups necessary?
+Inventing extra states just to work around that issue seems quite wrong.
 
-Can't we make ohci_suspend check this for us, so the drivers would just 
-check for error code? It seems like in all your patches this part of code 
-is duplicated, looking as a good candidate to be generic.
+So, I think you're relying on:
 
-Best regards,
-Tomasz
+default: Set up everything static.
+active: flip just a few pins to active state.
+idle: flip just a few pins to idle state.
 
-> +	if (rc)
-> +		return rc;
->  	/*
->  	 * Root hub was already suspended. Disable irq emission and
->  	 * mark HW unaccessible, bail out if RH has been resumed. Use
+... and assuming that the default->active or default->idle transitions
+will not affect any pins that are used in default, but not used in
+active/idle.
+
+However, that very specifically isn't the case; pinctrl drivers are
+allowed to force unused pins back to some default unused state when the
+pinctrl state that's being switched to doesn't mention them, and hence
+this concept won't work in general.
+
+Also, if default uses more pins that active, when you switch to active,
+those pins won't be marked as owned any more, I think, so something else
+could in theory grab them. At least, debugfs wouldn't be entirely
+accurate any more.
