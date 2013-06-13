@@ -1,82 +1,109 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Thu, 13 Jun 2013 14:59:53 -0600
-Subject: [PATCH 1/7] ARM: mxc: fix gpio-ranges for VF610
-Message-ID: <1371157199-7272-1-git-send-email-swarren@wwwdotorg.org>
+Date: Thu, 13 Jun 2013 14:59:55 -0600
+Subject: [PATCH 3/7] of: move documentation of of_parse_phandle_with_args
+In-Reply-To: <1371157199-7272-1-git-send-email-swarren@wwwdotorg.org>
+References: <1371157199-7272-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1371157199-7272-3-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Stephen Warren <swarren@nvidia.com>
 
-The gpio-ranges properties in vf610.dtsi were written according to an
-older version of the GPIO bindings. Unfortunately, these were changed
-incompatibly in commit 86853c8 "gpio: add gpio offset in gpio range
-cells property". This patch adds the missing required extra cell in each
-gpio-ranges property.
+Commit bd69f73 "of: Create function for counting number of phandles in
+a property" renamed of_parse_phandle_with_args(), and created a wrapper
+function that implemented the original name. However, the documentation
+of the original function was not moved, leaving it apparently documenting
+the newly renamed function.
+
+Move the documentation so that it is adjacent to the function it
+documents.
 
 Signed-off-by: Stephen Warren <swarren@nvidia.com>
 ---
-This should be immediately applied to the tree which added vf610.dtsi.
----
- arch/arm/boot/dts/vf610.dtsi | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/of/base.c | 64 +++++++++++++++++++++++++++----------------------------
+ 1 file changed, 32 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/boot/dts/vf610.dtsi b/arch/arm/boot/dts/vf610.dtsi
-index 659d845..e1eb7da 100644
---- a/arch/arm/boot/dts/vf610.dtsi
-+++ b/arch/arm/boot/dts/vf610.dtsi
-@@ -162,7 +162,7 @@
- 			iomuxc: iomuxc at 40048000 {
- 				compatible = "fsl,vf610-iomuxc";
- 				reg = <0x40048000 0x1000>;
--				#gpio-range-cells = <2>;
-+				#gpio-range-cells = <3>;
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index f53b992..f0b51e8 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -1101,38 +1101,6 @@ struct device_node *of_parse_phandle(const struct device_node *np,
+ }
+ EXPORT_SYMBOL(of_parse_phandle);
  
- 				/* functions and groups pins */
+-/**
+- * of_parse_phandle_with_args() - Find a node pointed by phandle in a list
+- * @np:		pointer to a device tree node containing a list
+- * @list_name:	property name that contains a list
+- * @cells_name:	property name that specifies phandles' arguments count
+- * @index:	index of a phandle to parse out
+- * @out_args:	optional pointer to output arguments structure (will be filled)
+- *
+- * This function is useful to parse lists of phandles and their arguments.
+- * Returns 0 on success and fills out_args, on error returns appropriate
+- * errno value.
+- *
+- * Caller is responsible to call of_node_put() on the returned out_args->node
+- * pointer.
+- *
+- * Example:
+- *
+- * phandle1: node1 {
+- * 	#list-cells = <2>;
+- * }
+- *
+- * phandle2: node2 {
+- * 	#list-cells = <1>;
+- * }
+- *
+- * node3 {
+- * 	list = <&phandle1 1 2 &phandle2 3>;
+- * }
+- *
+- * To get a device_node of the `node2' node you may call this:
+- * of_parse_phandle_with_args(node3, "list", "#list-cells", 1, &args);
+- */
+ static int __of_parse_phandle_with_args(const struct device_node *np,
+ 					const char *list_name,
+ 					const char *cells_name, int index,
+@@ -1235,6 +1203,38 @@ static int __of_parse_phandle_with_args(const struct device_node *np,
+ 	return rc;
+ }
  
-@@ -343,7 +343,7 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
--				gpio-ranges = <&iomuxc 0 32>;
-+				gpio-ranges = <&iomuxc 0 0 32>;
- 			};
- 
- 			gpio2: gpio at 4004a000 {
-@@ -354,7 +354,7 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
--				gpio-ranges = <&iomuxc 32 32>;
-+				gpio-ranges = <&iomuxc 0 32 32>;
- 			};
- 
- 			gpio3: gpio at 4004b000 {
-@@ -365,7 +365,7 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
--				gpio-ranges = <&iomuxc 64 32>;
-+				gpio-ranges = <&iomuxc 0 64 32>;
- 			};
- 
- 			gpio4: gpio at 4004c000 {
-@@ -376,7 +376,7 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
--				gpio-ranges = <&iomuxc 96 32>;
-+				gpio-ranges = <&iomuxc 0 96 32>;
- 			};
- 
- 			gpio5: gpio at 4004d000 {
-@@ -387,7 +387,7 @@
- 				#gpio-cells = <2>;
- 				interrupt-controller;
- 				#interrupt-cells = <2>;
--				gpio-ranges = <&iomuxc 128 7>;
-+				gpio-ranges = <&iomuxc 0 128 7>;
- 			};
- 
- 			anatop at 40050000 {
++/**
++ * of_parse_phandle_with_args() - Find a node pointed by phandle in a list
++ * @np:		pointer to a device tree node containing a list
++ * @list_name:	property name that contains a list
++ * @cells_name:	property name that specifies phandles' arguments count
++ * @index:	index of a phandle to parse out
++ * @out_args:	optional pointer to output arguments structure (will be filled)
++ *
++ * This function is useful to parse lists of phandles and their arguments.
++ * Returns 0 on success and fills out_args, on error returns appropriate
++ * errno value.
++ *
++ * Caller is responsible to call of_node_put() on the returned out_args->node
++ * pointer.
++ *
++ * Example:
++ *
++ * phandle1: node1 {
++ * 	#list-cells = <2>;
++ * }
++ *
++ * phandle2: node2 {
++ * 	#list-cells = <1>;
++ * }
++ *
++ * node3 {
++ * 	list = <&phandle1 1 2 &phandle2 3>;
++ * }
++ *
++ * To get a device_node of the `node2' node you may call this:
++ * of_parse_phandle_with_args(node3, "list", "#list-cells", 1, &args);
++ */
+ int of_parse_phandle_with_args(const struct device_node *np, const char *list_name,
+ 				const char *cells_name, int index,
+ 				struct of_phandle_args *out_args)
 -- 
 1.8.1.5
