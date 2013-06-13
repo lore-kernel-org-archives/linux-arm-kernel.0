@@ -1,28 +1,31 @@
-From: gang.chen@asianux.com (Chen Gang)
-Date: Thu, 13 Jun 2013 09:13:45 +0800
-Subject: [PATCH v2] arm64: kernel: compiling issue,
- need delete read_current_timer().
-In-Reply-To: <51B594F2.9030000@arm.com>
-References: <5199C725.8050102@asianux.com>
- <168084c28e8ba5124c05553e97463172@localhost>
- <20130520095606.GH31359@mudshark.cambridge.arm.com>
- <519AF2DC.2040200@asianux.com>
- <20130521085325.GB10453@mudshark.cambridge.arm.com>
- <519B425D.4030806@asianux.com> <51A32F40.1050309@asianux.com>
- <51B2B50A.1050305@asianux.com> <51B594F2.9030000@arm.com>
-Message-ID: <51B91CC9.3050707@asianux.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 12 Jun 2013 18:35:14 -0700
+Subject: [PATCH v4 0/5] clk: implement remuxing during set_rate
+In-Reply-To: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
+References: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
+Message-ID: <51B921D2.2030700@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2013 04:57 PM, Marc Zyngier wrote:
-> Sorry for the delay replying. This looks good to me.
-> 
-> FWIW:
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+On 05/20/13 06:28, James Hogan wrote:
+> This patchset adds support for automatic selection of the best parent
+> for a clock mux, i.e. the one which can provide the closest clock rate
+> to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
+> flag (which is set for all uses of clk_register_mux().
+>
+> This works by way of adding a new op, determine_rate, similar to
+> round_rate but with an extra parameter to allow the clock driver to
+> optionally select a different parent clock. This is used in
+> clk_calc_new_rates to decide whether to initiate a set_parent operation.
 
-Thanks, also sorry for my delay replying.
+I'd like to see this go into 3.11. We can tackle the larger problem that
+Saravana brought up later on since we're no worse off than we already
+are without these patches.
+
+Feel free to add my reviewed-by to all patches.
+
+Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
 
 -- 
-Chen Gang
-
-Asianux Corporation
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
