@@ -1,68 +1,104 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Thu, 13 Jun 2013 10:57:01 +0200
-Subject: [PATCH v4 2/3] mmc: dw_mmc-pltfm: move probe and remove below dt
- match table
+Date: Thu, 13 Jun 2013 10:58:22 +0200
+Subject: [PATCH v4 3/3] mmc: dw_mmc-pltfm: add Rockchip variant
 In-Reply-To: <201306131055.49595.heiko@sntech.de>
 References: <201306131055.49595.heiko@sntech.de>
-Message-ID: <201306131057.01769.heiko@sntech.de>
+Message-ID: <201306131058.23150.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In a subsquent patch probe will need to do some handling of data from
-the dt match table. So to prevent the need for forward declarations,
-move probe and remove below the match table.
+Cortex-A9 SoCs from Rockchip use a slightly modified variant of dw_mmc
+controllers that seems to require the SDMMC_CMD_USE_HOLD_REG bit to
+always be set.
+
+There also seem to be no other modifications (additional register etc)
+present, so to keep the footprint low, add this small variant to the
+pltfm driver.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Acked-by: Seungwon Jeon <tgih.jun@samsung.com>
 ---
- drivers/mmc/host/dw_mmc-pltfm.c |   28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+depends on "mmc: dw_mmc: Add support DW SD/MMC driver on SOCFPGA"
+ from Dinh Nguyen
 
+ .../devicetree/bindings/mmc/rockchip-dw-mshc.txt   |   23 ++++++++++++++++++++
+ drivers/mmc/host/dw_mmc-pltfm.c                    |   21 +++++++++++++++++-
+ 2 files changed, 43 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+
+diff --git a/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+new file mode 100644
+index 0000000..8a3d91d
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mmc/rockchip-dw-mshc.txt
+@@ -0,0 +1,23 @@
++* Rockchip specific extensions to the Synopsis Designware Mobile
++  Storage Host Controller
++
++The Synopsis designware mobile storage host controller is used to interface
++a SoC with storage medium such as eMMC or SD/MMC cards. This file documents
++differences between the core Synopsis dw mshc controller properties described
++by synopsis-dw-mshc.txt and the properties used by the Rockchip specific
++extensions to the Synopsis Designware Mobile Storage Host Controller.
++
++Required Properties:
++
++* compatible: should be
++	- "rockchip,rk2928-dw-mshc": for Rockchip RK2928 and following
++
++Example:
++
++	rkdwmmc0 at 12200000 {
++		compatible = "rockchip,rk2928-dw-mshc";
++		reg = <0x12200000 0x1000>;
++		interrupts = <0 75 0>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++	};
 diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-index 0048da8..9b05381 100644
+index 9b05381..3923ffd 100644
 --- a/drivers/mmc/host/dw_mmc-pltfm.c
 +++ b/drivers/mmc/host/dw_mmc-pltfm.c
-@@ -63,20 +63,6 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
- }
- EXPORT_SYMBOL_GPL(dw_mci_pltfm_register);
+@@ -24,6 +24,15 @@
  
--static int dw_mci_pltfm_probe(struct platform_device *pdev)
--{
--	return dw_mci_pltfm_register(pdev, NULL);
--}
--
--int dw_mci_pltfm_remove(struct platform_device *pdev)
--{
--	struct dw_mci *host = platform_get_drvdata(pdev);
--
--	dw_mci_remove(host);
--	return 0;
--}
--EXPORT_SYMBOL_GPL(dw_mci_pltfm_remove);
--
- #ifdef CONFIG_PM_SLEEP
- /*
-  * TODO: we should probably disable the clock to the card in the suspend path.
-@@ -118,6 +104,20 @@ static const struct of_device_id dw_mci_pltfm_match[] = {
+ #include "dw_mmc.h"
+ 
++static void dw_mci_rockchip_prepare_command(struct dw_mci *host, u32 *cmdr)
++{
++	*cmdr |= SDMMC_CMD_USE_HOLD_REG;
++}
++
++static const struct dw_mci_drv_data rockchip_drv_data = {
++	.prepare_command	= dw_mci_rockchip_prepare_command,
++};
++
+ int dw_mci_pltfm_register(struct platform_device *pdev,
+ 				const struct dw_mci_drv_data *drv_data)
+ {
+@@ -100,13 +109,23 @@ EXPORT_SYMBOL_GPL(dw_mci_pltfm_pmops);
+ 
+ static const struct of_device_id dw_mci_pltfm_match[] = {
+ 	{ .compatible = "snps,dw-mshc", },
++	{ .compatible = "rockchip,rk2928-dw-mshc",
++		.data = &rockchip_drv_data },
+ 	{},
  };
  MODULE_DEVICE_TABLE(of, dw_mci_pltfm_match);
  
-+static int dw_mci_pltfm_probe(struct platform_device *pdev)
-+{
-+	return dw_mci_pltfm_register(pdev, NULL);
-+}
+ static int dw_mci_pltfm_probe(struct platform_device *pdev)
+ {
+-	return dw_mci_pltfm_register(pdev, NULL);
++	const struct dw_mci_drv_data *drv_data = NULL;
++	const struct of_device_id *match;
 +
-+int dw_mci_pltfm_remove(struct platform_device *pdev)
-+{
-+	struct dw_mci *host = platform_get_drvdata(pdev);
++	if (pdev->dev.of_node) {
++		match = of_match_node(dw_mci_pltfm_match, pdev->dev.of_node);
++		drv_data = match->data;
++	}
 +
-+	dw_mci_remove(host);
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(dw_mci_pltfm_remove);
-+
- static struct platform_driver dw_mci_pltfm_driver = {
- 	.probe		= dw_mci_pltfm_probe,
- 	.remove		= dw_mci_pltfm_remove,
++	return dw_mci_pltfm_register(pdev, drv_data);
+ }
+ 
+ int dw_mci_pltfm_remove(struct platform_device *pdev)
 -- 
 1.7.10.4
