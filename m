@@ -1,109 +1,79 @@
-From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
-Date: Thu, 13 Jun 2013 22:24:33 +0200
-Subject: [PATCH 14/15] ARM: SAMSUNG: Remove remaining uses of
- plat/regs-timer.h header
-In-Reply-To: <1370467100-10820-15-git-send-email-tomasz.figa@gmail.com>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <1370467100-10820-15-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <201306132224.33866.heiko@sntech.de>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 13 Jun 2013 22:29:23 +0200
+Subject: [PATCH] pinctrl: move the pm state stubs
+Message-ID: <1371155363-28223-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 5. Juni 2013, 23:18:19 schrieb Tomasz Figa:
-> This patch removes remaining inclusions of plat/regs-timer.h as a
-> preparation to remove the header.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-hmm, the patch does a bit more than that, as it also removes the saving of the 
-registers from the suspend calls, which is most likely handled by the driver 
-now. But the description should possibly reflect that.
+The stubs for the !PINCTRL case were placed in the wrong
+part of the file, causing breakage in linux-next when compiling
+SH without pinctrl. Fix it up by moving the stubs to the right
+place.
 
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ include/linux/pinctrl/consumer.h | 40 ++++++++++++++++++++--------------------
+ 1 file changed, 20 insertions(+), 20 deletions(-)
 
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  arch/arm/mach-s3c64xx/irq-pm.c  |  2 --
->  arch/arm/mach-s5p64x0/pm.c      |  3 ---
->  arch/arm/mach-s5pv210/pm.c      | 10 ----------
->  arch/arm/plat-samsung/s5p-irq.c |  1 -
->  4 files changed, 16 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/irq-pm.c
-> b/arch/arm/mach-s3c64xx/irq-pm.c index 0c7e1d9..c3da1b6 100644
-> --- a/arch/arm/mach-s3c64xx/irq-pm.c
-> +++ b/arch/arm/mach-s3c64xx/irq-pm.c
-> @@ -22,7 +22,6 @@
->  #include <mach/map.h>
-> 
->  #include <plat/regs-serial.h>
-> -#include <plat/regs-timer.h>
->  #include <mach/regs-gpio.h>
->  #include <plat/cpu.h>
->  #include <plat/pm.h>
-> @@ -43,7 +42,6 @@ static struct sleep_save irq_save[] = {
->  	SAVE_ITEM(S3C64XX_EINT0FLTCON2),
->  	SAVE_ITEM(S3C64XX_EINT0FLTCON3),
->  	SAVE_ITEM(S3C64XX_EINT0MASK),
-> -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
->  };
-> 
->  static struct irq_grp_save {
-> diff --git a/arch/arm/mach-s5p64x0/pm.c b/arch/arm/mach-s5p64x0/pm.c
-> index 97c2a08a..861e15c 100644
-> --- a/arch/arm/mach-s5p64x0/pm.c
-> +++ b/arch/arm/mach-s5p64x0/pm.c
-> @@ -18,7 +18,6 @@
-> 
->  #include <plat/cpu.h>
->  #include <plat/pm.h>
-> -#include <plat/regs-timer.h>
->  #include <plat/wakeup-mask.h>
-> 
->  #include <mach/regs-clock.h>
-> @@ -48,8 +47,6 @@ static struct sleep_save s5p64x0_misc_save[] = {
->  	SAVE_ITEM(S5P64X0_MEM0CONSLP1),
->  	SAVE_ITEM(S5P64X0_MEM0DRVCON),
->  	SAVE_ITEM(S5P64X0_MEM1DRVCON),
-> -
-> -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
->  };
-> 
->  /* DPLL is present only in S5P6450 */
-> diff --git a/arch/arm/mach-s5pv210/pm.c b/arch/arm/mach-s5pv210/pm.c
-> index 2b68a67..3cf3f9c 100644
-> --- a/arch/arm/mach-s5pv210/pm.c
-> +++ b/arch/arm/mach-s5pv210/pm.c
-> @@ -21,7 +21,6 @@
-> 
->  #include <plat/cpu.h>
->  #include <plat/pm.h>
-> -#include <plat/regs-timer.h>
-> 
->  #include <mach/regs-irq.h>
->  #include <mach/regs-clock.h>
-> @@ -77,15 +76,6 @@ static struct sleep_save s5pv210_core_save[] = {
->  	/* Clock ETC */
->  	SAVE_ITEM(S5P_CLK_OUT),
->  	SAVE_ITEM(S5P_MDNIE_SEL),
-> -
-> -	/* PWM Register */
-> -	SAVE_ITEM(S3C2410_TCFG0),
-> -	SAVE_ITEM(S3C2410_TCFG1),
-> -	SAVE_ITEM(S3C64XX_TINT_CSTAT),
-> -	SAVE_ITEM(S3C2410_TCON),
-> -	SAVE_ITEM(S3C2410_TCNTB(0)),
-> -	SAVE_ITEM(S3C2410_TCMPB(0)),
-> -	SAVE_ITEM(S3C2410_TCNTO(0)),
->  };
-> 
->  static int s5pv210_cpu_suspend(unsigned long arg)
-> diff --git a/arch/arm/plat-samsung/s5p-irq.c
-> b/arch/arm/plat-samsung/s5p-irq.c index 6729cb2..ddfaca9 100644
-> --- a/arch/arm/plat-samsung/s5p-irq.c
-> +++ b/arch/arm/plat-samsung/s5p-irq.c
-> @@ -17,7 +17,6 @@
-> 
->  #include <mach/irqs.h>
->  #include <mach/map.h>
-> -#include <plat/regs-timer.h>
->  #include <plat/cpu.h>
-> 
->  void __init s5p_init_irq(u32 *vic, u32 num_vic)
+diff --git a/include/linux/pinctrl/consumer.h b/include/linux/pinctrl/consumer.h
+index 18cdbb1..7f18e4d 100644
+--- a/include/linux/pinctrl/consumer.h
++++ b/include/linux/pinctrl/consumer.h
+@@ -116,6 +116,26 @@ static inline void devm_pinctrl_put(struct pinctrl *p)
+ {
+ }
+ 
++static inline int pinctrl_pm_select_default_state(struct device *dev)
++{
++	return 0;
++}
++
++static inline int pinctrl_pm_select_active_state(struct device *dev)
++{
++	return 0;
++}
++
++static inline int pinctrl_pm_select_sleep_state(struct device *dev)
++{
++	return 0;
++}
++
++static inline int pinctrl_pm_select_idle_state(struct device *dev)
++{
++	return 0;
++}
++
+ #endif /* CONFIG_PINCTRL */
+ 
+ static inline struct pinctrl * __must_check pinctrl_get_select(
+@@ -223,26 +243,6 @@ static inline int pin_config_group_set(const char *dev_name,
+ 	return 0;
+ }
+ 
+-static inline int pinctrl_pm_select_default_state(struct device *dev)
+-{
+-	return 0;
+-}
+-
+-static inline int pinctrl_pm_select_active_state(struct device *dev)
+-{
+-	return 0;
+-}
+-
+-static inline int pinctrl_pm_select_sleep_state(struct device *dev)
+-{
+-	return 0;
+-}
+-
+-static inline int pinctrl_pm_select_idle_state(struct device *dev)
+-{
+-	return 0;
+-}
+-
+ #endif
+ 
+ #endif /* __LINUX_PINCTRL_CONSUMER_H */
+-- 
+1.7.11.3
