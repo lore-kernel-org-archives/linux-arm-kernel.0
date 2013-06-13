@@ -1,54 +1,88 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Thu, 13 Jun 2013 10:48:13 +0530
-Subject: [PATCH 09/13] clk: exynos5420: register clocks using common clock
- framework
-In-Reply-To: <CAL1qeaE91S-sTLXBb7d3tbDP9M68py4PsLdHxxp2JqisGsP=ww@mail.gmail.com>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-9-git-send-email-chander.kashyap@linaro.org>
- <1479353.W3tSzhFHaA@flatron>
- <CAL1qeaE91S-sTLXBb7d3tbDP9M68py4PsLdHxxp2JqisGsP=ww@mail.gmail.com>
-Message-ID: <CANuQgHHxkK2UOWZBgTPzRN_vo02MFRmFYUn9KqJftJ17xrAMfg@mail.gmail.com>
+From: jg1.han@samsung.com (Jingoo Han)
+Date: Thu, 13 Jun 2013 14:34:14 +0900
+Subject: [PATCH V4 3/3] ARM: dts: Add pcie controller node for Samsung
+ EXYNOS5440 SoC
+In-Reply-To: <3532163.SqzZzxO4BR@wuerfel>
+References: <003801ce6756$6578ff80$306afe80$@samsung.com>
+ <3532163.SqzZzxO4BR@wuerfel>
+Message-ID: <003a01ce67f7$a3fc7f60$ebf57e20$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 June 2013 03:02, Andrew Bresticker <abrestic@chromium.org> wrote:
-> Tomasz,
->
->>> +     apll = samsung_clk_register_pll35xx("fout_apll", "oscclk",
->>> +                     reg_base + 0x100);
->>> +     bpll = samsung_clk_register_pll35xx("fout_bpll", "oscclk",
->>> +                     reg_base + 0x20110);
->>> +     cpll = samsung_clk_register_pll35xx("fout_cpll", "oscclk",
->>> +                     reg_base + 0x10120);
->>> +     dpll = samsung_clk_register_pll35xx("fout_dpll", "oscclk",
->>> +                     reg_base + 0x10128);
->>> +     epll = samsung_clk_register_pll35xx("fout_epll", "oscclk",
->>> +                     reg_base + 0x10130);
->>> +     ipll = samsung_clk_register_pll35xx("fout_ipll", "oscclk",
->>> +                     reg_base + 0x10150);
->>> +     kpll = samsung_clk_register_pll35xx("fout_kpll", "oscclk",
->>> +                     reg_base + 0x28100);
->>> +     mpll = samsung_clk_register_pll35xx("fout_mpll", "oscclk",
->>> +                     reg_base + 0x10180);
->>> +     rpll = samsung_clk_register_pll35xx("fout_rpll", "oscclk",
->>> +                     reg_base + 0x10140);
->>> +     spll = samsung_clk_register_pll35xx("fout_spll", "oscclk",
->>> +                     reg_base + 0x10160);
->>> +     vpll = samsung_clk_register_pll35xx("fout_vpll", "oscclk",
->>> +                     reg_base + 0x10170);
->>
->> Are all those PLLs really PLL35xx? At least for VPLL and EPLL a PLL
->> without the K factor looks a bit awkward.
->
-> No they are not...  EPLL and RPLL should be pll36xx, but the rest are pll35xx.
-Yes EPLL and RPLL are pll36xx.
-Thanks for pointing out.
->
-> Thanks,
-> Andrew
+On Wednesday, June 12, 2013 7:56 PM, Arnd Bergmann wrote:
+> 
+> Thanks for the update! A few comments again:
+> 
+> On Wednesday 12 June 2013 19:20:00 Jingoo Han wrote:
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5440-ssdk5440.dts b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> > index d55042b..efe7d39 100644
+> > --- a/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> > +++ b/arch/arm/boot/dts/exynos5440-ssdk5440.dts
+> > @@ -30,4 +30,12 @@
+> >                         clock-frequency = <50000000>;
+> >                 };
+> >         };
+> > +
+> > +       pcie0 at 40000000 {
+> > +               reset-gpio = <5>;
+> > +       };
+> > +
+> > +       pcie1 at 60000000 {
+> > +               reset-gpio = <22>;
+> > +       };
+> >  };
+> 
+> As mentioned before, please use the gpio binding to pass gpio numbers.
 
+OK, I will use gpio binding.
 
+> 
+> > diff --git a/arch/arm/boot/dts/exynos5440.dtsi b/arch/arm/boot/dts/exynos5440.dtsi
+> > index f6b1c89..2c15f9d 100644
+> > --- a/arch/arm/boot/dts/exynos5440.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5440.dtsi
+> > @@ -216,4 +216,42 @@
+> >                 clock-names = "rtc";
+> >                 status = "disabled";
+> >         };
+> > +
+> > +       pcie0 at 0x290000 {
+> > +               compatible = "samsung,exynos5440-pcie";
+> > +               reg = <0x290000 0x1000
+> > +                       0x270000 0x1000
+> > +                       0x271000 0x40>;
+> > +               interrupts = <0 20 0>, <0 21 0>, <0 22 0>;
+> > +               clocks = <&clock 28>, <&clock 27>;
+> > +               clock-names = "pcie", "pcie_bus";
+> > +               #address-cells = >;
+> > +               #size-cells = <2>;
+> > +               device_type = "pci";
+> > +               ranges = <0x00000800 0 0x40000000 0x40000000 0 0x00200000   /* configuration space */
+> > +                         0x81000000 0 0          0x40200000 0 0x00010000   /* downstream I/O */
+> > +                         0x82000000 0 0x40210000 0x40210000 0 0x10000000>; /* non-prefetchable memory */
+> 
+> I think you did not reply to my question regarding the size of the
+> memory space. Does it extend from 0x40210000 to 0x50210000,
+> or from 0x40210000 to 0x50000000. You probably meant the latter
+> but wrote the former. If not, please add a comment for clarification.
 
---
-with warm regards,
-Chander Kashyap
+OK, I see.
+It extends to 0x60000000. I will modify it.
+
+> 
+> > +               #interrupt-cells = <1>;
+> > +               interrupt-map-mask = <0 0 0 0>;
+> > +               interrupt-map = <0x0 0 &gic 53>;
+> > +       };
+> 
+> So all PCI IntA interrupts are mapped to a single gic interrupt? That
+> sounds like a bottleneck when you have a lot of devices on the bus.
+> Do you have MSI support?
+
+INTA, INTB, INTC, and INTD are mapped to a single gic interrupt.
+Exynos5440 PCIe has MSI support; however, MSI support patch will
+be posted later.
+
+> 
+> 	Arnd
