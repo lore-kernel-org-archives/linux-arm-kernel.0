@@ -1,70 +1,70 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Thu, 13 Jun 2013 09:58:03 -0500
-Subject: [RFC PATCH 1/4] regulator: Introduce OMAP regulator to control
- PMIC over VC/VP
-In-Reply-To: <20130613144726.GY1403@sirena.org.uk>
-References: <1369246717-4167-1-git-send-email-nm@ti.com>
- <1369246717-4167-2-git-send-email-nm@ti.com>
- <20130610103131.GR31367@sirena.org.uk>
- <CAGo_u6qTiPpd0DDe3jnPh_UxTwox22azhcMGy=fftL8H+DGeyw@mail.gmail.com>
- <20130610164905.GJ1403@sirena.org.uk>
- <CAGo_u6ov=yaCwt8apbvW57ErAvhgUBHHw9gwADBC1fJUrfucUQ@mail.gmail.com>
- <20130610180150.GQ1403@sirena.org.uk>
- <20130613133950.GA32174@kahuna>
- <20130613144726.GY1403@sirena.org.uk>
-Message-ID: <20130613145803.GA32324@kahuna>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Thu, 13 Jun 2013 16:58:36 +0200
+Subject: [PATCH v4 0/4] arm: add basic support for Rockchip Cortex-A9 SoCs
+Message-ID: <201306131658.36584.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:47-20130613, Mark Brown wrote:
-> On Thu, Jun 13, 2013 at 08:39:50AM -0500, Nishanth Menon wrote:
-> 
-> > I am having a bit of a difficulty trying to understand your concern
-> > here.
-> 
-> Your device tree for this stuff appears to mostly consist of repeating
-> the description of the PMIC that we already have - this really doesn't
-> seem like a great result.
-> 
-> > Problem statement:
-> 
-> > OMAP has this weird custom h/w where one programs the voltage and that
-> > voltage is send over i2c - this is not same as Tegra's lookup table
-> > array which automatically sends out entries, in OMAP, software has to trigger
-> > the voltage transition
-> 
-> The basic idea that's important here is that you need to figure out how
-> to tell the hardware what to write - how those writes get triggered is a
-> separate problem.
-> 
-> > If your concern was describing PMIC parameters in dts, I can easily move
-> > them inside the omap_pmic driver and provide required compatible flags.
-> > If, on the other hand, the entire approach followed is flawed, I'd like to
-> > understand the rationale for the same.
-> 
-> That's the biggest problem I saw so far but to be honest I've not
-> drilled down too much into the specifics.  From my point of view the
-> main thing is how this fits into the frameworks and so on, having the
-> register information in the DT was an alarm flag that suggested the
-> overall approach was a concern.
-OK. would you be ok with an generic omap_pmic driver if the PMIC
-specific data set is moved into OF compatible data?
-I am proposing moving the following into OF match data.
-ti,i2c-slave-address
-ti,i2c-voltage-register
-ti,i2c-command-register
-ti,slew-rate-microvolt
-ti,step-size-micro-volts
-ti,voltage-selector-set-bits
-ti,voltage-selector-mask
-ti,voltage-selector-offset
-ti,non-zero-voltage-selector
+Fourth version of basic Rockchip A9 support.
 
-The only thing I propose to retain is board specific variations - e.g.
-gpios, boot voltage and standard regulator min,max overrides if any.
+Changes since v3:
+- split out standalone dw_mmc patches (submitted to linux-mmc)
+- Remove divider and mux clocks and use fixed rate clocks instead until
+  divider and mux clocks have got their generic dt bindings
+- Make the gate clock use CLK_OF_DECLARE and document the bindings
 
-I can also do voltage selector based operations while at it.
+Changes since v2:
+- use common (pending review) HIWORD_MASK clock flag from Haojian Zhuang and me
+- pinctrl driver is already in the pinctrl tree
+- add core-periph clock that supplies the twd
+- split "mmc: dw_mmc-pltfm: add Rockchip variant" into move and feature parts
+  as suggested by Andy Shevchenko
+
+Changes since v1:
+- addressed Linus Walleij's comments to the pinctrl driver, including the
+  move to generic pinconfig (hopefully I did catch all)
+- renamed the clocks to use the SoC name of the initial user
+  as suggested by Olof Johansson
+- fixed the uart address, found by Arnd Bergmann
+- address Arnd's comments on the board file (use of_clk_init and friends,
+  remove map_io, use real soc names)
+- removed Makefile.boot as suggested by Thomas Petazzoni
+
+
+Dependencies:
+- the 3 clock changes of "support Hisilicon SoC" from Haojian Zhuang (HIWORD_MASK)
+- series "dw_apb_timer: osc as sched_clock, clocks and clocksource_of support"
+  which is in arm-soc already
+
+Heiko Stuebner (4):
+  clk: add support for Rockchip gate clocks
+  arm: Add basic clocks for Rockchip rk3066a SoCs
+  arm: add debug uarts for rockchip rk29xx and rk3xxx series
+  arm: add basic support for Rockchip RK3066a boards
+
+ .../devicetree/bindings/clock/rockchip.txt         |   74 ++++
+ arch/arm/Kconfig                                   |    2 +
+ arch/arm/Kconfig.debug                             |   34 ++
+ arch/arm/Makefile                                  |    1 +
+ arch/arm/boot/dts/rk3066a-clocks.dtsi              |  300 +++++++++++++++
+ arch/arm/boot/dts/rk3066a.dtsi                     |  390 ++++++++++++++++++++
+ arch/arm/include/debug/rockchip.S                  |   42 +++
+ arch/arm/mach-rockchip/Kconfig                     |   16 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/rockchip.c                  |   54 +++
+ drivers/clk/Makefile                               |    1 +
+ drivers/clk/rockchip/Makefile                      |    5 +
+ drivers/clk/rockchip/clk-rockchip.c                |   94 +++++
+ 13 files changed, 1014 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip.txt
+ create mode 100644 arch/arm/boot/dts/rk3066a-clocks.dtsi
+ create mode 100644 arch/arm/boot/dts/rk3066a.dtsi
+ create mode 100644 arch/arm/include/debug/rockchip.S
+ create mode 100644 arch/arm/mach-rockchip/Kconfig
+ create mode 100644 arch/arm/mach-rockchip/Makefile
+ create mode 100644 arch/arm/mach-rockchip/rockchip.c
+ create mode 100644 drivers/clk/rockchip/Makefile
+ create mode 100644 drivers/clk/rockchip/clk-rockchip.c
 
 -- 
-Regards,
-Nishanth Menon
+1.7.10.4
