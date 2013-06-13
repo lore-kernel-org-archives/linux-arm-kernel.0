@@ -1,41 +1,45 @@
 From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Fri, 14 Jun 2013 00:45:50 +0200
-Subject: [PATCH 2/3] pinctrl: s3c24xx: use correct header for chained_irq
- functions
+Date: Fri, 14 Jun 2013 00:46:25 +0200
+Subject: [PATCH 3/3] ARM: S3C24XX: update uart addresses in s3c2416-dt auxdata
 In-Reply-To: <201306140044.15568.heiko@sntech.de>
 References: <201306140044.15568.heiko@sntech.de>
-Message-ID: <201306140045.51206.heiko@sntech.de>
+Message-ID: <201306140046.25954.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-chained_irq_enter and chained_irq_exit moved to a real header under
-linux/pinctrl instead of asm/.
+Commit 9ee51f01eee8 (tty: serial/samsung: make register definitions global)
+removed the S3C2410_PA_UARTX defines that the newly merged s3c2416 dt
+support still expected.
 
-Update the pinctrl driver to use the correct header and fix the build
-error.
+So update mach-s3c2416-dt.c to use the S3C24XX_PA_UART constant
+until we have support for the common clock framework the the s3c2416-dt.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/pinctrl/pinctrl-s3c24xx.c |    3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-s3c24xx/mach-s3c2416-dt.c |    8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/pinctrl/pinctrl-s3c24xx.c b/drivers/pinctrl/pinctrl-s3c24xx.c
-index c8b0399..24446da 100644
---- a/drivers/pinctrl/pinctrl-s3c24xx.c
-+++ b/drivers/pinctrl/pinctrl-s3c24xx.c
-@@ -19,12 +19,11 @@
- #include <linux/irqdomain.h>
- #include <linux/irq.h>
- #include <linux/of_irq.h>
-+#include <linux/irqchip/chained_irq.h>
- #include <linux/io.h>
- #include <linux/slab.h>
- #include <linux/err.h>
- 
--#include <asm/mach/irq.h>
--
- #include "pinctrl-samsung.h"
- 
- #define NUM_EINT	24
+diff --git a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+index f5c9072..f50454a 100644
+--- a/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
++++ b/arch/arm/mach-s3c24xx/mach-s3c2416-dt.c
+@@ -43,13 +43,13 @@
+  * data from the device tree.
+  */
+ static const struct of_dev_auxdata s3c2416_auxdata_lookup[] __initconst = {
+-	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C2410_PA_UART0,
++	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C24XX_PA_UART,
+ 				"s3c2440-uart.0", NULL),
+-	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C2410_PA_UART1,
++	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C24XX_PA_UART + 0x4000,
+ 				"s3c2440-uart.1", NULL),
+-	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C2410_PA_UART2,
++	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C24XX_PA_UART + 0x8000,
+ 				"s3c2440-uart.2", NULL),
+-	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C2443_PA_UART3,
++	OF_DEV_AUXDATA("samsung,s3c2440-uart", S3C24XX_PA_UART + 0xC000,
+ 				"s3c2440-uart.3", NULL),
+ 	OF_DEV_AUXDATA("samsung,s3c6410-sdhci", S3C_PA_HSMMC0,
+ 				"s3c-sdhci.0", NULL),
 -- 
 1.7.10.4
