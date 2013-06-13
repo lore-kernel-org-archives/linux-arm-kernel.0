@@ -1,51 +1,48 @@
-From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Jun 2013 01:46:03 +0200
-Subject: [PATCH v6 18/18] ARM: shmobile: marzen-reference: Add LED2-LED4 to
- the device tree
-In-Reply-To: <1371167163-10507-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-References: <1371167163-10507-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1371167163-10507-19-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 14 Jun 2013 01:53:49 +0200
+Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
+ properties from a dt node
+In-Reply-To: <CACRpkdZavNX3jk4K5unEJCED4vTuZEUF=NC1naGOMyr54hXQKw@mail.gmail.com>
+References: <201306102139.32444.heiko@sntech.de>
+ <201306131723.04721.heiko@sntech.de>
+ <CACRpkdZavNX3jk4K5unEJCED4vTuZEUF=NC1naGOMyr54hXQKw@mail.gmail.com>
+Message-ID: <1862891.4yIecp615h@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-LED2 to LED4 are GPIO LEDs. Add corresponding DT nodes.
+Hi Linus,
 
-Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
----
- arch/arm/boot/dts/r8a7779-marzen-reference.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+On Thursday 13 June 2013 17:36:00 Linus Walleij wrote:
+> On Thu, Jun 13, 2013 at 5:23 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> >> Ok, I'll see that I get this fixed :-)
+> > 
+> > Hmm ... what is the meaning of the argument of bias-disable and bias-high-
+> > impedance, as the kernel-doc in pinconf-generic.h does not tell?
+> 
+> I think those arguments are N/A, ignored, doesn't matter.
+> If these options were typed, they would be bool.
+> 
+> Please improve documentation if you can... sorry for all the
+> rough edges.
+> 
+> > bias-bus-hold ignores its argument and we already clarified that the
+> > pull-* do have != 0 or 0 argument.
+> 
+> I think in the DT binding, both these forms:
+> 
+> bias-pull-up;
+> bias-pull-up = <150000>;
+> 
+> Should be allowed.
+> 
+> So when parsing, you first check if it exists, then if there
+> is an argument, if there is no value supplied, just set it
+> to 1, as that is clearly != 0...
 
-diff --git a/arch/arm/boot/dts/r8a7779-marzen-reference.dts b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-index 6d20247..b64705b 100644
---- a/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-+++ b/arch/arm/boot/dts/r8a7779-marzen-reference.dts
-@@ -11,6 +11,7 @@
- 
- /dts-v1/;
- /include/ "r8a7779.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "marzen";
-@@ -47,6 +48,19 @@
- 		vddvario-supply = <&fixedregulator3v3>;
- 		vdd33a-supply = <&fixedregulator3v3>;
- 	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		led2 {
-+			gpios = <&gpio4 29 GPIO_ACTIVE_HIGH>;
-+		};
-+		led3 {
-+			gpios = <&gpio4 30 GPIO_ACTIVE_HIGH>;
-+		};
-+		led4 {
-+			gpios = <&gpio4 31 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
- };
- 
- &pfc {
+What's the expected way to disable pull-ups in DT ? Should it be 'bias-pull-up 
+= <0>;' or 'bias-disable;' ?
+
 -- 
-1.8.1.5
+Regards,
+
+Laurent Pinchart
