@@ -1,31 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 12 Jun 2013 18:35:14 -0700
-Subject: [PATCH v4 0/5] clk: implement remuxing during set_rate
-In-Reply-To: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
-References: <1369056507-32521-1-git-send-email-james.hogan@imgtec.com>
-Message-ID: <51B921D2.2030700@codeaurora.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 13 Jun 2013 04:37:29 +0300
+Subject: [GIT PULL] move omap mailbox to drivers for v3.11
+In-Reply-To: <1371074306-57583-1-git-send-email-s-anna@ti.com>
+References: <1371074306-57583-1-git-send-email-s-anna@ti.com>
+Message-ID: <20130613013729.GB12078@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/13 06:28, James Hogan wrote:
-> This patchset adds support for automatic selection of the best parent
-> for a clock mux, i.e. the one which can provide the closest clock rate
-> to that requested. It can be disabled by a new CLK_SET_RATE_NO_REPARENT
-> flag (which is set for all uses of clk_register_mux().
->
-> This works by way of adding a new op, determine_rate, similar to
-> round_rate but with an extra parameter to allow the clock driver to
-> optionally select a different parent clock. This is used in
-> clk_calc_new_rates to decide whether to initiate a set_parent operation.
+Hi,
 
-I'd like to see this go into 3.11. We can tackle the larger problem that
-Saravana brought up later on since we're no worse off than we already
-are without these patches.
+On Wed, Jun 12, 2013 at 04:58:26PM -0500, Suman Anna wrote:
+> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+> 
+>   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git at github.com:sumananna/mailbox.git tags/omap-mailbox-for-v3.11
 
-Feel free to add my reviewed-by to all patches.
+Tony might not have an ssh account on github, when sending pull requests
+make sure to use the git read-only URL.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+We even have separate url and pushurl attributes for the repository.
+Should be enough to just edit .git/config and fix it up.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130613/5ef05b17/attachment.sig>
