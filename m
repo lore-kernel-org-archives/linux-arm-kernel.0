@@ -1,33 +1,38 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Thu, 13 Jun 2013 09:58:50 -0500
-Subject: [GIT PULL] move omap mailbox to drivers for v3.11
-In-Reply-To: <20130613013729.GB12078@arwen.pp.htv.fi>
-References: <1371074306-57583-1-git-send-email-s-anna@ti.com>
- <20130613013729.GB12078@arwen.pp.htv.fi>
-Message-ID: <51B9DE2A.7060201@ti.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Thu, 13 Jun 2013 09:05:05 -0600
+Subject: [PATCH V2 2/2] ARM: decouple CPU offlining from reboot/shutdown
+In-Reply-To: <CAMj5BkiV29fWkk6k_Q=5ThSS-4hitvNZv0MFi86f5O=1Ma3Dhg@mail.gmail.com>
+References: <1371067281-655-1-git-send-email-swarren@wwwdotorg.org>
+ <1371067281-655-2-git-send-email-swarren@wwwdotorg.org>
+ <CAMj5BkiV29fWkk6k_Q=5ThSS-4hitvNZv0MFi86f5O=1Ma3Dhg@mail.gmail.com>
+Message-ID: <51B9DFA1.7030001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2013 08:37 PM, Felipe Balbi wrote:
-> Hi,
+On 06/12/2013 07:58 PM, zhangfei gao wrote:
+> On Thu, Jun 13, 2013 at 4:01 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+...
+> Hi, Setphen
 > 
-> On Wed, Jun 12, 2013 at 04:58:26PM -0500, Suman Anna wrote:
->> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
->>
->>   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
->>
->> are available in the git repository at:
->>
->>   git at github.com:sumananna/mailbox.git tags/omap-mailbox-for-v3.11
+> We also met the issue: fail to reboot system from panic.
+> Solve it by the following change.
 > 
-> Tony might not have an ssh account on github, when sending pull requests
-> make sure to use the git read-only URL.
+> cpu_die is function kill cpu itself
+> cpu_kill is functoin to check whethe the cpu is dead or not
+> 
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
 
-Thanks for the tip, Felipe.
+> @@ -554,6 +554,9 @@ static void ipi_cpu_stop(unsigned int cpu)
 
-Tony,
-please use
-git://github.com/sumananna/mailbox.git tags/omap-mailbox-for-v3.11
+> +#ifdef CONFIG_HOTPLUG_CPU
+> +       cpu_die();
+> +#endif
+>         while (1)
+>                 cpu_relax();
+>  }
+> 
+> What do you think?
 
-regards
-Suman
+That probably works too, since it pairs cpu_die/cpu_kill, although the
+patch I sent ends up running less code during the halt/power_off/restart
+path, which seems like a good idea; less stuff to potentially break.
