@@ -1,66 +1,45 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Jun 2013 01:46:00 +0200
-Subject: [PATCH v6 15/18] ARM: shmobile: armadillo-reference: Move st1232
- reset GPIO to DT
+Date: Fri, 14 Jun 2013 01:46:01 +0200
+Subject: [PATCH v6 16/18] ARM: shmobile: armadillo-reference: Add LED1-LED4 to
+ the device tree
 In-Reply-To: <1371167163-10507-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 References: <1371167163-10507-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
-Message-ID: <1371167163-10507-16-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1371167163-10507-17-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reference the st1232 reset GPIO from the device tree and remove it from
-board code.
+LED1 to LED4 are GPIO LEDs. Add corresponding DT nodes.
 
 Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts  | 2 ++
- arch/arm/mach-shmobile/board-armadillo800eva-reference.c | 7 -------
- 2 files changed, 2 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-index a6c6606..8ec4cd1 100644
+index 8ec4cd1..366f729 100644
 --- a/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
 +++ b/arch/arm/boot/dts/r8a7740-armadillo800eva-reference.dts
-@@ -10,6 +10,7 @@
- 
- /dts-v1/;
- /include/ "r8a7740.dtsi"
-+#include <dt-bindings/gpio/gpio.h>
- 
- / {
- 	model = "armadillo 800 eva reference";
-@@ -43,6 +44,7 @@
- 		interrupts = <2 0>; /* IRQ10: hwirq 2 on irqpin1 */
- 		pinctrl-0 = <&st1232_pins>;
- 		pinctrl-names = "default";
-+		gpios = <&pfc 166 GPIO_ACTIVE_LOW>;
+@@ -34,6 +34,21 @@
+ 		regulator-boot-on;
  	};
+ 
++	leds {
++		compatible = "gpio-leds";
++		led1 {
++			gpios = <&pfc 102 GPIO_ACTIVE_HIGH>;
++		};
++		led2 {
++			gpios = <&pfc 111 GPIO_ACTIVE_HIGH>;
++		};
++		led3 {
++			gpios = <&pfc 110 GPIO_ACTIVE_HIGH>;
++		};
++		led4 {
++			gpios = <&pfc 177 GPIO_ACTIVE_HIGH>;
++		};
++	};
  };
  
-diff --git a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-index 4ddd299..002d8d3 100644
---- a/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-+++ b/arch/arm/mach-shmobile/board-armadillo800eva-reference.c
-@@ -158,7 +158,6 @@ clock_error:
-  */
- static void __init eva_init(void)
- {
--
- 	r8a7740_clock_init(MD_CK0 | MD_CK2);
- 	eva_clock_init();
- 
-@@ -171,12 +170,6 @@ static void __init eva_init(void)
- 
- 	r8a7740_add_standard_devices_dt();
- 
--	/*
--	 * Touchscreen
--	 * TODO: Move reset GPIO over to .dts when we can reference it
--	 */
--	gpio_request_one(166, GPIOF_OUT_INIT_HIGH, NULL); /* TP_RST_B */
--
- 	r8a7740_pm_init();
- }
- 
+ &i2c0 {
 -- 
 1.8.1.5
