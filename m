@@ -1,63 +1,31 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 13 Jun 2013 21:14:59 +0900
-Subject: [PATCH RESEND V2] ARM: dts: Correct the base address of pinctrl_3
- on Exynos5250
-In-Reply-To: <1371025425-480-1-git-send-email-padma.v@samsung.com>
-References: <1371025425-480-1-git-send-email-padma.v@samsung.com>
-Message-ID: <150d01ce682f$a007f230$e017d690$%kim@samsung.com>
+Date: Thu, 13 Jun 2013 21:26:45 +0900
+Subject: [RESEND PATCH 1/3] ARM: EXYNOS: Move arm core power down clock to
+ exynos5250 common clock
+In-Reply-To: <1370501833-9196-1-git-send-email-amit.daniel@samsung.com>
+References: <1363240979-1939-2-git-send-email-amit.daniel@samsung.com>
+ <1370501833-9196-1-git-send-email-amit.daniel@samsung.com>
+Message-ID: <150e01ce6831$44d94920$ce8bdb60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padmavathi Venna wrote:
+Amit Daniel Kachhap wrote:
 > 
-> This patch corrects the base address of pinctrl_3 on Exynos5250
-> platform.
+> Now with common clock support added for exynos5250 it is necessary to move
+> this code to exynos5250 common clock driver as clock registers should be
+> handled there. This change is tested in exynos5250 based arndale platform.
 > 
-> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> ---
-> Changes since V1:
-> 	- Added platform name in the subject line.
-> 
->  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    2 +-
->  arch/arm/boot/dts/exynos5250.dtsi         |    4 ++--
->  2 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> index d1650fb..ded558b 100644
-> --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
-> @@ -763,7 +763,7 @@
->  		};
->  	};
-> 
-> -	pinctrl at 03680000 {
-> +	pinctrl at 03860000 {
->  		gpz: gpz {
->  			gpio-controller;
->  			#gpio-cells = <2>;
-> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
-> b/arch/arm/boot/dts/exynos5250.dtsi
-> index 7154e3d..e9bfd13 100644
-> --- a/arch/arm/boot/dts/exynos5250.dtsi
-> +++ b/arch/arm/boot/dts/exynos5250.dtsi
-> @@ -169,9 +169,9 @@
->  		interrupts = <0 50 0>;
->  	};
-> 
-> -	pinctrl_3: pinctrl at 03680000 {
-> +	pinctrl_3: pinctrl at 03860000 {
->  		compatible = "samsung,exynos5250-pinctrl";
-> -		reg = <0x0368000 0x1000>;
-> +		reg = <0x03860000 0x1000>;
->  		interrupts = <0 47 0>;
->  	};
-> 
-> --
-> 1.7.4.4
+> Cc: Abhilash Kesavan <a.kesavan@samsung.com>
+> Cc: Thomas Abraham <thomas.abraham@linaro.org>
+> Signed-off-by: Amit Daniel Kachhap <amit.daniel@samsung.com>
 
-Yes, right.
+Hmm...I'm not sure it's better to handle the ARM core power down clock in
+common clock but the clock registers should be handled in one part, clock.
 
-Thanks, applied.
+Acked-by: Kukjin Kim <kgene.kim@samsugn.com>
 
+Mike, the mach-exynos/cpuidle.c is not touched in samsung tree at this
+moment, so this patch will not create any conflict between samsung and clk.
+
+Thanks,
 - Kukjin
