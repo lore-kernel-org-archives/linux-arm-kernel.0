@@ -1,78 +1,42 @@
 From: acourbot@nvidia.com (Alexandre Courbot)
-Date: Thu, 13 Jun 2013 18:12:24 +0900
-Subject: [PATCH v2 2/3] ARM: tegra: split setting of CPU reset handler
-In-Reply-To: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
-References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
-Message-ID: <1371114745-24710-3-git-send-email-acourbot@nvidia.com>
+Date: Thu, 13 Jun 2013 18:12:22 +0900
+Subject: [PATCH v2 0/3] ARM: tegra: add basic support for Trusted Foundations
+Message-ID: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not all Tegra devices need to set the CPU reset handler in the same way.
-In particular, devices using a TrustZone secure monitor cannot set the
-reset handler directly and need to do it through a firmware operation.
+New revision of the initial patch, fixed according to the many suggestions
+received. (thanks!)
 
-This patch separates the act of setting the reset handler from its
-preparation, so the former can be implemented in a different way.
+Changes since v1:
+- Split patch into logical chunks as suggested by Tomasz
+- Simplified smc function according to comments from Russel and David
+- Use proper "Trusted Foundations" naming for firmware instead of "SecureOS"
+- Very simple firmware infrastructure in mach-tegra to support the use of other
+  firmwares
+- Presence of secure monitor is signaled through a DT node instead of a "chosen"
+  property
+- Complain if support for a declared secure monitor is not compiled in
 
-Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
----
- arch/arm/mach-tegra/reset.c | 27 +++++++++++++++++----------
- 1 file changed, 17 insertions(+), 10 deletions(-)
+Alexandre Courbot (3):
+  ARM: tegra: basic support for Trusted Foundations
+  ARM: tegra: split setting of CPU reset handler
+  ARM: tegra: set CPU reset handler with firmware op
 
-diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
-index 1ac434e..6964117 100644
---- a/arch/arm/mach-tegra/reset.c
-+++ b/arch/arm/mach-tegra/reset.c
-@@ -33,26 +33,18 @@
- 
- static bool is_enabled;
- 
--static void __init tegra_cpu_reset_handler_enable(void)
-+static void __init tegra_cpu_reset_handler_set(const u32 reset_address)
- {
--	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
- 	void __iomem *evp_cpu_reset =
- 		IO_ADDRESS(TEGRA_EXCEPTION_VECTORS_BASE + 0x100);
- 	void __iomem *sb_ctrl = IO_ADDRESS(TEGRA_SB_BASE);
- 	u32 reg;
- 
--	BUG_ON(is_enabled);
--	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
--
--	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
--			tegra_cpu_reset_handler_size);
--
- 	/*
- 	 * NOTE: This must be the one and only write to the EVP CPU reset
- 	 *       vector in the entire system.
- 	 */
--	writel(TEGRA_IRAM_RESET_BASE + tegra_cpu_reset_handler_offset,
--			evp_cpu_reset);
-+	writel(reset_address, evp_cpu_reset);
- 	wmb();
- 	reg = readl(evp_cpu_reset);
- 
-@@ -66,6 +58,21 @@ static void __init tegra_cpu_reset_handler_enable(void)
- 		writel(reg, sb_ctrl);
- 		wmb();
- 	}
-+}
-+
-+static void __init tegra_cpu_reset_handler_enable(void)
-+{
-+	void __iomem *iram_base = IO_ADDRESS(TEGRA_IRAM_RESET_BASE);
-+	const u32 reset_address = TEGRA_IRAM_RESET_BASE +
-+						tegra_cpu_reset_handler_offset;
-+
-+	BUG_ON(is_enabled);
-+	BUG_ON(tegra_cpu_reset_handler_size > TEGRA_IRAM_RESET_HANDLER_SIZE);
-+
-+	memcpy(iram_base, (void *)__tegra_cpu_reset_handler_start,
-+			tegra_cpu_reset_handler_size);
-+
-+	tegra_cpu_reset_handler_set(reset_address);
- 
- 	is_enabled = true;
- }
+ Documentation/devicetree/bindings/arm/tegra.txt    | 11 +++++
+ .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+ arch/arm/configs/tegra_defconfig                   |  1 +
+ arch/arm/mach-tegra/Kconfig                        | 14 ++++++
+ arch/arm/mach-tegra/Makefile                       |  3 ++
+ arch/arm/mach-tegra/common.c                       |  2 +
+ arch/arm/mach-tegra/firmware.c                     | 40 +++++++++++++++++
+ arch/arm/mach-tegra/firmware.h                     | 19 ++++++++
+ arch/arm/mach-tegra/reset.c                        | 40 ++++++++++++-----
+ arch/arm/mach-tegra/trusted_foundations.c          | 51 ++++++++++++++++++++++
+ 10 files changed, 171 insertions(+), 11 deletions(-)
+ create mode 100644 arch/arm/mach-tegra/firmware.c
+ create mode 100644 arch/arm/mach-tegra/firmware.h
+ create mode 100644 arch/arm/mach-tegra/trusted_foundations.c
+
 -- 
 1.8.3
