@@ -1,122 +1,105 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Thu, 13 Jun 2013 22:18:16 +0200
-Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
-In-Reply-To: <201306132214.20017.heiko@sntech.de>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <1370467100-10820-9-git-send-email-tomasz.figa@gmail.com>
- <201306132214.20017.heiko@sntech.de>
-Message-ID: <2169030.uXO88EfhRE@flatron>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 13 Jun 2013 22:19:45 +0200
+Subject: [PATCH 1/2] ARM: u300: switch to using syscon regmap for board
+Message-ID: <1371154785-28082-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 of June 2013 22:14:19 Heiko St?bner wrote:
-> Am Mittwoch, 5. Juni 2013, 23:18:13 schrieb Tomasz Figa:
-> > This patch introduces new Samsung PWM driver, which uses Samsung
-> > PWM/timer master driver to control shared parts of the hardware.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > ---
-> > 
-> >  drivers/pwm/Makefile      |   1 +
-> >  drivers/pwm/pwm-samsung.c | 528
-> > 
-> > ++++++++++++++++++++++++++++++++++++++++++++++ 2 files changed, 529
-> > insertions(+)
-> > 
-> >  create mode 100644 drivers/pwm/pwm-samsung.c
-> > 
-> > diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-> 
-> [...]
-> 
-> > +static int pwm_samsung_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct samsung_pwm_chip *chip;
-> > +	struct resource *res;
-> > +	int ret;
-> > +
-> > +	chip = devm_kzalloc(&pdev->dev, sizeof(*chip), GFP_KERNEL);
-> > +	if (chip == NULL) {
-> > +		dev_err(dev, "failed to allocate driver data\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	chip->chip.dev = &pdev->dev;
-> > +	chip->chip.ops = &pwm_samsung_ops;
-> > +	chip->chip.base = -1;
-> > +	chip->chip.npwm = SAMSUNG_PWM_NUM;
-> > +
-> > +	if (pdev->dev.of_node) {
-> > +		ret = pwm_samsung_parse_dt(chip);
-> > +		if (ret)
-> > +			return ret;
-> > +
-> > +		chip->chip.of_xlate = of_pwm_xlate_with_flags;
-> > +		chip->chip.of_pwm_n_cells = 3;
-> > +	} else {
-> > +		if (!pdev->dev.platform_data) {
-> > +			dev_err(&pdev->dev, "no platform data 
-specified\n");
-> > +			return -EINVAL;
-> > +		}
-> > +
-> > +		memcpy(&chip->variant, pdev->dev.platform_data,
-> > +							sizeof(chip-
->variant));
-> > +	}
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	if (!res) {
-> > +		dev_err(&pdev->dev, "failed to get mem resource\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	chip->base = devm_request_and_ioremap(&pdev->dev, res);
-> > +	if (!chip->base) {
-> > +		dev_err(&pdev->dev, "failed to request and map 
-registers\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	chip->base_clk = devm_clk_get(&pdev->dev, "timers");
-> > +	if (IS_ERR(chip->base_clk)) {
-> > +		dev_err(dev, "failed to get timer base clk\n");
-> > +		return PTR_ERR(chip->base_clk);
-> > +	}
-> > +	clk_prepare_enable(chip->base_clk);
-> > +
-> > +	chip->tclk0 = devm_clk_get(&pdev->dev, "pwm-tclk0");
-> > +	chip->tclk1 = devm_clk_get(&pdev->dev, "pwm-tclk1");
-> > +
-> > +	ret = pwmchip_add(&chip->chip);
-> > +	if (ret < 0) {
-> > +		dev_err(dev, "failed to register pwm\n");
-> > +		goto err_clk_disable;
-> > +	}
-> > +
-> > +	dev_info(dev, "base_clk at %lu, tclk0 at %lu, tclk1 at %lu\n",
-> > +		clk_get_rate(chip->base_clk),
-> > +		!IS_ERR(chip->tclk0) ? clk_get_rate(chip->tclk0) : 0,
-> > +		!IS_ERR(chip->tclk1) ? clk_get_rate(chip->tclk1) : 0);
-> 
-> hmm, these values simply tell some internal state of the pwm, so
-> wouldn't a dev_dbg be more appropriate?
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Hmm, I have kept it as dev_info as in old driver, but now as you say it, 
-dev_dbg might be more appropriate indeed, as it isn't really anything 
-important that users should know...
+This switches the code using a local remapping of the
+system controller to enable the U300 board to be
+self-powered over to making the U300-specific syscon
+compatible with the MFD generic syscon driver, selecting
+the generic syscon driver, and augmenting the board
+power code to pick the regmap and manipulate the syscon
+from the regmap side of things.
 
-Best regards,
-Tomasz
+Cc: Dong Aisheng <dong.aisheng@linaro.org>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-u300.dts |  2 +-
+ arch/arm/mach-u300/Kconfig     |  1 +
+ arch/arm/mach-u300/regulator.c | 19 ++++++++-----------
+ 3 files changed, 10 insertions(+), 12 deletions(-)
 
-> > +
-> > +	platform_set_drvdata(pdev, chip);
-> > +
-> > +	return 0;
-> > +
-> > +err_clk_disable:
-> > +	clk_disable_unprepare(chip->base_clk);
-> > +
-> > +	return ret;
-> > +}
+diff --git a/arch/arm/boot/dts/ste-u300.dts b/arch/arm/boot/dts/ste-u300.dts
+index 05a0821..8a1032c 100644
+--- a/arch/arm/boot/dts/ste-u300.dts
++++ b/arch/arm/boot/dts/ste-u300.dts
+@@ -31,7 +31,7 @@
+ 	};
+ 
+ 	syscon: syscon at c0011000 {
+-		compatible = "stericsson,u300-syscon";
++		compatible = "stericsson,u300-syscon", "syscon";
+ 		reg = <0xc0011000 0x1000>;
+ 		clk32: app_32_clk at 32k {
+ 			#clock-cells = <0>;
+diff --git a/arch/arm/mach-u300/Kconfig b/arch/arm/mach-u300/Kconfig
+index e2f350f..09f4dda 100644
+--- a/arch/arm/mach-u300/Kconfig
++++ b/arch/arm/mach-u300/Kconfig
+@@ -20,6 +20,7 @@ config ARCH_U300
+ 	select PINCTRL_COH901
+ 	select PINCTRL_U300
+ 	select SPARSE_IRQ
++	select MFD_SYSCON
+ 	select USE_OF
+ 	help
+ 	  Support for ST-Ericsson U300 series mobile platforms.
+diff --git a/arch/arm/mach-u300/regulator.c b/arch/arm/mach-u300/regulator.c
+index 273fceb..bf40cd4 100644
+--- a/arch/arm/mach-u300/regulator.c
++++ b/arch/arm/mach-u300/regulator.c
+@@ -15,9 +15,8 @@
+ #include <linux/platform_device.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/consumer.h>
+-/* Those are just for writing in syscon */
+-#include <linux/of_address.h>
+-#include <linux/io.h>
++#include <linux/mfd/syscon.h>
++#include <linux/regmap.h>
+ 
+ /* Power Management Control 16bit (R/W) */
+ #define U300_SYSCON_PMCR					(0x50)
+@@ -59,9 +58,8 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *syscon_np;
+-	static void __iomem *syscon_base;
++	struct regmap *regmap;
+ 	int err;
+-	u32 val;
+ 
+ 	pr_info("U300: setting up board power\n");
+ 
+@@ -70,9 +68,9 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
+ 		pr_crit("U300: no syscon node\n");
+ 		return -ENODEV;
+ 	}
+-	syscon_base = of_iomap(syscon_np, 0);
+-	if (!syscon_base) {
+-		pr_crit("U300: could not remap syscon\n");
++	regmap = syscon_node_to_regmap(syscon_np);
++	if (!regmap) {
++		pr_crit("U300: could not locate syscon regmap\n");
+ 		return -ENODEV;
+ 	}
+ 
+@@ -96,9 +94,8 @@ static int __init __u300_init_boardpower(struct platform_device *pdev)
+ 	 * the rest of the U300 power management is implemented.
+ 	 */
+ 	pr_info("U300: disable system controller pull-up\n");
+-	val = readw(syscon_base + U300_SYSCON_PMCR);
+-	val &= ~U300_SYSCON_PMCR_DCON_ENABLE;
+-	writew(val, syscon_base + U300_SYSCON_PMCR);
++	regmap_update_bits(regmap, U300_SYSCON_PMCR,
++			   U300_SYSCON_PMCR_DCON_ENABLE, 0);
+ 
+ 	/* Register globally exported PM poweroff hook */
+ 	pm_power_off = u300_pm_poweroff;
+-- 
+1.7.11.3
