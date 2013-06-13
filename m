@@ -1,37 +1,32 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Thu, 13 Jun 2013 09:37:14 -0700
-Subject: [PATCH v3 0/4] Zynq: Support more boards
-Message-ID: <1371141438-16553-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Thu, 13 Jun 2013 09:37:15 -0700
+Subject: [PATCH v3 1/4] arm: zynq: Remove board specific compatibility string
+In-Reply-To: <1371141438-16553-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1371141438-16553-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1371141438-16553-2-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just another respin. Still depending on armsoc/zynq/clk
+It is not necessary to have board specific compatibility strings
+in the platform code. The board dts files can use the more generic
+'xlnx,zynq-7000' string.
 
-	S?ren
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ arch/arm/mach-zynq/common.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-v3:
- - adding patch to use 'status' property for UART nodes
- - dropping board specific compat string in the Zed dts
-
-v2:
- - adding patch to remove board specific compat strings from the BSP
- - adding patch adding Zed support
-
-Soren Brinkmann (4):
-  arm: zynq: Remove board specific compatibility string
-  arm: dt: zynq: Use 'status' property for UART nodes
-  arm: dt: zynq: Add support for the zc706 platform
-  arm: dt: zynq: Add support for the zed platform
-
- arch/arm/boot/dts/Makefile       |  4 +++-
- arch/arm/boot/dts/zynq-7000.dtsi |  2 ++
- arch/arm/boot/dts/zynq-zc702.dts |  6 +++++-
- arch/arm/boot/dts/zynq-zc706.dts | 35 +++++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/zynq-zed.dts   | 35 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-zynq/common.c      |  1 -
- 6 files changed, 80 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/boot/dts/zynq-zc706.dts
- create mode 100644 arch/arm/boot/dts/zynq-zed.dts
-
+diff --git a/arch/arm/mach-zynq/common.c b/arch/arm/mach-zynq/common.c
+index 5bfe703..7e3d5f4 100644
+--- a/arch/arm/mach-zynq/common.c
++++ b/arch/arm/mach-zynq/common.c
+@@ -98,7 +98,6 @@ static void zynq_system_reset(char mode, const char *cmd)
+ }
+ 
+ static const char * const zynq_dt_match[] = {
+-	"xlnx,zynq-zc702",
+ 	"xlnx,zynq-7000",
+ 	NULL
+ };
 -- 
 1.8.3
