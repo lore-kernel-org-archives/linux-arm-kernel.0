@@ -1,40 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:25 +0900
-Subject: [GIT PULL 0/1] Renesas ARM based SoC GPIO R-Car updates for v3.11 
-Message-ID: <1371106826-25313-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 16:00:31 +0900
+Subject: [PATCH 07/12] phy-rcar-usb: add platform data
+In-Reply-To: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106836-25388-8-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-This pull request is based on renesas-pinmux-for-v3.11 which you have
-previously pulled. It provides the GPIO R-Car driver. I have broken this
-pull-request out from a separate pull request I plan to send with further
-pinmux updates as it relates specifically to DT. And I wanted to give you
-the option of merging it separately.
+Currently the driver hard-codes  USBPCTRL0 register to 0. It is wrong since this
+register contains board-specific USB ports configuration and so its value should
+be somehow passed via the platform data.  Add the global header file containing
+'struct rcar_phy_platform_data' consisting of the various bit fields describing
+USB ports' pin configuration.
 
-The following changes since commit 5fcf4a3c3a5bc08bf72a50ef1332501a3c1b96bb:
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ include/linux/platform_data/usb-rcar-phy.h | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 include/linux/platform_data/usb-rcar-phy.h
 
-  ARM: shmobile: marzen: Use RCAR_GP_PIN macro (2013-06-05 17:18:24 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-gpio-rcar-for-v3.11
-
-for you to fetch changes up to 159f8a0209aff155af7f6fcdedd4a4484dd19c23:
-
-  gpio-rcar: Add DT support (2013-06-12 21:48:09 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC GPIO R-Car updates for v3.11
-
-DT support to GPIO R-Car driver by Laurent Pinchart.
-
-----------------------------------------------------------------
-Laurent Pinchart (1):
-      gpio-rcar: Add DT support
-
- .../devicetree/bindings/gpio/renesas,gpio-rcar.txt | 52 +++++++++++++++++
- drivers/gpio/gpio-rcar.c                           | 66 ++++++++++++++++++----
- 2 files changed, 108 insertions(+), 10 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+diff --git a/include/linux/platform_data/usb-rcar-phy.h b/include/linux/platform_data/usb-rcar-phy.h
+new file mode 100644
+index 0000000..c49f35a
+--- /dev/null
++++ b/include/linux/platform_data/usb-rcar-phy.h
+@@ -0,0 +1,26 @@
++/*
++ * Copyright (C) 2013 Renesas Solutions Corp.
++ * Copyright (C) 2013 Cogent Embedded, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#ifndef __USB_RCAR_PHY_H
++#define __USB_RCAR_PHY_H
++
++#include <linux/types.h>
++
++struct rcar_phy_platform_data {
++	bool port1_func:1;	/* true: port 1 used by function, false: host */
++	unsigned penc1:1;	/* Output of the PENC1 pin in function mode */
++	struct {		/* Overcurrent pin control for ports 0..2 */
++		bool select_3_3v:1; /* true: USB_OVCn pin, false: OVCn pin */
++				/* Set to false on port 1 in function mode */
++		bool active_high:1; /* true: active  high, false: active low */
++				/* Set to true  on port 1 in function mode */
++	} ovc_pin[3];
++};
++
++#endif /* __USB_RCAR_PHY_H */
+-- 
+1.8.2.1
