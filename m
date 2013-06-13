@@ -1,48 +1,44 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Thu, 13 Jun 2013 15:56:03 +0200
-Subject: [PATCH] ARM: ux500: set coherent_dma_mask for dma40
-Message-ID: <1371131763-6288-1-git-send-email-fabio.baltieri@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 13 Jun 2013 07:10:01 -0700
+Subject: N900 device tree conversion: how to do first step
+In-Reply-To: <20130613132624.GA3464@amd.pavel.ucw.cz>
+References: <20130609015944.GA23559@amd.pavel.ucw.cz>
+ <20130609201119.GA3190@blackmetal.musicnaut.iki.fi>
+ <20130613132624.GA3464@amd.pavel.ucw.cz>
+Message-ID: <20130613141001.GF8164@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Set coherent_dma_mask to DMA_BIT_MASK(32) for dma40 platform_device, as
-without this DMA allocations were failing with the error:
+* Pavel Machek <pavel@ucw.cz> [130613 06:32]:
+> Hi!
+> 
+> > > I'd like to convert Nokia N900 to device tree.
+> > > 
+> > > Unfortunately, serial port is not easily available (very special cable
+> > > would be needed, does someone know where to get one?) and I don't have
+> > > BDI (and very special cable would be needed, too).
+> > > 
+> > > So I tried doing very small first step, hoping that I get booting
+> > > system... obviously I did not.
+> > 
+> > The following works for me, it's enough to boot and get the USB networking
+> > working. After that I can connect to the device with ssh. I don't use
+> > serial either, I just have initramfs with busybox+dropbear with hardcoded
+> > interface setup.
+> 
+> Nice.... thanks a lot.
+> 
+> Did you get video to work with the device tree? That's what I'd like
+> to accomplish now.
 
-dma40 dma40.0: coherent DMA mask is unset
+The DSS code is still using pdata, see mach-omap2/dss-common.[ch].
+ 
+> If I init spi manually (and some more hacks), it works in the
+> qemu. But I have not tested on real hw for a while.
 
-when booting without device-tree.
+You should be able to initialize spi by adding the .dts entry,
+or is there something missing in drivers/spi/spi-omap2-mcspi.c?
 
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
+Regards,
 
-Hi Linus, Lee,
-
-I found this while removing the last hack I was keeping in my ASoC tree.
-I originally thought that I had to set this on the driver's pdata, but
-it turns out it's needed on the DMA controller one instead.
-
-When booting with device-tree enabled the mask seems to be set
-automatically.
-
-Would you consider applying this with the other dma40 patches?
-
-Thanks,
-Fabio
-
- arch/arm/mach-ux500/devices-db8500.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/mach-ux500/devices-db8500.c b/arch/arm/mach-ux500/devices-db8500.c
-index e21ffd8..fa8f7a5 100644
---- a/arch/arm/mach-ux500/devices-db8500.c
-+++ b/arch/arm/mach-ux500/devices-db8500.c
-@@ -49,6 +49,7 @@ struct stedma40_platform_data dma40_plat_data = {
- struct platform_device u8500_dma40_device = {
- 	.dev = {
- 		.platform_data = &dma40_plat_data,
-+		.coherent_dma_mask = DMA_BIT_MASK(32),
- 	},
- 	.name = "dma40",
- 	.id = 0,
--- 
-1.8.2
+Tony
