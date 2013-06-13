@@ -1,136 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 13 Jun 2013 16:00:33 +0900
-Subject: [PATCH 09/12] phy-rcar-usb: handle platform data
-In-Reply-To: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371106836-25388-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371106836-25388-10-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 13 Jun 2013 16:00:54 +0900
+Subject: [PATCH 2/2] ARM: shmobile: r8a7790: don't use external clock for SCIFs
+In-Reply-To: <1371106854-25560-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371106854-25560-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371106854-25560-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+From: Ulrich Hecht <ulrich.hecht@gmail.com>
 
-Set the USBPCTRL0 register from the passed platform data in rcar_usb_phy_init();
-don't reset it to 0 in  rcar_usb_phy_shutdown()  anymore as that does not make
-sense.  Also, don't allow the driver's probe to succeed when the platform data
-are not supplied with a device.
+This is an external component and may or may not be there, while the
+internal clock always works.
 
-The patch has been tested on the Marzen and BOCK-W boards.
-
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Acked-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Acked-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Felipe Balbi <balbi@ti.com>
+Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- drivers/usb/phy/phy-rcar-usb.c | 51 +++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 45 insertions(+), 6 deletions(-)
+ arch/arm/mach-shmobile/setup-r8a7790.c | 16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/usb/phy/phy-rcar-usb.c b/drivers/usb/phy/phy-rcar-usb.c
-index d636cc7..823b2bb 100644
---- a/drivers/usb/phy/phy-rcar-usb.c
-+++ b/drivers/usb/phy/phy-rcar-usb.c
-@@ -1,8 +1,9 @@
- /*
-  * Renesas R-Car USB phy driver
-  *
-- * Copyright (C) 2012 Renesas Solutions Corp.
-+ * Copyright (C) 2012-2013 Renesas Solutions Corp.
-  * Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-+ * Copyright (C) 2013 Cogent Embedded, Inc.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 as
-@@ -15,6 +16,7 @@
- #include <linux/platform_device.h>
- #include <linux/spinlock.h>
- #include <linux/module.h>
-+#include <linux/platform_data/usb-rcar-phy.h>
- 
- /* REGS block */
- #define USBPCTRL0	0x00
-@@ -24,6 +26,25 @@
- #define USBOH0		0x1C
- #define USBCTL0		0x58
- 
-+/* USBPCTRL0 */
-+#define OVC2		(1 << 10) /* Switches the OVC input pin for port 2: */
-+				/* 1: USB_OVC2, 0: OVC2			*/
-+#define OVC1_VBUS1	(1 << 9) /* Switches the OVC input pin for port 1: */
-+				/* 1: USB_OVC1, 0: OVC1/VBUS1		*/
-+				/* Function mode: set to 0		*/
-+#define OVC0		(1 << 8) /* Switches the OVC input pin for port 0: */
-+				/* 1: USB_OVC0 pin, 0: OVC0		*/
-+#define OVC2_ACT 	(1 << 6) /* Host mode: OVC2 polarity:		*/
-+				/* 1: active-high, 0: active-low	*/
-+#define PENC		(1 << 4) /* Function mode: output level of PENC1 pin: */
-+				/* 1: high, 0: low			*/
-+#define OVC0_ACT 	(1 << 3) /* Host mode: OVC0 polarity:		*/
-+				/* 1: active-high, 0: active-low	*/
-+#define OVC1_ACT	(1 << 1) /* Host mode: OVC1 polarity:		*/
-+				/* 1: active-high, 0: active-low	*/
-+				/* Function mode: be sure to set to 1	*/
-+#define PORT1		(1 << 0) /* Selects port 1 mode:		*/
-+				/* 1: function, 0: host			*/
- /* USBPCTRL1 */
- #define PHY_RST		(1 << 2)
- #define PLL_ENB		(1 << 1)
-@@ -55,7 +76,9 @@ static int rcar_usb_phy_init(struct usb_phy *phy)
- {
- 	struct rcar_usb_phy_priv *priv = usb_phy_to_priv(phy);
- 	struct device *dev = phy->dev;
-+	struct rcar_phy_platform_data *pdata = dev->platform_data;
- 	void __iomem *reg0 = priv->reg0;
-+	static const u8 ovcn_act[] = { OVC0_ACT, OVC1_ACT, OVC2_ACT };
- 	int i;
- 	u32 val;
- 	unsigned long flags;
-@@ -89,8 +112,21 @@ static int rcar_usb_phy_init(struct usb_phy *phy)
- 		/* (4) USB-PHY reset clear */
- 		iowrite32(PHY_ENB | PLL_ENB | PHY_RST, (reg0 + USBPCTRL1));
- 
--		/* set platform specific port settings */
--		iowrite32(0x00000000, (reg0 + USBPCTRL0));
-+		/* Board specific port settings */
-+		val = 0;
-+		if (pdata->port1_func)
-+			val |= PORT1;
-+		if (pdata->penc1)
-+			val |= PENC;
-+		for (i = 0; i < 3; i++) {
-+			/* OVCn bits follow each other in the right order */
-+			if (pdata->ovc_pin[i].select_3_3v)
-+				val |= OVC0 << i;
-+			/* OVCn_ACT bits are spaced by irregular intervals */
-+			if (pdata->ovc_pin[i].active_high)
-+				val |= ovcn_act[i];
-+		}
-+		iowrite32(val, (reg0 + USBPCTRL0));
- 
- 		/*
- 		 * Bus alignment settings
-@@ -117,10 +153,8 @@ static void rcar_usb_phy_shutdown(struct usb_phy *phy)
- 
- 	spin_lock_irqsave(&priv->lock, flags);
- 
--	if (priv->counter-- == 1) { /* last user */
--		iowrite32(0x00000000, (reg0 + USBPCTRL0));
-+	if (priv->counter-- == 1)	/* last user */
- 		iowrite32(0x00000000, (reg0 + USBPCTRL1));
--	}
- 
- 	spin_unlock_irqrestore(&priv->lock, flags);
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 49de2d5..6531f3d 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -64,10 +64,18 @@ void __init r8a7790_pinmux_init(void)
+ [index] = {						\
+ 	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,			\
+-	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
++	.scscr = SCSCR_RE | SCSCR_TE,	\
  }
-@@ -133,6 +167,11 @@ static int rcar_usb_phy_probe(struct platform_device *pdev)
- 	void __iomem *reg0;
- 	int ret;
  
-+	if (!pdev->dev.platform_data) {
-+		dev_err(dev, "No platform data\n");
-+		return -EINVAL;
-+	}
+-enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1 };
++#define HSCIF_DATA(index, baseaddr, irq)		\
++[index] = {						\
++	SCIF_COMMON(PORT_HSCIF, baseaddr, irq),		\
++	.scbrr_algo_id	= SCBRR_ALGO_6,			\
++	.scscr = SCSCR_RE | SCSCR_TE,	\
++}
 +
- 	res0 = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!res0) {
- 		dev_err(dev, "Not enough platform resources\n");
++enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1,
++       HSCIF0, HSCIF1 };
+ 
+ static const struct plat_sci_port scif[] = {
+ 	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
+@@ -78,6 +86,8 @@ static const struct plat_sci_port scif[] = {
+ 	SCIFA_DATA(SCIFA2, 0xe6c60000, gic_spi(151)), /* SCIFA2 */
+ 	SCIF_DATA(SCIF0, 0xe6e60000, gic_spi(152)), /* SCIF0 */
+ 	SCIF_DATA(SCIF1, 0xe6e68000, gic_spi(153)), /* SCIF1 */
++	HSCIF_DATA(HSCIF0, 0xe62c0000, gic_spi(154)), /* HSCIF0 */
++	HSCIF_DATA(HSCIF1, 0xe62c8000, gic_spi(155)), /* HSCIF1 */
+ };
+ 
+ static inline void r8a7790_register_scif(int idx)
+@@ -115,6 +125,8 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(SCIFA2);
+ 	r8a7790_register_scif(SCIF0);
+ 	r8a7790_register_scif(SCIF1);
++	r8a7790_register_scif(HSCIF0);
++	r8a7790_register_scif(HSCIF1);
+ 	r8a7790_register_irqc(0);
+ }
+ 
 -- 
 1.8.2.1
