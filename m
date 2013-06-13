@@ -1,95 +1,33 @@
-From: josephl@nvidia.com (Joseph Lo)
-Date: Thu, 13 Jun 2013 22:32:40 +0800
-Subject: [PATCH V2 3/3] ARM: tegra114: cpuidle: add powered-down state
-In-Reply-To: <51B99151.5010107@linaro.org>
-References: <1370342880-422-1-git-send-email-josephl@nvidia.com>
- <1370342880-422-4-git-send-email-josephl@nvidia.com>
- <51AE5EE3.3010607@linaro.org>  <51B8B2C8.1090006@wwwdotorg.org>
- <1371089619.1681.21.camel@jlo-ubuntu-64.nvidia.com>
- <51B99151.5010107@linaro.org>
-Message-ID: <1371133960.1631.13.camel@jlo-ubuntu-64.nvidia.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 13 Jun 2013 10:33:43 -0400 (EDT)
+Subject: [PATCH 10/10] USB: OHCI: Properly handle ohci-spear suspend
+In-Reply-To: <CAKohpo=QdPFfcJzDFfH34t2b4QY-vqxCc4hk2KhoGnB_u9QudQ@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306131029230.1561-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2013-06-13 at 17:30 +0800, Daniel Lezcano wrote:
-> On 06/13/2013 04:13 AM, Joseph Lo wrote:
-> > On Thu, 2013-06-13 at 01:41 +0800, Stephen Warren wrote:
-> >> On 06/04/2013 03:40 PM, Daniel Lezcano wrote:
-> >>> On 06/04/2013 12:48 PM, Joseph Lo wrote:
-> >>>> This supports CPU core power down on each CPU when CPU idle. When CPU go
-> >>>> into this state, it saves it's context and needs a proper configuration
-> >>>> in flow controller to power gate the CPU when CPU runs into WFI
-> >>>> instruction. And the CPU also needs to set the IRQ as CPU power down idle
-> >>>> wake up event in flow controller.
-> >>>>
-> >>>> Signed-off-by: Joseph Lo <josephl@nvidia.com>
-> >>>
-> >>> I would like to understand why there is a WARN with the
-> >>> CPUIDLE_FLAG_TIMER_STOP flag set before queuing this patch and ensure it
-> >>> is not the tree hiding the forest.
-> >>
-> >> Joseph, are you planning to post an updated series or respond to resolve
-> >> Daniel's question?
-> > 
-> > I need more time to investigate the detail about what caused the WARN
-> > when apply the flag. And what's the difference if we didn't enable
-> > CONFIG_CPU_IDLE_MULTIPLE_DRIVERS, then it only applies
-> > CLOCK_EVT_NOTIFY_BROADCAST_ON on CPU0.
-> 
-> I think I got it for this one. It is a bug in the cpuidle driver's code.
-> 
-> cpuidle_register_driver does get_cpu => CPU0
-> 
-> Then __cpuidle_register_driver(drv, <CPU0>)
-> 
->  => __cpuidle_driver_init(drv, <CPU0>)
-> 
-> Hence, the timer broadcast is initialized only for cpu0.
-> 
-> That should have been fixed with:
-> 
-OK, thanks.
+On Thu, 13 Jun 2013, Viresh Kumar wrote:
 
-> commit 82467a5a885ddd9f80309682159da8db510e7832
-> Author: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Date:   Fri Jun 7 21:53:09 2013 +0000
+> > +       bool do_wakeup = device_may_wakeup(&pdev->dev);
+> > +       int ret;
+> > +
+> > +       ret = ohci_suspend(hcd, do_wakeup);
+> > +       if (ret == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
 > 
->     cpuidle: simplify multiple driver support
+> maybe s/ret == 0/!ret
+
+I tend to prefer using ! for boolean values and == 0 for numeric 
+values.  Just a matter of personal taste.
+
+> I thought ret == 0 is the success case and not error case.
 > 
->     Commit bf4d1b5 (cpuidle: support multiple drivers) introduced support
->     for using multiple cpuidle drivers at the same time.  It added a
->     couple of new APIs to register the driver per CPU, but that led to
->     some unnecessary code complexity related to the kernel config options
->     deciding whether or not the multiple driver support is enabled.  The
->     code has to work as it did before when the multiple driver support is
->     not enabled and the multiple driver support has to be compatible with
->     the previously existing API.
-> 
->     Remove the new API, not used by any driver in the tree yet (but
->     needed for the HMP cpuidle drivers that will be submitted soon), and
->     add a new cpumask pointer to the cpuidle driver structure that will
->     point to the mask of CPUs handled by the given driver.  That will
->     allow the cpuidle_[un]register_driver() API to be used for the
->     multiple driver support along with the cpuidle_[un]register()
->     functions added recently.
-> 
->     [rjw: Changelog]
->     Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->     Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-> 
-> 
-> > Why if I am moving the
-> > clockevent_notify of CLOCK_EVT_NOTIFY_BROADCAST_EXIT before
-> > "local_irq_enable" in the
-> > "cpuidle_enter_state" (drivers/cpuidle/cpuidle.c), then the warning
-> > message gone?
-> 
-> Is the warning coming immediately, at the first time
-> CLOCK_EVT_NOTIFY_BROADCAST_EXIT is invoked or can it occur at different
-> moment ?
-> 
-Not exactly at the 1st time, it may happen in the 3rd to 10th time. But
-it only happens once. I mean I did check the
-tick_broadcast_pending_mask, it only happens once the CPU didn't clear
-the tick_broadcast_pending_mask after CLOCK_EVT_NOTIFY_BROADCAST_EXIT.
-And cause the warning message. Then I didn't see it happen anymore.
+> > +               ohci_resume(hcd, false);
+> > +               ret = -EBUSY;
+> > +       }
+
+Yes, 0 is the success case.  You must not have seen the explanation for
+this code; it is needed to handle a race.  If the suspend succeeds but
+a wakeup request has already arrived, we need to undo the suspend.  
+Obviously, if the suspend failed then there's no need to undo anything.
+
+Alan Stern
