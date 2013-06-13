@@ -1,331 +1,54 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 13 Jun 2013 15:35:42 +0100
-Subject: [PATCH v2 1/3] ARM: tegra: basic support for Trusted Foundations
-In-Reply-To: <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
-References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
- <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
-Message-ID: <20130613143536.GA18021@localhost.localdomain>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 13 Jun 2013 15:47:26 +0100
+Subject: [RFC PATCH 1/4] regulator: Introduce OMAP regulator to control
+ PMIC over VC/VP
+In-Reply-To: <20130613133950.GA32174@kahuna>
+References: <1369246717-4167-1-git-send-email-nm@ti.com>
+ <1369246717-4167-2-git-send-email-nm@ti.com>
+ <20130610103131.GR31367@sirena.org.uk>
+ <CAGo_u6qTiPpd0DDe3jnPh_UxTwox22azhcMGy=fftL8H+DGeyw@mail.gmail.com>
+ <20130610164905.GJ1403@sirena.org.uk>
+ <CAGo_u6ov=yaCwt8apbvW57ErAvhgUBHHw9gwADBC1fJUrfucUQ@mail.gmail.com>
+ <20130610180150.GQ1403@sirena.org.uk>
+ <20130613133950.GA32174@kahuna>
+Message-ID: <20130613144726.GY1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 06:12:23PM +0900, Alexandre Courbot wrote:
-> Add basic support for booting secondary processors on Tegra devices
-> using the Trusted Foundations secure monitor.
-> 
-> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
-> ---
->  Documentation/devicetree/bindings/arm/tegra.txt    | 11 +++++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  arch/arm/configs/tegra_defconfig                   |  1 +
->  arch/arm/mach-tegra/Kconfig                        | 14 ++++++
->  arch/arm/mach-tegra/Makefile                       |  3 ++
->  arch/arm/mach-tegra/common.c                       |  2 +
->  arch/arm/mach-tegra/firmware.c                     | 40 +++++++++++++++++
->  arch/arm/mach-tegra/firmware.h                     | 19 ++++++++
->  arch/arm/mach-tegra/trusted_foundations.c          | 51 ++++++++++++++++++++++
->  9 files changed, 142 insertions(+)
->  create mode 100644 arch/arm/mach-tegra/firmware.c
->  create mode 100644 arch/arm/mach-tegra/firmware.h
->  create mode 100644 arch/arm/mach-tegra/trusted_foundations.c
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/tegra.txt b/Documentation/devicetree/bindings/arm/tegra.txt
-> index ed9c853..d59bc19 100644
-> --- a/Documentation/devicetree/bindings/arm/tegra.txt
-> +++ b/Documentation/devicetree/bindings/arm/tegra.txt
-> @@ -32,3 +32,14 @@ board-specific compatible values:
->    nvidia,whistler
->    toradex,colibri_t20-512
->    toradex,iris
-> +
-> +Optional nodes
-> +-------------------------------------------
-> +
-> +Trusted Foundations:
-> +Boards using the Trusted Foundations secure monitor should signal its
-> +presence by declaring a node compatible with "tl,trusted-foundations":
-> +
-> +	firmware {
+On Thu, Jun 13, 2013 at 08:39:50AM -0500, Nishanth Menon wrote:
 
-You need to make a clear statement about whether the node name is
+> I am having a bit of a difficulty trying to understand your concern
+> here.
 
-I think it shouldn't required to be exactly equal to "firmware", because
-that would lead to problems if there were multiple independent firmware
-APIs present (which is certainly possible, whether or not it is true
-on Tegra).
+Your device tree for this stuff appears to mostly consist of repeating
+the description of the PMIC that we already have - this really doesn't
+seem like a great result.
 
-> +		compatible = "tl,trusted-foundations";
-> +	};
+> Problem statement:
 
-For now, it might make more sense to make this binding tegra-specific,
-and to interpret the node is only implying the presence of the low-
-level SoC functions you are using on Tegra, not TF as a whole. 
+> OMAP has this weird custom h/w where one programs the voltage and that
+> voltage is send over i2c - this is not same as Tegra's lookup table
+> array which automatically sends out entries, in OMAP, software has to trigger
+> the voltage transition
 
-Otherwise, it feels too generic.  There is no description of exactly
-what functionality will be available if this node it present: if
-this is going to be a generic binding for TF, then it needs to work
-for all deployments of TF, not just your specific case.  For example,
-how to you find out what functionality is present?  Will there be
-a standard probing ABI for all versions and deployments of TF, or
-would extra information need to be described in the DT?
+The basic idea that's important here is that you need to figure out how
+to tell the hardware what to write - how those writes get triggered is a
+separate problem.
 
-Partly, this depends on whether the TF_SET_CPU_BOOT_ADDR_SMC call will
-be present, working, and with compatible ABI and semantics, on every SoC
-where an implementation of TF is present.  Someone from Trusted Logic, or
-someone with visibility of the relevant ABI/API specs would need to
-judge on that -- do you have that info?
+> If your concern was describing PMIC parameters in dts, I can easily move
+> them inside the omap_pmic driver and provide required compatible flags.
+> If, on the other hand, the entire approach followed is flawed, I'd like to
+> understand the rationale for the same.
 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 6931c43..c21e1e9 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -58,6 +58,7 @@ st	STMicroelectronics
->  ste	ST-Ericsson
->  stericsson	ST-Ericsson
->  ti	Texas Instruments
-> +tl	Trusted Logic
->  toshiba	Toshiba Corporation
->  via	VIA Technologies, Inc.
->  wlf	Wolfson Microelectronics
-> diff --git a/arch/arm/configs/tegra_defconfig b/arch/arm/configs/tegra_defconfig
-> index 4de3bce..3bf158a 100644
-> --- a/arch/arm/configs/tegra_defconfig
-> +++ b/arch/arm/configs/tegra_defconfig
-> @@ -28,6 +28,7 @@ CONFIG_ARCH_TEGRA_3x_SOC=y
->  CONFIG_ARCH_TEGRA_114_SOC=y
->  CONFIG_TEGRA_PCI=y
->  CONFIG_TEGRA_EMC_SCALING_ENABLE=y
-> +CONFIG_TEGRA_TRUSTED_FOUNDATIONS=y
->  CONFIG_SMP=y
->  CONFIG_PREEMPT=y
->  CONFIG_AEABI=y
-> diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-> index 84d72fc..055f496 100644
-> --- a/arch/arm/mach-tegra/Kconfig
-> +++ b/arch/arm/mach-tegra/Kconfig
-> @@ -87,4 +87,18 @@ config TEGRA_AHB
->  config TEGRA_EMC_SCALING_ENABLE
->  	bool "Enable scaling the memory frequency"
->  
-> +config TEGRA_TRUSTED_FOUNDATIONS
-> +	bool "Trusted Foundations secure monitor support"
-> +	help
-> +	  Many Tegra devices are booted with the Trusted Foundations secure
-> +	  monitor active, requiring some core operations to be performed by
-> +	  the secure monitor instead of the kernel.
-> +
-> +	  This option allows the kernel to invoke the secure monitor when
-> +	  required on devices using Trusted Foundations.
-> +
-> +	  Devices using Trusted Foundations should pass a device tree containing
-> +	  a node compatible with "tl,trusted-foundations" to signal the presence
-> +	  of the secure monitor.
-> +
->  endmenu
-> diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-> index d011f0a..9fdc004 100644
-> --- a/arch/arm/mach-tegra/Makefile
-> +++ b/arch/arm/mach-tegra/Makefile
-> @@ -12,6 +12,7 @@ obj-y					+= pm.o
->  obj-y					+= reset.o
->  obj-y					+= reset-handler.o
->  obj-y					+= sleep.o
-> +obj-y					+= firmware.o
->  obj-y					+= tegra.o
->  obj-$(CONFIG_CPU_IDLE)			+= cpuidle.o
->  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra20_speedo.o
-> @@ -37,3 +38,5 @@ endif
->  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-harmony-pcie.o
->  
->  obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= board-paz00.o
-> +
-> +obj-$(CONFIG_TEGRA_TRUSTED_FOUNDATIONS)	+= trusted_foundations.o
-> diff --git a/arch/arm/mach-tegra/common.c b/arch/arm/mach-tegra/common.c
-> index 9f852c6..4796bb0 100644
-> --- a/arch/arm/mach-tegra/common.c
-> +++ b/arch/arm/mach-tegra/common.c
-> @@ -37,6 +37,7 @@
->  #include "sleep.h"
->  #include "pm.h"
->  #include "reset.h"
-> +#include "firmware.h"
->  
->  /*
->   * Storage for debug-macro.S's state.
-> @@ -97,6 +98,7 @@ static void __init tegra_init_cache(void)
->  
->  void __init tegra_init_early(void)
->  {
-> +	tegra_init_firmware();
->  	tegra_cpu_reset_handler_init();
->  	tegra_apb_io_init();
->  	tegra_init_fuse();
-> diff --git a/arch/arm/mach-tegra/firmware.c b/arch/arm/mach-tegra/firmware.c
-> new file mode 100644
-> index 0000000..ea861ca
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/firmware.c
-> @@ -0,0 +1,40 @@
-> +/*
-> + * SecureOS support for Tegra CPUs
-
-Should the name "SecureOS" change in these comment headers? (affects
-multiple files)
-
-> + *
-> + * Copyright (c) 2013, NVIDIA Corporation.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + */
-> +
-> +#include <linux/printk.h>
-> +#include <linux/kconfig.h>
-> +#include <linux/of.h>
-> +#include <asm/firmware.h>
-> +
-> +#if IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS)
-> +extern const struct firmware_ops tegra_trusted_foundations_ops;
-> +#endif
-> +
-> +void __init tegra_init_firmware(void)
-> +{
-> +	struct device_node *node;
-> +
-> +	if (!of_have_populated_dt())
-> +		return;
-> +
-> +	node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
-> +	if (node && !IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS))
-> +		pr_warn("Trusted Foundations detected but support missing!\n");
-
-Should this be more than just a warning?
-
-It looks to me like tegra_cpu_reset_handler_set() might either silently
-fail or trigger an external abort in this situation, depending on the
-hardware and on how TF sets things up.
-
-There seems to be no way to signal an error when attempting to set a
-CPU's reset address.
-
-> +#if IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS)
-> +	else if (node)
-> +		register_firmware_ops(&tegra_trusted_foundations_ops);
-> +#endif
-> +}
-
-
-IS_ENABLED() allows #ifdefs to be avoided -- maybe this would be clearer
-as:
-
-	node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
-	if (!node)
-		return;
-
-	if (WARN_ON(!IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS))) {
-		pr_warn("Trusted Foundations detected but support missing!\n");
-		return;
-	}
-
-	register_firmware_ops(&tegra_trusted_foundations_ops);
-	
-
-> diff --git a/arch/arm/mach-tegra/firmware.h b/arch/arm/mach-tegra/firmware.h
-> new file mode 100644
-> index 0000000..77c62fb
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/firmware.h
-> @@ -0,0 +1,19 @@
-> +/*
-> + * Copyright (c) 2013, NVIDIA Corporation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + */
-> +
-> +#ifndef __TEGRA_FIRMWARE_H
-> +#define __TEGRA_FIRMWARE_H
-> +
-> +void tegra_init_firmware(void);
-> +
-> +#endif
-> diff --git a/arch/arm/mach-tegra/trusted_foundations.c b/arch/arm/mach-tegra/trusted_foundations.c
-> new file mode 100644
-> index 0000000..411044f
-> --- /dev/null
-> +++ b/arch/arm/mach-tegra/trusted_foundations.c
-> @@ -0,0 +1,51 @@
-> +/*
-> + * SecureOS support for Tegra CPUs
-> + *
-> + * Copyright (c) 2013, NVIDIA Corporation.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/init.h>
-> +#include <linux/of.h>
-> +#include <asm/firmware.h>
-> +
-> +#define TF_SET_CPU_BOOT_ADDR_SMC 0xfffff200
-> +
-> +static void __attribute__((naked)) tegra_tf_generic_smc(u32 type, u32 subtype,
-> +							u32 arg)
-> +{
-> +	asm volatile(
-> +		".arch_extension	sec\n\t"
-> +		"stmfd	sp!, {r3 - r11, lr}\n\t"
-
-I think you don't need to save r3: the ARM PCS makes r3 caller-save, so
-it shouldn't matter if the SMC call causes it to get trashed.
-
-> +		__asmeq("%0", "r0")
-> +		__asmeq("%1", "r1")
-> +		__asmeq("%2", "r2")
-> +		"mov	r3, #0\n\t"
-> +		"mov	r4, #0\n\t"
-> +		"smc	#0\n\t"
-> +		"ldmfd	sp!, {r3 - r11, pc}"
-> +		:
-> +		: "r" (type), "r" (subtype), "r" (arg)
-> +		: "memory");
-> +}
-> +
-> +static int tegra_tf_set_cpu_boot_addr(int cpu, unsigned long boot_addr)
-> +{
-> +	tegra_tf_generic_smc(TF_SET_CPU_BOOT_ADDR_SMC, boot_addr, 0);
-> +
-> +	return 0;
-> +}
-> +
-> +const struct firmware_ops tegra_trusted_foundations_ops = {
-> +	.set_cpu_boot_addr = tegra_tf_set_cpu_boot_addr,
-> +};
-> -- 
-> 1.8.3
-> 
-> _______________________________________________
-> devicetree-discuss mailing list
-> devicetree-discuss at lists.ozlabs.org
-> https://lists.ozlabs.org/listinfo/devicetree-discuss
+That's the biggest problem I saw so far but to be honest I've not
+drilled down too much into the specifics.  From my point of view the
+main thing is how this fits into the frameworks and so on, having the
+register information in the DT was an alarm flag that suggested the
+overall approach was a concern.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130613/09ae5905/attachment.sig>
