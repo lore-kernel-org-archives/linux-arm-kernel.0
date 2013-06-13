@@ -1,36 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Jun 2013 00:06:51 +0200
-Subject: [PATCH 1/4] ARM: cfa10036: Add USB0 OTG port
-In-Reply-To: <1371131025-12200-2-git-send-email-maxime.ripard@free-electrons.com>
-References: <1371131025-12200-1-git-send-email-maxime.ripard@free-electrons.com>
- <1371131025-12200-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <24013808.T2v7Fa5NMK@wuerfel>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Thu, 13 Jun 2013 15:12:11 -0700
+Subject: [GIT PULL] OMAP: PM: remove OMAP-specific no_console_suspend handling
+Message-ID: <87zjutacec.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 13 June 2013 15:43:42 Maxime Ripard wrote:
-> +
-> +       ahb at 80080000 {
-> +               usb0: usb at 80080000 {
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&usb0_otg_cfa10036>;
-> +                       status = "okay";
->                 };
->         };
-> 
+Tony,
 
-The patches all look good, just one trivial comment about the fragment above:
+Please pull this OMAP PM cleanup for v3.11.
 
-There is already a "usb0" label in the imx28.dtsi file for the same
-node. When you refer to the node from a board.dts file, either leave
-out the redundant label, or use it to simplify the statements above
-to the brief version:
+Thanks,
 
-	&usb0 {
-		pinctrl-names = "default";
-		pinctrl-0 = <&usb0_otg_cfa10036>;
-		status = "okay";
-	};
+Kevin
 
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-	Arnd
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.11/cleanup/pm
+
+for you to fetch changes up to 4b7ec5accecdb136c7afaf8739a06d5335cc05aa:
+
+  arm: omap2+: omap_device: remove no_idle_on_suspend (2013-05-16 07:09:09 -0700)
+
+----------------------------------------------------------------
+OMAP: PM: the serial core + driver can no handle no_console_suspend support
+without any SoC specific handlding or SoC-specific DT bindings.  Remove
+the now unused SoC specifics for OMAP.
+
+----------------------------------------------------------------
+Sourav Poddar (3):
+      arm: omap2+: serial: remove no_console_suspend support
+      arm: dts: am33xx: Remove "ti,no_idle_on_suspend" property.
+      arm: omap2+: omap_device: remove no_idle_on_suspend
+
+ arch/arm/boot/dts/am33xx.dtsi     |  1 -
+ arch/arm/mach-omap2/omap_device.c |  9 ++-------
+ arch/arm/mach-omap2/omap_device.h | 10 ----------
+ arch/arm/mach-omap2/serial.c      |  7 -------
+ 4 files changed, 2 insertions(+), 25 deletions(-)
