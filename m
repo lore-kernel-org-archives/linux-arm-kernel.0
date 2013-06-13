@@ -1,13 +1,11 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 12 Jun 2013 21:45:27 -0600
-Subject: [GIT PULL 2/2] ARM: bcm2835: defconfig updates
-In-Reply-To: <1371095127-23847-1-git-send-email-swarren@wwwdotorg.org>
-References: <1371095127-23847-1-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <1371095127-23847-2-git-send-email-swarren@wwwdotorg.org>
+Date: Wed, 12 Jun 2013 21:45:26 -0600
+Subject: [GIT PULL 1/2] ARM: bcm2835: device tree updates
+Message-ID: <1371095127-23847-1-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This enables gpio-leds and simplefb.
+Just one patch this time: enable the LED via gpio-leds.
 
 ----------------------------------------------------------------
 
@@ -17,16 +15,16 @@ The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.11-defconfig
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-rpi.git bcm2835-for-3.11-dt
 
-for you to fetch changes up to c321e7164493ac3684bfbb382d66a4a2416291fb:
+for you to fetch changes up to 805b4db8076d47a181032a87db8a732fc8d94596:
 
-  ARM: bcm2835: defconfig updates
+  ARM: bcm2835: Add Raspberry Pi's ACT LED to DT
 
 ----------------------------------------------------------------
 
-Stephen Warren (1):
-      ARM: bcm2835: defconfig updates
+Daniel Mack (1):
+      ARM: bcm2835: Add Raspberry Pi's ACT LED to DT
 
- arch/arm/configs/bcm2835_defconfig |   19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/bcm2835-rpi-b.dts |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
