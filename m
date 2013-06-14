@@ -1,10 +1,9 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 14:35:20 -0700
-Subject: [GIT PULL 5/6] omap soc changes for v3.11 merge window
-In-Reply-To: <51b8bcec.41ace00a.4b4c.0772SMTPIN_ADDED_MISSING@mx.google.com>
-References: <pull-1371061475-206272>
- <51b8bcec.41ace00a.4b4c.0772SMTPIN_ADDED_MISSING@mx.google.com>
-Message-ID: <20130614213520.GD17326@quad.lixom.net>
+Date: Fri, 14 Jun 2013 14:36:24 -0700
+Subject: [GIT PULL 6/6] omap5 data for v3.11 merge window
+In-Reply-To: <E1Umpk1-0005eT-9P@merlin.infradead.org>
+References: <pull-1371061475-206272> <E1Umpk1-0005eT-9P@merlin.infradead.org>
+Message-ID: <20130614213624.GE17326@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,14 +14,17 @@ On Wed, Jun 12, 2013 at 11:24:35AM -0700, Tony Lindgren wrote:
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/soc-signed
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/omap5-signed
 > 
-> for you to fetch changes up to 4f288f081bb67813d35c10d1b2fa68e863c4b188:
+> for you to fetch changes up to 6503a8e109a639760408f874c1251060d563942e:
 > 
->   ARM: OMAP2+: AM43x: SRAM base and size (2013-06-12 08:07:23 -0700)
+>   ARM: OMAP5: Remove unused include for ocp2scp (2013-06-09 21:17:15 -0700)
 
+Pulled.
 
-Pulled, thanks.
+>  25 files changed, 8982 insertions(+), 55 deletions(-)
+
+Owwie.
 
 
 -Olof
