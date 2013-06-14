@@ -1,35 +1,21 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 14 Jun 2013 20:33:59 +0800
-Subject: [PATCH] irqchip: gic: call gic_cpu_init() as well in
- CPU_STARTING_FROZEN case
-In-Reply-To: <20130612151748.GC31646@arm.com>
-References: <1371036627-13529-1-git-send-email-shawn.guo@linaro.org>
- <20130612151748.GC31646@arm.com>
-Message-ID: <20130614123357.GB4489@S2101-09.ap.freescale.net>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 14 Jun 2013 14:04:00 +0100
+Subject: [RFC PATCH v3 2/2] drivers: mfd: vexpress: add Serial Power
+ Controller (SPC) support
+In-Reply-To: <20130613225233.GB22310@quad.lixom.net>
+References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1370512763-32200-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130613225233.GB22310@quad.lixom.net>
+Message-ID: <1371215040.3154.6.camel@hornet>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 04:17:49PM +0100, Catalin Marinas wrote:
-> On Wed, Jun 12, 2013 at 12:30:27PM +0100, Shawn Guo wrote:
-> > diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-> > index 1760ceb..19ceaa6 100644
-> > --- a/drivers/irqchip/irq-gic.c
-> > +++ b/drivers/irqchip/irq-gic.c
-> > @@ -705,7 +705,7 @@ static int gic_irq_domain_xlate(struct irq_domain *d,
-> >  static int __cpuinit gic_secondary_init(struct notifier_block *nfb,
-> >  					unsigned long action, void *hcpu)
-> >  {
-> > -	if (action == CPU_STARTING)
-> > +	if (action == CPU_STARTING || action == CPU_STARTING_FROZEN)
-> >  		gic_cpu_init(&gic_data[0]);
-> >  	return NOTIFY_OK;
-> >  }
+On Thu, 2013-06-13 at 23:52 +0100, Olof Johansson wrote:
+> > +     reg = <0 0x7FFF0000 0 0x1000>;
 > 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> #size-cells 2 on the parent bus? That's somewhat unusual. 
 
-Thomas,
+LPAE == 40 bit physical addresses == potential > 32 bit sizes (memory
+blocks > 4GB)
 
-Can you please send the fix for 3.10?  Or are you fine with that I ask
-arm-soc folks to send it?
-
-Shawn
+Pawe?
