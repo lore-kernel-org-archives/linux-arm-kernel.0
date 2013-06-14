@@ -1,62 +1,54 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Fri, 14 Jun 2013 12:07:57 +0300
-Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
-In-Reply-To: <Pine.LNX.4.44L0.1306131106160.1561-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1306131106160.1561-100000@iolanthe.rowland.org>
-Message-ID: <51BADD6D.5040600@ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 14 Jun 2013 18:10:13 +0900
+Subject: [PATCH 14/15] ARM: shmobile: Remove AP4EVB board support
+In-Reply-To: <Pine.LNX.4.64.1306132128370.3777@axis700.grange>
+References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
+ <1371106793-25071-15-git-send-email-horms+renesas@verge.net.au>
+ <Pine.LNX.4.64.1306132128370.3777@axis700.grange>
+Message-ID: <CANqRtoSx4Jf_EfG3LvkpoOED4-SuOdWjRedz-RbwGCOcOeP-Xg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2013 06:08 PM, Alan Stern wrote:
-> On Thu, 13 Jun 2013, Chao Xie wrote:
-> 
->>>> These operations sound generic enough to be done at HCD layer, no? So no need to
->>>> replicate the same stuff in ohci, ehci, xhci, etc.
->>>
->>> The HCD layer handles suspend and resume only for PCI host controllers.
->>> Not for other types.
->>>
->>> I don't know if the acquire/start and stop/release parts can be moved
->>> into the USB core.  Maybe they can.
->>>
->>> Alan Stern
->>>
->> hi
->> The following is my understanding.
->> I think for PHY initialization and shutdown part, it is generic for
->> other parts.
->> PHY initialization need to be called before hc_driver->reset is called.
->> I think it can be added at usb_add_hcd.
->> For PHY shutdown, it can be added at usb_remove_hcd.
-> 
-> Yes, that should work.
+Hi Guennadi,
 
-I don't think this will work with OMAP USB host controller when used in
-Transceiver-less mode (e.g. HSIC). In this mode we need to release the HSIC
-reset (mapped to PHY init), after the EHCI controller is up and running.
+On Fri, Jun 14, 2013 at 4:36 AM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> Hi Simon
+>
+> On Thu, 13 Jun 2013, Simon Horman wrote:
+>
+>> From: Magnus Damm <damm@opensource.se>
+>>
+>> Remove board support for the sh7372 based AP4EVB board
+>>
+>> The sh7372 SoC support code is still kept around since it
+>> is in use by the Mackerel board which is basically a more
+>> recent board where the design is based on AP4EVB.
+>>
+>> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>
+> It would be a pity if this patch gets pulled now. We're still discussing
+> with Magnus, I believe. My opinion is, that this board is a good testing
+> platform for V4L2. It is the only board in the mainline, using the CSI2
+> interface, present on multiple Renesas SoCs, including r8a73a4 (APE6), and
+> (probably, not 100% sure) sh73a0 (AG5), and the IMX074 camera sensor, not
+> present on any other platform. If this board is removed, supporting both
+> CSI2 and IMX074 will become difficult. Besides, AP4EVB is used as an
+> example in my V4L2 clock / async probing patch series:
+>
+> http://www.mail-archive.com/linux-media at vger.kernel.org/msg63174.html
+>
+> If still possible, would be good to delay removing this board until we
+> complete our discussion.
 
-On the other hand, in the PHY mode, the PHY needs to be initialized (brought out
-of reset) before the EHCI controller starts.
+If fine with keeping the board if someone can show me progress in the
+area of INTC DT support. Recently I have not seen anything.
 
-This behavior might be different on other controllers. Generalization is good
-as long as there is an override available for the controllers to handle the
-PHY init/shutdown themselves.
+So if no one is developing DT support for this board then I can't
+really see how we will be able to support it in the future with ARM
+SoC requirements for DT and MULTIPLATFORM...
 
-> 
->> For suspend/resume, i do not know how to add it. For our EHCI driver,
->> when system goes to deep idle states, we just directly shutdown the
->> hcd and initialize it again when the system goes back.
-> 
-> You shut down the host controller?  Then how does it detect wakeup 
-> events?  And how does it know if a device was disconnected while the 
-> power was off?
-> 
+Cheers,
 
-On OMAP as well we are aiming to cut clocks to the host controller (state saved)
-during bus/system suspend. PHY is in low power mode capable of detecting wakeup events.
-The SoC is configured to wake up on any I/O activity on the PHY pins. Upon
-detection of PHY related I/O event, SoC wakes up, we restore the host controller state
-and proceed as normal.
-
-cheers,
--roger
+/ magnus
