@@ -1,68 +1,100 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 14 Jun 2013 04:27:42 +0300
-Subject: [PATCH 2/3] USB: OMAP: add omap-otg
-In-Reply-To: <20130613223711.GD18360@blackmetal.musicnaut.iki.fi>
-References: <1370817606-1008-1-git-send-email-aaro.koskinen@iki.fi>
- <1370817606-1008-3-git-send-email-aaro.koskinen@iki.fi>
- <20130612151326.GE15056@arwen.pp.htv.fi>
- <20130613223711.GD18360@blackmetal.musicnaut.iki.fi>
-Message-ID: <20130614012742.GA20258@arwen.pp.htv.fi>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 14 Jun 2013 10:29:25 +0900
+Subject: [GIT PULL 00/15] Renesas ARM based SoC boot cleanup for v3.11
+In-Reply-To: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130614012925.GA24731@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Jun 14, 2013 at 01:37:11AM +0300, Aaro Koskinen wrote:
-> Hi,
+On Thu, Jun 13, 2013 at 03:59:38PM +0900, Simon Horman wrote:
+> Hi Olof, Hi Arnd,
 > 
-> On Wed, Jun 12, 2013 at 06:13:26PM +0300, Felipe Balbi wrote:
-> > On Mon, Jun 10, 2013 at 01:40:05AM +0300, Aaro Koskinen wrote:
-> > > +void omap_otg_set_mode(enum omap_otg_mode mode)
-> > > +{
-> > > +	if (!otg_dev) {
-> > > +		WARN(1, "%s: controller not present\n", __func__);
-> > > +		return;
-> > > +	}
-> > > +	mutex_lock(&otg_dev->serialize);
-> > > +	switch (mode) {
-> > > +	case OMAP_OTG_MODE_DEVICE:
-> > > +		/*
-> > > +		 * Set B-session valid.
-> > > +		 */
-> > > +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSVLD);
-> > > +		break;
-> > > +	case OMAP_OTG_MODE_HOST:
-> > > +		/*
-> > > +		 * Set A-session valid.
-> > > +		 */
-> > > +		omap_otg_ctrl(OMAP_OTG_ASESSVLD);
-> > > +		break;
-> > > +	case OMAP_OTG_MODE_DISCONNECT:
-> > > +		/*
-> > > +		 * Set B-session end to indicate no VBUS.
-> > > +		 */
-> > > +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSEND);
-> > > +		break;
-> > > +	default:
-> > > +		WARN(1, "%s: unknown mode: %d\n", __func__, mode);
-> > > +	}
-> > > +	mutex_unlock(&otg_dev->serialize);
-> > > +}
-> > > +EXPORT_SYMBOL_GPL(omap_otg_set_mode);
-> > 
-> > looks like this should provide a extcon interface for its users.
+> This pull request is based on renesas-pinmux-for-v3.11, which you have
+> already pulled, in order to provide pre-requisites.
 > 
-> Is there any examples available? Anyway, I'll look into this.
+> The following changes since commit 5fcf4a3c3a5bc08bf72a50ef1332501a3c1b96bb:
+> 
+>   ARM: shmobile: marzen: Use RCAR_GP_PIN macro (2013-06-05 17:18:24 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-boot-for-v3.11
+> 
+> for you to fetch changes up to 9da629661d207299ad119a6735eb2411f54fd45f:
+> 
+>   ARM: shmobile: Remove Bonito board support (2013-06-13 14:26:04 +0900)
 
-In extcon tree there are some patches from Kishon adding that to
-dwc3-omap.c :-)
+Sorry about this but it seems that there is still some discussion,
+which I was not previously aware of, about the patch to remove the AP4EVB
+board.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/46d8465b/attachment.sig>
+Please ignore this pull-request for now.
+
+> 
+> ----------------------------------------------------------------
+> Renesas ARM based SoC boot cleanup for v3.11
+> 
+> Work by Magnus Damm and others to clean up the boot of and move
+> things closer to supporting MULTIARCH.
+> 
+> As a side effect of this work it was decided to remove support for
+> two boards, Bonito and APE4EVM. Those patches are included in this
+> series as they depend on earlier patches in the series.
+> 
+> ----------------------------------------------------------------
+> Kuninori Morimoto (1):
+>       ARM: shmobile: Remove Bonito board support
+> 
+> Magnus Damm (14):
+>       ARM: shmobile: uImage load address rework
+>       ARM: shmobile: Let romImage rely on default ATAGS
+>       ARM: shmobile: Remove romImage CONFIG_MEMORY_START
+>       ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
+>       ARM: shmobile: Add SMP boot function and argument
+>       ARM: shmobile: Add SCU boot function using argument
+>       ARM: shmobile: r8a7779 SMP with SCU boot fn and args
+>       ARM: shmobile: sh73a0 SMP with SCU boot fn and args
+>       ARM: shmobile: EMEV2 SMP with SCU boot fn and args
+>       ARM: shmobile: Remove old SCU boot code
+>       ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
+>       ARM: shmobile: Remove MEMORY_START/SIZE
+>       ARM: shmobile: Remove mach/memory.h
+>       ARM: shmobile: Remove AP4EVB board support
+> 
+>  arch/arm/Kconfig                                   |    2 +-
+>  arch/arm/boot/compressed/head-shmobile.S           |   21 +-
+>  arch/arm/configs/ap4evb_defconfig                  |   56 -
+>  arch/arm/configs/bonito_defconfig                  |   72 --
+>  arch/arm/mach-shmobile/Kconfig                     |   58 -
+>  arch/arm/mach-shmobile/Makefile                    |    2 -
+>  arch/arm/mach-shmobile/Makefile.boot               |   18 +-
+>  arch/arm/mach-shmobile/board-ap4evb.c              | 1310 --------------------
+>  arch/arm/mach-shmobile/board-bonito.c              |  502 --------
+>  arch/arm/mach-shmobile/headsmp-scu.S               |   29 +-
+>  arch/arm/mach-shmobile/headsmp.S                   |   13 +-
+>  arch/arm/mach-shmobile/include/mach/common.h       |    6 +-
+>  .../arm/mach-shmobile/include/mach/head-ap4evb.txt |   93 --
+>  arch/arm/mach-shmobile/include/mach/memory.h       |    7 -
+>  arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h    |   29 -
+>  arch/arm/mach-shmobile/include/mach/mmc.h          |    4 +-
+>  arch/arm/mach-shmobile/include/mach/sh7372.h       |    2 +
+>  arch/arm/mach-shmobile/include/mach/zboot.h        |    6 +-
+>  arch/arm/mach-shmobile/pm-sh7372.c                 |    3 +
+>  arch/arm/mach-shmobile/sleep-sh7372.S              |    5 +-
+>  arch/arm/mach-shmobile/smp-emev2.c                 |    6 +-
+>  arch/arm/mach-shmobile/smp-r8a7779.c               |    6 +-
+>  arch/arm/mach-shmobile/smp-sh73a0.c                |    6 +-
+>  23 files changed, 68 insertions(+), 2188 deletions(-)
+>  delete mode 100644 arch/arm/configs/ap4evb_defconfig
+>  delete mode 100644 arch/arm/configs/bonito_defconfig
+>  delete mode 100644 arch/arm/mach-shmobile/board-ap4evb.c
+>  delete mode 100644 arch/arm/mach-shmobile/board-bonito.c
+>  delete mode 100644 arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
+>  delete mode 100644 arch/arm/mach-shmobile/include/mach/memory.h
+>  delete mode 100644 arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
