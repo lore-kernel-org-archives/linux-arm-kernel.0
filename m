@@ -1,52 +1,69 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Fri, 14 Jun 2013 14:51:27 +0530
-Subject: [RFC PATCH 1/4] arm: omap: Add phy binding info for musb in plat
- data
-In-Reply-To: <51BAD181.3020902@ti.com>
-References: <1368796954-3499-1-git-send-email-kishon@ti.com>
- <51A43E0A.8090201@ti.com> <51B9C3B6.1080707@ti.com> <51BAABB0.5060107@ti.com>
- <20130614054720.GL8164@atomide.com> <51BAB9EA.5090805@ti.com>
- <20130614073314.GA20992@atomide.com> <51BAD181.3020902@ti.com>
-Message-ID: <51BAE097.2020609@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 14 Jun 2013 11:27:15 +0200 (CEST)
+Subject: [PATCH 14/15] ARM: shmobile: Remove AP4EVB board support
+In-Reply-To: <CANqRtoSx4Jf_EfG3LvkpoOED4-SuOdWjRedz-RbwGCOcOeP-Xg@mail.gmail.com>
+References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
+ <1371106793-25071-15-git-send-email-horms+renesas@verge.net.au>
+ <Pine.LNX.4.64.1306132128370.3777@axis700.grange>
+ <CANqRtoSx4Jf_EfG3LvkpoOED4-SuOdWjRedz-RbwGCOcOeP-Xg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1306141123380.6920@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 14 Jun 2013, Magnus Damm wrote:
 
-On Friday 14 June 2013 01:47 PM, Tomi Valkeinen wrote:
-> On 14/06/13 10:33, Tony Lindgren wrote:
->
->> If we want to fix something this late in the merge window, the patches
->> must have a clear description what caused the regression and what happens
->> without the patches. These patches don't have that. And they are marked
->> RFC also. So actually I'm not applying any of them before the regression
->> descriptions are there and the patches have been reposted without RFC
->> and have sufficient acks from people.
+> Hi Guennadi,
+> 
+> On Fri, Jun 14, 2013 at 4:36 AM, Guennadi Liakhovetski
+> <g.liakhovetski@gmx.de> wrote:
+> > Hi Simon
+> >
+> > On Thu, 13 Jun 2013, Simon Horman wrote:
+> >
+> >> From: Magnus Damm <damm@opensource.se>
+> >>
+> >> Remove board support for the sh7372 based AP4EVB board
+> >>
+> >> The sh7372 SoC support code is still kept around since it
+> >> is in use by the Mackerel board which is basically a more
+> >> recent board where the design is based on AP4EVB.
+> >>
+> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >
+> > It would be a pity if this patch gets pulled now. We're still discussing
+> > with Magnus, I believe. My opinion is, that this board is a good testing
+> > platform for V4L2. It is the only board in the mainline, using the CSI2
+> > interface, present on multiple Renesas SoCs, including r8a73a4 (APE6), and
+> > (probably, not 100% sure) sh73a0 (AG5), and the IMX074 camera sensor, not
+> > present on any other platform. If this board is removed, supporting both
+> > CSI2 and IMX074 will become difficult. Besides, AP4EVB is used as an
+> > example in my V4L2 clock / async probing patch series:
+> >
+> > http://www.mail-archive.com/linux-media at vger.kernel.org/msg63174.html
+> >
+> > If still possible, would be good to delay removing this board until we
+> > complete our discussion.
+> 
+> If fine with keeping the board if someone can show me progress in the
+> area of INTC DT support. Recently I have not seen anything.
+> 
+> So if no one is developing DT support for this board then I can't
+> really see how we will be able to support it in the future with ARM
+> SoC requirements for DT and MULTIPLATFORM...
 
-I posted this as RFC since this series uses _label_ and initially Felipe 
-din't want to find PHYs by _label_.
-After the device names are created using PLATFORM_DEVID_AUTO, our 
-original method of binding by device names doesn't work reliable (since 
-the device name changes). And I couldn't think of any other way to find 
-the PHY other than using _label_. So I just wanted to know if it's ok to 
-use _label_ or if there is any other better way to find PHYs.
-
->
-> No disagreement there.
->
-> Kishon, I tested the patches on top of v3.10-rc5, booting with nfs root
-> via usb gadget eth:
->
-> Overo: works
-> Beagle: works, but I need to reconnect the usb cable after kernel is up
-> Beagle-xm: doesn't work. The cable is detected correctly, though
-> Panda: works
->
-> The problems with Beagles are there even without these patches, so they
-> do make things better (fix Overo).
-
-Thanks for testing this. I'll post a new version removing RFC after 
-Felipe ACKs it.
+You seem to be keeping the other sh7372 board currently in the mainline - 
+the mackerel, so, keeping this one as well at least as long as sh7372 is 
+at all supported shouldn't come at an extra cost. As for INTC DT - I 
+think, the original idea was to specify the complete INTC configuration in 
+DT, which looked pretty horrifying. And it shouldn't be needed, since INTC 
+config is per-SoC, not per-board. What if we keep INTC configuration in 
+SoC files and use aux-data to supply platform data to DT device nodes? 
+Would that be difficult to implement?
 
 Thanks
-Kishon
+Guennadi
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
