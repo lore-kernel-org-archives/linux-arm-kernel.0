@@ -1,71 +1,69 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 14 Jun 2013 09:45:24 -0700
-Subject: [PATCH] ARM: mmu: Add debug_ll_io_init() mappings to early
- mappings
-In-Reply-To: <51BB15DA.8020302@gmail.com>
-References: <1371000607-1787-1-git-send-email-sboyd@codeaurora.org>
- <CAL_JsqLJ7ZD9-VR+vgOZZ_q-RD6FCDvKPSNSCjAADxy94SU1Xg@mail.gmail.com>
- <20130612172146.GB10823@codeaurora.org>
- <51BB15DA.8020302@gmail.com>
-Message-ID: <20130614164524.GA3399@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 14 Jun 2013 17:48:31 +0100
+Subject: [PATCH] arm: fix pmd flushing in map_init_section
+In-Reply-To: <20130614163409.GO3245@lvm>
+References: <1371226942-3189-1-git-send-email-mark.rutland@arm.com>
+ <20130614163409.GO3245@lvm>
+Message-ID: <20130614164831.GA3387@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14, Rob Herring wrote:
-> On 06/12/2013 12:21 PM, Stephen Boyd wrote:
-> > On 06/11, Rob Herring wrote:
-> >> On Tue, Jun 11, 2013 at 8:30 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >>
-> >>> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> >>> index e0d8565..04fe160 100644
-> >>> --- a/arch/arm/mm/mmu.c
-> >>> +++ b/arch/arm/mm/mmu.c
-> >>> @@ -938,8 +938,12 @@ static void __init pci_reserve_io(void)
-> >>>  #ifdef CONFIG_DEBUG_LL
-> >>>  void __init debug_ll_io_init(void)
-> >>>  {
-> >>> +       struct vm_struct *vm;
-> >>> +       struct static_vm *svm;
-> >>>         struct map_desc map;
-> >>>
-> >>> +       svm = early_alloc_aligned(sizeof(*svm), __alignof__(*svm));
-> >>> +
-> >>>         debug_ll_addr(&map.pfn, &map.virtual);
-> >>>         if (!map.pfn || !map.virtual)
-> >>>                 return;
-> >>> @@ -948,6 +952,15 @@ void __init debug_ll_io_init(void)
-> >>>         map.length = PAGE_SIZE;
-> >>>         map.type = MT_DEVICE;
-> >>>         create_mapping(&map);
-> >>> +
-> >>> +       vm = &svm->vm;
-> >>> +       vm->addr = (void *)map.virtual;
-> >>> +       vm->size = map.length;
-> >>> +       vm->phys_addr = __pfn_to_phys(map.pfn);
-> >>> +       vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
-> >>> +       vm->flags |= VM_ARM_MTYPE(map.type);
-> >>> +       vm->caller = debug_ll_io_init;
-> >>> +       add_static_vm_early(svm);
-> >>
-> >> Can you use vm_reserve_area_early here or perhaps just call
-> >> iotable_init instead of create_mapping directly? I don't recall if
-> >> there was some reason I didn't do that.
-> >>
+On Fri, Jun 14, 2013 at 05:34:09PM +0100, Christoffer Dall wrote:
+> On Fri, Jun 14, 2013 at 05:22:22PM +0100, Mark Rutland wrote:
+> > In e651eab0af: "ARM: 7677/1: LPAE: Fix mapping in alloc_init_section for
+> > unaligned addresses", the pmd flushing was broken when split out to
+> > map_init_section. At the end of the final iteration of the while loop,
+> > pmd will point at the pmd_t immediately after the pmds we updated, and
+> > thus flush_pmd_entry(pmd) won't flush the newly modified pmds. This has
+> > been observed to prevent an 11MPCore system from booting.
 > > 
-> > I had iotable_init() before but I thought it was better to have
-> > the ->caller argument say debug_ll_io_init() instead of
-> > iotable_init(). Shall I extract out the similar code?
+> > This patch fixes this by remembering the address of the first pmd we
+> > update and using this as the argument to flush_pmd_entry.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: R Sricharan <r.sricharan@ti.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Christoffer Dall <cdall@cs.columbia.edu>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Cc: stable at vger.kernel.org
+> > ---
+> >  arch/arm/mm/mmu.c | 3 ++-
+> >  1 file changed, 2 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> > index e0d8565..22bc0ff 100644
+> > --- a/arch/arm/mm/mmu.c
+> > +++ b/arch/arm/mm/mmu.c
+> > @@ -620,6 +620,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+> >  			unsigned long end, phys_addr_t phys,
+> >  			const struct mem_type *type)
+> >  {
+> > +	pmd_t *p = pmd;
+> >  #ifndef CONFIG_ARM_LPAE
+> >  	/*
+> >  	 * In classic MMU format, puds and pmds are folded in to
+> > @@ -638,7 +639,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
+> >  		phys += SECTION_SIZE;
+> >  	} while (pmd++, addr += SECTION_SIZE, addr != end);
+> >  
+> > -	flush_pmd_entry(pmd);
+> > +	flush_pmd_entry(p);
+> >  }
+> >  
+> >  static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+> > -- 
 > 
-> Well, that's always welcome...
-> 
-> Another option would be use __builtin_return_address. That would change
-> vmallocinfo from showing iotable_init to the caller of iotable_init.
-> Arguably, knowing the caller would be better.
-> 
+> Refresh my memory here again, why are we not flushing every pmd entry we
+> update?  Is it because we assume the cache lines cover the maximum span
+> between addr and end?
 
-Ok sounds fair. I'll use iotable_init() and send a follow-up
-patch to make iotable_init() more informative.
+Yup, we assume a minimum cache line size of 8 bytes. I'm not so keen on this,
+but I suspect others might not be happy with moving the flush into the loop.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+> 
+> Theoretically, shouldn't you also increment p in the non-LPAE case?
+
+Yes, I should. v2 shortly...
+
+Thanks,
+Mark.
