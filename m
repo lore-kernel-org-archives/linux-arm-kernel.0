@@ -1,28 +1,53 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 14 Jun 2013 16:01:40 +0200
-Subject: [PATCHv4 0/9] Add I2C support for Allwinner SoCs
-In-Reply-To: <201306121438.12549.arnd@arndb.de>
-References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
- <3315236.ZNXhyxmCRd@wuerfel> <20130612113849.GG16699@lukather>
- <201306121438.12549.arnd@arndb.de>
-Message-ID: <20130614140140.GB2929@katana>
+From: khilman@linaro.org (Kevin Hilman)
+Date: Fri, 14 Jun 2013 06:59:45 -0700
+Subject: [PATCH 1/2] ARM: OMAP2+: Powerdomain: Remove the need to always
+ have a voltdm associated to a pwrdm
+In-Reply-To: <1371118124-15910-2-git-send-email-rnayak@ti.com> (Rajendra
+ Nayak's message of "Thu, 13 Jun 2013 15:38:43 +0530")
+References: <1371118124-15910-1-git-send-email-rnayak@ti.com>
+ <1371118124-15910-2-git-send-email-rnayak@ti.com>
+Message-ID: <878v2caj3i.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Rajendra Nayak <rnayak@ti.com> writes:
 
-> > The weird thing is that the only difference between the two controllers
-> > is the register offsets, and that's it. The state numbers, bit index,
-> > etc, are exactly the same.
-> 
-> Ok, cool. Great someone noticed!
+> The powerdomain framework expects all powerdomains to be associated with
 
-:) First thing I do when reviewing new drivers is a manual fuzzy search
-for already known register sets.
+s/expects/currently expects/
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/fd37f2b0/attachment.sig>
+> a corresponding voltagedomain. For some SoCs' (like the already existing AM33xx
+> family, or for the upcoming AM437x and DRA7 SoCs') which
+> do not have a Voltage controller/Voltage Processor (neither the SR I2C
+> bus to communicate with the PMIC) there is no need for a Powerdomain to have
+> a voltage domain association (since they are really non scaleable, even
+> though the voltage domains exist in place).
+
+This last phrase inside the parentheses doesn't make sense to me.
+Reading that makes me think that the lack of an on-chip voltage domain
+means that evn an external regulators can't scale the voltage, which I
+don't believe is the case.
+
+> Extend the arch operations to add an api which the powerdomain core can
+> then use to identify if a voltdm lookup and association for a powerdomain
+> is really needed.
+
+Yes, this idea looks right to me.
+
+In addition to the wording above, a minor nit below...
+
+[...]
+
+> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
+> index 140c360..8ed89de 100644
+> --- a/arch/arm/mach-omap2/powerdomain.h
+> +++ b/arch/arm/mach-omap2/powerdomain.h
+> @@ -166,6 +166,7 @@ struct powerdomain {
+>   * @pwrdm_disable_hdwr_sar: Disable Hardware Save-Restore feature for a pd
+>   * @pwrdm_set_lowpwrstchange: Enable pd transitions from a shallow to deep sleep
+>   * @pwrdm_wait_transition: Wait for a pd state transition to complete
+> + * @pwrdm_has_voltdmi: Check if a voltdm association is needed
+
+s/voltdmi/voltdm/
+
+Kevin
