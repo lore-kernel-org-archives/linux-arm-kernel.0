@@ -1,75 +1,47 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Jun 2013 09:28:31 -0600
-Subject: [PATCH v2 1/3] ARM: tegra: basic support for Trusted Foundations
-In-Reply-To: <CAAVeFuLufKSfeQzP-tX1JpX9qtHa2EdFA9J8qpKE4Pyyrc8UQg@mail.gmail.com>
+Date: Fri, 14 Jun 2013 09:30:11 -0600
+Subject: [PATCH v2 3/3] ARM: tegra: set CPU reset handler with firmware op
+In-Reply-To: <CAAVeFuLi6-WnFP9LvEdqfj2cuK7pgW0_pg33i-Ucoobcxb8RSQ@mail.gmail.com>
 References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
- <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
- <20130613143536.GA18021@localhost.localdomain>
- <CAAVeFuLufKSfeQzP-tX1JpX9qtHa2EdFA9J8qpKE4Pyyrc8UQg@mail.gmail.com>
-Message-ID: <51BB369F.8000209@wwwdotorg.org>
+ <1371114745-24710-4-git-send-email-acourbot@nvidia.com>
+ <51BA1C3D.1010608@wwwdotorg.org>
+ <CAAVeFuLi6-WnFP9LvEdqfj2cuK7pgW0_pg33i-Ucoobcxb8RSQ@mail.gmail.com>
+Message-ID: <51BB3703.8040203@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2013 02:43 AM, Alexandre Courbot wrote:
-> On Thu, Jun 13, 2013 at 11:35 PM, Dave Martin <Dave.Martin@arm.com> wrote:
-...
->>> +             compatible = "tl,trusted-foundations";
->>> +     };
+On 06/14/2013 02:54 AM, Alexandre Courbot wrote:
+> On Fri, Jun 14, 2013 at 4:23 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>> On 06/13/2013 03:12 AM, Alexandre Courbot wrote:
+>>> Use a firmware operation to set the CPU reset handler and only resort to
+>>> doing it ourselves if there is none defined.
+>>>
+>>> This supports the booting of secondary CPUs on devices using a TrustZone
+>>> secure monitor.
 >>
->> For now, it might make more sense to make this binding tegra-specific,
->> and to interpret the node is only implying the presence of the low-
->> level SoC functions you are using on Tegra, not TF as a whole.
-> 
-> Do you mean the vendor should be changed from "tl" to "nvidia" here?
-> 
->> Otherwise, it feels too generic.  There is no description of exactly
->> what functionality will be available if this node it present: if
->> this is going to be a generic binding for TF, then it needs to work
->> for all deployments of TF, not just your specific case.  For example,
->> how to you find out what functionality is present?  Will there be
->> a standard probing ABI for all versions and deployments of TF, or
->> would extra information need to be described in the DT?
+>>> diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
 >>
->> Partly, this depends on whether the TF_SET_CPU_BOOT_ADDR_SMC call will
->> be present, working, and with compatible ABI and semantics, on every SoC
->> where an implementation of TF is present.  Someone from Trusted Logic, or
->> someone with visibility of the relevant ABI/API specs would need to
->> judge on that -- do you have that info?
+>>> +     err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
+>>> +     switch (err) {
+>>> +     case -ENOSYS:
+>>> +             tegra_cpu_reset_handler_set(reset_address);
+>>> +             /* pass-through */
+>>
+>> Rather than detecting -ENOSYS and falling back to the custom
+>> tegra_cpu_reset_handler_set(), does it make sense to plug in
+>> tegra_cpu_reset_handler_set as the firmware op when there is no secure
+>> firmware detected? That way, this code wouldn't need the special case;
+>> that would be isolated to firmware.c.
 > 
-> I'm currently looking into that. This patch makes the assumption that
-> all TF implementations have the same features and the same interface -
-> if this is the case, do you agree this binding is ok as it is?
-> 
-> If indeed TF's functionality and ABI is the same no matter whether we
-> are on Tegra on not, then its support should even be moved outside of
-> mach-tegra.
+> Mmmm I admit I just followed what Exynos did without thinking much
+> about it. I don't see any reason why your suggestion wouldn't work,
+> but on second thought tegra_cpu_reset_handler_set() is not a firmware
+> operation - wouldn't it be unexpected (and maybe confusing) to have it
+> called through call_firmware_op()?
 
-I expect we at least need a version number in the compatible value, even
-if we don't need a representation of the SoC or vendor for which the ABI
-was built.
-
->>> +     node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
->>> +     if (node && !IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS))
->>> +             pr_warn("Trusted Foundations detected but support missing!\n");
->>
->> Should this be more than just a warning?
->>
->> It looks to me like tegra_cpu_reset_handler_set() might either silently
->> fail or trigger an external abort in this situation, depending on the
->> hardware and on how TF sets things up.
-> 
-> What will happen (from 3.10) is that tegra_cpu_reset_handler_set()
-> will output a "CPUX: failed to come online" for each secondary CPU and
-> boot will continue (albeit on one CPU). The system's features are
-> degraded, but it is not fatal, so I think it is reasonable to continue
-> here.
-> 
->> There seems to be no way to signal an error when attempting to set a
->> CPU's reset address.
-> 
-> Indeed. But even if that fails the system can still survive, at least on Tegra.
-
-One more thought: Setting the CPU reset address isn't the only operation
-that'll be performed via firmware_ops; we'd also need to e.g. disable
-CPU power-gating and perhaps other things. Can that all be done at
-run-time? I guess it shouldn't be hard to fix that if we can't yet.
+I would see call_firmware_op() as an abstraction that performs certain
+operations, which in some cases are performed by firmware. If the
+operation doesn't actually need to call into firmware in some
+situations, that seems fine to me. But you're right, others may object.
+Perhaps get a ruling from whoever created firmware_ops and/or some main
+ARM maintainers.
