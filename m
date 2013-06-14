@@ -1,23 +1,29 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 14 Jun 2013 02:47:28 +0000 (UTC)
+Date: Fri, 14 Jun 2013 02:57:46 +0000 (UTC)
 Subject: OMAP v3.10-rc regressions that no one's fixed
-In-Reply-To: <51B6D618.30809@ti.com>
+In-Reply-To: <20130612174842.GQ8164@atomide.com>
 References: <alpine.DEB.2.02.1306100716560.4604@utopia.booyaka.com>
- <51B6D618.30809@ti.com>
-Message-ID: <alpine.DEB.2.02.1306140246590.5514@utopia.booyaka.com>
+ <20130612174842.GQ8164@atomide.com>
+Message-ID: <alpine.DEB.2.02.1306140257270.5514@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi P?ter,
+On Wed, 12 Jun 2013, Tony Lindgren wrote:
 
-On Tue, 11 Jun 2013, Peter Ujfalusi wrote:
+> * Paul Walmsley <paul@pwsan.com> [130610 00:27]:
+>
+> > * 37xx EVM: boot fails
+> >   - as of v3.10-rc1
+> >   - Cause unknown
+> 
+> This one is probably because of broken GPIO numbering in
+> the board file that uses hardcoded GPIOs for what are probably
+> twl GPIOs.
+> 
+> Does commenting out omap3_evm_display_init() in the board file
+> fix the booting for you?
 
-> I will send a patch soon to fix these. Need to test the patch(es) first. I
-> think they surfaced because I have enabled the audio support in
-> omap2plus_defconfig for OMAP4 and 5 - which require McPDM and DMIC.
-> Just couple of minutes, and I'll have the fix.
-
-Thanks for the fast fixes :-)
+Lokesh's patch fixes it here.
 
 
 - Paul
