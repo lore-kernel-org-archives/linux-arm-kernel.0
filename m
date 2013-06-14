@@ -1,62 +1,171 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Fri, 14 Jun 2013 16:35:32 +0200
-Subject: [PATCH 3/3] ARM: mach-moxart: add MOXA ART UART debug files
-In-Reply-To: <20130612225630.GC8146@quad.lixom.net>
-References: <1371040448-28742-1-git-send-email-jonas.jensen@gmail.com>
- <1371040448-28742-4-git-send-email-jonas.jensen@gmail.com>
- <20130612225630.GC8146@quad.lixom.net>
-Message-ID: <CACmBeS0ra+32VVFtCpNiz0xrENFbTZFpnb3KppxiOfMiiKUXVQ@mail.gmail.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Fri, 14 Jun 2013 20:11:26 +0530
+Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
+Message-ID: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Two cells were used to specify interrupts in mct node, while second cell
+always remains unused. Hence use only one cell.
+Suggested by Tomasz Figa.
 
-Thanks for the replies.
+Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+---
+ arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
+ arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
+ arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
+ arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
+ 4 files changed, 38 insertions(+), 42 deletions(-)
 
-On 13 June 2013 00:56, Olof Johansson <olof@lixom.net> wrote:
->> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
->> index 1d41908..a0e4a32 100644
->> --- a/arch/arm/Kconfig.debug
->> +++ b/arch/arm/Kconfig.debug
->> @@ -422,6 +422,15 @@ choice
->>                 Say Y here if you want kernel low-level debugging support
->>                 on Allwinner A1X based platforms on the UART1.
->>
->> +    config DEBUG_MOXART_UART0
->> +        bool "Kernel low-level debugging messages via MOXART UART0"
->> +        depends on ARCH_MOXART
->> +        help
->> +          Say Y here if you want kernel low-level debugging support
->> +          on MOXART based platforms on the UART0.
->> +          select this to make sure "putc" in arch/arm/boot/compressed/debug.S
->> +          uses arch/arm/include/debug/moxart.S:s "addruart" macro
->
-> Looks like the last two lines above are leftovers? It's not super-helpful for
-> someone trying to figure out if they want this option or not; the first two
-> lines covers that quite nicely.
-
-Leftovers removed. I only added them because I spent some time
-figuring out the call chain around putc.
-
->> +++ b/arch/arm/include/debug/moxart.S
->> @@ -0,0 +1,14 @@
->> +/* Copyright (C) 2013 Jonas Jensen <jonas.jensen@gmail.com>
->> + * This program is free software; you can redistribute it and/or modify it
->> + * under the terms of the GNU General Public License as published by the
->> + * Free Software Foundation; either version 2 of the License,
->> + * or (at your option) any later version. */
->> +
->> +#define MOXART_UART_DEBUG_PHYS_BASE          0x98200000
->> +
->> +.macro       addruart, rp, rv, tmp
->> +     ldr     \rp, =MOXART_UART_DEBUG_PHYS_BASE       @ physical
->
-> You need to set rv here too.
-
-Done. Used to be set with the IO_ADDRESS macro I worked so hard to
-remove. Looking at other platforms, it seems accepted to set a
-hardcoded value here.
-
-
-Best regards,
-Jonas
+diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
+index 54710de..ad50010 100644
+--- a/arch/arm/boot/dts/exynos4210.dtsi
++++ b/arch/arm/boot/dts/exynos4210.dtsi
+@@ -52,23 +52,22 @@
+ 		compatible = "samsung,exynos4210-mct";
+ 		reg = <0x10050000 0x800>;
+ 		interrupt-controller;
+-		#interrups-cells = <2>;
++		#interrups-cells = <1>;
+ 		interrupt-parent = <&mct_map>;
+-		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+-			     <4 0>, <5 0>;
++		interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
+ 		clocks = <&clock 3>, <&clock 344>;
+ 		clock-names = "fin_pll", "mct";
+ 
+ 		mct_map: mct-map {
+-			#interrupt-cells = <2>;
++			#interrupt-cells = <1>;
+ 			#address-cells = <0>;
+ 			#size-cells = <0>;
+-			interrupt-map = <0x0 0 &gic 0 57 0>,
+-					<0x1 0 &gic 0 69 0>,
+-					<0x2 0 &combiner 12 6>,
+-					<0x3 0 &combiner 12 7>,
+-					<0x4 0 &gic 0 42 0>,
+-					<0x5 0 &gic 0 48 0>;
++			interrupt-map = <0 &gic 0 57 0>,
++					<1 &gic 0 69 0>,
++					<2 &combiner 12 6>,
++					<3 &combiner 12 7>,
++					<4 &gic 0 42 0>,
++					<5 &gic 0 48 0>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
+index c0f60f4..ba9ada1 100644
+--- a/arch/arm/boot/dts/exynos4212.dtsi
++++ b/arch/arm/boot/dts/exynos4212.dtsi
+@@ -39,21 +39,20 @@
+ 		compatible = "samsung,exynos4412-mct";
+ 		reg = <0x10050000 0x800>;
+ 		interrupt-controller;
+-		#interrups-cells = <2>;
++		#interrups-cells = <1>;
+ 		interrupt-parent = <&mct_map>;
+-		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+-			     <4 0>, <5 0>;
++		interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
+ 
+ 		mct_map: mct-map {
+-			#interrupt-cells = <2>;
++			#interrupt-cells = <>;
+ 			#address-cells = <0>;
+ 			#size-cells = <0>;
+-			interrupt-map = <0x0 0 &gic 0 57 0>,
+-					<0x1 0 &combiner 12 5>,
+-					<0x2 0 &combiner 12 6>,
+-					<0x3 0 &combiner 12 7>,
+-					<0x4 0 &gic 1 12 0>,
+-					<0x5 0 &gic 1 12 0>;
++			interrupt-map = <0 &gic 0 57 0>,
++					<1 &combiner 12 5>,
++					<2 &combiner 12 6>,
++					<3 &combiner 12 7>,
++					<4 &gic 1 12 0>,
++					<5 &gic 1 12 0>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
+index 270b389..a680de7 100644
+--- a/arch/arm/boot/dts/exynos4412.dtsi
++++ b/arch/arm/boot/dts/exynos4412.dtsi
+@@ -39,25 +39,24 @@
+ 		compatible = "samsung,exynos4412-mct";
+ 		reg = <0x10050000 0x800>;
+ 		interrupt-controller;
+-		#interrups-cells = <2>;
++		#interrups-cells = <1>;
+ 		interrupt-parent = <&mct_map>;
+-		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+-			     <4 0>, <5 0>, <6 0>, <7 0>;
++		interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>;
+ 		clocks = <&clock 3>, <&clock 344>;
+ 		clock-names = "fin_pll", "mct";
+ 
+ 		mct_map: mct-map {
+-			#interrupt-cells = <2>;
++			#interrupt-cells = <1>;
+ 			#address-cells = <0>;
+ 			#size-cells = <0>;
+-			interrupt-map = <0x0 0 &gic 0 57 0>,
+-					<0x1 0 &combiner 12 5>,
+-					<0x2 0 &combiner 12 6>,
+-					<0x3 0 &combiner 12 7>,
+-					<0x4 0 &gic 1 12 0>,
+-					<0x5 0 &gic 1 12 0>,
+-					<0x6 0 &gic 1 12 0>,
+-					<0x7 0 &gic 1 12 0>;
++			interrupt-map = <0 &gic 0 57 0>,
++					<1 &combiner 12 5>,
++					<2 &combiner 12 6>,
++					<3 &combiner 12 7>,
++					<4 &gic 1 12 0>,
++					<5 &gic 1 12 0>,
++					<6 &gic 1 12 0>,
++					<7 &gic 1 12 0>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
+index a7cf3f5..4e633ef 100644
+--- a/arch/arm/boot/dts/exynos5250.dtsi
++++ b/arch/arm/boot/dts/exynos5250.dtsi
+@@ -94,23 +94,22 @@
+ 		compatible = "samsung,exynos4210-mct";
+ 		reg = <0x101C0000 0x800>;
+ 		interrupt-controller;
+-		#interrups-cells = <2>;
++		#interrups-cells = <1>;
+ 		interrupt-parent = <&mct_map>;
+-		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
+-			     <4 0>, <5 0>;
++		interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
+ 		clocks = <&clock 1>, <&clock 335>;
+ 		clock-names = "fin_pll", "mct";
+ 
+ 		mct_map: mct-map {
+-			#interrupt-cells = <2>;
++			#interrupt-cells = <1>;
+ 			#address-cells = <0>;
+ 			#size-cells = <0>;
+-			interrupt-map = <0x0 0 &combiner 23 3>,
+-					<0x1 0 &combiner 23 4>,
+-					<0x2 0 &combiner 25 2>,
+-					<0x3 0 &combiner 25 3>,
+-					<0x4 0 &gic 0 120 0>,
+-					<0x5 0 &gic 0 121 0>;
++			interrupt-map = <0 &combiner 23 3>,
++					<1 &combiner 23 4>,
++					<2 &combiner 25 2>,
++					<3 &combiner 25 3>,
++					<4 &gic 0 120 0>,
++					<5 &gic 0 121 0>;
+ 		};
+ 	};
+ 
+-- 
+1.7.9.5
