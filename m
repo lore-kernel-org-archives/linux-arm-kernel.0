@@ -1,48 +1,23 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Jun 2013 01:53:49 +0200
-Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
- properties from a dt node
-In-Reply-To: <CACRpkdZavNX3jk4K5unEJCED4vTuZEUF=NC1naGOMyr54hXQKw@mail.gmail.com>
-References: <201306102139.32444.heiko@sntech.de>
- <201306131723.04721.heiko@sntech.de>
- <CACRpkdZavNX3jk4K5unEJCED4vTuZEUF=NC1naGOMyr54hXQKw@mail.gmail.com>
-Message-ID: <1862891.4yIecp615h@avalon>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 13 Jun 2013 20:21:29 -0400 (EDT)
+Subject: [RFC PATCH v3 2/2] drivers: mfd: vexpress: add Serial Power
+ Controller (SPC) support
+In-Reply-To: <20130613225233.GB22310@quad.lixom.net>
+References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1370512763-32200-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130613225233.GB22310@quad.lixom.net>
+Message-ID: <alpine.LFD.2.03.1306132006390.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Thu, 13 Jun 2013, Olof Johansson wrote:
 
-On Thursday 13 June 2013 17:36:00 Linus Walleij wrote:
-> On Thu, Jun 13, 2013 at 5:23 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> >> Ok, I'll see that I get this fixed :-)
-> > 
-> > Hmm ... what is the meaning of the argument of bias-disable and bias-high-
-> > impedance, as the kernel-doc in pinconf-generic.h does not tell?
+> > +	u32 status = readl_relaxed(info->baseaddr + PWC_STATUS);
 > 
-> I think those arguments are N/A, ignored, doesn't matter.
-> If these options were typed, they would be bool.
-> 
-> Please improve documentation if you can... sorry for all the
-> rough edges.
-> 
-> > bias-bus-hold ignores its argument and we already clarified that the
-> > pull-* do have != 0 or 0 argument.
-> 
-> I think in the DT binding, both these forms:
-> 
-> bias-pull-up;
-> bias-pull-up = <150000>;
-> 
-> Should be allowed.
-> 
-> So when parsing, you first check if it exists, then if there
-> is an argument, if there is no value supplied, just set it
-> to 1, as that is clearly != 0...
+> Why readl_relaxed() here? Can't you use a normal readl()?
 
-What's the expected way to disable pull-ups in DT ? Should it be 'bias-pull-up 
-= <0>;' or 'bias-disable;' ?
+Unfortunately, on ARM readl_relaxed() _is_ the normal readl() because 
+the actual readl() may have side effects.  See commit 79f64dbf68c8.
 
--- 
-Regards,
 
-Laurent Pinchart
+Nicolas
