@@ -1,48 +1,83 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Fri, 14 Jun 2013 19:32:52 +0530
-Subject: [PATCH v2 10/10] ARM: Exynos: extend soft-reset support for Exynos5420
-In-Reply-To: <1371218572-8993-1-git-send-email-chander.kashyap@linaro.org>
-References: <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1371218572-8993-11-git-send-email-chander.kashyap@linaro.org>
+From: afzal@ti.com (Afzal Mohammed)
+Date: Fri, 14 Jun 2013 19:33:34 +0530
+Subject: [PATCH] ARM: dts: AM43x EPOS EVM support
+Message-ID: <1371218614-26311-1-git-send-email-afzal@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the soft reset support for Exynos5420 SoC.
+Add AM43x ePOS EVM minimal DT source - this is a minimal one to get
+it booting. Also include it in omap2plus dtbs and document bindings.
+The hardware is under development.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+Signed-off-by: Afzal Mohammed <afzal@ti.com>
 ---
- arch/arm/mach-exynos/common.c |   11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 6f435da..4e6c227 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -330,10 +330,10 @@ void exynos5_restart(char mode, const char *cmd)
- 	u32 val;
- 	void __iomem *addr;
+Hi Benoit,
+
+This is based on your for_3.11/dts branch.
+
+Ideally I wanted to split this into 3 patches - first doc, second dts
+and last adding build support. As changes in total is trivial, it was
+made a single one.
+
+Regards
+Afzal
+
+
+ Documentation/devicetree/bindings/arm/omap/omap.txt |  3 +++
+ arch/arm/boot/dts/Makefile                          |  3 ++-
+ arch/arm/boot/dts/am43x-epos-evm.dts                | 18 ++++++++++++++++++
+ 3 files changed, 23 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/am43x-epos-evm.dts
+
+diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
+index f8288ea..6d498c7 100644
+--- a/Documentation/devicetree/bindings/arm/omap/omap.txt
++++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
+@@ -56,3 +56,6 @@ Boards:
  
--	if (of_machine_is_compatible("samsung,exynos5250")) {
--		val = 0x1;
--		addr = EXYNOS_SWRESET;
--	} else if (of_machine_is_compatible("samsung,exynos5440")) {
-+	val = 0x1;
-+	addr = EXYNOS_SWRESET;
+ - OMAP5 EVM : Evaluation Module
+   compatible = "ti,omap5-evm", "ti,omap5"
 +
-+	if (of_machine_is_compatible("samsung,exynos5440")) {
- 		u32 status;
- 		np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
- 
-@@ -344,9 +344,6 @@ void exynos5_restart(char mode, const char *cmd)
- 		val = __raw_readl(addr);
- 
- 		val = (val & 0xffff0000) | (status & 0xffff);
--	} else {
--		pr_err("%s: cannot support non-DT\n", __func__);
--		return;
- 	}
- 
- 	__raw_writel(val, addr);
++- AM43x EPOS EVM
++  compatible = "ti,am43x-epos-evm", "ti,am4372", "ti,am43"
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 8e50761..05da469 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -155,7 +155,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
+ 	am335x-evmsk.dtb \
+ 	am335x-bone.dtb \
+ 	am3517-evm.dtb \
+-	am3517_mt_ventoux.dtb
++	am3517_mt_ventoux.dtb \
++	am43x-epos-evm.dtb
+ dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+new file mode 100644
+index 0000000..74174d4
+--- /dev/null
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -0,0 +1,18 @@
++/*
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/* AM43x EPOS EVM */
++
++/dts-v1/;
++
++#include "am4372.dtsi"
++
++/ {
++	model = "TI AM43x EPOS EVM";
++	compatible = "ti,am43x-epos-evm","ti,am4372","ti,am43";
++};
 -- 
-1.7.9.5
+1.7.12
