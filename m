@@ -1,102 +1,251 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 14 Jun 2013 15:53:41 +0200
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20130613115016.GB18614@n2100.arm.linux.org.uk>
-References: <20130610233611.GK18614@n2100.arm.linux.org.uk>
- <CAPM=9tz6p2rhjNUg7ednT09A+dztbYskF32QkZeaCi_qrH8ipw@mail.gmail.com>
- <20130612134845.GQ18614@n2100.arm.linux.org.uk>
- <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
- <20130612164914.GT18614@n2100.arm.linux.org.uk>
- <20130612170512.GU18614@n2100.arm.linux.org.uk>
- <20130612194021.GX18614@n2100.arm.linux.org.uk>
- <20130612230057.GY18614@n2100.arm.linux.org.uk>
- <20130613111903.GA18614@n2100.arm.linux.org.uk>
- <20130613115016.GB18614@n2100.arm.linux.org.uk>
-Message-ID: <20130614135341.GJ23483@phenom.ffwll.local>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Fri, 14 Jun 2013 19:24:57 +0530
+Subject: [PATCH 10/13] ARM: dts: Add initial device tree support for
+ Exynos5420
+In-Reply-To: <5641151.psa9JbBo0O@flatron>
+References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
+ <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
+ <5641151.psa9JbBo0O@flatron>
+Message-ID: <CANuQgHEjiEj93sjDAh5GnCWY+pnr9cy9dK_+NtW9mDVpfLjtVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 12:50:16PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 13, 2013 at 12:19:03PM +0100, Russell King - ARM Linux wrote:
-> > The deeper I look, the more bugs there seem to be in this DRM stuff,
-> > and I'm continuing to look because I'm chasing a framebuffer refcount
-> > bug.
-> 
-> So, this refcount bug - I think I've just found it.  This is the flow of
-> references to the new fb on mode set:
-> 
-> drm_mode_setcrtc():
->                         fb = drm_framebuffer_lookup(dev, crtc_req->fb_id);
->         set.fb = fb;
->         ret = drm_mode_set_config_internal(&set);
-> drm_mode_set_config_internal():
->         fb = set->fb;
->         ret = crtc->funcs->set_config(set);
-> drm_crtc_helper_set_config():
->                         old_fb = set->crtc->fb;
->                         set->crtc->fb = set->fb;
->                         if (!drm_crtc_helper_set_mode(set->crtc, set->mode,
->                                                       set->x, set->y,
->                                                       old_fb)) {
->                 drm_helper_disable_unused_functions(dev);
-> drm_helper_disable_unused_functions():
->         list_for_each_entry(crtc, &dev->mode_config.crtc_list, head) {
->                 crtc->enabled = drm_helper_crtc_in_use(crtc);
->                 if (!crtc->enabled) {
->                         crtc->fb = NULL;
-> 		}
-> 	}
-> back to drm_mode_set_config_internal():
->         if (ret == 0) {
->                 if (fb)
->                         drm_framebuffer_reference(fb);
-> back to drm_mode_setcrtc():
->         if (fb)
->                 drm_framebuffer_unreference(fb);
-> 
-> Assuming success all the way through, what happens when a CRTC is unused
-> is:
-> 
-> 1. We obtain a reference in drm_mode_setcrtc() via the lookup.
-> 2. We set the mode
-> 3. In trying to set the mode, we discover that all connectors for the CRTC
->    are in the disconnected state, and so we disable the CRTC
-> 4. We set crtc->fb to NULL
-> 5. back in drm_mode_set_config_internal(), we take a reference on the
->    framebuffer irrespective of this.
-> 6. back in drm_mode_setcrtc(), we drop the original reference caused by
->    the lookup.
-> 
-> We now have a framebuffer with a reference count incremented by one but
-> no actual reference to it - the CRTC's reference is completely lost by
-> the action of drm_helper_disable_unused_functions().
-> 
-> You could argue that it's something the driver should deal with - fine,
-> but what if it only implements the DPMS method?  Should it drop a
-> reference to the framebuffer when DPMS instructs it to turn off?  Surely
-> not, because that means when DPMS turns stuff back on you're missing a
-> refcount.
-> 
-> Are drivers required to implement a disable function and cater for the
-> imbalance in the upper layers of code?  If so, this is not a clean
-> design.
+On 8 June 2013 17:08, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Thursday 06 of June 2013 16:31:24 Chander Kashyap wrote:
+>> Add initial device tree nodes for Exynos5420 SoC and SMDK5420 board.
+>>
+>> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+>> ---
+>>  arch/arm/boot/dts/Makefile                |    1 +
+>>  arch/arm/boot/dts/exynos5420-smdk5420.dts |   40 ++++++++++++
+>>  arch/arm/boot/dts/exynos5420.dtsi         |  101
+>> +++++++++++++++++++++++++++++ 3 files changed, 142 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
+>>  create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index cb31259..304ba4d 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -56,6 +56,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
+>>       exynos5250-arndale.dtb \
+>>       exynos5440-sd5v1.dtb \
+>>       exynos5250-smdk5250.dtb \
+>> +     exynos5420-smdk5420.dtb \
+>
+> Please keep the sorting order.
+>
+>>       exynos5250-snow.dtb \
+>
+> Here is the correct place for exynos5440-*.
+I will sort it.
+>
+>>       exynos5440-ssdk5440.dtb
+>>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
+>> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> b/arch/arm/boot/dts/exynos5420-smdk5420.dts new file mode 100644
+>> index 0000000..b14e775
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> @@ -0,0 +1,40 @@
+>> +/*
+>> + * SAMSUNG SMDK5420 board device tree source
+>> + *
+>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>> + *           http://www.samsung.com
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as +
+>> * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +/dts-v1/;
+>> +/include/ "exynos5420.dtsi"
+>
+> #include "exynos5420.dtsi"
+>
+>> +
+>> +/ {
+>> +     model = "Samsung SMDK5420 board based on EXYNOS5420";
+>> +     compatible = "samsung,smdk5420", "samsung,exynos5420";
+>> +
+>> +     memory {
+>> +             reg =   <0x20000000 0x10000000
+>> +                      0x30000000 0x10000000
+>> +                      0x40000000 0x10000000
+>> +                      0x50000000 0x10000000
+>> +                      0x60000000 0x10000000
+>> +                      0x70000000 0x10000000
+>> +                      0x80000000 0x10000000
+>> +                      0x90000000 0x10000000>;
+>> +     };
+>> +
+>> +     chosen {
+>> +             bootargs = "console=ttySAC2,115200 init=/linuxrc";
+>> +     };
+>> +
+>> +     fixed-rate-clocks {
+>> +             oscclk {
+>> +                     compatible = "samsung,exynos5420-oscclk";
+>> +                     clock-frequency = <24000000>;
+>> +             };
+>> +     };
+>> +};
+>> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
+>> b/arch/arm/boot/dts/exynos5420.dtsi new file mode 100644
+>> index 0000000..577dfe5
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/exynos5420.dtsi
+>> @@ -0,0 +1,101 @@
+>> +/*
+>> + * SAMSUNG EXYNOS5420 SoC device tree source
+>> + *
+>> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>> + *           http://www.samsung.com
+>> + *
+>> + * SAMSUNG EXYNOS54200 SoC device nodes are listed in this file.
+>> + * EXYNOS5420 based board files can include this file and provide
+>> + * values for board specfic bindings.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as +
+>> * published by the Free Software Foundation.
+>> +*/
+>
+> nitpick: missing space to keep the alignment of stars
+>
+>> +
+>> +/include/ "skeleton.dtsi"
+>> +/include/ "exynos5.dtsi"
+>
+> #include and IMHO skeleton.dtsi should be already included from
+> exynos5.dtsi.
+>
+>> +/ {
+>> +     compatible = "samsung,exynos5420";
+>> +
+>> +     clock: clock-controller at 0x10010000 {
+>> +             compatible = "samsung,exynos5420-clock";
+>> +             reg = <0x10010000 0x30000>;
+>> +             #clock-cells = <1>;
+>> +     };
+>> +
+>> +     cpus {
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +
+>> +             cpu0: cpu at 0 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a15";
+>> +                     reg = <0x0>;
+>> +                     clock-frequency = <800000000>;
+>
+> Hmm. I don't remember seeing this property in CPU bindings, but maybe I'm
+> missing something. Anyway this makes little sense, since on every board
+> this frequency may be different. Not even saying about CPU frequency
+> scaling that would change it.
 
-Yep, if your driver grabs additional references (underlying gem object,
-pinning, whatever) you need to wire up your own ->disable hook to drop
-those. Note that for truly dumb kms drivers which only ever allocate an
-fb, the upper layer actually _does_ take care of all the refcounting.
+Well this is used to calculate cpu capacity.
+>
+>> +             };
+>> +
+>> +             cpu1: cpu at 1 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a15";
+>> +                     reg = <0x1>;
+>> +                     clock-frequency = <800000000>;
+>> +             };
+>> +
+>> +             cpu2: cpu at 2 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a15";
+>> +                     reg = <0x2>;
+>> +                     clock-frequency = <800000000>;
+>> +             };
+>> +
+>> +             cpu3: cpu at 3 {
+>> +                     device_type = "cpu";
+>> +                     compatible = "arm,cortex-a15";
+>> +                     reg = <0x3>;
+>> +                     clock-frequency = <800000000>;
+>> +             };
+>> +     };
+>> +
+>> +     mct at 101C0000 {
+>> +             compatible = "samsung,exynos4210-mct";
+>> +             reg = <0x101C0000 0x800>;
+>> +             interrupt-controller;
+>> +             #interrups-cells = <2>;
+>> +             interrupt-parent = <&mct_map>;
+>> +             interrupts =    <0 0>, <1 0>, <2 0>, <3 0>,
+>> +                             <4 0>, <5 0>, <6 0>, <7 0>;
+>> +             clocks = <&clock 1>, <&clock 315>;
+>> +             clock-names = "fin_pll", "mct";
+>> +
+>> +             mct_map: mct-map {
+>> +                     #interrupt-cells = <2>;
+>
+> Why do you need 2 cells here, if second one is unused in the map and kept
+> as 0?
+>
+>> +                     #address-cells = <0>;
+>> +                     #size-cells = <0>;
+>> +                     interrupt-map = <0x0 0 &combiner 23 3>,
+>> +                                     <0x1 0 &combiner 23 4>,
+>> +                                     <0x2 0 &combiner 25 2>,
+>> +                                     <0x3 0 &combiner 25 3>,
+>> +                                     <0x4 0 &gic 0 120 0>,
+>> +                                     <0x5 0 &gic 0 121 0>,
+>> +                                     <0x6 0 &gic 0 122 0>,
+>> +                                     <0x7 0 &gic 0 123 0>;
+>
+> Having #interrupt-cells = <1> would allow to simplify the map to:
+>
+>         interrupt-map = <0 &combiner 23 3>,
+>                         <1 &combiner 23 4>,
+>                         <2 &combiner 25 2>,
+>                         <3 &combiner 25 3>,
+>                         <4 &gic 0 120 0>,
+>                         <5 &gic 0 121 0>,
+>                         <6 &gic 0 122 0>,
+>                         <7 &gic 0 123 0>;
+>
+> and interrupt specifiers in mct node to:
+>
+>         interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>;
+>
+I will do the necessary changer.
+>> +             };
+>> +     };
+>> +
+>> +     serial at 12C00000 {
+>> +             clocks = <&clock 257>, <&clock 128>;
+>
+> This looks a bit awkward without the clock-names property here. See my
+> comments to patch 03/13.
+I will move the clock names and number to same place.
+>
+> Best regards,
+> Tomasz
+>
+>> +     };
+>> +
+>> +     serial at 12C10000 {
+>> +             clocks = <&clock 258>, <&clock 129>;
+>> +     };
+>> +
+>> +     serial at 12C20000 {
+>> +             clocks = <&clock 259>, <&clock 130>;
+>> +     };
+>> +
+>> +     serial at 12C30000 {
+>> +             clocks = <&clock 260>, <&clock 131>;
+>> +     };
+>> +};
 
-Also note the crtc helpers in drm_crtc_helper.c are purely optional. The
-real drm core -> driver interface is all contained in drm_crtc.c. And crtc
-helpers do make a few critical design assumptions about how your hw works
-(and there's a bit room for api cleanup, I agree on that). So if they
-simply don't work out for you no one will get upset if you roll your own
-modeset infrastructure. And in drm/i915 we've had to do just that since
-the impedance mismatch between crtc helper assumptions and what our hw
-needed grew to big (and in really fundamental ways, not just a bit of
-interface ugliness like you're seeing here).
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Thanks for the review.
+
+
+--
+with warm regards,
+Chander Kashyap
