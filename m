@@ -1,22 +1,61 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 15:24:19 -0700
-Subject: [GIT PULL 2/3] ARM: mvebu: dt changes for v3.11 #5
-In-Reply-To: <20130613212413.GF31667@titan.lakedaemon.net>
-References: <20130613212137.GE31667@titan.lakedaemon.net>
- <20130613212413.GF31667@titan.lakedaemon.net>
-Message-ID: <20130614222419.GJ17326@quad.lixom.net>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Sat, 15 Jun 2013 00:36:37 +0200
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <20130614221539.GO18614@n2100.arm.linux.org.uk>
+References: <20130612164914.GT18614@n2100.arm.linux.org.uk>
+ <20130612170512.GU18614@n2100.arm.linux.org.uk>
+ <20130612194021.GX18614@n2100.arm.linux.org.uk>
+ <20130612230057.GY18614@n2100.arm.linux.org.uk>
+ <20130613111903.GA18614@n2100.arm.linux.org.uk>
+ <20130613115016.GB18614@n2100.arm.linux.org.uk>
+ <20130613130339.GD18614@n2100.arm.linux.org.uk>
+ <CAKMK7uHgAe=05RFLxqSTz5R+myU9-nvuk=RMZym2k-tjzbC+2w@mail.gmail.com>
+ <20130614144251.GN18614@n2100.arm.linux.org.uk>
+ <CAKMK7uEzC8rCaAB_8VCwyox2Be9JZ=+OWSk0+BLyfug7G5=18A@mail.gmail.com>
+ <20130614221539.GO18614@n2100.arm.linux.org.uk>
+Message-ID: <CAKMK7uH=tZcD5SysgBXYgcD5yMuA3HEUQWFVfFGqV_fhR+quwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 05:24:13PM -0400, Jason Cooper wrote:
-> The following changes since commit 33a6675485f27adc182faa856944836e85520fa1:
-> 
->   ARM: Kirkwood add cpus definition needed by cpufreq driver to dtsi (2013-06-03 16:23:24 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-5
+On Sat, Jun 15, 2013 at 12:15 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jun 14, 2013 at 09:50:22PM +0200, Daniel Vetter wrote:
+>> On Fri, Jun 14, 2013 at 4:42 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > If you're happy with the patch I supplied, that's probably the minimal fix
+>> > which should go to stable kernels (I'm using 3.9 here) - this also counts
+>> > as a "user visible bug".  It's something I've tripped over which causes
+>> > exhausts memory and can prevent the X server from starting up.
+>> >
+>> > If you want me to package the patch up with a commit message and sign-off..
+>>
+>> Your patch doesn't fix drm/i915 (since we don't use the crtc helpers
+>> any more). And I don't think it's good to have the refcounting
+>> partially in the drm core and partially in drivers.
+>
+> Let me check what you mean by that.  I hope you mean that the drm core,
+> drm helpers and drivers are individually responsible for dropping any
+> refcount that they obtain on any object.
+>
+> In other words, if the drm core takes a refcount on object X, then the
+> DRM core must be the code base which drops that refcount.
 
-Pulled.
+Yeah, that's the idea. But since with the currently quirky drm core
+->set_config callback the drivers need to drop the reference if any
+other crtc loses all its connectors. My patch also drops the ref for
+that fb in the drm core functions. The reason for that is that we want
+to switch to a global ->set_config function anyway (usually called
+atomic modeset) to push the configuration for all the crtcs into the
+hw in one step (or fail it completely ofc). The current approach leads
+to too much flickering and some funny hacks in drivers ...
 
--Olof
+Of course such gradual transitions over mutliple kernel release (we're
+shuffling backend code in drm/i915 since about 3.7 for this) leaves a
+few ugly intermediat states. But I prefer to move into the overall
+right direction with a bit of ugliness than doing such big transitions
+in one big swoop.
+-Daniel
+--
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
