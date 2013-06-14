@@ -1,50 +1,49 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 14 Jun 2013 17:22:22 +0100
-Subject: [PATCH] arm: fix pmd flushing in map_init_section
-Message-ID: <1371226942-3189-1-git-send-email-mark.rutland@arm.com>
+Date: Fri, 14 Jun 2013 17:24:57 +0100
+Subject: [PATCH] irqchip: gic: fix boot for chained gics
+Message-ID: <1371227097-3326-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In e651eab0af: "ARM: 7677/1: LPAE: Fix mapping in alloc_init_section for
-unaligned addresses", the pmd flushing was broken when split out to
-map_init_section. At the end of the final iteration of the while loop,
-pmd will point at the pmd_t immediately after the pmds we updated, and
-thus flush_pmd_entry(pmd) won't flush the newly modified pmds. This has
-been observed to prevent an 11MPCore system from booting.
+As of c0114709ed: "irqchip: gic: Perform the gic_secondary_init() call
+via CPU notifier", booting on a platform with chained gics (e.g.
+Realview EB ARM11MPCore) will result in the gic_cpu_notifier being
+registered twice, corrupting the cpu notifier list and rendering the
+platform unbootable.
 
-This patch fixes this by remembering the address of the first pmd we
-update and using this as the argument to flush_pmd_entry.
+This patch ensures that we only register the notifier for the first gic,
+allowing platforms with chained gics to boot. At the same time we limit
+the pointlessly duplicated calls to set_smp_cross_call and
+set_handle_irq to the first gic registered.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: R Sricharan <r.sricharan@ti.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Christoffer Dall <cdall@cs.columbia.edu>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Cc: stable at vger.kernel.org
+Cc: Thomas Gleixner <tglx@linutronix.de>
 ---
- arch/arm/mm/mmu.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-gic.c | 9 +++++----
+ 1 file changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e0d8565..22bc0ff 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -620,6 +620,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
- 			unsigned long end, phys_addr_t phys,
- 			const struct mem_type *type)
- {
-+	pmd_t *p = pmd;
- #ifndef CONFIG_ARM_LPAE
- 	/*
- 	 * In classic MMU format, puds and pmds are folded in to
-@@ -638,7 +639,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
- 		phys += SECTION_SIZE;
- 	} while (pmd++, addr += SECTION_SIZE, addr != end);
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index 1760ceb..1a12bdf 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -808,12 +808,13 @@ void __init gic_init_bases(unsigned int gic_nr, int irq_start,
+ 	if (WARN_ON(!gic->domain))
+ 		return;
  
--	flush_pmd_entry(pmd);
-+	flush_pmd_entry(p);
- }
++	if (gic_nr == 0) {
+ #ifdef CONFIG_SMP
+-	set_smp_cross_call(gic_raise_softirq);
+-	register_cpu_notifier(&gic_cpu_notifier);
++		set_smp_cross_call(gic_raise_softirq);
++		register_cpu_notifier(&gic_cpu_notifier);
+ #endif
+-
+-	set_handle_irq(gic_handle_irq);
++		set_handle_irq(gic_handle_irq);
++	}
  
- static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
+ 	gic_chip.flags |= gic_arch_extn.flags;
+ 	gic_dist_init(gic);
 -- 
 1.8.1.1
