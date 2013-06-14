@@ -1,49 +1,52 @@
-From: cooloney@gmail.com (Bryan Wu)
-Date: Fri, 14 Jun 2013 15:50:39 -0700
-Subject: [PATCH v4 1/3] leds: leds-mc13783: Prepare driver to support
- MC13892 LEDs
-In-Reply-To: <51B81821.7020507@epfl.ch>
-References: <1370883572-877-1-git-send-email-shc_work@mail.ru>
- <51B6DBE8.5090505@epfl.ch>
- <CAK5ve-+aQNrVbbOkyHXaB6paDe96wMcZ-7yG=J0Wp9mtH0HGyw@mail.gmail.com>
- <51B81821.7020507@epfl.ch>
-Message-ID: <CAK5ve-Lgtx3DsHinW2Xsk2cMHewR5LiFcGAL7cXAP4av4Xeb=w@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 14 Jun 2013 16:08:38 -0700
+Subject: [GIT PULL] Integrator/AP PCI DT support
+In-Reply-To: <CACRpkdb8J4+QH36SYavgGWbFWaBZDg5JSYyyJELzL=mSZfMnBw@mail.gmail.com>
+References: <CACRpkdb8J4+QH36SYavgGWbFWaBZDg5JSYyyJELzL=mSZfMnBw@mail.gmail.com>
+Message-ID: <20130614230838.GA18124@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 11:41 PM, Philippe R?tornaz
-<philippe.retornaz@epfl.ch> wrote:
-> Le 11/06/2013 20:29, Bryan Wu a ?crit :
->
->> On Tue, Jun 11, 2013 at 1:12 AM, Philippe R?tornaz
->> <philippe.retornaz@epfl.ch> wrote:
->>>
->>> Le 10/06/2013 18:59, Alexander Shiyan a ?crit :
->>>
->>>> This patch rewrite driver code to be ready to add support for
->>>> MC13892 LEDs and probe from devicetree.
->>>>
->>>> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
->>>
->>>
->>>
->>>
->>> The whole serie:
->>>
->>> Tested-by: Philippe Retornaz <philippe.retornaz@epfl.ch>
->>>
->>> On mx31moboard with an mc13783.
->>>
->>
->> Thanks for testing, did you test device tree as well? I failed to see
->> any DTS file adding/change in this patchset.
->>
->
-> No, I tested on a mx31moboard: mc13783 with an imx31, so no device tree.
-> But AFAIK this board was the only in-tree user of this driver.
->
+On Mon, Jun 03, 2013 at 01:09:17PM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
+> 
+> here is a pull request for the Integrator/AP PCI DT support.
+> 
+> This is the final stepping stone making way for this development TODO:
+> 
+> - Preparing removal of the board files for the Integrators
+> - Multiplatform support
+> - Moving the PCIv3 driver to drivers/pci
+> 
+> The patches have been around on the lists for a long time now, only
+> waiting for the infrastructure recently added to the ARM SoC tree.
+> 
+> As you can see it is based on the of/pci-helpers branch in the ARM SoC
+> tree. I pulled this branch into my tree and rebased the patch set onto
+> this.
+> 
+> All is ACKed by Arnd except for the patch adding the function
+> pci_common_init_dev() to arch/arm/include/asm/mach/pci.h.
+> So this will be a good time for anyone who doesn't like that idea
+> to protest in the last minute.
+> 
+> Anyway: please pull it in.
+> 
+> Yours,
+> Linus Walleij
+> 
+> 
+> The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
+> 
+>   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+> tags/integrator-pci-for-arm-soc
 
-Sure, I merged these 3 patches into my tree.
+Pulled, apologies for the delay on this one, fell of my list of
+branches-to-pull somehow.
 
-Thanks,
--Bryan
+
+-Olof
