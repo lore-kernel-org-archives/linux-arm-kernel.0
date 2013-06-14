@@ -1,511 +1,994 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 14 Jun 2013 13:50:03 +0200
-Subject: [PATCH 2/4] mmc: omap_hsmmc: Enable SDIO IRQ using a GPIO in idle
- mode
-In-Reply-To: <20130607214952.18581.90049.stgit@localhost>
-References: <20130607214557.18581.75288.stgit@localhost>
- <20130607214952.18581.90049.stgit@localhost>
-Message-ID: <CAPDyKFq+==Bca+AaZwD=A5v6HzL8ShKatq+8U-S=atZUFh8=rQ@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 14 Jun 2013 13:19:26 +0100
+Subject: [RFC PATCH v3 2/2] drivers: mfd: vexpress: add Serial Power
+ Controller (SPC) support
+In-Reply-To: <20130613225233.GB22310@quad.lixom.net>
+References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1370512763-32200-3-git-send-email-lorenzo.pieralisi@arm.com>
+ <20130613225233.GB22310@quad.lixom.net>
+Message-ID: <20130614121926.GA32753@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2013 23:49, Tony Lindgren <tony@atomide.com> wrote:
-> From: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
->
-> Without functional clock the omap_hsmmc module can't forward SDIO IRQs to
-> the system. This patch reconfigures dat1 line as a gpio while the fclk is
-> off. When the fclk is present it uses the standard SDIO IRQ detection of
-> the module.
->
-> The gpio irq is managed via the 'disable_depth' ref counter of the irq
-> subsystem, this driver simply calls enable_irq/disable_irq when needed.
->
->                       sdio irq    sdio irq
->                       unmasked     masked
->    -----------------------------------------
->     runtime default  |    1     |   2
->     runtime suspend  |    0     |   1
->
->                   irq disable depth
->
->
-> only when sdio irq is enabled AND the module is idle, the reference
-> count drops to zero and the gpio irq is effectively armed.
->
-> Patch was tested on AM335x/Stream800. Test setup was two modules
-> with sdio wifi cards. Modules where connected to a dual-band AP, each
-> module using a different band. One of module was running iperf as server
-> the other as client connecting to the server in a while true loop. Test
-> was running for 4+ weeks. There were about 60 Mio. suspend/resume
-> transitions. Test was shut down regularly.
->
-> Cc: Andreas Fenkart <afenkart@gmail.com>
-> Cc: Balaji T K <balajitk@ti.com>
-> Signed-off-by: Andreas Fenkart <andreas.fenkart@streamunlimited.com>
-> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
-> [tony at atomide.com: updated and separated out pin muxing]
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> ---
->  .../devicetree/bindings/mmc/ti-omap-hsmmc.txt      |   42 ++++
->  drivers/mmc/host/omap_hsmmc.c                      |  206 +++++++++++++++++++-
->  include/linux/platform_data/mmc-omap.h             |    4
->  3 files changed, 239 insertions(+), 13 deletions(-)
->
-> diff --git a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> index ed271fc..5a3df37 100644
-> --- a/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/ti-omap-hsmmc.txt
-> @@ -20,6 +20,29 @@ ti,dual-volt: boolean, supports dual voltage cards
->  ti,non-removable: non-removable slot (like eMMC)
->  ti,needs-special-reset: Requires a special softreset sequence
->  ti,needs-special-hs-handling: HSMMC IP needs special setting for handling High Speed
-> +ti,cirq-gpio: When omap_hsmmc module is suspended, its functional
-> +clock is turned off. Without fclk it can't forward SDIO IRQs to the
-> +system. For that to happen, it needs to tell the PRCM to restore
-> +its fclk, which is done through the swakeup line.
-> +
-> +                   ------
-> +                  | PRCM |
-> +                   ------
-> +                    | ^
-> +               fclk | | swakeup
-> +                    v |
-> +                  -------               ------
-> +      <-- IRQ -- | hsmmc | <-- CIRQ -- | card |
-> +                  -------               ------
-> +
-> +The problem is, that on the AM335x family the swakeup line is
-> +missing, it has not been routed from the module to the PRCM.
-> +The way to work around this, is to reconfigure the dat1 line as a
-> +GPIO upon suspend. Beyond this option you also need to set named
-> +states "default" and "idle "in the .dts file for the pins, using
-> +pinctrl-single.c. The MMC driver will then then toggle between
-> +default and idle during the runtime.
-> +
->
->  Example:
->         mmc1: mmc at 0x4809c000 {
-> @@ -31,3 +54,22 @@ Example:
->                 vmmc-supply = <&vmmc>; /* phandle to regulator node */
->                 ti,non-removable;
->         };
-> +
-> +[am335x with with gpio for sdio irq]
-> +
-> +       mmc1_cirq_pin: pinmux_cirq_pin {
-> +               pinctrl-single,pins = <
-> +                       0x0f8 0x3f      /* MMC0_DAT1 as GPIO2_28 */
-> +               >;
-> +       };
-> +
-> +       mmc1: mmc at 48060000 {
-> +               pinctrl-names = "default", "idle";
-> +               pinctrl-0 = <&mmc1_pins>;
-> +               pinctrl-1 = <&mmc1_cirq_pin>;
-> +               ti,cirq-gpio = <&gpio3 28 0>;
-> +               ti,non-removable;
-> +               bus-width = <4>;
-> +               vmmc-supply = <&ldo2_reg>;
-> +               vmmc_aux-supply = <&vmmc>;
-> +       };
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 478849b..7e28501 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -22,6 +22,7 @@
->  #include <linux/dmaengine.h>
->  #include <linux/seq_file.h>
->  #include <linux/interrupt.h>
-> +#include <linux/irq.h>
->  #include <linux/delay.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/platform_device.h>
-> @@ -102,6 +103,7 @@
->  #define TC_EN                  (1 << 1)
->  #define BWR_EN                 (1 << 4)
->  #define BRR_EN                 (1 << 5)
-> +#define CIRQ_EN                        (1 << 8)
->  #define ERR_EN                 (1 << 15)
->  #define CTO_EN                 (1 << 16)
->  #define CCRC_EN                        (1 << 17)
-> @@ -182,9 +184,19 @@ struct omap_hsmmc_host {
->         int                     use_reg;
->         int                     req_in_progress;
->         struct omap_hsmmc_next  next_data;
-> +       bool                    sdio_irq_en;
-> +       bool                    active_pinmux;
->         struct  omap_mmc_platform_data  *pdata;
->  };
->
-> +static irqreturn_t omap_hsmmc_cirq(int irq, void *dev_id)
-> +{
-> +       struct omap_hsmmc_host *host = dev_id;
-> +
-> +       mmc_signal_sdio_irq(host->mmc);
-> +       return IRQ_HANDLED;
-> +}
-> +
->  static int omap_hsmmc_card_detect(struct device *dev, int slot)
->  {
->         struct omap_hsmmc_host *host = dev_get_drvdata(dev);
-> @@ -419,10 +431,31 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
->         } else
->                 pdata->slots[0].gpio_wp = -EINVAL;
->
-> +       if (pdata->slots[0].gpio_cirq > 0 &&
-> +           gpio_is_valid(pdata->slots[0].gpio_cirq)) {
-> +               pdata->slots[0].sdio_irq =
-> +                               gpio_to_irq(pdata->slots[0].gpio_cirq);
-> +
-> +               ret = gpio_request(pdata->slots[0].gpio_cirq, "sdio_cirq");
-> +               if (ret)
-> +                       goto err_free_ro;
-> +               ret = gpio_direction_input(pdata->slots[0].gpio_cirq);
-> +               if (ret)
-> +                       goto err_free_cirq;
-> +
-> +       } else {
-> +               pdata->slots[0].gpio_cirq = -EINVAL;
-> +       }
-> +
-> +
->         return 0;
->
-> +err_free_cirq:
-> +       gpio_free(pdata->slots[0].gpio_cirq);
-> +err_free_ro:
-> +       if (gpio_is_valid(pdata->slots[0].gpio_wp))
->  err_free_wp:
-> -       gpio_free(pdata->slots[0].gpio_wp);
-> +               gpio_free(pdata->slots[0].gpio_wp);
->  err_free_cd:
->         if (gpio_is_valid(pdata->slots[0].switch_pin))
->  err_free_sp:
-> @@ -436,6 +469,8 @@ static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
->                 gpio_free(pdata->slots[0].gpio_wp);
->         if (gpio_is_valid(pdata->slots[0].switch_pin))
->                 gpio_free(pdata->slots[0].switch_pin);
-> +       if (gpio_is_valid(pdata->slots[0].gpio_cirq))
-> +               gpio_free(pdata->slots[0].gpio_cirq);
->  }
->
->  /*
-> @@ -461,27 +496,46 @@ static void omap_hsmmc_stop_clock(struct omap_hsmmc_host *host)
->  static void omap_hsmmc_enable_irq(struct omap_hsmmc_host *host,
->                                   struct mmc_command *cmd)
->  {
-> -       unsigned int irq_mask;
-> +       u32 irq_mask = INT_EN_MASK;
-> +       unsigned long flags;
->
->         if (host->use_dma)
-> -               irq_mask = INT_EN_MASK & ~(BRR_EN | BWR_EN);
-> -       else
-> -               irq_mask = INT_EN_MASK;
-> +               irq_mask &= ~(BRR_EN | BWR_EN);
->
->         /* Disable timeout for erases */
->         if (cmd->opcode == MMC_ERASE)
->                 irq_mask &= ~DTO_EN;
->
-> +       spin_lock_irqsave(&host->irq_lock, flags);
-> +
->         OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
->         OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
-> +
-> +       /* latch pending CIRQ, but don't signal */
-> +       if (host->sdio_irq_en)
-> +               irq_mask |= CIRQ_EN;
-> +
->         OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
-> +
-> +       spin_unlock_irqrestore(&host->irq_lock, flags);
->  }
->
->  static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
->  {
-> -       OMAP_HSMMC_WRITE(host->base, ISE, 0);
-> -       OMAP_HSMMC_WRITE(host->base, IE, 0);
-> +       u32 irq_mask = 0;
-> +       unsigned long flags;
-> +
-> +       spin_lock_irqsave(&host->irq_lock, flags);
-> +
-> +       /* no transfer running, need to signal cirq if */
-> +       if (host->sdio_irq_en)
-> +               irq_mask |= CIRQ_EN;
-> +
-> +       OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
-> +       OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
->         OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
-> +
-> +       spin_unlock_irqrestore(&host->irq_lock, flags);
->  }
->
->  /* Calculate divisor for the given clock frequency */
-> @@ -1037,8 +1091,12 @@ static irqreturn_t omap_hsmmc_irq(int irq, void *dev_id)
->         int status;
->
->         status = OMAP_HSMMC_READ(host->base, STAT);
-> -       while (status & INT_EN_MASK && host->req_in_progress) {
-> -               omap_hsmmc_do_irq(host, status);
-> +       while (status & (INT_EN_MASK | CIRQ_EN)) {
-> +               if (host->req_in_progress)
-> +                       omap_hsmmc_do_irq(host, status);
-> +
-> +               if (status & CIRQ_EN)
-> +                       mmc_signal_sdio_irq(host->mmc);
->
->                 /* Flush posted write */
->                 OMAP_HSMMC_WRITE(host->base, STAT, status);
-> @@ -1554,6 +1612,51 @@ static void omap_hsmmc_init_card(struct mmc_host *mmc, struct mmc_card *card)
->                 mmc_slot(host).init_card(card);
->  }
->
-> +static void omap_hsmmc_enable_sdio_irq(struct mmc_host *mmc, int enable)
-> +{
-> +       struct omap_hsmmc_host *host = mmc_priv(mmc);
-> +       u32 irq_mask;
-> +       unsigned long flags;
-> +
-> +       spin_lock_irqsave(&host->irq_lock, flags);
-> +
-> +       if (host->sdio_irq_en == enable) {
-> +               dev_dbg(host->dev, "en/disable:%d already set", enable);
-> +               spin_unlock_irqrestore(&host->irq_lock, flags);
-> +               return;
-> +       }
-> +
+Hi Olof,
 
-Hi Tony/Andreas,
+thank you very much for having a look.
 
-I belive a "pm_runtime_get_sync" would be needed here, outside the
-spinlock ofcourse. Before returning from this function, obviusly
-return the references by a pm_runtime_put* in some form.
+On Thu, Jun 13, 2013 at 11:52:33PM +0100, Olof Johansson wrote:
+> Hi,
+> 
+> Overall this driver looks like it just needs more cooking
+> time. It's... gritty.  Complicated when it should be simple and
+> layered. Naming is nonobvious, and overall it's hard to glance at a
+> function and say "ah, it does <x>".
 
-Then you will be able to remove the "active_pinmux" variable entirely,
-since you know the runtime callbacks is the only place were you need
-to handle the gpio irq enable|disable.
+It is hard to make it clear too, and I am not on the defensive, it is
+not a standard component following a standard interface, but point taken
+I will do my best to improve it according to your reviews.
 
-Kind regards
-Ulf Hansson
+> I think some of this might be because of naming conventions. Lots of long
+> prefixes, subsystem indirection, etc. I wish I had a straight answer to
+> what would make it better, but just more overall polish.
+> 
+> So, I have a bunch of comments below. Most of these are related to
+> readability, which is one of the most important things of new code
+> these days.
+> 
+> Please find a shorter suitable prefix than vexpress_spc_.* too, it's
+> way too long.
 
-> +       host->sdio_irq_en = (enable != 0) ? true : false;
-> +
-> +       if (host->active_pinmux) { /* register access fails without fclk */
-> +               irq_mask = OMAP_HSMMC_READ(host->base, ISE);
-> +               if (enable)
-> +                       irq_mask |= CIRQ_EN;
-> +               else
-> +                       irq_mask &= ~CIRQ_EN;
-> +               OMAP_HSMMC_WRITE(host->base, IE, irq_mask);
-> +
-> +               if (!host->req_in_progress)
-> +                       OMAP_HSMMC_WRITE(host->base, ISE, irq_mask);
-> +
-> +               /*
-> +                * evtl. need to flush posted write
-> +                * OMAP_HSMMC_READ(host->base, IE);
-> +                */
-> +       }
-> +
-> +       if ((mmc_slot(host).sdio_irq)) {
-> +               if (enable) {
-> +                       enable_irq(mmc_slot(host).sdio_irq);
-> +               } else {
-> +                       /* _nosync, see mmc_signal_sdio_irq */
-> +                       disable_irq_nosync(mmc_slot(host).sdio_irq);
-> +               }
-> +       }
-> +
-> +       spin_unlock_irqrestore(&host->irq_lock, flags);
-> +}
-> +
->  static void omap_hsmmc_conf_bus_power(struct omap_hsmmc_host *host)
->  {
->         u32 hctl, capa, value;
-> @@ -1606,7 +1709,7 @@ static const struct mmc_host_ops omap_hsmmc_ops = {
->         .get_cd = omap_hsmmc_get_cd,
->         .get_ro = omap_hsmmc_get_ro,
->         .init_card = omap_hsmmc_init_card,
-> -       /* NYET -- enable_sdio_irq */
-> +       .enable_sdio_irq = omap_hsmmc_enable_sdio_irq,
->  };
->
->  #ifdef CONFIG_DEBUG_FS
-> @@ -1710,6 +1813,7 @@ static struct omap_mmc_platform_data *of_get_hsmmc_pdata(struct device *dev)
->         pdata->nr_slots = 1;
->         pdata->slots[0].switch_pin = cd_gpio;
->         pdata->slots[0].gpio_wp = wp_gpio;
-> +       pdata->slots[0].gpio_cirq = of_get_named_gpio(np, "ti,cirq-gpio", 0);
->
->         if (of_find_property(np, "ti,non-removable", NULL)) {
->                 pdata->slots[0].nonremovable = true;
-> @@ -1802,6 +1906,8 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->         host->dma_ch    = -1;
->         host->irq       = irq;
->         host->slot_id   = 0;
-> +       host->sdio_irq_en = false;
-> +       host->active_pinmux = true;
->         host->mapbase   = res->start + pdata->reg_offset;
->         host->base      = ioremap(host->mapbase, SZ_4K);
->         host->power_mode = MMC_POWER_OFF;
-> @@ -1955,6 +2061,29 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->                 pdata->resume = omap_hsmmc_resume_cdirq;
->         }
->
-> +       if ((mmc_slot(host).sdio_irq)) {
-> +               /* prevent auto-enabling of IRQ */
-> +               irq_set_status_flags(mmc_slot(host).sdio_irq, IRQ_NOAUTOEN);
-> +               ret = request_irq(mmc_slot(host).sdio_irq, omap_hsmmc_cirq,
-> +                                 IRQF_TRIGGER_LOW | IRQF_ONESHOT,
-> +                                 mmc_hostname(mmc), host);
-> +               if (ret) {
-> +                       dev_dbg(mmc_dev(host->mmc),
-> +                               "Unable to grab MMC SDIO IRQ\n");
-> +                       goto err_irq_sdio;
-> +               }
-> +
-> +               /*
-> +                * sdio_irq is managed with ref count
-> +                * - omap_hsmmc_enable_sdio_irq will +1/-1
-> +                * - pm_suspend/pm_resume will +1/-1
-> +                * only when sdio irq is enabled AND module will go to runtime
-> +                * suspend the ref count will drop to zero and the irq is
-> +                * effectively enabled. starting with ref count equal 2
-> +                */
-> +               disable_irq(mmc_slot(host).sdio_irq);
-> +       }
-> +
->         omap_hsmmc_disable_irq(host);
->
->         pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
-> @@ -1962,6 +2091,19 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->                 dev_warn(&pdev->dev,
->                         "pins are not configured from the driver\n");
->
-> +       /*
-> +        * For now, only support SDIO interrupt if we are doing
-> +        * muxing of dat1 when booted with DT. This is because the
-> +        * supposedly the wake-up events for CTPL don't work from deeper
-> +        * idle states. And we don't want to add new legacy mux platform
-> +        * init code callbacks any longer as we are moving to DT based
-> +        * booting anyways.
-> +        */
-> +       if (match) {
-> +               if (!IS_ERR(pinctrl) && mmc_slot(host).sdio_irq)
-> +                       mmc->caps |= MMC_CAP_SDIO_IRQ;
-> +       }
-> +
->         omap_hsmmc_protect_card(host);
->
->         mmc_add_host(mmc);
-> @@ -1986,6 +2128,9 @@ static int omap_hsmmc_probe(struct platform_device *pdev)
->
->  err_slot_name:
->         mmc_remove_host(mmc);
-> +       if ((mmc_slot(host).sdio_irq))
-> +               free_irq(mmc_slot(host).sdio_irq, host);
-> +err_irq_sdio:
->         free_irq(mmc_slot(host).card_detect_irq, host);
->  err_irq_cd:
->         if (host->use_reg)
-> @@ -2032,9 +2177,10 @@ static int omap_hsmmc_remove(struct platform_device *pdev)
->         if (host->pdata->cleanup)
->                 host->pdata->cleanup(&pdev->dev);
->         free_irq(host->irq, host);
-> +       if ((mmc_slot(host).sdio_irq))
-> +               free_irq(mmc_slot(host).sdio_irq, host);
->         if (mmc_slot(host).card_detect_irq)
->                 free_irq(mmc_slot(host).card_detect_irq, host);
-> -
->         if (host->tx_chan)
->                 dma_release_channel(host->tx_chan);
->         if (host->rx_chan)
-> @@ -2157,23 +2303,57 @@ static int omap_hsmmc_resume(struct device *dev)
->  static int omap_hsmmc_runtime_suspend(struct device *dev)
->  {
->         struct omap_hsmmc_host *host;
-> +       struct mmc_host *mmc;
-> +       unsigned long flags;
-> +       int ret = 0;
->
->         host = platform_get_drvdata(to_platform_device(dev));
-> +       mmc = host->mmc;
->         omap_hsmmc_context_save(host);
->         dev_dbg(dev, "disabled\n");
->
-> -       return 0;
-> +       if (mmc->caps & MMC_CAP_SDIO_IRQ) {
-> +               spin_lock_irqsave(&host->irq_lock, flags);
-> +               host->active_pinmux = false;
-> +               OMAP_HSMMC_WRITE(host->base, ISE, 0);
-> +               OMAP_HSMMC_WRITE(host->base, IE, 0);
-> +               OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
-> +               spin_unlock_irqrestore(&host->irq_lock, flags);
-> +
-> +               if (mmc_slot(host).sdio_irq)
-> +                       enable_irq(mmc_slot(host).sdio_irq);
-> +       }
-> +
-> +       return ret;
->  }
->
->  static int omap_hsmmc_runtime_resume(struct device *dev)
->  {
->         struct omap_hsmmc_host *host;
-> +       struct mmc_host *mmc;
-> +       unsigned long flags;
-> +       int ret = 0;
->
->         host = platform_get_drvdata(to_platform_device(dev));
-> +       mmc = host->mmc;
->         omap_hsmmc_context_restore(host);
->         dev_dbg(dev, "enabled\n");
->
-> -       return 0;
-> +       if (mmc->caps & MMC_CAP_SDIO_IRQ) {
-> +               if (mmc_slot(host).sdio_irq)
-> +                       disable_irq(mmc_slot(host).sdio_irq);
-> +
-> +               spin_lock_irqsave(&host->irq_lock, flags);
-> +               host->active_pinmux = true;
-> +
-> +               if (host->sdio_irq_en) {
-> +                       OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
-> +                       OMAP_HSMMC_WRITE(host->base, ISE, CIRQ_EN);
-> +                       OMAP_HSMMC_WRITE(host->base, IE, CIRQ_EN);
-> +               }
-> +               spin_unlock_irqrestore(&host->irq_lock, flags);
-> +       }
-> +       return ret;
->  }
->
->  static struct dev_pm_ops omap_hsmmc_dev_pm_ops = {
-> diff --git a/include/linux/platform_data/mmc-omap.h b/include/linux/platform_data/mmc-omap.h
-> index 2bf1b30..fd5fff5 100644
-> --- a/include/linux/platform_data/mmc-omap.h
-> +++ b/include/linux/platform_data/mmc-omap.h
-> @@ -115,6 +115,7 @@ struct omap_mmc_platform_data {
->
->                 int switch_pin;                 /* gpio (card detect) */
->                 int gpio_wp;                    /* gpio (write protect) */
-> +               int gpio_cirq;                  /* gpio (card irq) */
->
->                 int (*set_bus_mode)(struct device *dev, int slot, int bus_mode);
->                 int (*set_power)(struct device *dev, int slot,
-> @@ -145,6 +146,9 @@ struct omap_mmc_platform_data {
->                 int card_detect_irq;
->                 int (*card_detect)(struct device *dev, int slot);
->
-> +               /* SDIO IRQs */
-> +               int sdio_irq;
-> +
->                 unsigned int ban_openended:1;
->
->         } slots[OMAP_MMC_MAX_SLOTS];
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Ok.
+
+> On Thu, Jun 06, 2013 at 10:59:23AM +0100, Lorenzo Pieralisi wrote:
+> > The TC2 versatile express core tile integrates a logic block that provides the
+> > interface between the dual cluster test-chip and the M3 microcontroller that
+> > carries out power management. The logic block, called Serial Power Controller
+> > (SPC), contains several memory mapped registers to control among other things
+> > low-power states, operating points and reset control.
+> >
+> > This patch provides a driver that enables run-time control of features
+> > implemented by the SPC control logic.
+> >
+> > The driver also provides a bridge interface through the vexpress config
+> > infrastructure. Operations allowing to read/write operating points are
+> > made to go via the same interface as configuration transactions so that
+> > all requests to M3 are serialized.
+> >
+> > Device tree bindings documentation for the SPC component is provided with
+> > the patchset.
+> >
+> > Cc: Samuel Ortiz <sameo@linux.intel.com>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Cc: Amit Kucheria <amit.kucheria@linaro.org>
+> > Cc: Jon Medhurst <tixy@linaro.org>
+> > Signed-off-by: Achin Gupta <achin.gupta@arm.com>
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Signed-off-by: Sudeep KarkadaNagesha <Sudeep.KarkadaNagesha@arm.com>
+> > Reviewed-by: Nicolas Pitre <nico@linaro.org>
+> > ---
+> >  Documentation/devicetree/bindings/mfd/vexpress-spc.txt |  35 +
+> >  drivers/mfd/Kconfig                                    |   7 +
+> >  drivers/mfd/Makefile                                   |   1 +
+> >  drivers/mfd/vexpress-spc.c                             | 633 ++++++++++
+> >  include/linux/vexpress.h                               |  43 +
+> >  5 files changed, 719 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/mfd/vexpress-spc.txt b/Documentation/devicetree/bindings/mfd/vexpress-spc.txt
+> > new file mode 100644
+> > index 0000000..1d71dc2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mfd/vexpress-spc.txt
+> > @@ -0,0 +1,35 @@
+> > +* ARM Versatile Express Serial Power Controller device tree bindings
+> > +
+> > +Latest ARM development boards implement a power management interface (serial
+> > +power controller - SPC) that is capable of managing power/voltage and
+> > +operating point transitions, through memory mapped registers interface.
+> > +
+> > +On testchips like TC2 it also provides a configuration interface that can
+> > +be used to read/write values which cannot be read/written through simple
+> > +memory mapped reads/writes.
+> 
+> A configuration interface for what? Just having it as a PMIC doesn't warrant it
+> being an MFD, really.
+
+Ok, description added.
+
+> > +- spc node
+> > +
+> > +     - compatible:
+> > +             Usage: required
+> > +             Value type: <stringlist>
+> > +             Definition: must be
+> > +                         "arm,vexpress-spc,v2p-ca15_a7","arm,vexpress-spc"
+> > +     - reg:
+> > +             Usage: required
+> > +             Value type: <prop-encode-array>
+> > +             Definition: A standard property that specifies the base address
+> > +                         and the size of the SPC address space
+> > +     - interrupts:
+> > +             Usage: required
+> > +             Value type: <prop-encoded-array>
+> > +             Definition:  SPC interrupt configuration. A standard property
+> > +                          that follows ePAPR interrupts specifications
+> > +
+> > +Example:
+> > +
+> > +spc: spc at 7fff0000 {
+> > +     compatible = "arm,vexpress-spc,v2p-ca15_a7","arm,vexpress-spc";
+> 
+> Nit: space after comma between strings.
+> 
+> > +     reg = <0 0x7FFF0000 0 0x1000>;
+> 
+> #size-cells 2 on the parent bus? That's somewhat unusual. We tend to prefer
+> lowercase hex.
+> 
+
+Ok on both counts.
+
+> > +     interrupts = <0 95 4>;
+> > +};
+> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> > index d54e985..391eda1 100644
+> > --- a/drivers/mfd/Kconfig
+> > +++ b/drivers/mfd/Kconfig
+> > @@ -1148,3 +1148,10 @@ config VEXPRESS_CONFIG
+> >       help
+> >         Platform configuration infrastructure for the ARM Ltd.
+> >         Versatile Express.
+> > +
+> > +config VEXPRESS_SPC
+> > +     bool "Versatile Express SPC driver support"
+> > +     depends on ARM
+> > +     depends on VEXPRESS_CONFIG
+> > +     help
+> > +       Serial Power Controller driver for ARM Ltd. test chips.
+> 
+> One more line as to what conditions you'd like to have this enabled for would
+> be good.
+
+Done.
+
+> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> > index 718e94a..3a01203 100644
+> > --- a/drivers/mfd/Makefile
+> > +++ b/drivers/mfd/Makefile
+> > @@ -153,5 +153,6 @@ obj-$(CONFIG_MFD_SEC_CORE)        += sec-core.o sec-irq.o
+> >  obj-$(CONFIG_MFD_SYSCON)     += syscon.o
+> >  obj-$(CONFIG_MFD_LM3533)     += lm3533-core.o lm3533-ctrlbank.o
+> >  obj-$(CONFIG_VEXPRESS_CONFIG)        += vexpress-config.o vexpress-sysreg.o
+> > +obj-$(CONFIG_VEXPRESS_SPC)   += vexpress-spc.o
+> >  obj-$(CONFIG_MFD_RETU)               += retu-mfd.o
+> >  obj-$(CONFIG_MFD_AS3711)     += as3711.o
+> > diff --git a/drivers/mfd/vexpress-spc.c b/drivers/mfd/vexpress-spc.c
+> > new file mode 100644
+> > index 0000000..0c6718a
+> > --- /dev/null
+> > +++ b/drivers/mfd/vexpress-spc.c
+> > @@ -0,0 +1,633 @@
+> > +/*
+> > + * Versatile Express Serial Power Controller (SPC) support
+> > + *
+> > + * Copyright (C) 2013 ARM Ltd.
+> > + *
+> > + * Authors: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+> > + *          Achin Gupta           <achin.gupta@arm.com>
+> > + *          Lorenzo Pieralisi     <lorenzo.pieralisi@arm.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> > + * kind, whether express or implied; without even the implied warranty
+> > + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/device.h>
+> > +#include <linux/err.h>
+> > +#include <linux/io.h>
+> > +#include <linux/interrupt.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/of_irq.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/vexpress.h>
+> > +
+> > +#include <asm/cacheflush.h>
+> > +
+> > +#define SCC_CFGREG19         0x120
+> > +#define SCC_CFGREG20         0x124
+> > +#define A15_CONF             0x400
+> > +#define A7_CONF                      0x500
+> > +#define SYS_INFO             0x700
+> > +#define PERF_LVL_A15         0xB00
+> > +#define PERF_REQ_A15         0xB04
+> > +#define PERF_LVL_A7          0xB08
+> > +#define PERF_REQ_A7          0xB0c
+> > +#define SYS_CFGCTRL          0xB10
+> > +#define SYS_CFGCTRL_REQ              0xB14
+> > +#define PWC_STATUS           0xB18
+> > +#define PWC_FLAG             0xB1c
+> > +#define WAKE_INT_MASK                0xB24
+> > +#define WAKE_INT_RAW         0xB28
+> > +#define WAKE_INT_STAT                0xB2c
+> > +#define A15_PWRDN_EN         0xB30
+> > +#define A7_PWRDN_EN          0xB34
+> > +#define A7_PWRDNACK          0xB54
+> > +#define A15_BX_ADDR0         0xB68
+> > +#define SYS_CFG_WDATA                0xB70
+> > +#define SYS_CFG_RDATA                0xB74
+> > +#define A7_BX_ADDR0          0xB78
+> 
+> These are register offsets? A shared shrot prefix could make that more obvious
+> when reading the code below.
+
+Done.
+
+> > +
+> > +#define GBL_WAKEUP_INT_MSK   (0x3 << 10)
+> > +
+> > +#define CLKF_SHIFT           16
+> > +#define CLKF_MASK            0x1FFF
+> > +#define CLKR_SHIFT           0
+> > +#define CLKR_MASK            0x3F
+> > +#define CLKOD_SHIFT          8
+> > +#define CLKOD_MASK           0xF
+> 
+> What registers are these for? Having them defined right below the register
+> helps the mental grouping.
+
+CLK* removed, multiplier hardcoded, see below. I will comment on the
+wake up mask.
+
+> > +
+> > +#define OPP_FUNCTION         6
+> > +#define OPP_BASE_DEVICE              0x300
+> > +#define OPP_A15_OFFSET               0x4
+> > +#define OPP_A7_OFFSET                0xc
+> > +
+> > +#define SYS_CFGCTRL_START    (1 << 31)
+> > +#define SYS_CFGCTRL_WRITE    (1 << 30)
+> > +#define SYS_CFGCTRL_FUNC(n)  (((n) & 0x3f) << 20)
+> > +#define SYS_CFGCTRL_DEVICE(n)        (((n) & 0xfff) << 0)
+> > +
+> > +#define MAX_OPPS     8
+> > +#define MAX_CLUSTERS 2
+> > +
+> > +enum {
+> > +     A15_OPP_TYPE            = 0,
+> > +     A7_OPP_TYPE             = 1,
+> > +     SYS_CFGCTRL_TYPE        = 2,
+> > +     INVALID_TYPE
+> > +};
+> 
+> Some brief notes about what the OPPs are here would be beneficial.
+> 
+> Also, prefixing makes more sense:
+> 
+> OPP_TYPE_A15
+> OPP_TYPE_A7
+> ...
+
+Ok.
+
+> > +#define STAT_COMPLETE(type)  ((1 << 0) << (type << 2))
+> > +#define STAT_ERR(type)               ((1 << 1) << (type << 2))
+> > +#define RESPONSE_MASK(type)  (STAT_COMPLETE(type) | STAT_ERR(type))
+> > +
+> > +struct vexpress_spc_drvdata {
+> > +     void __iomem *baseaddr;
+> > +     u32 a15_clusid;
+> > +     int irq;
+> > +     u32 cur_req_type;
+> > +     u32 freqs[MAX_CLUSTERS][MAX_OPPS];
+> > +     int freqs_cnt[MAX_CLUSTERS];
+> 
+> Please document the non-obvious ones. Is a15 the dynamic cluster id of the A15
+> cluster perhaps?
+
+It is A15-MPIDR[15:8], I will document it.
+
+> > +};
+> > +
+> > +enum spc_func_type {
+> > +     CONFIG_FUNC = 0,
+> > +     PERF_FUNC   = 1,
+> > +};
+> > +
+> > +struct vexpress_spc_func {
+> > +     enum spc_func_type type;
+> > +     u32 function;
+> > +     u32 device;
+> > +};
+> > +
+> > +static struct vexpress_spc_drvdata *info;
+> > +static u32 *vexpress_spc_config_data;
+> > +static struct vexpress_config_bridge *vexpress_spc_config_bridge;
+> > +static struct vexpress_config_func *opp_func, *perf_func;
+> > +
+> > +static int vexpress_spc_load_result = -EAGAIN;
+> 
+> I think Sam already commented on some of these.
+
+Most of them are dynamically allocated now.
+
+> > +
+> > +static bool vexpress_spc_initialized(void)
+> > +{
+> > +     return vexpress_spc_load_result == 0;
+> > +}
+> > +
+> > +/**
+> > + * vexpress_spc_write_resume_reg() - set the jump address used for warm boot
+> > + *
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + * @cpu: mpidr[7:0] bitfield describing cpu affinity level
+> > + * @addr: physical resume address
+> > + */
+> > +void vexpress_spc_write_resume_reg(u32 cluster, u32 cpu, u32 addr)
+> > +{
+> > +     void __iomem *baseaddr;
+> > +
+> > +     if (WARN_ON_ONCE(cluster >= MAX_CLUSTERS))
+> > +             return;
+> 
+> Do you really need these in every function down the call chain?
+
+I will remove them.
+
+> > +
+> > +     if (cluster != info->a15_clusid)
+> 
+> You make this test in a bunch of places, I think a helper would be beneficial.
+> 
+> cluster_is_a15(cluster), or whatever.
+
+Done.
+
+> > +             baseaddr = info->baseaddr + A7_BX_ADDR0 + (cpu << 2);
+> > +     else
+> > +             baseaddr = info->baseaddr + A15_BX_ADDR0 + (cpu << 2);
+> > +
+> > +     writel_relaxed(addr, baseaddr);
+> > +}
+> > +
+> > +/**
+> > + * vexpress_spc_get_nb_cpus() - get number of cpus in a cluster
+> > + *
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + *
+> > + * Return: number of cpus in the cluster
+> > + *         -EINVAL if cluster number invalid
+> > + */
+> > +int vexpress_spc_get_nb_cpus(u32 cluster)
+> 
+> Nit: nb_cpus? nr_cpus is more common.
+
+Ok.
+
+> > +{
+> > +     u32 val;
+> > +
+> > +     if (WARN_ON_ONCE(cluster >= MAX_CLUSTERS))
+> > +             return -EINVAL;
+> > +
+> > +     val = readl_relaxed(info->baseaddr + SYS_INFO);
+> > +     val = (cluster != info->a15_clusid) ? (val >> 20) : (val >> 16);
+> > +     return val & 0xf;
+> > +}
+> > +EXPORT_SYMBOL_GPL(vexpress_spc_get_nb_cpus);
+> > +
+> > +/**
+> > + * vexpress_spc_get_performance - get current performance level of cluster
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + * @freq: pointer to the performance level to be assigned
+> 
+> Can't you return the perf level instead, with negative for error?
+
+Ok.
+
+> > + *
+> > + * Return: 0 on success
+> > + *         < 0 on read error
+> > + */
+> > +int vexpress_spc_get_performance(u32 cluster, u32 *freq)
+> 
+> This seems to be a get_freq function, should be named accordingly.
+
+Right, those are leftovers from the conversion from performance level to
+frequencies, I will change them.
+
+> > +{
+> > +     u32 perf_cfg_reg;
+> > +     int perf, ret;
+> > +
+> > +     if (!vexpress_spc_initialized() || (cluster >= MAX_CLUSTERS))
+> > +             return -EINVAL;
+> > +
+> > +     perf_cfg_reg = cluster != info->a15_clusid ? PERF_LVL_A7 : PERF_LVL_A15;
+> > +     ret = vexpress_config_read(perf_func, perf_cfg_reg, &perf);
+> > +
+> > +     if (!ret)
+> > +             *freq = info->freqs[cluster][perf];
+> > +
+> > +     return ret;
+> > +}
+> > +EXPORT_SYMBOL_GPL(vexpress_spc_get_performance);
+> > +
+> > +/**
+> > + * vexpress_spc_get_perf_index - get performance level corresponding to
+> > + *                            a frequency
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + * @freq: frequency to be looked-up
+> > + *
+> > + * Return: perf level index on success
+> > + *         -EINVAL on error
+> > + */
+> 
+> Can there be such a thing as overdocumenting stuff? Maybe. :-) For trivial
+> helpers that don't export an interface it's much better if the code is so
+> obvious to read than needing a defined interface.
+
+Agreed.
+
+> I think you'd be better off without the helper here, since it's only used
+> a single time.
+
+I am not sure, it is called every time a DVFS OPP is set, maybe it is better
+wrapped in a function.
+
+> > +static int vexpress_spc_find_perf_index(u32 cluster, u32 freq)
+> > +{
+> > +     int idx;
+> > +
+> > +     for (idx = 0; idx < info->freqs_cnt[cluster]; idx++)
+> > +             if (info->freqs[cluster][idx] == freq)
+> > +                     break;
+> > +     return (idx == info->freqs_cnt[cluster]) ? -EINVAL : idx;
+> > +}
+> > +
+> > +/**
+> > + * vexpress_spc_set_performance - set current performance level of cluster
+> > + *
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + * @freq: performance level to be programmed
+> 
+> Performance level, or target frequency frequency? Either the help is
+> wrong, or the name is confusing.
+
+You are right, see above.
+
+> > + *
+> > + * Returns: 0 on success
+> > + *          < 0 on write error
+> > + */
+> > +int vexpress_spc_set_performance(u32 cluster, u32 freq)
+> 
+> Again, set_freq() seems more appropriate.
+
+Ditto.
+
+> > +{
+> > +     int ret, perf, offset;
+> > +
+> > +     if (!vexpress_spc_initialized() || (cluster >= MAX_CLUSTERS))
+> > +             return -EINVAL;
+> > +
+> > +     offset = (cluster != info->a15_clusid) ? PERF_LVL_A7 : PERF_LVL_A15;
+> > +
+> > +     perf = vexpress_spc_find_perf_index(cluster, freq);
+> > +
+> > +     if (perf < 0 || perf >= MAX_OPPS)
+> > +             return -EINVAL;
+> > +
+> > +     ret = vexpress_config_write(perf_func, offset, perf);
+> > +
+> > +     return ret;
+> > +}
+> > +EXPORT_SYMBOL_GPL(vexpress_spc_set_performance);
+> > +
+> > +static void vexpress_spc_set_wake_intr(u32 mask)
+> > +{
+> > +     writel_relaxed(mask & VEXPRESS_SPC_WAKE_INTR_MASK,
+> > +                    info->baseaddr + WAKE_INT_MASK);
+> > +}
+> > +
+> > +static inline void reg_bitmask(u32 *reg, u32 mask, bool set)
+> > +{
+> > +     if (set)
+> > +             *reg |= mask;
+> > +     else
+> > +             *reg &= ~mask;
+> > +}
+> > +
+> > +/**
+> > + * vexpress_spc_set_global_wakeup_intr()
+> > + *
+> > + * Function to set/clear global wakeup IRQs. Not protected by locking since
+> > + * it might be used in code paths where normal cacheable locks are not
+> > + * working. Locking must be provided by the caller to ensure atomicity.
+> > + *
+> > + * @set: if true, global wake-up IRQs are set, if false they are cleared
+> > + */
+> > +void vexpress_spc_set_global_wakeup_intr(bool set)
+> 
+> vexpress_spc_set_foo, which passes in "set" which can either be true or false? Say what?
+
+Eh, again leftovers from API refactoring.
+
+> > +{
+> > +     u32 wake_int_mask_reg = 0;
+> > +
+> > +     wake_int_mask_reg = readl_relaxed(info->baseaddr + WAKE_INT_MASK);
+> > +     reg_bitmask(&wake_int_mask_reg, GBL_WAKEUP_INT_MSK, set);
+> 
+> This helper just obfuscates, in my opinion.
+
+I will have a look.
+
+> > +     vexpress_spc_set_wake_intr(wake_int_mask_reg);
+> > +}
+> > +
+> > +/**
+> > + * vexpress_spc_set_cpu_wakeup_irq()
+> > + *
+> > + * Function to set/clear per-CPU wake-up IRQs. Not protected by locking since
+> > + * it might be used in code paths where normal cacheable locks are not
+> > + * working. Locking must be provided by the caller to ensure atomicity.
+> > + *
+> > + * @cpu: mpidr[7:0] bitfield describing cpu affinity level
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + * @set: if true, wake-up IRQs are set, if false they are cleared
+> > + */
+> > +void vexpress_spc_set_cpu_wakeup_irq(u32 cpu, u32 cluster, bool set)
+> 
+> Same here, set in name vs set argument.
+
+Correct.
+
+> > +{
+> > +     u32 mask = 0;
+> > +     u32 wake_int_mask_reg = 0;
+> > +
+> > +     mask = 1 << cpu;
+> > +     if (info->a15_clusid != cluster)
+> > +             mask <<= 4;
+> > +
+> > +     wake_int_mask_reg = readl_relaxed(info->baseaddr + WAKE_INT_MASK);
+> > +     reg_bitmask(&wake_int_mask_reg, mask, set);
+> > +     vexpress_spc_set_wake_intr(wake_int_mask_reg);
+> > +}
+> > +
+> > +/**
+> > + * vexpress_spc_powerdown_enable()
+> > + *
+> > + * Function to enable/disable cluster powerdown. Not protected by locking
+> > + * since it might be used in code paths where normal cacheable locks are not
+> > + * working. Locking must be provided by the caller to ensure atomicity.
+> > + *
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + * @enable: if true enables powerdown, if false disables it
+> > + */
+> > +void vexpress_spc_powerdown_enable(u32 cluster, bool enable)
+> 
+> Again with the enable in name vs argument.
+
+Ditto.
+
+> > +{
+> > +     u32 pwdrn_reg = 0;
+> > +
+> > +     if (cluster >= MAX_CLUSTERS)
+> > +             return;
+> > +     pwdrn_reg = cluster != info->a15_clusid ? A7_PWRDN_EN : A15_PWRDN_EN;
+> > +     writel_relaxed(enable, info->baseaddr + pwdrn_reg);
+> > +}
+> > +
+> > +irqreturn_t vexpress_spc_irq_handler(int irq, void *data)
+> > +{
+> > +     int ret;
+> > +     u32 status = readl_relaxed(info->baseaddr + PWC_STATUS);
+> 
+> Why readl_relaxed() here? Can't you use a normal readl()?
+
+Nico replied to this.
+
+> > +     if (!(status & RESPONSE_MASK(info->cur_req_type)))
+> > +             return IRQ_NONE;
+> 
+> "pending" is maybe a better term to use than "current" here. I.e. "pending_req"
+> as a variable name instead.
+
+Ok.
+
+> > +
+> > +     if ((status == STAT_COMPLETE(SYS_CFGCTRL_TYPE))
+> > +                     && vexpress_spc_config_data) {
+> > +             *vexpress_spc_config_data =
+> > +                             readl_relaxed(info->baseaddr + SYS_CFG_RDATA);
+> > +             vexpress_spc_config_data = NULL;
+> > +     }
+> > +
+> > +     ret = STAT_COMPLETE(info->cur_req_type) ? 0 : -EIO;
+
+This is a bug, fixed, STAT_COMPLETE should be checked against status.
+
+> > +     info->cur_req_type = INVALID_TYPE;
+> 
+> INVALID_TYPE is 3, so the RESPONSE_MASK() check above will pass. That's
+> probably not desireable.
+
+Not sure I follow you here, but it helped me unearth the bug above.
+
+> > +     vexpress_config_complete(vexpress_spc_config_bridge, ret);
+> > +     return IRQ_HANDLED;
+> > +}
+> > +
+> > +/**
+> > + * Based on the firmware documentation, this is always fixed to 20
+> 
+> What is always fixed to 20? the multiplication factor? So why do we need to get
+> it?
+
+Removed.
+
+> > + * All the 4 OSC: A15 PLL0/1, A7 PLL0/1 must be programmed same
+> > + * values for both control and value registers.
+> > + * This function uses A15 PLL 0 registers to compute multiple factor
+> > + * F out = F in * (CLKF + 1) / ((CLKOD + 1) * (CLKR + 1))
+> > + */
+> > +static inline int __get_mult_factor(void)
+> 
+> __get_opp_freq_unit()?
+
+Gone :-)
+
+> > +{
+> > +     int i_div, o_div, f_div;
+> > +     u32 tmp;
+> > +
+> > +     tmp = readl(info->baseaddr + SCC_CFGREG19);
+> > +     f_div = (tmp >> CLKF_SHIFT) & CLKF_MASK;
+> > +
+> > +     tmp = readl(info->baseaddr + SCC_CFGREG20);
+> > +     o_div = (tmp >> CLKOD_SHIFT) & CLKOD_MASK;
+> > +     i_div = (tmp >> CLKR_SHIFT) & CLKR_MASK;
+> > +
+> > +     return (f_div + 1) / ((o_div + 1) * (i_div + 1));
+> > +}
+> > +
+> > +/**
+> > + * vexpress_spc_populate_opps() - initialize opp tables from microcontroller
+> > + *
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + *
+> > + * Return: 0 on success
+> > + *         < 0 on error
+> > + */
+> > +static int vexpress_spc_populate_opps(u32 cluster)
+> > +{
+> > +     u32 data = 0, ret, i, offset;
+> > +     int mult_fact = __get_mult_factor();
+> > +
+> > +     if (WARN_ON_ONCE(cluster >= MAX_CLUSTERS))
+> > +             return -EINVAL;
+> > +
+> > +     offset = cluster != info->a15_clusid ? OPP_A7_OFFSET : OPP_A15_OFFSET;
+> > +     for (i = 0; i < MAX_OPPS; i++) {
+> > +             ret = vexpress_config_read(opp_func, i + offset, &data);
+> 
+> offset + i
+
+Ok.
+
+> > +             if (!ret)
+> > +                     info->freqs[cluster][i] = (data & 0xFFFFF) * mult_fact;
+> > +             else
+> > +                     break;
+> > +     }
+> > +
+> > +     info->freqs_cnt[cluster] = i;
+> > +     return ret;
+> > +}
+> > +
+> > +/**
+> > + * vexpress_spc_get_freq_table() - Retrieve a pointer to the frequency
+> > + *                              table for a given cluster
+> > + *
+> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
+> > + * @fptr: pointer to be initialized
+> > + * Return: operating points count on success
+> > + *         -EINVAL on pointer error
+> > + */
+> > +int vexpress_spc_get_freq_table(u32 cluster, u32 **fptr)
+> > +{
+> > +     if (WARN_ON_ONCE(!fptr || cluster >= MAX_CLUSTERS))
+> > +             return -EINVAL;
+> > +     *fptr = info->freqs[cluster];
+> > +     return info->freqs_cnt[cluster];
+> > +}
+> > +EXPORT_SYMBOL_GPL(vexpress_spc_get_freq_table);
+> 
+> Exporting the pointer to the table is a little scary since the caller
+> could then modify it. Would be nicer to pass in an array that is
+> populated.
+
+Probably better.
+
+> I feel like a hypocrite for having to say this, but here's there's a need for
+> docs. You've documented the short trivial functions and not some of the long
+> ones... :)
+
+I will do that.
+
+> > +static void *vexpress_spc_func_get(struct device *dev,
+> > +             struct device_node *node, const char *id)
+> > +{
+> > +     struct vexpress_spc_func *spc_func;
+> > +     u32 func_device[2];
+> > +     int err = 0;
+> > +
+> > +     spc_func = kzalloc(sizeof(*spc_func), GFP_KERNEL);
+> > +     if (!spc_func)
+> > +             return NULL;
+> > +
+> > +     if (strcmp(id, "opp") == 0) {
+> > +             spc_func->type = CONFIG_FUNC;
+> > +             spc_func->function = OPP_FUNCTION;
+> > +             spc_func->device = OPP_BASE_DEVICE;
+> > +     } else if (strcmp(id, "perf") == 0) {
+> > +             spc_func->type = PERF_FUNC;
+> > +     } else if (node) {
+> > +             of_node_get(node);
+> > +             err = of_property_read_u32_array(node,
+> > +                             "arm,vexpress-sysreg,func", func_device,
+> > +                             ARRAY_SIZE(func_device));
+> > +             of_node_put(node);
+> > +             spc_func->type = CONFIG_FUNC;
+> > +             spc_func->function = func_device[0];
+> > +             spc_func->device = func_device[1];
+> > +     }
+> > +
+> > +     if (WARN_ON(err)) {
+> > +             kfree(spc_func);
+> > +             return NULL;
+> > +     }
+> > +
+> > +     pr_debug("func 0x%p = 0x%x, %d %d\n", spc_func,
+> > +                                          spc_func->function,
+> > +                                          spc_func->device,
+> > +                                          spc_func->type);
+> > +
+> > +     return spc_func;
+> > +}
+> > +
+> > +static void vexpress_spc_func_put(void *func)
+> > +{
+> > +     kfree(func);
+> > +}
+> > +
+> > +static int vexpress_spc_func_exec(void *func, int offset, bool write,
+> > +                               u32 *data)
+> > +{
+> > +     struct vexpress_spc_func *spc_func = func;
+> > +     u32 command;
+> > +
+> > +     if (!data)
+> > +             return -EINVAL;
+> > +     /*
+> > +      * Setting and retrieval of operating points is not part of
+> > +      * DCC config interface. It was made to go through the same
+> > +      * code path so that requests to the M3 can be serialized
+> > +      * properly with config reads/writes through the common
+> > +      * vexpress config interface
+> > +      */
+> > +     switch (spc_func->type) {
+> > +     case PERF_FUNC:
+> > +             if (write) {
+> > +                     info->cur_req_type = (offset == PERF_LVL_A15) ?
+> > +                                     A15_OPP_TYPE : A7_OPP_TYPE;
+> > +                     writel_relaxed(*data, info->baseaddr + offset);
+> > +                     return VEXPRESS_CONFIG_STATUS_WAIT;
+> > +             } else {
+> > +                     *data = readl_relaxed(info->baseaddr + offset);
+> > +                     return VEXPRESS_CONFIG_STATUS_DONE;
+> > +             }
+> > +     case CONFIG_FUNC:
+> > +             info->cur_req_type = SYS_CFGCTRL_TYPE;
+> > +
+> > +             command = SYS_CFGCTRL_START;
+> > +             command |= write ? SYS_CFGCTRL_WRITE : 0;
+> > +             command |= SYS_CFGCTRL_FUNC(spc_func->function);
+> > +             command |= SYS_CFGCTRL_DEVICE(spc_func->device + offset);
+> > +
+> > +             pr_debug("command %x\n", command);
+> > +
+> > +             if (!write)
+> > +                     vexpress_spc_config_data = data;
+> > +             else
+> > +                     writel_relaxed(*data, info->baseaddr + SYS_CFG_WDATA);
+> > +             writel_relaxed(command, info->baseaddr + SYS_CFGCTRL);
+> > +
+> > +             return VEXPRESS_CONFIG_STATUS_WAIT;
+> > +     default:
+> > +             return -EINVAL;
+> > +     }
+> > +}
+> > +
+> > +struct vexpress_config_bridge_info vexpress_spc_config_bridge_info = {
+> > +     .name = "vexpress-spc",
+> > +     .func_get = vexpress_spc_func_get,
+> > +     .func_put = vexpress_spc_func_put,
+> > +     .func_exec = vexpress_spc_func_exec,
+> > +};
+> 
+> Caveat: I'm running out of time reviewing this one driver, and didn't look into
+> the vexpress_config_bridge stuff. Seems like a pretty awkward interface but
+> I didn't look closer.
+
+Pawel commented on that code earlier.
+
+> > +
+> > +static const struct of_device_id vexpress_spc_ids[] __initconst = {
+> > +     { .compatible = "arm,vexpress-spc,v2p-ca15_a7" },
+> > +     { .compatible = "arm,vexpress-spc" },
+> > +     {},
+> > +};
+> > +
+> > +static int __init vexpress_spc_init(void)
+> > +{
+> > +     int ret;
+> > +     struct device_node *node = of_find_matching_node(NULL,
+> > +                                                      vexpress_spc_ids);
+> > +
+> > +     if (!node)
+> > +             return -ENODEV;
+> > +
+> > +     info = kzalloc(sizeof(*info), GFP_KERNEL);
+> > +     if (!info) {
+> > +             pr_err("%s: unable to allocate mem\n", __func__);
+> > +             return -ENOMEM;
+> > +     }
+> > +     info->cur_req_type = INVALID_TYPE;
+> > +
+> > +     info->baseaddr = of_iomap(node, 0);
+> > +     if (WARN_ON(!info->baseaddr)) {
+> 
+> pr_err() something or other.
+
+Yeah, added for all error conditions below.
+
+> > +             ret = -ENXIO;
+> > +             goto mem_free;
+> > +     }
+> > +
+> > +     info->irq = irq_of_parse_and_map(node, 0);
+> > +
+> > +     if (WARN_ON(!info->irq)) {
+> 
+> pr_err() something or other.
+> 
+> > +             ret = -ENXIO;
+> > +             goto unmap;
+> > +     }
+> > +
+> > +     readl_relaxed(info->baseaddr + PWC_STATUS);
+> > +
+> > +     ret = request_irq(info->irq, vexpress_spc_irq_handler,
+> > +             IRQF_DISABLED | IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
+> > +             "arm-spc", info);
+> > +
+> > +     if (ret) {
+> > +             pr_err("IRQ %d request failed\n", info->irq);
+> > +             ret = -ENODEV;
+> > +             goto unmap;
+> > +     }
+> > +
+> > +     info->a15_clusid = readl_relaxed(info->baseaddr + A15_CONF) & 0xf;
+> > +
+> > +     vexpress_spc_config_bridge = vexpress_config_bridge_register(
+> > +                     node, &vexpress_spc_config_bridge_info);
+> > +
+> > +     if (WARN_ON(!vexpress_spc_config_bridge)) {
+> 
+> pr_err()
+> 
+> > +             ret = -ENODEV;
+> > +             goto unmap;
+> > +     }
+> > +
+> > +     opp_func = vexpress_config_func_get(vexpress_spc_config_bridge, "opp");
+> > +     perf_func =
+> > +             vexpress_config_func_get(vexpress_spc_config_bridge, "perf");
+> 
+> Your identifiers are so long that you can't fit a simple call on minimum
+> indentation without wrapping the line. That should be a pretty strong indicator
+> that it needs to be shortened.
+
+Ok, point taken.
+
+> > +
+> > +     if (!opp_func || !perf_func) {
+> 
+> ...pr_err()
+> 
+> > +             ret = -ENODEV;
+> > +             goto unmap;
+> > +     }
+> > +
+> > +     if (vexpress_spc_populate_opps(0) || vexpress_spc_populate_opps(1)) {
+> > +             if (info->irq)
+> > +                     free_irq(info->irq, info);
+> > +             pr_err("failed to build OPP table\n");
+> > +             ret = -ENODEV;
+> > +             goto unmap;
+> > +     }
+> > +     /*
+> > +      * Multi-cluster systems may need this data when non-coherent, during
+> > +      * cluster power-up/power-down. Make sure it reaches main memory:
+> > +      */
+> > +     sync_cache_w(info);
+> > +     sync_cache_w(&info);
+> > +     pr_info("vexpress-spc loaded at %p\n", info->baseaddr);
+> > +     return 0;
+> > +
+> > +unmap:
+> > +     iounmap(info->baseaddr);
+> > +
+> > +mem_free:
+> > +     kfree(info);
+> > +     return ret;
+> > +}
+> > +
+> > +static bool __init __vexpress_spc_check_loaded(void);
+> > +/*
+> > + * Pointer spc_check_loaded is swapped after init hence it is safe
+> > + * to initialize it to a function in the __init section
+> > + */
+> > +static bool (*spc_check_loaded)(void) __refdata = &__vexpress_spc_check_loaded;
+> > +
+> > +static bool __init __vexpress_spc_check_loaded(void)
+> > +{
+> > +     if (vexpress_spc_load_result == -EAGAIN)
+> > +             vexpress_spc_load_result = vexpress_spc_init();
+> > +     spc_check_loaded = &vexpress_spc_initialized;
+> > +     return vexpress_spc_initialized();
+> > +}
+> 
+> Whoa. A "check_foo" function with side effects. Red flag.
+> 
+> So, you only want to try to run vexpress_spc_init() on the very first call to
+> spc_check_loaded()? Just do so in vexpress_spc_initalized() instead and keep
+> a static bool first_call = true; variable instead. Still confusing and with
+> side effects though.
+
+Well, I think the best thing to do is to call it eg spc_init(). That's what it
+does anyway and there is no need for syntactic sugar that just hides side
+effects.
+
+> > +
+> > +/*
+> > + * Function exported to manage early_initcall ordering.
+> > + * SPC code is needed very early in the boot process
+> > + * to bring CPUs out of reset and initialize power
+> > + * management back-end. After boot swap pointers to
+> > + * make the functionality check available to loadable
+> > + * modules, when early boot init functions have been
+> > + * already freed from kernel address space.
+> > + */
+> > +bool vexpress_spc_check_loaded(void)
+> > +{
+> > +     return spc_check_loaded();
+> > +}
+> > +EXPORT_SYMBOL_GPL(vexpress_spc_check_loaded);
+> 
+> Or, you do that test I mentioned right above here instead.
+
+Commented above.
+
+Thank you very much for the review.
+Lorenzo
