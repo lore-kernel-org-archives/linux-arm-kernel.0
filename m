@@ -1,56 +1,163 @@
-From: r64343@freescale.com (Liu Hui-R64343)
-Date: Fri, 14 Jun 2013 10:02:32 +0000
-Subject: [PATCH] ARM: smp_twd: twd_update_frequency need be run on all
- online CPUs
-In-Reply-To: <CACRpkdanMh=etQncxr7ekyiA_78buN6_sjvP5zEuoKbS3-JPFQ@mail.gmail.com>
-References: <1371079180-22344-1-git-send-email-r64343@freescale.com>
- <CACRpkdanMh=etQncxr7ekyiA_78buN6_sjvP5zEuoKbS3-JPFQ@mail.gmail.com>
-Message-ID: <AD13664F485EE54694E29A7F9D5BE1AF82F778@039-SN2MPN1-021.039d.mgd.msft.net>
+From: avinashphilipk@gmail.com (Philip Avinash)
+Date: Fri, 14 Jun 2013 15:50:39 +0530
+Subject: [PATCH v2 2/4] gpio: davinci: DT changes for driver
+In-Reply-To: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
+References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
+Message-ID: <1371205241-17205-3-git-send-email-avinashphilipk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Linus Walleij [mailto:linus.walleij at linaro.org]
->Sent: Thursday, June 13, 2013 4:00 PM
->To: Liu Hui-R64343; Mike Turquette
->Cc: linux-arm-kernel at lists.infradead.org; Russell King - ARM Linux
->Subject: Re: [PATCH] ARM: smp_twd: twd_update_frequency need be run on
->all online CPUs
->
->On Thu, Jun 13, 2013 at 1:19 AM, Jason Liu <r64343@freescale.com> wrote:
->
->> When the local timer freq changed, the twd_update_frequency function
->> should be run all the CPUs include itself, otherwise, the twd freq
->> will not get updated and the local timer will not run correcttly.
->>
->> smp_call_function will run functions on all other CPUs, but not
->> include himself, this is not correct,use on_each_cpu instead to fix
->this issue.
->>
->> Signed-off-by: Jason Liu <r64343@freescale.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: stable at vger.kernel.org
->
->Mike Turquette wrote this code, so let him look at it.
+From: KV Sujith <sujithkv@ti.com>
 
-Mike, could you please look at it?
+- Add of_device_id for Davinci GPIO driver.
+- Add function to populate data from DT.
+- Modify the probe to read from DT if DT match is found.
+- Add DT binding documentation for Davinci GPIO properties in a new file
+  gpio-davinci.txt located at Documentation/devicetree/bindings/gpio/.
 
->
->But it makes sense to me:
->Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: KV Sujith <sujithkv@ti.com>
+Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+---
+Changes since v1:
+	- description for interrupts changed to reflecti
+	   interrupt array usage.
 
-Thanks Linus W.
+ .../devicetree/bindings/gpio/gpio-davinci.txt      |   32 +++++++++++
+ drivers/gpio/gpio-davinci.c                        |   57 ++++++++++++++++++--
+ 2 files changed, 86 insertions(+), 3 deletions(-)
 
->
->Please mark this for stable and put it into Russell's patch tracker
->after allowing some time for others to have a look.
-
-Sure, Will do it after others look at it. 
-
->
->Yours,
->Linus Walleij
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-davinci.txt b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+new file mode 100644
+index 0000000..1c31638
+--- /dev/null
++++ b/Documentation/devicetree/bindings/gpio/gpio-davinci.txt
+@@ -0,0 +1,32 @@
++Davinci GPIO controller bindings
++
++Required Properties:
++- compatible:"ti,da830-gpio"
++
++- reg: Physical base address of the controller and length of memory mapped
++	region.
++
++- interrupts: Array of GPIO interrupt number.
++
++- ngpio: The number of GPIO pins supported
++
++- intc_irq_num: The number of IRQs supported by the Interrupt Controller
++
++- gpio_unbanked: The number of GPIOs that have an individual interrupt
++		line to processor.
++
++Example:
++#include <dt-bindings/interrupt-controller/irq.h>
++
++gpio: gpio at 1e26000 {
++	compatible = "ti,da830-gpio";
++	reg = <0x226000 0x1000>;
++	interrupts = <42 IRQ_TYPE_EDGE_BOTH 43 IRQ_TYPE_EDGE_BOTH
++		44 IRQ_TYPE_EDGE_BOTH 45 IRQ_TYPE_EDGE_BOTH
++		46 IRQ_TYPE_EDGE_BOTH 47 IRQ_TYPE_EDGE_BOTH
++		48 IRQ_TYPE_EDGE_BOTH 49 IRQ_TYPE_EDGE_BOTH
++		50 IRQ_TYPE_EDGE_BOTH>;
++	ngpio = <144>;
++	intc_irq_num = <101>;
++	gpio_unbanked = <0>;
++};
+diff --git a/drivers/gpio/gpio-davinci.c b/drivers/gpio/gpio-davinci.c
+index 475a5ece..cd2ed25 100644
+--- a/drivers/gpio/gpio-davinci.c
++++ b/drivers/gpio/gpio-davinci.c
+@@ -20,6 +20,8 @@
+ #include <linux/irqdomain.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
+ #include <linux/platform_data/gpio-davinci.h>
+ 
+@@ -137,6 +139,50 @@ davinci_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ 	__raw_writel((1 << offset), value ? &g->set_data : &g->clr_data);
+ }
+ 
++static struct davinci_gpio_platform_data *davinci_gpio_set_pdata_of(
++						struct platform_device *pdev)
++{
++	struct device_node *dn = pdev->dev.of_node;
++	struct davinci_gpio_platform_data *pdata;
++	u32 val, ret;
++
++	pdata = devm_kzalloc(&pdev->dev, sizeof(*pdata), GFP_KERNEL);
++	if (pdata) {
++		ret = of_property_read_u32(dn, "ngpio", &val);
++		if (ret)
++			goto of_err;
++
++		pdata->ngpio = val;
++
++		ret = of_property_read_u32(dn, "gpio_unbanked", &val);
++		if (ret)
++			goto of_err;
++
++		pdata->gpio_unbanked = val;
++
++		ret = of_property_read_u32(dn, "intc_irq_num", &val);
++		if (ret)
++			goto of_err;
++
++		pdata->intc_irq_num = val;
++	}
++
++	return pdata;
++
++of_err:
++	dev_err(&pdev->dev, "Populating pdata from DT failed: err %d\n", ret);
++	return NULL;
++}
++
++static const struct of_device_id davinci_gpio_ids[] = {
++	{
++		.compatible = "ti,da830-gpio",
++	},
++	{ },
++};
++
++MODULE_DEVICE_TABLE(of, davinci_gpio_ids);
++
+ static int davinci_gpio_probe(struct platform_device *pdev)
+ {
+ 	int i, base;
+@@ -146,13 +192,17 @@ static int davinci_gpio_probe(struct platform_device *pdev)
+ 	struct davinci_gpio_regs __iomem *regs;
+ 	struct device *dev = &pdev->dev;
+ 	struct resource *res;
++	const struct of_device_id *match =
++		of_match_device(of_match_ptr(davinci_gpio_ids), &pdev->dev);
+ 
+-	pdata = dev->platform_data;
++	pdata = match ? davinci_gpio_set_pdata_of(pdev) : dev->platform_data;
+ 	if (!pdata) {
+ 		dev_err(dev, "No platform data found\n");
+ 		return -EINVAL;
+ 	}
+ 
++	dev->platform_data = pdata;
++
+ 	/*
+ 	 * The gpio banks conceptually expose a segmented bitmap,
+ 	 * and "ngpio" is one more than the largest zero-based
+@@ -497,8 +547,9 @@ done:
+ static struct platform_driver davinci_gpio_driver = {
+ 	.probe		= davinci_gpio_probe,
+ 	.driver		= {
+-		.name	= "davinci_gpio",
+-		.owner	= THIS_MODULE,
++		.name		= "davinci_gpio",
++		.owner		= THIS_MODULE,
++		.of_match_table	= of_match_ptr(davinci_gpio_ids),
+ 	},
+ };
+ 
+-- 
+1.7.9.5
