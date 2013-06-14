@@ -1,40 +1,48 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 14 Jun 2013 17:54:59 +0900
-Subject: [PATCH v2 3/3] ARM: tegra: set CPU reset handler with firmware op
-In-Reply-To: <51BA1C3D.1010608@wwwdotorg.org>
-References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
- <1371114745-24710-4-git-send-email-acourbot@nvidia.com>
- <51BA1C3D.1010608@wwwdotorg.org>
-Message-ID: <CAAVeFuLi6-WnFP9LvEdqfj2cuK7pgW0_pg33i-Ucoobcxb8RSQ@mail.gmail.com>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Fri, 14 Jun 2013 05:03:57 -0400
+Subject: [PATCH V2] arm: pj4: check cpu id for pj4 cp0 access
+Message-ID: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 4:23 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/13/2013 03:12 AM, Alexandre Courbot wrote:
->> Use a firmware operation to set the CPU reset handler and only resort to
->> doing it ourselves if there is none defined.
->>
->> This supports the booting of secondary CPUs on devices using a TrustZone
->> secure monitor.
->
->> diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
->
->> +     err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
->> +     switch (err) {
->> +     case -ENOSYS:
->> +             tegra_cpu_reset_handler_set(reset_address);
->> +             /* pass-through */
->
-> Rather than detecting -ENOSYS and falling back to the custom
-> tegra_cpu_reset_handler_set(), does it make sense to plug in
-> tegra_cpu_reset_handler_set as the firmware op when there is no secure
-> firmware detected? That way, this code wouldn't need the special case;
-> that would be isolated to firmware.c.
+Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
+pj4_cpu0_init just return.
+This fix will help to make the all the V7 cpus(pj4 and no-PJ4)
+use same platform code.
 
-Mmmm I admit I just followed what Exynos did without thinking much
-about it. I don't see any reason why your suggestion wouldn't work,
-but on second thought tegra_cpu_reset_handler_set() is not a firmware
-operation - wouldn't it be unexpected (and maybe confusing) to have it
-called through call_firmware_op()?
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
+---
+ arch/arm/kernel/pj4-cp0.c |   11 +++++++++++
+ 1 files changed, 11 insertions(+), 0 deletions(-)
 
-Alex.
+diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
+index 679cf4d..bf658d3 100644
+--- a/arch/arm/kernel/pj4-cp0.c
++++ b/arch/arm/kernel/pj4-cp0.c
+@@ -17,6 +17,10 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <asm/thread_notify.h>
++#include <asm/cputype.h>
++
++#define CORE_PJ4_MASK	0xfffffff0
++#define CORE_PJ4_ID	0x562f5840
+ 
+ static int iwmmxt_do(struct notifier_block *self, unsigned long cmd, void *t)
+ {
+@@ -79,6 +83,13 @@ static void __init pj4_cp_access_write(u32 value)
+ static int __init pj4_cp0_init(void)
+ {
+ 	u32 cp_access;
++	unsigned int cpuid;
++
++	cpuid = read_cpuid_id();
++
++	/* If it is not a pj4 core, skip it. */
++	if ((cpuid & CORE_PJ4_MASK) != CORE_PJ4_ID)
++		return 0;
+ 
+ 	cp_access = pj4_cp_access_read() & ~0xf;
+ 	pj4_cp_access_write(cp_access);
+-- 
+1.7.4.1
