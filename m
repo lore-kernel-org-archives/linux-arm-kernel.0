@@ -1,26 +1,29 @@
-From: abrestic@google.com (Andrew Bresticker)
-Date: Fri, 14 Jun 2013 10:26:57 -0700
-Subject: [PATCH v2 06/10] clk: exynos5420: register clocks using common
- clock framework
-In-Reply-To: <1371218572-8993-7-git-send-email-chander.kashyap@linaro.org>
-References: <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-1-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-7-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CAL1qeaFS=MMHJj8TP4vX8-KeXNo0W_EjvhrLsb5=YNsnaqOVXw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 14 Jun 2013 18:29:10 +0100
+Subject: [PATCHv2] arm: fix pmd flushing in map_init_section
+In-Reply-To: <1371229044-3970-1-git-send-email-mark.rutland@arm.com>
+References: <20130614165417.GP3245@lvm>
+ <1371229044-3970-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20130614172910.GT29271@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander,
+On Fri, Jun 14, 2013 at 05:57:24PM +0100, Mark Rutland wrote:
+> In e651eab0af: "ARM: 7677/1: LPAE: Fix mapping in alloc_init_section for
+> unaligned addresses", the pmd flushing was broken when split out to
+> map_init_section. At the end of the final iteration of the while loop,
+> pmd will point at the pmd_t immediately after the pmds we updated, and
+> thus flush_pmd_entry(pmd) won't flush the newly modified pmds. This has
+> been observed to prevent an 11MPCore system from booting.
+> 
+> This patch fixes this by remembering the address of the first pmd we
+> update and using this as the argument to flush_pmd_entry.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: R Sricharan <r.sricharan@ti.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Christoffer Dall <cdall@cs.columbia.edu>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Cc: stable at vger.kernel.org
 
-> +       [Core Clocks]
-> +
-> +  Clock                        ID
-> +  ----------------------------
-> +
-> +  oscclk               1
-
-I know the UM refers to this as 'oscclk', but could we instead call
-this 'fin_pll' to be consistent with Exynos 4 and Exynos 5250?
-
-Thanks,
-Andrew
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
