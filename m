@@ -1,283 +1,58 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 14 Jun 2013 21:36:53 +0200
-Subject: [PATCHv5,2/8] i2c: mv64xxx: make the registers offset configurable
-In-Reply-To: <1371056017-8166-3-git-send-email-maxime.ripard@free-electrons.com>
-References: <1371056017-8166-3-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130614193653.GA25947@lunn.ch>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Fri, 14 Jun 2013 21:50:22 +0200
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <20130614144251.GN18614@n2100.arm.linux.org.uk>
+References: <20130612134845.GQ18614@n2100.arm.linux.org.uk>
+ <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
+ <20130612164914.GT18614@n2100.arm.linux.org.uk>
+ <20130612170512.GU18614@n2100.arm.linux.org.uk>
+ <20130612194021.GX18614@n2100.arm.linux.org.uk>
+ <20130612230057.GY18614@n2100.arm.linux.org.uk>
+ <20130613111903.GA18614@n2100.arm.linux.org.uk>
+ <20130613115016.GB18614@n2100.arm.linux.org.uk>
+ <20130613130339.GD18614@n2100.arm.linux.org.uk>
+ <CAKMK7uHgAe=05RFLxqSTz5R+myU9-nvuk=RMZym2k-tjzbC+2w@mail.gmail.com>
+ <20130614144251.GN18614@n2100.arm.linux.org.uk>
+Message-ID: <CAKMK7uEzC8rCaAB_8VCwyox2Be9JZ=+OWSk0+BLyfug7G5=18A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 06:53:31PM +0200, Maxime Ripard wrote:
-> The Allwinner i2c controller uses the same logic as the Marvell one, but
-> with slightly different register offsets.
-> 
-> Introduce a structure that will be passed by either the pdata or
-> associated to the compatible strings, and that holds the various
-> registers that might be needed.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+On Fri, Jun 14, 2013 at 4:42 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Jun 14, 2013 at 04:23:22PM +0200, Daniel Vetter wrote:
+>> On Thu, Jun 13, 2013 at 3:03 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > There's a bigger issue here - if it's possible for drm_crtc_helper_set_config()
+>> > to be called with set->fb set but set->mode NULL, then we overwrite
+>> > set->fb to NULL.  Again, that results in a lost reference.
+>> >
+>> > For the time being, I'm using this patch, which solves my dropped
+>> > refcount problem, and marks the other possible dropped reference.
+>> > Either that check needs to be removed or it needs to properly drop
+>> > the refcount on the fb before 'losing' the reference to it.
+>>
+>> Scrap my other mail, I see now where the leaking happens. One of them
+>> is interface abuse which is now fixed (and i915 has a bunch of BUG_ONs
+>> to enforce them). The other one is indeed a real case that eluded me
+>> when I've done the refcountification for drm_framebuffers. I'll hack
+>> up some patches, since this seems to be a good excuse to port some of
+>> the i915 modeset improvements back to the crtc helpers.
+>
+> If you're happy with the patch I supplied, that's probably the minimal fix
+> which should go to stable kernels (I'm using 3.9 here) - this also counts
+> as a "user visible bug".  It's something I've tripped over which causes
+> exhausts memory and can prevent the X server from starting up.
+>
+> If you want me to package the patch up with a commit message and sign-off..
 
-Hi Maxime
-
-I tested on a Kirkwood QNAP. It has an RTC on the i2c bus. It still
-gives the correct time with your patches applied.
-
-Tested-by: Andrew Lunn <andrew@lunn.ch>
-
-      Andrew
-
-> 
-> ---
-> drivers/i2c/busses/i2c-mv64xxx.c | 101 ++++++++++++++++++++++++---------------
->  1 file changed, 62 insertions(+), 39 deletions(-)
-> 
-> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
-> index d70a2fda..7ba9bac 100644
-> --- a/drivers/i2c/busses/i2c-mv64xxx.c
-> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
-> @@ -19,20 +19,12 @@
->  #include <linux/platform_device.h>
->  #include <linux/io.h>
->  #include <linux/of.h>
-> +#include <linux/of_device.h>
->  #include <linux/of_irq.h>
->  #include <linux/of_i2c.h>
->  #include <linux/clk.h>
->  #include <linux/err.h>
->  
-> -/* Register defines */
-> -#define	MV64XXX_I2C_REG_SLAVE_ADDR			0x00
-> -#define	MV64XXX_I2C_REG_DATA				0x04
-> -#define	MV64XXX_I2C_REG_CONTROL				0x08
-> -#define	MV64XXX_I2C_REG_STATUS				0x0c
-> -#define	MV64XXX_I2C_REG_BAUD				0x0c
-> -#define	MV64XXX_I2C_REG_EXT_SLAVE_ADDR			0x10
-> -#define	MV64XXX_I2C_REG_SOFT_RESET			0x1c
-> -
->  #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
->  #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
->  #define MV64XXX_I2C_BAUD_DIV_M(val)			((val & 0xf) << 3)
-> @@ -89,6 +81,16 @@ enum {
->  	MV64XXX_I2C_ACTION_SEND_STOP,
->  };
->  
-> +struct mv64xxx_i2c_regs {
-> +	u8	addr;
-> +	u8	ext_addr;
-> +	u8	data;
-> +	u8	control;
-> +	u8	status;
-> +	u8	clock;
-> +	u8	soft_reset;
-> +};
-> +
->  struct mv64xxx_i2c_data {
->  	struct i2c_msg		*msgs;
->  	int			num_msgs;
-> @@ -98,6 +100,7 @@ struct mv64xxx_i2c_data {
->  	u32			aborting;
->  	u32			cntl_bits;
->  	void __iomem		*reg_base;
-> +	struct mv64xxx_i2c_regs	reg_offsets;
->  	u32			addr1;
->  	u32			addr2;
->  	u32			bytes_left;
-> @@ -116,6 +119,16 @@ struct mv64xxx_i2c_data {
->  	struct i2c_adapter	adapter;
->  };
->  
-> +static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
-> +	.addr		= 0x00,
-> +	.ext_addr	= 0x10,
-> +	.data		= 0x04,
-> +	.control	= 0x08,
-> +	.status		= 0x0c,
-> +	.clock		= 0x0c,
-> +	.soft_reset	= 0x1c,
-> +};
-> +
->  static void
->  mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
->  	struct i2c_msg *msg)
-> @@ -154,13 +167,13 @@ mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
->  static void
->  mv64xxx_i2c_hw_init(struct mv64xxx_i2c_data *drv_data)
->  {
-> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SOFT_RESET);
-> +	writel(0, drv_data->reg_base + drv_data->reg_offsets.soft_reset);
->  	writel(MV64XXX_I2C_BAUD_DIV_M(drv_data->freq_m) | MV64XXX_I2C_BAUD_DIV_N(drv_data->freq_n),
-> -		drv_data->reg_base + MV64XXX_I2C_REG_BAUD);
-> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SLAVE_ADDR);
-> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_EXT_SLAVE_ADDR);
-> +		drv_data->reg_base + drv_data->reg_offsets.clock);
-> +	writel(0, drv_data->reg_base + drv_data->reg_offsets.addr);
-> +	writel(0, drv_data->reg_base + drv_data->reg_offsets.ext_addr);
->  	writel(MV64XXX_I2C_REG_CONTROL_TWSIEN | MV64XXX_I2C_REG_CONTROL_STOP,
-> -		drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +		drv_data->reg_base + drv_data->reg_offsets.control);
->  	drv_data->state = MV64XXX_I2C_STATE_IDLE;
->  }
->  
-> @@ -282,7 +295,7 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->  
->  		drv_data->cntl_bits |= MV64XXX_I2C_REG_CONTROL_START;
->  		writel(drv_data->cntl_bits,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  
->  		drv_data->msgs++;
->  		drv_data->num_msgs--;
-> @@ -300,48 +313,48 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->  
->  	case MV64XXX_I2C_ACTION_CONTINUE:
->  		writel(drv_data->cntl_bits,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_SEND_START:
->  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_SEND_ADDR_1:
->  		writel(drv_data->addr1,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
-> +			drv_data->reg_base + drv_data->reg_offsets.data);
->  		writel(drv_data->cntl_bits,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_SEND_ADDR_2:
->  		writel(drv_data->addr2,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
-> +			drv_data->reg_base + drv_data->reg_offsets.data);
->  		writel(drv_data->cntl_bits,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_SEND_DATA:
->  		writel(drv_data->msg->buf[drv_data->byte_posn++],
-> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
-> +			drv_data->reg_base + drv_data->reg_offsets.data);
->  		writel(drv_data->cntl_bits,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_RCV_DATA:
->  		drv_data->msg->buf[drv_data->byte_posn++] =
-> -			readl(drv_data->reg_base + MV64XXX_I2C_REG_DATA);
-> +			readl(drv_data->reg_base + drv_data->reg_offsets.data);
->  		writel(drv_data->cntl_bits,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  		break;
->  
->  	case MV64XXX_I2C_ACTION_RCV_DATA_STOP:
->  		drv_data->msg->buf[drv_data->byte_posn++] =
-> -			readl(drv_data->reg_base + MV64XXX_I2C_REG_DATA);
-> +			readl(drv_data->reg_base + drv_data->reg_offsets.data);
->  		drv_data->cntl_bits &= ~MV64XXX_I2C_REG_CONTROL_INTEN;
->  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  		drv_data->block = 0;
->  		wake_up(&drv_data->waitq);
->  		break;
-> @@ -356,7 +369,7 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
->  	case MV64XXX_I2C_ACTION_SEND_STOP:
->  		drv_data->cntl_bits &= ~MV64XXX_I2C_REG_CONTROL_INTEN;
->  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
-> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
-> +			drv_data->reg_base + drv_data->reg_offsets.control);
->  		drv_data->block = 0;
->  		wake_up(&drv_data->waitq);
->  		break;
-> @@ -372,9 +385,9 @@ mv64xxx_i2c_intr(int irq, void *dev_id)
->  	irqreturn_t	rc = IRQ_NONE;
->  
->  	spin_lock_irqsave(&drv_data->lock, flags);
-> -	while (readl(drv_data->reg_base + MV64XXX_I2C_REG_CONTROL) &
-> +	while (readl(drv_data->reg_base + drv_data->reg_offsets.control) &
->  						MV64XXX_I2C_REG_CONTROL_IFLG) {
-> -		status = readl(drv_data->reg_base + MV64XXX_I2C_REG_STATUS);
-> +		status = readl(drv_data->reg_base + drv_data->reg_offsets.status);
->  		mv64xxx_i2c_fsm(drv_data, status);
->  		mv64xxx_i2c_do_action(drv_data);
->  		rc = IRQ_HANDLED;
-> @@ -495,6 +508,12 @@ static const struct i2c_algorithm mv64xxx_i2c_algo = {
->   *
->   *****************************************************************************
->   */
-> +static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
-> +	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
-> +	{}
-> +};
-> +MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
-> +
->  #ifdef CONFIG_OF
->  static int
->  mv64xxx_calc_freq(const int tclk, const int n, const int m)
-> @@ -528,8 +547,10 @@ mv64xxx_find_baud_factors(const u32 req_freq, const u32 tclk, u32 *best_n,
->  
->  static int
->  mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
-> -		  struct device_node *np)
-> +		  struct device *dev)
->  {
-> +	const struct of_device_id *device;
-> +	struct device_node *np = dev->of_node;
->  	u32 bus_freq, tclk;
->  	int rc = 0;
->  
-> @@ -558,6 +579,13 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
->  	 * So hard code the value to 1 second.
->  	 */
->  	drv_data->adapter.timeout = HZ;
-> +
-> +	device = of_match_device(mv64xxx_i2c_of_match_table, dev);
-> +	if (!device)
-> +		return -ENODEV;
-> +
-> +	memcpy(&drv_data->reg_offsets, device->data, sizeof(drv_data->reg_offsets));
-> +
->  out:
->  	return rc;
->  #endif
-> @@ -565,7 +593,7 @@ out:
->  #else /* CONFIG_OF */
->  static int
->  mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
-> -		  struct device_node *np)
-> +		  struct device *dev)
->  {
->  	return -ENODEV;
->  }
-> @@ -611,8 +639,9 @@ mv64xxx_i2c_probe(struct platform_device *pd)
->  		drv_data->freq_n = pdata->freq_n;
->  		drv_data->irq = platform_get_irq(pd, 0);
->  		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
-> +		memcpy(&drv_data->reg_offsets, &mv64xxx_i2c_regs_mv64xxx, sizeof(drv_data->reg_offsets));
->  	} else if (pd->dev.of_node) {
-> -		rc = mv64xxx_of_config(drv_data, pd->dev.of_node);
-> +		rc = mv64xxx_of_config(drv_data, &pd->dev);
->  		if (rc)
->  			goto exit_clk;
->  	}
-> @@ -680,12 +709,6 @@ mv64xxx_i2c_remove(struct platform_device *dev)
->  	return 0;
->  }
->  
-> -static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
-> -	{ .compatible = "marvell,mv64xxx-i2c", },
-> -	{}
-> -};
-> -MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
-> -
->  static struct platform_driver mv64xxx_i2c_driver = {
->  	.probe	= mv64xxx_i2c_probe,
->  	.remove	= mv64xxx_i2c_remove,
+Your patch doesn't fix drm/i915 (since we don't use the crtc helpers
+any more). And I don't think it's good to have the refcounting
+partially in the drm core and partially in drivers. I've also thrown a
+few more things on top just to port a few of the i915 cleanups to the
+crtc helper. I'll submit my patches asap (need to test them a bit more
+first).
+-Daniel
+--
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
