@@ -1,248 +1,96 @@
-From: oliver+list@schinagl.nl (Oliver Schinagl)
-Date: Sat, 15 Jun 2013 01:16:20 +0200
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
-References: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <1371251781-17167-2-git-send-email-oliver+list@schinagl.nl>
+From: jiada_wang@mentor.com (Jiada Wang)
+Date: Sat, 15 Jun 2013 08:23:17 +0900
+Subject: [RFC] Staging: imx-drm: Do not use fractional part of divider
+In-Reply-To: <1371195670.904413971@f400.i.mail.ru>
+References: <1371195670.904413971@f400.i.mail.ru>
+Message-ID: <51BBA5E5.9070202@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oliver Schinagl <oliver@schinagl.nl>
+Hello Alexander
 
-Allwinner has electric fuses (efuse) on their line of chips. This driver
-reads those fuses, seeds the kernel entropy and exports them as a sysfs node.
 
-These fuses are most likly to be programmed at the factory, encoding
-things like Chip ID, some sort of serial number etc and appear to be
-reasonable unique.
-While in theory, these should be writeable by the user, it will probably
-be inconvinient to do so. Allwinner recommends that a certain input pin,
-labeled 'efuse_vddq', be connected to GND. To write these fuses, 2.5 V
-needs to be applied to this pin.
+Alexander Shiyan wrote:
+> Hello.
+>
+> Analysis of driver imx-drm led me to believe that the use fractional part of the divider is not always a good idea.
+> For example, for a parallel display bus connected to LVDS converter chip (DS90C363), in this case the use of
+> fractional part, clock will unstable and the on-chip PLL is not working properly, or rather, does not work at all.
+>
+> Let me give a specific example.
+> ipu_crtc_mode_set 0x36314752
+> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000035 outrate: 40150928 wanted: 40000000
+> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000035 outrate: 40150928 wanted: 40150928
+> imx-ipuv3 40000000.ipu: clk_di_set_rate: inrate: 133000000 desired: 40150928 div: 0x00000035
+>
+> In this case the divider is 3.5, that result to clock is incorrect. See an attached oscillogram F0000TEK.jpg.
+>
+> After a patch the clocks is OK. Patch just uncomment some FSL code.
+> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000040 outrate: 33250000 wanted: 40000000
+> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000040 outrate: 33250000 wanted: 33250000
+> imx-ipuv3 40000000.ipu: clk_di_set_rate: inrate: 133000000 desired: 33250000 div: 0x00000040
+>
+> See an attached oscillogram F0001TEK.jpg.
+>
+> So, I want to review this from developers and wait for comments.
+>
+>
 
-Even so, they can still be used to generate a board-unique mac from, board
-unique RSA key and seed the kernel RNG.
+Recently I am also looking at use of fractional part of CLKGEN0,
+and want to discuss with you some information I found.
 
-Currently supported are the following known chips:
-Allwinner sun4i (A10)
-Allwinner sun5i (A10s, A13)
+in our code we are using external PLL to drive DI pixel clock, although 
+I haven't checked with oscilloscope, but it's apparently fractional part 
+of CLKGEN0 doesn't work properly as it is described in reference manual. 
+After some investigation I found 0x8 (0.5) seems works fine.
 
-Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
----
- drivers/misc/eeprom/Kconfig     |  17 ++++
- drivers/misc/eeprom/Makefile    |   1 +
- drivers/misc/eeprom/sunxi_sid.c | 167 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 185 insertions(+)
- create mode 100644 drivers/misc/eeprom/sunxi_sid.c
+Our solution is try to set DI pixel clock's root clock to integer times 
+of clk_di_pixel as close as possible, so that we can avoid using 
+fractional part to get desired clock. if Pll -> ipu_di_podf could not 
+provide the clock close enough, then try to set it to X.5 times of DI 
+pixel clock, then only the "proved" 0x8 of fractional part will be used.
 
-diff --git a/drivers/misc/eeprom/Kconfig b/drivers/misc/eeprom/Kconfig
-index 04f2e1f..c7bc6ed 100644
---- a/drivers/misc/eeprom/Kconfig
-+++ b/drivers/misc/eeprom/Kconfig
-@@ -96,4 +96,21 @@ config EEPROM_DIGSY_MTC_CFG
- 
- 	  If unsure, say N.
- 
-+config EEPROM_SUNXI_SID
-+	tristate "Allwinner sunxi security ID support"
-+	depends on ARCH_SUNXI && SYSFS
-+	help
-+	  This is a driver for the 'security ID' available on various Allwinner
-+	  devices. Currently supported are:
-+		sun4i (A10)
-+		sun5i (A13)
-+
-+	  Due to the potential risks involved with changing e-fuses,
-+	  this driver is read-only
-+
-+	  For more information visit http://linux-sunxi.org/SID
-+
-+	  This driver can also be built as a module. If so, the module
-+	  will be called sunxi_sid.
-+
- endmenu
-diff --git a/drivers/misc/eeprom/Makefile b/drivers/misc/eeprom/Makefile
-index fc1e81d..9507aec 100644
---- a/drivers/misc/eeprom/Makefile
-+++ b/drivers/misc/eeprom/Makefile
-@@ -4,4 +4,5 @@ obj-$(CONFIG_EEPROM_LEGACY)	+= eeprom.o
- obj-$(CONFIG_EEPROM_MAX6875)	+= max6875.o
- obj-$(CONFIG_EEPROM_93CX6)	+= eeprom_93cx6.o
- obj-$(CONFIG_EEPROM_93XX46)	+= eeprom_93xx46.o
-+obj-$(CONFIG_EEPROM_SUNXI_SID)	+= sunxi_sid.o
- obj-$(CONFIG_EEPROM_DIGSY_MTC_CFG) += digsy_mtc_eeprom.o
-diff --git a/drivers/misc/eeprom/sunxi_sid.c b/drivers/misc/eeprom/sunxi_sid.c
-new file mode 100644
-index 0000000..f014e1b
---- /dev/null
-+++ b/drivers/misc/eeprom/sunxi_sid.c
-@@ -0,0 +1,167 @@
-+/*
-+ * Copyright (c) 2013 Oliver Schinagl
-+ * http://www.linux-sunxi.org
-+ *
-+ * Oliver Schinagl <oliver@schinagl.nl>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ * This driver exposes the Allwinner security ID, a 128 bit eeprom, in byte
-+ * sized chunks.
-+ */
-+
-+#include <linux/compiler.h>
-+#include <linux/device.h>
-+#include <linux/err.h>
-+#include <linux/errno.h>
-+#include <linux/export.h>
-+#include <linux/fs.h>
-+#include <linux/init.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/kobject.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/platform_device.h>
-+#include <linux/random.h>
-+#include <linux/stat.h>
-+#include <linux/sysfs.h>
-+#include <linux/types.h>
-+
-+#define DRV_NAME "sunxi-sid"
-+#define DRV_VERSION "1.0"
-+
-+/* There are 4 32-bit keys */
-+#define SID_KEYS 4
-+/* and 4 byte sized keys per 32-bit key */
-+#define SID_SIZE (SID_KEYS * 4)
-+
-+
-+/* We read the entire key, but only return the requested byte. This is of
-+ * course slower then it could be and uses 4 times more reads as needed but
-+ * keeps code simpler.
-+ */
-+static u8 sunxi_sid_read_byte(const void __iomem *sid_reg_base,
-+			      const unsigned int offset)
-+{
-+	u32 sid_key = 0;
-+
-+	if (offset >= SID_SIZE)
-+		goto exit;
-+
-+	sid_key = ioread32be(sid_reg_base + round_down(offset, 4));
-+	sid_key >>= (offset % 4) * 8;
-+	sid_key &= 0xff;
-+	/* fall through */
-+
-+exit:
-+	return (u8)sid_key;
-+}
-+
-+static ssize_t sid_read(struct file *fd, struct kobject *kobj,
-+			struct bin_attribute *attr, char *buf,
-+			loff_t pos, size_t size)
-+{
-+	int i;
-+	struct platform_device *pdev;
-+	void __iomem *sid_reg_base;
-+
-+	pdev = (struct platform_device *)to_platform_device(kobj_to_dev(kobj));
-+	sid_reg_base = (void __iomem *)platform_get_drvdata(pdev);
-+
-+	for (i = 0; i < size; i++) {
-+		if ((pos + i) >= SID_SIZE || (pos < 0))
-+			break;
-+		buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
-+	}
-+
-+	return i;
-+}
-+
-+static const struct of_device_id sunxi_sid_of_match[] = {
-+	{
-+		.compatible = "allwinner,sun4i-sid",
-+	},
-+	{/* sentinel */}
-+};
-+MODULE_DEVICE_TABLE(of, sunxi_sid_of_match);
-+
-+static const struct bin_attribute sid_bin_attr = {
-+	.attr = {
-+		.name = "eeprom",
-+		.mode = S_IRUGO,
-+	},
-+	.size = SID_SIZE,
-+	.read = sid_read,
-+};
-+
-+static int sunxi_sid_remove(struct platform_device *pdev)
-+{
-+	device_remove_bin_file(&pdev->dev, &sid_bin_attr);
-+	dev_info(&pdev->dev, "sunxi SID driver unloaded\n");
-+
-+	return 0;
-+}
-+
-+static int __init sunxi_sid_probe(struct platform_device *pdev)
-+{
-+	int entropy[SID_SIZE], i;
-+	struct resource *res;
-+	void __iomem *sid_reg_base;
-+	int ret;
-+
-+	if (!pdev->dev.of_node) {
-+		dev_err(&pdev->dev, "No devicetree data available\n");
-+		ret = -ENXIO;
-+		goto exit;
-+	}
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	sid_reg_base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(sid_reg_base)) {
-+		ret = PTR_ERR(sid_reg_base);
-+		goto exit;
-+	}
-+	platform_set_drvdata(pdev, sid_reg_base);
-+
-+	ret = device_create_bin_file(&pdev->dev, &sid_bin_attr);
-+	if (ret) {
-+		dev_err(&pdev->dev, "Unable to create sysfs bin entry\n");
-+		goto exit;
-+	}
-+
-+	for (i = 0; i < SID_SIZE; i++)
-+		entropy[i] = sunxi_sid_read_byte(sid_reg_base, i);
-+	add_device_randomness(entropy, SID_SIZE);
-+	dev_info(&pdev->dev, "sunxi SID ver %s loaded\n", DRV_VERSION);
-+	ret = 0;
-+	/* fall through */
-+
-+exit:
-+	return ret;
-+}
-+
-+static struct platform_driver sunxi_sid_driver = {
-+	.probe = sunxi_sid_probe,
-+	.remove = sunxi_sid_remove,
-+	.driver = {
-+		.name = DRV_NAME,
-+		.owner = THIS_MODULE,
-+		.of_match_table = sunxi_sid_of_match,
-+	},
-+};
-+module_platform_driver(sunxi_sid_driver);
-+
-+
-+MODULE_AUTHOR("Oliver Schinagl <oliver@schinagl.nl>");
-+MODULE_DESCRIPTION("Allwinner sunxi security id driver");
-+MODULE_VERSION(DRV_VERSION);
-+MODULE_LICENSE("GPL");
--- 
-1.8.1.5
+> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/stagineg/imx-drm/ipu-v3/ipu-di.c
+> index 19d777e..d424c22 100644
+> --- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
+> @@ -154,22 +154,15 @@ static int ipu_di_clk_calc_div(unsigned long inrate, unsigned long outrate)
+>
+>   	if (div < 0x10)
+>   		div = 0x10;
+> -
+> -#ifdef WTF_IS_THIS
+> -	/*
+> -	 * Freescale has this in their Kernel. It is neither clear what
+> -	 * it does nor why it does it
+> -	 */
+> -	if (div & 0x10)
+> -		div &= ~0x7;
+>   	else {
+>   		/* Round up divider if it gets us closer to desired pix clk */
+> -		if ((div & 0xC) == 0xC) {
+> +		if (div & 0x0f) {
+>   			div += 0x10;
+> -			div &= ~0xF;
+> +			/* Strip fractional part of divider */
+> +			div &= ~0x0f;
+If div = 0x11, and the display is not forgiving enough, the pixel clock 
+will probably not be accepted by it.
+
+thanks,
+jiada
+>   		}
+>   	}
+> -#endif
+> +
+>   	return div;
+>   }
+>
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
