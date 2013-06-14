@@ -1,43 +1,92 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Jun 2013 21:32:55 +0200
-Subject: [PATCH 19/28] ARM: EXYNOS: Do not select legacy Kconfig symbols any
- more
+Date: Fri, 14 Jun 2013 21:32:58 +0200
+Subject: [PATCH 22/28] ARM: EXYNOS: Remove mach/regs-gpio.h header
 In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
 References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371238384-1504-20-git-send-email-t.figa@samsung.com>
+Message-ID: <1371238384-1504-23-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes selection of several legacy Kconfig symbols from
-ARCH_EXYNOS to bypass compilation of code used only for ATAGS based
-boot.
+Contents of this header are not used any more and can be safely removed.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/Kconfig | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm/mach-exynos/common.c                 |  1 -
+ arch/arm/mach-exynos/include/mach/regs-gpio.h | 40 ---------------------------
+ arch/arm/mach-exynos/pm.c                     |  1 -
+ 3 files changed, 42 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/include/mach/regs-gpio.h
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 21bf253..61dff79 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -802,16 +802,11 @@ config ARCH_EXYNOS
- 	select COMMON_CLK
- 	select CPU_V7
- 	select GENERIC_CLOCKEVENTS
--	select GPIO_SAMSUNG
- 	select HAVE_CLK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
- 	select HAVE_S3C_RTC if RTC_CLASS
--	select NEED_MACH_GPIO_H
- 	select NEED_MACH_MEMORY_H
--	select S5P_GPIO_DRVSTR
--	select SAMSUNG_ATAGS
--	select SAMSUNG_GPIOLIB_4BIT
- 	select USE_OF
- 	help
- 	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index f81aa22..7b53e4c 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -40,7 +40,6 @@
+ 
+ #include <mach/regs-irq.h>
+ #include <mach/regs-pmu.h>
+-#include <mach/regs-gpio.h>
+ 
+ #include <plat/cpu.h>
+ #include <plat/pm.h>
+diff --git a/arch/arm/mach-exynos/include/mach/regs-gpio.h b/arch/arm/mach-exynos/include/mach/regs-gpio.h
+deleted file mode 100644
+index e4b5b60..0000000
+--- a/arch/arm/mach-exynos/include/mach/regs-gpio.h
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/include/mach/regs-gpio.h
+- *
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * EXYNOS4 - GPIO (including EINT) register definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#ifndef __ASM_ARCH_REGS_GPIO_H
+-#define __ASM_ARCH_REGS_GPIO_H __FILE__
+-
+-#include <mach/map.h>
+-#include <mach/irqs.h>
+-
+-#define EINT_REG_NR(x)			(EINT_OFFSET(x) >> 3)
+-#define EINT_CON(b, x)			(b + 0xE00 + (EINT_REG_NR(x) * 4))
+-#define EINT_FLTCON(b, x)		(b + 0xE80 + (EINT_REG_NR(x) * 4))
+-#define EINT_MASK(b, x)			(b + 0xF00 + (EINT_REG_NR(x) * 4))
+-#define EINT_PEND(b, x)			(b + 0xF40 + (EINT_REG_NR(x) * 4))
+-
+-#define EINT_OFFSET_BIT(x)		(1 << (EINT_OFFSET(x) & 0x7))
+-
+-/* compatibility for plat-s5p/irq-pm.c */
+-#define EXYNOS4_EINT40CON		(S5P_VA_GPIO2 + 0xE00)
+-#define S5P_EINT_CON(x)			(EXYNOS4_EINT40CON + ((x) * 0x4))
+-
+-#define EXYNOS4_EINT40FLTCON0		(S5P_VA_GPIO2 + 0xE80)
+-#define S5P_EINT_FLTCON(x)		(EXYNOS4_EINT40FLTCON0 + ((x) * 0x4))
+-
+-#define EXYNOS4_EINT40MASK		(S5P_VA_GPIO2 + 0xF00)
+-#define S5P_EINT_MASK(x)		(EXYNOS4_EINT40MASK + ((x) * 0x4))
+-
+-#define EXYNOS4_EINT40PEND		(S5P_VA_GPIO2 + 0xF40)
+-#define S5P_EINT_PEND(x)		(EXYNOS4_EINT40PEND + ((x) * 0x4))
+-
+-#endif /* __ASM_ARCH_REGS_GPIO_H */
+diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
+index e3faaa81..41c2069 100644
+--- a/arch/arm/mach-exynos/pm.c
++++ b/arch/arm/mach-exynos/pm.c
+@@ -30,7 +30,6 @@
+ #include <plat/regs-srom.h>
+ 
+ #include <mach/regs-irq.h>
+-#include <mach/regs-gpio.h>
+ #include <mach/regs-clock.h>
+ #include <mach/regs-pmu.h>
+ #include <mach/pm-core.h>
 -- 
 1.8.2.1
