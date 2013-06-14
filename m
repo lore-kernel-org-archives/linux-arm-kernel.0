@@ -1,58 +1,84 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Fri, 14 Jun 2013 21:50:22 +0200
-Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
-In-Reply-To: <20130614144251.GN18614@n2100.arm.linux.org.uk>
-References: <20130612134845.GQ18614@n2100.arm.linux.org.uk>
- <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
- <20130612164914.GT18614@n2100.arm.linux.org.uk>
- <20130612170512.GU18614@n2100.arm.linux.org.uk>
- <20130612194021.GX18614@n2100.arm.linux.org.uk>
- <20130612230057.GY18614@n2100.arm.linux.org.uk>
- <20130613111903.GA18614@n2100.arm.linux.org.uk>
- <20130613115016.GB18614@n2100.arm.linux.org.uk>
- <20130613130339.GD18614@n2100.arm.linux.org.uk>
- <CAKMK7uHgAe=05RFLxqSTz5R+myU9-nvuk=RMZym2k-tjzbC+2w@mail.gmail.com>
- <20130614144251.GN18614@n2100.arm.linux.org.uk>
-Message-ID: <CAKMK7uEzC8rCaAB_8VCwyox2Be9JZ=+OWSk0+BLyfug7G5=18A@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 14 Jun 2013 12:52:55 -0700
+Subject: [GIT PULL 3/3] msm clock for 3.11
+In-Reply-To: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
+References: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <20130614195238.GA2381@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 4:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jun 14, 2013 at 04:23:22PM +0200, Daniel Vetter wrote:
->> On Thu, Jun 13, 2013 at 3:03 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > There's a bigger issue here - if it's possible for drm_crtc_helper_set_config()
->> > to be called with set->fb set but set->mode NULL, then we overwrite
->> > set->fb to NULL.  Again, that results in a lost reference.
->> >
->> > For the time being, I'm using this patch, which solves my dropped
->> > refcount problem, and marks the other possible dropped reference.
->> > Either that check needs to be removed or it needs to properly drop
->> > the refcount on the fb before 'losing' the reference to it.
->>
->> Scrap my other mail, I see now where the leaking happens. One of them
->> is interface abuse which is now fixed (and i915 has a bunch of BUG_ONs
->> to enforce them). The other one is indeed a real case that eluded me
->> when I've done the refcountification for drm_framebuffers. I'll hack
->> up some patches, since this seems to be a good excuse to port some of
->> the i915 modeset improvements back to the crtc helpers.
->
-> If you're happy with the patch I supplied, that's probably the minimal fix
-> which should go to stable kernels (I'm using 3.9 here) - this also counts
-> as a "user visible bug".  It's something I've tripped over which causes
-> exhausts memory and can prevent the X server from starting up.
->
-> If you want me to package the patch up with a commit message and sign-off..
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 
-Your patch doesn't fix drm/i915 (since we don't use the crtc helpers
-any more). And I don't think it's good to have the refcounting
-partially in the drm core and partially in drivers. I've also thrown a
-few more things on top just to port a few of the i915 cleanups to the
-crtc helper. I'll submit my patches asap (need to test them a bit more
-first).
--Daniel
---
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-clock-for-3.11
+
+for you to fetch changes up to f54c1c11053d8aaf318a096b8b332fd41a394a66:
+
+  ARM: msm: Migrate to common clock framework (2013-06-12 14:43:31 -0700)
+
+----------------------------------------------------------------
+MSM clock updates for 3.11.
+
+Per Stephen Boyd's coverletter:
+
+This patchset moves the existing MSM clock code and affected drivers
+to the common clock framework. A prerequisite of moving to the common
+clock framework is to use clk_prepare() and clk_enable() so the first
+few patches migrate drivers to that call (clk_prepare() is a no-op on
+MSM right now). It also removes some custom clock APIs that MSM
+provides and finally moves the proc_comm clock code to the common
+struct clk.
+
+This patch series will be used as the foundation of the MSM 8660/8960
+clock code that I plan to send out after this series.
+
+----------------------------------------------------------------
+Stephen Boyd (12):
+      msm_serial: Convert to clk_prepare/unprepare
+      msm_serial: Use devm_clk_get() and properly return errors
+      usb: otg: msm: Convert to clk_prepare/unprepare
+      msm_sdcc: Convert to clk_prepare/unprepare
+      msm: iommu: Convert to clk_prepare/unprepare
+      msm: iommu: Use clk_set_rate() instead of clk_set_min_rate()
+      ARM: msm: Remove custom clk_set_flags() API
+      ARM: msm: Remove custom clk_set_{max,min}_rate() API
+      ARM: msm: Remove clock-7x30.h include file
+      ARM: msm: Prepare clk_get() users in mach-msm for clock-pcom driver
+      ARM: msm: Make proc_comm clock control into a platform driver
+      ARM: msm: Migrate to common clock framework
+
+ arch/arm/Kconfig                       |   2 +-
+ arch/arm/mach-msm/Makefile             |  10 +-
+ arch/arm/mach-msm/board-halibut.c      |   2 +-
+ arch/arm/mach-msm/board-msm7x30.c      |   2 +-
+ arch/arm/mach-msm/board-qsd8x50.c      |   2 +-
+ arch/arm/mach-msm/board-trout-panel.c  |  19 ++--
+ arch/arm/mach-msm/board-trout.c        |   3 +-
+ arch/arm/mach-msm/clock-7x30.h         | 155 ------------------------------
+ arch/arm/mach-msm/clock-debug.c        | 130 --------------------------
+ arch/arm/mach-msm/clock-pcom.c         | 149 ++++++++++++++++++-----------
+ arch/arm/mach-msm/clock-pcom.h         |  31 +++---
+ arch/arm/mach-msm/clock.c              | 166 +--------------------------------
+ arch/arm/mach-msm/clock.h              |  51 +++-------
+ arch/arm/mach-msm/devices-msm7x00.c    |  12 ++-
+ arch/arm/mach-msm/devices-msm7x30.c    |  14 ++-
+ arch/arm/mach-msm/devices-qsd8x50.c    |  11 ++-
+ arch/arm/mach-msm/devices.h            |  15 +--
+ arch/arm/mach-msm/dma.c                |   5 +-
+ arch/arm/mach-msm/include/mach/board.h |   5 -
+ arch/arm/mach-msm/include/mach/clk.h   |   9 --
+ drivers/iommu/msm_iommu_dev.c          |  20 ++--
+ drivers/mmc/host/msm_sdcc.c            |  14 ++-
+ drivers/tty/serial/msm_serial.c        |  35 +++----
+ drivers/usb/phy/phy-msm-usb.c          |  38 ++++----
+ 24 files changed, 241 insertions(+), 659 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/clock-7x30.h
+ delete mode 100644 arch/arm/mach-msm/clock-debug.c
+
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
