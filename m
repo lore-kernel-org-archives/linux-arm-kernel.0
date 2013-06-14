@@ -1,60 +1,27 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Jun 2013 16:52:26 +0200
-Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
- properties from a dt node
-In-Reply-To: <201306141118.22663.heiko@sntech.de>
-References: <201306102139.32444.heiko@sntech.de> <1862891.4yIecp615h@avalon>
- <201306141118.22663.heiko@sntech.de>
-Message-ID: <2970435.N7A5210Ocy@avalon>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 14 Jun 2013 10:56:09 -0400 (EDT)
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVPtZq4XWddBnP0ze2aecwXsuU+0OL8TP1Tb_5BrpJv9cw@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306141054530.26420-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Fri, 14 Jun 2013, Ming Lei wrote:
 
-On Friday 14 June 2013 11:18:22 Heiko St?bner wrote:
-> Am Freitag, 14. Juni 2013, 01:53:49 schrieb Laurent Pinchart:
-> > On Thursday 13 June 2013 17:36:00 Linus Walleij wrote:
-> > > On Thu, Jun 13, 2013 at 5:23 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > > >> Ok, I'll see that I get this fixed :-)
-> > > > 
-> > > > Hmm ... what is the meaning of the argument of bias-disable and
-> > > > bias-high- impedance, as the kernel-doc in pinconf-generic.h does not
-> > > > tell?
-> > > 
-> > > I think those arguments are N/A, ignored, doesn't matter.
-> > > If these options were typed, they would be bool.
-> > > 
-> > > Please improve documentation if you can... sorry for all the
-> > > rough edges.
-> > > 
-> > > > bias-bus-hold ignores its argument and we already clarified that the
-> > > > pull-* do have != 0 or 0 argument.
-> > > 
-> > > I think in the DT binding, both these forms:
-> > > 
-> > > bias-pull-up;
-> > > bias-pull-up = <150000>;
-> > > 
-> > > Should be allowed.
-> > > 
-> > > So when parsing, you first check if it exists, then if there
-> > > is an argument, if there is no value supplied, just set it
-> > > to 1, as that is clearly != 0...
-> > 
-> > What's the expected way to disable pull-ups in DT ? Should it be
-> > 'bias-pull-up = <0>;' or 'bias-disable;' ?
+> On Fri, Jun 14, 2013 at 3:41 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> >
+> > The main reason for moving away from the current scheme is to reduce
+> > latency for other interrupt handlers.  Ming gave two examples of slow
+> > USB code that runs in hardirq context now; with his change they would
+> > run in softirq context and therefore wouldn't delay other interrupts so
+> > much.  (Interrupt latency is hard to measure, however.)
 > 
-> According to the kernedoc I think both are valid and should be handled.
-> Using bias-disable is more descriptive but would also include disabling a
-> "high-impedance" or "bus-hold" bias (if supported by the hardware).
+> With the two trace points of irq_handler_entry and irq_handler_exit, the
+> interrupt latency(or the time taken by hard irq handler) isn't hard to measure.
+> One simple script can figure out the average/maximum latency for one irq
+> handler, like I did in 4/4.
 
-OK. I still fail to see how the various bias options are supposed to interract 
-together, but I don't think I'll get an answer on that.
+But that doesn't measure the time between when the IRQ request is 
+issued and when irq_handler_entry runs.
 
-> Personally, for my rockchip stuff I go with using the
-> "bias-pull-pin-default" <-> "bias-disable".
-
--- 
-Regards,
-
-Laurent Pinchart
+Alan Stern
