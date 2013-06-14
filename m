@@ -1,21 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Jun 2013 19:44:57 +0200
-Subject: [PATCH 1/3] ARM: mach-moxart: add MOXA ART SoC files
-In-Reply-To: <CAOesGMgznJXWN5nE-2igC-d0YY_aFk0Q1D_5p95oTZM-VTs5qw@mail.gmail.com>
-References: <1371040448-28742-1-git-send-email-jonas.jensen@gmail.com>
- <2428901.voOA9oET8R@wuerfel>
- <CAOesGMgznJXWN5nE-2igC-d0YY_aFk0Q1D_5p95oTZM-VTs5qw@mail.gmail.com>
-Message-ID: <6334975.lLWqiA43Az@wuerfel>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 14 Jun 2013 19:45:46 +0200
+Subject: [RFC PATCH 0/5] Generic PHY driver for Exynos SoCs MIPI CSI-2/DSIM
+ DPHYs
+Message-ID: <1371231951-1969-1-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 June 2013 09:41:36 Olof Johansson wrote:
-> I sort of presumed that there might be need for _some_ platform code
-> later on, just not quite yet, so I didn't want to be quite that
-> drastic. I suppose leaving it with the trivial file for now is OK, and
-> we can make a sweeping change down the road in case we want to clean
-> up and consolidate all the trivial platforms.
+Hi,
 
-Yes, good idea.
+The following is a simple driver for the Samsung S5P/Exynos SoCs MIPI CSI-2
+receiver and MIPI DSI transmitter DPHYs, using the generic PHY framework [1].
+Previously the MIPI CSIS and MIPI DSIM used a platform callback to control
+the PHY power enable and reset bits. The callback can be dropped now and
+those drivers don't depend any more on any platform code.
 
-	Arnd
+Any comments are welcome.
+
+Thanks,
+Sylwester
+
+[1] https://lkml.org/lkml/2013/6/13/97
+
+Sylwester Nawrocki (5):
+  phy: Add driver for Exynos MIPI CSIS/DSIM DPHYs
+  ARM: dts: Add MIPI PHY node to exynos4.dtsi
+  video: exynos_dsi: Use generic PHY driver
+  exynos4-is: Use generic MIPI CSIS PHY driver
+  ARM: Samsung: Remove MIPI PHY setup code
+
+ .../bindings/phy/exynos-video-mipi-phy.txt         |   16 ++
+ arch/arm/boot/dts/exynos4.dtsi                     |   12 ++
+ arch/arm/mach-exynos/include/mach/regs-pmu.h       |    5 -
+ arch/arm/mach-s5pv210/include/mach/regs-clock.h    |    4 -
+ arch/arm/plat-samsung/Makefile                     |    1 -
+ arch/arm/plat-samsung/setup-mipiphy.c              |   60 -------
+ drivers/media/platform/exynos4-is/mipi-csis.c      |   11 +-
+ drivers/phy/Kconfig                                |   10 ++
+ drivers/phy/Makefile                               |    3 +-
+ drivers/phy/exynos_video_mipi_phy.c                |  166 ++++++++++++++++++++
+ drivers/video/display/source-exynos_dsi.c          |   36 ++---
+ include/linux/platform_data/mipi-csis.h            |    9 --
+ include/video/exynos_dsi.h                         |    5 -
+ 13 files changed, 226 insertions(+), 112 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/phy/exynos-video-mipi-phy.txt
+ delete mode 100644 arch/arm/plat-samsung/setup-mipiphy.c
+ create mode 100644 drivers/phy/exynos_video_mipi_phy.c
+
+--
+1.7.9.5
