@@ -1,26 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 15:21:19 -0700
-Subject: [GIT PULL 3/3] ARM: mvebu: register map changes for v3.11
-In-Reply-To: <20130613213651.GG31667@titan.lakedaemon.net>
-References: <20130613212137.GE31667@titan.lakedaemon.net>
- <20130613213651.GG31667@titan.lakedaemon.net>
-Message-ID: <20130614222119.GI17326@quad.lixom.net>
+Date: Fri, 14 Jun 2013 15:25:19 -0700
+Subject: [GIT PULL 1/2] DaVinci SoC updates for v3.11
+In-Reply-To: <1371193161-25224-1-git-send-email-nsekhar@ti.com>
+References: <1371193161-25224-1-git-send-email-nsekhar@ti.com>
+Message-ID: <20130614222519.GK17326@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 05:36:51PM -0400, Jason Cooper wrote:
-> Arnd, Olof,
+On Fri, Jun 14, 2013 at 12:29:20PM +0530, Sekhar Nori wrote:
 > 
-> This branch is off by itself because it depends on mvebu/cleanup and
-> mvebu/fixes-non-critical.  It's been in linux-next about a week and has
-> an squirrelly merge conflict with armada-370-xp.c.  I've attached the
-> resolution to the bottom of this email.
+> Hi Arnd, Olof,
 > 
-> If you have any questions or if there is a better way for me to format
-> this, please let me know.
+> Please pull the following DaVinci SoC updates for v3.10.
+> 
+> On the DMA library movement, I was been waiting for acks
+> from Russell and Mark, but did not get them. OTOH, there
+> have been no objections as well. I assume the movement
+> is not a problem since its a movement within arch/arm
+> and does not end-up bringing new code in.
 
-Merged. Please check my conflict resolution once I push it out, but end delta
-is similar.
+Ok. I'll hold off since Mark was interested in seeing the code. Please resend
+once you have acks.
 
 
 -Olof
