@@ -1,31 +1,23 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 14 Jun 2013 02:46:33 +0000 (UTC)
-Subject: [PATCH 0/2] Remove unused voltagedomain data for AM33xx
-In-Reply-To: <1371118124-15910-1-git-send-email-rnayak@ti.com>
-References: <1371118124-15910-1-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.02.1306140243380.5514@utopia.booyaka.com>
+Date: Fri, 14 Jun 2013 02:47:28 +0000 (UTC)
+Subject: OMAP v3.10-rc regressions that no one's fixed
+In-Reply-To: <51B6D618.30809@ti.com>
+References: <alpine.DEB.2.02.1306100716560.4604@utopia.booyaka.com>
+ <51B6D618.30809@ti.com>
+Message-ID: <alpine.DEB.2.02.1306140246590.5514@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cc Kevin, Vaibhav
+Hi P?ter,
 
-On Thu, 13 Jun 2013, Rajendra Nayak wrote:
+On Tue, 11 Jun 2013, Peter Ujfalusi wrote:
 
-> The powerdomain framework today expects to always have a voltagedomain
-> associated with a given powerdomain. We already have AM33xx which
-> has no Voltage Controller/Voltage Processor as part of PRCM.
-> There are more SoCs' to follow starting with AM437x and DRA7xx
-> which do not have VC/VP.
-> 
-> Instead of adding dummy voltage domain data files, make the powerdomain
-> framework aware of the fact that some SoCs' might not really have
-> scalable voltage domains.
+> I will send a patch soon to fix these. Need to test the patch(es) first. I
+> think they surfaced because I have enabled the audio support in
+> omap2plus_defconfig for OMAP4 and 5 - which require McPDM and DMIC.
+> Just couple of minutes, and I'll have the fix.
 
-Fine with me in principle if AM335x doesn't support voltage scaling.  
-Vaibhav, if this is okay for you, please ack it.  
-
-Then, in terms of merging, probably Kevin would be the right person for 
-this since he's done much of the voltagedomain work.
+Thanks for the fast fixes :-)
 
 
 - Paul
