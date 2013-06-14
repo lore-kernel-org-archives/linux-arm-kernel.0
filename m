@@ -1,35 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 14 Jun 2013 23:26:04 +0200
-Subject: [PATCH 00/28] Twenty eight patches big Exynos cleanup
-In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <5750530.AyJQs5JHPZ@wuerfel>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 14 Jun 2013 14:28:15 -0700
+Subject: [GIT PULL 2/6] omap cleanup for v3.11 merge window
+In-Reply-To: <51b8bce9.1265310a.49c1.ffff940eSMTPIN_ADDED_MISSING@mx.google.com>
+References: <pull-1371061475-206272>
+ <51b8bce9.1265310a.49c1.ffff940eSMTPIN_ADDED_MISSING@mx.google.com>
+Message-ID: <20130614212815.GB17326@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 June 2013 21:32:36 Tomasz Figa wrote:
+On Wed, Jun 12, 2013 at 11:24:33AM -0700, Tony Lindgren wrote:
+> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
 > 
-> As I promised, I am doing some spring (or rather summer) cleaning
-> of Exynos- and Samsung- related code.
+>   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
 > 
-> This first part consists mostly of removing dead code remaining after
-> removal of ATAGS support for Exynos, but several patches cleans up
-> other things found by the way.
+> are available in the git repository at:
 > 
-> See particular patches for more detailed description.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/cleanup-signed
 > 
-> On Exynos4210-based Trats board:
-> Tested-by: Tomasz Figa <t.figa@samsung.com>
+> for you to fetch changes up to 09182ab11b49b67d04598b19eb89cf0bbd672a60:
 > 
-> Build tested every patch with s3c6400_defconfig, s5pv210_defconfig
-> and exynos_defconfig.
+>   ARM: OMAP4: hwmod data: Remove irq entries from mcspi, mmc hwmods (2013-06-12 09:41:46 -0700)
+> 
+> ----------------------------------------------------------------
+> Move omap4 over to device tree based booting. This allows us to get rid
+> a big pile of platform init code for things that are already handled by
+> device tree related code. As am33xx is already device tree based, we
+> can also remove the same data for am33xx.
 
-Great stuff. I unfortunately did almost the exact same patch since I
-did not know you were on it too. Yours looks better in some details,
-and your patch descriptions are /much/ better than my single large
-patch.
+Hm. This one has a somewhat silly conflict with the am33xx hwmod fix for uart2.
+I.e. the fix is reverted since the code is no longer needed -- data comes from
+device tree. Please double-check my merge resolution on it though.
 
-I'll try to cross-check the two series to see if there is anything
-you missed that was in my patch set.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+-Olof
