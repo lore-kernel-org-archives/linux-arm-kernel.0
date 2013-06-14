@@ -1,112 +1,131 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 14 Jun 2013 15:58:59 +0200
-Subject: [PATCH v2] i2c: vt8500: Add support for I2C bus on Wondermedia
- SoCs
-In-Reply-To: <1371023785-3132-1-git-send-email-linux@prisktech.co.nz>
-References: <1371023785-3132-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130614135857.GA2929@katana>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Fri, 14 Jun 2013 21:58:24 +0800
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
+References: <20130517191304.468.73487.stgit@localhost>
+ <20130517191753.468.1734.stgit@localhost>
+ <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+ <20130612163124.GD8164@atomide.com>
+ <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
+ <51B99B07.1050806@ti.com>
+ <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
+Message-ID: <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 07:56:25PM +1200, Tony Prisk wrote:
-> This patch adds support for the I2C bus controllers found on Wondermedia
-> 8xxx-series SoCs. Only master-mode is supported.
-> 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
+On Fri, Jun 14, 2013 at 9:31 PM, Ming Lei <tom.leiming@gmail.com> wrote:
+> On Thu, Jun 13, 2013 at 6:12 PM, Sricharan R <r.sricharan@ti.com> wrote:
+>> On Thursday 13 June 2013 02:51 PM, Sricharan R wrote:
+>>> Hi Tony,
+>>> On Wednesday 12 June 2013 10:44 PM, Tony Lindgren wrote:
+>>>> * Tony Lindgren <tony@atomide.com> [130612 09:37]:
+>>>>> * Ming Lei <tom.leiming@gmail.com> [130603 08:34]:
+>>>>>> Hi,
+>>>>>>
+>>>>>> On Sat, May 18, 2013 at 3:17 AM, Tony Lindgren <tony@atomide.com> wrote:
+>>>>>>> We can now boot with device tree. If you don't want to update u-boot,
+>>>>>>> you can boot with appended DTB with the following instructions:
+>>>>>>>
+>>>>>>> 1. Make sure you have the appended DTB support in .config
+>>>>>>>
+>>>>>>>    CONFIG_ARM_APPENDED_DTB=y
+>>>>>>>    CONFIG_ARM_ATAG_DTB_COMPAT=y
+>>>>>>>    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
+>>>>>>>
+>>>>>>> 2. Build the zImage
+>>>>>>>
+>>>>>>>    $ ARCH=arm CROSS_COMPILE=... make zImage
+>>>>>>>
+>>>>>>> 3. Build the device tree blobs
+>>>>>>>
+>>>>>>>    $ ARCH=arm CROSS_COMPILE=... make dtbs
+>>>>>>>
+>>>>>>> 4. Append the correct panda dtb to zImage
+>>>>>>>
+>>>>>>>    Depending on your hardware it's omap4-panda.dtb, omap4-panda-a4.dtb
+>>>>>>>    or omap4-panda-es.dtb.
+>>>>>>>
+>>>>>>>    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-panda-es.dtb > /tmp/appended
+>>>>>>>
+>>>>>>> 5. Use mkimage to produce the appended device tree uImage
+>>>>>>>
+>>>>>>>    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
+>>>>>>>      -n "Linux" -d /tmp/appended /tmp/uImage
+>>>>>> I followed the above steps and tried devicetree on Pandaboard against
+>>>>>> 3.10.0-rc3-next-20130528, and the board will hang during boot, but works
+>>>>>> well with legacy mode.
+>>>>>>
+>>>>>>          Hardware: Pandaboard A1
+>>>>>>          dtb: omap4-panda.dtb
+>>>>>>
+>>>>>> See 'dmesg' on below link:
+>>>>>>
+>>>>>>          http://kernel.ubuntu.com/~ming/up/panda-dts.dmesg
+>>>>>>
+>>>>> Hmm looks like it boots to init. Maybe add initcall_debug to the cmdline in
+>>>>> case there's some late_initcall that causes the issue. It's probably some
+>>>>> trivial issue causing it.
+>>>> Sricharan, maybe give this a quick try if you have the original pandaboard?
+>>>> I only have pandaboard es.
+>>>>
+>>>> Regards,
+>>>>
+>>>> Tony
+>>>
+>>> I tried your cleanup branch omap-for-v3.11/cleanup on panda board and it booted
+>>>  to prompt fine.
+>>>             Hardware: Pandaboard A1   dtb: omap4-panda.dtb
+>>>
+>>>   git pull on linux-next branch was not working though.
+>>>
+>>     Ok, tested in linux-next as well and it booted fine with DTB.
+>>      HW: OMAP4430ES2.1 PANDA A1 version DTB: OMAP4-PANDA.DTB
+>>
+>>     Booted with ramdisk and mmc FS
+>>
+>> commit c04efed734409f5a44715b54a6ca1b54b0ccf215
+>> Author: Stephen Rothwell <sfr@canb.auug.org.au>
+>> Date:   Fri Jun 7 16:40:02 2013 +1000
+>>
+>>     Add linux-next specific files for 20130607
+>
+> Looks linux-next-20130607 is broken, see below:
+>
+>   LD [M]  drivers/usb/gadget/g_ncm.o
+> drivers/usb/musb/omap2430.c: In function 'omap2430_probe':
+> drivers/usb/musb/omap2430.c:571:2: error: 'musb_resources' undeclared
+> (first use in this function)
+> drivers/usb/musb/omap2430.c:571:2: note: each undeclared identifier is
+> reported only once for each function it appears in
+> drivers/usb/musb/omap2430.c:571:2: error: bit-field '<anonymous>'
+> width not an integer constant
+> drivers/usb/musb/omap2430.c:585:4: error: bit-field '<anonymous>'
+> width not an integer constant
+> make[3]: *** [drivers/usb/musb/omap2430.o] Error 1
+> make[3]: *** Waiting for unfinished jobs....
+> make[2]: *** [drivers/usb/musb] Error 2
+> make[2]: *** Waiting for unfinished jobs....
+> make[1]: *** [drivers/usb] Error 2
+> make: *** [drivers] Error 2
+> install kernel and modules
+>
+> DEPMOD  3.10.0-rc4-next-20130607+
 
-Please describe here what changed since the last version. It's a lot
-easier and faster to review then.
+Even I disable musb so that kernel building is OK, but the kernel with dtb
+still can't boot, see attachment 'dmesg' and config.
 
-> +static int wmt_i2c_xfer(struct i2c_adapter *adap,
-> +			struct i2c_msg msgs[],
-> +			int num)
-> +{
-> +	struct i2c_msg *pmsg;
-> +	int i, is_last, no_start;
-> +	int ret = 0;
-> +
-> +	for (i = 0; ret >= 0 && i < num; i++) {
-> +		is_last = ((i + 1) == num);
-> +		no_start = (i != 0);
 
-(i != 0) is a restart condition (start instead of stop)...
-
-> +
-> +		pmsg = &msgs[i];
-> +		if (pmsg->flags & I2C_M_NOSTART)
-> +			no_start = 1;
-
-...and this is a no_start (concatenating messages). I do have the
-impression you are mixing those two?
-
-> +		if (pmsg->flags & I2C_M_RD)
-> +			ret = wmt_i2c_read(adap, pmsg, no_start, is_last);
-> +		else
-> +			ret = wmt_i2c_write(adap, pmsg, no_start, is_last);
-> +	}
-> +
-> +	return (ret < 0) ? ret : i;
-> +}
-> +	adap = &i2c_dev->adapter;
-> +	i2c_set_adapdata(adap, i2c_dev);
-> +	strlcpy(adap->name, "WMT I2C adapter", sizeof(adap->name));
-> +	adap->owner = THIS_MODULE;
-> +	adap->algo = &wmt_i2c_algo;
-> +	adap->dev.parent = &pdev->dev;
-> +	adap->dev.of_node = pdev->dev.of_node;
-> +	adap->nr = of_alias_get_id(pdev->dev.of_node, "i2c");
-
-Drop this line...
-
-> +
-> +	init_completion(&i2c_dev->complete);
-> +
-> +	err = wmt_i2c_reset_hardware(i2c_dev);
-> +	if (err) {
-> +		dev_err(&pdev->dev, "error initializing hardware\n");
-> +		return err;
-> +	}
-> +
-> +	err = i2c_add_numbered_adapter(adap);
-
-... and use i2c_add_adpter here. Since recently the core checks the
-ofnode for an alias. Sorry, forgot to mention this last time.
-
-> +	if (err) {
-> +		dev_err(&pdev->dev, "failed to add adapter\n");
-> +		return err;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, i2c_dev);
-> +
-> +	of_i2c_register_devices(adap);
-> +
-> +	return 0;
-> +}
-> +
-> +module_platform_driver(wmt_i2c_driver);
-> +
-> +MODULE_DESCRIPTION("Wondermedia I2C master-mode bus adapter");
-> +MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
-> +MODULE_LICENSE("GPL and additional rights");
-
-I see no additional rights mentioned. According to the header "GPL"
-should do, but you know the original sources better.
-
-> +MODULE_DEVICE_TABLE(of, wmt_i2c_dt_ids);
-> -- 
-> 1.7.9.5
-> 
-
-Regards,
-
-   Wolfram
-
+Thanks,
+-- 
+Ming Lei
+-------------- next part --------------
+An embedded and charset-unspecified text was scrubbed...
+Name: pandaA1-20130607-2.txt
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/92e61811/attachment-0001.txt>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/36622107/attachment.sig>
+Name: config.tar.gz
+Type: application/x-gzip
+Size: 19691 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/92e61811/attachment-0001.bin>
