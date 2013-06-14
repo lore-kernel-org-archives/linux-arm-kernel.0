@@ -1,140 +1,283 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Jun 2013 21:33:03 +0200
-Subject: [PATCH 27/28] ARM: EXYNOS: Remove CONFIG_SOC_EXYNOS4412
-In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371238384-1504-28-git-send-email-t.figa@samsung.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Fri, 14 Jun 2013 21:36:53 +0200
+Subject: [PATCHv5,2/8] i2c: mv64xxx: make the registers offset configurable
+In-Reply-To: <1371056017-8166-3-git-send-email-maxime.ripard@free-electrons.com>
+References: <1371056017-8166-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130614193653.GA25947@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos4212 and Exynos4412 SoCs differ only in number of ARM cores and
-there is no need to have separate Kconfig options for them, since they
-use the same code.
+On Wed, Jun 12, 2013 at 06:53:31PM +0200, Maxime Ripard wrote:
+> The Allwinner i2c controller uses the same logic as the Marvell one, but
+> with slightly different register offsets.
+> 
+> Introduce a structure that will be passed by either the pdata or
+> associated to the compatible strings, and that holds the various
+> registers that might be needed.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-This patch removes CONFIG_SOC_EXYNOS4412, leaving CONFIG_SOC_EXYNOS4212
-as the one supporting both SoCs from this series.
+Hi Maxime
 
-Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: cpufreq at vger.kernel.org
-Cc: linux-pm at vger.kernel.org
-Cc: linux-media at vger.kernel.org
-Cc: linux-serial at vger.kernel.org
-Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos/Kconfig              | 11 +----------
- arch/arm/plat-samsung/include/plat/cpu.h  |  6 +-----
- drivers/cpufreq/Kconfig.arm               |  2 +-
- drivers/media/platform/exynos4-is/Kconfig |  2 +-
- drivers/thermal/exynos_thermal.c          |  2 +-
- drivers/tty/serial/samsung.c              |  3 +--
- 6 files changed, 6 insertions(+), 20 deletions(-)
+I tested on a Kirkwood QNAP. It has an RTC on the i2c bus. It still
+gives the correct time with your patches applied.
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 47d8d9e..fe75a65 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -46,7 +46,7 @@ config CPU_EXYNOS4210
- 	  Enable EXYNOS4210 CPU support
- 
- config SOC_EXYNOS4212
--	bool "SAMSUNG EXYNOS4212"
-+	bool "SAMSUNG EXYNOS4212/4412"
- 	default y
- 	depends on ARCH_EXYNOS4
- 	select PINCTRL_EXYNOS
-@@ -56,15 +56,6 @@ config SOC_EXYNOS4212
- 	help
- 	  Enable EXYNOS4212 SoC support
- 
--config SOC_EXYNOS4412
--	bool "SAMSUNG EXYNOS4412"
--	default y
--	depends on ARCH_EXYNOS4
--	select PINCTRL_EXYNOS
--	select SAMSUNG_DMADEV
--	help
--	  Enable EXYNOS4412 SoC support
--
- config SOC_EXYNOS5250
- 	bool "SAMSUNG EXYNOS5250"
- 	default y
-diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
-index 989fefe..87b03bb 100644
---- a/arch/arm/plat-samsung/include/plat/cpu.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -122,13 +122,9 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
- 
- #if defined(CONFIG_SOC_EXYNOS4212)
- # define soc_is_exynos4212()	is_samsung_exynos4212()
--#else
--# define soc_is_exynos4212()	0
--#endif
--
--#if defined(CONFIG_SOC_EXYNOS4412)
- # define soc_is_exynos4412()	is_samsung_exynos4412()
- #else
-+# define soc_is_exynos4212()	0
- # define soc_is_exynos4412()	0
- #endif
- 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index a924408..b214ad6 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -32,7 +32,7 @@ config ARM_EXYNOS4210_CPUFREQ
- 	  SoC (S5PV310 or S5PC210).
- 
- config ARM_EXYNOS4X12_CPUFREQ
--	def_bool (SOC_EXYNOS4212 || SOC_EXYNOS4412)
-+	def_bool SOC_EXYNOS4212
- 	help
- 	  This adds the CPUFreq driver for Samsung EXYNOS4X12
- 	  SoC (EXYNOS4212 or EXYNOS4412).
-diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
-index 6ff99b5..f483e11 100644
---- a/drivers/media/platform/exynos4-is/Kconfig
-+++ b/drivers/media/platform/exynos4-is/Kconfig
-@@ -32,7 +32,7 @@ config VIDEO_S5P_MIPI_CSIS
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called s5p-csis.
- 
--if SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
-+if SOC_EXYNOS4212 || SOC_EXYNOS5250
- 
- config VIDEO_EXYNOS_FIMC_LITE
- 	tristate "EXYNOS FIMC-LITE camera interface driver"
-diff --git a/drivers/thermal/exynos_thermal.c b/drivers/thermal/exynos_thermal.c
-index 788b1dd..f88a2ad 100644
---- a/drivers/thermal/exynos_thermal.c
-+++ b/drivers/thermal/exynos_thermal.c
-@@ -817,7 +817,7 @@ static struct exynos_tmu_platform_data const exynos4210_default_tmu_data = {
- #define EXYNOS4210_TMU_DRV_DATA (NULL)
- #endif
- 
--#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4412)
-+#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4212)
- static struct exynos_tmu_platform_data const exynos_default_tmu_data = {
- 	.threshold_falling = 10,
- 	.trigger_levels[0] = 85,
-diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-index 0c8a9fa..eeb8ecb 100644
---- a/drivers/tty/serial/samsung.c
-+++ b/drivers/tty/serial/samsung.c
-@@ -1714,8 +1714,7 @@ static struct s3c24xx_serial_drv_data s5pv210_serial_drv_data = {
- #endif
- 
- #if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) || \
--	defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) || \
--	defined(CONFIG_SOC_EXYNOS5440)
-+	defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS5440)
- static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
- 	.info = &(struct s3c24xx_uart_info) {
- 		.name		= "Samsung Exynos4 UART",
--- 
-1.8.2.1
+Tested-by: Andrew Lunn <andrew@lunn.ch>
+
+      Andrew
+
+> 
+> ---
+> drivers/i2c/busses/i2c-mv64xxx.c | 101 ++++++++++++++++++++++++---------------
+>  1 file changed, 62 insertions(+), 39 deletions(-)
+> 
+> diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+> index d70a2fda..7ba9bac 100644
+> --- a/drivers/i2c/busses/i2c-mv64xxx.c
+> +++ b/drivers/i2c/busses/i2c-mv64xxx.c
+> @@ -19,20 +19,12 @@
+>  #include <linux/platform_device.h>
+>  #include <linux/io.h>
+>  #include <linux/of.h>
+> +#include <linux/of_device.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/of_i2c.h>
+>  #include <linux/clk.h>
+>  #include <linux/err.h>
+>  
+> -/* Register defines */
+> -#define	MV64XXX_I2C_REG_SLAVE_ADDR			0x00
+> -#define	MV64XXX_I2C_REG_DATA				0x04
+> -#define	MV64XXX_I2C_REG_CONTROL				0x08
+> -#define	MV64XXX_I2C_REG_STATUS				0x0c
+> -#define	MV64XXX_I2C_REG_BAUD				0x0c
+> -#define	MV64XXX_I2C_REG_EXT_SLAVE_ADDR			0x10
+> -#define	MV64XXX_I2C_REG_SOFT_RESET			0x1c
+> -
+>  #define MV64XXX_I2C_ADDR_ADDR(val)			((val & 0x7f) << 1)
+>  #define MV64XXX_I2C_BAUD_DIV_N(val)			(val & 0x7)
+>  #define MV64XXX_I2C_BAUD_DIV_M(val)			((val & 0xf) << 3)
+> @@ -89,6 +81,16 @@ enum {
+>  	MV64XXX_I2C_ACTION_SEND_STOP,
+>  };
+>  
+> +struct mv64xxx_i2c_regs {
+> +	u8	addr;
+> +	u8	ext_addr;
+> +	u8	data;
+> +	u8	control;
+> +	u8	status;
+> +	u8	clock;
+> +	u8	soft_reset;
+> +};
+> +
+>  struct mv64xxx_i2c_data {
+>  	struct i2c_msg		*msgs;
+>  	int			num_msgs;
+> @@ -98,6 +100,7 @@ struct mv64xxx_i2c_data {
+>  	u32			aborting;
+>  	u32			cntl_bits;
+>  	void __iomem		*reg_base;
+> +	struct mv64xxx_i2c_regs	reg_offsets;
+>  	u32			addr1;
+>  	u32			addr2;
+>  	u32			bytes_left;
+> @@ -116,6 +119,16 @@ struct mv64xxx_i2c_data {
+>  	struct i2c_adapter	adapter;
+>  };
+>  
+> +static struct mv64xxx_i2c_regs mv64xxx_i2c_regs_mv64xxx = {
+> +	.addr		= 0x00,
+> +	.ext_addr	= 0x10,
+> +	.data		= 0x04,
+> +	.control	= 0x08,
+> +	.status		= 0x0c,
+> +	.clock		= 0x0c,
+> +	.soft_reset	= 0x1c,
+> +};
+> +
+>  static void
+>  mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
+>  	struct i2c_msg *msg)
+> @@ -154,13 +167,13 @@ mv64xxx_i2c_prepare_for_io(struct mv64xxx_i2c_data *drv_data,
+>  static void
+>  mv64xxx_i2c_hw_init(struct mv64xxx_i2c_data *drv_data)
+>  {
+> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SOFT_RESET);
+> +	writel(0, drv_data->reg_base + drv_data->reg_offsets.soft_reset);
+>  	writel(MV64XXX_I2C_BAUD_DIV_M(drv_data->freq_m) | MV64XXX_I2C_BAUD_DIV_N(drv_data->freq_n),
+> -		drv_data->reg_base + MV64XXX_I2C_REG_BAUD);
+> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_SLAVE_ADDR);
+> -	writel(0, drv_data->reg_base + MV64XXX_I2C_REG_EXT_SLAVE_ADDR);
+> +		drv_data->reg_base + drv_data->reg_offsets.clock);
+> +	writel(0, drv_data->reg_base + drv_data->reg_offsets.addr);
+> +	writel(0, drv_data->reg_base + drv_data->reg_offsets.ext_addr);
+>  	writel(MV64XXX_I2C_REG_CONTROL_TWSIEN | MV64XXX_I2C_REG_CONTROL_STOP,
+> -		drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +		drv_data->reg_base + drv_data->reg_offsets.control);
+>  	drv_data->state = MV64XXX_I2C_STATE_IDLE;
+>  }
+>  
+> @@ -282,7 +295,7 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+>  
+>  		drv_data->cntl_bits |= MV64XXX_I2C_REG_CONTROL_START;
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  
+>  		drv_data->msgs++;
+>  		drv_data->num_msgs--;
+> @@ -300,48 +313,48 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+>  
+>  	case MV64XXX_I2C_ACTION_CONTINUE:
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_SEND_START:
+>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_START,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_SEND_ADDR_1:
+>  		writel(drv_data->addr1,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			drv_data->reg_base + drv_data->reg_offsets.data);
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_SEND_ADDR_2:
+>  		writel(drv_data->addr2,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			drv_data->reg_base + drv_data->reg_offsets.data);
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_SEND_DATA:
+>  		writel(drv_data->msg->buf[drv_data->byte_posn++],
+> -			drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			drv_data->reg_base + drv_data->reg_offsets.data);
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_RCV_DATA:
+>  		drv_data->msg->buf[drv_data->byte_posn++] =
+> -			readl(drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			readl(drv_data->reg_base + drv_data->reg_offsets.data);
+>  		writel(drv_data->cntl_bits,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  		break;
+>  
+>  	case MV64XXX_I2C_ACTION_RCV_DATA_STOP:
+>  		drv_data->msg->buf[drv_data->byte_posn++] =
+> -			readl(drv_data->reg_base + MV64XXX_I2C_REG_DATA);
+> +			readl(drv_data->reg_base + drv_data->reg_offsets.data);
+>  		drv_data->cntl_bits &= ~MV64XXX_I2C_REG_CONTROL_INTEN;
+>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  		drv_data->block = 0;
+>  		wake_up(&drv_data->waitq);
+>  		break;
+> @@ -356,7 +369,7 @@ mv64xxx_i2c_do_action(struct mv64xxx_i2c_data *drv_data)
+>  	case MV64XXX_I2C_ACTION_SEND_STOP:
+>  		drv_data->cntl_bits &= ~MV64XXX_I2C_REG_CONTROL_INTEN;
+>  		writel(drv_data->cntl_bits | MV64XXX_I2C_REG_CONTROL_STOP,
+> -			drv_data->reg_base + MV64XXX_I2C_REG_CONTROL);
+> +			drv_data->reg_base + drv_data->reg_offsets.control);
+>  		drv_data->block = 0;
+>  		wake_up(&drv_data->waitq);
+>  		break;
+> @@ -372,9 +385,9 @@ mv64xxx_i2c_intr(int irq, void *dev_id)
+>  	irqreturn_t	rc = IRQ_NONE;
+>  
+>  	spin_lock_irqsave(&drv_data->lock, flags);
+> -	while (readl(drv_data->reg_base + MV64XXX_I2C_REG_CONTROL) &
+> +	while (readl(drv_data->reg_base + drv_data->reg_offsets.control) &
+>  						MV64XXX_I2C_REG_CONTROL_IFLG) {
+> -		status = readl(drv_data->reg_base + MV64XXX_I2C_REG_STATUS);
+> +		status = readl(drv_data->reg_base + drv_data->reg_offsets.status);
+>  		mv64xxx_i2c_fsm(drv_data, status);
+>  		mv64xxx_i2c_do_action(drv_data);
+>  		rc = IRQ_HANDLED;
+> @@ -495,6 +508,12 @@ static const struct i2c_algorithm mv64xxx_i2c_algo = {
+>   *
+>   *****************************************************************************
+>   */
+> +static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
+> +	{ .compatible = "marvell,mv64xxx-i2c", .data = &mv64xxx_i2c_regs_mv64xxx},
+> +	{}
+> +};
+> +MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
+> +
+>  #ifdef CONFIG_OF
+>  static int
+>  mv64xxx_calc_freq(const int tclk, const int n, const int m)
+> @@ -528,8 +547,10 @@ mv64xxx_find_baud_factors(const u32 req_freq, const u32 tclk, u32 *best_n,
+>  
+>  static int
+>  mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+> -		  struct device_node *np)
+> +		  struct device *dev)
+>  {
+> +	const struct of_device_id *device;
+> +	struct device_node *np = dev->of_node;
+>  	u32 bus_freq, tclk;
+>  	int rc = 0;
+>  
+> @@ -558,6 +579,13 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+>  	 * So hard code the value to 1 second.
+>  	 */
+>  	drv_data->adapter.timeout = HZ;
+> +
+> +	device = of_match_device(mv64xxx_i2c_of_match_table, dev);
+> +	if (!device)
+> +		return -ENODEV;
+> +
+> +	memcpy(&drv_data->reg_offsets, device->data, sizeof(drv_data->reg_offsets));
+> +
+>  out:
+>  	return rc;
+>  #endif
+> @@ -565,7 +593,7 @@ out:
+>  #else /* CONFIG_OF */
+>  static int
+>  mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+> -		  struct device_node *np)
+> +		  struct device *dev)
+>  {
+>  	return -ENODEV;
+>  }
+> @@ -611,8 +639,9 @@ mv64xxx_i2c_probe(struct platform_device *pd)
+>  		drv_data->freq_n = pdata->freq_n;
+>  		drv_data->irq = platform_get_irq(pd, 0);
+>  		drv_data->adapter.timeout = msecs_to_jiffies(pdata->timeout);
+> +		memcpy(&drv_data->reg_offsets, &mv64xxx_i2c_regs_mv64xxx, sizeof(drv_data->reg_offsets));
+>  	} else if (pd->dev.of_node) {
+> -		rc = mv64xxx_of_config(drv_data, pd->dev.of_node);
+> +		rc = mv64xxx_of_config(drv_data, &pd->dev);
+>  		if (rc)
+>  			goto exit_clk;
+>  	}
+> @@ -680,12 +709,6 @@ mv64xxx_i2c_remove(struct platform_device *dev)
+>  	return 0;
+>  }
+>  
+> -static const struct of_device_id mv64xxx_i2c_of_match_table[] = {
+> -	{ .compatible = "marvell,mv64xxx-i2c", },
+> -	{}
+> -};
+> -MODULE_DEVICE_TABLE(of, mv64xxx_i2c_of_match_table);
+> -
+>  static struct platform_driver mv64xxx_i2c_driver = {
+>  	.probe	= mv64xxx_i2c_probe,
+>  	.remove	= mv64xxx_i2c_remove,
