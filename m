@@ -1,71 +1,52 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Fri, 14 Jun 2013 17:15:33 +0800
-Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
-In-Reply-To: <201306101035.20924.arnd@arndb.de>
-References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
- <201306061826.19551.arnd@arndb.de>
- <CADApbeixEKi984QED07LxA8vzfHmLGCGT8KxEbB5cqXzpW823Q@mail.gmail.com>
- <201306101035.20924.arnd@arndb.de>
-Message-ID: <CADApbeh9EJDetkvx9Sq=y58mkhU_X1oo-e_hgZqeBV9nriqTiQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Fri, 14 Jun 2013 11:18:22 +0200
+Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
+ properties from a dt node
+In-Reply-To: <1862891.4yIecp615h@avalon>
+References: <201306102139.32444.heiko@sntech.de>
+ <CACRpkdZavNX3jk4K5unEJCED4vTuZEUF=NC1naGOMyr54hXQKw@mail.gmail.com>
+ <1862891.4yIecp615h@avalon>
+Message-ID: <201306141118.22663.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 10, 2013 at 4:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+Am Freitag, 14. Juni 2013, 01:53:49 schrieb Laurent Pinchart:
+> Hi Linus,
+> 
+> On Thursday 13 June 2013 17:36:00 Linus Walleij wrote:
+> > On Thu, Jun 13, 2013 at 5:23 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > >> Ok, I'll see that I get this fixed :-)
+> > > 
+> > > Hmm ... what is the meaning of the argument of bias-disable and
+> > > bias-high- impedance, as the kernel-doc in pinconf-generic.h does not
+> > > tell?
+> > 
+> > I think those arguments are N/A, ignored, doesn't matter.
+> > If these options were typed, they would be bool.
+> > 
+> > Please improve documentation if you can... sorry for all the
+> > rough edges.
+> > 
+> > > bias-bus-hold ignores its argument and we already clarified that the
+> > > pull-* do have != 0 or 0 argument.
+> > 
+> > I think in the DT binding, both these forms:
+> > 
+> > bias-pull-up;
+> > bias-pull-up = <150000>;
+> > 
+> > Should be allowed.
+> > 
+> > So when parsing, you first check if it exists, then if there
+> > is an argument, if there is no value supplied, just set it
+> > to 1, as that is clearly != 0...
+> 
+> What's the expected way to disable pull-ups in DT ? Should it be
+> 'bias-pull-up = <0>;' or 'bias-disable;' ?
 
->
->> >> > __initdata = {
->> >> > >           .virtual        = (unsigned long)AXI_VIRT_BASE,
->> >> > >           .length         = AXI_PHYS_SIZE,
->> >> > >           .type           = MT_DEVICE,
->> >> > > - },
->> >> > > + }, {
->> >> > > +         .pfn            = __phys_to_pfn(MMP_CORE_PERIPH_PHYS_BASE),
->> >> > > +         .virtual        = (unsigned long)MMP_CORE_PERIPH_VIRT_BASE,
->> >> > > +         .length         = MMP_CORE_PERIPH_PHYS_SIZE,
->> >> > > +         .type           = MT_DEVICE,
->> >> > > + }
->> >> > >  };
->> >> > >
->> >> > >  void __init mmp_map_io(void)
->> >> >
->> >> > What is this needed for?
->> >>
->> >> This function is used to static map the device registers.
->> >
->> > I understand what map_io does. Why do you need a static mapping?
->> >
->>
->> The AXI and APB bus register mapping, It does not need to be static mapping.
->> Because we define the registers for each peripharals in device tree.
->> The device driver can map it.
->
-> Ok. Please try if it all keeps working without these mappings (aside
-> from the SCU). You can leave them in as a performance optimization
-> since the registers will get mapped as large pages this way, but it
-> should really work without them.
->
-> I would also suggest defining the virtual base addresses locally in this
-> file rather than globally, just to ensure that no driver starts relying
-> on the static mapping.
->
->> There is a exception. The address space used by core for example CPU
->> SCU registers for CA9.
->> We have to read/write the registers even device tree has not been
->> build up in kernel, for example ->smp_prepare_cpus.
->> At this point, how can we get the base address for SCU?
->
-> I guess that is a problem we have on other platforms as well, we should
-> find a generic solution for that. It would be nice to reserve a page
-> in "fixmap" and have common code map the SCU page into that.
->
+According to the kernedoc I think both are valid and should be handled. Using 
+bias-disable is more descriptive but would also include disabling a "high-
+impedance" or "bus-hold" bias (if supported by the hardware).
 
-So you mean that reserve a page in arch/arm/asm/include/fixmap.h?
-This reserve will depend on the cpu type beacuse only A9 will have SCU part.
-I do not know that in fixmap, the #ifdef is acceptable or not.
-For the common code to map the SCU page, where do you suggest to put it?
-
->> >> > > +/* PXA988 */
->> >> > > +static const struct of_dev_auxdata pxa988_auxdata_lookup[] __initconst
-
->
->         Arnd
+Personally, for my rockchip stuff I go with using the "bias-pull-pin-default" 
+<-> "bias-disable".
