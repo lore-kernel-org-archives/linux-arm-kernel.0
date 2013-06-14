@@ -1,44 +1,22 @@
-From: avinashphilipk@gmail.com (Philip Avinash)
-Date: Fri, 14 Jun 2013 15:27:49 +0530
-Subject: [PATCH 2/2] gpio: gpio-tnetv107x: Fix bulid breakge
-In-Reply-To: <1371203869-16308-1-git-send-email-avinashphilipk@gmail.com>
-References: <1371203869-16308-1-git-send-email-avinashphilipk@gmail.com>
-Message-ID: <1371203869-16308-3-git-send-email-avinashphilipk@gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 14 Jun 2013 11:00:20 +0100
+Subject: [PATCH] ASoC: Fix double assignment of .owner in struct
+ snd_soc_card
+In-Reply-To: <1371203336-16972-1-git-send-email-emilgoode@gmail.com>
+References: <1371203336-16972-1-git-send-email-emilgoode@gmail.com>
+Message-ID: <20130614100020.GH1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-includes linux/io.h for fixing following build error. This build error
-comes only after removing select option of NEED_MACH_GPIO_H for
-ARCH_DAVINCI. linux/io.h is got included from mach/gpio-davinci.h on
-selection of NEED_MACH_GPIO_H.
+On Fri, Jun 14, 2013 at 11:48:56AM +0200, Emil Goode wrote:
+> In struct snd_soc_card zylonite .owner is assigned THIS_MODULE
+> twice, remove one of them.
 
-drivers/gpio/gpio-tnetv107x.c: In function 'tnetv107x_gpio_request':
-drivers/gpio/gpio-tnetv107x.c:63:2: error: implicit declaration of
-function '__raw_writel'
-drivers/gpio/gpio-tnetv107x.c:63:2: error: implicit declaration of
-function '__raw_readl'
-drivers/gpio/gpio-tnetv107x.c: In function 'tnetv107x_gpio_setup':
-drivers/gpio/gpio-tnetv107x.c:172:2: error: implicit declaration of
-function 'ioremap'
-drivers/gpio/gpio-tnetv107x.c:172:7: warning: assignment makes pointer
-from integer without a cast
-
-Signed-off-by: Philip Avinash <avinashphilipk@gmail.com>
----
- drivers/gpio/gpio-tnetv107x.c |    1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/gpio/gpio-tnetv107x.c b/drivers/gpio/gpio-tnetv107x.c
-index 3fa3e28..c7ed335 100644
---- a/drivers/gpio/gpio-tnetv107x.c
-+++ b/drivers/gpio/gpio-tnetv107x.c
-@@ -14,6 +14,7 @@
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
-+#include <linux/io.h>
- #include <linux/gpio.h>
- 
- #include <mach/common.h>
--- 
-1.7.9.5
+Applied, thanks.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/c830586d/attachment.sig>
