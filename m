@@ -1,25 +1,26 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 14 Jun 2013 10:54:54 +0100
-Subject: [PATCH 2/2] regulators: ab3100: bootstrap board power
-In-Reply-To: <1371154828-28117-1-git-send-email-linus.walleij@stericsson.com>
-References: <1371154828-28117-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130614095454.GF1403@sirena.org.uk>
+From: avinashphilipk@gmail.com (Philip Avinash)
+Date: Fri, 14 Jun 2013 15:27:47 +0530
+Subject: [PATCH 0/2] Fix build breakage for tnetv107x platforms
+Message-ID: <1371203869-16308-1-git-send-email-avinashphilipk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 10:20:28PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This moves the code from the platform that is bootstrapping
-> the power on the U300 platform out from the machine directory
-> and the special-purpose board node and module and into the
-> regulator node and driver itself.
+tnetv107x_defconfig build failing on removal selection of NEED_MACH_GPIO_H
+for ARCH_DAVINCI. This is due to header files inclusion from mach/gpio-davinci.h
+So this patch series fixes the build breakage on removal of NEED_MACH_GPIO_H.
 
-Hrm.  Wouldn't this fit better into the new reset framework?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/cdf730b6/attachment.sig>
+This patch series is based on Linux 3.10-rc4 and is availabel at [1] and dependency on 2.
+
+1. https://github.com/avinashphilip/am335x_linux/tree/linux_davinci_v3.10_soc_gpio_v310-rc4
+2. https://patchwork.kernel.org/patch/97853/
+
+Philip Avinash (2):
+  ARM: davinci: fix for build breakage for tnetv107x platforms
+  gpio: gpio-tnetv107x: Fix bulid breakge
+
+ arch/arm/mach-davinci/board-tnetv107x-evm.c |    5 +++--
+ drivers/gpio/gpio-tnetv107x.c               |    1 +
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+-- 
+1.7.9.5
