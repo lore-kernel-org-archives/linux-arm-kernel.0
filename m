@@ -1,277 +1,101 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Jun 2013 21:33:02 +0200
-Subject: [PATCH 26/28] ARM: EXYNOS: Remove unused base addresses from
- mach/map.h header
+Date: Fri, 14 Jun 2013 21:33:04 +0200
+Subject: [PATCH 28/28] ARM: EXYNOS: Remove mach/regs-usb-phy.h header
 In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
 References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371238384-1504-27-git-send-email-t.figa@samsung.com>
+Message-ID: <1371238384-1504-29-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes all the unused base addresses from mach/map.h header,
-leaving only addresses of IPs that currently use static IO mapping or
-need the address hardcoded, like low level debug UART.
+This patch removes mach/regs-usb-phy.h header, which is not used
+anywhere in the kernel.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/map.h | 214 --------------------------------
- 1 file changed, 214 deletions(-)
+ arch/arm/mach-exynos/include/mach/regs-usb-phy.h | 74 ------------------------
+ 1 file changed, 74 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-phy.h
 
-diff --git a/arch/arm/mach-exynos/include/mach/map.h b/arch/arm/mach-exynos/include/mach/map.h
-index 92b29bb..7b046b5 100644
---- a/arch/arm/mach-exynos/include/mach/map.h
-+++ b/arch/arm/mach-exynos/include/mach/map.h
-@@ -30,31 +30,6 @@
- #define EXYNOS4x12_PA_SYSRAM_NS		0x0204F000
- #define EXYNOS5250_PA_SYSRAM_NS		0x0204F000
- 
--#define EXYNOS4_PA_FIMC0		0x11800000
--#define EXYNOS4_PA_FIMC1		0x11810000
--#define EXYNOS4_PA_FIMC2		0x11820000
--#define EXYNOS4_PA_FIMC3		0x11830000
+diff --git a/arch/arm/mach-exynos/include/mach/regs-usb-phy.h b/arch/arm/mach-exynos/include/mach/regs-usb-phy.h
+deleted file mode 100644
+index 0727773..0000000
+--- a/arch/arm/mach-exynos/include/mach/regs-usb-phy.h
++++ /dev/null
+@@ -1,74 +0,0 @@
+-/*
+- * Copyright (C) 2011 Samsung Electronics Co.Ltd
+- * Author: Joonyoung Shim <jy0922.shim@samsung.com>
+- *
+- * This program is free software; you can redistribute  it and/or modify it
+- * under  the terms of  the GNU General  Public License as published by the
+- * Free Software Foundation;  either version 2 of the  License, or (at your
+- * option) any later version.
+- */
 -
--#define EXYNOS4_PA_JPEG			0x11840000
+-#ifndef __PLAT_S5P_REGS_USB_PHY_H
+-#define __PLAT_S5P_REGS_USB_PHY_H
 -
--/* x = 0...1 */
--#define EXYNOS4_PA_FIMC_LITE(x)		(0x12390000 + ((x) * 0x10000))
+-#define EXYNOS4_HSOTG_PHYREG(x)		((x) + S3C_VA_USB_HSPHY)
 -
--#define EXYNOS4_PA_G2D			0x12800000
+-#define EXYNOS4_PHYPWR			EXYNOS4_HSOTG_PHYREG(0x00)
+-#define PHY1_HSIC_NORMAL_MASK		(0xf << 9)
+-#define PHY1_HSIC1_SLEEP		(1 << 12)
+-#define PHY1_HSIC1_FORCE_SUSPEND	(1 << 11)
+-#define PHY1_HSIC0_SLEEP		(1 << 10)
+-#define PHY1_HSIC0_FORCE_SUSPEND	(1 << 9)
 -
--#define EXYNOS4_PA_I2S0			0x03830000
--#define EXYNOS4_PA_I2S1			0xE3100000
--#define EXYNOS4_PA_I2S2			0xE2A00000
+-#define PHY1_STD_NORMAL_MASK		(0x7 << 6)
+-#define PHY1_STD_SLEEP			(1 << 8)
+-#define PHY1_STD_ANALOG_POWERDOWN	(1 << 7)
+-#define PHY1_STD_FORCE_SUSPEND		(1 << 6)
 -
--#define EXYNOS4_PA_PCM0			0x03840000
--#define EXYNOS4_PA_PCM1			0x13980000
--#define EXYNOS4_PA_PCM2			0x13990000
+-#define PHY0_NORMAL_MASK		(0x39 << 0)
+-#define PHY0_SLEEP			(1 << 5)
+-#define PHY0_OTG_DISABLE		(1 << 4)
+-#define PHY0_ANALOG_POWERDOWN		(1 << 3)
+-#define PHY0_FORCE_SUSPEND		(1 << 0)
 -
--#define EXYNOS4_PA_SROM_BANK(x)		(0x04000000 + ((x) * 0x01000000))
+-#define EXYNOS4_PHYCLK			EXYNOS4_HSOTG_PHYREG(0x04)
+-#define PHY1_COMMON_ON_N		(1 << 7)
+-#define PHY0_COMMON_ON_N		(1 << 4)
+-#define PHY0_ID_PULLUP			(1 << 2)
 -
--#define EXYNOS4_PA_ONENAND		0x0C000000
--#define EXYNOS4_PA_ONENAND_DMA		0x0C600000
+-#define EXYNOS4_CLKSEL_SHIFT		(0)
 -
- #define EXYNOS_PA_CHIPID		0x10000000
- 
- #define EXYNOS4_PA_SYSCON		0x10010000
-@@ -71,10 +46,6 @@
- #define EXYNOS4_PA_WATCHDOG		0x10060000
- #define EXYNOS5_PA_WATCHDOG		0x101D0000
- 
--#define EXYNOS4_PA_RTC			0x10070000
+-#define EXYNOS4210_CLKSEL_MASK		(0x3 << 0)
+-#define EXYNOS4210_CLKSEL_48M		(0x0 << 0)
+-#define EXYNOS4210_CLKSEL_12M		(0x2 << 0)
+-#define EXYNOS4210_CLKSEL_24M		(0x3 << 0)
 -
--#define EXYNOS4_PA_KEYPAD		0x100A0000
+-#define EXYNOS4X12_CLKSEL_MASK		(0x7 << 0)
+-#define EXYNOS4X12_CLKSEL_9600K		(0x0 << 0)
+-#define EXYNOS4X12_CLKSEL_10M		(0x1 << 0)
+-#define EXYNOS4X12_CLKSEL_12M		(0x2 << 0)
+-#define EXYNOS4X12_CLKSEL_19200K	(0x3 << 0)
+-#define EXYNOS4X12_CLKSEL_20M		(0x4 << 0)
+-#define EXYNOS4X12_CLKSEL_24M		(0x5 << 0)
 -
- #define EXYNOS4_PA_DMC0			0x10400000
- #define EXYNOS4_PA_DMC1			0x10410000
- 
-@@ -87,207 +58,22 @@
- #define EXYNOS5_PA_GIC_DIST		0x10481000
- 
- #define EXYNOS4_PA_COREPERI		0x10500000
--#define EXYNOS4_PA_TWD			0x10500600
- #define EXYNOS4_PA_L2CC			0x10502000
- 
--#define EXYNOS4_PA_TMU			0x100C0000
+-#define EXYNOS4_RSTCON			EXYNOS4_HSOTG_PHYREG(0x08)
+-#define HOST_LINK_PORT_SWRST_MASK	(0xf << 6)
+-#define HOST_LINK_PORT2_SWRST		(1 << 9)
+-#define HOST_LINK_PORT1_SWRST		(1 << 8)
+-#define HOST_LINK_PORT0_SWRST		(1 << 7)
+-#define HOST_LINK_ALL_SWRST		(1 << 6)
 -
--#define EXYNOS4_PA_MDMA0		0x10810000
--#define EXYNOS4_PA_MDMA1		0x12850000
--#define EXYNOS4_PA_S_MDMA1		0x12840000
--#define EXYNOS4_PA_PDMA0		0x12680000
--#define EXYNOS4_PA_PDMA1		0x12690000
--#define EXYNOS5_PA_MDMA0		0x10800000
--#define EXYNOS5_PA_MDMA1		0x11C10000
--#define EXYNOS5_PA_PDMA0		0x121A0000
--#define EXYNOS5_PA_PDMA1		0x121B0000
+-#define PHY1_SWRST_MASK			(0x7 << 3)
+-#define PHY1_HSIC_SWRST			(1 << 5)
+-#define PHY1_STD_SWRST			(1 << 4)
+-#define PHY1_ALL_SWRST			(1 << 3)
 -
--#define EXYNOS4_PA_SYSMMU_MDMA		0x10A40000
--#define EXYNOS4_PA_SYSMMU_2D_ACP	0x10A40000
--#define EXYNOS4_PA_SYSMMU_SSS		0x10A50000
--#define EXYNOS4_PA_SYSMMU_FIMC0		0x11A20000
--#define EXYNOS4_PA_SYSMMU_FIMC1		0x11A30000
--#define EXYNOS4_PA_SYSMMU_FIMC2		0x11A40000
--#define EXYNOS4_PA_SYSMMU_FIMC3		0x11A50000
--#define EXYNOS4_PA_SYSMMU_JPEG		0x11A60000
--#define EXYNOS4_PA_SYSMMU_FIMD0		0x11E20000
--#define EXYNOS4_PA_SYSMMU_FIMD1		0x12220000
--#define EXYNOS4_PA_SYSMMU_FIMC_ISP	0x12260000
--#define EXYNOS4_PA_SYSMMU_FIMC_DRC	0x12270000
--#define EXYNOS4_PA_SYSMMU_FIMC_FD	0x122A0000
--#define EXYNOS4_PA_SYSMMU_ISPCPU	0x122B0000
--#define EXYNOS4_PA_SYSMMU_FIMC_LITE0	0x123B0000
--#define EXYNOS4_PA_SYSMMU_FIMC_LITE1	0x123C0000
--#define EXYNOS4_PA_SYSMMU_PCIe		0x12620000
--#define EXYNOS4_PA_SYSMMU_G2D		0x12A20000
--#define EXYNOS4_PA_SYSMMU_ROTATOR	0x12A30000
--#define EXYNOS4_PA_SYSMMU_MDMA2		0x12A40000
--#define EXYNOS4_PA_SYSMMU_TV		0x12E20000
--#define EXYNOS4_PA_SYSMMU_MFC_L		0x13620000
--#define EXYNOS4_PA_SYSMMU_MFC_R		0x13630000
+-#define PHY0_SWRST_MASK			(0x7 << 0)
+-#define PHY0_PHYLINK_SWRST		(1 << 2)
+-#define PHY0_HLINK_SWRST		(1 << 1)
+-#define PHY0_SWRST			(1 << 0)
 -
--#define EXYNOS5_PA_GSC0			0x13E00000
--#define EXYNOS5_PA_GSC1			0x13E10000
--#define EXYNOS5_PA_GSC2			0x13E20000
--#define EXYNOS5_PA_GSC3			0x13E30000
+-#define EXYNOS4_PHY1CON			EXYNOS4_HSOTG_PHYREG(0x34)
+-#define FPENABLEN			(1 << 0)
 -
--#define EXYNOS5_PA_SYSMMU_MDMA1		0x10A40000
--#define EXYNOS5_PA_SYSMMU_SSS		0x10A50000
--#define EXYNOS5_PA_SYSMMU_2D		0x10A60000
--#define EXYNOS5_PA_SYSMMU_MFC_L		0x11200000
--#define EXYNOS5_PA_SYSMMU_MFC_R		0x11210000
--#define EXYNOS5_PA_SYSMMU_ROTATOR	0x11D40000
--#define EXYNOS5_PA_SYSMMU_MDMA2		0x11D50000
--#define EXYNOS5_PA_SYSMMU_JPEG		0x11F20000
--#define EXYNOS5_PA_SYSMMU_IOP		0x12360000
--#define EXYNOS5_PA_SYSMMU_RTIC		0x12370000
--#define EXYNOS5_PA_SYSMMU_ISP		0x13260000
--#define EXYNOS5_PA_SYSMMU_DRC		0x12370000
--#define EXYNOS5_PA_SYSMMU_SCALERC	0x13280000
--#define EXYNOS5_PA_SYSMMU_SCALERP	0x13290000
--#define EXYNOS5_PA_SYSMMU_FD		0x132A0000
--#define EXYNOS5_PA_SYSMMU_ISPCPU	0x132B0000
--#define EXYNOS5_PA_SYSMMU_ODC		0x132C0000
--#define EXYNOS5_PA_SYSMMU_DIS0		0x132D0000
--#define EXYNOS5_PA_SYSMMU_DIS1		0x132E0000
--#define EXYNOS5_PA_SYSMMU_3DNR		0x132F0000
--#define EXYNOS5_PA_SYSMMU_LITE0		0x13C40000
--#define EXYNOS5_PA_SYSMMU_LITE1		0x13C50000
--#define EXYNOS5_PA_SYSMMU_GSC0		0x13E80000
--#define EXYNOS5_PA_SYSMMU_GSC1		0x13E90000
--#define EXYNOS5_PA_SYSMMU_GSC2		0x13EA0000
--#define EXYNOS5_PA_SYSMMU_GSC3		0x13EB0000
--#define EXYNOS5_PA_SYSMMU_FIMD1		0x14640000
--#define EXYNOS5_PA_SYSMMU_TV		0x14650000
--
--#define EXYNOS4_PA_SPI0			0x13920000
--#define EXYNOS4_PA_SPI1			0x13930000
--#define EXYNOS4_PA_SPI2			0x13940000
--#define EXYNOS5_PA_SPI0			0x12D20000
--#define EXYNOS5_PA_SPI1			0x12D30000
--#define EXYNOS5_PA_SPI2			0x12D40000
--
--#define EXYNOS4_PA_GPIO1		0x11400000
--#define EXYNOS4_PA_GPIO2		0x11000000
--#define EXYNOS4_PA_GPIO3		0x03860000
--#define EXYNOS5_PA_GPIO1		0x11400000
--#define EXYNOS5_PA_GPIO2		0x13400000
--#define EXYNOS5_PA_GPIO3		0x10D10000
--#define EXYNOS5_PA_GPIO4		0x03860000
--
--#define EXYNOS4_PA_MIPI_CSIS0		0x11880000
--#define EXYNOS4_PA_MIPI_CSIS1		0x11890000
--
--#define EXYNOS4_PA_FIMD0		0x11C00000
--
--#define EXYNOS4_PA_HSMMC(x)		(0x12510000 + ((x) * 0x10000))
--#define EXYNOS4_PA_DWMCI		0x12550000
--#define EXYNOS5_PA_DWMCI0		0x12200000
--#define EXYNOS5_PA_DWMCI1		0x12210000
--#define EXYNOS5_PA_DWMCI2		0x12220000
--#define EXYNOS5_PA_DWMCI3		0x12230000
--
--#define EXYNOS4_PA_HSOTG		0x12480000
--#define EXYNOS4_PA_USB_HSPHY		0x125B0000
--
--#define EXYNOS4_PA_SATA			0x12560000
--#define EXYNOS4_PA_SATAPHY		0x125D0000
--#define EXYNOS4_PA_SATAPHY_CTRL		0x126B0000
--
- #define EXYNOS4_PA_SROMC		0x12570000
- #define EXYNOS5_PA_SROMC		0x12250000
- 
--#define EXYNOS4_PA_EHCI			0x12580000
--#define EXYNOS4_PA_OHCI			0x12590000
- #define EXYNOS4_PA_HSPHY		0x125B0000
--#define EXYNOS4_PA_MFC			0x13400000
- 
- #define EXYNOS4_PA_UART			0x13800000
- #define EXYNOS5_PA_UART			0x12C00000
- 
--#define EXYNOS4_PA_VP			0x12C00000
--#define EXYNOS4_PA_MIXER		0x12C10000
--#define EXYNOS4_PA_SDO			0x12C20000
--#define EXYNOS4_PA_HDMI			0x12D00000
--#define EXYNOS4_PA_IIC_HDMIPHY		0x138E0000
--
--#define EXYNOS4_PA_IIC(x)		(0x13860000 + ((x) * 0x10000))
--#define EXYNOS5_PA_IIC(x)		(0x12C60000 + ((x) * 0x10000))
--
--#define EXYNOS4_PA_ADC			0x13910000
--#define EXYNOS4_PA_ADC1			0x13911000
--
--#define EXYNOS4_PA_AC97			0x139A0000
--
--#define EXYNOS4_PA_SPDIF		0x139B0000
--
- #define EXYNOS4_PA_TIMER		0x139D0000
- #define EXYNOS5_PA_TIMER		0x12DD0000
- 
--#define EXYNOS4_PA_SDRAM		0x40000000
--#define EXYNOS5_PA_SDRAM		0x40000000
--
--/* Compatibiltiy Defines */
--
--#define S3C_PA_HSMMC0			EXYNOS4_PA_HSMMC(0)
--#define S3C_PA_HSMMC1			EXYNOS4_PA_HSMMC(1)
--#define S3C_PA_HSMMC2			EXYNOS4_PA_HSMMC(2)
--#define S3C_PA_HSMMC3			EXYNOS4_PA_HSMMC(3)
--#define S3C_PA_IIC			EXYNOS4_PA_IIC(0)
--#define S3C_PA_IIC1			EXYNOS4_PA_IIC(1)
--#define S3C_PA_IIC2			EXYNOS4_PA_IIC(2)
--#define S3C_PA_IIC3			EXYNOS4_PA_IIC(3)
--#define S3C_PA_IIC4			EXYNOS4_PA_IIC(4)
--#define S3C_PA_IIC5			EXYNOS4_PA_IIC(5)
--#define S3C_PA_IIC6			EXYNOS4_PA_IIC(6)
--#define S3C_PA_IIC7			EXYNOS4_PA_IIC(7)
--#define S3C_PA_RTC			EXYNOS4_PA_RTC
--#define S3C_PA_WDT			EXYNOS4_PA_WATCHDOG
--#define S3C_PA_SPI0			EXYNOS4_PA_SPI0
--#define S3C_PA_SPI1			EXYNOS4_PA_SPI1
--#define S3C_PA_SPI2			EXYNOS4_PA_SPI2
--#define S3C_PA_USB_HSOTG		EXYNOS4_PA_HSOTG
--
--#define S5P_PA_EHCI			EXYNOS4_PA_EHCI
--#define S5P_PA_FIMC0			EXYNOS4_PA_FIMC0
--#define S5P_PA_FIMC1			EXYNOS4_PA_FIMC1
--#define S5P_PA_FIMC2			EXYNOS4_PA_FIMC2
--#define S5P_PA_FIMC3			EXYNOS4_PA_FIMC3
--#define S5P_PA_JPEG			EXYNOS4_PA_JPEG
--#define S5P_PA_G2D			EXYNOS4_PA_G2D
--#define S5P_PA_FIMD0			EXYNOS4_PA_FIMD0
--#define S5P_PA_HDMI			EXYNOS4_PA_HDMI
--#define S5P_PA_IIC_HDMIPHY		EXYNOS4_PA_IIC_HDMIPHY
--#define S5P_PA_MFC			EXYNOS4_PA_MFC
--#define S5P_PA_MIPI_CSIS0		EXYNOS4_PA_MIPI_CSIS0
--#define S5P_PA_MIPI_CSIS1		EXYNOS4_PA_MIPI_CSIS1
--#define S5P_PA_MIXER			EXYNOS4_PA_MIXER
--#define S5P_PA_ONENAND			EXYNOS4_PA_ONENAND
--#define S5P_PA_ONENAND_DMA		EXYNOS4_PA_ONENAND_DMA
--#define S5P_PA_SDO			EXYNOS4_PA_SDO
--#define S5P_PA_SDRAM			EXYNOS4_PA_SDRAM
--#define S5P_PA_VP			EXYNOS4_PA_VP
--
--#define SAMSUNG_PA_ADC			EXYNOS4_PA_ADC
--#define SAMSUNG_PA_ADC1			EXYNOS4_PA_ADC1
--#define SAMSUNG_PA_KEYPAD		EXYNOS4_PA_KEYPAD
--
- /* Compatibility UART */
- 
--#define EXYNOS4_PA_UART0		0x13800000
--#define EXYNOS4_PA_UART1		0x13810000
--#define EXYNOS4_PA_UART2		0x13820000
--#define EXYNOS4_PA_UART3		0x13830000
--#define EXYNOS4_SZ_UART			SZ_256
--
--#define EXYNOS5_PA_UART0		0x12C00000
--#define EXYNOS5_PA_UART1		0x12C10000
--#define EXYNOS5_PA_UART2		0x12C20000
--#define EXYNOS5_PA_UART3		0x12C30000
--
- #define EXYNOS5440_PA_UART0		0x000B0000
--#define EXYNOS5440_PA_UART1		0x000C0000
--#define EXYNOS5440_SZ_UART		SZ_256
- 
- #define S3C_VA_UARTx(x)			(S3C_VA_UART + ((x) * S3C_UART_OFFSET))
- 
+-#endif /* __PLAT_S5P_REGS_USB_PHY_H */
 -- 
 1.8.2.1
