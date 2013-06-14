@@ -1,43 +1,49 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 14 Jun 2013 16:06:25 +0800
-Subject: [PATCH 4/4] mtd: gpmi: imx6: fix the wrong method for checking
- ready/busy
-In-Reply-To: <1371197185-27491-1-git-send-email-b32955@freescale.com>
-References: <1371197185-27491-1-git-send-email-b32955@freescale.com>
-Message-ID: <1371197185-27491-5-git-send-email-b32955@freescale.com>
+From: chao.xie@marvell.com (Chao Xie)
+Date: Fri, 14 Jun 2013 04:42:16 -0400
+Subject: [PATCH] arm: pj4: check cpu id for pj4 cp0 access
+Message-ID: <1371199336-28027-1-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the imx6, all the ready/busy pins are binding togeter.
-So we only need to check the chip 0 busy status.
+Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
+pj4_cpu0_init just return.
+This fix will help to make the all the V7 cpus(pj4 and no-PJ4)
+use same platform code.
 
-For example, When the CS1 is enabled, we also should check the
-ready/busy of chip 0, if we check the ready/busy of chip 1,
-we will get the wrong result.
-
-Signed-off-by: Huang Shijie <b32955@freescale.com>
+Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/kernel/pj4-cp0.c |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-index 7d56d87..660c5d7 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
-@@ -1079,6 +1079,14 @@ int gpmi_is_ready(struct gpmi_nand_data *this, unsigned chip)
- 		mask = MX23_BM_GPMI_DEBUG_READY0 << chip;
- 		reg = readl(r->gpmi_regs + HW_GPMI_DEBUG);
- 	} else if (GPMI_IS_MX28(this) || GPMI_IS_MX6Q(this)) {
-+		/*
-+		 * In the imx6, all the ready/busy pins are binding
-+		 * togeter. So we only need to check the ready/busy status
-+		 * of chip 0.
-+		 */
-+		if (GPMI_IS_MX6Q(this))
-+			chip = 0;
+diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
+index 679cf4d..684dec7 100644
+--- a/arch/arm/kernel/pj4-cp0.c
++++ b/arch/arm/kernel/pj4-cp0.c
+@@ -18,6 +18,9 @@
+ #include <linux/io.h>
+ #include <asm/thread_notify.h>
+ 
++#define CORE_PJ4_MASK	0xfffffff0
++#define CORE_PJ4_ID	0x562f5840
 +
- 		/* MX28 shares the same R/B register as MX6Q. */
- 		mask = MX28_BF_GPMI_STAT_READY_BUSY(1 << chip);
- 		reg = readl(r->gpmi_regs + HW_GPMI_STAT);
+ static int iwmmxt_do(struct notifier_block *self, unsigned long cmd, void *t)
+ {
+ 	struct thread_info *thread = t;
+@@ -79,6 +82,15 @@ static void __init pj4_cp_access_write(u32 value)
+ static int __init pj4_cp0_init(void)
+ {
+ 	u32 cp_access;
++	u32 cpuid;
++
++	__asm__ __volatile__ (
++		"mrc	p15, 0, %0, c0, c0\n\t"
++		: "=r" (cpuid));
++
++	/* If it is not a pj4 core, skip it. */
++	if ((cpuid & CORE_PJ4_MASK) != CORE_PJ4_ID)
++		return 0;
+ 
+ 	cp_access = pj4_cp_access_read() & ~0xf;
+ 	pj4_cp_access_write(cp_access);
 -- 
-1.7.1
+1.7.4.1
