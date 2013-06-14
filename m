@@ -1,38 +1,51 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 14 Jun 2013 16:06:24 +0800
-Subject: [PATCH 3/4] mtd: gpmi: scan two nand chips
+Date: Fri, 14 Jun 2013 16:06:22 +0800
+Subject: [PATCH 1/4] mtd: gpmi: decouple the chip select from the DMA channel
 In-Reply-To: <1371197185-27491-1-git-send-email-b32955@freescale.com>
 References: <1371197185-27491-1-git-send-email-b32955@freescale.com>
-Message-ID: <1371197185-27491-4-git-send-email-b32955@freescale.com>
+Message-ID: <1371197185-27491-2-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some nand chip has two DIEs in a single chip, such as Micron MT29F32G08QAA.
-Each die has its own chip select pin, so this chip acts as two nand
-chips.
-
-If we only scan one chip, we may find that we only get 2G for this chip,
-but in actually, this chip's size is 4G.
-
-So scan two chips by default.
+Decouple the chip select from the DMA channel, we use the DMA channel 0
+to accecc all the nand devices.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |    6 ++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    3 +++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-index 036e5e4..bb8af93 100644
---- a/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-+++ b/drivers/mtd/nand/gpmi-nand/gpmi-nand.c
-@@ -1551,7 +1551,7 @@ static int gpmi_nfc_init(struct gpmi_nand_data *this)
- 	if (ret)
- 		goto err_out;
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+index 4f8857f..7d56d87 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-lib.c
+@@ -187,6 +187,12 @@ int gpmi_init(struct gpmi_nand_data *this)
+ 	/* Select BCH ECC. */
+ 	writel(BM_GPMI_CTRL1_BCH_MODE, r->gpmi_regs + HW_GPMI_CTRL1_SET);
  
--	ret = nand_scan(mtd, 1);
-+	ret = nand_scan(mtd, 2);
- 	if (ret) {
- 		pr_err("Chip scan failed\n");
- 		goto err_out;
++	/*
++	 * Decouple the chip select from dma channel. We use dma0 for all
++	 * the chips.
++	 */
++	writel(BM_GPMI_CTRL1_DECOUPLE_CS, r->gpmi_regs + HW_GPMI_CTRL1_SET);
++
+ 	gpmi_disable_clk(this);
+ 	return 0;
+ err_out:
+diff --git a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
+index 53397cc..82114cd 100644
+--- a/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
++++ b/drivers/mtd/nand/gpmi-nand/gpmi-regs.h
+@@ -108,6 +108,9 @@
+ #define HW_GPMI_CTRL1_CLR				0x00000068
+ #define HW_GPMI_CTRL1_TOG				0x0000006c
+ 
++#define BP_GPMI_CTRL1_DECOUPLE_CS			24
++#define BM_GPMI_CTRL1_DECOUPLE_CS	(1 << BP_GPMI_CTRL1_DECOUPLE_CS)
++
+ #define BP_GPMI_CTRL1_WRN_DLY_SEL			22
+ #define BM_GPMI_CTRL1_WRN_DLY_SEL	(0x3 << BP_GPMI_CTRL1_WRN_DLY_SEL)
+ #define BF_GPMI_CTRL1_WRN_DLY_SEL(v)  \
 -- 
 1.7.1
