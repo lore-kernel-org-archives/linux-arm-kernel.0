@@ -1,27 +1,76 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 14 Jun 2013 11:24:58 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
-References: <20130613184703.GA5701@kroah.com>
- <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVPtZq4XWddBnP0ze2aecwXsuU+0OL8TP1Tb_5BrpJv9cw@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Fri, 14 Jun 2013 06:37:11 +0300
+Subject: [PATCH v3 2/2] i2c: designware: add two optional property
+ tx/rx-fifo-size
+In-Reply-To: <1370918230-24793-3-git-send-email-zhangfei.gao@linaro.org>
+References: <1370918230-24793-1-git-send-email-zhangfei.gao@linaro.org>
+ <1370918230-24793-3-git-send-email-zhangfei.gao@linaro.org>
+Message-ID: <20130614033711.GA4312@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 3:41 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
->
-> The main reason for moving away from the current scheme is to reduce
-> latency for other interrupt handlers.  Ming gave two examples of slow
-> USB code that runs in hardirq context now; with his change they would
-> run in softirq context and therefore wouldn't delay other interrupts so
-> much.  (Interrupt latency is hard to measure, however.)
+Hi Zhangfei,
 
-With the two trace points of irq_handler_entry and irq_handler_exit, the
-interrupt latency(or the time taken by hard irq handler) isn't hard to measure.
-One simple script can figure out the average/maximum latency for one irq
-handler, like I did in 4/4.
+On Tue, Jun 11, 2013 at 10:37:10AM +0800, Zhangfei Gao wrote:
+> rx-fifo-size and tx-fifo-size will be updated if provided from dts
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+> CC: Baruch Siach <baruch@tkos.co.il>
 
+Acked-by: Baruch Siach <baruch@tkos.co.il>
 
-Thanks,
---
-Ming Lei
+> ---
+>  .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
+>  drivers/i2c/busses/i2c-designware-platdrv.c        |    3 +++
+>  2 files changed, 10 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> index e42a2ee..84717fe 100644
+> --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
+> @@ -6,6 +6,11 @@ Required properties :
+>   - reg : Offset and length of the register set for the device
+>   - interrupts : <IRQ> where IRQ is the interrupt number.
+>  
+> +Optional properties:
+> +
+> + - rx-fifo-size : 1 cell, Rx fifo size
+> + - tx-fifo-size : 1 cell, Tx fifo size
+> +
+>  Recommended properties :
+>  
+>   - clock-frequency : desired I2C bus clock frequency in Hz.
+> @@ -18,5 +23,7 @@ Example :
+>  		compatible = "snps,designware-i2c";
+>  		reg = <0xf0000 0x1000>;
+>  		interrupts = <11>;
+> +		rx-fifo-size = <16>;
+> +		tx-fifo-size = <16>;
+>  		clock-frequency = <400000>;
+>  	};
+> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
+> index 41659c0..6760cea 100644
+> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
+> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
+> @@ -85,6 +85,7 @@ static int dw_i2c_probe(struct platform_device *pdev)
+>  	struct dw_i2c_dev *dev;
+>  	struct i2c_adapter *adap;
+>  	struct resource *mem;
+> +	struct device_node *np = pdev->dev.of_node;
+>  	int irq, r;
+>  
+>  	/* NOTE: driver uses the static register mapping */
+> @@ -140,6 +141,8 @@ static int dw_i2c_probe(struct platform_device *pdev)
+>  		dev->rx_fifo_depth = ((param1 >> 8)  & 0xff) + 1;
+>  		dev->adapter.nr = pdev->id;
+>  	}
+> +	of_property_read_u32(np, "rx-fifo-size", &dev->rx_fifo_depth);
+> +	of_property_read_u32(np, "tx-fifo-size", &dev->tx_fifo_depth);
+>  	r = i2c_dw_init(dev);
+>  	if (r)
+>  		return r;
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
