@@ -1,49 +1,47 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Jun 2013 21:32:52 +0200
-Subject: [PATCH 16/28] ARM: SAMSUNG: Compile s5p-irq-pm only with ATAGS support
+Date: Fri, 14 Jun 2013 21:32:54 +0200
+Subject: [PATCH 18/28] ARM: SAMSUNG: pm: Include most of mach/ headers
+ conditionally
 In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
 References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371238384-1504-17-git-send-email-t.figa@samsung.com>
+Message-ID: <1371238384-1504-19-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new Kconfig symbol, S5P_IRQ_PM that gets selected
-by S5P_PM, but only if SAMSUNG_ATAGS is selected.
+Since it is illegal to include mach/ headers from source files outside
+of respective mach-* directory and DT-only Samsung platforms might not
+have all of them anyway, this patches makes inclusion of them
+conditional, based on CONFIG_SAMSUNG_ATAGS.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/Kconfig  | 6 ++++++
- arch/arm/plat-samsung/Makefile | 2 +-
- 2 files changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/plat-samsung/pm.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index c0f0542..1c607da 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -421,6 +421,12 @@ config S3C_DMA
- 	help
- 	  Internal configuration for S3C DMA core
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 53210ec..d76ab72 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -21,13 +21,17 @@
  
-+config S5P_IRQ_PM
-+	bool
-+	default y if S5P_PM
-+	help
-+	  Legacy IRQ power management for S5P platforms
+ #include <asm/cacheflush.h>
+ #include <asm/suspend.h>
+-#include <mach/hardware.h>
+-#include <mach/map.h>
+ 
+ #include <plat/regs-serial.h>
 +
- endif
++#ifdef CONFIG_SAMSUNG_ATAGS
++#include <mach/hardware.h>
++#include <mach/map.h>
+ #include <mach/regs-clock.h>
+ #include <mach/regs-irq.h>
+ #include <mach/irqs.h>
++#endif
++
+ #include <asm/irq.h>
  
- config SAMSUNG_DMADEV
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index 8d95c15..0c9f3cd 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -58,5 +58,5 @@ obj-$(CONFIG_SAMSUNG_PM_CHECK)	+= pm-check.o
- obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
- 
- obj-$(CONFIG_S5P_PM)		+= s5p-pm.o
--obj-$(CONFIG_S5P_PM)		+= s5p-irq-pm.o
-+obj-$(CONFIG_S5P_IRQ_PM)	+= s5p-irq-pm.o
- obj-$(CONFIG_S5P_SLEEP)		+= s5p-sleep.o
+ #include <plat/pm.h>
 -- 
 1.8.2.1
