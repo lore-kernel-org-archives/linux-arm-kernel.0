@@ -1,27 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 14 Jun 2013 10:56:09 -0400 (EDT)
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <CACVXFVPtZq4XWddBnP0ze2aecwXsuU+0OL8TP1Tb_5BrpJv9cw@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306141054530.26420-100000@netrider.rowland.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 14 Jun 2013 08:01:09 -0700
+Subject: [PATCH] ARM: dts: Enable RTC node for exynos5250
+In-Reply-To: <1371189378-22823-1-git-send-email-tushar.behera@linaro.org>
+References: <1371189378-22823-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <CAD=FV=WeY5r_=qLV6dh8HkaNGygZ33uQg5Q6dKhwd31e7MfFTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Jun 2013, Ming Lei wrote:
+Tushar,
 
-> On Fri, Jun 14, 2013 at 3:41 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> >
-> > The main reason for moving away from the current scheme is to reduce
-> > latency for other interrupt handlers.  Ming gave two examples of slow
-> > USB code that runs in hardirq context now; with his change they would
-> > run in softirq context and therefore wouldn't delay other interrupts so
-> > much.  (Interrupt latency is hard to measure, however.)
-> 
-> With the two trace points of irq_handler_entry and irq_handler_exit, the
-> interrupt latency(or the time taken by hard irq handler) isn't hard to measure.
-> One simple script can figure out the average/maximum latency for one irq
-> handler, like I did in 4/4.
+On Thu, Jun 13, 2013 at 10:56 PM, Tushar Behera
+<tushar.behera@linaro.org> wrote:
+> The kernel dump produced by s3c-rtc driver as reported by
+> commit 522ccdb6fd0e ("ARM: dts: Disable the RTC by default on exynos5")
+> are no longer reproducible in latest kernel.
+>
+> Hence it would be good to re-enable RTC support for EXYNOS5250.
+>
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos5250.dtsi |    1 -
+>  1 file changed, 1 deletion(-)
 
-But that doesn't measure the time between when the IRQ request is 
-issued and when irq_handler_entry runs.
+I would prefer we not commit this.
 
-Alan Stern
+The original commit wasn't just about avoiding the bug (though that
+was a nice side effect).  My understanding is that the SoC dtsi file
+ought to have most peripherals disabled by default and individual
+board dts files should enable the peripherals that they want.  I think
+exynos5250 is particularly bad about this right now (it starts with
+most peripherals enabled) but that should probably be fixed...
+
+If my understanding is wrong, others on the list should definitely speak up!  :)
+
+-Doug
