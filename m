@@ -1,62 +1,38 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Fri, 14 Jun 2013 17:27:09 +0900
-Subject: [PATCH v2 1/3] ARM: tegra: basic support for Trusted Foundations
-In-Reply-To: <51BA1B41.6030002@wwwdotorg.org>
-References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
- <1371114745-24710-2-git-send-email-acourbot@nvidia.com>
- <51BA1B41.6030002@wwwdotorg.org>
-Message-ID: <CAAVeFuLc57pV=To5yaE5x9mrVy1yknH2e90QockCiNbEXRm0WQ@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 14 Jun 2013 16:06:21 +0800
+Subject: [PATCH 0/4] mtd: gpmi: support two nand chips at most
+Message-ID: <1371197185-27491-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 4:19 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
-> On 06/13/2013 03:12 AM, Alexandre Courbot wrote:
->> Add basic support for booting secondary processors on Tegra devices
->> using the Trusted Foundations secure monitor.
->>
->> Signed-off-by: Alexandre Courbot <acourbot@nvidia.com>
->> ---
->>  Documentation/devicetree/bindings/arm/tegra.txt    | 11 +++++
->>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->>  arch/arm/configs/tegra_defconfig                   |  1 +
->
-> The defconfig change should be a separate patch, so that I can squash it
-> into any other defconfig updates separately from all the code changes.
+Current gpmi-nand driver only supports one chips. But we may meet
+some embarrassing situation, such as Micron MT29F32G08QAA.
+This nand chip has two DIEs internally. Each die has its own chip select pin,
+so this chip acts as two nand chips.
 
-Ok, moved that part into its own patch.
+If we only scan one chip, we may find that we only get 2G for this chip,
+but in actually, this chip's size is 4G.
 
->> diff --git a/arch/arm/mach-tegra/firmware.c b/arch/arm/mach-tegra/firmware.c
->
->> +void __init tegra_init_firmware(void)
->> +{
->> +     struct device_node *node;
->> +
->> +     if (!of_have_populated_dt())
->> +             return;
->> +
->> +     node = of_find_compatible_node(NULL, NULL, "tl,trusted-foundations");
->> +     if (node && !IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS))
->> +             pr_warn("Trusted Foundations detected but support missing!\n");
->> +#if IS_ENABLED(CONFIG_TEGRA_TRUSTED_FOUNDATIONS)
->> +     else if (node)
->> +             register_firmware_ops(&tegra_trusted_foundations_ops);
->> +#endif
->> +}
->
-> Is it worth continuing on in the node && !IS_ENABLED case here? After
-> all, we can be pretty certain that the write to the CPU reset vector is
-> immediately going to trap...
+So scan two chips by default.
 
-That's what was happening until 3.9, but from 3.10 on the trap is
-apparently handled and the boot completes (although with only one
-processor).
+In order to support two nand chips, we have to do the following:
+   1.) We only have one dma channel now, so decouple the chip select
+      from the DMA channel, We can use the dma 0 to access all the nand chips.
 
-> I suppose that perhaps without SMP, cpuidle, suspend, ... we could keep
-> running, but that seems a little niche.
+   2.) fix the wrong method of checking the ready/busy status.
+      In the imx6, all the ready/busy pins are binding together, we
+      should check ready/busy status of chip 0 for the all the chips. 
 
-If we can keep running, even in degraded mode, I see no reason to
-panic. The problem is well reported in the kernel log, and having a
-running system might be helpful to analyze the issue.
+Tested this patch set with MT29F32G08QAA.
 
-Thanks,
-Alex.
+
+Huang Shijie (4):
+  mtd: gpmi: decouple the chip select from the DMA channel
+  mtd: gpmi: use DMA channel 0 for all the nand chips
+  mtd: gpmi: scan two nand chips
+  mtd: gpmi: imx6: fix the wrong method for checking ready/busy
+
+ drivers/mtd/nand/gpmi-nand/gpmi-lib.c  |   14 ++++++++++++++
+ drivers/mtd/nand/gpmi-nand/gpmi-nand.c |    7 +++----
+ drivers/mtd/nand/gpmi-nand/gpmi-regs.h |    3 +++
+ 3 files changed, 20 insertions(+), 4 deletions(-)
