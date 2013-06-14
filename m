@@ -1,152 +1,96 @@
 From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Fri, 14 Jun 2013 19:45:49 +0200
-Subject: [RFC PATCH 3/5] video: exynos_dsi: Use generic PHY driver
+Date: Fri, 14 Jun 2013 19:45:50 +0200
+Subject: [RFC PATCH 4/5] exynos4-is: Use generic MIPI CSIS PHY driver
 In-Reply-To: <1371231951-1969-1-git-send-email-s.nawrocki@samsung.com>
 References: <1371231951-1969-1-git-send-email-s.nawrocki@samsung.com>
-Message-ID: <1371231951-1969-4-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <1371231951-1969-5-git-send-email-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use the generic PHY API instead of the platform callback to control
-the MIPI DSIM DPHY.
+the MIPI CSIS DPHY.
 
 Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/video/display/source-exynos_dsi.c |   36 +++++++++--------------------
- include/video/exynos_dsi.h                |    5 ----
- 2 files changed, 11 insertions(+), 30 deletions(-)
+ drivers/media/platform/exynos4-is/mipi-csis.c |   11 +++++++++--
+ include/linux/platform_data/mipi-csis.h       |    9 ---------
+ 2 files changed, 9 insertions(+), 11 deletions(-)
 
-diff --git a/drivers/video/display/source-exynos_dsi.c b/drivers/video/display/source-exynos_dsi.c
-index 145d57b..dfab790 100644
---- a/drivers/video/display/source-exynos_dsi.c
-+++ b/drivers/video/display/source-exynos_dsi.c
-@@ -24,6 +24,7 @@
- #include <linux/mm.h>
+diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
+index 0fe80e3..88d0d61 100644
+--- a/drivers/media/platform/exynos4-is/mipi-csis.c
++++ b/drivers/media/platform/exynos4-is/mipi-csis.c
+@@ -20,6 +20,7 @@
+ #include <linux/memory.h>
  #include <linux/module.h>
  #include <linux/of.h>
 +#include <linux/phy/phy.h>
+ #include <linux/platform_data/mipi-csis.h>
  #include <linux/platform_device.h>
  #include <linux/pm_runtime.h>
- #include <linux/regulator/consumer.h>
-@@ -219,6 +220,7 @@ struct exynos_dsi {
- 	bool enabled;
- 
+@@ -184,6 +185,7 @@ struct csis_drvdata {
+  * @sd: v4l2_subdev associated with CSIS device instance
+  * @index: the hardware instance index
+  * @pdev: CSIS platform device
++ * @phy: pointer to the CSIS generic PHY
+  * @regs: mmaped I/O registers memory
+  * @supplies: CSIS regulator supplies
+  * @clock: CSIS clocks
+@@ -207,6 +209,7 @@ struct csis_state {
+ 	struct v4l2_subdev sd;
+ 	u8 index;
  	struct platform_device *pdev;
 +	struct phy *phy;
- 	struct device *dev;
- 	struct resource *res;
- 	struct clk *pll_clk;
-@@ -816,6 +818,7 @@ again:
- 
- static bool exynos_dsi_transfer_finish(struct exynos_dsi *dsi)
- {
-+	static unsigned long j;
- 	struct exynos_dsi_transfer *xfer;
- 	unsigned long flags;
- 	bool start = true;
-@@ -824,7 +827,8 @@ static bool exynos_dsi_transfer_finish(struct exynos_dsi *dsi)
- 
- 	if (list_empty(&dsi->transfer_list)) {
- 		spin_unlock_irqrestore(&dsi->transfer_lock, flags);
--		dev_warn(dsi->dev, "unexpected TX/RX interrupt\n");
-+		if (printk_timed_ratelimit(&j, 500))
-+			dev_warn(dsi->dev, "unexpected TX/RX interrupt\n");
- 		return false;
+ 	void __iomem *regs;
+ 	struct regulator_bulk_data supplies[CSIS_NUM_SUPPLIES];
+ 	struct clk *clock[NUM_CSIS_CLOCKS];
+@@ -861,6 +864,10 @@ static int s5pcsis_probe(struct platform_device *pdev)
+ 		return -EINVAL;
  	}
  
-@@ -994,8 +998,7 @@ static int exynos_dsi_enable(struct video_source *src)
- 	clk_prepare_enable(dsi->bus_clk);
- 	clk_prepare_enable(dsi->pll_clk);
- 
--	if (dsi->pd->phy_enable)
--		dsi->pd->phy_enable(dsi->pdev, true);
-+	phy_power_on(dsi->phy);
- 
- 	exynos_dsi_reset(dsi);
- 	exynos_dsi_init_link(dsi);
-@@ -1019,8 +1022,7 @@ static int exynos_dsi_disable(struct video_source *src)
- 
- 	exynos_dsi_disable_clock(dsi);
- 
--	if (dsi->pd->phy_enable)
--		dsi->pd->phy_enable(dsi->pdev, false);
-+	phy_power_off(dsi->phy);
- 
- 	clk_disable_unprepare(dsi->pll_clk);
- 	clk_disable_unprepare(dsi->bus_clk);
-@@ -1099,12 +1101,6 @@ static const struct dsi_video_source_ops exynos_dsi_ops = {
-  * Device Tree
-  */
- 
--static int (* const of_phy_enables[])(struct platform_device *, bool) = {
--#ifdef CONFIG_S5P_SETUP_MIPIPHY
--	[0] = s5p_dsim_phy_enable,
--#endif
--};
--
- static struct exynos_dsi_platform_data *exynos_dsi_parse_dt(
- 						struct platform_device *pdev)
- {
-@@ -1112,7 +1108,6 @@ static struct exynos_dsi_platform_data *exynos_dsi_parse_dt(
- 	struct exynos_dsi_platform_data *dsi_pd;
- 	struct device *dev = &pdev->dev;
- 	const __be32 *prop_data;
--	u32 val;
- 
- 	dsi_pd = kzalloc(sizeof(*dsi_pd), GFP_KERNEL);
- 	if (!dsi_pd) {
-@@ -1120,19 +1115,6 @@ static struct exynos_dsi_platform_data *exynos_dsi_parse_dt(
- 		return NULL;
- 	}
- 
--	prop_data = of_get_property(node, "samsung,phy-type", NULL);
--	if (!prop_data) {
--		dev_err(dev, "failed to get phy-type property\n");
--		goto err_free_pd;
--	}
--
--	val = be32_to_cpu(*prop_data);
--	if (val >= ARRAY_SIZE(of_phy_enables) || !of_phy_enables[val]) {
--		dev_err(dev, "Invalid phy-type %u\n", val);
--		goto err_free_pd;
--	}
--	dsi_pd->phy_enable = of_phy_enables[val];
--
- 	prop_data = of_get_property(node, "samsung,pll-stable-time", NULL);
- 	if (!prop_data) {
- 		dev_err(dev, "failed to get pll-stable-time property\n");
-@@ -1254,6 +1236,10 @@ static int exynos_dsi_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
-+	dsi->phy = devm_phy_get(&pdev->dev, "dsim");
-+	if (IS_ERR(dsi->phy))
-+		return PTR_ERR(dsi->phy);
++	state->phy = devm_phy_get(dev, "csis");
++	if (IS_ERR(state->phy))
++		return PTR_ERR(state->phy);
 +
- 	platform_set_drvdata(pdev, dsi);
- 
- 	dsi->irq = platform_get_irq(pdev, 0);
-diff --git a/include/video/exynos_dsi.h b/include/video/exynos_dsi.h
-index 95e1568..5c062c7 100644
---- a/include/video/exynos_dsi.h
-+++ b/include/video/exynos_dsi.h
-@@ -25,9 +25,6 @@
-  */
- struct exynos_dsi_platform_data {
- 	unsigned int enabled;
--
--	int (*phy_enable)(struct platform_device *pdev, bool on);
--
- 	unsigned int pll_stable_time;
- 	unsigned long pll_clk_rate;
- 	unsigned long esc_clk_rate;
-@@ -36,6 +33,4 @@ struct exynos_dsi_platform_data {
- 	unsigned short rx_timeout;
+ 	mem_res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	state->regs = devm_ioremap_resource(dev, mem_res);
+ 	if (IS_ERR(state->regs))
+@@ -946,7 +953,7 @@ static int s5pcsis_pm_suspend(struct device *dev, bool runtime)
+ 	mutex_lock(&state->lock);
+ 	if (state->flags & ST_POWERED) {
+ 		s5pcsis_stop_stream(state);
+-		ret = s5p_csis_phy_enable(state->index, false);
++		ret = phy_power_off(state->phy);
+ 		if (ret)
+ 			goto unlock;
+ 		ret = regulator_bulk_disable(CSIS_NUM_SUPPLIES,
+@@ -982,7 +989,7 @@ static int s5pcsis_pm_resume(struct device *dev, bool runtime)
+ 					    state->supplies);
+ 		if (ret)
+ 			goto unlock;
+-		ret = s5p_csis_phy_enable(state->index, true);
++		ret = phy_power_on(state->phy);
+ 		if (!ret) {
+ 			state->flags |= ST_POWERED;
+ 		} else {
+diff --git a/include/linux/platform_data/mipi-csis.h b/include/linux/platform_data/mipi-csis.h
+index bf34e17..c2fd902 100644
+--- a/include/linux/platform_data/mipi-csis.h
++++ b/include/linux/platform_data/mipi-csis.h
+@@ -25,13 +25,4 @@ struct s5p_platform_mipi_csis {
+ 	u8 hs_settle;
  };
  
--int s5p_dsim_phy_enable(struct platform_device *pdev, bool on);
+-/**
+- * s5p_csis_phy_enable - global MIPI-CSI receiver D-PHY control
+- * @id:     MIPI-CSIS harware instance index (0...1)
+- * @on:     true to enable D-PHY and deassert its reset
+- *          false to disable D-PHY
+- * @return: 0 on success, or negative error code on failure
+- */
+-int s5p_csis_phy_enable(int id, bool on);
 -
- #endif /* _EXYNOS_MIPI_DSIM_H */
+ #endif /* __PLAT_SAMSUNG_MIPI_CSIS_H_ */
 -- 
 1.7.9.5
