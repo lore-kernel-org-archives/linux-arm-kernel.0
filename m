@@ -1,83 +1,168 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sat, 15 Jun 2013 00:11:56 +0200
-Subject: [PATCH v3 1/2] ARM: at91: dt: add header to define at_hdmac
- configuration
-In-Reply-To: <1371112779-22738-2-git-send-email-ludovic.desroches@atmel.com>
-References: <1371112779-22738-1-git-send-email-ludovic.desroches@atmel.com>
- <1371112779-22738-2-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <51BB952C.2070209@atmel.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 14 Jun 2013 23:12:27 +0100
+Subject: [PATCH RFC 1/3] clk: omap: introduce clock driver
+In-Reply-To: <1370327958-19776-2-git-send-email-mturquette@linaro.org>
+References: <1370327958-19776-1-git-send-email-mturquette@linaro.org>
+ <1370327958-19776-2-git-send-email-mturquette@linaro.org>
+Message-ID: <20130614221227.A9EE03E0A56@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/06/2013 10:39, ludovic.desroches at atmel.com :
-> From: Ludovic Desroches <ludovic.desroches@atmel.com>
->
-> DMA-cell content is a concatenation of several values. In order to keep this
-> stuff human readable, macros are introduced.
->
-> The values for the FIFO configuration are not the same as the ones used in the
-> configuration register in order to keep backward compatibility. Most devices
-> use the half FIFO configuration but USART ones have to use the ASAP
-> configuration. This parameter was not initially planed to be into the at91 dma
-> dt binding. The third cell will be used to store this parameter, it will
-> become a concatenation of the FIFO configuration and of the peripheral ID. In
-> order to keep backward compatibility i.e. FIFO configuration is equal to 0, we
-> have to perform a translation since the value to put in the register to set
-> half FIFO is 1.
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+On Mon,  3 Jun 2013 23:39:16 -0700, Mike Turquette <mturquette@linaro.org> wrote:
+> Parses OMAP clock data from DT and registers those clocks with the clock
+> framework.  dt_omap_clk_init must be called early during boot for timer
+> initialization so it is exported and called from the existing clock code
+> instead of probing like a real driver.
+> 
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Joel A Fernandes <joelagnel@ti.com>
+> Cc: Nishanth Menon <nm@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
 
-Of course:
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Hi Mike,
 
-In addition to going through slave-dma Vinod's git tree, I also stack it 
-on the AT91 DT branch so that it can go in arm-soc and prevent a 
-dependency between the two trees that could lead to a build error...
-
-Best regards,
+Comments below...
 
 > ---
->   include/dt-bindings/dma/at91.h | 27 +++++++++++++++++++++++++++
->   1 file changed, 27 insertions(+)
->   create mode 100644 include/dt-bindings/dma/at91.h
->
-> diff --git a/include/dt-bindings/dma/at91.h b/include/dt-bindings/dma/at91.h
+> This driver simply matches the basic bindings (so far).  Eventually it
+> would match omap-specific bindings for DPLLs, CLKOUTX2 and strange leaf
+> clocks as well.  This doesn't scale well since non-OMAP related clock
+> data (e.g. a pmic or discrete audio codec) will get grouped into this
+> driver if it matches on a basic clock type.  Suggestions?
+
+Take a look at the definition of irqchip_init(). It would be possible to
+do the same think for clk chips so that merely configuring in the driver
+would add the support to a global list of clk chip initializers.
+
+drivers/irqchip/irqchip.c
+
+> 
+>  drivers/clk/Makefile      |  1 +
+>  drivers/clk/omap/Makefile |  1 +
+>  drivers/clk/omap/clk.c    | 55 +++++++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clk/omap.h  | 24 +++++++++++++++++++++
+>  4 files changed, 81 insertions(+)
+>  create mode 100644 drivers/clk/omap/Makefile
+>  create mode 100644 drivers/clk/omap/clk.c
+>  create mode 100644 include/linux/clk/omap.h
+> 
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index f51b52b..efd4f2a 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -31,6 +31,7 @@ obj-$(CONFIG_ARCH_VT8500)	+= clk-vt8500.o
+>  obj-$(CONFIG_ARCH_ZYNQ)		+= clk-zynq.o
+>  obj-$(CONFIG_ARCH_TEGRA)	+= tegra/
+>  obj-$(CONFIG_PLAT_SAMSUNG)	+= samsung/
+> +obj-$(CONFIG_ARCH_OMAP)		+= omap/
+>  
+>  obj-$(CONFIG_X86)		+= x86/
+>  
+> diff --git a/drivers/clk/omap/Makefile b/drivers/clk/omap/Makefile
 > new file mode 100644
-> index 0000000..e835037
+> index 0000000..8195931
 > --- /dev/null
-> +++ b/include/dt-bindings/dma/at91.h
-> @@ -0,0 +1,27 @@
+> +++ b/drivers/clk/omap/Makefile
+> @@ -0,0 +1 @@
+> +obj-y					+= clk.o
+> diff --git a/drivers/clk/omap/clk.c b/drivers/clk/omap/clk.c
+> new file mode 100644
+> index 0000000..e9e5c95
+> --- /dev/null
+> +++ b/drivers/clk/omap/clk.c
+> @@ -0,0 +1,55 @@
 > +/*
-> + * This header provides macros for at91 dma bindings.
+> + * OMAP PRCM clock driver
 > + *
-> + * Copyright (C) 2013 Ludovic Desroches <ludovic.desroches@atmel.com>
+> + * Copyright (C) 2013 Linaro.org - http://www.linaro.org
+> + * 	Mike Turquette <mturquette@linaro.org>
 > + *
-> + * GPLv2 only
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed "as is" WITHOUT ANY WARRANTY of any
+> + * kind, whether express or implied; without even the implied warranty
+> + * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
 > + */
 > +
-> +#ifndef __DT_BINDINGS_AT91_DMA_H__
-> +#define __DT_BINDINGS_AT91_DMA_H__
+> +#include <linux/clk-provider.h>
+> +#include <linux/clk/omap.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/platform_device.h>
 > +
-> +/*
-> + * Source and/or destination peripheral ID
-> + */
-> +#define AT91_DMA_CFG_PER_ID_MASK	(0xff)
-> +#define AT91_DMA_CFG_PER_ID(id)		(id & AT91_DMA_CFG_PER_ID_MASK)
+> +/* FIXME - should the OMAP PRCM clock driver match generic types? */
+> +static const struct of_device_id clk_match[] = {
+> +	{.compatible = "fixed-clock", .data = of_fixed_clk_setup, },
+> +	{.compatible = "mux-clock", .data = of_mux_clk_setup, },
+> +	{.compatible = "fixed-factor-clock",
+> +		.data = of_fixed_factor_clk_setup, },
+> +	{},
+> +};
 > +
-> +/*
-> + * FIFO configuration: it defines when a request is serviced.
-> + */
-> +#define AT91_DMA_CFG_FIFOCFG_OFFSET	(8)
-> +#define AT91_DMA_CFG_FIFOCFG_MASK	(0xf << AT91_DMA_CFG_FIFOCFG_OFFSET)
-> +#define AT91_DMA_CFG_FIFOCFG_HALF	(0x0 << AT91_DMA_CFG_FIFOCFG_OFFSET)	/* half FIFO (default behavior) */
-> +#define AT91_DMA_CFG_FIFOCFG_ALAP	(0x1 << AT91_DMA_CFG_FIFOCFG_OFFSET)	/* largest defined AHB burst */
-> +#define AT91_DMA_CFG_FIFOCFG_ASAP	(0x2 << AT91_DMA_CFG_FIFOCFG_OFFSET)	/* single AHB access */
+> +static int omap_clk_probe(struct platform_device *pdev)
+> +{
+> +	of_clk_init(clk_match);
+> +	return 0;
+> +}
 > +
-> +#endif /* __DT_BINDINGS_AT91_DMA_H__ */
->
+> +static struct platform_driver omap_clk_driver = {
+> +	.probe = omap_clk_probe,
+> +	.driver = {
+> +		   .name = "omap_clk",
+> +		   .of_match_table = of_match_ptr(clk_match),
+> +		   },
+> +};
+> +
+> +/* FIXME - need to initialize early; skip real driver registration & probe */
+> +int __init dt_omap_clk_init(void)
+> +{
+> +	return omap_clk_probe(NULL);
+> +}
 
+Since this isn't remotely a platform_driver, I would drop the pretense
+and cut out all the platform_drivers references. omap_clk_driver isn't
+even referenced anywhere!
 
--- 
-Nicolas Ferre
+> +
+> +MODULE_DESCRIPTION("OMAP Clock driver");
+> +MODULE_AUTHOR("Texas Instruments Inc.");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/clk/omap.h b/include/linux/clk/omap.h
+> new file mode 100644
+> index 0000000..504e838
+> --- /dev/null
+> +++ b/include/linux/clk/omap.h
+> @@ -0,0 +1,24 @@
+> +/*
+> + * Copyright (C) 2010 Broadcom
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+> + */
+> +
+> +#ifndef __LINUX_CLK_OMAP_H_
+> +#define __LINUX_CLK_OMAP_H_
+> +
+> +int __init dt_omap_clk_init(void);
+
+__init annotations don't generally go in the header files.
+
+g.
