@@ -1,26 +1,21 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 14 Jun 2013 18:29:53 +0100
-Subject: [PATCH] irqchip: gic: fix boot for chained gics
-In-Reply-To: <1371227097-3326-1-git-send-email-mark.rutland@arm.com>
-References: <1371227097-3326-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20130614172952.GU29271@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 14 Jun 2013 19:44:57 +0200
+Subject: [PATCH 1/3] ARM: mach-moxart: add MOXA ART SoC files
+In-Reply-To: <CAOesGMgznJXWN5nE-2igC-d0YY_aFk0Q1D_5p95oTZM-VTs5qw@mail.gmail.com>
+References: <1371040448-28742-1-git-send-email-jonas.jensen@gmail.com>
+ <2428901.voOA9oET8R@wuerfel>
+ <CAOesGMgznJXWN5nE-2igC-d0YY_aFk0Q1D_5p95oTZM-VTs5qw@mail.gmail.com>
+Message-ID: <6334975.lLWqiA43Az@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 05:24:57PM +0100, Mark Rutland wrote:
-> As of c0114709ed: "irqchip: gic: Perform the gic_secondary_init() call
-> via CPU notifier", booting on a platform with chained gics (e.g.
-> Realview EB ARM11MPCore) will result in the gic_cpu_notifier being
-> registered twice, corrupting the cpu notifier list and rendering the
-> platform unbootable.
-> 
-> This patch ensures that we only register the notifier for the first gic,
-> allowing platforms with chained gics to boot. At the same time we limit
-> the pointlessly duplicated calls to set_smp_cross_call and
-> set_handle_irq to the first gic registered.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
+On Friday 14 June 2013 09:41:36 Olof Johansson wrote:
+> I sort of presumed that there might be need for _some_ platform code
+> later on, just not quite yet, so I didn't want to be quite that
+> drastic. I suppose leaving it with the trivial file for now is OK, and
+> we can make a sweeping change down the road in case we want to clean
+> up and consolidate all the trivial platforms.
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+Yes, good idea.
+
+	Arnd
