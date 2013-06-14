@@ -1,69 +1,69 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 14 Jun 2013 11:27:15 +0200 (CEST)
-Subject: [PATCH 14/15] ARM: shmobile: Remove AP4EVB board support
-In-Reply-To: <CANqRtoSx4Jf_EfG3LvkpoOED4-SuOdWjRedz-RbwGCOcOeP-Xg@mail.gmail.com>
-References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
- <1371106793-25071-15-git-send-email-horms+renesas@verge.net.au>
- <Pine.LNX.4.64.1306132128370.3777@axis700.grange>
- <CANqRtoSx4Jf_EfG3LvkpoOED4-SuOdWjRedz-RbwGCOcOeP-Xg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1306141123380.6920@axis700.grange>
+From: avinashphilip@ti.com (Philip Avinash)
+Date: Fri, 14 Jun 2013 15:05:25 +0530
+Subject: [PATCH v2 0/7] Convert GPIO Davinci to platform driver
+Message-ID: <1371202532-14628-1-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Jun 2013, Magnus Damm wrote:
+To support DT booting of da850 EVM, davinci gpio driver converted to platform
+driver. Also when here, start using gpiolib API for gpio get/set functionalities.
+Hence removing gpio inline functionalities. However usage of gpiolib API will
+cause an additional software latencies.
 
-> Hi Guennadi,
-> 
-> On Fri, Jun 14, 2013 at 4:36 AM, Guennadi Liakhovetski
-> <g.liakhovetski@gmx.de> wrote:
-> > Hi Simon
-> >
-> > On Thu, 13 Jun 2013, Simon Horman wrote:
-> >
-> >> From: Magnus Damm <damm@opensource.se>
-> >>
-> >> Remove board support for the sh7372 based AP4EVB board
-> >>
-> >> The sh7372 SoC support code is still kept around since it
-> >> is in use by the Mackerel board which is basically a more
-> >> recent board where the design is based on AP4EVB.
-> >>
-> >> Signed-off-by: Magnus Damm <damm@opensource.se>
-> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> >
-> > It would be a pity if this patch gets pulled now. We're still discussing
-> > with Magnus, I believe. My opinion is, that this board is a good testing
-> > platform for V4L2. It is the only board in the mainline, using the CSI2
-> > interface, present on multiple Renesas SoCs, including r8a73a4 (APE6), and
-> > (probably, not 100% sure) sh73a0 (AG5), and the IMX074 camera sensor, not
-> > present on any other platform. If this board is removed, supporting both
-> > CSI2 and IMX074 will become difficult. Besides, AP4EVB is used as an
-> > example in my V4L2 clock / async probing patch series:
-> >
-> > http://www.mail-archive.com/linux-media at vger.kernel.org/msg63174.html
-> >
-> > If still possible, would be good to delay removing this board until we
-> > complete our discussion.
-> 
-> If fine with keeping the board if someone can show me progress in the
-> area of INTC DT support. Recently I have not seen anything.
-> 
-> So if no one is developing DT support for this board then I can't
-> really see how we will be able to support it in the future with ARM
-> SoC requirements for DT and MULTIPLATFORM...
+In this patch series
+- Cleaned gpio Davinci driver code with proper commenting style.
+- Create platform driver for GPIO Davinci in da8xx and dmxxx platforms and
+  removed gpio related member updation in davinci_soc_info structure.
+- Remove soc_info reference in the gpio davinci driver and start uses
+  gpiolib interface.
+- gpio-tnetv107x driver also modified to use gpiolib API interface.
 
-You seem to be keeping the other sh7372 board currently in the mainline - 
-the mackerel, so, keeping this one as well at least as long as sh7372 is 
-at all supported shouldn't come at an extra cost. As for INTC DT - I 
-think, the original idea was to specify the complete INTC configuration in 
-DT, which looked pretty horrifying. And it shouldn't be needed, since INTC 
-config is per-SoC, not per-board. What if we keep INTC configuration in 
-SoC files and use aux-data to supply platform data to DT device nodes? 
-Would that be difficult to implement?
+This series has been tested on da850 EVM for gpio interrupt generation.
+This patch series is based on Linux 3.10-rc4 and is availabel at [1].
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+1. https://github.com/avinashphilip/am335x_linux/tree/linux_davinci_v3.10_soc_gpio_v310-rc4
+
+KV Sujith (2):
+  gpio: davinci: move to platform device
+  ARM: davinci: da8xx: creation of gpio platform device
+
+Philip Avinash (5):
+  gpio: davinci: coding style correction
+  ARM: davinci: creation of gpio platform device for dmxxx platforms
+  ARM: davinci: da8xx: gpio device creation
+  ARM: davinci: dmxxx: gpio device creation
+  ARM: davinci: Start using gpiolib API inplace of inline functions
+
+ arch/arm/Kconfig                                  |    1 -
+ arch/arm/mach-davinci/board-da830-evm.c           |   19 ++-
+ arch/arm/mach-davinci/board-da850-evm.c           |   11 ++
+ arch/arm/mach-davinci/board-dm355-evm.c           |   27 ++++
+ arch/arm/mach-davinci/board-dm355-leopard.c       |    1 +
+ arch/arm/mach-davinci/board-dm365-evm.c           |   28 ++++
+ arch/arm/mach-davinci/board-dm644x-evm.c          |   26 ++++
+ arch/arm/mach-davinci/board-dm646x-evm.c          |   27 ++++
+ arch/arm/mach-davinci/board-neuros-osd2.c         |    1 +
+ arch/arm/mach-davinci/board-omapl138-hawk.c       |    2 +
+ arch/arm/mach-davinci/da830.c                     |    5 -
+ arch/arm/mach-davinci/da850.c                     |    5 -
+ arch/arm/mach-davinci/devices-da8xx.c             |   26 ++++
+ arch/arm/mach-davinci/devices.c                   |   13 ++
+ arch/arm/mach-davinci/dm355.c                     |    5 -
+ arch/arm/mach-davinci/dm365.c                     |    6 -
+ arch/arm/mach-davinci/dm644x.c                    |    5 -
+ arch/arm/mach-davinci/dm646x.c                    |    5 -
+ arch/arm/mach-davinci/include/mach/common.h       |    4 +
+ arch/arm/mach-davinci/include/mach/da8xx.h        |    1 +
+ arch/arm/mach-davinci/include/mach/gpio-davinci.h |   91 -------------
+ arch/arm/mach-davinci/include/mach/gpio.h         |   88 -------------
+ arch/arm/mach-davinci/tnetv107x.c                 |    2 +-
+ drivers/gpio/gpio-davinci.c                       |  144 ++++++++++++++-------
+ drivers/gpio/gpio-tnetv107x.c                     |    1 +
+ include/linux/platform_data/gpio-davinci.h        |   59 +++++++++
+ 26 files changed, 341 insertions(+), 262 deletions(-)
+ delete mode 100644 arch/arm/mach-davinci/include/mach/gpio-davinci.h
+ delete mode 100644 arch/arm/mach-davinci/include/mach/gpio.h
+ create mode 100644 include/linux/platform_data/gpio-davinci.h
+
+-- 
+1.7.9.5
