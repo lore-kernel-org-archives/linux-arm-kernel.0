@@ -1,21 +1,54 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 14 Jun 2013 14:51:52 +0800
-Subject: [PATCH 0/4] ARM: mxs: Various Crystalfontz DT additions
-In-Reply-To: <1371131025-12200-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1371131025-12200-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130614065150.GG20513@S2101-09.ap.freescale.net>
+From: Yalin.Wang@sonymobile.com (Wang, Yalin)
+Date: Fri, 14 Jun 2013 14:53:14 +0800
+Subject: A bug about system call on ARM
+In-Reply-To: <20130603095425.GA32242@mudshark.cambridge.arm.com>
+References: <35FD53F367049845BC99AC72306C23D1610991B865@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B866@CNBJMBX05.corpusers.net>
+ <20130530090949.GC7483@mudshark.cambridge.arm.com>
+ <20130530114112.GH7483@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B86D@CNBJMBX05.corpusers.net>
+ <20130531084638.GB4928@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B874@CNBJMBX05.corpusers.net>
+ <20130531111305.GI4928@mudshark.cambridge.arm.com>
+ <35FD53F367049845BC99AC72306C23D1610991B876@CNBJMBX05.corpusers.net>
+ <35FD53F367049845BC99AC72306C23D1610991B87B@CNBJMBX05.corpusers.net>
+ <20130603095425.GA32242@mudshark.cambridge.arm.com>
+Message-ID: <35FD53F367049845BC99AC72306C23D17B08729316@CNBJMBX05.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 03:43:41PM +0200, Maxime Ripard wrote:
-> Brian Lilly (3):
->   ARM: cfa10049: Switch the chip select pin of the LCD controller
->   ARM: mxs: dt: Add the Crystalfontz CFA-10055 device tree
->   ARM: mxs: dt: Add Crystalfontz CFA-10057 device tree
+Hi Will,
+
+We have tested the patch,
+It seems ok in the stability test .
+
+We have merged it into our main branch .
+
+Thanks for your patch !
+
+-----Original Message-----
+From: Will Deacon [mailto:will.deacon at arm.com] 
+Sent: Monday, June 03, 2013 5:54 PM
+To: Wang, Yalin
+Cc: 'richard -rw- weinberger'; 'linux-arch at vger.kernel.org'; 'linux-kernel at vger.kernel.org'; 'linux-arm-kernel at lists.infradead.org'
+Subject: Re: A bug about system call on ARM
+
+On Mon, Jun 03, 2013 at 06:25:26AM +0100, Wang, Yalin wrote:
+> Hi  Will,
 > 
-> Maxime Ripard (1):
->   ARM: cfa10036: Add USB0 OTG port
+> I have a question about this patch .
+> 
+> If the user space is thumb mode,
+> The PC should be rewind by 2 bytes,
+> So the fix_up code should be
+> 
+> Sub lr, lr, #2 .
+> 
+> 
+> Am I right ?
 
-All applied, thanks.
+No, because we don't have OABI-compat support for Thumb applications and force everything down the EABI path instead.
 
-Shawn
+Did you manage to test the patch?
+
+Will
