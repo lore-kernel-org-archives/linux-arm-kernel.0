@@ -1,40 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 09:41:36 -0700
-Subject: [PATCH 1/3] ARM: mach-moxart: add MOXA ART SoC files
-In-Reply-To: <2428901.voOA9oET8R@wuerfel>
-References: <1371040448-28742-1-git-send-email-jonas.jensen@gmail.com>
- <1371040448-28742-2-git-send-email-jonas.jensen@gmail.com>
- <2428901.voOA9oET8R@wuerfel>
-Message-ID: <CAOesGMgznJXWN5nE-2igC-d0YY_aFk0Q1D_5p95oTZM-VTs5qw@mail.gmail.com>
+Date: Fri, 14 Jun 2013 09:42:45 -0700
+Subject: [PATCH] ARM: exynos: remove unused code
+In-Reply-To: <201306141517.24287.arnd@arndb.de>
+References: <51B791EF.9070904@samsung.com> <201306141517.24287.arnd@arndb.de>
+Message-ID: <CAOesGMjKZGWp9J5pTj6C4K20xENCtm_G=b8oKwTTkJ-03-X=Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 7:47 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-arch.h>
->> +
->> +static const char * const moxart_dt_compat[] = {
->> +     "moxa,moxart-uc-7112-lx",
->> +     NULL,
->> +};
->> +
->> +DT_MACHINE_START(MOXART, "MOXA UC-7112-LX")
->> +     .dt_compat              = moxart_dt_compat,
->> +MACHINE_END
+On Fri, Jun 14, 2013 at 6:17 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> After exynos has been converted to DT-only booting by removing
+> most a lot of the ATAGS code, I had a closer look of what is
+> left. It turns out that a number of unused files are left in
+> the tree that can be removed along with about another quarter
+> of the remaining code in mach-exynos.
 >
-> If the .dt_compat fields is the only field in the machine descriptor,
-> you can leave out the entire descriptor!
+> Specifically this includes:
 >
-> Olof, do you have a preference to how we want to handle this? The
-> only advantage of having this file at all is to have the
-> "MOXA UC-7112-LX" string in /proc/cpuinfo.
-> Should we just remove the entire directory or leave it as the trivial
-> file above?
+> * all board files
+> * all setup-*.c files
+> * dev-audio.c and dev-uart.c
+> * all code testing for of_have_populated_dt
+> * the eint_irqchip
+> * almost all the mach/irqs.h constants (the remaining ones
+>   are likely bugs)
+> * Most physical address constants. The remaining ones are
+>   either bugs or used for the iotable. Both can probably
+>   get removed in the long run.
+> * regs-usb-phy.h, which was already unused before
+> * A lot of code in plat-samsung/ can be made conditional
+>   on CONFIG_ATAGS, in particular now unused device
+>   definitions.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-I sort of presumed that there might be need for _some_ platform code
-later on, just not quite yet, so I didn't want to be quite that
-drastic. I suppose leaving it with the trivial file for now is OK, and
-we can make a sweeping change down the road in case we want to clean
-up and consolidate all the trivial platforms.
+Acked-by: Olof Johansson <olof@lixom.net>
+
+> Hi Kukjin,
+>
+> Could you check the validity of this patch please?
+>
+> I think we should apply it on top of your series. I've generated
+> the patch using 'git format-patch -D' for brevity, so be careful
+> to actually delete the unused files if you want to apply it to
+> a local branch on your side.
+
+Great. This is the piece that I wanted to see in the non-DT-removal
+branch before I pulled it.
 
 
 -Olof
