@@ -1,25 +1,31 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 14 Jun 2013 02:38:41 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP3EVM: Marking omap3_evm_display_init() with
- CONFIG_BROKEN
-In-Reply-To: <1371120838-29599-1-git-send-email-lokeshvutla@ti.com>
-References: <1371120838-29599-1-git-send-email-lokeshvutla@ti.com>
-Message-ID: <alpine.DEB.2.02.1306140238270.5514@utopia.booyaka.com>
+Date: Fri, 14 Jun 2013 02:46:33 +0000 (UTC)
+Subject: [PATCH 0/2] Remove unused voltagedomain data for AM33xx
+In-Reply-To: <1371118124-15910-1-git-send-email-rnayak@ti.com>
+References: <1371118124-15910-1-git-send-email-rnayak@ti.com>
+Message-ID: <alpine.DEB.2.02.1306140243380.5514@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 13 Jun 2013, Lokesh Vutla wrote:
+cc Kevin, Vaibhav
 
-> On 37xx EVM non-dt boot fails with current mainline,
-> because of broken GPIO numbering in the board file
-> that uses hardcoded GPIOs.
-> 
-> So marking omap3_evm_display_init() with CONFIG_BROKEN
-> for now as suggested by Tony as per the below link:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg90399.html
-> 
-> Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com> ---
+On Thu, 13 Jun 2013, Rajendra Nayak wrote:
 
-Tested-by: Paul Walmsley <paul@pwsan.com>
+> The powerdomain framework today expects to always have a voltagedomain
+> associated with a given powerdomain. We already have AM33xx which
+> has no Voltage Controller/Voltage Processor as part of PRCM.
+> There are more SoCs' to follow starting with AM437x and DRA7xx
+> which do not have VC/VP.
+> 
+> Instead of adding dummy voltage domain data files, make the powerdomain
+> framework aware of the fact that some SoCs' might not really have
+> scalable voltage domains.
+
+Fine with me in principle if AM335x doesn't support voltage scaling.  
+Vaibhav, if this is okay for you, please ack it.  
+
+Then, in terms of merging, probably Kevin would be the right person for 
+this since he's done much of the voltagedomain work.
+
 
 - Paul
