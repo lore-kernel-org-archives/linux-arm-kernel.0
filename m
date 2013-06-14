@@ -1,56 +1,61 @@
 From: avinashphilip@ti.com (Philip Avinash)
-Date: Fri, 14 Jun 2013 15:15:55 +0530
-Subject: [PATCH v2 3/4] ARM: davinci: da850: add GPIO DT entries
+Date: Fri, 14 Jun 2013 15:15:56 +0530
+Subject: [PATCH v2 4/4] ARM: davinci: da850 evm: add GPIO DT data
 In-Reply-To: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
 References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <1371203156-15260-4-git-send-email-avinashphilip@ti.com>
+Message-ID: <1371203156-15260-5-git-send-email-avinashphilip@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: KV Sujith <sujithkv@ti.com>
 
-Add DT entries for Davinci GPIO.
+- Add GPIO DT Data and pinmux for DA850 EVM. GPIO is configurable differently
+  on different boards. So add GPIO pinmuxing in dts file.
+- Dependency: This patch is dependent on Grab-pin-control patch;
+  https://patchwork.kernel.org/patch/2013751/
 
 Signed-off-by: KV Sujith <sujithkv@ti.com>
 Signed-off-by: Philip Avinash <avinashphilip@ti.com>
 ---
-Changes since v1:
-	- interrupts member defined as array and with interrupt flags
+ arch/arm/boot/dts/da850-evm.dts |   19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
- arch/arm/boot/dts/da850.dtsi |   15 +++++++++++++++
- 1 file changed, 15 insertions(+)
-
-diff --git a/arch/arm/boot/dts/da850.dtsi b/arch/arm/boot/dts/da850.dtsi
-index 3b66020..cd7b362 100644
---- a/arch/arm/boot/dts/da850.dtsi
-+++ b/arch/arm/boot/dts/da850.dtsi
-@@ -8,6 +8,7 @@
-  * option) any later version.
-  */
- #include "skeleton.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	arm {
-@@ -126,6 +127,20 @@
- 				>;
+diff --git a/arch/arm/boot/dts/da850-evm.dts b/arch/arm/boot/dts/da850-evm.dts
+index 5bce7cc..2c127ff 100644
+--- a/arch/arm/boot/dts/da850-evm.dts
++++ b/arch/arm/boot/dts/da850-evm.dts
+@@ -17,6 +17,20 @@
+ 	soc {
+ 		pmx_core: pinmux at 1c14120 {
+ 			status = "okay";
++			gpio_pins: pinmux_gpio_pins {
++				pinctrl-single,bits = <
++					/* GPIO2_4 GPIO2_6 */
++					0x18 0x00008080 0x0000f0f0
++					/* GPIO2_8 GPIO2_15 */
++					0x14 0x80000008 0xf000000f
++					/* GPIO3_12 GPIO3_13 */
++					0x1C 0x00008800 0x0000ff00
++					/* GPIO4_0 GPIO4_1 */
++					0x28 0x88000000 0xff000000
++					/* GPIO6_9 GPIO6_10 GPIO6_13 */
++					0x34 0x08800800 0x0ff00f00
++				>;
++			};
+ 		};
+ 		serial0: serial at 1c42000 {
+ 			status = "okay";
+@@ -90,6 +104,11 @@
+ 				};
  			};
  		};
 +		gpio: gpio at 1e26000 {
-+			compatible = "ti,da830-gpio";
-+			reg = <0x226000 0x1000>;
-+			interrupts = <42 IRQ_TYPE_EDGE_BOTH
-+				43 IRQ_TYPE_EDGE_BOTH 44 IRQ_TYPE_EDGE_BOTH
-+				45 IRQ_TYPE_EDGE_BOTH 46 IRQ_TYPE_EDGE_BOTH
-+				47 IRQ_TYPE_EDGE_BOTH 48 IRQ_TYPE_EDGE_BOTH
-+				49 IRQ_TYPE_EDGE_BOTH 50 IRQ_TYPE_EDGE_BOTH>;
-+			ngpio = <144>;
-+			intc_irq_num = <101>;
-+			gpio_unbanked = <0>;
-+			status = "disabled";
++			status = "okay";
++			pinctrl-names = "default";
++			pinctrl-0 = <&gpio_pins>;
 +		};
- 		serial0: serial at 1c42000 {
- 			compatible = "ns16550a";
- 			reg = <0x42000 0x100>;
+ 	};
+ 	nand_cs3 at 62000000 {
+ 		status = "okay";
 -- 
 1.7.9.5
