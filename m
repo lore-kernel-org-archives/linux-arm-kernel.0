@@ -1,48 +1,62 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Fri, 14 Jun 2013 05:03:57 -0400
-Subject: [PATCH V2] arm: pj4: check cpu id for pj4 cp0 access
-Message-ID: <1371200637-20850-1-git-send-email-chao.xie@marvell.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Fri, 14 Jun 2013 12:07:57 +0300
+Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
+In-Reply-To: <Pine.LNX.4.44L0.1306131106160.1561-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1306131106160.1561-100000@iolanthe.rowland.org>
+Message-ID: <51BADD6D.5040600@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check cpu id in pj4_cp0_init. So for no-PJ4 V7 cpus,
-pj4_cpu0_init just return.
-This fix will help to make the all the V7 cpus(pj4 and no-PJ4)
-use same platform code.
+On 06/13/2013 06:08 PM, Alan Stern wrote:
+> On Thu, 13 Jun 2013, Chao Xie wrote:
+> 
+>>>> These operations sound generic enough to be done at HCD layer, no? So no need to
+>>>> replicate the same stuff in ohci, ehci, xhci, etc.
+>>>
+>>> The HCD layer handles suspend and resume only for PCI host controllers.
+>>> Not for other types.
+>>>
+>>> I don't know if the acquire/start and stop/release parts can be moved
+>>> into the USB core.  Maybe they can.
+>>>
+>>> Alan Stern
+>>>
+>> hi
+>> The following is my understanding.
+>> I think for PHY initialization and shutdown part, it is generic for
+>> other parts.
+>> PHY initialization need to be called before hc_driver->reset is called.
+>> I think it can be added at usb_add_hcd.
+>> For PHY shutdown, it can be added at usb_remove_hcd.
+> 
+> Yes, that should work.
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/kernel/pj4-cp0.c |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+I don't think this will work with OMAP USB host controller when used in
+Transceiver-less mode (e.g. HSIC). In this mode we need to release the HSIC
+reset (mapped to PHY init), after the EHCI controller is up and running.
 
-diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-index 679cf4d..bf658d3 100644
---- a/arch/arm/kernel/pj4-cp0.c
-+++ b/arch/arm/kernel/pj4-cp0.c
-@@ -17,6 +17,10 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <asm/thread_notify.h>
-+#include <asm/cputype.h>
-+
-+#define CORE_PJ4_MASK	0xfffffff0
-+#define CORE_PJ4_ID	0x562f5840
- 
- static int iwmmxt_do(struct notifier_block *self, unsigned long cmd, void *t)
- {
-@@ -79,6 +83,13 @@ static void __init pj4_cp_access_write(u32 value)
- static int __init pj4_cp0_init(void)
- {
- 	u32 cp_access;
-+	unsigned int cpuid;
-+
-+	cpuid = read_cpuid_id();
-+
-+	/* If it is not a pj4 core, skip it. */
-+	if ((cpuid & CORE_PJ4_MASK) != CORE_PJ4_ID)
-+		return 0;
- 
- 	cp_access = pj4_cp_access_read() & ~0xf;
- 	pj4_cp_access_write(cp_access);
--- 
-1.7.4.1
+On the other hand, in the PHY mode, the PHY needs to be initialized (brought out
+of reset) before the EHCI controller starts.
+
+This behavior might be different on other controllers. Generalization is good
+as long as there is an override available for the controllers to handle the
+PHY init/shutdown themselves.
+
+> 
+>> For suspend/resume, i do not know how to add it. For our EHCI driver,
+>> when system goes to deep idle states, we just directly shutdown the
+>> hcd and initialize it again when the system goes back.
+> 
+> You shut down the host controller?  Then how does it detect wakeup 
+> events?  And how does it know if a device was disconnected while the 
+> power was off?
+> 
+
+On OMAP as well we are aiming to cut clocks to the host controller (state saved)
+during bus/system suspend. PHY is in low power mode capable of detecting wakeup events.
+The SoC is configured to wake up on any I/O activity on the PHY pins. Upon
+detection of PHY related I/O event, SoC wakes up, we restore the host controller state
+and proceed as normal.
+
+cheers,
+-roger
