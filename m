@@ -1,101 +1,140 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Jun 2013 21:33:04 +0200
-Subject: [PATCH 28/28] ARM: EXYNOS: Remove mach/regs-usb-phy.h header
+Date: Fri, 14 Jun 2013 21:33:03 +0200
+Subject: [PATCH 27/28] ARM: EXYNOS: Remove CONFIG_SOC_EXYNOS4412
 In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
 References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371238384-1504-29-git-send-email-t.figa@samsung.com>
+Message-ID: <1371238384-1504-28-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes mach/regs-usb-phy.h header, which is not used
-anywhere in the kernel.
+Exynos4212 and Exynos4412 SoCs differ only in number of ARM cores and
+there is no need to have separate Kconfig options for them, since they
+use the same code.
 
+This patch removes CONFIG_SOC_EXYNOS4412, leaving CONFIG_SOC_EXYNOS4212
+as the one supporting both SoCs from this series.
+
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: Zhang Rui <rui.zhang@intel.com>
+Cc: Eduardo Valentin <eduardo.valentin@ti.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Cc: cpufreq at vger.kernel.org
+Cc: linux-pm at vger.kernel.org
+Cc: linux-media at vger.kernel.org
+Cc: linux-serial at vger.kernel.org
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/regs-usb-phy.h | 74 ------------------------
- 1 file changed, 74 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-phy.h
+ arch/arm/mach-exynos/Kconfig              | 11 +----------
+ arch/arm/plat-samsung/include/plat/cpu.h  |  6 +-----
+ drivers/cpufreq/Kconfig.arm               |  2 +-
+ drivers/media/platform/exynos4-is/Kconfig |  2 +-
+ drivers/thermal/exynos_thermal.c          |  2 +-
+ drivers/tty/serial/samsung.c              |  3 +--
+ 6 files changed, 6 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/regs-usb-phy.h b/arch/arm/mach-exynos/include/mach/regs-usb-phy.h
-deleted file mode 100644
-index 0727773..0000000
---- a/arch/arm/mach-exynos/include/mach/regs-usb-phy.h
-+++ /dev/null
-@@ -1,74 +0,0 @@
--/*
-- * Copyright (C) 2011 Samsung Electronics Co.Ltd
-- * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-- *
-- * This program is free software; you can redistribute  it and/or modify it
-- * under  the terms of  the GNU General  Public License as published by the
-- * Free Software Foundation;  either version 2 of the  License, or (at your
-- * option) any later version.
-- */
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 47d8d9e..fe75a65 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -46,7 +46,7 @@ config CPU_EXYNOS4210
+ 	  Enable EXYNOS4210 CPU support
+ 
+ config SOC_EXYNOS4212
+-	bool "SAMSUNG EXYNOS4212"
++	bool "SAMSUNG EXYNOS4212/4412"
+ 	default y
+ 	depends on ARCH_EXYNOS4
+ 	select PINCTRL_EXYNOS
+@@ -56,15 +56,6 @@ config SOC_EXYNOS4212
+ 	help
+ 	  Enable EXYNOS4212 SoC support
+ 
+-config SOC_EXYNOS4412
+-	bool "SAMSUNG EXYNOS4412"
+-	default y
+-	depends on ARCH_EXYNOS4
+-	select PINCTRL_EXYNOS
+-	select SAMSUNG_DMADEV
+-	help
+-	  Enable EXYNOS4412 SoC support
 -
--#ifndef __PLAT_S5P_REGS_USB_PHY_H
--#define __PLAT_S5P_REGS_USB_PHY_H
+ config SOC_EXYNOS5250
+ 	bool "SAMSUNG EXYNOS5250"
+ 	default y
+diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsung/include/plat/cpu.h
+index 989fefe..87b03bb 100644
+--- a/arch/arm/plat-samsung/include/plat/cpu.h
++++ b/arch/arm/plat-samsung/include/plat/cpu.h
+@@ -122,13 +122,9 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID, EXYNOS5_SOC_MASK)
+ 
+ #if defined(CONFIG_SOC_EXYNOS4212)
+ # define soc_is_exynos4212()	is_samsung_exynos4212()
+-#else
+-# define soc_is_exynos4212()	0
+-#endif
 -
--#define EXYNOS4_HSOTG_PHYREG(x)		((x) + S3C_VA_USB_HSPHY)
--
--#define EXYNOS4_PHYPWR			EXYNOS4_HSOTG_PHYREG(0x00)
--#define PHY1_HSIC_NORMAL_MASK		(0xf << 9)
--#define PHY1_HSIC1_SLEEP		(1 << 12)
--#define PHY1_HSIC1_FORCE_SUSPEND	(1 << 11)
--#define PHY1_HSIC0_SLEEP		(1 << 10)
--#define PHY1_HSIC0_FORCE_SUSPEND	(1 << 9)
--
--#define PHY1_STD_NORMAL_MASK		(0x7 << 6)
--#define PHY1_STD_SLEEP			(1 << 8)
--#define PHY1_STD_ANALOG_POWERDOWN	(1 << 7)
--#define PHY1_STD_FORCE_SUSPEND		(1 << 6)
--
--#define PHY0_NORMAL_MASK		(0x39 << 0)
--#define PHY0_SLEEP			(1 << 5)
--#define PHY0_OTG_DISABLE		(1 << 4)
--#define PHY0_ANALOG_POWERDOWN		(1 << 3)
--#define PHY0_FORCE_SUSPEND		(1 << 0)
--
--#define EXYNOS4_PHYCLK			EXYNOS4_HSOTG_PHYREG(0x04)
--#define PHY1_COMMON_ON_N		(1 << 7)
--#define PHY0_COMMON_ON_N		(1 << 4)
--#define PHY0_ID_PULLUP			(1 << 2)
--
--#define EXYNOS4_CLKSEL_SHIFT		(0)
--
--#define EXYNOS4210_CLKSEL_MASK		(0x3 << 0)
--#define EXYNOS4210_CLKSEL_48M		(0x0 << 0)
--#define EXYNOS4210_CLKSEL_12M		(0x2 << 0)
--#define EXYNOS4210_CLKSEL_24M		(0x3 << 0)
--
--#define EXYNOS4X12_CLKSEL_MASK		(0x7 << 0)
--#define EXYNOS4X12_CLKSEL_9600K		(0x0 << 0)
--#define EXYNOS4X12_CLKSEL_10M		(0x1 << 0)
--#define EXYNOS4X12_CLKSEL_12M		(0x2 << 0)
--#define EXYNOS4X12_CLKSEL_19200K	(0x3 << 0)
--#define EXYNOS4X12_CLKSEL_20M		(0x4 << 0)
--#define EXYNOS4X12_CLKSEL_24M		(0x5 << 0)
--
--#define EXYNOS4_RSTCON			EXYNOS4_HSOTG_PHYREG(0x08)
--#define HOST_LINK_PORT_SWRST_MASK	(0xf << 6)
--#define HOST_LINK_PORT2_SWRST		(1 << 9)
--#define HOST_LINK_PORT1_SWRST		(1 << 8)
--#define HOST_LINK_PORT0_SWRST		(1 << 7)
--#define HOST_LINK_ALL_SWRST		(1 << 6)
--
--#define PHY1_SWRST_MASK			(0x7 << 3)
--#define PHY1_HSIC_SWRST			(1 << 5)
--#define PHY1_STD_SWRST			(1 << 4)
--#define PHY1_ALL_SWRST			(1 << 3)
--
--#define PHY0_SWRST_MASK			(0x7 << 0)
--#define PHY0_PHYLINK_SWRST		(1 << 2)
--#define PHY0_HLINK_SWRST		(1 << 1)
--#define PHY0_SWRST			(1 << 0)
--
--#define EXYNOS4_PHY1CON			EXYNOS4_HSOTG_PHYREG(0x34)
--#define FPENABLEN			(1 << 0)
--
--#endif /* __PLAT_S5P_REGS_USB_PHY_H */
+-#if defined(CONFIG_SOC_EXYNOS4412)
+ # define soc_is_exynos4412()	is_samsung_exynos4412()
+ #else
++# define soc_is_exynos4212()	0
+ # define soc_is_exynos4412()	0
+ #endif
+ 
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index a924408..b214ad6 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -32,7 +32,7 @@ config ARM_EXYNOS4210_CPUFREQ
+ 	  SoC (S5PV310 or S5PC210).
+ 
+ config ARM_EXYNOS4X12_CPUFREQ
+-	def_bool (SOC_EXYNOS4212 || SOC_EXYNOS4412)
++	def_bool SOC_EXYNOS4212
+ 	help
+ 	  This adds the CPUFreq driver for Samsung EXYNOS4X12
+ 	  SoC (EXYNOS4212 or EXYNOS4412).
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index 6ff99b5..f483e11 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -32,7 +32,7 @@ config VIDEO_S5P_MIPI_CSIS
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called s5p-csis.
+ 
+-if SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
++if SOC_EXYNOS4212 || SOC_EXYNOS5250
+ 
+ config VIDEO_EXYNOS_FIMC_LITE
+ 	tristate "EXYNOS FIMC-LITE camera interface driver"
+diff --git a/drivers/thermal/exynos_thermal.c b/drivers/thermal/exynos_thermal.c
+index 788b1dd..f88a2ad 100644
+--- a/drivers/thermal/exynos_thermal.c
++++ b/drivers/thermal/exynos_thermal.c
+@@ -817,7 +817,7 @@ static struct exynos_tmu_platform_data const exynos4210_default_tmu_data = {
+ #define EXYNOS4210_TMU_DRV_DATA (NULL)
+ #endif
+ 
+-#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4412)
++#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4212)
+ static struct exynos_tmu_platform_data const exynos_default_tmu_data = {
+ 	.threshold_falling = 10,
+ 	.trigger_levels[0] = 85,
+diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+index 0c8a9fa..eeb8ecb 100644
+--- a/drivers/tty/serial/samsung.c
++++ b/drivers/tty/serial/samsung.c
+@@ -1714,8 +1714,7 @@ static struct s3c24xx_serial_drv_data s5pv210_serial_drv_data = {
+ #endif
+ 
+ #if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) || \
+-	defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) || \
+-	defined(CONFIG_SOC_EXYNOS5440)
++	defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS5440)
+ static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
+ 	.info = &(struct s3c24xx_uart_info) {
+ 		.name		= "Samsung Exynos4 UART",
 -- 
 1.8.2.1
