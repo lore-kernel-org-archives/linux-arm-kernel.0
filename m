@@ -1,100 +1,59 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 14 Jun 2013 10:29:25 +0900
-Subject: [GIT PULL 00/15] Renesas ARM based SoC boot cleanup for v3.11
-In-Reply-To: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130614012925.GA24731@verge.net.au>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Fri, 14 Jun 2013 09:31:49 +0800
+Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
+In-Reply-To: <Pine.LNX.4.44L0.1306131106160.1561-100000@iolanthe.rowland.org>
+References: <CADApbegr5RBODJD=4UZ5Skn_N91oxwDFDxnS7Qqh5dot0EnU-Q@mail.gmail.com>
+ <Pine.LNX.4.44L0.1306131106160.1561-100000@iolanthe.rowland.org>
+Message-ID: <CADApbeh_RT9nmHK29a2b_Hw3S0ptvNvr9_neWdw7ig5wzc-_SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 03:59:38PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> This pull request is based on renesas-pinmux-for-v3.11, which you have
-> already pulled, in order to provide pre-requisites.
-> 
-> The following changes since commit 5fcf4a3c3a5bc08bf72a50ef1332501a3c1b96bb:
-> 
->   ARM: shmobile: marzen: Use RCAR_GP_PIN macro (2013-06-05 17:18:24 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-boot-for-v3.11
-> 
-> for you to fetch changes up to 9da629661d207299ad119a6735eb2411f54fd45f:
-> 
->   ARM: shmobile: Remove Bonito board support (2013-06-13 14:26:04 +0900)
+On Thu, Jun 13, 2013 at 11:08 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
+> On Thu, 13 Jun 2013, Chao Xie wrote:
+>
+>> >> These operations sound generic enough to be done at HCD layer, no? So no need to
+>> >> replicate the same stuff in ohci, ehci, xhci, etc.
+>> >
+>> > The HCD layer handles suspend and resume only for PCI host controllers.
+>> > Not for other types.
+>> >
+>> > I don't know if the acquire/start and stop/release parts can be moved
+>> > into the USB core.  Maybe they can.
+>> >
+>> > Alan Stern
+>> >
+>> hi
+>> The following is my understanding.
+>> I think for PHY initialization and shutdown part, it is generic for
+>> other parts.
+>> PHY initialization need to be called before hc_driver->reset is called.
+>> I think it can be added at usb_add_hcd.
+>> For PHY shutdown, it can be added at usb_remove_hcd.
+>
+> Yes, that should work.
+>
+Fine, i can add a patch for that. My usb phy patches are pending on it.
 
-Sorry about this but it seems that there is still some discussion,
-which I was not previously aware of, about the patch to remove the AP4EVB
-board.
+>> For suspend/resume, i do not know how to add it. For our EHCI driver,
+>> when system goes to deep idle states, we just directly shutdown the
+>> hcd and initialize it again when the system goes back.
+>
+> You shut down the host controller?  Then how does it detect wakeup
+> events?  And how does it know if a device was disconnected while the
+> power was off?
+>
+Hi
+I think maybe my suspend/resume is not same as what you think.
+The suspend/resume i mean is the peripharal sub system suspend/resume
+states. When SOC enter this low power mode,
+the clock to usb, power to usb are all shut down.
+When the controller is shut down, i think that usb_remove_hcd will
+help to remove all the attached devices.
+We do not rely on usb host controller to wake up the whole sub system.
+If a device is disconnected while the power was off, when the host
+controller is powered again, it will do initialization again, and all
+the attached devices are susposed be removed already.
 
-Please ignore this pull-request for now.
 
-> 
-> ----------------------------------------------------------------
-> Renesas ARM based SoC boot cleanup for v3.11
-> 
-> Work by Magnus Damm and others to clean up the boot of and move
-> things closer to supporting MULTIARCH.
-> 
-> As a side effect of this work it was decided to remove support for
-> two boards, Bonito and APE4EVM. Those patches are included in this
-> series as they depend on earlier patches in the series.
-> 
-> ----------------------------------------------------------------
-> Kuninori Morimoto (1):
->       ARM: shmobile: Remove Bonito board support
-> 
-> Magnus Damm (14):
->       ARM: shmobile: uImage load address rework
->       ARM: shmobile: Let romImage rely on default ATAGS
->       ARM: shmobile: Remove romImage CONFIG_MEMORY_START
->       ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
->       ARM: shmobile: Add SMP boot function and argument
->       ARM: shmobile: Add SCU boot function using argument
->       ARM: shmobile: r8a7779 SMP with SCU boot fn and args
->       ARM: shmobile: sh73a0 SMP with SCU boot fn and args
->       ARM: shmobile: EMEV2 SMP with SCU boot fn and args
->       ARM: shmobile: Remove old SCU boot code
->       ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
->       ARM: shmobile: Remove MEMORY_START/SIZE
->       ARM: shmobile: Remove mach/memory.h
->       ARM: shmobile: Remove AP4EVB board support
-> 
->  arch/arm/Kconfig                                   |    2 +-
->  arch/arm/boot/compressed/head-shmobile.S           |   21 +-
->  arch/arm/configs/ap4evb_defconfig                  |   56 -
->  arch/arm/configs/bonito_defconfig                  |   72 --
->  arch/arm/mach-shmobile/Kconfig                     |   58 -
->  arch/arm/mach-shmobile/Makefile                    |    2 -
->  arch/arm/mach-shmobile/Makefile.boot               |   18 +-
->  arch/arm/mach-shmobile/board-ap4evb.c              | 1310 --------------------
->  arch/arm/mach-shmobile/board-bonito.c              |  502 --------
->  arch/arm/mach-shmobile/headsmp-scu.S               |   29 +-
->  arch/arm/mach-shmobile/headsmp.S                   |   13 +-
->  arch/arm/mach-shmobile/include/mach/common.h       |    6 +-
->  .../arm/mach-shmobile/include/mach/head-ap4evb.txt |   93 --
->  arch/arm/mach-shmobile/include/mach/memory.h       |    7 -
->  arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h    |   29 -
->  arch/arm/mach-shmobile/include/mach/mmc.h          |    4 +-
->  arch/arm/mach-shmobile/include/mach/sh7372.h       |    2 +
->  arch/arm/mach-shmobile/include/mach/zboot.h        |    6 +-
->  arch/arm/mach-shmobile/pm-sh7372.c                 |    3 +
->  arch/arm/mach-shmobile/sleep-sh7372.S              |    5 +-
->  arch/arm/mach-shmobile/smp-emev2.c                 |    6 +-
->  arch/arm/mach-shmobile/smp-r8a7779.c               |    6 +-
->  arch/arm/mach-shmobile/smp-sh73a0.c                |    6 +-
->  23 files changed, 68 insertions(+), 2188 deletions(-)
->  delete mode 100644 arch/arm/configs/ap4evb_defconfig
->  delete mode 100644 arch/arm/configs/bonito_defconfig
->  delete mode 100644 arch/arm/mach-shmobile/board-ap4evb.c
->  delete mode 100644 arch/arm/mach-shmobile/board-bonito.c
->  delete mode 100644 arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
->  delete mode 100644 arch/arm/mach-shmobile/include/mach/memory.h
->  delete mode 100644 arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Alan Stern
+>
