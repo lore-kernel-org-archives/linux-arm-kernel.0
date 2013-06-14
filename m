@@ -1,503 +1,1192 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Jun 2013 21:33:01 +0200
-Subject: [PATCH 25/28] ARM: EXYNOS: Remove mach/irqs.h header
+Date: Fri, 14 Jun 2013 21:32:43 +0200
+Subject: [PATCH 07/28] ARM: EXYNOS: Remove legacy dev- and setup- files
 In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
 References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371238384-1504-26-git-send-email-t.figa@samsung.com>
+Message-ID: <1371238384-1504-8-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Exynos now uses CONFIG_SPARSE_IRQ and all remaining users of this
-header has been fixed, we can safely remove it.
+This patch removes now unused files containing old device and GPIO setup
+code that was needed for ATAGS based boot, which is not supported on
+Exynos any more.
+
+The only exception is setup-i2c0.c that will be removed later, since it
+has dependencies in plat-samsung/ directory.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/irqs.h | 476 -------------------------------
- 1 file changed, 476 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/irqs.h
+ arch/arm/mach-exynos/Makefile           |   3 -
+ arch/arm/mach-exynos/dev-audio.c        | 254 --------------------------------
+ arch/arm/mach-exynos/dev-uart.c         |  55 -------
+ arch/arm/mach-exynos/setup-fimc.c       |  44 ------
+ arch/arm/mach-exynos/setup-fimd0.c      |  43 ------
+ arch/arm/mach-exynos/setup-i2c0.c       |  10 --
+ arch/arm/mach-exynos/setup-i2c1.c       |  23 ---
+ arch/arm/mach-exynos/setup-i2c2.c       |  23 ---
+ arch/arm/mach-exynos/setup-i2c3.c       |  23 ---
+ arch/arm/mach-exynos/setup-i2c4.c       |  23 ---
+ arch/arm/mach-exynos/setup-i2c5.c       |  23 ---
+ arch/arm/mach-exynos/setup-i2c6.c       |  23 ---
+ arch/arm/mach-exynos/setup-i2c7.c       |  23 ---
+ arch/arm/mach-exynos/setup-keypad.c     |  36 -----
+ arch/arm/mach-exynos/setup-sdhci-gpio.c | 152 -------------------
+ arch/arm/mach-exynos/setup-spi.c        |  45 ------
+ arch/arm/mach-exynos/setup-usb-phy.c    | 223 ----------------------------
+ 17 files changed, 1026 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/dev-audio.c
+ delete mode 100644 arch/arm/mach-exynos/dev-uart.c
+ delete mode 100644 arch/arm/mach-exynos/setup-fimc.c
+ delete mode 100644 arch/arm/mach-exynos/setup-fimd0.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c1.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c2.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c3.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c4.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c5.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c6.c
+ delete mode 100644 arch/arm/mach-exynos/setup-i2c7.c
+ delete mode 100644 arch/arm/mach-exynos/setup-keypad.c
+ delete mode 100644 arch/arm/mach-exynos/setup-sdhci-gpio.c
+ delete mode 100644 arch/arm/mach-exynos/setup-spi.c
+ delete mode 100644 arch/arm/mach-exynos/setup-usb-phy.c
 
-diff --git a/arch/arm/mach-exynos/include/mach/irqs.h b/arch/arm/mach-exynos/include/mach/irqs.h
+diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+index 9811f87..5fc6cfd 100644
+--- a/arch/arm/mach-exynos/Makefile
++++ b/arch/arm/mach-exynos/Makefile
+@@ -37,7 +37,4 @@ obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
+ 
+ # device support
+ 
+-obj-y					+= dev-uart.o
+-obj-$(CONFIG_ARCH_EXYNOS4)		+= dev-audio.o
+-
+ obj-$(CONFIG_ARCH_EXYNOS)		+= setup-i2c0.o
+diff --git a/arch/arm/mach-exynos/dev-audio.c b/arch/arm/mach-exynos/dev-audio.c
 deleted file mode 100644
-index c72f59d..0000000
---- a/arch/arm/mach-exynos/include/mach/irqs.h
+index c662c89..0000000
+--- a/arch/arm/mach-exynos/dev-audio.c
 +++ /dev/null
-@@ -1,476 +0,0 @@
--/*
-- * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
+@@ -1,254 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/dev-audio.c
+- *
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
 - *		http://www.samsung.com
 - *
-- * EXYNOS - IRQ definitions
+- * Copyright (c) 2010 Samsung Electronics Co. Ltd
+- *	Jaswinder Singh <jassi.brar@samsung.com>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/platform_device.h>
+-#include <linux/dma-mapping.h>
+-#include <linux/gpio.h>
+-#include <linux/platform_data/asoc-s3c.h>
+-
+-#include <plat/gpio-cfg.h>
+-
+-#include <mach/map.h>
+-#include <mach/dma.h>
+-#include <mach/irqs.h>
+-
+-#define EXYNOS4_AUDSS_INT_MEM	(0x03000000)
+-
+-static int exynos4_cfg_i2s(struct platform_device *pdev)
+-{
+-	/* configure GPIO for i2s port */
+-	switch (pdev->id) {
+-	case 0:
+-		s3c_gpio_cfgpin_range(EXYNOS4_GPZ(0), 7, S3C_GPIO_SFN(2));
+-		break;
+-	case 1:
+-		s3c_gpio_cfgpin_range(EXYNOS4_GPC0(0), 5, S3C_GPIO_SFN(2));
+-		break;
+-	case 2:
+-		s3c_gpio_cfgpin_range(EXYNOS4_GPC1(0), 5, S3C_GPIO_SFN(4));
+-		break;
+-	default:
+-		printk(KERN_ERR "Invalid Device %d\n", pdev->id);
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+-static struct s3c_audio_pdata i2sv5_pdata = {
+-	.cfg_gpio = exynos4_cfg_i2s,
+-	.type = {
+-		.i2s = {
+-			.quirks = QUIRK_PRI_6CHAN | QUIRK_SEC_DAI
+-					 | QUIRK_NEED_RSTCLR,
+-			.idma_addr = EXYNOS4_AUDSS_INT_MEM,
+-		},
+-	},
+-};
+-
+-static struct resource exynos4_i2s0_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_I2S0, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_I2S0_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_I2S0_RX),
+-	[3] = DEFINE_RES_DMA(DMACH_I2S0S_TX),
+-};
+-
+-struct platform_device exynos4_device_i2s0 = {
+-	.name = "samsung-i2s",
+-	.id = 0,
+-	.num_resources = ARRAY_SIZE(exynos4_i2s0_resource),
+-	.resource = exynos4_i2s0_resource,
+-	.dev = {
+-		.platform_data = &i2sv5_pdata,
+-	},
+-};
+-
+-static struct s3c_audio_pdata i2sv3_pdata = {
+-	.cfg_gpio = exynos4_cfg_i2s,
+-	.type = {
+-		.i2s = {
+-			.quirks = QUIRK_NO_MUXPSR,
+-		},
+-	},
+-};
+-
+-static struct resource exynos4_i2s1_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_I2S1, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_I2S1_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_I2S1_RX),
+-};
+-
+-struct platform_device exynos4_device_i2s1 = {
+-	.name = "samsung-i2s",
+-	.id = 1,
+-	.num_resources = ARRAY_SIZE(exynos4_i2s1_resource),
+-	.resource = exynos4_i2s1_resource,
+-	.dev = {
+-		.platform_data = &i2sv3_pdata,
+-	},
+-};
+-
+-static struct resource exynos4_i2s2_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_I2S2, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_I2S2_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_I2S2_RX),
+-};
+-
+-struct platform_device exynos4_device_i2s2 = {
+-	.name = "samsung-i2s",
+-	.id = 2,
+-	.num_resources = ARRAY_SIZE(exynos4_i2s2_resource),
+-	.resource = exynos4_i2s2_resource,
+-	.dev = {
+-		.platform_data = &i2sv3_pdata,
+-	},
+-};
+-
+-/* PCM Controller platform_devices */
+-
+-static int exynos4_pcm_cfg_gpio(struct platform_device *pdev)
+-{
+-	switch (pdev->id) {
+-	case 0:
+-		s3c_gpio_cfgpin_range(EXYNOS4_GPZ(0), 5, S3C_GPIO_SFN(3));
+-		break;
+-	case 1:
+-		s3c_gpio_cfgpin_range(EXYNOS4_GPC0(0), 5, S3C_GPIO_SFN(3));
+-		break;
+-	case 2:
+-		s3c_gpio_cfgpin_range(EXYNOS4_GPC1(0), 5, S3C_GPIO_SFN(3));
+-		break;
+-	default:
+-		printk(KERN_DEBUG "Invalid PCM Controller number!");
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+-static struct s3c_audio_pdata s3c_pcm_pdata = {
+-	.cfg_gpio = exynos4_pcm_cfg_gpio,
+-};
+-
+-static struct resource exynos4_pcm0_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_PCM0, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_PCM0_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_PCM0_RX),
+-};
+-
+-struct platform_device exynos4_device_pcm0 = {
+-	.name = "samsung-pcm",
+-	.id = 0,
+-	.num_resources = ARRAY_SIZE(exynos4_pcm0_resource),
+-	.resource = exynos4_pcm0_resource,
+-	.dev = {
+-		.platform_data = &s3c_pcm_pdata,
+-	},
+-};
+-
+-static struct resource exynos4_pcm1_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_PCM1, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_PCM1_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_PCM1_RX),
+-};
+-
+-struct platform_device exynos4_device_pcm1 = {
+-	.name = "samsung-pcm",
+-	.id = 1,
+-	.num_resources = ARRAY_SIZE(exynos4_pcm1_resource),
+-	.resource = exynos4_pcm1_resource,
+-	.dev = {
+-		.platform_data = &s3c_pcm_pdata,
+-	},
+-};
+-
+-static struct resource exynos4_pcm2_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_PCM2, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_PCM2_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_PCM2_RX),
+-};
+-
+-struct platform_device exynos4_device_pcm2 = {
+-	.name = "samsung-pcm",
+-	.id = 2,
+-	.num_resources = ARRAY_SIZE(exynos4_pcm2_resource),
+-	.resource = exynos4_pcm2_resource,
+-	.dev = {
+-		.platform_data = &s3c_pcm_pdata,
+-	},
+-};
+-
+-/* AC97 Controller platform devices */
+-
+-static int exynos4_ac97_cfg_gpio(struct platform_device *pdev)
+-{
+-	return s3c_gpio_cfgpin_range(EXYNOS4_GPC0(0), 5, S3C_GPIO_SFN(4));
+-}
+-
+-static struct resource exynos4_ac97_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_AC97, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_AC97_PCMOUT),
+-	[2] = DEFINE_RES_DMA(DMACH_AC97_PCMIN),
+-	[3] = DEFINE_RES_DMA(DMACH_AC97_MICIN),
+-	[4] = DEFINE_RES_IRQ(EXYNOS4_IRQ_AC97),
+-};
+-
+-static struct s3c_audio_pdata s3c_ac97_pdata = {
+-	.cfg_gpio = exynos4_ac97_cfg_gpio,
+-};
+-
+-static u64 exynos4_ac97_dmamask = DMA_BIT_MASK(32);
+-
+-struct platform_device exynos4_device_ac97 = {
+-	.name = "samsung-ac97",
+-	.id = -1,
+-	.num_resources = ARRAY_SIZE(exynos4_ac97_resource),
+-	.resource = exynos4_ac97_resource,
+-	.dev = {
+-		.platform_data = &s3c_ac97_pdata,
+-		.dma_mask = &exynos4_ac97_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-};
+-
+-/* S/PDIF Controller platform_device */
+-
+-static int exynos4_spdif_cfg_gpio(struct platform_device *pdev)
+-{
+-	s3c_gpio_cfgpin_range(EXYNOS4_GPC1(0), 2, S3C_GPIO_SFN(4));
+-
+-	return 0;
+-}
+-
+-static struct resource exynos4_spdif_resource[] = {
+-	[0] = DEFINE_RES_MEM(EXYNOS4_PA_SPDIF, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_SPDIF),
+-};
+-
+-static struct s3c_audio_pdata samsung_spdif_pdata = {
+-	.cfg_gpio = exynos4_spdif_cfg_gpio,
+-};
+-
+-static u64 exynos4_spdif_dmamask = DMA_BIT_MASK(32);
+-
+-struct platform_device exynos4_device_spdif = {
+-	.name = "samsung-spdif",
+-	.id = -1,
+-	.num_resources = ARRAY_SIZE(exynos4_spdif_resource),
+-	.resource = exynos4_spdif_resource,
+-	.dev = {
+-		.platform_data = &samsung_spdif_pdata,
+-		.dma_mask = &exynos4_spdif_dmamask,
+-		.coherent_dma_mask = DMA_BIT_MASK(32),
+-	},
+-};
+diff --git a/arch/arm/mach-exynos/dev-uart.c b/arch/arm/mach-exynos/dev-uart.c
+deleted file mode 100644
+index c48aff0..0000000
+--- a/arch/arm/mach-exynos/dev-uart.c
++++ /dev/null
+@@ -1,55 +0,0 @@
+-/*
+- * Copyright (c) 2012 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * Base EXYNOS UART resource and device definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/types.h>
+-#include <linux/interrupt.h>
+-#include <linux/list.h>
+-#include <linux/ioport.h>
+-#include <linux/platform_device.h>
+-
+-#include <asm/mach/arch.h>
+-#include <asm/mach/irq.h>
+-#include <mach/hardware.h>
+-#include <mach/map.h>
+-#include <mach/irqs.h>
+-
+-#include <plat/devs.h>
+-
+-#define EXYNOS_UART_RESOURCE(_series, _nr)	\
+-static struct resource exynos##_series##_uart##_nr##_resource[] = {	\
+-	[0] = DEFINE_RES_MEM(EXYNOS##_series##_PA_UART##_nr, EXYNOS##_series##_SZ_UART),	\
+-	[1] = DEFINE_RES_IRQ(EXYNOS##_series##_IRQ_UART##_nr),	\
+-};
+-
+-EXYNOS_UART_RESOURCE(4, 0)
+-EXYNOS_UART_RESOURCE(4, 1)
+-EXYNOS_UART_RESOURCE(4, 2)
+-EXYNOS_UART_RESOURCE(4, 3)
+-
+-struct s3c24xx_uart_resources exynos4_uart_resources[] __initdata = {
+-	[0] = {
+-		.resources	= exynos4_uart0_resource,
+-		.nr_resources	= ARRAY_SIZE(exynos4_uart0_resource),
+-	},
+-	[1] = {
+-		.resources	= exynos4_uart1_resource,
+-		.nr_resources	= ARRAY_SIZE(exynos4_uart1_resource),
+-	},
+-	[2] = {
+-		.resources	= exynos4_uart2_resource,
+-		.nr_resources	= ARRAY_SIZE(exynos4_uart2_resource),
+-	},
+-	[3] = {
+-		.resources	= exynos4_uart3_resource,
+-		.nr_resources	= ARRAY_SIZE(exynos4_uart3_resource),
+-	},
+-};
+diff --git a/arch/arm/mach-exynos/setup-fimc.c b/arch/arm/mach-exynos/setup-fimc.c
+deleted file mode 100644
+index 6a45078..0000000
+--- a/arch/arm/mach-exynos/setup-fimc.c
++++ /dev/null
+@@ -1,44 +0,0 @@
+-/*
+- * Copyright (C) 2011 Samsung Electronics Co., Ltd.
+- *
+- * Exynos4 camera interface GPIO configuration.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/gpio.h>
+-#include <plat/gpio-cfg.h>
+-#include <plat/camport.h>
+-
+-int exynos4_fimc_setup_gpio(enum s5p_camport_id id)
+-{
+-	u32 gpio8, gpio5;
+-	u32 sfn;
+-	int ret;
+-
+-	switch (id) {
+-	case S5P_CAMPORT_A:
+-		gpio8 = EXYNOS4_GPJ0(0); /* PCLK, VSYNC, HREF, DATA[0:4] */
+-		gpio5 = EXYNOS4_GPJ1(0); /* DATA[5:7], CLKOUT, FIELD */
+-		sfn = S3C_GPIO_SFN(2);
+-		break;
+-
+-	case S5P_CAMPORT_B:
+-		gpio8 = EXYNOS4_GPE0(0); /* DATA[0:7] */
+-		gpio5 = EXYNOS4_GPE1(0); /* PCLK, VSYNC, HREF, CLKOUT, FIELD */
+-		sfn = S3C_GPIO_SFN(3);
+-		break;
+-
+-	default:
+-		WARN(1, "Wrong camport id: %d\n", id);
+-		return -EINVAL;
+-	}
+-
+-	ret = s3c_gpio_cfgall_range(gpio8, 8, sfn, S3C_GPIO_PULL_UP);
+-	if (ret)
+-		return ret;
+-
+-	return s3c_gpio_cfgall_range(gpio5, 5, sfn, S3C_GPIO_PULL_UP);
+-}
+diff --git a/arch/arm/mach-exynos/setup-fimd0.c b/arch/arm/mach-exynos/setup-fimd0.c
+deleted file mode 100644
+index 5665bb4..0000000
+--- a/arch/arm/mach-exynos/setup-fimd0.c
++++ /dev/null
+@@ -1,43 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/setup-fimd0.c
+- *
+- * Copyright (c) 2009-2011 Samsung Electronics Co., Ltd.
+- *             http://www.samsung.com
+- *
+- * Base Exynos4 FIMD 0 configuration
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
 -*/
 -
--#ifndef __ASM_ARCH_IRQS_H
--#define __ASM_ARCH_IRQS_H __FILE__
+-#include <linux/fb.h>
+-#include <linux/gpio.h>
 -
--#include <plat/irqs.h>
+-#include <video/samsung_fimd.h>
+-#include <plat/gpio-cfg.h>
 -
--/* PPI: Private Peripheral Interrupt */
+-#include <mach/map.h>
 -
--#define IRQ_PPI(x)			(x + 16)
+-void exynos4_fimd0_gpio_setup_24bpp(void)
+-{
+-	unsigned int reg;
 -
--/* SPI: Shared Peripheral Interrupt */
+-	s3c_gpio_cfgrange_nopull(EXYNOS4_GPF0(0), 8, S3C_GPIO_SFN(2));
+-	s3c_gpio_cfgrange_nopull(EXYNOS4_GPF1(0), 8, S3C_GPIO_SFN(2));
+-	s3c_gpio_cfgrange_nopull(EXYNOS4_GPF2(0), 8, S3C_GPIO_SFN(2));
+-	s3c_gpio_cfgrange_nopull(EXYNOS4_GPF3(0), 4, S3C_GPIO_SFN(2));
 -
--#define IRQ_SPI(x)			(x + 32)
+-	/*
+-	 * Set DISPLAY_CONTROL register for Display path selection.
+-	 *
+-	 * DISPLAY_CONTROL[1:0]
+-	 * ---------------------
+-	 *  00 | MIE
+-	 *  01 | MDINE
+-	 *  10 | FIMD : selected
+-	 *  11 | FIMD
+-	 */
+-	reg = __raw_readl(S3C_VA_SYS + 0x0210);
+-	reg |= (1 << 1);
+-	__raw_writel(reg, S3C_VA_SYS + 0x0210);
+-}
+diff --git a/arch/arm/mach-exynos/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
+index e2d9dfb..ede6ceb 100644
+--- a/arch/arm/mach-exynos/setup-i2c0.c
++++ b/arch/arm/mach-exynos/setup-i2c0.c
+@@ -13,17 +13,7 @@
+ 
+ struct platform_device; /* don't need the contents */
+ 
+-#include <linux/gpio.h>
+-#include <linux/platform_data/i2c-s3c2410.h>
+-#include <plat/gpio-cfg.h>
+-#include <plat/cpu.h>
 -
--/* COMBINER */
--
--#define MAX_IRQ_IN_COMBINER		8
--#define COMBINER_GROUP(x)		((x) * MAX_IRQ_IN_COMBINER + IRQ_SPI(128))
--#define COMBINER_IRQ(x, y)		(COMBINER_GROUP(x) + y)
--
--/* For EXYNOS4 and EXYNOS5 */
--
--#define EXYNOS_IRQ_EINT16_31		IRQ_SPI(32)
--
--/* For EXYNOS4 SoCs */
--
--#define EXYNOS4_IRQ_EINT0		IRQ_SPI(16)
--#define EXYNOS4_IRQ_EINT1		IRQ_SPI(17)
--#define EXYNOS4_IRQ_EINT2		IRQ_SPI(18)
--#define EXYNOS4_IRQ_EINT3		IRQ_SPI(19)
--#define EXYNOS4_IRQ_EINT4		IRQ_SPI(20)
--#define EXYNOS4_IRQ_EINT5		IRQ_SPI(21)
--#define EXYNOS4_IRQ_EINT6		IRQ_SPI(22)
--#define EXYNOS4_IRQ_EINT7		IRQ_SPI(23)
--#define EXYNOS4_IRQ_EINT8		IRQ_SPI(24)
--#define EXYNOS4_IRQ_EINT9		IRQ_SPI(25)
--#define EXYNOS4_IRQ_EINT10		IRQ_SPI(26)
--#define EXYNOS4_IRQ_EINT11		IRQ_SPI(27)
--#define EXYNOS4_IRQ_EINT12		IRQ_SPI(28)
--#define EXYNOS4_IRQ_EINT13		IRQ_SPI(29)
--#define EXYNOS4_IRQ_EINT14		IRQ_SPI(30)
--#define EXYNOS4_IRQ_EINT15		IRQ_SPI(31)
--
--#define EXYNOS4_IRQ_MDMA0		IRQ_SPI(33)
--#define EXYNOS4_IRQ_MDMA1		IRQ_SPI(34)
--#define EXYNOS4_IRQ_PDMA0		IRQ_SPI(35)
--#define EXYNOS4_IRQ_PDMA1		IRQ_SPI(36)
--#define EXYNOS4_IRQ_TIMER0_VIC		IRQ_SPI(37)
--#define EXYNOS4_IRQ_TIMER1_VIC		IRQ_SPI(38)
--#define EXYNOS4_IRQ_TIMER2_VIC		IRQ_SPI(39)
--#define EXYNOS4_IRQ_TIMER3_VIC		IRQ_SPI(40)
--#define EXYNOS4_IRQ_TIMER4_VIC		IRQ_SPI(41)
--#define EXYNOS4_IRQ_MCT_L0		IRQ_SPI(42)
--#define EXYNOS4_IRQ_WDT			IRQ_SPI(43)
--#define EXYNOS4_IRQ_RTC_ALARM		IRQ_SPI(44)
--#define EXYNOS4_IRQ_RTC_TIC		IRQ_SPI(45)
--#define EXYNOS4_IRQ_GPIO_XB		IRQ_SPI(46)
--#define EXYNOS4_IRQ_GPIO_XA		IRQ_SPI(47)
--#define EXYNOS4_IRQ_MCT_L1		IRQ_SPI(48)
--
--#define EXYNOS4_IRQ_UART0		IRQ_SPI(52)
--#define EXYNOS4_IRQ_UART1		IRQ_SPI(53)
--#define EXYNOS4_IRQ_UART2		IRQ_SPI(54)
--#define EXYNOS4_IRQ_UART3		IRQ_SPI(55)
--#define EXYNOS4_IRQ_UART4		IRQ_SPI(56)
--#define EXYNOS4_IRQ_MCT_G0		IRQ_SPI(57)
--#define EXYNOS4_IRQ_IIC			IRQ_SPI(58)
--#define EXYNOS4_IRQ_IIC1		IRQ_SPI(59)
--#define EXYNOS4_IRQ_IIC2		IRQ_SPI(60)
--#define EXYNOS4_IRQ_IIC3		IRQ_SPI(61)
--#define EXYNOS4_IRQ_IIC4		IRQ_SPI(62)
--#define EXYNOS4_IRQ_IIC5		IRQ_SPI(63)
--#define EXYNOS4_IRQ_IIC6		IRQ_SPI(64)
--#define EXYNOS4_IRQ_IIC7		IRQ_SPI(65)
--#define EXYNOS4_IRQ_SPI0		IRQ_SPI(66)
--#define EXYNOS4_IRQ_SPI1		IRQ_SPI(67)
--#define EXYNOS4_IRQ_SPI2		IRQ_SPI(68)
--
--#define EXYNOS4_IRQ_USB_HOST		IRQ_SPI(70)
--#define EXYNOS4_IRQ_USB_HSOTG		IRQ_SPI(71)
--#define EXYNOS4_IRQ_MODEM_IF		IRQ_SPI(72)
--#define EXYNOS4_IRQ_HSMMC0		IRQ_SPI(73)
--#define EXYNOS4_IRQ_HSMMC1		IRQ_SPI(74)
--#define EXYNOS4_IRQ_HSMMC2		IRQ_SPI(75)
--#define EXYNOS4_IRQ_HSMMC3		IRQ_SPI(76)
--#define EXYNOS4_IRQ_DWMCI		IRQ_SPI(77)
--
--#define EXYNOS4_IRQ_MIPI_CSIS0		IRQ_SPI(78)
--#define EXYNOS4_IRQ_MIPI_CSIS1		IRQ_SPI(80)
--
--#define EXYNOS4_IRQ_ONENAND_AUDI	IRQ_SPI(82)
--#define EXYNOS4_IRQ_ROTATOR		IRQ_SPI(83)
--#define EXYNOS4_IRQ_FIMC0		IRQ_SPI(84)
--#define EXYNOS4_IRQ_FIMC1		IRQ_SPI(85)
--#define EXYNOS4_IRQ_FIMC2		IRQ_SPI(86)
--#define EXYNOS4_IRQ_FIMC3		IRQ_SPI(87)
--#define EXYNOS4_IRQ_JPEG		IRQ_SPI(88)
--#define EXYNOS4_IRQ_2D			IRQ_SPI(89)
--#define EXYNOS4_IRQ_PCIE		IRQ_SPI(90)
--
--#define EXYNOS4_IRQ_MIXER		IRQ_SPI(91)
--#define EXYNOS4_IRQ_HDMI		IRQ_SPI(92)
--#define EXYNOS4_IRQ_IIC_HDMIPHY		IRQ_SPI(93)
--#define EXYNOS4_IRQ_MFC			IRQ_SPI(94)
--#define EXYNOS4_IRQ_SDO			IRQ_SPI(95)
--
--#define EXYNOS4_IRQ_AUDIO_SS		IRQ_SPI(96)
--#define EXYNOS4_IRQ_I2S0		IRQ_SPI(97)
--#define EXYNOS4_IRQ_I2S1		IRQ_SPI(98)
--#define EXYNOS4_IRQ_I2S2		IRQ_SPI(99)
--#define EXYNOS4_IRQ_AC97		IRQ_SPI(100)
--
--#define EXYNOS4_IRQ_SPDIF		IRQ_SPI(104)
--#define EXYNOS4_IRQ_ADC0		IRQ_SPI(105)
--#define EXYNOS4_IRQ_PEN0		IRQ_SPI(106)
--#define EXYNOS4_IRQ_ADC1		IRQ_SPI(107)
--#define EXYNOS4_IRQ_PEN1		IRQ_SPI(108)
--#define EXYNOS4_IRQ_KEYPAD		IRQ_SPI(109)
--#define EXYNOS4_IRQ_POWER_PMU		IRQ_SPI(110)
--#define EXYNOS4_IRQ_GPS			IRQ_SPI(111)
--#define EXYNOS4_IRQ_INTFEEDCTRL_SSS	IRQ_SPI(112)
--#define EXYNOS4_IRQ_SLIMBUS		IRQ_SPI(113)
--
--#define EXYNOS4_IRQ_TSI			IRQ_SPI(115)
--#define EXYNOS4_IRQ_SATA		IRQ_SPI(116)
--
--#define EXYNOS4_IRQ_PMU			COMBINER_IRQ(2, 2)
--#define EXYNOS4_IRQ_PMU_CPU1		COMBINER_IRQ(3, 2)
--#define EXYNOS4_IRQ_PMU_CPU2		COMBINER_IRQ(18, 2)
--#define EXYNOS4_IRQ_PMU_CPU3		COMBINER_IRQ(19, 2)
--
--#define EXYNOS4_IRQ_TMU_TRIG0		COMBINER_IRQ(2, 4)
--#define EXYNOS4_IRQ_TMU_TRIG1		COMBINER_IRQ(3, 4)
--
--#define EXYNOS4_IRQ_SYSMMU_MDMA0_0	COMBINER_IRQ(4, 0)
--#define EXYNOS4_IRQ_SYSMMU_SSS_0	COMBINER_IRQ(4, 1)
--#define EXYNOS4_IRQ_SYSMMU_FIMC0_0	COMBINER_IRQ(4, 2)
--#define EXYNOS4_IRQ_SYSMMU_FIMC1_0	COMBINER_IRQ(4, 3)
--#define EXYNOS4_IRQ_SYSMMU_FIMC2_0	COMBINER_IRQ(4, 4)
--#define EXYNOS4_IRQ_SYSMMU_FIMC3_0	COMBINER_IRQ(4, 5)
--#define EXYNOS4_IRQ_SYSMMU_JPEG_0	COMBINER_IRQ(4, 6)
--#define EXYNOS4_IRQ_SYSMMU_2D_0		COMBINER_IRQ(4, 7)
--
--#define EXYNOS4_IRQ_SYSMMU_ROTATOR_0	COMBINER_IRQ(5, 0)
--#define EXYNOS4_IRQ_SYSMMU_MDMA1_0	COMBINER_IRQ(5, 1)
--#define EXYNOS4_IRQ_SYSMMU_LCD0_M0_0	COMBINER_IRQ(5, 2)
--#define EXYNOS4_IRQ_SYSMMU_LCD1_M1_0	COMBINER_IRQ(5, 3)
--#define EXYNOS4_IRQ_SYSMMU_TV_M0_0	COMBINER_IRQ(5, 4)
--#define EXYNOS4_IRQ_SYSMMU_MFC_M0_0	COMBINER_IRQ(5, 5)
--#define EXYNOS4_IRQ_SYSMMU_MFC_M1_0	COMBINER_IRQ(5, 6)
--#define EXYNOS4_IRQ_SYSMMU_PCIE_0	COMBINER_IRQ(5, 7)
--
--#define EXYNOS4_IRQ_SYSMMU_FIMC_LITE0_0	COMBINER_IRQ(16, 0)
--#define EXYNOS4_IRQ_SYSMMU_FIMC_LITE1_0	COMBINER_IRQ(16, 1)
--#define EXYNOS4_IRQ_SYSMMU_FIMC_ISP_0	COMBINER_IRQ(16, 2)
--#define EXYNOS4_IRQ_SYSMMU_FIMC_DRC_0	COMBINER_IRQ(16, 3)
--#define EXYNOS4_IRQ_SYSMMU_FIMC_FD_0	COMBINER_IRQ(16, 4)
--#define EXYNOS4_IRQ_SYSMMU_FIMC_CX_0	COMBINER_IRQ(16, 5)
--
--#define EXYNOS4_IRQ_FIMD0_FIFO		COMBINER_IRQ(11, 0)
--#define EXYNOS4_IRQ_FIMD0_VSYNC		COMBINER_IRQ(11, 1)
--#define EXYNOS4_IRQ_FIMD0_SYSTEM	COMBINER_IRQ(11, 2)
--
--#define EXYNOS4210_MAX_COMBINER_NR	16
--#define EXYNOS4212_MAX_COMBINER_NR	18
--#define EXYNOS4412_MAX_COMBINER_NR	20
--#define EXYNOS4_MAX_COMBINER_NR		EXYNOS4412_MAX_COMBINER_NR
--
--#define EXYNOS4_IRQ_GPIO1_NR_GROUPS	16
--#define EXYNOS4_IRQ_GPIO2_NR_GROUPS	9
--
+ void s3c_i2c0_cfg_gpio(struct platform_device *dev)
+ {
+-	if (soc_is_exynos5250() || soc_is_exynos5440())
+-		/* will be implemented with gpio function */
+-		return;
+ 
+-	s3c_gpio_cfgall_range(EXYNOS4_GPD1(0), 2,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+ }
+diff --git a/arch/arm/mach-exynos/setup-i2c1.c b/arch/arm/mach-exynos/setup-i2c1.c
+deleted file mode 100644
+index 8d2279c..0000000
+--- a/arch/arm/mach-exynos/setup-i2c1.c
++++ /dev/null
+@@ -1,23 +0,0 @@
 -/*
-- * For Compatibility:
-- * the default is for EXYNOS4, and
-- * for exynos5, should be re-mapped at function
+- * linux/arch/arm/mach-exynos4/setup-i2c1.c
+- *
+- * Copyright (C) 2010 Samsung Electronics Co., Ltd.
+- *
+- * I2C1 GPIO configuration.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-struct platform_device; /* don't need the contents */
+-
+-#include <linux/gpio.h>
+-#include <linux/platform_data/i2c-s3c2410.h>
+-#include <plat/gpio-cfg.h>
+-
+-void s3c_i2c1_cfg_gpio(struct platform_device *dev)
+-{
+-	s3c_gpio_cfgall_range(EXYNOS4_GPD1(2), 2,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+-}
+diff --git a/arch/arm/mach-exynos/setup-i2c2.c b/arch/arm/mach-exynos/setup-i2c2.c
+deleted file mode 100644
+index 0ed62fc..0000000
+--- a/arch/arm/mach-exynos/setup-i2c2.c
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * linux/arch/arm/mach-exynos4/setup-i2c2.c
+- *
+- * Copyright (c) 2009-2010 Samsung Electronics Co., Ltd.
+- *
+- * I2C2 GPIO configuration.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-struct platform_device; /* don't need the contents */
+-
+-#include <linux/gpio.h>
+-#include <linux/platform_data/i2c-s3c2410.h>
+-#include <plat/gpio-cfg.h>
+-
+-void s3c_i2c2_cfg_gpio(struct platform_device *dev)
+-{
+-	s3c_gpio_cfgall_range(EXYNOS4_GPA0(6), 2,
+-			      S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+-}
+diff --git a/arch/arm/mach-exynos/setup-i2c3.c b/arch/arm/mach-exynos/setup-i2c3.c
+deleted file mode 100644
+index 7787fd2..0000000
+--- a/arch/arm/mach-exynos/setup-i2c3.c
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * linux/arch/arm/mach-exynos4/setup-i2c3.c
+- *
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+- *
+- * I2C3 GPIO configuration.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-struct platform_device; /* don't need the contents */
+-
+-#include <linux/gpio.h>
+-#include <linux/platform_data/i2c-s3c2410.h>
+-#include <plat/gpio-cfg.h>
+-
+-void s3c_i2c3_cfg_gpio(struct platform_device *dev)
+-{
+-	s3c_gpio_cfgall_range(EXYNOS4_GPA1(2), 2,
+-			      S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+-}
+diff --git a/arch/arm/mach-exynos/setup-i2c4.c b/arch/arm/mach-exynos/setup-i2c4.c
+deleted file mode 100644
+index edc847f..0000000
+--- a/arch/arm/mach-exynos/setup-i2c4.c
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * linux/arch/arm/mach-exynos4/setup-i2c4.c
+- *
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+- *
+- * I2C4 GPIO configuration.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-struct platform_device; /* don't need the contents */
+-
+-#include <linux/gpio.h>
+-#include <linux/platform_data/i2c-s3c2410.h>
+-#include <plat/gpio-cfg.h>
+-
+-void s3c_i2c4_cfg_gpio(struct platform_device *dev)
+-{
+-	s3c_gpio_cfgall_range(EXYNOS4_GPB(2), 2,
+-			      S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+-}
+diff --git a/arch/arm/mach-exynos/setup-i2c5.c b/arch/arm/mach-exynos/setup-i2c5.c
+deleted file mode 100644
+index d88af7f..0000000
+--- a/arch/arm/mach-exynos/setup-i2c5.c
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * linux/arch/arm/mach-exynos4/setup-i2c5.c
+- *
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+- *
+- * I2C5 GPIO configuration.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-struct platform_device; /* don't need the contents */
+-
+-#include <linux/gpio.h>
+-#include <linux/platform_data/i2c-s3c2410.h>
+-#include <plat/gpio-cfg.h>
+-
+-void s3c_i2c5_cfg_gpio(struct platform_device *dev)
+-{
+-	s3c_gpio_cfgall_range(EXYNOS4_GPB(6), 2,
+-			      S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+-}
+diff --git a/arch/arm/mach-exynos/setup-i2c6.c b/arch/arm/mach-exynos/setup-i2c6.c
+deleted file mode 100644
+index c590286..0000000
+--- a/arch/arm/mach-exynos/setup-i2c6.c
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * linux/arch/arm/mach-exynos4/setup-i2c6.c
+- *
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+- *
+- * I2C6 GPIO configuration.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-struct platform_device; /* don't need the contents */
+-
+-#include <linux/gpio.h>
+-#include <linux/platform_data/i2c-s3c2410.h>
+-#include <plat/gpio-cfg.h>
+-
+-void s3c_i2c6_cfg_gpio(struct platform_device *dev)
+-{
+-	s3c_gpio_cfgall_range(EXYNOS4_GPC1(3), 2,
+-			      S3C_GPIO_SFN(4), S3C_GPIO_PULL_UP);
+-}
+diff --git a/arch/arm/mach-exynos/setup-i2c7.c b/arch/arm/mach-exynos/setup-i2c7.c
+deleted file mode 100644
+index 1bba755..0000000
+--- a/arch/arm/mach-exynos/setup-i2c7.c
++++ /dev/null
+@@ -1,23 +0,0 @@
+-/*
+- * linux/arch/arm/mach-exynos4/setup-i2c7.c
+- *
+- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+- *
+- * I2C7 GPIO configuration.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-struct platform_device; /* don't need the contents */
+-
+-#include <linux/gpio.h>
+-#include <linux/platform_data/i2c-s3c2410.h>
+-#include <plat/gpio-cfg.h>
+-
+-void s3c_i2c7_cfg_gpio(struct platform_device *dev)
+-{
+-	s3c_gpio_cfgall_range(EXYNOS4_GPD0(2), 2,
+-			      S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+-}
+diff --git a/arch/arm/mach-exynos/setup-keypad.c b/arch/arm/mach-exynos/setup-keypad.c
+deleted file mode 100644
+index 7862bfb..0000000
+--- a/arch/arm/mach-exynos/setup-keypad.c
++++ /dev/null
+@@ -1,36 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/setup-keypad.c
+- *
+- * Copyright (c) 2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * GPIO configuration for Exynos4 KeyPad device
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#include <linux/gpio.h>
+-#include <plat/gpio-cfg.h>
+-
+-void samsung_keypad_cfg_gpio(unsigned int rows, unsigned int cols)
+-{
+-	/* Keypads can be of various combinations, Just making sure */
+-
+-	if (rows > 8) {
+-		/* Set all the necessary GPX2 pins: KP_ROW[0~7] */
+-		s3c_gpio_cfgall_range(EXYNOS4_GPX2(0), 8, S3C_GPIO_SFN(3),
+-					S3C_GPIO_PULL_UP);
+-
+-		/* Set all the necessary GPX3 pins: KP_ROW[8~] */
+-		s3c_gpio_cfgall_range(EXYNOS4_GPX3(0), (rows - 8),
+-					 S3C_GPIO_SFN(3), S3C_GPIO_PULL_UP);
+-	} else {
+-		/* Set all the necessary GPX2 pins: KP_ROW[x] */
+-		s3c_gpio_cfgall_range(EXYNOS4_GPX2(0), rows, S3C_GPIO_SFN(3),
+-					S3C_GPIO_PULL_UP);
+-	}
+-
+-	/* Set all the necessary GPX1 pins to special-function 3: KP_COL[x] */
+-	s3c_gpio_cfgrange_nopull(EXYNOS4_GPX1(0), cols, S3C_GPIO_SFN(3));
+-}
+diff --git a/arch/arm/mach-exynos/setup-sdhci-gpio.c b/arch/arm/mach-exynos/setup-sdhci-gpio.c
+deleted file mode 100644
+index d5b98c8..0000000
+--- a/arch/arm/mach-exynos/setup-sdhci-gpio.c
++++ /dev/null
+@@ -1,152 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/setup-sdhci-gpio.c
+- *
+- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+- *		http://www.samsung.com
+- *
+- * EXYNOS4 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+-*/
+-
+-#include <linux/kernel.h>
+-#include <linux/types.h>
+-#include <linux/interrupt.h>
+-#include <linux/platform_device.h>
+-#include <linux/io.h>
+-#include <linux/gpio.h>
+-#include <linux/mmc/host.h>
+-#include <linux/mmc/card.h>
+-
+-#include <mach/gpio.h>
+-#include <plat/gpio-cfg.h>
+-#include <plat/sdhci.h>
+-
+-void exynos4_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
+-{
+-	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+-	unsigned int gpio;
+-
+-	/* Set all the necessary GPK0[0:1] pins to special-function 2 */
+-	for (gpio = EXYNOS4_GPK0(0); gpio < EXYNOS4_GPK0(2); gpio++) {
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-
+-	switch (width) {
+-	case 8:
+-		for (gpio = EXYNOS4_GPK1(3); gpio <= EXYNOS4_GPK1(6); gpio++) {
+-			/* Data pin GPK1[3:6] to special-function 3 */
+-			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
+-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
+-			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-		}
+-	case 4:
+-		for (gpio = EXYNOS4_GPK0(3); gpio <= EXYNOS4_GPK0(6); gpio++) {
+-			/* Data pin GPK0[3:6] to special-function 2 */
+-			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
+-			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-		}
+-	default:
+-		break;
+-	}
+-
+-	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+-		s3c_gpio_cfgpin(EXYNOS4_GPK0(2), S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(EXYNOS4_GPK0(2), S3C_GPIO_PULL_UP);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-}
+-
+-void exynos4_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
+-{
+-	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+-	unsigned int gpio;
+-
+-	/* Set all the necessary GPK1[0:1] pins to special-function 2 */
+-	for (gpio = EXYNOS4_GPK1(0); gpio < EXYNOS4_GPK1(2); gpio++) {
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-
+-	for (gpio = EXYNOS4_GPK1(3); gpio <= EXYNOS4_GPK1(6); gpio++) {
+-		/* Data pin GPK1[3:6] to special-function 2 */
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-
+-	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+-		s3c_gpio_cfgpin(EXYNOS4_GPK1(2), S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(EXYNOS4_GPK1(2), S3C_GPIO_PULL_UP);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-}
+-
+-void exynos4_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
+-{
+-	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+-	unsigned int gpio;
+-
+-	/* Set all the necessary GPK2[0:1] pins to special-function 2 */
+-	for (gpio = EXYNOS4_GPK2(0); gpio < EXYNOS4_GPK2(2); gpio++) {
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-
+-	switch (width) {
+-	case 8:
+-		for (gpio = EXYNOS4_GPK3(3); gpio <= EXYNOS4_GPK3(6); gpio++) {
+-			/* Data pin GPK3[3:6] to special-function 3 */
+-			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(3));
+-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
+-			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-		}
+-	case 4:
+-		for (gpio = EXYNOS4_GPK2(3); gpio <= EXYNOS4_GPK2(6); gpio++) {
+-			/* Data pin GPK2[3:6] to special-function 2 */
+-			s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-			s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
+-			s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-		}
+-	default:
+-		break;
+-	}
+-
+-	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+-		s3c_gpio_cfgpin(EXYNOS4_GPK2(2), S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(EXYNOS4_GPK2(2), S3C_GPIO_PULL_UP);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-}
+-
+-void exynos4_setup_sdhci3_cfg_gpio(struct platform_device *dev, int width)
+-{
+-	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
+-	unsigned int gpio;
+-
+-	/* Set all the necessary GPK3[0:1] pins to special-function 2 */
+-	for (gpio = EXYNOS4_GPK3(0); gpio < EXYNOS4_GPK3(2); gpio++) {
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-
+-	for (gpio = EXYNOS4_GPK3(3); gpio <= EXYNOS4_GPK3(6); gpio++) {
+-		/* Data pin GPK3[3:6] to special-function 2 */
+-		s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(gpio, S3C_GPIO_PULL_UP);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-
+-	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
+-		s3c_gpio_cfgpin(EXYNOS4_GPK3(2), S3C_GPIO_SFN(2));
+-		s3c_gpio_setpull(EXYNOS4_GPK3(2), S3C_GPIO_PULL_UP);
+-		s5p_gpio_set_drvstr(gpio, S5P_GPIO_DRVSTR_LV4);
+-	}
+-}
+diff --git a/arch/arm/mach-exynos/setup-spi.c b/arch/arm/mach-exynos/setup-spi.c
+deleted file mode 100644
+index 4999829..0000000
+--- a/arch/arm/mach-exynos/setup-spi.c
++++ /dev/null
+@@ -1,45 +0,0 @@
+-/* linux/arch/arm/mach-exynos4/setup-spi.c
+- *
+- * Copyright (C) 2011 Samsung Electronics Ltd.
+- *             http://www.samsung.com/
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
 - */
 -
--#define IRQ_TIMER0_VIC			EXYNOS4_IRQ_TIMER0_VIC
--#define IRQ_TIMER1_VIC			EXYNOS4_IRQ_TIMER1_VIC
--#define IRQ_TIMER2_VIC			EXYNOS4_IRQ_TIMER2_VIC
--#define IRQ_TIMER3_VIC			EXYNOS4_IRQ_TIMER3_VIC
--#define IRQ_TIMER4_VIC			EXYNOS4_IRQ_TIMER4_VIC
+-#include <linux/gpio.h>
+-#include <plat/gpio-cfg.h>
 -
--#define IRQ_WDT				EXYNOS4_IRQ_WDT
--#define IRQ_RTC_ALARM			EXYNOS4_IRQ_RTC_ALARM
--#define IRQ_RTC_TIC			EXYNOS4_IRQ_RTC_TIC
--#define IRQ_GPIO_XB			EXYNOS4_IRQ_GPIO_XB
--#define IRQ_GPIO_XA			EXYNOS4_IRQ_GPIO_XA
--
--#define IRQ_IIC				EXYNOS4_IRQ_IIC
--#define IRQ_IIC1			EXYNOS4_IRQ_IIC1
--#define IRQ_IIC3			EXYNOS4_IRQ_IIC3
--#define IRQ_IIC5			EXYNOS4_IRQ_IIC5
--#define IRQ_IIC6			EXYNOS4_IRQ_IIC6
--#define IRQ_IIC7			EXYNOS4_IRQ_IIC7
--
--#define IRQ_SPI0			EXYNOS4_IRQ_SPI0
--#define IRQ_SPI1			EXYNOS4_IRQ_SPI1
--#define IRQ_SPI2			EXYNOS4_IRQ_SPI2
--
--#define IRQ_USB_HOST			EXYNOS4_IRQ_USB_HOST
--#define IRQ_OTG				EXYNOS4_IRQ_USB_HSOTG
--
--#define IRQ_HSMMC0			EXYNOS4_IRQ_HSMMC0
--#define IRQ_HSMMC1			EXYNOS4_IRQ_HSMMC1
--#define IRQ_HSMMC2			EXYNOS4_IRQ_HSMMC2
--#define IRQ_HSMMC3			EXYNOS4_IRQ_HSMMC3
--
--#define IRQ_MIPI_CSIS0			EXYNOS4_IRQ_MIPI_CSIS0
--
--#define IRQ_ONENAND_AUDI		EXYNOS4_IRQ_ONENAND_AUDI
--
--#define IRQ_FIMC0			EXYNOS4_IRQ_FIMC0
--#define IRQ_FIMC1			EXYNOS4_IRQ_FIMC1
--#define IRQ_FIMC2			EXYNOS4_IRQ_FIMC2
--#define IRQ_FIMC3			EXYNOS4_IRQ_FIMC3
--#define IRQ_JPEG			EXYNOS4_IRQ_JPEG
--#define IRQ_2D				EXYNOS4_IRQ_2D
--
--#define IRQ_MIXER			EXYNOS4_IRQ_MIXER
--#define IRQ_HDMI			EXYNOS4_IRQ_HDMI
--#define IRQ_IIC_HDMIPHY			EXYNOS4_IRQ_IIC_HDMIPHY
--#define IRQ_MFC				EXYNOS4_IRQ_MFC
--#define IRQ_SDO				EXYNOS4_IRQ_SDO
--
--#define IRQ_I2S0			EXYNOS4_IRQ_I2S0
--
--#define IRQ_ADC				EXYNOS4_IRQ_ADC0
--#define IRQ_TC				EXYNOS4_IRQ_PEN0
--
--#define IRQ_KEYPAD			EXYNOS4_IRQ_KEYPAD
--
--#define IRQ_FIMD0_FIFO			EXYNOS4_IRQ_FIMD0_FIFO
--#define IRQ_FIMD0_VSYNC			EXYNOS4_IRQ_FIMD0_VSYNC
--#define IRQ_FIMD0_SYSTEM		EXYNOS4_IRQ_FIMD0_SYSTEM
--
--#define IRQ_GPIO1_NR_GROUPS		EXYNOS4_IRQ_GPIO1_NR_GROUPS
--#define IRQ_GPIO2_NR_GROUPS		EXYNOS4_IRQ_GPIO2_NR_GROUPS
--
--/* For EXYNOS5 SoCs */
--
--#define EXYNOS5_IRQ_MDMA0		IRQ_SPI(33)
--#define EXYNOS5_IRQ_PDMA0		IRQ_SPI(34)
--#define EXYNOS5_IRQ_PDMA1		IRQ_SPI(35)
--#define EXYNOS5_IRQ_TIMER0_VIC		IRQ_SPI(36)
--#define EXYNOS5_IRQ_TIMER1_VIC		IRQ_SPI(37)
--#define EXYNOS5_IRQ_TIMER2_VIC		IRQ_SPI(38)
--#define EXYNOS5_IRQ_TIMER3_VIC		IRQ_SPI(39)
--#define EXYNOS5_IRQ_TIMER4_VIC		IRQ_SPI(40)
--#define EXYNOS5_IRQ_RTIC		IRQ_SPI(41)
--#define EXYNOS5_IRQ_WDT			IRQ_SPI(42)
--#define EXYNOS5_IRQ_RTC_ALARM		IRQ_SPI(43)
--#define EXYNOS5_IRQ_RTC_TIC		IRQ_SPI(44)
--#define EXYNOS5_IRQ_GPIO_XB		IRQ_SPI(45)
--#define EXYNOS5_IRQ_GPIO_XA		IRQ_SPI(46)
--#define EXYNOS5_IRQ_GPIO		IRQ_SPI(47)
--#define EXYNOS5_IRQ_IEM_IEC		IRQ_SPI(48)
--#define EXYNOS5_IRQ_IEM_APC		IRQ_SPI(49)
--#define EXYNOS5_IRQ_GPIO_C2C		IRQ_SPI(50)
--#define EXYNOS5_IRQ_IIC			IRQ_SPI(56)
--#define EXYNOS5_IRQ_IIC1		IRQ_SPI(57)
--#define EXYNOS5_IRQ_IIC2		IRQ_SPI(58)
--#define EXYNOS5_IRQ_IIC3		IRQ_SPI(59)
--#define EXYNOS5_IRQ_IIC4		IRQ_SPI(60)
--#define EXYNOS5_IRQ_IIC5		IRQ_SPI(61)
--#define EXYNOS5_IRQ_IIC6		IRQ_SPI(62)
--#define EXYNOS5_IRQ_IIC7		IRQ_SPI(63)
--#define EXYNOS5_IRQ_IIC_HDMIPHY		IRQ_SPI(64)
--#define EXYNOS5_IRQ_TMU			IRQ_SPI(65)
--#define EXYNOS5_IRQ_FIQ_0		IRQ_SPI(66)
--#define EXYNOS5_IRQ_FIQ_1		IRQ_SPI(67)
--#define EXYNOS5_IRQ_SPI0		IRQ_SPI(68)
--#define EXYNOS5_IRQ_SPI1		IRQ_SPI(69)
--#define EXYNOS5_IRQ_SPI2		IRQ_SPI(70)
--#define EXYNOS5_IRQ_USB_HOST		IRQ_SPI(71)
--#define EXYNOS5_IRQ_USB3_DRD		IRQ_SPI(72)
--#define EXYNOS5_IRQ_MIPI_HSI		IRQ_SPI(73)
--#define EXYNOS5_IRQ_USB_HSOTG		IRQ_SPI(74)
--#define EXYNOS5_IRQ_HSMMC0		IRQ_SPI(75)
--#define EXYNOS5_IRQ_HSMMC1		IRQ_SPI(76)
--#define EXYNOS5_IRQ_HSMMC2		IRQ_SPI(77)
--#define EXYNOS5_IRQ_HSMMC3		IRQ_SPI(78)
--#define EXYNOS5_IRQ_MIPICSI0		IRQ_SPI(79)
--#define EXYNOS5_IRQ_MIPICSI1		IRQ_SPI(80)
--#define EXYNOS5_IRQ_EFNFCON_DMA_ABORT	IRQ_SPI(81)
--#define EXYNOS5_IRQ_MIPIDSI0		IRQ_SPI(82)
--#define EXYNOS5_IRQ_WDT_IOP		IRQ_SPI(83)
--#define EXYNOS5_IRQ_ROTATOR		IRQ_SPI(84)
--#define EXYNOS5_IRQ_GSC0		IRQ_SPI(85)
--#define EXYNOS5_IRQ_GSC1		IRQ_SPI(86)
--#define EXYNOS5_IRQ_GSC2		IRQ_SPI(87)
--#define EXYNOS5_IRQ_GSC3		IRQ_SPI(88)
--#define EXYNOS5_IRQ_JPEG		IRQ_SPI(89)
--#define EXYNOS5_IRQ_EFNFCON_DMA		IRQ_SPI(90)
--#define EXYNOS5_IRQ_2D			IRQ_SPI(91)
--#define EXYNOS5_IRQ_EFNFCON_0		IRQ_SPI(92)
--#define EXYNOS5_IRQ_EFNFCON_1		IRQ_SPI(93)
--#define EXYNOS5_IRQ_MIXER		IRQ_SPI(94)
--#define EXYNOS5_IRQ_HDMI		IRQ_SPI(95)
--#define EXYNOS5_IRQ_MFC			IRQ_SPI(96)
--#define EXYNOS5_IRQ_AUDIO_SS		IRQ_SPI(97)
--#define EXYNOS5_IRQ_I2S0		IRQ_SPI(98)
--#define EXYNOS5_IRQ_I2S1		IRQ_SPI(99)
--#define EXYNOS5_IRQ_I2S2		IRQ_SPI(100)
--#define EXYNOS5_IRQ_AC97		IRQ_SPI(101)
--#define EXYNOS5_IRQ_PCM0		IRQ_SPI(102)
--#define EXYNOS5_IRQ_PCM1		IRQ_SPI(103)
--#define EXYNOS5_IRQ_PCM2		IRQ_SPI(104)
--#define EXYNOS5_IRQ_SPDIF		IRQ_SPI(105)
--#define EXYNOS5_IRQ_ADC0		IRQ_SPI(106)
--#define EXYNOS5_IRQ_ADC1		IRQ_SPI(107)
--#define EXYNOS5_IRQ_SATA_PHY		IRQ_SPI(108)
--#define EXYNOS5_IRQ_SATA_PMEMREQ	IRQ_SPI(109)
--#define EXYNOS5_IRQ_CAM_C		IRQ_SPI(110)
--#define EXYNOS5_IRQ_EAGLE_PMU		IRQ_SPI(111)
--#define EXYNOS5_IRQ_INTFEEDCTRL_SSS	IRQ_SPI(112)
--#define EXYNOS5_IRQ_DP1_INTP1		IRQ_SPI(113)
--#define EXYNOS5_IRQ_CEC			IRQ_SPI(114)
--#define EXYNOS5_IRQ_SATA		IRQ_SPI(115)
--
--#define EXYNOS5_IRQ_MMC44		IRQ_SPI(123)
--#define EXYNOS5_IRQ_MDMA1		IRQ_SPI(124)
--#define EXYNOS5_IRQ_FIMC_LITE0		IRQ_SPI(125)
--#define EXYNOS5_IRQ_FIMC_LITE1		IRQ_SPI(126)
--#define EXYNOS5_IRQ_RP_TIMER		IRQ_SPI(127)
--
--/* EXYNOS5440 */
--
--#define EXYNOS5440_IRQ_UART0		IRQ_SPI(2)
--#define EXYNOS5440_IRQ_UART1		IRQ_SPI(3)
--
--#define EXYNOS5_IRQ_PMU			COMBINER_IRQ(1, 2)
--
--#define EXYNOS5_IRQ_SYSMMU_GSC0_0	COMBINER_IRQ(2, 0)
--#define EXYNOS5_IRQ_SYSMMU_GSC0_1	COMBINER_IRQ(2, 1)
--#define EXYNOS5_IRQ_SYSMMU_GSC1_0	COMBINER_IRQ(2, 2)
--#define EXYNOS5_IRQ_SYSMMU_GSC1_1	COMBINER_IRQ(2, 3)
--#define EXYNOS5_IRQ_SYSMMU_GSC2_0	COMBINER_IRQ(2, 4)
--#define EXYNOS5_IRQ_SYSMMU_GSC2_1	COMBINER_IRQ(2, 5)
--#define EXYNOS5_IRQ_SYSMMU_GSC3_0	COMBINER_IRQ(2, 6)
--#define EXYNOS5_IRQ_SYSMMU_GSC3_1	COMBINER_IRQ(2, 7)
--
--#define EXYNOS5_IRQ_SYSMMU_LITE2_0	COMBINER_IRQ(3, 0)
--#define EXYNOS5_IRQ_SYSMMU_LITE2_1	COMBINER_IRQ(3, 1)
--#define EXYNOS5_IRQ_SYSMMU_FIMD1_0	COMBINER_IRQ(3, 2)
--#define EXYNOS5_IRQ_SYSMMU_FIMD1_1	COMBINER_IRQ(3, 3)
--#define EXYNOS5_IRQ_SYSMMU_LITE0_0	COMBINER_IRQ(3, 4)
--#define EXYNOS5_IRQ_SYSMMU_LITE0_1	COMBINER_IRQ(3, 5)
--#define EXYNOS5_IRQ_SYSMMU_SCALERPISP_0	COMBINER_IRQ(3, 6)
--#define EXYNOS5_IRQ_SYSMMU_SCALERPISP_1	COMBINER_IRQ(3, 7)
--
--#define EXYNOS5_IRQ_SYSMMU_ROTATOR_0	COMBINER_IRQ(4, 0)
--#define EXYNOS5_IRQ_SYSMMU_ROTATOR_1	COMBINER_IRQ(4, 1)
--#define EXYNOS5_IRQ_SYSMMU_JPEG_0	COMBINER_IRQ(4, 2)
--#define EXYNOS5_IRQ_SYSMMU_JPEG_1	COMBINER_IRQ(4, 3)
--
--#define EXYNOS5_IRQ_SYSMMU_FD_0		COMBINER_IRQ(5, 0)
--#define EXYNOS5_IRQ_SYSMMU_FD_1		COMBINER_IRQ(5, 1)
--#define EXYNOS5_IRQ_SYSMMU_SCALERCISP_0	COMBINER_IRQ(5, 2)
--#define EXYNOS5_IRQ_SYSMMU_SCALERCISP_1	COMBINER_IRQ(5, 3)
--#define EXYNOS5_IRQ_SYSMMU_MCUISP_0	COMBINER_IRQ(5, 4)
--#define EXYNOS5_IRQ_SYSMMU_MCUISP_1	COMBINER_IRQ(5, 5)
--#define EXYNOS5_IRQ_SYSMMU_3DNR_0	COMBINER_IRQ(5, 6)
--#define EXYNOS5_IRQ_SYSMMU_3DNR_1	COMBINER_IRQ(5, 7)
--
--#define EXYNOS5_IRQ_SYSMMU_ARM_0	COMBINER_IRQ(6, 0)
--#define EXYNOS5_IRQ_SYSMMU_ARM_1	COMBINER_IRQ(6, 1)
--#define EXYNOS5_IRQ_SYSMMU_MFC_R_0	COMBINER_IRQ(6, 2)
--#define EXYNOS5_IRQ_SYSMMU_MFC_R_1	COMBINER_IRQ(6, 3)
--#define EXYNOS5_IRQ_SYSMMU_RTIC_0	COMBINER_IRQ(6, 4)
--#define EXYNOS5_IRQ_SYSMMU_RTIC_1	COMBINER_IRQ(6, 5)
--#define EXYNOS5_IRQ_SYSMMU_SSS_0	COMBINER_IRQ(6, 6)
--#define EXYNOS5_IRQ_SYSMMU_SSS_1	COMBINER_IRQ(6, 7)
--
--#define EXYNOS5_IRQ_SYSMMU_MDMA0_0	COMBINER_IRQ(7, 0)
--#define EXYNOS5_IRQ_SYSMMU_MDMA0_1	COMBINER_IRQ(7, 1)
--#define EXYNOS5_IRQ_SYSMMU_MDMA1_0	COMBINER_IRQ(7, 2)
--#define EXYNOS5_IRQ_SYSMMU_MDMA1_1	COMBINER_IRQ(7, 3)
--#define EXYNOS5_IRQ_SYSMMU_TV_0		COMBINER_IRQ(7, 4)
--#define EXYNOS5_IRQ_SYSMMU_TV_1		COMBINER_IRQ(7, 5)
--
--#define EXYNOS5_IRQ_SYSMMU_MFC_L_0	COMBINER_IRQ(8, 5)
--#define EXYNOS5_IRQ_SYSMMU_MFC_L_1	COMBINER_IRQ(8, 6)
--
--#define EXYNOS5_IRQ_SYSMMU_DIS1_0	COMBINER_IRQ(9, 4)
--#define EXYNOS5_IRQ_SYSMMU_DIS1_1	COMBINER_IRQ(9, 5)
--
--#define EXYNOS5_IRQ_DP			COMBINER_IRQ(10, 3)
--#define EXYNOS5_IRQ_SYSMMU_DIS0_0	COMBINER_IRQ(10, 4)
--#define EXYNOS5_IRQ_SYSMMU_DIS0_1	COMBINER_IRQ(10, 5)
--#define EXYNOS5_IRQ_SYSMMU_ISP_0	COMBINER_IRQ(10, 6)
--#define EXYNOS5_IRQ_SYSMMU_ISP_1	COMBINER_IRQ(10, 7)
--
--#define EXYNOS5_IRQ_SYSMMU_ODC_0	COMBINER_IRQ(11, 0)
--#define EXYNOS5_IRQ_SYSMMU_ODC_1	COMBINER_IRQ(11, 1)
--#define EXYNOS5_IRQ_SYSMMU_DRC_0	COMBINER_IRQ(11, 6)
--#define EXYNOS5_IRQ_SYSMMU_DRC_1	COMBINER_IRQ(11, 7)
--
--#define EXYNOS5_IRQ_MDMA1_ABORT		COMBINER_IRQ(13, 1)
--
--#define EXYNOS5_IRQ_MDMA0_ABORT		COMBINER_IRQ(15, 3)
--
--#define EXYNOS5_IRQ_FIMD1_FIFO		COMBINER_IRQ(18, 4)
--#define EXYNOS5_IRQ_FIMD1_VSYNC		COMBINER_IRQ(18, 5)
--#define EXYNOS5_IRQ_FIMD1_SYSTEM	COMBINER_IRQ(18, 6)
--
--#define EXYNOS5_IRQ_ARMIOP_GIC		COMBINER_IRQ(19, 0)
--#define EXYNOS5_IRQ_ARMISP_GIC		COMBINER_IRQ(19, 1)
--#define EXYNOS5_IRQ_IOP_GIC		COMBINER_IRQ(19, 3)
--#define EXYNOS5_IRQ_ISP_GIC		COMBINER_IRQ(19, 4)
--
--#define EXYNOS5_IRQ_PMU_CPU1		COMBINER_IRQ(22, 4)
--
--#define EXYNOS5_IRQ_EINT0		COMBINER_IRQ(23, 0)
--
--#define EXYNOS5_IRQ_EINT1		COMBINER_IRQ(24, 0)
--#define EXYNOS5_IRQ_SYSMMU_LITE1_0	COMBINER_IRQ(24, 1)
--#define EXYNOS5_IRQ_SYSMMU_LITE1_1	COMBINER_IRQ(24, 2)
--#define EXYNOS5_IRQ_SYSMMU_2D_0		COMBINER_IRQ(24, 5)
--#define EXYNOS5_IRQ_SYSMMU_2D_1		COMBINER_IRQ(24, 6)
--
--#define EXYNOS5_IRQ_EINT2		COMBINER_IRQ(25, 0)
--#define EXYNOS5_IRQ_EINT3		COMBINER_IRQ(25, 1)
--
--#define EXYNOS5_IRQ_EINT4		COMBINER_IRQ(26, 0)
--#define EXYNOS5_IRQ_EINT5		COMBINER_IRQ(26, 1)
--
--#define EXYNOS5_IRQ_EINT6		COMBINER_IRQ(27, 0)
--#define EXYNOS5_IRQ_EINT7		COMBINER_IRQ(27, 1)
--
--#define EXYNOS5_IRQ_EINT8		COMBINER_IRQ(28, 0)
--#define EXYNOS5_IRQ_EINT9		COMBINER_IRQ(28, 1)
--
--#define EXYNOS5_IRQ_EINT10		COMBINER_IRQ(29, 0)
--#define EXYNOS5_IRQ_EINT11		COMBINER_IRQ(29, 1)
--
--#define EXYNOS5_IRQ_EINT12		COMBINER_IRQ(30, 0)
--#define EXYNOS5_IRQ_EINT13		COMBINER_IRQ(30, 1)
--
--#define EXYNOS5_IRQ_EINT14		COMBINER_IRQ(31, 0)
--#define EXYNOS5_IRQ_EINT15		COMBINER_IRQ(31, 1)
--
--#define EXYNOS5_MAX_COMBINER_NR		32
--
--#define EXYNOS5_IRQ_GPIO1_NR_GROUPS	14
--#define EXYNOS5_IRQ_GPIO2_NR_GROUPS	9
--#define EXYNOS5_IRQ_GPIO3_NR_GROUPS	5
--#define EXYNOS5_IRQ_GPIO4_NR_GROUPS	1
--
--#define MAX_COMBINER_NR			(EXYNOS4_MAX_COMBINER_NR > EXYNOS5_MAX_COMBINER_NR ? \
--					EXYNOS4_MAX_COMBINER_NR : EXYNOS5_MAX_COMBINER_NR)
--
--#define S5P_EINT_BASE1			COMBINER_IRQ(MAX_COMBINER_NR, 0)
--#define S5P_EINT_BASE2			(S5P_EINT_BASE1 + 16)
--#define S5P_GPIOINT_BASE		(S5P_EINT_BASE1 + 32)
--#define IRQ_GPIO_END			(S5P_GPIOINT_BASE + S5P_GPIOINT_COUNT)
--#define IRQ_TIMER_BASE			(IRQ_GPIO_END + 64)
--
--/* Set the default NR_IRQS */
--#define EXYNOS_NR_IRQS			(IRQ_TIMER_BASE + IRQ_TIMER_COUNT)
--
--#ifndef CONFIG_SPARSE_IRQ
--#define NR_IRQS				EXYNOS_NR_IRQS
+-#ifdef CONFIG_S3C64XX_DEV_SPI0
+-int s3c64xx_spi0_cfg_gpio(void)
+-{
+-	s3c_gpio_cfgpin(EXYNOS4_GPB(0), S3C_GPIO_SFN(2));
+-	s3c_gpio_setpull(EXYNOS4_GPB(0), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgall_range(EXYNOS4_GPB(2), 2,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+-	return 0;
+-}
 -#endif
 -
--#endif /* __ASM_ARCH_IRQS_H */
+-#ifdef CONFIG_S3C64XX_DEV_SPI1
+-int s3c64xx_spi1_cfg_gpio(void)
+-{
+-	s3c_gpio_cfgpin(EXYNOS4_GPB(4), S3C_GPIO_SFN(2));
+-	s3c_gpio_setpull(EXYNOS4_GPB(4), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgall_range(EXYNOS4_GPB(6), 2,
+-			      S3C_GPIO_SFN(2), S3C_GPIO_PULL_UP);
+-	return 0;
+-}
+-#endif
+-
+-#ifdef CONFIG_S3C64XX_DEV_SPI2
+-int s3c64xx_spi2_cfg_gpio(void)
+-{
+-	s3c_gpio_cfgpin(EXYNOS4_GPC1(1), S3C_GPIO_SFN(5));
+-	s3c_gpio_setpull(EXYNOS4_GPC1(1), S3C_GPIO_PULL_UP);
+-	s3c_gpio_cfgall_range(EXYNOS4_GPC1(3), 2,
+-			      S3C_GPIO_SFN(5), S3C_GPIO_PULL_UP);
+-	return 0;
+-}
+-#endif
+diff --git a/arch/arm/mach-exynos/setup-usb-phy.c b/arch/arm/mach-exynos/setup-usb-phy.c
+deleted file mode 100644
+index 6af4066..0000000
+--- a/arch/arm/mach-exynos/setup-usb-phy.c
++++ /dev/null
+@@ -1,223 +0,0 @@
+-/*
+- * Copyright (C) 2011 Samsung Electronics Co.Ltd
+- * Author: Joonyoung Shim <jy0922.shim@samsung.com>
+- *
+- *  This program is free software; you can redistribute  it and/or modify it
+- *  under  the terms of  the GNU General  Public License as published by the
+- *  Free Software Foundation;  either version 2 of the  License, or (at your
+- *  option) any later version.
+- *
+- */
+-
+-#include <linux/clk.h>
+-#include <linux/delay.h>
+-#include <linux/err.h>
+-#include <linux/io.h>
+-#include <linux/platform_device.h>
+-#include <mach/regs-pmu.h>
+-#include <mach/regs-usb-phy.h>
+-#include <plat/cpu.h>
+-#include <plat/usb-phy.h>
+-
+-static atomic_t host_usage;
+-
+-static int exynos4_usb_host_phy_is_on(void)
+-{
+-	return (readl(EXYNOS4_PHYPWR) & PHY1_STD_ANALOG_POWERDOWN) ? 0 : 1;
+-}
+-
+-static void exynos4210_usb_phy_clkset(struct platform_device *pdev)
+-{
+-	struct clk *xusbxti_clk;
+-	u32 phyclk;
+-
+-	xusbxti_clk = clk_get(&pdev->dev, "xusbxti");
+-	if (xusbxti_clk && !IS_ERR(xusbxti_clk)) {
+-		if (soc_is_exynos4210()) {
+-			/* set clock frequency for PLL */
+-			phyclk = readl(EXYNOS4_PHYCLK) & ~EXYNOS4210_CLKSEL_MASK;
+-
+-			switch (clk_get_rate(xusbxti_clk)) {
+-			case 12 * MHZ:
+-				phyclk |= EXYNOS4210_CLKSEL_12M;
+-				break;
+-			case 48 * MHZ:
+-				phyclk |= EXYNOS4210_CLKSEL_48M;
+-				break;
+-			default:
+-			case 24 * MHZ:
+-				phyclk |= EXYNOS4210_CLKSEL_24M;
+-				break;
+-			}
+-			writel(phyclk, EXYNOS4_PHYCLK);
+-		} else if (soc_is_exynos4212() || soc_is_exynos4412()) {
+-			/* set clock frequency for PLL */
+-			phyclk = readl(EXYNOS4_PHYCLK) & ~EXYNOS4X12_CLKSEL_MASK;
+-
+-			switch (clk_get_rate(xusbxti_clk)) {
+-			case 9600 * KHZ:
+-				phyclk |= EXYNOS4X12_CLKSEL_9600K;
+-				break;
+-			case 10 * MHZ:
+-				phyclk |= EXYNOS4X12_CLKSEL_10M;
+-				break;
+-			case 12 * MHZ:
+-				phyclk |= EXYNOS4X12_CLKSEL_12M;
+-				break;
+-			case 19200 * KHZ:
+-				phyclk |= EXYNOS4X12_CLKSEL_19200K;
+-				break;
+-			case 20 * MHZ:
+-				phyclk |= EXYNOS4X12_CLKSEL_20M;
+-				break;
+-			default:
+-			case 24 * MHZ:
+-				/* default reference clock */
+-				phyclk |= EXYNOS4X12_CLKSEL_24M;
+-				break;
+-			}
+-			writel(phyclk, EXYNOS4_PHYCLK);
+-		}
+-		clk_put(xusbxti_clk);
+-	}
+-}
+-
+-static int exynos4210_usb_phy0_init(struct platform_device *pdev)
+-{
+-	u32 rstcon;
+-
+-	writel(readl(S5P_USBDEVICE_PHY_CONTROL) | S5P_USBDEVICE_PHY_ENABLE,
+-			S5P_USBDEVICE_PHY_CONTROL);
+-
+-	exynos4210_usb_phy_clkset(pdev);
+-
+-	/* set to normal PHY0 */
+-	writel((readl(EXYNOS4_PHYPWR) & ~PHY0_NORMAL_MASK), EXYNOS4_PHYPWR);
+-
+-	/* reset PHY0 and Link */
+-	rstcon = readl(EXYNOS4_RSTCON) | PHY0_SWRST_MASK;
+-	writel(rstcon, EXYNOS4_RSTCON);
+-	udelay(10);
+-
+-	rstcon &= ~PHY0_SWRST_MASK;
+-	writel(rstcon, EXYNOS4_RSTCON);
+-
+-	return 0;
+-}
+-
+-static int exynos4210_usb_phy0_exit(struct platform_device *pdev)
+-{
+-	writel((readl(EXYNOS4_PHYPWR) | PHY0_ANALOG_POWERDOWN |
+-				PHY0_OTG_DISABLE), EXYNOS4_PHYPWR);
+-
+-	writel(readl(S5P_USBDEVICE_PHY_CONTROL) & ~S5P_USBDEVICE_PHY_ENABLE,
+-			S5P_USBDEVICE_PHY_CONTROL);
+-
+-	return 0;
+-}
+-
+-static int exynos4210_usb_phy1_init(struct platform_device *pdev)
+-{
+-	struct clk *otg_clk;
+-	u32 rstcon;
+-	int err;
+-
+-	atomic_inc(&host_usage);
+-
+-	otg_clk = clk_get(&pdev->dev, "otg");
+-	if (IS_ERR(otg_clk)) {
+-		dev_err(&pdev->dev, "Failed to get otg clock\n");
+-		return PTR_ERR(otg_clk);
+-	}
+-
+-	err = clk_enable(otg_clk);
+-	if (err) {
+-		clk_put(otg_clk);
+-		return err;
+-	}
+-
+-	if (exynos4_usb_host_phy_is_on())
+-		return 0;
+-
+-	writel(readl(S5P_USBHOST_PHY_CONTROL) | S5P_USBHOST_PHY_ENABLE,
+-			S5P_USBHOST_PHY_CONTROL);
+-
+-	exynos4210_usb_phy_clkset(pdev);
+-
+-	/* floating prevention logic: disable */
+-	writel((readl(EXYNOS4_PHY1CON) | FPENABLEN), EXYNOS4_PHY1CON);
+-
+-	/* set to normal HSIC 0 and 1 of PHY1 */
+-	writel((readl(EXYNOS4_PHYPWR) & ~PHY1_HSIC_NORMAL_MASK),
+-			EXYNOS4_PHYPWR);
+-
+-	/* set to normal standard USB of PHY1 */
+-	writel((readl(EXYNOS4_PHYPWR) & ~PHY1_STD_NORMAL_MASK), EXYNOS4_PHYPWR);
+-
+-	/* reset all ports of both PHY and Link */
+-	rstcon = readl(EXYNOS4_RSTCON) | HOST_LINK_PORT_SWRST_MASK |
+-		PHY1_SWRST_MASK;
+-	writel(rstcon, EXYNOS4_RSTCON);
+-	udelay(10);
+-
+-	rstcon &= ~(HOST_LINK_PORT_SWRST_MASK | PHY1_SWRST_MASK);
+-	writel(rstcon, EXYNOS4_RSTCON);
+-	udelay(80);
+-
+-	clk_disable(otg_clk);
+-	clk_put(otg_clk);
+-
+-	return 0;
+-}
+-
+-static int exynos4210_usb_phy1_exit(struct platform_device *pdev)
+-{
+-	struct clk *otg_clk;
+-	int err;
+-
+-	if (atomic_dec_return(&host_usage) > 0)
+-		return 0;
+-
+-	otg_clk = clk_get(&pdev->dev, "otg");
+-	if (IS_ERR(otg_clk)) {
+-		dev_err(&pdev->dev, "Failed to get otg clock\n");
+-		return PTR_ERR(otg_clk);
+-	}
+-
+-	err = clk_enable(otg_clk);
+-	if (err) {
+-		clk_put(otg_clk);
+-		return err;
+-	}
+-
+-	writel((readl(EXYNOS4_PHYPWR) | PHY1_STD_ANALOG_POWERDOWN),
+-			EXYNOS4_PHYPWR);
+-
+-	writel(readl(S5P_USBHOST_PHY_CONTROL) & ~S5P_USBHOST_PHY_ENABLE,
+-			S5P_USBHOST_PHY_CONTROL);
+-
+-	clk_disable(otg_clk);
+-	clk_put(otg_clk);
+-
+-	return 0;
+-}
+-
+-int s5p_usb_phy_init(struct platform_device *pdev, int type)
+-{
+-	if (type == USB_PHY_TYPE_DEVICE)
+-		return exynos4210_usb_phy0_init(pdev);
+-	else if (type == USB_PHY_TYPE_HOST)
+-		return exynos4210_usb_phy1_init(pdev);
+-
+-	return -EINVAL;
+-}
+-
+-int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+-{
+-	if (type == USB_PHY_TYPE_DEVICE)
+-		return exynos4210_usb_phy0_exit(pdev);
+-	else if (type == USB_PHY_TYPE_HOST)
+-		return exynos4210_usb_phy1_exit(pdev);
+-
+-	return -EINVAL;
+-}
 -- 
 1.8.2.1
