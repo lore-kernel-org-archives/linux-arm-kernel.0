@@ -1,25 +1,34 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Fri, 14 Jun 2013 12:53:08 +0800
-Subject: [PATCH V2 2/2] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <20130613171144.GH18614@n2100.arm.linux.org.uk>
-References: <1371067281-655-1-git-send-email-swarren@wwwdotorg.org>
- <1371067281-655-2-git-send-email-swarren@wwwdotorg.org>
- <20130613074551.GA7769@mudshark.cambridge.arm.com>
- <51B9DE5C.9030904@wwwdotorg.org>
- <20130613171144.GH18614@n2100.arm.linux.org.uk>
-Message-ID: <CAMj5BkjY2_EeTFMnL=4aOUUeWjNHLu3MW5VAtXAuLT-HH7wxcQ@mail.gmail.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 14 Jun 2013 11:05:44 +0530
+Subject: [RFC PATCH 1/4] arm: omap: Add phy binding info for musb in plat
+ data
+In-Reply-To: <51B9C3B6.1080707@ti.com>
+References: <1368796954-3499-1-git-send-email-kishon@ti.com>
+ <51A43E0A.8090201@ti.com> <51B9C3B6.1080707@ti.com>
+Message-ID: <51BAABB0.5060107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 1:11 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jun 13, 2013 at 08:59:40AM -0600, Stephen Warren wrote:
->> Russell, does this look good to you? I assume I should put this into the
->> ARM patch tracker.
+Hi,
+
+On Thursday 13 June 2013 06:35 PM, Tomi Valkeinen wrote:
+> Hi,
 >
-> I think it's fine.  It would be nice if zhangfei gao would test these
-> patches and confirm whether they fix it there as well.
+> On 28/05/13 08:18, Kishon Vijay Abraham I wrote:
+>> Hi Tony,
+>>
+>> On Friday 17 May 2013 06:52 PM, Kishon Vijay Abraham I wrote:
+>>> In order for controllers to get PHY in case of non dt boot, the phy
+>>> binding information (phy label) should be added in the platform
+>>> data of the controller.
+>>
+>> This series would be needed to get MUSB working in OMAP3 boards for
+>> non-dt boot case. Do you think this is good enough to go in this rc cycle?
+>
+> Did this or some other solution go forward? I'm still unable to boot
+> with usb-gadget-ethernet with v3.10-rc5.
 
-It also works here, pass two hours stress test of panic -> reboot.
+No. I think Tony is ok to take this only during next merge window.
 
-Tested-by:  Zhangfei Gao <zhangfei.gao@gmail.com>
+Thanks
+Kishon
