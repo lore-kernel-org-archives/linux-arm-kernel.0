@@ -1,76 +1,26 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 14 Jun 2013 06:37:11 +0300
-Subject: [PATCH v3 2/2] i2c: designware: add two optional property
- tx/rx-fifo-size
-In-Reply-To: <1370918230-24793-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1370918230-24793-1-git-send-email-zhangfei.gao@linaro.org>
- <1370918230-24793-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20130614033711.GA4312@tarshish>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 14 Jun 2013 09:29:58 +0530
+Subject: [PATCH 6/7] ARM: spear: remove #gpio-ranges-cells property
+In-Reply-To: <1371157199-7272-6-git-send-email-swarren@wwwdotorg.org>
+References: <1371157199-7272-1-git-send-email-swarren@wwwdotorg.org>
+ <1371157199-7272-6-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <CAOh2x==PmNwbYwAgFPW5M0UyB=AeE1sbpTfOsR0utQOHUTYPwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhangfei,
-
-On Tue, Jun 11, 2013 at 10:37:10AM +0800, Zhangfei Gao wrote:
-> rx-fifo-size and tx-fifo-size will be updated if provided from dts
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> CC: Baruch Siach <baruch@tkos.co.il>
-
-Acked-by: Baruch Siach <baruch@tkos.co.il>
-
+On Fri, Jun 14, 2013 at 2:29 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> From: Stephen Warren <swarren@nvidia.com>
+>
+> This property is no longer required by the GPIO binding. Remove it.
+>
+> Signed-off-by: Stephen Warren <swarren@nvidia.com>
 > ---
->  .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
->  drivers/i2c/busses/i2c-designware-platdrv.c        |    3 +++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> index e42a2ee..84717fe 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> @@ -6,6 +6,11 @@ Required properties :
->   - reg : Offset and length of the register set for the device
->   - interrupts : <IRQ> where IRQ is the interrupt number.
->  
-> +Optional properties:
-> +
-> + - rx-fifo-size : 1 cell, Rx fifo size
-> + - tx-fifo-size : 1 cell, Tx fifo size
-> +
->  Recommended properties :
->  
->   - clock-frequency : desired I2C bus clock frequency in Hz.
-> @@ -18,5 +23,7 @@ Example :
->  		compatible = "snps,designware-i2c";
->  		reg = <0xf0000 0x1000>;
->  		interrupts = <11>;
-> +		rx-fifo-size = <16>;
-> +		tx-fifo-size = <16>;
->  		clock-frequency = <400000>;
->  	};
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index 41659c0..6760cea 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -85,6 +85,7 @@ static int dw_i2c_probe(struct platform_device *pdev)
->  	struct dw_i2c_dev *dev;
->  	struct i2c_adapter *adap;
->  	struct resource *mem;
-> +	struct device_node *np = pdev->dev.of_node;
->  	int irq, r;
->  
->  	/* NOTE: driver uses the static register mapping */
-> @@ -140,6 +141,8 @@ static int dw_i2c_probe(struct platform_device *pdev)
->  		dev->rx_fifo_depth = ((param1 >> 8)  & 0xff) + 1;
->  		dev->adapter.nr = pdev->id;
->  	}
-> +	of_property_read_u32(np, "rx-fifo-size", &dev->rx_fifo_depth);
-> +	of_property_read_u32(np, "tx-fifo-size", &dev->tx_fifo_depth);
->  	r = i2c_dw_init(dev);
->  	if (r)
->  		return r;
+> This should presumably be applied along with the previous changes
+> ---
+>  arch/arm/boot/dts/spear1310.dtsi | 1 -
+>  arch/arm/boot/dts/spear1340.dtsi | 1 -
+>  arch/arm/boot/dts/spear310.dtsi  | 1 -
+>  arch/arm/boot/dts/spear320.dtsi  | 2 --
+>  4 files changed, 5 deletions(-)
 
--- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
