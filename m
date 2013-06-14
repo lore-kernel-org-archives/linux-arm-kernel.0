@@ -1,47 +1,29 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Fri, 14 Jun 2013 09:30:11 -0600
-Subject: [PATCH v2 3/3] ARM: tegra: set CPU reset handler with firmware op
-In-Reply-To: <CAAVeFuLi6-WnFP9LvEdqfj2cuK7pgW0_pg33i-Ucoobcxb8RSQ@mail.gmail.com>
-References: <1371114745-24710-1-git-send-email-acourbot@nvidia.com>
- <1371114745-24710-4-git-send-email-acourbot@nvidia.com>
- <51BA1C3D.1010608@wwwdotorg.org>
- <CAAVeFuLi6-WnFP9LvEdqfj2cuK7pgW0_pg33i-Ucoobcxb8RSQ@mail.gmail.com>
-Message-ID: <51BB3703.8040203@wwwdotorg.org>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Fri, 14 Jun 2013 17:41:45 +0200
+Subject: [PATCH 0/5] pinctrl: fix some issues with new pinconfig dt parsing
+Message-ID: <201306141741.46077.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2013 02:54 AM, Alexandre Courbot wrote:
-> On Fri, Jun 14, 2013 at 4:23 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
->> On 06/13/2013 03:12 AM, Alexandre Courbot wrote:
->>> Use a firmware operation to set the CPU reset handler and only resort to
->>> doing it ourselves if there is none defined.
->>>
->>> This supports the booting of secondary CPUs on devices using a TrustZone
->>> secure monitor.
->>
->>> diff --git a/arch/arm/mach-tegra/reset.c b/arch/arm/mach-tegra/reset.c
->>
->>> +     err = call_firmware_op(set_cpu_boot_addr, 0, reset_address);
->>> +     switch (err) {
->>> +     case -ENOSYS:
->>> +             tegra_cpu_reset_handler_set(reset_address);
->>> +             /* pass-through */
->>
->> Rather than detecting -ENOSYS and falling back to the custom
->> tegra_cpu_reset_handler_set(), does it make sense to plug in
->> tegra_cpu_reset_handler_set as the firmware op when there is no secure
->> firmware detected? That way, this code wouldn't need the special case;
->> that would be isolated to firmware.c.
-> 
-> Mmmm I admit I just followed what Exynos did without thinking much
-> about it. I don't see any reason why your suggestion wouldn't work,
-> but on second thought tegra_cpu_reset_handler_set() is not a firmware
-> operation - wouldn't it be unexpected (and maybe confusing) to have it
-> called through call_firmware_op()?
+Some issues with the recently submitted generic pinconfig parsing from dt
+came up, so fix these in this follow-up series.
 
-I would see call_firmware_op() as an abstraction that performs certain
-operations, which in some cases are performed by firmware. If the
-operation doesn't actually need to call into firmware in some
-situations, that seems fine to me. But you're right, others may object.
-Perhaps get a ruling from whoever created firmware_ops and/or some main
-ARM maintainers.
+Hopefully I did catch all of them.
+
+Tested on my rk3066 device.
+
+Heiko Stuebner (5):
+  pinctrl: update the documentation for some pinconfig params
+  pinctrl: clarify some dt pinconfig options
+  pinctrl: handle zero found dt pinconfig properties better
+  pinctrl: dynamically alloc temp array when parsing dt pinconf options
+  pinctrl: rockchip: correctly handle arguments of pinconf options
+
+ .../bindings/pinctrl/pinctrl-bindings.txt          |   22 +++++++++++-
+ drivers/pinctrl/pinconf-generic.c                  |   38 +++++++++++++++-----
+ drivers/pinctrl/pinctrl-rockchip.c                 |   37 ++++++++++++++++---
+ include/linux/pinctrl/pinconf-generic.h            |   18 ++++++----
+ 4 files changed, 93 insertions(+), 22 deletions(-)
+
+-- 
+1.7.10.4
