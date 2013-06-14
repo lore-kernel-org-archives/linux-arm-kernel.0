@@ -1,29 +1,78 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 14 Jun 2013 16:23:20 -0400 (EDT)
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <CACVXFVO1Ou-wZedv0VntNwS1NZSRzvOjfVhvHBew0odz-PUYjg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306141620110.3152-100000@netrider.rowland.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 14 Jun 2013 13:32:58 -0700
+Subject: [PATCH v2 2/2] ARM: mmu: Introduce iotable_init_caller()
+In-Reply-To: <1371241978-6224-1-git-send-email-sboyd@codeaurora.org>
+References: <1371241978-6224-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371241978-6224-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 14 Jun 2013, Ming Lei wrote:
+Now that debug_ll_io_init() maps memory via iotable_init() we
+don't get much information in vmallocinfo about what the mapping
+corresponds to. Introduce iotable_init_caller() that does the
+same thing as iotable_init() except that it allows us to specify
+the function that should appear in vmallocinfo. This allows us to
+differentiate the debug_ll mapping from the other iotable_init()
+mappings.
 
-> >> With the two trace points of irq_handler_entry and irq_handler_exit, the
-> >> interrupt latency(or the time taken by hard irq handler) isn't hard to measure.
-> >> One simple script can figure out the average/maximum latency for one irq
-> >> handler, like I did in 4/4.
-> >
-> > But that doesn't measure the time between when the IRQ request is
-> > issued and when irq_handler_entry runs.
-> 
-> That might be hard to measure, also I am wondering if the time can be
-> measured only by software, but these patches only focus on the time
-> between HCD irq entry and irq exit.
+Cc: Rob Herring <rob.herring@calxeda.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-Not entirely.  On a UP system, leaving interrupts disabled for a long
-time (which is what we do now) increases the delay between when the IRQ
-is raised and when it is serviced.  On an SMP system, a long-running 
-interrupt handler will delay servicing a different device that shares 
-the same IRQ line.
+I'm ok without this patch. Using __builtin_return_address(0) seems
+to do alright on framepointer builds but fails on unwind table
+builds so I went with this approach.
 
-Alan Stern
+ arch/arm/mm/mmu.c | 18 ++++++++++++------
+ 1 file changed, 12 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 18b8aeb..0699bee 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -811,10 +811,8 @@ static void __init create_mapping(struct map_desc *md)
+ 	} while (pgd++, addr != end);
+ }
+ 
+-/*
+- * Create the architecture specific mappings
+- */
+-void __init iotable_init(struct map_desc *io_desc, int nr)
++static void __init
++iotable_init_caller(struct map_desc *io_desc, int nr, void *caller)
+ {
+ 	struct map_desc *md;
+ 	struct vm_struct *vm;
+@@ -834,11 +832,19 @@ void __init iotable_init(struct map_desc *io_desc, int nr)
+ 		vm->phys_addr = __pfn_to_phys(md->pfn);
+ 		vm->flags = VM_IOREMAP | VM_ARM_STATIC_MAPPING;
+ 		vm->flags |= VM_ARM_MTYPE(md->type);
+-		vm->caller = iotable_init;
++		vm->caller = caller;
+ 		add_static_vm_early(svm++);
+ 	}
+ }
+ 
++/*
++ * Create the architecture specific mappings
++ */
++void __init iotable_init(struct map_desc *io_desc, int nr)
++{
++	iotable_init_caller(io_desc, nr, iotable_init);
++}
++
+ void __init vm_reserve_area_early(unsigned long addr, unsigned long size,
+ 				  void *caller)
+ {
+@@ -947,7 +953,7 @@ void __init debug_ll_io_init(void)
+ 	map.virtual &= PAGE_MASK;
+ 	map.length = PAGE_SIZE;
+ 	map.type = MT_DEVICE;
+-	iotable_init(&map, 1);
++	iotable_init_caller(&map, 1, debug_ll_io_init);
+ }
+ #endif
+ 
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
