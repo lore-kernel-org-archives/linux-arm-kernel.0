@@ -1,52 +1,52 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 14 Jun 2013 11:18:22 +0200
-Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
- properties from a dt node
-In-Reply-To: <1862891.4yIecp615h@avalon>
-References: <201306102139.32444.heiko@sntech.de>
- <CACRpkdZavNX3jk4K5unEJCED4vTuZEUF=NC1naGOMyr54hXQKw@mail.gmail.com>
- <1862891.4yIecp615h@avalon>
-Message-ID: <201306141118.22663.heiko@sntech.de>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 14 Jun 2013 14:51:27 +0530
+Subject: [RFC PATCH 1/4] arm: omap: Add phy binding info for musb in plat
+ data
+In-Reply-To: <51BAD181.3020902@ti.com>
+References: <1368796954-3499-1-git-send-email-kishon@ti.com>
+ <51A43E0A.8090201@ti.com> <51B9C3B6.1080707@ti.com> <51BAABB0.5060107@ti.com>
+ <20130614054720.GL8164@atomide.com> <51BAB9EA.5090805@ti.com>
+ <20130614073314.GA20992@atomide.com> <51BAD181.3020902@ti.com>
+Message-ID: <51BAE097.2020609@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 14. Juni 2013, 01:53:49 schrieb Laurent Pinchart:
-> Hi Linus,
-> 
-> On Thursday 13 June 2013 17:36:00 Linus Walleij wrote:
-> > On Thu, Jun 13, 2013 at 5:23 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> > >> Ok, I'll see that I get this fixed :-)
-> > > 
-> > > Hmm ... what is the meaning of the argument of bias-disable and
-> > > bias-high- impedance, as the kernel-doc in pinconf-generic.h does not
-> > > tell?
-> > 
-> > I think those arguments are N/A, ignored, doesn't matter.
-> > If these options were typed, they would be bool.
-> > 
-> > Please improve documentation if you can... sorry for all the
-> > rough edges.
-> > 
-> > > bias-bus-hold ignores its argument and we already clarified that the
-> > > pull-* do have != 0 or 0 argument.
-> > 
-> > I think in the DT binding, both these forms:
-> > 
-> > bias-pull-up;
-> > bias-pull-up = <150000>;
-> > 
-> > Should be allowed.
-> > 
-> > So when parsing, you first check if it exists, then if there
-> > is an argument, if there is no value supplied, just set it
-> > to 1, as that is clearly != 0...
-> 
-> What's the expected way to disable pull-ups in DT ? Should it be
-> 'bias-pull-up = <0>;' or 'bias-disable;' ?
+Hi,
 
-According to the kernedoc I think both are valid and should be handled. Using 
-bias-disable is more descriptive but would also include disabling a "high-
-impedance" or "bus-hold" bias (if supported by the hardware).
+On Friday 14 June 2013 01:47 PM, Tomi Valkeinen wrote:
+> On 14/06/13 10:33, Tony Lindgren wrote:
+>
+>> If we want to fix something this late in the merge window, the patches
+>> must have a clear description what caused the regression and what happens
+>> without the patches. These patches don't have that. And they are marked
+>> RFC also. So actually I'm not applying any of them before the regression
+>> descriptions are there and the patches have been reposted without RFC
+>> and have sufficient acks from people.
 
-Personally, for my rockchip stuff I go with using the "bias-pull-pin-default" 
-<-> "bias-disable".
+I posted this as RFC since this series uses _label_ and initially Felipe 
+din't want to find PHYs by _label_.
+After the device names are created using PLATFORM_DEVID_AUTO, our 
+original method of binding by device names doesn't work reliable (since 
+the device name changes). And I couldn't think of any other way to find 
+the PHY other than using _label_. So I just wanted to know if it's ok to 
+use _label_ or if there is any other better way to find PHYs.
+
+>
+> No disagreement there.
+>
+> Kishon, I tested the patches on top of v3.10-rc5, booting with nfs root
+> via usb gadget eth:
+>
+> Overo: works
+> Beagle: works, but I need to reconnect the usb cable after kernel is up
+> Beagle-xm: doesn't work. The cable is detected correctly, though
+> Panda: works
+>
+> The problems with Beagles are there even without these patches, so they
+> do make things better (fix Overo).
+
+Thanks for testing this. I'll post a new version removing RFC after 
+Felipe ACKs it.
+
+Thanks
+Kishon
