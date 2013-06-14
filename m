@@ -1,53 +1,32 @@
-From: avinashphilip@ti.com (Philip, Avinash)
-Date: Fri, 14 Jun 2013 10:20:43 +0000
-Subject: [PATCH v2 0/4] GPIO DT support for da850
-In-Reply-To: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
-References: <1371203020-15092-1-git-send-email-avinashphilip@ti.com>
-Message-ID: <518397C60809E147AF5323E0420B992E3EADAFCF@DBDE04.ent.ti.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Fri, 14 Jun 2013 16:12:19 +0530
+Subject: [GIT PULL 1/2] DaVinci SoC updates for v3.11
+In-Reply-To: <20130614093306.GE1403@sirena.org.uk>
+References: <1371193161-25224-1-git-send-email-nsekhar@ti.com>
+ <20130614093306.GE1403@sirena.org.uk>
+Message-ID: <51BAF38B.6040109@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 15:13:36, Philip, Avinash wrote:
-> With conversion of GPIO davinci driver to platform driver, gpio-davinci driver
-> can support DT boot.
-> This patch series
-> - adds dt binding support for gpio-davinci.
-> - da850 dt support goio.
-> 
-> This patch series is based on Linux 3.10-rc4 and is availabel at [1].
-> 
-> 1. https://github.com/avinashphilip/am335x_linux/tree/linux_davinci_v3.10_soc_gpio_v310-rc4
 
+On 6/14/2013 3:03 PM, Mark Brown wrote:
+> On Fri, Jun 14, 2013 at 12:29:20PM +0530, Sekhar Nori wrote:
+> 
+>> On the DMA library movement, I was been waiting for acks
+>> from Russell and Mark, but did not get them. OTOH, there
+>> have been no objections as well. I assume the movement
+>> is not a problem since its a movement within arch/arm
+>> and does not end-up bringing new code in.
+> 
+> I'm not sure I've actually seen this code?  Is this the result of these
+> endless threads about MMC that I keep on getting spammed with - if it is
+> I did ask you guys to let me know when you'd actually figured out what
+> you were doing.  Given that there's subsystem work on DMA within ASoC
+> recently I'd really rather this got reviewed.
 
-This patch series has dependency on [PATCH v2 0/7] Convert GPIO Davinci to platform driver
+Mark, I will forward the patch to you separately (you were copied on
+it). This one is not really related to MMC. Its some (I think) trivial
+changes in sound/soc to go with the dma code movement.
 
-https://lkml.org/lkml/2013/6/14/120
-
-Thanks
-Avinash
-
-> 
-> KV Sujith (3):
->   gpio: davinci: DT changes for driver
->   ARM: davinci: da850: add GPIO DT entries
->   ARM: davinci: da850 evm: add GPIO DT data
-> 
-> Philip Avinash (1):
->   ARM: davinci: da850: Use #include for all device trees
-> 
->  .../devicetree/bindings/gpio/gpio-davinci.txt      |   32 +++++++++++
->  arch/arm/boot/dts/da850-enbw-cmc.dts               |    2 +-
->  arch/arm/boot/dts/da850-evm.dts                    |   21 +++++++-
->  arch/arm/boot/dts/da850.dtsi                       |   17 +++++-
->  drivers/gpio/gpio-davinci.c                        |   57 ++++++++++++++++++--
->  5 files changed, 123 insertions(+), 6 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-davinci.txt
-> 
-> -- 
-> 1.7.9.5
-> 
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
-> 
+Thanks,
+Sekhar
