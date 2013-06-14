@@ -1,56 +1,54 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Jun 2013 21:32:40 +0200
-Subject: [PATCH 04/28] ARM: EXYNOS: common: Remove legacy PMU initialization
- code
+Date: Fri, 14 Jun 2013 21:32:38 +0200
+Subject: [PATCH 02/28] ARM: EXYNOS: Make ARCH_EXYNOS select USE_OF
 In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
 References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371238384-1504-5-git-send-email-t.figa@samsung.com>
+Message-ID: <1371238384-1504-3-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes legacy PMU initialization code that was used to set
-up PMU when booting with ATAGS, which is not supported any more.
+Since EXYNOS is now DT-only, it always requires USE_OF option to be
+selected. This patch moves USE_OF selection from entries of DT board
+files to ARCH_EXYNOS.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/common.c | 27 ---------------------------
- 1 file changed, 27 deletions(-)
+ arch/arm/Kconfig             | 1 +
+ arch/arm/mach-exynos/Kconfig | 2 --
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 98343577..cb07f4a 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -922,30 +922,3 @@ static int __init exynos_init_irq_eint(void)
- 	return 0;
- }
- arch_initcall(exynos_init_irq_eint);
--
--static struct resource exynos4_pmu_resource[] = {
--	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU),
--	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU1),
--#if defined(CONFIG_SOC_EXYNOS4412)
--	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU2),
--	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU3),
--#endif
--};
--
--static struct platform_device exynos4_device_pmu = {
--	.name		= "arm-pmu",
--	.num_resources	= ARRAY_SIZE(exynos4_pmu_resource),
--	.resource	= exynos4_pmu_resource,
--};
--
--static int __init exynos_armpmu_init(void)
--{
--	if (!of_have_populated_dt()) {
--		if (soc_is_exynos4210() || soc_is_exynos4212())
--			exynos4_device_pmu.num_resources = 2;
--		platform_device_register(&exynos4_device_pmu);
--	}
--
--	return 0;
--}
--arch_initcall(exynos_armpmu_init);
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 0574901..a29fc7e 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -796,6 +796,7 @@ config ARCH_EXYNOS
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select NEED_MACH_GPIO_H
+ 	select NEED_MACH_MEMORY_H
++	select USE_OF
+ 	help
+ 	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
+ 
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index e101b14..0d93ebe 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -101,7 +101,6 @@ config MACH_EXYNOS4_DT
+ 	select CPU_EXYNOS4210
+ 	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
+ 	select S5P_DEV_MFC
+-	select USE_OF
+ 	help
+ 	  Machine support for Samsung Exynos4 machine with device tree enabled.
+ 	  Select this if a fdt blob is available for the Exynos4 SoC based board.
+@@ -115,7 +114,6 @@ config MACH_EXYNOS5_DT
+ 	select ARM_AMBA
+ 	select CLKSRC_OF
+ 	select USB_ARCH_HAS_XHCI
+-	select USE_OF
+ 	help
+ 	  Machine support for Samsung EXYNOS5 machine with device tree enabled.
+ 	  Select this if a fdt blob is available for the EXYNOS5 SoC based board.
 -- 
 1.8.2.1
