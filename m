@@ -1,56 +1,151 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Fri, 14 Jun 2013 21:32:48 +0200
-Subject: [PATCH 12/28] ARM: EXYNOS: firmware: Remove check for device tree
- presence
+Date: Fri, 14 Jun 2013 21:32:50 +0200
+Subject: [PATCH 14/28] ARM: SAMSUNG: Introduce GPIO_SAMSUNG Kconfig entry
 In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
 References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371238384-1504-13-git-send-email-t.figa@samsung.com>
+Message-ID: <1371238384-1504-15-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the firmware setup code assume presence of DT, since it
-is now the only way of booting supported for Exynos.
+This patch adds Kconfig entry that selects whether legacy Samsung GPIO
+driver should be built or not. For platforms that support only DT based
+boot, the new pinctrl driver is used and so the old one is not needed.
 
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/firmware.c | 22 ++++++++++------------
- 1 file changed, 10 insertions(+), 12 deletions(-)
+ arch/arm/Kconfig                        | 6 ++++++
+ arch/arm/plat-samsung/Makefile          | 5 +++--
+ arch/arm/plat-samsung/include/plat/pm.h | 5 +++++
+ drivers/gpio/Kconfig                    | 7 +++++++
+ drivers/gpio/Makefile                   | 2 +-
+ 5 files changed, 22 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/firmware.c b/arch/arm/mach-exynos/firmware.c
-index ed11f10..932129e 100644
---- a/arch/arm/mach-exynos/firmware.c
-+++ b/arch/arm/mach-exynos/firmware.c
-@@ -48,20 +48,18 @@ static const struct firmware_ops exynos_firmware_ops = {
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ae7247d..9c69e6c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -695,6 +695,7 @@ config ARCH_S3C24XX
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -718,6 +719,7 @@ config ARCH_S3C64XX
+ 	select CLKSRC_MMIO
+ 	select CPU_V6
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -741,6 +743,7 @@ config ARCH_S5P64X0
+ 	select CLKSRC_MMIO
+ 	select CPU_V6
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -758,6 +761,7 @@ config ARCH_S5PC100
+ 	select CLKSRC_MMIO
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -776,6 +780,7 @@ config ARCH_S5PV210
+ 	select CLKSRC_MMIO
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -795,6 +800,7 @@ config ARCH_EXYNOS
+ 	select COMMON_CLK
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index b549ea9..8d95c15 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -52,10 +52,11 @@ obj-$(CONFIG_SAMSUNG_DMADEV)	+= dma-ops.o
+ # PM support
  
- void __init exynos_firmware_init(void)
- {
--	if (of_have_populated_dt()) {
--		struct device_node *nd;
--		const __be32 *addr;
-+	struct device_node *nd;
-+	const __be32 *addr;
+ obj-$(CONFIG_PM)		+= pm.o
+-obj-$(CONFIG_PM)		+= pm-gpio.o
++obj-$(CONFIG_GPIO_SAMSUNG)	+= pm-gpio.o
+ obj-$(CONFIG_SAMSUNG_PM_CHECK)	+= pm-check.o
  
--		nd = of_find_compatible_node(NULL, NULL,
--						"samsung,secure-firmware");
--		if (!nd)
--			return;
-+	nd = of_find_compatible_node(NULL, NULL,
-+					"samsung,secure-firmware");
-+	if (!nd)
-+		return;
+ obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
  
--		addr = of_get_address(nd, 0, NULL, NULL);
--		if (!addr) {
--			pr_err("%s: No address specified.\n", __func__);
--			return;
--		}
-+	addr = of_get_address(nd, 0, NULL, NULL);
-+	if (!addr) {
-+		pr_err("%s: No address specified.\n", __func__);
-+		return;
- 	}
+-obj-$(CONFIG_S5P_PM)		+= s5p-pm.o s5p-irq-pm.o
++obj-$(CONFIG_S5P_PM)		+= s5p-pm.o
++obj-$(CONFIG_S5P_PM)		+= s5p-irq-pm.o
+ obj-$(CONFIG_S5P_SLEEP)		+= s5p-sleep.o
+diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
+index f6fcade..5d47ca3 100644
+--- a/arch/arm/plat-samsung/include/plat/pm.h
++++ b/arch/arm/plat-samsung/include/plat/pm.h
+@@ -166,6 +166,7 @@ extern void s3c_pm_check_store(void);
+  */
+ extern void s3c_pm_configure_extint(void);
  
- 	pr_info("Running under secure firmware.\n");
++#ifdef CONFIG_GPIO_SAMSUNG
+ /**
+  * samsung_pm_restore_gpios() - restore the state of the gpios after sleep.
+  *
+@@ -181,6 +182,10 @@ extern void samsung_pm_restore_gpios(void);
+  * Save the GPIO states for resotration on resume. See samsung_pm_restore_gpios().
+  */
+ extern void samsung_pm_save_gpios(void);
++#else
++static inline void samsung_pm_restore_gpios(void) {}
++static inline void samsung_pm_save_gpios(void) {}
++#endif
+ 
+ extern void s3c_pm_save_core(void);
+ extern void s3c_pm_restore_core(void);
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 573c449..9c993ed 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -209,6 +209,13 @@ config GPIO_RCAR
+ 	help
+ 	  Say yes here to support GPIO on Renesas R-Car SoCs.
+ 
++config GPIO_SAMSUNG
++	bool
++	depends on PLAT_SAMSUNG
++	help
++	  Legacy GPIO support. Use only for platforms without support for
++	  pinctrl.
++
+ config GPIO_SPEAR_SPICS
+ 	bool "ST SPEAr13xx SPI Chip Select as GPIO support"
+ 	depends on PLAT_SPEAR
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 0cb2d65..ef3e983 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -59,7 +59,7 @@ obj-$(CONFIG_GPIO_PXA)		+= gpio-pxa.o
+ obj-$(CONFIG_GPIO_RC5T583)	+= gpio-rc5t583.o
+ obj-$(CONFIG_GPIO_RDC321X)	+= gpio-rdc321x.o
+ obj-$(CONFIG_GPIO_RCAR)		+= gpio-rcar.o
+-obj-$(CONFIG_PLAT_SAMSUNG)	+= gpio-samsung.o
++obj-$(CONFIG_GPIO_SAMSUNG)	+= gpio-samsung.o
+ obj-$(CONFIG_ARCH_SA1100)	+= gpio-sa1100.o
+ obj-$(CONFIG_GPIO_SCH)		+= gpio-sch.o
+ obj-$(CONFIG_GPIO_SODAVILLE)	+= gpio-sodaville.o
 -- 
 1.8.2.1
