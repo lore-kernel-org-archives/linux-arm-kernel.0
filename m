@@ -1,10 +1,44 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 14 Jun 2013 10:56:52 -0700
-Subject: [GIT PULL 0/3] msm changes for 3.11
-Message-ID: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
+Date: Fri, 14 Jun 2013 10:56:54 -0700
+Subject: [GIT PULL 2/3] msm fixes for 3.11
+In-Reply-To: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
+References: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1371232615-30731-3-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following three pull requests are for the MSM tree for 3.11.  In
-addition to cleanups and fixes, there is starting to be some work
-toward getting full clock support in the MSM tree.
+The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+
+  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-fix-for-3.11
+
+for you to fetch changes up to 7ba655fc965b073292349fa49fb9d16d701185bc:
+
+  gpio: msm-v1: Remove errant __devinit to fix compile (2013-06-12 14:49:06 -0700)
+
+----------------------------------------------------------------
+Some minor fixes for MSM for 3.11
+
+I don't expect these to be necessary for stable, since the fixes are
+to recently added code.  The strncpy fix is only in debug code that
+isn't normally compiled or used (and is being removed in upcoming
+patches).
+
+----------------------------------------------------------------
+Chen Gang (1):
+      arch: arm: mach-msm: using strlcpy instead of strncpy
+
+Stephen Boyd (3):
+      ARM: dts: msm: Fix bad register addresses
+      mfd: ssbi: Add MODULE_DEVICE_TABLE
+      gpio: msm-v1: Remove errant __devinit to fix compile
+
+ arch/arm/boot/dts/msm8660-surf.dts | 4 ++--
+ arch/arm/boot/dts/msm8960-cdp.dts  | 2 +-
+ arch/arm/mach-msm/clock-debug.c    | 2 +-
+ drivers/gpio/gpio-msm-v1.c         | 2 +-
+ drivers/ssbi/ssbi.c                | 1 +
+ 5 files changed, 6 insertions(+), 5 deletions(-)
