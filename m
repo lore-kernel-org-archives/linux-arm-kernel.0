@@ -1,37 +1,32 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 14 Jun 2013 23:15:49 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306141054530.26420-100000@netrider.rowland.org>
-References: <CACVXFVPtZq4XWddBnP0ze2aecwXsuU+0OL8TP1Tb_5BrpJv9cw@mail.gmail.com>
- <Pine.LNX.4.44L0.1306141054530.26420-100000@netrider.rowland.org>
-Message-ID: <CACVXFVO1Ou-wZedv0VntNwS1NZSRzvOjfVhvHBew0odz-PUYjg@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 14 Jun 2013 17:23:21 +0200
+Subject: [PATCH 2/2] i2c-mv64xxx: Abort the mv64xxx_of_config if
+ clock-frequency is not provided
+In-Reply-To: <1370620140-17177-3-git-send-email-gregory.clement@free-electrons.com>
+References: <1370620140-17177-1-git-send-email-gregory.clement@free-electrons.com>
+ <1370620140-17177-3-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <20130614152321.GE2929@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 10:56 PM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Fri, 14 Jun 2013, Ming Lei wrote:
->
->> On Fri, Jun 14, 2013 at 3:41 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
->> >
->> > The main reason for moving away from the current scheme is to reduce
->> > latency for other interrupt handlers.  Ming gave two examples of slow
->> > USB code that runs in hardirq context now; with his change they would
->> > run in softirq context and therefore wouldn't delay other interrupts so
->> > much.  (Interrupt latency is hard to measure, however.)
->>
->> With the two trace points of irq_handler_entry and irq_handler_exit, the
->> interrupt latency(or the time taken by hard irq handler) isn't hard to measure.
->> One simple script can figure out the average/maximum latency for one irq
->> handler, like I did in 4/4.
->
-> But that doesn't measure the time between when the IRQ request is
-> issued and when irq_handler_entry runs.
+On Fri, Jun 07, 2013 at 05:49:00PM +0200, Gregory CLEMENT wrote:
+> From: Zbigniew Bodek <zbb@semihalf.com>
+> 
+> This commit adds checking whether clock-frequency property acquisition
+> has succeeded. Do not waste time to find baud factors if there is no
+> information about the desired bus frequency in dts.
+> 
+> [gregory.clement at free-electrons.com: Reword the commit log]
+> 
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
 
-That might be hard to measure, also I am wondering if the time can be
-measured only by software, but these patches only focus on the time
-between HCD irq entry and irq exit.
+Please run checkpatch.pl on your patches!
 
-
-Thanks,
---
-Ming Lei
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/07f32984/attachment.sig>
