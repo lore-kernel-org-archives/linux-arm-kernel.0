@@ -1,9 +1,9 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri, 14 Jun 2013 10:56:54 -0700
+Date: Fri, 14 Jun 2013 10:56:55 -0700
 Subject: [GIT PULL 2/3] msm fixes for 3.11
 In-Reply-To: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
 References: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1371232615-30731-3-git-send-email-davidb@codeaurora.org>
+Message-ID: <1371232615-30731-4-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
