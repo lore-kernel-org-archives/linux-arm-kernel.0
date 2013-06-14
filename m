@@ -1,60 +1,43 @@
-From: cdall@cs.columbia.edu (Christoffer Dall)
-Date: Fri, 14 Jun 2013 09:34:09 -0700
-Subject: [PATCH] arm: fix pmd flushing in map_init_section
-In-Reply-To: <1371226942-3189-1-git-send-email-mark.rutland@arm.com>
-References: <1371226942-3189-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20130614163409.GO3245@lvm>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Fri, 14 Jun 2013 10:37:18 -0600
+Subject: [GIT PULL 5/5] ARM: tegra: defconfig updates
+In-Reply-To: <1371227838-18764-1-git-send-email-swarren@wwwdotorg.org>
+References: <1371227838-18764-1-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <1371227838-18764-6-git-send-email-swarren@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 05:22:22PM +0100, Mark Rutland wrote:
-> In e651eab0af: "ARM: 7677/1: LPAE: Fix mapping in alloc_init_section for
-> unaligned addresses", the pmd flushing was broken when split out to
-> map_init_section. At the end of the final iteration of the while loop,
-> pmd will point at the pmd_t immediately after the pmds we updated, and
-> thus flush_pmd_entry(pmd) won't flush the newly modified pmds. This has
-> been observed to prevent an 11MPCore system from booting.
-> 
-> This patch fixes this by remembering the address of the first pmd we
-> update and using this as the argument to flush_pmd_entry.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: R Sricharan <r.sricharan@ti.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Christoffer Dall <cdall@cs.columbia.edu>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> Cc: stable at vger.kernel.org
-> ---
->  arch/arm/mm/mmu.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index e0d8565..22bc0ff 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -620,6 +620,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
->  			unsigned long end, phys_addr_t phys,
->  			const struct mem_type *type)
->  {
-> +	pmd_t *p = pmd;
->  #ifndef CONFIG_ARM_LPAE
->  	/*
->  	 * In classic MMU format, puds and pmds are folded in to
-> @@ -638,7 +639,7 @@ static void __init map_init_section(pmd_t *pmd, unsigned long addr,
->  		phys += SECTION_SIZE;
->  	} while (pmd++, addr += SECTION_SIZE, addr != end);
->  
-> -	flush_pmd_entry(pmd);
-> +	flush_pmd_entry(p);
->  }
->  
->  static void __init alloc_init_pmd(pud_t *pud, unsigned long addr,
-> -- 
+Enable some new features:
+* The Tegra114 SPI controller, for Dalmore's SPI flash.
+* Set all the GPIO leds triggers to their "if you don't know, say X"
+  value, so there are some useful triggers for the gpio-leds support.
+* TPS65090 charger, for Dalmore.
+* ASoC RT5640 machine driver, for audio on Beaver and Dalmore.
 
-Refresh my memory here again, why are we not flushing every pmd entry we
-update?  Is it because we assume the cache lines cover the maximum span
-between addr and end?
+Also, rebuild tegra_defconfig on top of linux-next. This should make it
+easier to create future defconfig patches, without extraneous diffs.
 
-Theoretically, shouldn't you also increment p in the non-LPAE case?
+This branch is based on v3.10-rc3, in order not to conflict with a
+defconfig change first included there.
 
--Christoffer
+----------------------------------------------------------------
+
+The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+
+  Linux 3.10-rc3
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.11-defconfig
+
+for you to fetch changes up to 16a4b5ae32cf31e64b481ab3e2aa0ae964872123:
+
+  ARM: tegra: defconfig updates
+
+----------------------------------------------------------------
+
+Stephen Warren (1):
+      ARM: tegra: defconfig updates
+
+ arch/arm/configs/tegra_defconfig | 23 +++++++++++++++--------
+ 1 file changed, 15 insertions(+), 8 deletions(-)
