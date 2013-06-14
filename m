@@ -1,251 +1,112 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Fri, 14 Jun 2013 19:24:57 +0530
-Subject: [PATCH 10/13] ARM: dts: Add initial device tree support for
- Exynos5420
-In-Reply-To: <5641151.psa9JbBo0O@flatron>
-References: <1370516488-25860-1-git-send-email-chander.kashyap@linaro.org>
- <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <5641151.psa9JbBo0O@flatron>
-Message-ID: <CANuQgHEjiEj93sjDAh5GnCWY+pnr9cy9dK_+NtW9mDVpfLjtVQ@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 14 Jun 2013 15:58:59 +0200
+Subject: [PATCH v2] i2c: vt8500: Add support for I2C bus on Wondermedia
+ SoCs
+In-Reply-To: <1371023785-3132-1-git-send-email-linux@prisktech.co.nz>
+References: <1371023785-3132-1-git-send-email-linux@prisktech.co.nz>
+Message-ID: <20130614135857.GA2929@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2013 17:08, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Thursday 06 of June 2013 16:31:24 Chander Kashyap wrote:
->> Add initial device tree nodes for Exynos5420 SoC and SMDK5420 board.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> ---
->>  arch/arm/boot/dts/Makefile                |    1 +
->>  arch/arm/boot/dts/exynos5420-smdk5420.dts |   40 ++++++++++++
->>  arch/arm/boot/dts/exynos5420.dtsi         |  101
->> +++++++++++++++++++++++++++++ 3 files changed, 142 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
->>  create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index cb31259..304ba4d 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -56,6 +56,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->>       exynos5250-arndale.dtb \
->>       exynos5440-sd5v1.dtb \
->>       exynos5250-smdk5250.dtb \
->> +     exynos5420-smdk5420.dtb \
->
-> Please keep the sorting order.
->
->>       exynos5250-snow.dtb \
->
-> Here is the correct place for exynos5440-*.
-I will sort it.
->
->>       exynos5440-ssdk5440.dtb
->>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> b/arch/arm/boot/dts/exynos5420-smdk5420.dts new file mode 100644
->> index 0000000..b14e775
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> @@ -0,0 +1,40 @@
->> +/*
->> + * SAMSUNG SMDK5420 board device tree source
->> + *
->> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
->> + *           http://www.samsung.com
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as +
->> * published by the Free Software Foundation.
->> +*/
->> +
->> +/dts-v1/;
->> +/include/ "exynos5420.dtsi"
->
-> #include "exynos5420.dtsi"
->
->> +
->> +/ {
->> +     model = "Samsung SMDK5420 board based on EXYNOS5420";
->> +     compatible = "samsung,smdk5420", "samsung,exynos5420";
->> +
->> +     memory {
->> +             reg =   <0x20000000 0x10000000
->> +                      0x30000000 0x10000000
->> +                      0x40000000 0x10000000
->> +                      0x50000000 0x10000000
->> +                      0x60000000 0x10000000
->> +                      0x70000000 0x10000000
->> +                      0x80000000 0x10000000
->> +                      0x90000000 0x10000000>;
->> +     };
->> +
->> +     chosen {
->> +             bootargs = "console=ttySAC2,115200 init=/linuxrc";
->> +     };
->> +
->> +     fixed-rate-clocks {
->> +             oscclk {
->> +                     compatible = "samsung,exynos5420-oscclk";
->> +                     clock-frequency = <24000000>;
->> +             };
->> +     };
->> +};
->> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
->> b/arch/arm/boot/dts/exynos5420.dtsi new file mode 100644
->> index 0000000..577dfe5
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/exynos5420.dtsi
->> @@ -0,0 +1,101 @@
->> +/*
->> + * SAMSUNG EXYNOS5420 SoC device tree source
->> + *
->> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
->> + *           http://www.samsung.com
->> + *
->> + * SAMSUNG EXYNOS54200 SoC device nodes are listed in this file.
->> + * EXYNOS5420 based board files can include this file and provide
->> + * values for board specfic bindings.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as +
->> * published by the Free Software Foundation.
->> +*/
->
-> nitpick: missing space to keep the alignment of stars
->
->> +
->> +/include/ "skeleton.dtsi"
->> +/include/ "exynos5.dtsi"
->
-> #include and IMHO skeleton.dtsi should be already included from
-> exynos5.dtsi.
->
->> +/ {
->> +     compatible = "samsung,exynos5420";
->> +
->> +     clock: clock-controller at 0x10010000 {
->> +             compatible = "samsung,exynos5420-clock";
->> +             reg = <0x10010000 0x30000>;
->> +             #clock-cells = <1>;
->> +     };
->> +
->> +     cpus {
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             cpu0: cpu at 0 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,cortex-a15";
->> +                     reg = <0x0>;
->> +                     clock-frequency = <800000000>;
->
-> Hmm. I don't remember seeing this property in CPU bindings, but maybe I'm
-> missing something. Anyway this makes little sense, since on every board
-> this frequency may be different. Not even saying about CPU frequency
-> scaling that would change it.
+On Wed, Jun 12, 2013 at 07:56:25PM +1200, Tony Prisk wrote:
+> This patch adds support for the I2C bus controllers found on Wondermedia
+> 8xxx-series SoCs. Only master-mode is supported.
+> 
+> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
+> ---
 
-Well this is used to calculate cpu capacity.
->
->> +             };
->> +
->> +             cpu1: cpu at 1 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,cortex-a15";
->> +                     reg = <0x1>;
->> +                     clock-frequency = <800000000>;
->> +             };
->> +
->> +             cpu2: cpu at 2 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,cortex-a15";
->> +                     reg = <0x2>;
->> +                     clock-frequency = <800000000>;
->> +             };
->> +
->> +             cpu3: cpu at 3 {
->> +                     device_type = "cpu";
->> +                     compatible = "arm,cortex-a15";
->> +                     reg = <0x3>;
->> +                     clock-frequency = <800000000>;
->> +             };
->> +     };
->> +
->> +     mct at 101C0000 {
->> +             compatible = "samsung,exynos4210-mct";
->> +             reg = <0x101C0000 0x800>;
->> +             interrupt-controller;
->> +             #interrups-cells = <2>;
->> +             interrupt-parent = <&mct_map>;
->> +             interrupts =    <0 0>, <1 0>, <2 0>, <3 0>,
->> +                             <4 0>, <5 0>, <6 0>, <7 0>;
->> +             clocks = <&clock 1>, <&clock 315>;
->> +             clock-names = "fin_pll", "mct";
->> +
->> +             mct_map: mct-map {
->> +                     #interrupt-cells = <2>;
->
-> Why do you need 2 cells here, if second one is unused in the map and kept
-> as 0?
->
->> +                     #address-cells = <0>;
->> +                     #size-cells = <0>;
->> +                     interrupt-map = <0x0 0 &combiner 23 3>,
->> +                                     <0x1 0 &combiner 23 4>,
->> +                                     <0x2 0 &combiner 25 2>,
->> +                                     <0x3 0 &combiner 25 3>,
->> +                                     <0x4 0 &gic 0 120 0>,
->> +                                     <0x5 0 &gic 0 121 0>,
->> +                                     <0x6 0 &gic 0 122 0>,
->> +                                     <0x7 0 &gic 0 123 0>;
->
-> Having #interrupt-cells = <1> would allow to simplify the map to:
->
->         interrupt-map = <0 &combiner 23 3>,
->                         <1 &combiner 23 4>,
->                         <2 &combiner 25 2>,
->                         <3 &combiner 25 3>,
->                         <4 &gic 0 120 0>,
->                         <5 &gic 0 121 0>,
->                         <6 &gic 0 122 0>,
->                         <7 &gic 0 123 0>;
->
-> and interrupt specifiers in mct node to:
->
->         interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>;
->
-I will do the necessary changer.
->> +             };
->> +     };
->> +
->> +     serial at 12C00000 {
->> +             clocks = <&clock 257>, <&clock 128>;
->
-> This looks a bit awkward without the clock-names property here. See my
-> comments to patch 03/13.
-I will move the clock names and number to same place.
->
-> Best regards,
-> Tomasz
->
->> +     };
->> +
->> +     serial at 12C10000 {
->> +             clocks = <&clock 258>, <&clock 129>;
->> +     };
->> +
->> +     serial at 12C20000 {
->> +             clocks = <&clock 259>, <&clock 130>;
->> +     };
->> +
->> +     serial at 12C30000 {
->> +             clocks = <&clock 260>, <&clock 131>;
->> +     };
->> +};
+Please describe here what changed since the last version. It's a lot
+easier and faster to review then.
 
-Thanks for the review.
+> +static int wmt_i2c_xfer(struct i2c_adapter *adap,
+> +			struct i2c_msg msgs[],
+> +			int num)
+> +{
+> +	struct i2c_msg *pmsg;
+> +	int i, is_last, no_start;
+> +	int ret = 0;
+> +
+> +	for (i = 0; ret >= 0 && i < num; i++) {
+> +		is_last = ((i + 1) == num);
+> +		no_start = (i != 0);
 
+(i != 0) is a restart condition (start instead of stop)...
 
---
-with warm regards,
-Chander Kashyap
+> +
+> +		pmsg = &msgs[i];
+> +		if (pmsg->flags & I2C_M_NOSTART)
+> +			no_start = 1;
+
+...and this is a no_start (concatenating messages). I do have the
+impression you are mixing those two?
+
+> +		if (pmsg->flags & I2C_M_RD)
+> +			ret = wmt_i2c_read(adap, pmsg, no_start, is_last);
+> +		else
+> +			ret = wmt_i2c_write(adap, pmsg, no_start, is_last);
+> +	}
+> +
+> +	return (ret < 0) ? ret : i;
+> +}
+> +	adap = &i2c_dev->adapter;
+> +	i2c_set_adapdata(adap, i2c_dev);
+> +	strlcpy(adap->name, "WMT I2C adapter", sizeof(adap->name));
+> +	adap->owner = THIS_MODULE;
+> +	adap->algo = &wmt_i2c_algo;
+> +	adap->dev.parent = &pdev->dev;
+> +	adap->dev.of_node = pdev->dev.of_node;
+> +	adap->nr = of_alias_get_id(pdev->dev.of_node, "i2c");
+
+Drop this line...
+
+> +
+> +	init_completion(&i2c_dev->complete);
+> +
+> +	err = wmt_i2c_reset_hardware(i2c_dev);
+> +	if (err) {
+> +		dev_err(&pdev->dev, "error initializing hardware\n");
+> +		return err;
+> +	}
+> +
+> +	err = i2c_add_numbered_adapter(adap);
+
+... and use i2c_add_adpter here. Since recently the core checks the
+ofnode for an alias. Sorry, forgot to mention this last time.
+
+> +	if (err) {
+> +		dev_err(&pdev->dev, "failed to add adapter\n");
+> +		return err;
+> +	}
+> +
+> +	platform_set_drvdata(pdev, i2c_dev);
+> +
+> +	of_i2c_register_devices(adap);
+> +
+> +	return 0;
+> +}
+> +
+> +module_platform_driver(wmt_i2c_driver);
+> +
+> +MODULE_DESCRIPTION("Wondermedia I2C master-mode bus adapter");
+> +MODULE_AUTHOR("Tony Prisk <linux@prisktech.co.nz>");
+> +MODULE_LICENSE("GPL and additional rights");
+
+I see no additional rights mentioned. According to the header "GPL"
+should do, but you know the original sources better.
+
+> +MODULE_DEVICE_TABLE(of, wmt_i2c_dt_ids);
+> -- 
+> 1.7.9.5
+> 
+
+Regards,
+
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/36622107/attachment.sig>
