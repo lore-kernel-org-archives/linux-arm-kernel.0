@@ -1,63 +1,54 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Fri, 14 Jun 2013 23:00:30 +0100
-Subject: [PATCH] of: irq: Pass trigger type in IRQ resource flags
-In-Reply-To: <54821523.hBKS2L2vLj@flatron>
-References: <1368917790-23770-1-git-send-email-tomasz.figa@gmail.com>
- <54821523.hBKS2L2vLj@flatron>
-Message-ID: <20130614220030.82ECF3E0A56@localhost>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Sat, 15 Jun 2013 00:02:44 +0200
+Subject: [GIT PULL v3] at91: USBA DT support / drivers update for 3.11 #1
+In-Reply-To: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1371247364-23213-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 05 Jun 2013 20:20:39 +0200, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> Hi,
-> 
-> On Sunday 19 of May 2013 00:56:30 Tomasz Figa wrote:
-> > Some drivers might rely on availability of trigger flags in IRQ
-> > resource, for example to configure the hardware for particular interrupt
-> > type. However current code creating IRQ resources from data in device
-> > tree does not configure trigger flags in resulting resources.
-> > 
-> > This patch solves the problem, based on the fact that
-> > irq_of_parse_and_map() configures the trigger based on DT interrupt
-> > specifier, IRQD_TRIGGER_* flags are consistent with IORESOURCE_IRQ_*,
-> > and we can get trigger type by calling irqd_get_trigger_type() after
-> > mapping the interrupt.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > ---
-> >  drivers/of/irq.c | 10 ++++++++++
-> >  1 file changed, 10 insertions(+)
-> > 
-> > diff --git a/drivers/of/irq.c b/drivers/of/irq.c
-> > index a3c1c5a..79a7a26 100644
-> > --- a/drivers/of/irq.c
-> > +++ b/drivers/of/irq.c
-> > @@ -355,6 +355,16 @@ int of_irq_to_resource(struct device_node *dev, int
-> > index, struct resource *r) r->start = r->end = irq;
-> >  		r->flags = IORESOURCE_IRQ;
-> >  		r->name = name ? name : dev->full_name;
-> > +
-> > +		/*
-> > +		 * Some drivers might rely on availability of trigger 
-> flags
-> > +		 * in IRQ resource. Since irq_of_parse_and_map() 
-> configures the
-> > +		 * trigger based on interrupt specifier and IRQD_TRIGGER_*
-> > +		 * flags are consistent with IORESOURCE_IRQ_*, we can get
-> > +		 * trigger type that was just set and pass it through 
-> resource
-> > +		 * flags as well.
-> > +		 */
-> > +		r->flags |= irqd_get_trigger_type(irq_get_irq_data(irq));
-> >  	}
-> > 
-> >  	return irq;
-> 
-> Any comments on this patch?
+Arnd, Olof,
 
-That's actually a pretty good solution and a whole lot less invasive
-that the approach that Javier was pursuing. Javier, I'm going to pick
-up this patch. Please yell if it doesn't solve the problem that you're
-trying to solve.
+This is a rework of the previous pull-request done by Jean-Christophe
+PLAGNIOL-VILLARD ([GIT PULL] at91: USBA DT support for 3.11).
+It is also the division of my previous pull request (v2) to extract only
+patches related to drivers. The DT patches will be stacked on top of our
+arm-soc/at91/dt branch in an upcoming pull-request.
+You should see that this material is based on the cleanup branch that you
+already have in arm-soc/at91/cleanup.
 
-g.
+This adds the DT support for USBA gadget driver present in the most recent
+AT91 SoCs.
+As agreed with Arnd and Felipe we send these drivers updates via arm-soc.
+
+Thanks, best regards,
+
+The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+
+  ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+
+are available in the git repository at:
+
+  git://github.com/at91linux/linux-at91.git tags/at91-drivers
+
+for you to fetch changes up to 4a3ae9324ebeb9715369d2bca799bfd7dcff6dd7:
+
+  USB: gadget: atmel_usba: add DT support (2013-05-24 07:14:45 +0800)
+
+----------------------------------------------------------------
+Adding the DT support to USB gadget High-Speed aka usba.
+
+----------------------------------------------------------------
+Jean-Christophe PLAGNIOL-VILLARD (3):
+      USB: gadget: atmel_usba: move global struct usba_ep usba_ep to struct usba_udc
+      USB: gadget: atmel_usba: allow multi instance
+      USB: gadget: atmel_usba: add DT support
+
+ .../devicetree/bindings/usb/atmel-usb.txt          |  82 +++++++
+ drivers/usb/gadget/Kconfig                         |   2 +-
+ drivers/usb/gadget/atmel_usba_udc.c                | 264 ++++++++++++++-------
+ drivers/usb/gadget/atmel_usba_udc.h                |   2 +
+ 4 files changed, 269 insertions(+), 81 deletions(-)
+
+-- 
+Nicolas Ferre
