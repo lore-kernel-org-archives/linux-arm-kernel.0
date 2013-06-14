@@ -1,66 +1,43 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 14 Jun 2013 10:56:53 -0700
-Subject: [GIT PULL 1/3] msm cleanups for 3.11
-In-Reply-To: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
-References: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1371232615-30731-2-git-send-email-davidb@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 14 Jun 2013 11:00:01 -0700
+Subject: [PATCH] ARM: mmu: Add debug_ll_io_init() mappings to early
+ mappings
+In-Reply-To: <20130614164524.GA3399@codeaurora.org>
+References: <1371000607-1787-1-git-send-email-sboyd@codeaurora.org>
+ <CAL_JsqLJ7ZD9-VR+vgOZZ_q-RD6FCDvKPSNSCjAADxy94SU1Xg@mail.gmail.com>
+ <20130612172146.GB10823@codeaurora.org>
+ <51BB15DA.8020302@gmail.com> <20130614164524.GA3399@codeaurora.org>
+Message-ID: <20130614180001.GB3399@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+On 06/14, Stephen Boyd wrote:
+> On 06/14, Rob Herring wrote:
+> > On 06/12/2013 12:21 PM, Stephen Boyd wrote:
+> > > On 06/11, Rob Herring wrote:
+> > >> Can you use vm_reserve_area_early here or perhaps just call
+> > >> iotable_init instead of create_mapping directly? I don't recall if
+> > >> there was some reason I didn't do that.
+> > >>
+> > > 
+> > > I had iotable_init() before but I thought it was better to have
+> > > the ->caller argument say debug_ll_io_init() instead of
+> > > iotable_init(). Shall I extract out the similar code?
+> > 
+> > Well, that's always welcome...
+> > 
+> > Another option would be use __builtin_return_address. That would change
+> > vmallocinfo from showing iotable_init to the caller of iotable_init.
+> > Arguably, knowing the caller would be better.
+> > 
+> 
+> Ok sounds fair. I'll use iotable_init() and send a follow-up
+> patch to make iotable_init() more informative.
+> 
 
-  Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm.git tags/msm-cleanup-for-3.11
-
-for you to fetch changes up to 1aa3d1a3c7d235c47e30c7c8c6b5ef02fb1536b3:
-
-  mfd: ssbi: Use devm_* and simplify code (2013-06-12 14:50:12 -0700)
-
-----------------------------------------------------------------
-Cleanups for MSM for 3.11
-
-These are a handful of cleanups to the MSM tree.  The gpio cleanups
-get us closer to having proper pinmux and gpio support.
-
-----------------------------------------------------------------
-Maxime Ripard (1):
-      ARM: msm: Remove init_irq declaration in machine description
-
-Rohit Vaswani (4):
-      msm: Remove unused file core.h
-      msm: iomap: Remove unused bases and mappings
-      ARM: msm: Remove gpiomux-v2 and re-organize MSM_GPIOMUX configs
-      gpio: msm: Add device tree and irqdomain support for gpio-msm-v2
-
-Stephen Boyd (1):
-      mfd: ssbi: Use devm_* and simplify code
-
- .../devicetree/bindings/gpio/gpio-msm.txt          |  26 +++
- arch/arm/boot/dts/msm8660-surf.dts                 |  11 ++
- arch/arm/boot/dts/msm8960-cdp.dts                  |  11 ++
- arch/arm/mach-msm/Kconfig                          |  13 +-
- arch/arm/mach-msm/Makefile                         |   6 +-
- arch/arm/mach-msm/board-dt-8660.c                  |   2 -
- arch/arm/mach-msm/board-dt-8960.c                  |   2 -
- arch/arm/mach-msm/core.h                           |   2 -
- arch/arm/mach-msm/gpiomux-8x60.c                   |  19 --
- arch/arm/mach-msm/gpiomux-v2.c                     |  25 ---
- arch/arm/mach-msm/gpiomux-v2.h                     |  61 -------
- arch/arm/mach-msm/gpiomux.c                        |  15 ++
- arch/arm/mach-msm/gpiomux.h                        |   5 -
- arch/arm/mach-msm/include/mach/msm_iomap-8960.h    |   7 -
- arch/arm/mach-msm/include/mach/msm_iomap-8x60.h    |   6 -
- arch/arm/mach-msm/include/mach/msm_iomap.h         |   2 -
- arch/arm/mach-msm/io.c                             |   4 -
- drivers/gpio/Kconfig                               |   2 +-
- drivers/gpio/gpio-msm-v2.c                         | 195 ++++++++++++---------
- drivers/ssbi/ssbi.c                                |  69 ++------
- 20 files changed, 197 insertions(+), 286 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio-msm.txt
- delete mode 100644 arch/arm/mach-msm/core.h
- delete mode 100644 arch/arm/mach-msm/gpiomux-8x60.c
- delete mode 100644 arch/arm/mach-msm/gpiomux-v2.c
- delete mode 100644 arch/arm/mach-msm/gpiomux-v2.h
+Well now I get paging_init() as the function because that's where
+we're going to return to. That actually seems less informative.
+I'll do the similar code extraction.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
