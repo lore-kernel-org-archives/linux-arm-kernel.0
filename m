@@ -1,34 +1,25 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 14 Jun 2013 14:12:37 -0400
-Subject: [PATCH] ARM: OMAP5: Fix omap5 standalone build break
-In-Reply-To: <1371201107-20929-1-git-send-email-rnayak@ti.com>
-References: <1371201107-20929-1-git-send-email-rnayak@ti.com>
-Message-ID: <51BB5D15.8030306@ti.com>
+From: jason@lakedaemon.net (Jason Cooper)
+Date: Fri, 14 Jun 2013 14:37:05 -0400
+Subject: [PATCH 2/7] gpio: mvebu: use irq_get_trigger_type() to get IRQ
+ flags
+In-Reply-To: <1371228049-27080-3-git-send-email-javier.martinez@collabora.co.uk>
+References: <1371228049-27080-1-git-send-email-javier.martinez@collabora.co.uk>
+ <1371228049-27080-3-git-send-email-javier.martinez@collabora.co.uk>
+Message-ID: <20130614183705.GI31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 June 2013 05:11 AM, Rajendra Nayak wrote:
-> Building omap5 standalone results in the below errors..
+On Fri, Jun 14, 2013 at 06:40:44PM +0200, Javier Martinez Canillas wrote:
+> Use irq_get_trigger_type() to get the IRQ trigger type flags
+> instead calling irqd_get_trigger_type(irq_get_irq_data(irq))
 > 
-> arch/arm/mach-omap2/built-in.o: In function `scu_gp_set':
-> arch/arm/mach-omap2/sleep44xx.S:132: undefined reference to `scu_power_mode'
-> arch/arm/mach-omap2/built-in.o: In function `scu_gp_clear':
-> arch/arm/mach-omap2/sleep44xx.S:229: undefined reference to `scu_power_mode'
-> arch/arm/mach-omap2/built-in.o: In function `omap4_smp_prepare_cpus':
-> arch/arm/mach-omap2/omap-smp.c:211: undefined reference to `scu_enable'
-> arch/arm/mach-omap2/built-in.o: In function `omap4_smp_init_cpus':
-> arch/arm/mach-omap2/omap-smp.c:185: undefined reference to `scu_get_core_count'
-> 
-> Fix this by adding the missing select for HAVE_ARM_SCU for SOC_OMAP5
-> 
-> Reported-by: Pekon Gupta <pekon@ti.com>
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
 > ---
-NAK. Similar patch [1] was posted by Vincent a while back.
-The right fix to remove the scu related dependency with OMAP5
-code.
+>  drivers/gpio/gpio-mvebu.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 
-Regards,
-Santosh
+Acked-by: Jason Cooper <jason@lakedaemon.net>
 
-[1] https://patchwork.kernel.org/patch/2568091/
+thx,
+
+Jason.
