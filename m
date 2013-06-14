@@ -1,32 +1,22 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 15:28:13 -0700
-Subject: [GIT PULL 2/2] DaVinci board updates for v3.11
-In-Reply-To: <1371193161-25224-2-git-send-email-nsekhar@ti.com>
-References: <1371193161-25224-1-git-send-email-nsekhar@ti.com>
- <1371193161-25224-2-git-send-email-nsekhar@ti.com>
-Message-ID: <20130614222813.GL17326@quad.lixom.net>
+Date: Fri, 14 Jun 2013 15:24:19 -0700
+Subject: [GIT PULL 2/3] ARM: mvebu: dt changes for v3.11 #5
+In-Reply-To: <20130613212413.GF31667@titan.lakedaemon.net>
+References: <20130613212137.GE31667@titan.lakedaemon.net>
+ <20130613212413.GF31667@titan.lakedaemon.net>
+Message-ID: <20130614222419.GJ17326@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 12:29:21PM +0530, Sekhar Nori wrote:
-> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+On Thu, Jun 13, 2013 at 05:24:13PM -0400, Jason Cooper wrote:
+> The following changes since commit 33a6675485f27adc182faa856944836e85520fa1:
 > 
->   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+>   ARM: Kirkwood add cpus definition needed by cpufreq driver to dtsi (2013-06-03 16:23:24 +0000)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/board
-> 
-> for you to fetch changes up to e57a9a4b97231c2ed4c03c7b6f692b632d538993:
-> 
->   ARM: davinci: remove stale SFFSDR maintainer name (2013-06-13 15:55:13 +0530)
-> 
-> ----------------------------------------------------------------
-> This pull request contains a trival change
-> to drop a stale maintainer name and address.
+>   git://git.infradead.org/users/jcooper/linux.git tags/dt-3.11-5
 
-Pulled into next/fixes-non-critical.
-
-Thanks,
+Pulled.
 
 -Olof
