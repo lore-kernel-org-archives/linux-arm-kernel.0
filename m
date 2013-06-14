@@ -1,171 +1,43 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Fri, 14 Jun 2013 20:11:26 +0530
-Subject: [PATCH] ARM: DT: Exynos: fix number of interrupt-cells in mct node
-Message-ID: <1371220886-11616-1-git-send-email-chander.kashyap@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 14 Jun 2013 15:42:51 +0100
+Subject: [PATCH RFC 2/8] DRM: Armada: Add Armada DRM driver
+In-Reply-To: <CAKMK7uHgAe=05RFLxqSTz5R+myU9-nvuk=RMZym2k-tjzbC+2w@mail.gmail.com>
+References: <20130612134845.GQ18614@n2100.arm.linux.org.uk>
+ <CAF6AEGs4GLkBePQUd_Bh4z_Hwv8kacaEQSMSVSj4rw=ezQA66Q@mail.gmail.com>
+ <20130612164914.GT18614@n2100.arm.linux.org.uk>
+ <20130612170512.GU18614@n2100.arm.linux.org.uk>
+ <20130612194021.GX18614@n2100.arm.linux.org.uk>
+ <20130612230057.GY18614@n2100.arm.linux.org.uk>
+ <20130613111903.GA18614@n2100.arm.linux.org.uk>
+ <20130613115016.GB18614@n2100.arm.linux.org.uk>
+ <20130613130339.GD18614@n2100.arm.linux.org.uk>
+ <CAKMK7uHgAe=05RFLxqSTz5R+myU9-nvuk=RMZym2k-tjzbC+2w@mail.gmail.com>
+Message-ID: <20130614144251.GN18614@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two cells were used to specify interrupts in mct node, while second cell
-always remains unused. Hence use only one cell.
-Suggested by Tomasz Figa.
+On Fri, Jun 14, 2013 at 04:23:22PM +0200, Daniel Vetter wrote:
+> On Thu, Jun 13, 2013 at 3:03 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > There's a bigger issue here - if it's possible for drm_crtc_helper_set_config()
+> > to be called with set->fb set but set->mode NULL, then we overwrite
+> > set->fb to NULL.  Again, that results in a lost reference.
+> >
+> > For the time being, I'm using this patch, which solves my dropped
+> > refcount problem, and marks the other possible dropped reference.
+> > Either that check needs to be removed or it needs to properly drop
+> > the refcount on the fb before 'losing' the reference to it.
+> 
+> Scrap my other mail, I see now where the leaking happens. One of them
+> is interface abuse which is now fixed (and i915 has a bunch of BUG_ONs
+> to enforce them). The other one is indeed a real case that eluded me
+> when I've done the refcountification for drm_framebuffers. I'll hack
+> up some patches, since this seems to be a good excuse to port some of
+> the i915 modeset improvements back to the crtc helpers.
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
----
- arch/arm/boot/dts/exynos4210.dtsi |   19 +++++++++----------
- arch/arm/boot/dts/exynos4212.dtsi |   19 +++++++++----------
- arch/arm/boot/dts/exynos4412.dtsi |   23 +++++++++++------------
- arch/arm/boot/dts/exynos5250.dtsi |   19 +++++++++----------
- 4 files changed, 38 insertions(+), 42 deletions(-)
+If you're happy with the patch I supplied, that's probably the minimal fix
+which should go to stable kernels (I'm using 3.9 here) - this also counts
+as a "user visible bug".  It's something I've tripped over which causes
+exhausts memory and can prevent the X server from starting up.
 
-diff --git a/arch/arm/boot/dts/exynos4210.dtsi b/arch/arm/boot/dts/exynos4210.dtsi
-index 54710de..ad50010 100644
---- a/arch/arm/boot/dts/exynos4210.dtsi
-+++ b/arch/arm/boot/dts/exynos4210.dtsi
-@@ -52,23 +52,22 @@
- 		compatible = "samsung,exynos4210-mct";
- 		reg = <0x10050000 0x800>;
- 		interrupt-controller;
--		#interrups-cells = <2>;
-+		#interrups-cells = <1>;
- 		interrupt-parent = <&mct_map>;
--		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
--			     <4 0>, <5 0>;
-+		interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
- 		clocks = <&clock 3>, <&clock 344>;
- 		clock-names = "fin_pll", "mct";
- 
- 		mct_map: mct-map {
--			#interrupt-cells = <2>;
-+			#interrupt-cells = <1>;
- 			#address-cells = <0>;
- 			#size-cells = <0>;
--			interrupt-map = <0x0 0 &gic 0 57 0>,
--					<0x1 0 &gic 0 69 0>,
--					<0x2 0 &combiner 12 6>,
--					<0x3 0 &combiner 12 7>,
--					<0x4 0 &gic 0 42 0>,
--					<0x5 0 &gic 0 48 0>;
-+			interrupt-map = <0 &gic 0 57 0>,
-+					<1 &gic 0 69 0>,
-+					<2 &combiner 12 6>,
-+					<3 &combiner 12 7>,
-+					<4 &gic 0 42 0>,
-+					<5 &gic 0 48 0>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/exynos4212.dtsi b/arch/arm/boot/dts/exynos4212.dtsi
-index c0f60f4..ba9ada1 100644
---- a/arch/arm/boot/dts/exynos4212.dtsi
-+++ b/arch/arm/boot/dts/exynos4212.dtsi
-@@ -39,21 +39,20 @@
- 		compatible = "samsung,exynos4412-mct";
- 		reg = <0x10050000 0x800>;
- 		interrupt-controller;
--		#interrups-cells = <2>;
-+		#interrups-cells = <1>;
- 		interrupt-parent = <&mct_map>;
--		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
--			     <4 0>, <5 0>;
-+		interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
- 
- 		mct_map: mct-map {
--			#interrupt-cells = <2>;
-+			#interrupt-cells = <>;
- 			#address-cells = <0>;
- 			#size-cells = <0>;
--			interrupt-map = <0x0 0 &gic 0 57 0>,
--					<0x1 0 &combiner 12 5>,
--					<0x2 0 &combiner 12 6>,
--					<0x3 0 &combiner 12 7>,
--					<0x4 0 &gic 1 12 0>,
--					<0x5 0 &gic 1 12 0>;
-+			interrupt-map = <0 &gic 0 57 0>,
-+					<1 &combiner 12 5>,
-+					<2 &combiner 12 6>,
-+					<3 &combiner 12 7>,
-+					<4 &gic 1 12 0>,
-+					<5 &gic 1 12 0>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 270b389..a680de7 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -39,25 +39,24 @@
- 		compatible = "samsung,exynos4412-mct";
- 		reg = <0x10050000 0x800>;
- 		interrupt-controller;
--		#interrups-cells = <2>;
-+		#interrups-cells = <1>;
- 		interrupt-parent = <&mct_map>;
--		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
--			     <4 0>, <5 0>, <6 0>, <7 0>;
-+		interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>;
- 		clocks = <&clock 3>, <&clock 344>;
- 		clock-names = "fin_pll", "mct";
- 
- 		mct_map: mct-map {
--			#interrupt-cells = <2>;
-+			#interrupt-cells = <1>;
- 			#address-cells = <0>;
- 			#size-cells = <0>;
--			interrupt-map = <0x0 0 &gic 0 57 0>,
--					<0x1 0 &combiner 12 5>,
--					<0x2 0 &combiner 12 6>,
--					<0x3 0 &combiner 12 7>,
--					<0x4 0 &gic 1 12 0>,
--					<0x5 0 &gic 1 12 0>,
--					<0x6 0 &gic 1 12 0>,
--					<0x7 0 &gic 1 12 0>;
-+			interrupt-map = <0 &gic 0 57 0>,
-+					<1 &combiner 12 5>,
-+					<2 &combiner 12 6>,
-+					<3 &combiner 12 7>,
-+					<4 &gic 1 12 0>,
-+					<5 &gic 1 12 0>,
-+					<6 &gic 1 12 0>,
-+					<7 &gic 1 12 0>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/exynos5250.dtsi b/arch/arm/boot/dts/exynos5250.dtsi
-index a7cf3f5..4e633ef 100644
---- a/arch/arm/boot/dts/exynos5250.dtsi
-+++ b/arch/arm/boot/dts/exynos5250.dtsi
-@@ -94,23 +94,22 @@
- 		compatible = "samsung,exynos4210-mct";
- 		reg = <0x101C0000 0x800>;
- 		interrupt-controller;
--		#interrups-cells = <2>;
-+		#interrups-cells = <1>;
- 		interrupt-parent = <&mct_map>;
--		interrupts = <0 0>, <1 0>, <2 0>, <3 0>,
--			     <4 0>, <5 0>;
-+		interrupts = <0>, <1>, <2>, <3>, <4>, <5>;
- 		clocks = <&clock 1>, <&clock 335>;
- 		clock-names = "fin_pll", "mct";
- 
- 		mct_map: mct-map {
--			#interrupt-cells = <2>;
-+			#interrupt-cells = <1>;
- 			#address-cells = <0>;
- 			#size-cells = <0>;
--			interrupt-map = <0x0 0 &combiner 23 3>,
--					<0x1 0 &combiner 23 4>,
--					<0x2 0 &combiner 25 2>,
--					<0x3 0 &combiner 25 3>,
--					<0x4 0 &gic 0 120 0>,
--					<0x5 0 &gic 0 121 0>;
-+			interrupt-map = <0 &combiner 23 3>,
-+					<1 &combiner 23 4>,
-+					<2 &combiner 25 2>,
-+					<3 &combiner 25 3>,
-+					<4 &gic 0 120 0>,
-+					<5 &gic 0 121 0>;
- 		};
- 	};
- 
--- 
-1.7.9.5
+If you want me to package the patch up with a commit message and sign-off...
