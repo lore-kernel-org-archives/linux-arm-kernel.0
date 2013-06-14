@@ -1,95 +1,113 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 13 Jun 2013 22:56:29 -0700
-Subject: N900 device tree conversion: how to do first step
-In-Reply-To: <20130613230808.GA14876@amd.pavel.ucw.cz>
-References: <20130609015944.GA23559@amd.pavel.ucw.cz>
- <20130609201119.GA3190@blackmetal.musicnaut.iki.fi>
- <20130613132624.GA3464@amd.pavel.ucw.cz>
- <20130613141001.GF8164@atomide.com>
- <20130613142809.GA3775@amd.pavel.ucw.cz>
- <20130613145724.GH8164@atomide.com>
- <20130613155240.GB3775@amd.pavel.ucw.cz>
- <20130613161418.GJ8164@atomide.com>
- <20130613230808.GA14876@amd.pavel.ucw.cz>
-Message-ID: <20130614055629.GM8164@atomide.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 13 Jun 2013 23:05:19 -0700
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <CACVXFVNKm5CUuyjZV-UrtmsrE76PEHYbcoBXembngt62VNR2+Q@mail.gmail.com>
+References: <20130613184703.GA5701@kroah.com>
+ <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
+ <20130614003503.GA31029@kroah.com>
+ <CACVXFVNKm5CUuyjZV-UrtmsrE76PEHYbcoBXembngt62VNR2+Q@mail.gmail.com>
+Message-ID: <20130614060519.GB23696@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pavel Machek <pavel@ucw.cz> [130613 16:14]:
-> Hi!
+On Fri, Jun 14, 2013 at 09:53:52AM +0800, Ming Lei wrote:
+> On Fri, Jun 14, 2013 at 8:35 AM, Greg Kroah-Hartman
+> <gregkh@linuxfoundation.org> wrote:
+> > On Thu, Jun 13, 2013 at 03:41:17PM -0400, Alan Stern wrote:
+> >> On Thu, 13 Jun 2013, Greg Kroah-Hartman wrote:
+> >>
+> >> > On Thu, Jun 13, 2013 at 10:54:13AM -0400, Alan Stern wrote:
+> >> > > On Thu, 13 Jun 2013, Ming Lei wrote:
+> >> > >
+> >> > > > - using interrupt threaded handler(default)
+> >> > > >         33.440 MB/sec
+> >> > > >
+> >> > > > - using tasklet(#undef USB_HCD_THREADED_IRQ)
+> >> > > >         34.29 MB/sec
+> >> > > >
+> >> > > > - using hard interrupt handler(by removing HCD_BH in ehci-hcd.c )
+> >> > > >         34.260 MB/s
+> >> > > >
+> >> > > >
+> >> > > > So looks usb mass storage performance loss can be observed with
+> >> > > > interrupt threaded handler because one mass storage read/write sectors
+> >> > > > requires at least 3 interrupts which wake up usb-storage thread 3 times
+> >> > > > (each interrupt wakeup the usb-storage each time), introducing irq threaded
+> >> > > > handler will make 2 threads to be waken up about 6 times for one read/write.
+> >> > > >
+> >> > > > I think usb mass storage transfer handler need to be rewritten, otherwise
+> >> > > > it may become worsen after using irq threaded handler in USB 3.0.(the
+> >> > > > above device can reach >120MB/sec with hardware handler or tasklet handler,
+> >> > > > which means about ~3K interrupts/sec, so ~6K contexts switch in case of
+> >> > > > using irq threaded handler)
+> >> > > >
+> >> > > > So how about supporting tasklet first, then convert to interrupt
+> >> > > > threaded handler
+> >> > > > after usb mass storage transfer is rewritten without performance loss?
+> >> > > > (rewriting
+> >> > > > usb mass storage transfer handler may need some time and work since storage
+> >> > > > stability/correctness is extremely important, :-)
+> >> > >
+> >> > > Maybe we should simply copy what the networking people do.  They are
+> >> > > very concerned about performance and latency; whatever technique they
+> >> > > use should be good for USB too.
+> >> >
+> >> > Yes, but for "old-style" usb-storage, is this really a big deal?  We are
+> >> > still easily hitting the "line-speed" of USB for usb-storage with simple
+> >> > machines, the bottlenecks that I'm seeing are in the devices themselves,
+> >> > and then in the USB wire speed.
+> >>
+> >> What about with USB-3 storage devices?  Many of them still use the
+> >> bulk-only transport instead of UAS.  They may push the limits up.
+> >
+> > Are they really?  Have we seen that happen yet?  With the number's I've
 > 
-> > > Now, by chance, any idea what is DT equivalent of 
-> > > 
-> > > omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-> > 
-> > You can try the attached hack after calling the above to grep for
-> > pins in /sys/kernel/debug/omap_mux/board/core and you get the pins
-> > in DT suitable format. There's a bug where the the pins are not
-> > correctly split between core and wkup domains in the legacy mux fwk,
-> > but you probably won't need to mux many wkup domain pins.
-> > 
-> > Then you just need to add the pinctr-single entries for each device,
-> > but AFAIK most of the pins are muxed correctly in the bootloader
-> > for the Nokia boards.
+> Yes, the device I am testing is bulk-only, no uas support , and it is very
+> popular in market.
 > 
-> Thanks a lot for the help. So far, I'm not playing with
-> suspend/resume, so wkup/core split should not be issue (right?).
-
-Well if you have any wkup mux registers mapped for core mux,
-pinctrl-single will complain about offset being out of range
-and not set the values. You can see that in dmesg, or at least
-with CONFIG_DEBUG_PINCTRL set.
- 
-> How does it work with the devices? AFAICT omap4 groups it logically,
-> but that's just for easy reading, no?
-
-No, there really are two instances of mux registers even on omap3,
-but I missed that earlier while reading the docs, and with the legacy
-mux framework it does not matter which mux domain it is. But it
-matters for pinctrl-single as it ioremaps the ranges separately.
- 
-> I tried this, but no luck, mux is not initialized correctly, so code
-> in board-rx51-video fails, and later fbcon crashes.
+> > seen published, we are easily serving up enough data to keep the pipe
+> > full, but that all depends on your CPU / host controller.
+> >
+> >> > Once hardware comes out that uses USB streams, and we get device support
+> >> > for the UAS protocol, then we might have a need to change things, but at
+> >> > this point in time, for the "old" driver, I think we are fine.
+> >> >
+> >> > Unless someone has a workload / benchmark that shows otherwise?
+> >>
+> >> The test results above show a 2.4% degradation for threaded interrupts
+> >> as compared to tasklets.  That's in addition to the bottlenecks caused
+> >> by the device; no doubt it would be worse for a faster device.  This
+> >> result calls into question the benefits of threaded interrupts.
+> >>
+> >> The main reason for moving away from the current scheme is to reduce
+> >> latency for other interrupt handlers.  Ming gave two examples of slow
+> >> USB code that runs in hardirq context now; with his change they would
+> >> run in softirq context and therefore wouldn't delay other interrupts so
+> >> much.  (Interrupt latency is hard to measure, however.)
+> >
+> > Yes, I know that people keep wanting to worry about latency issues, and
+> > the best answer for them has always been, "don't use USB." :)
 > 
-> Any ideas?
+> I think we can do it better, why don't do it? :-)
 
-You may have some wkup mux domain offsets in your .dts file, so
-pinctrl-single will abort the muxing.
+Because of other issues, that have been brought up here already.
 
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -81,3 +81,218 @@
->  	power = <50>;
->  };
->  */
-> +
-> +
-> +
-> +&omap3_pmx_core {
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <
-> +			&all_pins
-> +		>;
-> +
-> +		all_pins: pinmux_all_pins {
-> +		    pinctrl-single,pins = <
-> +			0xe6 0x4104	/* cam_d0.gpio_99 gpio99 INPUT | OFF_WAKEUPENABLE | MODE4 */
-> +			0xe8 0x11c	/* cam_d1.gpio_100 gpio100 INPUT_PULLUP | MODE4 */
-> +			0xfa 0x7	/* cam_d10.safe_mode gpio109 OUTPUT | MODE7 */
-...
+But if you can do it without affecting others, that's fine.
 
-This is not a good way of doing muxing, hogging all the pins under
-omap3_pmx_core will make it impossible to unload pinctrl-single
-as a module, which is not nice for distros and developers.
+> > You suffer throughput issues with predicitable latency dependancies, so
+> 
+> This patchset don't cause throughout degradation but decrease latency much,
+> also has other advantages.
 
-Further, if some pins need dynamic remuxing, we can't do it in
-the device driver for the device. For n900, dynamic remuxing needs
-to be done for eMMC at least, see rx51_mmc2_remux().
+Like what?
 
-Also, see the recent patches that Benoit has queued to use the
-preprocessor for the .dts files, we should modify the legacy mux
-dump hack to output the mux mode defines instead.
+> > we need to be careful we don't slow down the 99% of the systems out
+> > there that do not care about this at all.
+> 
+> Considered great amount of ARM devices in market, I think we need to
+> consider the problem on these devices, :-)
 
-Regards,
+Is it a problem on those devices?  I think they have host controller
+issues that are way bigger problems than this device driver, right?
 
-Tony
+greg k-h
