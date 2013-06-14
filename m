@@ -1,50 +1,42 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 14 Jun 2013 14:24:05 +0800
-Subject: [PATCH 7/9] ARM: dtsi: imx6qdl-sabresd: Enable SSI2 and AUDMUX
-In-Reply-To: <499493b4fd86c318da5990521678642bc0733d3c.1371123426.git.b42378@freescale.com>
-References: <cover.1371123426.git.b42378@freescale.com>
- <499493b4fd86c318da5990521678642bc0733d3c.1371123426.git.b42378@freescale.com>
-Message-ID: <20130614062404.GD20513@S2101-09.ap.freescale.net>
+Date: Fri, 14 Jun 2013 14:30:53 +0800
+Subject: [PATCH 1/4] ARM: cfa10036: Add USB0 OTG port
+In-Reply-To: <24013808.T2v7Fa5NMK@wuerfel>
+References: <1371131025-12200-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371131025-12200-2-git-send-email-maxime.ripard@free-electrons.com>
+ <24013808.T2v7Fa5NMK@wuerfel>
+Message-ID: <20130614063051.GE20513@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 07:51:02PM +0800, Nicolin Chen wrote:
-> Enable SSI2 and its pin configuration in AUDMUX.
+On Fri, Jun 14, 2013 at 12:06:51AM +0200, Arnd Bergmann wrote:
+> On Thursday 13 June 2013 15:43:42 Maxime Ripard wrote:
+> > +
+> > +       ahb at 80080000 {
+> > +               usb0: usb at 80080000 {
+> > +                       pinctrl-names = "default";
+> > +                       pinctrl-0 = <&usb0_otg_cfa10036>;
+> > +                       status = "okay";
+> >                 };
+> >         };
+> > 
 > 
-> Signed-off-by: Nicolin Chen <b42378@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6qdl-sabresd.dtsi |   11 +++++++++++
->  1 files changed, 11 insertions(+), 0 deletions(-)
+> The patches all look good, just one trivial comment about the fragment above:
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> index 4ee2413..a76e37a 100644
-> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
-> @@ -93,6 +93,17 @@
->  	status = "okay";
->  };
->  
-> +&ssi2 {
-> +	status = "okay";
-> +	fsl,mode = "i2s-slave";
-> +};
-> +
-> +&audmux {
-> +	status = "okay";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_audmux_2>;
-> +};
-> +
+> There is already a "usb0" label in the imx28.dtsi file for the same
+> node. When you refer to the node from a board.dts file, either leave
+> out the redundant label, or use it to simplify the statements above
+> to the brief version:
+> 
+> 	&usb0 {
+> 		pinctrl-names = "default";
+> 		pinctrl-0 = <&usb0_otg_cfa10036>;
+> 		status = "okay";
+> 	};
 
-I moved these two nodes around to have them properly sorted, and also
-move "status" to be the last property.
+Yeah, I moved all imx board level dts files to use this.  But I was told
+by Olof that the change does not gain too much and looks like a churn.
+That's why I haven't made the same move for mxs.  So I will remove the
+redundant label when applying this patch.
 
 Shawn
-
->  &i2c1 {
->  	status = "okay";
->  	clock-frequency = <100000>;
-> -- 
-> 1.7.1
-> 
-> 
