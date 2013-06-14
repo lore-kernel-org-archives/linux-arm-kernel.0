@@ -1,24 +1,83 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 15:05:55 -0700
-Subject: [GIT PULL 1/3] ARM: mvebu: cleanup for v3.11 #4
-In-Reply-To: <20130613212137.GE31667@titan.lakedaemon.net>
-References: <20130613212137.GE31667@titan.lakedaemon.net>
-Message-ID: <20130614220555.GH17326@quad.lixom.net>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Sat, 15 Jun 2013 00:11:56 +0200
+Subject: [PATCH v3 1/2] ARM: at91: dt: add header to define at_hdmac
+ configuration
+In-Reply-To: <1371112779-22738-2-git-send-email-ludovic.desroches@atmel.com>
+References: <1371112779-22738-1-git-send-email-ludovic.desroches@atmel.com>
+ <1371112779-22738-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <51BB952C.2070209@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 05:21:37PM -0400, Jason Cooper wrote:
-> The following changes since commit c589f9b4b51317cfc530812fe90a9895bd51430e:
-> 
->   arm: mvebu: mark functions of armada-370-xp.c as static (2013-05-21 13:44:32 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-4
+On 13/06/2013 10:39, ludovic.desroches at atmel.com :
+> From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> DMA-cell content is a concatenation of several values. In order to keep this
+> stuff human readable, macros are introduced.
+>
+> The values for the FIFO configuration are not the same as the ones used in the
+> configuration register in order to keep backward compatibility. Most devices
+> use the half FIFO configuration but USART ones have to use the ASAP
+> configuration. This parameter was not initially planed to be into the at91 dma
+> dt binding. The third cell will be used to store this parameter, it will
+> become a concatenation of the FIFO configuration and of the peripheral ID. In
+> order to keep backward compatibility i.e. FIFO configuration is equal to 0, we
+> have to perform a translation since the value to put in the register to set
+> half FIFO is 1.
+>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
 
-Pulled. I was this >< close to just cherry-picking the patch though, since
-that's way more efficient for just a single patch. But that'd mess up your
-downstream users.
+Of course:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+In addition to going through slave-dma Vinod's git tree, I also stack it 
+on the AT91 DT branch so that it can go in arm-soc and prevent a 
+dependency between the two trees that could lead to a build error...
+
+Best regards,
+
+> ---
+>   include/dt-bindings/dma/at91.h | 27 +++++++++++++++++++++++++++
+>   1 file changed, 27 insertions(+)
+>   create mode 100644 include/dt-bindings/dma/at91.h
+>
+> diff --git a/include/dt-bindings/dma/at91.h b/include/dt-bindings/dma/at91.h
+> new file mode 100644
+> index 0000000..e835037
+> --- /dev/null
+> +++ b/include/dt-bindings/dma/at91.h
+> @@ -0,0 +1,27 @@
+> +/*
+> + * This header provides macros for at91 dma bindings.
+> + *
+> + * Copyright (C) 2013 Ludovic Desroches <ludovic.desroches@atmel.com>
+> + *
+> + * GPLv2 only
+> + */
+> +
+> +#ifndef __DT_BINDINGS_AT91_DMA_H__
+> +#define __DT_BINDINGS_AT91_DMA_H__
+> +
+> +/*
+> + * Source and/or destination peripheral ID
+> + */
+> +#define AT91_DMA_CFG_PER_ID_MASK	(0xff)
+> +#define AT91_DMA_CFG_PER_ID(id)		(id & AT91_DMA_CFG_PER_ID_MASK)
+> +
+> +/*
+> + * FIFO configuration: it defines when a request is serviced.
+> + */
+> +#define AT91_DMA_CFG_FIFOCFG_OFFSET	(8)
+> +#define AT91_DMA_CFG_FIFOCFG_MASK	(0xf << AT91_DMA_CFG_FIFOCFG_OFFSET)
+> +#define AT91_DMA_CFG_FIFOCFG_HALF	(0x0 << AT91_DMA_CFG_FIFOCFG_OFFSET)	/* half FIFO (default behavior) */
+> +#define AT91_DMA_CFG_FIFOCFG_ALAP	(0x1 << AT91_DMA_CFG_FIFOCFG_OFFSET)	/* largest defined AHB burst */
+> +#define AT91_DMA_CFG_FIFOCFG_ASAP	(0x2 << AT91_DMA_CFG_FIFOCFG_OFFSET)	/* single AHB access */
+> +
+> +#endif /* __DT_BINDINGS_AT91_DMA_H__ */
+>
 
 
--Olof
+-- 
+Nicolas Ferre
