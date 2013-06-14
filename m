@@ -1,52 +1,54 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 16:08:38 -0700
-Subject: [GIT PULL] Integrator/AP PCI DT support
-In-Reply-To: <CACRpkdb8J4+QH36SYavgGWbFWaBZDg5JSYyyJELzL=mSZfMnBw@mail.gmail.com>
-References: <CACRpkdb8J4+QH36SYavgGWbFWaBZDg5JSYyyJELzL=mSZfMnBw@mail.gmail.com>
-Message-ID: <20130614230838.GA18124@quad.lixom.net>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Sat, 15 Jun 2013 01:16:21 +0200
+Subject: [PATCH 2/2] Add sunxi-sid to dts for sun4i and sun5i
+In-Reply-To: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
+References: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <1371251781-17167-3-git-send-email-oliver+list@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 03, 2013 at 01:09:17PM +0200, Linus Walleij wrote:
-> Hi ARM SoC folks,
-> 
-> here is a pull request for the Integrator/AP PCI DT support.
-> 
-> This is the final stepping stone making way for this development TODO:
-> 
-> - Preparing removal of the board files for the Integrators
-> - Multiplatform support
-> - Moving the PCIv3 driver to drivers/pci
-> 
-> The patches have been around on the lists for a long time now, only
-> waiting for the infrastructure recently added to the ARM SoC tree.
-> 
-> As you can see it is based on the of/pci-helpers branch in the ARM SoC
-> tree. I pulled this branch into my tree and rebased the patch set onto
-> this.
-> 
-> All is ACKed by Arnd except for the patch adding the function
-> pci_common_init_dev() to arch/arm/include/asm/mach/pci.h.
-> So this will be a good time for anyone who doesn't like that idea
-> to protest in the last minute.
-> 
-> Anyway: please pull it in.
-> 
-> Yours,
-> Linus Walleij
-> 
-> 
-> The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
-> 
->   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/integrator-pci-for-arm-soc
+From: Oliver Schinagl <oliver@schinagl.nl>
 
-Pulled, apologies for the delay on this one, fell of my list of
-branches-to-pull somehow.
+This patch shall add support for the sunxi-sid driver to the device table for
+sun4i and sun5i.
 
+Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
+---
+ arch/arm/boot/dts/sun4i-a10.dtsi | 5 +++++
+ arch/arm/boot/dts/sun5i-a13.dtsi | 5 +++++
+ 2 files changed, 10 insertions(+)
 
--Olof
+diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
+index e7ef619..bc71d64 100644
+--- a/arch/arm/boot/dts/sun4i-a10.dtsi
++++ b/arch/arm/boot/dts/sun4i-a10.dtsi
+@@ -213,6 +213,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
+ 		uart0: serial at 01c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index 8ba65c1..c80c81b 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -196,6 +196,11 @@
+ 			reg = <0x01c20c90 0x10>;
+ 		};
+ 
++		sid: eeprom at 01c23800 {
++			compatible = "allwinner,sun4i-sid";
++			reg = <0x01c23800 0x10>;
++		};
++
+ 		uart1: serial at 01c28400 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28400 0x400>;
+-- 
+1.8.1.5
