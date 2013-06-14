@@ -1,54 +1,63 @@
 From: oliver+list@schinagl.nl (Oliver Schinagl)
-Date: Sat, 15 Jun 2013 01:16:21 +0200
-Subject: [PATCH 2/2] Add sunxi-sid to dts for sun4i and sun5i
-In-Reply-To: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
-References: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <1371251781-17167-3-git-send-email-oliver+list@schinagl.nl>
+Date: Sat, 15 Jun 2013 01:16:19 +0200
+Subject: [PATCH 0/2] v3 Driver for Allwinner sunxi Security ID 
+Message-ID: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Oliver Schinagl <oliver@schinagl.nl>
 
-This patch shall add support for the sunxi-sid driver to the device table for
-sun4i and sun5i.
+I've tried to incoperate all requests/issues but as always could have possibly
+missed some. I've talked to a few people, maxime mostly about the return vs
+goto and he said it was up to me, and have choosen to stick with the goto for
+the error handling.
 
-Signed-off-by: Oliver Schinagl <oliver@schinagl.nl>
----
- arch/arm/boot/dts/sun4i-a10.dtsi | 5 +++++
- arch/arm/boot/dts/sun5i-a13.dtsi | 5 +++++
- 2 files changed, 10 insertions(+)
+Changes from v2:
+* Removed the global pointer, we can change that when the need for external
+  access arises
+* Fixed header inclusions
+* Corrected if guards. There where some crude mistakes there
+* Changed offset to an unsigned int so we don't have to worry about negatives
+* Cleaned up variable declarations
+* Changed ret value, ENXIO (No device/io) as that better matches a missing dt
+* Made the loading informercial print version so it is somewhat usefull
 
-diff --git a/arch/arm/boot/dts/sun4i-a10.dtsi b/arch/arm/boot/dts/sun4i-a10.dtsi
-index e7ef619..bc71d64 100644
---- a/arch/arm/boot/dts/sun4i-a10.dtsi
-+++ b/arch/arm/boot/dts/sun4i-a10.dtsi
-@@ -213,6 +213,11 @@
- 			reg = <0x01c20c90 0x10>;
- 		};
- 
-+		sid: eeprom at 01c23800 {
-+			compatible = "allwinner,sun4i-sid";
-+			reg = <0x01c23800 0x10>;
-+		};
-+
- 		uart0: serial at 01c28000 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28000 0x400>;
-diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
-index 8ba65c1..c80c81b 100644
---- a/arch/arm/boot/dts/sun5i-a13.dtsi
-+++ b/arch/arm/boot/dts/sun5i-a13.dtsi
-@@ -196,6 +196,11 @@
- 			reg = <0x01c20c90 0x10>;
- 		};
- 
-+		sid: eeprom at 01c23800 {
-+			compatible = "allwinner,sun4i-sid";
-+			reg = <0x01c23800 0x10>;
-+		};
-+
- 		uart1: serial at 01c28400 {
- 			compatible = "snps,dw-apb-uart";
- 			reg = <0x01c28400 0x400>;
+Changes from v1:
+* Renamed the sys-fs exported key to eeprom, since it really a read-only eeprom
+* Removed mention of sun[67]i since we haven't tested those
+* Fixed up mistakes in comments
+* Removed PAGE_SIZE references, since this is a binary only driver
+* Removed lookup table and calculate offsets better
+* Use proper endianess
+* Add the SID to seed the kernel entropy pool
+* Rewrite probe to use platform_get_resource/devm_ioremap_resource instead
+
+
+The Allwinner A-series of SoC's have efuses exposed via registers to read the
+factory programmed e-fuses. These should in theory be programmable but this is
+still to be confirmed. It does appear that these fuses are unique enough to be
+used as serial numbers, RSA keys, generate MAC addresses from etc. If it turns
+out to be user programmable, the use obviously increases. Allwinner did use the
+fuses initially to determine the chip-type.
+
+This driver supports all currently known chips based on datasheets and 'dumped'
+drivers that we have so far, the dts is only implemented for known chips.
+
+It has been tested on a Cubieboard 1
+
+This is my very first driver so please try to be gentle 
+
+Oliver Schinagl (2):
+  Initial support for Allwinner's Security ID fuses
+  Add sunxi-sid to dts for sun4i and sun5i
+
+ arch/arm/boot/dts/sun4i-a10.dtsi |   5 ++
+ arch/arm/boot/dts/sun5i-a13.dtsi |   5 ++
+ drivers/misc/eeprom/Kconfig      |  17 ++++
+ drivers/misc/eeprom/Makefile     |   1 +
+ drivers/misc/eeprom/sunxi_sid.c  | 167 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 195 insertions(+)
+ create mode 100644 drivers/misc/eeprom/sunxi_sid.c
+
 -- 
 1.8.1.5
