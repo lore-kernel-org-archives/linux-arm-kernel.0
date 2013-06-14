@@ -1,46 +1,69 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 14 Jun 2013 16:07:20 +0200
-Subject: [PATCHv5 0/8] Add I2C support for Allwinner SoCs
-In-Reply-To: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130614140719.GC2929@katana>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 14 Jun 2013 22:19:04 +0800
+Subject: [PATCH 1/3] usb: chipidea: add CSR SiRFSoC ci13xxx usb driver
+In-Reply-To: <87mwqshnl8.fsf@ashishki-desk.ger.corp.intel.com>
+References: <1370748338-13210-1-git-send-email-Baohua.Song@csr.com>
+ <1370748338-13210-2-git-send-email-Baohua.Song@csr.com>
+ <87sj0khq5o.fsf@ashishki-desk.ger.corp.intel.com>
+ <CAGsJ_4zH8f3TFZj=9JurzniKuooFKZny=6m=q7MsgTQqwKe=8w@mail.gmail.com>
+ <87mwqshnl8.fsf@ashishki-desk.ger.corp.intel.com>
+Message-ID: <CAGsJ_4xYTyeYxrOkcChucOQo6DebptgyLYfh+35UKp5m3xY78Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 06:53:29PM +0200, Maxime Ripard wrote:
-> Hi,
-> 
-> This patchset adds support for the I2C controller found on most of the
-> Allwinner SoCs, especially the already supported A10 and A13, and the
-> yet to come A31.
-> 
-> This driver leverages the Marvel mv64xxx i2c controller driver, that has
-> an almost identical logic, with a slightly different register layout.
+2013/6/14 Alexander Shishkin <alexander.shishkin@linux.intel.com>:
+> Barry Song <21cnbao@gmail.com> writes:
+>
+>> 2013/6/14 Alexander Shishkin <alexander.shishkin@linux.intel.com>:
+>>> Barry Song <21cnbao@gmail.com> writes:
+>>>
+>>>> +if USB_CHIPIDEA_UDC && USB_CHIPIDEA_HOST
+>>>> +
+>>>> +config USB_CHIPIDEA_SIRF
+>>>> +     depends on ARCH_SIRF
+>>>> +     bool "SiRF USB controller ChipIdea driver binding"
+>>>> +     default y
+>>>> +     help
+>>>> +       Say Y here to enable sirf usb ChipIdea driver binding.
+>>>> +
+>>>> +config USB_CHIPIDEA_MSM
+>>>> +     depends on ARCH_MSM
+>>>> +     bool "MSM USB controller ChipIdea driver binding"
+>>>> +     default y
+>>>> +     help
+>>>> +       Say Y here to enable msm usb ChipIdea driver binding.
+>>>> +
+>>>> +config USB_CHIPIDEA_IMX
+>>>> +     depends on ARCH_MXC || ARCH_MXS
+>>>> +     bool "i.MX USB controller ChipIdea driver binding"
+>>>> +     default y
+>>>> +     help
+>>>> +       Say Y here to enable imx usb ChipIdea driver binding.
+>>>> +
+>>>> +endif
+>>>
+>>> No. This is wrong on at least 3 different levels.
+>>
+>> the point is we don't directly include MSM, IMX, SiRF and all other
+>> drivers once we enable chipidea. that makes these drivers optional,
+>> not always be built-in.
+>
+> This has been discussed several times already. Just set the
+> USB_CHIPIDEA=m and then everything will be built as modules and nothing
+> will be built in. What exactly is the problem you're trying to solve
+> with this?
+>
 
-\o/ Yay, that's more like it. Thanks for the rework!
+Alex, it seems it is not much a generic way to use building-module to
+avoid all involved components built-in.
+but since you have discussed several times and got agreement, i'll
+follow it and don't re-open it.
 
-> It has been tested on a A13-Olinuxino and an A10s-Olinuxino.
+> The only way something like this will go in is with Jiri's COMPILE_TEST
+> patchset. This snippet above is just buggy.
+>
+> Regards,
+> --
+> Alex
 
-I'd love to get some Tested-by or other tags for Marvell hardware. Any
-volunteers?
-
-> Changes from v4:
->   * Don't expose the reg offset structure through the platform data
-
-Commit message 2/9 still speaks about pdata, but I will fix this locally
-if all goes well with this series.
-
-I will wait a bit more for tags and then pick up patches 1-3. I assume
-the rest goes via arm-soc, let me know if I should take them.
-
-Regards,
-
-   Wolfram
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/94e58209/attachment-0001.sig>
+-barry
