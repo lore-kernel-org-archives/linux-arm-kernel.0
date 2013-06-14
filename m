@@ -1,105 +1,68 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Fri, 14 Jun 2013 09:27:47 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306131656560.1561-100000@iolanthe.rowland.org>
-References: <1371154112.9844.306.camel@gandalf.local.home>
- <Pine.LNX.4.44L0.1306131656560.1561-100000@iolanthe.rowland.org>
-Message-ID: <CACVXFVPZ45+FgLsrR5R9o6fNdnm0+R6KtWt8YzHAdqcpiA3drQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 14 Jun 2013 04:27:42 +0300
+Subject: [PATCH 2/3] USB: OMAP: add omap-otg
+In-Reply-To: <20130613223711.GD18360@blackmetal.musicnaut.iki.fi>
+References: <1370817606-1008-1-git-send-email-aaro.koskinen@iki.fi>
+ <1370817606-1008-3-git-send-email-aaro.koskinen@iki.fi>
+ <20130612151326.GE15056@arwen.pp.htv.fi>
+ <20130613223711.GD18360@blackmetal.musicnaut.iki.fi>
+Message-ID: <20130614012742.GA20258@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 5:09 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
-> On Thu, 13 Jun 2013, Steven Rostedt wrote:
->
->> On Thu, 2013-06-13 at 15:41 -0400, Alan Stern wrote:
->>
->> > The test results above show a 2.4% degradation for threaded interrupts
->> > as compared to tasklets.  That's in addition to the bottlenecks caused
->> > by the device; no doubt it would be worse for a faster device.  This
->> > result calls into question the benefits of threaded interrupts.
->>
->> That's because it was written like a top half and not a full blown
->> interrupt. I just looked at the patch, and saw this:
->>
->> +#ifndef USB_HCD_THREADED_IRQ
->>         if (sched) {
->>                 if (async)
->>                         tasklet_schedule(&bh->bh);
->>                 else
->>                         tasklet_hi_schedule(&bh->bh);
->>         }
->> +#else
->> +       if (sched)
->> +               schedule_work(&hcd->periodic_bh->work);
->> +#endif
->>
->> What is this? The work isn't done by an interrupt thread, but by work queues!
->
-> You don't understand the patch.  Most of the time, sched will be 0
-> here and hence the work queue won't be involved.
->
-> Yes, part of the work is done by a work queue rather than the interrupt
-> thread.  But it is an unimportant part, the part that involves
-> transfers to root hubs or transfers that were cancelled.  These things
-> can complete without any interrupt occurring, so they can't be handled
-> by the interrupt thread.  However, they are the abnormal case; the
-> transfers we care about are not to root hubs and they do complete
-> normally.
->
->> The point of the interrupt thread is that you do *all* the work that
->> needs to be done when an interrupt comes in. You don't need to delay the
->> work.
->
-> You've got it backward.  The patch doesn't leave part of the work
-> undone when an interrupt occurs.  Rather it's the other way around --
-> sometimes work needs to be done when there isn't any interrupt.  This
-> could happen in a timer callback, or it could happen as a direct result
-> of a function call.
->
-> Since there doesn't seem to be any way to invoke the interrupt thread
-> in the absence of an interrupt, Ming pushed the job off to a work
-> queue.
->
->> If you just treat a threaded interrupt like a real interrupt and push
->> off work to something else, then yes, it will degrade performance.
->>
->> If you go the threaded interrupt route, you need to rethink the
->> paradigm. There's no reason that the interrupt handler needs to be fast
->> like it needs to be in true interrupt context. The handler can now use
->> mutexes, and other full features that currently only threads benefit
->> from. It should improve locking issues, and can serialize things if
->> needed.
->>
->> All this patch did was to switch the main irq to a thread and make a
->> bottom half into a work queue.
->
-> In case it's not clear, the code you quoted above is part of the
-> interrupt handler, not part of the thread.
->
->> Why couldn't you just do:
->>
->>       if (sched)
->>               usb_giveback_urb_bh(bh);
->>
->> ?
->
-> Because usb_giveback_urb_bh() is supposed to run in the context of the
-> tasklet or interrupt thread or work queue, not in the context of the
-> interrupt handler.
+Hi,
 
-Exactly, the code should have been the below shape:
+On Fri, Jun 14, 2013 at 01:37:11AM +0300, Aaro Koskinen wrote:
+> Hi,
+> 
+> On Wed, Jun 12, 2013 at 06:13:26PM +0300, Felipe Balbi wrote:
+> > On Mon, Jun 10, 2013 at 01:40:05AM +0300, Aaro Koskinen wrote:
+> > > +void omap_otg_set_mode(enum omap_otg_mode mode)
+> > > +{
+> > > +	if (!otg_dev) {
+> > > +		WARN(1, "%s: controller not present\n", __func__);
+> > > +		return;
+> > > +	}
+> > > +	mutex_lock(&otg_dev->serialize);
+> > > +	switch (mode) {
+> > > +	case OMAP_OTG_MODE_DEVICE:
+> > > +		/*
+> > > +		 * Set B-session valid.
+> > > +		 */
+> > > +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSVLD);
+> > > +		break;
+> > > +	case OMAP_OTG_MODE_HOST:
+> > > +		/*
+> > > +		 * Set A-session valid.
+> > > +		 */
+> > > +		omap_otg_ctrl(OMAP_OTG_ASESSVLD);
+> > > +		break;
+> > > +	case OMAP_OTG_MODE_DISCONNECT:
+> > > +		/*
+> > > +		 * Set B-session end to indicate no VBUS.
+> > > +		 */
+> > > +		omap_otg_ctrl(OMAP_OTG_ID | OMAP_OTG_BSESSEND);
+> > > +		break;
+> > > +	default:
+> > > +		WARN(1, "%s: unknown mode: %d\n", __func__, mode);
+> > > +	}
+> > > +	mutex_unlock(&otg_dev->serialize);
+> > > +}
+> > > +EXPORT_SYMBOL_GPL(omap_otg_set_mode);
+> > 
+> > looks like this should provide a extcon interface for its users.
+> 
+> Is there any examples available? Anyway, I'll look into this.
 
-        #ifndef USB_HCD_THREADED_IRQ
-              ......
-        #else
-               if (!in_irq()) {
-                      bh = hcd->periodic_bh;
-                      sched = 1;
-              }
-        #endif
+In extcon tree there are some patches from Kishon adding that to
+dwc3-omap.c :-)
 
-Then it will be quite clear.
-
-Thanks,
---
-Ming Lei
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/46d8465b/attachment.sig>
