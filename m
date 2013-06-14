@@ -1,55 +1,47 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 14 Jun 2013 12:53:11 +0200
-Subject: [PATCH V5 1/3] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <000001ce68d7$ca762200$5f626600$@samsung.com>
-References: <000b01ce6839$0f0455d0$2d0d0170$@samsung.com>
- <13685067.uPzcc2y1CU@wuerfel>
- <000001ce68d7$ca762200$5f626600$@samsung.com>
-Message-ID: <20130614105310.GA19060@manwe>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 14 Jun 2013 13:02:59 +0200
+Subject: [PATCH 1/4] ARM: cfa10036: Add USB0 OTG port
+In-Reply-To: <24013808.T2v7Fa5NMK@wuerfel>
+References: <1371131025-12200-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1371131025-12200-2-git-send-email-maxime.ripard@free-electrons.com>
+ <24013808.T2v7Fa5NMK@wuerfel>
+Message-ID: <20130614110259.GQ16699@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 05:18:46PM +0900, Jingoo Han wrote:
-> On Thursday, June 13, 2013 11:14 PM, Arnd Bergmann wrote:
-> > On Thursday 13 June 2013 22:22:31 Jingoo Han wrote:
-[...]
-> > > +static int __exit exynos_pcie_remove(struct platform_device *pdev)
-> > > +{
-> > > +	struct pcie_port *pp = platform_get_drvdata(pdev);
-> > > +
-> > > +	clk_disable_unprepare(pp->bus_clk);
-> > > +	clk_disable_unprepare(pp->clk);
-> > > +
-> > > +	return 0;
-> > > +}
+Hi Arnd,
+
+On Fri, Jun 14, 2013 at 12:06:51AM +0200, Arnd Bergmann wrote:
+> On Thursday 13 June 2013 15:43:42 Maxime Ripard wrote:
+> > +
+> > +       ahb at 80080000 {
+> > +               usb0: usb at 80080000 {
+> > +                       pinctrl-names = "default";
+> > +                       pinctrl-0 = <&usb0_otg_cfa10036>;
+> > +                       status = "okay";
+> >                 };
+> >         };
 > > 
-> > You also don't remove the PCI devices here, as mentioned in an earlier
-> > review.
 > 
-> I reviewed Marvell PCIe driver and Tegra PCIe driver; however,
-> I cannot know what you mean.
+> The patches all look good, just one trivial comment about the fragment above:
 > 
-> Could let me know which additional functions are needed?
+> There is already a "usb0" label in the imx28.dtsi file for the same
+> node. When you refer to the node from a board.dts file, either leave
+> out the redundant label, or use it to simplify the statements above
+> to the brief version:
+> 
+> 	&usb0 {
+> 		pinctrl-names = "default";
+> 		pinctrl-0 = <&usb0_otg_cfa10036>;
+> 		status = "okay";
+> 	};
+> 
 
-We don't currently do that on Tegra either. pci-mvebu doesn't do that
-either, but they don't implement the driver's .remove() in the first
-place.
+Good to know, thanks!
 
-I think the biggest missing piece is pci_common_exit(), the counterpart
-of pci_common_init(), to cleanup a host bridge on ARM. I haven't looked
-in detail at the other architectures, but I suspect there must be some
-code to call when a host bridge is removed.
+Maxime
 
-Looking at drivers/pci/remove.c, it seems like pci_remove_root_bus()
-might be what we're looking at. It isn't exported so it can't be used by
-modules, but that can be changed. Is that how a host bridge is typically
-removed from the system?
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/87654f11/attachment-0001.sig>
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
