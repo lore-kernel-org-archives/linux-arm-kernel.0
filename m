@@ -1,83 +1,46 @@
-From: afzal@ti.com (Afzal Mohammed)
-Date: Fri, 14 Jun 2013 19:33:34 +0530
-Subject: [PATCH] ARM: dts: AM43x EPOS EVM support
-Message-ID: <1371218614-26311-1-git-send-email-afzal@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 14 Jun 2013 16:07:20 +0200
+Subject: [PATCHv5 0/8] Add I2C support for Allwinner SoCs
+In-Reply-To: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20130614140719.GC2929@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add AM43x ePOS EVM minimal DT source - this is a minimal one to get
-it booting. Also include it in omap2plus dtbs and document bindings.
-The hardware is under development.
+On Wed, Jun 12, 2013 at 06:53:29PM +0200, Maxime Ripard wrote:
+> Hi,
+> 
+> This patchset adds support for the I2C controller found on most of the
+> Allwinner SoCs, especially the already supported A10 and A13, and the
+> yet to come A31.
+> 
+> This driver leverages the Marvel mv64xxx i2c controller driver, that has
+> an almost identical logic, with a slightly different register layout.
 
-Signed-off-by: Afzal Mohammed <afzal@ti.com>
----
+\o/ Yay, that's more like it. Thanks for the rework!
 
-Hi Benoit,
+> It has been tested on a A13-Olinuxino and an A10s-Olinuxino.
 
-This is based on your for_3.11/dts branch.
+I'd love to get some Tested-by or other tags for Marvell hardware. Any
+volunteers?
 
-Ideally I wanted to split this into 3 patches - first doc, second dts
-and last adding build support. As changes in total is trivial, it was
-made a single one.
+> Changes from v4:
+>   * Don't expose the reg offset structure through the platform data
 
-Regards
-Afzal
+Commit message 2/9 still speaks about pdata, but I will fix this locally
+if all goes well with this series.
 
+I will wait a bit more for tags and then pick up patches 1-3. I assume
+the rest goes via arm-soc, let me know if I should take them.
 
- Documentation/devicetree/bindings/arm/omap/omap.txt |  3 +++
- arch/arm/boot/dts/Makefile                          |  3 ++-
- arch/arm/boot/dts/am43x-epos-evm.dts                | 18 ++++++++++++++++++
- 3 files changed, 23 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/am43x-epos-evm.dts
+Regards,
 
-diff --git a/Documentation/devicetree/bindings/arm/omap/omap.txt b/Documentation/devicetree/bindings/arm/omap/omap.txt
-index f8288ea..6d498c7 100644
---- a/Documentation/devicetree/bindings/arm/omap/omap.txt
-+++ b/Documentation/devicetree/bindings/arm/omap/omap.txt
-@@ -56,3 +56,6 @@ Boards:
- 
- - OMAP5 EVM : Evaluation Module
-   compatible = "ti,omap5-evm", "ti,omap5"
-+
-+- AM43x EPOS EVM
-+  compatible = "ti,am43x-epos-evm", "ti,am4372", "ti,am43"
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 8e50761..05da469 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -155,7 +155,8 @@ dtb-$(CONFIG_ARCH_OMAP2PLUS) += omap2420-h4.dtb \
- 	am335x-evmsk.dtb \
- 	am335x-bone.dtb \
- 	am3517-evm.dtb \
--	am3517_mt_ventoux.dtb
-+	am3517_mt_ventoux.dtb \
-+	am43x-epos-evm.dtb
- dtb-$(CONFIG_ARCH_ORION5X) += orion5x-lacie-ethernet-disk-mini-v2.dtb
- dtb-$(CONFIG_ARCH_PRIMA2) += prima2-evb.dtb
- dtb-$(CONFIG_ARCH_U8500) += snowball.dtb \
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-new file mode 100644
-index 0000000..74174d4
---- /dev/null
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -0,0 +1,18 @@
-+/*
-+ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+/* AM43x EPOS EVM */
-+
-+/dts-v1/;
-+
-+#include "am4372.dtsi"
-+
-+/ {
-+	model = "TI AM43x EPOS EVM";
-+	compatible = "ti,am43x-epos-evm","ti,am4372","ti,am43";
-+};
--- 
-1.7.12
+   Wolfram
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/94e58209/attachment-0001.sig>
