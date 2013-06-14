@@ -1,213 +1,86 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 14 Jun 2013 02:27:01 +0200
-Subject: [PATCH 1/2] pinctrl: add function to parse generic pinconfig
- properties from a dt node
-In-Reply-To: <201306102140.29918.heiko@sntech.de>
-References: <201306102139.32444.heiko@sntech.de>
- <201306102140.29918.heiko@sntech.de>
-Message-ID: <2477455.I6AxjaGPuJ@avalon>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 13 Jun 2013 17:35:03 -0700
+Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
+In-Reply-To: <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
+References: <20130613184703.GA5701@kroah.com>
+ <Pine.LNX.4.44L0.1306131526500.1561-100000@iolanthe.rowland.org>
+Message-ID: <20130614003503.GA31029@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
-
-Thank you for the patch. I've tested it on an sh73a0 KZM9G board with the sh-
-pfc driver and it seems to work fine. Please see the code below for comments.
-
-On Monday 10 June 2013 21:40:29 Heiko St?bner wrote:
-> pinconf_generic_parse_dt_config() takes a node as input and generates an
-> array of generic pinconfig values from the properties of this node.
+On Thu, Jun 13, 2013 at 03:41:17PM -0400, Alan Stern wrote:
+> On Thu, 13 Jun 2013, Greg Kroah-Hartman wrote:
 > 
-> As I couldn't find a mechanism to count the number of properties of a node
-> the function uses internally an array to accept one of parameter and copies
-> the real present options to a smaller variable at its end.
+> > On Thu, Jun 13, 2013 at 10:54:13AM -0400, Alan Stern wrote:
+> > > On Thu, 13 Jun 2013, Ming Lei wrote:
+> > > 
+> > > > - using interrupt threaded handler(default)
+> > > >         33.440 MB/sec
+> > > > 
+> > > > - using tasklet(#undef USB_HCD_THREADED_IRQ)
+> > > >         34.29 MB/sec
+> > > > 
+> > > > - using hard interrupt handler(by removing HCD_BH in ehci-hcd.c )
+> > > >         34.260 MB/s
+> > > > 
+> > > > 
+> > > > So looks usb mass storage performance loss can be observed with
+> > > > interrupt threaded handler because one mass storage read/write sectors
+> > > > requires at least 3 interrupts which wake up usb-storage thread 3 times
+> > > > (each interrupt wakeup the usb-storage each time), introducing irq threaded
+> > > > handler will make 2 threads to be waken up about 6 times for one read/write.
+> > > > 
+> > > > I think usb mass storage transfer handler need to be rewritten, otherwise
+> > > > it may become worsen after using irq threaded handler in USB 3.0.(the
+> > > > above device can reach >120MB/sec with hardware handler or tasklet handler,
+> > > > which means about ~3K interrupts/sec, so ~6K contexts switch in case of
+> > > > using irq threaded handler)
+> > > > 
+> > > > So how about supporting tasklet first, then convert to interrupt
+> > > > threaded handler
+> > > > after usb mass storage transfer is rewritten without performance loss?
+> > > > (rewriting
+> > > > usb mass storage transfer handler may need some time and work since storage
+> > > > stability/correctness is extremely important, :-)
+> > > 
+> > > Maybe we should simply copy what the networking people do.  They are 
+> > > very concerned about performance and latency; whatever technique they 
+> > > use should be good for USB too.
+> > 
+> > Yes, but for "old-style" usb-storage, is this really a big deal?  We are
+> > still easily hitting the "line-speed" of USB for usb-storage with simple
+> > machines, the bottlenecks that I'm seeing are in the devices themselves,
+> > and then in the USB wire speed.
 > 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
->  .../bindings/pinctrl/pinctrl-bindings.txt          |   38 +++++++++
->  drivers/pinctrl/pinconf-generic.c                  |   81 +++++++++++++++++
->  drivers/pinctrl/pinconf.h                          |    6 ++
->  3 files changed, 125 insertions(+), 0 deletions(-)
+> What about with USB-3 storage devices?  Many of them still use the
+> bulk-only transport instead of UAS.  They may push the limits up.
+
+Are they really?  Have we seen that happen yet?  With the number's I've
+seen published, we are easily serving up enough data to keep the pipe
+full, but that all depends on your CPU / host controller.
+
+> > Once hardware comes out that uses USB streams, and we get device support
+> > for the UAS protocol, then we might have a need to change things, but at
+> > this point in time, for the "old" driver, I think we are fine.
+> > 
+> > Unless someone has a workload / benchmark that shows otherwise?
 > 
-> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt index
-> c95ea82..ef7cd57 100644
-> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-> @@ -126,3 +126,41 @@ device; they may be grandchildren, for example. Whether
-> this is legal, and whether there is any interaction between the child and
-> intermediate parent nodes, is again defined entirely by the binding for the
-> individual pin controller device.
-> +
-> +== Using generic pinconfig options ==
-> +
-> +Generic pinconfig parameters can be used by defining a separate node
-> containing +the applicable parameters (and optional values), like:
-> +
-> +pcfg_pull_up: pcfg_pull_up {
-> +	bias-pull-up;
-> +	drive-strength = <20>;
-> +};
-> +
-> +This node should then be referenced in the appropriate pinctrl node as a
-> phandle +and parsed in the driver using the pinconf_generic_parse_dt_config
-> function. +
-> +Supported configuration parameters are:
-> +
-> +bias-disable		- disable any pin bias
-> +bias-high-impedance	- high impedance mode ("third-state", "floating")
-> +bias-bus-hold		- latch weakly
-> +bias-pull-up		- pull up the pin
-> +bias-pull-down		- pull down the pin
-> +bias-pull-pin-default	- use pin-default pull state
-> +drive-push-pull		- drive actively high and low
-> +drive-open-drain	- drive with open drain
-> +drive-open-source	- drive with open source
-> +drive-strength		- sink or source at most X mA
-> +input-schmitt-enable	- enable schmitt-trigger mode
-> +input-schmitt-disable	- disable schmitt-trigger mode
-> +input-schmitt		- run in schmitt-trigger mode with hysteresis X
-> +input-debounce		- debounce mode with debound time X
-> +power-source		- select power source X
-> +slew-rate		- use slew-rate X
-> +low-power-mode		- low power mode
-> +output-low		- set the pin to output mode with low level
-> +output-high		- set the pin to output mode with high level
-> +
-> +More in-depth documentation on these parameters can be found in
-> +<include/linux/pinctrl/pinconfig-generic.h>
-> diff --git a/drivers/pinctrl/pinconf-generic.c
-> b/drivers/pinctrl/pinconf-generic.c index 9a6812b..3610e7b 100644
-> --- a/drivers/pinctrl/pinconf-generic.c
-> +++ b/drivers/pinctrl/pinconf-generic.c
-> @@ -21,6 +21,7 @@
->  #include <linux/pinctrl/pinctrl.h>
->  #include <linux/pinctrl/pinconf.h>
->  #include <linux/pinctrl/pinconf-generic.h>
-> +#include <linux/of.h>
->  #include "core.h"
->  #include "pinconf.h"
+> The test results above show a 2.4% degradation for threaded interrupts 
+> as compared to tasklets.  That's in addition to the bottlenecks caused 
+> by the device; no doubt it would be worse for a faster device.  This 
+> result calls into question the benefits of threaded interrupts.
 > 
-> @@ -139,3 +140,83 @@ void pinconf_generic_dump_config(struct pinctrl_dev
-> *pctldev, }
->  EXPORT_SYMBOL_GPL(pinconf_generic_dump_config);
->  #endif
-> +
-> +#ifdef CONFIG_OF
-> +struct pinconf_generic_dt_params {
-> +	const char * const property;
-> +	enum pin_config_param param;
-> +	u32 default_value;
-> +};
-> +
-> +static struct pinconf_generic_dt_params dt_params[] = {
-> +	{ "bias-disable", PIN_CONFIG_BIAS_DISABLE, 0 },
-> +	{ "bias-high-impedance", PIN_CONFIG_BIAS_HIGH_IMPEDANCE, 0 },
-> +	{ "bias-bus-hold", PIN_CONFIG_BIAS_BUS_HOLD, 0 },
-> +	{ "bias-pull-up", PIN_CONFIG_BIAS_PULL_UP, 0 },
-> +	{ "bias-pull-down", PIN_CONFIG_BIAS_PULL_DOWN, 0 },
-> +	{ "bias-pull-pin-default", PIN_CONFIG_BIAS_PULL_PIN_DEFAULT, 0 },
-> +	{ "drive-push-pull", PIN_CONFIG_DRIVE_PUSH_PULL, 0 },
-> +	{ "drive-open-drain", PIN_CONFIG_DRIVE_OPEN_DRAIN, 0 },
-> +	{ "drive-open-source", PIN_CONFIG_DRIVE_OPEN_SOURCE, 0 },
-> +	{ "drive-strength", PIN_CONFIG_DRIVE_STRENGTH, 0 },
-> +	{ "input-schmitt-enable", PIN_CONFIG_INPUT_SCHMITT_ENABLE, 1 },
-> +	{ "input-schmitt-disable", PIN_CONFIG_INPUT_SCHMITT_ENABLE, 0 },
-> +	{ "input-schmitt", PIN_CONFIG_INPUT_SCHMITT, 0 },
-> +	{ "input-debounce", PIN_CONFIG_INPUT_DEBOUNCE, 0 },
-> +	{ "power-source", PIN_CONFIG_POWER_SOURCE, 0 },
-> +	{ "slew-rate", PIN_CONFIG_SLEW_RATE, 0 },
-> +	{ "low-power-mode", PIN_CONFIG_LOW_POWER_MODE, 0 },
-> +	{ "output-low", PIN_CONFIG_OUTPUT, 0, },
-> +	{ "output-high", PIN_CONFIG_OUTPUT, 1, },
-> +};
-> +
-> +/**
-> + * pinconf_generic_parse_dt_config()
-> + * parse the config properties into generic pinconfig values.
-> + * @np: node containing the pinconfig properties
-> + * @configs: array with nconfigs entries containing the generic pinconf
-> values + * @nconfigs: umber of configurations
-> + */
-> +int pinconf_generic_parse_dt_config(struct device_node *np,
-> +				    unsigned long **configs,
-> +				    unsigned int *nconfigs)
-> +{
-> +	unsigned long cfg[ARRAY_SIZE(dt_params)];
+> The main reason for moving away from the current scheme is to reduce
+> latency for other interrupt handlers.  Ming gave two examples of slow
+> USB code that runs in hardirq context now; with his change they would
+> run in softirq context and therefore wouldn't delay other interrupts so
+> much.  (Interrupt latency is hard to measure, however.)
 
-I'm a bit uneasy about allocating large arrays on the stack. Would it be 
-better to dynamically allocate cfg ? I've used kzrealloc in my implementation 
-to grow the config array every time a config was found, but that might not be 
-the most efficient implementation, although I wonder how many configuration 
-options we will see in practice in a single node.
+Yes, I know that people keep wanting to worry about latency issues, and
+the best answer for them has always been, "don't use USB." :)
 
-> +	unsigned int ncfg = 0;
-> +	int ret;
-> +	int i;
-> +	u32 val;
-> +
-> +	if (!np)
-> +		return -EINVAL;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(dt_params); i++) {
-> +		struct pinconf_generic_dt_params *par = &dt_params[i];
-> +		ret = of_property_read_u32(np, par->property, &val);
-> +
-> +		/* property not found */
-> +		if (ret == -EINVAL)
-> +			continue;
-> +
-> +		/* use default value, when no value is specified */
-> +		if (ret)
-> +			val = par->default_value;
-> +
-> +		pr_debug("found %s with value %u\n", par->property, val);
-> +		cfg[ncfg] = pinconf_to_config_packed(par->param, val);
-> +		ncfg++;
-> +	}
+You suffer throughput issues with predicitable latency dependancies, so
+we need to be careful we don't slow down the 99% of the systems out
+there that do not care about this at all.
 
-You could add
-
-	if (ncfg == 0) {
-		*configs = NULL;
-		*nconfigs = 0;
-		return 0;
-	}
-
-here.
-
-Most of the issues I wanted to raise have already been addressed by comments 
-sent to the list. Do you plan to send a v2 in the near future ?
-
-> +
-> +	/*
-> +	 * Now limit the number of configs to the real number of
-> +	 * found properties.
-> +	 */
-> +	*configs = kzalloc(ncfg * sizeof(unsigned long), GFP_KERNEL);
-> +	if (!*configs)
-> +		return -ENOMEM;
-> +
-> +	memcpy(*configs, &cfg, ncfg * sizeof(unsigned long));
-> +	*nconfigs = ncfg;
-> +	return 0;
-> +}
-> +#endif
-> diff --git a/drivers/pinctrl/pinconf.h b/drivers/pinctrl/pinconf.h
-> index 92c7267..a4a5417 100644
-> --- a/drivers/pinctrl/pinconf.h
-> +++ b/drivers/pinctrl/pinconf.h
-> @@ -123,3 +123,9 @@ static inline void pinconf_generic_dump_config(struct
-> pinctrl_dev *pctldev, return;
->  }
->  #endif
-> +
-> +#if defined(CONFIG_GENERIC_PINCONF) && defined(CONFIG_OF)
-> +int pinconf_generic_parse_dt_config(struct device_node *np,
-> +				    unsigned long **configs,
-> +				    unsigned int *nconfigs);
-> +#endif
--- 
-Regards,
-
-Laurent Pinchart
+greg k-h
