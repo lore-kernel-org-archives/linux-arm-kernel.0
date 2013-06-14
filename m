@@ -1,131 +1,28 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Fri, 14 Jun 2013 21:58:24 +0800
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
-References: <20130517191304.468.73487.stgit@localhost>
- <20130517191753.468.1734.stgit@localhost>
- <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
- <20130612163124.GD8164@atomide.com>
- <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
- <51B99B07.1050806@ti.com>
- <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
-Message-ID: <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 14 Jun 2013 16:01:40 +0200
+Subject: [PATCHv4 0/9] Add I2C support for Allwinner SoCs
+In-Reply-To: <201306121438.12549.arnd@arndb.de>
+References: <1371024438-16631-1-git-send-email-maxime.ripard@free-electrons.com>
+ <3315236.ZNXhyxmCRd@wuerfel> <20130612113849.GG16699@lukather>
+ <201306121438.12549.arnd@arndb.de>
+Message-ID: <20130614140140.GB2929@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 9:31 PM, Ming Lei <tom.leiming@gmail.com> wrote:
-> On Thu, Jun 13, 2013 at 6:12 PM, Sricharan R <r.sricharan@ti.com> wrote:
->> On Thursday 13 June 2013 02:51 PM, Sricharan R wrote:
->>> Hi Tony,
->>> On Wednesday 12 June 2013 10:44 PM, Tony Lindgren wrote:
->>>> * Tony Lindgren <tony@atomide.com> [130612 09:37]:
->>>>> * Ming Lei <tom.leiming@gmail.com> [130603 08:34]:
->>>>>> Hi,
->>>>>>
->>>>>> On Sat, May 18, 2013 at 3:17 AM, Tony Lindgren <tony@atomide.com> wrote:
->>>>>>> We can now boot with device tree. If you don't want to update u-boot,
->>>>>>> you can boot with appended DTB with the following instructions:
->>>>>>>
->>>>>>> 1. Make sure you have the appended DTB support in .config
->>>>>>>
->>>>>>>    CONFIG_ARM_APPENDED_DTB=y
->>>>>>>    CONFIG_ARM_ATAG_DTB_COMPAT=y
->>>>>>>    CONFIG_ARM_ATAG_DTB_COMPAT_CMDLINE_EXTEND=y
->>>>>>>
->>>>>>> 2. Build the zImage
->>>>>>>
->>>>>>>    $ ARCH=arm CROSS_COMPILE=... make zImage
->>>>>>>
->>>>>>> 3. Build the device tree blobs
->>>>>>>
->>>>>>>    $ ARCH=arm CROSS_COMPILE=... make dtbs
->>>>>>>
->>>>>>> 4. Append the correct panda dtb to zImage
->>>>>>>
->>>>>>>    Depending on your hardware it's omap4-panda.dtb, omap4-panda-a4.dtb
->>>>>>>    or omap4-panda-es.dtb.
->>>>>>>
->>>>>>>    $ cat arch/arm/boot/zImage arch/arm/boot/dts/omap4-panda-es.dtb > /tmp/appended
->>>>>>>
->>>>>>> 5. Use mkimage to produce the appended device tree uImage
->>>>>>>
->>>>>>>    $ mkimage -A arm -O linux -T kernel -C none -a 0x80008000 -e 0x80008000 \
->>>>>>>      -n "Linux" -d /tmp/appended /tmp/uImage
->>>>>> I followed the above steps and tried devicetree on Pandaboard against
->>>>>> 3.10.0-rc3-next-20130528, and the board will hang during boot, but works
->>>>>> well with legacy mode.
->>>>>>
->>>>>>          Hardware: Pandaboard A1
->>>>>>          dtb: omap4-panda.dtb
->>>>>>
->>>>>> See 'dmesg' on below link:
->>>>>>
->>>>>>          http://kernel.ubuntu.com/~ming/up/panda-dts.dmesg
->>>>>>
->>>>> Hmm looks like it boots to init. Maybe add initcall_debug to the cmdline in
->>>>> case there's some late_initcall that causes the issue. It's probably some
->>>>> trivial issue causing it.
->>>> Sricharan, maybe give this a quick try if you have the original pandaboard?
->>>> I only have pandaboard es.
->>>>
->>>> Regards,
->>>>
->>>> Tony
->>>
->>> I tried your cleanup branch omap-for-v3.11/cleanup on panda board and it booted
->>>  to prompt fine.
->>>             Hardware: Pandaboard A1   dtb: omap4-panda.dtb
->>>
->>>   git pull on linux-next branch was not working though.
->>>
->>     Ok, tested in linux-next as well and it booted fine with DTB.
->>      HW: OMAP4430ES2.1 PANDA A1 version DTB: OMAP4-PANDA.DTB
->>
->>     Booted with ramdisk and mmc FS
->>
->> commit c04efed734409f5a44715b54a6ca1b54b0ccf215
->> Author: Stephen Rothwell <sfr@canb.auug.org.au>
->> Date:   Fri Jun 7 16:40:02 2013 +1000
->>
->>     Add linux-next specific files for 20130607
->
-> Looks linux-next-20130607 is broken, see below:
->
->   LD [M]  drivers/usb/gadget/g_ncm.o
-> drivers/usb/musb/omap2430.c: In function 'omap2430_probe':
-> drivers/usb/musb/omap2430.c:571:2: error: 'musb_resources' undeclared
-> (first use in this function)
-> drivers/usb/musb/omap2430.c:571:2: note: each undeclared identifier is
-> reported only once for each function it appears in
-> drivers/usb/musb/omap2430.c:571:2: error: bit-field '<anonymous>'
-> width not an integer constant
-> drivers/usb/musb/omap2430.c:585:4: error: bit-field '<anonymous>'
-> width not an integer constant
-> make[3]: *** [drivers/usb/musb/omap2430.o] Error 1
-> make[3]: *** Waiting for unfinished jobs....
-> make[2]: *** [drivers/usb/musb] Error 2
-> make[2]: *** Waiting for unfinished jobs....
-> make[1]: *** [drivers/usb] Error 2
-> make: *** [drivers] Error 2
-> install kernel and modules
->
-> DEPMOD  3.10.0-rc4-next-20130607+
 
-Even I disable musb so that kernel building is OK, but the kernel with dtb
-still can't boot, see attachment 'dmesg' and config.
+> > The weird thing is that the only difference between the two controllers
+> > is the register offsets, and that's it. The state numbers, bit index,
+> > etc, are exactly the same.
+> 
+> Ok, cool. Great someone noticed!
 
+:) First thing I do when reviewing new drivers is a manual fuzzy search
+for already known register sets.
 
-Thanks,
--- 
-Ming Lei
--------------- next part --------------
-An embedded and charset-unspecified text was scrubbed...
-Name: pandaA1-20130607-2.txt
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/92e61811/attachment-0001.txt>
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: config.tar.gz
-Type: application/x-gzip
-Size: 19691 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/92e61811/attachment-0001.bin>
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130614/fd37f2b0/attachment.sig>
