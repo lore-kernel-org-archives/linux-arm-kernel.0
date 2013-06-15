@@ -1,54 +1,66 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 15 Jun 2013 22:41:24 +0200
-Subject: [GIT PULL 3/5]: ux500 pinctrl changes for v3.11
-In-Reply-To: <20130615002029.GH18124@quad.lixom.net>
-References: <CACRpkdbFs=pX+Yc8EzgVyi-k5HypkHO9jMGMU+VkYfRYyinDSA@mail.gmail.com>
- <20130615000215.GD18124@quad.lixom.net>
- <20130615002029.GH18124@quad.lixom.net>
-Message-ID: <CACRpkdYwXGfMFaMN_Zsy5Wb18s7D2p_KE72erFAa4PLUa8RQKA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Sun, 16 Jun 2013 00:47:09 +0400
+Subject: [PATCH v3] ARM: shmobile: BOCK-W: add Ether support
+In-Reply-To: <201306020240.55702.sergei.shtylyov@cogentembedded.com>
+References: <201306020240.55702.sergei.shtylyov@cogentembedded.com>
+Message-ID: <51BCD2CD.4020407@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 15, 2013 at 2:20 AM, Olof Johansson <olof@lixom.net> wrote:
-> On Fri, Jun 14, 2013 at 05:02:15PM -0700, Olof Johansson wrote:
->> On Tue, Jun 04, 2013 at 02:25:39PM +0200, Linus Walleij wrote:
+On 06/02/2013 02:40 AM, Sergei Shtylyov wrote:
 
->> > ----------------------------------------------------------------
->> > Ux500 pinctrl changes:
->> > - Updates to MSP pinctrl entry for ALSA SoC
->> > - ABx500 pinctrl tables
->> >
->> > ----------------------------------------------------------------
+> Register Ether device from bockw_init(), passing the platform data to it, adding
+> only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
+> on the board, it's connected to the link/activity LED  output of the PHY, thus
+> the link disappears and reappears after each packet. We'd be better off ignoring
+> such signal and getting the link state from the PHY indirectly.
 
->> Pulled.
->
-> Hmm. u8500_defconfig:
->
-> arch/arm/mach-ux500/board-mop500-pins.c:51:6: warning: 'slpm_in_nopull_wkup' defined but not used [-Wunused-variable]
-> arch/arm/mach-ux500/board-mop500-pins.c:63:6: warning: 'slpm_out_lo_wkup' defined but not used [-Wunused-variable]
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-I wonder if that warning was not there before this patch set as well?
-Oh well, we shouldn't have them...
+> ---
+> The patch is atop of Simon's 'renesas.git' repo, 'renesas-next-20130528' tag
+> and the USB patches just reposted. I decided to move it ahead of the VIN patches
+> as it can be merged right now since all dependecies have been already met.
 
-> I've checked in the following on top:
->
->
-> From e1e16a4e7696add0c444a1f8766f6269d219a72b Mon Sep 17 00:00:00 2001
-> From: Olof Johansson <olof@lixom.net>
-> Date: Fri, 14 Jun 2013 17:15:12 -0700
-> Subject: [PATCH] ARM: ux500: board-mop500: remove unused pin modes
->
-> Removes the following warnings:
->
-> arch/arm/mach-ux500/board-mop500-pins.c:51:6: warning: 'slpm_in_nopull_wkup' defined but not used [-Wunused-variable]
-> arch/arm/mach-ux500/board-mop500-pins.c:63:6: warning: 'slpm_out_lo_wkup' defined but not used [-Wunused-variable]
->
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> Cc: Linus Walleij <linux.walleij@linaro.org>
+> Changes from version 2:
+> - resolved rejects due to patch move;
+> - removed the code dealing with the pin conflict with VIN1 and the note related
+>    to it from the changelog.
 
-Thanks.
+> Changes from the original posting:
+> - refreshed the patch.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>   arch/arm/mach-shmobile/board-bockw.c |   18 ++++++++++++++++++
+>   1 file changed, 18 insertions(+)
 
-Yours,
-Linus Walleij
+> Index: renesas/arch/arm/mach-shmobile/board-bockw.c
+> ===================================================================
+> --- renesas.orig/arch/arm/mach-shmobile/board-bockw.c
+> +++ renesas/arch/arm/mach-shmobile/board-bockw.c
+> @@ -65,7 +65,24 @@ static struct sh_mobile_sdhi_info sdhi0_
+>
+>   static struct rcar_phy_platform_data usb_phy_platform_data __initdata;
+>
+> +static struct sh_eth_plat_data ether_platform_data __initdata = {
+> +	.phy		= 0x01,
+> +	.edmac_endian	= EDMAC_LITTLE_ENDIAN,
+> +	.register_type	= SH_ETH_REG_FAST_RCAR,
+> +	.phy_interface	= PHY_INTERFACE_MODE_RMII,
+> +	/*
+> +	 * Although the LINK signal is available on the board, it's connected to
+> +	 * the link/activity LED output of the PHY, thus the link disappears and
+> +	 * reappears after each packet.  We'd be better off ignoring such signal
+> +	 * and getting the link state from the PHY indirectly.
+> +	 */
+> +	.no_ether_link	= 1,
+> +};
+> +
+>   static const struct pinctrl_map bockw_pinctrl_map[] = {
+> +	/* Ether */
+> +	PIN_MAP_MUX_GROUP_DEFAULT("sh-eth", "pfc-r8a7778",
+
+    Darn, I should have changed that to "r8a777x-ether" in view of the 
+changes queued in the 'net-next.git' repo and the v2 of the "fix Ether 
+device name" patch. I've completely overlooked that...
+
+WBR, Sergei
