@@ -1,152 +1,237 @@
-From: joelagnel@ti.com (Joel A Fernandes)
-Date: Fri, 14 Jun 2013 21:29:04 -0500
-Subject: [PATCH v10 0/8] DMA Engine support for AM33XX
-Message-ID: <1371263352-9229-1-git-send-email-joelagnel@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Sat, 15 Jun 2013 11:30:52 +0900
+Subject: [PATCH 00/28] Twenty eight patches big Exynos cleanup
+In-Reply-To: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
+References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
+Message-ID: <172701ce6970$5afdf710$10f9e530$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is a repost of Matt Porter's EDMA patches for AM33XX EDMA support
-with changes for few pending review comments on v9 series.
+Tomasz Figa wrote:
+> 
+> Hi All,
+> 
+> As I promised, I am doing some spring (or rather summer) cleaning
+> of Exynos- and Samsung- related code.
+> 
+> This first part consists mostly of removing dead code remaining after
+> removal of ATAGS support for Exynos, but several patches cleans up
+> other things found by the way.
+> 
+> See particular patches for more detailed description.
+> 
+> On Exynos4210-based Trats board:
+> Tested-by: Tomasz Figa <t.figa@samsung.com>
+> 
+> Build tested every patch with s3c6400_defconfig, s5pv210_defconfig
+> and exynos_defconfig.
+> 
+> Tomasz Figa (28):
+>   ARM: EXYNOS: Remove unused board files
+>   ARM: EXYNOS: Make ARCH_EXYNOS select USE_OF
+>   ARM: SAMSUNG: Introduce SAMSUNG_ATAGS Kconfig entry
+>   ARM: EXYNOS: common: Remove legacy PMU initialization code
+>   ARM: EXYNOS: common: Remove legacy EINT initialization code
+>   ARM: EXYNOS: common: Remove legacy UART initialization code
+>   ARM: EXYNOS: Remove legacy dev- and setup- files
+>   ARM: EXYNOS: common: Remove legacy interrupt initialization code
+>   ARM: EXYNOS: common: Remove legacy timer initialization code
+>   ARM: EXYNOS: common: Remove platform device initialization
+>   ARM: EXYNOS: common: Remove legacy mapping of chip ID block
+>   ARM: EXYNOS: firmware: Remove check for device tree presence
+>   ARM: EXYNOS: pm_domains: Remove legacy power domain registration code
+>   ARM: SAMSUNG: Introduce GPIO_SAMSUNG Kconfig entry
+>   ARM: EXYNOS: Provide compatibility stubs for PM code in pm-core.h
+>     header
+>   ARM: SAMSUNG: Compile s5p-irq-pm only with ATAGS support
+>   ARM: EXYNOS: Decouple ARCH_EXYNOS from PLAT_S5P
+>   ARM: SAMSUNG: pm: Include most of mach/ headers conditionally
+>   ARM: EXYNOS: Do not select legacy Kconfig symbols any more
+>   ARM: EXYNOS: Remove setup-i2c0.c
+>   ARM: EXYNOS: Remove mach/gpio.h
+>   ARM: EXYNOS: Remove mach/regs-gpio.h header
+>   ARM: SAMSUNG: Make legacy MFC support code depend on SAMSUNG_ATAGS
+>   ARM: EXYNOS: Select SPARSE_IRQ for Exynos
+>   ARM: EXYNOS: Remove mach/irqs.h header
+>   ARM: EXYNOS: Remove unused base addresses from mach/map.h header
+>   ARM: EXYNOS: Remove CONFIG_SOC_EXYNOS4412
+>   ARM: EXYNOS: Remove mach/regs-usb-phy.h header
+> 
+>  arch/arm/Kconfig                                 |   15 +-
+>  arch/arm/Makefile                                |    1 +
+>  arch/arm/mach-exynos/Kconfig                     |   14 +-
+>  arch/arm/mach-exynos/Makefile                    |    6 -
+>  arch/arm/mach-exynos/common.c                    |  472 +-------
+>  arch/arm/mach-exynos/dev-audio.c                 |  254 ----
+>  arch/arm/mach-exynos/dev-uart.c                  |   55 -
+>  arch/arm/mach-exynos/firmware.c                  |   22 +-
+>  arch/arm/mach-exynos/include/mach/gpio.h         |  289 -----
+>  arch/arm/mach-exynos/include/mach/irqs.h         |  476 --------
+>  arch/arm/mach-exynos/include/mach/map.h          |  214 ----
+>  arch/arm/mach-exynos/include/mach/pm-core.h      |    5 +
+>  arch/arm/mach-exynos/include/mach/regs-gpio.h    |   40 -
+>  arch/arm/mach-exynos/include/mach/regs-usb-phy.h |   74 --
+>  arch/arm/mach-exynos/mach-armlex4210.c           |  207 ----
+>  arch/arm/mach-exynos/mach-nuri.c                 | 1388
+---------------------
+> -
+>  arch/arm/mach-exynos/mach-origen.c               |  823 -------------
+>  arch/arm/mach-exynos/mach-smdk4x12.c             |  396 ------
+>  arch/arm/mach-exynos/mach-smdkv310.c             |  444 -------
+>  arch/arm/mach-exynos/mach-universal_c210.c       | 1159
+------------------
+>  arch/arm/mach-exynos/pm.c                        |    1 -
+>  arch/arm/mach-exynos/pm_domains.c                |   94 +-
+>  arch/arm/mach-exynos/setup-fimc.c                |   44 -
+>  arch/arm/mach-exynos/setup-fimd0.c               |   43 -
+>  arch/arm/mach-exynos/setup-i2c0.c                |   29 -
+>  arch/arm/mach-exynos/setup-i2c1.c                |   23 -
+>  arch/arm/mach-exynos/setup-i2c2.c                |   23 -
+>  arch/arm/mach-exynos/setup-i2c3.c                |   23 -
+>  arch/arm/mach-exynos/setup-i2c4.c                |   23 -
+>  arch/arm/mach-exynos/setup-i2c5.c                |   23 -
+>  arch/arm/mach-exynos/setup-i2c6.c                |   23 -
+>  arch/arm/mach-exynos/setup-i2c7.c                |   23 -
+>  arch/arm/mach-exynos/setup-keypad.c              |   36 -
+>  arch/arm/mach-exynos/setup-sdhci-gpio.c          |  152 ---
+>  arch/arm/mach-exynos/setup-spi.c                 |   45 -
+>  arch/arm/mach-exynos/setup-usb-phy.c             |  223 ----
+>  arch/arm/plat-samsung/Kconfig                    |   40 +-
+>  arch/arm/plat-samsung/Makefile                   |   11 +-
+>  arch/arm/plat-samsung/include/plat/cpu.h         |    6 +-
+>  arch/arm/plat-samsung/include/plat/pm.h          |    5 +
+>  arch/arm/plat-samsung/init.c                     |    8 +-
+>  arch/arm/plat-samsung/pm-gpio.c                  |    5 +-
+>  arch/arm/plat-samsung/pm.c                       |    8 +-
+>  arch/arm/plat-samsung/s5p-dev-mfc.c              |   11 +-
+>  drivers/cpufreq/Kconfig.arm                      |    2 +-
+>  drivers/gpio/Kconfig                             |    7 +
+>  drivers/gpio/Makefile                            |    2 +-
+>  drivers/media/platform/exynos4-is/Kconfig        |    2 +-
+>  drivers/thermal/exynos_thermal.c                 |    2 +-
+>  drivers/tty/serial/samsung.c                     |    3 +-
+>  50 files changed, 115 insertions(+), 7179 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/dev-audio.c
+>  delete mode 100644 arch/arm/mach-exynos/dev-uart.c
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/gpio.h
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/irqs.h
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-gpio.h
+>  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-phy.h
+>  delete mode 100644 arch/arm/mach-exynos/mach-armlex4210.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-nuri.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-origen.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-smdk4x12.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-smdkv310.c
+>  delete mode 100644 arch/arm/mach-exynos/mach-universal_c210.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-fimc.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-fimd0.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c0.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c1.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c2.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c3.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c4.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c5.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c6.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-i2c7.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-keypad.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-sdhci-gpio.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-spi.c
+>  delete mode 100644 arch/arm/mach-exynos/setup-usb-phy.c
+> 
+> --
+> 1.8.2.1
 
-Currently this is required for AM33XX (Beaglebone or EVM) to access MMC
-and be able mount to rootfs and boot till command prompt over MMC.
-Unless there are other pending review comments, I hope this series can
-finally make it into 3.11 merge window though that is probably wishful
-thinking at this point considering below code movement patches [1] is
-pending review and Ack.
+Basically, looks good. I'm looking at this series then let me take.
 
-Tested EDMA on AM1808 EVM and AM33XX Beaglebone with MMC.
+BTW, just note, happens build error with s5pc100_defconfig....
 
-Sekhar Nori has posted a GIT PULL [1] which has 2 patches this series depends on:
-ARM: davinci: move private EDMA API to arm/common
-ARM: dts: add AM33XX MMC support
-[1] http://www.spinics.net/lists/arm-kernel/msg251503.html
+arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_gpio_pm_1bit_save':
+arch/arm/plat-samsung/pm-gpio.c:33:6: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:34:6: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_gpio_pm_1bit_resume':
+arch/arm/plat-samsung/pm-gpio.c:42:22: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:43:22: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c: At top level:
+arch/arm/plat-samsung/pm-gpio.c:63:24: error: expected identifier or '('
+before 'void'
+arch/arm/plat-samsung/pm-gpio.c:63:24: error: expected ')' before numeric
+constant
+arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_gpio_pm_2bit_save':
+arch/arm/plat-samsung/pm-gpio.c:70:6: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:71:6: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:72:6: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_gpio_pm_2bit_resume':
+arch/arm/plat-samsung/pm-gpio.c:129:22: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:130:22: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:136:19: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c: At top level:
+arch/arm/plat-samsung/pm-gpio.c:190:24: error: expected identifier or '('
+before 'void'
+arch/arm/plat-samsung/pm-gpio.c:190:24: error: expected ')' before numeric
+constant
+arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_gpio_pm_4bit_save':
+arch/arm/plat-samsung/pm-gpio.c:199:6: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:200:6: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:201:6: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:204:7: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_gpio_pm_4bit_con':
+arch/arm/plat-samsung/pm-gpio.c:250:22: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_gpio_pm_4bit_resume':
+arch/arm/plat-samsung/pm-gpio.c:266:22: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:281:19: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:282:19: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:284:20: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:286:19: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:287:19: error: 'struct samsung_gpio_chip'
+has no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c: At top level:
+arch/arm/plat-samsung/pm-gpio.c:302:24: error: expected identifier or '('
+before 'void'
+arch/arm/plat-samsung/pm-gpio.c:302:24: error: expected ')' before numeric
+constant
+arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_pm_save_gpios':
+arch/arm/plat-samsung/pm-gpio.c:342:3: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:342:3: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:342:3: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c:342:3: error: 'struct samsung_gpio_chip' has
+no member named 'pm_save'
+arch/arm/plat-samsung/pm-gpio.c: At top level:
+arch/arm/plat-samsung/pm-gpio.c:31:13: warning: 'samsung_gpio_pm_1bit_save'
+defined but not used [-Wunused-function]
+arch/arm/plat-samsung/pm-gpio.c:37:13: warning:
+'samsung_gpio_pm_1bit_resume' defined but not used [-Wunused-function]
+arch/arm/plat-samsung/pm-gpio.c:68:13: warning: 'samsung_gpio_pm_2bit_save'
+defined but not used [-Wunused-function]
+arch/arm/plat-samsung/pm-gpio.c:124:13: warning:
+'samsung_gpio_pm_2bit_resume' defined but not used [-Wunused-function]
+arch/arm/plat-samsung/pm-gpio.c:197:13: warning: 'samsung_gpio_pm_4bit_save'
+defined but not used [-Wunused-function]
+arch/arm/plat-samsung/pm-gpio.c:261:13: warning:
+'samsung_gpio_pm_4bit_resume' defined but not used [-Wunused-function]
+make[2]: *** [arch/arm/plat-samsung/pm-gpio.o] Error 1
+make[2]: *** Waiting for unfinished jobs....
 
-Changes since v9:
-    - Droped reserved and queue DT entries from Documentation
-    for now from the original patch series.
-    - Drop DT entries that are non-hardware-description
-    - Split EDMA xbar support out of original EDMA DT parsing patch
-    to keep it easier for review.
-    - Rewrite shift and offset calculation xbar event mapping.
-    - Setup default one-to-one mapping for queue_priority and queue_tc
-    mapping as discussed in.
-    - Split out xbar stuff to separate patch.
-
-	Reference discussion:
-   https://patchwork.kernel.org/patch/2226761/
-
-Changes since v8:
-	- Removed edma node interrupt-parent property, it is inherited
-
-Changes since v7:
-	- Dropped dmaengine compat() patch. It is upstream.
-	- Submitted edma_alloc_slot() error checking bug fix separately,
-	  now a dependency
-	- Fixed bisect issues due to 3/10 hunks that went into 1/10
-	- Fixed incorrect IS_ERRVALUE() use in 3/10
-
-Changes since v6:
-	- Converted edma_of_read_*() to wrappers around of_property_read_*()
-	- Fixed wording on the omap-spi generic DMA properties
-	- Added comment/check to clarify that the driver only supports
-	  a single EDMA instance when booting from DT
-
-Changes since v5:
-	- Dropped mmc portion and moved it to a separate series
-	- Incorporate corrected version of dma_request_slave_channel_compat()
-	- Fix #defines and enablement of TI_PRIV_EDMA option
-
-Changes since v4:
-	- Fixed debug section mismatch in private edma api [01/14]
-	- Respun format-patch to catch the platform_data/edma.h rename [01/14]
-	- Removed address/size-cells from the EDMA binding [05/14]
-
-Changes since v3:
-	- Rebased on 3.8-rc3
-	- No longer an RFC
-	- Fixed bugs in DT/pdata parsing reported by Vaibhav Bedia
-	- Restored all the Davinci pdata to const
-	- Removed max_segs hack in favor of using dma_get_channel_caps()
-	- Fixed extra parens, __raw_* accessors and, ioremap error checks
-	  in xbar handling
-	- Removed excess license info in platform_data/edma.h
-	- Removed unneeded reserved channels data for AM33xx
-	- Removed test-specific pinmuxing from dts files
-	- Adjusted mmc1 node to be disabled by default in the dtsi
-
-Changes since v2:
-	- Rebased on 3.7-rc1
-	- Fixed bug in DT/pdata parsing first found by Gururaja
-	  that turned out to be masked by some toolchains
-	- Dropped unused mach-omap2/devices.c hsmmc patch
-	- Added AM33XX crossbar DMA event mux support
-	- Added am335x-evm support
-
-Changes since v1:
-	- Rebased on top of mainline from 12250d8
-	- Dropped the feature removal schedule patch
-	- Implemented dma_request_slave_channel_compat() and
-	  converted the mmc and spi drivers to use it
-	- Dropped unneeded #address-cells and #size-cells from
-	  EDMA DT support
-	- Moved private EDMA header to linux/platform_data/ and
-	  removed some unneeded definitions
-	- Fixed parsing of optional properties
-
-This series adds DMA Engine support for AM33xx, which uses
-an EDMA DMAC. The EDMA DMAC has been previously supported by only
-a private API implementation (much like the situation with OMAP
-DMA) found on the DaVinci family of SoCs.
-
-The series applies on top of 3.10-rc4.
-
-The approach taken is similar to how OMAP DMA is being converted to
-DMA Engine support. With the functional EDMA private API already
-existing in mach-davinci/dma.c, we first move that to an ARM common
-area so it can be shared. Adding DT and runtime PM support to the
-private EDMA API implementation allows it to run on AM33xx. AM33xx
-*only* boots using DT so the upstream generic DT DMA helpers are
-leveraged to register EDMA DMAC with the of_dma framework. SPI (and
-MMC in a separate series) are supported using the upstream
-dma_request_slave_channel_compat() dmaengine call that allows
-compatibility with !DT platforms.
-
-With this series both BeagleBone and the AM335x EVM have working
-SPI DMA support (and MMC support with the separate MMC series).
-
-This is tested on BeagleBone with a SPI framebuffer driver and MMC
-rootfs. A trivial gpio DMA event misc driver was used to test the
-crossbar DMA event support. It is also tested on the AM335x EVM
-with the onboard SPI flash and MMC rootfs. Note that MMC can only
-be tested with a separate MMC dmaengine/DT series applied.
-
-Regression testing was done on AM180x-EVM (which also makes use
-of the EDMA dmaengine driver and the EDMA private API) using SD,
-SPI flash, and the onboard audio supported by the ASoC Davinci
-driver. Regression testing was also done on a BeagleBoard xM
-booting from the legacy board file using MMC rootfs.
-
-Matt Porter (8):
-  ARM: edma: Add AM33XX support to the private EDMA API
-  ARM: edma: Add AM33XX EDMA crossbar event mux support
-  ARM: dts: add AM33XX EDMA support
-  dmaengine: edma: enable build for AM33XX
-  dmaengine: edma: Add TI EDMA device tree binding
-  spi: omap2-mcspi: add generic DMA request support to the DT binding
-  spi: omap2-mcspi: convert to dma_request_slave_channel_compat()
-  ARM: dts: add AM33XX SPI DMA support
-
- Documentation/devicetree/bindings/dma/ti-edma.txt  |   26 ++
- Documentation/devicetree/bindings/spi/omap-spi.txt |   27 ++-
- arch/arm/boot/dts/am33xx.dtsi                      |   22 ++
- arch/arm/common/edma.c                             |  249 +++++++++++++++++++-
- arch/arm/mach-omap2/Kconfig                        |    1 +
- drivers/dma/Kconfig                                |    2 +-
- drivers/spi/spi-omap2-mcspi.c                      |   64 +++--
- include/linux/platform_data/edma.h                 |    5 +-
- 8 files changed, 360 insertions(+), 36 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
-
--- 
-1.7.9.5
+- Kukjin
