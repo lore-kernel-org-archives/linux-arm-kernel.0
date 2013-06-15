@@ -1,72 +1,125 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 15 Jun 2013 17:03:53 +0100
-Subject: [PATCH 04/14] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <20130612212641.GB8625@obsidianresearch.com>
-References: <1370623671-7748-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <4160363.LWJuHATm2F@wuerfel> <20130612111441.E6D603E0A56@localhost>
- <201306122245.55960.arnd@arndb.de> <20130612211221.GB23012@localhost>
- <20130612212641.GB8625@obsidianresearch.com>
-Message-ID: <20130615160353.C97DA3E0A2E@localhost>
+From: arno@natisbad.org (Arnaud Ebalard)
+Date: Sat, 15 Jun 2013 18:13:29 +0200
+Subject: [PATCHv2 1/3] Add support for GMT G762/G763 PWM fan controller
+References: <cover.1369687670.git.arno@natisbad.org>
+ <b44f55c4194f6cd8c94f8a3d63ad5c8bd1d1cfe0.1369687670.git.arno@natisbad.org>
+ <20130531221616.GG7626@kw.sim.vm.gnt> <87fvx1pwrl.fsf@natisbad.org>
+ <20130602215904.GH7626@kw.sim.vm.gnt> <87sj0yz7tv.fsf@natisbad.org>
+ <20130604212306.GL7626@kw.sim.vm.gnt>
+Message-ID: <87sj0jmjx2.fsf@natisbad.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013 15:26:42 -0600, Jason Gunthorpe <jgunthorpe@obsidianresearch.com> wrote:
-> On Wed, Jun 12, 2013 at 06:12:22PM -0300, Ezequiel Garcia wrote:
-> 
-> > > Actually, the best thing about this solution is that we don't even
-> > > have to bother setting up the mappings when loading the mbus driver:
-> > > We don't need any ranges (other than internal-regs) in DT, and we
-> > > don't need complex logic to search through the child devices to
-> > > figure out what the mappings should be. The only thing one needs
-> 
-> To get optimal packing you need to have the list in advance so it can
-> be sorted and best fit.
-> 
-> Further, remember that to allocate the window we need to learn the
-> maximum end offset of *all* reg users for that target id, not just the
-> first one to request translation. Not sure how the of_bus stuff gets
-> that for you??
-> 
-> > > to do here is check if a mapping already exists when we get into the
-> > > of_bus handler and create one for the device being translated if
-> > > there isn't one!
-> > 
-> > This departs considerably from what I'm aiming right now.
-> > 
-> > Are you suggesting to not put *any* mapping in the mbus 'ranges' node in
-> > the DT (other than internal-regs)?
-> 
-> My view is that the ranges should be respected. If an address is
-> present, it should be used, unless there is a conflict.
-> 
-> If no address is present (unclear why anyone would do this, but OK)
-> then demand allocate via the linux resource allocator through the
-> of_bus stuff seems reasonable to me..
+Hi Simon,
 
-Care is needed here however. As far as complexity; I would score it thus
-(where lower numbers mean lower complexity):
+spoiler: end of the story below ;-)
 
-1:   Fully described in DT; no dynamic resolution
-5:   Fully /unresolved/ in DT; everything must be dynamically resolved
-100: Mixed mode; some stuff fully resolved, others dynamically resolved.
+Simon Guinot <simon.guinot@sequanux.org> writes:
 
-The moment you start to do mixed mode, the whole thing gets really hairy
-and difficult to get right. I you do proceed down this path, then it
-would be a really good idea to put together a generic resolved library
-that knows how to find and resolve all the static mappings before
-resolving dynamic ones. Then write test cases for the thing so we can
-know that it actually does what we want it to do.
+> OK you are lucky. Your bootloader initialize set_cnt with 0x5a. Mine
+> don't and it is precisely the issue: set_cnt is still 0xff (the default
+> value) when the driver controls the fan.
+>
+> Please, could you try open-loop mode with set_cnt set to 0xff ?  Maybe
+> you can enforce this value for the test purpose ?
+>
+> If you observe the same behaviour than me, then could modify the driver
+> to ensure that set_cnt is not 0xff when open-loop mode is selected ?
+> Maybe by systematically setting a different value (as 0) ?
 
-> Just to re-iterate Arnd's earlier comment: The DT representation
-> must handle dynamic allocation, but we can defer implementing the
-> kernel side until there is a need.
-> 
-> It isn't clear to me there is a need.....
+Here we go:
 
-I also am nervous about depending on dynamic resolution on something
-that isn't a dynamic bus... [although we're probably going to get pushed
-in this direction anyway when support for device tree overlays gets
-merged]
+# cd /sys/bus/i2c/drivers/g762/0-003e
 
-g.
+# for k in fan* pwm* ; do echo -n "$k:" ; echo `cat $k `; done
+fan1_alarm:0
+fan1_div:1
+fan1_fault:0
+fan1_input:1365
+fan1_pulses:2
+fan1_target:1365
+pwm1:0
+pwm1_enable:2             /* closed-loop */
+pwm1_mode:0               /* DC mode */
+
+# echo 0 > fan1_target   /* set set_cnt to 0, fan stops rotating */
+
+# echo 1 > pwm1_enable   /* switch to open-loop, fan does not rotate yet
+                          * as default value for set_out is 0 and it has
+                          * neither been touched by bootloader or driver */
+
+# for k in fan* pwm* ; do echo -n "$k:" ; echo `cat $k `; done
+fan1_alarm:0
+fan1_div:1
+fan1_fault:0
+fan1_input:0
+fan1_pulses:2
+fan1_target:0
+pwm1:0
+pwm1_enable:1
+pwm1_mode:0
+
+# echo 100 > pwm1        /* set set_out to 100, fan rotates */
+
+
+I don't get the issue in DC mode but ...
+
+
+# echo 1 > pwm1_mode     /* switch to PWM mode, fan stops rotating
+                          * even though set_out is still set to
+                          * 100: */
+# for k in fan* pwm* ; do echo -n "$k:" ; echo `cat $k `; done
+fan1_alarm:0
+fan1_div:1
+fan1_fault:1
+fan1_input:0
+fan1_pulses:2
+fan1_target:0
+pwm1:100
+pwm1_enable:1
+pwm1_mode:1
+
+# echo 1000 > fan1_target
+
+At that point, fan starts rotating again and its speed can be controlled
+using pwm1 (i.e. set_out). But, as you pointed, if set_cnt is set to 255
+then, it stop rotating: with my hardware, I tried and set fan1_target to
+481 (set_cnt is 255) and fan stops. Then setting fan1_target to 482
+gives set_cnt a value of 254 and make the fan run again.
+
+So, as a conclusion, I think I get the behavior you described i.e. in
+PWM mode + open-loop, if set_cnt is 255, then the fan will not rotate,
+no matter the value of set_out (which is supposed to control the
+rotation w/ open-loop). The problem does not appear in DC mode
+(i.e. set_cnt can be 255 in DC mode + open-loop and the fan will rotate
+as expected based on set_out value).
+
+In v4 version to come, I have implemented the following fix:
+
+	switch (val) {
+	case G762_FAN_MODE_OPEN_LOOP:
+		data->fan_cmd1 &= ~G762_REG_FAN_CMD1_FAN_MODE;
+		/*
+		 * BUG FIX: if SET_CNT register value is 255 then, for some
+		 * unknown reason, fan will not rotate as expected, no matter
+		 * the value of SET_OUT (to be specific, this seems to happen
+		 * only in PWM mode). To workaround this bug, we give SET_CNT
+		 * value of 254 if it is 255 when switching to open-loop.
+		 */
+		if (data->set_cnt == 0xff)
+			i2c_smbus_write_byte_data(client, G762_REG_SET_CNT,
+						  254);
+		break;
+	case G762_FAN_MODE_CLOSED_LOOP:
+		data->fan_cmd1 |=  G762_REG_FAN_CMD1_FAN_MODE;
+		break;
+	default:
+		goto out;
+	}
+
+I tested it and it fixe the issue. Can you confirm it also does on your
+side Simon by testing v4?
+
+Cheers,
+
+a+
