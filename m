@@ -1,211 +1,259 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sat, 15 Jun 2013 14:11:41 +0200
-Subject: [PATCH 27/28] ARM: EXYNOS: Remove CONFIG_SOC_EXYNOS4412
-In-Reply-To: <172201ce696e$4200f0c0$c602d240$%kim@samsung.com>
+Date: Sat, 15 Jun 2013 14:19:11 +0200
+Subject: [PATCH 00/28] Twenty eight patches big Exynos cleanup
+In-Reply-To: <172701ce6970$5afdf710$10f9e530$%kim@samsung.com>
 References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
- <1371238384-1504-28-git-send-email-t.figa@samsung.com>
- <172201ce696e$4200f0c0$c602d240$%kim@samsung.com>
-Message-ID: <3875939.5j09crQku4@flatron>
+ <172701ce6970$5afdf710$10f9e530$%kim@samsung.com>
+Message-ID: <1920357.fcgfDKgpf5@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 15 of June 2013 11:15:51 Kukjin Kim wrote:
+On Saturday 15 of June 2013 11:30:52 Kukjin Kim wrote:
 > Tomasz Figa wrote:
-> > Exynos4212 and Exynos4412 SoCs differ only in number of ARM cores and
-> > there is no need to have separate Kconfig options for them, since they
-> > use the same code.
+> > Hi All,
 > > 
-> > This patch removes CONFIG_SOC_EXYNOS4412, leaving
-> > CONFIG_SOC_EXYNOS4212
-> > as the one supporting both SoCs from this series.
+> > As I promised, I am doing some spring (or rather summer) cleaning
+> > of Exynos- and Samsung- related code.
 > > 
-> > Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
-> > Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> > Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
-> > Cc: Zhang Rui <rui.zhang@intel.com>
-> > Cc: Eduardo Valentin <eduardo.valentin@ti.com>
-> > Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> > Cc: cpufreq at vger.kernel.org
-> > Cc: linux-pm at vger.kernel.org
-> > Cc: linux-media at vger.kernel.org
-> > Cc: linux-serial at vger.kernel.org
-> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > ---
+> > This first part consists mostly of removing dead code remaining after
+> > removal of ATAGS support for Exynos, but several patches cleans up
+> > other things found by the way.
 > > 
-> >  arch/arm/mach-exynos/Kconfig              | 11 +----------
-> >  arch/arm/plat-samsung/include/plat/cpu.h  |  6 +-----
-> >  drivers/cpufreq/Kconfig.arm               |  2 +-
-> >  drivers/media/platform/exynos4-is/Kconfig |  2 +-
-> >  drivers/thermal/exynos_thermal.c          |  2 +-
-> >  drivers/tty/serial/samsung.c              |  3 +--
-> >  6 files changed, 6 insertions(+), 20 deletions(-)
+> > See particular patches for more detailed description.
 > > 
-> > diff --git a/arch/arm/mach-exynos/Kconfig
-> > b/arch/arm/mach-exynos/Kconfig index 47d8d9e..fe75a65 100644
-> > --- a/arch/arm/mach-exynos/Kconfig
-> > +++ b/arch/arm/mach-exynos/Kconfig
-> > @@ -46,7 +46,7 @@ config CPU_EXYNOS4210
+> > On Exynos4210-based Trats board:
+> > Tested-by: Tomasz Figa <t.figa@samsung.com>
 > > 
-> >  	  Enable EXYNOS4210 CPU support
+> > Build tested every patch with s3c6400_defconfig, s5pv210_defconfig
+> > and exynos_defconfig.
+> > 
+> > Tomasz Figa (28):
+> >   ARM: EXYNOS: Remove unused board files
+> >   ARM: EXYNOS: Make ARCH_EXYNOS select USE_OF
+> >   ARM: SAMSUNG: Introduce SAMSUNG_ATAGS Kconfig entry
+> >   ARM: EXYNOS: common: Remove legacy PMU initialization code
+> >   ARM: EXYNOS: common: Remove legacy EINT initialization code
+> >   ARM: EXYNOS: common: Remove legacy UART initialization code
+> >   ARM: EXYNOS: Remove legacy dev- and setup- files
+> >   ARM: EXYNOS: common: Remove legacy interrupt initialization code
+> >   ARM: EXYNOS: common: Remove legacy timer initialization code
+> >   ARM: EXYNOS: common: Remove platform device initialization
+> >   ARM: EXYNOS: common: Remove legacy mapping of chip ID block
+> >   ARM: EXYNOS: firmware: Remove check for device tree presence
+> >   ARM: EXYNOS: pm_domains: Remove legacy power domain registration
+> >   code
+> >   ARM: SAMSUNG: Introduce GPIO_SAMSUNG Kconfig entry
+> >   ARM: EXYNOS: Provide compatibility stubs for PM code in pm-core.h
+> >   
+> >     header
+> >   
+> >   ARM: SAMSUNG: Compile s5p-irq-pm only with ATAGS support
+> >   ARM: EXYNOS: Decouple ARCH_EXYNOS from PLAT_S5P
+> >   ARM: SAMSUNG: pm: Include most of mach/ headers conditionally
+> >   ARM: EXYNOS: Do not select legacy Kconfig symbols any more
+> >   ARM: EXYNOS: Remove setup-i2c0.c
+> >   ARM: EXYNOS: Remove mach/gpio.h
+> >   ARM: EXYNOS: Remove mach/regs-gpio.h header
+> >   ARM: SAMSUNG: Make legacy MFC support code depend on SAMSUNG_ATAGS
+> >   ARM: EXYNOS: Select SPARSE_IRQ for Exynos
+> >   ARM: EXYNOS: Remove mach/irqs.h header
+> >   ARM: EXYNOS: Remove unused base addresses from mach/map.h header
+> >   ARM: EXYNOS: Remove CONFIG_SOC_EXYNOS4412
+> >   ARM: EXYNOS: Remove mach/regs-usb-phy.h header
 > >  
-> >  config SOC_EXYNOS4212
-> > 
-> > -	bool "SAMSUNG EXYNOS4212"
-> > +	bool "SAMSUNG EXYNOS4212/4412"
-> > 
-> >  	default y
-> >  	depends on ARCH_EXYNOS4
-> >  	select PINCTRL_EXYNOS
-> > 
-> > @@ -56,15 +56,6 @@ config SOC_EXYNOS4212
-> > 
-> >  	help
-> >  	
-> >  	  Enable EXYNOS4212 SoC support
-> > 
-> > -config SOC_EXYNOS4412
-> > -	bool "SAMSUNG EXYNOS4412"
-> > -	default y
-> > -	depends on ARCH_EXYNOS4
-> > -	select PINCTRL_EXYNOS
-> > -	select SAMSUNG_DMADEV
-> > -	help
-> > -	  Enable EXYNOS4412 SoC support
+> >  arch/arm/Kconfig                                 |   15 +-
+> >  arch/arm/Makefile                                |    1 +
+> >  arch/arm/mach-exynos/Kconfig                     |   14 +-
+> >  arch/arm/mach-exynos/Makefile                    |    6 -
+> >  arch/arm/mach-exynos/common.c                    |  472 +-------
+> >  arch/arm/mach-exynos/dev-audio.c                 |  254 ----
+> >  arch/arm/mach-exynos/dev-uart.c                  |   55 -
+> >  arch/arm/mach-exynos/firmware.c                  |   22 +-
+> >  arch/arm/mach-exynos/include/mach/gpio.h         |  289 -----
+> >  arch/arm/mach-exynos/include/mach/irqs.h         |  476 --------
+> >  arch/arm/mach-exynos/include/mach/map.h          |  214 ----
+> >  arch/arm/mach-exynos/include/mach/pm-core.h      |    5 +
+> >  arch/arm/mach-exynos/include/mach/regs-gpio.h    |   40 -
+> >  arch/arm/mach-exynos/include/mach/regs-usb-phy.h |   74 --
+> >  arch/arm/mach-exynos/mach-armlex4210.c           |  207 ----
+> >  arch/arm/mach-exynos/mach-nuri.c                 | 1388
+> 
+> ---------------------
+> 
 > > -
 > > 
-> >  config SOC_EXYNOS5250
-> >  
-> >  	bool "SAMSUNG EXYNOS5250"
-> >  	default y
-> > 
-> > diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-
-> > samsung/include/plat/cpu.h
-> > index 989fefe..87b03bb 100644
-> > --- a/arch/arm/plat-samsung/include/plat/cpu.h
-> > +++ b/arch/arm/plat-samsung/include/plat/cpu.h
-> > @@ -122,13 +122,9 @@ IS_SAMSUNG_CPU(exynos5440, EXYNOS5440_SOC_ID,
-> > EXYNOS5_SOC_MASK)
-> > 
-> >  #if defined(CONFIG_SOC_EXYNOS4212)
-> >  # define soc_is_exynos4212()	is_samsung_exynos4212()
-> > 
-> > -#else
-> > -# define soc_is_exynos4212()	0
-> > -#endif
-> > -
-> > -#if defined(CONFIG_SOC_EXYNOS4412)
-> > 
-> >  # define soc_is_exynos4412()	is_samsung_exynos4412()
-> >  #else
-> > 
-> > +# define soc_is_exynos4212()	0
-> > 
-> >  # define soc_is_exynos4412()	0
-> >  #endif
-> > 
-> > diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> > index a924408..b214ad6 100644
-> > --- a/drivers/cpufreq/Kconfig.arm
-> > +++ b/drivers/cpufreq/Kconfig.arm
-> > @@ -32,7 +32,7 @@ config ARM_EXYNOS4210_CPUFREQ
-> > 
-> >  	  SoC (S5PV310 or S5PC210).
-> >  
-> >  config ARM_EXYNOS4X12_CPUFREQ
-> > 
-> > -	def_bool (SOC_EXYNOS4212 || SOC_EXYNOS4412)
-> > +	def_bool SOC_EXYNOS4212
-> > 
-> >  	help
-> >  	
-> >  	  This adds the CPUFreq driver for Samsung EXYNOS4X12
-> >  	  SoC (EXYNOS4212 or EXYNOS4412).
-> > 
-> > diff --git a/drivers/media/platform/exynos4-is/Kconfig
-> > b/drivers/media/platform/exynos4-is/Kconfig
-> > index 6ff99b5..f483e11 100644
-> > --- a/drivers/media/platform/exynos4-is/Kconfig
-> > +++ b/drivers/media/platform/exynos4-is/Kconfig
-> > @@ -32,7 +32,7 @@ config VIDEO_S5P_MIPI_CSIS
-> > 
-> >  	  To compile this driver as a module, choose M here: the
-> >  	  module will be called s5p-csis.
-> > 
-> > -if SOC_EXYNOS4212 || SOC_EXYNOS4412 || SOC_EXYNOS5250
-> > +if SOC_EXYNOS4212 || SOC_EXYNOS5250
-> > 
-> >  config VIDEO_EXYNOS_FIMC_LITE
-> >  
-> >  	tristate "EXYNOS FIMC-LITE camera interface driver"
-> > 
-> > diff --git a/drivers/thermal/exynos_thermal.c
-> > b/drivers/thermal/exynos_thermal.c
-> > index 788b1dd..f88a2ad 100644
-> > --- a/drivers/thermal/exynos_thermal.c
-> > +++ b/drivers/thermal/exynos_thermal.c
-> > @@ -817,7 +817,7 @@ static struct exynos_tmu_platform_data const
-> > exynos4210_default_tmu_data = {
-> > 
-> >  #define EXYNOS4210_TMU_DRV_DATA (NULL)
-> >  #endif
-> > 
-> > -#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4412)
-> > +#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4212)
-> > 
-> >  static struct exynos_tmu_platform_data const exynos_default_tmu_data
-> >  = {>  
-> >  	.threshold_falling = 10,
-> >  	.trigger_levels[0] = 85,
-> > 
-> > diff --git a/drivers/tty/serial/samsung.c
-> > b/drivers/tty/serial/samsung.c index 0c8a9fa..eeb8ecb 100644
-> > --- a/drivers/tty/serial/samsung.c
-> > +++ b/drivers/tty/serial/samsung.c
-> > @@ -1714,8 +1714,7 @@ static struct s3c24xx_serial_drv_data
-> > s5pv210_serial_drv_data = {
-> > 
-> >  #endif
-> >  
-> >  #if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212)
-> >  || \> 
-> > -	defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) 
-||
-> > \
-> > -	defined(CONFIG_SOC_EXYNOS5440)
-> > +	defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS5440)
-> > 
-> >  static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
-> >  
-> >  	.info = &(struct s3c24xx_uart_info) {
-> >  	
-> >  		.name		= "Samsung Exynos4 UART",
+> >  arch/arm/mach-exynos/mach-origen.c               |  823 -------------
+> >  arch/arm/mach-exynos/mach-smdk4x12.c             |  396 ------
+> >  arch/arm/mach-exynos/mach-smdkv310.c             |  444 -------
+> >  arch/arm/mach-exynos/mach-universal_c210.c       | 1159
+> 
+> ------------------
+> 
+> >  arch/arm/mach-exynos/pm.c                        |    1 -
+> >  arch/arm/mach-exynos/pm_domains.c                |   94 +-
+> >  arch/arm/mach-exynos/setup-fimc.c                |   44 -
+> >  arch/arm/mach-exynos/setup-fimd0.c               |   43 -
+> >  arch/arm/mach-exynos/setup-i2c0.c                |   29 -
+> >  arch/arm/mach-exynos/setup-i2c1.c                |   23 -
+> >  arch/arm/mach-exynos/setup-i2c2.c                |   23 -
+> >  arch/arm/mach-exynos/setup-i2c3.c                |   23 -
+> >  arch/arm/mach-exynos/setup-i2c4.c                |   23 -
+> >  arch/arm/mach-exynos/setup-i2c5.c                |   23 -
+> >  arch/arm/mach-exynos/setup-i2c6.c                |   23 -
+> >  arch/arm/mach-exynos/setup-i2c7.c                |   23 -
+> >  arch/arm/mach-exynos/setup-keypad.c              |   36 -
+> >  arch/arm/mach-exynos/setup-sdhci-gpio.c          |  152 ---
+> >  arch/arm/mach-exynos/setup-spi.c                 |   45 -
+> >  arch/arm/mach-exynos/setup-usb-phy.c             |  223 ----
+> >  arch/arm/plat-samsung/Kconfig                    |   40 +-
+> >  arch/arm/plat-samsung/Makefile                   |   11 +-
+> >  arch/arm/plat-samsung/include/plat/cpu.h         |    6 +-
+> >  arch/arm/plat-samsung/include/plat/pm.h          |    5 +
+> >  arch/arm/plat-samsung/init.c                     |    8 +-
+> >  arch/arm/plat-samsung/pm-gpio.c                  |    5 +-
+> >  arch/arm/plat-samsung/pm.c                       |    8 +-
+> >  arch/arm/plat-samsung/s5p-dev-mfc.c              |   11 +-
+> >  drivers/cpufreq/Kconfig.arm                      |    2 +-
+> >  drivers/gpio/Kconfig                             |    7 +
+> >  drivers/gpio/Makefile                            |    2 +-
+> >  drivers/media/platform/exynos4-is/Kconfig        |    2 +-
+> >  drivers/thermal/exynos_thermal.c                 |    2 +-
+> >  drivers/tty/serial/samsung.c                     |    3 +-
+> >  50 files changed, 115 insertions(+), 7179 deletions(-)
+> >  delete mode 100644 arch/arm/mach-exynos/dev-audio.c
+> >  delete mode 100644 arch/arm/mach-exynos/dev-uart.c
+> >  delete mode 100644 arch/arm/mach-exynos/include/mach/gpio.h
+> >  delete mode 100644 arch/arm/mach-exynos/include/mach/irqs.h
+> >  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-gpio.h
+> >  delete mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-phy.h
+> >  delete mode 100644 arch/arm/mach-exynos/mach-armlex4210.c
+> >  delete mode 100644 arch/arm/mach-exynos/mach-nuri.c
+> >  delete mode 100644 arch/arm/mach-exynos/mach-origen.c
+> >  delete mode 100644 arch/arm/mach-exynos/mach-smdk4x12.c
+> >  delete mode 100644 arch/arm/mach-exynos/mach-smdkv310.c
+> >  delete mode 100644 arch/arm/mach-exynos/mach-universal_c210.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-fimc.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-fimd0.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-i2c0.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-i2c1.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-i2c2.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-i2c3.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-i2c4.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-i2c5.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-i2c6.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-i2c7.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-keypad.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-sdhci-gpio.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-spi.c
+> >  delete mode 100644 arch/arm/mach-exynos/setup-usb-phy.c
 > > 
 > > --
 > > 1.8.2.1
 > 
-> Hmm, how about SOC_EXYNOS4X12 for exynos4212 and exynos4412?
+> Basically, looks good. I'm looking at this series then let me take.
+> 
+> BTW, just note, happens build error with s5pc100_defconfig....
 
-I was thinking about it and finally decided to leave SOC_EXYNOS4212 for 
-compatibility reasons - you don't need to change SOC_EXYNOS4212 to 
-SOC_EXYNOS4X12 wherever it's used, making it possible to apply some older 
-out of tree patches without modification.
+Hmm, I think I might know what the problem is.
 
-> BTW, AFAIK, we need to leave both to support something...I need to check
-> :)
+pm-gpio.c should be compiled only with CONFIG_PM selected, but I made it 
+compile on GPIO_SAMSUNG.
 
-OK.
-
-But IMHO, now with DeviceTree, there is usually no need for such level of 
-differentiation on config level.
-
-For example we might be even able reduce CPU_EXYNOS4210 and SOC_EXYNOS4212 
-to just ARCH_EXYNOS4, because they share almost all the code and all the 
-differencies are specified in device tree.
+Let me check this and send an updated version of patch 14/28, which 
+introduced this modification.
 
 Best regards,
 Tomasz
 
+> arch/arm/plat-samsung/pm-gpio.c: In function
+> 'samsung_gpio_pm_1bit_save': arch/arm/plat-samsung/pm-gpio.c:33:6:
+> error: 'struct samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:34:6: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c: In function
+> 'samsung_gpio_pm_1bit_resume': arch/arm/plat-samsung/pm-gpio.c:42:22:
+> error: 'struct samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:43:22: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c: At top level:
+> arch/arm/plat-samsung/pm-gpio.c:63:24: error: expected identifier or '('
+> before 'void'
+> arch/arm/plat-samsung/pm-gpio.c:63:24: error: expected ')' before
+> numeric constant
+> arch/arm/plat-samsung/pm-gpio.c: In function
+> 'samsung_gpio_pm_2bit_save': arch/arm/plat-samsung/pm-gpio.c:70:6:
+> error: 'struct samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:71:6: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:72:6: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c: In function
+> 'samsung_gpio_pm_2bit_resume': arch/arm/plat-samsung/pm-gpio.c:129:22:
+> error: 'struct samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:130:22: error: 'struct
+> samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:136:19: error: 'struct
+> samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c: At top level:
+> arch/arm/plat-samsung/pm-gpio.c:190:24: error: expected identifier or
+> '(' before 'void'
+> arch/arm/plat-samsung/pm-gpio.c:190:24: error: expected ')' before
+> numeric constant
+> arch/arm/plat-samsung/pm-gpio.c: In function
+> 'samsung_gpio_pm_4bit_save': arch/arm/plat-samsung/pm-gpio.c:199:6:
+> error: 'struct samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:200:6: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:201:6: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:204:7: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_gpio_pm_4bit_con':
+> arch/arm/plat-samsung/pm-gpio.c:250:22: error: 'struct
+> samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c: In function
+> 'samsung_gpio_pm_4bit_resume': arch/arm/plat-samsung/pm-gpio.c:266:22:
+> error: 'struct samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:281:19: error: 'struct
+> samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:282:19: error: 'struct
+> samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:284:20: error: 'struct
+> samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:286:19: error: 'struct
+> samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:287:19: error: 'struct
+> samsung_gpio_chip' has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c: At top level:
+> arch/arm/plat-samsung/pm-gpio.c:302:24: error: expected identifier or
+> '(' before 'void'
+> arch/arm/plat-samsung/pm-gpio.c:302:24: error: expected ')' before
+> numeric constant
+> arch/arm/plat-samsung/pm-gpio.c: In function 'samsung_pm_save_gpios':
+> arch/arm/plat-samsung/pm-gpio.c:342:3: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:342:3: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:342:3: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c:342:3: error: 'struct samsung_gpio_chip'
+> has no member named 'pm_save'
+> arch/arm/plat-samsung/pm-gpio.c: At top level:
+> arch/arm/plat-samsung/pm-gpio.c:31:13: warning:
+> 'samsung_gpio_pm_1bit_save' defined but not used [-Wunused-function]
+> arch/arm/plat-samsung/pm-gpio.c:37:13: warning:
+> 'samsung_gpio_pm_1bit_resume' defined but not used [-Wunused-function]
+> arch/arm/plat-samsung/pm-gpio.c:68:13: warning:
+> 'samsung_gpio_pm_2bit_save' defined but not used [-Wunused-function]
+> arch/arm/plat-samsung/pm-gpio.c:124:13: warning:
+> 'samsung_gpio_pm_2bit_resume' defined but not used [-Wunused-function]
+> arch/arm/plat-samsung/pm-gpio.c:197:13: warning:
+> 'samsung_gpio_pm_4bit_save' defined but not used [-Wunused-function]
+> arch/arm/plat-samsung/pm-gpio.c:261:13: warning:
+> 'samsung_gpio_pm_4bit_resume' defined but not used [-Wunused-function]
+> make[2]: *** [arch/arm/plat-samsung/pm-gpio.o] Error 1
+> make[2]: *** Waiting for unfinished jobs....
+> 
 > - Kukjin
 > 
 > --
