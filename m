@@ -1,26 +1,43 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 18:04:56 -0700
-Subject: [PATCH 2/2] ARM: shmobile: r8a7790: don't use external clock for
- SCIFs
-In-Reply-To: <1371106854-25560-3-git-send-email-horms+renesas@verge.net.au>
-References: <1371106854-25560-1-git-send-email-horms+renesas@verge.net.au>
- <1371106854-25560-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130615010456.GP18124@quad.lixom.net>
+Date: Fri, 14 Jun 2013 18:11:00 -0700
+Subject: [GIT PULL 3/5] ARM: tegra: device tree updates
+In-Reply-To: <1371227838-18764-4-git-send-email-swarren@wwwdotorg.org>
+References: <1371227838-18764-1-git-send-email-swarren@wwwdotorg.org>
+ <1371227838-18764-4-git-send-email-swarren@wwwdotorg.org>
+Message-ID: <20130615011100.GQ18124@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 04:00:54PM +0900, Simon Horman wrote:
-> From: Ulrich Hecht <ulrich.hecht@gmail.com>
+On Fri, Jun 14, 2013 at 10:37:16AM -0600, Stephen Warren wrote:
+> This branch contains all device tree updates for Tegra boards.
 > 
-> This is an external component and may or may not be there, while the
-> internal clock always works.
+> The changes are:
 > 
-> Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> * Converted all DT files to use the C pre-processor, to support the use
+>   of named constants. This included use of defines for GPIO, IRQ, and
+>   clock constants.
+> * Enabling new features such as:
+>   - SPI on Dalmore.
+>   - Audio on Dalmore and Beaver.
+>   - gpio-leds on Beaver.
+>   - Power-supply/batter linkage on Dalmore.
+> * A minor fix to the RAM size node on Beaver.
+> 
+> It is based on previous pull request tegra-for-3.11-deps-for-usb
+> followed by a merge of tegra-for-3.11-deps-for-clk.
+> 
+> ----------------------------------------------------------------
+> 
+> The following changes since commit 220cf5fb5c9eeef49930ff6fca2943286ec075a4:
+> 
+>   Merge branch 'for-3.11/deps-for-clk' into for-3.11/dt
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/swarren/linux-tegra.git tegra-for-3.11-dt
 
-Looks like this one is appropriate for arm-soc merging, but I'll hold off
-pulling this branch until the serial driver piece has been acked or dropped (to
-be merged by Greg).
+Thanks, pulled. It was good to see the two previous broken out but I ended up
+just pulling it all with this one.
 
 
 -Olof
