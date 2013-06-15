@@ -1,40 +1,36 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Sat, 15 Jun 2013 09:49:20 +0800
-Subject: [RFC PATCH 0/4] USB: HCD/EHCI: giveback of URB in tasklet context
-In-Reply-To: <Pine.LNX.4.44L0.1306141620110.3152-100000@netrider.rowland.org>
-References: <CACVXFVO1Ou-wZedv0VntNwS1NZSRzvOjfVhvHBew0odz-PUYjg@mail.gmail.com>
- <Pine.LNX.4.44L0.1306141620110.3152-100000@netrider.rowland.org>
-Message-ID: <CACVXFVO97Kng9eYVZww+GdJiO6Vx80tcwjmreSwRi2qfUk2JBw@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 14 Jun 2013 18:52:24 -0700
+Subject: [GIT PULL] at91: Device Tree update for 3.11 #2
+In-Reply-To: <1371250067-19317-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
+ <1371250067-19317-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20130615015224.GA25585@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 15, 2013 at 4:23 AM, Alan Stern <stern@rowland.harvard.edu> wrote:
->
-> Not entirely.  On a UP system, leaving interrupts disabled for a long
-> time (which is what we do now) increases the delay between when the IRQ
-> is raised and when it is serviced.  On an SMP system, a long-running
+On Sat, Jun 15, 2013 at 12:47:47AM +0200, Nicolas Ferre wrote:
+> Arnd, Olof,
+> 
+> Additional pull-request for AT91 DT patches.
+> It contains the remaining part of the USB gadget pull-request that I sent you
+> last week. After having split it, here is the DT part.
+> It also contains the update of DMA bindings: it is the AT91 part the should go
+> through arm-soc. I have included the patch (ARM: at91: dt: add header to define
+> at_hdmac configuration) so that we avoid build errors whichever git tree
+> (slave-dma or arm-soc) is merged first.
+> A SPI DT patch for at91sam9x5 is also added.
+> 
+> Thanks, best regards,
+> 
+> The following changes since commit 028633c238f91dc113520a7ad25d37b2ba9068af:
+> 
+>   ARM: at91/dt: add pinctrl definition for at91 tc blocks (2013-05-31 22:40:37 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://github.com/at91linux/linux-at91.git tags/at91-dt
 
-Yes, I mean the HCD IRQ handling time is already too long, and it
-isn't affected by the time between raising and servicing the IRQ.
-
-> interrupt handler will delay servicing a different device that shares
-> the same IRQ line.
-
-Not always so.
-
-Currently, ARM can only set one irq line to be served by one of CPU
-at the same time for power saving, which still results in above situation.
-In fact, without irq-balance, on ARM, all IRQs are handled by CPU0 only.
-
-On Sat, Jun 15, 2013 at 5:09 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> And on UP it delays ALL other interrupts. I've seen 500us+ caused by
-> the USB interrupt handlers...
-
-On SMP the above case may be worse than UP, when the same completion
-things(from hw view) happen on one of CPU, the releasing & reacquiring HCD
-private lock in interrupt handler may cause longer time.
+Pulled, thanks.
 
 
-Thanks,
---
-Ming Lei
+-Olof
