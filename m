@@ -1,46 +1,27 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 18:42:35 -0700
-Subject: ARM: sunxi: platform changes for 3.11
-In-Reply-To: <20130613213324.GA21940@lukather>
-References: <20130613213324.GA21940@lukather>
-Message-ID: <20130615014235.GA24977@quad.lixom.net>
+Date: Fri, 14 Jun 2013 18:43:43 -0700
+Subject: ARM: sunxi: DT changes for 3.11
+In-Reply-To: <20130613213706.GA22048@lukather>
+References: <20130613213706.GA22048@lukather>
+Message-ID: <20130615014343.GB24977@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 11:33:24PM +0200, Maxime Ripard wrote:
+On Thu, Jun 13, 2013 at 11:37:06PM +0200, Maxime Ripard wrote:
 > The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
 > 
 >   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://github.com/mripard/linux.git tags/sunxi-core-for-3.11
+>   git://github.com/mripard/linux.git tags/sunxi-dt-for-3.11
 > 
-> for you to fetch changes up to ec3805e6199649db2a462045a38eb1050c6151aa:
+> for you to fetch changes up to 39138bc60f90560ac79e76fb0971be5619ae32d7:
 > 
->   ARM: sunxi: irqchip: Update the documentation (2013-05-29 09:39:39 +0200)
+>   ARM: sunxi: dt: Register the pio node as interrupt controller (2013-06-10 17:35:51 +0200)
 > 
-> ----------------------------------------------------------------
-> Allwinner SoCs platform additions for 3.11
->   - Various cleanups and documentation updates
-> 
-> ----------------------------------------------------------------
-> Maxime Ripard (3):
->       ARM: sunxi: Remove init_irq declaration in machine description
->       ARM: sunxi: Update datasheet documentation
->       ARM: sunxi: irqchip: Update the documentation
-> 
->  Documentation/arm/sunxi/README                     | 21 +++--
->  .../interrupt-controller/allwinner,sun4i-ic.txt    | 87 +--------------------
->  .../interrupt-controller/sunxi/sun4i-a10.txt       | 89 ++++++++++++++++++++++
->  .../interrupt-controller/sunxi/sun5i-a13.txt       | 55 +++++++++++++
->  arch/arm/mach-sunxi/sunxi.c                        |  2 -
->  5 files changed, 159 insertions(+), 95 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/sunxi/sun4i-a10.txt
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/sunxi/sun5i-a13.txt
 
-
-Pulled into next/cleanup. Thanks.
+Pulled, thanks.
 
 
 -Olof
