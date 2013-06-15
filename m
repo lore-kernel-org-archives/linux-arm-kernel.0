@@ -1,38 +1,30 @@
 From: jason@lakedaemon.net (Jason Cooper)
-Date: Fri, 14 Jun 2013 23:40:23 -0400
-Subject: [GIT PULL 1/3] ARM: mvebu: cleanup for v3.11 #4
-In-Reply-To: <20130614220555.GH17326@quad.lixom.net>
+Date: Fri, 14 Jun 2013 23:41:55 -0400
+Subject: [GIT PULL 3/3] ARM: mvebu: register map changes for v3.11
+In-Reply-To: <20130614222119.GI17326@quad.lixom.net>
 References: <20130613212137.GE31667@titan.lakedaemon.net>
- <20130614220555.GH17326@quad.lixom.net>
-Message-ID: <20130615034023.GK31667@titan.lakedaemon.net>
+ <20130613213651.GG31667@titan.lakedaemon.net>
+ <20130614222119.GI17326@quad.lixom.net>
+Message-ID: <20130615034155.GL31667@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 03:05:55PM -0700, Olof Johansson wrote:
-> On Thu, Jun 13, 2013 at 05:21:37PM -0400, Jason Cooper wrote:
-> > The following changes since commit c589f9b4b51317cfc530812fe90a9895bd51430e:
+On Fri, Jun 14, 2013 at 03:21:19PM -0700, Olof Johansson wrote:
+> On Thu, Jun 13, 2013 at 05:36:51PM -0400, Jason Cooper wrote:
+> > Arnd, Olof,
 > > 
-> >   arm: mvebu: mark functions of armada-370-xp.c as static (2013-05-21 13:44:32 +0000)
+> > This branch is off by itself because it depends on mvebu/cleanup and
+> > mvebu/fixes-non-critical.  It's been in linux-next about a week and has
+> > an squirrelly merge conflict with armada-370-xp.c.  I've attached the
+> > resolution to the bottom of this email.
 > > 
-> > are available in the git repository at:
-> > 
-> >   git://git.infradead.org/users/jcooper/linux.git tags/cleanup-3.11-4
+> > If you have any questions or if there is a better way for me to format
+> > this, please let me know.
 > 
-> Pulled. I was this >< close to just cherry-picking the patch though, since
-> that's way more efficient for just a single patch. But that'd mess up your
-> downstream users.
+> Merged. Please check my conflict resolution once I push it out, but end delta
+> is similar.
 
-Thanks for not doing that.  I admit I hadn't considered this situation
-when I put together this workflow.  Having mvebu stuff in linux-next
-definitely prevents cherry-picking like above.
-
-For the next window (things seems pretty calm in mvebu-land right now!)
-I'll back off on the PRs for normal branches to avoid
-commit/merge-tag/commit/merge-tag on your side.
-
-Is there any other reason you might need to cherry-pick something in my
-tree?  I can't think of one, and would prefer to keep doing linux-next
-if possible.
+Found it at 5ae13ef4.  Looks good from here.  Thanks!
 
 thx,
 
