@@ -1,451 +1,113 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 15 Jun 2013 22:19:44 +0200
-Subject: [PATCH v3] ARM: integrator: basic PCIv3 device tree support
-Message-ID: <1371327584-699-1-git-send-email-linus.walleij@linaro.org>
+Date: Sat, 15 Jun 2013 22:32:45 +0200
+Subject: [GIT PULL] Integrator/AP PCI DT support
+In-Reply-To: <20130615000922.GG18124@quad.lixom.net>
+References: <CACRpkdb8J4+QH36SYavgGWbFWaBZDg5JSYyyJELzL=mSZfMnBw@mail.gmail.com>
+ <20130614230838.GA18124@quad.lixom.net>
+ <20130615000922.GG18124@quad.lixom.net>
+Message-ID: <CACRpkdZaTDEu8vUx347k1Y5Pht5Pi_mPJXpDsVtAsSYVT60n_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This registers the memory ranges for I/O, non-prefetched and
-prefetched memory and configuration space for the PCIv3 bridge
-and let us fetch these basic memory resources from the device
-tree in the device tree boot path. Remove the stepping stone
-platform device. This is an either/or approach - the platform
-data path is mutually exclusive to the plain platform data
-path and provided addresses from the device tree have to be
-correct.
+On Sat, Jun 15, 2013 at 2:09 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Fri, Jun 14, 2013 at 04:08:38PM -0700, Olof Johansson wrote:
+>> On Mon, Jun 03, 2013 at 01:09:17PM +0200, Linus Walleij wrote:
 
-This adds the interrupt-map property to the PCIv3 DTS file
-and makes the bridge obtain mappings from the device tree.
+>> > The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
+>> >
+>> >   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
+>> >
+>> > are available in the git repository at:
+>> >
+>> >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+>> > tags/integrator-pci-for-arm-soc
+>>
+>> Pulled, apologies for the delay on this one, fell of my list of
+>> branches-to-pull somehow.
+>
+> Hmm. integrator_defconfig no longer builds:
+>
+> arch/arm/mach-integrator/pci_v3.c: In function 'pci_v3_map_irq_dt':
+> arch/arm/mach-integrator/pci_v3.c:835:16: error: storage size of 'oirq' isn't known
+> arch/arm/mach-integrator/pci_v3.c:845:2: error: implicit declaration of function 'irq_create_of_mapping'
+>
+> linux/of_irq.h is already included, but it seems that CONFIG_USE_OF is off in
+> integrator defconfig.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-ChangeLog v2->v3:
-- Squash IRQ enablement patch into this patch
-- fixup with #ifdefs so the non-USE_OF build still works
----
- .../devicetree/bindings/pci/v3-v360epc-pci.txt     |  15 ++
+Grrr what is wrong with me.
+
+OK I sent out a revised version of the DT enablement patch that adds some
+#ifdef. I also squashed the IRQ enablement into the main DT enablement
+patch.
+
+It now compiles nicely with and without ATAGs.
+
+> What's the plan here? Making DT mandatory? Or making PCI depend on DT for this
+> platform?
+
+I have a branch that selects USE_OF for the integrator and *deletes*
+the ATAG boot path. I will rebase that on top of this and send out ASAP,
+maybe you can even get those quite nice yet simple cleanups in for this
+merge window then, as a stepping stone to multiplatform.
+
+> I've dropped the branch again until resolved.
+
+OK here is the fixed branch, using the v3 patch of DT enablement just
+posted to the list, please pull this instead (still the same base):
+
+
+The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
+
+  of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
+tags/integrator-pci-for-arm-soc
+
+for you to fetch changes up to f55b2b56cd37fa8bcfcb75248c27094eaf09e04c:
+
+  ARM: integrator: basic PCIv3 device tree support (2013-06-15 22:18:39 +0200)
+
+----------------------------------------------------------------
+This is a patch series that:
+- Pulls the Integrator/AP PCI bridge driver into one file
+- Adds full device tree support for it
+- Keeps ATAG support around for the time being
+
+----------------------------------------------------------------
+Linus Walleij (11):
+      Documentation/devicetree: add a small note on PCI
+      ARM: pci: create pci_common_init_dev()
+      ARM: integrator: merge PCIv3 driver into one file
+      ARM: integrator: convert PCIv3 bridge to platform device
+      ARM: integrator: grab PCI error IRQ in probe()
+      ARM: integrator: move PCI base address grab to probe
+      ARM: integrator: move V3 register definitions into driver
+      ARM: integrator: remap PCIv3 base dynamically
+      ARM: integrator: move VGA base assignment
+      ARM: integrator: move static ioremapping into PCIv3 driver
+      ARM: integrator: basic PCIv3 device tree support
+
+ Documentation/devicetree/bindings/pci/pci.txt      |   9 +
+ .../devicetree/bindings/pci/v3-v360epc-pci.txt     |  15 +
  .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/integratorap.dts                 |  41 +++++
- arch/arm/mach-integrator/integrator_ap.c           |  11 --
- arch/arm/mach-integrator/pci_v3.c                  | 177 ++++++++++++++++++---
- 5 files changed, 209 insertions(+), 36 deletions(-)
+ arch/arm/boot/dts/integratorap.dts                 |  41 ++
+ arch/arm/include/asm/hardware/pci_v3.h             | 186 -------
+ arch/arm/include/asm/mach/pci.h                    |  17 +-
+ arch/arm/kernel/bios32.c                           |   9 +-
+ arch/arm/mach-integrator/Makefile                  |   2 +-
+ arch/arm/mach-integrator/include/mach/platform.h   |  23 -
+ arch/arm/mach-integrator/integrator_ap.c           |  31 +-
+ arch/arm/mach-integrator/pci.c                     | 113 -----
+ arch/arm/mach-integrator/pci_v3.c                  | 532 +++++++++++++++++++--
+ arch/arm/mach-integrator/pci_v3.h                  |   2 +
+ 13 files changed, 575 insertions(+), 406 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/pci.txt
  create mode 100644 Documentation/devicetree/bindings/pci/v3-v360epc-pci.txt
+ delete mode 100644 arch/arm/include/asm/hardware/pci_v3.h
+ delete mode 100644 arch/arm/mach-integrator/pci.c
+ create mode 100644 arch/arm/mach-integrator/pci_v3.h
 
-diff --git a/Documentation/devicetree/bindings/pci/v3-v360epc-pci.txt b/Documentation/devicetree/bindings/pci/v3-v360epc-pci.txt
-new file mode 100644
-index 0000000..30b364e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/v3-v360epc-pci.txt
-@@ -0,0 +1,15 @@
-+V3 Semiconductor V360 EPC PCI bridge
-+
-+This bridge is found in the ARM Integrator/AP (Application Platform)
-+
-+Integrator-specific notes:
-+
-+- syscon: should contain a link to the syscon device node (since
-+  on the Integrator, some registers in the syscon are required to
-+  operate the V3).
-+
-+V360 EPC specific notes:
-+
-+- reg: should contain the base address of the V3 adapter.
-+- interrupts: should contain a reference to the V3 error interrupt
-+  as routed on the system.
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 6931c43..d247d10 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -59,6 +59,7 @@ ste	ST-Ericsson
- stericsson	ST-Ericsson
- ti	Texas Instruments
- toshiba	Toshiba Corporation
-+v3	V3 Semiconductor
- via	VIA Technologies, Inc.
- wlf	Wolfson Microelectronics
- wm	Wondermedia Technologies, Inc.
-diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
-index c9c3fa3..03f23b7 100644
---- a/arch/arm/boot/dts/integratorap.dts
-+++ b/arch/arm/boot/dts/integratorap.dts
-@@ -39,6 +39,47 @@
- 		valid-mask = <0x003fffff>;
- 	};
- 
-+	pci: pciv3 at 62000000 {
-+		compatible = "v3,v360epc-pci";
-+		#interrupt-cells = <1>;
-+		#size-cells = <2>;
-+		#address-cells = <3>;
-+		reg = <0x62000000 0x10000>;
-+		interrupt-parent = <&pic>;
-+		interrupts = <17>; /* Bus error IRQ */
-+		ranges = <0x00000000 0 0x61000000 /* config space */
-+			0x61000000 0 0x00100000 /* 16 MiB @ 61000000 */
-+			0x01000000 0 0x60000000 /* I/O space */
-+			0x60000000 0 0x00100000 /* 16 MiB @ 60000000 */
-+			0x02000000 0 0x40000000 /* non-prefectable memory */
-+			0x40000000 0 0x10000000 /* 256 MiB @ 40000000 */
-+			0x42000000 0 0x50000000 /* prefetchable memory */
-+			0x50000000 0 0x10000000>; /* 256 MiB @ 50000000 */
-+		interrupt-map-mask = <0xf800 0 0 0x7>;
-+		interrupt-map = <
-+		/* IDSEL 9 */
-+		0x4800 0 0 1 &pic 13 /* INT A on slot 9 is irq 13 */
-+		0x4800 0 0 2 &pic 14 /* INT B on slot 9 is irq 14 */
-+		0x4800 0 0 3 &pic 15 /* INT C on slot 9 is irq 15 */
-+		0x4800 0 0 4 &pic 16 /* INT D on slot 9 is irq 16 */
-+		/* IDSEL 10 */
-+		0x5000 0 0 1 &pic 14 /* INT A on slot 10 is irq 14 */
-+		0x5000 0 0 2 &pic 15 /* INT B on slot 10 is irq 15 */
-+		0x5000 0 0 3 &pic 16 /* INT C on slot 10 is irq 16 */
-+		0x5000 0 0 4 &pic 13 /* INT D on slot 10 is irq 13 */
-+		/* IDSEL 11 */
-+		0x5800 0 0 1 &pic 15 /* INT A on slot 11 is irq 15 */
-+		0x5800 0 0 2 &pic 16 /* INT B on slot 11 is irq 16 */
-+		0x5800 0 0 3 &pic 13 /* INT C on slot 11 is irq 13 */
-+		0x5800 0 0 4 &pic 14 /* INT D on slot 11 is irq 14 */
-+		/* IDSEL 12 */
-+		0x6000 0 0 1 &pic 16 /* INT A on slot 12 is irq 16 */
-+		0x6000 0 0 2 &pic 13 /* INT B on slot 12 is irq 13 */
-+		0x6000 0 0 3 &pic 14 /* INT C on slot 12 is irq 14 */
-+		0x6000 0 0 4 &pic 15 /* INT D on slot 12 is irq 15 */
-+		>;
-+	};
-+
- 	fpga {
- 		/*
- 		 * The Integator/AP predates the idea to have magic numbers
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 16f3196..a5b15c4 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -473,15 +473,6 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
- 	{ /* sentinel */ },
- };
- 
--/*
-- * This is a placeholder that will get deleted when we move the PCI
-- * device over to the device tree.
-- */
--static struct platform_device pci_v3_device_of = {
--	.name		= "pci-v3",
--	.id		= 0,
--};
--
- static void __init ap_init_of(void)
- {
- 	unsigned long sc_dec;
-@@ -536,8 +527,6 @@ static void __init ap_init_of(void)
- 	of_platform_populate(root, of_default_bus_match_table,
- 			ap_auxdata_lookup, parent);
- 
--	platform_device_register(&pci_v3_device_of);
--
- 	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
- 	for (i = 0; i < 4; i++) {
- 		struct lm_device *lmdev;
-diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-index a3cefde..a0e069d 100644
---- a/arch/arm/mach-integrator/pci_v3.c
-+++ b/arch/arm/mach-integrator/pci_v3.c
-@@ -28,6 +28,10 @@
- #include <linux/init.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_pci.h>
- #include <video/vga.h>
- 
- #include <mach/hardware.h>
-@@ -279,7 +283,12 @@
-  * the mappings into PCI memory.
-  */
- 
-+/* Filled in by probe */
- static void __iomem *pci_v3_base;
-+static struct resource conf_mem; /* FIXME: remap this instead of static map */
-+static struct resource io_mem;
-+static struct resource non_mem;
-+static struct resource pre_mem;
- 
- // V3 access routines
- #define v3_writeb(o,v) __raw_writeb(v, pci_v3_base + (unsigned int)(o))
-@@ -423,13 +432,13 @@ static void __iomem *v3_open_config_window(struct pci_bus *bus,
- 	 * prefetchable), this frees up base1 for re-use by
- 	 * configuration memory
- 	 */
--	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
-+	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(non_mem.start) |
- 			V3_LB_BASE_ADR_SIZE_512MB | V3_LB_BASE_ENABLE);
- 
- 	/*
- 	 * Set up base1/map1 to point into configuration space.
- 	 */
--	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_CONFIG_BASE) |
-+	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(conf_mem.start) |
- 			V3_LB_BASE_ADR_SIZE_16MB | V3_LB_BASE_ENABLE);
- 	v3_writew(V3_LB_MAP1, mapaddress);
- 
-@@ -441,7 +450,7 @@ static void v3_close_config_window(void)
- 	/*
- 	 * Reassign base1 for use by prefetchable PCI memory
- 	 */
--	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE + SZ_256M) |
-+	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(pre_mem.start) |
- 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_PREFETCH |
- 			V3_LB_BASE_ENABLE);
- 	v3_writew(V3_LB_MAP1, v3_addr_to_lb_map(PCI_BUS_PREMEM_START) |
-@@ -450,7 +459,7 @@ static void v3_close_config_window(void)
- 	/*
- 	 * And shrink base0 back to a 256M window (NOTE: MAP0 already correct)
- 	 */
--	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
-+	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(non_mem.start) |
- 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_ENABLE);
- }
- 
-@@ -522,20 +531,6 @@ static struct pci_ops pci_v3_ops = {
- 	.write	= v3_write_config,
- };
- 
--static struct resource non_mem = {
--	.name	= "PCI non-prefetchable",
--	.start	= PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START,
--	.end	= PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE - 1,
--	.flags	= IORESOURCE_MEM,
--};
--
--static struct resource pre_mem = {
--	.name	= "PCI prefetchable",
--	.start	= PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START,
--	.end	= PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START + PCI_BUS_PREMEM_SIZE - 1,
--	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
--};
--
- static int __init pci_v3_setup_resources(struct pci_sys_data *sys)
- {
- 	if (request_resource(&iomem_resource, &non_mem)) {
-@@ -659,7 +654,7 @@ static int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
- 		return -EINVAL;
- 
- 	if (nr == 0) {
--		sys->mem_offset = PHYS_PCI_MEM_BASE;
-+		sys->mem_offset = non_mem.start;
- 		ret = pci_v3_setup_resources(sys);
- 	}
- 
-@@ -697,7 +692,7 @@ static void __init pci_v3_preinit(void)
- 	 * Setup window 0 - PCI non-prefetchable memory
- 	 *  Local: 0x40000000 Bus: 0x00000000 Size: 256MB
- 	 */
--	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
-+	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(non_mem.start) |
- 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_ENABLE);
- 	v3_writew(V3_LB_MAP0, v3_addr_to_lb_map(PCI_BUS_NONMEM_START) |
- 			V3_LB_MAP_TYPE_MEM);
-@@ -706,7 +701,7 @@ static void __init pci_v3_preinit(void)
- 	 * Setup window 1 - PCI prefetchable memory
- 	 *  Local: 0x50000000 Bus: 0x10000000 Size: 256MB
- 	 */
--	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE + SZ_256M) |
-+	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(pre_mem.start) |
- 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_PREFETCH |
- 			V3_LB_BASE_ENABLE);
- 	v3_writew(V3_LB_MAP1, v3_addr_to_lb_map(PCI_BUS_PREMEM_START) |
-@@ -715,7 +710,7 @@ static void __init pci_v3_preinit(void)
- 	/*
- 	 * Setup window 2 - PCI IO
- 	 */
--	v3_writel(V3_LB_BASE2, v3_addr_to_lb_base2(PHYS_PCI_IO_BASE) |
-+	v3_writel(V3_LB_BASE2, v3_addr_to_lb_base2(io_mem.start) |
- 			V3_LB_BASE_ENABLE);
- 	v3_writew(V3_LB_MAP2, v3_addr_to_lb_map2(0));
- 
-@@ -772,7 +767,7 @@ static void __init pci_v3_postinit(void)
- 		       "interrupt: %d\n", ret);
- #endif
- 
--	register_isa_ports(PHYS_PCI_MEM_BASE, PHYS_PCI_IO_BASE, 0);
-+	register_isa_ports(non_mem.start, io_mem.start, 0);
- }
- 
- /*
-@@ -837,7 +832,6 @@ static int __init pci_v3_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
- 
- static struct hw_pci pci_v3 __initdata = {
- 	.swizzle		= pci_v3_swizzle,
--	.map_irq		= pci_v3_map_irq,
- 	.setup			= pci_v3_setup,
- 	.nr_controllers		= 1,
- 	.ops			= &pci_v3_ops,
-@@ -845,8 +839,107 @@ static struct hw_pci pci_v3 __initdata = {
- 	.postinit		= pci_v3_postinit,
- };
- 
-+#ifdef CONFIG_OF
-+
-+static int __init pci_v3_map_irq_dt(const struct pci_dev *dev, u8 slot, u8 pin)
-+{
-+	struct of_irq oirq;
-+	int ret;
-+
-+	ret = of_irq_map_pci(dev, &oirq);
-+	if (ret) {
-+		dev_err(&dev->dev, "of_irq_map_pci() %d\n", ret);
-+		/* Proper return code 0 == NO_IRQ */
-+		return 0;
-+	}
-+
-+	return irq_create_of_mapping(oirq.controller, oirq.specifier,
-+				     oirq.size);
-+}
-+
-+static int __init pci_v3_dtprobe(struct platform_device *pdev,
-+				struct device_node *np)
-+{
-+	struct of_pci_range_parser parser;
-+	struct of_pci_range range;
-+	struct resource *res;
-+	int irq, ret;
-+
-+	if (of_pci_range_parser_init(&parser, np))
-+		return -EINVAL;
-+
-+	/* Get base for bridge registers */
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res) {
-+		dev_err(&pdev->dev, "unable to obtain PCIv3 base\n");
-+		return -ENODEV;
-+	}
-+	pci_v3_base = devm_ioremap(&pdev->dev, res->start,
-+				   resource_size(res));
-+	if (!pci_v3_base) {
-+		dev_err(&pdev->dev, "unable to remap PCIv3 base\n");
-+		return -ENODEV;
-+	}
-+
-+	/* Get and request error IRQ resource */
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
-+		dev_err(&pdev->dev, "unable to obtain PCIv3 error IRQ\n");
-+		return -ENODEV;
-+	}
-+	ret = devm_request_irq(&pdev->dev, irq, v3_irq, 0,
-+			"PCIv3 error", NULL);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "unable to request PCIv3 error IRQ %d (%d)\n", irq, ret);
-+		return ret;
-+	}
-+
-+	for_each_of_pci_range(&parser, &range) {
-+		if (!range.flags) {
-+			of_pci_range_to_resource(&range, np, &conf_mem);
-+			conf_mem.name = "PCIv3 config";
-+		}
-+		if (range.flags & IORESOURCE_IO) {
-+			of_pci_range_to_resource(&range, np, &io_mem);
-+			io_mem.name = "PCIv3 I/O";
-+		}
-+		if ((range.flags & IORESOURCE_MEM) &&
-+			!(range.flags & IORESOURCE_PREFETCH)) {
-+			of_pci_range_to_resource(&range, np, &non_mem);
-+			non_mem.name = "PCIv3 non-prefetched mem";
-+		}
-+		if ((range.flags & IORESOURCE_MEM) &&
-+			(range.flags & IORESOURCE_PREFETCH)) {
-+			of_pci_range_to_resource(&range, np, &pre_mem);
-+			pre_mem.name = "PCIv3 prefetched mem";
-+		}
-+	}
-+
-+	if (!conf_mem.start || !io_mem.start ||
-+	    !non_mem.start || !pre_mem.start) {
-+		dev_err(&pdev->dev, "missing ranges in device node\n");
-+		return -EINVAL;
-+	}
-+
-+	pci_v3.map_irq = pci_v3_map_irq_dt;
-+	pci_common_init_dev(&pdev->dev, &pci_v3);
-+
-+	return 0;
-+}
-+
-+#else
-+
-+static inline int pci_v3_dtprobe(struct platform_device *pdev,
-+				  struct device_node *np)
-+{
-+	return -EINVAL;
-+}
-+
-+#endif
-+
- static int __init pci_v3_probe(struct platform_device *pdev)
- {
-+	struct device_node *np = pdev->dev.of_node;
- 	int ret;
- 
- 	/* Remap the Integrator system controller */
-@@ -856,6 +949,10 @@ static int __init pci_v3_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
-+	/* Device tree probe path */
-+	if (np)
-+		return pci_v3_dtprobe(pdev, np);
-+
- 	pci_v3_base = devm_ioremap(&pdev->dev, PHYS_PCI_V3_BASE, SZ_64K);
- 	if (!pci_v3_base) {
- 		dev_err(&pdev->dev, "unable to remap PCIv3 base\n");
-@@ -869,14 +966,44 @@ static int __init pci_v3_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
- 
--	pci_common_init(&pci_v3);
-+	conf_mem.name = "PCIv3 config";
-+	conf_mem.start = PHYS_PCI_CONFIG_BASE;
-+	conf_mem.end = PHYS_PCI_CONFIG_BASE + SZ_16M - 1;
-+	conf_mem.flags = IORESOURCE_MEM;
-+
-+	io_mem.name = "PCIv3 I/O";
-+	io_mem.start = PHYS_PCI_IO_BASE;
-+	io_mem.end = PHYS_PCI_IO_BASE + SZ_16M - 1;
-+	io_mem.flags = IORESOURCE_MEM;
-+
-+	non_mem.name = "PCIv3 non-prefetched mem";
-+	non_mem.start = PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START;
-+	non_mem.end = PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START +
-+		PCI_BUS_NONMEM_SIZE - 1;
-+	non_mem.flags = IORESOURCE_MEM;
-+
-+	pre_mem.name = "PCIv3 prefetched mem";
-+	pre_mem.start = PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START;
-+	pre_mem.end = PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START +
-+		PCI_BUS_PREMEM_SIZE - 1;
-+	pre_mem.flags = IORESOURCE_MEM | IORESOURCE_PREFETCH;
-+
-+	pci_v3.map_irq = pci_v3_map_irq;
-+
-+	pci_common_init_dev(&pdev->dev, &pci_v3);
- 
- 	return 0;
- }
- 
-+static const struct of_device_id pci_ids[] = {
-+	{ .compatible = "v3,v360epc-pci", },
-+	{},
-+};
-+
- static struct platform_driver pci_v3_driver = {
- 	.driver = {
- 		.name = "pci-v3",
-+		.of_match_table = pci_ids,
- 	},
- };
- 
--- 
-1.8.1.4
+Yours,
+Linus Walleij
