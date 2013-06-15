@@ -1,36 +1,41 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sat, 15 Jun 2013 13:18:17 +0200
-Subject: [PATCH v3] i2c: vt8500: Add support for I2C bus on Wondermedia
- SoCs
-In-Reply-To: <1371246736-5460-1-git-send-email-linux@prisktech.co.nz>
-References: <1371246736-5460-1-git-send-email-linux@prisktech.co.nz>
-Message-ID: <20130615111817.GA2938@katana>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sat, 15 Jun 2013 13:31:08 +0200
+Subject: [PATCH 0/1] gpio-rcar: Add DT support
+In-Reply-To: <20130615004751.GM18124@quad.lixom.net>
+References: <1371106826-25313-1-git-send-email-horms+renesas@verge.net.au>
+ <1371106826-25313-2-git-send-email-horms+renesas@verge.net.au>
+ <20130615004751.GM18124@quad.lixom.net>
+Message-ID: <2295525.muus9MNBiz@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 15, 2013 at 09:52:16AM +1200, Tony Prisk wrote:
-> This patch adds support for the I2C bus controllers found on Wondermedia
-> 8xxx-series SoCs. Only master-mode is supported.
+Hi Olof,
+
+On Friday 14 June 2013 17:47:51 Olof Johansson wrote:
+> On Thu, Jun 13, 2013 at 04:00:26PM +0900, Simon Horman wrote:
+> > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > 
+> > Add DT bindings for the gpio-rcar driver and read the device
+> > configuration from the DT node at probe time if available.
+> > 
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > Signed-off-by: Laurent Pinchart
+> > <laurent.pinchart+renesas@ideasonboard.com>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> ---
+> Hi,
+> 
+> I don't see this cc/acked by Linus or Grant/Rob.
 
-...
+The patch has been acked by Linus, but it seems the ack got lost somewhere.
 
-> +/* REG_TR */
-> +#define SCL_TIMEOUT(x)		(((x) & 0xFF) << 16)
+https://patchwork.kernel.org/patch/2596901/
 
-I assume this should be << 8 since all regs are 16 bit wide.
+> However, the binding looks very vanilla to me, so I'll merge it anyway.
 
-Fixed it locally and ready to apply. Please confirm or send a proper
-fix. Rest looks fine.
+Thank you.
 
-Thanks for the submission!
+-- 
+Regards,
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130615/41784a47/attachment.sig>
+Laurent Pinchart
