@@ -1,16 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 14 Jun 2013 17:02:04 -0700
-Subject: [GIT PULL 2/5]: ux500 clocksource changes for v3.11
-In-Reply-To: <CACRpkdbPBvEU0V29YCqL6Tp0XGbjfJebrZu1TZ_4OFkjB9dMww@mail.gmail.com>
-References: <CACRpkdbPBvEU0V29YCqL6Tp0XGbjfJebrZu1TZ_4OFkjB9dMww@mail.gmail.com>
-Message-ID: <20130615000204.GC18124@quad.lixom.net>
+Date: Fri, 14 Jun 2013 17:02:15 -0700
+Subject: [GIT PULL 3/5]: ux500 pinctrl changes for v3.11
+In-Reply-To: <CACRpkdbFs=pX+Yc8EzgVyi-k5HypkHO9jMGMU+VkYfRYyinDSA@mail.gmail.com>
+References: <CACRpkdbFs=pX+Yc8EzgVyi-k5HypkHO9jMGMU+VkYfRYyinDSA@mail.gmail.com>
+Message-ID: <20130615000215.GD18124@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 04, 2013 at 02:23:21PM +0200, Linus Walleij wrote:
+On Tue, Jun 04, 2013 at 02:25:39PM +0200, Linus Walleij wrote:
 > Hi ARM SoC folks,
 > 
-> this is the ux500 clocksource changes for v3.11. See the signed
+> this is the ux500 pin control changes for v3.11. See the signed
 > tag for details.
 > 
 > The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
@@ -20,26 +20,26 @@ On Tue, Jun 04, 2013 at 02:23:21PM +0200, Linus Walleij wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-> tags/ux500-clksrc-for-arm-soc
+> tags/ux500-pinctrl-for-arm-soc
 > 
-> for you to fetch changes up to 807eba55f73e98b76d0afdc197d942c46122bdca:
+> for you to fetch changes up to 8258b187c2ba91ba1ff276fd0413f5b655824247:
 > 
->   clocksource: dbx500-prcmu: comment cleanup (2013-05-27 14:05:54 +0200)
+>   ARM: ux500: add ABx500 pinctrl tables (2013-05-31 16:30:38 +0200)
 > 
 > ----------------------------------------------------------------
-> Ux500 clocksource updates:
-> - Use relaxed readl() variant
-> - Fix a single comment
+> Ux500 pinctrl changes:
+> - Updates to MSP pinctrl entry for ALSA SoC
+> - ABx500 pinctrl tables
 > 
 > ----------------------------------------------------------------
 > Fabio Baltieri (1):
->       clocksource: dbx500-prcmu: comment cleanup
+>       ARM: ux500: update MSP1 pinctrl defintions
 > 
-> Rabin Vincent (1):
->       clocksource: dbx500-prcmu: use relaxed readl variant
+> Patrice Chotard (1):
+>       ARM: ux500: add ABx500 pinctrl tables
 > 
->  drivers/clocksource/clksrc-dbx500-prcmu.c | 11 +++++------
->  1 file changed, 5 insertions(+), 6 deletions(-)
+>  arch/arm/mach-ux500/board-mop500-pins.c | 279 ++++++++++++++++++++++++++++++--
+>  1 file changed, 268 insertions(+), 11 deletions(-)
 
 Pulled.
 
