@@ -1,62 +1,63 @@
-From: agnel.joel@gmail.com (Joel A Fernandes)
-Date: Sat, 15 Jun 2013 02:23:32 -0500
-Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-In-Reply-To: <CAD=GYpYfMAZeV1RUC=DqhYGZaKiiukpTZg7bhO582eKwimS9aA@mail.gmail.com>
-References: <41fde401c8e646689123d7c6d3a2dffc@DLEE71.ent.ti.com>
- <20130307141235.GQ6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC20C57@DBDE01.ent.ti.com>
- <20130307144656.GR6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC20CCA@DBDE01.ent.ti.com>
- <20130307150408.GU6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC20D27@DBDE01.ent.ti.com>
- <20130307160236.GV6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC213C8@DBDE01.ent.ti.com>
- <CAD=GYpb3+nvoz863+VKO7iJijRHnM5RzsVj-5VJfQ-OHoUy19Q@mail.gmail.com>
- <20130614222537.GA25428@arwen.pp.htv.fi>
- <CAD=GYpYfMAZeV1RUC=DqhYGZaKiiukpTZg7bhO582eKwimS9aA@mail.gmail.com>
-Message-ID: <CAD=GYpbvy0B5pjq_zdGg-anUAB2rhzN5EYKRy-RV2_Bqj9SHKw@mail.gmail.com>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Sat, 15 Jun 2013 11:31:03 +0300
+Subject: [PATCH 2/8] ARM: OMAP2+: Remove duplicated DMA channel definitions
+In-Reply-To: <1371285069-6834-1-git-send-email-jarkko.nikula@bitmer.com>
+References: <1371285069-6834-1-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <1371285069-6834-3-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Felipe,
+Many DMA channel definitions in arch/arm/mach-omap2/dma.h have been moved or
+redefined in drivers without removing them from dma.h. Remove those with a
+script below:
 
-On Fri, Jun 14, 2013 at 6:43 PM, Joel A Fernandes <agnel.joel@gmail.com> wrote:
-> Felipe,
->
->
-> On Friday, June 14, 2013, Felipe Balbi wrote:
->>
->> Hi,
->>
->> On Fri, Jun 14, 2013 at 02:54:33PM -0500, Joel A Fernandes wrote:
->> > Hi Tony, Vaibhav,
->> >
->> > >> I just doublechecked MMC rootfs on bone and evmsk as it's the
->> > >> standard
->> > >> smoke test. My EVM is intermittent now so trying to coax it to power
->> > >> up
->> > >> to reverify.
->> > >>
->> > >
->> > > Matt,
->> > >
->> > > Your branch is working for me, I tested it on EVM. Not sure what is
->> > > wrong with manual rebasing
->> > > I did yesterday. I will try to nail-down root-cause here.
->> > >
->> > > And you can submit the next version fixing the comments I have given.
->> >
->> > The only comment I could find in the whole discussion was adding of
->> > the interrupts property. I tested I don't have any problem booting
->> > with Matt's patch, without having the interrupts property.
->>
->> might very well be, but we want to figure out why adding "intrrupts"
->> causes issues. Why does it have to come through hwmod ? You might have
->> uncovered a real problem which needs fixing. Besides, at the end of the
->
+egrep '#define OMAP.*DMA' arch/arm/mach-omap2/dma.h \
+	|cut -f 1 |cut -d ' ' -f 1-2 | while read -r i; do \
+		if [ `git grep -c "$i" |wc -l` -gt 1 ]; then \
+			echo "removing" $i; \
+			sed -i "/${i}/d" arch/arm/mach-omap2/dma.h; \
+		fi; \
+	done
 
-You are right, adding interrupts property to DT node causes problems
-(driver probe doesn't take place). Will debug further on Monday.
+Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+---
+ arch/arm/mach-omap2/dma.h |   12 ------------
+ 1 file changed, 12 deletions(-)
 
-Thanks,
-Joel
+diff --git a/arch/arm/mach-omap2/dma.h b/arch/arm/mach-omap2/dma.h
+index 4141ef0..8a71c7b 100644
+--- a/arch/arm/mach-omap2/dma.h
++++ b/arch/arm/mach-omap2/dma.h
+@@ -21,30 +21,18 @@
+ 
+ 
+ /* DMA channels for 24xx */
+-#define OMAP24XX_DMA_NO_DEVICE		0
+-#define OMAP24XX_DMA_EXT_DMAREQ0	2	/* S_DMA_1 */
+-#define OMAP24XX_DMA_EXT_DMAREQ1	3	/* S_DMA_2 */
+-#define OMAP24XX_DMA_GPMC		4	/* S_DMA_3 */
+-#define OMAP242X_DMA_EXT_DMAREQ2	14	/* S_DMA_13 */
+-#define OMAP242X_DMA_EXT_DMAREQ3	15	/* S_DMA_14 */
+-#define OMAP242X_DMA_EXT_DMAREQ4	16	/* S_DMA_15 */
+ #define OMAP34XX_DMA_I2C3_TX		25	/* S_DMA_24 */
+ #define OMAP34XX_DMA_I2C3_RX		26	/* S_DMA_25 */
+ #define OMAP24XX_DMA_I2C1_TX		27	/* S_DMA_26 */
+ #define OMAP24XX_DMA_I2C1_RX		28	/* S_DMA_27 */
+ #define OMAP24XX_DMA_I2C2_TX		29	/* S_DMA_28 */
+ #define OMAP24XX_DMA_I2C2_RX		30	/* S_DMA_29 */
+-#define OMAP24XX_DMA_MMC2_TX		47	/* S_DMA_46 */
+-#define OMAP24XX_DMA_MMC2_RX		48	/* S_DMA_47 */
+ #define OMAP24XX_DMA_UART1_TX		49	/* S_DMA_48 */
+ #define OMAP24XX_DMA_UART1_RX		50	/* S_DMA_49 */
+ #define OMAP24XX_DMA_UART2_TX		51	/* S_DMA_50 */
+ #define OMAP24XX_DMA_UART2_RX		52	/* S_DMA_51 */
+ #define OMAP24XX_DMA_UART3_TX		53	/* S_DMA_52 */
+ #define OMAP24XX_DMA_UART3_RX		54	/* S_DMA_53 */
+-#define OMAP24XX_DMA_MMC1_TX		61	/* S_DMA_60 */
+-#define OMAP24XX_DMA_MMC1_RX		62	/* S_DMA_61 */
+-#define OMAP242X_DMA_EXT_DMAREQ5	64	/* S_DMA_63 */
+ #define OMAP34XX_DMA_AES2_TX		65	/* S_DMA_64 */
+ #define OMAP34XX_DMA_AES2_RX		66	/* S_DMA_65 */
+ #define OMAP34XX_DMA_SHA1MD5_RX		69	/* S_DMA_68 */
+-- 
+1.7.10.4
