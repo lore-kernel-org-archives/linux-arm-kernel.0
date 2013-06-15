@@ -1,225 +1,451 @@
-From: minghuadev@gmail.com (minghua d)
-Date: Sat, 15 Jun 2013 13:12:10 -0700
-Subject: alignment handler fault when irq enabled with CONFIG_PREEMPT
-Message-ID: <CAH3QiXmFSVeSmuKvJRTWFAZkakKgoS3-Zb8+p_StcVgZVRHyFw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 15 Jun 2013 22:19:44 +0200
+Subject: [PATCH v3] ARM: integrator: basic PCIv3 device tree support
+Message-ID: <1371327584-699-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, We are seeing a kernel oops caused by alignment handler.
-It's a NXP LPC3250 based system with ARM 926 EJS processor.
+This registers the memory ranges for I/O, non-prefetched and
+prefetched memory and configuration space for the PCIv3 bridge
+and let us fetch these basic memory resources from the device
+tree in the device tree boot path. Remove the stepping stone
+platform device. This is an either/or approach - the platform
+data path is mutually exclusive to the plain platform data
+path and provided addresses from the device tree have to be
+correct.
 
-Are there any known issues or fixed issues in either kernel or silicon
-that could cause this? Any hint how to further debug this?
+This adds the interrupt-map property to the PCIv3 DTS file
+and makes the bridge obtain mappings from the device tree.
 
-Below is a detailed account of the problem and tests.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v2->v3:
+- Squash IRQ enablement patch into this patch
+- fixup with #ifdefs so the non-USE_OF build still works
+---
+ .../devicetree/bindings/pci/v3-v360epc-pci.txt     |  15 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/integratorap.dts                 |  41 +++++
+ arch/arm/mach-integrator/integrator_ap.c           |  11 --
+ arch/arm/mach-integrator/pci_v3.c                  | 177 ++++++++++++++++++---
+ 5 files changed, 209 insertions(+), 36 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pci/v3-v360epc-pci.txt
 
-
-Thanks.
--Minghua
-
-
-To have the problem happen it needs three conditions:
-[1] An udp app that opens 16 ports, keeps receiving and dropping packets.
-[2] A shell that grep dmesg for "Oops" once every second in a loop.
-[3] Large volume of packets sent to 16 udp ports through ethernet.
-
-Once the setup is running, the shell sub-processes in the loop will
-see random segment faults at a rate of 2 to 3 faults per minute.
-Sometimes the rate is much higher or much lower. The fault happens
-mostly in "__copy_from_user" and "file_read_actor", but also at:
-    __copy_to_user_std
-    __get_user_4
-    __copy_from_user
-    __strnlen_use
-
-When it runs for about a few minutes upto an hour, eventually it crashes
-due to an oops in alignment handler. I have been tracking this crash.
-It appears to be consistent and reproducible with kernel 2.6.39 and 2.6.27.
-Have not tried kernel 3.x due to build issues.
-
-The specific chunk of code that triggers the oops is in "do_alignment()":
-    fs = get_fs();
-    set_fs(KERNEL_DS);
-    fault = __get_user(instr, (u32 *)instrptr);
-    set_fs(fs);
-
-The oops will not happen if one of the three conditions is taken out;
-or if disable irq around the above "__get_user()" and around subsequent
-data featching code in alighment handler; or if !CONFIG_PREEMPT.
-
-There is an interesting work-around by doing "__get_user()" again if there
-is a fault at the first attempt. I interpret this as the paging tables are
-correct but momentarily loaded incorrectly. The code goes like this:
-    fs = get_fs();
-    set_fs(KERNEL_DS);
-    fault = __get_user(instr, (u32 *)instrptr);
-+   if (fault) fault = __get_user(instr, (u32 *)instrptr);
-    set_fs(fs);
-
-The sequence of events in the test is like:
-    A packet is received and processed by softirq.
-    In ip/udp stack it does unaligned access causing alighment exception.
-    Alignment handler fetches the instruction.
-    The next packet is transferred by DMA from Eth to memory, using
-bus bandwidth.
-    An interrupt kicks in thus the instruction fetching faults.
-
-I'm guessing a few reasons:
-    __get_user() cannot be interrupted;
-    __get_user() is corrupted if DMA occupies too much bus bandwidth;
-    address space switching/flushing is corrupted by interrupts or DMA;
-    other MMU issues or caching issues;
-    not a logic error in software or hardware, but just noises.
-
-Below is the dump of two consecutive faults in alignment handler. The kernel
-is modified in "__do_kernel_fault()" like the following code to help debug:
-    __show_regs(regs);
-    WARN_ON(1);
-    printk("Pre-fixup pc %pS va %pS\n", (void*)(regs->ARM_pc), (void*)addr);
-    printk("Pre-fixup pc %lx va %lx\n",regs->ARM_pc, addr);
-    //decode pgd/pud/pmd, follwing the logic in show_pte(), using values from
-    //  "pgd = cpu_get_pgd()", and from "pgd = init_mm.pgd".
-
-
-----first fault: fetching instruction:
-
-CPU: 0    Tainted: G        W    (2.6.39.2 #479)
-PC is at do_alignment+0x78/0x3e4
-LR is at do_alignment+0x28/0x3e4
-pc : [<c003163c>]    lr : [<c00315ec>]    psr: 40000013
-sp : c3ac7c60  ip : bf000000  fp : c02b11a8
-r10: 00000001  r9 : c02c52d0  r8 : c3b73042
-r7 : c01e590c  r6 : c3ac7d40  r5 : c3ac7d40  r4 : 00000001
-r3 : 00000017  r2 : 00000000  r1 : 00000000  r0 : 00000000
-Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 0005317f  Table: 83a5c000  DAC: 00000015
-------------[ cut here ]------------
-WARNING: at arch/arm/mm/fault.c:580 __do_kernel_fault+0x60/0x238()
-Modules linked in: DaliPeer DaliGpio DaliMem DaliI2c DaliSpi
-[<c002e4a0>] (unwind_backtrace+0x0/0xe4) from [<c003d7fc>]
-(warn_slowpath_common+0x4c/0x64)
-[<c003d7fc>] (warn_slowpath_common+0x4c/0x64) from [<c003d830>]
-(warn_slowpath_null+0x1c/0x24)
-[<c003d830>] (warn_slowpath_null+0x1c/0x24) from [<c002f840>]
-(__do_kernel_fault+0x60/0x238)
-[<c002f840>] (__do_kernel_fault+0x60/0x238) from [<c002fc88>]
-(do_bad_area+0x70/0x7c)
-[<c002fc88>] (do_bad_area+0x70/0x7c) from [<c002fca0>] (do_sect_fault+0xc/0x18)
-[<c002fca0>] (do_sect_fault+0xc/0x18) from [<c001e348>]
-(do_DataAbort+0xb8/0x138)
-[<c001e348>] (do_DataAbort+0xb8/0x138) from [<c0028fdc>] (__dabt_svc+0x5c/0x80)
-Exception stack(0xc3ac7c18 to 0xc3ac7c60)
-7c00:                                                       00000000 00000000
-7c20: 00000000 00000017 00000001 c3ac7d40 c3ac7d40 c01e590c c3b73042 c02c52d0
-7c40: 00000001 c02b11a8 bf000000 c3ac7c60 c00315ec c003163c 40000013 ffffffff
-[<c0028fdc>] (__dabt_svc+0x5c/0x80) from [<c003163c>] (do_alignment+0x78/0x3e4)
-[<c003163c>] (do_alignment+0x78/0x3e4) from [<c001e348>]
-(do_DataAbort+0xb8/0x138)
-[<c001e348>] (do_DataAbort+0xb8/0x138) from [<c0028fdc>] (__dabt_svc+0x5c/0x80)
-Exception stack(0xc3ac7d40 to 0xc3ac7d88)
-7d40: c28903e0 00000007 c3ac6000 c3b73036 c02d1414 c28903e0 c3ac6008 c3ac3260
-7d60: c3ac7f5c c3ac7edc 0047f7a2 0000251c c3ac7d78 c3ac7d88 c01e2564 c01e590c
-7d80: 40000013 ffffffff
-[<c0028fdc>] (__dabt_svc+0x5c/0x80) from [<c01e590c>] (udp_recvmsg+0x35c/0x52c)
-[<c01e590c>] (udp_recvmsg+0x35c/0x52c) from [<c01ea7d8>]
-(inet_recvmsg+0x44/0x58)
-[<c01ea7d8>] (inet_recvmsg+0x44/0x58) from [<c01940f4>] (sock_recvmsg+0x9c/0xc4)
-[<c01940f4>] (sock_recvmsg+0x9c/0xc4) from [<c0194964>] (sys_recvfrom+0x84/0xe0)
-[<c0194964>] (sys_recvfrom+0x84/0xe0) from [<c0029440>]
-(ret_fast_syscall+0x0/0x2c)
----[ end trace 65f8ea860415c06c ]---
-
-    Pre-fixup  pc do_alignment+0x78/0x3e4    va udp_recvmsg+0x35c/0x52c
-    Pre-fixup  pc c003163c    va c01e590c
-
-    cpu table
-     pgd table: c3a5c000  addr 0xc01e590c  index 0x00000600
-     pgd entry: c3a5f000  8000041e 8010041e
-     pud entry: c3a5f000
-     pmd entry: c3a5f000  8010041e  index 1 (section index, 0 or 1)
-      pmd sect entry =     8010041e
-      base addr bit 31..20 80100000
-            sbz bit 19..12 00000000
-            ap  bit 11..10 00000400
-         domain bit  8..5  00000000
-            1cb bit  4..2  0000001c
-           sect bit  1..0  00000002
-    addr offset bit 19..12 000e5000
-
-    init mm
-     pgd table: c0004000  addr 0xc01e590c  index 0x00000600
-     pgd entry: c0007000  8000041e 8010041e
-     pud entry: c0007000
-     pmd entry: c0007000  8010041e  index 1 (0 or 1)
-      pmd sect entry =     8010041e
-      base addr bit 31..20 80100000
-            sbz bit 19..12 00000000
-            ap  bit 11..10 00000400
-         domain bit  8..5  00000000
-            1cb bit  4..2  0000001c
-           sect bit  1..0  00000002
-    addr offset bit 19..12 000e5000
-
-
-----second fault: due to failure in fetching instruction
-
-CPU: 0    Tainted: G        W    (2.6.39.2 #479)
-PC is at udp_recvmsg+0x35c/0x52c
-LR is at dma_ptr_unlock+0x1c/0x48
-pc : [<c01e590c>]    lr : [<c01e2564>]    psr: 40000013
-sp : c3ac7d88  ip : c3ac7d78  fp : 0000251c
-r10: 0047f7a2  r9 : c3ac7edc  r8 : c3ac7f5c
-r7 : c3ac3260  r6 : c3ac6008  r5 : c28903e0  r4 : c02d1414
-Flags: nZcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-Control: 0005317f  Table: 83a5c000  DAC: 00000015
-------------[ cut here ]------------
-WARNING: at arch/arm/mm/alignment.c:822 do_alignment+0xc4/0x3e4()
-[<c002e4a0>] (unwind_backtrace+0x0/0xe4) from [<c003d7fc>]
-(warn_slowpath_common+0x4c/0x64)
-[<c003d7fc>] (warn_slowpath_common+0x4c/0x64) from [<c003d830>]
-(warn_slowpath_null+0x1c/0x24)
-[<c003d830>] (warn_slowpath_null+0x1c/0x24) from [<c0031688>]
-(do_alignment+0xc4/0x3e4)
-[<c0031688>] (do_alignment+0xc4/0x3e4) from [<c001e348>]
-(do_DataAbort+0xb8/0x138)
-[<c001e348>] (do_DataAbort+0xb8/0x138) from [<c0028fdc>] (__dabt_svc+0x5c/0x80)
-Exception stack(0xc3ac7d40 to 0xc3ac7d88)
-7d40: c28903e0 00000007 c3ac6000 c3b73036 c02d1414 c28903e0 c3ac6008 c3ac3260
-7d60: c3ac7f5c c3ac7edc 0047f7a2 0000251c c3ac7d78 c3ac7d88 c01e2564 c01e590c
-7d80: 40000013 ffffffff
-[<c0028fdc>] (__dabt_svc+0x5c/0x80) from [<c01e590c>] (udp_recvmsg+0x35c/0x52c)
-[<c01e590c>] (udp_recvmsg+0x35c/0x52c) from [<c01ea7d8>]
-(inet_recvmsg+0x44/0x58)
-[<c01ea7d8>] (inet_recvmsg+0x44/0x58) from [<c01940f4>] (sock_recvmsg+0x9c/0xc4)
-[<c01940f4>] (sock_recvmsg+0x9c/0xc4) from [<c0194964>] (sys_recvfrom+0x84/0xe0)
-[<c0194964>] (sys_recvfrom+0x84/0xe0) from [<c0029440>]
-(ret_fast_syscall+0x0/0x2c)
----[ end trace 65f8ea860415c06d ]---
-
-    cpu table
-     pgd table: c3a5c000  addr 0xc01e590c  index 0x00000600
-     pgd entry: c3a5f000  8000041e 8010041e
-     pud entry: c3a5f000
-     pmd entry: c3a5f000  8010041e  index 1 (section index, 0 or 1)
-      pmd sect entry =     8010041e
-      base addr bit 31..20 80100000
-            sbz bit 19..12 00000000
-            ap  bit 11..10 00000400
-         domain bit  8..5  00000000
-            1cb bit  4..2  0000001c
-           sect bit  1..0  00000002
-    addr offset bit 19..12 000e5000
-
-    init mm
-     pgd table: c0004000  addr 0xc01e590c  index 0x00000600
-     pgd entry: c0007000  8000041e 8010041e
-     pud entry: c0007000
-     pmd entry: c0007000  8010041e  index 1 (0 or 1)
-      pmd sect entry =     8010041e
-      base addr bit 31..20 80100000
-            sbz bit 19..12 00000000
-            ap  bit 11..10 00000400
-         domain bit  8..5  00000000
-            1cb bit  4..2  0000001c
-           sect bit  1..0  00000002
-    addr offset bit 19..12 000e5000
+diff --git a/Documentation/devicetree/bindings/pci/v3-v360epc-pci.txt b/Documentation/devicetree/bindings/pci/v3-v360epc-pci.txt
+new file mode 100644
+index 0000000..30b364e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/pci/v3-v360epc-pci.txt
+@@ -0,0 +1,15 @@
++V3 Semiconductor V360 EPC PCI bridge
++
++This bridge is found in the ARM Integrator/AP (Application Platform)
++
++Integrator-specific notes:
++
++- syscon: should contain a link to the syscon device node (since
++  on the Integrator, some registers in the syscon are required to
++  operate the V3).
++
++V360 EPC specific notes:
++
++- reg: should contain the base address of the V3 adapter.
++- interrupts: should contain a reference to the V3 error interrupt
++  as routed on the system.
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 6931c43..d247d10 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -59,6 +59,7 @@ ste	ST-Ericsson
+ stericsson	ST-Ericsson
+ ti	Texas Instruments
+ toshiba	Toshiba Corporation
++v3	V3 Semiconductor
+ via	VIA Technologies, Inc.
+ wlf	Wolfson Microelectronics
+ wm	Wondermedia Technologies, Inc.
+diff --git a/arch/arm/boot/dts/integratorap.dts b/arch/arm/boot/dts/integratorap.dts
+index c9c3fa3..03f23b7 100644
+--- a/arch/arm/boot/dts/integratorap.dts
++++ b/arch/arm/boot/dts/integratorap.dts
+@@ -39,6 +39,47 @@
+ 		valid-mask = <0x003fffff>;
+ 	};
+ 
++	pci: pciv3 at 62000000 {
++		compatible = "v3,v360epc-pci";
++		#interrupt-cells = <1>;
++		#size-cells = <2>;
++		#address-cells = <3>;
++		reg = <0x62000000 0x10000>;
++		interrupt-parent = <&pic>;
++		interrupts = <17>; /* Bus error IRQ */
++		ranges = <0x00000000 0 0x61000000 /* config space */
++			0x61000000 0 0x00100000 /* 16 MiB @ 61000000 */
++			0x01000000 0 0x60000000 /* I/O space */
++			0x60000000 0 0x00100000 /* 16 MiB @ 60000000 */
++			0x02000000 0 0x40000000 /* non-prefectable memory */
++			0x40000000 0 0x10000000 /* 256 MiB @ 40000000 */
++			0x42000000 0 0x50000000 /* prefetchable memory */
++			0x50000000 0 0x10000000>; /* 256 MiB @ 50000000 */
++		interrupt-map-mask = <0xf800 0 0 0x7>;
++		interrupt-map = <
++		/* IDSEL 9 */
++		0x4800 0 0 1 &pic 13 /* INT A on slot 9 is irq 13 */
++		0x4800 0 0 2 &pic 14 /* INT B on slot 9 is irq 14 */
++		0x4800 0 0 3 &pic 15 /* INT C on slot 9 is irq 15 */
++		0x4800 0 0 4 &pic 16 /* INT D on slot 9 is irq 16 */
++		/* IDSEL 10 */
++		0x5000 0 0 1 &pic 14 /* INT A on slot 10 is irq 14 */
++		0x5000 0 0 2 &pic 15 /* INT B on slot 10 is irq 15 */
++		0x5000 0 0 3 &pic 16 /* INT C on slot 10 is irq 16 */
++		0x5000 0 0 4 &pic 13 /* INT D on slot 10 is irq 13 */
++		/* IDSEL 11 */
++		0x5800 0 0 1 &pic 15 /* INT A on slot 11 is irq 15 */
++		0x5800 0 0 2 &pic 16 /* INT B on slot 11 is irq 16 */
++		0x5800 0 0 3 &pic 13 /* INT C on slot 11 is irq 13 */
++		0x5800 0 0 4 &pic 14 /* INT D on slot 11 is irq 14 */
++		/* IDSEL 12 */
++		0x6000 0 0 1 &pic 16 /* INT A on slot 12 is irq 16 */
++		0x6000 0 0 2 &pic 13 /* INT B on slot 12 is irq 13 */
++		0x6000 0 0 3 &pic 14 /* INT C on slot 12 is irq 14 */
++		0x6000 0 0 4 &pic 15 /* INT D on slot 12 is irq 15 */
++		>;
++	};
++
+ 	fpga {
+ 		/*
+ 		 * The Integator/AP predates the idea to have magic numbers
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 16f3196..a5b15c4 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -473,15 +473,6 @@ static struct of_dev_auxdata ap_auxdata_lookup[] __initdata = {
+ 	{ /* sentinel */ },
+ };
+ 
+-/*
+- * This is a placeholder that will get deleted when we move the PCI
+- * device over to the device tree.
+- */
+-static struct platform_device pci_v3_device_of = {
+-	.name		= "pci-v3",
+-	.id		= 0,
+-};
+-
+ static void __init ap_init_of(void)
+ {
+ 	unsigned long sc_dec;
+@@ -536,8 +527,6 @@ static void __init ap_init_of(void)
+ 	of_platform_populate(root, of_default_bus_match_table,
+ 			ap_auxdata_lookup, parent);
+ 
+-	platform_device_register(&pci_v3_device_of);
+-
+ 	sc_dec = readl(ap_syscon_base + INTEGRATOR_SC_DEC_OFFSET);
+ 	for (i = 0; i < 4; i++) {
+ 		struct lm_device *lmdev;
+diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+index a3cefde..a0e069d 100644
+--- a/arch/arm/mach-integrator/pci_v3.c
++++ b/arch/arm/mach-integrator/pci_v3.c
+@@ -28,6 +28,10 @@
+ #include <linux/init.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_irq.h>
++#include <linux/of_pci.h>
+ #include <video/vga.h>
+ 
+ #include <mach/hardware.h>
+@@ -279,7 +283,12 @@
+  * the mappings into PCI memory.
+  */
+ 
++/* Filled in by probe */
+ static void __iomem *pci_v3_base;
++static struct resource conf_mem; /* FIXME: remap this instead of static map */
++static struct resource io_mem;
++static struct resource non_mem;
++static struct resource pre_mem;
+ 
+ // V3 access routines
+ #define v3_writeb(o,v) __raw_writeb(v, pci_v3_base + (unsigned int)(o))
+@@ -423,13 +432,13 @@ static void __iomem *v3_open_config_window(struct pci_bus *bus,
+ 	 * prefetchable), this frees up base1 for re-use by
+ 	 * configuration memory
+ 	 */
+-	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
++	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(non_mem.start) |
+ 			V3_LB_BASE_ADR_SIZE_512MB | V3_LB_BASE_ENABLE);
+ 
+ 	/*
+ 	 * Set up base1/map1 to point into configuration space.
+ 	 */
+-	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_CONFIG_BASE) |
++	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(conf_mem.start) |
+ 			V3_LB_BASE_ADR_SIZE_16MB | V3_LB_BASE_ENABLE);
+ 	v3_writew(V3_LB_MAP1, mapaddress);
+ 
+@@ -441,7 +450,7 @@ static void v3_close_config_window(void)
+ 	/*
+ 	 * Reassign base1 for use by prefetchable PCI memory
+ 	 */
+-	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE + SZ_256M) |
++	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(pre_mem.start) |
+ 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_PREFETCH |
+ 			V3_LB_BASE_ENABLE);
+ 	v3_writew(V3_LB_MAP1, v3_addr_to_lb_map(PCI_BUS_PREMEM_START) |
+@@ -450,7 +459,7 @@ static void v3_close_config_window(void)
+ 	/*
+ 	 * And shrink base0 back to a 256M window (NOTE: MAP0 already correct)
+ 	 */
+-	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
++	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(non_mem.start) |
+ 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_ENABLE);
+ }
+ 
+@@ -522,20 +531,6 @@ static struct pci_ops pci_v3_ops = {
+ 	.write	= v3_write_config,
+ };
+ 
+-static struct resource non_mem = {
+-	.name	= "PCI non-prefetchable",
+-	.start	= PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START,
+-	.end	= PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START + PCI_BUS_NONMEM_SIZE - 1,
+-	.flags	= IORESOURCE_MEM,
+-};
+-
+-static struct resource pre_mem = {
+-	.name	= "PCI prefetchable",
+-	.start	= PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START,
+-	.end	= PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START + PCI_BUS_PREMEM_SIZE - 1,
+-	.flags	= IORESOURCE_MEM | IORESOURCE_PREFETCH,
+-};
+-
+ static int __init pci_v3_setup_resources(struct pci_sys_data *sys)
+ {
+ 	if (request_resource(&iomem_resource, &non_mem)) {
+@@ -659,7 +654,7 @@ static int __init pci_v3_setup(int nr, struct pci_sys_data *sys)
+ 		return -EINVAL;
+ 
+ 	if (nr == 0) {
+-		sys->mem_offset = PHYS_PCI_MEM_BASE;
++		sys->mem_offset = non_mem.start;
+ 		ret = pci_v3_setup_resources(sys);
+ 	}
+ 
+@@ -697,7 +692,7 @@ static void __init pci_v3_preinit(void)
+ 	 * Setup window 0 - PCI non-prefetchable memory
+ 	 *  Local: 0x40000000 Bus: 0x00000000 Size: 256MB
+ 	 */
+-	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE) |
++	v3_writel(V3_LB_BASE0, v3_addr_to_lb_base(non_mem.start) |
+ 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_ENABLE);
+ 	v3_writew(V3_LB_MAP0, v3_addr_to_lb_map(PCI_BUS_NONMEM_START) |
+ 			V3_LB_MAP_TYPE_MEM);
+@@ -706,7 +701,7 @@ static void __init pci_v3_preinit(void)
+ 	 * Setup window 1 - PCI prefetchable memory
+ 	 *  Local: 0x50000000 Bus: 0x10000000 Size: 256MB
+ 	 */
+-	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(PHYS_PCI_MEM_BASE + SZ_256M) |
++	v3_writel(V3_LB_BASE1, v3_addr_to_lb_base(pre_mem.start) |
+ 			V3_LB_BASE_ADR_SIZE_256MB | V3_LB_BASE_PREFETCH |
+ 			V3_LB_BASE_ENABLE);
+ 	v3_writew(V3_LB_MAP1, v3_addr_to_lb_map(PCI_BUS_PREMEM_START) |
+@@ -715,7 +710,7 @@ static void __init pci_v3_preinit(void)
+ 	/*
+ 	 * Setup window 2 - PCI IO
+ 	 */
+-	v3_writel(V3_LB_BASE2, v3_addr_to_lb_base2(PHYS_PCI_IO_BASE) |
++	v3_writel(V3_LB_BASE2, v3_addr_to_lb_base2(io_mem.start) |
+ 			V3_LB_BASE_ENABLE);
+ 	v3_writew(V3_LB_MAP2, v3_addr_to_lb_map2(0));
+ 
+@@ -772,7 +767,7 @@ static void __init pci_v3_postinit(void)
+ 		       "interrupt: %d\n", ret);
+ #endif
+ 
+-	register_isa_ports(PHYS_PCI_MEM_BASE, PHYS_PCI_IO_BASE, 0);
++	register_isa_ports(non_mem.start, io_mem.start, 0);
+ }
+ 
+ /*
+@@ -837,7 +832,6 @@ static int __init pci_v3_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+ 
+ static struct hw_pci pci_v3 __initdata = {
+ 	.swizzle		= pci_v3_swizzle,
+-	.map_irq		= pci_v3_map_irq,
+ 	.setup			= pci_v3_setup,
+ 	.nr_controllers		= 1,
+ 	.ops			= &pci_v3_ops,
+@@ -845,8 +839,107 @@ static struct hw_pci pci_v3 __initdata = {
+ 	.postinit		= pci_v3_postinit,
+ };
+ 
++#ifdef CONFIG_OF
++
++static int __init pci_v3_map_irq_dt(const struct pci_dev *dev, u8 slot, u8 pin)
++{
++	struct of_irq oirq;
++	int ret;
++
++	ret = of_irq_map_pci(dev, &oirq);
++	if (ret) {
++		dev_err(&dev->dev, "of_irq_map_pci() %d\n", ret);
++		/* Proper return code 0 == NO_IRQ */
++		return 0;
++	}
++
++	return irq_create_of_mapping(oirq.controller, oirq.specifier,
++				     oirq.size);
++}
++
++static int __init pci_v3_dtprobe(struct platform_device *pdev,
++				struct device_node *np)
++{
++	struct of_pci_range_parser parser;
++	struct of_pci_range range;
++	struct resource *res;
++	int irq, ret;
++
++	if (of_pci_range_parser_init(&parser, np))
++		return -EINVAL;
++
++	/* Get base for bridge registers */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "unable to obtain PCIv3 base\n");
++		return -ENODEV;
++	}
++	pci_v3_base = devm_ioremap(&pdev->dev, res->start,
++				   resource_size(res));
++	if (!pci_v3_base) {
++		dev_err(&pdev->dev, "unable to remap PCIv3 base\n");
++		return -ENODEV;
++	}
++
++	/* Get and request error IRQ resource */
++	irq = platform_get_irq(pdev, 0);
++	if (irq <= 0) {
++		dev_err(&pdev->dev, "unable to obtain PCIv3 error IRQ\n");
++		return -ENODEV;
++	}
++	ret = devm_request_irq(&pdev->dev, irq, v3_irq, 0,
++			"PCIv3 error", NULL);
++	if (ret < 0) {
++		dev_err(&pdev->dev, "unable to request PCIv3 error IRQ %d (%d)\n", irq, ret);
++		return ret;
++	}
++
++	for_each_of_pci_range(&parser, &range) {
++		if (!range.flags) {
++			of_pci_range_to_resource(&range, np, &conf_mem);
++			conf_mem.name = "PCIv3 config";
++		}
++		if (range.flags & IORESOURCE_IO) {
++			of_pci_range_to_resource(&range, np, &io_mem);
++			io_mem.name = "PCIv3 I/O";
++		}
++		if ((range.flags & IORESOURCE_MEM) &&
++			!(range.flags & IORESOURCE_PREFETCH)) {
++			of_pci_range_to_resource(&range, np, &non_mem);
++			non_mem.name = "PCIv3 non-prefetched mem";
++		}
++		if ((range.flags & IORESOURCE_MEM) &&
++			(range.flags & IORESOURCE_PREFETCH)) {
++			of_pci_range_to_resource(&range, np, &pre_mem);
++			pre_mem.name = "PCIv3 prefetched mem";
++		}
++	}
++
++	if (!conf_mem.start || !io_mem.start ||
++	    !non_mem.start || !pre_mem.start) {
++		dev_err(&pdev->dev, "missing ranges in device node\n");
++		return -EINVAL;
++	}
++
++	pci_v3.map_irq = pci_v3_map_irq_dt;
++	pci_common_init_dev(&pdev->dev, &pci_v3);
++
++	return 0;
++}
++
++#else
++
++static inline int pci_v3_dtprobe(struct platform_device *pdev,
++				  struct device_node *np)
++{
++	return -EINVAL;
++}
++
++#endif
++
+ static int __init pci_v3_probe(struct platform_device *pdev)
+ {
++	struct device_node *np = pdev->dev.of_node;
+ 	int ret;
+ 
+ 	/* Remap the Integrator system controller */
+@@ -856,6 +949,10 @@ static int __init pci_v3_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
++	/* Device tree probe path */
++	if (np)
++		return pci_v3_dtprobe(pdev, np);
++
+ 	pci_v3_base = devm_ioremap(&pdev->dev, PHYS_PCI_V3_BASE, SZ_64K);
+ 	if (!pci_v3_base) {
+ 		dev_err(&pdev->dev, "unable to remap PCIv3 base\n");
+@@ -869,14 +966,44 @@ static int __init pci_v3_probe(struct platform_device *pdev)
+ 		return -ENODEV;
+ 	}
+ 
+-	pci_common_init(&pci_v3);
++	conf_mem.name = "PCIv3 config";
++	conf_mem.start = PHYS_PCI_CONFIG_BASE;
++	conf_mem.end = PHYS_PCI_CONFIG_BASE + SZ_16M - 1;
++	conf_mem.flags = IORESOURCE_MEM;
++
++	io_mem.name = "PCIv3 I/O";
++	io_mem.start = PHYS_PCI_IO_BASE;
++	io_mem.end = PHYS_PCI_IO_BASE + SZ_16M - 1;
++	io_mem.flags = IORESOURCE_MEM;
++
++	non_mem.name = "PCIv3 non-prefetched mem";
++	non_mem.start = PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START;
++	non_mem.end = PHYS_PCI_MEM_BASE + PCI_BUS_NONMEM_START +
++		PCI_BUS_NONMEM_SIZE - 1;
++	non_mem.flags = IORESOURCE_MEM;
++
++	pre_mem.name = "PCIv3 prefetched mem";
++	pre_mem.start = PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START;
++	pre_mem.end = PHYS_PCI_MEM_BASE + PCI_BUS_PREMEM_START +
++		PCI_BUS_PREMEM_SIZE - 1;
++	pre_mem.flags = IORESOURCE_MEM | IORESOURCE_PREFETCH;
++
++	pci_v3.map_irq = pci_v3_map_irq;
++
++	pci_common_init_dev(&pdev->dev, &pci_v3);
+ 
+ 	return 0;
+ }
+ 
++static const struct of_device_id pci_ids[] = {
++	{ .compatible = "v3,v360epc-pci", },
++	{},
++};
++
+ static struct platform_driver pci_v3_driver = {
+ 	.driver = {
+ 		.name = "pci-v3",
++		.of_match_table = pci_ids,
+ 	},
+ };
+ 
+-- 
+1.8.1.4
