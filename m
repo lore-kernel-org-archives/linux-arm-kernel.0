@@ -1,95 +1,80 @@
 From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Sat, 15 Jun 2013 11:31:07 +0300
-Subject: [PATCH 6/8] ARM: OMAP1: Remove duplicated DMA channel definitions
+Date: Sat, 15 Jun 2013 11:31:09 +0300
+Subject: [PATCH 8/8] ARM: OMAP1: Remove dma.h
 In-Reply-To: <1371285069-6834-1-git-send-email-jarkko.nikula@bitmer.com>
 References: <1371285069-6834-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <1371285069-6834-7-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <1371285069-6834-9-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly than with OMAP2 there are many DMA channel definitions that have
-been moved or redefined in drivers using them and we can remove them from
-dma.h.
-
-There is exception with MMC that arch/arm/mach-omap1/devices.c is using
-MMC DMA channel definitions for setting platform data but those can be well
-replaced with numeric values.
-
-Remove dma.h include from arch/arm/mach-omap1/devices.c and use a script
-below for dropping duplicated definitions and for replacing definitions
-with DMA channel numbers.
-
-grep '#define OMAP_DMA' arch/arm/mach-omap1/dma.h | while read -r i; do \
-		DDEF=`echo $i |cut -d ' ' -f 1-2`; \
-		DEF=`echo $DDEF |cut -d ' ' -f 2`; \
-		CH=`echo $i |cut -d ' ' -f 3`; \
-		if [ `git grep -c "$DDEF" |wc -l` -gt 1 ]; then \
-			echo "removing" $DEF; \
-			sed -i "s/${DEF}/${CH}/" arch/arm/mach-omap1/devices.c; \
-			sed -i "/${DDEF}/d" arch/arm/mach-omap1/dma.h; \
-		fi; \
-	done
+Add definitions in arch/arm/mach-omap1/dma.h are now removed so remove
+the file and include statements from dma.c and lcd_dma.c.
 
 Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 ---
- arch/arm/mach-omap1/devices.c |    9 ++++-----
- arch/arm/mach-omap1/dma.h     |    8 --------
- 2 files changed, 4 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap1/dma.c     |    2 --
+ arch/arm/mach-omap1/dma.h     |   26 --------------------------
+ arch/arm/mach-omap1/lcd_dma.c |    2 --
+ 3 files changed, 30 deletions(-)
+ delete mode 100644 arch/arm/mach-omap1/dma.h
 
-diff --git a/arch/arm/mach-omap1/devices.c b/arch/arm/mach-omap1/devices.c
-index 0af635205..325e603 100644
---- a/arch/arm/mach-omap1/devices.c
-+++ b/arch/arm/mach-omap1/devices.c
-@@ -30,7 +30,6 @@
+diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+index a94b3a7..5bb8ce8 100644
+--- a/arch/arm/mach-omap1/dma.c
++++ b/arch/arm/mach-omap1/dma.c
+@@ -30,8 +30,6 @@
  
- #include "common.h"
- #include "clock.h"
+ #include <mach/irqs.h>
+ 
 -#include "dma.h"
- #include "mmc.h"
- #include "sram.h"
- 
-@@ -223,16 +222,16 @@ void __init omap1_init_mmc(struct omap_mmc_platform_data **mmc_data,
- 		case 0:
- 			base = OMAP1_MMC1_BASE;
- 			irq = INT_MMC;
--			rx_req = OMAP_DMA_MMC_RX;
--			tx_req = OMAP_DMA_MMC_TX;
-+			rx_req = 22;
-+			tx_req = 21;
- 			break;
- 		case 1:
- 			if (!cpu_is_omap16xx())
- 				return;
- 			base = OMAP1_MMC2_BASE;
- 			irq = INT_1610_MMC2;
--			rx_req = OMAP_DMA_MMC2_RX;
--			tx_req = OMAP_DMA_MMC2_TX;
-+			rx_req = 55;
-+			tx_req = 54;
- 			break;
- 		default:
- 			continue;
+-
+ #define OMAP1_DMA_BASE			(0xfffed800)
+ #define OMAP1_LOGICAL_DMA_CH_COUNT	17
+ #define OMAP1_DMA_STRIDE		0x40
 diff --git a/arch/arm/mach-omap1/dma.h b/arch/arm/mach-omap1/dma.h
-index 1932e9a..dc33cd9 100644
+deleted file mode 100644
+index 6c751e8..0000000
 --- a/arch/arm/mach-omap1/dma.h
-+++ b/arch/arm/mach-omap1/dma.h
-@@ -20,17 +20,9 @@
- #define __OMAP1_DMA_CHANNEL_H
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- *  OMAP1 DMA channel definitions
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; either version 2 of the License, or
+- * (at your option) any later version.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+- */
+-
+-#ifndef __OMAP1_DMA_CHANNEL_H
+-#define __OMAP1_DMA_CHANNEL_H
+-
+-/* DMA channels for omap1 */
+-
+-/* These are only for 1610 */
+-
+-#endif /* __OMAP1_DMA_CHANNEL_H */
+diff --git a/arch/arm/mach-omap1/lcd_dma.c b/arch/arm/mach-omap1/lcd_dma.c
+index 77924be..26a2b01 100644
+--- a/arch/arm/mach-omap1/lcd_dma.c
++++ b/arch/arm/mach-omap1/lcd_dma.c
+@@ -32,8 +32,6 @@
+ #include <mach/hardware.h>
+ #include <mach/lcdc.h>
  
- /* DMA channels for omap1 */
--#define OMAP_DMA_NO_DEVICE		0
- #define OMAP_DMA_UART3_TX		18
- #define OMAP_DMA_UART3_RX		19
--#define OMAP_DMA_CAMERA_IF_RX		20
--#define OMAP_DMA_MMC_TX			21
--#define OMAP_DMA_MMC_RX			22
--#define OMAP_DMA_USB_W2FC_RX0		26
--#define OMAP_DMA_USB_W2FC_TX0		29
- 
- /* These are only for 1610 */
--#define OMAP_DMA_MMC2_TX		54
--#define OMAP_DMA_MMC2_RX		55
- 
- #endif /* __OMAP1_DMA_CHANNEL_H */
+-#include "dma.h"
+-
+ int omap_lcd_dma_running(void)
+ {
+ 	/*
 -- 
 1.7.10.4
