@@ -1,7 +1,7 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 14 Jun 2013 20:13:56 -0400
-Subject: [PATCH 0/3] Keystone SOC support for 3.11
-Message-ID: <1371255236-2909-1-git-send-email-santosh.shilimkar@ti.com>
+Date: Fri, 14 Jun 2013 20:15:46 -0400
+Subject: [GIT PULL] Keystone SOC support for 3.11
+Message-ID: <1371255346-3000-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
