@@ -1,32 +1,24 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 15 Jun 2013 15:14:32 +0200
-Subject: [PATCH 0/6] Add support for Allwinner A10s SoCs
-In-Reply-To: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20130615131432.GW16699@lukather>
+Date: Sat, 15 Jun 2013 15:26:04 +0200
+Subject: [PATCHv5 0/8] Add I2C support for Allwinner SoCs
+In-Reply-To: <20130615113609.GB2938@katana>
+References: <1371056017-8166-1-git-send-email-maxime.ripard@free-electrons.com>
+ <20130614140719.GC2929@katana> <20130614151252.GR16699@lukather>
+ <20130615113609.GB2938@katana>
+Message-ID: <20130615132604.GX16699@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Wolfram,
 
-On Sun, Jun 09, 2013 at 06:36:01PM +0200, Maxime Ripard wrote:
-> Hi everyone,
-> 
-> This patch serie reworks a bit the pinctrl driver and adds the necessary
-> bits needed to support the Allwinner A10s SoC.
-> 
-> This SoC is a bit in between the A10 and A13. Notable differences with
-> the A13 is the addition of an HDMI controller and of the EMAC.
-> 
-> For the time being (ie until we find a proper datasheet for this SoCs),
-> the clock definition is taken from the A10 one.
-> 
-> This patches depends on the "Add external interrupt support for Allwinner SoCs"
-> patch serie.
+On Sat, Jun 15, 2013 at 01:36:10PM +0200, Wolfram Sang wrote:
+> Applied to for-next, thanks, especially for respinning the driver! Also
+> thanks to the testers! Great community work here \o/
 
-Do you have any comments on the two patches on the pinctrl driver?
+Thanks, I applied the other patches to my sunxi/dt-for-3.11 branch.
 
-Thanks,
+Thanks a lot to Sebastian and Andrew for their patches !
+
 Maxime
 
 -- 
