@@ -1,96 +1,47 @@
-From: jiada_wang@mentor.com (Jiada Wang)
-Date: Sat, 15 Jun 2013 08:23:17 +0900
-Subject: [RFC] Staging: imx-drm: Do not use fractional part of divider
-In-Reply-To: <1371195670.904413971@f400.i.mail.ru>
-References: <1371195670.904413971@f400.i.mail.ru>
-Message-ID: <51BBA5E5.9070202@mentor.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 14 Jun 2013 17:02:04 -0700
+Subject: [GIT PULL 2/5]: ux500 clocksource changes for v3.11
+In-Reply-To: <CACRpkdbPBvEU0V29YCqL6Tp0XGbjfJebrZu1TZ_4OFkjB9dMww@mail.gmail.com>
+References: <CACRpkdbPBvEU0V29YCqL6Tp0XGbjfJebrZu1TZ_4OFkjB9dMww@mail.gmail.com>
+Message-ID: <20130615000204.GC18124@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Alexander
+On Tue, Jun 04, 2013 at 02:23:21PM +0200, Linus Walleij wrote:
+> Hi ARM SoC folks,
+> 
+> this is the ux500 clocksource changes for v3.11. See the signed
+> tag for details.
+> 
+> The following changes since commit e4aa937ec75df0eea0bee03bffa3303ad36c986b:
+> 
+>   Linux 3.10-rc3 (2013-05-26 16:00:47 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+> tags/ux500-clksrc-for-arm-soc
+> 
+> for you to fetch changes up to 807eba55f73e98b76d0afdc197d942c46122bdca:
+> 
+>   clocksource: dbx500-prcmu: comment cleanup (2013-05-27 14:05:54 +0200)
+> 
+> ----------------------------------------------------------------
+> Ux500 clocksource updates:
+> - Use relaxed readl() variant
+> - Fix a single comment
+> 
+> ----------------------------------------------------------------
+> Fabio Baltieri (1):
+>       clocksource: dbx500-prcmu: comment cleanup
+> 
+> Rabin Vincent (1):
+>       clocksource: dbx500-prcmu: use relaxed readl variant
+> 
+>  drivers/clocksource/clksrc-dbx500-prcmu.c | 11 +++++------
+>  1 file changed, 5 insertions(+), 6 deletions(-)
+
+Pulled.
 
 
-Alexander Shiyan wrote:
-> Hello.
->
-> Analysis of driver imx-drm led me to believe that the use fractional part of the divider is not always a good idea.
-> For example, for a parallel display bus connected to LVDS converter chip (DS90C363), in this case the use of
-> fractional part, clock will unstable and the on-chip PLL is not working properly, or rather, does not work at all.
->
-> Let me give a specific example.
-> ipu_crtc_mode_set 0x36314752
-> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000035 outrate: 40150928 wanted: 40000000
-> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000035 outrate: 40150928 wanted: 40150928
-> imx-ipuv3 40000000.ipu: clk_di_set_rate: inrate: 133000000 desired: 40150928 div: 0x00000035
->
-> In this case the divider is 3.5, that result to clock is incorrect. See an attached oscillogram F0000TEK.jpg.
->
-> After a patch the clocks is OK. Patch just uncomment some FSL code.
-> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000040 outrate: 33250000 wanted: 40000000
-> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000040 outrate: 33250000 wanted: 33250000
-> imx-ipuv3 40000000.ipu: clk_di_set_rate: inrate: 133000000 desired: 33250000 div: 0x00000040
->
-> See an attached oscillogram F0001TEK.jpg.
->
-> So, I want to review this from developers and wait for comments.
->
->
-
-Recently I am also looking at use of fractional part of CLKGEN0,
-and want to discuss with you some information I found.
-
-in our code we are using external PLL to drive DI pixel clock, although 
-I haven't checked with oscilloscope, but it's apparently fractional part 
-of CLKGEN0 doesn't work properly as it is described in reference manual. 
-After some investigation I found 0x8 (0.5) seems works fine.
-
-Our solution is try to set DI pixel clock's root clock to integer times 
-of clk_di_pixel as close as possible, so that we can avoid using 
-fractional part to get desired clock. if Pll -> ipu_di_podf could not 
-provide the clock close enough, then try to set it to X.5 times of DI 
-pixel clock, then only the "proved" 0x8 of fractional part will be used.
-
-> diff --git a/drivers/staging/imx-drm/ipu-v3/ipu-di.c b/drivers/stagineg/imx-drm/ipu-v3/ipu-di.c
-> index 19d777e..d424c22 100644
-> --- a/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> +++ b/drivers/staging/imx-drm/ipu-v3/ipu-di.c
-> @@ -154,22 +154,15 @@ static int ipu_di_clk_calc_div(unsigned long inrate, unsigned long outrate)
->
->   	if (div < 0x10)
->   		div = 0x10;
-> -
-> -#ifdef WTF_IS_THIS
-> -	/*
-> -	 * Freescale has this in their Kernel. It is neither clear what
-> -	 * it does nor why it does it
-> -	 */
-> -	if (div & 0x10)
-> -		div &= ~0x7;
->   	else {
->   		/* Round up divider if it gets us closer to desired pix clk */
-> -		if ((div & 0xC) == 0xC) {
-> +		if (div & 0x0f) {
->   			div += 0x10;
-> -			div &= ~0xF;
-> +			/* Strip fractional part of divider */
-> +			div &= ~0x0f;
-If div = 0x11, and the display is not forgiving enough, the pixel clock 
-will probably not be accepted by it.
-
-thanks,
-jiada
->   		}
->   	}
-> -#endif
-> +
->   	return div;
->   }
->
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+-Olof
