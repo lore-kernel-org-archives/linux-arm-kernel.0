@@ -1,49 +1,34 @@
 From: joelagnel@ti.com (Joel A Fernandes)
-Date: Fri, 14 Jun 2013 21:32:50 -0500
-Subject: [PATCH v10 8/8] ARM: dts: add AM33XX SPI DMA support
+Date: Fri, 14 Jun 2013 21:32:46 -0500
+Subject: [PATCH v10 4/8] dmaengine: edma: enable build for AM33XX
 In-Reply-To: <1371263570-9323-1-git-send-email-joelagnel@ti.com>
 References: <1371263570-9323-1-git-send-email-joelagnel@ti.com>
-Message-ID: <1371263570-9323-8-git-send-email-joelagnel@ti.com>
+Message-ID: <1371263570-9323-4-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Matt Porter <mporter@ti.com>
 
-Adds DMA resources to the AM33XX SPI nodes.
+Enable TI EDMA option on OMAP.
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/dma/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index f8a8f19..119f8a9 100644
---- a/arch/arm/boot/dts/am33xx.dtsi
-+++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -352,6 +352,11 @@
- 			interrupts = <65>;
- 			ti,spi-num-cs = <2>;
- 			ti,hwmods = "spi0";
-+			dmas = <&edma 16
-+				&edma 17
-+				&edma 18
-+				&edma 19>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index e992489..3215a3c 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -213,7 +213,7 @@ config SIRF_DMA
  
-@@ -363,6 +368,11 @@
- 			interrupts = <125>;
- 			ti,spi-num-cs = <2>;
- 			ti,hwmods = "spi1";
-+			dmas = <&edma 42
-+				&edma 43
-+				&edma 44
-+				&edma 45>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
- 
+ config TI_EDMA
+ 	tristate "TI EDMA support"
+-	depends on ARCH_DAVINCI
++	depends on ARCH_DAVINCI || ARCH_OMAP
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+ 	default n
 -- 
 1.7.9.5
