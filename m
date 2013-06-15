@@ -1,80 +1,182 @@
 From: jarkko.nikula@bitmer.com (Jarkko Nikula)
-Date: Sat, 15 Jun 2013 11:31:09 +0300
-Subject: [PATCH 8/8] ARM: OMAP1: Remove dma.h
+Date: Sat, 15 Jun 2013 11:31:06 +0300
+Subject: [PATCH 5/8] ARM: OMAP1: Remove McBSP DMA channel definitions
 In-Reply-To: <1371285069-6834-1-git-send-email-jarkko.nikula@bitmer.com>
 References: <1371285069-6834-1-git-send-email-jarkko.nikula@bitmer.com>
-Message-ID: <1371285069-6834-9-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <1371285069-6834-6-git-send-email-jarkko.nikula@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add definitions in arch/arm/mach-omap1/dma.h are now removed so remove
-the file and include statements from dma.c and lcd_dma.c.
+arch/arm/mach-omap1/mcbsp.c is only place where OMAP1 McBSP DMA channel
+definitions are set. We may well use numerical values there and get rid
+of their definitions in arch/arm/mach-omap1/dma.h.
+
+Remove dma.h include from arch/arm/mach-omap1/mcbsp.c and use following
+script for replacing definitions with DMA channel number:
+
+egrep '#define OMAP_DMA_MCBSP' arch/arm/mach-omap1/dma.h | cut -f 1,3 \
+	| while read i; do \
+		DEF=`echo $i |cut -d ' ' -f 2`; \
+		CH=`echo $i |cut -d ' ' -f 3`; \
+		echo "removing" $DEF; \
+		sed -i "s/${DEF}/${CH}/" arch/arm/mach-omap1/mcbsp.c; \
+		sed -i "/${DEF}/d" arch/arm/mach-omap1/dma.h; \
+	done
 
 Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
 ---
- arch/arm/mach-omap1/dma.c     |    2 --
- arch/arm/mach-omap1/dma.h     |   26 --------------------------
- arch/arm/mach-omap1/lcd_dma.c |    2 --
- 3 files changed, 30 deletions(-)
- delete mode 100644 arch/arm/mach-omap1/dma.h
+ arch/arm/mach-omap1/dma.h   |    6 ------
+ arch/arm/mach-omap1/mcbsp.c |   33 ++++++++++++++++-----------------
+ 2 files changed, 16 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-index a94b3a7..5bb8ce8 100644
---- a/arch/arm/mach-omap1/dma.c
-+++ b/arch/arm/mach-omap1/dma.c
-@@ -30,8 +30,6 @@
+diff --git a/arch/arm/mach-omap1/dma.h b/arch/arm/mach-omap1/dma.h
+index d05909c..1932e9a 100644
+--- a/arch/arm/mach-omap1/dma.h
++++ b/arch/arm/mach-omap1/dma.h
+@@ -21,12 +21,6 @@
  
+ /* DMA channels for omap1 */
+ #define OMAP_DMA_NO_DEVICE		0
+-#define OMAP_DMA_MCBSP1_TX		8
+-#define OMAP_DMA_MCBSP1_RX		9
+-#define OMAP_DMA_MCBSP3_TX		10
+-#define OMAP_DMA_MCBSP3_RX		11
+-#define OMAP_DMA_MCBSP2_TX		16
+-#define OMAP_DMA_MCBSP2_RX		17
+ #define OMAP_DMA_UART3_TX		18
+ #define OMAP_DMA_UART3_RX		19
+ #define OMAP_DMA_CAMERA_IF_RX		20
+diff --git a/arch/arm/mach-omap1/mcbsp.c b/arch/arm/mach-omap1/mcbsp.c
+index b0d4723..8ed67f8 100644
+--- a/arch/arm/mach-omap1/mcbsp.c
++++ b/arch/arm/mach-omap1/mcbsp.c
+@@ -27,7 +27,6 @@
  #include <mach/irqs.h>
  
+ #include "iomap.h"
 -#include "dma.h"
--
- #define OMAP1_DMA_BASE			(0xfffed800)
- #define OMAP1_LOGICAL_DMA_CH_COUNT	17
- #define OMAP1_DMA_STRIDE		0x40
-diff --git a/arch/arm/mach-omap1/dma.h b/arch/arm/mach-omap1/dma.h
-deleted file mode 100644
-index 6c751e8..0000000
---- a/arch/arm/mach-omap1/dma.h
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/*
-- *  OMAP1 DMA channel definitions
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-- */
--
--#ifndef __OMAP1_DMA_CHANNEL_H
--#define __OMAP1_DMA_CHANNEL_H
--
--/* DMA channels for omap1 */
--
--/* These are only for 1610 */
--
--#endif /* __OMAP1_DMA_CHANNEL_H */
-diff --git a/arch/arm/mach-omap1/lcd_dma.c b/arch/arm/mach-omap1/lcd_dma.c
-index 77924be..26a2b01 100644
---- a/arch/arm/mach-omap1/lcd_dma.c
-+++ b/arch/arm/mach-omap1/lcd_dma.c
-@@ -32,8 +32,6 @@
- #include <mach/hardware.h>
- #include <mach/lcdc.h>
  
--#include "dma.h"
--
- int omap_lcd_dma_running(void)
- {
- 	/*
+ #define DPS_RSTCT2_PER_EN	(1 << 0)
+ #define DSP_RSTCT2_WD_PER_EN	(1 << 1)
+@@ -114,12 +113,12 @@ struct resource omap7xx_mcbsp_res[][6] = {
+ 		},
+ 		{
+ 			.name  = "rx",
+-			.start = OMAP_DMA_MCBSP1_RX,
++			.start = 9,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 		{
+ 			.name  = "tx",
+-			.start = OMAP_DMA_MCBSP1_TX,
++			.start = 8,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 	},
+@@ -141,12 +140,12 @@ struct resource omap7xx_mcbsp_res[][6] = {
+ 		},
+ 		{
+ 			.name  = "rx",
+-			.start = OMAP_DMA_MCBSP3_RX,
++			.start = 11,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 		{
+ 			.name  = "tx",
+-			.start = OMAP_DMA_MCBSP3_TX,
++			.start = 10,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 	},
+@@ -191,12 +190,12 @@ struct resource omap15xx_mcbsp_res[][6] = {
+ 		},
+ 		{
+ 			.name  = "rx",
+-			.start = OMAP_DMA_MCBSP1_RX,
++			.start = 9,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 		{
+ 			.name  = "tx",
+-			.start = OMAP_DMA_MCBSP1_TX,
++			.start = 8,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 	},
+@@ -218,12 +217,12 @@ struct resource omap15xx_mcbsp_res[][6] = {
+ 		},
+ 		{
+ 			.name  = "rx",
+-			.start = OMAP_DMA_MCBSP2_RX,
++			.start = 17,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 		{
+ 			.name  = "tx",
+-			.start = OMAP_DMA_MCBSP2_TX,
++			.start = 16,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 	},
+@@ -245,12 +244,12 @@ struct resource omap15xx_mcbsp_res[][6] = {
+ 		},
+ 		{
+ 			.name  = "rx",
+-			.start = OMAP_DMA_MCBSP3_RX,
++			.start = 11,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 		{
+ 			.name  = "tx",
+-			.start = OMAP_DMA_MCBSP3_TX,
++			.start = 10,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 	},
+@@ -298,12 +297,12 @@ struct resource omap16xx_mcbsp_res[][6] = {
+ 		},
+ 		{
+ 			.name  = "rx",
+-			.start = OMAP_DMA_MCBSP1_RX,
++			.start = 9,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 		{
+ 			.name  = "tx",
+-			.start = OMAP_DMA_MCBSP1_TX,
++			.start = 8,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 	},
+@@ -325,12 +324,12 @@ struct resource omap16xx_mcbsp_res[][6] = {
+ 		},
+ 		{
+ 			.name  = "rx",
+-			.start = OMAP_DMA_MCBSP2_RX,
++			.start = 17,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 		{
+ 			.name  = "tx",
+-			.start = OMAP_DMA_MCBSP2_TX,
++			.start = 16,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 	},
+@@ -352,12 +351,12 @@ struct resource omap16xx_mcbsp_res[][6] = {
+ 		},
+ 		{
+ 			.name  = "rx",
+-			.start = OMAP_DMA_MCBSP3_RX,
++			.start = 11,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 		{
+ 			.name  = "tx",
+-			.start = OMAP_DMA_MCBSP3_TX,
++			.start = 10,
+ 			.flags = IORESOURCE_DMA,
+ 		},
+ 	},
 -- 
 1.7.10.4
