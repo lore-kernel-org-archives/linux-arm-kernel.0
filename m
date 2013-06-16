@@ -1,29 +1,30 @@
-From: mturquette@linaro.org (Mike Turquette)
-Date: Sun, 16 Jun 2013 11:51:33 -0700
-Subject: [PATCH V4 1/4] ARM: tegra30: clocks: Fix pciex clock registration
-In-Reply-To: <51B8956B.8020704@wwwdotorg.org>
-References: <1371021223-6709-1-git-send-email-jagarwal@nvidia.com>
- <51B8956B.8020704@wwwdotorg.org>
-Message-ID: <20130616185132.7541.680@quantum>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 16 Jun 2013 21:08:17 +0200
+Subject: [PATCH 1/2] clk: nomadik: implement the Nomadik clocks properly
+In-Reply-To: <1370775348-7440-1-git-send-email-linus.walleij@linaro.org>
+References: <1370775348-7440-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdbtz=sJM+1ZEgLhfXT-or1a8AX6uwLWB1S8qS7b3N7fvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Stephen Warren (2013-06-12 08:36:11)
-> On 06/12/2013 01:13 AM, Jay Agarwal wrote:
-> > Registering pciex as peripheral clock instead of fixed clock
-> > as tegra_perih_reset_assert(deassert) api of this clock api
-> > gives warning and ultimately does not succeed to assert(deassert)
-> > 
-> > Signed-off-by: Jay Agarwal <jagarwal@nvidia.com>
-> > ---
-> > Patch is based on remotes/gitorious_thierryreding_linux/tegra/next and should be applied on top of this.
-> 
-> In this case, it would make more sense to apply this to the clock tree,
-> since it's a standalone bug-fix.
-> 
-> Acked-by: Stephen Warren <swarren@nvidia.com>
+On Sun, Jun 9, 2013 at 12:55 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-Pulled into clk-fixes for -rc7.
+> The Nomadik clock implementation was a stub just using
+> fixed clocks.
+>
+> This implements the clocks properly instead of relying
+> on them all being on at boot and leaving them all on.
 
-Regards,
-Mike
+Mike, ping on this.
+
+There was some debate on whether to use 0 or 1 cells
+for the clocks, but I made some argument that this is how
+they need to be represented.
+
+As subsystem maintainer I suspect you will need to be
+the Judge (Dredd) on this. I think I overheard some kind
+of positive tone to this style of modelling them  in some
+other review but it might've been imagination ...
+
+Yours,
+Linus Walleij
