@@ -1,112 +1,105 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 16 Jun 2013 22:54:08 +0200
-Subject: [RFC PATCH 01/11] dma: amba-pl08x: Use bitmap to pass variant
- specific quirks
+Date: Sun, 16 Jun 2013 22:54:09 +0200
+Subject: [RFC PATCH 02/11] dma: amba-pl08x: Refactor pl08x_getbytes_chan() to
+ lower indentation
 In-Reply-To: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
 References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <1371416058-22047-2-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1371416058-22047-3-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of defining new bool field in vendor_data struct for each quirk,
-it is more reasonable to use a single flags field and make each quirk
-use single bits.
+Further patch will introduce support for PL080S, which requires some
+things to be done conditionally, thus increasing indentation level of
+some functions even more.
+
+This patch reduces indentation level of pl08x_getbytes_chan() function
+by inverting several conditions and returning from function wherever
+possible.
 
 Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 ---
- drivers/dma/amba-pl08x.c | 31 +++++++++++++++++--------------
- 1 file changed, 17 insertions(+), 14 deletions(-)
+ drivers/dma/amba-pl08x.c | 51 ++++++++++++++++++++++++++----------------------
+ 1 file changed, 28 insertions(+), 23 deletions(-)
 
 diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-index 8bad254..d443a68 100644
+index d443a68..1e57ded 100644
 --- a/drivers/dma/amba-pl08x.c
 +++ b/drivers/dma/amba-pl08x.c
-@@ -93,18 +93,22 @@
- static struct amba_driver pl08x_amba_driver;
- struct pl08x_driver_data;
- 
-+/** Controller supports dual AHB masters. */
-+#define PL08X_IS_DUALMASTER	(1 << 0)
-+/**
-+ * Controller has Nomadik security extension bits that need to be checked
-+ * for permission before use and some registers are missing.
-+ */
-+#define PL08X_IS_NOMADIK	(1 << 1)
-+
- /**
-  * struct vendor_data - vendor-specific config parameters for PL08x derivatives
-  * @channels: the number of channels available in this variant
-- * @dualmaster: whether this version supports dual AHB masters or not.
-- * @nomadik: whether the channels have Nomadik security extension bits
-- *	that need to be checked for permission before use and some registers are
-- *	missing
-+ * @flags: Vendor-specific flags, see PL08X_IS_*
-  */
- struct vendor_data {
- 	u8 channels;
--	bool dualmaster;
--	bool nomadik;
-+	u32 flags;
- };
- 
- /*
-@@ -1391,7 +1395,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
- 	/* Both to be incremented or the code will break */
- 	txd->cctl |= PL080_CONTROL_SRC_INCR | PL080_CONTROL_DST_INCR;
- 
--	if (pl08x->vd->dualmaster)
-+	if (pl08x->vd->flags & PL08X_IS_DUALMASTER)
- 		txd->cctl |= pl08x_select_bus(pl08x->mem_buses,
- 					      pl08x->mem_buses);
- 
-@@ -1612,7 +1616,7 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
- static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
+@@ -473,47 +473,52 @@ static inline u32 get_bytes_in_cctl(u32 cctl)
+ /* The channel should be paused when calling this */
+ static u32 pl08x_getbytes_chan(struct pl08x_dma_chan *plchan)
  {
- 	/* The Nomadik variant does not have the config register */
--	if (pl08x->vd->nomadik)
-+	if (pl08x->vd->flags & PL08X_IS_NOMADIK)
- 		return;
- 	writel(PL080_CONFIG_ENABLE, pl08x->base + PL080_CONFIG);
- }
-@@ -1897,7 +1901,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 	/* By default, AHB1 only.  If dualmaster, from platform */
- 	pl08x->lli_buses = PL08X_AHB1;
- 	pl08x->mem_buses = PL08X_AHB1;
--	if (pl08x->vd->dualmaster) {
-+	if (pl08x->vd->flags & PL08X_IS_DUALMASTER) {
- 		pl08x->lli_buses = pl08x->pd->lli_buses;
- 		pl08x->mem_buses = pl08x->pd->mem_buses;
++	struct pl08x_lli *llis_va;
+ 	struct pl08x_phy_chan *ch;
++	dma_addr_t llis_bus;
+ 	struct pl08x_txd *txd;
+ 	size_t bytes = 0;
++	int index;
++	u32 clli;
+ 
+ 	ch = plchan->phychan;
+ 	txd = plchan->at;
+ 
++	if (!ch || !txd)
++		return bytes;
++
+ 	/*
+ 	 * Follow the LLIs to get the number of remaining
+ 	 * bytes in the currently active transaction.
+ 	 */
+-	if (ch && txd) {
+-		u32 clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
++	clli = readl(ch->base + PL080_CH_LLI) & ~PL080_LLI_LM_AHB2;
++
++	/* First get the remaining bytes in the active transfer */
++	bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
+ 
+-		/* First get the remaining bytes in the active transfer */
+-		bytes = get_bytes_in_cctl(readl(ch->base + PL080_CH_CONTROL));
++	if (!clli)
++		return bytes;
+ 
+-		if (clli) {
+-			struct pl08x_lli *llis_va = txd->llis_va;
+-			dma_addr_t llis_bus = txd->llis_bus;
+-			int index;
++	llis_va = txd->llis_va;
++	llis_bus = txd->llis_bus;
+ 
+-			BUG_ON(clli < llis_bus || clli >= llis_bus +
++	BUG_ON(clli < llis_bus || clli >= llis_bus +
+ 				sizeof(struct pl08x_lli) * MAX_NUM_TSFR_LLIS);
+ 
+-			/*
+-			 * Locate the next LLI - as this is an array,
+-			 * it's simple maths to find.
+-			 */
+-			index = (clli - llis_bus) / sizeof(struct pl08x_lli);
++	/*
++	 * Locate the next LLI - as this is an array,
++	 * it's simple maths to find.
++	 */
++	index = (clli - llis_bus) / sizeof(struct pl08x_lli);
+ 
+-			for (; index < MAX_NUM_TSFR_LLIS; index++) {
+-				bytes += get_bytes_in_cctl(llis_va[index].cctl);
++	for (; index < MAX_NUM_TSFR_LLIS; index++) {
++		bytes += get_bytes_in_cctl(llis_va[index].cctl);
+ 
+-				/*
+-				 * A LLI pointer of 0 terminates the LLI list
+-				 */
+-				if (!llis_va[index].lli)
+-					break;
+-			}
+-		}
++		/*
++		 * A LLI pointer of 0 terminates the LLI list
++		 */
++		if (!llis_va[index].lli)
++			break;
  	}
-@@ -1954,7 +1958,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
- 		 * down for the secure world only. Lock up these channels
- 		 * by perpetually serving a dummy virtual channel.
- 		 */
--		if (vd->nomadik) {
-+		if (vd->flags & PL08X_IS_NOMADIK) {
- 			u32 val;
  
- 			val = readl(ch->base + PL080_CH_CONFIG);
-@@ -2039,18 +2043,17 @@ out_no_pl08x:
- /* PL080 has 8 channels and the PL080 have just 2 */
- static struct vendor_data vendor_pl080 = {
- 	.channels = 8,
--	.dualmaster = true,
-+	.flags = PL08X_IS_DUALMASTER,
- };
- 
- static struct vendor_data vendor_nomadik = {
- 	.channels = 8,
--	.dualmaster = true,
--	.nomadik = true,
-+	.flags = PL08X_IS_DUALMASTER | PL08X_IS_NOMADIK,
- };
- 
- static struct vendor_data vendor_pl081 = {
- 	.channels = 2,
--	.dualmaster = false,
-+	.flags = 0,
- };
- 
- static struct amba_id pl08x_ids[] = {
+ 	return bytes;
 -- 
 1.8.2.1
