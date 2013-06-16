@@ -1,38 +1,39 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 16 Jun 2013 14:26:12 +0200
-Subject: [PATCH 1/5] pinctrl: update the documentation for some pinconfig
- params
-In-Reply-To: <201306161245.30465.heiko@sntech.de>
+Date: Sun, 16 Jun 2013 14:35:58 +0200
+Subject: [PATCH 5/5] pinctrl: rockchip: correctly handle arguments of
+ pinconf options
+In-Reply-To: <201306161302.32156.heiko@sntech.de>
 References: <201306141741.46077.heiko@sntech.de>
- <201306141742.21808.heiko@sntech.de>
- <CACRpkdaV78wXxGPFWVffEfnqrmhq1rsdVYdSKNx5mWaOcYOWrQ@mail.gmail.com>
- <201306161245.30465.heiko@sntech.de>
-Message-ID: <CACRpkdZrqpshFUnphphcpTDOiga4QHkyZZFYyVmswdLQaMQj2w@mail.gmail.com>
+ <201306141744.21117.heiko@sntech.de>
+ <CACRpkdY6pmS=5rphvYdt_8yKYJq8ADu0omy48ncZ3LFtEUf7yg@mail.gmail.com>
+ <201306161302.32156.heiko@sntech.de>
+Message-ID: <CACRpkdZxO-8rQPBRPsxAx8OBfwvh_BQuts7NAi379gMZG+1ocg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 12:45 PM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Sonntag, 16. Juni 2013, 12:26:38 schrieb Linus Walleij:
+On Sun, Jun 16, 2013 at 1:02 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
->> Can't we rely on PIN_CONFIG_BIAS_DISABLE for all this?
+>> > -               *config = 0;
+>> > +               pull = rockchip_get_pull(bank, pin - bank->pin_base);
+>> > +               *config = (pull == param) ? 1 : 0;
+>>
+>> And then I guess you should emit PIN_CONFIG_BIAS_DISABLE
+>> here as well.
 >
-> you're the boss on this, I'll do whatever you say :-)
+> rockchip_get_pull does emit PIN_CONFIG_BIAS_DISABLE when the pull is disabled,
+> only wrongly does add the argument here.
 
-Oh that's not good. As can be seen from past experience I am often
-avoiding to do horrible design mistakes by other smart people telling
-me how wrong I am ...
+Ah, right.
 
-> Actually I'm too more comfortable with only using bias-disable.
+> But I'm actually not quite sure what the expected behaviour is here at all :-)
 >
-> So I'll redo this patch to remove the disabling of a pull via this method, if
-> that's the right way to go.
+> Say the pin is in the "pin-default" pull state and the query in config_get is
+> for "bias-disable", what would be the expected bahviour/return value in this
+> case?
 
-I sent some patch on how I'd like it defined, please check it.
+return -EINVAL; ?
 
-> Same with the rockchip driver.
-
-Hm I merged that patch actually, but you can send a v2 if you want
-me to replace it. Or a patch on top, if preferred.
+Hm it was some time since I designed this...
 
 Yours,
 Linus Walleij
