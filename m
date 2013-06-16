@@ -1,67 +1,40 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Sun, 16 Jun 2013 00:15:08 +0100
-Subject: [RFC] arm: Remove sa1111 special case from mm setup code
-Message-ID: <1371338108-26354-1-git-send-email-grant.likely@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 15 Jun 2013 18:59:39 -0700
+Subject: [RESEND,PATCHv6 1/1] Add support for GMT G762/G763 PWM fan
+ controllers
+In-Reply-To: <87sj0jhuhn.fsf@natisbad.org>
+References: <87sj0jhuhn.fsf@natisbad.org>
+Message-ID: <20130616015939.GA5535@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't think this special case is needed anymore. From what I can tell,
-setup_dma_zone() takes care of marking the region to be reserved for
-DMA, and that happens before arm_memblock_init() which calls
-arm_mm_memblock_reserve(). Therefore the mm setup should already know
-about the reserved region and it won't need to be explicitly reserved
-and then freed. That means the special case can be dropped from the
-common code.
+On Sun, Jun 16, 2013 at 12:36:20AM +0200, Arnaud Ebalard wrote:
+> 
+> GMT G762/763 fan speed PWM controller is connected directly to a fan
+> and performs closed-loop or open-loop control of the fan speed. Two
+> modes - PWM or DC - are supported by the chip. Introduced driver
+> provides various knobs to control the operations of the chip (via
+> sysfs interface). Specific characteristics of the system can be passed
+> either using board init code or via DT. Documentation for both the
+> driver and DT bindings are also provided.
+> 
+> Signed-off-by: Arnaud Ebalard <arno@natisbad.org>
+> ---
+> Hi Guenter,
+> 
+> In the end, I think handling the clock properly for DT path
+> (clk_prepare_enable() and associated clk_disable_unprepare()
+> for both error and module unloading) adds some code but I
+> do not see how to spare this. Comments welcome.
+> 
+> If you have additional comments and a new version is required,
+> I'll handle those with Simon's tests on its platform.
+> 
+We might need to be more careful with the clocks. Several drivers
+save the value retrieved with of_clk_get() and call clk_put()
+afterwards. But some drivers don't do that, so I don't really
+know the implications.
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
+I'll look into it some more to make sure everything is correct.
 
-Hi Russell and Nicolas,
-
-I really don't know if this is correct. The MM code is not my strong
-area. Please take a look.
-
-Thanks,
-g.
-
- arch/arm/mm/init.c | 5 -----
- arch/arm/mm/mmu.c  | 8 --------
- 2 files changed, 13 deletions(-)
-
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index 9a5cdc0..73212fe 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -598,11 +598,6 @@ void __init mem_init(void)
- 
- 	totalram_pages += free_all_bootmem();
- 
--#ifdef CONFIG_SA1111
--	/* now that our DMA memory is actually so designated, we can free it */
--	free_reserved_area(__va(PHYS_PFN_OFFSET), swapper_pg_dir, 0, NULL);
--#endif
--
- 	free_highpages();
- 
- 	reserved_pages = free_pages = 0;
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e0d8565..f281a24 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1147,14 +1147,6 @@ void __init arm_mm_memblock_reserve(void)
- 	 * and can only be in node 0.
- 	 */
- 	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE);
--
--#ifdef CONFIG_SA1111
--	/*
--	 * Because of the SA1111 DMA bug, we want to preserve our
--	 * precious DMA-able memory...
--	 */
--	memblock_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
--#endif
- }
- 
- /*
--- 
-1.8.1.2
+Guenter
