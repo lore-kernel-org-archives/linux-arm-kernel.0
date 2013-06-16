@@ -1,36 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 16 Jun 2013 12:01:13 +0200
-Subject: [PATCH] drivers: pinctrl: add active state to core
-In-Reply-To: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
-References: <1370938616-5952-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <CACRpkdbM2iPoHjJe8zJjqtXKKZpL3S7C1S6OsLDWawFDjtvwuw@mail.gmail.com>
+Date: Sun, 16 Jun 2013 12:17:29 +0200
+Subject: [PATCH] pinctrl: document the pinctrl PM states
+In-Reply-To: <51BB3A2C.608@wwwdotorg.org>
+References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
+ <51BA1FE7.4000900@wwwdotorg.org>
+ <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+ <51BB3A2C.608@wwwdotorg.org>
+Message-ID: <CACRpkdbmv4abXiYZEpN7BsV+H1aafm+tQV4r8bFWYVKtFDQZMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 10:16 AM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Jun 14, 2013 at 5:43 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/13/2013 02:34 PM, Linus Walleij wrote:
+>> On Thu, Jun 13, 2013 at 9:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+>>> On 06/11/2013 01:59 PM, Linus Walleij wrote:
+>>>> From: Linus Walleij <linus.walleij@linaro.org>
+>>>>
+>>>> This document snippet tries to be helpful and define the pin
+>>>> PM states and helpers, and how they should be used to create
+>>>> some kind of common ontology around this.
+>>>
+>>> Oops. I haven't been keeping up well. I propose we hold off on this
+>>> patch for a short while until the other thread on this topic is finalized.
+>>
+>> Isn't it better if I split it?
+>>
+>> Most of this doc is about the default/sleep/idle states and
+>> how that relates to runtime PM, and that seems to be
+>> uncontroversial.
 >
-> In addition to the recently introduced pinctrl core
-> control, the PM runtime pin control for the OMAP platforms
-> require a fourth state in addtition to the default, idle and
-> sleep states already handled by the core: an explicit "active"
-> state. Let's introduce this to the core in addition to the
-> other states already defined.
->
-> Cc: Hebbar Gururaja <gururaja.hebbar@ti.com>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Wolfram Sang <wsa@the-dreams.de>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Mark Brown <broonie@kernel.org>
-> Cc: Kevin Hilman <khilman@linaro.org>
-> Suggested-by: Tony Lindgren <tony@atomide.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> I would tend to prefer sorting out the issue fully, then documenting it
+> once. This avoids churn.
 
-It seems this thing needs another round of discussion so I've pulled
-this patch out of the branch with stuff for -next and rebased dependencies.
+OK I've pulled out this patch for now.
 
 Yours,
 Linus Walleij
