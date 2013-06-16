@@ -1,78 +1,112 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Sun, 16 Jun 2013 22:54:07 +0200
-Subject: [RFC PATCH 00/11] ARM: s3c64xx: Let amba-pl08x driver handle DMA
-Message-ID: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+Date: Sun, 16 Jun 2013 22:54:08 +0200
+Subject: [RFC PATCH 01/11] dma: amba-pl08x: Use bitmap to pass variant
+ specific quirks
+In-Reply-To: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <1371416058-22047-2-git-send-email-tomasz.figa@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-One of the biggest roadblocks on the way of S3C64xx to DeviceTree support
-is its DMA driver, which is completely platform-specific and provides
-private API (s3c-dma), not even saying that its design is completely
-against multiplatform-awareness.
+Instead of defining new bool field in vendor_data struct for each quirk,
+it is more reasonable to use a single flags field and make each quirk
+use single bits.
 
-The DMA controller present on this SoC series is a custom variant
-of ARM PrimeCell PL080 modified by Samsung to add some extra features.
-It is mostly compatible with original PL080, except:
- - CH_CONTROL2 register is added between CH_CONTROL and CH_CONFIG,
- - offset of CH_CONFIG register is different,
- - transfer size field is moved from CH_CONTROL to CH_CONTROL2,
- - transfer size field is extended to 24 bits, allowing much bigger
-     single transfer,
- - LLI consists of one more word, to account for CH_CONTROL2 register.
+Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+---
+ drivers/dma/amba-pl08x.c | 31 +++++++++++++++++--------------
+ 1 file changed, 17 insertions(+), 14 deletions(-)
 
-Since all the rest is fully compatible with standard PL080 there is no
-point in having separate driver just for this single variant, so I decided
-to look into adding support for it to the amba-pl08x driver.
-
-There was already some attempt to achieve this before, but this was before
-Russel's big rework of the driver to use virtual channels, making the old
-patches being not much of use.
-
-This RFC series is a proof of concept that I managed to make during last
-days of hacking. Except one patch adding clkdev lookup to clock driver
-(which is being replaced with a CCF-compliant driver ATM), this is enough
-to get memcpy and slave transfers to work on S3C64xx.
-
-I have tested this on Mini6410 and SMDK6410 boards using dmatest for
-memcpy and Samsung I2S with madplay/aplay for slave transfers.
-Unfortunately I do not have access to other platforms with PL08x so
-I could not test for any regressions introduced on them.
-
-Credits for two patches go to Alban Bedel, who made a series fixing this
-driver to make it usable with audio drivers. I rebased his patches on top
-of mine and corrected coding style a bit.
-
-OK, that's all. Any comments are welcome. Feel free to start throwing eggs
-and tomatoes if you find this awful, but I won't be upset if I get some
-Tested-by or Acked-by as well. ;)
-
-Alban Bedel (2):
-  dmaengine: PL08x: Fix reading the byte count in cctl
-  dmaengine: PL08x: Add cyclic transfer support
-
-Tomasz Figa (9):
-  dma: amba-pl08x: Use bitmap to pass variant specific quirks
-  dma: amba-pl08x: Refactor pl08x_getbytes_chan() to lower indentation
-  dma: amba-pl08x: Add support for different offset of CONFIG register
-  dma: amba-pl08x: Add support for PL080S variant
-  dma: amba-pl08x: Add support for different maximum transfer size
-  dma: amba-pl08x: Keep LLIs aligned to 4-word boundary
-  spi: s3c64xx: Do not require legacy DMA API in case of S3C64XX
-  ASoC: samsung: Do not require legacy DMA API in case of S3C64XX
-  ARM: s3c64xx: Add support for DMA using generic amba-pl08x driver
-
- arch/arm/Kconfig                         |   1 +
- arch/arm/mach-s3c64xx/Kconfig            |   8 +-
- arch/arm/mach-s3c64xx/Makefile           |   1 +
- arch/arm/mach-s3c64xx/common.h           |   5 +
- arch/arm/mach-s3c64xx/include/mach/dma.h |  65 +++++
- arch/arm/mach-s3c64xx/pl080.c            | 244 +++++++++++++++++++
- drivers/dma/amba-pl08x.c                 | 399 ++++++++++++++++++++++---------
- drivers/spi/Kconfig                      |   2 +-
- include/linux/amba/pl080.h               |   1 +
- sound/soc/samsung/Kconfig                |   2 +-
- 10 files changed, 613 insertions(+), 115 deletions(-)
- create mode 100644 arch/arm/mach-s3c64xx/pl080.c
-
+diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+index 8bad254..d443a68 100644
+--- a/drivers/dma/amba-pl08x.c
++++ b/drivers/dma/amba-pl08x.c
+@@ -93,18 +93,22 @@
+ static struct amba_driver pl08x_amba_driver;
+ struct pl08x_driver_data;
+ 
++/** Controller supports dual AHB masters. */
++#define PL08X_IS_DUALMASTER	(1 << 0)
++/**
++ * Controller has Nomadik security extension bits that need to be checked
++ * for permission before use and some registers are missing.
++ */
++#define PL08X_IS_NOMADIK	(1 << 1)
++
+ /**
+  * struct vendor_data - vendor-specific config parameters for PL08x derivatives
+  * @channels: the number of channels available in this variant
+- * @dualmaster: whether this version supports dual AHB masters or not.
+- * @nomadik: whether the channels have Nomadik security extension bits
+- *	that need to be checked for permission before use and some registers are
+- *	missing
++ * @flags: Vendor-specific flags, see PL08X_IS_*
+  */
+ struct vendor_data {
+ 	u8 channels;
+-	bool dualmaster;
+-	bool nomadik;
++	u32 flags;
+ };
+ 
+ /*
+@@ -1391,7 +1395,7 @@ static struct dma_async_tx_descriptor *pl08x_prep_dma_memcpy(
+ 	/* Both to be incremented or the code will break */
+ 	txd->cctl |= PL080_CONTROL_SRC_INCR | PL080_CONTROL_DST_INCR;
+ 
+-	if (pl08x->vd->dualmaster)
++	if (pl08x->vd->flags & PL08X_IS_DUALMASTER)
+ 		txd->cctl |= pl08x_select_bus(pl08x->mem_buses,
+ 					      pl08x->mem_buses);
+ 
+@@ -1612,7 +1616,7 @@ bool pl08x_filter_id(struct dma_chan *chan, void *chan_id)
+ static void pl08x_ensure_on(struct pl08x_driver_data *pl08x)
+ {
+ 	/* The Nomadik variant does not have the config register */
+-	if (pl08x->vd->nomadik)
++	if (pl08x->vd->flags & PL08X_IS_NOMADIK)
+ 		return;
+ 	writel(PL080_CONFIG_ENABLE, pl08x->base + PL080_CONFIG);
+ }
+@@ -1897,7 +1901,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 	/* By default, AHB1 only.  If dualmaster, from platform */
+ 	pl08x->lli_buses = PL08X_AHB1;
+ 	pl08x->mem_buses = PL08X_AHB1;
+-	if (pl08x->vd->dualmaster) {
++	if (pl08x->vd->flags & PL08X_IS_DUALMASTER) {
+ 		pl08x->lli_buses = pl08x->pd->lli_buses;
+ 		pl08x->mem_buses = pl08x->pd->mem_buses;
+ 	}
+@@ -1954,7 +1958,7 @@ static int pl08x_probe(struct amba_device *adev, const struct amba_id *id)
+ 		 * down for the secure world only. Lock up these channels
+ 		 * by perpetually serving a dummy virtual channel.
+ 		 */
+-		if (vd->nomadik) {
++		if (vd->flags & PL08X_IS_NOMADIK) {
+ 			u32 val;
+ 
+ 			val = readl(ch->base + PL080_CH_CONFIG);
+@@ -2039,18 +2043,17 @@ out_no_pl08x:
+ /* PL080 has 8 channels and the PL080 have just 2 */
+ static struct vendor_data vendor_pl080 = {
+ 	.channels = 8,
+-	.dualmaster = true,
++	.flags = PL08X_IS_DUALMASTER,
+ };
+ 
+ static struct vendor_data vendor_nomadik = {
+ 	.channels = 8,
+-	.dualmaster = true,
+-	.nomadik = true,
++	.flags = PL08X_IS_DUALMASTER | PL08X_IS_NOMADIK,
+ };
+ 
+ static struct vendor_data vendor_pl081 = {
+ 	.channels = 2,
+-	.dualmaster = false,
++	.flags = 0,
+ };
+ 
+ static struct amba_id pl08x_ids[] = {
 -- 
 1.8.2.1
