@@ -1,30 +1,25 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 16 Jun 2013 15:25:15 +0200
-Subject: [PATCH v8 09/11] ASoC: fsl: Kconfig: Use fsl-ssi for phycore-ac97
+Date: Sun, 16 Jun 2013 15:25:16 +0200
+Subject: [PATCH v8 10/11] ASoC: fsl: Move fsl-ssi binding doc to sound/
 In-Reply-To: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
 References: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1371389117-19729-10-git-send-email-mpa@pengutronix.de>
+Message-ID: <1371389117-19729-11-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+fsl-ssi was located in powerpc/fsl/ssi.txt. This is no powerpc specific
+device, so it should be moved to sound/ as it connects to differen audio
+codecs.
+
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- sound/soc/fsl/Kconfig | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ .../devicetree/bindings/{powerpc/fsl/ssi.txt => sound/fsl,ssi.txt}        | 0
+ 1 file changed, 0 insertions(+), 0 deletions(-)
+ rename Documentation/devicetree/bindings/{powerpc/fsl/ssi.txt => sound/fsl,ssi.txt} (100%)
 
-diff --git a/sound/soc/fsl/Kconfig b/sound/soc/fsl/Kconfig
-index dafffd1..368686e 100644
---- a/sound/soc/fsl/Kconfig
-+++ b/sound/soc/fsl/Kconfig
-@@ -149,7 +149,8 @@ config SND_SOC_PHYCORE_AC97
- 	select SND_SOC_WM9712
- 	select SND_SOC_IMX_PCM_FIQ
- 	select SND_SOC_IMX_AUDMUX
--	select SND_SOC_IMX_SSI
-+	select SND_SOC_FSL_SSI if MACH_PCA100
-+	select SND_SOC_IMX_SSI if MACH_PCM043
- 	help
- 	  Say Y if you want to add support for SoC audio on Phytec phyCORE
- 	  and phyCARD boards in AC97 mode
+diff --git a/Documentation/devicetree/bindings/powerpc/fsl/ssi.txt b/Documentation/devicetree/bindings/sound/fsl,ssi.txt
+similarity index 100%
+rename from Documentation/devicetree/bindings/powerpc/fsl/ssi.txt
+rename to Documentation/devicetree/bindings/sound/fsl,ssi.txt
 -- 
 1.8.2.1
