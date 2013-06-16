@@ -1,61 +1,41 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 16 Jun 2013 12:45:48 +0200
-Subject: [PATCH] pinctrl: establish pull-up/pull-down terminology
-Message-ID: <1371379548-6482-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 16 Jun 2013 12:55:25 +0200
+Subject: [PATCH 1/3] drivers: pinctrl sleep and idle states in the core
+In-Reply-To: <51BA4158.906@wwwdotorg.org>
+References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+ <51AF73E9.90506@wwwdotorg.org>
+ <CACRpkdY_s_RkErKLqVOWdE-A80CZOq7+VZSE8jcYSUbYkvsYYQ@mail.gmail.com>
+ <51BA4158.906@wwwdotorg.org>
+Message-ID: <CACRpkda_tYONYU-N2M+j19A09iNP_dBWE8eBkOrL2LTrx42k_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Jun 14, 2013 at 12:02 AM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> On 06/11/2013 02:28 AM, Linus Walleij wrote:
+>> I tried to create a refactoring patch for this but couldn't come
+>> up with anything apropriate along the lines above. For example
+>> this function:
+> ...
+>
+> Don't you just want something very roughly like:
+>
+> int pinctrl_pm_select_xxx_state(struct device *dev,
+>                 unsigned long offset, char *name)
+> {
+>         struct dev_pin_info *pins = dev->pins;
+>         struct pinctrl_state **s = (void *)(((char *)pins) + offset)
+(...)
+>     return pinctrl_pm_select_xxx_state(dev,
+>                 offsetof(struct dev_pin_info, default_state),
+>                 "default");
+> }
 
-It is counter-intuitive to have "0" mean disable in a boolean
-manner for electronic properties of pins such as pull-up and
-pull-down. Therefore, define that a pull-up/pull-down argument
-of 0 to such a generic option means that the pin is
-short-circuited to VDD or GROUND. Pull disablement shall be
-done using PIN_CONFIG_BIAS_DISABLE.
+Argh that seems a bit too esoteric to save these few
+lines, maybe it's me being too stupid to parse this
+but it makes the code less maintainable for the pinctrl
+maintainer atleast so will not happen right now.
 
-Cc: Heiko St?bner <heiko@sntech.de>
-Cc: James Hogan <james.hogan@imgtec.com>
-Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- include/linux/pinctrl/pinconf-generic.h | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+But it is clever still. :-)
 
-diff --git a/include/linux/pinctrl/pinconf-generic.h b/include/linux/pinctrl/pinconf-generic.h
-index d414a77..67780f5 100644
---- a/include/linux/pinctrl/pinconf-generic.h
-+++ b/include/linux/pinctrl/pinconf-generic.h
-@@ -36,14 +36,15 @@
-  *	tristate. The argument is ignored.
-  * @PIN_CONFIG_BIAS_PULL_UP: the pin will be pulled up (usually with high
-  *	impedance to VDD). If the argument is != 0 pull-up is enabled,
-- *	if it is 0, pull-up is disabled.
-+ *	if it is 0, pull-up it total, i.e. the pin is connected to VDD.
-  * @PIN_CONFIG_BIAS_PULL_DOWN: the pin will be pulled down (usually with high
-  *	impedance to GROUND). If the argument is != 0 pull-down is enabled,
-- *	if it is 0, pull-down is disabled.
-+ *	if it is 0, pull-down is total, i.e. the pin is connected to GROUND.
-  * @PIN_CONFIG_BIAS_PULL_PIN_DEFAULT: the pin will be pulled up or down based
-  *	on embedded knowledge of the controller, like current mux function.
-- *	If the argument is != 0 pull up/down is enabled, if it is 0,
-- *	the pull is disabled.
-+ *	If the argument is != 0 pull up/down is enabled, if it is 0, the
-+ *	configuration is ignored. The proper way to disable it is to use
-+ *	@PIN_CONFIG_BIAS_DISABLE.
-  * @PIN_CONFIG_DRIVE_PUSH_PULL: the pin will be driven actively high and
-  *	low, this is the most typical case and is typically achieved with two
-  *	active transistors on the output. Setting this config will enable
-@@ -72,8 +73,8 @@
-  *	supplies, the argument to this parameter (on a custom format) tells
-  *	the driver which alternative power source to use.
-  * @PIN_CONFIG_SLEW_RATE: if the pin can select slew rate, the argument to
-- * 	this parameter (on a custom format) tells the driver which alternative
-- * 	slew rate to use.
-+ *	this parameter (on a custom format) tells the driver which alternative
-+ *	slew rate to use.
-  * @PIN_CONFIG_LOW_POWER_MODE: this will configure the pin for low power
-  *	operation, if several modes of operation are supported these can be
-  *	passed in the argument on a custom form, else just use argument 1
--- 
-1.7.11.3
+Yours,
+Linus Walleij
