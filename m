@@ -1,177 +1,85 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Sun, 16 Jun 2013 15:25:10 +0200
-Subject: [PATCH v8 04/11] ASoC: fsl-ssi: Add support for imx-pcm-fiq
-In-Reply-To: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
-References: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1371389117-19729-5-git-send-email-mpa@pengutronix.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Sun, 16 Jun 2013 15:34:06 +0200
+Subject: IGEPv2 audio problem
+In-Reply-To: <51BDAD7F.8090303@collabora.co.uk>
+References: <20130616135208.3f124c2c@skate> <51BDAD7F.8090303@collabora.co.uk>
+Message-ID: <20130616153406.1c8096fa@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for non-dma pcm for imx platforms with imx-pcm-fiq support.
-Instead of imx-pcm-audio, in this case imx-pcm-fiq-audio device is added
-and the SIER flags are set differently.
+Dear Javier Martinez Canillas,
 
-We need imx-pcm-fiq for some boards that use an incompatible codec.
-imx-pcm-fiq handles those codecs differently and allows to operate with
-them. DMA is not possible because some data sent by the codecs, e.g.
-wm9712, is not in the datastream. Also some data is mixed up in the
-fifos, so that we need to sort them out manually.
+Thanks for your quick feedback!
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
----
+On Sun, 16 Jun 2013 14:20:15 +0200, Javier Martinez Canillas wrote:
 
-Notes:
-    Changes in v4:
-     - Add a comment about the reason why we add a imx-pcm-fiq device.
-     - Change commit message to include information about the usage of imx-pcm-fiq
-    
-    Changes in v3:
-     - Rename bool "dma" to "use_dma"
+> Are you booting with DeviceTree or legacy using the IGEPv2 board file?
 
- sound/soc/fsl/fsl_ssi.c | 77 +++++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 65 insertions(+), 12 deletions(-)
+I was booting legacy with the IGEPv2 board file.
 
-diff --git a/sound/soc/fsl/fsl_ssi.c b/sound/soc/fsl/fsl_ssi.c
-index db55499..2fe4dbd 100644
---- a/sound/soc/fsl/fsl_ssi.c
-+++ b/sound/soc/fsl/fsl_ssi.c
-@@ -8,6 +8,26 @@
-  * This file is licensed under the terms of the GNU General Public License
-  * version 2.  This program is licensed "as is" without any warranty of any
-  * kind, whether express or implied.
-+ *
-+ *
-+ * Some notes why imx-pcm-fiq is used instead of DMA on some boards:
-+ *
-+ * The i.MX SSI core has some nasty limitations in AC97 mode. While most
-+ * sane processor vendors have a FIFO per AC97 slot, the i.MX has only
-+ * one FIFO which combines all valid receive slots. We cannot even select
-+ * which slots we want to receive. The WM9712 with which this driver
-+ * was developed with always sends GPIO status data in slot 12 which
-+ * we receive in our (PCM-) data stream. The only chance we have is to
-+ * manually skip this data in the FIQ handler. With sampling rates different
-+ * from 48000Hz not every frame has valid receive data, so the ratio
-+ * between pcm data and GPIO status data changes. Our FIQ handler is not
-+ * able to handle this, hence this driver only works with 48000Hz sampling
-+ * rate.
-+ * Reading and writing AC97 registers is another challenge. The core
-+ * provides us status bits when the read register is updated with *another*
-+ * value. When we read the same register two times (and the register still
-+ * contains the same value) these status bits are not set. We work
-+ * around this by not polling these bits but only wait a fixed delay.
-  */
- 
- #include <linux/init.h>
-@@ -121,11 +141,13 @@ struct fsl_ssi_private {
- 
- 	bool new_binding;
- 	bool ssi_on_imx;
-+	bool use_dma;
- 	struct clk *clk;
- 	struct snd_dmaengine_dai_dma_data dma_params_tx;
- 	struct snd_dmaengine_dai_dma_data dma_params_rx;
- 	struct imx_dma_data filter_data_tx;
- 	struct imx_dma_data filter_data_rx;
-+	struct imx_pcm_fiq_params fiq_params;
- 
- 	struct {
- 		unsigned int rfrc;
-@@ -355,7 +377,12 @@ static int fsl_ssi_startup(struct snd_pcm_substream *substream,
- 		 */
- 
- 		/* Enable the interrupts and DMA requests */
--		write_ssi(SIER_FLAGS, &ssi->sier);
-+		if (ssi_private->use_dma)
-+			write_ssi(SIER_FLAGS, &ssi->sier);
-+		else
-+			write_ssi(CCSR_SSI_SIER_TIE | CCSR_SSI_SIER_TFE0_EN |
-+					CCSR_SSI_SIER_RIE |
-+					CCSR_SSI_SIER_RFF0_EN, &ssi->sier);
- 
- 		/*
- 		 * Set the watermark for transmit FIFI 0 and receive FIFO 0. We
-@@ -549,7 +576,7 @@ static int fsl_ssi_dai_probe(struct snd_soc_dai *dai)
- {
- 	struct fsl_ssi_private *ssi_private = snd_soc_dai_get_drvdata(dai);
- 
--	if (ssi_private->ssi_on_imx) {
-+	if (ssi_private->ssi_on_imx && ssi_private->use_dma) {
- 		dai->playback_dma_data = &ssi_private->dma_params_tx;
- 		dai->capture_dma_data = &ssi_private->dma_params_rx;
- 	}
-@@ -702,6 +729,8 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	       sizeof(fsl_ssi_dai_template));
- 	ssi_private->cpu_dai_drv.name = ssi_private->name;
- 
-+	ssi_private->use_dma = !of_property_read_bool(np, "fsl,imx-fiq");
-+
- 	/* Get the addresses and IRQ */
- 	ret = of_address_to_resource(np, 0, &res);
- 	if (ret) {
-@@ -723,12 +752,15 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		goto error_iomap;
- 	}
- 
--	/* The 'name' should not have any slashes in it. */
--	ret = request_irq(ssi_private->irq, fsl_ssi_isr, 0, ssi_private->name,
--			  ssi_private);
--	if (ret < 0) {
--		dev_err(&pdev->dev, "could not claim irq %u\n", ssi_private->irq);
--		goto error_irqmap;
-+	if (ssi_private->use_dma) {
-+		/* The 'name' should not have any slashes in it. */
-+		ret = request_irq(ssi_private->irq, fsl_ssi_isr, 0,
-+				ssi_private->name, ssi_private);
-+		if (ret < 0) {
-+			dev_err(&pdev->dev, "could not claim irq %u\n",
-+					ssi_private->irq);
-+			goto error_irqmap;
-+		}
- 	}
- 
- 	/* Are the RX and the TX clocks locked? */
-@@ -777,7 +809,7 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 		 */
- 		ret = of_property_read_u32_array(pdev->dev.of_node,
- 					"fsl,ssi-dma-events", dma_events, 2);
--		if (ret) {
-+		if (ret && !ssi_private->use_dma) {
- 			dev_err(&pdev->dev, "could not get dma events\n");
- 			goto error_clk;
- 		}
-@@ -816,9 +848,30 @@ static int fsl_ssi_probe(struct platform_device *pdev)
- 	}
- 
- 	if (ssi_private->ssi_on_imx) {
--		ret = imx_pcm_dma_init(pdev);
--		if (ret)
--			goto error_dev;
-+		if (!ssi_private->use_dma) {
-+
-+			/*
-+			 * Some boards use an incompatible codec. To get it
-+			 * working, we are using imx-fiq-pcm-audio, that
-+			 * can handle those codecs. DMA is not possible in this
-+			 * situation.
-+			 */
-+
-+			ssi_private->fiq_params.irq = ssi_private->irq;
-+			ssi_private->fiq_params.base = ssi_private->ssi;
-+			ssi_private->fiq_params.dma_params_rx =
-+				&ssi_private->dma_params_rx;
-+			ssi_private->fiq_params.dma_params_tx =
-+				&ssi_private->dma_params_tx;
-+
-+			ret = imx_pcm_fiq_init(pdev, &ssi_private->fiq_params);
-+			if (ret)
-+				goto error_dev;
-+		} else {
-+			ret = imx_pcm_dma_init(pdev);
-+			if (ret)
-+				goto error_dev;
-+		}
- 	}
- 
- 	/*
+> I can take a look to this but I don't know if Tony is still accepting bugfixes
+> for board files.
+> 
+> twl4030 based audio should already work with DT as far as I know.
+> 
+> Can you please try using DT? I don't have access to my IGEPv2 right now but I'm
+> going to try with both DT and legacy boot too.
+
+I've tried DT based boot right now, and it doesn't work any better:
+
+# aplay test.wav 
+[  172.044494] omap-dma-engine 48056000.dma-controller: allocating channel for 33
+Playing WAVE 'test.wav' : Signed 16 bit Little Endian, Rate 44100 Hz, Stereo
+aplay: pcm_write[  192.184661] omap-dma-engine 48056000.dma-controller: freeing channel for 33
+:1737: write error: Input/output error
+
+and I still have the following message in dmesg:
+
+[  182.083740] ALSA pcm_lib.c:1942 playback write error (DMA or IRQ trouble?)
+
+And I'm really booting the DT way:
+
+$ dmesg | grep Flattened
+[    0.000000] Machine: Generic OMAP3 (Flattened Device Tree), model: IGEPv2
+
+Also, there is a fairly significant issue with the DT based booting:
+the Ethernet controller is not enabled apparently.
+
+I must admit I really don't understand the way mach-omap2 is handling
+the migration from legacy booting to DT-based booting. Right now, you
+have the choice between:
+
+ (*) Legacy booting, with which you get support for all devices, but as
+     you said, if something breaks, it may not get fixed as legacy booting
+     is deprecated.
+
+ (*) DT booting, which is supported, but not all devices are enabled
+     because some of them are handled by drivers that still lack a DT
+     binding.
+
+Why isn't the mach-omap2 world following the path that other platforms
+have followed, such as mach-kirkwood, where the migration to the DT is
+done progressively? When a board is converted to the DT, the
+possibility of booting it the legacy way is removed, but all the
+devices that cannot be initialized through DT remain initialized using
+C function calls and platform_device. This offers a smooth transition
+to end users. See
+http://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/arch/arm/mach-kirkwood/board-dt.c#n109
+for details on how it is done on Kirkwood platforms. For example,
+Kirkwood still lacks a DT binding for its Ethernet driver, but the
+Ethernet interface(s) still get probed the old way even if you're
+booting through DT.
+
+That said, in this particular case, it seems like audio doesn't work
+regarless of the boot method. But if audio gets fixed for DT based
+booting, it will be pretty useless: an IGEPv2 without Ethernet is not
+very useful.
+
+Best regards,
+
+Thomas
 -- 
-1.8.2.1
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
