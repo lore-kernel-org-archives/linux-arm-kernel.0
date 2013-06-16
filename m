@@ -1,92 +1,43 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 16 Jun 2013 11:21:52 +0200
-Subject: [PATCH v4] irqchip: Add support for ARMv7-M's NVIC
-In-Reply-To: <20130615004149.D85B13E0A2E@localhost>
-References: <1371073835-10639-1-git-send-email-u.kleine-koenig@pengutronix.de>
- <20130615004149.D85B13E0A2E@localhost>
-Message-ID: <20130616092152.GH11232@pengutronix.de>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Sun, 16 Jun 2013 12:45:01 +0300
+Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
+In-Reply-To: <51AE2980.6010005@linaro.org>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+ <51AD32A4.5070609@linaro.org>
+ <20130604160907.GW27516@mudshark.cambridge.arm.com>
+ <51AE2980.6010005@linaro.org>
+Message-ID: <20130616094501.GG10269@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 15, 2013 at 01:41:49AM +0100, Grant Likely wrote:
-> On Wed, 12 Jun 2013 23:50:35 +0200, Uwe Kleine-K?nig  <u.kleine-koenig@pengutronix.de> wrote:
-> > This interrupt controller is found on Cortex-M3 and Cortex-M4 machines.
-> > 
-> > Support for this controller appeared in Catalin's Cortex tree based on
-> > 2.6.33 but was nearly completely rewritten.
-> > 
-> > Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > 
-> > Notes:
-> >     Changes since v3, sent with
-> >     Message-Id: <1366214540-31166-1-git-send-email-u.kleine-koenig@pengutronix.de>:
-> >     
-> >      - use generic chip
-> >      - rename nvic_do_IRQ to nvic_handle_irq
-> >     
-> >     This depends on the stuff currently in tip/irq/for-arm
-> 
-> Minor comments below, but it looks good to me. Nice and small.
-> 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> 
-> > +asmlinkage void __exception_irq_entry
-> > +nvic_handle_irq(irq_hw_number_t hwirq, struct pt_regs *regs)
-> > +{
-> > +	unsigned int irq = irq_linear_revmap(nvic_irq_domain, hwirq);
-> > +
-> > +	handle_IRQ(irq, regs);
-> 
-> Or simply:
-> 	handle_IRQ(irq_linear_revmap(nvic_irq_domain, hwirq), regs);
-I think my version is more readable, so I tend to keep it the way I
-suggested.
+Hi John,
 
-> > +static int __init nvic_of_init(struct device_node *node,
-> > +			       struct device_node *parent)
-> > +{
-> > +	void __iomem *nvic_base;
-> > +	unsigned int irqs, i, ret;
-> > +	unsigned numbanks = (readl_relaxed(V7M_SCS_ICTR) &
-> > +			     V7M_SCS_ICTR_INTLINESNUM_MASK) + 1;
-> > +	unsigned int clr = IRQ_NOREQUEST | IRQ_NOPROBE | IRQ_NOAUTOEN;
-> > +
-> > +	nvic_base = of_iomap(node, 0);
-> > +	if (!nvic_base) {
-> > +		pr_warn("unable to map nvic registers\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	irqs = numbanks * 32;
-> > +	if (irqs > NVIC_MAX_IRQ)
-> > +		irqs = NVIC_MAX_IRQ;
-> 
-> I would display some kind of message here.
-That's not an error case. The documentation about INTLINESNUM reads:
+On Tue, Jun 04, 2013 at 10:53:04AM -0700, John Stultz wrote:
+> On 06/04/2013 09:09 AM, Will Deacon wrote:
+> >On Tue, Jun 04, 2013 at 01:19:48AM +0100, John Stultz wrote:
+> >>On 06/01/2013 11:39 PM, Stephen Boyd wrote:
+> >>>This is mostly a resend of a patch series I sent a little over a month
+> >>>ago. I've reordered the patches so that John can pick up the first three
+> >>>and get a generic sched_clock layer without having to take the 64 bit
+> >>>patches. The last three patches add 64 bit support and move the architected
+> >>>timers on ARM64 and ARM to use it.
+> >>
+> >>Yea, so from the initial look over it, I think I'm happy with queuing
+> >>the first three patches, although I'd like to get some acks from arm
+> >>folks on at least the first two, just so no one is surprised with it
+> >>going through the -tip tree.
+> >The first two patches are pretty simple so, FWIW, you can add my ack on those:
+> >
+> >   Acked-by: Will Deacon <will.deacon@arm.com>
+> Thanks! Added to the commits.
 
-	The total number of interrupt lines supported by an
-	implementation, defined in groups of 32. That is, the total number of
-	interrupt lines is up to (32*(INTLINESNUM+1)). However, the absolute
-	maximum number of interrupts is 496, corresponding to the INTLINESNUM
-	value 0b1111.
+What is the status of this series then? Is there a chance of seeing it in 
+3.11? I want to base some xtensa architecture work on this, so I'd like to 
+know whether there is a stable base to start from.
 
-And the documentation for e.g. NVIC_ISER0 - NVIC_ISER15 reads:
-
-	Usage constraints NVIC_ISERn[31:0] are the set-enable bits for
-	interrupts (31+(32*n)) - (32*n).
-	When n=15, bits [31:16] are reserved.
-
-So it's just an implementation detail that the last bank can only
-contain 16 interrupts. There is a comment describing that fact at the
-definition of NVIC_MAX_IRQ.
-
-So I think this case is important enough to clutter the kernel log.
-
-Best regards
-Uwe
+baruch
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
