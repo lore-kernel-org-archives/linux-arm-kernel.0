@@ -1,69 +1,40 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Sun, 16 Jun 2013 16:39:51 +0200
-Subject: [PATCH] pinctrl: establish pull-up/pull-down terminology
-In-Reply-To: <1371379548-6482-1-git-send-email-linus.walleij@stericsson.com>
-References: <1371379548-6482-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201306161639.51403.heiko@sntech.de>
+From: jarkko.nikula@bitmer.com (Jarkko Nikula)
+Date: Sun, 16 Jun 2013 18:35:13 +0300
+Subject: [PATCH 3/8] ARM: OMAP2+: hwmod: Remove remaining DMA channel
+ definitions
+In-Reply-To: <20130615150650.GB27629@arwen.pp.htv.fi>
+References: <1371285069-6834-1-git-send-email-jarkko.nikula@bitmer.com>
+ <1371285069-6834-4-git-send-email-jarkko.nikula@bitmer.com>
+ <20130615150650.GB27629@arwen.pp.htv.fi>
+Message-ID: <51BDDB31.2000200@bitmer.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Sonntag, 16. Juni 2013, 12:45:48 schrieb Linus Walleij:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> It is counter-intuitive to have "0" mean disable in a boolean
-> manner for electronic properties of pins such as pull-up and
-> pull-down. Therefore, define that a pull-up/pull-down argument
-> of 0 to such a generic option means that the pin is
-> short-circuited to VDD or GROUND. Pull disablement shall be
-> done using PIN_CONFIG_BIAS_DISABLE.
-> 
-> Cc: Heiko St?bner <heiko@sntech.de>
-> Cc: James Hogan <james.hogan@imgtec.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hi Felipe
 
-very nice :-)
-
-Acked-by: Heiko Stuebner <heiko@sntech.de>
-
-> ---
->  include/linux/pinctrl/pinconf-generic.h | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
+On 06/15/2013 06:06 PM, Felipe Balbi wrote:
+> On Sat, Jun 15, 2013 at 11:31:04AM +0300, Jarkko Nikula wrote:
+>> Last remaining DMA channel definitions in arch/arm/mach-omap2/dma.h
+>> are used only by omap_hwmod_2xxx_3xxx_ipblock_data.c and
+>> omap_hwmod_3xxx_data.c. Remove them by using directly DMA channel number in
+>> hwmod data and drop definitions with a following script:
+>>
+>> egrep '#define [OMAP|AM35XX].*DMA' arch/arm/mach-omap2/dma.h | cut -f 1,3 \
+>> 	| while read i; do \
+>> 		DEF=`echo $i |cut -d ' ' -f 2`; \
+>> 		CH=`echo $i |cut -d ' ' -f 3`; \
+>> 		echo "removing" $DEF; \
+>> 		sed -i "s/${DEF}/${CH}/" arch/arm/mach-omap2/omap_hwmod_*.c; \
+>> 		sed -i "/${DEF}/d" arch/arm/mach-omap2/dma.h; \
+>> 	done
+>>
+>>  /* DMA channels for 24xx */
 > 
-> diff --git a/include/linux/pinctrl/pinconf-generic.h
-> b/include/linux/pinctrl/pinconf-generic.h index d414a77..67780f5 100644
-> --- a/include/linux/pinctrl/pinconf-generic.h
-> +++ b/include/linux/pinctrl/pinconf-generic.h
-> @@ -36,14 +36,15 @@
->   *	tristate. The argument is ignored.
->   * @PIN_CONFIG_BIAS_PULL_UP: the pin will be pulled up (usually with high
->   *	impedance to VDD). If the argument is != 0 pull-up is enabled,
-> - *	if it is 0, pull-up is disabled.
-> + *	if it is 0, pull-up it total, i.e. the pin is connected to VDD.
->   * @PIN_CONFIG_BIAS_PULL_DOWN: the pin will be pulled down (usually with
-> high *	impedance to GROUND). If the argument is != 0 pull-down is enabled,
-> - *	if it is 0, pull-down is disabled.
-> + *	if it is 0, pull-down is total, i.e. the pin is connected to GROUND.
->   * @PIN_CONFIG_BIAS_PULL_PIN_DEFAULT: the pin will be pulled up or down
-> based *	on embedded knowledge of the controller, like current mux
-> function. - *	If the argument is != 0 pull up/down is enabled, if it is 0,
-> - *	the pull is disabled.
-> + *	If the argument is != 0 pull up/down is enabled, if it is 0, the
-> + *	configuration is ignored. The proper way to disable it is to use
-> + *	@PIN_CONFIG_BIAS_DISABLE.
->   * @PIN_CONFIG_DRIVE_PUSH_PULL: the pin will be driven actively high and
->   *	low, this is the most typical case and is typically achieved with two
->   *	active transistors on the output. Setting this config will enable
-> @@ -72,8 +73,8 @@
->   *	supplies, the argument to this parameter (on a custom format) tells
->   *	the driver which alternative power source to use.
->   * @PIN_CONFIG_SLEW_RATE: if the pin can select slew rate, the argument to
-> - * 	this parameter (on a custom format) tells the driver which 
-alternative
-> - * 	slew rate to use.
-> + *	this parameter (on a custom format) tells the driver which 
-alternative
-> + *	slew rate to use.
->   * @PIN_CONFIG_LOW_POWER_MODE: this will configure the pin for low power
->   *	operation, if several modes of operation are supported these can be
->   *	passed in the argument on a custom form, else just use argument 1
+> could remove the comments too.
+> 
+You are right. Actually I was thinking that myself too with this and
+omap1 patches but decided to keep manual work and scripts bare minimum
+and let final git rm in 4/8 and 8/8 to handle these :-)
+
+-- 
+Jarkko
