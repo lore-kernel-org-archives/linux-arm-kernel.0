@@ -1,38 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 16 Jun 2013 14:43:30 +0200
-Subject: [PATCH 2/7] gpio: clean up gpio-ranges documentation
-In-Reply-To: <1371157199-7272-2-git-send-email-swarren@wwwdotorg.org>
-References: <1371157199-7272-1-git-send-email-swarren@wwwdotorg.org>
- <1371157199-7272-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <CACRpkdYhMGg3OXTuD9T3WS3SQT2P+1WGG5KexmNqzomd00nErQ@mail.gmail.com>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Sun, 16 Jun 2013 15:25:07 +0200
+Subject: [PATCH v8 01/11] ASoC: imx-pcm-dma: DT support
+In-Reply-To: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
+References: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1371389117-19729-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 10:59 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+This patch removes the NO_DT flag. The pdev pointer may have a proper
+of_node with the dmas property, so we can use it to request DMA
+channels.
 
-> From: Stephen Warren <swarren@nvidia.com>
->
-> This change makes documentation of the the gpio-ranges property shorter
-> and more succinct, more consistent with the style of the rest of the
-> document, and not mention Linux-specifics such as the API
-> pinctrl_request_gpio(); DT binding documents should be OS independant
-> where at all possible.
->
-> This change also removes any mention of the #gpio-range-cells property.
-> Such properties are useful when one node references a second node, and
-> that second node dictates the format of the reference. However, that is
-> not the case here; the definition of gpio-ranges itself always dictates
-> its format entirely, and hence the value #gpio-range-cells must always
-> be 3, and hence there is no point requiring any referenced node to
-> include this property.
->
-> Signed-off-by: Stephen Warren <swarren@nvidia.com>
-> ---
-> Patches 2-6 need to be applied in the same branch, since they all build
-> upon each-other.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+---
 
-Very nice. If I can just get the OF maintainers to ACK the OF
-patches I can carry this stuff in pinctrl or gpio alike.
+Notes:
+    Changes in v6:
+     - After rebasing onto Shawn's imx-pcm cleanups, this patch just consists of
+       removing the NO_DT flag.
+    
+    Changes in v5:
+     - Use dev.parent pointer to get the of_node.
 
-Yours,
-Linus Walleij
+ sound/soc/fsl/imx-pcm-dma.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/sound/soc/fsl/imx-pcm-dma.c b/sound/soc/fsl/imx-pcm-dma.c
+index fde4d2e..f323ce0 100644
+--- a/sound/soc/fsl/imx-pcm-dma.c
++++ b/sound/soc/fsl/imx-pcm-dma.c
+@@ -64,7 +64,6 @@ int imx_pcm_dma_init(struct platform_device *pdev)
+ {
+ 	return snd_dmaengine_pcm_register(&pdev->dev, &imx_dmaengine_pcm_config,
+ 		SND_DMAENGINE_PCM_FLAG_NO_RESIDUE |
+-		SND_DMAENGINE_PCM_FLAG_NO_DT |
+ 		SND_DMAENGINE_PCM_FLAG_COMPAT);
+ }
+ EXPORT_SYMBOL_GPL(imx_pcm_dma_init);
+-- 
+1.8.2.1
