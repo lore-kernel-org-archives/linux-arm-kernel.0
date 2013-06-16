@@ -1,29 +1,60 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 16 Jun 2013 12:21:19 +0200
-Subject: [PATCH 2/2] regulators: ab3100: bootstrap board power
-In-Reply-To: <20130614095454.GF1403@sirena.org.uk>
-References: <1371154828-28117-1-git-send-email-linus.walleij@stericsson.com>
- <20130614095454.GF1403@sirena.org.uk>
-Message-ID: <CACRpkdbUMxvh2_BmKiKd=cm6TYooFYaWDTQF+o2k2zT9-mKzvA@mail.gmail.com>
+Date: Sun, 16 Jun 2013 12:26:38 +0200
+Subject: [PATCH 1/5] pinctrl: update the documentation for some pinconfig
+ params
+In-Reply-To: <201306141742.21808.heiko@sntech.de>
+References: <201306141741.46077.heiko@sntech.de>
+ <201306141742.21808.heiko@sntech.de>
+Message-ID: <CACRpkdaV78wXxGPFWVffEfnqrmhq1rsdVYdSKNx5mWaOcYOWrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 11:54 AM, Mark Brown <broonie@kernel.org> wrote:
-> On Thu, Jun 13, 2013 at 10:20:28PM +0200, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This moves the code from the platform that is bootstrapping
->> the power on the U300 platform out from the machine directory
->> and the special-purpose board node and module and into the
->> regulator node and driver itself.
+On Fri, Jun 14, 2013 at 5:42 PM, Heiko St?bner <heiko@sntech.de> wrote:
+
+> The BIAS_DISABLE and BIAS_HIGH_IMPEDANCE generic pinconfig options were
+> missing information about their argument - which should be ignored.
 >
-> Hrm.  Wouldn't this fit better into the new reset framework?
+> Also the BIAS_PULL_* options may have the pull strength as argument
+> when they are activated, while simpler hardware can use any
+> non-0 value for it.
+>
+> Update the kerneldoc to reflect this.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 
-OK that would anyway involve creating some specific DT node
-for this thing I guess.
+I'm holding this patch off.
 
-Then the current approach with a board node is no more
-complicated, so we can refactor from that point instead.
+>   * @PIN_CONFIG_BIAS_PULL_UP: the pin will be pulled up (usually with high
+> - *     impedance to VDD). If the argument is != 0 pull-up is enabled,
+> - *     if it is 0, pull-up is disabled.
+> + *     impedance to VDD). If the argument is != 0 pull-up is enabled. On
+> + *     hardware supporting this, the argument should contain the strength of
+> + *     the pull in Ohm. If it is 0, pull-up is disabled.
+
+As noted by Laurent, a pull-up of 0 Ohm is a short-circuit (bascially the TOTAL
+pull-up) and it is pretty counter-intuitive to have that mean "disable pull-up".
+Can we avoid this?
+
+>   * @PIN_CONFIG_BIAS_PULL_DOWN: the pin will be pulled down (usually with high
+> - *     impedance to GROUND). If the argument is != 0 pull-down is enabled,
+> - *     if it is 0, pull-down is disabled.
+> + *     impedance to GROUND). If the argument is != 0 pull-down is enabled. On
+> + *     hardware supporting this, the argument should contain the strength of
+> + *     the pull in Ohm. If it is 0, pull-down is disabled.
+
+Dito.
+
+>   * @PIN_CONFIG_BIAS_PULL_PIN_DEFAULT: the pin will be pulled up or down based
+>   *     on embedded knowledge of the controller, like current mux function.
+> - *     If the argument is != 0 pull up/down is enabled, if it is 0,
+> - *     the pull is disabled.
+> + *     If the argument is != 0 pull up/down is enabled. On hardware supporting
+> + *     this, the argument should contain the strength of the pull in Ohm.
+> + *     If it is 0, pull is disabled.
+
+Dito.
+
+Can't we rely on PIN_CONFIG_BIAS_DISABLE for all this?
 
 Yours,
 Linus Walleij
