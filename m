@@ -1,69 +1,29 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Sun, 16 Jun 2013 12:18:29 +0200
-Subject: [PATCH] pinctrl: update GPIO range doc
-Message-ID: <1371377909-5921-1-git-send-email-linus.walleij@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 16 Jun 2013 12:21:19 +0200
+Subject: [PATCH 2/2] regulators: ab3100: bootstrap board power
+In-Reply-To: <20130614095454.GF1403@sirena.org.uk>
+References: <1371154828-28117-1-git-send-email-linus.walleij@stericsson.com>
+ <20130614095454.GF1403@sirena.org.uk>
+Message-ID: <CACRpkdbUMxvh2_BmKiKd=cm6TYooFYaWDTQF+o2k2zT9-mKzvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Fri, Jun 14, 2013 at 11:54 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Thu, Jun 13, 2013 at 10:20:28PM +0200, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This moves the code from the platform that is bootstrapping
+>> the power on the U300 platform out from the machine directory
+>> and the special-purpose board node and module and into the
+>> regulator node and driver itself.
+>
+> Hrm.  Wouldn't this fit better into the new reset framework?
 
-This updates the GPIO range documentation with the API changes
-for sparse/random/arbitrary pin-to-GPIO mappings.
+OK that would anyway involve creating some specific DT node
+for this thing I guess.
 
-Cc: Christian Ruppert <christian.ruppert@abilis.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- Documentation/pinctrl.txt | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+Then the current approach with a board node is no more
+complicated, so we can refactor from that point instead.
 
-diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-index f6e664b..4548743 100644
---- a/Documentation/pinctrl.txt
-+++ b/Documentation/pinctrl.txt
-@@ -350,6 +350,23 @@ chip b:
-  - GPIO range : [48 .. 55]
-  - pin range  : [64 .. 71]
- 
-+The above examples assume the mapping between the GPIOs and pins is
-+linear. If the mapping is sparse or haphazard, an array of arbitrary pin
-+numbers can be encoded in the range like this:
-+
-+static const unsigned range_pins[] = { 14, 1, 22, 17, 10, 8, 6, 2 };
-+
-+static struct pinctrl_gpio_range gpio_range = {
-+	.name = "chip",
-+	.id = 0,
-+	.base = 32,
-+	.pins = &range_pins,
-+	.npins = ARRAY_SIZE(range_pins),
-+	.gc = &chip;
-+};
-+
-+In this case the pin_base property will be ignored.
-+
- When GPIO-specific functions in the pin control subsystem are called, these
- ranges will be used to look up the appropriate pin controller by inspecting
- and matching the pin to the pin ranges across all controllers. When a
-@@ -357,9 +374,9 @@ pin controller handling the matching range is found, GPIO-specific functions
- will be called on that specific pin controller.
- 
- For all functionalities dealing with pin biasing, pin muxing etc, the pin
--controller subsystem will subtract the range's .base offset from the passed
--in gpio number, and add the ranges's .pin_base offset to retrive a pin number.
--After that, the subsystem passes it on to the pin control driver, so the driver
-+controller subsystem will look up the corresponding pin number from the passed
-+in gpio number, and use the ranges internals to retrive a pin number. After
-+that, the subsystem passes it on to the pin control driver, so the driver
- will get an pin number into its handled number range. Further it is also passed
- the range ID value, so that the pin controller knows which range it should
- deal with.
-@@ -368,6 +385,7 @@ Calling pinctrl_add_gpio_range from pinctrl driver is DEPRECATED. Please see
- section 2.1 of Documentation/devicetree/bindings/gpio/gpio.txt on how to bind
- pinctrl and gpio drivers.
- 
-+
- PINMUX interfaces
- =================
- 
--- 
-1.7.11.3
+Yours,
+Linus Walleij
