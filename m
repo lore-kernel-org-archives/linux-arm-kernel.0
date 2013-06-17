@@ -1,28 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 15:42:15 +0200
-Subject: [RFC PATCH 05/11] dma: amba-pl08x: Add support for different
- maximum transfer size
-In-Reply-To: <1371416058-22047-6-git-send-email-tomasz.figa@gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-6-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdaHpNVXueXy0HRnKTshn4ZZSPFh-pgav6B0UAU1xqsNCg@mail.gmail.com>
+From: afzal@ti.com (Mohammed, Afzal)
+Date: Mon, 17 Jun 2013 13:43:52 +0000
+Subject: [PATCH v2 0/2] Remove unused voltagedomain data for AM33xx
+In-Reply-To: <1371474983-29296-1-git-send-email-rnayak@ti.com>
+References: <1371474983-29296-1-git-send-email-rnayak@ti.com>
+Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB20EA7@DBDE04.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+Hi,
 
-> PL080S has separate register to store transfer size in, allowing single
-> transfer to be much larger than in standard PL080.
->
-> This patch makes the amba-pl08x driver aware of this and removes writing
-> transfer size to reserved bits of CH_CONTROL register on PL080S, which
-> was not a problem witn transfer sizes fitting the original bitfield
-> of PL080, but now would overwrite other fields.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+On Mon, Jun 17, 2013 at 18:46:21, Nayak, Rajendra wrote:
 
-Very straight-forward.
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+> The powerdomain framework currently expects to always have a voltagedomain
+> associated with a given powerdomain. We already have AM33xx which
+> has no Voltage Controller/Voltage Processor as part of PRCM.
+> There are more SoCs' to follow starting with AM437x and DRA7xx
+> which do not have VC/VP. All these SoCs', hence do not support any
+> form of auto-scaling of voltages, that was possible on earlier OMAPs'
+> using the VFSM to trigger an i2c communication to the PMIC automatically
+> on hitting a low power state.
+> 
+> Instead of adding dummy voltage domain data files, like was done for the
+> AM33xx case, make the powerdomain framework aware of the fact that some
+> SoCs' might not really have support for auto-scaling of voltages in hw.
+> 
+> Patches are based of 3.10-rc6 and are boot tested on am335x bone.
 
-Yours,
-Linus Walleij
+Tested-by: Afzal Mohammed <afzal@ti.com> (am335x evm)
+
+Regards
+Afzal
