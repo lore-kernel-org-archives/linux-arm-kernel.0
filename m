@@ -1,29 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jun 2013 09:40:33 +0100
-Subject: [RFC] arm: Remove sa1111 special case from
- arm_mm_memblock_reserve()
-In-Reply-To: <1371429799-7128-1-git-send-email-grant.likely@linaro.org>
-References: <1371429799-7128-1-git-send-email-grant.likely@linaro.org>
-Message-ID: <20130617084033.GC2718@n2100.arm.linux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Jun 2013 10:41:06 +0200
+Subject: [PATCH 2/6] pinctrl: sunxi: Move the pins definitions to a
+ separate header
+In-Reply-To: <CACRpkdajdrcLy6u2cKkrpYnh0Hqx8Hjx+zJ_tfpYCfJFqWCrZA@mail.gmail.com>
+References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1370795767-9769-3-git-send-email-maxime.ripard@free-electrons.com>
+ <CACRpkdajdrcLy6u2cKkrpYnh0Hqx8Hjx+zJ_tfpYCfJFqWCrZA@mail.gmail.com>
+Message-ID: <20130617084106.GE16699@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 01:43:19AM +0100, Grant Likely wrote:
-> The machine desc structure has a hook for doing machine-specific
-> memblock code, but the SA1111 still has a platform-specific hook in the
-> generic code. This patch merely moves the needed memblock_reserve()
-> into a callback.
+Hi Linus,
 
-And... the reason I left this in generic code was to avoid the problem
-which you've created by doing this change - there is at least one PXA
-platform which also can have SA1111 enabled, and by omitting this
-reservation, you will make that platform blow up at boot time because
-we will try and free the same region of RAM twice into the buddy
-allocator.
+On Sun, Jun 16, 2013 at 01:03:09PM +0200, Linus Walleij wrote:
+> On Sun, Jun 9, 2013 at 6:36 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> 
+> > It will allow us to have a cleaner separation between the data needed by
+> > the driver to work, and the core logic of the driver in itself, and will
+> > allow having too much noise in the core driver in the future.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> 
+> Patch applied.
+> 
+> Since you will anyway have to bring the ARM SoC branch on
+> top of the pinctrl tree, I might as well apply this to my tree.
 
-It was left there because one of these currently has to stay in generic
-code, so they both need to in order to ensure that both are properly
-paired.
+Thanks for merging this.
 
-What problem, other than a distaste for having such things in generic
-code, are you having with this?
+I applied the other patches except for the 5th one that Emilio commented
+on.
+
+> If everything else fails, you'll have a nice development base
+> in v3.11 with this in place, right?
+
+Yes, As far as I can see, we should have a pretty complete support for
+the GPIO/muxing/IRQ on the "old" allwinner SoCs (sun4i and sun5i) now.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
