@@ -1,76 +1,38 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 17 Jun 2013 16:48:41 +1000
-Subject: linux-next: manual merge of the arm-soc tree with the tty tree
-Message-ID: <20130617164841.41561f78f3465bd4007411b6@canb.auug.org.au>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 17 Jun 2013 15:54:04 +0900
+Subject: [GIT PULL v2 0/1] Renesas ARM based SoC cleanups for v3.11
+Message-ID: <1371452045-21959-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Olof, Hi Arnd,
 
-Today's linux-next merge of the arm-soc tree got a conflict in
-drivers/tty/serial/xilinx_uartps.c between commit 696faedd616e ("serial:
-use platform_{get,set}_drvdata()") from the tty tree and commit
-30e1e28598c2 ("arm: zynq: Migrate platform to clock controller") from the
-arm-soc tree.
+This small pull request is based on a merge of
+renesas-soc-for-v3.11 and renesas-pinmux-for-v3.11 both
+of which you have previously pulled. The reason for this base is to provide
+all the code that the one patch in this request adds annotations to.
 
-I fixed it up (see below) and can carry the fix as necessary (no action
-is required).
+The following changes since commit 12dd9752512449f0336b7d64df3871145a28a2fe:
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+  Merge tags 'renesas-pinmux-for-v3.11' and 'renesas-soc-for-v3.11' into cleanup (2013-06-13 14:45:20 +0900)
 
-diff --cc drivers/tty/serial/xilinx_uartps.c
-index 6c91745,a4a3028..0000000
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@@ -972,14 -1004,15 +1004,14 @@@ static int xuartps_probe(struct platfor
-  		port->mapbase = res->start;
-  		port->irq = res2->start;
-  		port->dev = &pdev->dev;
-- 		port->uartclk = clk_get_rate(clk);
-- 		port->private_data = clk;
-+ 		port->uartclk = clk_get_rate(xuartps_data->refclk);
-+ 		port->private_data = xuartps_data;
- -		dev_set_drvdata(&pdev->dev, port);
- +		platform_set_drvdata(pdev, port);
-  		rc = uart_add_one_port(&xuartps_uart_driver, port);
-  		if (rc) {
-  			dev_err(&pdev->dev,
-  				"uart_add_one_port() failed; err=%i\n", rc);
-- 			return rc;
- -			dev_set_drvdata(&pdev->dev, NULL);
-+ 			goto err_out_clk_disable;
-  		}
-  		return 0;
-  	}
-@@@ -993,14 -1039,19 +1038,18 @@@ err_out_free
-   **/
-  static int xuartps_remove(struct platform_device *pdev)
-  {
- -	struct uart_port *port = dev_get_drvdata(&pdev->dev);
- +	struct uart_port *port = platform_get_drvdata(pdev);
-- 	struct clk *clk = port->private_data;
-+ 	struct xuartps *xuartps_data = port->private_data;
-  	int rc;
-  
-  	/* Remove the xuartps port from the serial core */
-  	rc = uart_remove_one_port(&xuartps_uart_driver, port);
- -	dev_set_drvdata(&pdev->dev, NULL);
-  	port->mapbase = 0;
-- 	clk_disable_unprepare(clk);
-+ 	clk_disable_unprepare(xuartps_data->refclk);
-+ 	clk_disable_unprepare(xuartps_data->aperclk);
-+ 	clk_put(xuartps_data->refclk);
-+ 	clk_put(xuartps_data->aperclk);
-+ 	kfree(xuartps_data);
-  	return rc;
-  }
-  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/6843bd74/attachment.sig>
+are available in the git repository at:
+
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v3.11
+
+for you to fetch changes up to f9094c526bca3cc50ef7d409c22976fa0f47bbba:
+
+  ARM: shmobile: r8a7790: add __initdata on resource and device data (2013-06-13 14:47:34 +0900)
+
+----------------------------------------------------------------
+Renesas ARM based SoC cleanups for v3.11
+
+__initdata annotations for the r8a7790 SoC by Morimoto-san.
+
+----------------------------------------------------------------
+Kuninori Morimoto (1):
+      ARM: shmobile: r8a7790: add __initdata on resource and device data
+
+ arch/arm/mach-shmobile/setup-r8a7790.c |   12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
