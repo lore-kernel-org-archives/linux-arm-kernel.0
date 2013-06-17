@@ -1,42 +1,40 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 17:12:44 +0900
-Subject: [PATCH 11/15] ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
+Date: Mon, 17 Jun 2013 17:12:41 +0900
+Subject: [PATCH 08/15] ARM: shmobile: sh73a0 SMP with SCU boot fn and args
 In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371456768-1084-12-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371456768-1084-9-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Adjust mach-shmobile to add a select for CONFIG_ARM_PATCH_PHYS_VIRT
-and at the same time remove NEED_MACH_MEMORY_H.
+Let sh73a0 make use of shmobile_boot_fn and shmobile_boot_arg
+together with shmobile_boot_scu and the SCU base address.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/Kconfig |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/mach-shmobile/smp-sh73a0.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index dfb4fee..f06e65b 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -634,6 +634,7 @@ config ARCH_MSM
+diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
+index 496592b..d613113 100644
+--- a/arch/arm/mach-shmobile/smp-sh73a0.c
++++ b/arch/arm/mach-shmobile/smp-sh73a0.c
+@@ -64,9 +64,11 @@ static void __init sh73a0_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	scu_enable(shmobile_scu_base);
  
- config ARCH_SHMOBILE
- 	bool "Renesas SH-Mobile / R-Mobile"
-+	select ARM_PATCH_PHYS_VIRT
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_ARM_SCU if SMP
-@@ -643,7 +644,6 @@ config ARCH_SHMOBILE
- 	select HAVE_SMP
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select MULTI_IRQ_HANDLER
--	select NEED_MACH_MEMORY_H
- 	select NO_IOPORT
- 	select PINCTRL
- 	select PM_GENERIC_DOMAINS if PM
+-	/* Map the reset vector (in headsmp-scu.S) */
++	/* Map the reset vector (in headsmp-scu.S, headsmp.S) */
+ 	__raw_writel(0, APARMBAREA);      /* 4k */
+-	__raw_writel(__pa(shmobile_secondary_vector_scu), SBAR);
++	__raw_writel(__pa(shmobile_boot_vector), SBAR);
++	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
++	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
+ 
+ 	/* enable cache coherency on booting CPU */
+ 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
 -- 
 1.7.10.4
