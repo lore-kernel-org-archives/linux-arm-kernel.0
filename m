@@ -1,73 +1,111 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 16:15:24 +0900
-Subject: [PATCH v4] irqchip: renesas-intc-irqpin: DT binding for sense
- bitfield width
-In-Reply-To: <Pine.LNX.4.64.1306131121230.31976@axis700.grange>
-References: <Pine.LNX.4.64.1306131121230.31976@axis700.grange>
-Message-ID: <20130617071524.GC22175@verge.net.au>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Jun 2013 00:20:22 -0700
+Subject: [PATCH] pinctrl: document the pinctrl PM states
+In-Reply-To: <51BB3A2C.608@wwwdotorg.org>
+References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
+ <51BA1FE7.4000900@wwwdotorg.org>
+ <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+ <51BB3A2C.608@wwwdotorg.org>
+Message-ID: <20130617072021.GB4465@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 11:23:38AM +0200, Guennadi Liakhovetski wrote:
-> Most Renesas irqpin controllers have 4-bit sense fields, however, some
-> have different widths. This patch adds a DT binding to optionally
-> specify such non-standard values.
+* Stephen Warren <swarren@wwwdotorg.org> [130614 08:49]:
+> On 06/13/2013 02:34 PM, Linus Walleij wrote:
+> > On Thu, Jun 13, 2013 at 9:39 PM, Stephen Warren <swarren@wwwdotorg.org> wrote:
+> >> On 06/11/2013 01:59 PM, Linus Walleij wrote:
+> >>> From: Linus Walleij <linus.walleij@linaro.org>
+> >>>
+> >>> This document snippet tries to be helpful and define the pin
+> >>> PM states and helpers, and how they should be used to create
+> >>> some kind of common ontology around this.
+> >>
+> >> Oops. I haven't been keeping up well. I propose we hold off on this
+> >> patch for a short while until the other thread on this topic is finalized.
+> > 
+> > Isn't it better if I split it?
+> > 
+> > Most of this doc is about the default/sleep/idle states and
+> > how that relates to runtime PM, and that seems to be
+> > uncontroversial.
 > 
-> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+> I would tend to prefer sorting out the issue fully, then documenting it
+> once. This avoids churn.
+> 
+> I would consider the complete set of standard pinctrl states as an
+> interface. If we add states, that actually changes the interface even
+> though it might not affect the definition of any individual states.
+> Since this also impacts DT which is supposed to be a stable ABI (or at
+> least evolve in a backwards-compatible fashion), it seems better to get
+> it right once.
 
-Arnd, are you happy with this version?
+Agreed, let's sort this out before it's too much of a pain to change.
+Below are some reasonings and examples that I'm hoping just might do the
+trick.
 
-> ---
-> 
-> v4: as suggested by Arnd, add a description for #interrupt-cells
-> 
->  .../interrupt-controller/renesas,intc-irqpin.txt   |   14 ++++++++++++++
->  drivers/irqchip/irq-renesas-intc-irqpin.c          |    4 ++++
->  2 files changed, 18 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> new file mode 100644
-> index 0000000..66fcaf5
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
-> @@ -0,0 +1,14 @@
-> +DT bindings for the R-/SH-Mobile irqpin controller
-> +
-> +Required properties:
-> +
-> +- compatible: has to be "renesas,intc-irqpin"
-> +- #interrupt-cells: has to be <2>: an interrupt index and flags, as defined in
-> +  interrupts.txt in this directory
-> +
-> +Optional properties:
-> +
-> +- any properties, listed in interrupts.txt, and any standard resource allocation
-> +  properties
-> +- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
-> +  if different from the default 4 bits
-> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> index 5a68e5a..4aca1b2 100644
-> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
-> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
-> @@ -18,6 +18,7 @@
->   */
->  
->  #include <linux/init.h>
-> +#include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/spinlock.h>
->  #include <linux/interrupt.h>
-> @@ -349,6 +350,9 @@ static int intc_irqpin_probe(struct platform_device *pdev)
->  	/* deal with driver instance configuration */
->  	if (pdata)
->  		memcpy(&p->config, pdata, sizeof(*pdata));
-> +	else
-> +		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
-> +				     &p->config.sense_bitfield_width);
->  	if (!p->config.sense_bitfield_width)
->  		p->config.sense_bitfield_width = 4; /* default to 4 bits */
->  
-> -- 
-> 1.7.2.5
-> 
+First, I think the concept of remuxing (or even checking) _all_ the pins
+for a consumer device is wrong on most if not all hardware. For past 10
+years I have not seen a case where _all_ the pins for a device would need
+to be remuxed for any reason.
+
+This means the named states "default", "idle" and "sleep" cannot represent
+the needs of hardware. So need to have a bit finer granularity for this.
+
+Maybe let's again try to first list all the known cases where we need to
+do remuxing, and the pins we need to remux?
+
+Below are the pin remuxing cases I'm aware of:
+
+1. Remux UART RX pin of a device for a wake-up event
+
+2. Remux whatever device interrupt line to a GPIO input for wake-up
+
+3. Remux audio jack between UART RX and TX to provide a debug console
+
+4. Remux MMC CMD and DAT lines for sleep with pulls to avoid device
+   from resetting with lines floating or to save power
+
+Please list any further use cases that I'm not familiar with. I'd like
+to hear how messed up this remuxing business can get :)
+
+Then for dealing with the above examples, I think we already have a
+pretty good setup in pinctrl framework to deal with this with the
+named modes. But I think that to do this properly with the named
+modes we should have named modes like the following:
+
+"static" && ("active" || "idle")
+"static" && ("rx" || "tx")
+
+Here the "static" pins would be set during driver probe and never
+need to change until the driver is unloaded. This is close to what we
+currently call "default". But we should probably make it clear that
+these will not change to avoid confusion. See below for more info.
+
+The the non-static states like "active"/"idle", or "rx"/"tx", can
+be set in addition to "static", but they should not be subsets of
+"static" to avoid the issues Stephen described earlier. This way we
+allow the named modes to do the work for us while protecting the
+claimed pins.
+
+Note also how the remuxing needs are not PM related for the RX/TX case.
+Also, the "static" + "active" set would have to be set also in many
+cases even if PM is not enabled, while "idle" would be only needed if
+we have PM enabled.
+
+Then, based on what I've seen "idle" and "sleep" pins have been
+the same. But I guess it's possible that some hardware needs different
+states for "idle" and "sleep"? In that case we'd have to have:
+
+"static" && ("active || "idle" || "sleep")
+
+Then iff a device really needs all it's pins remuxed for idle, that
+device should have the following sets:
+
+"static"	0 pins
+"active"	all pins when running
+"idle"		all pins when idle
+"sleep"		all pins when sleep if different from idle
+
+Cheers,
+
+Tony
