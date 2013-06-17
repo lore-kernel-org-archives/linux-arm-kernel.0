@@ -1,31 +1,138 @@
 From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 17 Jun 2013 01:39:25 +0100
-Subject: [RFC] arm: Remove sa1111 special case from mm setup code
-In-Reply-To: <20130616091005.GP18614@n2100.arm.linux.org.uk>
-References: <1371338108-26354-1-git-send-email-grant.likely@linaro.org>
- <20130616091005.GP18614@n2100.arm.linux.org.uk>
-Message-ID: <CACxGe6vy6kNzmP7s1NPvKYCfe+1mKHGJbOobr9Kxy=J16r2L0A@mail.gmail.com>
+Date: Mon, 17 Jun 2013 01:43:19 +0100
+Subject: [RFC] arm: Remove sa1111 special case from arm_mm_memblock_reserve()
+Message-ID: <1371429799-7128-1-git-send-email-grant.likely@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 10:10 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Jun 16, 2013 at 12:15:08AM +0100, Grant Likely wrote:
->> I don't think this special case is needed anymore. From what I can tell,
->> setup_dma_zone() takes care of marking the region to be reserved for
->> DMA, and that happens before arm_memblock_init() which calls
->> arm_mm_memblock_reserve(). Therefore the mm setup should already know
->> about the reserved region and it won't need to be explicitly reserved
->> and then freed. That means the special case can be dropped from the
->> common code.
->
-> No it doesn't.  setup_dma_zone is all about setting the high watermark
-> for GFP_DMA allocations.  It has nothing to do with _temoprarily_
-> reserving the low 1MB, ensuring that no other user can use any of that
-> precious SA1111 memory during the kernel boot.
+The machine desc structure has a hook for doing machine-specific
+memblock code, but the SA1111 still has a platform-specific hook in the
+generic code. This patch merely moves the needed memblock_reserve()
+into a callback.
 
-Ah, okay. So it's to protect against early allocations. All right,
-I've got an alternate patch that at least gets rid of one of the
-special case hooks. I'll post that one shortly.
+This still leaves a special case in mem_init() to call
+free_reserved_area() on the same region, but there isn't a suitable hook
+in mdesc for making that call so the change is left to another patch.
 
-g.
+Compile tested only.
+
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Nicolas Pitre <nico@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+---
+ arch/arm/mach-sa1100/assabet.c    |  1 +
+ arch/arm/mach-sa1100/badge4.c     |  1 +
+ arch/arm/mach-sa1100/generic.c    | 12 ++++++++++++
+ arch/arm/mach-sa1100/generic.h    |  1 +
+ arch/arm/mach-sa1100/jornada720.c |  1 +
+ arch/arm/mm/mmu.c                 |  8 --------
+ 6 files changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+index e838ba2..aab247a 100644
+--- a/arch/arm/mach-sa1100/assabet.c
++++ b/arch/arm/mach-sa1100/assabet.c
+@@ -621,6 +621,7 @@ MACHINE_START(ASSABET, "Intel-Assabet")
+ 	.fixup		= fixup_assabet,
+ 	.map_io		= assabet_map_io,
+ 	.nr_irqs	= SA1100_NR_IRQS,
++	.reserve	= sa1100_reserve,
+ 	.init_irq	= sa1100_init_irq,
+ 	.init_time	= sa1100_timer_init,
+ 	.init_machine	= assabet_init,
+diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
+index 63361b6..9033d74 100644
+--- a/arch/arm/mach-sa1100/badge4.c
++++ b/arch/arm/mach-sa1100/badge4.c
+@@ -334,6 +334,7 @@ MACHINE_START(BADGE4, "Hewlett-Packard Laboratories BadgePAD 4")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= badge4_map_io,
+ 	.nr_irqs	= SA1100_NR_IRQS,
++	.reserve	= sa1100_reserve,
+ 	.init_irq	= sa1100_init_irq,
+ 	.init_late	= sa11x0_init_late,
+ 	.init_time	= sa1100_timer_init,
+diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
+index 9db3e98..1e7164e 100644
+--- a/arch/arm/mach-sa1100/generic.c
++++ b/arch/arm/mach-sa1100/generic.c
+@@ -15,6 +15,7 @@
+ #include <linux/init.h>
+ #include <linux/delay.h>
+ #include <linux/dma-mapping.h>
++#include <linux/memblock.h>
+ #include <linux/pm.h>
+ #include <linux/cpufreq.h>
+ #include <linux/ioport.h>
+@@ -26,6 +27,7 @@
+ #include <asm/mach/map.h>
+ #include <asm/mach/flash.h>
+ #include <asm/irq.h>
++#include <asm/pgtable.h>
+ #include <asm/system_misc.h>
+ 
+ #include <mach/hardware.h>
+@@ -351,6 +353,16 @@ static struct platform_device *sa11x0_devices[] __initdata = {
+ 	&sa11x0dma_device,
+ };
+ 
++void __init sa1100_reserve(void)
++{
++	/*
++	 * Because of the SA1111 DMA bug, we want to preserve our
++	 * precious DMA-able memory...
++	 */
++	if (IS_ENABLED(CONFIG_SA1111))
++		memblock_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
++}
++
+ static int __init sa1100_init(void)
+ {
+ 	pm_power_off = sa1100_power_off;
+diff --git a/arch/arm/mach-sa1100/generic.h b/arch/arm/mach-sa1100/generic.h
+index 2abc6a1..5d8398c 100644
+--- a/arch/arm/mach-sa1100/generic.h
++++ b/arch/arm/mach-sa1100/generic.h
+@@ -5,6 +5,7 @@
+  */
+ 
+ extern void sa1100_timer_init(void);
++extern void sa1100_reserve(void);
+ extern void __init sa1100_map_io(void);
+ extern void __init sa1100_init_irq(void);
+ extern void __init sa1100_init_gpio(void);
+diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+index c0b1f5b..d95961a 100644
+--- a/arch/arm/mach-sa1100/jornada720.c
++++ b/arch/arm/mach-sa1100/jornada720.c
+@@ -345,6 +345,7 @@ MACHINE_START(JORNADA720, "HP Jornada 720")
+ 	.atag_offset	= 0x100,
+ 	.map_io		= jornada720_map_io,
+ 	.nr_irqs	= SA1100_NR_IRQS,
++	.reserve	= sa1100_reserve,
+ 	.init_irq	= sa1100_init_irq,
+ 	.init_time	= sa1100_timer_init,
+ 	.init_machine	= jornada720_mach_init,
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index e0d8565..f281a24 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1147,14 +1147,6 @@ void __init arm_mm_memblock_reserve(void)
+ 	 * and can only be in node 0.
+ 	 */
+ 	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE);
+-
+-#ifdef CONFIG_SA1111
+-	/*
+-	 * Because of the SA1111 DMA bug, we want to preserve our
+-	 * precious DMA-able memory...
+-	 */
+-	memblock_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
+-#endif
+ }
+ 
+ /*
+-- 
+1.8.1.2
