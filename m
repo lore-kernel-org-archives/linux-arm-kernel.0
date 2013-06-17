@@ -1,35 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 18:53:33 +0200
-Subject: [PATCH] ARM: ux500: add restart support via prcmu
-In-Reply-To: <1371216160-2595-1-git-send-email-fabio.baltieri@linaro.org>
-References: <1371216160-2595-1-git-send-email-fabio.baltieri@linaro.org>
-Message-ID: <CACRpkdbkXUkq5VBq8QEf11r=ByqmeyNcxMHkfVs8ip=_O5G4CA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 17 Jun 2013 09:56:20 -0700
+Subject: [GIT PULL] at91: Device Tree update for 3.11 #2
+In-Reply-To: <EABCC4A72A203F4BA2E04297CF0282C427D1E112@hnombx01.corp.atmel.com>
+References: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
+ <1371250067-19317-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130615015224.GA25585@quad.lixom.net>
+ <EABCC4A72A203F4BA2E04297CF0282C427D1E112@hnombx01.corp.atmel.com>
+Message-ID: <CAOesGMjHTSB3y3+TxLqM=s06jg8Qx8XnEeW9c2dDcWnneZPVXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 3:22 PM, Fabio Baltieri
-<fabio.baltieri@linaro.org> wrote:
-
-> Add necessary code to restart ux500 based machines using
-> prcmu_system_reset().
+On Mon, Jun 17, 2013 at 1:34 AM, Ferre, Nicolas <Nicolas.FERRE@atmel.com> wrote:
 >
-> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
-> ---
+>>On Sat, Jun 15, 2013 at 12:47:47AM +0200, Nicolas Ferre wrote:
+>>> Arnd, Olof,
+>>>
+>>> Additional pull-request for AT91 DT patches.
+>>> It contains the remaining part of the USB gadget pull-request that I sent you
+>>> last week. After having split it, here is the DT part.
+>>> It also contains the update of DMA bindings: it is the AT91 part the should go
+>>> through arm-soc. I have included the patch (ARM: at91: dt: add header to define
+>>> at_hdmac configuration) so that we avoid build errors whichever git tree
+>>> (slave-dma or arm-soc) is merged first.
+>>> A SPI DT patch for at91sam9x5 is also added.
+>>>
+>>> Thanks, best regards,
+>>>
+>>> The following changes since commit 028633c238f91dc113520a7ad25d37b2ba9068af:
+>>>
+>>>   ARM: at91/dt: add pinctrl definition for at91 tc blocks (2013-05-31 22:40:37 +0200)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+>>
+>>Pulled, thanks.
 >
-> Hi Linus,
+> Hi,
 >
-> this is something I had in my tree for some time.  This adds basic
-> soft-reboot support for all ux500 machines using prcmu (the actual
-> reboot code was already there) and may also be useful as a base to add
-> the remaining "reboot reason" code if necessary.
->
-> This is based on your current ste-next branch.
+> I do not see it appearing in arm-soc/at91/dt branch even though is it present in arm-soc/for-next: is it normal?
 
-Patch applied.
+I had missed to push that (and the driver branch) up. They are there
+now, as at91/dt2 and at91/drivers. Fixed the bad branch name in
+arm-soc-for-next-contents.txt as well.
 
-If you're meriging "reboot reason" code, rename "reason" to
-"cause" everywhere. Cause and effect. Causality. Not the
-age of reason.
 
-Yours,
-Linus Walleij
+-Olof
