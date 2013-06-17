@@ -1,74 +1,104 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Mon, 17 Jun 2013 11:22:50 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the tty tree
-In-Reply-To: <20130617164841.41561f78f3465bd4007411b6@canb.auug.org.au>
-References: <20130617164841.41561f78f3465bd4007411b6@canb.auug.org.au>
-Message-ID: <ed138cdb-8a20-4c84-95f4-6137e5803e36@CO9EHSMHS013.ehs.local>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Mon, 17 Jun 2013 12:24:12 -0600
+Subject: [PATCH v3, part2 20/20] PCI, ARM: use hotplug-safe PCI bus
+ iterators to walk PCI buses
+In-Reply-To: <1369583597-3801-21-git-send-email-jiang.liu@huawei.com>
+References: <1369583597-3801-1-git-send-email-jiang.liu@huawei.com>
+ <1369583597-3801-21-git-send-email-jiang.liu@huawei.com>
+Message-ID: <20130617182412.GB4233@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 04:48:41PM +1000, Stephen Rothwell wrote:
-> Hi all,
+On Sun, May 26, 2013 at 11:53:17PM +0800, Jiang Liu wrote:
+> Enhance ARM architecture specific code to use new hotplug-safe PCI
+> bus iterators to walk PCI buses.
 > 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/tty/serial/xilinx_uartps.c between commit 696faedd616e ("serial:
-> use platform_{get,set}_drvdata()") from the tty tree and commit
-> 30e1e28598c2 ("arm: zynq: Migrate platform to clock controller") from the
-> arm-soc tree.
+> Change pcibios_report_status implementation so that it doesn't access
+> pci_root_buses global list. The pci_root_buses list will be scheduled
+> to be removed.
 > 
-> I fixed it up (see below) and can carry the fix as necessary (no action
-> is required).
+> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Thierry Reding <thierry.reding@avionic-design.de>
+> Cc: Bjorn Helgaas <bhelgaas@google.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> ---
+>  arch/arm/kernel/bios32.c           | 13 +------------
+>  arch/arm/mach-footbridge/dc21285.c | 12 +++++++++++-
+>  2 files changed, 12 insertions(+), 13 deletions(-)
 > 
-> -- 
-> Cheers,
-> Stephen Rothwell                    sfr at canb.auug.org.au
-> 
-> diff --cc drivers/tty/serial/xilinx_uartps.c
-> index 6c91745,a4a3028..0000000
-> --- a/drivers/tty/serial/xilinx_uartps.c
-> +++ b/drivers/tty/serial/xilinx_uartps.c
-> @@@ -972,14 -1004,15 +1004,14 @@@ static int xuartps_probe(struct platfor
->   		port->mapbase = res->start;
->   		port->irq = res2->start;
->   		port->dev = &pdev->dev;
-> - 		port->uartclk = clk_get_rate(clk);
-> - 		port->private_data = clk;
-> + 		port->uartclk = clk_get_rate(xuartps_data->refclk);
-> + 		port->private_data = xuartps_data;
->  -		dev_set_drvdata(&pdev->dev, port);
->  +		platform_set_drvdata(pdev, port);
->   		rc = uart_add_one_port(&xuartps_uart_driver, port);
->   		if (rc) {
->   			dev_err(&pdev->dev,
->   				"uart_add_one_port() failed; err=%i\n", rc);
-> - 			return rc;
->  -			dev_set_drvdata(&pdev->dev, NULL);
-> + 			goto err_out_clk_disable;
->   		}
->   		return 0;
->   	}
-> @@@ -993,14 -1039,19 +1038,18 @@@ err_out_free
->    **/
->   static int xuartps_remove(struct platform_device *pdev)
->   {
->  -	struct uart_port *port = dev_get_drvdata(&pdev->dev);
->  +	struct uart_port *port = platform_get_drvdata(pdev);
-> - 	struct clk *clk = port->private_data;
-> + 	struct xuartps *xuartps_data = port->private_data;
->   	int rc;
->   
->   	/* Remove the xuartps port from the serial core */
->   	rc = uart_remove_one_port(&xuartps_uart_driver, port);
->  -	dev_set_drvdata(&pdev->dev, NULL);
->   	port->mapbase = 0;
-> - 	clk_disable_unprepare(clk);
-> + 	clk_disable_unprepare(xuartps_data->refclk);
-> + 	clk_disable_unprepare(xuartps_data->aperclk);
-> + 	clk_put(xuartps_data->refclk);
-> + 	clk_put(xuartps_data->aperclk);
-> + 	kfree(xuartps_data);
->   	return rc;
->   }
-Looks correct and boots fine on Zynq. Thanks.
+> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+> index b2ed73c..50ebbe8 100644
+> --- a/arch/arm/kernel/bios32.c
+> +++ b/arch/arm/kernel/bios32.c
+> @@ -22,7 +22,7 @@ static int debug_pci;
+>   * We can't use pci_find_device() here since we are
+>   * called from interrupt context.
+>   */
+> -static void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, int warn)
+> +void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, int warn)
+>  {
+>  	struct pci_dev *dev;
+>  
+> @@ -55,17 +55,6 @@ static void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, in
+>  			pcibios_bus_report_status(dev->subordinate, status_mask, warn);
+>  }
+>  
+> -void pcibios_report_status(u_int status_mask, int warn)
+> -{
+> -	struct list_head *l;
+> -
+> -	list_for_each(l, &pci_root_buses) {
+> -		struct pci_bus *bus = pci_bus_b(l);
+> -
+> -		pcibios_bus_report_status(bus, status_mask, warn);
+> -	}
+> -}
+> -
+>  /*
+>   * We don't use this to fix the device, but initialisation of it.
+>   * It's not the correct use for this, but it works.
+> diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+> index a7cd2cf..a0f1d01 100644
+> --- a/arch/arm/mach-footbridge/dc21285.c
+> +++ b/arch/arm/mach-footbridge/dc21285.c
+> @@ -35,7 +35,16 @@
+>  				  PCI_STATUS_PARITY) << 16)
+>  
+>  extern int setup_arm_irq(int, struct irqaction *);
+> -extern void pcibios_report_status(u_int status_mask, int warn);
+> +extern void pcibios_report_bus_status(struct pci_bus *bus, u_int status_mask,
+> +				      int warn);
+> +
+> +static struct pci_bus *dc21285_root_bus;
+> +
+> +static void pcibios_report_status(u_int status_mask, int warn)
+> +{
+> +	if (dc21285_root_bus)
+> +		pcibios_report_bus_status(dc21285_root_bus, status_mask, warn);
+> +}
+>  
+>  static unsigned long
+>  dc21285_base_address(struct pci_bus *bus, unsigned int devfn)
+> @@ -376,5 +385,6 @@ void __init dc21285_preinit(void)
+>  
+>  void __init dc21285_postinit(void)
+>  {
+> +	dc21285_root_bus = pci_get_next_root_bus(NULL);
 
-	S?ren
+It seems sort of ugly to scan the bus in pcibios_init_hw(), which
+*returns* the struct pci_bus, then search for it here.  Why can't
+we just remember the bus we scanned?
+
+It's also a little dubious that we only do pcibios_report_status()
+for footbridge.  That makes it look like it's debug code that might
+not be necessary at all.
+
+>  	register_isa_ports(DC21285_PCI_MEM, DC21285_PCI_IO, 0);
+>  }
+> -- 
+> 1.8.1.2
+> 
