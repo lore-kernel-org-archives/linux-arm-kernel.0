@@ -1,58 +1,29 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Jun 2013 15:21:26 -0700
-Subject: [PATCH] ARM: sched_clock: Load cycle count after epoch stabilizes
-In-Reply-To: <51BF848B.2030501@linaro.org>
-References: <1371082214-1119-1-git-send-email-sboyd@codeaurora.org>
- <51BF68DC.5030804@codeaurora.org> <51BF848B.2030501@linaro.org>
-Message-ID: <51BF8BE6.5080704@codeaurora.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 17 Jun 2013 18:22:41 -0400
+Subject: [PATCH v2 3/3] ARM: keystone: Enable SMP support on Keystone
+ machines
+In-Reply-To: <20130617212127.GJ28497@quad.lixom.net>
+References: <1371072317-15030-1-git-send-email-santosh.shilimkar@ti.com>
+ <1371072317-15030-4-git-send-email-santosh.shilimkar@ti.com>
+ <20130617212127.GJ28497@quad.lixom.net>
+Message-ID: <51BF8C31.6020205@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/13 14:50, John Stultz wrote:
-> On 06/17/2013 12:51 PM, Stephen Boyd wrote:
->> John,
+On Monday 17 June 2013 05:21 PM, Olof Johansson wrote:
+> On Wed, Jun 12, 2013 at 05:25:17PM -0400, Santosh Shilimkar wrote:
+>> Add basic SMP support for Keystone machines. This does not
+>> include support for CPU hotplug for now.
 >>
->> I just saw your pull request for making this code generic. I believe
->> this patch fixes a bug that nobody has seen in practice so it's probably
->> fine to delay this until 3.11.
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: arm at kernel.org
 >>
->> Also, I've just noticed that "ARM: sched_clock: Return suspended count
->> earlier" that I sent in that series is going to break the arm
->> architected timer path because they're circumventing all this epoch_ns
->> code. It would be better if you could replace that patch with this patch
->> because this optimizes it in the same way and also fixes a bug at the
->> same time.
->
-> Sorry, could you clarify a bit more? The above sounds like there are
-> two issues, but you only sent one patch.
+>> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> 
+> Acked-by: Olof Johansson <olof@lixom.net>
+> 
+Thanks !!
 
-I'm saying that the "return the suspended count earlier" patch is bad.
-But this patch does what that patch is doing plus it fixes a race at the
-same time. So it would be better to just take this patch and drop the other.
-
-The problem is that when the cd.suspended flag is true we're going to
-return the jiffies based sched_clock value for the ARM architected timer
-driver (the only driver that replaces the sched_clock_func function
-pointer with its own function). Jiffies should be pretty close to the
-actual time anyway, but since the ARM architected timer driver is
-already broken with respect to suspend (because it doesn't stop the
-sched_clock value from incrementing during suspend) it doesn't really
-matter. Every other driver using the sched_clock code will not be
-affected either way.
-
->
-> I'm also not sure how to proceed with the patch you sent, since it
-> collides with the patch that moves sched_clock to be generic.
-
-Ah I thought that the git rename detection would just make it work.
-
->
-> Could you refactor the change on-top of git branch I sent to Thomas?
-> Otherwise I'll have to withdraw the pull request, and we'll probably
-> miss 3.11 for the generic sched_clock change.
-
-Sure. I'll send it right now.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-hosted by The Linux Foundation
+Regards,
+Santosh
