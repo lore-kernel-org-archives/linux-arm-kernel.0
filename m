@@ -1,47 +1,24 @@
-From: Nicolas.FERRE@atmel.com (Ferre, Nicolas)
-Date: Mon, 17 Jun 2013 09:05:50 +0000
-Subject: [GIT PULL v3] at91: USBA DT support / drivers update for 3.11 #1
-In-Reply-To: <20130615020343.GB25585@quad.lixom.net>
-References: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
- <1371247364-23213-1-git-send-email-nicolas.ferre@atmel.com>,
- <20130615020343.GB25585@quad.lixom.net>
-Message-ID: <EABCC4A72A203F4BA2E04297CF0282C427D1E181@hnombx01.corp.atmel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 17 Jun 2013 10:06:47 +0100
+Subject: [GIT PULL 1/2] DaVinci SoC updates for v3.11
+In-Reply-To: <20130614222519.GK17326@quad.lixom.net>
+References: <1371193161-25224-1-git-send-email-nsekhar@ti.com>
+ <20130614222519.GK17326@quad.lixom.net>
+Message-ID: <20130617090647.GX1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jun 14, 2013 at 03:25:19PM -0700, Olof Johansson wrote:
 
-From: Olof Johansson [olof at lixom.net]
->On Sat, Jun 15, 2013 at 12:02:44AM +0200, Nicolas Ferre wrote:
->> Arnd, Olof,
->>
->> This is a rework of the previous pull-request done by Jean-Christophe
->> PLAGNIOL-VILLARD ([GIT PULL] at91: USBA DT support for 3.11).
->> It is also the division of my previous pull request (v2) to extract only
->> patches related to drivers. The DT patches will be stacked on top of our
->> arm-soc/at91/dt branch in an upcoming pull-request.
->> You should see that this material is based on the cleanup branch that you
->> already have in arm-soc/at91/cleanup.
->>
->> This adds the DT support for USBA gadget driver present in the most recent
->> AT91 SoCs.
->> As agreed with Arnd and Felipe we send these drivers updates via arm-soc.
->>
->> Thanks, best regards,
->>
->> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
->>
->>   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
->>
->> are available in the git repository at:
->>
->>   git://github.com/at91linux/linux-at91.git tags/at91-drivers
->
->Pulled, thanks. This had conflicts with some code from fixes. The change/remove
->ones were easy (cs-gpio vs interrupts), but there was one dealing with pinctrl.
->PLease double-check that there wasn't a need to carry over a fix to the
->include-file-based version.
+> Ok. I'll hold off since Mark was interested in seeing the code. Please resend
+> once you have acks.
 
-I have just double-checked and your resolution about pinctrl is right. Thanks a lot Olof.
-(note that I do not see the arm-soc/at91/drivers branch...)
-
-Bye,
+It should be OK to go.  I did actually find a bug when reviewing but the
+fix was to remove the offending driver since it's been broken for years.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/e6363d43/attachment.sig>
