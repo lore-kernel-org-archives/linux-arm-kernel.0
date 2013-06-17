@@ -1,40 +1,35 @@
-From: abrestic@chromium.org (Andrew Bresticker)
-Date: Mon, 17 Jun 2013 13:08:13 -0700
-Subject: [PATCH v5 7/7] clk: samsung: Add EPLL and VPLL freq table for
- exynos5250 SoC
-In-Reply-To: <1370712862-10501-8-git-send-email-yadi.brar@samsung.com>
-References: <1370712862-10501-1-git-send-email-yadi.brar@samsung.com>
- <1370712862-10501-8-git-send-email-yadi.brar@samsung.com>
-Message-ID: <CAL1qeaHSmMajbuChS6BLzW=jQWBF7Dse8pvSLGsZibzCUdx_hQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Jun 2013 22:20:53 +0200
+Subject: [PATCH 14/15] ARM: shmobile: Remove AP4EVB board support
+In-Reply-To: <CANqRtoQVqfZaGbuVLiY8PiMTjVpt8VDs7KZyqnqjud+1yZtvQQ@mail.gmail.com>
+References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
+ <201306141629.26580.arnd@arndb.de>
+ <CANqRtoQVqfZaGbuVLiY8PiMTjVpt8VDs7KZyqnqjud+1yZtvQQ@mail.gmail.com>
+Message-ID: <201306172220.54015.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
-> +       /* sorted in descending order */
-> +       /* PLL_36XX_RATE(rate, m, p, s, k) */
-> +       PLL_36XX_RATE(192000000, 48, 3, 1, 0),
-> +       PLL_36XX_RATE(180633600, 45, 3, 1, 10381),
-> +       PLL_36XX_RATE(180000000, 45, 3, 1, 0),
-> +       PLL_36XX_RATE(73728000, 73, 3, 3, 47710),
-> +       PLL_36XX_RATE(67737600, 90, 4, 3, 20762),
-> +       PLL_36XX_RATE(49152000, 49, 3, 3, 9962),
-> +       PLL_36XX_RATE(45158400, 45, 3, 3, 10381),
-> +       PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
-> +       { },
-> +};
+On Monday 17 June 2013, Magnus Damm wrote:
+> On Fri, Jun 14, 2013 at 11:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 14 June 2013, Magnus Damm wrote:
+> >> > If still possible, would be good to delay removing this board until we
+> >> > complete our discussion.
+> >>
+> >> If fine with keeping the board if someone can show me progress in the
+> >> area of INTC DT support. Recently I have not seen anything.
+> >
+> > As mentioned the last time we discussed this, I'm fine with using the
+> > existing code and "legacy" irqdomain for the older INTC implementations,
+> > as long as all the new ones can use your new generic code.
+> 
+> Thanks for explaining once again. Do you have any issues with us
+> reducing the number of supported boards and/or SoCs?
 
-I believe the UM says that 64 <= m <= 511.  Although the above seems
-to work on 5250 and 5420, it might be better to use a table that
-conforms to the constraint on m:
+No, I'm sure you know who the users of the board files in upstream kernels
+are. If someone comes up with a good reason why one of the files is
+needed after all, we can always revert the removal at a later point.
 
-PLL_36XX_RATE(192000000, 64, 2, 2, 0),
-PLL_36XX_RATE(180633600, 90, 3, 2, 20762),
-PLL_36XX_RATE(180000000, 90, 3, 2, 0),
-PLL_36XX_RATE(73728000, 98, 2, 4, 19923),
-PLL_36XX_RATE(67737600, 90, 2, 4, 20762),
-PLL_36XX_RATE(49152000, 98, 3, 4, 19923),
-PLL_36XX_RATE(45158400, 90, 3, 4, 20762),
-PLL_36XX_RATE(32768000, 131, 3, 5, 4719)
+I'm definitely in favor of removing known unused code that gets in the way
+of progress and adding clean code as quickly as we can review it.
 
-Thanks,
-Andrew
+	Arnd
