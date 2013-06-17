@@ -1,54 +1,57 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 17 Jun 2013 19:15:27 +0900
-Subject: [PATCH V6 6/6] clk: exynos5250: Add enum entries for divider clock
- of i2s1 and i2s2
-In-Reply-To: <CAAgF-Bf4BVfGVuFF8-CwPRi-em5VHA5HXYjkRDxPxvyAZPx7kw@mail.gmail.com>
-References: <1371024463-303-1-git-send-email-padma.v@samsung.com>
- <1371024463-303-7-git-send-email-padma.v@samsung.com>
- <20130612164553.26381.41398@quantum>
- <CAAgF-BfEvBcrm186t6U9Tp4r64wB3sEsy6hoXMQi=dHJgncvfw@mail.gmail.com>
- <CAAgF-Bf4BVfGVuFF8-CwPRi-em5VHA5HXYjkRDxPxvyAZPx7kw@mail.gmail.com>
-Message-ID: <19ac01ce6b43$96bfb4d0$c43f1e70$%kim@samsung.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Mon, 17 Jun 2013 12:16:35 +0200
+Subject: [PATCH v7 0/9] Generic PHY Framework
+In-Reply-To: <1371113039-5784-1-git-send-email-kishon@ti.com>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+Message-ID: <51BEE203.6090103@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Padma Venkat wrote:
-> 
-> Hi Mike,
-> 
-> On Thu, Jun 13, 2013 at 8:32 AM, Padma Venkat <padma.kvr@gmail.com> wrote:
-> > Hi Mike,
-> >
-> > On Wed, Jun 12, 2013 at 10:15 PM, Mike Turquette <mturquette@linaro.org>
-> wrote:
-> >> Quoting Padmavathi Venna (2013-06-12 01:07:43)
-> >>> This patch adds enum entries for div_i2s1 and div_i2s2 which are
-> >>> required for i2s1 and i2s2 controllers.
-> >>>
-> >>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> >>
-> >> Looks good.  Did you want me to take the clk patches or just gathering
-> >> Acks?
-> >
-> > Please take the patches :).
-> >
-> > Thanks
-> > Padma
-> 
-> clk related patches in this set has some dependency on arch side
-> patches because one of the patch replaces all '/include's with
-> '#include's and adds a header file in
-> arch/arm/boot/include/dt-bindings/. So all these patches required to
-> go into one tree.
-> 
-> Hi Kukjin,
-> 
-> Can you please take all these patches into samsung-tree?
-> 
-Padma, sure, I will.
+Hi,
 
-BTW, Mike, according to your reply, I may get your ack on 2nd and 6th clk
-patches...If any problems, please kindly let me know.
+On 06/13/2013 10:43 AM, Kishon Vijay Abraham I wrote:
+> Added a generic PHY framework that provides a set of APIs for the PHY drivers
+> to create/destroy a PHY and APIs for the PHY users to obtain a reference to
+> the PHY with or without using phandle.
+> 
+> This framework will be of use only to devices that uses external PHY (PHY
+> functionality is not embedded within the controller).
+> 
+> The intention of creating this framework is to bring the phy drivers spread
+> all over the Linux kernel to drivers/phy to increase code re-use and to
+> increase code maintainability.
+> 
+> Comments to make PHY as bus wasn't done because PHY devices can be part of
+> other bus and making a same device attached to multiple bus leads to bad
+> design.
+> 
+> If the PHY driver has to send notification on connect/disconnect, the PHY
+> driver should make use of the extcon framework. Using this susbsystem 
+> to use extcon framwork will have to be analysed.
+> 
+> Making omap-usb2 and twl4030 to use this framework is provided as a sample.
+> 
+> This patch series is developed on linux mainline tree.
+> 
+> Changes from v6
+> * corrected few typos in Documentation
+> * Changed PHY Subsystem to *bool* in Kconfig (to avoid compilation errors when
+>   PHY Subsystem is kept as module and the dependent modules are built-in)
+> * Added if pm_runtime_enabled check before runtime pm calls.
+
+Looks good, feel free to add:
+
+Reviewed-by: Sylwester Nawrocki <s.nawrocki@samsung.com> for patches
+1...3/9, 5...7/9
+
+and Tested-by: Sylwester Nawrocki <s.nawrocki@samsung.com> for patch 1/9
+
+Hopefully we can gather more Acks and merge it for 3.11.
+
+I have already used this API for our MIPI CSI-2/DSIM DPHYs driver,
+the RFC patch series can be found at [1].
 
 Thanks,
-- Kukjin
+Sylwester
+
+[1] http://www.spinics.net/lists/arm-kernel/msg251666.html
