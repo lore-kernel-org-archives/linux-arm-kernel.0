@@ -1,112 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jun 2013 19:21:27 +0100
-Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
-References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
- <1371467722-665-1-git-send-email-inki.dae@samsung.com>
- <51BEF458.4090606@canonical.com>
- <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
- <20130617133109.GG2718@n2100.arm.linux.org.uk>
- <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
- <20130617154237.GJ2718@n2100.arm.linux.org.uk>
- <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
-Message-ID: <20130617182127.GM2718@n2100.arm.linux.org.uk>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 17 Jun 2013 20:22:41 +0200
+Subject: [RFC PATCH 04/11] dma: amba-pl08x: Add support for PL080S variant
+In-Reply-To: <CACRpkdZ+g-_AC=2WBs3nruyTMX16Ona99g_wcS=PqOuZ6xVpog@mail.gmail.com>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+ <1371416058-22047-5-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdZ+g-_AC=2WBs3nruyTMX16Ona99g_wcS=PqOuZ6xVpog@mail.gmail.com>
+Message-ID: <3074496.mvNejQEAbP@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 02:19:04AM +0900, Inki Dae wrote:
-> It seems like that all pages of the scatterlist should be mapped with
-> DMA every time DMA operation  is started (or drm_xxx_set_src_dma_buffer
-> function call), and the pages should be unmapped from DMA again every
-> time DMA operation is completed: internally, including each cache
-> operation.
+On Monday 17 of June 2013 15:39:34 Linus Walleij wrote:
+> On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> 
+wrote:
+> > PL080S is a modified version of PL080 that can be found on Samsung
+> > SoCs, such as S3C6400 and S3C6410.
+> > 
+> > It has different offset of CONFIG register, separate CONTROL1 register
+> > that holds transfer size and larger maximum transfer size.
+> > 
+> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> (I would have done some smallish things differently but it
+> is only a matter of taste.)
+> 
+> >  static struct amba_id pl08x_ids[] = {
+> > 
+> > +       /* Samsung PL080S variant */
+> > +       {
+> > +               .id     = 0x0a141080,
+> > +               .mask   = 0xffffffff,
+> > +               .data   = &vendor_pl080s,
+> > +       },
+> 
+> Interesting that Samsung claim to be vendor 0x41
+> (ARM).
 
-Correct.
+Yeah, I had identical thought when I saw it first time.
 
-> Isn't that big overhead?
+> Well ARM never made revision no 0x0a so
+> this works.
 
-Yes, if you _have_ to do a cache operation to ensure that the DMA agent
-can see the data the CPU has written.
+Good, this is exactly what I wanted to read! ;)
 
-> And If there is no problem, we should accept such overhead?
+I was afraid that this ID might conflict with some revision of normal 
+PL080, but fortunately it is not the case.
 
-If there is no problem then why are we discussing this and why do we need
-this API extension? :)
-
-> Actually, drm_gem_fd_to_handle() includes to map a
-> given dmabuf with iommu table (just logical data) of the DMA. And then, the
-> device address (or iova) already mapped will be set to buffer register of
-> the DMA with drm_xxx_set_src/dst_dma_buffer(handle1, ...) call.
-
-Consider this with a PIPT cache:
-
-	dma_map_sg()	- at this point, the kernel addresses of these
-			buffers are cleaned and invalidated for the DMA
-
-	userspace writes to the buffer, the data sits in the CPU cache
-	Because the cache is PIPT, this data becomes visible to the
-	kernel as well.
-
-	DMA is started, and it writes to the buffer
-
-Now, at this point, which is the correct data?  The data physically in the
-RAM which the DMA has written, or the data in the CPU cache.  It may
-the answer is - they both are, and the loss of either can be a potential
-data corruption issue - there is no way to tell which data should be
-kept but the system is in an inconsistent state and _one_ of them will
-have to be discarded.
-
-	dma_unmap_sg()	- at this point, the kernel addresses of the
-			buffers are _invalidated_ and any data in those
-			cache lines is discarded
-
-Which also means that the data in userspace will also be discarded with
-PIPT caches.
-
-This is precisely why we have buffer rules associated with the DMA API,
-which are these:
-
-	dma_map_sg()
-	- the buffer transfers ownership from the CPU to the DMA agent.
-	- the CPU may not alter the buffer in any way.
-	while (cpu_wants_access) {
-		dma_sync_sg_for_cpu()
-		- the buffer transfers ownership from the DMA to the CPU.
-		- the DMA may not alter the buffer in any way.
-		dma_sync_sg_for_device()
-		- the buffer transfers ownership from the CPU to the DMA
-		- the CPU may not alter the buffer in any way.
-	}
-	dma_unmap_sg()
-	- the buffer transfers ownership from the DMA to the CPU.
-	- the DMA may not alter the buffer in any way.
-
-Any violation of that is likely to lead to data corruption.  Now, some
-may say that the DMA API is only about the kernel mapping.  Yes it is,
-because it takes no regard what so ever about what happens with the
-userspace mappings.  This is absolutely true when you have VIVT or
-aliasing VIPT caches.
-
-Now consider that with a PIPT cache, or a non-aliasing VIPT cache (which
-is exactly the same behaviourally from this aspect) any modification of
-a userspace mapping is precisely the same as modifying the kernel space
-mapping - and what you find is that the above rules end up _inherently_
-applying to the userspace mappings as well.
-
-In other words, userspace applications which have mapped the buffers
-must _also_ respect these rules.
-
-And there's no way in hell that I'd ever trust userspace to get this
-anywhere near right, and I *really* do not like these kinds of internal
-kernel API rules being exposed to userspace.
-
-And so the idea that userspace should be allowed to setup DMA transfers
-via "set source buffer", "set destination buffer" calls into an API is
-just plain rediculous.  No, userspace should be allowed to ask for
-"please copy from buffer X to buffer Y using this transform".
-
-Also remember that drm_xxx_set_src/dst_dma_buffer() would have to
-deal with the DRM object IDs for the buffer, and not the actual buffer
-information themselves - that is kept within the kernel, so the kernel
-knows what's happening.
+Best refards,
+Tomasz
