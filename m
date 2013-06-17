@@ -1,78 +1,126 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Jun 2013 10:43:09 -0700
-Subject: [PATCH/RESEND 02/12] msm_serial: Use devm_clk_get() and properly
- return errors
+Date: Mon, 17 Jun 2013 10:43:10 -0700
+Subject: [PATCH/RESEND 03/12] usb: otg: msm: Convert to clk_prepare/unprepare
 In-Reply-To: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
 References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1371490999-15501-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371490999-15501-4-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Clocks are not clk_put() in this driver's error paths during
-probe. The code that checks for clock errors also fails to
-properly return the error code from the pclk member if it turns
-out to be the failing clock, leading to potentially confusing
-error values if the clk member is not an error pointer. Fix these
-problems with devm_clk_get() and proper error checking.
+Add calls to clk_prepare and unprepare so that MSM can migrate to
+the common clock framework.
 
-Removing the clk_put() in msm_serial_remove() also points out
-that msm_port is unused. Furthermore, msm_port is the wrong type
-and so the clk_put() would be using the wrong pointer. Replace it
-with the proper type and call uart_remove_one_port() to do the
-proper cleanup.
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Acked-by: Felipe Balbi <balbi@ti.com>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/tty/serial/msm_serial.c | 21 ++++++++++++---------
- 1 file changed, 12 insertions(+), 9 deletions(-)
+ drivers/usb/phy/phy-msm-usb.c | 38 +++++++++++++++++++-------------------
+ 1 file changed, 19 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
-index 0149603..2c6cfb3 100644
---- a/drivers/tty/serial/msm_serial.c
-+++ b/drivers/tty/serial/msm_serial.c
-@@ -884,19 +884,22 @@ static int __init msm_serial_probe(struct platform_device *pdev)
- 		msm_port->is_uartdm = 0;
+diff --git a/drivers/usb/phy/phy-msm-usb.c b/drivers/usb/phy/phy-msm-usb.c
+index 749fbf4..d08f334 100644
+--- a/drivers/usb/phy/phy-msm-usb.c
++++ b/drivers/usb/phy/phy-msm-usb.c
+@@ -514,13 +514,13 @@ static int msm_otg_suspend(struct msm_otg *motg)
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL)
+ 		writel(readl(USB_PHY_CTRL) | PHY_RETEN, USB_PHY_CTRL);
  
- 	if (msm_port->is_uartdm) {
--		msm_port->clk = clk_get(&pdev->dev, "gsbi_uart_clk");
--		msm_port->pclk = clk_get(&pdev->dev, "gsbi_pclk");
-+		msm_port->clk = devm_clk_get(&pdev->dev, "gsbi_uart_clk");
-+		msm_port->pclk = devm_clk_get(&pdev->dev, "gsbi_pclk");
- 	} else {
--		msm_port->clk = clk_get(&pdev->dev, "uart_clk");
-+		msm_port->clk = devm_clk_get(&pdev->dev, "uart_clk");
- 		msm_port->pclk = ERR_PTR(-ENOENT);
+-	clk_disable(motg->pclk);
+-	clk_disable(motg->clk);
++	clk_disable_unprepare(motg->pclk);
++	clk_disable_unprepare(motg->clk);
+ 	if (motg->core_clk)
+-		clk_disable(motg->core_clk);
++		clk_disable_unprepare(motg->core_clk);
+ 
+ 	if (!IS_ERR(motg->pclk_src))
+-		clk_disable(motg->pclk_src);
++		clk_disable_unprepare(motg->pclk_src);
+ 
+ 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
+@@ -552,12 +552,12 @@ static int msm_otg_resume(struct msm_otg *motg)
+ 		return 0;
+ 
+ 	if (!IS_ERR(motg->pclk_src))
+-		clk_enable(motg->pclk_src);
++		clk_prepare_enable(motg->pclk_src);
+ 
+-	clk_enable(motg->pclk);
+-	clk_enable(motg->clk);
++	clk_prepare_enable(motg->pclk);
++	clk_prepare_enable(motg->clk);
+ 	if (motg->core_clk)
+-		clk_enable(motg->core_clk);
++		clk_prepare_enable(motg->core_clk);
+ 
+ 	if (motg->pdata->phy_type == SNPS_28NM_INTEGRATED_PHY &&
+ 			motg->pdata->otg_control == OTG_PMIC_CONTROL) {
+@@ -1468,7 +1468,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 		if (IS_ERR(motg->pclk_src))
+ 			goto put_clk;
+ 		clk_set_rate(motg->pclk_src, INT_MAX);
+-		clk_enable(motg->pclk_src);
++		clk_prepare_enable(motg->pclk_src);
+ 	} else
+ 		motg->pclk_src = ERR_PTR(-ENOENT);
+ 
+@@ -1511,8 +1511,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 		goto free_regs;
  	}
  
--	if (unlikely(IS_ERR(msm_port->clk) || (IS_ERR(msm_port->pclk) &&
--					       msm_port->is_uartdm)))
--			return PTR_ERR(msm_port->clk);
-+	if (IS_ERR(msm_port->clk))
-+		return PTR_ERR(msm_port->clk);
-+
-+	if (msm_port->is_uartdm) {
-+		if (IS_ERR(msm_port->pclk))
-+			return PTR_ERR(msm_port->pclk);
+-	clk_enable(motg->clk);
+-	clk_enable(motg->pclk);
++	clk_prepare_enable(motg->clk);
++	clk_prepare_enable(motg->pclk);
  
--	if (msm_port->is_uartdm)
- 		clk_set_rate(msm_port->clk, 1843200);
-+	}
+ 	ret = msm_hsusb_init_vddcx(motg, 1);
+ 	if (ret) {
+@@ -1532,7 +1532,7 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ 	}
  
- 	port->uartclk = clk_get_rate(msm_port->clk);
- 	printk(KERN_INFO "uartclk = %d\n", port->uartclk);
-@@ -919,9 +922,9 @@ static int __init msm_serial_probe(struct platform_device *pdev)
+ 	if (motg->core_clk)
+-		clk_enable(motg->core_clk);
++		clk_prepare_enable(motg->core_clk);
  
- static int msm_serial_remove(struct platform_device *pdev)
- {
--	struct msm_port *msm_port = platform_get_drvdata(pdev);
-+	struct uart_port *port = platform_get_drvdata(pdev);
+ 	writel(0, USB_USBINTR);
+ 	writel(0, USB_OTGSC);
+@@ -1579,8 +1579,8 @@ static int __init msm_otg_probe(struct platform_device *pdev)
+ free_irq:
+ 	free_irq(motg->irq, motg);
+ disable_clks:
+-	clk_disable(motg->pclk);
+-	clk_disable(motg->clk);
++	clk_disable_unprepare(motg->pclk);
++	clk_disable_unprepare(motg->clk);
+ ldo_exit:
+ 	msm_hsusb_ldo_init(motg, 0);
+ vddcx_exit:
+@@ -1593,7 +1593,7 @@ put_core_clk:
+ 	clk_put(motg->pclk);
+ put_pclk_src:
+ 	if (!IS_ERR(motg->pclk_src)) {
+-		clk_disable(motg->pclk_src);
++		clk_disable_unprepare(motg->pclk_src);
+ 		clk_put(motg->pclk_src);
+ 	}
+ put_clk:
+@@ -1643,12 +1643,12 @@ static int msm_otg_remove(struct platform_device *pdev)
+ 	if (cnt >= PHY_SUSPEND_TIMEOUT_USEC)
+ 		dev_err(phy->dev, "Unable to suspend PHY\n");
  
--	clk_put(msm_port->clk);
-+	uart_remove_one_port(&msm_uart_driver, port);
- 
- 	return 0;
- }
+-	clk_disable(motg->pclk);
+-	clk_disable(motg->clk);
++	clk_disable_unprepare(motg->pclk);
++	clk_disable_unprepare(motg->clk);
+ 	if (motg->core_clk)
+-		clk_disable(motg->core_clk);
++		clk_disable_unprepare(motg->core_clk);
+ 	if (!IS_ERR(motg->pclk_src)) {
+-		clk_disable(motg->pclk_src);
++		clk_disable_unprepare(motg->pclk_src);
+ 		clk_put(motg->pclk_src);
+ 	}
+ 	msm_hsusb_ldo_init(motg, 0);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
