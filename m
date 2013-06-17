@@ -1,38 +1,31 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 17 Jun 2013 07:32:49 -0700
-Subject: [PATCH v2 0/2] Remove unused voltagedomain data for AM33xx
-In-Reply-To: <1371474983-29296-1-git-send-email-rnayak@ti.com> (Rajendra
- Nayak's message of "Mon, 17 Jun 2013 18:46:21 +0530")
-References: <1371474983-29296-1-git-send-email-rnayak@ti.com>
-Message-ID: <87wqps959q.fsf@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 17 Jun 2013 07:55:46 -0700
+Subject: [PATCH V2] ARM: dts: Enable RTC node for Arndale
+In-Reply-To: <1371442179-23597-1-git-send-email-tushar.behera@linaro.org>
+References: <CAHbNUh2byimQ_ep0j9XkUjRFaU3K6YZE_ANcch5UhP4QsuZxPw@mail.gmail.com>
+ <1371442179-23597-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <CAD=FV=XAeLQ8DfcskRRE_h1AKu-CPA3jEGwNThJOmKm6LEiegQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rajendra Nayak <rnayak@ti.com> writes:
+Tushar,
 
-> Hi,
+On Sun, Jun 16, 2013 at 9:09 PM, Tushar Behera <tushar.behera@linaro.org> wrote:
+> The issues reported in commit 522ccdb6fd0e ("ARM: dts: Disable the RTC
+> by default on exynos5") are no longer reproduced on EXYNOS5250 based
+> Arndale board. Hence re-enabling RTC support for Arndale board.
 >
-> The powerdomain framework currently expects to always have a voltagedomain
-> associated with a given powerdomain. We already have AM33xx which
-> has no Voltage Controller/Voltage Processor as part of PRCM.
-> There are more SoCs' to follow starting with AM437x and DRA7xx
-> which do not have VC/VP. All these SoCs', hence do not support any
-> form of auto-scaling of voltages, that was possible on earlier OMAPs'
-> using the VFSM to trigger an i2c communication to the PMIC automatically
-> on hitting a low power state.
+> This is helpful for testing S2R on Arndale board.
 >
-> Instead of adding dummy voltage domain data files, like was done for the
-> AM33xx case, make the powerdomain framework aware of the fact that some
-> SoCs' might not really have support for auto-scaling of voltages in hw.
+> Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
+> ---
+> Changes for V2:
+> * RTC node is enabled only for Arndale board. Earlier it was enabled
+> in exynos5250.dtsi.
 >
-> Patches are based of 3.10-rc6 and are boot tested on am335x bone.
->
-> Rajendra Nayak (2):
->   ARM: OMAP2+: Powerdomain: Remove the need to always have a voltdm
->     associated to a pwrdm
->   ARM: AM33xx: Remove the unused voltagedomain data
+>  arch/arm/boot/dts/exynos5250-arndale.dts |    4 ++++
+>  1 file changed, 4 insertions(+)
 
-Thanks, queuing up this series with ack from Santosh and tested-by from
-Afzal.  I'll try, but not sure if it can make it for v3.11.
+Looks good!  I'll send up one for snow too.
 
-Kevin
+Reviewed-by: Doug Anderson <dianders@chromium.org>
