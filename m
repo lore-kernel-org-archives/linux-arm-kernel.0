@@ -1,25 +1,65 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 11:20:57 +0200
-Subject: [PATCH 4/7] mfd: stmpe: use irq_get_trigger_type() to get IRQ
- flags
-In-Reply-To: <1371228049-27080-5-git-send-email-javier.martinez@collabora.co.uk>
-References: <1371228049-27080-1-git-send-email-javier.martinez@collabora.co.uk>
- <1371228049-27080-5-git-send-email-javier.martinez@collabora.co.uk>
-Message-ID: <CACRpkdafxpwuaUHLb3uHiPNrKLsmcekqG1ATQKj8fgz+ekXmDg@mail.gmail.com>
+From: Nicolas.FERRE@atmel.com (Ferre, Nicolas)
+Date: Mon, 17 Jun 2013 09:20:55 +0000
+Subject: [GIT PULL] at91: soc updates for 3.11 #1
+In-Reply-To: <20130615023702.GA8635@quad.lixom.net>
+References: <1371246138-22207-1-git-send-email-nicolas.ferre@atmel.com>,
+ <20130615023702.GA8635@quad.lixom.net>
+Message-ID: <EABCC4A72A203F4BA2E04297CF0282C427D1E1F8@hnombx01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 6:40 PM, Javier Martinez Canillas
-<javier.martinez@collabora.co.uk> wrote:
-
-> Use irq_get_trigger_type() to get the IRQ trigger type flags
-> instead calling irqd_get_trigger_type(irq_get_irq_data(irq))
+From: Olof Johansson [olof at lixom.net]
+>Hi,
 >
-> Signed-off-by: Javier Martinez Canillas <javier.martinez@collabora.co.uk>
+>On Fri, Jun 14, 2013 at 11:42:18PM +0200, Nicolas Ferre wrote:
+>> Arnd, Olof,
+>>
+>> A little AT91 pull-request for patches that are more targeted to SoC/boards
+>> modifications. It is prepared on top of the arm-soc/at91/cleanup branch.
+>>
+>> Thanks, best regards,
+>>
+>> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+>>
+>>   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/at91linux/linux-at91.git tags/at91-soc
+>>
+>> for you to fetch changes up to 7e75545ea7fb972c3da759f92c3d0be84d1cee72:
+>>
+>>   ARM: at91: drop rm9200dk board support (2013-06-14 23:34:11 +0200)
+>>
+>> ----------------------------------------------------------------
+>> Two non critical fixes that can go in 3.11.
+>> An old board removed.
+>>
+>> ----------------------------------------------------------------
+>> Alexandre Belloni (1):
+>>       ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+>
+>Fix
+>
+>> Jean-Christophe PLAGNIOL-VILLARD (1):
+>>       ARM: at91: drop rm9200dk board support
+>
+>Cleanup
+>
+>> Wenyou Yang (1):
+>>       ARM: at91: Change the internal SRAM memory type MT_MEMORY_NONCACHED
+>
+>Fix
+>
+>...assuming, of course, that none of the fixes are for errors introduced in
+>some branch we already pulled, since then they should go on top of that branch.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+I do agree with you but:
+1/ the fixes are non-critical ones, so I do not see the need for another branch
+2/ I didn't feel like touching the "cleanup" branch because we want to base all our 3.11 material on top of it, without adding new patches on top.
 
-If you get the other patches ACKed.
+But, tell me if you think that it is too cautious...
 
-Yours,
-Linus Walleij
+Bye,
+-- 
+Nicolas Ferre
