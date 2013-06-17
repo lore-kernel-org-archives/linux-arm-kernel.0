@@ -1,68 +1,74 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 17:12:45 +0900
-Subject: [PATCH 12/15] ARM: shmobile: Remove MEMORY_START/SIZE
+Date: Mon, 17 Jun 2013 17:12:43 +0900
+Subject: [PATCH 10/15] ARM: shmobile: Remove old SCU boot code
 In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371456768-1084-13-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371456768-1084-11-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove CONFIG_MEMORY_START and CONFIG_MEMORY_SIZE from mach-shmobile.
-
-Boards should use DT to specify their memory setup. Boards that still
-not support DT may pass ATAGS with memory information from the boot
-loader. If those ATAGS turn out to be incorrect then appended DTB with
-memory information should be used as a workaround.
+Remove shmobile_secondary_vector_scu now when all SCU enabled
+SMP platforms instead make use of shmobile_boot_scu. This
+removes two inline virtual to physical address conversions.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Kconfig |   31 -------------------------------
- 1 file changed, 31 deletions(-)
+ arch/arm/mach-shmobile/headsmp-scu.S         |   22 +---------------------
+ arch/arm/mach-shmobile/include/mach/common.h |    1 -
+ 2 files changed, 1 insertion(+), 22 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 06da4d3..747f68a 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -195,37 +195,6 @@ config CPU_HAS_INTEVT
-         bool
- 	default y
+diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
+index c5c9106..6f98654 100644
+--- a/arch/arm/mach-shmobile/headsmp-scu.S
++++ b/arch/arm/mach-shmobile/headsmp-scu.S
+@@ -25,32 +25,12 @@
  
--menu "Memory configuration"
+ 	__CPUINIT
+ /*
+- * Reset vector for secondary CPUs.
++ * Boot code for secondary CPUs.
+  *
+  * First we turn on L1 cache coherency for our CPU. Then we jump to
+  * shmobile_invalidate_start that invalidates the cache and hands over control
+  * to the common ARM startup code.
+- * This function will be mapped to address 0 by the SBAR register.
+- * A normal branch is out of range here so we need a long jump. We jump to
+- * the physical address as the MMU is still turned off.
+  */
+-	.align	12
+-ENTRY(shmobile_secondary_vector_scu)
+-	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
+-	and	r0, r0, #3		@ mask out cpu ID
+-	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
+-	ldr	r1, 2f
+-	ldr	r1, [r1]		@ SCU base address
+-	ldr	r2, [r1, #8]		@ SCU Power Status Register
+-	mov	r3, #3
+-	bic	r2, r2, r3, lsl r0	@ Clear bits of our CPU (Run Mode)
+-	str	r2, [r1, #8]		@ write back
 -
--config MEMORY_START
--	hex "Physical memory start address"
--	default "0x40000000" if MACH_AP4EVB || MACH_AG5EVM || \
--				MACH_MACKEREL || MACH_BONITO || \
--				MACH_ARMADILLO800EVA || MACH_APE6EVM || \
--				MACH_LAGER
--	default "0x41000000" if MACH_KOTA2
--	default "0x00000000"
--	---help---
--	  Tweak this only when porting to a new machine which does not
--	  already have a defconfig. Changing it from the known correct
--	  value on any of the known systems will only lead to disaster.
+-	ldr	pc, 1f
+-1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
+-2:	.long shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
+-ENDPROC(shmobile_secondary_vector_scu)
 -
--config MEMORY_SIZE
--	hex "Physical memory size"
--	default "0x80000000" if MACH_LAGER
--	default "0x40000000" if MACH_APE6EVM
--	default "0x20000000" if MACH_AG5EVM || MACH_BONITO || \
--				MACH_ARMADILLO800EVA
--	default "0x1e000000" if MACH_KOTA2
--	default "0x10000000" if MACH_AP4EVB || MACH_MACKEREL
--	default "0x04000000"
--	help
--	  This sets the default memory size assumed by your kernel. It can
--	  be overridden as normal by the 'mem=' argument on the kernel command
--	  line.
--
--endmenu
--
- menu "Timer and clock configuration"
- 
- config SHMOBILE_TIMER_HZ
+ ENTRY(shmobile_boot_scu)
+ 					@ r0 = SCU base address
+ 	mrc     p15, 0, r1, c0, c0, 5	@ read MIPDR
+diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
+index 8ef1c3c..e818f02 100644
+--- a/arch/arm/mach-shmobile/include/mach/common.h
++++ b/arch/arm/mach-shmobile/include/mach/common.h
+@@ -10,7 +10,6 @@ extern void shmobile_setup_console(void);
+ extern void shmobile_boot_vector(void);
+ extern unsigned long shmobile_boot_fn;
+ extern unsigned long shmobile_boot_arg;
+-extern void shmobile_secondary_vector_scu(void);
+ extern void shmobile_boot_scu(void);
+ struct clk;
+ extern int shmobile_clk_init(void);
 -- 
 1.7.10.4
