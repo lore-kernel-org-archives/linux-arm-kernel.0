@@ -1,28 +1,47 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 17 Jun 2013 10:01:23 -0400 (EDT)
-Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
-In-Reply-To: <CADApbehH9wrNZEmAN=3ZWGMXA7Jetgd+VpWfMRBSX0AqUeG0pg@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306171000080.1437-100000@iolanthe.rowland.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Jun 2013 15:02:04 +0100
+Subject: [PATCH 1/2] arm: vexpress: select HAVE_ARM_ARCH_TIMER
+In-Reply-To: <1371476885.3483.36.camel@hornet>
+References: <1371462316-9201-1-git-send-email-mark.rutland@arm.com>
+ <1371462316-9201-2-git-send-email-mark.rutland@arm.com>
+ <1371476885.3483.36.camel@hornet>
+Message-ID: <20130617140204.GF6809@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Jun 2013, Chao Xie wrote:
+On Mon, Jun 17, 2013 at 02:48:05PM +0100, Pawel Moll wrote:
+> On Mon, 2013-06-17 at 10:45 +0100, Mark Rutland wrote:
+> > When building a ARCH_MULTI_V7 kernel, support for the architected timers
+> > won't be enabled out-of-the-box even when ARCH_VEXPRESS is selected,
+> > which is unexpected and disappointing when using a coretile with
+> > architected timers.
+> > 
+> > Fix this up by having ARCH_VEXPRESS select HAVE_ARM_ARCH_TIMER.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Cc: Pawel Moll <pawel.moll@arm.com>
+> > ---
+> >  arch/arm/mach-vexpress/Kconfig | 1 +
+> >  1 file changed, 1 insertion(+)
+> > 
+> > diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+> > index 5907e10..e0f4974 100644
+> > --- a/arch/arm/mach-vexpress/Kconfig
+> > +++ b/arch/arm/mach-vexpress/Kconfig
+> > @@ -9,6 +9,7 @@ config ARCH_VEXPRESS
+> >  	select COMMON_CLK_VERSATILE
+> >  	select CPU_V7
+> >  	select GENERIC_CLOCKEVENTS
+> > +	select HAVE_ARM_ARCH_TIMER
+> >  	select HAVE_ARM_SCU if SMP
+> >  	select HAVE_ARM_TWD if LOCAL_TIMERS
+> >  	select HAVE_CLK
+> 
+> Acked-by: Pawel Moll <pawel.moll@arm.com>
+> 
+> Do you want me to queue it for 3.12?
 
-> > To avoid PHY init/shutdown, the platform driver should simply leave the
-> > generic PHY pointer (which has not yet been added to struct hcd) set to
-> > NULL.
-> >
-> So does it mean that i need add adtional usb_phy to struct hcd?
+That would be great, yes please :)
 
-Ah, I was wrong.  There already is a PHY pointer in struct usb_hcd.  
-You don't need to add another one.
-
-> I think we can still make use of struct hcd->phy without add addtional members.
-> For OMAP transceiver-less mode, you can still use your own phy init/shutdown and
-> leave the hcd->phy to be NULL, and for the PHY mode, hcd->phy can be
-> set. It will
-> do ->init at usb_add_hcd and ->shutdown at usb_remove_hcd.
-
-That's right.
-
-Alan Stern
+Thanks,
+Mark.
