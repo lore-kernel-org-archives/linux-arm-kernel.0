@@ -1,41 +1,73 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 17 Jun 2013 09:12:51 +0200
-Subject: [PATCH v3] i2c: vt8500: Add support for I2C bus on Wondermedia
- SoCs
-In-Reply-To: <51BCE39D.4030505@prisktech.co.nz>
-References: <1371246736-5460-1-git-send-email-linux@prisktech.co.nz>
- <20130615111817.GA2938@katana> <51BCE39D.4030505@prisktech.co.nz>
-Message-ID: <20130617071250.GA2957@katana>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 17 Jun 2013 16:15:24 +0900
+Subject: [PATCH v4] irqchip: renesas-intc-irqpin: DT binding for sense
+ bitfield width
+In-Reply-To: <Pine.LNX.4.64.1306131121230.31976@axis700.grange>
+References: <Pine.LNX.4.64.1306131121230.31976@axis700.grange>
+Message-ID: <20130617071524.GC22175@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 09:58:53AM +1200, Tony Prisk wrote:
-> On 15/06/13 23:18, Wolfram Sang wrote:
-> >On Sat, Jun 15, 2013 at 09:52:16AM +1200, Tony Prisk wrote:
-> >>This patch adds support for the I2C bus controllers found on Wondermedia
-> >>8xxx-series SoCs. Only master-mode is supported.
-> >>
-> >>Signed-off-by: Tony Prisk <linux@prisktech.co.nz>
-> >>---
-> >...
-> >
-> >>+/* REG_TR */
-> >>+#define SCL_TIMEOUT(x)		(((x) & 0xFF) << 16)
-> >I assume this should be << 8 since all regs are 16 bit wide.
-> >
-> >Fixed it locally and ready to apply. Please confirm or send a proper
-> >fix. Rest looks fine.
-> >
-> >Thanks for the submission!
-> >
-> It should be << 8. Please apply your locally corrected version.
+On Thu, Jun 13, 2013 at 11:23:38AM +0200, Guennadi Liakhovetski wrote:
+> Most Renesas irqpin controllers have 4-bit sense fields, however, some
+> have different widths. This patch adds a DT binding to optionally
+> specify such non-standard values.
+> 
+> Signed-off-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
 
-Applied to for-next, thanks!
+Arnd, are you happy with this version?
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/24bc5c45/attachment.sig>
+> ---
+> 
+> v4: as suggested by Arnd, add a description for #interrupt-cells
+> 
+>  .../interrupt-controller/renesas,intc-irqpin.txt   |   14 ++++++++++++++
+>  drivers/irqchip/irq-renesas-intc-irqpin.c          |    4 ++++
+>  2 files changed, 18 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+> new file mode 100644
+> index 0000000..66fcaf5
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/interrupt-controller/renesas,intc-irqpin.txt
+> @@ -0,0 +1,14 @@
+> +DT bindings for the R-/SH-Mobile irqpin controller
+> +
+> +Required properties:
+> +
+> +- compatible: has to be "renesas,intc-irqpin"
+> +- #interrupt-cells: has to be <2>: an interrupt index and flags, as defined in
+> +  interrupts.txt in this directory
+> +
+> +Optional properties:
+> +
+> +- any properties, listed in interrupts.txt, and any standard resource allocation
+> +  properties
+> +- sense-bitfield-width: width of a single sense bitfield in the SENSE register,
+> +  if different from the default 4 bits
+> diff --git a/drivers/irqchip/irq-renesas-intc-irqpin.c b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> index 5a68e5a..4aca1b2 100644
+> --- a/drivers/irqchip/irq-renesas-intc-irqpin.c
+> +++ b/drivers/irqchip/irq-renesas-intc-irqpin.c
+> @@ -18,6 +18,7 @@
+>   */
+>  
+>  #include <linux/init.h>
+> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/spinlock.h>
+>  #include <linux/interrupt.h>
+> @@ -349,6 +350,9 @@ static int intc_irqpin_probe(struct platform_device *pdev)
+>  	/* deal with driver instance configuration */
+>  	if (pdata)
+>  		memcpy(&p->config, pdata, sizeof(*pdata));
+> +	else
+> +		of_property_read_u32(pdev->dev.of_node, "sense-bitfield-width",
+> +				     &p->config.sense_bitfield_width);
+>  	if (!p->config.sense_bitfield_width)
+>  		p->config.sense_bitfield_width = 4; /* default to 4 bits */
+>  
+> -- 
+> 1.7.2.5
+> 
