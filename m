@@ -1,56 +1,143 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:33:49 +0200
-Subject: [PATCH v2 04/38] ARM: EXYNOS: common: Remove legacy PMU initialization
- code
+Date: Mon, 17 Jun 2013 18:33:58 +0200
+Subject: [PATCH v2 13/38] ARM: EXYNOS: pm_domains: Remove legacy power domain
+ registration code
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-5-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-14-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes legacy PMU initialization code that was used to set
-up PMU when booting with ATAGS, which is not supported any more.
+This patch removes static definitions of power domains and code
+responsible for registering them and adding devices to them, since only
+DT based boot is now supported on Exynos.
 
+Cc: linux-pm at vger.kernel.org
+Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/common.c | 27 ---------------------------
- 1 file changed, 27 deletions(-)
+ arch/arm/mach-exynos/pm_domains.c | 94 +--------------------------------------
+ 1 file changed, 1 insertion(+), 93 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 98343577..cb07f4a 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -922,30 +922,3 @@ static int __init exynos_init_irq_eint(void)
+diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
+index beb946d..1703593 100644
+--- a/arch/arm/mach-exynos/pm_domains.c
++++ b/arch/arm/mach-exynos/pm_domains.c
+@@ -74,16 +74,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
+ 	return exynos_pd_power(domain, false);
+ }
+ 
+-#define EXYNOS_GPD(PD, BASE, NAME)			\
+-static struct exynos_pm_domain PD = {			\
+-	.base = (void __iomem *)BASE,			\
+-	.name = NAME,					\
+-	.pd = {						\
+-		.power_off = exynos_pd_power_off,	\
+-		.power_on = exynos_pd_power_on,	\
+-	},						\
+-}
+-
+ static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
+ 					 struct device *dev)
+ {
+@@ -156,7 +146,7 @@ static struct notifier_block platform_nb = {
+ 	.notifier_call = exynos_pm_notifier_call,
+ };
+ 
+-static __init int exynos_pm_dt_parse_domains(void)
++static __init int exynos4_pm_init_power_domain(void)
+ {
+ 	struct platform_device *pdev;
+ 	struct device_node *np;
+@@ -192,88 +182,6 @@ static __init int exynos_pm_dt_parse_domains(void)
+ 
  	return 0;
  }
- arch_initcall(exynos_init_irq_eint);
 -
--static struct resource exynos4_pmu_resource[] = {
--	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU),
--	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU1),
--#if defined(CONFIG_SOC_EXYNOS4412)
--	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU2),
--	DEFINE_RES_IRQ(EXYNOS4_IRQ_PMU_CPU3),
--#endif
--};
--
--static struct platform_device exynos4_device_pmu = {
--	.name		= "arm-pmu",
--	.num_resources	= ARRAY_SIZE(exynos4_pmu_resource),
--	.resource	= exynos4_pmu_resource,
--};
--
--static int __init exynos_armpmu_init(void)
+-static __init __maybe_unused void exynos_pm_add_dev_to_genpd(struct platform_device *pdev,
+-						struct exynos_pm_domain *pd)
 -{
--	if (!of_have_populated_dt()) {
--		if (soc_is_exynos4210() || soc_is_exynos4212())
--			exynos4_device_pmu.num_resources = 2;
--		platform_device_register(&exynos4_device_pmu);
+-	if (pdev->dev.bus) {
+-		if (!pm_genpd_add_device(&pd->pd, &pdev->dev))
+-			pm_genpd_dev_need_restore(&pdev->dev, true);
+-		else
+-			pr_info("%s: error in adding %s device to %s power"
+-				"domain\n", __func__, dev_name(&pdev->dev),
+-				pd->name);
+-	}
+-}
+-
+-EXYNOS_GPD(exynos4_pd_mfc, S5P_PMU_MFC_CONF, "pd-mfc");
+-EXYNOS_GPD(exynos4_pd_g3d, S5P_PMU_G3D_CONF, "pd-g3d");
+-EXYNOS_GPD(exynos4_pd_lcd0, S5P_PMU_LCD0_CONF, "pd-lcd0");
+-EXYNOS_GPD(exynos4_pd_lcd1, S5P_PMU_LCD1_CONF, "pd-lcd1");
+-EXYNOS_GPD(exynos4_pd_tv, S5P_PMU_TV_CONF, "pd-tv");
+-EXYNOS_GPD(exynos4_pd_cam, S5P_PMU_CAM_CONF, "pd-cam");
+-EXYNOS_GPD(exynos4_pd_gps, S5P_PMU_GPS_CONF, "pd-gps");
+-
+-static struct exynos_pm_domain *exynos4_pm_domains[] = {
+-	&exynos4_pd_mfc,
+-	&exynos4_pd_g3d,
+-	&exynos4_pd_lcd0,
+-	&exynos4_pd_lcd1,
+-	&exynos4_pd_tv,
+-	&exynos4_pd_cam,
+-	&exynos4_pd_gps,
+-};
+-
+-static __init int exynos4_pm_init_power_domain(void)
+-{
+-	int idx;
+-
+-	if (of_have_populated_dt())
+-		return exynos_pm_dt_parse_domains();
+-
+-	for (idx = 0; idx < ARRAY_SIZE(exynos4_pm_domains); idx++) {
+-		struct exynos_pm_domain *pd = exynos4_pm_domains[idx];
+-		int on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
+-
+-		pm_genpd_init(&pd->pd, NULL, !on);
 -	}
 -
+-#ifdef CONFIG_S5P_DEV_FIMD0
+-	exynos_pm_add_dev_to_genpd(&s5p_device_fimd0, &exynos4_pd_lcd0);
+-#endif
+-#ifdef CONFIG_S5P_DEV_TV
+-	exynos_pm_add_dev_to_genpd(&s5p_device_hdmi, &exynos4_pd_tv);
+-	exynos_pm_add_dev_to_genpd(&s5p_device_mixer, &exynos4_pd_tv);
+-#endif
+-#ifdef CONFIG_S5P_DEV_MFC
+-	exynos_pm_add_dev_to_genpd(&s5p_device_mfc, &exynos4_pd_mfc);
+-#endif
+-#ifdef CONFIG_S5P_DEV_FIMC0
+-	exynos_pm_add_dev_to_genpd(&s5p_device_fimc0, &exynos4_pd_cam);
+-#endif
+-#ifdef CONFIG_S5P_DEV_FIMC1
+-	exynos_pm_add_dev_to_genpd(&s5p_device_fimc1, &exynos4_pd_cam);
+-#endif
+-#ifdef CONFIG_S5P_DEV_FIMC2
+-	exynos_pm_add_dev_to_genpd(&s5p_device_fimc2, &exynos4_pd_cam);
+-#endif
+-#ifdef CONFIG_S5P_DEV_FIMC3
+-	exynos_pm_add_dev_to_genpd(&s5p_device_fimc3, &exynos4_pd_cam);
+-#endif
+-#ifdef CONFIG_S5P_DEV_CSIS0
+-	exynos_pm_add_dev_to_genpd(&s5p_device_mipi_csis0, &exynos4_pd_cam);
+-#endif
+-#ifdef CONFIG_S5P_DEV_CSIS1
+-	exynos_pm_add_dev_to_genpd(&s5p_device_mipi_csis1, &exynos4_pd_cam);
+-#endif
+-#ifdef CONFIG_S5P_DEV_G2D
+-	exynos_pm_add_dev_to_genpd(&s5p_device_g2d, &exynos4_pd_lcd0);
+-#endif
+-#ifdef CONFIG_S5P_DEV_JPEG
+-	exynos_pm_add_dev_to_genpd(&s5p_device_jpeg, &exynos4_pd_cam);
+-#endif
 -	return 0;
 -}
--arch_initcall(exynos_armpmu_init);
+ arch_initcall(exynos4_pm_init_power_domain);
+ 
+ int __init exynos_pm_late_initcall(void)
 -- 
 1.8.2.1
