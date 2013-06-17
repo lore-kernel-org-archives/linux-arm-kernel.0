@@ -1,40 +1,64 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 21:36:44 +0200
-Subject: [RFC PATCH 09/11] spi: s3c64xx: Do not require legacy DMA API in
- case of S3C64XX
-In-Reply-To: <20130617160630.GF1403@sirena.org.uk>
+Date: Mon, 17 Jun 2013 21:38:10 +0200
+Subject: [RFC PATCH 00/11] ARM: s3c64xx: Let amba-pl08x driver handle DMA
+In-Reply-To: <CACRpkdbS3YvwSjpMQbJvSNty=sBrx20vUHKYG44OaWowcN6b0g@mail.gmail.com>
 References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdb8V7pYVnOWOAJ6iG8_-jyeutq5W95+OCO4RLOv9EDjyg@mail.gmail.com>
- <20130617160630.GF1403@sirena.org.uk>
-Message-ID: <6736155.CBigTcsD4z@flatron>
+ <CACRpkdbS3YvwSjpMQbJvSNty=sBrx20vUHKYG44OaWowcN6b0g@mail.gmail.com>
+Message-ID: <7386771.s52fBU89jU@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 of June 2013 17:06:30 Mark Brown wrote:
-> On Mon, Jun 17, 2013 at 03:59:39PM +0200, Linus Walleij wrote:
-> > On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> 
+On Monday 17 of June 2013 16:06:25 Linus Walleij wrote:
+> On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> 
 wrote:
-> > > -       select S3C64XX_DMA if ARCH_S3C64XX
-> > > +       select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
+> > One of the biggest roadblocks on the way of S3C64xx to DeviceTree
+> > support is its DMA driver, which is completely platform-specific and
+> > provides private API (s3c-dma), not even saying that its design is
+> > completely against multiplatform-awareness.
 > > 
-> > I guess this means the SPI driver does not work without DMA.
-> > But is the SPI driver already augmented to handle generic DMA engine?
+> > The DMA controller present on this SoC series is a custom variant
+> > of ARM PrimeCell PL080 modified by Samsung to add some extra features.
+> > 
+> > It is mostly compatible with original PL080, except:
+> >  - CH_CONTROL2 register is added between CH_CONTROL and CH_CONFIG,
+> >  - offset of CH_CONFIG register is different,
+> >  - transfer size field is moved from CH_CONTROL to CH_CONTROL2,
+> >  - transfer size field is extended to 24 bits, allowing much bigger
+> >  
+> >      single transfer,
+> >  
+> >  - LLI consists of one more word, to account for CH_CONTROL2 register.
+> > 
+> > Since all the rest is fully compatible with standard PL080 there is no
+> > point in having separate driver just for this single variant, so I
+> > decided to look into adding support for it to the amba-pl08x driver.
+> > 
+> > There was already some attempt to achieve this before, but this was
+> > before Russel's big rework of the driver to use virtual channels,
+> > making the old patches being not much of use.
+> > 
+> > This RFC series is a proof of concept that I managed to make during
+> > last days of hacking. Except one patch adding clkdev lookup to clock
+> > driver (which is being replaced with a CCF-compliant driver ATM),
+> > this is enough to get memcpy and slave transfers to work on S3C64xx.
+> > 
+> > I have tested this on Mini6410 and SMDK6410 boards using dmatest for
+> > memcpy and Samsung I2S with madplay/aplay for slave transfers.
+> > Unfortunately I do not have access to other platforms with PL08x so
+> > I could not test for any regressions introduced on them.
+> > 
+> > Credits for two patches go to Alban Bedel, who made a series fixing
+> > this driver to make it usable with audio drivers. I rebased his
+> > patches on top of mine and corrected coding style a bit.
+> > 
+> > OK, that's all. Any comments are welcome. Feel free to start throwing
+> > eggs and tomatoes if you find this awful, but I won't be upset if I
+> > get some Tested-by or Acked-by as well. ;)
 > 
-> > Anyway:
-> Yes, the driver currently relies on DMA.  There are some pending patches
-> for non-DMA operation that I need to test.  To be honest for both this
-> and the ASoC driver I'd be more inclined to just either select or
-> depend on the DMA controller rather than leaving the option of using
-> the old code.
+> I've waited for a long time for this to happen, thank you very much for
+> doing this.
 
-Well, I just left this for the purpose of this RFC, so testing things on 
-both drivers would be possible (to see if any problems are caused by new 
-driver or just by things that don't work).
-
-If this driver turns out to be working correctly, I will happily remove 
-the old private one and after s3c24xx moves to Heiko's DMA engine driver 
-(or as it already moved?) we will be able to completely drop the private 
-s3c-dma API.
+You're welcome. Thanks for your review.
 
 Best regards,
 Tomasz
