@@ -1,44 +1,27 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Jun 2013 15:22:10 +0900
-Subject: [PATCH 14/15] ARM: shmobile: Remove AP4EVB board support
-In-Reply-To: <Pine.LNX.4.64.1306170805390.22409@axis700.grange>
-References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
- <1371106793-25071-15-git-send-email-horms+renesas@verge.net.au>
- <Pine.LNX.4.64.1306132128370.3777@axis700.grange>
- <CANqRtoSx4Jf_EfG3LvkpoOED4-SuOdWjRedz-RbwGCOcOeP-Xg@mail.gmail.com>
- <Pine.LNX.4.64.1306141123380.6920@axis700.grange>
- <CANqRtoRXBupbbU_cq257p5usu8F5975NFDenkOx1qTvYZaxF2w@mail.gmail.com>
- <Pine.LNX.4.64.1306170805390.22409@axis700.grange>
-Message-ID: <CANqRtoSd5CdU9YjFjih_kFuoby2dWVapt3RJBmgRR_WizbtxGg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Jun 2013 08:24:49 +0200
+Subject: [PATCH RESEND v2 1/3] GPIO: clps711x: Rewrite driver for using
+ generic GPIO code
+In-Reply-To: <1370411967-29451-17-git-send-email-shc_work@mail.ru>
+References: <1370411967-29451-1-git-send-email-shc_work@mail.ru>
+ <1370411967-29451-17-git-send-email-shc_work@mail.ru>
+Message-ID: <CACRpkdYZcRWOp=gzcifn+jgxm=eZcGrTCiSs5_T7RMHWZuJ5gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 3:12 PM, Guennadi Liakhovetski
-<g.liakhovetski@gmx.de> wrote:
-> On Mon, 17 Jun 2013, Magnus Damm wrote:
+On Wed, Jun 5, 2013 at 7:59 AM, Alexander Shiyan <shc_work@mail.ru> wrote:
+
+> This patch provides rewritten driver for CLPS711X GPIO which uses
+> generic GPIO code.
 >
-> [snip]
->
->> So Guennadi, if you want to keep this board then you have to step up
->> and fix things. If not then there is no point in keeping it.
->
-> Ok, after a private discussion we agreed to remove the board, which will
-> also make the drivers for the Renesas sh-/r-mobile CSI2 interface and for
-> the Sony IMX074 sensor untestable and susceptible to removal. Also
-> multi-subdevice support in soc-camera now will lose its only use and can
-> become broken. I will also drop CSI2 and AP4EVB patches from my V4L2 clock
-> / async probing series.
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-Thanks for writing this summary. It matches my understanding.
+Alexander are you sending this through ARM SoC?
 
-It is unfortunate, but it seems to me that the camera sensor has to be
-tested on another platform. Regarding the CSI2 interface, as we
-discussed, this IP still exists in newer SoCs so because of that I
-recommend you to try to request newer hardware for future testing.
+Alternatively I can carry this in the GPIO tree if there are
+no conflicts elsewhere in this next merge window.
 
-About multi-subdevice and your ongoing work with V4L2 clock / async
-probing, please select a more recent hardware platform.
-
-Thanks,
-
-/ magnus
+Yours,
+Linus Walleij
