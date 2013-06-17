@@ -1,59 +1,90 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:34:07 +0200
-Subject: [PATCH v2 22/38] ARM: EXYNOS: Remove setup-i2c0.c
+Date: Mon, 17 Jun 2013 18:34:22 +0200
+Subject: [PATCH v2 37/38] ARM: EXYNOS: Remove legacy L2X0 initialization
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-23-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-38-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now since SAMSUNG_ATAGS is no longer selected for ARCH_EXYNOS, we can
-safely remove the remaining setup code.
+Since Exynos is now supporting only DT-based boot, the old L2X0
+initialization code is not needed anymore, so exynos4_l2x0_cache_init()
+can be greatly simplified.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/Makefile     |  4 ----
- arch/arm/mach-exynos/setup-i2c0.c | 19 -------------------
- 2 files changed, 23 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/setup-i2c0.c
+ arch/arm/mach-exynos/common.c | 48 ++++---------------------------------------
+ 1 file changed, 4 insertions(+), 44 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 5fc6cfd..e970a7a 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -34,7 +34,3 @@ AFLAGS_exynos-smc.o		:=-Wa,-march=armv7-a$(plus_sec)
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 561890f..e886154 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -412,59 +412,19 @@ static int __init exynos_core_init(void)
+ }
+ core_initcall(exynos_core_init);
  
- obj-$(CONFIG_MACH_EXYNOS4_DT)		+= mach-exynos4-dt.o
- obj-$(CONFIG_MACH_EXYNOS5_DT)		+= mach-exynos5-dt.o
+-#ifdef CONFIG_CACHE_L2X0
+ static int __init exynos4_l2x0_cache_init(void)
+ {
+ 	int ret;
+ 
+-	if (soc_is_exynos5250() || soc_is_exynos5440())
+-		return 0;
 -
--# device support
+ 	ret = l2x0_of_init(L2_AUX_VAL, L2_AUX_MASK);
+-	if (!ret) {
+-		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+-		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
+-		return 0;
+-	}
 -
--obj-$(CONFIG_ARCH_EXYNOS)		+= setup-i2c0.o
-diff --git a/arch/arm/mach-exynos/setup-i2c0.c b/arch/arm/mach-exynos/setup-i2c0.c
-deleted file mode 100644
-index ede6ceb..0000000
---- a/arch/arm/mach-exynos/setup-i2c0.c
-+++ /dev/null
-@@ -1,19 +0,0 @@
--/*
-- * Copyright (c) 2009-2012 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com/
-- *
-- * I2C0 GPIO configuration.
-- *
-- * Based on plat-s3c64xx/setup-i2c0.c
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
+-	if (!(__raw_readl(S5P_VA_L2CC + L2X0_CTRL) & 0x1)) {
+-		l2x0_saved_regs.phy_base = EXYNOS4_PA_L2CC;
+-		/* TAG, Data Latency Control: 2 cycles */
+-		l2x0_saved_regs.tag_latency = 0x110;
 -
--struct platform_device; /* don't need the contents */
+-		if (soc_is_exynos4212() || soc_is_exynos4412())
+-			l2x0_saved_regs.data_latency = 0x120;
+-		else
+-			l2x0_saved_regs.data_latency = 0x110;
 -
--void s3c_i2c0_cfg_gpio(struct platform_device *dev)
--{
+-		l2x0_saved_regs.prefetch_ctrl = 0x30000007;
+-		l2x0_saved_regs.pwr_ctrl =
+-			(L2X0_DYNAMIC_CLK_GATING_EN | L2X0_STNDBY_MODE_EN);
 -
--}
+-		l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
+-
+-		__raw_writel(l2x0_saved_regs.tag_latency,
+-				S5P_VA_L2CC + L2X0_TAG_LATENCY_CTRL);
+-		__raw_writel(l2x0_saved_regs.data_latency,
+-				S5P_VA_L2CC + L2X0_DATA_LATENCY_CTRL);
+-
+-		/* L2X0 Prefetch Control */
+-		__raw_writel(l2x0_saved_regs.prefetch_ctrl,
+-				S5P_VA_L2CC + L2X0_PREFETCH_CTRL);
+-
+-		/* L2X0 Power Control */
+-		__raw_writel(l2x0_saved_regs.pwr_ctrl,
+-				S5P_VA_L2CC + L2X0_POWER_CTRL);
+-
+-		clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
+-		clean_dcache_area(&l2x0_saved_regs, sizeof(struct l2x0_regs));
+-	}
++	if (ret)
++		return ret;
+ 
+-	l2x0_init(S5P_VA_L2CC, L2_AUX_VAL, L2_AUX_MASK);
++	l2x0_regs_phys = virt_to_phys(&l2x0_saved_regs);
++	clean_dcache_area(&l2x0_regs_phys, sizeof(unsigned long));
+ 	return 0;
+ }
+ early_initcall(exynos4_l2x0_cache_init);
+-#endif
+ 
+ static int __init exynos_init(void)
+ {
 -- 
 1.8.2.1
