@@ -1,30 +1,41 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Jun 2013 22:03:16 +0800
-Subject: [PATCH v2] staging: imx_drm: imx_ldb: fix 18 bit format
-In-Reply-To: <1371459772-16443-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1371459772-16443-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130617140314.GJ31687@S2101-09.ap.freescale.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Jun 2013 16:04:47 +0200
+Subject: [RFC PATCH 11/11] ARM: s3c64xx: Add support for DMA using generic
+ amba-pl08x driver
+In-Reply-To: <1371416058-22047-12-git-send-email-tomasz.figa@gmail.com>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+ <1371416058-22047-12-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <CACRpkdbQ7+FDJh235vERbCcQcnW1Mzar9r5jgLaXAT5n6CiCFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 11:02:52AM +0200, Steffen Trumtrar wrote:
-> From: Markus Niebel <Markus.Niebel@tqs.de>
-> 
-> Since 18 bit is supported as datawidth in device tree it should be
-> supported in driver. Beside the LDB channel the IPU channel has also
-> to be configured to use BGR666.
-> 
-> Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> ---
-> This is based on the series: "staging: drm/imx: Add LDB support" by Philipp.
+On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-Greg,
+> This patch adds all required platform-specific data and initialization
+> code to support the generic amba-pl08x driver on S3C64xx SoCs.
+>
+> Also some compatibility definitions are added to make the transition from
+> legacy API to DMA engine easier. The biggest hack here is passing const
+> char * pointers through DMA resource, casted to unsigned long, but this
+> is how Samsung DMA wrappers (used to support both s3c-dma and DMA engine
+> in drivers) is designed.
+>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Can you queued this patch and "staging: drm/imx: Add LDB support" from
-Philipp Zabel for 3.11 please?  With these two patches, I can boot my
-imx6q board into LUbuntu 13.04 with LVDS panel.  So for both patches,
+Patch looks like an OK stepping stone.
 
-Tested-by: Shawn Guo <shawn.guo@linaro.org>
+> +static AMBA_AHB_DEVICE(s3c64xx_dma0, "dma-pl080s.0", 0x0a141080,
+> +                       0x75000000, {IRQ_DMA0}, &s3c64xx_dma0_plat_data);
+(...)
+> +static AMBA_AHB_DEVICE(s3c64xx_dma1, "dma-pl080s.1", 0x0a141080,
+> +                       0x75100000, {IRQ_DMA1}, &s3c64xx_dma1_plat_data);
 
-Shawn
+Ah, does this mean the device does not have any AMBA PrimeCell ID
+contents?
+
+Then use the ID 0x00053080 instead of 0x0a141080
+
+0x53 is "S" for Samsung. Variant 0.
+
+Yours,
+Linus Walleij
