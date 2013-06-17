@@ -1,78 +1,106 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jun 2013 20:41:00 +0100
-Subject: [PATCH V2 2/2] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <51BF5C6D.9050806@wwwdotorg.org>
-References: <1371067281-655-1-git-send-email-swarren@wwwdotorg.org>
- <1371067281-655-2-git-send-email-swarren@wwwdotorg.org>
- <51BF5C6D.9050806@wwwdotorg.org>
-Message-ID: <20130617194100.GS2718@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 17 Jun 2013 12:51:56 -0700
+Subject: [PATCH] ARM: sched_clock: Load cycle count after epoch stabilizes
+In-Reply-To: <1371082214-1119-1-git-send-email-sboyd@codeaurora.org>
+References: <1371082214-1119-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51BF68DC.5030804@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 12:58:53PM -0600, Stephen Warren wrote:
-> On 06/12/2013 02:01 PM, Stephen Warren wrote:
-> > From: Stephen Warren <swarren@nvidia.com>
-> > 
-> > Add comments to machine_shutdown()/halt()/power_off()/restart() that
-> > describe their purpose and/or requirements re: CPUs being active/not.
-> > 
-> > In machine_shutdown(), replace the call to smp_send_stop() with a call to
-> > disable_nonboot_cpus(). This completely disables all but one CPU, thus
-> > satisfying the requirement that only a single CPU be active for kexec.
-> > Adjust Kconfig dependencies for this change.
-> > 
-> > In machine_halt()/power_off()/restart(), call smp_send_stop() directly,
-> > rather than via machine_shutdown(); these functions don't need to
-> > completely de-activate all CPUs using hotplug, but rather just quiesce
-> > them.
-> > 
-> > Remove smp_kill_cpus(), and its call from smp_send_stop().
-> > smp_kill_cpus() was indirectly calling smp_ops.cpu_kill() without calling
-> > smp_ops.cpu_die() on the target CPUs first. At least some implementations
-> > of smp_ops had issues with this; it caused cpu_kill() to hang on Tegra,
-> > for example. Since smp_send_stop() is only used for shutdown, halt, and
-> > power-off, there is no need to attempt any kind of CPU hotplug here.
-> > 
-> > Adjust Kconfig to reflect that machine_shutdown() (and hence kexec)
-> > relies upon disable_nonboot_cpus(). However, this alone doesn't guarantee
-> > that hotplug will work, or even that hotplug is implemented for a
-> > particular piece of HW that a multi-platform zImage runs on. Hence, add
-> > error-checking to machine_kexec() to determine whether it did work.
-> 
-> Russell,
-> 
-> The patch which initially triggered the problem [shutdown/reboot hangs
-> on Tegra] (cf7df37 "reboot: rigrate shutdown/reboot to boot cpu") ended
-> up going into v3.10; I assumed it was only going into v3.11.
-> 
-> Is it possible to take this patch for v3.10 rather than v3.11? (or is
-> your git-curr branch for 3.10; that's where your patchd told me this was
-> applied.)
+John,
 
-The concern I have is that we're now at -rc6, and my "fixes" branch for
-this time around is getting much larger than previous ones:
+I just saw your pull request for making this code generic. I believe
+this patch fixes a bug that nobody has seen in practice so it's probably
+fine to delay this until 3.11.
 
- 5 files changed, 14 insertions(+), 11 deletions(-)
+Also, I've just noticed that "ARM: sched_clock: Return suspended count
+earlier" that I sent in that series is going to break the arm
+architected timer path because they're circumventing all this epoch_ns
+code. It would be better if you could replace that patch with this patch
+because this optimizes it in the same way and also fixes a bug at the
+same time.
 
- 3 files changed, 2 insertions(+), 3 deletions(-)
+Thanks,
+Stephen
 
- 7 files changed, 45 insertions(+), 5 deletions(-)
+On 06/12/13 17:10, Stephen Boyd wrote:
+> There is a small race between when the cycle count is read from
+> the hardware and when the epoch stabilizes. Consider this
+> scenario:
+>
+>  CPU0                           CPU1
+>  ----                           ----
+>  cyc = read_sched_clock()
+>  cyc_to_sched_clock()
+>                                  update_sched_clock()
+>                                   ...
+>                                   cd.epoch_cyc = cyc;
+>   epoch_cyc = cd.epoch_cyc;
+>   ...
+>   epoch_ns + cyc_to_ns((cyc - epoch_cyc)
+>
+> The cyc on cpu0 was read before the epoch changed. But we
+> calculate the nanoseconds based on the new epoch by subtracting
+> the new epoch from the old cycle count. Since epoch is most likely
+> larger than the old cycle count we calculate a large number that
+> will be converted to nanoseconds and added to epoch_ns, causing
+> time to jump forward too much.
+>
+> Fix this problem by reading the hardware after the epoch has
+> stabilized.
+>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
+>
+> Found this while reading through the code. I haven't actually
+> seen it in practice but I think it's real.
+>
+>  arch/arm/kernel/sched_clock.c | 13 +++++--------
+>  1 file changed, 5 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
+> index e8edcaa..a57cc5d 100644
+> --- a/arch/arm/kernel/sched_clock.c
+> +++ b/arch/arm/kernel/sched_clock.c
+> @@ -51,10 +51,11 @@ static inline u64 notrace cyc_to_ns(u64 cyc, u32 mult, u32 shift)
+>  	return (cyc * mult) >> shift;
+>  }
+>  
+> -static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
+> +static unsigned long long notrace sched_clock_32(void)
+>  {
+>  	u64 epoch_ns;
+>  	u32 epoch_cyc;
+> +	u32 cyc;
+>  
+>  	if (cd.suspended)
+>  		return cd.epoch_ns;
+> @@ -73,7 +74,9 @@ static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
+>  		smp_rmb();
+>  	} while (epoch_cyc != cd.epoch_cyc_copy);
+>  
+> -	return epoch_ns + cyc_to_ns((cyc - epoch_cyc) & mask, cd.mult, cd.shift);
+> +	cyc = read_sched_clock();
+> +	cyc = (cyc - epoch_cyc) & sched_clock_mask;
+> +	return epoch_ns + cyc_to_ns(cyc, cd.mult, cd.shift);
+>  }
+>  
+>  /*
+> @@ -165,12 +168,6 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
+>  	pr_debug("Registered %pF as sched_clock source\n", read);
+>  }
+>  
+> -static unsigned long long notrace sched_clock_32(void)
+> -{
+> -	u32 cyc = read_sched_clock();
+> -	return cyc_to_sched_clock(cyc, sched_clock_mask);
+> -}
+> -
+>  unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
+>  
+>  unsigned long long notrace sched_clock(void)
 
-and it's currently looking like:
 
- 7 files changed, 61 insertions(+), 9 deletions(-)
-
-yes, not huge, but it's the wrong direction - and consider I've dropped
-one thing from fixes this morning because they were actually broken...
-and you're asking me to include this:
-
- 4 files changed, 42 insertions(+), 20 deletions(-)
-
-into that, which'll make it:
-
-11 files changed, 103 insertions(+), 29 deletions(-)
-
-and it really starts to look like things are heading in the wrong
-direction... especially as far as Linus would be concerned for -rc6...
-
-I will try though. :)
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
