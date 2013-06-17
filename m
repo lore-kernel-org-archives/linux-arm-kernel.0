@@ -1,274 +1,66 @@
-From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
-Date: Tue, 18 Jun 2013 00:45:37 +0200
-Subject: [PATCH 4/4] ARM: rockchip: add smp bringup code
-In-Reply-To: <201306180043.11785.heiko@sntech.de>
-References: <201306180043.11785.heiko@sntech.de>
-Message-ID: <201306180045.37814.heiko@sntech.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 17 Jun 2013 18:46:39 -0400
+Subject: [GIT PULL] Keystone SOC support for 3.11
+In-Reply-To: <1371255346-3000-1-git-send-email-santosh.shilimkar@ti.com>
+References: <1371255346-3000-1-git-send-email-santosh.shilimkar@ti.com>
+Message-ID: <51BF91CF.9040509@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the necessary smp-operations and startup code to use
-additional cores on Rockchip SoCs.
+Olof,
 
-We currently hog the power management unit in the smp code, as it is
-necessary to control the power to the cpu core and nothing else it is
-currently using it, so a generic implementation can be done later.
+On Friday 14 June 2013 08:15 PM, Santosh Shilimkar wrote:
+> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
+> 
+>   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
+>
+Updated patches with your acks are pushed with the same tag as above.
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/mach-rockchip/Makefile   |    1 +
- arch/arm/mach-rockchip/core.h     |   22 ++++++
- arch/arm/mach-rockchip/headsmp.S  |   32 ++++++++
- arch/arm/mach-rockchip/platsmp.c  |  145 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-rockchip/rockchip.c |    2 +
- 5 files changed, 202 insertions(+)
- create mode 100644 arch/arm/mach-rockchip/core.h
- create mode 100644 arch/arm/mach-rockchip/headsmp.S
- create mode 100644 arch/arm/mach-rockchip/platsmp.c
-
-diff --git a/arch/arm/mach-rockchip/Makefile b/arch/arm/mach-rockchip/Makefile
-index 1547d4f..4377a14 100644
---- a/arch/arm/mach-rockchip/Makefile
-+++ b/arch/arm/mach-rockchip/Makefile
-@@ -1 +1,2 @@
- obj-$(CONFIG_ARCH_ROCKCHIP) += rockchip.o
-+obj-$(CONFIG_SMP) += headsmp.o platsmp.o
-diff --git a/arch/arm/mach-rockchip/core.h b/arch/arm/mach-rockchip/core.h
-new file mode 100644
-index 0000000..e2e7c9d
---- /dev/null
-+++ b/arch/arm/mach-rockchip/core.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (c) 2013 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+extern char rockchip_secondary_trampoline;
-+extern char rockchip_secondary_trampoline_end;
-+
-+extern unsigned long rockchip_boot_fn;
-+extern void rockchip_secondary_startup(void);
-+
-+extern struct smp_operations rockchip_smp_ops;
-diff --git a/arch/arm/mach-rockchip/headsmp.S b/arch/arm/mach-rockchip/headsmp.S
-new file mode 100644
-index 0000000..3dd72f7
---- /dev/null
-+++ b/arch/arm/mach-rockchip/headsmp.S
-@@ -0,0 +1,32 @@
-+/*
-+ * Copyright (c) 2013 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+#include <linux/linkage.h>
-+#include <linux/init.h>
-+
-+	__CPUINIT
-+
-+ENTRY(rockchip_secondary_startup)
-+	bl	v7_invalidate_l1
-+	b	secondary_startup
-+ENDPROC(rockchip_secondary_startup)
-+
-+ENTRY(rockchip_secondary_trampoline)
-+	ldr	pc, 1f
-+ENDPROC(rockchip_secondary_trampoline)
-+	.globl	rockchip_boot_fn
-+rockchip_boot_fn:
-+1:	.space	4
-+
-+ENTRY(rockchip_secondary_trampoline_end)
-diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-new file mode 100644
-index 0000000..9568b3c
---- /dev/null
-+++ b/arch/arm/mach-rockchip/platsmp.c
-@@ -0,0 +1,145 @@
-+/*
-+ * Copyright (c) 2013 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/delay.h>
-+#include <linux/init.h>
-+#include <linux/smp.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+
-+#include <asm/cacheflush.h>
-+#include <asm/smp_scu.h>
-+#include <asm/smp_plat.h>
-+#include <asm/mach/map.h>
-+
-+#include "core.h"
-+
-+static void __iomem *scu_base_addr;
-+static void __iomem *imem_base_addr;
-+static int ncores;
-+
-+/*
-+ * temporary PMU handling
-+ */
-+
-+#define PMU_PWRDN_CON		0x08
-+#define PMU_PWRDN_ST		0x0c
-+
-+static void __iomem *pmu_base_addr;
-+
-+static inline bool pmu_power_domain_is_on(int pd)
-+{
-+	return !(readl_relaxed(pmu_base_addr + PMU_PWRDN_ST) & BIT(pd));
-+}
-+
-+static void pmu_set_power_domain(int pd, bool on)
-+{
-+	u32 val = readl_relaxed(pmu_base_addr + PMU_PWRDN_CON);
-+	if (on)
-+		val &= ~BIT(pd);
-+	else
-+		val |=  BIT(pd);
-+	writel(val, pmu_base_addr + PMU_PWRDN_CON);
-+
-+	while (pmu_power_domain_is_on(pd) != on) { }
-+}
-+
-+/*
-+ * Handling of CPU cores
-+ */
-+
-+static int __cpuinit rockchip_boot_secondary(unsigned int cpu, struct task_struct *idle)
-+{
-+	unsigned long sz = &rockchip_secondary_trampoline_end -
-+					    &rockchip_secondary_trampoline;
-+
-+	if (!imem_base_addr || !pmu_base_addr) {
-+		pr_err("%s: sram or pmu missing for cpu boot\n", __func__);
-+		return -ENXIO;
-+	}
-+
-+	if (cpu >= ncores) {
-+		pr_err("%s: cpu %d outside maximum number of cpus %d\n",
-+							__func__, cpu, ncores);
-+		return -ENXIO;
-+	}
-+
-+	/* copy the trampoline to sram, that gets run during startup of the core */
-+	memcpy(imem_base_addr, &rockchip_secondary_trampoline, sz);
-+	flush_cache_all();
-+	outer_clean_range(0, sz);
-+
-+	dsb_sev();
-+
-+	/* start the core */
-+	pmu_set_power_domain(0 + cpu, true);
-+
-+	return 0;
-+}
-+
-+static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
-+{
-+	struct device_node *node;
-+	unsigned int i;
-+
-+	node = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-+	if (!node) {
-+		pr_err("%s: missing scu\n", __func__);
-+		return;
-+	}
-+
-+	scu_base_addr = of_iomap(node, 0);
-+	if (!scu_base_addr) {
-+		pr_err("%s: could not map scu registers\n", __func__);
-+		return;
-+	}
-+
-+	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-smp-sram");
-+	if (!node) {
-+		pr_err("%s: could not find sram dt node\n", __func__);
-+		return;
-+	}
-+
-+	imem_base_addr = of_iomap(node, 0);
-+
-+	node = of_find_compatible_node(NULL, NULL, "rockchip,rk3066-pmu");
-+	if (!node) {
-+		pr_err("%s: could not find sram dt node\n", __func__);
-+		return;
-+	}
-+
-+	pmu_base_addr = of_iomap(node, 0);
-+
-+	/*
-+	 * While the number of cpus is gathered from dt, also get the number
-+	 * of cores from the scu to verify this value when booting the cores.
-+	 */
-+	ncores = scu_get_core_count(scu_base_addr);
-+
-+	scu_enable(scu_base_addr);
-+
-+	/* Make sure that all cores except the first are really off */
-+	for (i = 1; i < ncores; i++)
-+		pmu_set_power_domain(0 + i, false);
-+
-+	/* set the boot function for the sram code */
-+	rockchip_boot_fn = virt_to_phys(rockchip_secondary_startup);
-+}
-+
-+struct smp_operations rockchip_smp_ops __initdata = {
-+	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
-+	.smp_boot_secondary	= rockchip_boot_secondary,
-+};
-diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
-index 0933e17..fd569a1 100644
---- a/arch/arm/mach-rockchip/rockchip.c
-+++ b/arch/arm/mach-rockchip/rockchip.c
-@@ -24,6 +24,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
- #include <asm/hardware/cache-l2x0.h>
-+#include "core.h"
  
- static void __init rockchip_timer_init(void)
- {
-@@ -48,6 +49,7 @@ static const char * const rockchip_board_dt_compat[] = {
- };
- 
- DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
-+	.smp		= smp_ops(rockchip_smp_ops),
- 	.init_machine	= rockchip_dt_init,
- 	.init_time	= rockchip_timer_init,
- 	.dt_compat	= rockchip_board_dt_compat,
--- 
-1.7.10.4
+> for you to fetch changes up to cc92fc07c26c1bec1abb58f0cd356b13dc00a28c:
+> 
+>   ARM: dts: keystone: Add minimal Keystone SOC device tree data (2013-06-14 19:45:46 -0400)
+> 
+> ----------------------------------------------------------------
+> SOC support for Keystone II devices:
+> 
+> - Minimal machine and device-tree support with arch_timers and console UART
+> - Reboot hook using PLL reset
+> - Low level debug support using UART
+> - SMP boot support
+> 
+> ----------------------------------------------------------------
+> Santosh Shilimkar (3):
+>       ARM: keystone: Add minimal TI Keystone platform support
+>       ARM: keystone: Enable SMP support on Keystone machines
+>       ARM: dts: keystone: Add minimal Keystone SOC device tree data
+> 
+>  .../devicetree/bindings/arm/keystone/keystone.txt  |   10 ++
+>  arch/arm/Kconfig                                   |    3 +
+>  arch/arm/Kconfig.debug                             |   16 ++
+>  arch/arm/Makefile                                  |    1 +
+>  arch/arm/boot/dts/keystone.dts                     |  109 ++++++++++++++
+>  arch/arm/configs/keystone_defconfig                |  157 ++++++++++++++++++++
+>  arch/arm/include/debug/keystone.S                  |   43 ++++++
+>  arch/arm/mach-keystone/Kconfig                     |   15 ++
+>  arch/arm/mach-keystone/Makefile                    |    2 +
+>  arch/arm/mach-keystone/Makefile.boot               |    1 +
+>  arch/arm/mach-keystone/keystone.c                  |   77 ++++++++++
+>  arch/arm/mach-keystone/keystone.h                  |   17 +++
+>  arch/arm/mach-keystone/platsmp.c                   |   52 +++++++
+>  13 files changed, 503 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/keystone/keystone.txt
+>  create mode 100644 arch/arm/boot/dts/keystone.dts
+>  create mode 100644 arch/arm/configs/keystone_defconfig
+>  create mode 100644 arch/arm/include/debug/keystone.S
+>  create mode 100644 arch/arm/mach-keystone/Kconfig
+>  create mode 100644 arch/arm/mach-keystone/Makefile
+>  create mode 100644 arch/arm/mach-keystone/Makefile.boot
+>  create mode 100644 arch/arm/mach-keystone/keystone.c
+>  create mode 100644 arch/arm/mach-keystone/keystone.h
+>  create mode 100644 arch/arm/mach-keystone/platsmp.c
+> 
