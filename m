@@ -1,32 +1,36 @@
-From: john.stultz@linaro.org (John Stultz)
+From: khilman@linaro.org (Kevin Hilman)
 Date: Mon, 17 Jun 2013 11:14:06 -0700
-Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
-In-Reply-To: <20130617180211.GJ10269@tarshish>
-References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
- <51AD32A4.5070609@linaro.org>
- <20130604160907.GW27516@mudshark.cambridge.arm.com>
- <51AE2980.6010005@linaro.org> <20130616094501.GG10269@tarshish>
- <51BF37E4.8020006@linaro.org> <20130617180211.GJ10269@tarshish>
-Message-ID: <51BF51EE.9020305@linaro.org>
+Subject: [GIT PULL] OMAP: PM: voltagedomain cleanup for v3.11
+Message-ID: <87r4g08v0x.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2013 11:02 AM, Baruch Siach wrote:
->> to send
->> >it by Thomas for 3.11 this week.
-> Good, thanks. This means that the xtensa ccount sched_clock patch
-> (http://lists.linux-xtensa.org/pipermail/linux-xtensa/Week-of-Mon-20130617/001077.html)
-> that depends on the third patch in this series, can go in for 3.11, if the
-> xtensa maintainer acks it (added to Cc). How should we handle the dependency
-> then?
-Well, Thomas hasn't picked them up yet, so he could still object, so no 
-promises yet :)
+The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
 
-As for the dependency, either you can base your patches off of 
-tip/timers/core (once the patches land there) and send a pull request to 
-the maintainer (so he gets the dependencies in -tip), or we can see 
-about queuing your changes via tip/timers/core (assuming you get 
-maintainer acks).
+  Linux 3.10-rc6 (2013-06-15 11:51:07 -1000)
 
-thanks
--john
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.11/voltdm
+
+for you to fetch changes up to 63b0420c85096d4bb1a3ba365dbf6b970a58b8f7:
+
+  ARM: AM33xx: Remove the unused voltagedomain data (2013-06-17 07:26:44 -0700)
+
+----------------------------------------------------------------
+OMAP: PM: remove requirement for voltage domain data; remove dummy data
+
+----------------------------------------------------------------
+Rajendra Nayak (2):
+      ARM: OMAP2+: Powerdomain: Remove the need to always have a voltdm associated to a pwrdm
+      ARM: AM33xx: Remove the unused voltagedomain data
+
+ arch/arm/mach-omap2/Makefile                  |  1 -
+ arch/arm/mach-omap2/io.c                      |  1 -
+ arch/arm/mach-omap2/powerdomain.c             |  5 ++++
+ arch/arm/mach-omap2/powerdomain.h             |  2 ++
+ arch/arm/mach-omap2/prm33xx.c                 |  7 +++++
+ arch/arm/mach-omap2/voltage.h                 |  1 -
+ arch/arm/mach-omap2/voltagedomains33xx_data.c | 43 ---------------------------
+ 7 files changed, 14 insertions(+), 46 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
