@@ -1,45 +1,54 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 19:13:18 +0900
-Subject: [PATCH 1/3] serial: sh-sci: HSCIF support
-In-Reply-To: <1371461329-26467-2-git-send-email-horms+renesas@verge.net.au>
-References: <1371461329-26467-1-git-send-email-horms+renesas@verge.net.au>
- <1371461329-26467-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130617101318.GA28277@verge.net.au>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 17 Jun 2013 19:15:27 +0900
+Subject: [PATCH V6 6/6] clk: exynos5250: Add enum entries for divider clock
+ of i2s1 and i2s2
+In-Reply-To: <CAAgF-Bf4BVfGVuFF8-CwPRi-em5VHA5HXYjkRDxPxvyAZPx7kw@mail.gmail.com>
+References: <1371024463-303-1-git-send-email-padma.v@samsung.com>
+ <1371024463-303-7-git-send-email-padma.v@samsung.com>
+ <20130612164553.26381.41398@quantum>
+ <CAAgF-BfEvBcrm186t6U9Tp4r64wB3sEsy6hoXMQi=dHJgncvfw@mail.gmail.com>
+ <CAAgF-Bf4BVfGVuFF8-CwPRi-em5VHA5HXYjkRDxPxvyAZPx7kw@mail.gmail.com>
+Message-ID: <19ac01ce6b43$96bfb4d0$c43f1e70$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ Cc Greg Kroah-Hartman <gregkh@linuxfoundation.org> ]
-
-On Mon, Jun 17, 2013 at 06:28:47PM +0900, Simon Horman wrote:
-> From: Ulrich Hecht <ulrich.hecht@gmail.com>
+Padma Venkat wrote:
 > 
-> Adds support for "High Speed Serial Communications Interface with FIFO",
-> essentially a SCIF with 128-byte FIFOs and more accurate baud rate
-> generator.
+> Hi Mike,
 > 
-> Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-> Acked-by: Paul Mundt <lethal@linux-sh.org>
-> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> On Thu, Jun 13, 2013 at 8:32 AM, Padma Venkat <padma.kvr@gmail.com> wrote:
+> > Hi Mike,
+> >
+> > On Wed, Jun 12, 2013 at 10:15 PM, Mike Turquette <mturquette@linaro.org>
+> wrote:
+> >> Quoting Padmavathi Venna (2013-06-12 01:07:43)
+> >>> This patch adds enum entries for div_i2s1 and div_i2s2 which are
+> >>> required for i2s1 and i2s2 controllers.
+> >>>
+> >>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+> >>
+> >> Looks good.  Did you want me to take the clk patches or just gathering
+> >> Acks?
+> >
+> > Please take the patches :).
+> >
+> > Thanks
+> > Padma
+> 
+> clk related patches in this set has some dependency on arch side
+> patches because one of the patch replaces all '/include's with
+> '#include's and adds a header file in
+> arch/arm/boot/include/dt-bindings/. So all these patches required to
+> go into one tree.
+> 
+> Hi Kukjin,
+> 
+> Can you please take all these patches into samsung-tree?
+> 
+Padma, sure, I will.
 
-[ snip ]
+BTW, Mike, according to your reply, I may get your ack on 2nd and 6th clk
+patches...If any problems, please kindly let me know.
 
-> diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
-> index 74c2bf7..26eee07 100644
-> --- a/include/uapi/linux/serial_core.h
-> +++ b/include/uapi/linux/serial_core.h
-> @@ -226,4 +226,7 @@
->  /* Rocketport EXPRESS/INFINITY */
->  #define PORT_RP2	102
->  
-> +/* SH-SCI */
-> +#define PORT_HSCIF	103
-> +
->  #endif /* _UAPILINUX_SERIAL_CORE_H */
-
-It seems that 103 conflicts with #define PORT_LPUART   103
-which is present in commit c9e2e946fb0b ("tty:
-serial: add Freescale lpuart driver support") which is
-in turn present in linux-next via tty-next.
-
-Should I re-spin this patch using 104 for PORT_HSCIF ?
+Thanks,
+- Kukjin
