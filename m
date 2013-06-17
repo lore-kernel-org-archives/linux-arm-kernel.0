@@ -1,29 +1,27 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 17 Jun 2013 11:12:01 +0800
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable PWM and backlight
- options
-In-Reply-To: <CAOMZO5Dzh48Rg-roBnjYu-msZN=hpKqipQ+TG7Jr=_JyrVOf4g@mail.gmail.com>
-References: <1370534190-10765-1-git-send-email-fabio.estevam@freescale.com>
- <CAOMZO5Dzh48Rg-roBnjYu-msZN=hpKqipQ+TG7Jr=_JyrVOf4g@mail.gmail.com>
-Message-ID: <20130617031159.GF31687@S2101-09.ap.freescale.net>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 17 Jun 2013 12:15:05 +0900
+Subject: [PATCH 0/2] serial: sh-sci: HSCIF support
+In-Reply-To: <20130617030023.GD12522@kroah.com>
+References: <1371436934-27744-1-git-send-email-horms+renesas@verge.net.au>
+ <20130617030023.GD12522@kroah.com>
+Message-ID: <20130617031505.GB27933@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 12:04:19AM -0300, Fabio Estevam wrote:
-> Hi Shawn,
+On Sun, Jun 16, 2013 at 08:00:23PM -0700, Greg Kroah-Hartman wrote:
+> On Mon, Jun 17, 2013 at 11:42:12AM +0900, Simon Horman wrote:
+> > Hi Greg, Hi All,
+> > 
+> > this short series adds HSCIF support to the sh-sci driver
+> > and enhances the r8a7790 SoC to not use external clocks for SCIF.
+> > 
+> > I have included these two patches in a single series as the second
+> > patch has a build-time dependency on the first.
+> > 
+> > Greg, would it be possible for you to review at least the first patch and
+> > if it is ok either:
+> > * Ack the first patch so I can merge it through the renesas tree or;
 > 
-> On Thu, Jun 6, 2013 at 12:56 PM, Fabio Estevam
-> <fabio.estevam@freescale.com> wrote:
-> > These options are useful for controlling backlight contrast via PWM.
-> >
-> > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> > ---
-> > Changes since v1:
-> > - Fix warnings
-> > - Fix typo in Subject
-> 
-> Does it look good now?
+> I've done this now, feel free to take this through the renesas tree.
 
-I've already applied it, but forgot sending a reply to let you know.
-
-Shawn
+Thanks Greg, much appreciated.
