@@ -1,37 +1,47 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:34:18 +0200
-Subject: [PATCH v2 33/38] thermal: exynos: Remove check for SOC_EXYNOS4412
+Date: Mon, 17 Jun 2013 18:34:05 +0200
+Subject: [PATCH v2 20/38] ARM: SAMSUNG: pm: Include most of mach/ headers
+ conditionally
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-34-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-21-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since SOC_EXYNOS4412 Kconfig symbol has been removed, it is enough to
-check for SOC_EXYNOS4212 for both SoCs from Exynos4x12 series.
+Since it is illegal to include mach/ headers from source files outside
+of respective mach-* directory and DT-only Samsung platforms might not
+have all of them anyway, this patches makes inclusion of them
+conditional, based on CONFIG_SAMSUNG_ATAGS.
 
-Cc: linux-pm at vger.kernel.org
-Cc: Zhang Rui <rui.zhang@intel.com>
-Cc: Eduardo Valentin <eduardo.valentin@ti.com>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/thermal/exynos_thermal.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/plat-samsung/pm.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/thermal/exynos_thermal.c b/drivers/thermal/exynos_thermal.c
-index 4cbe3ee..f88a2ad 100644
---- a/drivers/thermal/exynos_thermal.c
-+++ b/drivers/thermal/exynos_thermal.c
-@@ -817,8 +817,7 @@ static struct exynos_tmu_platform_data const exynos4210_default_tmu_data = {
- #define EXYNOS4210_TMU_DRV_DATA (NULL)
- #endif
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 53210ec..d76ab72 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -21,13 +21,17 @@
  
--#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4412) || \
--	defined(CONFIG_SOC_EXYNOS4212)
-+#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4212)
- static struct exynos_tmu_platform_data const exynos_default_tmu_data = {
- 	.threshold_falling = 10,
- 	.trigger_levels[0] = 85,
+ #include <asm/cacheflush.h>
+ #include <asm/suspend.h>
+-#include <mach/hardware.h>
+-#include <mach/map.h>
+ 
+ #include <plat/regs-serial.h>
++
++#ifdef CONFIG_SAMSUNG_ATAGS
++#include <mach/hardware.h>
++#include <mach/map.h>
+ #include <mach/regs-clock.h>
+ #include <mach/regs-irq.h>
+ #include <mach/irqs.h>
++#endif
++
+ #include <asm/irq.h>
+ 
+ #include <plat/pm.h>
 -- 
 1.8.2.1
