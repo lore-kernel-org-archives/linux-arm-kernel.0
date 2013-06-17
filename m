@@ -1,43 +1,60 @@
-From: Nicolas.FERRE@atmel.com (Ferre, Nicolas)
-Date: Mon, 17 Jun 2013 08:34:11 +0000
-Subject: [GIT PULL] at91: Device Tree update for 3.11 #2
-In-Reply-To: <20130615015224.GA25585@quad.lixom.net>
-References: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
- <1371250067-19317-1-git-send-email-nicolas.ferre@atmel.com>,
- <20130615015224.GA25585@quad.lixom.net>
-Message-ID: <EABCC4A72A203F4BA2E04297CF0282C427D1E112@hnombx01.corp.atmel.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Jun 2013 10:38:50 +0200
+Subject: [linux-sunxi] [PATCH 5/6] ARM: sunxi: Add Olimex
+ A10s-Olinuxino-micro device tree
+In-Reply-To: <51BB5C6D.5070308@elopez.com.ar>
+References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1370795767-9769-6-git-send-email-maxime.ripard@free-electrons.com>
+ <51BB5C6D.5070308@elopez.com.ar>
+Message-ID: <20130617083850.GD16699@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Emilio,
 
->On Sat, Jun 15, 2013 at 12:47:47AM +0200, Nicolas Ferre wrote:
->> Arnd, Olof,
->>
->> Additional pull-request for AT91 DT patches.
->> It contains the remaining part of the USB gadget pull-request that I sent you
->> last week. After having split it, here is the DT part.
->> It also contains the update of DMA bindings: it is the AT91 part the should go
->> through arm-soc. I have included the patch (ARM: at91: dt: add header to define
->> at_hdmac configuration) so that we avoid build errors whichever git tree
->> (slave-dma or arm-soc) is merged first.
->> A SPI DT patch for at91sam9x5 is also added.
->>
->> Thanks, best regards,
->>
->> The following changes since commit 028633c238f91dc113520a7ad25d37b2ba9068af:
->>
->>   ARM: at91/dt: add pinctrl definition for at91 tc blocks (2013-05-31 22:40:37 +0200)
->>
->> are available in the git repository at:
->>
->>   git://github.com/at91linux/linux-at91.git tags/at91-dt
->
->Pulled, thanks.
+On Fri, Jun 14, 2013 at 03:09:49PM -0300, Emilio L?pez wrote:
+> Hi Maxime,
+> 
+> El 09/06/13 13:36, Maxime Ripard escribi?:
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 75 ++++++++++++++++++++++++
+> >  1 file changed, 75 insertions(+)
+> >  create mode 100644 arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+> 
+> Please add this on the sunxi target in arch/arm/boot/dts/Makefile so it
+> gets built on make dtbs.
+> 
+> (snip)
+> 
+> > +	leds {
+> > +		compatible = "gpio-leds";
+> > +		pinctrl-names = "default";
+> > +		pinctrl-0 = <&led_pins_olinuxino>;
+> > +
+> > +		power {
+> > +			gpios = <&pio 4 3 0>;
+> > +			default-state = "on";
+> > +		};
+> 
+> Also, as discussed on IRC, I think it would be wise to change the name
+> on the LED node. The schematics have a 'power' led already that is
+> hard-wired to 3.3v, and this led node that you are declaring is referred
+> as 'led1' there. I suppose 'green' would be a suitable name to keep
+> consistency with other sunxi boards (namely cubieboard).
+> 
+> Other than that, my OLinuXino worked just fine after applying this
+> patchset, so
+> 
+> Tested-by: Emilio L?pez <emilio@elopez.com.ar>
 
-Hi,
+Thanks for your comments and the test.
 
-I do not see it appearing in arm-soc/at91/dt branch even though is it present in arm-soc/for-next: is it normal?
+I'll send a v2.
 
-Bye,
+Maxime
+
 -- 
-Nicolas Ferre
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
