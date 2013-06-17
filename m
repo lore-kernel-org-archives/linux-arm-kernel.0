@@ -1,24 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 15:31:27 +0200
-Subject: [RFC PATCH 03/11] dma: amba-pl08x: Add support for different
- offset of CONFIG register
-In-Reply-To: <1371416058-22047-4-git-send-email-tomasz.figa@gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-4-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdYbgnkoaSiZqc7o2QvE19hZEASScfv_3onZoMmr3L9CxA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jun 2013 14:31:10 +0100
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+Message-ID: <20130617133109.GG2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+On Mon, Jun 17, 2013 at 10:04:45PM +0900, Inki Dae wrote:
+> It's just to implement a thin sync framework coupling cache operation. This
+> approach is based on dma-buf for more generic implementation against android
+> sync driver or KDS.
+> 
+> The described steps may be summarized as:
+> 	lock -> cache operation -> CPU or DMA access to a buffer/s -> unlock
+> 
+> I think that there is no need to get complicated for such approach at least
+> for most devices sharing system memory. Simple is best.
 
-> Some variants of PL08x (namely PL080S, found in Samsung S3C64xx SoCs)
-> have CONFIG register at different offset. This patch makes the driver
-> use offset from vendor data struct.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+But hang on, doesn't the dmabuf API already provide that?
 
-Looks good to me:
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+The dmabuf API already uses dma_map_sg() and dma_unmap_sg() by providers,
+and the rules around the DMA API are that:
 
-Yours,
-Linus Walleij
+	dma_map_sg()
+	/* DMA _ONLY_ has access, CPU should not access */
+	dma_unmap_sg()
+	/* DMA may not access, CPU can access */
+
+It's a little more than that if you include the sync_sg_for_cpu and
+sync_sg_for_device APIs too - but the above is the general idea.  What
+this means from the dmabuf API point of view is that once you attach to
+a dma_buf, and call dma_buf_map_attachment() to get the SG list, the CPU
+doesn't have ownership of the buffer and _must_ _not_ access it via any
+other means - including using the other dma_buf methods, until either
+the appropriate dma_sync_sg_for_cpu() call has been made or the DMA
+mapping has been removed via dma_buf_unmap_attachment().
+
+So, the sequence should be:
+
+	dma_buf_map_attachment()
+	/* do DMA */
+	dma_buf_unmap_attachment()
+	/* CPU can now access the buffer */
