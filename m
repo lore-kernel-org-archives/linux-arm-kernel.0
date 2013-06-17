@@ -1,73 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 17:12:43 +0900
-Subject: [PATCH 10/15] ARM: shmobile: Remove old SCU boot code
+Date: Mon, 17 Jun 2013 17:12:38 +0900
+Subject: [PATCH 05/15] ARM: shmobile: Add SMP boot function and argument
 In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371456768-1084-11-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371456768-1084-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Remove shmobile_secondary_vector_scu now when all SCU enabled
-SMP platforms instead make use of shmobile_boot_scu. This
-removes two inline virtual to physical address conversions.
+Add code for mach-shmobile to allow specifying boot function
+and argument. Will initially be used for SMP together with SCU
+but may in the future also be used for deep sleep resume. This
+patch removes one inline virtual to physical address conversion.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/headsmp-scu.S         |   22 +---------------------
- arch/arm/mach-shmobile/include/mach/common.h |    1 -
- 2 files changed, 1 insertion(+), 22 deletions(-)
+ arch/arm/mach-shmobile/headsmp.S             |   13 ++++++++++---
+ arch/arm/mach-shmobile/include/mach/common.h |    4 +++-
+ 2 files changed, 13 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/headsmp-scu.S b/arch/arm/mach-shmobile/headsmp-scu.S
-index c5c9106..6f98654 100644
---- a/arch/arm/mach-shmobile/headsmp-scu.S
-+++ b/arch/arm/mach-shmobile/headsmp-scu.S
-@@ -25,32 +25,12 @@
- 
- 	__CPUINIT
- /*
-- * Reset vector for secondary CPUs.
-+ * Boot code for secondary CPUs.
-  *
-  * First we turn on L1 cache coherency for our CPU. Then we jump to
-  * shmobile_invalidate_start that invalidates the cache and hands over control
-  * to the common ARM startup code.
-- * This function will be mapped to address 0 by the SBAR register.
-- * A normal branch is out of range here so we need a long jump. We jump to
-- * the physical address as the MMU is still turned off.
+diff --git a/arch/arm/mach-shmobile/headsmp.S b/arch/arm/mach-shmobile/headsmp.S
+index 96001fd..559d1ce 100644
+--- a/arch/arm/mach-shmobile/headsmp.S
++++ b/arch/arm/mach-shmobile/headsmp.S
+@@ -27,7 +27,14 @@ ENDPROC(shmobile_invalidate_start)
+  * We need _long_ jump to the physical address.
   */
--	.align	12
--ENTRY(shmobile_secondary_vector_scu)
--	mrc     p15, 0, r0, c0, c0, 5	@ read MIPDR
--	and	r0, r0, #3		@ mask out cpu ID
--	lsl	r0, r0, #3		@ we will shift by cpu_id * 8 bits
--	ldr	r1, 2f
--	ldr	r1, [r1]		@ SCU base address
--	ldr	r2, [r1, #8]		@ SCU Power Status Register
--	mov	r3, #3
--	bic	r2, r2, r3, lsl r0	@ Clear bits of our CPU (Run Mode)
--	str	r2, [r1, #8]		@ write back
--
--	ldr	pc, 1f
--1:	.long shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
--2:	.long shmobile_scu_base - PAGE_OFFSET + PLAT_PHYS_OFFSET
--ENDPROC(shmobile_secondary_vector_scu)
--
- ENTRY(shmobile_boot_scu)
- 					@ r0 = SCU base address
- 	mrc     p15, 0, r1, c0, c0, 5	@ read MIPDR
+ 	.align  12
+-ENTRY(shmobile_secondary_vector)
++ENTRY(shmobile_boot_vector)
++	ldr     r0, 2f
+ 	ldr     pc, 1f
+-1:	.long   shmobile_invalidate_start - PAGE_OFFSET + PLAT_PHYS_OFFSET
+-ENDPROC(shmobile_secondary_vector)
++ENDPROC(shmobile_boot_vector)
++
++	.globl	shmobile_boot_fn
++shmobile_boot_fn:
++1:	.space	4
++	.globl	shmobile_boot_arg
++shmobile_boot_arg:
++2:	.space	4
 diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 8ef1c3c..e818f02 100644
+index 4634a5d..54472ef 100644
 --- a/arch/arm/mach-shmobile/include/mach/common.h
 +++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -10,7 +10,6 @@ extern void shmobile_setup_console(void);
- extern void shmobile_boot_vector(void);
- extern unsigned long shmobile_boot_fn;
- extern unsigned long shmobile_boot_arg;
--extern void shmobile_secondary_vector_scu(void);
- extern void shmobile_boot_scu(void);
+@@ -7,7 +7,9 @@ extern void shmobile_setup_delay(unsigned int max_cpu_core_mhz,
+ 			 unsigned int mult, unsigned int div);
+ struct twd_local_timer;
+ extern void shmobile_setup_console(void);
+-extern void shmobile_secondary_vector(void);
++extern void shmobile_boot_vector(void);
++extern unsigned long shmobile_boot_fn;
++extern unsigned long shmobile_boot_arg;
+ extern void shmobile_secondary_vector_scu(void);
  struct clk;
  extern int shmobile_clk_init(void);
 -- 
