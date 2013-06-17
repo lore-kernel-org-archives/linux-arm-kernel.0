@@ -1,109 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jun 2013 14:44:40 +0200
-Subject: [PATCH V5 1/3] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <005e01ce6b3f$74e3c940$5eab5bc0$@samsung.com>
-References: <000b01ce6839$0f0455d0$2d0d0170$@samsung.com>
- <3539874.V7zkhbMg0b@wuerfel> <005e01ce6b3f$74e3c940$5eab5bc0$@samsung.com>
-Message-ID: <7174350.I5qK0sQfHM@wuerfel>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Mon, 17 Jun 2013 14:44:00 +0200 (CEST)
+Subject: [PATCH 00/03] ARM: 64-bit memory fixes, APE6EVM second memory bank
+In-Reply-To: <20130605104427.1720.68752.sendpatchset@w520>
+References: <20130605104427.1720.68752.sendpatchset@w520>
+Message-ID: <Pine.LNX.4.64.1306171442380.22409@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013 18:45:52 Jingoo Han wrote:
-> On Friday, June 14, 2013 9:54 PM, Arnd Bergmann wrote:
-> > 
-> > Please look up the documentation about inbound viewport and describe
-> > in a code comment what it does. I /assume/ that this is how DMA accesses
-> > from the bus get translated into AXI bus transactions. If so, you have
-> > to let the window translate addresses from RAM. If it's something else,
-> > then you should document what it is and how it needs to be set up.
+On Wed, 5 Jun 2013, Magnus Damm wrote:
+
+> ARM: 64-bit memory fixes, APE6EVM second memory bank
 > 
-> One of our hardware engineer confirmed it.
-> He said that these inbound functions are unnecessary.
-> Also, I checked that PCIe works properly without these functions.
-> So, I will remove these inbound functions.
-
-Ok, good. So DMA just gets translated 1:1 independent of the
-inbound viewport? Have you tested this with PCI device using
-DMA?
-
-> static int exynos_pcie_setup(int nr, struct pci_sys_data *sys)
-> {
-> 	struct pcie_port *pp;
+> [PATCH 01/03] ARM: Let arm_add_memory() always use 64-bit arguments
+> [PATCH 02/03] ARM: Handle 64-bit memory in case of 32-bit phys_addr_t
+> [PATCH 03/03] ARM: shmobile: Add second memory bank to DTS for APE6EVM
 > 
-> 	pp = sys_to_pcie(sys);
+> This patch set contains two fixes and one mach-shmobile specific patch
+> to add a second memory bank. The fixes attempt to improve the memory bank
+> handling in the ARM kernel in case of 64-bit addresses.
 > 
-> 	if (!pp)
-> 		return 0;
+> Without patch 1/3 and 2/3 but with patch 3/3 by itself:
 > 
-> 	if (global_io_offset < SZ_1M && pp->config.io_size > 0) {
-> 		sys->io_offset = global_io_offset - pp->config.io_bus_addr; /* normally 0 */
-> 		pci_ioremap_io(sys->io_offset, pp->io.start);
-> 		global_io_offset += SZ_64K;
-> 	}
+> HIGHMEM=n, LPAE=n - OK (busted, second bank ignored with message [1])
+> HIGHMEM=y, LPAE=n - NG (busted, board hangs on boot)
+> HIGHMEM=n, LPAE=y - OK
+> HIGHMEM=y, LPAE=y - OK
 > 
-> 	sys->mem_offset = pp->mem.start - pp->config.mem_bus_addr; /* normally 0 */
+> [1] Ignoring RAM at 00000000-3fffffff (vmalloc region overlap).
 > 
-> 	pci_add_resource_offset(&sys->resources, &pp->io, sys->io_offset);
-> 	pci_add_resource_offset(&sys->resources, &pp->mem, sys->mem_offset);
+> With all patches applied:
 > 
->         return 1;
-> }
+> HIGHMEM=n, LPAE=n - OK
+> HIGHMEM=y, LPAE=n - OK
 
-This is what I meant, yes.
+Confirmed: these patches fix the LPAE=n case
 
-> In this case, boot message is as below:
+Tested-by: Guennadi Liakhovetski <g.liakhovetski+renesas@gmail.com>
+
+Thanks
+Guennadi
+
+> HIGHMEM=n, LPAE=y - OK
+> HIGHMEM=y, LPAE=y - OK
 > 
-> PCI host bridge to bus 0000:00
-> pci_bus 0000:00: root bus resource [io  0x40001000-0x40010fff]
-> pci_bus 0000:00: root bus resource [mem 0x40011000-0x5fffffff]
-> pci_bus 0000:00: No busn resource found for root bus, will use [bus 00-ff]
-> pci 0000:00:00.0: [144d:a549] type 01 class 0x060400
-> [.....]
-> PCI host bridge to bus 0001:00
-> pci_bus 0001:00: root bus resource [io  0x60001000-0x60010fff] (bus address [0x5fff1000-0x6000
-> 0fff])
-> pci_bus 0001:00: root bus resource [mem 0x60011000-0x7fffffff]
-> pci_bus 0001:00: No busn resource found for root bus, will use [bus 00-ff]
-> pci 0001:00:00.0: [144d:a549] type 01 class 0x060400
-
-The io resources here look wrong. I would have expected
-
-pci_bus 0000:00: root bus resource [io  0x001000-0x00ffff]
-pci_bus 0001:00: root bus resource [io  0x010000-0x01ffff] (bus address [0x000000-0x00ffff])
-
-Please have a look at the pci-mvebu driver and how it calculates its
-'realio' resource.
-
-> > > > > +static int __exit exynos_pcie_remove(struct platform_device *pdev)
-> > > > > +{
-> > > > > +	struct pcie_port *pp = platform_get_drvdata(pdev);
-> > > > > +
-> > > > > +	clk_disable_unprepare(pp->bus_clk);
-> > > > > +	clk_disable_unprepare(pp->clk);
-> > > > > +
-> > > > > +	return 0;
-> > > > > +}
-> > > >
-> > > > You also don't remove the PCI devices here, as mentioned in an earlier
-> > > > review.
-> > >
-> > > I reviewed Marvell PCIe driver and Tegra PCIe driver; however,
-> > > I cannot know what you mean.
-> > >
-> > > Could let me know which additional functions are needed?
-> > 
-> > The mvebu driver does not allow module unload. I haven't looked at the
-> > tegra driver. If you allow unloading the driver and provide a 'remove'
-> > callback, that callback needs to clean up the entire bus and remove
-> > all child devices that were added as well as undo everything the
-> > probe function did. I think it would be great if you can do that, although
-> > it might not be easy. The simplest solution would be to not support
-> > unloading though.
+> My opinion is that LPAE should be handled in a similar way to x86 PAE.
+> This means the kernel should boot regardless of kernel config but 64-bit
+> memory banks may be truncated if needed like when LPAE=n or HIGHMEN=n.
 > 
-> As the mvebu driver uses platform_driver_probe(), the Exynos driver uses
-> platform_driver_probe(). Thus, I will not provide a 'remove' callback.
+> Comments on how to implement this in a nicer way are very welcome!
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
+> ---
+> 
+>  Written against renesas.git renesas-next-20130604v2
+> 
+>  arch/arm/boot/dts/r8a73a4-ape6evm.dts |    5 +++++
+>  arch/arm/include/asm/setup.h          |    2 +-
+>  arch/arm/kernel/setup.c               |   22 +++++++++++++++-------
+>  3 files changed, 21 insertions(+), 8 deletions(-)
 
-Well, the important part is not to provide a module_exit() function, which
-will ensure the driver cannot be unloaded.
-
-	Arnd
+---
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
