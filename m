@@ -1,337 +1,154 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:33:50 +0200
-Subject: [PATCH v2 05/38] ARM: EXYNOS: common: Remove legacy EINT
- initialization code
+Date: Mon, 17 Jun 2013 18:33:48 +0200
+Subject: [PATCH v2 03/38] ARM: SAMSUNG: Introduce SAMSUNG_ATAGS Kconfig entry
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-6-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-4-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes legacy EINT initialization code that was used to
-handle external interrupts when booting with ATAGS, which is not
-supported any more.
+This patch adds a Kconfig entry that enables compilation of legacy
+support code required for Samsung platforms that require ATAGS based
+boot.
+
+This allows to bypass compilation of this code when platforms without
+ATAGS support are selected.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/common.c | 307 ------------------------------------------
- 1 file changed, 307 deletions(-)
+ arch/arm/Kconfig               |  6 ++++++
+ arch/arm/plat-samsung/Kconfig  | 26 +++++++++++++++++++++-----
+ arch/arm/plat-samsung/Makefile |  6 +++---
+ 3 files changed, 30 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index cb07f4a..488d9bd 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -615,310 +615,3 @@ static void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index a29fc7e..ae7247d 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -702,6 +702,7 @@ config ARCH_S3C24XX
+ 	select MULTI_IRQ_HANDLER
+ 	select NEED_MACH_GPIO_H
+ 	select NEED_MACH_IO_H
++	select SAMSUNG_ATAGS
+ 	help
+ 	  Samsung S3C2410, S3C2412, S3C2413, S3C2416, S3C2440, S3C2442, S3C2443
+ 	  and S3C2450 SoCs based systems, such as the Simtec Electronics BAST
+@@ -726,6 +727,7 @@ config ARCH_S3C64XX
+ 	select PLAT_SAMSUNG
+ 	select S3C_DEV_NAND
+ 	select S3C_GPIO_TRACK
++	select SAMSUNG_ATAGS
+ 	select SAMSUNG_CLKSRC
+ 	select SAMSUNG_GPIOLIB_4BIT
+ 	select SAMSUNG_IRQ_VIC_TIMER
+@@ -744,6 +746,7 @@ config ARCH_S5P64X0
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select NEED_MACH_GPIO_H
++	select SAMSUNG_ATAGS
+ 	help
+ 	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
+ 	  SMDK6450.
+@@ -760,6 +763,7 @@ config ARCH_S5PC100
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select NEED_MACH_GPIO_H
++	select SAMSUNG_ATAGS
+ 	help
+ 	  Samsung S5PC100 series based systems
  
- 	s3c24xx_init_uartdevs("exynos4210-uart", exynos4_uart_resources, cfg, no);
- }
+@@ -778,6 +782,7 @@ config ARCH_S5PV210
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select NEED_MACH_GPIO_H
+ 	select NEED_MACH_MEMORY_H
++	select SAMSUNG_ATAGS
+ 	help
+ 	  Samsung S5PV210/S5PC110 series based systems
+ 
+@@ -796,6 +801,7 @@ config ARCH_EXYNOS
+ 	select HAVE_S3C_RTC if RTC_CLASS
+ 	select NEED_MACH_GPIO_H
+ 	select NEED_MACH_MEMORY_H
++	select SAMSUNG_ATAGS
+ 	select USE_OF
+ 	help
+ 	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index f8ed2de..c0f0542 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -60,6 +60,20 @@ config S3C_LOWLEVEL_UART_PORT
+ 	  this configuration should be between zero and two. The port
+ 	  must have been initialised by the boot-loader before use.
+ 
++config SAMSUNG_ATAGS
++	def_bool n
++	depends on !ARCH_MULTIPLATFORM
++	depends on ATAGS
++	help
++	   This option enables ATAGS based boot support code for
++	   Samsung platforms, including static platform devices, legacy
++	   clock, timer and interrupt initialization, etc.
++
++	   Platforms that support only DT based boot need not to select
++	   this option.
++
++if SAMSUNG_ATAGS
++
+ # timer options
+ 
+ config SAMSUNG_HRT
+@@ -367,11 +381,6 @@ config S5P_DEV_JPEG
+ 	help
+ 	  Compile in platform device definitions for JPEG codec
+ 
+-config S5P_DEV_MFC
+-	bool
+-	help
+-	  Compile in setup memory (init) code for MFC
 -
--static void __iomem *exynos_eint_base;
--
--static DEFINE_SPINLOCK(eint_lock);
--
--static unsigned int eint0_15_data[16];
--
--static inline int exynos4_irq_to_gpio(unsigned int irq)
--{
--	if (irq < IRQ_EINT(0))
--		return -EINVAL;
--
--	irq -= IRQ_EINT(0);
--	if (irq < 8)
--		return EXYNOS4_GPX0(irq);
--
--	irq -= 8;
--	if (irq < 8)
--		return EXYNOS4_GPX1(irq);
--
--	irq -= 8;
--	if (irq < 8)
--		return EXYNOS4_GPX2(irq);
--
--	irq -= 8;
--	if (irq < 8)
--		return EXYNOS4_GPX3(irq);
--
--	return -EINVAL;
--}
--
--static inline int exynos5_irq_to_gpio(unsigned int irq)
--{
--	if (irq < IRQ_EINT(0))
--		return -EINVAL;
--
--	irq -= IRQ_EINT(0);
--	if (irq < 8)
--		return EXYNOS5_GPX0(irq);
--
--	irq -= 8;
--	if (irq < 8)
--		return EXYNOS5_GPX1(irq);
--
--	irq -= 8;
--	if (irq < 8)
--		return EXYNOS5_GPX2(irq);
--
--	irq -= 8;
--	if (irq < 8)
--		return EXYNOS5_GPX3(irq);
--
--	return -EINVAL;
--}
--
--static unsigned int exynos4_eint0_15_src_int[16] = {
--	EXYNOS4_IRQ_EINT0,
--	EXYNOS4_IRQ_EINT1,
--	EXYNOS4_IRQ_EINT2,
--	EXYNOS4_IRQ_EINT3,
--	EXYNOS4_IRQ_EINT4,
--	EXYNOS4_IRQ_EINT5,
--	EXYNOS4_IRQ_EINT6,
--	EXYNOS4_IRQ_EINT7,
--	EXYNOS4_IRQ_EINT8,
--	EXYNOS4_IRQ_EINT9,
--	EXYNOS4_IRQ_EINT10,
--	EXYNOS4_IRQ_EINT11,
--	EXYNOS4_IRQ_EINT12,
--	EXYNOS4_IRQ_EINT13,
--	EXYNOS4_IRQ_EINT14,
--	EXYNOS4_IRQ_EINT15,
--};
--
--static unsigned int exynos5_eint0_15_src_int[16] = {
--	EXYNOS5_IRQ_EINT0,
--	EXYNOS5_IRQ_EINT1,
--	EXYNOS5_IRQ_EINT2,
--	EXYNOS5_IRQ_EINT3,
--	EXYNOS5_IRQ_EINT4,
--	EXYNOS5_IRQ_EINT5,
--	EXYNOS5_IRQ_EINT6,
--	EXYNOS5_IRQ_EINT7,
--	EXYNOS5_IRQ_EINT8,
--	EXYNOS5_IRQ_EINT9,
--	EXYNOS5_IRQ_EINT10,
--	EXYNOS5_IRQ_EINT11,
--	EXYNOS5_IRQ_EINT12,
--	EXYNOS5_IRQ_EINT13,
--	EXYNOS5_IRQ_EINT14,
--	EXYNOS5_IRQ_EINT15,
--};
--static inline void exynos_irq_eint_mask(struct irq_data *data)
--{
--	u32 mask;
--
--	spin_lock(&eint_lock);
--	mask = __raw_readl(EINT_MASK(exynos_eint_base, data->irq));
--	mask |= EINT_OFFSET_BIT(data->irq);
--	__raw_writel(mask, EINT_MASK(exynos_eint_base, data->irq));
--	spin_unlock(&eint_lock);
--}
--
--static void exynos_irq_eint_unmask(struct irq_data *data)
--{
--	u32 mask;
--
--	spin_lock(&eint_lock);
--	mask = __raw_readl(EINT_MASK(exynos_eint_base, data->irq));
--	mask &= ~(EINT_OFFSET_BIT(data->irq));
--	__raw_writel(mask, EINT_MASK(exynos_eint_base, data->irq));
--	spin_unlock(&eint_lock);
--}
--
--static inline void exynos_irq_eint_ack(struct irq_data *data)
--{
--	__raw_writel(EINT_OFFSET_BIT(data->irq),
--		     EINT_PEND(exynos_eint_base, data->irq));
--}
--
--static void exynos_irq_eint_maskack(struct irq_data *data)
--{
--	exynos_irq_eint_mask(data);
--	exynos_irq_eint_ack(data);
--}
--
--static int exynos_irq_eint_set_type(struct irq_data *data, unsigned int type)
--{
--	int offs = EINT_OFFSET(data->irq);
--	int shift;
--	u32 ctrl, mask;
--	u32 newvalue = 0;
--
--	switch (type) {
--	case IRQ_TYPE_EDGE_RISING:
--		newvalue = S5P_IRQ_TYPE_EDGE_RISING;
--		break;
--
--	case IRQ_TYPE_EDGE_FALLING:
--		newvalue = S5P_IRQ_TYPE_EDGE_FALLING;
--		break;
--
--	case IRQ_TYPE_EDGE_BOTH:
--		newvalue = S5P_IRQ_TYPE_EDGE_BOTH;
--		break;
--
--	case IRQ_TYPE_LEVEL_LOW:
--		newvalue = S5P_IRQ_TYPE_LEVEL_LOW;
--		break;
--
--	case IRQ_TYPE_LEVEL_HIGH:
--		newvalue = S5P_IRQ_TYPE_LEVEL_HIGH;
--		break;
--
--	default:
--		printk(KERN_ERR "No such irq type %d", type);
--		return -EINVAL;
--	}
--
--	shift = (offs & 0x7) * 4;
--	mask = 0x7 << shift;
--
--	spin_lock(&eint_lock);
--	ctrl = __raw_readl(EINT_CON(exynos_eint_base, data->irq));
--	ctrl &= ~mask;
--	ctrl |= newvalue << shift;
--	__raw_writel(ctrl, EINT_CON(exynos_eint_base, data->irq));
--	spin_unlock(&eint_lock);
--
--	if (soc_is_exynos5250())
--		s3c_gpio_cfgpin(exynos5_irq_to_gpio(data->irq), S3C_GPIO_SFN(0xf));
--	else
--		s3c_gpio_cfgpin(exynos4_irq_to_gpio(data->irq), S3C_GPIO_SFN(0xf));
--
--	return 0;
--}
--
--static struct irq_chip exynos_irq_eint = {
--	.name		= "exynos-eint",
--	.irq_mask	= exynos_irq_eint_mask,
--	.irq_unmask	= exynos_irq_eint_unmask,
--	.irq_mask_ack	= exynos_irq_eint_maskack,
--	.irq_ack	= exynos_irq_eint_ack,
--	.irq_set_type	= exynos_irq_eint_set_type,
--#ifdef CONFIG_PM
--	.irq_set_wake	= s3c_irqext_wake,
--#endif
--};
--
--/*
-- * exynos4_irq_demux_eint
-- *
-- * This function demuxes the IRQ from from EINTs 16 to 31.
-- * It is designed to be inlined into the specific handler
-- * s5p_irq_demux_eintX_Y.
-- *
-- * Each EINT pend/mask registers handle eight of them.
-- */
--static inline void exynos_irq_demux_eint(unsigned int start)
--{
--	unsigned int irq;
--
--	u32 status = __raw_readl(EINT_PEND(exynos_eint_base, start));
--	u32 mask = __raw_readl(EINT_MASK(exynos_eint_base, start));
--
--	status &= ~mask;
--	status &= 0xff;
--
--	while (status) {
--		irq = fls(status) - 1;
--		generic_handle_irq(irq + start);
--		status &= ~(1 << irq);
--	}
--}
--
--static void exynos_irq_demux_eint16_31(unsigned int irq, struct irq_desc *desc)
--{
--	struct irq_chip *chip = irq_get_chip(irq);
--	chained_irq_enter(chip, desc);
--	exynos_irq_demux_eint(IRQ_EINT(16));
--	exynos_irq_demux_eint(IRQ_EINT(24));
--	chained_irq_exit(chip, desc);
--}
--
--static void exynos_irq_eint0_15(unsigned int irq, struct irq_desc *desc)
--{
--	u32 *irq_data = irq_get_handler_data(irq);
--	struct irq_chip *chip = irq_get_chip(irq);
--
--	chained_irq_enter(chip, desc);
--	generic_handle_irq(*irq_data);
--	chained_irq_exit(chip, desc);
--}
--
--static int __init exynos_init_irq_eint(void)
--{
--	int irq;
--
--#ifdef CONFIG_PINCTRL_SAMSUNG
--	/*
--	 * The Samsung pinctrl driver provides an integrated gpio/pinmux/pinconf
--	 * functionality along with support for external gpio and wakeup
--	 * interrupts. If the samsung pinctrl driver is enabled and includes
--	 * the wakeup interrupt support, then the setting up external wakeup
--	 * interrupts here can be skipped. This check here is temporary to
--	 * allow exynos4 platforms that do not use Samsung pinctrl driver to
--	 * co-exist with platforms that do. When all of the Samsung Exynos4
--	 * platforms switch over to using the pinctrl driver, the wakeup
--	 * interrupt support code here can be completely removed.
--	 */
--	static const struct of_device_id exynos_pinctrl_ids[] = {
--		{ .compatible = "samsung,exynos4210-pinctrl", },
--		{ .compatible = "samsung,exynos4x12-pinctrl", },
--		{ .compatible = "samsung,exynos5250-pinctrl", },
--	};
--	struct device_node *pctrl_np, *wkup_np;
--	const char *wkup_compat = "samsung,exynos4210-wakeup-eint";
--
--	for_each_matching_node(pctrl_np, exynos_pinctrl_ids) {
--		if (of_device_is_available(pctrl_np)) {
--			wkup_np = of_find_compatible_node(pctrl_np, NULL,
--							wkup_compat);
--			if (wkup_np)
--				return -ENODEV;
--		}
--	}
--#endif
--	if (soc_is_exynos5440())
--		return 0;
--
--	if (soc_is_exynos5250())
--		exynos_eint_base = ioremap(EXYNOS5_PA_GPIO1, SZ_4K);
--	else
--		exynos_eint_base = ioremap(EXYNOS4_PA_GPIO2, SZ_4K);
--
--	if (exynos_eint_base == NULL) {
--		pr_err("unable to ioremap for EINT base address\n");
--		return -ENOMEM;
--	}
--
--	for (irq = 0 ; irq <= 31 ; irq++) {
--		irq_set_chip_and_handler(IRQ_EINT(irq), &exynos_irq_eint,
--					 handle_level_irq);
--		set_irq_flags(IRQ_EINT(irq), IRQF_VALID);
--	}
--
--	irq_set_chained_handler(EXYNOS_IRQ_EINT16_31, exynos_irq_demux_eint16_31);
--
--	for (irq = 0 ; irq <= 15 ; irq++) {
--		eint0_15_data[irq] = IRQ_EINT(irq);
--
--		if (soc_is_exynos5250()) {
--			irq_set_handler_data(exynos5_eint0_15_src_int[irq],
--					     &eint0_15_data[irq]);
--			irq_set_chained_handler(exynos5_eint0_15_src_int[irq],
--						exynos_irq_eint0_15);
--		} else {
--			irq_set_handler_data(exynos4_eint0_15_src_int[irq],
--					     &eint0_15_data[irq]);
--			irq_set_chained_handler(exynos4_eint0_15_src_int[irq],
--						exynos_irq_eint0_15);
--		}
--	}
--
--	return 0;
--}
--arch_initcall(exynos_init_irq_eint);
+ config S5P_DEV_ONENAND
+ 	bool
+ 	help
+@@ -412,6 +421,8 @@ config S3C_DMA
+ 	help
+ 	  Internal configuration for S3C DMA core
+ 
++endif
++
+ config SAMSUNG_DMADEV
+ 	bool
+ 	select ARM_AMBA
+@@ -421,6 +432,11 @@ config SAMSUNG_DMADEV
+ 	help
+ 	  Use DMA device engine for PL330 DMAC.
+ 
++config S5P_DEV_MFC
++	bool
++	help
++	  Compile in setup memory (init) code for MFC
++
+ comment "Power management"
+ 
+ config SAMSUNG_PM_DEBUG
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index a23c460..b549ea9 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -31,10 +31,10 @@ obj-$(CONFIG_S3C_ADC)	+= adc.o
+ 
+ # devices
+ 
+-obj-y				+= platformdata.o
++obj-$(CONFIG_SAMSUNG_ATAGS)	+= platformdata.o
+ 
+-obj-y				+= devs.o
+-obj-y				+= dev-uart.o
++obj-$(CONFIG_SAMSUNG_ATAGS)	+= devs.o
++obj-$(CONFIG_SAMSUNG_ATAGS)	+= dev-uart.o
+ obj-$(CONFIG_S5P_DEV_MFC)	+= s5p-dev-mfc.o
+ obj-$(CONFIG_S5P_DEV_UART)	+= s5p-dev-uart.o
+ 
 -- 
 1.8.2.1
