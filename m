@@ -1,40 +1,32 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 20:27:20 +0200
-Subject: [RFC PATCH 05/11] dma: amba-pl08x: Add support for different
- maximum transfer size
-In-Reply-To: <CACRpkdaHpNVXueXy0HRnKTshn4ZZSPFh-pgav6B0UAU1xqsNCg@mail.gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-6-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdaHpNVXueXy0HRnKTshn4ZZSPFh-pgav6B0UAU1xqsNCg@mail.gmail.com>
-Message-ID: <5634002.KI4n5O8hcE@flatron>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 17 Jun 2013 11:27:19 -0700
+Subject: [v1 2/3] ata: ahci_platform: enable imx6q ahci sata support
+In-Reply-To: <1371462767-16630-3-git-send-email-r65037@freescale.com>
+References: <1371462767-16630-1-git-send-email-r65037@freescale.com>
+ <1371462767-16630-3-git-send-email-r65037@freescale.com>
+Message-ID: <CAOS58YM+ih4vLD8v5u08FS0JMcrwYNHo31zOmDd5VAed+NKbtg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 of June 2013 15:42:15 Linus Walleij wrote:
-> On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> 
-wrote:
-> > PL080S has separate register to store transfer size in, allowing
-> > single
-> > transfer to be much larger than in standard PL080.
-> > 
-> > This patch makes the amba-pl08x driver aware of this and removes
-> > writing transfer size to reserved bits of CH_CONTROL register on
-> > PL080S, which was not a problem witn transfer sizes fitting the
-> > original bitfield of PL080, but now would overwrite other fields.
-> > 
-> > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> 
-> Very straight-forward.
-> Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Jun 17, 2013 at 2:52 AM, Richard Zhu
+<richard.zhuhongxing@gmail.com> wrote:
+> imx6q contains the Synopsys AHCI SATA controller which shares
+> ahci_platform driver with other controllers.
+>
+> This patch updates the DT compatible list for ahci_platform,
+> and enable the imx6q ahci sata support.
+>
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
+
+I suppose this better be routed with the rest of the series through
+the arch tree?  If not, please let me know.
+
+Acked-by: Tejun Heo <tj@kernel.org>
+
+There probably will be a merge conflict but it's gonna be very
+trivial, so no worries.
 
 Thanks.
 
-Actually today I found another way of doing this, which wouldn't require 
-checking PL08X_IS_PL080S flag at all.
-
-Simply masking the transfer size in pl08x_cctl_bits() with mask of the 
-original bitfield would be enough I think, as writes to those bits seem to 
-be ignored on PL080S.
-
-Best regards,
-Tomasz
+--
+tejun
