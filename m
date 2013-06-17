@@ -1,27 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 11:22:16 +0200
-Subject: [PATCH 14/28] ARM: SAMSUNG: Introduce GPIO_SAMSUNG Kconfig entry
-In-Reply-To: <1371238384-1504-15-git-send-email-t.figa@samsung.com>
-References: <1371238384-1504-1-git-send-email-t.figa@samsung.com>
- <1371238384-1504-15-git-send-email-t.figa@samsung.com>
-Message-ID: <CACRpkdaJ9joD7rC_Rc_Jz5eocgtZFqYLRwGHwQp9FmNhVuBYtQ@mail.gmail.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 17 Jun 2013 14:55:50 +0530
+Subject: [PATCH V2 01/10] USB: OHCI: Properly handle ohci-at91 suspend
+In-Reply-To: <CAJFYCKG8i=33zXS-dhVJopaTVhCKJ_DCKo+q9wyx7CVzqzfn5g@mail.gmail.com>
+References: <1371114989-2342-2-git-send-email-manjunath.goudar@linaro.org>
+ <Pine.LNX.4.44L0.1306131513140.1561-100000@iolanthe.rowland.org>
+ <CAJFYCKG8i=33zXS-dhVJopaTVhCKJ_DCKo+q9wyx7CVzqzfn5g@mail.gmail.com>
+Message-ID: <CAKohpo=CJtzkbD5sf2==CKkEjez_x8L_5P66HVdBOW+WmCs5MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 9:32 PM, Tomasz Figa <t.figa@samsung.com> wrote:
-
-> This patch adds Kconfig entry that selects whether legacy Samsung GPIO
-> driver should be built or not. For platforms that support only DT based
-> boot, the new pinctrl driver is used and so the old one is not needed.
+On 17 June 2013 14:52, Manjunath Goudar <manjunath.goudar@linaro.org> wrote:
+> when we are using tab characters  before "do_wakeup" and "ret" variable,we
+> will be getting error below.
 >
-> Cc: Grant Likely <grant.likely@linaro.org>
-> Cc: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Tomasz Figa <t.figa@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> WARNING: please, no space before tabs
+> #31: FILE: drivers/usb/host/ohci-at91.c:622:
+> +^Ibool ^I^Ido_wakeup = device_may_wakeup(&pdev->dev);$
+>
+> WARNING: please, no space before tabs
+> #32: FILE: drivers/usb/host/ohci-at91.c:623:
+> +^Iint ^I^Iret;$
+>
+> total: 0 errors, 2 warnings, 27 lines checked
 
-Looks good to me.
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Yours,
-Linus Walleij
+That's because you are using both tabs and spaces to align. Just use
+multiple tabs and remove all spaces.
