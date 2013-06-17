@@ -1,67 +1,51 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Mon, 17 Jun 2013 11:17:21 +0300
-Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
-In-Reply-To: <Pine.LNX.4.44L0.1306141553030.3152-100000@netrider.rowland.org>
-References: <Pine.LNX.4.44L0.1306141553030.3152-100000@netrider.rowland.org>
-Message-ID: <51BEC611.5090304@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Jun 2013 01:24:59 -0700
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <87ppvlqhyy.fsf@lebrac.rtp-net.org>
+References: <20130517191753.468.1734.stgit@localhost>
+ <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+ <20130612163124.GD8164@atomide.com>
+ <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
+ <51B99B07.1050806@ti.com>
+ <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
+ <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
+ <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
+Message-ID: <20130617082458.GH20992@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2013 11:01 PM, Alan Stern wrote:
-> On Fri, 14 Jun 2013, Roger Quadros wrote:
+* Arnaud Patard <arnaud.patard@rtp-net.org> [130617 01:13]:
 > 
->>>> hi
->>>> The following is my understanding.
->>>> I think for PHY initialization and shutdown part, it is generic for
->>>> other parts.
->>>> PHY initialization need to be called before hc_driver->reset is called.
->>>> I think it can be added at usb_add_hcd.
->>>> For PHY shutdown, it can be added at usb_remove_hcd.
->>>
->>> Yes, that should work.
->>
->> I don't think this will work with OMAP USB host controller when used in
->> Transceiver-less mode (e.g. HSIC). In this mode we need to release the HSIC
->> reset (mapped to PHY init), after the EHCI controller is up and running.
->>
->> On the other hand, in the PHY mode, the PHY needs to be initialized (brought out
->> of reset) before the EHCI controller starts.
-> 
-> In other words, transceiver-less mode effectively works without using a 
-> software-controlled PHY?
-> 
-Right.
+> I hoped to have missed some mails and that people were testing pandabard
+> support with full support but given what I see, the ethernet support is
+> not there yet. This thread is about removing the non-DT boot. I see some
+> contradiction here. Please, look again at what Thomas said in the IGEP thread:
+> breaking existing support is bad and removing non-DT boot for panda with
+> not-working ethernet would exactly to that.
 
->> This behavior might be different on other controllers. Generalization is good
->> as long as there is an override available for the controllers to handle the
->> PHY init/shutdown themselves.
-> 
-> To avoid PHY init/shutdown, the platform driver should simply leave the 
-> generic PHY pointer (which has not yet been added to struct hcd) set to 
-> NULL.
-> 
->>>> For suspend/resume, i do not know how to add it. For our EHCI driver,
->>>> when system goes to deep idle states, we just directly shutdown the
->>>> hcd and initialize it again when the system goes back.
->>>
->>> You shut down the host controller?  Then how does it detect wakeup 
->>> events?  And how does it know if a device was disconnected while the 
->>> power was off?
->>>
->>
->> On OMAP as well we are aiming to cut clocks to the host controller (state saved)
->> during bus/system suspend. PHY is in low power mode capable of detecting wakeup events.
->> The SoC is configured to wake up on any I/O activity on the PHY pins. Upon
->> detection of PHY related I/O event, SoC wakes up, we restore the host controller state
->> and proceed as normal.
-> 
-> Maybe it's just me, but turning off USB Vbus power during suspend seems
-> like a bad idea.  Except for the case where all the root-hub ports are 
-> disabled (such as when no devices are plugged in) -- in that case it's 
-> fine.
+Hmm yes I guess the panda needs the aux clock and there are various
+patches posted for that for quite a while but have not gotten merged.
 
-We don't turn off Vbus power at all. Just the USB controller IPs clocks (internal to
-our SoC) are cut off.
+When I did my patches it seemed that Nishant's and my solution for
+getting the auxclk via DT was acceptable. Then Mike started doing
+all the clocks in DT and things changed.
 
-cheers,
--roger
+Mike, got any solution for us for v3.11 for the DT defined auxclk?
+ 
+> Yeah, I'm aware that some extra patches are being developped like the
+> omap clocks one: https://patchwork.kernel.org/patch/2541331/ but they
+> don't seem to be in -next. So, again, please, wait that all needed bits
+> are merged mainline before killing non-DT support (or provide 'mixed'
+> support like what is/was done on kirkwood)
+
+The ethernet issue can be fixed with the legacy mode support in the
+worst case, but probably just adding a clock alias for it does the
+trick.
+
+I'd rather not postpone making omap4 DT only because I think at this
+point fixing the any DT related issues is way less work compared to
+maintaining and testing both legacy boot and DT boot.
+
+Regards,
+
+Tony
