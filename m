@@ -1,37 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 18:05:18 +0200
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <20130617072021.GB4465@atomide.com>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
- <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
-Message-ID: <CACRpkdYwGHMznjoJqf5bX_74pmeKSiWtTwpNF1_4GSEk+KwrZA@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 17 Jun 2013 17:06:30 +0100
+Subject: [RFC PATCH 09/11] spi: s3c64xx: Do not require legacy DMA API in
+ case of S3C64XX
+In-Reply-To: <CACRpkdb8V7pYVnOWOAJ6iG8_-jyeutq5W95+OCO4RLOv9EDjyg@mail.gmail.com>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+ <1371416058-22047-10-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdb8V7pYVnOWOAJ6iG8_-jyeutq5W95+OCO4RLOv9EDjyg@mail.gmail.com>
+Message-ID: <20130617160630.GF1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 9:20 AM, Tony Lindgren <tony@atomide.com> wrote:
+On Mon, Jun 17, 2013 at 03:59:39PM +0200, Linus Walleij wrote:
+> On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-> First, I think the concept of remuxing (or even checking) _all_ the pins
-> for a consumer device is wrong on most if not all hardware. For past 10
-> years I have not seen a case where _all_ the pins for a device would need
-> to be remuxed for any reason.
+> > -       select S3C64XX_DMA if ARCH_S3C64XX
+> > +       select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
 
-We may be talking past each other here. On the ux500 we use a lot
-of runtime pincontrol, but none of this is *remuxing*.
+> I guess this means the SPI driver does not work without DMA.
+> But is the SPI driver already augmented to handle generic DMA engine?
+> Anyway:
 
-We are only *reconfiguring*.
-
-Now I know that Haojian only recently added pin config to the
-pinctrl-single.c driver so maybe you have mostly seen muxing
-in your driver so far, so you view of the world is a bit different.
-
-On the Nomadik pin controller we do mostly hogged muxing
-at boot time, but a lot of runtime reconfiguration. So our
-needs are very different.
-
-Bear in mind that struct pinctl * forks effects in two paths,
-one is muxing the other is config, like pull-ups etc.
-
-Yours,
-Linus Walleij
+Yes, the driver currently relies on DMA.  There are some pending patches
+for non-DMA operation that I need to test.  To be honest for both this
+and the ASoC driver I'd be more inclined to just either select or depend
+on the DMA controller rather than leaving the option of using the old
+code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/12639d9a/attachment.sig>
