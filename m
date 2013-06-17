@@ -1,85 +1,60 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 17:12:33 +0900
-Subject: [GIT PULL 00/15 v2] Renesas ARM based SoC boot cleanup for v3.11
-Message-ID: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 17 Jun 2013 17:12:34 +0900
+Subject: [PATCH 01/15] ARM: shmobile: uImage load address rework
+In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371456768-1084-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+From: Magnus Damm <damm@opensource.se>
 
-This pull request is based on renesas-pinmux-for-v3.11, which you have
-already pulled, in order to provide pre-requisites.
+This is V2 of the mach-shmobile uImage load address rework patch.
 
-The following changes since commit 5fcf4a3c3a5bc08bf72a50ef1332501a3c1b96bb:
+Rework the mach-shmobile uImage load address calculation by storing
+the per-board load addresses in Makefile.boot. This removes the
+CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
+it possible to create safe kernel images that boot on multiple boards.
 
-  ARM: shmobile: marzen: Use RCAR_GP_PIN macro (2013-06-05 17:18:24 +0900)
+This is one of several series of code that reworks code not to rely on
+CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
 
-are available in the git repository at:
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/Makefile.boot |   20 ++++++++++++++++++--
+ 1 file changed, 18 insertions(+), 2 deletions(-)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-boot-for-v3.11
-
-for you to fetch changes up to 53332005bfde9d2e3c9a66030c0e8c2598eaa1d5:
-
-  ARM: shmobile: Remove Bonito board support (2013-06-17 16:07:31 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC boot cleanup for v3.11
-
-Work by Magnus Damm and others to clean up the boot of and move
-things closer to supporting multi-arch.
-
-As a side effect of this work it was decided to remove support for
-two boards, Bonito and AP4EVB. Those patches are included in this
-series as they depend on earlier patches in the series.
-
-----------------------------------------------------------------
-Kuninori Morimoto (1):
-      ARM: shmobile: Remove Bonito board support
-
-Magnus Damm (14):
-      ARM: shmobile: uImage load address rework
-      ARM: shmobile: Let romImage rely on default ATAGS
-      ARM: shmobile: Remove romImage CONFIG_MEMORY_START
-      ARM: shmobile: Rework sh7372 sleep code to use virt_to_phys()
-      ARM: shmobile: Add SMP boot function and argument
-      ARM: shmobile: Add SCU boot function using argument
-      ARM: shmobile: r8a7779 SMP with SCU boot fn and args
-      ARM: shmobile: sh73a0 SMP with SCU boot fn and args
-      ARM: shmobile: EMEV2 SMP with SCU boot fn and args
-      ARM: shmobile: Remove old SCU boot code
-      ARM: shmobile: Enable ARM_PATCH_PHYS_VIRT
-      ARM: shmobile: Remove MEMORY_START/SIZE
-      ARM: shmobile: Remove mach/memory.h
-      ARM: shmobile: Remove AP4EVB board support
-
- arch/arm/Kconfig                                   |    2 +-
- arch/arm/boot/compressed/head-shmobile.S           |   21 +-
- arch/arm/configs/ap4evb_defconfig                  |   56 -
- arch/arm/configs/bonito_defconfig                  |   72 --
- arch/arm/mach-shmobile/Kconfig                     |   58 -
- arch/arm/mach-shmobile/Makefile                    |    2 -
- arch/arm/mach-shmobile/Makefile.boot               |   18 +-
- arch/arm/mach-shmobile/board-ap4evb.c              | 1310 --------------------
- arch/arm/mach-shmobile/board-bonito.c              |  502 --------
- arch/arm/mach-shmobile/headsmp-scu.S               |   29 +-
- arch/arm/mach-shmobile/headsmp.S                   |   13 +-
- arch/arm/mach-shmobile/include/mach/common.h       |    6 +-
- .../arm/mach-shmobile/include/mach/head-ap4evb.txt |   93 --
- arch/arm/mach-shmobile/include/mach/memory.h       |    7 -
- arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h    |   29 -
- arch/arm/mach-shmobile/include/mach/mmc.h          |    4 +-
- arch/arm/mach-shmobile/include/mach/sh7372.h       |    2 +
- arch/arm/mach-shmobile/include/mach/zboot.h        |    6 +-
- arch/arm/mach-shmobile/pm-sh7372.c                 |    3 +
- arch/arm/mach-shmobile/sleep-sh7372.S              |    5 +-
- arch/arm/mach-shmobile/smp-emev2.c                 |    6 +-
- arch/arm/mach-shmobile/smp-r8a7779.c               |    6 +-
- arch/arm/mach-shmobile/smp-sh73a0.c                |    6 +-
- 23 files changed, 68 insertions(+), 2188 deletions(-)
- delete mode 100644 arch/arm/configs/ap4evb_defconfig
- delete mode 100644 arch/arm/configs/bonito_defconfig
- delete mode 100644 arch/arm/mach-shmobile/board-ap4evb.c
- delete mode 100644 arch/arm/mach-shmobile/board-bonito.c
- delete mode 100644 arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
- delete mode 100644 arch/arm/mach-shmobile/include/mach/memory.h
- delete mode 100644 arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h
+diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
+index 498efd9..6b147ea 100644
+--- a/arch/arm/mach-shmobile/Makefile.boot
++++ b/arch/arm/mach-shmobile/Makefile.boot
+@@ -1,6 +1,22 @@
+-__ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
+-		     $$[$(CONFIG_MEMORY_START) + 0x8000]')
++# per-board load address for uImage
++loadaddr-y	:=
++loadaddr-$(CONFIG_MACH_AG5EVM) += 0x40008000
++loadaddr-$(CONFIG_MACH_AP4EVB) += 0x40008000
++loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
++loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
++loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
++loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
++loadaddr-$(CONFIG_MACH_BONITO) += 0x40008000
++loadaddr-$(CONFIG_MACH_KOTA2) += 0x41008000
++loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
++loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
++loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
++loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
++loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
++loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
++loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
+ 
++__ZRELADDR	:= $(sort $(loadaddr-y))
+    zreladdr-y   += $(__ZRELADDR)
+ 
+ # Unsupported legacy stuff
+-- 
+1.7.10.4
