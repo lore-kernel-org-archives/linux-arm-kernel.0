@@ -1,48 +1,30 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 17 Jun 2013 12:58:53 -0600
-Subject: [PATCH V2 2/2] ARM: decouple CPU offlining from reboot/shutdown
-In-Reply-To: <1371067281-655-2-git-send-email-swarren@wwwdotorg.org>
-References: <1371067281-655-1-git-send-email-swarren@wwwdotorg.org>
- <1371067281-655-2-git-send-email-swarren@wwwdotorg.org>
-Message-ID: <51BF5C6D.9050806@wwwdotorg.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jun 2013 20:01:37 +0100
+Subject: [RFC PATCH 06/11] dma: amba-pl08x: Keep LLIs aligned to 4-word
+ boundary
+In-Reply-To: <CACRpkdYzag=sKo87i6H3M_fSQuRiTX3_2-ZhQA+4S7ejZN5j4A@mail.gmail.com>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+ <1371416058-22047-7-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdYzag=sKo87i6H3M_fSQuRiTX3_2-ZhQA+4S7ejZN5j4A@mail.gmail.com>
+Message-ID: <20130617190137.GQ2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2013 02:01 PM, Stephen Warren wrote:
-> From: Stephen Warren <swarren@nvidia.com>
+On Mon, Jun 17, 2013 at 03:51:20PM +0200, Linus Walleij wrote:
+> On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> > diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
+> > index eb10eb8..0da5539 100644
+> > --- a/drivers/dma/amba-pl08x.c
+> > +++ b/drivers/dma/amba-pl08x.c
+> > @@ -127,6 +127,7 @@ struct pl08x_lli {
+> >         u32 lli;
+> >         u32 cctl;
+> >         u32 cctl1;
+> > +       u32 dummy[3];
 > 
-> Add comments to machine_shutdown()/halt()/power_off()/restart() that
-> describe their purpose and/or requirements re: CPUs being active/not.
-> 
-> In machine_shutdown(), replace the call to smp_send_stop() with a call to
-> disable_nonboot_cpus(). This completely disables all but one CPU, thus
-> satisfying the requirement that only a single CPU be active for kexec.
-> Adjust Kconfig dependencies for this change.
-> 
-> In machine_halt()/power_off()/restart(), call smp_send_stop() directly,
-> rather than via machine_shutdown(); these functions don't need to
-> completely de-activate all CPUs using hotplug, but rather just quiesce
-> them.
-> 
-> Remove smp_kill_cpus(), and its call from smp_send_stop().
-> smp_kill_cpus() was indirectly calling smp_ops.cpu_kill() without calling
-> smp_ops.cpu_die() on the target CPUs first. At least some implementations
-> of smp_ops had issues with this; it caused cpu_kill() to hang on Tegra,
-> for example. Since smp_send_stop() is only used for shutdown, halt, and
-> power-off, there is no need to attempt any kind of CPU hotplug here.
-> 
-> Adjust Kconfig to reflect that machine_shutdown() (and hence kexec)
-> relies upon disable_nonboot_cpus(). However, this alone doesn't guarantee
-> that hotplug will work, or even that hotplug is implemented for a
-> particular piece of HW that a multi-platform zImage runs on. Hence, add
-> error-checking to machine_kexec() to determine whether it did work.
+> Atleast put a comment into the code explaining what this is all
+> about. Or someone will add another member to the struct and
+> all is lost. Call it "padding" rather than dummy.
 
-Russell,
-
-The patch which initially triggered the problem [shutdown/reboot hangs
-on Tegra] (cf7df37 "reboot: rigrate shutdown/reboot to boot cpu") ended
-up going into v3.10; I assumed it was only going into v3.11.
-
-Is it possible to take this patch for v3.10 rather than v3.11? (or is
-your git-curr branch for 3.10; that's where your patchd told me this was
-applied.)
+Another solution to that is to use __attribute__((__aligned__(16)))
+if you want it aligned to 16 byte boundaries.
