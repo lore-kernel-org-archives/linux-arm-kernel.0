@@ -1,32 +1,29 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Jun 2013 10:04:51 -0700
-Subject: [PATCH RESEND V2] ARM: dts: Correct the base address of
- pinctrl_3 on Exynos5250
-In-Reply-To: <1a1601ce6b5a$6833d8a0$389b89e0$%kim@samsung.com>
-References: <1371025425-480-1-git-send-email-padma.v@samsung.com>
- <1a1601ce6b5a$6833d8a0$389b89e0$%kim@samsung.com>
-Message-ID: <20130617170451.GB28497@quad.lixom.net>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 17 Jun 2013 10:14:28 -0700
+Subject: [PATCH] gpio: msm-v1: Remove errant __devinit to fix compile
+In-Reply-To: <CACRpkdZ5x3q9tn3J5_mQj-nJ_wO3HWgX5DTMQdMzF3mUDrAieQ@mail.gmail.com>
+References: <1370373600-31921-1-git-send-email-sboyd@codeaurora.org>
+ <CACRpkdZ5x3q9tn3J5_mQj-nJ_wO3HWgX5DTMQdMzF3mUDrAieQ@mail.gmail.com>
+Message-ID: <51BF43F4.9000007@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 09:58:47PM +0900, Kukjin Kim wrote:
-> Padmavathi Venna wrote:
-> > 
-> > This patch corrects the base address of pinctrl_3 on Exynos5250
-> > platform.
-> > 
-> > Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
-> 
-> (+ Olof)
-> 
-> Olof, there is no other fixes in my tree for v3.10 yet, so would be helpful
-> if you could take this into fixes in arm-soc for v3.10. Just note, the wrong
-> address added during v3.10 merge window.
+On 06/16/13 22:54, Linus Walleij wrote:
+> On Tue, Jun 4, 2013 at 9:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>
+>> Commit 7bce696 (gpio: Make gpio-msm-v1 into a platform driver,
+>> 2013-03-04) was based on an older kernel where __devinit still
+>> existed. Remove the erroneous __devinit marking.
+>>
+>> Cc: David Brown <davidb@codeaurora.org>
+>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> Patch applied.
+>
+>
 
-Huh. I guess we lucked out on snow since we're definitely using this and didn't
-hit any problems from it.
+Thanks. It looks like David picked this up and sent it off to arm-soc
+last week. Cc'ing Olof for awareness of a possible duplicate.
 
-I'll apply to fixes.
-
-
--Olof
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
