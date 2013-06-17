@@ -1,69 +1,112 @@
-From: rvaswani@codeaurora.org (Rohit Vaswani)
-Date: Mon, 17 Jun 2013 11:15:58 -0700
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <CACRpkdbZ6QCU1N_3no+rahjVFSUgYMrDqtXW=4AjaY4RhaF9Zw@mail.gmail.com>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
- <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
- <CACRpkdbZ6QCU1N_3no+rahjVFSUgYMrDqtXW=4AjaY4RhaF9Zw@mail.gmail.com>
-Message-ID: <51BF525E.5080508@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jun 2013 19:21:27 +0100
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+Message-ID: <20130617182127.GM2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/17/2013 8:56 AM, Linus Walleij wrote:
-> On Mon, Jun 17, 2013 at 9:20 AM, Tony Lindgren <tony@atomide.com> wrote:
->
->> Maybe let's again try to first list all the known cases where we need to
->> do remuxing, and the pins we need to remux?
-> In the pinctrl documentation this is known as "runtime pinmuxing".
-> This is not common, it is much more common to change
-> pin config, i.e. all other electrical properties of the pins,
-> at runtime. Especially when going to sleep or idle.
+On Tue, Jun 18, 2013 at 02:19:04AM +0900, Inki Dae wrote:
+> It seems like that all pages of the scatterlist should be mapped with
+> DMA every time DMA operation  is started (or drm_xxx_set_src_dma_buffer
+> function call), and the pages should be unmapped from DMA again every
+> time DMA operation is completed: internally, including each cache
+> operation.
 
-MSM also does a significant amount of *remuxing* during suspend/resume.
-We have cases where a pin might be connected to a different device 
-during normal
-operation with a different pull and higher drive strength and we will 
-put it
-gpio mode, input for a low power configuration.
-Consolidating them into 1 operation would be preferred.
+Correct.
 
->> Below are the pin remuxing cases I'm aware of:
->>
->> 1. Remux UART RX pin of a device for a wake-up event
->>
->> 2. Remux whatever device interrupt line to a GPIO input for wake-up
->>
->> 3. Remux audio jack between UART RX and TX to provide a debug console
->>
->> 4. Remux MMC CMD and DAT lines for sleep with pulls to avoid device
->>     from resetting with lines floating or to save power
->>
->> Please list any further use cases that I'm not familiar with. I'd like
->> to hear how messed up this remuxing business can get :)
-> We have a debug port that can be muxed out on the keypad(!)
-> or the SD card, and some other variants...
->
-> Stephen added the I2C block switch thing that switch one
-> and the same IP core between different sets of pins (IIRC).
->
-> For runtime pin config I have many more examples, we
-> change a lot of those to so-called "GPIO mode" (basically
-> just turned into an input with wakeup,  or pulled to ground)
-> at sleep.
->
-> Yours,
-> Linus Walleij
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Isn't that big overhead?
 
+Yes, if you _have_ to do a cache operation to ensure that the DMA agent
+can see the data the CPU has written.
 
-Thanks,
-Rohit Vaswani
+> And If there is no problem, we should accept such overhead?
 
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
+If there is no problem then why are we discussing this and why do we need
+this API extension? :)
+
+> Actually, drm_gem_fd_to_handle() includes to map a
+> given dmabuf with iommu table (just logical data) of the DMA. And then, the
+> device address (or iova) already mapped will be set to buffer register of
+> the DMA with drm_xxx_set_src/dst_dma_buffer(handle1, ...) call.
+
+Consider this with a PIPT cache:
+
+	dma_map_sg()	- at this point, the kernel addresses of these
+			buffers are cleaned and invalidated for the DMA
+
+	userspace writes to the buffer, the data sits in the CPU cache
+	Because the cache is PIPT, this data becomes visible to the
+	kernel as well.
+
+	DMA is started, and it writes to the buffer
+
+Now, at this point, which is the correct data?  The data physically in the
+RAM which the DMA has written, or the data in the CPU cache.  It may
+the answer is - they both are, and the loss of either can be a potential
+data corruption issue - there is no way to tell which data should be
+kept but the system is in an inconsistent state and _one_ of them will
+have to be discarded.
+
+	dma_unmap_sg()	- at this point, the kernel addresses of the
+			buffers are _invalidated_ and any data in those
+			cache lines is discarded
+
+Which also means that the data in userspace will also be discarded with
+PIPT caches.
+
+This is precisely why we have buffer rules associated with the DMA API,
+which are these:
+
+	dma_map_sg()
+	- the buffer transfers ownership from the CPU to the DMA agent.
+	- the CPU may not alter the buffer in any way.
+	while (cpu_wants_access) {
+		dma_sync_sg_for_cpu()
+		- the buffer transfers ownership from the DMA to the CPU.
+		- the DMA may not alter the buffer in any way.
+		dma_sync_sg_for_device()
+		- the buffer transfers ownership from the CPU to the DMA
+		- the CPU may not alter the buffer in any way.
+	}
+	dma_unmap_sg()
+	- the buffer transfers ownership from the DMA to the CPU.
+	- the DMA may not alter the buffer in any way.
+
+Any violation of that is likely to lead to data corruption.  Now, some
+may say that the DMA API is only about the kernel mapping.  Yes it is,
+because it takes no regard what so ever about what happens with the
+userspace mappings.  This is absolutely true when you have VIVT or
+aliasing VIPT caches.
+
+Now consider that with a PIPT cache, or a non-aliasing VIPT cache (which
+is exactly the same behaviourally from this aspect) any modification of
+a userspace mapping is precisely the same as modifying the kernel space
+mapping - and what you find is that the above rules end up _inherently_
+applying to the userspace mappings as well.
+
+In other words, userspace applications which have mapped the buffers
+must _also_ respect these rules.
+
+And there's no way in hell that I'd ever trust userspace to get this
+anywhere near right, and I *really* do not like these kinds of internal
+kernel API rules being exposed to userspace.
+
+And so the idea that userspace should be allowed to setup DMA transfers
+via "set source buffer", "set destination buffer" calls into an API is
+just plain rediculous.  No, userspace should be allowed to ask for
+"please copy from buffer X to buffer Y using this transform".
+
+Also remember that drm_xxx_set_src/dst_dma_buffer() would have to
+deal with the DRM object IDs for the buffer, and not the actual buffer
+information themselves - that is kept within the kernel, so the kernel
+knows what's happening.
