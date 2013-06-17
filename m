@@ -1,43 +1,45 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Jun 2013 00:10:50 +0900
-Subject: [PATCH V2] ARM: dts: Enable RTC node for Arndale
-In-Reply-To: <1371442179-23597-1-git-send-email-tushar.behera@linaro.org>
-References: <CAHbNUh2byimQ_ep0j9XkUjRFaU3K6YZE_ANcch5UhP4QsuZxPw@mail.gmail.com>
- <1371442179-23597-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <51BF26FA.9010807@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Jun 2013 17:12:28 +0200
+Subject: [PATCH] pinctrl: export pinctrl_pm_select_*_state
+In-Reply-To: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+References: <1370439873-30053-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <3037061.7rG6iWz9IX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/13 13:09, Tushar Behera wrote:
-> The issues reported in commit 522ccdb6fd0e ("ARM: dts: Disable the RTC
-> by default on exynos5") are no longer reproduced on EXYNOS5250 based
-> Arndale board. Hence re-enabling RTC support for Arndale board.
->
-> This is helpful for testing S2R on Arndale board.
->
-> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
-> ---
-> Changes for V2:
-> * RTC node is enabled only for Arndale board. Earlier it was enabled
-> in exynos5250.dtsi.
->
->   arch/arm/boot/dts/exynos5250-arndale.dts |    4 ++++
->   1 file changed, 4 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
-> index 02cfc76..b38080a 100644
-> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
-> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
-> @@ -449,4 +449,8 @@
->   			clock-frequency =<24000000>;
->   		};
->   	};
-> +
-> +	rtc {
-> +		status = "okay";
-> +	};
->   };
+The three functions pinctrl_pm_select_default_state,
+pinctrl_pm_select_sleep_state, and pinctrl_pm_select_idle_state
+are used in drivers that can be loadable modules, and should
+be exported.
 
-Applied, thanks.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-- Kukjin
+diff --git a/drivers/pinctrl/core.c b/drivers/pinctrl/core.c
+index 33710b5..32eb7e2 100644
+--- a/drivers/pinctrl/core.c
++++ b/drivers/pinctrl/core.c
+@@ -1245,6 +1245,7 @@ int pinctrl_pm_select_default_state(struct device *dev)
+ 		dev_err(dev, "failed to activate default pinctrl state\n");
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(pinctrl_pm_select_default_state);
+ 
+ /**
+  * pinctrl_pm_select_sleep_state() - select sleep pinctrl state for PM
+@@ -1264,6 +1265,7 @@ int pinctrl_pm_select_sleep_state(struct device *dev)
+ 		dev_err(dev, "failed to activate pinctrl sleep state\n");
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(pinctrl_pm_select_sleep_state);
+ 
+ /**
+  * pinctrl_pm_select_idle_state() - select idle pinctrl state for PM
+@@ -1283,7 +1285,7 @@ int pinctrl_pm_select_idle_state(struct device *dev)
+ 		dev_err(dev, "failed to activate pinctrl idle state\n");
+ 	return ret;
+ }
+-
++EXPORT_SYMBOL_GPL(pinctrl_pm_select_idle_state);
+ #endif
+ 
+ #ifdef CONFIG_DEBUG_FS
