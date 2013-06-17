@@ -1,111 +1,108 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Jun 2013 15:23:53 -0700
-Subject: [PATCH 2/3] ARM: mach-moxart: add MOXA ART device tree files
-In-Reply-To: <CACmBeS0T1n92CcGN6kR+eBcFPuwsWc+PsUx7Cms+4vbeVFhQKg@mail.gmail.com>
-References: <1371040448-28742-1-git-send-email-jonas.jensen@gmail.com>
- <1371040448-28742-3-git-send-email-jonas.jensen@gmail.com>
- <20130612224952.GB8146@quad.lixom.net>
- <CACmBeS0T1n92CcGN6kR+eBcFPuwsWc+PsUx7Cms+4vbeVFhQKg@mail.gmail.com>
-Message-ID: <20130617222353.GB13266@quad.lixom.net>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 18 Jun 2013 00:26:25 +0200
+Subject: [PATCH v4 4/4] arm: add basic support for Rockchip RK3066a boards
+In-Reply-To: <20130617213515.GK28497@quad.lixom.net>
+References: <201306131658.36584.heiko@sntech.de>
+ <201306131702.13400.heiko@sntech.de> <20130617213515.GK28497@quad.lixom.net>
+Message-ID: <201306180026.25973.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 04:34:24PM +0200, Jonas Jensen wrote:
+Am Montag, 17. Juni 2013, 23:35:15 schrieb Olof Johansson:
 > Hi,
 > 
-> Thanks for the replies.
+> Just some small comments below. Once fixed:
 > 
-> What isn't commented below should already be fixed.
+> Acked-by: Olof Johansson <olof@lixom.net>
 > 
-> On 13 June 2013 00:49, Olof Johansson <olof@lixom.net> wrote:
-> > Hi,
-> >
-> > You should add a bindings description for the MOXA SoC platforms, similar to
-> > how others do it, under Documentation/devicetree/bindings/arm/.
+> On Thu, Jun 13, 2013 at 05:02:13PM +0200, Heiko St?bner wrote:
+> > +		dwmmc at 10214000 {
+> > +			compatible = "rockchip,rk2928-dw-mshc";
 > 
-> The following is now added under Documentation:
-> 
->  Documentation/devicetree/bindings/arm/moxart.txt   |    8 +++
->  .../arm/moxart/moxart-interrupt-controller.txt     |   29 ++++++++++++
->  .../bindings/arm/moxart/moxart-timer.txt           |   17 +++++++
-> 
-> > Same goes for other device bindings below -- they all need to be added to the
-> > bindings documentation. You might be better off removing some of them until you
-> > post and merge the corresponding drivers.
-> 
-> I'll remove them for now with the intent of adding them later. Maybe
-> when (and if) all drivers are posted and merged.
-> 
-> >> +/dts-v1/;
-> >> +/include/ "moxart.dtsi"
-> >> +
-> >> +/ {
-> >> +     model = "MOXA UC-7112-LX";
-> >> +     compatible = "moxa,moxart-uc-7112-lx";
-> >
-> > Is there a generic board design / eval board that you can have as a fallback
-> > compatible value? That way you won't have to add every board to the table in
-> > the c file.
-> 
-> There isn't really a generic board but the same can be accomplished by
-> adding "moxa,moxart" to compatible? New boards can then be added
-> without patching arch/arm/mach-moxart/moxart.c.
+> does it make sense to fall back and also specify "snps,dw-mshc"?
 
-Sounds good. See comment on the other email about checking for machine
-compatible in the init setup function too, that'll work well.
-
-> 
-> >> +     mxser at 98200040 {
-> >> +             compatible = "moxa,moxart-mxser";
-> >> +             reg =   <0x98200040 0x00000080>,        /* UART "3" base */
-> >> +                             <0x982000e4 0x00000080>,        /* UART mode base */
-> >> +                             <0x982000c0 0x00000020>;        /* UART interrupt vector */
-> >
-> > Are there other registers for other devices inbetween, or could you just do one
-> > large memory area here?
-> 
-> No, reg could simply be 0x98200040 to 0x982000e0. I split them out as
-> documentation but those could be defined in the driver instead, also
-> because it's sort of easier to assign values with of_iomap.
-
-I'd say just go with one register area, it's how most other drivers do it so
-it's most familiar to someone else coming in and reading your code to fix bugs
-or whatnot.
-
-> >> +             interrupts = <31 1>;
-> >> +     };
-> >> +
-> >> +     mac0: mac at 90900000 {
-> >> +             compatible = "moxa,moxart-mac0";
-> >> +             reg =   <0x90900000 0x1000>,
-> >> +                             <0x80000050 0x5>;                       /* MAC address stored on flash */
-> >
-> > This is a pretty unusal way to indicate mac address location. While I suppose
-> > it works, I'd like to get the device tree maintainers in the loop. ADding them
-> > to cc.
-> >
-> > Also, there should be a bindings doc for this device (and a driver)
-> 
-> I'm removing ethernet until the driver is submitted. This allows me to
-> submit bindings doc later?
-
-Yep.
-
-> 
-> > I'm also surprised that you have a 5-byte mac address. 6 bytes is much more
-> > common. :)
-> 
-> That _is_ surprising :) Corrected to 6 bytes.
-
-:)
-
-> > Finally, are the two MACs using the same driver? if so, using the same
-> > compatible value makes more sense.
-> 
-> Yes, using the same driver is the point. I see now they can use the
-> same value, they'll still be probed from the DT entries.
-
-Yeah. Let's discuss that further when the driver is ready if needed.
+nope, the rockchip-variant is necessary, with the regular dw-mshc it doesn't 
+work at all.
 
 
--Olof
+> > diff --git a/arch/arm/mach-rockchip/rockchip.c
+> > b/arch/arm/mach-rockchip/rockchip.c new file mode 100644
+> > index 0000000..0933e17
+> > --- /dev/null
+> > +++ b/arch/arm/mach-rockchip/rockchip.c
+> > @@ -0,0 +1,54 @@
+> > +/*
+> > + * Device Tree support for Rockchip SoCs
+> > + *
+> > + * Copyright (c) 2013 MundoReader S.L.
+> > + * Author: Heiko Stuebner <heiko@sntech.de>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/kernel.h>
+> > +#include <linux/init.h>
+> > +#include <linux/of_platform.h>
+> > +#include <linux/irqchip.h>
+> > +#include <linux/dw_apb_timer.h>
+> > +#include <linux/clk-provider.h>
+> > +#include <asm/mach/arch.h>
+> > +#include <asm/mach/map.h>
+> > +#include <asm/hardware/cache-l2x0.h>
+> > +
+> > +static void __init rockchip_timer_init(void)
+> > +{
+> > +	of_clk_init(NULL);
+> > +	clocksource_of_init();
+> > +}
+> > +
+> > +static void __init rockchip_dt_init(void)
+> > +{
+> > +#ifdef CONFIG_CACHE_L2X0
+> > +	l2x0_of_init(0, ~0UL);
+> > +#endif
+> 
+> No need to ifdef, there's a stub if CONFIG_CACHE_L2X0 isn't defined.
+
+ok
+
+
+> Side comment: I think it would be nice if the generic code did this
+> init if a l2x0 device node was in the device tree, since the only
+> reason to override init_machine is to do this call in addition to
+> of_platform_populate().
+
+Arnd said similar things in the initial version :-).
+
+Currently I'm wondering if it wouldn't be enough to call always l2x0_of_init 
+somewhere, because it does the checking for the dt nodes itself already.
+
+The only obstacle would be platforms having the need to use special aux-values 
+or which are currently calling the function from some other parts of the boot 
+process (tegra inits the cache in its tegra_init_early function for example).
+
+
+> > +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > +}
+> > +
+> > +static const char * const rockchip_board_dt_compat[] = {
+> > +	"rockchip,rk2928",
+> > +	"rockchip,rk3066a",
+> > +	"rockchip,rk3066b",
+> > +	"rockchip,rk3188",
+> > +	NULL,
+> > +};
+> > +
+> > +DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+> > +	.init_machine	= rockchip_dt_init,
+> > +	.init_time	= rockchip_timer_init,
+> > +	.dt_compat	= rockchip_board_dt_compat,
+> > +MACHINE_END
