@@ -1,20 +1,41 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jun 2013 09:26:03 +0100
-Subject: [PATCH v5] arm: Preserve the user r/w register TPIDRURW on
- context switch and fork
-In-Reply-To: <51B22F01.3030905@arm.com>
-References: <519D32E2.5050102@dawncrow.de> <51B22F01.3030905@arm.com>
-Message-ID: <20130617082603.GA2718@n2100.arm.linux.org.uk>
+Date: Mon, 17 Jun 2013 09:31:51 +0100
+Subject: [PATCH v4 2/2] ARM PJ4B: Add support for errata 4742
+In-Reply-To: <alpine.LFD.2.03.1306072208460.18597@syhkavp.arg>
+References: <1370599460-9947-1-git-send-email-gregory.clement@free-electrons.com>
+ <1370599460-9947-3-git-send-email-gregory.clement@free-electrons.com>
+ <alpine.LFD.2.03.1306072208460.18597@syhkavp.arg>
+Message-ID: <20130617083151.GB2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 08:05:37PM +0100, Jonathan Austin wrote:
-> The next step is to put it in to Russell's patch system. This is the way  
-> Russell manages (small/non-pull-request) things that need to go in to  
-> his tree.
+On Fri, Jun 07, 2013 at 10:09:09PM -0400, Nicolas Pitre wrote:
+> On Fri, 7 Jun 2013, Gregory CLEMENT wrote:
+> 
+> > This commit fixes the regression on Armada 370 (the kernal hang during
+> > boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
+> > TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
+> > 
+> > When coming out of either a Wait for Interrupt (WFI) or a Wait for
+> > Event (WFE) IDLE states, a specific timing sensitivity exists between
+> > the retiring WFI/WFE instructions and the newly issued subsequent
+> > instructions. This sensitivity can result in a CPU hang scenario.  The
+> > workaround is to insert either a Data Synchronization Barrier (DSB) or
+> > Data Memory Barrier (DMB) command immediately after the WFI/WFE
+> > instruction.
+> > 
+> > This commit was based on the work of Lior Amsalem, but heavily
+> > modified to apply the errata fix dynamically according to the
+> > processor type thanks to the suggestions of Russell King and Nicolas
+> > Pitre.
+> > 
+> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> 
+> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-And I'm going to drop this patch:
+Dropped-by: Me.  This causes build regression on anything using ARMv7 CPUs.
 
-arch/arm/kernel/entry-armv.S:692: Error: selected processor does not support ARM mode `ldrd r4,r5,[r2,#96]'
-
-LDRD is not supported on all the CPUs we have...
+Doing this kind of thing conditionally is only of any use if you ensure
+that _all_ the places you are using the new symbols you conditionally
+define are also appropriately conditionalised, which in this patch they
+aren't.
