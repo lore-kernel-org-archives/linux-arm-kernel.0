@@ -1,138 +1,114 @@
-From: grant.likely@linaro.org (Grant Likely)
-Date: Mon, 17 Jun 2013 01:43:19 +0100
-Subject: [RFC] arm: Remove sa1111 special case from arm_mm_memblock_reserve()
-Message-ID: <1371429799-7128-1-git-send-email-grant.likely@linaro.org>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 17 Jun 2013 09:06:41 +0800
+Subject: [PATCH v4 6/7] ARM: hi3xxx: add board support with device tree
+In-Reply-To: <20130612195455.GB5162@quad.lixom.net>
+References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
+ <1370702843-27172-7-git-send-email-haojian.zhuang@linaro.org>
+ <20130612195455.GB5162@quad.lixom.net>
+Message-ID: <CAD6h2NRLr9OXT_j=bjxXCqs2xV+iCvy4nKVOY04+_qjgJX4eOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The machine desc structure has a hook for doing machine-specific
-memblock code, but the SA1111 still has a platform-specific hook in the
-generic code. This patch merely moves the needed memblock_reserve()
-into a callback.
+On 13 June 2013 03:54, Olof Johansson <olof@lixom.net> wrote:
+> On Sat, Jun 08, 2013 at 10:47:22PM +0800, Haojian Zhuang wrote:
+>> Add board support with device tree for Hisilicon Hi36xx/Hi37xx platform.
+>>
+>> Changelog:
+>> v3:
+>> 1. Remove .map_io() in DT machine descriptor. Since debug_ll_io_init()
+>> is called by default.
+>> 2. Remove .init_machine() in DT machine descriptor. Since
+>> of_platform_populate() is called by default in DT mode.
+>>
+>> v2:
+>> 1. Remove .init_irq() in DT machine descriptor. Since irqchip_init()
+>> is called by default in DT mode.
+>>
+>> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> ---
+>>  .../bindings/arm/hisilicon/hisilicon.txt           | 10 ++++++
+>>  arch/arm/Kconfig                                   |  2 ++
+>>  arch/arm/Makefile                                  |  1 +
+>>  arch/arm/mach-hi3xxx/Kconfig                       | 13 ++++++++
+>>  arch/arm/mach-hi3xxx/Makefile                      |  5 +++
+>>  arch/arm/mach-hi3xxx/hi3xxx.c                      | 37 ++++++++++++++++++++++
+>>  6 files changed, 68 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>>  create mode 100644 arch/arm/mach-hi3xxx/Kconfig
+>>  create mode 100644 arch/arm/mach-hi3xxx/Makefile
+>>  create mode 100644 arch/arm/mach-hi3xxx/hi3xxx.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> new file mode 100644
+>> index 0000000..3be60c8
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
+>> @@ -0,0 +1,10 @@
+>> +Hisilicon Platforms Device Tree Bindings
+>> +----------------------------------------------------
+>> +
+>> +Hi3716 Development Board
+>> +Required root node properties:
+>> +     - compatible = "hisilicon,hi3716-dkb";
+>> +
+>> +Hi4511 Board
+>> +Required root node properties:
+>> +     - compatible = "hisilicon,hi3620-hi4511";
+>
+> Having the same namespace for boards and for SoCs is _extremely_ confusing.
+> I know it's not something you made up, but if you have a chance to influence
+> future naming, please do so. Or maybe consider using a different naming
+> scheme than just "hixxxx" for boards in the sources.
 
-This still leaves a special case in mem_init() to call
-free_reserved_area() on the same region, but there isn't a suitable hook
-in mdesc for making that call so the change is left to another patch.
+Maybe. But it's still their choice.
 
-Compile tested only.
+>
+>> diff --git a/arch/arm/mach-hi3xxx/hi3xxx.c b/arch/arm/mach-hi3xxx/hi3xxx.c
+>> new file mode 100644
+>> index 0000000..064b303
+>> --- /dev/null
+>> +++ b/arch/arm/mach-hi3xxx/hi3xxx.c
+>> @@ -0,0 +1,37 @@
+>> +/*
+>> + * (Hisilicon's Hi36xx/Hi37xx SoC based) flattened device tree enabled machine
+>> + *
+>> + * Copyright (c) 2012-2013 Hisilicon Ltd.
+>> + * Copyright (c) 2012-2013 Linaro Ltd.
+>> + *
+>> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> +*/
+>> +
+>> +#include <linux/clk-provider.h>
+>> +#include <linux/clocksource.h>
+>> +#include <linux/irqchip.h>
+>> +#include <linux/of_platform.h>
+>> +
+>> +#include <asm/mach/arch.h>
+>> +#include <asm/mach/map.h>
+>> +
+>> +static void __init hi3xxx_timer_init(void)
+>> +{
+>> +     of_clk_init(NULL);
+>> +     clocksource_of_init();
+>> +}
+>> +
+>> +static const char *hs_compat[] __initdata = {
+>> +     "hisilicon,hi3620-hi4511",
+>> +     NULL,
+>
+> Should you list the hisilicon,hi3716-dkb board here too, since you add the
+> bindings doc for it?
+>
+>
+> -Olof
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Nicolas Pitre <nico@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/mach-sa1100/assabet.c    |  1 +
- arch/arm/mach-sa1100/badge4.c     |  1 +
- arch/arm/mach-sa1100/generic.c    | 12 ++++++++++++
- arch/arm/mach-sa1100/generic.h    |  1 +
- arch/arm/mach-sa1100/jornada720.c |  1 +
- arch/arm/mm/mmu.c                 |  8 --------
- 6 files changed, 16 insertions(+), 8 deletions(-)
+If all of these patches are merged, I can submit hi3716-dkb continuously.
 
-diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
-index e838ba2..aab247a 100644
---- a/arch/arm/mach-sa1100/assabet.c
-+++ b/arch/arm/mach-sa1100/assabet.c
-@@ -621,6 +621,7 @@ MACHINE_START(ASSABET, "Intel-Assabet")
- 	.fixup		= fixup_assabet,
- 	.map_io		= assabet_map_io,
- 	.nr_irqs	= SA1100_NR_IRQS,
-+	.reserve	= sa1100_reserve,
- 	.init_irq	= sa1100_init_irq,
- 	.init_time	= sa1100_timer_init,
- 	.init_machine	= assabet_init,
-diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
-index 63361b6..9033d74 100644
---- a/arch/arm/mach-sa1100/badge4.c
-+++ b/arch/arm/mach-sa1100/badge4.c
-@@ -334,6 +334,7 @@ MACHINE_START(BADGE4, "Hewlett-Packard Laboratories BadgePAD 4")
- 	.atag_offset	= 0x100,
- 	.map_io		= badge4_map_io,
- 	.nr_irqs	= SA1100_NR_IRQS,
-+	.reserve	= sa1100_reserve,
- 	.init_irq	= sa1100_init_irq,
- 	.init_late	= sa11x0_init_late,
- 	.init_time	= sa1100_timer_init,
-diff --git a/arch/arm/mach-sa1100/generic.c b/arch/arm/mach-sa1100/generic.c
-index 9db3e98..1e7164e 100644
---- a/arch/arm/mach-sa1100/generic.c
-+++ b/arch/arm/mach-sa1100/generic.c
-@@ -15,6 +15,7 @@
- #include <linux/init.h>
- #include <linux/delay.h>
- #include <linux/dma-mapping.h>
-+#include <linux/memblock.h>
- #include <linux/pm.h>
- #include <linux/cpufreq.h>
- #include <linux/ioport.h>
-@@ -26,6 +27,7 @@
- #include <asm/mach/map.h>
- #include <asm/mach/flash.h>
- #include <asm/irq.h>
-+#include <asm/pgtable.h>
- #include <asm/system_misc.h>
- 
- #include <mach/hardware.h>
-@@ -351,6 +353,16 @@ static struct platform_device *sa11x0_devices[] __initdata = {
- 	&sa11x0dma_device,
- };
- 
-+void __init sa1100_reserve(void)
-+{
-+	/*
-+	 * Because of the SA1111 DMA bug, we want to preserve our
-+	 * precious DMA-able memory...
-+	 */
-+	if (IS_ENABLED(CONFIG_SA1111))
-+		memblock_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
-+}
-+
- static int __init sa1100_init(void)
- {
- 	pm_power_off = sa1100_power_off;
-diff --git a/arch/arm/mach-sa1100/generic.h b/arch/arm/mach-sa1100/generic.h
-index 2abc6a1..5d8398c 100644
---- a/arch/arm/mach-sa1100/generic.h
-+++ b/arch/arm/mach-sa1100/generic.h
-@@ -5,6 +5,7 @@
-  */
- 
- extern void sa1100_timer_init(void);
-+extern void sa1100_reserve(void);
- extern void __init sa1100_map_io(void);
- extern void __init sa1100_init_irq(void);
- extern void __init sa1100_init_gpio(void);
-diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
-index c0b1f5b..d95961a 100644
---- a/arch/arm/mach-sa1100/jornada720.c
-+++ b/arch/arm/mach-sa1100/jornada720.c
-@@ -345,6 +345,7 @@ MACHINE_START(JORNADA720, "HP Jornada 720")
- 	.atag_offset	= 0x100,
- 	.map_io		= jornada720_map_io,
- 	.nr_irqs	= SA1100_NR_IRQS,
-+	.reserve	= sa1100_reserve,
- 	.init_irq	= sa1100_init_irq,
- 	.init_time	= sa1100_timer_init,
- 	.init_machine	= jornada720_mach_init,
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e0d8565..f281a24 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1147,14 +1147,6 @@ void __init arm_mm_memblock_reserve(void)
- 	 * and can only be in node 0.
- 	 */
- 	memblock_reserve(__pa(swapper_pg_dir), SWAPPER_PG_DIR_SIZE);
--
--#ifdef CONFIG_SA1111
--	/*
--	 * Because of the SA1111 DMA bug, we want to preserve our
--	 * precious DMA-able memory...
--	 */
--	memblock_reserve(PHYS_OFFSET, __pa(swapper_pg_dir) - PHYS_OFFSET);
--#endif
- }
- 
- /*
--- 
-1.8.1.2
+The more things what I add only cause me pending more time.
+
+Regards
+Haojian
