@@ -1,45 +1,76 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 11:10:47 +0900
-Subject: [PATCH v3] ARM: shmobile: BOCK-W: add Ether support
-In-Reply-To: <51BDE454.5000006@cogentembedded.com>
-References: <201306020240.55702.sergei.shtylyov@cogentembedded.com>
- <20130612140905.GM32751@verge.net.au>
- <51BDE454.5000006@cogentembedded.com>
-Message-ID: <20130617021046.GI15043@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 17 Jun 2013 10:09:01 +0800
+Subject: [PATCH] ARM: dts: imx27: Add VPU devicetree node
+In-Reply-To: <1371298978-23617-1-git-send-email-shc_work@mail.ru>
+References: <1371298978-23617-1-git-send-email-shc_work@mail.ru>
+Message-ID: <20130617020900.GC31687@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 08:14:12PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Sat, Jun 15, 2013 at 04:22:58PM +0400, Alexander Shiyan wrote:
+> This patch adds the missing VPU devicetree node for i.MX27 CPUs.
 > 
-> On 12.06.2013 18:09, Simon Horman wrote:
-> 
-> >>Register Ether device from bockw_init(), passing the platform data to it, adding
-> >>only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
-> >>on the board, it's connected to the link/activity LED  output of the PHY, thus
-> >>the link disappears and reappears after each packet. We'd be better off ignoring
-> >>such signal and getting the link state from the PHY indirectly.
-> 
-> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> >>---
-> >>The patch is atop of Simon's 'renesas.git' repo, 'renesas-next-20130528' tag
-> >>and the USB patches just reposted. I decided to move it ahead of the VIN patches
-> >>as it can be merged right now since all dependecies have been already met.
-> 
-> >Thanks, queued up in the boards branch.
-> 
->    Has this been pulled by Olof/Arnd? If not, is it possible to
-> amend this patch or should I send an incremental one? I forgot to
-> update the platform device name from "sh-eth" to "r8a777x-ether" in
-> the PinMux table, in accordance to the R8A7778 Ether device name
-> fix. It would be
-> good if this got into 3.11 as otherwise Ether support on BOCK-W
-> wouldn't work. I have discovered the mistake only yesterday.
+> Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
 
-This patch is not present in arm-soc nor have I sent a pull request for it,
-though I was planing to do so today.
+Applied.  But obviously your patch does something that is not mentioned
+in the commit log, like sorting ccm node.
 
-I think that the best thing would be if you sent an incremental patch
-which I can add to the boards branch and then send a pull-request for
-that branch to Olof and Arnd.
+Shawn
+
+> ---
+>  arch/arm/boot/dts/imx27.dtsi | 26 +++++++++++++++++++-------
+>  1 file changed, 19 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx27.dtsi b/arch/arm/boot/dts/imx27.dtsi
+> index 7017bfe..4dd0c90 100644
+> --- a/arch/arm/boot/dts/imx27.dtsi
+> +++ b/arch/arm/boot/dts/imx27.dtsi
+> @@ -299,6 +299,21 @@
+>  			reg = <0x10020000 0x20000>;
+>  			ranges;
+>  
+> +			coda: coda at 10023000 {
+> +				compatible = "fsl,imx27-vpu";
+> +				reg = <0x10023000 0x0200>;
+> +				interrupts = <53>;
+> +				clocks = <&clks 57>, <&clks 66>;
+> +				clock-names = "per", "ahb";
+> +				iram = <&iram>;
+> +			};
+> +
+> +			clks: ccm at 10027000{
+> +				compatible = "fsl,imx27-ccm";
+> +				reg = <0x10027000 0x1000>;
+> +				#clock-cells = <1>;
+> +			};
+> +
+>  			fec: ethernet at 1002b000 {
+>  				compatible = "fsl,imx27-fec";
+>  				reg = <0x1002b000 0x4000>;
+> @@ -307,19 +322,16 @@
+>  				clock-names = "ipg", "ahb", "ptp";
+>  				status = "disabled";
+>  			};
+> -
+> -			clks: ccm at 10027000{
+> -				compatible = "fsl,imx27-ccm";
+> -				reg = <0x10027000 0x1000>;
+> -				#clock-cells = <1>;
+> -			};
+>  		};
+>  
+> +		iram: iram at ffff4c00 {
+> +			compatible = "mmio-sram";
+> +			reg = <0xffff4c00 0xb400>;
+> +		};
+>  
+>  		nfc: nand at d8000000 {
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> -
+>  			compatible = "fsl,imx27-nand";
+>  			reg = <0xd8000000 0x1000>;
+>  			interrupts = <29>;
+> -- 
+> 1.8.1.5
+> 
