@@ -1,56 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jun 2013 12:25:00 +0100
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <51BEE6BF.30401@schinagl.nl>
-References: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
- <1371251781-17167-2-git-send-email-oliver+list@schinagl.nl>
- <2828921.i3T9JhMInt@flatron> <51BEE6BF.30401@schinagl.nl>
-Message-ID: <20130617112459.GD2718@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Jun 2013 13:28:52 +0200
+Subject: [PATCH v6 02/18] sh-pfc: Add DT support
+In-Reply-To: <1785860.1aS5315FIj@avalon>
+References: <1371167163-10507-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <3527983.0zjA6RU0T0@avalon> <20130617070315.GA22175@verge.net.au>
+ <1785860.1aS5315FIj@avalon>
+Message-ID: <CACRpkdYf36uf6xikRi=YrS03j1mENvg7OLSBxxq_XHXt8ymOOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 12:36:47PM +0200, Oliver Schinagl wrote:
-> On 15-06-13 12:28, Tomasz Figa wrote:
->> What is this version thingy?
+On Mon, Jun 17, 2013 at 1:00 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Monday 17 June 2013 16:03:16 Simon Horman wrote:
+>> Hi Laurent,
 >>
->> Is there a versioning scheme defined for this driver? Do you expect it to
->> be changed every modification of this driver?
+>> As 3.10-rc6 has been released it is probably now too late for me
+>> to take this series through the renesas tree for v3.11.
 >>
->> I don't see any point of having such thing in a project with a version
->> control system, where you have all change history.
-> Well we export something to userspace, while trivial there is the  
-> possibility it changes over time. Say A40 which outputs 256 bits instead  
-> of the current 128 bits. That would validate a bump in version number.  
-> It's purely so the user can be aware of differences in the driver. So  
-> maybe DRV_A[BP]I_VERSION would be better?
+>> I am happy for Linus to take it if that is what he would like to do.
+>
+> OK.
+>
+> Linus, would you like to take the series through your tree, or push it back to
+> v3.12 ?
 
-What is better to do is to export such things as properties, or
-design the API in such a way that the length of the ID is reportable.
+Maybe a little bit of both?
 
-However, it's actually quite easy to do if you only care about the
-number of bytes - you just arrange for the read() function to return
-the number of bytes read.  So in the case of 128 bits available, that's
-16 bytes, so a read() of the sysfs attribute with a buffer of (say)
-256 bytes should report only 16 bytes read.
+I don't want to carry anything that will collide with the stuff
+harvested into ARM SoC through Simon.
 
-If it were to become 256 bytes later, then the read() would return
-32 bytes read.  So there's no need for any new APIs to do this.
+Can you send a small set of self-contained patches that
+do not touch anything in arch/arm/* and which does not
+collide with anything already queued in ARM SoC for v3.11?
 
-Also, this is over-complicated:
+In that case I'd be happy to take it as some preparation
+for v3.12.
 
-+       for (i = 0; i < size; i++) {
-+               if ((pos + i) >= SID_SIZE || (pos < 0))
-+                       break;
-+               buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
-+       }
-
-Maybe:
-	if (pos < 0 || pos >= SID_SIZE)
-		return 0;
-	if (size > SID_SIZE - pos)
-		size = SID_SIZE - pos;
-
-	for (i = 0; i < size; i++)
-		buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
-
-	return size;
+Yours,
+Linus Walleij
