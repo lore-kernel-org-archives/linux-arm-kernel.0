@@ -1,143 +1,86 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:33:58 +0200
-Subject: [PATCH v2 13/38] ARM: EXYNOS: pm_domains: Remove legacy power domain
- registration code
+Date: Mon, 17 Jun 2013 18:34:02 +0200
+Subject: [PATCH v2 17/38] [media] platform: Check for ARCH_EXYNOS separately
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-14-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-18-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes static definitions of power domains and code
-responsible for registering them and adding devices to them, since only
-DT based boot is now supported on Exynos.
+ARCH_EXYNOS is going to be excluded from PLAT_S5P, so it must be checked
+separately in Exynos-related Kconfig entries.
 
-Cc: linux-pm at vger.kernel.org
-Cc: "Rafael J. Wysocki" <rjw@sisk.pl>
+Cc: linux-media at vger.kernel.org
+Cc: Mauro Carvalho Chehab <mchehab@redhat.com>
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Kamil Debski <k.debski@samsung.com>
+Cc: Tomasz Stanislawski <t.stanislaws@samsung.com>
+Cc: Jeongtae Park <jtp.park@samsung.com>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/pm_domains.c | 94 +--------------------------------------
- 1 file changed, 1 insertion(+), 93 deletions(-)
+ drivers/media/platform/Kconfig            | 6 +++---
+ drivers/media/platform/exynos4-is/Kconfig | 3 ++-
+ drivers/media/platform/s5p-tv/Kconfig     | 2 +-
+ 3 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/pm_domains.c b/arch/arm/mach-exynos/pm_domains.c
-index beb946d..1703593 100644
---- a/arch/arm/mach-exynos/pm_domains.c
-+++ b/arch/arm/mach-exynos/pm_domains.c
-@@ -74,16 +74,6 @@ static int exynos_pd_power_off(struct generic_pm_domain *domain)
- 	return exynos_pd_power(domain, false);
- }
+diff --git a/drivers/media/platform/Kconfig b/drivers/media/platform/Kconfig
+index 0494d27..bce695d 100644
+--- a/drivers/media/platform/Kconfig
++++ b/drivers/media/platform/Kconfig
+@@ -159,7 +159,7 @@ config VIDEO_MEM2MEM_DEINTERLACE
  
--#define EXYNOS_GPD(PD, BASE, NAME)			\
--static struct exynos_pm_domain PD = {			\
--	.base = (void __iomem *)BASE,			\
--	.name = NAME,					\
--	.pd = {						\
--		.power_off = exynos_pd_power_off,	\
--		.power_on = exynos_pd_power_on,	\
--	},						\
--}
--
- static void exynos_add_device_to_domain(struct exynos_pm_domain *pd,
- 					 struct device *dev)
- {
-@@ -156,7 +146,7 @@ static struct notifier_block platform_nb = {
- 	.notifier_call = exynos_pm_notifier_call,
- };
+ config VIDEO_SAMSUNG_S5P_G2D
+ 	tristate "Samsung S5P and EXYNOS4 G2D 2d graphics accelerator driver"
+-	depends on VIDEO_DEV && VIDEO_V4L2 && PLAT_S5P
++	depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select V4L2_MEM2MEM_DEV
+ 	default n
+@@ -169,7 +169,7 @@ config VIDEO_SAMSUNG_S5P_G2D
  
--static __init int exynos_pm_dt_parse_domains(void)
-+static __init int exynos4_pm_init_power_domain(void)
- {
- 	struct platform_device *pdev;
- 	struct device_node *np;
-@@ -192,88 +182,6 @@ static __init int exynos_pm_dt_parse_domains(void)
+ config VIDEO_SAMSUNG_S5P_JPEG
+ 	tristate "Samsung S5P/Exynos4 JPEG codec driver"
+-	depends on VIDEO_DEV && VIDEO_V4L2 && PLAT_S5P
++	depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	select V4L2_MEM2MEM_DEV
+ 	---help---
+@@ -177,7 +177,7 @@ config VIDEO_SAMSUNG_S5P_JPEG
  
- 	return 0;
- }
--
--static __init __maybe_unused void exynos_pm_add_dev_to_genpd(struct platform_device *pdev,
--						struct exynos_pm_domain *pd)
--{
--	if (pdev->dev.bus) {
--		if (!pm_genpd_add_device(&pd->pd, &pdev->dev))
--			pm_genpd_dev_need_restore(&pdev->dev, true);
--		else
--			pr_info("%s: error in adding %s device to %s power"
--				"domain\n", __func__, dev_name(&pdev->dev),
--				pd->name);
--	}
--}
--
--EXYNOS_GPD(exynos4_pd_mfc, S5P_PMU_MFC_CONF, "pd-mfc");
--EXYNOS_GPD(exynos4_pd_g3d, S5P_PMU_G3D_CONF, "pd-g3d");
--EXYNOS_GPD(exynos4_pd_lcd0, S5P_PMU_LCD0_CONF, "pd-lcd0");
--EXYNOS_GPD(exynos4_pd_lcd1, S5P_PMU_LCD1_CONF, "pd-lcd1");
--EXYNOS_GPD(exynos4_pd_tv, S5P_PMU_TV_CONF, "pd-tv");
--EXYNOS_GPD(exynos4_pd_cam, S5P_PMU_CAM_CONF, "pd-cam");
--EXYNOS_GPD(exynos4_pd_gps, S5P_PMU_GPS_CONF, "pd-gps");
--
--static struct exynos_pm_domain *exynos4_pm_domains[] = {
--	&exynos4_pd_mfc,
--	&exynos4_pd_g3d,
--	&exynos4_pd_lcd0,
--	&exynos4_pd_lcd1,
--	&exynos4_pd_tv,
--	&exynos4_pd_cam,
--	&exynos4_pd_gps,
--};
--
--static __init int exynos4_pm_init_power_domain(void)
--{
--	int idx;
--
--	if (of_have_populated_dt())
--		return exynos_pm_dt_parse_domains();
--
--	for (idx = 0; idx < ARRAY_SIZE(exynos4_pm_domains); idx++) {
--		struct exynos_pm_domain *pd = exynos4_pm_domains[idx];
--		int on = __raw_readl(pd->base + 0x4) & S5P_INT_LOCAL_PWR_EN;
--
--		pm_genpd_init(&pd->pd, NULL, !on);
--	}
--
--#ifdef CONFIG_S5P_DEV_FIMD0
--	exynos_pm_add_dev_to_genpd(&s5p_device_fimd0, &exynos4_pd_lcd0);
--#endif
--#ifdef CONFIG_S5P_DEV_TV
--	exynos_pm_add_dev_to_genpd(&s5p_device_hdmi, &exynos4_pd_tv);
--	exynos_pm_add_dev_to_genpd(&s5p_device_mixer, &exynos4_pd_tv);
--#endif
--#ifdef CONFIG_S5P_DEV_MFC
--	exynos_pm_add_dev_to_genpd(&s5p_device_mfc, &exynos4_pd_mfc);
--#endif
--#ifdef CONFIG_S5P_DEV_FIMC0
--	exynos_pm_add_dev_to_genpd(&s5p_device_fimc0, &exynos4_pd_cam);
--#endif
--#ifdef CONFIG_S5P_DEV_FIMC1
--	exynos_pm_add_dev_to_genpd(&s5p_device_fimc1, &exynos4_pd_cam);
--#endif
--#ifdef CONFIG_S5P_DEV_FIMC2
--	exynos_pm_add_dev_to_genpd(&s5p_device_fimc2, &exynos4_pd_cam);
--#endif
--#ifdef CONFIG_S5P_DEV_FIMC3
--	exynos_pm_add_dev_to_genpd(&s5p_device_fimc3, &exynos4_pd_cam);
--#endif
--#ifdef CONFIG_S5P_DEV_CSIS0
--	exynos_pm_add_dev_to_genpd(&s5p_device_mipi_csis0, &exynos4_pd_cam);
--#endif
--#ifdef CONFIG_S5P_DEV_CSIS1
--	exynos_pm_add_dev_to_genpd(&s5p_device_mipi_csis1, &exynos4_pd_cam);
--#endif
--#ifdef CONFIG_S5P_DEV_G2D
--	exynos_pm_add_dev_to_genpd(&s5p_device_g2d, &exynos4_pd_lcd0);
--#endif
--#ifdef CONFIG_S5P_DEV_JPEG
--	exynos_pm_add_dev_to_genpd(&s5p_device_jpeg, &exynos4_pd_cam);
--#endif
--	return 0;
--}
- arch_initcall(exynos4_pm_init_power_domain);
+ config VIDEO_SAMSUNG_S5P_MFC
+ 	tristate "Samsung S5P MFC Video Codec"
+-	depends on VIDEO_DEV && VIDEO_V4L2 && PLAT_S5P
++	depends on VIDEO_DEV && VIDEO_V4L2 && (PLAT_S5P || ARCH_EXYNOS)
+ 	select VIDEOBUF2_DMA_CONTIG
+ 	default n
+ 	help
+diff --git a/drivers/media/platform/exynos4-is/Kconfig b/drivers/media/platform/exynos4-is/Kconfig
+index 6ff99b5..004fd0b 100644
+--- a/drivers/media/platform/exynos4-is/Kconfig
++++ b/drivers/media/platform/exynos4-is/Kconfig
+@@ -1,7 +1,8 @@
  
- int __init exynos_pm_late_initcall(void)
+ config VIDEO_SAMSUNG_EXYNOS4_IS
+ 	bool "Samsung S5P/EXYNOS4 SoC series Camera Subsystem driver"
+-	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && PLAT_S5P && PM_RUNTIME
++	depends on VIDEO_V4L2 && VIDEO_V4L2_SUBDEV_API && PM_RUNTIME
++	depends on (PLAT_S5P || ARCH_EXYNOS)
+ 	help
+ 	  Say Y here to enable camera host interface devices for
+ 	  Samsung S5P and EXYNOS SoC series.
+diff --git a/drivers/media/platform/s5p-tv/Kconfig b/drivers/media/platform/s5p-tv/Kconfig
+index 7b659bd..369a4c1 100644
+--- a/drivers/media/platform/s5p-tv/Kconfig
++++ b/drivers/media/platform/s5p-tv/Kconfig
+@@ -8,7 +8,7 @@
+ 
+ config VIDEO_SAMSUNG_S5P_TV
+ 	bool "Samsung TV driver for S5P platform"
+-	depends on PLAT_S5P && PM_RUNTIME
++	depends on (PLAT_S5P || ARCH_EXYNOS) && PM_RUNTIME
+ 	default n
+ 	---help---
+ 	  Say Y here to enable selecting the TV output devices for
 -- 
 1.8.2.1
