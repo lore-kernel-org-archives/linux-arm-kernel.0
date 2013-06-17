@@ -1,41 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jun 2013 09:31:51 +0100
-Subject: [PATCH v4 2/2] ARM PJ4B: Add support for errata 4742
-In-Reply-To: <alpine.LFD.2.03.1306072208460.18597@syhkavp.arg>
-References: <1370599460-9947-1-git-send-email-gregory.clement@free-electrons.com>
- <1370599460-9947-3-git-send-email-gregory.clement@free-electrons.com>
- <alpine.LFD.2.03.1306072208460.18597@syhkavp.arg>
-Message-ID: <20130617083151.GB2718@n2100.arm.linux.org.uk>
+From: Nicolas.FERRE@atmel.com (Ferre, Nicolas)
+Date: Mon, 17 Jun 2013 08:34:11 +0000
+Subject: [GIT PULL] at91: Device Tree update for 3.11 #2
+In-Reply-To: <20130615015224.GA25585@quad.lixom.net>
+References: <1370279139-7181-1-git-send-email-nicolas.ferre@atmel.com>
+ <1371250067-19317-1-git-send-email-nicolas.ferre@atmel.com>,
+ <20130615015224.GA25585@quad.lixom.net>
+Message-ID: <EABCC4A72A203F4BA2E04297CF0282C427D1E112@hnombx01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 07, 2013 at 10:09:09PM -0400, Nicolas Pitre wrote:
-> On Fri, 7 Jun 2013, Gregory CLEMENT wrote:
-> 
-> > This commit fixes the regression on Armada 370 (the kernal hang during
-> > boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
-> > TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
-> > 
-> > When coming out of either a Wait for Interrupt (WFI) or a Wait for
-> > Event (WFE) IDLE states, a specific timing sensitivity exists between
-> > the retiring WFI/WFE instructions and the newly issued subsequent
-> > instructions. This sensitivity can result in a CPU hang scenario.  The
-> > workaround is to insert either a Data Synchronization Barrier (DSB) or
-> > Data Memory Barrier (DMB) command immediately after the WFI/WFE
-> > instruction.
-> > 
-> > This commit was based on the work of Lior Amsalem, but heavily
-> > modified to apply the errata fix dynamically according to the
-> > processor type thanks to the suggestions of Russell King and Nicolas
-> > Pitre.
-> > 
-> > Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> 
-> Acked-by: Nicolas Pitre <nico@linaro.org>
 
-Dropped-by: Me.  This causes build regression on anything using ARMv7 CPUs.
+>On Sat, Jun 15, 2013 at 12:47:47AM +0200, Nicolas Ferre wrote:
+>> Arnd, Olof,
+>>
+>> Additional pull-request for AT91 DT patches.
+>> It contains the remaining part of the USB gadget pull-request that I sent you
+>> last week. After having split it, here is the DT part.
+>> It also contains the update of DMA bindings: it is the AT91 part the should go
+>> through arm-soc. I have included the patch (ARM: at91: dt: add header to define
+>> at_hdmac configuration) so that we avoid build errors whichever git tree
+>> (slave-dma or arm-soc) is merged first.
+>> A SPI DT patch for at91sam9x5 is also added.
+>>
+>> Thanks, best regards,
+>>
+>> The following changes since commit 028633c238f91dc113520a7ad25d37b2ba9068af:
+>>
+>>   ARM: at91/dt: add pinctrl definition for at91 tc blocks (2013-05-31 22:40:37 +0200)
+>>
+>> are available in the git repository at:
+>>
+>>   git://github.com/at91linux/linux-at91.git tags/at91-dt
+>
+>Pulled, thanks.
 
-Doing this kind of thing conditionally is only of any use if you ensure
-that _all_ the places you are using the new symbols you conditionally
-define are also appropriately conditionalised, which in this patch they
-aren't.
+Hi,
+
+I do not see it appearing in arm-soc/at91/dt branch even though is it present in arm-soc/for-next: is it normal?
+
+Bye,
+-- 
+Nicolas Ferre
