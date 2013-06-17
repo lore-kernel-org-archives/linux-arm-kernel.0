@@ -1,44 +1,36 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 17 Jun 2013 12:28:48 +0900
-Subject: [PATCH] ARM: shmobile: sh7372 build fix for SUSPEND=n && CPU_IDLE=n
-Message-ID: <20130617032848.21337.29264.sendpatchset@w520>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 17 Jun 2013 03:29:15 +0000 (UTC)
+Subject: [PATCH 3/8] ARM: OMAP2+: hwmod: Remove remaining DMA channel
+ definitions
+In-Reply-To: <1371285069-6834-4-git-send-email-jarkko.nikula@bitmer.com>
+References: <1371285069-6834-1-git-send-email-jarkko.nikula@bitmer.com>
+ <1371285069-6834-4-git-send-email-jarkko.nikula@bitmer.com>
+Message-ID: <alpine.DEB.2.02.1306170328080.4477@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Sat, 15 Jun 2013, Jarkko Nikula wrote:
 
-Move the code using cpu_resume() into a function being
-wrappend in #ifdef CONFIG_SUSPEND || CONFIG_CPU_IDLE.
+> Last remaining DMA channel definitions in arch/arm/mach-omap2/dma.h
+> are used only by omap_hwmod_2xxx_3xxx_ipblock_data.c and
+> omap_hwmod_3xxx_data.c. Remove them by using directly DMA channel number in
+> hwmod data and drop definitions with a following script:
+> 
+> egrep '#define [OMAP|AM35XX].*DMA' arch/arm/mach-omap2/dma.h | cut -f 1,3 \
+> 	| while read i; do \
+> 		DEF=`echo $i |cut -d ' ' -f 2`; \
+> 		CH=`echo $i |cut -d ' ' -f 3`; \
+> 		echo "removing" $DEF; \
+> 		sed -i "s/${DEF}/${CH}/" arch/arm/mach-omap2/omap_hwmod_*.c; \
+> 		sed -i "/${DEF}/d" arch/arm/mach-omap2/dma.h; \
+> 	done
+> 
+> Signed-off-by: Jarkko Nikula <jarkko.nikula@bitmer.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
 
-This fixes a build error triggered by ap4evb_defconfig.
+Looks fine to me for v3.12.  I guess Tony will take this series.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
+Acked-by: Paul Walmsley <paul@pwsan.com>
 
- Applies to renesas-next-20130613
 
- arch/arm/mach-shmobile/pm-sh7372.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
-
---- 0001/arch/arm/mach-shmobile/pm-sh7372.c
-+++ work/arch/arm/mach-shmobile/pm-sh7372.c	2013-06-17 12:03:18.000000000 +0900
-@@ -351,6 +351,9 @@ static void sh7372_enter_a4s_common(int
- 
- static void sh7372_pm_setup_smfram(void)
- {
-+	/* pass physical address of cpu_resume() to assembly resume code */
-+	sh7372_cpu_resume = virt_to_phys(cpu_resume);
-+
- 	memcpy((void *)SMFRAM, sh7372_resume_core_standby_sysc, 0x100);
- }
- #else
-@@ -524,9 +527,6 @@ void __init sh7372_pm_init(void)
- 	/* do not convert A3SM, A3SP, A3SG, A4R power down into A4S */
- 	__raw_writel(0, PDNSEL);
- 
--	/* pass physical address of cpu_resume() to assembly resume code */
--	sh7372_cpu_resume = virt_to_phys(cpu_resume);
--
- 	sh7372_pm_setup_smfram();
- 
- 	sh7372_suspend_init();
+- Paul
