@@ -1,33 +1,35 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Mon, 17 Jun 2013 20:22:48 +0000 (UTC)
-Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
-In-Reply-To: <20130616042256.7541.7096@quantum>
-References: <20130607121505.21868.72360.stgit@dusk.lan>
- <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
- <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
- <51B6D239.5030905@nvidia.com>
- <alpine.DEB.2.02.1306110944130.22645@utopia.booyaka.com>
- <20130616042256.7541.7096@quantum>
-Message-ID: <alpine.DEB.2.02.1306172019270.17176@utopia.booyaka.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon, 17 Jun 2013 13:26:24 -0700
+Subject: [GIT PULL 2/3] msm fixes for 3.11
+In-Reply-To: <20130615012617.GU18124@quad.lixom.net>
+References: <1371232615-30731-1-git-send-email-davidb@codeaurora.org>
+ <1371232615-30731-4-git-send-email-davidb@codeaurora.org>
+ <20130615012617.GU18124@quad.lixom.net>
+Message-ID: <20130617202624.GA23915@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 14, 2013 at 06:26:17PM -0700, Olof Johansson wrote:
 
-On Sat, 15 Jun 2013, Mike Turquette wrote:
+>> Stephen Boyd (3):
+>>       ARM: dts: msm: Fix bad register addresses
+>
+>Hmm. I see that the msm-hsuart device nodes completely lack reg entries. That's
+>considerably more important to fix than the cosmetic unit address that's not
+>even needed unless two nodes happen to have the same name.
 
-> These patches appear fine to me but I did not see any Acks, nor could I
-> tell if a v2 was necessary based on the comments. Will there be another
-> version?
+I'm not seeing the missing reg entries in anyone's tree.
 
-I'm not planning to do another version at this time.
+However, it appears that both of us resolved the merge conflict
+differently, and both did it incorrectly.
 
-> If not an Acked-by or Reviewed-by would be cool.
+How would you like this to be fixed?  Should I just send you a patch
+based off of the current soc tree?
 
-Hmm, not sure who the right people would be.  Looks like the 
-drivers/clk/tegra directory is unmaintained, so not sure who could ack it?
+Thanks,
+David
 
-Peter or Stephen, care to review these patches and send a Reviewed-by?
-
-
-- Paul
+-- 
+sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
