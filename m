@@ -1,25 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 18:11:02 +0200
-Subject: [PATCH 2/6] pinctrl: sunxi: Move the pins definitions to a
- separate header
-In-Reply-To: <20130617084106.GE16699@lukather>
-References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
- <1370795767-9769-3-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdajdrcLy6u2cKkrpYnh0Hqx8Hjx+zJ_tfpYCfJFqWCrZA@mail.gmail.com>
- <20130617084106.GE16699@lukather>
-Message-ID: <CACRpkda-_6G8Uq2VEX965KeGorFSZVRD++Y2+yvp66T9pQOmEA@mail.gmail.com>
+Date: Mon, 17 Jun 2013 18:14:20 +0200
+Subject: [PATCH] pinctrl: update GPIO range doc
+In-Reply-To: <1371446435.2776.122@driftwood>
+References: <1371377909-5921-1-git-send-email-linus.walleij@stericsson.com>
+ <1371446435.2776.122@driftwood>
+Message-ID: <CACRpkdZdPR-hrV_dRpochwZsM_E1SMZoSXFM9-MN_3Ko6Aa2cw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 10:41 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
+On Mon, Jun 17, 2013 at 7:20 AM, Rob Landley <rob@landley.net> wrote:
+> On 06/16/2013 05:18:29 AM, Linus Walleij wrote:
+>>
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This updates the GPIO range documentation with the API changes
+>> for sparse/random/arbitrary pin-to-GPIO mappings.
+>
+> Acked-by: Rob Landley <rob@landley.net>
+>
+> Why isn't this part of the pinctrl series you posted right afterwards? (It
+> should go in through that maintainer...)
 
-> Yes, As far as I can see, we should have a pretty complete support for
-> the GPIO/muxing/IRQ on the "old" allwinner SoCs (sun4i and sun5i) now.
+Well I'm the pinctrl maintainer so I keep it all in my head :-D
 
-Lucky you! My Android tablet is an Ainol Hero 2 using Actions
-Semiconductor ATM7029. They don't even publish their kernel
-sources nor datasheet so no chance of supporting that thing.
+>> +in gpio number, and use the ranges internals to retrive a pin number.
+>> After
+>
+> Range's perhaps?
+
+Thanks, fixed it up.
 
 Yours,
 Linus Walleij
