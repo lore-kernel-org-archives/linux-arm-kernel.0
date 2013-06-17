@@ -1,39 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 15:39:34 +0200
-Subject: [RFC PATCH 04/11] dma: amba-pl08x: Add support for PL080S variant
-In-Reply-To: <1371416058-22047-5-git-send-email-tomasz.figa@gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-5-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdZ+g-_AC=2WBs3nruyTMX16Ona99g_wcS=PqOuZ6xVpog@mail.gmail.com>
+From: jonas.jensen@gmail.com (Jonas Jensen)
+Date: Mon, 17 Jun 2013 15:39:20 +0200
+Subject: [PATCH] ARM: mm: cpu_fa526_do_idle: remove WFI
+Message-ID: <1371476360-8751-1-git-send-email-jonas.jensen@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+As it was already suggested by Russell King and Arnd Bergmann ( https://lkml.org/lkml/2013/5/16/133 ), moxart and gemini seem to be the only platforms using CPU_FA526, and instead of pointing arm_pm_idle to an empty function from platform code, it makes sense to remove WFI code from the processor specific idle function.
 
-> PL080S is a modified version of PL080 that can be found on Samsung SoCs,
-> such as S3C6400 and S3C6410.
->
-> It has different offset of CONFIG register, separate CONTROL1 register
-> that holds transfer size and larger maximum transfer size.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
+Note: moxart boots and prints to UART without this patch, but input is broken.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+---
+ arch/arm/mm/proc-fa526.S |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-(I would have done some smallish things differently but it
-is only a matter of taste.)
-
->  static struct amba_id pl08x_ids[] = {
-> +       /* Samsung PL080S variant */
-> +       {
-> +               .id     = 0x0a141080,
-> +               .mask   = 0xffffffff,
-> +               .data   = &vendor_pl080s,
-> +       },
-
-Interesting that Samsung claim to be vendor 0x41
-(ARM). Well ARM never made revision no 0x0a so
-this works.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mm/proc-fa526.S b/arch/arm/mm/proc-fa526.S
+index d217e97..85280b1 100644
+--- a/arch/arm/mm/proc-fa526.S
++++ b/arch/arm/mm/proc-fa526.S
+@@ -81,9 +81,7 @@ ENDPROC(cpu_fa526_reset)
+  */
+ 	.align	4
+ ENTRY(cpu_fa526_do_idle)
+-	mcr	p15, 0, r0, c7, c0, 4		@ Wait for interrupt
+-	mov	pc, lr
+-
++	nop
+ 
+ ENTRY(cpu_fa526_dcache_clean_area)
+ 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
+-- 
+1.7.2.5
