@@ -1,11 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 15:59:39 +0200
-Subject: [RFC PATCH 09/11] spi: s3c64xx: Do not require legacy DMA API in
+Date: Mon, 17 Jun 2013 16:01:12 +0200
+Subject: [RFC PATCH 10/11] ASoC: samsung: Do not require legacy DMA API in
  case of S3C64XX
-In-Reply-To: <1371416058-22047-10-git-send-email-tomasz.figa@gmail.com>
+In-Reply-To: <1371416058-22047-11-git-send-email-tomasz.figa@gmail.com>
 References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-10-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdb8V7pYVnOWOAJ6iG8_-jyeutq5W95+OCO4RLOv9EDjyg@mail.gmail.com>
+ <1371416058-22047-11-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <CACRpkdbvJjVzyXpsDiW1Q6knW5UCTo00nZXVsK+Pt+f7AqfM1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,11 +18,10 @@ On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 (...)
 > -       select S3C64XX_DMA if ARCH_S3C64XX
 > +       select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
+>         select S3C2410_DMA if ARCH_S3C24XX
 
-I guess this means the SPI driver does not work without DMA.
-But is the SPI driver already augmented to handle generic DMA engine?
-Anyway:
-
+I hope it will look nicer (like just selecting the real PL080 driver)
+in the end. OK can live with this:
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
 Yours,
