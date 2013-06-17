@@ -1,80 +1,84 @@
-From: r64343@freescale.com (Liu Hui-R64343)
-Date: Mon, 17 Jun 2013 08:11:38 +0000
-Subject: [PATCH] ARM: smp_twd: twd_update_frequency need be run on all
- online CPUs
-In-Reply-To: <20130617073120.GA4537@S2101-09.ap.freescale.net>
-References: <1371079180-22344-1-git-send-email-r64343@freescale.com>
- <20130617073120.GA4537@S2101-09.ap.freescale.net>
-Message-ID: <AD13664F485EE54694E29A7F9D5BE1AF84939C@039-SN2MPN1-022.039d.mgd.msft.net>
+From: christian.ruppert@abilis.com (Christian Ruppert)
+Date: Mon, 17 Jun 2013 10:11:58 +0200
+Subject: [PATCH] pinctrl: update GPIO range doc
+In-Reply-To: <1371377909-5921-1-git-send-email-linus.walleij@stericsson.com>
+References: <1371377909-5921-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20130617081158.GA19380@ab42.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->-----Original Message-----
->From: Shawn Guo [mailto:shawn.guo at linaro.org]
->Sent: Monday, June 17, 2013 3:31 PM
->To: Liu Hui-R64343
->Cc: linux-arm-kernel at lists.infradead.org
->Subject: Re: [PATCH] ARM: smp_twd: twd_update_frequency need be run on
->all online CPUs
->
->On Thu, Jun 13, 2013 at 07:19:40AM +0800, Jason Liu wrote:
->> When the local timer freq changed, the twd_update_frequency function
->> should be run all the CPUs include itself, otherwise, the twd freq
->> will not get updated and the local timer will not run correcttly.
->>
->> smp_call_function will run functions on all other CPUs, but not
->> include himself, this is not correct,use on_each_cpu instead to fix
->this issue.
->>
->> Signed-off-by: Jason Liu <r64343@freescale.com>
->> Cc: Russell King <linux@arm.linux.org.uk>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Cc: Rob Herring <rob.herring@calxeda.com>
->> Cc: Shawn Guo <shawn.guo@linaro.org>
->
->Acked-by: Shawn Guo <shawn.guo@linaro.org>
+On Sun, Jun 16, 2013 at 12:18:29PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This updates the GPIO range documentation with the API changes
+> for sparse/random/arbitrary pin-to-GPIO mappings.
 
-Thanks Shawn.
+Oops, sorry, I should have thought of updating this with my previous
+patch. Thanks for stepping in.
 
->
->BTW, is there anything wrong with your mailer (git send-email command
->line)?  I do not see people you put on Cc tag here show up in Cc of the
->email.  And that might the be reason why people are not responding so
->far.
+Reviewed-by: Christian Ruppert <christian.ruppert@abilis.com>
 
-Yes, there is one issue in my script and get fixed. I will put the patch
-Into Russell's patch tracking system after Mike and Russell reviewed it
-And also Cc stable kernel as Linus W. said. 
+> Cc: Christian Ruppert <christian.ruppert@abilis.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  Documentation/pinctrl.txt | 24 +++++++++++++++++++++---
+>  1 file changed, 21 insertions(+), 3 deletions(-)
+> 
+> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
+> index f6e664b..4548743 100644
+> --- a/Documentation/pinctrl.txt
+> +++ b/Documentation/pinctrl.txt
+> @@ -350,6 +350,23 @@ chip b:
+>   - GPIO range : [48 .. 55]
+>   - pin range  : [64 .. 71]
+>  
+> +The above examples assume the mapping between the GPIOs and pins is
+> +linear. If the mapping is sparse or haphazard, an array of arbitrary pin
+> +numbers can be encoded in the range like this:
+> +
+> +static const unsigned range_pins[] = { 14, 1, 22, 17, 10, 8, 6, 2 };
+> +
+> +static struct pinctrl_gpio_range gpio_range = {
+> +	.name = "chip",
+> +	.id = 0,
+> +	.base = 32,
+> +	.pins = &range_pins,
+> +	.npins = ARRAY_SIZE(range_pins),
+> +	.gc = &chip;
+> +};
+> +
+> +In this case the pin_base property will be ignored.
+> +
+>  When GPIO-specific functions in the pin control subsystem are called, these
+>  ranges will be used to look up the appropriate pin controller by inspecting
+>  and matching the pin to the pin ranges across all controllers. When a
+> @@ -357,9 +374,9 @@ pin controller handling the matching range is found, GPIO-specific functions
+>  will be called on that specific pin controller.
+>  
+>  For all functionalities dealing with pin biasing, pin muxing etc, the pin
+> -controller subsystem will subtract the range's .base offset from the passed
+> -in gpio number, and add the ranges's .pin_base offset to retrive a pin number.
+> -After that, the subsystem passes it on to the pin control driver, so the driver
+> +controller subsystem will look up the corresponding pin number from the passed
+> +in gpio number, and use the ranges internals to retrive a pin number. After
+> +that, the subsystem passes it on to the pin control driver, so the driver
+>  will get an pin number into its handled number range. Further it is also passed
+>  the range ID value, so that the pin controller knows which range it should
+>  deal with.
+> @@ -368,6 +385,7 @@ Calling pinctrl_add_gpio_range from pinctrl driver is DEPRECATED. Please see
+>  section 2.1 of Documentation/devicetree/bindings/gpio/gpio.txt on how to bind
+>  pinctrl and gpio drivers.
+>  
+> +
+>  PINMUX interfaces
+>  =================
+>  
+> -- 
+> 1.7.11.3
+> 
 
->
->Shawn
->
->> Cc: Arnd Bergmann <arnd@arndb.de>
->> Cc: stable at vger.kernel.org
->> ---
->>  arch/arm/kernel/smp_twd.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
->> index 90525d9..f6fd1d4 100644
->> --- a/arch/arm/kernel/smp_twd.c
->> +++ b/arch/arm/kernel/smp_twd.c
->> @@ -120,7 +120,7 @@ static int twd_rate_change(struct notifier_block
->*nb,
->>  	 * changing cpu.
->>  	 */
->>  	if (flags == POST_RATE_CHANGE)
->> -		smp_call_function(twd_update_frequency,
->> +		on_each_cpu(twd_update_frequency,
->>  				  (void *)&cnd->new_rate, 1);
->>
->>  	return NOTIFY_OK;
->> --
->> 1.7.10.4
->>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+  Christian Ruppert              ,          <christian.ruppert@abilis.com>
+                                /|
+  Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
+                             _// | bilis Systems   CH-1228 Plan-les-Ouates
