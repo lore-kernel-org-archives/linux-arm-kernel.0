@@ -1,100 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Jun 2013 11:01:52 +0100
-Subject: [PATCH v2 08/10] clocksource: exynos_mct: use
- (request/free)_irq calls for local timer registration
-In-Reply-To: <1371218572-8993-9-git-send-email-chander.kashyap@linaro.org>
-References: <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-1-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-9-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <20130617100152.GC6809@e106331-lin.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 17 Jun 2013 15:36:11 +0530
+Subject: [PATCH v10 2/2] ARM: edma: remove unused transfer controller handlers
+In-Reply-To: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
+References: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
+Message-ID: <1371463571-2578-3-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 03:02:50PM +0100, Chander Kashyap wrote:
-> Replace the (setup/remove)_irq calls for local timer registration with
-> (request/free)_irq calls. This generalizes the local timer registration API.
-> Suggested by Mark Rutland.
-> 
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> 
-> Replace the (setup/remove)_irq calls for local timer registration with
-> (request/free)_irq calls. This generalises the local timer registration API.
-> 
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+From: Matt Porter <mporter@ti.com>
 
-This looks much nicer now.
+Fix build on OMAP, the irqs are undefined on AM33xx.
+These error interrupt handlers were hardcoded as disabled
+so since they are unused code, simply remove them.
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Matt Porter <mporter@ti.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/common/edma.c |   37 -------------------------------------
+ 1 file changed, 37 deletions(-)
 
-> ---
->  drivers/clocksource/exynos_mct.c |   35 +++++++++--------------------------
->  1 file changed, 9 insertions(+), 26 deletions(-)
-> 
-> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
-> index 662fcc0..a704804 100644
-> --- a/drivers/clocksource/exynos_mct.c
-> +++ b/drivers/clocksource/exynos_mct.c
-> @@ -400,18 +400,6 @@ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
->  	return IRQ_HANDLED;
->  }
->  
-> -static struct irqaction mct_tick0_event_irq = {
-> -	.name		= "mct_tick0_irq",
-> -	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
-> -	.handler	= exynos4_mct_tick_isr,
-> -};
-> -
-> -static struct irqaction mct_tick1_event_irq = {
-> -	.name		= "mct_tick1_irq",
-> -	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
-> -	.handler	= exynos4_mct_tick_isr,
-> -};
-> -
->  static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->  {
->  	struct mct_clock_event_device *mevt;
-> @@ -435,16 +423,15 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->  	exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
->  
->  	if (mct_int_type == MCT_INT_SPI) {
-> -		if (cpu == 0) {
-> -			mct_tick0_event_irq.dev_id = mevt;
-> -			evt->irq = mct_irqs[MCT_L0_IRQ];
-> -			setup_irq(evt->irq, &mct_tick0_event_irq);
-> -		} else {
-> -			mct_tick1_event_irq.dev_id = mevt;
-> -			evt->irq = mct_irqs[MCT_L1_IRQ];
-> -			setup_irq(evt->irq, &mct_tick1_event_irq);
-> -			irq_set_affinity(evt->irq, cpumask_of(1));
-> +		evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
-> +		if (request_irq(evt->irq, exynos4_mct_tick_isr,
-> +				IRQF_TIMER | IRQF_NOBALANCING,
-> +				evt->name, mevt)) {
-> +			pr_err("exynos-mct: cannot register IRQ %d\n",
-> +				evt->irq);
-> +			return -EIO;
->  		}
-> +		irq_set_affinity(evt->irq, cpumask_of(cpu));
->  	} else {
->  		enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
->  	}
-> @@ -454,13 +441,9 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->  
->  static void exynos4_local_timer_stop(struct clock_event_device *evt)
->  {
-> -	unsigned int cpu = smp_processor_id();
->  	evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
->  	if (mct_int_type == MCT_INT_SPI)
-> -		if (cpu == 0)
-> -			remove_irq(evt->irq, &mct_tick0_event_irq);
-> -		else
-> -			remove_irq(evt->irq, &mct_tick1_event_irq);
-> +		free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
->  	else
->  		disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
->  }
-> -- 
-> 1.7.9.5
-> 
-> 
+diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
+index dcaeb8e..a1db6cd 100644
+--- a/arch/arm/common/edma.c
++++ b/arch/arm/common/edma.c
+@@ -494,26 +494,6 @@ static irqreturn_t dma_ccerr_handler(int irq, void *data)
+ 	return IRQ_HANDLED;
+ }
+ 
+-/******************************************************************************
+- *
+- * Transfer controller error interrupt handlers
+- *
+- *****************************************************************************/
+-
+-#define tc_errs_handled	false	/* disabled as long as they're NOPs */
+-
+-static irqreturn_t dma_tc0err_handler(int irq, void *data)
+-{
+-	dev_dbg(data, "dma_tc0err_handler\n");
+-	return IRQ_HANDLED;
+-}
+-
+-static irqreturn_t dma_tc1err_handler(int irq, void *data)
+-{
+-	dev_dbg(data, "dma_tc1err_handler\n");
+-	return IRQ_HANDLED;
+-}
+-
+ static int reserve_contiguous_slots(int ctlr, unsigned int id,
+ 				     unsigned int num_slots,
+ 				     unsigned int start_slot)
+@@ -1541,23 +1521,6 @@ static int __init edma_probe(struct platform_device *pdev)
+ 		arch_num_cc++;
+ 	}
+ 
+-	if (tc_errs_handled) {
+-		status = request_irq(IRQ_TCERRINT0, dma_tc0err_handler, 0,
+-					"edma_tc0", &pdev->dev);
+-		if (status < 0) {
+-			dev_dbg(&pdev->dev, "request_irq %d failed --> %d\n",
+-				IRQ_TCERRINT0, status);
+-			return status;
+-		}
+-		status = request_irq(IRQ_TCERRINT, dma_tc1err_handler, 0,
+-					"edma_tc1", &pdev->dev);
+-		if (status < 0) {
+-			dev_dbg(&pdev->dev, "request_irq %d --> %d\n",
+-				IRQ_TCERRINT, status);
+-			return status;
+-		}
+-	}
+-
+ 	return 0;
+ 
+ fail:
+-- 
+1.7.10.1
