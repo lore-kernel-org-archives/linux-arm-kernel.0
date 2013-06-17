@@ -1,66 +1,48 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 17 Jun 2013 18:46:39 -0400
-Subject: [GIT PULL] Keystone SOC support for 3.11
-In-Reply-To: <1371255346-3000-1-git-send-email-santosh.shilimkar@ti.com>
-References: <1371255346-3000-1-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <51BF91CF.9040509@ti.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Mon, 17 Jun 2013 15:47:40 -0700
+Subject: [PATCH] clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes
+Message-ID: <1371509260-2340-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+Zynq's Ethernet clocks are created by the following hierarchy:
+	mux0 ---> div0 ---> div1 ---> mux1 ---> gate
+Rate change requests on the gate have to propagate all the way up to
+div0 to properly leverage all dividers. Mux1 was missing the
+CLK_SET_RATE_PARENT flag, which is required to achieve this.
 
-On Friday 14 June 2013 08:15 PM, Santosh Shilimkar wrote:
-> The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
-> 
->   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git tags/keystone-soc-for-arm-soc
->
-Updated patches with your acks are pushed with the same tag as above.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ drivers/clk/zynq/clkc.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
- 
-> for you to fetch changes up to cc92fc07c26c1bec1abb58f0cd356b13dc00a28c:
-> 
->   ARM: dts: keystone: Add minimal Keystone SOC device tree data (2013-06-14 19:45:46 -0400)
-> 
-> ----------------------------------------------------------------
-> SOC support for Keystone II devices:
-> 
-> - Minimal machine and device-tree support with arch_timers and console UART
-> - Reboot hook using PLL reset
-> - Low level debug support using UART
-> - SMP boot support
-> 
-> ----------------------------------------------------------------
-> Santosh Shilimkar (3):
->       ARM: keystone: Add minimal TI Keystone platform support
->       ARM: keystone: Enable SMP support on Keystone machines
->       ARM: dts: keystone: Add minimal Keystone SOC device tree data
-> 
->  .../devicetree/bindings/arm/keystone/keystone.txt  |   10 ++
->  arch/arm/Kconfig                                   |    3 +
->  arch/arm/Kconfig.debug                             |   16 ++
->  arch/arm/Makefile                                  |    1 +
->  arch/arm/boot/dts/keystone.dts                     |  109 ++++++++++++++
->  arch/arm/configs/keystone_defconfig                |  157 ++++++++++++++++++++
->  arch/arm/include/debug/keystone.S                  |   43 ++++++
->  arch/arm/mach-keystone/Kconfig                     |   15 ++
->  arch/arm/mach-keystone/Makefile                    |    2 +
->  arch/arm/mach-keystone/Makefile.boot               |    1 +
->  arch/arm/mach-keystone/keystone.c                  |   77 ++++++++++
->  arch/arm/mach-keystone/keystone.h                  |   17 +++
->  arch/arm/mach-keystone/platsmp.c                   |   52 +++++++
->  13 files changed, 503 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/keystone/keystone.txt
->  create mode 100644 arch/arm/boot/dts/keystone.dts
->  create mode 100644 arch/arm/configs/keystone_defconfig
->  create mode 100644 arch/arm/include/debug/keystone.S
->  create mode 100644 arch/arm/mach-keystone/Kconfig
->  create mode 100644 arch/arm/mach-keystone/Makefile
->  create mode 100644 arch/arm/mach-keystone/Makefile.boot
->  create mode 100644 arch/arm/mach-keystone/keystone.c
->  create mode 100644 arch/arm/mach-keystone/keystone.h
->  create mode 100644 arch/arm/mach-keystone/platsmp.c
-> 
+diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+index 515a573..089d3e3 100644
+--- a/drivers/clk/zynq/clkc.c
++++ b/drivers/clk/zynq/clkc.c
+@@ -365,8 +365,9 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 			CLK_SET_RATE_PARENT, SLCR_GEM0_CLK_CTRL, 20, 6,
+ 			CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
+ 			&gem0clk_lock);
+-	clk = clk_register_mux(NULL, "gem0_emio_mux", gem0_mux_parents, 2, 0,
+-			SLCR_GEM0_CLK_CTRL, 6, 1, 0, &gem0clk_lock);
++	clk = clk_register_mux(NULL, "gem0_emio_mux", gem0_mux_parents, 2,
++			CLK_SET_RATE_PARENT, SLCR_GEM0_CLK_CTRL, 6, 1, 0,
++			&gem0clk_lock);
+ 	clks[gem0] = clk_register_gate(NULL, clk_output_name[gem0],
+ 			"gem0_emio_mux", CLK_SET_RATE_PARENT,
+ 			SLCR_GEM0_CLK_CTRL, 0, 0, &gem0clk_lock);
+@@ -387,8 +388,9 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 			CLK_SET_RATE_PARENT, SLCR_GEM1_CLK_CTRL, 20, 6,
+ 			CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
+ 			&gem1clk_lock);
+-	clk = clk_register_mux(NULL, "gem1_emio_mux", gem1_mux_parents, 2, 0,
+-			SLCR_GEM1_CLK_CTRL, 6, 1, 0, &gem1clk_lock);
++	clk = clk_register_mux(NULL, "gem1_emio_mux", gem1_mux_parents, 2,
++			CLK_SET_RATE_PARENT, SLCR_GEM1_CLK_CTRL, 6, 1, 0,
++			&gem1clk_lock);
+ 	clks[gem1] = clk_register_gate(NULL, clk_output_name[gem1],
+ 			"gem1_emio_mux", CLK_SET_RATE_PARENT,
+ 			SLCR_GEM1_CLK_CTRL, 0, 0, &gem1clk_lock);
+-- 
+1.8.3.1
