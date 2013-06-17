@@ -1,92 +1,41 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Jun 2013 15:40:58 -0700
-Subject: [PATCH v2] ARM: sched_clock: Load cycle count after epoch stabilizes
-Message-ID: <1371508858-23371-1-git-send-email-sboyd@codeaurora.org>
+From: heiko@sntech.de (Heiko =?utf-8?q?St=C3=BCbner?=)
+Date: Tue, 18 Jun 2013 00:43:11 +0200
+Subject: [PATCH 0/4] ARM: rockchip: add smp functionality
+Message-ID: <201306180043.11785.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a small race between when the cycle count is read from
-the hardware and when the epoch stabilizes. Consider this
-scenario:
+This series enables the use of the additional cores on Rockchip
+Cortex-A9 SoCs.
 
- CPU0                           CPU1
- ----                           ----
- cyc = read_sched_clock()
- cyc_to_sched_clock()
-                                 update_sched_clock()
-                                  ...
-                                  cd.epoch_cyc = cyc;
-  epoch_cyc = cd.epoch_cyc;
-  ...
-  epoch_ns + cyc_to_ns((cyc - epoch_cyc)
+To achieve this, add the scu, the needed sram and power-management-unit.
 
-The cyc on cpu0 was read before the epoch changed. But we
-calculate the nanoseconds based on the new epoch by subtracting
-the new epoch from the old cycle count. Since epoch is most likely
-larger than the old cycle count we calculate a large number that
-will be converted to nanoseconds and added to epoch_ns, causing
-time to jump forward too much.
+This is again new teritory for me, so I might've messed up something,
+but overall I'm happy to have gained a bit of smp understanding :-)
 
-Fix this problem by reading the hardware after the epoch has
-stabilized.
+This of course goes on top of the basic support series.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- kernel/time/sched_clock.c | 19 ++++++++-----------
- 1 file changed, 8 insertions(+), 11 deletions(-)
+Heiko Stuebner (4):
+  arm: rockchip: add snoop-control-unit
+  arm: rockchip: add sram dt nodes and documentation
+  arm: rockchip: add power-management-unit dt node
+  arm: rockchip: add smp bringup code
 
-diff --git a/kernel/time/sched_clock.c b/kernel/time/sched_clock.c
-index aad1ae6..a326f27 100644
---- a/kernel/time/sched_clock.c
-+++ b/kernel/time/sched_clock.c
-@@ -49,10 +49,14 @@ static inline u64 notrace cyc_to_ns(u64 cyc, u32 mult, u32 shift)
- 	return (cyc * mult) >> shift;
- }
- 
--static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
-+static unsigned long long notrace sched_clock_32(void)
- {
- 	u64 epoch_ns;
- 	u32 epoch_cyc;
-+	u32 cyc;
-+
-+	if (cd.suspended)
-+		return cd.epoch_ns;
- 
- 	/*
- 	 * Load the epoch_cyc and epoch_ns atomically.  We do this by
-@@ -68,7 +72,9 @@ static unsigned long long notrace cyc_to_sched_clock(u32 cyc, u32 mask)
- 		smp_rmb();
- 	} while (epoch_cyc != cd.epoch_cyc_copy);
- 
--	return epoch_ns + cyc_to_ns((cyc - epoch_cyc) & mask, cd.mult, cd.shift);
-+	cyc = read_sched_clock();
-+	cyc = (cyc - epoch_cyc) & sched_clock_mask;
-+	return epoch_ns + cyc_to_ns(cyc, cd.mult, cd.shift);
- }
- 
- /*
-@@ -160,19 +166,10 @@ void __init setup_sched_clock(u32 (*read)(void), int bits, unsigned long rate)
- 	pr_debug("Registered %pF as sched_clock source\n", read);
- }
- 
--static unsigned long long notrace sched_clock_32(void)
--{
--	u32 cyc = read_sched_clock();
--	return cyc_to_sched_clock(cyc, sched_clock_mask);
--}
--
- unsigned long long __read_mostly (*sched_clock_func)(void) = sched_clock_32;
- 
- unsigned long long notrace sched_clock(void)
- {
--	if (cd.suspended)
--		return cd.epoch_ns;
--
- 	return sched_clock_func();
- }
- 
+ .../devicetree/bindings/arm/rockchip/pmu.txt       |   16 +++
+ .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   29 ++++
+ arch/arm/boot/dts/rk3066a.dtsi                     |   24 ++++
+ arch/arm/mach-rockchip/Kconfig                     |    1 +
+ arch/arm/mach-rockchip/Makefile                    |    1 +
+ arch/arm/mach-rockchip/core.h                      |   22 +++
+ arch/arm/mach-rockchip/headsmp.S                   |   32 +++++
+ arch/arm/mach-rockchip/platsmp.c                   |  145 ++++++++++++++++++++
+ arch/arm/mach-rockchip/rockchip.c                  |    2 +
+ 9 files changed, 272 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+ create mode 100644 arch/arm/mach-rockchip/core.h
+ create mode 100644 arch/arm/mach-rockchip/headsmp.S
+ create mode 100644 arch/arm/mach-rockchip/platsmp.c
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+1.7.10.4
