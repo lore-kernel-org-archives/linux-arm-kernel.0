@@ -1,73 +1,40 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 17 Jun 2013 21:21:08 +0200
-Subject: [PATCH 2/2] gpio-rcar: Remove #ifdef CONFIG_OF around OF-specific
- sections
-In-Reply-To: <51BF612B.6030900@cogentembedded.com>
-References: <1371496527-13149-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <1371496527-13149-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
- <51BF612B.6030900@cogentembedded.com>
-Message-ID: <2696904.tcjoE5nNPq@avalon>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Mon, 17 Jun 2013 21:36:44 +0200
+Subject: [RFC PATCH 09/11] spi: s3c64xx: Do not require legacy DMA API in
+ case of S3C64XX
+In-Reply-To: <20130617160630.GF1403@sirena.org.uk>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdb8V7pYVnOWOAJ6iG8_-jyeutq5W95+OCO4RLOv9EDjyg@mail.gmail.com>
+ <20130617160630.GF1403@sirena.org.uk>
+Message-ID: <6736155.CBigTcsD4z@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013 23:19:07 Sergei Shtylyov wrote:
-> Hello.
+On Monday 17 of June 2013 17:06:30 Mark Brown wrote:
+> On Mon, Jun 17, 2013 at 03:59:39PM +0200, Linus Walleij wrote:
+> > On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> 
+wrote:
+> > > -       select S3C64XX_DMA if ARCH_S3C64XX
+> > > +       select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
+> > 
+> > I guess this means the SPI driver does not work without DMA.
+> > But is the SPI driver already augmented to handle generic DMA engine?
 > 
-> On 06/17/2013 11:15 PM, Laurent Pinchart wrote:
-> > All functions and data types used by OF-specific code paths are declared
-> > in <linux/of.h> regardless of CONFIG_OF. Replace the #ifdef CONFIG_OF
-> > guard with a if(IS_SELECTED(CONFIG_OF)) and let the compiler optimize
-> 
->     You're using IS_ENABLED() actually.
+> > Anyway:
+> Yes, the driver currently relies on DMA.  There are some pending patches
+> for non-DMA operation that I need to test.  To be honest for both this
+> and the ASoC driver I'd be more inclined to just either select or
+> depend on the DMA controller rather than leaving the option of using
+> the old code.
 
-Oops. We should fix gcc to check the commit messages :-)
+Well, I just left this for the purpose of this RFC, so testing things on 
+both drivers would be possible (to see if any problems are caused by new 
+driver or just by things that don't work).
 
-Simon, could you fix this while applying, or should I resubmit ?
+If this driver turns out to be working correctly, I will happily remove 
+the old private one and after s3c24xx moves to Heiko's DMA engine driver 
+(or as it already moved?) we will be able to completely drop the private 
+s3c-dma API.
 
-> > the unused code away.
-> > 
-> > Signed-off-by: Laurent Pinchart
-> > <laurent.pinchart+renesas@ideasonboard.com>
-> > ---
-> > 
-> >   drivers/gpio/gpio-rcar.c | 8 ++------
-> >   1 file changed, 2 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/drivers/gpio/gpio-rcar.c b/drivers/gpio/gpio-rcar.c
-> > index 5a693dd..7fd09ef 100644
-> > --- a/drivers/gpio/gpio-rcar.c
-> > +++ b/drivers/gpio/gpio-rcar.c
-> > @@ -279,16 +279,13 @@ static struct irq_domain_ops
-> > gpio_rcar_irq_domain_ops = {> 
-> >   static void gpio_rcar_parse_pdata(struct gpio_rcar_priv *p)
-> >   {
-> >   
-> >   	struct gpio_rcar_config *pdata = p->pdev->dev.platform_data;
-> > 
-> > -#ifdef CONFIG_OF
-> > 
-> >   	struct device_node *np = p->pdev->dev.of_node;
-> >   	struct of_phandle_args args;
-> >   	int ret;
-> > 
-> > -#endif
-> > 
-> > -	if (pdata)
-> > +	if (pdata) {
-> > 
-> >   		p->config = *pdata;
-> > 
-> > -#ifdef CONFIG_OF
-> > -	else if (np) {
-> > +	} else if (IS_ENABLED(CONFIG_OF) && np) {
-> > 
-> >   		ret = of_parse_phandle_with_args(np, "gpio-ranges",
-> >   		
-> >   				"#gpio-range-cells", 0, &args);
-> >   		
-> >   		p->config.number_of_pins = ret == 0 && args.args_count == 3
-
--- 
-Regards,
-
-Laurent Pinchart
+Best regards,
+Tomasz
