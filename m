@@ -1,49 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Jun 2013 01:27:24 -0700
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <CACVXFVMthQNgAe3QhMo8HUxuEYcFSOwsdb7RfAsFqwGFKL+dXA@mail.gmail.com>
-References: <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
- <20130612163124.GD8164@atomide.com>
- <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
- <51B99B07.1050806@ti.com>
- <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
- <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
- <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
- <CACVXFVMthQNgAe3QhMo8HUxuEYcFSOwsdb7RfAsFqwGFKL+dXA@mail.gmail.com>
-Message-ID: <20130617082724.GI20992@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jun 2013 09:26:03 +0100
+Subject: [PATCH v5] arm: Preserve the user r/w register TPIDRURW on
+ context switch and fork
+In-Reply-To: <51B22F01.3030905@arm.com>
+References: <519D32E2.5050102@dawncrow.de> <51B22F01.3030905@arm.com>
+Message-ID: <20130617082603.GA2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ming Lei <tom.leiming@gmail.com> [130617 01:22]:
-> On Mon, Jun 17, 2013 at 4:06 PM, Arnaud Patard
-> <arnaud.patard@rtp-net.org> wrote:
-> > Sricharan R <r.sricharan@ti.com> writes:
-> >
-> > I hoped to have missed some mails and that people were testing pandabard
-> > support with full support but given what I see, the ethernet support is
-> > not there yet. This thread is about removing the non-DT boot. I see some
-> > contradiction here. Please, look again at what Thomas said in the IGEP thread:
-> > breaking existing support is bad and removing non-DT boot for panda with
-> > not-working ethernet would exactly to that.
-> 
-> +1
-> 
-> Even no any USB support on Sricharan's setting.
+On Fri, Jun 07, 2013 at 08:05:37PM +0100, Jonathan Austin wrote:
+> The next step is to put it in to Russell's patch system. This is the way  
+> Russell manages (small/non-pull-request) things that need to go in to  
+> his tree.
 
-That's also related to the auxclk. Let's see what Mike says before
-we start adding back any legacy hacks for it. 
+And I'm going to drop this patch:
 
-> > Yeah, I'm aware that some extra patches are being developped like the
-> > omap clocks one: https://patchwork.kernel.org/patch/2541331/ but they
-> > don't seem to be in -next. So, again, please, wait that all needed bits
-> > are merged mainline before killing non-DT support (or provide 'mixed'
-> > support like what is/was done on kirkwood)
-> 
-> Agree, please don't be too quick, :-)
+arch/arm/kernel/entry-armv.S:692: Error: selected processor does not support ARM mode `ldrd r4,r5,[r2,#96]'
 
-Too quick? The basic DT based booting has been working for a few years
-now to some extent on omaps :)
-
-Regards,
-
-Tony
+LDRD is not supported on all the CPUs we have...
