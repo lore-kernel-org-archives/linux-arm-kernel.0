@@ -1,28 +1,68 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon, 17 Jun 2013 13:59:48 -0700
-Subject: [PATCH v2] staging: imx_drm: imx_ldb: fix 18 bit format
-In-Reply-To: <1371459772-16443-1-git-send-email-s.trumtrar@pengutronix.de>
-References: <1371459772-16443-1-git-send-email-s.trumtrar@pengutronix.de>
-Message-ID: <20130617205948.GA3018@kroah.com>
+From: oliver+list@schinagl.nl (Oliver Schinagl)
+Date: Mon, 17 Jun 2013 22:59:36 +0200
+Subject: [PATCH 0/2] v4 Driver for Allwinner sunxi Security ID
+Message-ID: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 11:02:52AM +0200, Steffen Trumtrar wrote:
-> From: Markus Niebel <Markus.Niebel@tqs.de>
-> 
-> Since 18 bit is supported as datawidth in device tree it should be
-> supported in driver. Beside the LDB channel the IPU channel has also
-> to be configured to use BGR666.
-> 
-> Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
-> Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> Tested-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
-> This is based on the series: "staging: drm/imx: Add LDB support" by Philipp.
+Note, this is a resent because i messed up the first send.
 
-I don't seem to have that series in my queue anywhere, can someone
-please resend it, and this patch, so that I can apply them?
+Changes from v3:
+  * Cleanup comments
+  * Remove last byte masking and useless casting, the C standard guarntees
+    we are ok
+  * Removed some complexity from sid_read, thanks to Russel
+  * Replace dev_info with dev_dbg reducing the verbosity
+  * Removed driver version
+  * Reorderd variable declrations based on usage, return value always last
+  * Removed all goto in exchange for return, due to popular request
+  * Reduced line count by removing extra lines
 
-thanks,
+Changes from v2:
+  * Removed the global pointer, we can change that when the need for external
+    access arises
+  * Fixed header inclusions
+  * Corrected if guards. There where some crude mistakes there
+  * Changed offset to an unsigned int so we don't have to worry about negatives
+  * Cleaned up variable declarations
+  * Changed ret value, ENXIO (No device/io) as that better matches a missing dt
+  * Made the loading informercial print version so it is somewhat usefull
 
-greg k-h
+Changes from v1:
+  * Renamed the sys-fs exported key to eeprom, since it really a read-only eeprom
+  * Removed mention of sun[67]i since we haven't tested those
+  * Fixed up mistakes in comments
+  * Removed PAGE_SIZE references, since this is a binary only driver
+  * Removed lookup table and calculate offsets better
+  * Use proper endianess
+  * Add the SID to seed the kernel entropy pool
+  * Rewrite probe to use platform_get_resource/devm_ioremap_resource instead
+
+The Allwinner A-series of SoC's have efuses exposed via registers to read the
+factory programmed e-fuses. These should in theory be programmable but this is
+still to be confirmed. It does appear that these fuses are unique enough to be
+used as serial numbers, RSA keys, generate MAC addresses from etc. If it turns
+out to be user programmable, the use obviously increases. Allwinner did use the
+fuses initially to determine the chip-type.
+
+This driver supports all currently known chips based on datasheets and 'dumped'
+drivers that we have so far, the dts is only implemented for known chips.
+
+It has been tested on a Cubieboard 1
+
+This is my very first driver so please try to be gentle 
+
+Oliver Schinagl (2):
+  Initial support for Allwinner's Security ID fuses
+  Add sunxi-sid to dts for sun4i and sun5i
+
+ arch/arm/boot/dts/sun4i-a10.dtsi |   5 ++
+ arch/arm/boot/dts/sun5i-a13.dtsi |   5 ++
+ drivers/misc/eeprom/Kconfig      |  17 +++++
+ drivers/misc/eeprom/Makefile     |   1 +
+ drivers/misc/eeprom/sunxi_sid.c  | 147 +++++++++++++++++++++++++++++++++++++++
+ 5 files changed, 175 insertions(+)
+ create mode 100644 drivers/misc/eeprom/sunxi_sid.c
+
+-- 
+1.8.1.5
