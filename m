@@ -1,48 +1,46 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Mon, 17 Jun 2013 15:47:40 -0700
-Subject: [PATCH] clk/zynq/clkc: Add CLK_SET_RATE_PARENT flag to ethernet muxes
-Message-ID: <1371509260-2340-1-git-send-email-soren.brinkmann@xilinx.com>
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 17 Jun 2013 15:58:28 -0700
+Subject: [PATCH v2] ARM: sched_clock: Load cycle count after epoch
+ stabilizes
+In-Reply-To: <1371508858-23371-1-git-send-email-sboyd@codeaurora.org>
+References: <1371508858-23371-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <51BF9494.9000209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Zynq's Ethernet clocks are created by the following hierarchy:
-	mux0 ---> div0 ---> div1 ---> mux1 ---> gate
-Rate change requests on the gate have to propagate all the way up to
-div0 to properly leverage all dividers. Mux1 was missing the
-CLK_SET_RATE_PARENT flag, which is required to achieve this.
+On 06/17/2013 03:40 PM, Stephen Boyd wrote:
+> There is a small race between when the cycle count is read from
+> the hardware and when the epoch stabilizes. Consider this
+> scenario:
+>
+>   CPU0                           CPU1
+>   ----                           ----
+>   cyc = read_sched_clock()
+>   cyc_to_sched_clock()
+>                                   update_sched_clock()
+>                                    ...
+>                                    cd.epoch_cyc = cyc;
+>    epoch_cyc = cd.epoch_cyc;
+>    ...
+>    epoch_ns + cyc_to_ns((cyc - epoch_cyc)
+>
+> The cyc on cpu0 was read before the epoch changed. But we
+> calculate the nanoseconds based on the new epoch by subtracting
+> the new epoch from the old cycle count. Since epoch is most likely
+> larger than the old cycle count we calculate a large number that
+> will be converted to nanoseconds and added to epoch_ns, causing
+> time to jump forward too much.
+>
+> Fix this problem by reading the hardware after the epoch has
+> stabilized.
+>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/clk/zynq/clkc.c | 10 ++++++----
- 1 file changed, 6 insertions(+), 4 deletions(-)
+Thanks for the resend here.
 
-diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
-index 515a573..089d3e3 100644
---- a/drivers/clk/zynq/clkc.c
-+++ b/drivers/clk/zynq/clkc.c
-@@ -365,8 +365,9 @@ static void __init zynq_clk_setup(struct device_node *np)
- 			CLK_SET_RATE_PARENT, SLCR_GEM0_CLK_CTRL, 20, 6,
- 			CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
- 			&gem0clk_lock);
--	clk = clk_register_mux(NULL, "gem0_emio_mux", gem0_mux_parents, 2, 0,
--			SLCR_GEM0_CLK_CTRL, 6, 1, 0, &gem0clk_lock);
-+	clk = clk_register_mux(NULL, "gem0_emio_mux", gem0_mux_parents, 2,
-+			CLK_SET_RATE_PARENT, SLCR_GEM0_CLK_CTRL, 6, 1, 0,
-+			&gem0clk_lock);
- 	clks[gem0] = clk_register_gate(NULL, clk_output_name[gem0],
- 			"gem0_emio_mux", CLK_SET_RATE_PARENT,
- 			SLCR_GEM0_CLK_CTRL, 0, 0, &gem0clk_lock);
-@@ -387,8 +388,9 @@ static void __init zynq_clk_setup(struct device_node *np)
- 			CLK_SET_RATE_PARENT, SLCR_GEM1_CLK_CTRL, 20, 6,
- 			CLK_DIVIDER_ONE_BASED | CLK_DIVIDER_ALLOW_ZERO,
- 			&gem1clk_lock);
--	clk = clk_register_mux(NULL, "gem1_emio_mux", gem1_mux_parents, 2, 0,
--			SLCR_GEM1_CLK_CTRL, 6, 1, 0, &gem1clk_lock);
-+	clk = clk_register_mux(NULL, "gem1_emio_mux", gem1_mux_parents, 2,
-+			CLK_SET_RATE_PARENT, SLCR_GEM1_CLK_CTRL, 6, 1, 0,
-+			&gem1clk_lock);
- 	clks[gem1] = clk_register_gate(NULL, clk_output_name[gem1],
- 			"gem1_emio_mux", CLK_SET_RATE_PARENT,
- 			SLCR_GEM1_CLK_CTRL, 0, 0, &gem1clk_lock);
--- 
-1.8.3.1
+I've got this in my tree and unless I get an objection in the next day 
+or so, I'll send it on to Thomas.
+
+thanks
+-john
