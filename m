@@ -1,81 +1,90 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Jun 2013 09:59:47 -0700
-Subject: [GIT PULL] at91: soc updates for 3.11 #1
-In-Reply-To: <EABCC4A72A203F4BA2E04297CF0282C427D1E1F8@hnombx01.corp.atmel.com>
-References: <1371246138-22207-1-git-send-email-nicolas.ferre@atmel.com>
- <20130615023702.GA8635@quad.lixom.net>
- <EABCC4A72A203F4BA2E04297CF0282C427D1E1F8@hnombx01.corp.atmel.com>
-Message-ID: <CAOesGMixxxUg-9h9KFNxAvp8DSNJN-SEQxXnU51BQJ9cAxSGBw@mail.gmail.com>
+Date: Mon, 17 Jun 2013 10:03:26 -0700
+Subject: [PATCH v10 1/2] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <1371463571-2578-2-git-send-email-nsekhar@ti.com>
+References: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
+ <1371463571-2578-2-git-send-email-nsekhar@ti.com>
+Message-ID: <20130617170326.GA28497@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 2:20 AM, Ferre, Nicolas <Nicolas.FERRE@atmel.com> wrote:
-> From: Olof Johansson [olof at lixom.net]
->>Hi,
->>
->>On Fri, Jun 14, 2013 at 11:42:18PM +0200, Nicolas Ferre wrote:
->>> Arnd, Olof,
->>>
->>> A little AT91 pull-request for patches that are more targeted to SoC/boards
->>> modifications. It is prepared on top of the arm-soc/at91/cleanup branch.
->>>
->>> Thanks, best regards,
->>>
->>> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
->>>
->>>   ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
->>>
->>> are available in the git repository at:
->>>
->>>   git://github.com/at91linux/linux-at91.git tags/at91-soc
->>>
->>> for you to fetch changes up to 7e75545ea7fb972c3da759f92c3d0be84d1cee72:
->>>
->>>   ARM: at91: drop rm9200dk board support (2013-06-14 23:34:11 +0200)
->>>
->>> ----------------------------------------------------------------
->>> Two non critical fixes that can go in 3.11.
->>> An old board removed.
->>>
->>> ----------------------------------------------------------------
->>> Alexandre Belloni (1):
->>>       ARM: at91: Fix link breakage when !CONFIG_PHYLIB
->>
->>Fix
->>
->>> Jean-Christophe PLAGNIOL-VILLARD (1):
->>>       ARM: at91: drop rm9200dk board support
->>
->>Cleanup
->>
->>> Wenyou Yang (1):
->>>       ARM: at91: Change the internal SRAM memory type MT_MEMORY_NONCACHED
->>
->>Fix
->>
->>...assuming, of course, that none of the fixes are for errors introduced in
->>some branch we already pulled, since then they should go on top of that branch.
->
-> I do agree with you but:
-> 1/ the fixes are non-critical ones, so I do not see the need for another branch
+On Mon, Jun 17, 2013 at 03:36:10PM +0530, Sekhar Nori wrote:
+> From: Matt Porter <mporter@ti.com>
+> 
+> Move mach-davinci/dma.c to common/edma.c so it can be used
+> by OMAP (specifically AM33xx) as well.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Acked-by: Chris Ball <cjb@laptop.org> # davinci_mmc.c
+> [nsekhar at ti.com: dropped davinci sffsdr changes]
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 
-We're happy to take branches with fixes that are not needed for
-current release and queue them for the next one. We tend to merge
-those into next/fixes-non-critical.
+Acked-by: Olof Johansson <olof@lixom.net>
 
-> 2/ I didn't feel like touching the "cleanup" branch because we want to base all our 3.11 material on top of it, without adding new patches on top.
+Tiny nit below, no need to respin just for that.
 
-Adding new patches on top of a branch that is a base for something
-else is just fine, and is the way you're supposed to do things. You
-don't have to rebase the dependent branches just because they're not
-based on the tip of the cleanup tree any more. I.e. just send another
-pull request for "cleanups2" or whatever, that's based on the old
-cleanups branch/tag. After that, cleanups3 would be based on
-cleanups2. Etc. Some platforms do this a lot.
+I suppose we should take this through arm-soc.
 
-Of course, that assumes that the additional cleanups don't conflict
-heavy with the later dependent branches like I already said. I don't
-think that was the case this time?
+> ---
+>  arch/arm/Kconfig                                   |    1 +
+>  arch/arm/common/Kconfig                            |    3 +
+>  arch/arm/common/Makefile                           |    1 +
+>  arch/arm/{mach-davinci/dma.c => common/edma.c}     |    2 +-
+>  arch/arm/mach-davinci/Makefile                     |    2 +-
+>  arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
+>  arch/arm/mach-davinci/davinci.h                    |    2 +-
+>  arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
+>  arch/arm/mach-davinci/devices.c                    |    6 +-
+>  arch/arm/mach-davinci/dm355.c                      |    2 +-
+>  arch/arm/mach-davinci/dm365.c                      |    2 +-
+>  arch/arm/mach-davinci/dm644x.c                     |    2 +-
+>  arch/arm/mach-davinci/dm646x.c                     |    2 +-
+>  arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
+>  drivers/dma/edma.c                                 |    2 +-
+>  drivers/mmc/host/davinci_mmc.c                     |    1 +
+>  include/linux/mfd/davinci_voicecodec.h             |    3 +-
+>  .../mach => include/linux/platform_data}/edma.h    |   89 +-------------------
+>  include/linux/platform_data/spi-davinci.h          |    2 +-
+>  sound/soc/davinci/davinci-evm.c                    |    1 +
+>  sound/soc/davinci/davinci-pcm.c                    |    1 +
+>  sound/soc/davinci/davinci-pcm.h                    |    2 +-
+>  22 files changed, 29 insertions(+), 103 deletions(-)
+>  rename arch/arm/{mach-davinci/dma.c => common/edma.c} (99%)
+>  rename {arch/arm/mach-davinci/include/mach => include/linux/platform_data}/edma.h (59%)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 49d993c..b1c66a4 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -840,6 +840,7 @@ config ARCH_DAVINCI
+>  	select GENERIC_IRQ_CHIP
+>  	select HAVE_IDE
+>  	select NEED_MACH_GPIO_H
+> +	select TI_PRIV_EDMA
 
+What does PRIV here mean? Privileged? Private? I think it can be shortened to
+TI_EDMA.
 
--Olof
+>  	select USE_OF
+>  	select ZONE_DMA
+>  	help
+> diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+> index 9353184..c3a4e9c 100644
+> --- a/arch/arm/common/Kconfig
+> +++ b/arch/arm/common/Kconfig
+> @@ -17,3 +17,6 @@ config SHARP_PARAM
+>  
+>  config SHARP_SCOOP
+>  	bool
+> +
+> +config TI_PRIV_EDMA
+> +	bool
+> diff --git a/arch/arm/common/Makefile b/arch/arm/common/Makefile
+> index 48434cb..8c60f47 100644
+> --- a/arch/arm/common/Makefile
+> +++ b/arch/arm/common/Makefile
+> @@ -16,3 +16,4 @@ obj-$(CONFIG_ARM_TIMER_SP804)	+= timer-sp.o
+>  obj-$(CONFIG_MCPM)		+= mcpm_head.o mcpm_entry.o mcpm_platsmp.o vlock.o
+>  AFLAGS_mcpm_head.o		:= -march=armv7-a
+>  AFLAGS_vlock.o			:= -march=armv7-a
+> +obj-$(CONFIG_TI_PRIV_EDMA)	+= edma.o
