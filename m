@@ -1,47 +1,65 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 12:38:45 +0900
-Subject: [GIT PULL 0/2 v2] Renesas sh-sci updates for v3.11
-Message-ID: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 17 Jun 2013 12:38:47 +0900
+Subject: [PATCH 2/2] ARM: shmobile: r8a7790: don't use external clock for SCIFs
+In-Reply-To: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371440327-30512-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Ulrich Hecht <ulrich.hecht@gmail.com>
 
-As requested the first patch is now includes an ack from Greg Kroah-Hartman.
+This is an external component and may or may not be there, while the
+internal clock always works.
 
-I have included the r8a7790 change in this patch as it
-depends on the first change in the pull-request but nothing else.
+Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/mach-shmobile/setup-r8a7790.c |   16 ++++++++++++++--
+ 1 file changed, 14 insertions(+), 2 deletions(-)
 
-This pull request will cause some conflicts though I believe all
-of them are not difficult to resolve. The renesas-next-20130613 tag in
-my tree illustrates how I have handled the conflicts with
-both changes already in arm-soc and changes I intend to send
-pull requests for in the near future.
-
-The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-
-  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh-sci-for-v3.11
-
-for you to fetch changes up to fe0b1091e41e0acae8ddf2da2a5a36b6867ff012:
-
-  ARM: shmobile: r8a7790: don't use external clock for SCIFs (2013-06-17 12:17:48 +0900)
-
-----------------------------------------------------------------
-Renesas sh-sci updates for v3.11
-
-HSCIF support by Ulrich Hecht.
-
-----------------------------------------------------------------
-Ulrich Hecht (2):
-      serial: sh-sci: HSCIF support
-      ARM: shmobile: r8a7790: don't use external clock for SCIFs
-
- arch/arm/mach-shmobile/setup-r8a7790.c |   16 ++++-
- drivers/tty/serial/sh-sci.c            |  102 +++++++++++++++++++++++++++++---
- include/linux/serial_sci.h             |   12 +++-
- include/uapi/linux/serial_core.h       |    3 +
- 4 files changed, 120 insertions(+), 13 deletions(-)
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index 49de2d5..6531f3d 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -64,10 +64,18 @@ void __init r8a7790_pinmux_init(void)
+ [index] = {						\
+ 	SCIF_COMMON(PORT_SCIF, baseaddr, irq),		\
+ 	.scbrr_algo_id	= SCBRR_ALGO_2,			\
+-	.scscr = SCSCR_RE | SCSCR_TE | SCSCR_CKE1,	\
++	.scscr = SCSCR_RE | SCSCR_TE,	\
+ }
+ 
+-enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1 };
++#define HSCIF_DATA(index, baseaddr, irq)		\
++[index] = {						\
++	SCIF_COMMON(PORT_HSCIF, baseaddr, irq),		\
++	.scbrr_algo_id	= SCBRR_ALGO_6,			\
++	.scscr = SCSCR_RE | SCSCR_TE,	\
++}
++
++enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1,
++       HSCIF0, HSCIF1 };
+ 
+ static const struct plat_sci_port scif[] = {
+ 	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
+@@ -78,6 +86,8 @@ static const struct plat_sci_port scif[] = {
+ 	SCIFA_DATA(SCIFA2, 0xe6c60000, gic_spi(151)), /* SCIFA2 */
+ 	SCIF_DATA(SCIF0, 0xe6e60000, gic_spi(152)), /* SCIF0 */
+ 	SCIF_DATA(SCIF1, 0xe6e68000, gic_spi(153)), /* SCIF1 */
++	HSCIF_DATA(HSCIF0, 0xe62c0000, gic_spi(154)), /* HSCIF0 */
++	HSCIF_DATA(HSCIF1, 0xe62c8000, gic_spi(155)), /* HSCIF1 */
+ };
+ 
+ static inline void r8a7790_register_scif(int idx)
+@@ -115,6 +125,8 @@ void __init r8a7790_add_standard_devices(void)
+ 	r8a7790_register_scif(SCIFA2);
+ 	r8a7790_register_scif(SCIF0);
+ 	r8a7790_register_scif(SCIF1);
++	r8a7790_register_scif(HSCIF0);
++	r8a7790_register_scif(HSCIF1);
+ 	r8a7790_register_irqc(0);
+ }
+ 
+-- 
+1.7.10.4
