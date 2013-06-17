@@ -1,32 +1,31 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 17 Jun 2013 11:27:19 -0700
-Subject: [v1 2/3] ata: ahci_platform: enable imx6q ahci sata support
-In-Reply-To: <1371462767-16630-3-git-send-email-r65037@freescale.com>
-References: <1371462767-16630-1-git-send-email-r65037@freescale.com>
- <1371462767-16630-3-git-send-email-r65037@freescale.com>
-Message-ID: <CAOS58YM+ih4vLD8v5u08FS0JMcrwYNHo31zOmDd5VAed+NKbtg@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon, 17 Jun 2013 11:27:49 -0700
+Subject: [PATCH/RESEND 01/12] msm_serial: Convert to clk_prepare/unprepare
+In-Reply-To: <20130617180728.GA21158@codeaurora.org>
+References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
+ <1371490999-15501-2-git-send-email-sboyd@codeaurora.org>
+ <20130617175510.GA15370@kroah.com>
+ <20130617180728.GA21158@codeaurora.org>
+Message-ID: <20130617182749.GA15627@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 2:52 AM, Richard Zhu
-<richard.zhuhongxing@gmail.com> wrote:
-> imx6q contains the Synopsys AHCI SATA controller which shares
-> ahci_platform driver with other controllers.
->
-> This patch updates the DT compatible list for ahci_platform,
-> and enable the imx6q ahci sata support.
->
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
+On Mon, Jun 17, 2013 at 11:07:28AM -0700, David Brown wrote:
+> On Mon, Jun 17, 2013 at 10:55:10AM -0700, Greg Kroah-Hartman wrote:
+> >On Mon, Jun 17, 2013 at 10:43:08AM -0700, Stephen Boyd wrote:
+> >>Add calls to clk_prepare and unprepare so that MSM can migrate to
+> >>the common clock framework.
+> >>
+> >>Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >>Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> >
+> >Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> >
+> >Or do you want me to take the serial ones through my tree?  It's your
+> >choice, either is fine for me.
+> 
+> I can go ahead and pull them through the MSM tree.
 
-I suppose this better be routed with the rest of the series through
-the arch tree?  If not, please let me know.
+Please do, thanks.
 
-Acked-by: Tejun Heo <tj@kernel.org>
-
-There probably will be a merge conflict but it's gonna be very
-trivial, so no worries.
-
-Thanks.
-
---
-tejun
+greg k-h
