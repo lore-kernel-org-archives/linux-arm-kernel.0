@@ -1,74 +1,180 @@
-From: oliver+list@schinagl.nl (Oliver Schinagl)
-Date: Mon, 17 Jun 2013 13:32:33 +0200
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <20130617112459.GD2718@n2100.arm.linux.org.uk>
-References: <1371251781-17167-1-git-send-email-oliver+list@schinagl.nl>
- <1371251781-17167-2-git-send-email-oliver+list@schinagl.nl>
- <2828921.i3T9JhMInt@flatron> <51BEE6BF.30401@schinagl.nl>
- <20130617112459.GD2718@n2100.arm.linux.org.uk>
-Message-ID: <51BEF3D1.8050305@schinagl.nl>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 17 Jun 2013 20:38:34 +0900
+Subject: [PATCH v3 01/10] ARM: dts: fork out common Exynos5 nodes
+In-Reply-To: <1371466836-4111-2-git-send-email-chander.kashyap@linaro.org>
+References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
+ <1371466836-4111-2-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1a0001ce6b4f$334cc260$99e64720$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-06-13 13:25, Russell King - ARM Linux wrote:
-> On Mon, Jun 17, 2013 at 12:36:47PM +0200, Oliver Schinagl wrote:
->> On 15-06-13 12:28, Tomasz Figa wrote:
->>> What is this version thingy?
->>>
->>> Is there a versioning scheme defined for this driver? Do you expect it to
->>> be changed every modification of this driver?
->>>
->>> I don't see any point of having such thing in a project with a version
->>> control system, where you have all change history.
->> Well we export something to userspace, while trivial there is the
->> possibility it changes over time. Say A40 which outputs 256 bits instead
->> of the current 128 bits. That would validate a bump in version number.
->> It's purely so the user can be aware of differences in the driver. So
->> maybe DRV_A[BP]I_VERSION would be better?
->
-> What is better to do is to export such things as properties, or
-> design the API in such a way that the length of the ID is reportable.
->
-> However, it's actually quite easy to do if you only care about the
-> number of bytes - you just arrange for the read() function to return
-> the number of bytes read.  So in the case of 128 bits available, that's
-> 16 bytes, so a read() of the sysfs attribute with a buffer of (say)
-> 256 bytes should report only 16 bytes read.
->
-> If it were to become 256 bytes later, then the read() would return
-> 32 bytes read.  So there's no need for any new APIs to do this.
-That makes sense for the sysfs bit and as the only user, I guess makes 
-the version information obsolete for now.
->
-> Also, this is over-complicated:
->
-> +       for (i = 0; i < size; i++) {
-> +               if ((pos + i) >= SID_SIZE || (pos < 0))
-> +                       break;
-> +               buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
-> +       }
->
-> Maybe:
-> 	if (pos < 0 || pos >= SID_SIZE)
-> 		return 0;
-> 	if (size > SID_SIZE - pos)
-> 		size = SID_SIZE - pos;
->
-> 	for (i = 0; i < size; i++)
-> 		buf[i] = sunxi_sid_read_byte(sid_reg_base, pos + i);
->
-> 	return size;
->
-I do like your approach, but takes a second to read ;) How is it less 
-complicated though? It's more LOC i suppose. I do appreciate that we 
-only perform the read function when our size is correct, thus making the 
-for loop only execute the minimally required code. While in this driver 
-is insignificant and not important, I am a proponent of it.
-Consider it changed.
+Chander Kashyap wrote:
+> 
+> In preparation of adding support for Exynos5420, which has many
+> peripherals
+> similar to Exynos5250, a new common Exynos5 device tree source file is
+> created out of the exising Exynos5250 device tree source file. Only the
+> common nodes required for basic boot up on Exynos5420 based boards are
+> moved
+> into this new file and the rest of the common nodes would be moved
+> subsequently.
+> 
+Yeah, most of exynos5250 is used in exynos5420. Since created exynos5.dtsi
+cannot support exynos5440 so that would be helpful if you could add some
+comments in git log and codes about that.
 
-Will wait a bit for Thomaz to optionally reply and then send yet a 
-nother version ;)
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> ---
+>  arch/arm/boot/dts/exynos5.dtsi    |  111
+> +++++++++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/exynos5250.dtsi |   68 +----------------------
+>  2 files changed, 113 insertions(+), 66 deletions(-)
+>  create mode 100644 arch/arm/boot/dts/exynos5.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/exynos5.dtsi
+> b/arch/arm/boot/dts/exynos5.dtsi
+> new file mode 100644
+> index 0000000..5684f89
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/exynos5.dtsi
+> @@ -0,0 +1,111 @@
+> +/*
+> + * Samsung's Exynos5 SoC series common device tree source
+> + *
+> + * Copyright (c) 2012-2013 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Samsung's Exynos5 SoC series device nodes are listed in this file.
+> Particular
+> + * SoCs from Exynos5 series can include this file and provide values for
+> SoCs
+> + * specfic bindings.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include "skeleton.dtsi"
+> +
+> +/ {
+> +	interrupt-parent = <&gic>;
+> +
+> +	chipid at 10000000 {
+> +		compatible = "samsung,exynos4210-chipid";
+> +		reg = <0x10000000 0x100>;
+> +	};
+> +
+> +	watchdog {
+> +		compatible = "samsung,s3c2410-wdt";
+> +		reg = <0x101D0000 0x100>;
+> +		interrupts = <0 42 0>;
+> +		status = "disabled";
+> +	};
 
-Thanks for your time,
+I think, you put them by the address order. But as you know, some of them
+are different with exynos5250 and exynos5420. So alphabetical ordering would
+be helpful after putting core part.
+So, chipid, gic, combiner and alphabetical ordering IPs...
 
-Oliver
+> +
+> +	rtc {
+> +		compatible = "samsung,s3c6410-rtc";
+> +		reg = <0x101E0000 0x100>;
+> +		interrupts = <0 43 0>, <0 44 0>;
+> +		status = "disabled";
+> +	};
+> +
+> +	combiner:interrupt-controller at 10440000 {
+> +		compatible = "samsung,exynos4210-combiner";
+> +		#interrupt-cells = <2>;
+> +		interrupt-controller;
+> +		samsung,combiner-nr = <32>;
+> +		reg = <0x10440000 0x1000>;
+> +		interrupts =	<0 0 0>, <0 1 0>, <0 2 0>, <0 3 0>,
+> +				<0 4 0>, <0 5 0>, <0 6 0>, <0 7 0>,
+> +				<0 8 0>, <0 9 0>, <0 10 0>, <0 11 0>,
+> +				<0 12 0>, <0 13 0>, <0 14 0>, <0 15 0>,
+> +				<0 16 0>, <0 17 0>, <0 18 0>, <0 19 0>,
+> +				<0 20 0>, <0 21 0>, <0 22 0>, <0 23 0>,
+> +				<0 24 0>, <0 25 0>, <0 26 0>, <0 27 0>,
+> +				<0 28 0>, <0 29 0>, <0 30 0>, <0 31 0>;
+> +	};
+> +
+> +	gic:interrupt-controller at 10481000 {
+> +		compatible = "arm,cortex-a15-gic", "arm,cortex-a9-gic";
+> +		#interrupt-cells = <3>;
+> +		interrupt-controller;
+> +		reg =	<0x10481000 0x1000>,
+> +			<0x10482000 0x1000>,
+> +			<0x10484000 0x2000>,
+> +			<0x10486000 0x2000>;
+> +		interrupts = <1 9 0xf04>;
+> +	};
+> +
+> +	dwmmc_0: dwmmc0 at 12200000 {
+> +		compatible = "samsung,exynos5250-dw-mshc";
+> +		interrupts = <0 75 0>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +	};
+> +
+> +	dwmmc_1: dwmmc1 at 12210000 {
+> +		compatible = "samsung,exynos5250-dw-mshc";
+> +		interrupts = <0 76 0>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +	};
+> +
+> +	dwmmc_2: dwmmc2 at 12220000 {
+> +		compatible = "samsung,exynos5250-dw-mshc";
+> +		interrupts = <0 77 0>;
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +	};
+> +
+> +	serial at 12C00000 {
+> +		compatible = "samsung,exynos4210-uart";
+> +		reg = <0x12C00000 0x100>;
+> +		interrupts = <0 51 0>;
+> +	};
+> +
+> +	serial at 12C10000 {
+> +		compatible = "samsung,exynos4210-uart";
+> +		reg = <0x12C10000 0x100>;
+> +		interrupts = <0 52 0>;
+> +	};
+> +
+> +	serial at 12C20000 {
+> +		compatible = "samsung,exynos4210-uart";
+> +		reg = <0x12C20000 0x100>;
+> +		interrupts = <0 53 0>;
+> +	};
+> +
+> +	serial at 12C30000 {
+> +		compatible = "samsung,exynos4210-uart";
+> +		reg = <0x12C30000 0x100>;
+> +		interrupts = <0 54 0>;
+> +	};
+> +};
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> index 0673524..2b59ea3 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -17,12 +17,11 @@
+>   * published by the Free Software Foundation.
+>  */
+> 
+> -/include/ "skeleton.dtsi"
+> -/include/ "exynos5250-pinctrl.dtsi"
+> +#include "exynos5.dtsi"
+> +#include "exynos5250-pinctrl.dtsi"
+> 
+I remember, to use #include is in Padma's patch and I've applied in my
+local. So don't change it and just adding inclusion exynos5 is enough.
+
+Others look good to me.
+
+Thanks,
+- Kukjin
