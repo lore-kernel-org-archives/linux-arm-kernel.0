@@ -1,54 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 17:59:47 +0900
-Subject: [GIT PULL 0/2 v2] Renesas sh-sci updates for v3.11
-In-Reply-To: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20130617085947.GA3083@verge.net.au>
+From: s.trumtrar@pengutronix.de (Steffen Trumtrar)
+Date: Mon, 17 Jun 2013 11:02:52 +0200
+Subject: [PATCH v2] staging: imx_drm: imx_ldb: fix 18 bit format
+Message-ID: <1371459772-16443-1-git-send-email-s.trumtrar@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, please ignore this, I realised that I have made an error when
-applying the second patch.
+From: Markus Niebel <Markus.Niebel@tqs.de>
 
-On Mon, Jun 17, 2013 at 12:38:45PM +0900, Simon Horman wrote:
-> Hi Olof, Hi Arnd,
-> 
-> As requested the first patch is now includes an ack from Greg Kroah-Hartman.
-> 
-> I have included the r8a7790 change in this patch as it
-> depends on the first change in the pull-request but nothing else.
-> 
-> This pull request will cause some conflicts though I believe all
-> of them are not difficult to resolve. The renesas-next-20130613 tag in
-> my tree illustrates how I have handled the conflicts with
-> both changes already in arm-soc and changes I intend to send
-> pull requests for in the near future.
-> 
-> The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
-> 
->   Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-sh-sci-for-v3.11
-> 
-> for you to fetch changes up to fe0b1091e41e0acae8ddf2da2a5a36b6867ff012:
-> 
->   ARM: shmobile: r8a7790: don't use external clock for SCIFs (2013-06-17 12:17:48 +0900)
-> 
-> ----------------------------------------------------------------
-> Renesas sh-sci updates for v3.11
-> 
-> HSCIF support by Ulrich Hecht.
-> 
-> ----------------------------------------------------------------
-> Ulrich Hecht (2):
->       serial: sh-sci: HSCIF support
->       ARM: shmobile: r8a7790: don't use external clock for SCIFs
-> 
->  arch/arm/mach-shmobile/setup-r8a7790.c |   16 ++++-
->  drivers/tty/serial/sh-sci.c            |  102 +++++++++++++++++++++++++++++---
->  include/linux/serial_sci.h             |   12 +++-
->  include/uapi/linux/serial_core.h       |    3 +
->  4 files changed, 120 insertions(+), 13 deletions(-)
-> 
+Since 18 bit is supported as datawidth in device tree it should be
+supported in driver. Beside the LDB channel the IPU channel has also
+to be configured to use BGR666.
+
+Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
+Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
+---
+This is based on the series: "staging: drm/imx: Add LDB support" by Philipp.
+
+Changes since v1:
+	- fixed function call: imx_drm_crtc_panel_format_pins -> imx_drm_crtc_panel_format
+
+ drivers/staging/imx-drm/imx-ldb.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/staging/imx-drm/imx-ldb.c b/drivers/staging/imx-drm/imx-ldb.c
+index 0a7e4da..92a0e21 100644
+--- a/drivers/staging/imx-drm/imx-ldb.c
++++ b/drivers/staging/imx-drm/imx-ldb.c
+@@ -179,6 +179,7 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+ 	struct imx_ldb_channel *imx_ldb_ch = enc_to_imx_ldb_ch(encoder);
+ 	struct imx_ldb *ldb = imx_ldb_ch->ldb;
+ 	struct drm_display_mode *mode = &encoder->crtc->mode;
++	u32 pixel_fmt;
+ 	unsigned long serial_clk;
+ 	unsigned long di_clk = mode->clock * 1000;
+ 	int mux = imx_drm_encoder_get_mux_id(imx_ldb_ch->imx_drm_encoder,
+@@ -194,8 +195,23 @@ static void imx_ldb_encoder_prepare(struct drm_encoder *encoder)
+ 		imx_ldb_set_clock(ldb, mux, imx_ldb_ch->chno, serial_clk, di_clk);
+ 	}
+ 
++	switch (imx_ldb_ch->chno) {
++	case 0:
++		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH0_24) ?
++			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
++		break;
++	case 1:
++		pixel_fmt = (ldb->ldb_ctrl & LDB_DATA_WIDTH_CH1_24) ?
++			V4L2_PIX_FMT_RGB24 : V4L2_PIX_FMT_BGR666;
++		break;
++	default:
++		dev_err(ldb->dev, "unable to config di%d panel format\n",
++			imx_ldb_ch->chno);
++		pixel_fmt = V4L2_PIX_FMT_RGB24;
++	}
++
+ 	imx_drm_crtc_panel_format(encoder->crtc, DRM_MODE_ENCODER_LVDS,
+-			V4L2_PIX_FMT_RGB24);
++			pixel_fmt);
+ }
+ 
+ static void imx_ldb_encoder_commit(struct drm_encoder *encoder)
+-- 
+1.8.3.1
