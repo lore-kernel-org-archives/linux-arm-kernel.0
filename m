@@ -1,86 +1,116 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Mon, 17 Jun 2013 10:29:13 -0700
-Subject: [PATCHv2 2/3] arm: mm: Define set_memory_* functions for ARM
-In-Reply-To: <1371490154-11041-1-git-send-email-lauraa@codeaurora.org>
-References: <1371490154-11041-1-git-send-email-lauraa@codeaurora.org>
-Message-ID: <1371490154-11041-3-git-send-email-lauraa@codeaurora.org>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 17 Jun 2013 10:30:59 -0700
+Subject: [PATCH v2] ARM: msm: Move msm_timer to CLOCKSOURCE_OF_DECLARE
+Message-ID: <1371490259-13495-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Other architectures define various set_memory functions to allow
-attributes to be changed (e.g. set_memory_x, set_memory_rw, etc.)
-Currently, these functions are missing on ARM. Define these in an
-appropriate manner for ARM.
+This allows us to remove the init_time callback in the DT machine
+descriptors, shrinking the code.
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/include/asm/cacheflush.h |    5 ++++
- arch/arm/mm/mmu.c                 |   38 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 43 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-index bff7138..55ed26b 100644
---- a/arch/arm/include/asm/cacheflush.h
-+++ b/arch/arm/include/asm/cacheflush.h
-@@ -438,4 +438,9 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
- #define sync_cache_w(ptr) __sync_cache_range_w(ptr, sizeof *(ptr))
- #define sync_cache_r(ptr) __sync_cache_range_r(ptr, sizeof *(ptr))
+Changes since v1:
+ * Added CLKSRC_OF selection
+
+ arch/arm/Kconfig                  |  1 +
+ arch/arm/mach-msm/board-dt-8660.c |  1 -
+ arch/arm/mach-msm/board-dt-8960.c |  1 -
+ arch/arm/mach-msm/common.h        |  1 -
+ arch/arm/mach-msm/timer.c         | 17 +++--------------
+ 5 files changed, 4 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index d423d58..96fe140 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -622,6 +622,7 @@ config ARCH_MSM
+ 	bool "Qualcomm MSM"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
++	select CLKSRC_OF if OF
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
+ 	help
+diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
+index 7dcfc53..4bd22ca 100644
+--- a/arch/arm/mach-msm/board-dt-8660.c
++++ b/arch/arm/mach-msm/board-dt-8660.c
+@@ -47,6 +47,5 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.init_irq = irqchip_init,
+ 	.init_machine = msm8x60_dt_init,
+ 	.init_late = msm8x60_init_late,
+-	.init_time	= msm_dt_timer_init,
+ 	.dt_compat = msm8x60_fluid_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
+index 7301936..9a2b525 100644
+--- a/arch/arm/mach-msm/board-dt-8960.c
++++ b/arch/arm/mach-msm/board-dt-8960.c
+@@ -32,7 +32,6 @@ DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
+ 	.smp = smp_ops(msm_smp_ops),
+ 	.map_io = msm_map_msm8960_io,
+ 	.init_irq = irqchip_init,
+-	.init_time	= msm_dt_timer_init,
+ 	.init_machine = msm_dt_init,
+ 	.dt_compat = msm8960_dt_match,
+ MACHINE_END
+diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
+index ce8215a..e32429e 100644
+--- a/arch/arm/mach-msm/common.h
++++ b/arch/arm/mach-msm/common.h
+@@ -14,7 +14,6 @@
  
-+int set_memory_ro(unsigned long addr, int numpages);
-+int set_memory_rw(unsigned long addr, int numpages);
-+int set_memory_x(unsigned long addr, int numpages);
-+int set_memory_nx(unsigned long addr, int numpages);
-+
- #endif
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index e0d8565..53b0de4 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -335,6 +335,44 @@ const struct mem_type *get_mem_type(unsigned int type)
+ extern void msm7x01_timer_init(void);
+ extern void msm7x30_timer_init(void);
+-extern void msm_dt_timer_init(void);
+ extern void qsd8x50_timer_init(void);
+ 
+ extern void msm_map_common_io(void);
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 284313f..1167cf6 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -219,15 +219,8 @@ err:
  }
- EXPORT_SYMBOL(get_mem_type);
  
-+#define PTE_SET_FN(_name, pteop) \
-+static int pte_set_##_name(pte_t *ptep, pgtable_t token, unsigned long addr, \
-+			void *data) \
-+{ \
-+	pte_t pte = pteop(*ptep); \
-+\
-+	set_pte_ext(ptep, pte, 0); \
-+	return 0; \
-+} \
-+
-+#define SET_MEMORY_FN(_name, callback) \
-+int set_memory_##_name(unsigned long addr, int numpages) \
-+{ \
-+	unsigned long start = addr; \
-+	unsigned long size = PAGE_SIZE*numpages; \
-+	unsigned end = start + size; \
-+\
-+	if (start < MODULES_VADDR || start >= MODULES_END) \
-+		return -EINVAL;\
-+\
-+	if (end < MODULES_VADDR || end >= MODULES_END) \
-+		return -EINVAL; \
-+\
-+	apply_to_page_range(&init_mm, start, size, callback, NULL); \
-+	flush_tlb_kernel_range(start, end); \
-+	return 0;\
-+}
-+
-+PTE_SET_FN(ro, pte_wrprotect)
-+PTE_SET_FN(rw, pte_mkwrite)
-+PTE_SET_FN(x, pte_mkexec)
-+PTE_SET_FN(nx, pte_mknexec)
-+
-+SET_MEMORY_FN(ro, pte_set_ro)
-+SET_MEMORY_FN(rw, pte_set_rw)
-+SET_MEMORY_FN(x, pte_set_x)
-+SET_MEMORY_FN(nx, pte_set_nx)
-+
- /*
-  * Adjust the PMD section entries according to the CPU in use.
-  */
+ #ifdef CONFIG_OF
+-static const struct of_device_id msm_timer_match[] __initconst = {
+-	{ .compatible = "qcom,kpss-timer" },
+-	{ .compatible = "qcom,scss-timer" },
+-	{ },
+-};
+-
+-void __init msm_dt_timer_init(void)
++static void __init msm_dt_timer_init(struct device_node *np)
+ {
+-	struct device_node *np;
+ 	u32 freq;
+ 	int irq;
+ 	struct resource res;
+@@ -235,12 +228,6 @@ void __init msm_dt_timer_init(void)
+ 	void __iomem *base;
+ 	void __iomem *cpu0_base;
+ 
+-	np = of_find_matching_node(NULL, msm_timer_match);
+-	if (!np) {
+-		pr_err("Can't find msm timer DT node\n");
+-		return;
+-	}
+-
+ 	base = of_iomap(np, 0);
+ 	if (!base) {
+ 		pr_err("Failed to map event base\n");
+@@ -283,6 +270,8 @@ void __init msm_dt_timer_init(void)
+ 
+ 	msm_timer_init(freq, 32, irq, !!percpu_offset);
+ }
++CLOCKSOURCE_OF_DECLARE(kpss_timer, "qcom,kpss-timer", msm_dt_timer_init);
++CLOCKSOURCE_OF_DECLARE(scss_timer, "qcom,scss-timer", msm_dt_timer_init);
+ #endif
+ 
+ static int __init msm_timer_map(phys_addr_t addr, u32 event, u32 source,
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
