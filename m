@@ -1,54 +1,81 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:33:47 +0200
-Subject: [PATCH v2 02/38] ARM: EXYNOS: Make ARCH_EXYNOS select USE_OF
+Date: Mon, 17 Jun 2013 18:33:54 +0200
+Subject: [PATCH v2 09/38] ARM: EXYNOS: common: Remove legacy timer
+ initialization code
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-3-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-10-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since EXYNOS is now DT-only, it always requires USE_OF option to be
-selected. This patch moves USE_OF selection from entries of DT board
-files to ARCH_EXYNOS.
+This patch removes legacy timer initialization code that was used to
+set up system timers when booting with ATAGS, which is not supported
+on Exynos any more.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/Kconfig             | 1 +
- arch/arm/mach-exynos/Kconfig | 2 --
- 2 files changed, 1 insertion(+), 2 deletions(-)
+ arch/arm/mach-exynos/common.c | 39 ++-------------------------------------
+ 1 file changed, 2 insertions(+), 37 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0574901..a29fc7e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -796,6 +796,7 @@ config ARCH_EXYNOS
- 	select HAVE_S3C_RTC if RTC_CLASS
- 	select NEED_MACH_GPIO_H
- 	select NEED_MACH_MEMORY_H
-+	select USE_OF
- 	help
- 	  Support for SAMSUNG's EXYNOS SoCs (EXYNOS4/5)
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 9626ce4..b1d0afa 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -299,13 +299,6 @@ static struct map_desc exynos5440_iodesc0[] __initdata = {
+ 	},
+ };
  
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index e101b14..0d93ebe 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -101,7 +101,6 @@ config MACH_EXYNOS4_DT
- 	select CPU_EXYNOS4210
- 	select KEYBOARD_SAMSUNG if INPUT_KEYBOARD
- 	select S5P_DEV_MFC
--	select USE_OF
- 	help
- 	  Machine support for Samsung Exynos4 machine with device tree enabled.
- 	  Select this if a fdt blob is available for the Exynos4 SoC based board.
-@@ -115,7 +114,6 @@ config MACH_EXYNOS5_DT
- 	select ARM_AMBA
- 	select CLKSRC_OF
- 	select USB_ARCH_HAS_XHCI
--	select USE_OF
- 	help
- 	  Machine support for Samsung EXYNOS5 machine with device tree enabled.
- 	  Select this if a fdt blob is available for the EXYNOS5 SoC based board.
+-static struct samsung_pwm_variant exynos4_pwm_variant = {
+-	.bits		= 32,
+-	.div_base	= 0,
+-	.has_tint_cstat	= true,
+-	.tclk_mask	= 0,
+-};
+-
+ void exynos4_restart(char mode, const char *cmd)
+ {
+ 	__raw_writel(0x1, S5P_SWRESET);
+@@ -451,38 +444,10 @@ static void __init exynos5440_map_io(void)
+ 	iotable_init(exynos5440_iodesc0, ARRAY_SIZE(exynos5440_iodesc0));
+ }
+ 
+-void __init exynos_set_timer_source(u8 channels)
+-{
+-	exynos4_pwm_variant.output_mask = BIT(SAMSUNG_PWM_NUM) - 1;
+-	exynos4_pwm_variant.output_mask &= ~channels;
+-}
+-
+ void __init exynos_init_time(void)
+ {
+-	unsigned int timer_irqs[SAMSUNG_PWM_NUM] = {
+-		EXYNOS4_IRQ_TIMER0_VIC, EXYNOS4_IRQ_TIMER1_VIC,
+-		EXYNOS4_IRQ_TIMER2_VIC, EXYNOS4_IRQ_TIMER3_VIC,
+-		EXYNOS4_IRQ_TIMER4_VIC,
+-	};
+-
+-	if (of_have_populated_dt()) {
+-		of_clk_init(NULL);
+-		clocksource_of_init();
+-	} else {
+-		/* todo: remove after migrating legacy E4 platforms to dt */
+-#ifdef CONFIG_ARCH_EXYNOS4
+-		exynos4_clk_init(NULL, !soc_is_exynos4210(), S5P_VA_CMU, readl(S5P_VA_CHIPID + 8) & 1);
+-		exynos4_clk_register_fixed_ext(xxti_f, xusbxti_f);
+-#endif
+-#ifdef CONFIG_CLKSRC_SAMSUNG_PWM
+-		if (soc_is_exynos4210() && samsung_rev() == EXYNOS4210_REV_0)
+-			samsung_pwm_clocksource_init(S3C_VA_TIMER,
+-					timer_irqs, &exynos4_pwm_variant);
+-		else
+-#endif
+-			mct_init(S5P_VA_SYSTIMER, EXYNOS4_IRQ_MCT_G0,
+-					EXYNOS4_IRQ_MCT_L0, EXYNOS4_IRQ_MCT_L1);
+-	}
++	of_clk_init(NULL);
++	clocksource_of_init();
+ }
+ 
+ void __init exynos4_init_irq(void)
 -- 
 1.8.2.1
