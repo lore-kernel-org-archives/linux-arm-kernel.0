@@ -1,46 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 17 Jun 2013 10:41:06 +0200
-Subject: [PATCH 2/6] pinctrl: sunxi: Move the pins definitions to a
- separate header
-In-Reply-To: <CACRpkdajdrcLy6u2cKkrpYnh0Hqx8Hjx+zJ_tfpYCfJFqWCrZA@mail.gmail.com>
-References: <1370795767-9769-1-git-send-email-maxime.ripard@free-electrons.com>
- <1370795767-9769-3-git-send-email-maxime.ripard@free-electrons.com>
- <CACRpkdajdrcLy6u2cKkrpYnh0Hqx8Hjx+zJ_tfpYCfJFqWCrZA@mail.gmail.com>
-Message-ID: <20130617084106.GE16699@lukather>
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Mon, 17 Jun 2013 16:41:50 +0800
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <20130617082724.GI20992@atomide.com>
+References: <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
+ <20130612163124.GD8164@atomide.com>
+ <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
+ <51B99B07.1050806@ti.com>
+ <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
+ <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
+ <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
+ <CACVXFVMthQNgAe3QhMo8HUxuEYcFSOwsdb7RfAsFqwGFKL+dXA@mail.gmail.com>
+ <20130617082724.GI20992@atomide.com>
+Message-ID: <CACVXFVP+-Qm-HrjF1vFxS5JCmf8rR7MdU44mw5-yo0UACYdfrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Mon, Jun 17, 2013 at 4:27 PM, Tony Lindgren <tony@atomide.com> wrote:
+> Too quick? The basic DT based booting has been working for a few years
+> now to some extent on omaps :)
 
-On Sun, Jun 16, 2013 at 01:03:09PM +0200, Linus Walleij wrote:
-> On Sun, Jun 9, 2013 at 6:36 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> 
-> > It will allow us to have a cleaner separation between the data needed by
-> > the driver to work, and the core logic of the driver in itself, and will
-> > allow having too much noise in the core driver in the future.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Patch applied.
-> 
-> Since you will anyway have to bring the ARM SoC branch on
-> top of the pinctrl tree, I might as well apply this to my tree.
+I mean it is OK to drop legacy mode now if it won't break old system.
+Otherwise, it is better to slow down the dropping legacy patch so that
+the board won't be one brick for us old board users, :-)
 
-Thanks for merging this.
 
-I applied the other patches except for the 5th one that Emilio commented
-on.
-
-> If everything else fails, you'll have a nice development base
-> in v3.11 with this in place, right?
-
-Yes, As far as I can see, we should have a pretty complete support for
-the GPIO/muxing/IRQ on the "old" allwinner SoCs (sun4i and sun5i) now.
-
-Maxime
-
+Thanks,
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Ming Lei
