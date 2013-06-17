@@ -1,32 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Jun 2013 01:49:42 -0700
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <CACVXFVP+-Qm-HrjF1vFxS5JCmf8rR7MdU44mw5-yo0UACYdfrw@mail.gmail.com>
-References: <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
- <51B99B07.1050806@ti.com>
- <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
- <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
- <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
- <CACVXFVMthQNgAe3QhMo8HUxuEYcFSOwsdb7RfAsFqwGFKL+dXA@mail.gmail.com>
- <20130617082724.GI20992@atomide.com>
- <CACVXFVP+-Qm-HrjF1vFxS5JCmf8rR7MdU44mw5-yo0UACYdfrw@mail.gmail.com>
-Message-ID: <20130617084942.GJ20992@atomide.com>
+From: haojian.zhuang@linaro.org (Haojian Zhuang)
+Date: Mon, 17 Jun 2013 16:56:12 +0800
+Subject: [PATCH v5 0/4] support Hisilicon SoC
+Message-ID: <1371459376-25438-1-git-send-email-haojian.zhuang@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ming Lei <tom.leiming@gmail.com> [130617 01:47]:
-> On Mon, Jun 17, 2013 at 4:27 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > Too quick? The basic DT based booting has been working for a few years
-> > now to some extent on omaps :)
-> 
-> I mean it is OK to drop legacy mode now if it won't break old system.
-> Otherwise, it is better to slow down the dropping legacy patch so that
-> the board won't be one brick for us old board users, :-)
+Changelog:
+v5:
+1. Remove HIWORD clk patches since they're merged into clk git tree.
+2. Set hisilicon,clk-reset property of clkgate node is optional.
+3. Update on commandline args in DTS file. Remove earlyprintk, mem, nfs.
+4. Move gpio-keys out of amba node in DTS file.
 
-Right, the plan is be able to use it naturally. The USB auxclk issue
-is fixable for DT boot, we just need to decide what's the best way
-to fix it.
+v4:
+1. Add clk gate with HIWORD mask for Rockchip.
+2. Update comments and code of HIWORD flags for mux/divider.
+3. Append a mux without HIWORD mask in Hisilicon 3620.
+4. Fix the pinmux setting in Hi4511.
 
-Regards,
+v3:
+1. Use clk_register_mux_table().
 
-Tony
+v2:
+1. Reuse mux & divider driver. So append CLK_MUX_HIWORD_MASK &
+CLK_DIVIDER_HIWORD_MASK for Hi3620 SoC.
+2. Fix system timer running too fast because wrong divider is choosen.
+3. Remove .init_irq in DT machine descriptor.
