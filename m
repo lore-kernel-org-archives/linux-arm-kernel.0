@@ -1,162 +1,167 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 17:12:48 +0900
-Subject: [PATCH 15/15] ARM: shmobile: Remove Bonito board support
+Date: Mon, 17 Jun 2013 17:12:47 +0900
+Subject: [PATCH 14/15] ARM: shmobile: Remove AP4EVB board support
 In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371456768-1084-16-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371456768-1084-15-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+From: Magnus Damm <damm@opensource.se>
 
-Remove board support for the r8a7740 based Bonito board
+Remove board support for the sh7372 based AP4EVB board
 
-The r8a7740 SoC support code is still kept around since it
-is in use by the Armadillo800eva board which is basically a more
-recent board where the design is based on Bonito.
+The sh7372 SoC support code is still kept around since it
+is in use by the Mackerel board which is basically a more
+recent board where the design is based on AP4EVB.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/configs/bonito_defconfig     |   72 -----
- arch/arm/mach-shmobile/Kconfig        |    6 -
- arch/arm/mach-shmobile/Makefile       |    1 -
- arch/arm/mach-shmobile/Makefile.boot  |    1 -
- arch/arm/mach-shmobile/board-bonito.c |  502 ---------------------------------
- 5 files changed, 582 deletions(-)
- delete mode 100644 arch/arm/configs/bonito_defconfig
- delete mode 100644 arch/arm/mach-shmobile/board-bonito.c
+ arch/arm/configs/ap4evb_defconfig                  |   56 -
+ arch/arm/mach-shmobile/Kconfig                     |   21 -
+ arch/arm/mach-shmobile/Makefile                    |    1 -
+ arch/arm/mach-shmobile/Makefile.boot               |    1 -
+ arch/arm/mach-shmobile/board-ap4evb.c              | 1310 --------------------
+ .../arm/mach-shmobile/include/mach/head-ap4evb.txt |   93 --
+ arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h    |   29 -
+ arch/arm/mach-shmobile/include/mach/mmc.h          |    4 +-
+ arch/arm/mach-shmobile/include/mach/zboot.h        |    6 +-
+ 9 files changed, 2 insertions(+), 1519 deletions(-)
+ delete mode 100644 arch/arm/configs/ap4evb_defconfig
+ delete mode 100644 arch/arm/mach-shmobile/board-ap4evb.c
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h
 
-diff --git a/arch/arm/configs/bonito_defconfig b/arch/arm/configs/bonito_defconfig
+diff --git a/arch/arm/configs/ap4evb_defconfig b/arch/arm/configs/ap4evb_defconfig
 deleted file mode 100644
-index 5457108..0000000
---- a/arch/arm/configs/bonito_defconfig
+index 66894f7..0000000
+--- a/arch/arm/configs/ap4evb_defconfig
 +++ /dev/null
-@@ -1,72 +0,0 @@
+@@ -1,56 +0,0 @@
 -CONFIG_EXPERIMENTAL=y
 -CONFIG_SYSVIPC=y
 -CONFIG_IKCONFIG=y
 -CONFIG_IKCONFIG_PROC=y
 -CONFIG_LOG_BUF_SHIFT=16
--# CONFIG_UTS_NS is not set
--# CONFIG_IPC_NS is not set
--# CONFIG_USER_NS is not set
--# CONFIG_PID_NS is not set
 -CONFIG_BLK_DEV_INITRD=y
--CONFIG_INITRAMFS_SOURCE=""
--CONFIG_CC_OPTIMIZE_FOR_SIZE=y
 -CONFIG_SLAB=y
--CONFIG_MODULES=y
--CONFIG_MODULE_UNLOAD=y
--CONFIG_MODULE_FORCE_UNLOAD=y
 -# CONFIG_BLK_DEV_BSG is not set
 -# CONFIG_IOSCHED_DEADLINE is not set
 -# CONFIG_IOSCHED_CFQ is not set
 -CONFIG_ARCH_SHMOBILE=y
--CONFIG_ARCH_R8A7740=y
--CONFIG_MACH_BONITO=y
--# CONFIG_SH_TIMER_TMU is not set
+-CONFIG_ARCH_SH7372=y
+-CONFIG_MACH_AP4EVB=y
 -CONFIG_AEABI=y
 -# CONFIG_OABI_COMPAT is not set
--CONFIG_FORCE_MAX_ZONEORDER=12
 -CONFIG_ZBOOT_ROM_TEXT=0x0
 -CONFIG_ZBOOT_ROM_BSS=0x0
--CONFIG_CMDLINE="console=ttySC5,115200 earlyprintk=sh-sci.5,115200 ignore_loglevel"
+-CONFIG_CMDLINE="console=ttySC0,115200 earlyprintk=sh-sci.0,115200"
 -CONFIG_KEXEC=y
--# CONFIG_CORE_DUMP_DEFAULT_ELF_HEADERS is not set
+-CONFIG_PM=y
 -# CONFIG_SUSPEND is not set
--CONFIG_PM_RUNTIME=y
 -CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
 -# CONFIG_FIRMWARE_IN_KERNEL is not set
 -CONFIG_MTD=y
+-CONFIG_MTD_CONCAT=y
+-CONFIG_MTD_PARTITIONS=y
 -CONFIG_MTD_CHAR=y
 -CONFIG_MTD_BLOCK=y
 -CONFIG_MTD_CFI=y
--CONFIG_MTD_CFI_ADV_OPTIONS=y
 -CONFIG_MTD_CFI_INTELEXT=y
 -CONFIG_MTD_PHYSMAP=y
--CONFIG_MTD_ARM_INTEGRATOR=y
--CONFIG_MTD_BLOCK2MTD=y
--CONFIG_SCSI=y
--CONFIG_BLK_DEV_SD=y
--# CONFIG_SCSI_LOWLEVEL is not set
+-CONFIG_MTD_NAND=y
+-# CONFIG_BLK_DEV is not set
+-# CONFIG_MISC_DEVICES is not set
+-# CONFIG_INPUT_MOUSEDEV_PSAUX is not set
 -# CONFIG_INPUT_KEYBOARD is not set
 -# CONFIG_INPUT_MOUSE is not set
--# CONFIG_LEGACY_PTYS is not set
+-# CONFIG_SERIO is not set
 -CONFIG_SERIAL_SH_SCI=y
--CONFIG_SERIAL_SH_SCI_NR_UARTS=9
+-CONFIG_SERIAL_SH_SCI_NR_UARTS=8
 -CONFIG_SERIAL_SH_SCI_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
 -# CONFIG_HW_RANDOM is not set
--CONFIG_I2C=y
--CONFIG_I2C_CHARDEV=y
--CONFIG_I2C_SH_MOBILE=y
--CONFIG_GPIO_SYSFS=y
 -# CONFIG_HWMON is not set
--# CONFIG_MFD_SUPPORT is not set
+-# CONFIG_VGA_CONSOLE is not set
 -# CONFIG_HID_SUPPORT is not set
 -# CONFIG_USB_SUPPORT is not set
--CONFIG_UIO=y
--CONFIG_UIO_PDRV=y
--CONFIG_UIO_PDRV_GENIRQ=y
 -# CONFIG_DNOTIFY is not set
--# CONFIG_INOTIFY_USER is not set
 -CONFIG_TMPFS=y
 -# CONFIG_MISC_FILESYSTEMS is not set
--# CONFIG_ENABLE_WARN_DEPRECATED is not set
--# CONFIG_ENABLE_MUST_CHECK is not set
--# CONFIG_ARM_UNWIND is not set
+-CONFIG_MAGIC_SYSRQ=y
+-CONFIG_DEBUG_KERNEL=y
+-# CONFIG_DETECT_SOFTLOCKUP is not set
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+-# CONFIG_FTRACE is not set
+-# CONFIG_CRC32 is not set
 diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index ae1a530..69a31bc 100644
+index 747f68a..ae1a530 100644
 --- a/arch/arm/mach-shmobile/Kconfig
 +++ b/arch/arm/mach-shmobile/Kconfig
-@@ -95,12 +95,6 @@ config MACH_KOTA2
- 	select ARCH_REQUIRE_GPIOLIB
- 	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+@@ -69,27 +69,6 @@ config ARCH_EMEV2
  
--config MACH_BONITO
--	bool "bonito board"
--	depends on ARCH_R8A7740
+ comment "SH-Mobile Board Type"
+ 
+-config MACH_AP4EVB
+-	bool "AP4EVB board"
+-	depends on ARCH_SH7372
 -	select ARCH_REQUIRE_GPIOLIB
 -	select REGULATOR_FIXED_VOLTAGE if REGULATOR
+-	select SH_LCD_MIPI_DSI
+-	select SND_SOC_AK4642 if SND_SIMPLE_CARD
 -
- config MACH_ARMADILLO800EVA
- 	bool "Armadillo-800 EVA board"
- 	depends on ARCH_R8A7740
+-choice
+-	prompt "AP4EVB LCD panel selection"
+-	default AP4EVB_QHD
+-	depends on MACH_AP4EVB
+-
+-config AP4EVB_QHD
+-	bool "MIPI-DSI QHD (960x540)"
+-
+-config AP4EVB_WVGA
+-	bool "Parallel WVGA (800x480)"
+-
+-endchoice
+-
+ config MACH_AG5EVM
+ 	bool "AG5EVM board"
+ 	depends on ARCH_SH73A0
 diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index aae28f3..76f1639 100644
+index 068f1da..aae28f3 100644
 --- a/arch/arm/mach-shmobile/Makefile
 +++ b/arch/arm/mach-shmobile/Makefile
-@@ -39,7 +39,6 @@ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
+@@ -35,7 +35,6 @@ obj-$(CONFIG_ARCH_R8A7779)	+= pm-r8a7779.o
+ obj-$(CONFIG_ARCH_SH73A0)	+= pm-sh73a0.o
+ 
+ # Board objects
+-obj-$(CONFIG_MACH_AP4EVB)	+= board-ap4evb.o
+ obj-$(CONFIG_MACH_AG5EVM)	+= board-ag5evm.o
  obj-$(CONFIG_MACH_APE6EVM)	+= board-ape6evm.o
  obj-$(CONFIG_MACH_MACKEREL)	+= board-mackerel.o
- obj-$(CONFIG_MACH_KOTA2)	+= board-kota2.o
--obj-$(CONFIG_MACH_BONITO)	+= board-bonito.o
- obj-$(CONFIG_MACH_BOCKW)	+= board-bockw.o
- obj-$(CONFIG_MACH_MARZEN)	+= board-marzen.o
- obj-$(CONFIG_MACH_MARZEN_REFERENCE)	+= board-marzen-reference.o
 diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index 3030673..84c6868 100644
+index 6b147ea..3030673 100644
 --- a/arch/arm/mach-shmobile/Makefile.boot
 +++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -5,7 +5,6 @@ loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
+@@ -1,7 +1,6 @@
+ # per-board load address for uImage
+ loadaddr-y	:=
+ loadaddr-$(CONFIG_MACH_AG5EVM) += 0x40008000
+-loadaddr-$(CONFIG_MACH_AP4EVB) += 0x40008000
+ loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
  loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
  loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
- loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
--loadaddr-$(CONFIG_MACH_BONITO) += 0x40008000
- loadaddr-$(CONFIG_MACH_KOTA2) += 0x41008000
- loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
- loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
-diff --git a/arch/arm/mach-shmobile/board-bonito.c b/arch/arm/mach-shmobile/board-bonito.c
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
 deleted file mode 100644
-index b373e9c..0000000
---- a/arch/arm/mach-shmobile/board-bonito.c
+index 297bf5e..0000000
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
 +++ /dev/null
-@@ -1,502 +0,0 @@
+@@ -1,1310 +0,0 @@
 -/*
-- * bonito board support
+- * AP4EVB board support
 - *
-- * Copyright (C) 2011 Renesas Solutions Corp.
-- * Copyright (C) 2011 Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+- * Copyright (C) 2010  Magnus Damm
+- * Copyright (C) 2008  Yoshihiro Shimoda
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License as published by
@@ -170,489 +175,1463 @@ index b373e9c..0000000
 - * You should have received a copy of the GNU General Public License
 - * along with this program; if not, write to the Free Software
 - * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- *
 - */
--
+-#include <linux/clk.h>
 -#include <linux/kernel.h>
--#include <linux/i2c.h>
 -#include <linux/init.h>
 -#include <linux/interrupt.h>
 -#include <linux/irq.h>
--#include <linux/pinctrl/machine.h>
 -#include <linux/platform_device.h>
--#include <linux/gpio.h>
+-#include <linux/delay.h>
+-#include <linux/mfd/tmio.h>
+-#include <linux/mmc/host.h>
+-#include <linux/mmc/sh_mobile_sdhi.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/partitions.h>
+-#include <linux/mtd/physmap.h>
+-#include <linux/mmc/sh_mmcif.h>
+-#include <linux/i2c.h>
+-#include <linux/i2c/tsc2007.h>
+-#include <linux/io.h>
+-#include <linux/pinctrl/machine.h>
 -#include <linux/regulator/fixed.h>
 -#include <linux/regulator/machine.h>
 -#include <linux/smsc911x.h>
--#include <linux/videodev2.h>
+-#include <linux/sh_intc.h>
+-#include <linux/sh_clk.h>
+-#include <linux/gpio.h>
+-#include <linux/input.h>
+-#include <linux/leds.h>
+-#include <linux/input/sh_keysc.h>
+-#include <linux/usb/r8a66597.h>
+-#include <linux/pm_clock.h>
+-#include <linux/dma-mapping.h>
+-
+-#include <media/sh_mobile_ceu.h>
+-#include <media/sh_mobile_csi2.h>
+-#include <media/soc_camera.h>
+-
+-#include <sound/sh_fsi.h>
+-#include <sound/simple_card.h>
+-
+-#include <video/sh_mobile_hdmi.h>
+-#include <video/sh_mobile_lcdc.h>
+-#include <video/sh_mipi_dsi.h>
+-
 -#include <mach/common.h>
+-#include <mach/irqs.h>
+-#include <mach/sh7372.h>
+-
 -#include <asm/mach-types.h>
 -#include <asm/mach/arch.h>
--#include <asm/mach/map.h>
--#include <asm/mach/time.h>
--#include <asm/hardware/cache-l2x0.h>
--#include <mach/r8a7740.h>
--#include <mach/irqs.h>
--#include <video/sh_mobile_lcdc.h>
+-#include <asm/setup.h>
+-
+-#include "sh-gpio.h"
 -
 -/*
-- * CS	Address		device			note
-- *----------------------------------------------------------------
-- * 0	0x0000_0000	NOR Flash (64MB)	SW12 : bit3 = OFF
-- * 2	0x0800_0000	ExtNOR (64MB)		SW12 : bit3 = OFF
-- * 4			-
-- * 5A			-
-- * 5B	0x1600_0000	SRAM (8MB)
-- * 6	0x1800_0000	FPGA (64K)
-- *	0x1801_0000	Ether (4KB)
-- *	0x1801_1000	USB (4KB)
+- * Address	Interface		BusWidth	note
+- * ------------------------------------------------------------------
+- * 0x0000_0000	NOR Flash ROM (MCP)	16bit		SW7 : bit1 = ON
+- * 0x0800_0000	user area		-
+- * 0x1000_0000	NOR Flash ROM (MCP)	16bit		SW7 : bit1 = OFF
+- * 0x1400_0000	Ether (LAN9220)		16bit
+- * 0x1600_0000	user area		-		cannot use with NAND
+- * 0x1800_0000	user area		-
+- * 0x1A00_0000	-
+- * 0x4000_0000	LPDDR2-SDRAM (POP)	32bit
 - */
 -
 -/*
-- * SW12
+- * NOR Flash ROM
 - *
-- *	bit1			bit2			bit3
-- *----------------------------------------------------------------------------
-- * ON	NOR WriteProtect	NAND WriteProtect	CS0 ExtNOR / CS2 NOR
-- * OFF	NOR Not WriteProtect	NAND Not WriteProtect	CS0 NOR    / CS2 ExtNOR
+- *  SW1  |     SW2    | SW7  | NOR Flash ROM
+- *  bit1 | bit1  bit2 | bit1 | Memory allocation
+- * ------+------------+------+------------------
+- *  OFF  | ON     OFF | ON   |    Area 0
+- *  OFF  | ON     OFF | OFF  |    Area 4
 - */
 -
 -/*
-- * SCIFA5 (CN42)
+- * NAND Flash ROM
 - *
-- * S38.3 = ON
-- * S39.6 = ON
-- * S43.1 = ON
+- *  SW1  |     SW2    | SW7  | NAND Flash ROM
+- *  bit1 | bit1  bit2 | bit2 | Memory allocation
+- * ------+------------+------+------------------
+- *  OFF  | ON     OFF | ON   |    FCE 0
+- *  OFF  | ON     OFF | OFF  |    FCE 1
 - */
 -
 -/*
-- * LCDC0 (CN3/CN4/CN7)
+- * SMSC 9220
 - *
-- * S38.1 = OFF
-- * S38.2 = OFF
+- *  SW1		SMSC 9220
+- * -----------------------
+- *  ON		access disable
+- *  OFF		access enable
+- */
+-
+-/*
+- * LCD / IRQ / KEYSC / IrDA
+- *
+- * IRQ = IRQ26 (TS), IRQ27 (VIO), IRQ28 (QHD-TouchScreen)
+- * LCD = 2nd LCDC (WVGA)
+- *
+- * 		|		SW43			|
+- * SW3		|	ON		|	OFF	|
+- * -------------+-----------------------+---------------+
+- * ON		| KEY / IrDA		| LCD		|
+- * OFF		| KEY / IrDA / IRQ	| IRQ		|
+- *
+- *
+- * QHD / WVGA display
+- *
+- * You can choice display type on menuconfig.
+- * Then, check above dip-switch.
+- */
+-
+-/*
+- * USB
+- *
+- * J7 : 1-2  MAX3355E VBUS
+- *      2-3  DC 5.0V
+- *
+- * S39: bit2: off
+- */
+-
+-/*
+- * FSI/FSMI
+- *
+- * SW41	:  ON : SH-Mobile AP4 Audio Mode
+- *	: OFF : Bluetooth Audio Mode
+- *
+- * it needs amixer settings for playing
+- *
+- * amixer set "Headphone Enable" on
+- */
+-
+-/*
+- * MMC0/SDHI1 (CN7)
+- *
+- * J22 : select card voltage
+- *       1-2 pin : 1.8v
+- *       2-3 pin : 3.3v
+- *
+- *        SW1  |             SW33
+- *             | bit1 | bit2 | bit3 | bit4
+- * ------------+------+------+------+-------
+- * MMC0   OFF  |  OFF |  ON  |  ON  |  X
+- * SDHI1  OFF  |  ON  |   X  |  OFF | ON
+- *
+- * voltage lebel
+- * CN7 : 1.8v
+- * CN12: 3.3v
 - */
 -
 -/* Dummy supplies, where voltage doesn't matter */
+-static struct regulator_consumer_supply fixed1v8_power_consumers[] =
+-{
+-	/* J22 default position: 1.8V */
+-	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.1"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.1"),
+-	REGULATOR_SUPPLY("vmmc", "sh_mmcif.0"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mmcif.0"),
+-};
+-
+-static struct regulator_consumer_supply fixed3v3_power_consumers[] =
+-{
+-	REGULATOR_SUPPLY("vmmc", "sh_mobile_sdhi.0"),
+-	REGULATOR_SUPPLY("vqmmc", "sh_mobile_sdhi.0"),
+-};
+-
 -static struct regulator_consumer_supply dummy_supplies[] = {
 -	REGULATOR_SUPPLY("vddvario", "smsc911x"),
 -	REGULATOR_SUPPLY("vdd33a", "smsc911x"),
 -};
 -
--/*
-- * FPGA
-- */
--#define IRQSR0		0x0020
--#define IRQSR1		0x0022
--#define IRQMR0		0x0030
--#define IRQMR1		0x0032
--#define BUSSWMR1	0x0070
--#define BUSSWMR2	0x0072
--#define BUSSWMR3	0x0074
--#define BUSSWMR4	0x0076
--
--#define LCDCR		0x10B4
--#define DEVRSTCR1	0x10D0
--#define DEVRSTCR2	0x10D2
--#define A1MDSR		0x10E0
--#define BVERR		0x1100
--
--/* FPGA IRQ */
--#define FPGA_IRQ_BASE		(512)
--#define FPGA_IRQ0		(FPGA_IRQ_BASE)
--#define FPGA_IRQ1		(FPGA_IRQ_BASE + 16)
--#define FPGA_ETH_IRQ		(FPGA_IRQ0 + 15)
--static u16 bonito_fpga_read(u32 offset)
--{
--	return __raw_readw(IOMEM(0xf0003000) + offset);
--}
--
--static void bonito_fpga_write(u32 offset, u16 val)
--{
--	__raw_writew(val, IOMEM(0xf0003000) + offset);
--}
--
--static void bonito_fpga_irq_disable(struct irq_data *data)
--{
--	unsigned int irq = data->irq;
--	u32 addr = (irq < 1016) ? IRQMR0 : IRQMR1;
--	int shift = irq % 16;
--
--	bonito_fpga_write(addr, bonito_fpga_read(addr) | (1 << shift));
--}
--
--static void bonito_fpga_irq_enable(struct irq_data *data)
--{
--	unsigned int irq = data->irq;
--	u32 addr = (irq < 1016) ? IRQMR0 : IRQMR1;
--	int shift = irq % 16;
--
--	bonito_fpga_write(addr, bonito_fpga_read(addr) & ~(1 << shift));
--}
--
--static struct irq_chip bonito_fpga_irq_chip __read_mostly = {
--	.name		= "bonito FPGA",
--	.irq_mask	= bonito_fpga_irq_disable,
--	.irq_unmask	= bonito_fpga_irq_enable,
--};
--
--static void bonito_fpga_irq_demux(unsigned int irq, struct irq_desc *desc)
--{
--	u32 val =  bonito_fpga_read(IRQSR1) << 16 |
--		   bonito_fpga_read(IRQSR0);
--	u32 mask = bonito_fpga_read(IRQMR1) << 16 |
--		   bonito_fpga_read(IRQMR0);
--
--	int i;
--
--	val &= ~mask;
--
--	for (i = 0; i < 32; i++) {
--		if (!(val & (1 << i)))
--			continue;
--
--		generic_handle_irq(FPGA_IRQ_BASE + i);
--	}
--}
--
--static void bonito_fpga_init(void)
--{
--	int i;
--
--	bonito_fpga_write(IRQMR0, 0xffff); /* mask all */
--	bonito_fpga_write(IRQMR1, 0xffff); /* mask all */
--
--	/* Device reset */
--	bonito_fpga_write(DEVRSTCR1,
--		   (1 << 2));	/* Eth */
--
--	/* FPGA irq require special handling */
--	for (i = FPGA_IRQ_BASE; i < FPGA_IRQ_BASE + 32; i++) {
--		irq_set_chip_and_handler_name(i, &bonito_fpga_irq_chip,
--					      handle_level_irq, "level");
--		set_irq_flags(i, IRQF_VALID); /* yuck */
--	}
--
--	irq_set_chained_handler(evt2irq(0x0340), bonito_fpga_irq_demux);
--	irq_set_irq_type(evt2irq(0x0340), IRQ_TYPE_LEVEL_LOW);
--}
--
--/*
--* PMIC settings
--*
--* FIXME
--*
--* bonito board needs some settings by pmic which use i2c access.
--* pmic settings use device_initcall() here for use it.
--*/
--static __u8 *pmic_settings = NULL;
--static __u8 pmic_do_2A[] = {
--	0x1C, 0x09,
--	0x1A, 0x80,
--	0xff, 0xff,
--};
--
--static int __init pmic_init(void)
--{
--	struct i2c_adapter *a = i2c_get_adapter(0);
--	struct i2c_msg msg;
--	__u8 buf[2];
--	int i, ret;
--
--	if (!pmic_settings)
--		return 0;
--	if (!a)
--		return 0;
--
--	msg.addr	= 0x46;
--	msg.buf		= buf;
--	msg.len		= 2;
--	msg.flags	= 0;
--
--	for (i = 0; ; i += 2) {
--		buf[0] = pmic_settings[i + 0];
--		buf[1] = pmic_settings[i + 1];
--
--		if ((0xff == buf[0]) && (0xff == buf[1]))
--			break;
--
--		ret = i2c_transfer(a, &msg, 1);
--		if (ret < 0) {
--			pr_err("i2c transfer fail\n");
--			break;
--		}
--	}
--
--	return 0;
--}
--device_initcall(pmic_init);
--
--/*
-- * LCDC0
-- */
--static const struct fb_videomode lcdc0_mode = {
--	.name		= "WVGA Panel",
--	.xres		= 800,
--	.yres		= 480,
--	.left_margin	= 88,
--	.right_margin	= 40,
--	.hsync_len	= 128,
--	.upper_margin	= 20,
--	.lower_margin	= 5,
--	.vsync_len	= 5,
--	.sync		= 0,
--};
--
--static struct sh_mobile_lcdc_info lcdc0_info = {
--	.clock_source	= LCDC_CLK_BUS,
--	.ch[0] = {
--		.chan			= LCDC_CHAN_MAINLCD,
--		.fourcc = V4L2_PIX_FMT_RGB565,
--		.interface_type		= RGB24,
--		.clock_divider		= 5,
--		.flags			= 0,
--		.lcd_modes		= &lcdc0_mode,
--		.num_modes		= 1,
--		.panel_cfg = {
--			.width	= 152,
--			.height = 91,
--		},
+-/* MTD */
+-static struct mtd_partition nor_flash_partitions[] = {
+-	{
+-		.name		= "loader",
+-		.offset		= 0x00000000,
+-		.size		= 512 * 1024,
+-		.mask_flags	= MTD_WRITEABLE,
+-	},
+-	{
+-		.name		= "bootenv",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= 512 * 1024,
+-		.mask_flags	= MTD_WRITEABLE,
+-	},
+-	{
+-		.name		= "kernel_ro",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= 8 * 1024 * 1024,
+-		.mask_flags	= MTD_WRITEABLE,
+-	},
+-	{
+-		.name		= "kernel",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= 8 * 1024 * 1024,
+-	},
+-	{
+-		.name		= "data",
+-		.offset		= MTDPART_OFS_APPEND,
+-		.size		= MTDPART_SIZ_FULL,
 -	},
 -};
 -
--static struct resource lcdc0_resources[] = {
+-static struct physmap_flash_data nor_flash_data = {
+-	.width		= 2,
+-	.parts		= nor_flash_partitions,
+-	.nr_parts	= ARRAY_SIZE(nor_flash_partitions),
+-};
+-
+-static struct resource nor_flash_resources[] = {
+-	[0]	= {
+-		.start	= 0x20000000, /* CS0 shadow instead of regular CS0 */
+-		.end	= 0x28000000 - 1, /* needed by USB MASK ROM boot */
+-		.flags	= IORESOURCE_MEM,
+-	}
+-};
+-
+-static struct platform_device nor_flash_device = {
+-	.name		= "physmap-flash",
+-	.dev		= {
+-		.platform_data	= &nor_flash_data,
+-	},
+-	.num_resources	= ARRAY_SIZE(nor_flash_resources),
+-	.resource	= nor_flash_resources,
+-};
+-
+-/* SMSC 9220 */
+-static struct resource smc911x_resources[] = {
+-	{
+-		.start	= 0x14000000,
+-		.end	= 0x16000000 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= evt2irq(0x02c0) /* IRQ6A */,
+-		.flags	= IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
+-	},
+-};
+-
+-static struct smsc911x_platform_config smsc911x_info = {
+-	.flags		= SMSC911X_USE_16BIT | SMSC911X_SAVE_MAC_ADDRESS,
+-	.irq_polarity   = SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
+-	.irq_type       = SMSC911X_IRQ_TYPE_PUSH_PULL,
+-};
+-
+-static struct platform_device smc911x_device = {
+-	.name           = "smsc911x",
+-	.id             = -1,
+-	.num_resources  = ARRAY_SIZE(smc911x_resources),
+-	.resource       = smc911x_resources,
+-	.dev            = {
+-		.platform_data = &smsc911x_info,
+-	},
+-};
+-
+-/*
+- * The card detect pin of the top SD/MMC slot (CN7) is active low and is
+- * connected to GPIO A22 of SH7372 (GPIO 41).
+- */
+-static int slot_cn7_get_cd(struct platform_device *pdev)
+-{
+-	return !gpio_get_value(41);
+-}
+-/* MERAM */
+-static struct sh_mobile_meram_info meram_info = {
+-	.addr_mode      = SH_MOBILE_MERAM_MODE1,
+-};
+-
+-static struct resource meram_resources[] = {
 -	[0] = {
--		.name	= "LCDC0",
--		.start	= 0xfe940000,
--		.end	= 0xfe943fff,
+-		.name	= "regs",
+-		.start	= 0xe8000000,
+-		.end	= 0xe807ffff,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= intcs_evt2irq(0x0580),
+-		.name	= "meram",
+-		.start	= 0xe8080000,
+-		.end	= 0xe81fffff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-};
+-
+-static struct platform_device meram_device = {
+-	.name           = "sh_mobile_meram",
+-	.id             = 0,
+-	.num_resources  = ARRAY_SIZE(meram_resources),
+-	.resource       = meram_resources,
+-	.dev            = {
+-		.platform_data = &meram_info,
+-	},
+-};
+-
+-/* SH_MMCIF */
+-static struct resource sh_mmcif_resources[] = {
+-	[0] = {
+-		.name	= "MMCIF",
+-		.start	= 0xE6BD0000,
+-		.end	= 0xE6BD00FF,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		/* MMC ERR */
+-		.start	= evt2irq(0x1ac0),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[2] = {
+-		/* MMC NOR */
+-		.start	= evt2irq(0x1ae0),
 -		.flags	= IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device lcdc0_device = {
--	.name		= "sh_mobile_lcdc_fb",
+-static struct sh_mmcif_plat_data sh_mmcif_plat = {
+-	.sup_pclk	= 0,
+-	.ocr		= MMC_VDD_165_195 | MMC_VDD_32_33 | MMC_VDD_33_34,
+-	.caps		= MMC_CAP_4_BIT_DATA |
+-			  MMC_CAP_8_BIT_DATA |
+-			  MMC_CAP_NEEDS_POLL,
+-	.get_cd		= slot_cn7_get_cd,
+-	.slave_id_tx	= SHDMA_SLAVE_MMCIF_TX,
+-	.slave_id_rx	= SHDMA_SLAVE_MMCIF_RX,
+-};
+-
+-static struct platform_device sh_mmcif_device = {
+-	.name		= "sh_mmcif",
 -	.id		= 0,
--	.resource	= lcdc0_resources,
--	.num_resources	= ARRAY_SIZE(lcdc0_resources),
+-	.dev		= {
+-		.dma_mask		= NULL,
+-		.coherent_dma_mask	= 0xffffffff,
+-		.platform_data		= &sh_mmcif_plat,
+-	},
+-	.num_resources	= ARRAY_SIZE(sh_mmcif_resources),
+-	.resource	= sh_mmcif_resources,
+-};
+-
+-/* SDHI0 */
+-static struct sh_mobile_sdhi_info sdhi0_info = {
+-	.dma_slave_tx	= SHDMA_SLAVE_SDHI0_TX,
+-	.dma_slave_rx	= SHDMA_SLAVE_SDHI0_RX,
+-	.tmio_caps	= MMC_CAP_SDIO_IRQ,
+-};
+-
+-static struct resource sdhi0_resources[] = {
+-	[0] = {
+-		.name	= "SDHI0",
+-		.start  = 0xe6850000,
+-		.end    = 0xe68500ff,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= evt2irq(0x0e00) /* SDHI0_SDHI0I0 */,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[2] = {
+-		.start	= evt2irq(0x0e20) /* SDHI0_SDHI0I1 */,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[3] = {
+-		.start	= evt2irq(0x0e40) /* SDHI0_SDHI0I2 */,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device sdhi0_device = {
+-	.name           = "sh_mobile_sdhi",
+-	.num_resources  = ARRAY_SIZE(sdhi0_resources),
+-	.resource       = sdhi0_resources,
+-	.id             = 0,
 -	.dev	= {
--		.platform_data	= &lcdc0_info,
+-		.platform_data	= &sdhi0_info,
+-	},
+-};
+-
+-/* SDHI1 */
+-static struct sh_mobile_sdhi_info sdhi1_info = {
+-	.dma_slave_tx	= SHDMA_SLAVE_SDHI1_TX,
+-	.dma_slave_rx	= SHDMA_SLAVE_SDHI1_RX,
+-	.tmio_ocr_mask	= MMC_VDD_165_195,
+-	.tmio_flags	= TMIO_MMC_WRPROTECT_DISABLE,
+-	.tmio_caps	= MMC_CAP_NEEDS_POLL | MMC_CAP_SDIO_IRQ,
+-	.get_cd		= slot_cn7_get_cd,
+-};
+-
+-static struct resource sdhi1_resources[] = {
+-	[0] = {
+-		.name	= "SDHI1",
+-		.start  = 0xe6860000,
+-		.end    = 0xe68600ff,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= evt2irq(0x0e80), /* SDHI1_SDHI1I0 */
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[2] = {
+-		.start	= evt2irq(0x0ea0), /* SDHI1_SDHI1I1 */
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-	[3] = {
+-		.start	= evt2irq(0x0ec0), /* SDHI1_SDHI1I2 */
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device sdhi1_device = {
+-	.name           = "sh_mobile_sdhi",
+-	.num_resources  = ARRAY_SIZE(sdhi1_resources),
+-	.resource       = sdhi1_resources,
+-	.id             = 1,
+-	.dev	= {
+-		.platform_data	= &sdhi1_info,
+-	},
+-};
+-
+-/* USB1 */
+-static void usb1_host_port_power(int port, int power)
+-{
+-	if (!power) /* only power-on supported for now */
+-		return;
+-
+-	/* set VBOUT/PWEN and EXTLP1 in DVSTCTR */
+-	__raw_writew(__raw_readw(IOMEM(0xE68B0008)) | 0x600, IOMEM(0xE68B0008));
+-}
+-
+-static struct r8a66597_platdata usb1_host_data = {
+-	.on_chip	= 1,
+-	.port_power	= usb1_host_port_power,
+-};
+-
+-static struct resource usb1_host_resources[] = {
+-	[0] = {
+-		.name	= "USBHS",
+-		.start	= 0xE68B0000,
+-		.end	= 0xE68B00E6 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= evt2irq(0x1ce0) /* USB1_USB1I0 */,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device usb1_host_device = {
+-	.name	= "r8a66597_hcd",
+-	.id	= 1,
+-	.dev = {
+-		.dma_mask		= NULL,         /*  not use dma */
+-		.coherent_dma_mask	= 0xffffffff,
+-		.platform_data		= &usb1_host_data,
+-	},
+-	.num_resources	= ARRAY_SIZE(usb1_host_resources),
+-	.resource	= usb1_host_resources,
+-};
+-
+-/*
+- * QHD display
+- */
+-#ifdef CONFIG_AP4EVB_QHD
+-
+-/* KEYSC (Needs SW43 set to ON) */
+-static struct sh_keysc_info keysc_info = {
+-	.mode		= SH_KEYSC_MODE_1,
+-	.scan_timing	= 3,
+-	.delay		= 2500,
+-	.keycodes = {
+-		KEY_0, KEY_1, KEY_2, KEY_3, KEY_4,
+-		KEY_5, KEY_6, KEY_7, KEY_8, KEY_9,
+-		KEY_A, KEY_B, KEY_C, KEY_D, KEY_E,
+-		KEY_F, KEY_G, KEY_H, KEY_I, KEY_J,
+-		KEY_K, KEY_L, KEY_M, KEY_N, KEY_O,
+-	},
+-};
+-
+-static struct resource keysc_resources[] = {
+-	[0] = {
+-		.name	= "KEYSC",
+-		.start  = 0xe61b0000,
+-		.end    = 0xe61b0063,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start  = evt2irq(0x0be0), /* KEYSC_KEY */
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device keysc_device = {
+-	.name           = "sh_keysc",
+-	.id             = 0, /* "keysc0" clock */
+-	.num_resources  = ARRAY_SIZE(keysc_resources),
+-	.resource       = keysc_resources,
+-	.dev	= {
+-		.platform_data	= &keysc_info,
+-	},
+-};
+-
+-/* MIPI-DSI */
+-static int sh_mipi_set_dot_clock(struct platform_device *pdev,
+-				 void __iomem *base,
+-				 int enable)
+-{
+-	struct clk *pck = clk_get(&pdev->dev, "dsip_clk");
+-
+-	if (IS_ERR(pck))
+-		return PTR_ERR(pck);
+-
+-	if (enable) {
+-		/*
+-		 * DSIPCLK	= 24MHz
+-		 * D-PHY	= DSIPCLK * ((0x6*2)+1) = 312MHz (see .phyctrl)
+-		 * HsByteCLK	= D-PHY/8 = 39MHz
+-		 *
+-		 *  X * Y * FPS =
+-		 * (544+72+600+16) * (961+8+8+2) * 30 = 36.1MHz
+-		 */
+-		clk_set_rate(pck, clk_round_rate(pck, 24000000));
+-		clk_enable(pck);
+-	} else {
+-		clk_disable(pck);
+-	}
+-
+-	clk_put(pck);
+-
+-	return 0;
+-}
+-
+-static struct resource mipidsi0_resources[] = {
+-	[0] = {
+-		.start  = 0xffc60000,
+-		.end    = 0xffc63073,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start  = 0xffc68000,
+-		.end    = 0xffc680ef,
+-		.flags  = IORESOURCE_MEM,
+-	},
+-};
+-
+-static struct sh_mipi_dsi_info mipidsi0_info = {
+-	.data_format	= MIPI_RGB888,
+-	.channel	= LCDC_CHAN_MAINLCD,
+-	.lane		= 2,
+-	.vsynw_offset	= 17,
+-	.phyctrl	= 0x6 << 8,
+-	.flags		= SH_MIPI_DSI_SYNC_PULSES_MODE |
+-			  SH_MIPI_DSI_HSbyteCLK,
+-	.set_dot_clock	= sh_mipi_set_dot_clock,
+-};
+-
+-static struct platform_device mipidsi0_device = {
+-	.name           = "sh-mipi-dsi",
+-	.num_resources  = ARRAY_SIZE(mipidsi0_resources),
+-	.resource       = mipidsi0_resources,
+-	.id             = 0,
+-	.dev	= {
+-		.platform_data	= &mipidsi0_info,
+-	},
+-};
+-
+-static struct platform_device *qhd_devices[] __initdata = {
+-	&mipidsi0_device,
+-	&keysc_device,
+-};
+-#endif /* CONFIG_AP4EVB_QHD */
+-
+-/* LCDC0 */
+-static const struct fb_videomode ap4evb_lcdc_modes[] = {
+-	{
+-#ifdef CONFIG_AP4EVB_QHD
+-		.name		= "R63302(QHD)",
+-		.xres		= 544,
+-		.yres		= 961,
+-		.left_margin	= 72,
+-		.right_margin	= 600,
+-		.hsync_len	= 16,
+-		.upper_margin	= 8,
+-		.lower_margin	= 8,
+-		.vsync_len	= 2,
+-		.sync		= FB_SYNC_VERT_HIGH_ACT | FB_SYNC_HOR_HIGH_ACT,
+-#else
+-		.name		= "WVGA Panel",
+-		.xres		= 800,
+-		.yres		= 480,
+-		.left_margin	= 220,
+-		.right_margin	= 110,
+-		.hsync_len	= 70,
+-		.upper_margin	= 20,
+-		.lower_margin	= 5,
+-		.vsync_len	= 5,
+-		.sync		= 0,
+-#endif
+-	},
+-};
+-
+-static const struct sh_mobile_meram_cfg lcd_meram_cfg = {
+-	.icb[0] = {
+-		.meram_size     = 0x40,
+-	},
+-	.icb[1] = {
+-		.meram_size     = 0x40,
+-	},
+-};
+-
+-static struct sh_mobile_lcdc_info lcdc_info = {
+-	.meram_dev = &meram_info,
+-	.ch[0] = {
+-		.chan = LCDC_CHAN_MAINLCD,
+-		.fourcc = V4L2_PIX_FMT_RGB565,
+-		.lcd_modes = ap4evb_lcdc_modes,
+-		.num_modes = ARRAY_SIZE(ap4evb_lcdc_modes),
+-		.meram_cfg = &lcd_meram_cfg,
+-#ifdef CONFIG_AP4EVB_QHD
+-		.tx_dev = &mipidsi0_device,
+-#endif
+-	}
+-};
+-
+-static struct resource lcdc_resources[] = {
+-	[0] = {
+-		.name	= "LCDC",
+-		.start	= 0xfe940000, /* P4-only space */
+-		.end	= 0xfe943fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= intcs_evt2irq(0x580),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device lcdc_device = {
+-	.name		= "sh_mobile_lcdc_fb",
+-	.num_resources	= ARRAY_SIZE(lcdc_resources),
+-	.resource	= lcdc_resources,
+-	.dev	= {
+-		.platform_data	= &lcdc_info,
 -		.coherent_dma_mask = ~0,
 -	},
 -};
 -
--static const struct pinctrl_map lcdc0_pinctrl_map[] = {
--	/* LCD0 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
--				  "lcd0_data24_1", "lcd0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
--				  "lcd0_lclk_1", "lcd0"),
--	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-r8a7740",
--				  "lcd0_sync", "lcd0"),
+-/* FSI */
+-#define IRQ_FSI		evt2irq(0x1840)
+-static struct sh_fsi_platform_info fsi_info = {
+-	.port_b = {
+-		.flags		= SH_FSI_CLK_CPG |
+-				  SH_FSI_FMT_SPDIF,
+-	},
 -};
 -
--/*
-- * SMSC 9221
-- */
--static struct resource smsc_resources[] = {
+-static struct resource fsi_resources[] = {
 -	[0] = {
--		.start		= 0x18010000,
--		.end		= 0x18011000 - 1,
--		.flags		= IORESOURCE_MEM,
+-		.name	= "FSI",
+-		.start	= 0xFE3C0000,
+-		.end	= 0xFE3C0400 - 1,
+-		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start		= FPGA_ETH_IRQ,
--		.flags		= IORESOURCE_IRQ,
+-		.start  = IRQ_FSI,
+-		.flags  = IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct smsc911x_platform_config smsc_platdata = {
--	.flags		= SMSC911X_USE_16BIT,
--	.phy_interface	= PHY_INTERFACE_MODE_MII,
--	.irq_polarity	= SMSC911X_IRQ_POLARITY_ACTIVE_LOW,
--	.irq_type	= SMSC911X_IRQ_TYPE_PUSH_PULL,
--};
--
--static struct platform_device smsc_device = {
--	.name		= "smsc911x",
--	.dev  = {
--		.platform_data = &smsc_platdata,
+-static struct platform_device fsi_device = {
+-	.name		= "sh_fsi2",
+-	.id		= -1,
+-	.num_resources	= ARRAY_SIZE(fsi_resources),
+-	.resource	= fsi_resources,
+-	.dev	= {
+-		.platform_data	= &fsi_info,
 -	},
--	.resource	= smsc_resources,
--	.num_resources	= ARRAY_SIZE(smsc_resources),
 -};
 -
--/*
-- * base board devices
-- */
--static struct platform_device *bonito_base_devices[] __initdata = {
--	&lcdc0_device,
--	&smsc_device,
+-static struct asoc_simple_card_info fsi2_ak4643_info = {
+-	.name		= "AK4643",
+-	.card		= "FSI2A-AK4643",
+-	.codec		= "ak4642-codec.0-0013",
+-	.platform	= "sh_fsi2",
+-	.daifmt		= SND_SOC_DAIFMT_LEFT_J,
+-	.cpu_dai = {
+-		.name	= "fsia-dai",
+-		.fmt	= SND_SOC_DAIFMT_CBS_CFS,
+-	},
+-	.codec_dai = {
+-		.name	= "ak4642-hifi",
+-		.fmt	= SND_SOC_DAIFMT_CBM_CFM,
+-		.sysclk	= 11289600,
+-	},
 -};
 -
--/*
-- * map I/O
-- */
--static struct map_desc bonito_io_desc[] __initdata = {
--	/*
--	 * for FPGA (0x1800000-0x19ffffff)
--	 * 0x18000000-0x18002000 -> 0xf0003000-0xf0005000
--	 */
--	{
--		.virtual	= 0xf0003000,
--		.pfn		= __phys_to_pfn(0x18000000),
--		.length		= PAGE_SIZE * 2,
--		.type		= MT_DEVICE_NONSHARED
+-static struct platform_device fsi_ak4643_device = {
+-	.name	= "asoc-simple-card",
+-	.dev	= {
+-		.platform_data	= &fsi2_ak4643_info,
+-	},
+-};
+-
+-/* LCDC1 */
+-static long ap4evb_clk_optimize(unsigned long target, unsigned long *best_freq,
+-				unsigned long *parent_freq);
+-
+-static struct sh_mobile_hdmi_info hdmi_info = {
+-	.flags = HDMI_SND_SRC_SPDIF,
+-	.clk_optimize_parent = ap4evb_clk_optimize,
+-};
+-
+-static struct resource hdmi_resources[] = {
+-	[0] = {
+-		.name	= "HDMI",
+-		.start	= 0xe6be0000,
+-		.end	= 0xe6be00ff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		/* There's also an HDMI interrupt on INTCS @ 0x18e0 */
+-		.start	= evt2irq(0x17e0),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device hdmi_device = {
+-	.name		= "sh-mobile-hdmi",
+-	.num_resources	= ARRAY_SIZE(hdmi_resources),
+-	.resource	= hdmi_resources,
+-	.id             = -1,
+-	.dev	= {
+-		.platform_data	= &hdmi_info,
+-	},
+-};
+-
+-static long ap4evb_clk_optimize(unsigned long target, unsigned long *best_freq,
+-				unsigned long *parent_freq)
+-{
+-	struct clk *hdmi_ick = clk_get(&hdmi_device.dev, "ick");
+-	long error;
+-
+-	if (IS_ERR(hdmi_ick)) {
+-		int ret = PTR_ERR(hdmi_ick);
+-		pr_err("Cannot get HDMI ICK: %d\n", ret);
+-		return ret;
+-	}
+-
+-	error = clk_round_parent(hdmi_ick, target, best_freq, parent_freq, 1, 64);
+-
+-	clk_put(hdmi_ick);
+-
+-	return error;
+-}
+-
+-static const struct sh_mobile_meram_cfg hdmi_meram_cfg = {
+-	.icb[0] = {
+-		.meram_size     = 0x100,
+-	},
+-	.icb[1] = {
+-		.meram_size     = 0x100,
+-	},
+-};
+-
+-static struct sh_mobile_lcdc_info sh_mobile_lcdc1_info = {
+-	.clock_source = LCDC_CLK_EXTERNAL,
+-	.meram_dev = &meram_info,
+-	.ch[0] = {
+-		.chan = LCDC_CHAN_MAINLCD,
+-		.fourcc = V4L2_PIX_FMT_RGB565,
+-		.interface_type = RGB24,
+-		.clock_divider = 1,
+-		.flags = LCDC_FLAGS_DWPOL,
+-		.meram_cfg = &hdmi_meram_cfg,
+-		.tx_dev = &hdmi_device,
 -	}
 -};
 -
--static void __init bonito_map_io(void)
+-static struct resource lcdc1_resources[] = {
+-	[0] = {
+-		.name	= "LCDC1",
+-		.start	= 0xfe944000,
+-		.end	= 0xfe947fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= intcs_evt2irq(0x1780),
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device lcdc1_device = {
+-	.name		= "sh_mobile_lcdc_fb",
+-	.num_resources	= ARRAY_SIZE(lcdc1_resources),
+-	.resource	= lcdc1_resources,
+-	.id             = 1,
+-	.dev	= {
+-		.platform_data	= &sh_mobile_lcdc1_info,
+-		.coherent_dma_mask = ~0,
+-	},
+-};
+-
+-static struct asoc_simple_card_info fsi2_hdmi_info = {
+-	.name		= "HDMI",
+-	.card		= "FSI2B-HDMI",
+-	.codec		= "sh-mobile-hdmi",
+-	.platform	= "sh_fsi2",
+-	.cpu_dai = {
+-		.name	= "fsib-dai",
+-		.fmt	= SND_SOC_DAIFMT_CBM_CFM | SND_SOC_DAIFMT_IB_NF,
+-	},
+-	.codec_dai = {
+-		.name	= "sh_mobile_hdmi-hifi",
+-	},
+-};
+-
+-static struct platform_device fsi_hdmi_device = {
+-	.name	= "asoc-simple-card",
+-	.id	= 1,
+-	.dev	= {
+-		.platform_data	= &fsi2_hdmi_info,
+-	},
+-};
+-
+-static struct gpio_led ap4evb_leds[] = {
+-	{
+-		.name			= "led4",
+-		.gpio			= 185,
+-		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+-	},
+-	{
+-		.name			= "led2",
+-		.gpio			= 186,
+-		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+-	},
+-	{
+-		.name			= "led3",
+-		.gpio			= 187,
+-		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+-	},
+-	{
+-		.name			= "led1",
+-		.gpio			= 188,
+-		.default_state	= LEDS_GPIO_DEFSTATE_ON,
+-	}
+-};
+-
+-static struct gpio_led_platform_data ap4evb_leds_pdata = {
+-	.num_leds = ARRAY_SIZE(ap4evb_leds),
+-	.leds = ap4evb_leds,
+-};
+-
+-static struct platform_device leds_device = {
+-	.name = "leds-gpio",
+-	.id = 0,
+-	.dev = {
+-		.platform_data  = &ap4evb_leds_pdata,
+-	},
+-};
+-
+-static struct i2c_board_info imx074_info = {
+-	I2C_BOARD_INFO("imx074", 0x1a),
+-};
+-
+-static struct soc_camera_link imx074_link = {
+-	.bus_id		= 0,
+-	.board_info	= &imx074_info,
+-	.i2c_adapter_id	= 0,
+-	.module_name	= "imx074",
+-};
+-
+-static struct platform_device ap4evb_camera = {
+-	.name   = "soc-camera-pdrv",
+-	.id     = 0,
+-	.dev    = {
+-		.platform_data = &imx074_link,
+-	},
+-};
+-
+-static struct sh_csi2_client_config csi2_clients[] = {
+-	{
+-		.phy		= SH_CSI2_PHY_MAIN,
+-		.lanes		= 0,		/* default: 2 lanes */
+-		.channel	= 0,
+-		.pdev		= &ap4evb_camera,
+-	},
+-};
+-
+-static struct sh_csi2_pdata csi2_info = {
+-	.type		= SH_CSI2C,
+-	.clients	= csi2_clients,
+-	.num_clients	= ARRAY_SIZE(csi2_clients),
+-	.flags		= SH_CSI2_ECC | SH_CSI2_CRC,
+-};
+-
+-static struct resource csi2_resources[] = {
+-	[0] = {
+-		.name	= "CSI2",
+-		.start	= 0xffc90000,
+-		.end	= 0xffc90fff,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= intcs_evt2irq(0x17a0),
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct sh_mobile_ceu_companion csi2 = {
+-	.id		= 0,
+-	.num_resources	= ARRAY_SIZE(csi2_resources),
+-	.resource	= csi2_resources,
+-	.platform_data	= &csi2_info,
+-};
+-
+-static struct sh_mobile_ceu_info sh_mobile_ceu_info = {
+-	.flags = SH_CEU_FLAG_USE_8BIT_BUS,
+-	.max_width = 8188,
+-	.max_height = 8188,
+-	.csi2 = &csi2,
+-};
+-
+-static struct resource ceu_resources[] = {
+-	[0] = {
+-		.name	= "CEU",
+-		.start	= 0xfe910000,
+-		.end	= 0xfe91009f,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= intcs_evt2irq(0x880),
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-	[2] = {
+-		/* place holder for contiguous memory */
+-	},
+-};
+-
+-static struct platform_device ceu_device = {
+-	.name		= "sh_mobile_ceu",
+-	.id             = 0, /* "ceu0" clock */
+-	.num_resources	= ARRAY_SIZE(ceu_resources),
+-	.resource	= ceu_resources,
+-	.dev	= {
+-		.platform_data		= &sh_mobile_ceu_info,
+-		.coherent_dma_mask	= 0xffffffff,
+-	},
+-};
+-
+-static struct platform_device *ap4evb_devices[] __initdata = {
+-	&leds_device,
+-	&nor_flash_device,
+-	&smc911x_device,
+-	&sdhi0_device,
+-	&sdhi1_device,
+-	&usb1_host_device,
+-	&fsi_device,
+-	&fsi_ak4643_device,
+-	&fsi_hdmi_device,
+-	&sh_mmcif_device,
+-	&hdmi_device,
+-	&lcdc_device,
+-	&lcdc1_device,
+-	&ceu_device,
+-	&ap4evb_camera,
+-	&meram_device,
+-};
+-
+-static void __init hdmi_init_pm_clock(void)
 -{
--	r8a7740_map_io();
--	iotable_init(bonito_io_desc, ARRAY_SIZE(bonito_io_desc));
+-	struct clk *hdmi_ick = clk_get(&hdmi_device.dev, "ick");
+-	int ret;
+-	long rate;
+-
+-	if (IS_ERR(hdmi_ick)) {
+-		ret = PTR_ERR(hdmi_ick);
+-		pr_err("Cannot get HDMI ICK: %d\n", ret);
+-		goto out;
+-	}
+-
+-	ret = clk_set_parent(&sh7372_pllc2_clk, &sh7372_dv_clki_div2_clk);
+-	if (ret < 0) {
+-		pr_err("Cannot set PLLC2 parent: %d, %d users\n", ret, sh7372_pllc2_clk.usecount);
+-		goto out;
+-	}
+-
+-	pr_debug("PLLC2 initial frequency %lu\n", clk_get_rate(&sh7372_pllc2_clk));
+-
+-	rate = clk_round_rate(&sh7372_pllc2_clk, 594000000);
+-	if (rate < 0) {
+-		pr_err("Cannot get suitable rate: %ld\n", rate);
+-		ret = rate;
+-		goto out;
+-	}
+-
+-	ret = clk_set_rate(&sh7372_pllc2_clk, rate);
+-	if (ret < 0) {
+-		pr_err("Cannot set rate %ld: %d\n", rate, ret);
+-		goto out;
+-	}
+-
+-	pr_debug("PLLC2 set frequency %lu\n", rate);
+-
+-	ret = clk_set_parent(hdmi_ick, &sh7372_pllc2_clk);
+-	if (ret < 0)
+-		pr_err("Cannot set HDMI parent: %d\n", ret);
+-
+-out:
+-	if (!IS_ERR(hdmi_ick))
+-		clk_put(hdmi_ick);
 -}
 -
--/*
-- * board init
-- */
--#define BIT_ON(sw, bit)		(sw & (1 << bit))
--#define BIT_OFF(sw, bit)	(!(sw & (1 << bit)))
--
--#define VCCQ1CR		IOMEM(0xE6058140)
--#define VCCQ1LCDCR	IOMEM(0xE6058186)
--
--/*
-- * HACK: The FPGA mappings should be associated with the FPGA device, but we
-- * don't have one@the moment. Associate them with the PFC device to make
-- * sure they will be applied.
-- */
--static const struct pinctrl_map fpga_pinctrl_map[] = {
--	/* FPGA */
--	PIN_MAP_MUX_GROUP_DEFAULT("pfc-r8a7740", "pfc-r8a7740",
--				  "bsc_cs5a_0", "bsc"),
--	PIN_MAP_MUX_GROUP_DEFAULT("pfc-r8a7740", "pfc-r8a7740",
--				  "bsc_cs5b", "bsc"),
--	PIN_MAP_MUX_GROUP_DEFAULT("pfc-r8a7740", "pfc-r8a7740",
--				  "bsc_cs6a", "bsc"),
--	PIN_MAP_MUX_GROUP_DEFAULT("pfc-r8a7740", "pfc-r8a7740",
--				  "intc_irq10", "intc"),
--};
--
--static const struct pinctrl_map scifa5_pinctrl_map[] = {
--	/* SCIFA5 */
--	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.5", "pfc-r8a7740",
--				  "scifa5_data_2", "scifa5"),
--};
--
--static void __init bonito_init(void)
--{
--	u16 val;
--
--	regulator_register_fixed(0, dummy_supplies, ARRAY_SIZE(dummy_supplies));
--
--	pinctrl_register_mappings(fpga_pinctrl_map,
--				  ARRAY_SIZE(fpga_pinctrl_map));
--	r8a7740_pinmux_init();
--	bonito_fpga_init();
--
--	pmic_settings = pmic_do_2A;
--
--	/*
--	 * core board settings
--	 */
--
--#ifdef CONFIG_CACHE_L2X0
--	/* Early BRESP enable, Shared attribute override enable, 32K*8way */
--	l2x0_init(IOMEM(0xf0002000), 0x40440000, 0x82000fff);
+-/* TouchScreen */
+-#ifdef CONFIG_AP4EVB_QHD
+-# define GPIO_TSC_PORT	123
+-#else /* WVGA */
+-# define GPIO_TSC_PORT	40
 -#endif
 -
--	r8a7740_add_standard_devices();
+-#define IRQ28	evt2irq(0x3380) /* IRQ28A */
+-#define IRQ7	evt2irq(0x02e0) /* IRQ7A */
+-static int ts_get_pendown_state(void)
+-{
+-	return !gpio_get_value(GPIO_TSC_PORT);
+-}
+-
+-static int ts_init(void)
+-{
+-	gpio_request_one(GPIO_TSC_PORT, GPIOF_IN, NULL);
+-
+-	return 0;
+-}
+-
+-static struct tsc2007_platform_data tsc2007_info = {
+-	.model			= 2007,
+-	.x_plate_ohms		= 180,
+-	.get_pendown_state	= ts_get_pendown_state,
+-	.init_platform_hw	= ts_init,
+-};
+-
+-static struct i2c_board_info tsc_device = {
+-	I2C_BOARD_INFO("tsc2007", 0x48),
+-	.type		= "tsc2007",
+-	.platform_data	= &tsc2007_info,
+-	/*.irq is selected on ap4evb_init */
+-};
+-
+-/* I2C */
+-static struct i2c_board_info i2c0_devices[] = {
+-	{
+-		I2C_BOARD_INFO("ak4643", 0x13),
+-	},
+-};
+-
+-static struct i2c_board_info i2c1_devices[] = {
+-	{
+-		I2C_BOARD_INFO("r2025sd", 0x32),
+-	},
+-};
+-
+-
+-static const struct pinctrl_map ap4evb_pinctrl_map[] = {
+-	/* CEU */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_ceu.0", "pfc-sh7372",
+-				  "ceu_clk_0", "ceu"),
+-	/* FSIA (AK4643) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
+-				  "fsia_sclk_in", "fsia"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
+-				  "fsia_data_in", "fsia"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.0", "pfc-sh7372",
+-				  "fsia_data_out", "fsia"),
+-	/* FSIB (HDMI) */
+-	PIN_MAP_MUX_GROUP_DEFAULT("asoc-simple-card.1", "pfc-sh7372",
+-				  "fsib_mclk_in", "fsib"),
+-	/* HDMI */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-mobile-hdmi", "pfc-sh7372",
+-				  "hdmi", "hdmi"),
+-	/* KEYSC */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc", "pfc-sh7372",
+-				  "keysc_in04_0", "keysc"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_keysc", "pfc-sh7372",
+-				  "keysc_out5", "keysc"),
+-#ifndef CONFIG_AP4EVB_QHD
+-	/* LCDC */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-sh7372",
+-				  "lcd_data18", "lcd"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_lcdc_fb.0", "pfc-sh7372",
+-				  "lcd_sync", "lcd"),
+-#endif
+-	/* MMCIF */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
+-				  "mmc0_data8_0", "mmc0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mmcif.0", "pfc-sh7372",
+-				  "mmc0_ctrl_0", "mmc0"),
+-	/* SCIFA0 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh-sci.0", "pfc-sh7372",
+-				  "scifa0_data", "scifa0"),
+-	/* SDHI0 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
+-				  "sdhi0_data4", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
+-				  "sdhi0_ctrl", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
+-				  "sdhi0_cd", "sdhi0"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.0", "pfc-sh7372",
+-				  "sdhi0_wp", "sdhi0"),
+-	/* SDHI1 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-sh7372",
+-				  "sdhi1_data4", "sdhi1"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("sh_mobile_sdhi.1", "pfc-sh7372",
+-				  "sdhi1_ctrl", "sdhi1"),
+-	/* SMSC911X */
+-	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-sh7372",
+-				  "bsc_cs5a", "bsc"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("smsc911x", "pfc-sh7372",
+-				  "intc_irq6_0", "intc"),
+-	/* TSC2007 */
+-#ifdef CONFIG_AP4EVB_QHD
+-	PIN_MAP_MUX_GROUP_DEFAULT("1-0048", "pfc-sh7372",
+-				  "intc_irq28_0", "intc"),
+-#else /* WVGA */
+-	PIN_MAP_MUX_GROUP_DEFAULT("1-0048", "pfc-sh7372",
+-				  "intc_irq7_0", "intc"),
+-#endif
+-	/* USBHS1 */
+-	PIN_MAP_MUX_GROUP_DEFAULT("r8a66597_hcd.1", "pfc-sh7372",
+-				  "usb1_vbus", "usb1"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("r8a66597_hcd.1", "pfc-sh7372",
+-				  "usb1_otg_id_0", "usb1"),
+-	PIN_MAP_MUX_GROUP_DEFAULT("r8a66597_hcd.1", "pfc-sh7372",
+-				  "usb1_otg_ctrl_0", "usb1"),
+-};
+-
+-#define GPIO_PORT9CR	IOMEM(0xE6051009)
+-#define GPIO_PORT10CR	IOMEM(0xE605100A)
+-#define USCCR1		IOMEM(0xE6058144)
+-static void __init ap4evb_init(void)
+-{
+-	struct pm_domain_device domain_devices[] = {
+-		{ "A4LC", &lcdc1_device, },
+-		{ "A4LC", &lcdc_device, },
+-		{ "A4MP", &fsi_device, },
+-		{ "A3SP", &sh_mmcif_device, },
+-		{ "A3SP", &sdhi0_device, },
+-		{ "A3SP", &sdhi1_device, },
+-		{ "A4R", &ceu_device, },
+-	};
+-	u32 srcr4;
+-	struct clk *clk;
+-
+-	regulator_register_always_on(0, "fixed-1.8V", fixed1v8_power_consumers,
+-				     ARRAY_SIZE(fixed1v8_power_consumers), 1800000);
+-	regulator_register_always_on(1, "fixed-3.3V", fixed3v3_power_consumers,
+-				     ARRAY_SIZE(fixed3v3_power_consumers), 3300000);
+-	regulator_register_fixed(2, dummy_supplies, ARRAY_SIZE(dummy_supplies));
+-
+-	/* External clock source */
+-	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+-
+-	pinctrl_register_mappings(ap4evb_pinctrl_map,
+-				  ARRAY_SIZE(ap4evb_pinctrl_map));
+-	sh7372_pinmux_init();
+-
+-	/* enable Debug switch (S6) */
+-	gpio_request_one(32, GPIOF_IN | GPIOF_EXPORT, NULL);
+-	gpio_request_one(33, GPIOF_IN | GPIOF_EXPORT, NULL);
+-	gpio_request_one(34, GPIOF_IN | GPIOF_EXPORT, NULL);
+-	gpio_request_one(35, GPIOF_IN | GPIOF_EXPORT, NULL);
+-
+-	/* setup USB phy */
+-	__raw_writew(0x8a0a, IOMEM(0xE6058130));	/* USBCR4 */
+-
+-	/* FSI2 port A (ak4643) */
+-	gpio_request_one(161, GPIOF_OUT_INIT_LOW, NULL); /* slave */
+-
+-	gpio_request(9, NULL);
+-	gpio_request(10, NULL);
+-	gpio_direction_none(GPIO_PORT9CR);  /* FSIAOBT needs no direction */
+-	gpio_direction_none(GPIO_PORT10CR); /* FSIAOLR needs no direction */
+-
+-	/* card detect pin for MMC slot (CN7) */
+-	gpio_request_one(41, GPIOF_IN, NULL);
+-
+-	/* FSI2 port B (HDMI) */
+-	__raw_writew(__raw_readw(USCCR1) & ~(1 << 6), USCCR1); /* use SPDIF */
+-
+-	/* set SPU2 clock to 119.6 MHz */
+-	clk = clk_get(NULL, "spu_clk");
+-	if (!IS_ERR(clk)) {
+-		clk_set_rate(clk, clk_round_rate(clk, 119600000));
+-		clk_put(clk);
+-	}
 -
 -	/*
--	 * base board settings
+-	 * set irq priority, to avoid sound chopping
+-	 * when NFS rootfs is used
+-	 *  FSI(3) > SMSC911X(2)
 -	 */
--	gpio_request_one(176, GPIOF_IN, NULL);
--	if (!gpio_get_value(176)) {
--		u16 bsw2;
--		u16 bsw3;
--		u16 bsw4;
+-	intc_set_priority(IRQ_FSI, 3);
 -
--		val = bonito_fpga_read(BVERR);
--		pr_info("bonito version: cpu %02x, base %02x\n",
--			((val >> 8) & 0xFF),
--			((val >> 0) & 0xFF));
+-	i2c_register_board_info(0, i2c0_devices,
+-				ARRAY_SIZE(i2c0_devices));
 -
--		bsw2 = bonito_fpga_read(BUSSWMR2);
--		bsw3 = bonito_fpga_read(BUSSWMR3);
--		bsw4 = bonito_fpga_read(BUSSWMR4);
+-	i2c_register_board_info(1, i2c1_devices,
+-				ARRAY_SIZE(i2c1_devices));
 -
--		/*
--		 * SCIFA5 (CN42)
--		 */
--		if (BIT_OFF(bsw2, 1) &&	/* S38.3 = ON */
--		    BIT_OFF(bsw3, 9) &&	/* S39.6 = ON */
--		    BIT_OFF(bsw4, 4)) {	/* S43.1 = ON */
--			pinctrl_register_mappings(scifa5_pinctrl_map,
--						  ARRAY_SIZE(scifa5_pinctrl_map));
--		}
+-#ifdef CONFIG_AP4EVB_QHD
 -
--		/*
--		 * LCDC0 (CN3)
--		 */
--		if (BIT_ON(bsw2, 3) &&	/* S38.1 = OFF */
--		    BIT_ON(bsw2, 2)) {	/* S38.2 = OFF */
--			pinctrl_register_mappings(lcdc0_pinctrl_map,
--						  ARRAY_SIZE(lcdc0_pinctrl_map));
+-	/*
+-	 * For QHD Panel (MIPI-DSI, CONFIG_AP4EVB_QHD=y) and
+-	 * IRQ28 for Touch Panel, set dip switches S3, S43 as OFF, ON.
+-	 */
 -
--			gpio_request_one(61, GPIOF_OUT_INIT_HIGH,
--					 NULL); /* LCDDON */
+-	/* enable TouchScreen */
+-	irq_set_irq_type(IRQ28, IRQ_TYPE_LEVEL_LOW);
 -
--			/* backlight on */
--			bonito_fpga_write(LCDCR, 1);
+-	tsc_device.irq = IRQ28;
+-	i2c_register_board_info(1, &tsc_device, 1);
 -
--			/*  drivability Max */
--			__raw_writew(0x00FF , VCCQ1LCDCR);
--			__raw_writew(0xFFFF , VCCQ1CR);
--		}
+-	/* LCDC0 */
+-	lcdc_info.clock_source			= LCDC_CLK_PERIPHERAL;
+-	lcdc_info.ch[0].interface_type		= RGB24;
+-	lcdc_info.ch[0].clock_divider		= 1;
+-	lcdc_info.ch[0].flags			= LCDC_FLAGS_DWPOL;
+-	lcdc_info.ch[0].panel_cfg.width		= 44;
+-	lcdc_info.ch[0].panel_cfg.height	= 79;
 -
--		platform_add_devices(bonito_base_devices,
--				     ARRAY_SIZE(bonito_base_devices));
+-	platform_add_devices(qhd_devices, ARRAY_SIZE(qhd_devices));
+-
+-#else
+-	/*
+-	 * For WVGA Panel (18-bit RGB, CONFIG_AP4EVB_WVGA=y) and
+-	 * IRQ7 for Touch Panel, set dip switches S3, S43 to ON, OFF.
+-	 */
+-	gpio_request_one(189, GPIOF_OUT_INIT_HIGH, NULL); /* backlight */
+-	gpio_request_one(151, GPIOF_OUT_INIT_HIGH, NULL); /* LCDDON */
+-
+-	lcdc_info.clock_source			= LCDC_CLK_BUS;
+-	lcdc_info.ch[0].interface_type		= RGB18;
+-	lcdc_info.ch[0].clock_divider		= 3;
+-	lcdc_info.ch[0].flags			= 0;
+-	lcdc_info.ch[0].panel_cfg.width		= 152;
+-	lcdc_info.ch[0].panel_cfg.height	= 91;
+-
+-	/* enable TouchScreen */
+-	irq_set_irq_type(IRQ7, IRQ_TYPE_LEVEL_LOW);
+-
+-	tsc_device.irq = IRQ7;
+-	i2c_register_board_info(0, &tsc_device, 1);
+-#endif /* CONFIG_AP4EVB_QHD */
+-
+-	/* CEU */
+-
+-	/*
+-	 * TODO: reserve memory for V4L2 DMA buffers, when a suitable API
+-	 * becomes available
+-	 */
+-
+-	/* MIPI-CSI stuff */
+-	clk = clk_get(NULL, "vck1_clk");
+-	if (!IS_ERR(clk)) {
+-		clk_set_rate(clk, clk_round_rate(clk, 13000000));
+-		clk_enable(clk);
+-		clk_put(clk);
 -	}
+-
+-	sh7372_add_standard_devices();
+-
+-	/* Reset HDMI, must be held at least one EXTALR (32768Hz) period */
+-#define SRCR4 IOMEM(0xe61580bc)
+-	srcr4 = __raw_readl(SRCR4);
+-	__raw_writel(srcr4 | (1 << 13), SRCR4);
+-	udelay(50);
+-	__raw_writel(srcr4 & ~(1 << 13), SRCR4);
+-
+-	platform_add_devices(ap4evb_devices, ARRAY_SIZE(ap4evb_devices));
+-
+-	rmobile_add_devices_to_domains(domain_devices,
+-				       ARRAY_SIZE(domain_devices));
+-
+-	hdmi_init_pm_clock();
+-	sh7372_pm_init();
+-	pm_clk_add(&fsi_device.dev, "spu2");
+-	pm_clk_add(&lcdc1_device.dev, "hdmi");
 -}
 -
--static void __init bonito_earlytimer_init(void)
--{
--	u16 val;
--	u8 md_ck = 0;
--
--	/* read MD_CK value */
--	val = bonito_fpga_read(A1MDSR);
--	if (val & (1 << 10))
--		md_ck |= MD_CK2;
--	if (val & (1 << 9))
--		md_ck |= MD_CK1;
--	if (val & (1 << 8))
--		md_ck |= MD_CK0;
--
--	r8a7740_clock_init(md_ck);
--	shmobile_earlytimer_init();
--}
--
--static void __init bonito_add_early_devices(void)
--{
--	r8a7740_add_early_devices();
--}
--
--MACHINE_START(BONITO, "bonito")
--	.map_io		= bonito_map_io,
--	.init_early	= bonito_add_early_devices,
--	.init_irq	= r8a7740_init_irq,
+-MACHINE_START(AP4EVB, "ap4evb")
+-	.map_io		= sh7372_map_io,
+-	.init_early	= sh7372_add_early_devices,
+-	.init_irq	= sh7372_init_irq,
 -	.handle_irq	= shmobile_handle_irq_intc,
--	.init_machine	= bonito_init,
--	.init_late	= shmobile_init_late,
--	.init_time	= bonito_earlytimer_init,
+-	.init_machine	= ap4evb_init,
+-	.init_late	= sh7372_pm_init_late,
+-	.init_time	= sh7372_earlytimer_init,
 -MACHINE_END
+diff --git a/arch/arm/mach-shmobile/include/mach/head-ap4evb.txt b/arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
+deleted file mode 100644
+index 9f134df..0000000
+--- a/arch/arm/mach-shmobile/include/mach/head-ap4evb.txt
++++ /dev/null
+@@ -1,93 +0,0 @@
+-LIST "partner-jet-setup.txt"
+-LIST "(C) Copyright 2010 Renesas Solutions Corp"
+-LIST "Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>"
+-
+-LIST "RWT Setting"
+-EW 0xE6020004, 0xA500
+-EW 0xE6030004, 0xA500
+-
+-LIST "GPIO Setting"
+-EB 0xE6051013, 0xA2
+-
+-LIST "CPG"
+-ED 0xE61500C0, 0x00000002
+-
+-WAIT 1, 0xFE40009C
+-
+-LIST "FRQCR"
+-ED 0xE6150000, 0x2D1305C3
+-ED 0xE61500E0, 0x9E40358E
+-ED 0xE6150004, 0x80331050
+-
+-WAIT 1, 0xFE40009C
+-
+-ED 0xE61500E4, 0x00002000
+-
+-WAIT 1, 0xFE40009C
+-
+-LIST "PLL"
+-ED 0xE6150028, 0x00004000
+-
+-WAIT 1, 0xFE40009C
+-
+-ED 0xE615002C, 0x93000040
+-
+-WAIT 1, 0xFE40009C
+-
+-LIST "SUB/USBClk"
+-ED 0xE6150080, 0x00000180
+-
+-LIST "BSC"
+-ED 0xFEC10000, 0x00E0001B
+-
+-LIST "SBSC1"
+-ED 0xFE400354, 0x01AD8000
+-ED 0xFE400354, 0x01AD8001
+-
+-WAIT 5, 0xFE40009C
+-
+-ED 0xFE400008, 0xBCC90151
+-ED 0xFE400040, 0x41774113
+-ED 0xFE400044, 0x2712E229
+-ED 0xFE400048, 0x20C18505
+-ED 0xFE40004C, 0x00110209
+-ED 0xFE400010, 0x00000087
+-
+-WAIT 30, 0xFE40009C
+-
+-ED 0xFE400084, 0x0000003F
+-EB 0xFE500000, 0x00
+-
+-WAIT 5, 0xFE40009C
+-
+-ED 0xFE400084, 0x0000FF0A
+-EB 0xFE500000, 0x00
+-
+-WAIT 1, 0xFE40009C
+-
+-ED 0xFE400084, 0x00002201
+-EB 0xFE500000, 0x00
+-ED 0xFE400084, 0x00000302
+-EB 0xFE500000, 0x00
+-EB 0xFE5C0000, 0x00
+-ED 0xFE400008, 0xBCC90159
+-ED 0xFE40008C, 0x88800004
+-ED 0xFE400094, 0x00000004
+-ED 0xFE400028, 0xA55A0032
+-ED 0xFE40002C, 0xA55A000C
+-ED 0xFE400020, 0xA55A2048
+-ED 0xFE400008, 0xBCC90959
+-
+-LIST "Change CPGA setting"
+-ED 0xE61500E0, 0x9E40352E
+-ED 0xE6150004, 0x80331050
+-
+-WAIT 1, 0xFE40009C
+-
+-ED 0xFE400354, 0x01AD8002
+-
+-LIST "SCIF0 - Serial port for earlyprintk"
+-EB 0xE6053098, 0xe1
+-EW 0xE6C40000, 0x0000
+-EB 0xE6C40004, 0x19
+-EW 0xE6C40008, 0x0030
+diff --git a/arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h b/arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h
+deleted file mode 100644
+index db59fdb..0000000
+--- a/arch/arm/mach-shmobile/include/mach/mmc-ap4eb.h
++++ /dev/null
+@@ -1,29 +0,0 @@
+-#ifndef MMC_AP4EB_H
+-#define MMC_AP4EB_H
+-
+-#define PORT185CR      (void __iomem *)0xe60520b9
+-#define PORT186CR      (void __iomem *)0xe60520ba
+-#define PORT187CR      (void __iomem *)0xe60520bb
+-#define PORT188CR      (void __iomem *)0xe60520bc
+-
+-#define PORTR191_160DR (void __iomem *)0xe6056014
+-
+-static inline void mmc_init_progress(void)
+-{
+-       /* Initialise LEDS1-4
+-        * registers: PORT185CR-PORT188CR (LED1-LED4 Control)
+-        * value:     0x10 - enable output
+-        */
+-       __raw_writeb(0x10, PORT185CR);
+-       __raw_writeb(0x10, PORT186CR);
+-       __raw_writeb(0x10, PORT187CR);
+-       __raw_writeb(0x10, PORT188CR);
+-}
+-
+-static inline void mmc_update_progress(int n)
+-{
+-	__raw_writel((__raw_readl(PORTR191_160DR) & ~(0xf << 25)) |
+-		     (1 << (25 + n)), PORTR191_160DR);
+-}
+-
+-#endif /* MMC_AP4EB_H */
+diff --git a/arch/arm/mach-shmobile/include/mach/mmc.h b/arch/arm/mach-shmobile/include/mach/mmc.h
+index 21a59db..e979b8f 100644
+--- a/arch/arm/mach-shmobile/include/mach/mmc.h
++++ b/arch/arm/mach-shmobile/include/mach/mmc.h
+@@ -7,9 +7,7 @@
+  *
+  **************************************************/
+ 
+-#ifdef CONFIG_MACH_AP4EVB
+-#include "mach/mmc-ap4eb.h"
+-#elif defined(CONFIG_MACH_MACKEREL)
++#ifdef CONFIG_MACH_MACKEREL
+ #include "mach/mmc-mackerel.h"
+ #else
+ #error "unsupported board."
+diff --git a/arch/arm/mach-shmobile/include/mach/zboot.h b/arch/arm/mach-shmobile/include/mach/zboot.h
+index 308b5cf..f2d8744 100644
+--- a/arch/arm/mach-shmobile/include/mach/zboot.h
++++ b/arch/arm/mach-shmobile/include/mach/zboot.h
+@@ -10,11 +10,7 @@
+  *
+  **************************************************/
+ 
+-#ifdef CONFIG_MACH_AP4EVB
+-#define MACH_TYPE	MACH_TYPE_AP4EVB
+-#define MEMORY_START	0x40000000
+-#include "mach/head-ap4evb.txt"
+-#elif defined(CONFIG_MACH_MACKEREL)
++#ifdef CONFIG_MACH_MACKEREL
+ #define MACH_TYPE	MACH_TYPE_MACKEREL
+ #define MEMORY_START	0x40000000
+ #include "mach/head-mackerel.txt"
 -- 
 1.7.10.4
