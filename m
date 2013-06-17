@@ -1,29 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 17 Jun 2013 11:43:27 +0100
-Subject: [PATCH v10 1/2] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <1371463571-2578-2-git-send-email-nsekhar@ti.com>
-References: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
- <1371463571-2578-2-git-send-email-nsekhar@ti.com>
-Message-ID: <20130617104327.GD1403@sirena.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Jun 2013 03:52:43 -0700
+Subject: [GIT PULL] move omap mailbox to drivers for v3.11
+In-Reply-To: <51B9DE2A.7060201@ti.com>
+References: <1371074306-57583-1-git-send-email-s-anna@ti.com>
+ <20130613013729.GB12078@arwen.pp.htv.fi> <51B9DE2A.7060201@ti.com>
+Message-ID: <20130617105242.GO20992@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 03:36:10PM +0530, Sekhar Nori wrote:
-> From: Matt Porter <mporter@ti.com>
+* Suman Anna <s-anna@ti.com> [130613 08:09]:
+> On 06/12/2013 08:37 PM, Felipe Balbi wrote:
+> > Hi,
+> > 
+> > On Wed, Jun 12, 2013 at 04:58:26PM -0500, Suman Anna wrote:
+> >> The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+> >>
+> >>   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+> >>
+> >> are available in the git repository at:
+> >>
+> >>   git at github.com:sumananna/mailbox.git tags/omap-mailbox-for-v3.11
+> > 
+> > Tony might not have an ssh account on github, when sending pull requests
+> > make sure to use the git read-only URL.
 > 
-> Move mach-davinci/dma.c to common/edma.c so it can be used
-> by OMAP (specifically AM33xx) as well.
+> Thanks for the tip, Felipe.
 > 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> Acked-by: Chris Ball <cjb@laptop.org> # davinci_mmc.c
-> [nsekhar at ti.com: dropped davinci sffsdr changes]
-> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> Tony,
+> please use
+> git://github.com/sumananna/mailbox.git tags/omap-mailbox-for-v3.11
 
-Acked-by: Mark Brown <broonie@linaro.org>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/5ea59388/attachment.sig>
+Thanks, pulling into omap-for-v3.11/mailbox.
+
+Regards,
+
+Tony
