@@ -1,43 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jun 2013 14:54:48 +0200
-Subject: [PATCH 1/2] serial: sh-sci: HSCIF support
-In-Reply-To: <1371440327-30512-2-git-send-email-horms+renesas@verge.net.au>
-References: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
- <1371440327-30512-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <201306171454.48936.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Mon, 17 Jun 2013 21:58:47 +0900
+Subject: [PATCH RESEND V2] ARM: dts: Correct the base address of pinctrl_3
+ on Exynos5250
+In-Reply-To: <1371025425-480-1-git-send-email-padma.v@samsung.com>
+References: <1371025425-480-1-git-send-email-padma.v@samsung.com>
+Message-ID: <1a1601ce6b5a$6833d8a0$389b89e0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013, Simon Horman wrote:
-> -       if (likely(baud && port->uartclk))
-> -               t = sci_scbrr_calc(s->cfg->scbrr_algo_id, baud, port->uartclk);
-> +       if (likely(baud && port->uartclk)) {
-> +               if (s->cfg->scbrr_algo_id == SCBRR_ALGO_6) {
-> +                       sci_baud_calc_hscif(baud, port->uartclk, &t, &srr,
-> +                                           &cks);
-> +               } else {
-> +                       t = sci_scbrr_calc(s->cfg->scbrr_algo_id, baud,
-> +                                          port->uartclk);
-> +                       for (cks = 0; t >= 256 && cks <= 3; cks++)
-> +                               t >>= 2;
-> +               }
-> +       }
+Padmavathi Venna wrote:
+> 
+> This patch corrects the base address of pinctrl_3 on Exynos5250
+> platform.
+> 
+> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
 
+(+ Olof)
 
-This hunk causes build warnings in linux-next now:
+Olof, there is no other fixes in my tree for v3.10 yet, so would be helpful
+if you could take this into fixes in arm-soc for v3.10. Just note, the wrong
+address added during v3.10 merge window.
 
-/git/arm-soc/drivers/tty/serial/sh-sci.c: In function 'sci_set_termios':
-/git/arm-soc/drivers/tty/serial/sh-sci.c:1942:37: warning: 'srr' may be used uninitialized in this function [-Wmaybe-uninitialized]
-    serial_port_out(port, HSSRR, srr | HSCIF_SRE);
-                                     ^
-/git/arm-soc/drivers/tty/serial/sh-sci.c:1892:15: note: 'srr' was declared here
-  unsigned int srr;
-               ^
-/git/arm-soc/drivers/tty/serial/sh-sci.c:1938:47: warning: 'cks' may be used uninitialized in this function [-Wmaybe-uninitialized]
-   serial_port_out(port, SCSMR, (smr_val & ~3) | cks);
-                                               ^
-/git/arm-soc/drivers/tty/serial/sh-sci.c:1890:40: note: 'cks' was declared here
-  unsigned int baud, smr_val, max_baud, cks;
-                                        ^
+If you want,
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-	Arnd
+If any problems, please kindly let me know.
+
+Thanks,
+- Kukjin
+
+> ---
+> Changes since V1:
+> 	- Added platform name in the subject line.
+> 
+>  arch/arm/boot/dts/exynos5250-pinctrl.dtsi |    2 +-
+>  arch/arm/boot/dts/exynos5250.dtsi         |    4 ++--
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> index d1650fb..ded558b 100644
+> --- a/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250-pinctrl.dtsi
+> @@ -763,7 +763,7 @@
+>  		};
+>  	};
+> 
+> -	pinctrl at 03680000 {
+> +	pinctrl at 03860000 {
+>  		gpz: gpz {
+>  			gpio-controller;
+>  			#gpio-cells = <2>;
+> diff --git a/arch/arm/boot/dts/exynos5250.dtsi
+> b/arch/arm/boot/dts/exynos5250.dtsi
+> index 7154e3d..e9bfd13 100644
+> --- a/arch/arm/boot/dts/exynos5250.dtsi
+> +++ b/arch/arm/boot/dts/exynos5250.dtsi
+> @@ -169,9 +169,9 @@
+>  		interrupts = <0 50 0>;
+>  	};
+> 
+> -	pinctrl_3: pinctrl at 03680000 {
+> +	pinctrl_3: pinctrl at 03860000 {
+>  		compatible = "samsung,exynos5250-pinctrl";
+> -		reg = <0x0368000 0x1000>;
+> +		reg = <0x03860000 0x1000>;
+>  		interrupts = <0 47 0>;
+>  	};
+> 
+> --
+> 1.7.4.4
