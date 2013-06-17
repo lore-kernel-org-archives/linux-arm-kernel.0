@@ -1,97 +1,65 @@
-From: yadi.brar@samsung.com (Yadwinder Singh Brar)
-Date: Sat, 08 Jun 2013 23:04:22 +0530
-Subject: [PATCH v5 7/7] clk: samsung: Add EPLL and VPLL freq table for
- exynos5250 SoC
-In-Reply-To: <1370712862-10501-1-git-send-email-yadi.brar@samsung.com>
-References: <1370712862-10501-1-git-send-email-yadi.brar@samsung.com>
-Message-ID: <1370712862-10501-8-git-send-email-yadi.brar@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 17 Jun 2013 10:43:08 -0700
+Subject: [PATCH/RESEND 01/12] msm_serial: Convert to clk_prepare/unprepare
+In-Reply-To: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
+References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371490999-15501-2-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds the EPLL and VPLL freq table for exynos5250 SoC.
+Add calls to clk_prepare and unprepare so that MSM can migrate to
+the common clock framework.
 
-Signed-off-by: Vikas Sajjan <vikas.sajjan@linaro.org>
-Signed-off-by: Yadwinder Singh Brar <yadi.brar@samsung.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- drivers/clk/samsung/clk-exynos5250.c |   38 ++++++++++++++++++++++++++++++++++
- drivers/clk/samsung/clk.h            |    2 +
- 2 files changed, 40 insertions(+), 0 deletions(-)
+ drivers/tty/serial/msm_serial.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
-index 09da356..d2743f9 100644
---- a/drivers/clk/samsung/clk-exynos5250.c
-+++ b/drivers/clk/samsung/clk-exynos5250.c
-@@ -492,6 +492,29 @@ static __initdata struct of_device_id ext_clk_match[] = {
- 	{ },
- };
- 
-+static __initdata struct samsung_pll_rate_table vpll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_36XX_RATE(rate, m, p, s, k) */
-+	PLL_36XX_RATE(266000000, 266, 3, 3, 0),
-+	/* Not in UM, but need for eDP on snow */
-+	PLL_36XX_RATE(70500000, 94, 2, 4, 0),
-+	{ },
-+};
-+
-+static __initdata struct samsung_pll_rate_table epll_24mhz_tbl[] = {
-+	/* sorted in descending order */
-+	/* PLL_36XX_RATE(rate, m, p, s, k) */
-+	PLL_36XX_RATE(192000000, 48, 3, 1, 0),
-+	PLL_36XX_RATE(180633600, 45, 3, 1, 10381),
-+	PLL_36XX_RATE(180000000, 45, 3, 1, 0),
-+	PLL_36XX_RATE(73728000, 73, 3, 3, 47710),
-+	PLL_36XX_RATE(67737600, 90, 4, 3, 20762),
-+	PLL_36XX_RATE(49152000, 49, 3, 3, 9962),
-+	PLL_36XX_RATE(45158400, 45, 3, 3, 10381),
-+	PLL_36XX_RATE(32768000, 131, 3, 5, 4719),
-+	{ },
-+};
-+
- struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
- 	[apll] = PLL_A(pll_35xx, fout_apll, "fout_apll", "fin_pll", APLL_LOCK,
- 		APLL_CON0, "fout_apll", NULL),
-@@ -513,6 +536,8 @@ struct __initdata samsung_pll_clock exynos5250_plls[nr_plls] = {
- void __init exynos5250_clk_init(struct device_node *np)
+diff --git a/drivers/tty/serial/msm_serial.c b/drivers/tty/serial/msm_serial.c
+index b11e997..0149603 100644
+--- a/drivers/tty/serial/msm_serial.c
++++ b/drivers/tty/serial/msm_serial.c
+@@ -408,9 +408,9 @@ static void msm_init_clock(struct uart_port *port)
  {
- 	void __iomem *reg_base;
-+	struct clk *vpllsrc;
-+	unsigned long fin_pll_rate, mout_vpllsrc_rate = 0;
+ 	struct msm_port *msm_port = UART_TO_MSM(port);
  
- 	if (np) {
- 		reg_base = of_iomap(np, 0);
-@@ -530,6 +555,19 @@ void __init exynos5250_clk_init(struct device_node *np)
- 			ext_clk_match);
- 	samsung_clk_register_mux(exynos5250_pll_pmux_clks,
- 				ARRAY_SIZE(exynos5250_pll_pmux_clks));
-+
-+	fin_pll_rate = _get_rate("fin_pll");
-+
-+	if (fin_pll_rate == (24 * MHZ))
-+		exynos5250_plls[epll].rate_table = epll_24mhz_tbl;
-+
-+	vpllsrc = __clk_lookup("mout_vpllsrc");
-+	if (vpllsrc)
-+		mout_vpllsrc_rate = clk_get_rate(vpllsrc);
-+
-+	if (mout_vpllsrc_rate == (24 * MHZ))
-+		exynos5250_plls[vpll].rate_table =  vpll_24mhz_tbl;
-+
- 	samsung_clk_register_pll(exynos5250_plls, ARRAY_SIZE(exynos5250_plls),
- 					reg_base);
- 	samsung_clk_register_fixed_rate(exynos5250_fixed_rate_clks,
-diff --git a/drivers/clk/samsung/clk.h b/drivers/clk/samsung/clk.h
-index 3e6501c..378bf98 100644
---- a/drivers/clk/samsung/clk.h
-+++ b/drivers/clk/samsung/clk.h
-@@ -40,6 +40,8 @@ struct samsung_clock_alias {
- 		.alias		= a,				\
- 	}
+-	clk_enable(msm_port->clk);
++	clk_prepare_enable(msm_port->clk);
+ 	if (!IS_ERR(msm_port->pclk))
+-		clk_enable(msm_port->pclk);
++		clk_prepare_enable(msm_port->pclk);
+ 	msm_serial_set_mnd_regs(port);
+ }
  
-+#define MHZ (1000*1000)
-+
- /**
-  * struct samsung_fixed_rate_clock: information about fixed-rate clock
-  * @id: platform specific id of the clock.
+@@ -486,7 +486,7 @@ static void msm_shutdown(struct uart_port *port)
+ 	msm_port->imr = 0;
+ 	msm_write(port, 0, UART_IMR); /* disable interrupts */
+ 
+-	clk_disable(msm_port->clk);
++	clk_disable_unprepare(msm_port->clk);
+ 
+ 	free_irq(port->irq, port);
+ }
+@@ -688,14 +688,14 @@ static void msm_power(struct uart_port *port, unsigned int state,
+ 
+ 	switch (state) {
+ 	case 0:
+-		clk_enable(msm_port->clk);
++		clk_prepare_enable(msm_port->clk);
+ 		if (!IS_ERR(msm_port->pclk))
+-			clk_enable(msm_port->pclk);
++			clk_prepare_enable(msm_port->pclk);
+ 		break;
+ 	case 3:
+-		clk_disable(msm_port->clk);
++		clk_disable_unprepare(msm_port->clk);
+ 		if (!IS_ERR(msm_port->pclk))
+-			clk_disable(msm_port->pclk);
++			clk_disable_unprepare(msm_port->pclk);
+ 		break;
+ 	default:
+ 		printk(KERN_ERR "msm_serial: Unknown PM state %d\n", state);
 -- 
-1.7.0.4
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+hosted by The Linux Foundation
