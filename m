@@ -1,37 +1,23 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 17 Jun 2013 05:03:22 +0200
-Subject: [PATCH 0/5] pinctrl: fix some issues with new pinconfig dt parsing
-In-Reply-To: <51BB3C62.4070000@imgtec.com>
-References: <201306141741.46077.heiko@sntech.de> <51BB3C62.4070000@imgtec.com>
-Message-ID: <2162180.An6kI8rHhm@avalon>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 17 Jun 2013 00:04:19 -0300
+Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Enable PWM and backlight
+ options
+In-Reply-To: <1370534190-10765-1-git-send-email-fabio.estevam@freescale.com>
+References: <1370534190-10765-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <CAOMZO5Dzh48Rg-roBnjYu-msZN=hpKqipQ+TG7Jr=_JyrVOf4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Shawn,
 
-On Friday 14 June 2013 16:53:06 James Hogan wrote:
-> On 14/06/13 16:41, Heiko St?bner wrote:
-> > Some issues with the recently submitted generic pinconfig parsing from dt
-> > came up, so fix these in this follow-up series.
-> > 
-> > Hopefully I did catch all of them.
-> > 
-> > Tested on my rk3066 device.
-> > 
-> > Heiko Stuebner (5):
-> >   pinctrl: update the documentation for some pinconfig params
-> >   pinctrl: clarify some dt pinconfig options
-> >   pinctrl: handle zero found dt pinconfig properties better
-> >   pinctrl: dynamically alloc temp array when parsing dt pinconf options
-> 
-> patches 1-4:
-> Reviewed-by: James Hogan <james.hogan@imgtec.com>
+On Thu, Jun 6, 2013 at 12:56 PM, Fabio Estevam
+<fabio.estevam@freescale.com> wrote:
+> These options are useful for controlling backlight contrast via PWM.
+>
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> Changes since v1:
+> - Fix warnings
+> - Fix typo in Subject
 
-Probably too late as Linus has already applied the patches, but for 2, 3 and 4
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
--- 
-Regards,
-
-Laurent Pinchart
+Does it look good now?
