@@ -1,20 +1,37 @@
-From: hdoyu@nvidia.com (Hiroshi Doyu)
-Date: Mon, 17 Jun 2013 07:16:22 +0200
-Subject: [PATCH] ARM: dma-mapping: Get pages if the cpu_addr is out of
- atomic_pool
-In-Reply-To: <1371442732-15088-1-git-send-email-yj44.cho@samsung.com>
-References: <1371442732-15088-1-git-send-email-yj44.cho@samsung.com>
-Message-ID: <20130617.081622.332935718957738769.hdoyu@nvidia.com>
+From: rob@landley.net (Rob Landley)
+Date: Mon, 17 Jun 2013 00:20:35 -0500
+Subject: [PATCH] pinctrl: update GPIO range doc
+In-Reply-To: <1371377909-5921-1-git-send-email-linus.walleij@stericsson.com>
+ (from linus.walleij@stericsson.com on Sun Jun 16 05:18:29 2013)
+References: <1371377909-5921-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <1371446435.2776.122@driftwood>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-YoungJun Cho <yj44.cho@samsung.com> wrote @ Mon, 17 Jun 2013 06:18:52 +0200:
-
-> In __iommu_get_pages(), the cpu_addr is checked wheather in
-> atomic_pool range or not. So if the cpu_addr is in atomic_pool
-> range, it does not need to check twice.
+On 06/16/2013 05:18:29 AM, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> Signed-off-by: YoungJun Cho <yj44.cho@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> This updates the GPIO range documentation with the API changes
+> for sparse/random/arbitrary pin-to-GPIO mappings.
 
-Looks ok to me, at least.
+Acked-by: Rob Landley <rob@landley.net>
+
+Why isn't this part of the pinctrl series you posted right afterwards?  
+(It should go in through that maintainer...)
+
+>  For all functionalities dealing with pin biasing, pin muxing etc,  
+> the pin
+> -controller subsystem will subtract the range's .base offset from the  
+> passed
+> -in gpio number, and add the ranges's .pin_base offset to retrive a  
+> pin number.
+> -After that, the subsystem passes it on to the pin control driver, so  
+> the driver
+> +controller subsystem will look up the corresponding pin number from  
+> the passed
+> +in gpio number, and use the ranges internals to retrive a pin  
+> number. After
+
+Range's perhaps?
+
+Rob
