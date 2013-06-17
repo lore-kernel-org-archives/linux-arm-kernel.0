@@ -1,38 +1,73 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 15:54:04 +0900
-Subject: [GIT PULL v2 0/1] Renesas ARM based SoC cleanups for v3.11
-Message-ID: <1371452045-21959-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon, 17 Jun 2013 15:54:05 +0900
+Subject: [PATCH] ARM: shmobile: r8a7790: add __initdata on resource and device
+ data
+In-Reply-To: <1371452045-21959-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371452045-21959-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371452045-21959-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Arnd,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-This small pull request is based on a merge of
-renesas-soc-for-v3.11 and renesas-pinmux-for-v3.11 both
-of which you have previously pulled. The reason for this base is to provide
-all the code that the one patch in this request adds annotations to.
+These data will be kmemdup()'ed on
+platform_device_add_resources() and platform_device_add_data()
+This patch removed "const" to avoid section type conflict
+with r8a7790_boards_compat_dt
 
-The following changes since commit 12dd9752512449f0336b7d64df3871145a28a2fe:
-
-  Merge tags 'renesas-pinmux-for-v3.11' and 'renesas-soc-for-v3.11' into cleanup (2013-06-13 14:45:20 +0900)
-
-are available in the git repository at:
-
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup-for-v3.11
-
-for you to fetch changes up to f9094c526bca3cc50ef7d409c22976fa0f47bbba:
-
-  ARM: shmobile: r8a7790: add __initdata on resource and device data (2013-06-13 14:47:34 +0900)
-
-----------------------------------------------------------------
-Renesas ARM based SoC cleanups for v3.11
-
-__initdata annotations for the r8a7790 SoC by Morimoto-san.
-
-----------------------------------------------------------------
-Kuninori Morimoto (1):
-      ARM: shmobile: r8a7790: add __initdata on resource and device data
-
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/mach-shmobile/setup-r8a7790.c |   12 ++++++------
  1 file changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-shmobile/setup-r8a7790.c b/arch/arm/mach-shmobile/setup-r8a7790.c
+index b461d93..196bd73 100644
+--- a/arch/arm/mach-shmobile/setup-r8a7790.c
++++ b/arch/arm/mach-shmobile/setup-r8a7790.c
+@@ -30,17 +30,17 @@
+ #include <mach/r8a7790.h>
+ #include <asm/mach/arch.h>
+ 
+-static const struct resource pfc_resources[] = {
++static struct resource pfc_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xe6060000, 0x250),
+ };
+ 
+ #define R8A7790_GPIO(idx)						\
+-static struct resource r8a7790_gpio##idx##_resources[] = {		\
++static struct resource r8a7790_gpio##idx##_resources[] __initdata = {	\
+ 	DEFINE_RES_MEM(0xe6050000 + 0x1000 * (idx), 0x50),		\
+ 	DEFINE_RES_IRQ(gic_spi(4 + (idx))),				\
+ };									\
+ 									\
+-static struct gpio_rcar_config r8a7790_gpio##idx##_platform_data = {	\
++static struct gpio_rcar_config r8a7790_gpio##idx##_platform_data __initdata = {	\
+ 	.gpio_base	= 32 * (idx),					\
+ 	.irq_base	= 0,						\
+ 	.number_of_pins	= 32,						\
+@@ -103,7 +103,7 @@ void __init r8a7790_pinmux_init(void)
+ 
+ enum { SCIFA0, SCIFA1, SCIFB0, SCIFB1, SCIFB2, SCIFA2, SCIF0, SCIF1 };
+ 
+-static const struct plat_sci_port scif[] = {
++static struct plat_sci_port scif[] __initdata = {
+ 	SCIFA_DATA(SCIFA0, 0xe6c40000, gic_spi(144)), /* SCIFA0 */
+ 	SCIFA_DATA(SCIFA1, 0xe6c50000, gic_spi(145)), /* SCIFA1 */
+ 	SCIFB_DATA(SCIFB0, 0xe6c20000, gic_spi(148)), /* SCIFB0 */
+@@ -120,11 +120,11 @@ static inline void r8a7790_register_scif(int idx)
+ 				      sizeof(struct plat_sci_port));
+ }
+ 
+-static struct renesas_irqc_config irqc0_data = {
++static struct renesas_irqc_config irqc0_data __initdata = {
+ 	.irq_base = irq_pin(0), /* IRQ0 -> IRQ3 */
+ };
+ 
+-static struct resource irqc0_resources[] = {
++static struct resource irqc0_resources[] __initdata = {
+ 	DEFINE_RES_MEM(0xe61c0000, 0x200), /* IRQC Event Detector Block_0 */
+ 	DEFINE_RES_IRQ(gic_spi(0)), /* IRQ0 */
+ 	DEFINE_RES_IRQ(gic_spi(1)), /* IRQ1 */
+-- 
+1.7.10.4
