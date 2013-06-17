@@ -1,75 +1,57 @@
-From: rnayak@ti.com (Rajendra Nayak)
-Date: Mon, 17 Jun 2013 18:46:22 +0530
-Subject: [PATCH v2 1/2] ARM: OMAP2+: Powerdomain: Remove the need to always
- have a voltdm associated to a pwrdm
-In-Reply-To: <1371474983-29296-1-git-send-email-rnayak@ti.com>
-References: <1371474983-29296-1-git-send-email-rnayak@ti.com>
-Message-ID: <1371474983-29296-2-git-send-email-rnayak@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jun 2013 14:19:28 +0100
+Subject: [GIT PULL] nommu-fixes, r7 and MPU support for 3.11
+In-Reply-To: <51B27207.8060208@arm.com>
+References: <51B232CA.9060700@arm.com> <51B27207.8060208@arm.com>
+Message-ID: <20130617131927.GE2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The powerdomain framework currently expects all powerdomains to be associated with
-a corresponding voltagedomain. For some SoCs' (like the already existing AM33xx
-family, or for the upcoming AM437x and DRA7 SoCs') which
-do not have a Voltage controller/Voltage Processor (neither the SR I2C
-bus to communicate with the PMIC) there is no need for a Powerdomain to have
-a voltage domain association since there is no auto-scaling of voltages possible
-using the voltage FSM.
+On Sat, Jun 08, 2013 at 12:51:35AM +0100, Jonathan Austin wrote:
+> This is rebased (and re-tested) on your devel-stable branch because
+> otherwise there were going to be conflicts with Uwe's V7M work now that
+> you've merged that. I've included the fix for limiting MPU to CPU_V7.
 
-Extend the arch operations to add an api which the powerdomain core can
-then use to identify if a voltdm lookup and association for a powerdomain
-is really needed.
+It looks like you have some rebasing errors:
 
-Acked-by: Nishanth Menon <nm@ti.com>
-Acked-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Signed-off-by: Rajendra Nayak <rnayak@ti.com>
----
- arch/arm/mach-omap2/powerdomain.c |    5 +++++
- arch/arm/mach-omap2/powerdomain.h |    2 ++
- 2 files changed, 7 insertions(+)
+In your 75709659007e7c33153129082bd85dfb74427078:
 
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 86babd7..e233dfc 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -102,6 +102,10 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
- 	if (_pwrdm_lookup(pwrdm->name))
- 		return -EEXIST;
- 
-+	if (arch_pwrdm && arch_pwrdm->pwrdm_has_voltdm)
-+		if (!arch_pwrdm->pwrdm_has_voltdm())
-+			goto skip_voltdm;
-+
- 	voltdm = voltdm_lookup(pwrdm->voltdm.name);
- 	if (!voltdm) {
- 		pr_err("powerdomain: %s: voltagedomain %s does not exist\n",
-@@ -111,6 +115,7 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
- 	pwrdm->voltdm.ptr = voltdm;
- 	INIT_LIST_HEAD(&pwrdm->voltdm_node);
- 	voltdm_add_pwrdm(voltdm, pwrdm);
-+skip_voltdm:
- 	spin_lock_init(&pwrdm->_lock);
- 
- 	list_add(&pwrdm->node, &pwrdm_list);
-diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-index 140c360..9701ad5 100644
---- a/arch/arm/mach-omap2/powerdomain.h
-+++ b/arch/arm/mach-omap2/powerdomain.h
-@@ -166,6 +166,7 @@ struct powerdomain {
-  * @pwrdm_disable_hdwr_sar: Disable Hardware Save-Restore feature for a pd
-  * @pwrdm_set_lowpwrstchange: Enable pd transitions from a shallow to deep sleep
-  * @pwrdm_wait_transition: Wait for a pd state transition to complete
-+ * @pwrdm_has_voltdm: Check if a voltdm association is needed
-  *
-  * Regarding @pwrdm_set_lowpwrstchange: On the OMAP2 and 3-family
-  * chips, a powerdomain's power state is not allowed to directly
-@@ -196,6 +197,7 @@ struct pwrdm_ops {
- 	int	(*pwrdm_disable_hdwr_sar)(struct powerdomain *pwrdm);
- 	int	(*pwrdm_set_lowpwrstchange)(struct powerdomain *pwrdm);
- 	int	(*pwrdm_wait_transition)(struct powerdomain *pwrdm);
-+	int	(*pwrdm_has_voltdm)(void);
- };
- 
- int pwrdm_register_platform_funcs(struct pwrdm_ops *custom_funcs);
--- 
-1.7.9.5
+@@ -1414,7 +1414,8 @@ config SMP
+        depends on CPU_V6K || CPU_V7
+        depends on GENERIC_CLOCKEVENTS
+        depends on HAVE_SMP
+-       depends on MMU
++       depends on MMU || ARM_MPU
++       select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+
+Yet, 4c3ffffdbca2e6f6f5125fa7b149d87a13f92c94 (ARM: Push selects for TWD/SCU into
+machine entries), that select was removed because it was moved elsewhere:
+
+@@ -1400,7 +1402,6 @@ config SMP
+        depends on GENERIC_CLOCKEVENTS
+        depends on HAVE_SMP
+        depends on MMU
+-       select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
+
+In arch/arm/include/asm/tlbflush.h:
+
++static inline void local_flush_tlb_all(void)                                                                  { }
+
+Yes, the lines are really that long - needlessly.  What's wrong with:
+
++static inline void local_flush_tlb_all(void)
++{
++}
+
+?
+
++               if ((cpsr & MODE32_BIT) && !IS_ENABLED(CONFIG_ARM_MPU)) {
+                        /*
+                         * 32-bit code can use the new high-page
+-                        * signal return code support.
++                        * signal return code support except when the MPU has
++                        * protected the vectors page from PL0
+
+Note that this means you can't support NX, because you need your stack to
+be executable.  You need to ensure that arm_elf_read_implies_exec()
+returns appropriately for MPU (it needs to return 1 for MPU.)
