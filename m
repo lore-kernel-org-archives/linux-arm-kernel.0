@@ -1,58 +1,62 @@
-From: fabio.baltieri@linaro.org (Fabio Baltieri)
-Date: Mon, 17 Jun 2013 12:08:15 +0200
-Subject: [PATCH] spi: pl022: remove unused ret and pins_state variables
-Message-ID: <1371463695-21252-1-git-send-email-fabio.baltieri@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Jun 2013 11:10:50 +0100
+Subject: [PATCH] arm: versatile: don't mark pen as __INIT
+In-Reply-To: <alpine.LFD.2.03.1306111136060.18597@syhkavp.arg>
+References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
+ <20130610232441.GI18614@n2100.arm.linux.org.uk>
+ <20130611090459.GA9529@e106331-lin.cambridge.arm.com>
+ <alpine.LFD.2.03.1306111136060.18597@syhkavp.arg>
+Message-ID: <20130617101050.GD6809@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Removes the warnings:
+On Tue, Jun 11, 2013 at 04:43:59PM +0100, Nicolas Pitre wrote:
+> On Tue, 11 Jun 2013, Mark Rutland wrote:
+> 
+> > On Tue, Jun 11, 2013 at 12:24:41AM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, Jun 10, 2013 at 04:07:24PM +0100, Mark Rutland wrote:
+> > > > When booting fewer cores than are physically present on a versatile
+> > > > platform (e.g. when passing maxcpus=N on the command line), some
+> > > > secondary cores may remain in the holding pen, which is marked __INIT.
+> > > > Late in the boot process, the memory comprising the holding pen will be
+> > > > released to the kernel for more general use, and may be overwritten with
+> > > > arbitrary data, which can cause the held secondaries to start behaving
+> > > > unpredictably. This can lead to all manner of odd behaviour from the
+> > > > kernel.
+> > > > 
+> > > > Instead don't mark the section as __INIT. This means we can't reuse the
+> > > > pen memory, but we won't get secondaries corrupting the rest of the
+> > > > kernel.
+> > > 
+> > > __CPUINIT is appropriate here; __CPUINIT will be kept around if you have
+> > > hotplug CPU suport, but if you don't it will be discarded after all
+> > > secondary CPUs have booted.  And without hotplug CPU, you can't ask
+> > > for the offline CPUs to be onlined.
+> > 
+> > Since 384a290283: "ARM: gic: use a private mapping for CPU target interfaces",
+> > each CPU's gic_cpu_map entry is initialised to 0xff, so a call to
+> > gic_raise_softirq will target *all* CPUs attached to the GIC if one of the CPUs
+> > targetted has not been initialised.
+> > 
+> > Thus any call to versatile_boot_secondary will wake up *all* secondaries
+> > physically present, throwing them all into the pen. If we use a subset of these
+> > (e.g. from having "maxcpus=N" on the command line), some will be left in the
+> > pen, even though we didn't ask for them explicitly. This will happen with or
+> > without CPU_HOTPLUG.
+> > 
+> > Another option would be to add an optional description of a CPU's gic id to the
+> > dt, which would allow us to avoid throwing these secondaries into the pen in
+> > the first place.
+> 
+> You mean adding extra description in DT for hardware information that is 
+> already perfectly self-discoverable, plus the code to parse it, just for 
+> those rare cases where someone might want to use maxcpus=N on the kernel 
+> cmdline while CONFIG_CPU_HOTPLUG=n ?
+> 
+> IMHO removing __CPUINIT from the holding pen is probably the preferable 
+> alternative.
 
-drivers/spi/spi-pl022.c: In function 'pl022_suspend_resources':
-drivers/spi/spi-pl022.c:2322:24: warning: unused variable 'pins_state' [-Wunused-variable]
-drivers/spi/spi-pl022.c:2321:6: warning: unused variable 'ret' [-Wunused-variable]
-drivers/spi/spi-pl022.c: In function 'pl022_resume_resources':
-drivers/spi/spi-pl022.c:2334:6: warning: unused variable 'ret' [-Wunused-variable]
-
-introduced in:
-
-f1c9cf0 spi: pl022: use pinctrl PM helpers
-
-Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
----
-
-Hi Linus,
-
-this is just a quick build warning fixup patch found while playing with
-today's linux-next, should apply cleanly on pinctrl/for-next.
+Ok, could I take that as your ack on the original patch?
 
 Thanks,
-Fabio
-
- drivers/spi/spi-pl022.c | 5 -----
- 1 file changed, 5 deletions(-)
-
-diff --git a/drivers/spi/spi-pl022.c b/drivers/spi/spi-pl022.c
-index 9652189..abef061 100644
---- a/drivers/spi/spi-pl022.c
-+++ b/drivers/spi/spi-pl022.c
-@@ -2318,9 +2318,6 @@ pl022_remove(struct amba_device *adev)
-  */
- static void pl022_suspend_resources(struct pl022 *pl022, bool runtime)
- {
--	int ret;
--	struct pinctrl_state *pins_state;
--
- 	clk_disable(pl022->clk);
- 
- 	if (runtime)
-@@ -2331,8 +2328,6 @@ static void pl022_suspend_resources(struct pl022 *pl022, bool runtime)
- 
- static void pl022_resume_resources(struct pl022 *pl022, bool runtime)
- {
--	int ret;
--
- 	/* First go to the default state */
- 	pinctrl_pm_select_default_state(&pl022->adev->dev);
- 	if (!runtime)
--- 
-1.8.2
+Mark.
