@@ -1,94 +1,52 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Jun 2013 10:57:03 -0700
-Subject: [PATCH v10 1/2] ARM: davinci: move private EDMA API to arm/common
-In-Reply-To: <083BC63EECB6FD41B8E81CF7FD87CC0F2E4E95C2@DLEE08.ent.ti.com>
-References: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
- <1371463571-2578-2-git-send-email-nsekhar@ti.com>
- <20130617170326.GA28497@quad.lixom.net>
- <083BC63EECB6FD41B8E81CF7FD87CC0F2E4E95C2@DLEE08.ent.ti.com>
-Message-ID: <CAOesGMgX=7mOtY9UN5iJNiCDTieXZpkLB-ceL1m_r0UZ_OSr0g@mail.gmail.com>
+From: baruch@tkos.co.il (Baruch Siach)
+Date: Mon, 17 Jun 2013 21:02:11 +0300
+Subject: [PATCHv2 0/6] Make ARM's sched_clock generic + 64 bit friendly
+In-Reply-To: <51BF37E4.8020006@linaro.org>
+References: <1370155183-31421-1-git-send-email-sboyd@codeaurora.org>
+ <51AD32A4.5070609@linaro.org>
+ <20130604160907.GW27516@mudshark.cambridge.arm.com>
+ <51AE2980.6010005@linaro.org> <20130616094501.GG10269@tarshish>
+ <51BF37E4.8020006@linaro.org>
+Message-ID: <20130617180211.GJ10269@tarshish>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 10:55 AM, Fernandes, Joel A <joelagnel@ti.com> wrote:
-> Hi Olof,
->
->> -----Original Message-----
->> From: Olof Johansson [mailto:olof at lixom.net]
->> Sent: Monday, June 17, 2013 12:03 PM
->> To: Nori, Sekhar
->> Cc: Russell King; Vinod Koul; Chris Ball; Liam Girdwood; Mark Brown; Kevin
->> Hilman; Matt Porter; Fernandes, Joel A; linux-arm-kernel at lists.infradead.org;
->> davinci-linux-open-source at linux.davincidsp.com; linux-mmc at vger.kernel.org;
->> alsa-devel at alsa-project.org; Arnd Bergmann
->> Subject: Re: [PATCH v10 1/2] ARM: davinci: move private EDMA API to
->> arm/common
->>
->> On Mon, Jun 17, 2013 at 03:36:10PM +0530, Sekhar Nori wrote:
->> > From: Matt Porter <mporter@ti.com>
->> >
->> > Move mach-davinci/dma.c to common/edma.c so it can be used by OMAP
->> > (specifically AM33xx) as well.
->> >
->> > Signed-off-by: Matt Porter <mporter@ti.com>
->> > Acked-by: Chris Ball <cjb@laptop.org> # davinci_mmc.c
->> > [nsekhar at ti.com: dropped davinci sffsdr changes]
->> > Signed-off-by: Sekhar Nori <nsekhar@ti.com>
->>
->> Acked-by: Olof Johansson <olof@lixom.net>
->>
->> Tiny nit below, no need to respin just for that.
->>
->> I suppose we should take this through arm-soc.
->>
->> > ---
->> >  arch/arm/Kconfig                                   |    1 +
->> >  arch/arm/common/Kconfig                            |    3 +
->> >  arch/arm/common/Makefile                           |    1 +
->> >  arch/arm/{mach-davinci/dma.c => common/edma.c}     |    2 +-
->> >  arch/arm/mach-davinci/Makefile                     |    2 +-
->> >  arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
->> >  arch/arm/mach-davinci/davinci.h                    |    2 +-
->> >  arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
->> >  arch/arm/mach-davinci/devices.c                    |    6 +-
->> >  arch/arm/mach-davinci/dm355.c                      |    2 +-
->> >  arch/arm/mach-davinci/dm365.c                      |    2 +-
->> >  arch/arm/mach-davinci/dm644x.c                     |    2 +-
->> >  arch/arm/mach-davinci/dm646x.c                     |    2 +-
->> >  arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
->> >  drivers/dma/edma.c                                 |    2 +-
->> >  drivers/mmc/host/davinci_mmc.c                     |    1 +
->> >  include/linux/mfd/davinci_voicecodec.h             |    3 +-
->> >  .../mach => include/linux/platform_data}/edma.h    |   89 +-------------------
->> >  include/linux/platform_data/spi-davinci.h          |    2 +-
->> >  sound/soc/davinci/davinci-evm.c                    |    1 +
->> >  sound/soc/davinci/davinci-pcm.c                    |    1 +
->> >  sound/soc/davinci/davinci-pcm.h                    |    2 +-
->> >  22 files changed, 29 insertions(+), 103 deletions(-)  rename
->> > arch/arm/{mach-davinci/dma.c => common/edma.c} (99%)  rename
->> > {arch/arm/mach-davinci/include/mach =>
->> > include/linux/platform_data}/edma.h (59%)
->> >
->> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
->> > 49d993c..b1c66a4 100644
->> > --- a/arch/arm/Kconfig
->> > +++ b/arch/arm/Kconfig
->> > @@ -840,6 +840,7 @@ config ARCH_DAVINCI
->> >     select GENERIC_IRQ_CHIP
->> >     select HAVE_IDE
->> >     select NEED_MACH_GPIO_H
->> > +   select TI_PRIV_EDMA
->>
->> What does PRIV here mean? Privileged? Private? I think it can be shortened to
->> TI_EDMA.
->>
->  [Joel] TI_EDMA already exists. It is used to build drivers/dma/edma.
-> I have a patch that reuses the TI_EDMA option instead of the PRIV one . I will
-> include that In my v11 series for EDMA (v10 was just posted) . If its ok, let us
-> merge Sekhar's patch as-is, and then mine will get rid of the PRIV option
-> (among other things).
+Hi John,
 
-Ok, fair enough. As I said, small nit.
+On Mon, Jun 17, 2013 at 09:23:00AM -0700, John Stultz wrote:
+> On 06/16/2013 02:45 AM, Baruch Siach wrote:
+> >On Tue, Jun 04, 2013 at 10:53:04AM -0700, John Stultz wrote:
+> >>On 06/04/2013 09:09 AM, Will Deacon wrote:
+> >>>On Tue, Jun 04, 2013 at 01:19:48AM +0100, John Stultz wrote:
+> >>>>On 06/01/2013 11:39 PM, Stephen Boyd wrote:
+> >>>>>This is mostly a resend of a patch series I sent a little over a month
+> >>>>>ago. I've reordered the patches so that John can pick up the first three
+> >>>>>and get a generic sched_clock layer without having to take the 64 bit
+> >>>>>patches. The last three patches add 64 bit support and move the architected
+> >>>>>timers on ARM64 and ARM to use it.
+> >>>>Yea, so from the initial look over it, I think I'm happy with queuing
+> >>>>the first three patches, although I'd like to get some acks from arm
+> >>>>folks on at least the first two, just so no one is surprised with it
+> >>>>going through the -tip tree.
+> >>>The first two patches are pretty simple so, FWIW, you can add my ack on those:
+> >>>
+> >>>   Acked-by: Will Deacon <will.deacon@arm.com>
+> >>Thanks! Added to the commits.
+> >What is the status of this series then? Is there a chance of seeing it in
+> >3.11? I want to base some xtensa architecture work on this, so I'd like to
+> >know whether there is a stable base to start from.
+> I've got the first three in my internal tree, and was going to send
+> it by Thomas for 3.11 this week.
 
+Good, thanks. This means that the xtensa ccount sched_clock patch 
+(http://lists.linux-xtensa.org/pipermail/linux-xtensa/Week-of-Mon-20130617/001077.html) 
+that depends on the third patch in this series, can go in for 3.11, if the 
+xtensa maintainer acks it (added to Cc). How should we handle the dependency 
+then?
 
--Olof
+baruch
+
+-- 
+     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
+=}------------------------------------------------ooO--U--Ooo------------{=
+   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
