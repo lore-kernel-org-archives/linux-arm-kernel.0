@@ -1,112 +1,77 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:33:51 +0200
-Subject: [PATCH v2 06/38] ARM: EXYNOS: common: Remove legacy UART
+Date: Mon, 17 Jun 2013 18:33:53 +0200
+Subject: [PATCH v2 08/38] ARM: EXYNOS: common: Remove legacy interrupt
  initialization code
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-7-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-9-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes legacy UART initialization code that was used to
-set up UART platform devices when booting with ATAGS, which is not
-supported on Exynos any more.
+This patch removes legacy IRQ initialization code that was used to set
+up interrupt handling when booting with ATAGS, which is not supported
+any more.
 
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/common.c | 17 -----------------
- arch/arm/plat-samsung/init.c  |  8 +++++---
- 2 files changed, 5 insertions(+), 20 deletions(-)
+ arch/arm/mach-exynos/common.c | 30 +-----------------------------
+ 1 file changed, 1 insertion(+), 29 deletions(-)
 
 diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 488d9bd..598e4b8 100644
+index 598e4b8..9626ce4 100644
 --- a/arch/arm/mach-exynos/common.c
 +++ b/arch/arm/mach-exynos/common.c
-@@ -69,7 +69,6 @@ static const char name_exynos5440[] = "EXYNOS5440";
- static void exynos4_map_io(void);
- static void exynos5_map_io(void);
- static void exynos5440_map_io(void);
--static void exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no);
- static int exynos_init(void);
+@@ -41,7 +41,6 @@
+ #include <mach/regs-irq.h>
+ #include <mach/regs-pmu.h>
+ #include <mach/regs-gpio.h>
+-#include <mach/irqs.h>
  
- unsigned long xxti_f = 0, xusbxti_f = 0;
-@@ -79,21 +78,18 @@ static struct cpu_table cpu_ids[] __initdata = {
- 		.idcode		= EXYNOS4210_CPU_ID,
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
--		.init_uarts	= exynos4_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4210,
- 	}, {
- 		.idcode		= EXYNOS4212_CPU_ID,
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
--		.init_uarts	= exynos4_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4212,
- 	}, {
- 		.idcode		= EXYNOS4412_CPU_ID,
- 		.idmask		= EXYNOS4_CPU_MASK,
- 		.map_io		= exynos4_map_io,
--		.init_uarts	= exynos4_init_uarts,
- 		.init		= exynos_init,
- 		.name		= name_exynos4412,
- 	}, {
-@@ -602,16 +598,3 @@ static int __init exynos_init(void)
- 
- 	return device_register(&exynos4_dev);
+ #include <plat/cpu.h>
+ #include <plat/devs.h>
+@@ -486,41 +485,14 @@ void __init exynos_init_time(void)
+ 	}
  }
--
--/* uart registration process */
--
--static void __init exynos4_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+ 
+-static unsigned int max_combiner_nr(void)
 -{
--	struct s3c2410_uartcfg *tcfg = cfg;
--	u32 ucnt;
--
--	for (ucnt = 0; ucnt < no; ucnt++, tcfg++)
--		tcfg->has_fracval = 1;
--
--	s3c24xx_init_uartdevs("exynos4210-uart", exynos4_uart_resources, cfg, no);
+-	if (soc_is_exynos5250())
+-		return EXYNOS5_MAX_COMBINER_NR;
+-	else if (soc_is_exynos4412())
+-		return EXYNOS4412_MAX_COMBINER_NR;
+-	else if (soc_is_exynos4212())
+-		return EXYNOS4212_MAX_COMBINER_NR;
+-	else
+-		return EXYNOS4210_MAX_COMBINER_NR;
 -}
-diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
-index 79d10fc..3e5c461 100644
---- a/arch/arm/plat-samsung/init.c
-+++ b/arch/arm/plat-samsung/init.c
-@@ -87,7 +87,7 @@ void __init s3c24xx_init_clocks(int xtal)
- }
- 
- /* uart management */
 -
-+#if IS_ENABLED(CONFIG_SAMSUNG_ATAGS)
- static int nr_uarts __initdata = 0;
- 
- static struct s3c2410_uartcfg uart_cfgs[CONFIG_SERIAL_SAMSUNG_UARTS];
-@@ -134,11 +134,12 @@ void __init s3c24xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
- 	if (cpu == NULL)
- 		return;
- 
--	if (cpu->init_uarts == NULL) {
-+	if (cpu->init_uarts == NULL && IS_ENABLED(CONFIG_SAMSUNG_ATAGS)) {
- 		printk(KERN_ERR "s3c24xx_init_uarts: cpu has no uart init\n");
- 	} else
- 		(cpu->init_uarts)(cfg, no);
- }
-+#endif
- 
- static int __init s3c_arch_init(void)
+-
+ void __init exynos4_init_irq(void)
  {
-@@ -152,8 +153,9 @@ static int __init s3c_arch_init(void)
- 	ret = (cpu->init)();
- 	if (ret != 0)
- 		return ret;
+-	unsigned int gic_bank_offset;
 -
-+#if IS_ENABLED(CONFIG_SAMSUNG_ATAGS)
- 	ret = platform_add_devices(s3c24xx_uart_devs, nr_uarts);
-+#endif
- 	return ret;
+-	gic_bank_offset = soc_is_exynos4412() ? 0x4000 : 0x8000;
+-
+-	if (!of_have_populated_dt())
+-		gic_init_bases(0, IRQ_PPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU, gic_bank_offset, NULL);
+-	else
+-		irqchip_init();
+-
+-	if (!of_have_populated_dt())
+-		combiner_init(S5P_VA_COMBINER_BASE, NULL,
+-			      max_combiner_nr(), COMBINER_IRQ(0, 0));
+-
+-	gic_arch_extn.irq_set_wake = s3c_irq_wake;
++	irqchip_init();
  }
  
+ void __init exynos5_init_irq(void)
+ {
+ 	irqchip_init();
+-	gic_arch_extn.irq_set_wake = s3c_irq_wake;
+ }
+ 
+ struct bus_type exynos_subsys = {
 -- 
 1.8.2.1
