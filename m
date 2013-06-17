@@ -1,65 +1,35 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:34:01 +0200
-Subject: [PATCH v2 16/38] ARM: SAMSUNG: Compile legacy IRQ and GPIO PM code
- only with ATAGS support
+Date: Mon, 17 Jun 2013 18:34:16 +0200
+Subject: [PATCH v2 31/38] cpufreq: exynos4x12: Remove check for SOC_EXYNOS4412
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-17-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-32-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds new Kconfig symbols, SAMSUNG_PM_GPIO and S5P_IRQ_PM that
-get enabled when GPIO_SAMSUNG, PM and S5P_PM are enabled, but only if
-SAMSUNG_ATAGS is selected.
+Since SOC_EXYNOS4412 Kconfig symbol has been removed, it is enough to
+check for SOC_EXYNOS4212 for both SoCs from Exynos4x12 series.
 
+Cc: linux-pm at vger.kernel.org
+Cc: Viresh Kumar <viresh.kumar@linaro.org>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/Kconfig  | 13 +++++++++++++
- arch/arm/plat-samsung/Makefile |  5 +++--
- 2 files changed, 16 insertions(+), 2 deletions(-)
+ drivers/cpufreq/Kconfig.arm | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index c0f0542..7b08b26 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -421,6 +421,19 @@ config S3C_DMA
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index a924408..b214ad6 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -32,7 +32,7 @@ config ARM_EXYNOS4210_CPUFREQ
+ 	  SoC (S5PV310 or S5PC210).
+ 
+ config ARM_EXYNOS4X12_CPUFREQ
+-	def_bool (SOC_EXYNOS4212 || SOC_EXYNOS4412)
++	def_bool SOC_EXYNOS4212
  	help
- 	  Internal configuration for S3C DMA core
- 
-+config S5P_IRQ_PM
-+	bool
-+	default y if S5P_PM
-+	help
-+	  Legacy IRQ power management for S5P platforms
-+
-+config SAMSUNG_PM_GPIO
-+	bool
-+	default y if GPIO_SAMSUNG && PM
-+	help
-+	  Include legacy GPIO power management code for platforms not using
-+	  pinctrl-samsung driver.
-+
- endif
- 
- config SAMSUNG_DMADEV
-diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-index b549ea9..6348ae2 100644
---- a/arch/arm/plat-samsung/Makefile
-+++ b/arch/arm/plat-samsung/Makefile
-@@ -52,10 +52,11 @@ obj-$(CONFIG_SAMSUNG_DMADEV)	+= dma-ops.o
- # PM support
- 
- obj-$(CONFIG_PM)		+= pm.o
--obj-$(CONFIG_PM)		+= pm-gpio.o
-+obj-$(CONFIG_SAMSUNG_PM_GPIO)	+= pm-gpio.o
- obj-$(CONFIG_SAMSUNG_PM_CHECK)	+= pm-check.o
- 
- obj-$(CONFIG_SAMSUNG_WAKEMASK)	+= wakeup-mask.o
- 
--obj-$(CONFIG_S5P_PM)		+= s5p-pm.o s5p-irq-pm.o
-+obj-$(CONFIG_S5P_PM)		+= s5p-pm.o
-+obj-$(CONFIG_S5P_IRQ_PM)	+= s5p-irq-pm.o
- obj-$(CONFIG_S5P_SLEEP)		+= s5p-sleep.o
+ 	  This adds the CPUFreq driver for Samsung EXYNOS4X12
+ 	  SoC (EXYNOS4212 or EXYNOS4412).
 -- 
 1.8.2.1
