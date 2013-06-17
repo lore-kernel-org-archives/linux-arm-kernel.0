@@ -1,33 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 17:48:23 +0200
-Subject: [PATCH v2] pinctrl: rockchip: correctly handle arguments of
- pinconf options
-In-Reply-To: <201306161741.17048.heiko@sntech.de>
-References: <201306141741.46077.heiko@sntech.de>
- <201306161302.32156.heiko@sntech.de>
- <CACRpkdZxO-8rQPBRPsxAx8OBfwvh_BQuts7NAi379gMZG+1ocg@mail.gmail.com>
- <201306161741.17048.heiko@sntech.de>
-Message-ID: <CACRpkdZx9pjfqzn_keKTGGPsP1jHOY2=4OQX9mmymeo9EPn=Cg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 17 Jun 2013 16:48:30 +0100
+Subject: [GIT PULL] nommu-fixes, r7 and MPU support for 3.11
+In-Reply-To: <51BF2A59.6070400@arm.com>
+References: <51B232CA.9060700@arm.com> <51B27207.8060208@arm.com>
+ <20130617131927.GE2718@n2100.arm.linux.org.uk> <51BF2A59.6070400@arm.com>
+Message-ID: <20130617154830.GK2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 5:41 PM, Heiko St?bner <heiko@sntech.de> wrote:
+On Mon, Jun 17, 2013 at 04:25:13PM +0100, Jonathan Austin wrote:
+> > You need to ensure that arm_elf_read_implies_exec()
+> > returns appropriately for MPU (it needs to return 1 for MPU.)
+> > 
+> 
+> This requirement I wasn't aware of, however. Is it still relevant when we don't have
+> elf support (which we don't, without an MMU?)
+> 
+> It looks to me like binfmt_flat never uses elf_read_implies_exec()...
 
-> Change the rockchip pinctrl driver to handle the arguments to the pull
-> pinconfig options correctly. So only accept non-0 values for the
-> pull options as the rockchip pin-controller can only turn pulls on and
-> off (this via BIAS_DISABLE).
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> changes since v1:
->  really respect the values for arguments of the pull options (aka 0 is not
->  meant to turn off a pull).
->  Replacing the patch also makes sure that no wrong knowledge stays in the
->  kernel via the old commit message, least somebody else reads it and takes
->  it as true.
+Well, something needs to set READ_IMPLIES_EXEC in the personality bitmask.
+It's not a biggie as the hardware doesn't honour PROT_EXEC, but it's
+something to bear in mind if you ever do consider adding that support.
 
-OK took out the v1 and put in this v2 version instead...
-
-Thanks!
-Linus Walleij
+It's interesting that the nommu code does seem to honour READ_IMPLIES_EXEC,
+but I haven't found anywhere in the nommu stuff which sets this flag..
+but then I haven't looked that hard.
