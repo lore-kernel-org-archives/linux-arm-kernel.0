@@ -1,78 +1,35 @@
 From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 11:28:57 -0700 (PDT)
-Subject: [RFC PATCH 06/11] dma: amba-pl08x: Keep LLIs aligned to 4-word
- boundary
-In-Reply-To: <CACRpkdYzag=sKo87i6H3M_fSQuRiTX3_2-ZhQA+4S7ejZN5j4A@mail.gmail.com>
+Date: Mon, 17 Jun 2013 20:32:38 +0200
+Subject: [RFC PATCH 07/11] dmaengine: PL08x: Fix reading the byte count in
+ cctl
+In-Reply-To: <CACRpkdZW0+wcVGrj1fD-1-UigjVQA7Wad7wEQ2CxFoyod2-YpQ@mail.gmail.com>
 References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-7-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdYzag=sKo87i6H3M_fSQuRiTX3_2-ZhQA+4S7ejZN5j4A@mail.gmail.com>
-Message-ID: <1689769.rtxlYhhpTQ@flatron>
+ <1371416058-22047-8-git-send-email-tomasz.figa@gmail.com>
+ <CACRpkdZW0+wcVGrj1fD-1-UigjVQA7Wad7wEQ2CxFoyod2-YpQ@mail.gmail.com>
+Message-ID: <2846792.ysBnunQQWS@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 of June 2013 15:51:20 Linus Walleij wrote:
+On Monday 17 of June 2013 15:53:14 Linus Walleij wrote:
 > On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> 
 wrote:
-> > PL080 reference manual states that to LLI entries should be aligned
-> > to 4-word boundary to make LLI fetches more efficient. This patch adds
-> > a 3-word padding to the LLi struct to make this condition true.
+> > From: Alban Bedel <alban.bedel@avionic-design.de>
 > > 
+> > There are more fields than just SWIDTH in CH_CONTROL register, so read
+> > register value must be masked in addition to shifting.
+> > 
+> > Signed-off-by: Alban Bedel <alban.bedel@avionic-design.de>
 > > Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> > ---
-> > 
-> >  drivers/dma/amba-pl08x.c | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> > index eb10eb8..0da5539 100644
-> > --- a/drivers/dma/amba-pl08x.c
-> > +++ b/drivers/dma/amba-pl08x.c
-> > @@ -127,6 +127,7 @@ struct pl08x_lli {
-> > 
-> >         u32 lli;
-> >         u32 cctl;
-> >         u32 cctl1;
-> > 
-> > +       u32 dummy[3];
 > 
-> Atleast put a comment into the code explaining what this is all
-> about. Or someone will add another member to the struct and
-> all is lost. Call it "padding" rather than dummy.
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> >  };
-> 
-> So it used to be like this before you added cctl1:
-> 
-> struct pl08x_lli {
->         u32 src;
->         u32 dst;
->         u32 lli;
->         u32 cctl;
-> };
-> 
-> Meaning it was 3 words.
-> 
-> And now you make it take 8 words for everyone.
-> 
-> Atleast this patch should be squashed into the patch
-> adding cctl1.
-> 
-> But I really don't like this fragile way of casting structs right
-> into memory, and I don't like that teh other PL080's also have
-> to waste 8 words when their LLIs fit so nicely into 4.
-> 
-> I would have solved this problem by creating a
-> marshalling function that just allocate the number of bytes the
-> LLI entry shall have and fill it in by assigning directly to the
-> precise target memory cell. This way the LLIs will take
-> 4 words on the original variants and you can use some
-> nice logic to pad out to 8 words on the PL080S variant.
+> Are we just lucky on current variants such that all unmasked bits
+> happen to be zero on them?
 
-Definitely a valid point. I'll see what I can do about it.
-
-I was thinking about it originally, but I couldn't find any really good 
-solution for this so I just went with this extremely simple approach as a 
-proof of concept and to show the problem. :)
+This is really interesting, because if you look at the bit layout, there 
+is a lot of other bitfields above the SWIDTH field, like DWIDTH, src and 
+dest AHB master selection, src and dest incerement setting, protection and 
+terminal count interrupt enable bits.
 
 Best regards,
 Tomasz
