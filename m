@@ -1,32 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 17 Jun 2013 14:20:05 +0100
-Subject: [GIT PULL] arm: arch_timer cleanups and niceties for 3.11
-In-Reply-To: <20130611100457.GB22334@e106331-lin.cambridge.arm.com>
-References: <20130607173902.GJ23311@e106331-lin.cambridge.arm.com>
- <20130611100457.GB22334@e106331-lin.cambridge.arm.com>
-Message-ID: <20130617132005.GF2718@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 17 Jun 2013 09:22:14 -0400
+Subject: [PATCH v2 0/2] Remove unused voltagedomain data for AM33xx
+In-Reply-To: <1371474983-29296-1-git-send-email-rnayak@ti.com>
+References: <1371474983-29296-1-git-send-email-rnayak@ti.com>
+Message-ID: <51BF0D86.7090703@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 11:04:57AM +0100, Mark Rutland wrote:
-> On Fri, Jun 07, 2013 at 06:39:02PM +0100, Mark Rutland wrote:
-> > Hi Russell,
-> > 
-> > Please pull these arch_timer cleanups I've been holding onto for a while.
-> > They're the same as my last posting [1], but have been rebased to v3.10-rc3.
-> > 
-> > Thanks,
-> > Mark.
-> > 
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2013-May/170602.html
+On Monday 17 June 2013 09:16 AM, Rajendra Nayak wrote:
+> Hi,
 > 
-> It looks like there was a final ARM_ARCH_TIMER select in multi_v7_defconfig
-> that's causing architected timer support to not get selected, which the patch
-> below should fix if appended to the series. I've grepped for ARM_ARCH_TIMER,
-> and it looks like it's the the last remaining occurence.
+> The powerdomain framework currently expects to always have a voltagedomain
+> associated with a given powerdomain. We already have AM33xx which
+> has no Voltage Controller/Voltage Processor as part of PRCM.
+> There are more SoCs' to follow starting with AM437x and DRA7xx
+> which do not have VC/VP. All these SoCs', hence do not support any
+> form of auto-scaling of voltages, that was possible on earlier OMAPs'
+> using the VFSM to trigger an i2c communication to the PMIC automatically
+> on hitting a low power state.
+> 
+> Instead of adding dummy voltage domain data files, like was done for the
+> AM33xx case, make the powerdomain framework aware of the fact that some
+> SoCs' might not really have support for auto-scaling of voltages in hw.
+> 
+> Patches are based of 3.10-rc6 and are boot tested on am335x bone.
+> 
+> Rajendra Nayak (2):
+>   ARM: OMAP2+: Powerdomain: Remove the need to always have a voltdm
+>     associated to a pwrdm
+>   ARM: AM33xx: Remove the unused voltagedomain data
+> 
+>  arch/arm/mach-omap2/Makefile                  |    1 -
+>  arch/arm/mach-omap2/io.c                      |    1 -
+>  arch/arm/mach-omap2/powerdomain.c             |    5 +++
+>  arch/arm/mach-omap2/powerdomain.h             |    2 ++
+>  arch/arm/mach-omap2/prm33xx.c                 |    7 ++++
+>  arch/arm/mach-omap2/voltage.h                 |    1 -
+>  arch/arm/mach-omap2/voltagedomains33xx_data.c |   43 -------------------------
+>  7 files changed, 14 insertions(+), 46 deletions(-)
+>  delete mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
+> 
+Nice !!
 
-So what do you want to do with this?  Is it needed to be included in your
-set of patches in your pull request?
-
-And I think I remember seeing some other patches related to this change
-too...
+FWIW, Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
