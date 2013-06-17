@@ -1,47 +1,56 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 17 Jun 2013 16:30:35 +0530
-Subject: [PATCH v3 10/10] ARM: Exynos: extend soft-reset support for Exynos5420
-In-Reply-To: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
-References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1371466836-4111-11-git-send-email-chander.kashyap@linaro.org>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 17 Jun 2013 16:31:24 +0530
+Subject: [PATCH v10 5/8] dmaengine: edma: Add TI EDMA device tree binding
+In-Reply-To: <1371263570-9323-5-git-send-email-joelagnel@ti.com>
+References: <1371263570-9323-1-git-send-email-joelagnel@ti.com>
+ <1371263570-9323-5-git-send-email-joelagnel@ti.com>
+Message-ID: <51BEEC84.1080102@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the soft reset support for Exynos5420 SoC.
+Grant, Rob,
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
----
- arch/arm/mach-exynos/common.c |   11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+Can one of you please take a look at this patch and see if you have any
+comments on the binding definition?
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 6f435da..4e6c227 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -330,10 +330,10 @@ void exynos5_restart(char mode, const char *cmd)
- 	u32 val;
- 	void __iomem *addr;
- 
--	if (of_machine_is_compatible("samsung,exynos5250")) {
--		val = 0x1;
--		addr = EXYNOS_SWRESET;
--	} else if (of_machine_is_compatible("samsung,exynos5440")) {
-+	val = 0x1;
-+	addr = EXYNOS_SWRESET;
-+
-+	if (of_machine_is_compatible("samsung,exynos5440")) {
- 		u32 status;
- 		np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
- 
-@@ -344,9 +344,6 @@ void exynos5_restart(char mode, const char *cmd)
- 		val = __raw_readl(addr);
- 
- 		val = (val & 0xffff0000) | (status & 0xffff);
--	} else {
--		pr_err("%s: cannot support non-DT\n", __func__);
--		return;
- 	}
- 
- 	__raw_writel(val, addr);
--- 
-1.7.9.5
+Joel,
+
+Ideally the bindings are described before they are used or along with
+its usage. In that aspect, this patch is present too far back in the
+series. Can you please fix this if you get to posting another version. I
+think I gave the same comment on v9 as well.
+
+On 6/15/2013 8:02 AM, Joel A Fernandes wrote:
+> From: Matt Porter <mdp@ti.com>
+> 
+> The binding definition is based on the generic DMA controller
+> binding.
+> 
+> Joel: Droped reserved and queue DT entries from Documentation
+> for now from the original patch series.
+> 
+> Signed-off-by: Matt Porter <mporter@ti.com>
+> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
+> ---
+>  Documentation/devicetree/bindings/dma/ti-edma.txt |   26 +++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
+> new file mode 100644
+> index 0000000..ada0018
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
+> @@ -0,0 +1,26 @@
+> +TI EDMA
+> +
+> +Required properties:
+> +- compatible : "ti,edma3"
+> +- ti,hwmods: Name of the hwmods associated to the EDMA
+
+ti,hwmods should be optional, no? hwmod is not present on DaVinci where
+EDMA is also used. If it is not optional then these bindings wont work
+there.
+
+Thanks,
+Sekhar
