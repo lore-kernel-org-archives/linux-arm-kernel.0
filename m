@@ -1,32 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jun 2013 17:07:21 +0200
-Subject: [PATCH] ARM: mm: cpu_fa526_do_idle: remove WFI
-In-Reply-To: <20130617143021.GI2718@n2100.arm.linux.org.uk>
-References: <1371476360-8751-1-git-send-email-jonas.jensen@gmail.com>
- <5020304.hteFFmWh1u@wuerfel> <20130617143021.GI2718@n2100.arm.linux.org.uk>
-Message-ID: <2819561.Rn435lDYbW@wuerfel>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 18 Jun 2013 00:10:50 +0900
+Subject: [PATCH V2] ARM: dts: Enable RTC node for Arndale
+In-Reply-To: <1371442179-23597-1-git-send-email-tushar.behera@linaro.org>
+References: <CAHbNUh2byimQ_ep0j9XkUjRFaU3K6YZE_ANcch5UhP4QsuZxPw@mail.gmail.com>
+ <1371442179-23597-1-git-send-email-tushar.behera@linaro.org>
+Message-ID: <51BF26FA.9010807@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013 15:30:21 Russell King - ARM Linux wrote:
-> > > diff --git a/arch/arm/mm/proc-fa526.S b/arch/arm/mm/proc-fa526.S
-> > > index d217e97..85280b1 100644
-> > > --- a/arch/arm/mm/proc-fa526.S
-> > > +++ b/arch/arm/mm/proc-fa526.S
-> > > @@ -81,9 +81,7 @@ ENDPROC(cpu_fa526_reset)
-> > >   */
-> > >     .align  4
-> > >  ENTRY(cpu_fa526_do_idle)
-> > > -   mcr     p15, 0, r0, c7, c0, 4           @ Wait for interrupt
-> > > -   mov     pc, lr
-> > > -
-> > > +   nop
-> 
-> It replaces the WFI and return with a pure nop, so we will fall through
-> to cpu_fa526_dcache_clean_area().  Do we really want to clean a random
-> D cache entry depending on what r0 happened to hold at this point?  I
-> think not...
+On 06/17/13 13:09, Tushar Behera wrote:
+> The issues reported in commit 522ccdb6fd0e ("ARM: dts: Disable the RTC
+> by default on exynos5") are no longer reproduced on EXYNOS5250 based
+> Arndale board. Hence re-enabling RTC support for Arndale board.
+>
+> This is helpful for testing S2R on Arndale board.
+>
+> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
+> ---
+> Changes for V2:
+> * RTC node is enabled only for Arndale board. Earlier it was enabled
+> in exynos5250.dtsi.
+>
+>   arch/arm/boot/dts/exynos5250-arndale.dts |    4 ++++
+>   1 file changed, 4 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5250-arndale.dts b/arch/arm/boot/dts/exynos5250-arndale.dts
+> index 02cfc76..b38080a 100644
+> --- a/arch/arm/boot/dts/exynos5250-arndale.dts
+> +++ b/arch/arm/boot/dts/exynos5250-arndale.dts
+> @@ -449,4 +449,8 @@
+>   			clock-frequency =<24000000>;
+>   		};
+>   	};
+> +
+> +	rtc {
+> +		status = "okay";
+> +	};
+>   };
 
-Right, I should have actually read the change...
+Applied, thanks.
 
-	Arnd
+- Kukjin
