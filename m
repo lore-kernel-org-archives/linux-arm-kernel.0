@@ -1,42 +1,51 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 17 Jun 2013 14:36:45 +0200
-Subject: [PATCH 0/5] ARM: at91: rm9200 dt updates
-Message-ID: <20130617123645.GA21034@game.jcrosoft.org>
+Date: Mon, 17 Jun 2013 14:38:26 +0200
+Subject: [PATCH 1/5] ARM: at91: at91_dt_defconfig: enable rm9200 support
+In-Reply-To: <20130617123645.GA21034@game.jcrosoft.org>
+References: <20130617123645.GA21034@game.jcrosoft.org>
+Message-ID: <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/configs/at91_dt_defconfig |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-	The following patch series enable rm9200 in the dt defconfig and add
-	- spi
-	- pqfp package version
-
-The following changes since commit 24ce10e142e7b063c4ae4437dd3b290fbfafe052:
-
-  ARM: at91: sam9m10g45ek add udc DT support (2013-06-15 00:15:22 +0200)
-
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git j/for-3.11-rm9200
-
-for you to fetch changes up to 0dab9f12eab58fdf876be8bb39432f7426615230:
-
-  ARM: at91: at91rm9200: set default mmc0 pinctrl-names (2013-06-17 20:37:26 +0800)
-
-----------------------------------------------------------------
-Jean-Christophe PLAGNIOL-VILLARD (5):
-      ARM: at91: at91_dt_defconfig: enable rm9200 support
-      ARM: at91: dt: rm9200: add spi support
-      ARM: at91: dt: rm9200ek: add spi support
-      ARM: AT91: dt: add at91rm9200 PQFP package version
-      ARM: at91: at91rm9200: set default mmc0 pinctrl-names
-
- arch/arm/boot/dts/at91rm9200.dtsi      |   21 +++++++++++++++++++++
- arch/arm/boot/dts/at91rm9200_pqfp.dtsi |   17 +++++++++++++++++
- arch/arm/boot/dts/at91rm9200ek.dts     |   10 ++++++++++
- arch/arm/configs/at91_dt_defconfig     |    4 +++-
- 4 files changed, 51 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/at91rm9200_pqfp.dtsi
-
-Best Regards,
-J.
+diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
+index 75fd842..690e892 100644
+--- a/arch/arm/configs/at91_dt_defconfig
++++ b/arch/arm/configs/at91_dt_defconfig
+@@ -14,11 +14,13 @@ CONFIG_MODULE_UNLOAD=y
+ # CONFIG_IOSCHED_DEADLINE is not set
+ # CONFIG_IOSCHED_CFQ is not set
+ CONFIG_ARCH_AT91=y
++CONFIG_SOC_AT91RM9200=y
+ CONFIG_SOC_AT91SAM9260=y
+ CONFIG_SOC_AT91SAM9263=y
+ CONFIG_SOC_AT91SAM9G45=y
+ CONFIG_SOC_AT91SAM9X5=y
+ CONFIG_SOC_AT91SAM9N12=y
++CONFIG_MACH_AT91RM9200_DT=y
+ CONFIG_MACH_AT91SAM9_DT=y
+ CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
+ CONFIG_AT91_TIMER_HZ=128
+@@ -62,6 +64,7 @@ CONFIG_MTD=y
+ CONFIG_MTD_CMDLINE_PARTS=y
+ CONFIG_MTD_CHAR=y
+ CONFIG_MTD_BLOCK=y
++CONFIG_MTD_DATAFLASH=y
+ CONFIG_MTD_NAND=y
+ CONFIG_MTD_NAND_ATMEL=y
+ CONFIG_MTD_UBI=y
+@@ -78,7 +81,6 @@ CONFIG_BLK_DEV_SD=y
+ CONFIG_SCSI_MULTI_LUN=y
+ # CONFIG_SCSI_LOWLEVEL is not set
+ CONFIG_NETDEVICES=y
+-CONFIG_MII=y
+ CONFIG_MACB=y
+ # CONFIG_NET_VENDOR_BROADCOM is not set
+ # CONFIG_NET_VENDOR_FARADAY is not set
+-- 
+1.7.10.4
