@@ -1,30 +1,24 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 11:25:00 +0900
-Subject: [PATCH 2/2] ARM: shmobile: r8a7790: don't use external clock for
- SCIFs
-In-Reply-To: <20130615010456.GP18124@quad.lixom.net>
-References: <1371106854-25560-1-git-send-email-horms+renesas@verge.net.au>
- <1371106854-25560-3-git-send-email-horms+renesas@verge.net.au>
- <20130615010456.GP18124@quad.lixom.net>
-Message-ID: <20130617022459.GL15043@verge.net.au>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 17 Jun 2013 10:36:57 +0800
+Subject: [PATCH v8 00/11] ASoC: fsl-ssi: ac97-slave support
+In-Reply-To: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
+References: <1371389117-19729-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <20130617023656.GE31687@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 06:04:56PM -0700, Olof Johansson wrote:
-> On Thu, Jun 13, 2013 at 04:00:54PM +0900, Simon Horman wrote:
-> > From: Ulrich Hecht <ulrich.hecht@gmail.com>
-> > 
-> > This is an external component and may or may not be there, while the
-> > internal clock always works.
-> > 
-> > Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Looks like this one is appropriate for arm-soc merging, but I'll hold off
-> pulling this branch until the serial driver piece has been acked or dropped (to
-> be merged by Greg).
+On Sun, Jun 16, 2013 at 03:25:06PM +0200, Markus Pargmann wrote:
+> Markus Pargmann (11):
+>       ASoC: imx-pcm-dma: DT support
+>       ASoC: imx-pcm-fiq: Introduce pcm-fiq-params
+>       ASoC: fsl: Move soc_ac97_ops from imx-ssi to fsl_ssi
+>       ASoC: fsl-ssi: Add support for imx-pcm-fiq
+>       ASoC: fsl-ssi: Use generic DMA bindings if possible
+>       ASoC: fsl-ssi: imx ac97 support
+>       ARM: imx: Export ac97 reset functions
+>       ASoC: Add phycore-ac97-dt driver
+>       ASoC: fsl: Kconfig: Use fsl-ssi for phycore-ac97
+>       ASoC: fsl: Move fsl-ssi binding doc to sound/
+>       ASoC: fsl: Update fsl-ssi binding doc
 
-This patch has a build-time dependency on the serial driver piece,
-which is why I included both patches in the same pull-request.
-
-I'll talk with Greg to see how he would like to move this forwards.
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
