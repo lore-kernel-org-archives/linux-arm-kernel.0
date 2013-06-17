@@ -1,34 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 17 Jun 2013 17:06:30 +0100
-Subject: [RFC PATCH 09/11] spi: s3c64xx: Do not require legacy DMA API in
- case of S3C64XX
-In-Reply-To: <CACRpkdb8V7pYVnOWOAJ6iG8_-jyeutq5W95+OCO4RLOv9EDjyg@mail.gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-10-git-send-email-tomasz.figa@gmail.com>
- <CACRpkdb8V7pYVnOWOAJ6iG8_-jyeutq5W95+OCO4RLOv9EDjyg@mail.gmail.com>
-Message-ID: <20130617160630.GF1403@sirena.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Jun 2013 18:08:51 +0200
+Subject: [PATCH 01/11] pinctrl: single: adopt pinctrl sleep mode management
+In-Reply-To: <20130617120340.GE10305@atomide.com>
+References: <1369995191-20855-1-git-send-email-gururaja.hebbar@ti.com>
+ <1369995191-20855-2-git-send-email-gururaja.hebbar@ti.com>
+ <CACRpkdZjvW6M1Q+K3OD1x_Jkz91AofdOdBThyJLGJ+Wx-BDTNw@mail.gmail.com>
+ <20130617120340.GE10305@atomide.com>
+Message-ID: <CACRpkdZGV7v2=rrKfiLXF7k3JG-1BEDr5=dC+E96gvpnPCCRcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 03:59:39PM +0200, Linus Walleij wrote:
-> On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+On Mon, Jun 17, 2013 at 2:03 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Linus Walleij <linus.walleij@linaro.org> [130617 04:38]:
+>> On Fri, May 31, 2013 at 12:13 PM, Hebbar Gururaja
+>> <gururaja.hebbar@ti.com> wrote:
+>>
+>> > Make pinctrl-single able to handle suspend/resume events and change
+>> > hogged pins states accordingly.
+>> >
+>> > Signed-off-by: Hebbar Gururaja <gururaja.hebbar@ti.com>
+>> > Cc: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Noone said anything about this patch, but it looks very straight-forward
+>> to me and seems sound so I have applied it.
+>>
+>> If Tony or Haojian has strong feelings about it I will dequeue it.
+>
+> I don't like the hogged pins at all as they prevent me from unloading
+> pinctrl-single.. But the patch seems fine to me:
 
-> > -       select S3C64XX_DMA if ARCH_S3C64XX
-> > +       select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
+Hm? I think the hogged pins are the *only* pins we can
+reliably release when unloading the driver, look:
 
-> I guess this means the SPI driver does not work without DMA.
-> But is the SPI driver already augmented to handle generic DMA engine?
-> Anyway:
+void pinctrl_unregister(struct pinctrl_dev *pctldev)
+{
+(...)
+        if (!IS_ERR(pctldev->p))
+                pinctrl_put(pctldev->p);
 
-Yes, the driver currently relies on DMA.  There are some pending patches
-for non-DMA operation that I need to test.  To be honest for both this
-and the ASoC driver I'd be more inclined to just either select or depend
-on the DMA controller rather than leaving the option of using the old
-code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/12639d9a/attachment.sig>
+That releases all hogged pinctrl handles when unloading
+a pinctrl driver.
+
+Yours,
+Linus Walleij
