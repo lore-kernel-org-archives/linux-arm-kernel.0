@@ -1,80 +1,22 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 17 Jun 2013 04:53:37 +0200
-Subject: [PATCH] pinctrl: establish pull-up/pull-down terminology
-In-Reply-To: <1371379548-6482-1-git-send-email-linus.walleij@stericsson.com>
-References: <1371379548-6482-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <1489894.RfoSsFGBq5@avalon>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 16 Jun 2013 20:00:05 -0700
+Subject: [PATCH 1/2] serial: sh-sci: HSCIF support
+In-Reply-To: <1371436934-27744-2-git-send-email-horms+renesas@verge.net.au>
+References: <1371436934-27744-1-git-send-email-horms+renesas@verge.net.au>
+ <1371436934-27744-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130617030005.GC12522@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-On Sunday 16 June 2013 12:45:48 Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Mon, Jun 17, 2013 at 11:42:13AM +0900, Simon Horman wrote:
+> From: Ulrich Hecht <ulrich.hecht@gmail.com>
 > 
-> It is counter-intuitive to have "0" mean disable in a boolean
-> manner for electronic properties of pins such as pull-up and
-> pull-down. Therefore, define that a pull-up/pull-down argument
-> of 0 to such a generic option means that the pin is
-> short-circuited to VDD or GROUND. Pull disablement shall be
-> done using PIN_CONFIG_BIAS_DISABLE.
+> Adds support for "High Speed Serial Communications Interface with FIFO",
+> essentially a SCIF with 128-byte FIFOs and more accurate baud rate
+> generator.
 > 
-> Cc: Heiko St?bner <heiko@sntech.de>
-> Cc: James Hogan <james.hogan@imgtec.com>
-> Cc: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+> Acked-by: Paul Mundt <lethal@linux-sh.org>
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-Nice clarification, thank you.
-
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-
-(with one small comment below)
-
-> ---
->  include/linux/pinctrl/pinconf-generic.h | 13 +++++++------
->  1 file changed, 7 insertions(+), 6 deletions(-)
-> 
-> diff --git a/include/linux/pinctrl/pinconf-generic.h
-> b/include/linux/pinctrl/pinconf-generic.h index d414a77..67780f5 100644
-> --- a/include/linux/pinctrl/pinconf-generic.h
-> +++ b/include/linux/pinctrl/pinconf-generic.h
-> @@ -36,14 +36,15 @@
->   *	tristate. The argument is ignored.
->   * @PIN_CONFIG_BIAS_PULL_UP: the pin will be pulled up (usually with high
->   *	impedance to VDD). If the argument is != 0 pull-up is enabled,
-> - *	if it is 0, pull-up is disabled.
-> + *	if it is 0, pull-up it total, i.e. the pin is connected to VDD.
->   * @PIN_CONFIG_BIAS_PULL_DOWN: the pin will be pulled down (usually with
-> high *	impedance to GROUND). If the argument is != 0 pull-down is enabled,
-> - *	if it is 0, pull-down is disabled.
-> + *	if it is 0, pull-down is total, i.e. the pin is connected to GROUND.
->   * @PIN_CONFIG_BIAS_PULL_PIN_DEFAULT: the pin will be pulled up or down
-> based *	on embedded knowledge of the controller, like current mux function.
-> - *	If the argument is != 0 pull up/down is enabled, if it is 0,
-> - *	the pull is disabled.
-> + *	If the argument is != 0 pull up/down is enabled, if it is 0, the
-> + *	configuration is ignored. The proper way to disable it is to use
-> + *	@PIN_CONFIG_BIAS_DISABLE.
->   * @PIN_CONFIG_DRIVE_PUSH_PULL: the pin will be driven actively high and
->   *	low, this is the most typical case and is typically achieved with two
->   *	active transistors on the output. Setting this config will enable
-> @@ -72,8 +73,8 @@
->   *	supplies, the argument to this parameter (on a custom format) tells
->   *	the driver which alternative power source to use.
->   * @PIN_CONFIG_SLEW_RATE: if the pin can select slew rate, the argument to
-> - * 	this parameter (on a custom format) tells the driver which 
-alternative
-> - * 	slew rate to use.
-> + *	this parameter (on a custom format) tells the driver which 
-alternative
-> + *	slew rate to use.
-
-This hunk doesn't seem to belong to the patch.
-
->   * @PIN_CONFIG_LOW_POWER_MODE: this will configure the pin for low power
->   *	operation, if several modes of operation are supported these can be
->   *	passed in the argument on a custom form, else just use argument 1
--- 
-Regards,
-
-Laurent Pinchart
+Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
