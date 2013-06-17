@@ -1,116 +1,54 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Jun 2013 10:30:59 -0700
-Subject: [PATCH v2] ARM: msm: Move msm_timer to CLOCKSOURCE_OF_DECLARE
-Message-ID: <1371490259-13495-1-git-send-email-sboyd@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 17 Jun 2013 10:31:19 -0700
+Subject: [PATCH 1/3] serial: sh-sci: HSCIF support
+In-Reply-To: <20130617101318.GA28277@verge.net.au>
+References: <1371461329-26467-1-git-send-email-horms+renesas@verge.net.au>
+ <1371461329-26467-2-git-send-email-horms+renesas@verge.net.au>
+ <20130617101318.GA28277@verge.net.au>
+Message-ID: <20130617173119.GE28497@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows us to remove the init_time callback in the DT machine
-descriptors, shrinking the code.
+On Mon, Jun 17, 2013 at 07:13:18PM +0900, Simon Horman wrote:
+> [ Cc Greg Kroah-Hartman <gregkh@linuxfoundation.org> ]
+> 
+> On Mon, Jun 17, 2013 at 06:28:47PM +0900, Simon Horman wrote:
+> > From: Ulrich Hecht <ulrich.hecht@gmail.com>
+> > 
+> > Adds support for "High Speed Serial Communications Interface with FIFO",
+> > essentially a SCIF with 128-byte FIFOs and more accurate baud rate
+> > generator.
+> > 
+> > Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+> > Acked-by: Paul Mundt <lethal@linux-sh.org>
+> > Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> [ snip ]
+> 
+> > diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
+> > index 74c2bf7..26eee07 100644
+> > --- a/include/uapi/linux/serial_core.h
+> > +++ b/include/uapi/linux/serial_core.h
+> > @@ -226,4 +226,7 @@
+> >  /* Rocketport EXPRESS/INFINITY */
+> >  #define PORT_RP2	102
+> >  
+> > +/* SH-SCI */
+> > +#define PORT_HSCIF	103
+> > +
+> >  #endif /* _UAPILINUX_SERIAL_CORE_H */
+> 
+> It seems that 103 conflicts with #define PORT_LPUART   103
+> which is present in commit c9e2e946fb0b ("tty:
+> serial: add Freescale lpuart driver support") which is
+> in turn present in linux-next via tty-next.
+> 
+> Should I re-spin this patch using 104 for PORT_HSCIF ?
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
+It's hard to predict what the final number will be. Best is to have Linus
+handle the numbering when he resolves the final conflict; we'll remember to
+point it out when we send the pull request.
 
-Changes since v1:
- * Added CLKSRC_OF selection
 
- arch/arm/Kconfig                  |  1 +
- arch/arm/mach-msm/board-dt-8660.c |  1 -
- arch/arm/mach-msm/board-dt-8960.c |  1 -
- arch/arm/mach-msm/common.h        |  1 -
- arch/arm/mach-msm/timer.c         | 17 +++--------------
- 5 files changed, 4 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d423d58..96fe140 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -622,6 +622,7 @@ config ARCH_MSM
- 	bool "Qualcomm MSM"
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
-+	select CLKSRC_OF if OF
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
- 	help
-diff --git a/arch/arm/mach-msm/board-dt-8660.c b/arch/arm/mach-msm/board-dt-8660.c
-index 7dcfc53..4bd22ca 100644
---- a/arch/arm/mach-msm/board-dt-8660.c
-+++ b/arch/arm/mach-msm/board-dt-8660.c
-@@ -47,6 +47,5 @@ DT_MACHINE_START(MSM_DT, "Qualcomm MSM (Flattened Device Tree)")
- 	.init_irq = irqchip_init,
- 	.init_machine = msm8x60_dt_init,
- 	.init_late = msm8x60_init_late,
--	.init_time	= msm_dt_timer_init,
- 	.dt_compat = msm8x60_fluid_match,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/board-dt-8960.c b/arch/arm/mach-msm/board-dt-8960.c
-index 7301936..9a2b525 100644
---- a/arch/arm/mach-msm/board-dt-8960.c
-+++ b/arch/arm/mach-msm/board-dt-8960.c
-@@ -32,7 +32,6 @@ DT_MACHINE_START(MSM8960_DT, "Qualcomm MSM (Flattened Device Tree)")
- 	.smp = smp_ops(msm_smp_ops),
- 	.map_io = msm_map_msm8960_io,
- 	.init_irq = irqchip_init,
--	.init_time	= msm_dt_timer_init,
- 	.init_machine = msm_dt_init,
- 	.dt_compat = msm8960_dt_match,
- MACHINE_END
-diff --git a/arch/arm/mach-msm/common.h b/arch/arm/mach-msm/common.h
-index ce8215a..e32429e 100644
---- a/arch/arm/mach-msm/common.h
-+++ b/arch/arm/mach-msm/common.h
-@@ -14,7 +14,6 @@
- 
- extern void msm7x01_timer_init(void);
- extern void msm7x30_timer_init(void);
--extern void msm_dt_timer_init(void);
- extern void qsd8x50_timer_init(void);
- 
- extern void msm_map_common_io(void);
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 284313f..1167cf6 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -219,15 +219,8 @@ err:
- }
- 
- #ifdef CONFIG_OF
--static const struct of_device_id msm_timer_match[] __initconst = {
--	{ .compatible = "qcom,kpss-timer" },
--	{ .compatible = "qcom,scss-timer" },
--	{ },
--};
--
--void __init msm_dt_timer_init(void)
-+static void __init msm_dt_timer_init(struct device_node *np)
- {
--	struct device_node *np;
- 	u32 freq;
- 	int irq;
- 	struct resource res;
-@@ -235,12 +228,6 @@ void __init msm_dt_timer_init(void)
- 	void __iomem *base;
- 	void __iomem *cpu0_base;
- 
--	np = of_find_matching_node(NULL, msm_timer_match);
--	if (!np) {
--		pr_err("Can't find msm timer DT node\n");
--		return;
--	}
--
- 	base = of_iomap(np, 0);
- 	if (!base) {
- 		pr_err("Failed to map event base\n");
-@@ -283,6 +270,8 @@ void __init msm_dt_timer_init(void)
- 
- 	msm_timer_init(freq, 32, irq, !!percpu_offset);
- }
-+CLOCKSOURCE_OF_DECLARE(kpss_timer, "qcom,kpss-timer", msm_dt_timer_init);
-+CLOCKSOURCE_OF_DECLARE(scss_timer, "qcom,scss-timer", msm_dt_timer_init);
- #endif
- 
- static int __init msm_timer_map(phys_addr_t addr, u32 event, u32 source,
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-hosted by The Linux Foundation
+-Olof
