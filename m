@@ -1,50 +1,45 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 11:07:18 +0900
-Subject: [PATCH 0/1] gpio-rcar: Add DT support
-In-Reply-To: <2295525.muus9MNBiz@avalon>
-References: <1371106826-25313-1-git-send-email-horms+renesas@verge.net.au>
- <1371106826-25313-2-git-send-email-horms+renesas@verge.net.au>
- <20130615004751.GM18124@quad.lixom.net> <2295525.muus9MNBiz@avalon>
-Message-ID: <20130617020717.GH15043@verge.net.au>
+Date: Mon, 17 Jun 2013 11:10:47 +0900
+Subject: [PATCH v3] ARM: shmobile: BOCK-W: add Ether support
+In-Reply-To: <51BDE454.5000006@cogentembedded.com>
+References: <201306020240.55702.sergei.shtylyov@cogentembedded.com>
+ <20130612140905.GM32751@verge.net.au>
+ <51BDE454.5000006@cogentembedded.com>
+Message-ID: <20130617021046.GI15043@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 15, 2013 at 01:31:08PM +0200, Laurent Pinchart wrote:
-> Hi Olof,
+On Sun, Jun 16, 2013 at 08:14:12PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> On Friday 14 June 2013 17:47:51 Olof Johansson wrote:
-> > On Thu, Jun 13, 2013 at 04:00:26PM +0900, Simon Horman wrote:
-> > > From: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> > > 
-> > > Add DT bindings for the gpio-rcar driver and read the device
-> > > configuration from the DT node at probe time if available.
-> > > 
-> > > Cc: devicetree-discuss at lists.ozlabs.org
-> > > Signed-off-by: Laurent Pinchart
-> > > <laurent.pinchart+renesas@ideasonboard.com>
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > 
-> > Hi,
-> > 
-> > I don't see this cc/acked by Linus or Grant/Rob.
+> On 12.06.2013 18:09, Simon Horman wrote:
 > 
-> The patch has been acked by Linus, but it seems the ack got lost somewhere.
+> >>Register Ether device from bockw_init(), passing the platform data to it, adding
+> >>only the RMII pin group to bockw_pinctrl_map[].  Although the LINK signal exists
+> >>on the board, it's connected to the link/activity LED  output of the PHY, thus
+> >>the link disappears and reappears after each packet. We'd be better off ignoring
+> >>such signal and getting the link state from the PHY indirectly.
 > 
-> https://patchwork.kernel.org/patch/2596901/
+> >>Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
+> >>---
+> >>The patch is atop of Simon's 'renesas.git' repo, 'renesas-next-20130528' tag
+> >>and the USB patches just reposted. I decided to move it ahead of the VIN patches
+> >>as it can be merged right now since all dependecies have been already met.
+> 
+> >Thanks, queued up in the boards branch.
+> 
+>    Has this been pulled by Olof/Arnd? If not, is it possible to
+> amend this patch or should I send an incremental one? I forgot to
+> update the platform device name from "sh-eth" to "r8a777x-ether" in
+> the PinMux table, in accordance to the R8A7778 Ether device name
+> fix. It would be
+> good if this got into 3.11 as otherwise Ether support on BOCK-W
+> wouldn't work. I have discovered the mistake only yesterday.
 
-Sorry for missing that.
+This patch is not present in arm-soc nor have I sent a pull request for it,
+though I was planing to do so today.
 
-> > However, the binding looks very vanilla to me, so I'll merge it anyway.
-> 
-> Thank you.
-> 
-> -- 
-> Regards,
-> 
-> Laurent Pinchart
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+I think that the best thing would be if you sent an incremental patch
+which I can add to the boards branch and then send a pull-request for
+that branch to Olof and Arnd.
