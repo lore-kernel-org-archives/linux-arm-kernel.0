@@ -1,68 +1,91 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 17 Jun 2013 13:08:03 +0200
-Subject: [PATCH v2 3/3] ARM: mach-moxart: add MOXA ART UART debug files
-In-Reply-To: <1371467283-6981-1-git-send-email-jonas.jensen@gmail.com>
-References: <1371467283-6981-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <1371467283-6981-3-git-send-email-jonas.jensen@gmail.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Mon, 17 Jun 2013 16:38:55 +0530
+Subject: [PATCH v2 07/10] ARM: dts: Add initial device tree support for
+ Exynos5420
+In-Reply-To: <CAGOxZ51H_dtZN3Nx-=qU+gjHAEwgPA--SZrdiu-sBCANhdKtAw@mail.gmail.com>
+References: <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
+ <1371218572-8993-1-git-send-email-chander.kashyap@linaro.org>
+ <1371218572-8993-8-git-send-email-chander.kashyap@linaro.org>
+ <20130617084648.GA6809@e106331-lin.cambridge.arm.com>
+ <CAGOxZ51H_dtZN3Nx-=qU+gjHAEwgPA--SZrdiu-sBCANhdKtAw@mail.gmail.com>
+Message-ID: <CANuQgHGh9briWaP7rAgQEY5n04Amfu9VGwMFUg5HioHPnGQe_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MOXA ART kernel low-level debugging port support.
+On 17 June 2013 14:22, Alim Akhtar <alim.akhtar@gmail.com> wrote:
+> Hi Chander and Mark
+>
+>
+> On Mon, Jun 17, 2013 at 2:16 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+>>
+>> Hi,
+>>
+>> > diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> > b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> > new file mode 100644
+>> > index 0000000..43f0eb8
+>> > --- /dev/null
+>> > +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
+>> > @@ -0,0 +1,40 @@
+>> > +/*
+>> > + * SAMSUNG SMDK5420 board device tree source
+>> > + *
+>> > + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
+>> > + *           http://www.samsung.com
+>> > + *
+>> > + * This program is free software; you can redistribute it and/or modify
+>> > + * it under the terms of the GNU General Public License version 2 as
+>> > + * published by the Free Software Foundation.
+>> > +*/
+>> > +
+>> > +/dts-v1/;
+>> > +#include "exynos5420.dtsi"
+>> > +
+>> > +/ {
+>> > +     model = "Samsung SMDK5420 board based on EXYNOS5420";
+>> > +     compatible = "samsung,smdk5420", "samsung,exynos5420";
+>> > +
+>> > +     memory {
+>> > +             reg =   <0x20000000 0x10000000
+>> > +                      0x30000000 0x10000000
+>> > +                      0x40000000 0x10000000
+>> > +                      0x50000000 0x10000000
+>> > +                      0x60000000 0x10000000
+>> > +                      0x70000000 0x10000000
+>> > +                      0x80000000 0x10000000
+>> > +                      0x90000000 0x10000000>;
+>> > +     };
+>>
+>> As splitting these into 256MB banks is a workaround for an implementation
+>> issue, there should at least be a comment to that effect.
+>>
+>> It would be far nicer if this were described as one bank and the kernel
+>> could
+>> split it up as necessary when using sparsemem.
+>>
+> Yes, I thing this is not needed at all, the bootloader should be setting
+> this for us.
+> Either remove this completly or just add as single bank of memory, like
+> starting address and the size.
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
- arch/arm/Kconfig.debug          |    8 ++++++++
- arch/arm/include/debug/moxart.S |   16 ++++++++++++++++
- 2 files changed, 24 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/include/debug/moxart.S
+I will convert it to single bank and resend.
+>
+>> Thanks,
+>> Mark.
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe
+>> linux-samsung-soc" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>
+>
+> --
+> Regards,
+> Alim
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e6a6ab1..d1ed6e5 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -447,6 +447,13 @@ choice
- 		  Say Y here if you want kernel low-level debugging support
- 		  on Allwinner A1X based platforms on the UART1.
- 
-+    config DEBUG_MOXART_UART0
-+        bool "Kernel low-level debugging messages via MOXART UART0"
-+        depends on ARCH_MOXART
-+        help
-+          Say Y here if you want kernel low-level debugging support
-+          on MOXART based platforms on the UART0.
-+
- 	config DEBUG_TEGRA_UART
- 		depends on ARCH_TEGRA
- 		bool "Use Tegra UART for low-level debug"
-@@ -668,6 +675,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/sirf.S" if DEBUG_SIRFPRIMA2_UART1 || DEBUG_SIRFMARCO_UART1
- 	default "debug/socfpga.S" if DEBUG_SOCFPGA_UART
- 	default "debug/sunxi.S" if DEBUG_SUNXI_UART0 || DEBUG_SUNXI_UART1
-+	default "debug/moxart.S" if DEBUG_MOXART_UART0
- 	default "debug/tegra.S" if DEBUG_TEGRA_UART
- 	default "debug/ux500.S" if DEBUG_UX500_UART
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT || \
-diff --git a/arch/arm/include/debug/moxart.S b/arch/arm/include/debug/moxart.S
-new file mode 100644
-index 0000000..7ac7c76
---- /dev/null
-+++ b/arch/arm/include/debug/moxart.S
-@@ -0,0 +1,16 @@
-+/* Copyright (C) 2013 Jonas Jensen <jonas.jensen@gmail.com>
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License,
-+ * or (at your option) any later version. */
-+
-+#define MOXART_UART_DEBUG_PHYS_BASE		0x98200000
-+#define MOXART_UART_DEBUG_VIRT_BASE		0xf9820000
-+
-+.macro	addruart, rp, rv, tmp
-+	ldr	\rp, =MOXART_UART_DEBUG_PHYS_BASE
-+	ldr \rv, =MOXART_UART_DEBUG_VIRT_BASE
-+.endm
-+
-+#define UART_SHIFT	2
-+#include <asm/hardware/debug-8250.S>
--- 
-1.7.2.5
+
+
+--
+with warm regards,
+Chander Kashyap
