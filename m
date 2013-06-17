@@ -1,316 +1,132 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:34:08 +0200
-Subject: [PATCH v2 23/38] ARM: EXYNOS: Remove mach/gpio.h
+Date: Mon, 17 Jun 2013 18:33:59 +0200
+Subject: [PATCH v2 14/38] ARM: SAMSUNG: Introduce GPIO_SAMSUNG Kconfig entry
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-24-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-15-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes mach/gpio.h header that is not required any more on
-Exynos.
+This patch adds Kconfig entry that selects whether legacy Samsung GPIO
+driver should be built or not. For platforms that support only DT based
+boot, the new pinctrl driver is used and so the old one is not needed.
 
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/gpio.h | 289 -------------------------------
- 1 file changed, 289 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/gpio.h
+ arch/arm/Kconfig                        | 6 ++++++
+ arch/arm/plat-samsung/include/plat/pm.h | 5 +++++
+ drivers/gpio/Kconfig                    | 7 +++++++
+ drivers/gpio/Makefile                   | 2 +-
+ 4 files changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/gpio.h b/arch/arm/mach-exynos/include/mach/gpio.h
-deleted file mode 100644
-index eb24f1e..0000000
---- a/arch/arm/mach-exynos/include/mach/gpio.h
-+++ /dev/null
-@@ -1,289 +0,0 @@
--/*
-- * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS - GPIO lib support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#ifndef __ASM_ARCH_GPIO_H
--#define __ASM_ARCH_GPIO_H __FILE__
--
--/* Macro for EXYNOS GPIO numbering */
--
--#define EXYNOS_GPIO_NEXT(__gpio) \
--	((__gpio##_START) + (__gpio##_NR) + CONFIG_S3C_GPIO_SPACE + 1)
--
--/* EXYNOS4 GPIO bank sizes */
--
--#define EXYNOS4_GPIO_A0_NR	(8)
--#define EXYNOS4_GPIO_A1_NR	(6)
--#define EXYNOS4_GPIO_B_NR	(8)
--#define EXYNOS4_GPIO_C0_NR	(5)
--#define EXYNOS4_GPIO_C1_NR	(5)
--#define EXYNOS4_GPIO_D0_NR	(4)
--#define EXYNOS4_GPIO_D1_NR	(4)
--#define EXYNOS4_GPIO_E0_NR	(5)
--#define EXYNOS4_GPIO_E1_NR	(8)
--#define EXYNOS4_GPIO_E2_NR	(6)
--#define EXYNOS4_GPIO_E3_NR	(8)
--#define EXYNOS4_GPIO_E4_NR	(8)
--#define EXYNOS4_GPIO_F0_NR	(8)
--#define EXYNOS4_GPIO_F1_NR	(8)
--#define EXYNOS4_GPIO_F2_NR	(8)
--#define EXYNOS4_GPIO_F3_NR	(6)
--#define EXYNOS4_GPIO_J0_NR	(8)
--#define EXYNOS4_GPIO_J1_NR	(5)
--#define EXYNOS4_GPIO_K0_NR	(7)
--#define EXYNOS4_GPIO_K1_NR	(7)
--#define EXYNOS4_GPIO_K2_NR	(7)
--#define EXYNOS4_GPIO_K3_NR	(7)
--#define EXYNOS4_GPIO_L0_NR	(8)
--#define EXYNOS4_GPIO_L1_NR	(3)
--#define EXYNOS4_GPIO_L2_NR	(8)
--#define EXYNOS4_GPIO_X0_NR	(8)
--#define EXYNOS4_GPIO_X1_NR	(8)
--#define EXYNOS4_GPIO_X2_NR	(8)
--#define EXYNOS4_GPIO_X3_NR	(8)
--#define EXYNOS4_GPIO_Y0_NR	(6)
--#define EXYNOS4_GPIO_Y1_NR	(4)
--#define EXYNOS4_GPIO_Y2_NR	(6)
--#define EXYNOS4_GPIO_Y3_NR	(8)
--#define EXYNOS4_GPIO_Y4_NR	(8)
--#define EXYNOS4_GPIO_Y5_NR	(8)
--#define EXYNOS4_GPIO_Y6_NR	(8)
--#define EXYNOS4_GPIO_Z_NR	(7)
--
--/* EXYNOS4 GPIO bank numbers */
--
--enum exynos4_gpio_number {
--	EXYNOS4_GPIO_A0_START	= 0,
--	EXYNOS4_GPIO_A1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_A0),
--	EXYNOS4_GPIO_B_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_A1),
--	EXYNOS4_GPIO_C0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_B),
--	EXYNOS4_GPIO_C1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_C0),
--	EXYNOS4_GPIO_D0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_C1),
--	EXYNOS4_GPIO_D1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_D0),
--	EXYNOS4_GPIO_E0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_D1),
--	EXYNOS4_GPIO_E1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E0),
--	EXYNOS4_GPIO_E2_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E1),
--	EXYNOS4_GPIO_E3_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E2),
--	EXYNOS4_GPIO_E4_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E3),
--	EXYNOS4_GPIO_F0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_E4),
--	EXYNOS4_GPIO_F1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F0),
--	EXYNOS4_GPIO_F2_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F1),
--	EXYNOS4_GPIO_F3_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F2),
--	EXYNOS4_GPIO_J0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_F3),
--	EXYNOS4_GPIO_J1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_J0),
--	EXYNOS4_GPIO_K0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_J1),
--	EXYNOS4_GPIO_K1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_K0),
--	EXYNOS4_GPIO_K2_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_K1),
--	EXYNOS4_GPIO_K3_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_K2),
--	EXYNOS4_GPIO_L0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_K3),
--	EXYNOS4_GPIO_L1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_L0),
--	EXYNOS4_GPIO_L2_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_L1),
--	EXYNOS4_GPIO_X0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_L2),
--	EXYNOS4_GPIO_X1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_X0),
--	EXYNOS4_GPIO_X2_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_X1),
--	EXYNOS4_GPIO_X3_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_X2),
--	EXYNOS4_GPIO_Y0_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_X3),
--	EXYNOS4_GPIO_Y1_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_Y0),
--	EXYNOS4_GPIO_Y2_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_Y1),
--	EXYNOS4_GPIO_Y3_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_Y2),
--	EXYNOS4_GPIO_Y4_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_Y3),
--	EXYNOS4_GPIO_Y5_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_Y4),
--	EXYNOS4_GPIO_Y6_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_Y5),
--	EXYNOS4_GPIO_Z_START	= EXYNOS_GPIO_NEXT(EXYNOS4_GPIO_Y6),
--};
--
--/* EXYNOS4 GPIO number definitions */
--
--#define EXYNOS4_GPA0(_nr)	(EXYNOS4_GPIO_A0_START + (_nr))
--#define EXYNOS4_GPA1(_nr)	(EXYNOS4_GPIO_A1_START + (_nr))
--#define EXYNOS4_GPB(_nr)	(EXYNOS4_GPIO_B_START + (_nr))
--#define EXYNOS4_GPC0(_nr)	(EXYNOS4_GPIO_C0_START + (_nr))
--#define EXYNOS4_GPC1(_nr)	(EXYNOS4_GPIO_C1_START + (_nr))
--#define EXYNOS4_GPD0(_nr)	(EXYNOS4_GPIO_D0_START + (_nr))
--#define EXYNOS4_GPD1(_nr)	(EXYNOS4_GPIO_D1_START + (_nr))
--#define EXYNOS4_GPE0(_nr)	(EXYNOS4_GPIO_E0_START + (_nr))
--#define EXYNOS4_GPE1(_nr)	(EXYNOS4_GPIO_E1_START + (_nr))
--#define EXYNOS4_GPE2(_nr)	(EXYNOS4_GPIO_E2_START + (_nr))
--#define EXYNOS4_GPE3(_nr)	(EXYNOS4_GPIO_E3_START + (_nr))
--#define EXYNOS4_GPE4(_nr)	(EXYNOS4_GPIO_E4_START + (_nr))
--#define EXYNOS4_GPF0(_nr)	(EXYNOS4_GPIO_F0_START + (_nr))
--#define EXYNOS4_GPF1(_nr)	(EXYNOS4_GPIO_F1_START + (_nr))
--#define EXYNOS4_GPF2(_nr)	(EXYNOS4_GPIO_F2_START + (_nr))
--#define EXYNOS4_GPF3(_nr)	(EXYNOS4_GPIO_F3_START + (_nr))
--#define EXYNOS4_GPJ0(_nr)	(EXYNOS4_GPIO_J0_START + (_nr))
--#define EXYNOS4_GPJ1(_nr)	(EXYNOS4_GPIO_J1_START + (_nr))
--#define EXYNOS4_GPK0(_nr)	(EXYNOS4_GPIO_K0_START + (_nr))
--#define EXYNOS4_GPK1(_nr)	(EXYNOS4_GPIO_K1_START + (_nr))
--#define EXYNOS4_GPK2(_nr)	(EXYNOS4_GPIO_K2_START + (_nr))
--#define EXYNOS4_GPK3(_nr)	(EXYNOS4_GPIO_K3_START + (_nr))
--#define EXYNOS4_GPL0(_nr)	(EXYNOS4_GPIO_L0_START + (_nr))
--#define EXYNOS4_GPL1(_nr)	(EXYNOS4_GPIO_L1_START + (_nr))
--#define EXYNOS4_GPL2(_nr)	(EXYNOS4_GPIO_L2_START + (_nr))
--#define EXYNOS4_GPX0(_nr)	(EXYNOS4_GPIO_X0_START + (_nr))
--#define EXYNOS4_GPX1(_nr)	(EXYNOS4_GPIO_X1_START + (_nr))
--#define EXYNOS4_GPX2(_nr)	(EXYNOS4_GPIO_X2_START + (_nr))
--#define EXYNOS4_GPX3(_nr)	(EXYNOS4_GPIO_X3_START + (_nr))
--#define EXYNOS4_GPY0(_nr)	(EXYNOS4_GPIO_Y0_START + (_nr))
--#define EXYNOS4_GPY1(_nr)	(EXYNOS4_GPIO_Y1_START + (_nr))
--#define EXYNOS4_GPY2(_nr)	(EXYNOS4_GPIO_Y2_START + (_nr))
--#define EXYNOS4_GPY3(_nr)	(EXYNOS4_GPIO_Y3_START + (_nr))
--#define EXYNOS4_GPY4(_nr)	(EXYNOS4_GPIO_Y4_START + (_nr))
--#define EXYNOS4_GPY5(_nr)	(EXYNOS4_GPIO_Y5_START + (_nr))
--#define EXYNOS4_GPY6(_nr)	(EXYNOS4_GPIO_Y6_START + (_nr))
--#define EXYNOS4_GPZ(_nr)	(EXYNOS4_GPIO_Z_START + (_nr))
--
--/* the end of the EXYNOS4 specific gpios */
--
--#define EXYNOS4_GPIO_END	(EXYNOS4_GPZ(EXYNOS4_GPIO_Z_NR) + 1)
--
--/* EXYNOS5 GPIO bank sizes */
--
--#define EXYNOS5_GPIO_A0_NR	(8)
--#define EXYNOS5_GPIO_A1_NR	(6)
--#define EXYNOS5_GPIO_A2_NR	(8)
--#define EXYNOS5_GPIO_B0_NR	(5)
--#define EXYNOS5_GPIO_B1_NR	(5)
--#define EXYNOS5_GPIO_B2_NR	(4)
--#define EXYNOS5_GPIO_B3_NR	(4)
--#define EXYNOS5_GPIO_C0_NR	(7)
--#define EXYNOS5_GPIO_C1_NR	(4)
--#define EXYNOS5_GPIO_C2_NR	(7)
--#define EXYNOS5_GPIO_C3_NR	(7)
--#define EXYNOS5_GPIO_C4_NR	(7)
--#define EXYNOS5_GPIO_D0_NR	(4)
--#define EXYNOS5_GPIO_D1_NR	(8)
--#define EXYNOS5_GPIO_Y0_NR	(6)
--#define EXYNOS5_GPIO_Y1_NR	(4)
--#define EXYNOS5_GPIO_Y2_NR	(6)
--#define EXYNOS5_GPIO_Y3_NR	(8)
--#define EXYNOS5_GPIO_Y4_NR	(8)
--#define EXYNOS5_GPIO_Y5_NR	(8)
--#define EXYNOS5_GPIO_Y6_NR	(8)
--#define EXYNOS5_GPIO_X0_NR	(8)
--#define EXYNOS5_GPIO_X1_NR	(8)
--#define EXYNOS5_GPIO_X2_NR	(8)
--#define EXYNOS5_GPIO_X3_NR	(8)
--#define EXYNOS5_GPIO_E0_NR	(8)
--#define EXYNOS5_GPIO_E1_NR	(2)
--#define EXYNOS5_GPIO_F0_NR	(4)
--#define EXYNOS5_GPIO_F1_NR	(4)
--#define EXYNOS5_GPIO_G0_NR	(8)
--#define EXYNOS5_GPIO_G1_NR	(8)
--#define EXYNOS5_GPIO_G2_NR	(2)
--#define EXYNOS5_GPIO_H0_NR	(4)
--#define EXYNOS5_GPIO_H1_NR	(8)
--#define EXYNOS5_GPIO_V0_NR	(8)
--#define EXYNOS5_GPIO_V1_NR	(8)
--#define EXYNOS5_GPIO_V2_NR	(8)
--#define EXYNOS5_GPIO_V3_NR	(8)
--#define EXYNOS5_GPIO_V4_NR	(2)
--#define EXYNOS5_GPIO_Z_NR	(7)
--
--/* EXYNOS5 GPIO bank numbers */
--
--enum exynos5_gpio_number {
--	EXYNOS5_GPIO_A0_START		= 0,
--	EXYNOS5_GPIO_A1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_A0),
--	EXYNOS5_GPIO_A2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_A1),
--	EXYNOS5_GPIO_B0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_A2),
--	EXYNOS5_GPIO_B1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_B0),
--	EXYNOS5_GPIO_B2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_B1),
--	EXYNOS5_GPIO_B3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_B2),
--	EXYNOS5_GPIO_C0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_B3),
--	EXYNOS5_GPIO_C1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C0),
--	EXYNOS5_GPIO_C2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C1),
--	EXYNOS5_GPIO_C3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C2),
--	EXYNOS5_GPIO_C4_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C3),
--	EXYNOS5_GPIO_D0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_C4),
--	EXYNOS5_GPIO_D1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D0),
--	EXYNOS5_GPIO_Y0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_D1),
--	EXYNOS5_GPIO_Y1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y0),
--	EXYNOS5_GPIO_Y2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y1),
--	EXYNOS5_GPIO_Y3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y2),
--	EXYNOS5_GPIO_Y4_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y3),
--	EXYNOS5_GPIO_Y5_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y4),
--	EXYNOS5_GPIO_Y6_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y5),
--	EXYNOS5_GPIO_X0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_Y6),
--	EXYNOS5_GPIO_X1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_X0),
--	EXYNOS5_GPIO_X2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_X1),
--	EXYNOS5_GPIO_X3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_X2),
--	EXYNOS5_GPIO_E0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_X3),
--	EXYNOS5_GPIO_E1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_E0),
--	EXYNOS5_GPIO_F0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_E1),
--	EXYNOS5_GPIO_F1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_F0),
--	EXYNOS5_GPIO_G0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_F1),
--	EXYNOS5_GPIO_G1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_G0),
--	EXYNOS5_GPIO_G2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_G1),
--	EXYNOS5_GPIO_H0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_G2),
--	EXYNOS5_GPIO_H1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_H0),
--	EXYNOS5_GPIO_V0_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_H1),
--	EXYNOS5_GPIO_V1_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_V0),
--	EXYNOS5_GPIO_V2_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_V1),
--	EXYNOS5_GPIO_V3_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_V2),
--	EXYNOS5_GPIO_V4_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_V3),
--	EXYNOS5_GPIO_Z_START		= EXYNOS_GPIO_NEXT(EXYNOS5_GPIO_V4),
--};
--
--/* EXYNOS5 GPIO number definitions */
--
--#define EXYNOS5_GPA0(_nr)	(EXYNOS5_GPIO_A0_START + (_nr))
--#define EXYNOS5_GPA1(_nr)	(EXYNOS5_GPIO_A1_START + (_nr))
--#define EXYNOS5_GPA2(_nr)	(EXYNOS5_GPIO_A2_START + (_nr))
--#define EXYNOS5_GPB0(_nr)	(EXYNOS5_GPIO_B0_START + (_nr))
--#define EXYNOS5_GPB1(_nr)	(EXYNOS5_GPIO_B1_START + (_nr))
--#define EXYNOS5_GPB2(_nr)	(EXYNOS5_GPIO_B2_START + (_nr))
--#define EXYNOS5_GPB3(_nr)	(EXYNOS5_GPIO_B3_START + (_nr))
--#define EXYNOS5_GPC0(_nr)	(EXYNOS5_GPIO_C0_START + (_nr))
--#define EXYNOS5_GPC1(_nr)	(EXYNOS5_GPIO_C1_START + (_nr))
--#define EXYNOS5_GPC2(_nr)	(EXYNOS5_GPIO_C2_START + (_nr))
--#define EXYNOS5_GPC3(_nr)	(EXYNOS5_GPIO_C3_START + (_nr))
--#define EXYNOS5_GPC4(_nr)	(EXYNOS5_GPIO_C4_START + (_nr))
--#define EXYNOS5_GPD0(_nr)	(EXYNOS5_GPIO_D0_START + (_nr))
--#define EXYNOS5_GPD1(_nr)	(EXYNOS5_GPIO_D1_START + (_nr))
--#define EXYNOS5_GPY0(_nr)	(EXYNOS5_GPIO_Y0_START + (_nr))
--#define EXYNOS5_GPY1(_nr)	(EXYNOS5_GPIO_Y1_START + (_nr))
--#define EXYNOS5_GPY2(_nr)	(EXYNOS5_GPIO_Y2_START + (_nr))
--#define EXYNOS5_GPY3(_nr)	(EXYNOS5_GPIO_Y3_START + (_nr))
--#define EXYNOS5_GPY4(_nr)	(EXYNOS5_GPIO_Y4_START + (_nr))
--#define EXYNOS5_GPY5(_nr)	(EXYNOS5_GPIO_Y5_START + (_nr))
--#define EXYNOS5_GPY6(_nr)	(EXYNOS5_GPIO_Y6_START + (_nr))
--#define EXYNOS5_GPX0(_nr)	(EXYNOS5_GPIO_X0_START + (_nr))
--#define EXYNOS5_GPX1(_nr)	(EXYNOS5_GPIO_X1_START + (_nr))
--#define EXYNOS5_GPX2(_nr)	(EXYNOS5_GPIO_X2_START + (_nr))
--#define EXYNOS5_GPX3(_nr)	(EXYNOS5_GPIO_X3_START + (_nr))
--#define EXYNOS5_GPE0(_nr)	(EXYNOS5_GPIO_E0_START + (_nr))
--#define EXYNOS5_GPE1(_nr)	(EXYNOS5_GPIO_E1_START + (_nr))
--#define EXYNOS5_GPF0(_nr)	(EXYNOS5_GPIO_F0_START + (_nr))
--#define EXYNOS5_GPF1(_nr)	(EXYNOS5_GPIO_F1_START + (_nr))
--#define EXYNOS5_GPG0(_nr)	(EXYNOS5_GPIO_G0_START + (_nr))
--#define EXYNOS5_GPG1(_nr)	(EXYNOS5_GPIO_G1_START + (_nr))
--#define EXYNOS5_GPG2(_nr)	(EXYNOS5_GPIO_G2_START + (_nr))
--#define EXYNOS5_GPH0(_nr)	(EXYNOS5_GPIO_H0_START + (_nr))
--#define EXYNOS5_GPH1(_nr)	(EXYNOS5_GPIO_H1_START + (_nr))
--#define EXYNOS5_GPV0(_nr)	(EXYNOS5_GPIO_V0_START + (_nr))
--#define EXYNOS5_GPV1(_nr)	(EXYNOS5_GPIO_V1_START + (_nr))
--#define EXYNOS5_GPV2(_nr)	(EXYNOS5_GPIO_V2_START + (_nr))
--#define EXYNOS5_GPV3(_nr)	(EXYNOS5_GPIO_V3_START + (_nr))
--#define EXYNOS5_GPV4(_nr)	(EXYNOS5_GPIO_V4_START + (_nr))
--#define EXYNOS5_GPZ(_nr)	(EXYNOS5_GPIO_Z_START + (_nr))
--
--/* the end of the EXYNOS5 specific gpios */
--
--#define EXYNOS5_GPIO_END	(EXYNOS5_GPZ(EXYNOS5_GPIO_Z_NR) + 1)
--
--/* actually, EXYNOS5_GPIO_END is bigger than EXYNOS4 */
--
--#define S3C_GPIO_END		(EXYNOS5_GPIO_END)
--
--/* define the number of gpios */
--
--#define ARCH_NR_GPIOS		(CONFIG_SAMSUNG_GPIO_EXTRA + S3C_GPIO_END)
--
--#endif /* __ASM_ARCH_GPIO_H */
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index ae7247d..9c69e6c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -695,6 +695,7 @@ config ARCH_S3C24XX
+ 	select CLKDEV_LOOKUP
+ 	select CLKSRC_MMIO
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -718,6 +719,7 @@ config ARCH_S3C64XX
+ 	select CLKSRC_MMIO
+ 	select CPU_V6
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -741,6 +743,7 @@ config ARCH_S5P64X0
+ 	select CLKSRC_MMIO
+ 	select CPU_V6
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -758,6 +761,7 @@ config ARCH_S5PC100
+ 	select CLKSRC_MMIO
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -776,6 +780,7 @@ config ARCH_S5PV210
+ 	select CLKSRC_MMIO
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+@@ -795,6 +800,7 @@ config ARCH_EXYNOS
+ 	select COMMON_CLK
+ 	select CPU_V7
+ 	select GENERIC_CLOCKEVENTS
++	select GPIO_SAMSUNG
+ 	select HAVE_CLK
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
+index f6fcade..5d47ca3 100644
+--- a/arch/arm/plat-samsung/include/plat/pm.h
++++ b/arch/arm/plat-samsung/include/plat/pm.h
+@@ -166,6 +166,7 @@ extern void s3c_pm_check_store(void);
+  */
+ extern void s3c_pm_configure_extint(void);
+ 
++#ifdef CONFIG_GPIO_SAMSUNG
+ /**
+  * samsung_pm_restore_gpios() - restore the state of the gpios after sleep.
+  *
+@@ -181,6 +182,10 @@ extern void samsung_pm_restore_gpios(void);
+  * Save the GPIO states for resotration on resume. See samsung_pm_restore_gpios().
+  */
+ extern void samsung_pm_save_gpios(void);
++#else
++static inline void samsung_pm_restore_gpios(void) {}
++static inline void samsung_pm_save_gpios(void) {}
++#endif
+ 
+ extern void s3c_pm_save_core(void);
+ extern void s3c_pm_restore_core(void);
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 573c449..9c993ed 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -209,6 +209,13 @@ config GPIO_RCAR
+ 	help
+ 	  Say yes here to support GPIO on Renesas R-Car SoCs.
+ 
++config GPIO_SAMSUNG
++	bool
++	depends on PLAT_SAMSUNG
++	help
++	  Legacy GPIO support. Use only for platforms without support for
++	  pinctrl.
++
+ config GPIO_SPEAR_SPICS
+ 	bool "ST SPEAr13xx SPI Chip Select as GPIO support"
+ 	depends on PLAT_SPEAR
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 0cb2d65..ef3e983 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -59,7 +59,7 @@ obj-$(CONFIG_GPIO_PXA)		+= gpio-pxa.o
+ obj-$(CONFIG_GPIO_RC5T583)	+= gpio-rc5t583.o
+ obj-$(CONFIG_GPIO_RDC321X)	+= gpio-rdc321x.o
+ obj-$(CONFIG_GPIO_RCAR)		+= gpio-rcar.o
+-obj-$(CONFIG_PLAT_SAMSUNG)	+= gpio-samsung.o
++obj-$(CONFIG_GPIO_SAMSUNG)	+= gpio-samsung.o
+ obj-$(CONFIG_ARCH_SA1100)	+= gpio-sa1100.o
+ obj-$(CONFIG_GPIO_SCH)		+= gpio-sch.o
+ obj-$(CONFIG_GPIO_SODAVILLE)	+= gpio-sodaville.o
 -- 
 1.8.2.1
