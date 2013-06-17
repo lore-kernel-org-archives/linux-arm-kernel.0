@@ -1,110 +1,40 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 17 Jun 2013 15:59:23 +0530
-Subject: [PATCH v2 08/10] clocksource: exynos_mct: use (request/free)_irq
- calls for local timer registration
-In-Reply-To: <20130617100152.GC6809@e106331-lin.cambridge.arm.com>
-References: <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-1-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-9-git-send-email-chander.kashyap@linaro.org>
- <20130617100152.GC6809@e106331-lin.cambridge.arm.com>
-Message-ID: <CANuQgHGAopvzomTkrNzzB6Xk-n9Ap9+VAPiEg9w8NLNFXJDn_A@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Jun 2013 03:33:42 -0700
+Subject: [GIT PULL 2/6] omap cleanup for v3.11 merge window
+In-Reply-To: <20130614212815.GB17326@quad.lixom.net>
+References: <pull-1371061475-206272>
+ <51b8bce9.1265310a.49c1.ffff940eSMTPIN_ADDED_MISSING@mx.google.com>
+ <20130614212815.GB17326@quad.lixom.net>
+Message-ID: <20130617103342.GL20992@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2013 15:31, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Jun 14, 2013 at 03:02:50PM +0100, Chander Kashyap wrote:
->> Replace the (setup/remove)_irq calls for local timer registration with
->> (request/free)_irq calls. This generalizes the local timer registration API.
->> Suggested by Mark Rutland.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->>
->> Replace the (setup/remove)_irq calls for local timer registration with
->> (request/free)_irq calls. This generalises the local timer registration API.
->>
->> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
->
-> This looks much nicer now.
->
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-Thanks Mark.
+* Olof Johansson <olof@lixom.net> [130614 14:34]:
+> On Wed, Jun 12, 2013 at 11:24:33AM -0700, Tony Lindgren wrote:
+> > The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
+> > 
+> >   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/cleanup-signed
+> > 
+> > for you to fetch changes up to 09182ab11b49b67d04598b19eb89cf0bbd672a60:
+> > 
+> >   ARM: OMAP4: hwmod data: Remove irq entries from mcspi, mmc hwmods (2013-06-12 09:41:46 -0700)
+> > 
+> > ----------------------------------------------------------------
+> > Move omap4 over to device tree based booting. This allows us to get rid
+> > a big pile of platform init code for things that are already handled by
+> > device tree related code. As am33xx is already device tree based, we
+> > can also remove the same data for am33xx.
+> 
+> Hm. This one has a somewhat silly conflict with the am33xx hwmod fix for uart2.
+> I.e. the fix is reverted since the code is no longer needed -- data comes from
+> device tree. Please double-check my merge resolution on it though.
 
->
->> ---
->>  drivers/clocksource/exynos_mct.c |   35 +++++++++--------------------------
->>  1 file changed, 9 insertions(+), 26 deletions(-)
->>
->> diff --git a/drivers/clocksource/exynos_mct.c b/drivers/clocksource/exynos_mct.c
->> index 662fcc0..a704804 100644
->> --- a/drivers/clocksource/exynos_mct.c
->> +++ b/drivers/clocksource/exynos_mct.c
->> @@ -400,18 +400,6 @@ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
->>       return IRQ_HANDLED;
->>  }
->>
->> -static struct irqaction mct_tick0_event_irq = {
->> -     .name           = "mct_tick0_irq",
->> -     .flags          = IRQF_TIMER | IRQF_NOBALANCING,
->> -     .handler        = exynos4_mct_tick_isr,
->> -};
->> -
->> -static struct irqaction mct_tick1_event_irq = {
->> -     .name           = "mct_tick1_irq",
->> -     .flags          = IRQF_TIMER | IRQF_NOBALANCING,
->> -     .handler        = exynos4_mct_tick_isr,
->> -};
->> -
->>  static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->>  {
->>       struct mct_clock_event_device *mevt;
->> @@ -435,16 +423,15 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->>       exynos4_mct_write(TICK_BASE_CNT, mevt->base + MCT_L_TCNTB_OFFSET);
->>
->>       if (mct_int_type == MCT_INT_SPI) {
->> -             if (cpu == 0) {
->> -                     mct_tick0_event_irq.dev_id = mevt;
->> -                     evt->irq = mct_irqs[MCT_L0_IRQ];
->> -                     setup_irq(evt->irq, &mct_tick0_event_irq);
->> -             } else {
->> -                     mct_tick1_event_irq.dev_id = mevt;
->> -                     evt->irq = mct_irqs[MCT_L1_IRQ];
->> -                     setup_irq(evt->irq, &mct_tick1_event_irq);
->> -                     irq_set_affinity(evt->irq, cpumask_of(1));
->> +             evt->irq = mct_irqs[MCT_L0_IRQ + cpu];
->> +             if (request_irq(evt->irq, exynos4_mct_tick_isr,
->> +                             IRQF_TIMER | IRQF_NOBALANCING,
->> +                             evt->name, mevt)) {
->> +                     pr_err("exynos-mct: cannot register IRQ %d\n",
->> +                             evt->irq);
->> +                     return -EIO;
->>               }
->> +             irq_set_affinity(evt->irq, cpumask_of(cpu));
->>       } else {
->>               enable_percpu_irq(mct_irqs[MCT_L0_IRQ], 0);
->>       }
->> @@ -454,13 +441,9 @@ static int __cpuinit exynos4_local_timer_setup(struct clock_event_device *evt)
->>
->>  static void exynos4_local_timer_stop(struct clock_event_device *evt)
->>  {
->> -     unsigned int cpu = smp_processor_id();
->>       evt->set_mode(CLOCK_EVT_MODE_UNUSED, evt);
->>       if (mct_int_type == MCT_INT_SPI)
->> -             if (cpu == 0)
->> -                     remove_irq(evt->irq, &mct_tick0_event_irq);
->> -             else
->> -                     remove_irq(evt->irq, &mct_tick1_event_irq);
->> +             free_irq(evt->irq, this_cpu_ptr(&percpu_mct_tick));
->>       else
->>               disable_percpu_irq(mct_irqs[MCT_L0_IRQ]);
->>  }
->> --
->> 1.7.9.5
->>
->>
+Thanks yes that should not be needed any longer in the hwmod data.
 
+Regards,
 
-
---
-with warm regards,
-Chander Kashyap
+Tony
