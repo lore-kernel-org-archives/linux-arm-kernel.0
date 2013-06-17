@@ -1,215 +1,332 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Jun 2013 10:43:16 -0700
-Subject: [PATCH/RESEND 09/12] ARM: msm: Remove clock-7x30.h include file
+Date: Mon, 17 Jun 2013 10:43:18 -0700
+Subject: [PATCH/RESEND 11/12] ARM: msm: Make proc_comm clock control into a
+ platform driver
 In-Reply-To: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
 References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1371490999-15501-10-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371490999-15501-12-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This file is not used outside of the two users in the clock-7x30
-array. Those two clocks are virtual "source" clocks that don't
-really need to exist outside of the clock driver. Let's remove
-them from the array, since they're not doing anything anyway, and
-then remove the clock-7x30.h include file along with it.
+To move closer to the generic struct clock framework move the
+proc_comm based clock code to a platform driver. The data
+describing the struct clks still live in the devices-$ARCH file,
+but the clock initialization is done at driver binding time.
 
 Cc: Saravana Kannan <skannan@codeaurora.org>
+Reviewed-by: Pankaj Jangra <jangra.pankaj9@gmail.com>
+Acked-by: Mike Turquette <mturquette@linaro.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-7x30.h      | 155 ------------------------------------
- arch/arm/mach-msm/devices-msm7x30.c |   3 -
- 2 files changed, 158 deletions(-)
- delete mode 100644 arch/arm/mach-msm/clock-7x30.h
+ arch/arm/mach-msm/board-halibut.c      |  2 +-
+ arch/arm/mach-msm/board-msm7x30.c      |  2 +-
+ arch/arm/mach-msm/board-qsd8x50.c      |  2 +-
+ arch/arm/mach-msm/board-trout.c        |  3 +--
+ arch/arm/mach-msm/clock-pcom.c         | 23 +++++++++++++++++++++--
+ arch/arm/mach-msm/clock-pcom.h         |  5 +++++
+ arch/arm/mach-msm/clock.c              |  2 +-
+ arch/arm/mach-msm/clock.h              |  3 +++
+ arch/arm/mach-msm/devices-msm7x00.c    | 12 ++++++++++--
+ arch/arm/mach-msm/devices-msm7x30.c    | 11 +++++++++--
+ arch/arm/mach-msm/devices-qsd8x50.c    | 11 +++++++++--
+ arch/arm/mach-msm/devices.h            | 15 +++------------
+ arch/arm/mach-msm/include/mach/board.h |  5 -----
+ 13 files changed, 65 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-msm/clock-7x30.h b/arch/arm/mach-msm/clock-7x30.h
-deleted file mode 100644
-index 1410445..0000000
---- a/arch/arm/mach-msm/clock-7x30.h
-+++ /dev/null
-@@ -1,155 +0,0 @@
--/* Copyright (c) 2009, Code Aurora Forum. All rights reserved.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 and
-- * only version 2 as published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- */
+diff --git a/arch/arm/mach-msm/board-halibut.c b/arch/arm/mach-msm/board-halibut.c
+index 82eaf88..803651a 100644
+--- a/arch/arm/mach-msm/board-halibut.c
++++ b/arch/arm/mach-msm/board-halibut.c
+@@ -59,6 +59,7 @@ static struct platform_device smc91x_device = {
+ };
+ 
+ static struct platform_device *devices[] __initdata = {
++	&msm_clock_7x01a,
+ 	&msm_device_gpio_7201,
+ 	&msm_device_uart3,
+ 	&msm_device_smd,
+@@ -91,7 +92,6 @@ static void __init halibut_fixup(struct tag *tags, char **cmdline,
+ static void __init halibut_map_io(void)
+ {
+ 	msm_map_common_io();
+-	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
+ }
+ 
+ static void __init halibut_init_late(void)
+diff --git a/arch/arm/mach-msm/board-msm7x30.c b/arch/arm/mach-msm/board-msm7x30.c
+index 520c141..db3d8c0 100644
+--- a/arch/arm/mach-msm/board-msm7x30.c
++++ b/arch/arm/mach-msm/board-msm7x30.c
+@@ -89,6 +89,7 @@ struct msm_gpiomux_config msm_gpiomux_configs[GPIOMUX_NGPIOS] = {
+ };
+ 
+ static struct platform_device *devices[] __initdata = {
++	&msm_clock_7x30,
+ 	&msm_device_gpio_7x30,
+ #if defined(CONFIG_SERIAL_MSM) || defined(CONFIG_MSM_SERIAL_DEBUGGER)
+         &msm_device_uart2,
+@@ -116,7 +117,6 @@ static void __init msm7x30_init(void)
+ static void __init msm7x30_map_io(void)
+ {
+ 	msm_map_msm7x30_io();
+-	msm_clock_init(msm_clocks_7x30, msm_num_clocks_7x30);
+ }
+ 
+ static void __init msm7x30_init_late(void)
+diff --git a/arch/arm/mach-msm/board-qsd8x50.c b/arch/arm/mach-msm/board-qsd8x50.c
+index 38a532d..f14a73d 100644
+--- a/arch/arm/mach-msm/board-qsd8x50.c
++++ b/arch/arm/mach-msm/board-qsd8x50.c
+@@ -89,6 +89,7 @@ static struct msm_otg_platform_data msm_otg_pdata = {
+ };
+ 
+ static struct platform_device *devices[] __initdata = {
++	&msm_clock_8x50,
+ 	&msm_device_gpio_8x50,
+ 	&msm_device_uart3,
+ 	&msm_device_smd,
+@@ -172,7 +173,6 @@ static void __init qsd8x50_init_mmc(void)
+ static void __init qsd8x50_map_io(void)
+ {
+ 	msm_map_qsd8x50_io();
+-	msm_clock_init(msm_clocks_8x50, msm_num_clocks_8x50);
+ }
+ 
+ static void __init qsd8x50_init_irq(void)
+diff --git a/arch/arm/mach-msm/board-trout.c b/arch/arm/mach-msm/board-trout.c
+index 80fe1c5..64a46eb 100644
+--- a/arch/arm/mach-msm/board-trout.c
++++ b/arch/arm/mach-msm/board-trout.c
+@@ -36,6 +36,7 @@
+ extern int trout_init_mmc(unsigned int);
+ 
+ static struct platform_device *devices[] __initdata = {
++	&msm_clock_7x01a,
+ 	&msm_device_gpio_7201,
+ 	&msm_device_uart3,
+ 	&msm_device_smd,
+@@ -94,8 +95,6 @@ static void __init trout_map_io(void)
+ 	/* route UART3 to the "H2W" extended usb connector */
+ 	writeb(0x80, TROUT_CPLD_BASE + 0x00);
+ #endif
 -
--#ifndef __ARCH_ARM_MACH_MSM_CLOCK_7X30_H
--#define __ARCH_ARM_MACH_MSM_CLOCK_7X30_H
--
--enum {
--	L_7X30_NONE_CLK = -1,
--	L_7X30_ADM_CLK,
--	L_7X30_I2C_CLK,
--	L_7X30_I2C_2_CLK,
--	L_7X30_QUP_I2C_CLK,
--	L_7X30_UART1DM_CLK,
--	L_7X30_UART1DM_P_CLK,
--	L_7X30_UART2DM_CLK,
--	L_7X30_UART2DM_P_CLK,
--	L_7X30_EMDH_CLK,
--	L_7X30_EMDH_P_CLK,
--	L_7X30_PMDH_CLK,
--	L_7X30_PMDH_P_CLK,
--	L_7X30_GRP_2D_CLK,
--	L_7X30_GRP_2D_P_CLK,
--	L_7X30_GRP_3D_SRC_CLK,
--	L_7X30_GRP_3D_CLK,
--	L_7X30_GRP_3D_P_CLK,
--	L_7X30_IMEM_CLK,
--	L_7X30_SDC1_CLK,
--	L_7X30_SDC1_P_CLK,
--	L_7X30_SDC2_CLK,
--	L_7X30_SDC2_P_CLK,
--	L_7X30_SDC3_CLK,
--	L_7X30_SDC3_P_CLK,
--	L_7X30_SDC4_CLK,
--	L_7X30_SDC4_P_CLK,
--	L_7X30_MDP_CLK,
--	L_7X30_MDP_P_CLK,
--	L_7X30_MDP_LCDC_PCLK_CLK,
--	L_7X30_MDP_LCDC_PAD_PCLK_CLK,
--	L_7X30_MDP_VSYNC_CLK,
--	L_7X30_MI2S_CODEC_RX_M_CLK,
--	L_7X30_MI2S_CODEC_RX_S_CLK,
--	L_7X30_MI2S_CODEC_TX_M_CLK,
--	L_7X30_MI2S_CODEC_TX_S_CLK,
--	L_7X30_MI2S_M_CLK,
--	L_7X30_MI2S_S_CLK,
--	L_7X30_LPA_CODEC_CLK,
--	L_7X30_LPA_CORE_CLK,
--	L_7X30_LPA_P_CLK,
--	L_7X30_MIDI_CLK,
--	L_7X30_MDC_CLK,
--	L_7X30_ROTATOR_IMEM_CLK,
--	L_7X30_ROTATOR_P_CLK,
--	L_7X30_SDAC_M_CLK,
--	L_7X30_SDAC_CLK,
--	L_7X30_UART1_CLK,
--	L_7X30_UART2_CLK,
--	L_7X30_UART3_CLK,
--	L_7X30_TV_CLK,
--	L_7X30_TV_DAC_CLK,
--	L_7X30_TV_ENC_CLK,
--	L_7X30_HDMI_CLK,
--	L_7X30_TSIF_REF_CLK,
--	L_7X30_TSIF_P_CLK,
--	L_7X30_USB_HS_SRC_CLK,
--	L_7X30_USB_HS_CLK,
--	L_7X30_USB_HS_CORE_CLK,
--	L_7X30_USB_HS_P_CLK,
--	L_7X30_USB_HS2_CLK,
--	L_7X30_USB_HS2_CORE_CLK,
--	L_7X30_USB_HS2_P_CLK,
--	L_7X30_USB_HS3_CLK,
--	L_7X30_USB_HS3_CORE_CLK,
--	L_7X30_USB_HS3_P_CLK,
--	L_7X30_VFE_CLK,
--	L_7X30_VFE_P_CLK,
--	L_7X30_VFE_MDC_CLK,
--	L_7X30_VFE_CAMIF_CLK,
--	L_7X30_CAMIF_PAD_P_CLK,
--	L_7X30_CAM_M_CLK,
--	L_7X30_JPEG_CLK,
--	L_7X30_JPEG_P_CLK,
--	L_7X30_VPE_CLK,
--	L_7X30_MFC_CLK,
--	L_7X30_MFC_DIV2_CLK,
--	L_7X30_MFC_P_CLK,
--	L_7X30_SPI_CLK,
--	L_7X30_SPI_P_CLK,
--	L_7X30_CSI0_CLK,
--	L_7X30_CSI0_VFE_CLK,
--	L_7X30_CSI0_P_CLK,
--	L_7X30_CSI1_CLK,
--	L_7X30_CSI1_VFE_CLK,
--	L_7X30_CSI1_P_CLK,
--	L_7X30_GLBL_ROOT_CLK,
--
--	L_7X30_AXI_LI_VG_CLK,
--	L_7X30_AXI_LI_GRP_CLK,
--	L_7X30_AXI_LI_JPEG_CLK,
--	L_7X30_AXI_GRP_2D_CLK,
--	L_7X30_AXI_MFC_CLK,
--	L_7X30_AXI_VPE_CLK,
--	L_7X30_AXI_LI_VFE_CLK,
--	L_7X30_AXI_LI_APPS_CLK,
--	L_7X30_AXI_MDP_CLK,
--	L_7X30_AXI_IMEM_CLK,
--	L_7X30_AXI_LI_ADSP_A_CLK,
--	L_7X30_AXI_ROTATOR_CLK,
--
--	L_7X30_NR_CLKS
--};
--
--struct clk_ops;
--extern struct clk_ops clk_ops_7x30;
--
--struct clk_ops *clk_7x30_is_local(uint32_t id);
--int clk_7x30_init(void);
--
--void pll_enable(uint32_t pll);
--void pll_disable(uint32_t pll);
--
--extern int internal_pwr_rail_ctl_auto(unsigned rail_id, bool enable);
--
--#define CLK_7X30(clk_name, clk_id, clk_dev, clk_flags) {	\
--	.con_id = clk_name, \
--	.dev_id = clk_dev, \
--	.clk = &(struct clk){ \
--		.id = L_7X30_##clk_id, \
--		.remote_id = P_##clk_id, \
--		.flags = clk_flags, \
--		.dbg_name = #clk_id, \
--	}, \
--	}
--
--#define CLK_7X30S(clk_name, l_id, r_id, clk_dev, clk_flags) {	\
--	.con_id = clk_name, \
--	.dev_id = clk_dev, \
--	.clk = &(struct clk){ \
--		.id = L_7X30_##l_id, \
--		.remote_id = P_##r_id, \
--		.flags = clk_flags, \
--		.dbg_name = #l_id, \
--		.ops = &clk_ops_pcom, \
--	}, \
--	}
--
--#endif
+-	msm_clock_init(msm_clocks_7x01a, msm_num_clocks_7x01a);
+ }
+ 
+ static void __init trout_init_late(void)
+diff --git a/arch/arm/mach-msm/clock-pcom.c b/arch/arm/mach-msm/clock-pcom.c
+index bb75f8e..6321731 100644
+--- a/arch/arm/mach-msm/clock-pcom.c
++++ b/arch/arm/mach-msm/clock-pcom.c
+@@ -14,8 +14,9 @@
+  */
+ 
+ #include <linux/err.h>
+-#include <linux/ctype.h>
+-#include <linux/stddef.h>
++#include <linux/platform_device.h>
++#include <linux/module.h>
++
+ #include <mach/clk.h>
+ 
+ #include "proc_comm.h"
+@@ -126,3 +127,21 @@ struct clk_ops clk_ops_pcom = {
+ 	.round_rate = pc_clk_round_rate,
+ 	.is_local = pc_clk_is_local,
+ };
++
++static int msm_clock_pcom_probe(struct platform_device *pdev)
++{
++	const struct pcom_clk_pdata *pdata = pdev->dev.platform_data;
++	msm_clock_init(pdata->lookup, pdata->num_lookups);
++	return 0;
++}
++
++static struct platform_driver msm_clock_pcom_driver = {
++	.probe		= msm_clock_pcom_probe,
++	.driver		= {
++		.name	= "msm-clock-pcom",
++		.owner	= THIS_MODULE,
++	},
++};
++module_platform_driver(msm_clock_pcom_driver);
++
++MODULE_LICENSE("GPL v2");
+diff --git a/arch/arm/mach-msm/clock-pcom.h b/arch/arm/mach-msm/clock-pcom.h
+index 974d003..87406a3 100644
+--- a/arch/arm/mach-msm/clock-pcom.h
++++ b/arch/arm/mach-msm/clock-pcom.h
+@@ -123,6 +123,11 @@
+ struct clk_ops;
+ extern struct clk_ops clk_ops_pcom;
+ 
++struct pcom_clk_pdata {
++	struct clk_lookup *lookup;
++	u32 num_lookups;
++};
++
+ int pc_clk_reset(unsigned id, enum clk_reset_action action);
+ 
+ #define CLK_PCOM(clk_name, clk_id, clk_dev, clk_flags) {	\
+diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
+index 8d07b25..01af7a4 100644
+--- a/arch/arm/mach-msm/clock.c
++++ b/arch/arm/mach-msm/clock.c
+@@ -116,7 +116,7 @@ EXPORT_SYMBOL(clk_get_parent);
+  */
+ static struct clk *ebi1_clk;
+ 
+-void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks)
++void msm_clock_init(struct clk_lookup *clock_tbl, size_t num_clocks)
+ {
+ 	unsigned n;
+ 
+diff --git a/arch/arm/mach-msm/clock.h b/arch/arm/mach-msm/clock.h
+index a25ff58..cc76bfe 100644
+--- a/arch/arm/mach-msm/clock.h
++++ b/arch/arm/mach-msm/clock.h
+@@ -63,4 +63,7 @@ static inline int __init clock_debug_init(void) { return 0; }
+ static inline int __init clock_debug_add(struct clk *clock) { return 0; }
+ #endif
+ 
++struct clk_lookup;
++void msm_clock_init(struct clk_lookup *clock_tbl, size_t num_clocks);
++
+ #endif
+diff --git a/arch/arm/mach-msm/devices-msm7x00.c b/arch/arm/mach-msm/devices-msm7x00.c
+index 1a0a230..9edfe68 100644
+--- a/arch/arm/mach-msm/devices-msm7x00.c
++++ b/arch/arm/mach-msm/devices-msm7x00.c
+@@ -425,7 +425,7 @@ struct platform_device msm_device_mdp = {
+ 	.resource = resources_mdp,
+ };
+ 
+-struct clk_lookup msm_clocks_7x01a[] = {
++static struct clk_lookup msm_clocks_7x01a[] = {
+ 	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
+ 	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
+ 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, 0),
+@@ -469,4 +469,12 @@ struct clk_lookup msm_clocks_7x01a[] = {
+ 	CLK_PCOM("vfe_mdc_clk",	VFE_MDC_CLK,	NULL, OFF),
+ };
+ 
+-unsigned msm_num_clocks_7x01a = ARRAY_SIZE(msm_clocks_7x01a);
++static struct pcom_clk_pdata msm_clock_7x01a_pdata = {
++	.lookup = msm_clocks_7x01a,
++	.num_lookups = ARRAY_SIZE(msm_clocks_7x01a),
++};
++
++struct platform_device msm_clock_7x01a = {
++	.name = "msm-clock-pcom",
++	.dev.platform_data = &msm_clock_7x01a_pdata,
++};
 diff --git a/arch/arm/mach-msm/devices-msm7x30.c b/arch/arm/mach-msm/devices-msm7x30.c
-index 12f482c..d233c51 100644
+index d233c51..e877fd6 100644
 --- a/arch/arm/mach-msm/devices-msm7x30.c
 +++ b/arch/arm/mach-msm/devices-msm7x30.c
-@@ -29,7 +29,6 @@
- #include <asm/mach/flash.h>
+@@ -160,7 +160,7 @@ struct platform_device msm_device_hsusb_host = {
+ 	},
+ };
  
- #include "clock-pcom.h"
--#include "clock-7x30.h"
+-struct clk_lookup msm_clocks_7x30[] = {
++static struct clk_lookup msm_clocks_7x30[] = {
+ 	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
+ 	CLK_PCOM("adsp_clk",	ADSP_CLK,	NULL, 0),
+ 	CLK_PCOM("cam_m_clk",	CAM_M_CLK,	NULL, 0),
+@@ -234,5 +234,12 @@ struct clk_lookup msm_clocks_7x30[] = {
+ 	CLK_PCOM("csi_vfe_clk",	CSI0_VFE_CLK,	NULL, 0),
+ };
  
+-unsigned msm_num_clocks_7x30 = ARRAY_SIZE(msm_clocks_7x30);
++static struct pcom_clk_pdata msm_clock_7x30_pdata = {
++	.lookup = msm_clocks_7x30,
++	.num_lookups = ARRAY_SIZE(msm_clocks_7x30),
++};
+ 
++struct platform_device msm_clock_7x30 = {
++	.name = "msm-clock-pcom",
++	.dev.platform_data = &msm_clock_7x30_pdata,
++};
+diff --git a/arch/arm/mach-msm/devices-qsd8x50.c b/arch/arm/mach-msm/devices-qsd8x50.c
+index 2e1b3ec..a62f647 100644
+--- a/arch/arm/mach-msm/devices-qsd8x50.c
++++ b/arch/arm/mach-msm/devices-qsd8x50.c
+@@ -322,7 +322,7 @@ int __init msm_add_sdcc(unsigned int controller,
+ 	return platform_device_register(pdev);
+ }
+ 
+-struct clk_lookup msm_clocks_8x50[] = {
++static struct clk_lookup msm_clocks_8x50[] = {
+ 	CLK_PCOM("adm_clk",	ADM_CLK,	NULL, 0),
+ 	CLK_PCOM("ce_clk",	CE_CLK,		NULL, 0),
+ 	CLK_PCOM("ebi1_clk",	EBI1_CLK,	NULL, CLK_MIN),
+@@ -376,5 +376,12 @@ struct clk_lookup msm_clocks_8x50[] = {
+ 	CLK_PCOM("usb_phy_clk",	USB_PHY_CLK,	NULL, 0),
+ };
+ 
+-unsigned msm_num_clocks_8x50 = ARRAY_SIZE(msm_clocks_8x50);
++static struct pcom_clk_pdata msm_clock_8x50_pdata = {
++	.lookup = msm_clocks_8x50,
++	.num_lookups = ARRAY_SIZE(msm_clocks_8x50),
++};
+ 
++struct platform_device msm_clock_8x50 = {
++	.name = "msm-clock-pcom",
++	.dev.platform_data = &msm_clock_8x50_pdata,
++};
+diff --git a/arch/arm/mach-msm/devices.h b/arch/arm/mach-msm/devices.h
+index da902cf..dccefad 100644
+--- a/arch/arm/mach-msm/devices.h
++++ b/arch/arm/mach-msm/devices.h
+@@ -16,10 +16,6 @@
+ #ifndef __ARCH_ARM_MACH_MSM_DEVICES_H
+ #define __ARCH_ARM_MACH_MSM_DEVICES_H
+ 
+-#include <linux/clkdev.h>
+-
+-#include "clock.h"
+-
+ extern struct platform_device msm_device_gpio_7201;
+ extern struct platform_device msm_device_gpio_7x30;
+ extern struct platform_device msm_device_gpio_8x50;
+@@ -50,13 +46,8 @@ extern struct platform_device msm_device_mddi0;
+ extern struct platform_device msm_device_mddi1;
+ extern struct platform_device msm_device_mdp;
+ 
+-extern struct clk_lookup msm_clocks_7x01a[];
+-extern unsigned msm_num_clocks_7x01a;
+-
+-extern struct clk_lookup msm_clocks_7x30[];
+-extern unsigned msm_num_clocks_7x30;
+-
+-extern struct clk_lookup msm_clocks_8x50[];
+-extern unsigned msm_num_clocks_8x50;
++extern struct platform_device msm_clock_7x01a;
++extern struct platform_device msm_clock_7x30;
++extern struct platform_device msm_clock_8x50;
+ 
+ #endif
+diff --git a/arch/arm/mach-msm/include/mach/board.h b/arch/arm/mach-msm/include/mach/board.h
+index 8cebedb..c34e246 100644
+--- a/arch/arm/mach-msm/include/mach/board.h
++++ b/arch/arm/mach-msm/include/mach/board.h
+@@ -20,16 +20,11 @@
+ #include <linux/types.h>
  #include <linux/platform_data/mmc-msm_sdcc.h>
  
-@@ -177,7 +176,6 @@ struct clk_lookup msm_clocks_7x30[] = {
- 	CLK_PCOM("grp_2d_pclk",	GRP_2D_P_CLK,	NULL, 0),
- 	CLK_PCOM("grp_clk",	GRP_3D_CLK,	NULL, 0),
- 	CLK_PCOM("grp_pclk",	GRP_3D_P_CLK,	NULL, 0),
--	CLK_7X30S("grp_src_clk", GRP_3D_SRC_CLK, GRP_3D_CLK,	NULL, 0),
- 	CLK_PCOM("hdmi_clk",	HDMI_CLK,	NULL, 0),
- 	CLK_PCOM("imem_clk",	IMEM_CLK,	NULL, OFF),
- 	CLK_PCOM("jpeg_clk",	JPEG_CLK,	NULL, OFF),
-@@ -210,7 +208,6 @@ struct clk_lookup msm_clocks_7x30[] = {
- 	CLK_PCOM("sdac_clk",	SDAC_CLK,	NULL, OFF),
- 	CLK_PCOM("spi_clk",	SPI_CLK,	NULL, 0),
- 	CLK_PCOM("spi_pclk",	SPI_P_CLK,	NULL, 0),
--	CLK_7X30S("tv_src_clk",	TV_CLK, 	TV_ENC_CLK,	NULL, 0),
- 	CLK_PCOM("tv_dac_clk",	TV_DAC_CLK,	NULL, 0),
- 	CLK_PCOM("tv_enc_clk",	TV_ENC_CLK,	NULL, 0),
- 	CLK_PCOM("uart_clk",	UART2_CLK,	"msm_serial.1", 0),
+-/* platform device data structures */
+-
+-struct clk_lookup;
+-
+ /* common init routines for use by arch/arm/mach-msm/board-*.c */
+ 
+ void __init msm_add_devices(void);
+ void __init msm_init_irq(void);
+ void __init msm_init_gpio(void);
+-void __init msm_clock_init(struct clk_lookup *clock_tbl, unsigned num_clocks);
+ int __init msm_add_sdcc(unsigned int controller,
+ 			struct msm_mmc_platform_data *plat,
+ 			unsigned int stat_irq, unsigned long stat_irq_flags);
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
