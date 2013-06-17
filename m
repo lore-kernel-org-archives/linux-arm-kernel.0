@@ -1,101 +1,109 @@
 From: t.figa@samsung.com (Tomasz Figa)
-Date: Mon, 17 Jun 2013 18:34:19 +0200
-Subject: [PATCH v2 34/38] ARM: EXYNOS: Remove mach/regs-usb-phy.h header
+Date: Mon, 17 Jun 2013 18:34:21 +0200
+Subject: [PATCH v2 36/38] ARM: EXYNOS: Use exynos_init_io() as map_io callback
 In-Reply-To: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
 References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
-Message-ID: <1371486863-12398-35-git-send-email-t.figa@samsung.com>
+Message-ID: <1371486863-12398-37-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch removes mach/regs-usb-phy.h header, which is not used
-anywhere in the kernel.
+Since there is no board specific mapping needed on Exynos,
+exynos_init_io() can be simplified and used as map_io callback for both
+Exynos4 and Exynos5.
 
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Tomasz Figa <t.figa@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos/include/mach/regs-usb-phy.h | 74 ------------------------
- 1 file changed, 74 deletions(-)
- delete mode 100644 arch/arm/mach-exynos/include/mach/regs-usb-phy.h
+ arch/arm/mach-exynos/common.c          | 5 +----
+ arch/arm/mach-exynos/common.h          | 2 +-
+ arch/arm/mach-exynos/mach-exynos4-dt.c | 7 +------
+ arch/arm/mach-exynos/mach-exynos5-dt.c | 7 +------
+ 4 files changed, 4 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/mach-exynos/include/mach/regs-usb-phy.h b/arch/arm/mach-exynos/include/mach/regs-usb-phy.h
-deleted file mode 100644
-index 0727773..0000000
---- a/arch/arm/mach-exynos/include/mach/regs-usb-phy.h
-+++ /dev/null
-@@ -1,74 +0,0 @@
--/*
-- * Copyright (C) 2011 Samsung Electronics Co.Ltd
-- * Author: Joonyoung Shim <jy0922.shim@samsung.com>
-- *
-- * This program is free software; you can redistribute  it and/or modify it
-- * under  the terms of  the GNU General  Public License as published by the
-- * Free Software Foundation;  either version 2 of the  License, or (at your
-- * option) any later version.
-- */
+diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+index 91d457f..561890f 100644
+--- a/arch/arm/mach-exynos/common.c
++++ b/arch/arm/mach-exynos/common.c
+@@ -351,15 +351,12 @@ int __init exynos_fdt_map_chipid(unsigned long node, const char *uname,
+  * register the standard cpu IO areas
+  */
+ 
+-void __init exynos_init_io(struct map_desc *mach_desc, int size)
++void __init exynos_init_io(void)
+ {
+ 	debug_ll_io_init();
+ 
+ 	of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
+ 
+-	if (mach_desc)
+-		iotable_init(mach_desc, size);
 -
--#ifndef __PLAT_S5P_REGS_USB_PHY_H
--#define __PLAT_S5P_REGS_USB_PHY_H
+ 	/* detect cpu id and rev. */
+ 	s5p_init_cpu(S5P_VA_CHIPID);
+ 
+diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+index 1c83f95..38d45fd 100644
+--- a/arch/arm/mach-exynos/common.h
++++ b/arch/arm/mach-exynos/common.h
+@@ -19,7 +19,7 @@ void exynos_init_time(void);
+ extern unsigned long xxti_f, xusbxti_f;
+ 
+ struct map_desc;
+-void exynos_init_io(struct map_desc *mach_desc, int size);
++void exynos_init_io(void);
+ void exynos4_restart(char mode, const char *cmd);
+ void exynos5_restart(char mode, const char *cmd);
+ void exynos_init_late(void);
+diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-exynos/mach-exynos4-dt.c
+index df15726..0099c6c 100644
+--- a/arch/arm/mach-exynos/mach-exynos4-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+@@ -23,11 +23,6 @@
+ 
+ #include "common.h"
+ 
+-static void __init exynos4_dt_map_io(void)
+-{
+-	exynos_init_io(NULL, 0);
+-}
 -
--#define EXYNOS4_HSOTG_PHYREG(x)		((x) + S3C_VA_USB_HSPHY)
+ static void __init exynos4_dt_machine_init(void)
+ {
+ 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+@@ -55,7 +50,7 @@ static void __init exynos4_reserve(void)
+ DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device Tree)")
+ 	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
+ 	.smp		= smp_ops(exynos_smp_ops),
+-	.map_io		= exynos4_dt_map_io,
++	.map_io		= exynos_init_io,
+ 	.init_early	= exynos_firmware_init,
+ 	.init_machine	= exynos4_dt_machine_init,
+ 	.init_late	= exynos_init_late,
+diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-exynos/mach-exynos5-dt.c
+index 8777310..ab54770 100644
+--- a/arch/arm/mach-exynos/mach-exynos5-dt.c
++++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+@@ -27,11 +27,6 @@
+ static u64 dma_mask64 = DMA_BIT_MASK(64);
+ static u64 dma_mask32 = DMA_BIT_MASK(32);
+ 
+-static void __init exynos5_dt_map_io(void)
+-{
+-	exynos_init_io(NULL, 0);
+-}
 -
--#define EXYNOS4_PHYPWR			EXYNOS4_HSOTG_PHYREG(0x00)
--#define PHY1_HSIC_NORMAL_MASK		(0xf << 9)
--#define PHY1_HSIC1_SLEEP		(1 << 12)
--#define PHY1_HSIC1_FORCE_SUSPEND	(1 << 11)
--#define PHY1_HSIC0_SLEEP		(1 << 10)
--#define PHY1_HSIC0_FORCE_SUSPEND	(1 << 9)
--
--#define PHY1_STD_NORMAL_MASK		(0x7 << 6)
--#define PHY1_STD_SLEEP			(1 << 8)
--#define PHY1_STD_ANALOG_POWERDOWN	(1 << 7)
--#define PHY1_STD_FORCE_SUSPEND		(1 << 6)
--
--#define PHY0_NORMAL_MASK		(0x39 << 0)
--#define PHY0_SLEEP			(1 << 5)
--#define PHY0_OTG_DISABLE		(1 << 4)
--#define PHY0_ANALOG_POWERDOWN		(1 << 3)
--#define PHY0_FORCE_SUSPEND		(1 << 0)
--
--#define EXYNOS4_PHYCLK			EXYNOS4_HSOTG_PHYREG(0x04)
--#define PHY1_COMMON_ON_N		(1 << 7)
--#define PHY0_COMMON_ON_N		(1 << 4)
--#define PHY0_ID_PULLUP			(1 << 2)
--
--#define EXYNOS4_CLKSEL_SHIFT		(0)
--
--#define EXYNOS4210_CLKSEL_MASK		(0x3 << 0)
--#define EXYNOS4210_CLKSEL_48M		(0x0 << 0)
--#define EXYNOS4210_CLKSEL_12M		(0x2 << 0)
--#define EXYNOS4210_CLKSEL_24M		(0x3 << 0)
--
--#define EXYNOS4X12_CLKSEL_MASK		(0x7 << 0)
--#define EXYNOS4X12_CLKSEL_9600K		(0x0 << 0)
--#define EXYNOS4X12_CLKSEL_10M		(0x1 << 0)
--#define EXYNOS4X12_CLKSEL_12M		(0x2 << 0)
--#define EXYNOS4X12_CLKSEL_19200K	(0x3 << 0)
--#define EXYNOS4X12_CLKSEL_20M		(0x4 << 0)
--#define EXYNOS4X12_CLKSEL_24M		(0x5 << 0)
--
--#define EXYNOS4_RSTCON			EXYNOS4_HSOTG_PHYREG(0x08)
--#define HOST_LINK_PORT_SWRST_MASK	(0xf << 6)
--#define HOST_LINK_PORT2_SWRST		(1 << 9)
--#define HOST_LINK_PORT1_SWRST		(1 << 8)
--#define HOST_LINK_PORT0_SWRST		(1 << 7)
--#define HOST_LINK_ALL_SWRST		(1 << 6)
--
--#define PHY1_SWRST_MASK			(0x7 << 3)
--#define PHY1_HSIC_SWRST			(1 << 5)
--#define PHY1_STD_SWRST			(1 << 4)
--#define PHY1_ALL_SWRST			(1 << 3)
--
--#define PHY0_SWRST_MASK			(0x7 << 0)
--#define PHY0_PHYLINK_SWRST		(1 << 2)
--#define PHY0_HLINK_SWRST		(1 << 1)
--#define PHY0_SWRST			(1 << 0)
--
--#define EXYNOS4_PHY1CON			EXYNOS4_HSOTG_PHYREG(0x34)
--#define FPENABLEN			(1 << 0)
--
--#endif /* __PLAT_S5P_REGS_USB_PHY_H */
+ static int exynos5440_platform_notifier(struct notifier_block *nb,
+ 				  unsigned long event, void *__dev)
+ {
+@@ -105,7 +100,7 @@ static void __init exynos5_reserve(void)
+ DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
+ 	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+ 	.smp		= smp_ops(exynos_smp_ops),
+-	.map_io		= exynos5_dt_map_io,
++	.map_io		= exynos_init_io,
+ 	.init_machine	= exynos5_dt_machine_init,
+ 	.init_late	= exynos_init_late,
+ 	.init_time	= exynos_init_time,
 -- 
 1.8.2.1
