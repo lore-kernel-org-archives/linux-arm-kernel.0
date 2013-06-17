@@ -1,78 +1,51 @@
 From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 17 Jun 2013 15:36:11 +0530
-Subject: [PATCH v10 2/2] ARM: edma: remove unused transfer controller handlers
-In-Reply-To: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
-References: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
-Message-ID: <1371463571-2578-3-git-send-email-nsekhar@ti.com>
+Date: Mon, 17 Jun 2013 15:36:09 +0530
+Subject: [PATCH v10 0/2] ARM: davinci: move EDMA API to arm/common
+Message-ID: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Porter <mporter@ti.com>
+This is a repost of first two patches of Matt Porter's EDMA
+series below:
 
-Fix build on OMAP, the irqs are undefined on AM33xx.
-These error interrupt handlers were hardcoded as disabled
-so since they are unused code, simply remove them.
+http://www.mail-archive.com/davinci-linux-open-source at linux.davincidsp.com/msg25317.html
 
-Signed-off-by: Matt Porter <mporter@ti.com>
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/common/edma.c |   37 -------------------------------------
- 1 file changed, 37 deletions(-)
+The only change that has been made is to drop changes
+related to DaVinci SFFSDR machine support for sound
+since that code is now queued to be removed.
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index dcaeb8e..a1db6cd 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -494,26 +494,6 @@ static irqreturn_t dma_ccerr_handler(int irq, void *data)
- 	return IRQ_HANDLED;
- }
- 
--/******************************************************************************
-- *
-- * Transfer controller error interrupt handlers
-- *
-- *****************************************************************************/
--
--#define tc_errs_handled	false	/* disabled as long as they're NOPs */
--
--static irqreturn_t dma_tc0err_handler(int irq, void *data)
--{
--	dev_dbg(data, "dma_tc0err_handler\n");
--	return IRQ_HANDLED;
--}
--
--static irqreturn_t dma_tc1err_handler(int irq, void *data)
--{
--	dev_dbg(data, "dma_tc1err_handler\n");
--	return IRQ_HANDLED;
--}
--
- static int reserve_contiguous_slots(int ctlr, unsigned int id,
- 				     unsigned int num_slots,
- 				     unsigned int start_slot)
-@@ -1541,23 +1521,6 @@ static int __init edma_probe(struct platform_device *pdev)
- 		arch_num_cc++;
- 	}
- 
--	if (tc_errs_handled) {
--		status = request_irq(IRQ_TCERRINT0, dma_tc0err_handler, 0,
--					"edma_tc0", &pdev->dev);
--		if (status < 0) {
--			dev_dbg(&pdev->dev, "request_irq %d failed --> %d\n",
--				IRQ_TCERRINT0, status);
--			return status;
--		}
--		status = request_irq(IRQ_TCERRINT, dma_tc1err_handler, 0,
--					"edma_tc1", &pdev->dev);
--		if (status < 0) {
--			dev_dbg(&pdev->dev, "request_irq %d --> %d\n",
--				IRQ_TCERRINT, status);
--			return status;
--		}
--	}
--
- 	return 0;
- 
- fail:
+Thanks,
+Sekhar
+
+Matt Porter (2):
+  ARM: davinci: move private EDMA API to arm/common
+  ARM: edma: remove unused transfer controller handlers
+
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/common/Kconfig                            |    3 +
+ arch/arm/common/Makefile                           |    1 +
+ arch/arm/{mach-davinci/dma.c => common/edma.c}     |   39 +--------
+ arch/arm/mach-davinci/Makefile                     |    2 +-
+ arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
+ arch/arm/mach-davinci/davinci.h                    |    2 +-
+ arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
+ arch/arm/mach-davinci/devices.c                    |    6 +-
+ arch/arm/mach-davinci/dm355.c                      |    2 +-
+ arch/arm/mach-davinci/dm365.c                      |    2 +-
+ arch/arm/mach-davinci/dm644x.c                     |    2 +-
+ arch/arm/mach-davinci/dm646x.c                     |    2 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
+ drivers/dma/edma.c                                 |    2 +-
+ drivers/mmc/host/davinci_mmc.c                     |    1 +
+ include/linux/mfd/davinci_voicecodec.h             |    3 +-
+ .../mach => include/linux/platform_data}/edma.h    |   89 +-------------------
+ include/linux/platform_data/spi-davinci.h          |    2 +-
+ sound/soc/davinci/davinci-evm.c                    |    1 +
+ sound/soc/davinci/davinci-pcm.c                    |    1 +
+ sound/soc/davinci/davinci-pcm.h                    |    2 +-
+ 22 files changed, 29 insertions(+), 140 deletions(-)
+ rename arch/arm/{mach-davinci/dma.c => common/edma.c} (97%)
+ rename {arch/arm/mach-davinci/include/mach => include/linux/platform_data}/edma.h (59%)
+
 -- 
 1.7.10.1
