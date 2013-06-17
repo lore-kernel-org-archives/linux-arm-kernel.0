@@ -1,56 +1,41 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 17 Jun 2013 16:31:24 +0530
-Subject: [PATCH v10 5/8] dmaengine: edma: Add TI EDMA device tree binding
-In-Reply-To: <1371263570-9323-5-git-send-email-joelagnel@ti.com>
-References: <1371263570-9323-1-git-send-email-joelagnel@ti.com>
- <1371263570-9323-5-git-send-email-joelagnel@ti.com>
-Message-ID: <51BEEC84.1080102@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Jun 2013 04:03:45 -0700
+Subject: [GIT PULL] OMAP: PM: remove OMAP-specific no_console_suspend
+ handling
+In-Reply-To: <87zjutacec.fsf@linaro.org>
+References: <87zjutacec.fsf@linaro.org>
+Message-ID: <20130617110344.GP20992@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant, Rob,
-
-Can one of you please take a look at this patch and see if you have any
-comments on the binding definition?
-
-Joel,
-
-Ideally the bindings are described before they are used or along with
-its usage. In that aspect, this patch is present too far back in the
-series. Can you please fix this if you get to posting another version. I
-think I gave the same comment on v9 as well.
-
-On 6/15/2013 8:02 AM, Joel A Fernandes wrote:
-> From: Matt Porter <mdp@ti.com>
+* Kevin Hilman <khilman@linaro.org> [130613 15:18]:
+> Tony,
 > 
-> The binding definition is based on the generic DMA controller
-> binding.
+> Please pull this OMAP PM cleanup for v3.11.
 > 
-> Joel: Droped reserved and queue DT entries from Documentation
-> for now from the original patch series.
+> Thanks,
 > 
-> Signed-off-by: Matt Porter <mporter@ti.com>
-> Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
-> ---
->  Documentation/devicetree/bindings/dma/ti-edma.txt |   26 +++++++++++++++++++++
->  1 file changed, 26 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
+> Kevin
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> new file mode 100644
-> index 0000000..ada0018
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> @@ -0,0 +1,26 @@
-> +TI EDMA
-> +
-> +Required properties:
-> +- compatible : "ti,edma3"
-> +- ti,hwmods: Name of the hwmods associated to the EDMA
+> The following changes since commit f722406faae2d073cc1d01063d1123c35425939e:
+> 
+>   Linux 3.10-rc1 (2013-05-11 17:14:08 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.11/cleanup/pm
+> 
+> for you to fetch changes up to 4b7ec5accecdb136c7afaf8739a06d5335cc05aa:
+> 
+>   arm: omap2+: omap_device: remove no_idle_on_suspend (2013-05-16 07:09:09 -0700)
+> 
+> ----------------------------------------------------------------
+> OMAP: PM: the serial core + driver can no handle no_console_suspend support
+> without any SoC specific handlding or SoC-specific DT bindings.  Remove
+> the now unused SoC specifics for OMAP.
 
-ti,hwmods should be optional, no? hwmod is not present on DaVinci where
-EDMA is also used. If it is not optional then these bindings wont work
-there.
+Thanks pulling into omap-for-v3.11/pm-serial.
 
-Thanks,
-Sekhar
+Regards,
+
+Tony
