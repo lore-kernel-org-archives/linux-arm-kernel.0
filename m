@@ -1,51 +1,47 @@
-From: xiechao.mail@gmail.com (Chao Xie)
-Date: Mon, 17 Jun 2013 12:17:02 +0800
-Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
-In-Reply-To: <2766142.mFu63TyH69@wuerfel>
-References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
- <201306101035.20924.arnd@arndb.de>
- <CADApbeh9EJDetkvx9Sq=y58mkhU_X1oo-e_hgZqeBV9nriqTiQ@mail.gmail.com>
- <2766142.mFu63TyH69@wuerfel>
-Message-ID: <CADApbejV3v11jedq=q9Nz7wyVWVAJp-4vYmAifsPb7UsdVj5zg@mail.gmail.com>
+From: yj44.cho@samsung.com (YoungJun Cho)
+Date: Mon, 17 Jun 2013 13:18:52 +0900
+Subject: [PATCH] ARM: dma-mapping: Get pages if the cpu_addr is out of
+ atomic_pool
+Message-ID: <1371442732-15088-1-git-send-email-yj44.cho@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 8:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Friday 14 June 2013 17:15:33 Chao Xie wrote:
->> On Mon, Jun 10, 2013 at 4:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->
->> > I guess that is a problem we have on other platforms as well, we should
->> > find a generic solution for that. It would be nice to reserve a page
->> > in "fixmap" and have common code map the SCU page into that.
->> >
->>
->> So you mean that reserve a page in arch/arm/asm/include/fixmap.h?
->
-> Yes.
->
->> This reserve will depend on the cpu type beacuse only A9 will have SCU part.
->
-> I think A5 and ARM11MPCore as well.
->
->> I do not know that in fixmap, the #ifdef is acceptable or not.
->
-> Yes, it is. We don't really use fixmap on ARM for anything other than
-> kmap_atomic at the moment. Please have a look at the powerpc and x86
-> implementations.
->
->> For the common code to map the SCU page, where do you suggest to put it?
->
-> arch/arm/kernel/smp_scu.c.
->
-I think smp_scu.c may not be good place to put the mapping for SCU page.
-As you know that the fix map will make use of the mapping that set up
-by vector page.
-It will make use of top_pmd, and some APIs only provided under arch/arm/mm/.
-For example
-get_mem_type: for the pgprot for MT_DEVICE
-set_top_pte:
-Is that possible to add a file fixmap.c under arch/arm/mm/? It can
-including all the fix mapping
-except highmem. So SCU is one of it.
+In __iommu_get_pages(), the cpu_addr is checked wheather in
+atomic_pool range or not. So if the cpu_addr is in atomic_pool
+range, it does not need to check twice.
 
->         Arnd
+Signed-off-by: YoungJun Cho <yj44.cho@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mm/dma-mapping.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index ef3e0f3..1d158c2 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -1372,16 +1372,17 @@ static int arm_iommu_mmap_attrs(struct device *dev, struct vm_area_struct *vma,
+ void arm_iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
+ 			  dma_addr_t handle, struct dma_attrs *attrs)
+ {
+-	struct page **pages = __iommu_get_pages(cpu_addr, attrs);
++	struct page **pages;
+ 	size = PAGE_ALIGN(size);
+ 
+-	if (!pages) {
+-		WARN(1, "trying to free invalid coherent area: %p\n", cpu_addr);
++	if (__in_atomic_pool(cpu_addr, size)) {
++		__iommu_free_atomic(dev, cpu_addr, handle, size);
+ 		return;
+ 	}
+ 
+-	if (__in_atomic_pool(cpu_addr, size)) {
+-		__iommu_free_atomic(dev, cpu_addr, handle, size);
++	pages = __iommu_get_pages(cpu_addr, attrs);
++	if (!pages) {
++		WARN(1, "trying to free invalid coherent area: %p\n", cpu_addr);
+ 		return;
+ 	}
+ 
+-- 
+1.7.4.1
