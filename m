@@ -1,217 +1,223 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Jun 2013 15:05:40 -0700
-Subject: [PATCH v5 4/4] ARM: hi3xxx: enable hi4511 with device tree
-In-Reply-To: <1371459376-25438-5-git-send-email-haojian.zhuang@linaro.org>
-References: <1371459376-25438-1-git-send-email-haojian.zhuang@linaro.org>
- <1371459376-25438-5-git-send-email-haojian.zhuang@linaro.org>
-Message-ID: <20130617220540.GP28497@quad.lixom.net>
+From: nerv@dawncrow.de (=?ISO-8859-1?Q?Andr=E9_Hentschel?=)
+Date: Tue, 18 Jun 2013 00:13:48 +0200
+Subject: [PATCH v6] arm: Preserve the user r/w register TPIDRURW on context,
+ switch and fork
+Message-ID: <51BF8A1C.5070403@dawncrow.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Andr? Hentschel <nerv@dawncrow.de>
 
-Some comments below. I didn't research the history of reviews so some might
-already have been pointed out and debated; apoligies if they have.
+Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
+prevent it from being used as a covert channel between two tasks.
 
-You should also post the device-tree bindings, in particular the clock ones
-since they seem to be a bit different from what else we have seen so far, to
-device-tree discuss and get them reviewed by Grant/Rob as well as Mike.
+There are more and more applications coming to Windows RT,
+Wine could support them, but mostly they expect to have
+the thread environment block (TEB) in TPIDRURW.
 
+This patch preserves that register per thread instead of clearing it.
+Unlike the TPIDRURO, which is already switched, the TPIDRURW
+can be updated from userspace so needs careful treatment in the case that we
+modify TPIDRURW and call fork(). To avoid this we must always read
+TPIDRURW in copy_thread.
 
--Olof
+Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
 
-On Mon, Jun 17, 2013 at 04:56:16PM +0800, Haojian Zhuang wrote:
-> Enable Hisilicon Hi4511 development platform with device tree support.
-> 
-> Signed-off-by: Haojian Zhuang <haojian.zhuang@linaro.org>
-> ---
->  arch/arm/boot/dts/Makefile          |    1 +
->  arch/arm/boot/dts/hi3620.dtsi       | 1147 +++++++++++++++++++++++++++++++++++
->  arch/arm/boot/dts/hi4511.dts        |  648 ++++++++++++++++++++
->  arch/arm/configs/multi_v7_defconfig |    1 +
->  4 files changed, 1797 insertions(+)
->  create mode 100644 arch/arm/boot/dts/hi3620.dtsi
->  create mode 100644 arch/arm/boot/dts/hi4511.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index f0895c5..216f983 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -58,6 +58,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb \
->  	exynos5250-smdk5250.dtb \
->  	exynos5250-snow.dtb \
->  	exynos5440-ssdk5440.dtb
-> +dtb-$(CONFIG_ARCH_HI3xxx) += hi4511.dtb
->  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
->  	ecx-2000.dtb
->  dtb-$(CONFIG_ARCH_INTEGRATOR) += integratorap.dtb \
-> diff --git a/arch/arm/boot/dts/hi3620.dtsi b/arch/arm/boot/dts/hi3620.dtsi
-> new file mode 100644
-> index 0000000..1f0a4aa
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/hi3620.dtsi
-> @@ -0,0 +1,1147 @@
-> +/*
-> + * Hisilicon Ltd. Hi3620 SoC
-> + *
-> + * Copyright (C) 2012-2013 Hisilicon Ltd.
-> + * Copyright (C) 2012-2013 Linaro Ltd.
-> + *
-> + * Author: Haojian Zhuang <haojian.zhuang@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * publishhed by the Free Software Foundation.
-> + */
-> +
-> +/include/ "skeleton.dtsi"
-> +
-> +/ {
-> +	aliases {
-> +		serial0 = &uart0;
-> +		serial1 = &uart1;
-> +		serial2 = &uart2;
-> +		serial3 = &uart3;
-> +		serial4 = &uart4;
-> +	};
+---
+This patch is against Linux 3.10-rc6 (7d132055814ef17a6c7b69f342244c410a5e000f)
 
-I would expect a cpus entry around here...?
-And a #size-cells and #address-cells.
+v2: rework and fixup of v1, based on a suggested patch by Will Deacon
+v3: total rework and fixup of v2
+v4: removed condition on assembler instruction,
+    adapted my code to kernel-style, both based on comments by Will Deacon
+v5: rebased v4 on 3.10-rc2 and adding this version history
+v6: moved loading the TLS registers to the macros
+    (fixing the "LDRD is not supported on all the CPUs we have" problem)
 
-> +
-> +	osc32k: osc at 0 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <32768>;
-> +		clock-output-names = "osc32khz";
-> +	};
-> +	osc26m: osc at 1 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <26000000>;
-> +		clock-output-names = "osc26mhz";
-> +	};
-> +	pclk: clk at 0 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <26000000>;
-> +		clock-output-names = "apb_pclk";
-> +	};
-
-These are not good names. There's nothing inherently addressable by them but
-you still have unit addresses on them. Also, if they have an unit address @<x>,
-then they need a reg property. It's probably better to give them unique names
-(and not abbreviated). "clock-armpclk". Or something.
-
-> +	pll_arm0: clk at 1 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1600000000>;
-> +		clock-output-names = "armpll0";
-> +	};
-> +	pll_arm1: clk at 2 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1600000000>;
-> +		clock-output-names = "armpll1";
-> +	};
-> +	pll_peri: clk at 3 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1440000000>;
-> +		clock-output-names = "armpll2";
-> +	};
-> +	pll_usb: clk at 4 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1440000000>;
-> +		clock-output-names = "armpll3";
-> +	};
-> +	pll_hdmi: clk at 5 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1188000000>;
-> +		clock-output-names = "armpll4";
-> +	};
-> +	pll_gpu: clk at 6 {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <1300000000>;
-> +		clock-output-names = "armpll5";
-> +	};
-
-Are these clocks really just there on the board, or are they provided from
-a PMIC or similar? Even if you don't have a driver for that chip, describing
-the hardware correctly now (with the exception of calling the clocks
-fixed-clock) seems like a good idea.
-
-> +
-> +	amba {
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		compatible = "arm,amba-bus";
-> +		interrupt-parent = <&intc>;
-> +		ranges;
-> +
-> +		pmctrl: pmctrl at fca08000 {
-> +			compatible = "hisilicon,pmctrl";
-> +			reg = <0xfca08000 0x1000>;
-> +		};
-
-[...]
-
-> +			dtable: dtable {
-> +				#hisilicon,clkdiv-table-cells = <2>;
-
-This definitely needs some review by the devicetree guys, Rob/Grant. It seems
-like a quite unusual binding. What hardware does dtable represent?
-
-> +			};
-> +			div_shareaxi: div_shareaxi {
-> +				compatible = "hisilicon,hi3620-clk-div";
-> +				#clock-cells = <0>;
-> +				clocks = <&rclk_shareAXI>;
-> +				clock-output-names = "shareAXI_div";
-> +				hisilicon,clkdiv-table = <
-> +					&dtable 0 1 &dtable 1 2 &dtable 2 3 &dtable 3 4
-> +					&dtable 4 5 &dtable 5 6 &dtable 6 7 &dtable 7 8
-> +					&dtable 8 9 &dtable 9 10 &dtable 10 11 &dtable 11 12
-> +					&dtable 12 13 &dtable 13 14 &dtable 14 15 &dtable 15 16
-> +					&dtable 16 17 &dtable 17 18 &dtable 18 19 &dtable 19 20
-> +					&dtable 20 21 &dtable 21 22 &dtable 22 23 &dtable 23 24
-> +					&dtable 24 25 &dtable 25 26 &dtable 26 27 &dtable 27 28
-> +					&dtable 28 29 &dtable 29 30 &dtable 30 31 &dtable 31 32>;
-> +				/* divider register offset, mask */
-> +				hisilicon,clkdiv = <0x100 0x1f>;
-> +			};
-
-> +
-> +		l2: l2-cache {
-> +			compatible = "arm,pl310-cache";
-> +			reg = <0xfc10000 0x100000>;
-> +			interrupts = <0 15 4>;
-> +			cache-unified;
-> +			cache-level = <2>;
-> +		};
-
-L2 is on amba?
-
-> +
-> +		intc: interrupt-controller at fc001000 {
-
-It's common to use "gic" as the label instead.
-
-> +			compatible = "arm,cortex-a9-gic";
-> +			#interrupt-cells = <3>;
-> +			#address-cells = <0>;
-> +			interrupt-controller;
-> +			/* gic dist base, gic cpu base */
-> +			reg = <0xfc001000 0x1000>, <0xfc000100 0x100>;
-> +		};
-> +
-
-[...]
+Why so much Signed-off-bys? Some History:
+The first patch had performance issues pointed out by Russel King,
+so Will Deacon jumped in to help me with that. The second one again
+had performance issues and the missing copy_thread part was uncovered.
+After some iterations by me, Jonathan Austin proposed a patch and
+Russel King sent his idea of the assembler part. All this was finally
+merged and refined into this patch.
+Thanks to everyone!
 
 
-
--Olof
+diff --git a/arch/arm/include/asm/thread_info.h b/arch/arm/include/asm/thread_info.h
+index 1995d1a..214d415 100644
+--- a/arch/arm/include/asm/thread_info.h
++++ b/arch/arm/include/asm/thread_info.h
+@@ -58,7 +58,7 @@ struct thread_info {
+ 	struct cpu_context_save	cpu_context;	/* cpu context */
+ 	__u32			syscall;	/* syscall number */
+ 	__u8			used_cp[16];	/* thread used copro */
+-	unsigned long		tp_value;
++	unsigned long		tp_value[2];	/* TLS registers */
+ #ifdef CONFIG_CRUNCH
+ 	struct crunch_state	crunchstate;
+ #endif
+diff --git a/arch/arm/include/asm/tls.h b/arch/arm/include/asm/tls.h
+index 73409e6..3742722 100644
+--- a/arch/arm/include/asm/tls.h
++++ b/arch/arm/include/asm/tls.h
+@@ -2,27 +2,33 @@
+ #define __ASMARM_TLS_H
+ 
+ #ifdef __ASSEMBLY__
+-	.macro set_tls_none, tp, tmp1, tmp2
++#include <asm/asm-offsets.h>
++	.macro switch_tls_none, prev, next, tp, tpuser, tmp1, tmp2
+ 	.endm
+ 
+-	.macro set_tls_v6k, tp, tmp1, tmp2
++	.macro switch_tls_v6k, prev, next, tp, tpuser, tmp1, tmp2
++	ldrd	\tp, \tpuser, [\next, #TI_TP_VALUE]	@ get the next TLS and user r/w register
++	mrc	p15, 0, \tmp2, c13, c0, 2	@ get the user r/w register
+ 	mcr	p15, 0, \tp, c13, c0, 3		@ set TLS register
+-	mov	\tmp1, #0
+-	mcr	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
++	mcr	p15, 0, \tpuser, c13, c0, 2	@ and the user r/w register
++	str	\tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
+ 	.endm
+ 
+-	.macro set_tls_v6, tp, tmp1, tmp2
++	.macro switch_tls_v6, prev, next, tp, tpuser, tmp1, tmp2
+ 	ldr	\tmp1, =elf_hwcap
+ 	ldr	\tmp1, [\tmp1, #0]
+ 	mov	\tmp2, #0xffff0fff
++	ldr	\tp, [\next, #TI_TP_VALUE]	@ get the next TLS register
+ 	tst	\tmp1, #HWCAP_TLS		@ hardware TLS available?
+-	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
+-	movne	\tmp1, #0
+-	mcrne	p15, 0, \tmp1, c13, c0, 2	@ clear user r/w TLS register
+ 	streq	\tp, [\tmp2, #-15]		@ set TLS value at 0xffff0ff0
++	mrcne	p15, 0, \tmp2, c13, c0, 2	@ get the previous user r/w register
++	ldrne	\tpuser, [\next, #TI_TP_VALUE + 4]	@ get the next user r/w register
++	mcrne	p15, 0, \tp, c13, c0, 3		@ yes, set TLS register
++	mcrne	p15, 0, \tpuser, c13, c0, 2	@ set user r/w register
++	strne	\tmp2, [\prev, #TI_TP_VALUE + 4] @ save it
+ 	.endm
+ 
+-	.macro set_tls_software, tp, tmp1, tmp2
++	.macro switch_tls_software, prev, next, tp, tpuser, tmp1, tmp2
+ 	mov	\tmp1, #0xffff0fff
+ 	str	\tp, [\tmp1, #-15]		@ set TLS value at 0xffff0ff0
+ 	.endm
+@@ -31,19 +37,30 @@
+ #ifdef CONFIG_TLS_REG_EMUL
+ #define tls_emu		1
+ #define has_tls_reg		1
+-#define set_tls		set_tls_none
++#define switch_tls	switch_tls_none
+ #elif defined(CONFIG_CPU_V6)
+ #define tls_emu		0
+ #define has_tls_reg		(elf_hwcap & HWCAP_TLS)
+-#define set_tls		set_tls_v6
++#define switch_tls	switch_tls_v6
+ #elif defined(CONFIG_CPU_32v6K)
+ #define tls_emu		0
+ #define has_tls_reg		1
+-#define set_tls		set_tls_v6k
++#define switch_tls	switch_tls_v6k
+ #else
+ #define tls_emu		0
+ #define has_tls_reg		0
+-#define set_tls		set_tls_software
++#define switch_tls	switch_tls_software
+ #endif
+ 
++#ifndef __ASSEMBLY__
++static inline unsigned long get_tpuser(void)
++{
++	unsigned long reg = 0;
++
++	if (has_tls_reg && !tls_emu)
++		__asm__("mrc p15, 0, %0, c13, c0, 2" : "=r" (reg));
++
++	return reg;
++}
++#endif
+ #endif	/* __ASMARM_TLS_H */
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 582b405..1484b59 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -685,7 +685,6 @@ ENTRY(__switch_to)
+  UNWIND(.fnstart	)
+  UNWIND(.cantunwind	)
+ 	add	ip, r1, #TI_CPU_SAVE
+-	ldr	r3, [r2, #TI_TP_VALUE]
+  ARM(	stmia	ip!, {r4 - sl, fp, sp, lr} )	@ Store most regs on stack
+  THUMB(	stmia	ip!, {r4 - sl, fp}	   )	@ Store most regs on stack
+  THUMB(	str	sp, [ip], #4		   )
+@@ -693,7 +692,7 @@ ENTRY(__switch_to)
+ #ifdef CONFIG_CPU_USE_DOMAINS
+ 	ldr	r6, [r2, #TI_CPU_DOMAIN]
+ #endif
+-	set_tls	r3, r4, r5
++	switch_tls r1, r2, r4, r5, r3, r7
+ #if defined(CONFIG_CC_STACKPROTECTOR) && !defined(CONFIG_SMP)
+ 	ldr	r7, [r2, #TI_TASK]
+ 	ldr	r8, =__stack_chk_guard
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 282de48..a24110f 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -39,6 +39,7 @@
+ #include <asm/thread_notify.h>
+ #include <asm/stacktrace.h>
+ #include <asm/mach/time.h>
++#include <asm/tls.h>
+ 
+ #ifdef CONFIG_CC_STACKPROTECTOR
+ #include <linux/stackprotector.h>
+@@ -343,7 +344,8 @@ copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 	clear_ptrace_hw_breakpoint(p);
+ 
+ 	if (clone_flags & CLONE_SETTLS)
+-		thread->tp_value = childregs->ARM_r3;
++		thread->tp_value[0] = childregs->ARM_r3;
++	thread->tp_value[1] = get_tpuser();
+ 
+ 	thread_notify(THREAD_NOTIFY_COPY, thread);
+ 
+diff --git a/arch/arm/kernel/ptrace.c b/arch/arm/kernel/ptrace.c
+index 03deeff..2bc1514 100644
+--- a/arch/arm/kernel/ptrace.c
++++ b/arch/arm/kernel/ptrace.c
+@@ -849,7 +849,7 @@ long arch_ptrace(struct task_struct *child, long request,
+ #endif
+ 
+ 		case PTRACE_GET_THREAD_AREA:
+-			ret = put_user(task_thread_info(child)->tp_value,
++			ret = put_user(task_thread_info(child)->tp_value[0],
+ 				       datap);
+ 			break;
+ 
+diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
+index 18b32e8..517bfd4 100644
+--- a/arch/arm/kernel/traps.c
++++ b/arch/arm/kernel/traps.c
+@@ -581,7 +581,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
+ 		return regs->ARM_r0;
+ 
+ 	case NR(set_tls):
+-		thread->tp_value = regs->ARM_r0;
++		thread->tp_value[0] = regs->ARM_r0;
+ 		if (tls_emu)
+ 			return 0;
+ 		if (has_tls_reg) {
+@@ -699,7 +699,7 @@ static int get_tp_trap(struct pt_regs *regs, unsigned int instr)
+ 	int reg = (instr >> 12) & 15;
+ 	if (reg == 15)
+ 		return 1;
+-	regs->uregs[reg] = current_thread_info()->tp_value;
++	regs->uregs[reg] = current_thread_info()->tp_value[0];
+ 	regs->ARM_pc += 4;
+ 	return 0;
+ }
+-- 
+1.8.1.2
