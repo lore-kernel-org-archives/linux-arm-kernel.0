@@ -1,84 +1,57 @@
-From: christian.ruppert@abilis.com (Christian Ruppert)
-Date: Mon, 17 Jun 2013 10:11:58 +0200
-Subject: [PATCH] pinctrl: update GPIO range doc
-In-Reply-To: <1371377909-5921-1-git-send-email-linus.walleij@stericsson.com>
-References: <1371377909-5921-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20130617081158.GA19380@ab42.lan>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 17 Jun 2013 17:12:35 +0900
+Subject: [PATCH 02/15] ARM: shmobile: Let romImage rely on default ATAGS
+In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
+References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371456768-1084-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 12:18:29PM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This updates the GPIO range documentation with the API changes
-> for sparse/random/arbitrary pin-to-GPIO mappings.
+From: Magnus Damm <damm@opensource.se>
 
-Oops, sorry, I should have thought of updating this with my previous
-patch. Thanks for stepping in.
+Remove the ATAGS data structure from head-shmobile.S
+since a default ATAGS is already provided by the code
+in arch/arm/kernel/atags_parser.c. Passing a NULL as
+ATAGS is valid. For actual hardware specific setup
+the fixup callback in the board code may be used.
 
-Reviewed-by: Christian Ruppert <christian.ruppert@abilis.com>
+Signed-off-by: Magnus Damm <damm@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/compressed/head-shmobile.S |   19 +------------------
+ 1 file changed, 1 insertion(+), 18 deletions(-)
 
-> Cc: Christian Ruppert <christian.ruppert@abilis.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  Documentation/pinctrl.txt | 24 +++++++++++++++++++++---
->  1 file changed, 21 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/pinctrl.txt b/Documentation/pinctrl.txt
-> index f6e664b..4548743 100644
-> --- a/Documentation/pinctrl.txt
-> +++ b/Documentation/pinctrl.txt
-> @@ -350,6 +350,23 @@ chip b:
->   - GPIO range : [48 .. 55]
->   - pin range  : [64 .. 71]
->  
-> +The above examples assume the mapping between the GPIOs and pins is
-> +linear. If the mapping is sparse or haphazard, an array of arbitrary pin
-> +numbers can be encoded in the range like this:
-> +
-> +static const unsigned range_pins[] = { 14, 1, 22, 17, 10, 8, 6, 2 };
-> +
-> +static struct pinctrl_gpio_range gpio_range = {
-> +	.name = "chip",
-> +	.id = 0,
-> +	.base = 32,
-> +	.pins = &range_pins,
-> +	.npins = ARRAY_SIZE(range_pins),
-> +	.gc = &chip;
-> +};
-> +
-> +In this case the pin_base property will be ignored.
-> +
->  When GPIO-specific functions in the pin control subsystem are called, these
->  ranges will be used to look up the appropriate pin controller by inspecting
->  and matching the pin to the pin ranges across all controllers. When a
-> @@ -357,9 +374,9 @@ pin controller handling the matching range is found, GPIO-specific functions
->  will be called on that specific pin controller.
->  
->  For all functionalities dealing with pin biasing, pin muxing etc, the pin
-> -controller subsystem will subtract the range's .base offset from the passed
-> -in gpio number, and add the ranges's .pin_base offset to retrive a pin number.
-> -After that, the subsystem passes it on to the pin control driver, so the driver
-> +controller subsystem will look up the corresponding pin number from the passed
-> +in gpio number, and use the ranges internals to retrive a pin number. After
-> +that, the subsystem passes it on to the pin control driver, so the driver
->  will get an pin number into its handled number range. Further it is also passed
->  the range ID value, so that the pin controller knows which range it should
->  deal with.
-> @@ -368,6 +385,7 @@ Calling pinctrl_add_gpio_range from pinctrl driver is DEPRECATED. Please see
->  section 2.1 of Documentation/devicetree/bindings/gpio/gpio.txt on how to bind
->  pinctrl and gpio drivers.
->  
-> +
->  PINMUX interfaces
->  =================
->  
-> -- 
-> 1.7.11.3
-> 
-
+diff --git a/arch/arm/boot/compressed/head-shmobile.S b/arch/arm/boot/compressed/head-shmobile.S
+index fe3719b..19b2304 100644
+--- a/arch/arm/boot/compressed/head-shmobile.S
++++ b/arch/arm/boot/compressed/head-shmobile.S
+@@ -55,26 +55,9 @@ __tmp_stack:
+ __continue:
+ #endif /* CONFIG_ZBOOT_ROM_MMC || CONFIG_ZBOOT_ROM_SH_MOBILE_SDHI */
+ 
+-	b	1f
+-__atags:@ tag #1
+-	.long	12			@ tag->hdr.size = tag_size(tag_core);
+-	.long	0x54410001		@ tag->hdr.tag = ATAG_CORE;
+-	.long   0			@ tag->u.core.flags = 0;
+-	.long	0			@ tag->u.core.pagesize = 0;
+-	.long	0			@ tag->u.core.rootdev = 0;
+-	@ tag #2
+-	.long	8			@ tag->hdr.size = tag_size(tag_mem32);
+-	.long	0x54410002		@ tag->hdr.tag = ATAG_MEM;
+-	.long	CONFIG_MEMORY_SIZE	@ tag->u.mem.size = CONFIG_MEMORY_SIZE;
+-	.long	CONFIG_MEMORY_START	@ @ tag->u.mem.start = CONFIG_MEMORY_START;
+-	@ tag #3
+-	.long	0			@ tag->hdr.size = 0
+-	.long	0			@ tag->hdr.tag = ATAG_NONE;
+-1:
+-
+ 	/* Set board ID necessary for boot */
+ 	ldr	r7, 1f				@ Set machine type register
+-	adr	r8, __atags			@ Set atag register
++	mov	r8, #0				@ pass null pointer as atag
+ 	b	2f
+ 
+ 1 :	.long MACH_TYPE
 -- 
-  Christian Ruppert              ,          <christian.ruppert@abilis.com>
-                                /|
-  Tel: +41/(0)22 816 19-42     //|                 3, Chemin du Pr?-Fleuri
-                             _// | bilis Systems   CH-1228 Plan-les-Ouates
+1.7.10.4
