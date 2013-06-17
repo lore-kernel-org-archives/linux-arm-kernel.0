@@ -1,65 +1,31 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 17 Jun 2013 10:07:56 +1000
-Subject: Request inclusion of ARM MPIDR linearization patches into
- linux-next
-In-Reply-To: <20130611174629.GA14453@e102568-lin.cambridge.arm.com>
-References: <20130611174629.GA14453@e102568-lin.cambridge.arm.com>
-Message-ID: <20130617100756.37c25388ab9f232b23321ce8@canb.auug.org.au>
+From: grant.likely@linaro.org (Grant Likely)
+Date: Mon, 17 Jun 2013 01:39:25 +0100
+Subject: [RFC] arm: Remove sa1111 special case from mm setup code
+In-Reply-To: <20130616091005.GP18614@n2100.arm.linux.org.uk>
+References: <1371338108-26354-1-git-send-email-grant.likely@linaro.org>
+ <20130616091005.GP18614@n2100.arm.linux.org.uk>
+Message-ID: <CACxGe6vy6kNzmP7s1NPvKYCfe+1mKHGJbOobr9Kxy=J16r2L0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
-
-On Tue, 11 Jun 2013 18:46:29 +0100 Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+On Sun, Jun 16, 2013 at 10:10 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sun, Jun 16, 2013 at 12:15:08AM +0100, Grant Likely wrote:
+>> I don't think this special case is needed anymore. From what I can tell,
+>> setup_dma_zone() takes care of marking the region to be reserved for
+>> DMA, and that happens before arm_memblock_init() which calls
+>> arm_mm_memblock_reserve(). Therefore the mm setup should already know
+>> about the reserved region and it won't need to be explicitly reserved
+>> and then freed. That means the special case can be dropped from the
+>> common code.
 >
-> can I ask you please to include the following branch into linux-next:
-> 
-> git://linux-arm.org/linux-2.6-lp.git for-next
-> 
-> It contains significant changes in ARM PM core code and would like to give it
-> wide coverage before requesting a pull. It has been already publicly posted,
-> reviewed and tested.
+> No it doesn't.  setup_dma_zone is all about setting the high watermark
+> for GFP_DMA allocations.  It has nothing to do with _temoprarily_
+> reserving the low 1MB, ensuring that no other user can use any of that
+> precious SA1111 memory during the kernel boot.
 
-Added from today with you as contact and called arm-mpidr.  I assume that
-this will be merged via Russell's arm tree.
+Ah, okay. So it's to protect against early allocations. All right,
+I've got an alternate patch that at least gets rid of one of the
+special case hooks. I'll post that one shortly.
 
-Thanks for adding your subsystem tree as a participant of linux-next.  As
-you may know, this is not a judgment of your code.  The purpose of
-linux-next is for integration testing and to lower the impact of
-conflicts between subsystems in the next merge window. 
-
-You will need to ensure that the patches/commits in your tree/series have
-been:
-     * submitted under GPL v2 (or later) and include the Contributor's
-	Signed-off-by,
-     * posted to the relevant mailing list,
-     * reviewed by you (or another maintainer of your subsystem tree),
-     * successfully unit tested, and 
-     * destined for the current or next Linux merge window.
-
-Basically, this should be just what you would send to Linus (or ask him
-to fetch).  It is allowed to be rebased if you deem it necessary.
-
--- 
-Cheers,
-Stephen Rothwell 
-sfr at canb.auug.org.au
-
-Legal Stuff:
-By participating in linux-next, your subsystem tree contributions are
-public and will be included in the linux-next trees.  You may be sent
-e-mail messages indicating errors or other issues when the
-patches/commits from your subsystem tree are merged and tested in
-linux-next.  These messages may also be cross-posted to the linux-next
-mailing list, the linux-kernel mailing list, etc.  The linux-next tree
-project and IBM (my employer) make no warranties regarding the linux-next
-project, the testing procedures, the results, the e-mails, etc.  If you
-don't agree to these ground rules, let me know and I'll remove your tree
-from participation in linux-next.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/765a413a/attachment.sig>
+g.
