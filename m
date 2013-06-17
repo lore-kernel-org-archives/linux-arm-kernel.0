@@ -1,35 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jun 2013 22:20:53 +0200
-Subject: [PATCH 14/15] ARM: shmobile: Remove AP4EVB board support
-In-Reply-To: <CANqRtoQVqfZaGbuVLiY8PiMTjVpt8VDs7KZyqnqjud+1yZtvQQ@mail.gmail.com>
-References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
- <201306141629.26580.arnd@arndb.de>
- <CANqRtoQVqfZaGbuVLiY8PiMTjVpt8VDs7KZyqnqjud+1yZtvQQ@mail.gmail.com>
-Message-ID: <201306172220.54015.arnd@arndb.de>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Mon, 17 Jun 2013 20:22:48 +0000 (UTC)
+Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
+In-Reply-To: <20130616042256.7541.7096@quantum>
+References: <20130607121505.21868.72360.stgit@dusk.lan>
+ <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
+ <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
+ <51B6D239.5030905@nvidia.com>
+ <alpine.DEB.2.02.1306110944130.22645@utopia.booyaka.com>
+ <20130616042256.7541.7096@quantum>
+Message-ID: <alpine.DEB.2.02.1306172019270.17176@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013, Magnus Damm wrote:
-> On Fri, Jun 14, 2013 at 11:29 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 14 June 2013, Magnus Damm wrote:
-> >> > If still possible, would be good to delay removing this board until we
-> >> > complete our discussion.
-> >>
-> >> If fine with keeping the board if someone can show me progress in the
-> >> area of INTC DT support. Recently I have not seen anything.
-> >
-> > As mentioned the last time we discussed this, I'm fine with using the
-> > existing code and "legacy" irqdomain for the older INTC implementations,
-> > as long as all the new ones can use your new generic code.
-> 
-> Thanks for explaining once again. Do you have any issues with us
-> reducing the number of supported boards and/or SoCs?
+Hi,
 
-No, I'm sure you know who the users of the board files in upstream kernels
-are. If someone comes up with a good reason why one of the files is
-needed after all, we can always revert the removal at a later point.
+On Sat, 15 Jun 2013, Mike Turquette wrote:
 
-I'm definitely in favor of removing known unused code that gets in the way
-of progress and adding clean code as quickly as we can review it.
+> These patches appear fine to me but I did not see any Acks, nor could I
+> tell if a v2 was necessary based on the comments. Will there be another
+> version?
 
-	Arnd
+I'm not planning to do another version at this time.
+
+> If not an Acked-by or Reviewed-by would be cool.
+
+Hmm, not sure who the right people would be.  Looks like the 
+drivers/clk/tegra directory is unmaintained, so not sure who could ack it?
+
+Peter or Stephen, care to review these patches and send a Reviewed-by?
+
+
+- Paul
