@@ -1,25 +1,59 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 17 Jun 2013 14:21:27 -0700
-Subject: [PATCH v2 3/3] ARM: keystone: Enable SMP support on Keystone
- machines
-In-Reply-To: <1371072317-15030-4-git-send-email-santosh.shilimkar@ti.com>
-References: <1371072317-15030-1-git-send-email-santosh.shilimkar@ti.com>
- <1371072317-15030-4-git-send-email-santosh.shilimkar@ti.com>
-Message-ID: <20130617212127.GJ28497@quad.lixom.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 17 Jun 2013 23:34:05 +0200
+Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
+In-Reply-To: <CADApbejV3v11jedq=q9Nz7wyVWVAJp-4vYmAifsPb7UsdVj5zg@mail.gmail.com>
+References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
+ <2766142.mFu63TyH69@wuerfel>
+ <CADApbejV3v11jedq=q9Nz7wyVWVAJp-4vYmAifsPb7UsdVj5zg@mail.gmail.com>
+Message-ID: <201306172334.05626.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 05:25:17PM -0400, Santosh Shilimkar wrote:
-> Add basic SMP support for Keystone machines. This does not
-> include support for CPU hotplug for now.
-> 
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: arm at kernel.org
-> 
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+On Monday 17 June 2013, Chao Xie wrote:
+> On Fri, Jun 14, 2013 at 8:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 14 June 2013 17:15:33 Chao Xie wrote:
+> >> On Mon, Jun 10, 2013 at 4:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> >> > I guess that is a problem we have on other platforms as well, we should
+> >> > find a generic solution for that. It would be nice to reserve a page
+> >> > in "fixmap" and have common code map the SCU page into that.
+> >> >
+> >>
+> >> So you mean that reserve a page in arch/arm/asm/include/fixmap.h?
+> >
+> > Yes.
+> >
+> >> This reserve will depend on the cpu type beacuse only A9 will have SCU part.
+> >
+> > I think A5 and ARM11MPCore as well.
+> >
+> >> I do not know that in fixmap, the #ifdef is acceptable or not.
+> >
+> > Yes, it is. We don't really use fixmap on ARM for anything other than
+> > kmap_atomic at the moment. Please have a look at the powerpc and x86
+> > implementations.
+> >
+> >> For the common code to map the SCU page, where do you suggest to put it?
+> >
+> > arch/arm/kernel/smp_scu.c.
+> >
+> I think smp_scu.c may not be good place to put the mapping for SCU page.
+> As you know that the fix map will make use of the mapping that set up
+> by vector page.
+> It will make use of top_pmd, and some APIs only provided under arch/arm/mm/.
+> For example
+> get_mem_type: for the pgprot for MT_DEVICE
+> set_top_pte:
+> Is that possible to add a file fixmap.c under arch/arm/mm/? It can
+> including all the fix mapping
+> except highmem. So SCU is one of it.
 
-Acked-by: Olof Johansson <olof@lixom.net>
+It's up to Russell, and he probably has an idea where this should be
+going.
 
+Russell, do you think using a fixmap page for the SCU makes sense?
+I'm looking for a method to consolidate the various methods of
+doing early mappings of the SCU for device tree based platforms.
+Where do you think that should be implemented?
 
--Olof
+	Arnd
