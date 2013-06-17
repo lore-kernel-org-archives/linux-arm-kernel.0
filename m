@@ -1,57 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Jun 2013 09:46:48 +0100
-Subject: [PATCH v2 07/10] ARM: dts: Add initial device tree support for
- Exynos5420
-In-Reply-To: <1371218572-8993-8-git-send-email-chander.kashyap@linaro.org>
-References: <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-1-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-8-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <20130617084648.GA6809@e106331-lin.cambridge.arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 17 Jun 2013 10:48:44 +0200
+Subject: [RFC] Staging: imx-drm: Do not use fractional part of divider
+In-Reply-To: <1371195670.904413971@f400.i.mail.ru>
+References: <1371195670.904413971@f400.i.mail.ru>
+Message-ID: <20130617084844.GP32299@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Jun 14, 2013 at 11:41:10AM +0400, Alexander Shiyan wrote:
+> Hello.
+> 
+> Analysis of driver imx-drm led me to believe that the use fractional part of the divider is not always a good idea.
+> For example, for a parallel display bus connected to LVDS converter chip (DS90C363), in this case the use of
+> fractional part, clock will unstable and the on-chip PLL is not working properly, or rather, does not work at all.
+> 
+> Let me give a specific example.
+> ipu_crtc_mode_set 0x36314752
+> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000035 outrate: 40150928 wanted: 40000000
+> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000035 outrate: 40150928 wanted: 40150928
+> imx-ipuv3 40000000.ipu: clk_di_set_rate: inrate: 133000000 desired: 40150928 div: 0x00000035
+> 
+> In this case the divider is 3.5, that result to clock is incorrect. See an attached oscillogram F0000TEK.jpg.
+> 
+> After a patch the clocks is OK. Patch just uncomment some FSL code.
+> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000040 outrate: 33250000 wanted: 40000000
+> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000040 outrate: 33250000 wanted: 33250000
+> imx-ipuv3 40000000.ipu: clk_di_set_rate: inrate: 133000000 desired: 33250000 div: 0x00000040
+> 
+> See an attached oscillogram F0001TEK.jpg.
+> 
+> So, I want to review this from developers and wait for comments.
+> 
 
-> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> new file mode 100644
-> index 0000000..43f0eb8
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> @@ -0,0 +1,40 @@
-> +/*
-> + * SAMSUNG SMDK5420 board device tree source
-> + *
-> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> +*/
-> +
-> +/dts-v1/;
-> +#include "exynos5420.dtsi"
-> +
-> +/ {
-> +	model = "Samsung SMDK5420 board based on EXYNOS5420";
-> +	compatible = "samsung,smdk5420", "samsung,exynos5420";
-> +
-> +	memory {
-> +		reg =	<0x20000000 0x10000000
-> +			 0x30000000 0x10000000
-> +			 0x40000000 0x10000000
-> +			 0x50000000 0x10000000
-> +			 0x60000000 0x10000000
-> +			 0x70000000 0x10000000
-> +			 0x80000000 0x10000000
-> +			 0x90000000 0x10000000>;
-> +	};
+We may need some flag in the devicetree to specify whether the
+fractional divider can be used or not.
 
-As splitting these into 256MB banks is a workaround for an implementation
-issue, there should at least be a comment to that effect.
+Sascha
 
-It would be far nicer if this were described as one bank and the kernel could
-split it up as necessary when using sparsemem.
-
-Thanks,
-Mark.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
