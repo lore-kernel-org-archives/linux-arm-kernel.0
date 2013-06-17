@@ -1,24 +1,35 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 18:49:04 +0200
-Subject: [PATCH 1/3] gpio: samsung: add PINCTRL_S3C24XX to exclude options
-In-Reply-To: <1a1701ce6b5c$651c4d80$2f54e880$%kim@samsung.com>
-References: <201306140044.15568.heiko@sntech.de>
- <201306140045.27744.heiko@sntech.de>
- <1a1701ce6b5c$651c4d80$2f54e880$%kim@samsung.com>
-Message-ID: <CACRpkdZ2RfB4rc7xrDkyxiOzS1NvpX3mFHM+xfQB_GVf+bMRiA@mail.gmail.com>
+Date: Mon, 17 Jun 2013 18:53:33 +0200
+Subject: [PATCH] ARM: ux500: add restart support via prcmu
+In-Reply-To: <1371216160-2595-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1371216160-2595-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <CACRpkdbkXUkq5VBq8QEf11r=ByqmeyNcxMHkfVs8ip=_O5G4CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 3:13 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Fri, Jun 14, 2013 at 3:22 PM, Fabio Baltieri
+<fabio.baltieri@linaro.org> wrote:
 
-> Linus, shall I take this into samsung tree? Or since the pinctrl-s3c24xx already merged into arm-soc, this could be picked into your tree...
+> Add necessary code to restart ux500 based machines using
+> prcmu_system_reset().
+>
+> Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> ---
+>
+> Hi Linus,
+>
+> this is something I had in my tree for some time.  This adds basic
+> soft-reboot support for all ux500 machines using prcmu (the actual
+> reboot code was already there) and may also be useful as a base to add
+> the remaining "reboot reason" code if necessary.
+>
+> This is based on your current ste-next branch.
 
-I'm not rebasing pinctrl agains the ARM SoC tree,
-I only rebase to Torvalds tree.
+Patch applied.
 
-So please take it through the Samsung tree...
-
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+If you're meriging "reboot reason" code, rename "reason" to
+"cause" everywhere. Cause and effect. Causality. Not the
+age of reason.
 
 Yours,
 Linus Walleij
