@@ -1,30 +1,433 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Mon, 17 Jun 2013 17:01:05 +1000
-Subject: linux-next: manual merge of the msm tree with the arm-soc tree
-Message-ID: <20130617170105.68c40901e9d43acea18752a7@canb.auug.org.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 17 Jun 2013 16:03:16 +0900
+Subject: [PATCH v6 02/18] sh-pfc: Add DT support
+In-Reply-To: <3527983.0zjA6RU0T0@avalon>
+References: <1371167163-10507-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1371167163-10507-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <3527983.0zjA6RU0T0@avalon>
+Message-ID: <20130617070315.GA22175@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David,
+Hi Laurent,
 
-Today's linux-next merge of the msm tree got a conflict in
-arch/arm/boot/dts/msm8960-cdp.dts between commit e45600107b67 ("Merge tag
-'msm-cleanup-for-3.11' of
-git://git.kernel.org/pub/scm/linux/kernel/git/davidb/linux-msm into
-next/cleanup") from the arm-soc tree and commit 70f0aa52e090 ("Merge
-branch 'msm-fix' into for-next") from the msm tree.
+As 3.10-rc6 has been released it is probably now too late for me
+to take this series through the renesas tree for v3.11.
 
-I fixed it up (the arm-soc merge used serial at 19440000, the msm merge used
-serial at 19c40000, I used the arm-soc version) and can carry the fix as
-necessary (no action is required).
+I am happy for Linus to take it if that is what he would like to do.
 
--- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/e5c1b8da/attachment.sig>
+Otherwise I think we need to discuss how this should be handled for v3.12.
+
+On Mon, Jun 17, 2013 at 05:08:25AM +0200, Laurent Pinchart wrote:
+> Hi Linus,
+> 
+> Would you be able to review this patch in the near future ? I'd like to push 
+> the series to v3.11.
+> 
+> On Friday 14 June 2013 01:45:47 Laurent Pinchart wrote:
+> > Support device instantiation through the device tree. The compatible
+> > property is used to select the SoC pinmux information.
+> > 
+> > Set the gpio_chip device field to the PFC device to enable automatic
+> > GPIO OF support.
+> > 
+> > Cc: devicetree-discuss at lists.ozlabs.org
+> > Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+> > ---
+> >  .../bindings/pinctrl/renesas,pfc-pinctrl.txt       | 135 ++++++++++++++++++
+> >  drivers/pinctrl/sh-pfc/core.c                      |  64 +++++++++-
+> >  drivers/pinctrl/sh-pfc/pinctrl.c                   | 116 ++++++++++++++++++
+> >  3 files changed, 314 insertions(+), 1 deletion(-)
+> >  create mode 100644
+> > Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
+> > 
+> > diff --git
+> > a/Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
+> > b/Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt new
+> > file mode 100644
+> > index 0000000..8264cbc
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/pinctrl/renesas,pfc-pinctrl.txt
+> > @@ -0,0 +1,135 @@
+> > +* Renesas Pin Function Controller (GPIO and Pin Mux/Config)
+> > +
+> > +The Pin Function Controller (PFC) is a Pin Mux/Config controller. On
+> > SH7372, +SH73A0, R8A73A4 and R8A7740 it also acts as a GPIO controller.
+> > +
+> > +
+> > +Pin Control
+> > +-----------
+> > +
+> > +Required Properties:
+> > +
+> > +  - compatible: should be one of the following.
+> > +    - "renesas,pfc-r8a73a4": for R8A73A4 (R-Mobile APE6) compatible
+> > pin-controller. +    - "renesas,pfc-r8a7740": for R8A7740 (R-Mobile A1)
+> > compatible pin-controller. +    - "renesas,pfc-r8a7778": for R8A7778
+> > (R-Mobile M1) compatible pin-controller. +    - "renesas,pfc-r8a7779": for
+> > R8A7779 (R-Car H1) compatible pin-controller. +    - "renesas,pfc-r8a7790":
+> > for R8A7790 (R-Car H2) compatible pin-controller. +    -
+> > "renesas,pfc-sh7372": for SH7372 (SH-Mobile AP4) compatible pin-controller.
+> > +    - "renesas,pfc-sh73a0": for SH73A0 (SH-Mobile AG5) compatible
+> > pin-controller. +
+> > +  - reg: Base address and length of each memory resource used by the pin
+> > +    controller hardware module.
+> > +
+> > +Optional properties:
+> > +
+> > +  - #gpio-range-cells: Mandatory when the PFC doesn't handle GPIO,
+> > forbidden +    otherwise. Should be 3.
+> > +
+> > +The PFC node also acts as a container for pin configuration nodes. Please
+> > refer +to pinctrl-bindings.txt in this directory for the definition of the
+> > term "pin +configuration node" and for the common pinctrl bindings used by
+> > client devices. +
+> > +Each pin configuration node represents desired functions to select on a pin
+> > +group or a list of pin groups. The functions and pin groups can be
+> > specified +directly in the pin configuration node, or grouped in child
+> > subnodes. Several +functions can thus be referenced as a single pin
+> > configuration node by client +devices.
+> > +
+> > +A configuration node or subnode must contain a function and reference at
+> > least +one pin group.
+> > +
+> > +All pin configuration nodes and subnodes names are ignored. All of those
+> > nodes +are parsed through phandles and processed purely based on their
+> > content. +
+> > +Pin Configuration Node Properties:
+> > +
+> > +- renesas,groups : An array of strings, each string containing the name of
+> > a pin +  group.
+> > +
+> > +- renesas,function: A string containing the name of the function to mux to
+> > the +  pin group(s) specified by the renesas,groups property
+> > +
+> > +  Valid values for pin, group and function names can be found in the group
+> > and +  function arrays of the PFC data file corresponding to the SoC
+> > +  (drivers/pinctrl/sh-pfc/pfc-*.c)
+> > +
+> > +
+> > +GPIO
+> > +----
+> > +
+> > +On SH7372, SH73A0, R8A73A4 and R8A7740 the PFC node is also a GPIO
+> > controller +node.
+> > +
+> > +Required Properties:
+> > +
+> > +  - gpio-controller: Marks the device node as a gpio controller.
+> > +
+> > +  - #gpio-cells: Should be 2. The first cell is the GPIO number and the
+> > second +    cell specifies GPIO flags, as defined in
+> > <dt-bindings/gpio/gpio.h>. Only the +    GPIO_ACTIVE_HIGH and
+> > GPIO_ACTIVE_LOW flags are supported.
+> > +
+> > +The syntax of the gpio specifier used by client nodes should be the
+> > following +with values derived from the SoC user manual.
+> > +
+> > +  <[phandle of the gpio controller node]
+> > +   [pin number within the gpio controller]
+> > +   [flags]>
+> > +
+> > +On other mach-shmobile platforms GPIO is handled by the gpio-rcar driver.
+> > +Please refer to
+> > Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt +for
+> > documentation of the GPIO device tree bindings on those platforms. +
+> > +
+> > +Examples
+> > +--------
+> > +
+> > +Example 1: SH73A0 (SH-Mobile AG5) pin controller node
+> > +
+> > +	pfc: pfc at e6050000 {
+> > +		compatible = "renesas,pfc-sh73a0";
+> > +		reg = <0xe6050000 0x8000>,
+> > +		      <0xe605801c 0x1c>;
+> > +		gpio-controller;
+> > +		#gpio-cells = <2>;
+> > +	};
+> > +
+> > +Example 2: A GPIO LED node that references a GPIO
+> > +
+> > +	#include <dt-bindings/gpio/gpio.h>
+> > +
+> > +	leds {
+> > +		compatible = "gpio-leds";
+> > +		led1 {
+> > +			gpios = <&pfc 20 GPIO_ACTIVE_LOW>;
+> > +		};
+> > +	};
+> > +
+> > +Example 3: KZM-A9-GT (SH-Mobile AG5) default pin state hog and pin control
+> > maps +           for the MMCIF and SCIFA4 devices
+> > +
+> > +	&pfc {
+> > +		pinctrl-0 = <&scifa4_pins>;
+> > +		pinctrl-names = "default";
+> > +
+> > +		mmcif_pins: mmcif {
+> > +			renesas,groups = "mmc0_data8_0", "mmc0_ctrl_0";
+> > +			renesas,function = "mmc0";
+> > +		};
+> > +
+> > +		scifa4_pins: scifa4 {
+> > +			renesas,groups = "scifa4_data", "scifa4_ctrl";
+> > +			renesas,function = "scifa4";
+> > +		};
+> > +	};
+> > +
+> > +Example 4: KZM-A9-GT (SH-Mobile AG5) default pin state for the MMCIF device
+> > +
+> > +	&mmcif {
+> > +		pinctrl-0 = <&mmcif_pins>;
+> > +		pinctrl-names = "default";
+> > +
+> > +		bus-width = <8>;
+> > +		vmmc-supply = <&reg_1p8v>;
+> > +		status = "okay";
+> > +	};
+> > diff --git a/drivers/pinctrl/sh-pfc/core.c b/drivers/pinctrl/sh-pfc/core.c
+> > index ac45084..f3fc66b 100644
+> > --- a/drivers/pinctrl/sh-pfc/core.c
+> > +++ b/drivers/pinctrl/sh-pfc/core.c
+> > @@ -18,6 +18,8 @@
+> >  #include <linux/ioport.h>
+> >  #include <linux/kernel.h>
+> >  #include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_device.h>
+> >  #include <linux/pinctrl/machine.h>
+> >  #include <linux/platform_device.h>
+> >  #include <linux/slab.h>
+> > @@ -348,13 +350,72 @@ int sh_pfc_config_mux(struct sh_pfc *pfc, unsigned
+> > mark, int pinmux_type) return 0;
+> >  }
+> > 
+> > +#ifdef CONFIG_OF
+> > +static const struct of_device_id sh_pfc_of_table[] = {
+> > +#ifdef CONFIG_PINCTRL_PFC_R8A73A4
+> > +	{
+> > +		.compatible = "renesas,pfc-r8a73a4",
+> > +		.data = &r8a73a4_pinmux_info,
+> > +	},
+> > +#endif
+> > +#ifdef CONFIG_PINCTRL_PFC_R8A7740
+> > +	{
+> > +		.compatible = "renesas,pfc-r8a7740",
+> > +		.data = &r8a7740_pinmux_info,
+> > +	},
+> > +#endif
+> > +#ifdef CONFIG_PINCTRL_PFC_R8A7778
+> > +	{
+> > +		.compatible = "renesas,pfc-r8a7778",
+> > +		.data = &r8a7778_pinmux_info,
+> > +	},
+> > +#endif
+> > +#ifdef CONFIG_PINCTRL_PFC_R8A7779
+> > +	{
+> > +		.compatible = "renesas,pfc-r8a7779",
+> > +		.data = &r8a7779_pinmux_info,
+> > +	},
+> > +#endif
+> > +#ifdef CONFIG_PINCTRL_PFC_R8A7790
+> > +	{
+> > +		.compatible = "renesas,pfc-r8a7790",
+> > +		.data = &r8a7790_pinmux_info,
+> > +	},
+> > +#endif
+> > +#ifdef CONFIG_PINCTRL_PFC_SH7372
+> > +	{
+> > +		.compatible = "renesas,pfc-sh7372",
+> > +		.data = &sh7372_pinmux_info,
+> > +	},
+> > +#endif
+> > +#ifdef CONFIG_PINCTRL_PFC_SH73A0
+> > +	{
+> > +		.compatible = "renesas,pfc-sh73a0",
+> > +		.data = &sh73a0_pinmux_info,
+> > +	},
+> > +#endif
+> > +	{ },
+> > +};
+> > +MODULE_DEVICE_TABLE(of, sh_pfc_of_table);
+> > +#endif
+> > +
+> >  static int sh_pfc_probe(struct platform_device *pdev)
+> >  {
+> > +	const struct platform_device_id *platid = platform_get_device_id(pdev);
+> > +#ifdef CONFIG_OF
+> > +	struct device_node *np = pdev->dev.of_node;
+> > +#endif
+> >  	const struct sh_pfc_soc_info *info;
+> >  	struct sh_pfc *pfc;
+> >  	int ret;
+> > 
+> > -	info = (void *)pdev->id_entry->driver_data;
+> > +#ifdef CONFIG_OF
+> > +	if (np)
+> > +		info = of_match_device(sh_pfc_of_table, &pdev->dev)->data;
+> > +	else
+> > +#endif
+> > +		info = platid ? (const void *)platid->driver_data : NULL;
+> > +
+> >  	if (info == NULL)
+> >  		return -ENODEV;
+> > 
+> > @@ -500,6 +561,7 @@ static struct platform_driver sh_pfc_driver = {
+> >  	.driver		= {
+> >  		.name	= DRV_NAME,
+> >  		.owner	= THIS_MODULE,
+> > +		.of_match_table = of_match_ptr(sh_pfc_of_table),
+> >  	},
+> >  };
+> > 
+> > diff --git a/drivers/pinctrl/sh-pfc/pinctrl.c
+> > b/drivers/pinctrl/sh-pfc/pinctrl.c index 3492ec9..7e32bb8 100644
+> > --- a/drivers/pinctrl/sh-pfc/pinctrl.c
+> > +++ b/drivers/pinctrl/sh-pfc/pinctrl.c
+> > @@ -14,7 +14,9 @@
+> >  #include <linux/err.h>
+> >  #include <linux/init.h>
+> >  #include <linux/module.h>
+> > +#include <linux/of.h>
+> >  #include <linux/pinctrl/consumer.h>
+> > +#include <linux/pinctrl/machine.h>
+> >  #include <linux/pinctrl/pinconf.h>
+> >  #include <linux/pinctrl/pinconf-generic.h>
+> >  #include <linux/pinctrl/pinctrl.h>
+> > @@ -72,11 +74,125 @@ static void sh_pfc_pin_dbg_show(struct pinctrl_dev
+> > *pctldev, struct seq_file *s, seq_printf(s, "%s", DRV_NAME);
+> >  }
+> > 
+> > +static int sh_pfc_dt_subnode_to_map(struct device *dev, struct device_node
+> > *np, +				    struct pinctrl_map **map,
+> > +				    unsigned int *num_maps, unsigned int *index)
+> > +{
+> > +	struct pinctrl_map *maps = *map;
+> > +	unsigned int nmaps = *num_maps;
+> > +	unsigned int idx = *index;
+> > +	const char *function = NULL;
+> > +	struct property *prop;
+> > +	const char *group;
+> > +	int ret;
+> > +
+> > +	/* Parse the function and configuration properties. At least a function
+> > +	 * or one configuration must be specified.
+> > +	 */
+> > +	ret = of_property_read_string(np, "renesas,function", &function);
+> > +	if (ret < 0 && ret != -EINVAL) {
+> > +		dev_err(dev, "Invalid function in DT\n");
+> > +		return ret;
+> > +	}
+> > +
+> > +	if (!function) {
+> > +		dev_err(dev, "DT node must contain at least one function\n");
+> > +		goto done;
+> > +	}
+> > +
+> > +	/* Count the number of groups and reallocate mappings. */
+> > +	ret = of_property_count_strings(np, "renesas,groups");
+> > +	if (ret < 0 && ret != -EINVAL) {
+> > +		dev_err(dev, "Invalid pin groups list in DT\n");
+> > +		goto done;
+> > +	}
+> > +
+> > +	if (!ret) {
+> > +		dev_err(dev, "No group provided in DT node\n");
+> > +		ret = -ENODEV;
+> > +		goto done;
+> > +	}
+> > +
+> > +	nmaps += ret;
+> > +
+> > +	maps = krealloc(maps, sizeof(*maps) * nmaps, GFP_KERNEL);
+> > +	if (maps == NULL) {
+> > +		ret = -ENOMEM;
+> > +		goto done;
+> > +	}
+> > +
+> > +	*map = maps;
+> > +	*num_maps = nmaps;
+> > +
+> > +	/* Iterate over pins and groups and create the mappings. */
+> > +	of_property_for_each_string(np, "renesas,groups", prop, group) {
+> > +		maps[idx].type = PIN_MAP_TYPE_MUX_GROUP;
+> > +		maps[idx].data.mux.group = group;
+> > +		maps[idx].data.mux.function = function;
+> > +		idx++;
+> > +	}
+> > +
+> > +	ret = 0;
+> > +
+> > +done:
+> > +	*index = idx;
+> > +	return ret;
+> > +}
+> > +
+> > +static void sh_pfc_dt_free_map(struct pinctrl_dev *pctldev,
+> > +			       struct pinctrl_map *map, unsigned num_maps)
+> > +{
+> > +	kfree(map);
+> > +}
+> > +
+> > +static int sh_pfc_dt_node_to_map(struct pinctrl_dev *pctldev,
+> > +				 struct device_node *np,
+> > +				 struct pinctrl_map **map, unsigned *num_maps)
+> > +{
+> > +	struct sh_pfc_pinctrl *pmx = pinctrl_dev_get_drvdata(pctldev);
+> > +	struct device *dev = pmx->pfc->dev;
+> > +	struct device_node *child;
+> > +	unsigned int index;
+> > +	int ret;
+> > +
+> > +	*map = NULL;
+> > +	*num_maps = 0;
+> > +	index = 0;
+> > +
+> > +	for_each_child_of_node(np, child) {
+> > +		ret = sh_pfc_dt_subnode_to_map(dev, child, map, num_maps,
+> > +					       &index);
+> > +		if (ret < 0)
+> > +			goto done;
+> > +	}
+> > +
+> > +	/* If no mapping has been found in child nodes try the config node. */
+> > +	if (*num_maps == 0) {
+> > +		ret = sh_pfc_dt_subnode_to_map(dev, np, map, num_maps, &index);
+> > +		if (ret < 0)
+> > +			goto done;
+> > +	}
+> > +
+> > +	if (*num_maps)
+> > +		return 0;
+> > +
+> > +	dev_err(dev, "no mapping found in node %s\n", np->full_name);
+> > +	ret = -EINVAL;
+> > +
+> > +done:
+> > +	if (ret < 0)
+> > +		sh_pfc_dt_free_map(pctldev, *map, *num_maps);
+> > +
+> > +	return ret;
+> > +}
+> > +
+> >  static const struct pinctrl_ops sh_pfc_pinctrl_ops = {
+> >  	.get_groups_count	= sh_pfc_get_groups_count,
+> >  	.get_group_name		= sh_pfc_get_group_name,
+> >  	.get_group_pins		= sh_pfc_get_group_pins,
+> >  	.pin_dbg_show		= sh_pfc_pin_dbg_show,
+> > +	.dt_node_to_map		= sh_pfc_dt_node_to_map,
+> > +	.dt_free_map		= sh_pfc_dt_free_map,
+> >  };
+> > 
+> >  static int sh_pfc_get_functions_count(struct pinctrl_dev *pctldev)
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
