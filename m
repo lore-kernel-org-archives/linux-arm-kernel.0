@@ -1,67 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 15:51:20 +0200
-Subject: [RFC PATCH 06/11] dma: amba-pl08x: Keep LLIs aligned to 4-word
- boundary
-In-Reply-To: <1371416058-22047-7-git-send-email-tomasz.figa@gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-7-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdYzag=sKo87i6H3M_fSQuRiTX3_2-ZhQA+4S7ejZN5j4A@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Mon, 17 Jun 2013 17:51:29 +0400
+Subject: linux-next: manual merge of the arm-soc tree with the net-next
+ tree
+In-Reply-To: <20130617163920.04523ba6de50bcc81563f33e@canb.auug.org.au>
+References: <20130617163920.04523ba6de50bcc81563f33e@canb.auug.org.au>
+Message-ID: <51BF1461.8060401@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+Hello.
 
-> PL080 reference manual states that to LLI entries should be aligned
-> to 4-word boundary to make LLI fetches more efficient. This patch adds
-> a 3-word padding to the LLi struct to make this condition true.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-> ---
->  drivers/dma/amba-pl08x.c | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/drivers/dma/amba-pl08x.c b/drivers/dma/amba-pl08x.c
-> index eb10eb8..0da5539 100644
-> --- a/drivers/dma/amba-pl08x.c
-> +++ b/drivers/dma/amba-pl08x.c
-> @@ -127,6 +127,7 @@ struct pl08x_lli {
->         u32 lli;
->         u32 cctl;
->         u32 cctl1;
-> +       u32 dummy[3];
+On 17-06-2013 10:39, Stephen Rothwell wrote:
 
-Atleast put a comment into the code explaining what this is all
-about. Or someone will add another member to the struct and
-all is lost. Call it "padding" rather than dummy.
+> Today's linux-next merge of the arm-soc tree got a conflict in
+> arch/arm/mach-shmobile/clock-r8a7740.c between commit e5c9b4cd6651
+> ("sh_eth: get R8A7740 support out of #ifdef") from the net-next tree and
+> commit 9e0b428f079d ("ARM: shmobile: r8a7740: Add interim sh-eth device
+> name to clocks list") from the arm-soc tree.
 
->  };
+    To me that latter commit looked utterly pointless, as there's no 
+device tree support for the 'sh-eth' driver yet (and at this stage it 
+isn't even going to happen due to procedural platform data). I'm instead 
+going to use OF_DEV_AUXDATA() in the platform code which again would 
+render that commit pointless.
 
-So it used to be like this before you added cctl1:
+> I fixed it up (see below) and can carry the fix as necessary (no action
+> is required).
 
-struct pl08x_lli {
-        u32 src;
-        u32 dst;
-        u32 lli;
-        u32 cctl;
-};
+    Thanks.
 
-Meaning it was 3 words.
-
-And now you make it take 8 words for everyone.
-
-Atleast this patch should be squashed into the patch
-adding cctl1.
-
-But I really don't like this fragile way of casting structs right
-into memory, and I don't like that teh other PL080's also have
-to waste 8 words when their LLIs fit so nicely into 4.
-
-I would have solved this problem by creating a
-marshalling function that just allocate the number of bytes the
-LLI entry shall have and fill it in by assigning directly to the
-precise target memory cell. This way the LLIs will take
-4 words on the original variants and you can use some
-nice logic to pad out to 8 words on the PL080S variant.
-
-Yours,
-Linus Walleij
+WBR, Sergei
