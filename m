@@ -1,104 +1,28 @@
-From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Mon, 17 Jun 2013 12:24:12 -0600
-Subject: [PATCH v3, part2 20/20] PCI, ARM: use hotplug-safe PCI bus
- iterators to walk PCI buses
-In-Reply-To: <1369583597-3801-21-git-send-email-jiang.liu@huawei.com>
-References: <1369583597-3801-1-git-send-email-jiang.liu@huawei.com>
- <1369583597-3801-21-git-send-email-jiang.liu@huawei.com>
-Message-ID: <20130617182412.GB4233@google.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Mon, 17 Jun 2013 11:24:46 -0700
+Subject: [PATCH V2] ahci: sata: add support for exynos5440 sata
+In-Reply-To: <1366104482-14240-1-git-send-email-ks.giri@samsung.com>
+References: <1366104482-14240-1-git-send-email-ks.giri@samsung.com>
+Message-ID: <20130617182446.GI32663@mtj.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 26, 2013 at 11:53:17PM +0800, Jiang Liu wrote:
-> Enhance ARM architecture specific code to use new hotplug-safe PCI
-> bus iterators to walk PCI buses.
+On Tue, Apr 16, 2013 at 02:58:02PM +0530, Girish K S wrote:
+> This patch adds the compatible string of the exynos5440 sata controller
+> compliant with the ahci 1.3 and sata 3.0 specification.
 > 
-> Change pcibios_report_status implementation so that it doesn't access
-> pci_root_buses global list. The pci_root_buses list will be scheduled
-> to be removed.
+> Signed-off-by: Girish K S <ks.giri@samsung.com>
 > 
-> Signed-off-by: Jiang Liu <jiang.liu@huawei.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Thierry Reding <thierry.reding@avionic-design.de>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Rob Herring <rob.herring@calxeda.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> ---
->  arch/arm/kernel/bios32.c           | 13 +------------
->  arch/arm/mach-footbridge/dc21285.c | 12 +++++++++++-
->  2 files changed, 12 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-> index b2ed73c..50ebbe8 100644
-> --- a/arch/arm/kernel/bios32.c
-> +++ b/arch/arm/kernel/bios32.c
-> @@ -22,7 +22,7 @@ static int debug_pci;
->   * We can't use pci_find_device() here since we are
->   * called from interrupt context.
->   */
-> -static void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, int warn)
-> +void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, int warn)
->  {
->  	struct pci_dev *dev;
->  
-> @@ -55,17 +55,6 @@ static void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, in
->  			pcibios_bus_report_status(dev->subordinate, status_mask, warn);
->  }
->  
-> -void pcibios_report_status(u_int status_mask, int warn)
-> -{
-> -	struct list_head *l;
-> -
-> -	list_for_each(l, &pci_root_buses) {
-> -		struct pci_bus *bus = pci_bus_b(l);
-> -
-> -		pcibios_bus_report_status(bus, status_mask, warn);
-> -	}
-> -}
-> -
->  /*
->   * We don't use this to fix the device, but initialisation of it.
->   * It's not the correct use for this, but it works.
-> diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-> index a7cd2cf..a0f1d01 100644
-> --- a/arch/arm/mach-footbridge/dc21285.c
-> +++ b/arch/arm/mach-footbridge/dc21285.c
-> @@ -35,7 +35,16 @@
->  				  PCI_STATUS_PARITY) << 16)
->  
->  extern int setup_arm_irq(int, struct irqaction *);
-> -extern void pcibios_report_status(u_int status_mask, int warn);
-> +extern void pcibios_report_bus_status(struct pci_bus *bus, u_int status_mask,
-> +				      int warn);
-> +
-> +static struct pci_bus *dc21285_root_bus;
-> +
-> +static void pcibios_report_status(u_int status_mask, int warn)
-> +{
-> +	if (dc21285_root_bus)
-> +		pcibios_report_bus_status(dc21285_root_bus, status_mask, warn);
-> +}
->  
->  static unsigned long
->  dc21285_base_address(struct pci_bus *bus, unsigned int devfn)
-> @@ -376,5 +385,6 @@ void __init dc21285_preinit(void)
->  
->  void __init dc21285_postinit(void)
->  {
-> +	dc21285_root_bus = pci_get_next_root_bus(NULL);
+> changes in v2:
+> 		changed the compatible string by adding the actual IP
+> owners name instead of the SoC vendor name.
 
-It seems sort of ugly to scan the bus in pcibios_init_hw(), which
-*returns* the struct pci_bus, then search for it here.  Why can't
-we just remember the bus we scanned?
+Applied to libata/for-3.11.
 
-It's also a little dubious that we only do pcibios_report_status()
-for footbridge.  That makes it look like it's debug code that might
-not be necessary at all.
+Can you please keep SOB at the end of the description after the
+revision history from the next time?
 
->  	register_isa_ports(DC21285_PCI_MEM, DC21285_PCI_IO, 0);
->  }
-> -- 
-> 1.8.1.2
-> 
+Thanks.
+
+-- 
+tejun
