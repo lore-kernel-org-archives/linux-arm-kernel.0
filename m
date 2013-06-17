@@ -1,39 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jun 2013 13:12:32 +0200
-Subject: [PATCH v10 5/8] dmaengine: edma: Add TI EDMA device tree binding
-In-Reply-To: <1371263570-9323-5-git-send-email-joelagnel@ti.com>
-References: <1371263570-9323-1-git-send-email-joelagnel@ti.com>
- <1371263570-9323-5-git-send-email-joelagnel@ti.com>
-Message-ID: <3940138.jZFEtfGGLz@wuerfel>
+Date: Mon, 17 Jun 2013 14:21:49 +0200
+Subject: [PATCH v3 10/10] ARM: Exynos: extend soft-reset support for
+ Exynos5420
+In-Reply-To: <1371466836-4111-11-git-send-email-chander.kashyap@linaro.org>
+References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
+ <1371466836-4111-11-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <3807303.re8cJcYGJh@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 14 June 2013 21:32:47 Joel A Fernandes wrote:
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> new file mode 100644
-> index 0000000..ada0018
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
-> @@ -0,0 +1,26 @@
-> +TI EDMA
+On Monday 17 June 2013 16:30:35 Chander Kashyap wrote:
+> @@ -330,10 +330,10 @@ void exynos5_restart(char mode, const char *cmd)
+>         u32 val;
+>         void __iomem *addr;
+>  
+> -       if (of_machine_is_compatible("samsung,exynos5250")) {
+> -               val = 0x1;
+> -               addr = EXYNOS_SWRESET;
+> -       } else if (of_machine_is_compatible("samsung,exynos5440")) {
+> +       val = 0x1;
+> +       addr = EXYNOS_SWRESET;
 > +
-> +Required properties:
-> +- compatible : "ti,edma3"
-> +- ti,hwmods: Name of the hwmods associated to the EDMA
-> +- ti,edma-regions: Number of regions
-> +- ti,edma-slots: Number of slots
-> +
-> +Optional properties:
-> +- ti,edma-xbar-event-map: Crossbar event to channel map
+> +       if (of_machine_is_compatible("samsung,exynos5440")) {
+>                 u32 status;
+>                 np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
+>  
 
-You need to list #dma-cells as required here, and which values are accepted by
-the driver (I suppose only <1>). You should also explain the format of the
-dma-specifier for a slave here for each possible value of #dma-cells.
+Please try to avoid adding further uses of hardcoded MMIO addresses.
 
-For each of the standard properties (reg, interrupts, dma-channels), list
-whether they are optional or required. Since the example has three interrupts,
-you should probably list how many interrupts need to be specified (minimum
-and maximum if the number is variable) and in what order to expect them.
+Can you change that to use the same logic that exynos5440 has?
 
 	Arnd
