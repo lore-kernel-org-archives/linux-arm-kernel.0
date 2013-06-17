@@ -1,29 +1,111 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Mon, 17 Jun 2013 16:41:50 +0800
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <20130617082724.GI20992@atomide.com>
-References: <CACVXFVOp6n3RhZnWD_hRxqE8a8amPA5SRWfkVhz+yCGZTtGjvQ@mail.gmail.com>
- <20130612163124.GD8164@atomide.com>
- <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
- <51B99B07.1050806@ti.com>
- <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
- <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
- <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
- <CACVXFVMthQNgAe3QhMo8HUxuEYcFSOwsdb7RfAsFqwGFKL+dXA@mail.gmail.com>
- <20130617082724.GI20992@atomide.com>
-Message-ID: <CACVXFVP+-Qm-HrjF1vFxS5JCmf8rR7MdU44mw5-yo0UACYdfrw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 17 Jun 2013 10:45:57 +0200
+Subject: [PATCHv2] ARM: sunxi: Add Olimex A10s-Olinuxino-micro device tree
+Message-ID: <1371458757-6343-1-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 4:27 PM, Tony Lindgren <tony@atomide.com> wrote:
-> Too quick? The basic DT based booting has been working for a few years
-> now to some extent on omaps :)
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Tested-by: Emilio L?pez <emilio@elopez.com.ar>
+---
+ arch/arm/boot/dts/Makefile                       |  1 +
+ arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts | 76 ++++++++++++++++++++++++
+ 2 files changed, 77 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
 
-I mean it is OK to drop legacy mode now if it won't break old system.
-Otherwise, it is better to slow down the dropping legacy patch so that
-the board won't be one brick for us old board users, :-)
-
-
-Thanks,
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index f0895c5..bae46c3 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -181,6 +181,7 @@ dtb-$(CONFIG_ARCH_SUNXI) += \
+ 	sun4i-a10-cubieboard.dtb \
+ 	sun4i-a10-mini-xplus.dtb \
+ 	sun4i-a10-hackberry.dtb \
++	sun5i-a10s-olinuxino-micro.dtb \
+ 	sun5i-a13-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_TEGRA) += tegra20-harmony.dtb \
+ 	tegra20-iris-512.dtb \
+diff --git a/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+new file mode 100644
+index 0000000..64dc0c4
+--- /dev/null
++++ b/arch/arm/boot/dts/sun5i-a10s-olinuxino-micro.dts
+@@ -0,0 +1,76 @@
++/*
++ * Copyright 2013 Maxime Ripard
++ *
++ * Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++/include/ "sun5i-a10s.dtsi"
++
++/ {
++	model = "Olimex A10s-Olinuxino Micro";
++	compatible = "olimex,a10s-olinuxino-micro", "allwinner,sun5i-a10s";
++
++	soc at 01c20000 {
++		emac: ethernet at 01c0b000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&emac_pins_a>;
++			phy = <&phy1>;
++			status = "okay";
++		};
++
++		mdio at 01c0b080 {
++			status = "okay";
++
++			phy1: ethernet-phy at 1 {
++				reg = <1>;
++			};
++		};
++
++		pinctrl at 01c20800 {
++			led_pins_olinuxino: led_pins at 0 {
++				allwinner,pins = "PE3";
++				allwinner,function = "gpio_out";
++				allwinner,drive = <1>;
++				allwinner,pull = <0>;
++			};
++		};
++
++		uart0: serial at 01c28000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart0_pins_a>;
++			status = "okay";
++		};
++
++		uart2: serial at 01c28800 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart2_pins_a>;
++			status = "okay";
++		};
++
++		uart3: serial at 01c28c00 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&uart3_pins_a>;
++			status = "okay";
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&led_pins_olinuxino>;
++
++		green {
++			label = "a10s-olinuxino-micro:green:usr";
++			gpios = <&pio 4 3 0>;
++			default-state = "on";
++		};
++	};
++};
 -- 
-Ming Lei
+1.8.3.1
