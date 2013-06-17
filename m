@@ -1,103 +1,79 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 17 Jun 2013 04:56:21 +0000 (UTC)
-Subject: [PATCH 3.9-stable] ARM: omap3: clock: fix wrong container_of in
- clock36xx.c
-In-Reply-To: <008d01ce6aea$96291790$c27b46b0$%choi@samsung.com>
-References: <008d01ce6aea$96291790$c27b46b0$%choi@samsung.com>
-Message-ID: <alpine.DEB.2.02.1306170454330.4477@utopia.booyaka.com>
+From: padma.kvr@gmail.com (Padma Venkat)
+Date: Mon, 17 Jun 2013 10:29:14 +0530
+Subject: [PATCH V6 6/6] clk: exynos5250: Add enum entries for divider
+ clock of i2s1 and i2s2
+In-Reply-To: <CAAgF-BfEvBcrm186t6U9Tp4r64wB3sEsy6hoXMQi=dHJgncvfw@mail.gmail.com>
+References: <1371024463-303-1-git-send-email-padma.v@samsung.com>
+ <1371024463-303-7-git-send-email-padma.v@samsung.com>
+ <20130612164553.26381.41398@quantum>
+ <CAAgF-BfEvBcrm186t6U9Tp4r64wB3sEsy6hoXMQi=dHJgncvfw@mail.gmail.com>
+Message-ID: <CAAgF-Bf4BVfGVuFF8-CwPRi-em5VHA5HXYjkRDxPxvyAZPx7kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 17 Jun 2013, Jonghwan Choi wrote:
+Hi Mike,
 
-> This patch looks like it should be in the 3.9-stable tree, should we apply
-> it?
+On Thu, Jun 13, 2013 at 8:32 AM, Padma Venkat <padma.kvr@gmail.com> wrote:
+> Hi Mike,
+>
+> On Wed, Jun 12, 2013 at 10:15 PM, Mike Turquette <mturquette@linaro.org> wrote:
+>> Quoting Padmavathi Venna (2013-06-12 01:07:43)
+>>> This patch adds enum entries for div_i2s1 and div_i2s2 which are
+>>> required for i2s1 and i2s2 controllers.
+>>>
+>>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>>
+>> Looks good.  Did you want me to take the clk patches or just gathering
+>> Acks?
+>
+> Please take the patches :).
+>
+> Thanks
+> Padma
 
-Please do.
+clk related patches in this set has some dependency on arch side
+patches because one of the patch replaces all '/include's with
+'#include's and adds a header file in
+arch/arm/boot/include/dt-bindings/. So all these patches required to
+go into one tree.
 
+Hi Kukjin,
 
-- Paul
+Can you please take all these patches into samsung-tree?
 
-> 
-> ------------------
-> 
-> From: "Jean-Philippe Francois <jp.francois@cynove.com>"
-> 
-> commit a93d8a1cea0899982993e9a93404c6f78b123697 upstream
-> 
-> omap36xx_pwrdn_clk_enable_with_hsdiv_restore expects the parent hw of
-> the clock to be a clk_hw_omap. However, looking at cclock3xxx_data.c,
-> all concerned clock have parent defined as clk_divider.  Fix the
-> function to use clk_divider.  Tested with 3.9 on dm3730.
-> 
-> Signed-off-by: Jean-Philippe Francois <jp.francois@cynove.com>
-> Cc: NeilBrown <neilb@suse.de>
-> Cc: Mike Turquette <mturquette@linaro.org>
-> Signed-off-by: Paul Walmsley <paul@pwsan.com>
-> Signed-off-by: Jonghwan Choi <jhbird.choi@samsung.com>
-> ---
->  arch/arm/mach-omap2/clock36xx.c |   18 +++++++++---------
->  1 file changed, 9 insertions(+), 9 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clock36xx.c
-> b/arch/arm/mach-omap2/clock36xx.c
-> index 8f3bf4e..bbd6a3f 100644
-> --- a/arch/arm/mach-omap2/clock36xx.c
-> +++ b/arch/arm/mach-omap2/clock36xx.c
-> @@ -20,11 +20,12 @@
->  
->  #include <linux/kernel.h>
->  #include <linux/clk.h>
-> +#include <linux/clk-provider.h>
->  #include <linux/io.h>
->  
->  #include "clock.h"
->  #include "clock36xx.h"
-> -
-> +#define to_clk_divider(_hw) container_of(_hw, struct clk_divider, hw)
->  
->  /**
->   * omap36xx_pwrdn_clk_enable_with_hsdiv_restore - enable clocks suffering
-> @@ -39,29 +40,28 @@
->   */
->  int omap36xx_pwrdn_clk_enable_with_hsdiv_restore(struct clk_hw *clk)
->  {
-> -	struct clk_hw_omap *parent;
-> +	struct clk_divider *parent;
->  	struct clk_hw *parent_hw;
-> -	u32 dummy_v, orig_v, clksel_shift;
-> +	u32 dummy_v, orig_v;
->  	int ret;
->  
->  	/* Clear PWRDN bit of HSDIVIDER */
->  	ret = omap2_dflt_clk_enable(clk);
->  
->  	parent_hw = __clk_get_hw(__clk_get_parent(clk->clk));
-> -	parent = to_clk_hw_omap(parent_hw);
-> +	parent = to_clk_divider(parent_hw);
->  
->  	/* Restore the dividers */
->  	if (!ret) {
-> -		clksel_shift = __ffs(parent->clksel_mask);
-> -		orig_v = __raw_readl(parent->clksel_reg);
-> +		orig_v = __raw_readl(parent->reg);
->  		dummy_v = orig_v;
->  
->  		/* Write any other value different from the Read value */
-> -		dummy_v ^= (1 << clksel_shift);
-> -		__raw_writel(dummy_v, parent->clksel_reg);
-> +		dummy_v ^= (1 << parent->shift);
-> +		__raw_writel(dummy_v, parent->reg);
->  
->  		/* Write the original divider */
-> -		__raw_writel(orig_v, parent->clksel_reg);
-> +		__raw_writel(orig_v, parent->reg);
->  	}
->  
->  	return ret;
-> -- 
-> 1.7.9.5
-> 
-
-
-- Paul
+Thanks
+Padma
+>
+>>
+>> Regards,
+>> Mike
+>>
+>>> ---
+>>>  drivers/clk/samsung/clk-exynos5250.c |    5 +++--
+>>>  1 files changed, 3 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/clk/samsung/clk-exynos5250.c b/drivers/clk/samsung/clk-exynos5250.c
+>>> index 5c97e75..7c68850 100644
+>>> --- a/drivers/clk/samsung/clk-exynos5250.c
+>>> +++ b/drivers/clk/samsung/clk-exynos5250.c
+>>> @@ -87,6 +87,7 @@ enum exynos5250_clks {
+>>>         sclk_mmc0, sclk_mmc1, sclk_mmc2, sclk_mmc3, sclk_sata, sclk_usb3,
+>>>         sclk_jpeg, sclk_uart0, sclk_uart1, sclk_uart2, sclk_uart3, sclk_pwm,
+>>>         sclk_audio1, sclk_audio2, sclk_spdif, sclk_spi0, sclk_spi1, sclk_spi2,
+>>> +       div_i2s1, div_i2s2,
+>>>
+>>>         /* gate clocks */
+>>>         gscl0 = 256, gscl1, gscl2, gscl3, gscl_wa, gscl_wb, smmu_gscl0,
+>>> @@ -291,8 +292,8 @@ struct samsung_div_clock exynos5250_div_clks[] __initdata = {
+>>>         DIV(none, "div_pcm1", "sclk_audio1", DIV_PERIC4, 4, 8),
+>>>         DIV(none, "div_audio2", "mout_audio2", DIV_PERIC4, 16, 4),
+>>>         DIV(none, "div_pcm2", "sclk_audio2", DIV_PERIC4, 20, 8),
+>>> -       DIV(none, "div_i2s1", "sclk_audio1", DIV_PERIC5, 0, 6),
+>>> -       DIV(none, "div_i2s2", "sclk_audio2", DIV_PERIC5, 8, 6),
+>>> +       DIV(div_i2s1, "div_i2s1", "sclk_audio1", DIV_PERIC5, 0, 6),
+>>> +       DIV(div_i2s2, "div_i2s2", "sclk_audio2", DIV_PERIC5, 8, 6),
+>>>         DIV(sclk_pixel, "div_hdmi_pixel", "sclk_vpll", DIV_DISP1_0, 28, 4),
+>>>         DIV_A(none, "armclk", "div_arm", DIV_CPU0, 28, 3, "armclk"),
+>>>         DIV_F(none, "div_mipi1_pre", "div_mipi1",
+>>> --
+>>> 1.7.4.4
