@@ -1,33 +1,28 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Mon, 17 Jun 2013 15:39:20 +0200
-Subject: [PATCH] ARM: mm: cpu_fa526_do_idle: remove WFI
-Message-ID: <1371476360-8751-1-git-send-email-jonas.jensen@gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Jun 2013 15:42:15 +0200
+Subject: [RFC PATCH 05/11] dma: amba-pl08x: Add support for different
+ maximum transfer size
+In-Reply-To: <1371416058-22047-6-git-send-email-tomasz.figa@gmail.com>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+ <1371416058-22047-6-git-send-email-tomasz.figa@gmail.com>
+Message-ID: <CACRpkdaHpNVXueXy0HRnKTshn4ZZSPFh-pgav6B0UAU1xqsNCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it was already suggested by Russell King and Arnd Bergmann ( https://lkml.org/lkml/2013/5/16/133 ), moxart and gemini seem to be the only platforms using CPU_FA526, and instead of pointing arm_pm_idle to an empty function from platform code, it makes sense to remove WFI code from the processor specific idle function.
+On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
 
-Note: moxart boots and prints to UART without this patch, but input is broken.
+> PL080S has separate register to store transfer size in, allowing single
+> transfer to be much larger than in standard PL080.
+>
+> This patch makes the amba-pl08x driver aware of this and removes writing
+> transfer size to reserved bits of CH_CONTROL register on PL080S, which
+> was not a problem witn transfer sizes fitting the original bitfield
+> of PL080, but now would overwrite other fields.
+>
+> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
- arch/arm/mm/proc-fa526.S |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+Very straight-forward.
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
 
-diff --git a/arch/arm/mm/proc-fa526.S b/arch/arm/mm/proc-fa526.S
-index d217e97..85280b1 100644
---- a/arch/arm/mm/proc-fa526.S
-+++ b/arch/arm/mm/proc-fa526.S
-@@ -81,9 +81,7 @@ ENDPROC(cpu_fa526_reset)
-  */
- 	.align	4
- ENTRY(cpu_fa526_do_idle)
--	mcr	p15, 0, r0, c7, c0, 4		@ Wait for interrupt
--	mov	pc, lr
--
-+	nop
- 
- ENTRY(cpu_fa526_dcache_clean_area)
- 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
--- 
-1.7.2.5
+Yours,
+Linus Walleij
