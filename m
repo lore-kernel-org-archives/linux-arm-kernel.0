@@ -1,60 +1,39 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 17:12:34 +0900
-Subject: [PATCH 01/15] ARM: shmobile: uImage load address rework
+Date: Mon, 17 Jun 2013 17:12:42 +0900
+Subject: [PATCH 09/15] ARM: shmobile: EMEV2 SMP with SCU boot fn and args
 In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371456768-1084-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371456768-1084-10-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-This is V2 of the mach-shmobile uImage load address rework patch.
-
-Rework the mach-shmobile uImage load address calculation by storing
-the per-board load addresses in Makefile.boot. This removes the
-CONFIG_MEMORY_START dependency from Makefile.boot, and it also makes
-it possible to create safe kernel images that boot on multiple boards.
-
-This is one of several series of code that reworks code not to rely on
-CONFIG_MEMORY_START/SIZE which in turn is needed for ARCH_MULTIPLATFORM.
+Let EMEV2 make use of shmobile_boot_fn and shmobile_boot_arg
+together with shmobile_boot_scu and the SCU base address.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
-Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Reviewed-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/Makefile.boot |   20 ++++++++++++++++++--
- 1 file changed, 18 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/smp-emev2.c |    6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Makefile.boot b/arch/arm/mach-shmobile/Makefile.boot
-index 498efd9..6b147ea 100644
---- a/arch/arm/mach-shmobile/Makefile.boot
-+++ b/arch/arm/mach-shmobile/Makefile.boot
-@@ -1,6 +1,22 @@
--__ZRELADDR	:= $(shell /bin/bash -c 'printf "0x%08x" \
--		     $$[$(CONFIG_MEMORY_START) + 0x8000]')
-+# per-board load address for uImage
-+loadaddr-y	:=
-+loadaddr-$(CONFIG_MACH_AG5EVM) += 0x40008000
-+loadaddr-$(CONFIG_MACH_AP4EVB) += 0x40008000
-+loadaddr-$(CONFIG_MACH_APE6EVM) += 0x40008000
-+loadaddr-$(CONFIG_MACH_ARMADILLO800EVA) += 0x40008000
-+loadaddr-$(CONFIG_MACH_ARMADILLO800EVA_REFERENCE) += 0x40008000
-+loadaddr-$(CONFIG_MACH_BOCKW) += 0x60008000
-+loadaddr-$(CONFIG_MACH_BONITO) += 0x40008000
-+loadaddr-$(CONFIG_MACH_KOTA2) += 0x41008000
-+loadaddr-$(CONFIG_MACH_KZM9D) += 0x40008000
-+loadaddr-$(CONFIG_MACH_KZM9G) += 0x41008000
-+loadaddr-$(CONFIG_MACH_KZM9G_REFERENCE) += 0x41008000
-+loadaddr-$(CONFIG_MACH_LAGER) += 0x40008000
-+loadaddr-$(CONFIG_MACH_MACKEREL) += 0x40008000
-+loadaddr-$(CONFIG_MACH_MARZEN) += 0x60008000
-+loadaddr-$(CONFIG_MACH_MARZEN_REFERENCE) += 0x60008000
+diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
+index e38691b..80991b3 100644
+--- a/arch/arm/mach-shmobile/smp-emev2.c
++++ b/arch/arm/mach-shmobile/smp-emev2.c
+@@ -40,8 +40,10 @@ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	scu_enable(shmobile_scu_base);
  
-+__ZRELADDR	:= $(sort $(loadaddr-y))
-    zreladdr-y   += $(__ZRELADDR)
+-	/* Tell ROM loader about our vector (in headsmp-scu.S) */
+-	emev2_set_boot_vector(__pa(shmobile_secondary_vector_scu));
++	/* Tell ROM loader about our vector (in headsmp-scu.S, headsmp.S) */
++	emev2_set_boot_vector(__pa(shmobile_boot_vector));
++	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
++	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
  
- # Unsupported legacy stuff
+ 	/* enable cache coherency on booting CPU */
+ 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
 -- 
 1.7.10.4
