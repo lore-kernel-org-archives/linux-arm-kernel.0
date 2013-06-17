@@ -1,29 +1,61 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 16 Jun 2013 23:20:53 -0700
-Subject: [PATCH 2/2] ARM: dts: add AM33XX MMC support
-In-Reply-To: <20130615150500.GA27629@arwen.pp.htv.fi>
-References: <20130307144656.GR6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC20CCA@DBDE01.ent.ti.com>
- <20130307150408.GU6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC20D27@DBDE01.ent.ti.com>
- <20130307160236.GV6209@beef>
- <79CD15C6BA57404B839C016229A409A83EC213C8@DBDE01.ent.ti.com>
- <CAD=GYpb3+nvoz863+VKO7iJijRHnM5RzsVj-5VJfQ-OHoUy19Q@mail.gmail.com>
- <20130614222537.GA25428@arwen.pp.htv.fi>
- <CAD=GYpYfMAZeV1RUC=DqhYGZaKiiukpTZg7bhO582eKwimS9aA@mail.gmail.com>
- <20130615150500.GA27629@arwen.pp.htv.fi>
-Message-ID: <20130617062052.GG20992@atomide.com>
+From: monstr@monstr.eu (Michal Simek)
+Date: Mon, 17 Jun 2013 08:13:51 +0200
+Subject: [GIT PULL] arm-soc: Xilinx Zynq cleanups for v3.11
+Message-ID: <51BEA91F.2000305@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [130615 08:12]:
-> 
-> fair enough, then let's just add those interrupts to hwmod which will,
-> eventually, let us drop all of that data from hwmod.
+Hi Arnd and Olof,
 
-Nope, we're already dropping the duplicate data from hwmod for
-am33xx and omap4. See omap-for-v3.11/cleanup branch.
+please pull the following changes to your arm-soc tree.
+There are just two cleanup patches.
 
-Regards,
+Thanks,
+Michal
 
-Tony
+
+The following changes since commit c7788792a5e7b0d5d7f96d0766b4cb6112d47d75:
+
+  Linux 3.10-rc2 (2013-05-20 14:37:38 -0700)
+
+are available in the git repository at:
+
+  git://git.xilinx.com/linux-xlnx.git tags/zynq-cleanup-for-3.11
+
+for you to fetch changes up to 88cd4e882de73c2e62c38591abfe8c13fcc8386a:
+
+  ARM: zynq: Not to rewrite jump code when starting address is 0x0 (2013-06-17 07:35:31 +0200)
+
+----------------------------------------------------------------
+arm: Xilinx Zynq cleanup patches for v3.11
+
+This branch contains two fixes:
+- Fix zynq smp code
+- Do not specify init_irq ptr
+
+----------------------------------------------------------------
+Maxime Ripard (1):
+      ARM: zynq: Remove init_irq declaration in machine description
+
+Michal Simek (1):
+      ARM: zynq: Not to rewrite jump code when starting address is 0x0
+
+ arch/arm/mach-zynq/common.c  |  2 --
+ arch/arm/mach-zynq/platsmp.c | 52 ++++++++++++++++++++++++++--------------------------
+ 2 files changed, 26 insertions(+), 28 deletions(-)
+
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 263 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/3735ec98/attachment.sig>
