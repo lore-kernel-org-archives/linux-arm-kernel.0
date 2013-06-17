@@ -1,353 +1,98 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 12:38:46 +0900
-Subject: [PATCH 1/2] serial: sh-sci: HSCIF support
-In-Reply-To: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
-References: <1371440327-30512-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371440327-30512-2-git-send-email-horms+renesas@verge.net.au>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 17 Jun 2013 12:45:27 +0900
+Subject: [PATCH 14/15] ARM: shmobile: Remove AP4EVB board support
+In-Reply-To: <Pine.LNX.4.64.1306141123380.6920@axis700.grange>
+References: <1371106793-25071-1-git-send-email-horms+renesas@verge.net.au>
+ <1371106793-25071-15-git-send-email-horms+renesas@verge.net.au>
+ <Pine.LNX.4.64.1306132128370.3777@axis700.grange>
+ <CANqRtoSx4Jf_EfG3LvkpoOED4-SuOdWjRedz-RbwGCOcOeP-Xg@mail.gmail.com>
+ <Pine.LNX.4.64.1306141123380.6920@axis700.grange>
+Message-ID: <CANqRtoRXBupbbU_cq257p5usu8F5975NFDenkOx1qTvYZaxF2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht@gmail.com>
+Hi Guennadi,
 
-Adds support for "High Speed Serial Communications Interface with FIFO",
-essentially a SCIF with 128-byte FIFOs and more accurate baud rate
-generator.
+On Fri, Jun 14, 2013 at 6:27 PM, Guennadi Liakhovetski
+<g.liakhovetski@gmx.de> wrote:
+> On Fri, 14 Jun 2013, Magnus Damm wrote:
+>
+>> Hi Guennadi,
+>>
+>> On Fri, Jun 14, 2013 at 4:36 AM, Guennadi Liakhovetski
+>> <g.liakhovetski@gmx.de> wrote:
+>> > Hi Simon
+>> >
+>> > On Thu, 13 Jun 2013, Simon Horman wrote:
+>> >
+>> >> From: Magnus Damm <damm@opensource.se>
+>> >>
+>> >> Remove board support for the sh7372 based AP4EVB board
+>> >>
+>> >> The sh7372 SoC support code is still kept around since it
+>> >> is in use by the Mackerel board which is basically a more
+>> >> recent board where the design is based on AP4EVB.
+>> >>
+>> >> Signed-off-by: Magnus Damm <damm@opensource.se>
+>> >> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> >
+>> > It would be a pity if this patch gets pulled now. We're still discussing
+>> > with Magnus, I believe. My opinion is, that this board is a good testing
+>> > platform for V4L2. It is the only board in the mainline, using the CSI2
+>> > interface, present on multiple Renesas SoCs, including r8a73a4 (APE6), and
+>> > (probably, not 100% sure) sh73a0 (AG5), and the IMX074 camera sensor, not
+>> > present on any other platform. If this board is removed, supporting both
+>> > CSI2 and IMX074 will become difficult. Besides, AP4EVB is used as an
+>> > example in my V4L2 clock / async probing patch series:
+>> >
+>> > http://www.mail-archive.com/linux-media at vger.kernel.org/msg63174.html
+>> >
+>> > If still possible, would be good to delay removing this board until we
+>> > complete our discussion.
+>>
+>> If fine with keeping the board if someone can show me progress in the
+>> area of INTC DT support. Recently I have not seen anything.
+>>
+>> So if no one is developing DT support for this board then I can't
+>> really see how we will be able to support it in the future with ARM
+>> SoC requirements for DT and MULTIPLATFORM...
+>
+> You seem to be keeping the other sh7372 board currently in the mainline -
+> the mackerel, so, keeping this one as well at least as long as sh7372 is
+> at all supported shouldn't come at an extra cost.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
-Acked-by: Paul Mundt <lethal@linux-sh.org>
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- drivers/tty/serial/sh-sci.c      |  102 +++++++++++++++++++++++++++++++++++---
- include/linux/serial_sci.h       |   12 +++--
- include/uapi/linux/serial_core.h |    3 ++
- 3 files changed, 106 insertions(+), 11 deletions(-)
+My plan is to slowly getting rid of sh7372 bit by bit. This since the
+sh7372 SoC never made it into mass production and it's getting old. As
+for AP4EVB, it's the first sh7372 board that we ran Linux on. It was
+soon replaced by Mackerel.
 
-diff --git a/drivers/tty/serial/sh-sci.c b/drivers/tty/serial/sh-sci.c
-index 1564186..931d6c3 100644
---- a/drivers/tty/serial/sh-sci.c
-+++ b/drivers/tty/serial/sh-sci.c
-@@ -146,6 +146,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= sci_reg_invalid,
- 		[SCSPTR]	= sci_reg_invalid,
- 		[SCLSR]		= sci_reg_invalid,
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- 
- 	/*
-@@ -165,6 +166,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= sci_reg_invalid,
- 		[SCSPTR]	= sci_reg_invalid,
- 		[SCLSR]		= sci_reg_invalid,
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- 
- 	/*
-@@ -183,6 +185,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= sci_reg_invalid,
- 		[SCSPTR]	= sci_reg_invalid,
- 		[SCLSR]		= sci_reg_invalid,
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- 
- 	/*
-@@ -201,6 +204,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= { 0x3c, 16 },
- 		[SCSPTR]	= sci_reg_invalid,
- 		[SCLSR]		= sci_reg_invalid,
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- 
- 	/*
-@@ -220,6 +224,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= sci_reg_invalid,
- 		[SCSPTR]	= { 0x20, 16 },
- 		[SCLSR]		= { 0x24, 16 },
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- 
- 	/*
-@@ -238,6 +243,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= sci_reg_invalid,
- 		[SCSPTR]	= sci_reg_invalid,
- 		[SCLSR]		= sci_reg_invalid,
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- 
- 	/*
-@@ -256,6 +262,26 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= sci_reg_invalid,
- 		[SCSPTR]	= { 0x20, 16 },
- 		[SCLSR]		= { 0x24, 16 },
-+		[HSSRR]		= sci_reg_invalid,
-+	},
-+
-+	/*
-+	 * Common HSCIF definitions.
-+	 */
-+	[SCIx_HSCIF_REGTYPE] = {
-+		[SCSMR]		= { 0x00, 16 },
-+		[SCBRR]		= { 0x04,  8 },
-+		[SCSCR]		= { 0x08, 16 },
-+		[SCxTDR]	= { 0x0c,  8 },
-+		[SCxSR]		= { 0x10, 16 },
-+		[SCxRDR]	= { 0x14,  8 },
-+		[SCFCR]		= { 0x18, 16 },
-+		[SCFDR]		= { 0x1c, 16 },
-+		[SCTFDR]	= sci_reg_invalid,
-+		[SCRFDR]	= sci_reg_invalid,
-+		[SCSPTR]	= { 0x20, 16 },
-+		[SCLSR]		= { 0x24, 16 },
-+		[HSSRR]		= { 0x40, 16 },
- 	},
- 
- 	/*
-@@ -275,6 +301,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= sci_reg_invalid,
- 		[SCSPTR]	= sci_reg_invalid,
- 		[SCLSR]		= { 0x24, 16 },
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- 
- 	/*
-@@ -294,6 +321,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= { 0x20, 16 },
- 		[SCSPTR]	= { 0x24, 16 },
- 		[SCLSR]		= { 0x28, 16 },
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- 
- 	/*
-@@ -313,6 +341,7 @@ static struct plat_sci_reg sci_regmap[SCIx_NR_REGTYPES][SCIx_NR_REGS] = {
- 		[SCRFDR]	= sci_reg_invalid,
- 		[SCSPTR]	= sci_reg_invalid,
- 		[SCLSR]		= sci_reg_invalid,
-+		[HSSRR]		= sci_reg_invalid,
- 	},
- };
- 
-@@ -374,6 +403,9 @@ static int sci_probe_regmap(struct plat_sci_port *cfg)
- 		 */
- 		cfg->regtype = SCIx_SH4_SCIF_REGTYPE;
- 		break;
-+	case PORT_HSCIF:
-+		cfg->regtype = SCIx_HSCIF_REGTYPE;
-+		break;
- 	default:
- 		printk(KERN_ERR "Can't probe register map for given port\n");
- 		return -EINVAL;
-@@ -1798,6 +1830,42 @@ static unsigned int sci_scbrr_calc(unsigned int algo_id, unsigned int bps,
- 	return ((freq + 16 * bps) / (32 * bps) - 1);
- }
- 
-+/* calculate sample rate, BRR, and clock select for HSCIF */
-+static void sci_baud_calc_hscif(unsigned int bps, unsigned long freq,
-+				int *brr, unsigned int *srr,
-+				unsigned int *cks)
-+{
-+	int sr, c, br, err;
-+	int min_err = 1000; /* 100% */
-+
-+	/* Find the combination of sample rate and clock select with the
-+	   smallest deviation from the desired baud rate. */
-+	for (sr = 8; sr <= 32; sr++) {
-+		for (c = 0; c <= 3; c++) {
-+			/* integerized formulas from HSCIF documentation */
-+			br = freq / (sr * (1 << (2 * c + 1)) * bps) - 1;
-+			if (br < 0 || br > 255)
-+				continue;
-+			err = freq / ((br + 1) * bps * sr *
-+			      (1 << (2 * c + 1)) / 1000) - 1000;
-+			if (min_err > err) {
-+				min_err = err;
-+				*brr = br;
-+				*srr = sr - 1;
-+				*cks = c;
-+			}
-+		}
-+	}
-+
-+	if (min_err == 1000) {
-+		WARN_ON(1);
-+		/* use defaults */
-+		*brr = 255;
-+		*srr = 15;
-+		*cks = 0;
-+	}
-+}
-+
- static void sci_reset(struct uart_port *port)
- {
- 	struct plat_sci_reg *reg;
-@@ -1821,6 +1889,7 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
- 	struct plat_sci_reg *reg;
- 	unsigned int baud, smr_val, max_baud, cks;
- 	int t = -1;
-+	unsigned int srr;
- 
- 	/*
- 	 * earlyprintk comes here early on with port->uartclk set to zero.
-@@ -1833,8 +1902,17 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
- 	max_baud = port->uartclk ? port->uartclk / 16 : 115200;
- 
- 	baud = uart_get_baud_rate(port, termios, old, 0, max_baud);
--	if (likely(baud && port->uartclk))
--		t = sci_scbrr_calc(s->cfg->scbrr_algo_id, baud, port->uartclk);
-+	if (likely(baud && port->uartclk)) {
-+		if (s->cfg->scbrr_algo_id == SCBRR_ALGO_6) {
-+			sci_baud_calc_hscif(baud, port->uartclk, &t, &srr,
-+					    &cks);
-+		} else {
-+			t = sci_scbrr_calc(s->cfg->scbrr_algo_id, baud,
-+					   port->uartclk);
-+			for (cks = 0; t >= 256 && cks <= 3; cks++)
-+				t >>= 2;
-+		}
-+	}
- 
- 	sci_port_enable(s);
- 
-@@ -1853,15 +1931,15 @@ static void sci_set_termios(struct uart_port *port, struct ktermios *termios,
- 
- 	uart_update_timeout(port, termios->c_cflag, baud);
- 
--	for (cks = 0; t >= 256 && cks <= 3; cks++)
--		t >>= 2;
--
- 	dev_dbg(port->dev, "%s: SMR %x, cks %x, t %x, SCSCR %x\n",
- 		__func__, smr_val, cks, t, s->cfg->scscr);
- 
- 	if (t >= 0) {
- 		serial_port_out(port, SCSMR, (smr_val & ~3) | cks);
- 		serial_port_out(port, SCBRR, t);
-+		reg = sci_getreg(port, HSSRR);
-+		if (reg->size)
-+			serial_port_out(port, HSSRR, srr | HSCIF_SRE);
- 		udelay((1000000+(baud-1)) / baud); /* Wait one bit interval */
- 	} else
- 		serial_port_out(port, SCSMR, smr_val);
-@@ -1947,6 +2025,8 @@ static const char *sci_type(struct uart_port *port)
- 		return "scifa";
- 	case PORT_SCIFB:
- 		return "scifb";
-+	case PORT_HSCIF:
-+		return "hscif";
- 	}
- 
- 	return NULL;
-@@ -1960,7 +2040,10 @@ static inline unsigned long sci_port_size(struct uart_port *port)
- 	 * from platform resource data at such a time that ports begin to
- 	 * behave more erratically.
- 	 */
--	return 64;
-+	if (port->type == PORT_HSCIF)
-+		return 96;
-+	else
-+		return 64;
- }
- 
- static int sci_remap_port(struct uart_port *port)
-@@ -2085,6 +2168,9 @@ static int sci_init_single(struct platform_device *dev,
- 	case PORT_SCIFB:
- 		port->fifosize = 256;
- 		break;
-+	case PORT_HSCIF:
-+		port->fifosize = 128;
-+		break;
- 	case PORT_SCIFA:
- 		port->fifosize = 64;
- 		break;
-@@ -2325,7 +2411,7 @@ static inline int sci_probe_earlyprintk(struct platform_device *pdev)
- #endif /* CONFIG_SERIAL_SH_SCI_CONSOLE */
- 
- static char banner[] __initdata =
--	KERN_INFO "SuperH SCI(F) driver initialized\n";
-+	KERN_INFO "SuperH (H)SCI(F) driver initialized\n";
- 
- static struct uart_driver sci_uart_driver = {
- 	.owner		= THIS_MODULE,
-@@ -2484,4 +2570,4 @@ module_exit(sci_exit);
- MODULE_LICENSE("GPL");
- MODULE_ALIAS("platform:sh-sci");
- MODULE_AUTHOR("Paul Mundt");
--MODULE_DESCRIPTION("SuperH SCI(F) serial driver");
-+MODULE_DESCRIPTION("SuperH (H)SCI(F) serial driver");
-diff --git a/include/linux/serial_sci.h b/include/linux/serial_sci.h
-index eb763ad..d340497 100644
---- a/include/linux/serial_sci.h
-+++ b/include/linux/serial_sci.h
-@@ -5,7 +5,7 @@
- #include <linux/sh_dma.h>
- 
- /*
-- * Generic header for SuperH SCI(F) (used by sh/sh64/h8300 and related parts)
-+ * Generic header for SuperH (H)SCI(F) (used by sh/sh64/h8300 and related parts)
-  */
- 
- #define SCIx_NOT_SUPPORTED	(-1)
-@@ -16,6 +16,7 @@ enum {
- 	SCBRR_ALGO_3,		/* (((clk * 2) + 16 * bps) / (16 * bps) - 1) */
- 	SCBRR_ALGO_4,		/* (((clk * 2) + 16 * bps) / (32 * bps) - 1) */
- 	SCBRR_ALGO_5,		/* (((clk * 1000 / 32) / bps) - 1) */
-+	SCBRR_ALGO_6,		/* HSCIF variable sample rate algorithm */
- };
- 
- #define SCSCR_TIE	(1 << 7)
-@@ -37,7 +38,7 @@ enum {
- 
- #define SCI_DEFAULT_ERROR_MASK (SCI_PER | SCI_FER)
- 
--/* SCxSR SCIF */
-+/* SCxSR SCIF, HSCIF */
- #define SCIF_ER    0x0080
- #define SCIF_TEND  0x0040
- #define SCIF_TDFE  0x0020
-@@ -55,6 +56,9 @@ enum {
- #define SCSPTR_SPB2IO	(1 << 1)
- #define SCSPTR_SPB2DT	(1 << 0)
- 
-+/* HSSRR HSCIF */
-+#define HSCIF_SRE	0x8000
-+
- /* Offsets into the sci_port->irqs array */
- enum {
- 	SCIx_ERI_IRQ,
-@@ -90,6 +94,7 @@ enum {
- 	SCIx_SH4_SCIF_NO_SCSPTR_REGTYPE,
- 	SCIx_SH4_SCIF_FIFODATA_REGTYPE,
- 	SCIx_SH7705_SCIF_REGTYPE,
-+	SCIx_HSCIF_REGTYPE,
- 
- 	SCIx_NR_REGTYPES,
- };
-@@ -115,6 +120,7 @@ enum {
- 	SCSMR, SCBRR, SCSCR, SCxSR,
- 	SCFCR, SCFDR, SCxTDR, SCxRDR,
- 	SCLSR, SCTFDR, SCRFDR, SCSPTR,
-+	HSSRR,
- 
- 	SCIx_NR_REGS,
- };
-@@ -137,7 +143,7 @@ struct plat_sci_port {
- 	unsigned long	mapbase;		/* resource base */
- 	unsigned int	irqs[SCIx_NR_IRQS];	/* ERI, RXI, TXI, BRI */
- 	unsigned int	gpios[SCIx_NR_FNS];	/* SCK, RXD, TXD, CTS, RTS */
--	unsigned int	type;			/* SCI / SCIF / IRDA */
-+	unsigned int	type;			/* SCI / SCIF / IRDA / HSCIF */
- 	upf_t		flags;			/* UPF_* flags */
- 	unsigned long	capabilities;		/* Port features/capabilities */
- 
-diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
-index 74c2bf7..26eee07 100644
---- a/include/uapi/linux/serial_core.h
-+++ b/include/uapi/linux/serial_core.h
-@@ -226,4 +226,7 @@
- /* Rocketport EXPRESS/INFINITY */
- #define PORT_RP2	102
- 
-+/* SH-SCI */
-+#define PORT_HSCIF	103
-+
- #endif /* _UAPILINUX_SERIAL_CORE_H */
--- 
-1.7.10.4
+So sh7372 was something we worked on a couple of generations ago. The
+sh7372 SoC code has issues related to DT for INTC, but that aside, the
+AP4EVB board has board specific Kconfig bits and other stuff making it
+difficult to fit into a single kernel binary. So I'd rather say good
+bye to all this unless someone plans to fix it.
+
+> As for INTC DT - I
+> think, the original idea was to specify the complete INTC configuration in
+> DT, which looked pretty horrifying.
+
+No, that was not the original idea. The first steps included code to
+keep the tables in C.
+
+http://www.spinics.net/lists/linux-sh/msg10788.html
+
+> And it shouldn't be needed, since INTC
+> config is per-SoC, not per-board. What if we keep INTC configuration in
+> SoC files and use aux-data to supply platform data to DT device nodes?
+> Would that be difficult to implement?
+
+Apparently. I made a prototype ages ago. Since then several people
+have been requested to work on this, but unfortunately no useful
+output has come from any of all this.
+
+So Guennadi, if you want to keep this board then you have to step up
+and fix things. If not then there is no point in keeping it.
+
+Cheers,
+
+/ magnus
