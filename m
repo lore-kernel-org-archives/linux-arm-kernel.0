@@ -1,49 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jun 2013 16:14:03 +0200
-Subject: [PATCH] ARM: mm: cpu_fa526_do_idle: remove WFI
-In-Reply-To: <1371476360-8751-1-git-send-email-jonas.jensen@gmail.com>
-References: <1371476360-8751-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <5020304.hteFFmWh1u@wuerfel>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Mon, 17 Jun 2013 19:13:04 +0530
+Subject: MUSB multiplatform work?
+In-Reply-To: <CAJe_ZheT6q6YnWU=1_bdwGE4-n9WNJyADFQ_TpQckuVfYai7zw@mail.gmail.com>
+References: <201305271702.09203.arnd@arndb.de>
+ <20130528163548.GC28253@arwen.pp.htv.fi>
+ <20130530201854.GB6467@atomide.com>
+ <CACRpkdZHupVFS+pNADpaJjunPa3fEtyCqLwbL-etHs3gt8EW0Q@mail.gmail.com>
+ <20130530203132.GC6467@atomide.com>
+ <CACRpkdaUegc7B8awUiQTvFRJHPMWv6hEEsE-2AHtZCDXVEMN9g@mail.gmail.com>
+ <20130612100542.GV4107@intel.com>
+ <CAJe_ZheT6q6YnWU=1_bdwGE4-n9WNJyADFQ_TpQckuVfYai7zw@mail.gmail.com>
+Message-ID: <20130617134304.GD10671@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013 15:39:20 Jonas Jensen wrote:
-> As it was already suggested by Russell King and Arnd Bergmann ( https://lkml.org/lkml/2013/5/16/133 ), moxart and gemini seem to be the only platforms using CPU_FA526, and instead of pointing arm_pm_idle to an empty function from platform code, it makes sense to remove WFI code from the processor specific idle function.
-> 
-> Note: moxart boots and prints to UART without this patch, but input is broken.
+On Wed, Jun 12, 2013 at 05:27:53PM +0530, Jassi Brar wrote:
+> IIRC,  TI's Sundaram Raju proposed a TI specific api to DMAEngine for
+> this very purpose, which was generalized into
+> device_prep_interleaved_dma().  Which I think should already be enough
+> to serve the purpose. Is it not?
+The interleaved for having to get/set data from interleaved or an 2d array.
+Think of a raw image from camera where you need to get some region only and skip
+rest. In those case interleaved API helps
 
-Please make sure you have proper line wraps. Lines in checkin
-comments should be no longer than 70 characters normally.
+Here this is just normal slave DMA with changing FIFO address and which just
+loops over the FIFO value
 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-Since this patch is independent from the actual platform support,
-it should go through Russell's patch tracker at
-http://www.arm.linux.org.uk/developer/patches/
-
->  arch/arm/mm/proc-fa526.S |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mm/proc-fa526.S b/arch/arm/mm/proc-fa526.S
-> index d217e97..85280b1 100644
-> --- a/arch/arm/mm/proc-fa526.S
-> +++ b/arch/arm/mm/proc-fa526.S
-> @@ -81,9 +81,7 @@ ENDPROC(cpu_fa526_reset)
->   */
->  	.align	4
->  ENTRY(cpu_fa526_do_idle)
-> -	mcr	p15, 0, r0, c7, c0, 4		@ Wait for interrupt
-> -	mov	pc, lr
-> -
-> +	nop
->  
->  ENTRY(cpu_fa526_dcache_clean_area)
->  1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
-
-Adding Imre and Florian to Cc for Gemini. They might have a comment
-about this. I think we should delete arch/arm/mach-gemini/idle.c
-after this as well.
-
-	Arnd
+--
+~Vinod
