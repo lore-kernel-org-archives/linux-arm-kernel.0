@@ -1,71 +1,45 @@
-From: paul.gortmaker@windriver.com (Paul Gortmaker)
-Date: Mon, 17 Jun 2013 17:54:33 -0400
-Subject: [PATCH] arm: delete __cpuinit usage from all users
-In-Reply-To: <1371503483-2382-1-git-send-email-paul.gortmaker@windriver.com>
-References: <1371503483-2382-1-git-send-email-paul.gortmaker@windriver.com>
-Message-ID: <51BF8599.4080701@windriver.com>
+From: soren.brinkmann@xilinx.com (Soren Brinkmann)
+Date: Mon, 17 Jun 2013 15:03:46 -0700
+Subject: [PATCH] clk/zynq/clkc: Add dedicated spinlock for the SWDT
+Message-ID: <1371506626-3892-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13-06-17 05:11 PM, Paul Gortmaker wrote:
-> The __cpuinit type of throwaway sections might have made sense
-> some time ago when RAM was more constrained, but now the savings
-> do not offset the cost and complications.  For example, the fix in
-> commit 5e427ec2d0 ("x86: Fix bit corruption at CPU resume time")
-> is a good example of the nasty type of bugs that can be created
-> with improper use of the various __init prefixes.
-> 
-> After a discussion on LKML[1] it was decided that cpuinit should go
-> the way of devinit and be phased out.  Once all the users are gone,
-> we can then finally remove the macros themselves from linux/init.h.
-> 
-> This removes all the ARM uses of the __cpuinit macros.
+The clk_mux for the system watchdog timer reused the register lock
+dedicated to the Ethernet module - for no apparent reason.
+Add a lock dedicated to the SWDT's clock register to remove this
+wrong dependency.
 
-This is missing dealing with __CPUINIT in asm files; sorry - I'll resend.
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+I don't know how this slipped in...
+Anyway, the fix depends on armsoc/zynq/clk.
 
-Thanks,
-Paul.
---
+	S?ren
 
-> 
-> [1] https://lkml.org/lkml/2013/5/20/589
-> 
-> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
-> ---
-> 
-> [This was generated against today's linux-next tree ; I'm assuming
->  most/all pending ARM changes are in there currently.]
-> 
->  arch/arm/common/mcpm_platsmp.c            |  4 ++--
->  arch/arm/include/asm/arch_timer.h         |  2 +-
->  arch/arm/kernel/hw_breakpoint.c           |  4 ++--
->  arch/arm/kernel/perf_event_cpu.c          |  6 +++---
->  arch/arm/kernel/psci_smp.c                |  3 +--
->  arch/arm/kernel/smp.c                     | 18 +++++++++---------
->  arch/arm/kernel/smp_twd.c                 |  6 +++---
->  arch/arm/lib/delay.c                      |  2 +-
->  arch/arm/mach-exynos/platsmp.c            |  4 ++--
->  arch/arm/mach-highbank/platsmp.c          |  2 +-
->  arch/arm/mach-imx/platsmp.c               |  2 +-
->  arch/arm/mach-msm/platsmp.c               |  6 +++---
->  arch/arm/mach-msm/timer.c                 |  4 ++--
->  arch/arm/mach-mvebu/coherency.c           |  2 +-
->  arch/arm/mach-mvebu/platsmp.c             |  5 ++---
->  arch/arm/mach-omap2/omap-mpuss-lowpower.c |  2 +-
->  arch/arm/mach-omap2/omap-smp.c            |  4 ++--
->  arch/arm/mach-omap2/omap-wakeupgen.c      |  4 ++--
->  arch/arm/mach-prima2/platsmp.c            |  4 ++--
->  arch/arm/mach-shmobile/smp-emev2.c        |  2 +-
->  arch/arm/mach-shmobile/smp-r8a7779.c      |  2 +-
->  arch/arm/mach-shmobile/smp-sh73a0.c       |  2 +-
->  arch/arm/mach-socfpga/platsmp.c           |  2 +-
->  arch/arm/mach-spear/generic.h             |  2 +-
->  arch/arm/mach-spear/platsmp.c             |  4 ++--
->  arch/arm/mach-tegra/platsmp.c             |  4 ++--
->  arch/arm/mach-tegra/pm.c                  |  2 +-
->  arch/arm/mach-ux500/platsmp.c             |  4 ++--
->  arch/arm/mach-zynq/common.h               |  2 +-
->  arch/arm/mach-zynq/platsmp.c              |  6 +++---
->  arch/arm/plat-versatile/platsmp.c         |  6 +++---
->  31 files changed, 60 insertions(+), 62 deletions(-)
-> 
+ drivers/clk/zynq/clkc.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/clk/zynq/clkc.c b/drivers/clk/zynq/clkc.c
+index 5c205b6..515a573 100644
+--- a/drivers/clk/zynq/clkc.c
++++ b/drivers/clk/zynq/clkc.c
+@@ -71,6 +71,7 @@ static DEFINE_SPINLOCK(armpll_lock);
+ static DEFINE_SPINLOCK(ddrpll_lock);
+ static DEFINE_SPINLOCK(iopll_lock);
+ static DEFINE_SPINLOCK(armclk_lock);
++static DEFINE_SPINLOCK(swdtclk_lock);
+ static DEFINE_SPINLOCK(ddrclk_lock);
+ static DEFINE_SPINLOCK(dciclk_lock);
+ static DEFINE_SPINLOCK(gem0clk_lock);
+@@ -293,7 +294,7 @@ static void __init zynq_clk_setup(struct device_node *np)
+ 	}
+ 	clks[swdt] = clk_register_mux(NULL, clk_output_name[swdt],
+ 			swdt_ext_clk_mux_parents, 2, CLK_SET_RATE_PARENT,
+-			SLCR_SWDT_CLK_SEL, 0, 1, 0, &gem0clk_lock);
++			SLCR_SWDT_CLK_SEL, 0, 1, 0, &swdtclk_lock);
+ 
+ 	/* DDR clocks */
+ 	clk = clk_register_divider(NULL, "ddr2x_div", "ddrpll", 0,
+-- 
+1.8.3.1
