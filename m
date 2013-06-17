@@ -1,91 +1,53 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Mon, 17 Jun 2013 16:38:55 +0530
-Subject: [PATCH v2 07/10] ARM: dts: Add initial device tree support for
- Exynos5420
-In-Reply-To: <CAGOxZ51H_dtZN3Nx-=qU+gjHAEwgPA--SZrdiu-sBCANhdKtAw@mail.gmail.com>
-References: <1370516488-25860-10-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-1-git-send-email-chander.kashyap@linaro.org>
- <1371218572-8993-8-git-send-email-chander.kashyap@linaro.org>
- <20130617084648.GA6809@e106331-lin.cambridge.arm.com>
- <CAGOxZ51H_dtZN3Nx-=qU+gjHAEwgPA--SZrdiu-sBCANhdKtAw@mail.gmail.com>
-Message-ID: <CANuQgHGh9briWaP7rAgQEY5n04Amfu9VGwMFUg5HioHPnGQe_Q@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Jun 2013 04:10:32 -0700
+Subject: N900 device tree conversion: how to do first step
+In-Reply-To: <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
+References: <20130609201119.GA3190@blackmetal.musicnaut.iki.fi>
+ <20130613132624.GA3464@amd.pavel.ucw.cz>
+ <20130613141001.GF8164@atomide.com>
+ <20130613142809.GA3775@amd.pavel.ucw.cz>
+ <20130613145724.GH8164@atomide.com>
+ <20130613155240.GB3775@amd.pavel.ucw.cz>
+ <20130613161418.GJ8164@atomide.com>
+ <20130613230808.GA14876@amd.pavel.ucw.cz>
+ <20130614055629.GM8164@atomide.com>
+ <20130614212816.GA31768@atrey.karlin.mff.cuni.cz>
+Message-ID: <20130617111031.GQ20992@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2013 14:22, Alim Akhtar <alim.akhtar@gmail.com> wrote:
-> Hi Chander and Mark
->
->
-> On Mon, Jun 17, 2013 at 2:16 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->>
->> Hi,
->>
->> > diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> > b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> > new file mode 100644
->> > index 0000000..43f0eb8
->> > --- /dev/null
->> > +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
->> > @@ -0,0 +1,40 @@
->> > +/*
->> > + * SAMSUNG SMDK5420 board device tree source
->> > + *
->> > + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
->> > + *           http://www.samsung.com
->> > + *
->> > + * This program is free software; you can redistribute it and/or modify
->> > + * it under the terms of the GNU General Public License version 2 as
->> > + * published by the Free Software Foundation.
->> > +*/
->> > +
->> > +/dts-v1/;
->> > +#include "exynos5420.dtsi"
->> > +
->> > +/ {
->> > +     model = "Samsung SMDK5420 board based on EXYNOS5420";
->> > +     compatible = "samsung,smdk5420", "samsung,exynos5420";
->> > +
->> > +     memory {
->> > +             reg =   <0x20000000 0x10000000
->> > +                      0x30000000 0x10000000
->> > +                      0x40000000 0x10000000
->> > +                      0x50000000 0x10000000
->> > +                      0x60000000 0x10000000
->> > +                      0x70000000 0x10000000
->> > +                      0x80000000 0x10000000
->> > +                      0x90000000 0x10000000>;
->> > +     };
->>
->> As splitting these into 256MB banks is a workaround for an implementation
->> issue, there should at least be a comment to that effect.
->>
->> It would be far nicer if this were described as one bank and the kernel
->> could
->> split it up as necessary when using sparsemem.
->>
-> Yes, I thing this is not needed at all, the bootloader should be setting
-> this for us.
-> Either remove this completly or just add as single bank of memory, like
-> starting address and the size.
+* Pavel Machek <pavel@ucw.cz> [130614 14:34]:
+> > * Pavel Machek <pavel@ucw.cz> [130613 16:14]:
+> > 
+> > No, there really are two instances of mux registers even on omap3,
+> > but I missed that earlier while reading the docs, and with the legacy
+> > mux framework it does not matter which mux domain it is. But it
+> > matters for pinctrl-single as it ioremaps the ranges separately.
+> 
+> Yes, you are right, with debugging prints it was easy to fix.
 
-I will convert it to single bank and resend.
->
->> Thanks,
->> Mark.
->> --
->> To unsubscribe from this list: send the line "unsubscribe
->> linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
->
->
-> --
-> Regards,
-> Alim
+OK cool.
+ 
+> > This is not a good way of doing muxing, hogging all the pins under
+> > omap3_pmx_core will make it impossible to unload pinctrl-single
+> > as a module, which is not nice for distros and developers.
+> 
+> Does omap4 do it correctly? I don't see how that works :-(.
 
+Just group the pins for each device using them. You can do:
 
+$ grep hsmmc1 /sys/kernel/debug/omap_mux/board/core
 
---
-with warm regards,
-Chander Kashyap
+And then you get the mmc1 pin settings that you can place under
+&mmc1 entry in your board specific .dts file.
+ 
+> Anyway... here's my current version, and thanks for all the help. I
+> guess I'll need to figure out clocks next, because I'd really like to
+> have video going on device.
+
+Well DSS is still using pdata based init because of the DT bindings
+are not ready yet.
+
+Regards,
+
+Tony 
