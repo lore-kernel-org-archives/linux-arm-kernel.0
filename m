@@ -1,36 +1,69 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Mon, 17 Jun 2013 11:14:06 -0700
-Subject: [GIT PULL] OMAP: PM: voltagedomain cleanup for v3.11
-Message-ID: <87r4g08v0x.fsf@linaro.org>
+From: rvaswani@codeaurora.org (Rohit Vaswani)
+Date: Mon, 17 Jun 2013 11:15:58 -0700
+Subject: [PATCH] pinctrl: document the pinctrl PM states
+In-Reply-To: <CACRpkdbZ6QCU1N_3no+rahjVFSUgYMrDqtXW=4AjaY4RhaF9Zw@mail.gmail.com>
+References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
+ <51BA1FE7.4000900@wwwdotorg.org>
+ <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
+ <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
+ <CACRpkdbZ6QCU1N_3no+rahjVFSUgYMrDqtXW=4AjaY4RhaF9Zw@mail.gmail.com>
+Message-ID: <51BF525E.5080508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
+On 6/17/2013 8:56 AM, Linus Walleij wrote:
+> On Mon, Jun 17, 2013 at 9:20 AM, Tony Lindgren <tony@atomide.com> wrote:
+>
+>> Maybe let's again try to first list all the known cases where we need to
+>> do remuxing, and the pins we need to remux?
+> In the pinctrl documentation this is known as "runtime pinmuxing".
+> This is not common, it is much more common to change
+> pin config, i.e. all other electrical properties of the pins,
+> at runtime. Especially when going to sleep or idle.
 
-  Linux 3.10-rc6 (2013-06-15 11:51:07 -1000)
+MSM also does a significant amount of *remuxing* during suspend/resume.
+We have cases where a pin might be connected to a different device 
+during normal
+operation with a different pull and higher drive strength and we will 
+put it
+gpio mode, input for a low power configuration.
+Consolidating them into 1 operation would be preferred.
 
-are available in the git repository at:
+>> Below are the pin remuxing cases I'm aware of:
+>>
+>> 1. Remux UART RX pin of a device for a wake-up event
+>>
+>> 2. Remux whatever device interrupt line to a GPIO input for wake-up
+>>
+>> 3. Remux audio jack between UART RX and TX to provide a debug console
+>>
+>> 4. Remux MMC CMD and DAT lines for sleep with pulls to avoid device
+>>     from resetting with lines floating or to save power
+>>
+>> Please list any further use cases that I'm not familiar with. I'd like
+>> to hear how messed up this remuxing business can get :)
+> We have a debug port that can be muxed out on the keypad(!)
+> or the SD card, and some other variants...
+>
+> Stephen added the I2C block switch thing that switch one
+> and the same IP core between different sets of pins (IIRC).
+>
+> For runtime pin config I have many more examples, we
+> change a lot of those to so-called "GPIO mode" (basically
+> just turned into an input with wakeup,  or pulled to ground)
+> at sleep.
+>
+> Yours,
+> Linus Walleij
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.11/voltdm
 
-for you to fetch changes up to 63b0420c85096d4bb1a3ba365dbf6b970a58b8f7:
+Thanks,
+Rohit Vaswani
 
-  ARM: AM33xx: Remove the unused voltagedomain data (2013-06-17 07:26:44 -0700)
-
-----------------------------------------------------------------
-OMAP: PM: remove requirement for voltage domain data; remove dummy data
-
-----------------------------------------------------------------
-Rajendra Nayak (2):
-      ARM: OMAP2+: Powerdomain: Remove the need to always have a voltdm associated to a pwrdm
-      ARM: AM33xx: Remove the unused voltagedomain data
-
- arch/arm/mach-omap2/Makefile                  |  1 -
- arch/arm/mach-omap2/io.c                      |  1 -
- arch/arm/mach-omap2/powerdomain.c             |  5 ++++
- arch/arm/mach-omap2/powerdomain.h             |  2 ++
- arch/arm/mach-omap2/prm33xx.c                 |  7 +++++
- arch/arm/mach-omap2/voltage.h                 |  1 -
- arch/arm/mach-omap2/voltagedomains33xx_data.c | 43 ---------------------------
- 7 files changed, 14 insertions(+), 46 deletions(-)
- delete mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum, hosted by The Linux Foundation
