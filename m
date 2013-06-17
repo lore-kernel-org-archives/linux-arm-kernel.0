@@ -1,34 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 17:45:46 +0200
-Subject: [PATCH 2/3] pinctrl: s3c24xx: use correct header for chained_irq
- functions
-In-Reply-To: <1a1801ce6b5c$d5395270$7fabf750$%kim@samsung.com>
-References: <201306140044.15568.heiko@sntech.de>
- <201306140045.51206.heiko@sntech.de>
- <1a1801ce6b5c$d5395270$7fabf750$%kim@samsung.com>
-Message-ID: <CACRpkdbmh5sXXycHHy0GYZY0WH5np0je1NU6jyHmb2h_VuagRA@mail.gmail.com>
+Date: Mon, 17 Jun 2013 17:48:23 +0200
+Subject: [PATCH v2] pinctrl: rockchip: correctly handle arguments of
+ pinconf options
+In-Reply-To: <201306161741.17048.heiko@sntech.de>
+References: <201306141741.46077.heiko@sntech.de>
+ <201306161302.32156.heiko@sntech.de>
+ <CACRpkdZxO-8rQPBRPsxAx8OBfwvh_BQuts7NAi379gMZG+1ocg@mail.gmail.com>
+ <201306161741.17048.heiko@sntech.de>
+Message-ID: <CACRpkdZx9pjfqzn_keKTGGPsP1jHOY2=4OQX9mmymeo9EPn=Cg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 3:16 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Heiko St?bner wrote:
->>
->> chained_irq_enter and chained_irq_exit moved to a real header under
->> linux/pinctrl instead of asm/.
->>
->> Update the pinctrl driver to use the correct header and fix the build
->> error.
->>
->> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-(...)
->
-> Hmm, would be nice if I could take 1st and 2nd into samsung tree :-)
->
-> Linus, if any problems, please let me know.
+On Sun, Jun 16, 2013 at 5:41 PM, Heiko St?bner <heiko@sntech.de> wrote:
 
-No that should work fine. Nothing is touching pinctrl-s3c in my
-pinctrl tree so:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Change the rockchip pinctrl driver to handle the arguments to the pull
+> pinconfig options correctly. So only accept non-0 values for the
+> pull options as the rockchip pin-controller can only turn pulls on and
+> off (this via BIAS_DISABLE).
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> changes since v1:
+>  really respect the values for arguments of the pull options (aka 0 is not
+>  meant to turn off a pull).
+>  Replacing the patch also makes sure that no wrong knowledge stays in the
+>  kernel via the old commit message, least somebody else reads it and takes
+>  it as true.
 
-Yours,
+OK took out the v1 and put in this v2 version instead...
+
+Thanks!
 Linus Walleij
