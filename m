@@ -1,51 +1,56 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Mon, 17 Jun 2013 14:38:26 +0200
-Subject: [PATCH 1/5] ARM: at91: at91_dt_defconfig: enable rm9200 support
-In-Reply-To: <20130617123645.GA21034@game.jcrosoft.org>
+Date: Mon, 17 Jun 2013 14:38:27 +0200
+Subject: [PATCH 2/5] ARM: at91: dt: rm9200: add spi support
+In-Reply-To: <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
 References: <20130617123645.GA21034@game.jcrosoft.org>
-Message-ID: <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
+ <1371472710-18535-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1371472710-18535-2-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/configs/at91_dt_defconfig |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/at91rm9200.dtsi |   20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/arch/arm/configs/at91_dt_defconfig b/arch/arm/configs/at91_dt_defconfig
-index 75fd842..690e892 100644
---- a/arch/arm/configs/at91_dt_defconfig
-+++ b/arch/arm/configs/at91_dt_defconfig
-@@ -14,11 +14,13 @@ CONFIG_MODULE_UNLOAD=y
- # CONFIG_IOSCHED_DEADLINE is not set
- # CONFIG_IOSCHED_CFQ is not set
- CONFIG_ARCH_AT91=y
-+CONFIG_SOC_AT91RM9200=y
- CONFIG_SOC_AT91SAM9260=y
- CONFIG_SOC_AT91SAM9263=y
- CONFIG_SOC_AT91SAM9G45=y
- CONFIG_SOC_AT91SAM9X5=y
- CONFIG_SOC_AT91SAM9N12=y
-+CONFIG_MACH_AT91RM9200_DT=y
- CONFIG_MACH_AT91SAM9_DT=y
- CONFIG_AT91_PROGRAMMABLE_CLOCKS=y
- CONFIG_AT91_TIMER_HZ=128
-@@ -62,6 +64,7 @@ CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_CHAR=y
- CONFIG_MTD_BLOCK=y
-+CONFIG_MTD_DATAFLASH=y
- CONFIG_MTD_NAND=y
- CONFIG_MTD_NAND_ATMEL=y
- CONFIG_MTD_UBI=y
-@@ -78,7 +81,6 @@ CONFIG_BLK_DEV_SD=y
- CONFIG_SCSI_MULTI_LUN=y
- # CONFIG_SCSI_LOWLEVEL is not set
- CONFIG_NETDEVICES=y
--CONFIG_MII=y
- CONFIG_MACB=y
- # CONFIG_NET_VENDOR_BROADCOM is not set
- # CONFIG_NET_VENDOR_FARADAY is not set
+diff --git a/arch/arm/boot/dts/at91rm9200.dtsi b/arch/arm/boot/dts/at91rm9200.dtsi
+index b91cf78..1fc645e 100644
+--- a/arch/arm/boot/dts/at91rm9200.dtsi
++++ b/arch/arm/boot/dts/at91rm9200.dtsi
+@@ -474,6 +474,15 @@
+ 					};
+ 				};
+ 
++				spi0 {
++					pinctrl_spi0: spi0-0 {
++						atmel,pins =
++							<AT91_PIOA 0 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PA0 periph A SPI0_MISO pin */
++							 AT91_PIOA 1 AT91_PERIPH_A AT91_PINCTRL_NONE	/* PA1 periph A SPI0_MOSI pin */
++							 AT91_PIOA 2 AT91_PERIPH_A AT91_PINCTRL_NONE>;	/* PA2 periph A SPI0_SPCK pin */
++					};
++				};
++
+ 				pioA: gpio at fffff400 {
+ 					compatible = "atmel,at91rm9200-gpio";
+ 					reg = <0xfffff400 0x200>;
+@@ -574,6 +583,17 @@
+ 				interrupts = <11 IRQ_TYPE_LEVEL_HIGH 2>;
+ 				status = "disabled";
+ 			};
++
++			spi0: spi at fffe0000 {
++				#address-cells = <1>;
++				#size-cells = <0>;
++				compatible = "atmel,at91rm9200-spi";
++				reg = <0xfffe0000 0x200>;
++				interrupts = <13 IRQ_TYPE_LEVEL_HIGH 3>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0>;
++				status = "disabled";
++			};
+ 		};
+ 
+ 		nand0: nand at 40000000 {
 -- 
 1.7.10.4
