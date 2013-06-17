@@ -1,40 +1,30 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 17 Jun 2013 03:33:42 -0700
-Subject: [GIT PULL 2/6] omap cleanup for v3.11 merge window
-In-Reply-To: <20130614212815.GB17326@quad.lixom.net>
-References: <pull-1371061475-206272>
- <51b8bce9.1265310a.49c1.ffff940eSMTPIN_ADDED_MISSING@mx.google.com>
- <20130614212815.GB17326@quad.lixom.net>
-Message-ID: <20130617103342.GL20992@atomide.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 17 Jun 2013 11:35:57 +0100
+Subject: [PATCH] spi: pl022: remove unused ret and pins_state variables
+In-Reply-To: <1371463695-21252-1-git-send-email-fabio.baltieri@linaro.org>
+References: <1371463695-21252-1-git-send-email-fabio.baltieri@linaro.org>
+Message-ID: <20130617103557.GC1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Olof Johansson <olof@lixom.net> [130614 14:34]:
-> On Wed, Jun 12, 2013 at 11:24:33AM -0700, Tony Lindgren wrote:
-> > The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
-> > 
-> >   Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/cleanup-signed
-> > 
-> > for you to fetch changes up to 09182ab11b49b67d04598b19eb89cf0bbd672a60:
-> > 
-> >   ARM: OMAP4: hwmod data: Remove irq entries from mcspi, mmc hwmods (2013-06-12 09:41:46 -0700)
-> > 
-> > ----------------------------------------------------------------
-> > Move omap4 over to device tree based booting. This allows us to get rid
-> > a big pile of platform init code for things that are already handled by
-> > device tree related code. As am33xx is already device tree based, we
-> > can also remove the same data for am33xx.
+On Mon, Jun 17, 2013 at 12:08:15PM +0200, Fabio Baltieri wrote:
+> Removes the warnings:
 > 
-> Hm. This one has a somewhat silly conflict with the am33xx hwmod fix for uart2.
-> I.e. the fix is reverted since the code is no longer needed -- data comes from
-> device tree. Please double-check my merge resolution on it though.
+> drivers/spi/spi-pl022.c: In function 'pl022_suspend_resources':
+> drivers/spi/spi-pl022.c:2322:24: warning: unused variable 'pins_state' [-Wunused-variable]
+> drivers/spi/spi-pl022.c:2321:6: warning: unused variable 'ret' [-Wunused-variable]
+> drivers/spi/spi-pl022.c: In function 'pl022_resume_resources':
+> drivers/spi/spi-pl022.c:2334:6: warning: unused variable 'ret' [-Wunused-variable]
+> 
+> introduced in:
+> 
+> f1c9cf0 spi: pl022: use pinctrl PM helpers
 
-Thanks yes that should not be needed any longer in the hwmod data.
-
-Regards,
-
-Tony
+Acked-by: Mark Brown <broonie@linaro.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130617/78f4d9e4/attachment.sig>
