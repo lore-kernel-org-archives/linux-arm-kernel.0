@@ -1,44 +1,32 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 17 Jun 2013 10:48:44 +0200
-Subject: [RFC] Staging: imx-drm: Do not use fractional part of divider
-In-Reply-To: <1371195670.904413971@f400.i.mail.ru>
-References: <1371195670.904413971@f400.i.mail.ru>
-Message-ID: <20130617084844.GP32299@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 17 Jun 2013 01:49:42 -0700
+Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
+In-Reply-To: <CACVXFVP+-Qm-HrjF1vFxS5JCmf8rR7MdU44mw5-yo0UACYdfrw@mail.gmail.com>
+References: <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
+ <51B99B07.1050806@ti.com>
+ <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
+ <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
+ <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
+ <CACVXFVMthQNgAe3QhMo8HUxuEYcFSOwsdb7RfAsFqwGFKL+dXA@mail.gmail.com>
+ <20130617082724.GI20992@atomide.com>
+ <CACVXFVP+-Qm-HrjF1vFxS5JCmf8rR7MdU44mw5-yo0UACYdfrw@mail.gmail.com>
+Message-ID: <20130617084942.GJ20992@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 14, 2013 at 11:41:10AM +0400, Alexander Shiyan wrote:
-> Hello.
+* Ming Lei <tom.leiming@gmail.com> [130617 01:47]:
+> On Mon, Jun 17, 2013 at 4:27 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > Too quick? The basic DT based booting has been working for a few years
+> > now to some extent on omaps :)
 > 
-> Analysis of driver imx-drm led me to believe that the use fractional part of the divider is not always a good idea.
-> For example, for a parallel display bus connected to LVDS converter chip (DS90C363), in this case the use of
-> fractional part, clock will unstable and the on-chip PLL is not working properly, or rather, does not work at all.
-> 
-> Let me give a specific example.
-> ipu_crtc_mode_set 0x36314752
-> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000035 outrate: 40150928 wanted: 40000000
-> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000035 outrate: 40150928 wanted: 40150928
-> imx-ipuv3 40000000.ipu: clk_di_set_rate: inrate: 133000000 desired: 40150928 div: 0x00000035
-> 
-> In this case the divider is 3.5, that result to clock is incorrect. See an attached oscillogram F0000TEK.jpg.
-> 
-> After a patch the clocks is OK. Patch just uncomment some FSL code.
-> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000040 outrate: 33250000 wanted: 40000000
-> imx-ipuv3 40000000.ipu: clk_di_round_rate: inrate: 133000000 div: 0x00000040 outrate: 33250000 wanted: 33250000
-> imx-ipuv3 40000000.ipu: clk_di_set_rate: inrate: 133000000 desired: 33250000 div: 0x00000040
-> 
-> See an attached oscillogram F0001TEK.jpg.
-> 
-> So, I want to review this from developers and wait for comments.
-> 
+> I mean it is OK to drop legacy mode now if it won't break old system.
+> Otherwise, it is better to slow down the dropping legacy patch so that
+> the board won't be one brick for us old board users, :-)
 
-We may need some flag in the devicetree to specify whether the
-fractional divider can be used or not.
+Right, the plan is be able to use it naturally. The USB auxclk issue
+is fixable for DT boot, we just need to decide what's the best way
+to fix it.
 
-Sascha
+Regards,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tony
