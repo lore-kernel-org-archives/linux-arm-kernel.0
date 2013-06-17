@@ -1,32 +1,46 @@
-From: afzal@ti.com (Mohammed, Afzal)
-Date: Mon, 17 Jun 2013 13:43:52 +0000
-Subject: [PATCH v2 0/2] Remove unused voltagedomain data for AM33xx
-In-Reply-To: <1371474983-29296-1-git-send-email-rnayak@ti.com>
-References: <1371474983-29296-1-git-send-email-rnayak@ti.com>
-Message-ID: <C8443D0743D26F4388EA172BF4E2A7A93EB20EA7@DBDE04.ent.ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 17 Jun 2013 13:45:18 +0000
+Subject: [PATCH 2/2] arm: highbank: select HAVE_ARM_ARCH_TIMER
+In-Reply-To: <1371462316-9201-3-git-send-email-mark.rutland@arm.com>
+References: <1371462316-9201-1-git-send-email-mark.rutland@arm.com>
+ <1371462316-9201-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAL_JsqJ=eAJc759f=mYcgfOUiVHBF4fx8y41uWOwAYh_qcFN4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 17, 2013 at 9:45 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> The ECX-2000 has architected timers, but support for them is not
+> selected by default.
+>
+> Make MACH_HIGHBANK select HAVE_ARM_ARCH_TIMER, to ensure arhcited timer
+> support is enabled by default.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
 
-On Mon, Jun 17, 2013 at 18:46:21, Nayak, Rajendra wrote:
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 
-> The powerdomain framework currently expects to always have a voltagedomain
-> associated with a given powerdomain. We already have AM33xx which
-> has no Voltage Controller/Voltage Processor as part of PRCM.
-> There are more SoCs' to follow starting with AM437x and DRA7xx
-> which do not have VC/VP. All these SoCs', hence do not support any
-> form of auto-scaling of voltages, that was possible on earlier OMAPs'
-> using the VFSM to trigger an i2c communication to the PMIC automatically
-> on hitting a low power state.
-> 
-> Instead of adding dummy voltage domain data files, like was done for the
-> AM33xx case, make the powerdomain framework aware of the fact that some
-> SoCs' might not really have support for auto-scaling of voltages in hw.
-> 
-> Patches are based of 3.10-rc6 and are boot tested on am335x bone.
-
-Tested-by: Afzal Mohammed <afzal@ti.com> (am335x evm)
-
-Regards
-Afzal
+> ---
+>  arch/arm/mach-highbank/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm/mach-highbank/Kconfig b/arch/arm/mach-highbank/Kconfig
+> index cd9fcb1..2bb896f 100644
+> --- a/arch/arm/mach-highbank/Kconfig
+> +++ b/arch/arm/mach-highbank/Kconfig
+> @@ -11,6 +11,7 @@ config ARCH_HIGHBANK
+>         select COMMON_CLK
+>         select CPU_V7
+>         select GENERIC_CLOCKEVENTS
+> +       select HAVE_ARM_ARCH_TIMER
+>         select HAVE_ARM_SCU
+>         select HAVE_ARM_TWD if LOCAL_TIMERS
+>         select HAVE_SMP
+> --
+> 1.8.1.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
