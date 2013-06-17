@@ -1,39 +1,35 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 17 Jun 2013 17:12:42 +0900
-Subject: [PATCH 09/15] ARM: shmobile: EMEV2 SMP with SCU boot fn and args
+Date: Mon, 17 Jun 2013 17:12:46 +0900
+Subject: [PATCH 13/15] ARM: shmobile: Remove mach/memory.h
 In-Reply-To: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
 References: <1371456768-1084-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1371456768-1084-10-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1371456768-1084-14-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-Let EMEV2 make use of shmobile_boot_fn and shmobile_boot_arg
-together with shmobile_boot_scu and the SCU base address.
+Remove mach-shmobile memory.h since it is no longer needed.
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/mach-shmobile/smp-emev2.c |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mach-shmobile/include/mach/memory.h |    7 -------
+ 1 file changed, 7 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/include/mach/memory.h
 
-diff --git a/arch/arm/mach-shmobile/smp-emev2.c b/arch/arm/mach-shmobile/smp-emev2.c
-index e38691b..80991b3 100644
---- a/arch/arm/mach-shmobile/smp-emev2.c
-+++ b/arch/arm/mach-shmobile/smp-emev2.c
-@@ -40,8 +40,10 @@ static void __init emev2_smp_prepare_cpus(unsigned int max_cpus)
- {
- 	scu_enable(shmobile_scu_base);
- 
--	/* Tell ROM loader about our vector (in headsmp-scu.S) */
--	emev2_set_boot_vector(__pa(shmobile_secondary_vector_scu));
-+	/* Tell ROM loader about our vector (in headsmp-scu.S, headsmp.S) */
-+	emev2_set_boot_vector(__pa(shmobile_boot_vector));
-+	shmobile_boot_fn = virt_to_phys(shmobile_boot_scu);
-+	shmobile_boot_arg = (unsigned long)shmobile_scu_base;
- 
- 	/* enable cache coherency on booting CPU */
- 	scu_power_mode(shmobile_scu_base, SCU_PM_NORMAL);
+diff --git a/arch/arm/mach-shmobile/include/mach/memory.h b/arch/arm/mach-shmobile/include/mach/memory.h
+deleted file mode 100644
+index 0ffbe81..0000000
+--- a/arch/arm/mach-shmobile/include/mach/memory.h
++++ /dev/null
+@@ -1,7 +0,0 @@
+-#ifndef __ASM_MACH_MEMORY_H
+-#define __ASM_MACH_MEMORY_H
+-
+-#define PLAT_PHYS_OFFSET	UL(CONFIG_MEMORY_START)
+-#define MEM_SIZE	UL(CONFIG_MEMORY_SIZE)
+-
+-#endif /* __ASM_MACH_MEMORY_H */
 -- 
 1.7.10.4
