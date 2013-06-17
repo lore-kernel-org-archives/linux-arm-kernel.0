@@ -1,59 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 17 Jun 2013 23:34:05 +0200
-Subject: [PATCH v2] ARM: mmp: bring up pxa988 with device tree support
-In-Reply-To: <CADApbejV3v11jedq=q9Nz7wyVWVAJp-4vYmAifsPb7UsdVj5zg@mail.gmail.com>
-References: <1369969115-4279-1-git-send-email-zhangwm@marvell.com>
- <2766142.mFu63TyH69@wuerfel>
- <CADApbejV3v11jedq=q9Nz7wyVWVAJp-4vYmAifsPb7UsdVj5zg@mail.gmail.com>
-Message-ID: <201306172334.05626.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 17 Jun 2013 14:35:15 -0700
+Subject: [PATCH v4 4/4] arm: add basic support for Rockchip RK3066a boards
+In-Reply-To: <201306131702.13400.heiko@sntech.de>
+References: <201306131658.36584.heiko@sntech.de>
+ <201306131702.13400.heiko@sntech.de>
+Message-ID: <20130617213515.GK28497@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 17 June 2013, Chao Xie wrote:
-> On Fri, Jun 14, 2013 at 8:56 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 14 June 2013 17:15:33 Chao Xie wrote:
-> >> On Mon, Jun 10, 2013 at 4:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >
-> >> > I guess that is a problem we have on other platforms as well, we should
-> >> > find a generic solution for that. It would be nice to reserve a page
-> >> > in "fixmap" and have common code map the SCU page into that.
-> >> >
-> >>
-> >> So you mean that reserve a page in arch/arm/asm/include/fixmap.h?
-> >
-> > Yes.
-> >
-> >> This reserve will depend on the cpu type beacuse only A9 will have SCU part.
-> >
-> > I think A5 and ARM11MPCore as well.
-> >
-> >> I do not know that in fixmap, the #ifdef is acceptable or not.
-> >
-> > Yes, it is. We don't really use fixmap on ARM for anything other than
-> > kmap_atomic at the moment. Please have a look at the powerpc and x86
-> > implementations.
-> >
-> >> For the common code to map the SCU page, where do you suggest to put it?
-> >
-> > arch/arm/kernel/smp_scu.c.
-> >
-> I think smp_scu.c may not be good place to put the mapping for SCU page.
-> As you know that the fix map will make use of the mapping that set up
-> by vector page.
-> It will make use of top_pmd, and some APIs only provided under arch/arm/mm/.
-> For example
-> get_mem_type: for the pgprot for MT_DEVICE
-> set_top_pte:
-> Is that possible to add a file fixmap.c under arch/arm/mm/? It can
-> including all the fix mapping
-> except highmem. So SCU is one of it.
+Hi,
 
-It's up to Russell, and he probably has an idea where this should be
-going.
+Just some small comments below. Once fixed:
 
-Russell, do you think using a fixmap page for the SCU makes sense?
-I'm looking for a method to consolidate the various methods of
-doing early mappings of the SCU for device tree based platforms.
-Where do you think that should be implemented?
+Acked-by: Olof Johansson <olof@lixom.net>
 
-	Arnd
+On Thu, Jun 13, 2013 at 05:02:13PM +0200, Heiko St?bner wrote:
+
+> +		dwmmc at 10214000 {
+> +			compatible = "rockchip,rk2928-dw-mshc";
+
+does it make sense to fall back and also specify "snps,dw-mshc"?
+
+> diff --git a/arch/arm/mach-rockchip/rockchip.c b/arch/arm/mach-rockchip/rockchip.c
+> new file mode 100644
+> index 0000000..0933e17
+> --- /dev/null
+> +++ b/arch/arm/mach-rockchip/rockchip.c
+> @@ -0,0 +1,54 @@
+> +/*
+> + * Device Tree support for Rockchip SoCs
+> + *
+> + * Copyright (c) 2013 MundoReader S.L.
+> + * Author: Heiko Stuebner <heiko@sntech.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/irqchip.h>
+> +#include <linux/dw_apb_timer.h>
+> +#include <linux/clk-provider.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/map.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +
+> +static void __init rockchip_timer_init(void)
+> +{
+> +	of_clk_init(NULL);
+> +	clocksource_of_init();
+> +}
+> +
+> +static void __init rockchip_dt_init(void)
+> +{
+> +#ifdef CONFIG_CACHE_L2X0
+> +	l2x0_of_init(0, ~0UL);
+> +#endif
+
+No need to ifdef, there's a stub if CONFIG_CACHE_L2X0 isn't defined.
+
+Side comment: I think it would be nice if the generic code did this
+init if a l2x0 device node was in the device tree, since the only
+reason to override init_machine is to do this call in addition to
+of_platform_populate().
+
+> +	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> +}
+> +
+> +static const char * const rockchip_board_dt_compat[] = {
+> +	"rockchip,rk2928",
+> +	"rockchip,rk3066a",
+> +	"rockchip,rk3066b",
+> +	"rockchip,rk3188",
+> +	NULL,
+> +};
+> +
+> +DT_MACHINE_START(ROCKCHIP_DT, "Rockchip Cortex-A9 (Device Tree)")
+> +	.init_machine	= rockchip_dt_init,
+> +	.init_time	= rockchip_timer_init,
+> +	.dt_compat	= rockchip_board_dt_compat,
+> +MACHINE_END
