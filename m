@@ -1,27 +1,30 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 17 Jun 2013 15:12:45 +0530
-Subject: [GIT PULL 1/2] DaVinci SoC updates for v3.11
-In-Reply-To: <20130617090647.GX1403@sirena.org.uk>
-References: <1371193161-25224-1-git-send-email-nsekhar@ti.com>
- <20130614222519.GK17326@quad.lixom.net> <20130617090647.GX1403@sirena.org.uk>
-Message-ID: <51BEDA15.4090908@ti.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 17 Jun 2013 10:45:14 +0100
+Subject: [PATCH 0/2] arm: move HAVE_ARM_ARCH_TIMER selects into multi_v7
+ platforms
+Message-ID: <1371462316-9201-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+The multi_v7_defconfig used to select ARM_ARCH_TIMER, but was broken by
+8a4da6e36c: "arm: arch_timer: move core to drivers/clocksource". Since
+then some platforms haven't been getting the architected timer support
+they want when building from a multi_v7_defconfig.
 
-On 6/17/2013 2:36 PM, Mark Brown wrote:
-> On Fri, Jun 14, 2013 at 03:25:19PM -0700, Olof Johansson wrote:
-> 
->> Ok. I'll hold off since Mark was interested in seeing the code. Please resend
->> once you have acks.
-> 
-> It should be OK to go.  I did actually find a bug when reviewing but the
-> fix was to remove the offending driver since it's been broken for years.
-
-Since I have sent you a patch removing SFFSDR support, I will also
-re-spin this pull request to drop those hunks. I will send the patch out
-shortly, please do ack it.
+As not all platforms require architected timer support, rather than
+selecting it in the multi_v7_defconfig, this patch adds selects to the
+platforms requiring support.
 
 Thanks,
-Sekhar
+Mark.
+
+Mark Rutland (2):
+  arm: vexpress: select HAVE_ARM_ARCH_TIMER
+  arm: highbank: select HAVE_ARM_ARCH_TIMER
+
+ arch/arm/mach-highbank/Kconfig | 1 +
+ arch/arm/mach-vexpress/Kconfig | 1 +
+ 2 files changed, 2 insertions(+)
+
+-- 
+1.8.1.1
