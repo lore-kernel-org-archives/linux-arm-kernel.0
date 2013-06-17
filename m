@@ -1,49 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 17:56:54 +0200
-Subject: [PATCH] pinctrl: document the pinctrl PM states
-In-Reply-To: <20130617072021.GB4465@atomide.com>
-References: <1370980749-15383-1-git-send-email-linus.walleij@stericsson.com>
- <51BA1FE7.4000900@wwwdotorg.org>
- <CACRpkdZV7R3MgbuvEMhs24YYv2hK8Kt9Kjmv_cpRQQ1NYviDQg@mail.gmail.com>
- <51BB3A2C.608@wwwdotorg.org> <20130617072021.GB4465@atomide.com>
-Message-ID: <CACRpkdbZ6QCU1N_3no+rahjVFSUgYMrDqtXW=4AjaY4RhaF9Zw@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Mon, 17 Jun 2013 21:27:21 +0530
+Subject: MUSB multiplatform work?
+In-Reply-To: <20130617134304.GD10671@intel.com>
+References: <201305271702.09203.arnd@arndb.de>
+ <20130528163548.GC28253@arwen.pp.htv.fi>
+ <20130530201854.GB6467@atomide.com>
+ <CACRpkdZHupVFS+pNADpaJjunPa3fEtyCqLwbL-etHs3gt8EW0Q@mail.gmail.com>
+ <20130530203132.GC6467@atomide.com>
+ <CACRpkdaUegc7B8awUiQTvFRJHPMWv6hEEsE-2AHtZCDXVEMN9g@mail.gmail.com>
+ <20130612100542.GV4107@intel.com>
+ <CAJe_ZheT6q6YnWU=1_bdwGE4-n9WNJyADFQ_TpQckuVfYai7zw@mail.gmail.com>
+ <20130617134304.GD10671@intel.com>
+Message-ID: <CABb+yY0gVbDx9qqJyj1LYhg9bKxU3t4X9a+EuVG+kXDazophKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 9:20 AM, Tony Lindgren <tony@atomide.com> wrote:
-
-> Maybe let's again try to first list all the known cases where we need to
-> do remuxing, and the pins we need to remux?
-
-In the pinctrl documentation this is known as "runtime pinmuxing".
-This is not common, it is much more common to change
-pin config, i.e. all other electrical properties of the pins,
-at runtime. Especially when going to sleep or idle.
-
-> Below are the pin remuxing cases I'm aware of:
+On Mon, Jun 17, 2013 at 7:13 PM, Vinod Koul <vinod.koul@intel.com> wrote:
+> On Wed, Jun 12, 2013 at 05:27:53PM +0530, Jassi Brar wrote:
+>> IIRC,  TI's Sundaram Raju proposed a TI specific api to DMAEngine for
+>> this very purpose, which was generalized into
+>> device_prep_interleaved_dma().  Which I think should already be enough
+>> to serve the purpose. Is it not?
+> The interleaved for having to get/set data from interleaved or an 2d array.
+> Think of a raw image from camera where you need to get some region only and skip
+> rest. In those case interleaved API helps
 >
-> 1. Remux UART RX pin of a device for a wake-up event
->
-> 2. Remux whatever device interrupt line to a GPIO input for wake-up
->
-> 3. Remux audio jack between UART RX and TX to provide a debug console
->
-> 4. Remux MMC CMD and DAT lines for sleep with pulls to avoid device
->    from resetting with lines floating or to save power
->
-> Please list any further use cases that I'm not familiar with. I'd like
-> to hear how messed up this remuxing business can get :)
+IIRC I designed the interleaved api ;)  and I am sure it was not
+designed solely for async, rather the first users of the api are
+slave.
 
-We have a debug port that can be muxed out on the keypad(!)
-or the SD card, and some other variants...
+> Here this is just normal slave DMA with changing FIFO address and which just
+> loops over the FIFO value
+>
+It is possible that I didn't understand the OMAP usecase and the
+interleave api won't work, but if it does work please let us not
+introduce yet another api for a 'normal' usecase.
 
-Stephen added the I2C block switch thing that switch one
-and the same IP core between different sets of pins (IIRC).
+In fact my bigger plan was to call the api 'generic' and have it
+eventually consume most, if not all, dma_transaction_type's but then
+we couldn't see the same and I got busy with non-dma stuff ...
+anyways.
 
-For runtime pin config I have many more examples, we
-change a lot of those to so-called "GPIO mode" (basically
-just turned into an input with wakeup,  or pulled to ground)
-at sleep.
-
-Yours,
-Linus Walleij
+cheers.
