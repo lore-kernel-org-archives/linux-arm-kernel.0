@@ -1,62 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 17 Jun 2013 11:10:50 +0100
-Subject: [PATCH] arm: versatile: don't mark pen as __INIT
-In-Reply-To: <alpine.LFD.2.03.1306111136060.18597@syhkavp.arg>
-References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
- <20130610232441.GI18614@n2100.arm.linux.org.uk>
- <20130611090459.GA9529@e106331-lin.cambridge.arm.com>
- <alpine.LFD.2.03.1306111136060.18597@syhkavp.arg>
-Message-ID: <20130617101050.GD6809@e106331-lin.cambridge.arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 17 Jun 2013 19:13:18 +0900
+Subject: [PATCH 1/3] serial: sh-sci: HSCIF support
+In-Reply-To: <1371461329-26467-2-git-send-email-horms+renesas@verge.net.au>
+References: <1371461329-26467-1-git-send-email-horms+renesas@verge.net.au>
+ <1371461329-26467-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20130617101318.GA28277@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 04:43:59PM +0100, Nicolas Pitre wrote:
-> On Tue, 11 Jun 2013, Mark Rutland wrote:
-> 
-> > On Tue, Jun 11, 2013 at 12:24:41AM +0100, Russell King - ARM Linux wrote:
-> > > On Mon, Jun 10, 2013 at 04:07:24PM +0100, Mark Rutland wrote:
-> > > > When booting fewer cores than are physically present on a versatile
-> > > > platform (e.g. when passing maxcpus=N on the command line), some
-> > > > secondary cores may remain in the holding pen, which is marked __INIT.
-> > > > Late in the boot process, the memory comprising the holding pen will be
-> > > > released to the kernel for more general use, and may be overwritten with
-> > > > arbitrary data, which can cause the held secondaries to start behaving
-> > > > unpredictably. This can lead to all manner of odd behaviour from the
-> > > > kernel.
-> > > > 
-> > > > Instead don't mark the section as __INIT. This means we can't reuse the
-> > > > pen memory, but we won't get secondaries corrupting the rest of the
-> > > > kernel.
-> > > 
-> > > __CPUINIT is appropriate here; __CPUINIT will be kept around if you have
-> > > hotplug CPU suport, but if you don't it will be discarded after all
-> > > secondary CPUs have booted.  And without hotplug CPU, you can't ask
-> > > for the offline CPUs to be onlined.
-> > 
-> > Since 384a290283: "ARM: gic: use a private mapping for CPU target interfaces",
-> > each CPU's gic_cpu_map entry is initialised to 0xff, so a call to
-> > gic_raise_softirq will target *all* CPUs attached to the GIC if one of the CPUs
-> > targetted has not been initialised.
-> > 
-> > Thus any call to versatile_boot_secondary will wake up *all* secondaries
-> > physically present, throwing them all into the pen. If we use a subset of these
-> > (e.g. from having "maxcpus=N" on the command line), some will be left in the
-> > pen, even though we didn't ask for them explicitly. This will happen with or
-> > without CPU_HOTPLUG.
-> > 
-> > Another option would be to add an optional description of a CPU's gic id to the
-> > dt, which would allow us to avoid throwing these secondaries into the pen in
-> > the first place.
-> 
-> You mean adding extra description in DT for hardware information that is 
-> already perfectly self-discoverable, plus the code to parse it, just for 
-> those rare cases where someone might want to use maxcpus=N on the kernel 
-> cmdline while CONFIG_CPU_HOTPLUG=n ?
-> 
-> IMHO removing __CPUINIT from the holding pen is probably the preferable 
-> alternative.
+[ Cc Greg Kroah-Hartman <gregkh@linuxfoundation.org> ]
 
-Ok, could I take that as your ack on the original patch?
+On Mon, Jun 17, 2013 at 06:28:47PM +0900, Simon Horman wrote:
+> From: Ulrich Hecht <ulrich.hecht@gmail.com>
+> 
+> Adds support for "High Speed Serial Communications Interface with FIFO",
+> essentially a SCIF with 128-byte FIFOs and more accurate baud rate
+> generator.
+> 
+> Signed-off-by: Ulrich Hecht <ulrich.hecht@gmail.com>
+> Acked-by: Paul Mundt <lethal@linux-sh.org>
+> Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Thanks,
-Mark.
+[ snip ]
+
+> diff --git a/include/uapi/linux/serial_core.h b/include/uapi/linux/serial_core.h
+> index 74c2bf7..26eee07 100644
+> --- a/include/uapi/linux/serial_core.h
+> +++ b/include/uapi/linux/serial_core.h
+> @@ -226,4 +226,7 @@
+>  /* Rocketport EXPRESS/INFINITY */
+>  #define PORT_RP2	102
+>  
+> +/* SH-SCI */
+> +#define PORT_HSCIF	103
+> +
+>  #endif /* _UAPILINUX_SERIAL_CORE_H */
+
+It seems that 103 conflicts with #define PORT_LPUART   103
+which is present in commit c9e2e946fb0b ("tty:
+serial: add Freescale lpuart driver support") which is
+in turn present in linux-next via tty-next.
+
+Should I re-spin this patch using 104 for PORT_HSCIF ?
