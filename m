@@ -1,28 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 17 Jun 2013 16:01:12 +0200
-Subject: [RFC PATCH 10/11] ASoC: samsung: Do not require legacy DMA API in
- case of S3C64XX
-In-Reply-To: <1371416058-22047-11-git-send-email-tomasz.figa@gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-11-git-send-email-tomasz.figa@gmail.com>
-Message-ID: <CACRpkdbvJjVzyXpsDiW1Q6knW5UCTo00nZXVsK+Pt+f7AqfM1g@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 17 Jun 2013 10:01:23 -0400 (EDT)
+Subject: [PATCh V10 04/12] usb: ehci: ehci-mv: use PHY driver for ehci
+In-Reply-To: <CADApbehH9wrNZEmAN=3ZWGMXA7Jetgd+VpWfMRBSX0AqUeG0pg@mail.gmail.com>
+Message-ID: <Pine.LNX.4.44L0.1306171000080.1437-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 16, 2013 at 10:54 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+On Mon, 17 Jun 2013, Chao Xie wrote:
 
-> With support for amba-pl08x driver, on S3C64xx the generic DMA engine API
-> can be used instead of the private s3c-dma interface.
->
-> Signed-off-by: Tomasz Figa <tomasz.figa@gmail.com>
-(...)
-> -       select S3C64XX_DMA if ARCH_S3C64XX
-> +       select S3C64XX_DMA if ARCH_S3C64XX && !S3C64XX_PL080
->         select S3C2410_DMA if ARCH_S3C24XX
+> > To avoid PHY init/shutdown, the platform driver should simply leave the
+> > generic PHY pointer (which has not yet been added to struct hcd) set to
+> > NULL.
+> >
+> So does it mean that i need add adtional usb_phy to struct hcd?
 
-I hope it will look nicer (like just selecting the real PL080 driver)
-in the end. OK can live with this:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Ah, I was wrong.  There already is a PHY pointer in struct usb_hcd.  
+You don't need to add another one.
 
-Yours,
-Linus Walleij
+> I think we can still make use of struct hcd->phy without add addtional members.
+> For OMAP transceiver-less mode, you can still use your own phy init/shutdown and
+> leave the hcd->phy to be NULL, and for the PHY mode, hcd->phy can be
+> set. It will
+> do ->init at usb_add_hcd and ->shutdown at usb_remove_hcd.
+
+That's right.
+
+Alan Stern
