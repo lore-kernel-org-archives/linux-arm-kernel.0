@@ -1,85 +1,56 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 17 Jun 2013 10:43:15 -0700
-Subject: [PATCH/RESEND 08/12] ARM: msm: Remove custom clk_set_{max,
- min}_rate() API
+Date: Mon, 17 Jun 2013 10:43:11 -0700
+Subject: [PATCH/RESEND 04/12] msm_sdcc: Convert to clk_prepare/unprepare
 In-Reply-To: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
 References: <1371490999-15501-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <1371490999-15501-9-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1371490999-15501-5-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are no users of this API anymore so let's just remove it.
-If a need arises in the future we can extend the common clock API
-to handle it.
+Add calls to clk_prepare and unprepare so that MSM can migrate to
+the common clock framework.
 
-Acked-by: Saravana Kannan <skannan@codeaurora.org>
+Cc: Chris Ball <cjb@laptop.org>
 Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/clock-debug.c      |  9 +--------
- arch/arm/mach-msm/clock.c            | 12 ------------
- arch/arm/mach-msm/include/mach/clk.h |  6 ------
- 3 files changed, 1 insertion(+), 26 deletions(-)
+ drivers/mmc/host/msm_sdcc.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-msm/clock-debug.c b/arch/arm/mach-msm/clock-debug.c
-index 4886404..c4b34d7 100644
---- a/arch/arm/mach-msm/clock-debug.c
-+++ b/arch/arm/mach-msm/clock-debug.c
-@@ -25,14 +25,7 @@ static int clock_debug_rate_set(void *data, u64 val)
- 	struct clk *clock = data;
- 	int ret;
+diff --git a/drivers/mmc/host/msm_sdcc.c b/drivers/mmc/host/msm_sdcc.c
+index 0ee4a57..b900de4 100644
+--- a/drivers/mmc/host/msm_sdcc.c
++++ b/drivers/mmc/host/msm_sdcc.c
+@@ -1268,10 +1268,18 @@ msmsdcc_probe(struct platform_device *pdev)
+ 		goto clk_put;
+ 	}
  
--	/* Only increases to max rate will succeed, but that's actually good
--	 * for debugging purposes so we don't check for error. */
--	if (clock->flags & CLK_MAX)
--		clk_set_max_rate(clock, val);
--	if (clock->flags & CLK_MIN)
--		ret = clk_set_min_rate(clock, val);
--	else
--		ret = clk_set_rate(clock, val);
-+	ret = clk_set_rate(clock, val);
- 	if (ret != 0)
- 		printk(KERN_ERR "clk_set%s_rate failed (%d)\n",
- 			(clock->flags & CLK_MIN) ? "_min" : "", ret);
-diff --git a/arch/arm/mach-msm/clock.c b/arch/arm/mach-msm/clock.c
-index 5fac2df..8d07b25 100644
---- a/arch/arm/mach-msm/clock.c
-+++ b/arch/arm/mach-msm/clock.c
-@@ -97,18 +97,6 @@ long clk_round_rate(struct clk *clk, unsigned long rate)
- }
- EXPORT_SYMBOL(clk_round_rate);
++	ret = clk_prepare(host->pclk);
++	if (ret)
++		goto clk_put;
++
++	ret = clk_prepare(host->clk);
++	if (ret)
++		goto clk_unprepare_p;
++
+ 	/* Enable clocks */
+ 	ret = msmsdcc_enable_clocks(host);
+ 	if (ret)
+-		goto clk_put;
++		goto clk_unprepare;
  
--int clk_set_min_rate(struct clk *clk, unsigned long rate)
--{
--	return clk->ops->set_min_rate(clk->id, rate);
--}
--EXPORT_SYMBOL(clk_set_min_rate);
--
--int clk_set_max_rate(struct clk *clk, unsigned long rate)
--{
--	return clk->ops->set_max_rate(clk->id, rate);
--}
--EXPORT_SYMBOL(clk_set_max_rate);
--
- int clk_set_parent(struct clk *clk, struct clk *parent)
- {
- 	return -ENOSYS;
-diff --git a/arch/arm/mach-msm/include/mach/clk.h b/arch/arm/mach-msm/include/mach/clk.h
-index 5f1c37d..fd4f4a7 100644
---- a/arch/arm/mach-msm/include/mach/clk.h
-+++ b/arch/arm/mach-msm/include/mach/clk.h
-@@ -25,12 +25,6 @@ enum clk_reset_action {
- 
- struct clk;
- 
--/* Rate is minimum clock rate in Hz */
--int clk_set_min_rate(struct clk *clk, unsigned long rate);
--
--/* Rate is maximum clock rate in Hz */
--int clk_set_max_rate(struct clk *clk, unsigned long rate);
--
- /* Assert/Deassert reset to a hardware block associated with a clock */
- int clk_reset(struct clk *clk, enum clk_reset_action action);
- 
+ 	host->pclk_rate = clk_get_rate(host->pclk);
+ 	host->clk_rate = clk_get_rate(host->clk);
+@@ -1386,6 +1394,10 @@ msmsdcc_probe(struct platform_device *pdev)
+ 		free_irq(host->stat_irq, host);
+  clk_disable:
+ 	msmsdcc_disable_clocks(host, 0);
++ clk_unprepare:
++	clk_unprepare(host->clk);
++ clk_unprepare_p:
++	clk_unprepare(host->pclk);
+  clk_put:
+ 	clk_put(host->clk);
+  pclk_put:
 -- 
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
 hosted by The Linux Foundation
