@@ -1,46 +1,34 @@
-From: joelagnel@ti.com (Fernandes, Joel A)
-Date: Mon, 17 Jun 2013 16:25:31 +0000
-Subject: [PATCH v10 5/8] dmaengine: edma: Add TI EDMA device tree binding
-In-Reply-To: <201306171819.57900.arnd@arndb.de>
-References: <1371263570-9323-1-git-send-email-joelagnel@ti.com>
- <3940138.jZFEtfGGLz@wuerfel>
- <083BC63EECB6FD41B8E81CF7FD87CC0F2E4E9395@DLEE08.ent.ti.com>
- <201306171819.57900.arnd@arndb.de>
-Message-ID: <083BC63EECB6FD41B8E81CF7FD87CC0F2E4E9479@DLEE08.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 17 Jun 2013 18:27:28 +0200
+Subject: [PATCH v2 05/11] pinctrl:stixxxx: Add pinctrl and pinconf support.
+In-Reply-To: <51BF0FC2.4000601@st.com>
+References: <1370855828-5318-1-git-send-email-srinivas.kandagatla@st.com>
+ <1370856161-6600-1-git-send-email-srinivas.kandagatla@st.com>
+ <CACRpkdYN-6W8tvbWNVOdCKOWObm3PCtzXqZuUnvHddBtyw2pyQ@mail.gmail.com>
+ <51BF0FC2.4000601@st.com>
+Message-ID: <CACRpkdbJD=bgLizJkDV2eVNs-eOQ0LLo+PtqmhKCN47eH7=fkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 17, 2013 at 3:31 PM, Srinivas KANDAGATLA
+<srinivas.kandagatla@st.com> wrote:
 
+>>> +config PINCTRL_STIXXXX
+>>
+>> As mentioned elsewhere STIXXXX is a bit too much X:es in.
+>> Please come up with some better naming if possible.
+>
+> Are you OK if I use pinctrl-st.c?
 
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Monday, June 17, 2013 11:20 AM
-> To: Fernandes, Joel A
-> Cc: Tony Lindgren; Nori, Sekhar; Matt Porter; Grant Likely; Rob Herring; Vinod
-> Koul; Mark Brown; Cousson, Benoit; Russell King; Rob Landley; Andrew Morton;
-> Jason Kridner; Koen Kooi; Devicetree Discuss; Linux OMAP List; Linux ARM
-> Kernel List; Linux DaVinci Kernel List; Linux Kernel Mailing List; Linux
-> Documentation List; Linux MMC List; Linux SPI Devel List
-> Subject: Re: [PATCH v10 5/8] dmaengine: edma: Add TI EDMA device tree
-> binding
-> 
-> On Monday 17 June 2013, Fernandes, Joel A wrote:
-> > [Joel] Thanks for the suggestion, I updated it and it looks like this now:
-> >
-> > Required properties:
-> > - compatible : "ti,edma3"
-> > - ti,hwmods: Name of the hwmods associated to the EDMA
-> > - ti,edma-regions: Number of regions
-> > - ti,edma-slots: Number of slots
-> > - #dma-cells: Should be set to <1>
-> >               Clients should use a single number per DMA channel request.
-> 
-> That still does not say what that number refers to.
-> Is it a channel number, or a request line number, or something completely
-> different?
- 
-[Joel] 
-Ah! Will fix, it's a channel number.
+It seems to no be taken so OK :-)
 
-Thanks,
-Joel
+The best choice is just the name of the IP block,
+something unique. I would consider trying to ask the
+hardware engineer writing that pinctrl block what name
+s/he prefer on it, if not possible just go with pinctrl-st.c.
+
+The rest seems to be addressed nicely, waiting for the
+next iteration!
+
+Yours,
+Linus Walleij
