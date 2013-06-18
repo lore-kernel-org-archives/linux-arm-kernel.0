@@ -1,89 +1,126 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Jun 2013 11:37:12 +0300
-Subject: [PATCH] USB: initialize or shutdown PHY when add or remove host
- controller
-In-Reply-To: <51C01B80.3050803@ti.com>
-References: <1371539701-11441-1-git-send-email-chao.xie@marvell.com>
- <20130618080130.GC5461@arwen.pp.htv.fi> <51C0191F.2050104@ti.com>
- <20130618082428.GF5461@arwen.pp.htv.fi> <51C01B80.3050803@ti.com>
-Message-ID: <20130618083712.GJ5461@arwen.pp.htv.fi>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 18 Jun 2013 10:42:18 +0200
+Subject: [PATCH v2 4/8] irqchip: armada-370-xp: implement MSI support
+In-Reply-To: <20130611133745.514CA3E0A90@localhost>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370536888-8871-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130611133745.514CA3E0A90@localhost>
+Message-ID: <20130618104218.7917f927@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Grant Likely,
 
-On Tue, Jun 18, 2013 at 11:34:08AM +0300, Roger Quadros wrote:
-> >>> On Tue, Jun 18, 2013 at 03:15:01AM -0400, Chao Xie wrote:
-> >>>> Some controller need software to initialize PHY before add
-> >>>> host controller, and shut down PHY after remove host controller.
-> >>>> Add the generic code for these controllers so they do not need
-> >>>> do it in its own host controller driver.
-> >>>>
-> >>>> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> >>>> ---
-> >>>>  drivers/usb/core/hcd.c |   19 ++++++++++++++++++-
-> >>>>  1 files changed, 18 insertions(+), 1 deletions(-)
-> >>>>
-> >>>> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-> >>>> index d53547d..b26196b 100644
-> >>>> --- a/drivers/usb/core/hcd.c
-> >>>> +++ b/drivers/usb/core/hcd.c
-> >>>> @@ -43,6 +43,7 @@
-> >>>>  
-> >>>>  #include <linux/usb.h>
-> >>>>  #include <linux/usb/hcd.h>
-> >>>> +#include <linux/usb/phy.h>
-> >>>>  
-> >>>>  #include "usb.h"
-> >>>>  
-> >>>> @@ -2531,12 +2532,22 @@ int usb_add_hcd(struct usb_hcd *hcd,
-> >>>>  	 */
-> >>>>  	set_bit(HCD_FLAG_RH_RUNNING, &hcd->flags);
-> >>>>  
-> >>>> +	/* Initialize the PHY before other hardware operation. */
-> >>>> +	if (hcd->phy) {
-> >>>
-> >>> this looks wrong for two reasons:
-> >>>
-> >>> a) you're not grabbing the PHY here.
-> >>>
-> >>> 	You can't just assume another entity grabbed your PHY for you.
-> >>
-> >> Isn't that done in the controller drivers e.g. ehci-fsl.c, ohci-omap, etc?
-> > 
-> > right, and what I'm saying is that it should all be re-factored into
-> > ehci-hcd core :-)
-> > 
-> >> If the controllers don't want HCD core to manage the PHY they can just set it
-> >> to some error code.
-> > 
-> > they shouldn't have the choice, otherwise it'll be a bit of a PITA to
-> > maintain the code. ehci core tries to grab the PHY, if it's not there,
-> > try to continue anyway. Assume it's not needed.
-> > 
+On Tue, 11 Jun 2013 14:37:45 +0100, Grant Likely wrote:
+
+> > +static int armada_370_xp_setup_msi_irq(struct msi_chip *chip,
+> > +				       struct pci_dev *pdev,
+> > +				       struct msi_desc *desc)
+> > +{
+> > +	struct msi_msg msg;
+> > +	int hwirq, irq;
+> > +
+> > +	hwirq = armada_370_xp_alloc_msi();
+> > +	if (hwirq < 0)
+> > +		return hwirq;
+> > +
+> > +	irq = irq_create_mapping(armada_370_xp_msi_domain, hwirq);
+> > +	if (!irq) {
+> > +		armada_370_xp_free_msi(hwirq);
+> > +		return -EINVAL;
+> > +	}
 > 
-> OK fine, but ehci-omap is a weird case as it needs a slightly different
-> sequence as to when PHY is initialized depending on which mode it is. (Transceiver
-> or transceiver-less). please see this fix.
-> http://www.spinics.net/lists/stable/msg12106.html
+> This looks like something that the irq_domain should handle for you.
+> It would be good to have a variant of irq_create_mapping() that keeps
+> track of available hwirqs, allocates a free one, and maps it all with
+> one function call. I can see that being useful by other MSI interrupt
+> controllers and would eliminate needing to open-code it above.
 > 
-> All I'm saying as that ehci-omap needs a way to tell hcd core that it needs PHY
-> handling for itself.
+> take a look at the irqdomain/test branch on git://git.secretlab.ca/git/linux
+> 
+> I'm hoping to push that series into v3.11 and it simplifies the
+> irq_domain code quite a bit. It would be easy to build an
+> irq_create_mapping() variant on top of that. Take a look at
+> irq_create_direct_mapping() for inspiration (although that function does
+> it the other way around. It allocates a virq and uses that number for
+> the hwirq number)
 
-why don't you do that always ? Meaning, why don't you *always* take PHY
-out of suspend ? If PHY is suspended, you can't wakeup unless you have
-(in OMAP case) pad wakeup working, right ?
+Ok, I've implemented something according to your idea. Will be part of
+the v3 of this series. For reference, the piece of code I've added in
+irqdomain.c looks like:
 
-Moreover, if you can suspend the PHY and still wakup, that's something
-we need to teach the PHY layer about. Currently it doesn't know anything
-about such wakeup capable PHYs ;-)
+ /**
++ * irq_alloc_mapping() - Allocate an irq for mapping
++ * @domain: domain to allocate the irq for or NULL for default domain
++ * @hwirq:  reference to the returned hwirq
++ *
++ * This routine are used for irq controllers which can choose the
++ * hardware interrupt number from a range [ 0 ; domain size ], such as
++ * is often the case with PCI MSI controllers. The function will
++ * returned the allocated hwirq number in the hwirq pointer, and the
++ * corresponding virq number as the return value.
++ */
++unsigned int irq_alloc_mapping(struct irq_domain *domain,
++                              irq_hw_number_t *out_hwirq)
++{
++       unsigned int virq;
++       irq_hw_number_t hwirq;
++
++       pr_debug("irq_alloc_mapping(0x%p)\n", domain);
++
++       if (domain == NULL)
++               domain = irq_default_domain;
++
++       for (hwirq = 0; hwirq < domain->hwirq_max; hwirq++)
++               if (!irq_find_mapping(domain, hwirq))
++                       break;
++
++       if (hwirq == domain->hwirq_max) {
++               pr_debug("-> no available hwirq found\n");
++               return 0;
++       }
++
++       virq = irq_alloc_desc_from(1, of_node_to_nid(domain->of_node));
++       if (virq <= 0) {
++               pr_debug("-> virq allocation failed\n");
++               return 0;
++       }
++
++       if (irq_domain_associate(domain, virq, hwirq)) {
++               irq_free_desc(virq);
++               return 0;
++       }
++
++       pr_debug("irq %lu on domain %s mapped to virtual irq %u\n",
++                hwirq, of_node_full_name(domain->of_node), virq);
++
++       *out_hwirq = hwirq;
++
++       return virq;
++}
++EXPORT_SYMBOL_GPL(irq_alloc_mapping);
++
++/**
 
+> > +static int armada_370_xp_msi_init(struct device_node *node)
+> > +{
+> > +	struct msi_chip *msi_chip;
+> > +	u32 reg;
+> > +
+> > +	msi_chip = kzalloc(sizeof(*msi_chip), GFP_KERNEL);
+> 
+> devm_kzalloc() so it gets freed on failure or unbind; although for this
+> device you may not care.
+
+Unfortunately, we don't have access to a platform_device by the time
+the IRQ controller driver is initialized. Thierry Redding suggested to
+use of_find_device_by_node(), but it returns NULL. I guess it's because
+this IRQ controller driver is initialized much before the
+platform_device structures are created.
+
+Thomas
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/311b1b74/attachment.sig>
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
