@@ -1,63 +1,50 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 18 Jun 2013 19:13:46 +0400
-Subject: [RFC PATCH v1 2/6] USB: disable IRQs deliberately when calling
- complete()
-In-Reply-To: <1371567833-9077-3-git-send-email-ming.lei@canonical.com>
-References: <1371567833-9077-1-git-send-email-ming.lei@canonical.com>
- <1371567833-9077-3-git-send-email-ming.lei@canonical.com>
-Message-ID: <51C0792A.9030409@cogentembedded.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jun 2013 16:13:43 +0100
+Subject: [PATCH] arm: versatile: don't mark pen as __INIT
+In-Reply-To: <1371562002.5375.27.camel@linaro1.home>
+References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
+ <1371562002.5375.27.camel@linaro1.home>
+Message-ID: <20130618151343.GA2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Tue, Jun 18, 2013 at 02:26:42PM +0100, Jon Medhurst (Tixy) wrote:
+> On Mon, 2013-06-10 at 16:07 +0100, Mark Rutland wrote:
+> > When booting fewer cores than are physically present on a versatile
+> > platform (e.g. when passing maxcpus=N on the command line), some
+> > secondary cores may remain in the holding pen, which is marked __INIT.
+> > Late in the boot process, the memory comprising the holding pen will be
+> > released to the kernel for more general use, and may be overwritten with
+> > arbitrary data, which can cause the held secondaries to start behaving
+> > unpredictably. This can lead to all manner of odd behaviour from the
+> > kernel.
+> > 
+> > Instead don't mark the section as __INIT. This means we can't reuse the
+> > pen memory, but we won't get secondaries corrupting the rest of the
+> > kernel.
+> > 
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Acked-by: Pawel Moll <pawel.moll@arm.com>
+> > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > ---
+> 
+> This gives section mismatch warnings when compiling with
+> vexpress_defconfig:
+> 
+>         WARNING: vmlinux.o(.text+0x14128): Section mismatch in reference from the variable pen to the function .cpuinit.text:secondary_startup()
+>         The function pen() references
+>         the function __cpuinit secondary_startup().
+>         This is often because pen lacks a __cpuinit 
+>         annotation or the annotation of secondary_startup is wrong.
+>         
+>         WARNING: vmlinux.o(.text+0x14130): Section mismatch in reference from the variable pen to the variable .cpuinit.data:pen_release
+>         The function pen() references
+>         the variable __cpuinitdata pen_release.
+>         This is often because pen lacks a __cpuinitdata 
+>         annotation or the annotation of pen_release is wrong.
+> 
+> wonder if this is opening up a small can of worms...?
 
-On 18-06-2013 19:03, Ming Lei wrote:
-
-> We disable local IRQs here in case of running complete() by
-> tasklet to avoid possible deadlock because drivers may call
-> spin_lock() to hold lock which might be acquired in one hard
-> interrupt handler.
-
-> The local_irq_save()/local_irq_restore() around complete()
-> will be removed if current USB drivers have been cleaned up
-> and no one may trigger the above deadlock situation when
-> running complete() in tasklet.
-
-> Cc: Oliver Neukum <oliver@neukum.org>
-> Cc: Alan Stern <stern@rowland.harvard.edu>
-> Signed-off-by: Ming Lei <ming.lei@canonical.com>
-> ---
->   drivers/usb/core/hcd.c |   23 ++++++++++++++++++++++-
->   1 file changed, 22 insertions(+), 1 deletion(-)
-
-> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-> index a272968..09a8263 100644
-> --- a/drivers/usb/core/hcd.c
-> +++ b/drivers/usb/core/hcd.c
-> @@ -1673,7 +1673,28 @@ static void __usb_hcd_giveback_urb(struct urb *urb)
->
->   	/* pass ownership to the completion handler */
->   	urb->status = status;
-> -	urb->complete (urb);
-> +
-> +	/*
-> +	 * We disable local IRQs here in case of running complete() by
-> +	 * tasklet to avoid possible deadlock because drivers may call
-> +	 * spin_lock() to hold lock which might be acquired in one hard
-> +	 * interrupt handler.
-> +	 *
-> +	 * The local_irq_save()/local_irq_restore() around complete()
-> +	 * will be removed if current USB drivers have been cleaned up
-> +	 * and no one may trigger the above deadlock situation when
-> +	 * running complete() in tasklet.
-> +	 */
-> +	if (hcd_giveback_urb_in_bh(hcd)) {
-> +		unsigned long flags;
-> +
-> +		local_irq_save(flags);
-> +		urb->complete (urb);
-
-    I guess you didn't run the patch thru scripts/checkpatch.pl, did you?
-It would complain about the space before (.
-
-WBR, Sergei
+With the death of __cpuinit and __CPUINIT, this becomes a non-issue.
+Realistically, how many ARM platforms are built without CPU hotplug?
+My guess is none what so ever, because CPU hotplug is needed for PM.
