@@ -1,42 +1,69 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Jun 2013 13:15:20 -0700
-Subject: [PATCH v2 00/38] Thirty eight patches big Exynos cleanup
-In-Reply-To: <201306182029.09790.arnd@arndb.de>
-References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
- <51C09E3C.5050108@samsung.com> <44244927.ekNqhkrd4q@flatron>
- <201306182029.09790.arnd@arndb.de>
-Message-ID: <CAOesGMi_M445-1Myd0Xd2b2okWxKRnvo=gAffgChMjGWVVpxzQ@mail.gmail.com>
+From: eduardo.valentin@ti.com (Eduardo Valentin)
+Date: Tue, 18 Jun 2013 16:16:20 -0400
+Subject: [PATCHv3 4/6] arm: dts: add bandgap entry for OMAP4460 devices
+In-Reply-To: <1370637968-23299-5-git-send-email-eduardo.valentin@ti.com>
+References: <1370637968-23299-1-git-send-email-eduardo.valentin@ti.com>
+ <1370637968-23299-5-git-send-email-eduardo.valentin@ti.com>
+Message-ID: <51C0C014.2000402@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 11:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 18 June 2013, Tomasz Figa wrote:
->> OK. Looking forward to it.
->>
->> Btw. This leaves us with two things broken:
->>  - sdhci-s3c checks for defined(CONFIG_SOC_EXYNOS4212), but does not check
->> for defined(CONFIG_SOC_EXYNOS4412),
->>  - exynos-thermal checks for defined(CONFIG_SOC_EXYNOS4412), but does not
->> check for defined(CONFIG_SOC_EXYNOS4212).
->>
->> I think this must be fixed, because selecting only Exynos4212 in kernel
->> config you end up without exynos-thermal, while selecting only Exynos4412
->> breaks sdhci-s3c.
->
-> I wonder what we actually gain by having all these fine-grained checks
-> in the kernel. Why not just reduce the compile-time checks to just
-> EXYNOS4 and EXYNOS5?
->
-> The drivers can easily implement code for all variants using
-> run-time checks, but I think it would be easier if building an EXYNOS4
-> kernel would just run on all EXYNOS4 machines.
+Benoit
 
-Agreed.
+On 07-06-2013 16:46, Eduardo Valentin wrote:
+> Include bandgap devices for OMAP4460 devices.
+> 
+> Cc: "Beno?t Cousson" <b-cousson@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-omap at vger.kernel.org
+> Cc: devicetree-discuss at lists.ozlabs.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+> ---
 
-These fine-grained dependencies tend to be useful on very low-end
-systems where every byte of memory counts, but on modern platforms
-such as Exynos the maintainability of the code trumps the last few
-bytes of savings, I'd say.
+Could you please have a look on patch 3 and 4 of this series? I have
+changed this one accordingly to your recommendation on v2. If nothing
+else, please let me know if they can still be queued for 3.11.
+
+I would need to rebase patch 01 to refresh on top of the thermal tree.
+
+Thanks.
+
+>  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
+> index 2cf227c..ea97201 100644
+> --- a/arch/arm/boot/dts/omap4460.dtsi
+> +++ b/arch/arm/boot/dts/omap4460.dtsi
+> @@ -29,4 +29,13 @@
+>  			     <0 55 0x4>;
+>  		ti,hwmods = "debugss";
+>  	};
+> +
+> +	bandgap {
+> +		reg = <0x4a002260 0x4
+> +			0x4a00232C 0x4
+> +			0x4a002378 0x18>;
+> +		compatible = "ti,omap4460-bandgap";
+> +		interrupts = <0 126 4>; /* talert */
+> +		gpios = <&gpio3 22 0>; /* tshut */
+> +	};
+>  };
+> 
 
 
--Olof
+-- 
+You have got to be excited about what you are doing. (L. Lamport)
+
+Eduardo Valentin
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 295 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/5eeb2557/attachment.sig>
