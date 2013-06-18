@@ -1,33 +1,83 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Jun 2013 16:45:41 +0800
-Subject: [PATCH 2/2] i2c: imx: Add Vybrid VF610 I2C controller support
-In-Reply-To: <1371521418-3003-2-git-send-email-b35083@freescale.com>
-References: <1371521418-3003-1-git-send-email-b35083@freescale.com>
- <1371521418-3003-2-git-send-email-b35083@freescale.com>
-Message-ID: <20130618084539.GB28384@S2101-09.ap.freescale.net>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Tue, 18 Jun 2013 10:44:17 +0200
+Subject: [PATCH RESEND] video: mxsfb: fix color settings for 18bit data bus
+ and 32bpp
+Message-ID: <51C01DE1.8030300@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 10:10:18AM +0800, Jingchang Lu wrote:
->   Add Freescale Vybrid VF610 I2C controller support to
-> imx I2C driver framework.
->   Some operation is different from imx I2C controller.
-> The register offset, the i2c clock divider value table,
-> the module enabling(I2CR_IEN) which is just invert with imx,
-> and the interrupt flag(I2SR) clearing opcode is w1c on VF610
-> but w0c on imx.
-> 
-> Signed-off-by: Jason Jin <Jason.jin@freescale.com>
-> Signed-off-by: Xiaochun Li <b41219@freescale.com>
-> Signed-off-by: Jingchang Lu <b35083@freescale.com>
-> ---
->  drivers/i2c/busses/i2c-imx.c | 144 +++++++++++++++++++++++++++++++++++++------
->  1 file changed, 125 insertions(+), 19 deletions(-)
+For a combination of 18bit LCD data bus width and a color
+mode of 32bpp, the driver was setting the color mapping to
+rgb666, which is wrong, as the color in memory realy has an
+rgb888 layout.
 
-It seems to me that the patch introduces section mismatch warnings.
+This patch also removes the setting of flag CTRL_DF24 that
+makes the driver dimiss the upper 2 bits when handling 32/24bpp
+colors in a diplay with 18bit data bus width. This flag made
+true color images display wrong in such configurations.
 
-WARNING: modpost: Found 2 section mismatch(es).
-To see full details build your kernel with:
-'make CONFIG_DEBUG_SECTION_MISMATCH=y'
+Finally, the color mapping rgb666 has also been removed as nobody
+is using it and high level applications like Qt5 cannot work
+with it either.
 
-Shawn
+Reference: https://lkml.org/lkml/2013/5/23/220
+Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+Acked-by: Juergen Beisert <jbe@pengutronix.de>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+  drivers/video/mxsfb.c | 26 --------------------------
+  1 file changed, 26 deletions(-)
+
+diff --git a/drivers/video/mxsfb.c b/drivers/video/mxsfb.c
+index 21223d4..d2c5105 100644
+--- a/drivers/video/mxsfb.c
++++ b/drivers/video/mxsfb.c
+@@ -239,24 +239,6 @@ static const struct fb_bitfield def_rgb565[] = {
+      }
+  };
+
+-static const struct fb_bitfield def_rgb666[] = {
+-    [RED] = {
+-        .offset = 16,
+-        .length = 6,
+-    },
+-    [GREEN] = {
+-        .offset = 8,
+-        .length = 6,
+-    },
+-    [BLUE] = {
+-        .offset = 0,
+-        .length = 6,
+-    },
+-    [TRANSP] = {    /* no support for transparency */
+-        .length = 0,
+-    }
+-};
+-
+  static const struct fb_bitfield def_rgb888[] = {
+      [RED] = {
+          .offset = 16,
+@@ -309,9 +291,6 @@ static int mxsfb_check_var(struct fb_var_screeninfo *var,
+              break;
+          case STMLCDIF_16BIT:
+          case STMLCDIF_18BIT:
+-            /* 24 bit to 18 bit mapping */
+-            rgb = def_rgb666;
+-            break;
+          case STMLCDIF_24BIT:
+              /* real 24 bit */
+              rgb = def_rgb888;
+@@ -453,11 +432,6 @@ static int mxsfb_set_par(struct fb_info *fb_info)
+              return -EINVAL;
+          case STMLCDIF_16BIT:
+          case STMLCDIF_18BIT:
+-            /* 24 bit to 18 bit mapping */
+-            ctrl |= CTRL_DF24; /* ignore the upper 2 bits in
+-                        *  each colour component
+-                        */
+-            break;
+          case STMLCDIF_24BIT:
+              /* real 24 bit */
+              break;
+-- 
+1.8.3
