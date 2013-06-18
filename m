@@ -1,51 +1,61 @@
 From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Tue, 18 Jun 2013 01:56:44 +0200
-Subject: [PATCH 1/3] mfd: twl4030-power: Split from twl-core into a
- dedicated module
-In-Reply-To: <1369921916-7435-2-git-send-email-florian.vaussard@epfl.ch>
+Date: Tue, 18 Jun 2013 02:02:11 +0200
+Subject: [PATCH 2/3] mfd: twl4030-power: Start transition to DT
+In-Reply-To: <1369921916-7435-3-git-send-email-florian.vaussard@epfl.ch>
 References: <1369921916-7435-1-git-send-email-florian.vaussard@epfl.ch>
- <1369921916-7435-2-git-send-email-florian.vaussard@epfl.ch>
-Message-ID: <20130617235644.GB7998@zurbaran>
+ <1369921916-7435-3-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <20130618000211.GC7998@zurbaran>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Florian,
 
-On Thu, May 30, 2013 at 03:51:54PM +0200, Florian Vaussard wrote:
-> For now, the call to twl4030-power is hard-wired inside twl-core.
-> To ease the future transition to DT, make twl4030-power as a
-> separate module, like what is already done for twl4030-audio
-> and others.
-> 
-> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
-> ---
->  drivers/mfd/twl-core.c      |   12 ++++++---
->  drivers/mfd/twl4030-power.c |   54 +++++++++++++++++++++++++++++++++++--------
->  include/linux/i2c/twl.h     |    1 -
->  3 files changed, 52 insertions(+), 15 deletions(-)
-Looks good, I only have one comment:
-
-> +static struct platform_driver twl4030_power_driver = {
-> +	.driver = {
-> +		.name	= "twl4030_power",
-> +		.owner	= THIS_MODULE,
-> +	},
-> +	.probe		= twl4030_power_probe,
-> +	.remove		= twl4030_power_remove,
-> +};
+On Thu, May 30, 2013 at 03:51:55PM +0200, Florian Vaussard wrote:
+>  int twl4030_power_probe(struct platform_device *pdev)
+>  {
+>  	struct twl4030_power_data *pdata = pdev->dev.platform_data;
+> +	struct device_node *node = pdev->dev.of_node;
+>  	int err = 0;
+> -	int i;
+> -	struct twl4030_resconfig *resconfig;
+> -	u8 val, address = twl4030_start_script_address;
+> +	u8 val;
 > +
-> +static int __init twl4030_power_init(void)
-> +{
-> +	return platform_driver_register(&twl4030_power_driver);
->  }
-> +subsys_initcall(twl4030_power_init);
-> +
-> +static void __exit twl4030_power_exit(void)
-> +{
-> +	platform_driver_unregister(&twl4030_power_driver);
-> +}
-> +module_exit(twl4030_power_exit);
-Please use module_platform_driver() here.
+> +	if (!pdata && !node) {
+> +		dev_err(&pdev->dev, "Platform data is missing\n");
+> +		return -EINVAL;
+> +	}
+>  
+>  	err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, TWL4030_PM_MASTER_KEY_CFG1,
+>  			       TWL4030_PM_MASTER_PROTECT_KEY);
+> @@ -525,26 +575,17 @@ int twl4030_power_probe(struct platform_device *pdev)
+>  	if (err)
+>  		goto unlock;
+>  
+> -	for (i = 0; i < pdata->num; i++) {
+> -		err = load_twl4030_script(pdata->scripts[i], address);
+> +	if (pdata) {
+> +		err = twl4030_power_configure_scripts(pdata);
+>  		if (err)
+>  			goto load;
+> -		address += pdata->scripts[i]->size;
+> -	}
+> -
+> -	resconfig = pdata->resource_config;
+> -	if (resconfig) {
+> -		while (resconfig->resource) {
+> -			err = twl4030_configure_resource(resconfig);
+> -			if (err)
+> -				goto resource;
+> -			resconfig++;
+> -
+> -		}
+> +		err = twl4030_power_configure_resources(pdata);
+> +		if (err)
+> +			goto resource;
+You're simplifying the probe routine here by defining 2
+twl4030_power_configure_* functions. That's good, but it should be a
+separate patch as it's not related to the DT porting effort.
 
 Cheers,
 Samuel.
