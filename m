@@ -1,56 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 16:01:16 +0200
-Subject: [PATCH v3 06/10] clk: exynos5420: register clocks using common
- clock framework
-In-Reply-To: <CANuQgHHoUyE5e+MnnpzWLxcFNcD11FjYwx76pucw7peV4qmFkQ@mail.gmail.com>
-References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
- <3875156.5RFgBjMoqF@wuerfel>
- <CANuQgHHoUyE5e+MnnpzWLxcFNcD11FjYwx76pucw7peV4qmFkQ@mail.gmail.com>
-Message-ID: <201306181601.16795.arnd@arndb.de>
+Date: Tue, 18 Jun 2013 16:02:16 +0200
+Subject: [PATCH V3 3/5] arm: pxa: use matrix_keymap for all boards
+In-Reply-To: <1371527778-5236-4-git-send-email-chao.xie@marvell.com>
+References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
+ <1371527778-5236-4-git-send-email-chao.xie@marvell.com>
+Message-ID: <201306181602.16261.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Chander Kashyap wrote:
-> >> +       [Core Clocks]
-> >> +
-> >> +  Clock                      ID
-> >> +  ----------------------------
-> >> +
-> >> +  fin_pll            1
-> >> +
-> >> +  [Clock Gate for Special Clocks]
-> >> +
-> >> +  Clock                      ID
-> >> +  ----------------------------
-> >> +  sclk_uart0         128
-> >> +  sclk_uart1         129
-> >> +  sclk_uart2         130
-> >
-> >> +
-> >> +   [Peripheral Clock Gates]
-> >> +
-> >> +  Clock                      ID
-> >> +  ----------------------------
-> >> +
-> >> +  aclk66_peric               256
-> >> +  uart0                      257
-> >> +  uart1                      258
-> >
-> > It looks like these are actually separate things. Wouldn't it be more sensible
-> > to have separate device nodes for each of the lists and use a local index?
-> I have listed the parent clock first, then the child clocks, to
-> maintain  readability.
-> >
-> > What numbers are used in the data sheet?
-> I didn't get your point?
+On Tuesday 18 June 2013, Chao Xie wrote:
+> Compile passed for configurations
+> 
+> em_x270_defconfig
+>   em_x270x.c(MACH_EM_X270, MACH_EXEDA)
+> 
+> ezx_defconfig
+>   ezx.c(MACH_EZX_A780, MACH_EZX_E680, MACH_EZX_A1200,
+>         MACH_EZX_A910, MACH_EZX_E6, MACH_EZX_E2)
+> 
+> palmz72_defconfig
+>   palmld.c(MACH_PALMLD), palmtreo.c(PALM_TREO),
+>   palmtx.c(MACH_PALMTX), palmz72.c(MACH_PALMZ72),
+>   palmt5.c(MACH_PALMT5)
+> 
+> pxa3xx_defconfig
+>   littleton.c(MACH_LITTLETON), tarvorevb.c(MACH_TAVOREVB),
+>   zylonite.c(MACH_ZYLONITE320), mioa701.c(MACH_MIOA701),
+>   z2.c(MACH_ZIPIT2)
+> 
+> mainstone_defconfig
+>   maintone.c(MACH_MAINSTONE)
+> 
+> Signed-off-by: Chao Xie <chao.xie@marvell.com>
 
-I would have expected three clock device nodes, one for fin_pll (presumably a
-fixed-rate clock?), one for "special clocks" and one for "peripheral clock
-gates", and a number space starting at '1' for each of them, rather than
-having a shared node and numbers starting at '1', '128' and '256', which looks
-a bit clumsy.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-Did you take the ID number definitions from a data sheet, or did you make up
-the numbers yourself for the purpose of defining a binding?
-
-	Arnd
+Thanks for the quick update.
