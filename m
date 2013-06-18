@@ -1,49 +1,49 @@
 From: joelagnel@ti.com (Joel A Fernandes)
-Date: Tue, 18 Jun 2013 01:38:16 -0500
-Subject: [PATCH v11 5/8] ARM: dts: add AM33XX SPI DMA support
+Date: Tue, 18 Jun 2013 01:38:15 -0500
+Subject: [PATCH v11 4/8] ARM: dts: add AM33XX EDMA support
 In-Reply-To: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
 References: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
-Message-ID: <1371537499-12970-6-git-send-email-joelagnel@ti.com>
+Message-ID: <1371537499-12970-5-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Porter <mporter@ti.com>
+From: Matt Porter <mdp@ti.com>
 
-Adds DMA resources to the AM33XX SPI nodes.
+Adds AM33XX EDMA support to the am33xx.dtsi as documented in
+Documentation/devicetree/bindings/dma/ti-edma.txt
+
+Joel: Drop DT entries that are non-hardware-description for now as discussed in [1]
+
+[1] https://patchwork.kernel.org/patch/2226761/
 
 Signed-off-by: Matt Porter <mporter@ti.com>
 Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
 ---
- arch/arm/boot/dts/am33xx.dtsi |   10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/am33xx.dtsi |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
-index 3d59bb3..fb17103 100644
+index d9cad72..3d59bb3 100644
 --- a/arch/arm/boot/dts/am33xx.dtsi
 +++ b/arch/arm/boot/dts/am33xx.dtsi
-@@ -361,6 +361,11 @@
- 			interrupts = <65>;
- 			ti,spi-num-cs = <2>;
- 			ti,hwmods = "spi0";
-+			dmas = <&edma 16
-+				&edma 17
-+				&edma 18
-+				&edma 19>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
+@@ -89,6 +89,18 @@
+ 			reg = <0x48200000 0x1000>;
  		};
  
-@@ -372,6 +377,11 @@
- 			interrupts = <125>;
- 			ti,spi-num-cs = <2>;
- 			ti,hwmods = "spi1";
-+			dmas = <&edma 42
-+				&edma 43
-+				&edma 44
-+				&edma 45>;
-+			dma-names = "tx0", "rx0", "tx1", "rx1";
- 			status = "disabled";
- 		};
- 
++		edma: edma at 49000000 {
++			compatible = "ti,edma3";
++			ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
++			reg =	<0x49000000 0x10000>,
++				<0x44e10f90 0x10>;
++			interrupts = <12 13 14>;
++			#dma-cells = <1>;
++			dma-channels = <64>;
++			ti,edma-regions = <4>;
++			ti,edma-slots = <256>;
++		};
++
+ 		gpio0: gpio at 44e07000 {
+ 			compatible = "ti,omap4-gpio";
+ 			ti,hwmods = "gpio1";
 -- 
 1.7.9.5
