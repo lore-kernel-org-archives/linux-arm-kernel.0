@@ -1,29 +1,18 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 18 Jun 2013 01:12:56 -0700
-Subject: [GIT PULL] OMAP: PM: voltagedomain cleanup for v3.11
-In-Reply-To: <87r4g08v0x.fsf@linaro.org>
-References: <87r4g08v0x.fsf@linaro.org>
-Message-ID: <20130618081256.GC5523@atomide.com>
+Date: Tue, 18 Jun 2013 01:18:20 -0700
+Subject: [PATCH] ARM: OMAP2: TI81XX: id: Add cpu id for TI816x ES2.0
+ and ES2.1
+In-Reply-To: <1369909261-23750-1-git-send-email-aida.mynzhasova@skitlab.ru>
+References: <1369909261-23750-1-git-send-email-aida.mynzhasova@skitlab.ru>
+Message-ID: <20130618081819.GD5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@linaro.org> [130617 11:20]:
-> The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
-> 
->   Linux 3.10-rc6 (2013-06-15 11:51:07 -1000)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.11/voltdm
-> 
-> for you to fetch changes up to 63b0420c85096d4bb1a3ba365dbf6b970a58b8f7:
-> 
->   ARM: AM33xx: Remove the unused voltagedomain data (2013-06-17 07:26:44 -0700)
-> 
-> ----------------------------------------------------------------
-> OMAP: PM: remove requirement for voltage domain data; remove dummy data
+* Aida Mynzhasova <aida.mynzhasova@skitlab.ru> [130530 03:26]:
+> Currently omap3xxx_check_revision() detects ES1.0 and ES1.1 only,
+> this patch extends it by adding ES2.0 and ES2.1 versions support.
 
-Thanks pulling into omap-for-v3.11/pm-voltdomain.
+Thanks applying into omap-for-v3.11/soc.
 
 Regards,
 
