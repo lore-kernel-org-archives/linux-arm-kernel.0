@@ -1,53 +1,27 @@
-From: girishks2000@gmail.com (girishks2000 at gmail.com)
-Date: Tue, 18 Jun 2013 10:30:11 +0530
-Subject: [RESEND PATCH v1 3/3] spi: s3c64xx: Added support for exynos5440 spi
-In-Reply-To: <1371531611-29031-1-git-send-email-0000-cover-letter.patch>
-References: <1371531611-29031-1-git-send-email-0000-cover-letter.patch>
-Message-ID: <51bfe978.4266420a.3737.352e@mx.google.com>
+From: hvaibhav@ti.com (Vaibhav Hiremath)
+Date: Tue, 18 Jun 2013 10:37:58 +0530
+Subject: [PATCH 0/2] ARM: AM33XX: clock: Add debugSS data to clk and hwmod
+ database
+Message-ID: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Girish K S <girishks2000@gmail.com>
+This patch adds DebugSS data to clock-tree and hwmod data files.
 
-This patch adds support for the exynos5440 spi controller.
-The integration of the spi IP in exynos5440 is different from
-other SoC's. The I/O pins are no more configured via gpio, they
-have dedicated pins.
+Changes from RFC/V1 (No code change):
+	- Based on comments, we have to follow DT and loadable module
+	  approach for debugSS module as well, so separated out 2 patches
+	  of clock-tree and hwmod data addition from the RFC patch-series.
+	- Added Paul's Ack on clock-tree patch.
+	- Rebased on top of Benoit's for-3.11/dts branch.
 
-Signed-off-by: Girish K S <ks.giri@samsung.com>
----
- drivers/spi/spi-s3c64xx.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+Link to original RFC -
+http://archive.arm.linux.org.uk/lurker/message/20130304.113554.53c9ec25.en.html
 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index eaf9e1c..bd43888 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -1608,6 +1608,15 @@ static struct s3c64xx_spi_port_config exynos4_spi_port_config = {
- 	.clk_from_cmu	= true,
- };
- 
-+static struct s3c64xx_spi_port_config exynos5440_spi_port_config = {
-+	.fifo_lvl_mask	= { 0x1ff },
-+	.rx_lvl_offset	= 15,
-+	.tx_st_done	= 25,
-+	.high_speed	= true,
-+	.clk_from_cmu	= true,
-+	.quirks		= S3C64XX_SPI_QUIRK_POLL,
-+};
-+
- static struct platform_device_id s3c64xx_spi_driver_ids[] = {
- 	{
- 		.name		= "s3c2443-spi",
-@@ -1636,6 +1645,9 @@ static const struct of_device_id s3c64xx_spi_dt_match[] = {
- 	{ .compatible = "samsung,exynos4210-spi",
- 			.data = (void *)&exynos4_spi_port_config,
- 	},
-+	{ .compatible = "samsung,exynos5440-spi",
-+			.data = (void *)&exynos5440_spi_port_config,
-+	},
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, s3c64xx_spi_dt_match);
--- 
-1.7.5.4
+Vaibhav Hiremath (2):
+  ARM: AM33XX: clock: Add debugSS clock nodes
+  ARM: AM33XX: hwmod: Add hwmod data for debugSS
+
+ arch/arm/mach-omap2/cclock33xx_data.c      |   47 +++++++++++++++++--
+ arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   69 +++++++++++++++++++---------
+ 2 files changed, 89 insertions(+), 27 deletions(-)
