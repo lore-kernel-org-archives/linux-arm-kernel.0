@@ -1,83 +1,105 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 18 Jun 2013 18:22:58 +0200
-Subject: [PATCH v3 2/2] i2c: designware: add two optional property
- tx/rx-fifo-size
-In-Reply-To: <1370918230-24793-3-git-send-email-zhangfei.gao@linaro.org>
-References: <1370918230-24793-1-git-send-email-zhangfei.gao@linaro.org>
- <1370918230-24793-3-git-send-email-zhangfei.gao@linaro.org>
-Message-ID: <20130618162257.GF7718@katana>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Tue, 18 Jun 2013 17:19:32 +0100
+Subject: [PATCH 1/2] Watchdog: allow orion_wdt to be built for Dove
+Message-ID: <E1Uoyd2-0001Cp-KL@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 11, 2013 at 10:37:10AM +0800, Zhangfei Gao wrote:
-> rx-fifo-size and tx-fifo-size will be updated if provided from dts
-> 
-> Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
-> CC: Baruch Siach <baruch@tkos.co.il>
-> ---
->  .../devicetree/bindings/i2c/i2c-designware.txt     |    7 +++++++
->  drivers/i2c/busses/i2c-designware-platdrv.c        |    3 +++
->  2 files changed, 10 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/i2c/i2c-designware.txt b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> index e42a2ee..84717fe 100644
-> --- a/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> +++ b/Documentation/devicetree/bindings/i2c/i2c-designware.txt
-> @@ -6,6 +6,11 @@ Required properties :
->   - reg : Offset and length of the register set for the device
->   - interrupts : <IRQ> where IRQ is the interrupt number.
->  
-> +Optional properties:
-> +
-> + - rx-fifo-size : 1 cell, Rx fifo size
-> + - tx-fifo-size : 1 cell, Tx fifo size
-> +
+The watchdog infrastructure in Dove is no different from that in
+Orion5x or Kirkwood, so let's enable it for Dove.  The only things
+missing are a few register settings in Dove's bridge-regs.h.
 
-I'd think the bindings are okay, yet I wonder they are not more used in
-practice. So, an ack from a dt-expert would be appreciated.
+Rather than duplicating the same register bit masks for the RSTOUTn_MASK
+and BRIDGE_CAUSE registers, move the definitions into the watchdog
+driver itself.
 
->  Recommended properties :
->  
->   - clock-frequency : desired I2C bus clock frequency in Hz.
-> @@ -18,5 +23,7 @@ Example :
->  		compatible = "snps,designware-i2c";
->  		reg = <0xf0000 0x1000>;
->  		interrupts = <11>;
-> +		rx-fifo-size = <16>;
-> +		tx-fifo-size = <16>;
->  		clock-frequency = <400000>;
->  	};
-> diff --git a/drivers/i2c/busses/i2c-designware-platdrv.c b/drivers/i2c/busses/i2c-designware-platdrv.c
-> index 41659c0..6760cea 100644
-> --- a/drivers/i2c/busses/i2c-designware-platdrv.c
-> +++ b/drivers/i2c/busses/i2c-designware-platdrv.c
-> @@ -85,6 +85,7 @@ static int dw_i2c_probe(struct platform_device *pdev)
->  	struct dw_i2c_dev *dev;
->  	struct i2c_adapter *adap;
->  	struct resource *mem;
-> +	struct device_node *np = pdev->dev.of_node;
->  	int irq, r;
->  
->  	/* NOTE: driver uses the static register mapping */
-> @@ -140,6 +141,8 @@ static int dw_i2c_probe(struct platform_device *pdev)
->  		dev->rx_fifo_depth = ((param1 >> 8)  & 0xff) + 1;
->  		dev->adapter.nr = pdev->id;
->  	}
-> +	of_property_read_u32(np, "rx-fifo-size", &dev->rx_fifo_depth);
-> +	of_property_read_u32(np, "tx-fifo-size", &dev->tx_fifo_depth);
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-dove/include/mach/bridge-regs.h     |    1 +
+ arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    2 --
+ arch/arm/mach-orion5x/include/mach/bridge-regs.h  |    3 ---
+ drivers/watchdog/Kconfig                          |    2 +-
+ drivers/watchdog/orion_wdt.c                      |    3 +++
+ 5 files changed, 5 insertions(+), 6 deletions(-)
 
-Those can fail.
-
->  	r = i2c_dw_init(dev);
->  	if (r)
->  		return r;
-> -- 
-> 1.7.9.5
-> 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/ddddd0da/attachment.sig>
+diff --git a/arch/arm/mach-dove/include/mach/bridge-regs.h b/arch/arm/mach-dove/include/mach/bridge-regs.h
+index 99f259e..5362df3 100644
+--- a/arch/arm/mach-dove/include/mach/bridge-regs.h
++++ b/arch/arm/mach-dove/include/mach/bridge-regs.h
+@@ -26,6 +26,7 @@
+ #define SYSTEM_SOFT_RESET	(BRIDGE_VIRT_BASE + 0x010c)
+ #define  SOFT_RESET		0x00000001
+ 
++#define BRIDGE_CAUSE		(BRIDGE_VIRT_BASE + 0x0110)
+ #define  BRIDGE_INT_TIMER1_CLR	(~0x0004)
+ 
+ #define IRQ_VIRT_BASE		(BRIDGE_VIRT_BASE + 0x0200)
+diff --git a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+index 5c82b7d..95a4c87 100644
+--- a/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
++++ b/arch/arm/mach-kirkwood/include/mach/bridge-regs.h
+@@ -20,14 +20,12 @@
+ #define CPU_RESET		0x00000002
+ 
+ #define RSTOUTn_MASK		(BRIDGE_VIRT_BASE + 0x0108)
+-#define WDT_RESET_OUT_EN	0x00000002
+ #define SOFT_RESET_OUT_EN	0x00000004
+ 
+ #define SYSTEM_SOFT_RESET	(BRIDGE_VIRT_BASE + 0x010c)
+ #define SOFT_RESET		0x00000001
+ 
+ #define BRIDGE_CAUSE		(BRIDGE_VIRT_BASE + 0x0110)
+-#define WDT_INT_REQ		0x0008
+ 
+ #define BRIDGE_INT_TIMER1_CLR	(~0x0004)
+ 
+diff --git a/arch/arm/mach-orion5x/include/mach/bridge-regs.h b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
+index 461fd69..f727d03 100644
+--- a/arch/arm/mach-orion5x/include/mach/bridge-regs.h
++++ b/arch/arm/mach-orion5x/include/mach/bridge-regs.h
+@@ -18,7 +18,6 @@
+ #define CPU_CTRL		(ORION5X_BRIDGE_VIRT_BASE + 0x104)
+ 
+ #define RSTOUTn_MASK		(ORION5X_BRIDGE_VIRT_BASE + 0x108)
+-#define WDT_RESET_OUT_EN	0x0002
+ 
+ #define CPU_SOFT_RESET		(ORION5X_BRIDGE_VIRT_BASE + 0x10c)
+ 
+@@ -26,8 +25,6 @@
+ 
+ #define POWER_MNG_CTRL_REG	(ORION5X_BRIDGE_VIRT_BASE + 0x11C)
+ 
+-#define WDT_INT_REQ		0x0008
+-
+ #define BRIDGE_INT_TIMER1_CLR	(~0x0004)
+ 
+ #define MAIN_IRQ_CAUSE		(ORION5X_BRIDGE_VIRT_BASE + 0x200)
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index e89fc31..c077ae9 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -291,7 +291,7 @@ config DAVINCI_WATCHDOG
+ 
+ config ORION_WATCHDOG
+ 	tristate "Orion watchdog"
+-	depends on ARCH_ORION5X || ARCH_KIRKWOOD
++	depends on ARCH_ORION5X || ARCH_KIRKWOOD || ARCH_DOVE
+ 	select WATCHDOG_CORE
+ 	help
+ 	  Say Y here if to include support for the watchdog timer
+diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
+index da57798..4074244 100644
+--- a/drivers/watchdog/orion_wdt.c
++++ b/drivers/watchdog/orion_wdt.c
+@@ -38,6 +38,9 @@
+ #define WDT_IN_USE		0
+ #define WDT_OK_TO_CLOSE		1
+ 
++#define WDT_RESET_OUT_EN	BIT(1)
++#define WDT_INT_REQ		BIT(3)
++
+ static bool nowayout = WATCHDOG_NOWAYOUT;
+ static int heartbeat = -1;		/* module parameter (seconds) */
+ static unsigned int wdt_max_duration;	/* (seconds) */
+-- 
+1.7.4.4
