@@ -1,53 +1,34 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Jun 2013 12:36:43 +0200
-Subject: [PATCH v2 4/8] irqchip: armada-370-xp: implement MSI support
-In-Reply-To: <20130618101538.8D54E3E0D60@localhost>
-References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370536888-8871-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130611133745.514CA3E0A90@localhost>
- <20130618104218.7917f927@skate>
- <20130618101538.8D54E3E0D60@localhost>
-Message-ID: <20130618123643.694e733d@skate>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Jun 2013 11:38:05 +0100
+Subject: DMA mapping API(IOMMU) for ARM64?
+In-Reply-To: <5159282.rrJMaZuYMv@wuerfel>
+References: <20130618.053955.305832937374936961.hdoyu@nvidia.com>
+ <20130618101914.GB3539@mudshark.cambridge.arm.com>
+ <5159282.rrJMaZuYMv@wuerfel>
+Message-ID: <20130618103804.GI9930@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Grant Likely,
-
-On Tue, 18 Jun 2013 11:15:38 +0100, Grant Likely wrote:
-
-> > +       if (domain == NULL)
-> > +               domain = irq_default_domain;
+On Tue, Jun 18, 2013 at 11:32:44AM +0100, Arnd Bergmann wrote:
+> On Tuesday 18 June 2013 11:19:14 Will Deacon wrote:
+> > I've spoken briefly with Catalin about this and it seems like there might be
+> > *some* scope for sharing common dma-mapping code between architectures.
+> > There doesn't really need to be any architecture-specific details in
+> > allocating iova space and the interface to the iommu drivers is
+> > well-defined. The arch-specific stuff is bogged down in the non-coherent
+> > buffer management, but that doesn't necessarily equate to lots of code.
+> > 
+> > So, the best bet would be to figure out how to split up what we have under
+> > arch/arm/ so that it can be re-used by arm64 and potentially other
+> > architectures (powerpc has some simple stuff for coherent mappings and some
+> > less-simple stuff for non-coherent buffers).
 > 
-> Drop the above 2 lines. You absolutely must know what irq_domain you
-> want to operate on when calling this function. There is no situation
-> where the default domain is what should be used.
+> I'm sure that other architectures are interested in sharing the code.
+> Best move it into the global mm/ directory, at least the version for
+> coherent mappings.
 
-Sure, makes sense.
+Or we could extend the lib/iommu-helper.c or add another file in there
+(we already have lib/swiotlb.c).
 
-> > +
-> > +       for (hwirq = 0; hwirq < domain->hwirq_max; hwirq++)
-> > +               if (!irq_find_mapping(domain, hwirq))
-> > +                       break;
-> 
-> Ugh. This will be slow on domains with a high hwirq_max and low
-> revmap_size since all the lookups will go out to the radix tree. Blech.
-> Not much to do about it though at this point without implementing some
-> kind of fast lookup path. To do it right would require iterating over
-> the radix tree looking for a hole.
-
-So to conclude you would leave it as I proposed for now?
-
-An option is to make irq_alloc_mapping() work only on linear domains,
-where hwirq_max == revmap_size, and return an error otherwise.
-
-> Once a free hwirq has been found, it would be better to call
-> irq_create_mapping() directly rather than open coding it.
-
-Thanks, will do.
-
-Thomas
 -- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Catalin
