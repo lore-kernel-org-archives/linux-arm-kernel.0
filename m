@@ -1,138 +1,54 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Jun 2013 02:59:58 +0900
-Subject: [PATCH] ARM: EXYNOS: Fix incorrect usage of S5P_ARM_CORE1_*
- registers
-In-Reply-To: <4951987.HiKYku7923@flatron>
-References: <1371569191-2364-1-git-send-email-t.figa@samsung.com>
- <4951987.HiKYku7923@flatron>
-Message-ID: <51C0A01E.5020206@samsung.com>
+Date: Wed, 19 Jun 2013 03:06:31 +0900
+Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
+In-Reply-To: <1430661.RSssKEDPJD@flatron>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1370467100-10820-9-git-send-email-tomasz.figa@gmail.com>
+ <20130617202910.GB5265@mithrandir> <1430661.RSssKEDPJD@flatron>
+Message-ID: <51C0A1A7.60309@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/13 02:45, Tomasz Figa wrote:
-> Ccing Arnd and Olof, because I forgot to add them to git send-email...
+On 06/19/13 02:59, Tomasz Figa wrote:
+> Hi Thierry,
 >
-> Sorry for the noise.
->
-> On Tuesday 18 of June 2013 17:26:31 Tomasz Figa wrote:
->> S5P_ARM_CORE1_* registers affect only core 1. To control further cores
->> properly another registers must be used.
->>
->> This patch replaces S5P_ARM_CORE1_* register definitions with
->> S5P_ARM_CORE_*(x) macro which return addresses of registers for
->> specified core.
->>
->> This fixes CPU hotplug on quad core Exynos SoCs on which currently
->> offlining CPUs 2 or 3 caused CPU 1 to be turned off.
->
-> Obviously this doesn't happen currently because of the if (cpu == 1), but
 
-Yes, not happened...and just note exynos5440 doesn't support hotplug :) 
-so this is available on exynos4412 and added 5420.
+[...]
 
-> if logical cpu1 turned out not to be physical cpu1, then it would crash.
+>>> +static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
+>>> +					unsigned int channel, u8 divisor)
+>>
+>> Nit: please align arguments on subsequent lines with the first argument
+>> of the first line. There's many more of these but I haven't mentioned
+>> them all explicitly.
+>
+> Hmm, I'm addressing all your comments that aren't addressed yet in v2 at
+> the moment and I'm wondering if this is really the correct way of breaking
+> function headers...
+>
+
+static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
+				    unsigned int channel, u8 divisor)
+
+
+I also would preferred to use above style :)
+
+- Kukjin
+
+> According to Documentation/CodingStyle:
+>
+> /* Quotation starts */
+> Statements longer than 80 columns will be broken into sensible chunks,
+> unless exceeding 80 columns significantly increases readability and does
+> not hide information. Descendants are always substantially shorter than
+> the parent and are placed substantially to the right. The same applies to
+> function headers with a long argument list. However, never break user-
+> visible strings such as printk messages, because that breaks the ability
+> to grep for them.
+> /* Quotation ends */
+>
+> Do I understand this incorrectly or does the above fragment state that
+> broken lines must be aligned to the right?
 >
 > Best regards,
 > Tomasz
->
->> In addition,
->> bring-up of CPU 2 and 3 is fixed on boards where bootloader powers off
->> secondary cores by default.
->>
-I need to test on board about above...
-
->> Cc: stable at vger.kernel.org
->> Signed-off-by: Tomasz Figa<t.figa@samsung.com>
->> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
->> ---
->>   arch/arm/mach-exynos/hotplug.c               |  9 +++++----
->>   arch/arm/mach-exynos/include/mach/regs-pmu.h | 10 +++++++---
->>   arch/arm/mach-exynos/platsmp.c               |  9 +++++----
->>   3 files changed, 17 insertions(+), 11 deletions(-)
->>
->> diff --git a/arch/arm/mach-exynos/hotplug.c
->> b/arch/arm/mach-exynos/hotplug.c index af90cfa..c089943 100644
->> --- a/arch/arm/mach-exynos/hotplug.c
->> +++ b/arch/arm/mach-exynos/hotplug.c
->> @@ -93,10 +93,11 @@ static inline void cpu_leave_lowpower(void)
->>   static inline void platform_do_lowpower(unsigned int cpu, int
->> *spurious) {
->>   	for (;;) {
->> +		void __iomem *reg_base;
->> +		unsigned int phys_cpu = cpu_logical_map(cpu);
->>
->> -		/* make cpu1 to be turned off at next WFI command */
->> -		if (cpu == 1)
->> -			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
->> +		reg_base = S5P_ARM_CORE_CONFIGURATION(phys_cpu);
->> +		__raw_writel(0, reg_base);
->>
->>   		/*
->>   		 * here's the WFI
->> @@ -106,7 +107,7 @@ static inline void platform_do_lowpower(unsigned int
->> cpu, int *spurious)
->>   		    : "memory", "cc");
->>
->> -		if (pen_release == cpu_logical_map(cpu)) {
->> +		if (pen_release == phys_cpu) {
->>   			/*
->>   			 * OK, proper wakeup, we're done
->>   			 */
->> diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h
->> b/arch/arm/mach-exynos/include/mach/regs-pmu.h index 57344b7..cf40b86
->> 100644
->> --- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
->> +++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
->> @@ -125,10 +125,14 @@
->>   #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
->>
->>   #define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
->> +#define S5P_ARM_CORE0_STATUS			S5P_PMUREG(0x2004)
->>   #define S5P_ARM_CORE0_OPTION			S5P_PMUREG(0x2008)
->> -#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
->> -#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
->> -#define S5P_ARM_CORE1_OPTION			S5P_PMUREG(0x2088)
->> +#define S5P_ARM_CORE_CONFIGURATION(_nr)		\
->> +		(S5P_ARM_CORE0_CONFIGURATION + ((_nr) * 0x80))
->> +#define S5P_ARM_CORE_STATUS(_nr)		\
->> +		(S5P_ARM_CORE0_STATUS + ((_nr) * 0x80))
->> +#define S5P_ARM_CORE_OPTION(_nr)		\
->> +		(S5P_ARM_CORE0_OPTION + ((_nr) * 0x80))
->>
->>   #define S5P_ARM_COMMON_OPTION			S5P_PMUREG(0x2408)
->>   #define S5P_TOP_PWR_OPTION			S5P_PMUREG(0x2C48)
->> diff --git a/arch/arm/mach-exynos/platsmp.c
->> b/arch/arm/mach-exynos/platsmp.c index d9c6d0a..2cbabc8 100644
->> --- a/arch/arm/mach-exynos/platsmp.c
->> +++ b/arch/arm/mach-exynos/platsmp.c
->> @@ -109,14 +109,15 @@ static int __cpuinit
->> exynos_boot_secondary(unsigned int cpu, struct task_struct */
->>   	write_pen_release(phys_cpu);
->>
->> -	if (!(__raw_readl(S5P_ARM_CORE1_STATUS)&  S5P_CORE_LOCAL_PWR_EN))
-> {
->> +	if (!(__raw_readl(S5P_ARM_CORE_STATUS(phys_cpu))
->> +	&  S5P_CORE_LOCAL_PWR_EN)) {
->>   		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
->> -			     S5P_ARM_CORE1_CONFIGURATION);
->> +			     S5P_ARM_CORE_CONFIGURATION(phys_cpu));
->>
->>   		timeout = 10;
->>
->>   		/* wait max 10 ms until cpu1 is on */
->> -		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
->> +		while ((__raw_readl(S5P_ARM_CORE_STATUS(phys_cpu))
->>   			&  S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN)
-> {
->>   			if (timeout-- == 0)
->>   				break;
->> @@ -125,7 +126,7 @@ static int __cpuinit exynos_boot_secondary(unsigned
->> int cpu, struct task_struct }
->>
->>   		if (timeout == 0) {
->> -			printk(KERN_ERR "cpu1 power enable failed");
->> +			printk(KERN_ERR "cpu%u power enable failed", cpu);
->>   			spin_unlock(&boot_lock);
->>   			return -ETIMEDOUT;
->>   		}
-> --
