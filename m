@@ -1,109 +1,78 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 23:45:26 +0200
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <20130618213454.GD2516@localhost>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306181814.33941.arnd@arndb.de> <20130618213454.GD2516@localhost>
-Message-ID: <201306182345.26281.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 18 Jun 2013 18:06:29 -0400 (EDT)
+Subject: [PATCH 1/2] ARM: vexpress/TC2: basic PM support
+In-Reply-To: <CAOesGMiE4uRM01obQA584Neufws5K8HsarA0TVcx-2JmSdNgGQ@mail.gmail.com>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130613203218.GA22310@quad.lixom.net>
+ <alpine.LFD.2.03.1306131817310.18597@syhkavp.arg>
+ <20130618172434.GI3289@localhost.localdomain>
+ <alpine.LFD.2.03.1306181528050.18597@syhkavp.arg>
+ <CAOesGMiE4uRM01obQA584Neufws5K8HsarA0TVcx-2JmSdNgGQ@mail.gmail.com>
+Message-ID: <alpine.LFD.2.03.1306181722530.18597@syhkavp.arg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Ezequiel Garcia wrote:
-> On Tue, Jun 18, 2013 at 06:14:33PM +0200, Arnd Bergmann wrote:
-> > On Tuesday 18 June 2013, Ezequiel Garcia wrote:
-> > > +Required properties:
-> > > +
-> > > +- compatible:	 Should be set to one of the following:
-> > > +		 marvell,armada370-mbus
-> > > +		 marvell,armadaxp-mbus
-> > > +
-> > > +- reg:		 Device's register space.
-> > > +		 Two entries are expected, see the examples below.
-> > > +		 The first one controls the devices decoding window and
-> > > +		 the second one controls the SDRAM decoding window.
-> > > +
-> > > +- address-cells: Must be '2'. The first cell for the MBus ID encoding,
-> > > +                 the second cell for the address offset within the window.
-> > > +
-> > > +- size-cells:    Must be '1'.
-> > > +
-> > > +- ranges:        Must be set up to provide a proper translation for each child.
-> > > +	         See the examples below.
-> > 
-> > You should explain here what the policy is regarding windows set up by the
-> > boot loader. Are the ranges in here required to be the ones that the boot
-> > loader has preconfigured, or are they the ones that the mbus driver is supposed
-> > to set up?
-> > 
+On Tue, 18 Jun 2013, Olof Johansson wrote:
+
+> I agree with most of the thread so far, but just wanted to highlight this:
 > 
-> Actually, I might be confused but the kernel MBus driver is completely
-> independent from the bootloader's -except in the internal register case,
-> (because we don't touch that from where the bootloader left it).
-
-Right, then state that clearly in the binding.
-
-> What happens is that any decoding window that was setup by the bootloader,
-> is wiped and completely new windows are allocated using the translations
-> in the DT, as described by this binding.
+> On Tue, Jun 18, 2013 at 12:50 PM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
 > 
-> This was the case from the start with the old MBus driver. FWIW, I think
-> it's actually the best choice that can be made: it makes the kernel
-> independent of the previous setting.
+> > Well... right now I think it is hard to abstract things properly as we
+> > have very few backends.  I would like to see more of them first.
 > 
-> I know you've suggested differently in the past, but I'm not sure I
-> understand what's the benefit in keeping the bootloaders configuration.
-
-The device tree /normally/ describes things that are either wired up
-in hardware or set up by the boot loader. Describing things that the
-boot loader may or may not have set up and that the kernel should
-set up but may ignore if it wants to is a bit fishy, but it seems
-that you have decided to do it that way. You should definitely
-document the fact that all ranges except the "internal-regs" are just
-suggestions and cannot be relied on to be present at boot time.
-
-A cleaner approach would be to require that all ranges here are exactly
-the ones that have been configured by the boot loader, and state the
-OS can either assume that they are valid or can reprogram them as
-needed. That would imply that you don't actually need an mbus driver
-unless you want to dynamically reassign the windows.
-
-Please also add a property that describes the address range in which
-the windows might be reassigned, i.e. everything that is not RAM.
-
-> > > +Each child device needs at least a 'ranges' property. If the child is avaiable
-> > > +(i.e. status not 'disabled'), then the MBus driver creates a decoding window
-> > > +for it. For instance, in the example below the BootROM child is specified:
-> > > +
-> > > +	soc {
-> > > +		compatible = "marvell,armada370-mbus", "simple-bus";
-> > > +		reg = <0xd0020000 0x100>, <0xd0020180 0x20>;
-> > > +		#address-cells = <2>;
-> > > +		#size-cells = <1>;
-> > > +
-> > > +		ranges = < ... /* other entries */
-> > > +			   0x011d0000 0 0 0xfff00000 0x100000>;
-> > > +
-> > > +		bootrom {
-> > > +			#address-cells = <1>;
-> > > +			#size-cells = <1>;
-> > > +			ranges = <0 0x011d0000 0 0x100000>;
-> > > +		};
-> > > +
-> > > +		/* other children */
-> > > +		...
-> > > +	};
-> > 
-> > Do you really want to require the child to provide a "ranges" property?
-> > I think this makes it more complicated to specify devices that belong
-> > into the "internal-regs" category.
-> > 
+> Yes. This.
 > 
-> No, this text is actually a left-over from the previous patchset, in
-> current v3 patchset MBus children are *not* required to have any ranges.
-> On the otherside, although you will need one except in the most trivial
-> cases like for the BootROM.
+> And this is why it's critical, absolutely critical, that the first one
+> or two implementations go in are as simple and clean as possible.
 
-Ok.
+I'll claim that this is rather utopic.  Simply because, once again, we 
+don't know how to do so yet.  This is an iterative process and things 
+will converge eventually.  But right now, even if the code is not 
+necessarily as simple and clean as possible, it is certainly good enough 
+for a start.
 
-	Arnd
+The perfect is the worst enemy of the good enough.
+
+> Otherwise seeing the commonalities and how to abstract them out will
+> be a complete headache, since only the person writing the driver will
+> be able to get a good grasp of it (alternatively, it will take a lot
+> of effort for someone to figure out, clean up, and see the bigger
+> picture).
+
+I don't see things as dramatically.  Probably because I'm one of the 
+people who worked directly on this stuff.  And I don't intend to 
+disappear after the code hits mainline either.  I therefore don't expect 
+things to get out of control.  The job doesn't end there.
+
+We do have ideas about improving things and the discussion is happening.  
+But it would be wrong to wait until we can't think of any way to improve 
+the code any further before merging it.  Otherwise even btrfs would 
+still be out of tree.
+
+The danger right now is that other people will reinvent their own layer 
+because they have no model to follow at all.  That is even worse than 
+having an imperfect model IMHO.
+
+What we need is more exposure of this code.  It needs to be used and 
+fiddled with by more people.  It has lived out of tree for a year 
+already, and it would be about time its evolution happens in mainline 
+from now on.
+
+Let's also not forget that, right now, TC2 is the only fully functional 
+big.LITTLE hardware implementation available to people.  Having it 
+supported in mainline, even if not optimally at first, would greatly 
+help other issues such as scheduler improvements for hybrid 
+multiprocessing which are far more important than this code, as such 
+platform could be distributed to scheduler people who might not always 
+be bothered by low-level PM details and out-of-tree patches.
+
+Please, understand that I fully appreciate the level of review and 
+scrutiny that you provide and you do a very good job at it. However some 
+accommodations for a compromise would be appreciated for the greater 
+good here.
+
+
+Nicolas
