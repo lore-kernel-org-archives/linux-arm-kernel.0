@@ -1,97 +1,49 @@
-From: t.figa@samsung.com (Tomasz Figa)
-Date: Tue, 18 Jun 2013 11:49:38 +0200
-Subject: [PATCH v4 00/10] ARM: Exynos: Add Exynos5420 SoC support
-In-Reply-To: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
-References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <3498782.ZLNmC7eOQx@amdc1227>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 18 Jun 2013 11:47:29 +0200
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+ <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+Message-ID: <1371548849.4276.6.camel@weser.hi.pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chander,
+Am Dienstag, den 18.06.2013, 18:04 +0900 schrieb Inki Dae:
+[...]
+> 
+> > a display device driver.  It shouldn't be used within a single driver
+> > as a means of passing buffers between userspace and kernel space.
+> 
+> What I try to do is not really such ugly thing. What I try to do is to
+> notify that, when CPU tries to access a buffer , to kernel side through
+> dmabuf interface. So it's not really to send the buffer to kernel.
+> 
+> Thanks,
+> Inki Dae
+> 
+The most basic question about why you are trying to implement this sort
+of thing in the dma_buf framework still stands.
 
-On Tuesday 18 of June 2013 11:59:12 Chander Kashyap wrote:
-> Exynos5420 is new SoC in Samsung's Exynos5 SoC series. This series adds
-> initial support for this SoC.
-> 
-> Changes since v3:
-> 1. Updated the max cpu clock frequency in dt node.
-> 2. Sorted DT nodes alphabetically as suggested by Kukjin.
-> 3. Removed the duplicate commit log comment in:
->    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
->    registration"
-> 4. Added comment for Exynos5440 in commit log of the patch:
->    "ARM: dts: fork out common Exynos5 nodes"
-> 
-> Changes since v2:
-> 
-> 1. Renamed oscclk to fin_pll, in order to keep it consistent with
->    Exynos4/Exynos5
-> 2. Pass memory as single bank rather than splitting in 256MB size banks.
-> 
-> Changes since v1:
-> 
-> 1. As not-dt platforms will not be supported from 3.11 onwards, following
->    patches from previous patch series are dropped:
->    "irqchip: exynos-combiner: set irq base as 256 for Exynos5420"
->    "ARM: Exynos: initialize l2x0 cache controller only for cortex-a9 based
-> SoCs" 2. Added device type property in cpu node in the following patch:
->    "ARM: dts: list the CPU nodes for Exynos5250
-> 3. Sorted out the nodes listed in based upon the physical addresses as
-> suggested by Tomasz Figa.
-> 4. As Tomasz is going to consolidate the secondary cpu power register
-> address calculation in all possible scnarios, hence dropped the following
-> patch: "ARM: Exynos: fix secondary cpu power control register address
-> calculation" 5. Replaced the setup/remove)_irq calls with
-> (request/free)_irq calls as suggested by Mark Rutland in patch:
->    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
->     registration"
-> 6. Changed the registration of epll and rpll from pll35xx to pl36xx.
-> 7. Changed driver data selection for serial port, based on ARCH_EXYNOS.
-> 8. Changed the interrupt cells from 2 to 1 as suggested by Tomasz Figa.
-> 
-> Chander Kashyap (10):
->   ARM: dts: fork out common Exynos5 nodes
->   ARM: dts: list the CPU nodes for Exynos5250
->   ARM: Exynos: Add support for Exynos5420 SoC
->   serial: samsung: select Exynos specific driver data if ARCH_EXYNOS is
->     defined
->   ARM: Exynos: use four additional chipid bits to identify Exynos
->     family
->   clk: exynos5420: register clocks using common clock framework
->   ARM: dts: Add initial device tree support for Exynos5420
->   clocksource: exynos_mct: use (request/free)_irq calls for local timer
->     registration
->   ARM: Exynos: add secondary CPU boot base location for Exynos5420
->   ARM: Exynos: extend soft-reset support for Exynos5420
-> 
->  .../devicetree/bindings/clock/exynos5420-clock.txt |  201 ++++++
->  arch/arm/boot/dts/Makefile                         |    1 +
->  arch/arm/boot/dts/exynos5.dtsi                     |  111 +++
->  arch/arm/boot/dts/exynos5250.dtsi                  |   78 +-
->  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   33 +
->  arch/arm/boot/dts/exynos5420.dtsi                  |  103 +++
->  arch/arm/mach-exynos/Kconfig                       |   10 +
->  arch/arm/mach-exynos/common.c                      |   18 +-
->  arch/arm/mach-exynos/include/mach/uncompress.h     |    7 +-
->  arch/arm/mach-exynos/mach-exynos5-dt.c             |    1 +
->  arch/arm/mach-exynos/platsmp.c                     |   12 +-
->  arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
->  drivers/clk/samsung/Makefile                       |    1 +
->  drivers/clk/samsung/clk-exynos5420.c               |  762
-> ++++++++++++++++++++ drivers/clocksource/exynos_mct.c                   |  
-> 35 +-
->  drivers/tty/serial/samsung.c                       |    4 +-
->  16 files changed, 1279 insertions(+), 106 deletions(-)
->  create mode 100644
-> Documentation/devicetree/bindings/clock/exynos5420-clock.txt create mode
-> 100644 arch/arm/boot/dts/exynos5.dtsi
->  create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
->  create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
->  create mode 100644 drivers/clk/samsung/clk-exynos5420.c
+Once you imported a dma_buf into your DRM driver it's a GEM object and
+you can and should use the native DRM ioctls to prepare/end a CPU access
+to this BO. Then internally to your driver you can use the dma_buf
+reservation/fence stuff to provide the necessary cross-device sync.
 
-Looks good.
-
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-
-Best regards,
-Tomasz
+Regards,
+Lucas
+-- 
+Pengutronix e.K.                           | Lucas Stach                 |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
