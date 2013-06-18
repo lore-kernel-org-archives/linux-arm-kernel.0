@@ -1,27 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 15:33:46 +0200
-Subject: [RFC PATCH 01/11] dma: amba-pl08x: Use bitmap to pass variant
- specific quirks
-In-Reply-To: <CACRpkdbt4fAdnDKuP8bVpwrWoJ-oGNuSbiDZDz5J12ix2qijfQ@mail.gmail.com>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <12368941.dQe8bcScGj@flatron>
- <CACRpkdbt4fAdnDKuP8bVpwrWoJ-oGNuSbiDZDz5J12ix2qijfQ@mail.gmail.com>
-Message-ID: <201306181533.46905.arnd@arndb.de>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 18 Jun 2013 15:37:41 +0200
+Subject: [PATCH] arm: mvebu: enable mini-PCIe connectors on Armada 370 RD
+Message-ID: <1371562661-7139-1-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Linus Walleij wrote:
-> I thought about it yesterday and it basically looks to me that
-> it tries to outsmart the compiler on how to stuff the flags to save
-> struct space on the heap and hint that they can be determined
-> quickly by a & operation, this is like premature optimization.
-> 
-> So please go back to the old system.
+The Armada 370 RD board has two internal mini-PCIe connectors. This
+commit adds the necessary Device Tree informations to enable the usage
+of those mini-PCIe connectors.
 
-Note that a 'bool' is typically stored as a 32-bit field, so there
-would be some space saving if there are a lot of flags.
+Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Cc: Florian Fainelli <florian@openwrt.org>
+---
+ arch/arm/boot/dts/armada-370-rd.dts | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-I agree with the conclusion though, the previous state was more
-readable, which outweighs any benefits.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
+index 130f839..ec1587b 100644
+--- a/arch/arm/boot/dts/armada-370-rd.dts
++++ b/arch/arm/boot/dts/armada-370-rd.dts
+@@ -84,6 +84,22 @@
+ 					gpios = <&gpio0 6 1>;
+ 				};
+ 			};
++
++			pcie-controller {
++				status = "okay";
++
++				/* Internal mini-PCIe connector */
++				pcie at 1,0 {
++					/* Port 0, Lane 0 */
++					status = "okay";
++				};
++
++				/* Internal mini-PCIe connector */
++				pcie at 2,0 {
++					/* Port 1, Lane 0 */
++					status = "okay";
++				};
++			};
+ 		};
+ 	};
+  };
+-- 
+1.8.1.2
