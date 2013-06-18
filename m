@@ -1,35 +1,81 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Tue, 18 Jun 2013 10:23:33 +0100
-Subject: [PATCH 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
-In-Reply-To: <1371514129-22801-3-git-send-email-dinguyen@altera.com>
-References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
- <1371514129-22801-3-git-send-email-dinguyen@altera.com>
-Message-ID: <20130618092333.GA8641@page>
+From: xiechao.mail@gmail.com (Chao Xie)
+Date: Tue, 18 Jun 2013 17:27:07 +0800
+Subject: [PATCH] USB: initialize or shutdown PHY when add or remove host
+ controller
+In-Reply-To: <20130618084845.GM5461@arwen.pp.htv.fi>
+References: <1371539701-11441-1-git-send-email-chao.xie@marvell.com>
+ <20130618080130.GC5461@arwen.pp.htv.fi> <51C0191F.2050104@ti.com>
+ <20130618082428.GF5461@arwen.pp.htv.fi> <51C01B80.3050803@ti.com>
+ <20130618083712.GJ5461@arwen.pp.htv.fi> <51C01E11.8050201@ti.com>
+ <20130618084845.GM5461@arwen.pp.htv.fi>
+Message-ID: <CADApbeiT+zv9kkrJ+J3XMZ1WWBXeHaQ20u12V2+DbOs3mB6vzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dinh,
+On Tue, Jun 18, 2013 at 4:48 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Tue, Jun 18, 2013 at 11:45:05AM +0300, Roger Quadros wrote:
+>> >>>>> this looks wrong for two reasons:
+>> >>>>>
+>> >>>>> a) you're not grabbing the PHY here.
+>> >>>>>
+>> >>>>>         You can't just assume another entity grabbed your PHY for you.
+>> >>>>
+>> >>>> Isn't that done in the controller drivers e.g. ehci-fsl.c, ohci-omap, etc?
+>> >>>
+>> >>> right, and what I'm saying is that it should all be re-factored into
+>> >>> ehci-hcd core :-)
+>> >>>
+>> >>>> If the controllers don't want HCD core to manage the PHY they can just set it
+>> >>>> to some error code.
+>> >>>
+>> >>> they shouldn't have the choice, otherwise it'll be a bit of a PITA to
+>> >>> maintain the code. ehci core tries to grab the PHY, if it's not there,
+>> >>> try to continue anyway. Assume it's not needed.
+>> >>>
+>> >>
+>> >> OK fine, but ehci-omap is a weird case as it needs a slightly different
+>> >> sequence as to when PHY is initialized depending on which mode it is. (Transceiver
+>> >> or transceiver-less). please see this fix.
+>> >> http://www.spinics.net/lists/stable/msg12106.html
+>> >>
+>> >> All I'm saying as that ehci-omap needs a way to tell hcd core that it needs PHY
+>> >> handling for itself.
+>> >
+>> > why don't you do that always ? Meaning, why don't you *always* take PHY
+>> > out of suspend ? If PHY is suspended, you can't wakeup unless you have
+>> > (in OMAP case) pad wakeup working, right ?
+>> >
+>>
+>> Maybe I wasn't clear before. This is nothing about wakeup and e always take PHY out of suspend.
+>> The problem is when to take it out of suspend relative to when EHCI controller starts.
+>> Let me clarify.
+>>
+>> In Transceiver mode we need this.
+>>
+>> - bring phy out of reset
+>> - start EHCI controller
+>>
+>> Whereas for Transceiver-less mode we need this.
+>>
+>> - start EHCI controller
+>> - bring phy out of reset
+>>
+>> If there is some way to signal this behaviour to the HCD core, it
+>> should be good enough.
+>
+> alright, now I get it. That's quite messed up that it has to be this way
+> :-p
+>
+It depends on the host controler's driver ehci-xxx to get the phy and
+set it to hcd->phy.
+If some controller do not want HCD or EHCI-HCD to do the phy
+initialization and shutdown, just do not set hcd->phy, and it will be
+NULL.
+If the host controller driver successlly get the phy, it can set
+hcd->phy, or it need return false in its probe.
 
-On Mon, Jun 17, 2013 at 07:08:49PM -0500, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
-> 
-> The read_sched_clock should return the ~value because the clock is a
-> countdown implementation. read_sched_clock() should be the same as
-> __apbt_read_clocksource().
-> 
-> If a separate timer for the sched_clock exist, then read_sched_clock()
-> will return an incorrect value. The (sched_io_base + 0x4) needs to be in
-> the function for both cases.
 
-Actually the old behaviour is correct for picoxcell as we're using the 
-DesignWare RTC rather than the counter block and the RTC does count 
-upwards, but your change will work as we'll start using the regular 
-timers anyway.
-
-Looks good to me though.
-
-Acked-by: Jamie Iles <jamie@jamieiles.com>
-
-for the series.
-
-Jamie
+> --
+> balbi
