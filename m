@@ -1,41 +1,24 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 15:11:23 +0200
-Subject: [PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and dw-apb-timer-sp
- to just dw-apb-timer
-In-Reply-To: <1371514129-22801-2-git-send-email-dinguyen@altera.com>
-References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
- <1371514129-22801-2-git-send-email-dinguyen@altera.com>
-Message-ID: <201306181511.24004.arnd@arndb.de>
+Date: Tue, 18 Jun 2013 15:12:58 +0200
+Subject: [PATCH 2/3] ARM: ux500: Correct the EN_3v3 regulator's on/off GPIO
+In-Reply-To: <1371545519-27119-3-git-send-email-lee.jones@linaro.org>
+References: <1371545519-27119-1-git-send-email-lee.jones@linaro.org>
+ <1371545519-27119-3-git-send-email-lee.jones@linaro.org>
+Message-ID: <201306181512.58546.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, dinguyen at altera.com wrote:
-> @@ -476,27 +476,31 @@
->                 };
->  
->                 timer0: timer0 at ffc08000 {
-> -                       compatible = "snps,dw-apb-timer-sp";
-> +                       compatible = "snps,dw-apb-timer";
->                         interrupts = <0 167 4>;
->                         reg = <0xffc08000 0x1000>;
-> +                       clocks = <&osc>;
->                 };
->  
->                 timer1: timer1 at ffc09000 {
-> -                       compatible = "snps,dw-apb-timer-sp";
-> +                       compatible = "snps,dw-apb-timer";
->                         interrupts = <0 168 4>;
->                         reg = <0xffc09000 0x1000>;
-> +                       clocks = <&osc>;
->                 };
+On Tuesday 18 June 2013, Lee Jones wrote:
+> -                gpios = <&gpio0 26  0x4>; // 26
+> -                startup-delay-us = <5000>;
+> -                enable-active-high;
+> +               regulator-name = "en-3v3-fixed-supply";
+> +               regulator-min-microvolt = <3300000>;
+> +               regulator-max-microvolt = <3300000>;
+> +               /* AB8500 GPIOs start from 1 - offset 25 is GPIO26. */
+> +               gpio = <&ab8500_gpio 25 0x4>;
 
-I think it would make sense to fix the device name as well, they should
-all be named "timer", not "timer0", so I would add
-
-
--                 timer0: timer0 at ffc08000 {
-+                 timer0: timer at ffc08000 {
-
-for all the timers in the dts file here.
+Is it intentional that you had "gpios" before and "gpio" after the change
+as the property name?
 
 	Arnd
