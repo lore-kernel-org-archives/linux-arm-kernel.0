@@ -1,61 +1,61 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 18 Jun 2013 10:53:50 +0200
-Subject: [PATCH 1/3] mfd: twl4030-power: Split from twl-core into a
- dedicated module
-In-Reply-To: <20130617235644.GB7998@zurbaran>
-References: <1369921916-7435-1-git-send-email-florian.vaussard@epfl.ch>
- <1369921916-7435-2-git-send-email-florian.vaussard@epfl.ch>
- <20130617235644.GB7998@zurbaran>
-Message-ID: <51C0201E.2040909@epfl.ch>
+From: amit.daniel@samsung.com (amit daniel kachhap)
+Date: Tue, 18 Jun 2013 14:24:50 +0530
+Subject: [PATCH v2 29/38] thermal: exynos: Support both Exynos4x12 SoCs
+In-Reply-To: <51BF9D0A.6050706@ti.com>
+References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
+ <1371486863-12398-30-git-send-email-t.figa@samsung.com>
+ <201306172159.15352.arnd@arndb.de> <51BF9D0A.6050706@ti.com>
+Message-ID: <CADGdYn7NqywgfYFmwZHGLQi_mciJLbPGOwj2Jm2Zgbme9GGUUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Eduardo,
 
-Thank you for the review.
-
-On 06/18/2013 01:56 AM, Samuel Ortiz wrote:
-> Hi Florian,
+On Tue, Jun 18, 2013 at 5:04 AM, Eduardo Valentin
+<eduardo.valentin@ti.com> wrote:
+> Arnd,
 >
-> On Thu, May 30, 2013 at 03:51:54PM +0200, Florian Vaussard wrote:
->> For now, the call to twl4030-power is hard-wired inside twl-core.
->> To ease the future transition to DT, make twl4030-power as a
->> separate module, like what is already done for twl4030-audio
->> and others.
+> On 17-06-2013 15:59, Arnd Bergmann wrote:
+>> On Monday 17 June 2013, Tomasz Figa wrote:
+>>> diff --git a/drivers/thermal/exynos_thermal.c b/drivers/thermal/exynos_thermal.c
+>>> index 788b1dd..4cbe3ee 100644
+>>> --- a/drivers/thermal/exynos_thermal.c
+>>> +++ b/drivers/thermal/exynos_thermal.c
+>>> @@ -817,7 +817,8 @@ static struct exynos_tmu_platform_data const exynos4210_default_tmu_data = {
+>>>  #define EXYNOS4210_TMU_DRV_DATA (NULL)
+>>>  #endif
+>>>
+>>> -#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4412)
+>>> +#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4412) || \
+>>> +       defined(CONFIG_SOC_EXYNOS4212)
+>>>  static struct exynos_tmu_platform_data const exynos_default_tmu_data = {
+>>>         .threshold_falling = 10,
+>>>         .trigger_levels[0] = 85,
 >>
->> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
->> ---
->>   drivers/mfd/twl-core.c      |   12 ++++++---
->>   drivers/mfd/twl4030-power.c |   54 +++++++++++++++++++++++++++++++++++--------
->>   include/linux/i2c/twl.h     |    1 -
->>   3 files changed, 52 insertions(+), 15 deletions(-)
-> Looks good, I only have one comment:
+>> The patch is correct, but generally speaking I think we should get away from
+>> having the drivers get configured per SoC on such a fine-grained level.
+>> Better make this driver (and others) always work on all exynos variants.
 >
->> +static struct platform_driver twl4030_power_driver = {
->> +	.driver = {
->> +		.name	= "twl4030_power",
->> +		.owner	= THIS_MODULE,
->> +	},
->> +	.probe		= twl4030_power_probe,
->> +	.remove		= twl4030_power_remove,
->> +};
->> +
->> +static int __init twl4030_power_init(void)
->> +{
->> +	return platform_driver_register(&twl4030_power_driver);
->>   }
->> +subsys_initcall(twl4030_power_init);
->> +
->> +static void __exit twl4030_power_exit(void)
->> +{
->> +	platform_driver_unregister(&twl4030_power_driver);
->> +}
->> +module_exit(twl4030_power_exit);
-> Please use module_platform_driver() here.
+> Amit, correct if I am wrong, but:
 >
+> The driver will work on supported exynos variants. Those that have the
+> need for thermal sensing. And each of them have specific thermal needs
+> (trigger points, thresholds, etc). That is what this file tries to
+> isolate. And there is specific data structures for each soc version.
+Yes its correct that there may be some changes in data points for
+different soc's. in the new re-structured code data is separated from
+driver so more data can be added cleanly.
 
-Sure!
-
-Regards,
-
-Florian
+>
+>
+>>
+>>       Arnd
+>>
+>>
+>
+>
+> --
+> You have got to be excited about what you are doing. (L. Lamport)
+>
+> Eduardo Valentin
+>
