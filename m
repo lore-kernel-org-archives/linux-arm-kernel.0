@@ -1,35 +1,56 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 18 Jun 2013 16:00:09 +0200
-Subject: Marvell SoCs: is register remapping to 0xf1NNNNNN safe?
-In-Reply-To: <20130618134220.GY2718@n2100.arm.linux.org.uk>
-References: <20130618134220.GY2718@n2100.arm.linux.org.uk>
-Message-ID: <51C067E9.5060607@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jun 2013 16:01:16 +0200
+Subject: [PATCH v3 06/10] clk: exynos5420: register clocks using common
+ clock framework
+In-Reply-To: <CANuQgHHoUyE5e+MnnpzWLxcFNcD11FjYwx76pucw7peV4qmFkQ@mail.gmail.com>
+References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
+ <3875156.5RFgBjMoqF@wuerfel>
+ <CANuQgHHoUyE5e+MnnpzWLxcFNcD11FjYwx76pucw7peV4qmFkQ@mail.gmail.com>
+Message-ID: <201306181601.16795.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/13 15:42, Russell King - ARM Linux wrote:
-> On the Armada 510, like most mvebu platforms, the registers are remapped
-> to 0xf1NNNNNN.  This means things like the ATA interfaces are at
-> 0xf10a0000, SPI at 0xf1010600 etc.
->
-> It also means that the global config 1 register is at 0xf10e802c.  Other
-> registers live at 0xf10e0000, 0xf10e4000, etc.
->
-> Now, if I access any register in the 0xf10eNNNN, whether it be the global
-> configuration register, a GPIO register, AC'97 register, the result is an
-> instant and solid hang - presumably the bus locks up.  It doesn't matter
-> if it is accessed in an interrupt-protected region, preempt-disabled
-> region, or via a userspace mapping of that memory, the result is always
-> the same, and things like sysrq don't work.
->
-> Only a watchdog or power cycle recovers the SoC (presumably also a hardware
-> reset too, but I can't test that.)
->
-> Any ideas?  Can this behaviour be replicated on any other of these SoCs?
+On Tuesday 18 June 2013, Chander Kashyap wrote:
+> >> +       [Core Clocks]
+> >> +
+> >> +  Clock                      ID
+> >> +  ----------------------------
+> >> +
+> >> +  fin_pll            1
+> >> +
+> >> +  [Clock Gate for Special Clocks]
+> >> +
+> >> +  Clock                      ID
+> >> +  ----------------------------
+> >> +  sclk_uart0         128
+> >> +  sclk_uart1         129
+> >> +  sclk_uart2         130
+> >
+> >> +
+> >> +   [Peripheral Clock Gates]
+> >> +
+> >> +  Clock                      ID
+> >> +  ----------------------------
+> >> +
+> >> +  aclk66_peric               256
+> >> +  uart0                      257
+> >> +  uart1                      258
+> >
+> > It looks like these are actually separate things. Wouldn't it be more sensible
+> > to have separate device nodes for each of the lists and use a local index?
+> I have listed the parent clock first, then the child clocks, to
+> maintain  readability.
+> >
+> > What numbers are used in the data sheet?
+> I didn't get your point?
 
-Russell,
+I would have expected three clock device nodes, one for fin_pll (presumably a
+fixed-rate clock?), one for "special clocks" and one for "peripheral clock
+gates", and a number space starting at '1' for each of them, rather than
+having a shared node and numbers starting at '1', '128' and '256', which looks
+a bit clumsy.
 
-just to make sure: Is pdma clock enabled, i.e. ungated? Usually, Dove
-only hangs if corresponding clocks are not enabled.
+Did you take the ID number definitions from a data sheet, or did you make up
+the numbers yourself for the purpose of defining a binding?
 
-Sebastian
+	Arnd
