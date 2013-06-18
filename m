@@ -1,32 +1,35 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 18 Jun 2013 10:03:52 -0700
-Subject: linux-next: origen build failed at
- drivers/pinctrl/pinctrl-exynos.c
-In-Reply-To: <CA+G9fYu3_-RZxFyRENuqJvzsM=YToT7PG+5fUytMzhsFu3=z7g@mail.gmail.com>
-References: <CA+G9fYu3_-RZxFyRENuqJvzsM=YToT7PG+5fUytMzhsFu3=z7g@mail.gmail.com>
-Message-ID: <CAOesGMhL7P350yPkxEKAZ+FS9X6QMFL+4gv5dCRBCW8rwQBB0g@mail.gmail.com>
+From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
+Date: Tue, 18 Jun 2013 18:06:59 +0100
+Subject: [PATCH 0/4] ARM/ARM64 architected timer updates
+Message-ID: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+
 Hi,
 
+This patch series adds support to configure the rate and enable the event
+stream for architected timer. Since the timer control register is reset to
+zero on warm boot, CPU PM notifier is added to re-initialse it.
 
-On Tue, Jun 18, 2013 at 9:19 AM, Naresh Kamboju
-<naresh.kamboju@linaro.org> wrote:
-> Hi,
->
-> linux-next branch failed to build origen build
->
-> defconfig: exynos_defconfig
+Regards,
+Sudeep
 
-This was broken yesterday and fixed today. Getting linux-next build
-error reports that are 24+ hours old isn't very useful, unfortunately.
+Sudeep KarkadaNagesha (3):
+  ARM: arch_timer: add macros for bits in control register
+  ARM/ARM64: arch_timer: remove __cpuinit attribute for
+    arch_counter_set_user_access
+  drivers: clocksource: add CPU PM notifier for ARM architected timer
 
-It'd also be convenient if you supplied the "git describe" version
-number of the source tree in these reports, so it'd be trivial to find
-out by glancing at the report, instead of going to the build log.
+Will Deacon (1):
+  drivers: clocksource: configure event stream for ARM arch timer
 
-(Besides that, thanks for the bug report!)
+ arch/arm/include/asm/arch_timer.h    | 10 ++++++--
+ arch/arm64/include/asm/arch_timer.h  | 12 +++++++---
+ drivers/clocksource/arm_arch_timer.c | 46 +++++++++++++++++++++++++++++++++++-
+ include/clocksource/arm_arch_timer.h | 10 ++++++++
+ 4 files changed, 72 insertions(+), 6 deletions(-)
 
-
--Olof
+-- 
+1.8.1.2
