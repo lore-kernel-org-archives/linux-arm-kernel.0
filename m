@@ -1,58 +1,25 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Jun 2013 19:31:06 +0900
-Subject: [PATCH v3 04/10] serial: samsung: select Exynos specific driver
- data if ARCH_EXYNOS is defined
-References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
- <1371466836-4111-5-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1c0e01ce6c0e$f0baf7d0$d230e770$%kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Jun 2013 11:31:51 +0100
+Subject: [RFC PATCH 2/2] arm64: KVM: Fix build errors after 32-bit THP
+ support
+In-Reply-To: <1371521861-372-2-git-send-email-christoffer.dall@linaro.org>
+References: <1371521861-372-1-git-send-email-christoffer.dall@linaro.org>
+ <1371521861-372-2-git-send-email-christoffer.dall@linaro.org>
+Message-ID: <20130618103151.GH9930@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kukjin Kim wrote:
+On Tue, Jun 18, 2013 at 03:17:41AM +0100, Christoffer Dall wrote:
+> When KVM 32-bit adds THP support the build of KVM/arm64 will break
+> because we rename some definition to be more sane and change the
+> interface to coherent_icache_guest_page.
 > 
-> Chander Kashyap wrote:
-> >
-> > All Exynos4/5 SoCs share a common driver data in the samsung serial
-> > driver. Hence, let the driver data inclusion be based on ARCH_EXYNOS
-> > instead of SOC specific definition.
-> >
-> > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> 
-> (+ Greg, Jiri)
-> 
-> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> 
-> Greg, Jiri, please take this in your tree with my ack if no problem on
-> this.
-> 
-Greg, Jiri, since there are other changes for this in samsung tree so would
-be nice if this could be sent to upstream with others via samsung tree. If
-you have any concerns, please kindly let me know.
+> Huge pages are not supported on arm64 and the pgtable predicates will
+> always return false, so this shouldn't change any functionality on the
+> 64-bit side.
 
-Thanks,
-- Kukjin
-> 
-> > ---
-> >  drivers/tty/serial/samsung.c |    4 +---
-> >  1 file changed, 1 insertion(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> > index 2552c7f..e70d19a 100644
-> > --- a/drivers/tty/serial/samsung.c
-> > +++ b/drivers/tty/serial/samsung.c
-> > @@ -1703,9 +1703,7 @@ static struct s3c24xx_serial_drv_data
-> > s5pv210_serial_drv_data = {
-> >  #define S5PV210_SERIAL_DRV_DATA	(kernel_ulong_t)NULL
-> >  #endif
-> >
-> > -#if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) ||
-> \
-> > -	defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) ||
-> > \
-> > -	defined(CONFIG_SOC_EXYNOS5440)
-> > +#if defined(CONFIG_ARCH_EXYNOS)
-> >  static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
-> >  	.info = &(struct s3c24xx_uart_info) {
-> >  		.name		= "Samsung Exynos4 UART",
-> > --
-> > 1.7.9.5
+FYI, huge pages will be supported on arm64 starting with 3.11-rc1. Given
+that it's -rc6 now, I would suggest you aim the kvm patches at 3.12.
+
+-- 
+Catalin
