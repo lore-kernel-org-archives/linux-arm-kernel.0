@@ -1,70 +1,111 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 17 Jun 2013 19:08:49 -0500
-Subject: [PATCH 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
+Date: Mon, 17 Jun 2013 19:08:48 -0500
+Subject: [PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to
+ just dw-apb-timer
 In-Reply-To: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
 References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1371514129-22801-3-git-send-email-dinguyen@altera.com>
+Message-ID: <1371514129-22801-2-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-The read_sched_clock should return the ~value because the clock is a
-countdown implementation. read_sched_clock() should be the same as
-__apbt_read_clocksource().
-
-If a separate timer for the sched_clock exist, then read_sched_clock()
-will return an incorrect value. The (sched_io_base + 0x4) needs to be in
-the function for both cases.
-
-Also, remove the use of "dw-apb-timer-sp" and "dw-apb-timer-osc" since
-they are the same DW clock.
+"dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
+DW APB timer, just fed by different clocks.
 
 Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
 CC: Rob Herring <rob.herring@calxeda.com>
+Cc: Grant Likely <grant.likely@linaro.org>
 CC: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
 CC: Jamie Iles <jamie@jamieiles.com>
 Cc: John Stultz <john.stultz@linaro.org>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Pavel Machek <pavel@denx.de>
-Cc: Heiko Stuebner <heiko@sntech.de>
+Cc: devicetree-discuss at lists.ozlabs.org
 Cc: linux-arm-kernel at lists.infradead.org
 ---
- drivers/clocksource/dw_apb_timer_of.c |    7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ Documentation/devicetree/bindings/rtc/dw-apb.txt |   21 +++------------------
+ arch/arm/boot/dts/socfpga.dtsi                   |   12 ++++++++----
+ 2 files changed, 11 insertions(+), 22 deletions(-)
 
-diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
-index cef5544..8dcbd4e 100644
---- a/drivers/clocksource/dw_apb_timer_of.c
-+++ b/drivers/clocksource/dw_apb_timer_of.c
-@@ -104,18 +104,17 @@ static void add_clocksource(struct device_node *source_timer)
- 	 * timer is found. sched_io_base then points to the current_value
- 	 * register of the clocksource timer.
- 	 */
--	sched_io_base = iobase + 0x04;
-+	sched_io_base = iobase;
- 	sched_rate = rate;
- }
+diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+index eb2327b..0a1020e 100644
+--- a/Documentation/devicetree/bindings/rtc/dw-apb.txt
++++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
+@@ -1,7 +1,7 @@
+ * Designware APB timer
  
- static u32 read_sched_clock(void)
- {
--	return __raw_readl(sched_io_base);
-+	return ~__raw_readl(sched_io_base + 0x4);
- }
+ Required properties:
+-- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
++- compatible: "snps,dw-apb-timer"
+ - reg: physical base address of the controller and length of memory mapped
+   region.
+ - interrupts: IRQ line for the timer.
+@@ -20,23 +20,8 @@ systems may use one.
  
- static const struct of_device_id sptimer_ids[] __initconst = {
- 	{ .compatible = "picochip,pc3x2-rtc" },
--	{ .compatible = "snps,dw-apb-timer-sp" },
- 	{ /* Sentinel */ },
- };
  
-@@ -155,4 +154,4 @@ static void __init dw_apb_timer_init(struct device_node *timer)
- 	num_called++;
- }
- CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
--CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
-+CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
+ Example:
+-
+-		timer1: timer at ffc09000 {
+-				compatible = "snps,dw-apb-timer-sp";
+-				interrupts = <0 168 4>;
+-				clock-frequency = <200000000>;
+-				reg = <0xffc09000 0x1000>;
+-			};
+-
+-		timer2: timer at ffd00000 {
+-				compatible = "snps,dw-apb-timer-osc";
+-				interrupts = <0 169 4>;
+-				clock-frequency = <200000000>;
+-				reg = <0xffd00000 0x1000>;
+-			};
+-
+-		timer3: timer at ffe00000 {
+-				compatible = "snps,dw-apb-timer-osc";
++		timer1: timer at ffe00000 {
++				compatible = "snps,dw-apb-timer";
+ 				interrupts = <0 170 4>;
+ 				reg = <0xffe00000 0x1000>;
+ 				clocks = <&timer_clk>, <&timer_pclk>;
+diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
+index bee62a2..ede33ae 100644
+--- a/arch/arm/boot/dts/socfpga.dtsi
++++ b/arch/arm/boot/dts/socfpga.dtsi
+@@ -476,27 +476,31 @@
+ 		};
+ 
+ 		timer0: timer0 at ffc08000 {
+-			compatible = "snps,dw-apb-timer-sp";
++			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 167 4>;
+ 			reg = <0xffc08000 0x1000>;
++			clocks = <&osc>;
+ 		};
+ 
+ 		timer1: timer1 at ffc09000 {
+-			compatible = "snps,dw-apb-timer-sp";
++			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 168 4>;
+ 			reg = <0xffc09000 0x1000>;
++			clocks = <&osc>;
+ 		};
+ 
+ 		timer2: timer2 at ffd00000 {
+-			compatible = "snps,dw-apb-timer-osc";
++			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 169 4>;
+ 			reg = <0xffd00000 0x1000>;
++			clocks = <&l4_sp_clk>;
+ 		};
+ 
+ 		timer3: timer3 at ffd01000 {
+-			compatible = "snps,dw-apb-timer-osc";
++			compatible = "snps,dw-apb-timer";
+ 			interrupts = <0 170 4>;
+ 			reg = <0xffd01000 0x1000>;
++			clocks = <&l4_sp_clk>;
+ 		};
+ 
+ 		uart0: serial0 at ffc02000 {
 -- 
 1.7.9.5
