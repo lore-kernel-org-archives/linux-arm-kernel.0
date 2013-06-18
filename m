@@ -1,35 +1,18 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jun 2013 17:52:47 +0100
-Subject: [PATCH 1/2] ARM: mmu: fix the hang when we steal a section
- unaligned size memory
-In-Reply-To: <20130618152905.GB8534@mudshark.cambridge.arm.com>
-References: <1371113826-1231-1-git-send-email-b32955@freescale.com>
- <20130618152905.GB8534@mudshark.cambridge.arm.com>
-Message-ID: <20130618165246.GC2718@n2100.arm.linux.org.uk>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 18 Jun 2013 12:55:13 -0400 (EDT)
+Subject: [RFC PATCH v1 6/6] USB: EHCI: support running URB giveback in
+ tasklet context
+In-Reply-To: <1371567833-9077-7-git-send-email-ming.lei@canonical.com>
+Message-ID: <Pine.LNX.4.44L0.1306181252320.1157-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 04:29:05PM +0100, Will Deacon wrote:
-> Wouldn't this be better achieved with a parameter, rather than a global
-> state variable? That said, I don't completely follow why memblock_alloc is
-> giving you back an unmapped physical address. It sounds like we're freeing
-> too much as part of the stealing (or simply that stealing has to be section
-> aligned), but memblock only deals with physical addresses.
-> 
-> Could you elaborate please?
+On Tue, 18 Jun 2013, Ming Lei wrote:
 
-It's a catch-22 situation.  memblock allocates from the top of usable
-memory.
+> Both 4 transfers can work well on EHCI HCD after switching to run
 
-While setting up the page tables for the second time, we insert section
-mappings.  If the last mapping is not section sized, we will try to set
-it up using page mappings.  For this, we need to allocate L2 page
-tables from memblock.
+"Both 4 transfers"?  The word "both" applies when there are two items, 
+not more than two.  And what are the four transfers you are referring 
+to?  Do you mean all four transfer _types_?
 
-memblock returns a 4K page in the last non-section sized mapping - which
-we're trying to setup, and hence is not yet mapped.
-
-This is why I've always said - if you steal memory from memblock, it
-_must_ be aligned to 1MB (the section size) to avoid this.  Not only
-that, but we didn't _used_ to allow page-sized mappings for MT_MEMORY -
-that got added for OMAP's SRAM support.
+Alan Stern
