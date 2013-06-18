@@ -1,51 +1,51 @@
-From: steve.capper@linaro.org (Steve Capper)
-Date: Tue, 18 Jun 2013 10:37:37 +0100
-Subject: [PATCH] arm64: Define PTE_TYPE_HUGEPAGE
-In-Reply-To: <1371519455-64998-1-git-send-email-christoffer.dall@linaro.org>
-References: <1371519455-64998-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <20130618093736.GB28428@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jun 2013 10:38:23 +0100
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+References: <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+ <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+ <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
+Message-ID: <20130618093823.GV2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 06:37:35PM -0700, Christoffer Dall wrote:
-> PTE_TYPE_HUGEPAGE is referenced by pte_huge, but because nobody uses
-> this macro it doesn't fail yet.  KVM will be using this when 32-bit
-> support for huge pages is added so add it.
+On Tue, Jun 18, 2013 at 06:04:44PM +0900, Inki Dae wrote:
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/include/asm/pgtable-hwdef.h | 1 +
->  1 file changed, 1 insertion(+)
 > 
-> diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> index 66367c6..0219523 100644
-> --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> @@ -54,6 +54,7 @@
->  #define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
->  #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
->  #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
-> +#define PTE_TYPE_HUGEPAGE	(_AT(pteval_t, 1) << 0)
->  #define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
->  #define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
->  #define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
-> -- 
-> 1.8.1.2
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> > Sent: Tuesday, June 18, 2013 5:43 PM
+> > To: Inki Dae
+> > Cc: 'Maarten Lankhorst'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI mailing
+> > list'; 'Rob Clark'; 'myungjoo.ham'; 'YoungJun Cho'; 'Daniel Vetter';
+> > linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org
+> > Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+> > framework
+> > 
+> > On Tue, Jun 18, 2013 at 02:27:40PM +0900, Inki Dae wrote:
+> > > So I'd like to ask for other DRM maintainers. How do you think about it?
+> > it
+> > > seems like that Intel DRM (maintained by Daniel), OMAP DRM (maintained
+> > by
+> > > Rob) and GEM CMA helper also have same issue Russell pointed out. I
+> > think
+> > > not only the above approach but also the performance is very important.
+> > 
+> > CMA uses coherent memory to back their buffers, though that might not be
+> > true of memory obtained from other drivers via dma_buf.  Plus, there is
+> > no support in the CMA helper for exporting or importng these buffers.
+> > 
 > 
+> It's not so. Please see Dave's drm next. recently dmabuf support for the CMA
+> helper has been merged to there.
 
-Hi Christoffer,
-We can have PROT_NONE protected huge pages in ARM64 and the descriptors for
-these will end in 00b. They are faulting descriptors, so any reads or writes by
-user or kernel space will fault.
-
-I have the following in my huge page patches:
-#define pte_huge(pte)          (!(pte_val(pte) & PTE_TABLE_BIT))
-
-i.e. check for bit 1 clear.
-
-Please let me know if I've missed a PTE_TYPE_HUGEPAGE somewhere and I'll fix
-it.
-
-Thanks,
--- 
-Steve
+The point stands: CMA is DMA coherent memory.  It doesn't need and must
+never be dma-map-sg'd or dma-sync'd or dma-unmap'd.
