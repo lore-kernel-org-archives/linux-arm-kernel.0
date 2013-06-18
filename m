@@ -1,93 +1,63 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 18 Jun 2013 18:34:55 -0300
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <201306181814.33941.arnd@arndb.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jun 2013 23:35:50 +0200
+Subject: [PATCH v3 11/12] ARM: mvebu: Relocate Armada 370 PCIe device tree
+ nodes
+In-Reply-To: <1371554737-25319-12-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306181814.33941.arnd@arndb.de>
-Message-ID: <20130618213454.GD2516@localhost>
+ <1371554737-25319-12-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <201306182335.50722.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd,
+On Tuesday 18 June 2013, Ezequiel Garcia wrote:
+> +
+> +                       ranges =
+> +                              <0x82000000 0 0x40000    0xffff0001 0x40000 0 0x00002000
+> +                               0x82000000 0 0x80000    0xffff0001 0x80000 0 0x00002000
+> +                               0x82000000 0 0xe0000000 0xffff0002 0          0 0x08000000
+> +                               0x81000000 0 0          0xffff0002 0x8000000  0 0x00100000>;
 
-On Tue, Jun 18, 2013 at 06:14:33PM +0200, Arnd Bergmann wrote:
-> On Tuesday 18 June 2013, Ezequiel Garcia wrote:
-> > +Required properties:
-> > +
-> > +- compatible:	 Should be set to one of the following:
-> > +		 marvell,armada370-mbus
-> > +		 marvell,armadaxp-mbus
-> > +
-> > +- reg:		 Device's register space.
-> > +		 Two entries are expected, see the examples below.
-> > +		 The first one controls the devices decoding window and
-> > +		 the second one controls the SDRAM decoding window.
-> > +
-> > +- address-cells: Must be '2'. The first cell for the MBus ID encoding,
-> > +                 the second cell for the address offset within the window.
-> > +
-> > +- size-cells:    Must be '1'.
-> > +
-> > +- ranges:        Must be set up to provide a proper translation for each child.
-> > +	         See the examples below.
-> 
-> You should explain here what the policy is regarding windows set up by the
-> boot loader. Are the ranges in here required to be the ones that the boot
-> loader has preconfigured, or are they the ones that the mbus driver is supposed
-> to set up?
-> 
+As pointed out on IRC, this is not a good representation of the memory space,
+since it requires a non-zero sys->mem_offset, and it conflicts with the straight
+mapping I suggested.
 
-Actually, I might be confused but the kernel MBus driver is completely
-independent from the bootloader's -except in the internal register case,
-(because we don't touch that from where the bootloader left it).
+I think it should be
 
-What happens is that any decoding window that was setup by the bootloader,
-is wiped and completely new windows are allocated using the translations
-in the DT, as described by this binding.
+                               0x82000000 0 0xe0000000 0xffff0002 0  0xe0000000 0x08000000
 
-This was the case from the start with the old MBus driver. FWIW, I think
-it's actually the best choice that can be made: it makes the kernel
-independent of the previous setting.
+if we want to encode the aperture in the ranges property here, i.e. have
+a 1:1 mapping between PCI memory space and MBUS space, and in mbus,
+you need the corresponding
 
-I know you've suggested differently in the past, but I'm not sure I
-understand what's the benefit in keeping the bootloaders configuration.
+-                           0xffff0002 0 0xe0000000 0x8100000
++                           0xffff0002 0xe0000000 0xe0000000 0x8100000
 
-> > +Each child device needs at least a 'ranges' property. If the child is avaiable
-> > +(i.e. status not 'disabled'), then the MBus driver creates a decoding window
-> > +for it. For instance, in the example below the BootROM child is specified:
-> > +
-> > +	soc {
-> > +		compatible = "marvell,armada370-mbus", "simple-bus";
-> > +		reg = <0xd0020000 0x100>, <0xd0020180 0x20>;
-> > +		#address-cells = <2>;
-> > +		#size-cells = <1>;
-> > +
-> > +		ranges = < ... /* other entries */
-> > +			   0x011d0000 0 0 0xfff00000 0x100000>;
-> > +
-> > +		bootrom {
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +			ranges = <0 0x011d0000 0 0x100000>;
-> > +		};
-> > +
-> > +		/* other children */
-> > +		...
-> > +	};
-> 
-> Do you really want to require the child to provide a "ranges" property?
-> I think this makes it more complicated to specify devices that belong
-> into the "internal-regs" category.
-> 
+so that mbus actually translates the right addresses. You could also
+have the PCI memory space start at 0, which would mean
 
-No, this text is actually a left-over from the previous patchset, in
-current v3 patchset MBus children are *not* required to have any ranges.
-On the otherside, although you will need one except in the most trivial
-cases like for the BootROM.
+                               0x82000000 0 0 0xffff0002 0  0 0x08000000
 
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+and
+
+                              0xffff0002 0 0xe0000000 0x8100000
+
+Note that the driver doesn't actually handle the generic case correctly, you would
+need to apply this patch
+	
+diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+index 13a633b..aa674f4 100644
+--- a/drivers/pci/host/pci-mvebu.c
++++ b/drivers/pci/host/pci-mvebu.c
+@@ -790,6 +790,7 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+ 		}
+ 		if (restype == IORESOURCE_MEM) {
+ 			of_pci_range_to_resource(&range, np, &pcie->mem);
++			sys->mem_offset = range.cpu_addr - range.pci_addr;
+ 			pcie->mem.name = "MEM";
+ 		}
+ 	}
+
+to deal with the generic case where the bus address is different from the
+CPU address.
+
+	Arnd
