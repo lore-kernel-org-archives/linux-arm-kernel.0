@@ -1,32 +1,49 @@
 From: laurent.pinchart+renesas@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 18 Jun 2013 12:29:47 +0200
-Subject: [PATCH v2 0/2] R-Car GPIO fixes
-Message-ID: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Date: Tue, 18 Jun 2013 12:29:48 +0200
+Subject: [PATCH v2 1/2] gpio-rcar: Reference core gpio documentation in the DT
+ bindings
+In-Reply-To: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <1371551389-5493-2-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Replaced the detailed gpio-ranges documentation with a reference to the
+code gpio DT bindings, and mention the gpio flags symbolic names.
 
-Here are two small fixes for the gpio-rcar driver. I would push them through
-the GPIO tree if it wasn't for the fact that they're based on gpio-rcar DT
-support, scheduled for merge through the ARM SoC tree.
-
-Simon, as these patches are fixes, would it be possible to get them in v3.11
-through your tree ?
-
-Changes since v1:
-
-- Fixed 2/2 commit message to mention IS_ENABLED, not IS_CONFIG
-
-Laurent Pinchart (2):
-  gpio-rcar: Reference core gpio documentation in the DT bindings
-  gpio-rcar: Remove #ifdef CONFIG_OF around OF-specific sections
-
+Signed-off-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+---
  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt     | 18 ++++++------------
- drivers/gpio/gpio-rcar.c                               |  8 ++------
- 2 files changed, 8 insertions(+), 18 deletions(-)
+ 1 file changed, 6 insertions(+), 12 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+index 46d76a0..cb3dc7b 100644
+--- a/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
++++ b/Documentation/devicetree/bindings/gpio/renesas,gpio-rcar.txt
+@@ -16,18 +16,12 @@ Required Properties:
+ 
+   - gpio-controller: Marks the device node as a gpio controller.
+   - #gpio-cells: Should be 2. The first cell is the GPIO number and the second
+-    cell is used to specify optional parameters as bit flags. Only the GPIO
+-    active low flag (bit 0) is currently supported.
+-  - gpio-ranges: Range of pins managed by the GPIO controller as a 4-cells
+-    tuple using the following syntax.
+-
+-    <[phandle of the pin controller node]
+-     0
+-     [index of the first pin]
+-     [number of pins]>
+-
+-Please refer to gpio.txt in this directory for details of the common GPIO
+-bindings used by client devices.
++    cell specifies GPIO flags, as defined in <dt-bindings/gpio/gpio.h>. Only the
++    GPIO_ACTIVE_HIGH and GPIO_ACTIVE_LOW flags are supported.
++  - gpio-ranges: Range of pins managed by the GPIO controller.
++
++Please refer to gpio.txt in this directory for details of gpio-ranges property
++and the common GPIO bindings used by client devices.
+ 
+ Example: R8A7779 (R-Car H1) GPIO controller nodes
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.8.1.5
