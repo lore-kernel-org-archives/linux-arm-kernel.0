@@ -1,121 +1,139 @@
-From: r65037@freescale.com (Zhu Richard-R65037)
-Date: Tue, 18 Jun 2013 02:20:23 +0000
-Subject: [v1 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
-In-Reply-To: <20130618020653.GC28381@S2101-09.ap.freescale.net>
-References: <1371462767-16630-1-git-send-email-r65037@freescale.com>
- <1371462767-16630-2-git-send-email-r65037@freescale.com>,
- <20130618020653.GC28381@S2101-09.ap.freescale.net>
-Message-ID: <0E83723C55F66F43A6041464FE31119D304710@039-SN2MPN1-013.039d.mgd.msft.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 17 Jun 2013 21:30:46 -0500
+Subject: [PATCH 2/4] ARM: rockchip: add sram dt nodes and documentation
+In-Reply-To: <201306180317.42820.heiko@sntech.de>
+References: <201306180043.11785.heiko@sntech.de>
+ <201306180044.18272.heiko@sntech.de> <51BF9EA7.3030408@gmail.com>
+ <201306180317.42820.heiko@sntech.de>
+Message-ID: <51BFC656.8020704@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn:
-Thanks for yor comments.
-Accepted.
+On 06/17/2013 08:17 PM, Heiko St?bner wrote:
+> Am Dienstag, 18. Juni 2013, 01:41:27 schrieb Rob Herring:
+>> On 06/17/2013 05:44 PM, Heiko St?bner wrote:
+>>> The Rockchip SoCs need a special part of their sram for bringup
+>>> of additional cores. Therefore the mapped area should be split
+>>> into a special area for the smp code and a generic area that gets
+>>> handled by mmio-sram.
+>>>
+>>> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+>>> ---
+>>>
+>>>  .../devicetree/bindings/arm/rockchip/smp-sram.txt  |   29
+>>>  ++++++++++++++++++++ arch/arm/boot/dts/rk3066a.dtsi                    
+>>>  |   14 ++++++++++ 2 files changed, 43 insertions(+)
+>>>  create mode 100644
+>>>  Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+>>> b/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt new file
+>>> mode 100644
+>>> index 0000000..9c81fac
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/arm/rockchip/smp-sram.txt
+>>> @@ -0,0 +1,29 @@
+>>> +Rockchip SRAM for smp bringup:
+>>> +------------------------------
+>>> +
+>>> +Rockchip smp-capable SoCs use the first part of the sram for the bringup
+>>> +of the cores. Once the core gets powered up it executes the code that is
+>>> +residing at the very beginning of the sram.
+>>> +
+>>> +While the suspend also needs to have code in the sram that can be
+>>> realized +with the generic mmio-sram driver and only the smp specific
+>>> part needs to +be mapped specially in the smp code.
+>>> +
+>>> +Therefore split the sram mapping in a smp-specific part that gets used
+>>> +by the smp code exclusively and a bigger generic part for mmio-sram
+>>> +
+>>> +Required node properties:
+>>> +- compatible value : = "rockchip,rk3066-smp-sram";
+>>> +- reg : physical base address and the size of the registers window
+>>> +
+>>> +Example:
+>>> +
+>>> +	sram at 10080000 {
+>>> +		compatible = "rockchip,rk3066-smp-sram";
+>>> +		reg = <0x10080000 0x100>;
+>>> +	};
+>>> +
+>>> +	sram: sram at 10080100 {
+>>> +		compatible = "mmio-sram";
+>>> +		reg = <0x10080100 0x9900>;
+>>
+>> I think a better way would be to specify some portion of the sram as
+>> reserved rather than defining the s/w use of the sram in DT.
+>> Something like this:
+>>
+>> mmio-sram-reserved = <base size base size>;
+>>
+>> where base values are relative to reg property base.
+> 
+> hmm, but I don't see how to get then access to the reserved part. As can be 
+> seen in patch 4 [which I've forgotton to cc you in, sorry] the smp-trampoline 
+> gets copied into this area for the core to execute after poweron, so I need to 
+> get the mapped representation of the reserved area.
 
-Best Regards
-Richard Zhu
-________________________________________
-From: Shawn Guo [shawn.guo at linaro.org]
-Sent: Tuesday, June 18, 2013 10:06 AM
-To: Richard Zhu
-Cc: linux-arm-kernel at lists.infradead.org; jgarzik at pobox.com; linux-ide at vger.kernel.org; Zhu Richard-R65037
-Subject: Re: [v1 1/3] ARM: dtsi: enable ahci sata on imx6q platforms
+That's helpful to know.
 
-On Mon, Jun 17, 2013 at 05:52:45PM +0800, Richard Zhu wrote:
-> Only imx6q has the ahci sata controller, enable
-> it on imx6q platforms.
->
-> Signed-off-by: Richard Zhu <r65037@freescale.com>
-> ---
->  arch/arm/boot/dts/imx6q-sabreauto.dts |    6 ++++++
->  arch/arm/boot/dts/imx6q-sabrelite.dts |    6 ++++++
->  arch/arm/boot/dts/imx6q-sabresd.dts   |    6 ++++++
->  arch/arm/boot/dts/imx6q.dtsi          |    9 +++++++++
->  4 files changed, 27 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/imx6q-sabreauto.dts b/arch/arm/boot/dts/imx6q-sabreauto.dts
-> index 09a7580..79643cc 100644
-> --- a/arch/arm/boot/dts/imx6q-sabreauto.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabreauto.dts
-> @@ -18,6 +18,12 @@
->  / {
->       model = "Freescale i.MX6 Quad SABRE Automotive Board";
->       compatible = "fsl,imx6q-sabreauto", "fsl,imx6q";
-> +
-> +     soc {
-> +             ahci at 02200000 { /* AHCI SATA */
-> +                     status = "okay";
-> +             };
-> +     }
->  };
->
->  &iomuxc {
-> diff --git a/arch/arm/boot/dts/imx6q-sabrelite.dts b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> index 6a00066..dac40af 100644
-> --- a/arch/arm/boot/dts/imx6q-sabrelite.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabrelite.dts
-> @@ -21,6 +21,12 @@
->               reg = <0x10000000 0x40000000>;
->       };
->
-> +     soc {
-> +             ahci at 02200000 { /* AHCI SATA */
-> +                     status = "okay";
-> +             };
-> +     }
-> +
->       regulators {
->               compatible = "simple-bus";
->
-> diff --git a/arch/arm/boot/dts/imx6q-sabresd.dts b/arch/arm/boot/dts/imx6q-sabresd.dts
-> index 0038228..ecae151 100644
-> --- a/arch/arm/boot/dts/imx6q-sabresd.dts
-> +++ b/arch/arm/boot/dts/imx6q-sabresd.dts
-> @@ -18,6 +18,12 @@
->  / {
->       model = "Freescale i.MX6 Quad SABRE Smart Device Board";
->       compatible = "fsl,imx6q-sabresd", "fsl,imx6q";
-> +
-> +     soc {
-> +             ahci at 02200000 { /* AHCI SATA */
-> +                     status = "okay";
-> +             };
-> +     };
->  };
->
->  &iomuxc {
-> diff --git a/arch/arm/boot/dts/imx6q.dtsi b/arch/arm/boot/dts/imx6q.dtsi
-> index e7dd2c4..e13ff30 100644
-> --- a/arch/arm/boot/dts/imx6q.dtsi
-> +++ b/arch/arm/boot/dts/imx6q.dtsi
-> @@ -424,6 +424,15 @@
->                       };
->               };
->
-> +             ahci at 02200000 { /* AHCI SATA */
+> Or do you mean
+> 
+> - let mmio-sram only allocate the non-reserved spaces for itself
+> - grab mmio-sram node in the smp code and map the necessary reserved space
 
-Add a label for the node like "ahci: ahci at 02200000", you can refer to
-the node simply using the label in board dts, just like every one else
-is doing.
+That would work. Another alternative would be having a way in the kernel
+to reserve a specific region of sram.
 
-&ahci {
-        status = "okay";
-};
+If you have to know what to put in the sram and are putting that into
+the kernel, then having to know where to put it is not really much more
+kernel data. So I don't really see the point to put a "smp boot" area
+into device tree.
 
-Shawn
+Seems like we're getting several platforms that are putting all their
+secondary core boot code into the kernel. I'm not sure this is something
+we want in the kernel. We may need to define the boot protocol for
+secondary cores just like the boot core and start pushing this into
+bootloaders.
 
-> +                     compatible = "snps,imx-ahci";
-> +                     reg = <0x02200000 0x4000>;
-> +                     interrupts = <0 39 0x04>;
-> +                     clocks = <&clks 154>, <&clks 187>;
-> +                     clock-names = "sata", "sata_ref_100m";
-> +                     status = "disabled";
-> +             };
-> +
->               ipu2: ipu at 02800000 {
->                       #crtc-cells = <1>;
->                       compatible = "fsl,imx6q-ipu";
-> --
-> 1.7.5.4
->
+Rob
+
+> 
+> This might actually work.
+> 
+> 
+> Thanks
+> Heiko
+> 
+> 
+>>> +	};
+>>> diff --git a/arch/arm/boot/dts/rk3066a.dtsi
+>>> b/arch/arm/boot/dts/rk3066a.dtsi index 26c4311..44eabd2 100644
+>>> --- a/arch/arm/boot/dts/rk3066a.dtsi
+>>> +++ b/arch/arm/boot/dts/rk3066a.dtsi
+>>> @@ -53,6 +53,20 @@
+>>>
+>>>  			reg = <0x1013c000 0x100>;
+>>>  		
+>>>  		};
+>>>
+>>> +		/*
+>>> +		 * the first part of the sram is needed for the smp
+>>> +		 * trampoline code during cpu bringup
+>>> +		 */
+>>> +		sram at 10080000 {
+>>> +			compatible = "rockchip,rk3066-smp-sram";
+>>> +			reg = <0x10080000 0x100>;
+>>> +		};
+>>> +
+>>> +		sram: sram at 10080100 {
+>>> +			compatible = "mmio-sram";
+>>> +			reg = <0x10080100 0x9900>;
+>>> +		};
+>>> +
+>>>
+>>>  		gic: interrupt-controller at 1013d000 {
+>>>  		
+>>>  			compatible = "arm,cortex-a9-gic";
+>>>  			interrupt-controller;
+> 
