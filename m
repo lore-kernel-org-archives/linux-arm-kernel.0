@@ -1,48 +1,47 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 18 Jun 2013 09:48:04 -0300
-Subject: [PATCH v3 06/12] memory: mvebu-devbus: Remove address decoding
- window workaround
-In-Reply-To: <20130618123354.GX31667@titan.lakedaemon.net>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130618113920.GW31667@titan.lakedaemon.net>
- <20130618141731.56e7966c@skate>
- <20130618123354.GX31667@titan.lakedaemon.net>
-Message-ID: <20130618124803.GA25416@localhost>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 18 Jun 2013 13:50:54 +0100
+Subject: DMA mapping API(IOMMU) for ARM64?
+In-Reply-To: <20130618.140137.1551430695673122122.hdoyu@nvidia.com>
+References: <20130618.053955.305832937374936961.hdoyu@nvidia.com>
+ <20130618101914.GB3539@mudshark.cambridge.arm.com>
+ <5159282.rrJMaZuYMv@wuerfel>
+ <20130618.140137.1551430695673122122.hdoyu@nvidia.com>
+Message-ID: <20130618125054.GL9930@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 08:33:54AM -0400, Jason Cooper wrote:
-> On Tue, Jun 18, 2013 at 02:17:31PM +0200, Thomas Petazzoni wrote:
-> > Dear Jason Cooper,
-> > 
-> > On Tue, 18 Jun 2013 07:39:20 -0400, Jason Cooper wrote:
-> > > On Tue, Jun 18, 2013 at 08:25:31AM -0300, Ezequiel Garcia wrote:
-> > > > Now that mbus device tree binding has been introduced, remove the address
-> > > > decoding window management from this driver.
-> > > > A suitable 'ranges' entry should be added to the devbus-compatible node in
-> > > > the device tree, as described by the mbus binding documentation.
-> > > > 
-> > > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > > ---
-> > > >  drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
-> > > >  1 file changed, 2 insertions(+), 62 deletions(-)
+On Tue, Jun 18, 2013 at 12:01:37PM +0100, Hiroshi Doyu wrote:
+> Arnd Bergmann <arnd@arndb.de> wrote @ Tue, 18 Jun 2013 12:32:44 +0200:
+> > On Tuesday 18 June 2013 11:19:14 Will Deacon wrote:
+> > > I've spoken briefly with Catalin about this and it seems like there might be
+> > > *some* scope for sharing common dma-mapping code between architectures.
+> > > There doesn't really need to be any architecture-specific details in
+> > > allocating iova space and the interface to the iommu drivers is
+> > > well-defined. The arch-specific stuff is bogged down in the non-coherent
+> > > buffer management, but that doesn't necessarily equate to lots of code.
 > > > 
-> > > Unfortunately, the patch adding mvebu-devbus is going through gregkh's
-> > > tree.  Either this patch needs to wait for v3.12, or ask Greg if he can
-> > > take this one.
+> > > So, the best bet would be to figure out how to split up what we have under
+> > > arch/arm/ so that it can be re-used by arm64 and potentially other
+> > > architectures (powerpc has some simple stuff for coherent mappings and some
+> > > less-simple stuff for non-coherent buffers).
 > > 
-> > I believe that what we're looking for right now is a Acked-by from both
-> > the Marvell maintainers, Arnd Bergmann and Jason Gunthorpe. Once we get
-> > those Acked-by, we can figure out the merge strategy for this patch
-> > set.
+> > I'm sure that other architectures are interested in sharing the code.
+> > Best move it into the global mm/ directory, at least the version for
+> > coherent mappings.
 > 
-> Right.  I was more looking to give Ezequiel a heads up
+> I'm guessing that this kind of unification usually takes some time
+> since we need to factor out the common code from the different
+> ${ARCH}/mm/dma-mapping.c. Also some of ${ARCH} has IOMMU support in
+> it. So if we want to develop our 64-bit ARM with working DMA mapping
+> API during this transition, the step to take would be:
+> 
+> 1, Copy arch/arm/mm/dma-mapping.c arch/arm64/mm/dma-mapping.c(+swiotlb)
+> 2, Adapt arch/arm64/mm/dma-mapping.c(+swiotlb) to 64bit compatible.
+> 3, Factor out the common code from them into mm/dma-mapping.c
 
-.. and you did :)
+Or add the relevant code to something like lib/iommu-helper.c, convert
+arm64 to use that and we can work on converting arm and other
+architectures afterwards.
 
-Thanks a lot,
 -- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+Catalin
