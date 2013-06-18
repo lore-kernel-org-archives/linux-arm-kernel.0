@@ -1,83 +1,44 @@
-From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 17 Jun 2013 23:56:15 -0400
-Subject: [PATCH V3 2/5] arm: mmp: use matrix_keymap for all boards
-In-Reply-To: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
-References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1371527778-5236-3-git-send-email-chao.xie@marvell.com>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 18 Jun 2013 09:40:51 +0530
+Subject: [PATCH v3 10/10] ARM: Exynos: extend soft-reset support for
+ Exynos5420
+In-Reply-To: <3807303.re8cJcYGJh@wuerfel>
+References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
+ <1371466836-4111-11-git-send-email-chander.kashyap@linaro.org>
+ <3807303.re8cJcYGJh@wuerfel>
+Message-ID: <CANuQgHFEO47Z0S_zELF7-aEp133dzitx=c=K_BSbckRXsGP7Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compile passed for the configuration
+On 17 June 2013 17:51, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Monday 17 June 2013 16:30:35 Chander Kashyap wrote:
+>> @@ -330,10 +330,10 @@ void exynos5_restart(char mode, const char *cmd)
+>>         u32 val;
+>>         void __iomem *addr;
+>>
+>> -       if (of_machine_is_compatible("samsung,exynos5250")) {
+>> -               val = 0x1;
+>> -               addr = EXYNOS_SWRESET;
+>> -       } else if (of_machine_is_compatible("samsung,exynos5440")) {
+>> +       val = 0x1;
+>> +       addr = EXYNOS_SWRESET;
+>> +
+>> +       if (of_machine_is_compatible("samsung,exynos5440")) {
+>>                 u32 status;
+>>                 np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
+>>
+>
+> Please try to avoid adding further uses of hardcoded MMIO addresses.
+I am not adding new hard-coded address. I have simply removed the
+unnecessary previously existing check.
+>
+Thanks.
+> Can you change that to use the same logic that exynos5440 has?
+>
+>         Arnd
 
-pxa168_defconfig
-  aspenite.c(MACH_ASPENITE), teton_bgs.c(MACH_TENTON_BGA)
 
-Signed-off-by: Chao Xie <chao.xie@marvell.com>
----
- arch/arm/mach-mmp/aspenite.c  |   10 +++++++---
- arch/arm/mach-mmp/teton_bga.c |   10 +++++++---
- 2 files changed, 14 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-mmp/aspenite.c b/arch/arm/mach-mmp/aspenite.c
-index 9f64d56..1e23346 100644
---- a/arch/arm/mach-mmp/aspenite.c
-+++ b/arch/arm/mach-mmp/aspenite.c
-@@ -205,7 +205,7 @@ struct pxa168fb_mach_info aspenite_lcd_info = {
- 	.invert_pixclock	= 0,
- };
- 
--static unsigned int aspenite_matrix_key_map[] = {
-+static const unsigned int aspenite_matrix_key_map[] = {
- 	KEY(0, 6, KEY_UP),	/* SW 4 */
- 	KEY(0, 7, KEY_DOWN),	/* SW 5 */
- 	KEY(1, 6, KEY_LEFT),	/* SW 6 */
-@@ -214,11 +214,15 @@ static unsigned int aspenite_matrix_key_map[] = {
- 	KEY(4, 7, KEY_ESC),	/* SW 9 */
- };
- 
-+static struct matrix_keymap_data aspenite_matrix_keymap_data = {
-+	.keymap			= aspenite_matrix_key_map,
-+	.keymap_size		= ARRAY_SIZE(aspenite_matrix_key_map),
-+};
-+
- static struct pxa27x_keypad_platform_data aspenite_keypad_info __initdata = {
- 	.matrix_key_rows	= 5,
- 	.matrix_key_cols	= 8,
--	.matrix_key_map		= aspenite_matrix_key_map,
--	.matrix_key_map_size	= ARRAY_SIZE(aspenite_matrix_key_map),
-+	.matrix_keymap_data	= &aspenite_matrix_keymap_data,
- 	.debounce_interval	= 30,
- };
- 
-diff --git a/arch/arm/mach-mmp/teton_bga.c b/arch/arm/mach-mmp/teton_bga.c
-index 8609967..2021769 100644
---- a/arch/arm/mach-mmp/teton_bga.c
-+++ b/arch/arm/mach-mmp/teton_bga.c
-@@ -49,18 +49,22 @@ static unsigned long teton_bga_pin_config[] __initdata = {
- 	GPIO78_GPIO,
- };
- 
--static unsigned int teton_bga_matrix_key_map[] = {
-+static const unsigned int teton_bga_matrix_key_map[] = {
- 	KEY(0, 6, KEY_ESC),
- 	KEY(0, 7, KEY_ENTER),
- 	KEY(1, 6, KEY_LEFT),
- 	KEY(1, 7, KEY_RIGHT),
- };
- 
-+static struct matrix_keymap_data teton_bga_matrix_keymap_data = {
-+	.keymap			= teton_bga_matrix_key_map,
-+	.keymap_size		= ARRAY_SIZE(teton_bga_matrix_key_map),
-+};
-+
- static struct pxa27x_keypad_platform_data teton_bga_keypad_info __initdata = {
- 	.matrix_key_rows        = 2,
- 	.matrix_key_cols        = 8,
--	.matrix_key_map         = teton_bga_matrix_key_map,
--	.matrix_key_map_size    = ARRAY_SIZE(teton_bga_matrix_key_map),
-+	.matrix_keymap_data	= &teton_bga_matrix_keymap_data,
- 	.debounce_interval      = 30,
- };
- 
--- 
-1.7.4.1
+--
+with warm regards,
+Chander Kashyap
