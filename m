@@ -1,46 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 18 Jun 2013 19:33:59 +0100
-Subject: [PATCH v4 02/10] pinctrl: mvebu: dove pinctrl driver
-In-Reply-To: <20130618151116.GZ2718@n2100.arm.linux.org.uk>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347550912-18021-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130618113606.GA26763@n2100.arm.linux.org.uk>
- <CACRpkdZTVN2O-Rv4u-Ccb9EzV0At3zc7GYQyTq=HkseOi=GTeg@mail.gmail.com>
- <20130618151116.GZ2718@n2100.arm.linux.org.uk>
-Message-ID: <20130618183359.GR1403@sirena.org.uk>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jun 2013 19:34:24 +0100
+Subject: OMAP4430 failure to boot
+Message-ID: <20130618183424.GD2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 04:11:16PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 18, 2013 at 05:02:49PM +0200, Linus Walleij wrote:
-> > Nowadays I would do the above with regmap_update_bits().
+So... the boot and build system last night managed to build its kernels
+after I dropped a couple of patches from my kernel, but we've gone from
+having both the 3430LDP and 4430SDP booting to only the 3430LDP.
 
-> > Mutual exclusion for read-modify-write of individual bits in a
-> > register is one of those cases where doing a regmap over
-> > a memory-mapped register range makes a lot of sense.
-> > (drivers/mfd/syscon.c being a nice example)
+Something has broken 4430SDP during the last week, and so far I've no
+idea what.  The 4430 seems to be utterly immune to any kind of debugging.
+It:
 
-> So, for that solution we need to have some kind of global regmap per
-> register or somesuch.  Then you run into regmap needing a struct
-> device - well, with a shared register, which struct device do you
-> use, or do you have to invent one?
+(a) doesn't produce any decompressor output because its part of the
+multiplatform kernel.  This means I've no idea if the decompressor is
+working or not.
 
-> That sounds more heavy-weight than is really necessary.
+(b) doesn't produce any output from the kernel via the use of printch()
+in the early assembly, nor via adding printascii() into printk().
 
-Yes, regmap is far too heavyweight for a lot of these things - it
-shouldn't really go in performance critical at the CPU level paths, it's
-designed around things where I/O costs are considerable and worth
-avoiding.
+Will has tested v3.10-rc6, and that works.  Will tested v3.10-rc6 plus
+arm-soc for-next, and got:
 
-I do think that this is a very good idea - with the I2C/SPI drivers I
-was reviewing prior to regmap there were always just far too many simple
-bugs with read/modify/write cycles so factoring out the code really
-helped with review.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/8db087fa/attachment.sig>
+	Error: unrecognized/unsupported machine ID (r1 = 0x00000ae7).
+
+I've just tested Linus' tip plus my tip, and that failed.  Tried Linus'
+tip.  Failed.  Removed the printch()/printascii() hooks, that got Linus'
+tip working.  I guess CONFIG_DEBUG_OMAP2UART1 is the wrong option.
+
+And yes, Linus plus my tip also works without printascii.  So that leaves
+the questionable case of Linus tip+my tip+arm-soc tip not being bootable
+on OMAP4430 but is on OMAP3430.
