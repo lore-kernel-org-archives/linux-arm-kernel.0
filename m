@@ -1,54 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Jun 2013 12:32:37 +0100
-Subject: [PATCH 02/10] ARM: tlb: don't perform inner-shareable
- invalidation for local TLB ops
-In-Reply-To: <51BA064B.7010204@arm.com>
-References: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
- <1370528914-17506-3-git-send-email-will.deacon@arm.com>
- <51BA064B.7010204@arm.com>
-Message-ID: <20130618113237.GC5893@mudshark.cambridge.arm.com>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 18 Jun 2013 13:33:37 +0200
+Subject: [PATCH v3 00/12] MBus device tree binding
+In-Reply-To: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <51C04591.3010206@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 06:50:03PM +0100, Jonathan Austin wrote:
-> Hi Will,
+On 06/18/13 13:25, Ezequiel Garcia wrote:
+> In the example below there's an extract of a device tree showing how
+> the internal-regs and pcie nodes can be represented:
+>
+> 	#define MBUS_ID(target,attributes) (((target) << 24) | ((attributes) << 16))
+>
+> 	soc {
+> 		compatible = "marvell,armadaxp-mbus";
+> 		reg = <0 0xd0020000 0 0x100>, <0 0xd0020180 0 0x20>;
+>
+> 		ranges = <0xffff0001 0 0 0xd0000000 0x100000   /* internal-regs */
+> 			  0xffff0000 0 0 0xe0000000 0x8100000  /* pcie */
+> 			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
+> 			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
 
-Hi Jonny,
+Ezequiel,
 
-> On 06/06/13 15:28, Will Deacon wrote:
-> > Inner-shareable TLB invalidation is typically more expensive than local
-> > (non-shareable) invalidation, so performing the broadcasting for
-> > local_flush_tlb_* operations is a waste of cycles and needlessly
-> > clobbers entries in the TLBs of other CPUs.
-> >
-> > This patch introduces __flush_tlb_* versions for many of the TLB
-> > invalidation functions, which only respect inner-shareable variants of
-> > the invalidation instructions. This allows us to modify the v7 SMP TLB
-> > flags to include *both* inner-shareable and non-shareable operations and
-> > then check the relevant flags depending on whether the operation is
-> > local or not.
-> 
-> I think this approach leaves us in trouble for some SMP_ON_UP cores as 
-> the IS versions of the instructions don't exist for them.
-> 
-> Is there something that should be ensuring your new __flush_tlb* 
-> functions don't get called for SMP_ON_UP? If not it looks like we might 
-> need to do some runtime patching with the ALT_SMP/ALT_UP macros...
+you should update PCIE above (and possibly anywhere else) too.
 
-Well spotted. Actually, the best fix here is no honour the tlb flags we end
-up with, since they get patched by the SMP_ON_UP code (which forces
-indirection via MULTI_TLB). We should extract the `meat' of the local_ ops
-into __local_ops, which can be inlined directly into the non-local variants
-without introducing additional barriers around the invalidation operations.
+> 		pcie-controller {
+> 			compatible = "marvell,armada-xp-pcie";
+> 			status = "okay";
+> 			device_type = "pci";
+>
+> 			#address-cells = <3>;
+> 			#size-cells = <2>;
+>
+> 			ranges =
+> 			       <0x82000000 0 0x40000 0xffff0001 0x40000 0 0x00002000   /* Port 0.0 registers */
+> 				0x82000000 0 0x42000 0xffff0001 0x42000 0 0x00002000   /* Port 2.0 registers */
+> 				0x82000000 0 0x44000 0xffff0001 0x44000 0 0x00002000   /* Port 0.1 registers */
+> 				0x82000000 0 0x48000 0xffff0001 0x48000 0 0x00002000   /* Port 0.2 registers */
+> 				0x82000000 0 0x4c000 0xffff0001 0x4c000 0 0x00002000   /* Port 0.3 registers */
+> 				0x82000000 0 0x80000 0xffff0001 0x80000 0 0x00002000   /* Port 1.0 registers */
+> 				0x82000000 0 0x82000 0xffff0001 0x82000 0 0x00002000   /* Port 3.0 registers */
+> 				0x82000000 0 0xe0000000 0xffff0000 0 0 0x08000000   /* non-prefetchable memory */
+> 				0x81000000 0 0 0xffff0000 0x8000000 0 0x00100000>; /* downstream I/O */
 
-> A follow on question is whether we still need to keep the *non* unified 
-> TLB maintenance operations (eg DTLBIALL, ITLBIALL). As far as I can see 
-> looking in to old TRMs, the last ARM CPU that didn't automatically treat 
-> those I/D ops to unified ones was ARM10, so not relevant here...
+Here for example.
 
-My reading of the 1136 TRM is that there are separate micro-tlbs and a
-unified main tlb. I don't see any implication that an operation on the
-unified tlb automatically applies to both micro-tlbs, but I've not checked
-the rtl (the implication holds the other way around).
+> Changes from v2:
+>   * Replaced the PCIe mapping with 0xffff0002, to avoid using a representation
+>     that might correspond to a possible window id.
 
-Will
+Out of curiosity, how will these fake mappings play with LPAE? If you
+extend possible address space to >32b the lower bits may belong to valid
+addresses.
+Maybe you can (already do?) ignore that because of the 32b address
+restriction for internal registers IIRC Thomas mentioned?
+
+Sebastian
