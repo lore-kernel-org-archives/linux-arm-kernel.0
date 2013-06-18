@@ -1,38 +1,71 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 16:02:16 +0200
-Subject: [PATCH V3 3/5] arm: pxa: use matrix_keymap for all boards
-In-Reply-To: <1371527778-5236-4-git-send-email-chao.xie@marvell.com>
-References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
- <1371527778-5236-4-git-send-email-chao.xie@marvell.com>
-Message-ID: <201306181602.16261.arnd@arndb.de>
+Date: Tue, 18 Jun 2013 16:09:14 +0200
+Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
+In-Reply-To: <CAMj5Bkh8=zc=RYoS9T_9ORYFuJeswQP2hfZ5GH_vywa_qM2DRA@mail.gmail.com>
+References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
+ <201306172258.08185.arnd@arndb.de>
+ <CAMj5Bkh8=zc=RYoS9T_9ORYFuJeswQP2hfZ5GH_vywa_qM2DRA@mail.gmail.com>
+Message-ID: <201306181609.14966.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Chao Xie wrote:
-> Compile passed for configurations
+On Tuesday 18 June 2013, zhangfei gao wrote:
+> On Tue, Jun 18, 2013 at 4:58 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >
+> >> +static struct of_dma_filter_info k3_dma_filter;
+> >> +static bool k3_dma_filter_fn(struct dma_chan *chan, void *param)
+> >> +{
+> >> +     return  (*(int *)param == chan->chan_id);
+> >> +}
+> >
+> > This filter function works only as long as there is no more than
+> > one DMA engine in the system, which is something that needs to
+> > be documented better. Unfortunately, providing a filter
+> > function to be called by .xlate is currently the only way that
+> > the dma-engine API supports, but we should really get over that.
+> >
+> > Vinod: I think we need to add a way for a dmaengine driver to
+> > just return one of its channels to the xlate function. The
+> > current method is getting very silly, and it adds run-time and
+> > code complexity without any need.
+> >
+> > How about something like
+> >
+> > int dma_get_slave_channel(struct dma_chan *chan)
+> > {
+> >         /* lock against __dma_request_channel */
+> >         mutex_lock(&dma_list_mutex);
+> >
+> >         if (chan->client_count == 0)
+> >                 ret = dma_chan_get(chan);
+> >         else
+> >                 ret = -EBUSY;
+> >
+> >         mutex_unlock(&dma_list_mutex);
+> >
+> >         return ret;
+> > }
+> > EXPORT_SYMBOL_GPL(dma_get_slave_channel);
 > 
-> em_x270_defconfig
->   em_x270x.c(MACH_EM_X270, MACH_EXEDA)
-> 
-> ezx_defconfig
->   ezx.c(MACH_EZX_A780, MACH_EZX_E680, MACH_EZX_A1200,
->         MACH_EZX_A910, MACH_EZX_E6, MACH_EZX_E2)
-> 
-> palmz72_defconfig
->   palmld.c(MACH_PALMLD), palmtreo.c(PALM_TREO),
->   palmtx.c(MACH_PALMTX), palmz72.c(MACH_PALMZ72),
->   palmt5.c(MACH_PALMT5)
-> 
-> pxa3xx_defconfig
->   littleton.c(MACH_LITTLETON), tarvorevb.c(MACH_TAVOREVB),
->   zylonite.c(MACH_ZYLONITE320), mioa701.c(MACH_MIOA701),
->   z2.c(MACH_ZIPIT2)
-> 
-> mainstone_defconfig
->   maintone.c(MACH_MAINSTONE)
-> 
-> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> Want to double check here.
+> Device need specific channel via request line, the requirement still
+> can be met, right?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+The driver can have a simple array of pointers that is indexed by
+the request number, so you end up with something like
 
-Thanks for the quick update.
+struct dma_chan *of_dma_simple_xlate(struct of_phandle_args *dma_spec,
+                                                struct of_dma *ofdma)
+{
+        struct k3_dma_dev *dev = ofdma->of_dma_data;
+	unsigned int vchan = dma_spec->args[0];
+
+	if (vchan > dev->nr_channels)
+		return NULL;
+
+        return dma_get_slave_channel(dev->vchan[vchan]);
+}
+
+With no need to have a filter function.
+
+	Arnd
