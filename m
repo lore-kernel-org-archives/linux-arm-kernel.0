@@ -1,49 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Jun 2013 11:07:15 +0100
-Subject: [PATCH v6] arm: Preserve the user r/w register TPIDRURW on
- context, switch and fork
-In-Reply-To: <51BF8A1C.5070403@dawncrow.de>
-References: <51BF8A1C.5070403@dawncrow.de>
-Message-ID: <20130618100715.GA3539@mudshark.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 18 Jun 2013 11:09:28 +0100
+Subject: [PATCH] ARM: KVM: vgic: fix GICD_ICFGRn access
+Message-ID: <1371550168-8036-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 11:13:48PM +0100, Andr? Hentschel wrote:
-> From: Andr? Hentschel <nerv@dawncrow.de>
-> 
-> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
-> prevent it from being used as a covert channel between two tasks.
-> 
-> There are more and more applications coming to Windows RT,
-> Wine could support them, but mostly they expect to have
-> the thread environment block (TEB) in TPIDRURW.
-> 
-> This patch preserves that register per thread instead of clearing it.
-> Unlike the TPIDRURO, which is already switched, the TPIDRURW
-> can be updated from userspace so needs careful treatment in the case that we
-> modify TPIDRURW and call fork(). To avoid this we must always read
-> TPIDRURW in copy_thread.
-> 
-> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
-> 
-> ---
-> This patch is against Linux 3.10-rc6 (7d132055814ef17a6c7b69f342244c410a5e000f)
-> 
-> v2: rework and fixup of v1, based on a suggested patch by Will Deacon
-> v3: total rework and fixup of v2
-> v4: removed condition on assembler instruction,
->     adapted my code to kernel-style, both based on comments by Will Deacon
-> v5: rebased v4 on 3.10-rc2 and adding this version history
-> v6: moved loading the TLS registers to the macros
->     (fixing the "LDRD is not supported on all the CPUs we have" problem)
+All the code in handle_mmio_cfg_reg() assumes the offset has
+been shifted right to accomodate for the 2:1 bit compression,
+but this is only done when getting the register addess.
 
-You've changed quite a lot with this version, including the way the macro
-parameters are passed. Why not just replace the problematic ldrd with two
-ldr instructions and be done with it? I don't think the simple build error
-warrants an overhaul of the code we already had.
+Shift the offset early so the code works mostly unchanged.
 
-Cheers,
+Reported-by: Zhaobo (Bob, ERC) <zhaobo@huawei.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/kvm/vgic.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-Will
+diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
+index a2d478a..902789f 100644
+--- a/arch/arm/kvm/vgic.c
++++ b/arch/arm/kvm/vgic.c
+@@ -541,8 +541,12 @@ static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
+ 				struct kvm_exit_mmio *mmio, phys_addr_t offset)
+ {
+ 	u32 val;
+-	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
+-				       vcpu->vcpu_id, offset >> 1);
++	u32 *reg;
++
++	offset >>= 1;
++	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
++				  vcpu->vcpu_id, offset);
++
+ 	if (offset & 2)
+ 		val = *reg >> 16;
+ 	else
+-- 
+1.8.2.3
