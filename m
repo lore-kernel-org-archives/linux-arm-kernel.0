@@ -1,35 +1,40 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 18 Jun 2013 15:51:34 +0200
-Subject: Marvell SoCs: is register remapping to 0xf1NNNNNN safe?
-In-Reply-To: <20130618134220.GY2718@n2100.arm.linux.org.uk>
-References: <20130618134220.GY2718@n2100.arm.linux.org.uk>
-Message-ID: <20130618135134.GB14346@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Jun 2013 14:52:50 +0100
+Subject: [PATCH] arm64/Makefile: provide vdso_install target
+In-Reply-To: <20130616193243.GC8939@redacted.bos.redhat.com>
+References: <20130616193243.GC8939@redacted.bos.redhat.com>
+Message-ID: <20130618135250.GH6801@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 02:42:20PM +0100, Russell King - ARM Linux wrote:
-> On the Armada 510, like most mvebu platforms, the registers are remapped
-> to 0xf1NNNNNN.  This means things like the ATA interfaces are at
-> 0xf10a0000, SPI at 0xf1010600 etc.
-> 
-> It also means that the global config 1 register is at 0xf10e802c.  Other
-> registers live at 0xf10e0000, 0xf10e4000, etc.
-> 
-> Now, if I access any register in the 0xf10eNNNN, whether it be the global
-> configuration register, a GPIO register, AC'97 register, the result is an
-> instant and solid hang - presumably the bus locks up.  It doesn't matter
-> if it is accessed in an interrupt-protected region, preempt-disabled
-> region, or via a userspace mapping of that memory, the result is always
-> the same, and things like sysrq don't work.
-> 
-> Only a watchdog or power cycle recovers the SoC (presumably also a hardware
-> reset too, but I can't test that.)
-> 
-> Any ideas?  Can this behaviour be replicated on any other of these SoCs?
+On Sun, Jun 16, 2013 at 08:32:44PM +0100, Kyle McMartin wrote:
+> Provide a vdso_install target in the arm64 Makefile, as other architectures
+> with a vdso do.
 
-Hi Russell
+Thanks Kyle.
 
-Kirkwood, and some of the other SoCs, will hang if the clock for the
-IP block is not ticking.
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-   Andrew
+Will
+
+> Signed-off-by: Kyle McMartin <kyle@redhat.com>
+> 
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -60,6 +60,10 @@ zinstall install: vmlinux
+>  dtbs: scripts
+>  	$(Q)$(MAKE) $(build)=$(boot)/dts dtbs
+>  
+> +PHONY += vdso_install
+> +vdso_install:
+> +	$(Q)$(MAKE) $(build)=arch/arm64/kernel/vdso $@
+> +
+>  # We use MRPROPER_FILES and CLEAN_FILES now
+>  archclean:
+>  	$(Q)$(MAKE) $(clean)=$(boot)
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
