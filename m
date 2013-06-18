@@ -1,33 +1,49 @@
-From: kishon@ti.com (Kishon Vijay Abraham I)
-Date: Tue, 18 Jun 2013 15:34:36 +0530
-Subject: [PATCH v7 5/9] ARM: OMAP: USB: Add phy binding information
-In-Reply-To: <20130618094438.GT5461@arwen.pp.htv.fi>
-References: <1371113039-5784-1-git-send-email-kishon@ti.com>
- <1371113039-5784-6-git-send-email-kishon@ti.com>
- <20130618094438.GT5461@arwen.pp.htv.fi>
-Message-ID: <51C030B4.5070707@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Jun 2013 11:07:15 +0100
+Subject: [PATCH v6] arm: Preserve the user r/w register TPIDRURW on
+ context, switch and fork
+In-Reply-To: <51BF8A1C.5070403@dawncrow.de>
+References: <51BF8A1C.5070403@dawncrow.de>
+Message-ID: <20130618100715.GA3539@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 17, 2013 at 11:13:48PM +0100, Andr? Hentschel wrote:
+> From: Andr? Hentschel <nerv@dawncrow.de>
+> 
+> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
+> prevent it from being used as a covert channel between two tasks.
+> 
+> There are more and more applications coming to Windows RT,
+> Wine could support them, but mostly they expect to have
+> the thread environment block (TEB) in TPIDRURW.
+> 
+> This patch preserves that register per thread instead of clearing it.
+> Unlike the TPIDRURO, which is already switched, the TPIDRURW
+> can be updated from userspace so needs careful treatment in the case that we
+> modify TPIDRURW and call fork(). To avoid this we must always read
+> TPIDRURW in copy_thread.
+> 
+> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
+> 
+> ---
+> This patch is against Linux 3.10-rc6 (7d132055814ef17a6c7b69f342244c410a5e000f)
+> 
+> v2: rework and fixup of v1, based on a suggested patch by Will Deacon
+> v3: total rework and fixup of v2
+> v4: removed condition on assembler instruction,
+>     adapted my code to kernel-style, both based on comments by Will Deacon
+> v5: rebased v4 on 3.10-rc2 and adding this version history
+> v6: moved loading the TLS registers to the macros
+>     (fixing the "LDRD is not supported on all the CPUs we have" problem)
 
-On Tuesday 18 June 2013 03:14 PM, Felipe Balbi wrote:
-> On Thu, Jun 13, 2013 at 02:13:55PM +0530, Kishon Vijay Abraham I wrote:
->> In order for controllers to get PHY in case of non dt boot, the phy
->> binding information (phy device name) should be added in the platform
->> data of the controller.
->>
->> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
->
-> I would rather not pass strings around, any other way to handle this ?
-> Why do you need to pass this string ?
+You've changed quite a lot with this version, including the way the macro
+parameters are passed. Why not just replace the problematic ldrd with two
+ldr instructions and be done with it? I don't think the simple build error
+warrants an overhaul of the code we already had.
 
-Our old way of binding the controller and the phy using device name 
-started creating problems after the devices are created using 
-PLATFORM_DEVID_AUTO. Infact non-dt boot is broken in mainline for OMAP3 
-platforms for which I have posted a RFC series 
-http://www.serverphorums.com/read.php?12,708632 which also uses strings.
-I'm not sure of any other way to deal with this.
+Cheers,
 
-Thanks
-Kishon
+Will
