@@ -1,41 +1,36 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Jun 2013 12:09:59 +0100
-Subject: [RFC 2/3] arm: mm: Define set_memory_* functions for ARM
-In-Reply-To: <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
-References: <1371057810-3189-1-git-send-email-lauraa@codeaurora.org>
- <1371057810-3189-3-git-send-email-lauraa@codeaurora.org>
-Message-ID: <20130618110959.GB5893@mudshark.cambridge.arm.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 18 Jun 2013 14:11:27 +0300
+Subject: [PATCH 0/4] ARM: OMAP4: Panda USB Host support and DVI EDID fix
+Message-ID: <1371553891-29364-1-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 06:23:29PM +0100, Laura Abbott wrote:
-> Other architectures define various set_memory functions to allow
-> attributes to be changed (e.g. set_memory_x, set_memory_rw, etc.)
-> Currently, these functions are missing on ARM. Define these in an
-> appropriate manner for ARM.
-> 
-> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
-> ---
->  arch/arm/include/asm/cacheflush.h |    5 ++
->  arch/arm/mm/mmu.c                 |   86 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 91 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/cacheflush.h b/arch/arm/include/asm/cacheflush.h
-> index bff7138..55ed26b 100644
-> --- a/arch/arm/include/asm/cacheflush.h
-> +++ b/arch/arm/include/asm/cacheflush.h
-> @@ -438,4 +438,9 @@ static inline void __sync_cache_range_r(volatile void *p, size_t size)
->  #define sync_cache_w(ptr) __sync_cache_range_w(ptr, sizeof *(ptr))
->  #define sync_cache_r(ptr) __sync_cache_range_r(ptr, sizeof *(ptr))
->  
-> +int set_memory_ro(unsigned long addr, int numpages);
-> +int set_memory_rw(unsigned long addr, int numpages);
-> +int set_memory_x(unsigned long addr, int numpages);
-> +int set_memory_nx(unsigned long addr, int numpages);
+Hi Benoit & Tony,
 
-This seems like a pretty clunky interface with a horribly generic name, but
-that seems to be what x86 and s390 are using. I wonder if there would be any
-interest in tidying it up a bit? It really looks like something that is
-x86-specific but has started to grow users in core code (set_memory_4k?!).
+The first two patches make changes to dts files to get USB host support
+and DVI EDID to work on Panda.
 
-Will
+The third patch should get USB host functional on uEVM.
+
+The fourth patch is a temporary workaround to create a clock alias to
+the USB PHY clock as it is not possible to define this via device tree.
+This patch is required for USB host to work on Panda and uEVM.
+
+The first 3 patches are for Benoit and the last one is for Tony.
+
+cheers,
+-roger
+
+Roger Quadros (4):
+  ARM: dts: omap4-panda: Add USB Host support
+  ARM: dts: omap4-panda: Fix DVI EDID reads
+  ARM: dts: omap5-uevm: Provide USB Host PHY clock frequency
+  ARM: OMAP2+: dts: HACK: Provide alias to USB PHY clock
+
+ arch/arm/boot/dts/omap4-panda-common.dtsi |   67 +++++++++++++++++++++++++++++
+ arch/arm/boot/dts/omap5-uevm.dts          |    7 +++
+ arch/arm/mach-omap2/board-generic.c       |   23 +++++++++-
+ 3 files changed, 96 insertions(+), 1 deletions(-)
+
+-- 
+1.7.4.1
