@@ -1,126 +1,106 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Jun 2013 07:39:20 -0400
-Subject: [PATCH v3 06/12] memory: mvebu-devbus: Remove address decoding
- window workaround
-In-Reply-To: <1371554737-25319-7-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-7-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130618113920.GW31667@titan.lakedaemon.net>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 18 Jun 2013 14:01:39 +0200
+Subject: [PATCH v4 02/10] pinctrl: mvebu: dove pinctrl driver
+In-Reply-To: <20130618113606.GA26763@n2100.arm.linux.org.uk>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347550912-18021-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130618113606.GA26763@n2100.arm.linux.org.uk>
+Message-ID: <51C04C23.4090807@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 08:25:31AM -0300, Ezequiel Garcia wrote:
-> Now that mbus device tree binding has been introduced, remove the address
-> decoding window management from this driver.
-> A suitable 'ranges' entry should be added to the devbus-compatible node in
-> the device tree, as described by the mbus binding documentation.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> ---
->  drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
->  1 file changed, 2 insertions(+), 62 deletions(-)
+On 06/18/13 13:36, Russell King - ARM Linux wrote:
+> On Thu, Sep 13, 2012 at 05:41:44PM +0200, Sebastian Hesselbarth wrote:
+>> +#define DOVE_GLOBAL_CONFIG_1		(DOVE_SB_REGS_VIRT_BASE | 0xe802C)
+>> +#define  DOVE_TWSI_ENABLE_OPTION1	BIT(7)
+>> +#define DOVE_GLOBAL_CONFIG_2		(DOVE_SB_REGS_VIRT_BASE | 0xe8030)
+>> +#define  DOVE_TWSI_ENABLE_OPTION2	BIT(20)
+>> +#define  DOVE_TWSI_ENABLE_OPTION3	BIT(21)
+>> +#define  DOVE_TWSI_OPTION3_GPIO		BIT(22)
+> ...
 
-Unfortunately, the patch adding mvebu-devbus is going through gregkh's
-tree.  Either this patch needs to wait for v3.12, or ask Greg if he can
-take this one.
+Russell,
 
-thx,
+the above absolute addresses already made me think of cleaning up dove
+pinctrl a while ago. I also had in mind that below function exclusively
+request ownership of global config registers.
 
-Jason.
+>> +static int dove_twsi_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
+>> +				unsigned long config)
+>> +{
+>> +	unsigned long gcfg1 = readl(DOVE_GLOBAL_CONFIG_1);
+>> +	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
+>> +
+>> +	gcfg1 &= ~DOVE_TWSI_ENABLE_OPTION1;
+>> +	gcfg2 &= ~(DOVE_TWSI_ENABLE_OPTION2 | DOVE_TWSI_ENABLE_OPTION2);
+>> +
+>> +	switch (config) {
+>> +	case 1:
+>> +		gcfg1 |= DOVE_TWSI_ENABLE_OPTION1;
+>> +		break;
+>> +	case 2:
+>> +		gcfg2 |= DOVE_TWSI_ENABLE_OPTION2;
+>> +		break;
+>> +	case 3:
+>> +		gcfg2 |= DOVE_TWSI_ENABLE_OPTION3;
+>> +		break;
+>> +	}
+>> +
+>> +	writel(gcfg1, DOVE_GLOBAL_CONFIG_1);
+>> +	writel(gcfg2, DOVE_GLOBAL_CONFIG_2);
+>> +
+>> +	return 0;
+>> +}
+>
+> So, I've just been thinking about the LCD clocking on the Armada 510,
+> and found that there's dividers for the internal LCD clocks in the
+> global config 1/2 registers.  So I grepped the kernel source for
+> references to these, expecting to find something in drivers/clk, but
+> found the above.
 
-> 
-> diff --git a/drivers/memory/mvebu-devbus.c b/drivers/memory/mvebu-devbus.c
-> index 978e8e3..94c9248 100644
-> --- a/drivers/memory/mvebu-devbus.c
-> +++ b/drivers/memory/mvebu-devbus.c
-> @@ -208,16 +208,11 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
->  {
->  	struct device *dev = &pdev->dev;
->  	struct device_node *node = pdev->dev.of_node;
-> -	struct device_node *parent;
->  	struct devbus *devbus;
->  	struct resource *res;
->  	struct clk *clk;
->  	unsigned long rate;
-> -	const __be32 *ranges;
-> -	int err, cs;
-> -	int addr_cells, p_addr_cells, size_cells;
-> -	int ranges_len, tuple_len;
-> -	u32 base, size;
-> +	int err;
->  
->  	devbus = devm_kzalloc(&pdev->dev, sizeof(struct devbus), GFP_KERNEL);
->  	if (!devbus)
-> @@ -248,68 +243,13 @@ static int mvebu_devbus_probe(struct platform_device *pdev)
->  		return err;
->  
->  	/*
-> -	 * Allocate an address window for this device.
-> -	 * If the device probing fails, then we won't be able to
-> -	 * remove the allocated address decoding window.
-> -	 *
-> -	 * FIXME: This is only a temporary hack! We need to do this here
-> -	 * because we still don't have device tree bindings for mbus.
-> -	 * Once that support is added, we will declare these address windows
-> -	 * statically in the device tree, and remove the window configuration
-> -	 * from here.
-> -	 */
-> -
-> -	/*
-> -	 * Get the CS to choose the window string.
-> -	 * This is a bit hacky, but it will be removed once the
-> -	 * address windows are declared in the device tree.
-> -	 */
-> -	cs = (((unsigned long)devbus->base) % 0x400) / 8;
-> -
-> -	/*
-> -	 * Parse 'ranges' property to obtain a (base,size) window tuple.
-> -	 * This will be removed once the address windows
-> -	 * are declared in the device tree.
-> -	 */
-> -	parent = of_get_parent(node);
-> -	if (!parent)
-> -		return -EINVAL;
-> -
-> -	p_addr_cells = of_n_addr_cells(parent);
-> -	of_node_put(parent);
-> -
-> -	addr_cells = of_n_addr_cells(node);
-> -	size_cells = of_n_size_cells(node);
-> -	tuple_len = (p_addr_cells + addr_cells + size_cells) * sizeof(__be32);
-> -
-> -	ranges = of_get_property(node, "ranges", &ranges_len);
-> -	if (ranges == NULL || ranges_len != tuple_len)
-> -		return -EINVAL;
-> -
-> -	base = of_translate_address(node, ranges + addr_cells);
-> -	if (base == OF_BAD_ADDR)
-> -		return -EINVAL;
-> -	size = of_read_number(ranges + addr_cells + p_addr_cells, size_cells);
-> -
-> -	/*
-> -	 * Create an mbus address windows.
-> -	 * FIXME: Remove this, together with the above code, once the
-> -	 * address windows are declared in the device tree.
-> -	 */
-> -	err = mvebu_mbus_add_window(devbus_wins[cs], base, size);
-> -	if (err < 0)
-> -		return err;
-> -
-> -	/*
->  	 * We need to create a child device explicitly from here to
->  	 * guarantee that the child will be probed after the timing
->  	 * parameters for the bus are written.
->  	 */
->  	err = of_platform_populate(node, NULL, NULL, dev);
-> -	if (err < 0) {
-> -		mvebu_mbus_del_window(base, size);
-> +	if (err < 0)
->  		return err;
-> -	}
->  
->  	return 0;
->  }
-> -- 
-> 1.8.1.5
-> 
+We have no peripheral clock handling for Dove, yet. Just core clocks and
+clock gates are implemented. And I guess they are DT only anyway.
+
+> However, todays kernel is sometimes SMP, commonly with kernel preemption
+> enabled, maybe even RT.  This makes things like the above sequence a
+> problem where a multifunction register is read, modified and then
+> written back.
+>
+> Consider two threads doing this, and a preemption event happening in the
+> middle of this sequence to another thread also doing a read-modify-write
+> of the same register.  Which one wins depends on the preemption sequence,
+> but ultimately one loses out.
+
+Yeah, sure. We have the same issue with watchdog driver messing with
+timer registers. There I exported a function to _clrset TIMER_CTRL
+register safely. Just went into irqchip (tip for-next).
+
+> Any access to such registers needs careful thought, and protection in some
+> manner.
+>
+> Maybe what we need is something like this:
+>
+> static DEFINE_SPINLOCK(io_lock);
+> static void modifyl(u32 new, u32 mask, void __iomem *reg)
+> {
+> 	unsigned long flags;
+> 	u32 val;
+>
+> 	spin_lock_irqsave(&io_lock, flags);
+> 	val = readl(reg) & ~mask;
+> 	val |= new | mask;
+> 	writel(val, reg);
+> 	spin_unlock_irqrestore(&io_lock, flags);
+> }
+>
+> in order to provide arbitrated access to these kinds of multifunction
+> registers in a safe, platform agnostic way.
+
+I am fine with a generic modify function with a single lock. Most cases
+should be fine with a single lock even for non-related register
+accesses, e.g. watchdog will access TIMER_CTRL only once to enable
+itself. If you think you need a special lock because you have a lot of
+writes to shared registers, you can still have your own modify lock.
+
+Sebastian
