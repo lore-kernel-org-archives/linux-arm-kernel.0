@@ -1,42 +1,37 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 19:16:41 +0200
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <20130618191255.178d2f42@skate>
+Date: Tue, 18 Jun 2013 19:18:58 +0200
+Subject: [PATCH v3 11/12] ARM: mvebu: Relocate Armada 370 PCIe device tree
+ nodes
+In-Reply-To: <20130618191535.44fe595c@skate>
 References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306181814.33941.arnd@arndb.de> <20130618191255.178d2f42@skate>
-Message-ID: <201306181916.41378.arnd@arndb.de>
+ <201306181829.35514.arnd@arndb.de> <20130618191535.44fe595c@skate>
+Message-ID: <201306181918.59046.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tuesday 18 June 2013, Thomas Petazzoni wrote:
-> Dear Arnd Bergmann,
-> 
-> On Tue, 18 Jun 2013 18:14:33 +0200, Arnd Bergmann wrote:
-> 
-> > Using 0xffff0002 as a placeholder for the pcie translation is definitely
-> > better than 0xffff0000 as you had before, but let me ask again in case
-> > you missed it the last time (and sorry if I missed the answer):
+> > To clarify my earlier comment, I think it would be nicer to write this as
 > > 
-> > Why not just put the actual translation here the way it happens for each
-> > of the PCIe ports? With the definition here, the PCIe driver actually has no
-> > way to figure out what settings the windows need to use!
+> >                        ranges =
+> >                               <0x82000000 0 0x40000    0xffff0001 0x40000 0 0x00002000
+> >                                0x82000000 0 0x80000    0xffff0001 0x80000 0 0x00002000
+> >                                0x82000000 1 0 MBUS_ID(0x12, 0x34) 0  1 0
+> >                                0x82000000 2 0 MBUS_ID(0x13, 0x34) 0  1 0
+> >                                0x81000000 1 0 MBUS_ID(0x12, 0x35) 0 0 0x10000;
+> >                                0x81000000 2 0 MBUS_ID(0x13, 0x35) 0 0 0x10000>;
+> > 
+> > The MBUS_ID numbers above are made up since I don't know them, but this way you can
+> > describe how the entire 4GB MMIO address space of the PCI bus is mapped into the
+> > MBUS address space.
 > 
-> Come on Arnd, this is something we have already discussed countless
-> times with you.
+> This is NOT possible because we don't know in advance how much memory
+> space and I/O space each PCIe device will require.
 > 
-> We cannot define translations for each PCIe port because we don't
-> know in advance how much I/O and memory space each PCIe device will
-> request. This is the reason why we have one global range for I/O
-> space and one global space for memory space, that are given to the
-> Linux PCI core, which then dynamically assigns sub-ranges for each
-> PCIe device into those two global ranges.
+> Arnd, we've discussed this at length with you while getting the PCIe
+> driver merged, and we've explained this to you numerous times. Could
+> you please understand that any of your proposal that suggests writing
+> down static windows for PCIe devices will not work?
 
-Could you just stop assuming that I'm an idiot and read my suggestion?
-
-The information that this puts into the device-tree is not where things
-are mapped by how things are connected in hardware. The mbus mapping
-is the part that is variable, while the PCI mapping is actually fixed
-in hardware.
+Where did I suggest static windows for PCIe devices?
 
 	Arnd
