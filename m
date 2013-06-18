@@ -1,62 +1,70 @@
 From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 17 Jun 2013 19:08:47 -0500
-Subject: [PATCH 0/2] Fix potential merge conflict for dw_apb_timer_of 
-Message-ID: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
+Date: Mon, 17 Jun 2013 19:08:49 -0500
+Subject: [PATCH 2/2] clocksource: dw_apb_timer_of: Fix read_sched_clock
+In-Reply-To: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
+References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
+Message-ID: <1371514129-22801-3-git-send-email-dinguyen@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Dinh Nguyen <dinguyen@altera.com>
 
-Hi Arnd/Olof,
+The read_sched_clock should return the ~value because the clock is a
+countdown implementation. read_sched_clock() should be the same as
+__apbt_read_clocksource().
 
-Because of the following patch series that is currently in arm-soc/for-next:
+If a separate timer for the sched_clock exist, then read_sched_clock()
+will return an incorrect value. The (sched_io_base + 0x4) needs to be in
+the function for both cases.
 
-10021488997317d1121505a7ac659124c058efed clocksource: dw_apb_timer_of: use clocksource_of_init
-1b4eca0f634be2a99f2baa6c29dfd183590ead3f clocksource: dw_apb_timer_of: select DW_APB_TIMER
-a8b447f2bbbba737ff4478f498d7f83c75a9461b clocksource: dw_apb_timer_of: add clock-handling
-a1198f83407ae3421f3f58355a0f296d5ea6249c clocksource: dw_apb_timer_of: enable the use the clocksource as sched clock
+Also, remove the use of "dw-apb-timer-sp" and "dw-apb-timer-osc" since
+they are the same DW clock.
 
-there will be a merge conflict with:
-
-55a68c23e0a675b2b8ac2656fd6edbf98b78e4c6 dw_apb_timer_of.c: Remove parts that were picoxcell-specific
-
-that is currently in John Stultz's tree fortglx/3.11/time.
-
-The following 2 patches will eliminate the need for the patch in John
-Stultz's tree. If there is to be merge of the 2 trees, then the
-patch:
-
-dw_apb_timer_of.c: Remove parts that were picoxcell-specific
-
-can be removed from John's tree to avoid a merge-conflict.
-
-Based on arm-soc/for-next:
-
-PATCH[1/2] - Rename "dw-apb-timer-osc" and "dw-apb-timer-sp" bindings to just
-"dw-apb-timer"
-PATCH[2/2] - Fix user/system reporting by fixing read_sched_clock()
-
-Thanks,
-Dinh
-
-Dinh Nguyen (2):
-  ARM: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to just
-    dw-apb-timer
-  clocksource: dw_apb_timer_of: Fix read_sched_clock
-
- Documentation/devicetree/bindings/rtc/dw-apb.txt |   21 +++------------------
- arch/arm/boot/dts/socfpga.dtsi                   |   12 ++++++++----
- drivers/clocksource/dw_apb_timer_of.c            |    7 +++----
- 3 files changed, 14 insertions(+), 26 deletions(-)
-
-
+Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
+CC: Rob Herring <rob.herring@calxeda.com>
 CC: Arnd Bergmann <arnd@arndb.de>
 Cc: Olof Johansson <olof@lixom.net>
 CC: Jamie Iles <jamie@jamieiles.com>
 Cc: John Stultz <john.stultz@linaro.org>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Linus Walleij <linus.walleij@linaro.org>
 Cc: Pavel Machek <pavel@denx.de>
-Cc: devicetree-discuss at lists.ozlabs.org
+Cc: Heiko Stuebner <heiko@sntech.de>
 Cc: linux-arm-kernel at lists.infradead.org
+---
+ drivers/clocksource/dw_apb_timer_of.c |    7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index cef5544..8dcbd4e 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -104,18 +104,17 @@ static void add_clocksource(struct device_node *source_timer)
+ 	 * timer is found. sched_io_base then points to the current_value
+ 	 * register of the clocksource timer.
+ 	 */
+-	sched_io_base = iobase + 0x04;
++	sched_io_base = iobase;
+ 	sched_rate = rate;
+ }
+ 
+ static u32 read_sched_clock(void)
+ {
+-	return __raw_readl(sched_io_base);
++	return ~__raw_readl(sched_io_base + 0x4);
+ }
+ 
+ static const struct of_device_id sptimer_ids[] __initconst = {
+ 	{ .compatible = "picochip,pc3x2-rtc" },
+-	{ .compatible = "snps,dw-apb-timer-sp" },
+ 	{ /* Sentinel */ },
+ };
+ 
+@@ -155,4 +154,4 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+ 	num_called++;
+ }
+ CLOCKSOURCE_OF_DECLARE(pc3x2_timer, "picochip,pc3x2-timer", dw_apb_timer_init);
+-CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
++CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer", dw_apb_timer_init);
 -- 
 1.7.9.5
