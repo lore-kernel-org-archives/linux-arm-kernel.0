@@ -1,41 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jun 2013 09:43:08 +0100
-Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
-References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
- <1371467722-665-1-git-send-email-inki.dae@samsung.com>
- <51BEF458.4090606@canonical.com>
- <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
- <20130617133109.GG2718@n2100.arm.linux.org.uk>
- <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
- <20130617154237.GJ2718@n2100.arm.linux.org.uk>
- <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
- <20130617182127.GM2718@n2100.arm.linux.org.uk>
- <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
-Message-ID: <20130618084308.GU2718@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 18 Jun 2013 10:45:51 +0200
+Subject: [GIT PULL] at91: soc updates for 3.11 #1
+In-Reply-To: <CAOesGMixxxUg-9h9KFNxAvp8DSNJN-SEQxXnU51BQJ9cAxSGBw@mail.gmail.com>
+References: <1371246138-22207-1-git-send-email-nicolas.ferre@atmel.com>
+ <20130615023702.GA8635@quad.lixom.net>
+ <EABCC4A72A203F4BA2E04297CF0282C427D1E1F8@hnombx01.corp.atmel.com>
+ <CAOesGMixxxUg-9h9KFNxAvp8DSNJN-SEQxXnU51BQJ9cAxSGBw@mail.gmail.com>
+Message-ID: <51C01E3F.7000303@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 02:27:40PM +0900, Inki Dae wrote:
-> So I'd like to ask for other DRM maintainers. How do you think about it? it
-> seems like that Intel DRM (maintained by Daniel), OMAP DRM (maintained by
-> Rob) and GEM CMA helper also have same issue Russell pointed out. I think
-> not only the above approach but also the performance is very important.
+On 17/06/2013 18:59, Olof Johansson :
+> On Mon, Jun 17, 2013 at 2:20 AM, Ferre, Nicolas <Nicolas.FERRE@atmel.com> wrote:
+>> From: Olof Johansson [olof at lixom.net]
+>>> Hi,
+>>>
+>>> On Fri, Jun 14, 2013 at 11:42:18PM +0200, Nicolas Ferre wrote:
+>>>> Arnd, Olof,
+>>>>
+>>>> A little AT91 pull-request for patches that are more targeted to SoC/boards
+>>>> modifications. It is prepared on top of the arm-soc/at91/cleanup branch.
+>>>>
+>>>> Thanks, best regards,
+>>>>
+>>>> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
+>>>>
+>>>>    ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
+>>>>
+>>>> are available in the git repository at:
+>>>>
+>>>>    git://github.com/at91linux/linux-at91.git tags/at91-soc
+>>>>
+>>>> for you to fetch changes up to 7e75545ea7fb972c3da759f92c3d0be84d1cee72:
+>>>>
+>>>>    ARM: at91: drop rm9200dk board support (2013-06-14 23:34:11 +0200)
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Two non critical fixes that can go in 3.11.
+>>>> An old board removed.
+>>>>
+>>>> ----------------------------------------------------------------
+>>>> Alexandre Belloni (1):
+>>>>        ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+>>>
+>>> Fix
+>>>
+>>>> Jean-Christophe PLAGNIOL-VILLARD (1):
+>>>>        ARM: at91: drop rm9200dk board support
+>>>
+>>> Cleanup
+>>>
+>>>> Wenyou Yang (1):
+>>>>        ARM: at91: Change the internal SRAM memory type MT_MEMORY_NONCACHED
+>>>
+>>> Fix
+>>>
+>>> ...assuming, of course, that none of the fixes are for errors introduced in
+>>> some branch we already pulled, since then they should go on top of that branch.
+>>
+>> I do agree with you but:
+>> 1/ the fixes are non-critical ones, so I do not see the need for another branch
+>
+> We're happy to take branches with fixes that are not needed for
+> current release and queue them for the next one. We tend to merge
+> those into next/fixes-non-critical.
+>
+>> 2/ I didn't feel like touching the "cleanup" branch because we want to base all our 3.11 material on top of it, without adding new patches on top.
+>
+> Adding new patches on top of a branch that is a base for something
+> else is just fine, and is the way you're supposed to do things. You
+> don't have to rebase the dependent branches just because they're not
+> based on the tip of the cleanup tree any more. I.e. just send another
+> pull request for "cleanups2" or whatever, that's based on the old
+> cleanups branch/tag. After that, cleanups3 would be based on
+> cleanups2. Etc. Some platforms do this a lot.
+>
+> Of course, that assumes that the additional cleanups don't conflict
+> heavy with the later dependent branches like I already said. I don't
+> think that was the case this time?
 
-CMA uses coherent memory to back their buffers, though that might not be
-true of memory obtained from other drivers via dma_buf.  Plus, there is
-no support in the CMA helper for exporting or importng these buffers.
+Fair enough, I have just sent 2 pull-requests:
+- a fixes-non-critical one
+- a cleanup one
 
-I guess Intel i915 is only used on x86, which is a coherent platform and
-requires no cache maintanence for DMA.
-
-OMAP DRM does not support importing non-DRM buffers buffers back into
-DRM.  Moreover, it will suffer from the problems I described if any
-attempt is made to write to the buffer after it has been re-imported.
-
-Lastly, I should point out that the dma_buf stuff is really only useful
-when you need to export a dma buffer from one driver and import it into
-another driver - for example to pass data from a camera device driver to
-a display device driver.  It shouldn't be used within a single driver
-as a means of passing buffers between userspace and kernel space.
+Bye,
+-- 
+Nicolas Ferre
