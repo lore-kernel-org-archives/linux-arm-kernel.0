@@ -1,117 +1,98 @@
-From: shc_work@mail.ru (Alexander Shiyan)
-Date: Tue, 18 Jun 2013 19:46:47 +0400
-Subject: [PATCH 1/4] drivers: bus: imx-weim: Remove private driver data
-Message-ID: <1371570410-12773-1-git-send-email-shc_work@mail.ru>
+From: agraf@suse.de (Alexander Graf)
+Date: Tue, 18 Jun 2013 17:51:42 +0200
+Subject: [PATCH 2/7] KVM: arm-vgic: Set base addr through device API
+In-Reply-To: <20130618154634.GD3332@lvm>
+References: <1370926279-32532-1-git-send-email-christoffer.dall@linaro.org>
+ <1370926279-32532-3-git-send-email-christoffer.dall@linaro.org>
+ <C2CF6B47-18E3-456B-9BE4-0682A7DD0DE9@suse.de> <20130618154634.GD3332@lvm>
+Message-ID: <4A58F898-C212-489B-86F7-05D07D7E4A03@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver uses only probe function so no reason to keep variables
-in private driver data.
 
-Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
----
- drivers/bus/imx-weim.c | 41 ++++++++++++++---------------------------
- 1 file changed, 14 insertions(+), 27 deletions(-)
+On 18.06.2013, at 17:46, Christoffer Dall wrote:
 
-diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
-index 349f14e..0c0e6fe 100644
---- a/drivers/bus/imx-weim.c
-+++ b/drivers/bus/imx-weim.c
-@@ -12,11 +12,6 @@
- #include <linux/io.h>
- #include <linux/of_device.h>
- 
--struct imx_weim {
--	void __iomem *base;
--	struct clk *clk;
--};
--
- static const struct of_device_id weim_id_table[] = {
- 	{ .compatible = "fsl,imx6q-weim", },
- 	{}
-@@ -27,10 +22,8 @@ MODULE_DEVICE_TABLE(of, weim_id_table);
- #define CS_REG_RANGE  0x18
- 
- /* Parse and set the timing for this device. */
--static int
--weim_timing_setup(struct platform_device *pdev, struct device_node *np)
-+static int weim_timing_setup(struct device_node *np, void __iomem *base)
- {
--	struct imx_weim *weim = platform_get_drvdata(pdev);
- 	u32 value[CS_TIMING_LEN];
- 	u32 cs_idx;
- 	int ret;
-@@ -52,11 +45,11 @@ weim_timing_setup(struct platform_device *pdev, struct device_node *np)
- 
- 	/* set the timing for WEIM */
- 	for (i = 0; i < CS_TIMING_LEN; i++)
--		writel(value[i], weim->base + cs_idx * CS_REG_RANGE + i * 4);
-+		writel(value[i], base + cs_idx * CS_REG_RANGE + i * 4);
- 	return 0;
- }
- 
--static int weim_parse_dt(struct platform_device *pdev)
-+static int weim_parse_dt(struct platform_device *pdev, void __iomem *base)
- {
- 	struct device_node *child;
- 	int ret;
-@@ -65,7 +58,7 @@ static int weim_parse_dt(struct platform_device *pdev)
- 		if (!child->name)
- 			continue;
- 
--		ret = weim_timing_setup(pdev, child);
-+		ret = weim_timing_setup(child, base);
- 		if (ret) {
- 			dev_err(&pdev->dev, "%s set timing failed.\n",
- 				child->full_name);
-@@ -82,38 +75,32 @@ static int weim_parse_dt(struct platform_device *pdev)
- 
- static int weim_probe(struct platform_device *pdev)
- {
--	struct imx_weim *weim;
- 	struct resource *res;
-+	struct clk *clk;
-+	void __iomem *base;
- 	int ret = -EINVAL;
- 
--	weim = devm_kzalloc(&pdev->dev, sizeof(*weim), GFP_KERNEL);
--	if (!weim) {
--		ret = -ENOMEM;
--		goto weim_err;
--	}
--	platform_set_drvdata(pdev, weim);
--
- 	/* get the resource */
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
--	weim->base = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(weim->base)) {
--		ret = PTR_ERR(weim->base);
-+	base = devm_ioremap_resource(&pdev->dev, res);
-+	if (IS_ERR(base)) {
-+		ret = PTR_ERR(base);
- 		goto weim_err;
- 	}
- 
- 	/* get the clock */
--	weim->clk = devm_clk_get(&pdev->dev, NULL);
--	if (IS_ERR(weim->clk))
-+	clk = devm_clk_get(&pdev->dev, NULL);
-+	if (IS_ERR(clk))
- 		goto weim_err;
- 
--	ret = clk_prepare_enable(weim->clk);
-+	ret = clk_prepare_enable(clk);
- 	if (ret)
- 		goto weim_err;
- 
- 	/* parse the device node */
--	ret = weim_parse_dt(pdev);
-+	ret = weim_parse_dt(pdev, base);
- 	if (ret) {
--		clk_disable_unprepare(weim->clk);
-+		clk_disable_unprepare(clk);
- 		goto weim_err;
- 	}
- 
--- 
-1.8.1.5
+> On Tue, Jun 18, 2013 at 03:25:04PM +0200, Alexander Graf wrote:
+>> 
+>> 
+>> Am 11.06.2013 um 06:51 schrieb Christoffer Dall <christoffer.dall@linaro.org>:
+>> 
+>>> Support setting the distributor and cpu interface base addresses in the
+>>> VM physical address space through the KVM_{SET,GET}_DEVICE_ATTR API
+>>> in addition the ARM specific API.
+>>> 
+>>> This has the added benefit of being able to share more code in user
+>>> space and do things in a uniform maner.
+>>> 
+>>> Also deprecate the older API at the same time, but backwards
+>>> compatibility will be maintained.
+>>> 
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>> Documentation/virtual/kvm/api.txt              |    5 +-
+>>> Documentation/virtual/kvm/devices/arm-vgic.txt |   11 +++
+>>> arch/arm/kvm/arm.c                             |    2 +-
+>>> include/kvm/arm_vgic.h                         |    2 +-
+>>> virt/kvm/arm/vgic.c                            |   90 ++++++++++++++++++++----
+>>> 5 files changed, 95 insertions(+), 15 deletions(-)
+>>> 
+>>> diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
+>>> index 5f91eda..ea5ec4a 100644
+>>> --- a/Documentation/virtual/kvm/api.txt
+>>> +++ b/Documentation/virtual/kvm/api.txt
+>>> @@ -2305,7 +2305,7 @@ This ioctl returns the guest registers that are supported for the
+>>> KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
+>>> 
+>>> 
+>>> -4.80 KVM_ARM_SET_DEVICE_ADDR
+>>> +4.80 KVM_ARM_SET_DEVICE_ADDR (deprecated)
+>>> 
+>>> Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
+>>> Architectures: arm
+>>> @@ -2342,6 +2342,9 @@ and distributor interface, the ioctl must be called after calling
+>>> KVM_CREATE_IRQCHIP, but before calling KVM_RUN on any of the VCPUs.  Calling
+>>> this ioctl twice for any of the base addresses will return -EEXIST.
+>>> 
+>>> +Note, this IOCTL is deprecated and the more flexible SET/GET_DEVICE_ATTR API
+>>> +should be used instead.
+>>> +
+>>> 4.82 KVM_PPC_RTAS_DEFINE_TOKEN
+>>> 
+>>> Capability: KVM_CAP_PPC_RTAS
+>>> diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>>> index 25fd2d9..ca83ad8 100644
+>>> --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
+>>> +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
+>>> @@ -8,3 +8,14 @@ Only one VGIC instance may be instantiated through either this API or the
+>>> legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
+>>> controller, requiring emulated user-space devices to inject interrupts to the
+>>> VGIC instead of directly to CPUs.
+>>> +
+>>> +Groups:
+>> 
+>> Ah, here they are :)
+>> 
+>>> +  KVM_DEV_ARM_VGIC_GRP_ADDR
+>>> +  Attributes:
+>>> +    KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
+>>> +      Base address in the guest physical address space of the GIC distributor
+>>> +      register mappings.
+>>> +
+>>> +    KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
+>>> +      Base address in the guest physical address space of the GIC virtual cpu
+>>> +      interface register mappings.
+>> 
+>> Is this per-cpu or per-vgic? Can different CPUs have their gic interface maps mapped at different offsets?
+>> 
+> This is per-vgic.
+> 
+> If the _CPU part is confusing, it means it's the address of the CPU
+> interface, as opposed to the Distributor interface.  Individual CPUs
+> calculate their specific offset from this base address based on a mask,
+> but the base is common for everyone (and banked depending on the
+> accessing CPU for a certain region).
+
+Ah, that's perfectly fine then. On the MPIC this is part of the normal address space, so I was merely confused on why it has a separate offset. But I guess you can't argue about how hardware works ;).
+
+
+Alex
