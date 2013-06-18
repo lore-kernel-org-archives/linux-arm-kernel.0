@@ -1,51 +1,53 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 18 Jun 2013 19:14:52 +0200
-Subject: [PATCH 2/2] Watchdog: fix clearing of the watchdog interrupt
-In-Reply-To: <E1Uoye0-0001Cw-Po@rmk-PC.arm.linux.org.uk>
-References: <E1Uoye0-0001Cw-Po@rmk-PC.arm.linux.org.uk>
-Message-ID: <20130618171452.GB31360@lunn.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 18 Jun 2013 19:15:35 +0200
+Subject: [PATCH v3 11/12] ARM: mvebu: Relocate Armada 370 PCIe device
+ tree nodes
+In-Reply-To: <201306181829.35514.arnd@arndb.de>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-12-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306181829.35514.arnd@arndb.de>
+Message-ID: <20130618191535.44fe595c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 05:20:32PM +0100, Russell King wrote:
-> The bits in BRIDGE_CAUSE are documented as RW0C - read, write 0 to
-> clear.  If we read the register, mask off the watchdog bit, and
-> write it back, we're actually clearing every interrupt which wasn't
-> pending at the time we read the register - and that is racy.
+Dear Arnd Bergmann,
+
+On Tue, 18 Jun 2013 18:29:35 +0200, Arnd Bergmann wrote:
+
+> To clarify my earlier comment, I think it would be nicer to write this as
 > 
-> Fix this to only write ~WATCHDOG_BIT to the register, which means
-> we write as zero only the watchdog bit.
+>                        ranges =
+>                               <0x82000000 0 0x40000    0xffff0001 0x40000 0 0x00002000
+>                                0x82000000 0 0x80000    0xffff0001 0x80000 0 0x00002000
+>                                0x82000000 1 0 MBUS_ID(0x12, 0x34) 0  1 0
+>                                0x82000000 2 0 MBUS_ID(0x13, 0x34) 0  1 0
+>                                0x81000000 1 0 MBUS_ID(0x12, 0x35) 0 0 0x10000;
+>                                0x81000000 2 0 MBUS_ID(0x13, 0x35) 0 0 0x10000>;
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  drivers/watchdog/orion_wdt.c |    4 +---
->  1 files changed, 1 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/watchdog/orion_wdt.c b/drivers/watchdog/orion_wdt.c
-> index 4074244..4ea5fcc 100644
-> --- a/drivers/watchdog/orion_wdt.c
-> +++ b/drivers/watchdog/orion_wdt.c
-> @@ -70,9 +70,7 @@ static int orion_wdt_start(struct watchdog_device *wdt_dev)
->  	writel(wdt_tclk * wdt_dev->timeout, wdt_reg + WDT_VAL);
->  
->  	/* Clear watchdog timer interrupt */
-> -	reg = readl(BRIDGE_CAUSE);
-> -	reg &= ~WDT_INT_REQ;
-> -	writel(reg, BRIDGE_CAUSE);
-> +	writel(~WDT_INT_REQ, BRIDGE_CAUSE);
->  
->  	/* Enable watchdog timer */
->  	reg = readl(wdt_reg + TIMER_CTRL);
-> -- 
-> 1.7.4.4
+> The MBUS_ID numbers above are made up since I don't know them, but this way you can
+> describe how the entire 4GB MMIO address space of the PCI bus is mapped into the
+> MBUS address space.
 
+This is *NOT* possible because we don't know in advance how much memory
+space and I/O space each PCIe device will require.
 
-Hi Russell
+Arnd, we've discussed this at length with you while getting the PCIe
+driver merged, and we've explained this to you numerous times. Could
+you please understand that *any* of your proposal that suggests writing
+down static windows for PCIe devices will *not* work?
 
-For this, and patch 1/2:
+> Does this make sense?
 
-Tested-by: Andrew Lunn <andrew@lunn.ch>
+Not at all. Please read once again the hundreds of e-mails we've
+exchanged about the need for dynamic windows for PCIe devices, which
+lead us to have the emulated PCI-to-PCI bridge stuff. I'm starting to
+be fed up to re-explain this to you over-and-over again.
 
-On a kirkwood.
+Best regards,
 
-   Andrew
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
