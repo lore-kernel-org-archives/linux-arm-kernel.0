@@ -1,38 +1,49 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 18 Jun 2013 20:24:56 +0200
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <20130618174622.GD2204@obsidianresearch.com>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130618174622.GD2204@obsidianresearch.com>
-Message-ID: <51C0A5F8.8030300@gmail.com>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 18 Jun 2013 11:28:08 -0700
+Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
+In-Reply-To: <alpine.DEB.2.02.1306172019270.17176@utopia.booyaka.com>
+References: <20130607121505.21868.72360.stgit@dusk.lan>
+ <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
+ <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
+ <51B6D239.5030905@nvidia.com>
+ <alpine.DEB.2.02.1306110944130.22645@utopia.booyaka.com>
+ <20130616042256.7541.7096@quantum>
+ <alpine.DEB.2.02.1306172019270.17176@utopia.booyaka.com>
+Message-ID: <20130618182808.9136.26244@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2013 07:46 PM, Jason Gunthorpe wrote:
-> On Tue, Jun 18, 2013 at 08:25:28AM -0300, Ezequiel Garcia wrote:
->> +
->> +IIAA0000
->> +
->> +Where:
->> +  -- I = Marvell defined target ID for programmable windows
->> +  -- A = Marvell defined target attributes for programmable windows
->
-> I thought we agreed to something like:
->
-> SIAA0000
->
-> Where 'S' is the designator for the special items like PCI-E and
-> internal-regs. 0 = normal target ids, 0xF = special ids.
->
-> The target is only 4 bits, the attr is 8, so a little doc update to
-> clarify this should be enough, no need to change the DTs.
+Quoting Paul Walmsley (2013-06-17 13:22:48)
+> Hi,
+> 
+> On Sat, 15 Jun 2013, Mike Turquette wrote:
+> 
+> > These patches appear fine to me but I did not see any Acks, nor could I
+> > tell if a v2 was necessary based on the comments. Will there be another
+> > version?
+> 
+> I'm not planning to do another version at this time.
 
-+1 for SIAA0000, as it allows to use MBUS_ID also for those fake
-windows. It makes it more readable IMHO.
+Thanks for clarifying.  I couldn't tell based on the discussion.
 
-Also allows you to have up to 40b offset, which _might_ be important
-with LPAE enabled.
+Anyways I've taken these into clk-next now.  There is not maintainer for
+that directory as you pointed out, so no need to wait for Acks.
 
-Sebastian
+Regards,
+Mike
+
+> 
+> > If not an Acked-by or Reviewed-by would be cool.
+> 
+> Hmm, not sure who the right people would be.  Looks like the 
+> drivers/clk/tegra directory is unmaintained, so not sure who could ack it?
+> 
+> Peter or Stephen, care to review these patches and send a Reviewed-by?
+> 
+> 
+> - Paul
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
