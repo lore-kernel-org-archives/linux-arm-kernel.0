@@ -1,45 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 18 Jun 2013 16:29:05 +0100
-Subject: [PATCH 1/2] ARM: mmu: fix the hang when we steal a section
- unaligned size memory
-In-Reply-To: <1371113826-1231-1-git-send-email-b32955@freescale.com>
-References: <1371113826-1231-1-git-send-email-b32955@freescale.com>
-Message-ID: <20130618152905.GB8534@mudshark.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jun 2013 17:28:58 +0200
+Subject: [PATCH] ARM: clocksource: add support for MOXA ART SoCs
+In-Reply-To: <1371549604-7201-1-git-send-email-jonas.jensen@gmail.com>
+References: <1371549604-7201-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <201306181728.58869.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 09:57:05AM +0100, Huang Shijie wrote:
-> If we want to steal 128K memory in the machine_desc->reserve() hook, we
-> will hang up immediately.
+On Tuesday 18 June 2013, Jonas Jensen wrote:
+> This patch adds an clocksource driver for the main timer found
+> on MOXA ART SoCs.
 > 
-> The hang reason is like this:
+> Applies to 3.10-rc1 and arm-soc/for-next (2013-06-15)
 > 
->   [1] Stealing 128K makes the left memory is not aligned with the SECTION_SIZE.
-> 
->   [2] So when the map_lowmem() tries to maps the lowmem memory banks,
->       it will call the memblock_alloc(in early_alloc_aligned()) to allocate
->       a page to store the pte. This pte page is in the unaligned region
->       which is not mapped yet.
-> 
->   [3] And when we use the memset() in the early_alloc_aligned(), we will hang
->       right now.
-> 
->   [4] The hang only occurs in the map_lowmem(). After the map_lowmem(), we have
->       setup the PTE mappings. So in the later places, such as
->       dma_contiguous_remap(), the hang will never occurs,
-> 
-> This patch adds a global variable, in_map_lowmem, to check if we are in
-> the map_lowmem() or not. If we are in the map_lowmem(), and we steal
-> a SECTION_SIZE unaligned memory, we will use the memblock_alloc_base()
-> to allocate the pte page. The @max_addr for memblock_alloc_base() is the
-> last mapped address.
+> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
 
-Wouldn't this be better achieved with a parameter, rather than a global
-state variable? That said, I don't completely follow why memblock_alloc is
-giving you back an unmapped physical address. It sounds like we're freeing
-too much as part of the stealing (or simply that stealing has to be section
-aligned), but memblock only deals with physical addresses.
+I didn't look closely before but I agree with Thomas Petazzoni, this should
+be converted to clocksource/clockevent.
 
-Could you elaborate please?
+A few other things I noticed now:
 
-Will
+> +#define APB_CLK 48000000
+
+You are hardcoding the clock rate above, which makes it less portable
+than it should be. Ideally you would use clk_get_rate() on
+the default clock, but you don't actually implement a clk
+driver for your platform and probably don't need one.
+
+I don't know what others think about this, but I'd suggest just
+using a "clock-frequency" property in the device node to read
+the clock rate.
+
+> +#define TIMER_1_COUNT(base_addr)        (base_addr + 0x00)
+> +#define TIMER_1_LOAD(base_addr)         (base_addr + 0x04)
+> +#define TIMER_1_MATCH1(base_addr)       (base_addr + 0x08)
+> +#define TIMER_1_MATCH2(base_addr)       (base_addr + 0x0C)
+> +
+> +#define TIMER_2_COUNT(base_addr)        (base_addr + 0x10)
+> +#define TIMER_2_LOAD(base_addr)         (base_addr + 0x14)
+> +#define TIMER_2_MATCH1(base_addr)       (base_addr + 0x18)
+> +#define TIMER_2_MATCH2(base_addr)       (base_addr + 0x1C)
+> +
+> +#define TIMER_3_COUNT(base_addr)        (base_addr + 0x20)
+> +#define TIMER_3_LOAD(base_addr)         (base_addr + 0x24)
+> +#define TIMER_3_MATCH1(base_addr)       (base_addr + 0x28)
+> +#define TIMER_3_MATCH2(base_addr)       (base_addr + 0x2C)
+> +
+
+You actually seem to have three independent timers here, which
+means you can use one as the clock source and one for clock
+events.
+
+> +#define TIMER1_COUNT                0x0
+> +#define TIMER1_LOAD                 0x4
+> +#define TIMER1_MATCH1               0x8
+> +#define TIMER1_MATCH2               0xC
+> +#define TIMER2_COUNT                0x10
+> +#define TIMER2_LOAD                 0x14
+> +#define TIMER2_MATCH1               0x18
+> +#define TIMER2_MATCH2               0x1C
+> +#define TIMER3_COUNT                0x20
+> +#define TIMER3_LOAD                 0x24
+> +#define TIMER3_MATCH1               0x28
+> +#define TIMER3_MATCH2               0x2C
+> +#define TIMER_INTR_MASK     0x38
+
+These look like duplicates from above. I'd prefer the second syntax, just
+do the addition of base_addr where you need it.
+
+	Arnd
