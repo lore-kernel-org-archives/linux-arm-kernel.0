@@ -1,30 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Jun 2013 09:25:47 +0800
-Subject: [PATCH v2] staging: imx_drm: imx_ldb: fix 18 bit format
-In-Reply-To: <20130617205948.GA3018@kroah.com>
-References: <1371459772-16443-1-git-send-email-s.trumtrar@pengutronix.de>
- <20130617205948.GA3018@kroah.com>
-Message-ID: <20130618012545.GA28381@S2101-09.ap.freescale.net>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 17 Jun 2013 18:37:35 -0700
+Subject: [PATCH] arm64: Define PTE_TYPE_HUGEPAGE
+Message-ID: <1371519455-64998-1-git-send-email-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 01:59:48PM -0700, Greg Kroah-Hartman wrote:
-> On Mon, Jun 17, 2013 at 11:02:52AM +0200, Steffen Trumtrar wrote:
-> > From: Markus Niebel <Markus.Niebel@tqs.de>
-> > 
-> > Since 18 bit is supported as datawidth in device tree it should be
-> > supported in driver. Beside the LDB channel the IPU channel has also
-> > to be configured to use BGR666.
-> > 
-> > Signed-off-by: Markus Niebel <Markus.Niebel@tqs.de>
-> > Signed-off-by: Steffen Trumtrar <s.trumtrar@pengutronix.de>
-> > Tested-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> > This is based on the series: "staging: drm/imx: Add LDB support" by Philipp.
-> 
-> I don't seem to have that series in my queue anywhere, can someone
-> please resend it, and this patch, so that I can apply them?
+PTE_TYPE_HUGEPAGE is referenced by pte_huge, but because nobody uses
+this macro it doesn't fail yet.  KVM will be using this when 32-bit
+support for huge pages is added so add it.
 
-I just resent them to you.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/include/asm/pgtable-hwdef.h | 1 +
+ 1 file changed, 1 insertion(+)
 
-Shawn
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index 66367c6..0219523 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -54,6 +54,7 @@
+ #define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
+ #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
+ #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
++#define PTE_TYPE_HUGEPAGE	(_AT(pteval_t, 1) << 0)
+ #define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
+ #define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
+ #define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
+-- 
+1.8.1.2
