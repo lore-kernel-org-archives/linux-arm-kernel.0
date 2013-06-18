@@ -1,37 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Jun 2013 09:47:24 +0200
-Subject: [RFC PATCH 01/11] dma: amba-pl08x: Use bitmap to pass variant
- specific quirks
-In-Reply-To: <12368941.dQe8bcScGj@flatron>
-References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
- <1371416058-22047-2-git-send-email-tomasz.figa@gmail.com>
- <20130617184856.GN2718@n2100.arm.linux.org.uk>
- <12368941.dQe8bcScGj@flatron>
-Message-ID: <CACRpkdbt4fAdnDKuP8bVpwrWoJ-oGNuSbiDZDz5J12ix2qijfQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 18 Jun 2013 17:02:03 +0900
+Subject: [PATCH 2/2] gpio-rcar: Remove #ifdef CONFIG_OF around
+ OF-specific sections
+In-Reply-To: <2696904.tcjoE5nNPq@avalon>
+References: <1371496527-13149-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <1371496527-13149-3-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+ <51BF612B.6030900@cogentembedded.com> <2696904.tcjoE5nNPq@avalon>
+Message-ID: <20130618080203.GA4191@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 8:56 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
-> On Monday 17 of June 2013 19:48:56 Russell King - ARM Linux wrote:
->> On Sun, Jun 16, 2013 at 10:54:08PM +0200, Tomasz Figa wrote:
->> > Instead of defining new bool field in vendor_data struct for each
->> > quirk, it is more reasonable to use a single flags field and make
->> > each quirk use single bits.
->>
->> Please explain why this is better over the existing system, and why it
->> is not just churn for code modification's sake.
->
-> It isn't anything important. I just thought that this is a better solution
-> to store more than just two flags. Initially I had more of them added in
-> further patches, but final version ended with just one, so this can be
-> dropped.
+On Mon, Jun 17, 2013 at 09:21:08PM +0200, Laurent Pinchart wrote:
+> On Monday 17 June 2013 23:19:07 Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 06/17/2013 11:15 PM, Laurent Pinchart wrote:
+> > > All functions and data types used by OF-specific code paths are declared
+> > > in <linux/of.h> regardless of CONFIG_OF. Replace the #ifdef CONFIG_OF
+> > > guard with a if(IS_SELECTED(CONFIG_OF)) and let the compiler optimize
+> > 
+> >     You're using IS_ENABLED() actually.
+> 
+> Oops. We should fix gcc to check the commit messages :-)
+> 
+> Simon, could you fix this while applying, or should I resubmit ?
 
-I thought about it yesterday and it basically looks to me that
-it tries to outsmart the compiler on how to stuff the flags to save
-struct space on the heap and hint that they can be determined
-quickly by a & operation, this is like premature optimization.
-
-So please go back to the old system.
-
-Yours,
-Linus Walleij
+Please re-spin, thanks.
