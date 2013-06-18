@@ -1,92 +1,59 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 18 Jun 2013 08:46:34 -0700
-Subject: [PATCH 2/7] KVM: arm-vgic: Set base addr through device API
-In-Reply-To: <C2CF6B47-18E3-456B-9BE4-0682A7DD0DE9@suse.de>
-References: <1370926279-32532-1-git-send-email-christoffer.dall@linaro.org>
- <1370926279-32532-3-git-send-email-christoffer.dall@linaro.org>
- <C2CF6B47-18E3-456B-9BE4-0682A7DD0DE9@suse.de>
-Message-ID: <20130618154634.GD3332@lvm>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 18 Jun 2013 08:42:36 -0700
+Subject: [PATCH V3 01/14] watchdog/mpcore_wdt: Mark it as BROKEN
+In-Reply-To: <22d22fe6eea294c5132e47b8901e094d60b0e99d.1371535242.git.viresh.kumar@linaro.org>
+References: <cover.1371535241.git.viresh.kumar@linaro.org>
+ <22d22fe6eea294c5132e47b8901e094d60b0e99d.1371535242.git.viresh.kumar@linaro.org>
+Message-ID: <20130618154236.GA9022@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 03:25:04PM +0200, Alexander Graf wrote:
+On Tue, Jun 18, 2013 at 08:50:25PM +0530, Viresh Kumar wrote:
+> This driver was broken since ever.
 > 
+> - Interrupt request doesn't use the right API: The TWD watchdog uses a per-cpu
+>   interrupt (usually interrupt #30), and the GIC configuration should flag it as
+>   such. With this setup, request_irq() should fail, and the right API is
+>   request_percpu_irq(), together with enable_percpu_irq()/disable_percpu_irq().
 > 
-> Am 11.06.2013 um 06:51 schrieb Christoffer Dall <christoffer.dall@linaro.org>:
+> - Nothing ensures the userspace ioctl() will end-up kicking the watchdog on the
+>   right CPU.
 > 
-> > Support setting the distributor and cpu interface base addresses in the
-> > VM physical address space through the KVM_{SET,GET}_DEVICE_ATTR API
-> > in addition the ARM specific API.
-> > 
-> > This has the added benefit of being able to share more code in user
-> > space and do things in a uniform maner.
-> > 
-> > Also deprecate the older API at the same time, but backwards
-> > compatibility will be maintained.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> > Documentation/virtual/kvm/api.txt              |    5 +-
-> > Documentation/virtual/kvm/devices/arm-vgic.txt |   11 +++
-> > arch/arm/kvm/arm.c                             |    2 +-
-> > include/kvm/arm_vgic.h                         |    2 +-
-> > virt/kvm/arm/vgic.c                            |   90 ++++++++++++++++++++----
-> > 5 files changed, 95 insertions(+), 15 deletions(-)
-> > 
-> > diff --git a/Documentation/virtual/kvm/api.txt b/Documentation/virtual/kvm/api.txt
-> > index 5f91eda..ea5ec4a 100644
-> > --- a/Documentation/virtual/kvm/api.txt
-> > +++ b/Documentation/virtual/kvm/api.txt
-> > @@ -2305,7 +2305,7 @@ This ioctl returns the guest registers that are supported for the
-> > KVM_GET_ONE_REG/KVM_SET_ONE_REG calls.
-> > 
-> > 
-> > -4.80 KVM_ARM_SET_DEVICE_ADDR
-> > +4.80 KVM_ARM_SET_DEVICE_ADDR (deprecated)
-> > 
-> > Capability: KVM_CAP_ARM_SET_DEVICE_ADDR
-> > Architectures: arm
-> > @@ -2342,6 +2342,9 @@ and distributor interface, the ioctl must be called after calling
-> > KVM_CREATE_IRQCHIP, but before calling KVM_RUN on any of the VCPUs.  Calling
-> > this ioctl twice for any of the base addresses will return -EEXIST.
-> > 
-> > +Note, this IOCTL is deprecated and the more flexible SET/GET_DEVICE_ATTR API
-> > +should be used instead.
-> > +
-> > 4.82 KVM_PPC_RTAS_DEFINE_TOKEN
-> > 
-> > Capability: KVM_CAP_PPC_RTAS
-> > diff --git a/Documentation/virtual/kvm/devices/arm-vgic.txt b/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > index 25fd2d9..ca83ad8 100644
-> > --- a/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > +++ b/Documentation/virtual/kvm/devices/arm-vgic.txt
-> > @@ -8,3 +8,14 @@ Only one VGIC instance may be instantiated through either this API or the
-> > legacy KVM_CREATE_IRQCHIP api.  The created VGIC will act as the VM interrupt
-> > controller, requiring emulated user-space devices to inject interrupts to the
-> > VGIC instead of directly to CPUs.
-> > +
-> > +Groups:
+> Was last discussed here:
 > 
-> Ah, here they are :)
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2012-April/095960.html
 > 
-> > +  KVM_DEV_ARM_VGIC_GRP_ADDR
-> > +  Attributes:
-> > +    KVM_VGIC_V2_ADDR_TYPE_DIST (rw, 64-bit)
-> > +      Base address in the guest physical address space of the GIC distributor
-> > +      register mappings.
-> > +
-> > +    KVM_VGIC_V2_ADDR_TYPE_CPU (rw, 64-bit)
-> > +      Base address in the guest physical address space of the GIC virtual cpu
-> > +      interface register mappings.
+> Lets mark it broken until somebody with this hardware gets up and fixes it.
 > 
-> Is this per-cpu or per-vgic? Can different CPUs have their gic interface maps mapped at different offsets?
-> 
-This is per-vgic.
+I must be missing something. What is the point of the remaining patches in this
+case ?
 
-If the _CPU part is confusing, it means it's the address of the CPU
-interface, as opposed to the Distributor interface.  Individual CPUs
-calculate their specific offset from this base address based on a mask,
-but the base is common for everyone (and banked depending on the
-accessing CPU for a certain region).
+Guenter
 
--Christoffer
+> Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
+> ---
+>  drivers/watchdog/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> index 9d03af1..c7dabe9 100644
+> --- a/drivers/watchdog/Kconfig
+> +++ b/drivers/watchdog/Kconfig
+> @@ -223,7 +223,7 @@ config DW_WATCHDOG
+>  
+>  config MPCORE_WATCHDOG
+>  	tristate "MPcore watchdog"
+> -	depends on HAVE_ARM_TWD
+> +	depends on HAVE_ARM_TWD && BROKEN
+>  	help
+>  	  Watchdog timer embedded into the MPcore system.
+>  
+> -- 
+> 1.7.12.rc2.18.g61b472e
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
