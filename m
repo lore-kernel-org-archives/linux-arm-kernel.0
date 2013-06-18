@@ -1,41 +1,73 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Jun 2013 04:59:59 +0900
-Subject: [GIT PULL 02/10] Samsung EXYNOS arch for v3.11
-Message-ID: <51C0BC3F.2060002@samsung.com>
+Date: Wed, 19 Jun 2013 05:00:08 +0900
+Subject: [GIT PULL 03/10] Samsung EXYNOS DT-2 for v3.11
+Message-ID: <51C0BC48.8030805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+The following changes since commit a38089057fa450944f2e2d07885d76fd727c8d16:
 
-   Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+   ARM: dts: add ohci and ehci controller nodes for EXYNOS5440 
+(2013-06-12 04:58:34 +0900)
 
 are available in the git repository at:
 
    git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git 
-tags/exynos-arch-2
+tags/exynos-dt-2
 
-for you to fetch changes up to b5f3c75a75d31039c6de3ab38d074b43c60462f7:
+for you to fetch changes up to 5f13269130d6798571ffbd9d84dbef0950984c5b:
 
-   ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor 
-(2013-06-19 03:41:38 +0900)
-
-----------------------------------------------------------------
-arch/arm/mach-exynos update
-- enable XHCI on exynos5
-- enable Pinctrl on exynos4 and exynos5
-- calling scu_enable() is only available on Cortex-A9
+   ARM: dts: Set BUCK7 as always on for Origen board (2013-06-19 
+00:41:56 +0900)
 
 ----------------------------------------------------------------
+2nd exynos dt update based on tags/exynos-dt-1
+- enable RTC on exynos5250 snow and Arndale boards
+- add support LCD and PWM for exynos4210 Origen board
+- update bootargs to support 8GiB for exynos5440 SSDK5440 and SD5v1 boards
+- enable spi and add opp level for exynos5440
+- add example doc for samsung-pinctrl dt bindings
+
+----------------------------------------------------------------
+Amit Daniel Kachhap (1):
+       ARM: dts: Add more opp levels in exynos5440
+
 Doug Anderson (1):
-       ARM: EXYNOS: Select PINCTRL_EXYNOS for exynos4/5 at chip level
+       ARM: dts: Enable RTC node for exynos5250-snow
+
+Giridhar Maruthy (1):
+       ARM: dts: Removing pdma for exynos5440
+
+Girish K S (1):
+       ARM: dts: enable spi for EXYNOS5440 SOC
 
 Leela Krishna Amudala (1):
-       ARM: EXYNOS: call scu_enable() only in case of cortex-A9 processor
+       Documentation: Add examples to samsung-pinctrl device tree 
+bindings documentation
 
-Vivek Gautam (1):
-       ARM: EXYNOS: Enable XHCI support on exynos5
+Padmavathi Venna (1):
+       ARM: dts: Add wm8994 regulator support on smdk5250
 
-  arch/arm/mach-exynos/Kconfig   | 10 +++++++---
-  arch/arm/mach-exynos/platsmp.c |  2 +-
-  drivers/pinctrl/Kconfig        |  5 +++--
-  3 files changed, 11 insertions(+), 6 deletions(-)
+Sachin Kamat (3):
+       ARM: dts: Add PWM related pinctrl entries for exynos4210
+       ARM: dts: Add LCD related pinctrl entries for exynos4210
+       ARM: dts: Add FIMD node to Origen4210 board
+
+Subash Patel (1):
+       ARM: dts: update bootargs to support 8GiB for SSDK5440 and SD5v1
+
+Tushar Behera (2):
+       ARM: dts: Enable RTC node for Arndale
+       ARM: dts: Set BUCK7 as always on for Origen board
+
+  .../bindings/pinctrl/samsung-pinctrl.txt           | 44 ++++++++++-
+  arch/arm/boot/dts/exynos4210-origen.dts            | 22 ++++++
+  arch/arm/boot/dts/exynos4210-pinctrl.dtsi          | 89 
+++++++++++++++++++++++
+  arch/arm/boot/dts/exynos5250-arndale.dts           |  3 +
+  arch/arm/boot/dts/exynos5250-smdk5250.dts          | 37 ++++++++-
+  arch/arm/boot/dts/exynos5250-snow.dts              |  4 +
+  arch/arm/boot/dts/exynos5440-sd5v1.dts             |  2 +-
+  arch/arm/boot/dts/exynos5440-ssdk5440.dts          | 41 +++++++++-
+  arch/arm/boot/dts/exynos5440.dtsi                  | 41 ++++------
+  9 files changed, 248 insertions(+), 35 deletions(-)
