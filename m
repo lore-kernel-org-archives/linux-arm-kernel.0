@@ -1,58 +1,90 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 18 Jun 2013 09:06:27 -0700
-Subject: [PATCH] ARM: KVM: vgic: fix GICD_ICFGRn access
-In-Reply-To: <1371550168-8036-1-git-send-email-marc.zyngier@arm.com>
-References: <1371550168-8036-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20130618160627.GG3332@lvm>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jun 2013 18:14:33 +0200
+Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <1371554737-25319-4-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-4-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <201306181814.33941.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 11:09:28AM +0100, Marc Zyngier wrote:
-> All the code in handle_mmio_cfg_reg() assumes the offset has
-> been shifted right to accomodate for the 2:1 bit compression,
-> but this is only done when getting the register addess.
-
-I personally think this is a funky assumption.  The offset is called
-offset, because it's the offset, not a "compressed index" value, so I'd
-prefer to fix the comparison values instead.
-
-If not, put a comment and explain the assumption, because it's not
-obvious.
-
-> 
-> Shift the offset early so the code works mostly unchanged.
-> 
-> Reported-by: Zhaobo (Bob, ERC) <zhaobo@huawei.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm/kvm/vgic.c | 8 ++++++--
->  1 file changed, 6 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-> index a2d478a..902789f 100644
-> --- a/arch/arm/kvm/vgic.c
-> +++ b/arch/arm/kvm/vgic.c
-> @@ -541,8 +541,12 @@ static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
->  				struct kvm_exit_mmio *mmio, phys_addr_t offset)
->  {
->  	u32 val;
-> -	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
-> -				       vcpu->vcpu_id, offset >> 1);
-> +	u32 *reg;
+On Tuesday 18 June 2013, Ezequiel Garcia wrote:
+> +Required properties:
 > +
-> +	offset >>= 1;
-> +	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
-> +				  vcpu->vcpu_id, offset);
+> +- compatible:	 Should be set to one of the following:
+> +		 marvell,armada370-mbus
+> +		 marvell,armadaxp-mbus
 > +
->  	if (offset & 2)
->  		val = *reg >> 16;
->  	else
-> -- 
-> 1.8.2.3
-> 
-> 
-> 
-> _______________________________________________
-> kvmarm mailing list
-> kvmarm at lists.cs.columbia.edu
-> https://lists.cs.columbia.edu/cucslists/listinfo/kvmarm
+> +- reg:		 Device's register space.
+> +		 Two entries are expected, see the examples below.
+> +		 The first one controls the devices decoding window and
+> +		 the second one controls the SDRAM decoding window.
+> +
+> +- address-cells: Must be '2'. The first cell for the MBus ID encoding,
+> +                 the second cell for the address offset within the window.
+> +
+> +- size-cells:    Must be '1'.
+> +
+> +- ranges:        Must be set up to provide a proper translation for each child.
+> +	         See the examples below.
+
+You should explain here what the policy is regarding windows set up by the
+boot loader. Are the ranges in here required to be the ones that the boot
+loader has preconfigured, or are they the ones that the mbus driver is supposed
+to set up?
+
+> +Each child device needs at least a 'ranges' property. If the child is avaiable
+> +(i.e. status not 'disabled'), then the MBus driver creates a decoding window
+> +for it. For instance, in the example below the BootROM child is specified:
+> +
+> +	soc {
+> +		compatible = "marvell,armada370-mbus", "simple-bus";
+> +		reg = <0xd0020000 0x100>, <0xd0020180 0x20>;
+> +		#address-cells = <2>;
+> +		#size-cells = <1>;
+> +
+> +		ranges = < ... /* other entries */
+> +			   0x011d0000 0 0 0xfff00000 0x100000>;
+> +
+> +		bootrom {
+> +			#address-cells = <1>;
+> +			#size-cells = <1>;
+> +			ranges = <0 0x011d0000 0 0x100000>;
+> +		};
+> +
+> +		/* other children */
+> +		...
+> +	};
+
+Do you really want to require the child to provide a "ranges" property?
+I think this makes it more complicated to specify devices that belong
+into the "internal-regs" category.
+
+Is this mainly for convenience when settup up the windows?
+
+> +
+> +			ranges =
+> +			       <0x82000000 0 0x40000 0xffff0001 0x40000 0 0x00002000   /* Port 0.0 registers */
+> +				0x82000000 0 0x42000 0xffff0001 0x42000 0 0x00002000   /* Port 2.0 registers */
+> +				0x82000000 0 0x44000 0xffff0001 0x44000 0 0x00002000   /* Port 0.1 registers */
+> +				0x82000000 0 0x48000 0xffff0001 0x48000 0 0x00002000   /* Port 0.2 registers */
+> +				0x82000000 0 0x4c000 0xffff0001 0x4c000 0 0x00002000   /* Port 0.3 registers */
+> +				0x82000000 0 0x80000 0xffff0001 0x80000 0 0x00002000   /* Port 1.0 registers */
+> +				0x82000000 0 0x82000 0xffff0001 0x82000 0 0x00002000   /* Port 3.0 registers */
+> +				0x82000000 0 0xe0000000 0xffff0002 0 0 0x08000000   /* non-prefetchable memory */
+> +				0x81000000 0 0 0xffff0002 0x8000000 0 0x00100000>; /* downstream I/O */
+
+Using 0xffff0002 as a placeholder for the pcie translation is definitely
+better than 0xffff0000 as you had before, but let me ask again in case
+you missed it the last time (and sorry if I missed the answer):
+
+Why not just put the actual translation here the way it happens for each
+of the PCIe ports? With the definition here, the PCIe driver actually has no
+way to figure out what settings the windows need to use!
+
+On a side note, is there a reason why you use 0xffff0001 for the internal-regs
+rather than just 0x1? This one isn't important as they both work as well, it's
+just more to write your way.
+
+	Arnd
