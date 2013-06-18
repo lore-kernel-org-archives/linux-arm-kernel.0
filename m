@@ -1,118 +1,46 @@
-From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 18 Jun 2013 18:07:00 +0100
-Subject: [PATCH 1/4] drivers: clocksource: configure event stream for ARM arch
- timer
-In-Reply-To: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1371575223-21702-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+From: aaro.koskinen@iki.fi (Aaro Koskinen)
+Date: Tue, 18 Jun 2013 20:06:57 +0300
+Subject: [PATCH v3 0/4] USB: OMAP1: Tahvo USB support for 770
+Message-ID: <1371575221-360-1-git-send-email-aaro.koskinen@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+Hi,
 
-The ARM architected timer can generate events (used for waking up
-CPUs executing the wfe instruction) at a frequency represented as a
-power-of-2 divisor of the clock rate.
+These patches add support for Tahvo USB transceiver and allow using both
+host and peripheral modes on Nokia 770.
 
-This patch configures the event stream, aiming for a period of 100us
-between events. This can be used to implement wfe-based timeouts for
-userspace locking implementations.
+Tested (peripheral mode, host mode, vbus detection) with 3.10-rc6.
 
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
----
- arch/arm/include/asm/arch_timer.h    | 5 +++--
- arch/arm64/include/asm/arch_timer.h  | 6 +++---
- drivers/clocksource/arm_arch_timer.c | 9 ++++++++-
- include/clocksource/arm_arch_timer.h | 2 ++
- 4 files changed, 16 insertions(+), 6 deletions(-)
+History:
+	v3: Delete accidental #include <mach/usb.h> from patch 3.
+	    Drop board file changes, already queued to linux-omap.
+	v2: http://marc.info/?l=linux-omap&m=137138976406242&w=2
+	    Use extcon framework to trigger OTG driver mode changes.
+	v1: http://marc.info/?l=linux-omap&m=137081763029385&w=2
 
-diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index accefe0..75c8ec3 100644
---- a/arch/arm/include/asm/arch_timer.h
-+++ b/arch/arm/include/asm/arch_timer.h
-@@ -89,14 +89,15 @@ static inline u64 arch_counter_get_cntvct(void)
- 	return cval;
- }
- 
--static inline void __cpuinit arch_counter_set_user_access(void)
-+static inline void __cpuinit arch_counter_set_user_access(int divider)
- {
- 	u32 cntkctl;
- 
- 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
- 
- 	/* disable user access to everything */
--	cntkctl &= ~((3 << 8) | (7 << 0));
-+	cntkctl &= ~((3 << 8) | (0xf << 4) | (3 << 0));
-+	cntkctl |= (divider << 4) | (1 << 2);
- 
- 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
- }
-diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index d56ed11..5fcaa6f 100644
---- a/arch/arm64/include/asm/arch_timer.h
-+++ b/arch/arm64/include/asm/arch_timer.h
-@@ -97,16 +97,16 @@ static inline u32 arch_timer_get_cntfrq(void)
- 	return val;
- }
- 
--static inline void __cpuinit arch_counter_set_user_access(void)
-+static inline void __cpuinit arch_counter_set_user_access(int divider)
- {
- 	u32 cntkctl;
- 
- 	/* Disable user access to the timers and the physical counter. */
- 	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
--	cntkctl &= ~((3 << 8) | (1 << 0));
-+	cntkctl &= ~((3 << 8) | (0xf << 4) | (1 << 0));
- 
- 	/* Enable user access to the virtual counter and frequency. */
--	cntkctl |= (1 << 1);
-+	cntkctl |= (divider << 4) | (1 << 2) | (1 << 1);
- 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
- }
- 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 053d846..11aaf06 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -125,6 +125,8 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
- 
- static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- {
-+	int evt_stream_div, pos;
-+
- 	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP;
- 	clk->name = "arch_sys_timer";
- 	clk->rating = 450;
-@@ -153,7 +155,12 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- 			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
- 	}
- 
--	arch_counter_set_user_access();
-+	/* Find the closest power of two to the divisor */
-+	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
-+	pos = fls(evt_stream_div);
-+	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
-+		pos--;
-+	arch_counter_set_user_access(min(pos, 15));
- 
- 	return 0;
- }
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index c463ce9..24dc140 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -29,6 +29,8 @@
- #define ARCH_TIMER_PHYS_ACCESS		0
- #define ARCH_TIMER_VIRT_ACCESS		1
- 
-+#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
-+
- #ifdef CONFIG_ARM_ARCH_TIMER
- 
- extern u32 arch_timer_get_rate(void);
+Earlier RFC versions:
+	http://marc.info/?l=linux-omap&m=136553710000679&w=2
+	http://marc.info/?l=linux-omap&m=136266725827698&w=2
+
+Aaro Koskinen (4):
+  ARM: OMAP1: USB: move omap_usb_config to platform data
+  USB: OMAP1: add extcon to platform data
+  USB: OMAP1: OTG controller driver
+  USB: OMAP1: Tahvo USB transceiver driver
+
+ arch/arm/mach-omap1/include/mach/usb.h  |  38 +--
+ drivers/usb/phy/Kconfig                 |  24 ++
+ drivers/usb/phy/Makefile                |   2 +
+ drivers/usb/phy/phy-omap-otg.c          | 169 ++++++++++++
+ drivers/usb/phy/phy-tahvo.c             | 448 ++++++++++++++++++++++++++++++++
+ include/linux/platform_data/usb-omap1.h |  53 ++++
+ 6 files changed, 697 insertions(+), 37 deletions(-)
+ create mode 100644 drivers/usb/phy/phy-omap-otg.c
+ create mode 100644 drivers/usb/phy/phy-tahvo.c
+ create mode 100644 include/linux/platform_data/usb-omap1.h
+
+A.
+
 -- 
-1.8.1.2
+1.8.3.1
