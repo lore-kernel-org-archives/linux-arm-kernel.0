@@ -1,40 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 18 Jun 2013 11:09:28 +0100
-Subject: [PATCH] ARM: KVM: vgic: fix GICD_ICFGRn access
-Message-ID: <1371550168-8036-1-git-send-email-marc.zyngier@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Jun 2013 03:09:46 -0700
+Subject: [PATCH] arm: omap: board-overo: reset GPIO for SMSC911x
+In-Reply-To: <1369144071-10673-1-git-send-email-florian.vaussard@epfl.ch>
+References: <1369144071-10673-1-git-send-email-florian.vaussard@epfl.ch>
+Message-ID: <20130618100945.GI5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All the code in handle_mmio_cfg_reg() assumes the offset has
-been shifted right to accomodate for the 2:1 bit compression,
-but this is only done when getting the register addess.
+* Florian Vaussard <florian.vaussard@epfl.ch> [130521 07:01]:
+> The reset GPIO should be set for the SMSC911x, otherwise the controller
+> will not work and probing will fail. In the case of the tobi-duo
+> expansion board, the second controller shares the same GPIO, thus no
+> more changes are required (not tested).
+> 
+> Signed-off-by: Florian Vaussard <florian.vaussard@epfl.ch>
 
-Shift the offset early so the code works mostly unchanged.
+Thanks applying into omap-for-v3.11/board.
 
-Reported-by: Zhaobo (Bob, ERC) <zhaobo@huawei.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kvm/vgic.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+Regards,
 
-diff --git a/arch/arm/kvm/vgic.c b/arch/arm/kvm/vgic.c
-index a2d478a..902789f 100644
---- a/arch/arm/kvm/vgic.c
-+++ b/arch/arm/kvm/vgic.c
-@@ -541,8 +541,12 @@ static bool handle_mmio_cfg_reg(struct kvm_vcpu *vcpu,
- 				struct kvm_exit_mmio *mmio, phys_addr_t offset)
- {
- 	u32 val;
--	u32 *reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
--				       vcpu->vcpu_id, offset >> 1);
-+	u32 *reg;
-+
-+	offset >>= 1;
-+	reg = vgic_bitmap_get_reg(&vcpu->kvm->arch.vgic.irq_cfg,
-+				  vcpu->vcpu_id, offset);
-+
- 	if (offset & 2)
- 		val = *reg >> 16;
- 	else
--- 
-1.8.2.3
+Tony
+
+> ---
+>  arch/arm/mach-omap2/board-overo.c |    3 ++-
+>  1 files changed, 2 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+> index 4ca6b68..5748b5d 100644
+> --- a/arch/arm/mach-omap2/board-overo.c
+> +++ b/arch/arm/mach-omap2/board-overo.c
+> @@ -68,6 +68,7 @@
+>  
+>  #define OVERO_SMSC911X_CS      5
+>  #define OVERO_SMSC911X_GPIO    176
+> +#define OVERO_SMSC911X_NRESET  64
+>  #define OVERO_SMSC911X2_CS     4
+>  #define OVERO_SMSC911X2_GPIO   65
+>  
+> @@ -122,7 +123,7 @@ static struct omap_smsc911x_platform_data smsc911x_cfg = {
+>  	.id		= 0,
+>  	.cs             = OVERO_SMSC911X_CS,
+>  	.gpio_irq       = OVERO_SMSC911X_GPIO,
+> -	.gpio_reset     = -EINVAL,
+> +	.gpio_reset     = OVERO_SMSC911X_NRESET,
+>  	.flags		= SMSC911X_USE_32BIT,
+>  };
+>  
+> -- 
+> 1.7.5.4
+> 
