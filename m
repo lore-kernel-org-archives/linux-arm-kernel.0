@@ -1,44 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 20:39:50 +0200
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation to
- the DT binding
-In-Reply-To: <51C0A5F8.8030300@gmail.com>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130618174622.GD2204@obsidianresearch.com> <51C0A5F8.8030300@gmail.com>
-Message-ID: <201306182039.50736.arnd@arndb.de>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 18 Jun 2013 11:40:47 -0700
+Subject: [PATCH 0/2] Fix potential merge conflict for dw_apb_timer_of
+In-Reply-To: <201306182028.50762.heiko@sntech.de>
+References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
+ <20130618150244.GC18055@amd.pavel.ucw.cz>
+ <201306181738.35671.heiko@sntech.de> <201306182028.50762.heiko@sntech.de>
+Message-ID: <51C0A9AF.4030409@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Sebastian Hesselbarth wrote:
-> On 06/18/2013 07:46 PM, Jason Gunthorpe wrote:
-> > On Tue, Jun 18, 2013 at 08:25:28AM -0300, Ezequiel Garcia wrote:
-> >> +
-> >> +IIAA0000
-> >> +
-> >> +Where:
-> >> +  -- I = Marvell defined target ID for programmable windows
-> >> +  -- A = Marvell defined target attributes for programmable windows
-> >
-> > I thought we agreed to something like:
-> >
-> > SIAA0000
-> >
-> > Where 'S' is the designator for the special items like PCI-E and
-> > internal-regs. 0 = normal target ids, 0xF = special ids.
-> >
-> > The target is only 4 bits, the attr is 8, so a little doc update to
-> > clarify this should be enough, no need to change the DTs.
-> 
-> +1 for SIAA0000, as it allows to use MBUS_ID also for those fake
-> windows. It makes it more readable IMHO.
+On 06/18/2013 11:28 AM, Heiko St?bner wrote:
+> Am Dienstag, 18. Juni 2013, 17:38:35 schrieb Heiko St?bner:
+>> Hi Pavel,
+>>
+>> Am Dienstag, 18. Juni 2013, 17:02:44 schrieb Pavel Machek:
+>>> Hi!
+>>>
+>>>>> The following 2 patches will eliminate the need for the patch in John
+>>>>> Stultz's tree. If there is to be merge of the 2 trees, then the
+>>>>> patch:
+>>>>>
+>>>>> dw_apb_timer_of.c: Remove parts that were picoxcell-specific
+>>>>>
+>>>>> can be removed from John's tree to avoid a merge-conflict.
+>>>>>
+>>>>> Based on arm-soc/for-next:
+>>>>>
+>>>>> PATCH[1/2] - Rename "dw-apb-timer-osc" and "dw-apb-timer-sp" bindings
+>>>>> to just "dw-apb-timer"
+>>>>> PATCH[2/2] - Fix user/system reporting by fixing read_sched_clock()
+>>>> Pavel/Jamie: Can you take a look at these too and make sure these cover
+>>>> what you were doing.
+>>> [It seems like Heiko St?bner was not aware of patches in the clock
+>>> tree, so did pretty much equivalent patch.]
+>> Correct ... I was going after what was in linux-next and the tip.git [which
+>> I also only saw recently at all] does not seem to be part of it.
+>>
+>>> Dinh's changes look good to me, but
+>>>
+>>> [PATCH v2 4/4] clocksource: dw_apb_timer_of: use clocksource_of_init
+>>>
+>>> does not exactly look nice: (I'm sorry I did not see original series,
+>>> before it was merged to -soc.). The function counts number of times it
+>>> was called, and behaves differently in each case. It is not very
+>>> traditional kernel code at the very least.
+>>>
+>>> +static int num_called;
+>>> +static void __init dw_apb_timer_init(struct device_node *timer)
+>>>
+>>>   {
+>>>
+>>> -       struct device_node *event_timer, *source_timer;
+>>> -
+>>> -       event_timer = of_find_matching_node(NULL, osctimer_ids);
+>>> -       if (!event_timer)
+>>> -               panic("No timer for clockevent");
+>>> -       add_clockevent(event_timer);
+>>> -
+>>> -       source_timer = of_find_matching_node(event_timer,
+>>> osctimer_ids);
+>>> -       if (!source_timer)
+>>> -               panic("No timer for clocksource");
+>>> -       add_clocksource(source_timer);
+>>> -
+>>> -       of_node_put(source_timer);
+>>> +       switch (num_called) {
+>>> +       case 0:
+>>> +               pr_debug("%s: found clockevent timer\n", __func__);
+>>> +               add_clockevent(timer);
+>>> +               of_node_put(timer);
+>>> +               break;
+>>> +       case 1:
+>>> +               pr_debug("%s: found clocksource timer\n", __func__);
+>>> +               add_clocksource(timer);
+>>> +               of_node_put(timer);
+>>> +               init_sched_clock();
+>>> +               break;
+>>> +       default:
+>>> +               break;
+>>> +       }
+>>>
+>>> -       init_sched_clock();
+>>> +       num_called++;
+>>>
+>>>   }
+>>>
+>>> Heiko, can you take a look at John Stultz tree? We modified this area
+>>> already... I understand you only have one timer on your silicon?
+> also it seems like not being able to use the apb_timer as sched_clock will
+> hurt my platform too.
+>
+> I've tried to use the arm_arch_timer, but when the arch_timer_get_cntfrq()
+> function gets called, I only get an "undefined instruction" Oops for the
+> executed asm in there.
+>
+> As there is no manual available for the SoC, I can only guess that it doesn't
+> contain such a component. This is fueled additionally by the PPI part of the
+> gic only having 3 interrupt sources [there is small excerpt of the soc-manual
+> floating around that contains this information], with one already being the
+> twd interrupt, while the arm_arch_timer seems to require 4 itself.
+>
+> Therefore it would cool, if we could keep the sched_clock functionality
+> (provided by the clocksource timer) around somehow.
 
-+1
+So whats the plan now?
 
-> Also allows you to have up to 40b offset, which might be important
-> with LPAE enabled.
+I'm feeling likely to revert "dw_apb_timer_of.c: Remove parts that were 
+picoxcell-specific" in my tree and leave the rest of the wreckage to the 
+arm-soc folks to sort out (either getting the fix in or reverting the 
+lot and trying again for 3.12), unless we get some agreed upon path 
+forward sorted quickly here.
 
-Not with the current generation I think, since the mbus windows are
-32 bit only, but it would avoid having to come up with a new format
-for a potential future-generation mbus that has wider address.
-
-	Arnd
+thanks
+-john
