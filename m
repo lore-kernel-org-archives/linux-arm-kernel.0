@@ -1,34 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 18 Jun 2013 19:34:24 +0100
-Subject: OMAP4430 failure to boot
-Message-ID: <20130618183424.GD2718@n2100.arm.linux.org.uk>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 18 Jun 2013 20:36:25 +0200
+Subject: [PATCH 1/2] Watchdog: allow orion_wdt to be built for Dove
+In-Reply-To: <20130618163129.GY31667@titan.lakedaemon.net>
+References: <E1Uoyd2-0001Cp-KL@rmk-PC.arm.linux.org.uk>
+ <20130618163129.GY31667@titan.lakedaemon.net>
+Message-ID: <51C0A8A9.4070608@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So... the boot and build system last night managed to build its kernels
-after I dropped a couple of patches from my kernel, but we've gone from
-having both the 3430LDP and 4430SDP booting to only the 3430LDP.
+On 06/18/2013 06:31 PM, Jason Cooper wrote:
+> On Tue, Jun 18, 2013 at 05:19:32PM +0100, Russell King wrote:
+>> The watchdog infrastructure in Dove is no different from that in
+>> Orion5x or Kirkwood, so let's enable it for Dove.  The only things
+>> missing are a few register settings in Dove's bridge-regs.h.
+>>
+>> Rather than duplicating the same register bit masks for the RSTOUTn_MASK
+>> and BRIDGE_CAUSE registers, move the definitions into the watchdog
+>> driver itself.
+>>
+>> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+>> ---
+>>   arch/arm/mach-dove/include/mach/bridge-regs.h     |    1 +
+>>   arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    2 --
+>>   arch/arm/mach-orion5x/include/mach/bridge-regs.h  |    3 ---
+>>   drivers/watchdog/Kconfig                          |    2 +-
+>>   drivers/watchdog/orion_wdt.c                      |    3 +++
+>>   5 files changed, 5 insertions(+), 6 deletions(-)
+>
+> There shouldn't be any conflicts on the mvebu side.  Wim, feel free to
+> take it:
+>
+> Acked-by: Jason Cooper<jason@lakedaemon.net>
 
-Something has broken 4430SDP during the last week, and so far I've no
-idea what.  The 4430 seems to be utterly immune to any kind of debugging.
-It:
+FWIW, you also kind of get my Acked-by, although I was silently hoping
+we can postpone orion wdt until we remove non-DT ;)
 
-(a) doesn't produce any decompressor output because its part of the
-multiplatform kernel.  This means I've no idea if the decompressor is
-working or not.
+With irqchip queued for 3.11, we will ack the timer irqs by a
+chained irq handler. But this will be DT-only and currently also only
+for Kirkwood and Dove (Orion5x DT progress is slow).
 
-(b) doesn't produce any output from the kernel via the use of printch()
-in the early assembly, nor via adding printascii() into printk().
+With 3.11 out, I will see how to handle wdt. Either make it non-DT/DT
+aware or also move non-DT to irqchip.
 
-Will has tested v3.10-rc6, and that works.  Will tested v3.10-rc6 plus
-arm-soc for-next, and got:
-
-	Error: unrecognized/unsupported machine ID (r1 = 0x00000ae7).
-
-I've just tested Linus' tip plus my tip, and that failed.  Tried Linus'
-tip.  Failed.  Removed the printch()/printascii() hooks, that got Linus'
-tip working.  I guess CONFIG_DEBUG_OMAP2UART1 is the wrong option.
-
-And yes, Linus plus my tip also works without printascii.  So that leaves
-the questionable case of Linus tip+my tip+arm-soc tip not being bootable
-on OMAP4430 but is on OMAP3430.
+Sebastian
