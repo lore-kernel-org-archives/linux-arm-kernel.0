@@ -1,46 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 18 Jun 2013 04:27:01 -0700
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <20130617102650.GK20992@atomide.com>
-References: <20130612171407.GM8164@atomide.com> <51B98F1E.1000006@ti.com>
- <51B99B07.1050806@ti.com>
- <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
- <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
- <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
- <20130617082458.GH20992@atomide.com>
- <87li69qdcs.fsf@lebrac.rtp-net.org>
- <20130617102650.GK20992@atomide.com>
-Message-ID: <20130618112701.GO5523@atomide.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Jun 2013 12:32:37 +0100
+Subject: [PATCH 02/10] ARM: tlb: don't perform inner-shareable
+ invalidation for local TLB ops
+In-Reply-To: <51BA064B.7010204@arm.com>
+References: <1370528914-17506-1-git-send-email-will.deacon@arm.com>
+ <1370528914-17506-3-git-send-email-will.deacon@arm.com>
+ <51BA064B.7010204@arm.com>
+Message-ID: <20130618113237.GC5893@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [130617 03:32]:
-> * Arnaud Patard <arnaud.patard@rtp-net.org> [130617 02:52]:
-> > Tony Lindgren <tony@atomide.com> writes:
-> > 
-> > I understand your concerns but, please, cope with reality: the clock
-> > work is not in -next so this tends to make me think it won't reach
-> > 3.11. We're at -rc6 after all. Telling users that their system doesn't
-> > have any network because it was easier to maintain, is not something
-> > they will understand imho.
+On Thu, Jun 13, 2013 at 06:50:03PM +0100, Jonathan Austin wrote:
+> Hi Will,
+
+Hi Jonny,
+
+> On 06/06/13 15:28, Will Deacon wrote:
+> > Inner-shareable TLB invalidation is typically more expensive than local
+> > (non-shareable) invalidation, so performing the broadcasting for
+> > local_flush_tlb_* operations is a waste of cycles and needlessly
+> > clobbers entries in the TLBs of other CPUs.
+> >
+> > This patch introduces __flush_tlb_* versions for many of the TLB
+> > invalidation functions, which only respect inner-shareable variants of
+> > the invalidation instructions. This allows us to modify the v7 SMP TLB
+> > flags to include *both* inner-shareable and non-shareable operations and
+> > then check the relevant flags depending on whether the operation is
+> > local or not.
 > 
-> Right, like I said: the idea is to have it usable with DT. And USB and
-> Ethernet certainly are part of what I call usable. So is MMC, WLAN and
-> DSS. I've certainly spent quite a bit of time on making sure panda works
-> with DT, and I can assure you that fixing the USB extclock is easier than
-> supporting the legacy boot with DT :)
+> I think this approach leaves us in trouble for some SMP_ON_UP cores as 
+> the IS versions of the instructions don't exist for them.
 > 
-> This issue can also be fixed with a clock alias if we don't have DT
-> defined clocks ready for v3.11. It may take a few days for us to have
-> the solution. But get getting a clock to a driver certainly is not a
-> showstopper here. After all, that's what all drivers already do.
+> Is there something that should be ensuring your new __flush_tlb* 
+> functions don't get called for SMP_ON_UP? If not it looks like we might 
+> need to do some runtime patching with the ALT_SMP/ALT_UP macros...
 
-Care to test the last patch just posted by Roger in thread
-" [PATCH 0/4] ARM: OMAP4: Panda USB Host support and DVI EDID fix"?
+Well spotted. Actually, the best fix here is no honour the tlb flags we end
+up with, since they get patched by the SMP_ON_UP code (which forces
+indirection via MULTI_TLB). We should extract the `meat' of the local_ ops
+into __local_ops, which can be inlined directly into the non-local variants
+without introducing additional barriers around the invalidation operations.
 
-That adds a clock alias for the EHCI auxclk so it should continue
-working until we have the DT clock patches available.
+> A follow on question is whether we still need to keep the *non* unified 
+> TLB maintenance operations (eg DTLBIALL, ITLBIALL). As far as I can see 
+> looking in to old TRMs, the last ARM CPU that didn't automatically treat 
+> those I/D ops to unified ones was ARM10, so not relevant here...
 
-Regards,
+My reading of the 1136 TRM is that there are separate micro-tlbs and a
+unified main tlb. I don't see any implication that an operation on the
+unified tlb automatically applies to both micro-tlbs, but I've not checked
+the rtl (the implication holds the other way around).
 
-Tony
+Will
