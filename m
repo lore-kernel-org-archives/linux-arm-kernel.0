@@ -1,24 +1,21 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 18 Jun 2013 09:03:12 -0700
-Subject: linux-next: manual merge of the arm-soc tree with the usb tree
-In-Reply-To: <20130618161239.5ce92432180d9418831d2514@canb.auug.org.au>
-References: <20130618161239.5ce92432180d9418831d2514@canb.auug.org.au>
-Message-ID: <20130618160312.GB28961@kroah.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jun 2013 17:03:04 +0100
+Subject: [PATCH V3 00/14] watchdog: ARM mpcore Improvements
+In-Reply-To: <cover.1371535241.git.viresh.kumar@linaro.org>
+References: <cover.1371535241.git.viresh.kumar@linaro.org>
+Message-ID: <20130618160304.GB2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 04:12:39PM +1000, Stephen Rothwell wrote:
-> Hi all,
-> 
-> Today's linux-next merge of the arm-soc tree got a conflict in
-> drivers/usb/phy/phy-rcar-usb.c between commit 56a9a6de2a87 ("usb: phy:
-> rcar-usb: Fix comment w.r.t. devm_ioremap_resource") from the usb tree
-> and commit 725bf9dcafe1 ("phy-rcar-usb: correct base address") from the
-> arm-soc tree.
-> 
-> I fixed it up (The latter removed the comment corrected by the former)
-> and can carry the fix as necessary (no action is required).
+On Tue, Jun 18, 2013 at 08:50:24PM +0530, Viresh Kumar wrote:
+> ARM mpcore watchdog isn't workable and so is marked broken in the first patch of
+> the series. Reasons are mentioned in 01/14 and important links are shared too.
 
-That sounds fine to me, thanks.
+The only way this is usable is if a watchdog user binds to a particular
+CPU before opening this device, and remains bound to that user.  The
+irq-requesting thing is something that has changed since the driver
+was originally added.
 
-greg k-h
+I suspect there are no users of this driver, and it should simply be
+deleted.  It doesn't really fit our watchdog API.  If anyone wants to
+resurect it, it's in git, your patches are in the list archives...
