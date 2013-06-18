@@ -1,106 +1,61 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 18 Jun 2013 14:01:39 +0200
-Subject: [PATCH v4 02/10] pinctrl: mvebu: dove pinctrl driver
-In-Reply-To: <20130618113606.GA26763@n2100.arm.linux.org.uk>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347550912-18021-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130618113606.GA26763@n2100.arm.linux.org.uk>
-Message-ID: <51C04C23.4090807@gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 18 Jun 2013 14:11:41 +0200
+Subject: [PATCH v2 4/8] irqchip: armada-370-xp: implement MSI support
+In-Reply-To: <20130618112604.GD6322@mithrandir>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370536888-8871-5-git-send-email-thomas.petazzoni@free-electrons.com>
+ <20130612104207.GE30841@mithrandir> <20130618104338.584098e1@skate>
+ <20130618112604.GD6322@mithrandir>
+Message-ID: <20130618141141.614d08b7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/13 13:36, Russell King - ARM Linux wrote:
-> On Thu, Sep 13, 2012 at 05:41:44PM +0200, Sebastian Hesselbarth wrote:
->> +#define DOVE_GLOBAL_CONFIG_1		(DOVE_SB_REGS_VIRT_BASE | 0xe802C)
->> +#define  DOVE_TWSI_ENABLE_OPTION1	BIT(7)
->> +#define DOVE_GLOBAL_CONFIG_2		(DOVE_SB_REGS_VIRT_BASE | 0xe8030)
->> +#define  DOVE_TWSI_ENABLE_OPTION2	BIT(20)
->> +#define  DOVE_TWSI_ENABLE_OPTION3	BIT(21)
->> +#define  DOVE_TWSI_OPTION3_GPIO		BIT(22)
-> ...
+Dear Thierry Reding,
 
-Russell,
+On Tue, 18 Jun 2013 13:26:04 +0200, Thierry Reding wrote:
 
-the above absolute addresses already made me think of cleaning up dove
-pinctrl a while ago. I also had in mind that below function exclusively
-request ownership of global config registers.
+> > As I replied to Grant, of_find_device_by_node() returns NULL, I believe
+> > because the all IRQ controller driver initialization is done pretty
+> > early, before the of_platform_populate() call is made, so there is no
+> > platform_device associated with the IRQ controller node at the time the
+> > armada_370_xp_mpic_of_init() function is called.
+> > 
+> > Do you see another approach, especially in relation to your comment on
+> > PATCH 2/8 ?
+> 
+> Hmmm, that's too bad. The only other possibility that I see is that you
+> could associate the struct device at a later point when it becomes
+> available, but looking at the irqchip driver it doesn't look like you
+> get notification of that either. I suppose you could add a
+> platform_driver to it and hook things up in its .probe() callback, but
+> I'm not sure if that's in line with how the irqchip was designed. Adding
+> Grant Likely and Thomas Gleixner on Cc, maybe they have better advice.
 
->> +static int dove_twsi_ctrl_set(struct mvebu_mpp_ctrl *ctrl,
->> +				unsigned long config)
->> +{
->> +	unsigned long gcfg1 = readl(DOVE_GLOBAL_CONFIG_1);
->> +	unsigned long gcfg2 = readl(DOVE_GLOBAL_CONFIG_2);
->> +
->> +	gcfg1 &= ~DOVE_TWSI_ENABLE_OPTION1;
->> +	gcfg2 &= ~(DOVE_TWSI_ENABLE_OPTION2 | DOVE_TWSI_ENABLE_OPTION2);
->> +
->> +	switch (config) {
->> +	case 1:
->> +		gcfg1 |= DOVE_TWSI_ENABLE_OPTION1;
->> +		break;
->> +	case 2:
->> +		gcfg2 |= DOVE_TWSI_ENABLE_OPTION2;
->> +		break;
->> +	case 3:
->> +		gcfg2 |= DOVE_TWSI_ENABLE_OPTION3;
->> +		break;
->> +	}
->> +
->> +	writel(gcfg1, DOVE_GLOBAL_CONFIG_1);
->> +	writel(gcfg2, DOVE_GLOBAL_CONFIG_2);
->> +
->> +	return 0;
->> +}
->
-> So, I've just been thinking about the LCD clocking on the Armada 510,
-> and found that there's dividers for the internal LCD clocks in the
-> global config 1/2 registers.  So I grepped the kernel source for
-> references to these, expecting to find something in drivers/clk, but
-> found the above.
+If we do hook the MSI stuff in a ->probe() callback, then we'd have a
+dependency between the ->probe() of the PCIe driver and the ->probe()
+of the IRQ controller driver. In order for the PCIe ->probe() to
+succeed, it needs the MSI controller to be registered, which wouldn't
+appear until the ->probe() of the IRQ controller driver gets called. A
+typical case of platform device dependency where the two platform
+devices don't have a bus -> child dependency. Could be handled by a
+-EPROBE_DEFER trick, though.
 
-We have no peripheral clock handling for Dove, yet. Just core clocks and
-clock gates are implemented. And I guess they are DT only anyway.
+> Looking at other irqchip drivers I find it a bit odd to see how they're
+> structured, though. We've been preaching for years that drivers should
+> be well-encapsulated and told everybody it was bad to use globals and
+> they should be associating driver-specific data with each instance of a
+> device. Then comes along irqchip and all of a sudden it's okay to use
+> globals again. It feels a bit fragile.
 
-> However, todays kernel is sometimes SMP, commonly with kernel preemption
-> enabled, maybe even RT.  This makes things like the above sequence a
-> problem where a multifunction register is read, modified and then
-> written back.
->
-> Consider two threads doing this, and a preemption event happening in the
-> middle of this sequence to another thread also doing a read-modify-write
-> of the same register.  Which one wins depends on the preemption sequence,
-> but ultimately one loses out.
+Yes, I've seen this as well, and I'm thinking of doing some
+improvements in this area if there's some interest. But I believe this
+is fairly separate from the specific discussion of this patch set.
 
-Yeah, sure. We have the same issue with watchdog driver messing with
-timer registers. There I exported a function to _clrset TIMER_CTRL
-register safely. Just went into irqchip (tip for-next).
+Best regards,
 
-> Any access to such registers needs careful thought, and protection in some
-> manner.
->
-> Maybe what we need is something like this:
->
-> static DEFINE_SPINLOCK(io_lock);
-> static void modifyl(u32 new, u32 mask, void __iomem *reg)
-> {
-> 	unsigned long flags;
-> 	u32 val;
->
-> 	spin_lock_irqsave(&io_lock, flags);
-> 	val = readl(reg) & ~mask;
-> 	val |= new | mask;
-> 	writel(val, reg);
-> 	spin_unlock_irqrestore(&io_lock, flags);
-> }
->
-> in order to provide arbitrated access to these kinds of multifunction
-> registers in a safe, platform agnostic way.
-
-I am fine with a generic modify function with a single lock. Most cases
-should be fine with a single lock even for non-related register
-accesses, e.g. watchdog will access TIMER_CTRL only once to enable
-itself. If you think you need a special lock because you have a lot of
-writes to shared registers, you can still have your own modify lock.
-
-Sebastian
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
