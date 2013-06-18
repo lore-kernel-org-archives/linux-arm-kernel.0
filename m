@@ -1,40 +1,43 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 18 Jun 2013 17:40:22 +0200
-Subject: [PATCH v2 0/2] i2c-mv64xxx: Various fixes
-Message-ID: <1371570024-11613-1-git-send-email-gregory.clement@free-electrons.com>
+Date: Tue, 18 Jun 2013 17:40:24 +0200
+Subject: [PATCH v2 2/2] i2c-mv64xxx: Abort the mv64xxx_of_config if
+ clock-frequency is not provided
+In-Reply-To: <1371570024-11613-1-git-send-email-gregory.clement@free-electrons.com>
+References: <1371570024-11613-1-git-send-email-gregory.clement@free-electrons.com>
+Message-ID: <1371570024-11613-3-git-send-email-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Zbigniew Bodek <zbb@semihalf.com>
 
-This series contains a real fix for the I2C controller of the Armada
-XP SoC and a patch closer to a improvement than a fix.
+This commit adds checking whether clock-frequency property acquisition
+has succeeded. Do not waste time to find baud factors if there is no
+information about the desired bus frequency in dts.
 
-They are independent and are only in the same series because they are
-kind of fixes.
+[gregory.clement at free-electrons.com: Reword the commit log]
 
-I kept the test on the compatible string "armadaxp" because I am not
-convinced that we have to introduce a new property in the binding for
-this. If latter another SoC got the same issue on this IP then it will
-still be time to add a new property. However I don't have a strong
-opinion on it, so if you really want it, I can send a new version with
-it.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+Signed-off-by: Zbigniew Bodek <zbb@semihalf.com>
+---
+ drivers/i2c/busses/i2c-mv64xxx.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Changelog:
-v1->v2:
- - Move the flag for the timing issue from global scope to per device
-   scope
- - Assignment is no more done in if condition
-
-Thanks,
-
-Zbigniew Bodek (2):
-  i2c-mv64xxx: Fix timing issue on Armada XP (errata FE-8471889)
-  i2c-mv64xxx: Abort the mv64xxx_of_config if clock-frequency is not
-    provided
-
- drivers/i2c/busses/i2c-mv64xxx.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/i2c/busses/i2c-mv64xxx.c b/drivers/i2c/busses/i2c-mv64xxx.c
+index 74f8fcb..de384a1 100644
+--- a/drivers/i2c/busses/i2c-mv64xxx.c
++++ b/drivers/i2c/busses/i2c-mv64xxx.c
+@@ -591,7 +591,11 @@ mv64xxx_of_config(struct mv64xxx_i2c_data *drv_data,
+ 		goto out;
+ 	}
+ 	tclk = clk_get_rate(drv_data->clk);
+-	of_property_read_u32(np, "clock-frequency", &bus_freq);
++
++	rc = of_property_read_u32(np, "clock-frequency", &bus_freq);
++	if (rc)
++		goto out;
++
+ 	if (!mv64xxx_find_baud_factors(bus_freq, tclk,
+ 				       &drv_data->freq_n, &drv_data->freq_m)) {
+ 		rc = -EINVAL;
 -- 
 1.8.1.2
