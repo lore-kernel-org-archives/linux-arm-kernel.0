@@ -1,30 +1,46 @@
-From: pwalmsley@nvidia.com (Paul Walmsley)
-Date: Tue, 18 Jun 2013 11:33:19 -0700
-Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
-In-Reply-To: <20130618182808.9136.26244@quantum>
-References: <20130607121505.21868.72360.stgit@dusk.lan>
- <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
- <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
- <51B6D239.5030905@nvidia.com>
- <alpine.DEB.2.02.1306110944130.22645@utopia.booyaka.com>
- <20130616042256.7541.7096@quantum>
- <alpine.DEB.2.02.1306172019270.17176@utopia.booyaka.com>
- <20130618182808.9136.26244@quantum>
-Message-ID: <51C0A7EF.2020903@nvidia.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 18 Jun 2013 19:33:59 +0100
+Subject: [PATCH v4 02/10] pinctrl: mvebu: dove pinctrl driver
+In-Reply-To: <20130618151116.GZ2718@n2100.arm.linux.org.uk>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347550912-18021-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130618113606.GA26763@n2100.arm.linux.org.uk>
+ <CACRpkdZTVN2O-Rv4u-Ccb9EzV0At3zc7GYQyTq=HkseOi=GTeg@mail.gmail.com>
+ <20130618151116.GZ2718@n2100.arm.linux.org.uk>
+Message-ID: <20130618183359.GR1403@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2013 11:28 AM, Mike Turquette wrote:
-> Thanks for clarifying. I couldn't tell based on the discussion.
+On Tue, Jun 18, 2013 at 04:11:16PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 18, 2013 at 05:02:49PM +0200, Linus Walleij wrote:
+> > Nowadays I would do the above with regmap_update_bits().
 
-No worries :-)
+> > Mutual exclusion for read-modify-write of individual bits in a
+> > register is one of those cases where doing a regmap over
+> > a memory-mapped register range makes a lot of sense.
+> > (drivers/mfd/syscon.c being a nice example)
 
-> Anyways I've taken these into clk-next now. There is not maintainer 
-> for that directory as you pointed out, so no need to wait for Acks.
+> So, for that solution we need to have some kind of global regmap per
+> register or somesuch.  Then you run into regmap needing a struct
+> device - well, with a shared register, which struct device do you
+> use, or do you have to invent one?
 
-Great, thanks.  Or if you'd prefer to wait for a Reviewed-by:, Peter 
-mentioned today that he might take a look at them.  Either way is fine 
-with me.
+> That sounds more heavy-weight than is really necessary.
 
+Yes, regmap is far too heavyweight for a lot of these things - it
+shouldn't really go in performance critical at the CPU level paths, it's
+designed around things where I/O costs are considerable and worth
+avoiding.
 
-- Paul
+I do think that this is a very good idea - with the I2C/SPI drivers I
+was reviewing prior to regmap there were always just far too many simple
+bugs with read/modify/write cycles so factoring out the code really
+helped with review.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/8db087fa/attachment.sig>
