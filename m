@@ -1,65 +1,102 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Jun 2013 11:26:14 +0100
-Subject: [RFC PATCH v4 2/2] drivers: mfd: vexpress: add Serial Power
- Controller (SPC) support
-In-Reply-To: <alpine.LFD.2.03.1306180001410.18597@syhkavp.arg>
-References: <1371484269-11743-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1371484269-11743-3-git-send-email-lorenzo.pieralisi@arm.com>
- <alpine.LFD.2.03.1306180001410.18597@syhkavp.arg>
-Message-ID: <20130618102614.GB1564@e102568-lin.cambridge.arm.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 18 Jun 2013 19:26:39 +0900
+Subject: [PATCH v4 00/10] ARM: Exynos: Add Exynos5420 SoC support
+In-Reply-To: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
+References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <1c0c01ce6c0e$51eeceb0$f5cc6c10$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 05:25:22AM +0100, Nicolas Pitre wrote:
-> On Mon, 17 Jun 2013, Lorenzo Pieralisi wrote:
+Chander Kashyap wrote:
 > 
-> > The TC2 versatile express core tile integrates a logic block that provides the
-> > interface between the dual cluster test-chip and the M3 microcontroller that
-> > carries out power management. The logic block, called Serial Power Controller
-> > (SPC), contains several memory mapped registers to control among other things
-> > low-power states, operating points and reset control.
+> Exynos5420 is new SoC in Samsung's Exynos5 SoC series. This series adds
+> initial support for this SoC.
 > 
-> [...]
+> Changes since v3:
+> 1. Updated the max cpu clock frequency in dt node.
+> 2. Sorted DT nodes alphabetically as suggested by Kukjin.
+> 3. Removed the duplicate commit log comment in:
+>    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
+>    registration"
+> 4. Added comment for Exynos5440 in commit log of the patch:
+>    "ARM: dts: fork out common Exynos5 nodes"
 > 
-> I slightly modified the following before committing this patch to my TC2 
-> branch:
+> Changes since v2:
 > 
-> > +/**
-> > + * ve_spc_cpu_wakeup_irq()
-> > + *
-> > + * Function to set/clear per-CPU wake-up IRQs. Not protected by locking since
-> > + * it might be used in code paths where normal cacheable locks are not
-> > + * working. Locking must be provided by the caller to ensure atomicity.
-> > + *
-> > + * @cpu: mpidr[7:0] bitfield describing cpu affinity level
-> > + * @cluster: mpidr[15:8] bitfield describing cluster affinity level
-> > + * @set: if true, wake-up IRQs are set, if false they are cleared
-> > + */
-> > +void ve_spc_cpu_wakeup_irq(u32 cpu, u32 cluster, bool set)
-> > +{
+> 1. Renamed oscclk to fin_pll, in order to keep it consistent with
+>    Exynos4/Exynos5
+> 2. Pass memory as single bank rather than splitting in 256MB size banks.
 > 
-> I made cluster first then cpu.  All the other functions have the cluster 
-> argument first, and ve_spc_set_resume_addr() already uses that order.
+> Changes since v1:
+> 
+> 1. As not-dt platforms will not be supported from 3.11 onwards, following
+>    patches from previous patch series are dropped:
+>    "irqchip: exynos-combiner: set irq base as 256 for Exynos5420"
+>    "ARM: Exynos: initialize l2x0 cache controller only for cortex-a9 based
+> SoCs"
+> 2. Added device type property in cpu node in the following patch:
+>    "ARM: dts: list the CPU nodes for Exynos5250
+> 3. Sorted out the nodes listed in based upon the physical addresses as
+> suggested
+>    by Tomasz Figa.
+> 4. As Tomasz is going to consolidate the secondary cpu power register
+> address
+>    calculation in all possible scnarios, hence dropped the following
+patch:
+>   "ARM: Exynos: fix secondary cpu power control register address
+> calculation"
+> 5. Replaced the setup/remove)_irq calls with (request/free)_irq calls as
+>    suggested by Mark Rutland in patch:
+>    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
+>     registration"
+> 6. Changed the registration of epll and rpll from pll35xx to pl36xx.
+> 7. Changed driver data selection for serial port, based on ARCH_EXYNOS.
+> 8. Changed the interrupt cells from 2 to 1 as suggested by Tomasz Figa.
+> 
+> Chander Kashyap (10):
+>   ARM: dts: fork out common Exynos5 nodes
+>   ARM: dts: list the CPU nodes for Exynos5250
+>   ARM: Exynos: Add support for Exynos5420 SoC
+>   serial: samsung: select Exynos specific driver data if ARCH_EXYNOS is
+>     defined
+>   ARM: Exynos: use four additional chipid bits to identify Exynos
+>     family
+>   clk: exynos5420: register clocks using common clock framework
+>   ARM: dts: Add initial device tree support for Exynos5420
+>   clocksource: exynos_mct: use (request/free)_irq calls for local timer
+>     registration
+>   ARM: Exynos: add secondary CPU boot base location for Exynos5420
+>   ARM: Exynos: extend soft-reset support for Exynos5420
+> 
+>  .../devicetree/bindings/clock/exynos5420-clock.txt |  201 ++++++
+>  arch/arm/boot/dts/Makefile                         |    1 +
+>  arch/arm/boot/dts/exynos5.dtsi                     |  111 +++
+>  arch/arm/boot/dts/exynos5250.dtsi                  |   78 +-
+>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   33 +
+>  arch/arm/boot/dts/exynos5420.dtsi                  |  103 +++
+>  arch/arm/mach-exynos/Kconfig                       |   10 +
+>  arch/arm/mach-exynos/common.c                      |   18 +-
+>  arch/arm/mach-exynos/include/mach/uncompress.h     |    7 +-
+>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    1 +
+>  arch/arm/mach-exynos/platsmp.c                     |   12 +-
+>  arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
+>  drivers/clk/samsung/Makefile                       |    1 +
+>  drivers/clk/samsung/clk-exynos5420.c               |  762
+> ++++++++++++++++++++
+>  drivers/clocksource/exynos_mct.c                   |   35 +-
+>  drivers/tty/serial/samsung.c                       |    4 +-
+>  16 files changed, 1279 insertions(+), 106 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/clock/exynos5420-
+> clock.txt
+>  create mode 100644 arch/arm/boot/dts/exynos5.dtsi
+>  create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
+>  create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
+>  create mode 100644 drivers/clk/samsung/clk-exynos5420.c
+> 
+> --
+> 1.7.9.5
 
-Ok thanks.
+Looks good to me, will apply with whole 'reviewed-by' comments.
 
-> [...]
-> > +#ifdef CONFIG_VEXPRESS_SPC
-> > +int ve_spc_probe(void);
-> > +int ve_spc_get_freq(u32 cluster);
-> > +int ve_spc_set_freq(u32 cluster, u32 freq);
-> > +int ve_spc_get_freq_table(u32 cluster, const u32 **fptr);
-> > +void ve_spc_global_wakeup_irq(bool set);
-> > +void ve_spc_cpu_wakeup_irq(u32 cpu, u32 cluster, bool set);
-> > +void ve_spc_set_resume_addr(u32 cluster, u32 cpu, u32 addr);
-> > +u32 ve_spc_get_nr_cpus(u32 cluster);
-> > +void ve_spc_powerdown(u32 cluster, bool enable);
-> > +#else
-> > +static inline bool ve_spc_probe(void) { return -ENODEV; }
-> 
-> s/bool/int/
-
-Bah, sorry.
-
-Thanks a lot,
-Lorenzo
+Thanks,
+- Kukjin
