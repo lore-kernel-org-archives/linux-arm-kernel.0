@@ -1,51 +1,59 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 18 Jun 2013 20:59:03 +0200
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <20130618184753.GA6090@obsidianresearch.com>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 18 Jun 2013 13:02:23 -0600
+Subject: [PATCH v3 11/12] ARM: mvebu: Relocate Armada 370 PCIe device
+ tree nodes
+In-Reply-To: <201306182022.08927.arnd@arndb.de>
 References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130618174622.GD2204@obsidianresearch.com> <51C0A5F8.8030300@gmail.com>
- <201306182039.50736.arnd@arndb.de> <51C0AA8E.9080807@gmail.com>
- <20130618184753.GA6090@obsidianresearch.com>
-Message-ID: <51C0ADF7.5050609@gmail.com>
+ <201306181918.59046.arnd@arndb.de> <20130618192154.4c1530cc@skate>
+ <201306182022.08927.arnd@arndb.de>
+Message-ID: <20130618190223.GA6578@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2013 08:47 PM, Jason Gunthorpe wrote:
-> On Tue, Jun 18, 2013 at 08:44:30PM +0200, Sebastian Hesselbarth wrote:
->> Yeah, I also recall Thomas or Gregory mention a 32b limitation in
->> remap windows. But we don't need to waste addresses here
->>
->> And even if SIAA0000 is a concern because there may be target id>15
->> someday, we can still have IIAASS00 instead of IIAA00SS. I guess
->> LPAE will not rise above 40b quickly ;)
->
-> S = 0 means 4 bit I, 8 bit A
-> S = F means special
-> S = 1 could mean 16 bit I, etc , etc
+On Tue, Jun 18, 2013 at 08:22:08PM +0200, Arnd Bergmann wrote:
 
-S & 0x8 == 0x0 means 7b target
-S & 0x8 == 0x8 means 7b special ?
+> > > > Arnd, we've discussed this at length with you while getting the PCIe
+> > > > driver merged, and we've explained this to you numerous times. Could
+> > > > you please understand that any of your proposal that suggests writing
+> > > > down static windows for PCIe devices will not work?
+> > > 
+> > > Where did I suggest static windows for PCIe devices?
+> > 
+> > Where does your new proposal buys us anything useful compared to the
+> > existing PCIe DT binding that has been discussed at length with you?
+> 
+> I'm pretty sure I explained the idea above originally and was ignored.
+> Jason Gunthorpe might remember better, but I think he liked it when I
+> originally proposed doing it this way.
 
-> Yes, we could define things as 'SIAAoooo oooooooo'
->
-> But remember 'o' is the offset within the window, it is not related to
-> LPAE.
->
-> To need>  32 bits 'o' you need to have windows>  4G in size. The only
-> thing that could possibly do that is PCI-E, and it is all special
-> anyhow..
->
-> The mbus top level ranges remap already supports>4G locations for
-> the windows, even though current hardware cannot do that.
+I remember it took a bit to understand your proposal, but I thought it
+could work, but I admit I forget all the little details now :(
 
-True. But as Arnd also mentioned, I don't think it will ever be a
-problem at all. Possibly there will never be any future SoC with mbus
-that will either allow >32b remap base addresses nor >4G size.
+Ah, if I can just rephrase simply - the notion was to move the
+determination of the aperture to use dynmic allocation and then
+restructure the ranges around the mbus target, since they no longer
+need to encode the aperture.
 
-But never the less, IIAA00SS (which is used in v3 of the patches) will
-limit both to 32b/4G forever.
+My concern: dynamically sizing the aperture is hard. There are three
+apertures that need to be picked, and the PCI core code has no support
+for dynamic apertures. Getting the aperture from the DT is a
+functional compromise.
 
-And we already have +3 for SIAAoooo ;)
+> * Since the host physical address for the PCIe memory space window
+>   is set up dynamically anyway, there is no reason to hardcode it in
+>   DT. We want it to be as large as possible, and this way the mbus
+>   driver can just pick the largest free area itself after setting up
+>   all the other mappings from the ranges property.
 
-Sebastian
+This seems to get really complicated if the mbus driver is ever
+required to support dynamic mappings.. If PCI-E claims all memory and
+then you modprobe something it could fail.
+
+IMHO, I go back to my original thoughts. There is no real need for any
+of this to be dynamic, we can use the values in the DT, presumably set
+by the bootloader and things will work well.
+
+The added complexity and failure modes for dynamic is simply not worth
+it..
+
+Jason
