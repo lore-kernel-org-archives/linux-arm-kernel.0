@@ -1,87 +1,51 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 18 Jun 2013 18:07:01 +0100
-Subject: [PATCH 2/4] ARM: arch_timer: add macros for bits in control register
+Date: Tue, 18 Jun 2013 18:07:02 +0100
+Subject: [PATCH 3/4] ARM/ARM64: arch_timer: remove __cpuinit attribute for
+ arch_counter_set_user_access
 In-Reply-To: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1371575223-21702-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1371575223-21702-4-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Add macros to describe the bitfields in the ARM architected timer
-control register to make code easy to understand.
+We must not declare arch_counter_set_user_access as __cpuinit as we
+need to use it in warm reset paths like CPU PM notifiers.
 
 Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/arch_timer.h    |  9 +++++++--
- arch/arm64/include/asm/arch_timer.h  | 10 ++++++++--
- include/clocksource/arm_arch_timer.h |  8 ++++++++
- 3 files changed, 23 insertions(+), 4 deletions(-)
+ arch/arm/include/asm/arch_timer.h   | 2 +-
+ arch/arm64/include/asm/arch_timer.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
-index 75c8ec3..6725017 100644
+index 6725017..26c65ae 100644
 --- a/arch/arm/include/asm/arch_timer.h
 +++ b/arch/arm/include/asm/arch_timer.h
-@@ -96,8 +96,13 @@ static inline void __cpuinit arch_counter_set_user_access(int divider)
- 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
- 
- 	/* disable user access to everything */
--	cntkctl &= ~((3 << 8) | (0xf << 4) | (3 << 0));
--	cntkctl |= (divider << 4) | (1 << 2);
-+	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-+			| ARCH_TIMER_USR_VT_ACCESS_EN
-+			| ARCH_TIMER_EVT_TRIGGER_MASK
-+			| ARCH_TIMER_USR_VCT_ACCESS_EN
-+			| ARCH_TIMER_USR_PCT_ACCESS_EN);
-+	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-+			| ARCH_TIMER_VIRT_EVT_EN;
- 
- 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+@@ -89,7 +89,7 @@ static inline u64 arch_counter_get_cntvct(void)
+ 	return cval;
  }
+ 
+-static inline void __cpuinit arch_counter_set_user_access(int divider)
++static inline void arch_counter_set_user_access(int divider)
+ {
+ 	u32 cntkctl;
+ 
 diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
-index 5fcaa6f..2269944 100644
+index 2269944..3494102 100644
 --- a/arch/arm64/include/asm/arch_timer.h
 +++ b/arch/arm64/include/asm/arch_timer.h
-@@ -103,10 +103,16 @@ static inline void __cpuinit arch_counter_set_user_access(int divider)
- 
- 	/* Disable user access to the timers and the physical counter. */
- 	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
--	cntkctl &= ~((3 << 8) | (0xf << 4) | (1 << 0));
-+	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
-+			| ARCH_TIMER_USR_VT_ACCESS_EN
-+			| ARCH_TIMER_EVT_TRIGGER_MASK
-+			| ARCH_TIMER_USR_PCT_ACCESS_EN)
- 
- 	/* Enable user access to the virtual counter and frequency. */
--	cntkctl |= (divider << 4) | (1 << 2) | (1 << 1);
-+	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-+			| ARCH_TIMER_VIRT_EVT_EN
-+			| ARCH_TIMER_USR_VCT_ACCESS_EN;
-+
- 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+@@ -97,7 +97,7 @@ static inline u32 arch_timer_get_cntfrq(void)
+ 	return val;
  }
  
-diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
-index 24dc140..c4d0fc4 100644
---- a/include/clocksource/arm_arch_timer.h
-+++ b/include/clocksource/arm_arch_timer.h
-@@ -29,6 +29,14 @@
- #define ARCH_TIMER_PHYS_ACCESS		0
- #define ARCH_TIMER_VIRT_ACCESS		1
+-static inline void __cpuinit arch_counter_set_user_access(int divider)
++static inline void arch_counter_set_user_access(int divider)
+ {
+ 	u32 cntkctl;
  
-+#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
-+#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
-+#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
-+#define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
-+#define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
-+#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
-+#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
-+
- #define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
- 
- #ifdef CONFIG_ARM_ARCH_TIMER
 -- 
 1.8.1.2
