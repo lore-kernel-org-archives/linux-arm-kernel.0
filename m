@@ -1,134 +1,40 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Tue, 18 Jun 2013 09:00:16 +0200
-Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <20130617154237.GJ2718@n2100.arm.linux.org.uk>
-References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
- <1371467722-665-1-git-send-email-inki.dae@samsung.com>
- <51BEF458.4090606@canonical.com>
- <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
- <20130617133109.GG2718@n2100.arm.linux.org.uk>
- <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
- <20130617154237.GJ2718@n2100.arm.linux.org.uk>
-Message-ID: <CAKMK7uECS=eqNB-Ud6s=NvdYMPfxgJaGPbUx9hANfP6kb02j_w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Jun 2013 00:10:47 -0700
+Subject: [PATCH v2 0/3] minor omap dma fixes
+In-Reply-To: <1371133031-29229-1-git-send-email-rnayak@ti.com>
+References: <1371133031-29229-1-git-send-email-rnayak@ti.com>
+Message-ID: <20130618071047.GA5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 04:42:37PM +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 18, 2013 at 12:03:31AM +0900, Inki Dae wrote:
-> > 2013/6/17 Russell King - ARM Linux <linux@arm.linux.org.uk>
-> > Exactly right. But that is not definitely my point. Could you please see
-> > the below simple example?:
-> > (Presume that CPU and DMA share a buffer and the buffer is mapped with user
-> > space as cachable)
-> >
-> >         handle1 = drm_gem_fd_to_handle(a dmabuf fd);  ----> 1
-> >                  ...
-> >         va1 = drm_gem_mmap(handle1);
-> >         va2 = drm_gem_mmap(handle2);
-> >         va3 = malloc(size);
-> >                  ...
-> >
-> >         while (conditions) {
-> >                  memcpy(va1, some data, size);
->
-> Nooooooooooooooooooooooooooooooooooooooooooooo!
->
-> Well, the first thing to say here is that under the requirements of the
-> DMA API, the above is immediately invalid, because you're writing to a
-> buffer which under the terms of the DMA API is currently owned by the
-> DMA agent, *not* by the CPU.  You're supposed to call dma_sync_sg_for_cpu()
-> before you do that - but how is userspace supposed to know that requirement?
-> Why should userspace even _have_ to know these requirements of the DMA
-> API?
->
-> It's also entirely possible that drm_gem_fd_to_handle() (which indirectly
-> causes dma_map_sg() on the buffers scatterlist) followed by mmap'ing it
-> into userspace is a bug too, as it has the potential to touch caches or
-> stuff in ways that maybe the DMA or IOMMU may not expect - but I'm not
-> going to make too big a deal about that, because I don't think we have
-> anything that picky.
->
-> However, the first point above is the most important one, and exposing
-> the quirks of the DMA API to userland is certainly not a nice thing to be
-> doing.  This needs to be fixed - we can't go and enforce an API which is
-> deeply embedded within the kernel all the way out to userland.
->
-> What we need is something along the lines of:
-> (a) dma_buf_map_attachment() _not_ to map the scatterlist for DMA.
-> or
-> (b) drm_gem_prime_import() not to call dma_buf_map_attachment() at all.
+* Rajendra Nayak <rnayak@ti.com> [130613 07:23]:
+> Hi,
+> 
+> Here are some minor omap dma fixes.
+> 
+> v2:
+> Patch 3/3 was wrongly fixed by just changing the
+> kfree() order. As Russell suggested the kfree()
+> was that for platform_data and wrong to begin with.
+> So Patch 3/3 now removes all instances of kfree() of
+> platform_data.
 
-I strongly vote for (b) (plus adding a dma_buf_map_sync interface to allow
-syncing to other devices/cpu whithout dropping the dma mappings). At least
-that's been the idea behind things, but currently all (x86-based) drm
-drivers cut corners here massively.
+Thanks applying into omap-for-v3.11/dma.
 
-Aside: The entire reason behind hiding the dma map step in the dma-buf
-attachment is to allow drivers to expose crazy iommus (e.g. the tiler unit
-on omap) to other devices. So imo (a) isn't the right choice.
->
-> and for the scatterlist to be mapped for DMA at the point where the DMA
-> operation is initiated, and unmapped at the point where the DMA operation
-> is complete.
->
-> So no, the problem is not that we need more APIs and code - we need the
-> existing kernel API fixed so that we don't go exposing userspace to the
-> requirements of the DMA API.  Unless we do that, we're going to end
-> up with a huge world of pain, where kernel architecture people need to
-> audit every damned DRM userspace implementation that happens to be run
-> on their platform, and that's not something arch people really can
-> afford to do.
->
-> Basically, I think the dma_buf stuff needs to be rewritten with the
-> requirements of the DMA API in the forefront of whosever mind is doing
-> the rewriting.
->
-> Note: the existing stuff does have the nice side effect of being able
-> to pass buffers which do not have a struct page * associated with them
-> through the dma_buf API - I think we can still preserve that by having
-> dma_buf provide a couple of new APIs to do the SG list map/sync/unmap,
-> but in any case we need to fix the existing API so that:
->
-> dma_buf_map_attachment() becomes dma_buf_get_sg()
-> dma_buf_unmap_attachment() becomes dma_buf_put_sg()
->
-> both getting rid of the DMA direction argument, and then we have four
-> new dma_buf calls:
->
-> dma_buf_map_sg()
-> dma_buf_unmap_sg()
-> dma_buf_sync_sg_for_cpu()
-> dma_buf_sync_sg_for_device()
->
-> which do the actual sg map/unmap via the DMA API *at the appropriate
-> time for DMA*.
+Regards,
 
-Hm, my idea was to just add a dma_buf_sync_attchment for the device side
-syncing, since the cpu access stuff is already bracketed with the
-begin/end cpu access stuff. We might need a sync_for_cpu or so for mmap,
-but imo mmap support for dma_buf is a bit insane anyway, so I don't care
-too much about it.
-
-Since such dma mappings would be really longstanding in most cases anyway
-drivers could just map with BIDIRECTIONAL and do all the real flushing
-with the new sync stuff.
-
-Another piece of fun will be integration with the fencing stuff Maarten is
-doing. I'm not sure whether we should integrate that into the dma-buf
-interface (for simple users who don't want to deal with the full
-complexity at least).
-
->
-> So, the summary of this is - at the moment, I regard DRM Prime and dmabuf
-> to be utterly broken in design for architectures such as ARM where the
-> requirements of the DMA API have to be followed if you're going to have
-> a happy life.
-
-Agreed. Unfortunately there are not many real drivers shipping in
-upstream, and x86 is _very_ forgiving about all this stuff.
--Daniel
---
-Daniel Vetter
-Software Engineer, Intel Corporation
-+41 (0) 79 365 57 48 - http://blog.ffwll.ch
+Tony
+ 
+> R Sricharan (2):
+>   ARM: OMAP: dma: Remove the wrong dev_id check
+>   ARM: OMAP: dma: Fix the dma_chan_link_map init order
+> 
+> Rajendra Nayak (1):
+>   ARM: OMAP: dma: Remove the erroneous freeing of platform data
+> 
+>  arch/arm/plat-omap/dma.c |   11 ++++-------
+>  1 file changed, 4 insertions(+), 7 deletions(-)
+> 
+> -- 
+> 1.7.9.5
+> 
