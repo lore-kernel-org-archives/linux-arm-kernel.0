@@ -1,73 +1,84 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 18 Jun 2013 13:47:11 -0400 (EDT)
-Subject: [PATCH V2 2/6] USB: OHCI: make ohci-omap a separate driver
-In-Reply-To: <1371052442-14541-3-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306181336500.1157-100000@iolanthe.rowland.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 19 Jun 2013 02:51:56 +0900
+Subject: [PATCH v2 00/38] Thirty eight patches big Exynos cleanup
+In-Reply-To: <1490899.cyTqiG9bBR@amdc1227>
+References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
+ <1c0b01ce6c0d$e0475930$a0d60b90$%kim@samsung.com>
+ <1490899.cyTqiG9bBR@amdc1227>
+Message-ID: <51C09E3C.5050108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Manjunath Goudar wrote:
+On 06/18/13 20:11, Tomasz Figa wrote:
+> On Tuesday 18 of June 2013 19:23:29 Kukjin Kim wrote:
+>> Tomasz Figa wrote:
+>>> Hi All,
+>>>
+>>> As I promised, I am doing some spring (or rather summer) cleaning
+>>> of Exynos- and Samsung- related code.
+>>>
+>>> This first part consists mostly of removing dead code remaining after
+>>> removal of ATAGS support for Exynos, but several patches cleans up
+>>> other things found by the way.
+>>>
+>>> See particular patches for more detailed description.
+>>>
+>>> On Exynos4210-based Trats board:
+>>> Tested-by: Tomasz Figa<t.figa@samsung.com>
+>>>
+>>> Build tested every patch with s3c6400_defconfig, s5pv210_defconfig
+>>> and exynos_defconfig.
+>>>
+>>> Changes since v1:
+>>>   - Split patches removing SOC_EXYNOS4412
+>>>   - Adjusted drivers to check for ARCH_EXYNOS in addition to PLAT_S5P
+>>>   - Fixed compilation issue on s5pc100
+>>>   - Removed empty line from mach-exynos/Makefile
+>>>   - Removed SAMSUNG_GPIOLIB_4BIT selection from ARCH_EXYNOS
+>>>   - Sorted Kconfig and Makefile entries
+>>>   - Added additional cleanup from Arnd (split and slightly modified)
+>>
+>> Tomasz, good job.
+>
+> Thanks.
+>
+>> After looking at, almost same with your previous version but modifying 16,
+>> 19, 21, 25(just Cc) and adding some patches 17, 18, 29 and 35 to 38. Would
+>> be helpful to  me if you could note about that in this series ;-)
+>
+> OK, my bad, haven't though about it, sorry. Will remember to do it next time
+> such series update happens.
+>
+> By the way, patch 14 has been updated as well.
+>
+Thanks ;)
 
-> Separate the  TI OHCI OMAP1/2 host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.11.
-> 
-> V2:
->  -omap_ohci_clock_power(0) called in usb_hcd_omap_remove().
->  -Removed ohci_setup() call from usb_hcd_omap_probe() and ohci_omap_reset().
+> Best regards,
+> Tomasz
+>
+>> Anyway, looks good I will apply this series
+>
+> OK, thanks.
+>
+>> except removing
+>> CONFIG_SOC_EXYNOS4412 patches.
+>
+> I don't really understand this decision, but if you really insist...
+>
+Sorry about that, but exynos4412 is not same with exynos4212 except 
+number of cores and exynos4412 is not one kind...
 
-You were supposed to remove the call from usb_hcd_omap_probe but leave 
-in the call from ohci_omap_reset.
+> Still, I think current setup is wrong, because you need to specify both SoCs
+> in drivers and both Kconfig entries must have "select" and "depends on" clauses
+> duplicated, while there are places currently where only one has been specified
+> by mistake.
+>
+> So if we can't get this duplication removed, I'd suggest introducing
+> CONFIG_SOC_EXYNOS4X12 which would represent the whole SoC series and making
+> existing two entries just simple bools selecting the new one.
+>
+Could be a solution but let's wait until something will be implemented 
+in mainline for exynos4412 not exynos4212 :)
 
->  -host_enabled and host_initialized variables aren't used for anything
->   thats what removed.
-
-
-> @@ -188,21 +195,21 @@ static void start_hnp(struct ohci_hcd *ohci)
->  
->  /*-------------------------------------------------------------------------*/
->  
-> -static int ohci_omap_init(struct usb_hcd *hcd)
-> +static int ohci_omap_reset(struct usb_hcd *hcd)
->  {
->  	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
->  	struct omap_usb_config	*config = hcd->self.controller->platform_data;
->  	int			need_transceiver = (config->otg != 0);
-> -	int			ret;
->  
->  	dev_dbg(hcd->self.controller, "starting USB Controller\n");
->  
-> -	if (config->otg) {
-> +	if (config->otg || config->rwc) {
->  		ohci_to_hcd(ohci)->self.otg_port = config->otg;
->  		/* default/minimum OTG power budget:  8 mA */
->  		ohci_to_hcd(ohci)->power_budget = 8;
-
-These three lines are supposed to run only when config->otg is set, not
-when config->rwc is set.  The next two lines can run when either one is
-set.
-
-Also, "ohci_to_hcd(ohci)" should be replaced by "hcd".
-
-> +		ohci->hc_control = OHCI_CTRL_RWC;
-> +		writel(OHCI_CTRL_RWC, &ohci->regs->control);
->  	}
-> -
-
-Don't remove this blank line.
-
->  	/* boards can use OTG transceivers in non-OTG modes */
->  	need_transceiver = need_transceiver
->  			|| machine_is_omap_h2() || machine_is_omap_h3();
-> @@ -238,9 +245,6 @@ static int ohci_omap_init(struct usb_hcd *hcd)
->  		omap_1510_local_bus_init();
->  	}
->  
-> -	if ((ret = ohci_init(ohci)) < 0)
-> -		return ret;
-> -
-
-This should call ohci_setup instead of ohci_init.
-
-Alan Stern
+Thanks,
+- Kukjin
