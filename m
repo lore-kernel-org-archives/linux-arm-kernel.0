@@ -1,67 +1,28 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 18 Jun 2013 13:59:27 +0800
-Subject: [v1 3/3] imx: ahci: enable ahci sata on imx6q platforms
-In-Reply-To: <0E83723C55F66F43A6041464FE31119D3057EF@039-SN2MPN1-013.039d.mgd.msft.net>
-References: <1371462767-16630-1-git-send-email-r65037@freescale.com>
- <1371462767-16630-4-git-send-email-r65037@freescale.com>
- <20130618030310.GD28381@S2101-09.ap.freescale.net>
- <0E83723C55F66F43A6041464FE31119D3057EF@039-SN2MPN1-013.039d.mgd.msft.net>
-Message-ID: <20130618055925.GA6723@S2101-09.ap.freescale.net>
+From: sfr@canb.auug.org.au (Stephen Rothwell)
+Date: Tue, 18 Jun 2013 16:12:39 +1000
+Subject: linux-next: manual merge of the arm-soc tree with the usb tree
+Message-ID: <20130618161239.5ce92432180d9418831d2514@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 05:00:09AM +0000, Zhu Richard-R65037 wrote:
-> > +enum {
-> > +     HOST_CAP = 0x00,
-> > +     HOST_CAP_SSS = (1 << 27), /* Staggered Spin-up */
-> > +     HOST_CTL = 0x04, /* global host control */
-> > +     HOST_RESET = (1 << 0),  /* reset controller; self-clear */
-> > +     HOST_PORTS_IMPL = 0x0c, /* bitmap of implemented ports */
-> > +     HOST_TIMER1MS = 0xe0, /* Timer 1-ms */
-> > +     HOST_VERSIONR = 0xf8, /* host version register*/
-> > +
-> > +     PORT_SATA_SR = 0x128, /* Port0 SATA Status */
-> > +     PORT_PHY_CTL = 0x178, /* Port0 PHY Control */
-> > +     PORT_PHY_CTL_PDDQ_LOC = 0x100000, /* PORT_PHY_CTL bits */
-> > +};
-> > +
-> 
-> This is all about IP stuff.  Some of them are just replication of
-> definitions found in drivers/ata/ahci.h. I do not understand why we
-> need them in platform.  It's a sign to me that we are doing something
-> in platform code that should really be done in the device driver, no?
-> 
-> [Richard] Regarding to the AHCI SPEC, some bits of the ahci sata registers are
->  specified to be RO, but they are RW in the design of fsl ahci ata in actually.
->  So the configurations of those bits are mandatory required in the
->  platform sata initialization. 
-> One HBA reset is better finished before start the configuration.
-> That's why those registers/bits are re-defined in the platform level.
-> 
-> For, e.x:
-> bit1 of the HOST_POSRTS_IMPL, HOST_CAP_SSS(bit27) of the HOST_CAP, are RO specified
-> in the AHCI SPEC. But they should be configured in the sata platform initialization.
-> 
-> BTW, HOST_TIMER1MS is defined by FSL, can't be used in the common codes.
-> regarding to the AHCI SPEC.
-> " Registers at offset A0h to FFh are vendor specific"
+Hi all,
 
-It sounds like to me that the generic ahci_platform driver does not
-perfectly fit imx6q sata device.  You're pushing all those bits that
-are not covered by the generic ahci_platform driver down to platform
-code.  This is not the right thing to do, and platform is not the right
-place to handle device/IP stuff.  I see two options you can go as below.
+Today's linux-next merge of the arm-soc tree got a conflict in
+drivers/usb/phy/phy-rcar-usb.c between commit 56a9a6de2a87 ("usb: phy:
+rcar-usb: Fix comment w.r.t. devm_ioremap_resource") from the usb tree
+and commit 725bf9dcafe1 ("phy-rcar-usb: correct base address") from the
+arm-soc tree.
 
-1. Create an imx6q sata specific compatible string and add code into
-   generic ahci_platform driver to implement programming model for imx6q
-   type of device.
+I fixed it up (The latter removed the comment corrected by the former)
+and can carry the fix as necessary (no action is required).
 
-2. The existing ahci_platform driver is not so useful for imx6q sata
-   considering you have so many imx6q custom bits to add.  It might be
-   more appropriate to create a custom ahci_platform driver for imx6q
-   sata device with forking the generic one, just like what
-   sata_highbank does.
-
-I would go for option 2.
-
-Shawn
+-- 
+Cheers,
+Stephen Rothwell                    sfr at canb.auug.org.au
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/72308bc1/attachment.sig>
