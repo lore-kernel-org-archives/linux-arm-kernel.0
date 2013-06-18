@@ -1,45 +1,74 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Jun 2013 10:56:42 +0200
-Subject: [PATCH v2 0/8] MSI support for Marvell EBU PCIe driver
-In-Reply-To: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130618105642.77c4f50d@skate>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 18 Jun 2013 18:04:44 +0900
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <20130618084308.GU2718@n2100.arm.linux.org.uk>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+ <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+ <20130618084308.GU2718@n2100.arm.linux.org.uk>
+Message-ID: <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bjorn,
 
-On Thu,  6 Jun 2013 18:41:20 +0200, Thomas Petazzoni wrote:
 
-> This set of patches introduces Message Signaled Interrupt support in
-> the Marvell EBU PCIe driver. It has been successfully tested on the
-> Armada XP GP platform with an Intel e1000e PCIe network card that
-> supports MSI.
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, June 18, 2013 5:43 PM
+> To: Inki Dae
+> Cc: 'Maarten Lankhorst'; 'linux-fbdev'; 'Kyungmin Park'; 'DRI mailing
+> list'; 'Rob Clark'; 'myungjoo.ham'; 'YoungJun Cho'; 'Daniel Vetter';
+> linux-arm-kernel at lists.infradead.org; linux-media at vger.kernel.org
+> Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+> framework
 > 
-> This version 2 follows the RFC version sent on March, 26th 2013. This
-> is based on work done by Lior Amsalem <alior@marvell.com>.
+> On Tue, Jun 18, 2013 at 02:27:40PM +0900, Inki Dae wrote:
+> > So I'd like to ask for other DRM maintainers. How do you think about it?
+> it
+> > seems like that Intel DRM (maintained by Daniel), OMAP DRM (maintained
+> by
+> > Rob) and GEM CMA helper also have same issue Russell pointed out. I
+> think
+> > not only the above approach but also the performance is very important.
 > 
-> The patches do the following:
+> CMA uses coherent memory to back their buffers, though that might not be
+> true of memory obtained from other drivers via dma_buf.  Plus, there is
+> no support in the CMA helper for exporting or importng these buffers.
 > 
->  * Patch 1 comes from Thierry Redding, and adds a minimal msi_chip
->    infrastructure.
-> 
->    This needs to be reviewed/acked by Bjorn Helgaas.
-> 
->  * Patch 2 extends the msi_chip infrastructure with a small registry,
->    so that one driver can register an msi_chip, and another driver can
->    find the msi_chip associated to a particular Device Tree node.
-> 
->    This needs to be reviewed/acked by Bjorn Helgaas.
 
-Could you have a look at those two patches and let me know what you
-think?
+It's not so. Please see Dave's drm next. recently dmabuf support for the CMA
+helper has been merged to there.
+
+> I guess Intel i915 is only used on x86, which is a coherent platform and
+> requires no cache maintanence for DMA.
+> 
+> OMAP DRM does not support importing non-DRM buffers buffers back into
+
+Correct. TODO yet.
+
+> DRM.  Moreover, it will suffer from the problems I described if any
+> attempt is made to write to the buffer after it has been re-imported.
+> 
+> Lastly, I should point out that the dma_buf stuff is really only useful
+> when you need to export a dma buffer from one driver and import it into
+> another driver - for example to pass data from a camera device driver to
+
+Most people know that.
+
+> a display device driver.  It shouldn't be used within a single driver
+> as a means of passing buffers between userspace and kernel space.
+
+What I try to do is not really such ugly thing. What I try to do is to
+notify that, when CPU tries to access a buffer , to kernel side through
+dmabuf interface. So it's not really to send the buffer to kernel.
 
 Thanks,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Inki Dae
