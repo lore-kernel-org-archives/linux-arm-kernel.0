@@ -1,21 +1,38 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 18 Jun 2013 14:23:01 -0400 (EDT)
-Subject: [PATCH V2 4/6] USB: OHCI: make ohci-spear a separate driver
-In-Reply-To: <1371052442-14541-5-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306181421520.1157-100000@iolanthe.rowland.org>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 18 Jun 2013 20:24:56 +0200
+Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
+ to the DT binding
+In-Reply-To: <20130618174622.GD2204@obsidianresearch.com>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-4-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130618174622.GD2204@obsidianresearch.com>
+Message-ID: <51C0A5F8.8030300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Manjunath Goudar wrote:
+On 06/18/2013 07:46 PM, Jason Gunthorpe wrote:
+> On Tue, Jun 18, 2013 at 08:25:28AM -0300, Ezequiel Garcia wrote:
+>> +
+>> +IIAA0000
+>> +
+>> +Where:
+>> +  -- I = Marvell defined target ID for programmable windows
+>> +  -- A = Marvell defined target attributes for programmable windows
+>
+> I thought we agreed to something like:
+>
+> SIAA0000
+>
+> Where 'S' is the designator for the special items like PCI-E and
+> internal-regs. 0 = normal target ids, 0xF = special ids.
+>
+> The target is only 4 bits, the attr is 8, so a little doc update to
+> clarify this should be enough, no need to change the DTs.
 
-> Separate the ST OHCI SPEAr host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.11.
-> 
-> V2:
->  -ohci_setup() removed because it is called in .reset member
->   of the ohci_hc_driver structure.
->  -debugging stuff isn't needed any more that's what removed.
++1 for SIAA0000, as it allows to use MBUS_ID also for those fake
+windows. It makes it more readable IMHO.
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Also allows you to have up to 40b offset, which _might_ be important
+with LPAE enabled.
+
+Sebastian
