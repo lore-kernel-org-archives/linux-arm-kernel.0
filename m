@@ -1,46 +1,24 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Jun 2013 15:37:41 +0200
-Subject: [PATCH] arm: mvebu: enable mini-PCIe connectors on Armada 370 RD
-Message-ID: <1371562661-7139-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 18 Jun 2013 15:41:04 +0200
+Subject: [PATCH] ARM: irqchip: add support for MOXA ART SoCs
+In-Reply-To: <1371549584-7169-1-git-send-email-jonas.jensen@gmail.com>
+References: <1371549584-7169-1-git-send-email-jonas.jensen@gmail.com>
+Message-ID: <20130618154104.7f8115c7@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370 RD board has two internal mini-PCIe connectors. This
-commit adds the necessary Device Tree informations to enable the usage
-of those mini-PCIe connectors.
+Dear Jonas Jensen,
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-Cc: Florian Fainelli <florian@openwrt.org>
----
- arch/arm/boot/dts/armada-370-rd.dts | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On Tue, 18 Jun 2013 11:59:44 +0200, Jonas Jensen wrote:
 
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index 130f839..ec1587b 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -84,6 +84,22 @@
- 					gpios = <&gpio0 6 1>;
- 				};
- 			};
-+
-+			pcie-controller {
-+				status = "okay";
-+
-+				/* Internal mini-PCIe connector */
-+				pcie at 1,0 {
-+					/* Port 0, Lane 0 */
-+					status = "okay";
-+				};
-+
-+				/* Internal mini-PCIe connector */
-+				pcie at 2,0 {
-+					/* Port 1, Lane 0 */
-+					status = "okay";
-+				};
-+			};
- 		};
- 	};
-  };
+> +asmlinkage void __exception_irq_entry moxart_handle_irq(struct pt_regs *regs);
+
+This forward declaration could be removed if moxart_handle_irq() was
+implemented before the initialization function of your driver.
+
+Thomas
 -- 
-1.8.1.2
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
