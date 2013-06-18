@@ -1,46 +1,59 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Jun 2013 13:00:14 +0300
-Subject: [PATCH v7 2/9] usb: phy: omap-usb2: use the new generic PHY
- framework
-In-Reply-To: <51C02EC7.7060908@ti.com>
-References: <1371113039-5784-1-git-send-email-kishon@ti.com>
- <1371113039-5784-3-git-send-email-kishon@ti.com>
- <20130618094058.GQ5461@arwen.pp.htv.fi> <51C02D0F.6010302@ti.com>
- <20130618095040.GZ5461@arwen.pp.htv.fi> <51C02EC7.7060908@ti.com>
-Message-ID: <20130618100014.GD5461@arwen.pp.htv.fi>
+From: sachin.kamat@linaro.org (Sachin Kamat)
+Date: Tue, 18 Jun 2013 15:32:03 +0530
+Subject: [PATCH V2 05/10] USB: OHCI: Properly handle ohci-exynos suspend
+In-Reply-To: <CAJFYCKFHhD2LuPP5LKSXzg4zuCMmNTSWRRUQkwFcQVmXSaLo9Q@mail.gmail.com>
+References: <9340690.Y20fM6tyU7@flatron>
+ <Pine.LNX.4.44L0.1306131542080.1561-100000@iolanthe.rowland.org>
+ <CAJFYCKFHhD2LuPP5LKSXzg4zuCMmNTSWRRUQkwFcQVmXSaLo9Q@mail.gmail.com>
+Message-ID: <CAK9yfHzR3y=jTL9K6w3Z9agrZ7SkzCdr6-HxKt-dj1Si6aBS3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 18 June 2013 15:24, Manjunath Goudar <manjunath.goudar@linaro.org> wrote:
+>
+>
+> On 14 June 2013 01:22, Alan Stern <stern@rowland.harvard.edu> wrote:
+>>
+>> On Thu, 13 Jun 2013, Tomasz Figa wrote:
+>>
+>> > > +   rc = ohci_suspend(hcd, do_wakeup);
+>> > > +   if (rc == 0 && do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
+>> > > +           ohci_resume(hcd, false);
+>> > > +           rc = -EBUSY;
+>> > > +   }
+>> >
+>> > I'm not into USB host subsystem, so I might just ask a stupid question.
+>> >
+>> > Can't we make ohci_suspend check this for us, so the drivers would just
+>> > check for error code? It seems like in all your patches this part of
+>> > code
+>> > is duplicated, looking as a good candidate to be generic.
+>>
+>> Argh!  You're right, of course.
+>>
+>> I didn't see it, because the only existing place where this check is
+>> made is in the PCI glue layer.  Pushing it into the HCDs themselves is
+>> obviously the right thing to do.
+>>
+>> Manjanuth, let's do this.  You can write a preliminary patch that puts
+>> this check at the end of the ohci_suspend() routine, and then resubmit
+>> your series.
+>>
+>
+> Alan and Tomaszas you are correct.
+>
+> Initially I also thought same, but later I analyzed this code is not
+> necessary for all bus glue; so I did not write in ohci_suspend() routine.
+>
+> After Alan explanation I am writing below code end of ohci_suspend()
+> routine.is it correct Alan.
+>
+>        if (do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
+>                 ohci_resume(hcd, false);
+>                 rc = -EBUSY;
 
-On Tue, Jun 18, 2013 at 03:26:23PM +0530, Kishon Vijay Abraham I wrote:
-> >>>On Thu, Jun 13, 2013 at 02:13:52PM +0530, Kishon Vijay Abraham I wrote:
-> >>>>@@ -159,6 +191,12 @@ static int omap_usb2_probe(struct platform_device *pdev)
-> >>>>  	otg->start_srp		= omap_usb_start_srp;
-> >>>>  	otg->phy		= &phy->phy;
-> >>>>
-> >>>>+	pm_runtime_enable(phy->dev);
-> >>>
-> >>>enabling pm_runtime here has the potential to cause a real big problem.
-> >>>How have you tested this patch ?
-> >>
-> >>performed boot and enumeration testing. What issue do you expect here?
-> >
-> >hint: look at drvdata usage around the driver. Where is it initialized ?
-> >Where is it used ?
-> 
-> hmm.. since runtime_get calls weren't made very early, I think I dint
-> see any issues. Thanks for pointing this.
-
-right, no problem. BTW, you don't get to_platform_device() ->
-platform_get_drvdata(). A simple dev_get_drvdata() is sufficient :-)
+You probably need to return this error code.
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/4631ffe0/attachment.sig>
+With warm regards,
+Sachin
