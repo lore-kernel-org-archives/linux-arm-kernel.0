@@ -1,58 +1,45 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 18 Jun 2013 16:28:22 +0100
-Subject: [PATCH] arm: versatile: don't mark pen as __INIT
-In-Reply-To: <20130618151343.GA2718@n2100.arm.linux.org.uk>
-References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
- <1371562002.5375.27.camel@linaro1.home>
- <20130618151343.GA2718@n2100.arm.linux.org.uk>
-Message-ID: <1371569302.5375.45.camel@linaro1.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 18 Jun 2013 16:29:05 +0100
+Subject: [PATCH 1/2] ARM: mmu: fix the hang when we steal a section
+ unaligned size memory
+In-Reply-To: <1371113826-1231-1-git-send-email-b32955@freescale.com>
+References: <1371113826-1231-1-git-send-email-b32955@freescale.com>
+Message-ID: <20130618152905.GB8534@mudshark.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-06-18 at 16:13 +0100, Russell King - ARM Linux wrote:
-> On Tue, Jun 18, 2013 at 02:26:42PM +0100, Jon Medhurst (Tixy) wrote:
-> > On Mon, 2013-06-10 at 16:07 +0100, Mark Rutland wrote:
-> > > When booting fewer cores than are physically present on a versatile
-> > > platform (e.g. when passing maxcpus=N on the command line), some
-> > > secondary cores may remain in the holding pen, which is marked __INIT.
-> > > Late in the boot process, the memory comprising the holding pen will be
-> > > released to the kernel for more general use, and may be overwritten with
-> > > arbitrary data, which can cause the held secondaries to start behaving
-> > > unpredictably. This can lead to all manner of odd behaviour from the
-> > > kernel.
-> > > 
-> > > Instead don't mark the section as __INIT. This means we can't reuse the
-> > > pen memory, but we won't get secondaries corrupting the rest of the
-> > > kernel.
-> > > 
-> > > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > > Acked-by: Pawel Moll <pawel.moll@arm.com>
-> > > Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > ---
-> > 
-> > This gives section mismatch warnings when compiling with
-> > vexpress_defconfig:
-> > 
-> >         WARNING: vmlinux.o(.text+0x14128): Section mismatch in reference from the variable pen to the function .cpuinit.text:secondary_startup()
-> >         The function pen() references
-> >         the function __cpuinit secondary_startup().
-> >         This is often because pen lacks a __cpuinit 
-> >         annotation or the annotation of secondary_startup is wrong.
-> >         
-> >         WARNING: vmlinux.o(.text+0x14130): Section mismatch in reference from the variable pen to the variable .cpuinit.data:pen_release
-> >         The function pen() references
-> >         the variable __cpuinitdata pen_release.
-> >         This is often because pen lacks a __cpuinitdata 
-> >         annotation or the annotation of pen_release is wrong.
-> > 
-> > wonder if this is opening up a small can of worms...?
+On Thu, Jun 13, 2013 at 09:57:05AM +0100, Huang Shijie wrote:
+> If we want to steal 128K memory in the machine_desc->reserve() hook, we
+> will hang up immediately.
 > 
-> With the death of __cpuinit and __CPUINIT, this becomes a non-issue.
-> Realistically, how many ARM platforms are built without CPU hotplug?
-> My guess is none what so ever, because CPU hotplug is needed for PM.
+> The hang reason is like this:
+> 
+>   [1] Stealing 128K makes the left memory is not aligned with the SECTION_SIZE.
+> 
+>   [2] So when the map_lowmem() tries to maps the lowmem memory banks,
+>       it will call the memblock_alloc(in early_alloc_aligned()) to allocate
+>       a page to store the pte. This pte page is in the unaligned region
+>       which is not mapped yet.
+> 
+>   [3] And when we use the memset() in the early_alloc_aligned(), we will hang
+>       right now.
+> 
+>   [4] The hang only occurs in the map_lowmem(). After the map_lowmem(), we have
+>       setup the PTE mappings. So in the later places, such as
+>       dma_contiguous_remap(), the hang will never occurs,
+> 
+> This patch adds a global variable, in_map_lowmem, to check if we are in
+> the map_lowmem() or not. If we are in the map_lowmem(), and we steal
+> a SECTION_SIZE unaligned memory, we will use the memblock_alloc_base()
+> to allocate the pte page. The @max_addr for memblock_alloc_base() is the
+> last mapped address.
 
-Indeed, a storm in a teacup. I had even seen the  __cpuinit removal
-patch a few hours earlier and didn't connect the dots. :-(
+Wouldn't this be better achieved with a parameter, rather than a global
+state variable? That said, I don't completely follow why memblock_alloc is
+giving you back an unmapped physical address. It sounds like we're freeing
+too much as part of the stealing (or simply that stealing has to be section
+aligned), but memblock only deals with physical addresses.
 
--- 
-Tixy
+Could you elaborate please?
+
+Will
