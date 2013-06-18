@@ -1,48 +1,45 @@
-From: ddutile@redhat.com (Don Dutile)
-Date: Tue, 18 Jun 2013 18:08:15 -0400
-Subject: DMA mapping API(IOMMU) for ARM64?
-In-Reply-To: <20130618125054.GL9930@arm.com>
-References: <20130618.053955.305832937374936961.hdoyu@nvidia.com>
- <20130618101914.GB3539@mudshark.cambridge.arm.com>
- <5159282.rrJMaZuYMv@wuerfel>
- <20130618.140137.1551430695673122122.hdoyu@nvidia.com>
- <20130618125054.GL9930@arm.com>
-Message-ID: <51C0DA4F.1010405@redhat.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 18 Jun 2013 19:09:30 -0300
+Subject: [PATCH v3 10/12] ARM: mvebu: Relocate Armada 370/XP DeviceBus
+ device tree nodes
+In-Reply-To: <201306181816.26530.arnd@arndb.de>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-11-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306181816.26530.arnd@arndb.de>
+Message-ID: <20130618220929.GA24056@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2013 08:50 AM, Catalin Marinas wrote:
-> On Tue, Jun 18, 2013 at 12:01:37PM +0100, Hiroshi Doyu wrote:
->> Arnd Bergmann<arnd@arndb.de>  wrote @ Tue, 18 Jun 2013 12:32:44 +0200:
->>> On Tuesday 18 June 2013 11:19:14 Will Deacon wrote:
->>>> I've spoken briefly with Catalin about this and it seems like there might be
->>>> *some* scope for sharing common dma-mapping code between architectures.
->>>> There doesn't really need to be any architecture-specific details in
->>>> allocating iova space and the interface to the iommu drivers is
->>>> well-defined. The arch-specific stuff is bogged down in the non-coherent
->>>> buffer management, but that doesn't necessarily equate to lots of code.
->>>>
->>>> So, the best bet would be to figure out how to split up what we have under
->>>> arch/arm/ so that it can be re-used by arm64 and potentially other
->>>> architectures (powerpc has some simple stuff for coherent mappings and some
->>>> less-simple stuff for non-coherent buffers).
->>>
->>> I'm sure that other architectures are interested in sharing the code.
->>> Best move it into the global mm/ directory, at least the version for
->>> coherent mappings.
->>
->> I'm guessing that this kind of unification usually takes some time
->> since we need to factor out the common code from the different
->> ${ARCH}/mm/dma-mapping.c. Also some of ${ARCH} has IOMMU support in
->> it. So if we want to develop our 64-bit ARM with working DMA mapping
->> API during this transition, the step to take would be:
->>
->> 1, Copy arch/arm/mm/dma-mapping.c arch/arm64/mm/dma-mapping.c(+swiotlb)
->> 2, Adapt arch/arm64/mm/dma-mapping.c(+swiotlb) to 64bit compatible.
->> 3, Factor out the common code from them into mm/dma-mapping.c
->
-> Or add the relevant code to something like lib/iommu-helper.c, convert
-> arm64 to use that and we can work on converting arm and other
-> architectures afterwards.
->
-why not in current drivers/iommu directory ?
+On Tue, Jun 18, 2013 at 06:16:26PM +0200, Arnd Bergmann wrote:
+> On Tuesday 18 June 2013, Ezequiel Garcia wrote:
+> > 
+> > +               devbus-bootcs {
+> > +                       compatible = "marvell,mvebu-devbus";
+> > +                       reg = <0xffff0001 0x10400 0x8>;
+> > +                       ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <1>;
+> > +                       clocks = <&coreclk 0>;
+> > +                       status = "disabled";
+> > +               };
+> 
+> This is a violation of the binding as far as I can tell, since you don't specify ranges
+> to access the 0xffff0001 0x10400 address. However, as I explained in my comment for
+> the binding, I think you should clarify the binding and leave the implementation
+> as you have it here.
+> 
+
+Mmm... again I got lost here. Which 'ranges' you say I don't specify to
+access the (formerly) 0xffff0001?
+
+AFAIK, 'ranges' are only for children translation, which means I don't
+need to specify a ranges for that in the devbus node, but in its parent,
+right?
+
+This ranges thing can be very tricky, so please correct me if I'm
+mistaken.
+
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
