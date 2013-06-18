@@ -1,35 +1,87 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 18 Jun 2013 18:06:59 +0100
-Subject: [PATCH 0/4] ARM/ARM64 architected timer updates
-Message-ID: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Date: Tue, 18 Jun 2013 18:07:01 +0100
+Subject: [PATCH 2/4] ARM: arch_timer: add macros for bits in control register
+In-Reply-To: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1371575223-21702-3-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
 
-Hi,
+Add macros to describe the bitfields in the ARM architected timer
+control register to make code easy to understand.
 
-This patch series adds support to configure the rate and enable the event
-stream for architected timer. Since the timer control register is reset to
-zero on warm boot, CPU PM notifier is added to re-initialse it.
+Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/arch_timer.h    |  9 +++++++--
+ arch/arm64/include/asm/arch_timer.h  | 10 ++++++++--
+ include/clocksource/arm_arch_timer.h |  8 ++++++++
+ 3 files changed, 23 insertions(+), 4 deletions(-)
 
-Regards,
-Sudeep
-
-Sudeep KarkadaNagesha (3):
-  ARM: arch_timer: add macros for bits in control register
-  ARM/ARM64: arch_timer: remove __cpuinit attribute for
-    arch_counter_set_user_access
-  drivers: clocksource: add CPU PM notifier for ARM architected timer
-
-Will Deacon (1):
-  drivers: clocksource: configure event stream for ARM arch timer
-
- arch/arm/include/asm/arch_timer.h    | 10 ++++++--
- arch/arm64/include/asm/arch_timer.h  | 12 +++++++---
- drivers/clocksource/arm_arch_timer.c | 46 +++++++++++++++++++++++++++++++++++-
- include/clocksource/arm_arch_timer.h | 10 ++++++++
- 4 files changed, 72 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index 75c8ec3..6725017 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -96,8 +96,13 @@ static inline void __cpuinit arch_counter_set_user_access(int divider)
+ 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
+ 
+ 	/* disable user access to everything */
+-	cntkctl &= ~((3 << 8) | (0xf << 4) | (3 << 0));
+-	cntkctl |= (divider << 4) | (1 << 2);
++	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
++			| ARCH_TIMER_USR_VT_ACCESS_EN
++			| ARCH_TIMER_EVT_TRIGGER_MASK
++			| ARCH_TIMER_USR_VCT_ACCESS_EN
++			| ARCH_TIMER_USR_PCT_ACCESS_EN);
++	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
++			| ARCH_TIMER_VIRT_EVT_EN;
+ 
+ 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+ }
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index 5fcaa6f..2269944 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -103,10 +103,16 @@ static inline void __cpuinit arch_counter_set_user_access(int divider)
+ 
+ 	/* Disable user access to the timers and the physical counter. */
+ 	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
+-	cntkctl &= ~((3 << 8) | (0xf << 4) | (1 << 0));
++	cntkctl &= ~(ARCH_TIMER_USR_PT_ACCESS_EN
++			| ARCH_TIMER_USR_VT_ACCESS_EN
++			| ARCH_TIMER_EVT_TRIGGER_MASK
++			| ARCH_TIMER_USR_PCT_ACCESS_EN)
+ 
+ 	/* Enable user access to the virtual counter and frequency. */
+-	cntkctl |= (divider << 4) | (1 << 2) | (1 << 1);
++	cntkctl |= (divider << ARCH_TIMER_EVT_TRIGGER_SHIFT)
++			| ARCH_TIMER_VIRT_EVT_EN
++			| ARCH_TIMER_USR_VCT_ACCESS_EN;
++
+ 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+ }
+ 
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index 24dc140..c4d0fc4 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -29,6 +29,14 @@
+ #define ARCH_TIMER_PHYS_ACCESS		0
+ #define ARCH_TIMER_VIRT_ACCESS		1
+ 
++#define ARCH_TIMER_USR_PCT_ACCESS_EN	(1 << 0) /* physical counter */
++#define ARCH_TIMER_USR_VCT_ACCESS_EN	(1 << 1) /* virtual counter */
++#define ARCH_TIMER_VIRT_EVT_EN		(1 << 2)
++#define ARCH_TIMER_EVT_TRIGGER_SHIFT	(4)
++#define ARCH_TIMER_EVT_TRIGGER_MASK	(0xF << ARCH_TIMER_EVT_TRIGGER_SHIFT)
++#define ARCH_TIMER_USR_VT_ACCESS_EN	(1 << 8) /* virtual timer registers */
++#define ARCH_TIMER_USR_PT_ACCESS_EN	(1 << 9) /* physical timer registers */
++
+ #define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
+ 
+ #ifdef CONFIG_ARM_ARCH_TIMER
 -- 
 1.8.1.2
