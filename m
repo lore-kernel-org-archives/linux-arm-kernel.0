@@ -1,44 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 18 Jun 2013 12:51:49 -0400 (EDT)
-Subject: [RFC PATCH v1 5/6] USB: EHCI: improve interrupt qh unlink
-In-Reply-To: <1371567833-9077-6-git-send-email-ming.lei@canonical.com>
-Message-ID: <Pine.LNX.4.44L0.1306181246140.1157-100000@iolanthe.rowland.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jun 2013 17:52:47 +0100
+Subject: [PATCH 1/2] ARM: mmu: fix the hang when we steal a section
+ unaligned size memory
+In-Reply-To: <20130618152905.GB8534@mudshark.cambridge.arm.com>
+References: <1371113826-1231-1-git-send-email-b32955@freescale.com>
+ <20130618152905.GB8534@mudshark.cambridge.arm.com>
+Message-ID: <20130618165246.GC2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Jun 2013, Ming Lei wrote:
-
-> Given interrupt URB will be resubmitted from tasklet context which
-> is scheduled by ehci hardware interrupt handler, and commonly only
-> one interrupt URB is scheduled on qh, so the qh may be unlinked
-> immediately once qh_completions() returns from ehci_irq(), then
-> the intr URB to be resubmitted in complete() can only be scheduled
-> and linked to hardware until the qh unlink is completed.
+On Tue, Jun 18, 2013 at 04:29:05PM +0100, Will Deacon wrote:
+> Wouldn't this be better achieved with a parameter, rather than a global
+> state variable? That said, I don't completely follow why memblock_alloc is
+> giving you back an unmapped physical address. It sounds like we're freeing
+> too much as part of the stealing (or simply that stealing has to be section
+> aligned), but memblock only deals with physical addresses.
 > 
-> This patch applied the QH_STATE_UNLINK_WAIT(not used by interrupt qh)
-> state to improve this above situation, and the qh will wait for 5
-> milliseconds before being unlinked from hardware, if one URB is submitted
-> during the period, the qh is move out of unlink wait state and the
-> interrupt transfer can be scheduled immediately, not like before: the
-> transfer is only linked to hardware until previous unlink is completed.
-> 
-> Only enable the improvement in case that HCD supports to run
-> giveback of URB in tasklet context.
+> Could you elaborate please?
 
-The approach used in this patch is wrong.  You shouldn't start the 
-unlink, then wait, then finish the unlink.  Consider what would happen 
-if an URB were submitted during the delay: It would have to wait until 
-the QH was completely unlinked.  Instead, you should wait first, then 
-do the entire unlink.
+It's a catch-22 situation.  memblock allocates from the top of usable
+memory.
 
-For example, scan_async() in ehci-q.c doesn't immediately begin to 
-unlink empty async QHs.  It merely marks them as being empty and starts 
-a timer to check them later.  It they are still empty at that point, 
-then they are unlinked.
+While setting up the page tables for the second time, we insert section
+mappings.  If the last mapping is not section sized, we will try to set
+it up using page mappings.  For this, we need to allocate L2 page
+tables from memblock.
 
-Also, it's silly to check whether or not giveback uses a tasklet.  We 
-know that following the 6/6 patch it will.  Even if it doesn't, there's 
-no harm in waiting a little while before unlinking an empty interrupt 
-QH.
+memblock returns a 4K page in the last non-section sized mapping - which
+we're trying to setup, and hence is not yet mapped.
 
-Alan Stern
+This is why I've always said - if you steal memory from memblock, it
+_must_ be aligned to 1MB (the section size) to avoid this.  Not only
+that, but we didn't _used_ to allow page-sized mappings for MT_MEMORY -
+that got added for OMAP's SRAM support.
