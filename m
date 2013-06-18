@@ -1,49 +1,37 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 18 Jun 2013 13:30:11 -0400 (EDT)
-Subject: [PATCH V2 1/6] USB: OHCI: make ohci-exynos a separate driver
-In-Reply-To: <1371052442-14541-2-git-send-email-manjunath.goudar@linaro.org>
-Message-ID: <Pine.LNX.4.44L0.1306181329070.1157-100000@iolanthe.rowland.org>
+From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
+Date: Tue, 18 Jun 2013 11:39:06 -0600
+Subject: [PATCH v3 05/12] ARM: mvebu: Remove the harcoded BootROM window
+ allocation
+In-Reply-To: <1371554737-25319-6-git-send-email-ezequiel.garcia@free-electrons.com>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-6-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <20130618173906.GC2204@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 12 Jun 2013, Manjunath Goudar wrote:
-
-> Separate the  Samsung OHCI EXYNOS host controller driver from ohci-hcd
-> host code so that it can be built as a separate driver module.
-> This work is part of enabling multi-platform kernels on ARM;
-> it would be nice to have in 3.11.
+On Tue, Jun 18, 2013 at 08:25:30AM -0300, Ezequiel Garcia wrote:
+> The address decoding window to access the BootROM should not be
+> allocated programatically, but instead declared in the device tree.
 > 
-> V2:
->  -exynos_ohci_hcd structure assignment error fixed.
->  -Removed multiple usb_create_hcd() from prob funtion.
->  -platform_set_drvdata() called before exynos_ohci_phy_enable().
->  -ohci_setup() removed because it is called in .reset member
->   of the ohci_hc_driver structure
+> Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+>  arch/arm/mach-mvebu/platsmp.c | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+> index 93f2f3a..d419fac 100644
+> +++ b/arch/arm/mach-mvebu/platsmp.c
+> @@ -118,7 +118,6 @@ void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+>  	set_secondary_cpus_clock();
+>  	flush_cache_all();
+>  	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+> -	mvebu_mbus_add_window("bootrom", 0xfff00000, SZ_1M);
+>  }
 
-> --- a/drivers/usb/host/ohci-exynos.c
-> +++ b/drivers/usb/host/ohci-exynos.c
-> @@ -12,24 +12,39 @@
->   */
->  
->  #include <linux/clk.h>
-> +#include <linux/dma-mapping.h>
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/platform_device.h>
->  #include <linux/platform_data/usb-ohci-exynos.h>
->  #include <linux/usb/phy.h>
->  #include <linux/usb/samsung_usb_phy.h>
-> +#include <linux/usb.h>
-> +#include <linux/usb/hcd.h>
-> +#include <linux/usb/otg.h>
-> +
-> +#include "ohci.h"
-> +
-> +#define DRIVER_DESC "OHCI exynos driver"
+I think some kind of test is needed here. As I understand it the SMP
+startup uses a trampoline in the boot rom and the boot rom *must* be
+mapped to 0xfff00000 ?
 
-I think the word "EXYNOS" is supposed to be in all capital letters.  
-Apart from that,
+Verifying the DT is setup this way and aborting if it is not seems
+like a good idea..
 
-Acked-by: Alan Stern <stern@rowland.harvard.edu>
+Jason
