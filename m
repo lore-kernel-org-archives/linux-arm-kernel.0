@@ -1,47 +1,51 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 18 Jun 2013 12:47:53 -0600
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <51C0AA8E.9080807@gmail.com>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130618174622.GD2204@obsidianresearch.com>
- <51C0A5F8.8030300@gmail.com> <201306182039.50736.arnd@arndb.de>
- <51C0AA8E.9080807@gmail.com>
-Message-ID: <20130618184753.GA6090@obsidianresearch.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jun 2013 19:54:09 +0100
+Subject: [PATCH 1/2] Watchdog: allow orion_wdt to be built for Dove
+In-Reply-To: <51C0A8A9.4070608@gmail.com>
+References: <E1Uoyd2-0001Cp-KL@rmk-PC.arm.linux.org.uk>
+ <20130618163129.GY31667@titan.lakedaemon.net> <51C0A8A9.4070608@gmail.com>
+Message-ID: <20130618185409.GE2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 08:44:30PM +0200, Sebastian Hesselbarth wrote:
-> On 06/18/2013 08:39 PM, Arnd Bergmann wrote:
-> >On Tuesday 18 June 2013, Sebastian Hesselbarth wrote:
-> >>Also allows you to have up to 40b offset, which might be important
-> >>with LPAE enabled.
-> >
-> >Not with the current generation I think, since the mbus windows are
-> >32 bit only, but it would avoid having to come up with a new format
-> >for a potential future-generation mbus that has wider address.
-> 
-> Yeah, I also recall Thomas or Gregory mention a 32b limitation in
-> remap windows. But we don't need to waste addresses here
-> 
-> And even if SIAA0000 is a concern because there may be target id >15
-> someday, we can still have IIAASS00 instead of IIAA00SS. I guess
-> LPAE will not rise above 40b quickly ;)
+On Tue, Jun 18, 2013 at 08:36:25PM +0200, Sebastian Hesselbarth wrote:
+> On 06/18/2013 06:31 PM, Jason Cooper wrote:
+>> On Tue, Jun 18, 2013 at 05:19:32PM +0100, Russell King wrote:
+>>> The watchdog infrastructure in Dove is no different from that in
+>>> Orion5x or Kirkwood, so let's enable it for Dove.  The only things
+>>> missing are a few register settings in Dove's bridge-regs.h.
+>>>
+>>> Rather than duplicating the same register bit masks for the RSTOUTn_MASK
+>>> and BRIDGE_CAUSE registers, move the definitions into the watchdog
+>>> driver itself.
+>>>
+>>> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+>>> ---
+>>>   arch/arm/mach-dove/include/mach/bridge-regs.h     |    1 +
+>>>   arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    2 --
+>>>   arch/arm/mach-orion5x/include/mach/bridge-regs.h  |    3 ---
+>>>   drivers/watchdog/Kconfig                          |    2 +-
+>>>   drivers/watchdog/orion_wdt.c                      |    3 +++
+>>>   5 files changed, 5 insertions(+), 6 deletions(-)
+>>
+>> There shouldn't be any conflicts on the mvebu side.  Wim, feel free to
+>> take it:
+>>
+>> Acked-by: Jason Cooper<jason@lakedaemon.net>
+>
+> FWIW, you also kind of get my Acked-by, although I was silently hoping
+> we can postpone orion wdt until we remove non-DT ;)
+>
+> With irqchip queued for 3.11, we will ack the timer irqs by a
+> chained irq handler. But this will be DT-only and currently also only
+> for Kirkwood and Dove (Orion5x DT progress is slow).
+>
+> With 3.11 out, I will see how to handle wdt. Either make it non-DT/DT
+> aware or also move non-DT to irqchip.
 
-S = 0 means 4 bit I, 8 bit A
-S = F means special
-S = 1 could mean 16 bit I, etc , etc
-
-Yes, we could define things as 'SIAAoooo oooooooo'
-
-But remember 'o' is the offset within the window, it is not related to
-LPAE.
-
-To need > 32 bits 'o' you need to have windows > 4G in size. The only
-thing that could possibly do that is PCI-E, and it is all special
-anyhow..
-
-The mbus top level ranges remap already supports >4G locations for
-the windows, even though current hardware cannot do that.
-
-Jason
+Well, it doesn't actually use IRQs at all.  What it needs to do though
+is ensure that the watchdog IRQ is cleared.  For the sake of speculation,
+this may be because it needs to be cleared otherwise setting
+WDT_RESET_OUT_EN might provoke an immediate reset...  Unfortunately
+the Armada 510 manual seems to lack very many words about the Watchdog
+behaviour.
