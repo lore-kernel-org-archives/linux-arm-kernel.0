@@ -1,113 +1,41 @@
 From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 18 Jun 2013 14:11:28 +0300
-Subject: [PATCH 1/4] ARM: dts: omap4-panda: Add USB Host support
+Date: Tue, 18 Jun 2013 14:11:29 +0300
+Subject: [PATCH 2/4] ARM: dts: omap4-panda: Fix DVI EDID reads
 In-Reply-To: <1371553891-29364-1-git-send-email-rogerq@ti.com>
 References: <1371553891-29364-1-git-send-email-rogerq@ti.com>
-Message-ID: <1371553891-29364-2-git-send-email-rogerq@ti.com>
+Message-ID: <1371553891-29364-3-git-send-email-rogerq@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide the RESET and Power regulators for the USB PHY,
-the USB Host port mode and the PHY device.
+On Panda the +5V supply for DVI EDID is supplied by the
+same regulator that poweres the USB Hub. Currently, the
+DSS/DVI subsystem doesn't know how to manage this regulator
+and so DVI EDID reads will fail if USB Hub is not enabled.
 
-Also provide pin multiplexer information for the USB host
-pins.
+As a temporary fix we keep this regulator permanently enabled
+on boot. This fixes the DVI EDID read problem.
 
+CC: Tomi Valkeinen <tomi.valkeinen@ti.com>
 Signed-off-by: Roger Quadros <rogerq@ti.com>
 ---
- arch/arm/boot/dts/omap4-panda-common.dtsi |   62 +++++++++++++++++++++++++++++
- 1 files changed, 62 insertions(+), 0 deletions(-)
+ arch/arm/boot/dts/omap4-panda-common.dtsi |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
-index 00cbaa5..7a21e8e 100644
+index 7a21e8e..40df79e 100644
 --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
 +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
-@@ -59,6 +59,42 @@
- 			"AFML", "Line In",
- 			"AFMR", "Line In";
- 	};
-+
-+	/* HS USB Port 1 RESET */
-+	hsusb1_reset: hsusb1_reset_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb1_reset";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio2 30 0>;	/* gpio_62 */
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
-+
-+	/* HS USB Port 1 Power */
-+	hsusb1_power: hsusb1_power_reg {
-+		compatible = "regulator-fixed";
-+		regulator-name = "hsusb1_vbus";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 1 0>;	/* gpio_1 */
-+		startup-delay-us = <70000>;
-+		enable-active-high;
-+	};
-+
-+	/* HS USB Host PHY on PORT 1 */
-+	hsusb1_phy: hsusb1_phy {
-+		compatible = "usb-nop-xceiv";
-+		reset-supply = <&hsusb1_reset>;
-+		vcc-supply = <&hsusb1_power>;
-+	/**
-+	 * FIXME:
-+	 * put the right clock phandle here when available
-+	 *	clocks = <&auxclk3>;
-+	 *	clock-names = "main_clk";
-+	 */
-+		clock-frequency = <19200000>;
-+	};
- };
- 
- &omap4_pmx_wkup {
-@@ -83,6 +119,7 @@
- 			&mcbsp1_pins
- 			&dss_hdmi_pins
- 			&tpd12s015_pins
-+			&hsusbb1_pins
- 	>;
- 
- 	twl6030_pins: pinmux_twl6030_pins {
-@@ -133,6 +170,23 @@
- 		>;
+@@ -80,6 +80,11 @@
+ 		gpio = <&gpio1 1 0>;	/* gpio_1 */
+ 		startup-delay-us = <70000>;
+ 		enable-active-high;
++		/*
++		 * FIXME: Remove boot-on when DSS can handle this regulator
++		 * for DVI EDID.
++		 */
++		regulator-boot-on;
  	};
  
-+	hsusbb1_pins: pinmux_hsusbb1_pins {
-+		pinctrl-single,pins = <
-+			0x82 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_clk.usbb1_ulpiphy_clk */
-+			0x84 (PIN_OUTPUT | MUX_MODE4)		/* usbb1_ulpitll_stp.usbb1_ulpiphy_stp */
-+			0x86 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dir.usbb1_ulpiphy_dir */
-+			0x88 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_nxt.usbb1_ulpiphy_nxt */
-+			0x8a (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat0.usbb1_ulpiphy_dat0 */
-+			0x8c (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat1.usbb1_ulpiphy_dat1 */
-+			0x8e (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat2.usbb1_ulpiphy_dat2 */
-+			0x90 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat3.usbb1_ulpiphy_dat3 */
-+			0x92 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat4.usbb1_ulpiphy_dat4 */
-+			0x94 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat5.usbb1_ulpiphy_dat5 */
-+			0x96 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat6.usbb1_ulpiphy_dat6 */
-+			0x98 (PIN_INPUT_PULLDOWN | MUX_MODE4)	/* usbb1_ulpitll_dat7.usbb1_ulpiphy_dat7 */
-+		>;
-+	};
-+
- 	i2c1_pins: pinmux_i2c1_pins {
- 		pinctrl-single,pins = <
- 			0xe2 (PIN_INPUT_PULLUP | MUX_MODE0)	/* i2c1_scl */
-@@ -283,3 +337,11 @@
- 	mode = <3>;
- 	power = <50>;
- };
-+
-+&usbhshost {
-+	port1-mode = "ehci-phy";
-+};
-+
-+&usbhsehci {
-+	phys = <&hsusb1_phy>;
-+};
+ 	/* HS USB Host PHY on PORT 1 */
 -- 
 1.7.4.1
