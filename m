@@ -1,126 +1,48 @@
-From: joelagnel@ti.com (Joel A Fernandes)
-Date: Tue, 18 Jun 2013 01:38:19 -0500
-Subject: [PATCH v11 8/8] spi: omap2-mcspi: convert to
- dma_request_slave_channel_compat()
-In-Reply-To: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
-References: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
-Message-ID: <1371537499-12970-9-git-send-email-joelagnel@ti.com>
+From: girishks2000@gmail.com (Girish KS)
+Date: Tue, 18 Jun 2013 12:20:54 +0530
+Subject: [PATCH v4 04/10] serial: samsung: select Exynos specific driver
+ data if ARCH_EXYNOS is defined
+In-Reply-To: <1371536962-13322-5-git-send-email-chander.kashyap@linaro.org>
+References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
+ <1371536962-13322-5-git-send-email-chander.kashyap@linaro.org>
+Message-ID: <CAKrE-KcvV5dQz0vUb-1y1msoron2Z=RjSnH1uxy8rzMtn8iChA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Porter <mporter@ti.com>
-
-Convert dmaengine channel requests to use
-dma_request_slave_channel_compat(). This supports the DT case of
-platforms requiring channel selection from either the OMAP DMA or
-the EDMA engine. AM33xx only boots from DT and is the only user
-implementing EDMA so in the !DT case we can default to the OMAP DMA
-filter.
-
-Signed-off-by: Matt Porter <mporter@ti.com>
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
----
- drivers/spi/spi-omap2-mcspi.c |   64 ++++++++++++++++++++++++++++-------------
- 1 file changed, 44 insertions(+), 20 deletions(-)
-
-diff --git a/drivers/spi/spi-omap2-mcspi.c b/drivers/spi/spi-omap2-mcspi.c
-index 86d2158..ca4ab78 100644
---- a/drivers/spi/spi-omap2-mcspi.c
-+++ b/drivers/spi/spi-omap2-mcspi.c
-@@ -102,6 +102,9 @@ struct omap2_mcspi_dma {
- 
- 	struct completion dma_tx_completion;
- 	struct completion dma_rx_completion;
-+
-+	char dma_rx_ch_name[14];
-+	char dma_tx_ch_name[14];
- };
- 
- /* use PIO for small transfers, avoiding DMA setup/teardown overhead and
-@@ -830,12 +833,20 @@ static int omap2_mcspi_request_dma(struct spi_device *spi)
- 	dma_cap_zero(mask);
- 	dma_cap_set(DMA_SLAVE, mask);
- 	sig = mcspi_dma->dma_rx_sync_dev;
--	mcspi_dma->dma_rx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+
-+	mcspi_dma->dma_rx =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &sig, &master->dev,
-+						 mcspi_dma->dma_rx_ch_name);
- 	if (!mcspi_dma->dma_rx)
- 		goto no_dma;
- 
- 	sig = mcspi_dma->dma_tx_sync_dev;
--	mcspi_dma->dma_tx = dma_request_channel(mask, omap_dma_filter_fn, &sig);
-+	mcspi_dma->dma_tx =
-+		dma_request_slave_channel_compat(mask, omap_dma_filter_fn,
-+						 &sig, &master->dev,
-+						 mcspi_dma->dma_tx_ch_name);
-+
- 	if (!mcspi_dma->dma_tx) {
- 		dma_release_channel(mcspi_dma->dma_rx);
- 		mcspi_dma->dma_rx = NULL;
-@@ -1256,29 +1267,42 @@ static int omap2_mcspi_probe(struct platform_device *pdev)
- 		goto free_master;
- 
- 	for (i = 0; i < master->num_chipselect; i++) {
--		char dma_ch_name[14];
-+		char *dma_rx_ch_name = mcspi->dma_channels[i].dma_rx_ch_name;
-+		char *dma_tx_ch_name = mcspi->dma_channels[i].dma_tx_ch_name;
- 		struct resource *dma_res;
- 
--		sprintf(dma_ch_name, "rx%d", i);
--		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--				dma_ch_name);
--		if (!dma_res) {
--			dev_dbg(&pdev->dev, "cannot get DMA RX channel\n");
--			status = -ENODEV;
--			break;
--		}
-+		sprintf(dma_rx_ch_name, "rx%d", i);
-+		if (!pdev->dev.of_node) {
-+			dma_res =
-+				platform_get_resource_byname(pdev,
-+							     IORESOURCE_DMA,
-+							     dma_rx_ch_name);
-+			if (!dma_res) {
-+				dev_dbg(&pdev->dev,
-+					"cannot get DMA RX channel\n");
-+				status = -ENODEV;
-+				break;
-+			}
- 
--		mcspi->dma_channels[i].dma_rx_sync_dev = dma_res->start;
--		sprintf(dma_ch_name, "tx%d", i);
--		dma_res = platform_get_resource_byname(pdev, IORESOURCE_DMA,
--				dma_ch_name);
--		if (!dma_res) {
--			dev_dbg(&pdev->dev, "cannot get DMA TX channel\n");
--			status = -ENODEV;
--			break;
-+			mcspi->dma_channels[i].dma_rx_sync_dev =
-+				dma_res->start;
- 		}
-+		sprintf(dma_tx_ch_name, "tx%d", i);
-+		if (!pdev->dev.of_node) {
-+			dma_res =
-+				platform_get_resource_byname(pdev,
-+							     IORESOURCE_DMA,
-+							     dma_tx_ch_name);
-+			if (!dma_res) {
-+				dev_dbg(&pdev->dev,
-+					"cannot get DMA TX channel\n");
-+				status = -ENODEV;
-+				break;
-+			}
- 
--		mcspi->dma_channels[i].dma_tx_sync_dev = dma_res->start;
-+			mcspi->dma_channels[i].dma_tx_sync_dev =
-+				dma_res->start;
-+		}
- 	}
- 
- 	if (status < 0)
--- 
-1.7.9.5
+On Tue, Jun 18, 2013 at 11:59 AM, Chander Kashyap
+<chander.kashyap@linaro.org> wrote:
+> All Exynos4/5 SoCs share a common driver data in the samsung serial
+> driver. Hence, let the driver data inclusion be based on ARCH_EXYNOS
+> instead of SOC specific definition.
+>
+> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+> ---
+>  drivers/tty/serial/samsung.c |    4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+>
+> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
+> index 2552c7f..e70d19a 100644
+> --- a/drivers/tty/serial/samsung.c
+> +++ b/drivers/tty/serial/samsung.c
+> @@ -1703,9 +1703,7 @@ static struct s3c24xx_serial_drv_data s5pv210_serial_drv_data = {
+>  #define S5PV210_SERIAL_DRV_DATA        (kernel_ulong_t)NULL
+>  #endif
+>
+> -#if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) || \
+> -       defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) || \
+> -       defined(CONFIG_SOC_EXYNOS5440)
+> +#if defined(CONFIG_ARCH_EXYNOS)
+>  static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
+>         .info = &(struct s3c24xx_uart_info) {
+>                 .name           = "Samsung Exynos4 UART",
+Looks good to me
+Reviewed by: Girish K S <ks.giri@samsung.com>
+> --
+> 1.7.9.5
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
