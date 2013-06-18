@@ -1,43 +1,35 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 18 Jun 2013 13:51:11 -0600
-Subject: [PATCH v3 05/12] ARM: mvebu: Remove the harcoded BootROM window
- allocation
-In-Reply-To: <20130618194330.GA2394@localhost>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-6-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130618173906.GC2204@obsidianresearch.com>
- <20130618194330.GA2394@localhost>
-Message-ID: <20130618195111.GC6578@obsidianresearch.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 18 Jun 2013 12:56:17 -0700
+Subject: [PATCH 1/2] ARM: vexpress/TC2: basic PM support
+In-Reply-To: <alpine.LFD.2.03.1306181528050.18597@syhkavp.arg>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130613203218.GA22310@quad.lixom.net>
+ <alpine.LFD.2.03.1306131817310.18597@syhkavp.arg>
+ <20130618172434.GI3289@localhost.localdomain>
+ <alpine.LFD.2.03.1306181528050.18597@syhkavp.arg>
+Message-ID: <CAOesGMiE4uRM01obQA584Neufws5K8HsarA0TVcx-2JmSdNgGQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 04:43:31PM -0300, Ezequiel Garcia wrote:
+I agree with most of the thread so far, but just wanted to highlight this:
 
-> > I think some kind of test is needed here. As I understand it the SMP
-> > startup uses a trampoline in the boot rom and the boot rom *must* be
-> > mapped to 0xfff00000 ?
+On Tue, Jun 18, 2013 at 12:50 PM, Nicolas Pitre
+<nicolas.pitre@linaro.org> wrote:
 
-> Yes, that's my understanding as well, but I will do some testing since
-> it should be interesting...
+> Well... right now I think it is hard to abstract things properly as we
+> have very few backends.  I would like to see more of them first.
 
-If it is like the earlier chips you will also have the choice of
-something based at 0, there is a register bit that sets the reset
-address.
- 
-> > Verifying the DT is setup this way and aborting if it is not seems
-> > like a good idea..
+Yes. This.
 
-> I have no problem doing that, but to me it sounds as it's the
-> responsability of the one that writes the DT, no?
+And this is why it's critical, absolutely critical, that the first one
+or two implementations go in are as simple and clean as possible.
 
-Having the kernel enforce that the DT node is present and at the right
-location, I think, is helpful for the bootloader folks to ensure they
-write correct DTs.
+Otherwise seeing the commonalities and how to abstract them out will
+be a complete headache, since only the person writing the driver will
+be able to get a good grasp of it (alternatively, it will take a lot
+of effort for someone to figure out, clean up, and see the bigger
+picture).
 
-> Maybe this is a requirement for this SoC, but not for another...
-> so, why should the kernel *check* for that?
 
-The function was called armada_xp_smp_prepare_cpus - all Armada XP's
-will work like this..
-
-Jason
+-Olof
