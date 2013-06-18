@@ -1,46 +1,62 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Tue, 18 Jun 2013 08:33:54 -0400
-Subject: [PATCH v3 06/12] memory: mvebu-devbus: Remove address decoding
- window workaround
-In-Reply-To: <20130618141731.56e7966c@skate>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-7-git-send-email-ezequiel.garcia@free-electrons.com>
- <20130618113920.GW31667@titan.lakedaemon.net>
- <20130618141731.56e7966c@skate>
-Message-ID: <20130618123354.GX31667@titan.lakedaemon.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Jun 2013 15:35:36 +0300
+Subject: [PATCH v7 5/9] ARM: OMAP: USB: Add phy binding information
+In-Reply-To: <51C040E8.2050904@ti.com>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+ <1371113039-5784-6-git-send-email-kishon@ti.com>
+ <20130618094438.GT5461@arwen.pp.htv.fi> <51C030B4.5070707@ti.com>
+ <20130618102725.GB7843@arwen.pp.htv.fi> <51C040E8.2050904@ti.com>
+Message-ID: <20130618123536.GD8620@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 02:17:31PM +0200, Thomas Petazzoni wrote:
-> Dear Jason Cooper,
+Hi,
+
+On Tue, Jun 18, 2013 at 04:43:44PM +0530, Kishon Vijay Abraham I wrote:
+> >On Tue, Jun 18, 2013 at 03:34:36PM +0530, Kishon Vijay Abraham I wrote:
+> >>On Tuesday 18 June 2013 03:14 PM, Felipe Balbi wrote:
+> >>>On Thu, Jun 13, 2013 at 02:13:55PM +0530, Kishon Vijay Abraham I wrote:
+> >>>>In order for controllers to get PHY in case of non dt boot, the phy
+> >>>>binding information (phy device name) should be added in the platform
+> >>>>data of the controller.
+> >>>>
+> >>>>Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >>>
+> >>>I would rather not pass strings around, any other way to handle this ?
+> >>>Why do you need to pass this string ?
+> >>
+> >>Our old way of binding the controller and the phy using device name
+> >>started creating problems after the devices are created using
+> >>PLATFORM_DEVID_AUTO. Infact non-dt boot is broken in mainline for
+> >>OMAP3 platforms for which I have posted a RFC series
+> >>http://www.serverphorums.com/read.php?12,708632 which also uses
+> >>strings.
+> >>I'm not sure of any other way to deal with this.
+> >
+> >have you checked how other frameworks handle it ? Regulator has some
+> >sort of binding in board-files, but I guess it passes the regulator
+> >name?
 > 
-> On Tue, 18 Jun 2013 07:39:20 -0400, Jason Cooper wrote:
-> > On Tue, Jun 18, 2013 at 08:25:31AM -0300, Ezequiel Garcia wrote:
-> > > Now that mbus device tree binding has been introduced, remove the address
-> > > decoding window management from this driver.
-> > > A suitable 'ranges' entry should be added to the devbus-compatible node in
-> > > the device tree, as described by the mbus binding documentation.
-> > > 
-> > > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
-> > > ---
-> > >  drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
-> > >  1 file changed, 2 insertions(+), 62 deletions(-)
-> > 
-> > Unfortunately, the patch adding mvebu-devbus is going through gregkh's
-> > tree.  Either this patch needs to wait for v3.12, or ask Greg if he can
-> > take this one.
+> From whatever I could make of, regulator has 3 ways to get the
+> regulator one of which is using the binding in board-files (but it
+> also uses device name which could create the same problem that we are
+> facing).
 > 
-> I believe that what we're looking for right now is a Acked-by from both
-> the Marvell maintainers, Arnd Bergmann and Jason Gunthorpe. Once we get
-> those Acked-by, we can figure out the merge strategy for this patch
-> set.
+> 1.) from dt data
+> 2.) from _supply_ name
+> 3.) from binding in board file
+> 
+> (referred regulator_dev_lookup() in regulator/core.c)
 
-Right.  I was more looking to give Ezequiel a heads up because I think
-he will have to extract devbus related changes out of the patches later
-in this series.  I haven't had time to look closely yet, but wanted to
-toss it out there so it didn't rear it's head later and throw things off
-track.
+right, spot on. Which means we don't have a better, more elegant
+solution now. Let's go ahead with this.
 
-thx,
-
-Jason.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/42f5d2bc/attachment.sig>
