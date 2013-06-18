@@ -1,29 +1,112 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 12:32:44 +0200
-Subject: DMA mapping API(IOMMU) for ARM64?
-In-Reply-To: <20130618101914.GB3539@mudshark.cambridge.arm.com>
-References: <20130618.053955.305832937374936961.hdoyu@nvidia.com>
- <20130618101914.GB3539@mudshark.cambridge.arm.com>
-Message-ID: <5159282.rrJMaZuYMv@wuerfel>
+From: chander.kashyap@linaro.org (Chander Kashyap)
+Date: Tue, 18 Jun 2013 16:02:51 +0530
+Subject: [PATCH v4 00/10] ARM: Exynos: Add Exynos5420 SoC support
+In-Reply-To: <1c0c01ce6c0e$51eeceb0$f5cc6c10$%kim@samsung.com>
+References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
+ <1c0c01ce6c0e$51eeceb0$f5cc6c10$%kim@samsung.com>
+Message-ID: <CANuQgHHrTg7rtWVC48qxOBBrP69YL9J5U1J4gwq=EAm4Rp6yqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013 11:19:14 Will Deacon wrote:
-> 
-> I've spoken briefly with Catalin about this and it seems like there might be
-> *some* scope for sharing common dma-mapping code between architectures.
-> There doesn't really need to be any architecture-specific details in
-> allocating iova space and the interface to the iommu drivers is
-> well-defined. The arch-specific stuff is bogged down in the non-coherent
-> buffer management, but that doesn't necessarily equate to lots of code.
-> 
-> So, the best bet would be to figure out how to split up what we have under
-> arch/arm/ so that it can be re-used by arm64 and potentially other
-> architectures (powerpc has some simple stuff for coherent mappings and some
-> less-simple stuff for non-coherent buffers).
+On 18 June 2013 15:56, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Chander Kashyap wrote:
+>>
+>> Exynos5420 is new SoC in Samsung's Exynos5 SoC series. This series adds
+>> initial support for this SoC.
+>>
+>> Changes since v3:
+>> 1. Updated the max cpu clock frequency in dt node.
+>> 2. Sorted DT nodes alphabetically as suggested by Kukjin.
+>> 3. Removed the duplicate commit log comment in:
+>>    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
+>>    registration"
+>> 4. Added comment for Exynos5440 in commit log of the patch:
+>>    "ARM: dts: fork out common Exynos5 nodes"
+>>
+>> Changes since v2:
+>>
+>> 1. Renamed oscclk to fin_pll, in order to keep it consistent with
+>>    Exynos4/Exynos5
+>> 2. Pass memory as single bank rather than splitting in 256MB size banks.
+>>
+>> Changes since v1:
+>>
+>> 1. As not-dt platforms will not be supported from 3.11 onwards, following
+>>    patches from previous patch series are dropped:
+>>    "irqchip: exynos-combiner: set irq base as 256 for Exynos5420"
+>>    "ARM: Exynos: initialize l2x0 cache controller only for cortex-a9 based
+>> SoCs"
+>> 2. Added device type property in cpu node in the following patch:
+>>    "ARM: dts: list the CPU nodes for Exynos5250
+>> 3. Sorted out the nodes listed in based upon the physical addresses as
+>> suggested
+>>    by Tomasz Figa.
+>> 4. As Tomasz is going to consolidate the secondary cpu power register
+>> address
+>>    calculation in all possible scnarios, hence dropped the following
+> patch:
+>>   "ARM: Exynos: fix secondary cpu power control register address
+>> calculation"
+>> 5. Replaced the setup/remove)_irq calls with (request/free)_irq calls as
+>>    suggested by Mark Rutland in patch:
+>>    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
+>>     registration"
+>> 6. Changed the registration of epll and rpll from pll35xx to pl36xx.
+>> 7. Changed driver data selection for serial port, based on ARCH_EXYNOS.
+>> 8. Changed the interrupt cells from 2 to 1 as suggested by Tomasz Figa.
+>>
+>> Chander Kashyap (10):
+>>   ARM: dts: fork out common Exynos5 nodes
+>>   ARM: dts: list the CPU nodes for Exynos5250
+>>   ARM: Exynos: Add support for Exynos5420 SoC
+>>   serial: samsung: select Exynos specific driver data if ARCH_EXYNOS is
+>>     defined
+>>   ARM: Exynos: use four additional chipid bits to identify Exynos
+>>     family
+>>   clk: exynos5420: register clocks using common clock framework
+>>   ARM: dts: Add initial device tree support for Exynos5420
+>>   clocksource: exynos_mct: use (request/free)_irq calls for local timer
+>>     registration
+>>   ARM: Exynos: add secondary CPU boot base location for Exynos5420
+>>   ARM: Exynos: extend soft-reset support for Exynos5420
+>>
+>>  .../devicetree/bindings/clock/exynos5420-clock.txt |  201 ++++++
+>>  arch/arm/boot/dts/Makefile                         |    1 +
+>>  arch/arm/boot/dts/exynos5.dtsi                     |  111 +++
+>>  arch/arm/boot/dts/exynos5250.dtsi                  |   78 +-
+>>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   33 +
+>>  arch/arm/boot/dts/exynos5420.dtsi                  |  103 +++
+>>  arch/arm/mach-exynos/Kconfig                       |   10 +
+>>  arch/arm/mach-exynos/common.c                      |   18 +-
+>>  arch/arm/mach-exynos/include/mach/uncompress.h     |    7 +-
+>>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    1 +
+>>  arch/arm/mach-exynos/platsmp.c                     |   12 +-
+>>  arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
+>>  drivers/clk/samsung/Makefile                       |    1 +
+>>  drivers/clk/samsung/clk-exynos5420.c               |  762
+>> ++++++++++++++++++++
+>>  drivers/clocksource/exynos_mct.c                   |   35 +-
+>>  drivers/tty/serial/samsung.c                       |    4 +-
+>>  16 files changed, 1279 insertions(+), 106 deletions(-)
+>>  create mode 100644 Documentation/devicetree/bindings/clock/exynos5420-
+>> clock.txt
+>>  create mode 100644 arch/arm/boot/dts/exynos5.dtsi
+>>  create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
+>>  create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
+>>  create mode 100644 drivers/clk/samsung/clk-exynos5420.c
+>>
+>> --
+>> 1.7.9.5
+>
+> Looks good to me, will apply with whole 'reviewed-by' comments.
+Thanks Kukjin.
+>
+> Thanks,
+> - Kukjin
+>
 
-I'm sure that other architectures are interested in sharing the code.
-Best move it into the global mm/ directory, at least the version for
-coherent mappings.
 
-	Arnd
+
+--
+with warm regards,
+Chander Kashyap
