@@ -1,57 +1,88 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Jun 2013 18:00:50 +0300
-Subject: [PATCH] USB: initialize or shutdown PHY when add or remove host
- controller
-In-Reply-To: <Pine.LNX.4.44L0.1306181046180.1157-100000@iolanthe.rowland.org>
-References: <20130618082428.GF5461@arwen.pp.htv.fi>
- <Pine.LNX.4.44L0.1306181046180.1157-100000@iolanthe.rowland.org>
-Message-ID: <20130618150050.GD10318@arwen.pp.htv.fi>
+From: pavel@denx.de (Pavel Machek)
+Date: Tue, 18 Jun 2013 17:02:44 +0200
+Subject: [PATCH 0/2] Fix potential merge conflict for dw_apb_timer_of
+In-Reply-To: <51BFABE8.5090504@linaro.org>
+References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
+ <51BFABE8.5090504@linaro.org>
+Message-ID: <20130618150244.GC18055@amd.pavel.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi!
 
-On Tue, Jun 18, 2013 at 10:53:26AM -0400, Alan Stern wrote:
-> > > If the controllers don't want HCD core to manage the PHY they can just set it
-> > > to some error code.
-> > 
-> > they shouldn't have the choice, otherwise it'll be a bit of a PITA to
-> > maintain the code. ehci core tries to grab the PHY, if it's not there,
-> > try to continue anyway. Assume it's not needed.
+> >The following 2 patches will eliminate the need for the patch in John
+> >Stultz's tree. If there is to be merge of the 2 trees, then the
+> >patch:
+> >
+> >dw_apb_timer_of.c: Remove parts that were picoxcell-specific
+> >
+> >can be removed from John's tree to avoid a merge-conflict.
+> >
+> >Based on arm-soc/for-next:
+> >
+> >PATCH[1/2] - Rename "dw-apb-timer-osc" and "dw-apb-timer-sp" bindings to just
+> >"dw-apb-timer"
+> >PATCH[2/2] - Fix user/system reporting by fixing read_sched_clock()
 > 
-> Felipe, are all these issues straightened out to your satisfaction?  I
-> can't tell from the email thread.
-> 
-> Looking through the EHCI glue source files, there appears to be a 
-> variety of different ways of getting the PHY.  It's not at all clear 
-> that they can be moved into the ehci-hcd core (or even better, the USB 
-> core -- which is what Chao is trying to do).
+> Pavel/Jamie: Can you take a look at these too and make sure these cover what you were doing.
 
-yeah, Roger brought up a big problem with OMAP's EHCI depending on the
-mode so, at least for now, we should keep phy_get and, in case of EHCI
-OMAP, phy_init in the glue :-(
+[It seems like Heiko St?bner was not aware of patches in the clock
+tree, so did pretty much equivalent patch.]
 
-Roger has all the details, and they're also in the list archives, but
-basically, depending on the mode, PHY *must* be initialized at a
-particular point.
+Dinh's changes look good to me, but
 
-> Given that the glue module has to be responsible for getting the PHY,
-> it should also be responsible for error checking.  So the code added to
-> hcd.c doesn't need to apply an IS_ERR check; it can simply assume that
-> if hcd->phy is NULL then either there is no software-controllable PHY
-> or else the HCD doesn't want the core to manage it.
+[PATCH v2 4/4] clocksource: dw_apb_timer_of: use clocksource_of_init
 
-makes sense to me, add the requirement to:
+does not exactly look nice: (I'm sorry I did not see original series,
+before it was merged to -soc.). The function counts number of times it
+was called, and behaves differently in each case. It is not very
+traditional kernel code at the very least.
 
-if (IS_ERR(hcd->phy))
-	hcd->phy = NULL;
++static int num_called;
++static void __init dw_apb_timer_init(struct device_node *timer)
+ {
+-       struct device_node *event_timer, *source_timer;
+-
+-       event_timer = of_find_matching_node(NULL, osctimer_ids);
+-       if (!event_timer)
+-               panic("No timer for clockevent");
+-       add_clockevent(event_timer);
+-       
+-       source_timer = of_find_matching_node(event_timer,
+osctimer_ids);
+-       if (!source_timer)
+-               panic("No timer for clocksource");
+-       add_clocksource(source_timer);
+-
+-       of_node_put(source_timer);
++       switch (num_called) {
++       case 0:
++               pr_debug("%s: found clockevent timer\n", __func__);
++               add_clockevent(timer);
++               of_node_put(timer);
++               break;
++       case 1:
++               pr_debug("%s: found clocksource timer\n", __func__);
++               add_clocksource(timer);
++               of_node_put(timer);
++               init_sched_clock();
++               break;
++       default:
++               break;
++       }
 
+-       init_sched_clock();
++       num_called++;
+ }
+
+Heiko, can you take a look at John Stultz tree? We modified this area
+already... I understand you only have one timer on your silicon?
+
+Would perhaps parameter on dw_apb_timer_init telling it what to do be
+better solution? I don't like the "num_called" variable too much...
+
+Thanks,
+									Pavel
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/fa95cad7/attachment-0001.sig>
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
