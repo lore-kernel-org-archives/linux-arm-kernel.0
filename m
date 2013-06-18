@@ -1,61 +1,68 @@
-From: amit.daniel@samsung.com (amit daniel kachhap)
-Date: Tue, 18 Jun 2013 14:24:50 +0530
-Subject: [PATCH v2 29/38] thermal: exynos: Support both Exynos4x12 SoCs
-In-Reply-To: <51BF9D0A.6050706@ti.com>
-References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
- <1371486863-12398-30-git-send-email-t.figa@samsung.com>
- <201306172159.15352.arnd@arndb.de> <51BF9D0A.6050706@ti.com>
-Message-ID: <CADGdYn7NqywgfYFmwZHGLQi_mciJLbPGOwj2Jm2Zgbme9GGUUw@mail.gmail.com>
+From: florian.vaussard@epfl.ch (Florian Vaussard)
+Date: Tue, 18 Jun 2013 10:55:03 +0200
+Subject: [PATCH 2/3] mfd: twl4030-power: Start transition to DT
+In-Reply-To: <20130618000211.GC7998@zurbaran>
+References: <1369921916-7435-1-git-send-email-florian.vaussard@epfl.ch>
+ <1369921916-7435-3-git-send-email-florian.vaussard@epfl.ch>
+ <20130618000211.GC7998@zurbaran>
+Message-ID: <51C02067.4000302@epfl.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo,
+Hello,
 
-On Tue, Jun 18, 2013 at 5:04 AM, Eduardo Valentin
-<eduardo.valentin@ti.com> wrote:
-> Arnd,
+On 06/18/2013 02:02 AM, Samuel Ortiz wrote:
+> Hi Florian,
 >
-> On 17-06-2013 15:59, Arnd Bergmann wrote:
->> On Monday 17 June 2013, Tomasz Figa wrote:
->>> diff --git a/drivers/thermal/exynos_thermal.c b/drivers/thermal/exynos_thermal.c
->>> index 788b1dd..4cbe3ee 100644
->>> --- a/drivers/thermal/exynos_thermal.c
->>> +++ b/drivers/thermal/exynos_thermal.c
->>> @@ -817,7 +817,8 @@ static struct exynos_tmu_platform_data const exynos4210_default_tmu_data = {
->>>  #define EXYNOS4210_TMU_DRV_DATA (NULL)
->>>  #endif
->>>
->>> -#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4412)
->>> +#if defined(CONFIG_SOC_EXYNOS5250) || defined(CONFIG_SOC_EXYNOS4412) || \
->>> +       defined(CONFIG_SOC_EXYNOS4212)
->>>  static struct exynos_tmu_platform_data const exynos_default_tmu_data = {
->>>         .threshold_falling = 10,
->>>         .trigger_levels[0] = 85,
+> On Thu, May 30, 2013 at 03:51:55PM +0200, Florian Vaussard wrote:
+>>   int twl4030_power_probe(struct platform_device *pdev)
+>>   {
+>>   	struct twl4030_power_data *pdata = pdev->dev.platform_data;
+>> +	struct device_node *node = pdev->dev.of_node;
+>>   	int err = 0;
+>> -	int i;
+>> -	struct twl4030_resconfig *resconfig;
+>> -	u8 val, address = twl4030_start_script_address;
+>> +	u8 val;
+>> +
+>> +	if (!pdata && !node) {
+>> +		dev_err(&pdev->dev, "Platform data is missing\n");
+>> +		return -EINVAL;
+>> +	}
 >>
->> The patch is correct, but generally speaking I think we should get away from
->> having the drivers get configured per SoC on such a fine-grained level.
->> Better make this driver (and others) always work on all exynos variants.
+>>   	err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, TWL4030_PM_MASTER_KEY_CFG1,
+>>   			       TWL4030_PM_MASTER_PROTECT_KEY);
+>> @@ -525,26 +575,17 @@ int twl4030_power_probe(struct platform_device *pdev)
+>>   	if (err)
+>>   		goto unlock;
+>>
+>> -	for (i = 0; i < pdata->num; i++) {
+>> -		err = load_twl4030_script(pdata->scripts[i], address);
+>> +	if (pdata) {
+>> +		err = twl4030_power_configure_scripts(pdata);
+>>   		if (err)
+>>   			goto load;
+>> -		address += pdata->scripts[i]->size;
+>> -	}
+>> -
+>> -	resconfig = pdata->resource_config;
+>> -	if (resconfig) {
+>> -		while (resconfig->resource) {
+>> -			err = twl4030_configure_resource(resconfig);
+>> -			if (err)
+>> -				goto resource;
+>> -			resconfig++;
+>> -
+>> -		}
+>> +		err = twl4030_power_configure_resources(pdata);
+>> +		if (err)
+>> +			goto resource;
+> You're simplifying the probe routine here by defining 2
+> twl4030_power_configure_* functions. That's good, but it should be a
+> separate patch as it's not related to the DT porting effort.
 >
-> Amit, correct if I am wrong, but:
->
-> The driver will work on supported exynos variants. Those that have the
-> need for thermal sensing. And each of them have specific thermal needs
-> (trigger points, thresholds, etc). That is what this file tries to
-> isolate. And there is specific data structures for each soc version.
-Yes its correct that there may be some changes in data points for
-different soc's. in the new re-structured code data is separated from
-driver so more data can be added cleanly.
 
->
->
->>
->>       Arnd
->>
->>
->
->
-> --
-> You have got to be excited about what you are doing. (L. Lamport)
->
-> Eduardo Valentin
->
+I agree. I will post a v2 with the changes.
+
+Regards,
+Florian
