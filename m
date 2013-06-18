@@ -1,27 +1,32 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 18 Jun 2013 11:42:17 +0200
-Subject: [PATCH 0/2] ARM: AM33XX: clock: Add debugSS data to clk and hwmod
- database
-In-Reply-To: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
-References: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <51C02B79.9010306@ti.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Jun 2013 12:40:58 +0300
+Subject: [PATCH v7 2/9] usb: phy: omap-usb2: use the new generic PHY
+ framework
+In-Reply-To: <1371113039-5784-3-git-send-email-kishon@ti.com>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+ <1371113039-5784-3-git-send-email-kishon@ti.com>
+Message-ID: <20130618094058.GQ5461@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vaihbav,
+Hi,
 
-On 6/18/2013 7:07 AM, Vaibhav Hiremath wrote:
-> This patch adds DebugSS data to clock-tree and hwmod data files.
->
-> Changes from RFC/V1 (No code change):
-> 	- Based on comments, we have to follow DT and loadable module
-> 	  approach for debugSS module as well, so separated out 2 patches
-> 	  of clock-tree and hwmod data addition from the RFC patch-series.
-> 	- Added Paul's Ack on clock-tree patch.
-> 	- Rebased on top of Benoit's for-3.11/dts branch.
+On Thu, Jun 13, 2013 at 02:13:52PM +0530, Kishon Vijay Abraham I wrote:
+> @@ -159,6 +191,12 @@ static int omap_usb2_probe(struct platform_device *pdev)
+>  	otg->start_srp		= omap_usb_start_srp;
+>  	otg->phy		= &phy->phy;
+>  
+> +	pm_runtime_enable(phy->dev);
 
-Thanks for the update. I'll apply the series in my branch before sending 
-the pull request to Tony.
+enabling pm_runtime here has the potential to cause a real big problem.
+How have you tested this patch ?
 
-Regards,
-Benoit
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/84ed60b9/attachment.sig>
