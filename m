@@ -1,27 +1,33 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Jun 2013 11:14:02 +0200
-Subject: [PATCH 0/3] ARM: ux500: mop500_snowball_ethernet_clock_enable()
- removal
-In-Reply-To: <1371545519-27119-1-git-send-email-lee.jones@linaro.org>
-References: <1371545519-27119-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <CACRpkdbpTMm8FG6KSwvq_7BQRGZ0P=PHHb+WikfRE6JqHv8xpw@mail.gmail.com>
+Date: Tue, 18 Jun 2013 11:16:17 +0200
+Subject: [PATCH] gpio: msm-v1: Remove errant __devinit to fix compile
+In-Reply-To: <51BF43F4.9000007@codeaurora.org>
+References: <1370373600-31921-1-git-send-email-sboyd@codeaurora.org>
+ <CACRpkdZ5x3q9tn3J5_mQj-nJ_wO3HWgX5DTMQdMzF3mUDrAieQ@mail.gmail.com>
+ <51BF43F4.9000007@codeaurora.org>
+Message-ID: <CACRpkdZ=VbMUBfHt-GruTzc5_7vF508XFAW50YZb4ouG1TrjZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 10:51 AM, Lee Jones <lee.jones@linaro.org> wrote:
-
-> As requested by you, this gets rid of  mop500_snowball_ethernet_clock_enable()
-> which is no longer in use. It also straightens out a bug which ensures the
-> SMSC911x's regulator is turned on at start-up when using Device Tree.
+On Mon, Jun 17, 2013 at 7:14 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/16/13 22:54, Linus Walleij wrote:
+>> On Tue, Jun 4, 2013 at 9:20 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>
+>>> Commit 7bce696 (gpio: Make gpio-msm-v1 into a platform driver,
+>>> 2013-03-04) was based on an older kernel where __devinit still
+>>> existed. Remove the erroneous __devinit marking.
+>>>
+>>> Cc: David Brown <davidb@codeaurora.org>
+>>> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+>> Patch applied.
 >
-> This is based on your test-merge-20130615 branch.
+> Thanks. It looks like David picked this up and sent it off to arm-soc
+> last week. Cc'ing Olof for awareness of a possible duplicate.
 
-All are Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Did that get ack by some GPIO maintainer?
 
-I suggest the ARM SoC folks merge these three patches directly.
-I've queued 1/3 and 2/3 on my devicetree branch so they won't
-be lost, but 3/3 does not apply on any of my branches, it
-needs to be applied directly on some ARM SoC baseline.
+This needs to go through the GPIO tree, but I
+guess GIT will survive if it ends up in two trees.
 
 Yours,
 Linus Walleij
