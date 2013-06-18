@@ -1,42 +1,31 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Jun 2013 19:12:55 +0200
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <201306181814.33941.arnd@arndb.de>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-4-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306181814.33941.arnd@arndb.de>
-Message-ID: <20130618191255.178d2f42@skate>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jun 2013 19:13:45 +0200
+Subject: [PATCH v3 06/10] clk: exynos5420: register clocks using common
+ clock framework
+In-Reply-To: <9285029.CIld1HyBWB@amdc1227>
+References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
+ <201306181601.16795.arnd@arndb.de> <9285029.CIld1HyBWB@amdc1227>
+Message-ID: <201306181913.45484.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Tuesday 18 June 2013, Tomasz Figa wrote:
+> This is a binding that has been defined for Samsung Common Clock Framework 
+> drivers. Exynos4 and Exynos5250 use the same convention. The numbers are 
+> defined in a way that should allow adding further clocks of particular types in 
+> future as need for such shows up.
 
-On Tue, 18 Jun 2013 18:14:33 +0200, Arnd Bergmann wrote:
+I see, it's probably too late to change that then. Maybe if there is an Exynos6
+this should be done differently though.
 
-> Using 0xffff0002 as a placeholder for the pcie translation is definitely
-> better than 0xffff0000 as you had before, but let me ask again in case
-> you missed it the last time (and sorry if I missed the answer):
-> 
-> Why not just put the actual translation here the way it happens for each
-> of the PCIe ports? With the definition here, the PCIe driver actually has no
-> way to figure out what settings the windows need to use!
+> Physically there is one clock controller (CMU) which has a lot of dividers, 
+> muxes and gates and so it is represented as a single device node.
 
-Come on Arnd, this is something we have already discussed *countless*
-times with you.
+Some platforms just put device nodes for their clocks under the clock controller
+node, which would have helped here. Another option would be to use #clock-cells=<2>
+and make the first cell the type of the clock, and the second one the number.
 
-We *cannot* define translations for each PCIe port because we don't
-know in advance how much I/O and memory space each PCIe device will
-request. This is the reason why we have *one* global range for I/O
-space and *one* global space for memory space, that are given to the
-Linux PCI core, which then dynamically assigns sub-ranges for each
-PCIe device into those two global ranges.
+Also, if I understand things correctly, simple fixed rate clocks would normally
+not go into the clock driver at all when they are not controller by it.
 
-Best regards,
-
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+	Arnd
