@@ -1,129 +1,157 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Jun 2013 12:47:03 +0300
-Subject: [PATCH v7 7/9] usb: musb: omap2430: use the new generic PHY
- framework
-In-Reply-To: <1371113039-5784-8-git-send-email-kishon@ti.com>
-References: <1371113039-5784-1-git-send-email-kishon@ti.com>
- <1371113039-5784-8-git-send-email-kishon@ti.com>
-Message-ID: <20130618094703.GV5461@arwen.pp.htv.fi>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 18 Jun 2013 11:48:27 +0200
+Subject: [PATCH v2 36/38] ARM: EXYNOS: Use exynos_init_io() as map_io
+ callback
+In-Reply-To: <1b9d01ce6c07$47e42cf0$d7ac86d0$%kim@samsung.com>
+References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
+ <1371486863-12398-37-git-send-email-t.figa@samsung.com>
+ <1b9d01ce6c07$47e42cf0$d7ac86d0$%kim@samsung.com>
+Message-ID: <4330740.PWIY8H74Fa@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Jun 13, 2013 at 02:13:57PM +0530, Kishon Vijay Abraham I wrote:
-> Use the generic PHY framework API to get the PHY. The usb_phy_set_resume
-> and usb_phy_set_suspend is replaced with power_on/get_sync and
-> power_off/put_sync to align with the new PHY framework.
+On Tuesday 18 of June 2013 18:36:16 Kukjin Kim wrote:
+> Tomasz Figa wrote:
+> > Since there is no board specific mapping needed on Exynos,
+> > exynos_init_io() can be simplified and used as map_io callback for both
+> > Exynos4 and Exynos5.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> > 
+> >  arch/arm/mach-exynos/common.c          | 5 +----
+> >  arch/arm/mach-exynos/common.h          | 2 +-
+> >  arch/arm/mach-exynos/mach-exynos4-dt.c | 7 +------
+> >  arch/arm/mach-exynos/mach-exynos5-dt.c | 7 +------
+> >  4 files changed, 4 insertions(+), 17 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
+> > index 91d457f..561890f 100644
+> > --- a/arch/arm/mach-exynos/common.c
+> > +++ b/arch/arm/mach-exynos/common.c
+> > @@ -351,15 +351,12 @@ int __init exynos_fdt_map_chipid(unsigned long node,
+> > const char *uname,
+> > 
+> >   * register the standard cpu IO areas
+> >   */
+> > 
+> > -void __init exynos_init_io(struct map_desc *mach_desc, int size)
+> > +void __init exynos_init_io(void)
+> > 
+> >  {
+> >  
+> >  	debug_ll_io_init();
+> >  	
+> >  	of_scan_flat_dt(exynos_fdt_map_chipid, NULL);
+> > 
+> > -	if (mach_desc)
+> > -		iotable_init(mach_desc, size);
+> > -
+> > 
+> >  	/* detect cpu id and rev. */
+> >  	s5p_init_cpu(S5P_VA_CHIPID);
+> > 
+> > diff --git a/arch/arm/mach-exynos/common.h b/arch/arm/mach-exynos/common.h
+> > index 1c83f95..38d45fd 100644
+> > --- a/arch/arm/mach-exynos/common.h
+> > +++ b/arch/arm/mach-exynos/common.h
+> > @@ -19,7 +19,7 @@ void exynos_init_time(void);
+> > 
+> >  extern unsigned long xxti_f, xusbxti_f;
+> >  
+> >  struct map_desc;
+> > 
+> > -void exynos_init_io(struct map_desc *mach_desc, int size);
+> > +void exynos_init_io(void);
+> > 
+> >  void exynos4_restart(char mode, const char *cmd);
+> >  void exynos5_restart(char mode, const char *cmd);
+> >  void exynos_init_late(void);
+> > 
+> > diff --git a/arch/arm/mach-exynos/mach-exynos4-dt.c b/arch/arm/mach-
+> > exynos/mach-exynos4-dt.c
+> > index df15726..0099c6c 100644
+> > --- a/arch/arm/mach-exynos/mach-exynos4-dt.c
+> > +++ b/arch/arm/mach-exynos/mach-exynos4-dt.c
+> > @@ -23,11 +23,6 @@
+> > 
+> >  #include "common.h"
+> > 
+> > -static void __init exynos4_dt_map_io(void)
+> > -{
+> > -	exynos_init_io(NULL, 0);
+> > -}
+> > -
+> > 
+> >  static void __init exynos4_dt_machine_init(void)
+> >  {
+> >  
+> >  	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
+> > 
+> > @@ -55,7 +50,7 @@ static void __init exynos4_reserve(void)
+> > 
+> >  DT_MACHINE_START(EXYNOS4210_DT, "Samsung Exynos4 (Flattened Device
 > 
-> musb->xceiv can't be removed as of now because musb core uses xceiv.state and
-> xceiv.otg. Once there is a separate state machine to handle otg, these can be
-> moved out of xceiv and then we can start using the generic PHY framework.
+> Tree)")
 > 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
-> ---
->  drivers/usb/musb/musb_core.c |    1 +
->  drivers/usb/musb/musb_core.h |    3 +++
->  drivers/usb/musb/omap2430.c  |   29 +++++++++++++++++++++--------
->  3 files changed, 25 insertions(+), 8 deletions(-)
+> >  	/* Maintainer: Thomas Abraham <thomas.abraham@linaro.org> */
+> >  	.smp		= smp_ops(exynos_smp_ops),
+> > 
+> > -	.map_io		= exynos4_dt_map_io,
+> > +	.map_io		= exynos_init_io,
+> > 
+> >  	.init_early	= exynos_firmware_init,
+> >  	.init_machine	= exynos4_dt_machine_init,
+> >  	.init_late	= exynos_init_late,
+> > 
+> > diff --git a/arch/arm/mach-exynos/mach-exynos5-dt.c b/arch/arm/mach-
+> > exynos/mach-exynos5-dt.c
+> > index 8777310..ab54770 100644
+> > --- a/arch/arm/mach-exynos/mach-exynos5-dt.c
+> > +++ b/arch/arm/mach-exynos/mach-exynos5-dt.c
+> > @@ -27,11 +27,6 @@
+> > 
+> >  static u64 dma_mask64 = DMA_BIT_MASK(64);
+> >  static u64 dma_mask32 = DMA_BIT_MASK(32);
+> > 
+> > -static void __init exynos5_dt_map_io(void)
+> > -{
+> > -	exynos_init_io(NULL, 0);
+> > -}
+> > -
+> > 
+> >  static int exynos5440_platform_notifier(struct notifier_block *nb,
+> >  
+> >  				  unsigned long event, void *__dev)
+> >  
+> >  {
+> > 
+> > @@ -105,7 +100,7 @@ static void __init exynos5_reserve(void)
+> > 
+> >  DT_MACHINE_START(EXYNOS5_DT, "SAMSUNG EXYNOS5 (Flattened Device Tree)")
+> >  
+> >  	/* Maintainer: Kukjin Kim <kgene.kim@samsung.com> */
+> >  	.smp		= smp_ops(exynos_smp_ops),
+> > 
+> > -	.map_io		= exynos5_dt_map_io,
+> > +	.map_io		= exynos_init_io,
+> > 
+> >  	.init_machine	= exynos5_dt_machine_init,
+> >  	.init_late	= exynos_init_late,
+> >  	.init_time	= exynos_init_time,
+> > 
+> > --
+> > 1.8.2.1
 > 
-> diff --git a/drivers/usb/musb/musb_core.c b/drivers/usb/musb/musb_core.c
-> index 37a261a..f732bcc 100644
-> --- a/drivers/usb/musb/musb_core.c
-> +++ b/drivers/usb/musb/musb_core.c
-> @@ -1864,6 +1864,7 @@ musb_init_controller(struct device *dev, int nIrq, void __iomem *ctrl)
->  	musb->board_set_power = plat->set_power;
->  	musb->min_power = plat->min_power;
->  	musb->ops = plat->platform_ops;
-> +	musb->phy_label = plat->phy_label;
->  
->  	/* The musb_platform_init() call:
->  	 *   - adjusts musb->mregs
-> diff --git a/drivers/usb/musb/musb_core.h b/drivers/usb/musb/musb_core.h
-> index 7fb4819..498ae21 100644
-> --- a/drivers/usb/musb/musb_core.h
-> +++ b/drivers/usb/musb/musb_core.h
-> @@ -46,6 +46,7 @@
->  #include <linux/usb.h>
->  #include <linux/usb/otg.h>
->  #include <linux/usb/musb.h>
-> +#include <linux/phy/phy.h>
->  
->  struct musb;
->  struct musb_hw_ep;
-> @@ -357,6 +358,7 @@ struct musb {
->  	u16			int_tx;
->  
->  	struct usb_phy		*xceiv;
-> +	struct phy		*phy;
->  
->  	int nIrq;
->  	unsigned		irq_wake:1;
-> @@ -434,6 +436,7 @@ struct musb {
->  	unsigned                double_buffer_not_ok:1;
->  
->  	struct musb_hdrc_config	*config;
-> +	const char		*phy_label;
->  
->  #ifdef MUSB_CONFIG_PROC_FS
->  	struct proc_dir_entry *proc_entry;
-> diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-> index 628b93f..c62a004 100644
-> --- a/drivers/usb/musb/omap2430.c
-> +++ b/drivers/usb/musb/omap2430.c
-> @@ -348,14 +348,24 @@ static int omap2430_musb_init(struct musb *musb)
->  	 * up through ULPI.  TWL4030-family PMICs include one,
->  	 * which needs a driver, drivers aren't always needed.
->  	 */
-> -	if (dev->parent->of_node)
-> +	if (dev->parent->of_node) {
-> +		musb->phy = devm_phy_get(dev->parent, "usb2-phy");
-> +
-> +		/* We can't totally remove musb->xceiv as of now because
-> +		 * musb core uses xceiv.state and xceiv.otg. Once we have
-> +		 * a separate state machine to handle otg, these can be moved
-> +		 * out of xceiv and then we can start using the generic PHY
-> +		 * framework
-> +		 */
->  		musb->xceiv = devm_usb_get_phy_by_phandle(dev->parent,
->  		    "usb-phy", 0);
-> -	else
-> +	} else {
->  		musb->xceiv = devm_usb_get_phy_dev(dev, 0);
-> +		musb->phy = devm_phy_get(dev, musb->phy_label);
-> +	}
->  
-> -	if (IS_ERR(musb->xceiv)) {
-> -		status = PTR_ERR(musb->xceiv);
-> +	if (IS_ERR(musb->xceiv) || IS_ERR(musb->phy)) {
-> +		status = PTR_ERR(musb->xceiv) | PTR_ERR(musb->phy);
->  
->  		if (status == -ENXIO)
->  			return status;
-> @@ -397,9 +407,10 @@ static int omap2430_musb_init(struct musb *musb)
->  	if (glue->status != OMAP_MUSB_UNKNOWN)
->  		omap_musb_set_mailbox(glue);
->  
-> -	usb_phy_init(musb->xceiv);
-> +	phy_init(musb->phy);
->  
->  	pm_runtime_put_noidle(musb->controller);
-> +	phy_pm_runtime_put(musb->phy);
+> Looks good to me, but I think, this change has been submitted by Arnd even
+> though you did split, so the author should be Arnd. As you know, it is very
+> important. Let me fix this and some patches when I apply. If any problems,
+> let me know.
 
-see, weird unbalanced calls :-)
+Right, I've been applying those changes manually and forgot to change the 
+author. Please fix patches 36-38 then.
 
-Make it all explicit:
-
-phy_pm_runtime_get_sync(phy);
-phy_init(phy);
-phy_pm_runtime_put(phy);
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/303b3b6b/attachment.sig>
+Best regards,
+Tomasz
