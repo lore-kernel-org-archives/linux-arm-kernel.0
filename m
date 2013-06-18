@@ -1,88 +1,56 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 18 Jun 2013 10:45:51 +0200
-Subject: [GIT PULL] at91: soc updates for 3.11 #1
-In-Reply-To: <CAOesGMixxxUg-9h9KFNxAvp8DSNJN-SEQxXnU51BQJ9cAxSGBw@mail.gmail.com>
-References: <1371246138-22207-1-git-send-email-nicolas.ferre@atmel.com>
- <20130615023702.GA8635@quad.lixom.net>
- <EABCC4A72A203F4BA2E04297CF0282C427D1E1F8@hnombx01.corp.atmel.com>
- <CAOesGMixxxUg-9h9KFNxAvp8DSNJN-SEQxXnU51BQJ9cAxSGBw@mail.gmail.com>
-Message-ID: <51C01E3F.7000303@atmel.com>
+From: hector.palacios@digi.com (Hector Palacios)
+Date: Tue, 18 Jun 2013 10:45:58 +0200
+Subject: [PATCH] video: mxsfb: fix color settings for 18bit data bus and
+ 32bpp
+In-Reply-To: <20130618083229.GC15037@lukather>
+References: <519E03B0.1080006@digi.com> <519F4435.5010703@digi.com>
+ <201305241300.25461.jbe@pengutronix.de>
+ <201305241533.19941.jbe@pengutronix.de> <20130607072103.GF14209@lukather>
+ <51B18BA0.50506@digi.com> <20130607074200.GG14209@lukather>
+ <51B1957F.40104@digi.com> <20130607090228.GI14209@lukather>
+ <20130618083229.GC15037@lukather>
+Message-ID: <51C01E46.8040506@digi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/2013 18:59, Olof Johansson :
-> On Mon, Jun 17, 2013 at 2:20 AM, Ferre, Nicolas <Nicolas.FERRE@atmel.com> wrote:
->> From: Olof Johansson [olof at lixom.net]
->>> Hi,
+On 06/18/2013 10:32 AM, maxime.ripard at free-electrons.com wrote:
+> Hi Hector,
+>
+> On Fri, Jun 07, 2013 at 11:02:28AM +0200, maxime.ripard at free-electrons.com wrote:
+>> On Fri, Jun 07, 2013 at 10:10:39AM +0200, Hector Palacios wrote:
+>>> For a combination of 18bit LCD data bus width and a color
+>>> mode of 32bpp, the driver was setting the color mapping to
+>>> rgb666, which is wrong, as the color in memory realy has an
+>>> rgb888 layout.
 >>>
->>> On Fri, Jun 14, 2013 at 11:42:18PM +0200, Nicolas Ferre wrote:
->>>> Arnd, Olof,
->>>>
->>>> A little AT91 pull-request for patches that are more targeted to SoC/boards
->>>> modifications. It is prepared on top of the arm-soc/at91/cleanup branch.
->>>>
->>>> Thanks, best regards,
->>>>
->>>> The following changes since commit b3f442b0eedbc20b5ce3f4a96530588d14901199:
->>>>
->>>>    ARM: at91: udpate defconfigs (2013-05-17 15:05:08 +0200)
->>>>
->>>> are available in the git repository at:
->>>>
->>>>    git://github.com/at91linux/linux-at91.git tags/at91-soc
->>>>
->>>> for you to fetch changes up to 7e75545ea7fb972c3da759f92c3d0be84d1cee72:
->>>>
->>>>    ARM: at91: drop rm9200dk board support (2013-06-14 23:34:11 +0200)
->>>>
->>>> ----------------------------------------------------------------
->>>> Two non critical fixes that can go in 3.11.
->>>> An old board removed.
->>>>
->>>> ----------------------------------------------------------------
->>>> Alexandre Belloni (1):
->>>>        ARM: at91: Fix link breakage when !CONFIG_PHYLIB
+>>> This patch also removes the setting of flag CTRL_DF24 that
+>>> makes the driver dimiss the upper 2 bits when handling 32/24bpp
+>>> colors in a diplay with 18bit data bus width. This flag made
+>>> true color images display wrong in such configurations.
 >>>
->>> Fix
+>>> Finally, the color mapping rgb666 has also been removed as nobody
+>>> is using it and high level applications like Qt5 cannot work
+>>> with it either.
 >>>
->>>> Jean-Christophe PLAGNIOL-VILLARD (1):
->>>>        ARM: at91: drop rm9200dk board support
->>>
->>> Cleanup
->>>
->>>> Wenyou Yang (1):
->>>>        ARM: at91: Change the internal SRAM memory type MT_MEMORY_NONCACHED
->>>
->>> Fix
->>>
->>> ...assuming, of course, that none of the fixes are for errors introduced in
->>> some branch we already pulled, since then they should go on top of that branch.
+>>> Reference: https://lkml.org/lkml/2013/5/23/220
+>>> Signed-off-by: Hector Palacios <hector.palacios@digi.com>
+>>> Acked-by: Juergen Beisert <jbe@pengutronix.de>
 >>
->> I do agree with you but:
->> 1/ the fixes are non-critical ones, so I do not see the need for another branch
+>> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>>
+>> Please also note that fbdev is now maintained by Jean Christophe
+>> Plagniol-Villard (plagnioj at jcrosoft.com, in CC), and that he is away
+>> until the 10th of June, so maybe it should be safe to resend it to him
+>> after this date.
 >
-> We're happy to take branches with fixes that are not needed for
-> current release and queue them for the next one. We tend to merge
-> those into next/fixes-non-critical.
->
->> 2/ I didn't feel like touching the "cleanup" branch because we want to base all our 3.11 material on top of it, without adding new patches on top.
->
-> Adding new patches on top of a branch that is a base for something
-> else is just fine, and is the way you're supposed to do things. You
-> don't have to rebase the dependent branches just because they're not
-> based on the tip of the cleanup tree any more. I.e. just send another
-> pull request for "cleanups2" or whatever, that's based on the old
-> cleanups branch/tag. After that, cleanups3 would be based on
-> cleanups2. Etc. Some platforms do this a lot.
->
-> Of course, that assumes that the additional cleanups don't conflict
-> heavy with the later dependent branches like I already said. I don't
-> think that was the case this time?
+> It seems like Jean-Christophe is back online, maybe you should resend
+> him the patch now, it would be great to have it for 3.11.
 
-Fair enough, I have just sent 2 pull-requests:
-- a fixes-non-critical one
-- a cleanup one
+I just resent it. Thanks for the reminder.
 
-Bye,
 -- 
-Nicolas Ferre
+H?ctor Palacios
+
+Best regards,
+--
+Hector Palacios
