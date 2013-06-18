@@ -1,75 +1,109 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 18 Jun 2013 11:07:27 -0700
-Subject: [GIT PULL 7/7] omap mailbox move to drivers for v3.11 merge window
-In-Reply-To: <pull-1371578847-800598>
-Message-ID: <mailman.10.1371578952.1060.linux-arm-kernel@lists.infradead.org>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Tue, 18 Jun 2013 20:09:57 +0200
+Subject: [PATCH v2 00/38] Thirty eight patches big Exynos cleanup
+In-Reply-To: <51C09E3C.5050108@samsung.com>
+References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
+ <1490899.cyTqiG9bBR@amdc1227> <51C09E3C.5050108@samsung.com>
+Message-ID: <44244927.ekNqhkrd4q@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+On Wednesday 19 of June 2013 02:51:56 Kukjin Kim wrote:
+> On 06/18/13 20:11, Tomasz Figa wrote:
+> > On Tuesday 18 of June 2013 19:23:29 Kukjin Kim wrote:
+> >> Tomasz Figa wrote:
+> >>> Hi All,
+> >>> 
+> >>> As I promised, I am doing some spring (or rather summer) cleaning
+> >>> of Exynos- and Samsung- related code.
+> >>> 
+> >>> This first part consists mostly of removing dead code remaining
+> >>> after
+> >>> removal of ATAGS support for Exynos, but several patches cleans up
+> >>> other things found by the way.
+> >>> 
+> >>> See particular patches for more detailed description.
+> >>> 
+> >>> On Exynos4210-based Trats board:
+> >>> Tested-by: Tomasz Figa<t.figa@samsung.com>
+> >>> 
+> >>> Build tested every patch with s3c6400_defconfig, s5pv210_defconfig
+> >>> and exynos_defconfig.
+> >>> 
+> >>> Changes since v1:
+> >>>   - Split patches removing SOC_EXYNOS4412
+> >>>   - Adjusted drivers to check for ARCH_EXYNOS in addition to
+> >>>   PLAT_S5P
+> >>>   - Fixed compilation issue on s5pc100
+> >>>   - Removed empty line from mach-exynos/Makefile
+> >>>   - Removed SAMSUNG_GPIOLIB_4BIT selection from ARCH_EXYNOS
+> >>>   - Sorted Kconfig and Makefile entries
+> >>>   - Added additional cleanup from Arnd (split and slightly modified)
+> >> 
+> >> Tomasz, good job.
+> > 
+> > Thanks.
+> > 
+> >> After looking at, almost same with your previous version but
+> >> modifying 16, 19, 21, 25(just Cc) and adding some patches 17, 18, 29
+> >> and 35 to 38. Would be helpful to  me if you could note about that
+> >> in this series ;-)> 
+> > OK, my bad, haven't though about it, sorry. Will remember to do it
+> > next time such series update happens.
+> > 
+> > By the way, patch 14 has been updated as well.
+> 
+> Thanks ;)
+> 
+> > Best regards,
+> > Tomasz
+> > 
+> >> Anyway, looks good I will apply this series
+> > 
+> > OK, thanks.
+> > 
+> >> except removing
+> >> CONFIG_SOC_EXYNOS4412 patches.
+> > 
+> > I don't really understand this decision, but if you really insist...
+> 
+> Sorry about that, but exynos4412 is not same with exynos4212 except
+> number of cores and exynos4412 is not one kind...
 
-  Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
+OK, so it seems like I got misinformed about the number of cores being the 
+only difference.
 
-are available in the git repository at:
+> > Still, I think current setup is wrong, because you need to specify
+> > both SoCs in drivers and both Kconfig entries must have "select" and
+> > "depends on" clauses duplicated, while there are places currently
+> > where only one has been specified by mistake.
+> > 
+> > So if we can't get this duplication removed, I'd suggest introducing
+> > CONFIG_SOC_EXYNOS4X12 which would represent the whole SoC series and
+> > making existing two entries just simple bools selecting the new one.
+> 
+> Could be a solution but let's wait until something will be implemented
+> in mainline for exynos4412 not exynos4212 :)
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/mailbox-signed
+OK. Looking forward to it.
 
-for you to fetch changes up to d2e993289cc5f1780ce74188e3a8d2b404748397:
+Btw. This leaves us with two things broken:
+ - sdhci-s3c checks for defined(CONFIG_SOC_EXYNOS4212), but does not check 
+for defined(CONFIG_SOC_EXYNOS4412),
+ - exynos-thermal checks for defined(CONFIG_SOC_EXYNOS4412), but does not 
+check for defined(CONFIG_SOC_EXYNOS4212).
 
-  Merge tag 'omap-mailbox-for-v3.11' of git://github.com/sumananna/mailbox into omap-for-v3.11/mailbox (2013-06-17 03:51:54 -0700)
+I think this must be fixed, because selecting only Exynos4212 in kernel 
+config you end up without exynos-thermal, while selecting only Exynos4412 
+breaks sdhci-s3c.
 
-----------------------------------------------------------------
+Best regards,
+Tomasz
 
-Move OMAP Mailbox framework to drivers via Suman Anna <s-anna@ti.com>
-
-The OMAP Mailbox driver framework is moved out of arch/arm folder
-into drivers/mailbox folder, to re-enable building it and also serve
-as a baseline for adapting to the new mailbox driver framework. The
-changes mainly contain:
-  - a minor bug fix and cleanup of mach-specific mailbox code
-  - remove any header dependencies from plat-omap for multi-platform
-    support
-  - represent mailbox device data through platform data/hwmod attrs
-  - move the omap mailbox code out of plat-omap/mach-omapX to
-    drivers/mailbox folder
-
-----------------------------------------------------------------
-Suman Anna (6):
-      omap: mailbox: check iomem resource before dereferencing it
-      omap: mailbox: call request_irq after mbox queues are allocated
-      omap: mailbox: correct the argument type for irq ops
-      ARM: OMAP2+: mbox: remove dependencies with soc.h
-      ARM: OMAP2+: add user and fifo info to mailbox platform data
-      mailbox/omap: move the OMAP mailbox framework to drivers
-
-Tony Lindgren (1):
-      Merge tag 'omap-mailbox-for-v3.11' of git://github.com/sumananna/mailbox into omap-for-v3.11/mailbox
-
- arch/arm/configs/omap1_defconfig                   |   3 +-
- arch/arm/mach-omap1/Makefile                       |   4 -
- arch/arm/mach-omap2/Makefile                       |   3 -
- arch/arm/mach-omap2/devices.c                      |  13 +-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  14 ++
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  13 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  13 +
- arch/arm/plat-omap/Kconfig                         |  16 --
- arch/arm/plat-omap/Makefile                        |   3 -
- drivers/mailbox/Kconfig                            |  34 +++
- drivers/mailbox/Makefile                           |   6 +
- .../mailbox.c => drivers/mailbox/mailbox-omap1.c   |  12 +-
- .../mailbox.c => drivers/mailbox/mailbox-omap2.c   | 276 ++++++++-------------
- .../mailbox.c => drivers/mailbox/omap-mailbox.c    |  54 +++-
- .../plat/mailbox.h => drivers/mailbox/omap-mbox.h  |  70 ++----
- drivers/remoteproc/Kconfig                         |   3 +-
- drivers/remoteproc/omap_remoteproc.c               |   2 +-
- drivers/staging/tidspbridge/Kconfig                |   3 +-
- .../tidspbridge/include/dspbridge/host_os.h        |   2 +-
- include/linux/omap-mailbox.h                       |  29 +++
- include/linux/platform_data/mailbox-omap.h         |  58 +++++
- 21 files changed, 355 insertions(+), 276 deletions(-)
- rename arch/arm/mach-omap1/mailbox.c => drivers/mailbox/mailbox-omap1.c (94%)
- rename arch/arm/mach-omap2/mailbox.c => drivers/mailbox/mailbox-omap2.c (59%)
- rename arch/arm/plat-omap/mailbox.c => drivers/mailbox/omap-mailbox.c (92%)
- rename arch/arm/plat-omap/include/plat/mailbox.h => drivers/mailbox/omap-mbox.h (54%)
- create mode 100644 include/linux/omap-mailbox.h
- create mode 100644 include/linux/platform_data/mailbox-omap.h
+> Thanks,
+> - Kukjin
+> --
+> To unsubscribe from this list: send the line "unsubscribe
+> linux-samsung-soc" in the body of a message to
+> majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
