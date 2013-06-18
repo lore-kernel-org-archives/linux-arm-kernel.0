@@ -1,48 +1,34 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 18 Jun 2013 11:59:22 +0530
-Subject: [PATCH v4 10/10] ARM: Exynos: extend soft-reset support for Exynos5420
-In-Reply-To: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
-References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1371536962-13322-11-git-send-email-chander.kashyap@linaro.org>
+From: joelagnel@ti.com (Joel A Fernandes)
+Date: Tue, 18 Jun 2013 01:38:17 -0500
+Subject: [PATCH v11 6/8] dmaengine: edma: enable build for AM33XX
+In-Reply-To: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
+References: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
+Message-ID: <1371537499-12970-7-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Extend the soft reset support for Exynos5420 SoC.
-Reviewed-by: Tomasz Figa <t.figa@samsung.com>
+From: Matt Porter <mporter@ti.com>
 
-Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
+Enable TI EDMA option on OMAP.
+
+Signed-off-by: Matt Porter <mporter@ti.com>
+Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
 ---
- arch/arm/mach-exynos/common.c |   11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+ drivers/dma/Kconfig |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-exynos/common.c b/arch/arm/mach-exynos/common.c
-index 6f435da..4e6c227 100644
---- a/arch/arm/mach-exynos/common.c
-+++ b/arch/arm/mach-exynos/common.c
-@@ -330,10 +330,10 @@ void exynos5_restart(char mode, const char *cmd)
- 	u32 val;
- 	void __iomem *addr;
+diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
+index e992489..3215a3c 100644
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -213,7 +213,7 @@ config SIRF_DMA
  
--	if (of_machine_is_compatible("samsung,exynos5250")) {
--		val = 0x1;
--		addr = EXYNOS_SWRESET;
--	} else if (of_machine_is_compatible("samsung,exynos5440")) {
-+	val = 0x1;
-+	addr = EXYNOS_SWRESET;
-+
-+	if (of_machine_is_compatible("samsung,exynos5440")) {
- 		u32 status;
- 		np = of_find_compatible_node(NULL, NULL, "samsung,exynos5440-clock");
- 
-@@ -344,9 +344,6 @@ void exynos5_restart(char mode, const char *cmd)
- 		val = __raw_readl(addr);
- 
- 		val = (val & 0xffff0000) | (status & 0xffff);
--	} else {
--		pr_err("%s: cannot support non-DT\n", __func__);
--		return;
- 	}
- 
- 	__raw_writel(val, addr);
+ config TI_EDMA
+ 	tristate "TI EDMA support"
+-	depends on ARCH_DAVINCI
++	depends on ARCH_DAVINCI || ARCH_OMAP
+ 	select DMA_ENGINE
+ 	select DMA_VIRTUAL_CHANNELS
+ 	default n
 -- 
 1.7.9.5
