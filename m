@@ -1,80 +1,62 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 18 Jun 2013 10:53:26 -0400 (EDT)
-Subject: [PATCH] USB: initialize or shutdown PHY when add or remove host
- controller
-In-Reply-To: <20130618082428.GF5461@arwen.pp.htv.fi>
-Message-ID: <Pine.LNX.4.44L0.1306181046180.1157-100000@iolanthe.rowland.org>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 18 Jun 2013 20:25:00 +0530
+Subject: [PATCH v7 5/9] ARM: OMAP: USB: Add phy binding information
+In-Reply-To: <20130618123536.GD8620@arwen.pp.htv.fi>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+ <1371113039-5784-6-git-send-email-kishon@ti.com>
+ <20130618094438.GT5461@arwen.pp.htv.fi> <51C030B4.5070707@ti.com>
+ <20130618102725.GB7843@arwen.pp.htv.fi> <51C040E8.2050904@ti.com>
+ <20130618123536.GD8620@arwen.pp.htv.fi>
+Message-ID: <51C074C4.5000601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Jun 2013, Felipe Balbi wrote:
+Hi,
 
-> HI,
-> 
-> On Tue, Jun 18, 2013 at 11:23:59AM +0300, Roger Quadros wrote:
-> > On 06/18/2013 11:01 AM, Felipe Balbi wrote:
-> > > Hi,
-> > > 
-> > > On Tue, Jun 18, 2013 at 03:15:01AM -0400, Chao Xie wrote:
-> > >> Some controller need software to initialize PHY before add
-> > >> host controller, and shut down PHY after remove host controller.
-> > >> Add the generic code for these controllers so they do not need
-> > >> do it in its own host controller driver.
-> > >>
-> > >> Signed-off-by: Chao Xie <chao.xie@marvell.com>
-> > >> ---
-> > >>  drivers/usb/core/hcd.c |   19 ++++++++++++++++++-
-> > >>  1 files changed, 18 insertions(+), 1 deletions(-)
-> > >>
-> > >> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
-> > >> index d53547d..b26196b 100644
-> > >> --- a/drivers/usb/core/hcd.c
-> > >> +++ b/drivers/usb/core/hcd.c
-> > >> @@ -43,6 +43,7 @@
-> > >>  
-> > >>  #include <linux/usb.h>
-> > >>  #include <linux/usb/hcd.h>
-> > >> +#include <linux/usb/phy.h>
-> > >>  
-> > >>  #include "usb.h"
-> > >>  
-> > >> @@ -2531,12 +2532,22 @@ int usb_add_hcd(struct usb_hcd *hcd,
-> > >>  	 */
-> > >>  	set_bit(HCD_FLAG_RH_RUNNING, &hcd->flags);
-> > >>  
-> > >> +	/* Initialize the PHY before other hardware operation. */
-> > >> +	if (hcd->phy) {
-> > > 
-> > > this looks wrong for two reasons:
-> > > 
-> > > a) you're not grabbing the PHY here.
-> > > 
-> > > 	You can't just assume another entity grabbed your PHY for you.
-> > 
-> > Isn't that done in the controller drivers e.g. ehci-fsl.c, ohci-omap, etc?
-> 
-> right, and what I'm saying is that it should all be re-factored into
-> ehci-hcd core :-)
-> 
-> > If the controllers don't want HCD core to manage the PHY they can just set it
-> > to some error code.
-> 
-> they shouldn't have the choice, otherwise it'll be a bit of a PITA to
-> maintain the code. ehci core tries to grab the PHY, if it's not there,
-> try to continue anyway. Assume it's not needed.
+On Tuesday 18 June 2013 06:05 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Tue, Jun 18, 2013 at 04:43:44PM +0530, Kishon Vijay Abraham I wrote:
+>>> On Tue, Jun 18, 2013 at 03:34:36PM +0530, Kishon Vijay Abraham I wrote:
+>>>> On Tuesday 18 June 2013 03:14 PM, Felipe Balbi wrote:
+>>>>> On Thu, Jun 13, 2013 at 02:13:55PM +0530, Kishon Vijay Abraham I wrote:
+>>>>>> In order for controllers to get PHY in case of non dt boot, the phy
+>>>>>> binding information (phy device name) should be added in the platform
+>>>>>> data of the controller.
+>>>>>>
+>>>>>> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+>>>>>
+>>>>> I would rather not pass strings around, any other way to handle this ?
+>>>>> Why do you need to pass this string ?
+>>>>
+>>>> Our old way of binding the controller and the phy using device name
+>>>> started creating problems after the devices are created using
+>>>> PLATFORM_DEVID_AUTO. Infact non-dt boot is broken in mainline for
+>>>> OMAP3 platforms for which I have posted a RFC series
+>>>> http://www.serverphorums.com/read.php?12,708632 which also uses
+>>>> strings.
+>>>> I'm not sure of any other way to deal with this.
+>>>
+>>> have you checked how other frameworks handle it ? Regulator has some
+>>> sort of binding in board-files, but I guess it passes the regulator
+>>> name?
+>>
+>>  From whatever I could make of, regulator has 3 ways to get the
+>> regulator one of which is using the binding in board-files (but it
+>> also uses device name which could create the same problem that we are
+>> facing).
+>>
+>> 1.) from dt data
+>> 2.) from _supply_ name
+>> 3.) from binding in board file
+>>
+>> (referred regulator_dev_lookup() in regulator/core.c)
+>
+> right, spot on. Which means we don't have a better, more elegant
+> solution now. Let's go ahead with this.
 
-Felipe, are all these issues straightened out to your satisfaction?  I
-can't tell from the email thread.
+Ok. So I'll drop RFC and resend this patch series
+http://www.serverphorums.com/read.php?12,708632
 
-Looking through the EHCI glue source files, there appears to be a 
-variety of different ways of getting the PHY.  It's not at all clear 
-that they can be moved into the ehci-hcd core (or even better, the USB 
-core -- which is what Chao is trying to do).
-
-Given that the glue module has to be responsible for getting the PHY,
-it should also be responsible for error checking.  So the code added to
-hcd.c doesn't need to apply an IS_ERR check; it can simply assume that
-if hcd->phy is NULL then either there is no software-controllable PHY
-or else the HCD doesn't want the core to manage it.
-
-Alan Stern
+Thanks
+Kishon
