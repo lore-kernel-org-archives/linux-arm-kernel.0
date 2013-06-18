@@ -1,172 +1,291 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 18 Jun 2013 08:25:33 -0300
-Subject: [PATCH v3 08/12] ARM: mvebu: Add MBus to Armada 370/XP device tree
+Date: Tue, 18 Jun 2013 08:25:35 -0300
+Subject: [PATCH v3 10/12] ARM: mvebu: Relocate Armada 370/XP DeviceBus device
+ tree nodes
 In-Reply-To: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1371554737-25319-9-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1371554737-25319-11-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Armada 370/XP SoC family has a completely configurable address
-space handled by the MBus controller.
-
-This patch introduces the device tree layout of MBus, making the
-'soc' node as mbus-compatible.
-Since every peripheral/controller is a child of this 'soc' node,
-this makes all of them sit behind the mbus, thus describing the
-hardware accurately.
-
-A translation entry has been added for the internal-regs mapping.
-This can't be done in the common armada-370-xp.dtsi because A370
-and AXP have different addressing width.
+Now that mbus has been added to the device tree, it's possible to
+move the DeviceBus out of internal registers, placing it directly
+below the mbus. This is a more accurate representation of the hardware.
 
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-370-db.dts              | 2 ++
- arch/arm/boot/dts/armada-370-mirabox.dts         | 2 ++
- arch/arm/boot/dts/armada-370-rd.dts              | 2 ++
- arch/arm/boot/dts/armada-370-xp.dtsi             | 7 ++-----
- arch/arm/boot/dts/armada-370.dtsi                | 5 +++--
- arch/arm/boot/dts/armada-xp-db.dts               | 2 ++
- arch/arm/boot/dts/armada-xp-gp.dts               | 3 +--
- arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 3 +--
- arch/arm/boot/dts/armada-xp.dtsi                 | 3 +++
- 9 files changed, 18 insertions(+), 11 deletions(-)
+ arch/arm/boot/dts/armada-370-xp.dtsi             | 94 +++++++++++++-----------
+ arch/arm/boot/dts/armada-xp-gp.dts               | 60 +++++++--------
+ arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts | 60 +++++++--------
+ 3 files changed, 110 insertions(+), 104 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-370-db.dts b/arch/arm/boot/dts/armada-370-db.dts
-index 231f8b2..530d1cf 100644
---- a/arch/arm/boot/dts/armada-370-db.dts
-+++ b/arch/arm/boot/dts/armada-370-db.dts
-@@ -30,6 +30,8 @@
- 	};
- 
- 	soc {
-+		ranges = <0xffff0001 0 0xd0000000 0x100000>;
-+
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <200000000>;
-diff --git a/arch/arm/boot/dts/armada-370-mirabox.dts b/arch/arm/boot/dts/armada-370-mirabox.dts
-index 7005f27..ad60835 100644
---- a/arch/arm/boot/dts/armada-370-mirabox.dts
-+++ b/arch/arm/boot/dts/armada-370-mirabox.dts
-@@ -25,6 +25,8 @@
- 	};
- 
- 	soc {
-+		ranges = <0xffff0001 0 0xd0000000 0x100000>;
-+
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <200000000>;
-diff --git a/arch/arm/boot/dts/armada-370-rd.dts b/arch/arm/boot/dts/armada-370-rd.dts
-index 5c3a1ec..9c2ab7f 100644
---- a/arch/arm/boot/dts/armada-370-rd.dts
-+++ b/arch/arm/boot/dts/armada-370-rd.dts
-@@ -28,6 +28,8 @@
- 	};
- 
- 	soc {
-+		ranges = <0xffff0001 0 0xd0000000 0x100000>;
-+
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <200000000>;
 diff --git a/arch/arm/boot/dts/armada-370-xp.dtsi b/arch/arm/boot/dts/armada-370-xp.dtsi
-index 52a1f5e..633534dd 100644
+index 4ae5eb5..0cd23ac 100644
 --- a/arch/arm/boot/dts/armada-370-xp.dtsi
 +++ b/arch/arm/boot/dts/armada-370-xp.dtsi
-@@ -29,18 +29,15 @@
- 	};
- 
- 	soc {
--		#address-cells = <1>;
-+		#address-cells = <2>;
+@@ -35,6 +35,56 @@
  		#size-cells = <1>;
--		compatible = "simple-bus";
  		interrupt-parent = <&mpic>;
--		ranges = <0          0 0xd0000000 0x0100000 /* internal registers */
--			  0xe0000000 0 0xe0000000 0x8100000 /* PCIe */>;
  
++		devbus-bootcs {
++			compatible = "marvell,mvebu-devbus";
++			reg = <0xffff0001 0x10400 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x2f) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs0 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <0xffff0001 0x10408 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3e) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs1 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <0xffff0001 0x10410 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3d) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs2 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <0xffff0001 0x10418 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x3b) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
++		devbus-cs3 {
++			compatible = "marvell,mvebu-devbus";
++			reg = <0xffff0001 0x10420 0x8>;
++			ranges = <0 MBUS_ID(0x01, 0x37) 0 0xffffffff>;
++			#address-cells = <1>;
++			#size-cells = <1>;
++			clocks = <&coreclk 0>;
++			status = "disabled";
++		};
++
  		internal-regs {
  			compatible = "simple-bus";
  			#address-cells = <1>;
- 			#size-cells = <1>;
--			ranges;
-+			ranges = <0 0xffff0001 0 0x100000>;
+@@ -181,50 +231,6 @@
+ 				status = "disabled";
+ 			};
  
- 			mpic: interrupt-controller at 20000 {
- 				compatible = "marvell,mpic";
-diff --git a/arch/arm/boot/dts/armada-370.dtsi b/arch/arm/boot/dts/armada-370.dtsi
-index 08ec6e3..c274b7b 100644
---- a/arch/arm/boot/dts/armada-370.dtsi
-+++ b/arch/arm/boot/dts/armada-370.dtsi
-@@ -29,8 +29,9 @@
+-			devbus-bootcs at 10400 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10400 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs0 at 10408 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10408 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs1 at 10410 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10410 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs2 at 10418 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10418 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+-
+-			devbus-cs3 at 10420 {
+-				compatible = "marvell,mvebu-devbus";
+-				reg = <0x10420 0x8>;
+-				#address-cells = <1>;
+-				#size-cells = <1>;
+-				clocks = <&coreclk 0>;
+-				status = "disabled";
+-			};
+ 		};
  	};
- 
- 	soc {
--		ranges = <0          0xd0000000 0x0100000 /* internal registers */
--			  0xe0000000 0xe0000000 0x8100000 /* PCIe */>;
-+		compatible = "marvell,armada370-mbus", "simple-bus";
-+		reg = <0xd0020000 0x100>, <0xd0020180 0x20>;
-+
- 		internal-regs {
- 			system-controller at 18200 {
- 				compatible = "marvell,armada-370-xp-system-controller";
-diff --git a/arch/arm/boot/dts/armada-xp-db.dts b/arch/arm/boot/dts/armada-xp-db.dts
-index 9a6ad0e..0996215 100644
---- a/arch/arm/boot/dts/armada-xp-db.dts
-+++ b/arch/arm/boot/dts/armada-xp-db.dts
-@@ -30,6 +30,8 @@
- 	};
- 
- 	soc {
-+		ranges = <0xffff0001 0 0 0xd0000000 0x100000>;
-+
- 		internal-regs {
- 			serial at 12000 {
- 				clock-frequency = <250000000>;
+  };
 diff --git a/arch/arm/boot/dts/armada-xp-gp.dts b/arch/arm/boot/dts/armada-xp-gp.dts
-index e0c6f60..f095a3e 100644
+index 1f4daa7..3e14e82 100644
 --- a/arch/arm/boot/dts/armada-xp-gp.dts
 +++ b/arch/arm/boot/dts/armada-xp-gp.dts
-@@ -39,8 +39,7 @@
- 	};
+@@ -40,7 +40,36 @@
  
  	soc {
--		ranges = <0          0 0xd0000000 0x100000
--			  0xf0000000 0 0xf0000000 0x1000000>;
-+		ranges = <0xffff0001 0 0 0xd0000000 0x100000>;
+ 		ranges = <0xffff0001 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x1000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 16 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x1000000>;
++				bank-width = <2>;
++			};
++		};
  
  		internal-regs {
  			serial at 12000 {
+@@ -116,35 +145,6 @@
+ 				};
+ 			};
+ 
+-			devbus-bootcs at 10400 {
+-				status = "okay";
+-				ranges = <0 0xf0000000 0x1000000>; /* @addr 0xf000000, size 0x1000000 */
+-
+-				/* Device Bus parameters are required */
+-
+-				/* Read parameters */
+-				devbus,bus-width    = <8>;
+-				devbus,turn-off-ps  = <60000>;
+-				devbus,badr-skew-ps = <0>;
+-				devbus,acc-first-ps = <124000>;
+-				devbus,acc-next-ps  = <248000>;
+-				devbus,rd-setup-ps  = <0>;
+-				devbus,rd-hold-ps   = <0>;
+-
+-				/* Write parameters */
+-				devbus,sync-enable = <0>;
+-				devbus,wr-high-ps  = <60000>;
+-				devbus,wr-low-ps   = <60000>;
+-				devbus,ale-wr-ps   = <60000>;
+-
+-				/* NOR 16 MiB */
+-				nor at 0 {
+-					compatible = "cfi-flash";
+-					reg = <0 0x1000000>;
+-					bank-width = <2>;
+-				};
+-			};
+-
+ 			pcie-controller {
+ 				status = "okay";
+ 
 diff --git a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-index 27a0ecf..91827cb 100644
+index ea47196..490c423 100644
 --- a/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
 +++ b/arch/arm/boot/dts/armada-xp-openblocks-ax3-4.dts
-@@ -27,8 +27,7 @@
- 	};
+@@ -28,7 +28,36 @@
  
  	soc {
--		ranges = <0          0 0xd0000000 0x100000
--			  0xf0000000 0 0xf0000000 0x8000000>;
-+		ranges = <0xffff0001 0 0 0xd0000000 0x100000>;
+ 		ranges = <0xffff0001 0 0 0xd0000000 0x100000
+-			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000>;
++			  MBUS_ID(0x01, 0x1d) 0 0 0xfff00000 0x100000
++			  MBUS_ID(0x01, 0x2f) 0 0 0xf0000000 0x8000000>;
++
++		devbus-bootcs {
++			status = "okay";
++
++			/* Device Bus parameters are required */
++
++			/* Read parameters */
++			devbus,bus-width    = <8>;
++			devbus,turn-off-ps  = <60000>;
++			devbus,badr-skew-ps = <0>;
++			devbus,acc-first-ps = <124000>;
++			devbus,acc-next-ps  = <248000>;
++			devbus,rd-setup-ps  = <0>;
++			devbus,rd-hold-ps   = <0>;
++
++			/* Write parameters */
++			devbus,sync-enable = <0>;
++			devbus,wr-high-ps  = <60000>;
++			devbus,wr-low-ps   = <60000>;
++			devbus,ale-wr-ps   = <60000>;
++
++			/* NOR 128 MiB */
++			nor at 0 {
++				compatible = "cfi-flash";
++				reg = <0 0x8000000>;
++				bank-width = <2>;
++			};
++		};
  
  		internal-regs {
  			serial at 12000 {
-diff --git a/arch/arm/boot/dts/armada-xp.dtsi b/arch/arm/boot/dts/armada-xp.dtsi
-index 3e770db..feec757 100644
---- a/arch/arm/boot/dts/armada-xp.dtsi
-+++ b/arch/arm/boot/dts/armada-xp.dtsi
-@@ -23,6 +23,9 @@
- 	compatible = "marvell,armadaxp", "marvell,armada-370-xp";
+@@ -144,35 +173,6 @@
+ 				status = "okay";
+ 			};
  
- 	soc {
-+		compatible = "marvell,armadaxp-mbus", "simple-bus";
-+		reg = <0 0xd0020000 0 0x100>, <0 0xd0020180 0 0x20>;
-+
- 		internal-regs {
- 			L2: l2-cache {
- 				compatible = "marvell,aurora-system-cache";
+-			devbus-bootcs at 10400 {
+-				status = "okay";
+-				ranges = <0 0xf0000000 0x8000000>; /* @addr 0xf000000, size 0x8000000 */
+-
+-				/* Device Bus parameters are required */
+-
+-				/* Read parameters */
+-				devbus,bus-width    = <8>;
+-				devbus,turn-off-ps  = <60000>;
+-				devbus,badr-skew-ps = <0>;
+-				devbus,acc-first-ps = <124000>;
+-				devbus,acc-next-ps  = <248000>;
+-				devbus,rd-setup-ps  = <0>;
+-				devbus,rd-hold-ps   = <0>;
+-
+-				/* Write parameters */
+-				devbus,sync-enable = <0>;
+-				devbus,wr-high-ps  = <60000>;
+-				devbus,wr-low-ps   = <60000>;
+-				devbus,ale-wr-ps   = <60000>;
+-
+-				/* NOR 128 MiB */
+-				nor at 0 {
+-					compatible = "cfi-flash";
+-					reg = <0 0x8000000>;
+-					bank-width = <2>;
+-				};
+-			};
+-
+ 			pcie-controller {
+ 				status = "okay";
+ 				/* Internal mini-PCIe connector */
 -- 
 1.8.1.5
