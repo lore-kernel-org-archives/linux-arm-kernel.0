@@ -1,47 +1,96 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Jun 2013 19:21:54 +0200
-Subject: [PATCH v3 11/12] ARM: mvebu: Relocate Armada 370 PCIe device
- tree nodes
-In-Reply-To: <201306181918.59046.arnd@arndb.de>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306181829.35514.arnd@arndb.de> <20130618191535.44fe595c@skate>
- <201306181918.59046.arnd@arndb.de>
-Message-ID: <20130618192154.4c1530cc@skate>
+From: Dave.Martin@arm.com (Dave P Martin)
+Date: Tue, 18 Jun 2013 18:24:34 +0100
+Subject: [PATCH 1/2] ARM: vexpress/TC2: basic PM support
+In-Reply-To: <alpine.LFD.2.03.1306131817310.18597@syhkavp.arg>
+References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
+ <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
+ <20130613203218.GA22310@quad.lixom.net>
+ <alpine.LFD.2.03.1306131817310.18597@syhkavp.arg>
+Message-ID: <20130618172434.GI3289@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd Bergmann,
+On Thu, Jun 13, 2013 at 06:31:32PM -0400, Nicolas Pitre wrote:
+> On Thu, 13 Jun 2013, Olof Johansson wrote:
 
-On Tue, 18 Jun 2013 19:18:58 +0200, Arnd Bergmann wrote:
+[...]
 
-> > >                        ranges =
-> > >                               <0x82000000 0 0x40000    0xffff0001 0x40000 0 0x00002000
-> > >                                0x82000000 0 0x80000    0xffff0001 0x80000 0 0x00002000
-> > >                                0x82000000 1 0 MBUS_ID(0x12, 0x34) 0  1 0
-> > >                                0x82000000 2 0 MBUS_ID(0x13, 0x34) 0  1 0
-> > >                                0x81000000 1 0 MBUS_ID(0x12, 0x35) 0 0 0x10000;
-> > >                                0x81000000 2 0 MBUS_ID(0x13, 0x35) 0 0 0x10000>;
-> > > 
-> > > The MBUS_ID numbers above are made up since I don't know them, but this way you can
-> > > describe how the entire 4GB MMIO address space of the PCI bus is mapped into the
-> > > MBUS address space.
-> > 
-> > This is NOT possible because we don't know in advance how much memory
-> > space and I/O space each PCIe device will require.
-> > 
-> > Arnd, we've discussed this at length with you while getting the PCIe
-> > driver merged, and we've explained this to you numerous times. Could
-> > you please understand that any of your proposal that suggests writing
-> > down static windows for PCIe devices will not work?
+> /* Keep per-cpu usage count to cope with unordered up/down requests */
+> static int tc2_pm_use_count[TC2_MAX_CPUS_PER_CLUSTER][TC2_CLUSTERS];
 > 
-> Where did I suggest static windows for PCIe devices?
+> #define tc2_cluster_unused(cluster) \
+>         (!tc2_pm_use_count[0][cluster] && \
+>          !tc2_pm_use_count[1][cluster] && \
+>          !tc2_pm_use_count[2][cluster])
+> 
+> > > +	if (!tc2_pm_use_count[0][cluster] &&
+> > > +	    !tc2_pm_use_count[1][cluster] &&
+> > > +	    !tc2_pm_use_count[2][cluster])
+> > 
+> > I see this construct used three times open-coded like this in the file. Adding
+> > a smaller helper with a descriptive name would be a good idea.
+> 
+> Good observation.  Being too close to this code makes those issues 
+> invisible.  Hence the tc2_cluster_unused() above.
+> 
+> > Same goes for other direct accesses to the array -- maybe a tiny helper to
+> > set/get state? It might end up overabstracted that way though.
+> 
+> I would think so.
 
-Where does your new proposal buys us anything useful compared to the
-existing PCIe DT binding that has been discussed at length with you?
+True, but it's worth noting that most mcpm backends (certainly any
+native backends) will end up duplicating this pattern.  We already
+have it for the fast model and for TC2.
 
-Thomas
--- 
-Thomas Petazzoni, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+
+In this code, the use counts are doing basically the same thing as
+the low-level mcpm coordination, but to coordinate things that can
+happen while all affected CPUs' MMUs are on -- this we can use
+proper spinlocks and be nice and efficient.  But there are still
+parallels between the operations on the use counts array and the
+low-level __mcpm_ state machine helpers.
+
+There are some interesting wrinkles here, such as the fact that
+tc2_pm_powered_up() chooses a first man to perform some post-MMU
+actions using regular spinlocking and the use counts... but this
+isn't necessarily the same CPU selected as first man by the
+low-level pre-MMU synchronisation.  And that's not a bug, because
+we want the winner at each stage to dash across the finish line:
+waiting for the runners-up just incurs latency.
+
+
+Much about this feels like it's solving a common but non-trivial
+problem, so there could be an argument for having more framework, or
+otherwise documenting it a bit more.
+
+We seem to have the following basic operations:
+
+	lock_for_power_down(cpu, cluster) ->
+
+		cluster and CPU need to be powered on, lock is held for both;
+		CPU needs to be powered on, lock is held for it; or
+		CPU is already on, so do nothing, lock is not held.
+
+	lock_for_power_up(cpu, cluster) ->
+
+		CPU and cluster need to be powered down (last man), lock is held for both; or
+		CPU needs to be powered down, lock is held for it; or
+		Someone is already turning the CPU on, so do nothing, lock is not held.
+
+	lock_for_setup(cpu, cluster) ->
+
+		cluster needs to be put into the powered-on state (post-MMU first man), lock is held for it.
+		cluster is already in the powrered-on state, so do nothing, lock is not held.
+
+	unlock()
+
+		guess
+
+
+These may not be great names, but hopefully you get the idea.
+
+They correspond to the operations done in .power_up(), .power_down()
+and .powered_up() respectively.
+
+Cheers
+---Dave
