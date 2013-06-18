@@ -1,108 +1,100 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 18 Jun 2013 11:22:13 +0100
-Subject: [RFC PATCH v4 2/2] drivers: mfd: vexpress: add Serial Power
- Controller (SPC) support
-In-Reply-To: <20130617174451.GF28497@quad.lixom.net>
-References: <1371484269-11743-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1371484269-11743-3-git-send-email-lorenzo.pieralisi@arm.com>
- <20130617174451.GF28497@quad.lixom.net>
-Message-ID: <20130618102213.GA1564@e102568-lin.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 18 Jun 2013 11:22:57 +0100
+Subject: [PATCHv7 01/11] clockevents: Prefer CPU local devices over
+ global devices
+In-Reply-To: <20130613183950.GA32061@codeaurora.org>
+References: <1370291642-13259-1-git-send-email-sboyd@codeaurora.org>
+ <1370291642-13259-2-git-send-email-sboyd@codeaurora.org>
+ <51B0A6E8.20909@linaro.org> <20130606180425.GQ599@codeaurora.org>
+ <51B10D85.1060507@linaro.org> <20130606223848.GR599@codeaurora.org>
+ <20130612214435.GE10823@codeaurora.org> <51B991EF.70800@linaro.org>
+ <alpine.LFD.2.02.1306131331430.22970@ionos>
+ <20130613183950.GA32061@codeaurora.org>
+Message-ID: <20130618102257.GH6809@e106331-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
-
-thanks a lot.
-
-On Mon, Jun 17, 2013 at 06:44:51PM +0100, Olof Johansson wrote:
-> On Mon, Jun 17, 2013 at 04:51:09PM +0100, Lorenzo Pieralisi wrote:
-> > The TC2 versatile express core tile integrates a logic block that provides the
-> > interface between the dual cluster test-chip and the M3 microcontroller that
-> > carries out power management. The logic block, called Serial Power Controller
-> > (SPC), contains several memory mapped registers to control among other things
-> > low-power states, operating points and reset control.
+On Thu, Jun 13, 2013 at 07:39:50PM +0100, Stephen Boyd wrote:
+> On 06/13, Thomas Gleixner wrote:
+> > On Thu, 13 Jun 2013, Daniel Lezcano wrote:
+> > > I prefer Thomas to have a look at it and ack it. I changed Cc to To for
+> > > Thomas.
 > > 
-> > This patch provides a driver that enables run-time control of features
-> > implemented by the SPC control logic.
+> > The patch does not apply on tip timers/core. The code has been
+> > reworked a month ago. Please work against tip timers/core. That's
+> > where this stuff ends up.
 > > 
-> > The SPC control logic is required to be programmed very early in the boot
-> > process to reset secondary CPUs on the TC2 testchip, set-up jump addresses and
-> > wake-up IRQs for power management.
-> > Since the SPC logic is also used to control clocks and operating points,
-> > that have to be initialized early as well, the SPC interface consumers can not
-> > rely on early initcalls ordering, which is inconsistent, to wait for SPC
-> > initialization. Hence, in order to keep the components relying on the SPC
-> > coded in a sane way, the driver puts in place a synchronization scheme that
-> > allows kernel drivers to check if the SPC driver has been initialized and if
-> > not, to initialize it upon check.
-> > 
-> > A status variable is kept in memory so that loadable modules that require SPC
-> > interface (eg CPUfreq drivers) can still check the correct initialization and
-> > use the driver correctly after functions used at boot to init the driver are
-> > freed.
-> > 
-> > The driver also provides a bridge interface through the vexpress config
-> > infrastructure. Operations allowing to read/write operating points are
-> > made to go via the same interface as configuration transactions so that
-> > all requests to M3 are serialized.
-> > 
-> > Device tree bindings documentation for the SPC component is provided with
-> > the patchset.
 > 
-> Sorry, I got to think of this over the weekend and should have replied
-> before you had a chance to repost, but still:
+> Ah, I thought your patch series had stalled. Here is a refreshed
+> patch. Every other patch in this series applies cleanly to tip
+> timers/core so I don't want to resend them again unless
+> absolutely necessary.
 > 
-> Why is the operating point and frequency change code in this driver at all?
-> Usually, the MFD driver contains a shared method to access register space on
-> a multifunction device, but the actual operation of each subdevice is handled
-> by individual drivers in the regular locations.
+> -----8<-----
+> Subject: [PATCH v8] clockevents: Prefer CPU local devices over global devices
 > 
-> So, in the case of operating points and requencies, that should be in
-> a cpufreq driver. And the clock setup should presumably be in a clk
-> framework driver if needed.
-
-Well, yes this can be done. I will probably move this code out of mfd
-since this choice caused more issues than the current driver solves.
-
-By moving the frequency changes into subsystems, we are certainly
-trimming down the code, not sure we improve the maintainability though,
-keep in mind that we already had to change the vexpress-config interface
-to cope with SPC oddities, at least now these intricacies are self-contained.
-
-What you are suggesting makes sense though, I will do it.
-
-> Then all that would be left here is the functionality for submitting the two
-> kinds of commands, and handling interrupts.
-
-Not really. There are still a bunch of registers to set-up wake-up IRQs,
-power down flags and warm-boot jump addresses that do not go through the
-vexpress interface, they are ad-hoc. I could also split that stuff, but I
-really do not think it is worth the effort.
-
-> That'll trim down the driver to a point where I think you'll find it much
-> easier to get merged. :-)
-
-To start with I have to understand in which directory this code should
-live. Moving the frequency settings in clk/CPUfreq drivers should be
-feasible with extra DT complexity for their bindings.
-
-> [...]
+> On an SMP system with only one global clockevent and a dummy
+> clockevent per CPU we run into problems. We want the dummy
+> clockevents to be registered as the per CPU tick devices, but
+> we can only achieve that if we register the dummy clockevents
+> before the global clockevent or if we artificially inflate the
+> rating of the dummy clockevents to be higher than the rating
+> of the global clockevent. Failure to do so leads to boot
+> hangs when the dummy timers are registered on all other CPUs
+> besides the CPU that accepted the global clockevent as its tick
+> device and there is no broadcast timer to poke the dummy
+> devices.
 > 
-> > +struct ve_spc_drvdata {
-> > +	void __iomem *baseaddr;
-> > +	/* A15 processor MPIDR[15:8] bitfield */
+> If we're registering multiple clockevents and one clockevent is
+> global and the other is local to a particular CPU we should
+> choose to use the local clockevent regardless of the rating of
+> the device. This way, if the clockevent is a dummy it will take
+> the tick device duty as long as there isn't a higher rated tick
+> device and any global clockevent will be bumped out into
+> broadcast mode, fixing the problem described above.
 > 
-> A comment describing what the meaning is would be more useful, even if
-> less technically specific. Or maybe something like "Cluster ID of the
-> A15 cluster, from MPIDR[15:8]" or similar.
-> 
-> > +	u32 a15_clusid;
-> 
-> 
-> (I reserve the right to have more comments later but I think we want to discuss
-> the removal of frequency management code first. :-)
+> Reported-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: John Stultz <john.stultz@linaro.org>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-I will do that and comments are always welcome.
+I've just tested this atop of tip/timers/core on a tc2, using only the
+sp804. As previously, without the patch boot hangs, and with the patch
+I'm able to reach userspace and do useful things.
 
-Thanks,
-Lorenzo
+Tested-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks for working on this, Stephen.
+
+Mark.
+
+> ---
+>  kernel/time/tick-common.c | 9 +++++++--
+>  1 file changed, 7 insertions(+), 2 deletions(-)
+> 
+> diff --git a/kernel/time/tick-common.c b/kernel/time/tick-common.c
+> index 5edfb48..edd45f6 100644
+> --- a/kernel/time/tick-common.c
+> +++ b/kernel/time/tick-common.c
+> @@ -243,8 +243,13 @@ static bool tick_check_preferred(struct clock_event_device *curdev,
+>  			return false;
+>  	}
+>  
+> -	/* Use the higher rated one */
+> -	return !curdev || newdev->rating > curdev->rating;
+> +	/*
+> +	 * Use the higher rated one, but prefer a CPU local device with a lower
+> +	 * rating than a non-CPU local device
+> +	 */
+> +	return !curdev ||
+> +		newdev->rating > curdev->rating ||
+> +	       !cpumask_equal(curdev->cpumask, newdev->cpumask);
+>  }
+>  
+>  /*
+> 
+> -- 
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> hosted by The Linux Foundation
+> 
