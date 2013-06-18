@@ -1,30 +1,49 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 17 Jun 2013 18:37:35 -0700
-Subject: [PATCH] arm64: Define PTE_TYPE_HUGEPAGE
-Message-ID: <1371519455-64998-1-git-send-email-christoffer.dall@linaro.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue, 18 Jun 2013 10:01:54 +0800
+Subject: [v1 2/3] ata: ahci_platform: enable imx6q ahci sata support
+In-Reply-To: <1371462767-16630-3-git-send-email-r65037@freescale.com>
+References: <1371462767-16630-1-git-send-email-r65037@freescale.com>
+ <1371462767-16630-3-git-send-email-r65037@freescale.com>
+Message-ID: <20130618020153.GB28381@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PTE_TYPE_HUGEPAGE is referenced by pte_huge, but because nobody uses
-this macro it doesn't fail yet.  KVM will be using this when 32-bit
-support for huge pages is added so add it.
+On Mon, Jun 17, 2013 at 05:52:46PM +0800, Richard Zhu wrote:
+> imx6q contains the Synopsys AHCI SATA controller which shares
+> ahci_platform driver with other controllers.
+> 
+> This patch updates the DT compatible list for ahci_platform,
+> and enable the imx6q ahci sata support.
+> 
+> Signed-off-by: Richard Zhu <r65037@freescale.com>
+> ---
+>  drivers/ata/ahci_platform.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/ata/ahci_platform.c b/drivers/ata/ahci_platform.c
+> index 7a8a284..61f2142 100644
+> --- a/drivers/ata/ahci_platform.c
+> +++ b/drivers/ata/ahci_platform.c
+> @@ -327,6 +327,7 @@ static SIMPLE_DEV_PM_OPS(ahci_pm_ops, ahci_suspend, ahci_resume);
+>  
+>  static const struct of_device_id ahci_of_match[] = {
+>  	{ .compatible = "snps,spear-ahci", },
+> +	{ .compatible = "snps,imx-ahci", },
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/include/asm/pgtable-hwdef.h | 1 +
- 1 file changed, 1 insertion(+)
+I'm not sure it makes much sense to invent multiple platform specific
+strings for an IP which is completely compatible between them.
+Why don't we just have a generic compatible string like "snps,ahci"
+for all those compatible platforms, and only add platform specific
+string when there is incompatibility on particular platform to deal
+with?
 
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index 66367c6..0219523 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -54,6 +54,7 @@
- #define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
- #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
- #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
-+#define PTE_TYPE_HUGEPAGE	(_AT(pteval_t, 1) << 0)
- #define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
- #define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
- #define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
--- 
-1.8.1.2
+Added devicetree-discuss to get DT people's opinion.
+
+Shawn
+
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, ahci_of_match);
+> -- 
+> 1.7.5.4
+> 
