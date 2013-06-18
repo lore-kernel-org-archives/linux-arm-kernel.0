@@ -1,30 +1,73 @@
-From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 18 Jun 2013 11:46:22 -0600
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <1371554737-25319-4-git-send-email-ezequiel.garcia@free-electrons.com>
-References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <1371554737-25319-4-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <20130618174622.GD2204@obsidianresearch.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 18 Jun 2013 13:47:11 -0400 (EDT)
+Subject: [PATCH V2 2/6] USB: OHCI: make ohci-omap a separate driver
+In-Reply-To: <1371052442-14541-3-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306181336500.1157-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 08:25:28AM -0300, Ezequiel Garcia wrote:
-> +
-> +IIAA0000
-> +
-> +Where:
-> +  -- I = Marvell defined target ID for programmable windows
-> +  -- A = Marvell defined target attributes for programmable windows
+On Wed, 12 Jun 2013, Manjunath Goudar wrote:
 
-I thought we agreed to something like:
+> Separate the  TI OHCI OMAP1/2 host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> it would be nice to have in 3.11.
+> 
+> V2:
+>  -omap_ohci_clock_power(0) called in usb_hcd_omap_remove().
+>  -Removed ohci_setup() call from usb_hcd_omap_probe() and ohci_omap_reset().
 
-SIAA0000
+You were supposed to remove the call from usb_hcd_omap_probe but leave 
+in the call from ohci_omap_reset.
 
-Where 'S' is the designator for the special items like PCI-E and
-internal-regs. 0 = normal target ids, 0xF = special ids.
+>  -host_enabled and host_initialized variables aren't used for anything
+>   thats what removed.
 
-The target is only 4 bits, the attr is 8, so a little doc update to
-clarify this should be enough, no need to change the DTs.
 
-Jason
+> @@ -188,21 +195,21 @@ static void start_hnp(struct ohci_hcd *ohci)
+>  
+>  /*-------------------------------------------------------------------------*/
+>  
+> -static int ohci_omap_init(struct usb_hcd *hcd)
+> +static int ohci_omap_reset(struct usb_hcd *hcd)
+>  {
+>  	struct ohci_hcd		*ohci = hcd_to_ohci(hcd);
+>  	struct omap_usb_config	*config = hcd->self.controller->platform_data;
+>  	int			need_transceiver = (config->otg != 0);
+> -	int			ret;
+>  
+>  	dev_dbg(hcd->self.controller, "starting USB Controller\n");
+>  
+> -	if (config->otg) {
+> +	if (config->otg || config->rwc) {
+>  		ohci_to_hcd(ohci)->self.otg_port = config->otg;
+>  		/* default/minimum OTG power budget:  8 mA */
+>  		ohci_to_hcd(ohci)->power_budget = 8;
+
+These three lines are supposed to run only when config->otg is set, not
+when config->rwc is set.  The next two lines can run when either one is
+set.
+
+Also, "ohci_to_hcd(ohci)" should be replaced by "hcd".
+
+> +		ohci->hc_control = OHCI_CTRL_RWC;
+> +		writel(OHCI_CTRL_RWC, &ohci->regs->control);
+>  	}
+> -
+
+Don't remove this blank line.
+
+>  	/* boards can use OTG transceivers in non-OTG modes */
+>  	need_transceiver = need_transceiver
+>  			|| machine_is_omap_h2() || machine_is_omap_h3();
+> @@ -238,9 +245,6 @@ static int ohci_omap_init(struct usb_hcd *hcd)
+>  		omap_1510_local_bus_init();
+>  	}
+>  
+> -	if ((ret = ohci_init(ohci)) < 0)
+> -		return ret;
+> -
+
+This should call ohci_setup instead of ohci_init.
+
+Alan Stern
