@@ -1,44 +1,58 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 18 Jun 2013 10:33:21 +0200
-Subject: [GIT PULL] at91: non critical fixes
-Message-ID: <1371544401-22369-1-git-send-email-nicolas.ferre@atmel.com>
+From: hechtb@gmail.com (Bastian Hecht)
+Date: Tue, 18 Jun 2013 10:33:27 +0200
+Subject: linux-next: manual merge of the arm-soc tree with the net-next
+ tree
+In-Reply-To: <51BF1461.8060401@cogentembedded.com>
+References: <20130617163920.04523ba6de50bcc81563f33e@canb.auug.org.au>
+ <51BF1461.8060401@cogentembedded.com>
+Message-ID: <CABYn4sx3PYBVMyio8uo-KhwprQnCmt_5k2EMaa9_EW2ud2q2nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
+Hello Sergei, hello Stephen,
 
-Refurbish of preceding "soc" pull-request for extracting fixes. Note that this
-at91-fixes tag is now based on v3.10-rc5 as I have found that it is the base of
-your next/fixes-non-critical branch.
+Sergei is completely right I think. He was sceptic about the commit in
+a mail some days ago already. Unfortunately I recently haven't had
+access to my development environment to check what's up with this
+patch. I'm sorry that it ended up to you both to deal with it. I have
+written some simple bindings for the sh-eth and wanted to use it for
+our DT reference version for the Armadillo board but discarded it as I
+saw Nobuhiro Iwamatsu, the author of the sh-eth driver, cooked up some
+more mature version. I don't see them in the next branch of Simon, so
+until they appear there we can delete commit 9e0b428f079d ("ARM:
+shmobile: r8a7740: Add interim sh-eth device name to clocks list")
+that is only needed for sh-eth DT usage.
 
-Thanks, best regards,
+Thanks,
 
-The following changes since commit 317ddd256b9c24b0d78fa8018f80f1e495481a10:
+ Bastian
 
-  Linux 3.10-rc5 (2013-06-08 17:41:04 -0700)
 
-are available in the git repository at:
-
-  git://github.com/at91linux/linux-at91.git tags/at91-fixes
-
-for you to fetch changes up to 133e00116b5bc76110bcc41ded369489209b641f:
-
-  ARM: at91: Change the internal SRAM memory type MT_MEMORY_NONCACHED (2013-06-18 10:20:30 +0200)
-
-----------------------------------------------------------------
-Two non critical fixes that can go in 3.11.
-
-----------------------------------------------------------------
-Alexandre Belloni (1):
-      ARM: at91: Fix link breakage when !CONFIG_PHYLIB
-
-Wenyou Yang (1):
-      ARM: at91: Change the internal SRAM memory type MT_MEMORY_NONCACHED
-
- arch/arm/mach-at91/Kconfig          | 1 +
- arch/arm/mach-at91/board-dt-sama5.c | 3 ++-
- arch/arm/mach-at91/setup.c          | 2 +-
- 3 files changed, 4 insertions(+), 2 deletions(-)
-
--- 
-Nicolas Ferre
+2013/6/17 Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>:
+> Hello.
+>
+>
+> On 17-06-2013 10:39, Stephen Rothwell wrote:
+>
+>> Today's linux-next merge of the arm-soc tree got a conflict in
+>> arch/arm/mach-shmobile/clock-r8a7740.c between commit e5c9b4cd6651
+>> ("sh_eth: get R8A7740 support out of #ifdef") from the net-next tree and
+>> commit 9e0b428f079d ("ARM: shmobile: r8a7740: Add interim sh-eth device
+>> name to clocks list") from the arm-soc tree.
+>
+>
+>    To me that latter commit looked utterly pointless, as there's no device
+> tree support for the 'sh-eth' driver yet (and at this stage it isn't even
+> going to happen due to procedural platform data). I'm instead going to use
+> OF_DEV_AUXDATA() in the platform code which again would render that commit
+> pointless.
+>
+>
+>> I fixed it up (see below) and can carry the fix as necessary (no action
+>> is required).
+>
+>
+>    Thanks.
+>
+> WBR, Sergei
+>
