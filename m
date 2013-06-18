@@ -1,56 +1,53 @@
-From: jg1.han@samsung.com (Jingoo Han)
-Date: Tue, 18 Jun 2013 14:35:54 +0900
-Subject: [PATCH V5 1/3] pci: Add PCIe driver for Samsung Exynos
-In-Reply-To: <7174350.I5qK0sQfHM@wuerfel>
-References: <000b01ce6839$0f0455d0$2d0d0170$@samsung.com>
- <3539874.V7zkhbMg0b@wuerfel> <005e01ce6b3f$74e3c940$5eab5bc0$@samsung.com>
- <7174350.I5qK0sQfHM@wuerfel>
-Message-ID: <000001ce6be5$b3fd0730$1bf71590$@samsung.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Tue, 18 Jun 2013 08:41:41 +0300
+Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
+In-Reply-To: <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
+References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
+ <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
+Message-ID: <CAHp75VdQXyRtfkNbnOyz36sADA_3tx=i4C+Ga5AevpMfo48XFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, June 17, 2013 9:45 PM, Arnd Bergmann wrote:
-> On Monday 17 June 2013 18:45:52 Jingoo Han wrote:
-> > On Friday, June 14, 2013 9:54 PM, Arnd Bergmann wrote:
-> > >
-[.....]
-> > > > > > +static int __exit exynos_pcie_remove(struct platform_device *pdev)
-> > > > > > +{
-> > > > > > +	struct pcie_port *pp = platform_get_drvdata(pdev);
-> > > > > > +
-> > > > > > +	clk_disable_unprepare(pp->bus_clk);
-> > > > > > +	clk_disable_unprepare(pp->clk);
-> > > > > > +
-> > > > > > +	return 0;
-> > > > > > +}
-> > > > >
-> > > > > You also don't remove the PCI devices here, as mentioned in an earlier
-> > > > > review.
-> > > >
-> > > > I reviewed Marvell PCIe driver and Tegra PCIe driver; however,
-> > > > I cannot know what you mean.
-> > > >
-> > > > Could let me know which additional functions are needed?
-> > >
-> > > The mvebu driver does not allow module unload. I haven't looked at the
-> > > tegra driver. If you allow unloading the driver and provide a 'remove'
-> > > callback, that callback needs to clean up the entire bus and remove
-> > > all child devices that were added as well as undo everything the
-> > > probe function did. I think it would be great if you can do that, although
-> > > it might not be easy. The simplest solution would be to not support
-> > > unloading though.
-> >
-> > As the mvebu driver uses platform_driver_probe(), the Exynos driver uses
-> > platform_driver_probe(). Thus, I will not provide a 'remove' callback.
-> 
-> Well, the important part is not to provide a module_exit() function, which
-> will ensure the driver cannot be unloaded.
+On Mon, Jun 17, 2013 at 11:59 PM, Oliver Schinagl
+<oliver+list@schinagl.nl> wrote:
+> From: Oliver Schinagl <oliver@schinagl.nl>
+>
+> Allwinner has electric fuses (efuse) on their line of chips. This driver
+> reads those fuses, seeds the kernel entropy and exports them as a sysfs node.
+>
+> These fuses are most likly to be programmed at the factory, encoding
+> things like Chip ID, some sort of serial number etc and appear to be
+> reasonable unique.
+> While in theory, these should be writeable by the user, it will probably
+> be inconvinient to do so. Allwinner recommends that a certain input pin,
+> labeled 'efuse_vddq', be connected to GND. To write these fuses, 2.5 V
+> needs to be applied to this pin.
+>
+> Even so, they can still be used to generate a board-unique mac from, board
+> unique RSA key and seed the kernel RNG.
+>
 
-Aha, I see.
-I will not provide a module_exit() function), as the mvebu driver does.
+> +++ b/drivers/misc/eeprom/sunxi_sid.c
+> @@ -0,0 +1,147 @@
 
-Best regards,
-Jingoo Han
+> +#include <linux/compiler.h>
 
-> 
-> 	Arnd
+I don't think you have to use this header explicitly.
+
+> +#define DRV_NAME "sunxi-sid"
+
+> +       if (size > (SID_SIZE - pos))
+
+Useless internal braces.
+
+> +static int sunxi_sid_remove(struct platform_device *pdev)
+> +{
+> +       device_remove_bin_file(&pdev->dev, &sid_bin_attr);
+> +       dev_dbg(&pdev->dev, "%s driver unloaded\n", DRV_NAME);
+
+It's useless to use DRV_NAME in conjunction with dev_* macros. dev_*
+will print driver name as a prefix.
+
+--
+With Best Regards,
+Andy Shevchenko
