@@ -1,28 +1,31 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 18 Jun 2013 12:47:36 +0300
-Subject: [PATCH v7 9/9] usb: phy: twl4030-usb: remove *set_suspend* and
- *phy_init* ops
-In-Reply-To: <1371113039-5784-10-git-send-email-kishon@ti.com>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Tue, 18 Jun 2013 15:19:03 +0530
+Subject: [PATCH v7 2/9] usb: phy: omap-usb2: use the new generic PHY
+ framework
+In-Reply-To: <20130618094058.GQ5461@arwen.pp.htv.fi>
 References: <1371113039-5784-1-git-send-email-kishon@ti.com>
- <1371113039-5784-10-git-send-email-kishon@ti.com>
-Message-ID: <20130618094736.GX5461@arwen.pp.htv.fi>
+ <1371113039-5784-3-git-send-email-kishon@ti.com>
+ <20130618094058.GQ5461@arwen.pp.htv.fi>
+Message-ID: <51C02D0F.6010302@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 13, 2013 at 02:13:59PM +0530, Kishon Vijay Abraham I wrote:
-> Now that twl4030-usb is adapted to the new generic PHY framework,
-> *set_suspend* and *phy_init* ops can be removed from twl4030-usb driver.
-> 
-> Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+Hi,
 
-Reviewed-by: Felipe Balbi <balbi@ti.com>
+On Tuesday 18 June 2013 03:10 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Thu, Jun 13, 2013 at 02:13:52PM +0530, Kishon Vijay Abraham I wrote:
+>> @@ -159,6 +191,12 @@ static int omap_usb2_probe(struct platform_device *pdev)
+>>   	otg->start_srp		= omap_usb_start_srp;
+>>   	otg->phy		= &phy->phy;
+>>
+>> +	pm_runtime_enable(phy->dev);
+>
+> enabling pm_runtime here has the potential to cause a real big problem.
+> How have you tested this patch ?
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 836 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/8e23d22f/attachment-0001.sig>
+performed boot and enumeration testing. What issue do you expect here?
+
+Thanks
+Kishon
