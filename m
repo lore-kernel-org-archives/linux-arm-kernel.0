@@ -1,73 +1,276 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Tue, 18 Jun 2013 19:04:47 +0300
-Subject: [PATCH v2 4/4] ARM: OMAP2+: Provide alias to USB PHY clock
-In-Reply-To: <1371571487-14389-1-git-send-email-rogerq@ti.com>
-References: <1371571487-14389-1-git-send-email-rogerq@ti.com>
-Message-ID: <1371571487-14389-5-git-send-email-rogerq@ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 18 Jun 2013 12:05:46 -0400 (EDT)
+Subject: [RFC PATCH v1 1/6] USB: HCD: support giveback of URB in tasklet
+ context
+In-Reply-To: <1371567833-9077-2-git-send-email-ming.lei@canonical.com>
+Message-ID: <Pine.LNX.4.44L0.1306181139180.1157-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Till the OMAP clocks are correctly defined in device tree, use
-this temporary hack to provide clock alias to the USB PHY clocks.
+On Tue, 18 Jun 2013, Ming Lei wrote:
 
-Without this, USB Host & Ethernet will not be functional with
-device tree boots on Panda and uEVM.
+> This patch implements the mechanism of giveback of URB in
+> tasklet context, so that hardware interrupt handling time for
+> usb host controller can be saved much, and HCD interrupt handling
+> can be simplified.
 
-Signed-off-by: Roger Quadros <rogerq@ti.com>
----
- arch/arm/mach-omap2/board-generic.c |   23 ++++++++++++++++++++++-
- 1 files changed, 22 insertions(+), 1 deletions(-)
+Okay.  I'd make a few relatively minor changes.
 
-diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
-index 88aa6b1..7428733 100644
---- a/arch/arm/mach-omap2/board-generic.c
-+++ b/arch/arm/mach-omap2/board-generic.c
-@@ -15,6 +15,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/irqdomain.h>
-+#include <linux/clk.h>
- 
- #include <asm/mach/arch.h>
- 
-@@ -35,6 +36,21 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
- 	{ }
- };
- 
-+/*
-+ * Create alias for USB host PHY clock.
-+ * Remove this when clock phandle can be provided via DT
-+ */
-+static void __init legacy_init_ehci_clk(char *clkname)
-+{
-+	int ret;
-+
-+	ret = clk_add_alias("main_clk", NULL, clkname, NULL);
-+	if (ret) {
-+		pr_err("%s:Failed to add main_clk alias to %s :%d\n",
-+						__func__, clkname, ret);
-+	}
-+}
-+
- static void __init omap_generic_init(void)
- {
- 	omap_sdrc_init(NULL, NULL);
-@@ -45,10 +61,15 @@ static void __init omap_generic_init(void)
- 	 * HACK: call display setup code for selected boards to enable omapdss.
- 	 * This will be removed when omapdss supports DT.
- 	 */
--	if (of_machine_is_compatible("ti,omap4-panda"))
-+	if (of_machine_is_compatible("ti,omap4-panda")) {
- 		omap4_panda_display_init_of();
-+		legacy_init_ehci_clk("auxclk3_ck");
-+
-+	}
- 	else if (of_machine_is_compatible("ti,omap4-sdp"))
- 		omap_4430sdp_display_init_of();
-+	else if (of_machine_is_compatible("ti,omap5-uevm"))
-+		legacy_init_ehci_clk("auxclk1_ck");
- }
- 
- #ifdef CONFIG_SOC_OMAP2420
--- 
-1.7.4.1
+> diff --git a/drivers/usb/core/hcd.c b/drivers/usb/core/hcd.c
+> index 014dc99..a272968 100644
+> --- a/drivers/usb/core/hcd.c
+> +++ b/drivers/usb/core/hcd.c
+> @@ -699,9 +699,11 @@ error:
+>  	 * Avoiding calls to local_irq_disable/enable makes the code
+>  	 * RT-friendly.
+>  	 */
+> -	spin_unlock(&hcd_root_hub_lock);
+> +	if (!hcd_giveback_urb_in_bh(hcd))
+> +		spin_unlock(&hcd_root_hub_lock);
+>  	usb_hcd_giveback_urb(hcd, urb, status);
+> -	spin_lock(&hcd_root_hub_lock);
+> +	if (!hcd_giveback_urb_in_bh(hcd))
+> +		spin_lock(&hcd_root_hub_lock);
+>  
+>  	spin_unlock_irq(&hcd_root_hub_lock);
+>  	return 0;
+> @@ -742,9 +744,11 @@ void usb_hcd_poll_rh_status(struct usb_hcd *hcd)
+>  			memcpy(urb->transfer_buffer, buffer, length);
+>  
+>  			usb_hcd_unlink_urb_from_ep(hcd, urb);
+> -			spin_unlock(&hcd_root_hub_lock);
+> +			if (!hcd_giveback_urb_in_bh(hcd))
+> +				spin_unlock(&hcd_root_hub_lock);
+>  			usb_hcd_giveback_urb(hcd, urb, 0);
+> -			spin_lock(&hcd_root_hub_lock);
+> +			if (!hcd_giveback_urb_in_bh(hcd))
+> +				spin_lock(&hcd_root_hub_lock);
+>  		} else {
+>  			length = 0;
+>  			set_bit(HCD_FLAG_POLL_PENDING, &hcd->flags);
+> @@ -835,9 +839,11 @@ static int usb_rh_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
+>  			hcd->status_urb = NULL;
+>  			usb_hcd_unlink_urb_from_ep(hcd, urb);
+>  
+> -			spin_unlock(&hcd_root_hub_lock);
+> +			if (!hcd_giveback_urb_in_bh(hcd))
+> +				spin_unlock(&hcd_root_hub_lock);
+>  			usb_hcd_giveback_urb(hcd, urb, status);
+> -			spin_lock(&hcd_root_hub_lock);
+> +			if (!hcd_giveback_urb_in_bh(hcd))
+> +				spin_lock(&hcd_root_hub_lock);
+>  		}
+>  	}
+>   done:
+
+None of these tests are necessary.  Root hubs are different from normal
+devices; their URBs are handled mostly by usbcore.  The only part done
+by the HCD is always synchronous.  And we know that root-hub URBs
+always have a very short completion handler.  So we may as well
+continue to handle root-hub URBs the way we always have.
+
+> @@ -1648,6 +1654,60 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
+>  
+>  /*-------------------------------------------------------------------------*/
+>  
+> +static void __usb_hcd_giveback_urb(struct urb *urb)
+> +{
+> +	struct usb_hcd *hcd = bus_to_hcd(urb->dev->bus);
+> +	int status = urb->status;
+> +
+> +	urb->hcpriv = NULL;
+> +	if (unlikely(urb->unlinked))
+> +		status = urb->unlinked;
+
+The way you're storing the status value isn't good.  We decided to make 
+the status a separate argument because of drivers that abuse the 
+urb->status field (they poll it instead of waiting for the completion 
+handler to be called).  Hopefully there aren't any examples of drivers 
+still doing this, but...
+
+This means you shouldn't store anything in urb->status until just
+before calling the completion handler.  What you can do instead is
+always store the status value in urb->unlinked.
+
+> +	else if (unlikely((urb->transfer_flags & URB_SHORT_NOT_OK) &&
+> +			urb->actual_length < urb->transfer_buffer_length &&
+> +			!status))
+> +		status = -EREMOTEIO;
+> +
+> +	unmap_urb_for_dma(hcd, urb);
+> +	usbmon_urb_complete(&hcd->self, urb, status);
+> +	usb_unanchor_urb(urb);
+> +
+> +	/* pass ownership to the completion handler */
+> +	urb->status = status;
+> +	urb->complete (urb);
+
+You are supposed to disable local interrupts around the call to the 
+completion handler.
+
+> +	atomic_dec (&urb->use_count);
+> +	if (unlikely(atomic_read(&urb->reject)))
+> +		wake_up (&usb_kill_urb_queue);
+> +	usb_put_urb (urb);
+> +}
+> +
+> +static void usb_giveback_urb_bh(unsigned long param)
+> +{
+> +	struct giveback_urb_bh *bh = (struct giveback_urb_bh *)param;
+> +	unsigned long flags;
+> +	struct list_head local_list;
+> +
+> +	spin_lock_irqsave(&bh->lock, flags);
+> +	bh->running = 1;
+> +restart:
+
+I like to have statement labels indented by a single space character, 
+so that tools like diff don't think the label marks the start of a new 
+function.
+
+> @@ -1667,25 +1727,33 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
+>   */
+>  void usb_hcd_giveback_urb(struct usb_hcd *hcd, struct urb *urb, int status)
+>  {
+> -	urb->hcpriv = NULL;
+> -	if (unlikely(urb->unlinked))
+> -		status = urb->unlinked;
+> -	else if (unlikely((urb->transfer_flags & URB_SHORT_NOT_OK) &&
+> -			urb->actual_length < urb->transfer_buffer_length &&
+> -			!status))
+> -		status = -EREMOTEIO;
+> +	struct giveback_urb_bh *bh = hcd->async_bh;
+> +	bool async = 1;
+> +	bool sched = 1;
+
+I know this is a common way of doing things, but to me it makes more 
+sense in this case to set these values later on, in an "if ... else 
+..." statement.
+
+>  
+> -	unmap_urb_for_dma(hcd, urb);
+> -	usbmon_urb_complete(&hcd->self, urb, status);
+> -	usb_unanchor_urb(urb);
+> -
+> -	/* pass ownership to the completion handler */
+>  	urb->status = status;
+
+This should now be:
+
+	if (urb->unlinked == 0)
+		urb->unlinked = status;
+
+> -	urb->complete (urb);
+> -	atomic_dec (&urb->use_count);
+> -	if (unlikely(atomic_read(&urb->reject)))
+> -		wake_up (&usb_kill_urb_queue);
+> -	usb_put_urb (urb);
+> +	if (!hcd_giveback_urb_in_bh(hcd)) {
+> +		__usb_hcd_giveback_urb(urb);
+> +		return;
+> +	}
+> +
+> +	if (usb_pipeisoc(urb->pipe) || usb_pipeint(urb->pipe)) {
+> +		bh = hcd->periodic_bh;
+> +		async = 0;
+
+I don't like these names, for several reasons.  The difference between 
+the two tasklets isn't that one is meant specifically for periodic URBs 
+and the other for async URBs; the difference is that one runs with 
+higher priority than the other.  The names should reflect this.  For 
+example, you could call them hcd->low_prio_bh and hcd->high_prio_bh.  
+
+> +	}
+> +
+> +	spin_lock(&bh->lock);
+> +	list_add_tail(&urb->urb_list, &bh->head);
+> +	if (bh->running)
+> +		sched = 0;
+> +	spin_unlock(&bh->lock);
+> +
+> +	if (sched) {
+> +		if (async)
+> +			tasklet_schedule(&bh->bh);
+> +		else
+> +			tasklet_hi_schedule(&bh->bh);
+> +	}
+
+
+Also, you could combine async and sched into a single variable.
+Using an enumerated type for sched, this would become:
+
+	if (!sched)
+		;	/* tasklet doesn't need to be scheduled */
+	else if (sched == HIGH_PRIO)
+		tasklet_hi_schedule(&bh->bh);
+	else
+		tasklet_schedule(&bh->bh);
+
+Or you could turn this into a "switch" statement.
+
+> +static int init_giveback_urb_bh(struct usb_hcd *hcd)
+> +{
+> +	if (!hcd_giveback_urb_in_bh(hcd))
+> +		return 0;
+> +
+> +	hcd->periodic_bh = kzalloc(sizeof(*hcd->periodic_bh), GFP_KERNEL);
+> +	if (!hcd->periodic_bh)
+> +		return -ENOMEM;
+> +
+> +	hcd->async_bh = kzalloc(sizeof(*hcd->async_bh), GFP_KERNEL);
+> +	if (!hcd->async_bh) {
+> +		kfree(hcd->periodic_bh);
+> +		return -ENOMEM;
+> +	}
+
+I think these things can be stored directly in the usb_hcd struct
+instead of allocated separately.
+
+> +
+> +	__init_giveback_urb_bh(hcd->periodic_bh);
+> +	__init_giveback_urb_bh(hcd->async_bh);
+> +
+> +	return 0;
+> +}
+> +
+> +static void __exit_giveback_urb_bh(struct giveback_urb_bh *bh)
+> +{
+> +	tasklet_kill(&bh->bh);
+> +}
+> +
+> +static void exit_giveback_urb_bh(struct usb_hcd *hcd)
+> +{
+> +	if (!hcd_giveback_urb_in_bh(hcd))
+> +		return;
+> +
+> +	__exit_giveback_urb_bh(hcd->periodic_bh);
+> +	__exit_giveback_urb_bh(hcd->async_bh);
+
+You might as well put the tasklet_kill() call directly inline instead 
+of going through a separate function.
+
+> +
+> +	kfree(hcd->periodic_bh);
+> +	kfree(hcd->async_bh);
+> +}
+> +
+>  /**
+>   * usb_create_shared_hcd - create and initialize an HCD structure
+>   * @driver: HC driver that will use this hcd
+> @@ -2573,6 +2687,16 @@ int usb_add_hcd(struct usb_hcd *hcd,
+>  			&& device_can_wakeup(&hcd->self.root_hub->dev))
+>  		dev_dbg(hcd->self.controller, "supports USB remote wakeup\n");
+>  
+> +	if (usb_hcd_is_primary_hcd(hcd)) {
+> +		retval = init_giveback_urb_bh(hcd);
+> +		if (retval)
+> +			goto err_init_giveback_bh;
+> +	} else {
+> +		/* share tasklet handling with primary hcd */
+> +		hcd->async_bh = hcd->primary_hcd->async_bh;
+> +		hcd->periodic_bh = hcd->primary_hcd->periodic_bh;
+> +	}
+
+Is there any reason why a secondary HCD can't have its own tasklets?
+
+Alan Stern
