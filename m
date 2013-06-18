@@ -1,61 +1,53 @@
-From: gregkh@linuxfoundation.org ('Greg Kroah-Hartman')
-Date: Tue, 18 Jun 2013 08:19:48 -0700
-Subject: [PATCH v3 04/10] serial: samsung: select Exynos specific driver
- data if ARCH_EXYNOS is defined
-In-Reply-To: <1c0e01ce6c0e$f0baf7d0$d230e770$%kim@samsung.com>
-References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
- <1371466836-4111-5-git-send-email-chander.kashyap@linaro.org>
- <1c0e01ce6c0e$f0baf7d0$d230e770$%kim@samsung.com>
-Message-ID: <20130618151948.GC27677@kroah.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 18 Jun 2013 20:50:24 +0530
+Subject: [PATCH V3 00/14] watchdog: ARM mpcore Improvements
+Message-ID: <cover.1371535241.git.viresh.kumar@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 07:31:06PM +0900, Kukjin Kim wrote:
-> Kukjin Kim wrote:
-> > 
-> > Chander Kashyap wrote:
-> > >
-> > > All Exynos4/5 SoCs share a common driver data in the samsung serial
-> > > driver. Hence, let the driver data inclusion be based on ARCH_EXYNOS
-> > > instead of SOC specific definition.
-> > >
-> > > Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> > 
-> > (+ Greg, Jiri)
-> > 
-> > Acked-by: Kukjin Kim <kgene.kim@samsung.com>
-> > 
-> > Greg, Jiri, please take this in your tree with my ack if no problem on
-> > this.
-> > 
-> Greg, Jiri, since there are other changes for this in samsung tree so would
-> be nice if this could be sent to upstream with others via samsung tree. If
-> you have any concerns, please kindly let me know.
-> 
-> Thanks,
-> - Kukjin
-> > 
-> > > ---
-> > >  drivers/tty/serial/samsung.c |    4 +---
-> > >  1 file changed, 1 insertion(+), 3 deletions(-)
-> > >
-> > > diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> > > index 2552c7f..e70d19a 100644
-> > > --- a/drivers/tty/serial/samsung.c
-> > > +++ b/drivers/tty/serial/samsung.c
-> > > @@ -1703,9 +1703,7 @@ static struct s3c24xx_serial_drv_data
-> > > s5pv210_serial_drv_data = {
-> > >  #define S5PV210_SERIAL_DRV_DATA	(kernel_ulong_t)NULL
-> > >  #endif
-> > >
-> > > -#if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) ||
-> > \
-> > > -	defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) ||
-> > > \
-> > > -	defined(CONFIG_SOC_EXYNOS5440)
-> > > +#if defined(CONFIG_ARCH_EXYNOS)
-> > >  static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
-> > >  	.info = &(struct s3c24xx_uart_info) {
-> > >  		.name		= "Samsung Exynos4 UART",
+** This still doesn't make it workable **
 
-Acked-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Hi,
+
+ARM mpcore watchdog isn't workable and so is marked broken in the first patch of
+the series. Reasons are mentioned in 01/14 and important links are shared too.
+
+Other are basically improvements which I have written more than a year back. I
+am just pushing them through as they still improve the driver (or broken
+driver). They still don't fix the issues pointed out by Marc Zyngier earlier.
+But as these are generic improvements I don't see why they can't be applied,
+even to a still broken driver.
+
+I don't want somebody to waste time reinventing these patches, rather they can
+work on fixing the issues due to which this driver is broken.
+
+I don't have hardware & time to fix the BROKEN part of this driver now :(
+
+Link to the last version, nothing much changed after that. Just a resend:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2012-March/089076.html
+
+Viresh Kumar (14):
+  watchdog/mpcore_wdt: Mark it as BROKEN
+  watchdog/mpcore_wdt: convert to watchdog core
+  watchdog/mpcore_wdt: Fix multiline comments
+  watchdog/mpcore_wdt: Arrange #includes in alphabetical order
+  watchdog/mpcore_wdt: Set default heartbeat in probe instead of init
+  watchdog/mpcore_wdt: convert to use module_platform_driver()
+  watchdog/mpcore_wdt: Add support for dev_pm_ops interface
+  watchdog/mpcore_wdt: disable wdt in suspend only if it is busy
+  watchdog/mpcore_wdt: replace (__raw_)readl/writel with lighter
+    *_relaxed variants
+  watchdog/mpcore_wdt: Add support for WDIOC_GETBOOTSTATUS IOCTL
+  watchdog/mpcore_wdt: Add clock framework support
+  watchdog/mpcore_wdt: use correct clk_rate to program timeout
+  watchdog/mpcore_wdt: Start registers from 0x00 instead of 0x20
+  watchdog/mpcore_wdt: Add DT probing support for ARM mpcore watchdog
+
+ arch/arm/include/asm/smp_twd.h |   7 -
+ drivers/watchdog/Kconfig       |   3 +-
+ drivers/watchdog/mpcore_wdt.c  | 529 ++++++++++++++++++++---------------------
+ 3 files changed, 256 insertions(+), 283 deletions(-)
+
+-- 
+1.7.12.rc2.18.g61b472e
