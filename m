@@ -1,136 +1,108 @@
 From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 18 Jun 2013 10:38:00 +0530
-Subject: [PATCH 2/2] ARM: AM33XX: hwmod: Add hwmod data for debugSS
+Date: Tue, 18 Jun 2013 10:37:59 +0530
+Subject: [PATCH 1/2] ARM: AM33XX: clock: Add debugSS clock nodes
 In-Reply-To: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
 References: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1371532080-27714-3-git-send-email-hvaibhav@ti.com>
+Message-ID: <1371532080-27714-2-git-send-email-hvaibhav@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the original hwmod data file, DebugSS entry was disabled,
-since we didn't (and do not) have SW to control it.
-
-This patch enables it back with right data, so that it can be
-controlled by different ways; and the suggested method it to
-have modular driver for debugSS as well.
-
-Refer to the link for more discussion on handling of debugSS -
-https://patchwork.kernel.org/patch/2212111/
+Represent debugSS clock interface as provided in
+CM_WKUP_DEBUGSS_CLKCTRL register, includes
+	- Clock gate for optional DEBUG_CLKA and DBGSYSCLK
+	- Clock Mux for TRC_PMD and STM_PMD
+	- Clock divider for STM and TPIU
 
 Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
+Acked-by: Paul Walmsley <paul@pwsan.com>
 Cc: Tony Lindgren <tony@atomide.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_33xx_data.c |   69 +++++++++++++++++++---------
- 1 files changed, 47 insertions(+), 22 deletions(-)
+ arch/arm/mach-omap2/cclock33xx_data.c |   47 +++++++++++++++++++++++++++++---
+ 1 files changed, 42 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-index 075f7cc..2a4bf69 100644
---- a/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_33xx_data.c
-@@ -416,7 +416,6 @@ static struct omap_hwmod am33xx_adc_tsc_hwmod = {
+diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
+index af3544c..6fd0ed1 100644
+--- a/arch/arm/mach-omap2/cclock33xx_data.c
++++ b/arch/arm/mach-omap2/cclock33xx_data.c
+@@ -431,15 +431,11 @@ DEFINE_STRUCT_CLK(aes0_fck, dpll_core_ck_parents, clk_ops_null);
+  *  - Driver code is not yet migrated to use hwmod/runtime pm
+  *  - Modules outside kernel access (to disable them by default)
   *
-  *    - cEFUSE (doesn't fall under any ocp_if)
-  *    - clkdiv32k
-- *    - debugss
-  *    - ocp watch point
+- *     - debugss
+  *     - mmu (gfx domain)
+  *     - cefuse
+  *     - usbotg_fck (its additional clock and not really a modulemode)
+  *     - ieee5000
   */
- #if 0
-@@ -460,27 +459,6 @@ static struct omap_hwmod am33xx_clkdiv32k_hwmod = {
- 	},
- };
+-DEFINE_CLK_GATE(debugss_ick, "dpll_core_m4_ck", &dpll_core_m4_ck, 0x0,
+-		AM33XX_CM_WKUP_DEBUGSS_CLKCTRL, AM33XX_MODULEMODE_SWCTRL_SHIFT,
+-		0x0, NULL);
  
--/*
-- * 'debugss' class
-- * debug sub system
-- */
--static struct omap_hwmod_class am33xx_debugss_hwmod_class = {
--	.name		= "debugss",
--};
--
--static struct omap_hwmod am33xx_debugss_hwmod = {
--	.name		= "debugss",
--	.class		= &am33xx_debugss_hwmod_class,
--	.clkdm_name	= "l3_aon_clkdm",
--	.main_clk	= "debugss_ick",
--	.prcm		= {
--		.omap4	= {
--			.clkctrl_offs	= AM33XX_CM_WKUP_DEBUGSS_CLKCTRL_OFFSET,
--			.modulemode	= MODULEMODE_SWCTRL,
--		},
--	},
--};
--
- /* ocpwp */
- static struct omap_hwmod_class am33xx_ocpwp_hwmod_class = {
- 	.name		= "ocpwp",
-@@ -598,6 +576,34 @@ static struct omap_hwmod am33xx_ocmcram_hwmod = {
- 	},
- };
+ DEFINE_CLK_GATE(mmu_fck, "dpll_core_m4_ck", &dpll_core_m4_ck, 0x0,
+ 		AM33XX_CM_GFX_MMUDATA_CLKCTRL, AM33XX_MODULEMODE_SWCTRL_SHIFT,
+@@ -863,6 +859,42 @@ static struct clk_hw_omap wdt1_fck_hw = {
+ DEFINE_STRUCT_CLK(wdt1_fck, wdt_ck_parents, gpio_fck_ops);
  
-+/*
-+ * 'debugss' class
-+ * debug sub system
+ /*
++ * debugss optional clocks
 + */
-+static struct omap_hwmod_opt_clk debugss_opt_clks[] = {
-+	{ .role = "dbg_sysclk", .clk = "dbg_sysclk_ck" },
-+	{ .role = "dbg_clka", .clk = "dbg_clka_ck" },
++DEFINE_CLK_GATE(dbg_sysclk_ck, "sys_clkin_ck", &sys_clkin_ck,
++		0x0, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
++		AM33XX_OPTFCLKEN_DBGSYSCLK_SHIFT, 0x0, NULL);
++
++DEFINE_CLK_GATE(dbg_clka_ck, "dpll_core_m4_ck", &dpll_core_m4_ck,
++		0x0, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
++		AM33XX_OPTCLK_DEBUG_CLKA_SHIFT, 0x0, NULL);
++
++static const char *stm_pmd_clock_mux_ck_parents[] = {
++	"dbg_sysclk_ck", "dbg_clka_ck",
 +};
 +
-+static struct omap_hwmod_class am33xx_debugss_hwmod_class = {
-+	.name		= "debugss",
-+};
++DEFINE_CLK_MUX(stm_pmd_clock_mux_ck, stm_pmd_clock_mux_ck_parents, NULL, 0x0,
++	       AM33XX_CM_WKUP_DEBUGSS_CLKCTRL, AM33XX_STM_PMD_CLKSEL_SHIFT,
++	       AM33XX_STM_PMD_CLKSEL_WIDTH, 0x0, NULL);
 +
-+static struct omap_hwmod am33xx_debugss_hwmod = {
-+	.name		= "debugss",
-+	.class		= &am33xx_debugss_hwmod_class,
-+	.clkdm_name	= "l3_aon_clkdm",
-+	.main_clk	= "trace_clk_div_ck",
-+	.prcm		= {
-+		.omap4	= {
-+			.clkctrl_offs	= AM33XX_CM_WKUP_DEBUGSS_CLKCTRL_OFFSET,
-+			.modulemode	= MODULEMODE_SWCTRL,
-+		},
-+	},
-+	.opt_clks	= debugss_opt_clks,
-+	.opt_clks_cnt	= ARRAY_SIZE(debugss_opt_clks),
-+};
++DEFINE_CLK_MUX(trace_pmd_clk_mux_ck, stm_pmd_clock_mux_ck_parents, NULL, 0x0,
++	       AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
++	       AM33XX_TRC_PMD_CLKSEL_SHIFT,
++	       AM33XX_TRC_PMD_CLKSEL_WIDTH, 0x0, NULL);
 +
- /* 'smartreflex' class */
- static struct omap_hwmod_class am33xx_smartreflex_hwmod_class = {
- 	.name		= "smartreflex",
-@@ -2382,6 +2388,24 @@ static struct omap_hwmod_ocp_if am33xx_l3_main__gfx = {
- 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
++DEFINE_CLK_DIVIDER(stm_clk_div_ck, "stm_pmd_clock_mux_ck",
++		   &stm_pmd_clock_mux_ck, 0x0, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
++		   AM33XX_STM_PMD_CLKDIVSEL_SHIFT,
++		   AM33XX_STM_PMD_CLKDIVSEL_WIDTH, CLK_DIVIDER_POWER_OF_TWO,
++		   NULL);
++
++DEFINE_CLK_DIVIDER(trace_clk_div_ck, "trace_pmd_clk_mux_ck",
++		   &trace_pmd_clk_mux_ck, 0x0, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
++		   AM33XX_TRC_PMD_CLKDIVSEL_SHIFT,
++		   AM33XX_TRC_PMD_CLKDIVSEL_WIDTH, CLK_DIVIDER_POWER_OF_TWO,
++		   NULL);
++
++/*
+  * clkdev
+  */
+ static struct omap_clk am33xx_clks[] = {
+@@ -899,7 +931,6 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK("481cc000.d_can",	NULL,		&dcan0_fck),
+ 	CLK(NULL,	"dcan1_fck",		&dcan1_fck),
+ 	CLK("481d0000.d_can",	NULL,		&dcan1_fck),
+-	CLK(NULL,	"debugss_ick",		&debugss_ick),
+ 	CLK(NULL,	"pruss_ocp_gclk",	&pruss_ocp_gclk),
+ 	CLK(NULL,	"mcasp0_fck",		&mcasp0_fck),
+ 	CLK(NULL,	"mcasp1_fck",		&mcasp1_fck),
+@@ -942,6 +973,12 @@ static struct omap_clk am33xx_clks[] = {
+ 	CLK(NULL,	"clkout2_div_ck",	&clkout2_div_ck),
+ 	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick),
+ 	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck),
++	CLK(NULL,	"dbg_sysclk_ck",	&dbg_sysclk_ck),
++	CLK(NULL,	"dbg_clka_ck",		&dbg_clka_ck),
++	CLK(NULL,	"stm_pmd_clock_mux_ck",	&stm_pmd_clock_mux_ck),
++	CLK(NULL,	"trace_pmd_clk_mux_ck",	&trace_pmd_clk_mux_ck),
++	CLK(NULL,	"stm_clk_div_ck",	&stm_clk_div_ck),
++	CLK(NULL,	"trace_clk_div_ck",	&trace_clk_div_ck),
  };
  
-+/* l3_main -> debugss */
-+static struct omap_hwmod_addr_space am33xx_debugss_addrs[] = {
-+	{
-+		.pa_start	= 0x4b000000,
-+		.pa_end		= 0x4b000000 + SZ_16M - 1,
-+		.flags		= ADDR_TYPE_RT
-+	},
-+	{ }
-+};
-+
-+static struct omap_hwmod_ocp_if am33xx_l3_main__debugss = {
-+	.master		= &am33xx_l3_main_hwmod,
-+	.slave		= &am33xx_debugss_hwmod,
-+	.clk		= "dpll_core_m4_ck",
-+	.addr		= am33xx_debugss_addrs,
-+	.user		= OCP_USER_MPU,
-+};
-+
- /* l4 wkup -> smartreflex0 */
- static struct omap_hwmod_addr_space am33xx_smartreflex0_addrs[] = {
- 	{
-@@ -3533,6 +3557,7 @@ static struct omap_hwmod_ocp_if *am33xx_hwmod_ocp_ifs[] __initdata = {
- 	&am33xx_pruss__l3_main,
- 	&am33xx_wkup_m3__l4_wkup,
- 	&am33xx_gfx__l3_main,
-+	&am33xx_l3_main__debugss,
- 	&am33xx_l4_wkup__wkup_m3,
- 	&am33xx_l4_wkup__control,
- 	&am33xx_l4_wkup__smartreflex0,
+ 
 -- 
 1.7.0.4
