@@ -1,164 +1,141 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 19 Jun 2013 00:45:02 +0200
-Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
-In-Reply-To: <20130618221705.GC1926@mithrandir>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <1920640.1A218CWh3x@flatron> <20130618221705.GC1926@mithrandir>
-Message-ID: <1433668.INLZy9nfLF@flatron>
+From: bhelgaas@google.com (Bjorn Helgaas)
+Date: Tue, 18 Jun 2013 16:46:31 -0600
+Subject: [PATCH v2 1/8] PCI: Introduce new MSI chip infrastructure
+In-Reply-To: <1370536888-8871-2-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1370536888-8871-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130618224631.GB16134@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 of June 2013 00:17:06 Thierry Reding wrote:
-> On Mon, Jun 17, 2013 at 10:50:40PM +0200, Tomasz Figa wrote:
-> > On Monday 17 of June 2013 22:29:11 Thierry Reding wrote:
-> > > On Wed, Jun 05, 2013 at 11:18:13PM +0200, Tomasz Figa wrote:
-> [...]
+On Thu, Jun 06, 2013 at 06:41:21PM +0200, Thomas Petazzoni wrote:
+> From: Thierry Reding <thierry.reding@avionic-design.de>
 > 
-> > > > +#ifndef CONFIG_CLKSRC_SAMSUNG_PWM
-> > > > +static DEFINE_SPINLOCK(samsung_pwm_lock);
-> > > > +#endif
-> > > 
-> > > Why is this lock global? Shouldn't it more correctly be part of
-> > > samsung_pwm_chip?
-> > 
-> > There are few registers shared with samsung_pwm_timer clocksource
-> > driver and so normally the spinlock is exported from it. However on
-> > on some platforms (namely Exynos >=4x12) kernel can be compiled
-> > without that driver, so the lock must be defined locally, just to
-> > synchronize multiple PWM channels, as they share registers as well.
+> The new struct msi_chip is used to associated an MSI controller with a
+> PCI bus. It is automatically handed down from the root to its children
+> during bus enumeration.
 > 
-> Okay, I think this needs further explanation. The clocksource driver is
-> used for what exactly? From a quick look it seems to be very much PWM-
-> specific. According to the device tree binding for the PWM driver, the
-> timer blocks can also be used as clock sources and clock event timers.
-> So if I understand correctly you have setups where you use one or more
-> channels as clock source or clock event timer and one or more channels
-> as PWM outputs.
+> This patch provides default (weak) implementations for the architecture-
+> specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
+> and arch_msi_check_device()) which check if a PCI device's bus has an
+> attached MSI chip and forward the call appropriately.
 > 
-> In that case it's a very bad idea to use a global lock to synchronize
-> accesses. You need to do much more than that. To properly split this
-> across several drivers there needs to be a mechanism to allocate
-> channels for use either as clock source/event timer or PWM. Otherwise,
-> how do you know that drivers aren't stepping on each other's toes?
+> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
+> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+> ---
+>  drivers/pci/msi.c   | 34 +++++++++++++++++++++++++++++++---
+>  drivers/pci/probe.c |  1 +
+>  include/linux/msi.h | 11 +++++++++++
+>  include/linux/pci.h |  1 +
+>  4 files changed, 44 insertions(+), 3 deletions(-)
 > 
-> > > > +		ret = pwm_samsung_parse_dt(chip);
-> > > > +		if (ret)
-> > > > +			return ret;
-> > > > +
-> > > > +		chip->chip.of_xlate = of_pwm_xlate_with_flags;
-> > > > +		chip->chip.of_pwm_n_cells = 3;
-> > > > +	} else {
-> > > > +		if (!pdev->dev.platform_data) {
-> > > > +			dev_err(&pdev->dev, "no platform data
-> > 
-> > specified\n");
-> > 
-> > > > +			return -EINVAL;
-> > > > +		}
-> > > > +
-> > > > +		memcpy(&chip->variant, pdev->dev.platform_data,
-> > > > +							
-sizeof(chip-
-> > >
-> > >variant));
-> > >
-> > > > +	}
-> > > 
-> > > Obviously this needs some modification in order for the variant to
-> > > become constant. But I think you can easily do so by making the
-> > > driver
-> > > match using the platform_driver's id_table field, similar to how the
-> > > matching is done for OF.
-> > 
-> > Generally output_mask is board-dependent and is passed inside a
-> > variant
-> > struct using platform_data pointer.
+> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
+> index 2c10752..4dafac6 100644
+> --- a/drivers/pci/msi.c
+> +++ b/drivers/pci/msi.c
+> @@ -29,13 +29,41 @@ static int pci_msi_enable = 1;
+>  
+>  
+>  /* Arch hooks */
+> +int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+> +{
+> +	struct msi_chip *chip = dev->bus->msi;
+> +
+> +	if (chip && chip->setup_irq) {
+> +		int err;
+> +
+> +		err = chip->setup_irq(chip, dev, desc);
+> +		if (err < 0)
+> +			return err;
+> +
+> +		irq_set_chip_data(desc->irq, chip);
+> +		return err;
+> +	}
+> +
+> +	return -EINVAL;
+> +}
+>  
+> -#ifndef arch_msi_check_device
+> -int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+> +void __weak arch_teardown_msi_irq(unsigned int irq)
+
+Please make a separate patch before this one for the conversion from the
+"#define arch_msi_check_device" strategy to the weak function.  I think
+it's a good idea to use a weak function rather than the #define, but we
+need to remove the #define from arch/powerpc/include/asm/pci.h at the same
+time.
+
+I don't think these patches touch arch_setup_msi_irqs() or
+arch_teardown_msi_irqs(), but I'd like to do the same with them just so we
+consistently use the same strategy to solve the same problem.
+
+>  {
+> +	struct msi_chip *chip = irq_get_chip_data(irq);
+> +
+> +	if (chip && chip->teardown_irq)
+> +		chip->teardown_irq(chip, irq);
+> +}
+> +
+> +int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+> +{
+> +	struct msi_chip *chip = dev->bus->msi;
+> +
+> +	if (chip && chip->check_device)
+> +		return chip->check_device(chip, dev, nvec, type);
+> +
+>  	return 0;
+>  }
+> -#endif
+>  
+>  #ifndef arch_setup_msi_irqs
+>  # define arch_setup_msi_irqs default_setup_msi_irqs
+> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+> index 70f10fa..c8591e4 100644
+> --- a/drivers/pci/probe.c
+> +++ b/drivers/pci/probe.c
+> @@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
+>  
+>  	child->parent = parent;
+>  	child->ops = parent->ops;
+> +	child->msi = parent->msi;
+>  	child->sysdata = parent->sysdata;
+>  	child->bus_flags = parent->bus_flags;
+>  
+> diff --git a/include/linux/msi.h b/include/linux/msi.h
+> index 20c2d6d..4633529 100644
+> --- a/include/linux/msi.h
+> +++ b/include/linux/msi.h
+> @@ -58,4 +58,15 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
+>  void arch_teardown_msi_irqs(struct pci_dev *dev);
+>  int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
+>  
+> +struct msi_chip {
+> +	struct module *owner;
+
+Can the MSI chip driver be a loadable module?  Does it need to be?
+
+> +	struct device *dev;
+> +
+> +	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+> +			 struct msi_desc *desc);
+> +	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
+> +	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
+> +			    int nvec, int type);
+> +};
+> +
+>  #endif /* LINUX_MSI_H */
+> diff --git a/include/linux/pci.h b/include/linux/pci.h
+> index 3a24e4f..7ffc012 100644
+> --- a/include/linux/pci.h
+> +++ b/include/linux/pci.h
+> @@ -432,6 +432,7 @@ struct pci_bus {
+>  	struct resource busn_res;	/* bus numbers routed to this bus */
+>  
+>  	struct pci_ops	*ops;		/* configuration access functions */
+> +	struct msi_chip	*msi;		/* MSI controller */
+>  	void		*sysdata;	/* hook for sys-specific extension */
+>  	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
+>  
+> -- 
+> 1.8.1.2
 > 
-> That's okay. But output_mask is the only thing that's board-dependent.
-> Everything else in the variant is SoC dependent judging by the OF device
-> table. So really only the output_mask should be part of the platform
-> data.
-> 
-> > Same platform data is used in samsung_pwm_timer clocksource driver, so
-> > I just reused it here without adding the need to rename platform
-> > device at runtime (see arch/arm/plat-samsung/devs.c).
-> 
-> Looking a bit at git log for the clocksource driver, there's this
-> commit:
-> 
-> 	a3ce54f clocksource: samsung_pwm_timer: Do not request PWM mem 
-region
-> 
-> That's an ugly workaround for sharing registers between two drivers.
-> There's a reason why drivers do request_mem_region(), and it is
-> precisely to prevent them from accessing the same registers. As I
-> already said above, I think you need to come up with some sort of API to
-> share resources between the drivers.
-> 
-> There was a similar issue a few months back with the pwm-tiehrpwm and
-> pwm-tiecap drivers, which use a shared block of registers. Initially
-> something similar was done as you do here, but eventually we came up
-> with a much better solution that involved introducing a new driver for
-> the shared functionality and an exported API.
-> 
-> The situation seems to be somewhat different here since you actually
-> share the same resources for different functionality instead of sharing
-> one subset of register across multiple drivers, but I think a similar
-> solution can be applied here.
-
-Well, current design, or rather lack of thereof, has been established 
-after a significant amount of discussion, mostly with ARM SoC and MFD 
-maintainers.
-
-It started from a simple reorganization of the clocksource driver to be 
-multiplatform friendly, without any means of synchronizing both drivers 
-other than local_irq_save() and _restore() that used to be there 
-originally, before I started my work on this. This was enough to work 
-correctly, because both drivers at the same time are used only on 
-uniprocessor systems.
-
-Here's the thread with patches:
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16664/focus=17267
-
-Then I opened a Pandora's Box by asking for opinion in this thread:
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16480/focus=16500
-
-After that I started working on a complex framework for sharing this IP 
-block that would solve all the problems with synchronization, channel 
-allocation, device tree parsing, variant management, etc.
-
-Here's an initial version, which started as an MFD master driver, which 
-would let 2 client drivers use the hardware (only the clocksource part was 
-implemented in that series):
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17464/focus=229250
-
-Still, that version didn't receive too good feedback, with comments 
-pointing me to change the architecture to master-slave, with the 
-clocksource driver being the master and PWM driver being the slave. And so 
-v5 was made:
-http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17864
-
-This version was generally accepted, but then we discussed on IRC (mostly 
-me and Arnd) whether such complex infrastructure is really needed and 
-concluded that for this platform a simple shared spinlock would be enough, 
-based on following reasons:
-- on all SoCs on which the clocksource driver is going to be used there is 
-only one instance of the PWM block, with 5 channels
-- on all existing boards there are always at least two channels that don't 
-have outputs
-- operations on particular PWM channels must be synchronized anyway, 
-because there are registers shared by all PWM channels (TCON being most 
-important where enable, autoreload and invert bits are located for all 
-channels).
-
-And so we got to current design which is basically a shared spinlock and 
-per-board output_mask, which specifies which channels have outputs on 
-particular boards. If you look to the clocksource driver, you can see that 
-it tries to allocate two output-less channels for timekeeping purposes and 
-if it fails to do so, it simply panics.
-
-IMHO this solution is fine, because it's simple, has little overhead and 
-it just works in case of platforms for which it is needed.
-
-Best regards,
-Tomasz
