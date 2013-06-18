@@ -1,65 +1,52 @@
-From: tixy@linaro.org (Jon Medhurst (Tixy))
-Date: Tue, 18 Jun 2013 14:26:42 +0100
-Subject: [PATCH] arm: versatile: don't mark pen as __INIT
-In-Reply-To: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
-References: <1370876844-6599-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1371562002.5375.27.camel@linaro1.home>
+From: rogerq@ti.com (Roger Quadros)
+Date: Tue, 18 Jun 2013 16:29:32 +0300
+Subject: [PATCH 2/4] ARM: dts: omap4-panda: Fix DVI EDID reads
+In-Reply-To: <1371553891-29364-3-git-send-email-rogerq@ti.com>
+References: <1371553891-29364-1-git-send-email-rogerq@ti.com>
+ <1371553891-29364-3-git-send-email-rogerq@ti.com>
+Message-ID: <51C060BC.8010300@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2013-06-10 at 16:07 +0100, Mark Rutland wrote:
-> When booting fewer cores than are physically present on a versatile
-> platform (e.g. when passing maxcpus=N on the command line), some
-> secondary cores may remain in the holding pen, which is marked __INIT.
-> Late in the boot process, the memory comprising the holding pen will be
-> released to the kernel for more general use, and may be overwritten with
-> arbitrary data, which can cause the held secondaries to start behaving
-> unpredictably. This can lead to all manner of odd behaviour from the
-> kernel.
+On 06/18/2013 02:11 PM, Roger Quadros wrote:
+> On Panda the +5V supply for DVI EDID is supplied by the
+> same regulator that poweres the USB Hub. Currently, the
+> DSS/DVI subsystem doesn't know how to manage this regulator
+> and so DVI EDID reads will fail if USB Hub is not enabled.
 > 
-> Instead don't mark the section as __INIT. This means we can't reuse the
-> pen memory, but we won't get secondaries corrupting the rest of the
-> kernel.
+> As a temporary fix we keep this regulator permanently enabled
+> on boot. This fixes the DVI EDID read problem.
 > 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Acked-by: Pawel Moll <pawel.moll@arm.com>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> CC: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
 > ---
-
-This gives section mismatch warnings when compiling with
-vexpress_defconfig:
-
-        WARNING: vmlinux.o(.text+0x14128): Section mismatch in reference from the variable pen to the function .cpuinit.text:secondary_startup()
-        The function pen() references
-        the function __cpuinit secondary_startup().
-        This is often because pen lacks a __cpuinit 
-        annotation or the annotation of secondary_startup is wrong.
-        
-        WARNING: vmlinux.o(.text+0x14130): Section mismatch in reference from the variable pen to the variable .cpuinit.data:pen_release
-        The function pen() references
-        the variable __cpuinitdata pen_release.
-        This is often because pen lacks a __cpuinitdata 
-        annotation or the annotation of pen_release is wrong.
-
-wonder if this is opening up a small can of worms...?
-
-
->  arch/arm/plat-versatile/headsmp.S | 2 --
->  1 file changed, 2 deletions(-)
+>  arch/arm/boot/dts/omap4-panda-common.dtsi |    5 +++++
+>  1 files changed, 5 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/plat-versatile/headsmp.S b/arch/arm/plat-versatile/headsmp.S
-> index b178d44..2677bc3 100644
-> --- a/arch/arm/plat-versatile/headsmp.S
-> +++ b/arch/arm/plat-versatile/headsmp.S
-> @@ -11,8 +11,6 @@
->  #include <linux/linkage.h>
->  #include <linux/init.h>
->  
-> -	__INIT
-> -
->  /*
->   * Realview/Versatile Express specific entry point for secondary CPUs.
->   * This provides a "holding pen" into which all secondary cores are held
+> diff --git a/arch/arm/boot/dts/omap4-panda-common.dtsi b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> index 7a21e8e..40df79e 100644
+> --- a/arch/arm/boot/dts/omap4-panda-common.dtsi
+> +++ b/arch/arm/boot/dts/omap4-panda-common.dtsi
+> @@ -80,6 +80,11 @@
+>  		gpio = <&gpio1 1 0>;	/* gpio_1 */
+>  		startup-delay-us = <70000>;
+>  		enable-active-high;
+> +		/*
+> +		 * FIXME: Remove boot-on when DSS can handle this regulator
+> +		 * for DVI EDID.
+> +		 */
+> +		regulator-boot-on;
 
--- 
-Tixy
+As pointed out by Tomi, the correct usage here is "regulator-always-on".
+
+The reason I use "regulator-boot-on" is because the regulator framework doesn't 
+turn on the regulator. (maybe a bug in the regulator framework?)
+
+"regulator-boot-on" is not sufficient as it doesn't prevent drivers from turning it
+off. e.g. loading and unloading the USB host driver will turn of the regulator.
+So it must be used along with "regulator-always-on"
+
+I'll fix this in v2.
+
+cheers,
+-roger
