@@ -1,53 +1,79 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Tue, 18 Jun 2013 08:41:41 +0300
-Subject: [PATCH 1/2] Initial support for Allwinner's Security ID fuses
-In-Reply-To: <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
-References: <1371502778-15849-1-git-send-email-oliver+list@schinagl.nl>
- <1371502778-15849-2-git-send-email-oliver+list@schinagl.nl>
-Message-ID: <CAHp75VdQXyRtfkNbnOyz36sADA_3tx=i4C+Ga5AevpMfo48XFQ@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 18 Jun 2013 11:15:12 +0530
+Subject: [GIT PULL v2] DaVinci SoC updates for v3.11
+In-Reply-To: <51BEDA15.4090908@ti.com>
+References: <1371193161-25224-1-git-send-email-nsekhar@ti.com>
+ <20130614222519.GK17326@quad.lixom.net> <20130617090647.GX1403@sirena.org.uk>
+ <51BEDA15.4090908@ti.com>
+Message-ID: <51BFF3E8.4070806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 17, 2013 at 11:59 PM, Oliver Schinagl
-<oliver+list@schinagl.nl> wrote:
-> From: Oliver Schinagl <oliver@schinagl.nl>
->
-> Allwinner has electric fuses (efuse) on their line of chips. This driver
-> reads those fuses, seeds the kernel entropy and exports them as a sysfs node.
->
-> These fuses are most likly to be programmed at the factory, encoding
-> things like Chip ID, some sort of serial number etc and appear to be
-> reasonable unique.
-> While in theory, these should be writeable by the user, it will probably
-> be inconvinient to do so. Allwinner recommends that a certain input pin,
-> labeled 'efuse_vddq', be connected to GND. To write these fuses, 2.5 V
-> needs to be applied to this pin.
->
-> Even so, they can still be used to generate a board-unique mac from, board
-> unique RSA key and seed the kernel RNG.
->
+Hi Olof,
 
-> +++ b/drivers/misc/eeprom/sunxi_sid.c
-> @@ -0,0 +1,147 @@
+Here is an updated version of this pull request with Mark's
+and your Acks added to the dma code movement.
 
-> +#include <linux/compiler.h>
+Thanks,
+Sekhar
 
-I don't think you have to use this header explicitly.
+The following changes since commit d683b96b072dc4680fc74964eca77e6a23d1fa6e:
 
-> +#define DRV_NAME "sunxi-sid"
+  Linux 3.10-rc4 (2013-06-02 17:11:17 +0900)
 
-> +       if (size > (SID_SIZE - pos))
+are available in the git repository at:
 
-Useless internal braces.
+  git://git.kernel.org/pub/scm/linux/kernel/git/nsekhar/linux-davinci.git tags/davinci-for-v3.11/soc-v2
 
-> +static int sunxi_sid_remove(struct platform_device *pdev)
-> +{
-> +       device_remove_bin_file(&pdev->dev, &sid_bin_attr);
-> +       dev_dbg(&pdev->dev, "%s driver unloaded\n", DRV_NAME);
+for you to fetch changes up to 7bb5d75ce91ca3725256c0d502624ed697231cde:
 
-It's useless to use DRV_NAME in conjunction with dev_* macros. dev_*
-will print driver name as a prefix.
+  ARM: edma: remove unused transfer controller handlers (2013-06-18 10:53:13 +0530)
 
---
-With Best Regards,
-Andy Shevchenko
+----------------------------------------------------------------
+DaVinci SoC changes for v3.11
+
+This pull request moves DaVinci EDMA library to
+arch/arm/common so it can be used by OMAP based AM335x.
+This is a temporary step until all drivers are converted
+to use the dmaengine driver in drivers/dma/edma.c.
+
+Several drivers like SPI, MMC/SD have already been converted.
+Some like audio are pending.
+
+The other two patches in the pull request are cleanup in nature.
+
+----------------------------------------------------------------
+Lad, Prabhakar (1):
+      ARM: davinci: remove __init atrribute from function declaration
+
+Matt Porter (2):
+      ARM: davinci: move private EDMA API to arm/common
+      ARM: edma: remove unused transfer controller handlers
+
+ arch/arm/Kconfig                                   |    1 +
+ arch/arm/common/Kconfig                            |    3 +
+ arch/arm/common/Makefile                           |    1 +
+ arch/arm/{mach-davinci/dma.c => common/edma.c}     |   39 +--------
+ arch/arm/mach-davinci/Makefile                     |    2 +-
+ arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
+ arch/arm/mach-davinci/davinci.h                    |   30 +++----
+ arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
+ arch/arm/mach-davinci/devices.c                    |    6 +-
+ arch/arm/mach-davinci/dm355.c                      |    2 +-
+ arch/arm/mach-davinci/dm365.c                      |    2 +-
+ arch/arm/mach-davinci/dm644x.c                     |    2 +-
+ arch/arm/mach-davinci/dm646x.c                     |    2 +-
+ arch/arm/mach-davinci/include/mach/cp_intc.h       |    4 +-
+ arch/arm/mach-davinci/include/mach/da8xx.h         |   18 ++--
+ arch/arm/mach-davinci/include/mach/tnetv107x.h     |    6 +-
+ drivers/dma/edma.c                                 |    2 +-
+ drivers/mmc/host/davinci_mmc.c                     |    1 +
+ include/linux/mfd/davinci_voicecodec.h             |    3 +-
+ .../mach => include/linux/platform_data}/edma.h    |   89 +-------------------
+ include/linux/platform_data/spi-davinci.h          |    2 +-
+ sound/soc/davinci/davinci-evm.c                    |    1 +
+ sound/soc/davinci/davinci-pcm.c                    |    1 +
+ sound/soc/davinci/davinci-pcm.h                    |    2 +-
+ 24 files changed, 56 insertions(+), 167 deletions(-)
+ rename arch/arm/{mach-davinci/dma.c => common/edma.c} (97%)
+ rename {arch/arm/mach-davinci/include/mach => include/linux/platform_data}/edma.h (59%)
