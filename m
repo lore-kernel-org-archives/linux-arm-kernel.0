@@ -1,76 +1,52 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 18 Jun 2013 09:51:59 +0100
-Subject: [PATCH 3/3] ARM: ux500: Remove mop500_snowball_ethernet_clock_enable()
-In-Reply-To: <1371545519-27119-1-git-send-email-lee.jones@linaro.org>
-References: <1371545519-27119-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1371545519-27119-4-git-send-email-lee.jones@linaro.org>
+From: fabio.baltieri@linaro.org (Fabio Baltieri)
+Date: Tue, 18 Jun 2013 10:53:16 +0200
+Subject: [PATCH] ARM: ux500: set coherent_dma_mask for dma40
+In-Reply-To: <CACRpkdYOP0xTJo3sLbRz5D=b4Vb1484a1qfE3aVAKRTM4+Y7QQ@mail.gmail.com>
+References: <1371131763-6288-1-git-send-email-fabio.baltieri@linaro.org>
+ <CACRpkdYOP0xTJo3sLbRz5D=b4Vb1484a1qfE3aVAKRTM4+Y7QQ@mail.gmail.com>
+Message-ID: <20130618085316.GA7239@balto.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mop500_snowball_ethernet_clock_enable() provided a means to enable a
-clock which was used for the SMSC911x Ethernet device on Snowball. It
-was merely a stand-in until the driver was common clk compliant. Now
-that it is, this can be removed for both DT and ATAGs booting.
+On Mon, Jun 17, 2013 at 05:42:48PM +0200, Linus Walleij wrote:
+> On Thu, Jun 13, 2013 at 3:56 PM, Fabio Baltieri
+> <fabio.baltieri@linaro.org> wrote:
+> 
+> > Set coherent_dma_mask to DMA_BIT_MASK(32) for dma40 platform_device, as
+> > without this DMA allocations were failing with the error:
+> >
+> > dma40 dma40.0: coherent DMA mask is unset
+> >
+> > when booting without device-tree.
+> >
+> > Signed-off-by: Fabio Baltieri <fabio.baltieri@linaro.org>
+> > ---
+> >
+> > Hi Linus, Lee,
+> >
+> > I found this while removing the last hack I was keeping in my ASoC tree.
+> > I originally thought that I had to set this on the driver's pdata, but
+> > it turns out it's needed on the DMA controller one instead.
+> >
+> > When booting with device-tree enabled the mask seems to be set
+> > automatically.
+> >
+> > Would you consider applying this with the other dma40 patches?
+> 
+> Those are now upstream in the ARM SoC tree, you'd have to send it
+> to arm at kernel.org and ask Olof/Arnd to apply it directly to
+> the next/drivers branch (I think).
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- arch/arm/mach-ux500/board-mop500.c | 11 -----------
- arch/arm/mach-ux500/board-mop500.h |  1 -
- arch/arm/mach-ux500/cpu-db8500.c   |  1 -
- 3 files changed, 13 deletions(-)
+Ok I can resend it but I'd like to have Lee's Ack before doing that.
 
-diff --git a/arch/arm/mach-ux500/board-mop500.c b/arch/arm/mach-ux500/board-mop500.c
-index 238b237..f7a1feb 100644
---- a/arch/arm/mach-ux500/board-mop500.c
-+++ b/arch/arm/mach-ux500/board-mop500.c
-@@ -419,15 +419,6 @@ static void mop500_prox_deactivate(struct device *dev)
- }
- #endif
- 
--void mop500_snowball_ethernet_clock_enable(void)
--{
--	struct clk *clk;
--
--	clk = clk_get_sys("fsmc", NULL);
--	if (!IS_ERR(clk))
--		clk_prepare_enable(clk);
--}
--
- #ifdef CONFIG_ATAGS
- static struct cryp_platform_data u8500_cryp1_platform_data = {
- 		.mem_to_engine = {
-@@ -644,8 +635,6 @@ static void __init snowball_init_machine(void)
- 	mop500_audio_init(parent);
- 	mop500_uart_init(parent);
- 
--	mop500_snowball_ethernet_clock_enable();
--
- 	u8500_cryp1_hash1_init(parent);
- 
- 	/* This board has full regulator constraints */
-diff --git a/arch/arm/mach-ux500/board-mop500.h b/arch/arm/mach-ux500/board-mop500.h
-index 6f0bfcb..d6fab16 100644
---- a/arch/arm/mach-ux500/board-mop500.h
-+++ b/arch/arm/mach-ux500/board-mop500.h
-@@ -105,7 +105,6 @@ void __init mop500_pinmaps_init(void);
- void __init snowball_pinmaps_init(void);
- void __init hrefv60_pinmaps_init(void);
- void mop500_audio_init(struct device *parent);
--void mop500_snowball_ethernet_clock_enable(void);
- 
- int __init mop500_uib_init(void);
- void mop500_uib_i2c_add(int busnum, struct i2c_board_info *info,
-diff --git a/arch/arm/mach-ux500/cpu-db8500.c b/arch/arm/mach-ux500/cpu-db8500.c
-index 084f104..1472dde 100644
---- a/arch/arm/mach-ux500/cpu-db8500.c
-+++ b/arch/arm/mach-ux500/cpu-db8500.c
-@@ -300,7 +300,6 @@ static void __init u8500_init_machine(void)
- 		mop500_pinmaps_init();
- 	else if (of_machine_is_compatible("calaosystems,snowball-a9500")) {
- 		snowball_pinmaps_init();
--		mop500_snowball_ethernet_clock_enable();
- 	} else if (of_machine_is_compatible("st-ericsson,hrefv60+"))
- 		hrefv60_pinmaps_init();
- 	else if (of_machine_is_compatible("st-ericsson,ccu9540")) {}
+Lee: have you had a chance to look at this patch?
+
+> I have also queued it on ux500-fixes so it won't be lost.
+
+That's nice!
+
+Thanks,
+Fabio
+
 -- 
-1.8.1.2
+Fabio Baltieri
