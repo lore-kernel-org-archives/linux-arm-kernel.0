@@ -1,31 +1,41 @@
-From: prabhakar.csengg@gmail.com (Prabhakar Lad)
-Date: Tue, 18 Jun 2013 14:15:13 +0530
-Subject: [PATCH v2] ARM: edma: Convert to devm_* api
-In-Reply-To: <51C01BC3.4060100@ti.com>
-References: <1371481078-18058-1-git-send-email-prabhakar.csengg@gmail.com>
- <51C01BC3.4060100@ti.com>
-Message-ID: <CA+V-a8szFcpxacZ3ERA3Sp7LP=fML3KaVyKtAL9K9tMwB3veNA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jun 2013 09:43:08 +0100
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+ <20130617182127.GM2718@n2100.arm.linux.org.uk>
+ <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
+Message-ID: <20130618084308.GU2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Tue, Jun 18, 2013 at 02:27:40PM +0900, Inki Dae wrote:
+> So I'd like to ask for other DRM maintainers. How do you think about it? it
+> seems like that Intel DRM (maintained by Daniel), OMAP DRM (maintained by
+> Rob) and GEM CMA helper also have same issue Russell pointed out. I think
+> not only the above approach but also the performance is very important.
 
-On Tue, Jun 18, 2013 at 2:05 PM, Sekhar Nori <nsekhar@ti.com> wrote:
-> On 6/17/2013 8:27 PM, Prabhakar Lad wrote:
->> From: "Lad, Prabhakar" <prabhakar.csengg@gmail.com>
->>
->> Use devm_ioremap_resource instead of reques_mem_region()/ioremap(),
->> devm_request_irq() instead of request_irq() and kzalloc() calls to
->> devm_kzalloc().
->>
->> This ensures more consistent error values and simplifies error paths.
->>
->> Signed-off-by: Lad, Prabhakar <prabhakar.csengg@gmail.com>
->
-> Nice clean-up. The patch did not build since <linux/err.h> was not
-> included. I fixed it locally and applied to v3.11/soc-2 branch of my tree.
->
-Thanks for fixing it.
+CMA uses coherent memory to back their buffers, though that might not be
+true of memory obtained from other drivers via dma_buf.  Plus, there is
+no support in the CMA helper for exporting or importng these buffers.
 
-Regards,
---Prabhakar Lad
+I guess Intel i915 is only used on x86, which is a coherent platform and
+requires no cache maintanence for DMA.
+
+OMAP DRM does not support importing non-DRM buffers buffers back into
+DRM.  Moreover, it will suffer from the problems I described if any
+attempt is made to write to the buffer after it has been re-imported.
+
+Lastly, I should point out that the dma_buf stuff is really only useful
+when you need to export a dma buffer from one driver and import it into
+another driver - for example to pass data from a camera device driver to
+a display device driver.  It shouldn't be used within a single driver
+as a means of passing buffers between userspace and kernel space.
