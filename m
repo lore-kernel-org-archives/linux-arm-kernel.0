@@ -1,165 +1,136 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue, 18 Jun 2013 12:00:04 +0200
-Subject: [PATCH] ARM: clocksource: add support for MOXA ART SoCs
-Message-ID: <1371549604-7201-1-git-send-email-jonas.jensen@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Jun 2013 03:01:13 -0700
+Subject: [PATCH v2 1/5] ARM: OMAP1: USB: move omap_usb_config to
+ platform data
+In-Reply-To: <1371389712-29516-2-git-send-email-aaro.koskinen@iki.fi>
+References: <1371389712-29516-1-git-send-email-aaro.koskinen@iki.fi>
+ <1371389712-29516-2-git-send-email-aaro.koskinen@iki.fi>
+Message-ID: <20130618100113.GG5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds an clocksource driver for the main timer found
-on MOXA ART SoCs.
+* Aaro Koskinen <aaro.koskinen@iki.fi> [130616 06:41]:
+> Move omap_usb_config to platform data, so that OTG driver can include it.
+> 
+> Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
 
-Applies to 3.10-rc1 and arm-soc/for-next (2013-06-15)
+This is probably best queued with the USB transceiver:
 
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
- drivers/clocksource/Makefile       |    1 +
- drivers/clocksource/moxart_timer.c |  129 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 130 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clocksource/moxart_timer.c
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index 8d979c7..c93e1a8 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -29,3 +29,4 @@ obj-$(CONFIG_CLKSRC_SAMSUNG_PWM)	+= samsung_pwm_timer.o
- 
- obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
- obj-$(CONFIG_CLKSRC_METAG_GENERIC)	+= metag_generic.o
-+obj-$(CONFIG_ARCH_MOXART)	+= moxart_timer.o
-diff --git a/drivers/clocksource/moxart_timer.c b/drivers/clocksource/moxart_timer.c
-new file mode 100644
-index 0000000..ce5a5a2
---- /dev/null
-+++ b/drivers/clocksource/moxart_timer.c
-@@ -0,0 +1,129 @@
-+/*
-+ * MOXA ART SoCs timer handling.
-+ *
-+ * Copyright (C) 2013 Jonas Jensen
-+ *
-+ * Jonas Jensen <jonas.jensen@gmail.com>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
-+#include <linux/clockchips.h>
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/irqreturn.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_irq.h>
-+#include <linux/clocksource.h>
-+
-+#include <asm/mach/time.h>
-+
-+#define APB_CLK 48000000
-+
-+#define TIMER_1_COUNT(base_addr)        (base_addr + 0x00)
-+#define TIMER_1_LOAD(base_addr)         (base_addr + 0x04)
-+#define TIMER_1_MATCH1(base_addr)       (base_addr + 0x08)
-+#define TIMER_1_MATCH2(base_addr)       (base_addr + 0x0C)
-+
-+#define TIMER_2_COUNT(base_addr)        (base_addr + 0x10)
-+#define TIMER_2_LOAD(base_addr)         (base_addr + 0x14)
-+#define TIMER_2_MATCH1(base_addr)       (base_addr + 0x18)
-+#define TIMER_2_MATCH2(base_addr)       (base_addr + 0x1C)
-+
-+#define TIMER_3_COUNT(base_addr)        (base_addr + 0x20)
-+#define TIMER_3_LOAD(base_addr)         (base_addr + 0x24)
-+#define TIMER_3_MATCH1(base_addr)       (base_addr + 0x28)
-+#define TIMER_3_MATCH2(base_addr)       (base_addr + 0x2C)
-+
-+#define TIMER_CR(base_addr)             (base_addr + 0x30)
-+
-+#define TIMER_1_CR_ENABLE(base_addr)    (base_addr + 0x30)
-+#define TIMER_1_CR_EXTCLK(base_addr)    (base_addr + 0x34)
-+#define TIMER_1_CR_FLOWIN(base_addr)    (base_addr + 0x38)
-+
-+#define TIMER_2_CR_ENABLE(base_addr)    (base_addr + 0x42)
-+#define TIMER_2_CR_EXTCLK(base_addr)    (base_addr + 0x46)
-+#define TIMER_2_CR_FLOWIN(base_addr)    (base_addr + 0x50)
-+
-+#define TIMER_3_CR_ENABLE(base_addr)    (base_addr + 0x54)
-+#define TIMER_3_CR_EXTCLK(base_addr)    (base_addr + 0x58)
-+#define TIMER_3_CR_FLOWIN(base_addr)    (base_addr + 0x62)
-+
-+#define TIMER_INTR_STATE(base_addr)     (base_addr + 0x34)
-+
-+#define TIMEREG_1_CR_ENABLE         (1 << 0)
-+#define TIMEREG_1_CR_CLOCK          (1 << 1)
-+#define TIMEREG_1_CR_INT            (1 << 2)
-+#define TIMEREG_2_CR_ENABLE         (1 << 3)
-+#define TIMEREG_2_CR_CLOCK          (1 << 4)
-+#define TIMEREG_2_CR_INT            (1 << 5)
-+#define TIMEREG_3_CR_ENABLE         (1 << 6)
-+#define TIMEREG_3_CR_CLOCK          (1 << 7)
-+#define TIMEREG_3_CR_INT            (1 << 8)
-+#define TIMEREG_COUNT_UP            (1 << 9)
-+#define TIMEREG_COUNT_DOWN          (0 << 9)
-+
-+#define MAX_TIMER   2
-+#define USED_TIMER  1
-+
-+#define TIMER1_COUNT                0x0
-+#define TIMER1_LOAD                 0x4
-+#define TIMER1_MATCH1               0x8
-+#define TIMER1_MATCH2               0xC
-+#define TIMER2_COUNT                0x10
-+#define TIMER2_LOAD                 0x14
-+#define TIMER2_MATCH1               0x18
-+#define TIMER2_MATCH2               0x1C
-+#define TIMER3_COUNT                0x20
-+#define TIMER3_LOAD                 0x24
-+#define TIMER3_MATCH1               0x28
-+#define TIMER3_MATCH2               0x2C
-+#define TIMER_INTR_MASK     0x38
-+
-+static void __iomem *timer_base;
-+
-+static irqreturn_t moxart_timer_interrupt(int irq, void *dev_id)
-+{
-+	timer_tick();
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction moxart_timer_irq = {
-+	.name = "moxart-timer",
-+	.flags = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
-+	.handler = moxart_timer_interrupt,
-+};
-+
-+static void __init moxart_timer_init(struct device_node *node)
-+{
-+	int ret, irq;
-+
-+	timer_base = of_iomap(node, 0);
-+	if (!timer_base)
-+		panic("%s: failed to map base\n", node->full_name);
-+
-+	irq = irq_of_parse_and_map(node, 0);
-+	if (irq <= 0)
-+		panic("%s: can't parse IRQ\n", node->full_name);
-+
-+	ret = setup_irq(irq, &moxart_timer_irq);
-+	if (ret)
-+		pr_warn("%s: failed to setup IRQ %d\n", node->full_name, irq);
-+
-+
-+	writel(APB_CLK / HZ, TIMER_1_COUNT(timer_base));
-+	writel(APB_CLK / HZ, TIMER_1_LOAD(timer_base));
-+
-+	writel(1, TIMER_1_CR_ENABLE(timer_base));
-+	writel(0, TIMER_1_CR_EXTCLK(timer_base));
-+	writel(1, TIMER_1_CR_FLOWIN(timer_base));
-+
-+	pr_info("%s: count/load (APB_CLK=%d/HZ=%d) IRQ=%d\n",
-+		node->full_name, APB_CLK, HZ, irq);
-+}
-+CLOCKSOURCE_OF_DECLARE(moxart, "moxa,moxart-timer", moxart_timer_init);
-+
--- 
-1.7.2.5
+
+> ---
+>  arch/arm/mach-omap1/include/mach/usb.h  | 38 +-----------------------
+>  include/linux/platform_data/usb-omap1.h | 51 +++++++++++++++++++++++++++++++++
+>  2 files changed, 52 insertions(+), 37 deletions(-)
+>  create mode 100644 include/linux/platform_data/usb-omap1.h
+> 
+> diff --git a/arch/arm/mach-omap1/include/mach/usb.h b/arch/arm/mach-omap1/include/mach/usb.h
+> index 45e5ac7..2c26305 100644
+> --- a/arch/arm/mach-omap1/include/mach/usb.h
+> +++ b/arch/arm/mach-omap1/include/mach/usb.h
+> @@ -8,43 +8,7 @@
+>  #define	is_usb0_device(config)	0
+>  #endif
+>  
+> -struct omap_usb_config {
+> -	/* Configure drivers according to the connectors on your board:
+> -	 *  - "A" connector (rectagular)
+> -	 *	... for host/OHCI use, set "register_host".
+> -	 *  - "B" connector (squarish) or "Mini-B"
+> -	 *	... for device/gadget use, set "register_dev".
+> -	 *  - "Mini-AB" connector (very similar to Mini-B)
+> -	 *	... for OTG use as device OR host, initialize "otg"
+> -	 */
+> -	unsigned	register_host:1;
+> -	unsigned	register_dev:1;
+> -	u8		otg;	/* port number, 1-based:  usb1 == 2 */
+> -
+> -	u8		hmc_mode;
+> -
+> -	/* implicitly true if otg:  host supports remote wakeup? */
+> -	u8		rwc;
+> -
+> -	/* signaling pins used to talk to transceiver on usbN:
+> -	 *  0 == usbN unused
+> -	 *  2 == usb0-only, using internal transceiver
+> -	 *  3 == 3 wire bidirectional
+> -	 *  4 == 4 wire bidirectional
+> -	 *  6 == 6 wire unidirectional (or TLL)
+> -	 */
+> -	u8		pins[3];
+> -
+> -	struct platform_device *udc_device;
+> -	struct platform_device *ohci_device;
+> -	struct platform_device *otg_device;
+> -
+> -	u32 (*usb0_init)(unsigned nwires, unsigned is_device);
+> -	u32 (*usb1_init)(unsigned nwires);
+> -	u32 (*usb2_init)(unsigned nwires, unsigned alt_pingroup);
+> -
+> -	int (*ocpi_enable)(void);
+> -};
+> +#include <linux/platform_data/usb-omap1.h>
+>  
+>  void omap_otg_init(struct omap_usb_config *config);
+>  
+> diff --git a/include/linux/platform_data/usb-omap1.h b/include/linux/platform_data/usb-omap1.h
+> new file mode 100644
+> index 0000000..8c7764d
+> --- /dev/null
+> +++ b/include/linux/platform_data/usb-omap1.h
+> @@ -0,0 +1,51 @@
+> +/*
+> + * Platform data for OMAP1 USB
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License. See the file "COPYING" in the main directory of this archive for
+> + * more details.
+> + */
+> +#ifndef __LINUX_USB_OMAP1_H
+> +#define __LINUX_USB_OMAP1_H
+> +
+> +#include <linux/platform_device.h>
+> +
+> +struct omap_usb_config {
+> +	/* Configure drivers according to the connectors on your board:
+> +	 *  - "A" connector (rectagular)
+> +	 *	... for host/OHCI use, set "register_host".
+> +	 *  - "B" connector (squarish) or "Mini-B"
+> +	 *	... for device/gadget use, set "register_dev".
+> +	 *  - "Mini-AB" connector (very similar to Mini-B)
+> +	 *	... for OTG use as device OR host, initialize "otg"
+> +	 */
+> +	unsigned	register_host:1;
+> +	unsigned	register_dev:1;
+> +	u8		otg;	/* port number, 1-based:  usb1 == 2 */
+> +
+> +	u8		hmc_mode;
+> +
+> +	/* implicitly true if otg:  host supports remote wakeup? */
+> +	u8		rwc;
+> +
+> +	/* signaling pins used to talk to transceiver on usbN:
+> +	 *  0 == usbN unused
+> +	 *  2 == usb0-only, using internal transceiver
+> +	 *  3 == 3 wire bidirectional
+> +	 *  4 == 4 wire bidirectional
+> +	 *  6 == 6 wire unidirectional (or TLL)
+> +	 */
+> +	u8		pins[3];
+> +
+> +	struct platform_device *udc_device;
+> +	struct platform_device *ohci_device;
+> +	struct platform_device *otg_device;
+> +
+> +	u32 (*usb0_init)(unsigned nwires, unsigned is_device);
+> +	u32 (*usb1_init)(unsigned nwires);
+> +	u32 (*usb2_init)(unsigned nwires, unsigned alt_pingroup);
+> +
+> +	int (*ocpi_enable)(void);
+> +};
+> +
+> +#endif /* __LINUX_USB_OMAP1_H */
+> -- 
+> 1.8.3.1
+> 
