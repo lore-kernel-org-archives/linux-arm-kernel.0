@@ -1,172 +1,75 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 18 Jun 2013 11:29:41 +0200
-Subject: [PATCH v5] ARM PJ4B: Add support for errata 4742
-In-Reply-To: <1371547781-31097-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1371547781-31097-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <1371547781-31097-2-git-send-email-gregory.clement@free-electrons.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 18 Jun 2013 11:31:47 +0200
+Subject: [PATCH v2 30/38] ARM: EXYNOS: Remove CONFIG_SOC_EXYNOS4412
+In-Reply-To: <1b9901ce6c04$9f4ff710$ddefe530$%kim@samsung.com>
+References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
+ <1371486863-12398-31-git-send-email-t.figa@samsung.com>
+ <1b9901ce6c04$9f4ff710$ddefe530$%kim@samsung.com>
+Message-ID: <3925237.eNXRl09cCa@amdc1227>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit fixes the regression on Armada 370 (the kernal hang during
-boot) introduced by the commit: "ARM: 7691/1: mm: kill unused
-TLB_CAN_READ_FROM_L1_CACHE and use ALT_SMP instead".
+Hi Kukjin,
 
-When coming out of either a Wait for Interrupt (WFI) or a Wait for
-Event (WFE) IDLE states, a specific timing sensitivity exists between
-the retiring WFI/WFE instructions and the newly issued subsequent
-instructions. This sensitivity can result in a CPU hang scenario.  The
-workaround is to insert either a Data Synchronization Barrier (DSB) or
-Data Memory Barrier (DMB) command immediately after the WFI/WFE
-instruction.
+On Tuesday 18 of June 2013 18:17:14 Kukjin Kim wrote:
+> Tomasz Figa wrote:
+> > Exynos4212 and Exynos4412 SoCs differ only in number of ARM cores and
+> > there is no need to have separate Kconfig options for them, since they
+> > use the same code.
+> > 
+> > This patch removes CONFIG_SOC_EXYNOS4412, leaving CONFIG_SOC_EXYNOS4212
+> > as the one supporting both SoCs from this series.
+> > 
+> > Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> > ---
+> > 
+> >  arch/arm/mach-exynos/Kconfig             | 11 +----------
+> >  arch/arm/plat-samsung/include/plat/cpu.h |  6 +-----
+> >  2 files changed, 2 insertions(+), 15 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> > index 65ca3ac..fcebdfb 100644
+> > --- a/arch/arm/mach-exynos/Kconfig
+> > +++ b/arch/arm/mach-exynos/Kconfig
+> > @@ -46,7 +46,7 @@ config CPU_EXYNOS4210
+> > 
+> >  	  Enable EXYNOS4210 CPU support
+> >  
+> >  config SOC_EXYNOS4212
+> > 
+> > -	bool "SAMSUNG EXYNOS4212"
+> > +	bool "SAMSUNG EXYNOS4212/4412"
+> > 
+> >  	default y
+> >  	depends on ARCH_EXYNOS4
+> >  	select PINCTRL_EXYNOS
+> > 
+> > @@ -56,15 +56,6 @@ config SOC_EXYNOS4212
+> > 
+> >  	help
+> >  	
+> >  	  Enable EXYNOS4212 SoC support
+> > 
+> > -config SOC_EXYNOS4412
+> > -	bool "SAMSUNG EXYNOS4412"
+> > -	default y
+> > -	depends on ARCH_EXYNOS4
+> > -	select PINCTRL_EXYNOS
+> > -	select SAMSUNG_DMADEV
+> > -	help
+> > -	  Enable EXYNOS4412 SoC support
+> > -
+> 
+> NAK, I'm still saying we need separation of exynos4212 and exynos4412
+> because there are differences, it is not implemented yet but will be
+> implemented in future. So would be helpful if we could keep them.
 
-This commit was based on the work of Lior Amsalem, but heavily
-modified to apply the errata fix dynamically according to the
-processor type thanks to the suggestions of Russell King and Nicolas
-Pitre.
+Sorry, but I don't understand how a Kconfig entry is related to separation of 
+those SoCs. It just selects which code needs to be compiled in, not what code 
+should be executed - this selection is done based on DeviceTree.
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-Cc: <stable@vger.kernel.org>
----
- arch/arm/Kconfig                 | 13 +++++++++++++
- arch/arm/include/asm/glue-proc.h |  9 +++++++++
- arch/arm/mm/proc-macros.S        |  5 +++++
- arch/arm/mm/proc-v7.S            | 34 +++++++++++++++++++++++++++++++---
- 4 files changed, 58 insertions(+), 3 deletions(-)
+Could you give a bit more in depth explanation for this?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 49d993c..95cbe9d 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1087,6 +1087,19 @@ if !MMU
- source "arch/arm/Kconfig-nommu"
- endif
- 
-+config PJ4B_ERRATA_4742
-+	bool "PJ4B Errata 4742: IDLE Wake Up Commands can Cause the CPU Core to Cease Operation"
-+	depends on CPU_PJ4B && MACH_ARMADA_370
-+	help
-+	  When coming out of either a Wait for Interrupt (WFI) or a Wait for
-+	  Event (WFE) IDLE states, a specific timing sensitivity exists between
-+	  the retiring WFI/WFE instructions and the newly issued subsequent
-+	  instructions.  This sensitivity can result in a CPU hang scenario.
-+	  Workaround:
-+	  The software must insert either a Data Synchronization Barrier (DSB)
-+	  or Data Memory Barrier (DMB) command immediately after the WFI/WFE
-+	  instruction
-+
- config ARM_ERRATA_326103
- 	bool "ARM errata: FSR write bit incorrect on a SWP to read-only memory"
- 	depends on CPU_V6
-diff --git a/arch/arm/include/asm/glue-proc.h b/arch/arm/include/asm/glue-proc.h
-index ac1dd54..8017e94 100644
---- a/arch/arm/include/asm/glue-proc.h
-+++ b/arch/arm/include/asm/glue-proc.h
-@@ -230,6 +230,15 @@
- # endif
- #endif
- 
-+#ifdef CONFIG_CPU_PJ4B
-+# ifdef CPU_NAME
-+#  undef  MULTI_CPU
-+#  define MULTI_CPU
-+# else
-+#  define CPU_NAME cpu_pj4b
-+# endif
-+#endif
-+
- #ifndef MULTI_CPU
- #define cpu_proc_init			__glue(CPU_NAME,_proc_init)
- #define cpu_proc_fin			__glue(CPU_NAME,_proc_fin)
-diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
-index f9a0aa7..e3c48a3 100644
---- a/arch/arm/mm/proc-macros.S
-+++ b/arch/arm/mm/proc-macros.S
-@@ -333,3 +333,8 @@ ENTRY(\name\()_tlb_fns)
- 	.endif
- 	.size	\name\()_tlb_fns, . - \name\()_tlb_fns
- .endm
-+
-+.macro globl_equ x, y
-+	.globl	\x
-+	.equ	\x, \y
-+.endm
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index fe3a9d3..b3cf7f0 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -342,6 +342,29 @@ __v7_setup:
- 	mov	pc, lr				@ return to head.S:__ret
- ENDPROC(__v7_setup)
- 
-+#ifdef CONFIG_CPU_PJ4B
-+	globl_equ	cpu_pj4b_switch_mm,     cpu_v7_switch_mm
-+	globl_equ	cpu_pj4b_set_pte_ext,	cpu_v7_set_pte_ext
-+	globl_equ	cpu_pj4b_proc_init,	cpu_v7_proc_init
-+	globl_equ	cpu_pj4b_proc_fin, 	cpu_v7_proc_fin
-+	globl_equ	cpu_pj4b_reset,	   	cpu_v7_reset
-+#ifdef CONFIG_PJ4B_ERRATA_4742
-+ENTRY(cpu_pj4b_do_idle)
-+	dsb					@ WFI may enter a low-power mode
-+	wfi
-+	dsb					@barrier
-+	mov	pc, lr
-+ENDPROC(cpu_pj4b_do_idle)
-+#else
-+	globl_equ	cpu_pj4b_do_idle,  	cpu_v7_do_idle
-+#endif
-+	globl_equ	cpu_pj4b_dcache_clean_area,	cpu_v7_dcache_clean_area
-+	globl_equ	cpu_pj4b_do_suspend,	cpu_v7_do_suspend
-+	globl_equ	cpu_pj4b_do_resume,	cpu_v7_do_resume
-+	globl_equ	cpu_pj4b_suspend_size,	cpu_v7_suspend_size
-+
-+#endif
-+
- 	.align	2
- __v7_setup_stack:
- 	.space	4 * 11				@ 11 registers
-@@ -350,6 +373,9 @@ __v7_setup_stack:
- 
- 	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
- 	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
-+#ifdef CONFIG_CPU_PJ4B
-+	define_processor_functions pj4b, dabort=v7_early_abort, pabort=v7_pabort, suspend=1
-+#endif
- 
- 	.section ".rodata"
- 
-@@ -362,7 +388,7 @@ __v7_setup_stack:
- 	/*
- 	 * Standard v7 proc info content
- 	 */
--.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
-+.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0, proc_fns = v7_processor_functions
- 	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
- 			PMD_SECT_AF | PMD_FLAGS_SMP | \mm_mmuflags)
- 	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
-@@ -375,7 +401,7 @@ __v7_setup_stack:
- 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \
- 		HWCAP_EDSP | HWCAP_TLS | \hwcaps
- 	.long	cpu_v7_name
--	.long	v7_processor_functions
-+	.long	\proc_fns
- 	.long	v7wbi_tlb_fns
- 	.long	v6_user_fns
- 	.long	v7_cache_fns
-@@ -407,12 +433,14 @@ __v7_ca9mp_proc_info:
- 	/*
- 	 * Marvell PJ4B processor.
- 	 */
-+#ifdef CONFIG_CPU_PJ4B
- 	.type   __v7_pj4b_proc_info, #object
- __v7_pj4b_proc_info:
- 	.long   0x560f5800
- 	.long	0xff0fff00
--	__v7_proc __v7_pj4b_setup
-+	__v7_proc __v7_pj4b_setup, proc_fns = pj4b_processor_functions
- 	.size	__v7_pj4b_proc_info, . - __v7_pj4b_proc_info
-+#endif
- 
- 	/*
- 	 * ARM Ltd. Cortex A7 processor.
--- 
-1.8.1.2
+Best regards,
+Tomasz
