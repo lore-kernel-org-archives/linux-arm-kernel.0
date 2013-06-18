@@ -1,32 +1,24 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 18 Jun 2013 11:06:00 -0400 (EDT)
-Subject: [PATCH V2 05/10] USB: OHCI: Properly handle ohci-exynos suspend
-In-Reply-To: <CAJFYCKFHhD2LuPP5LKSXzg4zuCMmNTSWRRUQkwFcQVmXSaLo9Q@mail.gmail.com>
-Message-ID: <Pine.LNX.4.44L0.1306181056590.1157-100000@iolanthe.rowland.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jun 2013 17:08:01 +0200
+Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
+In-Reply-To: <51C06D19.3020304@linaro.org>
+References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
+ <201306181609.14966.arnd@arndb.de> <51C06D19.3020304@linaro.org>
+Message-ID: <3686094.n3OCaPGG8M@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Jun 2013, Manjunath Goudar wrote:
-
-> After Alan explanation I am writing below code end of ohci_suspend()
-> routine.is it correct Alan.
+On Tuesday 18 June 2013 22:22:17 zhangfei wrote:
+> > With no need to have a filter function.
 > 
->        if (do_wakeup && HCD_WAKEUP_PENDING(hcd)) {
->                 ohci_resume(hcd, false);
->                 rc = -EBUSY;
->         }
+> Cool, then I would like to wait for the patch.
 
-I'm glad you asked, because there is an important part I forgot about.
-Just before the code above, it is also necessary to add:
+Maybe you can try to add the dma_get_slave_channel() function I proposed here
+as a first patch and add your driver on top. There may be issues I missed,
+and Vinod needs to agree to the concept first, but that would probably
+get his attention.
 
-	synchronize_irq(hcd->irq);
+Or you could send your the new interface as an add-on patch
+and convert your driver along with adding it.
 
-The reason is because a wakeup interrupt might race with the suspend
-call.  If the suspend finishes first, we need to wait until the
-interrupt has been handled before checking whether there is a pending
-wakeup.  That's what synchronize_irq() does; it waits until all the
-outstanding interrupt requests have been handled.
-
-(Also, as Sachin pointed out, you have to return rc instead of 0.)
-
-Alan Stern
+	Arnd
