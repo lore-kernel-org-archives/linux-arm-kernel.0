@@ -1,26 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 15:02:52 +0200
-Subject: [PATCH v2 29/38] thermal: exynos: Support both Exynos4x12 SoCs
-In-Reply-To: <51BF9D0A.6050706@ti.com>
-References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
- <201306172159.15352.arnd@arndb.de> <51BF9D0A.6050706@ti.com>
-Message-ID: <201306181502.52589.arnd@arndb.de>
+Date: Tue, 18 Jun 2013 15:07:40 +0200
+Subject: [PATCH v11 0/8] ] DMA Engine support for AM33XX
+In-Reply-To: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
+References: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
+Message-ID: <201306181507.40849.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Eduardo Valentin wrote:
-> The driver will work on supported exynos variants. Those that have the
-> need for thermal sensing. And each of them have specific thermal needs
-> (trigger points, thresholds, etc). That is what this file tries to
-> isolate. And there is specific data structures for each soc version.
+On Tuesday 18 June 2013, Joel A Fernandes wrote:
+> 
+> This series is a repost of Matt Porter's EDMA patches for AM33XX EDMA support
+> with changes for few pending review comments on v9 series.
+> 
+> Currently this is required for AM33XX (Beaglebone or EVM) to access MMC
+> and be able mount to rootfs and boot till command prompt over MMC.
+> Unless there are other pending review comments, I hope this series can
+> make it into 3.11 merge window, the dependent series has been posted at [1]
+> and completed review.
+> 
+> Tested EDMA on AM1808 EVM and AM33XX Beaglebone with MMC.
+> 
 
-Correct. My point is that the driver itself is much larger than the
-SoC-specific data sets in it. There is no reason to conditionally
-build a 108 byte data structure, making it more maintainably by removing
-all the #ifdef far outweighs the cost.
+Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-You can also change the driver to work only for DT based booting,
-that will simplify it further and save you more in terms of object
-code size than the exynos_tmu_platform_data instances.
+The binding looks good now.
+
+My usual comment about the fact that we shouldn't use a filter function in
+.xlate() applies here, but that is more about the missing interface of
+the dmaengine layer than the particular driver.
 
 	Arnd
