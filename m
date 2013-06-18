@@ -1,48 +1,134 @@
-From: girishks2000@gmail.com (Girish KS)
-Date: Tue, 18 Jun 2013 12:20:54 +0530
-Subject: [PATCH v4 04/10] serial: samsung: select Exynos specific driver
- data if ARCH_EXYNOS is defined
-In-Reply-To: <1371536962-13322-5-git-send-email-chander.kashyap@linaro.org>
-References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
- <1371536962-13322-5-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <CAKrE-KcvV5dQz0vUb-1y1msoron2Z=RjSnH1uxy8rzMtn8iChA@mail.gmail.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Tue, 18 Jun 2013 09:00:16 +0200
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+Message-ID: <CAKMK7uECS=eqNB-Ud6s=NvdYMPfxgJaGPbUx9hANfP6kb02j_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 11:59 AM, Chander Kashyap
-<chander.kashyap@linaro.org> wrote:
-> All Exynos4/5 SoCs share a common driver data in the samsung serial
-> driver. Hence, let the driver data inclusion be based on ARCH_EXYNOS
-> instead of SOC specific definition.
+On Mon, Jun 17, 2013 at 04:42:37PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 18, 2013 at 12:03:31AM +0900, Inki Dae wrote:
+> > 2013/6/17 Russell King - ARM Linux <linux@arm.linux.org.uk>
+> > Exactly right. But that is not definitely my point. Could you please see
+> > the below simple example?:
+> > (Presume that CPU and DMA share a buffer and the buffer is mapped with user
+> > space as cachable)
+> >
+> >         handle1 = drm_gem_fd_to_handle(a dmabuf fd);  ----> 1
+> >                  ...
+> >         va1 = drm_gem_mmap(handle1);
+> >         va2 = drm_gem_mmap(handle2);
+> >         va3 = malloc(size);
+> >                  ...
+> >
+> >         while (conditions) {
+> >                  memcpy(va1, some data, size);
 >
-> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> ---
->  drivers/tty/serial/samsung.c |    4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
+> Nooooooooooooooooooooooooooooooooooooooooooooo!
 >
-> diff --git a/drivers/tty/serial/samsung.c b/drivers/tty/serial/samsung.c
-> index 2552c7f..e70d19a 100644
-> --- a/drivers/tty/serial/samsung.c
-> +++ b/drivers/tty/serial/samsung.c
-> @@ -1703,9 +1703,7 @@ static struct s3c24xx_serial_drv_data s5pv210_serial_drv_data = {
->  #define S5PV210_SERIAL_DRV_DATA        (kernel_ulong_t)NULL
->  #endif
+> Well, the first thing to say here is that under the requirements of the
+> DMA API, the above is immediately invalid, because you're writing to a
+> buffer which under the terms of the DMA API is currently owned by the
+> DMA agent, *not* by the CPU.  You're supposed to call dma_sync_sg_for_cpu()
+> before you do that - but how is userspace supposed to know that requirement?
+> Why should userspace even _have_ to know these requirements of the DMA
+> API?
 >
-> -#if defined(CONFIG_CPU_EXYNOS4210) || defined(CONFIG_SOC_EXYNOS4212) || \
-> -       defined(CONFIG_SOC_EXYNOS4412) || defined(CONFIG_SOC_EXYNOS5250) || \
-> -       defined(CONFIG_SOC_EXYNOS5440)
-> +#if defined(CONFIG_ARCH_EXYNOS)
->  static struct s3c24xx_serial_drv_data exynos4210_serial_drv_data = {
->         .info = &(struct s3c24xx_uart_info) {
->                 .name           = "Samsung Exynos4 UART",
-Looks good to me
-Reviewed by: Girish K S <ks.giri@samsung.com>
-> --
-> 1.7.9.5
+> It's also entirely possible that drm_gem_fd_to_handle() (which indirectly
+> causes dma_map_sg() on the buffers scatterlist) followed by mmap'ing it
+> into userspace is a bug too, as it has the potential to touch caches or
+> stuff in ways that maybe the DMA or IOMMU may not expect - but I'm not
+> going to make too big a deal about that, because I don't think we have
+> anything that picky.
 >
+> However, the first point above is the most important one, and exposing
+> the quirks of the DMA API to userland is certainly not a nice thing to be
+> doing.  This needs to be fixed - we can't go and enforce an API which is
+> deeply embedded within the kernel all the way out to userland.
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> What we need is something along the lines of:
+> (a) dma_buf_map_attachment() _not_ to map the scatterlist for DMA.
+> or
+> (b) drm_gem_prime_import() not to call dma_buf_map_attachment() at all.
+
+I strongly vote for (b) (plus adding a dma_buf_map_sync interface to allow
+syncing to other devices/cpu whithout dropping the dma mappings). At least
+that's been the idea behind things, but currently all (x86-based) drm
+drivers cut corners here massively.
+
+Aside: The entire reason behind hiding the dma map step in the dma-buf
+attachment is to allow drivers to expose crazy iommus (e.g. the tiler unit
+on omap) to other devices. So imo (a) isn't the right choice.
+>
+> and for the scatterlist to be mapped for DMA at the point where the DMA
+> operation is initiated, and unmapped at the point where the DMA operation
+> is complete.
+>
+> So no, the problem is not that we need more APIs and code - we need the
+> existing kernel API fixed so that we don't go exposing userspace to the
+> requirements of the DMA API.  Unless we do that, we're going to end
+> up with a huge world of pain, where kernel architecture people need to
+> audit every damned DRM userspace implementation that happens to be run
+> on their platform, and that's not something arch people really can
+> afford to do.
+>
+> Basically, I think the dma_buf stuff needs to be rewritten with the
+> requirements of the DMA API in the forefront of whosever mind is doing
+> the rewriting.
+>
+> Note: the existing stuff does have the nice side effect of being able
+> to pass buffers which do not have a struct page * associated with them
+> through the dma_buf API - I think we can still preserve that by having
+> dma_buf provide a couple of new APIs to do the SG list map/sync/unmap,
+> but in any case we need to fix the existing API so that:
+>
+> dma_buf_map_attachment() becomes dma_buf_get_sg()
+> dma_buf_unmap_attachment() becomes dma_buf_put_sg()
+>
+> both getting rid of the DMA direction argument, and then we have four
+> new dma_buf calls:
+>
+> dma_buf_map_sg()
+> dma_buf_unmap_sg()
+> dma_buf_sync_sg_for_cpu()
+> dma_buf_sync_sg_for_device()
+>
+> which do the actual sg map/unmap via the DMA API *at the appropriate
+> time for DMA*.
+
+Hm, my idea was to just add a dma_buf_sync_attchment for the device side
+syncing, since the cpu access stuff is already bracketed with the
+begin/end cpu access stuff. We might need a sync_for_cpu or so for mmap,
+but imo mmap support for dma_buf is a bit insane anyway, so I don't care
+too much about it.
+
+Since such dma mappings would be really longstanding in most cases anyway
+drivers could just map with BIDIRECTIONAL and do all the real flushing
+with the new sync stuff.
+
+Another piece of fun will be integration with the fencing stuff Maarten is
+doing. I'm not sure whether we should integrate that into the dma-buf
+interface (for simple users who don't want to deal with the full
+complexity at least).
+
+>
+> So, the summary of this is - at the moment, I regard DRM Prime and dmabuf
+> to be utterly broken in design for architectures such as ARM where the
+> requirements of the DMA API have to be followed if you're going to have
+> a happy life.
+
+Agreed. Unfortunately there are not many real drivers shipping in
+upstream, and x86 is _very_ forgiving about all this stuff.
+-Daniel
+--
+Daniel Vetter
+Software Engineer, Intel Corporation
++41 (0) 79 365 57 48 - http://blog.ffwll.ch
