@@ -1,64 +1,51 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 18 Jun 2013 18:10:03 -0300
-Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
- to the DT binding
-In-Reply-To: <20130618205522.GA13691@obsidianresearch.com>
-References: <20130618174622.GD2204@obsidianresearch.com>
- <51C0A5F8.8030300@gmail.com> <201306182039.50736.arnd@arndb.de>
- <51C0AA8E.9080807@gmail.com>
- <20130618184753.GA6090@obsidianresearch.com>
- <51C0ADF7.5050609@gmail.com>
- <20130618191018.GB6578@obsidianresearch.com>
- <51C0B4A0.90204@gmail.com> <20130618204911.GB2516@localhost>
- <20130618205522.GA13691@obsidianresearch.com>
-Message-ID: <20130618211002.GC2516@localhost>
+From: mturquette@linaro.org (Mike Turquette)
+Date: Tue, 18 Jun 2013 14:17:35 -0700
+Subject: [PATCH 21/33 v2] clk: ux500: Add Device Tree support for the PRCC
+ Kernel clock
+In-Reply-To: <201306121646.30279.arnd@arndb.de>
+References: <1370521041-32318-1-git-send-email-lee.jones@linaro.org>
+ <1370521041-32318-22-git-send-email-lee.jones@linaro.org>
+ <20130611110923.GB3330@laptop> <201306121646.30279.arnd@arndb.de>
+Message-ID: <20130618211735.9136.25870@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 02:55:22PM -0600, Jason Gunthorpe wrote:
-> On Tue, Jun 18, 2013 at 05:49:11PM -0300, Ezequiel Garcia wrote:
-> > Hi Sebastian,
+Quoting Arnd Bergmann (2013-06-12 07:46:30)
+> On Tuesday 11 June 2013, Lee Jones wrote:
+> > This patch enables clocks to be specified from Device Tree via phandles
+> > to the "prcc-kernel-clock" node.
 > > 
-> > You loose +1 internet points for dropping me from Cc ;-)
+> > Cc: Mike Turquette <mturquette@linaro.org>
+> > Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> > Signed-off-by: Lee Jones <lee.jones@linaro.org>
 > > 
-> > On Tue, Jun 18, 2013 at 09:27:28PM +0200, Sebastian Hesselbarth wrote:
-> > > On 06/18/2013 09:10 PM, Jason Gunthorpe wrote:
-> > > >
-> > > > The forms could be:
-> > > >
-> > > >   0IAA0000
-> > > >   FK000000
-> > > >     - K=0 ->  internal regs
-> > > >     - K=1 ->  PCI-E thingy
-> > > >      etc
-> > > >   1IIAA000 (future expansion example)
-> > > 
-> > > Ok, got it. Any encoding is fine that allows to distinguish real
-> > > remap windows and fake ones. I assumed that maybe someday there
-> > > will be more than 4b target id so 0x80 as special case indicator
-> > > leaves 7b of normal target id in the _current_ mapping.
-> > > 
-> > 
-> > I'm also wondering about why we not care about target IDs being more
-> > than 4 bits.
-> > 
-> > Jason: (I'm checking now but perhaps you know better than me):
-> > Is there any MBus-architectural reason for you assuring the
-> > target ID will always be within 4-bits?
 > 
-> The manuals I have for the register set say 4 bits is allocated for
-> mbus targets.. Are yours different?
+> I don't understand the design of the common clock subsystem here, but is it really
+> necessary to hardcode all the clocks using clk_reg_prcc_kclk() here *and* register
+> a clkdev *and* store the pointer in an array, when you can get all that information
+> from the device tree?
 > 
+> Mike?
 
-Nope. 4 bits here as well.
+I'm a bit confused by what is going on here too.  There are several
+different ways to handle this.
 
-> If they change it then the window register layout changes and then the
-> mbus driver probably need to change as well.
+1) Since you have your own clock driver (e.g. not the basic clock types)
+then you could expand the argument list of clk_reg_prcc_kclk to include
+the clkdev dev_id string and toss the call to clk_register_clkdev inside
+of clk_reg_prcc_kclk.
+
+2) Move your clock data into DT and teach the driver to use of_clk_get
+to fetch the clk phandle directly instead of using the string-matching
+clkdev mechanisms. Of course both your clock and device bits need to be
+converted to DT first.
+
+Can you explain what prcc_kclk[] and friends are doing? Is that a legacy
+clock framework thing that is still hanging around? I'm curious to know
+why your clock driver needs a list of the clocks it registers.
+
+Regards,
+Mike
+
 > 
-
-Okey, then.
-
--- 
-Ezequiel Garc?a, Free Electrons
-Embedded Linux, Kernel and Android Engineering
-http://free-electrons.com
+>         Arnd
