@@ -1,45 +1,96 @@
-From: lkundrak@v3.sk (Lubomir Rintel)
-Date: Tue, 18 Jun 2013 18:57:13 +0200
-Subject: [PATCH] hwrng: bcm2835: fix MODULE_LICENSE tag
-In-Reply-To: <1366732475-479886-4-git-send-email-arnd@arndb.de>
-References: <1366732475-479886-1-git-send-email-arnd@arndb.de>
- <1366732475-479886-4-git-send-email-arnd@arndb.de>
-Message-ID: <1371574633.18688.9.camel@hobbes.kokotovo>
+From: arnd.bergmann@linaro.org (Arnd Bergmann)
+Date: Tue, 18 Jun 2013 18:58:37 +0200
+Subject: linux-next: origen build failed at
+ drivers/pinctrl/pinctrl-exynos.c
+In-Reply-To: <CA+G9fYu3_-RZxFyRENuqJvzsM=YToT7PG+5fUytMzhsFu3=z7g@mail.gmail.com>
+References: <CA+G9fYu3_-RZxFyRENuqJvzsM=YToT7PG+5fUytMzhsFu3=z7g@mail.gmail.com>
+Message-ID: <201306181858.37999.arnd.bergmann@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2013-04-23 at 17:54 +0200, Arnd Bergmann wrote:
-> The MODULE_LICENSE macro invocation must use either "GPL" or "GPL v2",
-> but not "GPLv2" in order to be detected by the module loader.
+On Tuesday 18 June 2013, Naresh Kamboju wrote:
+> Hi,
 > 
-> This fixes the allmodconfig build error:
+> linux-next branch failed to build origen build
 > 
-> FATAL: modpost: GPL-incompatible module bcm2835-rng.ko uses GPL-only symbol 'platform_driver_unregister'
+> defconfig: exynos_defconfig
+> 
+> full build log:
+> ----------------
+> https://ci.linaro.org/jenkins/job/linux-next/hwpack=origen,label=kernel_cloud/72/console
+> 
+> build error log:
+> --------------------
+> 05:02:12 /mnt/ci_build/workspace/linux-next/hwpack/origen/label/kernel_cloud/drivers/pinctrl/pinctrl-exynos.c:
+> In function ?exynos_wkup_irq_mask?:
+> 05:02:12 /mnt/ci_build/workspace/linux-next/hwpack/origen/label/kernel_cloud/drivers/pinctrl/pinctrl-exynos.c:299:3:
+> error: implicit declaration of function ?exynos_wkup_irq_ack?
+> [-Werror=implicit-function-declaration]
+> 05:02:12    exynos_wkup_irq_ack(irqd);
+> 05:02:12    ^
+> 05:02:12 /mnt/ci_build/workspace/linux-next/hwpack/origen/label/kernel_cloud/drivers/pinctrl/pinctrl-exynos.c:
+> At top level:
+> 05:02:12 /mnt/ci_build/workspace/linux-next/hwpack/origen/label/kernel_cloud/drivers/pinctrl/pinctrl-exynos.c:310:13:
+> warning: conflicting types for ?exynos_wkup_irq_ack? [enabled by
+> default]
+> 05:02:12  static void exynos_wkup_irq_ack(struct irq_data *irqd)
+> 05:02:12              ^
+> 05:02:12 /mnt/ci_build/workspace/linux-next/hwpack/origen/label/kernel_cloud/drivers/pinctrl/pinctrl-exynos.c:310:13:
+> error: static declaration of ?exynos_wkup_irq_ack? follows non-static
+> declaration
+> 05:02:12 /mnt/ci_build/workspace/linux-next/hwpack/origen/label/kernel_cloud/drivers/pinctrl/pinctrl-exynos.c:299:3:
+> note: previous implicit declaration of ?exynos_wkup_irq_ack? was here
+> 05:02:12    exynos_wkup_irq_ack(irqd);
+> 05:02:12    ^
+> 05:02:12 cc1: some warnings being treated as errors
+> 05:02:12 make[3]: *** [drivers/pinctrl/pinctrl-exynos.o] Error 1
+> 05:02:12 make[2]: *** [drivers/pinctrl] Error 2
+> 
+> Best regards
+> Naresh kamboju
+> 
 
-Thank you, obviously a typo of mine that slipped through. I'm wondering
-if this could get queued for 3.10; it definitely can't do any harm.
+I got the same thing and used this patch to fix it up.
 
-Acked-by: Lubomir Rintel <lkundrak@v3.sk>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Dom Cobley <popcornmix@gmail.com>
-> Cc: Lubomir Rintel <lkundrak@v3.sk>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Matt Mackall <mpm@selenic.com>
-> Cc: linux-rpi-kernel at lists.infradead.org
-> Cc: Herbert Xu <herbert@gondor.apana.org.au>
-> ---
->  drivers/char/hw_random/bcm2835-rng.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
-> index eb7f147..43577ca 100644
-> --- a/drivers/char/hw_random/bcm2835-rng.c
-> +++ b/drivers/char/hw_random/bcm2835-rng.c
-> @@ -110,4 +110,4 @@ module_platform_driver(bcm2835_rng_driver);
->  
->  MODULE_AUTHOR("Lubomir Rintel <lkundrak@v3.sk>");
->  MODULE_DESCRIPTION("BCM2835 Random Number Generator (RNG) driver");
-> -MODULE_LICENSE("GPLv2");
-> +MODULE_LICENSE("GPL v2");
+---
+
+Linus, could you fold that into Doug's patch?
+
+diff --git a/drivers/pinctrl/pinctrl-exynos.c b/drivers/pinctrl/pinctrl-exynos.c
+index ef75321..00cd89a 100644
+--- a/drivers/pinctrl/pinctrl-exynos.c
++++ b/drivers/pinctrl/pinctrl-exynos.c
+@@ -279,6 +279,15 @@ err_domains:
+ 	return ret;
+ }
+ 
++static void exynos_wkup_irq_ack(struct irq_data *irqd)
++{
++	struct samsung_pin_bank *b = irq_data_get_irq_chip_data(irqd);
++	struct samsung_pinctrl_drv_data *d = b->drvdata;
++	unsigned long pend = d->ctrl->weint_pend + b->eint_offset;
++
++	writel(1 << irqd->hwirq, d->virt_base + pend);
++}
++
+ static void exynos_wkup_irq_mask(struct irq_data *irqd)
+ {
+ 	struct samsung_pin_bank *b = irq_data_get_irq_chip_data(irqd);
+@@ -296,15 +305,6 @@ static void exynos_wkup_irq_mask(struct irq_data *irqd)
+ 	spin_unlock_irqrestore(&b->slock, flags);
+ }
+ 
+-static void exynos_wkup_irq_ack(struct irq_data *irqd)
+-{
+-	struct samsung_pin_bank *b = irq_data_get_irq_chip_data(irqd);
+-	struct samsung_pinctrl_drv_data *d = b->drvdata;
+-	unsigned long pend = d->ctrl->weint_pend + b->eint_offset;
+-
+-	writel(1 << irqd->hwirq, d->virt_base + pend);
+-}
+-
+ static void exynos_wkup_irq_unmask(struct irq_data *irqd)
+ {
+ 	struct samsung_pin_bank *b = irq_data_get_irq_chip_data(irqd);
