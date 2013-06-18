@@ -1,71 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 17:28:58 +0200
-Subject: [PATCH] ARM: clocksource: add support for MOXA ART SoCs
-In-Reply-To: <1371549604-7201-1-git-send-email-jonas.jensen@gmail.com>
-References: <1371549604-7201-1-git-send-email-jonas.jensen@gmail.com>
-Message-ID: <201306181728.58869.arnd@arndb.de>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Tue, 18 Jun 2013 12:31:19 -0300
+Subject: [PATCH] ARM: Kirkwood: Fix the internal register ranges translation
+Message-ID: <1371569479-31498-1-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Jonas Jensen wrote:
-> This patch adds an clocksource driver for the main timer found
-> on MOXA ART SoCs.
-> 
-> Applies to 3.10-rc1 and arm-soc/for-next (2013-06-15)
-> 
-> Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
+Although the internal register window size is 1 MiB, the previous
+ranges translation for the internal register space had a size of
+0x4000000. This was done to allow the crypto and nand node to access
+the corresponding 'sram' and 'nand' decoding windows.
 
-I didn't look closely before but I agree with Thomas Petazzoni, this should
-be converted to clocksource/clockevent.
+In order to describe the hardware more accurately, we declare the
+real 1 MiB internal register space in the ranges, and add a translation
+entry for the nand node to access the 'nand' window.
 
-A few other things I noticed now:
+This commit will make future improvements on the MBus DT binding easier.
 
-> +#define APB_CLK 48000000
+Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+---
+Tested on Plathome Openblocks A6 board.
 
-You are hardcoding the clock rate above, which makes it less portable
-than it should be. Ideally you would use clk_get_rate() on
-the default clock, but you don't actually implement a clk
-driver for your platform and probably don't need one.
+ arch/arm/boot/dts/kirkwood.dtsi | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-I don't know what others think about this, but I'd suggest just
-using a "clock-frequency" property in the device node to read
-the clock rate.
-
-> +#define TIMER_1_COUNT(base_addr)        (base_addr + 0x00)
-> +#define TIMER_1_LOAD(base_addr)         (base_addr + 0x04)
-> +#define TIMER_1_MATCH1(base_addr)       (base_addr + 0x08)
-> +#define TIMER_1_MATCH2(base_addr)       (base_addr + 0x0C)
-> +
-> +#define TIMER_2_COUNT(base_addr)        (base_addr + 0x10)
-> +#define TIMER_2_LOAD(base_addr)         (base_addr + 0x14)
-> +#define TIMER_2_MATCH1(base_addr)       (base_addr + 0x18)
-> +#define TIMER_2_MATCH2(base_addr)       (base_addr + 0x1C)
-> +
-> +#define TIMER_3_COUNT(base_addr)        (base_addr + 0x20)
-> +#define TIMER_3_LOAD(base_addr)         (base_addr + 0x24)
-> +#define TIMER_3_MATCH1(base_addr)       (base_addr + 0x28)
-> +#define TIMER_3_MATCH2(base_addr)       (base_addr + 0x2C)
-> +
-
-You actually seem to have three independent timers here, which
-means you can use one as the clock source and one for clock
-events.
-
-> +#define TIMER1_COUNT                0x0
-> +#define TIMER1_LOAD                 0x4
-> +#define TIMER1_MATCH1               0x8
-> +#define TIMER1_MATCH2               0xC
-> +#define TIMER2_COUNT                0x10
-> +#define TIMER2_LOAD                 0x14
-> +#define TIMER2_MATCH1               0x18
-> +#define TIMER2_MATCH2               0x1C
-> +#define TIMER3_COUNT                0x20
-> +#define TIMER3_LOAD                 0x24
-> +#define TIMER3_MATCH1               0x28
-> +#define TIMER3_MATCH2               0x2C
-> +#define TIMER_INTR_MASK     0x38
-
-These look like duplicates from above. I'd prefer the second syntax, just
-do the addition of base_addr where you need it.
-
-	Arnd
+diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
+index 8a1e3bb..910fabc 100644
+--- a/arch/arm/boot/dts/kirkwood.dtsi
++++ b/arch/arm/boot/dts/kirkwood.dtsi
+@@ -38,7 +38,8 @@
+ 
+ 	ocp at f1000000 {
+ 		compatible = "simple-bus";
+-		ranges = <0x00000000 0xf1000000 0x4000000
++		ranges = <0x00000000 0xf1000000 0x0100000
++		          0xf4000000 0xf4000000 0x0000400
+ 		          0xf5000000 0xf5000000 0x0000400>;
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -171,7 +172,7 @@
+ 			ale = <1>;
+ 			bank-width = <1>;
+ 			compatible = "marvell,orion-nand";
+-			reg = <0x3000000 0x400>;
++			reg = <0xf4000000 0x400>;
+ 			chip-delay = <25>;
+ 			/* set partition map and/or chip-delay in board dts */
+ 			clocks = <&gate_clk 7>;
+-- 
+1.8.1.5
