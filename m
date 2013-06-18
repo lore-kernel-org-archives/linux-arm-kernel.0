@@ -1,68 +1,45 @@
-From: florian.vaussard@epfl.ch (Florian Vaussard)
-Date: Tue, 18 Jun 2013 10:55:03 +0200
-Subject: [PATCH 2/3] mfd: twl4030-power: Start transition to DT
-In-Reply-To: <20130618000211.GC7998@zurbaran>
-References: <1369921916-7435-1-git-send-email-florian.vaussard@epfl.ch>
- <1369921916-7435-3-git-send-email-florian.vaussard@epfl.ch>
- <20130618000211.GC7998@zurbaran>
-Message-ID: <51C02067.4000302@epfl.ch>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Tue, 18 Jun 2013 10:56:42 +0200
+Subject: [PATCH v2 0/8] MSI support for Marvell EBU PCIe driver
+In-Reply-To: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130618105642.77c4f50d@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Bjorn,
 
-On 06/18/2013 02:02 AM, Samuel Ortiz wrote:
-> Hi Florian,
->
-> On Thu, May 30, 2013 at 03:51:55PM +0200, Florian Vaussard wrote:
->>   int twl4030_power_probe(struct platform_device *pdev)
->>   {
->>   	struct twl4030_power_data *pdata = pdev->dev.platform_data;
->> +	struct device_node *node = pdev->dev.of_node;
->>   	int err = 0;
->> -	int i;
->> -	struct twl4030_resconfig *resconfig;
->> -	u8 val, address = twl4030_start_script_address;
->> +	u8 val;
->> +
->> +	if (!pdata && !node) {
->> +		dev_err(&pdev->dev, "Platform data is missing\n");
->> +		return -EINVAL;
->> +	}
->>
->>   	err = twl_i2c_write_u8(TWL_MODULE_PM_MASTER, TWL4030_PM_MASTER_KEY_CFG1,
->>   			       TWL4030_PM_MASTER_PROTECT_KEY);
->> @@ -525,26 +575,17 @@ int twl4030_power_probe(struct platform_device *pdev)
->>   	if (err)
->>   		goto unlock;
->>
->> -	for (i = 0; i < pdata->num; i++) {
->> -		err = load_twl4030_script(pdata->scripts[i], address);
->> +	if (pdata) {
->> +		err = twl4030_power_configure_scripts(pdata);
->>   		if (err)
->>   			goto load;
->> -		address += pdata->scripts[i]->size;
->> -	}
->> -
->> -	resconfig = pdata->resource_config;
->> -	if (resconfig) {
->> -		while (resconfig->resource) {
->> -			err = twl4030_configure_resource(resconfig);
->> -			if (err)
->> -				goto resource;
->> -			resconfig++;
->> -
->> -		}
->> +		err = twl4030_power_configure_resources(pdata);
->> +		if (err)
->> +			goto resource;
-> You're simplifying the probe routine here by defining 2
-> twl4030_power_configure_* functions. That's good, but it should be a
-> separate patch as it's not related to the DT porting effort.
->
+On Thu,  6 Jun 2013 18:41:20 +0200, Thomas Petazzoni wrote:
 
-I agree. I will post a v2 with the changes.
+> This set of patches introduces Message Signaled Interrupt support in
+> the Marvell EBU PCIe driver. It has been successfully tested on the
+> Armada XP GP platform with an Intel e1000e PCIe network card that
+> supports MSI.
+> 
+> This version 2 follows the RFC version sent on March, 26th 2013. This
+> is based on work done by Lior Amsalem <alior@marvell.com>.
+> 
+> The patches do the following:
+> 
+>  * Patch 1 comes from Thierry Redding, and adds a minimal msi_chip
+>    infrastructure.
+> 
+>    This needs to be reviewed/acked by Bjorn Helgaas.
+> 
+>  * Patch 2 extends the msi_chip infrastructure with a small registry,
+>    so that one driver can register an msi_chip, and another driver can
+>    find the msi_chip associated to a particular Device Tree node.
+> 
+>    This needs to be reviewed/acked by Bjorn Helgaas.
 
-Regards,
-Florian
+Could you have a look at those two patches and let me know what you
+think?
+
+Thanks,
+
+Thomas
+-- 
+Thomas Petazzoni, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
