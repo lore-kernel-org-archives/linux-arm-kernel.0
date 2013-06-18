@@ -1,32 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 20:29:09 +0200
-Subject: [PATCH v2 00/38] Thirty eight patches big Exynos cleanup
-In-Reply-To: <44244927.ekNqhkrd4q@flatron>
-References: <1371486863-12398-1-git-send-email-t.figa@samsung.com>
- <51C09E3C.5050108@samsung.com> <44244927.ekNqhkrd4q@flatron>
-Message-ID: <201306182029.09790.arnd@arndb.de>
+From: pwalmsley@nvidia.com (Paul Walmsley)
+Date: Tue, 18 Jun 2013 11:33:19 -0700
+Subject: [PATCH 3/3] clk: tegra: T114: add DFLL DVCO reset control
+In-Reply-To: <20130618182808.9136.26244@quantum>
+References: <20130607121505.21868.72360.stgit@dusk.lan>
+ <20130607121901.21868.65416.stgit@dusk.lan> <51B21105.1080301@wwwdotorg.org>
+ <alpine.DEB.2.02.1306071703050.7753@utopia.booyaka.com>
+ <51B6D239.5030905@nvidia.com>
+ <alpine.DEB.2.02.1306110944130.22645@utopia.booyaka.com>
+ <20130616042256.7541.7096@quantum>
+ <alpine.DEB.2.02.1306172019270.17176@utopia.booyaka.com>
+ <20130618182808.9136.26244@quantum>
+Message-ID: <51C0A7EF.2020903@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013, Tomasz Figa wrote:
-> OK. Looking forward to it.
-> 
-> Btw. This leaves us with two things broken:
->  - sdhci-s3c checks for defined(CONFIG_SOC_EXYNOS4212), but does not check 
-> for defined(CONFIG_SOC_EXYNOS4412),
->  - exynos-thermal checks for defined(CONFIG_SOC_EXYNOS4412), but does not 
-> check for defined(CONFIG_SOC_EXYNOS4212).
-> 
-> I think this must be fixed, because selecting only Exynos4212 in kernel 
-> config you end up without exynos-thermal, while selecting only Exynos4412 
-> breaks sdhci-s3c.
+On 06/18/2013 11:28 AM, Mike Turquette wrote:
+> Thanks for clarifying. I couldn't tell based on the discussion.
 
-I wonder what we actually gain by having all these fine-grained checks
-in the kernel. Why not just reduce the compile-time checks to just
-EXYNOS4 and EXYNOS5?
+No worries :-)
 
-The drivers can easily implement code for all variants using
-run-time checks, but I think it would be easier if building an EXYNOS4
-kernel would just run on all EXYNOS4 machines.
+> Anyways I've taken these into clk-next now. There is not maintainer 
+> for that directory as you pointed out, so no need to wait for Acks.
 
-	Arnd
+Great, thanks.  Or if you'd prefer to wait for a Reviewed-by:, Peter 
+mentioned today that he might take a look at them.  Either way is fine 
+with me.
+
+
+- Paul
