@@ -1,45 +1,44 @@
-From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
-Date: Tue, 18 Jun 2013 20:36:25 +0200
-Subject: [PATCH 1/2] Watchdog: allow orion_wdt to be built for Dove
-In-Reply-To: <20130618163129.GY31667@titan.lakedaemon.net>
-References: <E1Uoyd2-0001Cp-KL@rmk-PC.arm.linux.org.uk>
- <20130618163129.GY31667@titan.lakedaemon.net>
-Message-ID: <51C0A8A9.4070608@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 18 Jun 2013 20:39:50 +0200
+Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation to
+ the DT binding
+In-Reply-To: <51C0A5F8.8030300@gmail.com>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130618174622.GD2204@obsidianresearch.com> <51C0A5F8.8030300@gmail.com>
+Message-ID: <201306182039.50736.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/18/2013 06:31 PM, Jason Cooper wrote:
-> On Tue, Jun 18, 2013 at 05:19:32PM +0100, Russell King wrote:
->> The watchdog infrastructure in Dove is no different from that in
->> Orion5x or Kirkwood, so let's enable it for Dove.  The only things
->> missing are a few register settings in Dove's bridge-regs.h.
->>
->> Rather than duplicating the same register bit masks for the RSTOUTn_MASK
->> and BRIDGE_CAUSE registers, move the definitions into the watchdog
->> driver itself.
->>
->> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
->> ---
->>   arch/arm/mach-dove/include/mach/bridge-regs.h     |    1 +
->>   arch/arm/mach-kirkwood/include/mach/bridge-regs.h |    2 --
->>   arch/arm/mach-orion5x/include/mach/bridge-regs.h  |    3 ---
->>   drivers/watchdog/Kconfig                          |    2 +-
->>   drivers/watchdog/orion_wdt.c                      |    3 +++
->>   5 files changed, 5 insertions(+), 6 deletions(-)
->
-> There shouldn't be any conflicts on the mvebu side.  Wim, feel free to
-> take it:
->
-> Acked-by: Jason Cooper<jason@lakedaemon.net>
+On Tuesday 18 June 2013, Sebastian Hesselbarth wrote:
+> On 06/18/2013 07:46 PM, Jason Gunthorpe wrote:
+> > On Tue, Jun 18, 2013 at 08:25:28AM -0300, Ezequiel Garcia wrote:
+> >> +
+> >> +IIAA0000
+> >> +
+> >> +Where:
+> >> +  -- I = Marvell defined target ID for programmable windows
+> >> +  -- A = Marvell defined target attributes for programmable windows
+> >
+> > I thought we agreed to something like:
+> >
+> > SIAA0000
+> >
+> > Where 'S' is the designator for the special items like PCI-E and
+> > internal-regs. 0 = normal target ids, 0xF = special ids.
+> >
+> > The target is only 4 bits, the attr is 8, so a little doc update to
+> > clarify this should be enough, no need to change the DTs.
+> 
+> +1 for SIAA0000, as it allows to use MBUS_ID also for those fake
+> windows. It makes it more readable IMHO.
 
-FWIW, you also kind of get my Acked-by, although I was silently hoping
-we can postpone orion wdt until we remove non-DT ;)
++1
 
-With irqchip queued for 3.11, we will ack the timer irqs by a
-chained irq handler. But this will be DT-only and currently also only
-for Kirkwood and Dove (Orion5x DT progress is slow).
+> Also allows you to have up to 40b offset, which might be important
+> with LPAE enabled.
 
-With 3.11 out, I will see how to handle wdt. Either make it non-DT/DT
-aware or also move non-DT to irqchip.
+Not with the current generation I think, since the mbus windows are
+32 bit only, but it would avoid having to come up with a new format
+for a potential future-generation mbus that has wider address.
 
-Sebastian
+	Arnd
