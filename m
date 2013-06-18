@@ -1,78 +1,48 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 18 Jun 2013 18:06:29 -0400 (EDT)
-Subject: [PATCH 1/2] ARM: vexpress/TC2: basic PM support
-In-Reply-To: <CAOesGMiE4uRM01obQA584Neufws5K8HsarA0TVcx-2JmSdNgGQ@mail.gmail.com>
-References: <1370587152-4630-1-git-send-email-nicolas.pitre@linaro.org>
- <1370587152-4630-2-git-send-email-nicolas.pitre@linaro.org>
- <20130613203218.GA22310@quad.lixom.net>
- <alpine.LFD.2.03.1306131817310.18597@syhkavp.arg>
- <20130618172434.GI3289@localhost.localdomain>
- <alpine.LFD.2.03.1306181528050.18597@syhkavp.arg>
- <CAOesGMiE4uRM01obQA584Neufws5K8HsarA0TVcx-2JmSdNgGQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.03.1306181722530.18597@syhkavp.arg>
+From: ddutile@redhat.com (Don Dutile)
+Date: Tue, 18 Jun 2013 18:08:15 -0400
+Subject: DMA mapping API(IOMMU) for ARM64?
+In-Reply-To: <20130618125054.GL9930@arm.com>
+References: <20130618.053955.305832937374936961.hdoyu@nvidia.com>
+ <20130618101914.GB3539@mudshark.cambridge.arm.com>
+ <5159282.rrJMaZuYMv@wuerfel>
+ <20130618.140137.1551430695673122122.hdoyu@nvidia.com>
+ <20130618125054.GL9930@arm.com>
+Message-ID: <51C0DA4F.1010405@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Jun 2013, Olof Johansson wrote:
-
-> I agree with most of the thread so far, but just wanted to highlight this:
-> 
-> On Tue, Jun 18, 2013 at 12:50 PM, Nicolas Pitre
-> <nicolas.pitre@linaro.org> wrote:
-> 
-> > Well... right now I think it is hard to abstract things properly as we
-> > have very few backends.  I would like to see more of them first.
-> 
-> Yes. This.
-> 
-> And this is why it's critical, absolutely critical, that the first one
-> or two implementations go in are as simple and clean as possible.
-
-I'll claim that this is rather utopic.  Simply because, once again, we 
-don't know how to do so yet.  This is an iterative process and things 
-will converge eventually.  But right now, even if the code is not 
-necessarily as simple and clean as possible, it is certainly good enough 
-for a start.
-
-The perfect is the worst enemy of the good enough.
-
-> Otherwise seeing the commonalities and how to abstract them out will
-> be a complete headache, since only the person writing the driver will
-> be able to get a good grasp of it (alternatively, it will take a lot
-> of effort for someone to figure out, clean up, and see the bigger
-> picture).
-
-I don't see things as dramatically.  Probably because I'm one of the 
-people who worked directly on this stuff.  And I don't intend to 
-disappear after the code hits mainline either.  I therefore don't expect 
-things to get out of control.  The job doesn't end there.
-
-We do have ideas about improving things and the discussion is happening.  
-But it would be wrong to wait until we can't think of any way to improve 
-the code any further before merging it.  Otherwise even btrfs would 
-still be out of tree.
-
-The danger right now is that other people will reinvent their own layer 
-because they have no model to follow at all.  That is even worse than 
-having an imperfect model IMHO.
-
-What we need is more exposure of this code.  It needs to be used and 
-fiddled with by more people.  It has lived out of tree for a year 
-already, and it would be about time its evolution happens in mainline 
-from now on.
-
-Let's also not forget that, right now, TC2 is the only fully functional 
-big.LITTLE hardware implementation available to people.  Having it 
-supported in mainline, even if not optimally at first, would greatly 
-help other issues such as scheduler improvements for hybrid 
-multiprocessing which are far more important than this code, as such 
-platform could be distributed to scheduler people who might not always 
-be bothered by low-level PM details and out-of-tree patches.
-
-Please, understand that I fully appreciate the level of review and 
-scrutiny that you provide and you do a very good job at it. However some 
-accommodations for a compromise would be appreciated for the greater 
-good here.
-
-
-Nicolas
+On 06/18/2013 08:50 AM, Catalin Marinas wrote:
+> On Tue, Jun 18, 2013 at 12:01:37PM +0100, Hiroshi Doyu wrote:
+>> Arnd Bergmann<arnd@arndb.de>  wrote @ Tue, 18 Jun 2013 12:32:44 +0200:
+>>> On Tuesday 18 June 2013 11:19:14 Will Deacon wrote:
+>>>> I've spoken briefly with Catalin about this and it seems like there might be
+>>>> *some* scope for sharing common dma-mapping code between architectures.
+>>>> There doesn't really need to be any architecture-specific details in
+>>>> allocating iova space and the interface to the iommu drivers is
+>>>> well-defined. The arch-specific stuff is bogged down in the non-coherent
+>>>> buffer management, but that doesn't necessarily equate to lots of code.
+>>>>
+>>>> So, the best bet would be to figure out how to split up what we have under
+>>>> arch/arm/ so that it can be re-used by arm64 and potentially other
+>>>> architectures (powerpc has some simple stuff for coherent mappings and some
+>>>> less-simple stuff for non-coherent buffers).
+>>>
+>>> I'm sure that other architectures are interested in sharing the code.
+>>> Best move it into the global mm/ directory, at least the version for
+>>> coherent mappings.
+>>
+>> I'm guessing that this kind of unification usually takes some time
+>> since we need to factor out the common code from the different
+>> ${ARCH}/mm/dma-mapping.c. Also some of ${ARCH} has IOMMU support in
+>> it. So if we want to develop our 64-bit ARM with working DMA mapping
+>> API during this transition, the step to take would be:
+>>
+>> 1, Copy arch/arm/mm/dma-mapping.c arch/arm64/mm/dma-mapping.c(+swiotlb)
+>> 2, Adapt arch/arm64/mm/dma-mapping.c(+swiotlb) to 64bit compatible.
+>> 3, Factor out the common code from them into mm/dma-mapping.c
+>
+> Or add the relevant code to something like lib/iommu-helper.c, convert
+> arm64 to use that and we can work on converting arm and other
+> architectures afterwards.
+>
+why not in current drivers/iommu directory ?
