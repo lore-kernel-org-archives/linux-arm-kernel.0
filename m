@@ -1,40 +1,112 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 18 Jun 2013 17:23:00 +0200
-Subject: [PATCH v4 02/10] pinctrl: mvebu: dove pinctrl driver
-In-Reply-To: <20130618151116.GZ2718@n2100.arm.linux.org.uk>
-References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
- <1347550912-18021-3-git-send-email-sebastian.hesselbarth@gmail.com>
- <20130618113606.GA26763@n2100.arm.linux.org.uk>
- <CACRpkdZTVN2O-Rv4u-Ccb9EzV0At3zc7GYQyTq=HkseOi=GTeg@mail.gmail.com>
- <20130618151116.GZ2718@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdadS4Si0pqrxRrnriQk81aZgeKKQta7onEpJv3vi6mfdw@mail.gmail.com>
+From: t.figa@samsung.com (Tomasz Figa)
+Date: Tue, 18 Jun 2013 17:26:31 +0200
+Subject: [PATCH] ARM: EXYNOS: Fix incorrect usage of S5P_ARM_CORE1_* registers
+Message-ID: <1371569191-2364-1-git-send-email-t.figa@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 5:11 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 18, 2013 at 05:02:49PM +0200, Linus Walleij wrote:
->> Nowadays I would do the above with regmap_update_bits().
->>
->> Mutual exclusion for read-modify-write of individual bits in a
->> register is one of those cases where doing a regmap over
->> a memory-mapped register range makes a lot of sense.
->> (drivers/mfd/syscon.c being a nice example)
->
-> So, for that solution we need to have some kind of global regmap per
-> register or somesuch.  Then you run into regmap needing a struct
-> device - well, with a shared register, which struct device do you
-> use, or do you have to invent one?
+S5P_ARM_CORE1_* registers affect only core 1. To control further cores
+properly another registers must be used.
 
-Usually, like for syscon, you create an MFD hub which
-carry the regmap.
+This patch replaces S5P_ARM_CORE1_* register definitions with
+S5P_ARM_CORE_*(x) macro which return addresses of registers for specified
+core.
 
-> That sounds more heavy-weight than is really necessary.
+This fixes CPU hotplug on quad core Exynos SoCs on which currently
+offlining CPUs 2 or 3 caused CPU 1 to be turned off. In addition,
+bring-up of CPU 2 and 3 is fixed on boards where bootloader powers off
+secondary cores by default.
 
-May be so, especially if there is just one register to protect.
-The usefulness of MM-regmap increase with the set of registers
-needing to be protected.
+Cc: stable at vger.kernel.org
+Signed-off-by: Tomasz Figa <t.figa@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos/hotplug.c               |  9 +++++----
+ arch/arm/mach-exynos/include/mach/regs-pmu.h | 10 +++++++---
+ arch/arm/mach-exynos/platsmp.c               |  9 +++++----
+ 3 files changed, 17 insertions(+), 11 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm/mach-exynos/hotplug.c b/arch/arm/mach-exynos/hotplug.c
+index af90cfa..c089943 100644
+--- a/arch/arm/mach-exynos/hotplug.c
++++ b/arch/arm/mach-exynos/hotplug.c
+@@ -93,10 +93,11 @@ static inline void cpu_leave_lowpower(void)
+ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ {
+ 	for (;;) {
++		void __iomem *reg_base;
++		unsigned int phys_cpu = cpu_logical_map(cpu);
+ 
+-		/* make cpu1 to be turned off at next WFI command */
+-		if (cpu == 1)
+-			__raw_writel(0, S5P_ARM_CORE1_CONFIGURATION);
++		reg_base = S5P_ARM_CORE_CONFIGURATION(phys_cpu);
++		__raw_writel(0, reg_base);
+ 
+ 		/*
+ 		 * here's the WFI
+@@ -106,7 +107,7 @@ static inline void platform_do_lowpower(unsigned int cpu, int *spurious)
+ 		    :
+ 		    : "memory", "cc");
+ 
+-		if (pen_release == cpu_logical_map(cpu)) {
++		if (pen_release == phys_cpu) {
+ 			/*
+ 			 * OK, proper wakeup, we're done
+ 			 */
+diff --git a/arch/arm/mach-exynos/include/mach/regs-pmu.h b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+index 57344b7..cf40b86 100644
+--- a/arch/arm/mach-exynos/include/mach/regs-pmu.h
++++ b/arch/arm/mach-exynos/include/mach/regs-pmu.h
+@@ -125,10 +125,14 @@
+ #define S5P_GPS_ALIVE_LOWPWR			S5P_PMUREG(0x13A0)
+ 
+ #define S5P_ARM_CORE0_CONFIGURATION		S5P_PMUREG(0x2000)
++#define S5P_ARM_CORE0_STATUS			S5P_PMUREG(0x2004)
+ #define S5P_ARM_CORE0_OPTION			S5P_PMUREG(0x2008)
+-#define S5P_ARM_CORE1_CONFIGURATION		S5P_PMUREG(0x2080)
+-#define S5P_ARM_CORE1_STATUS			S5P_PMUREG(0x2084)
+-#define S5P_ARM_CORE1_OPTION			S5P_PMUREG(0x2088)
++#define S5P_ARM_CORE_CONFIGURATION(_nr)		\
++		(S5P_ARM_CORE0_CONFIGURATION + ((_nr) * 0x80))
++#define S5P_ARM_CORE_STATUS(_nr)		\
++		(S5P_ARM_CORE0_STATUS + ((_nr) * 0x80))
++#define S5P_ARM_CORE_OPTION(_nr)		\
++		(S5P_ARM_CORE0_OPTION + ((_nr) * 0x80))
+ 
+ #define S5P_ARM_COMMON_OPTION			S5P_PMUREG(0x2408)
+ #define S5P_TOP_PWR_OPTION			S5P_PMUREG(0x2C48)
+diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
+index d9c6d0a..2cbabc8 100644
+--- a/arch/arm/mach-exynos/platsmp.c
++++ b/arch/arm/mach-exynos/platsmp.c
+@@ -109,14 +109,15 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
+ 	 */
+ 	write_pen_release(phys_cpu);
+ 
+-	if (!(__raw_readl(S5P_ARM_CORE1_STATUS) & S5P_CORE_LOCAL_PWR_EN)) {
++	if (!(__raw_readl(S5P_ARM_CORE_STATUS(phys_cpu))
++	    & S5P_CORE_LOCAL_PWR_EN)) {
+ 		__raw_writel(S5P_CORE_LOCAL_PWR_EN,
+-			     S5P_ARM_CORE1_CONFIGURATION);
++			     S5P_ARM_CORE_CONFIGURATION(phys_cpu));
+ 
+ 		timeout = 10;
+ 
+ 		/* wait max 10 ms until cpu1 is on */
+-		while ((__raw_readl(S5P_ARM_CORE1_STATUS)
++		while ((__raw_readl(S5P_ARM_CORE_STATUS(phys_cpu))
+ 			& S5P_CORE_LOCAL_PWR_EN) != S5P_CORE_LOCAL_PWR_EN) {
+ 			if (timeout-- == 0)
+ 				break;
+@@ -125,7 +126,7 @@ static int __cpuinit exynos_boot_secondary(unsigned int cpu, struct task_struct
+ 		}
+ 
+ 		if (timeout == 0) {
+-			printk(KERN_ERR "cpu1 power enable failed");
++			printk(KERN_ERR "cpu%u power enable failed", cpu);
+ 			spin_unlock(&boot_lock);
+ 			return -ETIMEDOUT;
+ 		}
+-- 
+1.8.2.1
