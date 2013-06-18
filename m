@@ -1,102 +1,46 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 18 Jun 2013 19:26:39 +0900
-Subject: [PATCH v4 00/10] ARM: Exynos: Add Exynos5420 SoC support
-In-Reply-To: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
-References: <1371536962-13322-1-git-send-email-chander.kashyap@linaro.org>
-Message-ID: <1c0c01ce6c0e$51eeceb0$f5cc6c10$%kim@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Jun 2013 13:27:25 +0300
+Subject: [PATCH v7 5/9] ARM: OMAP: USB: Add phy binding information
+In-Reply-To: <51C030B4.5070707@ti.com>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+ <1371113039-5784-6-git-send-email-kishon@ti.com>
+ <20130618094438.GT5461@arwen.pp.htv.fi> <51C030B4.5070707@ti.com>
+Message-ID: <20130618102725.GB7843@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Chander Kashyap wrote:
-> 
-> Exynos5420 is new SoC in Samsung's Exynos5 SoC series. This series adds
-> initial support for this SoC.
-> 
-> Changes since v3:
-> 1. Updated the max cpu clock frequency in dt node.
-> 2. Sorted DT nodes alphabetically as suggested by Kukjin.
-> 3. Removed the duplicate commit log comment in:
->    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
->    registration"
-> 4. Added comment for Exynos5440 in commit log of the patch:
->    "ARM: dts: fork out common Exynos5 nodes"
-> 
-> Changes since v2:
-> 
-> 1. Renamed oscclk to fin_pll, in order to keep it consistent with
->    Exynos4/Exynos5
-> 2. Pass memory as single bank rather than splitting in 256MB size banks.
-> 
-> Changes since v1:
-> 
-> 1. As not-dt platforms will not be supported from 3.11 onwards, following
->    patches from previous patch series are dropped:
->    "irqchip: exynos-combiner: set irq base as 256 for Exynos5420"
->    "ARM: Exynos: initialize l2x0 cache controller only for cortex-a9 based
-> SoCs"
-> 2. Added device type property in cpu node in the following patch:
->    "ARM: dts: list the CPU nodes for Exynos5250
-> 3. Sorted out the nodes listed in based upon the physical addresses as
-> suggested
->    by Tomasz Figa.
-> 4. As Tomasz is going to consolidate the secondary cpu power register
-> address
->    calculation in all possible scnarios, hence dropped the following
-patch:
->   "ARM: Exynos: fix secondary cpu power control register address
-> calculation"
-> 5. Replaced the setup/remove)_irq calls with (request/free)_irq calls as
->    suggested by Mark Rutland in patch:
->    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
->     registration"
-> 6. Changed the registration of epll and rpll from pll35xx to pl36xx.
-> 7. Changed driver data selection for serial port, based on ARCH_EXYNOS.
-> 8. Changed the interrupt cells from 2 to 1 as suggested by Tomasz Figa.
-> 
-> Chander Kashyap (10):
->   ARM: dts: fork out common Exynos5 nodes
->   ARM: dts: list the CPU nodes for Exynos5250
->   ARM: Exynos: Add support for Exynos5420 SoC
->   serial: samsung: select Exynos specific driver data if ARCH_EXYNOS is
->     defined
->   ARM: Exynos: use four additional chipid bits to identify Exynos
->     family
->   clk: exynos5420: register clocks using common clock framework
->   ARM: dts: Add initial device tree support for Exynos5420
->   clocksource: exynos_mct: use (request/free)_irq calls for local timer
->     registration
->   ARM: Exynos: add secondary CPU boot base location for Exynos5420
->   ARM: Exynos: extend soft-reset support for Exynos5420
-> 
->  .../devicetree/bindings/clock/exynos5420-clock.txt |  201 ++++++
->  arch/arm/boot/dts/Makefile                         |    1 +
->  arch/arm/boot/dts/exynos5.dtsi                     |  111 +++
->  arch/arm/boot/dts/exynos5250.dtsi                  |   78 +-
->  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   33 +
->  arch/arm/boot/dts/exynos5420.dtsi                  |  103 +++
->  arch/arm/mach-exynos/Kconfig                       |   10 +
->  arch/arm/mach-exynos/common.c                      |   18 +-
->  arch/arm/mach-exynos/include/mach/uncompress.h     |    7 +-
->  arch/arm/mach-exynos/mach-exynos5-dt.c             |    1 +
->  arch/arm/mach-exynos/platsmp.c                     |   12 +-
->  arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
->  drivers/clk/samsung/Makefile                       |    1 +
->  drivers/clk/samsung/clk-exynos5420.c               |  762
-> ++++++++++++++++++++
->  drivers/clocksource/exynos_mct.c                   |   35 +-
->  drivers/tty/serial/samsung.c                       |    4 +-
->  16 files changed, 1279 insertions(+), 106 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/clock/exynos5420-
-> clock.txt
->  create mode 100644 arch/arm/boot/dts/exynos5.dtsi
->  create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
->  create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
->  create mode 100644 drivers/clk/samsung/clk-exynos5420.c
-> 
-> --
-> 1.7.9.5
+Hi,
 
-Looks good to me, will apply with whole 'reviewed-by' comments.
+On Tue, Jun 18, 2013 at 03:34:36PM +0530, Kishon Vijay Abraham I wrote:
+> On Tuesday 18 June 2013 03:14 PM, Felipe Balbi wrote:
+> >On Thu, Jun 13, 2013 at 02:13:55PM +0530, Kishon Vijay Abraham I wrote:
+> >>In order for controllers to get PHY in case of non dt boot, the phy
+> >>binding information (phy device name) should be added in the platform
+> >>data of the controller.
+> >>
+> >>Signed-off-by: Kishon Vijay Abraham I <kishon@ti.com>
+> >
+> >I would rather not pass strings around, any other way to handle this ?
+> >Why do you need to pass this string ?
+> 
+> Our old way of binding the controller and the phy using device name
+> started creating problems after the devices are created using
+> PLATFORM_DEVID_AUTO. Infact non-dt boot is broken in mainline for
+> OMAP3 platforms for which I have posted a RFC series
+> http://www.serverphorums.com/read.php?12,708632 which also uses
+> strings.
+> I'm not sure of any other way to deal with this.
 
-Thanks,
-- Kukjin
+have you checked how other frameworks handle it ? Regulator has some
+sort of binding in board-files, but I guess it passes the regulator
+name?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/b245c2bb/attachment.sig>
