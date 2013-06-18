@@ -1,111 +1,53 @@
-From: dinguyen@altera.com (dinguyen at altera.com)
-Date: Mon, 17 Jun 2013 19:08:48 -0500
-Subject: [PATCH 1/2] ARM: dts: Change dw-apb-timer-osc and dw-apb-timer-sp to
- just dw-apb-timer
+From: john.stultz@linaro.org (John Stultz)
+Date: Mon, 17 Jun 2013 17:38:00 -0700
+Subject: [PATCH 0/2] Fix potential merge conflict for dw_apb_timer_of
 In-Reply-To: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
 References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
-Message-ID: <1371514129-22801-2-git-send-email-dinguyen@altera.com>
+Message-ID: <51BFABE8.5090504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Dinh Nguyen <dinguyen@altera.com>
+On 06/17/2013 05:08 PM, dinguyen at altera.com wrote:
+> From: Dinh Nguyen <dinguyen@altera.com>
+>
+> Hi Arnd/Olof,
+>
+> Because of the following patch series that is currently in arm-soc/for-next:
+>
+> 10021488997317d1121505a7ac659124c058efed clocksource: dw_apb_timer_of: use clocksource_of_init
+> 1b4eca0f634be2a99f2baa6c29dfd183590ead3f clocksource: dw_apb_timer_of: select DW_APB_TIMER
+> a8b447f2bbbba737ff4478f498d7f83c75a9461b clocksource: dw_apb_timer_of: add clock-handling
+> a1198f83407ae3421f3f58355a0f296d5ea6249c clocksource: dw_apb_timer_of: enable the use the clocksource as sched clock
+>
+> there will be a merge conflict with:
+>
+> 55a68c23e0a675b2b8ac2656fd6edbf98b78e4c6 dw_apb_timer_of.c: Remove parts that were picoxcell-specific
+>
+> that is currently in John Stultz's tree fortglx/3.11/time.
 
-"dw-apb-timer-osc" and "dw-apb-timer-sp" are the same implementation of the
-DW APB timer, just fed by different clocks.
+:( That one is also in Thomas' tip/timers/core already.
 
-Signed-off-by: Dinh Nguyen <dinguyen@altera.com>
-CC: Rob Herring <rob.herring@calxeda.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: Olof Johansson <olof@lixom.net>
-CC: Jamie Iles <jamie@jamieiles.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Pavel Machek <pavel@denx.de>
-Cc: devicetree-discuss at lists.ozlabs.org
-Cc: linux-arm-kernel at lists.infradead.org
----
- Documentation/devicetree/bindings/rtc/dw-apb.txt |   21 +++------------------
- arch/arm/boot/dts/socfpga.dtsi                   |   12 ++++++++----
- 2 files changed, 11 insertions(+), 22 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/rtc/dw-apb.txt b/Documentation/devicetree/bindings/rtc/dw-apb.txt
-index eb2327b..0a1020e 100644
---- a/Documentation/devicetree/bindings/rtc/dw-apb.txt
-+++ b/Documentation/devicetree/bindings/rtc/dw-apb.txt
-@@ -1,7 +1,7 @@
- * Designware APB timer
- 
- Required properties:
--- compatible: "snps,dw-apb-timer-sp" or "snps,dw-apb-timer-osc"
-+- compatible: "snps,dw-apb-timer"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: IRQ line for the timer.
-@@ -20,23 +20,8 @@ systems may use one.
- 
- 
- Example:
--
--		timer1: timer at ffc09000 {
--				compatible = "snps,dw-apb-timer-sp";
--				interrupts = <0 168 4>;
--				clock-frequency = <200000000>;
--				reg = <0xffc09000 0x1000>;
--			};
--
--		timer2: timer at ffd00000 {
--				compatible = "snps,dw-apb-timer-osc";
--				interrupts = <0 169 4>;
--				clock-frequency = <200000000>;
--				reg = <0xffd00000 0x1000>;
--			};
--
--		timer3: timer at ffe00000 {
--				compatible = "snps,dw-apb-timer-osc";
-+		timer1: timer at ffe00000 {
-+				compatible = "snps,dw-apb-timer";
- 				interrupts = <0 170 4>;
- 				reg = <0xffe00000 0x1000>;
- 				clocks = <&timer_clk>, <&timer_pclk>;
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index bee62a2..ede33ae 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -476,27 +476,31 @@
- 		};
- 
- 		timer0: timer0 at ffc08000 {
--			compatible = "snps,dw-apb-timer-sp";
-+			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 167 4>;
- 			reg = <0xffc08000 0x1000>;
-+			clocks = <&osc>;
- 		};
- 
- 		timer1: timer1 at ffc09000 {
--			compatible = "snps,dw-apb-timer-sp";
-+			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 168 4>;
- 			reg = <0xffc09000 0x1000>;
-+			clocks = <&osc>;
- 		};
- 
- 		timer2: timer2 at ffd00000 {
--			compatible = "snps,dw-apb-timer-osc";
-+			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 169 4>;
- 			reg = <0xffd00000 0x1000>;
-+			clocks = <&l4_sp_clk>;
- 		};
- 
- 		timer3: timer3 at ffd01000 {
--			compatible = "snps,dw-apb-timer-osc";
-+			compatible = "snps,dw-apb-timer";
- 			interrupts = <0 170 4>;
- 			reg = <0xffd01000 0x1000>;
-+			clocks = <&l4_sp_clk>;
- 		};
- 
- 		uart0: serial0 at ffc02000 {
--- 
-1.7.9.5
+> The following 2 patches will eliminate the need for the patch in John
+> Stultz's tree. If there is to be merge of the 2 trees, then the
+> patch:
+>
+> dw_apb_timer_of.c: Remove parts that were picoxcell-specific
+>
+> can be removed from John's tree to avoid a merge-conflict.
+>
+> Based on arm-soc/for-next:
+>
+> PATCH[1/2] - Rename "dw-apb-timer-osc" and "dw-apb-timer-sp" bindings to just
+> "dw-apb-timer"
+> PATCH[2/2] - Fix user/system reporting by fixing read_sched_clock()
+
+Pavel/Jamie: Can you take a look at these too and make sure these cover what you were doing.
+
+
+So Dinh, just to get this right, you're wanting me to revert  "Remove parts that were picoxcell-specific" and apply your two changes to my tree?
+
+The other 4 patches above are then fine to go in via arm-soc? Or do I need to merge those in too?
+
+thanks
+-john
