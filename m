@@ -1,108 +1,153 @@
-From: hvaibhav@ti.com (Vaibhav Hiremath)
-Date: Tue, 18 Jun 2013 10:37:59 +0530
-Subject: [PATCH 1/2] ARM: AM33XX: clock: Add debugSS clock nodes
-In-Reply-To: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
-References: <1371532080-27714-1-git-send-email-hvaibhav@ti.com>
-Message-ID: <1371532080-27714-2-git-send-email-hvaibhav@ti.com>
+From: inki.dae@samsung.com (Inki Dae)
+Date: Tue, 18 Jun 2013 14:27:40 +0900
+Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+ framework
+In-Reply-To: <20130617182127.GM2718@n2100.arm.linux.org.uk>
+References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
+ <1371467722-665-1-git-send-email-inki.dae@samsung.com>
+ <51BEF458.4090606@canonical.com>
+ <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
+ <20130617133109.GG2718@n2100.arm.linux.org.uk>
+ <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
+ <20130617154237.GJ2718@n2100.arm.linux.org.uk>
+ <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
+ <20130617182127.GM2718@n2100.arm.linux.org.uk>
+Message-ID: <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Represent debugSS clock interface as provided in
-CM_WKUP_DEBUGSS_CLKCTRL register, includes
-	- Clock gate for optional DEBUG_CLKA and DBGSYSCLK
-	- Clock Mux for TRC_PMD and STM_PMD
-	- Clock divider for STM and TPIU
 
-Signed-off-by: Vaibhav Hiremath <hvaibhav@ti.com>
-Acked-by: Paul Walmsley <paul@pwsan.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/cclock33xx_data.c |   47 +++++++++++++++++++++++++++++---
- 1 files changed, 42 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/cclock33xx_data.c b/arch/arm/mach-omap2/cclock33xx_data.c
-index af3544c..6fd0ed1 100644
---- a/arch/arm/mach-omap2/cclock33xx_data.c
-+++ b/arch/arm/mach-omap2/cclock33xx_data.c
-@@ -431,15 +431,11 @@ DEFINE_STRUCT_CLK(aes0_fck, dpll_core_ck_parents, clk_ops_null);
-  *  - Driver code is not yet migrated to use hwmod/runtime pm
-  *  - Modules outside kernel access (to disable them by default)
-  *
-- *     - debugss
-  *     - mmu (gfx domain)
-  *     - cefuse
-  *     - usbotg_fck (its additional clock and not really a modulemode)
-  *     - ieee5000
-  */
--DEFINE_CLK_GATE(debugss_ick, "dpll_core_m4_ck", &dpll_core_m4_ck, 0x0,
--		AM33XX_CM_WKUP_DEBUGSS_CLKCTRL, AM33XX_MODULEMODE_SWCTRL_SHIFT,
--		0x0, NULL);
- 
- DEFINE_CLK_GATE(mmu_fck, "dpll_core_m4_ck", &dpll_core_m4_ck, 0x0,
- 		AM33XX_CM_GFX_MMUDATA_CLKCTRL, AM33XX_MODULEMODE_SWCTRL_SHIFT,
-@@ -863,6 +859,42 @@ static struct clk_hw_omap wdt1_fck_hw = {
- DEFINE_STRUCT_CLK(wdt1_fck, wdt_ck_parents, gpio_fck_ops);
- 
- /*
-+ * debugss optional clocks
-+ */
-+DEFINE_CLK_GATE(dbg_sysclk_ck, "sys_clkin_ck", &sys_clkin_ck,
-+		0x0, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
-+		AM33XX_OPTFCLKEN_DBGSYSCLK_SHIFT, 0x0, NULL);
-+
-+DEFINE_CLK_GATE(dbg_clka_ck, "dpll_core_m4_ck", &dpll_core_m4_ck,
-+		0x0, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
-+		AM33XX_OPTCLK_DEBUG_CLKA_SHIFT, 0x0, NULL);
-+
-+static const char *stm_pmd_clock_mux_ck_parents[] = {
-+	"dbg_sysclk_ck", "dbg_clka_ck",
-+};
-+
-+DEFINE_CLK_MUX(stm_pmd_clock_mux_ck, stm_pmd_clock_mux_ck_parents, NULL, 0x0,
-+	       AM33XX_CM_WKUP_DEBUGSS_CLKCTRL, AM33XX_STM_PMD_CLKSEL_SHIFT,
-+	       AM33XX_STM_PMD_CLKSEL_WIDTH, 0x0, NULL);
-+
-+DEFINE_CLK_MUX(trace_pmd_clk_mux_ck, stm_pmd_clock_mux_ck_parents, NULL, 0x0,
-+	       AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
-+	       AM33XX_TRC_PMD_CLKSEL_SHIFT,
-+	       AM33XX_TRC_PMD_CLKSEL_WIDTH, 0x0, NULL);
-+
-+DEFINE_CLK_DIVIDER(stm_clk_div_ck, "stm_pmd_clock_mux_ck",
-+		   &stm_pmd_clock_mux_ck, 0x0, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
-+		   AM33XX_STM_PMD_CLKDIVSEL_SHIFT,
-+		   AM33XX_STM_PMD_CLKDIVSEL_WIDTH, CLK_DIVIDER_POWER_OF_TWO,
-+		   NULL);
-+
-+DEFINE_CLK_DIVIDER(trace_clk_div_ck, "trace_pmd_clk_mux_ck",
-+		   &trace_pmd_clk_mux_ck, 0x0, AM33XX_CM_WKUP_DEBUGSS_CLKCTRL,
-+		   AM33XX_TRC_PMD_CLKDIVSEL_SHIFT,
-+		   AM33XX_TRC_PMD_CLKDIVSEL_WIDTH, CLK_DIVIDER_POWER_OF_TWO,
-+		   NULL);
-+
-+/*
-  * clkdev
-  */
- static struct omap_clk am33xx_clks[] = {
-@@ -899,7 +931,6 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK("481cc000.d_can",	NULL,		&dcan0_fck),
- 	CLK(NULL,	"dcan1_fck",		&dcan1_fck),
- 	CLK("481d0000.d_can",	NULL,		&dcan1_fck),
--	CLK(NULL,	"debugss_ick",		&debugss_ick),
- 	CLK(NULL,	"pruss_ocp_gclk",	&pruss_ocp_gclk),
- 	CLK(NULL,	"mcasp0_fck",		&mcasp0_fck),
- 	CLK(NULL,	"mcasp1_fck",		&mcasp1_fck),
-@@ -942,6 +973,12 @@ static struct omap_clk am33xx_clks[] = {
- 	CLK(NULL,	"clkout2_div_ck",	&clkout2_div_ck),
- 	CLK(NULL,	"timer_32k_ck",		&clkdiv32k_ick),
- 	CLK(NULL,	"timer_sys_ck",		&sys_clkin_ck),
-+	CLK(NULL,	"dbg_sysclk_ck",	&dbg_sysclk_ck),
-+	CLK(NULL,	"dbg_clka_ck",		&dbg_clka_ck),
-+	CLK(NULL,	"stm_pmd_clock_mux_ck",	&stm_pmd_clock_mux_ck),
-+	CLK(NULL,	"trace_pmd_clk_mux_ck",	&trace_pmd_clk_mux_ck),
-+	CLK(NULL,	"stm_clk_div_ck",	&stm_clk_div_ck),
-+	CLK(NULL,	"trace_clk_div_ck",	&trace_clk_div_ck),
- };
- 
- 
--- 
-1.7.0.4
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Tuesday, June 18, 2013 3:21 AM
+> To: Inki Dae
+> Cc: Maarten Lankhorst; linux-fbdev; Kyungmin Park; DRI mailing list; Rob
+> Clark; myungjoo.ham; YoungJun Cho; Daniel Vetter; linux-arm-
+> kernel at lists.infradead.org; linux-media at vger.kernel.org
+> Subject: Re: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
+> framework
+> 
+> On Tue, Jun 18, 2013 at 02:19:04AM +0900, Inki Dae wrote:
+> > It seems like that all pages of the scatterlist should be mapped with
+> > DMA every time DMA operation  is started (or drm_xxx_set_src_dma_buffer
+> > function call), and the pages should be unmapped from DMA again every
+> > time DMA operation is completed: internally, including each cache
+> > operation.
+> 
+> Correct.
+> 
+> > Isn't that big overhead?
+> 
+> Yes, if you _have_ to do a cache operation to ensure that the DMA agent
+> can see the data the CPU has written.
+> 
+> > And If there is no problem, we should accept such overhead?
+> 
+> If there is no problem then why are we discussing this and why do we need
+> this API extension? :)
+
+Ok, another issue regardless of dmabuf-sync. Reasonable to me even though
+big overhead. Besides, it seems like that most DRM drivers have same issue.
+Therefore, we may need to solve this issue like below:
+	- do not map a dmabuf with DMA. And just create/update buffer object
+of importer.
+	- map the buffer with DMA every time DMA start or iommu page fault
+occurs.
+	- unmap the buffer from DMA every time DMA operation is completed
+
+With the above approach, cache operation portion of my approach,
+dmabuf-sync, can be removed. However, I'm not sure that we really have to
+use the above approach with a big overhead. Of course, if we don't use the
+above approach then user processes would need to do each cache operation
+before DMA operation is started and also after DMA operation is completed in
+some cases; user space mapped with physical memory as cachable, and CPU and
+DMA share the same buffer.
+
+So I'd like to ask for other DRM maintainers. How do you think about it? it
+seems like that Intel DRM (maintained by Daniel), OMAP DRM (maintained by
+Rob) and GEM CMA helper also have same issue Russell pointed out. I think
+not only the above approach but also the performance is very important.
+
+Thanks,
+Inki Dae
+
+> 
+> > Actually, drm_gem_fd_to_handle() includes to map a
+> > given dmabuf with iommu table (just logical data) of the DMA. And then,
+> the
+> > device address (or iova) already mapped will be set to buffer register
+> of
+> > the DMA with drm_xxx_set_src/dst_dma_buffer(handle1, ...) call.
+> 
+> Consider this with a PIPT cache:
+> 
+> 	dma_map_sg()	- at this point, the kernel addresses of these
+> 			buffers are cleaned and invalidated for the DMA
+> 
+> 	userspace writes to the buffer, the data sits in the CPU cache
+> 	Because the cache is PIPT, this data becomes visible to the
+> 	kernel as well.
+> 
+> 	DMA is started, and it writes to the buffer
+> 
+> Now, at this point, which is the correct data?  The data physically in the
+> RAM which the DMA has written, or the data in the CPU cache.  It may
+> the answer is - they both are, and the loss of either can be a potential
+> data corruption issue - there is no way to tell which data should be
+> kept but the system is in an inconsistent state and _one_ of them will
+> have to be discarded.
+> 
+> 	dma_unmap_sg()	- at this point, the kernel addresses of the
+> 			buffers are _invalidated_ and any data in those
+> 			cache lines is discarded
+> 
+> Which also means that the data in userspace will also be discarded with
+> PIPT caches.
+> 
+> This is precisely why we have buffer rules associated with the DMA API,
+> which are these:
+> 
+> 	dma_map_sg()
+> 	- the buffer transfers ownership from the CPU to the DMA agent.
+> 	- the CPU may not alter the buffer in any way.
+> 	while (cpu_wants_access) {
+> 		dma_sync_sg_for_cpu()
+> 		- the buffer transfers ownership from the DMA to the CPU.
+> 		- the DMA may not alter the buffer in any way.
+> 		dma_sync_sg_for_device()
+> 		- the buffer transfers ownership from the CPU to the DMA
+> 		- the CPU may not alter the buffer in any way.
+> 	}
+> 	dma_unmap_sg()
+> 	- the buffer transfers ownership from the DMA to the CPU.
+> 	- the DMA may not alter the buffer in any way.
+> 
+> Any violation of that is likely to lead to data corruption.  Now, some
+> may say that the DMA API is only about the kernel mapping.  Yes it is,
+> because it takes no regard what so ever about what happens with the
+> userspace mappings.  This is absolutely true when you have VIVT or
+> aliasing VIPT caches.
+> 
+> Now consider that with a PIPT cache, or a non-aliasing VIPT cache (which
+> is exactly the same behaviourally from this aspect) any modification of
+> a userspace mapping is precisely the same as modifying the kernel space
+> mapping - and what you find is that the above rules end up _inherently_
+> applying to the userspace mappings as well.
+> 
+> In other words, userspace applications which have mapped the buffers
+> must _also_ respect these rules.
+> 
+> And there's no way in hell that I'd ever trust userspace to get this
+> anywhere near right, and I *really* do not like these kinds of internal
+> kernel API rules being exposed to userspace.
+> 
+> And so the idea that userspace should be allowed to setup DMA transfers
+> via "set source buffer", "set destination buffer" calls into an API is
+> just plain rediculous.  No, userspace should be allowed to ask for
+> "please copy from buffer X to buffer Y using this transform".
+> 
+> Also remember that drm_xxx_set_src/dst_dma_buffer() would have to
+> deal with the DRM object IDs for the buffer, and not the actual buffer
+> information themselves - that is kept within the kernel, so the kernel
+> knows what's happening.
