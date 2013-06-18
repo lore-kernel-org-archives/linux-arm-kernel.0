@@ -1,62 +1,45 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 18 Jun 2013 20:13:51 +0200
-Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
-In-Reply-To: <51C0A1A7.60309@samsung.com>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <1430661.RSssKEDPJD@flatron> <51C0A1A7.60309@samsung.com>
-Message-ID: <1494539.CqPx2jpKaT@flatron>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 18 Jun 2013 14:16:46 -0400 (EDT)
+Subject: [PATCH V2 3/6] USB: OHCI: make ohci-omap3 a separate driver
+In-Reply-To: <1371052442-14541-4-git-send-email-manjunath.goudar@linaro.org>
+Message-ID: <Pine.LNX.4.44L0.1306181414280.1157-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 of June 2013 03:06:31 Kukjin Kim wrote:
-> On 06/19/13 02:59, Tomasz Figa wrote:
-> > Hi Thierry,
-> 
-> [...]
-> 
-> >>> +static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
-> >>> +					unsigned int channel, u8 divisor)
-> >> 
-> >> Nit: please align arguments on subsequent lines with the first
-> >> argument
-> >> of the first line. There's many more of these but I haven't mentioned
-> >> them all explicitly.
-> > 
-> > Hmm, I'm addressing all your comments that aren't addressed yet in v2
-> > at the moment and I'm wondering if this is really the correct way of
-> > breaking function headers...
-> 
-> static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
-> 				    unsigned int channel, u8 divisor)
-> 
-> 
-> I also would preferred to use above style :)
+On Wed, 12 Jun 2013, Manjunath Goudar wrote:
 
-Personally I find it looking better as well, but this is about being 
-compliant with kernel coding style guidelines (which also says that 
-indentation should be done using tabs). Please correct my understanding of 
-the quote below if it is incorrect.
-
-Best regards,
-Tomasz
-
+> Separate the  TI OHCI OMAP3 host controller driver from ohci-hcd
+> host code so that it can be built as a separate driver module.
+> This work is part of enabling multi-platform kernels on ARM;
+> it would be nice to have in 3.11.
 > 
-> - Kukjin
-> 
-> > According to Documentation/CodingStyle:
-> > 
-> > /* Quotation starts */
-> > Statements longer than 80 columns will be broken into sensible chunks,
-> > unless exceeding 80 columns significantly increases readability and
-> > does not hide information. Descendants are always substantially
-> > shorter than the parent and are placed substantially to the right.
-> > The same applies to function headers with a long argument list.
-> > However, never break user- visible strings such as printk messages,
-> > because that breaks the ability to grep for them.
-> > /* Quotation ends */
-> > 
-> > Do I understand this incorrectly or does the above fragment state that
-> > broken lines must be aligned to the right?
-> > 
-> > Best regards,
-> > Tomasz
+> V2:
+>  -ohci_setup() removed because it is called in .reset member
+>   of the ohci_hc_driver structure.
+>  -The improper multi-line commenting style written in proper way.
+>   ('*' characters aligned in vertically).
+
+Generally okay, just one problem...
+
+> @@ -185,7 +118,14 @@ static int ohci_hcd_omap3_probe(struct platform_device *pdev)
+>  	pm_runtime_enable(dev);
+>  	pm_runtime_get_sync(dev);
+>  
+> -	ohci_hcd_init(hcd_to_ohci(hcd));
+> +	ohci = hcd_to_ohci(hcd);
+> +	/*
+> +	 * RemoteWakeupConnected has to be set explicitly before
+> +	 * calling ohci_run. The reset value of RWC is 0.
+> +	 */
+> +	ohci->hc_control = OHCI_CTRL_RWC;
+> +	writel(OHCI_CTRL_RWC, &ohci->regs->control);
+
+ohci->regs doesn't get set until usb_add_hcd, so this line must not 
+appear here.  You can simply remove it.
+
+> +	dev_dbg(hcd->self.controller, "starting OHCI controller\n");
+>  
+>  	ret = usb_add_hcd(hcd, irq, 0);
+>  	if (ret) {
+
+Alan Stern
