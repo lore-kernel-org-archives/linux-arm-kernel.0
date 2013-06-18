@@ -1,57 +1,39 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Tue, 18 Jun 2013 14:11:41 +0200
-Subject: [PATCH v2 4/8] irqchip: armada-370-xp: implement MSI support
-In-Reply-To: <20130618112604.GD6322@mithrandir>
-References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370536888-8871-5-git-send-email-thomas.petazzoni@free-electrons.com>
- <20130612104207.GE30841@mithrandir> <20130618104338.584098e1@skate>
- <20130618112604.GD6322@mithrandir>
-Message-ID: <20130618141141.614d08b7@skate>
+Date: Tue, 18 Jun 2013 14:17:31 +0200
+Subject: [PATCH v3 06/12] memory: mvebu-devbus: Remove address decoding
+ window workaround
+In-Reply-To: <20130618113920.GW31667@titan.lakedaemon.net>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-7-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130618113920.GW31667@titan.lakedaemon.net>
+Message-ID: <20130618141731.56e7966c@skate>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Thierry Reding,
+Dear Jason Cooper,
 
-On Tue, 18 Jun 2013 13:26:04 +0200, Thierry Reding wrote:
-
-> > As I replied to Grant, of_find_device_by_node() returns NULL, I believe
-> > because the all IRQ controller driver initialization is done pretty
-> > early, before the of_platform_populate() call is made, so there is no
-> > platform_device associated with the IRQ controller node at the time the
-> > armada_370_xp_mpic_of_init() function is called.
+On Tue, 18 Jun 2013 07:39:20 -0400, Jason Cooper wrote:
+> On Tue, Jun 18, 2013 at 08:25:31AM -0300, Ezequiel Garcia wrote:
+> > Now that mbus device tree binding has been introduced, remove the address
+> > decoding window management from this driver.
+> > A suitable 'ranges' entry should be added to the devbus-compatible node in
+> > the device tree, as described by the mbus binding documentation.
 > > 
-> > Do you see another approach, especially in relation to your comment on
-> > PATCH 2/8 ?
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> > ---
+> >  drivers/memory/mvebu-devbus.c | 64 ++-----------------------------------------
+> >  1 file changed, 2 insertions(+), 62 deletions(-)
 > 
-> Hmmm, that's too bad. The only other possibility that I see is that you
-> could associate the struct device at a later point when it becomes
-> available, but looking at the irqchip driver it doesn't look like you
-> get notification of that either. I suppose you could add a
-> platform_driver to it and hook things up in its .probe() callback, but
-> I'm not sure if that's in line with how the irqchip was designed. Adding
-> Grant Likely and Thomas Gleixner on Cc, maybe they have better advice.
+> Unfortunately, the patch adding mvebu-devbus is going through gregkh's
+> tree.  Either this patch needs to wait for v3.12, or ask Greg if he can
+> take this one.
 
-If we do hook the MSI stuff in a ->probe() callback, then we'd have a
-dependency between the ->probe() of the PCIe driver and the ->probe()
-of the IRQ controller driver. In order for the PCIe ->probe() to
-succeed, it needs the MSI controller to be registered, which wouldn't
-appear until the ->probe() of the IRQ controller driver gets called. A
-typical case of platform device dependency where the two platform
-devices don't have a bus -> child dependency. Could be handled by a
--EPROBE_DEFER trick, though.
+I believe that what we're looking for right now is a Acked-by from both
+the Marvell maintainers, Arnd Bergmann and Jason Gunthorpe. Once we get
+those Acked-by, we can figure out the merge strategy for this patch
+set.
 
-> Looking at other irqchip drivers I find it a bit odd to see how they're
-> structured, though. We've been preaching for years that drivers should
-> be well-encapsulated and told everybody it was bad to use globals and
-> they should be associating driver-specific data with each instance of a
-> device. Then comes along irqchip and all of a sudden it's okay to use
-> globals again. It feels a bit fragile.
-
-Yes, I've seen this as well, and I'm thinking of doing some
-improvements in this area if there's some interest. But I believe this
-is fairly separate from the specific discussion of this patch set.
-
-Best regards,
+Thanks!
 
 Thomas
 -- 
