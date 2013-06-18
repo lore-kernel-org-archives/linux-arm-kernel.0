@@ -1,24 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 18 Jun 2013 17:08:01 +0200
-Subject: [PATCH] dmaengine: Add hisilicon k3 DMA engine driver
-In-Reply-To: <51C06D19.3020304@linaro.org>
-References: <1371444872-26994-1-git-send-email-zhangfei.gao@linaro.org>
- <201306181609.14966.arnd@arndb.de> <51C06D19.3020304@linaro.org>
-Message-ID: <3686094.n3OCaPGG8M@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 18 Jun 2013 16:11:16 +0100
+Subject: [PATCH v4 02/10] pinctrl: mvebu: dove pinctrl driver
+In-Reply-To: <CACRpkdZTVN2O-Rv4u-Ccb9EzV0At3zc7GYQyTq=HkseOi=GTeg@mail.gmail.com>
+References: <1344689809-6223-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347550912-18021-1-git-send-email-sebastian.hesselbarth@gmail.com>
+ <1347550912-18021-3-git-send-email-sebastian.hesselbarth@gmail.com>
+ <20130618113606.GA26763@n2100.arm.linux.org.uk>
+ <CACRpkdZTVN2O-Rv4u-Ccb9EzV0At3zc7GYQyTq=HkseOi=GTeg@mail.gmail.com>
+Message-ID: <20130618151116.GZ2718@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 June 2013 22:22:17 zhangfei wrote:
-> > With no need to have a filter function.
+On Tue, Jun 18, 2013 at 05:02:49PM +0200, Linus Walleij wrote:
+> Nowadays I would do the above with regmap_update_bits().
 > 
-> Cool, then I would like to wait for the patch.
+> Mutual exclusion for read-modify-write of individual bits in a
+> register is one of those cases where doing a regmap over
+> a memory-mapped register range makes a lot of sense.
+> (drivers/mfd/syscon.c being a nice example)
 
-Maybe you can try to add the dma_get_slave_channel() function I proposed here
-as a first patch and add your driver on top. There may be issues I missed,
-and Vinod needs to agree to the concept first, but that would probably
-get his attention.
+So, for that solution we need to have some kind of global regmap per
+register or somesuch.  Then you run into regmap needing a struct
+device - well, with a shared register, which struct device do you
+use, or do you have to invent one?
 
-Or you could send your the new interface as an add-on patch
-and convert your driver along with adding it.
-
-	Arnd
+That sounds more heavy-weight than is really necessary.
