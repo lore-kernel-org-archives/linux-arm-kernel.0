@@ -1,78 +1,73 @@
 From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 18 Jun 2013 08:25:27 -0300
-Subject: [PATCH v3 02/12] bus: mvebu-mbus: Introduce device tree binding
+Date: Tue, 18 Jun 2013 08:25:29 -0300
+Subject: [PATCH v3 04/12] ARM: mvebu: Initialize MBus using the DT binding
 In-Reply-To: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
 References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
-Message-ID: <1371554737-25319-3-git-send-email-ezequiel.garcia@free-electrons.com>
+Message-ID: <1371554737-25319-5-git-send-email-ezequiel.garcia@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the most fundamental device-tree initialization.
-We only introduce what's required to be able to probe the mvebu-mbus
-driver from the DT. Follow-up patches will extend the device tree binding,
-allowing to describe static address decoding windows.
+Now that the mbus device tree binding has been introduced, we can
+switch over to it.
 
-Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
+Also, and since the initialization of the mbus driver is quite
+fundamental for the system to work properly, this patch adds a BUG()
+in case mbus fails to initialize.
+
 Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
 ---
- drivers/bus/mvebu-mbus.c | 36 ++++++++++++++++++++++++++++++++++++
- include/linux/mbus.h     |  1 +
- 2 files changed, 37 insertions(+)
+ arch/arm/mach-mvebu/armada-370-xp.c | 34 +---------------------------------
+ 1 file changed, 1 insertion(+), 33 deletions(-)
 
-diff --git a/drivers/bus/mvebu-mbus.c b/drivers/bus/mvebu-mbus.c
-index d0feee5..23f6ae6 100644
---- a/drivers/bus/mvebu-mbus.c
-+++ b/drivers/bus/mvebu-mbus.c
-@@ -883,3 +883,39 @@ int __init mvebu_mbus_init(const char *soc, phys_addr_t mbuswins_phys_base,
- 			sdramwins_phys_base,
- 			sdramwins_size);
+diff --git a/arch/arm/mach-mvebu/armada-370-xp.c b/arch/arm/mach-mvebu/armada-370-xp.c
+index 0dbc370..4c312be 100644
+--- a/arch/arm/mach-mvebu/armada-370-xp.c
++++ b/arch/arm/mach-mvebu/armada-370-xp.c
+@@ -34,44 +34,12 @@ static void __init armada_370_xp_map_io(void)
+ 	debug_ll_io_init();
  }
-+
-+#ifdef CONFIG_OF
-+int __init mvebu_mbus_dt_init(void)
-+{
-+	struct resource mbuswins_res, sdramwins_res;
-+	struct device_node *np;
-+	const struct of_device_id *of_id;
-+	int ret;
-+
-+	np = of_find_matching_node(NULL, of_mvebu_mbus_ids);
-+	if (!np) {
-+		pr_err("could not find a matching SoC family\n");
-+		return -ENODEV;
-+	}
-+
-+	of_id = of_match_node(of_mvebu_mbus_ids, np);
-+	mbus_state.soc = of_id->data;
-+
-+	if (of_address_to_resource(np, 0, &mbuswins_res)) {
-+		pr_err("cannot get MBUS register address\n");
-+		return -EINVAL;
-+	}
-+
-+	if (of_address_to_resource(np, 1, &sdramwins_res)) {
-+		pr_err("cannot get SDRAM register address\n");
-+		return -EINVAL;
-+	}
-+
-+	ret = mvebu_mbus_common_init(&mbus_state,
-+				     mbuswins_res.start,
-+				     resource_size(&mbuswins_res),
-+				     sdramwins_res.start,
-+				     resource_size(&sdramwins_res));
-+	return ret;
-+}
-+#endif
-diff --git a/include/linux/mbus.h b/include/linux/mbus.h
-index dba482e..a93c62b 100644
---- a/include/linux/mbus.h
-+++ b/include/linux/mbus.h
-@@ -68,5 +68,6 @@ int mvebu_mbus_del_window(phys_addr_t base, size_t size);
- int mvebu_mbus_init(const char *soc, phys_addr_t mbus_phys_base,
- 		    size_t mbus_size, phys_addr_t sdram_phys_base,
- 		    size_t sdram_size);
-+int mvebu_mbus_dt_init(void);
  
- #endif /* __LINUX_MBUS_H */
+-/*
+- * This initialization will be replaced by a DT-based
+- * initialization once the mvebu-mbus driver gains DT support.
+- */
+-
+-#define ARMADA_370_XP_MBUS_WINS_OFFS   0x20000
+-#define ARMADA_370_XP_MBUS_WINS_SIZE   0x100
+-#define ARMADA_370_XP_SDRAM_WINS_OFFS  0x20180
+-#define ARMADA_370_XP_SDRAM_WINS_SIZE  0x20
+-
+-static void __init armada_370_xp_mbus_init(void)
+-{
+-	char *mbus_soc_name;
+-	struct device_node *dn;
+-	const __be32 mbus_wins_offs = cpu_to_be32(ARMADA_370_XP_MBUS_WINS_OFFS);
+-	const __be32 sdram_wins_offs = cpu_to_be32(ARMADA_370_XP_SDRAM_WINS_OFFS);
+-
+-	if (of_machine_is_compatible("marvell,armada370"))
+-		mbus_soc_name = "marvell,armada370-mbus";
+-	else
+-		mbus_soc_name = "marvell,armadaxp-mbus";
+-
+-	dn = of_find_node_by_name(NULL, "internal-regs");
+-	BUG_ON(!dn);
+-
+-	mvebu_mbus_init(mbus_soc_name,
+-			of_translate_address(dn, &mbus_wins_offs),
+-			ARMADA_370_XP_MBUS_WINS_SIZE,
+-			of_translate_address(dn, &sdram_wins_offs),
+-			ARMADA_370_XP_SDRAM_WINS_SIZE);
+-}
+-
+ static void __init armada_370_xp_timer_and_clk_init(void)
+ {
+ 	mvebu_clocks_init();
+ 	armada_370_xp_timer_init();
+ 	coherency_init();
+-	armada_370_xp_mbus_init();
++	BUG_ON(mvebu_mbus_dt_init());
+ #ifdef CONFIG_CACHE_L2X0
+ 	l2x0_of_init(0, ~0UL);
+ #endif
 -- 
 1.8.1.5
