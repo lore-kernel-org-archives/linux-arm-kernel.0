@@ -1,36 +1,86 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Tue, 18 Jun 2013 11:23:33 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP3EVM: Marking omap3_evm_display_init() with
- CONFIG_BROKEN
-In-Reply-To: <20130618101139.GJ5523@atomide.com>
-References: <1371120838-29599-1-git-send-email-lokeshvutla@ti.com>
- <alpine.DEB.2.02.1306140238270.5514@utopia.booyaka.com>
- <20130618101139.GJ5523@atomide.com>
-Message-ID: <alpine.DEB.2.02.1306181122390.4392@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Jun 2013 04:23:42 -0700
+Subject: [PATCH 4/4] ARM: OMAP2+: dts: HACK: Provide alias to USB PHY clock
+In-Reply-To: <1371553891-29364-5-git-send-email-rogerq@ti.com>
+References: <1371553891-29364-1-git-send-email-rogerq@ti.com>
+ <1371553891-29364-5-git-send-email-rogerq@ti.com>
+Message-ID: <20130618112342.GN5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 18 Jun 2013, Tony Lindgren wrote:
-
-> * Paul Walmsley <paul@pwsan.com> [130613 19:44]:
-> > On Thu, 13 Jun 2013, Lokesh Vutla wrote:
-> > 
-> > > On 37xx EVM non-dt boot fails with current mainline,
-> > > because of broken GPIO numbering in the board file
-> > > that uses hardcoded GPIOs.
-> > > 
-> > > So marking omap3_evm_display_init() with CONFIG_BROKEN
-> > > for now as suggested by Tony as per the below link:
-> > > http://www.mail-archive.com/linux-omap at vger.kernel.org/msg90399.html
-> > > 
-> > > Signed-off-by: Lokesh Vutla <lokeshvutla@ti.com> ---
-> > 
-> > Tested-by: Paul Walmsley <paul@pwsan.com>
+* Roger Quadros <rogerq@ti.com> [130618 04:17]:
+> Till the OMAP clocks are correctly defined in device tree, use
+> this temporary hack to provide clock alias to the USB PHY clocks.
 > 
-> Thanks applying into omap-for-v3.11/board.
+> Without this, USB Host & Ethernet will not be functional with
+> device tree boots on Panda and uEVM.
 
-This one is probably a candidate for v3.10-rc...  Otherwise 37xx EVM won't 
-boot on v3.10.
+Thanks, this looks OK to me to have USB working until we have the
+DT defined clock patches ready.
 
+The $Subject needs updating though, just make it ARM: OMAP2+: and
+leave out the dts and hack from there.
 
-- Paul
+Regards,
+
+Tony
+ 
+> Signed-off-by: Roger Quadros <rogerq@ti.com>
+> ---
+>  arch/arm/mach-omap2/board-generic.c |   23 ++++++++++++++++++++++-
+>  1 files changed, 22 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-generic.c b/arch/arm/mach-omap2/board-generic.c
+> index 88aa6b1..2b2d0de 100644
+> --- a/arch/arm/mach-omap2/board-generic.c
+> +++ b/arch/arm/mach-omap2/board-generic.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/of_irq.h>
+>  #include <linux/of_platform.h>
+>  #include <linux/irqdomain.h>
+> +#include <linux/clk.h>
+>  
+>  #include <asm/mach/arch.h>
+>  
+> @@ -35,6 +36,21 @@ static struct of_device_id omap_dt_match_table[] __initdata = {
+>  	{ }
+>  };
+>  
+> +/*
+> + * HACK: create alias for USB host PHY clock.
+> + * Remove this when clock phandle can be provided via DT
+> + */
+> +static void __init legacy_init_ehci_clk(char *clkname)
+> +{
+> +	int ret;
+> +
+> +	ret = clk_add_alias("main_clk", NULL, clkname, NULL);
+> +	if (ret) {
+> +		pr_err("%s:Failed to add main_clk alias to %s :%d\n",
+> +						__func__, clkname, ret);
+> +	}
+> +}
+> +
+>  static void __init omap_generic_init(void)
+>  {
+>  	omap_sdrc_init(NULL, NULL);
+> @@ -45,10 +61,15 @@ static void __init omap_generic_init(void)
+>  	 * HACK: call display setup code for selected boards to enable omapdss.
+>  	 * This will be removed when omapdss supports DT.
+>  	 */
+> -	if (of_machine_is_compatible("ti,omap4-panda"))
+> +	if (of_machine_is_compatible("ti,omap4-panda")) {
+>  		omap4_panda_display_init_of();
+> +		legacy_init_ehci_clk("auxclk3_ck");
+> +
+> +	}
+>  	else if (of_machine_is_compatible("ti,omap4-sdp"))
+>  		omap_4430sdp_display_init_of();
+> +	else if (of_machine_is_compatible("ti,omap5-uevm"))
+> +		legacy_init_ehci_clk("auxclk1_ck");
+>  }
+>  
+>  #ifdef CONFIG_SOC_OMAP2420
+> -- 
+> 1.7.4.1
+> 
