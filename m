@@ -1,59 +1,58 @@
 From: jgunthorpe@obsidianresearch.com (Jason Gunthorpe)
-Date: Tue, 18 Jun 2013 13:02:23 -0600
-Subject: [PATCH v3 11/12] ARM: mvebu: Relocate Armada 370 PCIe device
- tree nodes
-In-Reply-To: <201306182022.08927.arnd@arndb.de>
+Date: Tue, 18 Jun 2013 13:10:18 -0600
+Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
+ to the DT binding
+In-Reply-To: <51C0ADF7.5050609@gmail.com>
 References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
- <201306181918.59046.arnd@arndb.de> <20130618192154.4c1530cc@skate>
- <201306182022.08927.arnd@arndb.de>
-Message-ID: <20130618190223.GA6578@obsidianresearch.com>
+ <20130618174622.GD2204@obsidianresearch.com>
+ <51C0A5F8.8030300@gmail.com> <201306182039.50736.arnd@arndb.de>
+ <51C0AA8E.9080807@gmail.com>
+ <20130618184753.GA6090@obsidianresearch.com>
+ <51C0ADF7.5050609@gmail.com>
+Message-ID: <20130618191018.GB6578@obsidianresearch.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 08:22:08PM +0200, Arnd Bergmann wrote:
+On Tue, Jun 18, 2013 at 08:59:03PM +0200, Sebastian Hesselbarth wrote:
 
-> > > > Arnd, we've discussed this at length with you while getting the PCIe
-> > > > driver merged, and we've explained this to you numerous times. Could
-> > > > you please understand that any of your proposal that suggests writing
-> > > > down static windows for PCIe devices will not work?
-> > > 
-> > > Where did I suggest static windows for PCIe devices?
-> > 
-> > Where does your new proposal buys us anything useful compared to the
-> > existing PCIe DT binding that has been discussed at length with you?
+> >S = 0 means 4 bit I, 8 bit A
+> >S = F means special
+> >S = 1 could mean 16 bit I, etc , etc
 > 
-> I'm pretty sure I explained the idea above originally and was ignored.
-> Jason Gunthorpe might remember better, but I think he liked it when I
-> originally proposed doing it this way.
+> S & 0x8 == 0x0 means 7b target
+> S & 0x8 == 0x8 means 7b special ?
 
-I remember it took a bit to understand your proposal, but I thought it
-could work, but I admit I forget all the little details now :(
+No need, special == mbus driver defined. There is no target ID.
 
-Ah, if I can just rephrase simply - the notion was to move the
-determination of the aperture to use dynmic allocation and then
-restructure the ranges around the mbus target, since they no longer
-need to encode the aperture.
+The forms could be:
 
-My concern: dynamically sizing the aperture is hard. There are three
-apertures that need to be picked, and the PCI core code has no support
-for dynamic apertures. Getting the aperture from the DT is a
-functional compromise.
+ 0IAA0000
+ FK000000
+   - K=0 -> internal regs
+   - K=1 -> PCI-E thingy
+    etc
+ 1IIAA000 (future expansion example)
 
-> * Since the host physical address for the PCIe memory space window
->   is set up dynamically anyway, there is no reason to hardcode it in
->   DT. We want it to be as large as possible, and this way the mbus
->   driver can just pick the largest free area itself after setting up
->   all the other mappings from the ranges property.
 
-This seems to get really complicated if the mbus driver is ever
-required to support dynamic mappings.. If PCI-E claims all memory and
-then you modprobe something it could fail.
+> >The mbus top level ranges remap already supports>4G locations for
+> >the windows, even though current hardware cannot do that.
+> 
+> True. But as Arnd also mentioned, I don't think it will ever be a
+> problem at all. Possibly there will never be any future SoC with mbus
+> that will either allow >32b remap base addresses nor >4G size.
 
-IMHO, I go back to my original thoughts. There is no real need for any
-of this to be dynamic, we can use the values in the DT, presumably set
-by the bootloader and things will work well.
+Actually, I think the failure to allow > 32b remap is a mistake
+on Marvell's part. Linux needs as much low memory as possible, moving
+things above 4G gives you more low SDRAM.
 
-The added complexity and failure modes for dynamic is simply not worth
-it..
+So I'd hope to see 40bit addressing for MBUS windows in a future chip.
+
+But again, that already works with what Ezequiel has..
+
+To be very clear, the only issue with the 32 bit offset is if we need
+to describe an offset into a target in DT that is larger than 32
+bits. The only use of offsets in DT is for internal regs. The
+need for a > 32 bit offset in DT does not exist with the current
+architecture.
 
 Jason
