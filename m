@@ -1,107 +1,96 @@
-From: chander.kashyap@linaro.org (Chander Kashyap)
-Date: Tue, 18 Jun 2013 09:58:08 +0530
-Subject: [PATCH v3 00/10] ARM: Exynos: Add Exynos5420 SoC support
-In-Reply-To: <1a0401ce6b51$b58a3620$209ea260$%kim@samsung.com>
-References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
- <1a0401ce6b51$b58a3620$209ea260$%kim@samsung.com>
-Message-ID: <CANuQgHFx72xNYFN1h6t63OB5gc8nzaBtik=A2WseOXjgMDvhdw@mail.gmail.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Tue, 18 Jun 2013 10:04:28 +0530
+Subject: [PATCH v10 1/2] ARM: davinci: move private EDMA API to arm/common
+In-Reply-To: <083BC63EECB6FD41B8E81CF7FD87CC0F2E4E95C2@DLEE08.ent.ti.com>
+References: <1371463571-2578-1-git-send-email-nsekhar@ti.com>
+ <1371463571-2578-2-git-send-email-nsekhar@ti.com>
+ <20130617170326.GA28497@quad.lixom.net>
+ <083BC63EECB6FD41B8E81CF7FD87CC0F2E4E95C2@DLEE08.ent.ti.com>
+Message-ID: <51BFE354.6070207@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 June 2013 17:26, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> Chander Kashyap wrote:
+On 6/17/2013 11:25 PM, Fernandes, Joel A wrote:
+> Hi Olof,
+> 
+>> -----Original Message-----
+>> From: Olof Johansson [mailto:olof at lixom.net]
+>> Sent: Monday, June 17, 2013 12:03 PM
+>> To: Nori, Sekhar
+>> Cc: Russell King; Vinod Koul; Chris Ball; Liam Girdwood; Mark Brown; Kevin
+>> Hilman; Matt Porter; Fernandes, Joel A; linux-arm-kernel at lists.infradead.org;
+>> davinci-linux-open-source at linux.davincidsp.com; linux-mmc at vger.kernel.org;
+>> alsa-devel at alsa-project.org; Arnd Bergmann
+>> Subject: Re: [PATCH v10 1/2] ARM: davinci: move private EDMA API to
+>> arm/common
 >>
->> Exynos5420 is new SoC in Samsung's Exynos5 SoC series. This series adds
->> initial support for this SoC.
->> Changes since v2:
+>> On Mon, Jun 17, 2013 at 03:36:10PM +0530, Sekhar Nori wrote:
+>>> From: Matt Porter <mporter@ti.com>
+>>>
+>>> Move mach-davinci/dma.c to common/edma.c so it can be used by OMAP
+>>> (specifically AM33xx) as well.
+>>>
+>>> Signed-off-by: Matt Porter <mporter@ti.com>
+>>> Acked-by: Chris Ball <cjb@laptop.org> # davinci_mmc.c
+>>> [nsekhar at ti.com: dropped davinci sffsdr changes]
+>>> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 >>
->> 1. Renamed oscclk to fin_pll, in order to keep it consistant with
->> Exynos4/Exynos5
->> 2. Pass memory as single bank rather than splitting in 256MB size banks.
+>> Acked-by: Olof Johansson <olof@lixom.net>
 >>
->> Changes since v1:
+>> Tiny nit below, no need to respin just for that.
 >>
->> 1. As not-dt platforms will not be supported from 3.11 onwards, following
->>    patches from previous patch series are dropped:
->>    "irqchip: exynos-combiner: set irq base as 256 for Exynos5420"
->>    "ARM: Exynos: initialize l2x0 cache controller only for cortex-a9 based
->> SoCs"
->> 2. Added device type property in cpu node in the following patch:
->>    "ARM: dts: list the CPU nodes for Exynos5250
->> 3. Sorted out the nodes listed in based upon the physical addresses as
->> suggested
->>    by Tomasz Figa.
->> 4. As Tomasz is going to consolidate the secondary cpu power register
->> address
->>    calculation in all possible scnarios, hence dropped the following
-> patch:
->>   "ARM: Exynos: fix secondary cpu power control register address
->> calculation"
->> 5. Replaced the setup/remove)_irq calls with (request/free)_irq calls as
->>    suggested by Mark Rutland in patch:
->>    "clocksource: exynos_mct: use (request/free)_irq calls for local timer
->>     registration"
->> 6. Changed the registration of epll and rpll from pll35xx to pl36xx.
->> 7. Changed driver data selection for serial port, based on ARCH_EXYNOS.
->> 8. Changed the interrupt cells from 2 to 1 as suggested by Tomasz Figa.
+>> I suppose we should take this through arm-soc.
 >>
->> Chander Kashyap (10):
->>   ARM: dts: fork out common Exynos5 nodes
->>   ARM: dts: list the CPU nodes for Exynos5250
->>   ARM: Exynos: Add support for Exynos5420 SoC
->>   serial: samsung: select Exynos specific driver data if ARCH_EXYNOS is
->>     defined
->>   ARM: Exynos: use four additional chipid bits to identify Exynos
->>     family
->>   clk: exynos5420: register clocks using common clock framework
->>   ARM: dts: Add initial device tree support for Exynos5420
->>   clocksource: exynos_mct: use (request/free)_irq calls for local timer
->>     registration
->>   ARM: Exynos: add secondary CPU boot base location for Exynos5420
->>   ARM: Exynos: extend soft-reset support for Exynos5420
+>>> ---
+>>>  arch/arm/Kconfig                                   |    1 +
+>>>  arch/arm/common/Kconfig                            |    3 +
+>>>  arch/arm/common/Makefile                           |    1 +
+>>>  arch/arm/{mach-davinci/dma.c => common/edma.c}     |    2 +-
+>>>  arch/arm/mach-davinci/Makefile                     |    2 +-
+>>>  arch/arm/mach-davinci/board-tnetv107x-evm.c        |    2 +-
+>>>  arch/arm/mach-davinci/davinci.h                    |    2 +-
+>>>  arch/arm/mach-davinci/devices-tnetv107x.c          |    2 +-
+>>>  arch/arm/mach-davinci/devices.c                    |    6 +-
+>>>  arch/arm/mach-davinci/dm355.c                      |    2 +-
+>>>  arch/arm/mach-davinci/dm365.c                      |    2 +-
+>>>  arch/arm/mach-davinci/dm644x.c                     |    2 +-
+>>>  arch/arm/mach-davinci/dm646x.c                     |    2 +-
+>>>  arch/arm/mach-davinci/include/mach/da8xx.h         |    2 +-
+>>>  drivers/dma/edma.c                                 |    2 +-
+>>>  drivers/mmc/host/davinci_mmc.c                     |    1 +
+>>>  include/linux/mfd/davinci_voicecodec.h             |    3 +-
+>>>  .../mach => include/linux/platform_data}/edma.h    |   89 +-------------------
+>>>  include/linux/platform_data/spi-davinci.h          |    2 +-
+>>>  sound/soc/davinci/davinci-evm.c                    |    1 +
+>>>  sound/soc/davinci/davinci-pcm.c                    |    1 +
+>>>  sound/soc/davinci/davinci-pcm.h                    |    2 +-
+>>>  22 files changed, 29 insertions(+), 103 deletions(-)  rename
+>>> arch/arm/{mach-davinci/dma.c => common/edma.c} (99%)  rename
+>>> {arch/arm/mach-davinci/include/mach =>
+>>> include/linux/platform_data}/edma.h (59%)
+>>>
+>>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig index
+>>> 49d993c..b1c66a4 100644
+>>> --- a/arch/arm/Kconfig
+>>> +++ b/arch/arm/Kconfig
+>>> @@ -840,6 +840,7 @@ config ARCH_DAVINCI
+>>>  	select GENERIC_IRQ_CHIP
+>>>  	select HAVE_IDE
+>>>  	select NEED_MACH_GPIO_H
+>>> +	select TI_PRIV_EDMA
 >>
->>  .../devicetree/bindings/clock/exynos5420-clock.txt |  201 ++++++
->>  arch/arm/boot/dts/Makefile                         |    1 +
->>  arch/arm/boot/dts/exynos5.dtsi                     |  111 +++
->>  arch/arm/boot/dts/exynos5250.dtsi                  |   80 +-
->>  arch/arm/boot/dts/exynos5420-smdk5420.dts          |   33 +
->>  arch/arm/boot/dts/exynos5420.dtsi                  |  103 +++
->>  arch/arm/mach-exynos/Kconfig                       |   10 +
->>  arch/arm/mach-exynos/common.c                      |   18 +-
->>  arch/arm/mach-exynos/include/mach/uncompress.h     |    7 +-
->>  arch/arm/mach-exynos/mach-exynos5-dt.c             |    1 +
->>  arch/arm/mach-exynos/platsmp.c                     |   12 +-
->>  arch/arm/plat-samsung/include/plat/cpu.h           |    8 +
->>  drivers/clk/samsung/Makefile                       |    1 +
->>  drivers/clk/samsung/clk-exynos5420.c               |  762
->> ++++++++++++++++++++
->>  drivers/clocksource/exynos_mct.c                   |   35 +-
->>  drivers/tty/serial/samsung.c                       |    4 +-
->>  16 files changed, 1280 insertions(+), 107 deletions(-)
->>  create mode 100644 Documentation/devicetree/bindings/clock/exynos5420-
->> clock.txt
->>  create mode 100644 arch/arm/boot/dts/exynos5.dtsi
->>  create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
->>  create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
->>  create mode 100644 drivers/clk/samsung/clk-exynos5420.c
+>> What does PRIV here mean? Privileged? Private? I think it can be shortened to
+>> TI_EDMA.
 >>
->> --
->> 1.7.9.5
->
-> Chander, basically looks good to me but there are some comments on several
-> patches.
-Thanks Kukjin.
->
-> Please address comments then, let me take this series after getting Mike's
-> ack on clock stuff.
-I will address the comments and resend.
->
-> Thanks,
-> - Kukjin
->
+>  [Joel] TI_EDMA already exists. It is used to build drivers/dma/edma.
+> I have a patch that reuses the TI_EDMA option instead of the PRIV one . I will
+> include that In my v11 series for EDMA (v10 was just posted) . If its ok, let us
+> merge Sekhar's patch as-is, and then mine will get rid of the PRIV option
+> (among other things).
 
+PRIV is short for "private". We will get rid of TI_PRIV_EDMA along with
+all users of private DMA API (including audio). TI_EDMA and TI_PRIV_EDMA
+denote different things and we cannot reuse one for the other.
 
-
---
-with warm regards,
-Chander Kashyap
+Thanks,
+Sekhar
