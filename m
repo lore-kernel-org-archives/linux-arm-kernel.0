@@ -1,99 +1,62 @@
-From: sylvester.nawrocki@gmail.com (Sylwester Nawrocki)
-Date: Tue, 18 Jun 2013 23:22:52 +0200
-Subject: [PATCH v7 1/9] drivers: phy: add generic PHY framework
-In-Reply-To: <1371113039-5784-2-git-send-email-kishon@ti.com>
-References: <1371113039-5784-1-git-send-email-kishon@ti.com>
- <1371113039-5784-2-git-send-email-kishon@ti.com>
-Message-ID: <51C0CFAC.9080606@gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 18 Jun 2013 23:33:45 +0200
+Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
+In-Reply-To: <1494539.CqPx2jpKaT@flatron>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1430661.RSssKEDPJD@flatron> <51C0A1A7.60309@samsung.com>
+ <1494539.CqPx2jpKaT@flatron>
+Message-ID: <20130618213344.GA1926@mithrandir>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
+On Tue, Jun 18, 2013 at 08:13:51PM +0200, Tomasz Figa wrote:
+> On Wednesday 19 of June 2013 03:06:31 Kukjin Kim wrote:
+> > On 06/19/13 02:59, Tomasz Figa wrote:
+> > > Hi Thierry,
+> > 
+> > [...]
+> > 
+> > >>> +static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
+> > >>> +					unsigned int channel, u8 divisor)
+> > >> 
+> > >> Nit: please align arguments on subsequent lines with the first
+> > >> argument
+> > >> of the first line. There's many more of these but I haven't mentioned
+> > >> them all explicitly.
+> > > 
+> > > Hmm, I'm addressing all your comments that aren't addressed yet in v2
+> > > at the moment and I'm wondering if this is really the correct way of
+> > > breaking function headers...
+> > 
+> > static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
+> > 				    unsigned int channel, u8 divisor)
+> > 
+> > 
+> > I also would preferred to use above style :)
+> 
+> Personally I find it looking better as well, but this is about being 
+> compliant with kernel coding style guidelines (which also says that 
+> indentation should be done using tabs). Please correct my understanding of 
+> the quote below if it is incorrect.
 
-I've noticed there is a little inconsistency between the code and 
-documentation.
+"placed substantially to the right" doesn't imply right-aligned. My
+understanding is that it should be indented enough to make it stand
+apart. I don't recall ever seeing right-aligned code.
 
-On 06/13/2013 10:43 AM, Kishon Vijay Abraham I wrote:
-> +3. Creating the PHY
-> +
-> +The PHY driver should create the PHY in order for other peripheral controllers
-> +to make use of it. The PHY framework provides 2 APIs to create the PHY.
-> +
-> +struct phy *phy_create(struct device *dev, int id, const struct phy_ops *ops,
-> +	void *priv);
-> +struct phy *devm_phy_create(struct device *dev, int id,
-> +	const struct phy_ops *ops, void *priv);
+And regarding tabs, you should be indenting using tabs as far as
+possible and use spaces for the final alignment, so:
 
-The 'label' argument is missing in those function prototypes. It seems the
-labels must be unique, I guess this needs to be documented. And do we allow
-NULL labels ? If so, then there is probably a check for NULL label needed
-in phy_lookup() and if not, then phy_create() should fail when NULL label
-is passed ?
+static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
+				    unsigned int channel, u8 divisor)
 
-> +The PHY drivers can use one of the above 2 APIs to create the PHY by passing
-> +the device pointer, id, phy ops and a driver data.
-> +phy_ops is a set of function pointers for performing PHY operations such as
-> +init, exit, power_on and power_off.
+In case your emailer doesn't highlight it, that's four tabs and four
+spaces.
 
-> +/**
-> + * phy_create() - create a new phy
-> + * @dev: device that is creating the new phy
-> + * @id: id of the phy
-> + * @ops: function pointers for performing phy operations
-> + * @label: label given to the phy
-> + * @priv: private data from phy driver
-> + *
-> + * Called to create a phy using phy framework.
-> + */
-> +struct phy *phy_create(struct device *dev, u8 id, const struct phy_ops *ops,
-> +	const char *label, void *priv)
-> +{
-> +	int ret;
-> +	struct phy *phy;
-> +
-> +	if (!dev) {
-> +		dev_WARN(dev, "no device provided for PHY\n");
-> +		ret = -EINVAL;
-> +		goto err0;
-> +	}
-> +
-> +	phy = kzalloc(sizeof(*phy), GFP_KERNEL);
-> +	if (!phy) {
-> +		ret = -ENOMEM;
-> +		goto err0;
-> +	}
-> +
-> +	device_initialize(&phy->dev);
-> +
-> +	phy->dev.class = phy_class;
-> +	phy->dev.parent = dev;
-> +	phy->dev.of_node = dev->of_node;
-> +	phy->id = id;
-> +	phy->ops = ops;
-> +	phy->label = label;
-> +
-> +	dev_set_drvdata(&phy->dev, priv);
-> +
-> +	ret = dev_set_name(&phy->dev, "%s.%d", dev_name(dev), id);
-> +	if (ret)
-> +		goto err1;
-> +
-> +	ret = device_add(&phy->dev);
-> +	if (ret)
-> +		goto err1;
-> +
-> +	if (pm_runtime_enabled(dev))
-> +		pm_runtime_enable(&phy->dev);
-> +
-> +	return phy;
-> +
-> +err1:
-> +	put_device(&phy->dev);
-> +	kfree(phy);
-> +
-> +err0:
-> +	return ERR_PTR(ret);
-> +}
-
-Thanks,
-Sylwester
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/274c58b2/attachment-0001.sig>
