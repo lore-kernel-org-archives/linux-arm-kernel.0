@@ -1,136 +1,164 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Tue, 18 Jun 2013 17:35:00 -0500
-Subject: [PATCH 3/3] ARM: dts: OMAP2+: Add mailbox nodes
-Message-ID: <1371594900-37640-1-git-send-email-s-anna@ti.com>
+From: tomasz.figa@gmail.com (Tomasz Figa)
+Date: Wed, 19 Jun 2013 00:45:02 +0200
+Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
+In-Reply-To: <20130618221705.GC1926@mithrandir>
+References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
+ <1920640.1A218CWh3x@flatron> <20130618221705.GC1926@mithrandir>
+Message-ID: <1433668.INLZy9nfLF@flatron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mailbox DT node data has been added for OMAP2420,
-OMAP2430, OMAP3430/OMAP3630, OMAP44xx devices. Data for
-OMAP5 is skipped for now since the corresponding hwmod
-entry is not present.
+On Wednesday 19 of June 2013 00:17:06 Thierry Reding wrote:
+> On Mon, Jun 17, 2013 at 10:50:40PM +0200, Tomasz Figa wrote:
+> > On Monday 17 of June 2013 22:29:11 Thierry Reding wrote:
+> > > On Wed, Jun 05, 2013 at 11:18:13PM +0200, Tomasz Figa wrote:
+> [...]
+> 
+> > > > +#ifndef CONFIG_CLKSRC_SAMSUNG_PWM
+> > > > +static DEFINE_SPINLOCK(samsung_pwm_lock);
+> > > > +#endif
+> > > 
+> > > Why is this lock global? Shouldn't it more correctly be part of
+> > > samsung_pwm_chip?
+> > 
+> > There are few registers shared with samsung_pwm_timer clocksource
+> > driver and so normally the spinlock is exported from it. However on
+> > on some platforms (namely Exynos >=4x12) kernel can be compiled
+> > without that driver, so the lock must be defined locally, just to
+> > synchronize multiple PWM channels, as they share registers as well.
+> 
+> Okay, I think this needs further explanation. The clocksource driver is
+> used for what exactly? From a quick look it seems to be very much PWM-
+> specific. According to the device tree binding for the PWM driver, the
+> timer blocks can also be used as clock sources and clock event timers.
+> So if I understand correctly you have setups where you use one or more
+> channels as clock source or clock event timer and one or more channels
+> as PWM outputs.
+> 
+> In that case it's a very bad idea to use a global lock to synchronize
+> accesses. You need to do much more than that. To properly split this
+> across several drivers there needs to be a mechanism to allocate
+> channels for use either as clock source/event timer or PWM. Otherwise,
+> how do you know that drivers aren't stepping on each other's toes?
+> 
+> > > > +		ret = pwm_samsung_parse_dt(chip);
+> > > > +		if (ret)
+> > > > +			return ret;
+> > > > +
+> > > > +		chip->chip.of_xlate = of_pwm_xlate_with_flags;
+> > > > +		chip->chip.of_pwm_n_cells = 3;
+> > > > +	} else {
+> > > > +		if (!pdev->dev.platform_data) {
+> > > > +			dev_err(&pdev->dev, "no platform data
+> > 
+> > specified\n");
+> > 
+> > > > +			return -EINVAL;
+> > > > +		}
+> > > > +
+> > > > +		memcpy(&chip->variant, pdev->dev.platform_data,
+> > > > +							
+sizeof(chip-
+> > >
+> > >variant));
+> > >
+> > > > +	}
+> > > 
+> > > Obviously this needs some modification in order for the variant to
+> > > become constant. But I think you can easily do so by making the
+> > > driver
+> > > match using the platform_driver's id_table field, similar to how the
+> > > matching is done for OF.
+> > 
+> > Generally output_mask is board-dependent and is passed inside a
+> > variant
+> > struct using platform_data pointer.
+> 
+> That's okay. But output_mask is the only thing that's board-dependent.
+> Everything else in the variant is SoC dependent judging by the OF device
+> table. So really only the output_mask should be part of the platform
+> data.
+> 
+> > Same platform data is used in samsung_pwm_timer clocksource driver, so
+> > I just reused it here without adding the need to rename platform
+> > device at runtime (see arch/arm/plat-samsung/devs.c).
+> 
+> Looking a bit at git log for the clocksource driver, there's this
+> commit:
+> 
+> 	a3ce54f clocksource: samsung_pwm_timer: Do not request PWM mem 
+region
+> 
+> That's an ugly workaround for sharing registers between two drivers.
+> There's a reason why drivers do request_mem_region(), and it is
+> precisely to prevent them from accessing the same registers. As I
+> already said above, I think you need to come up with some sort of API to
+> share resources between the drivers.
+> 
+> There was a similar issue a few months back with the pwm-tiehrpwm and
+> pwm-tiecap drivers, which use a shared block of registers. Initially
+> something similar was done as you do here, but eventually we came up
+> with a much better solution that involved introducing a new driver for
+> the shared functionality and an exported API.
+> 
+> The situation seems to be somewhat different here since you actually
+> share the same resources for different functionality instead of sharing
+> one subset of register across multiple drivers, but I think a similar
+> solution can be applied here.
 
-The mailbox static device initialization logic is also
-adjusted for a DT boot.
+Well, current design, or rather lack of thereof, has been established 
+after a significant amount of discussion, mostly with ARM SoC and MFD 
+maintainers.
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/boot/dts/omap2420.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/omap2430.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/omap3.dtsi    | 12 ++++++++++++
- arch/arm/boot/dts/omap4.dtsi    | 12 ++++++++++++
- arch/arm/mach-omap2/devices.c   |  2 +-
- 5 files changed, 50 insertions(+), 1 deletion(-)
+It started from a simple reorganization of the clocksource driver to be 
+multiplatform friendly, without any means of synchronizing both drivers 
+other than local_irq_save() and _restore() that used to be there 
+originally, before I started my work on this. This was enough to work 
+correctly, because both drivers at the same time are used only on 
+uniprocessor systems.
 
-diff --git a/arch/arm/boot/dts/omap2420.dtsi b/arch/arm/boot/dts/omap2420.dtsi
-index c8f9c55..e0f4e47 100644
---- a/arch/arm/boot/dts/omap2420.dtsi
-+++ b/arch/arm/boot/dts/omap2420.dtsi
-@@ -114,6 +114,19 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		mailbox: mailbox at 48094000 {
-+			compatible = "ti,omap2-mailbox";
-+			reg = <0x48094000 0x200>;
-+			interrupts = <26>, /* DSP Interrupt */
-+				     <34>; /* IVA Interrupt */
-+			ti,hwmods = "mailbox";
-+			ti,mbox-num-users = <4>;
-+			ti,mbox-num-fifos = <6>;
-+			#ti,mbox-data-cells = <4>;
-+			ti,mbox-names = "dsp", "iva";
-+			ti,mbox-data = <0 1 0 0>, <2 3 1 3>;
-+		};
-+
- 		timer1: timer at 48028000 {
- 			compatible = "ti,omap2420-timer";
- 			reg = <0x48028000 0x400>;
-diff --git a/arch/arm/boot/dts/omap2430.dtsi b/arch/arm/boot/dts/omap2430.dtsi
-index c535a5a..b413423 100644
---- a/arch/arm/boot/dts/omap2430.dtsi
-+++ b/arch/arm/boot/dts/omap2430.dtsi
-@@ -175,6 +175,18 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		mailbox: mailbox at 48094000 {
-+			compatible = "ti,omap2-mailbox";
-+			reg = <0x48094000 0x200>;
-+			interrupts = <26>;
-+			ti,hwmods = "mailbox";
-+			ti,mbox-num-users = <4>;
-+			ti,mbox-num-fifos = <6>;
-+			#ti,mbox-data-cells = <4>;
-+			ti,mbox-names = "dsp";
-+			ti,mbox-data = <0 1 0 0>;
-+		};
-+
- 		timer1: timer at 49018000 {
- 			compatible = "ti,omap2420-timer";
- 			reg = <0x49018000 0x400>;
-diff --git a/arch/arm/boot/dts/omap3.dtsi b/arch/arm/boot/dts/omap3.dtsi
-index 6d05ee0..3cc7c28 100644
---- a/arch/arm/boot/dts/omap3.dtsi
-+++ b/arch/arm/boot/dts/omap3.dtsi
-@@ -380,6 +380,18 @@
- 			dma-names = "tx", "rx";
- 		};
- 
-+		mailbox: mailbox at 48094000 {
-+			compatible = "ti,omap2-mailbox";
-+			reg = <0x48094000 0x200>;
-+			interrupts = <26>;
-+			ti,hwmods = "mailbox";
-+			ti,mbox-num-users = <2>;
-+			ti,mbox-num-fifos = <2>;
-+			#ti,mbox-data-cells = <4>;
-+			ti,mbox-names = "dsp";
-+			ti,mbox-data = <0 1 0 0>;
-+		};
-+
- 		timer1: timer at 48318000 {
- 			compatible = "ti,omap3430-timer";
- 			reg = <0x48318000 0x400>;
-diff --git a/arch/arm/boot/dts/omap4.dtsi b/arch/arm/boot/dts/omap4.dtsi
-index 463b97d..0155182 100644
---- a/arch/arm/boot/dts/omap4.dtsi
-+++ b/arch/arm/boot/dts/omap4.dtsi
-@@ -516,6 +516,18 @@
- 			};
- 		};
- 
-+		mailbox: mailbox at 4a0f4000 {
-+			compatible = "ti,omap4-mailbox";
-+			reg = <0x4a0f4000 0x200>;
-+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
-+			ti,hwmods = "mailbox";
-+			ti,mbox-num-users = <3>;
-+			ti,mbox-num-fifos = <8>;
-+			#ti,mbox-data-cells = <4>;
-+			ti,mbox-names = "mbox-ipu", "mbox-dsp";
-+			ti,mbox-data = <0 1 0 0>, <3 2 0 0>;
-+		};
-+
- 		timer1: timer at 4a318000 {
- 			compatible = "ti,omap3430-timer";
- 			reg = <0x4a318000 0x80>;
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 73762ac..2058f24 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -655,11 +655,11 @@ static int __init omap2_init_devices(void)
- 	omap_init_audio();
- 	omap_init_camera();
- 	omap_init_hdmi_audio();
--	omap_init_mbox();
- 	/* If dtb is there, the devices will be created dynamically */
- 	if (!of_have_populated_dt()) {
- 		omap_init_control_usb();
- 		omap_init_dmic();
-+		omap_init_mbox();
- 		omap_init_mcpdm();
- 		omap_init_mcspi();
- 		omap_init_sham();
--- 
-1.8.3.1
+Here's the thread with patches:
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16664/focus=17267
+
+Then I opened a Pandora's Box by asking for opinion in this thread:
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/16480/focus=16500
+
+After that I started working on a complex framework for sharing this IP 
+block that would solve all the problems with synchronization, channel 
+allocation, device tree parsing, variant management, etc.
+
+Here's an initial version, which started as an MFD master driver, which 
+would let 2 client drivers use the hardware (only the clocksource part was 
+implemented in that series):
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17464/focus=229250
+
+Still, that version didn't receive too good feedback, with comments 
+pointing me to change the architecture to master-slave, with the 
+clocksource driver being the master and PWM driver being the slave. And so 
+v5 was made:
+http://thread.gmane.org/gmane.linux.kernel.samsung-soc/17864
+
+This version was generally accepted, but then we discussed on IRC (mostly 
+me and Arnd) whether such complex infrastructure is really needed and 
+concluded that for this platform a simple shared spinlock would be enough, 
+based on following reasons:
+- on all SoCs on which the clocksource driver is going to be used there is 
+only one instance of the PWM block, with 5 channels
+- on all existing boards there are always at least two channels that don't 
+have outputs
+- operations on particular PWM channels must be synchronized anyway, 
+because there are registers shared by all PWM channels (TCON being most 
+important where enable, autoreload and invert bits are located for all 
+channels).
+
+And so we got to current design which is basically a shared spinlock and 
+per-board output_mask, which specifies which channels have outputs on 
+particular boards. If you look to the clocksource driver, you can see that 
+it tries to allocate two output-less channels for timekeeping purposes and 
+if it fails to do so, it simply panics.
+
+IMHO this solution is fine, because it's simple, has little overhead and 
+it just works in case of platforms for which it is needed.
+
+Best regards,
+Tomasz
