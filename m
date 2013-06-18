@@ -1,141 +1,99 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 18 Jun 2013 16:46:31 -0600
-Subject: [PATCH v2 1/8] PCI: Introduce new MSI chip infrastructure
-In-Reply-To: <1370536888-8871-2-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 18 Jun 2013 16:48:44 -0600
+Subject: [PATCH v2 2/8] PCI: Add registry of MSI chips
+In-Reply-To: <1370536888-8871-3-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370536888-8871-2-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130618224631.GB16134@google.com>
+ <1370536888-8871-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130618224844.GC16134@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 06:41:21PM +0200, Thomas Petazzoni wrote:
-> From: Thierry Reding <thierry.reding@avionic-design.de>
+On Thu, Jun 06, 2013 at 06:41:22PM +0200, Thomas Petazzoni wrote:
+> This commit adds a very basic registry of msi_chip structures, so that
+> an IRQ controller driver can register an msi_chip, and a PCIe host
+> controller can find it, based on a 'struct device_node'.
 > 
-> The new struct msi_chip is used to associated an MSI controller with a
-> PCI bus. It is automatically handed down from the root to its children
-> during bus enumeration.
-> 
-> This patch provides default (weak) implementations for the architecture-
-> specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
-> and arch_msi_check_device()) which check if a PCI device's bus has an
-> attached MSI chip and forward the call appropriately.
-> 
-> Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  drivers/pci/msi.c   | 34 +++++++++++++++++++++++++++++++---
->  drivers/pci/probe.c |  1 +
+>  drivers/pci/msi.c   | 25 +++++++++++++++++++++++++
 >  include/linux/msi.h | 11 +++++++++++
->  include/linux/pci.h |  1 +
->  4 files changed, 44 insertions(+), 3 deletions(-)
+>  2 files changed, 36 insertions(+)
 > 
 > diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 2c10752..4dafac6 100644
+> index 4dafac6..0f177ee 100644
 > --- a/drivers/pci/msi.c
 > +++ b/drivers/pci/msi.c
-> @@ -29,13 +29,41 @@ static int pci_msi_enable = 1;
+> @@ -20,6 +20,7 @@
+>  #include <linux/errno.h>
+>  #include <linux/io.h>
+>  #include <linux/slab.h>
+> +#include <linux/of.h>
 >  
+>  #include "pci.h"
 >  
->  /* Arch hooks */
-> +int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
+> @@ -70,6 +71,30 @@ int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
+>  # define HAVE_DEFAULT_MSI_SETUP_IRQS
+>  #endif
+>  
+> +#ifdef CONFIG_OF
+> +static LIST_HEAD(msi_chip_list);
+> +static DEFINE_MUTEX(msi_chip_mutex);
+> +
+> +void msi_chip_add(struct msi_chip *chip)
 > +{
-> +	struct msi_chip *chip = dev->bus->msi;
+> +	mutex_lock(&msi_chip_mutex);
+> +	list_add(&chip->link, &msi_chip_list);
+> +	mutex_unlock(&msi_chip_mutex);
+> +}
 > +
-> +	if (chip && chip->setup_irq) {
-> +		int err;
-> +
-> +		err = chip->setup_irq(chip, dev, desc);
-> +		if (err < 0)
-> +			return err;
-> +
-> +		irq_set_chip_data(desc->irq, chip);
-> +		return err;
+> +struct msi_chip *msi_chip_find_by_of_node(struct device_node *of_node)
+> +{
+> +	struct msi_chip *c;
+> +	list_for_each_entry(c, &msi_chip_list, link) {
+> +		if (c->of_node == of_node &&
+> +		    of_property_read_bool(c->of_node, "msi-controller"))
+> +			return c;
 > +	}
 > +
-> +	return -EINVAL;
+> +	return NULL;
 > +}
->  
-> -#ifndef arch_msi_check_device
-> -int arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
-> +void __weak arch_teardown_msi_irq(unsigned int irq)
+> +#endif
 
-Please make a separate patch before this one for the conversion from the
-"#define arch_msi_check_device" strategy to the weak function.  I think
-it's a good idea to use a weak function rather than the #define, but we
-need to remove the #define from arch/powerpc/include/asm/pci.h at the same
-time.
+I don't really understand why the msi_chip_list lives here, since
+nothing in drivers/pci/msi.c uses it.  Seems like maybe something
+that could be in the OF code somewhere?
 
-I don't think these patches touch arch_setup_msi_irqs() or
-arch_teardown_msi_irqs(), but I'd like to do the same with them just so we
-consistently use the same strategy to solve the same problem.
-
+> +
+>  #ifdef HAVE_DEFAULT_MSI_SETUP_IRQS
+>  int default_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
 >  {
-> +	struct msi_chip *chip = irq_get_chip_data(irq);
-> +
-> +	if (chip && chip->teardown_irq)
-> +		chip->teardown_irq(chip, irq);
-> +}
-> +
-> +int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
-> +{
-> +	struct msi_chip *chip = dev->bus->msi;
-> +
-> +	if (chip && chip->check_device)
-> +		return chip->check_device(chip, dev, nvec, type);
-> +
->  	return 0;
->  }
-> -#endif
->  
->  #ifndef arch_setup_msi_irqs
->  # define arch_setup_msi_irqs default_setup_msi_irqs
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 70f10fa..c8591e4 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
->  
->  	child->parent = parent;
->  	child->ops = parent->ops;
-> +	child->msi = parent->msi;
->  	child->sysdata = parent->sysdata;
->  	child->bus_flags = parent->bus_flags;
->  
 > diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 20c2d6d..4633529 100644
+> index 4633529..a1a6084 100644
 > --- a/include/linux/msi.h
 > +++ b/include/linux/msi.h
-> @@ -58,4 +58,15 @@ int arch_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
->  void arch_teardown_msi_irqs(struct pci_dev *dev);
->  int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
+> @@ -61,6 +61,8 @@ int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
+>  struct msi_chip {
+>  	struct module *owner;
+>  	struct device *dev;
+> +	struct device_node *of_node;
+> +	struct list_head link;
 >  
-> +struct msi_chip {
-> +	struct module *owner;
-
-Can the MSI chip driver be a loadable module?  Does it need to be?
-
-> +	struct device *dev;
-> +
-> +	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
-> +			 struct msi_desc *desc);
-> +	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
-> +	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
-> +			    int nvec, int type);
-> +};
+>  	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
+>  			 struct msi_desc *desc);
+> @@ -69,4 +71,13 @@ struct msi_chip {
+>  			    int nvec, int type);
+>  };
+>  
+> +#if defined(CONFIG_PCI_MSI) && defined(CONFIG_OF)
+> +void msi_chip_add(struct msi_chip *chip);
+> +struct msi_chip *msi_chip_find_by_of_node(struct device_node *of_node);
+> +#else
+> +static inline void msi_chip_add(struct msi_chip *chip) {}
+> +static inline struct msi_chip *
+> +msi_chip_find_by_of_node(struct device_node *of_node) { return NULL; }
+> +#endif
 > +
 >  #endif /* LINUX_MSI_H */
-> diff --git a/include/linux/pci.h b/include/linux/pci.h
-> index 3a24e4f..7ffc012 100644
-> --- a/include/linux/pci.h
-> +++ b/include/linux/pci.h
-> @@ -432,6 +432,7 @@ struct pci_bus {
->  	struct resource busn_res;	/* bus numbers routed to this bus */
->  
->  	struct pci_ops	*ops;		/* configuration access functions */
-> +	struct msi_chip	*msi;		/* MSI controller */
->  	void		*sysdata;	/* hook for sys-specific extension */
->  	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
->  
 > -- 
 > 1.8.1.2
 > 
