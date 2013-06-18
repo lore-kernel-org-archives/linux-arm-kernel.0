@@ -1,50 +1,110 @@
-From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
-Date: Tue, 18 Jun 2013 12:31:19 -0300
-Subject: [PATCH] ARM: Kirkwood: Fix the internal register ranges translation
-Message-ID: <1371569479-31498-1-git-send-email-ezequiel.garcia@free-electrons.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 18 Jun 2013 17:38:35 +0200
+Subject: [PATCH 0/2] Fix potential merge conflict for dw_apb_timer_of
+In-Reply-To: <20130618150244.GC18055@amd.pavel.ucw.cz>
+References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
+ <51BFABE8.5090504@linaro.org> <20130618150244.GC18055@amd.pavel.ucw.cz>
+Message-ID: <201306181738.35671.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Although the internal register window size is 1 MiB, the previous
-ranges translation for the internal register space had a size of
-0x4000000. This was done to allow the crypto and nand node to access
-the corresponding 'sram' and 'nand' decoding windows.
+Hi Pavel,
 
-In order to describe the hardware more accurately, we declare the
-real 1 MiB internal register space in the ranges, and add a translation
-entry for the nand node to access the 'nand' window.
+Am Dienstag, 18. Juni 2013, 17:02:44 schrieb Pavel Machek:
+> Hi!
+> 
+> > >The following 2 patches will eliminate the need for the patch in John
+> > >Stultz's tree. If there is to be merge of the 2 trees, then the
+> > >patch:
+> > >
+> > >dw_apb_timer_of.c: Remove parts that were picoxcell-specific
+> > >
+> > >can be removed from John's tree to avoid a merge-conflict.
+> > >
+> > >Based on arm-soc/for-next:
+> > >
+> > >PATCH[1/2] - Rename "dw-apb-timer-osc" and "dw-apb-timer-sp" bindings to
+> > >just "dw-apb-timer"
+> > >PATCH[2/2] - Fix user/system reporting by fixing read_sched_clock()
+> > 
+> > Pavel/Jamie: Can you take a look at these too and make sure these cover
+> > what you were doing.
+> 
+> [It seems like Heiko St?bner was not aware of patches in the clock
+> tree, so did pretty much equivalent patch.]
 
-This commit will make future improvements on the MBus DT binding easier.
+Correct ... I was going after what was in linux-next and the tip.git [which I 
+also only saw recently at all] does not seem to be part of it. 
 
-Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
----
-Tested on Plathome Openblocks A6 board.
+> Dinh's changes look good to me, but
+> 
+> [PATCH v2 4/4] clocksource: dw_apb_timer_of: use clocksource_of_init
+> 
+> does not exactly look nice: (I'm sorry I did not see original series,
+> before it was merged to -soc.). The function counts number of times it
+> was called, and behaves differently in each case. It is not very
+> traditional kernel code at the very least.
+> 
+> +static int num_called;
+> +static void __init dw_apb_timer_init(struct device_node *timer)
+>  {
+> -       struct device_node *event_timer, *source_timer;
+> -
+> -       event_timer = of_find_matching_node(NULL, osctimer_ids);
+> -       if (!event_timer)
+> -               panic("No timer for clockevent");
+> -       add_clockevent(event_timer);
+> -
+> -       source_timer = of_find_matching_node(event_timer,
+> osctimer_ids);
+> -       if (!source_timer)
+> -               panic("No timer for clocksource");
+> -       add_clocksource(source_timer);
+> -
+> -       of_node_put(source_timer);
+> +       switch (num_called) {
+> +       case 0:
+> +               pr_debug("%s: found clockevent timer\n", __func__);
+> +               add_clockevent(timer);
+> +               of_node_put(timer);
+> +               break;
+> +       case 1:
+> +               pr_debug("%s: found clocksource timer\n", __func__);
+> +               add_clocksource(timer);
+> +               of_node_put(timer);
+> +               init_sched_clock();
+> +               break;
+> +       default:
+> +               break;
+> +       }
+> 
+> -       init_sched_clock();
+> +       num_called++;
+>  }
+> 
+> Heiko, can you take a look at John Stultz tree? We modified this area
+> already... I understand you only have one timer on your silicon?
 
- arch/arm/boot/dts/kirkwood.dtsi | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+nope, my silicon has actually three timers of this type (all of them of the 
+"snps,dw-apb-timer-osc" type ... which did change it seems).
 
-diff --git a/arch/arm/boot/dts/kirkwood.dtsi b/arch/arm/boot/dts/kirkwood.dtsi
-index 8a1e3bb..910fabc 100644
---- a/arch/arm/boot/dts/kirkwood.dtsi
-+++ b/arch/arm/boot/dts/kirkwood.dtsi
-@@ -38,7 +38,8 @@
- 
- 	ocp at f1000000 {
- 		compatible = "simple-bus";
--		ranges = <0x00000000 0xf1000000 0x4000000
-+		ranges = <0x00000000 0xf1000000 0x0100000
-+		          0xf4000000 0xf4000000 0x0000400
- 		          0xf5000000 0xf5000000 0x0000400>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -171,7 +172,7 @@
- 			ale = <1>;
- 			bank-width = <1>;
- 			compatible = "marvell,orion-nand";
--			reg = <0x3000000 0x400>;
-+			reg = <0xf4000000 0x400>;
- 			chip-delay = <25>;
- 			/* set partition map and/or chip-delay in board dts */
- 			clocks = <&gate_clk 7>;
--- 
-1.8.1.5
+But the clocksource also needs to provide the sched_clock on it.
+
+Due to the multiple matching I came up with the numbering, because the of-
+clocksource must match the timer ips multiple times and needs to use one as 
+clockevent and one as clocksource.
+
+
+> Would perhaps parameter on dw_apb_timer_init telling it what to do be
+> better solution? I don't like the "num_called" variable too much...
+
+The problem I see is, how do you want to distinguish between the timer used as 
+clockevent and the one used as clocksource. The ip blocks are the same, so the 
+dt binding must also be the same, as it only describes the hardware.
+
+And the
+CLOCKSOURCE_OF_DECLARE(apb_timer, "snps,dw-apb-timer-osc", dw_apb_timer_init);
+of course also matches against all the timer nodes in the dt.
+
+
+Heiko
