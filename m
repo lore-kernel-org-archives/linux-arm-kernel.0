@@ -1,99 +1,97 @@
 From: bhelgaas@google.com (Bjorn Helgaas)
-Date: Tue, 18 Jun 2013 16:48:44 -0600
-Subject: [PATCH v2 2/8] PCI: Add registry of MSI chips
-In-Reply-To: <1370536888-8871-3-git-send-email-thomas.petazzoni@free-electrons.com>
+Date: Tue, 18 Jun 2013 16:57:11 -0600
+Subject: [PATCH v2 6/8] pci: mvebu: add support for MSI
+In-Reply-To: <1370536888-8871-7-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1370536888-8871-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1370536888-8871-3-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130618224844.GC16134@google.com>
+ <1370536888-8871-7-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <20130618225711.GD16134@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 06, 2013 at 06:41:22PM +0200, Thomas Petazzoni wrote:
-> This commit adds a very basic registry of msi_chip structures, so that
-> an IRQ controller driver can register an msi_chip, and a PCIe host
-> controller can find it, based on a 'struct device_node'.
+On Thu, Jun 06, 2013 at 06:41:26PM +0200, Thomas Petazzoni wrote:
+> This commit adds support for Message Signaled Interrupts in the
+> Marvell PCIe host controller. The work is very simple: it simply gets
+> a reference to the msi_chip associated to the PCIe controller thanks
+> to the msi-parent DT property, and stores this reference in the
+> pci_bus structure. This is enough to let the Linux PCI core use the
+> functions of msi_chip to setup and teardown MSIs.
 > 
 > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 > ---
->  drivers/pci/msi.c   | 25 +++++++++++++++++++++++++
->  include/linux/msi.h | 11 +++++++++++
->  2 files changed, 36 insertions(+)
+>  drivers/pci/host/pci-mvebu.c | 21 +++++++++++++++++++++
+>  1 file changed, 21 insertions(+)
 > 
-> diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-> index 4dafac6..0f177ee 100644
-> --- a/drivers/pci/msi.c
-> +++ b/drivers/pci/msi.c
-> @@ -20,6 +20,7 @@
->  #include <linux/errno.h>
->  #include <linux/io.h>
+> diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> index 13a633b..0dc30bd 100644
+> --- a/drivers/pci/host/pci-mvebu.c
+> +++ b/drivers/pci/host/pci-mvebu.c
+> @@ -11,6 +11,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/module.h>
+>  #include <linux/mbus.h>
+> +#include <linux/msi.h>
 >  #include <linux/slab.h>
-> +#include <linux/of.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/of_address.h>
+> @@ -107,6 +108,7 @@ struct mvebu_pcie_port;
+>  struct mvebu_pcie {
+>  	struct platform_device *pdev;
+>  	struct mvebu_pcie_port *ports;
+> +	struct msi_chip *msi;
+>  	struct resource io;
+>  	struct resource realio;
+>  	struct resource mem;
+> @@ -690,6 +692,8 @@ static struct pci_bus *mvebu_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+>  	if (!bus)
+>  		return NULL;
 >  
->  #include "pci.h"
+> +	bus->msi = pcie->msi;
+
+Ideally, arches could use pci_scan_root_bus(), which does the
+pci_scan_child_bus() itself, so I never like to add arch-specific code
+between pci_create_root_bus() and pci_scan_child_bus().
+
+But you should be able to accomplish this by setting bus->msi in a
+pcibios_add_bus() hook.  There is a corresponding pcibios_remove_bus() hook
+that might be useful for deallocating the msi_chip.  I'm not too clear on
+how you manage the msi_chip lifetime -- I see the alloc in
+armada_370_xp_msi_init(), but I'm not sure whether you ever deallocate it
+or how you know when it would be safe to do so.
+
+>  	pci_scan_child_bus(bus);
 >  
-> @@ -70,6 +71,30 @@ int __weak arch_msi_check_device(struct pci_dev *dev, int nvec, int type)
->  # define HAVE_DEFAULT_MSI_SETUP_IRQS
->  #endif
+>  	return bus;
+> @@ -755,6 +759,21 @@ mvebu_pcie_map_registers(struct platform_device *pdev,
+>  	return devm_request_and_ioremap(&pdev->dev, &regs);
+>  }
 >  
-> +#ifdef CONFIG_OF
-> +static LIST_HEAD(msi_chip_list);
-> +static DEFINE_MUTEX(msi_chip_mutex);
-> +
-> +void msi_chip_add(struct msi_chip *chip)
+> +static void __init mvebu_pcie_msi_enable(struct mvebu_pcie *pcie)
 > +{
-> +	mutex_lock(&msi_chip_mutex);
-> +	list_add(&chip->link, &msi_chip_list);
-> +	mutex_unlock(&msi_chip_mutex);
+> +	struct device_node *msi_node;
+> +
+> +	msi_node = of_parse_phandle(pcie->pdev->dev.of_node,
+> +				    "msi-parent", 0);
+> +	if (!msi_node)
+> +		return;
+> +
+> +	pcie->msi = msi_chip_find_by_of_node(msi_node);
+> +
+> +	if (pcie->msi)
+> +		pcie->msi->dev = &pcie->pdev->dev;
 > +}
 > +
-> +struct msi_chip *msi_chip_find_by_of_node(struct device_node *of_node)
-> +{
-> +	struct msi_chip *c;
-> +	list_for_each_entry(c, &msi_chip_list, link) {
-> +		if (c->of_node == of_node &&
-> +		    of_property_read_bool(c->of_node, "msi-controller"))
-> +			return c;
-> +	}
-> +
-> +	return NULL;
-> +}
-> +#endif
-
-I don't really understand why the msi_chip_list lives here, since
-nothing in drivers/pci/msi.c uses it.  Seems like maybe something
-that could be in the OF code somewhere?
-
-> +
->  #ifdef HAVE_DEFAULT_MSI_SETUP_IRQS
->  int default_setup_msi_irqs(struct pci_dev *dev, int nvec, int type)
+>  static int __init mvebu_pcie_probe(struct platform_device *pdev)
 >  {
-> diff --git a/include/linux/msi.h b/include/linux/msi.h
-> index 4633529..a1a6084 100644
-> --- a/include/linux/msi.h
-> +++ b/include/linux/msi.h
-> @@ -61,6 +61,8 @@ int arch_msi_check_device(struct pci_dev* dev, int nvec, int type);
->  struct msi_chip {
->  	struct module *owner;
->  	struct device *dev;
-> +	struct device_node *of_node;
-> +	struct list_head link;
+>  	struct mvebu_pcie *pcie;
+> @@ -879,6 +898,8 @@ static int __init mvebu_pcie_probe(struct platform_device *pdev)
+>  		i++;
+>  	}
 >  
->  	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
->  			 struct msi_desc *desc);
-> @@ -69,4 +71,13 @@ struct msi_chip {
->  			    int nvec, int type);
->  };
->  
-> +#if defined(CONFIG_PCI_MSI) && defined(CONFIG_OF)
-> +void msi_chip_add(struct msi_chip *chip);
-> +struct msi_chip *msi_chip_find_by_of_node(struct device_node *of_node);
-> +#else
-> +static inline void msi_chip_add(struct msi_chip *chip) {}
-> +static inline struct msi_chip *
-> +msi_chip_find_by_of_node(struct device_node *of_node) { return NULL; }
-> +#endif
+> +	mvebu_pcie_msi_enable(pcie);
 > +
->  #endif /* LINUX_MSI_H */
+>  	mvebu_pcie_enable(pcie);
+>  
+>  	return 0;
 > -- 
 > 1.8.1.2
 > 
