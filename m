@@ -1,635 +1,364 @@
 From: chao.xie@marvell.com (Chao Xie)
-Date: Mon, 17 Jun 2013 23:56:16 -0400
-Subject: [PATCH V3 3/5] arm: pxa: use matrix_keymap for all boards
+Date: Mon, 17 Jun 2013 23:56:18 -0400
+Subject: [PATCH V3 5/5] input: pxa27x-keypad: add device tree support
 In-Reply-To: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
 References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
-Message-ID: <1371527778-5236-4-git-send-email-chao.xie@marvell.com>
+Message-ID: <1371527778-5236-6-git-send-email-chao.xie@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Compile passed for configurations
-
-em_x270_defconfig
-  em_x270x.c(MACH_EM_X270, MACH_EXEDA)
-
-ezx_defconfig
-  ezx.c(MACH_EZX_A780, MACH_EZX_E680, MACH_EZX_A1200,
-        MACH_EZX_A910, MACH_EZX_E6, MACH_EZX_E2)
-
-palmz72_defconfig
-  palmld.c(MACH_PALMLD), palmtreo.c(PALM_TREO),
-  palmtx.c(MACH_PALMTX), palmz72.c(MACH_PALMZ72),
-  palmt5.c(MACH_PALMT5)
-
-pxa3xx_defconfig
-  littleton.c(MACH_LITTLETON), tarvorevb.c(MACH_TAVOREVB),
-  zylonite.c(MACH_ZYLONITE320), mioa701.c(MACH_MIOA701),
-  z2.c(MACH_ZIPIT2)
-
-mainstone_defconfig
-  maintone.c(MACH_MAINSTONE)
-
 Signed-off-by: Chao Xie <chao.xie@marvell.com>
 ---
- arch/arm/mach-pxa/em-x270.c   |   20 +++++++++----
- arch/arm/mach-pxa/ezx.c       |   60 ++++++++++++++++++++++++++++------------
- arch/arm/mach-pxa/littleton.c |   10 +++++--
- arch/arm/mach-pxa/mainstone.c |   10 +++++--
- arch/arm/mach-pxa/mioa701.c   |   11 +++++--
- arch/arm/mach-pxa/palmld.c    |   10 +++++--
- arch/arm/mach-pxa/palmt5.c    |   10 +++++--
- arch/arm/mach-pxa/palmtreo.c  |   23 ++++++++++-----
- arch/arm/mach-pxa/palmtx.c    |   10 +++++--
- arch/arm/mach-pxa/palmz72.c   |   10 +++++--
- arch/arm/mach-pxa/tavorevb.c  |   10 +++++--
- arch/arm/mach-pxa/z2.c        |   10 +++++--
- arch/arm/mach-pxa/zylonite.c  |   10 +++++--
- 13 files changed, 142 insertions(+), 62 deletions(-)
+ .../devicetree/bindings/input/pxa27x-keypad.txt    |   60 +++++
+ drivers/input/keyboard/pxa27x_keypad.c             |  232 +++++++++++++++++++-
+ 2 files changed, 288 insertions(+), 4 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/input/pxa27x-keypad.txt
 
-diff --git a/arch/arm/mach-pxa/em-x270.c b/arch/arm/mach-pxa/em-x270.c
-index 446563a..f6726bb 100644
---- a/arch/arm/mach-pxa/em-x270.c
-+++ b/arch/arm/mach-pxa/em-x270.c
-@@ -833,21 +833,25 @@ static inline void em_x270_init_ac97(void) {}
- #endif
- 
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int em_x270_module_matrix_keys[] = {
-+static const unsigned int em_x270_module_matrix_keys[] = {
- 	KEY(0, 0, KEY_A), KEY(1, 0, KEY_UP), KEY(2, 1, KEY_B),
- 	KEY(0, 2, KEY_LEFT), KEY(1, 1, KEY_ENTER), KEY(2, 0, KEY_RIGHT),
- 	KEY(0, 1, KEY_C), KEY(1, 2, KEY_DOWN), KEY(2, 2, KEY_D),
- };
- 
-+static struct matrix_keymap_data em_x270_matrix_keymap_data = {
-+	.keymap			= em_x270_module_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(em_x270_module_matrix_keys),
-+};
+diff --git a/Documentation/devicetree/bindings/input/pxa27x-keypad.txt b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
+new file mode 100644
+index 0000000..f8674f7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
+@@ -0,0 +1,60 @@
++* Marvell PXA Keypad controller
 +
- struct pxa27x_keypad_platform_data em_x270_module_keypad_info = {
- 	/* code map for the matrix keys */
- 	.matrix_key_rows	= 3,
- 	.matrix_key_cols	= 3,
--	.matrix_key_map		= em_x270_module_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(em_x270_module_matrix_keys),
-+	.matrix_keymap_data	= &em_x270_matrix_keymap_data,
- };
- 
--static unsigned int em_x270_exeda_matrix_keys[] = {
-+static const unsigned int em_x270_exeda_matrix_keys[] = {
- 	KEY(0, 0, KEY_RIGHTSHIFT), KEY(0, 1, KEY_RIGHTCTRL),
- 	KEY(0, 2, KEY_RIGHTALT), KEY(0, 3, KEY_SPACE),
- 	KEY(0, 4, KEY_LEFTALT), KEY(0, 5, KEY_LEFTCTRL),
-@@ -889,12 +893,16 @@ static unsigned int em_x270_exeda_matrix_keys[] = {
- 	KEY(7, 6, 0), KEY(7, 7, 0),
- };
- 
-+static struct matrix_keymap_data em_x270_exeda_matrix_keymap_data = {
-+	.keymap			= em_x270_exeda_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(em_x270_exeda_matrix_keys),
-+};
++Required Properties
++- compatible : should be "marvell,pxa27x-keypad"
++- reg : Address and length of the register set for the device
++- interrupts : The interrupt for the keypad controller
++- marvell,debounce-interval : How long time the key will be
++  recognized when it is pressed. It is a u32 value, and bit[31:16]
++  is debounce interval for direct key and bit[15:0] is debounce
++  interval for matrix key. The value is in binary number of 2ms
 +
- struct pxa27x_keypad_platform_data em_x270_exeda_keypad_info = {
- 	/* code map for the matrix keys */
- 	.matrix_key_rows	= 8,
- 	.matrix_key_cols	= 8,
--	.matrix_key_map		= em_x270_exeda_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(em_x270_exeda_matrix_keys),
-+	.matrix_keymap_data	= &em_x270_exeda_matrix_keymap_data,
- };
- 
- static void __init em_x270_init_keypad(void)
-diff --git a/arch/arm/mach-pxa/ezx.c b/arch/arm/mach-pxa/ezx.c
-index dca1070..fe2eb83 100644
---- a/arch/arm/mach-pxa/ezx.c
-+++ b/arch/arm/mach-pxa/ezx.c
-@@ -392,7 +392,7 @@ static unsigned long e6_pin_config[] __initdata = {
- 
- /* KEYPAD */
- #ifdef CONFIG_MACH_EZX_A780
--static unsigned int a780_key_map[] = {
-+static const unsigned int a780_key_map[] = {
- 	KEY(0, 0, KEY_SEND),
- 	KEY(0, 1, KEY_BACK),
- 	KEY(0, 2, KEY_END),
-@@ -424,11 +424,15 @@ static unsigned int a780_key_map[] = {
- 	KEY(4, 4, KEY_DOWN),
- };
- 
-+static struct matrix_keymap_data a780_matrix_keymap_data = {
-+	.keymap			= a780_key_map,
-+	.keymap_size		= ARRAY_SIZE(a780_key_map),
-+};
++Optional Properties For Matrix Keyes
++Please refer to matrix-keymap.txt
 +
- static struct pxa27x_keypad_platform_data a780_keypad_platform_data = {
- 	.matrix_key_rows = 5,
- 	.matrix_key_cols = 5,
--	.matrix_key_map = a780_key_map,
--	.matrix_key_map_size = ARRAY_SIZE(a780_key_map),
-+	.matrix_keymap_data = &a780_matrix_keymap_data,
- 
- 	.direct_key_map = { KEY_CAMERA },
- 	.direct_key_num = 1,
-@@ -438,7 +442,7 @@ static struct pxa27x_keypad_platform_data a780_keypad_platform_data = {
- #endif /* CONFIG_MACH_EZX_A780 */
- 
- #ifdef CONFIG_MACH_EZX_E680
--static unsigned int e680_key_map[] = {
-+static const unsigned int e680_key_map[] = {
- 	KEY(0, 0, KEY_UP),
- 	KEY(0, 1, KEY_RIGHT),
- 	KEY(0, 2, KEY_RESERVED),
-@@ -455,11 +459,15 @@ static unsigned int e680_key_map[] = {
- 	KEY(2, 3, KEY_KPENTER),
- };
- 
-+static struct matrix_keymap_data e680_matrix_keymap_data = {
-+	.keymap			= e680_key_map,
-+	.keymap_size		= ARRAY_SIZE(e680_key_map),
-+};
++Optional Properties for Direct Keyes
++- marvell,direct-key-count : How many direct keyes are used.
++- marvell,direct-key-mask : The mask indicates which keyes
++  are used. If bit[X] of the mask is set, the direct key X
++  is used.
++- marvell,direct-key-low-active : Direct key status register
++  tells the level of pins that connects to the direct keyes.
++  When this property is set, it means that when the pin level
++  is low, the key is pressed(active).
++- marvell,direct-key-map : It is a u16 array. Each item indicates
++  the linux key-code for the direct key.
 +
- static struct pxa27x_keypad_platform_data e680_keypad_platform_data = {
- 	.matrix_key_rows = 3,
- 	.matrix_key_cols = 4,
--	.matrix_key_map = e680_key_map,
--	.matrix_key_map_size = ARRAY_SIZE(e680_key_map),
-+	.matrix_keymap_data = &e680_matrix_keymap_data,
- 
- 	.direct_key_map = {
- 		KEY_CAMERA,
-@@ -476,7 +484,7 @@ static struct pxa27x_keypad_platform_data e680_keypad_platform_data = {
- #endif /* CONFIG_MACH_EZX_E680 */
- 
- #ifdef CONFIG_MACH_EZX_A1200
--static unsigned int a1200_key_map[] = {
-+static const unsigned int a1200_key_map[] = {
- 	KEY(0, 0, KEY_RESERVED),
- 	KEY(0, 1, KEY_RIGHT),
- 	KEY(0, 2, KEY_PAGEDOWN),
-@@ -513,18 +521,22 @@ static unsigned int a1200_key_map[] = {
- 	KEY(4, 5, KEY_RESERVED),
- };
- 
-+static struct matrix_keymap_data a1200_matrix_keymap_data = {
-+	.keymap			= a1200_key_map,
-+	.keymap_size		= ARRAY_SIZE(a1200_key_map),
-+};
++Optional Properties For Rotary
++- marvell,rotary0 : It is a u32 value. Bit[31:16] is the
++  linux key-code for rotary up. Bit[15:0] is the linux key-code
++  for rotary down. It is for rotary 0.
++- marvell,rotary1 : Same as marvell,rotary0. It is for rotary 1.
++- marvell,rotary-rel-key : When rotary is used for relative axes
++  in the device, the value indicates the key-code for relative
++  axes measurement in the device. It is a u32 value. Bit[31:16]
++  is for rotary 1, and Bit[15:0] is for rotary 0.
 +
- static struct pxa27x_keypad_platform_data a1200_keypad_platform_data = {
- 	.matrix_key_rows = 5,
- 	.matrix_key_cols = 6,
--	.matrix_key_map = a1200_key_map,
--	.matrix_key_map_size = ARRAY_SIZE(a1200_key_map),
-+	.matrix_keymap_data = &a1200_matrix_keymap_data,
- 
- 	.debounce_interval = 30,
++Examples:
++	keypad: keypad at d4012000 {
++		keypad,num-rows = <3>;
++		keypad,num-columns = <5>;
++		linux,keymap = <0x0000000e	/* KEY_BACKSPACE */
++				0x0001006b	/* KEY_END */
++				0x00020061	/* KEY_RIGHTCTRL */
++				0x0003000b	/* KEY_0 */
++				0x00040002	/* KEY_1 */
++				0x0100008b	/* KEY_MENU */
++				0x01010066	/* KEY_HOME */
++				0x010200e7	/* KEY_SEND */
++				0x01030009	/* KEY_8 */
++				0x0104000a	/* KEY_9 */
++				0x02000160	/* KEY_OK */
++				0x02010003	/* KEY_2 */
++				0x02020004	/* KEY_3 */
++				0x02030005	/* KEY_4 */
++				0x02040006>;	/* KEY_5 */
++		marvell,rotary0 = <0x006c0067>;	/* KEY_UP & KEY_DOWN */
++		marvell,direct-key-count = <1>;
++		marvell,direct-key-map = <0x001c>;
++		marvell,debounce-interval = <0x001e001e>;
++	};
+diff --git a/drivers/input/keyboard/pxa27x_keypad.c b/drivers/input/keyboard/pxa27x_keypad.c
+index 947d657..16cf9a5 100644
+--- a/drivers/input/keyboard/pxa27x_keypad.c
++++ b/drivers/input/keyboard/pxa27x_keypad.c
+@@ -118,6 +118,217 @@ struct pxa27x_keypad {
+ 	unsigned int direct_key_mask;
  };
- #endif /* CONFIG_MACH_EZX_A1200 */
  
- #ifdef CONFIG_MACH_EZX_E6
--static unsigned int e6_key_map[] = {
-+static const unsigned int e6_key_map[] = {
- 	KEY(0, 0, KEY_RESERVED),
- 	KEY(0, 1, KEY_RIGHT),
- 	KEY(0, 2, KEY_PAGEDOWN),
-@@ -561,18 +573,22 @@ static unsigned int e6_key_map[] = {
- 	KEY(4, 5, KEY_PREVIOUSSONG),
- };
- 
-+static struct matrix_keymap_data e6_keymap_data = {
-+	.keymap			= e6_key_map,
-+	.keymap_size		= ARRAY_SIZE(e6_key_map),
-+};
++static int pxa27x_keypad_matrix_key_parse_dt(struct pxa27x_keypad *keypad)
++{
++	int ret;
++	u32 rows, cols;
++	struct input_dev *input_dev = keypad->input_dev;
++	struct device *dev = input_dev->dev.parent;
++	struct pxa27x_keypad_platform_data *pdata = keypad->pdata;
 +
- static struct pxa27x_keypad_platform_data e6_keypad_platform_data = {
- 	.matrix_key_rows = 5,
- 	.matrix_key_cols = 6,
--	.matrix_key_map = e6_key_map,
--	.matrix_key_map_size = ARRAY_SIZE(e6_key_map),
-+	.matrix_keymap_data = &e6_keymap_data,
- 
- 	.debounce_interval = 30,
- };
- #endif /* CONFIG_MACH_EZX_E6 */
- 
- #ifdef CONFIG_MACH_EZX_A910
--static unsigned int a910_key_map[] = {
-+static const unsigned int a910_key_map[] = {
- 	KEY(0, 0, KEY_NUMERIC_6),
- 	KEY(0, 1, KEY_RIGHT),
- 	KEY(0, 2, KEY_PAGEDOWN),
-@@ -609,18 +625,22 @@ static unsigned int a910_key_map[] = {
- 	KEY(4, 5, KEY_RESERVED),
- };
- 
-+static struct matrix_keymap_data a910_matrix_keymap_data = {
-+	.keymap			= a910_key_map,
-+	.keymap_size		= ARRAY_SIZE(a910_key_map),
-+};
++	ret = matrix_keypad_parse_of_params(dev, &rows, &cols);
++	if (ret)
++		return ret;
 +
- static struct pxa27x_keypad_platform_data a910_keypad_platform_data = {
- 	.matrix_key_rows = 5,
- 	.matrix_key_cols = 6,
--	.matrix_key_map = a910_key_map,
--	.matrix_key_map_size = ARRAY_SIZE(a910_key_map),
-+	.matrix_keymap_data = &a910_matrix_keymap_data,
- 
- 	.debounce_interval = 30,
- };
- #endif /* CONFIG_MACH_EZX_A910 */
- 
- #ifdef CONFIG_MACH_EZX_E2
--static unsigned int e2_key_map[] = {
-+static const unsigned int e2_key_map[] = {
- 	KEY(0, 0, KEY_NUMERIC_6),
- 	KEY(0, 1, KEY_RIGHT),
- 	KEY(0, 2, KEY_NUMERIC_9),
-@@ -657,11 +677,15 @@ static unsigned int e2_key_map[] = {
- 	KEY(4, 5, KEY_RESERVED),
- };
- 
-+static struct matrix_keymap_data e2_matrix_keymap_data = {
-+	.keymap			= e2_key_map,
-+	.keymap_size		= ARRAY_SIZE(e2_key_map),
-+};
++	if (rows > MAX_MATRIX_KEY_ROWS || cols > MAX_MATRIX_KEY_COLS) {
++		dev_err(dev, "rows or cols exceeds maximum value\n");
++		return -EINVAL;
++	}
 +
- static struct pxa27x_keypad_platform_data e2_keypad_platform_data = {
- 	.matrix_key_rows = 5,
- 	.matrix_key_cols = 6,
--	.matrix_key_map = e2_key_map,
--	.matrix_key_map_size = ARRAY_SIZE(e2_key_map),
-+	.matrix_keymap_data = &e2_matrix_keymap_data,
- 
- 	.debounce_interval = 30,
- };
-diff --git a/arch/arm/mach-pxa/littleton.c b/arch/arm/mach-pxa/littleton.c
-index e848c46..5d66558 100644
---- a/arch/arm/mach-pxa/littleton.c
-+++ b/arch/arm/mach-pxa/littleton.c
-@@ -222,7 +222,7 @@ static inline void littleton_init_spi(void) {}
- #endif
- 
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int littleton_matrix_key_map[] = {
-+static const unsigned int littleton_matrix_key_map[] = {
- 	/* KEY(row, col, key_code) */
- 	KEY(1, 3, KEY_0), KEY(0, 0, KEY_1), KEY(1, 0, KEY_2), KEY(2, 0, KEY_3),
- 	KEY(0, 1, KEY_4), KEY(1, 1, KEY_5), KEY(2, 1, KEY_6), KEY(0, 2, KEY_7),
-@@ -249,11 +249,15 @@ static unsigned int littleton_matrix_key_map[] = {
- 	KEY(3, 1, KEY_F23),	/* soft2 */
- };
- 
-+static struct matrix_keymap_data littleton_matrix_keymap_data = {
-+	.keymap			= littleton_matrix_key_map,
-+	.keymap_size		= ARRAY_SIZE(littleton_matrix_key_map),
-+};
++	pdata->matrix_key_rows = rows;
++	pdata->matrix_key_cols = cols;
 +
- static struct pxa27x_keypad_platform_data littleton_keypad_info = {
- 	.matrix_key_rows	= 6,
- 	.matrix_key_cols	= 5,
--	.matrix_key_map		= littleton_matrix_key_map,
--	.matrix_key_map_size	= ARRAY_SIZE(littleton_matrix_key_map),
-+	.matrix_keymap_data	= &littleton_matrix_keymap_data,
- 
- 	.enable_rotary0		= 1,
- 	.rotary0_up_key		= KEY_UP,
-diff --git a/arch/arm/mach-pxa/mainstone.c b/arch/arm/mach-pxa/mainstone.c
-index 7a12c1b..d2c6523 100644
---- a/arch/arm/mach-pxa/mainstone.c
-+++ b/arch/arm/mach-pxa/mainstone.c
-@@ -498,7 +498,7 @@ static struct pxaohci_platform_data mainstone_ohci_platform_data = {
- };
- 
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int mainstone_matrix_keys[] = {
-+static const unsigned int mainstone_matrix_keys[] = {
- 	KEY(0, 0, KEY_A), KEY(1, 0, KEY_B), KEY(2, 0, KEY_C),
- 	KEY(3, 0, KEY_D), KEY(4, 0, KEY_E), KEY(5, 0, KEY_F),
- 	KEY(0, 1, KEY_G), KEY(1, 1, KEY_H), KEY(2, 1, KEY_I),
-@@ -527,11 +527,15 @@ static unsigned int mainstone_matrix_keys[] = {
- 	KEY(4, 6, KEY_SELECT),
- };
- 
-+static struct matrix_keymap_data mainstone_matrix_keymap_data = {
-+	.keymap			= mainstone_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(mainstone_matrix_keys),
-+};
++	ret = matrix_keypad_build_keymap(NULL, NULL,
++					 pdata->matrix_key_rows,
++					 pdata->matrix_key_cols,
++					 keypad->keycodes, input_dev);
++	if (ret)
++		return ret;
 +
- struct pxa27x_keypad_platform_data mainstone_keypad_info = {
- 	.matrix_key_rows	= 6,
- 	.matrix_key_cols	= 7,
--	.matrix_key_map		= mainstone_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(mainstone_matrix_keys),
-+	.matrix_keymap_data	= &mainstone_matrix_keymap_data,
- 
- 	.enable_rotary0		= 1,
- 	.rotary0_up_key		= KEY_UP,
-diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-index f8979b9..654b0ac 100644
---- a/arch/arm/mach-pxa/mioa701.c
-+++ b/arch/arm/mach-pxa/mioa701.c
-@@ -222,7 +222,7 @@ static struct pxafb_mach_info mioa701_pxafb_info = {
- /*
-  * Keyboard configuration
-  */
--static unsigned int mioa701_matrix_keys[] = {
-+static const unsigned int mioa701_matrix_keys[] = {
- 	KEY(0, 0, KEY_UP),
- 	KEY(0, 1, KEY_RIGHT),
- 	KEY(0, 2, KEY_MEDIA),
-@@ -233,11 +233,16 @@ static unsigned int mioa701_matrix_keys[] = {
- 	KEY(2, 1, KEY_PHONE),	/* Phone Green key */
- 	KEY(2, 2, KEY_CAMERA)	/* Camera key */
- };
++	return 0;
++}
 +
-+static struct matrix_keymap_data mioa701_matrix_keymap_data = {
-+	.keymap			= mioa701_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(mioa701_matrix_keys),
-+};
++static int pxa27x_keypad_direct_key_parse_dt(struct pxa27x_keypad *keypad)
++{
++	const __be16 *prop;
++	unsigned short code;
++	int i, ret;
++	unsigned int proplen, size;
++	struct input_dev *input_dev = keypad->input_dev;
++	struct device *dev = input_dev->dev.parent;
++	struct pxa27x_keypad_platform_data *pdata = keypad->pdata;
++	struct device_node *np = dev->of_node;
 +
- static struct pxa27x_keypad_platform_data mioa701_keypad_info = {
- 	.matrix_key_rows = 3,
- 	.matrix_key_cols = 3,
--	.matrix_key_map = mioa701_matrix_keys,
--	.matrix_key_map_size = ARRAY_SIZE(mioa701_matrix_keys),
-+	.matrix_keymap_data = &mioa701_matrix_keymap_data,
- };
- 
- /*
-diff --git a/arch/arm/mach-pxa/palmld.c b/arch/arm/mach-pxa/palmld.c
-index 909b713..cf210b1 100644
---- a/arch/arm/mach-pxa/palmld.c
-+++ b/arch/arm/mach-pxa/palmld.c
-@@ -173,7 +173,7 @@ static inline void palmld_nor_init(void) {}
-  * GPIO keyboard
-  ******************************************************************************/
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int palmld_matrix_keys[] = {
-+static const unsigned int palmld_matrix_keys[] = {
- 	KEY(0, 1, KEY_F2),
- 	KEY(0, 2, KEY_UP),
- 
-@@ -190,11 +190,15 @@ static unsigned int palmld_matrix_keys[] = {
- 	KEY(3, 2, KEY_LEFT),
- };
- 
-+static struct matrix_keymap_data palmld_matrix_keymap_data = {
-+	.keymap			= palmld_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(palmld_matrix_keys),
-+};
++	ret = of_property_read_u32(np, "marvell,direct-key-count",
++				   &pdata->direct_key_num);
++	if (ret) {
++		/*
++		 * If do not have marvel,direct-key-count defined,
++		 * it means direct key is not supported.
++		 */
++		if (ret == -EINVAL)
++			return 0;
++		return ret;
++	}
++	ret = of_property_read_u32(np, "marvell,direct-key-mask",
++				   &pdata->direct_key_mask);
++	if (ret && ret != -EINVAL)
++		return ret;
++	/*
++	 * If marvell,direct-key-mask is not defined, driver will use
++	 * default value. Default value is set when configure the keypad.
++	 */
++	else if (ret == -EINVAL)
++		pdata->direct_key_mask = 0;
 +
- static struct pxa27x_keypad_platform_data palmld_keypad_platform_data = {
- 	.matrix_key_rows	= 4,
- 	.matrix_key_cols	= 3,
--	.matrix_key_map		= palmld_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(palmld_matrix_keys),
-+	.matrix_keymap_data	= &palmld_matrix_keymap_data,
- 
- 	.debounce_interval	= 30,
- };
-diff --git a/arch/arm/mach-pxa/palmt5.c b/arch/arm/mach-pxa/palmt5.c
-index 5033fd0..3ed9b02 100644
---- a/arch/arm/mach-pxa/palmt5.c
-+++ b/arch/arm/mach-pxa/palmt5.c
-@@ -108,7 +108,7 @@ static unsigned long palmt5_pin_config[] __initdata = {
-  * GPIO keyboard
-  ******************************************************************************/
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int palmt5_matrix_keys[] = {
-+static const unsigned int palmt5_matrix_keys[] = {
- 	KEY(0, 0, KEY_POWER),
- 	KEY(0, 1, KEY_F1),
- 	KEY(0, 2, KEY_ENTER),
-@@ -124,11 +124,15 @@ static unsigned int palmt5_matrix_keys[] = {
- 	KEY(3, 2, KEY_LEFT),
- };
- 
-+static struct matrix_keymap_data palmt5_matrix_keymap_data = {
-+	.keymap			= palmt5_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(palmt5_matrix_keys),
-+};
++	pdata->direct_key_low_active = of_property_read_bool(np,
++					"marvell,direct-key-low-active");
 +
- static struct pxa27x_keypad_platform_data palmt5_keypad_platform_data = {
- 	.matrix_key_rows	= 4,
- 	.matrix_key_cols	= 3,
--	.matrix_key_map		= palmt5_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(palmt5_matrix_keys),
-+	.matrix_keymap_data	= &palmt5_matrix_keymap_data,
- 
- 	.debounce_interval	= 30,
- };
-diff --git a/arch/arm/mach-pxa/palmtreo.c b/arch/arm/mach-pxa/palmtreo.c
-index d82a50b..d8b937c 100644
---- a/arch/arm/mach-pxa/palmtreo.c
-+++ b/arch/arm/mach-pxa/palmtreo.c
-@@ -168,7 +168,7 @@ static unsigned long centro685_pin_config[] __initdata = {
-  * GPIO keyboard
-  ******************************************************************************/
- #if IS_ENABLED(CONFIG_KEYBOARD_PXA27x)
--static unsigned int treo680_matrix_keys[] = {
-+static const unsigned int treo680_matrix_keys[] = {
- 	KEY(0, 0, KEY_F8),		/* Red/Off/Power */
- 	KEY(0, 1, KEY_LEFT),
- 	KEY(0, 2, KEY_LEFTCTRL),	/* Alternate */
-@@ -227,7 +227,7 @@ static unsigned int treo680_matrix_keys[] = {
- 	KEY(7, 5, KEY_I),
- };
- 
--static unsigned int centro_matrix_keys[] = {
-+static const unsigned int centro_matrix_keys[] = {
- 	KEY(0, 0, KEY_F9),		/* Home */
- 	KEY(0, 1, KEY_LEFT),
- 	KEY(0, 2, KEY_LEFTCTRL),	/* Alternate */
-@@ -286,11 +286,20 @@ static unsigned int centro_matrix_keys[] = {
- 	KEY(7, 5, KEY_I),
- };
- 
-+static struct matrix_keymap_data treo680_matrix_keymap_data = {
-+	.keymap			= treo680_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(treo680_matrix_keys),
-+};
++	prop = of_get_property(np, "marvell,direct-key-map", &proplen);
++	if (!prop)
++		return -EINVAL;
 +
-+static struct matrix_keymap_data centro_matrix_keymap_data = {
-+	.keymap			= centro_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(centro_matrix_keys),
-+};
++	if (proplen % sizeof(u16))
++		return -EINVAL;
 +
- static struct pxa27x_keypad_platform_data treo680_keypad_pdata = {
- 	.matrix_key_rows	= 8,
- 	.matrix_key_cols	= 7,
--	.matrix_key_map		= treo680_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(treo680_matrix_keys),
-+	.matrix_keymap_data	= &treo680_matrix_keymap_data,
- 	.direct_key_map		= { KEY_CONNECT },
- 	.direct_key_num		= 1,
- 
-@@ -301,10 +310,8 @@ static void __init palmtreo_kpc_init(void)
++	size = proplen / sizeof(u16);
++
++	/* Only MAX_DIRECT_KEY_NUM is accepted.*/
++	if (size > MAX_DIRECT_KEY_NUM)
++		return -EINVAL;
++
++	for (i = 0; i < size; i++) {
++		code = be16_to_cpup(prop + i);
++		keypad->keycodes[MAX_MATRIX_KEY_NUM + i] = code;
++		__set_bit(code, input_dev->keybit);
++	}
++
++	return 0;
++}
++
++static int pxa27x_keypad_rotary_parse_dt(struct pxa27x_keypad *keypad)
++{
++	const __be32 *prop;
++	int i, relkey_ret;
++	unsigned int code, proplen;
++	const char *rotaryname[2] = {
++			"marvell,rotary0", "marvell,rotary1"};
++	const char relkeyname[] = {"marvell,rotary-rel-key"};
++	struct input_dev *input_dev = keypad->input_dev;
++	struct device *dev = input_dev->dev.parent;
++	struct pxa27x_keypad_platform_data *pdata = keypad->pdata;
++	struct device_node *np = dev->of_node;
++
++	relkey_ret = of_property_read_u32(np, relkeyname, &code);
++	/* if can read correct rotary key-code, we do not need this. */
++	if (relkey_ret == 0) {
++		unsigned short relcode;
++
++		/* rotary0 taks lower half, rotary1 taks upper half. */
++		relcode = code & 0xffff;
++		pdata->rotary0_rel_code = (code & 0xffff);
++		__set_bit(relcode, input_dev->relbit);
++
++		relcode = code >> 16;
++		pdata->rotary1_rel_code = relcode;
++		__set_bit(relcode, input_dev->relbit);
++	}
++
++	for (i = 0; i < 2; i++) {
++		prop = of_get_property(np, rotaryname[i], &proplen);
++		/*
++		 * If the prop is not set, it means keypad does not need
++		 * initialize the rotaryX.
++		 */
++		if (!prop)
++			continue;
++
++		code = be32_to_cpup(prop);
++		/*
++		 * Not all up/down key code are valid.
++		 * Now we depends on direct-rel-code.
++		 */
++		if ((!(code & 0xffff) || !(code >> 16)) && relkey_ret) {
++			return relkey_ret;
++		} else {
++			unsigned int n = MAX_MATRIX_KEY_NUM + (i << 1);
++			unsigned short keycode;
++
++			keycode = code & 0xffff;
++			keypad->keycodes[n] = keycode;
++			__set_bit(keycode, input_dev->keybit);
++
++			keycode = code >> 16;
++			keypad->keycodes[n + 1] = keycode;
++			__set_bit(keycode, input_dev->keybit);
++
++			if (i == 0)
++				pdata->rotary0_rel_code = -1;
++			else
++				pdata->rotary1_rel_code = -1;
++		}
++		if (i == 0)
++			pdata->enable_rotary0 = 1;
++		else
++			pdata->enable_rotary1 = 1;
++	}
++
++	keypad->rotary_rel_code[0] = pdata->rotary0_rel_code;
++	keypad->rotary_rel_code[1] = pdata->rotary1_rel_code;
++
++	return 0;
++}
++
++static int pxa27x_keypad_build_keycode_from_dt(struct pxa27x_keypad *keypad)
++{
++	int ret;
++	struct input_dev *input_dev = keypad->input_dev;
++	struct device *dev = input_dev->dev.parent;
++	struct device_node *np = dev->of_node;
++
++	if (!keypad->pdata) {
++		keypad->pdata = devm_kzalloc(dev, sizeof(*keypad->pdata),
++					     GFP_KERNEL);
++		if (!keypad->pdata) {
++			dev_err(dev, "failed to allocate memory for pdata\n");
++			return -ENOMEM;
++		}
++	}
++
++	ret = pxa27x_keypad_matrix_key_parse_dt(keypad);
++	if (ret) {
++		dev_err(dev, "failed to parse matrix key\n");
++		return ret;
++	}
++
++	ret = pxa27x_keypad_direct_key_parse_dt(keypad);
++	if (ret) {
++		dev_err(dev, "failed to parse direct key\n");
++		return ret;
++	}
++
++	ret = pxa27x_keypad_rotary_parse_dt(keypad);
++	if (ret) {
++		dev_err(dev, "failed to parse rotary key\n");
++		return ret;
++	}
++
++	ret = of_property_read_u32(np, "marvell,debounce-interval",
++				   &keypad->pdata->debounce_interval);
++	if (ret) {
++		dev_err(dev, "failed to parse debpunce-interval\n");
++		return ret;
++	}
++
++	/*
++	 * The keycodes may not only includes matrix key but also the direct
++	 * key or rotary key.
++	 */
++	input_dev->keycodemax = ARRAY_SIZE(keypad->keycodes);
++
++	return 0;
++}
++
+ static int pxa27x_keypad_build_keycode(struct pxa27x_keypad *keypad)
  {
- 	static struct pxa27x_keypad_platform_data *data = &treo680_keypad_pdata;
+ 	struct pxa27x_keypad_platform_data *pdata = keypad->pdata;
+@@ -491,15 +702,15 @@ static const struct dev_pm_ops pxa27x_keypad_pm_ops = {
+ static int pxa27x_keypad_probe(struct platform_device *pdev)
+ {
+ 	struct pxa27x_keypad_platform_data *pdata = pdev->dev.platform_data;
++	struct device_node *np = pdev->dev.of_node;
+ 	struct pxa27x_keypad *keypad;
+ 	struct input_dev *input_dev;
+ 	struct resource *res;
+ 	int irq, error;
  
--	if (machine_is_centro()) {
--		data->matrix_key_map = centro_matrix_keys;
--		data->matrix_key_map_size = ARRAY_SIZE(centro_matrix_keys);
+-	if (pdata == NULL) {
+-		dev_err(&pdev->dev, "no platform data defined\n");
++	/* Driver need build keycode from device tree or pdata */
++	if (!np && !pdata)
+ 		return -EINVAL;
 -	}
-+	if (machine_is_centro())
-+		data->matrix_keymap_data = &centro_matrix_keymap_data;
  
- 	pxa_set_keypad_info(&treo680_keypad_pdata);
- }
-diff --git a/arch/arm/mach-pxa/palmtx.c b/arch/arm/mach-pxa/palmtx.c
-index 627c93a..83f830d 100644
---- a/arch/arm/mach-pxa/palmtx.c
-+++ b/arch/arm/mach-pxa/palmtx.c
-@@ -176,7 +176,7 @@ static inline void palmtx_nor_init(void) {}
-  * GPIO keyboard
-  ******************************************************************************/
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int palmtx_matrix_keys[] = {
-+static const unsigned int palmtx_matrix_keys[] = {
- 	KEY(0, 0, KEY_POWER),
- 	KEY(0, 1, KEY_F1),
- 	KEY(0, 2, KEY_ENTER),
-@@ -192,11 +192,15 @@ static unsigned int palmtx_matrix_keys[] = {
- 	KEY(3, 2, KEY_LEFT),
- };
+ 	irq = platform_get_irq(pdev, 0);
+ 	if (irq < 0) {
+@@ -561,12 +772,18 @@ static int pxa27x_keypad_probe(struct platform_device *pdev)
+ 	input_dev->evbit[0] = BIT_MASK(EV_KEY) | BIT_MASK(EV_REP);
+ 	input_set_capability(input_dev, EV_MSC, MSC_SCAN);
  
-+static struct matrix_keymap_data palmtx_matrix_keymap_data = {
-+	.keymap			= palmtx_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(palmtx_matrix_keys),
-+};
+-	error  = pxa27x_keypad_build_keycode(keypad);
++	if (np)
++		error = pxa27x_keypad_build_keycode_from_dt(keypad);
++	else
++		error  = pxa27x_keypad_build_keycode(keypad);
+ 	if (error) {
+ 		dev_err(&pdev->dev, "failed to build keycode\n");
+ 		goto failed_put_clk;
+ 	}
+ 
++	/* If device tree is supported, pdata will be allocated. */
++	pdata = keypad->pdata;
 +
- static struct pxa27x_keypad_platform_data palmtx_keypad_platform_data = {
- 	.matrix_key_rows	= 4,
- 	.matrix_key_cols	= 3,
--	.matrix_key_map		= palmtx_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(palmtx_matrix_keys),
-+	.matrix_keymap_data	= &palmtx_matrix_keymap_data,
+ 	if ((pdata->enable_rotary0 && keypad->rotary_rel_code[0] != -1) ||
+ 	    (pdata->enable_rotary1 && keypad->rotary_rel_code[1] != -1)) {
+ 		input_dev->evbit[0] |= BIT_MASK(EV_REL);
+@@ -627,11 +844,18 @@ static int pxa27x_keypad_remove(struct platform_device *pdev)
+ /* work with hotplug and coldplug */
+ MODULE_ALIAS("platform:pxa27x-keypad");
  
- 	.debounce_interval	= 30,
- };
-diff --git a/arch/arm/mach-pxa/palmz72.c b/arch/arm/mach-pxa/palmz72.c
-index 18b7fcd..1a35ddf 100644
---- a/arch/arm/mach-pxa/palmz72.c
-+++ b/arch/arm/mach-pxa/palmz72.c
-@@ -140,7 +140,7 @@ static unsigned long palmz72_pin_config[] __initdata = {
-  * GPIO keyboard
-  ******************************************************************************/
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int palmz72_matrix_keys[] = {
-+static const unsigned int palmz72_matrix_keys[] = {
- 	KEY(0, 0, KEY_POWER),
- 	KEY(0, 1, KEY_F1),
- 	KEY(0, 2, KEY_ENTER),
-@@ -156,11 +156,15 @@ static unsigned int palmz72_matrix_keys[] = {
- 	KEY(3, 2, KEY_LEFT),
- };
- 
-+static struct matrix_keymap_data almz72_matrix_keymap_data = {
-+	.keymap			= palmz72_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(palmz72_matrix_keys),
++static const struct of_device_id pxa27x_keypad_dt_match[] = {
++	{ .compatible = "marvell,pxa27x-keypad" },
++	{},
 +};
++MODULE_DEVICE_TABLE(of, pxa27x_keypad_dt_match);
 +
- static struct pxa27x_keypad_platform_data palmz72_keypad_platform_data = {
- 	.matrix_key_rows	= 4,
- 	.matrix_key_cols	= 3,
--	.matrix_key_map		= palmz72_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(palmz72_matrix_keys),
-+	.matrix_keymap_data	= &almz72_matrix_keymap_data,
- 
- 	.debounce_interval	= 30,
- };
-diff --git a/arch/arm/mach-pxa/tavorevb.c b/arch/arm/mach-pxa/tavorevb.c
-index f55979c..4680efe 100644
---- a/arch/arm/mach-pxa/tavorevb.c
-+++ b/arch/arm/mach-pxa/tavorevb.c
-@@ -106,7 +106,7 @@ static struct platform_device smc91x_device = {
- };
- 
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int tavorevb_matrix_key_map[] = {
-+static const unsigned int tavorevb_matrix_key_map[] = {
- 	/* KEY(row, col, key_code) */
- 	KEY(0, 4, KEY_A), KEY(0, 5, KEY_B), KEY(0, 6, KEY_C),
- 	KEY(1, 4, KEY_E), KEY(1, 5, KEY_F), KEY(1, 6, KEY_G),
-@@ -147,11 +147,15 @@ static unsigned int tavorevb_matrix_key_map[] = {
- 	KEY(3, 3, KEY_F23),	/* soft2 */
- };
- 
-+static struct matrix_keymap_data tavorevb_matrix_keymap_data = {
-+	.keymap		= tavorevb_matrix_key_map,
-+	.keymap_size	= ARRAY_SIZE(tavorevb_matrix_key_map),
-+};
-+
- static struct pxa27x_keypad_platform_data tavorevb_keypad_info = {
- 	.matrix_key_rows	= 7,
- 	.matrix_key_cols	= 7,
--	.matrix_key_map		= tavorevb_matrix_key_map,
--	.matrix_key_map_size	= ARRAY_SIZE(tavorevb_matrix_key_map),
-+	.matrix_keymap_data	= &tavorevb_matrix_keymap_data,
- 	.debounce_interval	= 30,
- };
- 
-diff --git a/arch/arm/mach-pxa/z2.c b/arch/arm/mach-pxa/z2.c
-index 989903a..2513d8f 100644
---- a/arch/arm/mach-pxa/z2.c
-+++ b/arch/arm/mach-pxa/z2.c
-@@ -345,7 +345,7 @@ static inline void z2_leds_init(void) {}
-  * GPIO keyboard
-  ******************************************************************************/
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int z2_matrix_keys[] = {
-+static const unsigned int z2_matrix_keys[] = {
- 	KEY(0, 0, KEY_OPTION),
- 	KEY(1, 0, KEY_UP),
- 	KEY(2, 0, KEY_DOWN),
-@@ -405,11 +405,15 @@ static unsigned int z2_matrix_keys[] = {
- 	KEY(5, 7, KEY_DOT),
- };
- 
-+static struct matrix_keymap_data z2_matrix_keymap_data = {
-+	.keymap			= z2_matrix_keys,
-+	.keymap_size		= ARRAY_SIZE(z2_matrix_keys),
-+};
-+
- static struct pxa27x_keypad_platform_data z2_keypad_platform_data = {
- 	.matrix_key_rows	= 7,
- 	.matrix_key_cols	= 8,
--	.matrix_key_map		= z2_matrix_keys,
--	.matrix_key_map_size	= ARRAY_SIZE(z2_matrix_keys),
-+	.matrix_keymap_data	= &z2_matrix_keymap_data,
- 
- 	.debounce_interval	= 30,
- };
-diff --git a/arch/arm/mach-pxa/zylonite.c b/arch/arm/mach-pxa/zylonite.c
-index 1f00d65..36cf7cf 100644
---- a/arch/arm/mach-pxa/zylonite.c
-+++ b/arch/arm/mach-pxa/zylonite.c
-@@ -263,7 +263,7 @@ static inline void zylonite_init_mmc(void) {}
- #endif
- 
- #if defined(CONFIG_KEYBOARD_PXA27x) || defined(CONFIG_KEYBOARD_PXA27x_MODULE)
--static unsigned int zylonite_matrix_key_map[] = {
-+static const unsigned int zylonite_matrix_key_map[] = {
- 	/* KEY(row, col, key_code) */
- 	KEY(0, 0, KEY_A), KEY(0, 1, KEY_B), KEY(0, 2, KEY_C), KEY(0, 5, KEY_D),
- 	KEY(1, 0, KEY_E), KEY(1, 1, KEY_F), KEY(1, 2, KEY_G), KEY(1, 5, KEY_H),
-@@ -306,11 +306,15 @@ static unsigned int zylonite_matrix_key_map[] = {
- 	KEY(0, 3, KEY_AUX),	/* contact */
- };
- 
-+static struct matrix_keymap_data zylonite_matrix_keymap_data = {
-+	.keymap			= zylonite_matrix_key_map,
-+	.keymap_size		= ARRAY_SIZE(zylonite_matrix_key_map),
-+};
-+
- static struct pxa27x_keypad_platform_data zylonite_keypad_info = {
- 	.matrix_key_rows	= 8,
- 	.matrix_key_cols	= 8,
--	.matrix_key_map		= zylonite_matrix_key_map,
--	.matrix_key_map_size	= ARRAY_SIZE(zylonite_matrix_key_map),
-+	.matrix_keymap_data	= &zylonite_matrix_keymap_data,
- 
- 	.enable_rotary0		= 1,
- 	.rotary0_up_key		= KEY_UP,
+ static struct platform_driver pxa27x_keypad_driver = {
+ 	.probe		= pxa27x_keypad_probe,
+ 	.remove		= pxa27x_keypad_remove,
+ 	.driver		= {
+ 		.name	= "pxa27x-keypad",
++		.of_match_table = of_match_ptr(pxa27x_keypad_dt_match),
+ 		.owner	= THIS_MODULE,
+ #ifdef CONFIG_PM
+ 		.pm	= &pxa27x_keypad_pm_ops,
 -- 
 1.7.4.1
