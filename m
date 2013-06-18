@@ -1,127 +1,118 @@
 From: Sudeep.KarkadaNagesha@arm.com (Sudeep KarkadaNagesha)
-Date: Tue, 18 Jun 2013 18:07:03 +0100
-Subject: [PATCH 4/4] drivers: clocksource: add CPU PM notifier for ARM
- architected timer
+Date: Tue, 18 Jun 2013 18:07:00 +0100
+Subject: [PATCH 1/4] drivers: clocksource: configure event stream for ARM arch
+ timer
 In-Reply-To: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 References: <1371575223-21702-1-git-send-email-Sudeep.KarkadaNagesha@arm.com>
-Message-ID: <1371575223-21702-5-git-send-email-Sudeep.KarkadaNagesha@arm.com>
+Message-ID: <1371575223-21702-2-git-send-email-Sudeep.KarkadaNagesha@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+From: Will Deacon <will.deacon@arm.com>
 
-Few control settings done in architected timer as part of initialisation
-are lost when CPU enters deeper power states. They need to be re-initialised
-when the CPU is (warm)reset again.
+The ARM architected timer can generate events (used for waking up
+CPUs executing the wfe instruction) at a frequency represented as a
+power-of-2 divisor of the clock rate.
 
-This patch moves all such initialisation into separate function that can
-be used both in cold and warm CPU reset paths. It also adds CPU PM
-notifiers to do the timer initialisation on warm resets.
+This patch configures the event stream, aiming for a period of 100us
+between events. This can be used to implement wfe-based timeouts for
+userspace locking implementations.
 
-Signed-off-by: Sudeep KarkadaNagesha <sudeep.karkadanagesha@arm.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Reviewed-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/clocksource/arm_arch_timer.c | 51 +++++++++++++++++++++++++++++++-----
- 1 file changed, 44 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/arch_timer.h    | 5 +++--
+ arch/arm64/include/asm/arch_timer.h  | 6 +++---
+ drivers/clocksource/arm_arch_timer.c | 9 ++++++++-
+ include/clocksource/arm_arch_timer.h | 2 ++
+ 4 files changed, 16 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index 11aaf06..1c691b1 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -13,6 +13,7 @@
- #include <linux/device.h>
- #include <linux/smp.h>
- #include <linux/cpu.h>
-+#include <linux/cpu_pm.h>
- #include <linux/clockchips.h>
- #include <linux/interrupt.h>
- #include <linux/of_irq.h>
-@@ -123,10 +124,20 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
- 	return 0;
+diff --git a/arch/arm/include/asm/arch_timer.h b/arch/arm/include/asm/arch_timer.h
+index accefe0..75c8ec3 100644
+--- a/arch/arm/include/asm/arch_timer.h
++++ b/arch/arm/include/asm/arch_timer.h
+@@ -89,14 +89,15 @@ static inline u64 arch_counter_get_cntvct(void)
+ 	return cval;
  }
  
--static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
-+static void arch_timer_initialise(void)
+-static inline void __cpuinit arch_counter_set_user_access(void)
++static inline void __cpuinit arch_counter_set_user_access(int divider)
  {
- 	int evt_stream_div, pos;
+ 	u32 cntkctl;
  
+ 	asm volatile("mrc p15, 0, %0, c14, c1, 0" : "=r" (cntkctl));
+ 
+ 	/* disable user access to everything */
+-	cntkctl &= ~((3 << 8) | (7 << 0));
++	cntkctl &= ~((3 << 8) | (0xf << 4) | (3 << 0));
++	cntkctl |= (divider << 4) | (1 << 2);
+ 
+ 	asm volatile("mcr p15, 0, %0, c14, c1, 0" : : "r" (cntkctl));
+ }
+diff --git a/arch/arm64/include/asm/arch_timer.h b/arch/arm64/include/asm/arch_timer.h
+index d56ed11..5fcaa6f 100644
+--- a/arch/arm64/include/asm/arch_timer.h
++++ b/arch/arm64/include/asm/arch_timer.h
+@@ -97,16 +97,16 @@ static inline u32 arch_timer_get_cntfrq(void)
+ 	return val;
+ }
+ 
+-static inline void __cpuinit arch_counter_set_user_access(void)
++static inline void __cpuinit arch_counter_set_user_access(int divider)
+ {
+ 	u32 cntkctl;
+ 
+ 	/* Disable user access to the timers and the physical counter. */
+ 	asm volatile("mrs	%0, cntkctl_el1" : "=r" (cntkctl));
+-	cntkctl &= ~((3 << 8) | (1 << 0));
++	cntkctl &= ~((3 << 8) | (0xf << 4) | (1 << 0));
+ 
+ 	/* Enable user access to the virtual counter and frequency. */
+-	cntkctl |= (1 << 1);
++	cntkctl |= (divider << 4) | (1 << 2) | (1 << 1);
+ 	asm volatile("msr	cntkctl_el1, %0" : : "r" (cntkctl));
+ }
+ 
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index 053d846..11aaf06 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -125,6 +125,8 @@ static int arch_timer_set_next_event_phys(unsigned long evt,
+ 
+ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+ {
++	int evt_stream_div, pos;
++
+ 	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP;
+ 	clk->name = "arch_sys_timer";
+ 	clk->rating = 450;
+@@ -153,7 +155,12 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
+ 			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
+ 	}
+ 
+-	arch_counter_set_user_access();
 +	/* Find the closest power of two to the divisor */
 +	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
 +	pos = fls(evt_stream_div);
 +	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
 +		pos--;
 +	arch_counter_set_user_access(min(pos, 15));
-+}
-+
-+static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
-+{
- 	clk->features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_C3STOP;
- 	clk->name = "arch_sys_timer";
- 	clk->rating = 450;
-@@ -155,12 +166,7 @@ static int __cpuinit arch_timer_setup(struct clock_event_device *clk)
- 			enable_percpu_irq(arch_timer_ppi[PHYS_NONSECURE_PPI], 0);
- 	}
- 
--	/* Find the closest power of two to the divisor */
--	evt_stream_div = arch_timer_rate / ARCH_TIMER_EVT_STREAM_FREQ;
--	pos = fls(evt_stream_div);
--	if (pos > 1 && !(evt_stream_div & (1 << (pos - 2))))
--		pos--;
--	arch_counter_set_user_access(min(pos, 15));
-+	arch_timer_initialise();
  
  	return 0;
  }
-@@ -267,6 +273,31 @@ static struct notifier_block arch_timer_cpu_nb __cpuinitdata = {
- 	.notifier_call = arch_timer_cpu_notify,
- };
+diff --git a/include/clocksource/arm_arch_timer.h b/include/clocksource/arm_arch_timer.h
+index c463ce9..24dc140 100644
+--- a/include/clocksource/arm_arch_timer.h
++++ b/include/clocksource/arm_arch_timer.h
+@@ -29,6 +29,8 @@
+ #define ARCH_TIMER_PHYS_ACCESS		0
+ #define ARCH_TIMER_VIRT_ACCESS		1
  
-+#ifdef CONFIG_CPU_PM
-+static int arch_timer_cpu_pm_notify(struct notifier_block *self,
-+				    unsigned long action, void *hcpu)
-+{
-+	if (action == CPU_PM_EXIT)
-+		arch_timer_initialise();
++#define ARCH_TIMER_EVT_STREAM_FREQ	10000	/* 100us */
 +
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block arch_timer_cpu_pm_notifier = {
-+	.notifier_call = arch_timer_cpu_pm_notify,
-+};
-+
-+static int __init arch_timer_cpu_pm_init(void)
-+{
-+	return cpu_pm_register_notifier(&arch_timer_cpu_pm_notifier);
-+}
-+#else
-+static int __init arch_timer_cpu_pm_init(void)
-+{
-+	return 0;
-+}
-+#endif
-+
- static int __init arch_timer_register(void)
- {
- 	int err;
-@@ -316,11 +347,17 @@ static int __init arch_timer_register(void)
- 	if (err)
- 		goto out_free_irq;
+ #ifdef CONFIG_ARM_ARCH_TIMER
  
-+	err = arch_timer_cpu_pm_init();
-+	if (err)
-+		goto out_unreg_notify;
-+
- 	/* Immediately configure the timer on the boot CPU */
- 	arch_timer_setup(this_cpu_ptr(arch_timer_evt));
- 
- 	return 0;
- 
-+out_unreg_notify:
-+	unregister_cpu_notifier(&arch_timer_cpu_nb);
- out_free_irq:
- 	if (arch_timer_use_virtual)
- 		free_percpu_irq(arch_timer_ppi[VIRT_PPI], arch_timer_evt);
+ extern u32 arch_timer_get_rate(void);
 -- 
 1.8.1.2
