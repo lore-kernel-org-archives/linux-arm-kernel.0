@@ -1,54 +1,51 @@
-From: nerv@dawncrow.de (=?ISO-8859-1?Q?Andr=E9_Hentschel?=)
-Date: Tue, 18 Jun 2013 20:58:27 +0200
-Subject: [PATCH v6] arm: Preserve the user r/w register TPIDRURW on
- context, switch and fork
-In-Reply-To: <20130618100715.GA3539@mudshark.cambridge.arm.com>
-References: <51BF8A1C.5070403@dawncrow.de>
- <20130618100715.GA3539@mudshark.cambridge.arm.com>
-Message-ID: <51C0ADD3.7030102@dawncrow.de>
+From: sebastian.hesselbarth@gmail.com (Sebastian Hesselbarth)
+Date: Tue, 18 Jun 2013 20:59:03 +0200
+Subject: [PATCH v3 03/12] bus: mvebu-mbus: Add static window allocation
+ to the DT binding
+In-Reply-To: <20130618184753.GA6090@obsidianresearch.com>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130618174622.GD2204@obsidianresearch.com> <51C0A5F8.8030300@gmail.com>
+ <201306182039.50736.arnd@arndb.de> <51C0AA8E.9080807@gmail.com>
+ <20130618184753.GA6090@obsidianresearch.com>
+Message-ID: <51C0ADF7.5050609@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.06.2013 12:07, Will Deacon wrote:
-> On Mon, Jun 17, 2013 at 11:13:48PM +0100, Andr? Hentschel wrote:
->> From: Andr? Hentschel <nerv@dawncrow.de>
+On 06/18/2013 08:47 PM, Jason Gunthorpe wrote:
+> On Tue, Jun 18, 2013 at 08:44:30PM +0200, Sebastian Hesselbarth wrote:
+>> Yeah, I also recall Thomas or Gregory mention a 32b limitation in
+>> remap windows. But we don't need to waste addresses here
 >>
->> Since commit 6a1c53124aa1 the user writeable TLS register was zeroed to
->> prevent it from being used as a covert channel between two tasks.
->>
->> There are more and more applications coming to Windows RT,
->> Wine could support them, but mostly they expect to have
->> the thread environment block (TEB) in TPIDRURW.
->>
->> This patch preserves that register per thread instead of clearing it.
->> Unlike the TPIDRURO, which is already switched, the TPIDRURW
->> can be updated from userspace so needs careful treatment in the case that we
->> modify TPIDRURW and call fork(). To avoid this we must always read
->> TPIDRURW in copy_thread.
->>
->> Signed-off-by: Andr? Hentschel <nerv@dawncrow.de>
->> Signed-off-by: Will Deacon <will.deacon@arm.com>
->> Signed-off-by: Jonathan Austin <jonathan.austin@arm.com> 
->>
->> ---
->> This patch is against Linux 3.10-rc6 (7d132055814ef17a6c7b69f342244c410a5e000f)
->>
->> v2: rework and fixup of v1, based on a suggested patch by Will Deacon
->> v3: total rework and fixup of v2
->> v4: removed condition on assembler instruction,
->>     adapted my code to kernel-style, both based on comments by Will Deacon
->> v5: rebased v4 on 3.10-rc2 and adding this version history
->> v6: moved loading the TLS registers to the macros
->>     (fixing the "LDRD is not supported on all the CPUs we have" problem)
-> 
-> You've changed quite a lot with this version, including the way the macro
-> parameters are passed. Why not just replace the problematic ldrd with two
-> ldr instructions and be done with it? I don't think the simple build error
-> warrants an overhaul of the code we already had.
+>> And even if SIAA0000 is a concern because there may be target id>15
+>> someday, we can still have IIAASS00 instead of IIAA00SS. I guess
+>> LPAE will not rise above 40b quickly ;)
+>
+> S = 0 means 4 bit I, 8 bit A
+> S = F means special
+> S = 1 could mean 16 bit I, etc , etc
 
-Wantig that patch to be in 3.11 i thought i should do more now to push it.
-I'm still not that familiar with the process, but i think Russell King would
-have done this easy change himself when he would be happy with it.
-Further this patch seems cleaner and much likely performing better.
-I'm off till saturday, hopefully i'm enlighted by feedback till then :)
-(just to be clear: i'm also happy with replacing ldrd with two ldr instructions)
+S & 0x8 == 0x0 means 7b target
+S & 0x8 == 0x8 means 7b special ?
+
+> Yes, we could define things as 'SIAAoooo oooooooo'
+>
+> But remember 'o' is the offset within the window, it is not related to
+> LPAE.
+>
+> To need>  32 bits 'o' you need to have windows>  4G in size. The only
+> thing that could possibly do that is PCI-E, and it is all special
+> anyhow..
+>
+> The mbus top level ranges remap already supports>4G locations for
+> the windows, even though current hardware cannot do that.
+
+True. But as Arnd also mentioned, I don't think it will ever be a
+problem at all. Possibly there will never be any future SoC with mbus
+that will either allow >32b remap base addresses nor >4G size.
+
+But never the less, IIAA00SS (which is used in v3 of the patches) will
+limit both to 32b/4G forever.
+
+And we already have +3 for SIAAoooo ;)
+
+Sebastian
