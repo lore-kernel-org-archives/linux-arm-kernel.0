@@ -1,53 +1,134 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 17 Jun 2013 17:38:00 -0700
-Subject: [PATCH 0/2] Fix potential merge conflict for dw_apb_timer_of
-In-Reply-To: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
-References: <1371514129-22801-1-git-send-email-dinguyen@altera.com>
-Message-ID: <51BFABE8.5090504@linaro.org>
+From: heiko@sntech.de (Heiko =?iso-8859-15?q?St=FCbner?=)
+Date: Tue, 18 Jun 2013 02:53:59 +0200
+Subject: [PATCH v2 3/5] clk: dt: binding for basic multiplexer clock
+In-Reply-To: <1371437905-15567-4-git-send-email-mturquette@linaro.org>
+References: <1371437905-15567-1-git-send-email-mturquette@linaro.org>
+ <1371437905-15567-4-git-send-email-mturquette@linaro.org>
+Message-ID: <201306180253.59691.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/17/2013 05:08 PM, dinguyen at altera.com wrote:
-> From: Dinh Nguyen <dinguyen@altera.com>
->
-> Hi Arnd/Olof,
->
-> Because of the following patch series that is currently in arm-soc/for-next:
->
-> 10021488997317d1121505a7ac659124c058efed clocksource: dw_apb_timer_of: use clocksource_of_init
-> 1b4eca0f634be2a99f2baa6c29dfd183590ead3f clocksource: dw_apb_timer_of: select DW_APB_TIMER
-> a8b447f2bbbba737ff4478f498d7f83c75a9461b clocksource: dw_apb_timer_of: add clock-handling
-> a1198f83407ae3421f3f58355a0f296d5ea6249c clocksource: dw_apb_timer_of: enable the use the clocksource as sched clock
->
-> there will be a merge conflict with:
->
-> 55a68c23e0a675b2b8ac2656fd6edbf98b78e4c6 dw_apb_timer_of.c: Remove parts that were picoxcell-specific
->
-> that is currently in John Stultz's tree fortglx/3.11/time.
+Am Montag, 17. Juni 2013, 04:58:23 schrieb Mike Turquette:
+> Device Tree binding for the basic clock multiplexer, plus the setup
+> function to register the clock.  Based on the existing fixed-clock
+> binding.
+> 
+> Includes minor beautification of clk-provider.h where some whitespace is
+> added and of_fixed_factor_clock_setup is relocated to maintain a
+> consistent style.
+> 
+> Signed-off-by: Mike Turquette <mturquette@linaro.org>
+> ---
 
-:( That one is also in Thomas' tip/timers/core already.
+> +void of_mux_clk_setup(struct device_node *node)
+> +{
+> +	struct clk *clk;
+> +	const char *clk_name = node->name;
+> +	void __iomem *reg;
+> +	int num_parents;
+> +	const char **parent_names;
+> +	int i;
+> +	u8 clk_mux_flags = 0;
+> +	u32 mask = 0;
+> +	u8 shift = 0;
+> +
+> +	of_property_read_string(node, "clock-output-names", &clk_name);
+> +
+> +	num_parents = of_clk_get_parent_count(node);
+> +	if (num_parents < 1) {
+> +		pr_err("%s: mux-clock %s must have parent(s)\n",
+> +				__func__, node->name);
+> +		return;
+> +	}
+> +
+> +	parent_names = kzalloc((sizeof(char*) * num_parents),
+> +			GFP_KERNEL);
+> +
+> +	for (i = 0; i < num_parents; i++)
+> +		parent_names[i] = of_clk_get_parent_name(node, i);
+> +
+> +	reg = of_iomap(node, 0);
+> +
+> +	if (of_property_read_u32(node, "bit-mask", &mask)) {
+> +		pr_err("%s: missing bit-mask property for %s\n", __func__, node-
+>name);
+> +		return;
+> +	}
+> +
+> +	if (of_property_read_u8(node, "bit-shift", &shift)) {
+> +		shift = __ffs(mask);
+> +		pr_debug("%s: bit-shift property defaults to 0x%x for %s\n",
+> +				__func__, shift, node->name);
+> +	}
+
+I'm not really sure if either I am or the code is doing something wrong.
+For me here of_property_read_u8 is always setting shift to 0, with bit-shift 
+values normally being <8>, <15> etc.
+
+When I change the type of shift to u32 and use the corresponding 
+of_property_read_u32 everything works fine.
+
+And when I switch both function and var back to u8 again, it again reads 0 for 
+everything.
 
 
-> The following 2 patches will eliminate the need for the patch in John
-> Stultz's tree. If there is to be merge of the 2 trees, then the
-> patch:
->
-> dw_apb_timer_of.c: Remove parts that were picoxcell-specific
->
-> can be removed from John's tree to avoid a merge-conflict.
->
-> Based on arm-soc/for-next:
->
-> PATCH[1/2] - Rename "dw-apb-timer-osc" and "dw-apb-timer-sp" bindings to just
-> "dw-apb-timer"
-> PATCH[2/2] - Fix user/system reporting by fixing read_sched_clock()
+For reference one of my muxes looks like:
 
-Pavel/Jamie: Can you take a look at these too and make sure these cover what you were doing.
+		mux_uart2: mux-uart2 at 20000080 {
+			compatible = "mux-clock";
+			reg = <0x20000080 0x04>;
+			clocks = <&clk_gates1 12>, <&dummy>, <&xin24m>;
+			bit-mask = <0x3>;
+			bit-shift = <8>;
+			hiword-mask;
+			#clock-cells = <0>;
+		};
+
+Same is of course also true for the divider-clock.
 
 
-So Dinh, just to get this right, you're wanting me to revert  "Remove parts that were picoxcell-specific" and apply your two changes to my tree?
+Very confused,
+Heiko
 
-The other 4 patches above are then fine to go in via arm-soc? Or do I need to merge those in too?
 
-thanks
--john
+> +
+> +	if (of_property_read_bool(node, "index-starts-at-one"))
+> +		clk_mux_flags |= CLK_MUX_INDEX_ONE;
+> +
+> +	clk = clk_register_mux_table(NULL, clk_name, parent_names, num_parents,
+> +			0, reg, shift, mask, clk_mux_flags,
+> +			NULL, NULL);
+> +
+> +	if (!IS_ERR(clk))
+> +		of_clk_add_provider(node, of_clk_src_simple_get, clk);
+> +}
+> +EXPORT_SYMBOL_GPL(of_mux_clk_setup);
+> +CLK_OF_DECLARE(mux_clk, "mux-clock", of_mux_clk_setup);
+> +#endif
+> diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+> index 8730cb9..24a04b8 100644
+> --- a/include/linux/clk-provider.h
+> +++ b/include/linux/clk-provider.h
+> @@ -340,7 +340,7 @@ struct clk *clk_register_mux_table(struct device *dev,
+> const char *name, void __iomem *reg, u8 shift, u32 mask,
+>  		u8 clk_mux_flags, u32 *table, spinlock_t *lock);
+> 
+> -void of_fixed_factor_clk_setup(struct device_node *node);
+> +void of_mux_clk_setup(struct device_node *node);
+> 
+>  /**
+>   * struct clk_fixed_factor - fixed multiplier and divider clock
+> @@ -361,10 +361,13 @@ struct clk_fixed_factor {
+>  };
+> 
+>  extern struct clk_ops clk_fixed_factor_ops;
+> +
+>  struct clk *clk_register_fixed_factor(struct device *dev, const char
+> *name, const char *parent_name, unsigned long flags,
+>  		unsigned int mult, unsigned int div);
+> 
+> +void of_fixed_factor_clk_setup(struct device_node *node);
+> +
+>  /***
+>   * struct clk_composite - aggregate clock of mux, divider and gate clocks
+>   *
