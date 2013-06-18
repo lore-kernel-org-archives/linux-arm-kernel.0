@@ -1,132 +1,70 @@
 From: joelagnel@ti.com (Joel A Fernandes)
-Date: Tue, 18 Jun 2013 01:38:14 -0500
-Subject: [PATCH v11 3/8] ARM: edma: Add EDMA crossbar event mux support
+Date: Tue, 18 Jun 2013 01:38:12 -0500
+Subject: [PATCH v11 1/8] dmaengine: edma: Add TI EDMA device tree binding
 In-Reply-To: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
 References: <1371537499-12970-1-git-send-email-joelagnel@ti.com>
-Message-ID: <1371537499-12970-4-git-send-email-joelagnel@ti.com>
+Message-ID: <1371537499-12970-2-git-send-email-joelagnel@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Matt Porter <mporter@ti.com>
+From: Matt Porter <mdp@ti.com>
 
-Changes by Joel:
-* Split EDMA xbar support out of original EDMA DT parsing patch
-to keep it easier for review.
-* Rewrite shift and offset calculation.
+The binding definition is based on the generic DMA controller
+binding.
 
-Suggested-by: Sekhar Nori <nsekhar@ti.com>
-Suggested by: Andy Shevchenko <andy.shevchenko@gmail.com>
+Joel:
+* Droped reserved and queue DT entries from Documentation
+for now from the original patch series (v10)
+* Included properties in Documentation and clarified DMA properties (V11)
+* Made ti,hwmod option
+* Clarified DMA entries
+
+Signed-off-by: Matt Porter <mporter@ti.com>
 Signed-off-by: Joel A Fernandes <joelagnel@ti.com>
-
-Reference:
-[1] https://patchwork.kernel.org/patch/2226991/
 ---
- arch/arm/common/edma.c             |   59 ++++++++++++++++++++++++++++++++++++
- include/linux/platform_data/edma.h |    1 +
- 2 files changed, 60 insertions(+)
+ Documentation/devicetree/bindings/dma/ti-edma.txt |   34 +++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/dma/ti-edma.txt
 
-diff --git a/arch/arm/common/edma.c b/arch/arm/common/edma.c
-index 9823b79..1c2fb15 100644
---- a/arch/arm/common/edma.c
-+++ b/arch/arm/common/edma.c
-@@ -1410,6 +1410,52 @@ static int edma_of_read_u32_to_s16_array(const struct device_node *np,
- 	return 0;
- }
- 
-+static int edma_xbar_event_map(struct device *dev,
-+			       struct device_node *node,
-+			       struct edma_soc_info *pdata, int len)
-+{
-+	int ret = 0;
-+	int i;
-+	struct resource res;
-+	void *xbar;
-+	const s16 (*xbar_chans)[2];
-+	u32 shift, offset, mux;
+diff --git a/Documentation/devicetree/bindings/dma/ti-edma.txt b/Documentation/devicetree/bindings/dma/ti-edma.txt
+new file mode 100644
+index 0000000..9fbbdb7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/dma/ti-edma.txt
+@@ -0,0 +1,34 @@
++TI EDMA
 +
-+	xbar_chans = devm_kzalloc(dev,
-+				  len/sizeof(s16) + 2*sizeof(s16),
-+				  GFP_KERNEL);
-+	if (!xbar_chans)
-+		return -ENOMEM;
++Required properties:
++- compatible : "ti,edma3"
++- ti,edma-regions: Number of regions
++- ti,edma-slots: Number of slots
++- #dma-cells: Should be set to <1>
++              Clients should use a single channel number per DMA request.
++- dma-channels: Specify total DMA channels per CC
++- reg: Memory map for accessing module
++- interrupt-parent: Interrupt controller the interrupt is routed through
++- interrupts: Exactly 3 interrupts need to be specified in the order:
++              1. Transfer completion interrupt.
++              2. Memory protection interrupt.
++              3. Error interrupt.
++Optional properties:
++- ti,hwmods: Name of the hwmods associated to the EDMA
++- ti,edma-xbar-event-map: Crossbar event to channel map
 +
-+	ret = of_address_to_resource(node, 1, &res);
-+	if (ret)
-+		return -EIO;
++Example:
 +
-+	xbar = devm_ioremap(dev, res.start, resource_size(&res));
-+	if (!xbar)
-+		return -ENOMEM;
-+
-+	ret = edma_of_read_u32_to_s16_array(node,
-+					    "ti,edma-xbar-event-map",
-+					    (s16 *)xbar_chans,
-+					    len/sizeof(u32));
-+	if (ret)
-+		return -EIO;
-+
-+	for (i = 0; xbar_chans[i][0] != -1; i++) {
-+		shift = (xbar_chans[i][1] & 0x03) << 3;
-+		offset = xbar_chans[i][1] & 0xfffffffc;
-+		mux = readl((void *)((u32)xbar + offset));
-+		mux &= ~(0xff << shift);
-+		mux |= xbar_chans[i][0] << shift;
-+		writel(mux, (void *)((u32)xbar + offset));
-+	}
-+
-+	pdata->xbar_chans = xbar_chans;
-+
-+	return 0;
-+}
-+
- static int edma_of_parse_dt(struct device *dev,
- 			    struct device_node *node,
- 			    struct edma_soc_info *pdata)
-@@ -1470,6 +1516,9 @@ static int edma_of_parse_dt(struct device *dev,
- 
- 	pdata->default_queue = 0;
- 
-+	prop = of_find_property(node, "ti,edma-xbar-event-map", &sz);
-+	if (prop)
-+		ret = edma_xbar_event_map(dev, node, pdata, sz);
- 
- 	return ret;
- }
-@@ -1489,6 +1538,7 @@ static int edma_probe(struct platform_device *pdev)
- 	int			status = -1;
- 	const s16		(*rsv_chans)[2];
- 	const s16		(*rsv_slots)[2];
-+	const s16		(*xbar_chans)[2];
- 	int			irq[EDMA_MAX_CC] = {0, 0};
- 	int			err_irq[EDMA_MAX_CC] = {0, 0};
- 	struct resource		*r[EDMA_MAX_CC] = {NULL, NULL};
-@@ -1617,6 +1667,15 @@ static int edma_probe(struct platform_device *pdev)
- 			}
- 		}
- 
-+		/* Clear the xbar mapped channels in unused list */
-+		xbar_chans = info[j]->xbar_chans;
-+		if (xbar_chans) {
-+			for (i = 0; xbar_chans[i][1] != -1; i++) {
-+				off = xbar_chans[i][1];
-+				clear_bits(off, 1,
-+					edma_cc[j]->edma_unused);
-+			}
-+		}
- 
- 		if (node)
- 			irq[j] = irq_of_parse_and_map(node, 0);
-diff --git a/include/linux/platform_data/edma.h b/include/linux/platform_data/edma.h
-index 317f2be..57300fd 100644
---- a/include/linux/platform_data/edma.h
-+++ b/include/linux/platform_data/edma.h
-@@ -177,6 +177,7 @@ struct edma_soc_info {
- 
- 	s8	(*queue_tc_mapping)[2];
- 	s8	(*queue_priority_mapping)[2];
-+	const s16	(*xbar_chans)[2];
- };
- 
- #endif
++edma: edma at 49000000 {
++	reg = <0x49000000 0x10000>;
++	interrupt-parent = <&intc>;
++	interrupts = <12 13 14>;
++	compatible = "ti,edma3";
++	ti,hwmods = "tpcc", "tptc0", "tptc1", "tptc2";
++	#dma-cells = <1>;
++	dma-channels = <64>;
++	ti,edma-regions = <4>;
++	ti,edma-slots = <256>;
++	ti,edma-xbar-event-map = <1 12
++				  2 13>;
++};
 -- 
 1.7.9.5
