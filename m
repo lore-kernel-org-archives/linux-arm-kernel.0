@@ -1,44 +1,30 @@
-From: jonas.jensen@gmail.com (Jonas Jensen)
-Date: Tue, 18 Jun 2013 10:11:05 +0200
-Subject: [PATCH v2] ARM: mm: cpu_fa526_do_idle: remove WFI
-Message-ID: <1371543065-5843-1-git-send-email-jonas.jensen@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Jun 2013 01:12:56 -0700
+Subject: [GIT PULL] OMAP: PM: voltagedomain cleanup for v3.11
+In-Reply-To: <87r4g08v0x.fsf@linaro.org>
+References: <87r4g08v0x.fsf@linaro.org>
+Message-ID: <20130618081256.GC5523@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As it was already suggested by Russell King and Arnd Bergmann:
+* Kevin Hilman <khilman@linaro.org> [130617 11:20]:
+> The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
+> 
+>   Linux 3.10-rc6 (2013-06-15 11:51:07 -1000)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git tags/omap-pm-v3.11/voltdm
+> 
+> for you to fetch changes up to 63b0420c85096d4bb1a3ba365dbf6b970a58b8f7:
+> 
+>   ARM: AM33xx: Remove the unused voltagedomain data (2013-06-17 07:26:44 -0700)
+> 
+> ----------------------------------------------------------------
+> OMAP: PM: remove requirement for voltage domain data; remove dummy data
 
-https://lkml.org/lkml/2013/5/16/133
+Thanks pulling into omap-for-v3.11/pm-voltdomain.
 
-moxart and gemini seem to be the only platforms using CPU_FA526,
-and instead of pointing arm_pm_idle to an empty function from
-platform code, it makes sense to remove WFI code from the processor
-specific idle function.
+Regards,
 
-Applies to arm-soc/for-next.
-
-Changes since v1:
-
-1. remove WFI but make sure cpu_fa526_do_idle do not fall through
-   to cpu_fa526_dcache_clean_area
-
-Note: moxart boots and prints to UART without this patch, but input is broken.
-
-Signed-off-by: Jonas Jensen <jonas.jensen@gmail.com>
----
- arch/arm/mm/proc-fa526.S |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mm/proc-fa526.S b/arch/arm/mm/proc-fa526.S
-index d217e97..aaeb6c1 100644
---- a/arch/arm/mm/proc-fa526.S
-+++ b/arch/arm/mm/proc-fa526.S
-@@ -81,7 +81,6 @@ ENDPROC(cpu_fa526_reset)
-  */
- 	.align	4
- ENTRY(cpu_fa526_do_idle)
--	mcr	p15, 0, r0, c7, c0, 4		@ Wait for interrupt
- 	mov	pc, lr
- 
- 
--- 
-1.7.2.5
+Tony
