@@ -1,238 +1,80 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Tue, 18 Jun 2013 09:36:55 +0200
-Subject: [PATCH v3 07/10] ARM: dts: Add initial device tree support for
- Exynos5420
-In-Reply-To: <CANuQgHEKCW5=_o6CUboQJ4B9PVCGe+3u5Nu1WA446YhSH6T79g@mail.gmail.com>
-References: <1371466836-4111-1-git-send-email-chander.kashyap@linaro.org>
- <3228621.2EHTYISgy0@amdc1227>
- <CANuQgHEKCW5=_o6CUboQJ4B9PVCGe+3u5Nu1WA446YhSH6T79g@mail.gmail.com>
-Message-ID: <6975264.aNGfC7oI1E@flatron>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 18 Jun 2013 09:38:49 +0200
+Subject: [PATCH v4 7/7] ARM: hi3xxx: enable hi4511 with device tree
+In-Reply-To: <1370702843-27172-8-git-send-email-haojian.zhuang@linaro.org>
+References: <1370702843-27172-1-git-send-email-haojian.zhuang@linaro.org>
+ <1370702843-27172-8-git-send-email-haojian.zhuang@linaro.org>
+Message-ID: <CACRpkdbbjKQ-Ghs79F9wvefi-4LVfU9SZYk9YmoAPudNu+QLhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 18 of June 2013 09:51:14 Chander Kashyap wrote:
-> On 17 June 2013 17:14, Tomasz Figa <t.figa@samsung.com> wrote:
-> > --
-> > Tomasz Figa
-> > Linux Kernel Developer
-> > Samsung R&D Institute Poland
-> > Samsung Electronics
-> > 
-> > On Monday 17 of June 2013 16:30:32 Chander Kashyap wrote:
-> >> Add initial device tree nodes for Exynos5420 SoC and SMDK5420 board.
-> >> 
-> >> Signed-off-by: Chander Kashyap <chander.kashyap@linaro.org>
-> >> ---
-> >> 
-> >>  arch/arm/boot/dts/Makefile                |    1 +
-> >>  arch/arm/boot/dts/exynos5420-smdk5420.dts |   33 +++++++++
-> >>  arch/arm/boot/dts/exynos5420.dtsi         |  103
-> >> 
-> >> +++++++++++++++++++++++++++++ 3 files changed, 137 insertions(+)
-> >> 
-> >>  create mode 100644 arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >>  create mode 100644 arch/arm/boot/dts/exynos5420.dtsi
-> >> 
-> >> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> >> index f0895c5..5efa7e0 100644
-> >> --- a/arch/arm/boot/dts/Makefile
-> >> +++ b/arch/arm/boot/dts/Makefile
-> >> @@ -57,6 +57,7 @@ dtb-$(CONFIG_ARCH_EXYNOS) += exynos4210-origen.dtb
-> >> \
-> >> 
-> >>       exynos5440-sd5v1.dtb \
-> >>       exynos5250-smdk5250.dtb \
-> >>       exynos5250-snow.dtb \
-> >> 
-> >> +     exynos5420-smdk5420.dtb \
-> >> 
-> >>       exynos5440-ssdk5440.dtb
-> >>  
-> >>  dtb-$(CONFIG_ARCH_HIGHBANK) += highbank.dtb \
-> >>  
-> >>       ecx-2000.dtb
-> >> 
-> >> diff --git a/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> b/arch/arm/boot/dts/exynos5420-smdk5420.dts new file mode 100644
-> >> index 0000000..d14ece5
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/exynos5420-smdk5420.dts
-> >> @@ -0,0 +1,33 @@
-> >> +/*
-> >> + * SAMSUNG SMDK5420 board device tree source
-> >> + *
-> >> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> >> + *           http://www.samsung.com
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or
-> >> modify + * it under the terms of the GNU General Public License
-> >> version 2 as + * published by the Free Software Foundation.
-> >> +*/
-> >> +
-> >> +/dts-v1/;
-> >> +#include "exynos5420.dtsi"
-> >> +
-> >> +/ {
-> >> +     model = "Samsung SMDK5420 board based on EXYNOS5420";
-> >> +     compatible = "samsung,smdk5420", "samsung,exynos5420";
-> >> +
-> >> +     memory {
-> >> +             reg =   <0x20000000 0x80000000>;
-> >> +     };
-> >> +
-> >> +     chosen {
-> >> +             bootargs = "console=ttySAC2,115200 init=/linuxrc";
-> >> +     };
-> >> +
-> >> +     fixed-rate-clocks {
-> >> +             oscclk {
-> >> +                     compatible = "samsung,exynos5420-oscclk";
-> >> +                     clock-frequency = <24000000>;
-> >> +             };
-> >> +     };
-> >> +};
-> >> diff --git a/arch/arm/boot/dts/exynos5420.dtsi
-> >> b/arch/arm/boot/dts/exynos5420.dtsi new file mode 100644
-> >> index 0000000..e865be5
-> >> --- /dev/null
-> >> +++ b/arch/arm/boot/dts/exynos5420.dtsi
-> >> @@ -0,0 +1,103 @@
-> >> +/*
-> >> + * SAMSUNG EXYNOS5420 SoC device tree source
-> >> + *
-> >> + * Copyright (c) 2013 Samsung Electronics Co., Ltd.
-> >> + *           http://www.samsung.com
-> >> + *
-> >> + * SAMSUNG EXYNOS54200 SoC device nodes are listed in this file.
-> >> + * EXYNOS5420 based board files can include this file and provide
-> >> + * values for board specfic bindings.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or
-> >> modify + * it under the terms of the GNU General Public License
-> >> version 2 as + * published by the Free Software Foundation.
-> >> + */
-> >> +
-> >> +#include "exynos5.dtsi"
-> >> +/ {
-> >> +     compatible = "samsung,exynos5420";
-> >> +
-> >> +     cpus {
-> >> +             #address-cells = <1>;
-> >> +             #size-cells = <0>;
-> >> +
-> >> +             cpu0: cpu at 0 {
-> >> +                     device_type = "cpu";
-> >> +                     compatible = "arm,cortex-a15";
-> >> +                     reg = <0x0>;
-> >> +                     clock-frequency = <800000000>;
-> > 
-> > It is the only frequency at which this SoC can run? What code does
-> > actually use this property? Can't this frequency be read by calling
-> > clk_get_rate() on armclk?
-> 
-> This is the max cpu frequency.
-> This property is used in "parse_dt_topology" in
-> arch/arm/kernel/topology.c" to calculate cpu capacity.
+On Sat, Jun 8, 2013 at 4:47 PM, Haojian Zhuang
+<haojian.zhuang@linaro.org> wrote:
 
-OK, fine. Thanks for the explanation.
+> +                       uart0_mux: uart0_mux {
+> +                               compatible = "hisilicon,hi3620-clk-mux";
+> +                               #clock-cells = <0>;
+> +                               clocks = <&osc26m &pclk>;
+> +                               clock-output-names = "uart0_mux";
+> +                               /* reg_offset, mask bits */
+> +                               hisilicon,clkmux-reg = <0x100 0x80>;
+> +                               /* each item value */
+> +                               hisilicon,clkmux-table = <0 0x80>;
+> +                       };
+> +                       uart1_mux: uart1_mux {
+> +                               compatible = "hisilicon,hi3620-clk-mux";
+> +                               #clock-cells = <0>;
+> +                               clocks = <&osc26m &pclk>;
+> +                               clock-output-names = "uart1_mux";
+> +                               hisilicon,clkmux-reg = <0x100 0x100>;
+> +                               hisilicon,clkmux-table = <0x0 0x100>;
+> +                       };
 
-I think we just found some kind of brokenness, because this is obviously 
-incorrect (the frequency is often dependent on many configuration factors 
-and should be received at runtime, for example from clock driver), but 
-that's nothing related to your patches.
+hisilicon,clkmux-reg and hisilicon,clkmux-table looks like
+a ladder of power of two.
 
-Best regards,
-Tomasz
+If the -reg part is register offsets I think it is wrong, I think
+drivers should know register offsets, instead I would encode
+a clock ID in the device tree and look up these from a
+table in the driver. (However this is Mike's decision.)
 
-> 
-> > Otherwise looks good:
-> > 
-> > Reviewed-by: Tomasz Figa <t.figa@samsung.com>
-> > 
-> > Best regards,
-> > Tomasz
-> > 
-> >> +             };
-> >> +
-> >> +             cpu1: cpu at 1 {
-> >> +                     device_type = "cpu";
-> >> +                     compatible = "arm,cortex-a15";
-> >> +                     reg = <0x1>;
-> >> +                     clock-frequency = <800000000>;
-> >> +             };
-> >> +
-> >> +             cpu2: cpu at 2 {
-> >> +                     device_type = "cpu";
-> >> +                     compatible = "arm,cortex-a15";
-> >> +                     reg = <0x2>;
-> >> +                     clock-frequency = <800000000>;
-> >> +             };
-> >> +
-> >> +             cpu3: cpu at 3 {
-> >> +                     device_type = "cpu";
-> >> +                     compatible = "arm,cortex-a15";
-> >> +                     reg = <0x3>;
-> >> +                     clock-frequency = <800000000>;
-> >> +             };
-> >> +     };
-> >> +
-> >> +     clock: clock-controller at 0x10010000 {
-> >> +             compatible = "samsung,exynos5420-clock";
-> >> +             reg = <0x10010000 0x30000>;
-> >> +             #clock-cells = <1>;
-> >> +     };
-> >> +
-> >> +     mct at 101C0000 {
-> >> +             compatible = "samsung,exynos4210-mct";
-> >> +             reg = <0x101C0000 0x800>;
-> >> +             interrupt-controller;
-> >> +             #interrups-cells = <1>;
-> >> +             interrupt-parent = <&mct_map>;
-> >> +             interrupts = <0>, <1>, <2>, <3>, <4>, <5>, <6>, <7>;
-> >> +             clocks = <&clock 1>, <&clock 315>;
-> >> +             clock-names = "fin_pll", "mct";
-> >> +
-> >> +             mct_map: mct-map {
-> >> +                     #interrupt-cells = <1>;
-> >> +                     #address-cells = <0>;
-> >> +                     #size-cells = <0>;
-> >> +                     interrupt-map = <0 &combiner 23 3>,
-> >> +                                     <1 &combiner 23 4>,
-> >> +                                     <2 &combiner 25 2>,
-> >> +                                     <3 &combiner 25 3>,
-> >> +                                     <4 &gic 0 120 0>,
-> >> +                                     <5 &gic 0 121 0>,
-> >> +                                     <6 &gic 0 122 0>,
-> >> +                                     <7 &gic 0 123 0>;
-> >> +             };
-> >> +     };
-> >> +
-> >> +     serial at 12C00000 {
-> >> +             clocks = <&clock 257>, <&clock 128>;
-> >> +             clock-names = "uart", "clk_uart_baud0";
-> >> +     };
-> >> +
-> >> +     serial at 12C10000 {
-> >> +             clocks = <&clock 258>, <&clock 129>;
-> >> +             clock-names = "uart", "clk_uart_baud0";
-> >> +     };
-> >> +
-> >> +     serial at 12C20000 {
-> >> +             clocks = <&clock 259>, <&clock 130>;
-> >> +             clock-names = "uart", "clk_uart_baud0";
-> >> +     };
-> >> +
-> >> +     serial at 12C30000 {
-> >> +             clocks = <&clock 260>, <&clock 131>;
-> >> +             clock-names = "uart", "clk_uart_baud0";
-> >> +     };
-> >> +};
-> 
-> --
-> with warm regards,
-> Chander Kashyap
-> --
-> To unsubscribe from this list: send the line "unsubscribe
-> linux-samsung-soc" in the body of a message to
-> majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+In any case, #define all these constants with symbolic names
+using the <dt-bindings/clock/hisilicon.h> or something like
+that so they are not just magic power of two numbers.
+
+#define HILSILICON_CLOCK_MUX_UART0 (1 << 7)
+#define HILSILICON_CLOCK_MUX_UART1 (1 << 8)
+
+hisilicon,clkmux-table = <0x0 HISLICON_CLOCK_MUX_UART0>;
+
+(or similar etc)
+
+> +               timer0: timer at fc800000 {
+> +                       compatible = "arm,sp804", "arm,primecell";
+> +                       reg = <0xfc800000 0x1000>;
+> +                       /* timer00 & timer01 */
+> +                       interrupts = <0 0 4>, <0 1 4>;
+
+Use
+
+#include <dt-bindings/interrupt-controller/arm-gic.h>
+#include <dt-bindings/interrupt-controller/irq.h>
+
+And you can write
+interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>, <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
+
+> +                               pinctrl-single,bias-pulldown = <0 2 0 2>;
+> +                               pinctrl-single,bias-pullup = <1 1 0 1>;
+> +                               pinctrl-single,drive-strength = <0x30 0xf0>;
+
+I think you should invent a
+<dt-bindings/pinctrl/pinctrl-single.h>
+defining all of these magic values in the same manner as
+the flags above. It will make everything more readable.
+
+Maybe single should simply be switched over to using the new
+generic pinconfig DT bindings we have in for -next?
+There we don't use magic cells at all, just string specifiers.
+
+Yours,
+Linus Walleij
