@@ -1,57 +1,80 @@
 From: eduardo.valentin@ti.com (Eduardo Valentin)
-Date: Tue, 18 Jun 2013 16:16:20 -0400
-Subject: [PATCHv3 4/6] arm: dts: add bandgap entry for OMAP4460 devices
-In-Reply-To: <1370637968-23299-5-git-send-email-eduardo.valentin@ti.com>
+Date: Tue, 18 Jun 2013 16:23:58 -0400
+Subject: [PATCHv3 2/6] arm: introduce config HAS_BANDGAP
+In-Reply-To: <20130612170733.GK8164@atomide.com>
 References: <1370637968-23299-1-git-send-email-eduardo.valentin@ti.com>
- <1370637968-23299-5-git-send-email-eduardo.valentin@ti.com>
-Message-ID: <51C0C014.2000402@ti.com>
+ <1370637968-23299-3-git-send-email-eduardo.valentin@ti.com>
+ <20130612170733.GK8164@atomide.com>
+Message-ID: <51C0C1DE.70602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Benoit
-
-On 07-06-2013 16:46, Eduardo Valentin wrote:
-> Include bandgap devices for OMAP4460 devices.
+On 12-06-2013 13:07, Tony Lindgren wrote:
+> * Eduardo Valentin <eduardo.valentin@ti.com> [130607 13:53]:
+>> Bandgap is a device used to measure temperature on
+>> electronic equipments. It is widely used in digital
+>> integrated circuits. It is based on the dependency
+>> between silicon voltage and temperature.
+>>
+>> This patch introduce HAS_BANDGAP config entry.
+>> This config is a boolean value so that arch
+>> code can flag if they feature a bandgap device.
+>>
+>> This config entry follows the same idea behind
+>> ARCH_HAS_CPUFREQ.
 > 
-> Cc: "Beno?t Cousson" <b-cousson@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-omap at vger.kernel.org
-> Cc: devicetree-discuss at lists.ozlabs.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
-> ---
-
-Could you please have a look on patch 3 and 4 of this series? I have
-changed this one accordingly to your recommendation on v2. If nothing
-else, please let me know if they can still be queued for 3.11.
-
-I would need to rebase patch 01 to refresh on top of the thermal tree.
-
-Thanks.
-
->  arch/arm/boot/dts/omap4460.dtsi | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> I suggest you add this to Russell's patch system:
 > 
-> diff --git a/arch/arm/boot/dts/omap4460.dtsi b/arch/arm/boot/dts/omap4460.dtsi
-> index 2cf227c..ea97201 100644
-> --- a/arch/arm/boot/dts/omap4460.dtsi
-> +++ b/arch/arm/boot/dts/omap4460.dtsi
-> @@ -29,4 +29,13 @@
->  			     <0 55 0x4>;
->  		ti,hwmods = "debugss";
->  	};
-> +
-> +	bandgap {
-> +		reg = <0x4a002260 0x4
-> +			0x4a00232C 0x4
-> +			0x4a002378 0x18>;
-> +		compatible = "ti,omap4460-bandgap";
-> +		interrupts = <0 126 4>; /* talert */
-> +		gpios = <&gpio3 22 0>; /* tshut */
-> +	};
->  };
+> Acked-by: Tony Lindgren <tony@atomide.com>
+
+Thanks!
+
+I have add it to Russell's patch system and it has been accepted and
+applied.
+
+>  
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: Tony Lindgren <tony@atomide.com>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-omap at vger.kernel.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Cc: Fabio Stevam <festevam@gmail.com>
+>> Signed-off-by: Eduardo Valentin <eduardo.valentin@ti.com>
+>> ---
+>>  arch/arm/Kconfig            | 3 +++
+>>  arch/arm/mach-omap2/Kconfig | 1 +
+>>  2 files changed, 4 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index d423d58..bcbdec9 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -174,6 +174,9 @@ config ARCH_HAS_CPUFREQ
+>>  	  and that the relevant menu configurations are displayed for
+>>  	  it.
+>>  
+>> +config ARCH_HAS_BANDGAP
+>> +	bool
+>> +
+>>  config GENERIC_HWEIGHT
+>>  	bool
+>>  	default y
+>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>> index f49cd51..8620ab5 100644
+>> --- a/arch/arm/mach-omap2/Kconfig
+>> +++ b/arch/arm/mach-omap2/Kconfig
+>> @@ -4,6 +4,7 @@ config ARCH_OMAP
+>>  config ARCH_OMAP2PLUS
+>>  	bool "TI OMAP2/3/4/5 SoCs with device tree support" if (ARCH_MULTI_V6 || ARCH_MULTI_V7)
+>>  	select ARCH_HAS_CPUFREQ
+>> +	select ARCH_HAS_BANDGAP
+>>  	select ARCH_HAS_HOLES_MEMORYMODEL
+>>  	select ARCH_OMAP
+>>  	select ARCH_REQUIRE_GPIOLIB
+>> -- 
+>> 1.8.2.1.342.gfa7285d
+>>
+> 
 > 
 
 
@@ -66,4 +89,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 295 bytes
 Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/5eeb2557/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/c73595f0/attachment.sig>
