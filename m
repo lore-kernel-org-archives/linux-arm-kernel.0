@@ -1,56 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 18 Jun 2013 16:41:48 +0900
-Subject: [PATCH 1/2] ARM: shmobile: irqpin: add a DT property to enable
- masking on parent
-In-Reply-To: <20130612083850.GF6006@verge.net.au>
-References: <Pine.LNX.4.64.1305241109530.1090@axis700.grange>
- <CANqRtoTqHiRixV571CrMkc=ijWcrfZFzaSrfjN1SKRNTgTTcZA@mail.gmail.com>
- <20130612083850.GF6006@verge.net.au>
-Message-ID: <20130618074146.GG24960@verge.net.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 18 Jun 2013 09:47:24 +0200
+Subject: [RFC PATCH 01/11] dma: amba-pl08x: Use bitmap to pass variant
+ specific quirks
+In-Reply-To: <12368941.dQe8bcScGj@flatron>
+References: <1371416058-22047-1-git-send-email-tomasz.figa@gmail.com>
+ <1371416058-22047-2-git-send-email-tomasz.figa@gmail.com>
+ <20130617184856.GN2718@n2100.arm.linux.org.uk>
+ <12368941.dQe8bcScGj@flatron>
+Message-ID: <CACRpkdbt4fAdnDKuP8bVpwrWoJ-oGNuSbiDZDz5J12ix2qijfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 12, 2013 at 05:38:50PM +0900, Simon Horman wrote:
-> On Tue, Jun 11, 2013 at 06:37:24PM +0900, Magnus Damm wrote:
-> > On Fri, May 24, 2013 at 6:13 PM, Guennadi Liakhovetski
-> > <g.liakhovetski@gmx.de> wrote:
-> > > To disable spurious interrupts, that get triggered on certain hardware, the
-> > > irqpin driver masks them on the parent interrupt controller. To specify
-> > > such broken devices a .control_parent parameter can be provided in the
-> > > platform data. In the DT case we need a property, to do the same.
-> > >
-> > > Signed-off-by: Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> > > ---
-> > >
-> > > These two patches simply split the earlier "ARM: shmobile: irqpin: fix
-> > > handling of spurious interrupts in DT case" patch into two parts.
-> > > Otherwise no change.
-> > 
-> > I'm fine with this portion of the patch series. Thanks for your help!
-> >
-> > Acked-by: Magnus Damm <damm@opensource.se>
-> 
-> I believe that this patch depends on
-> "irqchip: renesas-intc-irqpin: DT binding for sense bitfield width"
-> which Arnd has requested some modifications to.
-> 
-> "I think you should add documentation here about how the two interrupt
-> cells are to be interpreted, to allow people to fill the values from a data
-> sheet or board schematic."
-> http://www.spinics.net/lists/linux-sh/msg20202.html
-> 
-> Please post a fresh series that:
-> 
-> 1. Includes a fresh version of "irqchip: renesas-intc-irqpin: DT binding
->    for sense bitfield width" with Arnd's concerns addressed.
-> 
-> 2. Includes this patch with Magnus's Ack.
-> 
-> Please be sure to CC Arnd on the new series.
+On Mon, Jun 17, 2013 at 8:56 PM, Tomasz Figa <tomasz.figa@gmail.com> wrote:
+> On Monday 17 of June 2013 19:48:56 Russell King - ARM Linux wrote:
+>> On Sun, Jun 16, 2013 at 10:54:08PM +0200, Tomasz Figa wrote:
+>> > Instead of defining new bool field in vendor_data struct for each
+>> > quirk, it is more reasonable to use a single flags field and make
+>> > each quirk use single bits.
+>>
+>> Please explain why this is better over the existing system, and why it
+>> is not just churn for code modification's sake.
+>
+> It isn't anything important. I just thought that this is a better solution
+> to store more than just two flags. Initially I had more of them added in
+> further patches, but final version ended with just one, so this can be
+> dropped.
 
-Hi Guennadi,
+I thought about it yesterday and it basically looks to me that
+it tries to outsmart the compiler on how to stuff the flags to save
+struct space on the heap and hint that they can be determined
+quickly by a & operation, this is like premature optimization.
 
-I see that you reposted "irqchip: renesas-intc-irqpin: DT binding
-for sense bitfield width", which I have queued-up, without this patch.
+So please go back to the old system.
 
-Please rebase this patch and repost it with Magnus's Ack.
+Yours,
+Linus Walleij
