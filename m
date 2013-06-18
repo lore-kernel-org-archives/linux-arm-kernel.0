@@ -1,58 +1,66 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 18 Jun 2013 08:49:14 -0700
-Subject: [PATCH] arm64: Define PTE_TYPE_HUGEPAGE
-In-Reply-To: <20130618093736.GB28428@linaro.org>
-References: <1371519455-64998-1-git-send-email-christoffer.dall@linaro.org>
- <20130618093736.GB28428@linaro.org>
-Message-ID: <20130618154914.GE3332@lvm>
+From: shc_work@mail.ru (Alexander Shiyan)
+Date: Tue, 18 Jun 2013 19:46:48 +0400
+Subject: [PATCH 2/4] drivers: bus: imx-weim: Simplify error path
+In-Reply-To: <1371570410-12773-1-git-send-email-shc_work@mail.ru>
+References: <1371570410-12773-1-git-send-email-shc_work@mail.ru>
+Message-ID: <1371570410-12773-2-git-send-email-shc_work@mail.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 10:37:37AM +0100, Steve Capper wrote:
-> On Mon, Jun 17, 2013 at 06:37:35PM -0700, Christoffer Dall wrote:
-> > PTE_TYPE_HUGEPAGE is referenced by pte_huge, but because nobody uses
-> > this macro it doesn't fail yet.  KVM will be using this when 32-bit
-> > support for huge pages is added so add it.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/pgtable-hwdef.h | 1 +
-> >  1 file changed, 1 insertion(+)
-> > 
-> > diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-> > index 66367c6..0219523 100644
-> > --- a/arch/arm64/include/asm/pgtable-hwdef.h
-> > +++ b/arch/arm64/include/asm/pgtable-hwdef.h
-> > @@ -54,6 +54,7 @@
-> >  #define PTE_TYPE_MASK		(_AT(pteval_t, 3) << 0)
-> >  #define PTE_TYPE_FAULT		(_AT(pteval_t, 0) << 0)
-> >  #define PTE_TYPE_PAGE		(_AT(pteval_t, 3) << 0)
-> > +#define PTE_TYPE_HUGEPAGE	(_AT(pteval_t, 1) << 0)
-> >  #define PTE_USER		(_AT(pteval_t, 1) << 6)		/* AP[1] */
-> >  #define PTE_RDONLY		(_AT(pteval_t, 1) << 7)		/* AP[2] */
-> >  #define PTE_SHARED		(_AT(pteval_t, 3) << 8)		/* SH[1:0], inner shareable */
-> > -- 
-> > 1.8.1.2
-> > 
-> 
-> Hi Christoffer,
-> We can have PROT_NONE protected huge pages in ARM64 and the descriptors for
-> these will end in 00b. They are faulting descriptors, so any reads or writes by
-> user or kernel space will fault.
-> 
-> I have the following in my huge page patches:
-> #define pte_huge(pte)          (!(pte_val(pte) & PTE_TABLE_BIT))
-> 
-> i.e. check for bit 1 clear.
-> 
-> Please let me know if I've missed a PTE_TYPE_HUGEPAGE somewhere and I'll fix
-> it.
-> 
 
-I don't think so, the only place it showed up was for the predicates.
-I'll just wait until all this is worked out and merged into Catalin's
-tree (or upstream) and base the patch series on that for the next
-version.
+Signed-off-by: Alexander Shiyan <shc_work@mail.ru>
+---
+ drivers/bus/imx-weim.c | 22 ++++++++--------------
+ 1 file changed, 8 insertions(+), 14 deletions(-)
 
-Thanks,
--Christoffer
+diff --git a/drivers/bus/imx-weim.c b/drivers/bus/imx-weim.c
+index 0c0e6fe..0f4b081 100644
+--- a/drivers/bus/imx-weim.c
++++ b/drivers/bus/imx-weim.c
+@@ -78,36 +78,30 @@ static int weim_probe(struct platform_device *pdev)
+ 	struct resource *res;
+ 	struct clk *clk;
+ 	void __iomem *base;
+-	int ret = -EINVAL;
++	int ret;
+ 
+ 	/* get the resource */
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	base = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(base)) {
+-		ret = PTR_ERR(base);
+-		goto weim_err;
+-	}
++	if (IS_ERR(base))
++		return PTR_ERR(base);
+ 
+ 	/* get the clock */
+ 	clk = devm_clk_get(&pdev->dev, NULL);
+ 	if (IS_ERR(clk))
+-		goto weim_err;
++		return PTR_ERR(clk);
+ 
+ 	ret = clk_prepare_enable(clk);
+ 	if (ret)
+-		goto weim_err;
++		return ret;
+ 
+ 	/* parse the device node */
+ 	ret = weim_parse_dt(pdev, base);
+-	if (ret) {
++	if (ret)
+ 		clk_disable_unprepare(clk);
+-		goto weim_err;
+-	}
+-
+-	dev_info(&pdev->dev, "WEIM driver registered.\n");
+-	return 0;
++	else
++		dev_info(&pdev->dev, "Driver registered.\n");
+ 
+-weim_err:
+ 	return ret;
+ }
+ 
+-- 
+1.8.1.5
