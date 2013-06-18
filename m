@@ -1,49 +1,35 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 18 Jun 2013 11:47:29 +0200
-Subject: [RFC PATCH v2] dmabuf-sync: Introduce buffer synchronization
- framework
-In-Reply-To: <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
-References: <1371112088-15310-1-git-send-email-inki.dae@samsung.com>
- <1371467722-665-1-git-send-email-inki.dae@samsung.com>
- <51BEF458.4090606@canonical.com>
- <012501ce6b5b$3d39b0b0$b7ad1210$%dae@samsung.com>
- <20130617133109.GG2718@n2100.arm.linux.org.uk>
- <CAAQKjZO_t_kZkU46bUPTpoJs_oE1KkEqS2OTrTYjjJYZzBf+XA@mail.gmail.com>
- <20130617154237.GJ2718@n2100.arm.linux.org.uk>
- <CAAQKjZOokFKN85pygVnm7ShSa+O0ZzwxvQ0rFssgNLp+RO5pGg@mail.gmail.com>
- <20130617182127.GM2718@n2100.arm.linux.org.uk>
- <007301ce6be4$8d5c6040$a81520c0$%dae@samsung.com>
- <20130618084308.GU2718@n2100.arm.linux.org.uk>
- <008a01ce6c02$e00a9f50$a01fddf0$%dae@samsung.com>
-Message-ID: <1371548849.4276.6.camel@weser.hi.pengutronix.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 18 Jun 2013 12:49:42 +0300
+Subject: [PATCH v7 0/9] Generic PHY Framework
+In-Reply-To: <51BEE203.6090103@samsung.com>
+References: <1371113039-5784-1-git-send-email-kishon@ti.com>
+ <51BEE203.6090103@samsung.com>
+Message-ID: <20130618094942.GY5461@arwen.pp.htv.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 18.06.2013, 18:04 +0900 schrieb Inki Dae:
-[...]
-> 
-> > a display device driver.  It shouldn't be used within a single driver
-> > as a means of passing buffers between userspace and kernel space.
-> 
-> What I try to do is not really such ugly thing. What I try to do is to
-> notify that, when CPU tries to access a buffer , to kernel side through
-> dmabuf interface. So it's not really to send the buffer to kernel.
+Hi,
+
+On Mon, Jun 17, 2013 at 12:16:35PM +0200, Sylwester Nawrocki wrote:
+> I have already used this API for our MIPI CSI-2/DSIM DPHYs driver,
+> the RFC patch series can be found at [1].
 > 
 > Thanks,
-> Inki Dae
+> Sylwester
 > 
-The most basic question about why you are trying to implement this sort
-of thing in the dma_buf framework still stands.
+> [1] http://www.spinics.net/lists/arm-kernel/msg251666.html
 
-Once you imported a dma_buf into your DRM driver it's a GEM object and
-you can and should use the native DRM ioctls to prepare/end a CPU access
-to this BO. Then internally to your driver you can use the dma_buf
-reservation/fence stuff to provide the necessary cross-device sync.
+one comment to that series:
 
-Regards,
-Lucas
+let's make the phy names standardized, how about phy-exynos-video-mipi.c
+or phy-mipi-csi-dsim.c ?
+
 -- 
-Pengutronix e.K.                           | Lucas Stach                 |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-5076 |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20130618/be6293fb/attachment.sig>
