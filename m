@@ -1,54 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 19 Jun 2013 03:06:31 +0900
-Subject: [PATCH 08/15] pwm: Add new pwm-samsung driver
-In-Reply-To: <1430661.RSssKEDPJD@flatron>
-References: <1370467100-10820-1-git-send-email-tomasz.figa@gmail.com>
- <1370467100-10820-9-git-send-email-tomasz.figa@gmail.com>
- <20130617202910.GB5265@mithrandir> <1430661.RSssKEDPJD@flatron>
-Message-ID: <51C0A1A7.60309@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 18 Jun 2013 11:07:25 -0700
+Subject: [GIT PULL 3/7] omap voltdomain clean-up for v3.11 merge window
+In-Reply-To: <pull-1371578847-800598>
+Message-ID: <mailman.5.1371578874.1060.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/13 02:59, Tomasz Figa wrote:
-> Hi Thierry,
->
+The following changes since commit 7d132055814ef17a6c7b69f342244c410a5e000f:
 
-[...]
+  Linux 3.10-rc6 (2013-06-15 11:51:07 -1000)
 
->>> +static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
->>> +					unsigned int channel, u8 divisor)
->>
->> Nit: please align arguments on subsequent lines with the first argument
->> of the first line. There's many more of these but I haven't mentioned
->> them all explicitly.
->
-> Hmm, I'm addressing all your comments that aren't addressed yet in v2 at
-> the moment and I'm wondering if this is really the correct way of breaking
-> function headers...
->
+are available in the git repository at:
 
-static void pwm_samsung_set_divisor(struct samsung_pwm_chip *pwm,
-				    unsigned int channel, u8 divisor)
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v3.11/pm-voltdomain-signed
 
+for you to fetch changes up to 8bfdfc87dc3d00eb2f33e972b4177c36ca0e3d54:
 
-I also would preferred to use above style :)
+  Merge tag 'omap-pm-v3.11/voltdm' of git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm into omap-for-v3.11/pm-voltdomain (2013-06-18 01:08:39 -0700)
 
-- Kukjin
+----------------------------------------------------------------
 
-> According to Documentation/CodingStyle:
->
-> /* Quotation starts */
-> Statements longer than 80 columns will be broken into sensible chunks,
-> unless exceeding 80 columns significantly increases readability and does
-> not hide information. Descendants are always substantially shorter than
-> the parent and are placed substantially to the right. The same applies to
-> function headers with a long argument list. However, never break user-
-> visible strings such as printk messages, because that breaks the ability
-> to grep for them.
-> /* Quotation ends */
->
-> Do I understand this incorrectly or does the above fragment state that
-> broken lines must be aligned to the right?
->
-> Best regards,
-> Tomasz
+PM voltage domain clean-up via Kevin Hilman <khilman@linaro.org>:
+
+OMAP: PM: remove requirement for voltage domain data; remove dummy data
+
+----------------------------------------------------------------
+Rajendra Nayak (2):
+      ARM: OMAP2+: Powerdomain: Remove the need to always have a voltdm associated to a pwrdm
+      ARM: AM33xx: Remove the unused voltagedomain data
+
+Tony Lindgren (1):
+      Merge tag 'omap-pm-v3.11/voltdm' of git://git.kernel.org/.../khilman/linux-omap-pm into omap-for-v3.11/pm-voltdomain
+
+ arch/arm/mach-omap2/Makefile                  |  1 -
+ arch/arm/mach-omap2/io.c                      |  1 -
+ arch/arm/mach-omap2/powerdomain.c             |  5 ++++
+ arch/arm/mach-omap2/powerdomain.h             |  2 ++
+ arch/arm/mach-omap2/prm33xx.c                 |  7 +++++
+ arch/arm/mach-omap2/voltage.h                 |  1 -
+ arch/arm/mach-omap2/voltagedomains33xx_data.c | 43 ---------------------------
+ 7 files changed, 14 insertions(+), 46 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/voltagedomains33xx_data.c
