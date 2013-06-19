@@ -1,44 +1,28 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 19 Jun 2013 14:05:16 +0200
-Subject: [GIT PULL] Integrator/AP PCI DT support
-In-Reply-To: <CACRpkdZaTDEu8vUx347k1Y5Pht5Pi_mPJXpDsVtAsSYVT60n_Q@mail.gmail.com>
-References: <CACRpkdb8J4+QH36SYavgGWbFWaBZDg5JSYyyJELzL=mSZfMnBw@mail.gmail.com>
- <20130614230838.GA18124@quad.lixom.net>
- <20130615000922.GG18124@quad.lixom.net>
- <CACRpkdZaTDEu8vUx347k1Y5Pht5Pi_mPJXpDsVtAsSYVT60n_Q@mail.gmail.com>
-Message-ID: <CACRpkdYsmMLGF_u26Zxx3modFsFybk0KZe92c9D1rT2bd_XW=w@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Jun 2013 14:06:03 +0200
+Subject: [PATCH v3 11/12] ARM: mvebu: Relocate Armada 370 PCIe device tree
+ nodes
+In-Reply-To: <20130618214049.GA15234@localhost>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <201306182320.07351.arnd@arndb.de> <20130618214049.GA15234@localhost>
+Message-ID: <201306191406.04120.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 15, 2013 at 10:32 PM, Linus Walleij
-<linus.walleij@linaro.org> wrote:
+On Tuesday 18 June 2013, Ezequiel Garcia wrote:
+> Although I'd like the binding to take this into account, for there's no
+> point in restricting it -a priori- I can't see any advantage on doing
+> fully dynamic window configuration on devices that are fixed in the
+> first place. It sounds like bloating the whole thing without a strong
+> need.
 
-> OK here is the fixed branch, using the v3 patch of DT enablement just
-> posted to the list, please pull this instead (still the same base):
->
->
-> The following changes since commit 4e23d3f505e8acfeac7cc33d4113fbb5a25c3090:
->
->   of/pci: Add of_pci_parse_bus_range() function (2013-05-19 20:30:10 +0000)
->
-> are available in the git repository at:
->
->   git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-integrator.git
-> tags/integrator-pci-for-arm-soc
->
-> for you to fetch changes up to f55b2b56cd37fa8bcfcb75248c27094eaf09e04c:
->
->   ARM: integrator: basic PCIv3 device tree support (2013-06-15 22:18:39 +0200)
->
-> ----------------------------------------------------------------
-> This is a patch series that:
-> - Pulls the Integrator/AP PCI bridge driver into one file
-> - Adds full device tree support for it
-> - Keeps ATAG support around for the time being
->
-> ----------------------------------------------------------------
+After the suggestions that Grant made about the of_bus, I think the
+fully dynamic model would actually be simpler than what you have here.
+You wouldn't actually have to dissect the "ranges" property at all,
+just keep the mapping table in memory for all devices that are in use,
+with a special case for the internal-regs.
 
-Ping on this...
+But I think that's fine, we can alway simplify the code later as long
+as the binding covers all cases.
 
-Yours,
-Linus Walleij
+	Arnd
