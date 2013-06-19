@@ -1,42 +1,68 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 19 Jun 2013 13:22:10 +0200
-Subject: [PATCH 8/8] at91/avr32/atmel_lcdfb: prepare clk before calling enable
-In-Reply-To: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
-References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1371640930-9771-1-git-send-email-b.brezillon@overkiz.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Wed, 19 Jun 2013 16:53:04 +0530
+Subject: [PATCH v2 2/7] gpio: davinci: move to platform device
+In-Reply-To: <1371202532-14628-3-git-send-email-avinashphilip@ti.com>
+References: <1371202532-14628-1-git-send-email-avinashphilip@ti.com>
+ <1371202532-14628-3-git-send-email-avinashphilip@ti.com>
+Message-ID: <51C19498.8090807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-avoid common clk framework warnings.
+On 6/14/2013 3:05 PM, Philip Avinash wrote:
+> From: KV Sujith <sujithkv@ti.com>
+> 
+> Modify GPIO Davinci driver to be compliant to standard platform drivers.
+> The driver did not have platform driver structure or a probe. Instead,
+> had a davinci_gpio_setup() function which is called in the pure_init
+> sequence. The function also had dependency on davinci_soc_info structure
+> of the corresponding platform. For Device Tree(DT) implementation, we
+> need to get rid of the dependency on the davinci_soc_info structure.
+> Hence as a first stage of DT conversion, we implement a probe. Future
+> commits shall modify the probe to read platform related data from DT.
+> 
+> - Add platform_driver structure and driver register function for davinci
+>   GPIO driver. The driver registration is made to happen in
+>   postcore_initcall. This is required since machine init functions like
+>   da850_lcd_hw_init() make use of GPIO.
+> - Convert the davinci_gpio_setup() to davinci_gpio_probe().
+> - Remove access of members in soc_info structure. Instead, relevant data
+>   are taken from davinci_gpio_platform_data structure pointed by
+>   pdev->dev.platform_data.
+> - Change clk_get() to devm_clk_get() as devm_clk_get() is a device
+>   managed function and makes error handling simpler.
+> - Change pr_err to dev_err for ngpio error reporting.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/video/atmel_lcdfb.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+s/ngpio/gpio
 
-diff --git a/drivers/video/atmel_lcdfb.c b/drivers/video/atmel_lcdfb.c
-index 540909d..8525457 100644
---- a/drivers/video/atmel_lcdfb.c
-+++ b/drivers/video/atmel_lcdfb.c
-@@ -893,14 +893,14 @@ static int __init atmel_lcdfb_init_fbinfo(struct atmel_lcdfb_info *sinfo)
- 
- static void atmel_lcdfb_start_clock(struct atmel_lcdfb_info *sinfo)
- {
--	clk_enable(sinfo->bus_clk);
--	clk_enable(sinfo->lcdc_clk);
-+	clk_prepare_enable(sinfo->bus_clk);
-+	clk_prepare_enable(sinfo->lcdc_clk);
- }
- 
- static void atmel_lcdfb_stop_clock(struct atmel_lcdfb_info *sinfo)
- {
--	clk_disable(sinfo->bus_clk);
--	clk_disable(sinfo->lcdc_clk);
-+	clk_disable_unprepare(sinfo->bus_clk);
-+	clk_disable_unprepare(sinfo->lcdc_clk);
- }
- 
- 
--- 
-1.7.9.5
+> - Arrange include files in alphabetical order
+
+Doesn't happen in this patch.
+
+> - Add struct davinci_gpio_platform_data davinci for gpio module.
+> 
+> Signed-off-by: KV Sujith <sujithkv@ti.com>
+> [avinashphilip at ti.com: Move global definition for "struct
+> davinci_gpio_controller" variable to local in probe and set it as driver
+> data.]
+> Signed-off-by: Philip Avinash <avinashphilip@ti.com>
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+> ---
+
+> diff --git a/arch/arm/mach-davinci/include/mach/gpio-davinci.h b/arch/arm/mach-davinci/include/mach/gpio-davinci.h
+> index 1fdd1fd..b325a1d 100644
+> --- a/arch/arm/mach-davinci/include/mach/gpio-davinci.h
+> +++ b/arch/arm/mach-davinci/include/mach/gpio-davinci.h
+> @@ -60,6 +60,8 @@ struct davinci_gpio_controller {
+>  	void __iomem		*set_data;
+>  	void __iomem		*clr_data;
+>  	void __iomem		*in_data;
+> +	int			gpio_unbanked;
+
+You don't really use this member in this patch. You should add it in the
+patch you need it in.
+
+I fixed these issues locally and pushed this patch to my v3.11/gpio branch.
+
+Thanks,
+Sekhar
