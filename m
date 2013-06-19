@@ -1,25 +1,20 @@
-From: jason@lakedaemon.net (Jason Cooper)
-Date: Wed, 19 Jun 2013 10:29:55 -0400
-Subject: [PATCH] arm: mvebu: enable mini-PCIe connectors on Armada 370 RD
-In-Reply-To: <1371562661-7139-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1371562661-7139-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <20130619142955.GB31667@titan.lakedaemon.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 19 Jun 2013 23:48:30 +0900
+Subject: [GIT PULL 0/2] Samsung 3rd pull-request for v3.11
+Message-ID: <51C1C4BE.802@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 18, 2013 at 03:37:41PM +0200, Thomas Petazzoni wrote:
-> The Armada 370 RD board has two internal mini-PCIe connectors. This
-> commit adds the necessary Device Tree informations to enable the usage
-> of those mini-PCIe connectors.
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Florian Fainelli <florian@openwrt.org>
-> ---
->  arch/arm/boot/dts/armada-370-rd.dts | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
+Hi Arnd, Olof
 
-Applied to mvebu/dt
+This is 3rd pull-request for v3.11.
 
-thx,
+- pinctrl for exynos5420
+- update exynos clock
 
-Jason.
+Please see each tag in detail
+
+If any problems, please kindly let me know.
+
+Thanks,
+- Kukjin
