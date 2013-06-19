@@ -1,69 +1,73 @@
-From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 19 Jun 2013 13:13:20 +0200
-Subject: [PATCH 1/8] ARM: at91/tc/clocksource: replace clk_enable/disable with
- clk_prepare_enable/disable_unprepare.
-In-Reply-To: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
-References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1371640400-9399-1-git-send-email-b.brezillon@overkiz.com>
+From: gsi@denx.de (Gerhard Sittig)
+Date: Wed, 19 Jun 2013 13:13:41 +0200
+Subject: [PATCH V3 5/5] input: pxa27x-keypad: add device tree support
+In-Reply-To: <CADApbeiQWOi8SYEFf0bOsf1yn+TgXhwgDWaWFpGk7+nbC9bNDg@mail.gmail.com>
+References: <1371527778-5236-1-git-send-email-chao.xie@marvell.com>
+ <1371527778-5236-6-git-send-email-chao.xie@marvell.com>
+ <201306191022.51630.marex@denx.de>
+ <CADApbeiQWOi8SYEFf0bOsf1yn+TgXhwgDWaWFpGk7+nbC9bNDg@mail.gmail.com>
+Message-ID: <20130619111341.GH2426@book.gsilab.sittig.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace clk_enable/disable with clk_prepare_enable/disable_unprepare to
-avoid common clk framework warnings.
+On Wed, Jun 19, 2013 at 16:38 +0800, Chao Xie wrote:
+> 
+> On Wed, Jun 19, 2013 at 4:22 PM, Marek Vasut <marex@denx.de> wrote:
+> >
+> >> Signed-off-by: Chao Xie <chao.xie@marvell.com>
+> >> [ ... ]
+> >> +++ b/Documentation/devicetree/bindings/input/pxa27x-keypad.txt
+> >> @@ -0,0 +1,60 @@
+> >> +* Marvell PXA Keypad controller
+> >> +
+> >> +Required Properties
+> >> +- compatible : should be "marvell,pxa27x-keypad"
+> >> +- reg : Address and length of the register set for the device
+> >> +- interrupts : The interrupt for the keypad controller
+> >> +- marvell,debounce-interval : How long time the key will be
+> >
+> > Is there no generic prop name for this debounce interval?
+> >
+> I searched at drivers/input and Documents.
+> Two drivers use "debounce-interval", gpio-keys.c and stmpe-keypad.c.
+> They describe the meanings of "debounce-interval" at its own document file.
+> Some other drivers uses "xxx,debounce-delay-ms" or "debounce-delay-ms"
+> So it seems that there is no generic prop name for this debounce interval.
 
-Signed-off-by: Boris BREZILLON <b.brezillon@overkiz.com>
----
- drivers/clocksource/tcb_clksrc.c |   10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+Actually there is, but under a different (more user friendly)
+name:  See the 'debounce-delay-ms' property in
+Documentation/devicetree/bindings/input/gpio-matrix-keypad.txt
+which gets referenced in the matrix_keypad_parse_dt() routine in
+the drivers/input/keyboard/matrix_keypad.c source file.  Ah, your
+last sentence mentions that fact.
 
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 8a61872..229c019 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -100,7 +100,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
- 			|| tcd->clkevt.mode == CLOCK_EVT_MODE_ONESHOT) {
- 		__raw_writel(0xff, regs + ATMEL_TC_REG(2, IDR));
- 		__raw_writel(ATMEL_TC_CLKDIS, regs + ATMEL_TC_REG(2, CCR));
--		clk_disable(tcd->clk);
-+		clk_disable_unprepare(tcd->clk);
- 	}
- 
- 	switch (m) {
-@@ -109,7 +109,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
- 	 * of oneshot, we get lower overhead and improved accuracy.
- 	 */
- 	case CLOCK_EVT_MODE_PERIODIC:
--		clk_enable(tcd->clk);
-+		clk_prepare_enable(tcd->clk);
- 
- 		/* slow clock, count up to RC, then irq and restart */
- 		__raw_writel(timer_clock
-@@ -126,7 +126,7 @@ static void tc_mode(enum clock_event_mode m, struct clock_event_device *d)
- 		break;
- 
- 	case CLOCK_EVT_MODE_ONESHOT:
--		clk_enable(tcd->clk);
-+		clk_prepare_enable(tcd->clk);
- 
- 		/* slow clock, count up to RC, then irq and stop */
- 		__raw_writel(timer_clock | ATMEL_TC_CPCSTOP
-@@ -275,7 +275,7 @@ static int __init tcb_clksrc_init(void)
- 	pdev = tc->pdev;
- 
- 	t0_clk = tc->clk[0];
--	clk_enable(t0_clk);
-+	clk_prepare_enable(t0_clk);
- 
- 	/* How fast will we be counting?  Pick something over 5 MHz.  */
- 	rate = (u32) clk_get_rate(t0_clk);
-@@ -313,7 +313,7 @@ static int __init tcb_clksrc_init(void)
- 		/* tclib will give us three clocks no matter what the
- 		 * underlying platform supports.
- 		 */
--		clk_enable(tc->clk[1]);
-+		clk_prepare_enable(tc->clk[1]);
- 		/* setup both channel 0 & 1 */
- 		tcb_setup_dual_chan(tc, best_divisor_idx);
- 	}
+But when you introduce DT support into an existing driver which
+previously used platform data, then there is no problem with
+backwards compatibility in .dts files.  So I suggest to go with
+the "debounce-delay-ms" name since it better reflects to the .dts
+author (hardware engineer) which unit the number is supposed to
+be specified in.
+
+
+Note that I've recently worked on extending the matrix keypad
+input driver (doc improvements, software polling, binary encoded
+column selection), but haven't submitted the patch series yet
+since it's perfectly operational on the target which motivated
+the extension but wasn't tested yet on any other platform or
+matrix setup -- I currently lack access to an ARM based board
+with either lots of accessible GPIOs to connect a matrix to, or
+some matrix already built into the board, but more importantly
+lack free resources for this very driver extension.
+
+Alternatively I might send an RFC series since the current state
+isn't good enough for v1.  Just ask if you'd like to test or
+review what I have come up with so far (it builds but wasn't
+run-tested).
+
+
+virtually yours
+Gerhard Sittig
 -- 
-1.7.9.5
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr. 5, D-82194 Groebenzell, Germany
+Phone: +49-8142-66989-0 Fax: +49-8142-66989-80  Email: office at denx.de
