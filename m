@@ -1,66 +1,44 @@
-From: tomasz.figa@gmail.com (Tomasz Figa)
-Date: Wed, 19 Jun 2013 19:20:19 +0200
-Subject: [RFC PATCH 3/5] video: exynos_dsi: Use generic PHY driver
-In-Reply-To: <51C1E61C.8030808@samsung.com>
-References: <1371231951-1969-1-git-send-email-s.nawrocki@samsung.com>
- <1502179.yCdHZgQgqV@flatron> <51C1E61C.8030808@samsung.com>
-Message-ID: <1584349.5UScq5Ic6l@flatron>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Wed, 19 Jun 2013 10:21:41 -0700
+Subject: [PATCH -v11 resend 10/11] arm, change reboot_mode to use enum
+ reboot_mode
+In-Reply-To: <12642293.RmlRtOVM54@wuerfel>
+References: <1370519244-49918-1-git-send-email-holt@sgi.com>
+ <1370519244-49918-11-git-send-email-holt@sgi.com>
+ <4169120.1k31YLDD12@wuerfel> <12642293.RmlRtOVM54@wuerfel>
+Message-ID: <20130619102141.411c8e39.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 of June 2013 19:10:52 Sylwester Nawrocki wrote:
-> On 06/16/2013 11:15 PM, Tomasz Figa wrote:
-> > On Friday 14 of June 2013 19:45:49 Sylwester Nawrocki wrote:
-> >> > Use the generic PHY API instead of the platform callback to control
-> >> > the MIPI DSIM DPHY.
-> >> > 
-> >> > Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> >> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> >> > ---
-> >> > 
-> >> >  drivers/video/display/source-exynos_dsi.c |   36
-> >> > 
-> >> > +++++++++-------------------- include/video/exynos_dsi.h
-> >> > 
-> >> > |    5 ----
-> >> >  
-> >> >  2 files changed, 11 insertions(+), 30 deletions(-)
+On Wed, 19 Jun 2013 15:52:02 +0200 Arnd Bergmann <arnd@arndb.de> wrote:
+
+> On Wednesday 19 June 2013 12:58:10 Arnd Bergmann wrote:
+> > On Thursday 06 June 2013 06:47:23 Robin Holt wrote:
+> > > Preparing to move the parsing of reboot= to generic kernel code
+> > > forces the change in reboot_mode handling to use the enum.
+> > > 
+> > > Signed-off-by: Robin Holt <holt@sgi.com>
+> > > To: Andrew Morton <akpm@linux-foundation.org>
+> > > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > Cc: Russ Anderson <rja@sgi.com>
+> > > Cc: Robin Holt <holt@sgi.com>
+> > > Cc: H. Peter Anvin <hpa@zytor.com>
+> > > Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+> > > Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+> > > Cc: the arch/x86 maintainers <x86@kernel.org>
+> > > Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
+> > > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > > 
-> > Yes, this is what I was really missing a lot while developing this
-> > driver.
+> > Should we merge this through the arm-soc tree?
 > > 
-> > Definitely looks good! It's a shame we don't have this driver in
-> > mainline yet ;)
+> > I'm getting a few conflicts with new platforms getting added
+> > using the old interface.
 > 
-> Yes, I should have mentioned in the cover letter this patch depends
-> on modified version of this [1] patch set of yours. I'll drop this
-> patch and will update the driver staying in mainline now, but I won't
-> be able to test it, on a non-dt platform.
-> 
-> I guess even some pre-eliminary display (panel) API would be helpful.
-> The CDF development seems to have been stalled for some time. I wonder
-> if we could first have something that works for limited set of devices
-> and be extending it gradually, rather than living with zero support
-> for displays on DT based ARM platforms.
+> Hmm, I realized after sending it that this patch depends on
+> at least one other patch to add the 'enum'. Any suggestions
+> for how to handle that?
 
-Well, the problem is that once we define a binding for displays, we will 
-have to keep support for this binding even if we decide to change 
-something.
-
-But as I discussed with Laurent and Alexandre at LinuxCon Japan, we should 
-be able to reuse V4L2 bindings for our purposes, so someone just needs to 
-code a proof of concept implementation that doesn't necessarily provide 
-full functionality yet, but allows to make something work. Probably based 
-on already posted RFC versions of CDF.
-
-CCed Laurent and Alexandre, as they might be able to shed even more light 
-on this.
-
-Best regards,
-Tomasz
-
-> 
-> [1] http://www.spinics.net/lists/linux-fbdev/msg09689.html
-> 
-> Regards,
-> Sylwester
+This patchset gets a lot of rejects which I keep on fixing up.  Please
+merge up early in the merge window and compile-test (and review) the
+linux-next changes to make sure I didn't muck up the reject-fixing,
+then we should be fine.
