@@ -1,72 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 19 Jun 2013 02:58:37 -0700
-Subject: [PATCH 2/6] ARM: OMAP2+: Remove board-omap4panda.c
-In-Reply-To: <8761xaqvrn.fsf@lebrac.rtp-net.org>
-References: <51B99B07.1050806@ti.com>
- <CACVXFVN3=hzWJEwHN5TXRoJ4mvVRVR+3=Tasw+gvLH3vsNHwUg@mail.gmail.com>
- <CACVXFVNzAMrkhrAMAmQ7ZdJdby2O4VdoD8BVHRF-O=rPKQMqbw@mail.gmail.com>
- <51BEBDCD.3060104@ti.com> <87ppvlqhyy.fsf@lebrac.rtp-net.org>
- <20130617082458.GH20992@atomide.com>
- <87li69qdcs.fsf@lebrac.rtp-net.org>
- <20130617102650.GK20992@atomide.com>
- <20130618112701.GO5523@atomide.com>
- <8761xaqvrn.fsf@lebrac.rtp-net.org>
-Message-ID: <20130619095837.GY5523@atomide.com>
+From: ezequiel.garcia@free-electrons.com (Ezequiel Garcia)
+Date: Wed, 19 Jun 2013 07:02:00 -0300
+Subject: [PATCH v3 05/12] ARM: mvebu: Remove the harcoded BootROM window
+ allocation
+In-Reply-To: <20130618173906.GC2204@obsidianresearch.com>
+References: <1371554737-25319-1-git-send-email-ezequiel.garcia@free-electrons.com>
+ <1371554737-25319-6-git-send-email-ezequiel.garcia@free-electrons.com>
+ <20130618173906.GC2204@obsidianresearch.com>
+Message-ID: <20130619100159.GB16138@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnaud Patard <arnaud.patard@rtp-net.org> [130619 02:52]:
-> Tony Lindgren <tony@atomide.com> writes:
+On Tue, Jun 18, 2013 at 11:39:06AM -0600, Jason Gunthorpe wrote:
+> On Tue, Jun 18, 2013 at 08:25:30AM -0300, Ezequiel Garcia wrote:
+> > The address decoding window to access the BootROM should not be
+> > allocated programatically, but instead declared in the device tree.
+> > 
+> > Signed-off-by: Ezequiel Garcia <ezequiel.garcia@free-electrons.com>
+> >  arch/arm/mach-mvebu/platsmp.c | 1 -
+> >  1 file changed, 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/mach-mvebu/platsmp.c b/arch/arm/mach-mvebu/platsmp.c
+> > index 93f2f3a..d419fac 100644
+> > +++ b/arch/arm/mach-mvebu/platsmp.c
+> > @@ -118,7 +118,6 @@ void __init armada_xp_smp_prepare_cpus(unsigned int max_cpus)
+> >  	set_secondary_cpus_clock();
+> >  	flush_cache_all();
+> >  	set_cpu_coherent(cpu_logical_map(smp_processor_id()), 0);
+> > -	mvebu_mbus_add_window("bootrom", 0xfff00000, SZ_1M);
+> >  }
 > 
-> Hi,
+> I think some kind of test is needed here. As I understand it the SMP
+> startup uses a trampoline in the boot rom and the boot rom *must* be
+> mapped to 0xfff00000 ?
 > 
-> > * Tony Lindgren <tony@atomide.com> [130617 03:32]:
-> >> * Arnaud Patard <arnaud.patard@rtp-net.org> [130617 02:52]:
-> >> > Tony Lindgren <tony@atomide.com> writes:
-> >> > 
-> >> > I understand your concerns but, please, cope with reality: the clock
-> >> > work is not in -next so this tends to make me think it won't reach
-> >> > 3.11. We're at -rc6 after all. Telling users that their system doesn't
-> >> > have any network because it was easier to maintain, is not something
-> >> > they will understand imho.
-> >> 
-> >> Right, like I said: the idea is to have it usable with DT. And USB and
-> >> Ethernet certainly are part of what I call usable. So is MMC, WLAN and
-> >> DSS. I've certainly spent quite a bit of time on making sure panda works
-> >> with DT, and I can assure you that fixing the USB extclock is easier than
-> >> supporting the legacy boot with DT :)
-> >> 
-> >> This issue can also be fixed with a clock alias if we don't have DT
-> >> defined clocks ready for v3.11. It may take a few days for us to have
-> >> the solution. But get getting a clock to a driver certainly is not a
-> >> showstopper here. After all, that's what all drivers already do.
-> >
-> > Care to test the last patch just posted by Roger in thread
-> > " [PATCH 0/4] ARM: OMAP4: Panda USB Host support and DVI EDID fix"?
+
+Indeed, setting up 0xfff00000 is a *must*.
+
+> Verifying the DT is setup this way and aborting if it is not seems
+> like a good idea..
 > 
-> I tried to test them but they don't apply on linux-next due to some
-> pinctrl changes probably missing:
-> Error: arch/arm/boot/dts/omap4-panda-common.dtsi:177.14-15 syntax error
-> 
-> which corresponds to :
-> 0x82 (PIN_INPUT_PULLDOWN | MUX_MODE4)
 
-Oops, right, that's in Benoit's branch too for the .dts preprocessing.
-Until it is merged, maybe try with Roger's earlier version of that patch
-that did not yet use the macros?
- 
-> Also, the patch 3 (ARM: dts: omap5-uevm: Provide USB Host PHY clock)
-> doesn't apply as the omap5-uevm.dts doesn't exist.
+I agree it's a nice idea, but I'm not too sure how to accomplish this
+in a simple and generic way. There's nothing in the DT that allows you
+to know which of the ranges entries correspond to the BootROM, unless you go
+through each of the entries comparing against the known target ID and
+attribute.
 
-OK that's in Benoit's branch. But you won't need that one.
- 
-> Which tree should I use to test the patches if it's not linux-next ?
-> 
-> Also, you might want to know that drivers/usb/musb/omap2430.c doesn't
-> build due to some typos (musb_resources vs musb_resouces).
+You could also do a 'of_find_node_by_name(NULL, "bootrom");' but the binding
+no longer requires to even have any children for the window.
 
-Thanks, I think Felipe is already aware of that. 
+Any ideas?
 
-Regards,
-
-Tony
+-- 
+Ezequiel Garc?a, Free Electrons
+Embedded Linux, Kernel and Android Engineering
+http://free-electrons.com
