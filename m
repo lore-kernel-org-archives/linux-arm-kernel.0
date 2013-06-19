@@ -1,32 +1,34 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 19 Jun 2013 14:20:06 +0100
-Subject: [PATCH 5/5] ARM: KVM: issue a DSB after cache maintainance operations
+Date: Wed, 19 Jun 2013 14:20:03 +0100
+Subject: [PATCH 2/5] ARM: KVM: add missing dsb before invalidating Stage-2 TLBs
 In-Reply-To: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
 References: <1371648006-8036-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1371648006-8036-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1371648006-8036-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When performing the Set/Way cache maintainance operations, it is
-important to make sure the operation completes by issueing a DSB.
+When performing a Stage-2 TLB invalidation, it is necessary to
+make sure the write to the page tables is observable by all CPUs.
+
+For this purpose, add a dsb instruction to __kvm_tlb_flush_vmid_ipa
+before doing the TLB invalidation itself.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kvm/coproc.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/kvm/interrupts.S | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/kvm/coproc.c b/arch/arm/kvm/coproc.c
-index 4a51990..9e6bef4 100644
---- a/arch/arm/kvm/coproc.c
-+++ b/arch/arm/kvm/coproc.c
-@@ -106,6 +106,8 @@ static bool access_dcsw(struct kvm_vcpu *vcpu,
- 		break;
- 	}
+diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
+index d0a8fa3..afa6c04 100644
+--- a/arch/arm/kvm/interrupts.S
++++ b/arch/arm/kvm/interrupts.S
+@@ -49,6 +49,7 @@ __kvm_hyp_code_start:
+ ENTRY(__kvm_tlb_flush_vmid_ipa)
+ 	push	{r2, r3}
  
-+	dsb();
-+
- done:
- 	put_cpu();
- 
++	dsb
+ 	add	r0, r0, #KVM_VTTBR
+ 	ldrd	r2, r3, [r0]
+ 	mcrr	p15, 6, r2, r3, c2	@ Write VTTBR
 -- 
 1.8.2.3
