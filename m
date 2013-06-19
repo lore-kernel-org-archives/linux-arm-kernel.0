@@ -1,74 +1,39 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Wed, 19 Jun 2013 16:49:59 +0300
-Subject: [PATCHv2 10/11] ARM: dts: omap4 clock data
-In-Reply-To: <20130619133022.GA30364@kahuna>
-References: <1371647942-4811-1-git-send-email-t-kristo@ti.com>
- <1371647942-4811-11-git-send-email-t-kristo@ti.com>
- <20130619133022.GA30364@kahuna>
-Message-ID: <51C1B707.5090603@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 19 Jun 2013 15:52:02 +0200
+Subject: [PATCH -v11 resend 10/11] arm,
+ change reboot_mode to use enum reboot_mode
+In-Reply-To: <4169120.1k31YLDD12@wuerfel>
+References: <1370519244-49918-1-git-send-email-holt@sgi.com>
+ <1370519244-49918-11-git-send-email-holt@sgi.com>
+ <4169120.1k31YLDD12@wuerfel>
+Message-ID: <12642293.RmlRtOVM54@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/19/2013 04:30 PM, Nishanth Menon wrote:
-> On 16:19-20130619, Tero Kristo wrote:
-> <snip>
->> diff --git a/arch/arm/boot/dts/omap4-clocks.dtsi b/arch/arm/boot/dts/omap4-clocks.dtsi
->> new file mode 100644
->> index 0000000..b420d8a
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/omap4-clocks.dtsi
-> [...]
->> +/* XXX Missing round_rate, set_rate in ops */
-> could be dropped?
->> +dpll_core_m3x2_div_ck: dpll_core_m3x2_div_ck at 4a004134 {
->> +	compatible = "divider-clock";
->> +	clocks = <&dpll_core_x2_ck>;
->> +	#clock-cells = <0>;
->> +	reg = <0x4a004134 0x4>;
->> +	bit-mask = <0x1f>;
->> +	index-starts-at-one;
->> +};
-> [..]
->> +
->> +/* XXX Missing round_rate, set_rate in ops */
-> could be dropped?
+On Wednesday 19 June 2013 12:58:10 Arnd Bergmann wrote:
+> On Thursday 06 June 2013 06:47:23 Robin Holt wrote:
+> > Preparing to move the parsing of reboot= to generic kernel code
+> > forces the change in reboot_mode handling to use the enum.
+> > 
+> > Signed-off-by: Robin Holt <holt@sgi.com>
+> > To: Andrew Morton <akpm@linux-foundation.org>
+> > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > Cc: Russ Anderson <rja@sgi.com>
+> > Cc: Robin Holt <holt@sgi.com>
+> > Cc: H. Peter Anvin <hpa@zytor.com>
+> > Cc: Guan Xuetao <gxt@mprc.pku.edu.cn>
+> > Cc: Linux Kernel Mailing List <linux-kernel@vger.kernel.org>
+> > Cc: the arch/x86 maintainers <x86@kernel.org>
+> > Cc: Arm Mailing List <linux-arm-kernel@lists.infradead.org>
+> > Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Should we merge this through the arm-soc tree?
+> 
+> I'm getting a few conflicts with new platforms getting added
+> using the old interface.
 
-Yeah, I blame my bugged script here. :)
+Hmm, I realized after sending it that this patch depends on
+at least one other patch to add the 'enum'. Any suggestions
+for how to handle that?
 
->> +dpll_per_m3x2_div_ck: dpll_per_m3x2_div_ck at 4a008154 {
->> +	compatible = "divider-clock";
->> +	clocks = <&dpll_per_x2_ck>;
->> +	#clock-cells = <0>;
->> +	reg = <0x4a008154 0x4>;
->> +	bit-mask = <0x1f>;
->> +	index-starts-at-one;
->> +};
->> +
-> [...]
->> +
->> +/*
->> + * clocks specific to omap4460
->> + */
->> +/*
->> + * clocks specific to omap4430
->> + */
->> +/*
->> + * clocks common to omap44xx
->> + */
-> could be dropped?
-
-Same.
-
->
-> btw, are we differentiating 4430 and 4460?A
-> Example:
-> bandgap_fclk in 4430
-> Vs
-> div_ts_ck, bandgap_ts_fclk in 4460?
-
-Both nodes are available for both SoCs as of now. Driver should 
-differentiate which clock node to use though. Added Eduardo for 
-commenting this part, maybe we should add a couple of entries to the 
-list in cclock44xx_data.c...?
-
--Tero
+	Arnd
