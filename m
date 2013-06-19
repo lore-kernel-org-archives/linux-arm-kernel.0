@@ -1,122 +1,86 @@
 From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 19 Jun 2013 18:56:11 +0200
-Subject: [PATCHv3 03/11] PCI: Introduce new MSI chip infrastructure
+Date: Wed, 19 Jun 2013 18:56:15 +0200
+Subject: [PATCHv3 07/11] arm: pci: add ->add_bus() and ->remove_bus() hooks to
+ hw_pci
 In-Reply-To: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
 References: <1371660979-21588-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <1371660979-21588-4-git-send-email-thomas.petazzoni@free-electrons.com>
+Message-ID: <1371660979-21588-8-git-send-email-thomas.petazzoni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thierry Reding <thierry.reding@avionic-design.de>
+Some PCI drivers may need to adjust the pci_bus structure after it has
+been allocated by the Linux PCI core. The PCI core allows
+architectures to implement the pcibios_add_bus() and
+pcibios_remove_bus() for this purpose. This commit therefore extends
+the hw_pci and pci_sys_data structures of the ARM PCI core to allow
+PCI drivers to register ->add_bus() and ->remove_bus() in hw_pci,
+which will get called when a bus is added or removed from the system.
 
-The new struct msi_chip is used to associated an MSI controller with a
-PCI bus. It is automatically handed down from the root to its children
-during bus enumeration.
+This will be used for example by the Marvell PCIe driver to connect a
+particular PCI bus with its corresponding MSI chip to handle Message
+Signaled Interrupts.
 
-This patch provides default (weak) implementations for the architecture-
-specific MSI functions (arch_setup_msi_irq(), arch_teardown_msi_irq()
-and arch_msi_check_device()) which check if a PCI device's bus has an
-attached MSI chip and forward the call appropriately.
-
-Signed-off-by: Thierry Reding <thierry.reding@avionic-design.de>
 Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
 ---
- drivers/pci/msi.c   | 22 ++++++++++++++++++++++
- drivers/pci/probe.c |  1 +
- include/linux/msi.h | 11 +++++++++++
- include/linux/pci.h |  1 +
- 4 files changed, 35 insertions(+)
+ arch/arm/include/asm/mach/pci.h |  4 ++++
+ arch/arm/kernel/bios32.c        | 16 ++++++++++++++++
+ 2 files changed, 20 insertions(+)
 
-diff --git a/drivers/pci/msi.c b/drivers/pci/msi.c
-index 4bc0c8f..dc357e9 100644
---- a/drivers/pci/msi.c
-+++ b/drivers/pci/msi.c
-@@ -32,6 +32,19 @@ static int pci_msi_enable = 1;
+diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
+index 7d2c3c8..b71cc9d 100644
+--- a/arch/arm/include/asm/mach/pci.h
++++ b/arch/arm/include/asm/mach/pci.h
+@@ -35,6 +35,8 @@ struct hw_pci {
+ 					  resource_size_t start,
+ 					  resource_size_t size,
+ 					  resource_size_t align);
++	void            (*add_bus)(struct pci_bus *bus);
++	void            (*remove_bus)(struct pci_bus *bus);
+ };
  
- int default_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- {
-+	struct msi_chip *chip = dev->bus->msi;
-+
-+	if (chip && chip->setup_irq) {
-+		int err;
-+
-+		err = chip->setup_irq(chip, dev, desc);
-+		if (err < 0)
-+			return err;
-+
-+		irq_set_chip_data(desc->irq, chip);
-+		return err;
-+	}
-+
- 	return -EINVAL;
+ /*
+@@ -62,6 +64,8 @@ struct pci_sys_data {
+ 					  resource_size_t start,
+ 					  resource_size_t size,
+ 					  resource_size_t align);
++	void            (*add_bus)(struct pci_bus *bus);
++	void            (*remove_bus)(struct pci_bus *bus);
+ 	void		*private_data;	/* platform controller private data	*/
+ };
+ 
+diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
+index b2ed73c..0a441f8 100644
+--- a/arch/arm/kernel/bios32.c
++++ b/arch/arm/kernel/bios32.c
+@@ -363,6 +363,20 @@ void pcibios_fixup_bus(struct pci_bus *bus)
  }
+ EXPORT_SYMBOL(pcibios_fixup_bus);
  
-@@ -42,6 +55,10 @@ int __weak arch_setup_msi_irq(struct pci_dev *dev, struct msi_desc *desc)
- 
- void default_teardown_msi_irq(unsigned int irq)
- {
-+	struct msi_chip *chip = irq_get_chip_data(irq);
++void pcibios_add_bus(struct pci_bus *bus)
++{
++	struct pci_sys_data *sys = bus->sysdata;
++	if (sys->add_bus)
++		sys->add_bus(bus);
++}
 +
-+	if (chip && chip->teardown_irq)
-+		chip->teardown_irq(chip, irq);
- }
- 
- void __weak arch_teardown_msi_irq(unsigned int irq)
-@@ -51,6 +68,11 @@ void __weak arch_teardown_msi_irq(unsigned int irq)
- 
- int default_msi_check_device(struct pci_dev *dev, int nvec, int type)
- {
-+	struct msi_chip *chip = dev->bus->msi;
++void pcibios_remove_bus(struct pci_bus *bus)
++{
++	struct pci_sys_data *sys = bus->sysdata;
++	if (sys->remove_bus)
++		sys->remove_bus(bus);
++}
 +
-+	if (chip && chip->check_device)
-+		return chip->check_device(chip, dev, nvec, type);
-+
- 	return 0;
- }
+ /*
+  * Swizzle the device pin each time we cross a bridge.  If a platform does
+  * not provide a swizzle function, we perform the standard PCI swizzling.
+@@ -463,6 +477,8 @@ static void pcibios_init_hw(struct hw_pci *hw, struct list_head *head)
+ 		sys->swizzle = hw->swizzle;
+ 		sys->map_irq = hw->map_irq;
+ 		sys->align_resource = hw->align_resource;
++		sys->add_bus        = hw->add_bus;
++		sys->remove_bus     = hw->remove_bus;
+ 		INIT_LIST_HEAD(&sys->resources);
  
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 70f10fa..c8591e4 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -634,6 +634,7 @@ static struct pci_bus *pci_alloc_child_bus(struct pci_bus *parent,
- 
- 	child->parent = parent;
- 	child->ops = parent->ops;
-+	child->msi = parent->msi;
- 	child->sysdata = parent->sysdata;
- 	child->bus_flags = parent->bus_flags;
- 
-diff --git a/include/linux/msi.h b/include/linux/msi.h
-index e792a3f..e3a137d 100644
---- a/include/linux/msi.h
-+++ b/include/linux/msi.h
-@@ -71,4 +71,15 @@ int default_setup_msi_irqs(struct pci_dev *dev, int nvec, int type);
- void default_teardown_msi_irqs(struct pci_dev *dev);
- void default_restore_msi_irqs(struct pci_dev *dev, int irq);
- 
-+struct msi_chip {
-+	struct module *owner;
-+	struct device *dev;
-+
-+	int (*setup_irq)(struct msi_chip *chip, struct pci_dev *dev,
-+			 struct msi_desc *desc);
-+	void (*teardown_irq)(struct msi_chip *chip, unsigned int irq);
-+	int (*check_device)(struct msi_chip *chip, struct pci_dev *dev,
-+			    int nvec, int type);
-+};
-+
- #endif /* LINUX_MSI_H */
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index 3a24e4f..7ffc012 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -432,6 +432,7 @@ struct pci_bus {
- 	struct resource busn_res;	/* bus numbers routed to this bus */
- 
- 	struct pci_ops	*ops;		/* configuration access functions */
-+	struct msi_chip	*msi;		/* MSI controller */
- 	void		*sysdata;	/* hook for sys-specific extension */
- 	struct proc_dir_entry *procdir;	/* directory entry in /proc/bus/pci */
- 
+ 		if (hw->private_data)
 -- 
 1.8.1.2
