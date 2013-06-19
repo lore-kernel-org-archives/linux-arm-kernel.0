@@ -1,35 +1,57 @@
-From: khilman@linaro.org (Kevin Hilman)
-Date: Wed, 19 Jun 2013 13:41:10 -0700
-Subject: [RFC PATCH v2 0/2] ARM: MPIDR linearization
-In-Reply-To: <20130611095848.GD8164@e102568-lin.cambridge.arm.com> (Lorenzo
- Pieralisi's message of "Tue, 11 Jun 2013 10:58:48 +0100")
-References: <1370532125-14322-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20130611095848.GD8164@e102568-lin.cambridge.arm.com>
-Message-ID: <877ghp6dg9.fsf@linaro.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 19 Jun 2013 13:53:21 -0700
+Subject: [RESEND,PATCHv6 1/1] Add support for GMT G762/G763 PWM fan
+ controllers
+In-Reply-To: <8761x9svpf.fsf@natisbad.org>
+References: <87sj0jhuhn.fsf@natisbad.org> <20130617101948.GY7626@kw.sim.vm.gnt>
+ <8761x9svpf.fsf@natisbad.org>
+Message-ID: <20130619205321.GA7625@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lorenzo,
+On Wed, Jun 19, 2013 at 10:15:56PM +0200, Arnaud Ebalard wrote:
+> Hi Simon,
+> 
+> Simon Guinot <simon.guinot@sequanux.org> writes:
+> 
+> > I have tested this patch on my 2Big Network v2 board.
+> >
+> > Sometimes I get a weird "No such device" error while reading or writing
+> > the hwmon sysfs attributes. For example:
+> >
+> > # cat pwm1
+> > cat: read error: No such device
+> > # cat pwm1
+> > 0
+> 
+This is odd, since ENODEV should not be returned as error code from i2c read
+operations.
 
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+What is the i2c controller ?
 
-> Hi Russell, all,
->
-> even though I think this set is ready to get merged, it would be great
-> if we can test it on as many platforms as possible since it touches core
-> suspend/resume operations on ARM platforms relying on CONFIG_ARM_CPU_SUSPEND,
-> and there are many.
->
-> I pushed out a branch:
->
-> git://linux-arm.org/linux-2.6-lp.git mpidr-linearization
->
-> if anyone has time to test the set that would be really great, thank you
-> very much.
+Thanks,
+Guenter
 
-I'm a little late to the party, but I tested this on OMAP4 with the CPUs
-hitting off in the lower C-states.
-
-Tested-by: Kevin Hilman <khilman@linaro.org>
-
-Kevin
+> Weird, I cannot reproduce that at all on my ReadyNAS Duo v2.
+> 
+> > Note, that if the same command is executed again (just after the faulty
+> > one), then it will succeed most of the time. The errors seems to happen
+> > quite randomly and not very often. I'd say one time over ten tries.
+> > I suppose this error is now visible due to the enhanced error path in
+> > g762_update_client. It looks like we learn something by checking the
+> > return value for i2c_smbus_read_byte_data :)
+> >
+> > Except that, all is working as expected. This new version fixes
+> > effectively open-loop driving when the set_cnt register is set to 0xff.
+> >
+> > Also I am planning (hopefully this Wednesday) to test your patch on my
+> > 5Big Network v2 board. This last also embed a g762 controller but with a
+> > three wires fan instead. Then, I should be able to test the closed-loop
+> > mode behaviour.
+> 
+> Thanks for your tests, Simon.
+> 
+> Cheers,
+> 
+> a+ 
+> 
