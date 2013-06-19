@@ -1,57 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 19 Jun 2013 14:37:20 +0200
-Subject: [RFC PATCH v3 0/2] drivers: mfd: Versatile Express SPC support
-In-Reply-To: <20130619093014.GX7161@zurbaran>
-References: <1370512763-32200-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1371547782.16725.11.camel@hornet> <20130619093014.GX7161@zurbaran>
-Message-ID: <201306191437.20759.arnd@arndb.de>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 19 Jun 2013 21:40:02 +0900
+Subject: [PATCH v2 0/2] R-Car GPIO fixes
+In-Reply-To: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+References: <1371551389-5493-1-git-send-email-laurent.pinchart+renesas@ideasonboard.com>
+Message-ID: <20130619124002.GH32292@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 19 June 2013, Samuel Ortiz wrote:
-> > 2. Move the vexpress-sysreg "platform management" functions into misc
-> > (unless we get any better place for it)
-> This is for Arnd and Greg to decide I suppose.
+On Tue, Jun 18, 2013 at 12:29:47PM +0200, Laurent Pinchart wrote:
+> Hello,
+> 
+> Here are two small fixes for the gpio-rcar driver. I would push them through
+> the GPIO tree if it wasn't for the fact that they're based on gpio-rcar DT
+> support, scheduled for merge through the ARM SoC tree.
+> 
+> Simon, as these patches are fixes, would it be possible to get them in v3.11
+> through your tree ?
+> 
+> Changes since v1:
+> 
+> - Fixed 2/2 commit message to mention IS_ENABLED, not IS_CONFIG
+> 
+> Laurent Pinchart (2):
+>   gpio-rcar: Reference core gpio documentation in the DT bindings
+>   gpio-rcar: Remove #ifdef CONFIG_OF around OF-specific sections
+> 
+>  .../devicetree/bindings/gpio/renesas,gpio-rcar.txt     | 18 ++++++------------
+>  drivers/gpio/gpio-rcar.c                               |  8 ++------
+>  2 files changed, 8 insertions(+), 18 deletions(-)
 
-
-I think when vexpress-sysreg was created, we didn't have the syscon driver
-yet, otherwise I think we should have used that, and put separate
-drivers on top.
-
-Not sure if it's too late for changing it to that now, given that
-we already have a binding.
-
-It seems we should use the same code for versatile and realview, or
-at least it will only need small modifications to apply to all of
-these platforms.
-
-What I think could be helpful here is:
-
-* export a "syscon" for the low-level registers
-
-* add a gpio driver based on the syscon interface, and move the gpiochip
-  implementation there
-
-* move the low-leve "config" code from the sysreg driver into the
-  vexpress-config driver and make it use the syscon.
-
-* move the other global functions from the driver into the callers
-  and use syscon there.
-
-That would end up eliminating the sysreg driver, aside from maybe
-a one-line change to the syscon driver to allow it to probe the
-right device.
-
-> > 3. Move vexpress-config into drivers/bus as it is (however I see no one
-> > in MAINTAINERS for this directory)
-> ISTR that Arnd originally created that directory, so he may help here.
-> Arnd also had some concerns about implementing this code as a bus,
-> mostly about it not being a discoverable bus. IMHO that's a valid
-> concern, and this is why you ended up putting it under MFD which can be
-> seen as some sort of platform devices bus. But I still believe the bus
-> API would make this code look cleaner and easier to maintain.
-
-Sorry, I don't see why it would be a bus. I assume that there is code
-missing somewhere that is not yet merged, right?
-
-	Arnd
+Thanks, I have queued these up in the gpio-rcar branch.
+I will submit them for inclusion in v3.11.
