@@ -1,9 +1,9 @@
 From: b.brezillon@overkiz.com (Boris BREZILLON)
-Date: Wed, 19 Jun 2013 13:14:54 +0200
+Date: Wed, 19 Jun 2013 13:15:44 +0200
 Subject: [PATCH 2/8] at_hdmac: prepare clk before calling enable
 In-Reply-To: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
 References: <1371640263-9268-1-git-send-email-b.brezillon@overkiz.com>
-Message-ID: <1371640494-9472-1-git-send-email-b.brezillon@overkiz.com>
+Message-ID: <1371640544-9515-1-git-send-email-b.brezillon@overkiz.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
